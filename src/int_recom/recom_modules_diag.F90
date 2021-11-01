@@ -48,6 +48,10 @@ module recom_diag
   real(kind=WP),  save,  target                 :: valdelDetSi
   real(kind=WP),  save,  target                 :: valdelDetz2Si
 
+  real(kind=WP),  save,  target                 :: valdelDSii
+  real(kind=WP),  save,  target                 :: valdelDiaSii
+  real(kind=WP),  save,  target                 :: valdelDetSii
+  real(kind=WP),  save,  target                 :: valdelDetz2Sii
 
   real(kind=WP),  save,  target                 :: total_silicate
   real(kind=WP),  save,  target                 :: total_del_silicate
@@ -74,14 +78,18 @@ module recom_diag
 
 
 ! ==============================================================
-subroutine compute_carbon_diag(mesh)
+subroutine compute_carbon_diag(mode,mesh)
 
   implicit none
-!  real(kind=WP)                      :: valDIC, valDOC, valPhyC, valDetC, valHetC, valDiaC, valPhyCalc, valDetCalc
+  integer, intent(in)        :: mode
   type(t_mesh), intent(in)  , target :: mesh
+  logical, save              :: firstcall=.true.
 
-
-  total_carbon=0.0
+  if (firstcall) then  !allocate the stuff at the first call
+    total_carbon=0.0
+    firstcall=.false.
+    if (mode==0) return
+  end if
 
         ! DIC
         call integrate_nod(tr_arr(:,:,4), valDIC, mesh)
@@ -146,15 +154,19 @@ subroutine compute_carbon_diag(mesh)
 end subroutine compute_carbon_diag
 
 
-subroutine compute_silicate_diag(mesh)
+subroutine compute_silicate_diag(mode,mesh)
 
   implicit none
-!  real(kind=WP)                      :: val
+  integer, intent(in)        :: mode
   type(t_mesh), intent(in)  , target :: mesh
+  logical, save              :: firstcall=.true.
 
-
-  total_silicate=0.0
-  total_del_silicate=0.0
+  if (firstcall) then  !allocate the stuff at the first call
+    total_del_silicate=0.0 ! accumulates
+    firstcall=.false.
+    if (mode==0) return
+  end if
+    total_silicate=0.0 ! snapshot
 
         !DSi
         call integrate_nod(tr_arr(:,:,20), valDSi, mesh)
@@ -191,27 +203,36 @@ subroutine compute_silicate_diag(mesh)
 ! **********************************************
         !delDSi
         call integrate_nod(Gloaddtiny(:,:,1), valdelDSi, mesh)
+        !call integrate_nod(Gloaddtiny(:,:,5), valdelDSii, mesh)
         if (mype==0 .and. mod(mstep,recom_logfile_outfreq)==0) write(*,*) 'total integral of tiny DSi at timestep :', mstep, valdelDSi
-        total_del_silicate=total_del_silicate+valdelDSi
+        total_del_silicate=total_del_silicate+valdelDSi+valdelDSii
+        !total_silicate=total_silicate-valdelDSi-valdelDSii
+
 
         !delDetSi
         call integrate_nod(Gloaddtiny(:,:,2), valdelDetSi, mesh)
+        !call integrate_nod(Gloaddtiny(:,:,6), valdelDetSii, mesh)
         if (mype==0 .and. mod(mstep,recom_logfile_outfreq)==0) write(*,*) 'total integral of DetSi at timestep :', mstep, valdelDetSi
-        total_del_silicate=total_del_silicate+valdelDetSi
+        total_del_silicate=total_del_silicate+valdelDetSi+valdelDetSii
+        !total_silicate=total_silicate-valdelDetSi-valdelDetSii
 
         !delDiaSi
         call integrate_nod(Gloaddtiny(:,:,3), valdelDiaSi, mesh)
+        !call integrate_nod(Gloaddtiny(:,:,7), valdelDiaSii, mesh)
         if (mype==0 .and. mod(mstep,recom_logfile_outfreq)==0) write(*,*) 'total integral of DiaSi at timestep :', mstep, valdelDiaSi
-        total_del_silicate=total_del_silicate+valdelDiaSi
+        total_del_silicate=total_del_silicate+valdelDiaSi+valdelDiaSii
+        !total_silicate=total_silicate-valdelDiaSi-valdelDiaSii
 
 !if (REcoM_Second_Zoo) then
         !delDetz2Si
         call integrate_nod(Gloaddtiny(:,:,4), valdelDetz2Si, mesh)
+        !call integrate_nod(Gloaddtiny(:,:,8), valdelDetz2Sii, mesh)
         if (mype==0 .and. mod(mstep,recom_logfile_outfreq)==0) write(*,*) 'total integral of Detz2Si at timestep :', mstep, valdelDetSi
-        total_del_silicate=total_del_silicate+valdelDetz2Si
+        total_del_silicate=total_del_silicate+valdelDetz2Si+valdelDetz2Sii
+        !total_silicate=total_silicate-valdelDetz2Si-valdelDetz2Sii
 !end if 
 !*********************************
-
+total_silicate=total_silicate-total_del_silicate !-valBenSi
 
 end subroutine compute_silicate_diag
 
@@ -225,6 +246,7 @@ subroutine write_recom_diag(mode, mesh)
   integer                            :: valDICID, valDOCID, valPhyCID, valDetCID, valHetCID, valDiaCID, valPhyCalcID, valDetCalcID
   integer                            :: valDSiID, valDiaSiID, valDetSiID, valDetz2SiID, valBenSiID
   integer                            :: valdelDSiID, valdelDiaSiID, valdelDetSiID, valdelDetz2SiID
+  integer                            :: valdelDSiiID, valdelDiaSiiID, valdelDetSiiID, valdelDetz2SiiID
   integer                            :: rec_count=0
   character(2000)                    :: att_text
   real(real64)                       :: rtime !timestamp of the record
@@ -302,6 +324,11 @@ subroutine write_recom_diag(mode, mesh)
      status = nf_def_var(ncid, 'total_del_Detz2Si', NF_DOUBLE, 1, recID, valdelDetz2SiID)
 
 
+     status = nf_def_var(ncid, 'total_del_DSii', NF_DOUBLE, 1, recID, valdelDSiiID)
+     status = nf_def_var(ncid, 'total_del_DiaSii', NF_DOUBLE, 1, recID, valdelDiaSiiID)
+     status = nf_def_var(ncid, 'total_del_DetSii', NF_DOUBLE, 1, recID, valdelDetSiiID)
+     status = nf_def_var(ncid, 'total_del_Detz2Sii', NF_DOUBLE, 1, recID, valdelDetz2SiiID)
+
 !! add attributes
      att_text='time'
      status = nf_put_att_text(ncid, tID, 'long_name', len_trim(att_text), trim(att_text))
@@ -349,6 +376,11 @@ if (do_output) then
   status = nf_inq_varid(ncid, 'total_del_DiaSi', valdelDiaSiID)
   status = nf_inq_varid(ncid, 'total_del_DetSi', valdelDetSiID)
   status = nf_inq_varid(ncid, 'total_del_Detz2Si', valdelDetz2SiID)
+
+ status = nf_inq_varid(ncid, 'total_del_DSii', valdelDSiiID)
+  status = nf_inq_varid(ncid, 'total_del_DiaSii', valdelDiaSiiID)
+  status = nf_inq_varid(ncid, 'total_del_DetSii', valdelDetSiiID)
+  status = nf_inq_varid(ncid, 'total_del_Detz2Sii', valdelDetz2SiiID)
 
   do k=rec_count, 1, -1
      status=nf_get_vara_double(ncid, tID, k, 1, rtime, 1);
@@ -405,9 +437,9 @@ subroutine compute_recom_diagnostics(mode, mesh)
   type(t_mesh), intent(in)  , target :: mesh
 
   !1. carbon diagnostic
-  if (ldiag_carbon)      call compute_carbon_diag(mesh)
+  if (ldiag_carbon)      call compute_carbon_diag(mode,mesh)
   !2. silicate diagnostic
-  if (ldiag_silicate)    call compute_silicate_diag(mesh)
+  if (ldiag_silicate)    call compute_silicate_diag(mode,mesh)
   !3. write total carbon and silicate out into recom.diag.nc
   if (ldiag_carbon .or. ldiag_silicate) call write_recom_diag(mode, mesh)
 

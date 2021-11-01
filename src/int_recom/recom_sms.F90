@@ -121,12 +121,6 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
         kdzUpper	= 0.d0	        !< Upper light attenuation of top cell is set to zero
 
         if (any(abs(sms(:,:)) <= tiny)) sms(:,:) = zero      ! tiny = 2.23D-16
-!if (mype==0) write(*,*) sms(:,:)
-
-
-
-
-
 
 !-------------------------------------------------------------------------------
 ! Main vertical loop starts
@@ -151,28 +145,18 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
                 Zoo2C  = max(tiny,state(k,izoo2c)       + sms(k,izoo2c))
                 DetZ2N = max(tiny,state(k,idetz2n)      + sms(k,idetz2n))
                 DetZ2C = max(tiny,state(k,idetz2c)      + sms(k,idetz2c))
-
                 DetZ2Si = max(tiny,state(k,idetz2si)    + sms(k,idetz2si)) 
-
-
                 DetZ2Calc = max(tiny,state(k,idetz2calc)+ sms(k,idetz2calc))
-
             endif
             DON    = max(tiny,state(k,idon)   		+ sms(k,idon  ))
             EOC    = max(tiny,state(k,idoc)   		+ sms(k,idoc  ))
             DiaN   = max(tiny_N,state(k,idian)  	+ sms(k,idian ))
             DiaC   = max(tiny_C,state(k,idiac)  	+ sms(k,idiac ))
             DiaChl = max(tiny_chl,state(k,idchl)  	+ sms(k,idchl ))
-
             DiaSi  = max(tiny_si,state(k,idiasi)      	 + sms(k,idiasi)) 
             !DiaSi  = state(k,idiasi) 	+ sms(k,idiasi) 
-
             DetSi  = max(tiny,state(k,idetsi) 		 + sms(k,idetsi)) 
-
-
             Si     = max(tiny,state(k,isi)    		 + sms(k,isi   )) 
-
-
             Fe     = max(tiny,state(k,ife)    		+ sms(k,ife   ))
             O2     = max(tiny,state(k,ioxy)             + sms(k,ioxy  ))
             FreeFe = zero
@@ -182,10 +166,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
 
             addtiny(k,1) = Si      - (state(k,isi)           + sms(k,isi  ))
             addtiny(k,2) = DetSi   - (state(k,idetsi)        + sms(k,idetsi  )) 
-            addtiny(k,3) = DiaSi   - (state(k,idiasi)        + sms(k,idiasi  ))  
-!    if (REcoM_Second_Zoo) then
-            addtiny(k,4) = DetZ2Si - (state(k,idetz2si)      + sms(k,idetz2si  ))  
-! end if
+            addtiny(k,3) = DiaSi   - (state(k,idiasi)        + sms(k,idiasi  )) 
+            addtiny(k,4) = DetZ2Si - (state(k,idetz2si)      + sms(k,idetz2si  ))
+
+
             calc_diss      = calc_diss_rate * SinkVel(k,ivdet) /20.d0 ! Dissolution rate of CaCO3 scaled by the sinking velocity at the current depth 0.005714   !20.d0/3500.d0
             calc_diss2     = calc_diss_rate2  ! Dissolution rate of CaCO3 for seczoo
 
@@ -1781,7 +1765,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
 !     	) * recipbiostep
 
   end do ! Main vertikal loop ends
-if (1) then
+if (0) then
 !-------------------------------------------------------------------------------
 ! Remineralization from the sediments into the bottom layer
 !		kLoc = Nn      
@@ -1810,8 +1794,7 @@ if (1) then
 
 !*** Si ***
 !< decayRateBenSi: Remineralization rate for benthic Si [day^-1]
-!< LocBenthos(3) : Vertically integrated N concentration in benthos (1 layer) [mmolSi/m^2]
-		
+!< LocBenthos(3) : Vertically integrated N concentration in benthos (1 layer) [mmolSi/m^2]		
     decayBenthos(3) = decayRateBenSi * LocBenthos(3)                                      ! [1/day] * [mmolSi/m2] -> [mmolSi/m2/day]
     LocBenthos(3)   = LocBenthos(3)   - decaybenthos(3) * dt_b ! / depth of benthos    ! [mmolSi/m2]
 !    sms(Nn,isi)     = sms(Nn,isi)  + decayBenthos(3) * dt_b  &

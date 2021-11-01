@@ -73,7 +73,6 @@ subroutine recom_init(mesh)
     allocate(decayBenthos(benthos_num)) ! [1/day] Decay rate of detritus in the benthic layer
 
 !    allocate(wFluxDet(benthos_num))     ! [mmol/(m2 * day)] Flux of N,C,Si and calc through sinking of detritus
-
     allocate(wFluxPhy(benthos_num))     ! [mmol/(m2 * day)] Flux of N,C, calc and chl through sinking of phytoplankton
     allocate(wFluxDia(benthos_num))     ! [mmol/(m2 * day)] Flux of N,C, Si and chl through sinking of diatoms 	
 
@@ -94,10 +93,12 @@ end if
     GlowFluxPhy=0.0d0
     GlowFluxDia=0.0d0    
 
-    allocate(addtiny(nl-1,4))
+    allocate(addtiny(nl-1,8))
     addtiny=0.0d0
-    allocate(Gloaddtiny(nl-1,node_size,4))
+    allocate(Gloaddtiny(nl-1,node_size,8))
+    allocate(auxy(nl-1,node_size,bgc_num))
     Gloaddtiny=0.0d0
+    auxy=0.0d0
 
     allocate(GloHplus(node_size))
 

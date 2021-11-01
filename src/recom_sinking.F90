@@ -96,8 +96,7 @@ if (Vsink .gt. 0.1) then
                tracer_id(tr_num)==1026 .or. &  !idetz2c
                tracer_id(tr_num)==1027 .or. &  !idetz2si
                tracer_id(tr_num)==1028 ) then  !idetz2calc      
-               Wvel_flux(nz) = -200.0d0/SecondsPerDay ! --> VDet_zoo2
-               !Wvel_flux(nz) = -20.0d0/SecondsPerDay ! --> VDet_zoo2
+               Wvel_flux(nz) = -VDet_zoo2/SecondsPerDay ! --> VDet_zoo2
             endif
 !            endif
         end do

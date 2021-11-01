@@ -486,8 +486,8 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:,:)   :: GlowFluxDia    ! 
 
   Real(kind=8),allocatable,dimension(:,:)   :: addtiny
-  Real(kind=8),allocatable,dimension(:,:,:)   :: Gloaddtiny
-
+  Real(kind=8),allocatable,dimension(:,:,:) :: Gloaddtiny
+  Real(kind=8),allocatable,dimension(:,:,:) :: auxy 
 
 !  Real(kind=8),allocatable,dimension(:,:)   :: GlowFlux         ! 
   Real(kind=8),allocatable,dimension(:,:) :: diags2D          ! Diagnostics in 2D [8 n2d]

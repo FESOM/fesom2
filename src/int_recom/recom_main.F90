@@ -147,7 +147,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forci
      call REcoM_Forcing(zr, n, nzmax, C, SW, Loc_slp, Temp, Sali, PAR, mesh)
 
      tr_arr(1:nzmax, n, 3:num_tracers)       = C(1:nzmax, 1:bgc_num)
-     Gloaddtiny(1:nzmax, n, 1:benthos_num)             = addtiny(1:nzmax, 1:benthos_num)
+     Gloaddtiny(1:nzmax, n, 1:benthos_num*2) = addtiny(1:nzmax, 1:benthos_num*2)
 
      !!---- Local variables that have been changed during the time-step are stored so they can be saved
      Benthos(n,1:benthos_num)     = LocBenthos(1:benthos_num)                                ! Updating Benthos values
@@ -170,19 +170,11 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forci
      AtmNInput(n)                 = NDust 
      DenitBen(n)                  = LocDenit
 
+!     GlodecayBenthos(n, 1:benthos_num) = decayBenthos(1:benthos_num)/SecondsPerDay ! convert from [mmol/m2/d] to [mmol/m2/s]  
 
-!if (mype==0) write (*,*) "decayBenthos_Si mmol/m2/day= " , decayBenthos(3)
-     GlodecayBenthos(n, 1:benthos_num) = decayBenthos(1:benthos_num)/SecondsPerDay  ! convert from [mmol/m2/d] to [mmol/m2/s]  
-
-!if (REcoM_Second_Zoo) then
-!    GlowFluxDet(n,1:8)=wFluxDet(1:8)/SecondsPerDay  ! convert from [mmol/m2/d] to [mmol/m2/s]
-!else
-!    GlowFluxDet(n,1:benthos_num)=wFluxDet(1:benthos_num)/SecondsPerDay  ! convert from [mmol/m2/d] to [mmol/m2/s]
-!end if
-!!if   (NitrogenSS) LocDenit !!!!!
-!     GlowFluxPhy(n,1:benthos_num)=wFluxPhy(1:benthos_num)/SecondsPerDay  ! convert from [mmol/m2/d] to [mmol/m2/s]
-!     GlowFluxDia(n,1:benthos_num)=wFluxDia(1:benthos_num)/SecondsPerDay  ! convert from [mmol/m2/d] to [mmol/m2/s]
-
+!     GlowFluxDet(n, 1:benthos_num*2)= wFluxDet(1:benthos_num*2)/SecondsPerDay  ! convert from [mmol/m2/d] to [mmol/m2/s]  
+!     GlowFluxPhy(n, 1:benthos_num  )= wFluxPhy(1:benthos_num  )/SecondsPerDay  ! convert from [mmol/m2/d] to [mmol/m2/s] 
+!     GlowFluxDia(n, 1:benthos_num  )= wFluxDia(1:benthos_num  )/SecondsPerDay  ! convert from [mmol/m2/d] to [mmol/m2/s] 
 
      PAR3D(1:nzmax,n)             = PAR(1:nzmax) !     PAR3D(inds(1:nn))   = PAR(1:nn)
    
@@ -203,7 +195,6 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forci
 
   do n=1, benthos_num
     call exchange_nod(Benthos(:,n))
-    call exchange_nod(Gloaddtiny(:,:,n))
   end do
   
   do n=1, 8
@@ -216,12 +207,13 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forci
 
   do n=1, 4
     call exchange_nod(GlodecayBenthos(:,n))
-!    call exchange_nod(GlowFluxPhy(:,n))
-!    call exchange_nod(GlowFluxDia(:,n))
+    !call exchange_nod(GlowFluxPhy(:,n))
+    !call exchange_nod(GlowFluxDia(:,n))
   end do
-!  do n=1, 8
-!    call exchange_nod(GlowFluxDet(:,n))
-!  end do
+  do n=1, 8
+    call exchange_nod(Gloaddtiny(:,:,n))
+    !call exchange_nod(GlowFluxDet(:,n))
+  end do
 
   if (ciso) then
     call exchange_nod(GloPCO2surf_13)

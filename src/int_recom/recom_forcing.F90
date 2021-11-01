@@ -6,6 +6,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, PAR,
   use REcoM_declarations
   use REcoM_LocVar
   use recom_config
+  use REcoM_GloVar
   use GASX
   use REcoM_ciso
   use g_clock
@@ -62,9 +63,10 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, PAR,
   Real(kind=8)                          :: REcoM_O2(1)            ! [mmol/m3] Conc of O2 in the surface water, used to calculate O2 flux
 
 ! Subroutine REcoM_sms
-  Real(kind=8),dimension(mesh%nl-1,bgc_num) :: sms                ! matrix that entail changes in tracer concentrations
+  Real(kind=8),dimension(mesh%nl-1,bgc_num) :: sms, aux                ! matrix that entail changes in tracer concentrations
+
 !Diagnostics
-  integer                              :: idiags,n
+  integer                              :: idiags,n,k
 #include "../associate_mesh.h"
 !  do n=1, myDim_nod2D
 !     !!---- Number of vertical layers
@@ -163,14 +165,22 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, PAR,
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'//achar(27)//'[0m'
 
 
- 
-
+!  addtiny(1:nn,1) = state(1:nn,isi)
+!  addtiny(1:nn,2) = state(1:nn,idetsi) 
+!  addtiny(1:nn,3) = state(1:nn,idiasi)
+!  addtiny(1:nn,4) = state(1:nn,idetz2si)
 
   call REcoM_sms(n, Nn, state, thick, recipthick, SurfSW, sms, Temp, SinkVel, zF, PAR, mesh)
 
-!  state(1:nn,:)      = state(1:nn,:) + sms(1:nn,:)
-  state(1:nn,:)      = max(tiny,state(1:nn,:) + sms(1:nn,:))
+!  addtiny(1:nn,1) = (state(1:nn,isi)           - aux(1:nn,isi))
+!  addtiny(1:nn,2) = (state(1:nn,idetsi)        - aux(1:nn,idetsi))
+!  addtiny(1:nn,3) = (state(1:nn,idiasi)        - aux(1:nn,idiasi)) 
+!  addtiny(1:nn,4) = (state(1:nn,idetz2si)      - aux(1:nn,idetz2si))
 
+  aux=0.0d0
+  aux(1:nn,:)        = state(1:nn,:) + sms(1:nn,:)
+
+  state(1:nn,:)      = max(tiny,state(1:nn,:) + sms(1:nn,:))
   state(1:nn,ipchl)  = max(tiny_chl,state(1:nn,ipchl))
   state(1:nn,iphyn)  = max(tiny_N,  state(1:nn,iphyn))
   state(1:nn,iphyc)  = max(tiny_C,  state(1:nn,iphyc))
@@ -178,6 +188,16 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
   state(1:nn,idian)  = max(tiny_N_d,state(1:nn,idian))
   state(1:nn,idiac)  = max(tiny_C_d,state(1:nn,idiac))
   state(1:nn,idiasi) = max(tiny_Si, state(1:nn,idiasi))
+
+  addtiny(1:nn,5) = (state(1:nn,isi)           - aux(1:nn,isi))
+  addtiny(1:nn,6) = (state(1:nn,idetsi)        - aux(1:nn,idetsi))
+  addtiny(1:nn,7) = (state(1:nn,idiasi)        - aux(1:nn,idiasi)) 
+  addtiny(1:nn,8) = (state(1:nn,idetz2si)      - aux(1:nn,idetz2si))
+
+!  addtiny(1:nn,5) = state(1:nn,isi)
+!  addtiny(1:nn,6) = state(1:nn,idetsi) 
+!  addtiny(1:nn,7) = state(1:nn,idiasi)
+!  addtiny(1:nn,8) = state(1:nn,idetz2si)
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
   if (ciso) then
