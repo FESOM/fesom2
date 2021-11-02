@@ -48,14 +48,13 @@ module ocean_setup_interface
       USE MOD_PARSUP
       use mod_tracer
       use MOD_DYN
-      type(t_mesh)  , intent(in)   , target :: mesh
+      type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
       type(t_tracer), intent(inout), target :: tracers
-      type(t_dyn)   , intent(inout), target :: dynamics
+      type(t_dyn), intent(inout), target :: dynamics
     end subroutine
   end interface
 end module
-
 module before_oce_step_interface
   interface
     subroutine before_oce_step(dynamics, tracers, partit, mesh)
@@ -64,10 +63,10 @@ module before_oce_step_interface
       USE MOD_PARSUP
       use mod_tracer
       use MOD_DYN
-      type(t_mesh)  , intent(in)   , target :: mesh
+      type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
       type(t_tracer), intent(inout), target :: tracers
-      type(t_dyn)   , intent(inout), target :: dynamics
+      type(t_dyn), intent(inout), target :: dynamics
     end subroutine
   end interface
 end module
@@ -91,10 +90,10 @@ use Toy_Channel_Soufflet
 use oce_initial_state_interface
 use oce_adv_tra_fct_interfaces
 IMPLICIT NONE
-type(t_dyn)   , intent(inout), target :: dynamics
-type(t_tracer), intent(inout), target :: tracers
+type(t_mesh),   intent(inout), target :: mesh
 type(t_partit), intent(inout), target :: partit
-type(t_mesh)  , intent(inout), target :: mesh
+type(t_tracer), intent(inout), target :: tracers
+type(t_dyn), intent(inout), target :: dynamics
 integer                               :: n
     !___setup virt_salt_flux____________________________________________________
     ! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
@@ -439,8 +438,6 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     dynamics%use_freeslip  = free_slip
     dynamics%use_wsplit    = w_split
     dynamics%wsplit_maxcfl = w_max_cfl
-
-    
 END SUBROUTINE dynamics_init
 !
 !
@@ -872,17 +869,17 @@ SUBROUTINE before_oce_step(dynamics, tracers, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_TRACER
-    use MOD_DYN
+    USE MOD_DYN
     USE o_ARRAYS
     USE g_config
     USE Toy_Channel_Soufflet
     implicit none
     integer                  :: i, k, counter, rcounter3, id
     character(len=10)        :: i_string, id_string
-    type(t_mesh)  , intent(in)   , target  :: mesh
+    type(t_mesh),   intent(in),    target  :: mesh
     type(t_partit), intent(inout), target  :: partit
     type(t_tracer), intent(inout), target  :: tracers
-    type(t_dyn)   , intent(inout), target  :: dynamics
+    type(t_dyn), intent(inout), target  :: dynamics
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"

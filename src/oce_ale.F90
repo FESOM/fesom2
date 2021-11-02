@@ -37,9 +37,9 @@ module oce_ale_interfaces
       USE MOD_PARTIT
       USE MOD_PARSUP
       USE MOD_DYN
-      type(t_mesh)  , intent(in)   , target :: mesh
+      type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
-      type(t_dyn)   , intent(inout), target :: dynamics
+      type(t_dyn), intent(inout), target :: dynamics
     end subroutine
 
     subroutine update_stiff_mat_ale(partit, mesh)
@@ -54,10 +54,10 @@ module oce_ale_interfaces
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      USE MOD_DYN
-      type(t_mesh)  , intent(in)   , target :: mesh
+      use MOD_DYN
+      type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
-      type(t_dyn)   , intent(inout), target :: dynamics
+      type(t_dyn), intent(inout), target :: dynamics
     end subroutine
 
     subroutine solve_ssh_ale(partit, mesh)
@@ -73,10 +73,9 @@ module oce_ale_interfaces
       USE MOD_PARTIT
       USE MOD_PARSUP
       USE MOD_DYN
-      type(t_dyn)   , intent(inout), target :: dynamics
+      type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      
+      type(t_dyn), intent(inout), target :: dynamics
     end subroutine
 
     subroutine vert_vel_ale(dynamics, partit, mesh)
@@ -84,9 +83,9 @@ module oce_ale_interfaces
       USE MOD_PARTIT
       USE MOD_PARSUP
       USE MOD_DYN
-      type(t_dyn)   , intent(in)   , target :: dynamics
+      type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
+      type(t_dyn), intent(inout), target :: dynamics
     end subroutine
 
     subroutine update_thickness_ale(partit, mesh)
@@ -105,13 +104,13 @@ module oce_timestep_ale_interface
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      use MOD_TRACER
+      use mod_tracer
       use MOD_DYN
-      integer,        intent(in)            :: n
-      type(t_mesh)  , intent(in)   , target :: mesh
+      integer,        intent(in)                         :: n
+      type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
       type(t_tracer), intent(inout), target :: tracers
-      type(t_dyn)   , intent(inout), target :: dynamics
+      type(t_dyn), intent(inout), target :: dynamics
     end subroutine
   end interface
 end module
@@ -1627,9 +1626,9 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     integer       :: ed, el(2), enodes(2), nz, n, nzmin, nzmax
     real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2 
     real(kind=WP) :: dumc1_1, dumc1_2, dumc2_1, dumc2_2 !!PS
-    type(t_dyn)   , intent(in)   , target :: dynamics
+    type(t_mesh),   intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
-    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_dyn), intent(inout), target :: dynamics
     real(kind=WP), dimension(:,:,:), pointer :: UV
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -1744,9 +1743,9 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
     
     integer      :: ed, el(2), enodes(2),  nz,n, elnodes(3), elem, nzmin, nzmax
     real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2 
-    type(t_dyn)   , intent(inout), target :: dynamics
-    type(t_mesh)  , intent(inout), target :: mesh
+    type(t_mesh),   intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
+    type(t_dyn)   , intent(inout), target :: dynamics
     real(kind=WP), dimension(:,:,:), pointer :: UV
 
 #include "associate_part_def.h"
@@ -1865,10 +1864,9 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     real(kind=WP), dimension(:), allocatable :: max_dhbar2distr,cumsum_maxdhbar,distrib_dhbar
     integer      , dimension(:), allocatable :: idx
     type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_mesh),   intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
-    type(t_mesh)  , intent(inout), target :: mesh
     real(kind=WP), dimension(:,:,:), pointer :: UV
-
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -2520,14 +2518,14 @@ end subroutine solve_ssh_ale
 subroutine impl_vert_visc_ale(dynamics, partit, mesh)
 USE MOD_MESH
 USE o_PARAM
-USE o_ARRAYS
+USE o_ARRAYS, only: UV_rhs, Av, Wvel_i, stress_surf
 USE MOD_PARTIT
 USE MOD_PARSUP
 USE MOD_DYN
 USE g_CONFIG,only: dt
 IMPLICIT NONE
 
-type(t_mesh)  , intent(inout), target :: mesh
+type(t_mesh),   intent(inout), target :: mesh
 type(t_partit), intent(inout), target :: partit
 type(t_dyn)   , intent(inout), target :: dynamics
 
@@ -2699,7 +2697,7 @@ end subroutine impl_vert_visc_ale
 !
 !
 !===============================================================================
-subroutine oce_timestep_ale(n, dynamics,  tracers, partit, mesh)
+subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     use g_config
     use MOD_MESH
     use MOD_TRACER
@@ -2722,15 +2720,15 @@ subroutine oce_timestep_ale(n, dynamics,  tracers, partit, mesh)
     use pressure_bv_interface
     use pressure_force_4_linfs_interface
     use pressure_force_4_zxxxx_interface
-    use solve_tracers_ale_interface
     use compute_vel_rhs_interface
+    use solve_tracers_ale_interface
     use write_step_info_interface
     use check_blowup_interface
     IMPLICIT NONE
-    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
     type(t_tracer), intent(inout), target :: tracers
-    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_dyn), intent(inout), target :: dynamics
 
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
     integer           :: n, node
@@ -2872,7 +2870,7 @@ subroutine oce_timestep_ale(n, dynamics,  tracers, partit, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call impl_vert_visc_ale'//achar(27)//'[0m'
-    if(i_vert_visc) call impl_vert_visc_ale(dynamics, partit, mesh)
+    if(i_vert_visc) call impl_vert_visc_ale(dynamics,partit, mesh)
     t2=MPI_Wtime()
         
     !___________________________________________________________________________

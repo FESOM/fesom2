@@ -8,9 +8,9 @@
 
 program main
 USE MOD_MESH
+USE MOD_TRACER
 USE MOD_PARTIT
 USE MOD_PARSUP
-USE MOD_TRACER
 USE MOD_DYN
 USE o_ARRAYS
 USE o_PARAM
@@ -58,10 +58,11 @@ real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
 real(kind=real32) :: runtime_alltimesteps
 
 
-type(t_mesh)  , target, save :: mesh
-type(t_partit), target, save :: partit
-type(t_tracer), target, save :: tracers
-type(t_dyn)   , target, save :: dynamics
+type(t_mesh)  ,     target, save :: mesh
+type(t_tracer),     target, save :: tracers
+type(t_partit),     target, save :: partit
+type(t_dyn)   ,     target, save :: dynamics
+
 
 character(LEN=256)               :: dump_dir, dump_filename
 logical                          :: L_EXISTS
@@ -123,8 +124,8 @@ integer mpi_version_len
     call check_mesh_consistency(partit, mesh)
     if (mype==0) t2=MPI_Wtime()
 
+    call dynamics_init(dynamics, partit, mesh)
     call tracer_init(tracers, partit, mesh)                ! allocate array of ocean tracers (derived type "t_tracer")
-    call dynamics_init(dynamics, partit, mesh)                ! allocate array of ocean dynamics (derived type "t_tracer")
     call arrays_init(tracers%num_tracers, partit, mesh)    ! allocate other arrays (to be refactured same as tracers in the future)
     call ocean_setup(dynamics, tracers, partit, mesh)
 
@@ -269,6 +270,7 @@ integer mpi_version_len
 #endif
         call clock      
         !___compute horizontal velocity on nodes (originaly on elements)________
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call compute_vel_nodes'//achar(27)//'[0m'
         call compute_vel_nodes(dynamics, partit, mesh)
         
         !___model sea-ice step__________________________________________________
@@ -296,10 +298,8 @@ integer mpi_version_len
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
             if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
             call oce_fluxes_mom(dynamics, partit, mesh) ! momentum only
-            if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes...'//achar(27)//'[0m'
             call oce_fluxes(tracers, partit, mesh)
         end if
-        if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call before_oce_step...'//achar(27)//'[0m'
         call before_oce_step(dynamics, tracers, partit, mesh) ! prepare the things if required
         t2 = MPI_Wtime()
         !___model ocean step____________________________________________________
