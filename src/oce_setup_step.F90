@@ -42,28 +42,32 @@ end module
 
 module ocean_setup_interface
   interface
-    subroutine ocean_setup(tracers, partit, mesh)
+    subroutine ocean_setup(dynamics, tracers, partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
       USE MOD_PARSUP
       use mod_tracer
-      type(t_mesh),   intent(in),    target :: mesh
+      use MOD_DYN
+      type(t_mesh)  , intent(in)   , target :: mesh
       type(t_partit), intent(inout), target :: partit
       type(t_tracer), intent(inout), target :: tracers
+      type(t_dyn)   , intent(inout), target :: dynamics
     end subroutine
   end interface
 end module
 
 module before_oce_step_interface
   interface
-    subroutine before_oce_step(tracers, partit, mesh)
+    subroutine before_oce_step(dynamics, tracers, partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
       USE MOD_PARSUP
       use mod_tracer
-      type(t_mesh),   intent(in),    target :: mesh
+      use MOD_DYN
+      type(t_mesh)  , intent(in)   , target :: mesh
       type(t_partit), intent(inout), target :: partit
       type(t_tracer), intent(inout), target :: tracers
+      type(t_dyn)   , intent(inout), target :: dynamics
     end subroutine
   end interface
 end module
@@ -354,29 +358,28 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     type(t_mesh)  , intent(in)   , target :: mesh
     type(t_partit), intent(inout), target :: partit
     type(t_dyn)   , intent(inout), target :: dynamics
-    
-    ! define dynamics namelist parameter
-    namelist /dynamics_visc    / visc_opt, gamma0_visc, gamma1_visc, gamma2_visc,  &
-                                 div_c_visc, leith_c_visc, use_ivertvisc, easy_bs_return
-    namelist /dynamics_general / momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl 
-
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-    ! open and read namelist for I/O
-    open(unit=nm_unit, file='namelist.dyn', form='formatted', access='sequential', status='old', iostat=iost )
-    if (iost == 0) then
-        if (mype==0) write(*,*) '     file   : ', 'namelist.dyn',' open ok'
-    else
-        if (mype==0) write(*,*) 'ERROR: --> bad opening file   : ', 'namelist.dyn',' ; iostat=',iost
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-        stop
-    end if
-    read(nm_unit, nml=dynamics_visc   , iostat=iost)
-    read(nm_unit, nml=dynamics_general, iostat=iost)
-    close(nm_unit)
+!!PS     ! define dynamics namelist parameter
+!!PS     namelist /dynamics_visc    / visc_opt, gamma0_visc, gamma1_visc, gamma2_visc,  &
+!!PS                                  div_c_visc, leith_c_visc, use_ivertvisc, easy_bs_return
+!!PS     namelist /dynamics_general / momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl 
+!!PS 
+!!PS     ! open and read namelist for I/O
+!!PS     open(unit=nm_unit, file='namelist.dyn', form='formatted', access='sequential', status='old', iostat=iost )
+!!PS     if (iost == 0) then
+!!PS         if (mype==0) write(*,*) '     file   : ', 'namelist.dyn',' open ok'
+!!PS     else
+!!PS         if (mype==0) write(*,*) 'ERROR: --> bad opening file   : ', 'namelist.dyn',' ; iostat=',iost
+!!PS         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+!!PS         stop
+!!PS     end if
+!!PS     read(nm_unit, nml=dynamics_visc   , iostat=iost)
+!!PS     read(nm_unit, nml=dynamics_general, iostat=iost)
+!!PS     close(nm_unit)
 
     ! define local vertice & elem array size
     elem_size=myDim_elem2D+eDim_elem2D
@@ -413,17 +416,30 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     dynamics%ssh_rhs_old= 0.0_WP    
     
     ! set parameters in derived type
-    dynamics%visc_opt      = visc_opt
-    dynamics%gamma0_visc   = gamma0_visc
-    dynamics%gamma1_visc   = gamma1_visc
-    dynamics%gamma2_visc   = gamma2_visc
-    dynamics%div_c_visc    = div_c_visc
-    dynamics%leith_c_visc  = leith_c_visc
-    dynamics%use_ivertvisc = use_ivertvisc
-    dynamics%momadv_opt    = momadv_opt
-    dynamics%use_freeslip  = use_freeslip
-    dynamics%use_wsplit    = use_wsplit
-    dynamics%wsplit_maxcfl = wsplit_maxcfl
+!!PS     dynamics%visc_opt      = visc_opt
+!!PS     dynamics%gamma0_visc   = gamma0_visc
+!!PS     dynamics%gamma1_visc   = gamma1_visc
+!!PS     dynamics%gamma2_visc   = gamma2_visc
+!!PS     dynamics%div_c_visc    = div_c_visc
+!!PS     dynamics%leith_c_visc  = leith_c_visc
+!!PS     dynamics%use_ivertvisc = use_ivertvisc
+!!PS     dynamics%momadv_opt    = momadv_opt
+!!PS     dynamics%use_freeslip  = use_freeslip
+!!PS     dynamics%use_wsplit    = use_wsplit
+!!PS     dynamics%wsplit_maxcfl = wsplit_maxcfl
+
+    dynamics%visc_opt      = visc_option
+    dynamics%gamma0_visc   = gamma0
+    dynamics%gamma1_visc   = gamma1
+    dynamics%gamma2_visc   = gamma2
+    dynamics%div_c_visc    = Div_c
+    dynamics%leith_c_visc  = Leith_c
+    dynamics%use_ivertvisc = i_vert_visc
+    dynamics%momadv_opt    = mom_adv
+    dynamics%use_freeslip  = free_slip
+    dynamics%use_wsplit    = w_split
+    dynamics%wsplit_maxcfl = w_max_cfl
+
     
 END SUBROUTINE dynamics_init
 !
