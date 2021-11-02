@@ -13,6 +13,20 @@ module momentum_adv_scalar_interface
   end interface
 end module
 
+module compute_vel_rhs_interface
+  interface
+    subroutine compute_vel_rhs(dynamics, partit, mesh)
+      use mod_mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      USE MOD_DYN
+      type(t_dyn)   , intent(inout), target :: dynamics
+      type(t_partit), intent(inout), target :: partit
+      type(t_mesh)  , intent(in)   , target :: mesh
+      
+    end subroutine
+  end interface
+end module
 !
 !
 !_______________________________________________________________________________
