@@ -489,7 +489,6 @@ if (use_ice .and. use_momix) mixlength=0.
 ! Vertical velocity and pressure
 ! ================
 allocate( hpressure(nl,node_size))
-allocate(CFL_z(nl, node_size)) ! vertical CFL criteria
 allocate(bvfreq(nl,node_size),mixlay_dep(node_size),bv_ref(node_size))
 ! ================
 ! Ocean forcing arrays
@@ -622,7 +621,6 @@ end if
     eta_n=0.0_WP
     d_eta=0.0_WP
     ssh_rhs=0.0_WP
-    CFL_z   =0.0_WP
     hpressure=0.0_WP
 !
     heat_flux=0.0_WP
