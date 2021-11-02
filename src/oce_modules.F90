@@ -184,7 +184,8 @@ IMPLICIT NONE
 ! Arrays are described in subroutine array_setup  
 real(kind=WP), allocatable, target :: Wvel(:,:), Wvel_e(:,:), Wvel_i(:,:)
 !!PS real(kind=WP), allocatable         :: UV(:,:,:)
-real(kind=WP), allocatable         :: UV_rhs(:,:,:), UV_rhsAB(:,:,:)
+real(kind=WP), allocatable         :: UV_rhs(:,:,:)
+!!PS real(kind=WP), allocatable         :: UV_rhsAB(:,:,:)
 real(kind=WP), allocatable         :: uke(:,:), v_back(:,:), uke_back(:,:), uke_dis(:,:), uke_dif(:,:) 
 real(kind=WP), allocatable         :: uke_rhs(:,:), uke_rhs_old(:,:)
 real(kind=WP), allocatable         :: UV_dis_tend(:,:,:), UV_back_tend(:,:,:), UV_total_tend(:,:,:), UV_dis_tend_node(:,:,:)
