@@ -2808,7 +2808,7 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     ! use FESOM2.0 tuned k-profile parameterization for vertical mixing 
     if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_KPP'//achar(27)//'[0m' 
-        call oce_mixing_KPP(Av, Kv_double, tracers, partit, mesh)
+        call oce_mixing_KPP(Av, Kv_double, dynamics, tracers, partit, mesh)
         Kv=Kv_double(:,:,1)
         call mo_convect(partit, mesh)
         
@@ -2816,13 +2816,13 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     ! mixing     
     else if(mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_PP'//achar(27)//'[0m' 
-        call oce_mixing_PP(partit, mesh)
+        call oce_mixing_PP(dynamics, partit, mesh)
         call mo_convect(partit, mesh)
         
     ! use CVMIX KPP (Large at al. 1994) 
     else if(mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_kpp'//achar(27)//'[0m'
-        call calc_cvmix_kpp(tracers, partit, mesh)
+        call calc_cvmix_kpp(dynamics, tracers, partit, mesh)
         call mo_convect(partit, mesh)
         
     ! use CVMIX PP (Pacanowski and Philander 1981) parameterisation for mixing
@@ -2830,7 +2830,7 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     ! N^2 and vertical horizontal velocity shear dui/dz
     else if(mix_scheme_nmb==4 .or. mix_scheme_nmb==47) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_pp'//achar(27)//'[0m'
-        call calc_cvmix_pp(partit, mesh)
+        call calc_cvmix_pp(dynamics, partit, mesh)
         call mo_convect(partit, mesh)
         
     ! use CVMIX TKE (turbulent kinetic energy closure) parameterisation for 
@@ -2839,7 +2839,7 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     ! Model for the diapycnal diffusivity induced by internal gravity waves" 
     else if(mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then    
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tke'//achar(27)//'[0m'
-        call calc_cvmix_tke(partit, mesh)
+        call calc_cvmix_tke(dynamics, partit, mesh)
         call mo_convect(partit, mesh)
         
     end if     

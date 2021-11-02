@@ -137,19 +137,21 @@ end subroutine compute_nrst_pnt2cavline
 ! adjusted for use in FESOM by Ralph Timmermann, 16.02.2011
 ! Reviewed by ?
 ! adapted by P. SCholz for FESOM2.0
-subroutine cavity_heat_water_fluxes_3eq(tracers, partit, mesh)
+subroutine cavity_heat_water_fluxes_3eq(dynamics, tracers, partit, mesh)
     use MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
     use MOD_TRACER
+    use MOD_DYN
     use o_PARAM , only: density_0, WP
-    use o_ARRAYS, only: heat_flux, water_flux, Unode, density_m_rho0,density_ref
+    use o_ARRAYS, only: heat_flux, water_flux, density_m_rho0, density_ref
     use i_ARRAYS, only: net_heat_flux, fresh_wa_flux
     implicit none
     !___________________________________________________________________________
     type(t_partit), intent(inout),  target :: partit
     type(t_mesh),   intent(in),     target :: mesh
     type(t_tracer), intent(in),     target :: tracers
+    type(t_dyn), intent(in),     target :: dynamics
     real (kind=WP)  :: temp,sal,tin,zice
     real (kind=WP)  :: rhow, rhor, rho
     real (kind=WP)  :: gats1, gats2, gas, gat
@@ -187,11 +189,12 @@ subroutine cavity_heat_water_fluxes_3eq(tracers, partit, mesh)
     !      hemw=  4.02*14.
     !      oomw= -30.
     !      oofw= -2.5
-    
+    real(kind=WP), dimension(:,:,:), pointer :: UVnode
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    UVnode=>dynamics%uvnode(:,:,:)
 
     !___________________________________________________________________________
     do node=1,myDim_nod2D !+eDim_nod2D  
@@ -216,7 +219,7 @@ subroutine cavity_heat_water_fluxes_3eq(tracers, partit, mesh)
         ! if(vt1.eq.0.) vt1=0.001
         !rt      re   = Hz_r(i,j,N)*ds/un        !Reynolds number
         
-        vt1  = sqrt(Unode(1,nzmin,node)*Unode(1,nzmin,node)+Unode(2,nzmin,node)*Unode(2,nzmin,node))
+        vt1  = sqrt(UVnode(1,nzmin,node)*UVnode(1,nzmin,node)+UVnode(2,nzmin,node)*UVnode(2,nzmin,node))
         vt1  = max(vt1,0.001_WP)
         !vt1  = max(vt1,0.005) ! CW
         re   = 10._WP/un                   !vt1*re (=velocity times length scale over kinematic viscosity) is the Reynolds number
@@ -388,7 +391,7 @@ subroutine cavity_momentum_fluxes(dynamics, partit, mesh)
     USE MOD_PARSUP
     USE MOD_DYN
     use o_PARAM , only: density_0, C_d, WP
-    use o_ARRAYS, only: Unode, stress_surf, stress_node_surf
+    use o_ARRAYS, only: stress_surf, stress_node_surf
     use i_ARRAYS, only: u_w, v_w  
     implicit none
     
@@ -398,13 +401,14 @@ subroutine cavity_momentum_fluxes(dynamics, partit, mesh)
     type(t_mesh)  , intent(in)   , target :: mesh
     integer        :: elem, elnodes(3), nzmin, node
     real(kind=WP)  :: aux
-    real(kind=WP), dimension(:,:,:), pointer :: UV
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UVnode
     
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UV=>dynamics%uv(:,:,:)
+    UVnode=>dynamics%uvnode(:,:,:)
 
     !___________________________________________________________________________
     do elem=1,myDim_elem2D
@@ -428,9 +432,9 @@ subroutine cavity_momentum_fluxes(dynamics, partit, mesh)
         ! momentum stress:
         ! need to check the sensitivity to the drag coefficient
         ! here I use the bottom stress coefficient, which is 3e-3, for this FO2 work.
-        aux=sqrt(Unode(1,nzmin,node)**2+Unode(2,nzmin,node)**2)*density_0*C_d 
-        stress_node_surf(1,node)=-aux*Unode(1,nzmin,node)
-        stress_node_surf(2,node)=-aux*Unode(2,nzmin,node)
+        aux=sqrt(UVnode(1,nzmin,node)**2+UVnode(2,nzmin,node)**2)*density_0*C_d 
+        stress_node_surf(1,node)=-aux*UVnode(1,nzmin,node)
+        stress_node_surf(2,node)=-aux*UVnode(2,nzmin,node)
     end do
 end subroutine cavity_momentum_fluxes
 !

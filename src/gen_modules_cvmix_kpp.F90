@@ -26,6 +26,7 @@ module g_cvmix_kpp
     USE MOD_PARTIT
     USE MOD_PARSUP
     use mod_tracer
+    use MOD_DYN
     use o_arrays
     use g_comm_auto 
     use i_arrays
@@ -347,10 +348,11 @@ module g_cvmix_kpp
     !
     !===========================================================================
     ! calculate PP vertrical mixing coefficients from CVMIX library
-    subroutine calc_cvmix_kpp(tracers, partit, mesh)
+    subroutine calc_cvmix_kpp(dynamics, tracers, partit, mesh)
         type(t_mesh),   intent(in),    target :: mesh
         type(t_partit), intent(inout), target :: partit
         type(t_tracer), intent(in),    target :: tracers
+        type(t_dyn)   , intent(in),    target :: dynamics
         integer       :: node, elem, nz, nln, nun,  elnodes(3), aux_nz
         real(kind=WP) :: vshear2, dz2, aux, aux_wm(mesh%nl), aux_ws(mesh%nl)
         real(kind=WP) :: aux_coeff, sigma, stable
@@ -361,12 +363,15 @@ module g_cvmix_kpp
         real(kind=WP) :: rhopot, bulk_0, bulk_pz, bulk_pz2
         real(kind=WP) :: sfc_rhopot, sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2
         real(kind=WP), dimension(:,:), pointer :: temp, salt
+        real(kind=WP), dimension(:,:,:), pointer :: UVnode
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
         temp=>tracers%data(1)%values(:,:)
         salt=>tracers%data(2)%values(:,:)
+        UVnode=>dynamics%uvnode(:,:,:)
+        
         !_______________________________________________________________________
         kpp_Av = 0.0_WP
         kpp_Kv = 0.0_WP
@@ -402,15 +407,15 @@ module g_cvmix_kpp
                     !___________________________________________________________
                     ! calculate squared velocity shear referenced to the surface
                     ! --> cvmix wants to have it with  respect to the midlevel rather than full levels
-                    !!PS kpp_dvsurf2(nz) = ((Unode(1,nz-1,node)+Unode(1,nz,node))*0.5 - Unode( 1,1,node) )**2 + &
-                    !!PS                   ((Unode(2,nz-1,node)+Unode(2,nz,node))*0.5 - Unode( 2,1,node) )**2
-                    kpp_dvsurf2(nz) = ((Unode(1,nz-1,node)+Unode(1,nz,node))*0.5 - Unode( 1,nun,node) )**2 + &
-                                      ((Unode(2,nz-1,node)+Unode(2,nz,node))*0.5 - Unode( 2,nun,node) )**2
+                    !!PS kpp_dvsurf2(nz) = ((UVnode(1,nz-1,node)+UVnode(1,nz,node))*0.5 - UVnode( 1,1,node) )**2 + &
+                    !!PS                   ((UVnode(2,nz-1,node)+UVnode(2,nz,node))*0.5 - UVnode( 2,1,node) )**2
+                    kpp_dvsurf2(nz) = ((UVnode(1,nz-1,node)+UVnode(1,nz,node))*0.5 - UVnode( 1,nun,node) )**2 + &
+                                      ((UVnode(2,nz-1,node)+UVnode(2,nz,node))*0.5 - UVnode( 2,nun,node) )**2
                     !___________________________________________________________
                     ! calculate shear Richardson number Ri = N^2/(du/dz)^2
                     dz2     = (Z_3d_n( nz-1,node)-Z_3d_n( nz,node))**2
-                    vshear2 = (Unode(1,nz-1,node)-Unode(1,nz,node))**2 + &
-                              (Unode(2,nz-1,node)-Unode(2,nz,node))**2 
+                    vshear2 = (UVnode(1,nz-1,node)-UVnode(1,nz,node))**2 + &
+                              (UVnode(2,nz-1,node)-UVnode(2,nz,node))**2 
                     vshear2 = vshear2/dz2
                     kpp_shearRi(nz) = max(bvfreq(nz,node),0.0_WP)/(vshear2+kpp_epsln)
                     
@@ -457,8 +462,8 @@ module g_cvmix_kpp
                         htot     = htot+delh
                         sfc_temp = sfc_temp + temp(nztmp,node)*delh
                         sfc_salt = sfc_salt + salt(nztmp,node)*delh
-                        sfc_u    = sfc_u    + Unode(1,nztmp,node) *delh
-                        sfc_v    = sfc_v    + Unode(2,nztmp,node) *delh
+                        sfc_u    = sfc_u    + UVnode(1,nztmp,node) *delh
+                        sfc_v    = sfc_v    + UVnode(2,nztmp,node) *delh
                     end do
                     sfc_temp = sfc_temp/htot
                     sfc_salt = sfc_salt/htot
@@ -468,8 +473,8 @@ module g_cvmix_kpp
                     !___________________________________________________________
                     ! calculate vertical shear between present layer and surface
                     ! averaged sfc_u and sfc_v
-                    kpp_dvsurf2(nz) = (Unode(1,nz,node)-sfc_u)**2 + &
-                                      (Unode(2,nz,node)-sfc_v)**2
+                    kpp_dvsurf2(nz) = (UVnode(1,nz,node)-sfc_u)**2 + &
+                                      (UVnode(2,nz,node)-sfc_v)**2
                     
                     !___________________________________________________________
                     ! calculate buoyancy difference between the surface averaged 
@@ -492,8 +497,8 @@ module g_cvmix_kpp
                     ! calculate shear Richardson number Ri = N^2/(du/dz)^2 for 
                     ! mixing parameterisation below ocean boundary layer 
                     dz2     = (Z_3d_n( nz-1,node)-Z_3d_n( nz,node))**2
-                    vshear2 = (Unode(1,nz-1,node)-Unode(1,nz,node))**2 + &
-                              (Unode(2,nz-1,node)-Unode(2,nz,node))**2 
+                    vshear2 = (UVnode(1,nz-1,node)-UVnode(1,nz,node))**2 + &
+                              (UVnode(2,nz-1,node)-UVnode(2,nz,node))**2 
                     vshear2 = vshear2/dz2
                     kpp_shearRi(nz) = max(bvfreq(nz,node),0.0_WP)/(vshear2+kpp_epsln)
                 end do ! --> do nz=1, nln

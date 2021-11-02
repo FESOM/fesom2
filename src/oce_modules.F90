@@ -220,7 +220,7 @@ real(kind=WP), allocatable,dimension(:,:)   :: Av,Kv
 real(kind=WP), allocatable,dimension(:,:,:) :: Kv_double
 real(kind=WP), allocatable,dimension(:)     :: Kv0
 !Velocities interpolated to nodes
-real(kind=WP), allocatable,dimension(:,:,:)   :: Unode
+!!PS real(kind=WP), allocatable,dimension(:,:,:)   :: Unode
 
 ! Auxiliary arrays to store Redi-GM fields
 real(kind=WP), allocatable,dimension(:,:,:) :: neutral_slope
