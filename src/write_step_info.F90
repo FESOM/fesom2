@@ -41,7 +41,7 @@ subroutine write_step_info(istep, outfreq, dynamics, tracers, partit, mesh)
     use MOD_TRACER
     use MOD_DYN
 	use o_PARAM
-	use o_ARRAYS, only: eta_n, d_eta, water_flux, heat_flux, Wvel, Unode, CFL_z, &
+	use o_ARRAYS, only: eta_n, d_eta, water_flux, heat_flux, Unode, CFL_z, &
                         pgf_x, pgf_y, Av, Kv
 	use i_ARRAYS
 	use g_comm_auto
@@ -63,11 +63,13 @@ subroutine write_step_info(istep, outfreq, dynamics, tracers, partit, mesh)
     type(t_tracer), intent(in)   , target :: tracers
     type(t_dyn)   , intent(in)   , target :: dynamics
     real(kind=WP), dimension(:,:,:), pointer :: UV
+    real(kind=WP), dimension(:,:), pointer :: Wvel
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
     UV => dynamics%uv(:,:,:)
+    Wvel => dynamics%w(:,:)
     
 	if (mod(istep,outfreq)==0) then
 		
@@ -261,7 +263,7 @@ subroutine check_blowup(istep, dynamics, tracers, partit, mesh)
     use MOD_DYN
 	use o_PARAM
 	use o_ARRAYS, only: eta_n, d_eta, ssh_rhs, ssh_rhs_old, water_flux, stress_surf, &
-                        Wvel, CFL_z, heat_flux, Kv, Av
+                        CFL_z, heat_flux, Kv, Av
 	use i_ARRAYS
 	use g_comm_auto
 	use io_BLOWUP
@@ -277,11 +279,13 @@ subroutine check_blowup(istep, dynamics, tracers, partit, mesh)
     type(t_tracer), intent(in)   , target :: tracers
     type(t_dyn)   , intent(in)   , target :: dynamics
     real(kind=WP), dimension(:,:,:), pointer :: UV
+    real(kind=WP), dimension(:,:), pointer :: Wvel
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-    UV => dynamics%uv(:,:,:)
+    UV   => dynamics%uv(:,:,:)
+    Wvel => dynamics%w(:,:)
     
 	!___________________________________________________________________________
 ! ! 	if (mod(istep,logfile_outfreq)==0) then
@@ -550,3 +554,4 @@ subroutine check_blowup(istep, dynamics, tracers, partit, mesh)
 			call par_ex(partit%MPI_COMM_FESOM, partit%mype)
 		endif 
 end subroutine
+

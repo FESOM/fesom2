@@ -1843,8 +1843,8 @@ end subroutine compute_hbar_ale
 subroutine vert_vel_ale(dynamics, partit, mesh)
     use g_config,only: dt, which_ALE, min_hnode, lzstar_lev, flag_warn_cflz
     use MOD_MESH
-    use o_ARRAYS, only: Wvel, fer_Wvel, fer_UV, CFL_z, water_flux, ssh_rhs, & 
-                        ssh_rhs_old, eta_n, d_eta, Wvel_e, Wvel_i
+    use o_ARRAYS, only: fer_Wvel, fer_UV, CFL_z, water_flux, ssh_rhs, & 
+                        ssh_rhs_old, eta_n, d_eta
     use o_PARAM
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -1867,11 +1867,15 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     type(t_mesh),   intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
     real(kind=WP), dimension(:,:,:), pointer :: UV
+    real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, Wvel_i
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    UV=>dynamics%uv(:,:,:)
+    UV    =>dynamics%uv(:,:,:)
+    Wvel  =>dynamics%w(:,:)
+    Wvel_e=>dynamics%w_e(:,:)
+    Wvel_i=>dynamics%w_i(:,:)
 
     !___________________________________________________________________________
     ! Contributions from levels in divergence
@@ -2518,7 +2522,7 @@ end subroutine solve_ssh_ale
 subroutine impl_vert_visc_ale(dynamics, partit, mesh)
 USE MOD_MESH
 USE o_PARAM
-USE o_ARRAYS, only: UV_rhs, Av, Wvel_i, stress_surf
+USE o_ARRAYS, only: UV_rhs, Av, stress_surf
 USE MOD_PARTIT
 USE MOD_PARSUP
 USE MOD_DYN
@@ -2534,11 +2538,13 @@ real(kind=WP)              ::  cp(mesh%nl-1), up(mesh%nl-1), vp(mesh%nl-1)
 integer                    ::  nz, elem, nzmax, nzmin, elnodes(3)
 real(kind=WP)              ::  zinv, m, friction, wu, wd
 real(kind=WP), dimension(:,:,:), pointer :: UV
+real(kind=WP), dimension(:,:)  , pointer :: Wvel_i
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-UV=>dynamics%uv(:,:,:)
+UV    =>dynamics%uv(:,:,:)
+Wvel_i=>dynamics%w_i(:,:)
 
 DO elem=1,myDim_elem2D
     elnodes=elem2D_nodes(:,elem)
@@ -2952,10 +2958,12 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     t9=MPI_Wtime() 
     !___________________________________________________________________________
     ! write out global fields for debugging
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call write_step_info'//achar(27)//'[0m'
     call write_step_info(n,logfile_outfreq, dynamics, tracers, partit, mesh)
     
     ! check model for blowup --> ! write_step_info and check_blowup require 
     ! togeather around 2.5% of model runtime
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call check_blowup'//achar(27)//'[0m'
     call check_blowup(n, dynamics, tracers, partit, mesh)
     t10=MPI_Wtime()
 

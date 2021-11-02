@@ -13,10 +13,12 @@
 ! 5. Leith_c=?    (need to be adjusted)
 module h_viscosity_leith_interface
   interface
-    subroutine h_viscosity_leith(partit, mesh)
+    subroutine h_viscosity_leith(dynamics, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
+      USE MOD_DYN
+      type(t_dyn), intent(inout), target :: dynamics
       type(t_partit), intent(inout), target :: partit
       type(t_mesh)  , intent(in)   , target :: mesh
       
@@ -280,19 +282,19 @@ CASE (1)
      ! ====
      ! Harmonic Leith parameterization
      ! ====
-     call h_viscosity_leith(partit, mesh)
+     call h_viscosity_leith(dynamics, partit, mesh)
      call visc_filt_harmon(dynamics, partit, mesh)
 CASE (2)
      ! ===
      ! Laplacian+Leith+biharmonic background
      ! ===
-     call h_viscosity_leith(partit, mesh)
+     call h_viscosity_leith(dynamics, partit, mesh)
      call visc_filt_hbhmix(dynamics, partit, mesh)
 CASE (3)
      ! ===
      ! Biharmonic Leith parameterization
      ! ===
-     call h_viscosity_leith(partit, mesh)
+     call h_viscosity_leith(dynamics, partit, mesh)
      call visc_filt_biharm(2, dynamics, partit, mesh)
 CASE (4)
      ! ===
@@ -564,14 +566,14 @@ SUBROUTINE visc_filt_hbhmix(dynamics, partit, mesh)
 end subroutine visc_filt_hbhmix
 
 ! ===================================================================
-SUBROUTINE h_viscosity_leith(partit, mesh)
+SUBROUTINE h_viscosity_leith(dynamics, partit, mesh)
     !
     ! Coefficient of horizontal viscosity is a combination of the Leith (with Leith_c) and modified Leith (with Div_c)
     USE MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
     use MOD_DYN
-    USE o_ARRAYS
+    USE o_ARRAYS, only: Visc, vorticity
     USE o_PARAM
     USE g_CONFIG
     use g_comm_auto
@@ -580,13 +582,15 @@ SUBROUTINE h_viscosity_leith(partit, mesh)
     integer        :: elem, nl1, nz, elnodes(3), n, k, nt, ul1
     real(kind=WP)  :: leithx, leithy
     real(kind=WP), allocatable :: aux(:,:) 
+    type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
-    
+    real(kind=WP), dimension(:,:), pointer :: Wvel
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    Wvel  =>dynamics%w(:,:)
     !  
     if(mom_adv<4) call relative_vorticity(partit, mesh)  !!! vorticity array should be allocated
     ! Fill in viscosity:

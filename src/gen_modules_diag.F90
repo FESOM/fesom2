@@ -244,11 +244,13 @@ subroutine diag_energy(mode, dynamics, partit, mesh)
   real(kind=WP)              :: ux, vx, uy, vy, tvol, rval(2)
   real(kind=WP)              :: geo_grad_x(3), geo_grad_y(3), geo_u(3), geo_v(3)
   real(kind=WP), dimension(:,:,:), pointer :: UV
+  real(kind=WP), dimension(:,:), pointer :: Wvel
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-  UV => dynamics%uv(:,:,:)
+  UV   => dynamics%uv(:,:,:)
+  Wvel => dynamics%w(:,:)
 
 !=====================
   if (firstcall) then  !allocate the stuff at the first call
