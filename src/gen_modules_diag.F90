@@ -243,14 +243,15 @@ subroutine diag_energy(mode, dynamics, partit, mesh)
   integer                    :: iup, ilo
   real(kind=WP)              :: ux, vx, uy, vy, tvol, rval(2)
   real(kind=WP)              :: geo_grad_x(3), geo_grad_y(3), geo_u(3), geo_v(3)
-  real(kind=WP), dimension(:,:,:), pointer :: UV
+  real(kind=WP), dimension(:,:,:), pointer :: UV, UVnode
   real(kind=WP), dimension(:,:), pointer :: Wvel
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-  UV   => dynamics%uv(:,:,:)
-  Wvel => dynamics%w(:,:)
+  UV    => dynamics%uv(:,:,:)
+  UVnode=> dynamics%uvnode(:,:,:)
+  Wvel  => dynamics%w(:,:)
 
 !=====================
   if (firstcall) then  !allocate the stuff at the first call
@@ -291,9 +292,9 @@ subroutine diag_energy(mode, dynamics, partit, mesh)
      if (mode==0) return
   end if
   
-  u_x_u=Unode(1,1:nl-1,1:myDim_nod2D)*Unode(1,1:nl-1,1:myDim_nod2D)
-  u_x_v=Unode(1,1:nl-1,1:myDim_nod2D)*Unode(2,1:nl-1,1:myDim_nod2D)
-  v_x_v=Unode(2,1:nl-1,1:myDim_nod2D)*Unode(2,1:nl-1,1:myDim_nod2D)
+  u_x_u=UVnode(1,1:nl-1,1:myDim_nod2D)*UVnode(1,1:nl-1,1:myDim_nod2D)
+  u_x_v=UVnode(1,1:nl-1,1:myDim_nod2D)*UVnode(2,1:nl-1,1:myDim_nod2D)
+  v_x_v=UVnode(2,1:nl-1,1:myDim_nod2D)*UVnode(2,1:nl-1,1:myDim_nod2D)
   ! this loop might be very expensive
   DO n=1, myDim_elem2D
      nzmax = nlevels(n)
@@ -396,10 +397,10 @@ subroutine diag_energy(mode, dynamics, partit, mesh)
            if (nlevels(elem)-1 < nz) cycle
            elnodes=elem2D_nodes(:, elem)
            tvol=tvol+elem_area(elem)
-           ux=ux+sum(gradient_sca(1:3,elem)*Unode(1,nz,elnodes))*elem_area(elem)         !accumulate tensor of velocity derivatives
-           vx=vx+sum(gradient_sca(1:3,elem)*Unode(2,nz,elnodes))*elem_area(elem)
-           uy=uy+sum(gradient_sca(4:6,elem)*Unode(1,nz,elnodes))*elem_area(elem)
-           vy=vy+sum(gradient_sca(4:6,elem)*Unode(2,nz,elnodes))*elem_area(elem)
+           ux=ux+sum(gradient_sca(1:3,elem)*UVnode(1,nz,elnodes))*elem_area(elem)         !accumulate tensor of velocity derivatives
+           vx=vx+sum(gradient_sca(1:3,elem)*UVnode(2,nz,elnodes))*elem_area(elem)
+           uy=uy+sum(gradient_sca(4:6,elem)*UVnode(1,nz,elnodes))*elem_area(elem)
+           vy=vy+sum(gradient_sca(4:6,elem)*UVnode(2,nz,elnodes))*elem_area(elem)
         END DO
         dudx(nz,n)=ux/tvol!/area(nz, n)/3.
         dvdx(nz,n)=vx/tvol

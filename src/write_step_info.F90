@@ -41,7 +41,7 @@ subroutine write_step_info(istep, outfreq, dynamics, tracers, partit, mesh)
     use MOD_TRACER
     use MOD_DYN
 	use o_PARAM
-	use o_ARRAYS, only: eta_n, d_eta, water_flux, heat_flux, Unode, CFL_z, &
+	use o_ARRAYS, only: eta_n, d_eta, water_flux, heat_flux, CFL_z, &
                         pgf_x, pgf_y, Av, Kv
 	use i_ARRAYS
 	use g_comm_auto
@@ -62,13 +62,14 @@ subroutine write_step_info(istep, outfreq, dynamics, tracers, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_tracer), intent(in)   , target :: tracers
     type(t_dyn)   , intent(in)   , target :: dynamics
-    real(kind=WP), dimension(:,:,:), pointer :: UV
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UVnode
     real(kind=WP), dimension(:,:), pointer :: Wvel
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
     UV => dynamics%uv(:,:,:)
+    UVnode => dynamics%uvnode(:,:,:)
     Wvel => dynamics%w(:,:)
     
 	if (mod(istep,outfreq)==0) then
@@ -147,13 +148,13 @@ subroutine write_step_info(istep, outfreq, dynamics, tracers, partit, mesh)
 		call MPI_AllREDUCE(loc , min_wvel , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
 		loc = minval(Wvel(2,1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , min_wvel2 , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-		loc = minval(Unode(1,1,1:myDim_nod2D))
+		loc = minval(UVnode(1,1,1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , min_uvel , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-		loc = minval(Unode(1,2,1:myDim_nod2D))
+		loc = minval(UVnode(1,2,1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , min_uvel2 , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-		loc = minval(Unode(2,1,1:myDim_nod2D))
+		loc = minval(UVnode(2,1,1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , min_vvel , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-		loc = minval(Unode(2,2,1:myDim_nod2D))
+		loc = minval(UVnode(2,2,1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , min_vvel2 , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
 		loc = minval(d_eta(1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , min_deta  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
@@ -179,13 +180,13 @@ subroutine write_step_info(istep, outfreq, dynamics, tracers, partit, mesh)
 		call MPI_AllREDUCE(loc , max_wvel , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		loc = maxval(Wvel(2,1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , max_wvel2 , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-		loc = maxval(Unode(1,1,1:myDim_nod2D))
+		loc = maxval(UVnode(1,1,1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , max_uvel , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-		loc = maxval(Unode(1,2,1:myDim_nod2D))
+		loc = maxval(UVnode(1,2,1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , max_uvel2 , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-		loc = maxval(Unode(2,1,1:myDim_nod2D))
+		loc = maxval(UVnode(2,1,1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , max_vvel , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-		loc = maxval(Unode(2,2,1:myDim_nod2D))
+		loc = maxval(UVnode(2,2,1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , max_vvel2 , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		loc = maxval(d_eta(1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , max_deta  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)

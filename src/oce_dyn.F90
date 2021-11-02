@@ -207,7 +207,6 @@ subroutine compute_vel_nodes(dynamics, partit, mesh)
     USE MOD_PARSUP
     USE MOD_DYN
     USE o_PARAM
-    USE o_ARRAYS, only: Unode
     use g_comm_auto
     IMPLICIT NONE
     integer            :: n, nz, k, elem, nln, uln, nle, ule
@@ -216,12 +215,13 @@ subroutine compute_vel_nodes(dynamics, partit, mesh)
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
-    real(kind=WP), dimension(:,:,:), pointer :: UV
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UVnode
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UV=>dynamics%uv(:,:,:)
+    UVnode=>dynamics%uvnode(:,:,:)
 
     DO n=1, myDim_nod2D 
         uln = ulevels_nod2D(n)
@@ -241,11 +241,11 @@ subroutine compute_vel_nodes(dynamics, partit, mesh)
                 tx=tx+UV(1,nz,elem)*elem_area(elem)
                 ty=ty+UV(2,nz,elem)*elem_area(elem)
             END DO
-            Unode(1,nz,n)=tx/tvol
-            Unode(2,nz,n)=ty/tvol
+            UVnode(1,nz,n)=tx/tvol
+            UVnode(2,nz,n)=ty/tvol
         END DO
     END DO
-    call exchange_nod(Unode, partit)
+    call exchange_nod(UVnode, partit)
 end subroutine compute_vel_nodes
 !===========================================================================
 subroutine viscosity_filter(option, dynamics, partit, mesh)

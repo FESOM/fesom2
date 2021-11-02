@@ -28,6 +28,7 @@ module g_cvmix_tke
     use mod_mesh
     USE MOD_PARTIT
     USE MOD_PARSUP
+    USE MOD_DYN
     use o_arrays
     use g_comm_auto 
     implicit none
@@ -249,20 +250,23 @@ module g_cvmix_tke
     !
     !===========================================================================
     ! calculate TKE vertical mixing coefficients from CVMIX library
-    subroutine calc_cvmix_tke(partit, mesh)
+    subroutine calc_cvmix_tke(dynamics, partit, mesh)
         implicit none
         type(t_mesh),   intent(in),    target :: mesh
         type(t_partit), intent(inout), target :: partit
+        type(t_dyn), intent(inout), target :: dynamics
         integer       :: node, elem, nelem, nz, nln, nun, elnodes(3), node_size
         real(kind=WP) :: tvol
         real(kind=WP) :: dz_trr(mesh%nl), bvfreq2(mesh%nl), vshear2(mesh%nl)
         real(kind=WP) :: tke_Av_old(mesh%nl), tke_Kv_old(mesh%nl), tke_old(mesh%nl)
-        
+        real(kind=WP), dimension(:,:,:), pointer :: UVnode
+    
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
+        UVnode=>dynamics%uvnode(:,:,:)
+        
         node_size = myDim_nod2D
         !_______________________________________________________________________
         ! calculate all neccessary forcing for TKE 
@@ -297,8 +301,8 @@ module g_cvmix_tke
             ! calculate for TKE 3D vertical velocity shear
             vshear2=0.0_WP
             do nz=nun+1,nln
-                vshear2(nz)=(( Unode(1, nz-1, node) - Unode(1, nz, node))**2 + &
-                             ( Unode(2, nz-1, node) - Unode(2, nz, node))**2)/ &
+                vshear2(nz)=(( UVnode(1, nz-1, node) - UVnode(1, nz, node))**2 + &
+                             ( UVnode(2, nz-1, node) - UVnode(2, nz, node))**2)/ &
                              ((Z_3d_n(nz-1,node)-Z_3d_n(nz,node))**2)
             end do 
             

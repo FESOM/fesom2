@@ -562,7 +562,7 @@ UV_total_tend=0.0_8
 end if
 
 !Velocities at nodes
-allocate(Unode(2,nl-1,node_size))
+!!PS allocate(Unode(2,nl-1,node_size))
 
 ! tracer gradients & RHS  
 allocate(ttrhs(nl-1,node_size))
