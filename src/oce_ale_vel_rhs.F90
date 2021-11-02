@@ -38,7 +38,7 @@ subroutine compute_vel_rhs(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_DYN
-    use o_ARRAYS, only: UV_rhs, eta_n, coriolis, ssh_gp, pgf_x, pgf_y
+    use o_ARRAYS, only: eta_n, coriolis, ssh_gp, pgf_x, pgf_y
     use i_ARRAYS
     use i_therm_param
     use o_PARAM
@@ -60,13 +60,14 @@ subroutine compute_vel_rhs(dynamics, partit, mesh)
     real(kind=WP)            :: t1, t2, t3, t4
     real(kind=WP)            :: p_ice(3), p_air(3), p_eta(3)
     integer                  :: use_pice
-    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB, UV_rhs
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UV       =>dynamics%uv(:,:,:)
+    UV_rhs   =>dynamics%uv_rhs(:,:,:)
     UV_rhsAB =>dynamics%uv_rhsAB(:,:,:)
 
     t1=MPI_Wtime()

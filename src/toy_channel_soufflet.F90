@@ -53,12 +53,14 @@ subroutine relax_zonal_vel(dynamics, partit, mesh)
   type(t_dyn)   , intent(inout), target :: dynamics
   type(t_partit), intent(inout), target :: partit
   type(t_mesh)  , intent(in)   , target :: mesh
+  real(kind=WP), dimension(:,:,:), pointer :: UV_rhs
   
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-
+  UV_rhs=>dynamics%uv_rhs(:,:,:)
+  
   DO elem=1, myDim_elem2D
      ! ========
      ! Interpolation

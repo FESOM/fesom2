@@ -118,7 +118,7 @@ end subroutine relative_vorticity
 ! ==========================================================================
 subroutine compute_vel_rhs_vinv(dynamics, partit, mesh) !vector invariant
     USE o_PARAM
-    USE o_ARRAYS, only: UV_rhs, eta_n, coriolis_node, hpressure, vorticity
+    USE o_ARRAYS, only: eta_n, coriolis_node, hpressure, vorticity
                         
     USE MOD_MESH
     USE MOD_PARTIT
@@ -140,12 +140,13 @@ subroutine compute_vel_rhs_vinv(dynamics, partit, mesh) !vector invariant
     real(kind=WP)     :: KE_node(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP)     :: dZ_inv(2:mesh%nl-1), dzbar_inv(mesh%nl-1), elem_area_inv
     real(kind=WP)     :: density0_inv = 1./density_0
-    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs, UV_rhsAB
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
     UV       => dynamics%uv(:,:,:)
+    UV_rhs   => dynamics%uv_rhs(:,:,:)
     UV_rhsAB => dynamics%uv_rhsAB(:,:,:)
 
     w = 0.0_WP
