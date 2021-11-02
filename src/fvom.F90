@@ -45,7 +45,6 @@ module fesom_main_storage_module
     integer           :: n, nsteps, offset, row, i, provided
     integer, pointer  :: mype, npes, MPIerr, MPI_COMM_FESOM
     real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
-    real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
     real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing 
     real(kind=real32) :: rtime_setup_ice,  rtime_setup_other, rtime_setup_restart
     real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
@@ -81,9 +80,9 @@ module fvom_module
 
 contains
  
-  subroutine fesom_init(fesom_used_nsteps)
+  subroutine fesom_init(fesom_total_nsteps)
       use fesom_main_storage_module
-      integer, intent(out) :: fesom_used_nsteps
+      integer, intent(out) :: fesom_total_nsteps
       ! EO parameters
 
       if(command_argument_count() > 0) then
@@ -240,7 +239,7 @@ contains
     !    if (f%mype==10) write(,) f%mesh1%ssh_stiff%values-f%mesh%ssh_stiff%value
 
     
-    fesom_used_nsteps = f%nsteps
+    fesom_total_nsteps = f%nsteps
   end subroutine
 
 
