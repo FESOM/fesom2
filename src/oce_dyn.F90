@@ -206,7 +206,7 @@ subroutine compute_vel_nodes(dynamics, partit, mesh)
     USE MOD_PARSUP
     USE MOD_DYN
     USE o_PARAM
-    USE o_ARRAYS
+    USE o_ARRAYS, only: Unode
     use g_comm_auto
     IMPLICIT NONE
     integer            :: n, nz, k, elem, nln, uln, nle, ule
