@@ -474,7 +474,6 @@ node_size=myDim_nod2D+eDim_nod2D
 ! Velocities
 ! ================     
 !allocate(stress_diag(2, elem_size))!delete me
-allocate(UV_rhs(2,nl-1, elem_size))
 allocate(Visc(nl-1, elem_size))
 ! ================
 ! elevation and its rhs
@@ -620,10 +619,6 @@ end if
 ! Initialize with zeros 
 ! =================
 
-!!PS     UV=0.0_WP
-    UV_rhs=0.0_WP
-!!PS     UV_rhsAB=0.0_WP
-!
     eta_n=0.0_WP
     d_eta=0.0_WP
     ssh_rhs=0.0_WP

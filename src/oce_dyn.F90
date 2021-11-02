@@ -164,7 +164,7 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
     USE MOD_PARSUP
     USE MOD_DYN
     
-    USE o_ARRAYS, only: d_eta, eta_n, UV_rhs
+    USE o_ARRAYS, only: d_eta, eta_n
     USE o_PARAM
     USE g_CONFIG
     use g_comm_auto
@@ -175,13 +175,14 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_mesh)  , intent(in)   , target :: mesh
     type(t_partit), intent(inout), target :: partit
-    real(kind=WP), dimension(:,:,:), pointer :: UV
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UV=>dynamics%uv(:,:,:)
+    UV_rhs=>dynamics%uv_rhs(:,:,:)
 
     DO elem=1, myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
@@ -322,7 +323,7 @@ USE MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
 USE MOD_DYN
-USE o_ARRAYS, only: Visc, UV_rhs
+USE o_ARRAYS, only: Visc
 USE o_PARAM
 USE g_CONFIG
 IMPLICIT NONE
@@ -332,12 +333,13 @@ integer       :: nz, ed, el(2) , nzmin,nzmax
 type(t_dyn)   , intent(inout), target :: dynamics
 type(t_mesh)  , intent(in),    target :: mesh
 type(t_partit), intent(inout), target :: partit
-real(kind=WP), dimension(:,:,:), pointer :: UV
+real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 UV => dynamics%uv(:,:,:)
+UV_rhs => dynamics%uv_rhs(:,:,:)
 
  ! An analog of harmonic viscosity operator.  
  ! It adds to the rhs(0) Visc*(u1+u2+u3-3*u0)/area
@@ -369,7 +371,7 @@ SUBROUTINE visc_filt_biharm(option, dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     use MOD_DYN
-    USE o_ARRAYS, only: Visc, UV_rhs
+    USE o_ARRAYS, only: Visc
     USE o_PARAM
     USE g_CONFIG
     use g_comm_auto
@@ -383,12 +385,13 @@ SUBROUTINE visc_filt_biharm(option, dynamics, partit, mesh)
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
-    real(kind=WP), dimension(:,:,:), pointer :: UV
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UV => dynamics%uv(:,:,:)
+    UV_rhs => dynamics%uv_rhs(:,:,:)
 
     ! Filter is applied twice. 
     ed=myDim_elem2D+eDim_elem2D
@@ -478,7 +481,7 @@ SUBROUTINE visc_filt_hbhmix(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     use MOD_DYN 
-    USE o_ARRAYS, only: Visc, UV_rhs
+    USE o_ARRAYS, only: Visc
     USE o_PARAM
     USE g_CONFIG
     use g_comm_auto
@@ -494,12 +497,13 @@ SUBROUTINE visc_filt_hbhmix(dynamics, partit, mesh)
     type(t_dyn), intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(in),    target :: mesh
-    real(kind=WP), dimension(:,:,:), pointer :: UV
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UV => dynamics%uv(:,:,:)
+    UV_rhs => dynamics%uv_rhs(:,:,:)
 
     ! Filter is applied twice. 
     ed=myDim_elem2D+eDim_elem2D
@@ -680,7 +684,6 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     use MOD_DYN
-    USE o_ARRAYS, only: UV_rhs
     USE o_PARAM
     USE g_CONFIG
     USE g_comm_auto
@@ -692,12 +695,13 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
-    real(kind=WP), dimension(:,:,:), pointer :: UV
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UV => dynamics%uv(:,:,:)
+    UV_rhs => dynamics%uv_rhs(:,:,:)
 
     ! An analog of harmonic viscosity operator.
     ! Same as visc_filt_h, but with the backscatter. 
@@ -783,7 +787,6 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     use MOD_DYN
-    USE o_ARRAYS, only: UV_rhs
     USE o_PARAM
     USE g_CONFIG
     USE g_comm_auto
@@ -796,12 +799,13 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     
-    real(kind=WP), dimension(:,:,:), pointer :: UV
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UV => dynamics%uv(:,:,:)
+    UV_rhs => dynamics%uv_rhs(:,:,:)
 
     ed=myDim_elem2D+eDim_elem2D
     allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
@@ -870,7 +874,6 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     use MOD_DYN
-    USE o_ARRAYS, only: UV_rhs
     USE o_PARAM
     USE g_CONFIG
     USE g_comm_auto
@@ -882,12 +885,13 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     
-    real(kind=WP), dimension(:,:,:), pointer :: UV
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UV => dynamics%uv(:,:,:)
+    UV_rhs => dynamics%uv_rhs(:,:,:)
     !
     ed=myDim_elem2D+eDim_elem2D
     allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
@@ -950,7 +954,7 @@ USE MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
 use MOD_DYN
-USE o_ARRAYS, only: UV_rhs, v_back, UV_dis_tend, UV_total_tend, UV_back_tend, &
+USE o_ARRAYS, only: v_back, UV_dis_tend, UV_total_tend, UV_back_tend, &
                     uke, uke_dif
 USE o_PARAM
 USE g_CONFIG
@@ -966,12 +970,13 @@ real(kind=8), allocatable  :: uuu(:)
 type(t_dyn)   , intent(inout), target :: dynamics
 type(t_partit), intent(inout), target :: partit
 type(t_mesh)  , intent(in)   , target :: mesh
-real(kind=WP), dimension(:,:,:), pointer :: UV
+real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 UV => dynamics%uv(:,:,:)
+UV_rhs => dynamics%uv_rhs(:,:,:)
 
  ! An analog of harmonic viscosity operator.  
  ! It adds to the rhs(0) Visc*(u1+u2+u3-3*u0)/area
@@ -1317,4 +1322,5 @@ deallocate(uuu)
 end subroutine uke_update
 
 ! ===================================================================
+
 

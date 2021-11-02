@@ -1612,7 +1612,7 @@ end subroutine update_stiff_mat_ale
 subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     use g_config,only: which_ALE,dt
     use MOD_MESH
-    use o_ARRAYS, only: ssh_rhs, ssh_rhs_old, UV_rhs, water_flux
+    use o_ARRAYS, only: ssh_rhs, ssh_rhs_old, water_flux
     use o_PARAM
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -1629,12 +1629,13 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     type(t_mesh),   intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
     type(t_dyn), intent(inout), target :: dynamics
-    real(kind=WP), dimension(:,:,:), pointer :: UV
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UV=>dynamics%uv(:,:,:)
+    UV_rhs=>dynamics%uv_rhs(:,:,:)
 
     ssh_rhs=0.0_WP
     !___________________________________________________________________________
@@ -2522,7 +2523,7 @@ end subroutine solve_ssh_ale
 subroutine impl_vert_visc_ale(dynamics, partit, mesh)
 USE MOD_MESH
 USE o_PARAM
-USE o_ARRAYS, only: UV_rhs, Av, stress_surf
+USE o_ARRAYS, only: Av, stress_surf
 USE MOD_PARTIT
 USE MOD_PARSUP
 USE MOD_DYN
@@ -2537,14 +2538,15 @@ real(kind=WP)              ::  a(mesh%nl-1), b(mesh%nl-1), c(mesh%nl-1), ur(mesh
 real(kind=WP)              ::  cp(mesh%nl-1), up(mesh%nl-1), vp(mesh%nl-1)
 integer                    ::  nz, elem, nzmax, nzmin, elnodes(3)
 real(kind=WP)              ::  zinv, m, friction, wu, wd
-real(kind=WP), dimension(:,:,:), pointer :: UV
+real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
 real(kind=WP), dimension(:,:)  , pointer :: Wvel_i
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-UV    =>dynamics%uv(:,:,:)
-Wvel_i=>dynamics%w_i(:,:)
+UV     =>dynamics%uv(:,:,:)
+UV_rhs =>dynamics%uv_rhs(:,:,:)
+Wvel_i =>dynamics%w_i(:,:)
 
 DO elem=1,myDim_elem2D
     elnodes=elem2D_nodes(:,elem)
