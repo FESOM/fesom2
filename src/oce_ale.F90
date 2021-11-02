@@ -32,12 +32,14 @@ module oce_ale_interfaces
       type(t_partit), intent(inout), target :: partit
     end subroutine
 
-    subroutine impl_vert_visc_ale(partit, mesh)
+    subroutine impl_vert_visc_ale(dynamics, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      USE MOD_DYN
+      type(t_mesh)  , intent(in)   , target :: mesh
       type(t_partit), intent(inout), target :: partit
+      type(t_dyn)   , intent(inout), target :: dynamics
     end subroutine
 
     subroutine update_stiff_mat_ale(partit, mesh)
@@ -48,12 +50,14 @@ module oce_ale_interfaces
       type(t_partit), intent(inout), target :: partit
     end subroutine
 
-    subroutine compute_ssh_rhs_ale(partit, mesh)
+    subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      USE MOD_DYN
+      type(t_mesh)  , intent(in)   , target :: mesh
       type(t_partit), intent(inout), target :: partit
+      type(t_dyn)   , intent(inout), target :: dynamics
     end subroutine
 
     subroutine solve_ssh_ale(partit, mesh)
@@ -97,15 +101,17 @@ end module
 
 module oce_timestep_ale_interface
   interface
-    subroutine oce_timestep_ale(n, tracers, partit, mesh)
+    subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      use mod_tracer
-      integer,        intent(in)                         :: n
-      type(t_mesh),   intent(in),    target :: mesh
+      use MOD_TRACER
+      use MOD_DYN
+      integer,        intent(in)            :: n
+      type(t_mesh)  , intent(in)   , target :: mesh
       type(t_partit), intent(inout), target :: partit
       type(t_tracer), intent(inout), target :: tracers
+      type(t_dyn)   , intent(inout), target :: dynamics
     end subroutine
   end interface
 end module
@@ -1625,7 +1631,6 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     real(kind=WP), dimension(:,:,:), pointer :: UV
-
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -2855,17 +2860,17 @@ subroutine oce_timestep_ale(n, dynamics,  tracers, partit, mesh)
 !!PS         if (any(abs(Wvel_e)>1.0e20))       write(*,*) n, mype,' --> found Inf Wvel_e before compute_vel_rhs'
 
     if(mom_adv/=3) then
-        call compute_vel_rhs(partit, mesh)
+        call compute_vel_rhs(dynamics, partit, mesh)
     else
         call compute_vel_rhs_vinv(partit, mesh)
     end if
     
     !___________________________________________________________________________
-    call viscosity_filter(visc_option, partit, mesh)
+    call viscosity_filter(visc_option, dynamics, partit, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call impl_vert_visc_ale'//achar(27)//'[0m'
-    if(i_vert_visc) call impl_vert_visc_ale(partit, mesh)
+    if(i_vert_visc) call impl_vert_visc_ale(dynamics, partit, mesh)
     t2=MPI_Wtime()
         
     !___________________________________________________________________________
@@ -2877,7 +2882,7 @@ subroutine oce_timestep_ale(n, dynamics,  tracers, partit, mesh)
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_ssh_rhs_ale'//achar(27)//'[0m'
     ! ssh_rhs=-alpha*\nabla\int(U_n+U_rhs)dz-(1-alpha)*...
     ! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (18) rhs
-    call compute_ssh_rhs_ale(partit, mesh)
+    call compute_ssh_rhs_ale(dynamics, partit, mesh)
 
     ! Take updated ssh matrix and solve --> new ssh!
     t30=MPI_Wtime() 
@@ -2889,7 +2894,7 @@ subroutine oce_timestep_ale(n, dynamics,  tracers, partit, mesh)
     ! estimate new horizontal velocity u^(n+1)
     ! u^(n+1) = u* + [-g * tau * theta * grad(eta^(n+1)-eta^(n)) ]
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_vel'//achar(27)//'[0m'
-    call update_vel(partit, mesh)
+    call update_vel(partit, dynamics, mesh)
     
     ! --> eta_(n) --> eta_(n+1) = eta_(n) + deta = eta_(n) + (eta_(n+1) + eta_(n))
     t4=MPI_Wtime() 
@@ -2937,7 +2942,7 @@ subroutine oce_timestep_ale(n, dynamics,  tracers, partit, mesh)
     !___________________________________________________________________________
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
-    call solve_tracers_ale(tracers, partit, mesh)
+    call solve_tracers_ale(dynamics, tracers, partit, mesh)
     t8=MPI_Wtime() 
     
     !___________________________________________________________________________

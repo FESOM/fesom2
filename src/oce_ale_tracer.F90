@@ -14,15 +14,17 @@ module diff_part_hor_redi_interface
 end module
 module adv_tracers_ale_interface
   interface
-    subroutine adv_tracers_ale(dt, tr_num, tracer, partit, mesh) 
+    subroutine adv_tracers_ale(dt, tr_num, dynamics, tracer, partit, mesh) 
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
       use mod_tracer
+      use MOD_DYN
       real(kind=WP),  intent(in),    target :: dt
       integer,        intent(in),    target :: tr_num
+      type(t_dyn)   , intent(inout), target :: dynamics
       type(t_tracer), intent(inout), target :: tracer
-      type(t_mesh),   intent(in),    target :: mesh
+      type(t_mesh)  , intent(in)   , target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
@@ -71,14 +73,16 @@ module diff_ver_part_impl_ale_interface
 end module
 module diff_tracers_ale_interface
   interface
-    subroutine diff_tracers_ale(tr_num, tracer, partit, mesh) 
+    subroutine diff_tracers_ale(tr_num, dynamics, tracer, partit, mesh) 
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
       use mod_tracer
+      use MOD_DYN
       integer,        intent(in),    target :: tr_num
+      type(t_dyn)   , intent(inout), target :: dynamics
       type(t_tracer), intent(inout), target :: tracer
-      type(t_mesh),   intent(in),    target :: mesh
+      type(t_mesh)  , intent(in)   , target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
@@ -98,28 +102,32 @@ module bc_surface_interface
 end module
 module diff_part_bh_interface
   interface
-    subroutine diff_part_bh(tr_num, tracer, partit, mesh) 
+    subroutine diff_part_bh(tr_num, dynamics, tracer, partit, mesh) 
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
       use mod_tracer
+      use MOD_DYN
       integer,        intent(in),    target :: tr_num
+      type(t_dyn)   , intent(inout), target :: dynamics
       type(t_tracer), intent(inout), target :: tracer
-      type(t_mesh),   intent(in),    target :: mesh
+      type(t_mesh)  , intent(in)   , target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
 module solve_tracers_ale_interface
   interface
-    subroutine solve_tracers_ale(tracers, partit, mesh) 
+    subroutine solve_tracers_ale(dynamics, tracers, partit, mesh) 
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      use mod_tracer      
+      use mod_tracer     
+      use MOD_DYN
       type(t_tracer), intent(inout), target :: tracers
-      type(t_mesh),   intent(in),    target :: mesh
+      type(t_mesh)  , intent(in)   , target :: mesh
       type(t_partit), intent(inout), target :: partit
+      type(t_dyn)   , intent(inout), target :: dynamics
     end subroutine
   end interface
 end module
@@ -177,10 +185,10 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
         call init_tracers_AB(tr_num, tracers, partit, mesh) 
         ! advect tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
-        call adv_tracers_ale(dt, tr_num, tracers, partit, mesh) 
+        call adv_tracers_ale(dt, tr_num, dynamics, tracers, partit, mesh) 
         ! diffuse tracers 
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
-        call diff_tracers_ale(tr_num, tracers, partit, mesh) 
+        call diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh) 
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
 !       if ((toy_ocean) .AND. ((tr_num==1) .AND. (TRIM(which_toy)=="soufflet"))) then
@@ -280,11 +288,12 @@ end subroutine adv_tracers_ale
 !
 !
 !===============================================================================
-subroutine diff_tracers_ale(tr_num, tracers, partit, mesh) 
+subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh) 
     use mod_mesh
     USE MOD_PARTIT
     USE MOD_PARSUP
     use mod_tracer
+    use MOD_DYN
     use o_arrays
     use o_tracers
     use diff_part_hor_redi_interface
@@ -296,6 +305,7 @@ subroutine diff_tracers_ale(tr_num, tracers, partit, mesh)
     
     integer                               :: n, nzmax, nzmin
     integer,        intent(in),    target :: tr_num
+    type(t_dyn)   , intent(inout), target :: dynamics
     type(t_tracer), intent(inout), target :: tracers
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
@@ -357,7 +367,7 @@ subroutine diff_tracers_ale(tr_num, tracers, partit, mesh)
     !init_tracers will set it to zero for the next timestep
     !init_tracers will set it to zero for the next timestep
     if (tracers%smooth_bh_tra) then
-       call diff_part_bh(tr_num, tracers, partit, mesh)  ! alpply biharmonic diffusion (implemented as filter)                                                
+       call diff_part_bh(tr_num, dynamics, tracers, partit, mesh)  ! alpply biharmonic diffusion (implemented as filter)                                                
     end if
 end subroutine diff_tracers_ale
 !

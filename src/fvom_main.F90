@@ -125,7 +125,7 @@ integer mpi_version_len
     call tracer_init(tracers, partit, mesh)                ! allocate array of ocean tracers (derived type "t_tracer")
     call dynamics_init(dynamics, partit, mesh)                ! allocate array of ocean dynamics (derived type "t_tracer")
     call arrays_init(tracers%num_tracers, partit, mesh)    ! allocate other arrays (to be refactured same as tracers in the future)
-    call ocean_setup(tracers, partit, mesh)
+    call ocean_setup(dynamics, tracers, partit, mesh)
 
     if (mype==0) then
        write(*,*) 'FESOM ocean_setup... complete'
@@ -294,14 +294,16 @@ integer mpi_version_len
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
             if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
             call oce_fluxes_mom(dynamics, partit, mesh) ! momentum only
+            if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes...'//achar(27)//'[0m'
             call oce_fluxes(tracers, partit, mesh)
         end if
-        call before_oce_step(tracers, partit, mesh) ! prepare the things if required
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call before_oce_step...'//achar(27)//'[0m'
+        call before_oce_step(dynamics, tracers, partit, mesh) ! prepare the things if required
         t2 = MPI_Wtime()
         !___model ocean step____________________________________________________
         if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call oce_timestep_ale'//achar(27)//'[0m'
 
-        call oce_timestep_ale(n, tracers, partit, mesh)
+        call oce_timestep_ale(n, dynamics, tracers, partit, mesh)
 
         t3 = MPI_Wtime()
         !___compute energy diagnostics..._______________________________________
