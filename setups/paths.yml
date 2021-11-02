@@ -54,18 +54,14 @@ docker:
     lnodename:
         - ' '
     meshes:
-        pi: /fesom/pi/
         test_souf: ./test/meshes/soufflet/
         test_global: ./test/meshes/pi/
     forcing:
-        CORE2: /fesom/dCORE2/
-        JRA55: /fesom/dJRA55/
         test_global: ./test/input/global/
     clim:
-        phc: /fesom/phc3/
         test_global: ./test/input/global/
     opath:
-        opath: ../results/
+        opath: ./test/
 
 juwels:
     lnodename:
