@@ -269,7 +269,7 @@ integer mpi_version_len
 #endif
         call clock      
         !___compute horizontal velocity on nodes (originaly on elements)________
-        call compute_vel_nodes(partit, dynamics, mesh)
+        call compute_vel_nodes(dynamics, partit, mesh)
         !___model sea-ice step__________________________________________________
         t1 = MPI_Wtime()
         if(use_ice) then
