@@ -2723,6 +2723,7 @@ subroutine oce_timestep_ale(n, dynamics,  tracers, partit, mesh)
     use pressure_force_4_linfs_interface
     use pressure_force_4_zxxxx_interface
     use solve_tracers_ale_interface
+    use compute_vel_rhs_interface
     use write_step_info_interface
     use check_blowup_interface
     IMPLICIT NONE
@@ -2866,6 +2867,7 @@ subroutine oce_timestep_ale(n, dynamics,  tracers, partit, mesh)
     end if
     
     !___________________________________________________________________________
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call viscosity_filter'//achar(27)//'[0m'
     call viscosity_filter(visc_option, dynamics, partit, mesh)
     
     !___________________________________________________________________________
