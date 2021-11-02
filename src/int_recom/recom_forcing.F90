@@ -177,8 +177,8 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
 !  addtiny(1:nn,3) = (state(1:nn,idiasi)        - aux(1:nn,idiasi)) 
 !  addtiny(1:nn,4) = (state(1:nn,idetz2si)      - aux(1:nn,idetz2si))
 
-  aux=0.0d0
-  aux(1:nn,:)        = state(1:nn,:) + sms(1:nn,:)
+!  aux=0.0d0
+!  aux(1:nn,:)        = state(1:nn,:) + sms(1:nn,:)
 
   state(1:nn,:)      = max(tiny,state(1:nn,:) + sms(1:nn,:))
   state(1:nn,ipchl)  = max(tiny_chl,state(1:nn,ipchl))
@@ -189,10 +189,10 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
   state(1:nn,idiac)  = max(tiny_C_d,state(1:nn,idiac))
   state(1:nn,idiasi) = max(tiny_Si, state(1:nn,idiasi))
 
-  addtiny(1:nn,5) = (state(1:nn,isi)           - aux(1:nn,isi))
-  addtiny(1:nn,6) = (state(1:nn,idetsi)        - aux(1:nn,idetsi))
-  addtiny(1:nn,7) = (state(1:nn,idiasi)        - aux(1:nn,idiasi)) 
-  addtiny(1:nn,8) = (state(1:nn,idetz2si)      - aux(1:nn,idetz2si))
+!  addtiny(1:nn,5) = (state(1:nn,isi)           - aux(1:nn,isi))
+!  addtiny(1:nn,6) = (state(1:nn,idetsi)        - aux(1:nn,idetsi))
+!  addtiny(1:nn,7) = (state(1:nn,idiasi)        - aux(1:nn,idiasi)) 
+!  addtiny(1:nn,8) = (state(1:nn,idetz2si)      - aux(1:nn,idetz2si))
 
 !  addtiny(1:nn,5) = state(1:nn,isi)
 !  addtiny(1:nn,6) = state(1:nn,idetsi) 

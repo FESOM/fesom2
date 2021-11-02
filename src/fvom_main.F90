@@ -258,18 +258,7 @@ type(t_mesh),             target, save :: mesh
         call before_oce_step(mesh) ! prepare the things if required
 #if defined (__recom)
         if (use_REcoM) then
-
-!  auxy=0.0d0
-!  auxy(1:mesh%nl-1,:,:)        = tr_arr(1:mesh%nl-1, :, 3:num_tracers)
-
            call recom(mesh)
-
-!  Gloaddtiny(1:mesh%nl-1,:,1) = (tr_arr(1:mesh%nl-1,:,isi+2)           - auxy(1:mesh%nl-1,:,isi))
-!  Gloaddtiny(1:mesh%nl-1,:,2) = (tr_arr(1:mesh%nl-1,:,idetsi+2)        - auxy(1:mesh%nl-1,:,idetsi))
-!  Gloaddtiny(1:mesh%nl-1,:,3) = (tr_arr(1:mesh%nl-1,:,idiasi+2)        - auxy(1:mesh%nl-1,:,idiasi)) 
-!  Gloaddtiny(1:mesh%nl-1,:,4) = (tr_arr(1:mesh%nl-1,:,idetz2si+2)      - auxy(1:mesh%nl-1,:,idetz2si))
-
-
 !           if (mype==0 .and. n==1)  print *, achar(27)//'[46;1m'//'     --> call RECOM         '//achar(27)//'[0m'
 !           call compute_recom_diagnostics(1, mesh)
         end if

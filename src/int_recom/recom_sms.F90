@@ -164,10 +164,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
             PhyCalc= max(tiny,state(k,iphycal)		+ sms(k,iphycal))
             DetCalc= max(tiny,state(k,idetcal)		+ sms(k,idetcal))
 
-            addtiny(k,1) = Si      - (state(k,isi)           + sms(k,isi  ))
-            addtiny(k,2) = DetSi   - (state(k,idetsi)        + sms(k,idetsi  )) 
-            addtiny(k,3) = DiaSi   - (state(k,idiasi)        + sms(k,idiasi  )) 
-            addtiny(k,4) = DetZ2Si - (state(k,idetz2si)      + sms(k,idetz2si  ))
+!            addtiny(k,1) = Si      - (state(k,isi)           + sms(k,isi  ))
+!            addtiny(k,2) = DetSi   - (state(k,idetsi)        + sms(k,idetsi  )) 
+!            addtiny(k,3) = DiaSi   - (state(k,idiasi)        + sms(k,idiasi  )) 
+!            addtiny(k,4) = DetZ2Si - (state(k,idetz2si)      + sms(k,idetz2si  ))
 
 
             calc_diss      = calc_diss_rate * SinkVel(k,ivdet) /20.d0 ! Dissolution rate of CaCO3 scaled by the sinking velocity at the current depth 0.005714   !20.d0/3500.d0
@@ -1756,16 +1756,9 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
         Diags3Dloc(k,8) = Diags3Dloc(k,8) + (   &
         + KOchl_dia  &
         ) * recipbiostep
-!	Diags3Dloc(k,7) = Diags3Dloc(k,7) + (   &
-!     	+ N_assim                 * PhyC  &
-!     	) * recipbiostep
-
-!	Diags3Dloc(k,8) = Diags3Dloc(k,8) + (   &
-!     	+ N_assim_dia             * DiaC  &
-!     	) * recipbiostep
 
   end do ! Main vertikal loop ends
-if (0) then
+
 !-------------------------------------------------------------------------------
 ! Remineralization from the sediments into the bottom layer
 !		kLoc = Nn      
@@ -1781,54 +1774,40 @@ if (0) then
 !< LocBenthos(1): Vertically integrated N concentration in benthos (1 layer) [mmolN/m^2]
     decayBenthos(1) = decayRateBenN * LocBenthos(1)                                       ! flux
     LocBenthos(1)   = LocBenthos(1)   - decaybenthos(1) * dt_b ! / depth of benthos    ! remove from benthos (flux)
-!    sms(Nn,idin)    = sms(Nn,idin) + decayBenthos(1) * dt_b  &
-!                      / bottom_node_thickness(n) !recipthick(Nn) 			  ! add to water column (flux)
 
 !*** DIC ***
 !< decayRateBenC: Remineralization rate for benthic C [day^-1]
 !< LocBenthos(2): Vertically integrated C concentration in benthos (1 layer) [mmolC/m^2]		
     decayBenthos(2) = decayRateBenC * LocBenthos(2)
     LocBenthos(2)   = LocBenthos(2)   - decaybenthos(2) * dt_b ! / depth of benthos
-!    sms(Nn,idic)    = sms(Nn,idic) + decayBenthos(2) * dt_b  &
-!                      / bottom_node_thickness(n) !recipthick(Nn)
+
 
 !*** Si ***
 !< decayRateBenSi: Remineralization rate for benthic Si [day^-1]
 !< LocBenthos(3) : Vertically integrated N concentration in benthos (1 layer) [mmolSi/m^2]		
     decayBenthos(3) = decayRateBenSi * LocBenthos(3)                                      ! [1/day] * [mmolSi/m2] -> [mmolSi/m2/day]
     LocBenthos(3)   = LocBenthos(3)   - decaybenthos(3) * dt_b ! / depth of benthos    ! [mmolSi/m2]
-!    sms(Nn,isi)     = sms(Nn,isi)  + decayBenthos(3) * dt_b  &
-!                      / bottom_node_thickness(n) !recipthick(Nn)
 
 !*** Calc: DIC, Alk ***
-!#ifdef REcoM_calcification
+
     decayBenthos(4) = calc_diss * LocBenthos(4)
     LocBenthos(4)      = LocBenthos(4)   - decayBenthos(4) * dt_b ! / depth of benthos
-!    sms(Nn,idic)    = sms(Nn,idic) + decayBenthos(4) * dt_b  &
-!                      / bottom_node_thickness(n) !* recipthick(Nn) 
-!    sms(Nn,ialk)    = sms(Nn,ialk) + decayBenthos(4) * dt_b  &
-!                      / bottom_node_thickness(n)* 2.d0  !recipthick(Nn)* 2.d0 
-!#endif
+
     if (ciso) then
 !*** DIC_13 ***  We ignore isotopic fractionation during remineralization.
         decayBenthos(5) = alpha_dcal_13   * decayRateBenC   * LocBenthos(5)
         LocBenthos(5)   = LocBenthos(5)   - decayBenthos(5) * dt_b
-!        sms(Nn,idic_13) = sms(Nn,idic_13) + decayBenthos(5) * dt_b  &
-!                          * recipthick(Nn) !recipdzF(Nn)
 !*** DIC_14 ***  We ignore isotopic fractionation during remineralization.
         decayBenthos(6) = alpha_dcal_14   * decayRateBenC   * LocBenthos(6)
         LocBenthos(6)   = LocBenthos(6)   - decayBenthos(6) * dt_b
-!        sms(Nn,idic_14) = sms(Nn,idic_14) + decayBenthos(6) * dt_b &
-!                          * recipthick(Nn) !recipdzF(Nn)
+
 !*** Calc: DIC_13,14 ***
         decayBenthos(7) = calc_diss_13    * LocBenthos(7)
         LocBenthos(7)   = LocBenthos(7)   - decayBenthos(7) * dt_b ! / depth of benthos
-!        sms(Nn,idic_13) = sms(Nn,idic_13) + decayBenthos(7) * dt_b &
-!                          * recipthick(Nn) !recipdzF(Nn)
+
         decayBenthos(8) = calc_diss_14    * LocBenthos(8)
         LocBenthos(8)   = LocBenthos(8)   - decayBenthos(8) * dt_b ! / depth of benthos
-!        sms(Nn,idic_14) = sms(Nn,idic_14) + decayBenthos(8) * dt_b &
-!                          * recipthick(Nn) ! recipdzF(Nn)
+
     end if ! ciso
 !*** DFe ***
 !  if(use_Fe2N) then 
@@ -1842,297 +1821,8 @@ if (0) then
 !   sms(Nn,ioxy)    = sms(Nn,ioxy) - decayBenthos(2) * redO2C *dt_b  &
 !                      * recipthick(Nn)
 
-endif
   end do ! Main time loop ends
 
-!-------------------------------------------------------------------------------
-! Sinking
-
-  dt_sink = dt_b * real(biostep)
-
-if (0) then	
-!  dt = dt_s / SecondsPerDay ! Physics time step converted to [day] as sinking velocity is in [m/day]
-
-  if (VPhy .gt. 0.1) then
-    call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivphy),thick,recipthick,state(:,iphyn),sink,zF, mesh)
-    sms(1:Nn,iphyn) = sms(1:Nn,iphyn) + sink(1:Nn)
-
-    call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivphy),thick,recipthick,state(:,iphyc),sink,zF, mesh)
-    sms(1:Nn,iphyc) = sms(1:Nn,iphyc) + sink(1:Nn)	
-
-    call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivphy),thick,recipthick,state(:,ipchl),sink,zF, mesh)
-    sms(1:Nn,ipchl) = sms(1:Nn,ipchl) + sink(1:Nn)
-
-!#ifdef REcoM_calcification
-    call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivphy),thick,recipthick,state(:,iphycal),sink,zF, mesh)
-    sms(1:Nn,iphycal) = sms(1:Nn,iphycal) + sink(1:Nn)
-
-!#endif
-
-  end if		
-
-  if (VDia .gt. 0.1) then
-    call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivdia),thick,recipthick,state(:,idian),sink,zF, mesh)
-    sms(1:Nn,idian) = sms(1:Nn,idian) + sink(1:Nn)
-
-    call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivdia),thick,recipthick,state(:,idiac),sink,zF, mesh)
-    sms(1:Nn,idiac) = sms(1:Nn,idiac) + sink(1:Nn)
-
-    call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivdia),thick,recipthick,state(:,idchl),sink,zF, mesh)
-    sms(1:Nn,idchl) = sms(1:Nn,idchl) + sink(1:Nn)
-
-    call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivdia),thick,recipthick,state(:,idiasi),sink,zF, mesh)
-    sms(1:Nn,idiasi) = sms(1:Nn,idiasi) + sink(1:Nn)
-!
-  end if		
-
-  if (VDet .gt. 0.1) then
-    call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivdet),thick,recipthick,state(:,idetn),sink,zF, mesh)
-    sms(1:Nn,idetn) = sms(1:Nn,idetn) + sink(1:Nn)
-
-    call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivdet),thick,recipthick,state(:,idetc),sink,zF, mesh)
-    sms(1:Nn,idetc) = sms(1:Nn,idetc) + sink(1:Nn)	
-
-    call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivdet),thick,recipthick,state(:,idetsi),sink,zF, mesh)
-    sms(1:Nn,idetsi) = sms(1:Nn,idetsi) + sink(1:Nn)
-
-!#ifdef REcoM_calcification
-    call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivdet),thick,recipthick,state(:,idetcal),sink,zF, mesh)
-    sms(1:Nn,idetcal) = sms(1:Nn,idetcal) + sink(1:Nn)
-!#endif
-
-   if (REcoM_Second_Zoo) then
-    call REcoM_sinking2(dt_sink,Nn,SinkVel(:,ivdetsc),thick,recipthick,state(:,idetz2n),sink,zF, mesh)
-    sms(1:Nn,idetz2n) = sms(1:Nn,idetz2n) + sink(1:Nn)
-
-    call REcoM_sinking2(dt_sink,Nn,SinkVel(:,ivdetsc),thick,recipthick,state(:,idetz2c),sink,zF, mesh)
-    sms(1:Nn,idetz2c) = sms(1:Nn,idetz2c) + sink(1:Nn)
-
-    call REcoM_sinking2(dt_sink,Nn,SinkVel(:,ivdetsc),thick,recipthick,state(:,idetz2si),sink,zF, mesh)
-    sms(1:Nn,idetz2si) = sms(1:Nn,idetz2si) + sink(1:Nn)
-
-    call REcoM_sinking2(dt_sink,Nn,SinkVel(:,ivdetsc),thick,recipthick,state(:,idetz2calc),sink,zF, mesh)
-    sms(1:Nn,idetz2calc) = sms(1:Nn,idetz2calc) + sink(1:Nn)
-   end if
-
-  end if		
-  if (ciso) then
-!   sinking of 13|14C compounds
-    if (VPhy .gt. 0.1) then
-        call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivphy),thick,recipthick,state(:,iphyc_13),sink,zF,mesh)
-        sms(:,iphyc_13) = sms(:,iphyc_13) + sink
-
-        call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivphy),thick,recipthick,state(:,iphyc_14),sink,zF,mesh)
-        sms(:,iphyc_14) = sms(:,iphyc_14) + sink
-
-        call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivphy),thick,recipthick,state(:,iphycal_13),sink,zF,mesh)
-        sms(:,iphycal_13) = sms(:,iphycal_13) + sink
-
-        call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivphy),thick,recipthick,state(:,iphycal_14),sink,zF,mesh)
-        sms(:,iphycal_14) = sms(:,iphycal_14) + sink
-    end if
-
-    if (VDia .gt. 0.1) then
-        call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivdia),thick,recipthick,state(:,idiac_13),sink,zF,mesh)
-        sms(:,idiac_13) = sms(:,idiac_13) + sink
-
-        call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivdia),thick,recipthick,state(:,idiac_14),sink,zF,mesh)
-        sms(:,idiac_14) = sms(:,idiac_14) + sink
-    end if
-
-    if (VDet .gt. 0.1) then
-        call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivdet),thick,recipthick,state(:,idetc_13),sink,zF,mesh)
-        sms(:,idetc_13) = sms(:,idetc_13) + sink
-
-        call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivdet),thick,recipthick,state(:,idetc_14),sink,zF,mesh)
-        sms(:,idetc_14) = sms(:,idetc_14) + sink
-
-        call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivdet),thick,recipthick,state(:,idetcal_13),sink,zF,mesh)
-        sms(:,idetcal_13) = sms(:,idetcal_13) + sink
-
-        call REcoM_sinking(dt_sink,Nn,SinkVel(:,ivdet),thick,recipthick,state(:,idetcal_14),sink,zF,mesh)
-        sms(:,idetcal_14) = sms(:,idetcal_14) + sink
-    end if
-  end if ! ciso
-end if
-
-if (0) then
-!-------------------------------------------------------------------------------
-! Benthic layer: Detritus and phytoplankton sink into the benthic layer and are 
-! lost from the water column
-! (but remineralized and re-released in dissolved form later
-
-!   if (mype==0) then
-!      write(*,*) '____________________________________________________________'
-!      write(*,*) ' --> Benthic layer: Detritus and phytoplankton sink'
-!      write(*,*) '     into the bottom layer'
-!   endif
- if (REcoM_Second_Zoo) then
-  if (allow_var_sinking) then
-    Vben_det = Vdet_a * abs(zF(Nn)) + VDet
-    Vben_det_seczoo = VDet_zoo2
-    Vben_phy = Vdet_a * abs(zF(Nn)) + VPhy
-    Vben_dia = Vdet_a * abs(zF(Nn)) + VDia
-  else
-    Vben_det = VDet
-    Vben_det_seczoo = VDet_zoo2
-    Vben_phy = VPhy
-    Vben_dia = VDia
-  endif
- else 
-  if (allow_var_sinking) then
-    Vben_det = Vdet_a * abs(zF(Nn)) + VDet
-    Vben_phy = Vdet_a * abs(zF(Nn)) + VPhy
-    Vben_dia = Vdet_a * abs(zF(Nn)) + VDia
-  else
-    Vben_det = VDet
-    Vben_phy = VPhy
-    Vben_dia = VDia
-  endif
- endif
-
-!*** Det *** (index: 1=N,2=C,3=Si,4=calc)
-    wFluxDet(1)    = Vben_det * state(Nn,idetn)
-!    sms(Nn,idetn)  = sms(Nn,idetn)    - wFluxDet(1) * dt_b  &
-!                     / bottom_node_thickness(n) ! * recipthick(Nn)
-    LocBenthos(1)  = LocBenthos(1)    + wFluxDet(1) * dt_b ! / thickness of benthos layer
-
-    wFluxDet(2)    = Vben_det * state(Nn,idetc)
-    Fc             = max(tiny,0.1d0 * wFluxDet(2))                                     ! Conversion of detC from [mmolC/m2/day] => [umol/cm2/day]
-    if (NitrogenSS) then
-      LocDenit       = -0.9543 + 0.7662 * log(Fc) - 0.2350 * log(Fc) * log(Fc) ! Denitrification factor following Middelburg et al. (1996)
-      LocDenit       = exp(LocDenit * log(10.d0))                                 ! = 10^Denit, following Middelburg et al. (1996)
-      LocDenit       = q_NC_Denit * LocDenit * wFluxDet(2) ! q_NC_Denit = 0.86 N:C quota of the denitrification process
-      sms(Nn,idin)   = sms(Nn,idin)    -   LocDenit * dt_b * recipthick(Nn)   ! Part of benthos din is removed and lost due to denitrification
-    else
-      LocDenit = zero
-    end if                     
-
-!    sms(Nn,idetc)  = sms(Nn,idetc)    - wFluxDet(2) * dt_b  &
-!                     / bottom_node_thickness(n) ! * recipthick(Nn)
-    LocBenthos(2)  = LocBenthos(2)    + wFluxDet(2) * dt_b ! / thickness of benthos layer
-
-    wFluxDet(3)    = Vben_det * state(Nn,idetsi)                        ! m/day*[mmol/m3 ] 
-!    sms(Nn,idetsi) = sms(Nn,idetsi)   - wFluxDet(3) * dt_b  &
-!                      / bottom_node_thickness(n) ! * recipthick(Nn)
-    LocBenthos(3)  = LocBenthos(3)    + wFluxDet(3) * dt_b ! / thickness of benthos layer   [mmol/day/m2]*[day] 
-	  
-!#ifdef REcoM_calcification 
-    wFluxDet(4)     = Vben_det * state(Nn,idetcal)
-!    sms(Nn,idetcal) = sms(Nn,idetcal) - wFluxDet(4) * dt_b &
-!                      / bottom_node_thickness(n) ! * recipthick(Nn) 
-    LocBenthos(4)   = LocBenthos(4)   + wFluxDet(4) * dt_b ! / thickness of benthos layer
-!#endif
-
-!*** Phy *** (index: 1=N,2=C,3=calc)
-    wFluxPhy(1)     = Vben_phy * state(Nn,iphyn)
-!    sms(Nn,iphyn)   = sms(Nn,iphyn)   - wFluxPhy(1) * dt_b  &
-!                      / bottom_node_thickness(n) ! * recipthick(Nn)
-    LocBenthos(1)   = LocBenthos(1)   + wFluxPhy(1) * dt_b ! / thickness of benthos layer
-
-    wFluxPhy(2)     = Vben_phy * state(Nn,iphyc)
-!    sms(Nn,iphyc)   = sms(Nn,iphyc)   - wFluxPhy(2) * dt_b  &
-!                      / bottom_node_thickness(n) ! * recipthick(Nn)
-    LocBenthos(2)   = LocBenthos(2)   + wFluxPhy(2) * dt_b ! / thickness of benthos layer
-!#ifdef REcoM_calcification
-    wFluxPhy(3)     = Vben_phy * state(Nn,iphycal)
-!    sms(Nn,iphycal) = sms(Nn,iphycal) - wFluxPhy(3) * dt_b  &
-!                      / bottom_node_thickness(n) ! * recipthick(Nn)
-    LocBenthos(4)   = LocBenthos(4)   + wFluxPhy(3) * dt_b ! / thickness of benthos layer
-!#endif
-
-    wFluxPhy(4)     = Vben_phy * state(Nn,ipchl)
-!    sms(Nn,ipchl)   = sms(Nn,ipchl)   - wFluxPhy(4) * dt_b  &
-!     	              / bottom_node_thickness(n) !* recipthick(Nn)
-
-!------------------------------------
-if (REcoM_Second_Zoo) then
-    wFluxDet(5)    = Vben_det_seczoo * state(Nn,idetz2n)
-!    sms(Nn,idetz2n)  = sms(Nn,idetz2n)    - wFluxDet(5) * dt_b  &
-!                      / bottom_node_thickness(n) ! * recipthick(Nn)
-    LocBenthos(1)  = LocBenthos(1)    + wFluxDet(5) * dt_b ! / thickness of benthos layer  
-
-    wFluxDet(6)    = Vben_det_seczoo * state(Nn,idetz2c)
-!    sms(Nn,idetz2c)  = sms(Nn,idetz2c)    - wFluxDet(6) * dt_b  &
-!                      / bottom_node_thickness(n) ! * recipthick(Nn)
-    LocBenthos(2)  = LocBenthos(2)    + wFluxDet(6) * dt_b ! / thickness of benthos layer  
-
-    wFluxDet(7)    = Vben_det_seczoo * state(Nn,idetz2si)
-!    sms(Nn,idetz2si)  = sms(Nn,idetz2si)    - wFluxDet(7) * dt_b  &
-!                      / bottom_node_thickness(n) ! * recipthick(Nn)
-    LocBenthos(3)  = LocBenthos(3)    + wFluxDet(7) * dt_b ! / thickness of benthos layer  
-
-    wFluxDet(8)    = Vben_det_seczoo * state(Nn,idetz2calc)
-!    sms(Nn,idetz2calc)  = sms(Nn,idetz2calc)    - wFluxDet(8) * dt_b  &
-!                      / bottom_node_thickness(n) ! * recipthick(Nn)
-    LocBenthos(4)  = LocBenthos(4)    + wFluxDet(8) * dt_b ! / thickness of benthos layer  
-endif
-
-!*** Dia *** (index: 1=N,2=C,3=Si)
-    wFluxDia(1)     = Vben_dia * state(Nn,idian)
-!    sms(Nn,idian)   = sms(Nn,idian)   - wFluxDia(1) * dt_b  &
-!                      / bottom_node_thickness(n) !* recipthick(Nn)
-    LocBenthos(1)   = LocBenthos(1)   + wFluxDia(1) * dt_b ! / thickness of benthos layer
- 
-    wFluxDia(2)     = Vben_dia * state(Nn,idiac)
-!    sms(Nn,idiac)   = sms(Nn,idiac)   - wFluxDia(2) * dt_b  &
-!                      / bottom_node_thickness(n) !* recipthick(Nn) 
-    LocBenthos(2)   = LocBenthos(2)   + wFluxDia(2) * dt_b ! / thickness of benthos layer
-
-    wFluxDia(3)     = Vben_dia * state(Nn,idiasi)
-!    sms(Nn,idiasi)  = sms(Nn,idiasi)  - wFluxDia(3) * dt_b  &
-!                      / bottom_node_thickness(n) !* recipthick(Nn)
-    LocBenthos(3)   = LocBenthos(3)   + wFluxDia(3) * dt_b ! / thickness of benthos layer
-    
-    wFluxDia(4)     = Vben_dia * state(Nn,idchl)
-!    sms(Nn,idchl)   = sms(Nn,idchl)   - wFluxDia(4) * dt_b  &
-!     	              / bottom_node_thickness(n) !* recipthick(Nn)
-
-    if (ciso) then ! reorganize the index here after secondzoopnakton and detritus
-!*** Det *** (index: 5=C_13,6=C_14,7=calc_13,8=calc_14)
-        wFluxDet(5)        = Vben_det * state(Nn,idetc_13)
-        sms(Nn,idetc_13)   = sms(Nn,idetc_13) - wFluxDet(5) * dt_b * recipthick(Nn)
-        LocBenthos(5)      = LocBenthos(5)    + wFluxDet(5) * dt_b ! / thickness of benthos layer
-
-        wFluxDet(6)        = Vben_det * state(Nn,idetc_14)
-        sms(Nn,idetc_14)   = sms(Nn,idetc_14) - wFluxDet(6) * dt_b * recipthick(Nn)
-        LocBenthos(6)      = LocBenthos(6)    + wFluxDet(6) * dt_b ! / thickness of benthos layer
-
-        wFluxDet(7)        = Vben_det * state(Nn,idetcal_13)
-        sms(Nn,idetcal_13) = sms(Nn,idetcal_13) - wFluxDet(7) * dt_b * recipthick(Nn)
-        LocBenthos(7)      = LocBenthos(7)   + wFluxDet(7) * dt_b ! / thickness of benthos layer
-
-        wFluxDet(8)        = Vben_det * state(Nn,idetcal_14)
-        sms(Nn,idetcal_14) = sms(Nn,idetcal_14) - wFluxDet(8) * dt_b * recipthick(Nn)
-        LocBenthos(8)      = LocBenthos(8)   + wFluxDet(8) * dt_b ! / thickness of benthos layer
-
-!*** Phy *** (index: 5=C_13,6=C_14,7=calc_13,8=calc_14)
-        wFluxPhy(5)        = Vben_phy * state(Nn,iphyc_13)
-        sms(Nn,iphyc_13)   = sms(Nn,iphyc_13) - wFluxPhy(5) * dt_b * recipthick(Nn)
-        LocBenthos(5)      = LocBenthos(5)   + wFluxPhy(5) * dt_b ! / thickness of benthos layer
-
-        wFluxPhy(6)        = Vben_phy * state(Nn,iphyc_14)
-        sms(Nn,iphyc_14)   = sms(Nn,iphyc_14) - wFluxPhy(6) * dt_b * recipthick(Nn)
-        LocBenthos(6)      = LocBenthos(6)   + wFluxPhy(6) * dt_b ! / thickness of benthos layer
-
-        wFluxPhy(7)        = Vben_phy * state(Nn,iphycal_13)
-        sms(Nn,iphycal_13) = sms(Nn,iphycal_13) - wFluxPhy(7) * dt_b * recipthick(Nn)
-        LocBenthos(7)      = LocBenthos(7)   + wFluxPhy(7) * dt_b ! / thickness of benthos layer
-
-        wFluxPhy(8)        = Vben_phy * state(Nn,iphycal_14)
-        sms(Nn,iphycal_14) = sms(Nn,iphycal_14) - wFluxPhy(8) * dt_b * recipthick(Nn)
-        LocBenthos(8)      = LocBenthos(8)   + wFluxPhy(8) * dt_b ! / thickness of benthos layer
-
-!*** Dia *** (index: 5=C_13,6=C_14)
-        wFluxDia(5)        = Vben_dia * state(Nn,idiac_13)
-        sms(Nn,idiac_13)   = sms(Nn,idiac_13) - wFluxDia(5) * dt_b * recipthick(Nn)
-        LocBenthos(5)      = LocBenthos(5)   + wFluxDia(5) * dt_b ! / thickness of benthos layer
-
-        wFluxDia(6)        = Vben_dia * state(Nn,idiac_14)
-        sms(Nn,idiac_14)   = sms(Nn,idiac_14) - wFluxDia(6) * dt_b * recipthick(Nn)
-        LocBenthos(6)      = LocBenthos(6)   + wFluxDia(6) * dt_b ! / thickness of benthos layer
-    end if ! ciso
-end if
 
 end subroutine REcoM_sms
 
@@ -2187,318 +1877,3 @@ function iron_chemistry(Fe, totalLigand, ligandStabConst)
   return
   end
 
-!===============================================================================
-! Subroutine calculating sinking of Detritus, diatoms and possibly phy
-!===============================================================================
-subroutine REcoM_sinking(dt, Nn, wF, dzF, recipDzF, C, sink, zF, mesh)
-
-  use recom_config
-  use g_PARSUP
-  use mod_MESH
- 
-  implicit none
-
-  type(t_mesh), intent(in), target  :: mesh
-
-  Real(kind=8)                      :: dt
-  Integer                           :: Nn
-
-  Integer	                    :: k,km1,km2,kp1
-
-  Real(kind=8),dimension(mesh%nl-1) :: C
-  Real(kind=8),dimension(mesh%nl)   :: wF            ! Vertical velocity for fluxes
-
-  Real(kind=8)                      :: wLoc,wM,wPs
-  Real(kind=8)                      :: Rjp,Rj,Rjm
-
-  Real(kind=8),dimension(mesh%nl-1) :: dzF,recipdzF
-
-  Real(kind=8)                      :: cfl, d0, d1, thetaP, thetaM, psiP, psiM
-  Real(kind=8)                      :: onesixth	= 	1.d0/6.d0
-  Real(kind=8)                      :: wflux
-  Real(kind=8)                      :: wfluxkp1
-
-  Real(kind=8),dimension(mesh%nl-1) :: sink	
-
-  Real(kind=8),dimension(mesh%nl)   :: zF                   ! [m] Depth of fluxes
-  Real(kind=8),dimension(mesh%nl)   :: new_wF
-
-#include  "../associate_mesh.h"
-
-!! zbar (depth of levels) and Z (mid depths of layers)
-!! zbar is negative 
-!! zbar(mesh%nl) allocate the array for storing the standard depths
-!! Z(mesh%nl-1)  mid-depths of cells
-
-    !    ----------- zbar_1, V_1 (Volume eq. to Area)
-    ! Z_1 o T_1
-    !    ----------- zbar_2, V_2
-    ! Z_2 o T_2
-    !    ----------- zbar_3, V_3
-    ! Z_3 o T_3
-    !    ----------- zbar_4
-
-
-!-------------------------------------------------------------------------------
-! 
-!-------------------------------------------------------------------------------
-
-  if (allow_var_sinking) then
-
-!! loop over the layers
-!write (*,*) "nlevels_nod2D= ", nlevels_nod2D(n), " Nn= ", Nn
-
-    do k=1,Nn+1
-
-
-      ! Vdet_a = 0.0288       ! [1/day]
-      new_wF(k)= Vdet_a * abs(zF(k)) + wF(k) ! Applies to phy, dia and det.
-!!                |-----------------|
-!!                       |                | 
-!!                       |                '--> ! constant through the water column and positive downwards ((calculated in recom_extra)
-!!                       '-->	increasing sinking velocity with depth [m/day] (calculated in recom_extra)     
-    enddo
-
-  else
-!! constant through the water column positive downwards ((calculated in recom_extra)
-    new_wF = wF 
-
-  endif
-
-!-------------------------------------------------------------------------------
-! 
-!-------------------------------------------------------------------------------
-
-  
-  wfluxkp1   = 0.d0
-  wflux      = 0.d0	
-	
-! mid layers
- 
-  do k = Nn,2,-1   
-
-     !___________________________________________________________________
-            ! if topographic depth dd is deeper than depth of deepest full cell 
-            ! depth level zbar(nle)
-            !       : 
-            !       : 
-            ! ______________ zbar(Nn-4)--------->+---->+
-            !                                     |     |
-            !                                     |     |
-            ! -------------- Z(Nn-4)              |     |
-            !                                     |     |
-            !                                     |     |
-            ! ______________ zbar(Nn-3)--------->+---->+   --> km2
-            !                                     |     |            |
-            !                                     |     |            |
-            ! -------------- Z(Nn-3)              |     |            Rjm 
-            !                                     |     |            |
-            !                                     |     |            |
-            ! ______________ zbar(Nn-2)--------->+---->+   --> km1
-            !                                     |     |            |
-            !                                     |     |            |
-            ! -------------- Z(Nn-2)              |     |            Rj
-            !                                     |     |            |
-            !                                     |     |            |
-            ! ______________ zbar(Nn-1)--------->+---->+   --> k       
-            !                                     |     |            |
-            !                                     |     |            |
-            ! -------------- Z(Nn-1)              |     |            Rjp
-            !                                     |     |            |
-            !                                     |     |            |
-            ! ______________ zbar(Nn)----------->+---->+   --> kp1
-            ! / / / / / / / / / / / / / / / / / / 
-           
-
-
-    ! -- lower layer  
-    km1      = max(1,  k-1) 
-    ! -- upper layer
-    km2      = max(1,  k-2) 
-
-    kp1      = min(Nn, k+1) ! -- kp1 --> maximum depth Nn 
-
-    wLoc     = -new_wF(k)  ! new_wF(k) is positive downwards therefore wLoc is negative
-
-    wPs      = wLoc + abs(wLoc) ! --> Positive vertical velocity
-    wM       = wLoc - abs(wLoc) ! --> Negative vertical velocity
-
-    Rjp	     = C(k)	- C(kp1) 
-
-    Rj       = C(km1)   - C(k)  
-
-    Rjm	     = C(km2)   - C(km1)	
-
-    cfl      = abs(wLoc * dt * recipDzF(k))         ! [m/day] * [day] * [1/m]
-
-    d0       = (2.d0 - cfl)*(1.d0 - cfl)*onesixth
-
-    d1       = (1.d0 - cfl*cfl)*onesixth
-	
-    thetaP   = Rjm/(1.d-20+Rj)
-
-    psiP     = d0 + d1*thetaP
-    psiP     = max(0.d0, min(min(1.d0,psiP), &
-                 (1.d0-cfl)/(1.d-20+cfl)*thetaP))
-
-    thetaM   = Rjp/(1.d-20 + Rj)	
-    psiM     = d0 + d1*thetaM
-
-    psiM     = max(0.d0, min(min(1.d0,psiM), &
-		(1.d0-cfl)/(1.d-20-cfl)*thetaM))
-
-    wflux    = ( 0.5*wPs*(C(k)  + psiM * Rj)+ &
-		0.5*wM*(C(km1)+ psiP * Rj))
-
-    sink(k)  = -(wflux-wfluxkp1)*recipDzF(k)*dt
-
-    wfluxkp1 =	wflux	
-
-  enddo
-
-! surface layer 
-
-  k          = 1
-  wflux      = 0
-  sink(k)    = -(wflux-wfluxkp1)*recipDzF(k)*dt
-	
-end subroutine REcoM_sinking
-!===============================================================================
-! Subroutine calculating sinking2 of secondzoo
-!===============================================================================
-subroutine REcoM_sinking2(dt, Nn, wF, dzF, recipDzF, C, sink, zF, mesh)
-
-  use recom_config
-  use g_PARSUP
-  use mod_MESH
- 
-  implicit none
-
-  type(t_mesh), intent(in), target  :: mesh
-
-  Real(kind=8)                      :: dt
-  Integer                           :: Nn
-
-  Integer	                    :: k,km1,km2,kp1
-
-  Real(kind=8),dimension(mesh%nl-1) :: C
-  Real(kind=8),dimension(mesh%nl)   :: wF            ! Vertical velocity for fluxes
-
-  Real(kind=8)                      :: wLoc,wM,wPs
-  Real(kind=8)                      :: Rjp,Rj,Rjm
-
-  Real(kind=8),dimension(mesh%nl-1) :: dzF,recipdzF
-
-  Real(kind=8)                      :: cfl, d0, d1, thetaP, thetaM, psiP, psiM
-  Real(kind=8)                      :: onesixth	= 	1.d0/6.d0
-  Real(kind=8)                      :: wflux
-  Real(kind=8)                      :: wfluxkp1
-
-  Real(kind=8),dimension(mesh%nl-1) :: sink	
-
-  Real(kind=8),dimension(mesh%nl)   :: zF                   ! [m] Depth of fluxes
-  Real(kind=8),dimension(mesh%nl)   :: new_wF
-
-#include  "../associate_mesh.h"
-
-
-  new_wF = wF 
-
-!-------------------------------------------------------------------------------
-! 
-!-------------------------------------------------------------------------------
-
-  
-  wfluxkp1   = 0.d0
-  wflux      = 0.d0	
-	
-! mid layers
- 
-  do k = Nn,2,-1   
-
-     !___________________________________________________________________
-            ! if topographic depth dd is deeper than depth of deepest full cell 
-            ! depth level zbar(nle)
-            !       : 
-            !       : 
-            ! ______________ zbar(Nn-4)--------->+---->+
-            !                                     |     |
-            !                                     |     |
-            ! -------------- Z(Nn-4)              |     |
-            !                                     |     |
-            !                                     |     |
-            ! ______________ zbar(Nn-3)--------->+---->+   --> km2
-            !                                     |     |            |
-            !                                     |     |            |
-            ! -------------- Z(Nn-3)              |     |            Rjm 
-            !                                     |     |            |
-            !                                     |     |            |
-            ! ______________ zbar(Nn-2)--------->+---->+   --> km1
-            !                                     |     |            |
-            !                                     |     |            |
-            ! -------------- Z(Nn-2)              |     |            Rj
-            !                                     |     |            |
-            !                                     |     |            |
-            ! ______________ zbar(Nn-1)--------->+---->+   --> k       
-            !                                     |     |            |
-            !                                     |     |            |
-            ! -------------- Z(Nn-1)              |     |            Rjp
-            !                                     |     |            |
-            !                                     |     |            |
-            ! ______________ zbar(Nn)----------->+---->+   --> kp1
-            ! / / / / / / / / / / / / / / / / / / 
-           
-
-
-    ! -- lower layer  
-    km1      = max(1,  k-1) 
-    ! -- upper layer
-    km2      = max(1,  k-2) 
-
-    kp1      = min(Nn, k+1) ! -- kp1 --> maximum depth Nn 
-
-    wLoc     = -new_wF(k)  ! new_wF(k) is positive downwards therefore wLoc is negative
-
-    wPs      = wLoc + abs(wLoc) ! --> Positive vertical velocity
-    wM       = wLoc - abs(wLoc) ! --> Negative vertical velocity
-
-    Rjp	     = C(k)	- C(kp1) 
-
-    Rj       = C(km1)   - C(k)  
-
-    Rjm	     = C(km2)   - C(km1)	
-
-    cfl      = abs(wLoc * dt * recipDzF(k))         ! [m/day] * [day] * [1/m]
-
-    d0       = (2.d0 - cfl)*(1.d0 - cfl)*onesixth
-
-    d1       = (1.d0 - cfl*cfl)*onesixth
-	
-    thetaP   = Rjm/(1.d-20+Rj)
-
-    psiP     = d0 + d1*thetaP
-    psiP     = max(0.d0, min(min(1.d0,psiP), &
-                 (1.d0-cfl)/(1.d-20+cfl)*thetaP))
-
-    thetaM   = Rjp/(1.d-20 + Rj)	
-    psiM     = d0 + d1*thetaM
-
-    psiM     = max(0.d0, min(min(1.d0,psiM), &
-		(1.d0-cfl)/(1.d-20-cfl)*thetaM))
-
-    wflux    = ( 0.5*wPs*(C(k)  + psiM * Rj)+ &
-		0.5*wM*(C(km1)+ psiP * Rj))
-
-    sink(k)  = -(wflux-wfluxkp1)*recipDzF(k)*dt
-
-    wfluxkp1 =	wflux	
-
-  enddo
-
-! surface layer 
-
-  k          = 1
-  wflux      = 0
-  sink(k)    = -(wflux-wfluxkp1)*recipDzF(k)*dt
-	
-end subroutine REcoM_sinking2
