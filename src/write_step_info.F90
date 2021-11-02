@@ -41,7 +41,7 @@ subroutine write_step_info(istep, outfreq, dynamics, tracers, partit, mesh)
     use MOD_TRACER
     use MOD_DYN
 	use o_PARAM
-	use o_ARRAYS, only: eta_n, d_eta, water_flux, heat_flux, CFL_z, &
+	use o_ARRAYS, only: eta_n, d_eta, water_flux, heat_flux, &
                         pgf_x, pgf_y, Av, Kv
 	use i_ARRAYS
 	use g_comm_auto
@@ -63,7 +63,7 @@ subroutine write_step_info(istep, outfreq, dynamics, tracers, partit, mesh)
     type(t_tracer), intent(in)   , target :: tracers
     type(t_dyn)   , intent(in)   , target :: dynamics
     real(kind=WP), dimension(:,:,:), pointer :: UV, UVnode
-    real(kind=WP), dimension(:,:), pointer :: Wvel
+    real(kind=WP), dimension(:,:), pointer :: Wvel, CFL_z
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -71,6 +71,7 @@ subroutine write_step_info(istep, outfreq, dynamics, tracers, partit, mesh)
     UV => dynamics%uv(:,:,:)
     UVnode => dynamics%uvnode(:,:,:)
     Wvel => dynamics%w(:,:)
+    CFL_z => dynamics%cfl_z(:,:)
     
 	if (mod(istep,outfreq)==0) then
 		
@@ -264,7 +265,7 @@ subroutine check_blowup(istep, dynamics, tracers, partit, mesh)
     use MOD_DYN
 	use o_PARAM
 	use o_ARRAYS, only: eta_n, d_eta, ssh_rhs, ssh_rhs_old, water_flux, stress_surf, &
-                        CFL_z, heat_flux, Kv, Av
+                        heat_flux, Kv, Av
 	use i_ARRAYS
 	use g_comm_auto
 	use io_BLOWUP
@@ -280,13 +281,14 @@ subroutine check_blowup(istep, dynamics, tracers, partit, mesh)
     type(t_tracer), intent(in)   , target :: tracers
     type(t_dyn)   , intent(in)   , target :: dynamics
     real(kind=WP), dimension(:,:,:), pointer :: UV
-    real(kind=WP), dimension(:,:), pointer :: Wvel
+    real(kind=WP), dimension(:,:), pointer :: Wvel, CFL_z
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
     UV   => dynamics%uv(:,:,:)
     Wvel => dynamics%w(:,:)
+    CFL_z => dynamics%cfl_z(:,:)
     
 	!___________________________________________________________________________
 ! ! 	if (mod(istep,logfile_outfreq)==0) then

@@ -188,7 +188,6 @@ real(kind=WP), allocatable         :: UV_dis_tend(:,:,:), UV_back_tend(:,:,:), U
 real(kind=WP), allocatable         :: UV_dis_posdef_b2(:,:), UV_dis_posdef(:,:), UV_back_posdef(:,:)
 real(kind=WP), allocatable         :: eta_n(:), d_eta(:)
 real(kind=WP), allocatable         :: ssh_rhs(:), hpressure(:,:)
-real(kind=WP), allocatable         :: CFL_z(:,:)
 real(kind=WP), allocatable         :: stress_surf(:,:)
 real(kind=WP), allocatable         :: stress_node_surf(:,:)
 REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_x(:)

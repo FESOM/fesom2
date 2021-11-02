@@ -1844,7 +1844,7 @@ end subroutine compute_hbar_ale
 subroutine vert_vel_ale(dynamics, partit, mesh)
     use g_config,only: dt, which_ALE, min_hnode, lzstar_lev, flag_warn_cflz
     use MOD_MESH
-    use o_ARRAYS, only: fer_Wvel, fer_UV, CFL_z, water_flux, ssh_rhs, & 
+    use o_ARRAYS, only: fer_Wvel, fer_UV, water_flux, ssh_rhs, & 
                         ssh_rhs_old, eta_n, d_eta
     use o_PARAM
     USE MOD_PARTIT
@@ -1868,7 +1868,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     type(t_mesh),   intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
     real(kind=WP), dimension(:,:,:), pointer :: UV
-    real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, Wvel_i
+    real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, Wvel_i, CFL_z
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -1877,6 +1877,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     Wvel  =>dynamics%w(:,:)
     Wvel_e=>dynamics%w_e(:,:)
     Wvel_i=>dynamics%w_i(:,:)
+    CFL_z =>dynamics%cfl_z(:,:)
 
     !___________________________________________________________________________
     ! Contributions from levels in divergence
