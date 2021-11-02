@@ -25,6 +25,7 @@ use io_MEANDATA
 use io_mesh_info
 use diagnostics
 use mo_tidal
+use dynamics_init_interface
 use tracer_init_interface
 use ocean_setup_interface
 use ice_setup_interface
@@ -268,7 +269,7 @@ integer mpi_version_len
 #endif
         call clock      
         !___compute horizontal velocity on nodes (originaly on elements)________
-        call compute_vel_nodes(partit, mesh)
+        call compute_vel_nodes(partit, dynamics, mesh)
         !___model sea-ice step__________________________________________________
         t1 = MPI_Wtime()
         if(use_ice) then
