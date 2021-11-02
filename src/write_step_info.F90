@@ -1,6 +1,6 @@
 module write_step_info_interface
   interface
-    subroutine write_step_info(istep,outfreq,dynamics, tracers,partit,mesh)
+    subroutine write_step_info(istep, outfreq, dynamics, tracers, partit, mesh)
       use MOD_MESH
       USE MOD_PARTIT
       USE MOD_PARSUP
@@ -16,7 +16,7 @@ module write_step_info_interface
 end module
 module check_blowup_interface
   interface
-    subroutine check_blowup(istep, dynamics, tracers,partit,mesh)
+    subroutine check_blowup(istep, dynamics, tracers, partit, mesh)
       use MOD_MESH
       USE MOD_PARTIT
       USE MOD_PARSUP
