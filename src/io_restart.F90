@@ -124,8 +124,8 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
   !___Define the netCDF variables for 3D fields_______________________________
   call def_variable(oid, 'u',        (/nl-1, elem2D/), 'zonal velocity',        'm/s', dynamics%uv(1,:,:));
   call def_variable(oid, 'v',        (/nl-1, elem2D/), 'meridional velocity',   'm/s', dynamics%uv(2,:,:));
-  call def_variable(oid, 'urhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for u', 'm/s', UV_rhsAB(1,:,:));
-  call def_variable(oid, 'vrhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for v', 'm/s', UV_rhsAB(2,:,:));
+  call def_variable(oid, 'urhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for u', 'm/s', dynamics%uv_rhsAB(1,:,:));
+  call def_variable(oid, 'vrhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for v', 'm/s', dynamics%uv_rhsAB(2,:,:));
   
   !___Save restart variables for TKE and IDEMIX_________________________________
   if (trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then

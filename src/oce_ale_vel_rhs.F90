@@ -1,17 +1,3 @@
-module momentum_adv_scalar_interface
-  interface
-    subroutine momentum_adv_scalar(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      type(t_dyn)   , intent(inout), target :: dynamics
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      
-    end subroutine
-  end interface
-end module
 
 module compute_vel_rhs_interface
   interface
@@ -28,6 +14,22 @@ module compute_vel_rhs_interface
   end interface
 end module
 
+module momentum_adv_scalar_interface
+  interface
+    subroutine momentum_adv_scalar(dynamics, partit, mesh)
+      use mod_mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      USE MOD_DYN
+      type(t_dyn)   , intent(inout), target :: dynamics
+      type(t_partit), intent(inout), target :: partit
+      type(t_mesh)  , intent(in)   , target :: mesh
+      
+    end subroutine
+  end interface
+end module
+
+
 !
 !
 !_______________________________________________________________________________
@@ -36,7 +38,7 @@ subroutine compute_vel_rhs(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_DYN
-    use o_ARRAYS, only: UV_rhs, UV_rhsAB, eta_n, coriolis, ssh_gp, pgf_x, pgf_y
+    use o_ARRAYS, only: UV_rhs, eta_n, coriolis, ssh_gp, pgf_x, pgf_y
     use i_ARRAYS
     use i_therm_param
     use o_PARAM
@@ -58,13 +60,14 @@ subroutine compute_vel_rhs(dynamics, partit, mesh)
     real(kind=WP)            :: t1, t2, t3, t4
     real(kind=WP)            :: p_ice(3), p_air(3), p_eta(3)
     integer                  :: use_pice
-    real(kind=WP), dimension(:,:,:), pointer :: UV
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    UV=>dynamics%uv(:,:,:)
+    UV       =>dynamics%uv(:,:,:)
+    UV_rhsAB =>dynamics%uv_rhsAB(:,:,:)
 
     t1=MPI_Wtime()
     use_pice=0
@@ -186,7 +189,7 @@ USE MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
 use MOD_DYN
-USE o_ARRAYS, only: Wvel_e, UV_rhsAB
+USE o_ARRAYS, only: Wvel_e
 USE o_PARAM
 use g_comm_auto
 IMPLICIT NONE
@@ -200,13 +203,14 @@ integer                  :: nl1, nl2, ul1, ul2, nod(2), el, ed, k, nle, ule
 real(kind=WP)            :: un1(1:mesh%nl-1), un2(1:mesh%nl-1)
 real(kind=WP)            :: wu(1:mesh%nl), wv(1:mesh%nl)
 real(kind=WP)            :: Unode_rhs(2,mesh%nl-1,partit%myDim_nod2d+partit%eDim_nod2D)
-real(kind=WP), dimension(:,:,:), pointer :: UV
+real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    UV=>dynamics%uv(:,:,:)
+    UV      =>dynamics%uv(:,:,:)
+    UV_rhsAB=>dynamics%uv_rhsAB(:,:,:)
 
     !___________________________________________________________________________
     ! 1st. compute vertical momentum advection component: w * du/dz, w*dv/dz

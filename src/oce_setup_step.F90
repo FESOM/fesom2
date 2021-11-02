@@ -476,7 +476,7 @@ node_size=myDim_nod2D+eDim_nod2D
 !allocate(stress_diag(2, elem_size))!delete me
 !!PS allocate(UV(2, nl-1, elem_size))
 allocate(UV_rhs(2,nl-1, elem_size))
-allocate(UV_rhsAB(2,nl-1, elem_size))
+!!PS allocate(UV_rhsAB(2,nl-1, elem_size))
 allocate(Visc(nl-1, elem_size))
 ! ================
 ! elevation and its rhs
@@ -625,7 +625,7 @@ end if
 
 !!PS     UV=0.0_WP
     UV_rhs=0.0_WP
-    UV_rhsAB=0.0_WP
+!!PS     UV_rhsAB=0.0_WP
 !
     eta_n=0.0_WP
     d_eta=0.0_WP
