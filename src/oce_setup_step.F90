@@ -474,9 +474,7 @@ node_size=myDim_nod2D+eDim_nod2D
 ! Velocities
 ! ================     
 !allocate(stress_diag(2, elem_size))!delete me
-!!PS allocate(UV(2, nl-1, elem_size))
 allocate(UV_rhs(2,nl-1, elem_size))
-!!PS allocate(UV_rhsAB(2,nl-1, elem_size))
 allocate(Visc(nl-1, elem_size))
 ! ================
 ! elevation and its rhs
@@ -491,8 +489,7 @@ if (use_ice .and. use_momix) mixlength=0.
 ! ================
 ! Vertical velocity and pressure
 ! ================
-allocate(Wvel(nl, node_size), hpressure(nl,node_size))
-allocate(Wvel_e(nl, node_size), Wvel_i(nl, node_size))
+allocate( hpressure(nl,node_size))
 allocate(CFL_z(nl, node_size)) ! vertical CFL criteria
 allocate(bvfreq(nl,node_size),mixlay_dep(node_size),bv_ref(node_size))
 ! ================
@@ -630,9 +627,6 @@ end if
     eta_n=0.0_WP
     d_eta=0.0_WP
     ssh_rhs=0.0_WP
-    Wvel=0.0_WP
-    Wvel_e	=0.0_WP
-    Wvel_i	=0.0_WP
     CFL_z   =0.0_WP
     hpressure=0.0_WP
 !

@@ -158,9 +158,9 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
      longname=trim(longname)//', Adams–Bashforth'
      call def_variable(oid, trim(trname)//'_AB',(/nl-1, nod2D/), trim(longname), trim(units), tracers%data(j)%valuesAB(:,:));
   end do
-  call def_variable(oid, 'w',      (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel);
-  call def_variable(oid, 'w_expl', (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel_e);
-  call def_variable(oid, 'w_impl', (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel_i);
+  call def_variable(oid, 'w',      (/nl, nod2D/), 'vertical velocity', 'm/s', dynamics%w);
+  call def_variable(oid, 'w_expl', (/nl, nod2D/), 'vertical velocity', 'm/s', dynamics%w_e);
+  call def_variable(oid, 'w_impl', (/nl, nod2D/), 'vertical velocity', 'm/s', dynamics%w_i);
 end subroutine ini_ocean_io
 !
 !--------------------------------------------------------------------------------------------

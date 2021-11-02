@@ -59,12 +59,14 @@ module diff_ver_part_redi_expl_interface
 end module
 module diff_ver_part_impl_ale_interface
   interface
-    subroutine diff_ver_part_impl_ale(tr_num, tracer, partit, mesh) 
+    subroutine diff_ver_part_impl_ale(tr_num, dynamics,  tracer, partit, mesh) 
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
       use mod_tracer
+      use MOD_DYN
       integer,        intent(in),    target :: tr_num
+      type(t_dyn), intent(inout), target :: dynamics
       type(t_tracer), intent(inout), target :: tracer
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
@@ -138,7 +140,7 @@ end module
 subroutine solve_tracers_ale(dynamics, tracers, partit, mesh) 
     use g_config
     use o_PARAM, only: SPP, Fer_GM
-    use o_arrays, only: Wvel, Wvel_e, fer_Wvel, fer_UV
+    use o_arrays, only: fer_Wvel, fer_UV
     use mod_mesh
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -157,12 +159,15 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     integer                               :: tr_num, node, nzmax, nzmin
     real(kind=WP), dimension(:,:,:), pointer :: UV
+    real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e 
     
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-    UV => dynamics%uv(:,:,:)
+    UV     => dynamics%uv(:,:,:)
+    Wvel   => dynamics%w(:,:)
+    Wvel_e => dynamics%w_e(:,:)
 
     !___________________________________________________________________________
     if (SPP) call cal_rejected_salt(partit, mesh)
@@ -271,7 +276,7 @@ subroutine adv_tracers_ale(dt, tr_num, dynamics, tracers, partit, mesh)
     ! here --> add horizontal advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
     tracers%work%del_ttf_advhoriz = 0.0_WP
     tracers%work%del_ttf_advvert  = 0.0_WP
-    call do_oce_adv_tra(dt, dynamics%uv, wvel, wvel_i, wvel_e, tr_num, tracers, partit, mesh)    
+    call do_oce_adv_tra(dt, dynamics%uv, dynamics%w, dynamics%w_i, dynamics%w_e, tr_num, tracers, partit, mesh)    
     !___________________________________________________________________________
     ! update array for total tracer flux del_ttf with the fluxes from horizontal
     ! and vertical advection
@@ -360,7 +365,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     if (tracers%i_vert_diff) then
         ! do vertical diffusion: implicite 
-        call diff_ver_part_impl_ale(tr_num, tracers, partit, mesh) 
+        call diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh) 
         
     end if
     !We DO not set del_ttf to zero because it will not be used in this timestep anymore
@@ -454,13 +459,14 @@ end subroutine diff_ver_part_expl_ale
 !
 !===============================================================================
 ! vertical diffusivity augmented with Redi contribution [vertical flux of K(3,3)*d_zT]
-subroutine diff_ver_part_impl_ale(tr_num, tracers, partit, mesh) 
+subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh) 
     use MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
     use MOD_TRACER
+    use MOD_DYN
     use o_PARAM
-    use o_ARRAYS
+    use o_ARRAYS, only: Ki, Kv, heat_flux, water_flux, slope_tapered
     use i_ARRAYS
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -472,8 +478,9 @@ subroutine diff_ver_part_impl_ale(tr_num, tracers, partit, mesh)
         
     implicit none
     integer,        intent(in),    target :: tr_num
+    type(t_dyn)   , intent(inout), target :: dynamics
     type(t_tracer), intent(inout), target :: tracers
-    type(t_mesh),   intent(in),    target :: mesh
+    type(t_mesh)  , intent(in)   , target :: mesh
     type(t_partit), intent(inout), target :: partit
     real(kind=WP)            :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
     real(kind=WP)            :: cp(mesh%nl), tp(mesh%nl)
@@ -485,12 +492,14 @@ subroutine diff_ver_part_impl_ale(tr_num, tracers, partit, mesh)
     logical                  :: do_wimpl=.true.
 
     real(kind=WP), dimension(:,:), pointer :: trarr
+    real(kind=WP), dimension(:,:), pointer :: Wvel_i
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-    trarr=>tracers%data(tr_num)%values(:,:)
+    trarr  => tracers%data(tr_num)%values(:,:)
+    Wvel_i => dynamics%w_i(:,:)
     !___________________________________________________________________________
     if ((trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') .OR. (.not. w_split)) do_wimpl=.false.
     

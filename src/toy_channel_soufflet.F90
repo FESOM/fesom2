@@ -375,11 +375,13 @@ subroutine energy_out_soufflet(dynamics, partit, mesh)
   type(t_mesh)  , intent(in)   , target :: mesh
   
 real(kind=WP), dimension(:,:,:), pointer :: UV
+real(kind=WP), dimension(:,:), pointer :: Wvel
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
 UV => dynamics%uv(:,:,:)
+Wvel => dynamics%w(:,:)
 
 
  nybins=100

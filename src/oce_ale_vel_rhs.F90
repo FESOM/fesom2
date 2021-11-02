@@ -189,7 +189,6 @@ USE MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
 use MOD_DYN
-USE o_ARRAYS, only: Wvel_e
 USE o_PARAM
 use g_comm_auto
 IMPLICIT NONE
@@ -204,6 +203,7 @@ real(kind=WP)            :: un1(1:mesh%nl-1), un2(1:mesh%nl-1)
 real(kind=WP)            :: wu(1:mesh%nl), wv(1:mesh%nl)
 real(kind=WP)            :: Unode_rhs(2,mesh%nl-1,partit%myDim_nod2d+partit%eDim_nod2D)
 real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB
+real(kind=WP), dimension(:,:), pointer :: Wvel_e
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -211,6 +211,7 @@ real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB
 #include "associate_mesh_ass.h"
     UV      =>dynamics%uv(:,:,:)
     UV_rhsAB=>dynamics%uv_rhsAB(:,:,:)
+    Wvel_e  =>dynamics%w_e(:,:)
 
     !___________________________________________________________________________
     ! 1st. compute vertical momentum advection component: w * du/dz, w*dv/dz

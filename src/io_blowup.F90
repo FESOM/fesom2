@@ -143,9 +143,9 @@ MODULE io_BLOWUP
 !!PS 			longname=trim(longname)//', Adams–Bashforth'
 !!PS 			call def_variable(bid, trim(trname)//'_AB',(/nl-1, nod2D/), trim(longname), trim(units), tracers%data(j)%valuesAB(:,:)(:,:));
 		end do
-		call def_variable(bid, 'w'			, (/nl, nod2D/)		, 'vertical velocity', 'm/s', Wvel);
-		call def_variable(bid, 'w_expl'		, (/nl, nod2D/)		, 'vertical velocity', 'm/s', Wvel_e);
-		call def_variable(bid, 'w_impl'		, (/nl, nod2D/)		, 'vertical velocity', 'm/s', Wvel_i);
+		call def_variable(bid, 'w'			, (/nl, nod2D/)		, 'vertical velocity', 'm/s', dynamics%w);
+		call def_variable(bid, 'w_expl'		, (/nl, nod2D/)		, 'vertical velocity', 'm/s', dynamics%w_e);
+		call def_variable(bid, 'w_impl'		, (/nl, nod2D/)		, 'vertical velocity', 'm/s', dynamics%w_i);
 		call def_variable(bid, 'cfl_z'		, (/nl-1, nod2D/)		, 'vertical CFL criteria', '', CFL_z);
 		
 		!_____________________________________________________________________________
