@@ -153,6 +153,20 @@ module uke_update_interface
   end interface
 end module
 
+module relative_vorticity_interface
+  interface
+    subroutine relative_vorticity(dynamics, partit, mesh)
+      use mod_mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      use MOD_DYN
+      type(t_dyn)   , intent(inout), target :: dynamics
+      type(t_partit), intent(inout), target :: partit
+      type(t_mesh)  , intent(in)   , target :: mesh
+      
+    end subroutine
+  end interface
+end module
 
 ! ===================================================================
 ! Contains routines needed for computations of dynamics.
@@ -582,6 +596,7 @@ SUBROUTINE h_viscosity_leith(dynamics, partit, mesh)
     USE o_PARAM
     USE g_CONFIG
     use g_comm_auto
+    use relative_vorticity_interface
     IMPLICIT NONE
     real(kind=WP)  ::  dz, div_elem(3), xe, ye, vi
     integer        :: elem, nl1, nz, elnodes(3), n, k, nt, ul1
@@ -597,7 +612,7 @@ SUBROUTINE h_viscosity_leith(dynamics, partit, mesh)
 #include "associate_mesh_ass.h"
     Wvel  =>dynamics%w(:,:)
     !  
-    if(mom_adv<4) call relative_vorticity(partit, mesh)  !!! vorticity array should be allocated
+    if(mom_adv<4) call relative_vorticity(dynamics, partit, mesh)  !!! vorticity array should be allocated
     ! Fill in viscosity:
     Visc = 0.0_WP
     DO  elem=1, myDim_elem2D    	!! m=1, myDim_elem2D
@@ -1321,7 +1336,105 @@ call exchange_elem(uke, partit)
 
 deallocate(uuu)
 end subroutine uke_update
+!
+!
+!_______________________________________________________________________________
+subroutine relative_vorticity(dynamics, partit, mesh)
+    USE o_ARRAYS, only: vorticity
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_DYN
+    use g_comm_auto
+    IMPLICIT NONE
+    integer        :: n, nz, el(2), enodes(2), nl1, nl2, edge, ul1, ul2, nl12, ul12
+    real(kind=WP)  :: deltaX1, deltaY1, deltaX2, deltaY2, c1
+    
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    real(kind=WP), dimension(:,:,:), pointer :: UV
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
+    UV => dynamics%uv(:,:,:)
 
-! ===================================================================
-
+    !!PS DO n=1,myDim_nod2D
+    !!PS    nl1 = nlevels_nod2D(n)-1
+    !!PS    ul1 = ulevels_nod2D(n)
+    !!PS    vorticity(ul1:nl1,n)=0.0_WP
+    !!PS    !!PS DO nz=1, nlevels_nod2D(n)-1
+    !!PS    !!PS    vorticity(nz,n)=0.0_WP
+    !!PS    !!PS END DO
+    !!PS END DO      
+    vorticity(:,1:myDim_nod2D) = 0.0_WP
+    DO edge=1,myDim_edge2D
+                                    !! edge=myList_edge2D(m)
+        enodes=edges(:,edge)
+        el=edge_tri(:,edge)
+        nl1=nlevels(el(1))-1
+        ul1=ulevels(el(1))
+        deltaX1=edge_cross_dxdy(1,edge)
+        deltaY1=edge_cross_dxdy(2,edge)
+        nl2=0
+        ul2=0
+        if(el(2)>0) then
+            deltaX2=edge_cross_dxdy(3,edge)
+            deltaY2=edge_cross_dxdy(4,edge)
+            nl2=nlevels(el(2))-1
+            ul2=ulevels(el(2))
+        end if  
+        nl12 = min(nl1,nl2)
+        ul12 = max(ul1,ul2)
+        
+        DO nz=ul1,ul12-1
+            c1=deltaX1*UV(1,nz,el(1))+deltaY1*UV(2,nz,el(1))
+            vorticity(nz,enodes(1))=vorticity(nz,enodes(1))+c1
+            vorticity(nz,enodes(2))=vorticity(nz,enodes(2))-c1
+        END DO
+        if (ul2>0) then
+            DO nz=ul2,ul12-1
+                c1= -deltaX2*UV(1,nz,el(2))-deltaY2*UV(2,nz,el(2))
+                vorticity(nz,enodes(1))=vorticity(nz,enodes(1))+c1
+                vorticity(nz,enodes(2))=vorticity(nz,enodes(2))-c1
+            END DO
+        endif 
+        !!PS DO nz=1,min(nl1,nl2)
+        DO nz=ul12,nl12
+            c1=deltaX1*UV(1,nz,el(1))+deltaY1*UV(2,nz,el(1))- &
+            deltaX2*UV(1,nz,el(2))-deltaY2*UV(2,nz,el(2))
+            vorticity(nz,enodes(1))=vorticity(nz,enodes(1))+c1
+            vorticity(nz,enodes(2))=vorticity(nz,enodes(2))-c1
+        END DO
+        !!PS DO nz=min(nl1,nl2)+1,nl1
+        DO nz=nl12+1,nl1
+            c1=deltaX1*UV(1,nz,el(1))+deltaY1*UV(2,nz,el(1))
+            vorticity(nz,enodes(1))=vorticity(nz,enodes(1))+c1
+            vorticity(nz,enodes(2))=vorticity(nz,enodes(2))-c1
+        END DO
+        !!PS DO nz=min(nl1,nl2)+1,nl2
+        DO nz=nl12+1,nl2
+            c1= -deltaX2*UV(1,nz,el(2))-deltaY2*UV(2,nz,el(2))
+            vorticity(nz,enodes(1))=vorticity(nz,enodes(1))+c1
+            vorticity(nz,enodes(2))=vorticity(nz,enodes(2))-c1
+        END DO
+    END DO
+    
+    ! vorticity = vorticity*area at this stage
+    ! It is correct only on myDim nodes
+    DO n=1,myDim_nod2D
+                                !! n=myList_nod2D(m)
+        ul1 = ulevels_nod2D(n)
+        nl1 = nlevels_nod2D(n)
+        !!PS DO nz=1,nlevels_nod2D(n)-1
+        DO nz=ul1,nl1-1
+            vorticity(nz,n)=vorticity(nz,n)/areasvol(nz,n)
+        END DO
+    END DO      
+    
+    call exchange_nod(vorticity, partit)
+    
+! Now it the relative vorticity known on neighbors too
+end subroutine relative_vorticity
 

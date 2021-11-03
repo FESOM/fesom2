@@ -2862,18 +2862,7 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'
-    
-!!PS         if (any(UV_rhs/=UV_rhs))           write(*,*) n, mype,' --> found NaN UV_rhs before compute_vel_rhs'
-!!PS         if (any(UV/=UV))                   write(*,*) n, mype,' --> found NaN UV before compute_vel_rhs'
-!!PS         if (any(ssh_rhs/=ssh_rhs))         write(*,*) n, mype,' --> found NaN ssh_rhs before compute_vel_rhs'
-!!PS         if (any(ssh_rhs_old/=ssh_rhs_old)) write(*,*) n, mype,' --> found NaN ssh_rhs_old before compute_vel_rhs'
-!!PS         if (any(abs(Wvel_e)>1.0e20))       write(*,*) n, mype,' --> found Inf Wvel_e before compute_vel_rhs'
-
-    if(mom_adv/=3) then
-        call compute_vel_rhs(dynamics, partit, mesh)
-    else
-        call compute_vel_rhs_vinv(partit, mesh)
-    end if
+    call compute_vel_rhs(dynamics, partit, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call viscosity_filter'//achar(27)//'[0m'
