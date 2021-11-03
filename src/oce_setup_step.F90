@@ -89,6 +89,8 @@ use g_cvmix_tidal
 use Toy_Channel_Soufflet
 use oce_initial_state_interface
 use oce_adv_tra_fct_interfaces
+use init_ale_interface
+use init_thickness_ale_interface
 IMPLICIT NONE
 type(t_mesh),   intent(inout), target :: mesh
 type(t_partit), intent(inout), target :: partit
@@ -117,7 +119,10 @@ integer                               :: n
        write(*,*) ' --> initialise ALE arrays + sparse SSH stiff matrix'
        write(*,*)
     end if
-    call init_ale(partit, mesh)
+    
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_ale'//achar(27)//'[0m'
+    call init_ale(dynamics, partit, mesh)
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_stiff_mat_ale'//achar(27)//'[0m'
     call init_stiff_mat_ale(partit, mesh) !!PS test  
     
     !___________________________________________________________________________
@@ -145,20 +150,24 @@ integer                               :: n
 
     ! initialise fesom1.4 like KPP
     if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_kpp_init'//achar(27)//'[0m'
         call oce_mixing_kpp_init(partit, mesh)
     ! initialise fesom1.4 like PP
     elseif (mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
     
     ! initialise cvmix_KPP
     elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_kpp'//achar(27)//'[0m'
         call init_cvmix_kpp(partit, mesh)
         
     ! initialise cvmix_PP    
     elseif (mix_scheme_nmb==4 .or. mix_scheme_nmb==47) then
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_pp'//achar(27)//'[0m'
         call init_cvmix_pp(partit, mesh)
         
     ! initialise cvmix_TKE    
     elseif (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_tke'//achar(27)//'[0m'
         call init_cvmix_tke(partit, mesh)
         
     endif
@@ -166,12 +175,14 @@ integer                               :: n
     ! initialise additional mixing cvmix_IDEMIX --> only in combination with 
     ! cvmix_TKE+cvmix_IDEMIX or stand alone for debbuging as cvmix_TKE
     if     (mod(mix_scheme_nmb,10)==6) then
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_idemix'//achar(27)//'[0m'
         call init_cvmix_idemix(partit, mesh)
         
     ! initialise additional mixing cvmix_TIDAL --> only in combination with 
     ! KPP+cvmix_TIDAL, PP+cvmix_TIDAL, cvmix_KPP+cvmix_TIDAL, cvmix_PP+cvmix_TIDAL 
     ! or stand alone for debbuging as cvmix_TIDAL   
     elseif (mod(mix_scheme_nmb,10)==7) then
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_tidal'//achar(27)//'[0m'
         call init_cvmix_tidal(partit, mesh)
     end if         
     
@@ -192,7 +203,7 @@ integer                               :: n
     if(partit%mype==0) write(*,*) 'Arrays are set'
         
     !if(open_boundary) call set_open_boundary   !TODO
-    
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call oce_adv_tra_fct_init'//achar(27)//'[0m'
     call oce_adv_tra_fct_init(tracers%work, partit, mesh)
     call muscl_adv_init(tracers%work, partit, mesh) !!PS test
     !=====================
@@ -202,6 +213,7 @@ integer                               :: n
     if (toy_ocean) then  
        SELECT CASE (TRIM(which_toy))
          CASE ("soufflet") !forcing update for soufflet testcase
+         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call toy_channel'//achar(27)//'[0m'
            if (mod(mstep, soufflet_forc_update)==0) then
               call initial_state_soufflet(dynamics, tracers, partit, mesh)
               call compute_zonal_mean_ini(partit, mesh)  
@@ -225,7 +237,8 @@ integer                               :: n
         write(*,*) ' --> call init_thickness_ale'
         write(*,*)
     end if
-    call init_thickness_ale(partit, mesh)
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_thickness_ale'//achar(27)//'[0m'
+    call init_thickness_ale(dynamics, partit, mesh)
     
     !___________________________________________________________________________
     if(partit%mype==0) write(*,*) 'Initial state'
@@ -408,11 +421,11 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     allocate(dynamics%eta_n(      node_size))
     allocate(dynamics%d_eta(      node_size))
     allocate(dynamics%ssh_rhs(    node_size))
-    allocate(dynamics%ssh_rhs_old(node_size))
+    !!PS     allocate(dynamics%ssh_rhs_old(node_size))
     dynamics%eta_n      = 0.0_WP
     dynamics%d_eta      = 0.0_WP
     dynamics%ssh_rhs    = 0.0_WP
-    dynamics%ssh_rhs_old= 0.0_WP    
+!!PS     dynamics%ssh_rhs_old= 0.0_WP    
     
     ! set parameters in derived type
 !!PS     dynamics%visc_opt      = visc_opt
@@ -479,7 +492,6 @@ allocate(Visc(nl-1, elem_size))
 ! elevation and its rhs
 ! ================
 allocate(eta_n(node_size), d_eta(node_size))
-allocate(ssh_rhs(node_size))
 ! ================
 ! Monin-Obukhov
 ! ================
@@ -620,7 +632,6 @@ end if
 
     eta_n=0.0_WP
     d_eta=0.0_WP
-    ssh_rhs=0.0_WP
     hpressure=0.0_WP
 !
     heat_flux=0.0_WP

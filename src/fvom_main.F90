@@ -112,6 +112,7 @@ integer mpi_version_len
     call setup_model(partit)  ! Read Namelists, always before clock_init
     call clock_init(partit)   ! read the clock file 
     call get_run_steps(nsteps, partit)
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call mesh_setup'//achar(27)//'[0m'
     call mesh_setup(partit, mesh)
 
     if (mype==0) write(*,*) 'FESOM mesh_setup... complete'
@@ -121,12 +122,16 @@ integer mpi_version_len
     ! and additional arrays needed for 
     ! fancy advection etc.  
     !=====================
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call check_mesh_consistency'//achar(27)//'[0m'
     call check_mesh_consistency(partit, mesh)
     if (mype==0) t2=MPI_Wtime()
 
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call xxxx_init'//achar(27)//'[0m'
     call dynamics_init(dynamics, partit, mesh)
     call tracer_init(tracers, partit, mesh)                ! allocate array of ocean tracers (derived type "t_tracer")
     call arrays_init(tracers%num_tracers, partit, mesh)    ! allocate other arrays (to be refactured same as tracers in the future)
+    
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call ocean_setup'//achar(27)//'[0m'
     call ocean_setup(dynamics, tracers, partit, mesh)
 
     if (mype==0) then
