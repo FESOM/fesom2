@@ -441,8 +441,6 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
 !!PS     dynamics%gamma0_visc   = gamma0_visc
 !!PS     dynamics%gamma1_visc   = gamma1_visc
 !!PS     dynamics%gamma2_visc   = gamma2_visc
-!!PS     dynamics%div_c_visc    = div_c_visc
-!!PS     dynamics%leith_c_visc  = leith_c_visc
 !!PS     dynamics%use_ivertvisc = use_ivertvisc
 !!PS     dynamics%momadv_opt    = momadv_opt
 !!PS     dynamics%use_freeslip  = use_freeslip
@@ -453,8 +451,6 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     dynamics%gamma0_visc   = gamma0
     dynamics%gamma1_visc   = gamma1
     dynamics%gamma2_visc   = gamma2
-    dynamics%div_c_visc    = Div_c
-    dynamics%leith_c_visc  = Leith_c
     dynamics%use_ivertvisc = i_vert_visc
     dynamics%momadv_opt    = mom_adv
     dynamics%use_freeslip  = free_slip
@@ -496,7 +492,7 @@ node_size=myDim_nod2D+eDim_nod2D
 ! Velocities
 ! ================     
 !allocate(stress_diag(2, elem_size))!delete me
-allocate(Visc(nl-1, elem_size))
+!!PS allocate(Visc(nl-1, elem_size))
 ! ================
 ! elevation and its rhs
 ! ================

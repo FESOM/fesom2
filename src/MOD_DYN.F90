@@ -43,10 +43,6 @@ TYPE T_DYN
     
     
     ! visc_option=...
-    ! 1=Harmonic Leith parameterization;
-    ! 2=Laplacian+Leith+biharmonic background
-    ! 3=Biharmonic Leith parameterization
-    ! 4=Biharmonic flow aware
     ! 5=Kinematic (easy) Backscatter
     ! 6=Biharmonic flow aware (viscosity depends on velocity Laplacian)
     ! 7=Biharmonic flow aware (viscosity depends on velocity differences)
@@ -61,11 +57,6 @@ TYPE T_DYN
     real(kind=WP)                               :: gamma1_visc   = 0.1
     real(kind=WP)                               :: gamma2_visc   = 0.285
 
-    ! div_c the strength of the modified Leith viscosity, nondimensional, 0.3 -- 1.0
-    ! leith the strength of the Leith viscosity
-    real(kind=WP)                               :: div_c_visc    = 0.5
-    real(kind=WP)                               :: leith_c_visc  = 0.05
-    
     ! coefficient for returned sub-gridscale energy, to be used with visc_option=5 
     ! (easy backscatter)
     real(kind=WP)                               :: easy_bs_return= 1.5    
@@ -125,8 +116,6 @@ subroutine WRITE_T_DYN(dynamics, unit, iostat, iomsg)
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%gamma0_visc
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%gamma1_visc
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%gamma2_visc
-    write(unit, iostat=iostat, iomsg=iomsg) dynamics%div_c_visc
-    write(unit, iostat=iostat, iomsg=iomsg) dynamics%leith_c_visc
     
     !___________________________________________________________________________
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%use_ivertvisc
@@ -168,8 +157,6 @@ subroutine READ_T_DYN(dynamics, unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%gamma0_visc
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%gamma1_visc
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%gamma2_visc
-    read(unit, iostat=iostat, iomsg=iomsg) dynamics%div_c_visc
-    read(unit, iostat=iostat, iomsg=iomsg) dynamics%leith_c_visc
     
     !___________________________________________________________________________
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%use_ivertvisc
