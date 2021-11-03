@@ -204,17 +204,17 @@ integer                  :: n, nz, el1, el2
 integer                  :: nl1, nl2, ul1, ul2, nod(2), el, ed, k, nle, ule
 real(kind=WP)            :: un1(1:mesh%nl-1), un2(1:mesh%nl-1)
 real(kind=WP)            :: wu(1:mesh%nl), wv(1:mesh%nl)
-real(kind=WP)            :: Unode_rhs(2,mesh%nl-1,partit%myDim_nod2d+partit%eDim_nod2D)
-real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB
+real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB, UVnode_rhs
 real(kind=WP), dimension(:,:), pointer :: Wvel_e
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    UV      =>dynamics%uv(:,:,:)
-    UV_rhsAB=>dynamics%uv_rhsAB(:,:,:)
-    Wvel_e  =>dynamics%w_e(:,:)
+    UV        =>dynamics%uv(:,:,:)
+    UV_rhsAB  =>dynamics%uv_rhsAB(:,:,:)
+    UVnode_rhs=>dynamics%uvnode_rhs(:,:,:)
+    Wvel_e    =>dynamics%w_e(:,:)
 
     !___________________________________________________________________________
     ! 1st. compute vertical momentum advection component: w * du/dz, w*dv/dz
@@ -261,15 +261,15 @@ real(kind=WP), dimension(:,:), pointer :: Wvel_e
 !!PS             if (ul1>1) write(*,*) mype, wu(ul1:nl1)
             ! Here 1/3 because 1/3 of the area is related to the node --> comes from
             ! averaging the elemental velocities
-            Unode_rhs(1,nz,n) = - (wu(nz) - wu(nz+1) ) / (3._WP*hnode(nz,n)) 
-            Unode_rhs(2,nz,n) = - (wv(nz) - wv(nz+1) ) / (3._WP*hnode(nz,n)) 
+            UVnode_rhs(1,nz,n) = - (wu(nz) - wu(nz+1) ) / (3._WP*hnode(nz,n)) 
+            UVnode_rhs(2,nz,n) = - (wv(nz) - wv(nz+1) ) / (3._WP*hnode(nz,n)) 
             
         enddo
         
         !_______________________________________________________________________
         ! To get a clean checksum, set the remaining values to zero
-        Unode_rhs(1:2,nl1+1:nl-1,n) = 0._WP
-        Unode_rhs(1:2,1:ul1-1   ,n) = 0._WP
+        UVnode_rhs(1:2,nl1+1:nl-1,n) = 0._WP
+        UVnode_rhs(1:2,1:ul1-1   ,n) = 0._WP
     end do
 
 
@@ -327,8 +327,8 @@ real(kind=WP), dimension(:,:), pointer :: Wvel_e
             if (nod(1) <= myDim_nod2d) then
                 do nz=min(ul1,ul2), max(nl1,nl2)
                     ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
-                    Unode_rhs(1,nz,nod(1)) = Unode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1) + un2(nz)*UV(1,nz,el2) 
-                    Unode_rhs(2,nz,nod(1)) = Unode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1) + un2(nz)*UV(2,nz,el2)
+                    UVnode_rhs(1,nz,nod(1)) = UVnode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1) + un2(nz)*UV(1,nz,el2) 
+                    UVnode_rhs(2,nz,nod(1)) = UVnode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1) + un2(nz)*UV(2,nz,el2)
                 end do
             endif
             
@@ -336,8 +336,8 @@ real(kind=WP), dimension(:,:), pointer :: Wvel_e
             if (nod(2) <= myDim_nod2d) then
                 do nz=min(ul1,ul2), max(nl1,nl2)
                     ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
-                    Unode_rhs(1,nz,nod(2)) = Unode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1) - un2(nz)*UV(1,nz,el2)
-                    Unode_rhs(2,nz,nod(2)) = Unode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1) - un2(nz)*UV(2,nz,el2)
+                    UVnode_rhs(1,nz,nod(2)) = UVnode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1) - un2(nz)*UV(1,nz,el2)
+                    UVnode_rhs(2,nz,nod(2)) = UVnode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1) - un2(nz)*UV(2,nz,el2)
                 end do
             endif
             
@@ -346,8 +346,8 @@ real(kind=WP), dimension(:,:), pointer :: Wvel_e
             if (nod(1) <= myDim_nod2d) then
                 do nz=ul1, nl1
                     ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
-                    Unode_rhs(1,nz,nod(1)) = Unode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1)
-                    Unode_rhs(2,nz,nod(1)) = Unode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1)
+                    UVnode_rhs(1,nz,nod(1)) = UVnode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1)
+                    UVnode_rhs(2,nz,nod(1)) = UVnode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1)
                 end do ! --> do nz=ul1, nl1
             endif 
             
@@ -356,8 +356,8 @@ real(kind=WP), dimension(:,:), pointer :: Wvel_e
                 !!PS do nz=1, nl1
                 do nz=ul1, nl1
                     ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
-                    Unode_rhs(1,nz,nod(2)) = Unode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1)
-                    Unode_rhs(2,nz,nod(2)) = Unode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1)
+                    UVnode_rhs(1,nz,nod(2)) = UVnode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1)
+                    UVnode_rhs(2,nz,nod(2)) = UVnode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1)
                 end do ! --> do nz=ul1, nl1
             endif
         endif ! --> if (el2>0) then
@@ -368,14 +368,14 @@ real(kind=WP), dimension(:,:), pointer :: Wvel_e
     do n=1,myDim_nod2d
         nl1 = nlevels_nod2D(n)-1
         ul1 = ulevels_nod2D(n)
-!!PS         Unode_rhs(1,ul1:nl1,n) = Unode_rhs(1,ul1:nl1,n) *area_inv(ul1:nl1,n) ! --> TEST_cavity
-!!PS         Unode_rhs(2,ul1:nl1,n) = Unode_rhs(2,ul1:nl1,n) *area_inv(ul1:nl1,n) ! --> TEST_cavity
-        Unode_rhs(1,ul1:nl1,n) = Unode_rhs(1,ul1:nl1,n) *areasvol_inv(ul1:nl1,n)
-        Unode_rhs(2,ul1:nl1,n) = Unode_rhs(2,ul1:nl1,n) *areasvol_inv(ul1:nl1,n)
+!!PS         UVnode_rhs(1,ul1:nl1,n) = UVnode_rhs(1,ul1:nl1,n) *area_inv(ul1:nl1,n) ! --> TEST_cavity
+!!PS         UVnode_rhs(2,ul1:nl1,n) = UVnode_rhs(2,ul1:nl1,n) *area_inv(ul1:nl1,n) ! --> TEST_cavity
+        UVnode_rhs(1,ul1:nl1,n) = UVnode_rhs(1,ul1:nl1,n) *areasvol_inv(ul1:nl1,n)
+        UVnode_rhs(2,ul1:nl1,n) = UVnode_rhs(2,ul1:nl1,n) *areasvol_inv(ul1:nl1,n)
     end do !-->do n=1,myDim_nod2d
 
     !___________________________________________________________________________
-    call exchange_nod(Unode_rhs, partit)
+    call exchange_nod(UVnode_rhs, partit)
 
     !___________________________________________________________________________
     ! convert total nodal advection from vertice --> elements
@@ -383,9 +383,9 @@ real(kind=WP), dimension(:,:), pointer :: Wvel_e
         nl1 = nlevels(el)-1
         ul1 = ulevels(el)
         UV_rhsAB(1:2,ul1:nl1,el) = UV_rhsAB(1:2,ul1:nl1,el) &
-                + elem_area(el)*(Unode_rhs(1:2,ul1:nl1,elem2D_nodes(1,el)) &
-                + Unode_rhs(1:2,ul1:nl1,elem2D_nodes(2,el)) & 
-                + Unode_rhs(1:2,ul1:nl1,elem2D_nodes(3,el))) / 3.0_WP     
+                + elem_area(el)*(UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(1,el)) &
+                + UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(2,el)) & 
+                + UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(3,el))) / 3.0_WP     
     
     end do ! --> do el=1, myDim_elem2D
 end subroutine momentum_adv_scalar
