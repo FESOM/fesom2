@@ -264,7 +264,7 @@ subroutine check_blowup(istep, dynamics, tracers, partit, mesh)
     USE MOD_PARSUP
     use MOD_DYN
 	use o_PARAM
-	use o_ARRAYS, only: eta_n, d_eta, ssh_rhs, ssh_rhs_old, water_flux, stress_surf, &
+	use o_ARRAYS, only: eta_n, d_eta, water_flux, stress_surf, &
                         heat_flux, Kv, Av
 	use i_ARRAYS
 	use g_comm_auto
@@ -281,7 +281,8 @@ subroutine check_blowup(istep, dynamics, tracers, partit, mesh)
     type(t_tracer), intent(in)   , target :: tracers
     type(t_dyn)   , intent(in)   , target :: dynamics
     real(kind=WP), dimension(:,:,:), pointer :: UV
-    real(kind=WP), dimension(:,:), pointer :: Wvel, CFL_z
+    real(kind=WP), dimension(:,:)  , pointer :: Wvel, CFL_z
+    real(kind=WP), dimension(:)    , pointer :: ssh_rhs, ssh_rhs_old
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -289,6 +290,8 @@ subroutine check_blowup(istep, dynamics, tracers, partit, mesh)
     UV   => dynamics%uv(:,:,:)
     Wvel => dynamics%w(:,:)
     CFL_z => dynamics%cfl_z(:,:)
+    ssh_rhs => dynamics%ssh_rhs(:)
+    ssh_rhs_old => dynamics%ssh_rhs_old(:)
     
 	!___________________________________________________________________________
 ! ! 	if (mod(istep,logfile_outfreq)==0) then
@@ -557,4 +560,5 @@ subroutine check_blowup(istep, dynamics, tracers, partit, mesh)
 			call par_ex(partit%MPI_COMM_FESOM, partit%mype)
 		endif 
 end subroutine
+
 

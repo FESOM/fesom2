@@ -60,12 +60,14 @@ module oce_ale_interfaces
       type(t_dyn), intent(inout), target :: dynamics
     end subroutine
 
-    subroutine solve_ssh_ale(partit, mesh)
+    subroutine solve_ssh_ale(dynamics, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
+      USE MOD_DYN
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
+      type(t_dyn), intent(inout), target :: dynamics
     end subroutine
 
     subroutine compute_hbar_ale(dynamics, partit, mesh)
@@ -94,6 +96,34 @@ module oce_ale_interfaces
       USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
+    end subroutine
+  end interface
+end module
+
+module init_ale_interface
+  interface
+    subroutine init_ale(dynamics, partit, mesh)
+      use mod_mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      use MOD_DYN
+      type(t_mesh)  , intent(in)   , target :: mesh
+      type(t_partit), intent(inout), target :: partit
+      type(t_dyn)   , intent(inout), target :: dynamics
+    end subroutine
+  end interface
+end module
+
+module init_thickness_ale_interface
+  interface
+    subroutine init_thickness_ale(dynamics, partit, mesh)
+      use mod_mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      use MOD_DYN
+      type(t_mesh)  , intent(in)   , target :: mesh
+      type(t_partit), intent(inout), target :: partit
+      type(t_dyn)   , intent(inout), target :: dynamics
     end subroutine
   end interface
 end module
@@ -136,11 +166,12 @@ end module
 !    
 !===============================================================================
 ! allocate & initialise arrays for Arbitrary-Langrangian-Eularian (ALE) method
-subroutine init_ale(partit, mesh)
+subroutine init_ale(dynamics, partit, mesh)
     USE o_PARAM
     USE MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
+    USE MOD_DYN
     USE o_ARRAYS
     USE g_config, only: which_ale, use_cavity, use_partial_cell
     USE g_forcing_param, only: use_virt_salt
@@ -150,6 +181,7 @@ subroutine init_ale(partit, mesh)
     integer                               :: n, nzmax, nzmin, elnodes(3), elem
     type(t_mesh),   intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
+    type(t_dyn)   , intent(inout), target :: dynamics
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -160,7 +192,8 @@ subroutine init_ale(partit, mesh)
     allocate(mesh%hnode_new(1:nl-1, myDim_nod2D+eDim_nod2D))
     
     ! ssh_rhs_old: auxiliary array to store an intermediate part of the rhs computations.
-    allocate(ssh_rhs_old(myDim_nod2D+eDim_nod2D))
+    allocate(dynamics%ssh_rhs_old(myDim_nod2D+eDim_nod2D))
+    dynamics%ssh_rhs_old = 0.0_WP
     
     ! hbar, hbar_old: correspond to the elevation, but on semi-integer time steps.
     allocate(mesh%hbar(myDim_nod2D+eDim_nod2D))
@@ -647,7 +680,7 @@ end subroutine init_surface_node_depth
 !
 !===============================================================================
 ! initialize thickness arrays based on the current hbar 
-subroutine init_thickness_ale(partit, mesh)
+subroutine init_thickness_ale(dynamics, partit, mesh)
 ! For z-star case: we stretch scalar thicknesses (nodal) 
 ! through nlevels_nod2D_min -2 layers. Layer nlevels_nod2D_min-1
 ! should not be touched if partial cell is implemented (it is).
@@ -658,17 +691,20 @@ subroutine init_thickness_ale(partit, mesh)
     use MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use o_ARRAYS
+    USE MOD_DYN
+    use o_ARRAYS, only: eta_n
     implicit none
     integer :: n, nz, elem, elnodes(3), nzmin, nzmax
     real(kind=WP) :: dd 
     type(t_mesh),   intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
-    
+    type(t_dyn), intent(inout), target :: dynamics
+    real(kind=WP), dimension(:), pointer :: ssh_rhs_old
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    ssh_rhs_old=>dynamics%ssh_rhs_old(:)
     
     if(mype==0) then
         write(*,*) '____________________________________________________________'
@@ -1612,7 +1648,7 @@ end subroutine update_stiff_mat_ale
 subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     use g_config,only: which_ALE,dt
     use MOD_MESH
-    use o_ARRAYS, only: ssh_rhs, ssh_rhs_old, water_flux
+    use o_ARRAYS, only: water_flux
     use o_PARAM
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -1630,12 +1666,15 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_dyn), intent(inout), target :: dynamics
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
+    real(kind=WP), dimension(:), pointer :: ssh_rhs, ssh_rhs_old
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UV=>dynamics%uv(:,:,:)
     UV_rhs=>dynamics%uv_rhs(:,:,:)
+    ssh_rhs=>dynamics%ssh_rhs(:)
+    ssh_rhs_old=>dynamics%ssh_rhs_old(:)
 
     ssh_rhs=0.0_WP
     !___________________________________________________________________________
@@ -1728,7 +1767,7 @@ end subroutine compute_ssh_rhs_ale
 subroutine compute_hbar_ale(dynamics, partit, mesh)
     use g_config,only: dt, which_ALE, use_cavity
     use MOD_MESH
-    use o_ARRAYS, only: ssh_rhs, ssh_rhs_old, water_flux
+    use o_ARRAYS, only: water_flux
     use o_PARAM
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -1748,12 +1787,15 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_dyn)   , intent(inout), target :: dynamics
     real(kind=WP), dimension(:,:,:), pointer :: UV
+    real(kind=WP), dimension(:), pointer :: ssh_rhs, ssh_rhs_old
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UV=>dynamics%uv(:,:,:)
+    ssh_rhs=>dynamics%ssh_rhs(:)
+    ssh_rhs_old=>dynamics%ssh_rhs_old(:)
 
     !___________________________________________________________________________
     ! compute the rhs
@@ -1844,8 +1886,8 @@ end subroutine compute_hbar_ale
 subroutine vert_vel_ale(dynamics, partit, mesh)
     use g_config,only: dt, which_ALE, min_hnode, lzstar_lev, flag_warn_cflz
     use MOD_MESH
-    use o_ARRAYS, only: fer_Wvel, fer_UV, water_flux, ssh_rhs, & 
-                        ssh_rhs_old, eta_n, d_eta
+    use o_ARRAYS, only: fer_Wvel, fer_UV, water_flux, & 
+                        eta_n, d_eta
     use o_PARAM
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -1869,6 +1911,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     real(kind=WP), dimension(:,:,:), pointer :: UV
     real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, Wvel_i, CFL_z
+    real(kind=WP), dimension(:)  , pointer :: ssh_rhs, ssh_rhs_old
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -1878,6 +1921,8 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     Wvel_e=>dynamics%w_e(:,:)
     Wvel_i=>dynamics%w_i(:,:)
     CFL_z =>dynamics%cfl_z(:,:)
+    ssh_rhs =>dynamics%ssh_rhs(:)
+    ssh_rhs_old =>dynamics%ssh_rhs_old(:)
 
     !___________________________________________________________________________
     ! Contributions from levels in divergence
@@ -2372,12 +2417,13 @@ end subroutine vert_vel_ale
 !===============================================================================
 ! solve  eq.18 in S. Danilov et al. : FESOM2: from finite elements to finite volumes. 
 ! for (eta^(n+1)-eta^n) = d_eta
-subroutine solve_ssh_ale(partit, mesh)
+subroutine solve_ssh_ale(dynamics, partit, mesh)
 use o_PARAM
 use MOD_MESH
 use o_ARRAYS
 USE MOD_PARTIT
 USE MOD_PARSUP
+USE MOD_DYN
 use g_comm_auto
 use g_config, only: which_ale
     !
@@ -2401,14 +2447,16 @@ logical, save                   :: lfirst=.true.
 real(kind=WP), allocatable      :: arr_nod2D(:),arr_nod2D2(:,:),arr_nod2D3(:)
 real(kind=WP)                   :: cssh1,cssh2,crhs
 integer                         :: i
-type(t_mesh),   intent(inout), target :: mesh
+type(t_mesh)  , intent(inout), target :: mesh
 type(t_partit), intent(inout), target :: partit
-
+type(t_dyn)   , intent(inout), target :: dynamics
+!!PS real(kind=WP), dimension(:), pointer :: ssh_rhs
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+!!PS ssh_rhs=>dynamics%ssh_rhs(:)
 
 Pmode = PET_BLOCKP+PET_SOLVE + PET_BICGSTAB +PET_REPORT + PET_QUIET+ PET_RCM+PET_PCBJ
 if (lfirst) then   
@@ -2422,7 +2470,7 @@ call PETSC_S(Pmode, 1, ssh_stiff%dim, ssh_stiff%nza, myrows, &
      droptol,  &  
      soltol,   &
      part, ssh_stiff%rowptr, ssh_stiff%colind, ssh_stiff%values, &
-     ssh_rhs, d_eta, &
+     dynamics%ssh_rhs, d_eta, &
      rinfo, MPI_COMM_FESOM, mesh)
     !
     !
@@ -2438,8 +2486,9 @@ integer(kind=C_INT)  :: n3, reuse, new_values
 integer(kind=C_INT)  :: maxiter, restart, lutype, fillin
 real(kind=C_DOUBLE)  :: droptol, soltol
 integer :: n
-type(t_mesh),   intent(inout), target :: mesh
+type(t_mesh)  , intent(inout), target :: mesh
 type(t_partit), intent(inout), target :: partit
+type(t_dyn)   , intent(inout), target :: dynamics
 
 
 interface
@@ -2509,7 +2558,7 @@ if (lfirst) then
         ssh_stiff%colind-1, ssh_stiff%values, reuse, MPI_COMM_FESOM)
    lfirst=.false.
 end if
-    call psolve(ident, ssh_rhs, ssh_stiff%values, d_eta, new_values)
+    call psolve(ident, dynamics%ssh_rhs, ssh_stiff%values, d_eta, new_values)
 
 #endif
     !
@@ -2895,7 +2944,7 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
 
     ! Take updated ssh matrix and solve --> new ssh!
     t30=MPI_Wtime() 
-    call solve_ssh_ale(partit, mesh)
+    call solve_ssh_ale(dynamics, partit, mesh)
     
     if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) call relax_zonal_vel(dynamics, partit, mesh)
     t3=MPI_Wtime() 
