@@ -1886,7 +1886,7 @@ end subroutine compute_hbar_ale
 subroutine vert_vel_ale(dynamics, partit, mesh)
     use g_config,only: dt, which_ALE, min_hnode, lzstar_lev, flag_warn_cflz
     use MOD_MESH
-    use o_ARRAYS, only: fer_Wvel, fer_UV, water_flux
+    use o_ARRAYS, only: water_flux
     use o_PARAM
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -1908,8 +1908,8 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_mesh),   intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
-    real(kind=WP), dimension(:,:,:), pointer :: UV
-    real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, Wvel_i, CFL_z
+    real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
+    real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, Wvel_i, CFL_z, fer_Wvel
     real(kind=WP), dimension(:)  , pointer :: ssh_rhs, ssh_rhs_old
     real(kind=WP), dimension(:)  , pointer :: eta_n, d_eta
 #include "associate_part_def.h"
@@ -1925,7 +1925,10 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     ssh_rhs_old =>dynamics%ssh_rhs_old(:)
     eta_n =>dynamics%eta_n(:)
     d_eta =>dynamics%d_eta(:)
-
+    if (Fer_GM) then
+        fer_UV    =>dynamics%fer_uv(:,:,:)
+        fer_Wvel  =>dynamics%fer_w(:,:)
+    end if 
     !___________________________________________________________________________
     ! Contributions from levels in divergence
     Wvel=0.0_WP
@@ -2784,6 +2787,7 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     use solve_tracers_ale_interface
     use write_step_info_interface
     use check_blowup_interface
+    use fer_solve_interface
     IMPLICIT NONE
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
@@ -2990,7 +2994,7 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     if (Fer_GM) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call fer_solve_Gamma'//achar(27)//'[0m'
         call fer_solve_Gamma(partit, mesh)
-        call fer_gamma2vel(partit, mesh)
+        call fer_gamma2vel(dynamics, partit, mesh)
     end if
     t6=MPI_Wtime()    
     !___________________________________________________________________________

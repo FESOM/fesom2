@@ -353,6 +353,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_DYN
+    USE o_param
     IMPLICIT NONE
     integer        :: elem_size, node_size
     integer, save  :: nm_unit  = 104       ! unit to open namelist file, skip 100-102 for cray
@@ -425,6 +426,14 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     dynamics%eta_n      = 0.0_WP
     dynamics%d_eta      = 0.0_WP
     dynamics%ssh_rhs    = 0.0_WP
+    
+    if (Fer_GM) then
+        allocate(dynamics%fer_uv(2, nl-1, elem_size))
+        allocate(dynamics%fer_w(      nl, node_size))
+        dynamics%fer_uv = 0.0_WP
+        dynamics%fer_w  = 0.0_WP
+    end if 
+    
 !!PS     dynamics%ssh_rhs_old= 0.0_WP    
     
     ! set parameters in derived type
@@ -612,10 +621,7 @@ dens_flux=0.0_WP
 
 if (Fer_GM) then
    allocate(fer_c(node_size),fer_scal(node_size), fer_gamma(2, nl, node_size), fer_K(nl, node_size))
-   allocate(fer_wvel(nl, node_size), fer_UV(2, nl-1, elem_size))
    fer_gamma=0.0_WP
-   fer_uv=0.0_WP
-   fer_wvel=0.0_WP
    fer_K=500._WP
    fer_c=1._WP
    fer_scal = 0.0_WP

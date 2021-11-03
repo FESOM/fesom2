@@ -28,13 +28,15 @@ END TYPE T_solverinfo
 ! option for momentum advection 
 TYPE T_DYN
     ! instant zonal merdional velocity & Adams-Bashfort rhs
-    real(kind=WP), allocatable, dimension(:,:,:):: uv, uv_rhs, uv_rhsAB  
+    real(kind=WP), allocatable, dimension(:,:,:):: uv, uv_rhs, uv_rhsAB, fer_uv  
 
-    ! instant vertical velm explicite+implicite part
-    real(kind=WP), allocatable, dimension(:,:)  :: w, w_e, w_i, cfl_z
-    
+    ! horizontal velocities at nodes
     real(kind=WP), allocatable, dimension(:,:,:):: uvnode, uvnode_rhs
     
+    ! instant vertical vel arrays
+    real(kind=WP), allocatable, dimension(:,:)  :: w, w_e, w_i, cfl_z, fer_w
+    
+    ! sea surface height arrays
     real(kind=WP), allocatable, dimension(:)    :: eta_n, d_eta, ssh_rhs, ssh_rhs_old
     
     ! summarizes solver input parameter
@@ -112,8 +114,12 @@ subroutine WRITE_T_DYN(dynamics, unit, iostat, iomsg)
     call write_bin_array(dynamics%w         , unit, iostat, iomsg)
     call write_bin_array(dynamics%w_e       , unit, iostat, iomsg)
     call write_bin_array(dynamics%w_i       , unit, iostat, iomsg)
-    
     call write_bin_array(dynamics%cfl_z     , unit, iostat, iomsg)
+    
+    if (Fer_GM) then
+        call write_bin_array(dynamics%fer_w     , unit, iostat, iomsg)
+        call write_bin_array(dynamics%fer_uv    , unit, iostat, iomsg)
+    end if 
     
     !___________________________________________________________________________
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%visc_opt
@@ -151,8 +157,12 @@ subroutine READ_T_DYN(dynamics, unit, iostat, iomsg)
     call read_bin_array(dynamics%w         , unit, iostat, iomsg)
     call read_bin_array(dynamics%w_e       , unit, iostat, iomsg)
     call read_bin_array(dynamics%w_i       , unit, iostat, iomsg)
-    
     call read_bin_array(dynamics%cfl_z     , unit, iostat, iomsg)
+    
+    if (Fer_GM) then
+        call read_bin_array(dynamics%fer_w     , unit, iostat, iomsg)
+        call read_bin_array(dynamics%fer_uv    , unit, iostat, iomsg)
+    end if
     
     !___________________________________________________________________________
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%visc_opt
