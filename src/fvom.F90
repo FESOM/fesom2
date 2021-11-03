@@ -48,7 +48,6 @@ module fesom_main_storage_module
     real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
     real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing 
     real(kind=real32) :: rtime_setup_ice,  rtime_setup_other, rtime_setup_restart
-    real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
     real(kind=real32) :: runtime_alltimesteps
 
 
@@ -354,7 +353,70 @@ contains
 
 
   subroutine fesom_finalize()
+    use fesom_main_storage_module
+    ! EO parameters
+    real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
 
+    call finalize_output()
+
+    !___FINISH MODEL RUN________________________________________________________
+
+    call MPI_Barrier(f%MPI_COMM_FESOM, f%MPIERR)
+    if (f%mype==0) then
+       f%t1 = MPI_Wtime()
+       f%runtime_alltimesteps = real(f%t1-f%t0,real32)
+       write(*,*) 'FESOM Run is finished, updating clock'
+    endif
+
+    mean_rtime(1)  = rtime_oce         
+    mean_rtime(2)  = rtime_oce_mixpres 
+    mean_rtime(3)  = rtime_oce_dyn     
+    mean_rtime(4)  = rtime_oce_dynssh  
+    mean_rtime(5)  = rtime_oce_solvessh
+    mean_rtime(6)  = rtime_oce_GMRedi  
+    mean_rtime(7)  = rtime_oce_solvetra
+    mean_rtime(8)  = rtime_ice         
+    mean_rtime(9)  = rtime_tot  
+    mean_rtime(10) = f%rtime_fullice - f%rtime_read_forcing 
+    mean_rtime(11) = f%rtime_compute_diag
+    mean_rtime(12) = f%rtime_write_means
+    mean_rtime(13) = f%rtime_write_restart
+    mean_rtime(14) = f%rtime_read_forcing   
+    
+    max_rtime(1:14) = mean_rtime(1:14)
+    min_rtime(1:14) = mean_rtime(1:14)
+
+    call MPI_AllREDUCE(MPI_IN_PLACE, mean_rtime, 14, MPI_REAL, MPI_SUM, f%MPI_COMM_FESOM, f%MPIerr)
+    mean_rtime(1:14) = mean_rtime(1:14) / real(f%npes,real32)
+    call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime,  14, MPI_REAL, MPI_MAX, f%MPI_COMM_FESOM, f%MPIerr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime,  14, MPI_REAL, MPI_MIN, f%MPI_COMM_FESOM, f%MPIerr)
+
+    if (f%mype==0) then
+        write(*,*) '___MODEL RUNTIME mean, min, max per task [seconds]________________________'
+        write(*,*) '  runtime ocean:',mean_rtime(1), min_rtime(1), max_rtime(1)
+        write(*,*) '    > runtime oce. mix,pres. :',mean_rtime(2), min_rtime(2), max_rtime(2)
+        write(*,*) '    > runtime oce. dyn. u,v,w:',mean_rtime(3), min_rtime(3), max_rtime(3)
+        write(*,*) '    > runtime oce. dyn. ssh  :',mean_rtime(4), min_rtime(4), max_rtime(4)
+        write(*,*) '        > runtime oce. solve ssh:',mean_rtime(5), min_rtime(5), max_rtime(5)
+        write(*,*) '    > runtime oce. GM/Redi   :',mean_rtime(6), min_rtime(6), max_rtime(6)
+        write(*,*) '    > runtime oce. tracer    :',mean_rtime(7), min_rtime(7), max_rtime(7)
+        write(*,*) '  runtime ice  :',mean_rtime(10), min_rtime(10), max_rtime(10)
+        write(*,*) '    > runtime ice step :',mean_rtime(8), min_rtime(8), max_rtime(8)
+        write(*,*) '  runtime diag:   ', mean_rtime(11), min_rtime(11), max_rtime(11)
+        write(*,*) '  runtime output: ', mean_rtime(12), min_rtime(12), max_rtime(12)
+        write(*,*) '  runtime restart:', mean_rtime(13), min_rtime(13), max_rtime(13)
+        write(*,*) '  runtime forcing:', mean_rtime(14), min_rtime(14), max_rtime(14)
+        write(*,*) '  runtime total (ice+oce):',mean_rtime(9), min_rtime(9), max_rtime(9)
+        write(*,*)
+        write(*,*) '============================================'
+        write(*,*) '=========== BENCHMARK RUNTIME =============='
+        write(*,*) '    Number of cores : ',f%npes
+        write(*,*) '    Runtime for all timesteps : ',f%runtime_alltimesteps,' sec'
+        write(*,*) '============================================'
+        write(*,*)
+    end if    
+!   call clock_finish  
+    call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
   end subroutine
 
 end module
