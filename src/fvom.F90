@@ -45,6 +45,7 @@ module fesom_main_storage_module
     integer           :: n, from_nstep, offset, row, i, provided
     integer, pointer  :: mype, npes, MPIerr, MPI_COMM_FESOM
     real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
+    real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
     real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing 
     real(kind=real32) :: rtime_setup_ice,  rtime_setup_other, rtime_setup_restart
     real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
@@ -238,6 +239,13 @@ contains
     !         
     !    if (f%mype==10) write(,) f%mesh1%ssh_stiff%values-f%mesh%ssh_stiff%value    
   
+    ! Initialize timers
+    f%rtime_fullice       = 0._WP
+    f%rtime_write_restart = 0._WP
+    f%rtime_write_means   = 0._WP
+    f%rtime_compute_diag  = 0._WP
+    f%rtime_read_forcing  = 0._WP
+
     f%from_nstep = 1
   end subroutine
 
@@ -248,18 +256,10 @@ contains
     ! EO parameters
 
     integer n
-    real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
 
     !=====================
     ! Time stepping
     !=====================
-
-! Initialize timers
-    rtime_fullice       = 0._WP
-    rtime_write_restart = 0._WP
-    rtime_write_means   = 0._WP
-    rtime_compute_diag  = 0._WP
-    rtime_read_forcing  = 0._WP
 
     if (f%mype==0) write(*,*) 'FESOM start iteration before the barrier...'
     call MPI_Barrier(f%MPI_COMM_FESOM, f%MPIERR)
@@ -342,11 +342,11 @@ contains
         call restart(n, .false., .false., f%tracers, f%partit, f%mesh)
         f%t6 = MPI_Wtime()
         
-        rtime_fullice       = rtime_fullice       + f%t2 - f%t1
-        rtime_compute_diag  = rtime_compute_diag  + f%t4 - f%t3
-        rtime_write_means   = rtime_write_means   + f%t5 - f%t4   
-        rtime_write_restart = rtime_write_restart + f%t6 - f%t5
-        rtime_read_forcing  = rtime_read_forcing  + f%t1_frc - f%t0_frc
+        f%rtime_fullice       = f%rtime_fullice       + f%t2 - f%t1
+        f%rtime_compute_diag  = f%rtime_compute_diag  + f%t4 - f%t3
+        f%rtime_write_means   = f%rtime_write_means   + f%t5 - f%t4   
+        f%rtime_write_restart = f%rtime_write_restart + f%t6 - f%t5
+        f%rtime_read_forcing  = f%rtime_read_forcing  + f%t1_frc - f%t0_frc
     end do
 
     f%from_nstep = f%from_nstep+current_nsteps
