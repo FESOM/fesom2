@@ -25,7 +25,7 @@ module par_support_interfaces
      USE MOD_PARTIT
      USE MOD_PARSUP
      implicit none
-     type(t_partit), intent(in), target :: partit
+     type(t_partit), intent(inout), target :: partit
      type(t_mesh),   intent(in), target :: mesh
   end subroutine
 
