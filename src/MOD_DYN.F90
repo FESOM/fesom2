@@ -16,9 +16,8 @@ TYPE T_solverinfo
     integer       :: restart = 15
     integer       :: fillin  = 3
     integer       :: lutype  = 2
-    real(kind=WP) :: droptol=1.e-8
-    real(kind=WP) :: soltol =1e-10  !1.e-10
-    
+    real(kind=WP) :: droptol = 1.e-8
+    real(kind=WP) :: soltol  = 1e-10  !1.e-10    
 END TYPE T_solverinfo
 
 !

@@ -2491,6 +2491,8 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
 
     ! new_values>0 requires reuse=1 in psolver_init!
 
+    !
+    !___________________________________________________________________________
     if (lfirst) then
     ! Set SOLCG for CG solver (symmetric, positiv definit matrices only, no precond available!!)
     !     SOLBICGS for BiCGstab solver (arbitrary matrices)
@@ -2507,11 +2509,10 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
             ssh_stiff%colind-1, ssh_stiff%values, reuse, MPI_COMM_FESOM)
     lfirst=.false.
     end if
-    
+    !
+    !___________________________________________________________________________    
     call psolve(ident, dynamics%ssh_rhs, ssh_stiff%values, dynamics%d_eta, new_values)
 
-
-    !
     !
     !___________________________________________________________________________
     call exchange_nod(dynamics%d_eta, partit) !is this required after calling psolve ?
