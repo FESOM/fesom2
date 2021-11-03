@@ -254,7 +254,6 @@ real(kind=WP),allocatable :: mo(:,:),mixlength(:)
 !GM_stuff
 real(kind=WP),allocatable :: bvfreq(:,:),mixlay_dep(:),bv_ref(:)
 
-real(kind=WP),         allocatable    :: fer_UV(:,:,:), fer_wvel(:,:)
 real(kind=WP), target, allocatable    :: fer_c(:), fer_scal(:), fer_K(:,:), fer_gamma(:,:,:)
 
 real(kind=WP),         allocatable    :: ice_rejected_salt(:)

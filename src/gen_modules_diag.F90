@@ -430,15 +430,15 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
   real(kind=WP), save, allocatable        :: std_dens_w(:,:), std_dens_VOL1(:,:), std_dens_VOL2(:,:)
   logical, save                           :: firstcall_s=.true., firstcall_e=.true.
   real(kind=WP), dimension(:,:), pointer  :: temp, salt
-  real(kind=WP), dimension(:,:,:), pointer :: UV
+  real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-  UV => dynamics%uv(:,:,:)
-
-  temp=>tracers%data(1)%values(:,:)
-  salt=>tracers%data(2)%values(:,:)
+  UV     => dynamics%uv(:,:,:)
+  temp   => tracers%data(1)%values(:,:)
+  salt   => tracers%data(2)%values(:,:)
+  fer_UV => dynamics%fer_uv(:,:,:)
 
   if (firstcall_s) then !allocate the stuff at the first call
      allocate(std_dens_UVDZ(2,std_dens_N, myDim_elem2D))

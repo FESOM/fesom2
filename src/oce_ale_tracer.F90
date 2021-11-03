@@ -140,7 +140,6 @@ end module
 subroutine solve_tracers_ale(dynamics, tracers, partit, mesh) 
     use g_config
     use o_PARAM, only: SPP, Fer_GM
-    use o_arrays, only: fer_Wvel, fer_UV
     use mod_mesh
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -158,8 +157,8 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
     type(t_mesh)  , intent(in)   , target :: mesh
     type(t_partit), intent(inout), target :: partit
     integer                               :: tr_num, node, nzmax, nzmin
-    real(kind=WP), dimension(:,:,:), pointer :: UV
-    real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e 
+    real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
+    real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, fer_Wvel
     
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -168,6 +167,10 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
     UV     => dynamics%uv(:,:,:)
     Wvel   => dynamics%w(:,:)
     Wvel_e => dynamics%w_e(:,:)
+    if (Fer_GM) then
+        fer_UV     => dynamics%fer_uv(:,:,:)
+        fer_Wvel   => dynamics%fer_w(:,:)
+    end if 
 
     !___________________________________________________________________________
     if (SPP) call cal_rejected_salt(partit, mesh)
