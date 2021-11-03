@@ -108,11 +108,16 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     ! part of antidiffusive flux
     if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then 
         ! compute the low order upwind horizontal flux
-        ! init_zero=.true.  : zero the horizontal flux before computation
-        ! init_zero=.false. : input flux will be substracted
-        call adv_tra_hor_upw1(vel, ttf, partit, mesh, adv_flux_hor, init_zero=.true.)
+        ! o_init_zero=.true.  : zero the horizontal flux before computation
+        ! o_init_zero=.false. : input flux will be substracted
+        call adv_tra_hor_upw1(vel, ttf, partit, mesh, adv_flux_hor, o_init_zero=.true.)
         ! update the LO solution for horizontal contribution
-        fct_LO=0.0_WP
+!$OMP PARALLEL DO
+        do n=1, myDim_nod2D+eDim_nod2D
+           fct_LO(:,n)=0.0_WP
+        end do
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(e, enodes, el, nl1, nu1, nl2, nu2, nz)
         do e=1, myDim_edge2D
             enodes=edges(:,e)
             el=edge_tri(:,e)        
@@ -130,15 +135,29 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
             if (nu2>0) nu12 = min(nu1,nu2)
             
             !!PS do  nz=1, max(nl1, nl2)
+#if defined(_OPENMP)
+            call omp_set_lock(partit%plock(enodes(1)))
+#endif
             do nz=nu12, nl12
-                fct_LO(nz, enodes(1))=fct_LO(nz, enodes(1))+adv_flux_hor(nz, e)
-                fct_LO(nz, enodes(2))=fct_LO(nz, enodes(2))-adv_flux_hor(nz, e)
+               fct_LO(nz, enodes(1))=fct_LO(nz, enodes(1))+adv_flux_hor(nz, e)
             end do
-        end do 
+#if defined(_OPENMP)
+            call omp_unset_lock(partit%plock(enodes(1)))
+            call omp_set_lock  (partit%plock(enodes(2)))
+#endif
+            do nz=nu12, nl12
+               fct_LO(nz, enodes(2))=fct_LO(nz, enodes(2))-adv_flux_hor(nz, e)
+            end do
+#if defined(_OPENMP)
+            call omp_unset_lock(partit%plock(enodes(2)))
+#endif
+        end do
+!$OMP END PARALLEL DO
         ! compute the low order upwind vertical flux (explicit part only)
         ! zero the input/output flux before computation
-        call adv_tra_ver_upw1(we, ttf, partit, mesh, adv_flux_ver, init_zero=.true.)        
+        call adv_tra_ver_upw1(we, ttf, partit, mesh, adv_flux_ver, o_init_zero=.true.)        
         ! update the LO solution for vertical contribution
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nu1, nl1, nz)
         do n=1, myDim_nod2D
             nu1 = ulevels_nod2D(n)
             nl1 = nlevels_nod2D(n)
@@ -147,30 +166,35 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
                 fct_LO(nz,n)=(ttf(nz,n)*hnode(nz,n)+(fct_LO(nz,n)+(adv_flux_ver(nz, n)-adv_flux_ver(nz+1, n)))*dt/areasvol(nz,n))/hnode_new(nz,n)
             end do
         end do
+<<<<<<< HEAD
         if (dynamics%use_wsplit) then !wvel/=wvel_e
             ! update for implicit contribution (use_wsplit option)
+=======
+!$OMP END PARALLEL DO
+        if (w_split) then !wvel/=wvel_e
+            ! update for implicit contribution (w_split option)
+>>>>>>> tracer advection part has been fullly OpenMP parallelized. It turns out that OpenMP does not slow down the modes as compared to MPI.
             call adv_tra_vert_impl(dt, wi, fct_LO, partit, mesh)
             ! compute the low order upwind vertical flux (full vertical velocity)
             ! zero the input/output flux before computation
             ! --> compute here low order part of vertical anti diffusive fluxes, 
             !     has to be done on the full vertical velocity w
-            call adv_tra_ver_upw1(w, ttf, partit, mesh, adv_flux_ver, init_zero=.true.)
-        end if    
+            call adv_tra_ver_upw1(w, ttf, partit, mesh, adv_flux_ver, o_init_zero=.true.)
+        end if
         call exchange_nod(fct_LO, partit)
     end if
-
     do_zero_flux=.true.
     if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') do_zero_flux=.false.
     !___________________________________________________________________________
     ! do horizontal tracer advection, in case of FCT high order solution 
     SELECT CASE(trim(tracers%data(tr_num)%tra_adv_hor))
         CASE('MUSCL')
-            ! compute the untidiffusive horizontal flux (init_zero=.false.: input is the LO horizontal flux computed above)
-            call adv_tra_hor_muscl(vel, ttfAB, partit, mesh, opth,  adv_flux_hor, edge_up_dn_grad, nboundary_lay, init_zero=do_zero_flux)
+            ! compute the untidiffusive horizontal flux (o_init_zero=.false.: input is the LO horizontal flux computed above)
+            call adv_tra_hor_muscl(vel, ttfAB, partit, mesh, opth,  adv_flux_hor, edge_up_dn_grad, nboundary_lay, o_init_zero=do_zero_flux)
         CASE('MFCT')
-             call adv_tra_hor_mfct(vel, ttfAB, partit, mesh, opth,  adv_flux_hor, edge_up_dn_grad,                init_zero=do_zero_flux)
+             call adv_tra_hor_mfct(vel, ttfAB, partit, mesh, opth,  adv_flux_hor, edge_up_dn_grad,                o_init_zero=do_zero_flux)
         CASE('UPW1')
-             call adv_tra_hor_upw1(vel, ttfAB, partit, mesh,        adv_flux_hor,                                 init_zero=do_zero_flux)
+             call adv_tra_hor_upw1(vel, ttfAB, partit, mesh,        adv_flux_hor,                                 o_init_zero=do_zero_flux)
         CASE DEFAULT !unknown
             if (mype==0) write(*,*) 'Unknown horizontal advection type ',  trim(tracers%data(tr_num)%tra_adv_hor), '! Check your namelists!'
             call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
@@ -184,14 +208,14 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     ! do vertical tracer advection, in case of FCT high order solution 
     SELECT CASE(trim(tracers%data(tr_num)%tra_adv_ver))
         CASE('QR4C')
-            ! compute the untidiffusive vertical flux   (init_zero=.false.:input is the LO vertical flux computed above)
-            call adv_tra_ver_qr4c (   pwvel, ttfAB, partit, mesh, optv, adv_flux_ver, init_zero=do_zero_flux)
+            ! compute the untidiffusive vertical flux   (o_init_zero=.false.:input is the LO vertical flux computed above)
+            call adv_tra_ver_qr4c (   pwvel, ttfAB, partit, mesh, optv, adv_flux_ver, o_init_zero=do_zero_flux)
         CASE('CDIFF')
-            call adv_tra_ver_cdiff(   pwvel, ttfAB, partit, mesh,       adv_flux_ver, init_zero=do_zero_flux)
+            call adv_tra_ver_cdiff(   pwvel, ttfAB, partit, mesh,       adv_flux_ver, o_init_zero=do_zero_flux)
         CASE('PPM')
-            call adv_tra_vert_ppm(dt, pwvel, ttfAB, partit, mesh,       adv_flux_ver, init_zero=do_zero_flux)
+            call adv_tra_vert_ppm(dt, pwvel, ttfAB, partit, mesh,       adv_flux_ver, o_init_zero=do_zero_flux)
         CASE('UPW1')
-            call adv_tra_ver_upw1 (   pwvel, ttfAB, partit, mesh,       adv_flux_ver, init_zero=do_zero_flux)
+            call adv_tra_ver_upw1 (   pwvel, ttfAB, partit, mesh,       adv_flux_ver, o_init_zero=do_zero_flux)
         CASE DEFAULT !unknown
             if (mype==0) write(*,*) 'Unknown vertical advection type ',  trim(tracers%data(tr_num)%tra_adv_ver), '! Check your namelists!'
             call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
@@ -260,9 +284,9 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
             dttf_v(nz,n)=dttf_v(nz,n) + (flux_v(nz,n)-flux_v(nz+1,n))*dt/areasvol(nz,n)
         end do
     end do
-!$OMP END DO
-!$OMP END PARALLEL   
+!$OMP END DO  
     ! Horizontal
+!$OMP DO
     do edge=1, myDim_edge2D
         enodes(1:2)=edges(:,edge)
         el=edge_tri(:,edge)
@@ -280,10 +304,23 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
         nu12 = nu1
         if (nu2>0) nu12 = min(nu1,nu2)
             
-        !!PS do  nz=1, max(nl1, nl2)
+#if defined(_OPENMP)
+        call omp_set_lock(partit%plock(enodes(1)))
+#endif
         do nz=nu12, nl12
             dttf_h(nz,enodes(1))=dttf_h(nz,enodes(1))+flux_h(nz,edge)*dt/areasvol(nz,enodes(1))
+        end do
+#if defined(_OPENMP)
+        call omp_unset_lock(partit%plock(enodes(1)))
+        call omp_set_lock  (partit%plock(enodes(2)))
+#endif
+        do nz=nu12, nl12
             dttf_h(nz,enodes(2))=dttf_h(nz,enodes(2))-flux_h(nz,edge)*dt/areasvol(nz,enodes(2))
         end do
+#if defined(_OPENMP)
+        call omp_unset_lock(partit%plock(enodes(2)))
+#endif
     end do
+!$OMP END DO
+!$OMP END PARALLEL 
 end subroutine oce_tra_adv_flux2dtracer
