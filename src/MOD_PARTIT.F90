@@ -5,6 +5,9 @@ USE O_PARAM
 USE, intrinsic :: ISO_FORTRAN_ENV
 USE MOD_WRITE_BINARY_ARRAYS
 USE MOD_READ_BINARY_ARRAYS
+#if defined(_OPENMP)
+    USE OMP_LIB
+#endif
 IMPLICIT NONE
 SAVE
 include 'mpif.h'
@@ -69,11 +72,15 @@ TYPE T_PARTIT
   integer, allocatable, dimension(:)  :: myList_edge2D
 
   integer :: pe_status = 0 ! if /=0 then something is wrong 
-  !!! remPtr_* are constructed during the runtime ans shall not be dumped!!!
+  !!! remPtr_* are constructed during the runtime and shall not be dumped!!!
   integer, allocatable ::  remPtr_nod2D(:),  remList_nod2D(:)
   integer, allocatable ::  remPtr_elem2D(:), remList_elem2D(:)
 
   logical :: elem_full_flag
+#if defined(_OPENMP)
+  !!! plock is constructed during the runtime and shall not be dumped!!!
+    integer(omp_lock_kind), allocatable :: plock(:)
+#endif
   contains
   procedure WRITE_T_PARTIT
   procedure  READ_T_PARTIT

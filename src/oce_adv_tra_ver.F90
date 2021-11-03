@@ -15,10 +15,10 @@ module oce_adv_tra_ver_interfaces
 !===============================================================================
 ! 1st order upwind (explicit)
 ! returns flux given at vertical interfaces of scalar volumes
-! IF init_zero=.TRUE.  : flux will be set to zero before computation
-! IF init_zero=.FALSE. : flux=flux-input flux
+! IF o_init_zero=.TRUE.  : flux will be set to zero before computation
+! IF o_init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-    subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, init_zero)
+    subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
       use MOD_MESH
       USE MOD_PARTIT
       USE MOD_PARSUP
@@ -27,15 +27,15 @@ module oce_adv_tra_ver_interfaces
       real(kind=WP), intent(in)         :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent(in)         :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent(inout)      :: flux(mesh%nl,  partit%myDim_nod2D)
-      logical, optional                 :: init_zero
+      logical, optional                 :: o_init_zero
     end subroutine
 !===============================================================================
 ! QR (4th order centerd)
 ! returns flux given at vertical interfaces of scalar volumes
-! IF init_zero=.TRUE.  : flux will be set to zero before computation
-! IF init_zero=.FALSE. : flux=flux-input flux
+! IF o_init_zero=.TRUE.  : flux will be set to zero before computation
+! IF o_init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-    subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, init_zero)
+    subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
       use MOD_MESH
       USE MOD_PARTIT
       USE MOD_PARSUP
@@ -45,34 +45,33 @@ module oce_adv_tra_ver_interfaces
       real(kind=WP), intent(in)         :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent(in)         :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent(inout)      :: flux(mesh%nl,  partit%myDim_nod2D)
-      logical, optional                 :: init_zero
+      logical, optional                 :: o_init_zero
     end subroutine
 !===============================================================================
 ! Vertical advection with PPM reconstruction (5th order)
 ! returns flux given at vertical interfaces of scalar volumes
-! IF init_zero=.TRUE.  : flux will be set to zero before computation
-! IF init_zero=.FALSE. : flux=flux-input flux
+! IF o_init_zero=.TRUE.  : flux will be set to zero before computation
+! IF o_init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-   subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, init_zero)
+   subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
       use MOD_MESH
       USE MOD_PARTIT
       USE MOD_PARSUP
       real(kind=WP), intent(in), target :: dt
       type(t_partit),intent(in), target :: partit
       type(t_mesh),  intent(in), target :: mesh
-      integer                           :: n, nz, nl1
       real(kind=WP)                     :: tvert(mesh%nl), tv
       real(kind=WP), intent(in)         :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent(in)         :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent(inout)      :: flux(mesh%nl,  partit%myDim_nod2D)
-      logical, optional                 :: init_zero
+      logical, optional                 :: o_init_zero
     end subroutine
 ! central difference reconstruction (2nd order, use only with FCT)
 ! returns flux given at vertical interfaces of scalar volumes
-! IF init_zero=.TRUE.  : flux will be set to zero before computation
-! IF init_zero=.FALSE. : flux=flux-input flux
+! IF o_init_zero=.TRUE.  : flux will be set to zero before computation
+! IF o_init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-    subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, init_zero)
+    subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, o_init_zero)
       use MOD_MESH
       USE MOD_PARTIT
       USE MOD_PARSUP
@@ -83,7 +82,7 @@ module oce_adv_tra_ver_interfaces
       real(kind=WP), intent(in)         :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent(in)         :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent(inout)      :: flux(mesh%nl,  partit%myDim_nod2D)
-      logical, optional                 :: init_zero
+      logical, optional                 :: o_init_zero
     end subroutine
   end interface
 end module
@@ -240,7 +239,7 @@ end subroutine adv_tra_vert_impl
 !
 !
 !===============================================================================
-subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, init_zero)
+subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
     use MOD_MESH
     use MOD_TRACER
     USE MOD_PARTIT
@@ -255,19 +254,27 @@ subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, init_zero)
     real(kind=WP), intent(in)         :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP), intent(in)         :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP), intent(inout)      :: flux(mesh%nl,  partit%myDim_nod2D)
-    logical, optional                 :: init_zero
+    logical, optional                 :: o_init_zero
+    logical                           :: l_init_zero
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-    if (present(init_zero))then
-       if (init_zero) flux=0.0_WP
-    else
-       flux=0.0_WP
+    l_init_zero=.true.
+    if (present(o_init_zero)) then
+       l_init_zero=o_init_zero
+    end if
+    if (l_init_zero) then
+!$OMP PARALLEL DO
+       do n=1, myDim_nod2D
+          flux(:, n)=0.0_WP
+       end do
+!$OMP END PARALLEL DO
     end if
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tvert, n, nz, nzmax, nzmin)
 !$OMP DO
+
     do n=1, myDim_nod2D
        !_______________________________________________________________________
        nzmax=nlevels_nod2D(n)
@@ -301,7 +308,7 @@ end subroutine adv_tra_ver_upw1
 !
 !
 !===============================================================================
-subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, init_zero)
+subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
     use MOD_MESH
     use o_ARRAYS
     use o_PARAM
@@ -314,7 +321,8 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, init_zero)
     real(kind=WP), intent(in)    :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP), intent(in)    :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP), intent(inout) :: flux(mesh%nl,  partit%myDim_nod2D)
-    logical, optional            :: init_zero
+    logical, optional            :: o_init_zero
+    logical                      :: l_init_zero
     real(kind=WP)                :: tvert(mesh%nl)
     integer                      :: n, nz, nzmax, nzmin
     real(kind=WP)                :: Tmean, Tmean1, Tmean2
@@ -325,13 +333,20 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, init_zero)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-    if (present(init_zero))then
-       if (init_zero) flux=0.0_WP
-    else
-       flux=0.0_WP
+    l_init_zero=.true.
+    if (present(o_init_zero)) then
+       l_init_zero=o_init_zero
+    end if
+    if (l_init_zero) then
+!$OMP PARALLEL DO
+       do n=1, myDim_nod2D
+          flux(:, n)=0.0_WP
+       end do
+!$OMP END PARALLEL DO
     end if
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tvert,n, nz, nzmax, nzmin, Tmean, Tmean1, Tmean2, qc, qu,qd)
 !$OMP DO
+
     do n=1, myDim_nod2D
        !_______________________________________________________________________
        nzmax=nlevels_nod2D(n)
@@ -380,7 +395,7 @@ end subroutine adv_tra_ver_qr4c
 !
 !
 !===============================================================================
-subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, init_zero)
+subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
     use MOD_MESH
     use MOD_TRACER
     USE MOD_PARTIT
@@ -393,7 +408,8 @@ subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, init_zero)
     real(kind=WP), intent(in)          :: ttf (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP), intent(in)          :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP), intent(inout)       :: flux(mesh%nl,   partit%myDim_nod2D)
-    logical, optional                  :: init_zero
+    logical, optional                  :: o_init_zero
+    logical                            :: l_init_zero
     real(kind=WP)                      :: tvert(mesh%nl), tv(mesh%nl), aL, aR, aj, x
     real(kind=WP)                      :: dzjm1, dzj, dzjp1, dzjp2, deltaj, deltajp1
     integer                            :: n, nz, nzmax, nzmin
@@ -404,10 +420,16 @@ subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, init_zero)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-    if (present(init_zero))then
-       if (init_zero) flux=0.0_WP
-    else
-       flux=0.0_WP
+    l_init_zero=.true.
+    if (present(o_init_zero)) then
+       l_init_zero=o_init_zero
+    end if
+    if (l_init_zero) then
+!$OMP PARALLEL DO
+       do n=1, myDim_nod2D
+          flux(:, n)=0.0_WP
+       end do
+!$OMP END PARALLEL DO
     end if
 
     ! --------------------------------------------------------------------------
@@ -568,7 +590,7 @@ end subroutine adv_tra_vert_ppm
 !
 !
 !===============================================================================
-subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, init_zero)
+subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, o_init_zero)
     use MOD_MESH
     use MOD_TRACER
     USE MOD_PARTIT
@@ -580,7 +602,8 @@ subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, init_zero)
     real(kind=WP), intent(in)         :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP), intent(in)         :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP), intent(inout)      :: flux(mesh%nl,  partit%myDim_nod2D)
-    logical, optional                 :: init_zero
+    logical, optional                 :: o_init_zero
+    logical                           :: l_init_zero
     integer                           :: n, nz, nzmax, nzmin
     real(kind=WP)                     :: tvert(mesh%nl), tv
 #include "associate_part_def.h"
@@ -588,11 +611,18 @@ subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, init_zero)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-    if (present(init_zero))then
-       if (init_zero) flux=0.0_WP
-    else
-       flux=0.0_WP
+    l_init_zero=.true.
+    if (present(o_init_zero)) then
+       l_init_zero=o_init_zero
     end if
+    if (l_init_zero) then
+!$OMP PARALLEL DO
+       do n=1, myDim_nod2D
+          flux(:, n)=0.0_WP
+       end do
+!$OMP END PARALLEL DO
+    end if
+
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmax, nzmin, tv, tvert)
 !$OMP DO
     do n=1, myDim_nod2D

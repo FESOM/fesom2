@@ -81,9 +81,6 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE g_comm_auto
-#if defined(_OPENMP)
-    USE OMP_LIB
-#endif
     implicit none
     real(kind=WP), intent(in),    target :: dt
     type(t_mesh),  intent(in),    target :: mesh
@@ -101,12 +98,6 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     real(kind=WP)                     :: flux, ae,tvert_max(mesh%nl-1),tvert_min(mesh%nl-1) 
     real(kind=WP)                     :: flux_eps=1e-16
     real(kind=WP)                     :: bignumber=1e3
-    integer                           :: vlimit=1
-#if defined(_OPENMP)
-    integer(omp_lock_kind), allocatable, save            :: plock(:)
-    integer(omp_lock_kind)                               :: mlock(partit%myDim_nod2D)
-#endif
-    logical, save                                        :: l_first=.true.
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -114,17 +105,6 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, k, elem, enodes, num, el, nl1, nl2, nu1, nu2, nl12, nu12, edge, &
 !$OMP                          flux, ae,tvert_max, tvert_min)
-!$OMP MASTER
-#if defined(_OPENMP)
-    if (l_first) then
-       allocate(plock(partit%myDim_nod2D+partit%eDim_nod2D))
-    do n=1, myDim_nod2D+partit%eDim_nod2D
-       call omp_init_lock_with_hint(plock(n),omp_sync_hint_speculative+omp_sync_hint_uncontended)
-    enddo
-    l_first = .false.
-    endif
-#endif
-!$OMP END MASTER
     ! --------------------------------------------------------------------------
     ! ttf is the tracer field on step n
     ! del_ttf is the increment 
@@ -246,22 +226,22 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
        nu12 = nu1
        if (nu2>0) nu12 = min(nu1,nu2)
 #if defined(_OPENMP)
-       call omp_set_lock(plock(enodes(1)))
+       call omp_set_lock(partit%plock(enodes(1)))
 #endif
        do nz=nu12, nl12
           fct_plus (nz,enodes(1))=fct_plus (nz,enodes(1)) + max(0.0_WP, adf_h(nz,edge))
           fct_minus(nz,enodes(1))=fct_minus(nz,enodes(1)) + min(0.0_WP, adf_h(nz,edge))
        end do
 #if defined(_OPENMP)
-       call omp_unset_lock(plock(enodes(1)))
-       call omp_set_lock(plock(enodes(2)))
+       call omp_unset_lock(partit%plock(enodes(1)))
+       call omp_set_lock  (partit%plock(enodes(2)))
 #endif
        do nz=nu12, nl12  
           fct_plus (nz,enodes(2))=fct_plus (nz,enodes(2)) + max(0.0_WP,-adf_h(nz,edge))
           fct_minus(nz,enodes(2))=fct_minus(nz,enodes(2)) + min(0.0_WP,-adf_h(nz,edge)) 
        end do
 #if defined(_OPENMP)
-       call omp_unset_lock(plock(enodes(2)))
+       call omp_unset_lock(partit%plock(enodes(2)))
 #endif
     end do
 !$OMP END DO 

@@ -506,6 +506,14 @@ subroutine init_gatherLists(partit)
      call MPI_SEND(myList_elem2D, myDim_elem2D, MPI_INTEGER, 0, 3, MPI_COMM_FESOM, MPIerr )
 
   endif
+!$OMP MASTER
+#if defined(_OPENMP)
+    allocate(partit%plock(partit%myDim_nod2D+partit%eDim_nod2D))
+    do n=1, myDim_nod2D+partit%eDim_nod2D
+       call omp_init_lock_with_hint(partit%plock(n),omp_sync_hint_speculative+omp_sync_hint_uncontended)
+    enddo
+#endif
+!$OMP END MASTER
 end subroutine init_gatherLists
 !===================================================================
 subroutine status_check(partit)
