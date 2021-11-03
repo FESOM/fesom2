@@ -42,7 +42,7 @@ module fesom_main_storage_module
     
   type :: fesom_main_storage_type
 
-    integer           :: n, nsteps, offset, row, i, provided
+    integer           :: n, from_nstep, offset, row, i, provided
     integer, pointer  :: mype, npes, MPIerr, MPI_COMM_FESOM
     real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
     real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing 
@@ -123,7 +123,7 @@ contains
         !=====================
         call setup_model(f%partit)  ! Read Namelists, always before clock_init
         call clock_init(f%partit)   ! read the clock file 
-        call get_run_steps(f%nsteps, f%partit)
+        call get_run_steps(fesom_total_nsteps, f%partit)
         call mesh_setup(f%partit, f%mesh)
 
         if (f%mype==0) write(*,*) 'FESOM mesh_setup... complete'
@@ -236,17 +236,120 @@ contains
     !call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
     !stop
     !         
-    !    if (f%mype==10) write(,) f%mesh1%ssh_stiff%values-f%mesh%ssh_stiff%value
-
-    
-    fesom_total_nsteps = f%nsteps
+    !    if (f%mype==10) write(,) f%mesh1%ssh_stiff%values-f%mesh%ssh_stiff%value    
+  
+    f%from_nstep = 1
   end subroutine
 
 
-  subroutine fesom_runloop(nsteps)
-    integer, intent(in) :: nsteps 
+  subroutine fesom_runloop(current_nsteps)
+    use fesom_main_storage_module
+    integer, intent(in) :: current_nsteps 
     ! EO parameters
 
+    integer n
+    real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
+
+    !=====================
+    ! Time stepping
+    !=====================
+
+! Initialize timers
+    rtime_fullice       = 0._WP
+    rtime_write_restart = 0._WP
+    rtime_write_means   = 0._WP
+    rtime_compute_diag  = 0._WP
+    rtime_read_forcing  = 0._WP
+
+    if (f%mype==0) write(*,*) 'FESOM start iteration before the barrier...'
+    call MPI_Barrier(f%MPI_COMM_FESOM, f%MPIERR)
+    
+    if (f%mype==0) then
+       write(*,*) 'FESOM start iteration after the barrier...'
+       f%t0 = MPI_Wtime()
+    endif
+    if(f%mype==0) then
+        write(*,*)
+        print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
+        print *, achar(27)//'[7;32m'//' --> FESOM STARTS TIME LOOP                                 '//achar(27)//'[0m'
+    end if
+    !___MODEL TIME STEPPING LOOP________________________________________________
+    if (use_global_tides) then
+       call foreph_ini(yearnew, month, f%partit)
+    end if
+    do n=f%from_nstep, f%from_nstep-1+current_nsteps        
+        if (use_global_tides) then
+           call foreph(f%partit, f%mesh)
+        end if
+        mstep = n
+        if (mod(n,logfile_outfreq)==0 .and. f%mype==0) then
+            write(*,*) 'FESOM ======================================================='
+!             write(*,*) 'FESOM step:',n,' day:', n*dt/24./3600.,
+            write(*,*) 'FESOM step:',n,' day:', daynew,' year:',yearnew 
+            write(*,*)
+        end if
+#if defined (__oifs) || defined (__oasis)
+            seconds_til_now=INT(dt)*(n-1)
+#endif
+        call clock      
+        !___compute horizontal velocity on nodes (originaly on elements)________
+        call compute_vel_nodes(f%partit, f%mesh)
+        !___model sea-ice step__________________________________________________
+        f%t1 = MPI_Wtime()
+        if(use_ice) then
+            !___compute fluxes from ocean to ice________________________________
+            if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ocean2ice(n)'//achar(27)//'[0m'
+            call ocean2ice(f%tracers, f%partit, f%mesh)
+            
+            !___compute update of atmospheric forcing____________________________
+            if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call update_atm_forcing(n)'//achar(27)//'[0m'
+            f%t0_frc = MPI_Wtime()
+            call update_atm_forcing(n, f%tracers, f%partit, f%mesh)
+            f%t1_frc = MPI_Wtime()       
+            !___compute ice step________________________________________________
+            if (ice_steps_since_upd>=ice_ave_steps-1) then
+                ice_update=.true.
+                ice_steps_since_upd = 0
+            else
+                ice_update=.false.
+                ice_steps_since_upd=ice_steps_since_upd+1
+            endif
+            if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_timestep(n)'//achar(27)//'[0m'
+            if (ice_update) call ice_timestep(n, f%partit, f%mesh)  
+            !___compute fluxes to the ocean: heat, freshwater, momentum_________
+            if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
+            call oce_fluxes_mom(f%partit, f%mesh) ! momentum only
+            call oce_fluxes(f%tracers, f%partit, f%mesh)
+        end if
+        call before_oce_step(f%tracers, f%partit, f%mesh) ! prepare the things if required
+        f%t2 = MPI_Wtime()
+        !___model ocean step____________________________________________________
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_timestep_ale'//achar(27)//'[0m'
+
+        call oce_timestep_ale(n, f%tracers, f%partit, f%mesh)
+
+        f%t3 = MPI_Wtime()
+        !___compute energy diagnostics..._______________________________________
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call compute_diagnostics(1)'//achar(27)//'[0m'
+        call compute_diagnostics(1, f%tracers, f%partit, f%mesh)
+
+        f%t4 = MPI_Wtime()
+        !___prepare output______________________________________________________
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
+        call output (n, f%tracers, f%partit, f%mesh)
+
+        f%t5 = MPI_Wtime()
+        call restart(n, .false., .false., f%tracers, f%partit, f%mesh)
+        f%t6 = MPI_Wtime()
+        
+        rtime_fullice       = rtime_fullice       + f%t2 - f%t1
+        rtime_compute_diag  = rtime_compute_diag  + f%t4 - f%t3
+        rtime_write_means   = rtime_write_means   + f%t5 - f%t4   
+        rtime_write_restart = rtime_write_restart + f%t6 - f%t5
+        rtime_read_forcing  = rtime_read_forcing  + f%t1_frc - f%t0_frc
+    end do
+
+    f%from_nstep = f%from_nstep+current_nsteps
   end subroutine
 
 
