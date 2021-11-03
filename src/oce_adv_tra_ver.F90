@@ -24,10 +24,10 @@ module oce_adv_tra_ver_interfaces
       USE MOD_PARSUP
       type(t_partit),intent(in), target :: partit
       type(t_mesh),  intent(in), target :: mesh
-      real(kind=WP), intent(in)  :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(in)  :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(inout) :: flux(mesh%nl,  partit%myDim_nod2D)
-      logical, optional          :: init_zero
+      real(kind=WP), intent(in)         :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+      real(kind=WP), intent(in)         :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
+      real(kind=WP), intent(inout)      :: flux(mesh%nl,  partit%myDim_nod2D)
+      logical, optional                 :: init_zero
     end subroutine
 !===============================================================================
 ! QR (4th order centerd)
@@ -103,7 +103,7 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
     real(kind=WP), intent(in)          :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP)                      :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
     real(kind=WP)                      :: cp(mesh%nl), tp(mesh%nl)
-    integer                            :: nz, n, nzmax, nzmin, tr_num
+    integer                            :: nz, n, nzmax, nzmin
     real(kind=WP)                      :: m, zinv, dt_inv, dz
     real(kind=WP)                      :: c1, v_adv
 
@@ -113,7 +113,8 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
 #include "associate_mesh_ass.h"
 
     dt_inv=1.0_WP/dt
-    
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(a, b, c, tr, cp, tp, n, nz, nzmax, nzmin, m, zinv, dz, c1, v_adv)
+!$OMP DO    
     !___________________________________________________________________________
     ! loop over local nodes
     do n=1,myDim_nod2D  
@@ -233,6 +234,8 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
             ttf(nz,n)=ttf(nz,n)+tr(nz)
         end do
     end do ! --> do n=1,myDim_nod2D
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine adv_tra_vert_impl
 !
 !
@@ -263,7 +266,8 @@ subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, init_zero)
     else
        flux=0.0_WP
     end if
-
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tvert, n, nz, nzmax, nzmin)
+!$OMP DO
     do n=1, myDim_nod2D
        !_______________________________________________________________________
        nzmax=nlevels_nod2D(n)
@@ -291,6 +295,8 @@ subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, init_zero)
                       ttf(nz-1,n)*(W(nz,n)-abs(W(nz,n))))*area(nz,n)-flux(nz,n)
        end do
     end do
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine adv_tra_ver_upw1
 !
 !
@@ -324,7 +330,8 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, init_zero)
     else
        flux=0.0_WP
     end if
-
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tvert,n, nz, nzmax, nzmin, Tmean, Tmean1, Tmean2, qc, qu,qd)
+!$OMP DO
     do n=1, myDim_nod2D
        !_______________________________________________________________________
        nzmax=nlevels_nod2D(n)
@@ -364,10 +371,11 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, init_zero)
             Tmean1=ttf(nz  ,n)+(2*qc+qu)*(zbar_3d_n(nz,n)-Z_3d_n(nz  ,n))/3.0_WP
             Tmean2=ttf(nz-1,n)+(2*qc+qd)*(zbar_3d_n(nz,n)-Z_3d_n(nz-1,n))/3.0_WP
             Tmean =(W(nz,n)+abs(W(nz,n)))*Tmean1+(W(nz,n)-abs(W(nz,n)))*Tmean2
-    !         flux(nz,n)=-0.5_WP*(num_ord*(Tmean1+Tmean2)*W(nz,n)+(1.0_WP-num_ord)*Tmean)*area(nz,n)-flux(nz,n)
             flux(nz,n)=(-0.5_WP*(1.0_WP-num_ord)*Tmean - num_ord*(0.5_WP*(Tmean1+Tmean2))*W(nz,n))*area(nz,n)-flux(nz,n)
        end do
     end do
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine adv_tra_ver_qr4c
 !
 !
@@ -389,7 +397,7 @@ subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, init_zero)
     real(kind=WP)                      :: tvert(mesh%nl), tv(mesh%nl), aL, aR, aj, x
     real(kind=WP)                      :: dzjm1, dzj, dzjp1, dzjp2, deltaj, deltajp1
     integer                            :: n, nz, nzmax, nzmin
-    integer                            :: overshoot_counter, counter
+!   integer                            :: overshoot_counter, counter
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -410,8 +418,10 @@ subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, init_zero)
     ! non-uniformity into account, but this is more cumbersome. This is the version for AB
     ! time stepping
     ! --------------------------------------------------------------------------
-    overshoot_counter=0
-    counter          =0
+!   overshoot_counter=0
+!   counter          =0
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tvert, tv, aL, aR, aj, x, dzjm1, dzj, dzjp1, dzjp2, deltaj, deltajp1, n, nz, nzmax, nzmin)
+!$OMP DO
     do n=1, myDim_nod2D
         !_______________________________________________________________________
         !Interpolate to zbar...depth levels --> all quantities (tracer ...) are 
@@ -510,12 +520,12 @@ subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, init_zero)
         ! loop over layers (segments)
         do nz=nzmin, nzmax-1
             if ((W(nz,n)<=0._WP) .AND. (W(nz+1,n)>=0._WP)) CYCLE
-            counter=counter+1
+            !counter=counter+1
             aL=tv(nz)
             aR=tv(nz+1)
             if ((aR-ttf(nz, n))*(ttf(nz, n)-aL)<=0._WP) then
                 !   write(*,*) aL, ttf(nz, n), aR
-                overshoot_counter=overshoot_counter+1
+                !   overshoot_counter=overshoot_counter+1
                 aL =ttf(nz, n)
                 aR =ttf(nz, n)
             end if
@@ -552,6 +562,8 @@ subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, init_zero)
         flux(nzmin:nzmax, n)=tvert(nzmin:nzmax)-flux(nzmin:nzmax, n)
     end do ! --> do n=1, myDim_nod2D
 !       if (mype==0) write(*,*) 'PPM overshoot statistics:', real(overshoot_counter)/real(counter)
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine adv_tra_vert_ppm
 !
 !
@@ -581,7 +593,8 @@ subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, init_zero)
     else
        flux=0.0_WP
     end if
-
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmax, nzmin, tv, tvert)
+!$OMP DO
     do n=1, myDim_nod2D
         !_______________________________________________________________________
         nzmax=nlevels_nod2D(n)-1
@@ -605,4 +618,6 @@ subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, init_zero)
         !_______________________________________________________________________
         flux(nzmin:nzmax, n)=tvert(nzmin:nzmax)-flux(nzmin:nzmax, n)
     end do ! --> do n=1, myDim_nod2D
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine adv_tra_ver_cdiff

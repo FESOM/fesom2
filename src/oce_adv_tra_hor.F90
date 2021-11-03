@@ -92,6 +92,9 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, init_zero)
     ! The result is the low-order solution horizontal fluxes
     ! They are put into flux
     !___________________________________________________________________________
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, &
+!$OMP                       a, vflux, el, enodes, nz, nu12, nl12, nl1, nl2, nu1, nu2)
+!$OMP DO
     do edge=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,edge)      
@@ -214,6 +217,8 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, init_zero)
                              ttf(nz, enodes(2))*(vflux-abs(vflux)))-flux(nz, edge)
         end do
     end do
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine adv_tra_hor_upw1
 !
 !
@@ -255,6 +260,9 @@ subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_g
     ! The result is the low-order solution horizontal fluxes
     ! They are put into flux
     !___________________________________________________________________________
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, Tmean1, Tmean2, cHO, &
+!$OMP                                      c_lo, a, vflux, el, enodes, nz, nu12, nl12, nl1, nl2, nu1, nu2)
+!$OMP DO
     do edge=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,edge)          
@@ -487,6 +495,8 @@ subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_g
            flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
         end do
     end do
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine adv_tra_hor_muscl
 !
 !
@@ -498,7 +508,7 @@ end subroutine adv_tra_hor_muscl
     USE MOD_PARSUP
     use g_comm_auto
     implicit none
-    type(t_partit),intent(in), target :: partit
+    type(t_partit),intent(inout), target :: partit
     type(t_mesh),  intent(in), target :: mesh    
     real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
     real(kind=WP), intent(in)         :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
@@ -526,6 +536,9 @@ end subroutine adv_tra_hor_muscl
     ! The result is the low-order solution horizontal fluxes
     ! They are put into flux
     !___________________________________________________________________________
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, Tmean1, Tmean2, cHO, &
+!$OMP                                     a, vflux, el, enodes, nz, nu12, nl12, nl1, nl2, nu1, nu2)
+!$OMP DO
     do edge=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,edge)  
@@ -741,5 +754,7 @@ end subroutine adv_tra_hor_muscl
            flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
         end do
     end do
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine adv_tra_hor_mfct
 

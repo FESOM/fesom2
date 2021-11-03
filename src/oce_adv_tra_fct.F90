@@ -23,7 +23,7 @@ module oce_adv_tra_fct_interfaces
       real(kind=WP), intent(in)         :: lo (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent(inout)      :: adf_h(mesh%nl-1, partit%myDim_edge2D)
       real(kind=WP), intent(inout)      :: adf_v(mesh%nl,   partit%myDim_nod2D)
-      real(kind=WP), intent(inout)      :: fct_plus(mesh%nl-1, partit%myDim_edge2D)
+      real(kind=WP), intent(inout)      :: fct_plus(mesh%nl-1, partit%myDim_nod2D)
       real(kind=WP), intent(inout)      :: fct_minus(mesh%nl,  partit%myDim_nod2D)
       real(kind=WP), intent(inout)      :: AUX(:,:,:) !a large auxuary array
     end subroutine
@@ -40,7 +40,7 @@ subroutine oce_adv_tra_fct_init(twork, partit, mesh)
     implicit none
     integer                                    :: my_size
     type(t_mesh),        intent(in) ,   target :: mesh
-   type(t_partit),       intent(inout), target :: partit
+    type(t_partit),      intent(inout), target :: partit
     type(t_tracer_work), intent(inout), target :: twork
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -81,6 +81,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     USE MOD_PARTIT
     USE MOD_PARSUP
     use g_comm_auto
+    use omp_lib
     implicit none
     real(kind=WP), intent(in),    target :: dt
     type(t_mesh),  intent(in),    target :: mesh
@@ -99,12 +100,25 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     real(kind=WP)                     :: flux_eps=1e-16
     real(kind=WP)                     :: bignumber=1e3
     integer                           :: vlimit=1
-
+    integer(omp_lock_kind), allocatable, save            :: plock(:)
+    integer(omp_lock_kind)                               :: mlock(partit%myDim_nod2D)
+    logical, save                                        :: l_first=.true.
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, k, elem, enodes, num, el, nl1, nl2, nu1, nu2, nl12, nu12, edge, &
+!$OMP                          flux, ae,tvert_max, tvert_min)
+!$OMP MASTER 
+    if (l_first) then
+       allocate(plock(partit%myDim_nod2D+partit%eDim_nod2D))
+    do n=1, myDim_nod2D+partit%eDim_nod2D
+       call omp_init_lock_with_hint(plock(n),omp_sync_hint_speculative+omp_sync_hint_uncontended)
+    enddo
+    l_first = .false.
+    endif
+!$OMP END MASTER
     ! --------------------------------------------------------------------------
     ! ttf is the tracer field on step n
     ! del_ttf is the increment 
@@ -112,6 +126,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     ! --------------------------------------------------------------------------
     !___________________________________________________________________________
     ! a1. max, min between old solution and updated low-order solution per node
+!$OMP DO
     do n=1,myDim_nod2D + edim_nod2d
         nu1 = ulevels_nod2D(n)
         nl1 = nlevels_nod2D(n)
@@ -119,12 +134,13 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
             fct_ttf_max(nz,n)=max(LO(nz,n), ttf(nz,n))
             fct_ttf_min(nz,n)=min(LO(nz,n), ttf(nz,n))
         end do
-    end do       
-    
+    end do
+!$OMP END DO        
     !___________________________________________________________________________
     ! a2. Admissible increments on elements
     !     (only layers below the first and above the last layer)
     !     look for max, min bounds for each element --> AUX here auxilary array
+!$OMP DO
     do elem=1, myDim_elem2D
         enodes=elem2D_nodes(:,elem)
         nu1 = ulevels(elem)
@@ -140,98 +156,51 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
             end do
         endif
     end do ! --> do elem=1, myDim_elem2D
-    
+!$OMP END DO
     !___________________________________________________________________________
     ! a3. Bounds on clusters and admissible increments
     ! Vertical1: In this version we look at the bounds on the clusters
     !            above and below, which leaves wide bounds because typically 
     !            vertical gradients are larger.  
-    if(vlimit==1) then
         !Horizontal
-        do n=1, myDim_nod2D
-            nu1 = ulevels_nod2D(n)
-            nl1 = nlevels_nod2D(n)
-            
-            !___________________________________________________________________
-            do nz=nu1,nl1-1
-                ! max,min horizontal bound in cluster around node n in every 
-                ! vertical layer
-                ! nod_in_elem2D     --> elem indices of which node n is surrounded
-                ! nod_in_elem2D_num --> max number of surrounded elem 
-                tvert_max(nz)= maxval(AUX(1,nz,nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
-                tvert_min(nz)= minval(AUX(2,nz,nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
-            end do
-            
-            !___________________________________________________________________
-            ! calc max,min increment of surface layer with respect to low order 
-            ! solution 
-            fct_ttf_max(nu1,n)=tvert_max(nu1)-LO(nu1,n)
-            fct_ttf_min(nu1,n)=tvert_min(nu1)-LO(nu1,n)
-            
-            ! calc max,min increment from nz-1:nz+1 with respect to low order 
-            ! solution at layer nz
-            do nz=nu1+1,nl1-2  
-                fct_ttf_max(nz,n)=maxval(tvert_max(nz-1:nz+1))-LO(nz,n)
-                fct_ttf_min(nz,n)=minval(tvert_min(nz-1:nz+1))-LO(nz,n)
-            end do
-            ! calc max,min increment of bottom layer -1 with respect to low order 
-            ! solution 
-            nz=nl1-1
-            fct_ttf_max(nz,n)=tvert_max(nz)-LO(nz,n)
-            fct_ttf_min(nz,n)=tvert_min(nz)-LO(nz,n)  
-        end do
-    end if
-    
-    !___________________________________________________________________________
-    ! Vertical2: Similar to the version above, but the vertical bounds are more 
-    ! local  
-    if(vlimit==2) then
-        do n=1, myDim_nod2D
-            nu1 = ulevels_nod2D(n)
-            nl1 = nlevels_nod2D(n)
-            do nz=nu1,nl1-1
-                tvert_max(nz)= maxval(AUX(1,nz,nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
-                tvert_min(nz)= minval(AUX(2,nz,nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
-            end do
-            do nz=nu1+1, nl1-2
-                tvert_max(nz)=max(tvert_max(nz),maxval(fct_ttf_max(nz-1:nz+1,n)))
-                tvert_min(nz)=min(tvert_min(nz),minval(fct_ttf_max(nz-1:nz+1,n)))
-            end do
-            do nz=nu1,nl1-1
-                fct_ttf_max(nz,n)=tvert_max(nz)-LO(nz,n)
-                fct_ttf_min(nz,n)=tvert_min(nz)-LO(nz,n)  
-            end do
-        end do
-    end if
-    
-    !___________________________________________________________________________
-    ! Vertical3: Vertical bounds are taken into account only if they are narrower than the
-    !            horizontal ones  
-    if(vlimit==3) then
-        do n=1, myDim_nod2D
-            nu1 = ulevels_nod2D(n)
-            nl1 = nlevels_nod2D(n)
-            do nz=nu1, nl1-1
-                tvert_max(nz)= maxval(AUX(1,nz,nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
-                tvert_min(nz)= minval(AUX(2,nz,nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
-            end do
-            do nz=nu1+1, nl1-2
-                tvert_max(nz)=min(tvert_max(nz),maxval(fct_ttf_max(nz-1:nz+1,n)))
-                tvert_min(nz)=max(tvert_min(nz),minval(fct_ttf_max(nz-1:nz+1,n)))
-            end do
-            do nz=nu1, nl1-1
-                fct_ttf_max(nz,n)=tvert_max(nz)-LO(nz,n)
-                fct_ttf_min(nz,n)=tvert_min(nz)-LO(nz,n)  
-            end do
-        end do
-    end if
-    
+!$OMP DO
+    do n=1, myDim_nod2D
+       nu1 = ulevels_nod2D(n)
+       nl1 = nlevels_nod2D(n)      
+       !___________________________________________________________________
+       do nz=nu1,nl1-1
+          ! max,min horizontal bound in cluster around node n in every 
+          ! vertical layer
+          ! nod_in_elem2D     --> elem indices of which node n is surrounded
+          ! nod_in_elem2D_num --> max number of surrounded elem 
+          tvert_max(nz)= maxval(AUX(1,nz,nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
+          tvert_min(nz)= minval(AUX(2,nz,nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
+       end do            
+       !___________________________________________________________________
+       ! calc max,min increment of surface layer with respect to low order 
+       ! solution 
+       fct_ttf_max(nu1,n)=tvert_max(nu1)-LO(nu1,n)
+       fct_ttf_min(nu1,n)=tvert_min(nu1)-LO(nu1,n)     
+       ! calc max,min increment from nz-1:nz+1 with respect to low order 
+       ! solution at layer nz
+       do nz=nu1+1,nl1-2  
+          fct_ttf_max(nz,n)=maxval(tvert_max(nz-1:nz+1))-LO(nz,n)
+          fct_ttf_min(nz,n)=minval(tvert_min(nz-1:nz+1))-LO(nz,n)
+       end do
+       ! calc max,min increment of bottom layer -1 with respect to low order 
+       ! solution 
+       nz=nl1-1
+       fct_ttf_max(nz,n)=tvert_max(nz)-LO(nz,n)
+       fct_ttf_min(nz,n)=tvert_min(nz)-LO(nz,n)  
+    end do
+!$OMP END DO
     !___________________________________________________________________________
     ! b1. Split positive and negative antidiffusive contributions
     ! --> sum all positive (fct_plus), negative (fct_minus) antidiffusive 
     !     horizontal element and vertical node contribution to node n and layer nz
     !     see. R. Löhner et al. "finite element flux corrected transport (FEM-FCT)
     !     for the euler and navier stoke equation
+!$OMP DO
     do n=1, myDim_nod2D
         nu1 = ulevels_nod2D(n)
         nl1 = nlevels_nod2D(n)
@@ -240,50 +209,54 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
             fct_minus(nz,n)=0._WP
         end do
     end do
-    
+!$OMP END DO
     !Vertical
+!$OMP DO
     do n=1, myDim_nod2D
-        nu1 = ulevels_nod2D(n)
-        nl1 = nlevels_nod2D(n)
-        do nz=nu1,nl1-1
-!             fct_plus(nz,n)=fct_plus(nz,n)+ &
-!                             (max(0.0_WP,adf_v(nz,n))+max(0.0_WP,-adf_v(nz+1,n))) &
-!                             /hnode(nz,n)
-!             fct_minus(nz,n)=fct_minus(nz,n)+ &
-!                             (min(0.0_WP,adf_v(nz,n))+min(0.0_WP,-adf_v(nz+1,n))) &
-!                             /hnode(nz,n)
-            fct_plus(nz,n) =fct_plus(nz,n) +(max(0.0_WP,adf_v(nz,n))+max(0.0_WP,-adf_v(nz+1,n)))
-            fct_minus(nz,n)=fct_minus(nz,n)+(min(0.0_WP,adf_v(nz,n))+min(0.0_WP,-adf_v(nz+1,n)))
-        end do
+       nu1 = ulevels_nod2D(n)
+       nl1 = nlevels_nod2D(n)
+       do nz=nu1,nl1-1
+          fct_plus(nz,n) =fct_plus(nz,n) +(max(0.0_WP,adf_v(nz,n))+max(0.0_WP,-adf_v(nz+1,n)))
+          fct_minus(nz,n)=fct_minus(nz,n)+(min(0.0_WP,adf_v(nz,n))+min(0.0_WP,-adf_v(nz+1,n)))
+       end do
     end do
-    
+!$OMP END DO
+
+!$OMP DO
     !Horizontal
     do edge=1, myDim_edge2D
-        enodes(1:2)=edges(:,edge)   
-        el=edge_tri(:,edge)
-        nl1=nlevels(el(1))-1
-        nu1=ulevels(el(1))
-        nl2=0
-        nu2=0
-        if(el(2)>0) then
-            nl2=nlevels(el(2))-1
-            nu2=ulevels(el(2))
-        end if  
+       enodes(1:2)=edges(:,edge)   
+       el=edge_tri(:,edge)
+       nl1=nlevels(el(1))-1
+       nu1=ulevels(el(1))
+       nl2=0
+       nu2=0
+       if (el(2)>0) then
+          nl2=nlevels(el(2))-1
+          nu2=ulevels(el(2))
+       end if  
         
-        nl12 = max(nl1,nl2)
-        nu12 = nu1
-        if (nu2>0) nu12 = min(nu1,nu2)
-        
-        do nz=nu12, nl12
-            fct_plus (nz,enodes(1))=fct_plus (nz,enodes(1)) + max(0.0_WP, adf_h(nz,edge))
-            fct_minus(nz,enodes(1))=fct_minus(nz,enodes(1)) + min(0.0_WP, adf_h(nz,edge))  
-            fct_plus (nz,enodes(2))=fct_plus (nz,enodes(2)) + max(0.0_WP,-adf_h(nz,edge))
-            fct_minus(nz,enodes(2))=fct_minus(nz,enodes(2)) + min(0.0_WP,-adf_h(nz,edge)) 
-        end do
-    end do 
-    
+       nl12 = max(nl1,nl2)
+       nu12 = nu1
+       if (nu2>0) nu12 = min(nu1,nu2)
+       call omp_set_lock(plock(enodes(1)))
+       do nz=nu12, nl12
+          fct_plus (nz,enodes(1))=fct_plus (nz,enodes(1)) + max(0.0_WP, adf_h(nz,edge))
+          fct_minus(nz,enodes(1))=fct_minus(nz,enodes(1)) + min(0.0_WP, adf_h(nz,edge))
+       end do
+       call omp_unset_lock(plock(enodes(1)))
+
+       call omp_set_lock(plock(enodes(2)))
+       do nz=nu12, nl12  
+          fct_plus (nz,enodes(2))=fct_plus (nz,enodes(2)) + max(0.0_WP,-adf_h(nz,edge))
+          fct_minus(nz,enodes(2))=fct_minus(nz,enodes(2)) + min(0.0_WP,-adf_h(nz,edge)) 
+       end do
+       call omp_unset_lock(plock(enodes(2)))
+    end do
+!$OMP END DO 
     !___________________________________________________________________________
     ! b2. Limiting factors
+!$OMP DO
     do n=1,myDim_nod2D
         nu1=ulevels_nod2D(n)
         nl1=nlevels_nod2D(n)
@@ -294,13 +267,16 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
             fct_minus(nz,n)=min(1.0_WP,fct_ttf_min(nz,n)/flux)
         end do
     end do 
-    
+!$OMP END DO
     ! fct_minus and fct_plus must be known to neighbouring PE
+!$OMP MASTER
     call exchange_nod(fct_plus, fct_minus, partit)
-    
+!$OMP END MASTER
+!!$OMP BARRIER
     !___________________________________________________________________________
     ! b3. Limiting   
     !Vertical
+!$OMP DO
     do n=1, myDim_nod2D
         nu1=ulevels_nod2D(n)
         nl1=nlevels_nod2D(n)
@@ -331,10 +307,13 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
         end do
     ! the bottom flux is always zero 
     end do
-
-    call exchange_nod_end(partit)  ! fct_plus, fct_minus
-    
+!$OMP END DO
+!!$OMP MASTER
+!    call exchange_nod_end(partit)  ! fct_plus, fct_minus
+!!$OMP END MASTER
+!!$OMP BARRIER
     !Horizontal
+!$OMP DO
     do edge=1, myDim_edge2D
         enodes(1:2)=edges(:,edge)
         el=edge_tri(:,edge)
@@ -366,4 +345,6 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
             adf_h(nz,edge)=ae*adf_h(nz,edge)
         end do
     end do
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine oce_tra_adv_fct
