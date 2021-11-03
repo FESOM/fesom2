@@ -11,14 +11,14 @@ SAVE
 !
 !_______________________________________________________________________________
 TYPE T_solverinfo
-    integer        :: maxiter=2000
-    integer        :: restarts=15
-    integer        :: fillin=3
-    integer        :: lutype=2
-    integer        :: nrhs=1
-    real(kind=WP)  :: droptol=1.e-7
-    real(kind=WP)  :: soltol =1e-10  !1.e-10
-    logical        :: lfirst=.true.
+    integer       :: ident   = 1
+    integer       :: maxiter = 2000
+    integer       :: restart = 15
+    integer       :: fillin  = 3
+    integer       :: lutype  = 2
+    real(kind=WP) :: droptol=1.e-8
+    real(kind=WP) :: soltol =1e-10  !1.e-10
+    
 END TYPE T_solverinfo
 
 !
