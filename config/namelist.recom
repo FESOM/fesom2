@@ -1,0 +1,264 @@
+This is the namelist recom
+
+&precom_diag_list
+ldiag_carbon          =.true.
+ldiag_silicate        =.true.
+recom_diag_freq       = 1          !only required for d,h,s cases,  y, m take 1
+recom_diag_freq_unit  = 'm'        !output period: y,  d, h, s 
+recom_logfile_outfreq = 2700       !in recom logfile info. output frequency, # steps
+/
+
+&pavariables
+use_REcoM             =.true.
+REcoM_restart         =.true.
+recom_binary_write    =.false.      ! Determines if tracervalue snapshots are saved. For fine grids it may crash the model to set this to true
+
+recom_binary_init     = .false.     ! Restart from binary
+bgc_num               = 28 !24 !38
+diags3d_num           = 8           ! Number of diagnostic 3d tracers to be saved
+VDet                  = 20.d0       ! Sinking velocity, constant through the water column and positive downwards
+VDet_zoo2             = 20.d0       ! Sinking velocity, constant through the water column
+VPhy                  = 0.d0        !!! If the number of sinking velocities are different from 3, code needs to be changed !!!
+VDia                  = 0.d0 
+allow_var_sinking     = .true.   
+biostep               = 1           ! Number of times biology should be stepped forward for each time step		 
+REcoM_Geider_limiter  = .false.     ! Decides what routine should be used to calculate limiters in sms
+REcoM_Grazing_Variable_Preference = .true. ! Decides if grazing should have preference for phyN or DiaN 
+REcoM_Second_Zoo      = .true.     ! Decides second zooplankton or no 
+Grazing_detritus      = .true.
+zoo2_fecal_loss       = .true.
+zoo2_initial_field    = .false.
+het_resp_noredfield   = .true.    ! Decides respiratation of copepod group
+diatom_mucus          = .true.    ! Decides nutrient limitation effect on aggregation
+Graz_pref_new         = .true.    ! If it is true Fasham 1990, if not recom original variable preference
+Diags                 = .true.
+constant_CO2          = .true.
+UseFeDust             = .true.      ! Turns dust input of iron off when set to.false.
+UseDustClim           = .true.
+UseDustClimAlbani     = .true.     ! Use Albani dustclim field (If it is false Mahowald will be used)
+use_Fe2N              = .true.      ! use Fe2N instead of Fe2C, as in MITgcm version
+use_photodamage       = .true.      ! use Alvarez et al (2018) for chlorophyll degradation
+HetRespFlux_plus      = .true.      !MB More stable computation of zooplankton respiration fluxes adding a small number to HetN
+REcoMDataPath         = '/work/ollie/ogurses/input/mesh_CORE2_finaltopo_mean/' !'/work/ollie/projects/MarESys/forcing/CORE2mesh/'
+restore_alkalinity    = .true.
+useRivers             = .false.
+useErosion            = .false.
+NitrogenSS            = .false.     ! When set to true, external sources and sinks of nitrogen are activated (Riverine, aeolian and denitrification)
+useAeolianN           = .false.      ! When set to true, aeolian nitrogen deposition is activated
+firstyearoffesomcycle = 1851        ! The first year of the actual physical forcing (e.g. JRA-55) used
+lastyearoffesomcycle  = 1957        ! Last year of the actual physical forcing used
+numofCO2cycles        = 1           ! Number of cycles of the forcing planned 
+currentCO2cycle       = 1           ! Which CO2 cycle we are currently running
+DIC_PI                = .true.
+Nmocsy                = 1           ! Length of the vector that is passed to mocsy (always one for recom)
+recom_debug           =.false.
+ciso                  =.false.     ! Main switch to enable/disable carbon isotopes (13|14C)
+benthos_num           = 4          ! number of benthic BGC tracers -> 8 if (ciso == .true.) otherwise -> 4
+/
+
+&pasinking
+Vdet_a                = 0.0288      ! [1/day]
+/
+
+&painitialization_N
+cPhyN                 = 0.2d0
+cHetN                 = 0.2d0
+cZoo2N                = 0.2d0
+/
+
+&paArrhenius
+recom_Tref            = 288.15d0    ! [K]
+C2K                   = 273.15d0    ! Conversion from degrees C to K
+Ae                    = 4500.d0     ! [K] Slope of the linear part of the Arrhenius function
+reminSi               = 0.02d0
+/
+
+&palimiter_function
+NMinSlope             = 50.d0 
+SiMinSlope            = 1000.d0
+NCmin                 = 0.04d0
+NCmin_d               = 0.04d0
+SiCmin                = 0.04d0
+k_Fe                  = 0.04d0
+k_Fe_d                = 0.12d0
+k_si                  = 4.d0
+P_cm                  = 3.0d0       ! [1/day]            Rate of C-specific photosynthesis 
+P_cm_d                = 3.5d0
+/
+
+&palight_calculations
+k_w                   = 0.04d0      ! [1/m]              Light attenuation coefficient
+a_chl                 = 0.03d0      ! [1/m * 1/(mg Chl)] Chlorophyll specific attenuation coefficients
+/
+
+&paphotosynthesis
+alfa                  = 0.14d0	    ! [(mmol C*m2)/(mg Chl*W*day)] 
+alfa_d                = 0.19d0      ! An initial slope of the P-I curve
+parFrac               = 0.43d0
+/
+
+&paassimilation
+V_cm_fact             = 0.7d0       ! scaling factor for temperature dependent maximum of C-specific N-uptake
+V_cm_fact_d           = 0.7d0  
+NMaxSlope             = 1000.d0     ! Max slope for limiting function
+SiMaxSlope            = 1000.d0
+NCmax                 = 0.2d0       ! [mmol N/mmol C] Maximum cell quota of nitrogen (N:C)
+NCmax_d               = 0.2d0
+SiCmax                = 0.8d0
+NCuptakeRatio         = 0.2d0       ! [mmol N/mmol C] Maximum uptake ratio of N:C
+NCUptakeRatio_d       = 0.2d0
+SiCUptakeRatio        = 0.2d0
+k_din                 = 0.55d0      ! [mmol N/m3] Half-saturation constant for nitrate uptake
+k_din_d               = 1.0d0
+Chl2N_max             = 3.15d0      ! [mg CHL/mmol N] Maximum CHL a : N ratio = 0.3 gCHL gN^-1
+Chl2N_max_d           = 4.2d0
+res_phy               = 0.01d0      ! [1/day] Maintenance respiration rate constant
+res_phy_d             = 0.01d0
+biosynth              = 2.33d0      ! [mmol C/mmol N] Cost of biosynthesis
+biosynthSi            = 0.d0
+/
+
+&pairon_chem
+totalligand           = 1.d0        ! [mumol/m3] order 1. Total free ligand
+ligandStabConst       = 100.d0      ! [m3/mumol] order 100. Ligand-free iron stability constant
+/
+
+&pazooplankton
+graz_max              = 2.4d0       ! [mmol N/(m3 * day)] Maximum grazing loss parameter 
+epsilonr               = 0.35d0      ! [(mmol N)2 /m6] Half saturation constant for grazing loss 
+res_het               = 0.01d0      ! [1/day] Respiration by heterotrophs and mortality (loss to detritus)
+Redfield              = 6.625       ! [mmol C/mmol N] Redfield ratio of C:N = 106:16
+loss_het              = 0.05d0      ! [1/day] Temperature dependent N degradation of extracellular organic N (EON)
+pzDia                 = 0.5d0       ! Maximum diatom preference
+sDiaNsq               = 0.d0
+pzPhy                 = 1.0d0       ! Maximum nano-phytoplankton preference                                                                                           
+sPhyNsq               = 0.d0
+tiny_het              = 1.d-5       ! for more stable computation of HetRespFlux (_plus). Value can be > tiny because HetRespFlux ~ hetC**2.
+/
+
+&pasecondzooplankton
+graz_max2      = 0.1d0              ! [mmol N/(m3 * day)] Maximum grazing loss parameter                                                                                        
+epsilon2       = 0.0144d0           ! [(mmol N)2 /m6] Half saturation constant for grazing loss                                                                              
+res_zoo2       = 0.0107d0           ! [1/day] Respiration by heterotrophs and mortality (loss to detritus)                                                            
+loss_zoo2      = 0.003d0            ! [1/day] Temperature dependent N degradation of extracellular organic N (EON)
+fecal_rate_n      = 0.104d0          ! [1/day] Temperature dependent N degradation of \
+fecal_rate_c      = 0.236d0                                                            
+pzDia2         = 1.d0               ! Maximum diatom preference                                                                                                                 
+sDiaNsq2       = 0.d0
+pzPhy2         = 0.5d0              ! Maximum diatom preference                                                                                                                
+sPhyNsq2       = 0.d0
+pzHet          = 0.8d0              ! Maximum diatom preference                                                                                                               
+sHetNsq        = 0.d0
+t1_zoo2        = 28145.d0           ! Krill temp. function constant1                                                                                                       
+t2_zoo2        = 272.5d0            ! Krill temp. function constant2                                                                                                         
+t3_zoo2        = 105234.d0          ! Krill temp. function constant3                                                                                                      
+t4_zoo2        = 274.15d0           ! Krill temp. function constant3
+/
+
+&pagrazingdetritus
+pzDet         = 0.5d0           ! Maximum small detritus prefence by first zooplankton
+sDetNsq       = 0.d0
+pzDetZ2       = 0.5d0         ! Maximum large detritus preference by first zooplankton                                 
+sDetZ2Nsq     = 0.d0
+pzDet2         = 0.5d0           ! Maximum small detritus prefence by second zooplankton                               
+sDetNsq2       = 0.d0
+pzDetZ22       = 0.5d0           ! Maximum large detritus preference by second zooplankton
+sDetZ2Nsq2     = 0.d0
+/
+
+&paaggregation
+agg_PD                = 0.165d0     ! [m3/(mmol N * day)] Maximum aggregation loss parameter for DetN
+agg_PP                = 0.015d0     ! [m3/(mmol N * day)] Maximum aggregation loss parameter for PhyN and DiaN (plankton)
+/
+
+&padin_rho_N
+rho_N                 = 0.11d0      ! [1/day] Temperature dependent N degradation of extracellular organic N (EON) (Remineralization of DON)
+/
+
+&padic_rho_C1
+rho_C1                = 0.1d0       ! [1/day] Temperature dependent C degradation of extracellular organic C (EOC)
+/
+
+&paphytoplankton_N
+lossN                 = 0.05d0      ! [1/day] Phytoplankton loss of organic N compounds
+lossN_d               = 0.05d0
+/
+
+&paphytoplankton_C
+lossC                 = 0.10d0      ! [1/day] Phytoplankton loss of carbon 
+lossC_d               = 0.10d0
+/
+
+&paphytoplankton_ChlA
+deg_Chl               = 0.2d0 !0.25d0      ! [1/day]
+deg_Chl_d             = 0.2d0 !0.15d0
+/
+
+&padetritus_N
+grazEff               = 0.4d0       ! [] Grazing efficiency (fraction of grazing flux into zooplankton pool) 
+grazEff2              = 0.8d0         ! [] Grazing efficiency (fraction of grazing flux into second zooplankton pool)
+reminN                = 0.165d0     ! [1/day] Temperature dependent remineralisation rate of detritus	
+/
+
+&padetritus_C
+reminC                = 0.15d0      ! [1/day] Temperature dependent remineralisation rate of detritus
+rho_c2                = 0.1d0       ! [1/day] Temperature dependent C degradation of TEP-C
+/
+
+&paheterotrophs
+lossN_z               = 0.15d0
+lossC_z               = 0.15d0
+/
+
+&paseczooloss
+lossN_z2              = 0.02d0
+lossC_z2              = 0.02d0
+/
+
+&pairon
+Fe2N                  = 0.033d0     ! Fe2C * 6.625
+Fe2N_benthos          = 0.15d0      ! test, default was 0.14 Fe2C_benthos * 6.625 - will have to be tuned. [umol/m2/day]
+Fe2C                  = 0.005d0
+Fe2C_benthos          = 0.02125     ! 0.68d0/32.d0 ! [umol/m2/day]
+kScavFe               = 0.07d0
+dust_sol              = 0.02d0      ! Dissolution of Dust for bioavaliable
+/
+
+&pacalc
+calc_prod_ratio       = 0.02
+calc_diss_guts        = 0.0d0
+calc_diss_rate        = 0.005714    ! 20.d0/3500.d0
+calc_diss_rate2       = 0.005714d0
+/
+
+&pabenthos_decay_rate
+decayRateBenN         = 0.005d0
+decayRateBenC         = 0.005d0
+decayRateBenSi        = 0.005d0
+q_NC_Denit            = 0.86d0      ! N:C quota of the denitrification process
+/
+
+&paco2_flux_param
+permil                = 0.000000976 ! 1.e-3/1024.5d0              ! Converting DIC from [mmol/m3] to [mol/kg]
+permeg                = 1.e-6                       ! [atm/uatm] Changes units from uatm to atm
+!X1                    = exp(-5.d0*log(10.d0))       ! Lowest ph-value = 7.7 (phlo)
+!X2                    = exp(-9.d0*log(10.d0))       ! Highest ph-value = 9.5 (phhi)
+Xacc                  = 1.e-12                      ! Accuracy for ph-iteration (phacc)
+CO2_for_spinup        = 278.d0                      ! [uatm] Atmospheric partial pressure of CO2
+/
+
+&paalkalinity_restoring
+surf_relax_Alk      = 3.2e-07 !10.d0/31536000.d0
+/
+
+&paciso
+ciso_airsea           = .true.     ! fractionation during air-sea exchange
+ciso_calcdiss         = .true.     ! fractionation during biogenic calcification and dissolution
+ciso_init             = .true.     ! initial fractionation of bulk organic matter
+ciso_photo_Laws       = .true.     ! fractionation during photosynthesis according to Laws et al. (1998)
+ciso_photo_Rau        = .false.     ! fractionation during photosynthesis according to Rau (1994)
+lambda_14             = 3.8561e-12  ! corresponding to 1 year = 365.00 days
+CO2_for_spinup_13     = 282.4       ! atmospheric 13CO2 spinup value (Graven et al. 2017: d13C = -6.61 permil, CO2_for_spinup = 284.3 uatm)
+CO2_for_spinup_14     = 294.0       ! atmospheric 14CO2 spinup value (Graven et al. 2017: d14C = -4.05 permil, CO2_for_spinup = 284.3 uatm)
+/
+
