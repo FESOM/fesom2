@@ -76,17 +76,20 @@ module diagnostics
 
 ! ==============================================================
 !rhs_diag=ssh_rhs?
-subroutine diag_solver(mode, partit, mesh)
+subroutine diag_solver(mode, dynamics, partit, mesh)
   implicit none
-  type(t_mesh),   intent(in),    target :: mesh
+  type(t_mesh)  , intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
+  type(t_dyn)   , intent(inout), target :: dynamics
   integer,        intent(in)            :: mode
   integer                               :: n, is, ie
   logical, save                         :: firstcall=.true.
+  real(kind=WP), dimension(:)    , pointer :: d_eta
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+  d_eta    =>dynamics%d_eta(:)
 !=====================
 
   if (firstcall) then !allocate the stuff at the first call
@@ -677,7 +680,7 @@ subroutine compute_diagnostics(mode, dynamics, tracers, partit, mesh)
   type(t_dyn)   , intent(inout), target :: dynamics
   integer, intent(in)                   :: mode !constructor mode (0=only allocation; any other=do diagnostic)
   real(kind=WP)                         :: val  !1. solver diagnostic
-  if (ldiag_solver)      call diag_solver(mode, partit, mesh)
+  if (ldiag_solver)      call diag_solver(mode, dynamics, partit, mesh)
   !2. compute curl(stress_surf)
   if (lcurt_stress_surf) call diag_curl_stress_surf(mode, partit, mesh)
   !3. compute curl(velocity)

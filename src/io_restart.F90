@@ -114,11 +114,11 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
   !===========================================================================
   !___Define the netCDF variables for 2D fields_______________________________
   !___SSH_____________________________________________________________________
-  call def_variable(oid, 'ssh',             (/nod2D/), 'sea surface elevation', 'm',   eta_n);
+  call def_variable(oid, 'ssh',             (/nod2D/), 'sea surface elevation', 'm',   dynamics%eta_n);
   !___ALE related fields______________________________________________________
   call def_variable(oid, 'hbar',            (/nod2D/), 'ALE surface elevation', 'm',   hbar);
 !!PS   call def_variable(oid, 'ssh_rhs',         (/nod2D/), 'RHS for the elevation', '?',   ssh_rhs);
-  call def_variable(oid, 'ssh_rhs_old',     (/nod2D/), 'RHS for the elevation', '?',   ssh_rhs_old);
+  call def_variable(oid, 'ssh_rhs_old',     (/nod2D/), 'RHS for the elevation', '?',   dynamics%ssh_rhs_old);
   call def_variable(oid, 'hnode',    (/nl-1,  nod2D/), 'nodal layer thickness', 'm',   hnode);
   
   !___Define the netCDF variables for 3D fields_______________________________

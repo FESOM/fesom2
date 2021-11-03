@@ -692,19 +692,19 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_DYN
-    use o_ARRAYS, only: eta_n
     implicit none
     integer :: n, nz, elem, elnodes(3), nzmin, nzmax
     real(kind=WP) :: dd 
     type(t_mesh),   intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
     type(t_dyn), intent(inout), target :: dynamics
-    real(kind=WP), dimension(:), pointer :: ssh_rhs_old
+    real(kind=WP), dimension(:), pointer :: ssh_rhs_old, eta_n
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     ssh_rhs_old=>dynamics%ssh_rhs_old(:)
+    eta_n      =>dynamics%eta_n(:)
     
     if(mype==0) then
         write(*,*) '____________________________________________________________'
@@ -1886,8 +1886,7 @@ end subroutine compute_hbar_ale
 subroutine vert_vel_ale(dynamics, partit, mesh)
     use g_config,only: dt, which_ALE, min_hnode, lzstar_lev, flag_warn_cflz
     use MOD_MESH
-    use o_ARRAYS, only: fer_Wvel, fer_UV, water_flux, & 
-                        eta_n, d_eta
+    use o_ARRAYS, only: fer_Wvel, fer_UV, water_flux
     use o_PARAM
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -1912,6 +1911,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     real(kind=WP), dimension(:,:,:), pointer :: UV
     real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, Wvel_i, CFL_z
     real(kind=WP), dimension(:)  , pointer :: ssh_rhs, ssh_rhs_old
+    real(kind=WP), dimension(:)  , pointer :: eta_n, d_eta
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -1923,6 +1923,8 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     CFL_z =>dynamics%cfl_z(:,:)
     ssh_rhs =>dynamics%ssh_rhs(:)
     ssh_rhs_old =>dynamics%ssh_rhs_old(:)
+    eta_n =>dynamics%eta_n(:)
+    d_eta =>dynamics%d_eta(:)
 
     !___________________________________________________________________________
     ! Contributions from levels in divergence
@@ -2558,13 +2560,13 @@ if (lfirst) then
         ssh_stiff%colind-1, ssh_stiff%values, reuse, MPI_COMM_FESOM)
    lfirst=.false.
 end if
-    call psolve(ident, dynamics%ssh_rhs, ssh_stiff%values, d_eta, new_values)
+    call psolve(ident, dynamics%ssh_rhs, ssh_stiff%values, dynamics%d_eta, new_values)
 
 #endif
     !
     !
     !___________________________________________________________________________
-call exchange_nod(d_eta, partit) !is this required after calling psolve ?
+call exchange_nod(dynamics%d_eta, partit) !is this required after calling psolve ?
 
 end subroutine solve_ssh_ale
 !
@@ -2790,12 +2792,13 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
 
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
     integer           :: n, node
-
+    real(kind=WP), dimension(:), pointer :: eta_n
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
+    eta_n => dynamics%eta_n(:)
+    
     t0=MPI_Wtime()
 
 !     water_flux = 0.0_WP
@@ -3049,3 +3052,4 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
         write(*,*)
     end if
 end subroutine oce_timestep_ale
+

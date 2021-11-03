@@ -100,8 +100,8 @@ MODULE io_BLOWUP
 		!===========================================================================
 		!___Define the netCDF variables for 2D fields_______________________________
 		!___SSH_____________________________________________________________________
-		call def_variable(bid, 'eta_n'		, (/nod2D/)			, 'sea surface elevation', 'm', eta_n);
-		call def_variable(bid, 'd_eta'		, (/nod2D/)			, 'change in ssh from solver', 'm', d_eta);
+		call def_variable(bid, 'eta_n'		, (/nod2D/)			, 'sea surface elevation', 'm', dynamics%eta_n);
+		call def_variable(bid, 'd_eta'		, (/nod2D/)			, 'change in ssh from solver', 'm', dynamics%d_eta);
 		!___ALE related fields______________________________________________________
 		call def_variable(bid, 'hbar'		, (/nod2D/)			, 'ALE surface elevation hbar_n+0.5', 'm', hbar);
 !!PS 		call def_variable(bid, 'hbar_old'	, (/nod2D/)			, 'ALE surface elevation hbar_n-0.5', 'm', hbar_old);

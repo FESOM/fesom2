@@ -41,7 +41,7 @@ subroutine write_step_info(istep, outfreq, dynamics, tracers, partit, mesh)
     use MOD_TRACER
     use MOD_DYN
 	use o_PARAM
-	use o_ARRAYS, only: eta_n, d_eta, water_flux, heat_flux, &
+	use o_ARRAYS, only: water_flux, heat_flux, &
                         pgf_x, pgf_y, Av, Kv
 	use i_ARRAYS
 	use g_comm_auto
@@ -63,15 +63,18 @@ subroutine write_step_info(istep, outfreq, dynamics, tracers, partit, mesh)
     type(t_tracer), intent(in)   , target :: tracers
     type(t_dyn)   , intent(in)   , target :: dynamics
     real(kind=WP), dimension(:,:,:), pointer :: UV, UVnode
-    real(kind=WP), dimension(:,:), pointer :: Wvel, CFL_z
+    real(kind=WP), dimension(:,:)  , pointer :: Wvel, CFL_z
+    real(kind=WP), dimension(:)    , pointer :: eta_n, d_eta
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-    UV => dynamics%uv(:,:,:)
+    UV     => dynamics%uv(:,:,:)
     UVnode => dynamics%uvnode(:,:,:)
-    Wvel => dynamics%w(:,:)
-    CFL_z => dynamics%cfl_z(:,:)
+    Wvel   => dynamics%w(:,:)
+    CFL_z  => dynamics%cfl_z(:,:)
+    eta_n  => dynamics%eta_n(:)
+    d_eta  => dynamics%d_eta(:)
     
 	if (mod(istep,outfreq)==0) then
 		
@@ -264,7 +267,7 @@ subroutine check_blowup(istep, dynamics, tracers, partit, mesh)
     USE MOD_PARSUP
     use MOD_DYN
 	use o_PARAM
-	use o_ARRAYS, only: eta_n, d_eta, water_flux, stress_surf, &
+	use o_ARRAYS, only: water_flux, stress_surf, &
                         heat_flux, Kv, Av
 	use i_ARRAYS
 	use g_comm_auto
@@ -283,15 +286,18 @@ subroutine check_blowup(istep, dynamics, tracers, partit, mesh)
     real(kind=WP), dimension(:,:,:), pointer :: UV
     real(kind=WP), dimension(:,:)  , pointer :: Wvel, CFL_z
     real(kind=WP), dimension(:)    , pointer :: ssh_rhs, ssh_rhs_old
+    real(kind=WP), dimension(:)    , pointer :: eta_n, d_eta
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-    UV   => dynamics%uv(:,:,:)
-    Wvel => dynamics%w(:,:)
-    CFL_z => dynamics%cfl_z(:,:)
-    ssh_rhs => dynamics%ssh_rhs(:)
+    UV          => dynamics%uv(:,:,:)
+    Wvel        => dynamics%w(:,:)
+    CFL_z       => dynamics%cfl_z(:,:)
+    ssh_rhs     => dynamics%ssh_rhs(:)
     ssh_rhs_old => dynamics%ssh_rhs_old(:)
+    eta_n       => dynamics%eta_n(:)
+    d_eta       => dynamics%d_eta(:)
     
 	!___________________________________________________________________________
 ! ! 	if (mod(istep,logfile_outfreq)==0) then
