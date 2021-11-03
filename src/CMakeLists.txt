@@ -4,6 +4,8 @@ project(fesom C Fortran)
 
 option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
 
+find_package(OpenMP REQUIRED)
+
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
 if(${USE_ICEPACK})
@@ -84,6 +86,7 @@ target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C ${NETCDF_Fortran_LIBRARI
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} async_threads_cpp)
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
+target_link_libraries(${PROJECT_NAME} OpenMP::OpenMP_Fortran)
 
 set(FESOM_INSTALL_FILEPATH "${CMAKE_CURRENT_LIST_DIR}/../bin/fesom.x" CACHE FILEPATH "file path where the FESOM binary should be put")
 get_filename_component(FESOM_INSTALL_PATH ${FESOM_INSTALL_FILEPATH} DIRECTORY)
