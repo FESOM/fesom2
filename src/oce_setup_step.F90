@@ -491,7 +491,7 @@ allocate(Visc(nl-1, elem_size))
 ! ================
 ! elevation and its rhs
 ! ================
-allocate(eta_n(node_size), d_eta(node_size))
+
 ! ================
 ! Monin-Obukhov
 ! ================
@@ -630,8 +630,6 @@ end if
 ! Initialize with zeros 
 ! =================
 
-    eta_n=0.0_WP
-    d_eta=0.0_WP
     hpressure=0.0_WP
 !
     heat_flux=0.0_WP

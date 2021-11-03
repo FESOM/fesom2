@@ -163,8 +163,6 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_DYN
-    
-    USE o_ARRAYS, only: d_eta, eta_n
     USE o_PARAM
     USE g_CONFIG
     use g_comm_auto
@@ -176,6 +174,7 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
     type(t_mesh)  , intent(in)   , target :: mesh
     type(t_partit), intent(inout), target :: partit
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
+    real(kind=WP), dimension(:), pointer :: eta_n, d_eta
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -183,7 +182,9 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
 #include "associate_mesh_ass.h"
     UV=>dynamics%uv(:,:,:)
     UV_rhs=>dynamics%uv_rhs(:,:,:)
-
+    eta_n=>dynamics%eta_n(:)
+    d_eta=>dynamics%d_eta(:)
+        
     DO elem=1, myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
         eta=-g*theta*dt*d_eta(elnodes)
