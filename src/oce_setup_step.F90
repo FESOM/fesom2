@@ -403,35 +403,35 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     allocate(dynamics%uv_rhs(    2, nl-1, elem_size))
     allocate(dynamics%uv_rhsAB(  2, nl-1, elem_size))
     allocate(dynamics%uvnode(    2, nl-1, node_size))
-    allocate(dynamics%uvnode_rhs(2, nl-1, node_size))
-    dynamics%uv         = 0.0_WP
-    dynamics%uv_rhs     = 0.0_WP
-    dynamics%uv_rhsAB   = 0.0_WP
-    dynamics%uvnode     = 0.0_WP
-    dynamics%uvnode_rhs = 0.0_WP
+    allocate(dynamics%work%uvnode_rhs(2, nl-1, node_size))
+    dynamics%uv              = 0.0_WP
+    dynamics%uv_rhs          = 0.0_WP
+    dynamics%uv_rhsAB        = 0.0_WP
+    dynamics%uvnode          = 0.0_WP
+    dynamics%work%uvnode_rhs = 0.0_WP
     
     allocate(dynamics%w(              nl, node_size))
     allocate(dynamics%w_e(            nl, node_size))
     allocate(dynamics%w_i(            nl, node_size))
     allocate(dynamics%cfl_z(          nl, node_size))
-    dynamics%w          = 0.0_WP
-    dynamics%w_e        = 0.0_WP
-    dynamics%w_i        = 0.0_WP
-    dynamics%cfl_z      = 0.0_WP
+    dynamics%w               = 0.0_WP
+    dynamics%w_e             = 0.0_WP
+    dynamics%w_i             = 0.0_WP
+    dynamics%cfl_z           = 0.0_WP
     
     allocate(dynamics%eta_n(      node_size))
     allocate(dynamics%d_eta(      node_size))
     allocate(dynamics%ssh_rhs(    node_size))
     !!PS     allocate(dynamics%ssh_rhs_old(node_size))
-    dynamics%eta_n      = 0.0_WP
-    dynamics%d_eta      = 0.0_WP
-    dynamics%ssh_rhs    = 0.0_WP
+    dynamics%eta_n           = 0.0_WP
+    dynamics%d_eta           = 0.0_WP
+    dynamics%ssh_rhs         = 0.0_WP
     
     if (Fer_GM) then
         allocate(dynamics%fer_uv(2, nl-1, elem_size))
         allocate(dynamics%fer_w(      nl, node_size))
-        dynamics%fer_uv = 0.0_WP
-        dynamics%fer_w  = 0.0_WP
+        dynamics%fer_uv      = 0.0_WP
+        dynamics%fer_w       = 0.0_WP
     end if 
     
 !!PS     dynamics%ssh_rhs_old= 0.0_WP    

@@ -213,7 +213,7 @@ real(kind=WP), dimension(:,:), pointer :: Wvel_e
 #include "associate_mesh_ass.h"
     UV        =>dynamics%uv(:,:,:)
     UV_rhsAB  =>dynamics%uv_rhsAB(:,:,:)
-    UVnode_rhs=>dynamics%uvnode_rhs(:,:,:)
+    UVnode_rhs=>dynamics%work%uvnode_rhs(:,:,:)
     Wvel_e    =>dynamics%w_e(:,:)
 
     !___________________________________________________________________________

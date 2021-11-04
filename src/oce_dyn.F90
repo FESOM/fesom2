@@ -11,7 +11,6 @@
 !    (5) visc_filt_bcksct, (6) visc_filt_bilapl, (7) visc_filt_bidiff
 ! 4. Div_c  =1.    should be default
 ! 5. Leith_c=?    (need to be adjusted)
-
 module visc_filt_bcksct_interface
   interface
     subroutine visc_filt_bcksct(dynamics, partit, mesh)
@@ -267,17 +266,21 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
 
     real(kind=8)  :: u1, v1, len, vi 
     integer       :: nz, ed, el(2), nelem(3),k, elem, nzmin, nzmax
-    real(kind=8), allocatable  ::  U_b(:,:), V_b(:,:), U_c(:,:), V_c(:,:)  
+!!PS     real(kind=8), allocatable  ::  U_c(:,:), V_c(:,:)  
+    real(kind=8), allocatable  ::  U_b(:,:), V_b(:,:)
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
+    real(kind=WP), dimension(:,:)  , pointer :: U_c, V_c
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    UV => dynamics%uv(:,:,:)
+    UV     => dynamics%uv(:,:,:)
     UV_rhs => dynamics%uv_rhs(:,:,:)
+    U_c    => dynamics%work%u_c(:,:)
+    V_c    => dynamics%work%v_c(:,:)
 
     ! An analog of harmonic viscosity operator.
     ! Same as visc_filt_h, but with the backscatter. 
@@ -370,19 +373,22 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
     IMPLICIT NONE
     real(kind=8)  :: u1, v1, vi, len
     integer       :: ed, el(2), nz, nzmin, nzmax
-    real(kind=8), allocatable         :: U_c(:,:), V_c(:,:) 
+!!PS     real(kind=8), allocatable         :: U_c(:,:), V_c(:,:) 
     
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
+    real(kind=WP), dimension(:,:)  , pointer :: U_c, V_c
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UV => dynamics%uv(:,:,:)
     UV_rhs => dynamics%uv_rhs(:,:,:)
+    U_c    => dynamics%work%u_c(:,:)
+    V_c    => dynamics%work%v_c(:,:)
 
     ed=myDim_elem2D+eDim_elem2D
     allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
@@ -459,18 +465,21 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
     IMPLICIT NONE
     real(kind=8)  :: u1, v1, vi, len
     integer       :: ed, el(2), nz, nzmin, nzmax
-    real(kind=8), allocatable         :: U_c(:,:), V_c(:,:) 
+!!PS     real(kind=8), allocatable         :: U_c(:,:), V_c(:,:) 
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
+    real(kind=WP), dimension(:,:)  , pointer :: U_c, V_c
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UV => dynamics%uv(:,:,:)
     UV_rhs => dynamics%uv_rhs(:,:,:)
+    U_c    => dynamics%work%u_c(:,:)
+    V_c    => dynamics%work%v_c(:,:)
     !
     ed=myDim_elem2D+eDim_elem2D
     allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
@@ -543,18 +552,22 @@ IMPLICIT NONE
 
 real(kind=8)  :: u1, v1, le(2), len, crosslen, vi, uke1 
 integer       :: nz, ed, el(2)
-real(kind=8), allocatable  :: U_c(:,:), V_c(:,:), UV_back(:,:,:), UV_dis(:,:,:), uke_d(:,:) 
-real(kind=8), allocatable  :: uuu(:)
+!!PS real(kind=8), allocatable  :: U_c(:,:), V_c(:,:)
+real(kind=8)  , allocatable  :: UV_back(:,:,:), UV_dis(:,:,:), uke_d(:,:) 
+real(kind=8)  , allocatable  :: uuu(:)
 type(t_dyn)   , intent(inout), target :: dynamics
 type(t_partit), intent(inout), target :: partit
 type(t_mesh)  , intent(in)   , target :: mesh
-real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
+real(kind=WP) , dimension(:,:,:), pointer :: UV, UV_rhs
+real(kind=WP) , dimension(:,:)  , pointer :: U_c, V_c
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-UV => dynamics%uv(:,:,:)
+UV     => dynamics%uv(:,:,:)
 UV_rhs => dynamics%uv_rhs(:,:,:)
+U_c    => dynamics%work%u_c(:,:)
+V_c    => dynamics%work%v_c(:,:)
 
  ! An analog of harmonic viscosity operator.  
  ! It adds to the rhs(0) Visc*(u1+u2+u3-3*u0)/area

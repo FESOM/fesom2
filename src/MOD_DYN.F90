@@ -10,7 +10,7 @@ SAVE
 !
 !
 !_______________________________________________________________________________
-TYPE T_solverinfo
+TYPE T_SOLVERINFO
     integer       :: ident   = 1
     integer       :: maxiter = 2000
     integer       :: restart = 15
@@ -18,19 +18,37 @@ TYPE T_solverinfo
     integer       :: lutype  = 2
     real(kind=WP) :: droptol = 1.e-8
     real(kind=WP) :: soltol  = 1e-10  !1.e-10    
-END TYPE T_solverinfo
-
+    contains
+        procedure WRITE_T_SOLVERINFO
+        procedure READ_T_SOLVERINFO
+        generic :: write(unformatted) => WRITE_T_SOLVERINFO
+        generic :: read(unformatted)  => READ_T_SOLVERINFO
+END TYPE T_SOLVERINFO
+!
+!
+!_______________________________________________________________________________
+TYPE T_DYN_WORK
+    real(kind=WP), allocatable, dimension(:,:,:) :: uvnode_rhs
+    real(kind=WP), allocatable, dimension(:,:)   :: u_c, v_c
+    real(kind=WP), allocatable, dimension(:,:)   :: u_b, v_b
+    contains
+        procedure WRITE_T_DYN_WORK
+        procedure READ_T_DYN_WORK
+        generic :: write(unformatted) => WRITE_T_DYN_WORK
+        generic :: read(unformatted)  => READ_T_DYN_WORK
+END TYPE T_DYN_WORK
 !
 !
 !_______________________________________________________________________________
 ! set main structure for dynamicss, contains viscosity options and parameters + 
 ! option for momentum advection 
 TYPE T_DYN
+!___________________________________________________________________________
     ! instant zonal merdional velocity & Adams-Bashfort rhs
     real(kind=WP), allocatable, dimension(:,:,:):: uv, uv_rhs, uv_rhsAB, fer_uv  
 
     ! horizontal velocities at nodes
-    real(kind=WP), allocatable, dimension(:,:,:):: uvnode, uvnode_rhs
+    real(kind=WP), allocatable, dimension(:,:,:):: uvnode
     
     ! instant vertical vel arrays
     real(kind=WP), allocatable, dimension(:,:)  :: w, w_e, w_i, cfl_z, fer_w
@@ -38,10 +56,15 @@ TYPE T_DYN
     ! sea surface height arrays
     real(kind=WP), allocatable, dimension(:)    :: eta_n, d_eta, ssh_rhs, ssh_rhs_old
     
+    !___________________________________________________________________________
     ! summarizes solver input parameter
     type(t_solverinfo)                          :: solverinfo
     
+    !___________________________________________________________________________
+    ! put dynmiacs working arrays
+    type(t_dyn_work)                            :: work
     
+    !___________________________________________________________________________
     ! visc_option=...
     ! 5=Kinematic (easy) Backscatter
     ! 6=Biharmonic flow aware (viscosity depends on velocity Laplacian)
@@ -86,6 +109,71 @@ contains
 !
 !
 !_______________________________________________________________________________
+! set unformatted writing and reading for T_DYN_WORK
+subroutine WRITE_T_SOLVERINFO(tsolverinfo, unit, iostat, iomsg)
+    IMPLICIT NONE
+    class(T_SOLVERINFO),  intent(in)     :: tsolverinfo
+    integer,              intent(in)     :: unit
+    integer,              intent(out)    :: iostat
+    character(*),         intent(inout)  :: iomsg
+    !___________________________________________________________________________
+    write(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%ident
+    write(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%maxiter
+    write(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%restart
+    write(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%fillin
+    write(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%lutype
+    write(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%droptol
+    write(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%soltol
+end subroutine WRITE_T_SOLVERINFO
+
+subroutine READ_T_SOLVERINFO(tsolverinfo, unit, iostat, iomsg)
+    IMPLICIT NONE
+    class(T_SOLVERINFO),  intent(inout)     :: tsolverinfo
+    integer,              intent(in)     :: unit
+    integer,              intent(out)    :: iostat
+    character(*),         intent(inout)  :: iomsg
+    read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%ident
+    read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%maxiter
+    read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%restart
+    read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%fillin
+    read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%lutype
+    read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%droptol
+    read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%soltol
+end subroutine READ_T_SOLVERINFO
+
+!
+!
+!_______________________________________________________________________________
+! set unformatted writing and reading for T_DYN_WORK
+subroutine WRITE_T_DYN_WORK(twork, unit, iostat, iomsg)
+    IMPLICIT NONE
+    class(T_DYN_WORK), intent(in)        :: twork
+    integer,              intent(in)     :: unit
+    integer,              intent(out)    :: iostat
+    character(*),         intent(inout)  :: iomsg
+    call write_bin_array(twork%uvnode_rhs, unit, iostat, iomsg)
+    call write_bin_array(twork%u_c,        unit, iostat, iomsg)
+    call write_bin_array(twork%v_c,        unit, iostat, iomsg)
+    call write_bin_array(twork%u_b,        unit, iostat, iomsg)
+    call write_bin_array(twork%v_b,        unit, iostat, iomsg)
+end subroutine WRITE_T_DYN_WORK
+
+subroutine READ_T_DYN_WORK(twork, unit, iostat, iomsg)
+    IMPLICIT NONE
+    class(T_DYN_WORK), intent(inout)        :: twork
+    integer,              intent(in)     :: unit
+    integer,              intent(out)    :: iostat
+    character(*),         intent(inout)  :: iomsg
+    call read_bin_array(twork%uvnode_rhs, unit, iostat, iomsg)
+    call read_bin_array(twork%u_c,        unit, iostat, iomsg)
+    call read_bin_array(twork%v_c,        unit, iostat, iomsg)
+    call read_bin_array(twork%u_b,        unit, iostat, iomsg)
+    call read_bin_array(twork%v_b,        unit, iostat, iomsg)
+end subroutine READ_T_DYN_WORK
+
+!
+!
+!_______________________________________________________________________________
 ! set unformatted writing and reading for T_DYN
 subroutine WRITE_T_DYN(dynamics, unit, iostat, iomsg)
     IMPLICIT NONE
@@ -99,7 +187,6 @@ subroutine WRITE_T_DYN(dynamics, unit, iostat, iomsg)
     call write_bin_array(dynamics%uv_rhs    , unit, iostat, iomsg)
     call write_bin_array(dynamics%uv_rhsAB  , unit, iostat, iomsg)
     call write_bin_array(dynamics%uvnode    , unit, iostat, iomsg)
-    call write_bin_array(dynamics%uvnode_rhs, unit, iostat, iomsg)
     
     call write_bin_array(dynamics%w         , unit, iostat, iomsg)
     call write_bin_array(dynamics%w_e       , unit, iostat, iomsg)
@@ -107,9 +194,15 @@ subroutine WRITE_T_DYN(dynamics, unit, iostat, iomsg)
     call write_bin_array(dynamics%cfl_z     , unit, iostat, iomsg)
     
     if (Fer_GM) then
-        call write_bin_array(dynamics%fer_w     , unit, iostat, iomsg)
-        call write_bin_array(dynamics%fer_uv    , unit, iostat, iomsg)
+        call write_bin_array(dynamics%fer_w , unit, iostat, iomsg)
+        call write_bin_array(dynamics%fer_uv, unit, iostat, iomsg)
     end if 
+    
+    !___________________________________________________________________________
+    write(unit, iostat=iostat, iomsg=iomsg) dynamics%work
+    
+    !___________________________________________________________________________
+    write(unit, iostat=iostat, iomsg=iomsg) dynamics%solverinfo
     
     !___________________________________________________________________________
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%visc_opt
@@ -140,7 +233,6 @@ subroutine READ_T_DYN(dynamics, unit, iostat, iomsg)
     call read_bin_array(dynamics%uv_rhs    , unit, iostat, iomsg)
     call read_bin_array(dynamics%uv_rhsAB  , unit, iostat, iomsg)
     call read_bin_array(dynamics%uvnode    , unit, iostat, iomsg)
-    call read_bin_array(dynamics%uvnode_rhs, unit, iostat, iomsg)
     
     call read_bin_array(dynamics%w         , unit, iostat, iomsg)
     call read_bin_array(dynamics%w_e       , unit, iostat, iomsg)
@@ -151,6 +243,9 @@ subroutine READ_T_DYN(dynamics, unit, iostat, iomsg)
         call read_bin_array(dynamics%fer_w     , unit, iostat, iomsg)
         call read_bin_array(dynamics%fer_uv    , unit, iostat, iomsg)
     end if
+    
+    !___________________________________________________________________________
+    read(unit, iostat=iostat, iomsg=iomsg) dynamics%work
     
     !___________________________________________________________________________
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%visc_opt
