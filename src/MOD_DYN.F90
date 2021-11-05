@@ -30,6 +30,8 @@ END TYPE T_SOLVERINFO
 TYPE T_DYN_WORK
     real(kind=WP), allocatable, dimension(:,:,:) :: uvnode_rhs
     real(kind=WP), allocatable, dimension(:,:)   :: u_c, v_c
+    
+    ! easy backscatter contribution
     real(kind=WP), allocatable, dimension(:,:)   :: u_b, v_b
     contains
         procedure WRITE_T_DYN_WORK

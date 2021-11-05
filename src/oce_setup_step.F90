@@ -394,48 +394,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
 !!PS     read(nm_unit, nml=dynamics_general, iostat=iost)
 !!PS     close(nm_unit)
 
-    ! define local vertice & elem array size
-    elem_size=myDim_elem2D+eDim_elem2D
-    node_size=myDim_nod2D+eDim_nod2D
-
-    ! allocate data arrays in derived type
-    allocate(dynamics%uv(        2, nl-1, elem_size))
-    allocate(dynamics%uv_rhs(    2, nl-1, elem_size))
-    allocate(dynamics%uv_rhsAB(  2, nl-1, elem_size))
-    allocate(dynamics%uvnode(    2, nl-1, node_size))
-    allocate(dynamics%work%uvnode_rhs(2, nl-1, node_size))
-    dynamics%uv              = 0.0_WP
-    dynamics%uv_rhs          = 0.0_WP
-    dynamics%uv_rhsAB        = 0.0_WP
-    dynamics%uvnode          = 0.0_WP
-    dynamics%work%uvnode_rhs = 0.0_WP
-    
-    allocate(dynamics%w(              nl, node_size))
-    allocate(dynamics%w_e(            nl, node_size))
-    allocate(dynamics%w_i(            nl, node_size))
-    allocate(dynamics%cfl_z(          nl, node_size))
-    dynamics%w               = 0.0_WP
-    dynamics%w_e             = 0.0_WP
-    dynamics%w_i             = 0.0_WP
-    dynamics%cfl_z           = 0.0_WP
-    
-    allocate(dynamics%eta_n(      node_size))
-    allocate(dynamics%d_eta(      node_size))
-    allocate(dynamics%ssh_rhs(    node_size))
-    !!PS     allocate(dynamics%ssh_rhs_old(node_size))
-    dynamics%eta_n           = 0.0_WP
-    dynamics%d_eta           = 0.0_WP
-    dynamics%ssh_rhs         = 0.0_WP
-    
-    if (Fer_GM) then
-        allocate(dynamics%fer_uv(2, nl-1, elem_size))
-        allocate(dynamics%fer_w(      nl, node_size))
-        dynamics%fer_uv      = 0.0_WP
-        dynamics%fer_w       = 0.0_WP
-    end if 
-    
-!!PS     dynamics%ssh_rhs_old= 0.0_WP    
-    
+    !___________________________________________________________________________
     ! set parameters in derived type
 !!PS     dynamics%visc_opt      = visc_opt
 !!PS     dynamics%gamma0_visc   = gamma0_visc
@@ -456,6 +415,69 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     dynamics%use_freeslip  = free_slip
     dynamics%use_wsplit    = w_split
     dynamics%wsplit_maxcfl = w_max_cfl
+
+    !___________________________________________________________________________
+    ! define local vertice & elem array size
+    elem_size=myDim_elem2D+eDim_elem2D
+    node_size=myDim_nod2D+eDim_nod2D
+    
+    !___________________________________________________________________________
+    ! allocate/initialise horizontal velocity arrays in derived type
+    allocate(dynamics%uv(        2, nl-1, elem_size))
+    allocate(dynamics%uv_rhs(    2, nl-1, elem_size))
+    allocate(dynamics%uv_rhsAB(  2, nl-1, elem_size))
+    allocate(dynamics%uvnode(    2, nl-1, node_size))
+    dynamics%uv              = 0.0_WP
+    dynamics%uv_rhs          = 0.0_WP
+    dynamics%uv_rhsAB        = 0.0_WP
+    dynamics%uvnode          = 0.0_WP
+    if (Fer_GM) then
+        allocate(dynamics%fer_uv(2, nl-1, elem_size))
+        dynamics%fer_uv      = 0.0_WP
+    end if 
+    
+    !___________________________________________________________________________
+    ! allocate/initialise vertical velocity arrays in derived type
+    allocate(dynamics%w(              nl, node_size))
+    allocate(dynamics%w_e(            nl, node_size))
+    allocate(dynamics%w_i(            nl, node_size))
+    allocate(dynamics%cfl_z(          nl, node_size))
+    dynamics%w               = 0.0_WP
+    dynamics%w_e             = 0.0_WP
+    dynamics%w_i             = 0.0_WP
+    dynamics%cfl_z           = 0.0_WP
+    if (Fer_GM) then
+        allocate(dynamics%fer_w(      nl, node_size))
+        dynamics%fer_w       = 0.0_WP
+    end if 
+    
+    !___________________________________________________________________________
+    ! allocate/initialise ssh arrays in derived type
+    allocate(dynamics%eta_n(      node_size))
+    allocate(dynamics%d_eta(      node_size))
+    allocate(dynamics%ssh_rhs(    node_size))
+    dynamics%eta_n           = 0.0_WP
+    dynamics%d_eta           = 0.0_WP
+    dynamics%ssh_rhs         = 0.0_WP
+    !!PS     allocate(dynamics%ssh_rhs_old(node_size))
+    !!PS     dynamics%ssh_rhs_old= 0.0_WP   
+
+    !___________________________________________________________________________
+    ! inititalise working arrays
+    allocate(dynamics%work%uvnode_rhs(2, nl-1, node_size))
+    allocate(dynamics%work%u_c(nl-1, elem_size))
+    allocate(dynamics%work%v_c(nl-1, elem_size))
+    dynamics%work%uvnode_rhs = 0.0_WP
+    dynamics%work%u_c = 0.0_WP
+    dynamics%work%v_c = 0.0_WP
+    if (dynamics%visc_opt==5) then
+        allocate(dynamics%work%u_b(nl-1, elem_size))
+        allocate(dynamics%work%v_b(nl-1, elem_size))
+        dynamics%work%u_b = 0.0_WP
+        dynamics%work%v_b = 0.0_WP
+    end if 
+
+
 END SUBROUTINE dynamics_init
 !
 !
