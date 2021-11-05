@@ -510,7 +510,13 @@ subroutine init_gatherLists(partit)
 #if defined(_OPENMP)
     allocate(partit%plock(partit%myDim_nod2D+partit%eDim_nod2D))
     do n=1, myDim_nod2D+partit%eDim_nod2D
+!experiments showd that OPENMP5 implementation of the lock (201811) is >10% more efficient
+!make sure you use OPENMP v. 5.0
+#if _OPENMP >= 201811
        call omp_init_lock_with_hint(partit%plock(n),omp_sync_hint_speculative+omp_sync_hint_uncontended)
+#else
+       call omp_init_lock(partit%plock(n))
+#endif
     enddo
 #endif
 !$OMP END MASTER
