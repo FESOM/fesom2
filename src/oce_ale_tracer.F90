@@ -233,7 +233,7 @@ subroutine adv_tracers_ale(dt, tr_num, tracers, partit, mesh)
     implicit none
     real(kind=WP),  intent(in),    target :: dt
     integer                               :: node, nz
-    integer,        intent(in)            :: tr_num
+    integer,        intent(in),    target :: tr_num
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
     type(t_tracer), intent(inout), target :: tracers

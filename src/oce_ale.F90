@@ -4,7 +4,7 @@ module oce_ale_interfaces
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
 
@@ -12,7 +12,7 @@ module oce_ale_interfaces
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
     
@@ -20,7 +20,7 @@ module oce_ale_interfaces
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
 
@@ -28,7 +28,7 @@ module oce_ale_interfaces
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
 
@@ -36,7 +36,7 @@ module oce_ale_interfaces
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
 
@@ -44,7 +44,7 @@ module oce_ale_interfaces
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
 
@@ -52,7 +52,7 @@ module oce_ale_interfaces
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
 
@@ -60,7 +60,7 @@ module oce_ale_interfaces
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
 
@@ -68,7 +68,7 @@ module oce_ale_interfaces
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
 
@@ -76,7 +76,7 @@ module oce_ale_interfaces
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
 
@@ -84,7 +84,7 @@ module oce_ale_interfaces
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      type(t_mesh),   intent(inout),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
@@ -97,8 +97,8 @@ module oce_timestep_ale_interface
       USE MOD_PARTIT
       USE MOD_PARSUP
       use mod_tracer
-      integer,        intent(in)                         :: n
-      type(t_mesh),   intent(in),    target :: mesh
+      integer,        intent(in)            :: n
+      type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
       type(t_tracer), intent(inout), target :: tracers
     end subroutine
@@ -2700,12 +2700,13 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
     use write_step_info_interface
     use check_blowup_interface
     IMPLICIT NONE
-    type(t_mesh),   intent(in),    target :: mesh
+    integer,        intent(in)            :: n
+    type(t_mesh),   intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
     type(t_tracer), intent(inout), target :: tracers
 
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
-    integer           :: n, node
+    integer           :: node
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"

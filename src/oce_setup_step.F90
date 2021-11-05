@@ -31,7 +31,7 @@ module ocean_setup_interface
       USE MOD_PARTIT
       USE MOD_PARSUP
       use mod_tracer
-      type(t_mesh),   intent(in),    target :: mesh
+      type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
       type(t_tracer), intent(inout), target :: tracers
     end subroutine
