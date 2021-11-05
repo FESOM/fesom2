@@ -266,21 +266,21 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
 
     real(kind=8)  :: u1, v1, len, vi 
     integer       :: nz, ed, el(2), nelem(3),k, elem, nzmin, nzmax
-!!PS     real(kind=8), allocatable  ::  U_c(:,:), V_c(:,:)  
-    real(kind=8), allocatable  ::  U_b(:,:), V_b(:,:)
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
-    real(kind=WP), dimension(:,:)  , pointer :: U_c, V_c
+    real(kind=WP), dimension(:,:)  , pointer :: U_c, V_c, U_b, V_b
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    UV     => dynamics%uv(:,:,:)
+    UV     => dynamics%uv(    :,:,:)
     UV_rhs => dynamics%uv_rhs(:,:,:)
     U_c    => dynamics%work%u_c(:,:)
     V_c    => dynamics%work%v_c(:,:)
+    U_b    => dynamics%work%u_b(:,:)
+    V_b    => dynamics%work%v_b(:,:)
 
     ! An analog of harmonic viscosity operator.
     ! Same as visc_filt_h, but with the backscatter. 
@@ -351,7 +351,6 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
             UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+V_b(nz,ed) -easy_bs_return*sum(V_c(nz,nelem))/3.0_WP
         END DO
     end do
-    deallocate(V_c,U_c,V_b,U_b)
 end subroutine visc_filt_bcksct
 !
 !
@@ -373,7 +372,6 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
     IMPLICIT NONE
     real(kind=8)  :: u1, v1, vi, len
     integer       :: ed, el(2), nz, nzmin, nzmax
-!!PS     real(kind=8), allocatable         :: U_c(:,:), V_c(:,:) 
     
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -465,7 +463,6 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
     IMPLICIT NONE
     real(kind=8)  :: u1, v1, vi, len
     integer       :: ed, el(2), nz, nzmin, nzmax
-!!PS     real(kind=8), allocatable         :: U_c(:,:), V_c(:,:) 
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
