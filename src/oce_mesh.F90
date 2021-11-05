@@ -82,7 +82,7 @@ module elem_center_interface
       USE MOD_PARTIT
       USE MOD_PARSUP
       integer       :: elem    
-      real(kind=WP), intent(inout), :: x, y
+      real(kind=WP), intent(inout) :: x, y
       type(t_mesh),  intent(inout), target :: mesh
     end subroutine
   end interface
