@@ -86,6 +86,7 @@ use g_cvmix_idemix
 use g_cvmix_pp
 use g_cvmix_kpp
 use g_cvmix_tidal
+use g_backscatter
 use Toy_Channel_Soufflet
 use oce_initial_state_interface
 use oce_adv_tra_fct_interfaces
@@ -239,6 +240,11 @@ integer                               :: n
     end if
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_thickness_ale'//achar(27)//'[0m'
     call init_thickness_ale(dynamics, partit, mesh)
+    
+    !___________________________________________________________________________
+    ! initialise arrays that are needed for backscatter_coef
+    if(dynamics%visc_opt==8) call init_backscatter(partit, mesh)
+        
     
     !___________________________________________________________________________
     if(partit%mype==0) write(*,*) 'Initial state'
@@ -577,27 +583,27 @@ end if
 ! Backscatter arrays
 ! =================
 
-if(visc_option==8) then
-
-allocate(uke(nl-1,elem_size)) ! Unresolved kinetic energy for backscatter coefficient
-allocate(v_back(nl-1,elem_size))  ! Backscatter viscosity
-allocate(uke_dis(nl-1,elem_size), uke_back(nl-1,elem_size)) 
-allocate(uke_dif(nl-1,elem_size))
-allocate(uke_rhs(nl-1,elem_size), uke_rhs_old(nl-1,elem_size))
-allocate(UV_dis_tend(2,nl-1,elem_size), UV_back_tend(2,nl-1,elem_size))
-allocate(UV_total_tend(2,nl-1,elem_size))
-
-uke=0.0_8
-v_back=0.0_8
-uke_dis=0.0_8
-uke_dif=0.0_8
-uke_back=0.0_8
-uke_rhs=0.0_8
-uke_rhs_old=0.0_8
-UV_dis_tend=0.0_8
-UV_back_tend=0.0_8
-UV_total_tend=0.0_8
-end if
+!!PS if(visc_option==8) then
+!!PS 
+!!PS allocate(uke(nl-1,elem_size)) ! Unresolved kinetic energy for backscatter coefficient
+!!PS allocate(v_back(nl-1,elem_size))  ! Backscatter viscosity
+!!PS allocate(uke_dis(nl-1,elem_size), uke_back(nl-1,elem_size)) 
+!!PS allocate(uke_dif(nl-1,elem_size))
+!!PS allocate(uke_rhs(nl-1,elem_size), uke_rhs_old(nl-1,elem_size))
+!!PS allocate(UV_dis_tend(2,nl-1,elem_size), UV_back_tend(2,nl-1,elem_size))
+!!PS allocate(UV_total_tend(2,nl-1,elem_size))
+!!PS 
+!!PS uke=0.0_8
+!!PS v_back=0.0_8
+!!PS uke_dis=0.0_8
+!!PS uke_dif=0.0_8
+!!PS uke_back=0.0_8
+!!PS uke_rhs=0.0_8
+!!PS uke_rhs_old=0.0_8
+!!PS UV_dis_tend=0.0_8
+!!PS UV_back_tend=0.0_8
+!!PS UV_total_tend=0.0_8
+!!PS end if
 
 !Velocities at nodes
 !!PS allocate(Unode(2,nl-1,node_size))
