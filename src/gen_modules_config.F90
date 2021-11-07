@@ -107,7 +107,7 @@ module g_config
   real(kind=WP)                 :: cavity_partial_cell_thresh=0.0_WP ! same as partial_cell_tresh but for surface
   logical                       :: toy_ocean=.false. ! Ersatz forcing has to be supplied
   character(100)                :: which_toy="soufflet" 
-  logical                       :: flag_debug=.true.    ! prints name of actual subroutine he is in 
+  logical                       :: flag_debug=.false.    ! prints name of actual subroutine he is in 
   logical                       :: flag_warn_cflz=.true. ! switches off cflz warning
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
                         use_cavity_partial_cell, cavity_partial_cell_thresh, toy_ocean, which_toy, flag_debug, flag_warn_cflz
