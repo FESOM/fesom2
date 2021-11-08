@@ -148,9 +148,8 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
     use g_comm_auto
     use o_tracers
     use Toy_Channel_Soufflet
-    use adv_tracers_ale_interface
     use diff_tracers_ale_interface
-    
+    use oce_adv_tra_driver_interfaces    
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_tracer), intent(inout), target :: tracers
@@ -180,9 +179,13 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
     ! 1. bolus velocities are computed according to GM implementation after R. Ferrari et al., 2010
     ! 2. bolus velocities are used only for advecting tracers and shall be subtracted back afterwards
     if (Fer_GM) then
-        UV    =UV    +fer_UV
-        Wvel_e=Wvel_e+fer_Wvel
-        Wvel  =Wvel  +fer_Wvel
+        do elem=1, myDim_elem2D+eDim_elem2D
+           UV(:, :, elem)    =UV(:, :, elem) + fer_UV(:, :, elem)
+        end do
+        do node=1, myDim_nod2D+eDim_nod2D
+           Wvel_e(:, node)=Wvel_e(:, node)+fer_Wvel(:, node)
+           Wvel  (:, node)=Wvel  (:, node)+fer_Wvel(:, node)
+        end do
     end if
     !___________________________________________________________________________
     ! loop over all tracers 
@@ -215,10 +218,14 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! subtract the the bolus velocities back from 3D velocities:
     if (Fer_GM) then
-        UV    =UV    -fer_UV
-        Wvel_e=Wvel_e-fer_Wvel
-        Wvel  =Wvel  -fer_Wvel
-    end if    
+        do elem=1, myDim_elem2D+eDim_elem2D
+           UV(:, :, elem)    =UV(:, :, elem) - fer_UV(:, :, elem)
+        end do
+        do node=1, myDim_nod2D+eDim_nod2D
+           Wvel_e(:, node)=Wvel_e(:, node)-fer_Wvel(:, node)
+           Wvel  (:, node)=Wvel  (:, node)-fer_Wvel(:, node)
+        end do
+    end if
     !___________________________________________________________________________
     ! to avoid crash with high salinities when coupled to atmosphere
     ! --> if we do only where (tr_arr(:,:,2) < 3._WP ) we also fill up the bottom 
@@ -326,35 +333,23 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
 
     del_ttf => tracers%work%del_ttf
     !___________________________________________________________________________
-    ! convert tr_arr_old(:,:,tr_num)=ttr_n-0.5   --> prepare to calc ttr_n+0.5
-    ! eliminate AB (adams bashfort) interpolates tracer, which is only needed for 
-    ! tracer advection. For diffusion only need tracer from previouse time step
-    tracers%data(tr_num)%valuesAB(:,:)=tracers%data(tr_num)%values(:,:) !DS: check that this is the right place!
-    !___________________________________________________________________________
     ! do horizontal diffusiion
     ! write there also horizontal diffusion rhs to del_ttf which is equal the R_T^n 
     ! in danilovs srcipt
     ! includes Redi diffusivity if Redi=.true.
     call diff_part_hor_redi(tr_num, tracers, partit, mesh)  ! seems to be ~9% faster than diff_part_hor
     !___________________________________________________________________________
-    ! do vertical diffusion: explicite 
+    ! do vertical diffusion: explicit
     if (.not. tracers%i_vert_diff) call diff_ver_part_expl_ale(tr_num, tracers, partit, mesh) 
     ! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
     ! derivatives and has to be computed explicitly!
-    if (Redi) call diff_ver_part_redi_expl(tr_num, tracers, partit, mesh) 
-    
+    if (Redi) call diff_ver_part_redi_expl(tr_num, tracers, partit, mesh)     
     !___________________________________________________________________________
-    ! Update tracers --> calculate T* see Danilov etal "FESOM2 from finite elements
-    ! to finite volume" 
+    ! Update tracers --> calculate T* see Danilov et al. (2017)
     ! T* =  (dt*R_T^n + h^(n-0.5)*T^(n-0.5))/h^(n+0.5)
     do n=1, myDim_nod2D 
         nzmax=nlevels_nod2D(n)-1
         nzmin=ulevels_nod2D(n)
-        !!PS del_ttf(1:nzmax,n)=del_ttf(1:nzmax,n)+tr_arr(1:nzmax,n,tr_num)* &
-        !!PS                             (hnode(1:nzmax,n)-hnode_new(1:nzmax,n))
-        !!PS tr_arr(1:nzmax,n,tr_num)=tr_arr(1:nzmax,n,tr_num)+ &
-        !!PS                             del_ttf(1:nzmax,n)/hnode_new(1:nzmax,n)
-        
         del_ttf(nzmin:nzmax,n)=del_ttf(nzmin:nzmax,n)+tracers%data(tr_num)%values(nzmin:nzmax,n)* &
                                     (hnode(nzmin:nzmax,n)-hnode_new(nzmin:nzmax,n))
         tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
