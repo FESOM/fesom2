@@ -179,13 +179,17 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
     ! 1. bolus velocities are computed according to GM implementation after R. Ferrari et al., 2010
     ! 2. bolus velocities are used only for advecting tracers and shall be subtracted back afterwards
     if (Fer_GM) then
+!$OMP PARALLEL DO
         do elem=1, myDim_elem2D+eDim_elem2D
            UV(:, :, elem)    =UV(:, :, elem) + fer_UV(:, :, elem)
         end do
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO
         do node=1, myDim_nod2D+eDim_nod2D
            Wvel_e(:, node)=Wvel_e(:, node)+fer_Wvel(:, node)
            Wvel  (:, node)=Wvel  (:, node)+fer_Wvel(:, node)
         end do
+!$OMP END PARALLEL DO
     end if
     !___________________________________________________________________________
     ! loop over all tracers 
@@ -204,12 +208,12 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
 !$OMP PARALLEL DO
         do node=1, myDim_nod2d
            tracers%work%del_ttf(:, node)=tracers%work%del_ttf(:, node)+tracers%work%del_ttf_advhoriz(:, node)+tracers%work%del_ttf_advvert(:, node)
+           !___________________________________________________________________________
+           ! AB is not needed after the advection step. Initialize it with the current tracer before it is modified.
+           ! call init_tracers_AB at the beginning of this loop will compute AB for the next time step then.
+           tracers%data(tr_num)%valuesAB(:, node)=tracers%data(tr_num)%values(:, node) !DS: check that this is the right place!
         end do
 !$OMP END PARALLEL DO
-        !___________________________________________________________________________
-        ! AB is not needed after the advection step. Initialize it with the current tracer before it is modified.
-        ! call init_tracers_AB at the beginning of this loop will compute AB for the next time step then.
-        tracers%data(tr_num)%valuesAB(:,:)=tracers%data(tr_num)%values(:,:) !DS: check that this is the right place!
         ! diffuse tracers 
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
         call diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh) 
@@ -224,26 +228,32 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
     end do
     !___________________________________________________________________________
+    ! 3D restoring for "passive" tracers
+    !!!$OMPTODO: add OpenMP later, not needed right now!
     do tr_num=1, ptracers_restore_total
-        tracers%data(ptracers_restore(tr_num)%locid)%values(:,ptracers_restore(tr_num)%ind2)=1.0_WP    
+       tracers%data(ptracers_restore(tr_num)%locid)%values(:, ptracers_restore(tr_num)%ind2)=1.0_WP
     end do
-
     !___________________________________________________________________________
     ! subtract the the bolus velocities back from 3D velocities:
     if (Fer_GM) then
+!$OMP PARALLEL DO
         do elem=1, myDim_elem2D+eDim_elem2D
            UV(:, :, elem)    =UV(:, :, elem) - fer_UV(:, :, elem)
         end do
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO
         do node=1, myDim_nod2D+eDim_nod2D
            Wvel_e(:, node)=Wvel_e(:, node)-fer_Wvel(:, node)
            Wvel  (:, node)=Wvel  (:, node)-fer_Wvel(:, node)
         end do
+!$OMP END PARALLEL DO
     end if
     !___________________________________________________________________________
     ! to avoid crash with high salinities when coupled to atmosphere
     ! --> if we do only where (tr_arr(:,:,2) < 3._WP ) we also fill up the bottom 
     !     topogrpahy with values which are then writte into the output --> thats why
     !     do node=1,.... and tr_arr(node,1:nzmax,2)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nzmin, nzmax)
     do node=1,myDim_nod2D+eDim_nod2D
         nzmax=nlevels_nod2D(node)-1
         nzmin=ulevels_nod2D(node)
@@ -255,6 +265,7 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
                tracers%data(2)%values(nzmin:nzmax,node) = 3._WP
         end where        
     end do
+!$OMP END PARALLEL DO
 end subroutine solve_tracers_ale
 !
 !
