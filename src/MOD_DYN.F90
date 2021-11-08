@@ -67,24 +67,24 @@ TYPE T_DYN
     type(t_dyn_work)                            :: work
     
     !___________________________________________________________________________
-    ! visc_option=...
+    ! opt_visc=...
     ! 5=Kinematic (easy) Backscatter
     ! 6=Biharmonic flow aware (viscosity depends on velocity Laplacian)
     ! 7=Biharmonic flow aware (viscosity depends on velocity differences)
     ! 8=Dynamic Backscatter
-    integer                                     :: visc_opt      = 5      
+    integer                                     :: opt_visc      = 5      
 
     ! gamma0 [m/s],   backgroung viscosity= gamma0*len, it should be as small 
     !                 as possible (keep it < 0.01 m/s).
     ! gamma1 [nodim], for computation of the flow aware viscosity
     ! gamma2 [s/m],   is only used in easy backscatter option
-    real(kind=WP)                               :: gamma0_visc   = 0.03
-    real(kind=WP)                               :: gamma1_visc   = 0.1
-    real(kind=WP)                               :: gamma2_visc   = 0.285
+    real(kind=WP)                               :: visc_gamma0   = 0.03
+    real(kind=WP)                               :: visc_gamma1   = 0.1
+    real(kind=WP)                               :: visc_gamma2   = 0.285
 
-    ! coefficient for returned sub-gridscale energy, to be used with visc_option=5 
+    ! coefficient for returned sub-gridscale energy, to be used with opt_visc=5 
     ! (easy backscatter)
-    real(kind=WP)                               :: easy_bs_return= 1.5    
+    real(kind=WP)                               :: visc_easybsreturn = 1.5    
 
     logical                                     :: use_ivertvisc = .true.
     integer                                     :: momadv_opt    = 2
@@ -207,10 +207,11 @@ subroutine WRITE_T_DYN(dynamics, unit, iostat, iomsg)
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%solverinfo
     
     !___________________________________________________________________________
-    write(unit, iostat=iostat, iomsg=iomsg) dynamics%visc_opt
-    write(unit, iostat=iostat, iomsg=iomsg) dynamics%gamma0_visc
-    write(unit, iostat=iostat, iomsg=iomsg) dynamics%gamma1_visc
-    write(unit, iostat=iostat, iomsg=iomsg) dynamics%gamma2_visc
+    write(unit, iostat=iostat, iomsg=iomsg) dynamics%opt_visc
+    write(unit, iostat=iostat, iomsg=iomsg) dynamics%visc_gamma0
+    write(unit, iostat=iostat, iomsg=iomsg) dynamics%visc_gamma1
+    write(unit, iostat=iostat, iomsg=iomsg) dynamics%visc_gamma2
+    write(unit, iostat=iostat, iomsg=iomsg) dynamics%visc_easybsreturn
     
     !___________________________________________________________________________
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%use_ivertvisc
@@ -250,10 +251,11 @@ subroutine READ_T_DYN(dynamics, unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%work
     
     !___________________________________________________________________________
-    read(unit, iostat=iostat, iomsg=iomsg) dynamics%visc_opt
-    read(unit, iostat=iostat, iomsg=iomsg) dynamics%gamma0_visc
-    read(unit, iostat=iostat, iomsg=iomsg) dynamics%gamma1_visc
-    read(unit, iostat=iostat, iomsg=iomsg) dynamics%gamma2_visc
+    read(unit, iostat=iostat, iomsg=iomsg) dynamics%opt_visc
+    read(unit, iostat=iostat, iomsg=iomsg) dynamics%visc_gamma0
+    read(unit, iostat=iostat, iomsg=iomsg) dynamics%visc_gamma1
+    read(unit, iostat=iostat, iomsg=iomsg) dynamics%visc_gamma2
+    read(unit, iostat=iostat, iomsg=iomsg) dynamics%visc_easybsreturn
     
     !___________________________________________________________________________
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%use_ivertvisc

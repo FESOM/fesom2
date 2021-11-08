@@ -243,15 +243,15 @@ integer                               :: n
     
     !___________________________________________________________________________
     ! initialise arrays that are needed for backscatter_coef
-    if(dynamics%visc_opt==8) call init_backscatter(partit, mesh)
+    if(dynamics%opt_visc==8) call init_backscatter(partit, mesh)
         
     
     !___________________________________________________________________________
     if(partit%mype==0) write(*,*) 'Initial state'
-    if (w_split .and. partit%mype==0) then
+    if (dynamics%use_wsplit .and. partit%mype==0) then
         write(*,*) '******************************************************************************'
         write(*,*) 'vertical velocity will be split onto explicit and implicit constitutes;'
-        write(*,*) 'maximum allowed CDF on explicit W is set to: ', w_max_cfl
+        write(*,*) 'maximum allowed CDF on explicit W is set to: ', dynamics%wsplit_maxcfl
         write(*,*) '******************************************************************************'
     end if
 end subroutine ocean_setup
@@ -362,12 +362,12 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     USE o_param
     IMPLICIT NONE
     integer        :: elem_size, node_size
-    integer, save  :: nm_unit  = 104       ! unit to open namelist file, skip 100-102 for cray
+    integer, save  :: nm_unit  = 105       ! unit to open namelist file, skip 100-102 for cray
     integer        :: iost
 
-    integer        :: visc_opt
-    real(kind=WP)  :: gamma0_visc, gamma1_visc, gamma2_visc
-    real(kind=WP)  :: div_c_visc, leith_c_visc, easybackscat_return
+    integer        :: opt_visc
+    real(kind=WP)  :: visc_gamma0, visc_gamma1, visc_gamma2
+    real(kind=WP)  :: visc_easybsreturn
     logical        :: use_ivertvisc
     integer        :: momadv_opt
     logical        :: use_freeslip
@@ -377,50 +377,42 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     type(t_mesh)  , intent(in)   , target :: mesh
     type(t_partit), intent(inout), target :: partit
     type(t_dyn)   , intent(inout), target :: dynamics
+
+    ! define dynamics namelist parameter
+    namelist /dynamics_visc   / opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
+                                use_ivertvisc, visc_easybsreturn
+    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl 
+
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
-
-!!PS     ! define dynamics namelist parameter
-!!PS     namelist /dynamics_visc    / visc_opt, gamma0_visc, gamma1_visc, gamma2_visc,  &
-!!PS                                  div_c_visc, leith_c_visc, use_ivertvisc, easy_bs_return
-!!PS     namelist /dynamics_general / momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl 
-!!PS 
-!!PS     ! open and read namelist for I/O
-!!PS     open(unit=nm_unit, file='namelist.dyn', form='formatted', access='sequential', status='old', iostat=iost )
-!!PS     if (iost == 0) then
-!!PS         if (mype==0) write(*,*) '     file   : ', 'namelist.dyn',' open ok'
-!!PS     else
-!!PS         if (mype==0) write(*,*) 'ERROR: --> bad opening file   : ', 'namelist.dyn',' ; iostat=',iost
-!!PS         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-!!PS         stop
-!!PS     end if
-!!PS     read(nm_unit, nml=dynamics_visc   , iostat=iost)
-!!PS     read(nm_unit, nml=dynamics_general, iostat=iost)
-!!PS     close(nm_unit)
+#include "associate_mesh_ass.h"   
+    
+    ! open and read namelist for I/O
+    open(unit=nm_unit, file='namelist.dyn', form='formatted', access='sequential', status='old', iostat=iost )
+    if (iost == 0) then
+        if (mype==0) write(*,*) '     file   : ', 'namelist.dyn',' open ok'
+    else
+        if (mype==0) write(*,*) 'ERROR: --> bad opening file   : ', 'namelist.dyn',' ; iostat=',iost
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        stop
+    end if
+    read(nm_unit, nml=dynamics_visc,    iostat=iost)
+    read(nm_unit, nml=dynamics_general, iostat=iost)
+    close(nm_unit)
 
     !___________________________________________________________________________
     ! set parameters in derived type
-!!PS     dynamics%visc_opt      = visc_opt
-!!PS     dynamics%gamma0_visc   = gamma0_visc
-!!PS     dynamics%gamma1_visc   = gamma1_visc
-!!PS     dynamics%gamma2_visc   = gamma2_visc
-!!PS     dynamics%use_ivertvisc = use_ivertvisc
-!!PS     dynamics%momadv_opt    = momadv_opt
-!!PS     dynamics%use_freeslip  = use_freeslip
-!!PS     dynamics%use_wsplit    = use_wsplit
-!!PS     dynamics%wsplit_maxcfl = wsplit_maxcfl
-
-    dynamics%visc_opt      = visc_option
-    dynamics%gamma0_visc   = gamma0
-    dynamics%gamma1_visc   = gamma1
-    dynamics%gamma2_visc   = gamma2
-    dynamics%use_ivertvisc = i_vert_visc
-    dynamics%momadv_opt    = mom_adv
-    dynamics%use_freeslip  = free_slip
-    dynamics%use_wsplit    = w_split
-    dynamics%wsplit_maxcfl = w_max_cfl
+    dynamics%opt_visc          = opt_visc
+    dynamics%visc_gamma0       = visc_gamma0
+    dynamics%visc_gamma1       = visc_gamma1
+    dynamics%visc_gamma2       = visc_gamma2
+    dynamics%visc_easybsreturn = visc_easybsreturn
+    dynamics%use_ivertvisc     = use_ivertvisc
+    dynamics%momadv_opt        = momadv_opt
+    dynamics%use_freeslip      = use_freeslip
+    dynamics%use_wsplit        = use_wsplit
+    dynamics%wsplit_maxcfl     = wsplit_maxcfl
 
     !___________________________________________________________________________
     ! define local vertice & elem array size
@@ -476,7 +468,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     dynamics%work%uvnode_rhs = 0.0_WP
     dynamics%work%u_c = 0.0_WP
     dynamics%work%v_c = 0.0_WP
-    if (dynamics%visc_opt==5) then
+    if (dynamics%opt_visc==5) then
         allocate(dynamics%work%u_b(nl-1, elem_size))
         allocate(dynamics%work%v_b(nl-1, elem_size))
         dynamics%work%u_b = 0.0_WP
@@ -556,14 +548,6 @@ allocate(real_salt_flux(node_size)) !PS
 allocate(Tsurf_t(node_size,2), Ssurf_t(node_size,2))
 allocate(tau_x_t(node_size,2), tau_y_t(node_size,2))  
 
-! =================
-! All auxiliary arrays
-! =================
- 
-!if(mom_adv==3) then
-allocate(vorticity(nl-1,node_size))
-vorticity=0.0_WP
-!end if
 
 ! =================
 ! Visc and Diff coefs
@@ -578,35 +562,6 @@ if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
    Kv_double=0.0_WP
    !!PS call oce_mixing_kpp_init ! Setup constants, allocate arrays and construct look up table
 end if
-
-! =================
-! Backscatter arrays
-! =================
-
-!!PS if(visc_option==8) then
-!!PS 
-!!PS allocate(uke(nl-1,elem_size)) ! Unresolved kinetic energy for backscatter coefficient
-!!PS allocate(v_back(nl-1,elem_size))  ! Backscatter viscosity
-!!PS allocate(uke_dis(nl-1,elem_size), uke_back(nl-1,elem_size)) 
-!!PS allocate(uke_dif(nl-1,elem_size))
-!!PS allocate(uke_rhs(nl-1,elem_size), uke_rhs_old(nl-1,elem_size))
-!!PS allocate(UV_dis_tend(2,nl-1,elem_size), UV_back_tend(2,nl-1,elem_size))
-!!PS allocate(UV_total_tend(2,nl-1,elem_size))
-!!PS 
-!!PS uke=0.0_8
-!!PS v_back=0.0_8
-!!PS uke_dis=0.0_8
-!!PS uke_dif=0.0_8
-!!PS uke_back=0.0_8
-!!PS uke_rhs=0.0_8
-!!PS uke_rhs_old=0.0_8
-!!PS UV_dis_tend=0.0_8
-!!PS UV_back_tend=0.0_8
-!!PS UV_total_tend=0.0_8
-!!PS end if
-
-!Velocities at nodes
-!!PS allocate(Unode(2,nl-1,node_size))
 
 ! tracer gradients & RHS  
 allocate(ttrhs(nl-1,node_size))

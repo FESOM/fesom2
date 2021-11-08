@@ -2396,19 +2396,19 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     
     !___________________________________________________________________________
     ! Split implicit vertical velocity onto implicit and explicit components using CFL criteria:
-    ! w_max_cfl constrains the allowed explicit w according to the CFL at this place
-    ! w_max_cfl=1 means   w_exp  is cut at at the maximum of allowed CFL
-    ! w_max_cfl=0 means   w_exp  is zero (everything computed implicitly)
-    ! w_max_cfl=inf menas w_impl is zero (everything computed explicitly)
-    ! a guess for optimal choice of w_max_cfl would be 0.95
+    ! wsplit_maxcfl constrains the allowed explicit w according to the CFL at this place
+    ! wsplit_maxcfl=1 means   w_exp  is cut at at the maximum of allowed CFL
+    ! wsplit_maxcfl=0 means   w_exp  is zero (everything computed implicitly)
+    ! wsplit_maxcfl=inf menas w_impl is zero (everything computed explicitly)
+    ! a guess for optimal choice of wsplit_maxcfl would be 0.95
     do n=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(n)
         nzmax = nlevels_nod2D(n)
         do nz=nzmin,nzmax
             c1=1.0_WP
             c2=0.0_WP
-            if (w_split .and. (CFL_z(nz, n) > w_max_cfl)) then
-                dd=max((CFL_z(nz, n)-w_max_cfl), 0.0_WP)/max(w_max_cfl, 1.e-12)
+            if (dynamics%use_wsplit  .and. (CFL_z(nz, n) > dynamics%wsplit_maxcfl)) then
+                dd=max((CFL_z(nz, n)-dynamics%wsplit_maxcfl), 0.0_WP)/max(dynamics%wsplit_maxcfl, 1.e-12)
                 c1=1.0_WP/(1.0_WP+dd) !explicit part =1. if dd=0.
                 c2=dd    /(1.0_WP+dd) !implicit part =1. if dd=inf
             end if
@@ -2866,11 +2866,11 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call viscosity_filter'//achar(27)//'[0m'
-    call viscosity_filter(visc_option, dynamics, partit, mesh)
+    call viscosity_filter(dynamics%opt_visc, dynamics, partit, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call impl_vert_visc_ale'//achar(27)//'[0m'
-    if(i_vert_visc) call impl_vert_visc_ale(dynamics,partit, mesh)
+    if(dynamics%use_ivertvisc) call impl_vert_visc_ale(dynamics,partit, mesh)
     t2=MPI_Wtime()
         
     !___________________________________________________________________________
