@@ -166,14 +166,15 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
                 fct_LO(nz,n)=(ttf(nz,n)*hnode(nz,n)+(fct_LO(nz,n)+(adv_flux_ver(nz, n)-adv_flux_ver(nz+1, n)))*dt/areasvol(nz,n))/hnode_new(nz,n)
             end do
         end do
-<<<<<<< HEAD
-        if (dynamics%use_wsplit) then !wvel/=wvel_e
-            ! update for implicit contribution (use_wsplit option)
-=======
 !$OMP END PARALLEL DO
-        if (w_split) then !wvel/=wvel_e
+
+        if (dynamics%use_wsplit) then !wvel/=wvel_e
             ! update for implicit contribution (w_split option)
+<<<<<<< HEAD
 >>>>>>> tracer advection part has been fullly OpenMP parallelized. It turns out that OpenMP does not slow down the modes as compared to MPI.
+=======
+            
+>>>>>>>   solve conflicts from merging with refactoring branch
             call adv_tra_vert_impl(dt, wi, fct_LO, partit, mesh)
             ! compute the low order upwind vertical flux (full vertical velocity)
             ! zero the input/output flux before computation
