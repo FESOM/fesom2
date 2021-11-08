@@ -27,7 +27,9 @@ SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
 
     do n=1, partit%myDim_nod2D+partit%eDim_nod2D
        ! del_ttf will contain all advection / diffusion contributions for this tracer. Set it to 0 at the beginning!
-       tracers%work%del_ttf(:, n) = 0.0_WP
+       tracers%work%del_ttf          (:, n) = 0.0_WP
+       tracers%work%del_ttf_advhoriz (:, n) = 0.0_WP
+       tracers%work%del_ttf_advvert  (:, n) = 0.0_WP
        ! AB interpolation
        tracers%data(tr_num)%valuesAB(:, n)=-(0.5_WP+epsilon)*tracers%data(tr_num)%valuesAB(:, n)+(1.5_WP+epsilon)*tracers%data(tr_num)%values(:, n)
     end do
