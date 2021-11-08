@@ -5,6 +5,7 @@ module fesom_main_storage_module
   USE MOD_TRACER
   USE MOD_PARTIT
   USE MOD_PARSUP
+  USE MOD_DYN
   USE o_ARRAYS
   USE o_PARAM
   USE i_PARAM
@@ -51,15 +52,17 @@ module fesom_main_storage_module
     real(kind=real32) :: runtime_alltimesteps
 
 
-    type(t_mesh) mesh
+    type(t_mesh)   mesh
     type(t_tracer) tracers
+    type(t_dyn)    dynamics
     type(t_partit) partit
 
 
     character(LEN=256)               :: dump_dir, dump_filename
     logical                          :: L_EXISTS
-    type(t_mesh) mesh_copy
+    type(t_mesh)   mesh_copy
     type(t_tracer) tracers_copy
+    type(t_dyn)    dynamics_copy
 
     character(LEN=MPI_MAX_LIBRARY_VERSION_STRING) :: mpi_version_txt
     integer mpi_version_len
@@ -124,6 +127,7 @@ contains
         call setup_model(f%partit)  ! Read Namelists, always before clock_init
         call clock_init(f%partit)   ! read the clock file 
         call get_run_steps(fesom_total_nsteps, f%partit)
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call mesh_setup'//achar(27)//'[0m'
         call mesh_setup(f%partit, f%mesh)
 
         if (f%mype==0) write(*,*) 'FESOM mesh_setup... complete'
@@ -133,12 +137,21 @@ contains
         ! and additional arrays needed for 
         ! fancy advection etc.  
         !=====================
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call check_mesh_consistency'//achar(27)//'[0m'
         call check_mesh_consistency(f%partit, f%mesh)
         if (f%mype==0) f%t2=MPI_Wtime()
 
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call dynamics_init'//achar(27)//'[0m'
+        call dynamics_init(f%dynamics, f%partit, f%mesh)
+        
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call tracer_init'//achar(27)//'[0m'
         call tracer_init(f%tracers, f%partit, f%mesh)                ! allocate array of ocean tracers (derived type "t_tracer")
+        
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call arrays_init'//achar(27)//'[0m'
         call arrays_init(f%tracers%num_tracers, f%partit, f%mesh)    ! allocate other arrays (to be refactured same as tracers in the future)
-        call ocean_setup(f%tracers, f%partit, f%mesh)
+        
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ocean_setup'//achar(27)//'[0m'
+        call ocean_setup(f%dynamics, f%tracers, f%partit, f%mesh)
 
         if (f%mype==0) then
            write(*,*) 'FESOM ocean_setup... complete'
@@ -154,7 +167,7 @@ contains
             if (f%mype==0) write(*,*) 'EVP scheme option=', whichEVP
         endif
         if (f%mype==0) f%t5=MPI_Wtime()
-        call compute_diagnostics(0, f%tracers, f%partit, f%mesh) ! allocate arrays for diagnostic
+        call compute_diagnostics(0, f%dynamics, f%tracers, f%partit, f%mesh) ! allocate arrays for diagnostic
 #if defined (__oasis)
         call cpl_oasis3mct_define_unstr(f%partit, f%mesh)
         if(f%mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
@@ -179,7 +192,7 @@ contains
         ! if l_write  is TRUE the restart will be forced
         ! if l_read the restart will be read
         ! as an example, for reading restart one does: call restart(0, .false., .false., .true., tracers, partit, mesh)
-        call restart(0, .false., r_restart, f%tracers, f%partit, f%mesh) ! istep, l_write, l_read
+        call restart(0, .false., r_restart, f%dynamics, f%tracers, f%partit, f%mesh) ! istep, l_write, l_read
         if (f%mype==0) f%t7=MPI_Wtime()
         ! store grid information into netcdf file
         if (.not. r_restart) call write_mesh_info(f%partit, f%mesh)
@@ -230,9 +243,18 @@ contains
         close (f%mype+300)
 
     !    open  (f%mype+300, file=trim(f%dump_filename), status='old', form="unformatted")
-    !    read  (f%mype+300) f%tracers_copy
+    !    read  (f%mype+300) f%dynamics_copy
     !    close (f%mype+300)
 
+        write (f%dump_filename, "(A9,I7.7)") "t_dynamics.", f%mype
+        open  (f%mype+300, file=TRIM(f%dump_dir)//trim(f%dump_filename), status='replace', form="unformatted")
+        write (f%mype+300) f%dynamics
+        close (f%mype+300)
+
+    !    open  (f%mype+300, file=trim(f%dump_filename), status='old', form="unformatted")
+    !    read  (f%mype+300) f%tracers_copy
+    !    close (f%mype+300)
+    
     !call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
     !stop
     !         
@@ -292,13 +314,15 @@ contains
 #endif
         call clock      
         !___compute horizontal velocity on nodes (originaly on elements)________
-        call compute_vel_nodes(f%partit, f%mesh)
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call compute_vel_nodes'//achar(27)//'[0m'
+        call compute_vel_nodes(f%dynamics, f%partit, f%mesh)
+        
         !___model sea-ice step__________________________________________________
         f%t1 = MPI_Wtime()
         if(use_ice) then
             !___compute fluxes from ocean to ice________________________________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ocean2ice(n)'//achar(27)//'[0m'
-            call ocean2ice(f%tracers, f%partit, f%mesh)
+            call ocean2ice(f%dynamics, f%tracers, f%partit, f%mesh)
             
             !___compute update of atmospheric forcing____________________________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call update_atm_forcing(n)'//achar(27)//'[0m'
@@ -317,28 +341,28 @@ contains
             if (ice_update) call ice_timestep(n, f%partit, f%mesh)  
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
-            call oce_fluxes_mom(f%partit, f%mesh) ! momentum only
+            call oce_fluxes_mom(f%dynamics, f%partit, f%mesh) ! momentum only
             call oce_fluxes(f%tracers, f%partit, f%mesh)
         end if
-        call before_oce_step(f%tracers, f%partit, f%mesh) ! prepare the things if required
+        call before_oce_step(f%dynamics, f%tracers, f%partit, f%mesh) ! prepare the things if required
         f%t2 = MPI_Wtime()
+        
         !___model ocean step____________________________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_timestep_ale'//achar(27)//'[0m'
-
-        call oce_timestep_ale(n, f%tracers, f%partit, f%mesh)
+        call oce_timestep_ale(n, f%dynamics, f%tracers, f%partit, f%mesh)
 
         f%t3 = MPI_Wtime()
         !___compute energy diagnostics..._______________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call compute_diagnostics(1)'//achar(27)//'[0m'
-        call compute_diagnostics(1, f%tracers, f%partit, f%mesh)
+        call compute_diagnostics(1, f%dynamics, f%tracers, f%partit, f%mesh)
 
         f%t4 = MPI_Wtime()
         !___prepare output______________________________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
-        call output (n, f%tracers, f%partit, f%mesh)
+        call output (n, f%dynamics, f%tracers, f%partit, f%mesh)
 
         f%t5 = MPI_Wtime()
-        call restart(n, .false., .false., f%tracers, f%partit, f%mesh)
+        call restart(n, .false., .false., f%dynamics, f%tracers, f%partit, f%mesh)
         f%t6 = MPI_Wtime()
         
         f%rtime_fullice       = f%rtime_fullice       + f%t2 - f%t1
