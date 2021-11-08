@@ -12,6 +12,7 @@ module diff_part_hor_redi_interface
     end subroutine
   end interface
 end module
+<<<<<<< HEAD
 module adv_tracers_ale_interface
   interface
     subroutine adv_tracers_ale(dt, tr_num, dynamics, tracer, partit, mesh) 
@@ -29,6 +30,8 @@ module adv_tracers_ale_interface
     end subroutine
   end interface
 end module
+=======
+>>>>>>> beb9fe92a459cfc34d01cbba0cd37ef66428314a
 module diff_ver_part_expl_ale_interface
   interface
     subroutine diff_ver_part_expl_ale(tr_num, tracer, partit, mesh) 
@@ -148,10 +151,10 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
     use g_comm_auto
     use o_tracers
     use Toy_Channel_Soufflet
-    use adv_tracers_ale_interface
     use diff_tracers_ale_interface
-    
+    use oce_adv_tra_driver_interfaces    
     implicit none
+<<<<<<< HEAD
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_tracer), intent(inout), target :: tracers
     type(t_mesh)  , intent(in)   , target :: mesh
@@ -160,10 +163,18 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
     real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
     real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, fer_Wvel
     
+=======
+    type(t_tracer), intent(inout), target    :: tracers
+    type(t_mesh),   intent(in),    target    :: mesh
+    type(t_partit), intent(inout), target    :: partit
+    integer                                  :: tr_num, node, elem, nzmax, nzmin
+    real(kind=WP),  pointer, dimension (:,:) :: del_ttf
+>>>>>>> beb9fe92a459cfc34d01cbba0cd37ef66428314a
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
+<<<<<<< HEAD
     UV     => dynamics%uv(:,:,:)
     Wvel   => dynamics%w(:,:)
     Wvel_e => dynamics%w_e(:,:)
@@ -171,6 +182,10 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
         fer_UV     => dynamics%fer_uv(:,:,:)
         fer_Wvel   => dynamics%fer_w(:,:)
     end if 
+=======
+
+    del_ttf => tracers%work%del_ttf
+>>>>>>> beb9fe92a459cfc34d01cbba0cd37ef66428314a
 
     !___________________________________________________________________________
     if (SPP) call cal_rejected_salt(partit, mesh)
@@ -180,9 +195,17 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
     ! 1. bolus velocities are computed according to GM implementation after R. Ferrari et al., 2010
     ! 2. bolus velocities are used only for advecting tracers and shall be subtracted back afterwards
     if (Fer_GM) then
-        UV    =UV    +fer_UV
-        Wvel_e=Wvel_e+fer_Wvel
-        Wvel  =Wvel  +fer_Wvel
+!$OMP PARALLEL DO
+        do elem=1, myDim_elem2D+eDim_elem2D
+           UV(:, :, elem)    =UV(:, :, elem) + fer_UV(:, :, elem)
+        end do
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO
+        do node=1, myDim_nod2D+eDim_nod2D
+           Wvel_e(:, node)=Wvel_e(:, node)+fer_Wvel(:, node)
+           Wvel  (:, node)=Wvel  (:, node)+fer_Wvel(:, node)
+        end do
+!$OMP END PARALLEL DO
     end if
     !___________________________________________________________________________
     ! loop over all tracers 
@@ -193,7 +216,24 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
         call init_tracers_AB(tr_num, tracers, partit, mesh) 
         ! advect tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
+<<<<<<< HEAD
         call adv_tracers_ale(dt, tr_num, dynamics, tracers, partit, mesh) 
+=======
+        ! it will update del_ttf with contributions from horizontal and vertical advection parts (del_ttf_advhoriz and del_ttf_advvert)
+        call do_oce_adv_tra(dt, UV, wvel, wvel_i, wvel_e, tr_num, tracers, partit, mesh)
+        !___________________________________________________________________________
+        ! update array for total tracer flux del_ttf with the fluxes from horizontal
+        ! and vertical advection
+!$OMP PARALLEL DO
+        do node=1, myDim_nod2d
+           tracers%work%del_ttf(:, node)=tracers%work%del_ttf(:, node)+tracers%work%del_ttf_advhoriz(:, node)+tracers%work%del_ttf_advvert(:, node)
+           !___________________________________________________________________________
+           ! AB is not needed after the advection step. Initialize it with the current tracer before it is modified.
+           ! call init_tracers_AB at the beginning of this loop will compute AB for the next time step then.
+           tracers%data(tr_num)%valuesAB(:, node)=tracers%data(tr_num)%values(:, node) !DS: check that this is the right place!
+        end do
+!$OMP END PARALLEL DO
+>>>>>>> beb9fe92a459cfc34d01cbba0cd37ef66428314a
         ! diffuse tracers 
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
         call diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh) 
@@ -208,22 +248,32 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
     end do
     !___________________________________________________________________________
+    ! 3D restoring for "passive" tracers
+    !!!$OMPTODO: add OpenMP later, not needed right now!
     do tr_num=1, ptracers_restore_total
-        tracers%data(ptracers_restore(tr_num)%locid)%values(:,ptracers_restore(tr_num)%ind2)=1.0_WP    
+       tracers%data(ptracers_restore(tr_num)%locid)%values(:, ptracers_restore(tr_num)%ind2)=1.0_WP
     end do
-
     !___________________________________________________________________________
     ! subtract the the bolus velocities back from 3D velocities:
     if (Fer_GM) then
-        UV    =UV    -fer_UV
-        Wvel_e=Wvel_e-fer_Wvel
-        Wvel  =Wvel  -fer_Wvel
-    end if    
+!$OMP PARALLEL DO
+        do elem=1, myDim_elem2D+eDim_elem2D
+           UV(:, :, elem)    =UV(:, :, elem) - fer_UV(:, :, elem)
+        end do
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO
+        do node=1, myDim_nod2D+eDim_nod2D
+           Wvel_e(:, node)=Wvel_e(:, node)-fer_Wvel(:, node)
+           Wvel  (:, node)=Wvel  (:, node)-fer_Wvel(:, node)
+        end do
+!$OMP END PARALLEL DO
+    end if
     !___________________________________________________________________________
     ! to avoid crash with high salinities when coupled to atmosphere
     ! --> if we do only where (tr_arr(:,:,2) < 3._WP ) we also fill up the bottom 
     !     topogrpahy with values which are then writte into the output --> thats why
     !     do node=1,.... and tr_arr(node,1:nzmax,2)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nzmin, nzmax)
     do node=1,myDim_nod2D+eDim_nod2D
         nzmax=nlevels_nod2D(node)-1
         nzmin=ulevels_nod2D(node)
@@ -235,10 +285,12 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
                tracers%data(2)%values(nzmin:nzmax,node) = 3._WP
         end where        
     end do
+!$OMP END PARALLEL DO
 end subroutine solve_tracers_ale
 !
 !
 !===============================================================================
+<<<<<<< HEAD
 subroutine adv_tracers_ale(dt, tr_num, dynamics, tracers, partit, mesh) 
     use g_config, only: flag_debug
     use mod_mesh
@@ -297,6 +349,9 @@ end subroutine adv_tracers_ale
 !
 !===============================================================================
 subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh) 
+=======
+subroutine diff_tracers_ale(tr_num, tracers, partit, mesh) 
+>>>>>>> beb9fe92a459cfc34d01cbba0cd37ef66428314a
     use mod_mesh
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -326,35 +381,23 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
 
     del_ttf => tracers%work%del_ttf
     !___________________________________________________________________________
-    ! convert tr_arr_old(:,:,tr_num)=ttr_n-0.5   --> prepare to calc ttr_n+0.5
-    ! eliminate AB (adams bashfort) interpolates tracer, which is only needed for 
-    ! tracer advection. For diffusion only need tracer from previouse time step
-    tracers%data(tr_num)%valuesAB(:,:)=tracers%data(tr_num)%values(:,:) !DS: check that this is the right place!
-    !___________________________________________________________________________
     ! do horizontal diffusiion
     ! write there also horizontal diffusion rhs to del_ttf which is equal the R_T^n 
     ! in danilovs srcipt
     ! includes Redi diffusivity if Redi=.true.
     call diff_part_hor_redi(tr_num, tracers, partit, mesh)  ! seems to be ~9% faster than diff_part_hor
     !___________________________________________________________________________
-    ! do vertical diffusion: explicite 
+    ! do vertical diffusion: explicit
     if (.not. tracers%i_vert_diff) call diff_ver_part_expl_ale(tr_num, tracers, partit, mesh) 
     ! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
     ! derivatives and has to be computed explicitly!
-    if (Redi) call diff_ver_part_redi_expl(tr_num, tracers, partit, mesh) 
-    
+    if (Redi) call diff_ver_part_redi_expl(tr_num, tracers, partit, mesh)     
     !___________________________________________________________________________
-    ! Update tracers --> calculate T* see Danilov etal "FESOM2 from finite elements
-    ! to finite volume" 
+    ! Update tracers --> calculate T* see Danilov et al. (2017)
     ! T* =  (dt*R_T^n + h^(n-0.5)*T^(n-0.5))/h^(n+0.5)
     do n=1, myDim_nod2D 
         nzmax=nlevels_nod2D(n)-1
         nzmin=ulevels_nod2D(n)
-        !!PS del_ttf(1:nzmax,n)=del_ttf(1:nzmax,n)+tr_arr(1:nzmax,n,tr_num)* &
-        !!PS                             (hnode(1:nzmax,n)-hnode_new(1:nzmax,n))
-        !!PS tr_arr(1:nzmax,n,tr_num)=tr_arr(1:nzmax,n,tr_num)+ &
-        !!PS                             del_ttf(1:nzmax,n)/hnode_new(1:nzmax,n)
-        
         del_ttf(nzmin:nzmax,n)=del_ttf(nzmin:nzmax,n)+tracers%data(tr_num)%values(nzmin:nzmax,n)* &
                                     (hnode(nzmin:nzmax,n)-hnode_new(nzmin:nzmax,n))
         tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
@@ -372,10 +415,16 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
         
     end if
     !We DO not set del_ttf to zero because it will not be used in this timestep anymore
+<<<<<<< HEAD
     !init_tracers will set it to zero for the next timestep
     !init_tracers will set it to zero for the next timestep
     if (tracers%smooth_bh_tra) then
        call diff_part_bh(tr_num, dynamics, tracers, partit, mesh)  ! alpply biharmonic diffusion (implemented as filter)                                                
+=======
+    !init_tracers_AB will set it to zero for the next timestep
+     if (tracers%smooth_bh_tra) then
+       call diff_part_bh(tr_num, tracers, partit, mesh)  ! alpply biharmonic diffusion (implemented as filter)                                                
+>>>>>>> beb9fe92a459cfc34d01cbba0cd37ef66428314a
     end if
 end subroutine diff_tracers_ale
 !

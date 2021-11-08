@@ -25,7 +25,7 @@ module par_support_interfaces
      USE MOD_PARTIT
      USE MOD_PARSUP
      implicit none
-     type(t_partit), intent(in), target :: partit
+     type(t_partit), intent(inout), target :: partit
      type(t_mesh),   intent(in), target :: mesh
   end subroutine
 
@@ -506,6 +506,20 @@ subroutine init_gatherLists(partit)
      call MPI_SEND(myList_elem2D, myDim_elem2D, MPI_INTEGER, 0, 3, MPI_COMM_FESOM, MPIerr )
 
   endif
+!$OMP MASTER
+#if defined(_OPENMP)
+    allocate(partit%plock(partit%myDim_nod2D+partit%eDim_nod2D))
+    do n=1, myDim_nod2D+partit%eDim_nod2D
+!experiments showd that OPENMP5 implementation of the lock (201811) is >10% more efficient
+!make sure you use OPENMP v. 5.0
+#if _OPENMP >= 201811
+       call omp_init_lock_with_hint(partit%plock(n),omp_sync_hint_speculative+omp_sync_hint_uncontended)
+#else
+       call omp_init_lock(partit%plock(n))
+#endif
+    enddo
+#endif
+!$OMP END MASTER
 end subroutine init_gatherLists
 !===================================================================
 subroutine status_check(partit)

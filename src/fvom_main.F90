@@ -7,6 +7,7 @@
 !=============================================================================!    
 
 program main
+<<<<<<< HEAD
 USE MOD_MESH
 USE MOD_TRACER
 USE MOD_PARTIT
@@ -41,13 +42,17 @@ use command_line_options_module
 #if defined (__icepack)
 use icedrv_main,          only: set_icepack, init_icepack, alloc_icepack
 #endif
+=======
+  use fvom_module
+>>>>>>> beb9fe92a459cfc34d01cbba0cd37ef66428314a
 
-#if defined (__oasis)
-use cpl_driver
-#endif
+  integer nsteps
 
-IMPLICIT NONE
+  call fesom_init(nsteps)
+  call fesom_runloop(nsteps)
+  call fesom_finalize
 
+<<<<<<< HEAD
 integer           :: n, nsteps, offset, row, i, provided
 integer, pointer  :: mype, npes, MPIerr, MPI_COMM_FESOM
 real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
@@ -395,3 +400,6 @@ integer mpi_version_len
     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
 end program main
     
+=======
+end program
+>>>>>>> beb9fe92a459cfc34d01cbba0cd37ef66428314a

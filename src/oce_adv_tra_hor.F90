@@ -8,7 +8,7 @@ module oce_adv_tra_hor_interfaces
 ! IF init_zero=.TRUE.  : flux will be set to zero before computation
 ! IF init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-    subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, init_zero)
+    subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
       use MOD_MESH
       use MOD_TRACER
       USE MOD_PARTIT
@@ -18,7 +18,7 @@ module oce_adv_tra_hor_interfaces
       real(kind=WP), intent(in)         :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
       real(kind=WP), intent(inout)      :: flux(  mesh%nl-1, partit%myDim_edge2D)
-      logical, optional                 :: init_zero
+      logical, optional                 :: o_init_zero
     end subroutine
 !===============================================================================
 ! MUSCL
@@ -27,7 +27,7 @@ module oce_adv_tra_hor_interfaces
 ! IF init_zero=.TRUE.  : flux will be set to zero before computation
 ! IF init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-    subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad, nboundary_lay, init_zero)
+    subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad, nboundary_lay, o_init_zero)
       use MOD_MESH
       USE MOD_PARTIT
       USE MOD_PARSUP
@@ -39,11 +39,11 @@ module oce_adv_tra_hor_interfaces
       real(kind=WP), intent(inout)      :: flux(  mesh%nl-1, partit%myDim_edge2D)
       integer,       intent(in)         :: nboundary_lay(partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, partit%myDim_edge2D)
-      logical, optional                 :: init_zero
+      logical, optional                 :: o_init_zero
     end subroutine
 ! a not stable version of MUSCL (reconstruction in the vicinity of bottom topography is not upwind)
 ! it runs with FCT option only
-    subroutine adv_tra_hor_mfct(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad,                 init_zero)
+    subroutine adv_tra_hor_mfct(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad,                 o_init_zero)
       use MOD_MESH
       USE MOD_PARTIT
       USE MOD_PARSUP
@@ -54,14 +54,14 @@ module oce_adv_tra_hor_interfaces
       real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
       real(kind=WP), intent(inout)      :: flux(  mesh%nl-1, partit%myDim_edge2D)
       real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, partit%myDim_edge2D)
-      logical, optional                 :: init_zero
+      logical, optional                 :: o_init_zero
     end subroutine
   end interface
 end module
 !
 !
 !===============================================================================
-subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, init_zero)
+subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
     use MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -72,7 +72,8 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, init_zero)
     real(kind=WP), intent(in)         :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
     real(kind=WP), intent(inout)      :: flux(  mesh%nl-1, partit%myDim_edge2D)
-    logical, optional                 :: init_zero
+    logical, optional                 :: o_init_zero
+    logical                           :: l_init_zero
     real(kind=WP)                     :: deltaX1, deltaY1, deltaX2, deltaY2
     real(kind=WP)                     :: a, vflux
     integer                           :: el(2), enodes(2), nz, edge
@@ -83,15 +84,24 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, init_zero)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-    if (present(init_zero))then
-       if (init_zero) flux=0.0_WP
-    else
-       flux=0.0_WP
+    l_init_zero=.true.
+    if (present(o_init_zero)) then
+       l_init_zero=o_init_zero
+    end if
+    if (l_init_zero) then
+!$OMP PARALLEL DO
+       do edge=1, myDim_edge2D
+          flux(:,edge)=0.0_WP
+       end do
+!$OMP END PARALLEL DO
     end if
 
     ! The result is the low-order solution horizontal fluxes
     ! They are put into flux
     !___________________________________________________________________________
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, &
+!$OMP                       a, vflux, el, enodes, nz, nu12, nl12, nl1, nl2, nu1, nu2)
+!$OMP DO
     do edge=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,edge)      
@@ -214,11 +224,13 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, init_zero)
                              ttf(nz, enodes(2))*(vflux-abs(vflux)))-flux(nz, edge)
         end do
     end do
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine adv_tra_hor_upw1
 !
 !
 !===============================================================================
-subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad, nboundary_lay, init_zero)
+subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad, nboundary_lay, o_init_zero)
     use MOD_MESH
     use MOD_TRACER
     USE MOD_PARTIT
@@ -233,7 +245,8 @@ subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_g
     real(kind=WP), intent(inout)      :: flux(  mesh%nl-1, partit%myDim_edge2D)
     integer,       intent(in)         :: nboundary_lay(partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, partit%myDim_edge2D)
-    logical, optional                 :: init_zero
+    logical, optional                 :: o_init_zero
+    logical                           :: l_init_zero
     real(kind=WP)                     :: deltaX1, deltaY1, deltaX2, deltaY2
     real(kind=WP)                     :: Tmean1, Tmean2, cHO
     real(kind=WP)                     :: c_lo(2)
@@ -246,15 +259,24 @@ subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_g
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-    if (present(init_zero))then
-       if (init_zero) flux=0.0_WP
-    else
-       flux=0.0_WP
+    l_init_zero=.true.
+    if (present(o_init_zero)) then
+       l_init_zero=o_init_zero
+    end if
+    if (l_init_zero) then
+!$OMP PARALLEL DO
+       do edge=1, myDim_edge2D
+          flux(:,edge)=0.0_WP
+       end do
+!$OMP END PARALLEL DO
     end if
 
     ! The result is the low-order solution horizontal fluxes
     ! They are put into flux
     !___________________________________________________________________________
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, Tmean1, Tmean2, cHO, &
+!$OMP                                      c_lo, a, vflux, el, enodes, nz, nu12, nl12, nl1, nl2, nu1, nu2)
+!$OMP DO
     do edge=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,edge)          
@@ -487,25 +509,28 @@ subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_g
            flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
         end do
     end do
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine adv_tra_hor_muscl
 !
 !
 !===============================================================================
-    subroutine adv_tra_hor_mfct(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad,                 init_zero)
+    subroutine adv_tra_hor_mfct(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad,                 o_init_zero)
     use MOD_MESH
     use MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
     use g_comm_auto
     implicit none
-    type(t_partit),intent(in), target :: partit
+    type(t_partit),intent(inout), target :: partit
     type(t_mesh),  intent(in), target :: mesh    
     real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
     real(kind=WP), intent(in)         :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
     real(kind=WP), intent(inout)      :: flux(  mesh%nl-1, partit%myDim_edge2D)
     real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, partit%myDim_edge2D)
-    logical, optional                 :: init_zero
+    logical, optional                 :: o_init_zero
+    logical                           :: l_init_zero
     real(kind=WP)                     :: deltaX1, deltaY1, deltaX2, deltaY2
     real(kind=WP)                     :: Tmean1, Tmean2, cHO
     real(kind=WP)                     :: a, vflux
@@ -517,15 +542,24 @@ end subroutine adv_tra_hor_muscl
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-    if (present(init_zero))then
-       if (init_zero) flux=0.0_WP
-    else
-       flux=0.0_WP
+    l_init_zero=.true.
+    if (present(o_init_zero)) then
+       l_init_zero=o_init_zero
+    end if
+    if (l_init_zero) then
+!$OMP PARALLEL DO
+       do edge=1, myDim_edge2D
+          flux(:,edge)=0.0_WP
+       end do
+!$OMP END PARALLEL DO
     end if
 
     ! The result is the low-order solution horizontal fluxes
     ! They are put into flux
     !___________________________________________________________________________
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, Tmean1, Tmean2, cHO, &
+!$OMP                                     a, vflux, el, enodes, nz, nu12, nl12, nl1, nl2, nu1, nu2)
+!$OMP DO
     do edge=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,edge)  
@@ -741,5 +775,7 @@ end subroutine adv_tra_hor_muscl
            flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
         end do
     end do
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine adv_tra_hor_mfct
 
