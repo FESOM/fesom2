@@ -1,23 +1,44 @@
-module momentum_adv_scalar_interface
+
+module compute_vel_rhs_interface
   interface
-    subroutine momentum_adv_scalar(partit, mesh)
+    subroutine compute_vel_rhs(dynamics, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      USE MOD_DYN
+      type(t_dyn)   , intent(inout), target :: dynamics
       type(t_partit), intent(inout), target :: partit
+      type(t_mesh)  , intent(in)   , target :: mesh
+      
     end subroutine
   end interface
 end module
 
+module momentum_adv_scalar_interface
+  interface
+    subroutine momentum_adv_scalar(dynamics, partit, mesh)
+      use mod_mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      USE MOD_DYN
+      type(t_dyn)   , intent(inout), target :: dynamics
+      type(t_partit), intent(inout), target :: partit
+      type(t_mesh)  , intent(in)   , target :: mesh
+      
+    end subroutine
+  end interface
+end module
+
+
 !
 !
 !_______________________________________________________________________________
-subroutine compute_vel_rhs(partit, mesh)
+subroutine compute_vel_rhs(dynamics, partit, mesh)
     use MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use o_ARRAYS
+    USE MOD_DYN
+    use o_ARRAYS, only: coriolis, ssh_gp, pgf_x, pgf_y
     use i_ARRAYS
     use i_therm_param
     use o_PARAM
@@ -29,8 +50,9 @@ subroutine compute_vel_rhs(partit, mesh)
     use momentum_adv_scalar_interface
     
     implicit none 
-    type(t_mesh),   intent(in),    target :: mesh
+    type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
     integer                  :: elem, elnodes(3), nz, nzmax, nzmin 
     real(kind=WP)            :: ff, mm 
     real(kind=WP)            :: Fx, Fy, pre(3)
@@ -38,10 +60,17 @@ subroutine compute_vel_rhs(partit, mesh)
     real(kind=WP)            :: t1, t2, t3, t4
     real(kind=WP)            :: p_ice(3), p_air(3), p_eta(3)
     integer                  :: use_pice
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB, UV_rhs
+    real(kind=WP), dimension(:)    , pointer :: eta_n
+
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    UV       =>dynamics%uv(:,:,:)
+    UV_rhs   =>dynamics%uv_rhs(:,:,:)
+    UV_rhsAB =>dynamics%uv_rhsAB(:,:,:)
+    eta_n    =>dynamics%eta_n(:)
 
     t1=MPI_Wtime()
     use_pice=0
@@ -117,11 +146,11 @@ subroutine compute_vel_rhs(partit, mesh)
     t2=MPI_Wtime() 
     !___________________________________________________________________________
     ! advection
-    if (mom_adv==1) then
+    if (dynamics%momadv_opt==1) then
        if (mype==0) write(*,*) 'in moment not adapted mom_adv advection typ for ALE, check your namelist'
        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
-    elseif (mom_adv==2) then
-       call momentum_adv_scalar(partit, mesh)
+    elseif (dynamics%momadv_opt==2) then
+       call momentum_adv_scalar(dynamics, partit, mesh)
     end if
     t3=MPI_Wtime() 
 
@@ -158,27 +187,34 @@ END SUBROUTINE compute_vel_rhs
 ! Momentum advection on scalar control volumes with ALE adaption--> exchange zinv(nz)
 ! against hnode(nz,node)
 !_______________________________________________________________________________
-subroutine momentum_adv_scalar(partit, mesh)
+subroutine momentum_adv_scalar(dynamics, partit, mesh)
 USE MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
-USE o_ARRAYS
+use MOD_DYN
 USE o_PARAM
 use g_comm_auto
 IMPLICIT NONE
 
-type(t_mesh),   intent(in),    target :: mesh
+type(t_dyn)   , intent(inout), target :: dynamics
 type(t_partit), intent(inout), target :: partit
+type(t_mesh)  , intent(in)   , target :: mesh
+
 integer                  :: n, nz, el1, el2
 integer                  :: nl1, nl2, ul1, ul2, nod(2), el, ed, k, nle, ule
 real(kind=WP)            :: un1(1:mesh%nl-1), un2(1:mesh%nl-1)
 real(kind=WP)            :: wu(1:mesh%nl), wv(1:mesh%nl)
-real(kind=WP)            :: Unode_rhs(2,mesh%nl-1,partit%myDim_nod2d+partit%eDim_nod2D)
+real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB, UVnode_rhs
+real(kind=WP), dimension(:,:), pointer :: Wvel_e
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    UV        =>dynamics%uv(:,:,:)
+    UV_rhsAB  =>dynamics%uv_rhsAB(:,:,:)
+    UVnode_rhs=>dynamics%work%uvnode_rhs(:,:,:)
+    Wvel_e    =>dynamics%w_e(:,:)
 
     !___________________________________________________________________________
     ! 1st. compute vertical momentum advection component: w * du/dz, w*dv/dz
@@ -225,15 +261,15 @@ real(kind=WP)            :: Unode_rhs(2,mesh%nl-1,partit%myDim_nod2d+partit%eDim
 !!PS             if (ul1>1) write(*,*) mype, wu(ul1:nl1)
             ! Here 1/3 because 1/3 of the area is related to the node --> comes from
             ! averaging the elemental velocities
-            Unode_rhs(1,nz,n) = - (wu(nz) - wu(nz+1) ) / (3._WP*hnode(nz,n)) 
-            Unode_rhs(2,nz,n) = - (wv(nz) - wv(nz+1) ) / (3._WP*hnode(nz,n)) 
+            UVnode_rhs(1,nz,n) = - (wu(nz) - wu(nz+1) ) / (3._WP*hnode(nz,n)) 
+            UVnode_rhs(2,nz,n) = - (wv(nz) - wv(nz+1) ) / (3._WP*hnode(nz,n)) 
             
         enddo
         
         !_______________________________________________________________________
         ! To get a clean checksum, set the remaining values to zero
-        Unode_rhs(1:2,nl1+1:nl-1,n) = 0._WP
-        Unode_rhs(1:2,1:ul1-1   ,n) = 0._WP
+        UVnode_rhs(1:2,nl1+1:nl-1,n) = 0._WP
+        UVnode_rhs(1:2,1:ul1-1   ,n) = 0._WP
     end do
 
 
@@ -291,8 +327,8 @@ real(kind=WP)            :: Unode_rhs(2,mesh%nl-1,partit%myDim_nod2d+partit%eDim
             if (nod(1) <= myDim_nod2d) then
                 do nz=min(ul1,ul2), max(nl1,nl2)
                     ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
-                    Unode_rhs(1,nz,nod(1)) = Unode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1) + un2(nz)*UV(1,nz,el2) 
-                    Unode_rhs(2,nz,nod(1)) = Unode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1) + un2(nz)*UV(2,nz,el2)
+                    UVnode_rhs(1,nz,nod(1)) = UVnode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1) + un2(nz)*UV(1,nz,el2) 
+                    UVnode_rhs(2,nz,nod(1)) = UVnode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1) + un2(nz)*UV(2,nz,el2)
                 end do
             endif
             
@@ -300,8 +336,8 @@ real(kind=WP)            :: Unode_rhs(2,mesh%nl-1,partit%myDim_nod2d+partit%eDim
             if (nod(2) <= myDim_nod2d) then
                 do nz=min(ul1,ul2), max(nl1,nl2)
                     ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
-                    Unode_rhs(1,nz,nod(2)) = Unode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1) - un2(nz)*UV(1,nz,el2)
-                    Unode_rhs(2,nz,nod(2)) = Unode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1) - un2(nz)*UV(2,nz,el2)
+                    UVnode_rhs(1,nz,nod(2)) = UVnode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1) - un2(nz)*UV(1,nz,el2)
+                    UVnode_rhs(2,nz,nod(2)) = UVnode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1) - un2(nz)*UV(2,nz,el2)
                 end do
             endif
             
@@ -310,8 +346,8 @@ real(kind=WP)            :: Unode_rhs(2,mesh%nl-1,partit%myDim_nod2d+partit%eDim
             if (nod(1) <= myDim_nod2d) then
                 do nz=ul1, nl1
                     ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
-                    Unode_rhs(1,nz,nod(1)) = Unode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1)
-                    Unode_rhs(2,nz,nod(1)) = Unode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1)
+                    UVnode_rhs(1,nz,nod(1)) = UVnode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1)
+                    UVnode_rhs(2,nz,nod(1)) = UVnode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1)
                 end do ! --> do nz=ul1, nl1
             endif 
             
@@ -320,8 +356,8 @@ real(kind=WP)            :: Unode_rhs(2,mesh%nl-1,partit%myDim_nod2d+partit%eDim
                 !!PS do nz=1, nl1
                 do nz=ul1, nl1
                     ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
-                    Unode_rhs(1,nz,nod(2)) = Unode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1)
-                    Unode_rhs(2,nz,nod(2)) = Unode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1)
+                    UVnode_rhs(1,nz,nod(2)) = UVnode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1)
+                    UVnode_rhs(2,nz,nod(2)) = UVnode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1)
                 end do ! --> do nz=ul1, nl1
             endif
         endif ! --> if (el2>0) then
@@ -332,14 +368,14 @@ real(kind=WP)            :: Unode_rhs(2,mesh%nl-1,partit%myDim_nod2d+partit%eDim
     do n=1,myDim_nod2d
         nl1 = nlevels_nod2D(n)-1
         ul1 = ulevels_nod2D(n)
-!!PS         Unode_rhs(1,ul1:nl1,n) = Unode_rhs(1,ul1:nl1,n) *area_inv(ul1:nl1,n) ! --> TEST_cavity
-!!PS         Unode_rhs(2,ul1:nl1,n) = Unode_rhs(2,ul1:nl1,n) *area_inv(ul1:nl1,n) ! --> TEST_cavity
-        Unode_rhs(1,ul1:nl1,n) = Unode_rhs(1,ul1:nl1,n) *areasvol_inv(ul1:nl1,n)
-        Unode_rhs(2,ul1:nl1,n) = Unode_rhs(2,ul1:nl1,n) *areasvol_inv(ul1:nl1,n)
+!!PS         UVnode_rhs(1,ul1:nl1,n) = UVnode_rhs(1,ul1:nl1,n) *area_inv(ul1:nl1,n) ! --> TEST_cavity
+!!PS         UVnode_rhs(2,ul1:nl1,n) = UVnode_rhs(2,ul1:nl1,n) *area_inv(ul1:nl1,n) ! --> TEST_cavity
+        UVnode_rhs(1,ul1:nl1,n) = UVnode_rhs(1,ul1:nl1,n) *areasvol_inv(ul1:nl1,n)
+        UVnode_rhs(2,ul1:nl1,n) = UVnode_rhs(2,ul1:nl1,n) *areasvol_inv(ul1:nl1,n)
     end do !-->do n=1,myDim_nod2d
 
     !___________________________________________________________________________
-    call exchange_nod(Unode_rhs, partit)
+    call exchange_nod(UVnode_rhs, partit)
 
     !___________________________________________________________________________
     ! convert total nodal advection from vertice --> elements
@@ -347,9 +383,9 @@ real(kind=WP)            :: Unode_rhs(2,mesh%nl-1,partit%myDim_nod2d+partit%eDim
         nl1 = nlevels(el)-1
         ul1 = ulevels(el)
         UV_rhsAB(1:2,ul1:nl1,el) = UV_rhsAB(1:2,ul1:nl1,el) &
-                + elem_area(el)*(Unode_rhs(1:2,ul1:nl1,elem2D_nodes(1,el)) &
-                + Unode_rhs(1:2,ul1:nl1,elem2D_nodes(2,el)) & 
-                + Unode_rhs(1:2,ul1:nl1,elem2D_nodes(3,el))) / 3.0_WP     
+                + elem_area(el)*(UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(1,el)) &
+                + UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(2,el)) & 
+                + UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(3,el))) / 3.0_WP     
     
     end do ! --> do el=1, myDim_elem2D
 end subroutine momentum_adv_scalar

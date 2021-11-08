@@ -2,10 +2,11 @@ MODULE io_BLOWUP
 	use g_config
 	use g_clock
 	use g_comm_auto
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_TRACER        
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_TRACER  
+    USE MOD_DYN
 	use o_arrays
 	use i_arrays
 	implicit none
@@ -64,12 +65,13 @@ MODULE io_BLOWUP
 	!_______________________________________________________________________________
 	! ini_ocean_io initializes bid datatype which contains information of all variables need to be written into 
 	! the ocean restart file. This is the only place need to be modified if a new variable is added!
-	subroutine ini_blowup_io(year, tracers, partit, mesh)
+	subroutine ini_blowup_io(year, dynamics, tracers, partit, mesh)
 		implicit none
 		integer, intent(in)       :: year
-                type(t_mesh),   intent(in),    target :: mesh
-                type(t_partit), intent(inout), target :: partit
-                type(t_tracer), intent(in),    target :: tracers
+        type(t_mesh)  , intent(in)   , target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        type(t_tracer), intent(in)   , target :: tracers
+        type(t_dyn)   , intent(in)   , target :: dynamics
 		integer                   :: ncid, j
 		integer                   :: varid
 		character(500)            :: longname
@@ -98,22 +100,22 @@ MODULE io_BLOWUP
 		!===========================================================================
 		!___Define the netCDF variables for 2D fields_______________________________
 		!___SSH_____________________________________________________________________
-		call def_variable(bid, 'eta_n'		, (/nod2D/)			, 'sea surface elevation', 'm', eta_n);
-		call def_variable(bid, 'd_eta'		, (/nod2D/)			, 'change in ssh from solver', 'm', d_eta);
+		call def_variable(bid, 'eta_n'		, (/nod2D/)			, 'sea surface elevation', 'm', dynamics%eta_n);
+		call def_variable(bid, 'd_eta'		, (/nod2D/)			, 'change in ssh from solver', 'm', dynamics%d_eta);
 		!___ALE related fields______________________________________________________
 		call def_variable(bid, 'hbar'		, (/nod2D/)			, 'ALE surface elevation hbar_n+0.5', 'm', hbar);
 !!PS 		call def_variable(bid, 'hbar_old'	, (/nod2D/)			, 'ALE surface elevation hbar_n-0.5', 'm', hbar_old);
-		call def_variable(bid, 'ssh_rhs'	, (/nod2D/)			, 'RHS for the elevation', '?', ssh_rhs);
-		call def_variable(bid, 'ssh_rhs_old', (/nod2D/)			, 'RHS for the elevation', '?', ssh_rhs_old);
+		call def_variable(bid, 'ssh_rhs'	, (/nod2D/)			, 'RHS for the elevation', '?', dynamics%ssh_rhs);
+		call def_variable(bid, 'ssh_rhs_old', (/nod2D/)			, 'RHS for the elevation', '?', dynamics%ssh_rhs_old);
 		!___Define the netCDF variables for 3D fields_______________________________
 		call def_variable(bid, 'hnode'		, (/nl-1,  nod2D/)	, 'ALE stuff', '?', hnode);
 		call def_variable(bid, 'helem'		, (/nl-1, elem2D/)	, 'Element layer thickness', 'm/s', helem(:,:));
-		call def_variable(bid, 'u'			, (/nl-1, elem2D/)	, 'zonal velocity', 'm/s', UV(1,:,:));
-		call def_variable(bid, 'v'			, (/nl-1, elem2D/)	, 'meridional velocity', 'm/s', UV(2,:,:));
-		call def_variable(bid, 'u_rhs'			, (/nl-1, elem2D/)	, 'zonal velocity', 'm/s', UV_rhs(1,:,:));
-		call def_variable(bid, 'v_rhs'			, (/nl-1, elem2D/)	, 'meridional velocity', 'm/s', UV_rhs(2,:,:));
-		call def_variable(bid, 'urhs_AB'	, (/nl-1, elem2D/)	, 'Adams–Bashforth for u', 'm/s', UV_rhsAB(1,:,:));
-		call def_variable(bid, 'vrhs_AB'	, (/nl-1, elem2D/)	, 'Adams–Bashforth for v', 'm/s', UV_rhsAB(2,:,:));
+		call def_variable(bid, 'u'			, (/nl-1, elem2D/)	, 'zonal velocity', 'm/s', dynamics%uv(1,:,:));
+		call def_variable(bid, 'v'			, (/nl-1, elem2D/)	, 'meridional velocity', 'm/s', dynamics%uv(2,:,:));
+		call def_variable(bid, 'u_rhs'			, (/nl-1, elem2D/)	, 'zonal velocity', 'm/s', dynamics%uv_rhs(1,:,:));
+		call def_variable(bid, 'v_rhs'			, (/nl-1, elem2D/)	, 'meridional velocity', 'm/s', dynamics%uv_rhs(2,:,:));
+		call def_variable(bid, 'urhs_AB'	, (/nl-1, elem2D/)	, 'Adams–Bashforth for u', 'm/s', dynamics%uv_rhsAB(1,:,:));
+		call def_variable(bid, 'vrhs_AB'	, (/nl-1, elem2D/)	, 'Adams–Bashforth for v', 'm/s', dynamics%uv_rhsAB(2,:,:));
 		call def_variable(bid, 'zbar_n_bot' , (/nod2D/)			, 'node bottom depth', 'm', zbar_n_bot);
 		call def_variable(bid, 'zbar_e_bot' , (/elem2d/)		, 'elem bottom depth', 'm', zbar_e_bot);
 		call def_variable(bid, 'bottom_node_thickness' , (/nod2D/)			, 'node bottom thickness', 'm', bottom_node_thickness);
@@ -141,10 +143,10 @@ MODULE io_BLOWUP
 !!PS 			longname=trim(longname)//', Adams–Bashforth'
 !!PS 			call def_variable(bid, trim(trname)//'_AB',(/nl-1, nod2D/), trim(longname), trim(units), tracers%data(j)%valuesAB(:,:)(:,:));
 		end do
-		call def_variable(bid, 'w'			, (/nl, nod2D/)		, 'vertical velocity', 'm/s', Wvel);
-		call def_variable(bid, 'w_expl'		, (/nl, nod2D/)		, 'vertical velocity', 'm/s', Wvel_e);
-		call def_variable(bid, 'w_impl'		, (/nl, nod2D/)		, 'vertical velocity', 'm/s', Wvel_i);
-		call def_variable(bid, 'cfl_z'		, (/nl-1, nod2D/)		, 'vertical CFL criteria', '', CFL_z);
+		call def_variable(bid, 'w'			, (/nl, nod2D/)		, 'vertical velocity', 'm/s', dynamics%w);
+		call def_variable(bid, 'w_expl'		, (/nl, nod2D/)		, 'vertical velocity', 'm/s', dynamics%w_e);
+		call def_variable(bid, 'w_impl'		, (/nl, nod2D/)		, 'vertical velocity', 'm/s', dynamics%w_i);
+		call def_variable(bid, 'cfl_z'		, (/nl-1, nod2D/)		, 'vertical CFL criteria', '', dynamics%cfl_z);
 		
 		!_____________________________________________________________________________
 		! write snapshot ice variables to blowup file
@@ -173,15 +175,16 @@ MODULE io_BLOWUP
 !
 !
 !_______________________________________________________________________________
-	subroutine blowup(istep, tracers, partit, mesh)
+	subroutine blowup(istep, dynamics, tracers, partit, mesh)
 		implicit none
-                type(t_mesh),   intent(in),    target :: mesh
-                type(t_partit), intent(inout), target :: partit
-                type(t_tracer), intent(in),    target :: tracers
+        type(t_mesh)  , intent(in)   , target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        type(t_tracer), intent(in)   , target :: tracers
+        type(t_dyn)   , intent(in)   , target :: dynamics
 		integer                               :: istep
 		
 		ctime=timeold+(dayold-1.)*86400
-		call ini_blowup_io(yearnew, tracers, partit, mesh)
+		call ini_blowup_io(yearnew, dynamics, tracers, partit, mesh)
 		if(partit%mype==0) write(*,*)'Do output (netCDF, blowup) ...'
 		if(partit%mype==0) write(*,*)' --> call assoc_ids(bid)'
 		call assoc_ids(bid, partit) ; call was_error(bid, partit)
