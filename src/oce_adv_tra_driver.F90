@@ -114,7 +114,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         ! update the LO solution for horizontal contribution
 !$OMP PARALLEL DO
         do n=1, myDim_nod2D+eDim_nod2D
-           fct_LO(:,n)=0.0_WP
+           fct_LO(:,n) = 0.0_WP
         end do
 !$OMP END PARALLEL DO
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(e, enodes, el, nl1, nu1, nl2, nu2, nz)

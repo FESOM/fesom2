@@ -196,7 +196,20 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
         call init_tracers_AB(tr_num, tracers, partit, mesh) 
         ! advect tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
-        call adv_tracers_ale(dt, tr_num, dynamics, tracers, partit, mesh) 
+        ! it will update del_ttf with contributions from horizontal and vertical advection parts (del_ttf_advhoriz and del_ttf_advvert)
+        call do_oce_adv_tra(dt, UV, wvel, wvel_i, wvel_e, tr_num, tracers, partit, mesh)
+        !___________________________________________________________________________
+        ! update array for total tracer flux del_ttf with the fluxes from horizontal
+        ! and vertical advection
+!$OMP DO
+        do node=1, myDim_nod2d
+           tracers%work%del_ttf(:, node)=tracers%work%del_ttf(:, node)+tracers%work%del_ttf_advhoriz(:, node)+tracers%work%del_ttf_advvert(:, node)
+        end do
+!$OMP END DO
+        !___________________________________________________________________________
+        ! AB is not needed after the advection step. Initialize it with the current tracer before it is modified.
+        ! call init_tracers_AB at the beginning of this loop will compute AB for the next time step then.
+        tracers%data(tr_num)%valuesAB(:,:)=tracers%data(tr_num)%values(:,:) !DS: check that this is the right place!
         ! diffuse tracers 
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
         call diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh) 
