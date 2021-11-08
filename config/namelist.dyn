@@ -21,7 +21,3 @@ wsplit_maxcfl= 1.0     ! maximum allowed CFL criteria in vertical (0.5 < w_max_c
                        ! in older FESOM it used to be w_exp_max=1.e-3
 /
 
-!&dynamics_phys
-!A_ver         = 1.e-4   ! Vertical viscosity, m^2/s
-!scale_area    = 5.8e9   ! Visc. and diffus. are for an element with scale_area
-!/
