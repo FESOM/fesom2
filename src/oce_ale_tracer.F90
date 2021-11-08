@@ -168,11 +168,11 @@ subroutine solve_tracers_ale(tracers, partit, mesh)
         !___________________________________________________________________________
         ! update array for total tracer flux del_ttf with the fluxes from horizontal
         ! and vertical advection
-!$OMP DO
+!$OMP PARALLEL DO
         do node=1, myDim_nod2d
            tracers%work%del_ttf(:, node)=tracers%work%del_ttf(:, node)+tracers%work%del_ttf_advhoriz(:, node)+tracers%work%del_ttf_advvert(:, node)
         end do
-!$OMP END DO
+!$OMP END PARALLEL DO
         !___________________________________________________________________________
         ! AB is not needed after the advection step. Initialize it with the current tracer before it is modified.
         ! call init_tracers_AB at the beginning of this loop will compute AB for the next time step then.
