@@ -146,10 +146,10 @@ subroutine compute_vel_rhs(dynamics, partit, mesh)
     t2=MPI_Wtime() 
     !___________________________________________________________________________
     ! advection
-    if (mom_adv==1) then
+    if (dynamics%momadv_opt==1) then
        if (mype==0) write(*,*) 'in moment not adapted mom_adv advection typ for ALE, check your namelist'
        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
-    elseif (mom_adv==2) then
+    elseif (dynamics%momadv_opt==2) then
        call momentum_adv_scalar(dynamics, partit, mesh)
     end if
     t3=MPI_Wtime() 

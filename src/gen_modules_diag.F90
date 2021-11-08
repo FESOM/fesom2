@@ -17,11 +17,15 @@ module diagnostics
   implicit none
 
   private
-  public :: ldiag_solver, lcurt_stress_surf, ldiag_energy, ldiag_dMOC, ldiag_DVD, ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, &
-            compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, wrhof, rhof, &
-            u_x_u, u_x_v, v_x_v, v_x_w, u_x_w, dudx, dudy, dvdx, dvdy, dudz, dvdz, utau_surf, utau_bott, av_dudz_sq, av_dudz, av_dvdz, stress_bott, u_surf, v_surf, u_bott, v_bott, &
-            std_dens_min, std_dens_max, std_dens_N, std_dens, std_dens_UVDZ, std_dens_DIV, std_dens_Z, std_dens_dVdT, std_dens_flux, dens_flux_e, &
-            compute_diag_dvd_2ndmoment_klingbeil_etal_2014, compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd
+  public :: ldiag_solver, lcurt_stress_surf, ldiag_energy, ldiag_dMOC, ldiag_DVD,       &
+            ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, ldiag_vorticity,      &
+            compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, wrhof, rhof,    &
+            u_x_u, u_x_v, v_x_v, v_x_w, u_x_w, dudx, dudy, dvdx, dvdy, dudz, dvdz,      & 
+            utau_surf, utau_bott, av_dudz_sq, av_dudz, av_dvdz, stress_bott, u_surf,    &
+            v_surf, u_bott, v_bott, std_dens_min, std_dens_max, std_dens_N, std_dens,   &
+            std_dens_UVDZ, std_dens_DIV, std_dens_Z, std_dens_dVdT, std_dens_flux,      &
+            dens_flux_e, vorticity, compute_diag_dvd_2ndmoment_klingbeil_etal_2014,                &
+            compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
   ! A=ssh_stiff, x=d_eta, rhs=ssh_rhs; rhs_diag=A*x;
@@ -33,6 +37,7 @@ module diagnostics
   real(kind=WP),  save, allocatable, target      :: dudx(:,:), dudy(:,:), dvdx(:,:), dvdy(:,:), dudz(:,:), dvdz(:,:), av_dudz(:,:), av_dvdz(:,:), av_dudz_sq(:,:)
   real(kind=WP),  save, allocatable, target      :: utau_surf(:), utau_bott(:)
   real(kind=WP),  save, allocatable, target      :: stress_bott(:,:), u_bott(:), v_bott(:), u_surf(:), v_surf(:)
+  real(kind=WP),  save, allocatable, target      :: vorticity(:,:)
 
 ! defining a set of standard density bins which will be used for computing densMOC
 ! integer,        parameter                      :: std_dens_N  = 100
@@ -69,8 +74,10 @@ module diagnostics
   
   logical                                       :: ldiag_forc       =.false.
   
+  logical                                       :: ldiag_vorticity  =.false.
+  
   namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_energy, &
-                       ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc
+                       ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, ldiag_vorticity
   
   contains
 
@@ -670,8 +677,112 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
   std_dens_VOL1=std_dens_VOL2
   firstcall_e=.false.
 end subroutine diag_densMOC
-! ==============================================================
+!
+!
+!_______________________________________________________________________________
+subroutine relative_vorticity(mode, dynamics, partit, mesh)
+    IMPLICIT NONE
+    integer        :: n, nz, el(2), enodes(2), nl1, nl2, edge, ul1, ul2, nl12, ul12
+    real(kind=WP)  :: deltaX1, deltaY1, deltaX2, deltaY2, c1
+    integer,        intent(in)            :: mode
+    logical,        save                  :: firstcall=.true.
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    real(kind=WP), dimension(:,:,:), pointer :: UV
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
+    UV => dynamics%uv(:,:,:)
+    
+    !___________________________________________________________________________
+    if (firstcall) then  !allocate the stuff at the first call
+        allocate(vorticity(nl-1, myDim_nod2D+eDim_nod2D))
+        firstcall=.false.
+        if (mode==0) return
+    end if
+    !!PS DO n=1,myDim_nod2D
+    !!PS    nl1 = nlevels_nod2D(n)-1
+    !!PS    ul1 = ulevels_nod2D(n)
+    !!PS    vorticity(ul1:nl1,n)=0.0_WP
+    !!PS    !!PS DO nz=1, nlevels_nod2D(n)-1
+    !!PS    !!PS    vorticity(nz,n)=0.0_WP
+    !!PS    !!PS END DO
+    !!PS END DO      
+    vorticity = 0.0_WP
+    DO edge=1,myDim_edge2D
+                                    !! edge=myList_edge2D(m)
+        enodes=edges(:,edge)
+        el=edge_tri(:,edge)
+        nl1=nlevels(el(1))-1
+        ul1=ulevels(el(1))
+        deltaX1=edge_cross_dxdy(1,edge)
+        deltaY1=edge_cross_dxdy(2,edge)
+        nl2=0
+        ul2=0
+        if(el(2)>0) then
+            deltaX2=edge_cross_dxdy(3,edge)
+            deltaY2=edge_cross_dxdy(4,edge)
+            nl2=nlevels(el(2))-1
+            ul2=ulevels(el(2))
+        end if  
+        nl12 = min(nl1,nl2)
+        ul12 = max(ul1,ul2)
+        
+        DO nz=ul1,ul12-1
+            c1=deltaX1*UV(1,nz,el(1))+deltaY1*UV(2,nz,el(1))
+            vorticity(nz,enodes(1))=vorticity(nz,enodes(1))+c1
+            vorticity(nz,enodes(2))=vorticity(nz,enodes(2))-c1
+        END DO
+        if (ul2>0) then
+            DO nz=ul2,ul12-1
+                c1= -deltaX2*UV(1,nz,el(2))-deltaY2*UV(2,nz,el(2))
+                vorticity(nz,enodes(1))=vorticity(nz,enodes(1))+c1
+                vorticity(nz,enodes(2))=vorticity(nz,enodes(2))-c1
+            END DO
+        endif 
+        !!PS DO nz=1,min(nl1,nl2)
+        DO nz=ul12,nl12
+            c1=deltaX1*UV(1,nz,el(1))+deltaY1*UV(2,nz,el(1))- &
+            deltaX2*UV(1,nz,el(2))-deltaY2*UV(2,nz,el(2))
+            vorticity(nz,enodes(1))=vorticity(nz,enodes(1))+c1
+            vorticity(nz,enodes(2))=vorticity(nz,enodes(2))-c1
+        END DO
+        !!PS DO nz=min(nl1,nl2)+1,nl1
+        DO nz=nl12+1,nl1
+            c1=deltaX1*UV(1,nz,el(1))+deltaY1*UV(2,nz,el(1))
+            vorticity(nz,enodes(1))=vorticity(nz,enodes(1))+c1
+            vorticity(nz,enodes(2))=vorticity(nz,enodes(2))-c1
+        END DO
+        !!PS DO nz=min(nl1,nl2)+1,nl2
+        DO nz=nl12+1,nl2
+            c1= -deltaX2*UV(1,nz,el(2))-deltaY2*UV(2,nz,el(2))
+            vorticity(nz,enodes(1))=vorticity(nz,enodes(1))+c1
+            vorticity(nz,enodes(2))=vorticity(nz,enodes(2))-c1
+        END DO
+    END DO
+    
+    ! vorticity = vorticity*area at this stage
+    ! It is correct only on myDim nodes
+    DO n=1,myDim_nod2D
+                                !! n=myList_nod2D(m)
+        ul1 = ulevels_nod2D(n)
+        nl1 = nlevels_nod2D(n)
+        !!PS DO nz=1,nlevels_nod2D(n)-1
+        DO nz=ul1,nl1-1
+            vorticity(nz,n)=vorticity(nz,n)/areasvol(nz,n)
+        END DO
+    END DO      
+    
+    call exchange_nod(vorticity, partit)
+    
+! Now it the relative vorticity known on neighbors too
+end subroutine relative_vorticity
 
+
+
+! ==============================================================
 subroutine compute_diagnostics(mode, dynamics, tracers, partit, mesh)
   implicit none
   type(t_mesh)  , intent(in)   , target :: mesh
@@ -698,6 +809,9 @@ subroutine compute_diagnostics(mode, dynamics, tracers, partit, mesh)
   end if
   !6. MOC in density coordinate
   if (ldiag_dMOC)        call diag_densMOC(mode, dynamics, tracers, partit, mesh)
+  
+  ! compute relative vorticity
+  if (ldiag_vorticity)   call relative_vorticity(mode, dynamics, partit, mesh)
 
 end subroutine compute_diagnostics
 

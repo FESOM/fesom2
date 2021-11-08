@@ -279,7 +279,7 @@ subroutine adv_tracers_ale(dt, tr_num, dynamics, tracers, partit, mesh)
     ! here --> add horizontal advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
     tracers%work%del_ttf_advhoriz = 0.0_WP
     tracers%work%del_ttf_advvert  = 0.0_WP
-    call do_oce_adv_tra(dt, dynamics%uv, dynamics%w, dynamics%w_i, dynamics%w_e, tr_num, tracers, partit, mesh)    
+    call do_oce_adv_tra(dt, dynamics%uv, dynamics%w, dynamics%w_i, dynamics%w_e, tr_num, dynamics, tracers, partit, mesh)    
     !___________________________________________________________________________
     ! update array for total tracer flux del_ttf with the fluxes from horizontal
     ! and vertical advection
@@ -504,7 +504,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
     trarr  => tracers%data(tr_num)%values(:,:)
     Wvel_i => dynamics%w_i(:,:)
     !___________________________________________________________________________
-    if ((trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') .OR. (.not. w_split)) do_wimpl=.false.
+    if ((trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') .OR. (.not. dynamics%use_wsplit)) do_wimpl=.false.
     
     if (Redi) isredi=1._WP
     dt_inv=1.0_WP/dt
@@ -1221,7 +1221,10 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
            v1=UV(2, nz,el(1))-UV(2, nz,el(2))
            vi=u1*u1+v1*v1
            tt=ttf(nz,en(1))-ttf(nz,en(2))
-           vi=sqrt(max(gamma0, max(gamma1*sqrt(vi), gamma2*vi))*len)
+           vi=sqrt(max(dynamics%visc_gamma0,            &
+                   max(dynamics%visc_gamma1*sqrt(vi),   & 
+                   dynamics%visc_gamma2*vi)             &
+                  )*len)       
            !vi=sqrt(max(sqrt(u1*u1+v1*v1),0.04)*le)  ! 10m^2/s for 10 km (0.04 h/50)
            !vi=sqrt(10.*le)
            tt=tt*vi
@@ -1245,7 +1248,10 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
               v1=UV(2, nz,el(1))-UV(2, nz,el(2))
               vi=u1*u1+v1*v1
               tt=temporary_ttf(nz,en(1))-temporary_ttf(nz,en(2))
-              vi=sqrt(max(gamma0, max(gamma1*sqrt(vi), gamma2*vi))*len)
+              vi=sqrt(max(dynamics%visc_gamma0,     &
+                      max(dynamics%visc_gamma1*sqrt(vi), &
+                      dynamics%visc_gamma2*vi)           &
+                     )*len)
               !vi=sqrt(max(sqrt(u1*u1+v1*v1),0.04)*le)  ! 10m^2/s for 10 km (0.04 h/50)
               !vi=sqrt(10.*le) 
               tt=-tt*vi*dt

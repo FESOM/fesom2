@@ -1,15 +1,17 @@
 module oce_adv_tra_driver_interfaces
   interface
-   subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, tracers, partit, mesh)
+   subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit, mesh)
       use MOD_MESH
       use MOD_TRACER
       USE MOD_PARTIT
       USE MOD_PARSUP
+      USE MOD_DYN
       real(kind=WP),  intent(in),    target :: dt
       integer,        intent(in)            :: tr_num
       type(t_partit), intent(inout), target :: partit
-      type(t_mesh),   intent(in),    target :: mesh
+      type(t_mesh)  , intent(in)   , target :: mesh
       type(t_tracer), intent(inout), target :: tracers
+      type(t_dyn)   , intent(inout), target :: dynamics
       real(kind=WP),  intent(in)            :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
       real(kind=WP),  intent(in), target    :: W(mesh%nl,    partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP),  intent(in), target    :: WI(mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
@@ -41,11 +43,12 @@ end module
 !
 !
 !===============================================================================
-subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, tracers, partit, mesh)
+subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit, mesh)
     use MOD_MESH
     use MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
+    USE MOD_DYN
     use g_comm_auto
     use oce_adv_tra_hor_interfaces
     use oce_adv_tra_ver_interfaces
@@ -54,9 +57,10 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, tracers, partit, mesh)
     implicit none
     real(kind=WP),  intent(in),    target :: dt
     integer,        intent(in)            :: tr_num
-    type(t_mesh),   intent(in),    target :: mesh
+    type(t_mesh)  , intent(in)   , target :: mesh
     type(t_partit), intent(inout), target :: partit
     type(t_tracer), intent(inout), target :: tracers
+    type(t_dyn)   , intent(inout), target :: dynamics
     real(kind=WP),  intent(in)            :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
     real(kind=WP),  intent(in), target    :: W(mesh%nl,    partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP),  intent(in), target    :: WI(mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
@@ -143,8 +147,8 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, tracers, partit, mesh)
                 fct_LO(nz,n)=(ttf(nz,n)*hnode(nz,n)+(fct_LO(nz,n)+(adv_flux_ver(nz, n)-adv_flux_ver(nz+1, n)))*dt/areasvol(nz,n))/hnode_new(nz,n)
             end do
         end do
-        if (w_split) then !wvel/=wvel_e
-            ! update for implicit contribution (w_split option)
+        if (dynamics%use_wsplit) then !wvel/=wvel_e
+            ! update for implicit contribution (use_wsplit option)
             call adv_tra_vert_impl(dt, wi, fct_LO, partit, mesh)
             ! compute the low order upwind vertical flux (full vertical velocity)
             ! zero the input/output flux before computation
