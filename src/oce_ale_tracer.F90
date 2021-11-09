@@ -206,9 +206,14 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
 !$OMP PARALLEL DO
         do node=1, myDim_nod2d
            tracers%work%del_ttf(:, node)=tracers%work%del_ttf(:, node)+tracers%work%del_ttf_advhoriz(:, node)+tracers%work%del_ttf_advvert(:, node)
-           !___________________________________________________________________________
-           ! AB is not needed after the advection step. Initialize it with the current tracer before it is modified.
-           ! call init_tracers_AB at the beginning of this loop will compute AB for the next time step then.
+        end do
+!$OMP END PARALLEL DO          
+
+        !___________________________________________________________________________
+        ! AB is not needed after the advection step. Initialize it with the current tracer before it is modified.
+        ! call init_tracers_AB at the beginning of this loop will compute AB for the next time step then.
+!$OMP PARALLEL DO
+        do node=1, myDim_nod2d+eDim_nod2D   
            tracers%data(tr_num)%valuesAB(:, node)=tracers%data(tr_num)%values(:, node) !DS: check that this is the right place!
         end do
 !$OMP END PARALLEL DO
