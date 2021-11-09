@@ -238,10 +238,6 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
     ! Here the contribution from squared velocities is added to the viscosity.    
     ! The contribution from boundary edges is neglected (free slip). 
 
-    ed=myDim_elem2D+eDim_elem2D
-    allocate(U_b(nl-1,ed), V_b(nl-1, ed))
-    ed=myDim_nod2D+eDim_nod2D
-    allocate(U_c(nl-1,ed), V_c(nl-1,ed))
     U_b=0.0_WP
     V_b=0.0_WP
     U_c=0.0_WP
@@ -342,8 +338,6 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
     U_c    => dynamics%work%u_c(:,:)
     V_c    => dynamics%work%v_c(:,:)
 
-    ed=myDim_elem2D+eDim_elem2D
-    allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
     U_c=0.0_WP
     V_c=0.0_WP
     DO ed=1, myDim_edge2D+eDim_edge2D
@@ -396,8 +390,7 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
             UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
             UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
         END DO 
-    END DO  
-    deallocate(V_c,U_c)
+    END DO
 
 end subroutine visc_filt_bilapl
 !
@@ -434,9 +427,7 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
     UV_rhs => dynamics%uv_rhs(:,:,:)
     U_c    => dynamics%work%u_c(:,:)
     V_c    => dynamics%work%v_c(:,:)
-    !
-    ed=myDim_elem2D+eDim_elem2D
-    allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
+    
     U_c=0.0_WP
     V_c=0.0_WP
     DO ed=1, myDim_edge2D+eDim_edge2D
@@ -490,6 +481,5 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
             UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
         END DO 
     END DO
-    deallocate(V_c, U_c)
 end subroutine visc_filt_bidiff
 
