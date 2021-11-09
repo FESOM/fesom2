@@ -113,7 +113,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, tracers, partit, mesh)
            fct_LO(:,n) = 0.0_WP
         end do
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(e, enodes, el, nl1, nu1, nl2, nu2, nz)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(e, enodes, el, nl1, nu1, nl2, nu2, nu12, nl12, nz)
         do e=1, myDim_edge2D
             enodes=edges(:,e)
             el=edge_tri(:,e)        
