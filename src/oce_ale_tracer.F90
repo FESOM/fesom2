@@ -12,27 +12,6 @@ module diff_part_hor_redi_interface
     end subroutine
   end interface
 end module
-<<<<<<< HEAD
-module adv_tracers_ale_interface
-  interface
-    subroutine adv_tracers_ale(dt, tr_num, dynamics, tracer, partit, mesh) 
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use mod_tracer
-      use MOD_DYN
-      real(kind=WP),  intent(in),    target :: dt
-      integer,        intent(in),    target :: tr_num
-      type(t_dyn)   , intent(inout), target :: dynamics
-      type(t_tracer), intent(inout), target :: tracer
-      type(t_mesh)  , intent(in)   , target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine
-  end interface
-end module
-=======
-
->>>>>>>   solve conflicts from merging with refactoring branch
 module diff_ver_part_expl_ale_interface
   interface
     subroutine diff_ver_part_expl_ale(tr_num, tracer, partit, mesh) 
