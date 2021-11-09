@@ -27,7 +27,6 @@ module g_cvmix_pp
     use MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
-    USE MOD_DYN
     use o_arrays
     use g_comm_auto 
     use i_arrays
@@ -67,6 +66,7 @@ module g_cvmix_pp
     ! allocate and initialize CVMIX PP variables --> call initialisation 
     ! routine from cvmix library
     subroutine init_cvmix_pp(partit, mesh)
+        use MOD_MESH
         implicit none
         type(t_mesh),   intent(in),    target :: mesh
         type(t_partit), intent(inout), target :: partit
@@ -162,21 +162,17 @@ module g_cvmix_pp
     !
     !===========================================================================
     ! calculate PP vertrical mixing coefficients from CVMIX library
-    subroutine calc_cvmix_pp(dynamics, partit, mesh)
+    subroutine calc_cvmix_pp(partit, mesh)
         use MOD_MESH
-        
         implicit none
         type(t_mesh),   intent(in),    target :: mesh
         type(t_partit), intent(inout), target :: partit
-        type(t_dyn), intent(inout), target :: dynamics
         integer       :: node, elem, nz, nln, nun, elnodes(3), windnl=2, node_size
         real(kind=WP) :: vshear2, dz2, Kvb
-        real(kind=WP), dimension(:,:,:), pointer :: UVnode
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-        UVnode=>dynamics%uvnode(:,:,:)
         node_size = myDim_nod2D
         !_______________________________________________________________________
         do node = 1,node_size
@@ -190,8 +186,8 @@ module g_cvmix_pp
             !!PS do nz=2,nln
             do nz=nun+1,nln
                 dz2     = (Z_3d_n( nz-1,node)-Z_3d_n( nz,node))**2
-                vshear2 = (UVnode(1,nz-1,node)-UVnode(1,nz,node))**2 +&
-                          (UVnode(2,nz-1,node)-UVnode(2,nz,node))**2 
+                vshear2 = (Unode(1,nz-1,node)-Unode(1,nz,node))**2 +&
+                          (Unode(2,nz-1,node)-Unode(2,nz,node))**2 
                 vshear2 = vshear2/dz2
                 ! WIKIPEDIA: The Richardson number is always 
                 ! considered positive. A negative value of N² (i.e. complex N) 
