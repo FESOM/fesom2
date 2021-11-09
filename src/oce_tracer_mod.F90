@@ -6,20 +6,52 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 
-interface
-  subroutine tracer_gradient_z(ttf, partit, mesh)
+CONTAINS
+!
+!
+!===============================================================================
+SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
     USE MOD_MESH
-    USE MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
+    USE MOD_TRACER
+    use g_config, only: flag_debug
+    use o_arrays
+    use g_comm_auto
     IMPLICIT NONE
+    integer,        intent(in)            :: tr_num
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
-    real(kind=WP)                      :: ttf(mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D)
-  end subroutine
-end interface
+    type(t_tracer), intent(inout), target :: tracers
+    integer                               :: n,nz 
 
-CONTAINS
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+       ! del_ttf will contain all advection / diffusion contributions for this tracer. Set it to 0 at the beginning!
+       tracers%work%del_ttf          (:, n) = 0.0_WP
+       tracers%work%del_ttf_advhoriz (:, n) = 0.0_WP
+       tracers%work%del_ttf_advvert  (:, n) = 0.0_WP
+       ! AB interpolation
+       tracers%data(tr_num)%valuesAB(:, n)=-(0.5_WP+epsilon)*tracers%data(tr_num)%valuesAB(:, n)+(1.5_WP+epsilon)*tracers%data(tr_num)%values(:, n)
+    end do
+
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
+    call tracer_gradient_elements(tracers%data(tr_num)%valuesAB, partit, mesh)
+    call exchange_elem_begin(tr_xy, partit)
+
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_z'//achar(27)//'[0m'
+    call tracer_gradient_z(tracers%data(tr_num)%values, partit, mesh)    !WHY NOT AB HERE? DSIDOREN!
+    call exchange_elem_end(partit)      ! tr_xy used in fill_up_dn_grad
+    call exchange_nod_begin(tr_z, partit) ! not used in fill_up_dn_grad 
+
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call fill_up_dn_grad'//achar(27)//'[0m'
+    call fill_up_dn_grad(tracers%work, partit, mesh)
+    call exchange_nod_end(partit)       ! tr_z halos should have arrived by now.
+
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
+    call tracer_gradient_elements(tracers%data(tr_num)%values, partit, mesh) !redefine tr_arr to the current timestep
+    call exchange_elem(tr_xy, partit)
+
+END SUBROUTINE init_tracers_AB
 !
 !
 !=======================================================================
@@ -58,44 +90,42 @@ END SUBROUTINE tracer_gradient_elements
 !
 !
 !========================================================================================
-SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
+SUBROUTINE tracer_gradient_z(ttf, partit, mesh)
+    !computes vertical gradient of tracer
     USE MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_TRACER
-    use g_config, only: flag_debug
-    use o_arrays
-    use g_comm_auto
+    USE o_PARAM
+    USE o_ARRAYS
+    USE g_CONFIG
     IMPLICIT NONE
-    integer,        intent(in)            :: tr_num
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
-    type(t_tracer), intent(inout), target :: tracers
-    integer                               :: n,nz 
-    !filling work arrays
-    tracers%work%del_ttf=0.0_WP
+    real(kind=WP)            :: ttf(mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP)            :: dz
+    integer                  :: n, nz, nzmin, nzmax
 
-    !AB interpolation
-    tracers%data(tr_num)%valuesAB(:,:)=-(0.5_WP+epsilon)*tracers%data(tr_num)%valuesAB(:,:)+(1.5_WP+epsilon)*tracers%data(tr_num)%values(:,:)
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
 
-    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
-    call tracer_gradient_elements(tracers%data(tr_num)%valuesAB, partit, mesh)
-    call exchange_elem_begin(tr_xy, partit)
-
-    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_z'//achar(27)//'[0m'
-    call tracer_gradient_z(tracers%data(tr_num)%values, partit, mesh)    !WHY NOT AB HERE? DSIDOREN!
-    call exchange_elem_end(partit)      ! tr_xy used in fill_up_dn_grad
-    call exchange_nod_begin(tr_z, partit) ! not used in fill_up_dn_grad 
-
-    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call fill_up_dn_grad'//achar(27)//'[0m'
-    call fill_up_dn_grad(tracers%work, partit, mesh)
-    call exchange_nod_end(partit)       ! tr_z halos should have arrived by now.
-
-    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
-    call tracer_gradient_elements(tracers%data(tr_num)%values, partit, mesh) !redefine tr_arr to the current timestep
-    call exchange_elem(tr_xy, partit)
-
-END SUBROUTINE init_tracers_AB
+    DO n=1, myDim_nod2D+eDim_nod2D
+    !!PS nlev=nlevels_nod2D(n)
+    nzmax=nlevels_nod2D(n)
+    nzmin=ulevels_nod2D(n)
+    !!PS DO nz=2,  nlev-1
+    DO nz=nzmin+1,  nzmax-1
+        dz=0.5_WP*(hnode_new(nz-1,n)+hnode_new(nz,n))
+        tr_z(nz, n)=(ttf(nz-1,n)-ttf(nz,n))/dz
+    END DO
+    !!PS tr_z(1,    n)=0.0_WP
+    !!PS tr_z(nlev, n)=0.0_WP
+    tr_z(nzmin, n)=0.0_WP
+    tr_z(nzmax, n)=0.0_WP
+    END DO
+END SUBROUTINE tracer_gradient_z
 !
 !
 !========================================================================================
@@ -141,42 +171,3 @@ SUBROUTINE relax_to_clim(tr_num, tracers, partit, mesh)
     END IF 
 END SUBROUTINE relax_to_clim
 END MODULE o_tracers
-!
-!
-!========================================================================================
-SUBROUTINE tracer_gradient_z(ttf, partit, mesh)
-    !computes vertical gradient of tracer
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_TRACER
-    USE o_PARAM
-    USE o_ARRAYS
-    USE g_CONFIG
-    IMPLICIT NONE
-    type(t_mesh),   intent(in),    target :: mesh
-    type(t_partit), intent(inout), target :: partit
-    real(kind=WP)            :: ttf(mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D)
-    real(kind=WP)            :: dz
-    integer                  :: n, nz, nzmin, nzmax
-
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
-
-    DO n=1, myDim_nod2D+eDim_nod2D
-    !!PS nlev=nlevels_nod2D(n)
-    nzmax=nlevels_nod2D(n)
-    nzmin=ulevels_nod2D(n)
-    !!PS DO nz=2,  nlev-1
-    DO nz=nzmin+1,  nzmax-1
-        dz=0.5_WP*(hnode_new(nz-1,n)+hnode_new(nz,n))
-        tr_z(nz, n)=(ttf(nz-1,n)-ttf(nz,n))/dz
-    END DO
-    !!PS tr_z(1,    n)=0.0_WP
-    !!PS tr_z(nlev, n)=0.0_WP
-    tr_z(nzmin, n)=0.0_WP
-    tr_z(nzmax, n)=0.0_WP
-    END DO
-END SUBROUTINE tracer_gradient_z

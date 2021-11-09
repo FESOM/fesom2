@@ -9,6 +9,10 @@ if(${ENABLE_OPENMP})
    find_package(OpenMP REQUIRED)
 endif()
 
+# option to trigger building a library version of FESOM
+# we do not always build the library along with the executable to avoid having two targets here in the CMakeLists.txt
+# two targets would allow e.g. setting different compiler options or preprocessor definition, which would be error prone.
+option(BUILD_FESOM_AS_LIBRARY "Build a library instead of an executable" OFF)
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
@@ -37,6 +41,7 @@ add_custom_command(OUTPUT 5303B6F4_E4F4_45B2_A6E5_8E2B9FB5CDC4 ${FESOM_GENERATED
 #endif()
 list(REMOVE_ITEM sources_Fortran ${src_home}/fvom_init.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90)
 list(REMOVE_ITEM sources_C       ${src_home}/fort_part.c)
+list(REMOVE_ITEM sources_Fortran ${src_home}/fvom_main.F90)
 
 # depends on the metis library
 #add_subdirectory(../lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
@@ -52,8 +57,15 @@ add_library(${PROJECT_NAME}_C ${sources_C})
 target_compile_definitions(${PROJECT_NAME}_C PRIVATE PARMS USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
 target_link_libraries(${PROJECT_NAME}_C parms) #metis
 
-# create our binary (set its name to name of this project)
-add_executable(${PROJECT_NAME} ${sources_Fortran})
+
+# create our binary or library (set its name to name of this project)
+# we do not always build the library along with the executable to avoid having two targets here in the CMakeLists.txt
+# two targets would allow e.g. setting different compiler options or preprocessor definition, which would be error prone.
+if(${BUILD_FESOM_AS_LIBRARY})
+   add_library(${PROJECT_NAME} ${sources_Fortran})
+else()
+   add_executable(${PROJECT_NAME} ${sources_Fortran} ${src_home}/fvom_main.F90)
+endif()
 target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
 if(${DISABLE_MULTITHREADING})
    target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_MULTITHREADING)
@@ -98,7 +110,13 @@ if(${ENABLE_OPENMP} AND NOT ${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray)
    target_link_libraries(${PROJECT_NAME} OpenMP::OpenMP_Fortran)
 endif()
 
-set(FESOM_INSTALL_FILEPATH "${CMAKE_CURRENT_LIST_DIR}/../bin/fesom.x" CACHE FILEPATH "file path where the FESOM binary should be put")
-get_filename_component(FESOM_INSTALL_PATH ${FESOM_INSTALL_FILEPATH} DIRECTORY)
-get_filename_component(FESOM_INSTALL_NAME ${FESOM_INSTALL_FILEPATH} NAME)
-install(PROGRAMS ${PROJECT_BINARY_DIR}/${PROJECT_NAME} DESTINATION ${FESOM_INSTALL_PATH} RENAME ${FESOM_INSTALL_NAME})
+
+set(FESOM_INSTALL_PREFIX "${CMAKE_CURRENT_LIST_DIR}/.." CACHE FILEPATH "directory where FESOM will be installed to via 'make install'")
+if(${BUILD_FESOM_AS_LIBRARY})
+   install(TARGETS ${PROJECT_NAME} DESTINATION "${FESOM_INSTALL_PREFIX}/lib")
+else()
+   set(FESOM_INSTALL_FILEPATH "${FESOM_INSTALL_PREFIX}/bin/fesom.x")
+   get_filename_component(FESOM_INSTALL_PATH ${FESOM_INSTALL_FILEPATH} DIRECTORY)
+   get_filename_component(FESOM_INSTALL_NAME ${FESOM_INSTALL_FILEPATH} NAME)
+   install(PROGRAMS ${PROJECT_BINARY_DIR}/${PROJECT_NAME} DESTINATION ${FESOM_INSTALL_PATH} RENAME ${FESOM_INSTALL_NAME})
+endif()
