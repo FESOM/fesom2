@@ -2742,7 +2742,7 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     type(t_dyn), intent(inout), target :: dynamics
 
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
-    integer           :: n, node
+    integer           :: node
     real(kind=WP), dimension(:), pointer :: eta_n
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
