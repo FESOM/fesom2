@@ -166,7 +166,7 @@ subroutine solve_tracers_ale(tracers, partit, mesh)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
         call init_tracers_AB(tr_num, tracers, partit, mesh) 
         ! advect tracers
-        if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call  do_oce_adv_tra'//achar(27)//'[0m'
         ! it will update del_ttf with contributions from horizontal and vertical advection parts (del_ttf_advhoriz and del_ttf_advvert)
         call do_oce_adv_tra(dt, UV, wvel, wvel_i, wvel_e, tr_num, tracers, partit, mesh)
         !___________________________________________________________________________

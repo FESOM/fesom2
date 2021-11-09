@@ -97,10 +97,11 @@ subroutine update_atm_forcing(istep, tracers, partit, mesh)
   use force_flux_consv_interface
 
   implicit none
+  integer,        intent(in)            :: istep
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
   type(t_tracer), intent(in),    target :: tracers
-  integer		   :: i, istep,itime,n2,n,nz,k,elem
+  integer		   :: i, itime,n2,n,nz,k,elem
   real(kind=WP)            :: i_coef, aux
   real(kind=WP)	           :: dux, dvy,tx,ty,tvol
   real(kind=WP)            :: t1, t2

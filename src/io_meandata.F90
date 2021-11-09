@@ -1077,8 +1077,8 @@ end subroutine
     do i=1, io_NSTREAMS
       if(trim(io_stream(i)%name) .eq. name) then
           print *,"variable '"//name//"' already exists, &
-              check if you define it multiple times, for example in namelist.io, &
-              namelist.icepack, io_meandata.F90 or other place that add I/O stream."
+              &check if you define it multiple times, for example in namelist.io, &
+              &namelist.icepack, io_meandata.F90 or other place that add I/O stream."
           call assert(.false., __LINE__) 
       end if
     end do

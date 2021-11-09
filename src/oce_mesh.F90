@@ -82,8 +82,8 @@ module elem_center_interface
       USE MOD_PARTIT
       USE MOD_PARSUP
       integer       :: elem    
-      real(kind=WP) :: x, y
-      type(t_mesh),   intent(inout), target :: mesh
+      real(kind=WP), intent(inout) :: x, y
+      type(t_mesh),  intent(inout), target :: mesh
     end subroutine
   end interface
 end module
@@ -94,8 +94,8 @@ module edge_center_interface
       USE MOD_PARTIT
       USE MOD_PARSUP
       integer                     :: n1, n2
-      real(kind=WP)               :: x, y
-      type(t_mesh),   intent(inout), target :: mesh
+      real(kind=WP), intent(inout):: x, y
+      type(t_mesh),  intent(inout), target :: mesh
     end subroutine
   end interface
 end module
@@ -1857,7 +1857,7 @@ USE g_CONFIG
 implicit none
 integer                        :: n1, n2   ! nodes of the edge
 real(kind=WP),  intent(inout)  :: x, y
-type(t_mesh),   intent(in)     :: mesh
+type(t_mesh),   intent(inout), target :: mesh
 real(kind=WP)                  :: a(2), b(2)
 
 a=mesh%coord_nod2D(:,n1)
@@ -1875,7 +1875,7 @@ USE o_PARAM
 USE g_CONFIG  
 implicit none
 real(kind=WP), intent(inout) :: x, y
-type(t_mesh),  intent(in)    :: mesh
+type(t_mesh),  intent(inout), target :: mesh
 integer                      :: elem, elnodes(3), k    
 real(kind=WP)                ::  ax(3), amin
 

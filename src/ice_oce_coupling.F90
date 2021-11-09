@@ -128,7 +128,7 @@ subroutine ocean2ice(tracers, partit, mesh)
 
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(in),    target :: mesh
-    type(t_tracer), intent(in),    target :: tracers
+    type(t_tracer), intent(inout), target :: tracers
     integer :: n, elem, k
     real(kind=WP) :: uw, vw, vol
     real(kind=WP), dimension(:,:), pointer :: temp, salt
@@ -217,7 +217,7 @@ subroutine oce_fluxes(tracers, partit, mesh)
   implicit none
   type(t_partit), intent(inout), target :: partit
   type(t_mesh),   intent(in),    target :: mesh
-  type(t_tracer), intent(in),    target :: tracers
+  type(t_tracer), intent(inout), target :: tracers
   integer                    :: n, elem, elnodes(3),n1
   real(kind=WP)              :: rsss, net
   real(kind=WP), allocatable :: flux(:)
