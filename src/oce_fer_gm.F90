@@ -1,35 +1,3 @@
-module fer_solve_interface
-    interface
-        subroutine fer_solve_Gamma(partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        type(t_mesh)  , intent(in)   , target :: mesh
-        type(t_partit), intent(inout), target :: partit
-        end subroutine
-        
-        subroutine fer_gamma2vel(dynamics, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_mesh)  , intent(in)   , target :: mesh
-        type(t_partit), intent(inout), target :: partit
-        type(t_dyn)   , intent(inout), target :: dynamics
-        end subroutine
-
-        subroutine init_Redi_GM(partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        type(t_mesh)  , intent(in)   , target :: mesh
-        type(t_partit), intent(inout), target :: partit
-        end subroutine
-    end interface
-end module
-
-
-
 !---------------------------------------------------------------------------
 !Implementation of Gent & McWiliams parameterization after R. Ferrari et al., 2010
 !Contains:
@@ -159,13 +127,12 @@ END subroutine fer_solve_Gamma
 !
 !
 !====================================================================
-subroutine fer_gamma2vel(dynamics, partit, mesh)
+subroutine fer_gamma2vel(partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
-    USE MOD_DYN
     USE o_PARAM
-    USE o_ARRAYS, ONLY: fer_gamma
+    USE o_ARRAYS, ONLY: fer_gamma, fer_uv
     USE g_CONFIG
     use g_comm_auto
     IMPLICIT NONE
@@ -173,18 +140,14 @@ subroutine fer_gamma2vel(dynamics, partit, mesh)
     integer                                :: nz, nzmax, el, elnod(3), nzmin
     real(kind=WP)                          :: zinv
     real(kind=WP)                          :: onethird=1._WP/3._WP
-    type(t_dyn)   , intent(inout), target  :: dynamics
     type(t_partit), intent(inout), target  :: partit
-    type(t_mesh)  , intent(in),    target  :: mesh
-    real(kind=WP), dimension(:,:,:), pointer :: fer_UV
-    real(kind=WP), dimension(:,:)  , pointer :: fer_Wvel
+    type(t_mesh),   intent(in),    target  :: mesh
+
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    fer_UV    =>dynamics%fer_uv(:,:,:)
-    fer_Wvel  =>dynamics%fer_w(:,:)
-        
+
     DO el=1, myDim_elem2D
         elnod=elem2D_nodes(:,el)
         ! max. number of levels at element el
