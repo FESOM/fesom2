@@ -19,11 +19,9 @@ namelist.config:
         restart_length_unit: "d"
         logfile_outfreq: 10
 
-namelist.oce:
-    oce_dyn:
-        Div_c: 0.5
-        Leith_c: 0.05
-        w_split: True
+namelist.dyn:
+    dynamics_general:
+        use_wsplit: True
 
 namelist.ice:
     ice_dyn:
