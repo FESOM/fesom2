@@ -36,13 +36,14 @@ namelist.config:
 namelist.oce:
     oce_dyn:
         state_equation: 0
-        Div_c: 0.5
-        Leith_c: 0.05
-        w_split: False
         Fer_GM: False
         Redi: False
         mix_scheme: "PP"
-        
+
+namelist.dyn:
+    dynamics_general:
+        use_wsplit: False
+
 namelist.tra:
     tracer_phys:
         use_momix: False
