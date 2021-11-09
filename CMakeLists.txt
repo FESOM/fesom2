@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.9)
 
 # set default build type cache entry (do so before project(...) is called, which would create this cache entry on its own)
 if(NOT CMAKE_BUILD_TYPE)
