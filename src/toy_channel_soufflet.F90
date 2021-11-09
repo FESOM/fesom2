@@ -3,7 +3,6 @@ MODULE Toy_Channel_Soufflet
   USE MOD_PARTIT
   USE MOD_PARSUP
   USE MOD_TRACER
-  USE MOD_DYN
   USE o_ARRAYS
   USE o_PARAM
   USE g_config
@@ -45,22 +44,17 @@ MODULE Toy_Channel_Soufflet
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine relax_zonal_vel(dynamics, partit, mesh)
+subroutine relax_zonal_vel(partit, mesh)
   implicit none
   integer        :: elem,  nz, nn, nn1
   real(kind=WP)  :: a, yy, uzon 
-  
-  type(t_dyn)   , intent(inout), target :: dynamics
+  type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
-  type(t_mesh)  , intent(in)   , target :: mesh
-  real(kind=WP), dimension(:,:,:), pointer :: UV_rhs
-  
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-  UV_rhs=>dynamics%uv_rhs(:,:,:)
-  
+
   DO elem=1, myDim_elem2D
      ! ========
      ! Interpolation
@@ -177,20 +171,17 @@ ztem=0.0
  ! no division by 0 is occurring 
 end subroutine compute_zonal_mean_ini
 !==========================================================================
-subroutine compute_zonal_mean(dynamics, tracers, partit, mesh)
+subroutine compute_zonal_mean(tracers, partit, mesh)
   implicit none 
   integer                            :: elem, nz, m, elnodes(3)
   real(kind=8), allocatable          :: zvel1D(:), znum1D(:)
-  type(t_mesh)  , intent(in)   , target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
   type(t_tracer), intent(inout), target :: tracers
-  type(t_dyn)   , intent(inout), target :: dynamics
-  real(kind=WP), dimension(:,:,:), pointer :: UV
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-  UV => dynamics%uv(:,:,:)
 
  ztem=0.
  zvel=0.
@@ -244,25 +235,22 @@ subroutine compute_zonal_mean(dynamics, tracers, partit, mesh)
 
 end subroutine compute_zonal_mean
 ! ====================================================================================
-subroutine initial_state_soufflet(dynamics, tracers, partit, mesh)
+subroutine initial_state_soufflet(tracers, partit, mesh)
  ! Profiles Soufflet 2016 (OM)
   implicit none
-  type(t_mesh)  , intent(in)   , target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
   type(t_tracer), intent(inout), target :: tracers
-  type(t_dyn)   , intent(inout), target :: dynamics
 
   integer                            :: n, nz, elnodes(3)
   real(kind=8)                       :: dst, yn, Fy, Lx
 ! real(kind=8)                       :: Ljet,rhomax,Sb, drho_No, drho_So
 ! real(kind=8)                       :: z_No, z_So,dz_No,dz_So, drhosurf_No, drhosurf_So, zsurf 
   real(kind=8)                       :: d_No(mesh%nl-1), d_So(mesh%nl-1), rho_No(mesh%nl-1), rho_So(mesh%nl-1)
-  real(kind=WP), dimension(:,:,:), pointer :: UV
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-  UV => dynamics%uv(:,:,:)
 
   dy=ysize/nybins/r_earth
 
@@ -367,23 +355,18 @@ do n=1, myDim_nod2D+eDim_nod2D
   write(*,*) mype, 'Vel', maxval(UV(1,:,:)), minval(UV(1,:,:))
  END subroutine initial_state_soufflet
 ! ===============================================================================
-subroutine energy_out_soufflet(dynamics, partit, mesh)
+subroutine energy_out_soufflet(partit, mesh)
   implicit none 
   real(kind=8)                      :: tke(2), aux(2), ww, wwaux 
   integer                           :: elem, nz, m, elnodes(3), nybins
   real(kind=8),   allocatable       :: zvel1D(:), znum1D(:)
-  type(t_dyn)   , intent(inout), target :: dynamics
+  type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
-  type(t_mesh)  , intent(in)   , target :: mesh
-  
-real(kind=WP), dimension(:,:,:), pointer :: UV
-real(kind=WP), dimension(:,:), pointer :: Wvel
+
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-UV => dynamics%uv(:,:,:)
-Wvel => dynamics%w(:,:)
 
 
  nybins=100

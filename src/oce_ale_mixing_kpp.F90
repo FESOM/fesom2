@@ -11,7 +11,6 @@ MODULE o_mixing_KPP_mod
   USE MOD_PARTIT
   USE MOD_PARSUP
   USE MOD_TRACER
-  USE MOD_DYN
   USE o_ARRAYS
   USE g_config
   USE i_arrays
@@ -243,7 +242,7 @@ contains
   !  diffK = diffusion coefficient (m^2/s) 
   !
   !---------------------------------------------------------------  
-  subroutine oce_mixing_KPP(viscAE, diffK, dynamics, tracers, partit, mesh)
+  subroutine oce_mixing_KPP(viscAE, diffK, tracers, partit, mesh)
 
      IMPLICIT NONE
 
@@ -254,7 +253,6 @@ contains
      type(t_mesh),   intent(in),    target :: mesh
      type(t_partit), intent(inout), target :: partit
      type(t_tracer), intent(in),    target :: tracers
-     type(t_dyn)   , intent(in),    target :: dynamics
      integer                    :: node, kn, elem, elnodes(3)
      integer                    :: nz, ns, j, q, lay, lay_mi, nzmin, nzmax
      real(KIND=WP)              :: smftu, smftv, aux, vol
@@ -267,12 +265,11 @@ contains
      real(KIND=WP), dimension(mesh%nl, partit%myDim_elem2D+partit%eDim_elem2D), intent(inout)                     :: viscAE!for momentum (elements)
      real(KIND=WP), dimension(mesh%nl, partit%myDim_nod2D +partit%eDim_nod2D)                                     :: viscA !for momentum (nodes)
      real(KIND=WP), dimension(mesh%nl, partit%myDim_nod2D +partit%eDim_nod2D, tracers%num_tracers), intent(inout) :: diffK !for T and S
-     real(kind=WP), dimension(:,:,:), pointer :: UVnode
+
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    UVnode=>dynamics%uvnode(:,:,:)
 
   ViscA=0.0_WP
   DO node=1, myDim_nod2D !+eDim_nod2D
@@ -302,15 +299,15 @@ contains
      dbsfc(nzmin,node) = 0.0_WP 
 
 ! Surface velocity
-     usurf = UVnode(1,nzmin,node)   
-     vsurf = UVnode(2,nzmin,node)
+     usurf = Unode(1,nzmin,node)   
+     vsurf = Unode(2,nzmin,node)
 
      !!PS DO nz=2, nlevels_nod2d(node)-1
      DO nz=nzmin+1, nzmax-1
 
 !    Squared velocity shear referenced to surface (@ Z)
-        u_loc = 0.5_WP * ( UVnode(1,nz-1,node) + UVnode(1,nz,node) )
-        v_loc = 0.5_WP * ( UVnode(2,nz-1,node) + UVnode(2,nz,node) )
+        u_loc = 0.5_WP * ( Unode(1,nz-1,node) + Unode(1,nz,node) )
+        v_loc = 0.5_WP * ( Unode(2,nz-1,node) + Unode(2,nz,node) )
            
         dVsq(nz,node) = ( usurf - u_loc )**2 + ( vsurf - v_loc )**2
 
@@ -350,7 +347,7 @@ contains
 ! compute interior mixing coefficients everywhere, due to constant 
 ! internal wave activity, static instability, and local shear 
 ! instability.
-    CALL ri_iwmix(viscA, diffK, dynamics, tracers, partit, mesh)
+    CALL ri_iwmix(viscA, diffK, tracers, partit, mesh)
 ! add double diffusion
     IF (double_diffusion) then
        CALL ddmix(diffK, tracers, partit, mesh)
@@ -732,12 +729,11 @@ contains
   !    visc = viscosity coefficient (m**2/s)       
   !    diff = diffusion coefficient (m**2/s)     
   !
-  subroutine ri_iwmix(viscA, diffK, dynamics, tracers, partit, mesh)
+  subroutine ri_iwmix(viscA, diffK, tracers, partit, mesh)
      IMPLICIT NONE
      type(t_mesh),   intent(in),    target :: mesh
      type(t_partit), intent(inout), target :: partit
      type(t_tracer), intent(in),    target :: tracers
-     type(t_dyn), intent(in),    target :: dynamics
      integer                     :: node, nz, mr, nzmin, nzmax
      real(KIND=WP) , parameter   :: Riinfty = 0.8_WP                ! local Richardson Number limit for shear instability (LMD 1994 uses 0.7)
      real(KIND=WP)               :: ri_prev, tmp
@@ -750,12 +746,11 @@ contains
 ! Put them under the namelist.oce
      logical                     :: smooth_richardson_number = .false.
      integer                     :: num_smoothings = 1              ! for vertical smoothing of Richardson number
-     real(kind=WP), dimension(:,:,:), pointer :: UVnode
+
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-     UVnode=>dynamics%uvnode(:,:,:)
 
 ! Compute Richardson number and store it as diffK to save memory
      DO node=1, myDim_nod2D! +eDim_nod2D
@@ -764,8 +759,8 @@ contains
         !!PS DO nz=2,nlevels_nod2d(node)-1
         DO nz=nzmin+1,nzmax-1
            dz_inv = 1.0_WP / (Z_3d_n(nz-1,node)-Z_3d_n(nz,node))  ! > 0
-           shear  = ( UVnode(1, nz-1, node) - UVnode(1, nz, node) )**2 + &
-                ( UVnode(2, nz-1, node) - UVnode(2, nz, node) )**2 
+           shear  = ( Unode(1, nz-1, node) - Unode(1, nz, node) )**2 + &
+                ( Unode(2, nz-1, node) - Unode(2, nz, node) )**2 
            shear  = shear * dz_inv * dz_inv
            diffK(nz,node,1) = MAX( bvfreq(nz,node), 0.0_WP ) / (shear + epsln)  ! To avoid NaNs at start
         END DO                                                                  ! minimum Richardson number is 0

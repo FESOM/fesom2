@@ -164,8 +164,8 @@ subroutine viscosity_filter(option, dynamics, partit, mesh)
     use visc_filt_bcksct_interface
     use visc_filt_bilapl_interface
     use visc_filt_bidiff_interface
-!!PS     use visc_filt_dbcksc_interface
-!!PS     use backscatter_coef_interface
+    use visc_filt_dbcksc_interface
+    use backscatter_coef_interface
     use g_backscatter
     IMPLICIT NONE 
     integer                               :: option
