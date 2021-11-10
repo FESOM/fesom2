@@ -9,8 +9,6 @@
 !    We however, try to keep dynamics%visc_gamma1<0.1
 ! 3. dynamics%visc_gamma2 is dimensional (1/velocity). If it is 10, then the respective term dominates starting from |u|=0.1 m/s an so on. It is only used in: 
 !    (5) visc_filt_bcksct, (6) visc_filt_bilapl, (7) visc_filt_bidiff
-! 4. Div_c  =1.    should be default
-! 5. Leith_c=?    (need to be adjusted)
 module visc_filt_bcksct_interface
   interface
     subroutine visc_filt_bcksct(dynamics, partit, mesh)
@@ -69,24 +67,27 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
     USE g_CONFIG
     use g_comm_auto
     IMPLICIT NONE
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
     integer       :: elem, elnodes(3), nz, m, nzmax, nzmin
     real(kind=WP) :: eta(3) 
     real(kind=WP) :: Fx, Fy
-    type(t_dyn)   , intent(inout), target :: dynamics
-    type(t_mesh)  , intent(in)   , target :: mesh
-    type(t_partit), intent(inout), target :: partit
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
-    real(kind=WP), dimension(:), pointer :: eta_n, d_eta
-
+    real(kind=WP), dimension(:)    , pointer :: eta_n, d_eta
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    UV=>dynamics%uv(:,:,:)
-    UV_rhs=>dynamics%uv_rhs(:,:,:)
-    eta_n=>dynamics%eta_n(:)
-    d_eta=>dynamics%d_eta(:)
-        
+    UV     => dynamics%uv(:,:,:)
+    UV_rhs => dynamics%uv_rhs(:,:,:)
+    eta_n  => dynamics%eta_n(:)
+    d_eta  => dynamics%d_eta(:)
+    
+    !___________________________________________________________________________    
     DO elem=1, myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
         eta=-g*theta*dt*d_eta(elnodes)
@@ -94,7 +95,6 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
         Fy=sum(gradient_sca(4:6,elem)*eta)
         nzmin = ulevels(elem)
         nzmax = nlevels(elem)
-        !!PS DO nz=1, nlevels(elem)-1
         DO nz=nzmin, nzmax-1
             UV(1,nz,elem)= UV(1,nz,elem) + UV_rhs(1,nz,elem) + Fx
             UV(2,nz,elem)= UV(2,nz,elem) + UV_rhs(2,nz,elem) + Fy
@@ -114,12 +114,14 @@ subroutine compute_vel_nodes(dynamics, partit, mesh)
     USE o_PARAM
     use g_comm_auto
     IMPLICIT NONE
-    integer            :: n, nz, k, elem, nln, uln, nle, ule
-    real(kind=WP)      :: tx, ty, tvol
-    
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    integer            :: n, nz, k, elem, nln, uln, nle, ule
+    real(kind=WP)      :: tx, ty, tvol
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UVnode
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -127,11 +129,11 @@ subroutine compute_vel_nodes(dynamics, partit, mesh)
 #include "associate_mesh_ass.h"
     UV=>dynamics%uv(:,:,:)
     UVnode=>dynamics%uvnode(:,:,:)
-
+    
+    !___________________________________________________________________________
     DO n=1, myDim_nod2D 
         uln = ulevels_nod2D(n)
         nln = nlevels_nod2D(n) 
-        !!PS DO nz=1, nlevels_nod2D(n)-1
         DO nz=uln, nln-1
             tvol=0.0_WP
             tx  =0.0_WP
@@ -164,15 +166,13 @@ subroutine viscosity_filter(option, dynamics, partit, mesh)
     use visc_filt_bcksct_interface
     use visc_filt_bilapl_interface
     use visc_filt_bidiff_interface
-!!PS     use visc_filt_dbcksc_interface
-!!PS     use backscatter_coef_interface
     use g_backscatter
     IMPLICIT NONE 
     integer                               :: option
     type(t_dyn)   , intent(inout), target :: dynamics
-    type(t_mesh)  , intent(in)   , target :: mesh
     type(t_partit), intent(inout), target :: partit
-
+    type(t_mesh)  , intent(in)   , target :: mesh
+    
     ! Driving routine 
     ! Background viscosity is selected in terms of Vl, where V is 
     ! background velocity scale and l is the resolution. V is 0.005 
@@ -214,12 +214,14 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
     USE g_CONFIG
     USE g_comm_auto
     IMPLICIT NONE
-
-    real(kind=8)  :: u1, v1, len, vi 
-    integer       :: nz, ed, el(2), nelem(3),k, elem, nzmin, nzmax
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    real(kind=8)  :: u1, v1, len, vi 
+    integer       :: nz, ed, el(2), nelem(3),k, elem, nzmin, nzmax
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
     real(kind=WP), dimension(:,:)  , pointer :: U_c, V_c, U_b, V_b
 #include "associate_part_def.h"
@@ -233,22 +235,21 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
     U_b    => dynamics%work%u_b(:,:)
     V_b    => dynamics%work%v_b(:,:)
 
+    !___________________________________________________________________________
     ! An analog of harmonic viscosity operator.
     ! Same as visc_filt_h, but with the backscatter. 
     ! Here the contribution from squared velocities is added to the viscosity.    
     ! The contribution from boundary edges is neglected (free slip). 
-
-    U_b=0.0_WP
-    V_b=0.0_WP
-    U_c=0.0_WP
-    V_c=0.0_WP
+    U_b = 0.0_WP
+    V_b = 0.0_WP
+    U_c = 0.0_WP
+    V_c = 0.0_WP
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
         len=sqrt(sum(elem_area(el)))
         nzmax = minval(nlevels(el))
         nzmin = maxval(ulevels(el))
-        !!PS DO  nz=1,minval(nlevels(el))-1
         DO  nz=nzmin,nzmax-1
             u1=UV(1,nz,el(1))-UV(1,nz,el(2))
             v1=UV(2,nz,el(1))-UV(2,nz,el(2))
@@ -274,7 +275,6 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
     DO ed=1, myDim_nod2D 
         nzmin = ulevels_nod2D(ed)
         nzmax = nlevels_nod2D(ed)
-        !!PS DO nz=1, nlevels_nod2D(ed)-1
         DO nz=nzmin, nzmax-1
             vi=0.0_WP
             u1=0.0_WP
@@ -295,7 +295,6 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
         nelem=elem2D_nodes(:,ed)
         nzmin = ulevels(ed)
         nzmax = nlevels(ed)
-        !!PS Do nz=1, nlevels(ed)-1
         Do nz=nzmin, nzmax-1
             UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+U_b(nz,ed) -dynamics%visc_easybsreturn*sum(U_c(nz,nelem))/3.0_WP
             UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+V_b(nz,ed) -dynamics%visc_easybsreturn*sum(V_c(nz,nelem))/3.0_WP
@@ -320,32 +319,33 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
     USE g_CONFIG
     USE g_comm_auto
     IMPLICIT NONE
-    real(kind=8)  :: u1, v1, vi, len
-    integer       :: ed, el(2), nz, nzmin, nzmax
-    
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
-    
+    !___________________________________________________________________________
+    real(kind=8)  :: u1, v1, vi, len
+    integer       :: ed, el(2), nz, nzmin, nzmax
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
     real(kind=WP), dimension(:,:)  , pointer :: U_c, V_c
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    UV => dynamics%uv(:,:,:)
+    UV     => dynamics%uv(:,:,:)
     UV_rhs => dynamics%uv_rhs(:,:,:)
     U_c    => dynamics%work%u_c(:,:)
     V_c    => dynamics%work%v_c(:,:)
-
-    U_c=0.0_WP
-    V_c=0.0_WP
+    
+    !___________________________________________________________________________
+    U_c = 0.0_WP
+    V_c = 0.0_WP
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
         nzmin = maxval(ulevels(el))
         nzmax = minval(nlevels(el))
-        !!PS DO  nz=1,minval(nlevels(el))-1
         DO  nz=nzmin,nzmax-1
             u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
             v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
@@ -360,7 +360,6 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
         len=sqrt(elem_area(ed))
         nzmin = ulevels(ed)
         nzmax = nlevels(ed)
-        !!PS Do nz=1,nlevels(ed)-1
         Do nz=nzmin,nzmax-1
             ! vi has the sense of harmonic viscosity coef. because of 
             ! division by area in the end 
@@ -381,7 +380,6 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
         el=edge_tri(:,ed)
         nzmin = maxval(ulevels(el))
         nzmax = minval(nlevels(el))
-        !!PS DO  nz=1,minval(nlevels(el))-1
         DO  nz=nzmin,nzmax-1
             u1=(U_c(nz,el(1))-U_c(nz,el(2)))
             v1=(V_c(nz,el(1))-V_c(nz,el(2)))
@@ -411,32 +409,34 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
     USE g_CONFIG
     USE g_comm_auto
     IMPLICIT NONE
-    real(kind=8)  :: u1, v1, vi, len
-    integer       :: ed, el(2), nz, nzmin, nzmax
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
-    
+    !___________________________________________________________________________
+    real(kind=8)  :: u1, v1, vi, len
+    integer       :: ed, el(2), nz, nzmin, nzmax
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
     real(kind=WP), dimension(:,:)  , pointer :: U_c, V_c
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    UV => dynamics%uv(:,:,:)
+    UV     => dynamics%uv(:,:,:)
     UV_rhs => dynamics%uv_rhs(:,:,:)
     U_c    => dynamics%work%u_c(:,:)
     V_c    => dynamics%work%v_c(:,:)
     
-    U_c=0.0_WP
-    V_c=0.0_WP
+    !___________________________________________________________________________
+    U_c = 0.0_WP
+    V_c = 0.0_WP
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
         len=sqrt(sum(elem_area(el)))
         nzmin = maxval(ulevels(el))
         nzmax = minval(nlevels(el))
-        !!PS DO  nz=1,minval(nlevels(el))-1
         DO  nz=nzmin,nzmax-1
             u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
             v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
@@ -463,7 +463,6 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
         len=sqrt(sum(elem_area(el)))
         nzmin = maxval(ulevels(el))
         nzmax = minval(nlevels(el))
-        !!PS DO  nz=1,minval(nlevels(el))-1
         DO  nz=nzmin,nzmax-1
             u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
             v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
