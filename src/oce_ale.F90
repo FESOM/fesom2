@@ -209,12 +209,9 @@ subroutine init_ale(dynamics, partit, mesh)
     ! of the ssh operator.      
     allocate(mesh%dhe(myDim_elem2D))
     
-    ! zbar_n: depth of layers due to ale thinkness variactions at ervery node n 
-    allocate(mesh%zbar_n(nl))
     allocate(mesh%zbar_3d_n(nl,myDim_nod2D+eDim_nod2D))
     
     ! Z_n: mid depth of layers due to ale thinkness variactions at ervery node n 
-    allocate(mesh%Z_n(nl-1))
     allocate(mesh%Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
     
     ! bottom_elem_tickness: changed bottom layer thinkness due to partial cells
@@ -240,8 +237,6 @@ subroutine init_ale(dynamics, partit, mesh)
     dhe(1:myDim_elem2D)                                        => mesh%dhe
     hbar(1:myDim_nod2D+eDim_nod2D)                             => mesh%hbar
     hbar_old(1:myDim_nod2D+eDim_nod2D)                         => mesh%hbar_old
-    zbar_n(1:mesh%nl)                                          => mesh%zbar_n
-    Z_n(1:mesh%nl-1)                                           => mesh%Z_n
     zbar_n_bot(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_bot
     zbar_e_bot(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_bot
     zbar_n_srf(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_srf
@@ -2569,6 +2564,7 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
     real(kind=WP)              ::  cp(mesh%nl-1), up(mesh%nl-1), vp(mesh%nl-1)
     integer                    ::  nz, elem, nzmax, nzmin, elnodes(3)
     real(kind=WP)              ::  zinv, m, friction, wu, wd
+    real(kind=WP)              ::  zbar_n(mesh%nl), Z_n(mesh%nl-1)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs

@@ -575,7 +575,6 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     end if
 
     ! tracer gradients & RHS  
-    allocate(ttrhs(nl-1,node_size))
     allocate(tr_xy(2,nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D))
     allocate(tr_z(nl,myDim_nod2D+eDim_nod2D))
 
@@ -625,7 +624,6 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     ! =================
     ! Initialize with zeros 
     ! =================
-
     hpressure=0.0_WP
 !
     heat_flux=0.0_WP

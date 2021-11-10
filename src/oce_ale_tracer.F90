@@ -1,17 +1,17 @@
 module diff_part_hor_redi_interface
     interface
-        subroutine diff_part_hor_redi(tr_num, tracer, partit, mesh) 
+        subroutine diff_part_hor_redi(tracer, partit, mesh) 
         use mod_mesh
         USE MOD_PARTIT
         USE MOD_PARSUP
         use mod_tracer
-        integer       , intent(in)   , target :: tr_num
         type(t_tracer), intent(inout), target :: tracer
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
         end subroutine
     end interface
 end module
+
 module diff_ver_part_expl_ale_interface
     interface
         subroutine diff_ver_part_expl_ale(tr_num, tracer, partit, mesh) 
@@ -29,12 +29,11 @@ end module
 
 module diff_ver_part_redi_expl_interface
     interface
-        subroutine diff_ver_part_redi_expl(tr_num, tracer, partit, mesh) 
+        subroutine diff_ver_part_redi_expl(tracer, partit, mesh) 
         use mod_mesh
         USE MOD_PARTIT
         USE MOD_PARSUP
         use mod_tracer
-        integer       , intent(in)   , target :: tr_num
         type(t_tracer), intent(inout), target :: tracer
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
@@ -311,18 +310,19 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
     ! write there also horizontal diffusion rhs to del_ttf which is equal the R_T^n 
     ! in danilovs srcipt
     ! includes Redi diffusivity if Redi=.true.
-    call diff_part_hor_redi(tr_num, tracers, partit, mesh)  ! seems to be ~9% faster than diff_part_hor
+    call diff_part_hor_redi(tracers, partit, mesh)  ! seems to be ~9% faster than diff_part_hor
     
     !___________________________________________________________________________
     ! do vertical diffusion: explicit
     if (.not. tracers%i_vert_diff) call diff_ver_part_expl_ale(tr_num, tracers, partit, mesh) 
     ! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
     ! derivatives and has to be computed explicitly!
-    if (Redi) call diff_ver_part_redi_expl(tr_num, tracers, partit, mesh)     
-    
+    if (Redi) call diff_ver_part_redi_expl(tracers, partit, mesh)     
+
     !___________________________________________________________________________
     ! Update tracers --> calculate T* see Danilov et al. (2017)
     ! T* =  (dt*R_T^n + h^(n-0.5)*T^(n-0.5))/h^(n+0.5)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nzmin, nzmax)
     do n=1, myDim_nod2D 
         nzmax=nlevels_nod2D(n)-1
         nzmin=ulevels_nod2D(n)
@@ -332,10 +332,10 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
                                     del_ttf(nzmin:nzmax,n)/hnode_new(nzmin:nzmax,n)
         ! WHY NOT ??? --> whats advantage of above --> tested it --> the upper 
         ! equation has a 30% smaller nummerical drift
-        !tr_arr(1:nzmax,n,tr_num)=(hnode(1:nzmax,n)*tr_arr(1:nzmax,n,tr_num)+ &
-        !                        del_ttf(1:nzmax,n))/hnode_new(1:nzmax,n)
+        ! tr_arr(1:nzmax,n,tr_num)=(hnode(1:nzmax,n)*tr_arr(1:nzmax,n,tr_num)+ &
+        !                           del_ttf(1:nzmax,n))/hnode_new(1:nzmax,n)
     end do
-
+!$OMP END PARALLEL DO
     !___________________________________________________________________________
     if (tracers%i_vert_diff) then
         ! do vertical diffusion: implicite 
@@ -366,10 +366,10 @@ subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
+    integer                  :: n, nz, nl1, ul1
     real(kind=WP)            :: vd_flux(mesh%nl-1)
-    real(kind=WP)            :: rdata,flux,rlx
-    integer                  :: nz,nl1,ul1,n
-    real(kind=WP)            :: zinv1,Ty
+    real(kind=WP)            :: rdata, flux, rlx
+    real(kind=WP)            :: zinv1
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), pointer   :: del_ttf(:,:)
@@ -378,9 +378,9 @@ subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
     del_ttf => tracers%work%del_ttf
-
+    
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nl1, ul1, vd_flux, rdata, flux, rlx, zinv1)
     !___________________________________________________________________________    
-    Ty = 0.0_WP
     do n=1, myDim_nod2D
         nl1=nlevels_nod2D(n)-1
         ul1=ulevels_nod2D(n)
@@ -396,35 +396,23 @@ subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
             flux  = 0._WP
             rdata = 0._WP
             rlx=0._WP
-        endif
-        
+        endif        
         !_______________________________________________________________________
         !Surface forcing
-        !!PS vd_flux(1)= flux
-        vd_flux(ul1)= flux
-        
-        !_______________________________________________________________________
-        !!PS do nz=2,nl1
+        vd_flux(ul1)= flux        
         do nz=ul1+1,nl1
             !___________________________________________________________________
-            zinv1=1.0_WP/(Z_3d_n(nz-1,n)-Z_3d_n(nz,n))
-            
-            !___________________________________________________________________
-!            Ty= Kd(4,nz-1,n)*(Z_3d_n(nz-1,n)-zbar_3d_n(nz,n))*zinv1 *neutral_slope(3,nz-1,n)**2 + &
-!                Kd(4,nz,n)*(zbar_3d_n(nz,n)-Z_3d_n(nz,n))*zinv1 *neutral_slope(3,nz,n)**2
-            
-            vd_flux(nz) = (Kv(nz,n)+Ty)*(tracers%data(tr_num)%values(nz-1,n)-tracers%data(tr_num)%values(nz,n))*zinv1*area(nz,n)
-            
+            zinv1=1.0_WP/(Z_3d_n(nz-1,n)-Z_3d_n(nz,n))                       
+            vd_flux(nz) = Kv(nz,n)*(tracers%data(tr_num)%values(nz-1,n)-tracers%data(tr_num)%values(nz,n))*zinv1*area(nz,n)            
         end do
         
-        !_______________________________________________________________________
-        !!PS do nz=1,nl1-1
         do nz=ul1,nl1-1
             del_ttf(nz,n) = del_ttf(nz,n) + (vd_flux(nz) - vd_flux(nz+1))/(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))*dt/areasvol(nz,n)
         end do
         del_ttf(nl1,n) = del_ttf(nl1,n) + (vd_flux(nl1)/(zbar_3d_n(nl1,n)-zbar_3d_n(nl1+1,n)))*dt/areasvol(nl1,n)
         
     end do ! --> do n=1, myDim_nod2D
+!$OMP END PARALLEL DO
 end subroutine diff_ver_part_expl_ale
 !
 !
@@ -461,6 +449,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
     real(kind=WP), external  :: TFrez  ! Sea water freeze temperature.
     real(kind=WP)            :: isredi=0._WP
     logical                  :: do_wimpl=.true.
+    real(kind=WP)            :: zbar_n(mesh%nl), z_n(mesh%nl-1)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:), pointer :: trarr
@@ -901,7 +890,7 @@ end subroutine diff_ver_part_impl_ale
 !
 !
 !===============================================================================
-subroutine diff_ver_part_redi_expl(tr_num, tracers, partit, mesh) 
+subroutine diff_ver_part_redi_expl(tracers, partit, mesh) 
     use o_ARRAYS
     use MOD_MESH
     USE MOD_PARTIT
@@ -911,15 +900,15 @@ subroutine diff_ver_part_redi_expl(tr_num, tracers, partit, mesh)
     use g_config
     use g_comm_auto
     IMPLICIT NONE
-    integer,        intent(in),    target :: tr_num
     type(t_tracer), intent(inout), target :: tracers
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(in),    target :: mesh
     !___________________________________________________________________________
-    integer                  :: elem,k
-    integer                  :: n2,nl1,ul1,nl2,nz,n
-    real(kind=WP)            :: Tx, Ty
-    real(kind=WP)            :: tr_xynodes(2,mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D), vd_flux(mesh%nl)
+    integer                  :: n, k, elem, nz
+    integer                  :: n2, nl1, ul1, nl2
+    real(kind=WP)            :: Tx, Ty, vd_flux(mesh%nl)
+    real(kind=WP)            :: tr_xynodes(2,mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP)            :: zbar_n(mesh%nl), z_n(mesh%nl-1)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), pointer   :: del_ttf(:,:)
@@ -929,6 +918,8 @@ subroutine diff_ver_part_redi_expl(tr_num, tracers, partit, mesh)
 #include "associate_mesh_ass.h" 
     del_ttf => tracers%work%del_ttf
 
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, elem, nz, n2, nl1, ul1, nl2, Tx, Ty, vd_flux, zbar_n, z_n)
+!$OMP DO
     !___________________________________________________________________________
     do n=1, myDim_nod2D
         nl1=nlevels_nod2D(n)-1
@@ -950,45 +941,43 @@ subroutine diff_ver_part_redi_expl(tr_num, tracers, partit, mesh)
         end do
     end do
     
-    ! call exchange_nod_begin(tr_xynodes)  !NR the halo is not needed
-    
+!$OMP END DO
+    ! no halo exchange of tr_xynodes is needed !
+!$OMP DO
     do n=1, myDim_nod2D
         nl1=nlevels_nod2D(n)-1
         ul1=ulevels_nod2D(n)
         vd_flux=0._WP
         
         !_______________________________________________________________________
-        zbar_n=0.0_WP
-        Z_n   =0.0_WP
-!         zbar_n(nl1+1)=zbar(nl1+1)
+        zbar_n(1:mesh%nl  )=0.0_WP
+        z_n   (1:mesh%nl-1)=0.0_WP
         zbar_n(nl1+1)=zbar_n_bot(n)
-        Z_n(nl1)=zbar_n(nl1+1) + hnode_new(nl1,n)/2.0_WP
-        !!PS do nz=nl1, 2, -1
+        z_n(nl1)=zbar_n(nl1+1) + hnode_new(nl1,n)/2.0_WP
         do nz=nl1, ul1+1, -1
             zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
-            Z_n(nz-1)  = zbar_n(nz) + hnode_new(nz-1,n)/2.0_WP
+            z_n(nz-1)  = zbar_n(nz)   + hnode_new(nz-1,n)/2.0_WP
         end do
-        !!PS zbar_n(1) = zbar_n(2) + hnode_new(1,n)
-        zbar_n(ul1) = zbar_n(ul1+1) + hnode_new(ul1,n)
+        zbar_n(ul1) = zbar_n(ul1+1)   + hnode_new(ul1,n)
         
         !_______________________________________________________________________
-        !!PS do nz=2,nl1
         do nz=ul1+1,nl1
-            vd_flux(nz)=(Z_n(nz-1)-zbar_n(nz))*(slope_tapered(1,nz-1,n)*tr_xynodes(1,nz-1,n)+slope_tapered(2,nz-1,n)*tr_xynodes(2,nz-1,n))*Ki(nz-1,n)
+            vd_flux(nz)=(z_n(nz-1)-zbar_n(nz))*(slope_tapered(1,nz-1,n)*tr_xynodes(1,nz-1,n)+slope_tapered(2,nz-1,n)*tr_xynodes(2,nz-1,n))*Ki(nz-1,n)
             vd_flux(nz)=vd_flux(nz)+&
-                        (zbar_n(nz)-Z_n(nz))  *(slope_tapered(1,nz,n)  *tr_xynodes(1,nz,n)  +slope_tapered(2,nz,n)  *tr_xynodes(2,nz,n))  *Ki(nz,n)
-            vd_flux(nz)=vd_flux(nz)/(Z_n(nz-1)-Z_n(nz))*area(nz,n)
+                        (zbar_n(nz)-z_n(nz))  *(slope_tapered(1,nz,n)  *tr_xynodes(1,nz,n)  +slope_tapered(2,nz,n)  *tr_xynodes(2,nz,n))  *Ki(nz,n)
+            vd_flux(nz)=vd_flux(nz)/(z_n(nz-1)-z_n(nz))*area(nz,n)
         enddo
-        !!PS do nz=1,nl1
         do nz=ul1,nl1
             del_ttf(nz,n) = del_ttf(nz,n)+(vd_flux(nz) - vd_flux(nz+1))*dt/areasvol(nz,n)
         enddo
     end do
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine diff_ver_part_redi_expl
 !
 !
 !===============================================================================
-subroutine diff_part_hor_redi(tr_num, tracers, partit, mesh) 
+subroutine diff_part_hor_redi(tracers, partit, mesh) 
     use o_ARRAYS
     use MOD_MESH
     USE MOD_PARTIT
@@ -997,15 +986,14 @@ subroutine diff_part_hor_redi(tr_num, tracers, partit, mesh)
     use o_param
     use g_config
     IMPLICIT NONE
-    integer       , intent(in)   , target :: tr_num
     type(t_tracer), intent(inout), target :: tracers
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
-    real(kind=WP)            :: deltaX1,deltaY1,deltaX2,deltaY2
     integer                  :: edge
-    integer                  :: n2,nl1,ul1,nl2,ul2,nl12,ul12,nz,el(2),elnodes(3),n,enodes(2)
-    real(kind=WP)            :: c, Fx, Fy,Tx, Ty, Tx_z, Ty_z, SxTz, SyTz, Tz(2)
+    real(kind=WP)            :: deltaX1, deltaY1, deltaX2, deltaY2
+    integer                  :: nl1, ul1, nl2, ul2, nl12, ul12, nz, el(2), elnodes(3), enodes(2)
+    real(kind=WP)            :: c, Fx, Fy, Tx, Ty, Tx_z, Ty_z, SxTz, SyTz, Tz(2)
     real(kind=WP)            :: rhs1(mesh%nl-1), rhs2(mesh%nl-1), Kh, dz
     real(kind=WP)            :: isredi=0._WP
     !___________________________________________________________________________
@@ -1019,6 +1007,11 @@ subroutine diff_part_hor_redi(tr_num, tracers, partit, mesh)
 
     !___________________________________________________________________________
     if (Redi) isredi=1._WP
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, &
+!$OMP                   nl1, ul1, nl2, ul2, nl12, ul12, nz, el, elnodes, enodes, &
+!$OMP                             c, Fx, Fy, Tx, Ty, Tx_z, Ty_z, SxTz, SyTz, Tz, &
+!$OMP                                                          rhs1, rhs2, Kh, dz)
+!$OMP DO
     do edge=1, myDim_edge2D
         rhs1=0.0_WP
         rhs2=0.0_WP
@@ -1030,25 +1023,21 @@ subroutine diff_part_hor_redi(tr_num, tracers, partit, mesh)
         nl1=nlevels(el(1))-1
         ul1=ulevels(el(1))
         elnodes=elem2d_nodes(:,el(1))
-        !Kh=elem_area(el(1))
         !_______________________________________________________________________
         nl2=0
         ul2=0
         if (el(2)>0) then 
-            !Kh=0.5_WP*(Kh+elem_area(el(2)))
             nl2=nlevels(el(2))-1
             ul2=ulevels(el(2))
             deltaX2=edge_cross_dxdy(3,edge)
             deltaY2=edge_cross_dxdy(4,edge)
         endif
-        !Kh=K_hor*Kh/scale_area
         !_______________________________________________________________________
         nl12=min(nl1,nl2)
         ul12=max(ul1,ul2)
-        
         !_______________________________________________________________________
         ! (A)
-        do nz=ul1,ul12-1
+        do nz=ul1, ul12-1
             Kh=sum(Ki(nz, enodes))/2.0_WP
             dz=helem(nz, el(1))
             Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
@@ -1062,7 +1051,6 @@ subroutine diff_part_hor_redi(tr_num, tracers, partit, mesh)
             rhs1(nz) = rhs1(nz) + c
             rhs2(nz) = rhs2(nz) - c
         end do
-        
         !_______________________________________________________________________
         ! (B)
         if (ul2>0) then
@@ -1081,11 +1069,9 @@ subroutine diff_part_hor_redi(tr_num, tracers, partit, mesh)
                 rhs2(nz) = rhs2(nz) - c
             end do
         end if
-        
         !_______________________________________________________________________
         ! (C)
-        !!PS do nz=1,nl12
-        do nz=ul12,nl12
+        do nz=ul12, nl12
             Kh=sum(Ki(nz, enodes))/2.0_WP
             dz=sum(helem(nz, el))/2.0_WP
             Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
@@ -1099,10 +1085,9 @@ subroutine diff_part_hor_redi(tr_num, tracers, partit, mesh)
             rhs1(nz) = rhs1(nz) + c
             rhs2(nz) = rhs2(nz) - c
         enddo
-        
         !_______________________________________________________________________
         ! (D)
-        do nz=nl12+1,nl1
+        do nz=nl12+1, nl1
             Kh=sum(Ki(nz, enodes))/2.0_WP
             dz=helem(nz, el(1))
             Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
@@ -1116,10 +1101,9 @@ subroutine diff_part_hor_redi(tr_num, tracers, partit, mesh)
             rhs1(nz) = rhs1(nz) + c
             rhs2(nz) = rhs2(nz) - c
         end do
-        
         !_______________________________________________________________________
         ! (E)
-        do nz=nl12+1,nl2
+        do nz=nl12+1, nl2
             Kh=sum(Ki(nz, enodes))/2.0_WP
             dz=helem(nz, el(2))
             Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
@@ -1133,17 +1117,25 @@ subroutine diff_part_hor_redi(tr_num, tracers, partit, mesh)
             rhs1(nz) = rhs1(nz) + c
             rhs2(nz) = rhs2(nz) - c
         end do
-        
         !_______________________________________________________________________
         nl12=max(nl1,nl2)
         ul12 = ul1
         if (ul2>0) ul12=min(ul1,ul2)
-        !!PS del_ttf(1:nl12,enodes(1))=del_ttf(1:nl12,enodes(1))+rhs1(1:nl12)*dt/area(1:nl12,enodes(1))
-        !!PS del_ttf(1:nl12,enodes(2))=del_ttf(1:nl12,enodes(2))+rhs2(1:nl12)*dt/area(1:nl12,enodes(2))
+#if defined(_OPENMP)
+        call omp_set_lock(partit%plock(enodes(1)))
+#endif
         del_ttf(ul12:nl12,enodes(1))=del_ttf(ul12:nl12,enodes(1))+rhs1(ul12:nl12)*dt/areasvol(ul12:nl12,enodes(1))
+#if defined(_OPENMP)
+        call omp_unset_lock(partit%plock(enodes(1)))
+        call omp_set_lock  (partit%plock(enodes(2)))
+#endif
         del_ttf(ul12:nl12,enodes(2))=del_ttf(ul12:nl12,enodes(2))+rhs2(ul12:nl12)*dt/areasvol(ul12:nl12,enodes(2))
-        
+#if defined(_OPENMP)
+        call omp_unset_lock(partit%plock(enodes(2)))
+#endif
     end do
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine diff_part_hor_redi
 !
 !

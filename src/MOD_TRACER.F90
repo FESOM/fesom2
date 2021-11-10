@@ -28,7 +28,7 @@ END TYPE T_TRACER_DATA
 TYPE T_TRACER_WORK
 !auxuary arrays to work with tracers:
 real(kind=WP), allocatable         :: del_ttf(:,:)
-real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:)
+real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:), del_ttf_advvert(:,:)
 !_______________________________________________________________________________
 ! in case ldiag_DVD=.true. --> calculate discrete variance decay (DVD)
 real(kind=WP), allocatable                    :: tr_dvd_horiz(:,:,:), tr_dvd_vert(:,:,:)
