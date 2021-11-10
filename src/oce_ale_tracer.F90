@@ -223,7 +223,7 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
             call relax_zonal_temp(tracers%data(1), partit, mesh) 
         else
             call relax_to_clim(tr_num, tracers, partit, mesh) 
-        end if 
+        end if
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
     end do
     !___________________________________________________________________________
@@ -433,10 +433,9 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     real(kind=WP)            :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
     real(kind=WP)            :: cp(mesh%nl), tp(mesh%nl)
-    integer                  :: nz, n, nzmax,nzmin
-    real(kind=WP)            :: m, zinv, dt_inv, dz
-    real(kind=WP)            :: rsss, Ty,Ty1, c1,zinv1,zinv2,v_adv
-    real(kind=WP), external  :: TFrez  ! Sea water freeze temperature.
+    integer                  :: nz, n, nzmax, nzmin
+    real(kind=WP)            :: m, zinv, dz
+    real(kind=WP)            :: rsss, Ty, Ty1, c1, zinv1, zinv2, v_adv
     real(kind=WP)            :: isredi=0._WP
     logical                  :: do_wimpl=.true.
     real(kind=WP)            :: zbar_n(mesh%nl), z_n(mesh%nl-1)
@@ -450,10 +449,8 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
     trarr  => tracers%data(tr_num)%values(:,:)
     Wvel_i => dynamics%w_i(:,:)
     !___________________________________________________________________________
-    if ((trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') .OR. (.not. dynamics%use_wsplit)) do_wimpl=.false.
-    
+    if ((trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') .OR. (.not. dynamics%use_wsplit)) do_wimpl=.false.    
     if (Redi) isredi=1._WP
-    dt_inv=1.0_WP/dt
     Ty    =0.0_WP
     Ty1   =0.0_WP
     
@@ -535,8 +532,11 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     ! loop over local nodes
-    do n=1,myDim_nod2D  
-        
+
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmax, nzmin, a, b, c, tr, cp, tp, m, zinv, dz, &
+!$OMP                                         rsss, Ty, Ty1, c1, zinv1, zinv2, v_adv, zbar_n, z_n)
+!$OMP DO
+    do n=1,myDim_nod2D 
         ! initialise
         a  = 0.0_WP
         b  = 0.0_WP
@@ -544,11 +544,9 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
         tr = 0.0_WP
         tp = 0.0_WP
         cp = 0.0_WP
-        
         ! max. number of levels at node n
         nzmax=nlevels_nod2D(n)
         nzmin=ulevels_nod2D(n)
-        
         !___________________________________________________________________________
         ! Here can not exchange zbar_n & Z_n with zbar_3d_n & Z_3d_n because  
         ! they be calculate from the actualized mesh with hnode_new
@@ -564,7 +562,6 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
             Z_n(nz-1)  = zbar_n(nz) + hnode_new(nz-1,n)/2.0_WP
         end do
         zbar_n(nzmin) = zbar_n(nzmin+1) + hnode_new(nzmin,n)
-        
         !_______________________________________________________________________
         ! Regular part of coefficients: --> surface layer 
         nz=nzmin
@@ -583,7 +580,6 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
         !!PS c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv * (area(nz+1,n)/areasvol(nz,n))
         c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv * area(nz+1,n)/areasvol(nz,n) 
         b(nz)=-c(nz)+hnode_new(nz,n)      ! ale
-        
         ! update from the vertical advection --> comes from splitting of vert 
         ! velocity into explicite and implicite contribution
         if (do_wimpl) then
@@ -601,7 +597,6 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
         end if        
         ! backup zinv2 for next depth level
         zinv1=zinv2
-        
         !_______________________________________________________________________
         ! Regular part of coefficients: --> 2nd...nl-2 layer
         do nz=nzmin+1, nzmax-2
@@ -628,7 +623,6 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
             
             ! backup zinv2 for next depth level
             zinv1=zinv2
-            
             ! update from the vertical advection
             if (do_wimpl) then
                 !_______________________________________________________________
@@ -873,7 +867,10 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
             trarr(nz,n)=trarr(nz,n)+tr(nz)
         end do
         
-    end do ! --> do n=1,myDim_nod2D   
+    end do ! --> do n=1,myDim_nod2D
+!$OMP END DO
+!$OMP END PARALLEL
+write(*,*) 'END IMPL VERTICAL DIFFUSION'
 end subroutine diff_ver_part_impl_ale
 !
 !
@@ -1135,28 +1132,33 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
     use g_comm_auto
 
     IMPLICIT NONE
-    integer,        intent(in),    target   :: tr_num
-    type(t_dyn)   , intent(inout), target   :: dynamics
-    type(t_tracer), intent(inout), target   :: tracers
-    type(t_mesh)  , intent(in)   , target   :: mesh
-    type(t_partit), intent(inout), target   :: partit
-    real(kind=WP)                           :: u1, v1, len, vi, tt, ww 
-    integer                                 :: nz, ed, el(2), en(2), k, elem, nl1, ul1
-    real(kind=WP), allocatable              :: temporary_ttf(:,:)
-    real(kind=WP), pointer                  :: ttf(:,:)
+    integer,        intent(in),    target    :: tr_num
+    type(t_dyn)   , intent(inout), target    :: dynamics
+    type(t_tracer), intent(inout), target    :: tracers
+    type(t_mesh)  , intent(in)   , target    :: mesh
+    type(t_partit), intent(inout), target    :: partit
+    integer                                  :: n, nz, ed, el(2), en(2), k, elem, nl1, ul1
+    real(kind=WP)                            :: u1, v1, len, vi, tt, ww 
+    real(kind=WP), pointer                   :: temporary_ttf(:,:)
+    real(kind=WP), pointer                   :: ttf(:,:)
     real(kind=WP), dimension(:,:,:), pointer :: UV
     
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-    UV => dynamics%uv(:,:,:)
-    ttf => tracers%data(tr_num)%values
+    UV            => dynamics%uv(:,:,:)
+    ttf           => tracers%data(tr_num)%values
+    temporary_ttf => tracers%work%del_ttf !use already allocated working array. could be fct_LO instead etc.
 
-    ed=myDim_nod2D+eDim_nod2D
-    allocate(temporary_ttf(nl-1, ed))
+!$OMP PARALLEL DO
+        do n=1, myDim_nod2D+eDim_nod2D
+           temporary_ttf(:, n)=0.0_8
+        end do
+!$OMP END PARALLEL DO
 
-    temporary_ttf=0.0_8
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, ed, el, en, k, elem, nl1, ul1, u1, v1, len, vi, tt, ww)
+!$OMP DO
     DO ed=1, myDim_edge2D+eDim_edge2D
        if (myList_edge2D(ed)>edge2D_in) cycle
        el=edge_tri(:,ed)
@@ -1180,10 +1182,13 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
            temporary_ttf(nz,en(2))=temporary_ttf(nz,en(2))+tt
        END DO 
     END DO
+!$OMP END DO
     call exchange_nod(temporary_ttf, partit)
+!$OMP BARRIER
     ! ===========
     ! Second round: 
     ! ===========
+!$OMP DO
     DO ed=1, myDim_edge2D+eDim_edge2D
        if (myList_edge2D(ed)>edge2D_in) cycle
           el=edge_tri(:,ed)
@@ -1206,8 +1211,9 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
               ttf(nz,en(1))=ttf(nz,en(1))-tt/area(nz,en(1))
               ttf(nz,en(2))=ttf(nz,en(2))+tt/area(nz,en(2))
           END DO 
-    END DO  
-    deallocate(temporary_ttf)
+    END DO
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine diff_part_bh
 !
 !
