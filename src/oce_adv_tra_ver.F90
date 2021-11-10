@@ -102,6 +102,7 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
     real(kind=WP), intent(in)          :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP)                      :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
     real(kind=WP)                      :: cp(mesh%nl), tp(mesh%nl)
+    real(kind=WP)                      :: zbar_n(mesh%nl), z_n(mesh%nl-1)
     integer                            :: nz, n, nzmax, nzmin
     real(kind=WP)                      :: m, zinv, dt_inv, dz
     real(kind=WP)                      :: c1, v_adv

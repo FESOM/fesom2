@@ -564,7 +564,6 @@ if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
 end if
 
 ! tracer gradients & RHS  
-allocate(ttrhs(nl-1,node_size))
 allocate(tr_xy(2,nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D))
 allocate(tr_z(nl,myDim_nod2D+eDim_nod2D))
 

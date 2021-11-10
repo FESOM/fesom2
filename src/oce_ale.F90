@@ -182,6 +182,7 @@ subroutine init_ale(dynamics, partit, mesh)
     type(t_mesh),   intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
     type(t_dyn)   , intent(inout), target :: dynamics
+    real(kind=WP)                         :: zbar_n(mesh%nl), z_n(mesh%nl-1)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -206,12 +207,9 @@ subroutine init_ale(dynamics, partit, mesh)
     ! of the ssh operator.      
     allocate(mesh%dhe(myDim_elem2D))
     
-    ! zbar_n: depth of layers due to ale thinkness variactions at ervery node n 
-    allocate(mesh%zbar_n(nl))
     allocate(mesh%zbar_3d_n(nl,myDim_nod2D+eDim_nod2D))
     
     ! Z_n: mid depth of layers due to ale thinkness variactions at ervery node n 
-    allocate(mesh%Z_n(nl-1))
     allocate(mesh%Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
     
     ! bottom_elem_tickness: changed bottom layer thinkness due to partial cells
@@ -237,8 +235,6 @@ subroutine init_ale(dynamics, partit, mesh)
     dhe(1:myDim_elem2D)                                        => mesh%dhe
     hbar(1:myDim_nod2D+eDim_nod2D)                             => mesh%hbar
     hbar_old(1:myDim_nod2D+eDim_nod2D)                         => mesh%hbar_old
-    zbar_n(1:mesh%nl)                                          => mesh%zbar_n
-    Z_n(1:mesh%nl-1)                                           => mesh%Z_n
     zbar_n_bot(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_bot
     zbar_e_bot(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_bot
     zbar_n_srf(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_srf
@@ -447,6 +443,7 @@ subroutine init_bottom_node_thickness(partit, mesh)
     real(kind=WP) :: hnbot, tvol 
     type(t_mesh),   intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
+
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -2535,10 +2532,11 @@ type(t_mesh),   intent(inout), target :: mesh
 type(t_partit), intent(inout), target :: partit
 type(t_dyn)   , intent(inout), target :: dynamics
 
-real(kind=WP)              ::  a(mesh%nl-1), b(mesh%nl-1), c(mesh%nl-1), ur(mesh%nl-1), vr(mesh%nl-1)
-real(kind=WP)              ::  cp(mesh%nl-1), up(mesh%nl-1), vp(mesh%nl-1)
-integer                    ::  nz, elem, nzmax, nzmin, elnodes(3)
-real(kind=WP)              ::  zinv, m, friction, wu, wd
+real(kind=WP)              :: a(mesh%nl-1), b(mesh%nl-1), c(mesh%nl-1), ur(mesh%nl-1), vr(mesh%nl-1)
+real(kind=WP)              :: cp(mesh%nl-1), up(mesh%nl-1), vp(mesh%nl-1)
+integer                    :: nz, elem, nzmax, nzmin, elnodes(3)
+real(kind=WP)              :: zinv, m, friction, wu, wd
+real(kind=WP)              :: zbar_n(mesh%nl), z_n(mesh%nl-1)
 real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
 real(kind=WP), dimension(:,:)  , pointer :: Wvel_i
 #include "associate_part_def.h"

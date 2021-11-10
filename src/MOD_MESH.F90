@@ -117,7 +117,7 @@ real(kind=WP), allocatable,dimension(:)     :: hbar, hbar_old
 
 ! --> auxiliary array to store depth of layers and depth of mid level due to changing 
 !     layer thinkness at every node
-real(kind=WP), allocatable,dimension(:)     :: zbar_n, Z_n
+!real(kind=WP), allocatable,dimension(:)     :: zbar_n, Z_n
 
 ! new bottom depth at node and element due to partial cells
 real(kind=WP), allocatable,dimension(:)     :: zbar_n_bot
@@ -222,8 +222,8 @@ subroutine write_t_mesh(mesh, unit, iostat, iomsg)
     call write_bin_array(mesh%dhe,                     unit, iostat, iomsg)
     call write_bin_array(mesh%hbar,                    unit, iostat, iomsg)
     call write_bin_array(mesh%hbar_old,                unit, iostat, iomsg)
-    call write_bin_array(mesh%zbar_n,                  unit, iostat, iomsg)
-    call write_bin_array(mesh%Z_n,                     unit, iostat, iomsg)
+!   call write_bin_array(mesh%zbar_n,                  unit, iostat, iomsg)
+!   call write_bin_array(mesh%Z_n,                     unit, iostat, iomsg)
     call write_bin_array(mesh%zbar_n_bot,              unit, iostat, iomsg)
     call write_bin_array(mesh%zbar_e_bot,              unit, iostat, iomsg)
     call write_bin_array(mesh%zbar_n_srf,              unit, iostat, iomsg)
@@ -316,8 +316,8 @@ subroutine read_t_mesh(mesh, unit, iostat, iomsg)
     call read_bin_array(mesh%dhe,                     unit, iostat, iomsg)
     call read_bin_array(mesh%hbar,                    unit, iostat, iomsg)
     call read_bin_array(mesh%hbar_old,                unit, iostat, iomsg)
-    call read_bin_array(mesh%zbar_n,                  unit, iostat, iomsg)
-    call read_bin_array(mesh%Z_n,                     unit, iostat, iomsg)
+!   call read_bin_array(mesh%zbar_n,                  unit, iostat, iomsg)
+!   call read_bin_array(mesh%Z_n,                     unit, iostat, iomsg)
     call read_bin_array(mesh%zbar_n_bot,              unit, iostat, iomsg)
     call read_bin_array(mesh%zbar_e_bot,              unit, iostat, iomsg)
     call read_bin_array(mesh%zbar_n_srf,              unit, iostat, iomsg)
