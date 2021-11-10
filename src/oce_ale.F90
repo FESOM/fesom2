@@ -2564,7 +2564,7 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
     real(kind=WP)              ::  cp(mesh%nl-1), up(mesh%nl-1), vp(mesh%nl-1)
     integer                    ::  nz, elem, nzmax, nzmin, elnodes(3)
     real(kind=WP)              ::  zinv, m, friction, wu, wd
-    real(kind=WP)              ::  zbar_n(mesh%nl), Z_n(mesh%nl-1),
+    real(kind=WP)              ::  zbar_n(mesh%nl), Z_n(mesh%nl-1)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
