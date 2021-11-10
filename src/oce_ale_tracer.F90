@@ -1,124 +1,125 @@
 module diff_part_hor_redi_interface
-  interface
-    subroutine diff_part_hor_redi(tracer, partit, mesh) 
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use mod_tracer
-      type(t_tracer), intent(inout), target :: tracer
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine
-  end interface
+    interface
+        subroutine diff_part_hor_redi(tracer, partit, mesh) 
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use mod_tracer
+        type(t_tracer), intent(inout), target :: tracer
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
 end module
+
 module diff_ver_part_expl_ale_interface
-  interface
-    subroutine diff_ver_part_expl_ale(tr_num, tracer, partit, mesh) 
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use mod_tracer
-      integer,        intent(in),    target :: tr_num
-      type(t_tracer), intent(inout), target :: tracer
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine
-  end interface
+    interface
+        subroutine diff_ver_part_expl_ale(tr_num, tracer, partit, mesh) 
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use mod_tracer
+        integer       , intent(in)   , target :: tr_num
+        type(t_tracer), intent(inout), target :: tracer
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
 end module
 
 module diff_ver_part_redi_expl_interface
-  interface
-    subroutine diff_ver_part_redi_expl(tracer, partit, mesh) 
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use mod_tracer
-      type(t_tracer), intent(inout), target :: tracer
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine
-  end interface
+    interface
+        subroutine diff_ver_part_redi_expl(tracer, partit, mesh) 
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use mod_tracer
+        type(t_tracer), intent(inout), target :: tracer
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
 end module
 
 module diff_ver_part_impl_ale_interface
-  interface
-    subroutine diff_ver_part_impl_ale(tr_num, dynamics,  tracer, partit, mesh) 
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use mod_tracer
-      use MOD_DYN
-      integer,        intent(in),    target :: tr_num
-      type(t_dyn), intent(inout), target :: dynamics
-      type(t_tracer), intent(inout), target :: tracer
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine
-  end interface
+    interface
+        subroutine diff_ver_part_impl_ale(tr_num, dynamics,  tracer, partit, mesh) 
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use mod_tracer
+        use MOD_DYN
+        integer       , intent(in)   , target :: tr_num
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_tracer), intent(inout), target :: tracer
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
 end module
 
 module diff_tracers_ale_interface
-  interface
-    subroutine diff_tracers_ale(tr_num, dynamics, tracer, partit, mesh) 
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use mod_tracer
-      use MOD_DYN
-      integer,        intent(in),    target :: tr_num
-      type(t_dyn)   , intent(inout), target :: dynamics
-      type(t_tracer), intent(inout), target :: tracer
-      type(t_mesh)  , intent(in)   , target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine
-  end interface
+    interface
+        subroutine diff_tracers_ale(tr_num, dynamics, tracer, partit, mesh) 
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use mod_tracer
+        use MOD_DYN
+        integer       , intent(in),    target :: tr_num
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_tracer), intent(inout), target :: tracer
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
 end module
 
 module bc_surface_interface
-  interface
-    function bc_surface(n, id, sval, partit) 
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      integer , intent(in)                  :: n, id
-      type(t_partit), intent(inout), target :: partit
-      real(kind=WP)                         :: bc_surface
-      real(kind=WP), intent(in)             :: sval
-    end function
-  end interface
+    interface
+        function bc_surface(n, id, sval, partit) 
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        integer , intent(in)                  :: n, id
+        type(t_partit), intent(inout), target :: partit
+        real(kind=WP)                         :: bc_surface
+        real(kind=WP), intent(in)             :: sval
+        end function
+    end interface
 end module
 
 module diff_part_bh_interface
-  interface
-    subroutine diff_part_bh(tr_num, dynamics, tracer, partit, mesh) 
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use mod_tracer
-      use MOD_DYN
-      integer,        intent(in),    target :: tr_num
-      type(t_dyn)   , intent(inout), target :: dynamics
-      type(t_tracer), intent(inout), target :: tracer
-      type(t_mesh)  , intent(in)   , target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine
-  end interface
+    interface
+        subroutine diff_part_bh(tr_num, dynamics, tracer, partit, mesh) 
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use mod_tracer
+        use MOD_DYN
+        integer       , intent(in)   , target :: tr_num
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_tracer), intent(inout), target :: tracer
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
 end module
 
 module solve_tracers_ale_interface
-  interface
-    subroutine solve_tracers_ale(dynamics, tracers, partit, mesh) 
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use mod_tracer     
-      use MOD_DYN
-      type(t_tracer), intent(inout), target :: tracers
-      type(t_mesh)  , intent(in)   , target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      type(t_dyn)   , intent(inout), target :: dynamics
-    end subroutine
-  end interface
+    interface
+        subroutine solve_tracers_ale(dynamics, tracers, partit, mesh) 
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use mod_tracer     
+        use MOD_DYN
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_tracer), intent(inout), target :: tracers
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
 end module
 !
 !
@@ -138,12 +139,14 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
     use diff_tracers_ale_interface
     use oce_adv_tra_driver_interfaces    
     implicit none
-
     type(t_dyn)   , intent(inout), target    :: dynamics
     type(t_tracer), intent(inout), target    :: tracers
-    type(t_mesh)  , intent(in)   , target    :: mesh
     type(t_partit), intent(inout), target    :: partit
+    type(t_mesh)  , intent(in)   , target    :: mesh
+    !___________________________________________________________________________
     integer                                  :: tr_num, node, elem, nzmax, nzmin
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
     real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, Wvel_i, fer_Wvel
     real(kind=WP), dimension(:,:)  , pointer :: del_ttf
@@ -226,12 +229,14 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
         end if 
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
     end do
+    
     !___________________________________________________________________________
     ! 3D restoring for "passive" tracers
     !!!$OMPTODO: add OpenMP later, not needed right now!
     do tr_num=1, ptracers_restore_total
        tracers%data(ptracers_restore(tr_num)%locid)%values(:, ptracers_restore(tr_num)%ind2)=1.0_WP
     end do
+    
     !___________________________________________________________________________
     ! subtract the the bolus velocities back from 3D velocities:
     if (Fer_GM) then
@@ -247,6 +252,7 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
         end do
 !$OMP END PARALLEL DO
     end if
+    
     !___________________________________________________________________________
     ! to avoid crash with high salinities when coupled to atmosphere
     ! --> if we do only where (tr_arr(:,:,2) < 3._WP ) we also fill up the bottom 
@@ -283,33 +289,36 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
     use diff_ver_part_impl_ale_interface
     use diff_part_bh_interface
     implicit none
-    
-    integer                               :: n, nzmax, nzmin
-    integer,        intent(in),    target :: tr_num
+    integer       , intent(in)   , target :: tr_num
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_tracer), intent(inout), target :: tracers
-    type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    integer                               :: n, nzmax, nzmin
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
     real(kind=WP), pointer                :: del_ttf(:,:)
-
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-
     del_ttf => tracers%work%del_ttf
+    
     !___________________________________________________________________________
     ! do horizontal diffusiion
     ! write there also horizontal diffusion rhs to del_ttf which is equal the R_T^n 
     ! in danilovs srcipt
     ! includes Redi diffusivity if Redi=.true.
     call diff_part_hor_redi(tracers, partit, mesh)  ! seems to be ~9% faster than diff_part_hor
+    
     !___________________________________________________________________________
     ! do vertical diffusion: explicit
     if (.not. tracers%i_vert_diff) call diff_ver_part_expl_ale(tr_num, tracers, partit, mesh) 
     ! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
     ! derivatives and has to be computed explicitly!
     if (Redi) call diff_ver_part_redi_expl(tracers, partit, mesh)     
+
     !___________________________________________________________________________
     ! Update tracers --> calculate T* see Danilov et al. (2017)
     ! T* =  (dt*R_T^n + h^(n-0.5)*T^(n-0.5))/h^(n+0.5)
@@ -351,26 +360,28 @@ subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
     USE MOD_PARSUP
     use MOD_TRACER
     use g_config,only: dt
-    
     implicit none 
-    integer,        intent(in),    target :: tr_num
+    integer       , intent(in)   , target :: tr_num
     type(t_tracer), intent(inout), target :: tracers
-    type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
     integer                  :: n, nz, nl1, ul1
     real(kind=WP)            :: vd_flux(mesh%nl-1)
     real(kind=WP)            :: rdata, flux, rlx
     real(kind=WP)            :: zinv1
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
     real(kind=WP), pointer   :: del_ttf(:,:)
-
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-
     del_ttf => tracers%work%del_ttf
+    
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nl1, ul1, vd_flux, rdata, flux, rlx, zinv1)
     !___________________________________________________________________________    
+    Ty = 0.0_WP
     do n=1, myDim_nod2D
         nl1=nlevels_nod2D(n)-1
         ul1=ulevels_nod2D(n)
@@ -424,13 +435,13 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
     use o_mixing_KPP_mod !for ghats _GO_   
     use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
     use bc_surface_interface
-        
     implicit none
-    integer,        intent(in),    target :: tr_num
+    integer       , intent(in)   , target :: tr_num
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_tracer), intent(inout), target :: tracers
-    type(t_mesh)  , intent(in)   , target :: mesh
     type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
     real(kind=WP)            :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
     real(kind=WP)            :: cp(mesh%nl), tp(mesh%nl)
     integer                  :: nz, n, nzmax,nzmin
@@ -440,15 +451,17 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
     real(kind=WP)            :: isredi=0._WP
     logical                  :: do_wimpl=.true.
     real(kind=WP)            :: zbar_n(mesh%nl), z_n(mesh%nl-1)
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
     real(kind=WP), dimension(:,:), pointer :: trarr
     real(kind=WP), dimension(:,:), pointer :: Wvel_i
-
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
     trarr  => tracers%data(tr_num)%values(:,:)
     Wvel_i => dynamics%w_i(:,:)
+    
     !___________________________________________________________________________
     if ((trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') .OR. (.not. dynamics%use_wsplit)) do_wimpl=.false.
     
@@ -889,24 +902,26 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
     use g_comm_auto
     IMPLICIT NONE
     type(t_tracer), intent(inout), target :: tracers
-    type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+    !___________________________________________________________________________
     integer                  :: n, k, elem, nz
     integer                  :: n2, nl1, ul1, nl2
     real(kind=WP)            :: Tx, Ty, vd_flux(mesh%nl)
     real(kind=WP)            :: tr_xynodes(2,mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP)            :: zbar_n(mesh%nl), z_n(mesh%nl-1)
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
     real(kind=WP), pointer   :: del_ttf(:,:)
-
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-
     del_ttf => tracers%work%del_ttf
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, elem, nz, n2, nl1, ul1, nl2, Tx, Ty, vd_flux, zbar_n, z_n)
 !$OMP DO
+    !___________________________________________________________________________
     do n=1, myDim_nod2D
         nl1=nlevels_nod2D(n)-1
         ul1=ulevels_nod2D(n)
@@ -973,22 +988,25 @@ subroutine diff_part_hor_redi(tracers, partit, mesh)
     use g_config
     IMPLICIT NONE
     type(t_tracer), intent(inout), target :: tracers
-    type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
     integer                  :: edge
     real(kind=WP)            :: deltaX1, deltaY1, deltaX2, deltaY2
     integer                  :: nl1, ul1, nl2, ul2, nl12, ul12, nz, el(2), elnodes(3), enodes(2)
     real(kind=WP)            :: c, Fx, Fy, Tx, Ty, Tx_z, Ty_z, SxTz, SyTz, Tz(2)
     real(kind=WP)            :: rhs1(mesh%nl-1), rhs2(mesh%nl-1), Kh, dz
     real(kind=WP)            :: isredi=0._WP
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
     real(kind=WP), pointer   :: del_ttf(:,:)
-
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-
     del_ttf => tracers%work%del_ttf
+
+    !___________________________________________________________________________
     if (Redi) isredi=1._WP
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, &
 !$OMP                   nl1, ul1, nl2, ul2, nl12, ul12, nz, el, elnodes, enodes, &
@@ -1133,30 +1151,32 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
     use o_param
     use g_config
     use g_comm_auto
-
     IMPLICIT NONE
-    integer,        intent(in),    target   :: tr_num
+    integer       , intent(in)   , target   :: tr_num
     type(t_dyn)   , intent(inout), target   :: dynamics
     type(t_tracer), intent(inout), target   :: tracers
-    type(t_mesh)  , intent(in)   , target   :: mesh
     type(t_partit), intent(inout), target   :: partit
+    type(t_mesh)  , intent(in)   , target   :: mesh
+    !___________________________________________________________________________
     real(kind=WP)                           :: u1, v1, len, vi, tt, ww 
     integer                                 :: nz, ed, el(2), en(2), k, elem, nl1, ul1
     real(kind=WP), allocatable              :: temporary_ttf(:,:)
-    real(kind=WP), pointer                  :: ttf(:,:)
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV
-    
+    real(kind=WP), dimension(:,:)  , pointer :: ttf
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
     UV => dynamics%uv(:,:,:)
     ttf => tracers%data(tr_num)%values
-
+    
+    !___________________________________________________________________________
     ed=myDim_nod2D+eDim_nod2D
     allocate(temporary_ttf(nl-1, ed))
 
-    temporary_ttf=0.0_8
+    temporary_ttf=0.0_WP
     DO ed=1, myDim_edge2D+eDim_edge2D
        if (myList_edge2D(ed)>edge2D_in) cycle
        el=edge_tri(:,ed)
