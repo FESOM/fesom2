@@ -29,7 +29,6 @@ module momentum_adv_scalar_interface
   end interface
 end module
 
-
 !
 !
 !_______________________________________________________________________________
@@ -48,11 +47,11 @@ subroutine compute_vel_rhs(dynamics, partit, mesh)
     use g_comm_auto
     use g_sbf, only: l_mslp
     use momentum_adv_scalar_interface
-    
     implicit none 
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
     integer                  :: elem, elnodes(3), nz, nzmax, nzmin 
     real(kind=WP)            :: ff, mm 
     real(kind=WP)            :: Fx, Fy, pre(3)
@@ -60,9 +59,10 @@ subroutine compute_vel_rhs(dynamics, partit, mesh)
     real(kind=WP)            :: t1, t2, t3, t4
     real(kind=WP)            :: p_ice(3), p_air(3), p_eta(3)
     integer                  :: use_pice
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB, UV_rhs
     real(kind=WP), dimension(:)    , pointer :: eta_n
-
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -72,6 +72,7 @@ subroutine compute_vel_rhs(dynamics, partit, mesh)
     UV_rhsAB =>dynamics%uv_rhsAB(:,:,:)
     eta_n    =>dynamics%eta_n(:)
 
+    !___________________________________________________________________________
     t1=MPI_Wtime()
     use_pice=0
     if (use_floatice .and.  .not. trim(which_ale)=='linfs') use_pice=1
@@ -182,31 +183,31 @@ subroutine compute_vel_rhs(dynamics, partit, mesh)
     !    write(*,*) 'vert. part  ', t4-t3
     ! end if     
 END SUBROUTINE compute_vel_rhs
-! ===================================================================
+
 !
 ! Momentum advection on scalar control volumes with ALE adaption--> exchange zinv(nz)
 ! against hnode(nz,node)
 !_______________________________________________________________________________
 subroutine momentum_adv_scalar(dynamics, partit, mesh)
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-use MOD_DYN
-USE o_PARAM
-use g_comm_auto
-IMPLICIT NONE
-
-type(t_dyn)   , intent(inout), target :: dynamics
-type(t_partit), intent(inout), target :: partit
-type(t_mesh)  , intent(in)   , target :: mesh
-
-integer                  :: n, nz, el1, el2
-integer                  :: nl1, nl2, ul1, ul2, nod(2), el, ed, k, nle, ule
-real(kind=WP)            :: un1(1:mesh%nl-1), un2(1:mesh%nl-1)
-real(kind=WP)            :: wu(1:mesh%nl), wv(1:mesh%nl)
-real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB, UVnode_rhs
-real(kind=WP), dimension(:,:), pointer :: Wvel_e
-
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use MOD_DYN
+    USE o_PARAM
+    use g_comm_auto
+    IMPLICIT NONE
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    integer                  :: n, nz, el1, el2
+    integer                  :: nl1, nl2, ul1, ul2, nod(2), el, ed, k, nle, ule
+    real(kind=WP)            :: un1(1:mesh%nl-1), un2(1:mesh%nl-1)
+    real(kind=WP)            :: wu(1:mesh%nl), wv(1:mesh%nl)
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB, UVnode_rhs
+    real(kind=WP), dimension(:,:)  , pointer :: Wvel_e
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"

@@ -1,103 +1,108 @@
 module oce_initial_state_interface
-  interface
-    subroutine oce_initial_state(tracers, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use mod_tracer
-      type(t_mesh),   intent(in)  ,  target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      type(t_tracer), intent(inout), target :: tracers
-    end subroutine
-  end interface
+    interface
+        subroutine oce_initial_state(tracers, partit, mesh)
+        USE MOD_MESH
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use mod_tracer
+        type(t_tracer), intent(inout), target :: tracers
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in)  ,  target :: mesh
+        end subroutine
+    end interface
 end module
 
 module tracer_init_interface
-  interface
-    subroutine tracer_init(tracers, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use mod_tracer
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      type(t_tracer), intent(inout), target :: tracers
-    end subroutine
-  end interface
+    interface
+        subroutine tracer_init(tracers, partit, mesh)
+        USE MOD_MESH
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use mod_tracer
+        type(t_tracer), intent(inout), target :: tracers
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in)  ,  target :: mesh
+        end subroutine
+    end interface
 end module
 
 module dynamics_init_interface
-  interface
-    subroutine dynamics_init(dynamics, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use MOD_DYN
-      type(t_mesh)  , intent(in)   , target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      type(t_dyn)   , intent(inout), target :: dynamics
-    end subroutine
-  end interface
+    interface
+        subroutine dynamics_init(dynamics, partit, mesh)
+        USE MOD_MESH
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use MOD_DYN
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
 end module
 
 module ocean_setup_interface
-  interface
-    subroutine ocean_setup(dynamics, tracers, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use mod_tracer
-      use MOD_DYN
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      type(t_tracer), intent(inout), target :: tracers
-      type(t_dyn), intent(inout), target :: dynamics
-    end subroutine
-  end interface
+    interface
+        subroutine ocean_setup(dynamics, tracers, partit, mesh)
+        USE MOD_MESH
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use mod_tracer
+        use MOD_DYN
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_tracer), intent(inout), target :: tracers
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
 end module
+
 module before_oce_step_interface
-  interface
-    subroutine before_oce_step(dynamics, tracers, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use mod_tracer
-      use MOD_DYN
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      type(t_tracer), intent(inout), target :: tracers
-      type(t_dyn), intent(inout), target :: dynamics
-    end subroutine
-  end interface
+    interface
+        subroutine before_oce_step(dynamics, tracers, partit, mesh)
+        USE MOD_MESH
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use mod_tracer
+        use MOD_DYN
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_tracer), intent(inout), target :: tracers
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
 end module
+!
+!
 !_______________________________________________________________________________
 subroutine ocean_setup(dynamics, tracers, partit, mesh)
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE MOD_TRACER
-USE MOD_DYN
-USE o_PARAM
-USE o_ARRAYS
-USE g_config
-USE g_forcing_param, only: use_virt_salt
-use g_cvmix_tke
-use g_cvmix_idemix
-use g_cvmix_pp
-use g_cvmix_kpp
-use g_cvmix_tidal
-use g_backscatter
-use Toy_Channel_Soufflet
-use oce_initial_state_interface
-use oce_adv_tra_fct_interfaces
-use init_ale_interface
-use init_thickness_ale_interface
-IMPLICIT NONE
-type(t_mesh),   intent(inout), target :: mesh
-type(t_partit), intent(inout), target :: partit
-type(t_tracer), intent(inout), target :: tracers
-type(t_dyn), intent(inout), target :: dynamics
-integer                               :: n
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_TRACER
+    USE MOD_DYN
+    USE o_PARAM
+    USE o_ARRAYS
+    USE g_config
+    USE g_forcing_param, only: use_virt_salt
+    use g_cvmix_tke
+    use g_cvmix_idemix
+    use g_cvmix_pp
+    use g_cvmix_kpp
+    use g_cvmix_tidal
+    use g_backscatter
+    use Toy_Channel_Soufflet
+    use oce_initial_state_interface
+    use oce_adv_tra_fct_interfaces
+    use init_ale_interface
+    use init_thickness_ale_interface
+    IMPLICIT NONE
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_tracer), intent(inout), target :: tracers
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(inout), target :: mesh
+    !___________________________________________________________________________
+    integer                               :: n
+    
     !___setup virt_salt_flux____________________________________________________
     ! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
     ! salinity flux need to be used
@@ -255,101 +260,106 @@ integer                               :: n
         write(*,*) '******************************************************************************'
     end if
 end subroutine ocean_setup
+!
+!
 !_______________________________________________________________________________
 SUBROUTINE tracer_init(tracers, partit, mesh)
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE MOD_TRACER
-USE DIAGNOSTICS, only: ldiag_DVD
-USE g_ic3d
-IMPLICIT NONE
-integer        :: elem_size, node_size
-integer, save  :: nm_unit  = 104       ! unit to open namelist file, skip 100-102 for cray
-integer        :: iost
-integer        :: n
-
-integer        :: num_tracers
-logical        :: i_vert_diff, smooth_bh_tra
-real(kind=WP)  :: gamma0_tra, gamma1_tra, gamma2_tra
-
-type(t_mesh),   intent(in) ,   target               :: mesh
-type(t_partit), intent(inout), target               :: partit
-type(t_tracer), intent(inout), target               :: tracers
-type(nml_tracer_list_type),    target, allocatable  :: nml_tracer_list(:)
-
-namelist /tracer_listsize/ num_tracers
-namelist /tracer_list    / nml_tracer_list
-namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff
-
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_TRACER
+    USE DIAGNOSTICS, only: ldiag_DVD
+    USE g_ic3d
+    IMPLICIT NONE
+    type(t_tracer), intent(inout), target               :: tracers
+    type(t_partit), intent(inout), target               :: partit
+    type(t_mesh),   intent(in) ,   target               :: mesh
+    type(nml_tracer_list_type),    target, allocatable  :: nml_tracer_list(:)
+    !___________________________________________________________________________
+    integer        :: elem_size, node_size
+    integer, save  :: nm_unit  = 104       ! unit to open namelist file, skip 100-102 for cray
+    integer        :: iost
+    integer        :: n
+    !___________________________________________________________________________
+    ! define tracer namelist parameter
+    integer        :: num_tracers
+    logical        :: i_vert_diff, smooth_bh_tra
+    real(kind=WP)  :: gamma0_tra, gamma1_tra, gamma2_tra
+    namelist /tracer_listsize/ num_tracers
+    namelist /tracer_list    / nml_tracer_list
+    namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    
+    !___________________________________________________________________________
+    ! OPEN and read namelist for I/O
+    open( unit=nm_unit, file='namelist.tra', form='formatted', access='sequential', status='old', iostat=iost )
+    if (iost == 0) then
+        if (mype==0) WRITE(*,*) '     file   : ', 'namelist.tra',' open ok'
+        else
+        if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.tra',' ; iostat=',iost
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        stop
+    end if
 
-! OPEN and read namelist for I/O
-open( unit=nm_unit, file='namelist.tra', form='formatted', access='sequential', status='old', iostat=iost )
-if (iost == 0) then
-   if (mype==0) WRITE(*,*) '     file   : ', 'namelist.tra',' open ok'
-else
-   if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.tra',' ; iostat=',iost
-   call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-   stop
-end if
+    READ(nm_unit, nml=tracer_listsize, iostat=iost)
+    allocate(nml_tracer_list(num_tracers))
+    READ(nm_unit, nml=tracer_list,     iostat=iost)
+    read(nm_unit, nml=tracer_init3d,   iostat=iost)
+    READ(nm_unit, nml=tracer_general,  iostat=iost)
+    close(nm_unit)
 
-READ(nm_unit,  nml=tracer_listsize, iostat=iost)
-allocate(nml_tracer_list(num_tracers))
-READ(nm_unit,  nml=tracer_list,     iostat=iost)
-read (nm_unit, nml=tracer_init3d,   iostat=iost)
-READ(nm_unit,  nml=tracer_general,  iostat=iost)
-close(nm_unit)
+    do n=1, num_tracers
+    if (nml_tracer_list(n)%id==-1) then
+        if (mype==0) write(*,*) 'number of tracers will be changed from ', num_tracers, ' to ', n-1, '!'
+        num_tracers=n-1
+        EXIT
+    end if
+    end do
 
-do n=1, num_tracers
-   if (nml_tracer_list(n)%id==-1) then
-      if (mype==0) write(*,*) 'number of tracers will be changed from ', num_tracers, ' to ', n-1, '!'
-      num_tracers=n-1
-      EXIT
-   end if
-end do
+    if (mype==0) write(*,*) 'total number of tracers is: ', num_tracers
 
-if (mype==0) write(*,*) 'total number of tracers is: ', num_tracers
+    !___________________________________________________________________________
+    ! define local vertice & elem array size + number of tracers
+    elem_size=myDim_elem2D+eDim_elem2D
+    node_size=myDim_nod2D+eDim_nod2D
+    tracers%num_tracers=num_tracers
 
-elem_size=myDim_elem2D+eDim_elem2D
-node_size=myDim_nod2D+eDim_nod2D
-
-tracers%num_tracers=num_tracers
-
-! ================
-! Temperature (index=1), Salinity (index=2), etc.
-! ================
-allocate(tracers%data(num_tracers))
-do n=1, tracers%num_tracers
-   allocate(tracers%data(n)%values  (nl-1,node_size))
-   allocate(tracers%data(n)%valuesAB(nl-1,node_size))
-   tracers%data(n)%ID            = nml_tracer_list(n)%id
-   tracers%data(n)%tra_adv_hor   = TRIM(nml_tracer_list(n)%adv_hor)
-   tracers%data(n)%tra_adv_ver   = TRIM(nml_tracer_list(n)%adv_ver)
-   tracers%data(n)%tra_adv_lim   = TRIM(nml_tracer_list(n)%adv_lim)
-   tracers%data(n)%tra_adv_ph    = nml_tracer_list(n)%adv_ph
-   tracers%data(n)%tra_adv_pv    = nml_tracer_list(n)%adv_pv
-   tracers%data(n)%smooth_bh_tra = smooth_bh_tra
-   tracers%data(n)%gamma0_tra    = gamma0_tra
-   tracers%data(n)%gamma1_tra    = gamma1_tra
-   tracers%data(n)%gamma2_tra    = gamma2_tra
-   tracers%data(n)%values        = 0.
-   tracers%data(n)%valuesAB      = 0.
-   tracers%data(n)%i_vert_diff   = i_vert_diff
-end do
-allocate(tracers%work%del_ttf(nl-1,node_size))
-allocate(tracers%work%del_ttf_advhoriz(nl-1,node_size),tracers%work%del_ttf_advvert(nl-1,node_size))
-tracers%work%del_ttf          = 0.0_WP
-tracers%work%del_ttf_advhoriz = 0.0_WP
-tracers%work%del_ttf_advvert  = 0.0_WP
-if (ldiag_DVD) then
-    allocate(tracers%work%tr_dvd_horiz(nl-1,node_size,2),tracers%work%tr_dvd_vert(nl-1,node_size,2))
-    tracers%work%tr_dvd_horiz = 0.0_WP
-    tracers%work%tr_dvd_vert  = 0.0_WP
-end if
+    !___________________________________________________________________________
+    ! allocate/initialise horizontal velocity arrays in derived type
+    ! Temperature (index=1), Salinity (index=2), etc.
+    allocate(tracers%data(num_tracers))
+    do n=1, tracers%num_tracers
+        allocate(tracers%data(n)%values  (nl-1,node_size))
+        allocate(tracers%data(n)%valuesAB(nl-1,node_size))
+        tracers%data(n)%ID            = nml_tracer_list(n)%id
+        tracers%data(n)%tra_adv_hor   = TRIM(nml_tracer_list(n)%adv_hor)
+        tracers%data(n)%tra_adv_ver   = TRIM(nml_tracer_list(n)%adv_ver)
+        tracers%data(n)%tra_adv_lim   = TRIM(nml_tracer_list(n)%adv_lim)
+        tracers%data(n)%tra_adv_ph    = nml_tracer_list(n)%adv_ph
+        tracers%data(n)%tra_adv_pv    = nml_tracer_list(n)%adv_pv
+        tracers%data(n)%smooth_bh_tra = smooth_bh_tra
+        tracers%data(n)%gamma0_tra    = gamma0_tra
+        tracers%data(n)%gamma1_tra    = gamma1_tra
+        tracers%data(n)%gamma2_tra    = gamma2_tra
+        tracers%data(n)%values        = 0.
+        tracers%data(n)%valuesAB      = 0.
+        tracers%data(n)%i_vert_diff   = i_vert_diff
+    end do
+    allocate(tracers%work%del_ttf(nl-1,node_size))
+    allocate(tracers%work%del_ttf_advhoriz(nl-1,node_size),tracers%work%del_ttf_advvert(nl-1,node_size))
+    tracers%work%del_ttf          = 0.0_WP
+    tracers%work%del_ttf_advhoriz = 0.0_WP
+    tracers%work%del_ttf_advvert  = 0.0_WP
+    if (ldiag_DVD) then
+        allocate(tracers%work%tr_dvd_horiz(nl-1,node_size,2),tracers%work%tr_dvd_vert(nl-1,node_size,2))
+        tracers%work%tr_dvd_horiz = 0.0_WP
+        tracers%work%tr_dvd_vert  = 0.0_WP
+    end if
 END SUBROUTINE tracer_init
 !
 !
@@ -361,10 +371,15 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     USE MOD_DYN
     USE o_param
     IMPLICIT NONE
+    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_dyn)   , intent(inout), target :: dynamics
+    !___________________________________________________________________________
     integer        :: elem_size, node_size
     integer, save  :: nm_unit  = 105       ! unit to open namelist file, skip 100-102 for cray
     integer        :: iost
-
+    !___________________________________________________________________________
+    ! define dynamics namelist parameter
     integer        :: opt_visc
     real(kind=WP)  :: visc_gamma0, visc_gamma1, visc_gamma2
     real(kind=WP)  :: visc_easybsreturn
@@ -373,21 +388,17 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     logical        :: use_freeslip
     logical        :: use_wsplit
     real(kind=WP)  :: wsplit_maxcfl
-
-    type(t_mesh)  , intent(in)   , target :: mesh
-    type(t_partit), intent(inout), target :: partit
-    type(t_dyn)   , intent(inout), target :: dynamics
-
-    ! define dynamics namelist parameter
     namelist /dynamics_visc   / opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
                                 use_ivertvisc, visc_easybsreturn
     namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl 
-
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"   
     
+    !___________________________________________________________________________
     ! open and read namelist for I/O
     open(unit=nm_unit, file='namelist.dyn', form='formatted', access='sequential', status='old', iostat=iost )
     if (iost == 0) then
@@ -474,146 +485,146 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
         dynamics%work%u_b = 0.0_WP
         dynamics%work%v_b = 0.0_WP
     end if 
-
-
 END SUBROUTINE dynamics_init
 !
 !
 !_______________________________________________________________________________
 SUBROUTINE arrays_init(num_tracers, partit, mesh)
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE o_ARRAYS
-USE o_PARAM
-use g_comm_auto
-use g_config
-use g_forcing_arrays
-use o_mixing_kpp_mod ! KPP
-USE g_forcing_param, only: use_virt_salt
-use diagnostics,     only: ldiag_dMOC, ldiag_DVD
-IMPLICIT NONE
-integer                               :: elem_size, node_size
-integer                               :: n
-integer,        intent(in)            :: num_tracers
-type(t_mesh),   intent(in),    target :: mesh
-type(t_partit), intent(inout), target :: partit
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE o_ARRAYS
+    USE o_PARAM
+    use g_comm_auto
+    use g_config
+    use g_forcing_arrays
+    use o_mixing_kpp_mod ! KPP
+    USE g_forcing_param, only: use_virt_salt
+    use diagnostics,     only: ldiag_dMOC, ldiag_DVD
+    IMPLICIT NONE
+    integer,        intent(in)            :: num_tracers
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+    !___________________________________________________________________________
+    integer                               :: elem_size, node_size
+    integer                               :: n
+    !___________________________________________________________________________
+    ! define dynamics namelist parameter
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
+    !___________________________________________________________________________
+    elem_size=myDim_elem2D+eDim_elem2D
+    node_size=myDim_nod2D+eDim_nod2D
 
-elem_size=myDim_elem2D+eDim_elem2D
-node_size=myDim_nod2D+eDim_nod2D
+    ! ================
+    ! Velocities
+    ! ================     
+    !allocate(stress_diag(2, elem_size))!delete me
+    !!PS allocate(Visc(nl-1, elem_size))
+    ! ================
+    ! elevation and its rhs
+    ! ================
+
+    ! ================
+    ! Monin-Obukhov
+    ! ================
+    if (use_ice .and. use_momix) allocate(mo(nl,node_size),mixlength(node_size))
+    if (use_ice .and. use_momix) mixlength=0.
+    ! ================
+    ! Vertical velocity and pressure
+    ! ================
+    allocate( hpressure(nl,node_size))
+    allocate(bvfreq(nl,node_size),mixlay_dep(node_size),bv_ref(node_size))
+    ! ================
+    ! Ocean forcing arrays
+    ! ================
+    allocate(Tclim(nl-1,node_size), Sclim(nl-1, node_size))
+    allocate(stress_surf(2,myDim_elem2D))    !!! Attention, it is shorter !!! 
+    allocate(stress_node_surf(2,node_size))
+    allocate(stress_atmoce_x(node_size), stress_atmoce_y(node_size)) 
+    allocate(relax2clim(node_size)) 
+    allocate(heat_flux(node_size), Tsurf(node_size))
+    allocate(water_flux(node_size), Ssurf(node_size))
+    allocate(relax_salt(node_size))
+    allocate(virtual_salt(node_size))
+
+    allocate(heat_flux_in(node_size))
+    allocate(real_salt_flux(node_size)) !PS
+    ! =================
+    ! Arrays used to organize surface forcing
+    ! =================
+    allocate(Tsurf_t(node_size,2), Ssurf_t(node_size,2))
+    allocate(tau_x_t(node_size,2), tau_y_t(node_size,2))  
 
 
-! ================
-! Velocities
-! ================     
-!allocate(stress_diag(2, elem_size))!delete me
-!!PS allocate(Visc(nl-1, elem_size))
-! ================
-! elevation and its rhs
-! ================
+    ! =================
+    ! Visc and Diff coefs
+    ! =================
 
-! ================
-! Monin-Obukhov
-! ================
-if (use_ice .and. use_momix) allocate(mo(nl,node_size),mixlength(node_size))
-if (use_ice .and. use_momix) mixlength=0.
-! ================
-! Vertical velocity and pressure
-! ================
-allocate( hpressure(nl,node_size))
-allocate(bvfreq(nl,node_size),mixlay_dep(node_size),bv_ref(node_size))
-! ================
-! Ocean forcing arrays
-! ================
-allocate(Tclim(nl-1,node_size), Sclim(nl-1, node_size))
-allocate(stress_surf(2,myDim_elem2D))    !!! Attention, it is shorter !!! 
-allocate(stress_node_surf(2,node_size))
-allocate(stress_atmoce_x(node_size), stress_atmoce_y(node_size)) 
-allocate(relax2clim(node_size)) 
-allocate(heat_flux(node_size), Tsurf(node_size))
-allocate(water_flux(node_size), Ssurf(node_size))
-allocate(relax_salt(node_size))
-allocate(virtual_salt(node_size))
+    allocate(Av(nl,elem_size), Kv(nl,node_size))
 
-allocate(heat_flux_in(node_size))
-allocate(real_salt_flux(node_size)) !PS
-! =================
-! Arrays used to organize surface forcing
-! =================
-allocate(Tsurf_t(node_size,2), Ssurf_t(node_size,2))
-allocate(tau_x_t(node_size,2), tau_y_t(node_size,2))  
+    Av=0.0_WP
+    Kv=0.0_WP
+    if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
+    allocate(Kv_double(nl,node_size, num_tracers))
+    Kv_double=0.0_WP
+    !!PS call oce_mixing_kpp_init ! Setup constants, allocate arrays and construct look up table
+    end if
 
+    ! tracer gradients & RHS  
+    allocate(ttrhs(nl-1,node_size))
+    allocate(tr_xy(2,nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D))
+    allocate(tr_z(nl,myDim_nod2D+eDim_nod2D))
 
-! =================
-! Visc and Diff coefs
-! =================
+    ! neutral slope etc. to be used in Redi formulation
+    allocate(neutral_slope(3, nl-1, node_size))
+    allocate(slope_tapered(3, nl-1, node_size))
+    allocate(Ki(nl-1, node_size))
 
-allocate(Av(nl,elem_size), Kv(nl,node_size))
+    do n=1, node_size
+    !  Ki(n)=K_hor*area(1,n)/scale_area
+    Ki(:,n)=K_hor*(mesh_resolution(n)/100000.0_WP)**2
+    end do
+    call exchange_nod(Ki, partit)
 
-Av=0.0_WP
-Kv=0.0_WP
-if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
-   allocate(Kv_double(nl,node_size, num_tracers))
-   Kv_double=0.0_WP
-   !!PS call oce_mixing_kpp_init ! Setup constants, allocate arrays and construct look up table
-end if
+    neutral_slope=0.0_WP
+    slope_tapered=0.0_WP
 
-! tracer gradients & RHS  
-allocate(ttrhs(nl-1,node_size))
-allocate(tr_xy(2,nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D))
-allocate(tr_z(nl,myDim_nod2D+eDim_nod2D))
+    allocate(MLD1(node_size), MLD2(node_size), MLD1_ind(node_size), MLD2_ind(node_size))
+    if (use_global_tides) then
+    allocate(ssh_gp(node_size))
+    ssh_gp=0.
+    end if
+    ! xy gradient of a neutral surface
+    allocate(sigma_xy(2, nl-1, node_size))
+    sigma_xy=0.0_WP
 
-! neutral slope etc. to be used in Redi formulation
-allocate(neutral_slope(3, nl-1, node_size))
-allocate(slope_tapered(3, nl-1, node_size))
-allocate(Ki(nl-1, node_size))
+    ! alpha and beta in the EoS
+    allocate(sw_beta(nl-1, node_size), sw_alpha(nl-1, node_size))
+    allocate(dens_flux(node_size))
+    sw_beta  =0.0_WP
+    sw_alpha =0.0_WP
+    dens_flux=0.0_WP
 
-do n=1, node_size
-!  Ki(n)=K_hor*area(1,n)/scale_area
-   Ki(:,n)=K_hor*(mesh_resolution(n)/100000.0_WP)**2
-end do
-call exchange_nod(Ki, partit)
+    if (Fer_GM) then
+    allocate(fer_c(node_size),fer_scal(node_size), fer_gamma(2, nl, node_size), fer_K(nl, node_size))
+    fer_gamma=0.0_WP
+    fer_K=500._WP
+    fer_c=1._WP
+    fer_scal = 0.0_WP
+    end if
 
-neutral_slope=0.0_WP
-slope_tapered=0.0_WP
+    if (SPP) then
+    allocate(ice_rejected_salt(node_size))
+    ice_rejected_salt=0._WP
+    end if
 
-allocate(MLD1(node_size), MLD2(node_size), MLD1_ind(node_size), MLD2_ind(node_size))
-if (use_global_tides) then
-   allocate(ssh_gp(node_size))
-   ssh_gp=0.
-end if
-! xy gradient of a neutral surface
-allocate(sigma_xy(2, nl-1, node_size))
-sigma_xy=0.0_WP
-
-! alpha and beta in the EoS
-allocate(sw_beta(nl-1, node_size), sw_alpha(nl-1, node_size))
-allocate(dens_flux(node_size))
-sw_beta  =0.0_WP
-sw_alpha =0.0_WP
-dens_flux=0.0_WP
-
-if (Fer_GM) then
-   allocate(fer_c(node_size),fer_scal(node_size), fer_gamma(2, nl, node_size), fer_K(nl, node_size))
-   fer_gamma=0.0_WP
-   fer_K=500._WP
-   fer_c=1._WP
-   fer_scal = 0.0_WP
-end if
-
-if (SPP) then
-   allocate(ice_rejected_salt(node_size))
-   ice_rejected_salt=0._WP
-end if
-
-! =================
-! Initialize with zeros 
-! =================
+    ! =================
+    ! Initialize with zeros 
+    ! =================
 
     hpressure=0.0_WP
 !
@@ -680,166 +691,167 @@ END SUBROUTINE arrays_init
 !_______________________________________________________________________________
 ! Here the 3D tracers will be initialized. Initialization strategy depends on a tracer ID.
 ! ID = 0 and 1 are reserved for temperature and salinity
+! --> reads the initial state or the restart file for the ocean
 SUBROUTINE oce_initial_state(tracers, partit, mesh)
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE MOD_TRACER
-USE o_ARRAYS
-USE g_config
-USE g_ic3d
-  !
-  ! reads the initial state or the restart file for the ocean
-  !
-  implicit none
-  integer                  :: i, k, counter, rcounter3, id
-  character(len=10)        :: i_string, id_string
-  type(t_mesh),   intent(in) ,   target :: mesh
-  type(t_partit), intent(inout), target :: partit
-  type(t_tracer), intent(inout), target :: tracers
-  real(kind=WP)            :: loc, max_temp, min_temp, max_salt, min_salt
-
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_TRACER
+    USE o_ARRAYS
+    USE g_config
+    USE g_ic3d
+    implicit none
+    type(t_tracer), intent(inout), target :: tracers
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in) ,   target :: mesh
+    !___________________________________________________________________________
+    integer                  :: i, k, counter, rcounter3, id
+    character(len=10)        :: i_string, id_string
+    real(kind=WP)            :: loc, max_temp, min_temp, max_salt, min_salt
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-  if (mype==0) write(*,*) tracers%num_tracers, ' tracers will be used in FESOM'
-  if (mype==0) write(*,*) 'tracer IDs are: ', tracers%data(1:tracers%num_tracers)%ID
-  !
-  ! read ocean state
-  ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
-  if(mype==0) write(*,*) 'read Temperatur climatology from:', trim(filelist(1))
-  if(mype==0) write(*,*) 'read Salt       climatology from:', trim(filelist(2))
-  call do_ic3d(tracers, partit, mesh)
-  
-  Tclim=tracers%data(1)%values
-  Sclim=tracers%data(2)%values
-  Tsurf=Tclim(1,:)
-  Ssurf=Sclim(1,:)
-  relax2clim=0.0_WP
+    !___________________________________________________________________________
+    if (mype==0) write(*,*) tracers%num_tracers, ' tracers will be used in FESOM'
+    if (mype==0) write(*,*) 'tracer IDs are: ', tracers%data(1:tracers%num_tracers)%ID
+    !
+    ! read ocean state
+    ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
+    if(mype==0) write(*,*) 'read Temperatur climatology from:', trim(filelist(1))
+    if(mype==0) write(*,*) 'read Salt       climatology from:', trim(filelist(2))
+    call do_ic3d(tracers, partit, mesh)
+    
+    Tclim=tracers%data(1)%values
+    Sclim=tracers%data(2)%values
+    Tsurf=Tclim(1,:)
+    Ssurf=Sclim(1,:)
+    relax2clim=0.0_WP
 
-  ! count the passive tracers which require 3D source (ptracers_restore_total)
-  ptracers_restore_total=0
-  DO i=3, tracers%num_tracers
-     id=tracers%data(i)%ID
-     SELECT CASE (id)
-     CASE (301)
-          ptracers_restore_total=ptracers_restore_total+1
-     CASE (302)
-          ptracers_restore_total=ptracers_restore_total+1
-     CASE (303)
-          ptracers_restore_total=ptracers_restore_total+1
+    ! count the passive tracers which require 3D source (ptracers_restore_total)
+    ptracers_restore_total=0
+    DO i=3, tracers%num_tracers
+        id=tracers%data(i)%ID
+        SELECT CASE (id)
+        CASE (301)
+            ptracers_restore_total=ptracers_restore_total+1
+        CASE (302)
+            ptracers_restore_total=ptracers_restore_total+1
+        CASE (303)
+            ptracers_restore_total=ptracers_restore_total+1
 
-     END SELECT
-  END DO
-  allocate(ptracers_restore(ptracers_restore_total))
-  
-  rcounter3=0         ! counter for tracers with 3D source
-  DO i=3, tracers%num_tracers
-     id=tracers%data(i)%ID
-     SELECT CASE (id)
-       CASE (101)       ! initialize tracer ID=101
-         tracers%data(i)%values(:,:)=0.0_WP
-         if (mype==0) then
-            write (i_string,  "(I3)") i
-            write (id_string, "(I3)") id
-            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
-         end if
-       CASE (301) !Fram Strait 3d restored passive tracer
-         tracers%data(i)%values(:,:)=0.0_WP
-         rcounter3    =rcounter3+1
-         counter=0
-         do k=1, myDim_nod2D+eDim_nod2D
-            if     (((geo_coord_nod2D(2,k)>77.5*rad) .and. (geo_coord_nod2D(2,k)<78.*rad))&
-               .and.((geo_coord_nod2D(1,k)>0.  *rad) .and. (geo_coord_nod2D(1,k)<10.*rad))) then
-               counter=counter+1
+        END SELECT
+    END DO
+    allocate(ptracers_restore(ptracers_restore_total))
+    
+    rcounter3=0         ! counter for tracers with 3D source
+    DO i=3, tracers%num_tracers
+        id=tracers%data(i)%ID
+        SELECT CASE (id)
+        CASE (101)       ! initialize tracer ID=101
+            tracers%data(i)%values(:,:)=0.0_WP
+            if (mype==0) then
+                write (i_string,  "(I3)") i
+                write (id_string, "(I3)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-         end do
-         allocate(ptracers_restore(rcounter3)%ind2(counter))
-         ptracers_restore(rcounter3)%id   =301
-         ptracers_restore(rcounter3)%locid=i
-         counter=0
-         do k=1, myDim_nod2D+eDim_nod2D
-            if     (((geo_coord_nod2D(2,k)>77.5*rad) .and. (geo_coord_nod2D(2,k)<78.*rad))&
-               .and.((geo_coord_nod2D(1,k)>0.  *rad) .and. (geo_coord_nod2D(1,k)<10.*rad))) then
-               counter=counter+1
-               ptracers_restore(rcounter3)%ind2(counter)=k
+        CASE (301) !Fram Strait 3d restored passive tracer
+            tracers%data(i)%values(:,:)=0.0_WP
+            rcounter3    =rcounter3+1
+            counter=0
+            do k=1, myDim_nod2D+eDim_nod2D
+                if     (((geo_coord_nod2D(2,k)>77.5*rad) .and. (geo_coord_nod2D(2,k)<78.*rad))&
+                .and.((geo_coord_nod2D(1,k)>0.  *rad) .and. (geo_coord_nod2D(1,k)<10.*rad))) then
+                counter=counter+1
+                end if
+            end do
+            allocate(ptracers_restore(rcounter3)%ind2(counter))
+            ptracers_restore(rcounter3)%id   =301
+            ptracers_restore(rcounter3)%locid=i
+            counter=0
+            do k=1, myDim_nod2D+eDim_nod2D
+                if     (((geo_coord_nod2D(2,k)>77.5*rad) .and. (geo_coord_nod2D(2,k)<78.*rad))&
+                .and.((geo_coord_nod2D(1,k)>0.  *rad) .and. (geo_coord_nod2D(1,k)<10.*rad))) then
+                counter=counter+1
+                ptracers_restore(rcounter3)%ind2(counter)=k
+                end if
+            end do
+            tracers%data(i)%values(:,ptracers_restore(rcounter3)%ind2)=1.
+            if (mype==0) then
+                write (i_string,  "(I3)") i
+                write (id_string, "(I3)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-         end do
-         tracers%data(i)%values(:,ptracers_restore(rcounter3)%ind2)=1.
-         if (mype==0) then
-            write (i_string,  "(I3)") i
-            write (id_string, "(I3)") id
-            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
-         end if
 
-       CASE (302) !Bering Strait 3d restored passive tracer
-         tracers%data(i)%values(:,:)=0.0_WP
-         rcounter3    =rcounter3+1
-         counter=0
-         do k=1, myDim_nod2D+eDim_nod2D
-            if     (((geo_coord_nod2D(2,k)>65.6*rad) .and. (geo_coord_nod2D(2,k)<66.*rad))&
-               .and.((geo_coord_nod2D(1,k)>-172.  *rad) .and. (geo_coord_nod2D(1,k)<-166.*rad))) then
-               counter=counter+1
+        CASE (302) !Bering Strait 3d restored passive tracer
+            tracers%data(i)%values(:,:)=0.0_WP
+            rcounter3    =rcounter3+1
+            counter=0
+            do k=1, myDim_nod2D+eDim_nod2D
+                if     (((geo_coord_nod2D(2,k)>65.6*rad) .and. (geo_coord_nod2D(2,k)<66.*rad))&
+                .and.((geo_coord_nod2D(1,k)>-172.  *rad) .and. (geo_coord_nod2D(1,k)<-166.*rad))) then
+                counter=counter+1
+                end if
+            end do
+            allocate(ptracers_restore(rcounter3)%ind2(counter))
+            ptracers_restore(rcounter3)%id   =302
+            ptracers_restore(rcounter3)%locid=i
+            counter=0
+            do k=1, myDim_nod2D+eDim_nod2D
+                if     (((geo_coord_nod2D(2,k)>65.6*rad) .and. (geo_coord_nod2D(2,k)<66.*rad))&
+                .and.((geo_coord_nod2D(1,k)>-172.  *rad) .and. (geo_coord_nod2D(1,k)<-166.*rad))) then
+                counter=counter+1
+                ptracers_restore(rcounter3)%ind2(counter)=k
+                end if
+            end do
+            tracers%data(i)%values(:,ptracers_restore(rcounter3)%ind2)=0.0_WP
+            if (mype==0) then
+                write (i_string,  "(I3)") i
+                write (id_string, "(I3)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-         end do
-         allocate(ptracers_restore(rcounter3)%ind2(counter))
-         ptracers_restore(rcounter3)%id   =302
-         ptracers_restore(rcounter3)%locid=i
-         counter=0
-         do k=1, myDim_nod2D+eDim_nod2D
-            if     (((geo_coord_nod2D(2,k)>65.6*rad) .and. (geo_coord_nod2D(2,k)<66.*rad))&
-               .and.((geo_coord_nod2D(1,k)>-172.  *rad) .and. (geo_coord_nod2D(1,k)<-166.*rad))) then
-               counter=counter+1
-               ptracers_restore(rcounter3)%ind2(counter)=k
+        
+        CASE (303) !BSO 3d restored passive tracer
+            tracers%data(i)%values(:,:)=0.0_WP
+            rcounter3    =rcounter3+1
+            counter=0
+            do k=1, myDim_nod2D+eDim_nod2D
+                if     (((geo_coord_nod2D(2,k)>69.5*rad) .and. (geo_coord_nod2D(2,k)<74.5*rad))&
+                .and.((geo_coord_nod2D(1,k)>19.  *rad) .and. (geo_coord_nod2D(1,k)<20.*rad))) then
+                counter=counter+1
+                end if
+            end do
+            allocate(ptracers_restore(rcounter3)%ind2(counter))
+            ptracers_restore(rcounter3)%id   =303
+            ptracers_restore(rcounter3)%locid=i
+            counter=0
+            do k=1, myDim_nod2D+eDim_nod2D
+                if     (((geo_coord_nod2D(2,k)>69.5*rad) .and. (geo_coord_nod2D(2,k)<74.5*rad))&
+                .and.((geo_coord_nod2D(1,k)>19.  *rad) .and. (geo_coord_nod2D(1,k)<20.*rad))) then
+                counter=counter+1
+                ptracers_restore(rcounter3)%ind2(counter)=k
+                end if
+            end do
+            tracers%data(i)%values(:,ptracers_restore(rcounter3)%ind2)=0.0_WP
+            if (mype==0) then
+                write (i_string,  "(I3)") i
+                write (id_string, "(I3)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-         end do
-         tracers%data(i)%values(:,ptracers_restore(rcounter3)%ind2)=0.0_WP
-         if (mype==0) then
-            write (i_string,  "(I3)") i
-            write (id_string, "(I3)") id
-            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
-         end if
-       
-      CASE (303) !BSO 3d restored passive tracer
-         tracers%data(i)%values(:,:)=0.0_WP
-         rcounter3    =rcounter3+1
-         counter=0
-         do k=1, myDim_nod2D+eDim_nod2D
-            if     (((geo_coord_nod2D(2,k)>69.5*rad) .and. (geo_coord_nod2D(2,k)<74.5*rad))&
-               .and.((geo_coord_nod2D(1,k)>19.  *rad) .and. (geo_coord_nod2D(1,k)<20.*rad))) then
-               counter=counter+1
+        CASE DEFAULT
+            if (mype==0) then
+                write (i_string,  "(I3)") i
+                write (id_string, "(I3)") id
+                if (mype==0) write(*,*) 'invalid ID '//trim(id_string)//' specified for '//trim(i_string)//' th tracer!!!'
+                if (mype==0) write(*,*) 'the model will stop!'
             end if
-         end do
-         allocate(ptracers_restore(rcounter3)%ind2(counter))
-         ptracers_restore(rcounter3)%id   =303
-         ptracers_restore(rcounter3)%locid=i
-         counter=0
-         do k=1, myDim_nod2D+eDim_nod2D
-            if     (((geo_coord_nod2D(2,k)>69.5*rad) .and. (geo_coord_nod2D(2,k)<74.5*rad))&
-               .and.((geo_coord_nod2D(1,k)>19.  *rad) .and. (geo_coord_nod2D(1,k)<20.*rad))) then
-               counter=counter+1
-               ptracers_restore(rcounter3)%ind2(counter)=k
-            end if
-         end do
-         tracers%data(i)%values(:,ptracers_restore(rcounter3)%ind2)=0.0_WP
-         if (mype==0) then
-            write (i_string,  "(I3)") i
-            write (id_string, "(I3)") id
-            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
-         end if
-       CASE DEFAULT
-         if (mype==0) then
-            write (i_string,  "(I3)") i
-            write (id_string, "(I3)") id
-            if (mype==0) write(*,*) 'invalid ID '//trim(id_string)//' specified for '//trim(i_string)//' th tracer!!!'
-            if (mype==0) write(*,*) 'the model will stop!'
-         end if
-         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-         stop
-     END SELECT
-  END DO
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            stop
+        END SELECT
+    END DO
 end subroutine oce_initial_state
 !
 !
@@ -855,18 +867,21 @@ SUBROUTINE before_oce_step(dynamics, tracers, partit, mesh)
     USE g_config
     USE Toy_Channel_Soufflet
     implicit none
+    type(t_dyn)   , intent(inout), target  :: dynamics
+    type(t_tracer), intent(inout), target  :: tracers
+    type(t_partit), intent(inout), target  :: partit
+    type(t_mesh)  , intent(in)   , target  :: mesh
+    !___________________________________________________________________________
     integer                  :: i, k, counter, rcounter3, id
     character(len=10)        :: i_string, id_string
-    type(t_mesh),   intent(in),    target  :: mesh
-    type(t_partit), intent(inout), target  :: partit
-    type(t_tracer), intent(inout), target  :: tracers
-    type(t_dyn), intent(inout), target  :: dynamics
-
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
+    
+    !___________________________________________________________________________
     if (toy_ocean) then
         SELECT CASE (TRIM(which_toy))
             CASE ("soufflet") !forcing update for soufflet testcase
