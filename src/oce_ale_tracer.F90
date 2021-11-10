@@ -381,7 +381,6 @@ subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
     
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nl1, ul1, vd_flux, rdata, flux, rlx, zinv1)
     !___________________________________________________________________________    
-    Ty = 0.0_WP
     do n=1, myDim_nod2D
         nl1=nlevels_nod2D(n)-1
         ul1=ulevels_nod2D(n)
