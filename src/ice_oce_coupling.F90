@@ -1,13 +1,16 @@
 module ocean2ice_interface
   interface
-    subroutine ocean2ice(tracers, partit, mesh)
+    subroutine ocean2ice(dynamics, tracers, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
       use mod_tracer
+      use MOD_DYN
+      type(t_dyn)   , intent(in)   , target :: dynamics
+      type(t_tracer), intent(in)   , target :: tracers
       type(t_partit), intent(inout), target :: partit
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_tracer), intent(inout), target :: tracers
+      type(t_mesh)  , intent(in)   , target :: mesh
+      
     end subroutine
   end interface
 end module
@@ -20,8 +23,8 @@ module oce_fluxes_interface
       USE MOD_PARSUP
       use mod_tracer
       type(t_partit), intent(inout), target :: partit
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_tracer), intent(inout), target :: tracers
+      type(t_mesh)  , intent(in)   , target :: mesh
+      type(t_tracer), intent(in)   , target :: tracers
     end subroutine
   end interface
 end module
@@ -29,7 +32,7 @@ end module
 !
 !
 !_______________________________________________________________________________
-subroutine oce_fluxes_mom(partit, mesh)
+subroutine oce_fluxes_mom(dynamics, partit, mesh)
     ! transmits the relevant fields from the ice to the ocean model
     !
     use o_PARAM
@@ -37,6 +40,7 @@ subroutine oce_fluxes_mom(partit, mesh)
     use MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
+    USE MOD_DYN
     use i_ARRAYS
     use i_PARAM
     USE g_CONFIG
@@ -50,8 +54,9 @@ subroutine oce_fluxes_mom(partit, mesh)
     
     integer                  :: n, elem, elnodes(3),n1
     real(kind=WP)            :: aux, aux1
+    type(t_dyn)   , intent(in)   , target :: dynamics
     type(t_partit), intent(inout), target :: partit
-    type(t_mesh),   intent(in),    target :: mesh
+    type(t_mesh)  , intent(in)   , target :: mesh
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -105,39 +110,41 @@ subroutine oce_fluxes_mom(partit, mesh)
     END DO
     
     !___________________________________________________________________________
-    if (use_cavity) call cavity_momentum_fluxes(partit, mesh)
+    if (use_cavity) call cavity_momentum_fluxes(dynamics, partit, mesh)
   
 end subroutine oce_fluxes_mom
 !
 !
 !_______________________________________________________________________________
-subroutine ocean2ice(tracers, partit, mesh)
+subroutine ocean2ice(dynamics, tracers, partit, mesh)
   
     ! transmits the relevant fields from the ocean to the ice model
 
     use o_PARAM
-    use o_ARRAYS
     use i_ARRAYS
     use MOD_MESH
+    use MOD_DYN
     use MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE g_CONFIG
     use g_comm_auto
     implicit none
-
+    type(t_dyn)   , intent(in)   , target :: dynamics
+    type(t_tracer), intent(inout), target :: tracers
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(in),    target :: mesh
-    type(t_tracer), intent(inout), target :: tracers
     integer :: n, elem, k
     real(kind=WP) :: uw, vw, vol
-    real(kind=WP), dimension(:,:), pointer :: temp, salt
+    real(kind=WP), dimension(:,:)  , pointer :: temp, salt
+    real(kind=WP), dimension(:,:,:), pointer :: UV
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    temp=>tracers%data(1)%values(:,:)
-    salt=>tracers%data(2)%values(:,:)
+    temp => tracers%data(1)%values(:,:)
+    salt => tracers%data(2)%values(:,:)
+    UV   => dynamics%uv(:,:,:)
 
     ! the arrays in the ice model are renamed
         

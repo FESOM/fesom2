@@ -11,6 +11,7 @@ module oce_initial_state_interface
     end subroutine
   end interface
 end module
+
 module tracer_init_interface
   interface
     subroutine tracer_init(tracers, partit, mesh)
@@ -24,38 +25,58 @@ module tracer_init_interface
     end subroutine
   end interface
 end module
+
+module dynamics_init_interface
+  interface
+    subroutine dynamics_init(dynamics, partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      use MOD_DYN
+      type(t_mesh)  , intent(in)   , target :: mesh
+      type(t_partit), intent(inout), target :: partit
+      type(t_dyn)   , intent(inout), target :: dynamics
+    end subroutine
+  end interface
+end module
+
 module ocean_setup_interface
   interface
-    subroutine ocean_setup(tracers, partit, mesh)
+    subroutine ocean_setup(dynamics, tracers, partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
       USE MOD_PARSUP
       use mod_tracer
-      type(t_mesh),   intent(inout), target :: mesh
+      use MOD_DYN
+      type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
       type(t_tracer), intent(inout), target :: tracers
+      type(t_dyn), intent(inout), target :: dynamics
     end subroutine
   end interface
 end module
 module before_oce_step_interface
   interface
-    subroutine before_oce_step(tracers, partit, mesh)
+    subroutine before_oce_step(dynamics, tracers, partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
       USE MOD_PARSUP
       use mod_tracer
+      use MOD_DYN
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
       type(t_tracer), intent(inout), target :: tracers
+      type(t_dyn), intent(inout), target :: dynamics
     end subroutine
   end interface
 end module
 !_______________________________________________________________________________
-subroutine ocean_setup(tracers, partit, mesh)
+subroutine ocean_setup(dynamics, tracers, partit, mesh)
 USE MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
 USE MOD_TRACER
+USE MOD_DYN
 USE o_PARAM
 USE o_ARRAYS
 USE g_config
@@ -65,13 +86,17 @@ use g_cvmix_idemix
 use g_cvmix_pp
 use g_cvmix_kpp
 use g_cvmix_tidal
+use g_backscatter
 use Toy_Channel_Soufflet
 use oce_initial_state_interface
 use oce_adv_tra_fct_interfaces
+use init_ale_interface
+use init_thickness_ale_interface
 IMPLICIT NONE
 type(t_mesh),   intent(inout), target :: mesh
 type(t_partit), intent(inout), target :: partit
 type(t_tracer), intent(inout), target :: tracers
+type(t_dyn), intent(inout), target :: dynamics
 integer                               :: n
     !___setup virt_salt_flux____________________________________________________
     ! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
@@ -95,7 +120,10 @@ integer                               :: n
        write(*,*) ' --> initialise ALE arrays + sparse SSH stiff matrix'
        write(*,*)
     end if
-    call init_ale(partit, mesh)
+    
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_ale'//achar(27)//'[0m'
+    call init_ale(dynamics, partit, mesh)
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_stiff_mat_ale'//achar(27)//'[0m'
     call init_stiff_mat_ale(partit, mesh) !!PS test  
     
     !___________________________________________________________________________
@@ -123,20 +151,24 @@ integer                               :: n
 
     ! initialise fesom1.4 like KPP
     if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_kpp_init'//achar(27)//'[0m'
         call oce_mixing_kpp_init(partit, mesh)
     ! initialise fesom1.4 like PP
     elseif (mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
     
     ! initialise cvmix_KPP
     elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_kpp'//achar(27)//'[0m'
         call init_cvmix_kpp(partit, mesh)
         
     ! initialise cvmix_PP    
     elseif (mix_scheme_nmb==4 .or. mix_scheme_nmb==47) then
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_pp'//achar(27)//'[0m'
         call init_cvmix_pp(partit, mesh)
         
     ! initialise cvmix_TKE    
     elseif (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_tke'//achar(27)//'[0m'
         call init_cvmix_tke(partit, mesh)
         
     endif
@@ -144,12 +176,14 @@ integer                               :: n
     ! initialise additional mixing cvmix_IDEMIX --> only in combination with 
     ! cvmix_TKE+cvmix_IDEMIX or stand alone for debbuging as cvmix_TKE
     if     (mod(mix_scheme_nmb,10)==6) then
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_idemix'//achar(27)//'[0m'
         call init_cvmix_idemix(partit, mesh)
         
     ! initialise additional mixing cvmix_TIDAL --> only in combination with 
     ! KPP+cvmix_TIDAL, PP+cvmix_TIDAL, cvmix_KPP+cvmix_TIDAL, cvmix_PP+cvmix_TIDAL 
     ! or stand alone for debbuging as cvmix_TIDAL   
     elseif (mod(mix_scheme_nmb,10)==7) then
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_tidal'//achar(27)//'[0m'
         call init_cvmix_tidal(partit, mesh)
     end if         
     
@@ -170,7 +204,7 @@ integer                               :: n
     if(partit%mype==0) write(*,*) 'Arrays are set'
         
     !if(open_boundary) call set_open_boundary   !TODO
-    
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call oce_adv_tra_fct_init'//achar(27)//'[0m'
     call oce_adv_tra_fct_init(tracers%work, partit, mesh)
     call muscl_adv_init(tracers%work, partit, mesh) !!PS test
     !=====================
@@ -180,10 +214,11 @@ integer                               :: n
     if (toy_ocean) then  
        SELECT CASE (TRIM(which_toy))
          CASE ("soufflet") !forcing update for soufflet testcase
+         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call toy_channel'//achar(27)//'[0m'
            if (mod(mstep, soufflet_forc_update)==0) then
-              call initial_state_soufflet(tracers, partit, mesh)
+              call initial_state_soufflet(dynamics, tracers, partit, mesh)
               call compute_zonal_mean_ini(partit, mesh)  
-              call compute_zonal_mean(tracers, partit, mesh)
+              call compute_zonal_mean(dynamics, tracers, partit, mesh)
            end if
        END SELECT
     else
@@ -203,14 +238,20 @@ integer                               :: n
         write(*,*) ' --> call init_thickness_ale'
         write(*,*)
     end if
-    call init_thickness_ale(partit, mesh)
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_thickness_ale'//achar(27)//'[0m'
+    call init_thickness_ale(dynamics, partit, mesh)
+    
+    !___________________________________________________________________________
+    ! initialise arrays that are needed for backscatter_coef
+    if(dynamics%opt_visc==8) call init_backscatter(partit, mesh)
+        
     
     !___________________________________________________________________________
     if(partit%mype==0) write(*,*) 'Initial state'
-    if (w_split .and. partit%mype==0) then
+    if (dynamics%use_wsplit .and. partit%mype==0) then
         write(*,*) '******************************************************************************'
         write(*,*) 'vertical velocity will be split onto explicit and implicit constitutes;'
-        write(*,*) 'maximum allowed CDF on explicit W is set to: ', w_max_cfl
+        write(*,*) 'maximum allowed CDF on explicit W is set to: ', dynamics%wsplit_maxcfl
         write(*,*) '******************************************************************************'
     end if
 end subroutine ocean_setup
@@ -313,6 +354,132 @@ END SUBROUTINE tracer_init
 !
 !
 !_______________________________________________________________________________
+SUBROUTINE dynamics_init(dynamics, partit, mesh)
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_DYN
+    USE o_param
+    IMPLICIT NONE
+    integer        :: elem_size, node_size
+    integer, save  :: nm_unit  = 105       ! unit to open namelist file, skip 100-102 for cray
+    integer        :: iost
+
+    integer        :: opt_visc
+    real(kind=WP)  :: visc_gamma0, visc_gamma1, visc_gamma2
+    real(kind=WP)  :: visc_easybsreturn
+    logical        :: use_ivertvisc
+    integer        :: momadv_opt
+    logical        :: use_freeslip
+    logical        :: use_wsplit
+    real(kind=WP)  :: wsplit_maxcfl
+
+    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_dyn)   , intent(inout), target :: dynamics
+
+    ! define dynamics namelist parameter
+    namelist /dynamics_visc   / opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
+                                use_ivertvisc, visc_easybsreturn
+    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl 
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"   
+    
+    ! open and read namelist for I/O
+    open(unit=nm_unit, file='namelist.dyn', form='formatted', access='sequential', status='old', iostat=iost )
+    if (iost == 0) then
+        if (mype==0) write(*,*) '     file   : ', 'namelist.dyn',' open ok'
+    else
+        if (mype==0) write(*,*) 'ERROR: --> bad opening file   : ', 'namelist.dyn',' ; iostat=',iost
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        stop
+    end if
+    read(nm_unit, nml=dynamics_visc,    iostat=iost)
+    read(nm_unit, nml=dynamics_general, iostat=iost)
+    close(nm_unit)
+
+    !___________________________________________________________________________
+    ! set parameters in derived type
+    dynamics%opt_visc          = opt_visc
+    dynamics%visc_gamma0       = visc_gamma0
+    dynamics%visc_gamma1       = visc_gamma1
+    dynamics%visc_gamma2       = visc_gamma2
+    dynamics%visc_easybsreturn = visc_easybsreturn
+    dynamics%use_ivertvisc     = use_ivertvisc
+    dynamics%momadv_opt        = momadv_opt
+    dynamics%use_freeslip      = use_freeslip
+    dynamics%use_wsplit        = use_wsplit
+    dynamics%wsplit_maxcfl     = wsplit_maxcfl
+
+    !___________________________________________________________________________
+    ! define local vertice & elem array size
+    elem_size=myDim_elem2D+eDim_elem2D
+    node_size=myDim_nod2D+eDim_nod2D
+    
+    !___________________________________________________________________________
+    ! allocate/initialise horizontal velocity arrays in derived type
+    allocate(dynamics%uv(        2, nl-1, elem_size))
+    allocate(dynamics%uv_rhs(    2, nl-1, elem_size))
+    allocate(dynamics%uv_rhsAB(  2, nl-1, elem_size))
+    allocate(dynamics%uvnode(    2, nl-1, node_size))
+    dynamics%uv              = 0.0_WP
+    dynamics%uv_rhs          = 0.0_WP
+    dynamics%uv_rhsAB        = 0.0_WP
+    dynamics%uvnode          = 0.0_WP
+    if (Fer_GM) then
+        allocate(dynamics%fer_uv(2, nl-1, elem_size))
+        dynamics%fer_uv      = 0.0_WP
+    end if 
+    
+    !___________________________________________________________________________
+    ! allocate/initialise vertical velocity arrays in derived type
+    allocate(dynamics%w(              nl, node_size))
+    allocate(dynamics%w_e(            nl, node_size))
+    allocate(dynamics%w_i(            nl, node_size))
+    allocate(dynamics%cfl_z(          nl, node_size))
+    dynamics%w               = 0.0_WP
+    dynamics%w_e             = 0.0_WP
+    dynamics%w_i             = 0.0_WP
+    dynamics%cfl_z           = 0.0_WP
+    if (Fer_GM) then
+        allocate(dynamics%fer_w(      nl, node_size))
+        dynamics%fer_w       = 0.0_WP
+    end if 
+    
+    !___________________________________________________________________________
+    ! allocate/initialise ssh arrays in derived type
+    allocate(dynamics%eta_n(      node_size))
+    allocate(dynamics%d_eta(      node_size))
+    allocate(dynamics%ssh_rhs(    node_size))
+    dynamics%eta_n           = 0.0_WP
+    dynamics%d_eta           = 0.0_WP
+    dynamics%ssh_rhs         = 0.0_WP
+    !!PS     allocate(dynamics%ssh_rhs_old(node_size))
+    !!PS     dynamics%ssh_rhs_old= 0.0_WP   
+
+    !___________________________________________________________________________
+    ! inititalise working arrays
+    allocate(dynamics%work%uvnode_rhs(2, nl-1, node_size))
+    allocate(dynamics%work%u_c(nl-1, elem_size))
+    allocate(dynamics%work%v_c(nl-1, elem_size))
+    dynamics%work%uvnode_rhs = 0.0_WP
+    dynamics%work%u_c = 0.0_WP
+    dynamics%work%v_c = 0.0_WP
+    if (dynamics%opt_visc==5) then
+        allocate(dynamics%work%u_b(nl-1, elem_size))
+        allocate(dynamics%work%v_b(nl-1, elem_size))
+        dynamics%work%u_b = 0.0_WP
+        dynamics%work%v_b = 0.0_WP
+    end if 
+
+
+END SUBROUTINE dynamics_init
+!
+!
+!_______________________________________________________________________________
 SUBROUTINE arrays_init(num_tracers, partit, mesh)
 USE MOD_MESH
 USE MOD_PARTIT
@@ -345,15 +512,11 @@ node_size=myDim_nod2D+eDim_nod2D
 ! Velocities
 ! ================     
 !allocate(stress_diag(2, elem_size))!delete me
-allocate(UV(2, nl-1, elem_size))
-allocate(UV_rhs(2,nl-1, elem_size))
-allocate(UV_rhsAB(2,nl-1, elem_size))
-allocate(Visc(nl-1, elem_size))
+!!PS allocate(Visc(nl-1, elem_size))
 ! ================
 ! elevation and its rhs
 ! ================
-allocate(eta_n(node_size), d_eta(node_size))
-allocate(ssh_rhs(node_size))
+
 ! ================
 ! Monin-Obukhov
 ! ================
@@ -362,9 +525,7 @@ if (use_ice .and. use_momix) mixlength=0.
 ! ================
 ! Vertical velocity and pressure
 ! ================
-allocate(Wvel(nl, node_size), hpressure(nl,node_size))
-allocate(Wvel_e(nl, node_size), Wvel_i(nl, node_size))
-allocate(CFL_z(nl, node_size)) ! vertical CFL criteria
+allocate( hpressure(nl,node_size))
 allocate(bvfreq(nl,node_size),mixlay_dep(node_size),bv_ref(node_size))
 ! ================
 ! Ocean forcing arrays
@@ -387,14 +548,6 @@ allocate(real_salt_flux(node_size)) !PS
 allocate(Tsurf_t(node_size,2), Ssurf_t(node_size,2))
 allocate(tau_x_t(node_size,2), tau_y_t(node_size,2))  
 
-! =================
-! All auxiliary arrays
-! =================
- 
-!if(mom_adv==3) then
-allocate(vorticity(nl-1,node_size))
-vorticity=0.0_WP
-!end if
 
 ! =================
 ! Visc and Diff coefs
@@ -409,35 +562,6 @@ if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
    Kv_double=0.0_WP
    !!PS call oce_mixing_kpp_init ! Setup constants, allocate arrays and construct look up table
 end if
-
-! =================
-! Backscatter arrays
-! =================
-
-if(visc_option==8) then
-
-allocate(uke(nl-1,elem_size)) ! Unresolved kinetic energy for backscatter coefficient
-allocate(v_back(nl-1,elem_size))  ! Backscatter viscosity
-allocate(uke_dis(nl-1,elem_size), uke_back(nl-1,elem_size)) 
-allocate(uke_dif(nl-1,elem_size))
-allocate(uke_rhs(nl-1,elem_size), uke_rhs_old(nl-1,elem_size))
-allocate(UV_dis_tend(2,nl-1,elem_size), UV_back_tend(2,nl-1,elem_size))
-allocate(UV_total_tend(2,nl-1,elem_size))
-
-uke=0.0_8
-v_back=0.0_8
-uke_dis=0.0_8
-uke_dif=0.0_8
-uke_back=0.0_8
-uke_rhs=0.0_8
-uke_rhs_old=0.0_8
-UV_dis_tend=0.0_8
-UV_back_tend=0.0_8
-UV_total_tend=0.0_8
-end if
-
-!Velocities at nodes
-allocate(Unode(2,nl-1,node_size))
 
 ! tracer gradients & RHS  
 allocate(ttrhs(nl-1,node_size))
@@ -476,10 +600,7 @@ dens_flux=0.0_WP
 
 if (Fer_GM) then
    allocate(fer_c(node_size),fer_scal(node_size), fer_gamma(2, nl, node_size), fer_K(nl, node_size))
-   allocate(fer_wvel(nl, node_size), fer_UV(2, nl-1, elem_size))
    fer_gamma=0.0_WP
-   fer_uv=0.0_WP
-   fer_wvel=0.0_WP
    fer_K=500._WP
    fer_c=1._WP
    fer_scal = 0.0_WP
@@ -494,17 +615,6 @@ end if
 ! Initialize with zeros 
 ! =================
 
-    UV=0.0_WP
-    UV_rhs=0.0_WP
-    UV_rhsAB=0.0_WP
-!
-    eta_n=0.0_WP
-    d_eta=0.0_WP
-    ssh_rhs=0.0_WP
-    Wvel=0.0_WP
-    Wvel_e	=0.0_WP
-    Wvel_i	=0.0_WP
-    CFL_z   =0.0_WP
     hpressure=0.0_WP
 !
     heat_flux=0.0_WP
@@ -735,11 +845,12 @@ end subroutine oce_initial_state
 !
 !==========================================================================
 ! Here we do things (if applicable) before the ocean timestep will be made
-SUBROUTINE before_oce_step(tracers, partit, mesh)
+SUBROUTINE before_oce_step(dynamics, tracers, partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_TRACER
+    USE MOD_DYN
     USE o_ARRAYS
     USE g_config
     USE Toy_Channel_Soufflet
@@ -749,6 +860,7 @@ SUBROUTINE before_oce_step(tracers, partit, mesh)
     type(t_mesh),   intent(in),    target  :: mesh
     type(t_partit), intent(inout), target  :: partit
     type(t_tracer), intent(inout), target  :: tracers
+    type(t_dyn), intent(inout), target  :: dynamics
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -759,7 +871,7 @@ SUBROUTINE before_oce_step(tracers, partit, mesh)
         SELECT CASE (TRIM(which_toy))
             CASE ("soufflet") !forcing update for soufflet testcase
             if (mod(mstep, soufflet_forc_update)==0) then
-                call compute_zonal_mean(tracers, partit, mesh)
+                call compute_zonal_mean(dynamics, tracers, partit, mesh)
             end if
         END SELECT
     end if

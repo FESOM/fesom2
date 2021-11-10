@@ -21,11 +21,9 @@ namelist.config:
     run_config:
         use_floatice: True
 
-namelist.oce:
-    oce_dyn:
-        Div_c: 0.5
-        Leith_c: 0.05
-        w_split: True
+namelist.dyn:
+    dynamics_general:
+        use_wsplit: True
 
 namelist.ice:
     ice_dyn:

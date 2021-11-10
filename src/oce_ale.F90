@@ -32,12 +32,14 @@ module oce_ale_interfaces
       type(t_partit), intent(inout), target :: partit
     end subroutine
 
-    subroutine impl_vert_visc_ale(partit, mesh)
+    subroutine impl_vert_visc_ale(dynamics, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
+      USE MOD_DYN
+      type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
+      type(t_dyn), intent(inout), target :: dynamics
     end subroutine
 
     subroutine update_stiff_mat_ale(partit, mesh)
@@ -48,36 +50,44 @@ module oce_ale_interfaces
       type(t_partit), intent(inout), target :: partit
     end subroutine
 
-    subroutine compute_ssh_rhs_ale(partit, mesh)
+    subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
+      use MOD_DYN
+      type(t_mesh),   intent(inout),    target :: mesh
       type(t_partit), intent(inout), target :: partit
+      type(t_dyn), intent(inout), target :: dynamics
     end subroutine
 
-    subroutine solve_ssh_ale(partit, mesh)
+    subroutine solve_ssh_ale(dynamics, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
+      USE MOD_DYN
+      type(t_mesh),   intent(inout),    target :: mesh
       type(t_partit), intent(inout), target :: partit
+      type(t_dyn), intent(inout), target :: dynamics
     end subroutine
 
-    subroutine compute_hbar_ale(partit, mesh)
+    subroutine compute_hbar_ale(dynamics, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
+      USE MOD_DYN
+      type(t_mesh),   intent(inout),    target :: mesh
       type(t_partit), intent(inout), target :: partit
+      type(t_dyn), intent(inout), target :: dynamics
     end subroutine
 
-    subroutine vert_vel_ale(partit, mesh)
+    subroutine vert_vel_ale(dynamics, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
+      USE MOD_DYN
+      type(t_mesh),   intent(inout),    target :: mesh
       type(t_partit), intent(inout), target :: partit
+      type(t_dyn), intent(inout), target :: dynamics
     end subroutine
 
     subroutine update_thickness_ale(partit, mesh)
@@ -90,17 +100,47 @@ module oce_ale_interfaces
   end interface
 end module
 
+module init_ale_interface
+  interface
+    subroutine init_ale(dynamics, partit, mesh)
+      use mod_mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      use MOD_DYN
+      type(t_mesh)  , intent(in)   , target :: mesh
+      type(t_partit), intent(inout), target :: partit
+      type(t_dyn)   , intent(inout), target :: dynamics
+    end subroutine
+  end interface
+end module
+
+module init_thickness_ale_interface
+  interface
+    subroutine init_thickness_ale(dynamics, partit, mesh)
+      use mod_mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      use MOD_DYN
+      type(t_mesh)  , intent(in)   , target :: mesh
+      type(t_partit), intent(inout), target :: partit
+      type(t_dyn)   , intent(inout), target :: dynamics
+    end subroutine
+  end interface
+end module
+
 module oce_timestep_ale_interface
   interface
-    subroutine oce_timestep_ale(n, tracers, partit, mesh)
+    subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
       use mod_tracer
-      integer,        intent(in)            :: n
-      type(t_mesh),   intent(inout), target :: mesh
+      use MOD_DYN
+      integer,        intent(in)                         :: n
+      type(t_mesh),   intent(inout),    target :: mesh
       type(t_partit), intent(inout), target :: partit
       type(t_tracer), intent(inout), target :: tracers
+      type(t_dyn), intent(inout), target :: dynamics
     end subroutine
   end interface
 end module
@@ -126,11 +166,12 @@ end module
 !    
 !===============================================================================
 ! allocate & initialise arrays for Arbitrary-Langrangian-Eularian (ALE) method
-subroutine init_ale(partit, mesh)
+subroutine init_ale(dynamics, partit, mesh)
     USE o_PARAM
     USE MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
+    USE MOD_DYN
     USE o_ARRAYS
     USE g_config, only: which_ale, use_cavity, use_partial_cell
     USE g_forcing_param, only: use_virt_salt
@@ -140,6 +181,7 @@ subroutine init_ale(partit, mesh)
     integer                               :: n, nzmax, nzmin, elnodes(3), elem
     type(t_mesh),   intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
+    type(t_dyn)   , intent(inout), target :: dynamics
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -150,7 +192,8 @@ subroutine init_ale(partit, mesh)
     allocate(mesh%hnode_new(1:nl-1, myDim_nod2D+eDim_nod2D))
     
     ! ssh_rhs_old: auxiliary array to store an intermediate part of the rhs computations.
-    allocate(ssh_rhs_old(myDim_nod2D+eDim_nod2D))
+    allocate(dynamics%ssh_rhs_old(myDim_nod2D+eDim_nod2D))
+    dynamics%ssh_rhs_old = 0.0_WP
     
     ! hbar, hbar_old: correspond to the elevation, but on semi-integer time steps.
     allocate(mesh%hbar(myDim_nod2D+eDim_nod2D))
@@ -637,7 +680,7 @@ end subroutine init_surface_node_depth
 !
 !===============================================================================
 ! initialize thickness arrays based on the current hbar 
-subroutine init_thickness_ale(partit, mesh)
+subroutine init_thickness_ale(dynamics, partit, mesh)
 ! For z-star case: we stretch scalar thicknesses (nodal) 
 ! through nlevels_nod2D_min -2 layers. Layer nlevels_nod2D_min-1
 ! should not be touched if partial cell is implemented (it is).
@@ -648,17 +691,20 @@ subroutine init_thickness_ale(partit, mesh)
     use MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use o_ARRAYS
+    USE MOD_DYN
     implicit none
     integer :: n, nz, elem, elnodes(3), nzmin, nzmax
     real(kind=WP) :: dd 
     type(t_mesh),   intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
-    
+    type(t_dyn), intent(inout), target :: dynamics
+    real(kind=WP), dimension(:), pointer :: ssh_rhs_old, eta_n
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    ssh_rhs_old=>dynamics%ssh_rhs_old(:)
+    eta_n      =>dynamics%eta_n(:)
     
     if(mype==0) then
         write(*,*) '____________________________________________________________'
@@ -1599,13 +1645,14 @@ end subroutine update_stiff_mat_ale
 !"FESOM2: from finite elements to finite volumes"
 !
 ! ssh_rhs = alpha * grad[  int_hbot^hbar(n+0.5)( u^n+deltau)dz + W(n+0.5) ]
-subroutine compute_ssh_rhs_ale(partit, mesh)
+subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     use g_config,only: which_ALE,dt
     use MOD_MESH
-    use o_ARRAYS
+    use o_ARRAYS, only: water_flux
     use o_PARAM
     USE MOD_PARTIT
     USE MOD_PARSUP
+    USE MOD_DYN
     use g_comm_auto
     implicit none
     
@@ -1617,12 +1664,17 @@ subroutine compute_ssh_rhs_ale(partit, mesh)
     real(kind=WP) :: dumc1_1, dumc1_2, dumc2_1, dumc2_2 !!PS
     type(t_mesh),   intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
-
-
+    type(t_dyn), intent(inout), target :: dynamics
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
+    real(kind=WP), dimension(:), pointer :: ssh_rhs, ssh_rhs_old
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    UV=>dynamics%uv(:,:,:)
+    UV_rhs=>dynamics%uv_rhs(:,:,:)
+    ssh_rhs=>dynamics%ssh_rhs(:)
+    ssh_rhs_old=>dynamics%ssh_rhs_old(:)
 
     ssh_rhs=0.0_WP
     !___________________________________________________________________________
@@ -1712,13 +1764,14 @@ end subroutine compute_ssh_rhs_ale
 ! hbar(n+0.5) = hbar(n-0.5) - tau*ssh_rhs_old
 !
 ! in S. Danilov et al.: "FESOM2: from finite elements to finite volumes"
-subroutine compute_hbar_ale(partit, mesh)
+subroutine compute_hbar_ale(dynamics, partit, mesh)
     use g_config,only: dt, which_ALE, use_cavity
     use MOD_MESH
-    use o_ARRAYS
+    use o_ARRAYS, only: water_flux
     use o_PARAM
     USE MOD_PARTIT
     USE MOD_PARSUP
+    USE MOD_DYN
     use g_comm_auto
     
     implicit none
@@ -1732,11 +1785,17 @@ subroutine compute_hbar_ale(partit, mesh)
     real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2 
     type(t_mesh),   intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
+    type(t_dyn)   , intent(inout), target :: dynamics
+    real(kind=WP), dimension(:,:,:), pointer :: UV
+    real(kind=WP), dimension(:), pointer :: ssh_rhs, ssh_rhs_old
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    UV=>dynamics%uv(:,:,:)
+    ssh_rhs=>dynamics%ssh_rhs(:)
+    ssh_rhs_old=>dynamics%ssh_rhs_old(:)
 
     !___________________________________________________________________________
     ! compute the rhs
@@ -1824,13 +1883,14 @@ end subroutine compute_hbar_ale
 ! > for zlevel: dh_k/dt_k=1 != 0
 ! > for zstar : dh_k/dt_k=1...kbot-1 != 0
 !
-subroutine vert_vel_ale(partit, mesh)
+subroutine vert_vel_ale(dynamics, partit, mesh)
     use g_config,only: dt, which_ALE, min_hnode, lzstar_lev, flag_warn_cflz
     use MOD_MESH
-    use o_ARRAYS
+    use o_ARRAYS, only: water_flux
     use o_PARAM
     USE MOD_PARTIT
     USE MOD_PARSUP
+    USE MOD_DYN
     use g_comm_auto
     use io_RESTART !!PS
     use i_arrays !!PS
@@ -1845,14 +1905,30 @@ subroutine vert_vel_ale(partit, mesh)
     real(kind=WP) :: dhbar_total, dhbar_rest, distrib_dhbar_int  !PS
     real(kind=WP), dimension(:), allocatable :: max_dhbar2distr,cumsum_maxdhbar,distrib_dhbar
     integer      , dimension(:), allocatable :: idx
+    type(t_dyn)   , intent(inout), target :: dynamics
     type(t_mesh),   intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
-
+    real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
+    real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, Wvel_i, CFL_z, fer_Wvel
+    real(kind=WP), dimension(:)  , pointer :: ssh_rhs, ssh_rhs_old
+    real(kind=WP), dimension(:)  , pointer :: eta_n, d_eta
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
+    UV    =>dynamics%uv(:,:,:)
+    Wvel  =>dynamics%w(:,:)
+    Wvel_e=>dynamics%w_e(:,:)
+    Wvel_i=>dynamics%w_i(:,:)
+    CFL_z =>dynamics%cfl_z(:,:)
+    ssh_rhs =>dynamics%ssh_rhs(:)
+    ssh_rhs_old =>dynamics%ssh_rhs_old(:)
+    eta_n =>dynamics%eta_n(:)
+    d_eta =>dynamics%d_eta(:)
+    if (Fer_GM) then
+        fer_UV    =>dynamics%fer_uv(:,:,:)
+        fer_Wvel  =>dynamics%fer_w(:,:)
+    end if 
     !___________________________________________________________________________
     ! Contributions from levels in divergence
     Wvel=0.0_WP
@@ -2320,19 +2396,19 @@ subroutine vert_vel_ale(partit, mesh)
     
     !___________________________________________________________________________
     ! Split implicit vertical velocity onto implicit and explicit components using CFL criteria:
-    ! w_max_cfl constrains the allowed explicit w according to the CFL at this place
-    ! w_max_cfl=1 means   w_exp  is cut at at the maximum of allowed CFL
-    ! w_max_cfl=0 means   w_exp  is zero (everything computed implicitly)
-    ! w_max_cfl=inf menas w_impl is zero (everything computed explicitly)
-    ! a guess for optimal choice of w_max_cfl would be 0.95
+    ! wsplit_maxcfl constrains the allowed explicit w according to the CFL at this place
+    ! wsplit_maxcfl=1 means   w_exp  is cut at at the maximum of allowed CFL
+    ! wsplit_maxcfl=0 means   w_exp  is zero (everything computed implicitly)
+    ! wsplit_maxcfl=inf menas w_impl is zero (everything computed explicitly)
+    ! a guess for optimal choice of wsplit_maxcfl would be 0.95
     do n=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(n)
         nzmax = nlevels_nod2D(n)
         do nz=nzmin,nzmax
             c1=1.0_WP
             c2=0.0_WP
-            if (w_split .and. (CFL_z(nz, n) > w_max_cfl)) then
-                dd=max((CFL_z(nz, n)-w_max_cfl), 0.0_WP)/max(w_max_cfl, 1.e-12)
+            if (dynamics%use_wsplit  .and. (CFL_z(nz, n) > dynamics%wsplit_maxcfl)) then
+                dd=max((CFL_z(nz, n)-dynamics%wsplit_maxcfl), 0.0_WP)/max(dynamics%wsplit_maxcfl, 1.e-12)
                 c1=1.0_WP/(1.0_WP+dd) !explicit part =1. if dd=0.
                 c2=dd    /(1.0_WP+dd) !implicit part =1. if dd=inf
             end if
@@ -2346,176 +2422,132 @@ end subroutine vert_vel_ale
 !===============================================================================
 ! solve  eq.18 in S. Danilov et al. : FESOM2: from finite elements to finite volumes. 
 ! for (eta^(n+1)-eta^n) = d_eta
-subroutine solve_ssh_ale(partit, mesh)
-use o_PARAM
-use MOD_MESH
-use o_ARRAYS
-USE MOD_PARTIT
-USE MOD_PARSUP
-use g_comm_auto
-use g_config, only: which_ale
-    !
-    !
-    !___USE PETSC SOLVER________________________________________________________
-    ! this is not longer used but is still kept in the code
-#ifdef PETSC
-implicit none
-#include "petscf.h"
-integer                         :: myrows
-integer                         :: Pmode
-real(kind=WP)                   :: rinfo(20,20)
-integer                         :: maxiter=2000
-integer                         :: restarts=15
-integer                         :: fillin=3
-integer                         :: lutype=2
-integer                         :: nrhs=1
-real(kind=WP)                   :: droptol=1.e-7
-real(kind=WP)                   :: soltol =1e-10  !1.e-10
-logical, save                   :: lfirst=.true.
-real(kind=WP), allocatable      :: arr_nod2D(:),arr_nod2D2(:,:),arr_nod2D3(:)
-real(kind=WP)                   :: cssh1,cssh2,crhs
-integer                         :: i
-type(t_mesh),   intent(inout), target :: mesh
-type(t_partit), intent(inout), target :: partit
-
-
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
-
-Pmode = PET_BLOCKP+PET_SOLVE + PET_BICGSTAB +PET_REPORT + PET_QUIET+ PET_RCM+PET_PCBJ
-if (lfirst) then   
-   Pmode = Pmode+PET_STRUCT+PET_PMVALS + PET_PCASM+PET_OVL_2 !+PET_PCBJ+PET_ILU
-   lfirst=.false.
-end if
-call PETSC_S(Pmode, 1, ssh_stiff%dim, ssh_stiff%nza, myrows, &
-     maxiter,  & 
-     restarts, &
-     fillin,   &
-     droptol,  &  
-     soltol,   &
-     part, ssh_stiff%rowptr, ssh_stiff%colind, ssh_stiff%values, &
-     ssh_rhs, d_eta, &
-     rinfo, MPI_COMM_FESOM, mesh)
-    !
-    !
-    !___USE PARMS SOLVER (recommended)__________________________________________
-#elif defined(PARMS)
-
-  use iso_c_binding, only: C_INT, C_DOUBLE
-  implicit none
+subroutine solve_ssh_ale(dynamics, partit, mesh)
+    use o_PARAM
+    use MOD_MESH
+    use o_ARRAYS
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_DYN
+    use g_comm_auto
+    use g_config, only: which_ale
+    use iso_c_binding, only: C_INT, C_DOUBLE
+    implicit none
 #include "fparms.h"
-logical, save        :: lfirst=.true.
-integer(kind=C_INT)  :: ident
-integer(kind=C_INT)  :: n3, reuse, new_values
-integer(kind=C_INT)  :: maxiter, restart, lutype, fillin
-real(kind=C_DOUBLE)  :: droptol, soltol
-integer :: n
-type(t_mesh),   intent(inout), target :: mesh
-type(t_partit), intent(inout), target :: partit
+    logical, save        :: lfirst=.true.
+    integer(kind=C_INT)  :: n3, reuse, new_values
+    integer              :: n
+    type(t_mesh)  , intent(inout), target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_dyn)   , intent(inout), target :: dynamics
+    real(kind=C_DOUBLE), pointer  :: droptol, soltol
+    integer(kind=C_INT), pointer  :: maxiter, restart, lutype, fillin, ident
 
-
-interface
-   subroutine psolver_init(ident, SOL, PCGLOB, PCLOC, lutype, &
-        fillin, droptol, maxiter, restart, soltol, &
-        part, rowptr, colind, values, reuse, MPI_COMM) bind(C)
-     use iso_c_binding, only: C_INT, C_DOUBLE
-     integer(kind=C_INT) :: ident, SOL, PCGLOB, PCLOC, lutype, &
-                            fillin,  maxiter, restart, &
-                            part(*), rowptr(*), colind(*), reuse, MPI_COMM
-     real(kind=C_DOUBLE) :: droptol,  soltol, values(*)
-   end subroutine psolver_init
-end interface
-interface
-   subroutine psolve(ident, ssh_rhs, values, d_eta, newvalues) bind(C)
-
-     use iso_c_binding, only: C_INT, C_DOUBLE
-     integer(kind=C_INT) :: ident, newvalues
-     real(kind=C_DOUBLE) :: values(*), ssh_rhs(*), d_eta(*)
-
-   end subroutine psolve
-end interface
+    interface
+        subroutine psolver_init(ident, SOL, PCGLOB, PCLOC, lutype, &
+                                fillin, droptol, maxiter, restart, soltol, &
+                                part, rowptr, colind, values, reuse, MPI_COMM) bind(C)
+            use iso_c_binding, only: C_INT, C_DOUBLE
+            integer(kind=C_INT) :: ident, SOL, PCGLOB, PCLOC, lutype, &
+                                    fillin,  maxiter, restart, &
+                                    part(*), rowptr(*), colind(*), reuse, MPI_COMM
+            real(kind=C_DOUBLE) :: droptol,  soltol, values(*)
+        end subroutine psolver_init
+    end interface
+    interface
+        subroutine psolve(ident, ssh_rhs, values, d_eta, newvalues) bind(C)
+            use iso_c_binding, only: C_INT, C_DOUBLE
+            integer(kind=C_INT) :: ident, newvalues
+            real(kind=C_DOUBLE) :: values(*), ssh_rhs(*), d_eta(*)
+        end subroutine psolve
+    end interface
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    ident   => dynamics%solverinfo%ident
+    maxiter => dynamics%solverinfo%maxiter
+    restart => dynamics%solverinfo%restart
+    lutype  => dynamics%solverinfo%lutype
+    fillin  => dynamics%solverinfo%fillin
+    droptol => dynamics%solverinfo%droptol
+    soltol  => dynamics%solverinfo%soltol
 
-ident=1
-maxiter=2000
-restart=15
-fillin=3
-lutype=2
-droptol=1.e-8
-soltol=1.e-10
+    if  (trim(which_ale)=='linfs') then
+        reuse=0
+        new_values=0
+    else
+        reuse=1     ! For varying coefficients, set reuse=1
+        new_values=1 !PS 1 ! and new_values=1, as soon as the coefficients have changed
+    end if
 
-if  (trim(which_ale)=='linfs') then
-    reuse=0
-    new_values=0
-else
-    reuse=1     ! For varying coefficients, set reuse=1
-    new_values=1 !PS 1 ! and new_values=1, as soon as the coefficients have changed
-end if
+    ! reuse=0: matrix remains static
+    ! reuse=1: keeps a copy of the matrix structure to apply scaling of the matrix fast
 
-! reuse=0: matrix remains static
-! reuse=1: keeps a copy of the matrix structure to apply scaling of the matrix fast
+    ! new_values=0: matrix coefficients unchanged (compared to the last call of psolve) 
+    ! new_values=1: replaces the matrix values (keeps the structure and the preconditioner) 
+    ! new_values=2: replaces the matrix values and recomputes the preconditioner (keeps the structure)
 
-! new_values=0: matrix coefficients unchanged (compared to the last call of psolve) 
-! new_values=1: replaces the matrix values (keeps the structure and the preconditioner) 
-! new_values=2: replaces the matrix values and recomputes the preconditioner (keeps the structure)
+    ! new_values>0 requires reuse=1 in psolver_init!
 
-! new_values>0 requires reuse=1 in psolver_init!
-
-if (lfirst) then
-   ! Set SOLCG for CG solver (symmetric, positiv definit matrices only, no precond available!!)
-   !     SOLBICGS for BiCGstab solver (arbitrary matrices)
-   !     SOLBICGS_RAS for BiCGstab solver (arbitrary matrices) with integrated RAS - the global 
-   !                  preconditioner setting is ignored! It saves a 4 vector copies per iteration
-   !                  compared to SOLBICGS + PCRAS.
-   !     SOLPBICGS for pipelined BiCGstab solver (arbitrary matrices)
-   !               Should scale better than SOLBICGS, but be careful, it is still experimental.
-   !     SOLPBICGS_RAS is SOLPBICGS with integrated RAS (global preconditioner setting is ignored!)
-   !                   for even better scalability, well, in the end, it does not matter much.     
-    call psolver_init(ident, SOLBICGS_RAS, PCRAS, PCILUK, lutype, &
-        fillin, droptol, maxiter, restart, soltol, &
-        part-1, ssh_stiff%rowptr(:)-ssh_stiff%rowptr(1), &
-        ssh_stiff%colind-1, ssh_stiff%values, reuse, MPI_COMM_FESOM)
-   lfirst=.false.
-end if
-    call psolve(ident, ssh_rhs, ssh_stiff%values, d_eta, new_values)
-
-#endif
-    !
     !
     !___________________________________________________________________________
-call exchange_nod(d_eta, partit) !is this required after calling psolve ?
+    if (lfirst) then
+    ! Set SOLCG for CG solver (symmetric, positiv definit matrices only, no precond available!!)
+    !     SOLBICGS for BiCGstab solver (arbitrary matrices)
+    !     SOLBICGS_RAS for BiCGstab solver (arbitrary matrices) with integrated RAS - the global 
+    !                  preconditioner setting is ignored! It saves a 4 vector copies per iteration
+    !                  compared to SOLBICGS + PCRAS.
+    !     SOLPBICGS for pipelined BiCGstab solver (arbitrary matrices)
+    !               Should scale better than SOLBICGS, but be careful, it is still experimental.
+    !     SOLPBICGS_RAS is SOLPBICGS with integrated RAS (global preconditioner setting is ignored!)
+    !                   for even better scalability, well, in the end, it does not matter much.     
+        call psolver_init(ident, SOLBICGS_RAS, PCRAS, PCILUK, lutype, &
+            fillin, droptol, maxiter, restart, soltol, &
+            part-1, ssh_stiff%rowptr(:)-ssh_stiff%rowptr(1), &
+            ssh_stiff%colind-1, ssh_stiff%values, reuse, MPI_COMM_FESOM)
+    lfirst=.false.
+    end if
+    !
+    !___________________________________________________________________________    
+    call psolve(ident, dynamics%ssh_rhs, ssh_stiff%values, dynamics%d_eta, new_values)
+
+    !
+    !___________________________________________________________________________
+    call exchange_nod(dynamics%d_eta, partit) !is this required after calling psolve ?
 
 end subroutine solve_ssh_ale
 !
 !
 !===============================================================================
-subroutine impl_vert_visc_ale(partit, mesh)
+subroutine impl_vert_visc_ale(dynamics, partit, mesh)
 USE MOD_MESH
 USE o_PARAM
-USE o_ARRAYS
+USE o_ARRAYS, only: Av, stress_surf
 USE MOD_PARTIT
 USE MOD_PARSUP
+USE MOD_DYN
 USE g_CONFIG,only: dt
 IMPLICIT NONE
 
 type(t_mesh),   intent(inout), target :: mesh
 type(t_partit), intent(inout), target :: partit
+type(t_dyn)   , intent(inout), target :: dynamics
 
 real(kind=WP)              ::  a(mesh%nl-1), b(mesh%nl-1), c(mesh%nl-1), ur(mesh%nl-1), vr(mesh%nl-1)
 real(kind=WP)              ::  cp(mesh%nl-1), up(mesh%nl-1), vp(mesh%nl-1)
 integer                    ::  nz, elem, nzmax, nzmin, elnodes(3)
 real(kind=WP)              ::  zinv, m, friction, wu, wd
-
+real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
+real(kind=WP), dimension(:,:)  , pointer :: Wvel_i
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+UV     =>dynamics%uv(:,:,:)
+UV_rhs =>dynamics%uv_rhs(:,:,:)
+Wvel_i =>dynamics%w_i(:,:)
 
 DO elem=1,myDim_elem2D
     elnodes=elem2D_nodes(:,elem)
@@ -2674,10 +2706,11 @@ end subroutine impl_vert_visc_ale
 !
 !
 !===============================================================================
-subroutine oce_timestep_ale(n, tracers, partit, mesh)
+subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     use g_config
     use MOD_MESH
     use MOD_TRACER
+    use MOD_DYN
     use o_ARRAYS
     use o_PARAM
     USE MOD_PARTIT
@@ -2696,23 +2729,27 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
     use pressure_bv_interface
     use pressure_force_4_linfs_interface
     use pressure_force_4_zxxxx_interface
+    use compute_vel_rhs_interface
     use solve_tracers_ale_interface
     use write_step_info_interface
     use check_blowup_interface
+    use fer_solve_interface
     IMPLICIT NONE
     integer,        intent(in)            :: n
     type(t_mesh),   intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
     type(t_tracer), intent(inout), target :: tracers
+    type(t_dyn), intent(inout), target :: dynamics
 
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
     integer           :: node
-
+    real(kind=WP), dimension(:), pointer :: eta_n
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
+    eta_n => dynamics%eta_n(:)
+    
     t0=MPI_Wtime()
 
 !     water_flux = 0.0_WP
@@ -2775,7 +2812,7 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
     ! use FESOM2.0 tuned k-profile parameterization for vertical mixing 
     if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_KPP'//achar(27)//'[0m' 
-        call oce_mixing_KPP(Av, Kv_double, tracers, partit, mesh)
+        call oce_mixing_KPP(Av, Kv_double, dynamics, tracers, partit, mesh)
         Kv=Kv_double(:,:,1)
         call mo_convect(partit, mesh)
         
@@ -2783,13 +2820,13 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
     ! mixing     
     else if(mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_PP'//achar(27)//'[0m' 
-        call oce_mixing_PP(partit, mesh)
+        call oce_mixing_PP(dynamics, partit, mesh)
         call mo_convect(partit, mesh)
         
     ! use CVMIX KPP (Large at al. 1994) 
     else if(mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_kpp'//achar(27)//'[0m'
-        call calc_cvmix_kpp(tracers, partit, mesh)
+        call calc_cvmix_kpp(dynamics, tracers, partit, mesh)
         call mo_convect(partit, mesh)
         
     ! use CVMIX PP (Pacanowski and Philander 1981) parameterisation for mixing
@@ -2797,7 +2834,7 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
     ! N^2 and vertical horizontal velocity shear dui/dz
     else if(mix_scheme_nmb==4 .or. mix_scheme_nmb==47) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_pp'//achar(27)//'[0m'
-        call calc_cvmix_pp(partit, mesh)
+        call calc_cvmix_pp(dynamics, partit, mesh)
         call mo_convect(partit, mesh)
         
     ! use CVMIX TKE (turbulent kinetic energy closure) parameterisation for 
@@ -2806,7 +2843,7 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
     ! Model for the diapycnal diffusivity induced by internal gravity waves" 
     else if(mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then    
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tke'//achar(27)//'[0m'
-        call calc_cvmix_tke(partit, mesh)
+        call calc_cvmix_tke(dynamics, partit, mesh)
         call mo_convect(partit, mesh)
         
     end if     
@@ -2826,25 +2863,15 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'
-    
-!!PS         if (any(UV_rhs/=UV_rhs))           write(*,*) n, mype,' --> found NaN UV_rhs before compute_vel_rhs'
-!!PS         if (any(UV/=UV))                   write(*,*) n, mype,' --> found NaN UV before compute_vel_rhs'
-!!PS         if (any(ssh_rhs/=ssh_rhs))         write(*,*) n, mype,' --> found NaN ssh_rhs before compute_vel_rhs'
-!!PS         if (any(ssh_rhs_old/=ssh_rhs_old)) write(*,*) n, mype,' --> found NaN ssh_rhs_old before compute_vel_rhs'
-!!PS         if (any(abs(Wvel_e)>1.0e20))       write(*,*) n, mype,' --> found Inf Wvel_e before compute_vel_rhs'
-
-    if(mom_adv/=3) then
-        call compute_vel_rhs(partit, mesh)
-    else
-        call compute_vel_rhs_vinv(partit, mesh)
-    end if
+    call compute_vel_rhs(dynamics, partit, mesh)
     
     !___________________________________________________________________________
-    call viscosity_filter(visc_option, partit, mesh)
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call viscosity_filter'//achar(27)//'[0m'
+    call viscosity_filter(dynamics%opt_visc, dynamics, partit, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call impl_vert_visc_ale'//achar(27)//'[0m'
-    if(i_vert_visc) call impl_vert_visc_ale(partit, mesh)
+    if(dynamics%use_ivertvisc) call impl_vert_visc_ale(dynamics,partit, mesh)
     t2=MPI_Wtime()
         
     !___________________________________________________________________________
@@ -2856,26 +2883,26 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_ssh_rhs_ale'//achar(27)//'[0m'
     ! ssh_rhs=-alpha*\nabla\int(U_n+U_rhs)dz-(1-alpha)*...
     ! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (18) rhs
-    call compute_ssh_rhs_ale(partit, mesh)
+    call compute_ssh_rhs_ale(dynamics, partit, mesh)
 
     ! Take updated ssh matrix and solve --> new ssh!
     t30=MPI_Wtime() 
-    call solve_ssh_ale(partit, mesh)
+    call solve_ssh_ale(dynamics, partit, mesh)
     
-    if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) call relax_zonal_vel(partit, mesh)
+    if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) call relax_zonal_vel(dynamics, partit, mesh)
     t3=MPI_Wtime() 
 
     ! estimate new horizontal velocity u^(n+1)
     ! u^(n+1) = u* + [-g * tau * theta * grad(eta^(n+1)-eta^(n)) ]
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_vel'//achar(27)//'[0m'
-    call update_vel(partit, mesh)
+    call update_vel(dynamics, partit, mesh)
     
     ! --> eta_(n) --> eta_(n+1) = eta_(n) + deta = eta_(n) + (eta_(n+1) + eta_(n))
     t4=MPI_Wtime() 
     
     ! Update to hbar(n+3/2) and compute dhe to be used on the next step
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_hbar_ale'//achar(27)//'[0m'
-    call compute_hbar_ale(partit, mesh)
+    call compute_hbar_ale(dynamics, partit, mesh)
 
     !___________________________________________________________________________
     ! - Current dynamic elevation alpha*hbar(n+1/2)+(1-alpha)*hbar(n-1/2)
@@ -2903,20 +2930,20 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
     if (Fer_GM) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call fer_solve_Gamma'//achar(27)//'[0m'
         call fer_solve_Gamma(partit, mesh)
-        call fer_gamma2vel(partit, mesh)
+        call fer_gamma2vel(dynamics, partit, mesh)
     end if
     t6=MPI_Wtime()    
     !___________________________________________________________________________
     ! The main step of ALE procedure --> this is were the magic happens --> here 
     ! is decided how change in hbar is distributed over the vertical layers
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call vert_vel_ale'//achar(27)//'[0m'
-    call vert_vel_ale(partit, mesh)
+    call vert_vel_ale(dynamics, partit, mesh)
     t7=MPI_Wtime() 
 
     !___________________________________________________________________________
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
-    call solve_tracers_ale(tracers, partit, mesh)
+    call solve_tracers_ale(dynamics, tracers, partit, mesh)
     t8=MPI_Wtime() 
     
     !___________________________________________________________________________
@@ -2926,11 +2953,13 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
     t9=MPI_Wtime() 
     !___________________________________________________________________________
     ! write out global fields for debugging
-    call write_step_info(n,logfile_outfreq, tracers, partit, mesh)
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call write_step_info'//achar(27)//'[0m'
+    call write_step_info(n,logfile_outfreq, dynamics, tracers, partit, mesh)
     
     ! check model for blowup --> ! write_step_info and check_blowup require 
     ! togeather around 2.5% of model runtime
-    call check_blowup(n, tracers, partit, mesh)
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call check_blowup'//achar(27)//'[0m'
+    call check_blowup(n, dynamics, tracers, partit, mesh)
     t10=MPI_Wtime()
 
     !___________________________________________________________________________
@@ -2963,3 +2992,4 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
         write(*,*)
     end if
 end subroutine oce_timestep_ale
+
