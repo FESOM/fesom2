@@ -4,15 +4,6 @@
 !
 ! -Original code by Kristian Mogensen, ECMWF.
 
-SUBROUTINE nemogcmcoup_end_ioserver
-
-! End the NEMO mppio server
-
-    WRITE(*,*)'No mpp_ioserver used'
-!   CALL abort
- 
-END SUBROUTINE nemogcmcoup_end_ioserver
-
 SUBROUTINE nemogcmcoup_init_ioserver( icomm, lnemoioserver )
 
    ! Initialize the NEMO mppio server
@@ -22,7 +13,7 @@ SUBROUTINE nemogcmcoup_init_ioserver( icomm, lnemoioserver )
    LOGICAL :: lnemoioserver
 
    WRITE(*,*)'No mpp_ioserver'
-   !CALL abort
+   CALL abort
    
 END SUBROUTINE nemogcmcoup_init_ioserver
 
