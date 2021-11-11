@@ -434,8 +434,11 @@ contains
         write(*,*)
         write(*,*) '============================================'
         write(*,*) '=========== BENCHMARK RUNTIME =============='
-        write(*,*) '    Number of cores : ',f%npes
-        write(*,*) '    Runtime for all timesteps : ',f%runtime_alltimesteps,' sec'
+        write(*,*) '    Number of cores :    ',f%npes
+#if defined(_OPENMP)
+        write(*,*) '    Max OpenMP threads : ',OMP_GET_MAX_THREADS()
+#endif
+        write(*,*) '    Runtime for all timesteps :  ',f%runtime_alltimesteps,' sec'
         write(*,*) '============================================'
         write(*,*)
     end if    
