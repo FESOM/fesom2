@@ -75,7 +75,7 @@ subroutine forcing_array_setup(partit, mesh)
   evaporation = 0.0_WP
   ice_sublimation = 0.0_WP
 
-#if defined (__oasis)
+#if defined (__oasis) || defined (__ifsinterface)
   allocate(tmp_sublimation(n2),tmp_evap_no_ifrac(n2), tmp_shortwave(n2))
   allocate(sublimation(n2),evap_no_ifrac(n2))
   allocate(atm_net_fluxes_north(nrecv), atm_net_fluxes_south(nrecv))
