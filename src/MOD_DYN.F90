@@ -45,7 +45,7 @@ END TYPE T_DYN_WORK
 ! set main structure for dynamicss, contains viscosity options and parameters + 
 ! option for momentum advection 
 TYPE T_DYN
-!___________________________________________________________________________
+    !___________________________________________________________________________
     ! instant zonal merdional velocity & Adams-Bashfort rhs
     real(kind=WP), allocatable, dimension(:,:,:):: uv, uv_rhs, uv_rhsAB, fer_uv  
 
