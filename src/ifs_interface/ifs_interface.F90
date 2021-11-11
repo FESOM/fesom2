@@ -52,7 +52,7 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
 
    fesom%MPI_COMM_FESOM=icomm
    itini = 1
-   CALL main_initialize(itend_fesom) !also sets mype and npes 
+   CALL fesom_init(itend_fesom) !also sets mype and npes 
    itend=itend_fesom/substeps
    if(fesom%mype==0) then
    WRITE(0,*)'!======================================'
@@ -1474,7 +1474,7 @@ SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )
    if(fesom%mype==0) then
    WRITE(0,*)'! IFS at timestep ', istp, '. Do ', substeps , 'FESOM timesteps...'
    endif
-   CALL main_timestepping(substeps)
+   CALL fesom_runloop(substeps)
 
    ! Compute date and time at the end of the time step
 
@@ -1510,7 +1510,7 @@ SUBROUTINE nemogcmcoup_final
    if(fesom%mype==0) then
    WRITE(*,*)'Finalization of FESOM from IFS.'
    endif
-   CALL main_finalize
+   CALL fesom_finalize
 
 END SUBROUTINE nemogcmcoup_final
 #endif
