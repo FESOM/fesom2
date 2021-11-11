@@ -1,148 +1,148 @@
 module oce_ale_interfaces
-  interface
-    subroutine init_bottom_elem_thickness(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine
+    interface
+        subroutine init_bottom_elem_thickness(partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(inout), target :: mesh
+        end subroutine
 
-    subroutine init_bottom_node_thickness(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine
-    
-    subroutine init_surface_elem_depth(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine
+        subroutine init_bottom_node_thickness(partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(inout), target :: mesh
+        end subroutine
+        
+        subroutine init_surface_elem_depth(partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(inout), target :: mesh
+        end subroutine
 
-    subroutine init_surface_node_depth(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine
+        subroutine init_surface_node_depth(partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(inout), target :: mesh
+        end subroutine
 
-    subroutine impl_vert_visc_ale(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      type(t_dyn), intent(inout), target :: dynamics
-    end subroutine
+        subroutine impl_vert_visc_ale(dynamics, partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_DYN
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(inout), target :: mesh
+        end subroutine
 
-    subroutine update_stiff_mat_ale(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine
+        subroutine update_stiff_mat_ale(partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(inout), target :: mesh
+        end subroutine
 
-    subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use MOD_DYN
-      type(t_mesh),   intent(inout),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      type(t_dyn), intent(inout), target :: dynamics
-    end subroutine
+        subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use MOD_DYN
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(inout), target :: mesh
+        end subroutine
 
-    subroutine solve_ssh_ale(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      type(t_mesh),   intent(inout),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      type(t_dyn), intent(inout), target :: dynamics
-    end subroutine
+        subroutine solve_ssh_ale(dynamics, partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_DYN
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(inout), target :: mesh
+        end subroutine
 
-    subroutine compute_hbar_ale(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      type(t_mesh),   intent(inout),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      type(t_dyn), intent(inout), target :: dynamics
-    end subroutine
+        subroutine compute_hbar_ale(dynamics, partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_DYN
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(inout), target :: mesh
+        end subroutine
 
-    subroutine vert_vel_ale(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      type(t_mesh),   intent(inout),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      type(t_dyn), intent(inout), target :: dynamics
-    end subroutine
+        subroutine vert_vel_ale(dynamics, partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_DYN
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(inout), target :: mesh
+        end subroutine
 
-    subroutine update_thickness_ale(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine
-  end interface
+        subroutine update_thickness_ale(partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(inout), target :: mesh
+        end subroutine
+    end interface
 end module
 
 module init_ale_interface
-  interface
-    subroutine init_ale(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use MOD_DYN
-      type(t_mesh)  , intent(in)   , target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      type(t_dyn)   , intent(inout), target :: dynamics
-    end subroutine
-  end interface
+    interface
+        subroutine init_ale(dynamics, partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use MOD_DYN
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(inout), target :: mesh
+        end subroutine
+    end interface
 end module
 
 module init_thickness_ale_interface
-  interface
-    subroutine init_thickness_ale(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use MOD_DYN
-      type(t_mesh)  , intent(in)   , target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      type(t_dyn)   , intent(inout), target :: dynamics
-    end subroutine
-  end interface
+    interface
+        subroutine init_thickness_ale(dynamics, partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use MOD_DYN
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(inout), target :: mesh
+        end subroutine
+    end interface
 end module
 
 module oce_timestep_ale_interface
-  interface
-    subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use mod_tracer
-      use MOD_DYN
-      integer,        intent(in)                         :: n
-      type(t_mesh),   intent(inout),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      type(t_tracer), intent(inout), target :: tracers
-      type(t_dyn), intent(inout), target :: dynamics
-    end subroutine
-  end interface
+    interface
+        subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use mod_tracer
+        use MOD_DYN
+        integer       , intent(in)            :: n
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_tracer), intent(inout), target :: tracers
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(inout), target :: mesh
+        end subroutine
+    end interface
 end module
 ! CONTENT:
 ! ------------
@@ -177,15 +177,18 @@ subroutine init_ale(dynamics, partit, mesh)
     USE g_forcing_param, only: use_virt_salt
     use oce_ale_interfaces
     Implicit NONE
-    
-    integer                               :: n, nzmax, nzmin, elnodes(3), elem
-    type(t_mesh),   intent(inout), target :: mesh
-    type(t_partit), intent(inout), target :: partit
     type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(inout), target :: mesh
+    !___________________________________________________________________________
+    integer                               :: n, nzmax, nzmin, elnodes(3), elem
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+
     !___allocate________________________________________________________________
     ! hnode and hnode_new: layer thicknesses at nodes. 
     allocate(mesh%hnode(1:nl-1, myDim_nod2D+eDim_nod2D))
@@ -206,12 +209,9 @@ subroutine init_ale(dynamics, partit, mesh)
     ! of the ssh operator.      
     allocate(mesh%dhe(myDim_elem2D))
     
-    ! zbar_n: depth of layers due to ale thinkness variactions at ervery node n 
-    allocate(mesh%zbar_n(nl))
     allocate(mesh%zbar_3d_n(nl,myDim_nod2D+eDim_nod2D))
     
     ! Z_n: mid depth of layers due to ale thinkness variactions at ervery node n 
-    allocate(mesh%Z_n(nl-1))
     allocate(mesh%Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
     
     ! bottom_elem_tickness: changed bottom layer thinkness due to partial cells
@@ -237,8 +237,6 @@ subroutine init_ale(dynamics, partit, mesh)
     dhe(1:myDim_elem2D)                                        => mesh%dhe
     hbar(1:myDim_nod2D+eDim_nod2D)                             => mesh%hbar
     hbar_old(1:myDim_nod2D+eDim_nod2D)                         => mesh%hbar_old
-    zbar_n(1:mesh%nl)                                          => mesh%zbar_n
-    Z_n(1:mesh%nl-1)                                           => mesh%Z_n
     zbar_n_bot(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_bot
     zbar_e_bot(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_bot
     zbar_n_srf(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_srf
@@ -318,11 +316,13 @@ subroutine init_bottom_elem_thickness(partit, mesh)
     use g_comm_auto
     use g_support
     implicit none
-    
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(inout), target :: mesh
+    !___________________________________________________________________________
     integer       :: elem, elnodes(3), nle
     real(kind=WP) :: dd
-    type(t_mesh),   intent(inout), target :: mesh
-    type(t_partit), intent(inout), target :: partit
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -441,12 +441,14 @@ subroutine init_bottom_node_thickness(partit, mesh)
     use g_comm_auto
     use g_support
     implicit none
-    
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(inout), target :: mesh
+    !___________________________________________________________________________
     integer       :: node, nln, elem, elemi, nelem
     real(kind=WP) :: dd 
     real(kind=WP) :: hnbot, tvol 
-    type(t_mesh),   intent(inout), target :: mesh
-    type(t_partit), intent(inout), target :: partit
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -552,12 +554,13 @@ subroutine init_surface_elem_depth(partit, mesh)
     use g_comm_auto
     use g_support
     implicit none
-    
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(inout), target :: mesh
+    !___________________________________________________________________________
     integer       :: elem, elnodes(3), ule
     real(kind=WP) :: dd
-    type(t_mesh),   intent(inout), target :: mesh
-    type(t_partit), intent(inout), target :: partit
-    
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -630,17 +633,19 @@ subroutine init_surface_node_depth(partit, mesh)
     use g_comm_auto
     use g_support
     implicit none
-    
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(inout), target :: mesh
+    !___________________________________________________________________________
     integer       :: node, uln, nelem, elemi
     real(kind=WP) :: dd 
-    type(t_mesh),   intent(inout), target :: mesh
-    type(t_partit), intent(inout), target :: partit
-
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     
+    !___________________________________________________________________________
     if (use_cavity) then 
         !___________________________________________________________________________
         ! If we use partial cells and cavity, the thickness of surface cell is adjusted.
@@ -693,11 +698,14 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
     USE MOD_PARSUP
     USE MOD_DYN
     implicit none
-    integer :: n, nz, elem, elnodes(3), nzmin, nzmax
-    real(kind=WP) :: dd 
-    type(t_mesh),   intent(inout), target :: mesh
+    type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
-    type(t_dyn), intent(inout), target :: dynamics
+    type(t_mesh)  , intent(inout), target :: mesh
+    !___________________________________________________________________________
+    integer       :: n, nz, elem, elnodes(3), nzmin, nzmax
+    real(kind=WP) :: dd 
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer :: ssh_rhs_old, eta_n
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -705,6 +713,8 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
 #include "associate_mesh_ass.h"
     ssh_rhs_old=>dynamics%ssh_rhs_old(:)
     eta_n      =>dynamics%eta_n(:)
+    
+    !___________________________________________________________________________
     
     if(mype==0) then
         write(*,*) '____________________________________________________________'
@@ -946,11 +956,13 @@ subroutine update_thickness_ale(partit, mesh)
     use o_ARRAYS
     use g_config,only: which_ale,lzstar_lev,min_hnode
     implicit none
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(inout), target :: mesh
+    !___________________________________________________________________________
     integer :: n, nz, elem, elnodes(3),nzmax, nzmin
     integer      , dimension(:), allocatable :: idx
-    type(t_mesh),   intent(inout), target :: mesh
-    type(t_partit), intent(inout), target :: partit
-
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -1148,16 +1160,19 @@ subroutine restart_thickness_ale(partit, mesh)
     use o_ARRAYS
     use g_config,only: which_ale,lzstar_lev,min_hnode
     implicit none
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(inout), target :: mesh
+    !___________________________________________________________________________
     integer :: n, nz, elem, elnodes(3), nzmax, nzmin, lcl_lzstar_lev
     integer      , dimension(:), allocatable :: idx
-    type(t_mesh),   intent(inout), target :: mesh
-    type(t_partit), intent(inout), target :: partit
-
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
+    !___________________________________________________________________________
     if(mype==0) then
         write(*,*) '____________________________________________________________'
         write(*,*) ' --> restart ALE layerthicknesses, depth levels and middepth levels'
@@ -1253,7 +1268,9 @@ subroutine init_stiff_mat_ale(partit, mesh)
     USE MOD_PARSUP
     use g_CONFIG
     implicit none
-    
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(inout), target :: mesh
+    !___________________________________________________________________________
     integer                             :: n, n1, n2, i, j, row, ed, fileID
     integer                             :: elnodes(3), el(2)
     integer                             :: npos(3), offset, nini, nend
@@ -1264,13 +1281,14 @@ subroutine init_stiff_mat_ale(partit, mesh)
     character(MAX_PATH)                 :: dist_mesh_dir, file_name
     real(kind=WP)                       :: t0, t1
     integer                             :: ierror              ! MPI, return error code
-    type(t_mesh),   intent(inout), target :: mesh
-    type(t_partit), intent(inout), target :: partit
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
+    !___________________________________________________________________________
     t0=MPI_Wtime()
     if (mype==0) then
         write(*,*) '____________________________________________________________'
@@ -1541,17 +1559,18 @@ subroutine update_stiff_mat_ale(partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     use o_ARRAYS
-    !
     implicit none
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(inout), target :: mesh
+    !___________________________________________________________________________
     integer                             :: n, i, j,  row, ed,n2
     integer                             :: enodes(2), elnodes(3), el(2)
     integer                             :: elem, npos(3), offset, nini, nend
     real(kind=WP)                       :: factor 
     real(kind=WP)                       :: fx(3), fy(3)
     integer, allocatable                :: n_num(:)
-    type(t_mesh),   intent(inout), target :: mesh
-    type(t_partit), intent(inout), target :: partit
-
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -1645,6 +1664,9 @@ end subroutine update_stiff_mat_ale
 !"FESOM2: from finite elements to finite volumes"
 !
 ! ssh_rhs = alpha * grad[  int_hbot^hbar(n+0.5)( u^n+deltau)dz + W(n+0.5) ]
+! In the semiimplicit method: 
+! ssh_rhs=-alpha*\nabla\int(U_n+U_rhs)dz-(1-alpha)*...
+! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
 subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     use g_config,only: which_ALE,dt
     use MOD_MESH
@@ -1655,30 +1677,29 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     USE MOD_DYN
     use g_comm_auto
     implicit none
-    
-    ! In the semiimplicit method: 
-    ! ssh_rhs=-alpha*\nabla\int(U_n+U_rhs)dz-(1-alpha)*...
-    ! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
+    type(t_mesh)  , intent(inout), target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_dyn)   , intent(inout), target :: dynamics
+    !___________________________________________________________________________
     integer       :: ed, el(2), enodes(2), nz, n, nzmin, nzmax
     real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2 
     real(kind=WP) :: dumc1_1, dumc1_2, dumc2_1, dumc2_2 !!PS
-    type(t_mesh),   intent(inout), target :: mesh
-    type(t_partit), intent(inout), target :: partit
-    type(t_dyn), intent(inout), target :: dynamics
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
-    real(kind=WP), dimension(:), pointer :: ssh_rhs, ssh_rhs_old
+    real(kind=WP), dimension(:)    , pointer :: ssh_rhs, ssh_rhs_old
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    UV=>dynamics%uv(:,:,:)
-    UV_rhs=>dynamics%uv_rhs(:,:,:)
-    ssh_rhs=>dynamics%ssh_rhs(:)
-    ssh_rhs_old=>dynamics%ssh_rhs_old(:)
+    UV         => dynamics%uv(:,:,:)
+    UV_rhs     => dynamics%uv_rhs(:,:,:)
+    ssh_rhs    => dynamics%ssh_rhs(:)
+    ssh_rhs_old=> dynamics%ssh_rhs_old(:)
 
-    ssh_rhs=0.0_WP
     !___________________________________________________________________________
     ! loop over local edges
+    ssh_rhs=0.0_WP
     do ed=1, myDim_edge2D      
         ! local indice of nodes that span up edge ed
         enodes=edges(:,ed)
@@ -1764,6 +1785,11 @@ end subroutine compute_ssh_rhs_ale
 ! hbar(n+0.5) = hbar(n-0.5) - tau*ssh_rhs_old
 !
 ! in S. Danilov et al.: "FESOM2: from finite elements to finite volumes"
+!
+! see "FESOM2: from finite elements to finte volumes, S. Danilov..." 
+! hbar(n+1)-hbar(n)=tau*ssh_rhs_old 
+! ssh_rhs_old=-\nabla\int(U_n)dz-water_flux*area (if free surface)
+! Find new elevation hbar
 subroutine compute_hbar_ale(dynamics, partit, mesh)
     use g_config,only: dt, which_ALE, use_cavity
     use MOD_MESH
@@ -1773,29 +1799,24 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
     USE MOD_PARSUP
     USE MOD_DYN
     use g_comm_auto
-    
     implicit none
-    
-    ! see "FESOM2: from finite elements to finte volumes, S. Danilov..." 
-    ! hbar(n+1)-hbar(n)=tau*ssh_rhs_old 
-    ! ssh_rhs_old=-\nabla\int(U_n)dz-water_flux*area (if free surface)
-    ! Find new elevation hbar
-    
-    integer      :: ed, el(2), enodes(2),  nz,n, elnodes(3), elem, nzmin, nzmax
-    real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2 
-    type(t_mesh),   intent(inout), target :: mesh
-    type(t_partit), intent(inout), target :: partit
     type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(inout), target :: mesh
+    !___________________________________________________________________________
+    integer       :: ed, el(2), enodes(2),  nz,n, elnodes(3), elem, nzmin, nzmax
+    real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2 
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV
-    real(kind=WP), dimension(:), pointer :: ssh_rhs, ssh_rhs_old
-
+    real(kind=WP), dimension(:)    , pointer :: ssh_rhs, ssh_rhs_old
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    UV=>dynamics%uv(:,:,:)
-    ssh_rhs=>dynamics%ssh_rhs(:)
-    ssh_rhs_old=>dynamics%ssh_rhs_old(:)
+    UV         => dynamics%uv(:,:,:)
+    ssh_rhs    => dynamics%ssh_rhs(:)
+    ssh_rhs_old=> dynamics%ssh_rhs_old(:)
 
     !___________________________________________________________________________
     ! compute the rhs
@@ -1896,39 +1917,40 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     use i_arrays !!PS
     use g_forcing_arrays !!PS
     implicit none
-    
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(inout), target :: mesh
+    !___________________________________________________________________________
     integer       :: el(2), enodes(2), n, nz, ed, nzmin, nzmax, uln1, uln2, nln1, nln2
     real(kind=WP) :: c1, c2, deltaX1, deltaY1, deltaX2, deltaY2, dd, dd1, dddt, cflmax
-    
-    !_______________________________
     ! --> zlevel with local zstar
     real(kind=WP) :: dhbar_total, dhbar_rest, distrib_dhbar_int  !PS
     real(kind=WP), dimension(:), allocatable :: max_dhbar2distr,cumsum_maxdhbar,distrib_dhbar
     integer      , dimension(:), allocatable :: idx
-    type(t_dyn)   , intent(inout), target :: dynamics
-    type(t_mesh),   intent(inout), target :: mesh
-    type(t_partit), intent(inout), target :: partit
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
     real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, Wvel_i, CFL_z, fer_Wvel
-    real(kind=WP), dimension(:)  , pointer :: ssh_rhs, ssh_rhs_old
-    real(kind=WP), dimension(:)  , pointer :: eta_n, d_eta
+    real(kind=WP), dimension(:)    , pointer :: ssh_rhs, ssh_rhs_old
+    real(kind=WP), dimension(:)    , pointer :: eta_n, d_eta
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    UV    =>dynamics%uv(:,:,:)
-    Wvel  =>dynamics%w(:,:)
-    Wvel_e=>dynamics%w_e(:,:)
-    Wvel_i=>dynamics%w_i(:,:)
-    CFL_z =>dynamics%cfl_z(:,:)
-    ssh_rhs =>dynamics%ssh_rhs(:)
-    ssh_rhs_old =>dynamics%ssh_rhs_old(:)
-    eta_n =>dynamics%eta_n(:)
-    d_eta =>dynamics%d_eta(:)
+    UV          => dynamics%uv(:,:,:)
+    Wvel        => dynamics%w(:,:)
+    Wvel_e      => dynamics%w_e(:,:)
+    Wvel_i      => dynamics%w_i(:,:)
+    CFL_z       => dynamics%cfl_z(:,:)
+    ssh_rhs     => dynamics%ssh_rhs(:)
+    ssh_rhs_old => dynamics%ssh_rhs_old(:)
+    eta_n       => dynamics%eta_n(:)
+    d_eta       => dynamics%d_eta(:)
     if (Fer_GM) then
-        fer_UV    =>dynamics%fer_uv(:,:,:)
-        fer_Wvel  =>dynamics%fer_w(:,:)
+        fer_UV  => dynamics%fer_uv(:,:,:)
+        fer_Wvel=> dynamics%fer_w(:,:)
     end if 
+    
     !___________________________________________________________________________
     ! Contributions from levels in divergence
     Wvel=0.0_WP
@@ -2434,15 +2456,15 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     use iso_c_binding, only: C_INT, C_DOUBLE
     implicit none
 #include "fparms.h"
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(inout), target :: mesh
+    !___________________________________________________________________________
     logical, save        :: lfirst=.true.
     integer(kind=C_INT)  :: n3, reuse, new_values
     integer              :: n
-    type(t_mesh)  , intent(inout), target :: mesh
-    type(t_partit), intent(inout), target :: partit
-    type(t_dyn)   , intent(inout), target :: dynamics
-    real(kind=C_DOUBLE), pointer  :: droptol, soltol
-    integer(kind=C_INT), pointer  :: maxiter, restart, lutype, fillin, ident
-
+    !___________________________________________________________________________
+    ! interface for solver
     interface
         subroutine psolver_init(ident, SOL, PCGLOB, PCLOC, lutype, &
                                 fillin, droptol, maxiter, restart, soltol, &
@@ -2461,7 +2483,10 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
             real(kind=C_DOUBLE) :: values(*), ssh_rhs(*), d_eta(*)
         end subroutine psolve
     end interface
-
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=C_DOUBLE), pointer  :: droptol, soltol
+    integer(kind=C_INT), pointer  :: maxiter, restart, lutype, fillin, ident
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -2474,6 +2499,7 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     droptol => dynamics%solverinfo%droptol
     soltol  => dynamics%solverinfo%soltol
 
+    !___________________________________________________________________________
     if  (trim(which_ale)=='linfs') then
         reuse=0
         new_values=0
@@ -2522,185 +2548,188 @@ end subroutine solve_ssh_ale
 !
 !===============================================================================
 subroutine impl_vert_visc_ale(dynamics, partit, mesh)
-USE MOD_MESH
-USE o_PARAM
-USE o_ARRAYS, only: Av, stress_surf
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE MOD_DYN
-USE g_CONFIG,only: dt
-IMPLICIT NONE
-
-type(t_mesh),   intent(inout), target :: mesh
-type(t_partit), intent(inout), target :: partit
-type(t_dyn)   , intent(inout), target :: dynamics
-
-real(kind=WP)              ::  a(mesh%nl-1), b(mesh%nl-1), c(mesh%nl-1), ur(mesh%nl-1), vr(mesh%nl-1)
-real(kind=WP)              ::  cp(mesh%nl-1), up(mesh%nl-1), vp(mesh%nl-1)
-integer                    ::  nz, elem, nzmax, nzmin, elnodes(3)
-real(kind=WP)              ::  zinv, m, friction, wu, wd
-real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
-real(kind=WP), dimension(:,:)  , pointer :: Wvel_i
+    USE MOD_MESH
+    USE o_PARAM
+    USE o_ARRAYS, only: Av, stress_surf
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_DYN
+    USE g_CONFIG,only: dt
+    IMPLICIT NONE
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(inout), target :: mesh
+    !___________________________________________________________________________
+    real(kind=WP)              ::  a(mesh%nl-1), b(mesh%nl-1), c(mesh%nl-1), ur(mesh%nl-1), vr(mesh%nl-1)
+    real(kind=WP)              ::  cp(mesh%nl-1), up(mesh%nl-1), vp(mesh%nl-1)
+    integer                    ::  nz, elem, nzmax, nzmin, elnodes(3)
+    real(kind=WP)              ::  zinv, m, friction, wu, wd
+    real(kind=WP)              ::  zbar_n(mesh%nl), Z_n(mesh%nl-1)
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
+    real(kind=WP), dimension(:,:)  , pointer :: Wvel_i
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-UV     =>dynamics%uv(:,:,:)
-UV_rhs =>dynamics%uv_rhs(:,:,:)
-Wvel_i =>dynamics%w_i(:,:)
+    UV     =>dynamics%uv(:,:,:)
+    UV_rhs =>dynamics%uv_rhs(:,:,:)
+    Wvel_i =>dynamics%w_i(:,:)
 
-DO elem=1,myDim_elem2D
-    elnodes=elem2D_nodes(:,elem)
-    nzmin = ulevels(elem)
-    nzmax = nlevels(elem)
-    
     !___________________________________________________________________________
-    ! Here can not exchange zbar_n & Z_n with zbar_3d_n & Z_3d_n because 
-    ! they run over elements here 
-    zbar_n=0.0_WP
-    Z_n   =0.0_WP
-    ! in case of partial cells zbar_n(nzmax) is not any more at zbar(nzmax), 
-    ! zbar_n(nzmax) is now zbar_e_bot(elem), 
-    zbar_n(nzmax)=zbar_e_bot(elem)
-    Z_n(nzmax-1)=zbar_n(nzmax) + helem(nzmax-1,elem)/2.0_WP
-    !!PS do nz=nzmax-1,2,-1
-    do nz=nzmax-1,nzmin+1,-1
-        zbar_n(nz) = zbar_n(nz+1) + helem(nz,elem)
-        Z_n(nz-1) = zbar_n(nz) + helem(nz-1,elem)/2.0_WP
-    end do
-    !!PS zbar_n(1) = zbar_n(2) + helem(1,elem)
-    zbar_n(nzmin) = zbar_n(nzmin+1) + helem(nzmin,elem)
-    
-    !___________________________________________________________________________
-    ! Operator
-    ! Regular part of coefficients:
-    !!PS do nz=2, nzmax-2
-    do nz=nzmin+1, nzmax-2
-        zinv=1.0_WP*dt/(zbar_n(nz)-zbar_n(nz+1))
-        a(nz)=-Av(nz,elem)/(Z_n(nz-1)-Z_n(nz))*zinv
-        c(nz)=-Av(nz+1,elem)/(Z_n(nz)-Z_n(nz+1))*zinv
-        b(nz)=-a(nz)-c(nz)+1.0_WP
+    DO elem=1,myDim_elem2D
+        elnodes=elem2D_nodes(:,elem)
+        nzmin = ulevels(elem)
+        nzmax = nlevels(elem)
+        
+        !___________________________________________________________________________
+        ! Here can not exchange zbar_n & Z_n with zbar_3d_n & Z_3d_n because 
+        ! they run over elements here 
+        zbar_n=0.0_WP
+        Z_n   =0.0_WP
+        ! in case of partial cells zbar_n(nzmax) is not any more at zbar(nzmax), 
+        ! zbar_n(nzmax) is now zbar_e_bot(elem), 
+        zbar_n(nzmax)=zbar_e_bot(elem)
+        Z_n(nzmax-1)=zbar_n(nzmax) + helem(nzmax-1,elem)/2.0_WP
+        !!PS do nz=nzmax-1,2,-1
+        do nz=nzmax-1,nzmin+1,-1
+            zbar_n(nz) = zbar_n(nz+1) + helem(nz,elem)
+            Z_n(nz-1) = zbar_n(nz) + helem(nz-1,elem)/2.0_WP
+        end do
+        !!PS zbar_n(1) = zbar_n(2) + helem(1,elem)
+        zbar_n(nzmin) = zbar_n(nzmin+1) + helem(nzmin,elem)
+        
+        !___________________________________________________________________________
+        ! Operator
+        ! Regular part of coefficients:
+        !!PS do nz=2, nzmax-2
+        do nz=nzmin+1, nzmax-2
+            zinv=1.0_WP*dt/(zbar_n(nz)-zbar_n(nz+1))
+            a(nz)=-Av(nz,elem)/(Z_n(nz-1)-Z_n(nz))*zinv
+            c(nz)=-Av(nz+1,elem)/(Z_n(nz)-Z_n(nz+1))*zinv
+            b(nz)=-a(nz)-c(nz)+1.0_WP
+            ! Update from the vertical advection
+            wu=sum(Wvel_i(nz,   elnodes))/3._WP
+            wd=sum(Wvel_i(nz+1, elnodes))/3._WP
+            a(nz)=a(nz)+min(0._WP, wu)*zinv
+            b(nz)=b(nz)+max(0._WP, wu)*zinv
+            
+            b(nz)=b(nz)-min(0._WP, wd)*zinv
+            c(nz)=c(nz)-max(0._WP, wd)*zinv
+            
+        end do
+        ! The last row
+        zinv=1.0_WP*dt/(zbar_n(nzmax-1)-zbar_n(nzmax))
+        a(nzmax-1)=-Av(nzmax-1,elem)/(Z_n(nzmax-2)-Z_n(nzmax-1))*zinv
+        b(nzmax-1)=-a(nzmax-1)+1.0_WP
+        c(nzmax-1)=0.0_WP
+        
         ! Update from the vertical advection
-        wu=sum(Wvel_i(nz,   elnodes))/3._WP
-        wd=sum(Wvel_i(nz+1, elnodes))/3._WP
-        a(nz)=a(nz)+min(0._WP, wu)*zinv
-        b(nz)=b(nz)+max(0._WP, wu)*zinv
+        wu=sum(Wvel_i(nzmax-1, elnodes))/3._WP
+        a(nzmax-1)=a(nzmax-1)+min(0._WP, wu)*zinv
+        b(nzmax-1)=b(nzmax-1)+max(0._WP, wu)*zinv
         
-        b(nz)=b(nz)-min(0._WP, wd)*zinv
-        c(nz)=c(nz)-max(0._WP, wd)*zinv
+        ! The first row
+        !!PS zinv=1.0_WP*dt/(zbar_n(1)-zbar_n(2))
+        !!PS c(1)=-Av(2,elem)/(Z_n(1)-Z_n(2))*zinv
+        !!PS a(1)=0.0_WP
+        !!PS b(1)=-c(1)+1.0_WP
+        zinv=1.0_WP*dt/(zbar_n(nzmin)-zbar_n(nzmin+1))
+        c(nzmin)=-Av(nzmin+1,elem)/(Z_n(nzmin)-Z_n(nzmin+1))*zinv
+        a(nzmin)=0.0_WP
+        b(nzmin)=-c(nzmin)+1.0_WP
         
-    end do
-    ! The last row
-    zinv=1.0_WP*dt/(zbar_n(nzmax-1)-zbar_n(nzmax))
-    a(nzmax-1)=-Av(nzmax-1,elem)/(Z_n(nzmax-2)-Z_n(nzmax-1))*zinv
-    b(nzmax-1)=-a(nzmax-1)+1.0_WP
-    c(nzmax-1)=0.0_WP
-    
-    ! Update from the vertical advection
-    wu=sum(Wvel_i(nzmax-1, elnodes))/3._WP
-    a(nzmax-1)=a(nzmax-1)+min(0._WP, wu)*zinv
-    b(nzmax-1)=b(nzmax-1)+max(0._WP, wu)*zinv
-    
-    ! The first row
-    !!PS zinv=1.0_WP*dt/(zbar_n(1)-zbar_n(2))
-    !!PS c(1)=-Av(2,elem)/(Z_n(1)-Z_n(2))*zinv
-    !!PS a(1)=0.0_WP
-    !!PS b(1)=-c(1)+1.0_WP
-    zinv=1.0_WP*dt/(zbar_n(nzmin)-zbar_n(nzmin+1))
-    c(nzmin)=-Av(nzmin+1,elem)/(Z_n(nzmin)-Z_n(nzmin+1))*zinv
-    a(nzmin)=0.0_WP
-    b(nzmin)=-c(nzmin)+1.0_WP
-    
-    ! Update from the vertical advection
-    !!PS wu=sum(Wvel_i(1, elnodes))/3._WP
-    !!PS wd=sum(Wvel_i(2, elnodes))/3._WP
-    wu=sum(Wvel_i(nzmin, elnodes))/3._WP
-    wd=sum(Wvel_i(nzmin+1, elnodes))/3._WP
-    
-    !!PS b(1)=b(1)+wu*zinv
-    !!PS b(1)=b(1)-min(0._WP, wd)*zinv
-    !!PS c(1)=c(1)-max(0._WP, wd)*zinv
-    b(nzmin)=b(nzmin)+wu*zinv
-    b(nzmin)=b(nzmin)-min(0._WP, wd)*zinv
-    c(nzmin)=c(nzmin)-max(0._WP, wd)*zinv
-    
-    ! ===========================
-    ! The rhs:
-    ! ===========================
-    !!PS ur(1:nzmax-1)=UV_rhs(1,1:nzmax-1,elem)
-    !!PS vr(1:nzmax-1)=UV_rhs(2,1:nzmax-1,elem)
-    ur(nzmin:nzmax-1)=UV_rhs(1,nzmin:nzmax-1,elem)
-    vr(nzmin:nzmax-1)=UV_rhs(2,nzmin:nzmax-1,elem)
-    
-    ! The first row contains surface forcing
-    !!PS ur(1)= ur(1)+zinv*stress_surf(1,elem)/density_0
-    !!PS vr(1)= vr(1)+zinv*stress_surf(2,elem)/density_0
-    ur(nzmin)= ur(nzmin)+zinv*stress_surf(1,elem)/density_0
-    vr(nzmin)= vr(nzmin)+zinv*stress_surf(2,elem)/density_0
-    
-    ! The last row contains bottom friction
-    zinv=1.0_WP*dt/(zbar_n(nzmax-1)-zbar_n(nzmax))
-    !!PS friction=-C_d*sqrt(UV(1,nlevels(elem)-1,elem)**2+ &
-    !!PS             UV(2,nlevels(elem)-1,elem)**2)
-    friction=-C_d*sqrt(UV(1,nzmax-1,elem)**2+ &
-                       UV(2,nzmax-1,elem)**2)
-    ur(nzmax-1)=ur(nzmax-1)+zinv*friction*UV(1,nzmax-1,elem)
-    vr(nzmax-1)=vr(nzmax-1)+zinv*friction*UV(2,nzmax-1,elem)
-    
-    ! Model solves for the difference to the timestep N and therefore we need to 
-    ! update the RHS for advective and diffusive contributions at the previous time step
-    !!PS do nz=2, nzmax-2
-    do nz=nzmin+1, nzmax-2
-        ur(nz)=ur(nz)-a(nz)*UV(1,nz-1,elem)-(b(nz)-1.0_WP)*UV(1,nz,elem)-c(nz)*UV(1,nz+1,elem)
-        vr(nz)=vr(nz)-a(nz)*UV(2,nz-1,elem)-(b(nz)-1.0_WP)*UV(2,nz,elem)-c(nz)*UV(2,nz+1,elem)
-    end do
-    !!PS ur(1)=ur(1)-(b(1)-1.0_WP)*UV(1,1,elem)-c(1)*UV(1,2,elem)
-    !!PS vr(1)=vr(1)-(b(1)-1.0_WP)*UV(2,1,elem)-c(1)*UV(2,2,elem)
-    ur(nzmin)=ur(nzmin)-(b(nzmin)-1.0_WP)*UV(1,nzmin,elem)-c(nzmin)*UV(1,nzmin+1,elem)
-    vr(nzmin)=vr(nzmin)-(b(nzmin)-1.0_WP)*UV(2,nzmin,elem)-c(nzmin)*UV(2,nzmin+1,elem)
-    
-    ur(nzmax-1)=ur(nzmax-1)-a(nzmax-1)*UV(1,nzmax-2,elem)-(b(nzmax-1)-1.0_WP)*UV(1,nzmax-1,elem)
-    vr(nzmax-1)=vr(nzmax-1)-a(nzmax-1)*UV(2,nzmax-2,elem)-(b(nzmax-1)-1.0_WP)*UV(2,nzmax-1,elem)
-    
-    ! ===========================
-    ! The sweep algorithm
-    ! ===========================
-    ! initialize c-prime and s,t-prime
-    !!PS cp(1) = c(1)/b(1)
-    !!PS up(1) = ur(1)/b(1)
-    !!PS vp(1) = vr(1)/b(1)
-    cp(nzmin) = c(nzmin)/b(nzmin)
-    up(nzmin) = ur(nzmin)/b(nzmin)
-    vp(nzmin) = vr(nzmin)/b(nzmin)
-    
-    ! solve for vectors c-prime and t, s-prime
-    !!PS do nz = 2,nzmax-1
-    do nz = nzmin+1,nzmax-1
-        m = b(nz)-cp(nz-1)*a(nz)
-        cp(nz) = c(nz)/m
-        up(nz) = (ur(nz)-up(nz-1)*a(nz))/m
-        vp(nz) = (vr(nz)-vp(nz-1)*a(nz))/m
-    enddo
-    ! initialize x
-    ur(nzmax-1) = up(nzmax-1)
-    vr(nzmax-1) = vp(nzmax-1)
-    
-    ! solve for x from the vectors c-prime and d-prime
-    !!PS do nz = nzmax-2, 1, -1
-    do nz = nzmax-2, nzmin, -1
-        ur(nz) = up(nz)-cp(nz)*ur(nz+1)
-        vr(nz) = vp(nz)-cp(nz)*vr(nz+1)
-    end do
-    
-    ! ===========================
-    ! RHS update
-    ! ===========================
-    !!PS do nz=1,nzmax-1
-    do nz=nzmin,nzmax-1
-        UV_rhs(1,nz,elem)=ur(nz)
-        UV_rhs(2,nz,elem)=vr(nz)
-    end do
-end do   !!! cycle over elements
+        ! Update from the vertical advection
+        !!PS wu=sum(Wvel_i(1, elnodes))/3._WP
+        !!PS wd=sum(Wvel_i(2, elnodes))/3._WP
+        wu=sum(Wvel_i(nzmin, elnodes))/3._WP
+        wd=sum(Wvel_i(nzmin+1, elnodes))/3._WP
+        
+        !!PS b(1)=b(1)+wu*zinv
+        !!PS b(1)=b(1)-min(0._WP, wd)*zinv
+        !!PS c(1)=c(1)-max(0._WP, wd)*zinv
+        b(nzmin)=b(nzmin)+wu*zinv
+        b(nzmin)=b(nzmin)-min(0._WP, wd)*zinv
+        c(nzmin)=c(nzmin)-max(0._WP, wd)*zinv
+        
+        ! ===========================
+        ! The rhs:
+        ! ===========================
+        !!PS ur(1:nzmax-1)=UV_rhs(1,1:nzmax-1,elem)
+        !!PS vr(1:nzmax-1)=UV_rhs(2,1:nzmax-1,elem)
+        ur(nzmin:nzmax-1)=UV_rhs(1,nzmin:nzmax-1,elem)
+        vr(nzmin:nzmax-1)=UV_rhs(2,nzmin:nzmax-1,elem)
+        
+        ! The first row contains surface forcing
+        !!PS ur(1)= ur(1)+zinv*stress_surf(1,elem)/density_0
+        !!PS vr(1)= vr(1)+zinv*stress_surf(2,elem)/density_0
+        ur(nzmin)= ur(nzmin)+zinv*stress_surf(1,elem)/density_0
+        vr(nzmin)= vr(nzmin)+zinv*stress_surf(2,elem)/density_0
+        
+        ! The last row contains bottom friction
+        zinv=1.0_WP*dt/(zbar_n(nzmax-1)-zbar_n(nzmax))
+        !!PS friction=-C_d*sqrt(UV(1,nlevels(elem)-1,elem)**2+ &
+        !!PS             UV(2,nlevels(elem)-1,elem)**2)
+        friction=-C_d*sqrt(UV(1,nzmax-1,elem)**2+ &
+                        UV(2,nzmax-1,elem)**2)
+        ur(nzmax-1)=ur(nzmax-1)+zinv*friction*UV(1,nzmax-1,elem)
+        vr(nzmax-1)=vr(nzmax-1)+zinv*friction*UV(2,nzmax-1,elem)
+        
+        ! Model solves for the difference to the timestep N and therefore we need to 
+        ! update the RHS for advective and diffusive contributions at the previous time step
+        !!PS do nz=2, nzmax-2
+        do nz=nzmin+1, nzmax-2
+            ur(nz)=ur(nz)-a(nz)*UV(1,nz-1,elem)-(b(nz)-1.0_WP)*UV(1,nz,elem)-c(nz)*UV(1,nz+1,elem)
+            vr(nz)=vr(nz)-a(nz)*UV(2,nz-1,elem)-(b(nz)-1.0_WP)*UV(2,nz,elem)-c(nz)*UV(2,nz+1,elem)
+        end do
+        !!PS ur(1)=ur(1)-(b(1)-1.0_WP)*UV(1,1,elem)-c(1)*UV(1,2,elem)
+        !!PS vr(1)=vr(1)-(b(1)-1.0_WP)*UV(2,1,elem)-c(1)*UV(2,2,elem)
+        ur(nzmin)=ur(nzmin)-(b(nzmin)-1.0_WP)*UV(1,nzmin,elem)-c(nzmin)*UV(1,nzmin+1,elem)
+        vr(nzmin)=vr(nzmin)-(b(nzmin)-1.0_WP)*UV(2,nzmin,elem)-c(nzmin)*UV(2,nzmin+1,elem)
+        
+        ur(nzmax-1)=ur(nzmax-1)-a(nzmax-1)*UV(1,nzmax-2,elem)-(b(nzmax-1)-1.0_WP)*UV(1,nzmax-1,elem)
+        vr(nzmax-1)=vr(nzmax-1)-a(nzmax-1)*UV(2,nzmax-2,elem)-(b(nzmax-1)-1.0_WP)*UV(2,nzmax-1,elem)
+        
+        ! ===========================
+        ! The sweep algorithm
+        ! ===========================
+        ! initialize c-prime and s,t-prime
+        !!PS cp(1) = c(1)/b(1)
+        !!PS up(1) = ur(1)/b(1)
+        !!PS vp(1) = vr(1)/b(1)
+        cp(nzmin) = c(nzmin)/b(nzmin)
+        up(nzmin) = ur(nzmin)/b(nzmin)
+        vp(nzmin) = vr(nzmin)/b(nzmin)
+        
+        ! solve for vectors c-prime and t, s-prime
+        !!PS do nz = 2,nzmax-1
+        do nz = nzmin+1,nzmax-1
+            m = b(nz)-cp(nz-1)*a(nz)
+            cp(nz) = c(nz)/m
+            up(nz) = (ur(nz)-up(nz-1)*a(nz))/m
+            vp(nz) = (vr(nz)-vp(nz-1)*a(nz))/m
+        enddo
+        ! initialize x
+        ur(nzmax-1) = up(nzmax-1)
+        vr(nzmax-1) = vp(nzmax-1)
+        
+        ! solve for x from the vectors c-prime and d-prime
+        !!PS do nz = nzmax-2, 1, -1
+        do nz = nzmax-2, nzmin, -1
+            ur(nz) = up(nz)-cp(nz)*ur(nz+1)
+            vr(nz) = vp(nz)-cp(nz)*vr(nz+1)
+        end do
+        
+        ! ===========================
+        ! RHS update
+        ! ===========================
+        !!PS do nz=1,nzmax-1
+        do nz=nzmin,nzmax-1
+            UV_rhs(1,nz,elem)=ur(nz)
+            UV_rhs(2,nz,elem)=vr(nz)
+        end do
+    end do   !!! cycle over elements
 
 end subroutine impl_vert_visc_ale
 !
@@ -2735,14 +2764,16 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     use check_blowup_interface
     use fer_solve_interface
     IMPLICIT NONE
-    integer,        intent(in)            :: n
-    type(t_mesh),   intent(inout), target :: mesh
-    type(t_partit), intent(inout), target :: partit
+    integer       , intent(in)            :: n
+    type(t_dyn)   , intent(inout), target :: dynamics
     type(t_tracer), intent(inout), target :: tracers
-    type(t_dyn), intent(inout), target :: dynamics
-
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(inout), target :: mesh
+    !___________________________________________________________________________
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
     integer           :: node
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer :: eta_n
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -2750,8 +2781,8 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
 #include "associate_mesh_ass.h"
     eta_n => dynamics%eta_n(:)
     
+    !___________________________________________________________________________
     t0=MPI_Wtime()
-
 !     water_flux = 0.0_WP
 !     heat_flux  = 0.0_WP
 !     stress_surf= 0.0_WP

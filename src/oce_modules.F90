@@ -196,7 +196,6 @@ real(kind=WP), allocatable    :: MLD1(:), MLD2(:)
 integer,       allocatable    :: MLD1_ind(:), MLD2_ind(:)
 real(kind=WP), allocatable    :: ssh_gp(:)
 !Tracer gradients&RHS      
-real(kind=WP), allocatable :: ttrhs(:,:)
 real(kind=WP), allocatable :: tr_xy(:,:,:)
 real(kind=WP), allocatable :: tr_z(:,:)
 

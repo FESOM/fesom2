@@ -52,6 +52,8 @@ subroutine fer_solve_Gamma(partit, mesh)
     real(kind=WP)                          :: zinv1,zinv2, zinv, m, r
     real(kind=WP)                          :: a(mesh%nl), b(mesh%nl), c(mesh%nl)
     real(kind=WP)                          :: cp(mesh%nl), tp(2,mesh%nl)
+    real(kind=WP)                          :: zbar_n(mesh%nl), z_n(mesh%nl-1)
+
     real(kind=WP), dimension(:,:), pointer :: tr
 
 #include "associate_part_def.h"

@@ -611,6 +611,7 @@ subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
                                               dZn, dZn_i, dh, dval, mean_e_rho,dZn_rho_grad(2)
     real(kind=WP)                          :: rhopot, bulk_0, bulk_pz, bulk_pz2
     real(kind=WP), dimension(:,:), pointer :: temp, salt
+    real(kind=WP)                          :: zbar_n(mesh%nl), z_n(mesh%nl-1)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -780,6 +781,7 @@ subroutine pressure_force_4_linfs_shchepetkin(partit, mesh)
     integer                                :: elem, elnodes(3), nle, ule, nlz, idx(3),ni
     real(kind=WP)                          :: int_dp_dx(2), drho_dx, dz_dx, aux_sum
     real(kind=WP)                          :: dx10(3), dx20(3), dx21(3), df10(3), df21(3), drho_dz(3)
+    real(kind=WP)                          :: zbar_n(mesh%nl), z_n(mesh%nl-1)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -1044,6 +1046,7 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
     real(kind=WP)                          :: rho_at_Zn(3), temp_at_Zn(3), salt_at_Zn(3), drho_dz(3), aux_dref
     real(kind=WP)                          :: rhopot(3), bulk_0(3), bulk_pz(3), bulk_pz2(3)
     real(kind=WP)                          :: dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2
+    real(kind=WP)                          :: zbar_n(mesh%nl), z_n(mesh%nl-1)
     real(kind=WP), dimension(:,:), pointer :: temp, salt
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -1401,7 +1404,8 @@ subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
     real(kind=WP)                          :: interp_n_dens(3) 
     integer                                :: s_ind(4)
     real(kind=WP)                          :: s_z(4), s_dens(4), s_H, aux1, aux2, s_dup, s_dlo
-    real(kind=WP)                          :: a, b, c, d, dz 
+    real(kind=WP)                          :: a, b, c, d, dz
+    real(kind=WP)                          :: zbar_n(mesh%nl), z_n(mesh%nl-1)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -1601,6 +1605,7 @@ subroutine pressure_force_4_linfs_cavity(partit, mesh)
     integer                                :: elem, elnodes(3), nle, ule,  nlz, idx(3), ni
     real(kind=WP)                          :: int_dp_dx(2), drho_dx, dz_dx, aux_sum
     real(kind=WP)                          :: dx10(3), dx20(3), dx21(3), df10(3), df21(3), drho_dz(3)
+    real(kind=WP)                          :: zbar_n(mesh%nl), z_n(mesh%nl-1)
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -1858,6 +1863,7 @@ subroutine pressure_force_4_zxxxx_cubicspline(partit, mesh)
     integer                                :: s_ind(4)
     real(kind=WP)                          :: s_z(4), s_dens(4), s_H, aux1, aux2, aux(2), s_dup, s_dlo
     real(kind=WP)                          :: a, b, c, d, dz, rho_n(3), rhograd_e(2), p_grad(2)
+    real(kind=WP)                          :: zbar_n(mesh%nl), z_n(mesh%nl-1)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -2043,6 +2049,7 @@ subroutine pressure_force_4_zxxxx_shchepetkin(partit, mesh)
     real(kind=WP)                          :: int_dp_dx(2), drho_dx, drho_dy, drho_dz(3), dz_dx, dz_dy, aux_sum 
     real(kind=WP)                          :: dx10(3), dx20(3), dx21(3), df10(3), df21(3)
     real(kind=WP)                          :: rhopot(3), bulk_0(3), bulk_pz(3), bulk_pz2(3)
+    real(kind=WP)                          :: zbar_n(mesh%nl), z_n(mesh%nl-1)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -2292,6 +2299,7 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
     real(kind=WP)                           :: rho_at_Zn(3), temp_at_Zn(3), salt_at_Zn(3), drho_dz(3), aux_dref
     real(kind=WP)                           :: rhopot(3), bulk_0(3), bulk_pz(3), bulk_pz2(3)
     real(kind=WP)                           :: dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2
+    real(kind=WP)                           :: zbar_n(mesh%nl), z_n(mesh%nl-1)
     real(kind=WP),  dimension(:,:), pointer :: temp, salt
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"

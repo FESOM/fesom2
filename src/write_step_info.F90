@@ -437,7 +437,6 @@ subroutine check_blowup(istep, dynamics, tracers, partit, mesh)
 					write(*,*) 'nz          = ',nz
 					write(*,*) 'nzmin, nzmax= ',ulevels_nod2D(n),nlevels_nod2D(n)
 					write(*,*) 'x=', geo_coord_nod2D(1,n)/rad, ' ; ', 'y=', geo_coord_nod2D(2,n)/rad
-					write(*,*) 'z=', Z_n(nz)
 					write(*,*) 'temp(nz, n) = ',tracers%data(1)%values(nz, n)
 					write(*,*) 'temp(: , n) = ',tracers%data(1)%values(:, n)
 					write(*,*) 'temp_old(nz,n)= ',tracers%data(1)%valuesAB(nz, n)
@@ -491,7 +490,7 @@ subroutine check_blowup(istep, dynamics, tracers, partit, mesh)
 					write(*,*) 'nz          = ',nz
 					write(*,*) 'nzmin, nzmax= ',ulevels_nod2D(n),nlevels_nod2D(n)
 					write(*,*) 'x=', geo_coord_nod2D(1,n)/rad, ' ; ', 'y=', geo_coord_nod2D(2,n)/rad
-					write(*,*) 'z=', Z_n(nz)
+!					write(*,*) 'z=', Z_n(nz)
 					write(*,*) 'salt(nz, n) = ',tracers%data(2)%values(nz, n)
 					write(*,*) 'salt(: , n) = ',tracers%data(2)%values(:, n)
 					write(*,*)
