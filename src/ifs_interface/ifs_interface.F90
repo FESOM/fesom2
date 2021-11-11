@@ -16,7 +16,7 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    ! Initialize the FESOM model for single executable coupling 
 
    USE par_kind !in ifs_modules.F90
-   USE g_PARSUP, only: MPI_COMM_FESOM, mype
+   USE fesom_main_storage_module, only: fesom => f ! only: MPI_COMM_FESOM, mype (previously in g_parsup)
    USE g_config, only: dt
    USE g_clock, only: timenew, daynew, yearnew, month, day_in_month
    USE nemogcmcoup_steps, ONLY : substeps
@@ -44,17 +44,17 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    INTEGER :: i
    NAMELIST/namfesomstep/substeps
 
-   ! TODO hard-coded here, put in namelist
+   ! overwritten from value namelist
    substeps=2
    OPEN(9,file='namfesomstep.in')
    READ(9,namfesomstep)
    CLOSE(9)
 
-   MPI_COMM_FESOM=icomm
+   fesom%MPI_COMM_FESOM=icomm
    itini = 1
    CALL main_initialize(itend_fesom) !also sets mype and npes 
    itend=itend_fesom/substeps
-   if(mype==0) then
+   if(fesom%mype==0) then
    WRITE(0,*)'!======================================'
    WRITE(0,*)'! FESOM is initialized from within IFS.'
    WRITE(0,*)'! get MPI_COMM_FESOM. ================='
@@ -66,14 +66,14 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    ! initial date and time (time is not used)
    inidate = yearnew*10000 + month*100 + day_in_month ! e.g. 20170906
    initime = 0
-   if(mype==0) then
+   if(fesom%mype==0) then
    WRITE(0,*)'! FESOM initial date is ', inidate ,' ======'
    WRITE(0,*)'! FESOM substeps are ', substeps ,' ======'
    endif
 
    ! fesom timestep (as seen by IFS)
    zstp = REAL(substeps,wpIFS)*dt
-   if(mype==0) then
+   if(fesom%mype==0) then
    WRITE(0,*)'! FESOM timestep as seen by IFS is ', real(zstp,4), 'sec (',substeps,'xdt)'
    WRITE(0,*)'!======================================'
    endif
@@ -85,11 +85,8 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    &                             npoints, nlocmsk, ngloind )
 
    ! FESOM modules
-   USE g_PARSUP, only: mype, npes, myDim_nod2D, eDim_nod2D, myDim_elem2D, eDim_elem2D, eXDim_elem2D, &
-							    myDim_edge2D, eDim_edge2D, myList_nod2D, myList_elem2D
-   USE MOD_MESH
-   !USE o_MESH,   only: nod2D, elem2D
-   USE g_init2timestepping, only: meshinmod
+   USE fesom_main_storage_module, only: fesom => f ! only: mype, npes, myDim_nod2D, eDim_nod2D, myDim_elem2D, eDim_elem2D, eXDim_elem2D, &
+							!  myDim_edge2D, eDim_edge2D, myList_nod2D, myList_elem2D
 
    ! Initialize single executable coupling 
    USE parinter
@@ -109,9 +106,13 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    INTEGER :: iunit = 0
 
    ! Local variables
-   type(t_mesh), target :: mesh
+   !type(t_mesh), target :: mesh
    integer    , pointer :: nod2D 
    integer    , pointer :: elem2D   
+   integer,     pointer :: myDim_nod2D, eDim_nod2D
+   integer, dimension(:), pointer :: myList_nod2D
+   integer, pointer               :: myDim_elem2D, eDim_elem2D, eXDim_elem2D
+   integer, dimension(:), pointer :: myList_elem2D
 
    ! Namelist containing the file names of the weights
    CHARACTER(len=256) :: cdfile_gauss_to_T, cdfile_gauss_to_UV, &
@@ -145,16 +146,21 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
 
    ! associate the mesh, only what is needed here
    ! #include "associate_mesh.h"
-   mesh = meshinmod
-   nod2D              => mesh%nod2D              
-   elem2D             => mesh%elem2D  
-
+   nod2D              => fesom%mesh%nod2D              
+   elem2D             => fesom%mesh%elem2D  
+   myDim_nod2D        => fesom%partit%myDim_nod2D
+   eDim_nod2D         => fesom%partit%eDim_nod2D
+   myList_nod2D(1:myDim_nod2D+eDim_nod2D) => fesom%partit%myList_nod2D
+   myDim_elem2D       => fesom%partit%myDim_elem2D
+   eDim_elem2D        => fesom%partit%eDim_elem2D
+   eXDim_elem2D       => fesom%partit%eXDim_elem2D
+   myList_elem2D(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => fesom%partit%myList_elem2D
 
    ! here FESOM knows about the (total number of) MPI tasks
 
-   if(mype==0) then
+   if(fesom%mype==0) then
    write(*,*) 'MPI has been initialized in the atmospheric model'
-   write(*, *) 'Running on ', npes, ' PEs'
+   write(*, *) 'Running on ', fesom%npes, ' PEs'
    end if
 
    ! Read namelists
@@ -179,7 +185,7 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
       &                mpi_integer, mpi_sum, icomm, ierr)
 
 
-   if(mype==0) then
+   if(fesom%mype==0) then
    WRITE(0,*)'!======================================'
    WRITE(0,*)'! SCALARS ============================='
 
@@ -205,24 +211,24 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    ! from atmosphere Gaussian grid to ocean T-grid
    
    IF (lreaddist) THEN
-      CALL parinter_read( mype, npes, nglopoints, noglopoints, gausstoT,  &
+      CALL parinter_read( fesom%mype, fesom%npes, nglopoints, noglopoints, gausstoT,  &
          & cdpathdist,'ifs_to_fesom_gridT',lexists)
    ENDIF
    IF ((.NOT.lreaddist).OR.(.NOT.lexists)) THEN
       IF (lparbcast) THEN
          CALL scripremap_read_sgl(cdfile_gauss_to_T,remap_gauss_to_T,&
-            & mype,npes,icomm,.TRUE.)
+            & fesom%mype,fesom%npes,icomm,.TRUE.)
       ELSE
          CALL scripremap_read(cdfile_gauss_to_T,remap_gauss_to_T)
       ENDIF
-      CALL parinter_init( mype, npes, icomm, &
+      CALL parinter_init( fesom%mype, fesom%npes, icomm, &
          & npoints, nglopoints, nlocmsk, ngloind, &
          & nopoints, noglopoints, omask, ogloind, & 
          & remap_gauss_to_T, gausstoT, lcommout, TRIM(commoutprefix)//'_gtoT', &
          & iunit )
       CALL scripremap_dealloc(remap_gauss_to_T)
       IF (lwritedist) THEN
-         CALL parinter_write( mype, npes, nglopoints, noglopoints, gausstoT,  &
+         CALL parinter_write( fesom%mype, fesom%npes, nglopoints, noglopoints, gausstoT,  &
             & cdpathdist,'ifs_to_fesom_gridT')
       ENDIF
    ENDIF
@@ -230,25 +236,25 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    ! From ocean T-grid to atmosphere Gaussian grid
 
    IF (lreaddist) THEN
-      CALL parinter_read( mype, npes, noglopoints, nglopoints, Ttogauss,  &
+      CALL parinter_read( fesom%mype, fesom%npes, noglopoints, nglopoints, Ttogauss,  &
          & cdpathdist,'fesom_gridT_to_ifs',lexists)
    ENDIF
    IF ((.NOT.lreaddist).OR.(.NOT.lexists)) THEN
       IF (lparbcast) THEN
          CALL scripremap_read_sgl(cdfile_T_to_gauss,remap_T_to_gauss,&
-            & mype,npes,icomm,.TRUE.)
+            & fesom%mype,fesom%npes,icomm,.TRUE.)
       ELSE
          CALL scripremap_read(cdfile_T_to_gauss,remap_T_to_gauss)
       ENDIF
 
-      CALL parinter_init( mype, npes, icomm, &
+      CALL parinter_init( fesom%mype, fesom%npes, icomm, &
          & nopoints, noglopoints, omask, ogloind, & 
          & npoints, nglopoints, nlocmsk, ngloind, &
          & remap_T_to_gauss, Ttogauss, lcommout, TRIM(commoutprefix)//'_Ttog', &
          & iunit )
       CALL scripremap_dealloc(remap_T_to_gauss)
       IF (lwritedist) THEN
-         CALL parinter_write( mype, npes, noglopoints, nglopoints, Ttogauss,  &
+         CALL parinter_write( fesom%mype, fesom%npes, noglopoints, nglopoints, Ttogauss,  &
             & cdpathdist,'fesom_gridT_to_ifs')
       ENDIF
    ENDIF
@@ -256,7 +262,7 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    DEALLOCATE(omask,ogloind)
 
 
-   if(mype==0) then
+   if(fesom%mype==0) then
    WRITE(0,*)'!======================================'
    WRITE(0,*)'! VECTORS ============================='
 
@@ -276,24 +282,24 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    ! from atmosphere Gaussian grid to ocean UV-grid
    
    IF (lreaddist) THEN
-      CALL parinter_read( mype, npes, nglopoints, noglopoints, gausstoUV,  &
+      CALL parinter_read( fesom%mype, fesom%npes, nglopoints, noglopoints, gausstoUV,  &
          & cdpathdist,'ifs_to_fesom_gridUV',lexists)
    ENDIF
    IF ((.NOT.lreaddist).OR.(.NOT.lexists)) THEN
       IF (lparbcast) THEN
          CALL scripremap_read_sgl(cdfile_gauss_to_UV,remap_gauss_to_UV,&
-            & mype,npes,icomm,.TRUE.)
+            & fesom%mype,fesom%npes,icomm,.TRUE.)
       ELSE
          CALL scripremap_read(cdfile_gauss_to_UV,remap_gauss_to_UV)
       ENDIF
-      CALL parinter_init( mype, npes, icomm, &
+      CALL parinter_init( fesom%mype, fesom%npes, icomm, &
          & npoints, nglopoints, nlocmsk, ngloind, &
          & nopoints, noglopoints, omask, ogloind, & 
          & remap_gauss_to_UV, gausstoUV, lcommout, TRIM(commoutprefix)//'_gtoUV', &
          & iunit )
       CALL scripremap_dealloc(remap_gauss_to_UV)
       IF (lwritedist) THEN
-         CALL parinter_write( mype, npes, nglopoints, noglopoints, gausstoUV,  &
+         CALL parinter_write( fesom%mype, fesom%npes, nglopoints, noglopoints, gausstoUV,  &
             & cdpathdist,'ifs_to_fesom_gridUV')
       ENDIF
    ENDIF
@@ -301,25 +307,25 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    ! From ocean UV-grid to atmosphere Gaussian grid
 
    IF (lreaddist) THEN
-      CALL parinter_read( mype, npes, noglopoints, nglopoints, UVtogauss,  &
+      CALL parinter_read( fesom%mype, fesom%npes, noglopoints, nglopoints, UVtogauss,  &
          & cdpathdist,'fesom_gridUV_to_ifs',lexists)
    ENDIF
    IF ((.NOT.lreaddist).OR.(.NOT.lexists)) THEN
       IF (lparbcast) THEN
          CALL scripremap_read_sgl(cdfile_UV_to_gauss,remap_UV_to_gauss,&
-            & mype,npes,icomm,.TRUE.)
+            & fesom%mype,fesom%npes,icomm,.TRUE.)
       ELSE
          CALL scripremap_read(cdfile_UV_to_gauss,remap_UV_to_gauss)
       ENDIF
 
-      CALL parinter_init( mype, npes, icomm, &
+      CALL parinter_init( fesom%mype, fesom%npes, icomm, &
          & nopoints, noglopoints, omask, ogloind, & 
          & npoints, nglopoints, nlocmsk, ngloind, &
          & remap_UV_to_gauss, UVtogauss, lcommout, TRIM(commoutprefix)//'_UVtog', &
          & iunit )
       CALL scripremap_dealloc(remap_UV_to_gauss)
       IF (lwritedist) THEN
-         CALL parinter_write( mype, npes, noglopoints, nglopoints, UVtogauss,  &
+         CALL parinter_write( fesom%mype, fesom%npes, noglopoints, nglopoints, UVtogauss,  &
             & cdpathdist,'fesom_gridUV_to_ifs')
       ENDIF
    ENDIF
@@ -334,22 +340,17 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    &                             pgifr, pghic, pghsn, pgucur, pgvcur, &
    &                             pgistl, licelvls )
 
-   ! Interpolate sst, ice: surf T; albedo; concentration; thickness,
+   ! Interpolate sst, ice; surf T; albedo; concentration; thickness,
    ! snow thickness and currents from the FESOM grid to the Gaussian grid. 
    
    ! This routine can be called at any point in time since it does
    ! the necessary message passing in parinter_fld. 
 
    USE par_kind ! in ifs_modules.F90
-   USE o_ARRAYS, ONLY : tr_arr, UV
+   USE fesom_main_storage_module, only: fesom => f
+   USE o_ARRAYS, ONLY : UV ! tr_arr is now tracers
    USE i_arrays, ONLY : m_ice, a_ice, m_snow
    USE i_therm_param, ONLY : tmelt
-   !USE o_PARAM, ONLY : WP
-   USE g_PARSUP, only: myDim_nod2D,eDim_nod2D, myDim_elem2D,eDim_elem2D,eXDim_elem2D
-   !USE o_MESH, only: elem2D_nodes, coord_nod2D
-   USE MOD_MESH
-   USE g_init2timestepping, only: meshinmod
-
    USE g_rotate_grid, only: vector_r2g
    USE parinter
    USE scripremap
@@ -362,9 +363,12 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    REAL(wpIFS), DIMENSION(nopoints,3) :: pgistl
    LOGICAL :: licelvls
 
-   type(t_mesh), target :: mesh
+   !type(t_mesh), target :: mesh
    real(kind=wpIFS), dimension(:,:), pointer :: coord_nod2D
-   integer, dimension(:,:)      , pointer :: elem2D_nodes
+   integer, dimension(:,:)         , pointer :: elem2D_nodes
+   integer, pointer :: myDim_nod2D, eDim_nod2D
+   integer, pointer :: myDim_elem2D, eDim_elem2D, eXDim_elem2D
+
 
    ! Message passing information
    INTEGER, INTENT(IN) :: mype, npes, icomm
@@ -372,8 +376,8 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    INTEGER, INTENT(IN) :: nopoints
 
    ! Local variables
-   REAL(wpIFS), DIMENSION(myDim_nod2D)  :: zsend
-   REAL(wpIFS), DIMENSION(myDim_elem2D) :: zsendU, zsendV
+   REAL(wpIFS), DIMENSION(fesom%partit%myDim_nod2D)  :: zsend
+   REAL(wpIFS), DIMENSION(fesom%partit%myDim_elem2D) :: zsendU, zsendV
    INTEGER			     :: elnodes(3)
    REAL(wpIFS)			     :: rlon, rlat	
 
@@ -382,16 +386,23 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
 
    !#include "associate_mesh.h"
    ! associate what is needed only
-   mesh = meshinmod
-   coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)                  => mesh%coord_nod2D   
-   elem2D_nodes(1:3, 1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => mesh%elem2D_nodes
+   myDim_nod2D        => fesom%partit%myDim_nod2D
+   eDim_nod2D         => fesom%partit%eDim_nod2D
+
+   myDim_elem2D       => fesom%partit%myDim_elem2D
+   eDim_elem2D        => fesom%partit%eDim_elem2D
+   eXDim_elem2D       => fesom%partit%eXDim_elem2D
+
+   coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)                  => fesom%mesh%coord_nod2D   
+   elem2D_nodes(1:3, 1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => fesom%mesh%elem2D_nodes
+
 
 
    ! =================================================================== !
    ! Pack SST data and convert to K. 'pgsst' is on Gauss grid.
    do n=1,myDim_nod2D
-      zsend(n)=tr_arr(1, n, 1)+tmelt	! sea surface temperature [K], 
-					! (1=surface, n=node, 1/2=T/S)
+      zsend(n)=fesom%tracers%data(1)%values(1, n) +tmelt ! sea surface temperature [K], 
+							 ! (1=surface, n=node, data(1/2)=T/S)
    enddo
 
    ! Interpolate SST
@@ -549,10 +560,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! interpolation of the input gaussian grid data
    
    USE par_kind !in ifs_modules.F90
-   USE g_PARSUP, 	only: myDim_nod2D, myDim_elem2D, par_ex, eDim_nod2D, eDim_elem2D, eXDim_elem2D, myDim_edge2D, eDim_edge2D
-   !USE o_MESH, 	only: coord_nod2D !elem2D_nodes
-   USE MOD_MESH
-   USE g_init2timestepping, only: meshinmod
+   USE fesom_main_storage_module, only: fesom => f
    !USE o_PARAM, ONLY : WP, use wpIFS from par_kind (IFS)
    USE g_rotate_grid, 	only: vector_r2g, vector_g2r
    USE g_forcing_arrays, only: 	shortwave, prec_rain, prec_snow, runoff, & 
@@ -590,23 +598,25 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! QNS ice filter switch (requires tice_atm to be sent)
    LOGICAL, INTENT(IN) :: lqnsicefilt
 
-   type(t_mesh), target :: mesh
+   !type(t_mesh), target :: mesh
 
    ! Local variables
    INTEGER		:: n
+   integer, pointer     :: myDim_nod2D, eDim_nod2D
    REAL(wpIFS), parameter 	:: rhofwt = 1000. ! density of freshwater
 
 
    ! Packed receive buffer
-   REAL(wpIFS), DIMENSION(myDim_nod2D) :: zrecv
-   REAL(wpIFS), DIMENSION(myDim_elem2D):: zrecvU, zrecvV
+   REAL(wpIFS), DIMENSION(fesom%partit%myDim_nod2D) :: zrecv
+   REAL(wpIFS), DIMENSION(fesom%partit%myDim_elem2D):: zrecvU, zrecvV
 
 
    !#include "associate_mesh.h"
    ! associate only the necessary things
-   real(kind=WP), dimension(:,:), pointer :: coord_nod2D
-   mesh = meshinmod
-   coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => mesh%coord_nod2D  
+   real(kind=wpIFS), dimension(:,:), pointer :: coord_nod2D
+   myDim_nod2D        => fesom%partit%myDim_nod2D
+   eDim_nod2D         => fesom%partit%eDim_nod2D
+   coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => fesom%mesh%coord_nod2D  
 
    ! =================================================================== !
    ! Sort out incoming arrays from the IFS and put them on the ocean grid
@@ -642,7 +652,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    shortwave(1:myDim_nod2D)=zrecv(1:myDim_nod2D)
 
    ! Do the halo exchange
-   call exchange_nod(shortwave)
+   call exchange_nod(shortwave,fesom%partit)
 
 
    ! =================================================================== !
@@ -660,7 +670,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    oce_heat_flux(1:myDim_nod2D)=zrecv(1:myDim_nod2D)
 
    ! Do the halo exchange
-   call exchange_nod(oce_heat_flux)
+   call exchange_nod(oce_heat_flux,fesom%partit)
 
 
    ! =================================================================== !
@@ -673,7 +683,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ice_heat_flux(1:myDim_nod2D)=zrecv(1:myDim_nod2D)
 
    ! Do the halo exchange
-   call exchange_nod(ice_heat_flux)
+   call exchange_nod(ice_heat_flux,fesom%partit)
 
 
    ! =================================================================== !
@@ -695,7 +705,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    evap_no_ifrac(1:myDim_nod2D)=-zrecv(1:myDim_nod2D)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
 
    ! Do the halo exchange
-   call exchange_nod(evap_no_ifrac)
+   call exchange_nod(evap_no_ifrac,fesom%partit)
 
    !7. Interpolate sublimation (evaporation over ice) to T grid
 
@@ -706,7 +716,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    sublimation(1:myDim_nod2D)=-zrecv(1:myDim_nod2D)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
 
    ! Do the halo exchange
-   call exchange_nod(sublimation)
+   call exchange_nod(sublimation,fesom%partit)
    ! =================================================================== !
    ! =================================================================== !
 
@@ -721,7 +731,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    prec_rain(1:myDim_nod2D)=zrecv(1:myDim_nod2D)/rhofwt	! kg m^(-2) s^(-1) -> m/s
    
    ! Do the halo exchange
-   call exchange_nod(prec_rain)
+   call exchange_nod(prec_rain,fesom%partit)
 
 
    ! =================================================================== !
@@ -734,7 +744,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    prec_snow(1:myDim_nod2D)=zrecv(1:myDim_nod2D)/rhofwt	! kg m^(-2) s^(-1) -> m/s
 
    ! Do the halo exchange
-   call exchange_nod(prec_snow)
+   call exchange_nod(prec_snow,fesom%partit)
 
 
    ! =================================================================== !
@@ -747,7 +757,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    !runoff(1:myDim_nod2D)=zrecv(1:myDim_nod2D) !conversion??
    !
    ! Do the halo exchange
-   !call exchange_nod(runoff)
+   !call exchange_nod(runoff,fesom%partit)
    !
    !11. Interpolate ocean runoff to T grid
    !
@@ -772,7 +782,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    
    ! Unpack x stress atm->oce, without halo; then do halo exchange
    stress_atmoce_x(1:myDim_nod2D)=zrecv(1:myDim_nod2D)
-   call exchange_nod(stress_atmoce_x)
+   call exchange_nod(stress_atmoce_x,fesom%partit)
 
    !
    CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, tauy_oce,  &
@@ -780,7 +790,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    
    ! Unpack y stress atm->oce, without halo; then do halo exchange
    stress_atmoce_y(1:myDim_nod2D)=zrecv(1:myDim_nod2D)
-   call exchange_nod(stress_atmoce_y)
+   call exchange_nod(stress_atmoce_y,fesom%partit)
 
    ! =================================================================== !
    ! OVER ICE:
@@ -790,7 +800,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    
    ! Unpack x stress atm->ice, without halo; then do halo exchange
    stress_atmice_x(1:myDim_nod2D)=zrecv(1:myDim_nod2D)
-   call exchange_nod(stress_atmice_x)
+   call exchange_nod(stress_atmice_x,fesom%partit)
 
    !
    CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, tauy_ice,  &
@@ -798,7 +808,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    
    ! Unpack y stress atm->ice, without halo; then do halo exchange
    stress_atmice_y(1:myDim_nod2D)=zrecv(1:myDim_nod2D)
-   call exchange_nod(stress_atmice_y)
+   call exchange_nod(stress_atmice_y,fesom%partit)
 
 
    ! =================================================================== !
@@ -1449,7 +1459,7 @@ END SUBROUTINE nemogcmcoup_lim2_update
 SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )
 
    USE g_clock, only: yearnew, month, day_in_month
-   USE g_PARSUP, only: mype
+   USE fesom_main_storage_module, only: fesom => f ! mype
    USE nemogcmcoup_steps, ONLY : substeps
    IMPLICIT NONE
 
@@ -1461,7 +1471,7 @@ SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )
    ! Data and time from NEMO
    INTEGER, INTENT(OUT) :: icdate, ictime
 
-   if(mype==0) then
+   if(fesom%mype==0) then
    WRITE(0,*)'! IFS at timestep ', istp, '. Do ', substeps , 'FESOM timesteps...'
    endif
    CALL main_timestepping(substeps)
@@ -1471,7 +1481,7 @@ SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )
    icdate = yearnew*10000 + month*100 + day_in_month ! e.g. 20170906
    ictime = 0 ! (time is not used)
 
-   if(mype==0) then
+   if(fesom%mype==0) then
    WRITE(0,*)'! FESOM date at end of timestep is ', icdate ,' ======'
    endif
 
@@ -1491,13 +1501,13 @@ END SUBROUTINE nemogcmcoup_step
 
 SUBROUTINE nemogcmcoup_final
 
-   USE g_PARSUP, only: mype
+   USE fesom_main_storage_module, only: fesom => f ! mype
 
    ! Finalize the FESOM model
 
    IMPLICIT NONE
 
-   if(mype==0) then
+   if(fesom%mype==0) then
    WRITE(*,*)'Finalization of FESOM from IFS.'
    endif
    CALL main_finalize
