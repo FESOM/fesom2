@@ -20,6 +20,7 @@ jobs:
     - uses: actions/checkout@v2
 
     - name: switch OpenMP ON
+      run: |
         cd ./src/
         sed -i 's/with OpenMP\" OFF/with OpenMP\" ON/g' CMakeLists.txt
         cd ../
