@@ -72,7 +72,10 @@ subroutine par_init(partit)    ! initializes MPI
     end if
     write(*,*) 'MPI has been initialized, provided MPI thread support level: ', &
          provided_mpi_thread_support_level_name,provided_mpi_thread_support_level
-    write(*, *) 'Running on ', partit%npes, ' PEs'
+    write(*, *) 'Running on                   ', partit%npes, ' PEs'
+#if defined(_OPENMP)
+    write(*, *) 'This is MPI/OpenMP run, with ', OMP_GET_MAX_THREADS(), ' threads per PE'
+#endif
   end if
 end subroutine par_init
 !=================================================================
