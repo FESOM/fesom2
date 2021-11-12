@@ -60,6 +60,7 @@ subroutine smooth_nod2D(arr, N, partit, mesh)
 
   allocate(work_array(myDim_nod2D))
   DO q=1, N !apply mass matrix N times to smooth the field
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, elem, j, q, elnodes, vol)
      DO node=1, myDim_nod2D
         vol=0._WP
         work_array(node)=0._WP
@@ -68,13 +69,20 @@ subroutine smooth_nod2D(arr, N, partit, mesh)
            elnodes=elem2D_nodes(:,elem)
            work_array(node)=work_array(node)+sum(arr(elnodes))/3._WP*elem_area(elem)
            vol=vol+elem_area(elem)
-       END DO
-       work_array(node)=work_array(node)/vol
+        END DO
+        work_array(node)=work_array(node)/vol
     END DO
+!$OMP END PARALLEL DO
+
+!$OMP PARALLEL DO
     DO node=1,myDim_nod2D
        arr(node)=work_array(node)
     ENDDO
+!$OMP END PARALLEL DO
+!$OMP MASTER
     call exchange_nod(arr, partit)
+!$OMP END MASTER
+!$OMP BARRIER
   END DO
   deallocate(work_array)
 end subroutine smooth_nod2D
@@ -104,20 +112,17 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
   
 ! Precompute area of patches on all levels (at the bottom, some neighbouring
 ! nodes may vanish in the bathymetry) in the first smoothing step
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, el, nz, j, q, num_el, nlev, nl_loc, nu_loc, uln, nln, ule, nle)
+!$OMP DO
   DO n=1, myDim_nod2D
      uln = ulevels_nod2d(n)
      nln = min(nlev,nlevels_nod2d(n))
      vol(       1:nln,n) = 0._WP
      work_array(1:nln,n) = 0._WP
-     !!PS vol(       1:min(nlev, nlevels_nod2d(n)),n) = 0._WP
-     !!PS work_array(1:min(nlev, nlevels_nod2d(n)),n) = 0._WP
      DO j=1, nod_in_elem2D_num(n)
         el = nod_in_elem2D(j,n)
-!!PS         nl_loc = min(nlev, minval(nlevels_nod2d(elem2D_nodes(1:3,el))))
-!!PS         nu_loc = maxval(ulevels_nod2D(elem2D_nodes(1:3,el)))
         ule = max( uln, ulevels(el) )
         nle = min( nln, min(nlev,nlevels(el)) )
-        !!PS DO nz=1, nl_loc
         DO nz=ule, nle
            vol(nz,n) = vol(nz,n) + elem_area(el)
            work_array(nz,n) = work_array(nz,n) + elem_area(el) * (arr(nz, elem2D_nodes(1,el)) &
@@ -125,46 +130,34 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
                                                                 + arr(nz, elem2D_nodes(3,el)))
         END DO
      ENDDO
-     !!PS DO nz=1,nlevels_nod2d(n)
      DO nz=uln,nln
         vol(nz,n) = 1._WP / (3._WP * vol(nz,n))  ! Here, we need the inverse and scale by 1/3
      END DO
   END DO
-
+!$OMP END DO
   ! combined: scale by patch volume + copy back to original field
+!$OMP DO
   DO n=1, myDim_nod2D
-     !!PS DO nz=1, min(nlev, nlevels_nod2d(n))
      uln = ulevels_nod2d(n)
      nln = min(nlev,nlevels_nod2d(n))
      DO nz=uln,nln
         arr(nz, n) = work_array(nz, n) *vol(nz,n) 
-!!PS         if (arr(nz,n)/=arr(nz,n)) then
-!!PS             write(*,*) ' --> found NaN in smoothing'
-!!PS             write(*,*) ' mype = ', mype
-!!PS             write(*,*) ' n    = ', n
-!!PS             write(*,*) ' nz,uln,nln      = ', nz,uln,nln
-!!PS             write(*,*) ' arr(nz,n)       = ', arr(nz,n)
-!!PS             write(*,*) ' work_array(nz,n)= ', work_array(nz,n)
-!!PS             write(*,*) ' vol(nz,n)       = ', vol(nz,n)
-!!PS         endif 
      END DO
-  end DO
-  
+  END DO
+!$OMP END DO  
+!$OMP MASTER
   call exchange_nod(arr, partit)
-
+!$OMP END MASTER
+!$OMP BARRIER
 ! And the remaining smoothing sweeps
-
   DO q=1,N_smooth-1
+!$OMP DO
      DO n=1, myDim_nod2D
         uln = ulevels_nod2d(n)
         nln = min(nlev,nlevels_nod2d(n))
-        !!PS work_array(1:min(nlev, nlevels_nod2d(n)),n) = 0._WP
         work_array(1:nln,n) = 0._WP
         DO j=1,nod_in_elem2D_num(n)
            el = nod_in_elem2D(j,n)
-           !!PS nl_loc = min(nlev, minval(nlevels_nod2d(elem2D_nodes(1:3,el))))
-           !!PS nu_loc = maxval(ulevels_nod2D(elem2D_nodes(1:3,el)))
-           !!PS DO nz=1, 
            ule = max( uln, ulevels(el) )
            nle = min( nln, min(nlev,nlevels(el)) )
            DO nz=ule,nle
@@ -174,7 +167,9 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
            END DO
         ENDDO
      ENDDO
+!$OMP END DO
 ! combined: scale by patch volume + copy back to original field
+!$OMP DO
      DO n=1, myDim_nod2D
         !!PS DO nz=1, min(nlev, nlevels_nod2d(n))
         uln = ulevels_nod2d(n)
@@ -182,10 +177,14 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
         DO nz=uln,nln
            arr(nz, n) = work_array(nz, n) *vol(nz,n) 
         END DO
-     end DO
+     END DO
+!$OMP END DO
+!$OMP MASTER
      call exchange_nod(arr, partit)
+!$OMP END MASTER
+!$OMP BARRIER
   enddo
-
+!$OMP END PARALLEL
   deallocate(work_array)
 end subroutine smooth_nod3D
 
@@ -206,6 +205,8 @@ subroutine smooth_elem2D(arr, N, partit, mesh)
 #include "associate_mesh_ass.h" 
     allocate(work_array(myDim_nod2D+eDim_nod2D))
     DO q=1, N !apply mass matrix N times to smooth the field
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, elem, j, q, elnodes, vol)
+!$OMP DO
         DO node=1, myDim_nod2D
             vol=0._WP
             work_array(node)=0._WP
@@ -217,12 +218,22 @@ subroutine smooth_elem2D(arr, N, partit, mesh)
             END DO
             work_array(node)=work_array(node)/vol
         END DO
+!$OMP END DO
+!$OMP MASTER
         call exchange_nod(work_array, partit)
+!$OMP END MASTER
+!$OMP BARRIER
+!$OMP DO
         DO elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:, elem)
             arr(elem)=sum(work_array(elnodes))/3.0_WP  ! Here, we need the inverse and scale by 1/3
         ENDDO
+!$OMP END DO
+!$OMP MASTER
         call exchange_elem(arr, partit)
+!$OMP END MASTER
+!$OMP BARRIER
+!$OMP END PARALLEL
     END DO
     deallocate(work_array)
 end subroutine smooth_elem2D
@@ -247,7 +258,13 @@ subroutine smooth_elem3D(arr, N, partit, mesh)
     my_nl=ubound(arr,1)
     DO q=1, N !apply mass matrix N times to smooth the field
         DO nz=1, my_nl
-            work_array = 0.0_WP
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, elem, j, q, elnodes, vol)
+!$OMP DO
+            DO node=1, myDim_nod2D+eDim_nod2D
+               work_array(node) = 0.0_WP
+            END DO
+!$OMP END DO
+!$OMP DO
             DO node=1, myDim_nod2D
                 vol=0._WP
                 if (nz > nlevels_nod2d(node)) CYCLE
@@ -263,15 +280,23 @@ subroutine smooth_elem3D(arr, N, partit, mesh)
                 END DO
                 work_array(node)=work_array(node)/vol
             END DO
+!$OMP END DO
+!$OMP MASTER
             call exchange_nod(work_array, partit)
+!$OMP END MASTER
+!$OMP BARRIER
+!$OMP DO
             DO elem=1, myDim_elem2D
                 if (nz>nlevels(elem)  ) CYCLE
                 if (nz<ulevels(elem)) CYCLE
                 elnodes=elem2D_nodes(:, elem)
                 arr(nz, elem)=sum(work_array(elnodes))/3.0_WP
             ENDDO
+!$OMP END DO
+!$OMP END PARALLEL
         END DO
         call exchange_elem(arr, partit)
+!$OMP BARRIER
     END DO
     deallocate(work_array)
 
