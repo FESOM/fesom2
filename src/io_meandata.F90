@@ -641,8 +641,7 @@ subroutine create_new_file(entry, dynamics, partit, mesh)
   call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'axis', len_trim('T'), trim('T')), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'stored_direction', len_trim('increasing'), trim('increasing')), __LINE__)
   
-  call assert_nf( nf_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), entry%ndim+1, &
-                                    (/entry%dimid(1:entry%ndim), entry%recID/), entry%varID), __LINE__)
+  call assert_nf( nf_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), entry%ndim+1, (/entry%dimid(entry%ndim:1:-1), entry%recID/), entry%varID), __LINE__)
 !CHUNKING stuff (netcdf libraries not always compited with it)
 !if (entry%ndim==2) then
 !     call assert_nf( nf_def_var_chunking(entry%ncid, entry%varID, NF_CHUNKED, (/1, entry%glsize(1)/)), __LINE__);
@@ -752,7 +751,7 @@ subroutine write_mean(entry, entry_index)
           if (entry%ndim==1) then
             call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r8, 1), __LINE__)
           elseif (entry%ndim==2) then
-            call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r8, 1), __LINE__)
+            call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size2, 1, 1/), entry%aux_r8, 1), __LINE__)
           end if
         end if
      end do
@@ -772,7 +771,7 @@ subroutine write_mean(entry, entry_index)
            if (entry%ndim==1) then
              call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r4, 1), __LINE__)
            elseif (entry%ndim==2) then
-             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r4, 1), __LINE__)
+             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size2, 1, 1/), entry%aux_r4, 1), __LINE__)
            end if
         end if
      end do
@@ -1084,8 +1083,8 @@ end subroutine
     do i=1, io_NSTREAMS
       if(trim(io_stream(i)%name) .eq. name) then
           print *,"variable '"//name//"' already exists, &
-              check if you define it multiple times, for example in namelist.io, &
-              namelist.icepack, io_meandata.F90 or other place that add I/O stream."
+              &check if you define it multiple times, for example in namelist.io, &
+              &namelist.icepack, io_meandata.F90 or other place that add I/O stream."
           call assert(.false., __LINE__) 
       end if
     end do

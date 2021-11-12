@@ -47,7 +47,7 @@ module oce_adv_tra_hor_interfaces
       use MOD_MESH
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_partit),intent(in), target :: partit
+      type(t_partit),intent(inout), target :: partit
       type(t_mesh),  intent(in), target :: mesh    
       real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
       real(kind=WP), intent(in)         :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)

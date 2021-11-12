@@ -71,7 +71,7 @@ save
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: eps11, eps12, eps22
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: fresh_wa_flux
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: net_heat_flux
-#if defined (__oasis)
+#if defined (__oasis) || defined (__ifsinterface)
   real(kind=WP),target, allocatable, dimension(:)  :: ice_alb, ice_temp ! new fields for OIFS coupling
   real(kind=WP),target, allocatable, dimension(:)  :: oce_heat_flux, ice_heat_flux
   real(kind=WP),target, allocatable, dimension(:)  :: tmp_oce_heat_flux, tmp_ice_heat_flux
@@ -81,7 +81,7 @@ save
 #if defined (__oifs)
   real(kind=WP),target, allocatable, dimension(:)  :: enthalpyoffuse
 #endif
-#endif /* (__oasis) */
+#endif /* (__oasis) || defined (__ifsinterface)*/
 
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: S_oc_array, T_oc_array
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_iceoce_x         
