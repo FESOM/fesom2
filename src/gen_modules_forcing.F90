@@ -59,7 +59,7 @@ use o_param
   real(kind=WP), allocatable, dimension(:)         :: runoff, evaporation, ice_sublimation
   real(kind=WP), allocatable, dimension(:)         :: cloudiness, press_air
 
-#if defined (__oasis)
+#if defined (__oasis) || defined (__ifsinterface)
   real(kind=WP), target, allocatable, dimension(:) :: sublimation, evap_no_ifrac
   real(kind=WP), target, allocatable, dimension(:) :: tmp_sublimation, tmp_evap_no_ifrac !temporary flux fields
   real(kind=WP), target, allocatable, dimension(:) :: tmp_shortwave 			!(for flux correction) 

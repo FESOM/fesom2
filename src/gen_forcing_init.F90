@@ -75,9 +75,13 @@ subroutine forcing_array_setup(partit, mesh)
   evaporation = 0.0_WP
   ice_sublimation = 0.0_WP
 
+#if defined (__oasis) || defined (__ifsinterface)
+  allocate(sublimation(n2), evap_no_ifrac(n2))
+  sublimation=0.0_WP
+  evap_no_ifrac=0.0_WP
+#endif
 #if defined (__oasis)
   allocate(tmp_sublimation(n2),tmp_evap_no_ifrac(n2), tmp_shortwave(n2))
-  allocate(sublimation(n2),evap_no_ifrac(n2))
   allocate(atm_net_fluxes_north(nrecv), atm_net_fluxes_south(nrecv))
   allocate(oce_net_fluxes_north(nrecv), oce_net_fluxes_south(nrecv))
   allocate(flux_correction_north(nrecv), flux_correction_south(nrecv))
@@ -92,9 +96,8 @@ subroutine forcing_array_setup(partit, mesh)
   flux_correction_north=0.0_WP
   flux_correction_south=0.0_WP
   flux_correction_total=0.0_WP  
-  evap_no_ifrac=0.0_WP
-  sublimation=0.0_WP
 #endif 
+
 
 
 ! Temp storage for averaging
