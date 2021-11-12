@@ -348,7 +348,7 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
 
    USE par_kind ! in ifs_modules.F90
    USE fesom_main_storage_module, only: fesom => f
-   USE o_ARRAYS, ONLY : UV ! tr_arr is now tracers
+   !USE o_ARRAYS, ONLY : UV ! tr_arr is now tracers, UV in dynamics derived type
    USE i_arrays, ONLY : m_ice, a_ice, m_snow
    USE i_therm_param, ONLY : tmelt
    USE g_rotate_grid, only: vector_r2g
@@ -463,8 +463,8 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    ! Surface currents need to be rotated to geographical grid
 
    ! Pack u(v) surface currents
-   zsendU(:)=UV(1,1,1:myDim_elem2D)
-   zsendV(:)=UV(2,1,1:myDim_elem2D) !UV includes eDim, leave those away here
+   zsendU(:)=fesom%dynamics%UV(1,1,1:myDim_elem2D)
+   zsendV(:)=fesom%dynamics%UV(2,1,1:myDim_elem2D) !UV includes eDim, leave those away here
 
    do elem=1, myDim_elem2D
 
