@@ -399,7 +399,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
 #include "associate_mesh_ass.h"   
     
     !___________________________________________________________________________
-    ! open and read namelist for I/O
+    ! open and read namelist.dyn for I/O
     open(unit=nm_unit, file='namelist.dyn', form='formatted', access='sequential', status='old', iostat=iost )
     if (iost == 0) then
         if (mype==0) write(*,*) '     file   : ', 'namelist.dyn',' open ok'
