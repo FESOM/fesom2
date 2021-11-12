@@ -1,6 +1,6 @@
 !==========================================================
 MODULE MOD_TRACER
-USE O_PARAM
+USE O_PARAM, only: WP
 USE, intrinsic :: ISO_FORTRAN_ENV
 USE MOD_WRITE_BINARY_ARRAYS
 USE MOD_READ_BINARY_ARRAYS
@@ -224,5 +224,3 @@ subroutine READ_T_TRACER(tracer, unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg)    tracer%i_vert_diff
 end subroutine READ_T_TRACER
 end module MOD_TRACER
-!==========================================================
-
