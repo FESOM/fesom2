@@ -23,12 +23,20 @@ subroutine create_noise(mesh)
  
  elem_size=myDim_elem2D+eDim_elem2D
 
+ ! set a_.. to 0
+ lu_a_xx=0*lu_a_xx
+ lu_a_yy=0*lu_a_yy
+ lu_a_zz=0*lu_a_zz
+ lu_a_xy=0*lu_a_xy
+ lu_a_xz=0*lu_a_xz
+ lu_a_yz=0*lu_a_yz
+ 
    Do nz=1, 10!nl-1 ! TODOLU where is nl defined ...?
     
     mean_u=sum(UV(1,nz,:))/real(elem_size)
     mean_v=sum(UV(2,nz,:))/real(elem_size)
     
-    ! set a_.. to 0
+    
     
     Do elem=1, myDim_elem2D
       
@@ -40,7 +48,7 @@ subroutine create_noise(mesh)
            lu_mat_W(elem,i)              = UV(1,nz,uv_neighbour_set(nz,elem,rnd_obs_id(i)))-mean_u
            lu_mat_W(elem + myDim_elem2D,i)  = UV(2,nz,uv_neighbour_set(nz,elem,rnd_obs_id(i)))-mean_v
 
-!compute the associated w velocity
+   !compute the associated w velocity
            
            lu_mat_W(elem + 2*myDim_elem2D,i)  = lu_mat_W(elem,i)/2 + lu_mat_W(elem + myDim_elem2D,i)/2 ! TODOLU just a dummy here    
            
@@ -100,7 +108,7 @@ subroutine SVD(A,U,S,M,N)
 ! Program computes the matrix singular value decomposition. 
 ! Using Lapack library.
 
- DOUBLE PRECISION A(M,N),U(M,M),S(N)
+ DOUBLE PRECISION A(M,N),U(M,N),S(N)
  DOUBLE PRECISION,ALLOCATABLE :: WORK(:)
  INTEGER LDA,M,N,LWORK,INFO
 
