@@ -287,6 +287,44 @@ if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
 end if
 
 ! =================
+! Location Uncertainty arrays
+! =================
+if(lu_option) then
+
+allocate(lu_sdbt_UV(2, nl-1, elem_size))
+allocate(lu_UVs(2, nl-1, elem_size))
+allocate(lu_sdbt_w(nl, node_size))
+allocate(lu_sdbt_w_e(nl, node_size))
+allocate(lu_sdbt_w_i(nl, node_size))
+allocate(lu_ws(nl, node_size))
+allocate(lu_ws_e(nl, node_size))
+allocate(lu_ws_i(nl, node_size))
+allocate(lu_noiseTracer_adv(nl-1,node_size))
+
+allocate(uv_neighbour_set(nl-1,elem_size,20))
+uv_neighbour_set=0.0_WP
+
+allocate(lu_mat_W(3*elem_size,20))
+allocate(lu_mat_U(3*elem_size,20))
+allocate(lu_mat_S(20))
+allocate(lu_a_xx(elem_size,nl-1))
+allocate(lu_a_yy(elem_size,nl-1))
+allocate(lu_a_zz(elem_size,nl-1))
+allocate(lu_a_xy(elem_size,nl-1))
+allocate(lu_a_xz(elem_size,nl-1))
+allocate(lu_a_yz(elem_size,nl-1))
+
+
+lu_sdbt_UV=0.0_WP
+lu_UVs=0.0_WP
+lu_sdbt_w=0.0_WP
+lu_ws=0.0_WP
+lu_noiseTracer_adv=0.0_WP ! TODOLU not sure if it is needed ...?
+
+end if
+
+
+! =================
 ! Backscatter arrays
 ! =================
 

@@ -30,6 +30,7 @@ real(kind=WP)                 :: Div_c  =1.0_WP !modified Leith viscosity weight
 real(kind=WP)                 :: Leith_c=1.0_WP	!Leith viscosity weight. It needs vorticity!
 real(kind=WP)                 :: easy_bs_return=1.0 !backscatter option only (how much to return)
 real(kind=WP)                 :: A_ver=0.001_WP ! Vertical harm. visc.
+logical                       :: lu_option=.true. ! switch to turn on/off location unceartainty 
 integer                       :: visc_option=5
 logical                       :: uke_scaling=.true.
 real(kind=WP)                 :: uke_scaling_factor=1._WP
@@ -176,7 +177,7 @@ character(20)                  :: which_pgf='shchepetkin'
                     scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_max_cfl, SPP,&
                     Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, & 
                     scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, & 
-                    Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, visc_option, alpha, theta, use_density_ref, &
+                    Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, lu_option, visc_option, alpha, theta, use_density_ref, &
                     K_back, c_back, uke_scaling, uke_scaling_factor, smooth_back, smooth_dis, &
                     smooth_back_tend, rosb_dis
 
@@ -283,6 +284,26 @@ real(kind=WP), allocatable,dimension(:)     :: dens_flux
 !real(kind=WP), allocatable,dimension(:,:)   :: hd_flux,vd_flux
 !Isoneutral diffusivities (or xy diffusivities if Redi=.false)
 real(kind=WP), allocatable :: Ki(:,:)
+
+!_______________________________________________________________________________
+! Location Uncertainty variables
+real(kind=WP), allocatable         :: lu_sdbt_UV(:,:,:)
+real(kind=WP), allocatable         :: lu_UVs(:,:,:)
+real(kind=WP), allocatable, target :: lu_sdbt_w(:,:), lu_sdbt_w_e(:,:), lu_sdbt_w_i(:,:)
+real(kind=WP), allocatable, target :: lu_ws(:,:),lu_ws_e(:,:),lu_ws_i(:,:)
+real(kind=WP), allocatable         :: lu_noiseTracer_adv(:,:)
+
+real(kind=WP), allocatable         :: uv_neighbour_set(:,:,:) ! TODOLU temporary needs to be set up
+real(kind=WP), allocatable         :: lu_mat_W(:,:) ! TODOLU not sure where to set up this variable
+real(kind=WP), allocatable         :: lu_mat_U(:,:)
+real(kind=WP), allocatable         :: lu_mat_S(:)
+
+real(kind=WP), allocatable         :: lu_a_xx(:,:)
+real(kind=WP), allocatable         :: lu_a_yy(:,:)
+real(kind=WP), allocatable         :: lu_a_zz(:,:)
+real(kind=WP), allocatable         :: lu_a_xy(:,:)
+real(kind=WP), allocatable         :: lu_a_xz(:,:)
+real(kind=WP), allocatable         :: lu_a_yz(:,:)
 
 !_______________________________________________________________________________
 ! Arrays added for ALE implementation:

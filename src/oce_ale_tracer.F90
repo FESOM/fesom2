@@ -227,7 +227,7 @@ subroutine adv_tracers_ale(tr_num, mesh)
         call compute_diag_dvd_2ndmoment_klingbeil_etal_2014(tr_num, mesh)
         !!PS call compute_diag_dvd_2ndmoment_burchard_etal_2008(tr_num)
     end if    
-    
+                
     !___________________________________________________________________________
     ! horizontal ale tracer advection 
     ! here --> add horizontal advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
@@ -239,6 +239,19 @@ subroutine adv_tracers_ale(tr_num, mesh)
     ! and vertical advection
     del_ttf=del_ttf+del_ttf_advhoriz+del_ttf_advvert
     
+    
+    !___________________________________________________________________________
+    ! LU noise advection for tracer
+    if(lu_option) then   
+    
+    del_ttf_advhoriz = 0.0_WP  ! TODOLU do these variables just save the results?
+    del_ttf_advvert  = 0.0_WP  ! ???
+    
+    call do_oce_adv_tra(tr_arr(:,:,tr_num), tr_arr_old(:,:,tr_num), lu_sdbt_UV-lu_UVs, lu_sdbt_w-lu_ws, lu_sdbt_w_i-lu_ws_i, lu_sdbt_w_e-lu_ws_e, 1, del_ttf_advhoriz, del_ttf_advvert, tra_adv_ph, tra_adv_pv, mesh)   
+    
+    del_ttf=del_ttf+del_ttf_advhoriz+del_ttf_advvert ! TODOLU is this corrct ???
+    
+    end if
     !___________________________________________________________________________
     ! compute discrete variance decay after Burchard and Rennau 2008
     if (ldiag_DVD .and. tr_num <= 2) then
