@@ -26,7 +26,7 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    ! Input arguments
 
    ! Message passing information
-   INTEGER, INTENT(IN) :: icommIN
+   INTEGER, INTENT(IN) :: icomm
    ! Initial date (e.g. 20170906), time, initial timestep and final time step
    INTEGER, INTENT(OUT) ::  inidate, initime, itini, itend
    ! Length of the time step
