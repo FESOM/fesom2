@@ -2,6 +2,7 @@
 !           so they can be reused after fesom_init
 module fesom_main_storage_module
   USE MOD_MESH
+  USE MOD_ICE
   USE MOD_TRACER
   USE MOD_PARTIT
   USE MOD_PARSUP
@@ -27,6 +28,7 @@ module fesom_main_storage_module
   use update_atm_forcing_interface
   use before_oce_step_interface
   use oce_timestep_ale_interface
+  use ice_timestep_interface
   use read_mesh_interface
   use fesom_version_info_module
   use command_line_options_module
@@ -53,17 +55,20 @@ module fesom_main_storage_module
 
 
     type(t_mesh)   mesh
-    type(t_tracer) tracers
+    type(t_ice)    ice
     type(t_dyn)    dynamics
+    type(t_tracer) tracers
     type(t_partit) partit
 
 
     character(LEN=256)               :: dump_dir, dump_filename
     logical                          :: L_EXISTS
-    type(t_mesh)   mesh_copy
+    type(t_ice)    ice_copy
     type(t_tracer) tracers_copy
     type(t_dyn)    dynamics_copy
-
+    type(t_mesh)   mesh_copy
+    
+    
     character(LEN=MPI_MAX_LIBRARY_VERSION_STRING) :: mpi_version_txt
     integer mpi_version_len
     
@@ -119,6 +124,8 @@ contains
             print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
             print *, achar(27)//'[7;32m'//' --> FESOM BUILDS UP MODEL CONFIGURATION                    '//achar(27)//'[0m'
         end if
+        
+        !_______________________________________________________________________
         !=====================
         ! Read configuration data,  
         ! load the mesh and fill in 
@@ -129,9 +136,10 @@ contains
         call get_run_steps(fesom_total_nsteps, f%partit)
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call mesh_setup'//achar(27)//'[0m'
         call mesh_setup(f%partit, f%mesh)
-
+        
         if (f%mype==0) write(*,*) 'FESOM mesh_setup... complete'
-    
+        
+        !_______________________________________________________________________
         !=====================
         ! Allocate field variables 
         ! and additional arrays needed for 
@@ -152,27 +160,35 @@ contains
         
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ocean_setup'//achar(27)//'[0m'
         call ocean_setup(f%dynamics, f%tracers, f%partit, f%mesh)
-
+        
         if (f%mype==0) then
            write(*,*) 'FESOM ocean_setup... complete'
            f%t3=MPI_Wtime()
         endif
+        
+        !_______________________________________________________________________
         call forcing_setup(f%partit, f%mesh)
-
+        
+        !_______________________________________________________________________
         if (f%mype==0) f%t4=MPI_Wtime()
         if (use_ice) then 
-            call ice_setup(f%tracers, f%partit, f%mesh)
+            if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_setup'//achar(27)//'[0m'
+            call ice_setup(f%ice, f%tracers, f%partit, f%mesh)
             ice_steps_since_upd = ice_ave_steps-1
             ice_update=.true.
             if (f%mype==0) write(*,*) 'EVP scheme option=', whichEVP
         endif
         if (f%mype==0) f%t5=MPI_Wtime()
+        
+        !_______________________________________________________________________
         call compute_diagnostics(0, f%dynamics, f%tracers, f%partit, f%mesh) ! allocate arrays for diagnostic
+        
+        !_______________________________________________________________________
 #if defined (__oasis)
         call cpl_oasis3mct_define_unstr(f%partit, f%mesh)
         if(f%mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
 #endif
-
+        !_______________________________________________________________________
 #if defined (__icepack)
         !=====================
         ! Setup icepack
@@ -183,6 +199,8 @@ contains
         call init_icepack(f%tracers%data(1), f%mesh)
         if (f%mype==0) write(*,*) 'Icepack: setup complete'
 #endif
+
+        !_______________________________________________________________________
         call clock_newyear                        ! check if it is a new year
         if (f%mype==0) f%t6=MPI_Wtime()
         !___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
@@ -338,7 +356,7 @@ contains
                 ice_steps_since_upd=ice_steps_since_upd+1
             endif
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_timestep(n)'//achar(27)//'[0m'
-            if (ice_update) call ice_timestep(n, f%partit, f%mesh)  
+            if (ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh)  
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
             call oce_fluxes_mom(f%dynamics, f%partit, f%mesh) ! momentum only
