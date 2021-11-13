@@ -29,10 +29,13 @@ END TYPE T_ICE_DATA
 ! set work array derived type for ice
 TYPE T_ICE_WORK
     !___________________________________________________________________________
-    real(kind=WP), allocatable, dimension(:)    :: tmax, tmin
+    real(kind=WP), allocatable, dimension(:)    :: fct_tmax, fct_tmin
+    real(kind=WP), allocatable, dimension(:)    :: fct_plus, fct_minus
+    real(kind=WP), allocatable, dimension(:,:)  :: fct_fluxes
     real(kind=WP), allocatable, dimension(:)    :: sigma11, sigma12, sigma22
     real(kind=WP), allocatable, dimension(:)    :: eps11, eps12, eps22
-  
+    real(kind=WP), allocatable, dimension(:)    :: ice_strength, inv_areamass, inv_mass
+    real(kind=WP), allocatable, dimension(:)    :: t_skin, thdgr, thdgrsn, thdgr_old
     !___________________________________________________________________________
     contains
         procedure WRITE_T_ICE_WORK
@@ -40,6 +43,20 @@ TYPE T_ICE_WORK
         generic :: write(unformatted) => WRITE_T_ICE_WORK
         generic :: read(unformatted)  => READ_T_ICE_WORK
 END TYPE T_ICE_WORK
+!
+! 
+!_______________________________________________________________________________
+! set work array derived type for ice
+TYPE T_ICE_THERMO
+    !___________________________________________________________________________
+    real(kind=WP), allocatable, dimension(:)    :: t_skin, thdgr, thdgrsn, thdgr_old, ustar
+    !___________________________________________________________________________
+    contains
+        procedure WRITE_T_ICE_THERMO
+        procedure READ_T_ICE_THERMO
+        generic :: write(unformatted) => WRITE_T_ICE_THERMO
+        generic :: read(unformatted)  => READ_T_ICE_THERMO
+END TYPE T_ICE_THERMO
 !
 ! 
 !_______________________________________________________________________________
@@ -55,7 +72,6 @@ TYPE T_ICE_ATMCOUPL
     ! tracer in ice%data(4)%values
 #endif /* (__oifs) */
 #endif /* (__oasis) */
-    
     !___________________________________________________________________________
     contains
         procedure WRITE_T_ICE_ATMCOUPL
@@ -99,6 +115,9 @@ TYPE T_ICE
     ! put ice working arrays
     type(t_ice_work)                            :: work
     
+    ! put thermodynamics arrays
+    type(t_ice_thermo)                          :: thermo
+    
 #if defined (__oasis)
     !___________________________________________________________________________
     ! put ice arrays for coupled model
@@ -107,7 +126,7 @@ TYPE T_ICE
     !___________________________________________________________________________
     ! set ice model parameters:
     ! --- RHEOLOGY ---
-    real(kind=WP)             :: Pstar      = 30000.0_WP   ![N/m^2]
+    real(kind=WP)             :: pstar      = 30000.0_WP   ![N/m^2]
     real(kind=WP)             :: ellipse    = 2.0_WP       !
     real(kind=WP)             :: c_pressure = 20.0_WP      !
     real(kind=WP)             :: delta_min  = 1.0e-11      ! [s^(-1)]
@@ -128,7 +147,6 @@ TYPE T_ICE
     
     real(kind=WP)             :: ice_dt                    ! ice step=ice_ave_steps*oce_step
     real(kind=WP)             :: Tevp_inv                  
-    
     !___________________________________________________________________________
     contains
         procedure WRITE_T_ICE
@@ -182,14 +200,20 @@ subroutine WRITE_T_ICE_WORK(twork, unit, iostat, iomsg)
     integer,                intent(in)     :: unit
     integer,                intent(out)    :: iostat
     character(*),           intent(inout)  :: iomsg
-    call write_bin_array(twork%tmin,    unit, iostat, iomsg)
-    call write_bin_array(twork%tmax,    unit, iostat, iomsg)
-    call write_bin_array(twork%sigma11, unit, iostat, iomsg)
-    call write_bin_array(twork%sigma12, unit, iostat, iomsg)
-    call write_bin_array(twork%sigma22, unit, iostat, iomsg)
-    call write_bin_array(twork%eps11,   unit, iostat, iomsg)
-    call write_bin_array(twork%eps12,   unit, iostat, iomsg)
-    call write_bin_array(twork%eps22,   unit, iostat, iomsg)
+    call write_bin_array(twork%fct_tmax,     unit, iostat, iomsg)
+    call write_bin_array(twork%fct_tmin,     unit, iostat, iomsg)
+    call write_bin_array(twork%fct_plus,     unit, iostat, iomsg)
+    call write_bin_array(twork%fct_minus,    unit, iostat, iomsg)
+    call write_bin_array(twork%fct_fluxes,   unit, iostat, iomsg)
+    call write_bin_array(twork%sigma11,      unit, iostat, iomsg)
+    call write_bin_array(twork%sigma12,      unit, iostat, iomsg)
+    call write_bin_array(twork%sigma22,      unit, iostat, iomsg)
+    call write_bin_array(twork%eps11,        unit, iostat, iomsg)
+    call write_bin_array(twork%eps12,        unit, iostat, iomsg)
+    call write_bin_array(twork%eps22,        unit, iostat, iomsg)
+    call write_bin_array(twork%ice_strength, unit, iostat, iomsg)
+    call write_bin_array(twork%inv_areamass, unit, iostat, iomsg)
+    call write_bin_array(twork%inv_mass,     unit, iostat, iomsg)
 end subroutine WRITE_T_ICE_WORK    
 
 ! Unformatted reading for T_ICE_WORK
@@ -199,15 +223,51 @@ subroutine READ_T_ICE_WORK(twork, unit, iostat, iomsg)
     integer,                intent(in)     :: unit
     integer,                intent(out)    :: iostat
     character(*),           intent(inout)  :: iomsg
-    call read_bin_array(twork%tmin, unit, iostat, iomsg)
-    call read_bin_array(twork%tmax, unit, iostat, iomsg)
-    call read_bin_array(twork%sigma11, unit, iostat, iomsg)
-    call read_bin_array(twork%sigma12, unit, iostat, iomsg)
-    call read_bin_array(twork%sigma22, unit, iostat, iomsg)
-    call read_bin_array(twork%eps11,   unit, iostat, iomsg)
-    call read_bin_array(twork%eps12,   unit, iostat, iomsg)
-    call read_bin_array(twork%eps22,   unit, iostat, iomsg)
+    call read_bin_array(twork%fct_tmax,     unit, iostat, iomsg)
+    call read_bin_array(twork%fct_tmin,     unit, iostat, iomsg)
+    call read_bin_array(twork%fct_plus,     unit, iostat, iomsg)
+    call read_bin_array(twork%fct_minus,    unit, iostat, iomsg)
+    call read_bin_array(twork%fct_fluxes,   unit, iostat, iomsg)
+    call read_bin_array(twork%sigma11,      unit, iostat, iomsg)
+    call read_bin_array(twork%sigma12,      unit, iostat, iomsg)
+    call read_bin_array(twork%sigma22,      unit, iostat, iomsg)
+    call read_bin_array(twork%eps11,        unit, iostat, iomsg)
+    call read_bin_array(twork%eps12,        unit, iostat, iomsg)
+    call read_bin_array(twork%eps22,        unit, iostat, iomsg)
+    call read_bin_array(twork%ice_strength, unit, iostat, iomsg)
+    call read_bin_array(twork%inv_areamass, unit, iostat, iomsg)
+    call read_bin_array(twork%inv_mass,     unit, iostat, iomsg)
 end subroutine READ_T_ICE_WORK
+!
+!
+!_______________________________________________________________________________
+! Unformatted writing for T_ICE_WORK
+subroutine WRITE_T_ICE_THERMO(ttherm, unit, iostat, iomsg)
+    IMPLICIT NONE
+    class(T_ICE_THERMO),    intent(in)     :: ttherm
+    integer,                intent(in)     :: unit
+    integer,                intent(out)    :: iostat
+    character(*),           intent(inout)  :: iomsg
+    call write_bin_array(ttherm%t_skin,       unit, iostat, iomsg)
+    call write_bin_array(ttherm%thdgr,        unit, iostat, iomsg)
+    call write_bin_array(ttherm%thdgrsn,      unit, iostat, iomsg)
+    call write_bin_array(ttherm%thdgr_old,    unit, iostat, iomsg)
+    call write_bin_array(ttherm%ustar,        unit, iostat, iomsg)
+end subroutine WRITE_T_ICE_THERMO    
+
+! Unformatted reading for T_ICE_WORK
+subroutine READ_T_ICE_THERMO(ttherm, unit, iostat, iomsg)
+    IMPLICIT NONE
+    class(T_ICE_THERMO),    intent(inout)  :: ttherm
+    integer,                intent(in)     :: unit
+    integer,                intent(out)    :: iostat
+    character(*),           intent(inout)  :: iomsg
+    call read_bin_array(ttherm%t_skin,       unit, iostat, iomsg)
+    call read_bin_array(ttherm%thdgr,        unit, iostat, iomsg)
+    call read_bin_array(ttherm%thdgrsn,      unit, iostat, iomsg)
+    call read_bin_array(ttherm%thdgr_old,    unit, iostat, iomsg)
+    call read_bin_array(ttherm%ustar,        unit, iostat, iomsg)
+end subroutine READ_T_ICE_THERMO
 !
 !
 !_______________________________________________________________________________
@@ -277,13 +337,14 @@ subroutine WRITE_T_ICE(ice, unit, iostat, iomsg)
        write(unit, iostat=iostat, iomsg=iomsg) ice%data(i)
     end do
     !___________________________________________________________________________
+    write(unit, iostat=iostat, iomsg=iomsg) ice%thermo
     write(unit, iostat=iostat, iomsg=iomsg) ice%work
 #if defined (__oasis)
     write(unit, iostat=iostat, iomsg=iomsg) ice%atmcoupl
 #endif /* (__oasis) */       
 
     !___________________________________________________________________________
-    write(unit, iostat=iostat, iomsg=iomsg) ice%Pstar
+    write(unit, iostat=iostat, iomsg=iomsg) ice%pstar
     write(unit, iostat=iostat, iomsg=iomsg) ice%ellipse
     write(unit, iostat=iostat, iomsg=iomsg) ice%c_pressure
     write(unit, iostat=iostat, iomsg=iomsg) ice%delta_min
@@ -331,13 +392,14 @@ subroutine READ_T_ICE(ice, unit, iostat, iomsg)
        read(unit, iostat=iostat, iomsg=iomsg) ice%data(i)
     end do
     !___________________________________________________________________________
+    read(unit, iostat=iostat, iomsg=iomsg) ice%thermo
     read(unit, iostat=iostat, iomsg=iomsg) ice%work
 #if defined (__oasis)
     read(unit, iostat=iostat, iomsg=iomsg) ice%atmcoupl
 #endif /* (__oasis) */       
 
     !___________________________________________________________________________
-    read(unit, iostat=iostat, iomsg=iomsg) ice%Pstar
+    read(unit, iostat=iostat, iomsg=iomsg) ice%pstar
     read(unit, iostat=iostat, iomsg=iomsg) ice%ellipse
     read(unit, iostat=iostat, iomsg=iomsg) ice%c_pressure
     read(unit, iostat=iostat, iomsg=iomsg) ice%delta_min
@@ -425,7 +487,7 @@ subroutine ice_init(ice, partit, mesh)
     !___________________________________________________________________________
     ! set parameters in ice derived type from namelist.ice
     ice%whichEVP        = whichEVP 
-    ice%Pstar           = Pstar
+    ice%pstar           = Pstar
     ice%ellipse         = ellipse
     ice%c_pressure      = c_pressure
     ice%delta_min       = delta_min
@@ -483,7 +545,7 @@ subroutine ice_init(ice, partit, mesh)
     
     !___________________________________________________________________________
     ! initialse data array of ice derived type containing "ice tracer" that have
-    ! to be advected: area (index=1), hice (index=2), hsnow (index=3), 
+    ! to be advected: a_ice (index=1), m_ice (index=2), m_snow (index=3), 
     ! ice_temp (index=4, only when coupled)
     allocate(ice%data(ice%num_itracers))
     do n = 1, ice%num_itracers
@@ -504,22 +566,45 @@ subroutine ice_init(ice, partit, mesh)
     
     !___________________________________________________________________________
     ! initialse work array of ice derived type 
-    allocate(ice%work%tmax(            node_size))
-    allocate(ice%work%tmin(            node_size))
+    allocate(ice%work%fct_tmax(        node_size))
+    allocate(ice%work%fct_tmin(        node_size))
+    allocate(ice%work%fct_plus(        node_size))
+    allocate(ice%work%fct_minus(       node_size))
+    allocate(ice%work%fct_fluxes(      elem_size, 3))
+    ice%work%fct_tmax    = 0.0_WP
+    ice%work%fct_tmin    = 0.0_WP
+    ice%work%fct_plus    = 0.0_WP
+    ice%work%fct_minus   = 0.0_WP
+    ice%work%fct_fluxes  = 0.0_WP
+    
     allocate(ice%work%sigma11(         elem_size))
     allocate(ice%work%sigma12(         elem_size))
     allocate(ice%work%sigma22(         elem_size))
     allocate(ice%work%eps11(           elem_size))
     allocate(ice%work%eps12(           elem_size))
     allocate(ice%work%eps22(           elem_size))
-    ice%work%tmax        = 0.0_WP
-    ice%work%tmin        = 0.0_WP
     ice%work%sigma11     = 0.0_WP
     ice%work%sigma12     = 0.0_WP
     ice%work%sigma22     = 0.0_WP
     ice%work%eps11       = 0.0_WP
     ice%work%eps12       = 0.0_WP
     ice%work%eps22       = 0.0_WP
+    
+    allocate(ice%work%ice_strength(    node_size))
+    allocate(ice%work%inv_areamass(    node_size))
+    allocate(ice%work%inv_mass(        node_size))
+    ice%work%ice_strength= 0.0_WP
+    ice%work%inv_areamass= 0.0_WP
+    ice%work%inv_mass    = 0.0_WP
+    
+    allocate(ice%work%t_skin(          node_size))
+    allocate(ice%work%thdgr(           node_size))
+    allocate(ice%work%thdgrsn(         node_size))
+    allocate(ice%work%thdgr_old(       node_size))
+    ice%work%t_skin      = 0.0_WP
+    ice%work%thdgr       = 0.0_WP
+    ice%work%thdgrsn     = 0.0_WP
+    ice%work%thdgr_old   = 0.0_WP
     
     !___________________________________________________________________________
     ! initialse coupling array of ice derived type 
