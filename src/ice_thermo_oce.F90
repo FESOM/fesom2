@@ -1,19 +1,56 @@
+module ice_thermodynamics_interfaces
+    interface
+        subroutine thermodynamics(ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice)   , intent(in)   , target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+        
+        subroutine cut_off(ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice)   , intent(in)   , target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface  
+end module
+
+
 !===================================================================
-subroutine cut_off(partit, mesh)
-    use o_param
-    use i_arrays
-    use MOD_MESH
+subroutine cut_off(ice, partit, mesh)
+    USE MOD_ICE    
     USE MOD_PARTIT
     USE MOD_PARSUP
+    USE MOD_MESH
+    use o_param, only: WP
     use g_config, only: use_cavity
     implicit none
-    type(t_mesh),   intent(in),    target :: mesh
+    type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
-
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer :: a_ice, m_ice, m_snow
+#if defined (__oifs)     
+    real(kind=WP), dimension(:), pointer :: ice_temp
+#endif /* (__oifs) */
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    a_ice   => ice%data(1)%values(:)
+    m_ice   => ice%data(2)%values(:)
+    m_snow  => ice%data(3)%values(:)
+#if defined (__oifs) 
+    ice_temp=> ice%data(4)%values(:)
+#endif /* (__oifs) */    
 
     !___________________________________________________________________________
     ! lower cutoff: a_ice
@@ -40,22 +77,6 @@ subroutine cut_off(partit, mesh)
 #endif /* (__oifs) */
     end where
     
-
-!!PS     if (use_cavity) then
-!!PS         ! upper cutoff SH: m_ice
-!!PS         where(m_ice>5.0_WP  .and. ulevels_nod2d==1 .and. geo_coord_nod2D(2,:)<0.0_WP) m_ice=5.0_WP 
-!!PS         
-!!PS         ! upper cutoff NH: m_ice
-!!PS         where(m_ice>10.0_WP .and. ulevels_nod2d==1 .and. geo_coord_nod2D(2,:)>0.0_WP) m_ice=10.0_WP 
-!!PS         
-!!PS         ! upper cutoff: m_snow
-!!PS         where(m_snow>2.5_WP .and. ulevels_nod2d==1) m_snow=2.5_WP 
-!!PS         
-!!PS         !___________________________________________________________________________
-!!PS         ! lower cutoff: m_snow
-!!PS         !!PS where(m_snow<0.1e-8_WP) m_snow=0.0_WP
-!!PS     end if 
-    
     !___________________________________________________________________________
 #if defined (__oifs)
     where(ice_temp>273.15_WP) ice_temp=273.15_WP
@@ -66,7 +87,7 @@ subroutine cut_off(partit, mesh)
 #endif /* (__oifs) */
 
 end subroutine cut_off
-#if !defined (__oasis)
+
 !===================================================================
 ! Sea-ice thermodynamics routines
 !
@@ -77,158 +98,183 @@ end subroutine cut_off
 ! Adjusted for general forcing data and NlFs option, cleaned up, bug fixing,
 ! by Qiang Wang, 13.01.2009
 !----------------------------------------------------------------------------
+! if coupled different thermodynamics !!!
+#if !defined (__oasis) 
+subroutine thermodynamics(ice, partit, mesh)
+    !
+    ! For every surface node, this subroutine extracts the information
+    ! needed for computation of thermodydnamics, calls the relevant
+    ! subroutine, and returns the information to the vectors of prognostic
+    ! variables.
+    !------------------------------------------------------------------------
+    
+    use o_param
+    USE MOD_ICE
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_MESH
+    use i_therm_param
+    use i_param
+    use i_arrays, only: 
+    use g_config
+    use g_forcing_param
+    use g_forcing_arrays, only: shortwave, longwave, Tair, shum, prec_rain, evaporation , &
+                                prec_snow, runoff, u_wind, v_wind, Ch_atm_oce_arr, &
+                                Ce_atm_oce_arr, ice_sublimation, flice, olat_heat, &
+                                osen_heat, olwout, real_salt_flux
+    use g_comm_auto
+    use g_sbf, only: l_snow
+    implicit none
+    type(t_ice)   , intent(inout)   , target :: ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    real(kind=WP)  :: h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss,rsf,evap_in
+    real(kind=WP)  :: ug,ustar,T_oc,S_oc,h_ml,t,ch,ce,ch_i,ce_i,fw,ehf,evap
+    real(kind=WP)  :: ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout, subli
+    real(kind=WP)  :: lat
+    integer        :: i, j, elem
+    real(kind=WP)  :: lid_clo
+    !___________________________________________________________________________
+    real(kind=WP), dimension(:), pointer :: a_ice, m_ice, m_snow
+    real(kind=WP), dimension(:), pointer :: a_ice_old, m_ice_old, m_snow_old
+    real(kind=WP), dimension(:), pointer :: u_ice, v_ice, u_w, v_w
+    real(kind=WP), dimension(:), pointer :: T_oc_array, S_oc_array
+    real(kind=WP), dimension(:), pointer :: fresh_wa_flux, net_heat_flux
+    real(kind=WP), dimension(:), pointer :: t_skin, thdgr, thdgrsn, thdgr_old, ustar_aux
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"    
+    a_ice         => ice%data(1)%values(:)
+    m_ice         => ice%data(2)%values(:)
+    m_snow        => ice%data(3)%values(:)
+    a_ice_old     => ice%data(1)%values_old(:)
+    m_ice_old     => ice%data(2)%values_old(:)
+    m_snow_old    => ice%data(3)%values_old(:)
+    u_ice         => ice%uvice(1, :)
+    v_ice         => ice%uvice(2, :)
+    u_w           => ice%srfoce_uv(1, :)
+    v_w           => ice%srfoce_uv(2, :)
+    T_oc_array    => ice%srfoce_temp(:)
+    S_oc_array    => ice%srfoce_salt(:)
+    fresh_wa_flux => ice%flx_fw
+    net_heat_flux => ice%flx_h
+    ustar_aux     => ice%thermo%ustar
+    t_skin        => ice%thermo%t_skin
+    thdgr         => ice%thermo%thdgr
+    thdgrsn       => ice%thermo%thdgrsn
+    thdgr_old     => ice%thermo%thdgr_old
+    
+    
+    !___________________________________________________________________________
+    rsss=ref_sss
 
-subroutine thermodynamics(partit, mesh)
-  !
-  ! For every surface node, this subroutine extracts the information
-  ! needed for computation of thermodydnamics, calls the relevant
-  ! subroutine, and returns the information to the vectors of prognostic
-  ! variables.
-  !------------------------------------------------------------------------
-  
-  use o_param
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use i_therm_param
-  use i_param
-  use i_arrays
-  use g_config
-  use g_forcing_param
-  use g_forcing_arrays
-  use g_comm_auto
-  use g_sbf, only: l_snow
-  implicit none
-  type(t_mesh),   intent(in),    target :: mesh
-  type(t_partit), intent(inout), target :: partit
-
-  real(kind=WP)  :: h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss,rsf,evap_in
-  real(kind=WP)  :: ug,ustar,T_oc,S_oc,h_ml,t,ch,ce,ch_i,ce_i,fw,ehf,evap
-  real(kind=WP)  :: ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout, subli
-  real(kind=WP)  :: lat
-  integer        :: i, j, elem
-  real(kind=WP), allocatable  :: ustar_aux(:)
-  real(kind=WP)  lid_clo
-
-  integer, pointer                       :: myDim_nod2D, eDim_nod2D
-  integer,        dimension(:),  pointer :: ulevels_nod2D
-  real(kind=WP),  dimension(:,:),pointer :: geo_coord_nod2D
-
-  myDim_nod2d=>partit%myDim_nod2D
-  eDim_nod2D =>partit%eDim_nod2D
-  ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D
-  geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => mesh%geo_coord_nod2D 
-  rsss=ref_sss
-
-  ! u_ice and v_ice are at nodes
-  ! u_w, v_w are at nodes (interpolated from elements)
-  ! u_wind and v_wind are always at nodes
-  ! ================
-  ! Friction velocity 
-  ! ================
-  allocate(ustar_aux(myDim_nod2D+eDim_nod2D))
+    ! u_ice and v_ice are at nodes
+    ! u_w, v_w are at nodes (interpolated from elements)
+    ! u_wind and v_wind are always at nodes
+    !___________________________________________________________________________
+    ! Friction velocity 
     ustar_aux=0.0_WP
-    DO i=1, myDim_nod2D
-       ustar=0.0_WP
-       if(ulevels_nod2d(i)>1) cycle 
-       ustar=((u_ice(i)-u_w(i))**2+ &
-              (v_ice(i)-v_w(i))**2)
-       ustar_aux(i)=sqrt(ustar*Cd_oce_ice)
-    END DO
-  call exchange_nod(ustar_aux, partit)
-  ! ================
-  ! end: friction velocity 
-  ! ================
-
-  do i=1, myDim_nod2d+eDim_nod2D
-     !__________________________________________________________________________
-     ! if there is a cavity no sea ice thermodynamics is apllied
-     if(ulevels_nod2d(i)>1) cycle 
-     
-     !__________________________________________________________________________
-     h       = m_ice(i)
-     hsn     = m_snow(i)
-     A       = a_ice(i)
-     fsh     = shortwave(i)
-     flo     = longwave(i)
-     Ta      = Tair(i)
-     qa      = shum(i)  
-     if (.not. l_snow) then
-        if (Ta>=0.0_WP) then
-           rain=prec_rain(i)
-           snow=0.0_WP
+    do i=1, myDim_nod2D
+        ustar=0.0_WP
+        if(ulevels_nod2d(i)>1) cycle 
+        ustar=((u_ice(i)-u_w(i))**2+ &
+               (v_ice(i)-v_w(i))**2)
+        ustar_aux(i)=sqrt(ustar*Cd_oce_ice)
+    end do
+    call exchange_nod(ustar_aux, partit)
+    
+    !___________________________________________________________________________
+    do i=1, myDim_nod2d+eDim_nod2D
+        !_______________________________________________________________________
+        ! if there is a cavity no sea ice thermodynamics is apllied
+        if(ulevels_nod2d(i)>1) cycle 
+        
+        !_______________________________________________________________________
+        h       = m_ice(i)
+        hsn     = m_snow(i)
+        A       = a_ice(i)
+        fsh     = shortwave(i)
+        flo     = longwave(i)
+        Ta      = Tair(i)
+        qa      = shum(i)  
+        
+        if (.not. l_snow) then
+            if (Ta>=0.0_WP) then
+            rain=prec_rain(i)
+            snow=0.0_WP
+            else
+            rain=0.0_WP
+            snow=prec_rain(i)
+            endif
+            evap_in=evaporation(i) !evap_in: positive up
+    !!PS         evap_in=0.0_WP
         else
-           rain=0.0_WP
-           snow=prec_rain(i)
+            rain = prec_rain(i)
+            snow = prec_snow(i)
+            evap_in=0.0_WP
+        end if
+        
+        runo    = runoff(i)
+        ug      = sqrt(u_wind(i)**2+v_wind(i)**2)
+        ustar   = ustar_aux(i)
+        T_oc    = T_oc_array(i)      
+        S_oc    = S_oc_array(i)
+        if(ref_sss_local) rsss = S_oc
+        t       = t_skin(i)   
+        ch	     = Ch_atm_oce_arr(i)
+        ce	     = Ce_atm_oce_arr(i)
+        ch_i    = Ch_atm_ice
+        ce_i    = Ce_atm_ice
+    !!PS     h_ml    = 10.0_WP       	         ! 10.0 or 30. used previously
+    !!PS     h_ml    = 5.0_WP       	         ! 10.0 or 30. used previously
+        h_ml    = 2.5_WP       	         ! 10.0 or 30. used previously
+    !!PS     h_ml    = 1.25_WP       	         ! 10.0 or 30. used previously
+        fw      = 0.0_WP
+        ehf     = 0.0_WP
+        lid_Clo=h0
+        if (geo_coord_nod2D(2,i)>0) then !TODO 2 separate pars for each hemisphere
+        lid_clo=0.5_WP
+        else
+        lid_clo=0.5_WP
         endif
-        evap_in=evaporation(i) !evap_in: positive up
-!!PS         evap_in=0.0_WP
-     else
-        rain = prec_rain(i)
-        snow = prec_snow(i)
-        evap_in=0.0_WP
-     end if
-     runo    = runoff(i)
-     ug      = sqrt(u_wind(i)**2+v_wind(i)**2)
-     ustar   = ustar_aux(i)
-     T_oc    = T_oc_array(i)      
-     S_oc    = S_oc_array(i)
-     if(ref_sss_local) rsss = S_oc
-     t       = t_skin(i)   
-     ch	     = Ch_atm_oce_arr(i)
-     ce	     = Ce_atm_oce_arr(i)
-     ch_i    = Ch_atm_ice
-     ce_i    = Ce_atm_ice
-!!PS     h_ml    = 10.0_WP       	         ! 10.0 or 30. used previously
-!!PS     h_ml    = 5.0_WP       	         ! 10.0 or 30. used previously
-     h_ml    = 2.5_WP       	         ! 10.0 or 30. used previously
-!!PS     h_ml    = 1.25_WP       	         ! 10.0 or 30. used previously
-     fw      = 0.0_WP
-     ehf     = 0.0_WP
-     lid_Clo=h0
-     if (geo_coord_nod2D(2,i)>0) then !TODO 2 separate pars for each hemisphere
-       lid_clo=0.5_WP
-     else
-       lid_clo=0.5_WP
-     endif
-
-     call therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
-          ug,ustar,T_oc,S_oc,h_ml,t,ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
-          rsf, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,lid_clo,subli)
-
-     m_ice_old(i)         = m_ice(i) !PS
-     m_snow_old(i)        = m_snow(i) !PS
-     a_ice_old(i)         = a_ice(i) !PS
-     thdgr_old(i)         = thdgr(i) !PS
-     
-     m_ice(i)         = h
-     m_snow(i)        = hsn
-     a_ice(i)         = A
-     t_skin(i)        = t
-     fresh_wa_flux(i) = fw      !positive down
-     net_heat_flux(i) = ehf     !positive down
-     evaporation(i)   = evap    !negative up
-     ice_sublimation(i)= subli 
-     
-     thdgr(i)         = ithdgr
-     thdgrsn(i)       = ithdgrsn
-     flice(i)         = iflice
-     olat_heat(i)     = hflatow
-     osen_heat(i)     = hfsenow
-     olwout(i)        = hflwrdout
-     
-     ! real salt flux due to salinity that is contained in the sea ice 4-5 psu
-     real_salt_flux(i)= rsf !PS
-
-     ! if snow file is not given snow computed from prec_rain --> but prec_snow 
-     ! array needs to be filled --> so that the freshwater balancing adds up
-     if (.not. l_snow) then
-        prec_rain(i)     = rain
-        prec_snow(i)     = snow
-     end if 
-     
-  end do
-     deallocate(ustar_aux)
+        
+        call therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
+            ug,ustar,T_oc,S_oc,h_ml,t,ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
+            rsf, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,lid_clo,subli)
+        
+        m_ice_old(i)         = m_ice(i) !PS
+        m_snow_old(i)        = m_snow(i) !PS
+        a_ice_old(i)         = a_ice(i) !PS
+        thdgr_old(i)         = thdgr(i) !PS
+        
+        m_ice(i)         = h
+        m_snow(i)        = hsn
+        a_ice(i)         = A
+        t_skin(i)        = t
+        fresh_wa_flux(i) = fw      !positive down
+        net_heat_flux(i) = ehf     !positive down
+        evaporation(i)   = evap    !negative up
+        ice_sublimation(i)= subli 
+        
+        thdgr(i)         = ithdgr
+        thdgrsn(i)       = ithdgrsn
+        flice(i)         = iflice
+        olat_heat(i)     = hflatow
+        osen_heat(i)     = hfsenow
+        olwout(i)        = hflwrdout
+        
+        ! real salt flux due to salinity that is contained in the sea ice 4-5 psu
+        real_salt_flux(i)= rsf !PS
+        
+        ! if snow file is not given snow computed from prec_rain --> but prec_snow 
+        ! array needs to be filled --> so that the freshwater balancing adds up
+        if (.not. l_snow) then
+            prec_rain(i)     = rain
+            prec_snow(i)     = snow
+        end if 
+    end do
 end subroutine thermodynamics
 !
 !===================================================================
