@@ -7,7 +7,7 @@ module ocean2ice_interface
       use mod_tracer
       use MOD_DYN
       type(t_dyn)   , intent(in)   , target :: dynamics
-      type(t_tracer), intent(in)   , target :: tracers
+      type(t_tracer), intent(inout), target :: tracers
       type(t_partit), intent(inout), target :: partit
       type(t_mesh)  , intent(in)   , target :: mesh
       
@@ -17,14 +17,16 @@ end module
 
 module oce_fluxes_interface
   interface
-    subroutine oce_fluxes(tracers, partit, mesh)
+    subroutine oce_fluxes(dynamics, tracers, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      use MOD_DYN
       USE MOD_PARSUP
       use mod_tracer
       type(t_partit), intent(inout), target :: partit
       type(t_mesh)  , intent(in)   , target :: mesh
-      type(t_tracer), intent(in)   , target :: tracers
+      type(t_tracer), intent(inout), target :: tracers
+      type(t_dyn)   , intent(in)   , target :: dynamics
     end subroutine
   end interface
 end module
@@ -201,9 +203,10 @@ end subroutine ocean2ice
 !
 !
 !_______________________________________________________________________________
-subroutine oce_fluxes(tracers, partit, mesh)
+subroutine oce_fluxes(dynamics, tracers, partit, mesh)
 
   use MOD_MESH
+  use MOD_DYN
   use MOD_TRACER
   USE MOD_PARTIT
   USE MOD_PARSUP
@@ -225,6 +228,7 @@ subroutine oce_fluxes(tracers, partit, mesh)
   type(t_partit), intent(inout), target :: partit
   type(t_mesh),   intent(in),    target :: mesh
   type(t_tracer), intent(inout), target :: tracers
+  type(t_dyn),    intent(in),    target :: dynamics
   integer                    :: n, elem, elnodes(3),n1
   real(kind=WP)              :: rsss, net
   real(kind=WP), allocatable :: flux(:)
@@ -276,7 +280,7 @@ subroutine oce_fluxes(tracers, partit, mesh)
     water_flux  = -fresh_wa_flux
 #endif 
     heat_flux_in=heat_flux ! sw_pene will change the heat_flux
-    if (use_cavity) call cavity_heat_water_fluxes_3eq(tracers, partit, mesh)
+    if (use_cavity) call cavity_heat_water_fluxes_3eq(dynamics, tracers, partit, mesh)
     !!PS if (use_cavity) call cavity_heat_water_fluxes_2eq(mesh)
     
 !!PS     where(ulevels_nod2D>1) heat_flux=0.0_WP
