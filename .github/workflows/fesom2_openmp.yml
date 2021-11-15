@@ -42,10 +42,7 @@ jobs:
         chmod +x job_docker_new
         ./job_docker_new
   
-    - name: Check global results with large tollerance
-      run: |
-        cd work_pi
-        fcheck -a 1e-9 .
+
     
         
     
