@@ -3068,6 +3068,7 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
 !$OMP END PARALLEL
 call exchange_nod(sw_alpha, partit)
 call exchange_nod(sw_beta, partit)
+!$OMP BARRIER
 end subroutine sw_alpha_beta
 !
 !
@@ -3155,6 +3156,7 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
 !$OMP END DO
 !$OMP END PARALLEL
   call exchange_nod(sigma_xy, partit)
+!$OMP BARRIER
 end subroutine compute_sigma_xy
 !
 !
@@ -3206,6 +3208,7 @@ subroutine compute_neutral_slope(partit, mesh)
 !$OMP END PARALLEL
     call exchange_nod(neutral_slope, partit)
     call exchange_nod(slope_tapered, partit)
+!$OMP BARRIER
 end subroutine compute_neutral_slope
 !
 !
