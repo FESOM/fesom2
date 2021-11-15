@@ -1,10 +1,11 @@
 MODULE gen_bulk
     ! Compute heat and momentum exchange coefficients
+    USE MOD_ICE
     use mod_mesh
     USE MOD_PARTIT
     USE MOD_PARSUP    
     use i_therm_param
-    use i_arrays
+    use i_arrays, only:
     use g_forcing_arrays
     use g_forcing_param, only: ncar_bulk_z_wind, ncar_bulk_z_tair, ncar_bulk_z_shum
     use o_param, only: WP
@@ -19,7 +20,7 @@ MODULE gen_bulk
 !
 !
 !_______________________________________________________________________________    
-subroutine ncar_ocean_fluxes_mode_fesom14(partit, mesh)
+subroutine ncar_ocean_fluxes_mode_fesom14(ice, partit, mesh)
     ! Compute drag coefficient and the transfer coefficients for evaporation
     ! and sensible heat according to LY2004.
     ! In this routine we assume air temperature and humidity are at the same
@@ -36,7 +37,10 @@ subroutine ncar_ocean_fluxes_mode_fesom14(partit, mesh)
     ! Code from CORE website is adopted to FESOM by Qiang Wang
     ! Reviewed by ??
     !----------------------------------------------------------------------
-
+    type(t_ice)   , intent(inout), target :: ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
     integer, parameter :: n_itts = 2
     integer            :: i, j, m
     real(kind=WP) :: cd_n10, ce_n10, ch_n10, cd_n10_rt    ! neutral 10m drag coefficients
@@ -47,17 +51,19 @@ subroutine ncar_ocean_fluxes_mode_fesom14(partit, mesh)
     real(kind=WP), parameter :: grav = 9.80_WP, vonkarm = 0.40_WP
     real(kind=WP), parameter :: q1=640380._WP, q2=-5107.4_WP    ! for saturated surface specific humidity
     real(kind=WP), parameter :: zz = 10.0_WP
-    type(t_mesh),   intent(in),    target :: mesh
-    type(t_partit), intent(inout), target :: partit
     
+    !___________________________________________________________________________
     do i=1, partit%myDim_nod2d+partit%eDim_nod2d       
         t=tair(i) + tmelt					      ! degree celcium to Kelvin
-        ts=t_oc_array(i) + tmelt				      !
+        !!PS ts=t_oc_array(i) + tmelt				      !
+        ts=ice%srfoce_temp(i) + tmelt
         q=shum(i)
         qs=0.98_WP*q1*inv_rhoair*exp(q2/ts) 			      ! L-Y eqn. 5 
         tv = t*(1.0_WP+0.608_WP*q)
-        dux=u_wind(i)-u_w(i)
-        dvy=v_wind(i)-v_w(i)
+        !!PS dux=u_wind(i)-u_w(i)
+        !!PS dvy=v_wind(i)-v_w(i)
+        dux=u_wind(i)-ice%srfoce_uv(1,i)
+        dvy=v_wind(i)-ice%srfoce_uv(2,i)
         u = max(sqrt(dux**2+dvy**2), 0.5_WP)           	      ! 0.5 m/s floor on wind (undocumented NCAR)
         u10 = u                                                  ! first guess 10m wind
         
@@ -114,7 +120,7 @@ end subroutine ncar_ocean_fluxes_mode_fesom14
 !
 !
 !_______________________________________________________________________________
-subroutine ncar_ocean_fluxes_mode(partit, mesh)
+subroutine ncar_ocean_fluxes_mode(ice, partit, mesh)
     ! Compute drag coefficient and the transfer coefficients for evaporation
     ! and sensible heat according to LY2004.
     ! with updates from Large et al. 2009 for the computation of the wind drag 
@@ -133,7 +139,10 @@ subroutine ncar_ocean_fluxes_mode(partit, mesh)
     ! Code from CORE website is adopted to FESOM by Qiang Wang
     ! Reviewed by ??
     !---------------------------------------------------------------------------
-
+    type(t_ice)   , intent(inout), target :: ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
     integer, parameter :: n_itts = 5
     integer            :: i, j, m
     real(kind=WP) :: cd_n10, ce_n10, ch_n10, cd_n10_rt, hl1   ! neutral 10m drag coefficients
@@ -153,14 +162,13 @@ subroutine ncar_ocean_fluxes_mode(partit, mesh)
     real(kind=WP) :: test, cd_prev, inc_ratio=1.0e-4 
     real(kind=WP) :: t_prev, q_prev
     
-    type(t_mesh),   intent(in),    target :: mesh
-    type(t_partit), intent(inout), target :: partit
-
+    
     do i=1,partit%myDim_nod2d+partit%eDim_nod2d   
         if (mesh%ulevels_nod2d(i)>1) cycle
         ! degree celcium to Kelvin
         t      = tair(i) + tmelt 
-        ts     = t_oc_array(i) + tmelt  
+        !!PS ts     = t_oc_array(i) + tmelt
+        ts     = ice%srfoce_temp(i) + tmelt  
         
         q      = shum(i)
         qs     = 0.98_WP*q1*inv_rhoair*exp(q2/ts)                   ! L-Y eqn. 5 
@@ -168,8 +176,10 @@ subroutine ncar_ocean_fluxes_mode(partit, mesh)
         tv     = t*(1.0_WP+0.608_WP*q)
         
         ! first guess 10m wind
-        dux    = u_wind(i)-u_w(i)
-        dvy    = v_wind(i)-v_w(i)
+        !!PS dux    = u_wind(i)-u_w(i)
+        !!PS dvy    = v_wind(i)-v_w(i)
+        dux    = u_wind(i)-ice%srfoce_uv(1,i)
+        dvy    = v_wind(i)-ice%srfoce_uv(2,i)
         u      = max(sqrt(dux**2+dvy**2), u10min)  ! 0.5 m/s floor on wind (undocumented NCAR)
         
         ! iteration variables for 10m level --> Monin-Obukov projection
@@ -342,12 +352,13 @@ subroutine cal_wind_drag_coeff(partit)
 
 end subroutine cal_wind_drag_coeff
 !
-SUBROUTINE nemo_ocean_fluxes_mode(partit)
+SUBROUTINE nemo_ocean_fluxes_mode(ice, partit)
 !!----------------------------------------------------------------------
 !! ** Purpose : Change model variables according to atm fluxes
 !! source of original code: NEMO 3.1.1 + NCAR
 !!----------------------------------------------------------------------
    IMPLICIT NONE
+   type(t_ice), intent(in) :: ice
    type(t_partit), intent(in) :: partit
    integer             :: i
    real(wp)            :: rtmp    ! temporal real
@@ -370,10 +381,13 @@ SUBROUTINE nemo_ocean_fluxes_mode(partit)
 !!$OMP PARALLEL
 !!$OMP DO
    do i = 1, partit%myDim_nod2D+partit%eDim_nod2d
-      wdx  = atmdata(i_xwind,i) - u_w(i) ! wind from data - ocean current ( x direction)
-      wdy  = atmdata(i_ywind,i) - v_w(i) ! wind from data - ocean current ( y direction)
+      !!PS wdx  = atmdata(i_xwind,i) - u_w(i) ! wind from data - ocean current ( x direction)
+      !!PS wdy  = atmdata(i_ywind,i) - v_w(i) ! wind from data - ocean current ( y direction)
+      wdx  = atmdata(i_xwind,i) - ice%srfoce_uv(1,i) ! wind from data - ocean current ( x direction)
+      wdy  = atmdata(i_ywind,i) - ice%srfoce_uv(2,i) ! wind from data - ocean current ( y direction)
       wndm = SQRT( wdx * wdx + wdy * wdy )
-      zst  = t_oc_array(i)+273.15_WP
+      !!PS zst  = t_oc_array(i)+273.15_WP
+      zst  = ice%srfoce_temp(i)+273.15_WP
 
       q_sat = 0.98_WP * 640380._WP / rhoa * EXP( -5107.4_WP / zst )
 

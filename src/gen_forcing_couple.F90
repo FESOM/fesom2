@@ -45,14 +45,16 @@ end module
 
 module update_atm_forcing_interface
   interface
-    subroutine update_atm_forcing(istep, tracers, partit,mesh)
-      use mod_mesh
+    subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
+      USE MOD_ICE
+      USE MOD_TRACER
       USE MOD_PARTIT
       USE MOD_PARSUP
-      use mod_tracer
+      USE MOD_MESH
       integer,        intent(in)            :: istep
-      type(t_tracer), intent(in),    target :: tracers
-      type(t_mesh),   intent(in),    target :: mesh
+      type(t_ice)   , intent(inout), target :: ice
+      type(t_tracer), intent(in)   , target :: tracers
+      type(t_mesh)  , intent(in)   , target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
@@ -70,14 +72,14 @@ module net_rec_from_atm_interface
 end module
 ! Routines for updating ocean surface forcing fields
 !-------------------------------------------------------------------------
-subroutine update_atm_forcing(istep, tracers, partit, mesh)
-  use o_PARAM
-  use MOD_MESH
+subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
+  USE MOD_ICE
+  USE MOD_TRACER
   USE MOD_PARTIT
   USE MOD_PARSUP
-  use MOD_TRACER
+  USE MOD_MESH
+  use o_PARAM
   use o_arrays
-  use i_arrays
   use i_param
   use i_therm_param
   use g_forcing_param
@@ -98,9 +100,11 @@ subroutine update_atm_forcing(istep, tracers, partit, mesh)
 
   implicit none
   integer,        intent(in)            :: istep
-  type(t_mesh),   intent(in),    target :: mesh
+  type(t_ice)   , intent(inout), target :: ice
+  type(t_tracer), intent(in)   , target :: tracers
   type(t_partit), intent(inout), target :: partit
-  type(t_tracer), intent(in),    target :: tracers
+  type(t_mesh)  , intent(in)   , target :: mesh
+  !_____________________________________________________________________________
   integer		   :: i, itime,n2,n,nz,k,elem
   real(kind=WP)            :: i_coef, aux
   real(kind=WP)	           :: dux, dvy,tx,ty,tvol
@@ -301,8 +305,7 @@ subroutine update_atm_forcing(istep, tracers, partit, mesh)
   prec_rain = atmdata(i_prec ,:)/1000._WP
   prec_snow = atmdata(i_snow ,:)/1000._WP
   press_air = atmdata(i_mslp ,:) ! unit should be Pa
-  
-  
+
   if (use_cavity) then 
     do i=1,myDim_nod2d+eDim_nod2d
         if (ulevels_nod2d(i)>1) then
@@ -318,45 +321,51 @@ subroutine update_atm_forcing(istep, tracers, partit, mesh)
         end if 
     end do
   endif 
-
+  
   ! second, compute exchange coefficients
   ! 1) drag coefficient 
   if(AOMIP_drag_coeff) then
      call cal_wind_drag_coeff(partit)
   end if
+  
   ! 2) drag coeff. and heat exchange coeff. over ocean in case using ncar formulae
   if(ncar_bulk_formulae) then
      cd_atm_oce_arr=0.0_WP
      ch_atm_oce_arr=0.0_WP
      ce_atm_oce_arr=0.0_WP
-     call ncar_ocean_fluxes_mode(partit, mesh)
+     call ncar_ocean_fluxes_mode(ice, partit, mesh)
+
   elseif(AOMIP_drag_coeff) then
      cd_atm_oce_arr=cd_atm_ice_arr
   end if
+
   ! third, compute wind stress
   do i=1,myDim_nod2d+eDim_nod2d   
      !__________________________________________________________________________
      if (ulevels_nod2d(i)>1) then
         stress_atmoce_x(i)=0.0_WP
         stress_atmoce_y(i)=0.0_WP
-        stress_atmice_x(i)=0.0_WP
-        stress_atmice_y(i)=0.0_WP
+        ice%stress_atmice_xy(:,i)=0.0_WP
         cycle
      end if 
      
      !__________________________________________________________________________
-     dux=u_wind(i)-(1.0_WP-Swind)*u_w(i) 
-     dvy=v_wind(i)-(1.0_WP-Swind)*v_w(i)
+     !!PS dux=u_wind(i)-(1.0_WP-Swind)*u_w(i) 
+     !!PS dvy=v_wind(i)-(1.0_WP-Swind)*v_w(i)
+     dux=u_wind(i)-(1.0_WP-Swind)*ice%srfoce_uv(1,i) 
+     dvy=v_wind(i)-(1.0_WP-Swind)*ice%srfoce_uv(2,i)
      aux=sqrt(dux**2+dvy**2)*rhoair
      stress_atmoce_x(i) = Cd_atm_oce_arr(i)*aux*dux
      stress_atmoce_y(i) = Cd_atm_oce_arr(i)*aux*dvy
      
      !__________________________________________________________________________
-     dux=u_wind(i)-u_ice(i) 
-     dvy=v_wind(i)-v_ice(i)
+     !!PS dux=u_wind(i)-u_ice(i) 
+     !!PS dvy=v_wind(i)-v_ice(i)
+     dux=u_wind(i)-ice%uvice(1,i) 
+     dvy=v_wind(i)-ice%uvice(2,i) 
      aux=sqrt(dux**2+dvy**2)*rhoair
-     stress_atmice_x(i) = Cd_atm_ice_arr(i)*aux*dux
-     stress_atmice_y(i) = Cd_atm_ice_arr(i)*aux*dvy
+     ice%stress_atmice_xy(1,i) = Cd_atm_ice_arr(i)*aux*dux
+     ice%stress_atmice_xy(2,i) = Cd_atm_ice_arr(i)*aux*dvy
   end do
 
   ! heat and fresh water fluxes are treated in i_therm and ice2ocean
