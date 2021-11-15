@@ -14,7 +14,7 @@ SAVE
 TYPE T_ICE_DATA
     !___________________________________________________________________________
     real(kind=WP), allocatable, dimension(:)    :: values, values_old, values_rhs, & 
-                                                   values_div_rhs, dvalues, values1
+                                                   values_div_rhs, dvalues, valuesl
     integer                                     :: ID
     !___________________________________________________________________________
     contains
@@ -32,6 +32,7 @@ TYPE T_ICE_WORK
     real(kind=WP), allocatable, dimension(:)    :: fct_tmax, fct_tmin
     real(kind=WP), allocatable, dimension(:)    :: fct_plus, fct_minus
     real(kind=WP), allocatable, dimension(:,:)  :: fct_fluxes
+    real(kind=WP), allocatable, dimension(:)    :: fct_massmatrix
     real(kind=WP), allocatable, dimension(:)    :: sigma11, sigma12, sigma22
     real(kind=WP), allocatable, dimension(:)    :: eps11, eps12, eps22
     real(kind=WP), allocatable, dimension(:)    :: ice_strength, inv_areamass, inv_mass
@@ -88,7 +89,7 @@ TYPE T_ICE
 
     !___________________________________________________________________________
     ! zonal & merdional ice velocity
-    real(kind=WP), allocatable, dimension(:,:)  :: uvice, uvice_rhs, uvice_old
+    real(kind=WP), allocatable, dimension(:,:)  :: uvice, uvice_rhs, uvice_old, uvice_aux
     
     ! surface stess atm<-->ice, oce<-->ice
     real(kind=WP), allocatable, dimension(:,:)  :: stress_atmice_xy, stress_iceoce_xy
@@ -146,7 +147,10 @@ TYPE T_ICE
     integer                   :: whichEVP=0                ! 0=standart; 1=mEVP; 2=aEVP
     
     real(kind=WP)             :: ice_dt                    ! ice step=ice_ave_steps*oce_step
-    real(kind=WP)             :: Tevp_inv                  
+    real(kind=WP)             :: Tevp_inv   
+    integer                   :: ice_steps_since_upd
+    
+    logical                   :: ice_update = .true.
     !___________________________________________________________________________
     contains
         procedure WRITE_T_ICE
@@ -171,7 +175,7 @@ subroutine WRITE_T_ICE_DATA(tdata, unit, iostat, iomsg)
     call write_bin_array(tdata%values_rhs,     unit, iostat, iomsg)
     call write_bin_array(tdata%values_div_rhs, unit, iostat, iomsg)
     call write_bin_array(tdata%dvalues,        unit, iostat, iomsg)
-    call write_bin_array(tdata%values1,        unit, iostat, iomsg)
+    call write_bin_array(tdata%valuesl,        unit, iostat, iomsg)
     write(unit, iostat=iostat, iomsg=iomsg) tdata%ID
 end subroutine WRITE_T_ICE_DATA  
 
@@ -187,7 +191,7 @@ subroutine READ_T_ICE_DATA(tdata, unit, iostat, iomsg)
     call read_bin_array(tdata%values_rhs,     unit, iostat, iomsg)
     call read_bin_array(tdata%values_div_rhs, unit, iostat, iomsg)
     call read_bin_array(tdata%dvalues,        unit, iostat, iomsg)
-    call read_bin_array(tdata%values1,        unit, iostat, iomsg)
+    call read_bin_array(tdata%valuesl,        unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg) tdata%ID
 end subroutine READ_T_ICE_DATA                                   
 !
@@ -205,6 +209,7 @@ subroutine WRITE_T_ICE_WORK(twork, unit, iostat, iomsg)
     call write_bin_array(twork%fct_plus,     unit, iostat, iomsg)
     call write_bin_array(twork%fct_minus,    unit, iostat, iomsg)
     call write_bin_array(twork%fct_fluxes,   unit, iostat, iomsg)
+    call write_bin_array(twork%fct_massmatrix,unit, iostat, iomsg)
     call write_bin_array(twork%sigma11,      unit, iostat, iomsg)
     call write_bin_array(twork%sigma12,      unit, iostat, iomsg)
     call write_bin_array(twork%sigma22,      unit, iostat, iomsg)
@@ -228,6 +233,7 @@ subroutine READ_T_ICE_WORK(twork, unit, iostat, iomsg)
     call read_bin_array(twork%fct_plus,     unit, iostat, iomsg)
     call read_bin_array(twork%fct_minus,    unit, iostat, iomsg)
     call read_bin_array(twork%fct_fluxes,   unit, iostat, iomsg)
+    call read_bin_array(twork%fct_massmatrix,unit, iostat, iomsg)
     call read_bin_array(twork%sigma11,      unit, iostat, iomsg)
     call read_bin_array(twork%sigma12,      unit, iostat, iomsg)
     call read_bin_array(twork%sigma22,      unit, iostat, iomsg)
@@ -323,6 +329,7 @@ subroutine WRITE_T_ICE(ice, unit, iostat, iomsg)
     call write_bin_array(ice%uvice, unit, iostat, iomsg)
     call write_bin_array(ice%uvice_rhs, unit, iostat, iomsg)
     call write_bin_array(ice%uvice_old, unit, iostat, iomsg)
+    if (ice%whichEVP /= 0) call write_bin_array(ice%uvice_aux, unit, iostat, iomsg)
     call write_bin_array(ice%stress_atmice_xy, unit, iostat, iomsg)
     call write_bin_array(ice%stress_iceoce_xy, unit, iostat, iomsg)
     call write_bin_array(ice%srfoce_temp, unit, iostat, iomsg)
@@ -364,6 +371,8 @@ subroutine WRITE_T_ICE(ice, unit, iostat, iomsg)
     write(unit, iostat=iostat, iomsg=iomsg) ice%whichEVP
     write(unit, iostat=iostat, iomsg=iomsg) ice%ice_dt
     write(unit, iostat=iostat, iomsg=iomsg) ice%Tevp_inv
+    write(unit, iostat=iostat, iomsg=iomsg) ice%ice_steps_since_upd
+    write(unit, iostat=iostat, iomsg=iomsg) ice%ice_update
 end subroutine WRITE_T_ICE
 
 ! Unformatted reading for T_ICE
@@ -378,6 +387,7 @@ subroutine READ_T_ICE(ice, unit, iostat, iomsg)
     call read_bin_array(ice%uvice, unit, iostat, iomsg)
     call read_bin_array(ice%uvice_rhs, unit, iostat, iomsg)
     call read_bin_array(ice%uvice_old, unit, iostat, iomsg)
+    if (ice%whichEVP /= 0) call read_bin_array(ice%uvice_aux, unit, iostat, iomsg)
     call read_bin_array(ice%stress_atmice_xy, unit, iostat, iomsg)
     call read_bin_array(ice%stress_iceoce_xy, unit, iostat, iomsg)
     call read_bin_array(ice%srfoce_temp, unit, iostat, iomsg)
@@ -419,6 +429,8 @@ subroutine READ_T_ICE(ice, unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg) ice%whichEVP
     read(unit, iostat=iostat, iomsg=iomsg) ice%ice_dt
     read(unit, iostat=iostat, iomsg=iomsg) ice%Tevp_inv
+    read(unit, iostat=iostat, iomsg=iomsg) ice%ice_steps_since_upd
+    read(unit, iostat=iostat, iomsg=iomsg) ice%ice_update
 end subroutine READ_T_ICE
 END MODULE MOD_ICE
 !
@@ -526,6 +538,10 @@ subroutine ice_init(ice, partit, mesh)
     ice%uvice_old        = 0.0_WP
     ice%stress_atmice_xy = 0.0_WP
     ice%stress_iceoce_xy = 0.0_WP
+    if (ice%whichEVP /= 0) then
+        allocate(ice%uvice_aux(     2, node_size))
+        ice%uvice_aux    = 0.0_WP
+    end if 
     
     !___________________________________________________________________________
     ! initialise surface ocean arrays in ice derived type 
@@ -554,14 +570,14 @@ subroutine ice_init(ice, partit, mesh)
         allocate(ice%data(n)%values_rhs(node_size))
         allocate(ice%data(n)%values_div_rhs(node_size))
         allocate(ice%data(n)%dvalues(   node_size))
-        allocate(ice%data(n)%values1(   node_size))
+        allocate(ice%data(n)%valuesl(   node_size))
         ice%data(n)%ID             = n
         ice%data(n)%values         = 0.0_WP
         ice%data(n)%values_old     = 0.0_WP
         ice%data(n)%values_rhs     = 0.0_WP
         ice%data(n)%values_div_rhs = 0.0_WP
         ice%data(n)%dvalues        = 0.0_WP
-        ice%data(n)%values1        = 0.0_WP
+        ice%data(n)%valuesl        = 0.0_WP
     end do
     
     !___________________________________________________________________________
@@ -577,6 +593,9 @@ subroutine ice_init(ice, partit, mesh)
     ice%work%fct_minus   = 0.0_WP
     ice%work%fct_fluxes  = 0.0_WP
     
+    allocate(ice%work%fct_massmatrix(sum(nn_num(1:myDim_nod2D))))
+    ice%work%fct_massmatrix = 0.0_WP
+    
     allocate(ice%work%sigma11(         elem_size))
     allocate(ice%work%sigma12(         elem_size))
     allocate(ice%work%sigma22(         elem_size))
@@ -590,7 +609,7 @@ subroutine ice_init(ice, partit, mesh)
     ice%work%eps12       = 0.0_WP
     ice%work%eps22       = 0.0_WP
     
-    allocate(ice%work%ice_strength(    node_size))
+    allocate(ice%work%ice_strength(    elem_size))
     allocate(ice%work%inv_areamass(    node_size))
     allocate(ice%work%inv_mass(        node_size))
     ice%work%ice_strength= 0.0_WP
@@ -607,21 +626,34 @@ subroutine ice_init(ice, partit, mesh)
     ice%work%thdgr_old   = 0.0_WP
     
     !___________________________________________________________________________
+    ! initialse thermo array of ice derived type 
+    allocate(ice%thermo%ustar(         node_size))
+    allocate(ice%thermo%t_skin(        node_size))
+    allocate(ice%thermo%thdgr(         node_size))
+    allocate(ice%thermo%thdgrsn(       node_size))
+    allocate(ice%thermo%thdgr_old(     node_size))
+    ice%thermo%ustar     = 0.0_WP
+    ice%thermo%t_skin    = 0.0_WP
+    ice%thermo%thdgr     = 0.0_WP
+    ice%thermo%thdgrsn   = 0.0_WP
+    ice%thermo%thdgr_old = 0.0_WP
+    
+    !___________________________________________________________________________
     ! initialse coupling array of ice derived type 
 #if defined (__oasis)    
-    allocate(tcoupl%oce_flx_h          node_size))
-    allocate(tcoupl%ice_flx_h          node_size))
-    allocate(tcoupl%tmpoce_flx_h       node_size))
-    allocate(tcoupl%tmpice_flx_h       node_size))
-    tcoupl%oce_flx_h     = 0.0_WP
-    tcoupl%ice_flx_h     = 0.0_WP
-    tcoupl%tmpoce_flx_h  = 0.0_WP
-    tcoupl%tmpice_flx_h  = 0.0_WP
+    allocate(ice%tcoupl%oce_flx_h(     node_size))
+    allocate(ice%tcoupl%ice_flx_h(     node_size))
+    allocate(ice%tcoupl%tmpoce_flx_h(  node_size))
+    allocate(ice%tcoupl%tmpice_flx_h(  node_size))
+    ice%tcoupl%oce_flx_h     = 0.0_WP
+    ice%tcoupl%ice_flx_h     = 0.0_WP
+    ice%tcoupl%tmpoce_flx_h  = 0.0_WP
+    ice%tcoupl%tmpice_flx_h  = 0.0_WP
 #if defined (__oifs)  
-    allocate(tcoupl%ice_alb            node_size))
-    allocate(tcoupl%enthalpyoffuse     node_size))
-    tcoupl%ice_alb       = 0.0_WP
-    tcoupl%enthalpyoffuse= 0.0_WP
+    allocate(ice%tcoupl%ice_alb(       node_size))
+    allocate(ice%tcoupl%enthalpyoffuse(node_size))
+    ice%tcoupl%ice_alb       = 0.0_WP
+    ice%tcoupl%enthalpyoffuse= 0.0_WP
 #endif /* (__oifs) */
 #endif /* (__oasis) */        
 end subroutine ice_init    
