@@ -8,39 +8,44 @@
 ! Ref: Duffy1997, Duffy1999, Nguyen2009
 ! Originaly coded by Qiang Wang in FESOM 1.4 
 !--------------------------------------------------------
-subroutine cal_rejected_salt(partit, mesh)
-use o_arrays
-use mod_mesh
-USE MOD_PARTIT
-USE MOD_PARSUP
-use g_comm_auto
-use o_tracers
-use g_forcing_arrays, only: thdgr
-use i_ARRAYS,         only: S_oc_array
-use i_therm_param,    only: rhoice, rhowat, Sice
-use g_config,         only: dt
-implicit none
-
-integer         :: row
-real(kind=WP)   :: aux
-type(t_mesh),   intent(in),    target :: mesh
-type(t_partit), intent(in),    target :: partit
-
+subroutine cal_rejected_salt(ice, partit, mesh)
+    use o_arrays
+    USE MOD_ICE
+    use mod_mesh
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use g_comm_auto
+    use o_tracers
+    use g_forcing_arrays, only: thdgr
+    use i_therm_param,    only: rhoice, rhowat, Sice
+    use g_config,         only: dt
+    implicit none
+    type(t_ice)   , intent(in),    target :: ice
+    type(t_partit), intent(in),    target :: partit
+    type(t_mesh)  , intent(in),    target :: mesh
+    !___________________________________________________________________________
+    integer         :: row
+    real(kind=WP)   :: aux
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: S_oc_array
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
-aux=rhoice/rhowat*dt
-do row=1, myDim_nod2d +eDim_nod2D! myDim is sufficient
-   if (thdgr(row)>0.0_WP .and. ulevels_nod2D(row)==1) then
-      ice_rejected_salt(row)= &
-      (S_oc_array(row)-Sice)*thdgr(row)*aux*area(1, row)
-      !unit: psu m3
-   else
-      ice_rejected_salt(row)=0.0_WP
-   end if
-end do
+    S_oc_array => ice%srfoce_salt
+    
+    !___________________________________________________________________________
+    aux=rhoice/rhowat*dt
+    do row=1, myDim_nod2d +eDim_nod2D! myDim is sufficient
+        if (thdgr(row)>0.0_WP .and. ulevels_nod2D(row)==1) then
+            ice_rejected_salt(row)= &
+            (S_oc_array(row)-Sice)*thdgr(row)*aux*area(1, row)
+            !unit: psu m3
+        else
+            ice_rejected_salt(row)=0.0_WP
+        end if
+    end do
 
 end subroutine cal_rejected_salt
 !

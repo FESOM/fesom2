@@ -1,25 +1,44 @@
+module mo_convect_interface
+    interface
+        subroutine mo_convect(ice, partit, mesh)
+            USE MOD_ICE
+            USE MOD_PARTIT
+            USE MOD_PARSUP
+            USE MOD_MESH
+            type(t_ice)   , intent(inout), target :: ice
+            type(t_partit), intent(inout), target :: partit
+            type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
+end module    
 !
 !
 !_______________________________________________________________________________
-subroutine mo_convect(partit, mesh)
-    USE o_PARAM
-    USE MOD_MESH
+subroutine mo_convect(ice, partit, mesh)
+    USE MOD_ICE
     USE MOD_PARTIT
     USE MOD_PARSUP
+    USE MOD_MESH
+    USE o_PARAM
     USE o_ARRAYS
     USE g_config
-    use i_arrays
     use g_comm_auto
     IMPLICIT NONE
-
-    integer                               :: node, elem, nz, elnodes(3), nzmin, nzmax
-    type(t_mesh),   intent(in),    target :: mesh
+    type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
-
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    integer                               :: node, elem, nz, elnodes(3), nzmin, nzmax
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer :: a_ice, u_ice, v_ice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
+    a_ice       => ice%data(1)%values(:)
+    u_ice       => ice%uvice(1,:)
+    v_ice       => ice%uvice(2,:)
 
     !___________________________________________________________________________
     ! add vertical mixing scheme of Timmermann and Beckmann, 2004,"Parameterization 

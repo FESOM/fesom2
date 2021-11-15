@@ -1,42 +1,45 @@
-subroutine cal_shortwave_rad(partit, mesh)
-  ! This routine is inherited from FESOM 1.4 and adopted appropreately. It calculates 
-  ! shortwave penetration into the ocean assuming the constant chlorophyll concentration.
-  ! No penetration under the ice is applied. A decent way for ice region is to be discussed.
-  ! This routine should be called after ice2oce coupling done if ice model is used.
-  ! Ref.: Morel and Antoine 1994, Sweeney et al. 2005
-  USE MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  USE o_PARAM
-  USE o_ARRAYS
-  USE g_CONFIG
-  use g_forcing_arrays
-  use g_comm_auto
-  use i_param
-  use i_arrays
-  use i_therm_param
-  IMPLICIT NONE
-
-  integer      :: m, n2, n3, k, nzmax, nzmin
-  real(kind=WP):: swsurf, aux
-  real(kind=WP):: c, c2, c3, c4, c5
-  real(kind=WP):: v1, v2, sc1, sc2
-  type(t_mesh),   intent(in),    target :: mesh
-  type(t_partit), intent(inout), target :: partit
-
+subroutine cal_shortwave_rad(ice, partit, mesh)
+    ! This routine is inherited from FESOM 1.4 and adopted appropreately. It calculates 
+    ! shortwave penetration into the ocean assuming the constant chlorophyll concentration.
+    ! No penetration under the ice is applied. A decent way for ice region is to be discussed.
+    ! This routine should be called after ice2oce coupling done if ice model is used.
+    ! Ref.: Morel and Antoine 1994, Sweeney et al. 2005
+    USE MOD_ICE
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_MESH
+    USE o_PARAM
+    USE o_ARRAYS
+    USE g_CONFIG
+    use g_forcing_arrays
+    use g_comm_auto
+    use i_param
+    use i_arrays, only: 
+    use i_therm_param
+    IMPLICIT NONE
+    type(t_ice)   , intent(inout), target :: ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    integer      :: m, n2, n3, k, nzmax, nzmin
+    real(kind=WP):: swsurf, aux
+    real(kind=WP):: c, c2, c3, c4, c5
+    real(kind=WP):: v1, v2, sc1, sc2
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
-  sw_3d=0.0_WP
-  !_____________________________________________________________________________
-  do n2=1, myDim_nod2D+eDim_nod2D   
+    
+    !___________________________________________________________________________
+    sw_3d=0.0_WP
+    do n2=1, myDim_nod2D+eDim_nod2D   
      
      !__________________________________________________________________________
      if (ulevels_nod2D(n2)>1) cycle ! in case of cavity no shortwave pentration
-     if (use_ice .and. a_ice(n2)> 0._WP) cycle !assume in ice region no penetration
-     
+     !!PS if (use_ice .and. a_ice(n2)> 0._WP) cycle !assume in ice region no penetration
+     if (use_ice .and. ice%data(1)%values(n2)> 0._WP) cycle !assume in ice region no penetration
      !__________________________________________________________________________
      ! shortwave rad.
      swsurf=(1.0_WP-albw)*shortwave(n2)

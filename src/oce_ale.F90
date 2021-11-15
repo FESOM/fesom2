@@ -130,13 +130,15 @@ end module
 
 module oce_timestep_ale_interface
     interface
-        subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
-        use mod_mesh
+        subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
+        USE MOD_ICE
+        use MOD_DYN
+        USE MOD_TRACER
         USE MOD_PARTIT
         USE MOD_PARSUP
-        use mod_tracer
-        use MOD_DYN
+        USE MOD_MESH
         integer       , intent(in)            :: n
+        type(t_ice)   , intent(inout), target :: ice
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
@@ -2735,15 +2737,16 @@ end subroutine impl_vert_visc_ale
 !
 !
 !===============================================================================
-subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
+subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     use g_config
-    use MOD_MESH
-    use MOD_TRACER
-    use MOD_DYN
-    use o_ARRAYS
-    use o_PARAM
+    USE MOD_ICE
+    USE MOD_DYN
+    USE MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
+    USE MOD_MESH
+    use o_ARRAYS
+    use o_PARAM
     use g_comm_auto
     use io_RESTART !PS
     use i_ARRAYS !PS
@@ -2763,8 +2766,10 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     use write_step_info_interface
     use check_blowup_interface
     use fer_solve_interface
+    use mo_convect_interface
     IMPLICIT NONE
     integer       , intent(in)            :: n
+    type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_tracer), intent(inout), target :: tracers
     type(t_partit), intent(inout), target :: partit
@@ -2845,20 +2850,23 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_KPP'//achar(27)//'[0m' 
         call oce_mixing_KPP(Av, Kv_double, dynamics, tracers, partit, mesh)
         Kv=Kv_double(:,:,1)
-        call mo_convect(partit, mesh)
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call mo_convect'//achar(27)//'[0m' 
+        call mo_convect(ice, partit, mesh)
         
     ! use FESOM2.0 tuned pacanowski & philander parameterization for vertical 
     ! mixing     
     else if(mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_PP'//achar(27)//'[0m' 
         call oce_mixing_PP(dynamics, partit, mesh)
-        call mo_convect(partit, mesh)
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call mo_convect'//achar(27)//'[0m' 
+        call mo_convect(ice, partit, mesh)
         
     ! use CVMIX KPP (Large at al. 1994) 
     else if(mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_kpp'//achar(27)//'[0m'
-        call calc_cvmix_kpp(dynamics, tracers, partit, mesh)
-        call mo_convect(partit, mesh)
+        call calc_cvmix_kpp(ice, dynamics, tracers, partit, mesh)
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call mo_convect'//achar(27)//'[0m' 
+        call mo_convect(ice, partit, mesh)
         
     ! use CVMIX PP (Pacanowski and Philander 1981) parameterisation for mixing
     ! based on Richardson number Ri = N^2/(du/dz)^2, using Brunt Väisälä frequency
@@ -2866,7 +2874,8 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     else if(mix_scheme_nmb==4 .or. mix_scheme_nmb==47) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_pp'//achar(27)//'[0m'
         call calc_cvmix_pp(dynamics, partit, mesh)
-        call mo_convect(partit, mesh)
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call mo_convect'//achar(27)//'[0m' 
+        call mo_convect(ice, partit, mesh)
         
     ! use CVMIX TKE (turbulent kinetic energy closure) parameterisation for 
     ! vertical mixing with or without the IDEMIX (dissipation of energy by 
@@ -2875,7 +2884,8 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     else if(mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then    
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tke'//achar(27)//'[0m'
         call calc_cvmix_tke(dynamics, partit, mesh)
-        call mo_convect(partit, mesh)
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call mo_convect'//achar(27)//'[0m' 
+        call mo_convect(ice, partit, mesh)
         
     end if     
 
@@ -2894,7 +2904,7 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'
-    call compute_vel_rhs(dynamics, partit, mesh)
+    call compute_vel_rhs(ice, dynamics, partit, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call viscosity_filter'//achar(27)//'[0m'
@@ -2985,12 +2995,12 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! write out global fields for debugging
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call write_step_info'//achar(27)//'[0m'
-    call write_step_info(n,logfile_outfreq, dynamics, tracers, partit, mesh)
+    call write_step_info(n,logfile_outfreq, ice, dynamics, tracers, partit, mesh)
     
     ! check model for blowup --> ! write_step_info and check_blowup require 
     ! togeather around 2.5% of model runtime
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call check_blowup'//achar(27)//'[0m'
-    call check_blowup(n, dynamics, tracers, partit, mesh)
+    call check_blowup(n, ice, dynamics, tracers, partit, mesh)
     t10=MPI_Wtime()
 
     !___________________________________________________________________________

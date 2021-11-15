@@ -14,7 +14,7 @@ MODULE o_mixing_KPP_mod
   USE MOD_DYN
   USE o_ARRAYS
   USE g_config
-  USE i_arrays
+  USE i_arrays, only:
   USE g_forcing_arrays
   USE g_comm_auto
   USE g_support
@@ -350,19 +350,25 @@ contains
 ! compute interior mixing coefficients everywhere, due to constant 
 ! internal wave activity, static instability, and local shear 
 ! instability.
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call ri_iwmix...'//achar(27)//'[0m' 
     CALL ri_iwmix(viscA, diffK, dynamics, tracers, partit, mesh)
+
 ! add double diffusion
     IF (double_diffusion) then
+       if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call ddmix...'//achar(27)//'[0m' 
        CALL ddmix(diffK, tracers, partit, mesh)
     END IF
 
 ! boundary layer mixing coefficients: diagnose new b.l. depth
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call bldepth...'//achar(27)//'[0m' 
     CALL bldepth(partit, mesh)
    
 ! boundary layer diffusivities
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call blmix_kpp...'//achar(27)//'[0m' 
     CALL blmix_kpp(viscA, diffK, partit, mesh)
 
 ! enhance diffusivity at interface kbl - 1
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call enhance...'//achar(27)//'[0m' 
     CALL enhance(viscA, diffK, partit, mesh)
     
     if (smooth_blmc) then
@@ -373,12 +379,13 @@ contains
           !_____________________________________________________________________  
           ! all loops go over myDim_nod2D so no halo information --> for smoothing 
           ! haloinfo is required --> therefor exchange_nod
+          if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call smooth_nod...'//achar(27)//'[0m' 
           call smooth_nod(blmc(:,:,j), 3, partit, mesh)
        end do
     end if
     
 ! then combine blmc and viscA/diffK
-
+  if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> blmc -> viscA & diffK...'//achar(27)//'[0m'   
   DO node=1, myDim_nod2D
      nzmin = ulevels_nod2D(node)
      nzmax = nlevels_nod2D(node)
