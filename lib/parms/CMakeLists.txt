@@ -19,3 +19,6 @@ target_link_libraries(${PROJECT_NAME} INTERFACE ${BLAS_C_LIBRARIES} $ENV{UBUNTU_
 if(${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
 	target_compile_options(${PROJECT_NAME} PRIVATE -no-prec-div -no-prec-sqrt -fast-transcendentals -fp-model precise)
 endif()
+if(${BUILD_FESOM_AS_LIBRARY})
+  target_compile_options(parms PRIVATE -fPIC)
+endif()

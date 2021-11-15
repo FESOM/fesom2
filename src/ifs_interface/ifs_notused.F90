@@ -359,4 +359,18 @@ SUBROUTINE nemogcmcoup_wam_update_stress( mype, npes, icomm, npoints, &
    CALL abort
 
 END SUBROUTINE nemogcmcoup_wam_update_stress
+
+SUBROUTINE nemogcmcoup_end_ioserver
+
+   ! Close io servers
+
+   IMPLICIT NONE
+   INTEGER :: icomm
+   LOGICAL :: lnemoioserver
+
+   WRITE(*,*)'No mpp_ioserver'
+   CALL abort
+
+END SUBROUTINE nemogcmcoup_end_ioserver
+
 #endif
