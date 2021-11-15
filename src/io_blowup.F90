@@ -1,15 +1,16 @@
 MODULE io_BLOWUP
-	use g_config
-	use g_clock
-	use g_comm_auto
-    USE MOD_MESH
+    USE MOD_ICE
+    USE MOD_DYN
+    USE MOD_TRACER  
     USE MOD_PARTIT
     USE MOD_PARSUP
-    USE MOD_TRACER  
-    USE MOD_DYN
-	use o_arrays
-	use i_arrays
-	implicit none
+    USE MOD_MESH
+    use g_config
+    use g_clock
+    use g_comm_auto
+    use o_arrays
+    use i_arrays
+    implicit none
 #include "netcdf.inc"
 	!___________________________________________________________________________
 	type nc_dims
@@ -60,30 +61,34 @@ MODULE io_BLOWUP
 	END INTERFACE
 	!___________________________________________________________________________
 	contains
-	!
-	!
-	!_______________________________________________________________________________
-	! ini_ocean_io initializes bid datatype which contains information of all variables need to be written into 
-	! the ocean restart file. This is the only place need to be modified if a new variable is added!
-	subroutine ini_blowup_io(year, dynamics, tracers, partit, mesh)
-		implicit none
-		integer, intent(in)       :: year
-        type(t_mesh)  , intent(in)   , target :: mesh
-        type(t_partit), intent(inout), target :: partit
-        type(t_tracer), intent(in)   , target :: tracers
+    !
+    !
+    !_______________________________________________________________________________
+    ! ini_ocean_io initializes bid datatype which contains information of all variables need to be written into 
+    ! the ocean restart file. This is the only place need to be modified if a new variable is added!
+    subroutine ini_blowup_io(year, ice, dynamics, tracers, partit, mesh)
+        implicit none
+        integer       , intent(in)            :: year
+        type(t_ice)   , intent(in)   , target :: ice
         type(t_dyn)   , intent(in)   , target :: dynamics
-		integer                   :: ncid, j
-		integer                   :: varid
-		character(500)            :: longname
-		character(500)            :: filename
-		character(500)            :: trname, units
-		character(4)              :: cyear
-
+        type(t_tracer), intent(in)   , target :: tracers
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        !_______________________________________________________________________
+        integer                   :: ncid, j
+        integer                   :: varid
+        character(500)            :: longname
+        character(500)            :: filename
+        character(500)            :: trname, units
+        character(4)              :: cyear
+        !_______________________________________________________________________
+        ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
+        !_______________________________________________________________________
 		if(mype==0) write(*,*)' --> Init. blowpup file '
 		write(cyear,'(i4)') year
 		! create an ocean restart file; serial output implemented so far
@@ -150,11 +155,11 @@ MODULE io_BLOWUP
 		
 		!_____________________________________________________________________________
 		! write snapshot ice variables to blowup file
-		call def_variable(bid, 'a_ice'		, (/nod2D/)			, 'ice concentration [0 to 1]', '%', a_ice);
-		call def_variable(bid, 'm_ice'		, (/nod2D/)			, 'effective ice thickness',    'm', m_ice);
-		call def_variable(bid, 'm_snow'		, (/nod2D/)			, 'effective snow thickness',   'm', m_snow);
-		call def_variable(bid, 'u_ice'		, (/nod2D/)			, 'zonal velocity',    'm/s', u_ice);
-		call def_variable(bid, 'v_ice'		, (/nod2D/)			, 'meridional velocity', 'm', v_ice);
+		call def_variable(bid, 'a_ice'		, (/nod2D/)			, 'ice concentration [0 to 1]', '%', ice%data(1)%values);
+		call def_variable(bid, 'm_ice'		, (/nod2D/)			, 'effective ice thickness',    'm', ice%data(2)%values);
+		call def_variable(bid, 'm_snow'		, (/nod2D/)			, 'effective snow thickness',   'm', ice%data(3)%values);
+		call def_variable(bid, 'u_ice'		, (/nod2D/)			, 'zonal velocity',    'm/s', ice%uvice(1,:));
+		call def_variable(bid, 'v_ice'		, (/nod2D/)			, 'meridional velocity', 'm', ice%uvice(2,:));
 !!PS  		call def_variable(bid, 'a_ice_old'	, (/nod2D/)			, 'ice concentration [0 to 1]', '%', a_ice_old); !PS
 !!PS  		call def_variable(bid, 'm_ice_old'	, (/nod2D/)			, 'effective ice thickness',    'm', m_ice_old); !PS
 !!PS  		call def_variable(bid, 'm_snow_old'	, (/nod2D/)			, 'effective snow thickness',   'm', m_snow_old); !PS
@@ -174,24 +179,25 @@ MODULE io_BLOWUP
 	end subroutine ini_blowup_io
 !
 !
-!_______________________________________________________________________________
-	subroutine blowup(istep, dynamics, tracers, partit, mesh)
-		implicit none
-        type(t_mesh)  , intent(in)   , target :: mesh
-        type(t_partit), intent(inout), target :: partit
-        type(t_tracer), intent(in)   , target :: tracers
+!_______________________________________________________________________________    
+    subroutine blowup(istep, ice, dynamics, tracers, partit, mesh)
+        implicit none
+        integer                               :: istep
+        type(t_ice)   , intent(in)   , target :: ice
         type(t_dyn)   , intent(in)   , target :: dynamics
-		integer                               :: istep
-		
-		ctime=timeold+(dayold-1.)*86400
-		call ini_blowup_io(yearnew, dynamics, tracers, partit, mesh)
-		if(partit%mype==0) write(*,*)'Do output (netCDF, blowup) ...'
-		if(partit%mype==0) write(*,*)' --> call assoc_ids(bid)'
-		call assoc_ids(bid, partit) ; call was_error(bid, partit)
-		if(partit%mype==0) write(*,*)' --> call write_blowup(bid, istep)'
-		call write_blowup(bid, istep, partit, mesh) ; call was_error(bid, partit)
-	
-	end subroutine blowup
+        type(t_tracer), intent(in)   , target :: tracers
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        !_______________________________________________________________________
+        ctime=timeold+(dayold-1.)*86400
+        call ini_blowup_io(yearnew, ice, dynamics, tracers, partit, mesh)
+        if(partit%mype==0) write(*,*)'Do output (netCDF, blowup) ...'
+        if(partit%mype==0) write(*,*)' --> call assoc_ids(bid)'
+        call assoc_ids(bid, partit) ; call was_error(bid, partit)
+        if(partit%mype==0) write(*,*)' --> call write_blowup(bid, istep)'
+        call write_blowup(bid, istep, partit, mesh) ; call was_error(bid, partit)
+    
+    end subroutine blowup
 !
 !
 !_______________________________________________________________________________

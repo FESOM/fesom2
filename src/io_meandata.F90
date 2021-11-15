@@ -93,12 +93,13 @@ module io_MEANDATA
   end subroutine
 
 
-subroutine ini_mean_io(dynamics, tracers, partit, mesh)
-  use MOD_MESH
-  use MOD_TRACER
+subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
+  USE MOD_ICE
+  USE MOD_DYN
+  USE MOD_TRACER
   USE MOD_PARTIT
   USE MOD_PARSUP
-  USE MOD_DYN
+  USE MOD_MESH
   use g_cvmix_tke
   use g_cvmix_idemix
   use g_cvmix_kpp
@@ -106,16 +107,17 @@ subroutine ini_mean_io(dynamics, tracers, partit, mesh)
   use diagnostics
   use i_PARAM, only: whichEVP
   implicit none
+  type(t_ice)   , intent(in)   , target :: ice
+  type(t_dyn)   , intent(in)   , target :: dynamics
+  type(t_tracer), intent(in)   , target :: tracers
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh)  , intent(in)   , target :: mesh
+  
   integer                   :: i, j
   integer, save             :: nm_io_unit  = 103       ! unit to open namelist file, skip 100-102 for cray
   integer                   :: iost
   integer,dimension(15)     :: sel_forcvar=0
   character(len=10)         :: id_string
-
-  type(t_mesh)  , intent(in)   , target :: mesh
-  type(t_partit), intent(inout), target :: partit
-  type(t_tracer), intent(in)   , target :: tracers
-  type(t_dyn)   , intent(in)   , target :: dynamics
   namelist /nml_listsize/ io_listsize
   namelist /nml_list    / io_list
 
@@ -168,27 +170,27 @@ CASE ('ssh_rhs_old   ')
 ! output sea ice 
 CASE ('uice      ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'uice',     'ice velocity x',                 'm/s',    u_ice,                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'uice',     'ice velocity x',                 'm/s',    ice%uvice(1,:),                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('vice      ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'vice',     'ice velocity y',                 'm/s',    v_ice,                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'vice',     'ice velocity y',                 'm/s',    ice%uvice(2,:),                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('a_ice     ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'a_ice',    'ice concentration',              '%',      a_ice(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'a_ice',    'ice concentration',              '%',      ice%data(1)%values(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('m_ice     ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'm_ice',    'ice height',                     'm',      m_ice(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'm_ice',    'ice height',                     'm',      ice%data(2)%values(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('thdgr     ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'thdgr',    'thermodynamic growth rate ice',    'm/s',    thdgr(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'thdgr',    'thermodynamic growth rate ice',    'm/s',    ice%thermo%thdgr(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('thdgrsn   ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'thdgrsn',  'thermodynamic growth rate snow',   'm/s',    thdgrsn(1:myDim_nod2D),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'thdgrsn',  'thermodynamic growth rate snow',   'm/s',    ice%thermo%thdgrsn(1:myDim_nod2D),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('flice     ')
     if (use_ice) then
@@ -196,7 +198,7 @@ CASE ('flice     ')
     end if
 CASE ('m_snow    ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'm_snow',   'snow height',                     'm',      m_snow(1:myDim_nod2D),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'm_snow',   'snow height',                     'm',      ice%data(3)%values(1:myDim_nod2D),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
     
 !___________________________________________________________________________________________________________________________________
@@ -213,17 +215,17 @@ CASE ('fh        ')
 CASE ('fw        ')
     call def_stream(nod2D, myDim_nod2D, 'fw',       'fresh water flux',                'm/s',    water_flux(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('atmice_x  ')
-    call def_stream(nod2D, myDim_nod2D, 'atmice_x', 'stress atmice x',                 'N/m2',   stress_atmice_x(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'atmice_x', 'stress atmice x',                 'N/m2',   ice%stress_atmice_xy(1,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('atmice_y  ')
-    call def_stream(nod2D, myDim_nod2D, 'atmice_y', 'stress atmice y',                 'N/m2',   stress_atmice_y(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'atmice_y', 'stress atmice y',                 'N/m2',   ice%stress_atmice_xy(2,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('atmoce_x  ')
     call def_stream(nod2D, myDim_nod2D, 'atmoce_x', 'stress atmoce x',                 'N/m2',   stress_atmoce_x(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('atmoce_y  ')
     call def_stream(nod2D, myDim_nod2D, 'atmoce_y', 'stress atmoce y',                 'N/m2',   stress_atmoce_y(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('iceoce_x  ')
-    call def_stream(nod2D, myDim_nod2D, 'iceoce_x', 'stress iceoce x',                 'N/m2',   stress_iceoce_x(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'iceoce_x', 'stress iceoce x',                 'N/m2',   ice%stress_iceoce_xy(1,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('iceoce_y  ')
-    call def_stream(nod2D, myDim_nod2D, 'iceoce_y', 'stress iceoce y',                 'N/m2',   stress_iceoce_y(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'iceoce_y', 'stress iceoce y',                 'N/m2',   ice%stress_iceoce_xy(2,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('alpha     ')
     call def_stream(nod2D, myDim_nod2D, 'alpha',    'thermal expansion',               'none',   sw_alpha(1,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('beta      ')
@@ -808,33 +810,36 @@ end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine output(istep, dynamics, tracers, partit, mesh)
-  use g_clock
-  use mod_mesh
+subroutine output(istep, ice, dynamics, tracers, partit, mesh)
+  USE MOD_ICE
+  USE MOD_DYN
+  USE MOD_TRACER
   USE MOD_PARTIT
   USE MOD_PARSUP
-  use MOD_DYN
-  use mod_tracer
+  use MOD_MESH
+  use g_clock
   use io_gather_module
 #if defined (__icepack)
   use icedrv_main,    only: init_io_icepack
 #endif
   implicit none
   integer       :: istep
+  type(t_ice)   , intent(in)   , target :: ice
+  type(t_dyn)   , intent(in)   , target :: dynamics
+  type(t_tracer), intent(in)   , target :: tracers
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh)  , intent(in)   , target :: mesh
+  !_____________________________________________________________________________
   logical, save :: lfirst=.true.
   integer       :: n, k
   logical       :: do_output
   type(Meandata), pointer :: entry
-  type(t_mesh)  , intent(in)   , target :: mesh
-  type(t_partit), intent(inout), target :: partit
-  type(t_tracer), intent(in)   , target :: tracers
-  type(t_dyn)   , intent(in)   , target :: dynamics
   character(:),   allocatable           :: filepath
   real(real64)                          :: rtime !timestamp of the record
 
   ctime=timeold+(dayold-1.)*86400
   if (lfirst) then
-     call ini_mean_io(dynamics, tracers, partit, mesh)
+     call ini_mean_io(ice, dynamics, tracers, partit, mesh)
 #if defined (__icepack)
      call init_io_icepack(mesh) !icapack has its copy of p_partit => partit
 #endif
