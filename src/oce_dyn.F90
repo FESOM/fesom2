@@ -71,7 +71,7 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
-    integer       :: elem, elnodes(3), nz, m, nzmax, nzmin
+    integer       :: n, elem, elnodes(3), nz, nzmin, nzmax
     real(kind=WP) :: eta(3) 
     real(kind=WP) :: Fx, Fy
     !___________________________________________________________________________
@@ -88,6 +88,7 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
     d_eta  => dynamics%d_eta(:)
     
     !___________________________________________________________________________    
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax, eta, Fx, Fy)
     DO elem=1, myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
         eta=-g*theta*dt*d_eta(elnodes)
@@ -100,8 +101,15 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
             UV(2,nz,elem)= UV(2,nz,elem) + UV_rhs(2,nz,elem) + Fy
         END DO
     END DO
-    eta_n=eta_n+d_eta
+!$OMP END PARALLEL DO
+
+!$OMP PARALLEL DO
+    DO n=1, myDim_nod2D+eDim_nod2D
+       eta_n(n)=eta_n(n)+d_eta(n)
+    END DO
+!$OMP END PARALLEL DO
     call exchange_elem(UV, partit)
+!$OMP BARRIER
 end subroutine update_vel
 !
 !
@@ -129,8 +137,8 @@ subroutine compute_vel_nodes(dynamics, partit, mesh)
 #include "associate_mesh_ass.h"
     UV=>dynamics%uv(:,:,:)
     UVnode=>dynamics%uvnode(:,:,:)
-    
     !___________________________________________________________________________
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, k, elem, nln, uln, nle, ule, tx, ty, tvol)
     DO n=1, myDim_nod2D 
         uln = ulevels_nod2D(n)
         nln = nlevels_nod2D(n) 
@@ -152,7 +160,9 @@ subroutine compute_vel_nodes(dynamics, partit, mesh)
             UVnode(2,nz,n)=ty/tvol
         END DO
     END DO
+!$OMP END PARALLEL DO
     call exchange_nod(UVnode, partit)
+!$OMP BARRIER
 end subroutine compute_vel_nodes
 !
 !
@@ -239,11 +249,18 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
     ! An analog of harmonic viscosity operator.
     ! Same as visc_filt_h, but with the backscatter. 
     ! Here the contribution from squared velocities is added to the viscosity.    
-    ! The contribution from boundary edges is neglected (free slip). 
-    U_b = 0.0_WP
-    V_b = 0.0_WP
-    U_c = 0.0_WP
-    V_c = 0.0_WP
+    ! The contribution from boundary edges is neglected (free slip).
+!$OMP PARALLEL DO
+    DO elem=1, myDim_elem2D+eDim_elem2D
+       U_b(:, elem) = 0.0_WP
+       V_b(:, elem) = 0.0_WP
+       U_c(:, elem) = 0.0_WP
+       V_c(:, elem) = 0.0_WP
+    END DO
+!$OMP END PARALLEL DO
+
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, nz, ed, el, nelem, k, elem, nzmin, nzmax)
+!$OMP DO
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
@@ -267,11 +284,16 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
             V_b(nz,el(2))=V_b(nz,el(2))+v1/elem_area(el(2))
         END DO 
     END DO
+!$OMP END DO
+!$OMP MASTER
     call exchange_elem(U_b, partit)
     call exchange_elem(V_b, partit)
+!$OMP END MASTER
+!$OMP BARRIER
     ! ===========
     ! Compute smoothed viscous term: 
     ! ===========
+!$OMP DO
     DO ed=1, myDim_nod2D 
         nzmin = ulevels_nod2D(ed)
         nzmax = nlevels_nod2D(ed)
@@ -289,8 +311,13 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
             V_c(nz,ed)=v1/vi
         END DO
     END DO
+!$OMP END DO
+!$OMP MASTER
     call exchange_nod(U_c, partit)
     call exchange_nod(V_c, partit)
+!$OMP END MASTER
+!$OMP BARRIER
+!$OMP DO
     do ed=1, myDim_elem2D
         nelem=elem2D_nodes(:,ed)
         nzmin = ulevels(ed)
@@ -300,6 +327,8 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
             UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+V_b(nz,ed) -dynamics%visc_easybsreturn*sum(V_c(nz,nelem))/3.0_WP
         END DO
     end do
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine visc_filt_bcksct
 !
 !
