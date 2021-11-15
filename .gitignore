@@ -7,6 +7,6 @@
 *~
 *.swp
 src/icepack_drivers/Icepack
-lib/libfesom.a
+lib/*.a
 /work_*
 Makefile.in
