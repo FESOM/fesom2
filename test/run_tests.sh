@@ -20,3 +20,17 @@ echo $test
 
 done
 
+othertest="test_lib_compiles"
+
+for test in $othertest; do
+	
+    echo $othertest
+    ./test/ifs_interface/configure_lib.sh -l
+
+    FILE=./lib/libfesom.a
+    if [ -f "$FILE" ]; then
+	echo "$FILE compiled and linked."
+    else
+	echo "$FILE does not exist."
+    fi
+done
