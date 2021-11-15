@@ -174,8 +174,8 @@ contains
         if (use_ice) then 
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_setup'//achar(27)//'[0m'
             call ice_setup(f%ice, f%tracers, f%partit, f%mesh)
-            ice_steps_since_upd = ice_ave_steps-1
-            ice_update=.true.
+            f%ice%ice_steps_since_upd = ice_ave_steps-1
+            f%ice%ice_update=.true.
             if (f%mype==0) write(*,*) 'EVP scheme option=', whichEVP
         endif
         if (f%mype==0) f%t5=MPI_Wtime()
@@ -210,7 +210,7 @@ contains
         ! if l_write  is TRUE the restart will be forced
         ! if l_read the restart will be read
         ! as an example, for reading restart one does: call restart(0, .false., .false., .true., tracers, partit, mesh)
-        call restart(0, .false., r_restart, f%dynamics, f%tracers, f%partit, f%mesh) ! istep, l_write, l_read
+        call restart(0, .false., r_restart, f%ice, f%dynamics, f%tracers, f%partit, f%mesh) ! istep, l_write, l_read
         if (f%mype==0) f%t7=MPI_Wtime()
         ! store grid information into netcdf file
         if (.not. r_restart) call write_mesh_info(f%partit, f%mesh)
@@ -340,34 +340,39 @@ contains
         if(use_ice) then
             !___compute fluxes from ocean to ice________________________________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ocean2ice(n)'//achar(27)//'[0m'
-            call ocean2ice(f%dynamics, f%tracers, f%partit, f%mesh)
+            call ocean2ice(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
             
             !___compute update of atmospheric forcing____________________________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call update_atm_forcing(n)'//achar(27)//'[0m'
             f%t0_frc = MPI_Wtime()
-            call update_atm_forcing(n, f%tracers, f%partit, f%mesh)
+            call update_atm_forcing(n, f%ice, f%tracers, f%partit, f%mesh)
             f%t1_frc = MPI_Wtime()       
             !___compute ice step________________________________________________
-            if (ice_steps_since_upd>=ice_ave_steps-1) then
-                ice_update=.true.
-                ice_steps_since_upd = 0
+            if (f%ice%ice_steps_since_upd>=ice_ave_steps-1) then
+                f%ice%ice_update=.true.
+                f%ice%ice_steps_since_upd = 0
             else
-                ice_update=.false.
-                ice_steps_since_upd=ice_steps_since_upd+1
+                f%ice%ice_update=.false.
+                f%ice%ice_steps_since_upd=ice_steps_since_upd+1
             endif
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_timestep(n)'//achar(27)//'[0m'
-            if (ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh)  
+            if (f%ice%ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh)  
+            
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
-            call oce_fluxes_mom(f%dynamics, f%partit, f%mesh) ! momentum only
-            call oce_fluxes(f%tracers, f%partit, f%mesh)
+            call oce_fluxes_mom(f%ice, f%dynamics, f%partit, f%mesh) ! momentum only
+            
+            if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes...'//achar(27)//'[0m'
+            call oce_fluxes(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         end if
+        
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call before_oce_step...'//achar(27)//'[0m'
         call before_oce_step(f%dynamics, f%tracers, f%partit, f%mesh) ! prepare the things if required
         f%t2 = MPI_Wtime()
         
         !___model ocean step____________________________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_timestep_ale'//achar(27)//'[0m'
-        call oce_timestep_ale(n, f%dynamics, f%tracers, f%partit, f%mesh)
+        call oce_timestep_ale(n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
 
         f%t3 = MPI_Wtime()
         !___compute energy diagnostics..._______________________________________
@@ -377,10 +382,10 @@ contains
         f%t4 = MPI_Wtime()
         !___prepare output______________________________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
-        call output (n, f%dynamics, f%tracers, f%partit, f%mesh)
+        call output (n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
 
         f%t5 = MPI_Wtime()
-        call restart(n, .false., .false., f%dynamics, f%tracers, f%partit, f%mesh)
+        call restart(n, .false., .false., f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         f%t6 = MPI_Wtime()
         
         f%rtime_fullice       = f%rtime_fullice       + f%t2 - f%t1
