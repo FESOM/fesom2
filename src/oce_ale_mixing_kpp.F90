@@ -283,7 +283,6 @@ contains
         ViscA(:, node) = 0.0_WP
      END DO
 !$OMP END PARALLEL DO
-
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, usurf, vsurf, u_loc, v_loc)
      DO node=1, myDim_nod2D !+eDim_nod2D
         nzmin = ulevels_nod2D(node)
@@ -349,7 +348,6 @@ contains
                          + sw_beta (nzmin,node) * water_flux(node) * tracers%data(2)%values(nzmin,node)) 
      END DO
 !$OMP END PARALLEL DO
-
 ! compute interior mixing coefficients everywhere, due to constant 
 ! internal wave activity, static instability, and local shear 
 ! instability.
@@ -361,10 +359,8 @@ contains
 
 ! boundary layer mixing coefficients: diagnose new b.l. depth
      CALL bldepth(partit, mesh)
-   
 ! boundary layer diffusivities
      CALL blmix_kpp(viscA, diffK, partit, mesh)
-
 ! enhance diffusivity at interface kbl - 1
      CALL enhance(viscA, diffK, partit, mesh)
     
@@ -376,7 +372,7 @@ contains
           !_____________________________________________________________________  
           ! all loops go over myDim_nod2D so no halo information --> for smoothing 
           ! haloinfo is required --> therefor exchange_nod
-          call smooth_nod(blmc(:,:,j), 3, partit, mesh)
+         call smooth_nod(blmc(:,:,j), 3, partit, mesh)
         end do
      end if
 !$OMP BARRIER
@@ -966,13 +962,11 @@ contains
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
 !$OMP PARALLEL DO
      DO node=1, myDim_nod2D+eDim_nod2D
-        blmc   (:, n,  :) = 0.0_WP
+        blmc   (:, node,  :) = 0.0_WP
      END DO
 !$OMP END PARALLEL DO
-     blmc = 0.0_WP
 !    *******************************************************************
 !     Kv over the NODE 
 !    *******************************************************************
