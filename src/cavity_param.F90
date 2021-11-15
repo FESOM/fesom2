@@ -1,16 +1,45 @@
 module cavity_heat_water_fluxes_3eq_interface
-  interface
-    subroutine cavity_heat_water_fluxes_3eq(tracers, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use mod_tracer
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_tracer), intent(in),    target :: tracers
-    end subroutine
-  end interface
+    interface
+        subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
+        USE MOD_ICE
+        USE MOD_DYN
+        USE MOD_TRACER
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice)   , intent(in)   , target :: ice
+        type(t_dyn)   , intent(in)   , target :: dynamics
+        type(t_tracer), intent(in)   , target :: tracers
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
 end module
+
+module cavity_ice_clean_interface
+    interface
+        subroutine cavity_ice_clean_vel(ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice)   , intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+        
+        subroutine cavity_ice_clean_ma(ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice)   , intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
+end module
+
 !
 !
 !_______________________________________________________________________________
@@ -137,21 +166,22 @@ end subroutine compute_nrst_pnt2cavline
 ! adjusted for use in FESOM by Ralph Timmermann, 16.02.2011
 ! Reviewed by ?
 ! adapted by P. SCholz for FESOM2.0
-subroutine cavity_heat_water_fluxes_3eq(dynamics, tracers, partit, mesh)
-    use MOD_MESH
+subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
+    USE MOD_ICE
+    USE MOD_DYN
+    USE MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use MOD_TRACER
-    use MOD_DYN
+    USE MOD_MESH
     use o_PARAM , only: density_0, WP
     use o_ARRAYS, only: heat_flux, water_flux, density_m_rho0, density_ref
-    use i_ARRAYS, only: net_heat_flux, fresh_wa_flux
     implicit none
+    type(t_ice)   , intent(in)   , target :: ice
+    type(t_dyn)   , intent(in)   , target :: dynamics
+    type(t_tracer), intent(in)   , target :: tracers
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
-    type(t_partit), intent(inout),  target :: partit
-    type(t_mesh),   intent(in),     target :: mesh
-    type(t_tracer), intent(in),     target :: tracers
-    type(t_dyn), intent(in),     target :: dynamics
     real (kind=WP)  :: temp,sal,tin,zice
     real (kind=WP)  :: rhow, rhor, rho
     real (kind=WP)  :: gats1, gats2, gas, gat
@@ -190,12 +220,15 @@ subroutine cavity_heat_water_fluxes_3eq(dynamics, tracers, partit, mesh)
     !      oomw= -30.
     !      oofw= -2.5
     real(kind=WP), dimension(:,:,:), pointer :: UVnode
+    real(kind=WP), dimension(:)    , pointer :: net_heat_flux, fresh_wa_flux
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    UVnode=>dynamics%uvnode(:,:,:)
-
+    UVnode        => dynamics%uvnode(:,:,:)
+    net_heat_flux => ice%flx_h(:)
+    fresh_wa_flux => ice%flx_fw(:)
+    
     !___________________________________________________________________________
     do node=1,myDim_nod2D !+eDim_nod2D  
         nzmin = ulevels_nod2D(node)
@@ -330,29 +363,34 @@ end subroutine cavity_heat_water_fluxes_3eq
 ! Compute the heat and freshwater fluxes under ice cavity using simple 2equ.
 ! Coded by Adriana Huerta-Casas
 ! Reviewed by Qiang Wang
-subroutine cavity_heat_water_fluxes_2eq(tracers, partit, mesh)
-    use MOD_MESH
+subroutine cavity_heat_water_fluxes_2eq(ice, tracers, partit, mesh)
+    USE MOD_ICE
+    USE MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use MOD_TRACER
+    USE MOD_MESH
     use o_PARAM , only: WP
     use o_ARRAYS, only: heat_flux, water_flux
-    use i_ARRAYS, only: net_heat_flux, fresh_wa_flux
     implicit none
-
+    type(t_ice)   , intent(in)   ,  target :: ice
+    type(t_tracer), intent(in)   ,  target :: tracers
     type(t_partit), intent(inout),  target :: partit
-    type(t_mesh),   intent(in),     target :: mesh
-    type(t_tracer), intent(in),     target :: tracers
-    integer        :: node, nzmin
+    type(t_mesh)  , intent(in)   ,  target :: mesh
+    !___________________________________________________________________________
+    integer         :: node, nzmin
     real(kind=WP)   :: gama, L, aux
     real(kind=WP)   :: c2, c3, c4, c5, c6
     real(kind=WP)   :: t_i, s_i, p, t_fz
-    
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:)    , pointer :: net_heat_flux, fresh_wa_flux
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
+    net_heat_flux => ice%flx_h(:)
+    fresh_wa_flux => ice%flx_fw(:)
+    
     !___________________________________________________________________________
     ! parameter for computing heat and water fluxes
     gama = 1.0e-4_WP     ! heat exchange velocity [m/s]
@@ -385,30 +423,34 @@ end subroutine cavity_heat_water_fluxes_2eq
 !_______________________________________________________________________________
 ! Compute the momentum fluxes under ice cavity
 ! Moved to this separated routine by Qiang, 20.1.2012
-subroutine cavity_momentum_fluxes(dynamics, partit, mesh)
-    use MOD_MESH
+subroutine cavity_momentum_fluxes(ice, dynamics, partit, mesh)
+    USE MOD_ICE
+    USE MOD_DYN
     USE MOD_PARTIT
     USE MOD_PARSUP
-    USE MOD_DYN
+    USE MOD_MESH
     use o_PARAM , only: density_0, C_d, WP
     use o_ARRAYS, only: stress_surf, stress_node_surf
-    use i_ARRAYS, only: u_w, v_w  
     implicit none
-    
-    !___________________________________________________________________________
+    type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
     integer        :: elem, elnodes(3), nzmin, node
     real(kind=WP)  :: aux
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UVnode
-    
+    real(kind=WP), dimension(:)    , pointer :: u_w, v_w
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UV=>dynamics%uv(:,:,:)
     UVnode=>dynamics%uvnode(:,:,:)
+    u_w   =>ice%srfoce_uv(1,:)
+    v_w   =>ice%srfoce_uv(2,:)
 
     !___________________________________________________________________________
     do elem=1,myDim_elem2D
@@ -440,21 +482,28 @@ end subroutine cavity_momentum_fluxes
 !
 !
 !_______________________________________________________________________________
-subroutine cavity_ice_clean_vel(partit, mesh)
-    use MOD_MESH
+subroutine cavity_ice_clean_vel(ice, partit, mesh)
+    USE MOD_ICE
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use i_ARRAYS, only: U_ice, V_ice
+    USE MOD_MESH
     implicit none
+    type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
-    type(t_mesh),   intent(in),    target :: mesh
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
     integer                               :: node
-    
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: U_ice, V_ice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    U_ice       => ice%uvice(1, :)
+    V_ice       => ice%uvice(2, :)
 
+    !___________________________________________________________________________
     do node=1,myDim_nod2d+eDim_nod2d           
         if(ulevels_nod2D(node)>1) then
             U_ice(node)=0._WP
@@ -465,21 +514,29 @@ end subroutine cavity_ice_clean_vel
 !
 !
 !_______________________________________________________________________________
-subroutine cavity_ice_clean_ma(partit, mesh)
-    use MOD_MESH
+subroutine cavity_ice_clean_ma(ice, partit, mesh)
+    USE MOD_ICE
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use i_ARRAYS, only: m_ice, m_snow, a_ice
+    USE MOD_MESH
     implicit none
+    type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
-    type(t_mesh),   intent(in),    target :: mesh
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
     integer                               :: node
-    
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
+    a_ice       => ice%data(1)%values(:)
+    m_ice       => ice%data(2)%values(:)
+    m_snow      => ice%data(3)%values(:)
+    
+    !___________________________________________________________________________
     do node=1,myDim_nod2d+eDim_nod2d           
         if(ulevels_nod2D(node)>1) then
             m_ice(node) =0.0_WP
