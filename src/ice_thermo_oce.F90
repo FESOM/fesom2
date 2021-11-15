@@ -166,7 +166,6 @@ subroutine thermodynamics(ice, partit, mesh)
     thdgrsn       => ice%thermo%thdgrsn
     thdgr_old     => ice%thermo%thdgr_old
     
-    
     !___________________________________________________________________________
     rsss=ref_sss
 
@@ -190,7 +189,7 @@ subroutine thermodynamics(ice, partit, mesh)
         !_______________________________________________________________________
         ! if there is a cavity no sea ice thermodynamics is apllied
         if(ulevels_nod2d(i)>1) cycle 
-        
+    
         !_______________________________________________________________________
         h       = m_ice(i)
         hsn     = m_snow(i)
@@ -223,8 +222,8 @@ subroutine thermodynamics(ice, partit, mesh)
         S_oc    = S_oc_array(i)
         if(ref_sss_local) rsss = S_oc
         t       = t_skin(i)   
-        ch	     = Ch_atm_oce_arr(i)
-        ce	     = Ce_atm_oce_arr(i)
+        ch	    = Ch_atm_oce_arr(i)
+        ce	    = Ce_atm_oce_arr(i)
         ch_i    = Ch_atm_ice
         ce_i    = Ce_atm_ice
     !!PS     h_ml    = 10.0_WP       	         ! 10.0 or 30. used previously
@@ -241,38 +240,38 @@ subroutine thermodynamics(ice, partit, mesh)
         endif
         
         call therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
-            ug,ustar,T_oc,S_oc,h_ml,t,ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
+            ug,ustar,T_oc,S_oc,h_ml,t,ice%ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
             rsf, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,lid_clo,subli)
         
-        m_ice_old(i)         = m_ice(i) !PS
-        m_snow_old(i)        = m_snow(i) !PS
-        a_ice_old(i)         = a_ice(i) !PS
-        thdgr_old(i)         = thdgr(i) !PS
+        m_ice_old(i)      = m_ice(i) !PS
+        m_snow_old(i)     = m_snow(i) !PS
+        a_ice_old(i)      = a_ice(i) !PS
+        thdgr_old(i)      = thdgr(i) !PS
         
-        m_ice(i)         = h
-        m_snow(i)        = hsn
-        a_ice(i)         = A
-        t_skin(i)        = t
-        fresh_wa_flux(i) = fw      !positive down
-        net_heat_flux(i) = ehf     !positive down
-        evaporation(i)   = evap    !negative up
+        m_ice(i)          = h
+        m_snow(i)         = hsn
+        a_ice(i)          = A
+        t_skin(i)         = t
+        fresh_wa_flux(i)  = fw      !positive down
+        net_heat_flux(i)  = ehf     !positive down
+        evaporation(i)    = evap    !negative up
         ice_sublimation(i)= subli 
         
-        thdgr(i)         = ithdgr
-        thdgrsn(i)       = ithdgrsn
-        flice(i)         = iflice
-        olat_heat(i)     = hflatow
-        osen_heat(i)     = hfsenow
-        olwout(i)        = hflwrdout
+        thdgr(i)          = ithdgr
+        thdgrsn(i)        = ithdgrsn
+        flice(i)          = iflice
+        olat_heat(i)      = hflatow
+        osen_heat(i)      = hfsenow
+        olwout(i)         = hflwrdout
         
         ! real salt flux due to salinity that is contained in the sea ice 4-5 psu
-        real_salt_flux(i)= rsf !PS
+        real_salt_flux(i) = rsf !PS
         
         ! if snow file is not given snow computed from prec_rain --> but prec_snow 
         ! array needs to be filled --> so that the freshwater balancing adds up
         if (.not. l_snow) then
-            prec_rain(i)     = rain
-            prec_snow(i)     = snow
+            prec_rain(i)  = rain
+            prec_snow(i)  = snow
         end if 
     end do
 end subroutine thermodynamics
