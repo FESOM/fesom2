@@ -1,83 +1,109 @@
 module ice_maEVP_interfaces
-  interface
-    subroutine ssh2rhs(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine
+    interface
+        subroutine ssh2rhs(ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice)   , intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
 
-    subroutine stress_tensor_a(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine
+        subroutine stress_tensor_a(ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice)   , intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
 
-    subroutine stress2rhs_m(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine
+        subroutine stress2rhs_m(ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice)   , intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
 
-    subroutine find_alpha_field_a(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine
+        subroutine find_alpha_field_a(ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice)   , intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
 
-    subroutine find_beta_field_a(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine
-  end interface  
+        subroutine find_beta_field_a(partit, mesh)
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface  
 end module
-
-! ====================================================================
+! ==============================================================================
 ! New evp implementation following Bouillion et al. 2013
 ! and Kimmritz et al. 2015 (mEVP) and Kimmritz et al. 2016 (aEVP)
-! ====================================================================  
-subroutine stress_tensor_m(partit, mesh)
-  ! Internal stress tensor
-  ! New implementation following Boullion et al, Ocean Modelling 2013.
-  ! SD, 30.07.2014
-  !===================================================================
-  use o_param
-  use i_param
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use g_config
-  use i_arrays
+! ==============================================================================
 
+!
+!
+!_______________________________________________________________________________
+! Internal stress tensor
+! New implementation following Boullion et al, Ocean Modelling 2013.
+! SD, 30.07.2014
+subroutine stress_tensor_m(ice, partit, mesh)
+    USE MOD_ICE
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_MESH
+    use o_param
+    use i_param
+    use g_config
 #if defined (__icepack)
-use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
+    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
 #endif
-
-  implicit none
-  type(t_mesh),   intent(in),    target :: mesh
-  type(t_partit), intent(inout), target :: partit
-
-  integer         :: elem, elnodes(3)
-  real(kind=WP)   :: dx(3), dy(3), msum, asum
-  real(kind=WP)   :: eps1, eps2, pressure, delta
-  real(kind=WP)   :: val3, meancos, usum, vsum, vale
-  real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2
-
+    implicit none
+    type(t_ice)   , intent(inout), target :: ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    integer         :: elem, elnodes(3)
+    real(kind=WP)   :: dx(3), dy(3), msum, asum
+    real(kind=WP)   :: eps1, eps2, pressure, delta
+    real(kind=WP)   :: val3, meancos, usum, vsum, vale
+    real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
+    real(kind=WP), dimension(:), pointer  :: eps11, eps12, eps22
+    real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
+    real(kind=WP), dimension(:), pointer  :: u_ice_aux, v_ice_aux
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-
+    a_ice        => ice%data(1)%values(:)
+    m_ice        => ice%data(2)%values(:)
+    m_snow       => ice%data(3)%values(:)
+    eps11        => ice%work%eps11(:)
+    eps12        => ice%work%eps12(:)
+    eps22        => ice%work%eps22(:)
+    sigma11      => ice%work%sigma11(:)
+    sigma12      => ice%work%sigma12(:)
+    sigma22      => ice%work%sigma22(:)
+    u_ice_aux    => ice%uvice_aux(1,:)
+    v_ice_aux    => ice%uvice_aux(2,:)
+    
+    !___________________________________________________________________________
   val3=1.0_WP/3.0_WP
   vale=1.0_WP/(ellipse**2)
   det2=1.0_WP/(1.0_WP+alpha_evp)
@@ -145,216 +171,271 @@ use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
 end subroutine stress_tensor_m
 
 !
-! ==================================================================
-! 
-subroutine ssh2rhs(partit, mesh)
-  ! Compute the contribution from the elevation to the rhs
-  ! S.D. 30.07.2014
-  use o_param
-  use i_param
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use g_config
-  use i_arrays
-  use i_therm_param
-  implicit none
-  type(t_mesh),   intent(in),    target :: mesh
-  type(t_partit), intent(inout), target :: partit
-  
-  integer                  :: row, elem, elnodes(3), n
-  real(kind=WP)            :: dx(3), dy(3), vol
-  real(kind=WP)            :: val3, meancos, aa, bb, p_ice(3)
- 
+!
+!_______________________________________________________________________________
+! Compute the contribution from the elevation to the rhs
+! S.D. 30.07.2014
+subroutine ssh2rhs(ice, partit, mesh)
+    USE MOD_ICE
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use MOD_MESH
+    use o_param
+    use i_param
+    use g_config
+    use i_arrays, only:
+    use i_therm_param
+    implicit none
+    type(t_ice)   , intent(inout), target :: ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    integer                  :: row, elem, elnodes(3), n
+    real(kind=WP)            :: dx(3), dy(3), vol
+    real(kind=WP)            :: val3, meancos, aa, bb, p_ice(3)
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: m_ice, m_snow
+    real(kind=WP), dimension(:), pointer  :: elevation, rhs_a, rhs_m
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-
-  val3=1.0_WP/3.0_WP
-  
-  ! use rhs_m and rhs_a for storing the contribution from elevation:
-  do row=1, myDim_nod2d 
-     rhs_a(row)=0.0_WP
-     rhs_m(row)=0.0_WP
-  end do
-  
-  !_____________________________________________________________________________
-  ! use floating sea ice for zlevel and zstar
-  if (use_floatice .and.  .not. trim(which_ale)=='linfs') then
-    do elem=1,myDim_elem2d         
-        elnodes=elem2D_nodes(:,elem)
-        !_______________________________________________________________________
-        ! if element has any cavity node skip it 
-        if (ulevels(elem) > 1) cycle
-        
-        !_______________________________________________________________________
-        vol=elem_area(elem)
-        dx=gradient_sca(1:3,elem)
-        dy=gradient_sca(4:6,elem)     
-        
-        !_______________________________________________________________________
-        ! add pressure gradient from sea ice --> in case of floating sea ice
-        p_ice=(rhoice*m_ice(elnodes)+rhosno*m_snow(elnodes))*inv_rhowat
-        do n=1,3
-            p_ice(n)=min(p_ice(n),max_ice_loading)
+    m_ice      => ice%data(2)%values
+    m_snow     => ice%data(3)%values
+    elevation  => ice%srfoce_ssh(:)
+    rhs_a      => ice%data(2)%values_rhs
+    rhs_m      => ice%data(3)%values_rhs
+    
+    !___________________________________________________________________________
+    val3=1.0_WP/3.0_WP
+    ! use rhs_m and rhs_a for storing the contribution from elevation:
+    do row=1, myDim_nod2d 
+        rhs_a(row)=0.0_WP
+        rhs_m(row)=0.0_WP
+    end do
+    
+    !_____________________________________________________________________________
+    ! use floating sea ice for zlevel and zstar
+    if (use_floatice .and.  .not. trim(which_ale)=='linfs') then
+        do elem=1,myDim_elem2d         
+            elnodes=elem2D_nodes(:,elem)
+            !_______________________________________________________________________
+            ! if element has any cavity node skip it 
+            if (ulevels(elem) > 1) cycle
+            
+            !_______________________________________________________________________
+            vol=elem_area(elem)
+            dx=gradient_sca(1:3,elem)
+            dy=gradient_sca(4:6,elem)     
+            
+            !_______________________________________________________________________
+            ! add pressure gradient from sea ice --> in case of floating sea ice
+            p_ice=(rhoice*m_ice(elnodes)+rhosno*m_snow(elnodes))*inv_rhowat
+            do n=1,3
+                p_ice(n)=min(p_ice(n),max_ice_loading)
+            end do
+            
+            !_______________________________________________________________________
+            bb=g*val3*vol
+            aa=bb*sum(dx*(elevation(elnodes)+p_ice))
+            bb=bb*sum(dy*(elevation(elnodes)+p_ice))
+            rhs_a(elnodes)=rhs_a(elnodes)-aa    
+            rhs_m(elnodes)=rhs_m(elnodes)-bb
         end do
-        
-        !_______________________________________________________________________
-        bb=g*val3*vol
-        aa=bb*sum(dx*(elevation(elnodes)+p_ice))
-        bb=bb*sum(dy*(elevation(elnodes)+p_ice))
-        rhs_a(elnodes)=rhs_a(elnodes)-aa    
-        rhs_m(elnodes)=rhs_m(elnodes)-bb
-    end do
-  else
-    do elem=1,myDim_elem2d         
-        elnodes=elem2D_nodes(:,elem)
-        !_______________________________________________________________________
-        ! if element has any cavity node skip it 
-        if (ulevels(elem) > 1) cycle
-        
-        vol=elem_area(elem)
-        dx=gradient_sca(1:3,elem)
-        dy=gradient_sca(4:6,elem)     
-        bb=g*val3*vol
-        aa=bb*sum(dx*elevation(elnodes))
-        bb=bb*sum(dy*elevation(elnodes))
-        rhs_a(elnodes)=rhs_a(elnodes)-aa   
-        rhs_m(elnodes)=rhs_m(elnodes)-bb
-    end do
-  end if 
+    else
+        do elem=1,myDim_elem2d         
+            elnodes=elem2D_nodes(:,elem)
+            !_______________________________________________________________________
+            ! if element has any cavity node skip it 
+            if (ulevels(elem) > 1) cycle
+            
+            vol=elem_area(elem)
+            dx=gradient_sca(1:3,elem)
+            dy=gradient_sca(4:6,elem)     
+            bb=g*val3*vol
+            aa=bb*sum(dx*elevation(elnodes))
+            bb=bb*sum(dy*elevation(elnodes))
+            rhs_a(elnodes)=rhs_a(elnodes)-aa   
+            rhs_m(elnodes)=rhs_m(elnodes)-bb
+        end do
+    end if 
 end subroutine ssh2rhs
 !
-!===================================================================
 !
-subroutine stress2rhs_m(partit, mesh)
-
-  ! add internal stress to the rhs
-  ! SD, 30.07.2014
-  !-----------------------------------------------------------------  
-  use o_param
-  use i_param
-  use i_therm_param
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use g_config
-  use i_arrays
-  implicit none
-
-  type(t_mesh),   intent(in),    target :: mesh
-  type(t_partit), intent(inout), target :: partit
-  
-  integer                  :: k, row, elem, elnodes(3)
-  real(kind=WP)            :: dx(3), dy(3), vol
-  real(kind=WP)            :: val3, mf, aa, bb
-  real(kind=WP)            :: mass, cluster_area, elevation_elem(3)
-
+!_______________________________________________________________________________
+! add internal stress to the rhs
+! SD, 30.07.2014
+subroutine stress2rhs_m(ice, partit, mesh)
+    USE MOD_ICE
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_MESH
+    use o_param
+    use i_param
+    use i_therm_param
+    use g_config
+    use i_arrays, only:
+    implicit none
+    type(t_ice)   , intent(inout), target :: ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    integer                  :: k, row, elem, elnodes(3)
+    real(kind=WP)            :: dx(3), dy(3), vol
+    real(kind=WP)            :: val3, mf, aa, bb
+    real(kind=WP)            :: mass, cluster_area, elevation_elem(3)
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
+    real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m
+    real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice
+    real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22    
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
+    a_ice           => ice%data(1)%values
+    m_ice           => ice%data(2)%values
+    m_snow          => ice%data(3)%values
+    rhs_a           => ice%data(1)%values_rhs
+    rhs_m           => ice%data(2)%values_rhs
+    u_rhs_ice       => ice%uvice_rhs(1,:)
+    v_rhs_ice       => ice%uvice_rhs(2,:)
+    sigma11         => ice%work%sigma11(:)
+    sigma12         => ice%work%sigma12(:)
+    sigma22         => ice%work%sigma22(:)
+    
+    !___________________________________________________________________________
+    val3 = 1.0_WP/3.0_WP
+    do row=1, myDim_nod2d 
+        u_rhs_ice(row)=0.0_WP
+        v_rhs_ice(row)=0.0_WP
+    end do
 
-  val3=1.0_WP/3.0_WP
-  
-  do row=1, myDim_nod2d 
-     u_rhs_ice(row)=0.0_WP
-     v_rhs_ice(row)=0.0_WP
-  end do
+    do elem=1,myDim_elem2d         
+        elnodes=elem2D_nodes(:,elem)
+        !_______________________________________________________________________
+        ! if element has any cavity node skip it 
+        if (ulevels(elem) > 1) cycle
 
-  do elem=1,myDim_elem2d         
-     elnodes=elem2D_nodes(:,elem)
-     !_______________________________________________________________________
-     ! if element has any cavity node skip it 
-     if (ulevels(elem) > 1) cycle
+        if(sum(a_ice(elnodes)) < 0.01_WP) cycle !DS
+        
+        vol=elem_area(elem)
+        dx=gradient_sca(1:3,elem)
+        dy=gradient_sca(4:6,elem)     
+        mf=metric_factor(elem)                               !metrics
 
-     if(sum(a_ice(elnodes)) < 0.01_WP) cycle !DS
-     
-     vol=elem_area(elem)
-     dx=gradient_sca(1:3,elem)
-     dy=gradient_sca(4:6,elem)     
-     mf=metric_factor(elem)                               !metrics
-
-     do k=1,3
-        row=elnodes(k)
-        u_rhs_ice(row)=u_rhs_ice(row) - vol* &
-             (sigma11(elem)*dx(k)+sigma12(elem)*dy(k))    &
-       -vol*sigma12(elem)*val3*mf                         !metrics
-        v_rhs_ice(row)=v_rhs_ice(row) - vol* &
-             (sigma12(elem)*dx(k)+sigma22(elem)*dy(k))    &
-       +vol*sigma11(elem)*val3*mf                         ! metrics
-     end do
-  end do
-  
-  do row=1, myDim_nod2d     
-     !_________________________________________________________________________
-     ! if cavity node skip it 
-     if ( ulevels_nod2d(row)>1 ) cycle
-     
-     mass=(m_ice(row)*rhoice+m_snow(row)*rhosno)
-     mass=mass/(1.0_WP+mass*mass)
-     u_rhs_ice(row)=(u_rhs_ice(row)*mass + rhs_a(row))/area(1,row) 
-     v_rhs_ice(row)=(v_rhs_ice(row)*mass + rhs_m(row))/area(1,row) 
-  end do
+        do k=1,3
+            row=elnodes(k)
+            u_rhs_ice(row)=u_rhs_ice(row) - vol* &
+                (sigma11(elem)*dx(k)+sigma12(elem)*dy(k))    &
+        -vol*sigma12(elem)*val3*mf                         !metrics
+            v_rhs_ice(row)=v_rhs_ice(row) - vol* &
+                (sigma12(elem)*dx(k)+sigma22(elem)*dy(k))    &
+        +vol*sigma11(elem)*val3*mf                         ! metrics
+        end do
+    end do
+    
+    do row=1, myDim_nod2d     
+        !_________________________________________________________________________
+        ! if cavity node skip it 
+        if ( ulevels_nod2d(row)>1 ) cycle
+        
+        mass=(m_ice(row)*rhoice+m_snow(row)*rhosno)
+        mass=mass/(1.0_WP+mass*mass)
+        u_rhs_ice(row)=(u_rhs_ice(row)*mass + rhs_a(row))/area(1,row) 
+        v_rhs_ice(row)=(v_rhs_ice(row)*mass + rhs_m(row))/area(1,row) 
+    end do
 end subroutine stress2rhs_m
 !
-!===================================================================
 !
-subroutine EVPdynamics_m(partit, mesh)
-  ! assemble rhs and solve for ice velocity
-  ! New implementation based on Bouillion et al. Ocean Modelling 2013
-  ! SD 30.07.14
-  !---------------------------------------------------------
-
-  use o_param
-  use i_param
-  use i_therm_param
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use g_config
-  use i_arrays
-  use o_arrays
-  use g_comm_auto
-
+!_______________________________________________________________________________
+! assemble rhs and solve for ice velocity
+! New implementation based on Bouillion et al. Ocean Modelling 2013
+! SD 30.07.14
+subroutine EVPdynamics_m(ice, partit, mesh)
+    USE MOD_ICE
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_MESH
+    use o_param
+    use i_param
+    use i_therm_param
+    use g_config
+    use i_arrays, only: 
+    use o_arrays
+    use g_comm_auto
 #if defined (__icepack)
-  use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
-  use icedrv_main,   only: icepack_to_fesom
+    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
+    use icedrv_main,   only: icepack_to_fesom
 #endif
-
-  implicit none
-  type(t_mesh),   intent(in),    target :: mesh
-  type(t_partit), intent(inout), target :: partit
-  integer          :: steps, shortstep, i, ed,n
-  real(kind=WP)    :: rdt, drag, det
-  real(kind=WP)    :: inv_thickness(partit%myDim_nod2D), umod, rhsu, rhsv
-  logical          :: ice_el(partit%myDim_elem2D), ice_nod(partit%myDim_nod2D)
-
-!NR for stress_tensor_m
-  integer         :: el, elnodes(3)
-  real(kind=WP)   :: dx(3), dy(3), msum, asum
-  real(kind=WP)   :: eps1, eps2, pressure, pressure_fac(partit%myDim_elem2D), delta
-  real(kind=WP)   :: val3, meancos, vale
-  real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2
-
-!NR for stress2rhs_m  
-  integer        :: k, row
-  real(kind=WP)  :: vol
-  real(kind=WP)  :: mf,aa, bb,p_ice(3)
-  real(kind=WP)  :: mass(partit%myDim_nod2D)
-
+    implicit none
+    type(t_ice)   , intent(inout), target :: ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    integer          :: steps, shortstep, i, ed,n
+    real(kind=WP)    :: rdt, drag, det
+    real(kind=WP)    :: inv_thickness(partit%myDim_nod2D), umod, rhsu, rhsv
+    logical          :: ice_el(partit%myDim_elem2D), ice_nod(partit%myDim_nod2D)
+    !NR for stress_tensor_m
+    integer         :: el, elnodes(3)
+    real(kind=WP)   :: dx(3), dy(3), msum, asum
+    real(kind=WP)   :: eps1, eps2, pressure, pressure_fac(partit%myDim_elem2D), delta
+    real(kind=WP)   :: val3, meancos, vale
+    real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2
+    !NR for stress2rhs_m  
+    integer        :: k, row
+    real(kind=WP)  :: vol
+    real(kind=WP)  :: mf,aa, bb,p_ice(3)
+    real(kind=WP)  :: mass(partit%myDim_nod2D)
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
+    real(kind=WP), dimension(:), pointer  :: a_ice_old, m_ice_old, m_snow_old
+    real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, elevation
+    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, u_ice_aux, v_ice_aux
+    real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice, u_w, v_w
+    real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
+    real(kind=WP), dimension(:), pointer  :: eps11, eps12, eps22
+    real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
+    a_ice           => ice%data(1)%values
+    a_ice_old       => ice%data(1)%values_old
+    rhs_a           => ice%data(1)%values_rhs
+    m_ice           => ice%data(2)%values
+    m_ice_old       => ice%data(2)%values_old
+    rhs_m           => ice%data(2)%values_rhs
+    m_snow          => ice%data(3)%values
+    m_snow_old      => ice%data(3)%values_old
+    u_ice           => ice%uvice(1,:)
+    v_ice           => ice%uvice(2,:)
+    u_rhs_ice       => ice%uvice_rhs(1,:)
+    v_rhs_ice       => ice%uvice_rhs(2,:)
+    u_ice_aux       => ice%uvice_aux(1,:)
+    v_ice_aux       => ice%uvice_aux(2,:)
+    u_w             => ice%srfoce_uv(1,:)
+    v_w             => ice%srfoce_uv(2,:)
+    stress_atmice_x => ice%stress_atmice_xy(1,:)
+    stress_atmice_y => ice%stress_atmice_xy(2,:)
+    eps11           => ice%work%eps11(:)
+    eps12           => ice%work%eps12(:)
+    eps22           => ice%work%eps22(:)
+    sigma11         => ice%work%sigma11(:)
+    sigma12         => ice%work%sigma12(:)
+    sigma22         => ice%work%sigma22(:)
 
-  val3=1.0_WP/3.0_WP
-  vale=1.0_WP/(ellipse**2)
-  det2=1.0_WP/(1.0_WP+alpha_evp)
-  det1=alpha_evp*det2
-  rdt=ice_dt
-  steps=evp_rheol_steps
+    !___________________________________________________________________________
+    val3 = 1.0_WP/3.0_WP
+    vale = 1.0_WP/(ice%ellipse**2)
+    det2 = 1.0_WP/(1.0_WP+ice%alpha_evp)
+    det1 = ice%alpha_evp*det2
+    rdt  = ice%ice_dt
+    steps= ice%evp_rheol_steps
   
   u_ice_aux=u_ice    ! Initialize solver variables
   v_ice_aux=v_ice
@@ -363,7 +444,6 @@ subroutine EVPdynamics_m(partit, mesh)
   a_ice_old(:)  = a_ice(:)
   m_ice_old(:)  = a_ice(:)
   m_snow_old(:) = m_snow(:)
-
   call icepack_to_fesom (nx_in=(myDim_nod2D+eDim_nod2D), &
                          aice_out=a_ice,                 &
                          vice_out=m_ice,                 &
@@ -633,48 +713,58 @@ subroutine EVPdynamics_m(partit, mesh)
   end do ! --> do shortstep=1, steps
 
   u_ice=u_ice_aux
-  v_ice=v_ice_aux
-  
+  v_ice=v_ice_aux  
 end subroutine EVPdynamics_m
+
 !
 !
-!
-! ====================================================================
+!_______________________________________________________________________________
 ! aEVP implementation: Similar to mEVP, but alpha is variable.
 ! The subroutines involved are with _a.
-! ====================================================================
-!
-subroutine find_alpha_field_a(partit, mesh)
-  ! EVP stability parameter alpha is computed at each element
-  ! aEVP implementation
-  ! SD, 13.02.2017
-  ! ==================================================================
-  use o_param
-  use i_param
-  use i_therm_param
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use g_config
-  use i_arrays
+! EVP stability parameter alpha is computed at each element
+! aEVP implementation
+! SD, 13.02.2017
 
+subroutine find_alpha_field_a(ice, partit, mesh)
+    USE MOD_ICE
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_MESH
+    use o_param
+    use i_param
+    use i_therm_param
+    use g_config
+    use i_arrays, only: alpha_evp_array
 #if defined (__icepack)
-  use icedrv_main,   only: strength
+    use icedrv_main,   only: strength
 #endif
-
-  implicit none
-  type(t_mesh),   intent(in),    target :: mesh
-  type(t_partit), intent(inout), target :: partit
-  integer                  :: elem, elnodes(3)
-  real(kind=WP)            :: dx(3), dy(3), msum, asum
-  real(kind=WP)            :: eps1, eps2, pressure, delta
-  real(kind=WP)            :: val3, meancos, usum, vsum, vale
-
+    implicit none
+    type(t_ice)   , intent(inout), target :: ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    integer                  :: elem, elnodes(3)
+    real(kind=WP)            :: dx(3), dy(3), msum, asum
+    real(kind=WP)            :: eps1, eps2, pressure, delta
+    real(kind=WP)            :: val3, meancos, usum, vsum, vale
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice
+    real(kind=WP), dimension(:), pointer  :: u_ice_aux, v_ice_aux
+    real(kind=WP), dimension(:), pointer  :: eps11, eps12, eps22
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-
+    a_ice     => ice%data(1)%values(:)
+    m_ice     => ice%data(2)%values(:)
+    u_ice_aux => ice%uvice_aux(1,:)
+    v_ice_aux => ice%uvice_aux(2,:)
+    eps11     => ice%work%eps11(:)
+    eps12     => ice%work%eps12(:)
+    eps22     => ice%work%eps22(:)
+    
+    !___________________________________________________________________________
   val3=1.0_WP/3.0_WP
   vale=1.0_WP/(ellipse**2)
    do elem=1,myDim_elem2D
@@ -720,42 +810,60 @@ subroutine find_alpha_field_a(partit, mesh)
      ! /voltriangle(elem) for FESOM1.4
      ! We do not allow alpha to be too small!
    end do
-  end subroutine find_alpha_field_a  
-! ====================================================================
-
-subroutine stress_tensor_a(partit, mesh)
-  ! Internal stress tensor
-  ! New implementation following Boullion et al, Ocean Modelling 2013.
-  ! and Kimmritz et al., Ocean Modelling 2016
-  ! SD, 14.02.2017
-  !===================================================================
-  use o_param
-  use i_param
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use g_config
-  use i_arrays
-
+end subroutine find_alpha_field_a  
+!
+!
+!_______________________________________________________________________________
+! Internal stress tensor
+! New implementation following Boullion et al, Ocean Modelling 2013.
+! and Kimmritz et al., Ocean Modelling 2016
+! SD, 14.02.2017
+subroutine stress_tensor_a(ice, partit, mesh)
+    USE MOD_ICE
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_MESH
+    use o_param
+    use i_param
+    use g_config
+    use i_arrays, only: alpha_evp_array
 #if defined (__icepack)
-  use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
+    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
 #endif
-
-  implicit none
-  type(t_mesh),   intent(in),    target :: mesh
-  type(t_partit), intent(inout), target :: partit
-  integer                   :: elem, elnodes(3)
-  real(kind=WP)             :: dx(3), dy(3), msum, asum
-  real(kind=WP)             :: eps1, eps2, pressure, delta
-  real(kind=WP)             :: val3, meancos, usum, vsum, vale
-  real(kind=WP)             :: det1, det2, r1, r2, r3, si1, si2
+    implicit none
+    type(t_ice)   , intent(inout), target :: ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    integer                   :: elem, elnodes(3)
+    real(kind=WP)             :: dx(3), dy(3), msum, asum
+    real(kind=WP)             :: eps1, eps2, pressure, delta
+    real(kind=WP)             :: val3, meancos, usum, vsum, vale
+    real(kind=WP)             :: det1, det2, r1, r2, r3, si1, si2
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice
+    real(kind=WP), dimension(:), pointer  :: u_ice_aux, v_ice_aux
+    real(kind=WP), dimension(:), pointer  :: eps11, eps12, eps22
+    real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22    
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-  
-  val3=1.0_WP/3.0_WP
-  vale=1.0_WP/(ellipse**2)
+    a_ice           => ice%data(1)%values
+    m_ice           => ice%data(2)%values
+    u_ice_aux       => ice%uvice_aux(1,:)
+    v_ice_aux       => ice%uvice_aux(2,:)
+    eps11           => ice%work%eps11(:)
+    eps12           => ice%work%eps12(:)
+    eps22           => ice%work%eps22(:)
+    sigma11         => ice%work%sigma11(:)
+    sigma12         => ice%work%sigma12(:)
+    sigma22         => ice%work%sigma22(:)
+    
+    !___________________________________________________________________________
+    val3=1.0_WP/3.0_WP
+    vale=1.0_WP/(ice%ellipse**2)
    do elem=1,myDim_elem2D
      !__________________________________________________________________________
      ! if element has any cavity node skip it 
@@ -823,58 +931,79 @@ subroutine stress_tensor_a(partit, mesh)
  ! and similarly for si2 and sigma12
 end subroutine stress_tensor_a
 !
-!===================================================================
 !
-subroutine EVPdynamics_a(partit, mesh)
-  ! assemble rhs and solve for ice velocity
-  ! New implementation based on Bouillion et al. Ocean Modelling 2013
-  ! and Kimmritz et al., Ocean Modelling  2016 
-  ! SD 14.02.17
-  !---------------------------------------------------------
-
-use o_param
-use mod_mesh
-USE MOD_PARTIT
-USE MOD_PARSUP
-use i_arrays
-USE o_arrays
-use i_param
-use o_PARAM
-use i_therm_param
-use g_config, only: use_cavity
-use g_comm_auto
-use ice_maEVP_interfaces
-
+!_______________________________________________________________________________
+! assemble rhs and solve for ice velocity
+! New implementation based on Bouillion et al. Ocean Modelling 2013
+! and Kimmritz et al., Ocean Modelling  2016 
+! SD 14.02.17
+!---------------------------------------------------------
+subroutine EVPdynamics_a(ice, partit, mesh)
+    USE MOD_ICE
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_MESH
+    use o_param
+    use i_arrays, only: beta_evp_array
+    USE o_arrays
+    use i_param
+    use o_PARAM
+    use i_therm_param
+    use g_config, only: use_cavity
+    use g_comm_auto
+    use ice_maEVP_interfaces
 #if defined (__icepack)
-  use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem
+    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem
 #endif
-
-  implicit none
-  type(t_mesh),   intent(in),    target :: mesh
-  type(t_partit), intent(inout), target :: partit
-  integer          :: steps, shortstep, i, ed
-  real(kind=WP)    :: rdt, drag, det, fc
-  real(kind=WP)    :: thickness, inv_thickness, umod, rhsu, rhsv
-  REAL(kind=WP)    :: t0,t1, t2, t3, t4, t5, t00, txx
+    implicit none
+    type(t_ice)   , intent(inout), target :: ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    integer          :: steps, shortstep, i, ed
+    real(kind=WP)    :: rdt, drag, det, fc
+    real(kind=WP)    :: thickness, inv_thickness, umod, rhsu, rhsv
+    REAL(kind=WP)    :: t0,t1, t2, t3, t4, t5, t00, txx
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
+    real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, elevation
+    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, u_ice_aux, v_ice_aux
+    real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice, u_w, v_w
+    real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-
-  steps=evp_rheol_steps
-  rdt=ice_dt
-  u_ice_aux=u_ice    ! Initialize solver variables
-  v_ice_aux=v_ice
-  call ssh2rhs(partit, mesh)
-
+    a_ice           => ice%data(1)%values
+    m_ice           => ice%data(2)%values
+    m_snow          => ice%data(3)%values
+    u_ice           => ice%uvice(1,:)
+    v_ice           => ice%uvice(2,:)
+    u_rhs_ice       => ice%uvice_rhs(1,:)
+    v_rhs_ice       => ice%uvice_rhs(2,:)
+    u_ice_aux       => ice%uvice_aux(1,:)
+    v_ice_aux       => ice%uvice_aux(2,:)
+    u_w             => ice%srfoce_uv(1,:)
+    v_w             => ice%srfoce_uv(2,:)
+    stress_atmice_x => ice%stress_atmice_xy(1,:)
+    stress_atmice_y => ice%stress_atmice_xy(2,:)
+    
+    !___________________________________________________________________________
+    steps=ice%evp_rheol_steps
+    rdt  =ice%ice_dt
+    u_ice_aux=u_ice    ! Initialize solver variables
+    v_ice_aux=v_ice
+    call ssh2rhs(ice, partit, mesh)
 #if defined (__icepack)
-  rdg_conv_elem(:)  = 0.0_WP
-  rdg_shear_elem(:) = 0.0_WP
+    rdg_conv_elem(:)  = 0.0_WP
+    rdg_shear_elem(:) = 0.0_WP
 #endif
- 
+    
+    !___________________________________________________________________________
   do shortstep=1, steps 
-     call stress_tensor_a(partit, mesh)
-     call stress2rhs_m(partit, mesh)    ! _m=_a, so no _m version is the only one!
+     call stress_tensor_a(ice, partit, mesh)
+     call stress2rhs_m(ice, partit, mesh)    ! _m=_a, so no _m version is the only one!
      do i=1,myDim_nod2D 
      
          !_______________________________________________________________________
@@ -929,9 +1058,9 @@ use ice_maEVP_interfaces
     u_ice=u_ice_aux
     v_ice=v_ice_aux
  
-  call find_alpha_field_a(partit, mesh)             ! alpha_evp_array is initialized with alpha_evp;
-                                      ! At this stage we already have non-trivial velocities. 
-  call find_beta_field_a(partit, mesh)
+    call find_alpha_field_a(ice, partit, mesh)             ! alpha_evp_array is initialized with alpha_evp;
+                                        ! At this stage we already have non-trivial velocities. 
+    call find_beta_field_a(partit, mesh)
 end subroutine EVPdynamics_a
 !
 ! =================================================================
