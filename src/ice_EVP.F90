@@ -48,7 +48,6 @@ subroutine stress_tensor(ice, partit, mesh)
     USE MOD_MESH
     use o_param
     use i_param
-    use i_arrays, only:
     USE g_CONFIG
 #if defined (__icepack)
     use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
@@ -85,7 +84,7 @@ subroutine stress_tensor(ice, partit, mesh)
     
     !___________________________________________________________________________
     vale = 1.0_WP/(ice%ellipse**2)
-    dte  = ice_dt/(1.0_WP*ice%evp_rheol_steps)
+    dte  = ice%ice_dt/(1.0_WP*ice%evp_rheol_steps)
     det1 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte)
     det2 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte) !*ellipse**2 
      
@@ -145,7 +144,7 @@ subroutine stress_tensor(ice, partit, mesh)
         
             zeta = zeta*ice%Tevp_inv
                             
-            r1  = zeta*(eps11(el)+eps22(el)) - ice_strength(el)*Tevp_inv
+            r1  = zeta*(eps11(el)+eps22(el)) - ice_strength(el)*ice%Tevp_inv
             r2  = zeta*(eps11(el)-eps22(el))*vale
             r3  = zeta*eps12(el)*vale
             
@@ -194,9 +193,9 @@ end subroutine stress_tensor
 ! ! 
 ! !   vale = 1.0_WP/(ellipse**2)
 ! !    
-! !   dte  = ice_dt/(1.0_WP*evp_rheol_steps)
-! !   det1 = 1.0_WP/(1.0_WP + 0.5_WP*Tevp_inv*dte)
-! !   det2 = 1.0_WP/(1.0_WP + 0.5_WP*Tevp_inv*dte) !*ellipse**2 
+! !   dte  = ice%ice_dt/(1.0_WP*ice%evp_rheol_steps)
+! !   det1 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte)
+! !   det2 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte) !*ellipse**2 
 ! !      
 ! ! 
 ! !   do el=1,myDim_elem2D
@@ -257,7 +256,7 @@ end subroutine stress_tensor
 ! !       
 ! !         zeta = zeta*Tevp_inv
 ! !         
-! !         r1  = zeta*(eps11(el)+eps22(el)) - ice_strength(el)*Tevp_inv
+! !         r1  = zeta*(eps11(el)+eps22(el)) - ice_strength(el)*ice%Tevp_inv
 ! !         r2  = zeta*(eps11(el)-eps22(el))*vale
 ! !         r3  = zeta*eps12(el)*vale
 ! !         
