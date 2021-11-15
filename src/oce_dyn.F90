@@ -228,7 +228,7 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
-    real(kind=8)  :: u1, v1, len, vi 
+    real(kind=8)  :: u1, v1, len, vi
     integer       :: nz, ed, el(2), nelem(3),k, elem, nzmin, nzmax
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -278,10 +278,20 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
             !here dynamics%visc_gamma2 is dimensional (1/velocity). If it is 10, then the respective term dominates starting from |u|=0.1 m/s an so on.
             u1=u1*vi
             v1=v1*vi
+#if defined(_OPENMP)
+            call omp_set_lock(partit%plock(el(1)))
+#endif
             U_b(nz,el(1))=U_b(nz,el(1))-u1/elem_area(el(1))
-            U_b(nz,el(2))=U_b(nz,el(2))+u1/elem_area(el(2))
             V_b(nz,el(1))=V_b(nz,el(1))-v1/elem_area(el(1))
+#if defined(_OPENMP)
+            call omp_unset_lock(partit%plock(el(1)))
+            call omp_set_lock(partit%plock(el(2)))
+#endif
+            U_b(nz,el(2))=U_b(nz,el(2))+u1/elem_area(el(2))
             V_b(nz,el(2))=V_b(nz,el(2))+v1/elem_area(el(2))
+#if defined(_OPENMP)
+            call omp_unset_lock(partit%plock(el(2)))
+#endif
         END DO 
     END DO
 !$OMP END DO
@@ -353,7 +363,7 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
     real(kind=8)  :: u1, v1, vi, len
-    integer       :: ed, el(2), nz, nzmin, nzmax
+    integer       :: ed, el(2), elem, nz, nzmin, nzmax
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
@@ -368,8 +378,15 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
     V_c    => dynamics%work%v_c(:,:)
     
     !___________________________________________________________________________
-    U_c = 0.0_WP
-    V_c = 0.0_WP
+!$OMP PARALLEL DO
+    DO elem=1, myDim_elem2D+eDim_elem2D
+       U_c(:, elem) = 0.0_WP
+       V_c(:, elem) = 0.0_WP
+    END DO
+!$OMP END PARALLEL DO
+
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, ed, el, nz, nzmin, nzmax)
+!$OMP DO
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
@@ -384,8 +401,9 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
             V_c(nz,el(2))=V_c(nz,el(2))+v1
         END DO 
     END DO
- 
-    Do ed=1,myDim_elem2D
+!$OMP END DO
+!$OMP DO
+    DO ed=1,myDim_elem2D
         len=sqrt(elem_area(ed))
         nzmin = ulevels(ed)
         nzmax = nlevels(ed)
@@ -400,10 +418,14 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
             U_c(nz,ed)=-U_c(nz,ed)*vi                             
             V_c(nz,ed)=-V_c(nz,ed)*vi
         END DO
-    end do
-    
+    END DO
+!$OMP END DO
+!$OMP MASTER
     call exchange_elem(U_c, partit)
     call exchange_elem(V_c, partit)
+!$OMP END MASTER
+!$OMP BARRIER
+!$OMP DO
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
@@ -412,13 +434,24 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
         DO  nz=nzmin,nzmax-1
             u1=(U_c(nz,el(1))-U_c(nz,el(2)))
             v1=(V_c(nz,el(1))-V_c(nz,el(2)))
+#if defined(_OPENMP)
+            call omp_set_lock(partit%plock(el(1)))
+#endif
             UV_rhs(1,nz,el(1))=UV_rhs(1,nz,el(1))-u1/elem_area(el(1))
-            UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
             UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
+#if defined(_OPENMP)
+            call omp_unset_lock(partit%plock(el(1)))
+            call omp_set_lock(partit%plock(el(2)))
+#endif
+            UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
             UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
+#if defined(_OPENMP)
+            call omp_unset_lock(partit%plock(el(2)))
+#endif
         END DO 
     END DO
-
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine visc_filt_bilapl
 !
 !
@@ -442,8 +475,8 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
-    real(kind=8)  :: u1, v1, vi, len
-    integer       :: ed, el(2), nz, nzmin, nzmax
+    real(kind=8)  :: u1, v1, len, vi
+    integer       :: ed, el(2), nz, nzmin, nzmax, elem
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
@@ -458,8 +491,14 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
     V_c    => dynamics%work%v_c(:,:)
     
     !___________________________________________________________________________
-    U_c = 0.0_WP
-    V_c = 0.0_WP
+!$OMP PARALLEL DO
+    DO elem=1, myDim_elem2D+eDim_elem2D
+       U_c(:, elem) = 0.0_WP
+       V_c(:, elem) = 0.0_WP
+    END DO
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, ed, el, nz, nzmin, nzmax)
+!$OMP DO
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
@@ -483,9 +522,13 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
             V_c(nz,el(2))=V_c(nz,el(2))+v1
         END DO 
     END DO
-    
+!$OMP END DO
+!$OMP MASTER
     call exchange_elem(U_c, partit)
     call exchange_elem(V_c, partit)
+!$OMP END MASTER
+!$OMP BARRIER
+!$OMP DO
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
@@ -503,11 +546,24 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
             ! vi=-dt*sqrt(max(dynamics%visc_gamma0, dynamics%visc_gamma1*max(sqrt(vi), dynamics%visc_gamma2*vi))*len)
             u1=vi*(U_c(nz,el(1))-U_c(nz,el(2)))
             v1=vi*(V_c(nz,el(1))-V_c(nz,el(2)))
+
+#if defined(_OPENMP)
+            call omp_set_lock(partit%plock(el(1)))
+#endif
             UV_rhs(1,nz,el(1))=UV_rhs(1,nz,el(1))-u1/elem_area(el(1))
-            UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
             UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
+#if defined(_OPENMP)
+            call omp_unset_lock(partit%plock(el(1)))
+            call omp_set_lock(partit%plock(el(2)))
+#endif
+            UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
             UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
+#if defined(_OPENMP)
+            call omp_unset_lock(partit%plock(el(2)))
+#endif
         END DO 
     END DO
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine visc_filt_bidiff
 
