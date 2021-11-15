@@ -235,18 +235,18 @@ subroutine pressure_bv(tracers, partit, mesh)
     mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==17)
     !___________________________________________________________________________
     ! Screen salinity
-    a_loc=0.0_WP
+    a    =0.0_WP
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, a_loc)
+    a_loc=0.0_WP
 !$OMP DO
     do node=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(node)
         nzmax = nlevels_nod2D(node)
         do nz=nzmin,nzmax-1
-            a_loc=min(a_loc,salt(nz,node))
+            a_loc=min(a_loc, salt(nz,node))
         enddo
     enddo
 !$OMP END DO
-    a=0.0_WP
 !$OMP CRITICAL
     a=min(a, a_loc)
 !$OMP END CRITICAL
