@@ -10,6 +10,7 @@
 
 #define DBL_EPSILON 2.2204460492503131e-16 // double epsilon
 
+#if defined USE_DUBLICATE
 int qsplitC(FLOAT *a, int *ind, int n, int ncut)
 {
 /*----------------------------------------------------------------------
@@ -58,6 +59,7 @@ label1:
    goto label1;
 }
 /*--------------- end of zqsplitC ----------------------------------------*/
+#endif
 
 int SparTran(csptr amat, csptr bmat, int job, int flag)
 {

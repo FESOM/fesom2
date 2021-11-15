@@ -30,6 +30,7 @@ else()
 endif()
 #list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_partition_init.F90)
 file(GLOB sources_C ${src_home}/*.c)
+list(REMOVE_ITEM sources_C ${src_home}/psolve_feom.c)
 
 # generate a custom file from fesom_version_info.F90 which includes the current git SHA
 set(FESOM_ORIGINAL_VERSION_FILE ${src_home}/fesom_version_info.F90)
@@ -58,7 +59,11 @@ add_subdirectory(async_threads_cpp)
 
 include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindNETCDF.cmake)
 
-add_library(${PROJECT_NAME}_C ${sources_C})
+if(${BUILD_FESOM_AS_LIBRARY})
+  add_library(${PROJECT_NAME}_C SHARED ${sources_C})
+else()
+  add_library(${PROJECT_NAME}_C ${sources_C})
+endif()
 target_compile_definitions(${PROJECT_NAME}_C PRIVATE PARMS USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
 target_link_libraries(${PROJECT_NAME}_C parms) #metis
 
@@ -67,7 +72,7 @@ target_link_libraries(${PROJECT_NAME}_C parms) #metis
 # we do not always build the library along with the executable to avoid having two targets here in the CMakeLists.txt
 # two targets would allow e.g. setting different compiler options or preprocessor definition, which would be error prone.
 if(${BUILD_FESOM_AS_LIBRARY})
-   add_library(${PROJECT_NAME} ${sources_Fortran})
+   add_library(${PROJECT_NAME} SHARED ${sources_Fortran})
 else()
    add_executable(${PROJECT_NAME} ${sources_Fortran} ${src_home}/fvom_main.F90)
 endif()

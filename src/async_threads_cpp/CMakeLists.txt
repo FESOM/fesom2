@@ -8,7 +8,11 @@ file(GLOB sources_CXX ${CMAKE_CURRENT_LIST_DIR}/*.cpp)
 include(FortranCInterface)
 FortranCInterface_HEADER(ThreadsManagerFCMacros.h MACRO_NAMESPACE "ThreadsManagerFCMacros_" SYMBOLS init_ccall begin_ccall end_ccall)
 
-add_library(${PROJECT_NAME} ${sources_CXX})
+if(${BUILD_FESOM_AS_LIBRARY})
+  add_library(${PROJECT_NAME} SHARED ${sources_CXX})
+else()
+  add_library(${PROJECT_NAME} ${sources_CXX})
+endif()
 target_include_directories(${PROJECT_NAME}
 	INTERFACE ${CMAKE_CURRENT_LIST_DIR}
 	PUBLIC ${CMAKE_CURRENT_BINARY_DIR}

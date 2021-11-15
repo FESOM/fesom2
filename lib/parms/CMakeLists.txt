@@ -9,7 +9,11 @@ file(GLOB all_sources ${src_home}/src/*.c ${src_home}/src/DDPQ/*.c)
 include("${CMAKE_CURRENT_LIST_DIR}/../../cmake/FindBLAS.cmake")
 
 # create our library (set its name to name of this project)
-add_library(${PROJECT_NAME} ${all_sources})
+if(${BUILD_FESOM_AS_LIBRARY})
+  add_library(${PROJECT_NAME} SHARED ${all_sources})
+else()
+  add_library(${PROJECT_NAME} ${all_sources})
+endif()
 target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS USE_MPI REAL=double DBL FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 HAS_BLAS)
 target_include_directories(${PROJECT_NAME}
 	PRIVATE ${src_home}/src/../include ${src_home}/src/include
