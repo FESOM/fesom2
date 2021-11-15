@@ -2844,7 +2844,12 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_KPP'//achar(27)//'[0m' 
         call oce_mixing_KPP(Av, Kv_double, dynamics, tracers, partit, mesh)
-        Kv=Kv_double(:,:,1)
+!$OMP PARALLEL DO
+        DO node=1, myDim_nod2D+eDim_nod2D
+           Kv(:, node)=Kv_double(:, node, 1)
+        END DO
+!$OMP END PARALLEL DO
+
         call mo_convect(partit, mesh)
         
     ! use FESOM2.0 tuned pacanowski & philander parameterization for vertical 
