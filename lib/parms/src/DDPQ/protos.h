@@ -128,6 +128,6 @@ extern int init_blocks( csptr csmat, int *pnBlock, int **pnB, int
 			*t_angle );
 
 /* systimer.c */
-extern double sys_timer();
+//extern double sys_timer();
 
 #endif 

@@ -70,7 +70,8 @@ int init_blocks( csptr csmat, int *pnBlock, int **pnB, int **pperm,
   int nextBlockID, nextBlockPos, belongTo, grp;
   double eps_2 = eps * eps, t1, t2;
 
-  t1 = sys_timer(); /* begin Hash method timer */
+  // t1 = sys_timer(); /* begin Hash method timer */
+  t1 = 0.0;
   group = (KeyType *)Malloc( n*sizeof(KeyType), "init_blocks" );
   compress = (CompressType *)Malloc( n*sizeof(CompressType), "init_blocks" );
   perm = (int *)Malloc( n * sizeof(int), "init_blocks" );
@@ -130,10 +131,12 @@ int init_blocks( csptr csmat, int *pnBlock, int **pnB, int **pperm,
       }
     }
   }
-  t2 = sys_timer(); /* end Hash method timer */
+  //t2 = sys_timer(); /* end Hash method timer */
+  t2 = 0.0;
   *t_hash = t2 - t1;
 
-  t1 = sys_timer(); /* begin angle method timer */
+  //t1 = sys_timer(); /* begin angle method timer */
+  t1 = 0.0; /* begin angle method timer */
   nB = (int *)Malloc( n * sizeof(int), "init_blocks" );
   jbuf = (int *)Malloc( n * sizeof(int), "init_blocks" );
 
@@ -232,7 +235,8 @@ int init_blocks( csptr csmat, int *pnBlock, int **pnB, int **pperm,
       nB[belongTo]++;
     }
   }
-  t2 = sys_timer(); /* end angle method timer */
+  //t2 = sys_timer(); /* end angle method timer */
+  t2 = 0.0;
   *t_angle = t2 - t1;
   *pperm = perm;
 
