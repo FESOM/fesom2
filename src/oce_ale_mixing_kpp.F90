@@ -600,7 +600,7 @@ contains
   end if
 !$OMP BARRIER
 
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, dzup)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, dzup, coeff_sw)
   DO node=1, myDim_nod2D
        nzmax = nlevels_nod2D(node)
        nzmin = ulevels_nod2D(node)
@@ -616,10 +616,12 @@ contains
               EXIT
            END IF
         END DO
+
        !-----------------------------------------------------------------------
        !     find stability and buoyancy forcing for final hbl values
        !-----------------------------------------------------------------------      
         IF (use_sw_pene)  THEN     
+           coeff_sw = g * sw_alpha(nzmin,node)  ! @ the surface @ Z (m/s2/K)
            ! Linear interpolation of sw_3d to depth of hbl
            bfsfc(node) = Bo(node) + & 
                          coeff_sw * &
@@ -786,7 +788,7 @@ contains
 !$OMP BARRIER
     !___________________________________________________________________________
     ! compute viscA and diffK
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, Rigg, ratio, frit)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, Rigg, ratio, frit, Kv0_b)
     do node=1, myDim_nod2D
        nzmin = ulevels_nod2D(node)
        nzmax = nlevels_nod2D(node)
