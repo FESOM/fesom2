@@ -428,7 +428,8 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     sigma11         => ice%work%sigma11(:)
     sigma12         => ice%work%sigma12(:)
     sigma22         => ice%work%sigma22(:)
-
+    elevation       => ice%srfoce_ssh(:)
+    
     !___________________________________________________________________________
     val3 = 1.0_WP/3.0_WP
     vale = 1.0_WP/(ice%ellipse**2)
@@ -458,7 +459,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
      rhs_a(row)=0.0_WP
      rhs_m(row)=0.0_WP
   end do
-  
+
   !_____________________________________________________________________________
   ! use floating sea ice for zlevel and zstar
   if (use_floatice .and.  .not. trim(which_ale)=='linfs') then
@@ -547,7 +548,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
      if(msum > 0.01) then
         ice_el(el) = .true.
         asum=sum(a_ice(elnodes))*val3          
-        pressure_fac(el) = det2*pstar*msum*exp(-c_pressure*(1.0_WP-asum))
+        pressure_fac(el) = det2*ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
      endif
   end do
 
@@ -600,7 +601,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
         ! ====== moduli:
         delta = sqrt(eps1**2+vale*(eps2**2+4.0_WP*eps12(el)**2))
         
-        pressure = pressure_fac(el)/(delta+delta_min)
+        pressure = pressure_fac(el)/(delta+ice%delta_min)
         
 !        si1 = det1*(sigma11(el)+sigma22(el)) + pressure*(eps1-delta) 
 !        si2 = det1*(sigma11(el)-sigma22(el)) + pressure*eps2*vale

@@ -546,7 +546,7 @@ subroutine EVPdynamics(ice, partit, mesh)
                             vice_out=m_ice,                &
                             vsno_out=m_snow)
 #endif
-
+    
     !___________________________________________________________________________
     rdt=ice%ice_dt/(1.0*ice%evp_rheol_steps)
     ax=cos(ice%theta_io)
@@ -670,7 +670,7 @@ subroutine EVPdynamics(ice, partit, mesh)
             end if
         enddo
     endif ! --> if ( .not. trim(which_ALE)=='linfs') then
- 
+    
     !___________________________________________________________________________
     do n=1,myDim_nod2D 
         if (ulevels_nod2d(n)>1) cycle
@@ -678,18 +678,19 @@ subroutine EVPdynamics(ice, partit, mesh)
         rhs_m(n) = rhs_m(n)/area(1,n)
     enddo
     ! End of Precomputing
-
+    
     !___________________________________________________________________________
     ! And the ice stepping starts
 #if defined (__icepack)
     rdg_conv_elem(:)  = 0.0_WP
     rdg_shear_elem(:) = 0.0_WP
 #endif
+    
     do shortstep=1, ice%evp_rheol_steps 
         !_______________________________________________________________________
-        !!PS if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call stress_tensor'//achar(27)//'[0m'
+        if (shortstep==1 .and. flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call stress_tensor'//achar(27)//'[0m'
         call stress_tensor(ice, partit, mesh)
-        !!PS if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call stress2rhs'//achar(27)//'[0m'
+        if (shortstep==1 .and. flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call stress2rhs'//achar(27)//'[0m'
         call stress2rhs(ice, partit, mesh) 
         
         !_______________________________________________________________________

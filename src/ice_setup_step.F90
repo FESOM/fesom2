@@ -149,8 +149,9 @@ subroutine ice_timestep(step, ice, partit, mesh)
     
     !___________________________________________________________________________
     ! Dynamics
+    
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'  
-    SELECT CASE (whichEVP)
+    SELECT CASE (ice%whichEVP)
         CASE (0)
             call EVPdynamics(ice, partit, mesh)
         CASE (1)
