@@ -69,15 +69,13 @@ subroutine muscl_adv_init(twork, partit, mesh)
         ! --> SSH_stiff%rowptr(n+1)-SSH_stiff%rowptr(n) gives maximum number of 
         !     neighbouring nodes within a single row of the sparse matrix
         k=SSH_stiff%rowptr(n+1)-SSH_stiff%rowptr(n)
-#if defined(_OPENMP)
-           call omp_set_lock(partit%plock(n))
-#endif
+
+!$OMP CRITICAL
         if (k > nn_size) then
            nn_size=k ! nnum maximum number of neighbouring nodes
         end if
-#if defined(_OPENMP)
-           call omp_unset_lock(partit%plock(n))
-#endif
+!$OMP END CRITICAL
+
     end do
 !$OMP END DO    
 !$OMP END PARALLEL
