@@ -66,7 +66,7 @@ subroutine cut_off(partit, mesh)
 #endif /* (__oifs) */
 
 end subroutine cut_off
-#if !defined (__oasis)
+#if !defined (__oasis) && !defined (__ifsinterface)
 !===================================================================
 ! Sea-ice thermodynamics routines
 !
@@ -669,4 +669,4 @@ end function TFrez
 !
 !======================================================================================
 !
-#endif
+#endif /* #if !defined (__oasis) && !defined (__ifsinterface) */
