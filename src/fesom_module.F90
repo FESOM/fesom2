@@ -77,7 +77,7 @@ end module
 ! synopsis: main FESOM program split into 3 parts
 !           this way FESOM can e.g. be used as a library with an external time loop driver
 !           used with IFS-FESOM
-module fvom_module
+module fesom_module
   implicit none
   public fesom_init, fesom_runloop, fesom_finalize
   private
