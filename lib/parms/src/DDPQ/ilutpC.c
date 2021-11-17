@@ -298,7 +298,7 @@ msg_timer_start(&t27);
       len = lenl > fil5 ? fil5 : lenl;
       ilusch->L->nnzrow[ii] = len;
       if (lenl > len)
-         qsplitC(w, jw, lenl, len);
+         qsplitCF(w, jw, lenl, len);
 /*
   printf("  row %d   length of L = %d",ii,len);
 */
@@ -328,7 +328,7 @@ msg_timer_start(&t28);
       len = lenu > fil6 ? fil6 : lenu;
       ilusch->U->nnzrow[ii] = len;
       if (lenu > len+1)
-         qsplitC(&w[ii+1], &jw[ii+1], lenu-1, len);
+         qsplitCF(&w[ii+1], &jw[ii+1], lenu-1, len);
       ilusch->U->pa[ii] = (FLOAT *) Malloc(len*sizeof(FLOAT), "ilutpC:7" ); 
       ilusch->U->pj[ii] = (int *) Malloc(len*sizeof(int), "ilutpC:8" ); 
 /*---------------------------------------------------------------------
@@ -686,7 +686,7 @@ label40:
       lenl = len > fil5 ? fil5 : len;
       ilusch->L->nnzrow[ii] = lenl;
       if (len > lenl)
-         qsplitC(w, jw, len, lenl);
+         qsplitCF(w, jw, len, lenl);
       if (len > 0) {
 	 ilusch->L->pj[ii] = (int *) Malloc(lenl*sizeof(int), "ilutD:4" ); 
 	 ilusch->L->pa[ii] = (FLOAT *) Malloc(lenl*sizeof(FLOAT), "ilutD:5"); 
@@ -711,7 +711,7 @@ label40:
       ilusch->U->nnzrow[ii] = lenu;
       jpos = lenu-1;
       if (len > jpos)
-         qsplitC(w, jw, len, jpos);
+         qsplitCF(w, jw, len, jpos);
       ilusch->U->pa[ii] = (FLOAT *) Malloc(lenu*sizeof(FLOAT), "ilutD:6" ); 
       ilusch->U->pj[ii] = (int *) Malloc(lenu*sizeof(int), "ilutD:7" ); 
       if(ABS_VALUE(t) <= DBL_EPSILON) t= tnorm;
