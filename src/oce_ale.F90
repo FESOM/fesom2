@@ -980,7 +980,8 @@ subroutine update_thickness_ale(partit, mesh)
         
         ! if lzstar_lev=4 --> idx = /1,2,3,4/
         idx = (/(nz, nz=1, lzstar_lev, 1)/)
-        
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, elem, elnodes)
+!$OMP DO        
         !_______________________________________________________________________
         do elem=1,myDim_elem2D
             elnodes=elem2D_nodes(:, elem)
@@ -994,21 +995,6 @@ subroutine update_thickness_ale(partit, mesh)
             
             !___________________________________________________________________
             ! actualize elemental layer thinkness in first lzstar_lev layers
-!!PS             if (any(hnode_new(2:lzstar_lev,elnodes(1))-hnode(2:lzstar_lev,elnodes(1))/=0.0_WP) .or. &
-!!PS                 any(hnode_new(2:lzstar_lev,elnodes(2))-hnode(2:lzstar_lev,elnodes(2))/=0.0_WP) .or. &
-!!PS                 any(hnode_new(2:lzstar_lev,elnodes(3))-hnode(2:lzstar_lev,elnodes(3))/=0.0_WP)      &
-!!PS                 ) then
-!!PS                 ! --> case local zstar
-!!PS                 ! try to limitate over how much layers i realy need to distribute
-!!PS                 ! the change in ssh, so that the next loops run only over the 
-!!PS                 ! nesseccary levels and not over all lzstar_lev levels
-!!PS                 nz    = max(1 ,maxval(pack(idx,hnode_new(1:lzstar_lev,elnodes(1))-hnode(1:lzstar_lev,elnodes(1))/=0.0_WP)))
-!!PS                 nz    = max(nz,maxval(pack(idx,hnode_new(1:lzstar_lev,elnodes(2))-hnode(1:lzstar_lev,elnodes(2))/=0.0_WP)))
-!!PS                 nz    = max(nz,maxval(pack(idx,hnode_new(1:lzstar_lev,elnodes(3))-hnode(1:lzstar_lev,elnodes(3))/=0.0_WP)))
-!!PS                 nzmax = min(nz,nlevels(elem)-2)
-!!PS                 do nz=1,nzmax
-!!PS                     helem(nz,elem)=sum(hnode_new(nz,elnodes))/3.0_WP
-!!PS                 end do
             if (any(hnode_new(nzmin+1:nzmin+lzstar_lev-1,elnodes(1)) - hnode(nzmin+1:nzmin+lzstar_lev-1,elnodes(1))/=0.0_WP) .or. &
                 any(hnode_new(nzmin+1:nzmin+lzstar_lev-1,elnodes(2)) - hnode(nzmin+1:nzmin+lzstar_lev-1,elnodes(2))/=0.0_WP) .or. &
                 any(hnode_new(nzmin+1:nzmin+lzstar_lev-1,elnodes(3)) - hnode(nzmin+1:nzmin+lzstar_lev-1,elnodes(3))/=0.0_WP)      &
@@ -1031,10 +1017,10 @@ subroutine update_thickness_ale(partit, mesh)
                 helem(nzmin,elem)=sum(hnode_new(nzmin,elnodes))/3.0_WP
             end if
         end do
-        
+!$OMP END DO 
         !_______________________________________________________________________
+!$OMP DO 
         do n=1,myDim_nod2D+eDim_nod2D
-            !!PS nzmin = ulevels_nod2D(n)
             nzmin = ulevels_nod2D_max(n)
             nzmax = nlevels_nod2D_min(n)-1
             
@@ -1045,24 +1031,6 @@ subroutine update_thickness_ale(partit, mesh)
             
             !___________________________________________________________________
             ! actualize layer thinkness in first lzstar_lev layers
-!!PS             if ( (any(hnode_new(2:lzstar_lev,n)-hnode(2:lzstar_lev,n)/=0.0_WP)) ) then
-!!PS                 ! --> case local zstar 
-!!PS                 ! try to limitate over how much layers i realy need to distribute
-!!PS                 ! the change in ssh, so that the next loops run only over the 
-!!PS                 ! nesseccary levels and not over all lzstar_lev levels
-!!PS                 nz = max(1,maxval(pack(idx,hnode_new(1:lzstar_lev,n)-hnode(1:lzstar_lev,n)/=0.0_WP)))
-!!PS                 
-!!PS                 ! nlevels_nod2D_min(n)-1 ...would be hnode of partial bottom cell but this
-!!PS                 ! one is not allowed to change so go until nlevels_nod2D_min(n)-2
-!!PS                 nzmax = min(nz,nlevels_nod2D_min(n)-2)
-!!PS                 ! do not touch zbars_3d_n that are involved in the bottom cell !!!!
-!!PS                 ! this ones are set up during initialisation and are not touched afterwards
-!!PS                 ! --> nlevels_nod2D_min(n),nlevels_nod2D_min(n)-1
-!!PS                 do nz=nzmax,1,-1
-!!PS                     hnode(nz,n)     = hnode_new(nz,n)
-!!PS                     zbar_3d_n(nz,n) = zbar_3d_n(nz+1,n)+hnode_new(nz,n)
-!!PS                     Z_3d_n(nz,n)    = zbar_3d_n(nz+1,n)+hnode_new(nz,n)/2.0_WP
-!!PS                 end do
             if ( (any(hnode_new(nzmin+1:nzmin+lzstar_lev-1,n)-hnode(nzmin+1:nzmin+lzstar_lev-1,n)/=0.0_WP)) ) then
                 ! --> case local zstar 
                 ! try to limitate over how much layers i realy need to distribute
@@ -1085,17 +1053,14 @@ subroutine update_thickness_ale(partit, mesh)
             !___________________________________________________________________
             ! only actualize layer thinkness in first layer 
             else
-!!PS                 ! --> case normal zlevel
-!!PS                 hnode(1,n)    = hnode_new(1,n)
-!!PS                 zbar_3d_n(1,n)= zbar_3d_n(2,n)+hnode_new(1,n)
-!!PS                 Z_3d_n(1,n)   = zbar_3d_n(2,n)+hnode_new(1,n)/2.0_WP
                 ! --> case normal zlevel
                 hnode(nzmin,n)    = hnode_new(nzmin,n)
                 zbar_3d_n(nzmin,n)= zbar_3d_n(nzmin+1,n)+hnode_new(nzmin,n)
                 Z_3d_n(nzmin,n)   = zbar_3d_n(nzmin+1,n)+hnode_new(nzmin,n)/2.0_WP
             end if
         end do
-        
+!$OMP END DO
+!$OMP END PARALLEL        
         !_______________________________________________________________________
         deallocate(idx)
         
@@ -1105,10 +1070,10 @@ subroutine update_thickness_ale(partit, mesh)
     elseif (trim(which_ale)=='zstar' ) then
         
         ! --> update layer thinkness, depth layer  and mid-depth layer at node
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax)
         do n=1, myDim_nod2D+eDim_nod2D
             ! actualize 3d depth levels and mid-depth levels from bottom to top
             nzmin = ulevels_nod2D(n)
-!!PS             nzmin = ulevels_nod2D_max(n)
             nzmax = nlevels_nod2D_min(n)-2
             
             !___________________________________________________________________
@@ -1119,20 +1084,19 @@ subroutine update_thickness_ale(partit, mesh)
             !___________________________________________________________________
             ! do not touch zbars_3d_n that are involved in the bottom cell !!!!
             ! --> nlevels_nod2D_min(n),nlevels_nod2D_min(n)-1
-            !!PS do nz=nzmax,1,-1
-            do nz=nzmax,nzmin,-1
+            do nz=nzmax, nzmin,-1
                 hnode(nz,n)     = hnode_new(nz,n)
                 zbar_3d_n(nz,n) = zbar_3d_n(nz+1,n) + hnode_new(nz,n)
                 Z_3d_n(nz,n)    = zbar_3d_n(nz+1,n) + hnode_new(nz,n)/2.0_WP
             end do
         end do
-        
+!$OMP END PARALLEL DO
         !_______________________________________________________________________
         ! --> update mean layer thinkness at element
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax)
         do elem=1, myDim_elem2D
             nzmin = ulevels(elem)
             nzmax = nlevels(elem)-1
-            
             !___________________________________________________________________
             ! if there is a cavity layer thickness is not updated, its 
             ! kept fixed 
@@ -1140,13 +1104,12 @@ subroutine update_thickness_ale(partit, mesh)
             
             !___________________________________________________________________
             elnodes=elem2D_nodes(:, elem)
-            !!PS do nz=1,nlevels(elem)-2
-            do nz=nzmin,nzmax-1
+            do nz=nzmin, nzmax-1
                 helem(nz,elem)=sum(hnode(nz,elnodes))/3.0_WP
             end do
         end do
+!$OMP END PARALLEL DO
     endif
-
 end subroutine update_thickness_ale
 !
 !
