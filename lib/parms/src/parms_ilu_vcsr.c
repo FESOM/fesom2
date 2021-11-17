@@ -16,7 +16,7 @@ typedef struct parms_ilu_data {
 } *parms_ilu_data;
 
 /*
-int qsplitC(FLOAT *a, int *ind, int n, int ncut);
+int qsplitCF(FLOAT *a, int *ind, int n, int ncut);
 void qqsort(int *ja, FLOAT *ma, int left, int right);
 */
 
@@ -1436,7 +1436,7 @@ int parms_ilut_vcsr(parms_Mat self, parms_FactParam param, void *mat,
 #endif 
     /* quick sort */
     if (len > lenl) {
-      qsplitC(w,jw,len,lenl);
+      qsplitCF(w,jw,len,lenl);
     }
     
     if (lenl > 0) {
@@ -1471,7 +1471,7 @@ int parms_ilut_vcsr(parms_Mat self, parms_FactParam param, void *mat,
       lenu = len + 1 > fill ? fill: len + 1;
       jpos = lenu - 1;
       if (len > jpos)
-	qsplitC(&w[ii+start+1], &jw[ii+start+1], len, jpos);
+	qsplitCF(&w[ii+start+1], &jw[ii+start+1], len, jpos);
       
       data->U->nnzrow[start+ii] = lenu;
 
