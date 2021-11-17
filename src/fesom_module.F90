@@ -234,32 +234,32 @@ contains
             write(*,*) '============================================' 
         endif
 
-        f%dump_dir='DUMP/'
-        INQUIRE(file=trim(f%dump_dir), EXIST=f%L_EXISTS)
-        if (.not. f%L_EXISTS) call system('mkdir '//trim(f%dump_dir))
+    !    f%dump_dir='DUMP/'
+    !    INQUIRE(file=trim(f%dump_dir), EXIST=f%L_EXISTS)
+    !    if (.not. f%L_EXISTS) call system('mkdir '//trim(f%dump_dir))
 
-        write (f%dump_filename, "(A7,I7.7)") "t_mesh.", f%mype
-        open  (f%mype+300, file=TRIM(f%dump_dir)//trim(f%dump_filename), status='replace', form="unformatted")
-        write (f%mype+300) f%mesh
-        close (f%mype+300)
+    !    write (f%dump_filename, "(A7,I7.7)") "t_mesh.", f%mype
+    !    open  (f%mype+300, file=TRIM(f%dump_dir)//trim(f%dump_filename), status='replace', form="unformatted")
+    !    write (f%mype+300) f%mesh
+    !    close (f%mype+300)
 
     !    open  (f%mype+300, file=trim(f%dump_filename), status='old', form="unformatted")
     !    read  (f%mype+300) f%mesh_copy
     !    close (f%mype+300)
          
-        write (f%dump_filename, "(A9,I7.7)") "t_tracer.", f%mype
-        open  (f%mype+300, file=TRIM(f%dump_dir)//trim(f%dump_filename), status='replace', form="unformatted")
-        write (f%mype+300) f%tracers
-        close (f%mype+300)
+    !    write (f%dump_filename, "(A9,I7.7)") "t_tracer.", f%mype
+    !    open  (f%mype+300, file=TRIM(f%dump_dir)//trim(f%dump_filename), status='replace', form="unformatted")
+    !    write (f%mype+300) f%tracers
+    !    close (f%mype+300)
 
     !    open  (f%mype+300, file=trim(f%dump_filename), status='old', form="unformatted")
     !    read  (f%mype+300) f%dynamics_copy
     !    close (f%mype+300)
 
-        write (f%dump_filename, "(A9,I7.7)") "t_dynamics.", f%mype
-        open  (f%mype+300, file=TRIM(f%dump_dir)//trim(f%dump_filename), status='replace', form="unformatted")
-        write (f%mype+300) f%dynamics
-        close (f%mype+300)
+    !    write (f%dump_filename, "(A9,I7.7)") "t_dynamics.", f%mype
+    !    open  (f%mype+300, file=TRIM(f%dump_dir)//trim(f%dump_filename), status='replace', form="unformatted")
+    !    write (f%mype+300) f%dynamics
+    !    close (f%mype+300)
 
     !    open  (f%mype+300, file=trim(f%dump_filename), status='old', form="unformatted")
     !    read  (f%mype+300) f%tracers_copy
