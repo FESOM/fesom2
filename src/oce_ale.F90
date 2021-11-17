@@ -979,7 +979,7 @@ subroutine update_thickness_ale(partit, mesh)
         allocate(idx(lzstar_lev))
         
         ! if lzstar_lev=4 --> idx = /1,2,3,4/
-        idx = (/(nz,nz=1,lzstar_lev,1)/)
+        idx = (/(nz, nz=1, lzstar_lev, 1)/)
         
         !_______________________________________________________________________
         do elem=1,myDim_elem2D
@@ -2165,7 +2165,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
        idx = (/(nz, nz=1, lzstar_lev, 1)/)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, dhbar_total, max_dhbar2distr, cumsum_maxdhbar, &
-!$OMP                                                    distrib_dhbar, dhbar_rest, distrib_dhbar_int, idx )
+!$OMP                                                    distrib_dhbar, dhbar_rest, distrib_dhbar_int)
 !$OMP DO
         do n=1, myDim_nod2D
             nzmin = ulevels_nod2D(n)
