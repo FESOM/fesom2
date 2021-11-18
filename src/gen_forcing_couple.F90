@@ -97,7 +97,6 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
 #endif
   use gen_bulk
   use force_flux_consv_interface
-
   implicit none
   integer,        intent(in)            :: istep
   type(t_ice)   , intent(inout), target :: ice
@@ -125,10 +124,19 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   !integer, parameter                    :: nci=192, ncj=94 ! T62 grid
   !real(kind=WP), dimension(nci,ncj)     :: array_nc, array_nc2,array_nc3,x
   !character(500)                        :: file
+  integer,        dimension(:),  pointer :: oce_heat_flux, ice_heat_flux,
+  integer,        dimension(:),  pointer :: stress_atmice_x, stress_atmice_y 
+  integer,        dimension(:),  pointer :: enthalpyoffuse
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+  oce_heat_flux   => ice%atmcoupl%oce_flx_h
+  ice_heat_flux   => ice%atmcoupl%ice_flx_h
+  stress_atmice_x => ice%stress_atmice_xy(1,:)
+  stress_atmice_y => ice%stress_atmice_xy(2,:)
+  enthalpyoffuse  => ice%atmcoupl%enthalpyoffuse
+  
   t1=MPI_Wtime()
 #ifdef __oasis
      if (firstcall) then
@@ -347,7 +355,8 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
      if (ulevels_nod2d(i)>1) then
         stress_atmoce_x(i)=0.0_WP
         stress_atmoce_y(i)=0.0_WP
-        ice%stress_atmice_xy(:,i)=0.0_WP
+        stress_atmice_x(i)=0.0_WP
+        stress_atmice_y(i)=0.0_WP
         cycle
      end if 
      

@@ -23,7 +23,9 @@ subroutine thermodynamics(ice, partit, mesh)
   use i_param
   use g_config
   use g_forcing_param
-  use g_forcing_arrays
+  use g_forcing_arrays, only: shortwave, prec_rain, prec_snow, evaporation,  &
+                              runoff, sublimation, evap_no_ifrac, real_salt_flux, &
+                              flice
   use g_comm_auto
   use g_rotate_grid
   implicit none
@@ -58,8 +60,11 @@ subroutine thermodynamics(ice, partit, mesh)
   integer, pointer                       :: myDim_nod2D, eDim_nod2D
   integer,        dimension(:),  pointer :: ulevels_nod2D
   real(kind=WP),  dimension(:,:),pointer :: geo_coord_nod2D
-  integer,        dimension(:),  pointer :: a_ice, m_ice, m_snow, T_oc_array, S_oc_array
+  integer,        dimension(:),  pointer :: a_ice, m_ice, m_snow, u_ice, v_ice, 
+  integer,        dimension(:),  pointer :: ice_temp, ice_alb
+  integer,        dimension(:),  pointer :: T_oc_array, S_oc_array, u_w, v_w
   integer,        dimension(:),  pointer :: net_heat_flux, fresh_wa_flux, thdgr, thdgrsn
+  integer,        dimension(:),  pointer :: oce_heat_flux, ice_heat_flux, enthalpyoffuse
   myDim_nod2d=>partit%myDim_nod2D
   eDim_nod2D =>partit%eDim_nod2D
   ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D
@@ -67,13 +72,21 @@ subroutine thermodynamics(ice, partit, mesh)
   a_ice         => ice%data(1)%values(:)
   m_ice         => ice%data(2)%values(:)
   m_snow        => ice%data(3)%values(:)
+  ice_temp      => ice%data(4)%values(:)
+  u_ice         => ice%uvice(1,:)
+  v_ice         => ice%uvice(1,:)
   T_oc_array    => ice%srfoce_temp(:)
   S_oc_array    => ice%srfoce_salt(:)
+  u_w           => ice%srfoce_uv(1,:)
+  v_w           => ice%srfoce_uv(1,:)
   fresh_wa_flux => ice%flx_fw
   net_heat_flux => ice%flx_h
   thdgr         => ice%thermo%thdgr
   thdgrsn       => ice%thermo%thdgrsn
-   
+  ice_alb       => ice%atmcoupl%ice_alb
+  oce_heat_flux => ice%atmcoupl%oce_flx_h
+  ice_heat_flux => ice%atmcoupl%ice_flx_h
+  enthalpyoffuse=> ice%atmcoupl%enthalpyoffuse
   !_____________________________________________________________________________ 
   rsss = ref_sss
 
