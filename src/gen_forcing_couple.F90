@@ -124,7 +124,7 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   !integer, parameter                    :: nci=192, ncj=94 ! T62 grid
   !real(kind=WP), dimension(nci,ncj)     :: array_nc, array_nc2,array_nc3,x
   !character(500)                        :: file
-  integer,        dimension(:),  pointer :: oce_heat_flux, ice_heat_flux,
+  integer,        dimension(:),  pointer :: oce_heat_flux, ice_heat_flux
   integer,        dimension(:),  pointer :: stress_atmice_x, stress_atmice_y 
   integer,        dimension(:),  pointer :: enthalpyoffuse
 #include "associate_part_def.h"
