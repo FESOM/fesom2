@@ -148,7 +148,7 @@ TYPE T_ICE
     
     real(kind=WP)             :: ice_dt                    ! ice step=ice_ave_steps*oce_step
     real(kind=WP)             :: Tevp_inv   
-    integer                   :: ice_steps_since_upd
+    integer                   :: ice_steps_since_upd=0
     
     logical                   :: ice_update = .true.
     !___________________________________________________________________________

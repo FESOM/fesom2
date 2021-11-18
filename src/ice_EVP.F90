@@ -5,7 +5,7 @@ module ice_EVP_interfaces
         USE MOD_PARTIT
         USE MOD_PARSUP
         USE MOD_MESH
-        type(t_ice)   , intent(in)   , target :: ice
+        type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
         end subroutine
@@ -15,12 +15,13 @@ module ice_EVP_interfaces
         USE MOD_PARTIT
         USE MOD_PARSUP
         USE MOD_MESH
-        type(t_ice)   , intent(in)   , target :: ice
+        type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
         end subroutine
     end interface  
 end module
+
 module ice_EVPdynamics_interfaces
     interface
         subroutine EVPdynamics(ice, partit, mesh)
@@ -28,7 +29,7 @@ module ice_EVPdynamics_interfaces
         USE MOD_PARTIT
         USE MOD_PARSUP
         USE MOD_MESH
-        type(t_ice)   , intent(in)   , target :: ice
+        type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
         end subroutine
@@ -87,7 +88,7 @@ subroutine stress_tensor(ice, partit, mesh)
     dte  = ice%ice_dt/(1.0_WP*ice%evp_rheol_steps)
     det1 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte)
     det2 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte) !*ellipse**2 
-     
+    
     !___________________________________________________________________________
     do el=1,myDim_elem2D
         !_______________________________________________________________________
@@ -109,6 +110,7 @@ subroutine stress_tensor(ice, partit, mesh)
             eps12(el) = 0.5_WP*(sum(gradient_sca(4:6,el)*U_ice(elem2D_nodes(1:3,el))) &
                         + sum(gradient_sca(1:3,el)*V_ice(elem2D_nodes(1:3,el))) &
                         + metric_factor(el) * sum(U_ice(elem2D_nodes(1:3,el)))/3.0_WP)
+            
             !___________________________________________________________________
             ! moduli:
             delta = sqrt((eps11(el)*eps11(el) + eps22(el)*eps22(el))*(1.0_WP+vale) + &
@@ -137,11 +139,11 @@ subroutine stress_tensor(ice, partit, mesh)
             ! Without it divergence and zeta can be noisy (but code 
             ! remains stable), using it reduces viscosities too strongly.
             ! It is therefore commented
-        
+            
             !if (zeta>Clim_evp*voltriangle(el)) then
             !zeta=Clim_evp*voltriangle(el)
             !end if 
-        
+            
             zeta = zeta*ice%Tevp_inv
                             
             r1  = zeta*(eps11(el)+eps22(el)) - ice_strength(el)*ice%Tevp_inv
@@ -154,7 +156,7 @@ subroutine stress_tensor(ice, partit, mesh)
             sigma12(el) = det2*(sigma12(el)+dte*r3)
             sigma11(el) = 0.5_WP*(si1+si2)
             sigma22(el) = 0.5_WP*(si1-si2)
-
+            
 #if defined (__icepack)
             rdg_conv_elem(el)  = -min((eps11(el)+eps22(el)),0.0_WP)
             rdg_shear_elem(el) = 0.5_WP*(delta - abs(eps11(el)+eps22(el)))
@@ -386,7 +388,6 @@ subroutine stress2rhs(ice, partit, mesh)
     USE o_PARAM
     USE i_PARAM
     USE i_THERM_PARAM
-    USE i_arrays, only:
     IMPLICIT NONE
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -460,6 +461,7 @@ subroutine stress2rhs(ice, partit, mesh)
             V_rhs_ice(n) = 0._WP
         endif
     end do
+    
 end subroutine stress2rhs
 !
 !
@@ -481,7 +483,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     USE icedrv_main,   only: icepack_to_fesom   
 #endif
     IMPLICIT NONE
-    type(t_ice)   , intent(in)   , target :: ice
+    type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
@@ -502,12 +504,12 @@ subroutine EVPdynamics(ice, partit, mesh)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer :: a_ice, m_ice, m_snow
-    real(kind=WP), dimension(:), pointer :: ice_strength, inv_areamass, inv_mass
     real(kind=WP), dimension(:), pointer :: stress_atmice_x, stress_atmice_y
     real(kind=WP), dimension(:), pointer :: U_ice, V_ice, U_ice_old, V_ice_old, &
                                             U_w, V_w, U_rhs_ice, V_rhs_ice
     real(kind=WP), dimension(:), pointer :: a_ice_old, m_ice_old, m_snow_old
     real(kind=WP), dimension(:), pointer :: rhs_a, rhs_m, elevation
+    real(kind=WP), dimension(:), pointer :: ice_strength, inv_areamass, inv_mass
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -555,6 +557,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     ! Precompute values that are never changed during the iteration
     inv_areamass =0.0_WP
     inv_mass     =0.0_WP
+    ice_strength =0.0_WP
     rhs_a        =0.0_WP
     rhs_m        =0.0_WP
     do n=1,myDim_nod2D 
@@ -577,8 +580,8 @@ subroutine EVPdynamics(ice, partit, mesh)
             ! Limit the mass if it is too small
             inv_mass(n) = 1.0_WP/max(inv_mass(n), 9.0_WP)        
         endif
-        !!PS rhs_a(n)=0.0_WP       ! these are used as temporal storage here
-        !!PS rhs_m(n)=0.0_WP       ! for the contribution due to ssh
+!         rhs_a(n)=0.0_WP       ! these are used as temporal storage here
+!         rhs_m(n)=0.0_WP       ! for the contribution due to ssh
     enddo
     
     !___________________________________________________________________________
@@ -685,17 +688,18 @@ subroutine EVPdynamics(ice, partit, mesh)
     rdg_conv_elem(:)  = 0.0_WP
     rdg_shear_elem(:) = 0.0_WP
 #endif
-    
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> do evp subcycle'//achar(27)//'[0m'
     do shortstep=1, ice%evp_rheol_steps 
         !_______________________________________________________________________
-        if (shortstep==1 .and. flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call stress_tensor'//achar(27)//'[0m'
+        !!PS if (shortstep==1 .and. flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call stress_tensor'//achar(27)//'[0m', shortstep
         call stress_tensor(ice, partit, mesh)
-        if (shortstep==1 .and. flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call stress2rhs'//achar(27)//'[0m'
-        call stress2rhs(ice, partit, mesh) 
+        !!PS if (shortstep==1 .and. flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call stress2rhs'//achar(27)//'[0m', shortstep
+        call stress2rhs(ice, partit, mesh)
         
         !_______________________________________________________________________
         U_ice_old = U_ice !PS
         V_ice_old = V_ice !PS
+        
         do n=1,myDim_nod2D 
             !___________________________________________________________________
             ! if cavity node skip it 
@@ -704,7 +708,9 @@ subroutine EVPdynamics(ice, partit, mesh)
             !___________________________________________________________________
             if (a_ice(n) >= 0.01_WP) then               ! Skip if ice is absent
                 umod = sqrt((U_ice(n)-U_w(n))**2+(V_ice(n)-V_w(n))**2)
+                
                 drag = ice%cd_oce_ice*umod*density_0*inv_mass(n)
+                
                 rhsu = U_ice(n) +rdt*(drag*(ax*U_w(n) - ay*V_w(n))+ &
                        inv_mass(n)*stress_atmice_x(n) + U_rhs_ice(n))
                 rhsv = V_ice(n) +rdt*(drag*(ax*V_w(n) + ay*U_w(n))+ &
@@ -716,6 +722,7 @@ subroutine EVPdynamics(ice, partit, mesh)
                 
                 U_ice(n) = det*(r_a*rhsu +r_b*rhsv)
                 V_ice(n) = det*(r_a*rhsv -r_b*rhsu)
+                
             else  ! Set velocities to 0 if ice is absent 
                 U_ice(n) = 0.0_WP
                 V_ice(n) = 0.0_WP
@@ -726,7 +733,7 @@ subroutine EVPdynamics(ice, partit, mesh)
         ! apply sea ice velocity boundary condition 
         DO  ed=1,myDim_edge2D
             !___________________________________________________________________
-            ! apply coastal sea ice velocity boundary conditions
+            !apply coastal sea ice velocity boundary conditions
             if(myList_edge2D(ed) > edge2D_in) then
                 U_ice(edges(1:2,ed))=0.0_WP
                 V_ice(edges(1:2,ed))=0.0_WP
@@ -742,6 +749,8 @@ subroutine EVPdynamics(ice, partit, mesh)
                 end if 
             end if 
         end do
-        call exchange_nod(U_ice, V_ice, partit)   
+        call exchange_nod(U_ice, V_ice, partit) 
+        
     end do
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> finish rest evp subcycle'//achar(27)//'[0m'
 end subroutine EVPdynamics

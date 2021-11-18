@@ -149,7 +149,6 @@ subroutine ice_timestep(step, ice, partit, mesh)
     
     !___________________________________________________________________________
     ! Dynamics
-    
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'  
     SELECT CASE (ice%whichEVP)
         CASE (0)
@@ -260,8 +259,7 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
     !!PS real(kind=WP), external               :: TFrez  ! Sea water freeze temperature.
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP), dimension(:)  , pointer:: a_ice, m_ice, m_snow
-    real(kind=WP), dimension(:,:), pointer:: uv_ice
+    real(kind=WP), dimension(:)  , pointer:: a_ice, m_ice, m_snow, u_ice, v_ice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -269,8 +267,9 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
     a_ice  => ice%data(1)%values
     m_ice  => ice%data(2)%values
     m_snow => ice%data(3)%values
-    !!PS uv_ice => ice%uvice
-
+    u_ice  => ice%uvice(1,:)
+    v_ice  => ice%uvice(2,:)
+    
     !___________________________________________________________________________
     ! pointer on necessary derived types
     if(mype==0) write(*,*) 'initialize the sea ice'
@@ -295,7 +294,8 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
                 m_snow(node)= 0.5_WP 
             end if
             a_ice(node) = 0.9_WP
-            !!PS uv_ice(:,i) = 0.0_WP
+            u_ice(node) = 0.0_WP
+            v_ice(node) = 0.0_WP
             
         endif
     enddo
