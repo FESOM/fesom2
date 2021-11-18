@@ -295,6 +295,7 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
         do_rotate_ice_wind=.false.
     end if
 #else
+#ifndef __ifsinterface
   call sbc_do(partit, mesh)
   u_wind    = atmdata(i_xwind,:)
   v_wind    = atmdata(i_ywind,:)
@@ -305,7 +306,8 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   prec_rain = atmdata(i_prec ,:)/1000._WP
   prec_snow = atmdata(i_snow ,:)/1000._WP
   press_air = atmdata(i_mslp ,:) ! unit should be Pa
-
+#endif  
+  
   if (use_cavity) then 
     do i=1,myDim_nod2d+eDim_nod2d
         if (ulevels_nod2d(i)>1) then

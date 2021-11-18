@@ -7,7 +7,7 @@
 !=============================================================================!    
 
 program main
-  use fvom_module
+  use fesom_module
 
   integer nsteps
 

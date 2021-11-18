@@ -73,6 +73,7 @@ module g_cvmix_pp
         character(len=MAX_PATH)          :: nmlfile
         logical                          :: nmlfile_exist=.False.
         integer                          :: node_size
+        integer fileunit
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -102,9 +103,9 @@ module g_cvmix_pp
         ! check if cvmix namelist file exists if not use default values 
         inquire(file=trim(nmlfile),exist=nmlfile_exist) 
         if (nmlfile_exist) then
-            open(20,file=trim(nmlfile))
-                read(20,nml=param_pp)
-            close(20)
+            open(newunit=fileunit,file=trim(nmlfile))
+                read(fileunit,nml=param_pp)
+            close(fileunit)
         else
             write(*,*) '     could not find namelist.cvmix, will use default values !'
         end if

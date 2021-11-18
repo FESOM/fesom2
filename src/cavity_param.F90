@@ -7,7 +7,7 @@ module cavity_heat_water_fluxes_3eq_interface
         USE MOD_PARTIT
         USE MOD_PARSUP
         USE MOD_MESH
-        type(t_ice)   , intent(in)   , target :: ice
+        type(t_ice)   , intent(inout), target :: ice
         type(t_dyn)   , intent(in)   , target :: dynamics
         type(t_tracer), intent(in)   , target :: tracers
         type(t_partit), intent(inout), target :: partit
@@ -176,7 +176,7 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
     use o_PARAM , only: density_0, WP
     use o_ARRAYS, only: heat_flux, water_flux, density_m_rho0, density_ref
     implicit none
-    type(t_ice)   , intent(in)   , target :: ice
+    type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(in)   , target :: dynamics
     type(t_tracer), intent(in)   , target :: tracers
     type(t_partit), intent(inout), target :: partit

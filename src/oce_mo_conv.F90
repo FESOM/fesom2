@@ -46,6 +46,7 @@ subroutine mo_convect(ice, partit, mesh)
     ! Computes the mixing length derived from the Monin
     if (use_momix) then
         mo = 0._WP
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax)
         do node=1, myDim_nod2D+eDim_nod2D
             nzmax = nlevels_nod2d(node)
             nzmin = ulevels_nod2d(node)
@@ -78,11 +79,12 @@ subroutine mo_convect(ice, partit, mesh)
                 end if    
             end do 
         end do
+!$OMP END PARALLEL DO
     end if
-    
     !
     !___________________________________________________________________________
     ! apply mixing enhancements to vertical diffusivity
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax)
     do node=1, myDim_nod2D+eDim_nod2D
         nzmax = nlevels_nod2d(node)
         nzmin = ulevels_nod2d(node)
@@ -98,11 +100,12 @@ subroutine mo_convect(ice, partit, mesh)
             
         end do
     end do
-    
+!$OMP END PARALLEL DO
     !
     !___________________________________________________________________________
     ! apply mixing enhancements to vertical viscosity
     ! elem2D_nodes has no dimension until +eDim_elem2D
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax)
     do elem=1, myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
         nzmax = nlevels(elem)
@@ -123,7 +126,7 @@ subroutine mo_convect(ice, partit, mesh)
                 if (use_windmix .and. nz<=windmix_nl+1) Av(nz,elem)=max(Av(nz,elem), windmix_kv)
         end do
     end do
-    !!PS call exchange_elem(Av)
+!$OMP END PARALLEL DO
 end subroutine mo_convect
 !
 !

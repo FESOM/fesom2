@@ -88,6 +88,7 @@ subroutine cut_off(ice, partit, mesh)
 
 end subroutine cut_off
 
+
 !===================================================================
 ! Sea-ice thermodynamics routines
 !
@@ -99,7 +100,7 @@ end subroutine cut_off
 ! by Qiang Wang, 13.01.2009
 !----------------------------------------------------------------------------
 ! if coupled different thermodynamics !!!
-#if !defined (__oasis) 
+#if !defined (__oasis) && !defined (__ifsinterface)
 subroutine thermodynamics(ice, partit, mesh)
     !
     ! For every surface node, this subroutine extracts the information
@@ -714,4 +715,4 @@ end function TFrez
 !
 !======================================================================================
 !
-#endif
+#endif /* #if !defined (__oasis) && !defined (__ifsinterface) */

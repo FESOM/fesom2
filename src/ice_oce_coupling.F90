@@ -9,7 +9,7 @@ module ocean2ice_interface
       USE MOD_MESH
       type(t_ice)   , intent(inout), target :: ice
       type(t_dyn)   , intent(in)   , target :: dynamics
-      type(t_tracer), intent(in)   , target :: tracers
+      type(t_tracer), intent(inout), target :: tracers
       type(t_partit), intent(inout), target :: partit
       type(t_mesh)  , intent(in)   , target :: mesh
       

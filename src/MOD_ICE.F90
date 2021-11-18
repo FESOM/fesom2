@@ -63,15 +63,15 @@ END TYPE T_ICE_THERMO
 !_______________________________________________________________________________
 ! set work array derived type for ice
 TYPE T_ICE_ATMCOUPL
-#if defined (__oasis)
+#if defined (__oasis) || defined (__ifsinterface)
     !___________________________________________________________________________
     real(kind=WP), allocatable, dimension(:)    :: oce_flx_h, ice_flx_h, tmpoce_flx_h, tmpice_flx_h
-#if defined (__oifs)
+#if defined (__oifs) || defined (__ifsinterface)
     !___________________________________________________________________________
     real(kind=WP), allocatable, dimension(:)    :: ice_alb, enthalpyoffuse
     ! !!! DONT FORGET ice_temp rhs_tempdiv rhs_temp is advected for oifs !!! --> becomes additional ice 
     ! tracer in ice%data(4)%values
-#endif /* (__oifs) */
+#endif /* (__oifs)  */
 #endif /* (__oasis) */
     !___________________________________________________________________________
     contains
@@ -103,7 +103,7 @@ TYPE T_ICE
     
     !___________________________________________________________________________
     ! total number of ice tracers (default=3, 1=area, 2=mice, 3=msnow, (4=ice_temp)
-#if defined (__oifs)
+#if defined (__oifs) || defined (__ifsinterface)
     integer                                     :: num_itracers=4
 #else
     integer                                     :: num_itracers=3
@@ -119,7 +119,7 @@ TYPE T_ICE
     ! put thermodynamics arrays
     type(t_ice_thermo)                          :: thermo
     
-#if defined (__oasis)
+#if defined (__oasis) || defined (__ifsinterface)
     !___________________________________________________________________________
     ! put ice arrays for coupled model
     type(t_ice_atmcoupl)                        :: atmcoupl
@@ -284,12 +284,12 @@ subroutine WRITE_T_ICE_ATMCOUPL(tcoupl, unit, iostat, iomsg)
     integer,                intent(in)     :: unit
     integer,                intent(out)    :: iostat
     character(*),           intent(inout)  :: iomsg
-#if defined (__oasis)    
+#if defined (__oasis) || defined (__ifsinterface)    
     call write_bin_array(tcoupl%oce_flx_h,      unit, iostat, iomsg)
     call write_bin_array(tcoupl%ice_flx_h,      unit, iostat, iomsg)
     call write_bin_array(tcoupl%tmpoce_flx_h,   unit, iostat, iomsg)
     call write_bin_array(tcoupl%tmpice_flx_h,   unit, iostat, iomsg)
-#if defined (__oifs)    
+#if defined (__oifs) || defined (__ifsinterface)  
     call write_bin_array(tcoupl%ice_alb,        unit, iostat, iomsg)
     call write_bin_array(tcoupl%enthalpyoffuse, unit, iostat, iomsg)
 #endif /* (__oifs) */
@@ -303,12 +303,12 @@ subroutine READ_T_ICE_ATMCOUPL(tcoupl, unit, iostat, iomsg)
     integer,                intent(in)     :: unit
     integer,                intent(out)    :: iostat
     character(*),           intent(inout)  :: iomsg
-#if defined (__oasis)    
+#if defined (__oasis) || defined (__ifsinterface)
     call read_bin_array(tcoupl%oce_flx_h, unit, iostat, iomsg)
     call read_bin_array(tcoupl%ice_flx_h, unit, iostat, iomsg)
     call read_bin_array(tcoupl%tmpoce_flx_h, unit, iostat, iomsg)
     call read_bin_array(tcoupl%tmpice_flx_h, unit, iostat, iomsg)
-#if defined (__oifs)    
+#if defined (__oifs) || defined (__ifsinterface)  
     call read_bin_array(tcoupl%ice_alb, unit, iostat, iomsg)
     call read_bin_array(tcoupl%enthalpyoffuse, unit, iostat, iomsg)
 #endif /* (__oifs) */
@@ -346,7 +346,7 @@ subroutine WRITE_T_ICE(ice, unit, iostat, iomsg)
     !___________________________________________________________________________
     write(unit, iostat=iostat, iomsg=iomsg) ice%thermo
     write(unit, iostat=iostat, iomsg=iomsg) ice%work
-#if defined (__oasis)
+#if defined (__oasis) || defined (__ifsinterface)
     write(unit, iostat=iostat, iomsg=iomsg) ice%atmcoupl
 #endif /* (__oasis) */       
 
@@ -404,7 +404,7 @@ subroutine READ_T_ICE(ice, unit, iostat, iomsg)
     !___________________________________________________________________________
     read(unit, iostat=iostat, iomsg=iomsg) ice%thermo
     read(unit, iostat=iostat, iomsg=iomsg) ice%work
-#if defined (__oasis)
+#if defined (__oasis) || defined (__ifsinterface)
     read(unit, iostat=iostat, iomsg=iomsg) ice%atmcoupl
 #endif /* (__oasis) */       
 
@@ -640,7 +640,7 @@ subroutine ice_init(ice, partit, mesh)
     
     !___________________________________________________________________________
     ! initialse coupling array of ice derived type 
-#if defined (__oasis)    
+#if defined (__oasis) || defined (__ifsinterface)    
     allocate(ice%tcoupl%oce_flx_h(     node_size))
     allocate(ice%tcoupl%ice_flx_h(     node_size))
     allocate(ice%tcoupl%tmpoce_flx_h(  node_size))
@@ -649,7 +649,7 @@ subroutine ice_init(ice, partit, mesh)
     ice%tcoupl%ice_flx_h     = 0.0_WP
     ice%tcoupl%tmpoce_flx_h  = 0.0_WP
     ice%tcoupl%tmpice_flx_h  = 0.0_WP
-#if defined (__oifs)  
+#if defined (__oifs) || defined (__ifsinterface)  
     allocate(ice%tcoupl%ice_alb(       node_size))
     allocate(ice%tcoupl%enthalpyoffuse(node_size))
     ice%tcoupl%ice_alb       = 0.0_WP

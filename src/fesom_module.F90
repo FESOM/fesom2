@@ -71,6 +71,7 @@ module fesom_main_storage_module
     
     character(LEN=MPI_MAX_LIBRARY_VERSION_STRING) :: mpi_version_txt
     integer mpi_version_len
+    logical fesom_did_mpi_init
     
   end type
   type(fesom_main_storage_type), save, target :: f
@@ -81,7 +82,7 @@ end module
 ! synopsis: main FESOM program split into 3 parts
 !           this way FESOM can e.g. be used as a library with an external time loop driver
 !           used with IFS-FESOM
-module fvom_module
+module fesom_module
   implicit none
   public fesom_init, fesom_runloop, fesom_finalize
   private
@@ -92,16 +93,25 @@ contains
       use fesom_main_storage_module
       integer, intent(out) :: fesom_total_nsteps
       ! EO parameters
+      logical mpi_is_initialized
 
       if(command_argument_count() > 0) then
         call command_line_options%parse()
         stop
       end if
+      
+      mpi_is_initialized = .false.
+      f%fesom_did_mpi_init = .false.
 
 #ifndef __oifs
         !ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
         !OIFS-FESOM2 coupling: does not require MPI_INIT here as this is done by OASIS
-        call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, f%provided, f%i)
+        call MPI_Initialized(mpi_is_initialized, f%i)
+        if(.not. mpi_is_initialized) then
+            ! do not initialize MPI here if it has been initialized already, e.g. via IFS when fesom is called as library (__ifsinterface is defined)
+            call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, f%provided, f%i)
+            f%fesom_did_mpi_init = .true.
+        end if
 #endif
     
 
@@ -242,32 +252,32 @@ contains
             write(*,*) '============================================' 
         endif
 
-        f%dump_dir='DUMP/'
-        INQUIRE(file=trim(f%dump_dir), EXIST=f%L_EXISTS)
-        if (.not. f%L_EXISTS) call system('mkdir '//trim(f%dump_dir))
+    !    f%dump_dir='DUMP/'
+    !    INQUIRE(file=trim(f%dump_dir), EXIST=f%L_EXISTS)
+    !    if (.not. f%L_EXISTS) call system('mkdir '//trim(f%dump_dir))
 
-        write (f%dump_filename, "(A7,I7.7)") "t_mesh.", f%mype
-        open  (f%mype+300, file=TRIM(f%dump_dir)//trim(f%dump_filename), status='replace', form="unformatted")
-        write (f%mype+300) f%mesh
-        close (f%mype+300)
+    !    write (f%dump_filename, "(A7,I7.7)") "t_mesh.", f%mype
+    !    open  (f%mype+300, file=TRIM(f%dump_dir)//trim(f%dump_filename), status='replace', form="unformatted")
+    !    write (f%mype+300) f%mesh
+    !    close (f%mype+300)
 
     !    open  (f%mype+300, file=trim(f%dump_filename), status='old', form="unformatted")
     !    read  (f%mype+300) f%mesh_copy
     !    close (f%mype+300)
          
-        write (f%dump_filename, "(A9,I7.7)") "t_tracer.", f%mype
-        open  (f%mype+300, file=TRIM(f%dump_dir)//trim(f%dump_filename), status='replace', form="unformatted")
-        write (f%mype+300) f%tracers
-        close (f%mype+300)
+    !    write (f%dump_filename, "(A9,I7.7)") "t_tracer.", f%mype
+    !    open  (f%mype+300, file=TRIM(f%dump_dir)//trim(f%dump_filename), status='replace', form="unformatted")
+    !    write (f%mype+300) f%tracers
+    !    close (f%mype+300)
 
     !    open  (f%mype+300, file=trim(f%dump_filename), status='old', form="unformatted")
     !    read  (f%mype+300) f%dynamics_copy
     !    close (f%mype+300)
 
-        write (f%dump_filename, "(A9,I7.7)") "t_dynamics.", f%mype
-        open  (f%mype+300, file=TRIM(f%dump_dir)//trim(f%dump_filename), status='replace', form="unformatted")
-        write (f%mype+300) f%dynamics
-        close (f%mype+300)
+    !    write (f%dump_filename, "(A9,I7.7)") "t_dynamics.", f%mype
+    !    open  (f%mype+300, file=TRIM(f%dump_dir)//trim(f%dump_filename), status='replace', form="unformatted")
+    !    write (f%mype+300) f%dynamics
+    !    close (f%mype+300)
 
     !    open  (f%mype+300, file=trim(f%dump_filename), status='old', form="unformatted")
     !    read  (f%mype+300) f%tracers_copy
@@ -457,13 +467,16 @@ contains
         write(*,*)
         write(*,*) '============================================'
         write(*,*) '=========== BENCHMARK RUNTIME =============='
-        write(*,*) '    Number of cores : ',f%npes
-        write(*,*) '    Runtime for all timesteps : ',f%runtime_alltimesteps,' sec'
+        write(*,*) '    Number of cores :    ',f%npes
+#if defined(_OPENMP)
+        write(*,*) '    Max OpenMP threads : ',OMP_GET_MAX_THREADS()
+#endif
+        write(*,*) '    Runtime for all timesteps :  ',f%runtime_alltimesteps,' sec'
         write(*,*) '============================================'
         write(*,*)
     end if    
 !   call clock_finish  
-    call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
+    if(f%fesom_did_mpi_init) call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
   end subroutine
 
 end module

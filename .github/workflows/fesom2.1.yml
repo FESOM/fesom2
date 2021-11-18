@@ -19,10 +19,17 @@ jobs:
     # NK: this changes working directory to fesom2
     - uses: actions/checkout@v2
     
-    - name: Compile model
+    - name: Compile model (binary)
       run: |
         bash -l configure.sh ubuntu
-    
+
+    - name: Compile model (library)
+      run: |
+        bash ./test/ifs_interface/configure_lib.sh -l
+    - name: Library exists
+      run: |
+        bash ./test/ifs_interface/check_exist.sh
+
     - name: Create global test run
       run: |
         mkrun pi test_pi -m docker
