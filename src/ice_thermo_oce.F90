@@ -116,7 +116,6 @@ subroutine thermodynamics(ice, partit, mesh)
     USE MOD_MESH
     use i_therm_param
     use i_param
-    use i_arrays, only: 
     use g_config
     use g_forcing_param
     use g_forcing_arrays, only: shortwave, longwave, Tair, shum, prec_rain, evaporation , &

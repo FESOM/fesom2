@@ -1,5 +1,5 @@
 #if defined (__oasis) || defined (__ifsinterface)
-subroutine thermodynamics(partit, mesh)
+subroutine thermodynamics(ice, partit, mesh)
 
   !===================================================================
   !
@@ -14,21 +14,23 @@ subroutine thermodynamics(partit, mesh)
   !         Wolfgang Dorn (AWI), Oct-2012 (h0min adapted)
   !
   !===================================================================
-
-  use o_param
-  USE MOD_MESH
+  USE MOD_ICE
   USE MOD_PARTIT
   USE MOD_PARSUP
+  USE MOD_MESH
+  use o_param
   use i_therm_param
   use i_param
-  use i_arrays
   use g_config
   use g_forcing_param
   use g_forcing_arrays
   use g_comm_auto
   use g_rotate_grid
   implicit none
-
+  type(t_ice)   , intent(inout), target :: ice
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh)  , intent(in)   , target :: mesh
+  !_____________________________________________________________________________  
   integer :: inod
   !---- prognostic variables (updated in `ice_growth')
   real(kind=WP)  :: A, h, hsn, alb, t
@@ -51,19 +53,28 @@ subroutine thermodynamics(partit, mesh)
   real(kind=WP)  :: h0min = 0.5, h0max = 1.5
 
   real(kind=WP), parameter :: Aimin = 0.001, himin = 0.005
-
-  type(t_mesh),   intent(in),    target :: mesh
-  type(t_partit), intent(inout), target :: partit
-
+  !___________________________________________________________________________
+  ! pointer on necessary derived types
   integer, pointer                       :: myDim_nod2D, eDim_nod2D
   integer,        dimension(:),  pointer :: ulevels_nod2D
   real(kind=WP),  dimension(:,:),pointer :: geo_coord_nod2D
-
+  integer,        dimension(:),  pointer :: a_ice, m_ice, m_snow, T_oc_array, S_oc_array
+  integer,        dimension(:),  pointer :: net_heat_flux, fresh_wa_flux, thdgr, thdgrsn
   myDim_nod2d=>partit%myDim_nod2D
   eDim_nod2D =>partit%eDim_nod2D
   ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D
   geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => mesh%geo_coord_nod2D
-
+  a_ice         => ice%data(1)%values(:)
+  m_ice         => ice%data(2)%values(:)
+  m_snow        => ice%data(3)%values(:)
+  T_oc_array    => ice%srfoce_temp(:)
+  S_oc_array    => ice%srfoce_salt(:)
+  fresh_wa_flux => ice%flx_fw
+  net_heat_flux => ice%flx_h
+  thdgr         => ice%thermo%thdgr
+  thdgrsn       => ice%thermo%thdgrsn
+   
+  !_____________________________________________________________________________ 
   rsss = ref_sss
 
   !---- total evaporation (needed in oce_salt_balance.F90)
