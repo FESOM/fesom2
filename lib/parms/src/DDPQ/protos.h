@@ -94,7 +94,7 @@ extern void qsortC(int *ja, FLOAT *ma, int left, int right, int
 		   abval); 
 extern void qsortR2I(double *wa, int *cor1, int *cor2, int left, int
 		     right); 
-extern int qsplitC(FLOAT *a, int *ind, int n, int ncut);
+extern int qsplitCF(FLOAT *a, int *ind, int n, int ncut);
 extern int roscalC(csptr mata, double *diag, int nrm);
 extern void swapj(int v[], int i, int j);
 extern void swapm(FLOAT v[], int i, int j);

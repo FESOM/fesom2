@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.9)
 
 project(fesom C Fortran)
 
@@ -20,6 +20,9 @@ if(${USE_ICEPACK})
    file(GLOB sources_Fortran ${src_home}/*.F90
                              ${src_home}/icepack_drivers/*.F90
                              ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90)
+elseif(${BUILD_FESOM_AS_LIBRARY})
+   file(GLOB sources_Fortran ${src_home}/*.F90
+                             ${src_home}/ifs_interface/*.F90) # ICEPACK + LIBRARY NOT SUPPORTED (YET)
 else()
    file(GLOB sources_Fortran ${src_home}/*.F90)
 endif()
@@ -41,7 +44,7 @@ add_custom_command(OUTPUT 5303B6F4_E4F4_45B2_A6E5_8E2B9FB5CDC4 ${FESOM_GENERATED
 #endif()
 list(REMOVE_ITEM sources_Fortran ${src_home}/fvom_init.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90)
 list(REMOVE_ITEM sources_C       ${src_home}/fort_part.c)
-list(REMOVE_ITEM sources_Fortran ${src_home}/fvom_main.F90)
+list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_main.F90)
 
 # depends on the metis library
 #add_subdirectory(../lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
@@ -64,7 +67,7 @@ target_link_libraries(${PROJECT_NAME}_C parms) #metis
 if(${BUILD_FESOM_AS_LIBRARY})
    add_library(${PROJECT_NAME} ${sources_Fortran})
 else()
-   add_executable(${PROJECT_NAME} ${sources_Fortran} ${src_home}/fvom_main.F90)
+   add_executable(${PROJECT_NAME} ${sources_Fortran} ${src_home}/fesom_main.F90)
 endif()
 target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
 if(${DISABLE_MULTITHREADING})
@@ -79,6 +82,9 @@ if(${OIFS_COUPLED})
 endif()
 if(${USE_ICEPACK})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __icepack)
+endif()
+if(${BUILD_FESOM_AS_LIBRARY})
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __ifsinterface)
 endif()
 if(${VERBOSE})
    target_compile_definitions(${PROJECT_NAME} PRIVATE VERBOSE)

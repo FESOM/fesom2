@@ -51,7 +51,7 @@ module ocean_setup_interface
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
+        type(t_mesh)  , intent(inout)   , target :: mesh
         end subroutine
     end interface
 end module

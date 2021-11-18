@@ -217,7 +217,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     type(t_mesh),   intent(in) ,    target  :: mesh
     type(t_partit), intent(inout),  target  :: partit
     type(t_tracer), intent(in),     target  :: tracers
-    real(kind=WP)                           :: dz_inv, bv,  a, rho_up, rho_dn, t, s
+    real(kind=WP)                           :: dz_inv, bv,  a, a_loc, rho_up, rho_dn, t, s
     integer                                 :: node, nz, nl1, nzmax, nzmin
     real(kind=WP)                           :: rhopot(mesh%nl), bulk_0(mesh%nl), bulk_pz(mesh%nl), bulk_pz2(mesh%nl), rho(mesh%nl), dbsfc1(mesh%nl), db_max
     real(kind=WP)                           :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf, aux_rho, aux_rho1
@@ -232,28 +232,34 @@ subroutine pressure_bv(tracers, partit, mesh)
     salt=>tracers%data(2)%values(:,:)
     smallvalue=1.0e-20
     buoyancy_crit=0.0003_WP
-    mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==17)  ! NR Evaluate string comparison outside the loop. It is expensive.
-!!PS     mixing_kpp = (trim(mix_scheme)=='KPP' .or. trim(mix_scheme)=='cvmix_KPP')  ! NR Evaluate string comparison outside the loop. It is expensive.
+    mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==17)
     !___________________________________________________________________________
     ! Screen salinity
-    a=0.0_WP
+    a    =0.0_WP
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, a_loc)
+    a_loc=0.0_WP
+!$OMP DO
     do node=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(node)
         nzmax = nlevels_nod2D(node)
-        !!PS do nz=1,nlevels_nod2d(node)-1
         do nz=nzmin,nzmax-1
-            a=min(a,salt(nz,node))
+            a_loc=min(a_loc, salt(nz,node))
         enddo
     enddo
-    
+!$OMP END DO
+!$OMP CRITICAL
+    a=min(a, a_loc)
+!$OMP END CRITICAL
+!$OMP END PARALLEL
+
     !___________________________________________________________________________
-    if(a<0.0_WP) then
+    ! model explodes, no OpenMP parallelization !
+    if( a < 0.0_WP ) then
         write (*,*)' --> pressure_bv: s<0 happens!', a
         pe_status=1
         do node=1, myDim_nod2D+eDim_nod2D
             nzmin = ulevels_nod2D(node)
             nzmax = nlevels_nod2D(node)
-            !!PS do nz=1, nlevels_nod2d(node)-1
             do nz=nzmin, nzmax-1
                 if (salt(nz, node) < 0) write (*,*) 'the model blows up at n=', mylist_nod2D(node), ' ; ', 'nz=', nz
             end do
@@ -261,6 +267,11 @@ subroutine pressure_bv(tracers, partit, mesh)
     endif
     
     !___________________________________________________________________________
+
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(dz_inv, bv,  a, a_loc, rho_up, rho_dn, t, s, node, nz, nl1, nzmax, nzmin, &
+!$OMP                                  rhopot, bulk_0, bulk_pz, bulk_pz2, rho, dbsfc1, db_max, bulk_up, bulk_dn, &
+!$OMP                                  rho_surf, aux_rho, aux_rho1, flag1, flag2)
+!$OMP DO
     do node=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(node)
         nzmax = nlevels_nod2D(node)
@@ -463,9 +474,11 @@ subroutine pressure_bv(tracers, partit, mesh)
         ! The mixed layer depth 
         ! mixlay_depth    
         ! bv_ref
+        !_______________________________________________________________________
+        ! BV is defined on full levels except for the first and the last ones.
     end do
-    !_______________________________________________________________________
-    ! BV is defined on full levels except for the first and the last ones.
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine pressure_bv
 !
 !
@@ -558,6 +571,7 @@ subroutine pressure_force_4_linfs_fullcell(partit, mesh)
 #include "associate_mesh_ass.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule,  nlz)
     do elem=1, myDim_elem2D
         !_______________________________________________________________________
         ! number of levels at elem
@@ -577,6 +591,7 @@ subroutine pressure_force_4_linfs_fullcell(partit, mesh)
             pgf_y(nlz,elem) = sum(gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
         end do 
     end do !-->do elem=1, myDim_elem2D
+!$OMP END PARALLEL DO
 end subroutine pressure_force_4_linfs_fullcell   
 !
 !
@@ -610,8 +625,8 @@ subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
     real(kind=WP)                          :: interp_n_dens(3), interp_n_temp, interp_n_salt, &
                                               dZn, dZn_i, dh, dval, mean_e_rho,dZn_rho_grad(2)
     real(kind=WP)                          :: rhopot, bulk_0, bulk_pz, bulk_pz2
-    real(kind=WP), dimension(:,:), pointer :: temp, salt
     real(kind=WP)                          :: zbar_n(mesh%nl), z_n(mesh%nl-1)
+    real(kind=WP), dimension(:,:), pointer :: temp, salt
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -620,6 +635,11 @@ subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
     salt=>tracers%data(2)%values(:,:)
     !___________________________________________________________________________
     ! loop over triangular elemments
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nlz, nln, uln, ni, nlc, nlce, hpress_n_bottom, &
+!$OMP                                  interp_n_dens, interp_n_temp, interp_n_salt, dZn, dZn_i, dh, dval,      &
+!$OMP                                  mean_e_rho, dZn_rho_grad, rhopot, bulk_0, bulk_pz, bulk_pz2,            &
+!$OMP                                  zbar_n, z_n)
+!$OMP DO
     do elem=1, myDim_elem2D
         !_______________________________________________________________________
         ! nle...number of mid-depth levels at elem
@@ -756,6 +776,8 @@ subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
         pgf_y(nle,elem) = sum(gradient_sca(4:6,elem)*hpress_n_bottom)/density_0
         
     end do ! --> do elem=1, myDim_elem2D
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine pressure_force_4_linfs_nemo
 !
 !
@@ -778,7 +800,7 @@ subroutine pressure_force_4_linfs_shchepetkin(partit, mesh)
     implicit none
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit    
-    integer                                :: elem, elnodes(3), nle, ule, nlz, idx(3),ni
+    integer                                :: elem, elnodes(3), nle, ule, nlz, idx(3), ni
     real(kind=WP)                          :: int_dp_dx(2), drho_dx, dz_dx, aux_sum
     real(kind=WP)                          :: dx10(3), dx20(3), dx21(3), df10(3), df21(3), drho_dz(3)
     real(kind=WP)                          :: zbar_n(mesh%nl), z_n(mesh%nl-1)
@@ -788,6 +810,9 @@ subroutine pressure_force_4_linfs_shchepetkin(partit, mesh)
 #include "associate_mesh_ass.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nlz, idx, ni, int_dp_dx, drho_dx, dz_dx, aux_sum, &
+!$OMP                                  dx10, dx20, dx21, df10, df21, drho_dz, zbar_n, z_n)
+!$OMP DO
     do elem=1, myDim_elem2D
         !_______________________________________________________________________
         ! nle...number of mid-depth levels at elem
@@ -1017,6 +1042,8 @@ subroutine pressure_force_4_linfs_shchepetkin(partit, mesh)
         pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
         
     end do ! --> do elem=1, myDim_elem2D
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine pressure_force_4_linfs_shchepetkin
 !
 !
@@ -1057,6 +1084,10 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
 
     !___________________________________________________________________________
     ! loop over triangular elemments
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nlz, idx, ni, int_dp_dx, drho_dx, aux_sum, dx10, dx20, dx21, t0, dt10, dt21, s0, ds10, ds21, &
+!$OMP                                  rho_at_Zn, temp_at_Zn, salt_at_Zn, drho_dz, aux_dref, rhopot, bulk_0, bulk_pz, bulk_pz2, dref_rhopot, dref_bulk_0,    &
+!$OMP                                  dref_bulk_pz, dref_bulk_pz2, zbar_n, z_n                                                                              )
+!$OMP DO
     do elem=1, myDim_elem2D
         !_______________________________________________________________________
         ! nle...number of mid-depth levels at elem
@@ -1381,6 +1412,8 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
         pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
         
     end do ! --> do elem=1, myDim_elem2D
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine pressure_force_4_linfs_easypgf
 !
 !
@@ -1412,6 +1445,10 @@ subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
 #include "associate_mesh_ass.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nlz, nlc, ni, node, nln, uln, dd, int_dp_dx, drho_dx, dz_dx, drho_dz, auxp, &
+!$OMP                                  dx10, dx20, dx21, df10, df21, interp_n_dens, s_ind, s_z, s_dens, s_H, aux1, aux2, s_dup, s_dlo,      &
+!$OMP                                  a, b, c, d, dz, zbar_n, z_n                                                                          )
+!$OMP DO
     do elem=1, myDim_elem2D
         !_______________________________________________________________________
         ! nle...number of mid-depth levels at elem
@@ -1585,6 +1622,8 @@ subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
         int_dp_dx(2)    = int_dp_dx(2) + auxp
         
     end do ! --> do elem=1, myDim_elem2D
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine pressure_force_4_linfs_cubicspline
 !
 !
@@ -1614,6 +1653,9 @@ subroutine pressure_force_4_linfs_cavity(partit, mesh)
     
     !___________________________________________________________________________
     ! loop over triangular elemments
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nlz, idx, ni, int_dp_dx, drho_dx, dz_dx, aux_sum, &
+!$OMP                                  dx10, dx20, dx21, df10, df21, drho_dz,  zbar_n, z_n                        )
+!$OMP DO
     do elem=1, myDim_elem2D
         !_______________________________________________________________________
         ! number of levels at elem
@@ -1801,6 +1843,8 @@ subroutine pressure_force_4_linfs_cavity(partit, mesh)
         end if 
         
     end do !-->do elem=1, myDim_elem2D
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine pressure_force_4_linfs_cavity
 !
 !
@@ -1836,7 +1880,7 @@ subroutine pressure_force_4_zxxxx(tracers, partit, mesh)
         write(*,*) '            shchepetkin, cubicspline, easypgf                   '
         write(*,*) '________________________________________________________'
         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
-    end if 
+    end if
 end subroutine pressure_force_4_zxxxx
 !
 !
@@ -1857,8 +1901,8 @@ subroutine pressure_force_4_zxxxx_cubicspline(partit, mesh)
     implicit none
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit    
-    integer                                :: elem, elnodes(3), nle, ule, nln(3), uln(3), nlz, nlc,dd
-    integer                                :: ni, node, dens_ind,kk
+    integer                                :: elem, elnodes(3), nle, ule, nln(3), uln(3), nlz, nlc, dd
+    integer                                :: ni, node, dens_ind, kk
     real(kind=WP)                          :: ze
     integer                                :: s_ind(4)
     real(kind=WP)                          :: s_z(4), s_dens(4), s_H, aux1, aux2, aux(2), s_dup, s_dlo
@@ -1870,6 +1914,9 @@ subroutine pressure_force_4_zxxxx_cubicspline(partit, mesh)
 #include "associate_mesh_ass.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nln, uln, nlz, nlc, dd, ni, node, dens_ind, kk, ze, s_ind, s_z, s_dens, s_H, &
+!$OMP                                  aux1, aux2, aux, s_dup, s_dlo, a, b, c, d, dz, rho_n, rhograd_e, p_grad, zbar_n, z_n                  )
+!$OMP DO
     do elem=1, myDim_elem2D
         ule          = ulevels(elem)
         nle          = nlevels(elem)-1
@@ -2021,6 +2068,8 @@ subroutine pressure_force_4_zxxxx_cubicspline(partit, mesh)
             
         end do ! --> do nlz=1,nle
     end do ! --> do elem=1, myDim_elem2D
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine pressure_force_4_zxxxx_cubicspline
 !
 !
@@ -2045,7 +2094,7 @@ subroutine pressure_force_4_zxxxx_shchepetkin(partit, mesh)
     implicit none
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
-    integer                                :: elem, elnodes(3), nle,ule, nlz, nln(3), ni, nlc, nlce, idx(3)
+    integer                                :: elem, elnodes(3), nle, ule, nlz, nln(3), ni, nlc, nlce, idx(3)
     real(kind=WP)                          :: int_dp_dx(2), drho_dx, drho_dy, drho_dz(3), dz_dx, dz_dy, aux_sum 
     real(kind=WP)                          :: dx10(3), dx20(3), dx21(3), df10(3), df21(3)
     real(kind=WP)                          :: rhopot(3), bulk_0(3), bulk_pz(3), bulk_pz2(3)
@@ -2057,6 +2106,9 @@ subroutine pressure_force_4_zxxxx_shchepetkin(partit, mesh)
     
     !___________________________________________________________________________
     ! loop over triangular elemments
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nlz, nln, ni, nlc, nlce, idx, int_dp_dx, drho_dx, drho_dy, drho_dz, dz_dx, dz_dy, aux_sum, & 
+!$OMP                                  dx10, dx20, dx21, df10, df21, rhopot, bulk_0, bulk_pz, bulk_pz2, zbar_n, z_n)
+!$OMP DO
     do elem=1, myDim_elem2D
         !_______________________________________________________________________
         ! nle...number of mid-depth levels at elem
@@ -2263,7 +2315,8 @@ subroutine pressure_force_4_zxxxx_shchepetkin(partit, mesh)
         pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
         
     end do ! --> do elem=1, myDim_elem2D
-    
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine pressure_force_4_zxxxx_shchepetkin
 !
 !
@@ -2290,8 +2343,8 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
     type(t_mesh),   intent(in) ,    target  :: mesh
     type(t_partit), intent(inout),  target  :: partit
     type(t_tracer), intent(in),     target  :: tracers    
-    integer                                 :: elem, elnodes(3), nle,ule, nlz, nln(3), ni, nlc, nlce, idx(3)
-    real(kind=WP)                           :: int_dp_dx(2), drho_dx, dz_dx, drho_dy, dz_dy,aux_sum 
+    integer                                 :: elem, elnodes(3), nle, ule, nlz, nln(3), ni, nlc, nlce, idx(3)
+    real(kind=WP)                           :: int_dp_dx(2), drho_dx, dz_dx, drho_dy, dz_dy, aux_sum 
     real(kind=WP)                           :: dx10(3), dx20(3), dx21(3)
     real(kind=WP)                           :: f0(3), df10(3), df21(3)
     real(kind=WP)                           :: t0(3), dt10(3), dt21(3)
@@ -2309,6 +2362,10 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
     salt=>tracers%data(2)%values(:,:)
     !___________________________________________________________________________
     ! loop over triangular elemments
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nlz, nln, ni, nlc, nlce, idx, int_dp_dx, drho_dx, drho_dy, dz_dx, dz_dy, aux_sum, dx10, dx20, dx21, &
+!$OMP                                  f0, df10, df21, t0, dt10, dt21, s0, ds10, ds21, rho_at_Zn, temp_at_Zn, salt_at_Zn, drho_dz, aux_dref, rhopot,                &
+!$OMP                                  bulk_0, bulk_pz, bulk_pz2, dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, zbar_n, z_n                                )
+!$OMP DO
     do elem=1, myDim_elem2D
         !_______________________________________________________________________
         ! nle...number of mid-depth levels at elem
@@ -2716,6 +2773,8 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
         pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
        
     end do ! --> do elem=1, myDim_elem2D
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine pressure_force_4_zxxxx_easypgf
 !
 !
@@ -2950,7 +3009,7 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
   type(t_mesh),   intent(in) ,    target :: mesh
   type(t_partit), intent(inout),  target :: partit
   integer                                :: n, nz, nzmin, nzmax
-  real(kind=WP)                          :: t1,t1_2,t1_3,t1_4,p1,p1_2,p1_3,s1,s35,s35_2 
+  real(kind=WP)                          :: t1, t1_2, t1_3, t1_4, p1, p1_2, p1_3, s1, s35, s35_2 
   real(kind=WP)                          :: a_over_b    
   real(kind=WP)                          :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D),SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
 
@@ -2959,6 +3018,8 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, t1, t1_2, t1_3, t1_4, p1, p1_2, p1_3, s1, s35, s35_2, a_over_b)
+!$OMP DO
   do n = 1,myDim_nod2d
      nzmin = ulevels_nod2d(n)   
      nzmax = nlevels_nod2d(n)   
@@ -3003,8 +3064,11 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
      sw_alpha(nz,n) = a_over_b*sw_beta(nz,n)
    end do
  end do
+!$OMP END DO
+!$OMP END PARALLEL
 call exchange_nod(sw_alpha, partit)
 call exchange_nod(sw_beta, partit)
+!$OMP BARRIER
 end subroutine sw_alpha_beta
 !
 !
@@ -3041,7 +3105,9 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-  !
+
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tx, ty, sx, sy, vol, testino, n, nz, elnodes, el, k, nln, uln, nle, ule)
+!$OMP DO
   DO n=1, myDim_nod2D
         nln = nlevels_nod2D(n)-1
         uln = ulevels_nod2D(n)
@@ -3087,8 +3153,10 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
         sigma_xy(1,uln:nln,n) = (-sw_alpha(uln:nln,n)*tx(uln:nln)+sw_beta(uln:nln,n)*sx(uln:nln))/vol(uln:nln)*density_0
         sigma_xy(2,uln:nln,n) = (-sw_alpha(uln:nln,n)*ty(uln:nln)+sw_beta(uln:nln,n)*sy(uln:nln))/vol(uln:nln)*density_0
   END DO 
-
+!$OMP END DO
+!$OMP END PARALLEL
   call exchange_nod(sigma_xy, partit)
+!$OMP BARRIER
 end subroutine compute_sigma_xy
 !
 !
@@ -3105,10 +3173,10 @@ subroutine compute_neutral_slope(partit, mesh)
     IMPLICIT NONE
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
-    real(kind=WP)                          :: deltaX1,deltaY1,deltaX2,deltaY2
     integer                                :: edge
-    integer                                :: n,nz,nl1,ul1,el(2),elnodes(3),enodes(2)
-    real(kind=WP)                          :: c, ro_z_inv,eps,S_cr,S_d
+    real(kind=WP)                          :: deltaX1, deltaY1, deltaX2, deltaY2
+    integer                                :: n, nz, nl1, ul1, el(2), elnodes(3), enodes(2)
+    real(kind=WP)                          :: c, ro_z_inv, eps, S_cr, S_d
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -3118,12 +3186,13 @@ subroutine compute_neutral_slope(partit, mesh)
     eps=5.0e-6_WP
     S_cr=1.0e-2_WP
     S_d=1.0e-3_WP
-    slope_tapered=0._WP
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, n, nz, nl1, ul1, el, elnodes, enodes, c, ro_z_inv)
+!$OMP DO
     do n=1, myDim_nod2D
+        slope_tapered(: , :, n)=0._WP
         nl1=nlevels_nod2d(n)-1
         ul1=ulevels_nod2d(n)
-        !!PS do nz = 2,nl1
-        do nz = ul1+1,nl1
+        do nz = ul1+1, nl1
             ro_z_inv=2._WP*g/density_0/max(bvfreq(nz,n)+bvfreq(nz+1,n), eps**2) !without minus, because neutral slope S=-(nabla\rho)/(d\rho/dz)
             neutral_slope(1,nz,n)=sigma_xy(1,nz,n)*ro_z_inv
             neutral_slope(2,nz,n)=sigma_xy(2,nz,n)*ro_z_inv
@@ -3133,13 +3202,13 @@ subroutine compute_neutral_slope(partit, mesh)
             c=0.5_WP*(1.0_WP + tanh((S_cr - neutral_slope(3,nz,n))/S_d))
             if ((bvfreq(nz,n) <= 0.0_WP) .or. (bvfreq(nz+1,n) <= 0.0_WP)) c=0.0_WP
             slope_tapered(:,nz,n)=neutral_slope(:,nz,n)*c
-!                       slope_tapered(:,nl1-1:nl1,n)=0.
-!                       slope_tapered(:,1:2,n)      =0.
         enddo
     enddo
-
+!$OMP END DO
+!$OMP END PARALLEL
     call exchange_nod(neutral_slope, partit)
     call exchange_nod(slope_tapered, partit)
+!$OMP BARRIER
 end subroutine compute_neutral_slope
 !
 !
@@ -3161,7 +3230,7 @@ subroutine insitu2pot(tracers, partit, mesh)
   type(t_tracer), intent(in),    target   :: tracers
   real(kind=WP),  external                :: ptheta
   real(kind=WP)                           :: pp, pr, tt, ss
-  integer                                 :: n, nz, nzmin,nzmax
+  integer                                 :: n, nz, nzmin, nzmax
   real(kind=WP),  dimension(:,:), pointer :: temp, salt 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -3171,6 +3240,7 @@ subroutine insitu2pot(tracers, partit, mesh)
   salt=>tracers%data(2)%values(:,:)
   ! Convert in situ temperature into potential temperature
   pr=0.0_WP
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, tt, ss, pp)
   do n=1,myDim_nod2d+eDim_nod2D
      nzmin = ulevels_nod2D(n)
      nzmax = nlevels_nod2D(n)
@@ -3189,6 +3259,7 @@ subroutine insitu2pot(tracers, partit, mesh)
         temp(nz,n)=ptheta(ss, tt, pp, pr)
      end do
   end do
+!$OMP END PARALLEL DO 
 end subroutine insitu2pot
 !
 !
@@ -3254,15 +3325,10 @@ subroutine init_ref_density(partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
     !___________________________________________________________________________
-!!PS     S=34.  
-!!PS     T=2.0 
-    
-    !___________________________________________________________________________
-    density_ref = 0.0_WP
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, rhopot, bulk_0, bulk_pz, bulk_pz2, rho, T, S, auxz)
     do node=1,myDim_nod2d+eDim_nod2d
-        !!PS nzmin = ulevels_nod2d(node)
+        density_ref(:, node) = 0.0_WP
         nzmin = 1
         nzmax = nlevels_nod2d(node)-1
         auxz=min(0.0,Z_3d_n(nzmin,node))
@@ -3270,7 +3336,7 @@ subroutine init_ref_density(partit, mesh)
         !_______________________________________________________________________
         call densityJM_components(density_ref_T, density_ref_S, bulk_0, bulk_pz, bulk_pz2, rhopot, partit, mesh)
         rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
-        density_ref(nzmin,node) = rho*rhopot/(rho+0.1_WP*auxz)
+        density_ref(nzmin, node) = rho*rhopot/(rho+0.1_WP*auxz)
         
         !_______________________________________________________________________
         do nz=nzmin+1,nzmax
@@ -3279,6 +3345,7 @@ subroutine init_ref_density(partit, mesh)
             density_ref(nz,node) = rho*rhopot/(rho+0.1_WP*auxz)
         end do
     end do
+!$OMP END PARALLEL DO 
     if(mype==0) write(*,*) ' --> compute reference density'
 end subroutine init_ref_density
 
