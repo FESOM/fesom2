@@ -136,6 +136,7 @@ subroutine thermodynamics(ice, partit, mesh)
     integer        :: i, j, elem
     real(kind=WP)  :: lid_clo
     !___________________________________________________________________________
+    ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:), pointer :: a_ice_old, m_ice_old, m_snow_old
     real(kind=WP), dimension(:), pointer :: u_ice, v_ice, u_w, v_w
