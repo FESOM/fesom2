@@ -641,19 +641,19 @@ subroutine ice_init(ice, partit, mesh)
     !___________________________________________________________________________
     ! initialse coupling array of ice derived type 
 #if defined (__oasis) || defined (__ifsinterface)    
-    allocate(ice%tcoupl%oce_flx_h(     node_size))
-    allocate(ice%tcoupl%ice_flx_h(     node_size))
-    allocate(ice%tcoupl%tmpoce_flx_h(  node_size))
-    allocate(ice%tcoupl%tmpice_flx_h(  node_size))
-    ice%tcoupl%oce_flx_h     = 0.0_WP
-    ice%tcoupl%ice_flx_h     = 0.0_WP
-    ice%tcoupl%tmpoce_flx_h  = 0.0_WP
-    ice%tcoupl%tmpice_flx_h  = 0.0_WP
+    allocate(ice%atmcoupl%oce_flx_h(     node_size))
+    allocate(ice%atmcoupl%ice_flx_h(     node_size))
+    allocate(ice%atmcoupl%tmpoce_flx_h(  node_size))
+    allocate(ice%atmcoupl%tmpice_flx_h(  node_size))
+    ice%atmcoupl%oce_flx_h     = 0.0_WP
+    ice%atmcoupl%ice_flx_h     = 0.0_WP
+    ice%atmcoupl%tmpoce_flx_h  = 0.0_WP
+    ice%atmcoupl%tmpice_flx_h  = 0.0_WP
 #if defined (__oifs) || defined (__ifsinterface)  
-    allocate(ice%tcoupl%ice_alb(       node_size))
-    allocate(ice%tcoupl%enthalpyoffuse(node_size))
-    ice%tcoupl%ice_alb       = 0.0_WP
-    ice%tcoupl%enthalpyoffuse= 0.0_WP
+    allocate(ice%atmcoupl%ice_alb(       node_size))
+    allocate(ice%atmcoupl%enthalpyoffuse(node_size))
+    ice%atmcoupl%ice_alb       = 0.0_WP
+    ice%atmcoupl%enthalpyoffuse= 0.0_WP
 #endif /* (__oifs) */
 #endif /* (__oasis) */        
 end subroutine ice_init    
