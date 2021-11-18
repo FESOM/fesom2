@@ -57,14 +57,14 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP), parameter :: Aimin = 0.001, himin = 0.005
   !___________________________________________________________________________
   ! pointer on necessary derived types
-  integer, pointer                       :: myDim_nod2D, eDim_nod2D
-  integer,        dimension(:),  pointer :: ulevels_nod2D
-  real(kind=WP),  dimension(:,:),pointer :: geo_coord_nod2D
-  integer,        dimension(:),  pointer :: a_ice, m_ice, m_snow, u_ice, v_ice 
-  integer,        dimension(:),  pointer :: ice_temp, ice_alb
-  integer,        dimension(:),  pointer :: T_oc_array, S_oc_array, u_w, v_w
-  integer,        dimension(:),  pointer :: net_heat_flux, fresh_wa_flux, thdgr, thdgrsn
-  integer,        dimension(:),  pointer :: oce_heat_flux, ice_heat_flux, enthalpyoffuse
+  integer      ,                pointer :: myDim_nod2D, eDim_nod2D
+  integer      , dimension(:),  pointer :: ulevels_nod2D
+  real(kind=WP), dimension(:,:),pointer :: geo_coord_nod2D
+  real(kind=WP), dimension(:),  pointer :: a_ice, m_ice, m_snow, u_ice, v_ice 
+  real(kind=WP), dimension(:),  pointer :: ice_temp, ice_alb
+  real(kind=WP), dimension(:),  pointer :: T_oc_array, S_oc_array, u_w, v_w
+  real(kind=WP), dimension(:),  pointer :: net_heat_flux, fresh_wa_flux, thdgr, thdgrsn
+  real(kind=WP), dimension(:),  pointer :: oce_heat_flux, ice_heat_flux, enthalpyoffuse
   myDim_nod2d=>partit%myDim_nod2D
   eDim_nod2D =>partit%eDim_nod2D
   ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D
