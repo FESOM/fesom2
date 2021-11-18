@@ -135,11 +135,14 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
 #include "associate_mesh_ass.h"
   stress_atmice_x => ice%stress_atmice_xy(1,:)
   stress_atmice_y => ice%stress_atmice_xy(2,:)
+#if defined (__oasis) || defined (__ifsinterface)      
   oce_heat_flux   => ice%atmcoupl%oce_flx_h
   ice_heat_flux   => ice%atmcoupl%ice_flx_h
-#if defined (__oifs)  
+#if defined (__oifs) || defined (__ifsinterface)  
   enthalpyoffuse  => ice%atmcoupl%enthalpyoffuse
 #endif
+#endif 
+
   !_____________________________________________________________________________
   t1=MPI_Wtime()
 #ifdef __oasis
