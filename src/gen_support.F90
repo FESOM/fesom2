@@ -11,7 +11,7 @@ module g_support
   implicit none
 
   private
-  public :: smooth_nod, smooth_elem, integrate_nod, extrap_nod
+  public :: smooth_nod, smooth_elem, integrate_nod, extrap_nod, omp_min_max_sum1, omp_min_max_sum2
   real(kind=WP), dimension(:), allocatable  :: work_array
 !
 !--------------------------------------------------------------------------------------------
@@ -476,7 +476,125 @@ subroutine extrap_nod3D(arr, partit, mesh)
 end subroutine extrap_nod3D
 !
 !--------------------------------------------------------------------------------------------
+! returns min/max/sum of a one dimentional array (same as minval) but with the support of OpenMP
+FUNCTION omp_min_max_sum1(arr, pos1, pos2, what, partit, nan) 
+  USE MOD_PARTIT
+  implicit none
+  real(kind=WP), intent(in)   :: arr(:)
+  integer,       intent(in)   :: pos1, pos2
+  character(3),  intent(in)   :: what
+  real(kind=WP), optional     :: nan !to be implemented upon the need (for masked arrays)
+  real(kind=WP)               :: omp_min_max_sum1
+  real(kind=WP)               :: loc, val
+  integer                     :: n
+
+  type(t_partit),intent(in), &
+                       target :: partit
+
+  SELECT CASE (trim(what))
+    CASE ('sum')
+       val=0.0_WP
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, loc)
+       loc=0.0_WP
+!$OMP DO
+       do n=pos1, pos2
+          loc=loc+arr(n)
+       end do
+!$OMP END DO
+!$OMP CRITICAL
+       val=val+loc
+!$OMP END CRITICAL
+!$OMP END PARALLEL
+    CASE ('min')
+       val=arr(1)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, loc)
+       loc=val
+!$OMP DO
+       do n=pos1, pos2
+          loc=min(loc, arr(n))
+       end do
+!$OMP END DO
+!$OMP CRITICAL
+       val=min(val, loc)
+!$OMP END CRITICAL
+!$OMP END PARALLEL
+    CASE ('max')
+       val=arr(1)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, loc)
+       loc=val
+!$OMP DO
+       do n=pos1, pos2
+          loc=max(loc, arr(n))
+       end do
+!$OMP END DO
+!$OMP CRITICAL
+       val=max(val, loc)
+!$OMP END CRITICAL
+!$OMP END PARALLEL
+   CASE DEFAULT
+      if (partit%mype==0) write(*,*) trim(what), ' is not implemented in omp_min_max_sum case!'
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+      STOP
+  END SELECT
+  omp_min_max_sum1=val
+END FUNCTION
 !
+!--------------------------------------------------------------------------------------------
+! returns min/max/sum of a two dimentional array (same as minval) but with the support of OpenMP
+FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan) 
+  implicit none
+  real(kind=WP), intent(in)   :: arr(:,:)
+  integer,       intent(in)   :: pos11, pos12, pos21, pos22
+  character(3),  intent(in)   :: what
+  real(kind=WP), optional     :: nan !to be implemented upon the need (for masked arrays)
+  real(kind=WP)               :: omp_min_max_sum2
+  real(kind=WP)               :: loc, val, vmasked
+  integer                     :: i, j
+
+
+  type(t_partit),intent(in), &
+                       target :: partit
+
+  SELECT CASE (trim(what))
+    CASE ('min')
+      if (.not. present(nan)) vmasked=huge(vmasked) !just some crazy number
+      val=arr(1,1)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, loc)
+      loc=val
+      do i=pos11, pos12
+!$OMP DO
+      do j=pos21, pos22
+         if (arr(i,j)/=vmasked) loc=min(loc, arr(i,j))
+      end do
+!$OMP END DO
+      end do
+!$OMP CRITICAL
+      val=min(val, loc)
+!$OMP END CRITICAL
+!$OMP END PARALLEL
+    CASE ('max')
+      if (.not. present(nan)) vmasked=tiny(vmasked) !just some crazy number
+      val=arr(1,1)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, loc)
+      loc=val
+      do i=pos11, pos12
+!$OMP DO
+      do j=pos21, pos22
+         if (arr(i,j)/=vmasked) loc=max(loc, arr(i,j))
+      end do
+!$OMP END DO
+      end do
+!$OMP CRITICAL
+      val=max(val, loc)
+!$OMP END CRITICAL
+!$OMP END PARALLEL
+   CASE DEFAULT
+      if (partit%mype==0) write(*,*) trim(what), ' is not implemented in omp_min_max_sum case!'
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+      STOP
+   END SELECT
+omp_min_max_sum2=val
+END FUNCTION
 end module g_support
 
 
