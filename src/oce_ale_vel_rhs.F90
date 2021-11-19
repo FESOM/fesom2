@@ -1,42 +1,43 @@
 
 module compute_vel_rhs_interface
-  interface
-    subroutine compute_vel_rhs(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      type(t_dyn)   , intent(inout), target :: dynamics
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      
-    end subroutine
-  end interface
+    interface
+        subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
+        USE MOD_ICE
+        USE MOD_DYN
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice)   , intent(inout), target :: ice
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
 end module
 
 module momentum_adv_scalar_interface
-  interface
-    subroutine momentum_adv_scalar(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      type(t_dyn)   , intent(inout), target :: dynamics
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      
-    end subroutine
-  end interface
+    interface
+        subroutine momentum_adv_scalar(dynamics, partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_DYN
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
 end module
 
 !
 !
 !_______________________________________________________________________________
-subroutine compute_vel_rhs(dynamics, partit, mesh)
-    use MOD_MESH
+subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
+    USE MOD_ICE
+    USE MOD_DYN
     USE MOD_PARTIT
     USE MOD_PARSUP
-    USE MOD_DYN
+    USE MOD_MESH
     use o_ARRAYS, only: coriolis, ssh_gp, pgf_x, pgf_y
     use i_ARRAYS
     use i_therm_param
@@ -48,6 +49,7 @@ subroutine compute_vel_rhs(dynamics, partit, mesh)
     use g_sbf, only: l_mslp
     use momentum_adv_scalar_interface
     implicit none 
+    type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
@@ -62,6 +64,7 @@ subroutine compute_vel_rhs(dynamics, partit, mesh)
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB, UV_rhs
     real(kind=WP), dimension(:)    , pointer :: eta_n
+    real(kind=WP), dimension(:)    , pointer :: m_ice, m_snow
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -70,7 +73,9 @@ subroutine compute_vel_rhs(dynamics, partit, mesh)
     UV_rhs   =>dynamics%uv_rhs(:,:,:)
     UV_rhsAB =>dynamics%uv_rhsAB(:,:,:)
     eta_n    =>dynamics%eta_n(:)
-
+    m_ice    => ice%data(2)%values(:)
+    m_snow   => ice%data(3)%values(:)
+    
     !___________________________________________________________________________
     use_pice=0
     if (use_floatice .and.  .not. trim(which_ale)=='linfs') use_pice=1

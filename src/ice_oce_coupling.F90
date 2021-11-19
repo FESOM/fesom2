@@ -16,32 +16,33 @@ module ocean2ice_interface
 end module
 
 module oce_fluxes_interface
-  interface
-    subroutine oce_fluxes(dynamics, tracers, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      use MOD_DYN
-      USE MOD_PARSUP
-      use mod_tracer
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      type(t_tracer), intent(inout), target :: tracers
-      type(t_dyn)   , intent(in)   , target :: dynamics
-    end subroutine
-    
-    subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      use MOD_DYN
-      USE MOD_ICE
-      USE MOD_PARSUP
-      use mod_tracer
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      type(t_dyn)   , intent(in)   , target :: dynamics
-      type(t_ice)   , intent(inout), target :: ice
-    end subroutine
-  end interface
+    interface
+        subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
+        USE MOD_ICE
+        USE MOD_DYN
+        USE MOD_TRACER
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice)   , intent(inout), target :: ice
+        type(t_dyn)   , intent(in)   , target :: dynamics
+        type(t_tracer), intent(inout), target :: tracers
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+        
+        subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
+        USE MOD_ICE
+        USE MOD_DYN
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice)   , intent(inout), target :: ice
+        type(t_dyn)   , intent(in)   , target :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
 end module
 
 !
@@ -50,38 +51,38 @@ end module
 subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
     ! transmits the relevant fields from the ice to the ocean model
     !
-    use o_PARAM
-    use o_ARRAYS
-    use MOD_MESH
+    USE MOD_ICE
+    USE MOD_DYN
     USE MOD_PARTIT
     USE MOD_PARSUP
-    USE MOD_DYN
-    USE MOD_ICE
+    USE MOD_MESH
+    use o_PARAM
+    use o_ARRAYS
     use i_ARRAYS
     use i_PARAM
     USE g_CONFIG
     use g_comm_auto
-
 #if defined (__icepack)
     use icedrv_main,   only: icepack_to_fesom
 #endif
-
     implicit none
-    
-    integer                  :: n, elem, elnodes(3),n1
-    real(kind=WP)            :: aux, aux1
+    type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(in)   , target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
-    type(t_ice), intent(inout), target :: ice
-
-    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
+    !___________________________________________________________________________
+    integer                  :: n, elem, elnodes(3),n1
+    real(kind=WP)            :: aux, aux1
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, a_ice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    u_ice           => ice%uvice(1,:)
-    v_ice           => ice%uvice(2,:)
+    u_ice        => ice%uvice(1,:)
+    v_ice        => ice%uvice(2,:)
+    a_ice        => ice%data(1)%values(:)
     
     ! ==================
     ! momentum flux:
@@ -221,43 +222,47 @@ end subroutine ocean2ice
 !
 !
 !_______________________________________________________________________________
-subroutine oce_fluxes(dynamics, tracers, partit, mesh)
-
-  use MOD_MESH
-  use MOD_DYN
-  use MOD_TRACER
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  USE g_CONFIG
-  use o_ARRAYS
-  use i_ARRAYS
-  use g_comm_auto
-  use g_forcing_param, only: use_virt_salt
-  use g_forcing_arrays
-  use g_support
-  use i_therm_param
-
+subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
+    USE MOD_ICE
+    use MOD_DYN
+    use MOD_TRACER
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use MOD_MESH
+    USE g_CONFIG
+    use o_ARRAYS
+    use i_ARRAYS
+    use g_comm_auto
+    use g_forcing_param, only: use_virt_salt
+    use g_forcing_arrays
+    use g_support
+    use i_therm_param
+    use cavity_interfaces
 #if defined (__icepack)
-  use icedrv_main,   only: icepack_to_fesom,    &
-                           init_flux_atm_ocn
+    use icedrv_main,   only: icepack_to_fesom,    &
+                            init_flux_atm_ocn
 #endif
-  use cavity_heat_water_fluxes_3eq_interface
-  implicit none
-  type(t_partit), intent(inout), target :: partit
-  type(t_mesh),   intent(in),    target :: mesh
-  type(t_tracer), intent(inout), target :: tracers
-  type(t_dyn),    intent(in),    target :: dynamics
-  integer                    :: n, elem, elnodes(3),n1
-  real(kind=WP)              :: rsss, net
-  real(kind=WP), allocatable :: flux(:)
-  real(kind=WP), dimension(:,:), pointer :: temp, salt
+    use cavity_interfaces
+    implicit none
+    type(t_ice)   , intent(inout), target :: ice
+    type(t_dyn)   , intent(in)   , target :: dynamics
+    type(t_tracer), intent(inout), target :: tracers
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    integer                    :: n, elem, elnodes(3),n1
+    real(kind=WP)              :: rsss, net
+    real(kind=WP), allocatable :: flux(:)
+    !___________________________________________________________________________
+    real(kind=WP), dimension(:,:), pointer :: temp, salt
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-  temp=>tracers%data(1)%values(:,:)
-  salt=>tracers%data(2)%values(:,:)
+    temp=>tracers%data(1)%values(:,:)
+    salt=>tracers%data(2)%values(:,:)
     
+    !___________________________________________________________________________
     allocate(flux(myDim_nod2D+eDim_nod2D))
     flux = 0.0_WP
     
@@ -414,7 +419,7 @@ subroutine oce_fluxes(dynamics, tracers, partit, mesh)
     end if 
     
     !___________________________________________________________________________
-    if (use_sw_pene) call cal_shortwave_rad(partit, mesh)
+    if (use_sw_pene) call cal_shortwave_rad(ice, partit, mesh)
     
     !___________________________________________________________________________
     deallocate(flux)

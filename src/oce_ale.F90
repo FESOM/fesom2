@@ -2944,7 +2944,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! use CVMIX KPP (Large at al. 1994) 
     else if(mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_kpp'//achar(27)//'[0m'
-        call calc_cvmix_kpp(dynamics, tracers, partit, mesh)
+        call calc_cvmix_kpp(ice, dynamics, tracers, partit, mesh)
         call mo_convect(ice, partit, mesh)
         
     ! use CVMIX PP (Pacanowski and Philander 1981) parameterisation for mixing
@@ -2981,7 +2981,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'
-    call compute_vel_rhs(dynamics, partit, mesh)
+    call compute_vel_rhs(ice, dynamics, partit, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call viscosity_filter'//achar(27)//'[0m'

@@ -12,18 +12,21 @@ subroutine mo_convect(ice, partit, mesh)
     use i_arrays
     use g_comm_auto
     IMPLICIT NONE
-
-    integer                               :: node, elem, nz, elnodes(3), nzmin, nzmax
-    type(t_mesh),   intent(in),    target :: mesh
-    type(t_partit), intent(inout), target :: partit
     type(t_ice), intent(in), target :: ice
-    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+    !___________________________________________________________________________
+    integer                               :: node, elem, nz, elnodes(3), nzmin, nzmax
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, a_ice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-    u_ice           => ice%uvice(1,:)
-    v_ice           => ice%uvice(2,:)
+    u_ice => ice%uvice(1,:)
+    v_ice => ice%uvice(2,:)
+    a_ice => ice%data(1)%values(:)
     
     !___________________________________________________________________________
     ! add vertical mixing scheme of Timmermann and Beckmann, 2004,"Parameterization 

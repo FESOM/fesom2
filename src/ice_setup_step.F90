@@ -137,7 +137,7 @@ e_size=myDim_elem2D+eDim_elem2D
  allocate(U_rhs_ice(n_size), V_rhs_ice(n_size))
  allocate(sigma11(e_size), sigma12(e_size), sigma22(e_size))
  allocate(eps11(e_size),     eps12(e_size),   eps22(e_size))
- allocate(m_ice(n_size), a_ice(n_size), m_snow(n_size))
+!  allocate(m_ice(n_size), a_ice(n_size), m_snow(n_size))
  allocate(rhs_m(n_size), rhs_a(n_size), rhs_ms(n_size))
  allocate(t_skin(n_size))
  allocate(U_ice_old(n_size), V_ice_old(n_size)) !PS
@@ -165,9 +165,9 @@ e_size=myDim_elem2D+eDim_elem2D
  rhs_m=0.0_WP
  rhs_ms=0.0_WP
  rhs_a=0.0_WP
- m_ice=0.0_WP
- a_ice=0.0_WP
- m_snow=0.0_WP
+!  m_ice=0.0_WP
+!  a_ice=0.0_WP
+!  m_snow=0.0_WP
  U_rhs_ice=0.0_WP
  V_rhs_ice=0.0_WP
 !  U_ice=0.0_WP
@@ -237,6 +237,7 @@ use ice_EVP_interfaces
 use ice_maEVP_interfaces
 use ice_fct_interfaces
 use ice_thermodynamics_interfaces
+use cavity_interfaces
 #if defined (__icepack)
     use icedrv_main,   only: step_icepack 
 #endif
@@ -359,25 +360,27 @@ end subroutine ice_timestep
 !_______________________________________________________________________________
 ! sets inital values or reads restart file for ice model
 subroutine ice_initial_state(ice, tracers, partit, mesh)
-    use i_ARRAYs
-    use MOD_MESH
+    USE MOD_ICE
+    USE MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use MOD_TRACER
-    use MOD_ICE
+    USE MOD_MESH
+    use i_ARRAYs
     use o_PARAM   
     use o_arrays        
     use g_CONFIG
     implicit none
-    !
     type(t_ice),    intent(inout), target :: ice
-    type(t_mesh),   intent(in),    target :: mesh
-    type(t_partit), intent(inout), target :: partit
     type(t_tracer), intent(in),    target :: tracers
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+    !___________________________________________________________________________
     integer                               :: i
     character(MAX_PATH)                   :: filename
     real(kind=WP), external               :: TFrez  ! Sea water freeze temperature.
-    
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -385,7 +388,11 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
 #include "associate_mesh_ass.h"
     u_ice           => ice%uvice(1,:)
     v_ice           => ice%uvice(2,:)
+    a_ice        => ice%data(1)%values(:)
+    m_ice        => ice%data(2)%values(:)
+    m_snow       => ice%data(3)%values(:)
     
+    !___________________________________________________________________________
     m_ice =0._WP
     a_ice =0._WP
     u_ice =0._WP

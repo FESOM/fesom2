@@ -474,12 +474,16 @@ REAL(kind=WP) :: mass, uc, vc,  deltaX1, deltaX2, deltaY1, deltaY2
 !_______________________________________________________________________________
 ! pointer on necessary derived types
 real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
+real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 u_ice           => ice%uvice(1,:)
 v_ice           => ice%uvice(2,:)
+a_ice           => ice%data(1)%values(:)
+m_ice           => ice%data(2)%values(:)
+m_snow          => ice%data(3)%values(:)
 
 !_______________________________________________________________________________
 ! If Icepack is used, always update the tracers

@@ -356,7 +356,7 @@ contains
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
             call oce_fluxes_mom(f%ice, f%dynamics, f%partit, f%mesh) ! momentum only
-            call oce_fluxes(f%dynamics, f%tracers, f%partit, f%mesh)
+            call oce_fluxes(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         end if
         call before_oce_step(f%dynamics, f%tracers, f%partit, f%mesh) ! prepare the things if required
         f%t2 = MPI_Wtime()

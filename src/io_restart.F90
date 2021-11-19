@@ -197,9 +197,9 @@ subroutine ini_ice_io(year, ice, partit, mesh)
   !===================== Definition part =====================================
   !===========================================================================
   !___Define the netCDF variables for 2D fields_______________________________
-  call def_variable(iid, 'area',       (/nod2D/), 'ice concentration [0 to 1]', '%',   a_ice);
-  call def_variable(iid, 'hice',       (/nod2D/), 'effective ice thickness',    'm',   m_ice);
-  call def_variable(iid, 'hsnow',      (/nod2D/), 'effective snow thickness',   'm',   m_snow);
+  call def_variable(iid, 'area',       (/nod2D/), 'ice concentration [0 to 1]', '%',   ice%data(1)%values(:));
+  call def_variable(iid, 'hice',       (/nod2D/), 'effective ice thickness',    'm',   ice%data(2)%values(:));
+  call def_variable(iid, 'hsnow',      (/nod2D/), 'effective snow thickness',   'm',   ice%data(3)%values(:));
   call def_variable(iid, 'uice',       (/nod2D/), 'zonal velocity',             'm/s', ice%uvice(1,:));
   call def_variable(iid, 'vice',       (/nod2D/), 'meridional velocity',        'm',   ice%uvice(2,:));
 #if defined (__oifs)

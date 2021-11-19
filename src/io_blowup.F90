@@ -152,9 +152,9 @@ MODULE io_BLOWUP
 		
 		!_____________________________________________________________________________
 		! write snapshot ice variables to blowup file
-		call def_variable(bid, 'a_ice'		, (/nod2D/)			, 'ice concentration [0 to 1]', '%', a_ice);
-		call def_variable(bid, 'm_ice'		, (/nod2D/)			, 'effective ice thickness',    'm', m_ice);
-		call def_variable(bid, 'm_snow'		, (/nod2D/)			, 'effective snow thickness',   'm', m_snow);
+		call def_variable(bid, 'a_ice'		, (/nod2D/)			, 'ice concentration [0 to 1]', '%', ice%data(1)%values);
+		call def_variable(bid, 'm_ice'		, (/nod2D/)			, 'effective ice thickness',    'm', ice%data(2)%values);
+		call def_variable(bid, 'm_snow'		, (/nod2D/)			, 'effective snow thickness',   'm', ice%data(3)%values);
 		call def_variable(bid, 'u_ice'		, (/nod2D/)			, 'zonal velocity',    'm/s', ice%uvice(1,:));
 		call def_variable(bid, 'v_ice'		, (/nod2D/)			, 'meridional velocity', 'm', ice%uvice(2,:));
 !!PS  		call def_variable(bid, 'a_ice_old'	, (/nod2D/)			, 'ice concentration [0 to 1]', '%', a_ice_old); !PS

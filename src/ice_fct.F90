@@ -87,32 +87,36 @@ end module
 !
 ! =====================================================================
 subroutine ice_TG_rhs(ice, partit, mesh)
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  USE MOD_ICE
-  use i_Arrays
-  use i_PARAM
-  use o_PARAM
-  USE g_CONFIG
-  implicit none 
-  type(t_ice),    intent(inout), target :: ice
-  type(t_partit), intent(inout), target :: partit
-  type(t_mesh),   intent(in),    target :: mesh
-  !_____________________________________________________________________________
-  real(kind=WP)   :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
-  integer         :: n, q, row, elem, elnodes(3)
-  !_____________________________________________________________________________
-  ! pointer on necessary derived types
-  real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
+    use MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_ICE
+    use i_Arrays
+    use i_PARAM
+    use o_PARAM
+    USE g_CONFIG
+    implicit none 
+    type(t_ice),    intent(inout), target :: ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+    !___________________________________________________________________________
+    real(kind=WP)   :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
+    integer         :: n, q, row, elem, elnodes(3)
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
+    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-  u_ice           => ice%uvice(1,:)
-  v_ice           => ice%uvice(2,:)
-  
-  !_____________________________________________________________________________
+    u_ice           => ice%uvice(1,:)
+    v_ice           => ice%uvice(2,:)
+    a_ice        => ice%data(1)%values(:)
+    m_ice        => ice%data(2)%values(:)
+    m_snow       => ice%data(3)%values(:)
+    
+    !___________________________________________________________________________
     ! Taylor-Galerkin (Lax-Wendroff) rhs
     DO row=1, myDim_nod2D
         rhs_m(row)=0._WP
@@ -259,7 +263,6 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     ! matrices acting on the field from the previous time step. The consistent 
     ! mass matrix on the lhs is replaced with the lumped one.       
     USE MOD_ICE
-    USE MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_MESH
@@ -275,10 +278,14 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     real(kind=WP) :: gamma
     !___________________________________________________________________________
     ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    a_ice        => ice%data(1)%values(:)
+    m_ice        => ice%data(2)%values(:)
+    m_snow       => ice%data(3)%values(:)
     
     !___________________________________________________________________________
     gamma=ice_gamma_fct         ! Added diffusivity parameter
@@ -432,18 +439,23 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     type(t_ice),    intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(in),    target :: mesh
-    !_____________________________________________________________________________
+    !___________________________________________________________________________
     integer   :: tr_array_id
     integer   :: icoef(3,3),n,q, elem,elnodes(3),row
     real(kind=WP), allocatable, dimension(:) :: tmax, tmin 
     real(kind=WP)   :: vol, flux, ae, gamma
-    !_____________________________________________________________________________
-  ! pointer on necessary derived types
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-  
+    a_ice        => ice%data(1)%values(:)
+    m_ice        => ice%data(2)%values(:)
+    m_snow       => ice%data(3)%values(:)
+    
+    !___________________________________________________________________________
     gamma=ice_gamma_fct        ! It should coinside with gamma in 
                              ! ts_solve_low_order  
   
@@ -820,31 +832,36 @@ END SUBROUTINE ice_mass_matrix_fill
 !
 subroutine ice_TG_rhs_div(ice, partit, mesh)
   use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  USE MOD_ICE
-  use i_Arrays
-  use i_PARAM
-  use o_PARAM
-  USE g_CONFIG
-  implicit none 
-  real(kind=WP)            :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
-  integer                  :: n, q, row, elem, elnodes(3)
-  real(kind=WP)            :: c1, c2, c3, c4, cx1, cx2, cx3, cx4, entries2(3) 
-  type(t_ice), intent(inout), target :: ice
-  type(t_partit), intent(inout), target :: partit
-  type(t_mesh),   intent(in),    target :: mesh
-  !_____________________________________________________________________________
-  ! pointer on necessary derived types
-  real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_ICE
+    use i_Arrays
+    use i_PARAM
+    use o_PARAM
+    USE g_CONFIG
+    implicit none 
+    type(t_ice)   , intent(inout), target :: ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    real(kind=WP)            :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
+    integer                  :: n, q, row, elem, elnodes(3)
+    real(kind=WP)            :: c1, c2, c3, c4, cx1, cx2, cx3, cx4, entries2(3) 
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
+    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-  u_ice           => ice%uvice(1,:)
-  v_ice           => ice%uvice(2,:)
-  
-  
+    u_ice        => ice%uvice(1,:)
+    v_ice        => ice%uvice(2,:)
+    a_ice        => ice%data(1)%values(:)
+    m_ice        => ice%data(2)%values(:)
+    m_snow       => ice%data(3)%values(:)
+    
+    !___________________________________________________________________________
  ! Computes the rhs in a Taylor-Galerkin way (with upwind type of 
  ! correction for the advection operator)
  ! In this version I tr to split divergent term off, so that FCT works without it.
@@ -933,20 +950,25 @@ subroutine ice_update_for_div(ice, partit, mesh)
     USE g_CONFIG
     use g_comm_auto
     implicit none
-    !
+    type(t_ice)   , intent(inout), target   :: ice
+    type(t_partit), intent(inout), target   :: partit
+    type(t_mesh)  , intent(in)   , target   :: mesh
+    !___________________________________________________________________________
     integer                                 :: n,i,clo,clo2,cn,location(100),row
     real(kind=WP)                           :: rhs_new
     integer                                 :: num_iter_solve=3
-    type(t_ice), intent(inout), target   :: ice
-    type(t_partit), intent(inout), target   :: partit
-    type(t_mesh),   intent(in),    target   :: mesh
-    !_____________________________________________________________________________
-  ! pointer on necessary derived types
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
+    a_ice        => ice%data(1)%values(:)
+    m_ice        => ice%data(2)%values(:)
+    m_snow       => ice%data(3)%values(:)
+    
+    !___________________________________________________________________________
     ! Does Taylor-Galerkin solution
     !
     !the first approximation

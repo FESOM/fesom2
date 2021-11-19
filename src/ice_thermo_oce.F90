@@ -36,12 +36,17 @@ subroutine cut_off(ice, partit, mesh)
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
     type(t_ice), intent(inout), target :: ice
-
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
+    a_ice        => ice%data(1)%values(:)
+    m_ice        => ice%data(2)%values(:)
+    m_snow       => ice%data(3)%values(:)
+    
     !___________________________________________________________________________
     ! lower cutoff: a_ice
     where(a_ice>1.0_WP)  a_ice=1.0_WP
@@ -66,23 +71,7 @@ subroutine cut_off(ice, partit, mesh)
         ice_temp=273.15_WP
 #endif /* (__oifs) */
     end where
-    
-
-!!PS     if (use_cavity) then
-!!PS         ! upper cutoff SH: m_ice
-!!PS         where(m_ice>5.0_WP  .and. ulevels_nod2d==1 .and. geo_coord_nod2D(2,:)<0.0_WP) m_ice=5.0_WP 
-!!PS         
-!!PS         ! upper cutoff NH: m_ice
-!!PS         where(m_ice>10.0_WP .and. ulevels_nod2d==1 .and. geo_coord_nod2D(2,:)>0.0_WP) m_ice=10.0_WP 
-!!PS         
-!!PS         ! upper cutoff: m_snow
-!!PS         where(m_snow>2.5_WP .and. ulevels_nod2d==1) m_snow=2.5_WP 
-!!PS         
-!!PS         !___________________________________________________________________________
-!!PS         ! lower cutoff: m_snow
-!!PS         !!PS where(m_snow<0.1e-8_WP) m_snow=0.0_WP
-!!PS     end if 
-    
+     
     !___________________________________________________________________________
 #if defined (__oifs)
     where(ice_temp>273.15_WP) ice_temp=273.15_WP
@@ -113,11 +102,11 @@ subroutine thermodynamics(ice, partit, mesh)
   ! variables.
   !------------------------------------------------------------------------
   
-  use o_param
-  use mod_mesh
+  USE MOD_ICE
   USE MOD_PARTIT
   USE MOD_PARSUP
-  USE MOD_ICE
+  USE MOD_MESH
+  use o_param
   use i_therm_param
   use i_param
   use i_arrays
@@ -127,10 +116,10 @@ subroutine thermodynamics(ice, partit, mesh)
   use g_comm_auto
   use g_sbf, only: l_snow
   implicit none
+  type(t_ice),    intent(inout), target :: ice
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
-  type(t_ice),    intent(inout), target :: ice
-
+  !_____________________________________________________________________________
   real(kind=WP)  :: h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss,rsf,evap_in
   real(kind=WP)  :: ug,ustar,T_oc,S_oc,h_ml,t,ch,ce,ch_i,ce_i,fw,ehf,evap
   real(kind=WP)  :: ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout, subli
@@ -138,20 +127,23 @@ subroutine thermodynamics(ice, partit, mesh)
   integer        :: i, j, elem
   real(kind=WP), allocatable  :: ustar_aux(:)
   real(kind=WP)  lid_clo
-
+  !_____________________________________________________________________________
+  ! pointer on necessary derived types
   integer, pointer                       :: myDim_nod2D, eDim_nod2D
   integer,        dimension(:),  pointer :: ulevels_nod2D
   real(kind=WP),  dimension(:,:),pointer :: geo_coord_nod2D
-  real(kind=WP),  dimension(:),  pointer  :: u_ice, v_ice
-
+  real(kind=WP),  dimension(:),  pointer :: u_ice, v_ice
+  real(kind=WP), dimension(:),   pointer :: a_ice, m_ice, m_snow
   myDim_nod2d=>partit%myDim_nod2D
   eDim_nod2D =>partit%eDim_nod2D
   ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D
   geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => mesh%geo_coord_nod2D 
-  u_ice           => ice%uvice(1,:)
-  v_ice           => ice%uvice(2,:)
-  
-  
+  u_ice      => ice%uvice(1,:)
+  v_ice      => ice%uvice(2,:)
+  a_ice      => ice%data(1)%values(:)
+  m_ice      => ice%data(2)%values(:)
+  m_snow     => ice%data(3)%values(:)
+  !_____________________________________________________________________________
   rsss=ref_sss
 
   ! u_ice and v_ice are at nodes

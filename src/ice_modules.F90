@@ -60,9 +60,9 @@ save
   integer                   :: ice_steps_since_upd = 0 !
   real(kind=WP),allocatable,dimension(:,:)         :: ice_grad_vel
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice, V_ice
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: m_ice, a_ice  
+!   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: m_ice, a_ice, m_snow  
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice_old, V_ice_old, m_ice_old, a_ice_old, m_snow_old,thdgr_old !PS
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_rhs_ice, V_rhs_ice, m_snow
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_rhs_ice, V_rhs_ice
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_m, rhs_a, rhs_ms, ths_temp
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_w, V_w
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: u_ice_aux, v_ice_aux  ! of the size of u_ice, v_ice
