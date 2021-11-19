@@ -10,7 +10,7 @@
 
 #define DBL_EPSILON 2.2204460492503131e-16 // double epsilon
 
-int qsplitC(FLOAT *a, int *ind, int n, int ncut)
+int qsplitCF(FLOAT *a, int *ind, int n, int ncut)
 {
 /*----------------------------------------------------------------------
 |     does a quick-sort split of a complex real array.
@@ -57,7 +57,7 @@ label1:
       first = mid+1;
    goto label1;
 }
-/*--------------- end of zqsplitC ----------------------------------------*/
+/*--------------- end of zqsplitCF ----------------------------------------*/
 
 int SparTran(csptr amat, csptr bmat, int job, int flag)
 {

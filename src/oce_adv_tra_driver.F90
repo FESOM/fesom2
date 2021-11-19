@@ -178,6 +178,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
             call adv_tra_ver_upw1(w, ttf, partit, mesh, adv_flux_ver, o_init_zero=.true.)
         end if
         call exchange_nod(fct_LO, partit)
+!$OMP BARRIER
     end if
     do_zero_flux=.true.
     if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') do_zero_flux=.false.
