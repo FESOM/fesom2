@@ -372,4 +372,3 @@ SUBROUTINE nemogcmcoup_end_ioserver
 
 END SUBROUTINE nemogcmcoup_end_ioserver
 
-#endif
