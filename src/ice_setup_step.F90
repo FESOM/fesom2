@@ -172,10 +172,10 @@ e_size=myDim_elem2D+eDim_elem2D
  stress_iceoce_x = 0.0_WP
  stress_iceoce_y = 0.0_WP
  allocate(U_w(n_size), V_w(n_size))   ! =uf and vf of ocean at surface nodes
-#if defined (__oasis)
+#if defined (__oasis) || defined (__ifsinterface)
   allocate(oce_heat_flux(n_size), ice_heat_flux(n_size))
   allocate(tmp_oce_heat_flux(n_size), tmp_ice_heat_flux(n_size))
-#if defined (__oifs)
+#if defined (__oifs) || defined (__ifsinterface)
   allocate(ice_alb(n_size), ice_temp(n_size), enthalpyoffuse(n_size))
   allocate(rhs_tempdiv(n_size), rhs_temp(n_size))
   ice_alb=0.6_WP
@@ -183,12 +183,12 @@ e_size=myDim_elem2D+eDim_elem2D
   rhs_tempdiv=0._WP
   rhs_temp=0._WP
   enthalpyoffuse=0._WP
-#endif /* (__oifs) */
+#endif /* (__oifs) || defined (__ifsinterface) */
   oce_heat_flux=0._WP
   ice_heat_flux=0._WP
   tmp_oce_heat_flux=0._WP
   tmp_ice_heat_flux=0._WP
-#endif /* (__oasis) */
+#endif /* (__oasis) || defined (__ifsinterface) */
 end subroutine ice_array_setup
 !
 !

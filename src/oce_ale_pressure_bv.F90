@@ -235,18 +235,18 @@ subroutine pressure_bv(tracers, partit, mesh)
     mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==17)
     !___________________________________________________________________________
     ! Screen salinity
-    a_loc=0.0_WP
+    a    =0.0_WP
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, a_loc)
+    a_loc=0.0_WP
 !$OMP DO
     do node=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(node)
         nzmax = nlevels_nod2D(node)
         do nz=nzmin,nzmax-1
-            a_loc=min(a_loc,salt(nz,node))
+            a_loc=min(a_loc, salt(nz,node))
         enddo
     enddo
 !$OMP END DO
-    a=0.0_WP
 !$OMP CRITICAL
     a=min(a, a_loc)
 !$OMP END CRITICAL
@@ -3068,6 +3068,7 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
 !$OMP END PARALLEL
 call exchange_nod(sw_alpha, partit)
 call exchange_nod(sw_beta, partit)
+!$OMP BARRIER
 end subroutine sw_alpha_beta
 !
 !
@@ -3155,6 +3156,7 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
 !$OMP END DO
 !$OMP END PARALLEL
   call exchange_nod(sigma_xy, partit)
+!$OMP BARRIER
 end subroutine compute_sigma_xy
 !
 !
@@ -3206,6 +3208,7 @@ subroutine compute_neutral_slope(partit, mesh)
 !$OMP END PARALLEL
     call exchange_nod(neutral_slope, partit)
     call exchange_nod(slope_tapered, partit)
+!$OMP BARRIER
 end subroutine compute_neutral_slope
 !
 !

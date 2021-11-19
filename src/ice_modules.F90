@@ -78,7 +78,7 @@ save
 							!temporary flux fields
 							!(for flux correction)
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_temp, m_templ, dm_temp, rhs_tempdiv
-#if defined (__oifs)
+#if defined (__oifs) || defined (__ifsinterface)
   real(kind=WP),target, allocatable, dimension(:)  :: enthalpyoffuse
 #endif
 #endif /* (__oasis) || defined (__ifsinterface)*/
