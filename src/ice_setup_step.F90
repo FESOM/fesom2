@@ -143,66 +143,68 @@ subroutine ice_timestep(step, ice, partit, mesh)
 
     !___________________________________________________________________________
     t0=MPI_Wtime()
-!#if defined (__icepack)
-!    call step_icepack(mesh, ice, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts    
-!#else     
+#if defined (__icepack)
+   call step_icepack(mesh, ice, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts    
+#else     
     
     !___________________________________________________________________________
     ! Dynamics
-    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'  
     SELECT CASE (ice%whichEVP)
         CASE (0)
+            if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'  
             call EVPdynamics(ice, partit, mesh)
         CASE (1)
+            if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics_m...'//achar(27)//'[0m'  
             call EVPdynamics_m(ice, partit, mesh)
         CASE (2)
+            if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics_a...'//achar(27)//'[0m'  
             call EVPdynamics_a(ice, partit, mesh)
         CASE DEFAULT
             if (mype==0) write(*,*) 'a non existing EVP scheme specified!'
             call par_ex(partit%MPI_COMM_FESOM, partit%mype)
             stop
     END SELECT
-!     if (use_cavity) call cavity_ice_clean_vel(ice, partit, mesh)
-!     t1=MPI_Wtime()   
-!     
-!     !___________________________________________________________________________
-!     ! Advection part
-!     ! old FCT routines
-!     ! call ice_TG_rhs
-!     ! call ice_fct_solve
-!     ! call cut_off
-!     ! new FCT routines from Sergey Danilov 08.05.2018
-! #if defined (__oifs)
-!     do i=1,myDim_nod2D+eDim_nod2D
-!         ice_temp(i) = ice_temp(i)*a_ice(i)
-!     end do
-! #endif /* (__oifs) */
-!     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
-!     call ice_TG_rhs_div(ice, partit, mesh) 
-!     
-!     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_solve...'//achar(27)//'[0m' 
-!     call ice_fct_solve(ice, partit, mesh)
-!     
-!     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_update_for_div...'//achar(27)//'[0m'
-!     call ice_update_for_div(ice, partit, mesh)
-!     
-! #if defined (__oifs)
-!     do i=1,myDim_nod2D+eDim_nod2D
-!         if (a_ice(i)>0.0_WP) ice_temp(i) = ice_temp(i)/a_ice(i)
-!     end do
-! #endif /* (__oifs) */
-! 
-!     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call cut_off...'//achar(27)//'[0m'
-!     call cut_off(ice, partit, mesh)
-!     
-!     if (use_cavity) call cavity_ice_clean_ma(ice, partit, mesh)
-!     t2=MPI_Wtime()
-!     
-!     !___________________________________________________________________________
-!     ! Thermodynamic part
-!     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
-!     call thermodynamics(ice, partit, mesh)
-! #endif /* (__icepack) */
+    if (use_cavity) call cavity_ice_clean_vel(ice, partit, mesh)
+    t1=MPI_Wtime()   
+    
+    !___________________________________________________________________________
+    ! Advection part
+    ! old FCT routines
+    ! call ice_TG_rhs
+    ! call ice_fct_solve
+    ! call cut_off
+    ! new FCT routines from Sergey Danilov 08.05.2018
+#if defined (__oifs)
+    do i=1,myDim_nod2D+eDim_nod2D
+        ice_temp(i) = ice_temp(i)*a_ice(i)
+    end do
+#endif /* (__oifs) */
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
+    call ice_TG_rhs_div(ice, partit, mesh) 
+    
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_solve...'//achar(27)//'[0m' 
+    call ice_fct_solve(ice, partit, mesh)
+    
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_update_for_div...'//achar(27)//'[0m'
+    call ice_update_for_div(ice, partit, mesh)
+    
+#if defined (__oifs)
+    do i=1,myDim_nod2D+eDim_nod2D
+        if (a_ice(i)>0.0_WP) ice_temp(i) = ice_temp(i)/a_ice(i)
+    end do
+#endif /* (__oifs) */
+
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call cut_off...'//achar(27)//'[0m'
+    call cut_off(ice, partit, mesh)
+    
+    if (use_cavity) call cavity_ice_clean_ma(ice, partit, mesh)
+    t2=MPI_Wtime()
+    
+    !___________________________________________________________________________
+    ! Thermodynamic part
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
+    call thermodynamics(ice, partit, mesh)
+#endif /* (__icepack) */
 
     !___________________________________________________________________________
     do node=1,myDim_nod2D+eDim_nod2D
