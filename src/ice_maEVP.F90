@@ -105,9 +105,9 @@ subroutine stress_tensor_m(ice, partit, mesh)
     
     !___________________________________________________________________________
   val3=1.0_WP/3.0_WP
-  vale=1.0_WP/(ellipse**2)
-  det2=1.0_WP/(1.0_WP+alpha_evp)
-  det1=alpha_evp*det2
+  vale=1.0_WP/(ice%ellipse**2)
+  det2=1.0_WP/(1.0_WP+ice%alpha_evp)
+  det1=ice%alpha_evp*det2
    do elem=1,myDim_elem2D
      elnodes=elem2D_nodes(:,elem)
      !_______________________________________________________________________
@@ -141,12 +141,12 @@ subroutine stress_tensor_m(ice, partit, mesh)
      delta=sqrt(delta)
     
 #if defined (__icepack)
-     pressure = sum(strength(elnodes))*val3/max(delta,delta_min)
+     pressure = sum(strength(elnodes))*val3/max(delta,ice%delta_min)
 #else
-     pressure=pstar*msum*exp(-c_pressure*(1.0_WP-asum))/max(delta,delta_min)
+     pressure=ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))/max(delta,ice%delta_min)
 #endif
     
-        r1=pressure*(eps1-max(delta,delta_min))
+        r1=pressure*(eps1-max(delta,ice%delta_min))
         r2=pressure*eps2*vale
         r3=pressure*eps12(elem)*vale
         si1=sigma11(elem)+sigma22(elem)
@@ -666,17 +666,17 @@ subroutine EVPdynamics_m(ice, partit, mesh)
  !    do i=1,myDim_nod2D
  
         umod = sqrt((u_ice_aux(i)-u_w(i))**2+(v_ice_aux(i)-v_w(i))**2)
-        drag = rdt*Cd_oce_ice*umod*density_0*inv_thickness(i)
+        drag = rdt*ice%cd_oce_ice*umod*density_0*inv_thickness(i)
 
         !rhs for water stress, air stress, and u_rhs_ice/v (internal stress + ssh)
-        rhsu = u_ice(i)+drag*u_w(i)+rdt*(inv_thickness(i)*stress_atmice_x(i)+u_rhs_ice(i)) + beta_evp*u_ice_aux(i)
-        rhsv = v_ice(i)+drag*v_w(i)+rdt*(inv_thickness(i)*stress_atmice_y(i)+v_rhs_ice(i)) + beta_evp*v_ice_aux(i)
+        rhsu = u_ice(i)+drag*u_w(i)+rdt*(inv_thickness(i)*stress_atmice_x(i)+u_rhs_ice(i)) + ice%beta_evp*u_ice_aux(i)
+        rhsv = v_ice(i)+drag*v_w(i)+rdt*(inv_thickness(i)*stress_atmice_y(i)+v_rhs_ice(i)) + ice%beta_evp*v_ice_aux(i)
 
         !solve (Coriolis and water stress are treated implicitly)        
-        det = bc_index_nod2D(i) / ((1.0_WP+beta_evp+drag)**2 + (rdt*coriolis_node(i))**2)
+        det = bc_index_nod2D(i) / ((1.0_WP+ice%beta_evp+drag)**2 + (rdt*coriolis_node(i))**2)
 
-        u_ice_aux(i) = det*((1.0_WP+beta_evp+drag)*rhsu +rdt*coriolis_node(i)*rhsv)
-        v_ice_aux(i) = det*((1.0_WP+beta_evp+drag)*rhsv -rdt*coriolis_node(i)*rhsu)
+        u_ice_aux(i) = det*((1.0_WP+ice%beta_evp+drag)*rhsu +rdt*coriolis_node(i)*rhsv)
+        v_ice_aux(i) = det*((1.0_WP+ice%beta_evp+drag)*rhsv -rdt*coriolis_node(i)*rhsu)
         end if
      end do ! --> do i=1, myDim_nod2d 
 
@@ -767,7 +767,7 @@ subroutine find_alpha_field_a(ice, partit, mesh)
     
     !___________________________________________________________________________
   val3=1.0_WP/3.0_WP
-  vale=1.0_WP/(ellipse**2)
+  vale=1.0_WP/(ice%ellipse**2)
    do elem=1,myDim_elem2D
      elnodes=elem2D_nodes(:,elem)
      !_______________________________________________________________________
@@ -801,13 +801,13 @@ subroutine find_alpha_field_a(ice, partit, mesh)
      delta=sqrt(delta)
          
 #if defined (__icepack)
-     pressure = sum(strength(elnodes))*val3/(delta+delta_min)/msum
+     pressure = sum(strength(elnodes))*val3/(delta+ice%delta_min)/msum
 #else
-     pressure = pstar*exp(-c_pressure*(1.0_WP-asum))/(delta+delta_min) ! no multiplication
+     pressure = ice%pstar*exp(-ice%c_pressure*(1.0_WP-asum))/(delta+ice%delta_min) ! no multiplication
                                                                        ! with thickness (msum)
 #endif
-     !adjust c_aevp such, that alpha_evp_array and beta_evp_array become in acceptable range
-     alpha_evp_array(elem)=max(50.0_WP,sqrt(ice_dt*c_aevp*pressure/rhoice/elem_area(elem)))
+     !adjust ice%c_aevp such, that alpha_evp_array and beta_evp_array become in acceptable range
+     alpha_evp_array(elem)=max(50.0_WP,sqrt(ice%ice_dt*ice%c_aevp*pressure/rhoice/elem_area(elem)))
      ! /voltriangle(elem) for FESOM1.4
      ! We do not allow alpha to be too small!
    end do
@@ -903,9 +903,9 @@ subroutine stress_tensor_a(ice, partit, mesh)
      delta=sqrt(delta)
    
 #if defined (__icepack)
-     pressure = sum(strength(elnodes))*val3/(delta+delta_min)
+     pressure = sum(strength(elnodes))*val3/(delta+ice%delta_min)
 #else
-     pressure=pstar*msum*exp(-c_pressure*(1.0_WP-asum))/(delta+delta_min)
+     pressure=ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))/(delta+ice%delta_min)
 #endif
     
         r1=pressure*(eps1-delta) 
@@ -1016,7 +1016,7 @@ subroutine EVPdynamics_a(ice, partit, mesh)
          inv_thickness=1.0_WP/thickness
 
          umod=sqrt((u_ice_aux(i)-u_w(i))**2+(v_ice_aux(i)-v_w(i))**2)
-         drag=rdt*Cd_oce_ice*umod*density_0*inv_thickness
+         drag=rdt*ice%cd_oce_ice*umod*density_0*inv_thickness
 
          !rhs for water stress, air stress, and u_rhs_ice/v (internal stress + ssh)
          rhsu=u_ice(i)+drag*u_w(i)+rdt*(inv_thickness*stress_atmice_x(i)+u_rhs_ice(i))
@@ -1059,7 +1059,7 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     u_ice=u_ice_aux
     v_ice=v_ice_aux
  
-    call find_alpha_field_a(ice, partit, mesh)             ! alpha_evp_array is initialized with alpha_evp;
+    call find_alpha_field_a(ice, partit, mesh)             ! alpha_evp_array is initialized with ice%alpha_evp;
                                         ! At this stage we already have non-trivial velocities. 
     call find_beta_field_a(partit, mesh)
 end subroutine EVPdynamics_a

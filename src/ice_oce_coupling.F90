@@ -105,7 +105,7 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
         
         !_______________________________________________________________________
         if(a_ice(n)>0.001_WP) then
-            aux=sqrt((u_ice(n)-u_w(n))**2+(v_ice(n)-v_w(n))**2)*density_0*Cd_oce_ice
+            aux=sqrt((u_ice(n)-u_w(n))**2+(v_ice(n)-v_w(n))**2)*density_0*ice%cd_oce_ice
             stress_iceoce_x(n) = aux * (u_ice(n)-u_w(n))
             stress_iceoce_y(n) = aux * (v_ice(n)-v_w(n))
         else
@@ -316,6 +316,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     heat_flux   = -net_heat_flux 
     water_flux  = -fresh_wa_flux
 #endif 
+    
     heat_flux_in=heat_flux ! sw_pene will change the heat_flux
     if (use_cavity) call cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
     !!PS if (use_cavity) call cavity_heat_water_fluxes_2eq(ice, tracers, partit, mesh)

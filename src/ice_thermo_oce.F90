@@ -181,7 +181,7 @@ subroutine thermodynamics(ice, partit, mesh)
         if(ulevels_nod2d(i)>1) cycle 
         ustar=((u_ice(i)-u_w(i))**2+ &
                (v_ice(i)-v_w(i))**2)
-        ustar_aux(i)=sqrt(ustar*Cd_oce_ice)
+        ustar_aux(i)=sqrt(ustar*ice%cd_oce_ice)
     end do
     call exchange_nod(ustar_aux, partit)
     

@@ -105,7 +105,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
   use g_cvmix_kpp
   use g_cvmix_tidal
   use diagnostics
-  use i_PARAM, only: whichEVP
+!   use i_PARAM, only: whichEVP
   implicit none
   type(t_ice)   , intent(in)   , target :: ice
   type(t_dyn)   , intent(in)   , target :: dynamics
@@ -505,10 +505,10 @@ END DO
     end if
 
     !___________________________________________________________________________________________________________________________________
-    if (whichEVP==1) then
+    if (ice%whichEVP==1) then
     end if
     
-    if (whichEVP==2) then
+    if (ice%whichEVP==2) then
         call def_stream(elem2D, myDim_elem2D, 'alpha_EVP', 'alpha in EVP', 'n/a', alpha_evp_array,  1, 'd', i_real4, partit, mesh)
         call def_stream(nod2D,  myDim_nod2D,  'beta_EVP',  'beta in EVP',  'n/a', beta_evp_array,   1, 'd', i_real4, partit, mesh)
     end if
@@ -584,12 +584,13 @@ end function
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine create_new_file(entry, dynamics, partit, mesh)
+subroutine create_new_file(entry, ice, dynamics, partit, mesh)
   use g_clock
   use mod_mesh
   USE MOD_PARTIT
   USE MOD_PARSUP
   USE MOD_DYN
+  USE MOD_ICE
   use fesom_version_info_module
   use g_config
   use i_PARAM
@@ -600,6 +601,7 @@ subroutine create_new_file(entry, dynamics, partit, mesh)
   type(t_mesh)  , intent(in) :: mesh
   type(t_partit), intent(in) :: partit
   type(t_dyn)   , intent(in) :: dynamics
+  type(t_ice)   , intent(in) :: ice
  
   type(Meandata), intent(inout) :: entry
   character(len=*), parameter :: global_attributes_prefix = "FESOM_"
@@ -672,8 +674,8 @@ subroutine create_new_file(entry, dynamics, partit, mesh)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'force_rotation'   , NF_INT, 1,  force_rotation), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'include_fleapyear', NF_INT, 1,  include_fleapyear), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_floatice'     , NF_INT, 1,  use_floatice), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'whichEVP'         , NF_INT, 1,  whichEVP), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'evp_rheol_steps'  , NF_INT, 1,  evp_rheol_steps), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'whichEVP'         , NF_INT, 1,  ice%whichEVP), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'evp_rheol_steps'  , NF_INT, 1,  ice%evp_rheol_steps), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'opt_visc'         , NF_INT, 1,  dynamics%opt_visc), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_wsplit'       , NF_INT, 1,  dynamics%use_wsplit), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell' , NF_INT, 1,  use_partial_cell), __LINE__)
@@ -887,7 +889,7 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
             entry%filename = filepath
             ! use any existing file with this name or create a new one
             if( nf_open(entry%filename, nf_write, entry%ncid) /= nf_noerr ) then
-              call create_new_file(entry, dynamics, partit, mesh)
+              call create_new_file(entry, ice, dynamics, partit, mesh)
               call assert_nf( nf_open(entry%filename, nf_write, entry%ncid), __LINE__)
             end if
             call assoc_ids(entry)

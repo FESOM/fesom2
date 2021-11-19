@@ -184,9 +184,9 @@ contains
         if (use_ice) then 
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_setup'//achar(27)//'[0m'
             call ice_setup(f%ice, f%tracers, f%partit, f%mesh)
-            f%ice%ice_steps_since_upd = ice_ave_steps-1
+            f%ice%ice_steps_since_upd = f%ice%ice_ave_steps-1
             f%ice%ice_update=.true.
-            if (f%mype==0) write(*,*) 'EVP scheme option=', whichEVP
+            if (f%mype==0) write(*,*) 'EVP scheme option=', f%ice%whichEVP
         endif
         if (f%mype==0) f%t5=MPI_Wtime()
         
@@ -358,12 +358,12 @@ contains
             call update_atm_forcing(n, f%ice, f%tracers, f%partit, f%mesh)
             f%t1_frc = MPI_Wtime()       
             !___compute ice step________________________________________________
-            if (f%ice%ice_steps_since_upd>=ice_ave_steps-1) then
+            if (f%ice%ice_steps_since_upd>=f%ice%ice_ave_steps-1) then
                 f%ice%ice_update=.true.
                 f%ice%ice_steps_since_upd = 0
             else
                 f%ice%ice_update=.false.
-                f%ice%ice_steps_since_upd=ice_steps_since_upd+1
+                f%ice%ice_steps_since_upd=f%ice%ice_steps_since_upd+1
             endif
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_timestep(n)'//achar(27)//'[0m'
             if (f%ice%ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh)  
@@ -382,7 +382,7 @@ contains
         
         !___model ocean step____________________________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_timestep_ale'//achar(27)//'[0m'
-        call oce_timestep_ale(n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+!         call oce_timestep_ale(n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
 
         f%t3 = MPI_Wtime()
         !___compute energy diagnostics..._______________________________________
