@@ -19,7 +19,6 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    USE g_config, only: dt
    USE g_clock, only: timenew, daynew, yearnew, month, day_in_month
    USE nemogcmcoup_steps, ONLY : substeps
-   USE fvom_module, only: fesom_init
 
    IMPLICIT NONE
 
@@ -1461,7 +1460,6 @@ SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )
    USE g_clock, only: yearnew, month, day_in_month
    USE fesom_main_storage_module, only: fesom => f ! mype
    USE nemogcmcoup_steps, ONLY : substeps
-   USE fvom_module, only: fesom_runloop
    IMPLICIT NONE
 
    ! Arguments
@@ -1503,7 +1501,6 @@ END SUBROUTINE nemogcmcoup_step
 SUBROUTINE nemogcmcoup_final
 
    USE fesom_main_storage_module, only: fesom => f ! mype
-   USE fvom_module, only: fesom_finalize
 
    ! Finalize the FESOM model
 
