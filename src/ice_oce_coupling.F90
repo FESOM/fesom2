@@ -226,6 +226,7 @@ subroutine ocean2ice(ice, dynamics, tracers, partit, mesh)
         endif
     end do
     call exchange_nod(u_w, v_w, partit)
+    
 end subroutine ocean2ice
 !
 !

@@ -107,7 +107,8 @@ subroutine ice_timestep(step, ice, partit, mesh)
     use o_param, only: WP
     use g_CONFIG
 !     use i_PARAM, only: whichEVP
-!     use ice_EVPdynamics_interfaces
+    use ice_EVP_interfaces
+    use ice_maEVP_interfaces
     use ice_TG_rhs_div_interfaces
     use ice_update_for_div_interface
     use ice_fct_solve_interface
@@ -144,18 +145,20 @@ subroutine ice_timestep(step, ice, partit, mesh)
     !___________________________________________________________________________
     t0=MPI_Wtime()
 !#if defined (__icepack)
-!    call step_icepack(mesh, ice, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts    
+!   call step_icepack(mesh, ice, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts    
 !#else     
     
     !___________________________________________________________________________
     ! Dynamics
-    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'  
     SELECT CASE (ice%whichEVP)
         CASE (0)
+            if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'  
             call EVPdynamics(ice, partit, mesh)
         CASE (1)
+            if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics_m...'//achar(27)//'[0m'  
             call EVPdynamics_m(ice, partit, mesh)
         CASE (2)
+            if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics_a...'//achar(27)//'[0m'  
             call EVPdynamics_a(ice, partit, mesh)
         CASE DEFAULT
             if (mype==0) write(*,*) 'a non existing EVP scheme specified!'
@@ -163,7 +166,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
             stop
     END SELECT
 !     if (use_cavity) call cavity_ice_clean_vel(ice, partit, mesh)
-!     t1=MPI_Wtime()   
+    t1=MPI_Wtime()   
 !     
 !     !___________________________________________________________________________
 !     ! Advection part
@@ -196,7 +199,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
 !     call cut_off(ice, partit, mesh)
 !     
 !     if (use_cavity) call cavity_ice_clean_ma(ice, partit, mesh)
-!     t2=MPI_Wtime()
+    t2=MPI_Wtime()
 !     
 !     !___________________________________________________________________________
 !     ! Thermodynamic part
@@ -249,7 +252,7 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
     use g_CONFIG
     implicit none
     !
-    type(t_ice)   , intent(in)   , target :: ice
+    type(t_ice)   , intent(inout), target :: ice
     type(t_tracer), intent(in)   , target :: tracers
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh

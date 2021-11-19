@@ -372,7 +372,7 @@ subroutine cavity_heat_water_fluxes_2eq(ice, tracers, partit, mesh)
     use o_PARAM , only: WP
     use o_ARRAYS, only: heat_flux, water_flux
     implicit none
-    type(t_ice)   , intent(in)   ,  target :: ice
+    type(t_ice)   , intent(inout),  target :: ice
     type(t_tracer), intent(in)   ,  target :: tracers
     type(t_partit), intent(inout),  target :: partit
     type(t_mesh)  , intent(in)   ,  target :: mesh

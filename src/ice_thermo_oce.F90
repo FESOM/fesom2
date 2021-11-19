@@ -5,7 +5,7 @@ module ice_thermodynamics_interfaces
         USE MOD_PARTIT
         USE MOD_PARSUP
         USE MOD_MESH
-        type(t_ice)   , intent(in)   , target :: ice
+        type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
         end subroutine
@@ -15,7 +15,7 @@ module ice_thermodynamics_interfaces
         USE MOD_PARTIT
         USE MOD_PARSUP
         USE MOD_MESH
-        type(t_ice)   , intent(in)   , target :: ice
+        type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
         end subroutine
@@ -125,7 +125,7 @@ subroutine thermodynamics(ice, partit, mesh)
     use g_comm_auto
     use g_sbf, only: l_snow
     implicit none
-    type(t_ice)   , intent(inout)   , target :: ice
+    type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
