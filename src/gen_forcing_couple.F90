@@ -44,18 +44,20 @@ module integrate_2D_interface
 end module
 
 module update_atm_forcing_interface
-  interface
-    subroutine update_atm_forcing(istep, tracers, partit,mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use mod_tracer
-      integer,        intent(in)            :: istep
-      type(t_tracer), intent(in),    target :: tracers
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine
-  end interface
+    interface
+        subroutine update_atm_forcing(istep, ice, tracers, partit,mesh)
+        USE MOD_TRACER
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        integer,        intent(in)            :: istep
+        type(t_ice),    intent(inout), target :: ice
+        type(t_tracer), intent(in),    target :: tracers
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        end subroutine
+    end interface
 end module
 
 module net_rec_from_atm_interface
@@ -70,12 +72,13 @@ module net_rec_from_atm_interface
 end module
 ! Routines for updating ocean surface forcing fields
 !-------------------------------------------------------------------------
-subroutine update_atm_forcing(istep, tracers, partit, mesh)
+subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   use o_PARAM
   use MOD_MESH
   USE MOD_PARTIT
   USE MOD_PARSUP
   use MOD_TRACER
+  use MOD_ICE
   use o_arrays
   use i_arrays
   use i_param
@@ -98,9 +101,11 @@ subroutine update_atm_forcing(istep, tracers, partit, mesh)
 
   implicit none
   integer,        intent(in)            :: istep
-  type(t_mesh),   intent(in),    target :: mesh
-  type(t_partit), intent(inout), target :: partit
+  type(t_ice)   , intent(inout), target :: ice
   type(t_tracer), intent(in),    target :: tracers
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh),   intent(in),    target :: mesh
+  !_____________________________________________________________________________
   integer		   :: i, itime,n2,n,nz,k,elem
   real(kind=WP)            :: i_coef, aux
   real(kind=WP)	           :: dux, dvy,tx,ty,tvol
@@ -121,10 +126,16 @@ subroutine update_atm_forcing(istep, tracers, partit, mesh)
   !integer, parameter                    :: nci=192, ncj=94 ! T62 grid
   !real(kind=WP), dimension(nci,ncj)     :: array_nc, array_nc2,array_nc3,x
   !character(500)                        :: file
+  !_____________________________________________________________________________
+  ! pointer on necessary derived types
+  real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+  u_ice           => ice%uvice(1,:)
+  v_ice           => ice%uvice(2,:)
+
   t1=MPI_Wtime()
 #ifdef __oasis
      if (firstcall) then

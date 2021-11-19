@@ -39,6 +39,26 @@ module ice_maEVP_interfaces
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
+    
+    subroutine EVPdynamics_a(ice, partit, mesh)
+      use mod_mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      USE MOD_ice
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
+      type(t_ice), intent(inout), target :: ice
+    end subroutine
+
+    subroutine EVPdynamics_m(ice, partit, mesh)
+      use mod_mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      USE MOD_ice
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
+      type(t_ice), intent(inout), target :: ice
+    end subroutine
   end interface  
 end module
 
@@ -301,7 +321,7 @@ end subroutine stress2rhs_m
 !
 !===================================================================
 !
-subroutine EVPdynamics_m(partit, mesh)
+subroutine EVPdynamics_m(ice, partit, mesh)
   ! assemble rhs and solve for ice velocity
   ! New implementation based on Bouillion et al. Ocean Modelling 2013
   ! SD 30.07.14
@@ -313,6 +333,7 @@ subroutine EVPdynamics_m(partit, mesh)
   use mod_mesh
   USE MOD_PARTIT
   USE MOD_PARSUP
+  USE MOD_ICE
   use g_config
   use i_arrays
   use o_arrays
@@ -326,6 +347,7 @@ subroutine EVPdynamics_m(partit, mesh)
   implicit none
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
+  type(t_ice), intent(inout), target :: ice
   integer          :: steps, shortstep, i, ed,n
   real(kind=WP)    :: rdt, drag, det
   real(kind=WP)    :: inv_thickness(partit%myDim_nod2D), umod, rhsu, rhsv
@@ -344,11 +366,14 @@ subroutine EVPdynamics_m(partit, mesh)
   real(kind=WP)  :: mf,aa, bb,p_ice(3)
   real(kind=WP)  :: mass(partit%myDim_nod2D)
 
+real(kind=WP), dimension(:), pointer  :: u_ice, v_ice  
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-
+u_ice           => ice%uvice(1,:)
+v_ice           => ice%uvice(2,:)
+    
   val3=1.0_WP/3.0_WP
   vale=1.0_WP/(ellipse**2)
   det2=1.0_WP/(1.0_WP+alpha_evp)
@@ -825,7 +850,7 @@ end subroutine stress_tensor_a
 !
 !===================================================================
 !
-subroutine EVPdynamics_a(partit, mesh)
+subroutine EVPdynamics_a(ice, partit, mesh)
   ! assemble rhs and solve for ice velocity
   ! New implementation based on Bouillion et al. Ocean Modelling 2013
   ! and Kimmritz et al., Ocean Modelling  2016 
@@ -836,6 +861,7 @@ use o_param
 use mod_mesh
 USE MOD_PARTIT
 USE MOD_PARSUP
+USE MOD_ICE
 use i_arrays
 USE o_arrays
 use i_param
@@ -852,15 +878,20 @@ use ice_maEVP_interfaces
   implicit none
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
+  type(t_ice),    intent(inout), target :: ice
   integer          :: steps, shortstep, i, ed
   real(kind=WP)    :: rdt, drag, det, fc
   real(kind=WP)    :: thickness, inv_thickness, umod, rhsu, rhsv
   REAL(kind=WP)    :: t0,t1, t2, t3, t4, t5, t00, txx
+  
+  real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-
+  u_ice           => ice%uvice(1,:)
+  v_ice           => ice%uvice(2,:)
+  
   steps=evp_rheol_steps
   rdt=ice_dt
   u_ice_aux=u_ice    ! Initialize solver variables

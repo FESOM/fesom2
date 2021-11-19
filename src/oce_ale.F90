@@ -130,14 +130,16 @@ end module
 
 module oce_timestep_ale_interface
     interface
-        subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
+        subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         use mod_mesh
         USE MOD_PARTIT
         USE MOD_PARSUP
         use mod_tracer
         use MOD_DYN
+        use MOD_ICE
         integer       , intent(in)            :: n
         type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_ice), intent(inout), target :: ice
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
@@ -2450,6 +2452,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, lcflmax)
     lcflmax=0.
+    cflmax = 0.
 !$OMP DO
     do n=1, myDim_nod2D+eDim_nod2D
        lcflmax=max(lcflmax, maxval(CFL_z(:, n)))
@@ -2812,11 +2815,12 @@ end subroutine impl_vert_visc_ale
 !
 !
 !===============================================================================
-subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
+subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     use g_config
     use MOD_MESH
     use MOD_TRACER
     use MOD_DYN
+    USE MOD_ICE
     use o_ARRAYS
     use o_PARAM
     USE MOD_PARTIT
@@ -2846,6 +2850,7 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     type(t_tracer), intent(inout), target :: tracers
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
+    type(t_ice)   , intent(inout), target :: ice
     !___________________________________________________________________________
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
     integer           :: node
@@ -2927,20 +2932,20 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
         END DO
 !$OMP END PARALLEL DO
 
-        call mo_convect(partit, mesh)
+        call mo_convect(ice, partit, mesh)
         
     ! use FESOM2.0 tuned pacanowski & philander parameterization for vertical 
     ! mixing     
     else if(mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_PP'//achar(27)//'[0m' 
         call oce_mixing_PP(dynamics, partit, mesh)
-        call mo_convect(partit, mesh)
+        call mo_convect(ice, partit, mesh)
         
     ! use CVMIX KPP (Large at al. 1994) 
     else if(mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_kpp'//achar(27)//'[0m'
         call calc_cvmix_kpp(dynamics, tracers, partit, mesh)
-        call mo_convect(partit, mesh)
+        call mo_convect(ice, partit, mesh)
         
     ! use CVMIX PP (Pacanowski and Philander 1981) parameterisation for mixing
     ! based on Richardson number Ri = N^2/(du/dz)^2, using Brunt Väisälä frequency
@@ -2948,7 +2953,7 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     else if(mix_scheme_nmb==4 .or. mix_scheme_nmb==47) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_pp'//achar(27)//'[0m'
         call calc_cvmix_pp(dynamics, partit, mesh)
-        call mo_convect(partit, mesh)
+        call mo_convect(ice, partit, mesh)
         
     ! use CVMIX TKE (turbulent kinetic energy closure) parameterisation for 
     ! vertical mixing with or without the IDEMIX (dissipation of energy by 
@@ -2957,7 +2962,7 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     else if(mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then    
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tke'//achar(27)//'[0m'
         call calc_cvmix_tke(dynamics, partit, mesh)
-        call mo_convect(partit, mesh)
+        call mo_convect(ice, partit, mesh)
         
     end if     
 
@@ -3071,12 +3076,12 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! write out global fields for debugging
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call write_step_info'//achar(27)//'[0m'
-    call write_step_info(n,logfile_outfreq, dynamics, tracers, partit, mesh)
+    call write_step_info(n,logfile_outfreq, ice, dynamics, tracers, partit, mesh)
     
     ! check model for blowup --> ! write_step_info and check_blowup require 
     ! togeather around 2.5% of model runtime
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call check_blowup'//achar(27)//'[0m'
-    call check_blowup(n, dynamics, tracers, partit, mesh)
+    call check_blowup(n, ice, dynamics, tracers, partit, mesh)
     t10=MPI_Wtime()
 
     !___________________________________________________________________________

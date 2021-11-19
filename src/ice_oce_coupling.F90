@@ -28,13 +28,26 @@ module oce_fluxes_interface
       type(t_tracer), intent(inout), target :: tracers
       type(t_dyn)   , intent(in)   , target :: dynamics
     end subroutine
+    
+    subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
+      use mod_mesh
+      USE MOD_PARTIT
+      use MOD_DYN
+      USE MOD_ICE
+      USE MOD_PARSUP
+      use mod_tracer
+      type(t_partit), intent(inout), target :: partit
+      type(t_mesh)  , intent(in)   , target :: mesh
+      type(t_dyn)   , intent(in)   , target :: dynamics
+      type(t_ice)   , intent(inout), target :: ice
+    end subroutine
   end interface
 end module
 
 !
 !
 !_______________________________________________________________________________
-subroutine oce_fluxes_mom(dynamics, partit, mesh)
+subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
     ! transmits the relevant fields from the ice to the ocean model
     !
     use o_PARAM
@@ -43,6 +56,7 @@ subroutine oce_fluxes_mom(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_DYN
+    USE MOD_ICE
     use i_ARRAYS
     use i_PARAM
     USE g_CONFIG
@@ -59,12 +73,16 @@ subroutine oce_fluxes_mom(dynamics, partit, mesh)
     type(t_dyn)   , intent(in)   , target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_ice), intent(inout), target :: ice
 
+    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
+    u_ice           => ice%uvice(1,:)
+    v_ice           => ice%uvice(2,:)
+    
     ! ==================
     ! momentum flux:
     ! ==================

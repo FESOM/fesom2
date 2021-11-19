@@ -1,3 +1,4 @@
+
 module ice_array_setup_interface
   interface
     subroutine ice_array_setup(partit, mesh)
@@ -13,34 +14,56 @@ end module
 
 module ice_initial_state_interface
   interface
-    subroutine ice_initial_state(tracers, partit, mesh)
+    subroutine ice_initial_state(ice, tracers, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
       use mod_tracer
+      USE MOD_ICE 
       type(t_partit), intent(inout), target :: partit
       type(t_mesh),   intent(in),    target :: mesh
       type(t_tracer), intent(in),    target :: tracers
+      type(t_ice)   , intent(inout), target :: ice
     end subroutine
   end interface
 end module
+
 module ice_setup_interface
   interface
-    subroutine ice_setup(tracers, partit, mesh)
+    subroutine ice_setup(ice, tracers, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
       use mod_tracer
+      USE MOD_ICE
       type(t_partit), intent(inout), target :: partit
       type(t_mesh),   intent(in),    target :: mesh
       type(t_tracer), intent(in),    target :: tracers
+      type(t_ice),    intent(inout), target :: ice
     end subroutine
   end interface
 end module
+
+module ice_timestep_interface
+  interface
+    subroutine ice_timestep(istep, ice, partit, mesh)
+      use mod_mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      use mod_tracer
+      USE MOD_ICE
+      integer,        intent(in)            :: istep
+      type(t_partit), intent(inout), target :: partit
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_ice),    intent(inout), target :: ice
+    end subroutine
+  end interface
+end module
+
 !
 !_______________________________________________________________________________
 ! ice initialization + array allocation + time stepping
-subroutine ice_setup(tracers, partit, mesh)
+subroutine ice_setup(ice, tracers, partit, mesh)
     use o_param
     use i_param
     use i_arrays
@@ -49,12 +72,18 @@ subroutine ice_setup(tracers, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     use mod_tracer
+    use MOD_ICE
     use ice_array_setup_interface
     use ice_initial_state_interface
     implicit none 
+    type(t_ice),    intent(inout), target :: ice
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
     type(t_tracer), intent(in),    target :: tracers
+    
+    !___________________________________________________________________________
+    ! initialise ice derived type 
+    call ice_init(ice, partit, mesh)
     
     ! ================ DO not change
     ice_dt=real(ice_ave_steps,WP)*dt
@@ -64,12 +93,12 @@ subroutine ice_setup(tracers, partit, mesh)
                                                             ! it always enters
     ! ================
     call ice_array_setup(partit, mesh)
-    call ice_fct_init(partit, mesh)
+    call ice_fct_init(ice, partit, mesh)
     ! ================
     ! Initialization routine, user input is required 
     ! ================
     !call ice_init_fields_test
-    call ice_initial_state(tracers, partit, mesh)   ! Use it unless running test example
+    call ice_initial_state(ice, tracers, partit, mesh)   ! Use it unless running test example
     if(partit%mype==0) write(*,*) 'Ice is initialized'
 end subroutine ice_setup
 !
@@ -104,7 +133,7 @@ n_size=myDim_nod2D+eDim_nod2D
 e_size=myDim_elem2D+eDim_elem2D
 
 ! Allocate memory for variables of ice model
- allocate(u_ice(n_size), v_ice(n_size))
+!  allocate(u_ice(n_size), v_ice(n_size))
  allocate(U_rhs_ice(n_size), V_rhs_ice(n_size))
  allocate(sigma11(e_size), sigma12(e_size), sigma22(e_size))
  allocate(eps11(e_size),     eps12(e_size),   eps22(e_size))
@@ -141,8 +170,8 @@ e_size=myDim_elem2D+eDim_elem2D
  m_snow=0.0_WP
  U_rhs_ice=0.0_WP
  V_rhs_ice=0.0_WP
- U_ice=0.0_WP
- V_ice=0.0_WP
+!  U_ice=0.0_WP
+!  V_ice=0.0_WP
  sigma11=0.0_WP
  sigma22=0.0_WP
  sigma12=0.0_WP
@@ -195,34 +224,42 @@ end subroutine ice_array_setup
 !
 !_______________________________________________________________________________
 ! Sea ice model step
-subroutine ice_timestep(step, partit, mesh)
+subroutine ice_timestep(step, ice, partit, mesh)
 use mod_mesh
 USE MOD_PARTIT
 USE MOD_PARSUP
+USE MOD_ICE
 use i_arrays
 use o_param
 use g_CONFIG
 use i_PARAM, only: whichEVP
-
+use ice_EVP_interfaces
+use ice_maEVP_interfaces
+use ice_fct_interfaces
+use ice_thermodynamics_interfaces
 #if defined (__icepack)
     use icedrv_main,   only: step_icepack 
 #endif
 
 implicit none 
+integer,        intent(in)            :: step
+type(t_ice),    intent(inout), target :: ice
 type(t_partit), intent(inout), target :: partit
 type(t_mesh),   intent(in),    target :: mesh
-integer                               :: step,i
+integer                               :: i
 REAL(kind=WP)                         :: t0,t1, t2, t3
 
 #if defined (__icepack)
 real(kind=WP)                         :: time_evp, time_advec, time_therm
 #endif
 
+real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
+u_ice           => ice%uvice(1,:)
+v_ice           => ice%uvice(2,:)
 
 t0=MPI_Wtime()
 
@@ -232,21 +269,24 @@ t0=MPI_Wtime()
     
     !___________________________________________________________________________
     ! ===== Dynamics
-    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'  
+    
     SELECT CASE (whichEVP)
     CASE (0)
-        call EVPdynamics  (partit, mesh)
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'  
+        call EVPdynamics  (ice, partit, mesh)
     CASE (1)
-        call EVPdynamics_m(partit, mesh)
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics_m...'//achar(27)//'[0m'  
+        call EVPdynamics_m(ice, partit, mesh)
     CASE (2)
-        call EVPdynamics_a(partit, mesh)
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics_a...'//achar(27)//'[0m'  
+        call EVPdynamics_a(ice, partit, mesh)
     CASE DEFAULT
         if (mype==0) write(*,*) 'a non existing EVP scheme specified!'
         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
         stop
     END SELECT
     
-    if (use_cavity) call cavity_ice_clean_vel(partit, mesh)
+    if (use_cavity) call cavity_ice_clean_vel(ice, partit, mesh)
     t1=MPI_Wtime()   
     
     !___________________________________________________________________________
@@ -262,26 +302,26 @@ t0=MPI_Wtime()
     end do
 #endif /* (__oifs) */
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
-    call ice_TG_rhs_div    (partit, mesh)   
+    call ice_TG_rhs_div    (ice, partit, mesh)   
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_solve...'//achar(27)//'[0m' 
-    call ice_fct_solve     (partit, mesh)
+    call ice_fct_solve     (ice, partit, mesh)
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_update_for_div...'//achar(27)//'[0m'
-    call ice_update_for_div(partit, mesh)
+    call ice_update_for_div(ice, partit, mesh)
 #if defined (__oifs)
     do i=1,myDim_nod2D+eDim_nod2D
         if (a_ice(i)>0.0_WP) ice_temp(i) = ice_temp(i)/a_ice(i)
     end do
 #endif /* (__oifs) */
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call cut_off...'//achar(27)//'[0m'
-    call cut_off(partit, mesh)
+    call cut_off(ice, partit, mesh)
     
-    if (use_cavity) call cavity_ice_clean_ma(partit, mesh)
+    if (use_cavity) call cavity_ice_clean_ma(ice, partit, mesh)
     t2=MPI_Wtime()
     
     !___________________________________________________________________________
     ! ===== Thermodynamic part
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
-    call thermodynamics(partit, mesh)
+    call thermodynamics(ice, partit, mesh)
 #endif /* (__icepack) */
 
 
@@ -318,29 +358,34 @@ end subroutine ice_timestep
 !
 !_______________________________________________________________________________
 ! sets inital values or reads restart file for ice model
-subroutine ice_initial_state(tracers, partit, mesh)
+subroutine ice_initial_state(ice, tracers, partit, mesh)
     use i_ARRAYs
     use MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
     use MOD_TRACER
+    use MOD_ICE
     use o_PARAM   
     use o_arrays        
     use g_CONFIG
     implicit none
     !
+    type(t_ice),    intent(inout), target :: ice
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
     type(t_tracer), intent(in),    target :: tracers
     integer                               :: i
     character(MAX_PATH)                   :: filename
     real(kind=WP), external               :: TFrez  ! Sea water freeze temperature.
-
+    
+    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
+    u_ice           => ice%uvice(1,:)
+    v_ice           => ice%uvice(2,:)
+    
     m_ice =0._WP
     a_ice =0._WP
     u_ice =0._WP

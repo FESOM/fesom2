@@ -93,12 +93,13 @@ module io_MEANDATA
   end subroutine
 
 
-subroutine ini_mean_io(dynamics, tracers, partit, mesh)
+subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
   use MOD_MESH
   use MOD_TRACER
   USE MOD_PARTIT
   USE MOD_PARSUP
   USE MOD_DYN
+  USE MOD_ICE
   use g_cvmix_tke
   use g_cvmix_idemix
   use g_cvmix_kpp
@@ -116,6 +117,7 @@ subroutine ini_mean_io(dynamics, tracers, partit, mesh)
   type(t_partit), intent(inout), target :: partit
   type(t_tracer), intent(in)   , target :: tracers
   type(t_dyn)   , intent(in)   , target :: dynamics
+  type(t_ice)   , intent(in)   , target :: ice
   namelist /nml_listsize/ io_listsize
   namelist /nml_list    / io_list
 
@@ -168,11 +170,11 @@ CASE ('ssh_rhs_old   ')
 ! output sea ice 
 CASE ('uice      ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'uice',     'ice velocity x',                 'm/s',    u_ice,                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'uice',     'ice velocity x',                 'm/s',    ice%uvice(1,:),                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('vice      ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'vice',     'ice velocity y',                 'm/s',    v_ice,                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'vice',     'ice velocity y',                 'm/s',    ice%uvice(2,:),                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('a_ice     ')
     if (use_ice) then
@@ -808,12 +810,13 @@ end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine output(istep, dynamics, tracers, partit, mesh)
+subroutine output(istep, ice, dynamics, tracers, partit, mesh)
   use g_clock
   use mod_mesh
   USE MOD_PARTIT
   USE MOD_PARSUP
   use MOD_DYN
+  use MOD_ICE
   use mod_tracer
   use io_gather_module
 #if defined (__icepack)
@@ -829,12 +832,14 @@ subroutine output(istep, dynamics, tracers, partit, mesh)
   type(t_partit), intent(inout), target :: partit
   type(t_tracer), intent(in)   , target :: tracers
   type(t_dyn)   , intent(in)   , target :: dynamics
+  type(t_ice)   , intent(inout), target :: ice
+  
   character(:),   allocatable           :: filepath
   real(real64)                          :: rtime !timestamp of the record
 
   ctime=timeold+(dayold-1.)*86400
   if (lfirst) then
-     call ini_mean_io(dynamics, tracers, partit, mesh)
+     call ini_mean_io(ice, dynamics, tracers, partit, mesh)
 #if defined (__icepack)
      call init_io_icepack(mesh) !icapack has its copy of p_partit => partit
 #endif

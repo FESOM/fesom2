@@ -1,18 +1,34 @@
 module cavity_heat_water_fluxes_3eq_interface
-  interface
-    subroutine cavity_heat_water_fluxes_3eq(dynamics, tracers, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use MOD_DYN
-      use mod_tracer
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_tracer), intent(in),    target :: tracers
-      type(t_dyn),    intent(in),    target :: dynamics
-    end subroutine
-  end interface
+    interface
+        subroutine cavity_heat_water_fluxes_3eq(dynamics, tracers, partit, mesh)
+        USE MOD_DYN
+        USE MOD_TRACER
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_dyn),    intent(in),    target :: dynamics
+        type(t_tracer), intent(in),    target :: tracers
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        end subroutine
+    end interface
 end module
+
+module cavity_ice_clean_vel_interface
+    interface
+        subroutine cavity_ice_clean_vel(ice, partit, mesh)
+        use MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice),    intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        end subroutine
+    end interface
+end module
+
+
 !
 !
 !_______________________________________________________________________________
@@ -442,21 +458,28 @@ end subroutine cavity_momentum_fluxes
 !
 !
 !_______________________________________________________________________________
-subroutine cavity_ice_clean_vel(partit, mesh)
-    use MOD_MESH
+subroutine cavity_ice_clean_vel(ice, partit, mesh)
+    USE MOD_ICE
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use i_ARRAYS, only: U_ice, V_ice
+    USE MOD_MESH
     implicit none
+    type(t_ice),    intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(in),    target :: mesh
+    !___________________________________________________________________________
     integer                               :: node
-    
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
+    u_ice           => ice%uvice(1,:)
+    v_ice           => ice%uvice(2,:)
+    
+    !___________________________________________________________________________
     do node=1,myDim_nod2d+eDim_nod2d           
         if(ulevels_nod2D(node)>1) then
             U_ice(node)=0._WP

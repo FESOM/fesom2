@@ -1,14 +1,41 @@
+module ice_thermodynamics_interfaces
+    interface
+        subroutine thermodynamics(ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice)   , intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+        
+        subroutine cut_off(ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice)   , intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface  
+end module
+
+
 !===================================================================
-subroutine cut_off(partit, mesh)
+subroutine cut_off(ice, partit, mesh)
     use o_param
     use i_arrays
     use MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
+    USE MOD_ICE
     use g_config, only: use_cavity
     implicit none
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
+    type(t_ice), intent(inout), target :: ice
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -78,7 +105,7 @@ end subroutine cut_off
 ! by Qiang Wang, 13.01.2009
 !----------------------------------------------------------------------------
 
-subroutine thermodynamics(partit, mesh)
+subroutine thermodynamics(ice, partit, mesh)
   !
   ! For every surface node, this subroutine extracts the information
   ! needed for computation of thermodydnamics, calls the relevant
@@ -90,6 +117,7 @@ subroutine thermodynamics(partit, mesh)
   use mod_mesh
   USE MOD_PARTIT
   USE MOD_PARSUP
+  USE MOD_ICE
   use i_therm_param
   use i_param
   use i_arrays
@@ -101,6 +129,7 @@ subroutine thermodynamics(partit, mesh)
   implicit none
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
+  type(t_ice),    intent(inout), target :: ice
 
   real(kind=WP)  :: h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss,rsf,evap_in
   real(kind=WP)  :: ug,ustar,T_oc,S_oc,h_ml,t,ch,ce,ch_i,ce_i,fw,ehf,evap
@@ -113,11 +142,16 @@ subroutine thermodynamics(partit, mesh)
   integer, pointer                       :: myDim_nod2D, eDim_nod2D
   integer,        dimension(:),  pointer :: ulevels_nod2D
   real(kind=WP),  dimension(:,:),pointer :: geo_coord_nod2D
+  real(kind=WP),  dimension(:),  pointer  :: u_ice, v_ice
 
   myDim_nod2d=>partit%myDim_nod2D
   eDim_nod2D =>partit%eDim_nod2D
   ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D
   geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => mesh%geo_coord_nod2D 
+  u_ice           => ice%uvice(1,:)
+  v_ice           => ice%uvice(2,:)
+  
+  
   rsss=ref_sss
 
   ! u_ice and v_ice are at nodes

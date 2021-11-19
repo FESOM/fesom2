@@ -1,38 +1,76 @@
 module ice_fct_interfaces
-  interface
-    subroutine ice_mass_matrix_fill(partit, mesh)
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh),   intent(in),    target :: mesh
-    end subroutine
+    interface
+        subroutine ice_mass_matrix_fill(ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice),    intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        end subroutine
 
-    subroutine ice_solve_high_order(partit, mesh)
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh),   intent(in),    target :: mesh
-    end subroutine
+        subroutine ice_solve_high_order(ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice),    intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        end subroutine
 
-    subroutine ice_solve_low_order(partit, mesh)
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh),   intent(in),    target :: mesh
-    end subroutine
-    
-    subroutine ice_fem_fct(tr_array_id, partit, mesh)
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      integer   :: tr_array_id
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh),   intent(in),    target :: mesh
-    end subroutine
-  end interface
+        subroutine ice_solve_low_order(ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice),    intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        end subroutine
+        
+        subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        integer   :: tr_array_id
+        type(t_ice),    intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        end subroutine
+        
+        subroutine ice_TG_rhs_div(ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice),    intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        end subroutine
+        
+        subroutine ice_TG_rhs(ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice),    intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        end subroutine
+        
+        subroutine ice_update_for_div(ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice),    intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        end subroutine
+    end interface
 end module
 
 ! 
@@ -48,25 +86,33 @@ end module
 ! The code is adapted from  FESOM
 !
 ! =====================================================================
-subroutine ice_TG_rhs(partit, mesh)
+subroutine ice_TG_rhs(ice, partit, mesh)
   use MOD_MESH
   USE MOD_PARTIT
   USE MOD_PARSUP
+  USE MOD_ICE
   use i_Arrays
   use i_PARAM
   use o_PARAM
   USE g_CONFIG
   implicit none 
-  real(kind=WP)   :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
-  integer         :: n, q, row, elem, elnodes(3)
+  type(t_ice),    intent(inout), target :: ice
   type(t_partit), intent(inout), target :: partit
   type(t_mesh),   intent(in),    target :: mesh
-
+  !_____________________________________________________________________________
+  real(kind=WP)   :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
+  integer         :: n, q, row, elem, elnodes(3)
+  !_____________________________________________________________________________
+  ! pointer on necessary derived types
+  real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
+  u_ice           => ice%uvice(1,:)
+  v_ice           => ice%uvice(2,:)
+  
+  !_____________________________________________________________________________
     ! Taylor-Galerkin (Lax-Wendroff) rhs
     DO row=1, myDim_nod2D
         rhs_m(row)=0._WP
@@ -118,23 +164,25 @@ end subroutine ice_TG_rhs
 !
 !----------------------------------------------------------------------------
 !
-subroutine ice_fct_init(partit, mesh)
-  use o_PARAM
-  use MOD_MESH
+subroutine ice_fct_init(ice, partit, mesh)
+  USE MOD_ICE
   USE MOD_PARTIT
   USE MOD_PARSUP
+  use MOD_MESH
+  use o_PARAM
   use i_ARRAYS
   use ice_fct_interfaces
   implicit none
   integer   :: n_size
+  type(t_ice),    intent(inout), target :: ice
   type(t_partit), intent(inout), target :: partit
   type(t_mesh),   intent(in),    target :: mesh
-
+  !_____________________________________________________________________________
+  ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
   
   n_size=myDim_nod2D+eDim_nod2D
   
@@ -164,38 +212,41 @@ subroutine ice_fct_init(partit, mesh)
   dm_snow = 0.0_WP
   
   ! Fill in  the mass matrix    
-  call ice_mass_matrix_fill(partit, mesh)
+  call ice_mass_matrix_fill(ice, partit, mesh)
   if (mype==0) write(*,*) 'Ice FCT is initialized' 
 end subroutine ice_fct_init
 !
 !----------------------------------------------------------------------------
 !
-subroutine ice_fct_solve(partit, mesh)
-  use MOD_MESH
+subroutine ice_fct_solve(ice, partit, mesh)
+  USE MOD_ICE
   USE MOD_PARTIT
   USE MOD_PARSUP
+  USE MOD_MESH
   use ice_fct_interfaces
   implicit none
+  type(t_ice),    intent(inout), target :: ice
   type(t_partit), intent(inout), target :: partit
   type(t_mesh),   intent(in),    target :: mesh
+  !_____________________________________________________________________________
   ! Driving routine
-  call ice_solve_high_order(partit, mesh)   ! uses arrays of low-order solutions as temp
+  call ice_solve_high_order(ice, partit, mesh)   ! uses arrays of low-order solutions as temp
                                     ! storage. It should preceed the call of low
                                     ! order solution.  
-  call ice_solve_low_order(partit, mesh)
+  call ice_solve_low_order(ice, partit, mesh)
 
-  call ice_fem_fct(1, partit, mesh)    ! m_ice
-  call ice_fem_fct(2, partit, mesh)    ! a_ice
-  call ice_fem_fct(3, partit, mesh)    ! m_snow
+  call ice_fem_fct(1, ice, partit, mesh)    ! m_ice
+  call ice_fem_fct(2, ice, partit, mesh)    ! a_ice
+  call ice_fem_fct(3, ice, partit, mesh)    ! m_snow
 #if defined (__oifs)
-  call ice_fem_fct(4, partit, mesh)    ! ice_temp
+  call ice_fem_fct(4, ice, partit, mesh)    ! ice_temp
 #endif /* (__oifs) */
 
 end subroutine ice_fct_solve
 !
 !
 !_______________________________________________________________________________
-subroutine ice_solve_low_order(partit, mesh)
+subroutine ice_solve_low_order(ice, partit, mesh)
  
     !============================
     ! Low-order solution
@@ -207,24 +258,29 @@ subroutine ice_solve_low_order(partit, mesh)
     ! is implemented as the difference between the consistent and lumped mass
     ! matrices acting on the field from the previous time step. The consistent 
     ! mass matrix on the lhs is replaced with the lumped one.       
-    use MOD_MESH
+    USE MOD_ICE
+    USE MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use MOD_TRACER
+    USE MOD_MESH
     use i_ARRAYS
     use i_PARAM
     use g_comm_auto
     implicit none
-    integer       :: row, clo, clo2, cn, location(100)
-    real(kind=WP) :: gamma
+    type(t_ice),    intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(in),    target :: mesh
-
+    !___________________________________________________________________________
+    integer       :: row, clo, clo2, cn, location(100)
+    real(kind=WP) :: gamma
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
+    
+    !___________________________________________________________________________
     gamma=ice_gamma_fct         ! Added diffusivity parameter
                                 ! Adjust it to ensure posivity of solution    
     do row=1,myDim_nod2D
@@ -265,26 +321,31 @@ end subroutine ice_solve_low_order
 !
 !
 !_______________________________________________________________________________
-subroutine ice_solve_high_order(partit, mesh)
-  use MOD_MESH
+subroutine ice_solve_high_order(ice, partit, mesh)
+  USE MOD_ICE
+  USE MOD_TRACER
   USE MOD_PARTIT
   USE MOD_PARSUP
-  use MOD_TRACER
+  USE MOD_MESH
   use i_ARRAYS
   use o_PARAM
   use g_comm_auto
   implicit none
-  !
+  type(t_ice),    intent(inout), target :: ice
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh),   intent(in),    target :: mesh
+  !_____________________________________________________________________________
   integer                               :: n,i,clo,clo2,cn,location(100),row
   real(kind=WP)                         :: rhs_new
   integer                               :: num_iter_solve=3
-  type(t_partit), intent(inout), target :: partit
-  type(t_mesh),   intent(in),    target :: mesh
-
+  !_____________________________________________________________________________
+  ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+
+  !_____________________________________________________________________________
   ! Does Taylor-Galerkin solution
   !
   !the first approximation
@@ -351,7 +412,7 @@ end subroutine ice_solve_high_order
 !
 !
 !_______________________________________________________________________________
-subroutine ice_fem_fct(tr_array_id, partit, mesh)
+subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     ! Flux corrected transport algorithm for tracer advection
     !
     ! It is based on Loehner et al. (Finite-element flux-corrected 
@@ -359,23 +420,25 @@ subroutine ice_fem_fct(tr_array_id, partit, mesh)
     ! Int. J. Numer. Meth. Fluids, 7 (1987), 1093--1109) as described by Kuzmin and
     ! Turek. (kuzmin@math.uni-dortmund.de) 
     !
-    use MOD_MESH
+    USE MOD_ICE
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use MOD_TRACER
+    USE MOD_MESH
     use i_arrays
     use i_param
     use o_PARAM
     use g_comm_auto
     implicit none
-
+    type(t_ice),    intent(inout), target :: ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+    !_____________________________________________________________________________
     integer   :: tr_array_id
     integer   :: icoef(3,3),n,q, elem,elnodes(3),row
     real(kind=WP), allocatable, dimension(:) :: tmax, tmin 
     real(kind=WP)   :: vol, flux, ae, gamma
-    type(t_partit), intent(inout), target :: partit
-    type(t_mesh),   intent(in),    target :: mesh
-
+    !_____________________________________________________________________________
+  ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -668,12 +731,13 @@ end subroutine ice_fem_fct
 !
 !
 !_______________________________________________________________________________
-SUBROUTINE ice_mass_matrix_fill(partit, mesh)
+SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
 ! Used in ice_fct inherited from FESOM
   use MOD_MESH
   USE MOD_PARTIT
   USE MOD_PARSUP
   use MOD_TRACER
+  use MOD_ICE
   use i_PARAM
   use i_ARRAYS
   !
@@ -684,9 +748,11 @@ SUBROUTINE ice_mass_matrix_fill(partit, mesh)
   integer, allocatable                :: col_pos(:)
   real(kind=WP)                       :: aa
   integer                             :: flag=0,iflag=0
+  type(t_ice), intent(inout), target :: ice
   type(t_partit), intent(inout), target :: partit
   type(t_mesh),   intent(in),    target :: mesh
-
+  !_____________________________________________________________________________
+  ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -752,10 +818,11 @@ END SUBROUTINE ice_mass_matrix_fill
 !
 !=========================================================
 !
-subroutine ice_TG_rhs_div(partit, mesh)
+subroutine ice_TG_rhs_div(ice, partit, mesh)
   use MOD_MESH
   USE MOD_PARTIT
   USE MOD_PARSUP
+  USE MOD_ICE
   use i_Arrays
   use i_PARAM
   use o_PARAM
@@ -764,14 +831,20 @@ subroutine ice_TG_rhs_div(partit, mesh)
   real(kind=WP)            :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
   integer                  :: n, q, row, elem, elnodes(3)
   real(kind=WP)            :: c1, c2, c3, c4, cx1, cx2, cx3, cx4, entries2(3) 
+  type(t_ice), intent(inout), target :: ice
   type(t_partit), intent(inout), target :: partit
   type(t_mesh),   intent(in),    target :: mesh
-
+  !_____________________________________________________________________________
+  ! pointer on necessary derived types
+  real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
+  u_ice           => ice%uvice(1,:)
+  v_ice           => ice%uvice(2,:)
+  
+  
  ! Computes the rhs in a Taylor-Galerkin way (with upwind type of 
  ! correction for the advection operator)
  ! In this version I tr to split divergent term off, so that FCT works without it.
@@ -848,11 +921,12 @@ end subroutine ice_TG_rhs_div
 !
 !
 !_______________________________________________________________________________
-subroutine ice_update_for_div(partit, mesh)
+subroutine ice_update_for_div(ice, partit, mesh)
     use MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
     use MOD_TRACER
+    use MOD_ICE
     use i_Arrays
     use i_PARAM
     use o_PARAM
@@ -863,9 +937,11 @@ subroutine ice_update_for_div(partit, mesh)
     integer                                 :: n,i,clo,clo2,cn,location(100),row
     real(kind=WP)                           :: rhs_new
     integer                                 :: num_iter_solve=3
+    type(t_ice), intent(inout), target   :: ice
     type(t_partit), intent(inout), target   :: partit
     type(t_mesh),   intent(in),    target   :: mesh
-
+    !_____________________________________________________________________________
+  ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
