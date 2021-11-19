@@ -144,6 +144,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
 
     !___________________________________________________________________________
     t0=MPI_Wtime()
+
 !#if defined (__icepack)
 !   call step_icepack(mesh, ice, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts    
 !#else     
@@ -165,6 +166,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
             call par_ex(partit%MPI_COMM_FESOM, partit%mype)
             stop
     END SELECT
+
 !     if (use_cavity) call cavity_ice_clean_vel(ice, partit, mesh)
     t1=MPI_Wtime()   
 !     
