@@ -84,6 +84,8 @@ module g_cvmix_tidal
         integer                  :: node_size
         type(t_mesh),   intent(in),    target :: mesh
         type(t_partit), intent(inout), target :: partit
+        integer fileunit
+
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -113,9 +115,9 @@ module g_cvmix_tidal
         file_exist=.False.
         inquire(file=trim(nmlfile),exist=file_exist) 
         if (file_exist) then
-            open(20,file=trim(nmlfile))
-                read(20,nml=param_tidal)
-            close(20)
+            open(newunit=fileunit,file=trim(nmlfile))
+                read(fileunit,nml=param_tidal)
+            close(fileunit)
         else
             write(*,*) '     could not find namelist.cvmix, will use default values !'    
         end if    

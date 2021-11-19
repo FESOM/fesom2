@@ -1,4 +1,3 @@
-#if defined (__ifsinterface)
 ! Routines usually provided by the library that are currently
 ! not implemented for FESOM2.
 !

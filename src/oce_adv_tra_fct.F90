@@ -263,7 +263,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 !$OMP MASTER
     call exchange_nod(fct_plus, fct_minus, partit)
 !$OMP END MASTER
-!!$OMP BARRIER
+!$OMP BARRIER
     !___________________________________________________________________________
     ! b3. Limiting   
     !Vertical
@@ -299,10 +299,6 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     ! the bottom flux is always zero 
     end do
 !$OMP END DO
-!!$OMP MASTER
-!    call exchange_nod_end(partit)  ! fct_plus, fct_minus
-!!$OMP END MASTER
-!!$OMP BARRIER
     !Horizontal
 !$OMP DO
     do edge=1, myDim_edge2D

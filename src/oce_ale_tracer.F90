@@ -228,6 +228,7 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
             call relax_to_clim(tr_num, tracers, partit, mesh) 
         end if
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
+!$OMP BARRIER
     end do
     
     !___________________________________________________________________________

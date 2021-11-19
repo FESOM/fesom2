@@ -6,7 +6,7 @@
 #include <math.h>
 #endif 
 
-int qsplitC(FLOAT *a, int *ind, int n, int ncut)
+int qsplitCF(FLOAT *a, int *ind, int n, int ncut)
 {
   /*----------------------------------------------------------------------
     |     does a quick-sort split of a real array.
