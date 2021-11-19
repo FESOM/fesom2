@@ -1,63 +1,63 @@
 
 module ice_array_setup_interface
-  interface
-    subroutine ice_array_setup(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use mod_tracer
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh),   intent(in),    target :: mesh
-    end subroutine
-  end interface
+    interface
+        subroutine ice_array_setup(partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use mod_tracer
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        end subroutine
+    end interface
 end module
 
 module ice_initial_state_interface
-  interface
-    subroutine ice_initial_state(ice, tracers, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use mod_tracer
-      USE MOD_ICE 
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_tracer), intent(in),    target :: tracers
-      type(t_ice)   , intent(inout), target :: ice
-    end subroutine
-  end interface
+    interface
+        subroutine ice_initial_state(ice, tracers, partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use mod_tracer
+        USE MOD_ICE 
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_tracer), intent(in),    target :: tracers
+        type(t_ice)   , intent(inout), target :: ice
+        end subroutine
+    end interface
 end module
 
 module ice_setup_interface
-  interface
-    subroutine ice_setup(ice, tracers, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use mod_tracer
-      USE MOD_ICE
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_tracer), intent(in),    target :: tracers
-      type(t_ice),    intent(inout), target :: ice
-    end subroutine
-  end interface
+    interface
+        subroutine ice_setup(ice, tracers, partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use mod_tracer
+        USE MOD_ICE
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_tracer), intent(in),    target :: tracers
+        type(t_ice),    intent(inout), target :: ice
+        end subroutine
+    end interface
 end module
 
 module ice_timestep_interface
-  interface
-    subroutine ice_timestep(istep, ice, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use mod_tracer
-      USE MOD_ICE
-      integer,        intent(in)            :: istep
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_ice),    intent(inout), target :: ice
-    end subroutine
-  end interface
+    interface
+        subroutine ice_timestep(istep, ice, partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use mod_tracer
+        USE MOD_ICE
+        integer,        intent(in)            :: istep
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_ice),    intent(inout), target :: ice
+        end subroutine
+    end interface
 end module
 
 !
@@ -135,8 +135,8 @@ e_size=myDim_elem2D+eDim_elem2D
 ! Allocate memory for variables of ice model
 !  allocate(u_ice(n_size), v_ice(n_size))
  allocate(U_rhs_ice(n_size), V_rhs_ice(n_size))
- allocate(sigma11(e_size), sigma12(e_size), sigma22(e_size))
- allocate(eps11(e_size),     eps12(e_size),   eps22(e_size))
+!  allocate(sigma11(e_size), sigma12(e_size), sigma22(e_size))
+!  allocate(eps11(e_size),     eps12(e_size),   eps22(e_size))
 !  allocate(m_ice(n_size), a_ice(n_size), m_snow(n_size))
  allocate(rhs_m(n_size), rhs_a(n_size), rhs_ms(n_size))
  allocate(t_skin(n_size))
@@ -172,12 +172,12 @@ e_size=myDim_elem2D+eDim_elem2D
  V_rhs_ice=0.0_WP
 !  U_ice=0.0_WP
 !  V_ice=0.0_WP
- sigma11=0.0_WP
- sigma22=0.0_WP
- sigma12=0.0_WP
- eps11=0.0_WP
- eps12=0.0_WP
- eps22=0.0_WP
+!  sigma11=0.0_WP
+!  sigma22=0.0_WP
+!  sigma12=0.0_WP
+!  eps11=0.0_WP
+!  eps12=0.0_WP
+!  eps22=0.0_WP
  t_skin=0.0_WP
  rhs_mdiv=0.0_WP
  rhs_adiv=0.0_WP
@@ -225,52 +225,50 @@ end subroutine ice_array_setup
 !_______________________________________________________________________________
 ! Sea ice model step
 subroutine ice_timestep(step, ice, partit, mesh)
-use mod_mesh
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE MOD_ICE
-use i_arrays
-use o_param
-use g_CONFIG
-use i_PARAM, only: whichEVP
-use ice_EVP_interfaces
-use ice_maEVP_interfaces
-use ice_fct_interfaces
-use ice_thermodynamics_interfaces
-use cavity_interfaces
+    use mod_mesh
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_ICE
+    use i_arrays
+    use o_param
+    use g_CONFIG
+    use i_PARAM, only: whichEVP
+    use ice_EVP_interfaces
+    use ice_maEVP_interfaces
+    use ice_fct_interfaces
+    use ice_thermodynamics_interfaces
+    use cavity_interfaces
 #if defined (__icepack)
     use icedrv_main,   only: step_icepack 
 #endif
-
-implicit none 
-integer,        intent(in)            :: step
-type(t_ice),    intent(inout), target :: ice
-type(t_partit), intent(inout), target :: partit
-type(t_mesh),   intent(in),    target :: mesh
-integer                               :: i
-REAL(kind=WP)                         :: t0,t1, t2, t3
-
+    implicit none 
+    integer,        intent(in)            :: step
+    type(t_ice),    intent(inout), target :: ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+    !___________________________________________________________________________
+    integer                               :: i
+    REAL(kind=WP)                         :: t0,t1, t2, t3
 #if defined (__icepack)
-real(kind=WP)                         :: time_evp, time_advec, time_therm
+    real(kind=WP)                         :: time_evp, time_advec, time_therm
 #endif
-
-real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-u_ice           => ice%uvice(1,:)
-v_ice           => ice%uvice(2,:)
-
-t0=MPI_Wtime()
-
+    u_ice           => ice%uvice(1,:)
+    v_ice           => ice%uvice(2,:)
+    !___________________________________________________________________________
+    t0=MPI_Wtime()
 #if defined (__icepack)
     call step_icepack(mesh, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts    
 #else     
     
     !___________________________________________________________________________
     ! ===== Dynamics
-    
     SELECT CASE (whichEVP)
     CASE (0)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'  
@@ -303,16 +301,20 @@ t0=MPI_Wtime()
     end do
 #endif /* (__oifs) */
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
-    call ice_TG_rhs_div    (ice, partit, mesh)   
+    call ice_TG_rhs_div    (ice, partit, mesh)  
+    
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_solve...'//achar(27)//'[0m' 
     call ice_fct_solve     (ice, partit, mesh)
+    
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_update_for_div...'//achar(27)//'[0m'
     call ice_update_for_div(ice, partit, mesh)
+    
 #if defined (__oifs)
     do i=1,myDim_nod2D+eDim_nod2D
         if (a_ice(i)>0.0_WP) ice_temp(i) = ice_temp(i)/a_ice(i)
     end do
 #endif /* (__oifs) */
+
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call cut_off...'//achar(27)//'[0m'
     call cut_off(ice, partit, mesh)
     
@@ -325,7 +327,7 @@ t0=MPI_Wtime()
     call thermodynamics(ice, partit, mesh)
 #endif /* (__icepack) */
 
-
+    !___________________________________________________________________________
     do i=1,myDim_nod2D+eDim_nod2D
         if ( ( U_ice(i)/=0.0_WP .and. mesh%ulevels_nod2d(i)>1) .or. (V_ice(i)/=0.0_WP .and. mesh%ulevels_nod2d(i)>1) ) then
             write(*,*) " --> found cavity velocity /= 0.0_WP , ", mype
@@ -339,21 +341,20 @@ t0=MPI_Wtime()
     rtime_ice = rtime_ice + (t3-t0)
     rtime_tot = rtime_tot + (t3-t0)
     if(mod(step,logfile_outfreq)==0 .and. mype==0) then 
-		write(*,*) '___ICE STEP EXECUTION TIMES____________________________'
+        write(*,*) '___ICE STEP EXECUTION TIMES____________________________'
 #if defined (__icepack)
-		write(*,"(A, ES10.3)") '	Ice Dyn.        :', time_evp
+        write(*,"(A, ES10.3)") '	Ice Dyn.        :', time_evp
                 write(*,"(A, ES10.3)") '        Ice Advect.     :', time_advec
                 write(*,"(A, ES10.3)") '        Ice Thermodyn.  :', time_therm
 #else
-		write(*,"(A, ES10.3)") '	Ice Dyn.        :', t1-t0
-		write(*,"(A, ES10.3)") '	Ice Advect.     :', t2-t1
-		write(*,"(A, ES10.3)") '	Ice Thermodyn.  :', t3-t2
+        write(*,"(A, ES10.3)") '	Ice Dyn.        :', t1-t0
+        write(*,"(A, ES10.3)") '	Ice Advect.     :', t2-t1
+        write(*,"(A, ES10.3)") '	Ice Thermodyn.  :', t3-t2
 #endif /* (__icepack) */
-		write(*,*) '   _______________________________'
-		write(*,"(A, ES10.3)") '	Ice TOTAL       :', t3-t0
-		write(*,*)
+        write(*,*) '   _______________________________'
+        write(*,"(A, ES10.3)") '	Ice TOTAL       :', t3-t0
+        write(*,*)
      endif
-
 end subroutine ice_timestep
 !
 !
