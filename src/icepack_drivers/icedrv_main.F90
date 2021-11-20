@@ -799,7 +799,7 @@
                   implicit none
                   type(t_mesh),        intent(in), target :: mesh
                   type(t_tracer_data), intent(in), target :: tracer
-                  type(t_ice)        , intent(in), target :: ice
+                  type(t_ice)        , intent(inout), target :: ice
               end subroutine init_icepack
 
               ! Copy variables from fesom to icepack
