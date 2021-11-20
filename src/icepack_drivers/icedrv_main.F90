@@ -792,12 +792,14 @@
               end subroutine init_history_bgc
 
               ! Initialize all
-              module subroutine init_icepack(tracer, mesh)
+              module subroutine init_icepack(ice, tracer, mesh)
                   use mod_mesh
                   use mod_tracer
+                  use mod_ice
                   implicit none
                   type(t_mesh),        intent(in), target :: mesh
                   type(t_tracer_data), intent(in), target :: tracer
+                  type(t_ice)        , intent(in), target :: ice
               end subroutine init_icepack
 
               ! Copy variables from fesom to icepack
