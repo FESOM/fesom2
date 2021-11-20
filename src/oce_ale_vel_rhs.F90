@@ -74,9 +74,8 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     UV_rhs   => dynamics%uv_rhs(:,:,:)
     UV_rhsAB => dynamics%uv_rhsAB(:,:,:)
     eta_n    => dynamics%eta_n(:)
-    ! because of toy channel cannot acces here the pointer since its not initialised
-!     m_ice    => ice%data(2)%values(:)
-!     m_snow   => ice%data(3)%values(:)
+    m_ice    => ice%data(2)%values(:)
+    m_snow   => ice%data(3)%values(:)
     write(*,*) ">-))))°> something is fishy 1"
     !___________________________________________________________________________
     use_pice=0
@@ -119,8 +118,8 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         ! to account for floating ice
         if (use_pice > 0) then
             p_ice = 0.0_WP
-            !!PS p_ice = (m_ice(elnodes)*rhoice+m_snow(elnodes)*rhosno)*inv_rhowat
-            p_ice = (ice%data(2)%values(elnodes)*rhoice+ice%data(3)%values(elnodes)*rhosno)*inv_rhowat
+            p_ice = (m_ice(elnodes)*rhoice+m_snow(elnodes)*rhosno)*inv_rhowat
+            !!PS p_ice = (ice%data(2)%values(elnodes)*rhoice+ice%data(3)%values(elnodes)*rhosno)*inv_rhowat
             ! limit maximum ice loading like in FESOM1.4
             p_ice = g*min(p_ice,max_ice_loading)
         else
