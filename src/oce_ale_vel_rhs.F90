@@ -64,7 +64,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB, UV_rhs
     real(kind=WP), dimension(:)    , pointer :: eta_n
-    real(kind=WP), dimension(:)    , pointer :: m_ice, m_snow
+    real(kind=WP), dimension(:)    , pointer :: m_ice, m_snow, a_ice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -74,7 +74,11 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     UV_rhs   => dynamics%uv_rhs(:,:,:)
     UV_rhsAB => dynamics%uv_rhsAB(:,:,:)
     eta_n    => dynamics%eta_n(:)
+    write(*,*) ">-))))°> something is fishy 0.1"
+    a_ice => ice%data(1)%values(:)
+    write(*,*) ">-))))°> something is fishy 0.2"
     m_ice    => ice%data(2)%values(:)
+    write(*,*) ">-))))°> something is fishy 0.3"
     m_snow   => ice%data(3)%values(:)
     write(*,*) ">-))))°> something is fishy 1"
     !___________________________________________________________________________
@@ -119,7 +123,6 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         if (use_pice > 0) then
             p_ice = 0.0_WP
             p_ice = (m_ice(elnodes)*rhoice+m_snow(elnodes)*rhosno)*inv_rhowat
-            !!PS p_ice = (ice%data(2)%values(elnodes)*rhoice+ice%data(3)%values(elnodes)*rhosno)*inv_rhowat
             ! limit maximum ice loading like in FESOM1.4
             p_ice = g*min(p_ice,max_ice_loading)
         else
