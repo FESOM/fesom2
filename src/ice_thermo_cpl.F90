@@ -1,5 +1,5 @@
 #if defined (__oasis) || defined (__ifsinterface)
-subroutine thermodynamics(partit, mesh)
+subroutine thermodynamics(ice, partit, mesh)
 
   !===================================================================
   !
@@ -16,9 +16,10 @@ subroutine thermodynamics(partit, mesh)
   !===================================================================
 
   use o_param
-  USE MOD_MESH
+  USE MOD_ICE
   USE MOD_PARTIT
   USE MOD_PARSUP
+  USE MOD_MESH
   use i_therm_param
   use i_param
   use i_arrays
@@ -28,7 +29,10 @@ subroutine thermodynamics(partit, mesh)
   use g_comm_auto
   use g_rotate_grid
   implicit none
-
+  type(t_ice)   , intent(inout), target :: ice
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh)  , intent(in)   , target :: mesh
+  !_____________________________________________________________________________
   integer :: inod
   !---- prognostic variables (updated in `ice_growth')
   real(kind=WP)  :: A, h, hsn, alb, t
@@ -52,18 +56,21 @@ subroutine thermodynamics(partit, mesh)
 
   real(kind=WP), parameter :: Aimin = 0.001, himin = 0.005
 
-  type(t_mesh),   intent(in),    target :: mesh
-  type(t_partit), intent(inout), target :: partit
-
+  !_____________________________________________________________________________
+  ! pointer on necessary derived types
   integer, pointer                       :: myDim_nod2D, eDim_nod2D
   integer,        dimension(:),  pointer :: ulevels_nod2D
   real(kind=WP),  dimension(:,:),pointer :: geo_coord_nod2D
-
+  real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
   myDim_nod2d=>partit%myDim_nod2D
   eDim_nod2D =>partit%eDim_nod2D
   ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D
   geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => mesh%geo_coord_nod2D
-
+  a_ice           => ice%data(1)%values(:)
+  m_ice           => ice%data(2)%values(:)
+  m_snow          => ice%data(3)%values(:)  
+  
+  !_____________________________________________________________________________  
   rsss = ref_sss
 
   !---- total evaporation (needed in oce_salt_balance.F90)
