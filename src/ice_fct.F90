@@ -106,15 +106,19 @@ subroutine ice_TG_rhs(ice, partit, mesh)
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
+    real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, rhs_ms
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    u_ice           => ice%uvice(1,:)
-    v_ice           => ice%uvice(2,:)
+    u_ice        => ice%uvice(1,:)
+    v_ice        => ice%uvice(2,:)
     a_ice        => ice%data(1)%values(:)
     m_ice        => ice%data(2)%values(:)
     m_snow       => ice%data(3)%values(:)
+    rhs_a        => ice%data(1)%values_rhs(:)
+    rhs_m        => ice%data(2)%values_rhs(:)
+    rhs_ms       => ice%data(3)%values_rhs(:)
     
     !___________________________________________________________________________
     ! Taylor-Galerkin (Lax-Wendroff) rhs
@@ -279,6 +283,7 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
+    real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, rhs_ms
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -286,6 +291,9 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     a_ice        => ice%data(1)%values(:)
     m_ice        => ice%data(2)%values(:)
     m_snow       => ice%data(3)%values(:)
+    rhs_a        => ice%data(1)%values_rhs(:)
+    rhs_m        => ice%data(2)%values_rhs(:)
+    rhs_ms       => ice%data(3)%values_rhs(:)
     
     !___________________________________________________________________________
     gamma=ice_gamma_fct         ! Added diffusivity parameter
@@ -347,11 +355,15 @@ subroutine ice_solve_high_order(ice, partit, mesh)
   integer                               :: num_iter_solve=3
   !_____________________________________________________________________________
   ! pointer on necessary derived types
+  real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, rhs_ms
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
+  rhs_a        => ice%data(1)%values_rhs(:)
+  rhs_m        => ice%data(2)%values_rhs(:)
+  rhs_ms       => ice%data(3)%values_rhs(:)
+  
   !_____________________________________________________________________________
   ! Does Taylor-Galerkin solution
   !
@@ -851,6 +863,7 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
+    real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, rhs_ms
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -860,6 +873,9 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
     a_ice        => ice%data(1)%values(:)
     m_ice        => ice%data(2)%values(:)
     m_snow       => ice%data(3)%values(:)
+    rhs_a        => ice%data(1)%values_rhs(:)
+    rhs_m        => ice%data(2)%values_rhs(:)
+    rhs_ms       => ice%data(3)%values_rhs(:)
     
     !___________________________________________________________________________
  ! Computes the rhs in a Taylor-Galerkin way (with upwind type of 

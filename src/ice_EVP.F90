@@ -381,6 +381,7 @@ subroutine stress2rhs(inv_areamass, ice_strength, ice, partit, mesh)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
+    real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice, rhs_a, rhs_m
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -388,6 +389,11 @@ subroutine stress2rhs(inv_areamass, ice_strength, ice, partit, mesh)
     sigma11      => ice%work%sigma11(:)
     sigma12      => ice%work%sigma12(:)
     sigma22      => ice%work%sigma22(:)
+    u_rhs_ice    => ice%uvice_rhs(1,:)
+    v_rhs_ice    => ice%uvice_rhs(2,:)
+    rhs_a        => ice%data(1)%values_rhs(:)
+    rhs_m        => ice%data(2)%values_rhs(:)
+    
     !___________________________________________________________________________    
     val3=1/3.0_WP
 
@@ -484,6 +490,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:), pointer  :: u_ice_old, v_ice_old
+    real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice, rhs_a, rhs_m
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -495,6 +502,11 @@ subroutine EVPdynamics(ice, partit, mesh)
     m_snow          => ice%data(3)%values(:)
     u_ice_old       => ice%uvice_old(1,:)
     v_ice_old       => ice%uvice_old(2,:)
+    u_rhs_ice       => ice%uvice_rhs(1,:)
+    v_rhs_ice       => ice%uvice_rhs(2,:)
+    rhs_a           => ice%data(1)%values_rhs(:)
+    rhs_m           => ice%data(2)%values_rhs(:)
+    
     !_______________________________________________________________________________
     ! If Icepack is used, always update the tracers
 #if defined (__icepack)

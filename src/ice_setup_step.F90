@@ -139,11 +139,11 @@ e_size=myDim_elem2D+eDim_elem2D
 
 ! Allocate memory for variables of ice model
 !  allocate(u_ice(n_size), v_ice(n_size))
- allocate(U_rhs_ice(n_size), V_rhs_ice(n_size))
+!  allocate(U_rhs_ice(n_size), V_rhs_ice(n_size))
 !  allocate(sigma11(e_size), sigma12(e_size), sigma22(e_size))
 !  allocate(eps11(e_size),     eps12(e_size),   eps22(e_size))
 !  allocate(m_ice(n_size), a_ice(n_size), m_snow(n_size))
- allocate(rhs_m(n_size), rhs_a(n_size), rhs_ms(n_size))
+!  allocate(rhs_m(n_size), rhs_a(n_size), rhs_ms(n_size))
  allocate(t_skin(n_size))
 !  allocate(U_ice_old(n_size), V_ice_old(n_size)) !PS
 !  allocate(m_ice_old(n_size), a_ice_old(n_size), m_snow_old(n_size), thdgr_old(n_size)) !PS
@@ -168,14 +168,14 @@ e_size=myDim_elem2D+eDim_elem2D
 !  U_ice_old=0.0_WP !PS
 !  V_ice_old=0.0_WP !PS
  
- rhs_m=0.0_WP
- rhs_ms=0.0_WP
- rhs_a=0.0_WP
+!  rhs_m=0.0_WP
+!  rhs_ms=0.0_WP
+!  rhs_a=0.0_WP
 !  m_ice=0.0_WP
 !  a_ice=0.0_WP
 !  m_snow=0.0_WP
- U_rhs_ice=0.0_WP
- V_rhs_ice=0.0_WP
+!  U_rhs_ice=0.0_WP
+!  V_rhs_ice=0.0_WP
 !  U_ice=0.0_WP
 !  V_ice=0.0_WP
 !  sigma11=0.0_WP
