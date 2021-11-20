@@ -147,8 +147,8 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
             UV_rhsAB(2,nz,elem) =-UV(1,nz,elem)*ff! - mm*UV(1,nz,elem)*UV(2,nz,elem)
         end do
     end do
-    write(*,*) ">-))))°> something is fishy 2"
 !$OMP END PARALLEL DO
+    write(*,*) ">-))))°> something is fishy 2"
     !___________________________________________________________________________
     ! advection
     if (dynamics%momadv_opt==1) then
@@ -173,8 +173,8 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
             UV_rhs(2,nz,elem)=dt*(UV_rhs(2,nz,elem)+UV_rhsAB(2,nz,elem)*ff)/elem_area(elem)
         end do
     end do
-    write(*,*) ">-))))°> something is fishy 3"
 !$OMP END PARALLEL DO
+    write(*,*) ">-))))°> something is fishy 3"
     ! =======================  
     ! U_rhs contains all contributions to velocity from old time steps   
     ! =======================

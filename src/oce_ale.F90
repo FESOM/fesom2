@@ -3007,7 +3007,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     t30=MPI_Wtime() 
     call solve_ssh_ale(dynamics, partit, mesh)
     
-    if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) 
+    if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call relax_zonal_vel'//achar(27)//'[0m'
         call relax_zonal_vel(dynamics, partit, mesh)
     end if     
