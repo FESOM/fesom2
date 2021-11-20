@@ -69,16 +69,19 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    UV       =>dynamics%uv(:,:,:)
-    UV_rhs   =>dynamics%uv_rhs(:,:,:)
-    UV_rhsAB =>dynamics%uv_rhsAB(:,:,:)
-    eta_n    =>dynamics%eta_n(:)
-    m_ice    => ice%data(2)%values(:)
-    m_snow   => ice%data(3)%values(:)
+    write(*,*) ">-))))°> something is fishy 0"
+    UV       => dynamics%uv(:,:,:)
+    UV_rhs   => dynamics%uv_rhs(:,:,:)
+    UV_rhsAB => dynamics%uv_rhsAB(:,:,:)
+    eta_n    => dynamics%eta_n(:)
+    ! because of toy channel cannot acces here the pointer since its not initialised
+!     m_ice    => ice%data(2)%values(:)
+!     m_snow   => ice%data(3)%values(:)
     write(*,*) ">-))))°> something is fishy 1"
     !___________________________________________________________________________
     use_pice=0
     if (use_floatice .and.  .not. trim(which_ale)=='linfs') use_pice=1
+    if ((toy_ocean)  .and. (trim(which_toy)=="soufflet"))   use_pice=0
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax, elnodes, ff, mm, Fx, Fy, pre, p_ice, p_air, p_eta)
     do elem=1, myDim_elem2D
@@ -116,7 +119,8 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         ! to account for floating ice
         if (use_pice > 0) then
             p_ice = 0.0_WP
-            p_ice = (m_ice(elnodes)*rhoice+m_snow(elnodes)*rhosno)*inv_rhowat
+            !!PS p_ice = (m_ice(elnodes)*rhoice+m_snow(elnodes)*rhosno)*inv_rhowat
+            p_ice = (ice%data(2)%values(elnodes)*rhoice+ice%data(3)%values(elnodes)*rhosno)*inv_rhowat
             ! limit maximum ice loading like in FESOM1.4
             p_ice = g*min(p_ice,max_ice_loading)
         else
