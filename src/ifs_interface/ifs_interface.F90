@@ -348,7 +348,7 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    USE par_kind ! in ifs_modules.F90
    USE fesom_main_storage_module, only: fesom => f
    !USE o_ARRAYS, ONLY : UV ! tr_arr is now tracers, UV in dynamics derived type
-   USE i_arrays, ONLY : m_ice, a_ice, m_snow
+   !USE i_arrays, ONLY : m_ice, a_ice, m_snow
    USE i_therm_param, ONLY : tmelt
    USE g_rotate_grid, only: vector_r2g
    USE parinter
@@ -367,7 +367,7 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    integer, dimension(:,:)         , pointer :: elem2D_nodes
    integer, pointer :: myDim_nod2D, eDim_nod2D
    integer, pointer :: myDim_elem2D, eDim_elem2D, eXDim_elem2D
-
+   real(kind=wpIFS), dimension(:), pointer :: a_ice, m_ice, m_snow
 
    ! Message passing information
    INTEGER, INTENT(IN) :: mype, npes, icomm
@@ -394,7 +394,10 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
 
    coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)                  => fesom%mesh%coord_nod2D   
    elem2D_nodes(1:3, 1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => fesom%mesh%elem2D_nodes
-
+   a_ice           => fesom%ice%data(1)%values(:)
+   m_ice           => fesom%ice%data(2)%values(:)
+   m_snow          => fesom%ice%data(3)%values(:)
+ 
 
 
    ! =================================================================== !
