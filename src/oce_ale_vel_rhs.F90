@@ -74,11 +74,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     UV_rhs   => dynamics%uv_rhs(:,:,:)
     UV_rhsAB => dynamics%uv_rhsAB(:,:,:)
     eta_n    => dynamics%eta_n(:)
-    write(*,*) ">-))))°> something is fishy 0.1"
-    a_ice => ice%data(1)%values(:)
-    write(*,*) ">-))))°> something is fishy 0.2"
     m_ice    => ice%data(2)%values(:)
-    write(*,*) ">-))))°> something is fishy 0.3"
     m_snow   => ice%data(3)%values(:)
     write(*,*) ">-))))°> something is fishy 1"
     !___________________________________________________________________________

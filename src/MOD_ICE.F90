@@ -656,4 +656,46 @@ subroutine ice_init(ice, partit, mesh)
     ice%atmcoupl%enthalpyoffuse= 0.0_WP
 #endif /* (__oifs) */
 #endif /* (__oasis) */        
-end subroutine ice_init    
+end subroutine ice_init  
+!
+!
+!
+!
+!
+!_______________________________________________________________________________
+! initialise derived type for sea ice 
+subroutine ice_init_toyocean_dummy(ice, partit, mesh)
+    USE MOD_ICE
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_MESH
+    USE o_param, only: WP
+    IMPLICIT NONE
+    type(t_ice)   , intent(inout), target :: ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    integer        :: node_size, n
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"   
+
+    !___________________________________________________________________________
+    ! define local vertice & elem array size
+    node_size=myDim_nod2D+eDim_nod2D
+    
+    !___________________________________________________________________________
+    ! allocate/initialise arrays in ice derived type
+    ! initialise velocity and stress related arrays in ice derived type 
+    allocate(ice%uvice(             2, node_size))
+    ice%uvice               = 0.0_WP
+    allocate(ice%data(ice%num_itracers))
+    do n = 1, ice%num_itracers
+        allocate(ice%data(n)%values(    node_size))
+        ice%data(n)%ID      = n
+        ice%data(n)%values  = 0.0_WP
+    end do
+end subroutine ice_init_toyocean_dummy    

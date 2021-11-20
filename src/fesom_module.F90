@@ -179,7 +179,10 @@ contains
             ice_steps_since_upd = ice_ave_steps-1
             ice_update=.true.
             if (f%mype==0) write(*,*) 'EVP scheme option=', whichEVP
+        else 
+            call ice_init_toyocean_dummy(f%ice, f%partit, f%mesh)
         endif
+        
         if (f%mype==0) f%t5=MPI_Wtime()
         call compute_diagnostics(0, f%dynamics, f%tracers, f%partit, f%mesh) ! allocate arrays for diagnostic
 #if defined (__oasis)
