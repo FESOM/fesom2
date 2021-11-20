@@ -233,8 +233,8 @@ subroutine ice_timestep(step, ice, partit, mesh)
     use o_param
     use g_CONFIG
     use i_PARAM, only: whichEVP
-    use ice_EVP_interfaces
-    use ice_maEVP_interfaces
+    use ice_EVPdynamics_interface
+    use ice_maEVPdynamics_interface
     use ice_fct_interfaces
     use ice_thermodynamics_interfaces
     use cavity_interfaces

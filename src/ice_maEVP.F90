@@ -47,7 +47,11 @@ module ice_maEVP_interfaces
         type(t_mesh),   intent(in),    target :: mesh
         type(t_partit), intent(inout), target :: partit
         end subroutine
-            
+   end interface  
+end module
+
+module ice_maEVPdynamics_interface
+    interface
         subroutine EVPdynamics_a(ice, partit, mesh)
         USE MOD_ICE
         USE MOD_PARTIT
@@ -67,8 +71,8 @@ module ice_maEVP_interfaces
         type(t_partit), intent(inout), target :: partit
         type(t_ice), intent(inout), target :: ice
         end subroutine
-    end interface  
-end module
+   end interface  
+end module 
 !
 !
 !_______________________________________________________________________________

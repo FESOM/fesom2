@@ -34,6 +34,20 @@ module ice_EVP_interfaces
     end interface  
 end module
 
+module ice_EVPdynamics_interface
+    interface
+        subroutine EVPdynamics(ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice),    intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        end subroutine
+    end interface  
+end module
+
 !
 ! Contains routines of EVP dynamics
 !
