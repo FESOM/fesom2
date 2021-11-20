@@ -931,7 +931,7 @@
           character(len=*), parameter :: subname='(icedrv_initialize)'
           type(t_mesh),        intent(in), target :: mesh
           type(t_tracer_data), intent(in), target :: tracer
-          type(t_tracer_ice), intent(in), target :: ice
+          type(t_ice), intent(in), target :: ice
           call icepack_query_parameters(wave_spec_out=wave_spec)
           call icepack_query_tracer_flags(tr_aero_out=tr_aero)
           call icepack_query_tracer_flags(tr_zaero_out=tr_zaero)
