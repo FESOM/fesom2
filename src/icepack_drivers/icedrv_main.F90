@@ -806,7 +806,7 @@
                   use mod_ice
                   implicit none
                   type(t_mesh), intent(in), target :: mesh
-                  type(t_ice), intent(in), target :: ice
+                  type(t_ice), intent(inout), target :: ice
               end subroutine fesom_to_icepack
 
               ! Copy variables from icepack to fesom
@@ -874,7 +874,7 @@
                      time_advec,                       &
                      time_evp
                   type(t_mesh), intent(in), target  :: mesh
-                  type(t_ice), intent(in), target  :: ice
+                  type(t_ice), intent(inout), target  :: ice
               end subroutine step_icepack
 
               ! Initialize output
