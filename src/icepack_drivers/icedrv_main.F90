@@ -801,10 +801,12 @@
               end subroutine init_icepack
 
               ! Copy variables from fesom to icepack
-              module subroutine fesom_to_icepack(mesh)
+              module subroutine fesom_to_icepack(ice, mesh)
                   use mod_mesh
+                  use mod_ice
                   implicit none
                   type(t_mesh), intent(in), target :: mesh
+                  type(t_ice), intent(in), target :: ice
               end subroutine fesom_to_icepack
 
               ! Copy variables from icepack to fesom
@@ -860,8 +862,9 @@
               end subroutine init_advection_icepack
 
               ! Driving subroutine for column physics
-              module subroutine step_icepack(mesh, time_evp, time_advec, time_therm)
+              module subroutine step_icepack(ice, mesh, time_evp, time_advec, time_therm)
                   use mod_mesh
+                  use mod_ice
                   use g_config,              only: dt
                   use i_PARAM,               only: whichEVP
                   use icepack_intfc,         only: icepack_ice_strength
@@ -871,6 +874,7 @@
                      time_advec,                       &
                      time_evp
                   type(t_mesh), intent(in), target  :: mesh
+                  type(t_ice), intent(in), target  :: ice
               end subroutine step_icepack
 
               ! Initialize output

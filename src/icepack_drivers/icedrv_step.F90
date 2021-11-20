@@ -1141,10 +1141,10 @@ submodule (icedrv_main) icedrv_step
              time_therm,                       &
              time_advec,                       &
              time_evp
-
-          type(t_mesh), target, intent(in) :: mesh    
+          
           type(t_ice), target, intent(inout) :: ice  
-
+          type(t_mesh), target, intent(in) :: mesh    
+          
           character(len=*), parameter :: subname='(ice_step)'
 
 
