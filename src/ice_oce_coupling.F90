@@ -255,12 +255,16 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     real(kind=WP), allocatable :: flux(:)
     !___________________________________________________________________________
     real(kind=WP), dimension(:,:), pointer :: temp, salt
+    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    temp=>tracers%data(1)%values(:,:)
-    salt=>tracers%data(2)%values(:,:)
+    temp    => tracers%data(1)%values(:,:)
+    salt    => tracers%data(2)%values(:,:)
+    a_ice   => ice%data(1)%values(:)
+    m_ice   => ice%data(2)%values(:)
+    m_snow  => ice%data(3)%values(:)
     
     !___________________________________________________________________________
     allocate(flux(myDim_nod2D+eDim_nod2D))
