@@ -180,6 +180,11 @@ contains
             ice_update=.true.
             if (f%mype==0) write(*,*) 'EVP scheme option=', whichEVP
         else 
+            ! create a dummy ice derived type with only a_ice, m_ice, m_snow and 
+            ! uvice since oce_timesteps still needs in moment
+            ! ice as an input for mo_convect(ice, partit, mesh), call 
+            ! compute_vel_rhs(ice, dynamics, partit, mesh),  
+            ! call write_step_info(...) and call check_blowup(...)
             call ice_init_toyocean_dummy(f%ice, f%partit, f%mesh)
         endif
         
@@ -197,7 +202,7 @@ contains
         if (f%mype==0) write(*,*) 'Icepack: reading namelists from namelist.icepack'
         call set_icepack(f%partit)
         call alloc_icepack
-        call init_icepack(f%tracers%data(1), f%mesh)
+        call init_icepack(f%ice, f%tracers%data(1), f%mesh)
         if (f%mype==0) write(*,*) 'Icepack: setup complete'
 #endif
         call clock_newyear                        ! check if it is a new year

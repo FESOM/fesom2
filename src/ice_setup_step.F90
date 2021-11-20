@@ -264,7 +264,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
     !___________________________________________________________________________
     t0=MPI_Wtime()
 #if defined (__icepack)
-    call step_icepack(mesh, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts    
+    call step_icepack(ice, mesh, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts    
 #else     
     
     !___________________________________________________________________________

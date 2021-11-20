@@ -10,7 +10,7 @@
 
       contains
 
-      module subroutine fesom_to_icepack(mesh)
+      module subroutine fesom_to_icepack(ice, mesh)
 
           use g_forcing_arrays, only: Tair, shum, u_wind,   v_wind,       & ! Atmospheric forcing fields
                                       shortwave,  longwave, prec_rain,    &
@@ -20,8 +20,9 @@
           use g_sbf,            only: l_mslp                     
           use i_arrays,         only: S_oc_array,      T_oc_array,        & ! Ocean and sea ice fields
                                       u_w,             v_w,               &
-                                      u_ice,           v_ice,             &
                                       stress_atmice_x, stress_atmice_y
+!                                       u_ice,           v_ice,             &
+                                    
           use i_param,          only: cd_oce_ice                            ! Sea ice parameters
           use icepack_intfc,    only: icepack_warnings_flush, icepack_warnings_aborted
           use icepack_intfc,    only: icepack_query_parameters
@@ -32,6 +33,7 @@
           use o_param,          only: mstep
           use mod_mesh
           use mod_tracer
+          use mod_ice
           use g_clock
  
           implicit none
@@ -60,9 +62,11 @@
              cprho
 
           type(t_mesh), target, intent(in) :: mesh
-
+          type(t_ice), target, intent(inout) :: ice
+          real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
 #include "associate_mesh.h"
-
+          u_ice           => ice%uvice(1,:)
+          v_ice           => ice%uvice(2,:)
           ! Ice 
     
           uvel(:)  = u_ice(:)
