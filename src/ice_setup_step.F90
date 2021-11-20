@@ -140,8 +140,8 @@ e_size=myDim_elem2D+eDim_elem2D
 !  allocate(m_ice(n_size), a_ice(n_size), m_snow(n_size))
  allocate(rhs_m(n_size), rhs_a(n_size), rhs_ms(n_size))
  allocate(t_skin(n_size))
- allocate(U_ice_old(n_size), V_ice_old(n_size)) !PS
- allocate(m_ice_old(n_size), a_ice_old(n_size), m_snow_old(n_size), thdgr_old(n_size)) !PS
+!  allocate(U_ice_old(n_size), V_ice_old(n_size)) !PS
+!  allocate(m_ice_old(n_size), a_ice_old(n_size), m_snow_old(n_size), thdgr_old(n_size)) !PS
  if (whichEVP > 0) then
     allocate(u_ice_aux(n_size), v_ice_aux(n_size))
     allocate(alpha_evp_array(myDim_elem2D))
@@ -155,12 +155,12 @@ e_size=myDim_elem2D+eDim_elem2D
  
  allocate(rhs_mdiv(n_size), rhs_adiv(n_size), rhs_msdiv(n_size))
 
- m_ice_old=0.0_WP !PS
- a_ice_old=0.0_WP !PS
- m_snow_old=0.0_WP !PS
+!  m_ice_old=0.0_WP !PS
+!  a_ice_old=0.0_WP !PS
+!  m_snow_old=0.0_WP !PS
  thdgr_old=0.0_WP !PS
- U_ice_old=0.0_WP !PS
- V_ice_old=0.0_WP !PS
+!  U_ice_old=0.0_WP !PS
+!  V_ice_old=0.0_WP !PS
  
  rhs_m=0.0_WP
  rhs_ms=0.0_WP

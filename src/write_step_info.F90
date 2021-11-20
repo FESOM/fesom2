@@ -1,3 +1,4 @@
+
 module write_step_info_interface
   interface
     subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
@@ -282,22 +283,26 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
     real(kind=WP), dimension(:)    , pointer :: eta_n, d_eta
     real(kind=WP), dimension(:)    , pointer :: u_ice, v_ice
     real(kind=WP), dimension(:)    , pointer :: a_ice, m_ice, m_snow
+    real(kind=WP), dimension(:)    , pointer :: a_ice_old, m_ice_old, m_snow_old
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-    UV       => dynamics%uv(:,:,:)
-    Wvel     => dynamics%w(:,:)
-    CFL_z    => dynamics%cfl_z(:,:)
+    UV          => dynamics%uv(:,:,:)
+    Wvel        => dynamics%w(:,:)
+    CFL_z       => dynamics%cfl_z(:,:)
     ssh_rhs     => dynamics%ssh_rhs(:)
     ssh_rhs_old => dynamics%ssh_rhs_old(:)
-    eta_n    => dynamics%eta_n(:)
-    d_eta    => dynamics%d_eta(:)
-    u_ice    => ice%uvice(1,:)
-    v_ice    => ice%uvice(2,:)
-    a_ice    => ice%data(1)%values(:)
-    m_ice    => ice%data(2)%values(:)
-    m_snow   => ice%data(3)%values(:)
+    eta_n       => dynamics%eta_n(:)
+    d_eta       => dynamics%d_eta(:)
+    u_ice       => ice%uvice(1,:)
+    v_ice       => ice%uvice(2,:)
+    a_ice       => ice%data(1)%values(:)
+    m_ice       => ice%data(2)%values(:)
+    m_snow      => ice%data(3)%values(:)
+    a_ice_old   => ice%data(1)%values_old(:)
+    m_ice_old   => ice%data(2)%values_old(:)
+    m_snow_old  => ice%data(3)%values_old(:)
     
     !___________________________________________________________________________
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz)

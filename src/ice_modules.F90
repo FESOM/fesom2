@@ -61,7 +61,8 @@ save
   real(kind=WP),allocatable,dimension(:,:)         :: ice_grad_vel
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice, V_ice
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: m_ice, a_ice, m_snow  
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice_old, V_ice_old, m_ice_old, a_ice_old, m_snow_old,thdgr_old !PS
+!   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice_old, V_ice_old, m_ice_old, a_ice_old, m_snow_old,thdgr_old !PS
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: thdgr_old
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_rhs_ice, V_rhs_ice
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_m, rhs_a, rhs_ms, ths_temp
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_w, V_w

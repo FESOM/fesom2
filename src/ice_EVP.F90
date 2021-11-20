@@ -483,6 +483,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
+    real(kind=WP), dimension(:), pointer  :: u_ice_old, v_ice_old
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -492,7 +493,8 @@ subroutine EVPdynamics(ice, partit, mesh)
     a_ice           => ice%data(1)%values(:)
     m_ice           => ice%data(2)%values(:)
     m_snow          => ice%data(3)%values(:)
-
+    u_ice_old       => ice%uvice_old(1,:)
+    v_ice_old       => ice%uvice_old(2,:)
     !_______________________________________________________________________________
     ! If Icepack is used, always update the tracers
 #if defined (__icepack)
