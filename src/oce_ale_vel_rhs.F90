@@ -75,7 +75,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     eta_n    =>dynamics%eta_n(:)
     m_ice    => ice%data(2)%values(:)
     m_snow   => ice%data(3)%values(:)
-    
+    write(*,*) ">-))))°> something is fishy 1"
     !___________________________________________________________________________
     use_pice=0
     if (use_floatice .and.  .not. trim(which_ale)=='linfs') use_pice=1
@@ -147,6 +147,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
             UV_rhsAB(2,nz,elem) =-UV(1,nz,elem)*ff! - mm*UV(1,nz,elem)*UV(2,nz,elem)
         end do
     end do
+    write(*,*) ">-))))°> something is fishy 2"
 !$OMP END PARALLEL DO
     !___________________________________________________________________________
     ! advection
@@ -172,6 +173,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
             UV_rhs(2,nz,elem)=dt*(UV_rhs(2,nz,elem)+UV_rhsAB(2,nz,elem)*ff)/elem_area(elem)
         end do
     end do
+    write(*,*) ">-))))°> something is fishy 3"
 !$OMP END PARALLEL DO
     ! =======================  
     ! U_rhs contains all contributions to velocity from old time steps   
