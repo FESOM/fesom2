@@ -1123,7 +1123,8 @@ submodule (icedrv_main) icedrv_step
           use i_PARAM,                only: whichEVP
           use mod_mesh    
           use mod_ice    
-
+          use ice_EVPdynamics_interface
+          use ice_maEVPdynamics_interface
           implicit none
     
           integer (kind=int_kind) :: &
