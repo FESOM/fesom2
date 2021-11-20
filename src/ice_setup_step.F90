@@ -83,6 +83,7 @@ subroutine ice_setup(ice, tracers, partit, mesh)
     
     !___________________________________________________________________________
     ! initialise ice derived type 
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call ice_init'//achar(27)//'[0m'
     call ice_init(ice, partit, mesh)
     
     ! ================ DO not change
@@ -92,12 +93,16 @@ subroutine ice_setup(ice, tracers, partit, mesh)
     Clim_evp=Clim_evp*(evp_rheol_steps/ice_dt)**2/Tevp_inv  ! This is combination 
                                                             ! it always enters
     ! ================
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call ice_array_setup'//achar(27)//'[0m'
     call ice_array_setup(partit, mesh)
+    
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_init'//achar(27)//'[0m'
     call ice_fct_init(ice, partit, mesh)
     ! ================
     ! Initialization routine, user input is required 
     ! ================
     !call ice_init_fields_test
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call ice_initial_state'//achar(27)//'[0m'
     call ice_initial_state(ice, tracers, partit, mesh)   ! Use it unless running test example
     if(partit%mype==0) write(*,*) 'Ice is initialized'
 end subroutine ice_setup
@@ -142,6 +147,7 @@ e_size=myDim_elem2D+eDim_elem2D
  allocate(t_skin(n_size))
 !  allocate(U_ice_old(n_size), V_ice_old(n_size)) !PS
 !  allocate(m_ice_old(n_size), a_ice_old(n_size), m_snow_old(n_size), thdgr_old(n_size)) !PS
+ allocate(thdgr_old(n_size)) !PS
  if (whichEVP > 0) then
     allocate(u_ice_aux(n_size), v_ice_aux(n_size))
     allocate(alpha_evp_array(myDim_elem2D))

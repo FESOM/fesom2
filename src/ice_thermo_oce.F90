@@ -133,12 +133,13 @@ subroutine thermodynamics(ice, partit, mesh)
   integer,        dimension(:),  pointer :: ulevels_nod2D
   real(kind=WP),  dimension(:,:),pointer :: geo_coord_nod2D
   real(kind=WP),  dimension(:),  pointer :: u_ice, v_ice
-  real(kind=WP), dimension(:),   pointer :: a_ice, m_ice, m_snow
+  real(kind=WP),  dimension(:),  pointer :: a_ice, m_ice, m_snow
   real(kind=WP),  dimension(:),  pointer :: a_ice_old, m_ice_old, m_snow_old
   myDim_nod2d=>partit%myDim_nod2D
   eDim_nod2D =>partit%eDim_nod2D
   ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D
   geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => mesh%geo_coord_nod2D 
+  
   u_ice      => ice%uvice(1,:)
   v_ice      => ice%uvice(2,:)
   a_ice      => ice%data(1)%values(:)
@@ -149,7 +150,7 @@ subroutine thermodynamics(ice, partit, mesh)
   m_snow_old => ice%data(3)%values_old(:)
   !_____________________________________________________________________________
   rsss=ref_sss
-
+  
   ! u_ice and v_ice are at nodes
   ! u_w, v_w are at nodes (interpolated from elements)
   ! u_wind and v_wind are always at nodes
@@ -169,7 +170,7 @@ subroutine thermodynamics(ice, partit, mesh)
   ! ================
   ! end: friction velocity 
   ! ================
-
+  
   do i=1, myDim_nod2d+eDim_nod2D
      !__________________________________________________________________________
      ! if there is a cavity no sea ice thermodynamics is apllied
@@ -221,19 +222,20 @@ subroutine thermodynamics(ice, partit, mesh)
      else
        lid_clo=0.5_WP
      endif
-
+    
      call therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
           ug,ustar,T_oc,S_oc,h_ml,t,ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
           rsf, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,lid_clo,subli)
-
+    
      m_ice_old(i)         = m_ice(i) !PS
      m_snow_old(i)        = m_snow(i) !PS
      a_ice_old(i)         = a_ice(i) !PS
      thdgr_old(i)         = thdgr(i) !PS
-     
+    
      m_ice(i)         = h
      m_snow(i)        = hsn
      a_ice(i)         = A
+    
      t_skin(i)        = t
      fresh_wa_flux(i) = fw      !positive down
      net_heat_flux(i) = ehf     !positive down
@@ -258,6 +260,7 @@ subroutine thermodynamics(ice, partit, mesh)
      end if 
      
   end do
+    
      deallocate(ustar_aux)
 end subroutine thermodynamics
 !

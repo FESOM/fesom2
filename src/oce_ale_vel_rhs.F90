@@ -69,14 +69,13 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    write(*,*) ">-))))°> something is fishy 0"
     UV       => dynamics%uv(:,:,:)
     UV_rhs   => dynamics%uv_rhs(:,:,:)
     UV_rhsAB => dynamics%uv_rhsAB(:,:,:)
     eta_n    => dynamics%eta_n(:)
     m_ice    => ice%data(2)%values(:)
     m_snow   => ice%data(3)%values(:)
-    write(*,*) ">-))))°> something is fishy 1"
+    
     !___________________________________________________________________________
     use_pice=0
     if (use_floatice .and.  .not. trim(which_ale)=='linfs') use_pice=1
@@ -150,7 +149,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         end do
     end do
 !$OMP END PARALLEL DO
-    write(*,*) ">-))))°> something is fishy 2"
+    
     !___________________________________________________________________________
     ! advection
     if (dynamics%momadv_opt==1) then
@@ -176,7 +175,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         end do
     end do
 !$OMP END PARALLEL DO
-    write(*,*) ">-))))°> something is fishy 3"
+    
     ! =======================  
     ! U_rhs contains all contributions to velocity from old time steps   
     ! =======================
