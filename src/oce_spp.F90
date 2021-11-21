@@ -8,14 +8,14 @@
 ! Ref: Duffy1997, Duffy1999, Nguyen2009
 ! Originaly coded by Qiang Wang in FESOM 1.4 
 !--------------------------------------------------------
-subroutine cal_rejected_salt(partit, mesh)
+subroutine cal_rejected_salt(ice, partit, mesh)
 use o_arrays
+USE MOD_ICE
 use mod_mesh
 USE MOD_PARTIT
 USE MOD_PARSUP
 use g_comm_auto
 use o_tracers
-use g_forcing_arrays, only: thdgr
 use i_ARRAYS,         only: S_oc_array
 use i_therm_param,    only: rhoice, rhowat, Sice
 use g_config,         only: dt
@@ -23,13 +23,15 @@ implicit none
 
 integer         :: row
 real(kind=WP)   :: aux
-type(t_mesh),   intent(in),    target :: mesh
-type(t_partit), intent(in),    target :: partit
-
+type(t_ice)   , intent(in), target :: ice
+type(t_mesh)  , intent(in), target :: mesh
+type(t_partit), intent(in), target :: partit
+real(kind=WP), dimension(:)  , pointer :: thdgr
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+thdgr    => ice%thermo%thdgr
 
 aux=rhoice/rhowat*dt
 do row=1, myDim_nod2d +eDim_nod2D! myDim is sufficient

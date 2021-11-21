@@ -145,10 +145,11 @@ subroutine forcing_array_setup(partit, mesh)
 
   !for ice diagnose
   if(use_ice) then
-    allocate(thdgr(n2), thdgrsn(n2), flice(n2))
+!     allocate(thdgr(n2), thdgrsn(n2))
+    allocate(flice(n2))
     allocate(olat_heat(n2), osen_heat(n2), olwout(n2))
-    thdgr=0.0_WP
-    thdgrsn=0.0_WP
+!     thdgr=0.0_WP
+!     thdgrsn=0.0_WP
     flice=0.0_WP
     olat_heat=0.0_WP
     osen_heat=0.0_WP

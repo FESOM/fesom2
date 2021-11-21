@@ -164,7 +164,7 @@ e_size=myDim_elem2D+eDim_elem2D
 !  m_ice_old=0.0_WP !PS
 !  a_ice_old=0.0_WP !PS
 !  m_snow_old=0.0_WP !PS
- thdgr_old=0.0_WP !PS
+!  thdgr_old=0.0_WP !PS
 !  U_ice_old=0.0_WP !PS
 !  V_ice_old=0.0_WP !PS
  
