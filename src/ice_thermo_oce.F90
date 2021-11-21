@@ -125,7 +125,7 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP)  :: ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout, subli
   real(kind=WP)  :: lat
   integer        :: i, j, elem
-  real(kind=WP), allocatable  :: ustar_aux(:)
+  !!PS real(kind=WP), allocatable  :: ustar_aux(:)
   real(kind=WP)  lid_clo
   !_____________________________________________________________________________
   ! pointer on necessary derived types
@@ -135,7 +135,7 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP),  dimension(:),  pointer :: u_ice, v_ice
   real(kind=WP),  dimension(:),  pointer :: a_ice, m_ice, m_snow
   real(kind=WP),  dimension(:),  pointer :: a_ice_old, m_ice_old, m_snow_old
-  real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn
+  real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn, thdgr_old, t_skin, ustar_aux
   myDim_nod2d=>partit%myDim_nod2D
   eDim_nod2D =>partit%eDim_nod2D
   ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D
@@ -151,6 +151,10 @@ subroutine thermodynamics(ice, partit, mesh)
   m_snow_old => ice%data(3)%values_old(:)
   thdgr      => ice%thermo%thdgr
   thdgrsn    => ice%thermo%thdgrsn
+  thdgr_old  => ice%thermo%thdgr_old
+  t_skin     => ice%thermo%t_skin
+  ustar_aux  => ice%thermo%ustar
+  
   !_____________________________________________________________________________
   rsss=ref_sss
   
@@ -160,7 +164,7 @@ subroutine thermodynamics(ice, partit, mesh)
   ! ================
   ! Friction velocity 
   ! ================
-  allocate(ustar_aux(myDim_nod2D+eDim_nod2D))
+!   allocate(ustar_aux(myDim_nod2D+eDim_nod2D))
     ustar_aux=0.0_WP
     DO i=1, myDim_nod2D
        ustar=0.0_WP
@@ -262,9 +266,7 @@ subroutine thermodynamics(ice, partit, mesh)
         prec_snow(i)     = snow
      end if 
      
-  end do
-    
-     deallocate(ustar_aux)
+    end do
 end subroutine thermodynamics
 !
 !===================================================================

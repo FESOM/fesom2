@@ -36,7 +36,6 @@ TYPE T_ICE_WORK
     real(kind=WP), allocatable, dimension(:)    :: sigma11, sigma12, sigma22
     real(kind=WP), allocatable, dimension(:)    :: eps11, eps12, eps22
     real(kind=WP), allocatable, dimension(:)    :: ice_strength, inv_areamass, inv_mass
-    real(kind=WP), allocatable, dimension(:)    :: t_skin, thdgr, thdgrsn, thdgr_old
     !___________________________________________________________________________
     contains
         procedure WRITE_T_ICE_WORK
@@ -615,15 +614,6 @@ subroutine ice_init(ice, partit, mesh)
     ice%work%ice_strength= 0.0_WP
     ice%work%inv_areamass= 0.0_WP
     ice%work%inv_mass    = 0.0_WP
-    
-    allocate(ice%work%t_skin(          node_size))
-    allocate(ice%work%thdgr(           node_size))
-    allocate(ice%work%thdgrsn(         node_size))
-    allocate(ice%work%thdgr_old(       node_size))
-    ice%work%t_skin      = 0.0_WP
-    ice%work%thdgr       = 0.0_WP
-    ice%work%thdgrsn     = 0.0_WP
-    ice%work%thdgr_old   = 0.0_WP
     
     !___________________________________________________________________________
     ! initialse thermo array of ice derived type 

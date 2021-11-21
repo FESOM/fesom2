@@ -62,7 +62,7 @@ save
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice, V_ice
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: m_ice, a_ice, m_snow  
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice_old, V_ice_old, m_ice_old, a_ice_old, m_snow_old,thdgr_old !PS
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: thdgr_old
+!   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: thdgr_old
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_rhs_ice, V_rhs_ice
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_m, rhs_a, rhs_ms, ths_temp
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: ths_temp
@@ -91,7 +91,7 @@ save
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_iceoce_y
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmice_x         
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmice_y
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: t_skin
+!   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: t_skin
  ! FCT implementation
  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: m_icel, a_icel, m_snowl
  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: dm_ice, da_ice, dm_snow
