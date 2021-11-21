@@ -63,6 +63,7 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP), dimension(:,:), pointer :: geo_coord_nod2D
   real(kind=WP), dimension(:)  , pointer :: u_ice, v_ice
   real(kind=WP), dimension(:)  , pointer :: a_ice, m_ice, m_snow
+  real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn
   myDim_nod2d=>partit%myDim_nod2D
   eDim_nod2D =>partit%eDim_nod2D
   ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D
@@ -72,7 +73,8 @@ subroutine thermodynamics(ice, partit, mesh)
   a_ice           => ice%data(1)%values(:)
   m_ice           => ice%data(2)%values(:)
   m_snow          => ice%data(3)%values(:)  
-  
+  thdgr           => ice%thermo%thdgr
+  thdgrsn  => ice%thermo%thdgrsn
   !_____________________________________________________________________________  
   rsss = ref_sss
 
