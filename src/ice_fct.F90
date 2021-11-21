@@ -864,6 +864,7 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, rhs_ms
+    real(kind=WP), dimension(:), pointer  :: rhs_adiv, rhs_mdiv, rhs_msdiv
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -876,6 +877,9 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
     rhs_a        => ice%data(1)%values_rhs(:)
     rhs_m        => ice%data(2)%values_rhs(:)
     rhs_ms       => ice%data(3)%values_rhs(:)
+    rhs_adiv     => ice%data(1)%values_div_rhs(:)
+    rhs_mdiv     => ice%data(2)%values_div_rhs(:)
+    rhs_msdiv    => ice%data(3)%values_div_rhs(:)
     
     !___________________________________________________________________________
  ! Computes the rhs in a Taylor-Galerkin way (with upwind type of 
@@ -976,6 +980,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
+    real(kind=WP), dimension(:), pointer  :: rhs_adiv, rhs_mdiv, rhs_msdiv
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -983,6 +988,9 @@ subroutine ice_update_for_div(ice, partit, mesh)
     a_ice        => ice%data(1)%values(:)
     m_ice        => ice%data(2)%values(:)
     m_snow       => ice%data(3)%values(:)
+    rhs_adiv     => ice%data(1)%values_div_rhs(:)
+    rhs_mdiv     => ice%data(2)%values_div_rhs(:)
+    rhs_msdiv    => ice%data(3)%values_div_rhs(:)
     
     !___________________________________________________________________________
     ! Does Taylor-Galerkin solution

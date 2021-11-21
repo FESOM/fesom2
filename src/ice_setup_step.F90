@@ -159,7 +159,7 @@ e_size=myDim_elem2D+eDim_elem2D
     v_ice_aux=0.0_WP
  end if
  
- allocate(rhs_mdiv(n_size), rhs_adiv(n_size), rhs_msdiv(n_size))
+!  allocate(rhs_mdiv(n_size), rhs_adiv(n_size), rhs_msdiv(n_size))
 
 !  m_ice_old=0.0_WP !PS
 !  a_ice_old=0.0_WP !PS
@@ -185,9 +185,9 @@ e_size=myDim_elem2D+eDim_elem2D
 !  eps12=0.0_WP
 !  eps22=0.0_WP
  t_skin=0.0_WP
- rhs_mdiv=0.0_WP
- rhs_adiv=0.0_WP
- rhs_msdiv=0.0_WP
+!  rhs_mdiv=0.0_WP
+!  rhs_adiv=0.0_WP
+!  rhs_msdiv=0.0_WP
 
 
 ! Allocate memory for arrays used in coupling 
