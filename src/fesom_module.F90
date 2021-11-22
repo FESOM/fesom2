@@ -90,10 +90,12 @@ contains
       ! EO parameters
       logical mpi_is_initialized
 
+#if !defined  __ifsinterface
       if(command_argument_count() > 0) then
         call command_line_options%parse()
         stop
       end if
+#endif
       
       mpi_is_initialized = .false.
       f%fesom_did_mpi_init = .false.

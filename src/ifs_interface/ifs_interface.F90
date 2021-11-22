@@ -16,6 +16,7 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
 
    USE par_kind !in ifs_modules.F90
    USE fesom_main_storage_module, only: fesom => f ! only: MPI_COMM_FESOM, mype (previously in g_parsup)
+   USE fesom_module, ONLY : fesom_init
    USE g_config, only: dt
    USE g_clock, only: timenew, daynew, yearnew, month, day_in_month
    USE nemogcmcoup_steps, ONLY : substeps
@@ -49,7 +50,8 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    READ(9,namfesomstep)
    CLOSE(9)
 
-   fesom%MPI_COMM_FESOM=icomm
+   fesom%partit%MPI_COMM_FESOM=icomm
+
    itini = 1
    CALL fesom_init(itend_fesom) !also sets mype and npes 
    itend=itend_fesom/substeps
@@ -1459,6 +1461,7 @@ SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )
 
    USE g_clock, only: yearnew, month, day_in_month
    USE fesom_main_storage_module, only: fesom => f ! mype
+   USE fesom_module, ONLY : fesom_runloop
    USE nemogcmcoup_steps, ONLY : substeps
    IMPLICIT NONE
 
@@ -1501,6 +1504,7 @@ END SUBROUTINE nemogcmcoup_step
 SUBROUTINE nemogcmcoup_final
 
    USE fesom_main_storage_module, only: fesom => f ! mype
+   USE fesom_module, ONLY : fesom_finalize
 
    ! Finalize the FESOM model
 

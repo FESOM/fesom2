@@ -937,6 +937,8 @@ CONTAINS
          write(*,*) "Surface boundary conditions parameters:"
       end if
 
+#if !defined __ifsinterface
+
       i_totfl=0
       if (l_xwind) then
          if (mype==0) then
@@ -1041,6 +1043,7 @@ CONTAINS
       ALLOCATE(sbc_flfi(i_totfl))
       call nc_sbc_ini(rdate, partit, mesh)
       !==========================================================================
+#endif
       ! runoff    
       if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
          ! runoff in CORE is constant in time
