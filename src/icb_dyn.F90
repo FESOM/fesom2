@@ -157,7 +157,6 @@ type(t_mesh), intent(in) , target :: mesh
 
   new_u_ib = u_ib + au_ib * dt_ib
   new_v_ib = v_ib + av_ib * dt_ib
-  !write(*,*) 'LA DEBUG 145: u_ib: ',u_ib,', new_u_ib: ',new_u_ib
 
  if (l_semiimplicit) then !a matrix multiplication is to be performed
   			  !for semiimpl. coriolis term and implicit
@@ -186,7 +185,6 @@ type(t_mesh), intent(in) , target :: mesh
    !now the velocity can be updated
    new_u_ib = SI_velo(1)
    new_v_ib = SI_velo(2)
- !write(*,*) 'LA DEBUG 174: u_ib: ',u_ib,', new_u_ib: ',new_u_ib
    
  else !compute only water drag implicitly, coriolis: AB
   
@@ -206,7 +204,6 @@ type(t_mesh), intent(in) , target :: mesh
    !now the velocity can be updated
    new_u_ib = SI_velo(1)
    new_v_ib = SI_velo(2)  
- !write(*,*) 'LA DEBUG 194: u_ib: ',u_ib,', new_u_ib: ',new_u_ib
     
  end if !matrix-multiplication
 
@@ -217,7 +214,6 @@ type(t_mesh), intent(in) , target :: mesh
       
  new_u_ib = (1-frozen_in) * new_u_ib + frozen_in * ui_ib
  new_v_ib = (1-frozen_in) * new_v_ib + frozen_in * vi_ib
- !write(*,*) 'LA DEBUG 205: u_ib: ',u_ib,', new_u_ib: ',new_u_ib
  
 end subroutine iceberg_dyn
 

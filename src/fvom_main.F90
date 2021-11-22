@@ -419,9 +419,7 @@ type(t_mesh),             target, save :: mesh
             if (use_icebergs .and. mod(n - 1, steps_per_ib_step)==0) then
                 if (mype==0) write(*,*) '*** step n=',n
                 t1_icb = MPI_Wtime()
-                write(*,*) "LA DEBUG: start iceberg_calculation"
                 call iceberg_calculation(mesh,n)
-                write(*,*) "LA DEBUG: finish iceberg_calculation"
                 t2_icb = MPI_Wtime()
             end if
             !___model sea-ice step__________________________________________________
@@ -686,7 +684,7 @@ type(t_mesh),             target, save :: mesh
 
 ! kh 09.03.21
                 call iceberg_calculation(mesh,n_ib)
-!               call icb2fesom
+!                call icb2fesom
 !               t2_icb = MPI_Wtime()
             end if
 !           t2 = MPI_Wtime()

@@ -129,20 +129,12 @@ type(t_mesh), intent(in) , target :: mesh
  call MPI_IAllREDUCE(arr_block, arr_block_red, 15*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)
 !$omp end critical
 
-if (mype==0) then
-    write(*,*) "LA DEBUG: finished MPI_IAllREDUCE"
-end if
-
  completed = .false.
  do while (.not. completed)
 !$omp critical
 CALL MPI_TEST(req, completed, status, MPIERR_IB)
 !$omp end critical
  end do
-
-if (mype==0) then
-    write(*,*) "LA DEBUG: finished MPI_TEST"
-end if
 
 ! kh 25.03.21 orig
 ! call MPI_AllREDUCE(elem_block, elem_block_red, ib_num, MPI_INTEGER, MPI_SUM, &
@@ -151,20 +143,12 @@ end if
  call MPI_IAllREDUCE(elem_block, elem_block_red, ib_num, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)  
 !$omp end critical
 
-if (mype==0) then
-    write(*,*) "LA DEBUG: finished MPI_IAllREDUCE 2"
-end if
-
 completed = .false.
  do while (.not. completed)
 !$omp critical
   CALL MPI_TEST(req, completed, status, MPIERR_IB)
 !$omp end critical
  end do
-
-if (mype==0) then
-    write(*,*) "LA DEBUG: finished MPI_TEST 2"
-end if
 
  !ALLREDUCE: vl_block, containing the volume losses (IBs may switch PE during the output interval)
 ! kh 25.03.21 orig
@@ -174,20 +158,12 @@ end if
  call MPI_IAllREDUCE(vl_block, vl_block_red, 4*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)
 !$omp end critical
 
-if (mype==0) then
-    write(*,*) "LA DEBUG: finished MPI_IAllREDUCE 3"
-end if
-
  completed = .false.
  do while (.not. completed)
 !$omp critical
   CALL MPI_TEST(req, completed, status, MPIERR_IB)
 !$omp end critical
  end do
-
-if (mype==0) then
-    write(*,*) "LA DEBUG: finished MPI_TEST 3"
-end if
 
 ! call MPI_Barrier(MPI_COMM_WORLD,MPIerr)
 ! arr_block_red = 0.0
@@ -238,9 +214,6 @@ end if
                             u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib), lastsubstep,&
                             f_u_ib_old(ib), f_v_ib_old(ib), l_semiimplicit,   &
                             semiimplicit_coeff, AB_coeff, istep)	
-        if (mype==0) then
-            write(*,*) "LA DEBUG: finish iceberg_step2"
-        end if
         !call MPI_Barrier(MPI_COMM_WORLD, MPIERR) !necessary?
         !end do
     end if
@@ -408,7 +381,7 @@ type(t_mesh), intent(in) , target :: mesh
  end if 
  
  if (find_iceberg_elem) then
- lon_rad = lon_deg*rad
+  lon_rad = lon_deg*rad
   lat_rad = lat_deg*rad
   !write(*,*) 'IB ',ib,' not rot. coords:', lon_deg, lat_deg !,lon_rad, lat_rad
   call g2r(lon_rad, lat_rad, lon_rad, lat_rad)
@@ -463,8 +436,19 @@ type(t_mesh), intent(in) , target :: mesh
 ! f_u_ib_old = coriolis_ib(local_idx_of(iceberg_elem))*u_ib
 ! f_v_ib_old = coriolis_ib(local_idx_of(iceberg_elem))*v_ib
 
-  f_u_ib_old = coriolis(local_idx_of(iceberg_elem))*u_ib
-  f_v_ib_old = coriolis(local_idx_of(iceberg_elem))*v_ib
+! kh 06.08.21 observed via -check bounds: forrtl: severe (408): fort: (3): Subscript #1 of the array CORIOLIS has value 0 which is less than the lower bound of 1
+  if(local_idx_of(iceberg_elem) > 0) then
+    if(local_idx_of(iceberg_elem) <= myDim_elem2D ) then
+
+      f_u_ib_old = coriolis(local_idx_of(iceberg_elem))*u_ib
+      f_v_ib_old = coriolis(local_idx_of(iceberg_elem))*v_ib
+      
+    else
+      write(*,*) 'Error local_idx_of(iceberg_elem) > myDim_elem2D, istep, local_idx_of(iceberg_elem), myDim_elem2D', istep, local_idx_of(iceberg_elem), myDim_elem2D
+    endif
+  else
+    write(*,*) 'Error local_idx_of(iceberg_elem) <= 0, istep, local_idx_of(iceberg_elem)', istep, local_idx_of(iceberg_elem)
+  endif
  end if
  
  file_track='/work/ollie/lackerma/iceberg/iceberg_ICBref_'
@@ -527,10 +511,8 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 		   
   !=======================END OF DYNAMICS============================
  
-  write(*,*) "LA DEBUG: call depth_bathy"
   call depth_bathy(mesh, Zdepth3, local_idx_of(iceberg_elem))
   !interpolate depth to location of iceberg (2 times because FEM_3eval expects a 2 component vector...)
-  write(*,*) "LA DEBUG: call FEM_3eval"
   call FEM_3eval(mesh, Zdepth,Zdepth,lon_rad,lat_rad,Zdepth3,Zdepth3,local_idx_of(iceberg_elem))
   
   !write(*,*) 'nodal depth in iceberg ', ib,'s element:', Zdepth3
@@ -1177,17 +1159,13 @@ subroutine iceberg_restart
   if(mype==0) then
   write(*,*) 'no iceberg restart'
 
-  write(*,*) 'LA DEBUG: start init_buoy_output'
   if(.NOT.ascii_out) call init_buoy_output
-  write(*,*) 'LA DEBUG: finish init_buoy_output'
 
   end if
 
   !call init_buoys ! all PEs read LON,LAT from files  
   !write(*,*) 'initialized positions from file'
-  write(*,*) 'LA DEBUG: start init_icebergs'
   call init_icebergs ! all PEs read LON,LAT,LENGTH from files
-  write(*,*) 'LA DEBUG: finish init_icebergs'
   !write(*,*) 'initialized positions and length/width from file'
   !write(*,*) '*************************************************************'
  end if
@@ -1272,7 +1250,7 @@ subroutine iceberg_out
  integer :: icbID, icbID_ISM, ib, istep
  
  icbID = 42
- !icbID_ISM = 43
+ icbID_ISM = 43
  
  !calving_day has to be adjusted for restarts because calving_day gives the amount
  !of days (since the model FIRST has been started) after which icebergs are released
@@ -1287,7 +1265,7 @@ subroutine iceberg_out
 
  if(mype==0) then
   open(unit=icbID,file=IcebergRestartPath,position='append', status='replace')
-  !open(unit=icbID_ISM,file=IcebergRestartPath_ISM,position='append', status='replace')
+  open(unit=icbID_ISM,file=IcebergRestartPath_ISM,position='append', status='replace')
   
   do ib=1, ib_num 
   
@@ -1301,18 +1279,18 @@ subroutine iceberg_out
    
    !***************************************************************
    !write new restart file with only non melted icebergs
-   !if(melted(ib)==.false.) then
-   !    !write all parameters that icb_step needs:
-   !    write(icbID_ISM,'(18e15.7,I,L,3e15.7,L)')						&
-   !         height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
-   !         Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
-   !         conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
-   !         u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
-   !         f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), melted(ib)
-   !end if
+   if(melted(ib)==.false.) then
+       !write all parameters that icb_step needs:
+       write(icbID_ISM,'(18e15.7,I,L,3e15.7,L)')						&
+            height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
+            Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
+            conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
+            u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
+            f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), melted(ib)
+   end if
 
   end do
-  !close(icbID_ISM)
+  close(icbID_ISM)
   close(icbID)
  end if
 end subroutine iceberg_out
