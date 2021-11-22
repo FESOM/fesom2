@@ -111,8 +111,8 @@ subroutine ice_TG_rhs(ice, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    u_ice        => ice%uvice(1,:)
-    v_ice        => ice%uvice(2,:)
+    u_ice        => ice%uice(:)
+    v_ice        => ice%vice(:)
     a_ice        => ice%data(1)%values(:)
     m_ice        => ice%data(2)%values(:)
     m_snow       => ice%data(3)%values(:)
@@ -869,8 +869,8 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    u_ice        => ice%uvice(1,:)
-    v_ice        => ice%uvice(2,:)
+    u_ice        => ice%uice(:)
+    v_ice        => ice%vice(:)
     a_ice        => ice%data(1)%values(:)
     m_ice        => ice%data(2)%values(:)
     m_snow       => ice%data(3)%values(:)

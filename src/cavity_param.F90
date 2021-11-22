@@ -491,8 +491,8 @@ subroutine cavity_ice_clean_vel(ice, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    u_ice           => ice%uvice(1,:)
-    v_ice           => ice%uvice(2,:)
+    u_ice           => ice%uice(:)
+    v_ice           => ice%vice(:)
     
     !___________________________________________________________________________
     do node=1,myDim_nod2d+eDim_nod2d           

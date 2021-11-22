@@ -89,10 +89,12 @@ TYPE T_ICE
 
     !___________________________________________________________________________
     ! zonal & merdional ice velocity
-    real(kind=WP), allocatable, dimension(:,:)  :: uvice, uvice_rhs, uvice_old, uvice_aux
+    real(kind=WP), allocatable, dimension(:)    :: uice, uice_rhs, uice_old, uice_aux
+    real(kind=WP), allocatable, dimension(:)    :: vice, vice_rhs, vice_old, vice_aux
     
     ! surface stess atm<-->ice, oce<-->ice
-    real(kind=WP), allocatable, dimension(:,:)  :: stress_atmice_xy, stress_iceoce_xy
+    real(kind=WP), allocatable, dimension(:)    :: stress_atmice_x, stress_iceoce_x
+    real(kind=WP), allocatable, dimension(:)    :: stress_atmice_y, stress_iceoce_y
     
     ! oce temp, salt, ssh, and uv at surface
     real(kind=WP), allocatable, dimension(:)    :: srfoce_temp, srfoce_salt, srfoce_ssh
@@ -327,12 +329,18 @@ subroutine WRITE_T_ICE(ice, unit, iostat, iomsg)
     character(*),           intent(inout)  :: iomsg
     integer                                :: i
     !___________________________________________________________________________
-    call write_bin_array(ice%uvice, unit, iostat, iomsg)
-    call write_bin_array(ice%uvice_rhs, unit, iostat, iomsg)
-    call write_bin_array(ice%uvice_old, unit, iostat, iomsg)
-    if (ice%whichEVP /= 0) call write_bin_array(ice%uvice_aux, unit, iostat, iomsg)
-    call write_bin_array(ice%stress_atmice_xy, unit, iostat, iomsg)
-    call write_bin_array(ice%stress_iceoce_xy, unit, iostat, iomsg)
+    call write_bin_array(ice%uice, unit, iostat, iomsg)
+    call write_bin_array(ice%uice_rhs, unit, iostat, iomsg)
+    call write_bin_array(ice%uice_old, unit, iostat, iomsg)
+    if (ice%whichEVP /= 0) call write_bin_array(ice%uice_aux, unit, iostat, iomsg)
+    call write_bin_array(ice%vice, unit, iostat, iomsg)
+    call write_bin_array(ice%vice_rhs, unit, iostat, iomsg)
+    call write_bin_array(ice%vice_old, unit, iostat, iomsg)
+    if (ice%whichEVP /= 0) call write_bin_array(ice%vice_aux, unit, iostat, iomsg)
+    call write_bin_array(ice%stress_atmice_x, unit, iostat, iomsg)
+    call write_bin_array(ice%stress_iceoce_x, unit, iostat, iomsg)
+    call write_bin_array(ice%stress_atmice_y, unit, iostat, iomsg)
+    call write_bin_array(ice%stress_iceoce_y, unit, iostat, iomsg)
 !     call write_bin_array(ice%srfoce_uv, unit, iostat, iomsg)
     call write_bin_array(ice%srfoce_u, unit, iostat, iomsg)
     call write_bin_array(ice%srfoce_v, unit, iostat, iomsg)
@@ -388,12 +396,18 @@ subroutine READ_T_ICE(ice, unit, iostat, iomsg)
     character(*),           intent(inout)  :: iomsg
     integer                                :: i
     !___________________________________________________________________________
-    call read_bin_array(ice%uvice, unit, iostat, iomsg)
-    call read_bin_array(ice%uvice_rhs, unit, iostat, iomsg)
-    call read_bin_array(ice%uvice_old, unit, iostat, iomsg)
-    if (ice%whichEVP /= 0) call read_bin_array(ice%uvice_aux, unit, iostat, iomsg)
-    call read_bin_array(ice%stress_atmice_xy, unit, iostat, iomsg)
-    call read_bin_array(ice%stress_iceoce_xy, unit, iostat, iomsg)
+    call read_bin_array(ice%uice, unit, iostat, iomsg)
+    call read_bin_array(ice%uice_rhs, unit, iostat, iomsg)
+    call read_bin_array(ice%uice_old, unit, iostat, iomsg)
+    if (ice%whichEVP /= 0) call read_bin_array(ice%uice_aux, unit, iostat, iomsg)
+    call read_bin_array(ice%vice, unit, iostat, iomsg)
+    call read_bin_array(ice%vice_rhs, unit, iostat, iomsg)
+    call read_bin_array(ice%vice_old, unit, iostat, iomsg)
+    if (ice%whichEVP /= 0) call read_bin_array(ice%vice_aux, unit, iostat, iomsg)
+    call read_bin_array(ice%stress_atmice_x, unit, iostat, iomsg)
+    call read_bin_array(ice%stress_iceoce_x, unit, iostat, iomsg)
+    call read_bin_array(ice%stress_atmice_y, unit, iostat, iomsg)
+    call read_bin_array(ice%stress_iceoce_y, unit, iostat, iomsg)
 !     call read_bin_array(ice%srfoce_uv, unit, iostat, iomsg)
     call read_bin_array(ice%srfoce_u, unit, iostat, iomsg)
     call read_bin_array(ice%srfoce_v, unit, iostat, iomsg)
@@ -535,30 +549,42 @@ subroutine ice_init(ice, partit, mesh)
     !___________________________________________________________________________
     ! allocate/initialise arrays in ice derived type
     ! initialise velocity and stress related arrays in ice derived type 
-    allocate(ice%uvice(             2, node_size))
-    allocate(ice%uvice_rhs(         2, node_size))
-    allocate(ice%uvice_old(         2, node_size))
-    allocate(ice%stress_atmice_xy(  2, node_size))
-    allocate(ice%stress_iceoce_xy(  2, node_size))
-    ice%uvice            = 0.0_WP
-    ice%uvice_rhs        = 0.0_WP
-    ice%uvice_old        = 0.0_WP
-    ice%stress_atmice_xy = 0.0_WP
-    ice%stress_iceoce_xy = 0.0_WP
+    allocate(ice%uice(                 node_size))
+    allocate(ice%uice_rhs(             node_size))
+    allocate(ice%uice_old(             node_size))
+    allocate(ice%vice(                 node_size))
+    allocate(ice%vice_rhs(             node_size))
+    allocate(ice%vice_old(             node_size))
+    allocate(ice%stress_atmice_x(      node_size))
+    allocate(ice%stress_iceoce_x(      node_size))
+    allocate(ice%stress_atmice_y(      node_size))
+    allocate(ice%stress_iceoce_y(      node_size))
+    ice%uice            = 0.0_WP
+    ice%uice_rhs        = 0.0_WP
+    ice%uice_old        = 0.0_WP
+    ice%stress_atmice_x = 0.0_WP
+    ice%stress_iceoce_x = 0.0_WP
     if (ice%whichEVP /= 0) then
-        allocate(ice%uvice_aux(     2, node_size))
-        ice%uvice_aux    = 0.0_WP
+        allocate(ice%uice_aux(         node_size))
+        ice%uice_aux    = 0.0_WP
+    end if 
+    ice%vice            = 0.0_WP
+    ice%vice_rhs        = 0.0_WP
+    ice%vice_old        = 0.0_WP
+    ice%stress_atmice_y = 0.0_WP
+    ice%stress_iceoce_y = 0.0_WP
+    if (ice%whichEVP /= 0) then
+        allocate(ice%vice_aux(         node_size))
+        ice%vice_aux    = 0.0_WP
     end if 
     
     !___________________________________________________________________________
     ! initialise surface ocean arrays in ice derived type 
-!     allocate(ice%srfoce_uv(         2, node_size))
     allocate(ice%srfoce_u(             node_size))
     allocate(ice%srfoce_v(             node_size))
     allocate(ice%srfoce_temp(          node_size))
     allocate(ice%srfoce_salt(          node_size))
     allocate(ice%srfoce_ssh(           node_size))
-!     ice%srfoce_uv        = 0.0_WP
     ice%srfoce_u         = 0.0_WP
     ice%srfoce_v         = 0.0_WP
     ice%srfoce_temp      = 0.0_WP
@@ -692,8 +718,10 @@ subroutine ice_init_toyocean_dummy(ice, partit, mesh)
     !___________________________________________________________________________
     ! allocate/initialise arrays in ice derived type
     ! initialise velocity and stress related arrays in ice derived type 
-    allocate(ice%uvice(             2, node_size))
-    ice%uvice               = 0.0_WP
+    allocate(ice%uice(                  node_size))
+    allocate(ice%vice(                  node_size))
+    ice%uice               = 0.0_WP
+    ice%vice               = 0.0_WP
     allocate(ice%data(ice%num_itracers))
     do n = 1, ice%num_itracers
         allocate(ice%data(n)%values(    node_size))

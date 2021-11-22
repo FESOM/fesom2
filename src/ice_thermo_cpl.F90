@@ -69,8 +69,8 @@ subroutine thermodynamics(ice, partit, mesh)
   eDim_nod2D =>partit%eDim_nod2D
   ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D
   geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => mesh%geo_coord_nod2D
-  u_ice      => ice%uvice(1,:)
-  v_ice      => ice%uvice(2,:)
+  u_ice      => ice%uice(:)
+  v_ice      => ice%vice(:)
   a_ice      => ice%data(1)%values(:)
   m_ice      => ice%data(2)%values(:)
   m_snow     => ice%data(3)%values(:)  
