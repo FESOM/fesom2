@@ -491,21 +491,25 @@ subroutine EVPdynamics(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:), pointer  :: u_ice_old, v_ice_old
     real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice, rhs_a, rhs_m
+    real(kind=WP), dimension(:), pointer  :: u_w, v_w, elevation
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    u_ice           => ice%uvice(1,:)
-    v_ice           => ice%uvice(2,:)
-    a_ice           => ice%data(1)%values(:)
-    m_ice           => ice%data(2)%values(:)
-    m_snow          => ice%data(3)%values(:)
-    u_ice_old       => ice%uvice_old(1,:)
-    v_ice_old       => ice%uvice_old(2,:)
-    u_rhs_ice       => ice%uvice_rhs(1,:)
-    v_rhs_ice       => ice%uvice_rhs(2,:)
-    rhs_a           => ice%data(1)%values_rhs(:)
-    rhs_m           => ice%data(2)%values_rhs(:)
+    u_ice        => ice%uvice(1,:)
+    v_ice        => ice%uvice(2,:)
+    a_ice        => ice%data(1)%values(:)
+    m_ice        => ice%data(2)%values(:)
+    m_snow       => ice%data(3)%values(:)
+    u_ice_old    => ice%uvice_old(1,:)
+    v_ice_old    => ice%uvice_old(2,:)
+    u_rhs_ice    => ice%uvice_rhs(1,:)
+    v_rhs_ice    => ice%uvice_rhs(2,:)
+    rhs_a        => ice%data(1)%values_rhs(:)
+    rhs_m        => ice%data(2)%values_rhs(:)
+    u_w          => ice%srfoce_uv(1,:)
+    v_w          => ice%srfoce_uv(2,:)
+    elevation    => ice%srfoce_ssh(:)
     
     !_______________________________________________________________________________
     ! If Icepack is used, always update the tracers

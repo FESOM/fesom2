@@ -214,6 +214,7 @@ subroutine ssh2rhs(ice, partit, mesh)
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: m_ice, m_snow
     real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m
+    real(kind=WP), dimension(:), pointer  :: elevation
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -222,6 +223,7 @@ subroutine ssh2rhs(ice, partit, mesh)
     m_snow       => ice%data(3)%values(:)
     rhs_a        => ice%data(1)%values_rhs(:)
     rhs_m        => ice%data(2)%values_rhs(:)
+    elevation    => ice%srfoce_ssh
     
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
@@ -413,7 +415,9 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:), pointer  :: eps11, eps12, eps22
     real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
-    real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice, rhs_a, rhs_m  
+    real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice, rhs_a, rhs_m
+    real(kind=WP), dimension(:), pointer  :: u_w, v_w
+    real(kind=WP), dimension(:), pointer  :: elevation
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -433,7 +437,9 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     v_rhs_ice    => ice%uvice_rhs(2,:)
     rhs_a        => ice%data(1)%values_rhs(:)
     rhs_m        => ice%data(2)%values_rhs(:)
-    
+    u_w          => ice%srfoce_uv(1,:)
+    v_w          => ice%srfoce_uv(2,:)
+    elevation    => ice%srfoce_ssh(:)
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
     vale=1.0_WP/(ellipse**2)
@@ -960,6 +966,7 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice
+    real(kind=WP), dimension(:), pointer  :: u_w, v_w
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -971,6 +978,8 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     m_snow       => ice%data(3)%values(:)
     u_rhs_ice    => ice%uvice_rhs(1,:)
     v_rhs_ice    => ice%uvice_rhs(2,:)
+    u_w          => ice%srfoce_uv(1,:)
+    v_w          => ice%srfoce_uv(2,:)
     
     !___________________________________________________________________________
     steps=evp_rheol_steps

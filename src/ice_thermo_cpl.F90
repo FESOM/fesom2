@@ -64,17 +64,23 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP), dimension(:)  , pointer :: u_ice, v_ice
   real(kind=WP), dimension(:)  , pointer :: a_ice, m_ice, m_snow
   real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn
+  real(kind=WP), dimension(:)  , pointer :: S_oc_array, T_oc_array, u_w, v_w
   myDim_nod2d=>partit%myDim_nod2D
   eDim_nod2D =>partit%eDim_nod2D
   ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D
   geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => mesh%geo_coord_nod2D
-  u_ice           => ice%uvice(1,:)
-  v_ice           => ice%uvice(2,:)
-  a_ice           => ice%data(1)%values(:)
-  m_ice           => ice%data(2)%values(:)
-  m_snow          => ice%data(3)%values(:)  
-  thdgr           => ice%thermo%thdgr
-  thdgrsn  => ice%thermo%thdgrsn
+  u_ice      => ice%uvice(1,:)
+  v_ice      => ice%uvice(2,:)
+  a_ice      => ice%data(1)%values(:)
+  m_ice      => ice%data(2)%values(:)
+  m_snow     => ice%data(3)%values(:)  
+  thdgr      => ice%thermo%thdgr
+  thdgrsn    => ice%thermo%thdgrsn
+  T_oc_array => ice%srfoce_temp(:)
+  S_oc_array => ice%srfoce_salt(:)
+  u_w        => ice%srfoce_uv(1,:)
+  v_w        => ice%srfoce_uv(2,:)
+  
   !_____________________________________________________________________________  
   rsss = ref_sss
 

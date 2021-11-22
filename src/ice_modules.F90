@@ -66,10 +66,10 @@ save
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_rhs_ice, V_rhs_ice
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_m, rhs_a, rhs_ms, ths_temp
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: ths_temp
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_w, V_w
+!   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_w, V_w
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: u_ice_aux, v_ice_aux  ! of the size of u_ice, v_ice
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_mdiv, rhs_adiv, rhs_msdiv
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: elevation
+!   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: elevation
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: sigma11, sigma12, sigma22
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: eps11, eps12, eps22
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: fresh_wa_flux
@@ -86,7 +86,7 @@ save
 #endif
 #endif /* (__oasis) || defined (__ifsinterface)*/
 
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: S_oc_array, T_oc_array
+!   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: S_oc_array, T_oc_array
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_iceoce_x         
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_iceoce_y
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmice_x         

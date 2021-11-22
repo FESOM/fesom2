@@ -128,14 +128,16 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   !character(500)                        :: file
   !_____________________________________________________________________________
   ! pointer on necessary derived types
-  real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
+  real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, u_w, v_w
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-  u_ice           => ice%uvice(1,:)
-  v_ice           => ice%uvice(2,:)
-
+  u_ice => ice%uvice(1,:)
+  v_ice => ice%uvice(2,:)
+  u_w   => ice%srfoce_uv(1,:)
+  v_w   => ice%srfoce_uv(2,:)
+  
   t1=MPI_Wtime()
 #ifdef __oasis
      if (firstcall) then
@@ -341,7 +343,7 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
      cd_atm_oce_arr=0.0_WP
      ch_atm_oce_arr=0.0_WP
      ce_atm_oce_arr=0.0_WP
-     call ncar_ocean_fluxes_mode(partit, mesh)
+     call ncar_ocean_fluxes_mode(ice, partit, mesh)
   elseif(AOMIP_drag_coeff) then
      cd_atm_oce_arr=cd_atm_ice_arr
   end if

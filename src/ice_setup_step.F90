@@ -192,21 +192,21 @@ e_size=myDim_elem2D+eDim_elem2D
 
 ! Allocate memory for arrays used in coupling 
 ! with ocean and atmosphere
- allocate(S_oc_array(n_size), T_oc_array(n_size))  ! copies of ocean T ans S
- S_oc_array = 0.0_WP
- T_oc_array = 0.0_WP
+!  allocate(S_oc_array(n_size), T_oc_array(n_size))  ! copies of ocean T ans S
+!  S_oc_array = 0.0_WP
+!  T_oc_array = 0.0_WP
  allocate(fresh_wa_flux(n_size), net_heat_flux(n_size))
  fresh_wa_flux = 0.0_WP
  net_heat_flux = 0.0_WP
  allocate(stress_atmice_x(n_size), stress_atmice_y(n_size))    
  stress_atmice_x = 0.0_WP
  stress_atmice_y = 0.0_WP
- allocate(elevation(n_size))           ! =ssh  of ocean        
- elevation = 0.0_WP
+!  allocate(elevation(n_size))           ! =ssh  of ocean        
+!  elevation = 0.0_WP
  allocate(stress_iceoce_x(n_size), stress_iceoce_y(n_size))    
  stress_iceoce_x = 0.0_WP
  stress_iceoce_y = 0.0_WP
- allocate(U_w(n_size), V_w(n_size))   ! =uf and vf of ocean at surface nodes
+!  allocate(U_w(n_size), V_w(n_size))   ! =uf and vf of ocean at surface nodes
 #if defined (__oasis) || defined (__ifsinterface)
   allocate(oce_heat_flux(n_size), ice_heat_flux(n_size))
   allocate(tmp_oce_heat_flux(n_size), tmp_ice_heat_flux(n_size))

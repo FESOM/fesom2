@@ -426,7 +426,6 @@ subroutine cavity_momentum_fluxes(dynamics, partit, mesh)
     USE MOD_DYN
     use o_PARAM , only: density_0, C_d, WP
     use o_ARRAYS, only: stress_surf, stress_node_surf
-    use i_ARRAYS, only: u_w, v_w  
     implicit none
     
     !___________________________________________________________________________

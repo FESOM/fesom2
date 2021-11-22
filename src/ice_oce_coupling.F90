@@ -1,18 +1,19 @@
 module ocean2ice_interface
-  interface
-    subroutine ocean2ice(dynamics, tracers, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use mod_tracer
-      use MOD_DYN
-      type(t_dyn)   , intent(in)   , target :: dynamics
-      type(t_tracer), intent(inout), target :: tracers
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      
-    end subroutine
-  end interface
+    interface
+        subroutine ocean2ice(ice, dynamics, tracers, partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_TRACER
+        USE MOD_DYN
+        USE MOD_ICE
+        type(t_ice)   , intent(in)   , target :: ice
+        type(t_dyn)   , intent(in)   , target :: dynamics
+        type(t_tracer), intent(inout), target :: tracers
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
 end module
 
 module oce_fluxes_interface
@@ -75,14 +76,16 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
     real(kind=WP)            :: aux, aux1
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, a_ice
+    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, a_ice, u_w, v_w
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    u_ice        => ice%uvice(1,:)
-    v_ice        => ice%uvice(2,:)
-    a_ice        => ice%data(1)%values(:)
+    u_ice  => ice%uvice(1,:)
+    v_ice  => ice%uvice(2,:)
+    a_ice  => ice%data(1)%values(:)
+    u_w    => ice%srfoce_uv(1,:)
+    v_w    => ice%srfoce_uv(2,:)
     
     ! ==================
     ! momentum flux:
@@ -137,7 +140,7 @@ end subroutine oce_fluxes_mom
 !
 !
 !_______________________________________________________________________________
-subroutine ocean2ice(dynamics, tracers, partit, mesh)
+subroutine ocean2ice(ice, dynamics, tracers, partit, mesh)
   
     ! transmits the relevant fields from the ocean to the ice model
 
@@ -145,12 +148,14 @@ subroutine ocean2ice(dynamics, tracers, partit, mesh)
     use i_ARRAYS
     use MOD_MESH
     use MOD_DYN
+    use MOD_ICE
     use MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE g_CONFIG
     use g_comm_auto
     implicit none
+    type(t_ice)   , intent(in)   , target :: ice
     type(t_dyn)   , intent(in)   , target :: dynamics
     type(t_tracer), intent(inout), target :: tracers
     type(t_partit), intent(inout), target :: partit
@@ -159,16 +164,21 @@ subroutine ocean2ice(dynamics, tracers, partit, mesh)
     real(kind=WP) :: uw, vw, vol
     real(kind=WP), dimension(:,:)  , pointer :: temp, salt
     real(kind=WP), dimension(:,:,:), pointer :: UV
+    real(kind=WP), dimension(:)    , pointer :: S_oc_array, T_oc_array, u_w, v_w, elevation
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    temp => tracers%data(1)%values(:,:)
-    salt => tracers%data(2)%values(:,:)
-    UV   => dynamics%uv(:,:,:)
-
+    temp       => tracers%data(1)%values(:,:)
+    salt       => tracers%data(2)%values(:,:)
+    UV         => dynamics%uv(:,:,:)
+    u_w        => ice%srfoce_uv(1,:)
+    v_w        => ice%srfoce_uv(2,:)
+    T_oc_array => ice%srfoce_temp(:)
+    S_oc_array => ice%srfoce_salt(:)
+    elevation  => ice%srfoce_ssh(:)
+    
     ! the arrays in the ice model are renamed
-        
     if (ice_update) then
         do n=1, myDim_nod2d+eDim_nod2d  
             if (ulevels_nod2D(n)>1) cycle 

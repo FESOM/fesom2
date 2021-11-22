@@ -3,6 +3,7 @@ MODULE gen_bulk
     use mod_mesh
     USE MOD_PARTIT
     USE MOD_PARSUP    
+    USE MOD_ICE
     use i_therm_param
     use i_arrays
     use g_forcing_arrays
@@ -19,7 +20,7 @@ MODULE gen_bulk
 !
 !
 !_______________________________________________________________________________    
-subroutine ncar_ocean_fluxes_mode_fesom14(partit, mesh)
+subroutine ncar_ocean_fluxes_mode_fesom14(ice, partit, mesh)
     ! Compute drag coefficient and the transfer coefficients for evaporation
     ! and sensible heat according to LY2004.
     ! In this routine we assume air temperature and humidity are at the same
@@ -47,9 +48,14 @@ subroutine ncar_ocean_fluxes_mode_fesom14(partit, mesh)
     real(kind=WP), parameter :: grav = 9.80_WP, vonkarm = 0.40_WP
     real(kind=WP), parameter :: q1=640380._WP, q2=-5107.4_WP    ! for saturated surface specific humidity
     real(kind=WP), parameter :: zz = 10.0_WP
-    type(t_mesh),   intent(in),    target :: mesh
-    type(t_partit), intent(inout), target :: partit
-    
+    type(t_mesh)  , intent(in)   , target  :: mesh
+    type(t_partit), intent(inout), target  :: partit
+    type(t_ice)   , intent(inout), target  :: ice
+    real(kind=WP), dimension(:)  , pointer :: T_oc_array, u_w, v_w
+    u_w        => ice%srfoce_uv(1,:)
+    v_w        => ice%srfoce_uv(2,:)
+    T_oc_array => ice%srfoce_temp(:)
+  
     do i=1, partit%myDim_nod2d+partit%eDim_nod2d       
         t=tair(i) + tmelt					      ! degree celcium to Kelvin
         ts=t_oc_array(i) + tmelt				      !
@@ -114,7 +120,7 @@ end subroutine ncar_ocean_fluxes_mode_fesom14
 !
 !
 !_______________________________________________________________________________
-subroutine ncar_ocean_fluxes_mode(partit, mesh)
+subroutine ncar_ocean_fluxes_mode(ice, partit, mesh)
     ! Compute drag coefficient and the transfer coefficients for evaporation
     ! and sensible heat according to LY2004.
     ! with updates from Large et al. 2009 for the computation of the wind drag 
@@ -153,8 +159,14 @@ subroutine ncar_ocean_fluxes_mode(partit, mesh)
     real(kind=WP) :: test, cd_prev, inc_ratio=1.0e-4 
     real(kind=WP) :: t_prev, q_prev
     
-    type(t_mesh),   intent(in),    target :: mesh
+    type(t_mesh)  , intent(in)   , target :: mesh
     type(t_partit), intent(inout), target :: partit
+    type(t_ice)   , intent(inout), target :: ice
+    real(kind=WP), dimension(:)  , pointer :: T_oc_array, u_w, v_w
+    u_w        => ice%srfoce_uv(1,:)
+    v_w        => ice%srfoce_uv(2,:)
+    T_oc_array => ice%srfoce_temp(:)
+    
 
     do i=1,partit%myDim_nod2d+partit%eDim_nod2d   
         if (mesh%ulevels_nod2d(i)>1) cycle
@@ -342,13 +354,14 @@ subroutine cal_wind_drag_coeff(partit)
 
 end subroutine cal_wind_drag_coeff
 !
-SUBROUTINE nemo_ocean_fluxes_mode(partit)
+SUBROUTINE nemo_ocean_fluxes_mode(ice, partit)
 !!----------------------------------------------------------------------
 !! ** Purpose : Change model variables according to atm fluxes
 !! source of original code: NEMO 3.1.1 + NCAR
 !!----------------------------------------------------------------------
    IMPLICIT NONE
-   type(t_partit), intent(in) :: partit
+   type(t_partit), intent(inout), target :: partit
+   type(t_ice),    intent(inout), target :: ice
    integer             :: i
    real(wp)            :: rtmp    ! temporal real
    real(wp)            :: wndm    ! delta of wind module and ocean curent module
@@ -367,6 +380,11 @@ SUBROUTINE nemo_ocean_fluxes_mode(partit)
       t_zu,     &     ! air temp. shifted at zu                     [K]
       q_zu            ! spec. hum.  shifted at zu               [kg/kg]
    real(wp)           :: zevap, zqsb, zqla, zqlw
+   real(kind=WP), dimension(:)  , pointer :: u_w, v_w, t_oc_array
+   u_w        => ice%srfoce_uv(1,:)
+   v_w        => ice%srfoce_uv(2,:)
+   t_oc_array => ice%srfoce_temp(:)
+   
 !!$OMP PARALLEL
 !!$OMP DO
    do i = 1, partit%myDim_nod2D+partit%eDim_nod2d

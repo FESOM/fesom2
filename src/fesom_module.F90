@@ -344,7 +344,7 @@ contains
         if(use_ice) then
             !___compute fluxes from ocean to ice________________________________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ocean2ice(n)'//achar(27)//'[0m'
-            call ocean2ice(f%dynamics, f%tracers, f%partit, f%mesh)
+            call ocean2ice(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
             
             !___compute update of atmospheric forcing____________________________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call update_atm_forcing(n)'//achar(27)//'[0m'
