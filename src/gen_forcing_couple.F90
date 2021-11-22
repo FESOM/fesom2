@@ -320,7 +320,9 @@ subroutine update_atm_forcing(istep, tracers, partit, mesh)
             Tair(i)     = 0.0_WP
             prec_rain(i)= 0.0_WP
             prec_snow(i)= 0.0_WP
-            press_air(i)= 0.0_WP 
+            if (l_mslp) then
+               press_air(i)= 0.0_WP 
+            end if
             runoff(i)   = 0.0_WP
         end if
     end do
