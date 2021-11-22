@@ -293,18 +293,23 @@ subroutine update_atm_forcing(istep, tracers, partit, mesh)
 #else
 #ifndef __ifsinterface
   call sbc_do(partit, mesh)
-  u_wind    = atmdata(i_xwind,:)
-  v_wind    = atmdata(i_ywind,:)
-  shum      = atmdata(i_humi ,:)
-  longwave  = atmdata(i_qlw  ,:)
-  shortwave = atmdata(i_qsr  ,:)
-  Tair      = atmdata(i_tair ,:)-273.15_WP
-  prec_rain = atmdata(i_prec ,:)/1000._WP
-  prec_snow = atmdata(i_snow ,:)/1000._WP
-  press_air = atmdata(i_mslp ,:) ! unit should be Pa
+!$OMP PARALLEL DO
+  DO n=1, myDim_nod2D+eDim_nod2D
+     u_wind    = atmdata(i_xwind,n)
+     v_wind    = atmdata(i_ywind,n)
+     shum      = atmdata(i_humi ,n)
+     longwave  = atmdata(i_qlw  ,n)
+     shortwave = atmdata(i_qsr  ,n)
+     Tair      = atmdata(i_tair ,n)-273.15_WP
+     prec_rain = atmdata(i_prec ,n)/1000._WP
+     prec_snow = atmdata(i_snow ,n)/1000._WP
+     press_air = atmdata(i_mslp ,n) ! unit should be Pa
+  END DO
+!$OMP END PARALLEL DO
 #endif  
   
   if (use_cavity) then 
+!$OMP PARALLEL DO
     do i=1,myDim_nod2d+eDim_nod2d
         if (ulevels_nod2d(i)>1) then
             u_wind(i)   = 0.0_WP
@@ -316,8 +321,9 @@ subroutine update_atm_forcing(istep, tracers, partit, mesh)
             prec_snow(i)= 0.0_WP
             press_air(i)= 0.0_WP 
             runoff(i)   = 0.0_WP
-        end if 
+        end if
     end do
+!$OMP END PARALLEL DO
   endif 
 
   ! second, compute exchange coefficients
@@ -327,14 +333,15 @@ subroutine update_atm_forcing(istep, tracers, partit, mesh)
   end if
   ! 2) drag coeff. and heat exchange coeff. over ocean in case using ncar formulae
   if(ncar_bulk_formulae) then
-     cd_atm_oce_arr=0.0_WP
-     ch_atm_oce_arr=0.0_WP
-     ce_atm_oce_arr=0.0_WP
+!     cd_atm_oce_arr=0.0_WP
+!     ch_atm_oce_arr=0.0_WP
+!     ce_atm_oce_arr=0.0_WP
      call ncar_ocean_fluxes_mode(partit, mesh)
   elseif(AOMIP_drag_coeff) then
      cd_atm_oce_arr=cd_atm_ice_arr
   end if
   ! third, compute wind stress
+!$OMP PARALLEL DO
   do i=1,myDim_nod2d+eDim_nod2d   
      !__________________________________________________________________________
      if (ulevels_nod2d(i)>1) then
@@ -359,7 +366,7 @@ subroutine update_atm_forcing(istep, tracers, partit, mesh)
      stress_atmice_x(i) = Cd_atm_ice_arr(i)*aux*dux
      stress_atmice_y(i) = Cd_atm_ice_arr(i)*aux*dvy
   end do
-
+!$OMP END PARALLEL DO
   ! heat and fresh water fluxes are treated in i_therm and ice2ocean
 #endif /* (__oasis) */
 

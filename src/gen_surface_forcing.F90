@@ -556,6 +556,7 @@ CONTAINS
       do fld_idx = 1, i_totfl
          flf=>sbc_flfi(fld_idx)
          ! prepare nearest coordinates in INfile , save to bilin_indx_i/j
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i, x, y)
          do i = 1, myDim_nod2D+eDim_nod2D
             x  = geo_coord_nod2D(1,i)/rad
             if (x < 0) x=x+360._WP
@@ -588,6 +589,7 @@ CONTAINS
                end if
             end if
          end do
+!$OMP END PARALLEL DO
       end do
       lfirst=.false.
       end if
@@ -793,8 +795,7 @@ CONTAINS
 !      end if
       ! bilinear space interpolation, and time interpolation ,
       ! data is assumed to be sampled on a regular grid
-!!$OMP PARALLEL
-!!$OMP DO
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ii, i, j, ip1, jp1, x, y, extrp, x1, x2, y1, y2, denom, data1, data2)
       do ii = 1, myDim_nod2D+eDim_nod2D
          i = bilin_indx_i(fld_idx, ii)
          j = bilin_indx_j(fld_idx, ii)
@@ -851,9 +852,8 @@ CONTAINS
          coef_a(fld_idx, ii) = ( data2 - data1 ) / delta_t !( nc_time(t_indx+1) - nc_time(t_indx) )
          coef_b(fld_idx, ii) = data1 - coef_a(fld_idx, ii) * nc_time(t_indx)
 
-      end do !ii
-!!$OMP END DO
-!!$OMP END PARALLEL
+      end do
+!$OMP END PARALLEL DO
    END SUBROUTINE getcoeffld
 
    SUBROUTINE data_timeinterp(rdate, partit)
@@ -871,16 +871,14 @@ CONTAINS
      ! assign data from interpolation to taux and tauy
       integer            :: fld_idx, i,j,ii
 
-!!$OMP PARALLEL
-!!$OMP DO
       do fld_idx = 1, i_totfl
+!$OMP PARALLEL DO
          do i = 1, partit%myDim_nod2D+partit%eDim_nod2D
             ! store processed forcing data for fesom computation
             atmdata(fld_idx,i) = rdate * coef_a(fld_idx,i) + coef_b(fld_idx,i)
          end do !nod2D
-      end do !fld_idx
-!!$OMP END DO
-!!$OMP END PARALLEL
+!$OMP END PARALLEL DO
+      end do
    END SUBROUTINE data_timeinterp
 
    SUBROUTINE sbc_ini(partit, mesh)
@@ -1110,10 +1108,12 @@ CONTAINS
       end do
 
       if (do_rotation) then
+!$OMP PARALLEL DO
          do i=1, myDim_nod2D+eDim_nod2D
             call vector_g2r(coef_a(i_xwind,i), coef_a(i_ywind,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
             call vector_g2r(coef_b(i_xwind,i), coef_b(i_ywind,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
          end do
+!$OMP END PARALLEL DO
       end if
       
       !==========================================================================
