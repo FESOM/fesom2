@@ -260,7 +260,9 @@ subroutine update_atm_forcing(istep, mesh)
   Tair      = atmdata(i_tair ,:)-273.15_WP
   prec_rain = atmdata(i_prec ,:)/1000._WP
   prec_snow = atmdata(i_snow ,:)/1000._WP
-  press_air = atmdata(i_mslp ,:) ! unit should be Pa
+  if (l_mslp) then
+     press_air = atmdata(i_mslp ,:) ! unit should be Pa
+  end if
   
   
   if (use_cavity) then 
@@ -273,7 +275,9 @@ subroutine update_atm_forcing(istep, mesh)
             Tair(i)     = 0.0_WP
             prec_rain(i)= 0.0_WP
             prec_snow(i)= 0.0_WP
-            press_air(i)= 0.0_WP 
+            if (l_mslp) then
+               press_air(i)= 0.0_WP 
+            end if
             runoff(i)   = 0.0_WP
         end if 
     end do
