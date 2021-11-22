@@ -49,7 +49,10 @@ subroutine ncar_ocean_fluxes_mode_fesom14(partit, mesh)
     real(kind=WP), parameter :: zz = 10.0_WP
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
-    
+
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, m, cd_n10, ce_n10, ch_n10, cd_n10_rt, cd, ce, ch, cd_rt, zeta, x2, x, psi_m, psi_h, stab, &
+!$OMP                                                               t, ts, q, qs, u, u10, tv, xx, dux, dvy, tstar, qstar, ustar, bstar )
+!$OMP DO
     do i=1, partit%myDim_nod2d+partit%eDim_nod2d       
         t=tair(i) + tmelt					      ! degree celcium to Kelvin
         ts=t_oc_array(i) + tmelt				      !
@@ -104,12 +107,12 @@ subroutine ncar_ocean_fluxes_mode_fesom14(partit, mesh)
             ch = ch_n10/(1.0_WP+ch_n10*xx/cd_n10_rt)*sqrt(cd/cd_n10)     ! 10b (corrected code aug2007)
             ce = ce_n10/(1.0_WP+ce_n10*xx/cd_n10_rt)*sqrt(cd/cd_n10)     ! 10c (corrected code aug2007)
         end do
-        
         cd_atm_oce_arr(i)=cd
         ch_atm_oce_arr(i)=ch
         ce_atm_oce_arr(i)=ce 
     end do
-
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine ncar_ocean_fluxes_mode_fesom14
 !
 !
@@ -156,6 +159,11 @@ subroutine ncar_ocean_fluxes_mode(partit, mesh)
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
 
+
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, m, cd_n10, ce_n10, ch_n10, cd_n10_rt, hl1, cd, ce, ch, cd_rt, x2, x, stab, &
+!$OMP                                    zeta_u, zeta_t, zeta_q, psi_m_u, psi_h_u, psi_m_t, psi_h_t, psi_m_q, psi_h_q, &
+!$OMP                                                                 ts, qs, tv, xx, dux, dvy, t, t10, q, q10, u, u10 )
+!$OMP DO
     do i=1,partit%myDim_nod2d+partit%eDim_nod2d   
         if (mesh%ulevels_nod2d(i)>1) cycle
         ! degree celcium to Kelvin
@@ -264,7 +272,6 @@ subroutine ncar_ocean_fluxes_mode(partit, mesh)
             !___________________________________________________________________
             ! (3a) shift wind speed to 10m and neutral stability
             u10 = u/(1.0_WP+cd_n10_rt*(log(ncar_bulk_z_wind/10._WP)-psi_m_u)/vonkarm) ! L-Y eqn. 9a !why cd_n10_rt not cd_rt
-!!PS             u10 = u/(1.0_WP+cd_rt*(log(ncar_bulk_z_wind/10._WP)-psi_m_u)/vonkarm) ! L-Y eqn. 9a !why cd_n10_rt not cd_rt
             u10 = max(u10, u10min)             ! 0.3 [m/s] floor on wind
             ! (3b) shift temperature and humidity to wind height
             t10 = t - tstar/vonkarm*(log(ncar_bulk_z_tair/ncar_bulk_z_wind)+psi_h_u-psi_h_t)! L-Y eqn. 9b
@@ -315,7 +322,8 @@ subroutine ncar_ocean_fluxes_mode(partit, mesh)
         ch_atm_oce_arr(i)=ch
         ce_atm_oce_arr(i)=ce     
     end do
-
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine ncar_ocean_fluxes_mode
 !
 !---------------------------------------------------------------------------------------------------
@@ -335,11 +343,12 @@ subroutine cal_wind_drag_coeff(partit)
   real(kind=WP)              :: ws
   type(t_partit), intent(in) :: partit
 
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i, ws)
   do i=1,partit%myDim_nod2d+partit%eDim_nod2d    
      ws=sqrt(u_wind(i)**2+v_wind(i)**2)
      cd_atm_ice_arr(i)=(1.1_WP+0.04_WP*ws)*1.0e-3_WP
   end do
-
+!$OMP END PARALLEL DO
 end subroutine cal_wind_drag_coeff
 !
 SUBROUTINE nemo_ocean_fluxes_mode(partit)
@@ -366,9 +375,8 @@ SUBROUTINE nemo_ocean_fluxes_mode(partit)
       Ce,       &     ! transfert coefficient for evaporation   (Q_lat)
       t_zu,     &     ! air temp. shifted at zu                     [K]
       q_zu            ! spec. hum.  shifted at zu               [kg/kg]
-   real(wp)           :: zevap, zqsb, zqla, zqlw
-!!$OMP PARALLEL
-!!$OMP DO
+
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i, wdx, wdy, wndm, zst, q_sat, Cd, Ch, Ce, t_zu, q_zu)
    do i = 1, partit%myDim_nod2D+partit%eDim_nod2d
       wdx  = atmdata(i_xwind,i) - u_w(i) ! wind from data - ocean current ( x direction)
       wdy  = atmdata(i_ywind,i) - v_w(i) ! wind from data - ocean current ( y direction)
@@ -383,8 +391,7 @@ SUBROUTINE nemo_ocean_fluxes_mode(partit)
      ch_atm_oce_arr(i)=Ch
      ce_atm_oce_arr(i)=Ce
    end do
-!!$OMP END DO
-!!$OMP END PARALLEL
+!$OMP END PARALLEL DO
 END SUBROUTINE nemo_ocean_fluxes_mode
 
 !-------------------------------------------------------------------------------

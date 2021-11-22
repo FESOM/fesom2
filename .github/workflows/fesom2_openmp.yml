@@ -1,0 +1,49 @@
+
+name: FESOM2 OpenMP test
+
+# Controls when the action will run. Triggers the workflow on push or pull request. 
+
+on: [push, pull_request]
+
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  openmp_test:
+    # Containers must run in Linux based operating systems
+    runs-on: ubuntu-latest
+    # Docker Hub image that `container-job` executes in
+    container: koldunovn/fesom2_test:refactoring2
+
+    # Service containers to run with `gfortran_ubuntu`
+    steps:
+    # NK: this changes working directory to fesom2
+    - uses: actions/checkout@v2
+
+    - name: switch OpenMP ON
+      run: |
+        cd ./src/
+        sed -i 's/with OpenMP\" OFF/with OpenMP\" ON/g' CMakeLists.txt
+        cd ../
+
+    - name: Compile model
+      run: |
+        bash -l configure.sh ubuntu
+    
+    - name: Create global test run with 4 OpenMP threads
+      run: |
+        mkrun pi test_pi -m docker
+        cd work_pi
+        sed -i 's/THREADS=1/THREADS=4/g' job_docker_new
+        cd ../
+
+    - name: FESOM2 global test run
+      run: |    
+        cd work_pi
+        chmod +x job_docker_new
+        ./job_docker_new
+  
+
+    
+        
+    
+

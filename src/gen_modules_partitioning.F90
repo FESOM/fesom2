@@ -48,14 +48,14 @@ subroutine par_init(partit)    ! initializes MPI
   integer                               :: provided_mpi_thread_support_level
   character(:), allocatable             :: provided_mpi_thread_support_level_name
 
-#ifndef __oasis
-  call MPI_Comm_Size(MPI_COMM_WORLD,partit%npes,i)
-  call MPI_Comm_Rank(MPI_COMM_WORLD,partit%mype,i)
-  partit%MPI_COMM_FESOM=MPI_COMM_WORLD
+#if defined __oasis || defined  __ifsinterface
+  ! use comm from coupler or ifs
 #else
-  call MPI_Comm_Size(MPI_COMM_FESOM,partit%npes,i)
-  call MPI_Comm_Rank(MPI_COMM_FESOM,partit%mype,i)
+  partit%MPI_COMM_FESOM=MPI_COMM_WORLD ! use global comm if not coupled (e.g. no __oasis or __ifsinterface)
 #endif  
+  call MPI_Comm_Size(partit%MPI_COMM_FESOM,partit%npes,i)
+  call MPI_Comm_Rank(partit%MPI_COMM_FESOM,partit%mype,i)
+ 
 
   if(partit%mype==0) then
     call MPI_Query_thread(provided_mpi_thread_support_level, i)
@@ -72,7 +72,10 @@ subroutine par_init(partit)    ! initializes MPI
     end if
     write(*,*) 'MPI has been initialized, provided MPI thread support level: ', &
          provided_mpi_thread_support_level_name,provided_mpi_thread_support_level
-    write(*, *) 'Running on ', partit%npes, ' PEs'
+    write(*, *) 'Running on                   ', partit%npes, ' PEs'
+#if defined(_OPENMP)
+    write(*, *) 'This is MPI/OpenMP run, with ', OMP_GET_MAX_THREADS(), ' threads per PE'
+#endif
   end if
 end subroutine par_init
 !=================================================================
@@ -508,8 +511,8 @@ subroutine init_gatherLists(partit)
   endif
 !$OMP MASTER
 #if defined(_OPENMP)
-    allocate(partit%plock(partit%myDim_nod2D+partit%eDim_nod2D))
-    do n=1, myDim_nod2D+partit%eDim_nod2D
+    allocate(partit%plock(myDim_elem2D+eDim_elem2D)) !allocate with maximum dimention (nELEM> nNODE) 
+    do n=1, myDim_elem2D+eDim_elem2D
 !experiments showd that OPENMP5 implementation of the lock (201811) is >10% more efficient
 !make sure you use OPENMP v. 5.0
 #if _OPENMP >= 201811

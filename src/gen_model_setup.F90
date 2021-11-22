@@ -14,22 +14,23 @@ subroutine setup_model(partit)
   implicit none
   type(t_partit), intent(inout), target :: partit
   character(len=MAX_PATH)               :: nmlfile
+  integer fileunit
 
   namelist /clockinit/ timenew, daynew, yearnew
 
   nmlfile ='namelist.config'    ! name of general configuration namelist file
-  open (20,file=nmlfile)
-  read (20,NML=modelname)
-  read (20,NML=timestep)
-  read (20,NML=clockinit) 
-  read (20,NML=paths)
-  read (20,NML=restart_log)
-  read (20,NML=ale_def)
-  read (20,NML=geometry)
-  read (20,NML=calendar)
-  read (20,NML=run_config)
-!!$  read (20,NML=machine)
-  close (20)
+  open (newunit=fileunit, file=nmlfile)
+  read (fileunit, NML=modelname)
+  read (fileunit, NML=timestep)
+  read (fileunit, NML=clockinit) 
+  read (fileunit, NML=paths)
+  read (fileunit, NML=restart_log)
+  read (fileunit, NML=ale_def)
+  read (fileunit, NML=geometry)
+  read (fileunit, NML=calendar)
+  read (fileunit, NML=run_config)
+!!$  read (fileunit, NML=machine)
+  close (fileunit)
   ! ==========
   ! compute dt
   ! ========== 
@@ -46,34 +47,34 @@ subroutine setup_model(partit)
 ! =================================
  
   nmlfile ='namelist.oce'    ! name of ocean namelist file
-  open (20,file=nmlfile)
-  read (20,NML=oce_dyn)
-  close (20)
+  open (newunit=fileunit, file=nmlfile)
+  read (fileunit, NML=oce_dyn)
+  close (fileunit)
 
   nmlfile ='namelist.tra'    ! name of ocean namelist file
-  open (20,file=nmlfile)
-  read (20,NML=tracer_phys)
-  close (20)
+  open (newunit=fileunit, file=nmlfile)
+  read (fileunit, NML=tracer_phys)
+  close (fileunit)
 
   nmlfile ='namelist.forcing'    ! name of forcing namelist file
-  open (20,file=nmlfile)
-  read (20,NML=forcing_exchange_coeff)
-  read (20,NML=forcing_bulk)
-  read (20,NML=land_ice)
-  close (20)
+  open (newunit=fileunit, file=nmlfile)
+  read (fileunit, NML=forcing_exchange_coeff)
+  read (fileunit, NML=forcing_bulk)
+  read (fileunit, NML=land_ice)
+  close (fileunit)
 
   if(use_ice) then
   nmlfile ='namelist.ice'    ! name of ice namelist file
-  open (20,file=nmlfile)
-  read (20,NML=ice_dyn)
-  read (20,NML=ice_therm)
-  close (20)
+  open (newunit=fileunit, file=nmlfile)
+  read (fileunit, NML=ice_dyn)
+  read (fileunit, NML=ice_therm)
+  close (fileunit)
   endif
   
   nmlfile ='namelist.io'    ! name of forcing namelist file
-  open (20,file=nmlfile)
-  read (20,NML=diag_list)
-  close (20)
+  open (newunit=fileunit, file=nmlfile)
+  read (fileunit, NML=diag_list)
+  close (fileunit)
 
   if(partit%mype==0) write(*,*) 'Namelist files are read in'
   

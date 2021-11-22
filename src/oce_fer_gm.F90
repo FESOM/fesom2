@@ -61,6 +61,8 @@ subroutine fer_solve_Gamma(partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmax, nzmin, zinv1,zinv2, zinv, m, r, a, b, c, cp, tp, tr, zbar_n, Z_n)
+!$OMP DO
     DO n=1,myDim_nod2D
         tr=>fer_gamma(:,:,n)
 !       !_____________________________________________________________________
@@ -154,8 +156,10 @@ subroutine fer_solve_Gamma(partit, mesh)
             tr(:,nz) = tp(:,nz)-cp(nz)*tr(:,nz+1)
         end do
     END DO   !!! cycle over nodes
-    
+!$OMP END DO
+!$OMP END PARALLEL
     call exchange_nod(fer_gamma, partit)
+!$OMP BARRIER
 END subroutine fer_solve_Gamma
 !
 !
@@ -186,7 +190,8 @@ subroutine fer_gamma2vel(dynamics, partit, mesh)
 #include "associate_mesh_ass.h"
     fer_UV    =>dynamics%fer_uv(:,:,:)
     fer_Wvel  =>dynamics%fer_w(:,:)
-        
+
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnod, nz, nzmin, nzmax, zinv)
     DO el=1, myDim_elem2D
         elnod=elem2D_nodes(:,el)
         ! max. number of levels at element el
@@ -199,7 +204,9 @@ subroutine fer_gamma2vel(dynamics, partit, mesh)
             fer_uv(2,nz,el)=sum(fer_gamma(2,nz,elnod)-fer_gamma(2,nz+1,elnod))*zinv
         END DO
     END DO
+!$OMP END PARALLEL DO
     call exchange_elem(fer_uv, partit)
+!$OMP BARRIER
 end subroutine fer_gamma2vel
 !
 !
@@ -230,6 +237,8 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
 
     ! fill arrays for 3D Redi and GM coefficients: F1(xy)*F2(z)
     !******************************* F1(x,y) ***********************************
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmax, nzmin, reso, c1, rosb, scaling, rr_ratio, aux_zz, zscaling, bvref)
+!$OMP DO
     do n=1, myDim_nod2D
         nzmax=minval(nlevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
         nzmin=maxval(ulevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
@@ -297,18 +306,22 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
             Ki(nzmin,n)=K_hor*(reso/100000.0_WP)**2
         end if
     end do
- 
+!$OMP END DO
+
     !Like in FESOM 1.4 we make Redi equal GM
     if (Redi .and. Fer_GM) then
-        !!PS Ki(1,:)=fer_k(1,:)
-        Ki(nzmin,:)=fer_k(nzmin,:)
+!$OMP DO
+        do n=1, myDim_nod2D
+           Ki(nzmin, n)=fer_k(nzmin, n)
+        end do
+!$OMP END DO
     end if
    
 !******************************* F2(z) (e.g. Ferreira et al., 2005) *********************************
 !Ferreira, D., Marshall, J. and Heimbach, P.: Estimating Eddy Stresses by Fitting Dynamics to Observations Using a
 !Residual-Mean Ocean Circulation Model and Its Adjoint, Journal of Physical Oceanography, 35(10), 1891–
 !1910, doi:10.1175/jpo2785.1, 2005.
-
+!$OMP DO
     do n=1,myDim_nod2D
         nzmax=nlevels_nod2D(n)
         nzmin=ulevels_nod2D(n)
@@ -387,9 +400,11 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
             Ki(nzmin,n)=Ki(nzmin,n)*0.5_WP*(zscaling(nzmin)+zscaling(nzmin+1))
         end if
    end do
-
+!$OMP END DO
+!$OMP END PARALLEL
    if (Fer_GM) call exchange_nod(fer_c, partit)
    if (Fer_GM) call exchange_nod(fer_k, partit)
    if (Redi)   call exchange_nod(Ki, partit)
+!$OMP BARRIER
 end subroutine init_Redi_GM
 !====================================================================

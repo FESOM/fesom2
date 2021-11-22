@@ -29,8 +29,16 @@ subroutine cal_shortwave_rad(partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-  sw_3d=0.0_WP
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(m, n2, n3, k, nzmax, nzmin, swsurf, aux, c, c2, c3, c4, c5, v1, v2, sc1, sc2)
+!$OMP DO
+  do n2=1, myDim_nod2D+eDim_nod2D 
+     do k=1, nl
+        sw_3d(k, n2)=0.0_WP
+     end do
+  end do
+!$OMP END DO
   !_____________________________________________________________________________
+!$OMP DO
   do n2=1, myDim_nod2D+eDim_nod2D   
      
      !__________________________________________________________________________
@@ -63,15 +71,12 @@ subroutine cal_shortwave_rad(partit, mesh)
      v1=0.321_WP+v1
      sc1=1.54_WP-0.197_WP*c+0.166_WP*c2-0.252_WP*c3-0.055_WP*c4+0.042_WP*c5
      sc2=7.925_WP-6.644_WP*c+3.662_WP*c2-1.815_WP*c3-0.218_WP*c4+0.502_WP*c5
-
      ! convert from heat flux [W/m2] to temperature flux [K m/s]
      swsurf=swsurf/vcpw
      ! vis. sw. rad. in the colume
      nzmax=(nlevels_nod2D(n2))
      nzmin=(ulevels_nod2D(n2))
-     !!PS sw_3d(1, n2)=swsurf
      sw_3d(nzmin, n2)=swsurf
-     !!PS do k=2, nzmax
      do k=nzmin+1, nzmax
         aux=(v1*exp(zbar_3d_n(k,n2)/sc1)+v2*exp(zbar_3d_n(k,n2)/sc2))
         sw_3d(k, n2)=swsurf*aux
@@ -95,6 +100,6 @@ subroutine cal_shortwave_rad(partit, mesh)
 !end if
 
   end do
-!call par_ex
-!stop
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine cal_shortwave_rad

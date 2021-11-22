@@ -11,7 +11,7 @@ module g_support
   implicit none
 
   private
-  public :: smooth_nod, smooth_elem, integrate_nod, extrap_nod
+  public :: smooth_nod, smooth_elem, integrate_nod, extrap_nod, omp_min_max_sum1, omp_min_max_sum2
   real(kind=WP), dimension(:), allocatable  :: work_array
 !
 !--------------------------------------------------------------------------------------------
@@ -60,6 +60,7 @@ subroutine smooth_nod2D(arr, N, partit, mesh)
 
   allocate(work_array(myDim_nod2D))
   DO q=1, N !apply mass matrix N times to smooth the field
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, elem, j, q, elnodes, vol)
      DO node=1, myDim_nod2D
         vol=0._WP
         work_array(node)=0._WP
@@ -68,13 +69,20 @@ subroutine smooth_nod2D(arr, N, partit, mesh)
            elnodes=elem2D_nodes(:,elem)
            work_array(node)=work_array(node)+sum(arr(elnodes))/3._WP*elem_area(elem)
            vol=vol+elem_area(elem)
-       END DO
-       work_array(node)=work_array(node)/vol
+        END DO
+        work_array(node)=work_array(node)/vol
     END DO
+!$OMP END PARALLEL DO
+
+!$OMP PARALLEL DO
     DO node=1,myDim_nod2D
        arr(node)=work_array(node)
     ENDDO
+!$OMP END PARALLEL DO
+!$OMP MASTER
     call exchange_nod(arr, partit)
+!$OMP END MASTER
+!$OMP BARRIER
   END DO
   deallocate(work_array)
 end subroutine smooth_nod2D
@@ -104,20 +112,17 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
   
 ! Precompute area of patches on all levels (at the bottom, some neighbouring
 ! nodes may vanish in the bathymetry) in the first smoothing step
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, el, nz, j, q, num_el, nlev, nl_loc, nu_loc, uln, nln, ule, nle)
+!$OMP DO
   DO n=1, myDim_nod2D
      uln = ulevels_nod2d(n)
      nln = min(nlev,nlevels_nod2d(n))
      vol(       1:nln,n) = 0._WP
      work_array(1:nln,n) = 0._WP
-     !!PS vol(       1:min(nlev, nlevels_nod2d(n)),n) = 0._WP
-     !!PS work_array(1:min(nlev, nlevels_nod2d(n)),n) = 0._WP
      DO j=1, nod_in_elem2D_num(n)
         el = nod_in_elem2D(j,n)
-!!PS         nl_loc = min(nlev, minval(nlevels_nod2d(elem2D_nodes(1:3,el))))
-!!PS         nu_loc = maxval(ulevels_nod2D(elem2D_nodes(1:3,el)))
         ule = max( uln, ulevels(el) )
         nle = min( nln, min(nlev,nlevels(el)) )
-        !!PS DO nz=1, nl_loc
         DO nz=ule, nle
            vol(nz,n) = vol(nz,n) + elem_area(el)
            work_array(nz,n) = work_array(nz,n) + elem_area(el) * (arr(nz, elem2D_nodes(1,el)) &
@@ -125,46 +130,34 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
                                                                 + arr(nz, elem2D_nodes(3,el)))
         END DO
      ENDDO
-     !!PS DO nz=1,nlevels_nod2d(n)
      DO nz=uln,nln
         vol(nz,n) = 1._WP / (3._WP * vol(nz,n))  ! Here, we need the inverse and scale by 1/3
      END DO
   END DO
-
+!$OMP END DO
   ! combined: scale by patch volume + copy back to original field
+!$OMP DO
   DO n=1, myDim_nod2D
-     !!PS DO nz=1, min(nlev, nlevels_nod2d(n))
      uln = ulevels_nod2d(n)
      nln = min(nlev,nlevels_nod2d(n))
      DO nz=uln,nln
         arr(nz, n) = work_array(nz, n) *vol(nz,n) 
-!!PS         if (arr(nz,n)/=arr(nz,n)) then
-!!PS             write(*,*) ' --> found NaN in smoothing'
-!!PS             write(*,*) ' mype = ', mype
-!!PS             write(*,*) ' n    = ', n
-!!PS             write(*,*) ' nz,uln,nln      = ', nz,uln,nln
-!!PS             write(*,*) ' arr(nz,n)       = ', arr(nz,n)
-!!PS             write(*,*) ' work_array(nz,n)= ', work_array(nz,n)
-!!PS             write(*,*) ' vol(nz,n)       = ', vol(nz,n)
-!!PS         endif 
      END DO
-  end DO
-  
+  END DO
+!$OMP END DO  
+!$OMP MASTER
   call exchange_nod(arr, partit)
-
+!$OMP END MASTER
+!$OMP BARRIER
 ! And the remaining smoothing sweeps
-
   DO q=1,N_smooth-1
+!$OMP DO
      DO n=1, myDim_nod2D
         uln = ulevels_nod2d(n)
         nln = min(nlev,nlevels_nod2d(n))
-        !!PS work_array(1:min(nlev, nlevels_nod2d(n)),n) = 0._WP
         work_array(1:nln,n) = 0._WP
         DO j=1,nod_in_elem2D_num(n)
            el = nod_in_elem2D(j,n)
-           !!PS nl_loc = min(nlev, minval(nlevels_nod2d(elem2D_nodes(1:3,el))))
-           !!PS nu_loc = maxval(ulevels_nod2D(elem2D_nodes(1:3,el)))
-           !!PS DO nz=1, 
            ule = max( uln, ulevels(el) )
            nle = min( nln, min(nlev,nlevels(el)) )
            DO nz=ule,nle
@@ -174,7 +167,9 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
            END DO
         ENDDO
      ENDDO
+!$OMP END DO
 ! combined: scale by patch volume + copy back to original field
+!$OMP DO
      DO n=1, myDim_nod2D
         !!PS DO nz=1, min(nlev, nlevels_nod2d(n))
         uln = ulevels_nod2d(n)
@@ -182,10 +177,14 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
         DO nz=uln,nln
            arr(nz, n) = work_array(nz, n) *vol(nz,n) 
         END DO
-     end DO
+     END DO
+!$OMP END DO
+!$OMP MASTER
      call exchange_nod(arr, partit)
+!$OMP END MASTER
+!$OMP BARRIER
   enddo
-
+!$OMP END PARALLEL
   deallocate(work_array)
 end subroutine smooth_nod3D
 
@@ -206,6 +205,8 @@ subroutine smooth_elem2D(arr, N, partit, mesh)
 #include "associate_mesh_ass.h" 
     allocate(work_array(myDim_nod2D+eDim_nod2D))
     DO q=1, N !apply mass matrix N times to smooth the field
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, elem, j, q, elnodes, vol)
+!$OMP DO
         DO node=1, myDim_nod2D
             vol=0._WP
             work_array(node)=0._WP
@@ -217,12 +218,22 @@ subroutine smooth_elem2D(arr, N, partit, mesh)
             END DO
             work_array(node)=work_array(node)/vol
         END DO
+!$OMP END DO
+!$OMP MASTER
         call exchange_nod(work_array, partit)
+!$OMP END MASTER
+!$OMP BARRIER
+!$OMP DO
         DO elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:, elem)
             arr(elem)=sum(work_array(elnodes))/3.0_WP  ! Here, we need the inverse and scale by 1/3
         ENDDO
+!$OMP END DO
+!$OMP MASTER
         call exchange_elem(arr, partit)
+!$OMP END MASTER
+!$OMP BARRIER
+!$OMP END PARALLEL
     END DO
     deallocate(work_array)
 end subroutine smooth_elem2D
@@ -247,7 +258,13 @@ subroutine smooth_elem3D(arr, N, partit, mesh)
     my_nl=ubound(arr,1)
     DO q=1, N !apply mass matrix N times to smooth the field
         DO nz=1, my_nl
-            work_array = 0.0_WP
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, elem, j, q, elnodes, vol)
+!$OMP DO
+            DO node=1, myDim_nod2D+eDim_nod2D
+               work_array(node) = 0.0_WP
+            END DO
+!$OMP END DO
+!$OMP DO
             DO node=1, myDim_nod2D
                 vol=0._WP
                 if (nz > nlevels_nod2d(node)) CYCLE
@@ -263,15 +280,23 @@ subroutine smooth_elem3D(arr, N, partit, mesh)
                 END DO
                 work_array(node)=work_array(node)/vol
             END DO
+!$OMP END DO
+!$OMP MASTER
             call exchange_nod(work_array, partit)
+!$OMP END MASTER
+!$OMP BARRIER
+!$OMP DO
             DO elem=1, myDim_elem2D
                 if (nz>nlevels(elem)  ) CYCLE
                 if (nz<ulevels(elem)) CYCLE
                 elnodes=elem2D_nodes(:, elem)
                 arr(nz, elem)=sum(work_array(elnodes))/3.0_WP
             ENDDO
+!$OMP END DO
+!$OMP END PARALLEL
         END DO
         call exchange_elem(arr, partit)
+!$OMP BARRIER
     END DO
     deallocate(work_array)
 
@@ -291,17 +316,24 @@ subroutine integrate_nod_2D(data, int2D, partit, mesh)
   real(kind=WP), intent(inout)      :: int2D
 
   integer       :: row
-  real(kind=WP) :: lval
+  real(kind=WP) :: lval_omp, lval
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-  lval=0.0_WP
-  do row=1, myDim_nod2D
-     !!PS lval=lval+data(row)*area(1,row)
-     lval=lval+data(row)*areasvol(ulevels_nod2D(row),row)
-  end do
 
+lval=0.0_WP
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row, lval_omp)
+  lval_omp=0.0_WP
+!$OMP DO
+  do row=1, myDim_nod2D
+     lval_omp=lval_omp+data(row)*areasvol(ulevels_nod2D(row),row)
+  end do
+!$OMP END DO
+!$OMP CRITICAL
+lval=lval+lval_omp
+!$OMP END CRITICAL
+!$OMP END PARALLEL
   int2D=0.0_WP
   call MPI_AllREDUCE(lval, int2D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
@@ -321,19 +353,26 @@ subroutine integrate_nod_3D(data, int3D, partit, mesh)
   real(kind=WP), intent(inout)    :: int3D
 
   integer       :: k, row
-  real(kind=WP) :: lval
+  real(kind=WP) :: lval_omp, lval
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
 
   lval=0.0_WP
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row, k, lval_omp)
+  lval_omp=0.0_WP
+!$OMP DO
   do row=1, myDim_nod2D
-     !!PS do k=1, nlevels_nod2D(row)-1
      do k=ulevels_nod2D(row), nlevels_nod2D(row)-1
         lval=lval+data(k, row)*areasvol(k,row)*hnode_new(k,row)  ! --> TEST_cavity
      end do
   end do
+!$OMP END DO
+!$OMP CRITICAL
+lval=lval+lval_omp
+!$OMP END CRITICAL
+!$OMP END PARALLEL
   int3D=0.0_WP
   call MPI_AllREDUCE(lval, int3D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
@@ -451,7 +490,125 @@ subroutine extrap_nod3D(arr, partit, mesh)
 end subroutine extrap_nod3D
 !
 !--------------------------------------------------------------------------------------------
+! returns min/max/sum of a one dimentional array (same as minval) but with the support of OpenMP
+FUNCTION omp_min_max_sum1(arr, pos1, pos2, what, partit, nan) 
+  USE MOD_PARTIT
+  implicit none
+  real(kind=WP), intent(in)   :: arr(:)
+  integer,       intent(in)   :: pos1, pos2
+  character(3),  intent(in)   :: what
+  real(kind=WP), optional     :: nan !to be implemented upon the need (for masked arrays)
+  real(kind=WP)               :: omp_min_max_sum1
+  real(kind=WP)               :: loc, val
+  integer                     :: n
+
+  type(t_partit),intent(in), &
+                       target :: partit
+
+  SELECT CASE (trim(what))
+    CASE ('sum')
+       val=0.0_WP
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, loc)
+       loc=0.0_WP
+!$OMP DO
+       do n=pos1, pos2
+          loc=loc+arr(n)
+       end do
+!$OMP END DO
+!$OMP CRITICAL
+       val=val+loc
+!$OMP END CRITICAL
+!$OMP END PARALLEL
+    CASE ('min')
+       val=arr(1)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, loc)
+       loc=val
+!$OMP DO
+       do n=pos1, pos2
+          loc=min(loc, arr(n))
+       end do
+!$OMP END DO
+!$OMP CRITICAL
+       val=min(val, loc)
+!$OMP END CRITICAL
+!$OMP END PARALLEL
+    CASE ('max')
+       val=arr(1)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, loc)
+       loc=val
+!$OMP DO
+       do n=pos1, pos2
+          loc=max(loc, arr(n))
+       end do
+!$OMP END DO
+!$OMP CRITICAL
+       val=max(val, loc)
+!$OMP END CRITICAL
+!$OMP END PARALLEL
+   CASE DEFAULT
+      if (partit%mype==0) write(*,*) trim(what), ' is not implemented in omp_min_max_sum case!'
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+      STOP
+  END SELECT
+  omp_min_max_sum1=val
+END FUNCTION
 !
+!--------------------------------------------------------------------------------------------
+! returns min/max/sum of a two dimentional array (same as minval) but with the support of OpenMP
+FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan) 
+  implicit none
+  real(kind=WP), intent(in)   :: arr(:,:)
+  integer,       intent(in)   :: pos11, pos12, pos21, pos22
+  character(3),  intent(in)   :: what
+  real(kind=WP), optional     :: nan !to be implemented upon the need (for masked arrays)
+  real(kind=WP)               :: omp_min_max_sum2
+  real(kind=WP)               :: loc, val, vmasked
+  integer                     :: i, j
+
+
+  type(t_partit),intent(in), &
+                       target :: partit
+
+  SELECT CASE (trim(what))
+    CASE ('min')
+      if (.not. present(nan)) vmasked=huge(vmasked) !just some crazy number
+      val=arr(1,1)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, loc)
+      loc=val
+      do i=pos11, pos12
+!$OMP DO
+      do j=pos21, pos22
+         if (arr(i,j)/=vmasked) loc=min(loc, arr(i,j))
+      end do
+!$OMP END DO
+      end do
+!$OMP CRITICAL
+      val=min(val, loc)
+!$OMP END CRITICAL
+!$OMP END PARALLEL
+    CASE ('max')
+      if (.not. present(nan)) vmasked=tiny(vmasked) !just some crazy number
+      val=arr(1,1)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, loc)
+      loc=val
+      do i=pos11, pos12
+!$OMP DO
+      do j=pos21, pos22
+         if (arr(i,j)/=vmasked) loc=max(loc, arr(i,j))
+      end do
+!$OMP END DO
+      end do
+!$OMP CRITICAL
+      val=max(val, loc)
+!$OMP END CRITICAL
+!$OMP END PARALLEL
+   CASE DEFAULT
+      if (partit%mype==0) write(*,*) trim(what), ' is not implemented in omp_min_max_sum case!'
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+      STOP
+   END SELECT
+omp_min_max_sum2=val
+END FUNCTION
 end module g_support
 
 

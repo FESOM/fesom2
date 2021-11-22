@@ -1,13 +1,15 @@
 module cavity_heat_water_fluxes_3eq_interface
   interface
-    subroutine cavity_heat_water_fluxes_3eq(tracers, partit, mesh)
+    subroutine cavity_heat_water_fluxes_3eq(dynamics, tracers, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
+      use MOD_DYN
       use mod_tracer
       type(t_partit), intent(inout), target :: partit
       type(t_mesh),   intent(in),    target :: mesh
       type(t_tracer), intent(in),    target :: tracers
+      type(t_dyn),    intent(in),    target :: dynamics
     end subroutine
   end interface
 end module
