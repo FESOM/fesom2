@@ -783,27 +783,50 @@ subroutine update_means
   implicit none
   type(Meandata), pointer :: entry
   integer                 :: n
-
-  do n=1, io_NSTREAMS
+  integer                 :: I, J
+  DO n=1, io_NSTREAMS
      entry=>io_stream(n)
 !_____________ compute in 8 byte accuracy _________________________
-    if (entry%accuracy == i_real8) then
-      if (entry%flip) then
-          entry%local_values_r8 = entry%local_values_r8 + transpose(entry%ptr3(1:size(entry%local_values_r8,dim=2),1:size(entry%local_values_r8,dim=1)))
-      else 
-          entry%local_values_r8 = entry%local_values_r8 + entry%ptr3(1:size(entry%local_values_r8,dim=1),1:size(entry%local_values_r8,dim=2))
-      end if
+     IF (entry%accuracy == i_real8) then
+        IF (entry%flip) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+           DO J=1, size(entry%local_values_r8,dim=2)
+              DO I=1, size(entry%local_values_r8,dim=1)
+                 entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(J,I)
+              END DO
+           END DO
+!$OMP END PARALLEL DO
+        ELSE
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+           DO J=1, size(entry%local_values_r8,dim=2)
+              DO I=1, size(entry%local_values_r8,dim=1)
+                 entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(I,J)
+              END DO
+           END DO
+!$OMP END PARALLEL DO
+        END IF
 !_____________ compute in 4 byte accuracy _________________________
-    elseif (entry%accuracy == i_real4) then
-      if (entry%flip) then
-          entry%local_values_r4 = entry%local_values_r4 + transpose(real(entry%ptr3(1:size(entry%local_values_r4,dim=2),1:size(entry%local_values_r4,dim=1)),real32))
-      else
-          entry%local_values_r4 = entry%local_values_r4 + real(entry%ptr3(1:size(entry%local_values_r4,dim=1),1:size(entry%local_values_r4,dim=2)),real32)
-      end if
-    endif
-
-     entry%addcounter=entry%addcounter+1
-  end do
+     ELSE IF (entry%accuracy == i_real4) then
+        IF (entry%flip) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+           DO J=1, size(entry%local_values_r4,dim=2)
+              DO I=1, size(entry%local_values_r4,dim=1)
+                 entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(J,I), real32)
+              END DO
+           END DO
+!$OMP END PARALLEL DO
+        ELSE
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J)
+           DO J=1, size(entry%local_values_r4,dim=2)
+              DO I=1, size(entry%local_values_r4,dim=1)
+                 entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(I,J), real32)
+              END DO
+           END DO
+!$OMP END PARALLEL DO
+        END IF
+     END IF
+    entry%addcounter=entry%addcounter+1
+  END DO
 end subroutine
 !
 !--------------------------------------------------------------------------------------------
@@ -823,6 +846,7 @@ subroutine output(istep, dynamics, tracers, partit, mesh)
   integer       :: istep
   logical, save :: lfirst=.true.
   integer       :: n, k
+  integer       :: i, j !for OMP loops
   logical       :: do_output
   type(Meandata), pointer :: entry
   type(t_mesh)  , intent(in)   , target :: mesh
@@ -906,11 +930,23 @@ subroutine output(istep, dynamics, tracers, partit, mesh)
         end if
 
         if (entry%accuracy == i_real8) then
-          entry%local_values_r8_copy = entry%local_values_r8 /real(entry%addcounter,real64)  ! compute_means
-          entry%local_values_r8 = 0._real64 ! clean_meanarrays
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+           DO J=1, size(entry%local_values_r8,dim=2)
+              DO I=1, size(entry%local_values_r8,dim=1)
+                 entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64)  ! compute_means
+                 entry%local_values_r8(I,J) = 0._real64 ! clean_meanarrays
+              END DO
+           END DO
+!$OMP END PARALLEL DO
         else if (entry%accuracy == i_real4) then
-          entry%local_values_r4_copy = entry%local_values_r4 /real(entry%addcounter,real32)  ! compute_means
-          entry%local_values_r4 = 0._real32 ! clean_meanarrays
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+           DO J=1, size(entry%local_values_r4,dim=2)
+              DO I=1, size(entry%local_values_r4,dim=1)
+                 entry%local_values_r4_copy(I,J) = entry%local_values_r4(I,J) /real(entry%addcounter,real32)  ! compute_means
+                 entry%local_values_r4(I,J) = 0._real32 ! clean_meanarrays
+              END DO
+           END DO
+!$OMP END PARALLEL DO
         end if
         entry%addcounter   = 0  ! clean_meanarrays
         entry%ctime_copy = ctime
