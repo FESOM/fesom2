@@ -295,15 +295,15 @@ subroutine update_atm_forcing(istep, tracers, partit, mesh)
   call sbc_do(partit, mesh)
 !$OMP PARALLEL DO
   DO n=1, myDim_nod2D+eDim_nod2D
-     u_wind    = atmdata(i_xwind,n)
-     v_wind    = atmdata(i_ywind,n)
-     shum      = atmdata(i_humi ,n)
-     longwave  = atmdata(i_qlw  ,n)
-     shortwave = atmdata(i_qsr  ,n)
-     Tair      = atmdata(i_tair ,n)-273.15_WP
-     prec_rain = atmdata(i_prec ,n)/1000._WP
-     prec_snow = atmdata(i_snow ,n)/1000._WP
-     press_air = atmdata(i_mslp ,n) ! unit should be Pa
+     u_wind(n)    = atmdata(i_xwind,n)
+     v_wind(n)    = atmdata(i_ywind,n)
+     shum(n)      = atmdata(i_humi ,n)
+     longwave(n)  = atmdata(i_qlw  ,n)
+     shortwave(n) = atmdata(i_qsr  ,n)
+     Tair(n)      = atmdata(i_tair ,n)-273.15_WP
+     prec_rain(n) = atmdata(i_prec ,n)/1000._WP
+     prec_snow(n) = atmdata(i_snow ,n)/1000._WP
+     press_air(n) = atmdata(i_mslp ,n) ! unit should be Pa
   END DO
 !$OMP END PARALLEL DO
 #endif  
