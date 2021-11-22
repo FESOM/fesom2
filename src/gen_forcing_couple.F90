@@ -303,11 +303,12 @@ subroutine update_atm_forcing(istep, tracers, partit, mesh)
      Tair(n)      = atmdata(i_tair ,n)-273.15_WP
      prec_rain(n) = atmdata(i_prec ,n)/1000._WP
      prec_snow(n) = atmdata(i_snow ,n)/1000._WP
-     press_air(n) = atmdata(i_mslp ,n) ! unit should be Pa
+     if (l_mslp) then
+        press_air(n) = atmdata(i_mslp ,n) ! unit should be Pa
+     end if
   END DO
 !$OMP END PARALLEL DO
-#endif  
-  
+#endif
   if (use_cavity) then 
 !$OMP PARALLEL DO
     do i=1,myDim_nod2d+eDim_nod2d
@@ -325,7 +326,6 @@ subroutine update_atm_forcing(istep, tracers, partit, mesh)
     end do
 !$OMP END PARALLEL DO
   endif 
-
   ! second, compute exchange coefficients
   ! 1) drag coefficient 
   if(AOMIP_drag_coeff) then
@@ -341,7 +341,7 @@ subroutine update_atm_forcing(istep, tracers, partit, mesh)
      cd_atm_oce_arr=cd_atm_ice_arr
   end if
   ! third, compute wind stress
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i, dux, dvy, aux)
   do i=1,myDim_nod2d+eDim_nod2d   
      !__________________________________________________________________________
      if (ulevels_nod2d(i)>1) then

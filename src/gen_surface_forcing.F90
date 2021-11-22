@@ -528,6 +528,7 @@ CONTAINS
       integer                  :: numnodes   ! nu,ber of nodes in elem (3 for triangle, 4 for ... )
       real(wp)                 :: x, y       ! coordinates of elements
       integer                  :: fld_idx
+      integer                  :: warn_omp
       type(flfi_type), pointer :: flf
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
@@ -541,8 +542,8 @@ CONTAINS
 !              & qns(elem2D), emp(elem2D), qsr(elem2D),     &
 !                   &      STAT=sbc_alloc )
 ! used to inerpolate on nodes
-      warn = 0
-
+      warn     = 0
+      warn_omp = 0
 
       ! get ini year; Fill names of sbc_flfi
       idate=int(rdate)
@@ -556,7 +557,8 @@ CONTAINS
       do fld_idx = 1, i_totfl
          flf=>sbc_flfi(fld_idx)
          ! prepare nearest coordinates in INfile , save to bilin_indx_i/j
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i, x, y)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, x, y, warn)
+!$OMP DO
          do i = 1, myDim_nod2D+eDim_nod2D
             x  = geo_coord_nod2D(1,i)/rad
             if (x < 0) x=x+360._WP
@@ -581,15 +583,19 @@ CONTAINS
                   bilin_indx_j(fld_idx, i)=0
                end if
             end if
-            if (warn == 0) then
+            if (warn_omp == 0) then
                if (bilin_indx_i(fld_idx, i) < 1 .or. bilin_indx_j(fld_idx, i) < 1) then
 !                 WRITE(*,*) '     WARNING:  node/element coordinate out of forcing bounds,'
 !                 WRITE(*,*) '        nearest value will be used as a constant field'
-                  warn = 1
+                  warn_omp = 1
                end if
             end if
          end do
-!$OMP END PARALLEL DO
+!$OMP END DO
+!$OMP CRITICAL
+         warn=max(warn_omp, warn)
+!$OMP END CRITICAL
+!$OMP END PARALLEL
       end do
       lfirst=.false.
       end if
