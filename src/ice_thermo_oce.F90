@@ -155,8 +155,8 @@ subroutine thermodynamics(ice, partit, mesh)
   thdgr_old  => ice%thermo%thdgr_old
   t_skin     => ice%thermo%t_skin
   ustar_aux  => ice%thermo%ustar
-  u_w        => ice%srfoce_uv(1,:)
-  v_w        => ice%srfoce_uv(2,:)
+  u_w        => ice%srfoce_u(:)
+  v_w        => ice%srfoce_v(:)
   T_oc_array => ice%srfoce_temp(:)
   S_oc_array => ice%srfoce_salt(:)
   

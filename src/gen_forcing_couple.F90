@@ -135,8 +135,8 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
 #include "associate_mesh_ass.h"
   u_ice => ice%uvice(1,:)
   v_ice => ice%uvice(2,:)
-  u_w   => ice%srfoce_uv(1,:)
-  v_w   => ice%srfoce_uv(2,:)
+  u_w   => ice%srfoce_u(:)
+  v_w   => ice%srfoce_v(:)
   
   t1=MPI_Wtime()
 #ifdef __oasis

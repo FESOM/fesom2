@@ -52,8 +52,8 @@ subroutine ncar_ocean_fluxes_mode_fesom14(ice, partit, mesh)
     type(t_partit), intent(inout), target  :: partit
     type(t_ice)   , intent(inout), target  :: ice
     real(kind=WP), dimension(:)  , pointer :: T_oc_array, u_w, v_w
-    u_w        => ice%srfoce_uv(1,:)
-    v_w        => ice%srfoce_uv(2,:)
+    u_w        => ice%srfoce_u(:)
+    v_w        => ice%srfoce_v(:)
     T_oc_array => ice%srfoce_temp(:)
   
     do i=1, partit%myDim_nod2d+partit%eDim_nod2d       
@@ -163,8 +163,8 @@ subroutine ncar_ocean_fluxes_mode(ice, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_ice)   , intent(inout), target :: ice
     real(kind=WP), dimension(:)  , pointer :: T_oc_array, u_w, v_w
-    u_w        => ice%srfoce_uv(1,:)
-    v_w        => ice%srfoce_uv(2,:)
+    u_w        => ice%srfoce_u(:)
+    v_w        => ice%srfoce_v(:)
     T_oc_array => ice%srfoce_temp(:)
     
 
@@ -381,8 +381,8 @@ SUBROUTINE nemo_ocean_fluxes_mode(ice, partit)
       q_zu            ! spec. hum.  shifted at zu               [kg/kg]
    real(wp)           :: zevap, zqsb, zqla, zqlw
    real(kind=WP), dimension(:)  , pointer :: u_w, v_w, t_oc_array
-   u_w        => ice%srfoce_uv(1,:)
-   v_w        => ice%srfoce_uv(2,:)
+   u_w        => ice%srfoce_u(:)
+   v_w        => ice%srfoce_v(:)
    t_oc_array => ice%srfoce_temp(:)
    
 !!$OMP PARALLEL

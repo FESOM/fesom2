@@ -7,7 +7,7 @@ module ocean2ice_interface
         USE MOD_TRACER
         USE MOD_DYN
         USE MOD_ICE
-        type(t_ice)   , intent(in)   , target :: ice
+        type(t_ice)   , intent(inout), target :: ice
         type(t_dyn)   , intent(in)   , target :: dynamics
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
@@ -84,8 +84,8 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
     u_ice  => ice%uvice(1,:)
     v_ice  => ice%uvice(2,:)
     a_ice  => ice%data(1)%values(:)
-    u_w    => ice%srfoce_uv(1,:)
-    v_w    => ice%srfoce_uv(2,:)
+    u_w    => ice%srfoce_u(:)
+    v_w    => ice%srfoce_v(:)
     
     ! ==================
     ! momentum flux:
@@ -155,7 +155,7 @@ subroutine ocean2ice(ice, dynamics, tracers, partit, mesh)
     USE g_CONFIG
     use g_comm_auto
     implicit none
-    type(t_ice)   , intent(in)   , target :: ice
+    type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(in)   , target :: dynamics
     type(t_tracer), intent(inout), target :: tracers
     type(t_partit), intent(inout), target :: partit
@@ -172,8 +172,8 @@ subroutine ocean2ice(ice, dynamics, tracers, partit, mesh)
     temp       => tracers%data(1)%values(:,:)
     salt       => tracers%data(2)%values(:,:)
     UV         => dynamics%uv(:,:,:)
-    u_w        => ice%srfoce_uv(1,:)
-    v_w        => ice%srfoce_uv(2,:)
+    u_w        => ice%srfoce_u(:)
+    v_w        => ice%srfoce_v(:)
     T_oc_array => ice%srfoce_temp(:)
     S_oc_array => ice%srfoce_salt(:)
     elevation  => ice%srfoce_ssh(:)

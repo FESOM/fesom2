@@ -61,8 +61,9 @@ END TYPE T_ICE_THERMO
 ! 
 !_______________________________________________________________________________
 ! set work array derived type for ice
-TYPE T_ICE_ATMCOUPL
 #if defined (__oasis) || defined (__ifsinterface)
+TYPE T_ICE_ATMCOUPL
+
     !___________________________________________________________________________
     real(kind=WP), allocatable, dimension(:)    :: oce_flx_h, ice_flx_h, tmpoce_flx_h, tmpice_flx_h
 #if defined (__oifs) || defined (__ifsinterface)
@@ -71,7 +72,6 @@ TYPE T_ICE_ATMCOUPL
     ! !!! DONT FORGET ice_temp rhs_tempdiv rhs_temp is advected for oifs !!! --> becomes additional ice 
     ! tracer in ice%data(4)%values
 #endif /* (__oifs)  */
-#endif /* (__oasis) */
     !___________________________________________________________________________
     contains
         procedure WRITE_T_ICE_ATMCOUPL
@@ -79,6 +79,7 @@ TYPE T_ICE_ATMCOUPL
         generic :: write(unformatted) => WRITE_T_ICE_ATMCOUPL
         generic :: read(unformatted)  => READ_T_ICE_ATMCOUPL
 END TYPE T_ICE_ATMCOUPL
+#endif /* (__oasis) */
 
 !
 ! 
@@ -95,7 +96,8 @@ TYPE T_ICE
     
     ! oce temp, salt, ssh, and uv at surface
     real(kind=WP), allocatable, dimension(:)    :: srfoce_temp, srfoce_salt, srfoce_ssh
-    real(kind=WP), allocatable, dimension(:,:)  :: srfoce_uv
+!     real(kind=WP), allocatable, dimension(:,:)  :: srfoce_uv
+    real(kind=WP), allocatable, dimension(:)    :: srfoce_u, srfoce_v
     
     ! freshwater & heatflux
     real(kind=WP), allocatable, dimension(:)    :: flx_fw, flx_h
@@ -277,13 +279,13 @@ end subroutine READ_T_ICE_THERMO
 !
 !_______________________________________________________________________________
 ! Unformatted writing for T_ICE_ATMCOUPL
+#if defined (__oasis) || defined (__ifsinterface)    
 subroutine WRITE_T_ICE_ATMCOUPL(tcoupl, unit, iostat, iomsg)
     IMPLICIT NONE
     class(T_ICE_ATMCOUPL),  intent(in)     :: tcoupl
     integer,                intent(in)     :: unit
     integer,                intent(out)    :: iostat
     character(*),           intent(inout)  :: iomsg
-#if defined (__oasis) || defined (__ifsinterface)    
     call write_bin_array(tcoupl%oce_flx_h,      unit, iostat, iomsg)
     call write_bin_array(tcoupl%ice_flx_h,      unit, iostat, iomsg)
     call write_bin_array(tcoupl%tmpoce_flx_h,   unit, iostat, iomsg)
@@ -292,17 +294,17 @@ subroutine WRITE_T_ICE_ATMCOUPL(tcoupl, unit, iostat, iomsg)
     call write_bin_array(tcoupl%ice_alb,        unit, iostat, iomsg)
     call write_bin_array(tcoupl%enthalpyoffuse, unit, iostat, iomsg)
 #endif /* (__oifs) */
-#endif /* (__oasis) */    
 end subroutine WRITE_T_ICE_ATMCOUPL  
+#endif /* (__oasis) */    
 
 ! Unformatted reading for T_ICE_ATMCOUPL
+#if defined (__oasis) || defined (__ifsinterface)
 subroutine READ_T_ICE_ATMCOUPL(tcoupl, unit, iostat, iomsg)
     IMPLICIT NONE
     class(T_ICE_ATMCOUPL),  intent(inout)  :: tcoupl
     integer,                intent(in)     :: unit
     integer,                intent(out)    :: iostat
     character(*),           intent(inout)  :: iomsg
-#if defined (__oasis) || defined (__ifsinterface)
     call read_bin_array(tcoupl%oce_flx_h, unit, iostat, iomsg)
     call read_bin_array(tcoupl%ice_flx_h, unit, iostat, iomsg)
     call read_bin_array(tcoupl%tmpoce_flx_h, unit, iostat, iomsg)
@@ -311,8 +313,8 @@ subroutine READ_T_ICE_ATMCOUPL(tcoupl, unit, iostat, iomsg)
     call read_bin_array(tcoupl%ice_alb, unit, iostat, iomsg)
     call read_bin_array(tcoupl%enthalpyoffuse, unit, iostat, iomsg)
 #endif /* (__oifs) */
-#endif /* (__oasis) */   
 end subroutine READ_T_ICE_ATMCOUPL
+#endif /* (__oasis) */   
 !
 !
 !_______________________________________________________________________________
@@ -331,6 +333,9 @@ subroutine WRITE_T_ICE(ice, unit, iostat, iomsg)
     if (ice%whichEVP /= 0) call write_bin_array(ice%uvice_aux, unit, iostat, iomsg)
     call write_bin_array(ice%stress_atmice_xy, unit, iostat, iomsg)
     call write_bin_array(ice%stress_iceoce_xy, unit, iostat, iomsg)
+!     call write_bin_array(ice%srfoce_uv, unit, iostat, iomsg)
+    call write_bin_array(ice%srfoce_u, unit, iostat, iomsg)
+    call write_bin_array(ice%srfoce_v, unit, iostat, iomsg)
     call write_bin_array(ice%srfoce_temp, unit, iostat, iomsg)
     call write_bin_array(ice%srfoce_salt, unit, iostat, iomsg)
     call write_bin_array(ice%srfoce_ssh, unit, iostat, iomsg)
@@ -389,6 +394,9 @@ subroutine READ_T_ICE(ice, unit, iostat, iomsg)
     if (ice%whichEVP /= 0) call read_bin_array(ice%uvice_aux, unit, iostat, iomsg)
     call read_bin_array(ice%stress_atmice_xy, unit, iostat, iomsg)
     call read_bin_array(ice%stress_iceoce_xy, unit, iostat, iomsg)
+!     call read_bin_array(ice%srfoce_uv, unit, iostat, iomsg)
+    call read_bin_array(ice%srfoce_u, unit, iostat, iomsg)
+    call read_bin_array(ice%srfoce_v, unit, iostat, iomsg)
     call read_bin_array(ice%srfoce_temp, unit, iostat, iomsg)
     call read_bin_array(ice%srfoce_salt, unit, iostat, iomsg)
     call read_bin_array(ice%srfoce_ssh, unit, iostat, iomsg)
@@ -544,11 +552,15 @@ subroutine ice_init(ice, partit, mesh)
     
     !___________________________________________________________________________
     ! initialise surface ocean arrays in ice derived type 
-    allocate(ice%srfoce_uv(         2, node_size))
+!     allocate(ice%srfoce_uv(         2, node_size))
+    allocate(ice%srfoce_u(             node_size))
+    allocate(ice%srfoce_v(             node_size))
     allocate(ice%srfoce_temp(          node_size))
     allocate(ice%srfoce_salt(          node_size))
     allocate(ice%srfoce_ssh(           node_size))
-    ice%srfoce_uv        = 0.0_WP
+!     ice%srfoce_uv        = 0.0_WP
+    ice%srfoce_u         = 0.0_WP
+    ice%srfoce_v         = 0.0_WP
     ice%srfoce_temp      = 0.0_WP
     ice%srfoce_salt      = 0.0_WP
     ice%srfoce_ssh       = 0.0_WP

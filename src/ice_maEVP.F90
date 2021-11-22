@@ -57,9 +57,9 @@ module ice_maEVPdynamics_interface
         USE MOD_PARTIT
         USE MOD_PARSUP
         USE MOD_MESH
-        type(t_mesh),   intent(in),    target :: mesh
+        type(t_mesh)  , intent(in)   , target :: mesh
         type(t_partit), intent(inout), target :: partit
-        type(t_ice), intent(inout), target :: ice
+        type(t_ice)   , intent(inout), target :: ice
         end subroutine
         
         subroutine EVPdynamics_m(ice, partit, mesh)
@@ -67,9 +67,9 @@ module ice_maEVPdynamics_interface
         USE MOD_PARTIT
         USE MOD_PARSUP
         USE MOD_MESH
-        type(t_mesh),   intent(in),    target :: mesh
+        type(t_mesh)  , intent(in)   , target :: mesh
         type(t_partit), intent(inout), target :: partit
-        type(t_ice), intent(inout), target :: ice
+        type(t_ice)   , intent(inout), target :: ice
         end subroutine
    end interface  
 end module 
@@ -437,8 +437,8 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     v_rhs_ice    => ice%uvice_rhs(2,:)
     rhs_a        => ice%data(1)%values_rhs(:)
     rhs_m        => ice%data(2)%values_rhs(:)
-    u_w          => ice%srfoce_uv(1,:)
-    v_w          => ice%srfoce_uv(2,:)
+    u_w          => ice%srfoce_u(:)
+    v_w          => ice%srfoce_v(:)
     elevation    => ice%srfoce_ssh(:)
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
@@ -978,8 +978,8 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     m_snow       => ice%data(3)%values(:)
     u_rhs_ice    => ice%uvice_rhs(1,:)
     v_rhs_ice    => ice%uvice_rhs(2,:)
-    u_w          => ice%srfoce_uv(1,:)
-    v_w          => ice%srfoce_uv(2,:)
+    u_w          => ice%srfoce_u(:)
+    v_w          => ice%srfoce_v(:)
     
     !___________________________________________________________________________
     steps=evp_rheol_steps

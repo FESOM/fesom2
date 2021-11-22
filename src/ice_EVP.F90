@@ -507,8 +507,8 @@ subroutine EVPdynamics(ice, partit, mesh)
     v_rhs_ice    => ice%uvice_rhs(2,:)
     rhs_a        => ice%data(1)%values_rhs(:)
     rhs_m        => ice%data(2)%values_rhs(:)
-    u_w          => ice%srfoce_uv(1,:)
-    v_w          => ice%srfoce_uv(2,:)
+    u_w          => ice%srfoce_u(:)
+    v_w          => ice%srfoce_v(:)
     elevation    => ice%srfoce_ssh(:)
     
     !_______________________________________________________________________________

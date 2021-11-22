@@ -78,8 +78,8 @@ subroutine thermodynamics(ice, partit, mesh)
   thdgrsn    => ice%thermo%thdgrsn
   T_oc_array => ice%srfoce_temp(:)
   S_oc_array => ice%srfoce_salt(:)
-  u_w        => ice%srfoce_uv(1,:)
-  v_w        => ice%srfoce_uv(2,:)
+  u_w        => ice%srfoce_u(:)
+  v_w        => ice%srfoce_v(:)
   
   !_____________________________________________________________________________  
   rsss = ref_sss
