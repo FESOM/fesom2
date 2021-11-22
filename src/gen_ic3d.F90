@@ -308,6 +308,8 @@ CONTAINS
       !! ** Method  : 
       !! ** Action  : 
       !!----------------------------------------------------------------------
+
+      USE ieee_arithmetic
       IMPLICIT NONE      
       type(t_mesh),   intent(in),    target   :: mesh
       type(t_partit), intent(inout), target   :: partit 
@@ -327,6 +329,8 @@ CONTAINS
       real(wp), allocatable, dimension(:)     :: data1d      
       integer                                 :: elnodes(3)
       integer                                 :: ierror              ! return error code
+      integer				      :: NO_FILL	     ! 0=no fillval, 1=fillval
+      real(wp)				      :: FILL_VALUE
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -345,6 +349,12 @@ CONTAINS
       ! get variable id
       if (mype==0) then
          iost = nf_inq_varid(ncid, varname, id_data)
+         iost = nf_inq_var_fill(ncid, id_data, NO_FILL, FILL_VALUE) ! FillValue defined?
+         if (NO_FILL==1) then
+            print *, 'No _FillValue is set in ', filename, ', trying dummy =', dummy, FILL_VALUE
+         else
+            print *, 'The FillValue in ', filename, ' is set to ', FILL_VALUE ! should set dummy accordingly
+         end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename,partit)   
@@ -359,9 +369,20 @@ CONTAINS
          iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, ncdata(2:nc_Nlon-1,:,:))
          ncdata(1,:,:)      =ncdata(nc_Nlon-1,:,:)
          ncdata(nc_Nlon,:,:)=ncdata(2,:,:)
-         where (ncdata < -0.99_WP*dummy ) ! dummy values are only positive
-                ncdata = dummy
-         end where
+
+         ! replace nan (or fillvalue) by dummy value
+         do k=1,nc_Ndepth
+            do j=1,nc_Nlat
+               do i=1,nc_Nlon
+                  if (ieee_is_nan(ncdata(i,j,k)) .or. (ncdata(i,j,k)==FILL_VALUE)) then
+                     ncdata(i,j,k) = dummy
+                  elseif (ncdata(i,j,k) < -0.99_WP*dummy .or. ncdata(i,j,k) > dummy) then 
+                     ! and in case the input data has other conventions on missing values:
+                     ncdata(i,j,k) = dummy
+                  endif
+               end do
+            end do
+         end do
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename,partit)

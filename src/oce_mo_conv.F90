@@ -45,9 +45,9 @@ subroutine mo_convect(ice, partit, mesh)
     ! of vertical mixing in the Weddell Sea!
     ! Computes the mixing length derived from the Monin
     if (use_momix) then
-        mo = 0._WP
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax)
         do node=1, myDim_nod2D+eDim_nod2D
+            mo(:, node) = 0._WP
             nzmax = nlevels_nod2d(node)
             nzmin = ulevels_nod2d(node)
             !___________________________________________________________________

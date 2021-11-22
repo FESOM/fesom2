@@ -61,7 +61,7 @@ subroutine fer_solve_Gamma(partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmax, nzmin, zinv1,zinv2, zinv, m, r, a, b, c, cp, tp, zbar_n, Z_n)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmax, nzmin, zinv1,zinv2, zinv, m, r, a, b, c, cp, tp, tr, zbar_n, Z_n)
 !$OMP DO
     DO n=1,myDim_nod2D
         tr=>fer_gamma(:,:,n)
