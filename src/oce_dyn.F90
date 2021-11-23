@@ -230,6 +230,7 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
     !___________________________________________________________________________
     real(kind=8)  :: u1, v1, len, vi
     integer       :: nz, ed, el(2), nelem(3),k, elem, nzmin, nzmax
+    integer       :: nzminl, nzminr, nzmaxl, nzmaxr
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
@@ -259,17 +260,50 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
     END DO
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, nz, ed, el, nelem, k, elem, nzmin, nzmax)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, nz, ed, el, nelem, k, elem, nzmin, nzmax, nzminl, nzminr, nzmaxl, nzmaxr)
 !$OMP DO
     DO ed=1, myDim_edge2D+eDim_edge2D
-        if(myList_edge2D(ed)>edge2D_in) cycle
+!       if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
-        len=sqrt(sum(elem_area(el)))
-        nzmax = minval(nlevels(el))
-        nzmin = maxval(ulevels(el))
-        DO  nz=nzmin,nzmax-1
-            u1=UV(1,nz,el(1))-UV(1,nz,el(2))
-            v1=UV(2,nz,el(1))-UV(2,nz,el(2))
+        ! for no slip implementation
+        nzmaxl=nlevels(el(1))
+        nzminl=ulevels(el(2))
+        if (el(2) > 0) then
+           nzmaxr =nlevels(el(2))
+           nzminr =ulevels(el(2))
+           len=sqrt(sum(elem_area(el)))
+        else
+           nzmaxr =0   !above the surface
+           nzminr =nl+1!below the bottom
+           len=sqrt(elem_area(el(1)))
+        end if
+
+        DO  nz=min(nzminl, nzminr), max(nzmaxl, nzmaxr)-1
+            if (myList_edge2D(ed) <= edge2D_in) then
+               u1=UV(1,nz,el(1))-UV(1,nz,el(2))
+               v1=UV(2,nz,el(1))-UV(2,nz,el(2))             
+            end if
+            
+            if (nz < nzminl) then !no splip for cavity, left triangle does not exist
+               u1=2.*UV(1,nz,el(2))
+               v1=2.*UV(2,nz,el(2))
+            end if
+
+            if (nz < nzminr) then !no splip for cavity, right triangle does not exist
+               u1=2.*UV(1,nz,el(1))
+               v1=2.*UV(2,nz,el(1))
+            end if
+
+            if (nz > nzmaxl) then !no splip, left triangle does not exist
+               u1=2.*UV(1,nz,el(2))
+               v1=2.*UV(2,nz,el(2))
+            end if
+
+            if (nz > nzmaxr) then !no splip, right triangle does not exist
+               u1=2.*UV(1,nz,el(1))
+               v1=2.*UV(2,nz,el(1))
+            end if
+
             vi=dt*max(dynamics%visc_gamma0,                         &
                       max(dynamics%visc_gamma1*sqrt(u1*u1+v1*v1),   &
                       dynamics%visc_gamma2*(u1*u1+v1*v1))           &
@@ -281,18 +315,22 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
 #if defined(_OPENMP)
             call omp_set_lock(partit%plock(el(1)))
 #endif
-            U_b(nz,el(1))=U_b(nz,el(1))-u1/elem_area(el(1))
-            V_b(nz,el(1))=V_b(nz,el(1))-v1/elem_area(el(1))
+            if ((nz-nzminl)*(nz-nzmaxl) >= 0) then
+                U_b(nz,el(1))=U_b(nz,el(1))-u1/elem_area(el(1))
+                V_b(nz,el(1))=V_b(nz,el(1))-v1/elem_area(el(1))
+            end if
 #if defined(_OPENMP)
             call omp_unset_lock(partit%plock(el(1)))
             call omp_set_lock(partit%plock(el(2)))
 #endif
-            U_b(nz,el(2))=U_b(nz,el(2))+u1/elem_area(el(2))
-            V_b(nz,el(2))=V_b(nz,el(2))+v1/elem_area(el(2))
+            if ((nz-nzminr)*(nz-nzmaxr) >= 0) then
+               U_b(nz,el(2))=U_b(nz,el(2))+u1/elem_area(el(2))
+               V_b(nz,el(2))=V_b(nz,el(2))+v1/elem_area(el(2))
+            end if
 #if defined(_OPENMP)
             call omp_unset_lock(partit%plock(el(2)))
 #endif
-        END DO 
+        END DO
     END DO
 !$OMP END DO
 !$OMP MASTER
@@ -300,6 +338,7 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
     call exchange_elem(V_b, partit)
 !$OMP END MASTER
 !$OMP BARRIER
+
     ! ===========
     ! Compute smoothed viscous term: 
     ! ===========
