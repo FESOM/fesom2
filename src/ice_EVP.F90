@@ -1,37 +1,41 @@
 module ice_EVP_interfaces
-  interface
-    subroutine stress_tensor(ice_strength, ice, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_ICE
-      type(t_ice)   , intent(inout), target :: ice
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      real(kind=WP),  intent(in)            :: ice_strength(partit%mydim_elem2D)
-    end subroutine
+    interface
+        subroutine stress_tensor(ice_strength, ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice),    intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        real(kind=WP),  intent(in)            :: ice_strength(partit%mydim_elem2D)
+        end subroutine
 
-    subroutine stress2rhs(inv_areamass, ice_strength, ice, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_ICE
-      type(t_ice)   , intent(inout), target :: ice
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      REAL(kind=WP),  intent(in)            :: inv_areamass(partit%myDim_nod2D), ice_strength(partit%mydim_elem2D)
-    end subroutine
-    
-    subroutine EVPdynamics(ice, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_ICE
-      type(t_ice)   , intent(inout), target :: ice
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine
-  end interface  
+        subroutine stress2rhs(inv_areamass, ice_strength, ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice),    intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        real(kind=WP),  intent(in)            :: inv_areamass(partit%myDim_nod2D), ice_strength(partit%mydim_elem2D)
+        end subroutine
+    end interface  
+end module
+
+module ice_EVPdynamics_interface
+    interface
+        subroutine EVPdynamics(ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice),    intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        end subroutine
+    end interface  
 end module
 
 !

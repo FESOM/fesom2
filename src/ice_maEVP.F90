@@ -46,6 +46,20 @@ module ice_maEVP_interfaces
         USE MOD_MESH
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine        
+    end interface  
+end module
+
+module ice_maEVPdynamics_interface
+    interface
+        subroutine EVPdynamics_a(ice, partit, mesh)
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_mesh)  , intent(in)   , target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        type(t_ice)   , intent(inout), target :: ice
         end subroutine
         
         subroutine EVPdynamics_m(ice, partit, mesh)
@@ -53,22 +67,12 @@ module ice_maEVP_interfaces
         USE MOD_PARTIT
         USE MOD_PARSUP
         USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
-        
-        subroutine EVPdynamics_a(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
+        type(t_ice)   , intent(inout), target :: ice
         end subroutine
-    end interface  
-end module
+   end interface  
+end module 
 ! ==============================================================================
 ! New evp implementation following Bouillion et al. 2013
 ! and Kimmritz et al. 2015 (mEVP) and Kimmritz et al. 2016 (aEVP)
