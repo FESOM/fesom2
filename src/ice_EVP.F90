@@ -71,8 +71,8 @@ real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-U_ice        => ice%uvice(1, :)
-V_ice        => ice%uvice(2, :)
+U_ice        => ice%uice(:)
+V_ice        => ice%vice(:)
 eps11        => ice%work%eps11(:)
 eps12        => ice%work%eps12(:)
 eps22        => ice%work%eps22(:)
@@ -197,8 +197,8 @@ real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-U_rhs_ice       => ice%uvice_rhs(1, :)
-V_rhs_ice       => ice%uvice_rhs(2, :)
+U_rhs_ice       => ice%uice_rhs(:)
+V_rhs_ice       => ice%vice_rhs(:)
 rhs_a           => ice%data(1)%values_rhs(:)
 rhs_m           => ice%data(2)%values_rhs(:)
 sigma11         => ice%work%sigma11(:)
@@ -319,16 +319,16 @@ m_snow_old      => ice%data(3)%values_old(:)
 rhs_a           => ice%data(1)%values_rhs(:)
 rhs_m           => ice%data(2)%values_rhs(:)
 elevation       => ice%srfoce_ssh(:)
-U_ice           => ice%uvice(1, :)
-V_ice           => ice%uvice(2, :)
-U_rhs_ice       => ice%uvice_rhs(1, :)
-V_rhs_ice       => ice%uvice_rhs(2, :)
-U_ice_old       => ice%uvice_old(1, :)
-V_ice_old       => ice%uvice_old(2, :)
-U_w             => ice%srfoce_uv(1, :)
-V_w             => ice%srfoce_uv(2, :)
-stress_atmice_x => ice%stress_atmice_xy(1, :)
-stress_atmice_y => ice%stress_atmice_xy(2, :)
+U_ice           => ice%uice(:)
+V_ice           => ice%vice(:)
+U_rhs_ice       => ice%uice_rhs(:)
+V_rhs_ice       => ice%vice_rhs(:)
+U_ice_old       => ice%uice_old(:)
+V_ice_old       => ice%vice_old(:)
+U_w             => ice%srfoce_u(:)
+V_w             => ice%srfoce_v(:)
+stress_atmice_x => ice%stress_atmice_x(:)
+stress_atmice_y => ice%stress_atmice_y(:)
 ! If Icepack is used, always update the tracers
 
 #if defined (__icepack)

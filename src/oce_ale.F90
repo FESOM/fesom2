@@ -2451,7 +2451,8 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
 !$OMP END PARALLEL DO
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, lcflmax)
-    lcflmax=0.
+    lcflmax=0._WP
+    cflmax=0._WP
 !$OMP DO
     do n=1, myDim_nod2D+eDim_nod2D
        lcflmax=max(lcflmax, maxval(CFL_z(:, n)))

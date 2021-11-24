@@ -120,8 +120,8 @@ subroutine stress_tensor_m(ice, partit, mesh)
     sigma11      => ice%work%sigma11(:)
     sigma12      => ice%work%sigma12(:)
     sigma22      => ice%work%sigma22(:)
-    u_ice_aux    => ice%uvice_aux(1,:)
-    v_ice_aux    => ice%uvice_aux(2,:)
+    u_ice_aux    => ice%uice_aux(:)
+    v_ice_aux    => ice%vice_aux(:)
     
     !___________________________________________________________________________
   val3=1.0_WP/3.0_WP
@@ -224,8 +224,8 @@ subroutine ssh2rhs(ice, partit, mesh)
     m_ice      => ice%data(2)%values
     m_snow     => ice%data(3)%values
     elevation  => ice%srfoce_ssh(:)
-    rhs_a      => ice%data(2)%values_rhs
-    rhs_m      => ice%data(3)%values_rhs
+    rhs_a      => ice%data(1)%values_rhs
+    rhs_m      => ice%data(2)%values_rhs
     
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
@@ -320,8 +320,8 @@ subroutine stress2rhs_m(ice, partit, mesh)
     m_snow          => ice%data(3)%values
     rhs_a           => ice%data(1)%values_rhs
     rhs_m           => ice%data(2)%values_rhs
-    u_rhs_ice       => ice%uvice_rhs(1,:)
-    v_rhs_ice       => ice%uvice_rhs(2,:)
+    u_rhs_ice       => ice%uice_rhs(:)
+    v_rhs_ice       => ice%vice_rhs(:)
     sigma11         => ice%work%sigma11(:)
     sigma12         => ice%work%sigma12(:)
     sigma22         => ice%work%sigma22(:)
@@ -432,16 +432,16 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     rhs_m           => ice%data(2)%values_rhs
     m_snow          => ice%data(3)%values
     m_snow_old      => ice%data(3)%values_old
-    u_ice           => ice%uvice(1,:)
-    v_ice           => ice%uvice(2,:)
-    u_rhs_ice       => ice%uvice_rhs(1,:)
-    v_rhs_ice       => ice%uvice_rhs(2,:)
-    u_ice_aux       => ice%uvice_aux(1,:)
-    v_ice_aux       => ice%uvice_aux(2,:)
-    u_w             => ice%srfoce_uv(1,:)
-    v_w             => ice%srfoce_uv(2,:)
-    stress_atmice_x => ice%stress_atmice_xy(1,:)
-    stress_atmice_y => ice%stress_atmice_xy(2,:)
+    u_ice           => ice%uice(:)
+    v_ice           => ice%vice(:)
+    u_rhs_ice       => ice%uice_rhs(:)
+    v_rhs_ice       => ice%vice_rhs(:)
+    u_ice_aux       => ice%uice_aux(:)
+    v_ice_aux       => ice%vice_aux(:)
+    u_w             => ice%srfoce_u(:)
+    v_w             => ice%srfoce_v(:)
+    stress_atmice_x => ice%stress_atmice_x(:)
+    stress_atmice_y => ice%stress_atmice_y(:)
     eps11           => ice%work%eps11(:)
     eps12           => ice%work%eps12(:)
     eps22           => ice%work%eps22(:)
@@ -779,8 +779,8 @@ subroutine find_alpha_field_a(ice, partit, mesh)
 #include "associate_mesh_ass.h" 
     a_ice     => ice%data(1)%values(:)
     m_ice     => ice%data(2)%values(:)
-    u_ice_aux => ice%uvice_aux(1,:)
-    v_ice_aux => ice%uvice_aux(2,:)
+    u_ice_aux => ice%uice_aux(:)
+    v_ice_aux => ice%vice_aux(:)
     eps11     => ice%work%eps11(:)
     eps12     => ice%work%eps12(:)
     eps22     => ice%work%eps22(:)
@@ -873,8 +873,8 @@ subroutine stress_tensor_a(ice, partit, mesh)
 #include "associate_mesh_ass.h" 
     a_ice           => ice%data(1)%values
     m_ice           => ice%data(2)%values
-    u_ice_aux       => ice%uvice_aux(1,:)
-    v_ice_aux       => ice%uvice_aux(2,:)
+    u_ice_aux       => ice%uice_aux(:)
+    v_ice_aux       => ice%vice_aux(:)
     eps11           => ice%work%eps11(:)
     eps12           => ice%work%eps12(:)
     eps22           => ice%work%eps22(:)
@@ -999,16 +999,16 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     a_ice           => ice%data(1)%values
     m_ice           => ice%data(2)%values
     m_snow          => ice%data(3)%values
-    u_ice           => ice%uvice(1,:)
-    v_ice           => ice%uvice(2,:)
-    u_rhs_ice       => ice%uvice_rhs(1,:)
-    v_rhs_ice       => ice%uvice_rhs(2,:)
-    u_ice_aux       => ice%uvice_aux(1,:)
-    v_ice_aux       => ice%uvice_aux(2,:)
-    u_w             => ice%srfoce_uv(1,:)
-    v_w             => ice%srfoce_uv(2,:)
-    stress_atmice_x => ice%stress_atmice_xy(1,:)
-    stress_atmice_y => ice%stress_atmice_xy(2,:)
+    u_ice           => ice%uice(:)
+    v_ice           => ice%vice(:)
+    u_rhs_ice       => ice%uice_rhs(:)
+    v_rhs_ice       => ice%vice_rhs(:)
+    u_ice_aux       => ice%uice_aux(:)
+    v_ice_aux       => ice%vice_aux(:)
+    u_w             => ice%srfoce_u(:)
+    v_w             => ice%srfoce_v(:)
+    stress_atmice_x => ice%stress_atmice_x(:)
+    stress_atmice_y => ice%stress_atmice_y(:)
     
     !___________________________________________________________________________
     steps=ice%evp_rheol_steps

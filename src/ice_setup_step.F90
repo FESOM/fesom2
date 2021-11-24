@@ -85,7 +85,8 @@ subroutine ice_setup(ice, tracers, partit, mesh)
     
     !___________________________________________________________________________
     ! Fill in  the mass matrix  
-    call ice_mass_matrix_fill(ice, partit, mesh)
+    call ice_fct_init(ice, partit, mesh)
+!     call ice_mass_matrix_fill(ice, partit, mesh)
     
     !___________________________________________________________________________
     ! Initialization routine, user input is required 
@@ -145,9 +146,9 @@ subroutine ice_timestep(step, ice, partit, mesh)
     !___________________________________________________________________________
     t0=MPI_Wtime()
 
-!#if defined (__icepack)
-!   call step_icepack(mesh, ice, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts    
-!#else     
+#if defined (__icepack)
+  call step_icepack(mesh, ice, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts    
+#else     
     
     !___________________________________________________________________________
     ! Dynamics
@@ -167,56 +168,57 @@ subroutine ice_timestep(step, ice, partit, mesh)
             stop
     END SELECT
 
-!     if (use_cavity) call cavity_ice_clean_vel(ice, partit, mesh)
+    if (use_cavity) call cavity_ice_clean_vel(ice, partit, mesh)
     t1=MPI_Wtime()   
-!     
-!     !___________________________________________________________________________
-!     ! Advection part
-!     ! old FCT routines
-!     ! call ice_TG_rhs
-!     ! call ice_fct_solve
-!     ! call cut_off
-!     ! new FCT routines from Sergey Danilov 08.05.2018
-! #if defined (__oifs)
-!     do i=1,myDim_nod2D+eDim_nod2D
-!         ice_temp(i) = ice_temp(i)*a_ice(i)
-!     end do
-! #endif /* (__oifs) */
-!     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
-!     call ice_TG_rhs_div(ice, partit, mesh) 
-!     
-!     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_solve...'//achar(27)//'[0m' 
-!     call ice_fct_solve(ice, partit, mesh)
-!     
-!     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_update_for_div...'//achar(27)//'[0m'
-!     call ice_update_for_div(ice, partit, mesh)
-!     
-! #if defined (__oifs)
-!     do i=1,myDim_nod2D+eDim_nod2D
-!         if (a_ice(i)>0.0_WP) ice_temp(i) = ice_temp(i)/a_ice(i)
-!     end do
-! #endif /* (__oifs) */
-! 
-!     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call cut_off...'//achar(27)//'[0m'
-!     call cut_off(ice, partit, mesh)
-!     
-!     if (use_cavity) call cavity_ice_clean_ma(ice, partit, mesh)
+    
+    !___________________________________________________________________________
+    ! Advection part
+    ! old FCT routines
+    ! call ice_TG_rhs
+    ! call ice_fct_solve
+    ! call cut_off
+    ! new FCT routines from Sergey Danilov 08.05.2018
+#if defined (__oifs)
+   do i=1,myDim_nod2D+eDim_nod2D
+       ice_temp(i) = ice_temp(i)*a_ice(i)
+   end do
+#endif /* (__oifs) */
+
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
+    call ice_TG_rhs_div(ice, partit, mesh) 
+    
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_solve...'//achar(27)//'[0m' 
+    call ice_fct_solve(ice, partit, mesh)
+    
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_update_for_div...'//achar(27)//'[0m'
+    call ice_update_for_div(ice, partit, mesh)
+    
+#if defined (__oifs)
+    do i=1,myDim_nod2D+eDim_nod2D
+        if (a_ice(i)>0.0_WP) ice_temp(i) = ice_temp(i)/a_ice(i)
+    end do
+#endif /* (__oifs) */
+
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call cut_off...'//achar(27)//'[0m'
+    call cut_off(ice, partit, mesh)
+    
+    if (use_cavity) call cavity_ice_clean_ma(ice, partit, mesh)
     t2=MPI_Wtime()
-!     
-!     !___________________________________________________________________________
-!     ! Thermodynamic part
-!     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
-!     call thermodynamics(ice, partit, mesh)
-! #endif /* (__icepack) */
+    
+    !___________________________________________________________________________
+    ! Thermodynamic part
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
+    call thermodynamics(ice, partit, mesh)
+#endif /* (__icepack) */
 
     !___________________________________________________________________________
     do node=1,myDim_nod2D+eDim_nod2D
-        if ( (ice%uvice(1, node)/=0.0_WP .and. mesh%ulevels_nod2d(node)>1) .or. &
-             (ice%uvice(2, node)/=0.0_WP .and. mesh%ulevels_nod2d(node)>1) ) then
+        if ( (ice%uice(node)/=0.0_WP .and. mesh%ulevels_nod2d(node)>1) .or. &
+             (ice%vice(node)/=0.0_WP .and. mesh%ulevels_nod2d(node)>1) ) then
             write(*,*) " --> found cavity velocity /= 0.0_WP , ", mype
             write(*,*) " ulevels_nod2d(n) = ", mesh%ulevels_nod2d(node)
-            write(*,*) " U_ice(n) = ", ice%uvice(1, node)
-            write(*,*) " V_ice(n) = ", ice%uvice(2, node)
+            write(*,*) " U_ice(n) = ", ice%uice(node)
+            write(*,*) " V_ice(n) = ", ice%vice(node)
             write(*,*)
         end if 
     end do
@@ -272,8 +274,8 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
     a_ice  => ice%data(1)%values
     m_ice  => ice%data(2)%values
     m_snow => ice%data(3)%values
-    u_ice  => ice%uvice(1,:)
-    v_ice  => ice%uvice(2,:)
+    u_ice  => ice%uice(:)
+    v_ice  => ice%vice(:)
     
     !___________________________________________________________________________
     ! pointer on necessary derived types

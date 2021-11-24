@@ -51,22 +51,23 @@ subroutine ncar_ocean_fluxes_mode_fesom14(ice, partit, mesh)
     real(kind=WP), parameter :: grav = 9.80_WP, vonkarm = 0.40_WP
     real(kind=WP), parameter :: q1=640380._WP, q2=-5107.4_WP    ! for saturated surface specific humidity
     real(kind=WP), parameter :: zz = 10.0_WP
-    
+    real(kind=WP), dimension(:), pointer :: t_oc_array, u_w, v_w
+    t_oc_array => ice%srfoce_temp
+    u_w        => ice%srfoce_u
+    v_w        => ice%srfoce_v
+   
     !___________________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, m, cd_n10, ce_n10, ch_n10, cd_n10_rt, cd, ce, ch, cd_rt, zeta, x2, x, psi_m, psi_h, stab, &
 !$OMP                                                               t, ts, q, qs, u, u10, tv, xx, dux, dvy, tstar, qstar, ustar, bstar )
 !$OMP DO
     do i=1, partit%myDim_nod2d+partit%eDim_nod2d       
         t=tair(i) + tmelt					      ! degree celcium to Kelvin
-        !!PS ts=t_oc_array(i) + tmelt				      !
-        ts=ice%srfoce_temp(i) + tmelt
+        ts=t_oc_array(i) + tmelt				      !
         q=shum(i)
         qs=0.98_WP*q1*inv_rhoair*exp(q2/ts) 			      ! L-Y eqn. 5 
         tv = t*(1.0_WP+0.608_WP*q)
-        !!PS dux=u_wind(i)-u_w(i)
-        !!PS dvy=v_wind(i)-v_w(i)
-        dux=u_wind(i)-ice%srfoce_uv(1,i)
-        dvy=v_wind(i)-ice%srfoce_uv(2,i)
+        dux=u_wind(i)-u_w(i)
+        dvy=v_wind(i)-v_w(i)
         u = max(sqrt(dux**2+dvy**2), 0.5_WP)           	      ! 0.5 m/s floor on wind (undocumented NCAR)
         u10 = u                                                  ! first guess 10m wind
         
@@ -164,7 +165,12 @@ subroutine ncar_ocean_fluxes_mode(ice, partit, mesh)
     !--> check for convergence
     real(kind=WP) :: test, cd_prev, inc_ratio=1.0e-4 
     real(kind=WP) :: t_prev, q_prev
-
+    
+    real(kind=WP), dimension(:), pointer :: t_oc_array, u_w, v_w
+    t_oc_array => ice%srfoce_temp
+    u_w        => ice%srfoce_u
+    v_w        => ice%srfoce_v
+    
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, m, cd_n10, ce_n10, ch_n10, cd_n10_rt, hl1, cd, ce, ch, cd_rt, x2, x, stab, &
 !$OMP                                    zeta_u, zeta_t, zeta_q, psi_m_u, psi_h_u, psi_m_t, psi_h_t, psi_m_q, psi_h_q, &
 !$OMP                                                                 ts, qs, tv, xx, dux, dvy, t, t10, q, q10, u, u10 )
@@ -173,8 +179,7 @@ subroutine ncar_ocean_fluxes_mode(ice, partit, mesh)
         if (mesh%ulevels_nod2d(i)>1) cycle
         ! degree celcium to Kelvin
         t      = tair(i) + tmelt 
-        !!PS ts     = t_oc_array(i) + tmelt
-        ts     = ice%srfoce_temp(i) + tmelt  
+        ts     = t_oc_array(i) + tmelt
         
         q      = shum(i)
         qs     = 0.98_WP*q1*inv_rhoair*exp(q2/ts)                   ! L-Y eqn. 5 
@@ -182,10 +187,8 @@ subroutine ncar_ocean_fluxes_mode(ice, partit, mesh)
         tv     = t*(1.0_WP+0.608_WP*q)
         
         ! first guess 10m wind
-        !!PS dux    = u_wind(i)-u_w(i)
-        !!PS dvy    = v_wind(i)-v_w(i)
-        dux    = u_wind(i)-ice%srfoce_uv(1,i)
-        dvy    = v_wind(i)-ice%srfoce_uv(2,i)
+        dux    = u_wind(i)-u_w(i)
+        dvy    = v_wind(i)-v_w(i)
         u      = max(sqrt(dux**2+dvy**2), u10min)  ! 0.5 m/s floor on wind (undocumented NCAR)
         
         ! iteration variables for 10m level --> Monin-Obukov projection
@@ -365,8 +368,8 @@ SUBROUTINE nemo_ocean_fluxes_mode(ice, partit)
 !! source of original code: NEMO 3.1.1 + NCAR
 !!----------------------------------------------------------------------
    IMPLICIT NONE
-   type(t_ice), intent(in) :: ice
-   type(t_partit), intent(in) :: partit
+   type(t_ice)   , intent(in), target :: ice
+   type(t_partit), intent(in), target :: partit
    integer             :: i
    real(wp)            :: rtmp    ! temporal real
    real(wp)            :: wndm    ! delta of wind module and ocean curent module
@@ -384,17 +387,18 @@ SUBROUTINE nemo_ocean_fluxes_mode(ice, partit)
       Ce,       &     ! transfert coefficient for evaporation   (Q_lat)
       t_zu,     &     ! air temp. shifted at zu                     [K]
       q_zu            ! spec. hum.  shifted at zu               [kg/kg]
-
+    real(kind=WP), dimension(:), pointer :: t_oc_array, u_w, v_w
+    t_oc_array => ice%srfoce_temp
+    u_w        => ice%srfoce_u
+    v_w        => ice%srfoce_v
+    
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i, wdx, wdy, wndm, zst, q_sat, Cd, Ch, Ce, t_zu, q_zu)
    do i = 1, partit%myDim_nod2D+partit%eDim_nod2d
-      !!PS wdx  = atmdata(i_xwind,i) - u_w(i) ! wind from data - ocean current ( x direction)
-      !!PS wdy  = atmdata(i_ywind,i) - v_w(i) ! wind from data - ocean current ( y direction)
-      wdx  = atmdata(i_xwind,i) - ice%srfoce_uv(1,i) ! wind from data - ocean current ( x direction)
-      wdy  = atmdata(i_ywind,i) - ice%srfoce_uv(2,i) ! wind from data - ocean current ( y direction)
+      wdx  = atmdata(i_xwind,i) - u_w(i) ! wind from data - ocean current ( x direction)
+      wdy  = atmdata(i_ywind,i) - v_w(i) ! wind from data - ocean current ( y direction)
       wndm = SQRT( wdx * wdx + wdy * wdy )
-      !!PS zst  = t_oc_array(i)+273.15_WP
-      zst  = ice%srfoce_temp(i)+273.15_WP
-
+      zst  = t_oc_array(i)+273.15_WP
+      
       q_sat = 0.98_WP * 640380._WP / rhoa * EXP( -5107.4_WP / zst )
 
       call core_coeff_2z(2.0_WP, 10.0_WP, zst, atmdata(i_tair,i), &

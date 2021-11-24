@@ -93,9 +93,9 @@ save
  ! FCT implementation
 !  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: m_icel, a_icel, m_snowl
 !  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: dm_ice, da_ice, dm_snow
-!  REAL(kind=WP), ALLOCATABLE, DIMENSION(:,:)        :: icefluxes
-!  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: icepplus, icepminus
-!  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: mass_matrix  
+ REAL(kind=WP), ALLOCATABLE, DIMENSION(:,:)        :: icefluxes
+ REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: icepplus, icepminus
+ REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: mass_matrix  
  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: alpha_evp_array(:)   ! of myDim_elem2D
  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: beta_evp_array(:)    ! of myDim_node2D+eDim_node2D
 

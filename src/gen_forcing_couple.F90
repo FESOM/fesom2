@@ -128,13 +128,19 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   ! pointer on necessary derived types
   real(kind=WP), dimension(:), pointer :: oce_heat_flux, ice_heat_flux
   real(kind=WP), dimension(:), pointer :: stress_atmice_x, stress_atmice_y 
+  
+  real(kind=WP), dimension(:), pointer :: u_ice, v_ice, u_w, v_w
   real(kind=WP), dimension(:), pointer :: enthalpyoffuse
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-  stress_atmice_x => ice%stress_atmice_xy(1,:)
-  stress_atmice_y => ice%stress_atmice_xy(2,:)
+  u_ice           => ice%uice(:)
+  v_ice           => ice%vice(:)
+  u_w             => ice%srfoce_u(:)
+  v_w             => ice%srfoce_v(:)
+  stress_atmice_x => ice%stress_atmice_x(:)
+  stress_atmice_y => ice%stress_atmice_y(:)
 #if defined (__oasis) || defined (__ifsinterface)      
   oce_heat_flux   => ice%atmcoupl%oce_flx_h
   ice_heat_flux   => ice%atmcoupl%ice_flx_h
@@ -374,22 +380,18 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
      end if 
      
      !__________________________________________________________________________
-     !!PS dux=u_wind(i)-(1.0_WP-Swind)*u_w(i) 
-     !!PS dvy=v_wind(i)-(1.0_WP-Swind)*v_w(i)
-     dux=u_wind(i)-(1.0_WP-Swind)*ice%srfoce_uv(1,i) 
-     dvy=v_wind(i)-(1.0_WP-Swind)*ice%srfoce_uv(2,i)
+     dux=u_wind(i)-(1.0_WP-Swind)*u_w(i) 
+     dvy=v_wind(i)-(1.0_WP-Swind)*v_w(i)
      aux=sqrt(dux**2+dvy**2)*rhoair
      stress_atmoce_x(i) = Cd_atm_oce_arr(i)*aux*dux
      stress_atmoce_y(i) = Cd_atm_oce_arr(i)*aux*dvy
      
      !__________________________________________________________________________
-     !!PS dux=u_wind(i)-u_ice(i) 
-     !!PS dvy=v_wind(i)-v_ice(i)
-     dux=u_wind(i)-ice%uvice(1,i) 
-     dvy=v_wind(i)-ice%uvice(2,i) 
+     dux=u_wind(i)-u_ice(i) 
+     dvy=v_wind(i)-v_ice(i)
      aux=sqrt(dux**2+dvy**2)*rhoair
-     ice%stress_atmice_xy(1,i) = Cd_atm_ice_arr(i)*aux*dux
-     ice%stress_atmice_xy(2,i) = Cd_atm_ice_arr(i)*aux*dvy
+     stress_atmice_x(i) = Cd_atm_ice_arr(i)*aux*dux
+     stress_atmice_y(i) = Cd_atm_ice_arr(i)*aux*dvy
   end do
 !$OMP END PARALLEL DO
   ! heat and fresh water fluxes are treated in i_therm and ice2ocean

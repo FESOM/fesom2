@@ -83,12 +83,12 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     a_ice           => ice%data(1)%values
-    stress_iceoce_x => ice%stress_iceoce_xy(1,:)
-    stress_iceoce_y => ice%stress_iceoce_xy(2,:)
-    u_ice           => ice%uvice(1,:)
-    v_ice           => ice%uvice(2,:)
-    u_w             => ice%srfoce_uv(1,:)
-    v_w             => ice%srfoce_uv(2,:)
+    u_ice           => ice%uice(:)
+    v_ice           => ice%vice(:)
+    u_w             => ice%srfoce_u(:)
+    v_w             => ice%srfoce_v(:)
+    stress_iceoce_x => ice%stress_iceoce_x(:)
+    stress_iceoce_y => ice%stress_iceoce_y(:)
     
     !___________________________________________________________________________
 #if defined (__icepack)
@@ -172,19 +172,19 @@ subroutine ocean2ice(ice, dynamics, tracers, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    temp => tracers%data(1)%values(:,:)
-    salt => tracers%data(2)%values(:,:)
-    UV   => dynamics%uv(:,:,:)
+    temp       => tracers%data(1)%values(:,:)
+    salt       => tracers%data(2)%values(:,:)
+    UV         => dynamics%uv(:,:,:)
     T_oc_array => ice%srfoce_temp
     S_oc_array => ice%srfoce_salt
-    u_w        => ice%srfoce_uv(1,:)
-    v_w        => ice%srfoce_uv(2,:)
+    u_w        => ice%srfoce_u(:)
+    v_w        => ice%srfoce_v(:)
     elevation  => ice%srfoce_ssh
     
     !___________________________________________________________________________
     ! the arrays in the ice model are renamed
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, elem, k, uw, vw, vol)
-    if (ice_update) then
+    if (ice%ice_update) then
 !$OMP DO
         do n=1, myDim_nod2d+eDim_nod2d  
             if (ulevels_nod2D(n)>1) cycle 
@@ -382,14 +382,6 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         end do
 !$OMP END PARALLEL DO
     end if
-<<<<<<< HEAD
-    
-    where (ulevels_nod2d == 1)
-          dens_flux=sw_alpha(1,:) * heat_flux_in / vcpw + sw_beta(1, :) * (relax_salt + water_flux * salt(1,:))
-    elsewhere
-          dens_flux=0.0_WP
-    end where
-=======
 
 !$OMP PARALLEL DO
     do n=1, myDim_nod2D+eDim_nod2D    
@@ -400,7 +392,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
       end if
     end do
 !$OMP END PARALLEL DO
->>>>>>> refactoring
+
     !___________________________________________________________________________
     ! balance SSS restoring to climatology
     if (use_cavity) then

@@ -73,12 +73,12 @@ subroutine thermodynamics(ice, partit, mesh)
   m_ice         => ice%data(2)%values(:)
   m_snow        => ice%data(3)%values(:)
   ice_temp      => ice%data(4)%values(:)
-  u_ice         => ice%uvice(1,:)
-  v_ice         => ice%uvice(1,:)
+  u_ice         => ice%uice(:)
+  v_ice         => ice%vice(:)
   T_oc_array    => ice%srfoce_temp(:)
   S_oc_array    => ice%srfoce_salt(:)
-  u_w           => ice%srfoce_uv(1,:)
-  v_w           => ice%srfoce_uv(1,:)
+  u_w           => ice%srfoce_u(:)
+  v_w           => ice%srfoce_v(:)
   fresh_wa_flux => ice%flx_fw
   net_heat_flux => ice%flx_h
   thdgr         => ice%thermo%thdgr
@@ -87,6 +87,7 @@ subroutine thermodynamics(ice, partit, mesh)
   oce_heat_flux => ice%atmcoupl%oce_flx_h
   ice_heat_flux => ice%atmcoupl%ice_flx_h
   enthalpyoffuse=> ice%atmcoupl%enthalpyoffuse
+  
   !_____________________________________________________________________________ 
   rsss = ref_sss
 

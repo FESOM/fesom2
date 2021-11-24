@@ -442,16 +442,13 @@ subroutine cavity_momentum_fluxes(ice, dynamics, partit, mesh)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UVnode
-    real(kind=WP), dimension(:)    , pointer :: u_w, v_w
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UV=>dynamics%uv(:,:,:)
     UVnode=>dynamics%uvnode(:,:,:)
-    u_w   =>ice%srfoce_uv(1,:)
-    v_w   =>ice%srfoce_uv(2,:)
-
+    
     !___________________________________________________________________________
     do elem=1,myDim_elem2D
         elnodes= elem2D_nodes(:,elem)
@@ -500,8 +497,8 @@ subroutine cavity_ice_clean_vel(ice, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    U_ice       => ice%uvice(1, :)
-    V_ice       => ice%uvice(2, :)
+    U_ice       => ice%uice(:)
+    V_ice       => ice%vice(:)
 
     !___________________________________________________________________________
     do node=1,myDim_nod2d+eDim_nod2d           

@@ -217,6 +217,63 @@ end module
 !
 !
 !_______________________________________________________________________________
+!
+!
+!_______________________________________________________________________________
+subroutine ice_fct_init(ice, partit, mesh)
+  use o_PARAM
+  use MOD_MESH
+  use MOD_ICE
+  USE MOD_PARTIT
+  USE MOD_PARSUP
+  use i_ARRAYS
+  use ice_fct_interfaces
+  implicit none
+  integer   :: n_size
+  type(t_ice), intent(inout), target :: ice
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh),   intent(in),    target :: mesh
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+  
+  n_size=myDim_nod2D+eDim_nod2D
+  
+  ! Initialization of arrays necessary to implement FCT algorithm
+!   allocate(m_icel(n_size), a_icel(n_size), m_snowl(n_size))  ! low-order solutions
+!   m_icel=0.0_WP
+!   a_icel=0.0_WP 
+!   m_snowl=0.0_WP
+! #if defined (__oifs)
+!   allocate(m_templ(n_size))  
+!   allocate(dm_temp(n_size))  
+! #endif /* (__oifs) */
+  allocate(icefluxes(myDim_elem2D,3))
+  allocate(icepplus(n_size), icepminus(n_size))
+  icefluxes = 0.0_WP
+  icepplus = 0.0_WP
+  icepminus= 0.0_WP
+!   
+! #if defined (__oifs)
+!   m_templ=0.0_WP
+!   dm_temp=0.0_WP
+! #endif /* (__oifs) */
+  
+!   allocate(dm_ice(n_size), da_ice(n_size), dm_snow(n_size))  ! increments of high
+!   dm_ice = 0.0_WP                                            ! order solutions
+!   da_ice = 0.0_WP
+!   dm_snow = 0.0_WP
+  
+  ! Fill in  the mass matrix    
+  call ice_mass_matrix_fill(ice, partit, mesh)
+  if (mype==0) write(*,*) 'Ice FCT is initialized' 
+end subroutine ice_fct_init
+!
+!
+!_______________________________________________________________________________
 subroutine ice_fct_solve(ice, partit, mesh)
     USE MOD_ICE
     USE MOD_PARTIT
@@ -268,6 +325,7 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     use i_PARAM
+    use i_arrays
     use g_comm_auto
     implicit none
     type(t_ice)   , intent(inout), target :: ice
@@ -281,7 +339,7 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:), pointer :: a_icel, m_icel, m_snowl
     real(kind=WP), dimension(:), pointer :: rhs_a, rhs_m, rhs_ms
-    real(kind=WP), dimension(:), pointer :: mass_matrix
+!     real(kind=WP), dimension(:), pointer :: mass_matrix
 #if defined (__oifs)
     real(kind=WP), dimension(:), pointer :: ice_temp, rhs_temp, m_templ
 #endif /* (__oifs) */    
@@ -303,7 +361,7 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     m_templ     => ice%data(4)%valuesl(:)
     rhs_temp    => ice%data(4)%values_rhs(:)
 #endif /* (__oifs) */ 
-    mass_matrix => ice%work%fct_massmatrix(:)
+!     mass_matrix => ice%work%fct_massmatrix(:)
     
     !___________________________________________________________________________
     ! Added diffusivity parameter Adjust it to ensure posivity of solution    
@@ -350,6 +408,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     use o_PARAM
+    use i_arrays
     use g_comm_auto
     implicit none
     type(t_ice)   , intent(inout), target :: ice
@@ -364,7 +423,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer :: a_icel, m_icel, m_snowl
     real(kind=WP), dimension(:), pointer :: rhs_a, rhs_m, rhs_ms
     real(kind=WP), dimension(:), pointer :: da_ice, dm_ice, dm_snow
-    real(kind=WP), dimension(:), pointer :: mass_matrix
+!     real(kind=WP), dimension(:), pointer :: mass_matrix
 #if defined (__oifs)
     real(kind=WP), dimension(:), pointer :: dm_temp, rhs_temp, m_templ
 #endif /* (__oifs) */
@@ -386,7 +445,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
     rhs_temp    => ice%data(4)%values_rhs(:)
     dm_temp     => ice%data(4)%dvalues(:)
 #endif /* (__oifs) */ 
-    mass_matrix => ice%work%fct_massmatrix(:)
+!     mass_matrix => ice%work%fct_massmatrix(:)
 
     !___________________________________________________________________________
     ! Does Taylor-Galerkin solution
@@ -461,6 +520,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     use i_param
+    use i_arrays
     use o_PARAM
     use g_comm_auto
     implicit none
@@ -471,13 +531,14 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     integer   :: tr_array_id
     integer   :: icoef(3,3),n,q, elem,elnodes(3),row
     real(kind=WP)   :: vol, flux, ae, gamma
+    real(kind=WP), allocatable, dimension(:) :: tmax, tmin 
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:)  , pointer :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:)  , pointer :: a_icel, m_icel, m_snowl
     real(kind=WP), dimension(:)  , pointer :: da_ice, dm_ice, dm_snow
-    real(kind=WP), dimension(:)  , pointer :: tmax, tmin, icepplus, icepminus
-    real(kind=WP), dimension(:,:), pointer :: icefluxes
+!     real(kind=WP), dimension(:)  , pointer :: tmax, tmin, icepplus, icepminus
+!     real(kind=WP), dimension(:,:), pointer :: icefluxes
 #if defined (__oifs)
     real(kind=WP), dimension(:)  , pointer :: dm_temp, ice_temp, m_templ
 #endif /* (__oifs) */
@@ -499,22 +560,23 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     m_templ     => ice%data(4)%valuesl(:)
     dm_temp     => ice%data(4)%dvalues(:)
 #endif /* (__oifs) */ 
-    tmax        => ice%work%fct_tmax
-    tmin        => ice%work%fct_tmin
-    icepplus    => ice%work%fct_plus
-    icepminus   => ice%work%fct_minus
-    icefluxes   => ice%work%fct_fluxes
+!     tmax        => ice%work%fct_tmax
+!     tmin        => ice%work%fct_tmin
+!     icepplus    => ice%work%fct_plus
+!     icepminus   => ice%work%fct_minus
+!     icefluxes   => ice%work%fct_fluxes
     
     !___________________________________________________________________________
     ! It should coinside with gamma in ts_solve_low_order
-    gamma=ice%ice_gamma_fct          
-  
+    gamma=ice%ice_gamma_fct 
+    
     !___________________________________________________________________________
     ! Compute elemental antidiffusive fluxes to nodes
     ! This is the most unpleasant part --- 
     ! it takes memory and time. For every element 
     ! we need its antidiffusive contribution to 
     ! each of its 3 nodes
+allocate(tmax(myDim_nod2D), tmin(myDim_nod2D))
     tmax = 0.0_WP
     tmin = 0.0_WP
     
@@ -525,7 +587,6 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         icoef(n,n)=-2
     end do	    
     
-    !___________________________________________________________________________
     do elem=1, myDim_elem2D
         !_______________________________________________________________________
         elnodes=elem2D_nodes(:,elem)
@@ -567,15 +628,17 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #endif /* (__oifs) */
     end do
      
-    !___________________________________________________________________________
+    !==========================   
     ! Screening the low-order solution
+    !==========================
     ! TO BE ADDED IF FOUND NECESSARY
     ! Screening means comparing low-order solutions with the
     ! solution on the previous time step and using whichever 
     ! is greater/smaller in computations of max/min below
     
-    !___________________________________________________________________________
+    !==========================
     ! Cluster min/max
+    !==========================
     if (tr_array_id==1) then
         do row=1, myDim_nod2D
             if (ulevels_nod2d(row)>1) cycle
@@ -626,8 +689,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     end if
 #endif /* (__oifs) */
  
-    !___________________________________________________________________________
+    !=========================
     ! Sums of positive/negative fluxes to node row
+    !=========================
     icepplus=0._WP
     icepminus=0._WP
     do elem=1, myDim_elem2D
@@ -650,8 +714,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         end do  
     end do   
         
-    !___________________________________________________________________________
+    !========================
     ! The least upper bound for the correction factors
+    !========================
     do n=1,myDim_nod2D
         !_______________________________________________________________________
         ! if cavity cycle over
@@ -674,8 +739,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     ! pminus and pplus are to be known to neighbouting PE
     call exchange_nod(icepminus, icepplus, partit)
     
-    !___________________________________________________________________________
+    !======================== 
     ! Limiting
+    !======================== 
     do elem=1, myDim_elem2D
         !_______________________________________________________________________
         elnodes=elem2D_nodes(:,elem)
@@ -695,8 +761,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         icefluxes(elem,:)=ae*icefluxes(elem,:)
     end do   
   
-    !_______________________________________________________________________
+    !==========================
     ! Update the solution 
+    !==========================
     if(tr_array_id==1) then
         do n=1,myDim_nod2D
             if(ulevels_nod2D(n)>1) cycle !LK89140
@@ -773,10 +840,14 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         end do
     end if
 #endif /* (__oifs) */
+    
     call exchange_nod(m_ice, a_ice, m_snow, partit)
+
 #if defined (__oifs)
     call exchange_nod(ice_temp, partit)
 #endif /* (__oifs) */    
+
+    deallocate(tmin, tmax)
 end subroutine ice_fem_fct
 !
 !
@@ -788,6 +859,7 @@ subroutine ice_mass_matrix_fill(ice, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     use i_PARAM
+    use i_arrays
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -800,15 +872,17 @@ subroutine ice_mass_matrix_fill(ice, partit, mesh)
     integer                             :: flag=0,iflag=0
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP), dimension(:), pointer :: mass_matrix
+!     real(kind=WP), dimension(:), pointer :: mass_matrix
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    mass_matrix => ice%work%fct_massmatrix(:)
+!     mass_matrix => ice%work%fct_massmatrix(:)
     
     !___________________________________________________________________________
     ! a)
+    allocate(mass_matrix(sum(nn_num(1:myDim_nod2D))))
+    mass_matrix =0.0_WP
     allocate(col_pos(myDim_nod2D+eDim_nod2D))
     
     DO elem=1,myDim_elem2D
@@ -898,8 +972,8 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
     a_ice       => ice%data(1)%values(:)
     m_ice       => ice%data(2)%values(:)
     m_snow      => ice%data(3)%values(:)
-    u_ice       => ice%uvice(1, :)
-    v_ice       => ice%uvice(2, :)
+    u_ice       => ice%uice(:)
+    v_ice       => ice%vice(:)
     rhs_a       => ice%data(1)%values_rhs(:)
     rhs_m       => ice%data(2)%values_rhs(:)
     rhs_ms      => ice%data(3)%values_rhs(:)
