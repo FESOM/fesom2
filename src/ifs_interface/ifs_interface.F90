@@ -620,8 +620,8 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    myDim_nod2D        => fesom%partit%myDim_nod2D
    eDim_nod2D         => fesom%partit%eDim_nod2D
    coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => fesom%mesh%coord_nod2D  
-   stress_atmice_x(1:myDim_nod2D+eDim_nod2D) => fesom%ice%stress_atmice_xy(1,:)
-   stress_atmice_y(1:myDim_nod2D+eDim_nod2D) => fesom%ice%stress_atmice_xy(2,:)
+   stress_atmice_x(1:myDim_nod2D+eDim_nod2D) => fesom%ice%stress_atmice_x(:)
+   stress_atmice_y(1:myDim_nod2D+eDim_nod2D) => fesom%ice%stress_atmice_y(:)
    oce_heat_flux(1:myDim_nod2D+eDim_nod2D)   => fesom%ice%atmcoupl%oce_flx_h
    ice_heat_flux(1:myDim_nod2D+eDim_nod2D)   => fesom%ice%atmcoupl%ice_flx_h
    
