@@ -85,8 +85,8 @@ subroutine ice_setup(ice, tracers, partit, mesh)
     
     !___________________________________________________________________________
     ! Fill in  the mass matrix  
-    call ice_fct_init(ice, partit, mesh)
-!     call ice_mass_matrix_fill(ice, partit, mesh)
+!     call ice_fct_init(ice, partit, mesh)
+    call ice_mass_matrix_fill(ice, partit, mesh)
     
     !___________________________________________________________________________
     ! Initialization routine, user input is required 
