@@ -299,7 +299,7 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     a_icel       => ice%data(1)%valuesl(:)
     m_icel       => ice%data(2)%valuesl(:)
     m_snowl      => ice%data(3)%valuesl(:)
-    mass_matrix  => ice%work%fct_massmatrix
+    mass_matrix  => ice%work%fct_massmatrix(:)
     
     !___________________________________________________________________________
     gamma=ice_gamma_fct         ! Added diffusivity parameter
@@ -378,7 +378,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
   da_ice       => ice%data(1)%dvalues(:)
   dm_ice       => ice%data(2)%dvalues(:)
   dm_snow      => ice%data(3)%dvalues(:)
-  mass_matrix  => ice%work%fct_massmatrix
+  mass_matrix  => ice%work%fct_massmatrix(:)
   
   !_____________________________________________________________________________
   ! Does Taylor-Galerkin solution

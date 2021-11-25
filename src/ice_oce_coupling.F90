@@ -268,18 +268,22 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     real(kind=WP), dimension(:)  , pointer :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:)  , pointer :: a_ice_old
     real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn
+    real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    temp     => tracers%data(1)%values(:,:)
-    salt     => tracers%data(2)%values(:,:)
-    a_ice    => ice%data(1)%values(:)
-    m_ice    => ice%data(2)%values(:)
-    m_snow   => ice%data(3)%values(:)
-    a_ice_old=> ice%data(1)%values_old(:)
-    thdgr    => ice%thermo%thdgr
-    thdgrsn  => ice%thermo%thdgrsn
+    temp          => tracers%data(1)%values(:,:)
+    salt          => tracers%data(2)%values(:,:)
+    a_ice         => ice%data(1)%values(:)
+    m_ice         => ice%data(2)%values(:)
+    m_snow        => ice%data(3)%values(:)
+    a_ice_old     => ice%data(1)%values_old(:)
+    thdgr         => ice%thermo%thdgr(:)
+    thdgrsn       => ice%thermo%thdgrsn(:)
+    fresh_wa_flux => ice%flx_fw(:)
+    net_heat_flux => ice%flx_h(:)
+    
     !___________________________________________________________________________
     allocate(flux(myDim_nod2D+eDim_nod2D))
     flux = 0.0_WP
@@ -321,7 +325,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     water_flux  = -fresh_wa_flux
 #endif 
     heat_flux_in=heat_flux ! sw_pene will change the heat_flux
-    if (use_cavity) call cavity_heat_water_fluxes_3eq(dynamics, tracers, partit, mesh)
+    if (use_cavity) call cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
     !!PS if (use_cavity) call cavity_heat_water_fluxes_2eq(mesh)
     
 !!PS     where(ulevels_nod2D>1) heat_flux=0.0_WP

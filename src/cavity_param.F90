@@ -1,15 +1,29 @@
 module cavity_interfaces
     interface
-        subroutine cavity_heat_water_fluxes_3eq(dynamics, tracers, partit, mesh)
+        subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
+        USE MOD_ICE
         USE MOD_DYN
         USE MOD_TRACER
         USE MOD_PARTIT
         USE MOD_PARSUP
         USE MOD_MESH
-        type(t_dyn),    intent(in),    target :: dynamics
-        type(t_tracer), intent(in),    target :: tracers
+        type(t_ice)   , intent(inout), target :: ice
+        type(t_dyn)   , intent(in)   , target :: dynamics
+        type(t_tracer), intent(in)   , target :: tracers
         type(t_partit), intent(inout), target :: partit
-        type(t_mesh),   intent(in),    target :: mesh
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+        
+        subroutine cavity_heat_water_fluxes_2eq(ice, tracers, partit, mesh)
+        USE MOD_ICE
+        USE MOD_TRACER
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice)   , intent(inout), target :: ice
+        type(t_tracer), intent(in)   , target :: tracers
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
         end subroutine
 
         subroutine cavity_ice_clean_vel(ice, partit, mesh)
@@ -171,20 +185,21 @@ end subroutine compute_nrst_pnt2cavline
 ! adjusted for use in FESOM by Ralph Timmermann, 16.02.2011
 ! Reviewed by ?
 ! adapted by P. SCholz for FESOM2.0
-subroutine cavity_heat_water_fluxes_3eq(dynamics, tracers, partit, mesh)
+subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
     use MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
     use MOD_TRACER
     use MOD_DYN
+    use MOD_ICE
     use o_PARAM , only: density_0, WP
     use o_ARRAYS, only: heat_flux, water_flux, density_m_rho0, density_ref
-    use i_ARRAYS, only: net_heat_flux, fresh_wa_flux
     implicit none
     !___________________________________________________________________________
-    type(t_partit), intent(inout),  target :: partit
-    type(t_mesh),   intent(in),     target :: mesh
-    type(t_tracer), intent(in),     target :: tracers
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_tracer), intent(in)   , target :: tracers
+    type(t_ice)   , intent(inout), target :: ice
     type(t_dyn), intent(in),     target :: dynamics
     real (kind=WP)  :: temp,sal,tin,zice
     real (kind=WP)  :: rhow, rhor, rho
@@ -224,12 +239,15 @@ subroutine cavity_heat_water_fluxes_3eq(dynamics, tracers, partit, mesh)
     !      oomw= -30.
     !      oofw= -2.5
     real(kind=WP), dimension(:,:,:), pointer :: UVnode
+    real(kind=WP), dimension(:)    , pointer :: fresh_wa_flux, net_heat_flux
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UVnode=>dynamics%uvnode(:,:,:)
-
+    fresh_wa_flux => ice%flx_fw(:)
+    net_heat_flux => ice%flx_h(:)
+    
     !___________________________________________________________________________
     do node=1,myDim_nod2D !+eDim_nod2D  
         nzmin = ulevels_nod2D(node)
@@ -364,29 +382,32 @@ end subroutine cavity_heat_water_fluxes_3eq
 ! Compute the heat and freshwater fluxes under ice cavity using simple 2equ.
 ! Coded by Adriana Huerta-Casas
 ! Reviewed by Qiang Wang
-subroutine cavity_heat_water_fluxes_2eq(tracers, partit, mesh)
+subroutine cavity_heat_water_fluxes_2eq(ice, tracers, partit, mesh)
     use MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
     use MOD_TRACER
+    use MOD_ICE
     use o_PARAM , only: WP
     use o_ARRAYS, only: heat_flux, water_flux
-    use i_ARRAYS, only: net_heat_flux, fresh_wa_flux
     implicit none
 
-    type(t_partit), intent(inout),  target :: partit
-    type(t_mesh),   intent(in),     target :: mesh
-    type(t_tracer), intent(in),     target :: tracers
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_tracer), intent(in)   , target :: tracers
+    type(t_ice)   , intent(inout), target :: ice
     integer        :: node, nzmin
     real(kind=WP)   :: gama, L, aux
     real(kind=WP)   :: c2, c3, c4, c5, c6
     real(kind=WP)   :: t_i, s_i, p, t_fz
-    
+    real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
+    fresh_wa_flux => ice%flx_fw(:)
+    net_heat_flux => ice%flx_h(:)
+    
     !___________________________________________________________________________
     ! parameter for computing heat and water fluxes
     gama = 1.0e-4_WP     ! heat exchange velocity [m/s]
