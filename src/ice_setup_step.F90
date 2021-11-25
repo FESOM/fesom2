@@ -149,14 +149,14 @@ e_size=myDim_elem2D+eDim_elem2D
 !  allocate(m_ice_old(n_size), a_ice_old(n_size), m_snow_old(n_size), thdgr_old(n_size)) !PS
 !  allocate(thdgr_old(n_size)) !PS
  if (whichEVP > 0) then
-    allocate(u_ice_aux(n_size), v_ice_aux(n_size))
+!     allocate(u_ice_aux(n_size), v_ice_aux(n_size))
     allocate(alpha_evp_array(myDim_elem2D))
     allocate(beta_evp_array(n_size))
 
     alpha_evp_array=alpha_evp
     beta_evp_array =alpha_evp  ! alpha=beta works most reliable
-    u_ice_aux=0.0_WP
-    v_ice_aux=0.0_WP
+!     u_ice_aux=0.0_WP
+!     v_ice_aux=0.0_WP
  end if
  
 !  allocate(rhs_mdiv(n_size), rhs_adiv(n_size), rhs_msdiv(n_size))

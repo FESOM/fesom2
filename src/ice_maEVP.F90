@@ -109,6 +109,7 @@ subroutine stress_tensor_m(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice
     real(kind=WP), dimension(:), pointer  :: eps11, eps12, eps22
     real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
+    real(kind=WP), dimension(:), pointer  :: u_ice_aux, v_ice_aux
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -121,6 +122,8 @@ subroutine stress_tensor_m(ice, partit, mesh)
     sigma11      => ice%work%sigma11(:)
     sigma12      => ice%work%sigma12(:)
     sigma22      => ice%work%sigma22(:)
+    u_ice_aux    => ice%uice_aux(:)
+    v_ice_aux    => ice%vice_aux(:)
     
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
@@ -419,6 +422,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: u_w, v_w
     real(kind=WP), dimension(:), pointer  :: elevation
     real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y  
+    real(kind=WP), dimension(:), pointer  :: u_ice_aux, v_ice_aux
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -443,6 +447,8 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     elevation       => ice%srfoce_ssh(:)
     stress_atmice_x => ice%stress_atmice_x(:)
     stress_atmice_y => ice%stress_atmice_y(:)
+    u_ice_aux       => ice%uice_aux(:)
+    v_ice_aux       => ice%vice_aux(:)
     
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
@@ -757,6 +763,7 @@ subroutine find_alpha_field_a(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice
     real(kind=WP), dimension(:), pointer  :: eps11, eps12, eps22
     real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
+    real(kind=WP), dimension(:), pointer  :: u_ice_aux, v_ice_aux
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -769,6 +776,8 @@ subroutine find_alpha_field_a(ice, partit, mesh)
     sigma11      => ice%work%sigma11(:)
     sigma12      => ice%work%sigma12(:)
     sigma22      => ice%work%sigma22(:)
+    u_ice_aux    => ice%uice_aux(:)
+    v_ice_aux    => ice%vice_aux(:)
     
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
@@ -851,6 +860,7 @@ subroutine stress_tensor_a(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice
     real(kind=WP), dimension(:), pointer  :: eps11, eps12, eps22
     real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
+    real(kind=WP), dimension(:), pointer  :: u_ice_aux, v_ice_aux
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -863,6 +873,8 @@ subroutine stress_tensor_a(ice, partit, mesh)
     sigma11      => ice%work%sigma11(:)
     sigma12      => ice%work%sigma12(:)
     sigma22      => ice%work%sigma22(:)
+    u_ice_aux    => ice%uice_aux(:)
+    v_ice_aux    => ice%vice_aux(:)
     
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
@@ -971,7 +983,8 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice
     real(kind=WP), dimension(:), pointer  :: u_w, v_w
-    real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y  
+    real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
+    real(kind=WP), dimension(:), pointer  :: u_ice_aux, v_ice_aux
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -987,7 +1000,8 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     v_w             => ice%srfoce_v(:)
     stress_atmice_x => ice%stress_atmice_x
     stress_atmice_y => ice%stress_atmice_y
-  
+    u_ice_aux       => ice%uice_aux(:)
+    v_ice_aux       => ice%vice_aux(:)
     !___________________________________________________________________________
     steps=evp_rheol_steps
     rdt=ice_dt
