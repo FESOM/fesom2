@@ -130,6 +130,10 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   ! pointer on necessary derived types
   real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, u_w, v_w
   real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
+#if defined (__oasis) || defined (__ifsinterface)
+  real(kind=WP), dimension(:), pointer  ::  oce_heat_flux, ice_heat_flux 
+  real(kind=WP), dimension(:), pointer  ::  tmp_oce_heat_flux, tmp_ice_heat_flux 
+#endif 
 #if defined (__oifs) || defined (__ifsinterface)
   real(kind=WP), dimension(:), pointer  :: ice_temp
 #endif
@@ -137,16 +141,23 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-  u_ice           => ice%uice(:)
-  v_ice           => ice%vice(:)
-  u_w             => ice%srfoce_u(:)
-  v_w             => ice%srfoce_v(:)
-  stress_atmice_x => ice%stress_atmice_x(:)
-  stress_atmice_y => ice%stress_atmice_y(:)
+  u_ice            => ice%uice(:)
+  v_ice            => ice%vice(:)
+  u_w              => ice%srfoce_u(:)
+  v_w              => ice%srfoce_v(:)
+  stress_atmice_x  => ice%stress_atmice_x(:)
+  stress_atmice_y  => ice%stress_atmice_y(:)
 #if defined (__oifs) || defined (__ifsinterface)
-  ice_temp        => ice%data(4)%values(:)
+  ice_temp         => ice%data(4)%values(:)
 #endif      
-  
+#if defined (__oasis) || defined (__ifsinterface)
+  oce_heat_flux    => ice%atmcoupl%oce_flx_h(:)
+  ice_heat_flux    => ice%atmcoupl%ice_flx_h(:)
+  tmp_oce_heat_flux=> ice%atmcoupl%tmpoce_flx_h(:)
+  tmp_ice_heat_flux=> ice%atmcoupl%tmpice_flx_h(:)
+#endif 
+
+  !_____________________________________________________________________________
   t1=MPI_Wtime()
 #if defined (__oasis)
      if (firstcall) then

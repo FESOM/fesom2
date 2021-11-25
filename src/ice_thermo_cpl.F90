@@ -69,6 +69,9 @@ subroutine thermodynamics(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
   real(kind=WP), dimension(:)  , pointer :: ice_temp
 #endif
+#if defined (__oasis) || defined (__ifsinterface)
+  real(kind=WP), dimension(:), pointer   ::  oce_heat_flux, ice_heat_flux 
+#endif 
   myDim_nod2d=>partit%myDim_nod2D
   eDim_nod2D =>partit%eDim_nod2D
   ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D
@@ -89,6 +92,10 @@ subroutine thermodynamics(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
   ice_temp      => ice%data(4)%values(:)
 #endif 
+#if defined (__oasis) || defined (__ifsinterface)
+  oce_heat_flux => ice%atmcoupl%oce_flx_h(:)
+  ice_heat_flux => ice%atmcoupl%ice_flx_h(:)
+#endif
   !_____________________________________________________________________________  
   rsss = ref_sss
 

@@ -398,9 +398,9 @@ CASE ('alb       ')
 CASE ('ist       ')
   call def_stream(nod2D, myDim_nod2D, 'ist',    'ice surface temperature', 'K',      ice%data(4)%values(:),                  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('qsi       ')
-  call def_stream(nod2D, myDim_nod2D, 'qsi',    'ice heat flux',           'W/m^2',  ice_heat_flux(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+  call def_stream(nod2D, myDim_nod2D, 'qsi',    'ice heat flux',           'W/m^2',  ice%atmcoupl%ice_flx_h(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('qso       ')
-  call def_stream(nod2D, myDim_nod2D, 'qso',    'oce heat flux',           'W/m^2',  oce_heat_flux(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+  call def_stream(nod2D, myDim_nod2D, 'qso',    'oce heat flux',           'W/m^2',   ice%atmcoupl%oce_flx_h(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 #endif
 !___________________________________________________________________________________________________________________________________
 
