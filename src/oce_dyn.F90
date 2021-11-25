@@ -266,8 +266,8 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
 !       if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
         ! for no slip implementation
-        nzmaxl=nlevels(el(1))
-        nzminl=ulevels(el(2))
+        nzmaxl =nlevels(el(1))
+        nzminl =ulevels(el(1))
         if (el(2) > 0) then
            nzmaxr =nlevels(el(2))
            nzminr =ulevels(el(2))
@@ -279,14 +279,14 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
         end if
 
         DO  nz=min(nzminl, nzminr), max(nzmaxl, nzmaxr)-1
-            if (myList_edge2D(ed) <= edge2D_in) then
+            if (( nz >= max(nzminl, nzminr) ) .AND. ( nz <= min(nzmaxl, nzmaxr) )) then
                u1=UV(1,nz,el(1))-UV(1,nz,el(2))
                v1=UV(2,nz,el(1))-UV(2,nz,el(2))             
             end if
             
             if (nz < nzminl) then !no splip for cavity, left triangle does not exist
-               u1=2.*UV(1,nz,el(2))
-               v1=2.*UV(2,nz,el(2))
+               u1=-2.*UV(1,nz,el(2))
+               v1=-2.*UV(2,nz,el(2))
             end if
 
             if (nz < nzminr) then !no splip for cavity, right triangle does not exist
@@ -294,12 +294,12 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
                v1=2.*UV(2,nz,el(1))
             end if
 
-            if (nz > nzmaxl) then !no splip, left triangle does not exist
-               u1=2.*UV(1,nz,el(2))
-               v1=2.*UV(2,nz,el(2))
+            if (nz > nzmaxl-1) then !no splip, left triangle does not exist
+               u1=-2.*UV(1,nz,el(2))
+               v1=-2.*UV(2,nz,el(2))
             end if
 
-            if (nz > nzmaxr) then !no splip, right triangle does not exist
+            if (nz > nzmaxr-1) then !no splip, right triangle does not exist
                u1=2.*UV(1,nz,el(1))
                v1=2.*UV(2,nz,el(1))
             end if
@@ -308,28 +308,30 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
                       max(dynamics%visc_gamma1*sqrt(u1*u1+v1*v1),   &
                       dynamics%visc_gamma2*(u1*u1+v1*v1))           &
                     )*len
-!            vi=dt*max(dynamics%visc_gamma0, dynamics%visc_gamma1*max(sqrt(u1*u1+v1*v1), dynamics%visc_gamma2*(u1*u1+v1*v1)))*len 
+            !vi=dt*max(dynamics%visc_gamma0, dynamics%visc_gamma1*max(sqrt(u1*u1+v1*v1), dynamics%visc_gamma2*(u1*u1+v1*v1)))*len 
             !here dynamics%visc_gamma2 is dimensional (1/velocity). If it is 10, then the respective term dominates starting from |u|=0.1 m/s an so on.
             u1=u1*vi
             v1=v1*vi
+            if ( (nz>=nzminl) .AND. (nz<=nzmaxl) ) then
 #if defined(_OPENMP)
-            call omp_set_lock(partit%plock(el(1)))
+                call omp_set_lock(partit%plock(el(1)))
 #endif
-            if ((nz-nzminl)*(nz-nzmaxl) >= 0) then
                 U_b(nz,el(1))=U_b(nz,el(1))-u1/elem_area(el(1))
                 V_b(nz,el(1))=V_b(nz,el(1))-v1/elem_area(el(1))
-            end if
 #if defined(_OPENMP)
-            call omp_unset_lock(partit%plock(el(1)))
-            call omp_set_lock(partit%plock(el(2)))
+                call omp_unset_lock(partit%plock(el(1)))
 #endif
-            if ((nz-nzminr)*(nz-nzmaxr) >= 0) then
+            end if
+            if ( (nz>=nzminr) .AND. (nz<=nzmaxr) ) then
+#if defined(_OPENMP)
+               call omp_set_lock(partit%plock(el(2)))
+#endif
                U_b(nz,el(2))=U_b(nz,el(2))+u1/elem_area(el(2))
                V_b(nz,el(2))=V_b(nz,el(2))+v1/elem_area(el(2))
-            end if
 #if defined(_OPENMP)
-            call omp_unset_lock(partit%plock(el(2)))
+               call omp_unset_lock(partit%plock(el(2)))
 #endif
+            end if
         END DO
     END DO
 !$OMP END DO
