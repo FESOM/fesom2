@@ -73,7 +73,7 @@ save
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: sigma11, sigma12, sigma22
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: eps11, eps12, eps22
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: fresh_wa_flux
-!   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: net_heat_flux
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: net_heat_flux
 #if defined (__oasis) || defined (__ifsinterface)
   real(kind=WP),target, allocatable, dimension(:)  :: ice_alb, ice_temp ! new fields for OIFS coupling
   real(kind=WP),target, allocatable, dimension(:)  :: oce_heat_flux, ice_heat_flux
