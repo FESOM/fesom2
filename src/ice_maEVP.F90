@@ -40,12 +40,14 @@ module ice_maEVP_interfaces
         type(t_mesh)  , intent(in)   , target :: mesh
         end subroutine
         
-        subroutine find_beta_field_a(partit, mesh)
+        subroutine find_beta_field_a(ice, partit, mesh)
+        USE MOD_ICE
         USE MOD_PARTIT
         USE MOD_PARSUP
         USE MOD_MESH
-        type(t_mesh),   intent(in),    target :: mesh
+        type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
         end subroutine
    end interface  
 end module
@@ -764,6 +766,7 @@ subroutine find_alpha_field_a(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: eps11, eps12, eps22
     real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
     real(kind=WP), dimension(:), pointer  :: u_ice_aux, v_ice_aux
+    real(kind=WP), dimension(:), pointer  :: alpha_evp_array
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -778,7 +781,7 @@ subroutine find_alpha_field_a(ice, partit, mesh)
     sigma22      => ice%work%sigma22(:)
     u_ice_aux    => ice%uice_aux(:)
     v_ice_aux    => ice%vice_aux(:)
-    
+    alpha_evp_array => ice%alpha_evp_array(:)
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
     vale=1.0_WP/(ellipse**2)
@@ -861,20 +864,22 @@ subroutine stress_tensor_a(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: eps11, eps12, eps22
     real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
     real(kind=WP), dimension(:), pointer  :: u_ice_aux, v_ice_aux
+    real(kind=WP), dimension(:), pointer  :: alpha_evp_array
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-    a_ice        => ice%data(1)%values(:)
-    m_ice        => ice%data(2)%values(:)
-    eps11        => ice%work%eps11(:)
-    eps12        => ice%work%eps12(:)
-    eps22        => ice%work%eps22(:)
-    sigma11      => ice%work%sigma11(:)
-    sigma12      => ice%work%sigma12(:)
-    sigma22      => ice%work%sigma22(:)
-    u_ice_aux    => ice%uice_aux(:)
-    v_ice_aux    => ice%vice_aux(:)
+    a_ice           => ice%data(1)%values(:)
+    m_ice           => ice%data(2)%values(:)
+    eps11           => ice%work%eps11(:)
+    eps12           => ice%work%eps12(:)
+    eps22           => ice%work%eps22(:)
+    sigma11         => ice%work%sigma11(:)
+    sigma12         => ice%work%sigma12(:)
+    sigma22         => ice%work%sigma22(:)
+    u_ice_aux       => ice%uice_aux(:)
+    v_ice_aux       => ice%vice_aux(:)
+    alpha_evp_array => ice%alpha_evp_array(:)
     
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
@@ -985,6 +990,7 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: u_w, v_w
     real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
     real(kind=WP), dimension(:), pointer  :: u_ice_aux, v_ice_aux
+    real(kind=WP), dimension(:), pointer  :: beta_evp_array
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -1002,6 +1008,8 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     stress_atmice_y => ice%stress_atmice_y
     u_ice_aux       => ice%uice_aux(:)
     v_ice_aux       => ice%vice_aux(:)
+    beta_evp_array  => ice%beta_evp_array(:)
+    
     !___________________________________________________________________________
     steps=evp_rheol_steps
     rdt=ice_dt
@@ -1073,7 +1081,7 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     
     call find_alpha_field_a(ice, partit, mesh)             ! alpha_evp_array is initialized with alpha_evp;
                                         ! At this stage we already have non-trivial velocities. 
-    call find_beta_field_a(partit, mesh)
+    call find_beta_field_a(ice, partit, mesh)
 end subroutine EVPdynamics_a
 !
 !
@@ -1082,25 +1090,30 @@ end subroutine EVPdynamics_a
 ! reason we need it in addition to alpha_evp_array (we work with 
 ! alpha=beta, and keep different names for generality; mEVP can work with 
 ! alpha \ne beta, but not aEVP).
-subroutine find_beta_field_a(partit, mesh)
+subroutine find_beta_field_a(ice, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_MESH
+    USE MOD_ICE
     use o_param
     USE i_param
     use i_arrays
     Implicit none    
-    type(t_mesh),   intent(in),    target :: mesh
+    type(t_mesh)  , intent(in)   , target :: mesh
     type(t_partit), intent(inout), target :: partit
+    type(t_ice)   , intent(inout), target :: ice
     !___________________________________________________________________________
     integer :: n
     !___________________________________________________________________________
     ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: alpha_evp_array, beta_evp_array
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-
+    alpha_evp_array => ice%alpha_evp_array(:)
+    beta_evp_array  => ice%beta_evp_array(:)
+  
     !___________________________________________________________________________
     DO n=1, myDim_nod2D
        !________________________________________________________________________

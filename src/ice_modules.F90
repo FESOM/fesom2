@@ -98,8 +98,8 @@ save
 !  REAL(kind=WP), ALLOCATABLE, DIMENSION(:,:)        :: icefluxes
 !  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: icepplus, icepminus
  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: mass_matrix  
- REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: alpha_evp_array(:)   ! of myDim_elem2D
- REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: beta_evp_array(:)    ! of myDim_node2D+eDim_node2D
+!  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: alpha_evp_array(:)   ! of myDim_elem2D
+!  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: beta_evp_array(:)    ! of myDim_node2D+eDim_node2D
 
 ! Mean arrays
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice_mean, V_ice_mean

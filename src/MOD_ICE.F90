@@ -104,6 +104,9 @@ TYPE T_ICE
     ! freshwater & heatflux
     real(kind=WP), allocatable, dimension(:)    :: flx_fw, flx_h
     
+    ! maEVP variables
+    real(kind=WP), allocatable, dimension(:)    :: alpha_evp_array, beta_evp_array
+    
     !___________________________________________________________________________
     ! total number of ice tracers (default=3, 1=area, 2=mice, 3=msnow, (4=ice_temp)
 #if defined (__oifs) || defined (__ifsinterface)
@@ -341,7 +344,6 @@ subroutine WRITE_T_ICE(ice, unit, iostat, iomsg)
     call write_bin_array(ice%stress_iceoce_x, unit, iostat, iomsg)
     call write_bin_array(ice%stress_atmice_y, unit, iostat, iomsg)
     call write_bin_array(ice%stress_iceoce_y, unit, iostat, iomsg)
-!     call write_bin_array(ice%srfoce_uv, unit, iostat, iomsg)
     call write_bin_array(ice%srfoce_u, unit, iostat, iomsg)
     call write_bin_array(ice%srfoce_v, unit, iostat, iomsg)
     call write_bin_array(ice%srfoce_temp, unit, iostat, iomsg)
@@ -349,7 +351,11 @@ subroutine WRITE_T_ICE(ice, unit, iostat, iomsg)
     call write_bin_array(ice%srfoce_ssh, unit, iostat, iomsg)
     call write_bin_array(ice%flx_fw, unit, iostat, iomsg)
     call write_bin_array(ice%flx_h, unit, iostat, iomsg)
-    
+        if (ice%whichEVP > 0) then
+        call write_bin_array(ice%alpha_evp_array, unit, iostat, iomsg)
+        call write_bin_array(ice%beta_evp_array, unit, iostat, iomsg)
+    end if     
+
     !___________________________________________________________________________
     write(unit, iostat=iostat, iomsg=iomsg) ice%num_itracers
     do i=1, ice%num_itracers
@@ -408,7 +414,6 @@ subroutine READ_T_ICE(ice, unit, iostat, iomsg)
     call read_bin_array(ice%stress_iceoce_x, unit, iostat, iomsg)
     call read_bin_array(ice%stress_atmice_y, unit, iostat, iomsg)
     call read_bin_array(ice%stress_iceoce_y, unit, iostat, iomsg)
-!     call read_bin_array(ice%srfoce_uv, unit, iostat, iomsg)
     call read_bin_array(ice%srfoce_u, unit, iostat, iomsg)
     call read_bin_array(ice%srfoce_v, unit, iostat, iomsg)
     call read_bin_array(ice%srfoce_temp, unit, iostat, iomsg)
@@ -416,7 +421,10 @@ subroutine READ_T_ICE(ice, unit, iostat, iomsg)
     call read_bin_array(ice%srfoce_ssh, unit, iostat, iomsg)
     call read_bin_array(ice%flx_fw, unit, iostat, iomsg)
     call read_bin_array(ice%flx_h, unit, iostat, iomsg)
-    
+    if (ice%whichEVP > 0) then
+        call read_bin_array(ice%alpha_evp_array, unit, iostat, iomsg)
+        call read_bin_array(ice%beta_evp_array, unit, iostat, iomsg)
+    end if     
     !___________________________________________________________________________
     read(unit, iostat=iostat, iomsg=iomsg) ice%num_itracers
     do i=1, ice%num_itracers
@@ -564,20 +572,23 @@ subroutine ice_init(ice, partit, mesh)
     ice%uice_old        = 0.0_WP
     ice%stress_atmice_x = 0.0_WP
     ice%stress_iceoce_x = 0.0_WP
-    if (ice%whichEVP /= 0) then
-        allocate(ice%uice_aux(         node_size))
-        ice%uice_aux    = 0.0_WP
-    end if 
     ice%vice            = 0.0_WP
     ice%vice_rhs        = 0.0_WP
     ice%vice_old        = 0.0_WP
     ice%stress_atmice_y = 0.0_WP
     ice%stress_iceoce_y = 0.0_WP
     if (ice%whichEVP /= 0) then
+        allocate(ice%uice_aux(         node_size))
         allocate(ice%vice_aux(         node_size))
+        ice%uice_aux    = 0.0_WP
         ice%vice_aux    = 0.0_WP
-    end if 
-    
+    end if
+    if (ice%whichEVP == 2) then
+        allocate(ice%alpha_evp_array(  node_size))
+        allocate(ice%beta_evp_array(   node_size))
+        ice%alpha_evp_array = 0.0_WP
+        ice%beta_evp_array  = 0.0_WP
+    end if
     !___________________________________________________________________________
     ! initialise surface ocean arrays in ice derived type 
     allocate(ice%srfoce_u(             node_size))
