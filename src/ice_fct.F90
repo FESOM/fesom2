@@ -175,60 +175,60 @@ subroutine ice_TG_rhs(ice, partit, mesh)
         END DO
     end do
 end subroutine ice_TG_rhs   
-!
-!----------------------------------------------------------------------------
-!
-subroutine ice_fct_init(ice, partit, mesh)
-  USE MOD_ICE
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use MOD_MESH
-  use o_PARAM
-  use i_ARRAYS
-  use ice_fct_interfaces
-  implicit none
-  integer   :: n_size
-  type(t_ice),    intent(inout), target :: ice
-  type(t_partit), intent(inout), target :: partit
-  type(t_mesh),   intent(in),    target :: mesh
-  !_____________________________________________________________________________
-  ! pointer on necessary derived types
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
-  
-  n_size=myDim_nod2D+eDim_nod2D
-  
-  ! Initialization of arrays necessary to implement FCT algorithm
-!   allocate(m_icel(n_size), a_icel(n_size), m_snowl(n_size))  ! low-order solutions
-!   m_icel=0.0_WP
-!   a_icel=0.0_WP 
-!   m_snowl=0.0_WP
-#if defined (__oifs) || defined (__ifsinterface)
-!   allocate(m_templ(n_size))  
-!   allocate(dm_temp(n_size))  
-#endif /* (__oifs) */
-!   allocate(icefluxes(myDim_elem2D,3))
-!   allocate(icepplus(n_size), icepminus(n_size))
-!   icefluxes = 0.0_WP
-!   icepplus = 0.0_WP
-!   icepminus= 0.0_WP
-  
-#if defined (__oifs) || defined (__ifsinterface)
-!   m_templ=0.0_WP
-!   dm_temp=0.0_WP
-#endif /* (__oifs) */
-  
-!   allocate(dm_ice(n_size), da_ice(n_size), dm_snow(n_size))  ! increments of high
-!   dm_ice = 0.0_WP                                            ! order solutions
-!   da_ice = 0.0_WP
-!   dm_snow = 0.0_WP
-  
-  ! Fill in  the mass matrix    
-  call ice_mass_matrix_fill(ice, partit, mesh)
-  if (mype==0) write(*,*) 'Ice FCT is initialized' 
-end subroutine ice_fct_init
+! !
+! !----------------------------------------------------------------------------
+! !
+! subroutine ice_fct_init(ice, partit, mesh)
+!   USE MOD_ICE
+!   USE MOD_PARTIT
+!   USE MOD_PARSUP
+!   use MOD_MESH
+!   use o_PARAM
+!   use i_ARRAYS
+!   use ice_fct_interfaces
+!   implicit none
+!   integer   :: n_size
+!   type(t_ice),    intent(inout), target :: ice
+!   type(t_partit), intent(inout), target :: partit
+!   type(t_mesh),   intent(in),    target :: mesh
+!   !_____________________________________________________________________________
+!   ! pointer on necessary derived types
+! #include "associate_part_def.h"
+! #include "associate_mesh_def.h"
+! #include "associate_part_ass.h"
+! #include "associate_mesh_ass.h"
+!   
+!   n_size=myDim_nod2D+eDim_nod2D
+!   
+!   ! Initialization of arrays necessary to implement FCT algorithm
+! !   allocate(m_icel(n_size), a_icel(n_size), m_snowl(n_size))  ! low-order solutions
+! !   m_icel=0.0_WP
+! !   a_icel=0.0_WP 
+! !   m_snowl=0.0_WP
+! #if defined (__oifs) || defined (__ifsinterface)
+! !   allocate(m_templ(n_size))  
+! !   allocate(dm_temp(n_size))  
+! #endif /* (__oifs) */
+! !   allocate(icefluxes(myDim_elem2D,3))
+! !   allocate(icepplus(n_size), icepminus(n_size))
+! !   icefluxes = 0.0_WP
+! !   icepplus = 0.0_WP
+! !   icepminus= 0.0_WP
+!   
+! #if defined (__oifs) || defined (__ifsinterface)
+! !   m_templ=0.0_WP
+! !   dm_temp=0.0_WP
+! #endif /* (__oifs) */
+!   
+! !   allocate(dm_ice(n_size), da_ice(n_size), dm_snow(n_size))  ! increments of high
+! !   dm_ice = 0.0_WP                                            ! order solutions
+! !   da_ice = 0.0_WP
+! !   dm_snow = 0.0_WP
+!   
+!   ! Fill in  the mass matrix    
+!   call ice_mass_matrix_fill(ice, partit, mesh)
+!   if (mype==0) write(*,*) 'Ice FCT is initialized' 
+! end subroutine ice_fct_init
 !
 !----------------------------------------------------------------------------
 !
