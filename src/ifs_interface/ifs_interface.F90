@@ -616,10 +616,12 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    !#include "associate_mesh.h"
    ! associate only the necessary things
    real(kind=wpIFS), dimension(:,:), pointer :: coord_nod2D
+!    real(kind=wpIFS), dimension(:,:), pointer :: stress_atmice_x, stress_atmice_y
    myDim_nod2D        => fesom%partit%myDim_nod2D
    eDim_nod2D         => fesom%partit%eDim_nod2D
    coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => fesom%mesh%coord_nod2D  
-
+   stress_atmice_x    => fesom%ice%stress_atmice_x
+   stress_atmice_y    => fesom%ice%stress_atmice_y
    ! =================================================================== !
    ! Sort out incoming arrays from the IFS and put them on the ocean grid
 
