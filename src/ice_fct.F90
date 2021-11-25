@@ -291,7 +291,7 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, rhs_ms
     real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
-!     real(kind=WP), dimension(:), pointer  :: mass_matrix
+    real(kind=WP), dimension(:), pointer  :: mass_matrix
 #if defined (__oifs) || defined (__ifsinterface)
     real(kind=WP), dimension(:), pointer  :: ice_temp, rhs_temp, m_templ
 #endif 
@@ -308,11 +308,11 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     a_icel       => ice%data(1)%valuesl(:)
     m_icel       => ice%data(2)%valuesl(:)
     m_snowl      => ice%data(3)%valuesl(:)
-!     mass_matrix  => ice%work%fct_massmatrix(:)
+    mass_matrix  => ice%work%fct_massmatrix(:)
 #if defined (__oifs) || defined (__ifsinterface)
-    ice_temp => ice%data(4)%values(:)
-    rhs_temp => ice%data(4)%values_rhs(:)
-    m_templ  => ice%data(4)%valuesl(:)
+    ice_temp     => ice%data(4)%values(:)
+    rhs_temp     => ice%data(4)%values_rhs(:)
+    m_templ      => ice%data(4)%valuesl(:)
 #endif       
     !___________________________________________________________________________
     gamma=ice_gamma_fct         ! Added diffusivity parameter
@@ -377,7 +377,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
   real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, rhs_ms
   real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
   real(kind=WP), dimension(:), pointer  :: da_ice, dm_ice, dm_snow
-!   real(kind=WP), dimension(:), pointer  :: mass_matrix
+  real(kind=WP), dimension(:), pointer  :: mass_matrix
 #if defined (__oifs) || defined (__ifsinterface)
   real(kind=WP), dimension(:), pointer  :: rhs_temp, m_templ, dm_temp
 #endif 
@@ -394,7 +394,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
   da_ice       => ice%data(1)%dvalues(:)
   dm_ice       => ice%data(2)%dvalues(:)
   dm_snow      => ice%data(3)%dvalues(:)
-!   mass_matrix  => ice%work%fct_massmatrix(:)
+  mass_matrix  => ice%work%fct_massmatrix(:)
 #if defined (__oifs) || defined (__ifsinterface)
   rhs_temp     => ice%data(4)%values_rhs(:)
   m_templ      => ice%data(4)%valuesl(:)
@@ -835,16 +835,16 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
   type(t_mesh)  , intent(in)   , target :: mesh
   !_____________________________________________________________________________
   ! pointer on necessary derived types
-!   real(kind=WP), dimension(:), pointer  :: mass_matrix
+  real(kind=WP), dimension(:), pointer  :: mass_matrix
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-!   mass_matrix => ice%work%fct_massmatrix
+  mass_matrix => ice%work%fct_massmatrix(:)
     !
     ! a)
-    allocate(mass_matrix(sum(nn_num(1:myDim_nod2D))))
-    mass_matrix =0.0_WP
+!     allocate(mass_matrix(sum(nn_num(1:myDim_nod2D))))
+!     mass_matrix =0.0_WP
     allocate(col_pos(myDim_nod2D+eDim_nod2D))
     
     DO elem=1,myDim_elem2D
@@ -1050,7 +1050,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: rhs_adiv, rhs_mdiv, rhs_msdiv
     real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
     real(kind=WP), dimension(:), pointer  :: da_ice, dm_ice, dm_snow
-!     real(kind=WP), dimension(:), pointer  :: mass_matrix
+    real(kind=WP), dimension(:), pointer  :: mass_matrix
 #if defined (__oifs) || defined (__ifsinterface)
     real(kind=WP), dimension(:), pointer  :: ice_temp, m_templ, dm_temp, rhs_tempdiv
 #endif 
@@ -1070,7 +1070,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
     da_ice       => ice%data(1)%dvalues(:)
     dm_ice       => ice%data(2)%dvalues(:)
     dm_snow      => ice%data(3)%dvalues(:)
-!     mass_matrix  => ice%work%fct_massmatrix(:)
+    mass_matrix  => ice%work%fct_massmatrix(:)
 #if defined (__oifs) || defined (__ifsinterface)
     ice_temp     => ice%data(4)%values(:)
     m_templ      => ice%data(4)%valuesl(:)
