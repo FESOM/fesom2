@@ -78,7 +78,7 @@ save
 !   real(kind=WP),target, allocatable, dimension(:)  :: ice_alb, ice_temp ! new fields for OIFS coupling
   real(kind=WP),target, allocatable, dimension(:)  :: ice_alb ! new fields for OIFS coupling
 !   real(kind=WP),target, allocatable, dimension(:)  :: oce_heat_flux, ice_heat_flux
-  real(kind=WP),target, allocatable, dimension(:)  :: tmp_oce_heat_flux, tmp_ice_heat_flux
+!   real(kind=WP),target, allocatable, dimension(:)  :: tmp_oce_heat_flux, tmp_ice_heat_flux
 							!temporary flux fields
 							!(for flux correction)
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_temp, m_templ, dm_temp, rhs_tempdiv
