@@ -194,6 +194,7 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
     use MOD_ICE
     use o_PARAM , only: density_0, WP
     use o_ARRAYS, only: heat_flux, water_flux, density_m_rho0, density_ref
+    use i_ARRAYS
     implicit none
     !___________________________________________________________________________
     type(t_partit), intent(inout), target :: partit
@@ -239,13 +240,14 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
     !      oomw= -30.
     !      oofw= -2.5
     real(kind=WP), dimension(:,:,:), pointer :: UVnode
-    real(kind=WP), dimension(:)    , pointer :: fresh_wa_flux, net_heat_flux
+!     real(kind=WP), dimension(:)    , pointer :: fresh_wa_flux, net_heat_flux
+    real(kind=WP), dimension(:)    , pointer :: net_heat_flux
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UVnode=>dynamics%uvnode(:,:,:)
-    fresh_wa_flux => ice%flx_fw(:)
+!     fresh_wa_flux => ice%flx_fw(:)
     net_heat_flux => ice%flx_h(:)
     
     !___________________________________________________________________________
@@ -390,6 +392,7 @@ subroutine cavity_heat_water_fluxes_2eq(ice, tracers, partit, mesh)
     use MOD_ICE
     use o_PARAM , only: WP
     use o_ARRAYS, only: heat_flux, water_flux
+    use i_ARRAYS
     implicit none
 
     type(t_partit), intent(inout), target :: partit
@@ -400,12 +403,13 @@ subroutine cavity_heat_water_fluxes_2eq(ice, tracers, partit, mesh)
     real(kind=WP)   :: gama, L, aux
     real(kind=WP)   :: c2, c3, c4, c5, c6
     real(kind=WP)   :: t_i, s_i, p, t_fz
-    real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
+!     real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
+    real(kind=WP), dimension(:)  , pointer :: net_heat_flux
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    fresh_wa_flux => ice%flx_fw(:)
+!     fresh_wa_flux => ice%flx_fw(:)
     net_heat_flux => ice%flx_h(:)
     
     !___________________________________________________________________________
