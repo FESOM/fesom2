@@ -148,7 +148,7 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
 #endif      
   
   t1=MPI_Wtime()
-#if defined (__oasis) || defined (__ifsinterface)
+#if defined (__oasis)
      if (firstcall) then
         allocate(exchange(myDim_nod2D+eDim_nod2D), mask(myDim_nod2D+eDim_nod2D))
         allocate(a2o_fcorr_stat(nrecv,6))
