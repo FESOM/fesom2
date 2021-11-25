@@ -285,6 +285,7 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, rhs_ms
     real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
+    real(kind=WP), dimension(:), pointer  :: mass_matrix
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -298,6 +299,7 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     a_icel       => ice%data(1)%valuesl(:)
     m_icel       => ice%data(2)%valuesl(:)
     m_snowl      => ice%data(3)%valuesl(:)
+    mass_matrix  => ice%work%fct_massmatrix
     
     !___________________________________________________________________________
     gamma=ice_gamma_fct         ! Added diffusivity parameter
@@ -362,6 +364,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
   real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, rhs_ms
   real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
   real(kind=WP), dimension(:), pointer  :: da_ice, dm_ice, dm_snow
+  real(kind=WP), dimension(:), pointer  :: mass_matrix
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -375,6 +378,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
   da_ice       => ice%data(1)%dvalues(:)
   dm_ice       => ice%data(2)%dvalues(:)
   dm_snow      => ice%data(3)%dvalues(:)
+  mass_matrix  => ice%work%fct_massmatrix
   
   !_____________________________________________________________________________
   ! Does Taylor-Galerkin solution
@@ -799,15 +803,17 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
   integer, allocatable                :: col_pos(:)
   real(kind=WP)                       :: aa
   integer                             :: flag=0,iflag=0
-  type(t_ice), intent(inout), target :: ice
+  type(t_ice)   , intent(inout), target :: ice
   type(t_partit), intent(inout), target :: partit
-  type(t_mesh),   intent(in),    target :: mesh
+  type(t_mesh)  , intent(in)   , target :: mesh
   !_____________________________________________________________________________
   ! pointer on necessary derived types
+  real(kind=WP), dimension(:), pointer  :: mass_matrix
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+  mass_matrix => ice%work%fct_massmatrix
     !
     ! a)
     allocate(mass_matrix(sum(nn_num(1:myDim_nod2D))))
@@ -1010,6 +1016,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: rhs_adiv, rhs_mdiv, rhs_msdiv
     real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
     real(kind=WP), dimension(:), pointer  :: da_ice, dm_ice, dm_snow
+    real(kind=WP), dimension(:), pointer  :: mass_matrix
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -1026,6 +1033,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
     da_ice       => ice%data(1)%dvalues(:)
     dm_ice       => ice%data(2)%dvalues(:)
     dm_snow      => ice%data(3)%dvalues(:)
+    mass_matrix  => ice%work%fct_massmatrix(:)
     
     !___________________________________________________________________________
     ! Does Taylor-Galerkin solution
