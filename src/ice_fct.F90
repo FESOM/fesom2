@@ -808,12 +808,12 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
   type(t_mesh)  , intent(in)   , target :: mesh
   !_____________________________________________________________________________
   ! pointer on necessary derived types
-  real(kind=WP), dimension(:), pointer  :: mass_matrix
+!   real(kind=WP), dimension(:), pointer  :: mass_matrix
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-  mass_matrix => ice%work%fct_massmatrix
+!   mass_matrix => ice%work%fct_massmatrix
     !
     ! a)
     allocate(mass_matrix(sum(nn_num(1:myDim_nod2D))))
