@@ -39,14 +39,20 @@ subroutine cut_off(ice, partit, mesh)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
+#if defined (__oifs) || defined (__ifsinterface)
+    real(kind=WP), dimension(:), pointer  :: ice_temp
+#endif /* (__oifs) */
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    a_ice        => ice%data(1)%values(:)
-    m_ice        => ice%data(2)%values(:)
-    m_snow       => ice%data(3)%values(:)
-    
+    a_ice    => ice%data(1)%values(:)
+    m_ice    => ice%data(2)%values(:)
+    m_snow   => ice%data(3)%values(:)
+#if defined (__oifs) || defined (__ifsinterface)
+    ice_temp => ice%data(4)%values(:)
+#endif /* (__oifs) */
+
     !___________________________________________________________________________
     ! lower cutoff: a_ice
     where(a_ice>1.0_WP)  a_ice=1.0_WP
@@ -54,7 +60,7 @@ subroutine cut_off(ice, partit, mesh)
     ! upper cutoff: a_ice
     where(a_ice<0.1e-8_WP)
         a_ice=0.0_WP
-#if defined (__oifs)
+#if defined (__oifs) || defined (__ifsinterface)
         m_ice=0.0_WP
         m_snow=0.0_WP
         ice_temp=273.15_WP
@@ -65,7 +71,7 @@ subroutine cut_off(ice, partit, mesh)
     ! lower cutoff: m_ice
     where(m_ice<0.1e-8_WP)
         m_ice=0.0_WP 
-#if defined (__oifs)
+#if defined (__oifs) || defined (__ifsinterface)
         m_snow=0.0_WP
         a_ice=0.0_WP
         ice_temp=273.15_WP
@@ -73,15 +79,16 @@ subroutine cut_off(ice, partit, mesh)
     end where
      
     !___________________________________________________________________________
-#if defined (__oifs)
+#if defined (__oifs) || defined (__ifsinterface)
     where(ice_temp>273.15_WP) ice_temp=273.15_WP
 #endif /* (__oifs) */
 
-#if defined (__oifs)
+#if defined (__oifs) || defined (__ifsinterface)
     where(ice_temp < 173.15_WP .and. a_ice >= 0.1e-8_WP) ice_temp=271.35_WP
 #endif /* (__oifs) */
 
 end subroutine cut_off
+
 #if !defined (__oasis) && !defined (__ifsinterface)
 !===================================================================
 ! Sea-ice thermodynamics routines

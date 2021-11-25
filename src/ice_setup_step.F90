@@ -213,12 +213,14 @@ e_size=myDim_elem2D+eDim_elem2D
   allocate(oce_heat_flux(n_size), ice_heat_flux(n_size))
   allocate(tmp_oce_heat_flux(n_size), tmp_ice_heat_flux(n_size))
 #if defined (__oifs) || defined (__ifsinterface)
-  allocate(ice_alb(n_size), ice_temp(n_size), enthalpyoffuse(n_size))
-  allocate(rhs_tempdiv(n_size), rhs_temp(n_size))
+!   allocate(ice_alb(n_size), ice_temp(n_size), enthalpyoffuse(n_size))
+allocate(ice_alb(n_size), enthalpyoffuse(n_size))
+!   allocate(rhs_tempdiv(n_size), rhs_temp(n_size))
+  allocate(rhs_tempdiv(n_size))
   ice_alb=0.6_WP
-  ice_temp=265.15_WP
+!   ice_temp=265.15_WP
   rhs_tempdiv=0._WP
-  rhs_temp=0._WP
+!   rhs_temp=0._WP
   enthalpyoffuse=0._WP
 #endif /* (__oifs) || defined (__ifsinterface) */
   oce_heat_flux=0._WP
@@ -263,12 +265,19 @@ subroutine ice_timestep(step, ice, partit, mesh)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
+#if defined (__oifs) || defined (__ifsinterface)
+    real(kind=WP), dimension(:), pointer  :: ice_temp, a_ice
+#endif     
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    u_ice           => ice%uice(:)
-    v_ice           => ice%vice(:)
+    u_ice    => ice%uice(:)
+    v_ice    => ice%vice(:)
+#if defined (__oifs) || defined (__ifsinterface)
+    a_ice    => ice%data(1)%values(:)
+    ice_temp => ice%data(4)%values(:)
+#endif     
     !___________________________________________________________________________
     t0=MPI_Wtime()
 #if defined (__icepack)
@@ -303,7 +312,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
     ! call ice_fct_solve
     ! call cut_off
     ! new FCT routines from Sergey Danilov 08.05.2018
-#if defined (__oifs)
+#if defined (__oifs) || defined (__ifsinterface)
     do i=1,myDim_nod2D+eDim_nod2D
         ice_temp(i) = ice_temp(i)*a_ice(i)
     end do
@@ -317,7 +326,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_update_for_div...'//achar(27)//'[0m'
     call ice_update_for_div(ice, partit, mesh)
     
-#if defined (__oifs)
+#if defined (__oifs) || defined (__ifsinterface)
     do i=1,myDim_nod2D+eDim_nod2D
         if (a_ice(i)>0.0_WP) ice_temp(i) = ice_temp(i)/a_ice(i)
     end do

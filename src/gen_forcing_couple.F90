@@ -129,7 +129,10 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   !_____________________________________________________________________________
   ! pointer on necessary derived types
   real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, u_w, v_w
-  real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y  
+  real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
+#if defined (__oifs) || defined (__ifsinterface)
+  real(kind=WP), dimension(:), pointer  :: ice_temp
+#endif
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -140,10 +143,12 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   v_w             => ice%srfoce_v(:)
   stress_atmice_x => ice%stress_atmice_x(:)
   stress_atmice_y => ice%stress_atmice_y(:)
-  
+#if defined (__oifs) || defined (__ifsinterface)
+  ice_temp        => ice%data(4)%values(:)
+#endif      
   
   t1=MPI_Wtime()
-#ifdef __oasis
+#ifdef (__oasis) || defined (__ifsinterface)
      if (firstcall) then
         allocate(exchange(myDim_nod2D+eDim_nod2D), mask(myDim_nod2D+eDim_nod2D))
         allocate(a2o_fcorr_stat(nrecv,6))
@@ -155,7 +160,7 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
      do i=1,nsend
          exchange  =0.
          if (i.eq.1) then
-#if defined (__oifs) 
+#if defined (__oifs) || defined (__ifsinterface)
             ! AWI-CM3 outgoing state vectors
             do n=1,myDim_nod2D+eDim_nod2D
             exchange(n)=tracers%data(1)%values(1, n)+tmelt	           ! sea surface temperature [K]
@@ -281,7 +286,7 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
                 mask=1.
                 call force_flux_consv(runoff, mask, i, 0,action, partit, mesh)
             end if
-#if defined (__oifs)
+#if defined (__oifs) || defined (__ifsinterface)
 
          elseif (i.eq.13) then
              if (action) then

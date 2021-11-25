@@ -66,6 +66,9 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn
   real(kind=WP), dimension(:)  , pointer :: S_oc_array, T_oc_array, u_w, v_w
   real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
+#if defined (__oifs) || defined (__ifsinterface)
+  real(kind=WP), dimension(:)  , pointer :: ice_temp
+#endif
   myDim_nod2d=>partit%myDim_nod2D
   eDim_nod2D =>partit%eDim_nod2D
   ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D
@@ -83,7 +86,9 @@ subroutine thermodynamics(ice, partit, mesh)
   v_w           => ice%srfoce_v(:)
   fresh_wa_flux => ice%flx_fw(:)
   net_heat_flux => ice%flx_h(:)
-  
+#if defined (__oifs) || defined (__ifsinterface)
+  ice_temp      => ice%data(4)%values(:)
+#endif 
   !_____________________________________________________________________________  
   rsss = ref_sss
 
@@ -101,7 +106,7 @@ subroutine thermodynamics(ice, partit, mesh)
      h       = m_ice(inod)
      hsn     = m_snow(inod)
 
-#if defined (__oifs)
+#if defined (__oifs) || defined (__ifsinterface)
      a2ohf   = oce_heat_flux(inod) + shortwave(inod) + enthalpyoffuse(inod)
 #else
      a2ohf   = oce_heat_flux(inod) + shortwave(inod)
@@ -124,7 +129,7 @@ subroutine thermodynamics(ice, partit, mesh)
         rsf     = 0._WP
      end if
 
-#if defined (__oifs)
+#if defined (__oifs) || defined (__ifsinterface)
      !---- different lead closing parameter for NH and SH
      if (geo_coord_nod2D(2, inod)>0) then
         h0min = 0.3
@@ -297,7 +302,7 @@ contains
     !---- snow melt rate over sea ice (dsnow <= 0)
     !---- if there is atmospheric melting over sea ice, first melt any
     !---- snow that is present, but do not melt more snow than available
-#if defined (__oifs)
+#if defined (__oifs) || defined (__ifsinterface)
     !---- new condition added - surface temperature must be
     !----                       larger than 273K to melt snow
     if (t.gt.273_WP) then
@@ -309,7 +314,7 @@ contains
 #else
     dsnow = A*min(Qatmice-Qicecon,0._WP)
     dsnow = max(dsnow*rhoice/rhosno,-hsn)
-#endif
+#endif 
 
     !---- update snow thickness after atmospheric snow melt
     hsn = hsn + dsnow

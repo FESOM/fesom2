@@ -626,6 +626,7 @@ subroutine ice_init(ice, partit, mesh)
         ice%data(n)%values_div_rhs = 0.0_WP
         ice%data(n)%dvalues        = 0.0_WP
         ice%data(n)%valuesl        = 0.0_WP
+        if (n==4) ice%data(n)%values = 265.15_WP
     end do
     
     !___________________________________________________________________________
