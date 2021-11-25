@@ -466,14 +466,14 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     !___________________________________________________________________________
     integer   :: tr_array_id
     integer   :: icoef(3,3),n,q, elem,elnodes(3),row
-    real(kind=WP), allocatable, dimension(:) :: tmax, tmin 
+!     real(kind=WP), allocatable, dimension(:) :: tmax, tmin 
     real(kind=WP)   :: vol, flux, ae, gamma
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:)  , pointer  :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:)  , pointer  :: a_icel, m_icel, m_snowl
     real(kind=WP), dimension(:)  , pointer  :: da_ice, dm_ice, dm_snow
-    real(kind=WP), dimension(:)  , pointer  :: icepplus, icepminus
+    real(kind=WP), dimension(:)  , pointer  :: icepplus, icepminus, tmax, tmin
     real(kind=WP), dimension(:,:), pointer  :: icefluxes
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -491,6 +491,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     icefluxes    => ice%work%fct_fluxes(:,:)
     icepplus     => ice%work%fct_plus(:)
     icepminus    => ice%work%fct_minus(:)
+    tmax         => ice%work%fct_tmax(:)
+    tmin         => ice%work%fct_tmin(:)
+    
     !___________________________________________________________________________
     gamma=ice_gamma_fct        ! It should coinside with gamma in 
                              ! ts_solve_low_order  
@@ -503,7 +506,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     ! we need its antidiffusive contribution to 
     ! each of its 3 nodes
     
-    allocate(tmax(myDim_nod2D), tmin(myDim_nod2D))
+!     allocate(tmax(myDim_nod2D), tmin(myDim_nod2D))
     tmax = 0.0_WP
     tmin = 0.0_WP
     
@@ -774,7 +777,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     call exchange_nod(ice_temp, partit)
 #endif /* (__oifs) */    
 
-    deallocate(tmin, tmax)
+!     deallocate(tmin, tmax)
 end subroutine ice_fem_fct
 !
 !
