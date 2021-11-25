@@ -203,11 +203,11 @@ subroutine ice_fct_init(ice, partit, mesh)
   allocate(m_templ(n_size))  
   allocate(dm_temp(n_size))  
 #endif /* (__oifs) */
-  allocate(icefluxes(myDim_elem2D,3))
-  allocate(icepplus(n_size), icepminus(n_size))
-  icefluxes = 0.0_WP
-  icepplus = 0.0_WP
-  icepminus= 0.0_WP
+!   allocate(icefluxes(myDim_elem2D,3))
+!   allocate(icepplus(n_size), icepminus(n_size))
+!   icefluxes = 0.0_WP
+!   icepplus = 0.0_WP
+!   icepminus= 0.0_WP
   
 #if defined (__oifs)
   m_templ=0.0_WP
@@ -470,9 +470,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     real(kind=WP)   :: vol, flux, ae, gamma
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
-    real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
-    real(kind=WP), dimension(:), pointer  :: da_ice, dm_ice, dm_snow
+    real(kind=WP), dimension(:)  , pointer  :: a_ice, m_ice, m_snow
+    real(kind=WP), dimension(:)  , pointer  :: a_icel, m_icel, m_snowl
+    real(kind=WP), dimension(:)  , pointer  :: da_ice, dm_ice, dm_snow
+    real(kind=WP), dimension(:)  , pointer  :: icepplus, icepminus
+    real(kind=WP), dimension(:,:), pointer  :: icefluxes
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -486,7 +488,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     da_ice       => ice%data(1)%dvalues(:)
     dm_ice       => ice%data(2)%dvalues(:)
     dm_snow      => ice%data(3)%dvalues(:)
-    
+    icefluxes    => ice%work%fct_fluxes(:,:)
+    icepplus     => ice%work%fct_plus(:)
+    icepminus    => ice%work%fct_minus(:)
     !___________________________________________________________________________
     gamma=ice_gamma_fct        ! It should coinside with gamma in 
                              ! ts_solve_low_order  
