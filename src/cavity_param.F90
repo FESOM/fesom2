@@ -240,15 +240,15 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
     !      oomw= -30.
     !      oofw= -2.5
     real(kind=WP), dimension(:,:,:), pointer :: UVnode
-!     real(kind=WP), dimension(:)    , pointer :: fresh_wa_flux, net_heat_flux
+    real(kind=WP), dimension(:)    , pointer :: fresh_wa_flux, net_heat_flux
 !     real(kind=WP), dimension(:)    , pointer :: net_heat_flux
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UVnode=>dynamics%uvnode(:,:,:)
-!     fresh_wa_flux => ice%flx_fw(:)
-!     net_heat_flux => ice%flx_h(:)
+    fresh_wa_flux => ice%flx_fw(:)
+    net_heat_flux => ice%flx_h(:)
     
     !___________________________________________________________________________
     do node=1,myDim_nod2D !+eDim_nod2D  
@@ -403,14 +403,14 @@ subroutine cavity_heat_water_fluxes_2eq(ice, tracers, partit, mesh)
     real(kind=WP)   :: gama, L, aux
     real(kind=WP)   :: c2, c3, c4, c5, c6
     real(kind=WP)   :: t_i, s_i, p, t_fz
-!     real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
+    real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
 !     real(kind=WP), dimension(:)  , pointer :: net_heat_flux
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-!     fresh_wa_flux => ice%flx_fw(:)
-!     net_heat_flux => ice%flx_h(:)
+    fresh_wa_flux => ice%flx_fw(:)
+    net_heat_flux => ice%flx_h(:)
     
     !___________________________________________________________________________
     ! parameter for computing heat and water fluxes

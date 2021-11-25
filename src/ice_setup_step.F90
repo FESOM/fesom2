@@ -196,10 +196,10 @@ e_size=myDim_elem2D+eDim_elem2D
 !  S_oc_array = 0.0_WP
 !  T_oc_array = 0.0_WP
 !  allocate(fresh_wa_flux(n_size), net_heat_flux(n_size))
- allocate(fresh_wa_flux(n_size))
-allocate(net_heat_flux(n_size))
- fresh_wa_flux = 0.0_WP
- net_heat_flux = 0.0_WP
+!  allocate(fresh_wa_flux(n_size))
+! allocate(net_heat_flux(n_size))
+!  fresh_wa_flux = 0.0_WP
+!  net_heat_flux = 0.0_WP
  allocate(stress_atmice_x(n_size), stress_atmice_y(n_size))    
  stress_atmice_x = 0.0_WP
  stress_atmice_y = 0.0_WP

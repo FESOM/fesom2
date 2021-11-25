@@ -137,7 +137,7 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP),  dimension(:),  pointer :: a_ice_old, m_ice_old, m_snow_old
   real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn, thdgr_old, t_skin, ustar_aux
   real(kind=WP), dimension(:)  , pointer :: S_oc_array, T_oc_array, u_w, v_w
-!   real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
+  real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
 !   real(kind=WP), dimension(:)  , pointer :: net_heat_flux
   myDim_nod2d=>partit%myDim_nod2D
   eDim_nod2D =>partit%eDim_nod2D
@@ -161,8 +161,8 @@ subroutine thermodynamics(ice, partit, mesh)
   v_w           => ice%srfoce_v(:)
   T_oc_array    => ice%srfoce_temp(:)
   S_oc_array    => ice%srfoce_salt(:)
-!   net_heat_flux => ice%flx_h(:)
-!   fresh_wa_flux => ice%flx_fw(:)
+  net_heat_flux => ice%flx_h(:)
+  fresh_wa_flux => ice%flx_fw(:)
   
   !_____________________________________________________________________________
   rsss=ref_sss
