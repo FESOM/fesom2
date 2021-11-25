@@ -568,7 +568,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    USE g_forcing_arrays, only: 	shortwave, prec_rain, prec_snow, runoff, & 
       			&	evap_no_ifrac, sublimation !'longwave' only stand-alone, 'evaporation' filled later
 !    USE i_ARRAYS, 	only: stress_atmice_x, stress_atmice_y, oce_heat_flux, ice_heat_flux
-   SE i_ARRAYS, 	only: oce_heat_flux, ice_heat_flux 
+   USE i_ARRAYS, 	only: oce_heat_flux, ice_heat_flux 
    USE o_ARRAYS,        only: stress_atmoce_x, stress_atmoce_y
    USE g_comm_auto	! exchange_nod does the halo exchange
    
