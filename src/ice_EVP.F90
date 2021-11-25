@@ -492,24 +492,27 @@ subroutine EVPdynamics(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: u_ice_old, v_ice_old
     real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice, rhs_a, rhs_m
     real(kind=WP), dimension(:), pointer  :: u_w, v_w, elevation
+    real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y  
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    u_ice        => ice%uice(:)
-    v_ice        => ice%vice(:)
-    a_ice        => ice%data(1)%values(:)
-    m_ice        => ice%data(2)%values(:)
-    m_snow       => ice%data(3)%values(:)
-    u_ice_old    => ice%uice_old(:)
-    v_ice_old    => ice%vice_old(:)
-    u_rhs_ice    => ice%uice_rhs(:)
-    v_rhs_ice    => ice%vice_rhs(:)
-    rhs_a        => ice%data(1)%values_rhs(:)
-    rhs_m        => ice%data(2)%values_rhs(:)
-    u_w          => ice%srfoce_u(:)
-    v_w          => ice%srfoce_v(:)
-    elevation    => ice%srfoce_ssh(:)
+    u_ice           => ice%uice(:)
+    v_ice           => ice%vice(:)
+    a_ice           => ice%data(1)%values(:)
+    m_ice           => ice%data(2)%values(:)
+    m_snow          => ice%data(3)%values(:)
+    u_ice_old       => ice%uice_old(:)
+    v_ice_old       => ice%vice_old(:)
+    u_rhs_ice       => ice%uice_rhs(:)
+    v_rhs_ice       => ice%vice_rhs(:)
+    rhs_a           => ice%data(1)%values_rhs(:)
+    rhs_m           => ice%data(2)%values_rhs(:)
+    u_w             => ice%srfoce_u(:)
+    v_w             => ice%srfoce_v(:)
+    elevation       => ice%srfoce_ssh(:)
+    stress_atmice_x => ice%stress_atmice_x(:)
+    stress_atmice_y => ice%stress_atmice_y(:)
     
     !_______________________________________________________________________________
     ! If Icepack is used, always update the tracers

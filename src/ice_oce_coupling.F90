@@ -77,16 +77,19 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, a_ice, u_w, v_w
+    real(kind=WP), dimension(:), pointer  :: stress_iceoce_x, stress_iceoce_y  
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    u_ice  => ice%uice(:)
-    v_ice  => ice%vice(:)
-    a_ice  => ice%data(1)%values(:)
-    u_w    => ice%srfoce_u(:)
-    v_w    => ice%srfoce_v(:)
-    
+    u_ice           => ice%uice(:)
+    v_ice           => ice%vice(:)
+    a_ice           => ice%data(1)%values(:)
+    u_w             => ice%srfoce_u(:)
+    v_w             => ice%srfoce_v(:)
+    stress_iceoce_x => ice%stress_iceoce_x(:)
+    stress_iceoce_y => ice%stress_iceoce_y(:)
+  
     ! ==================
     ! momentum flux:
     ! ==================

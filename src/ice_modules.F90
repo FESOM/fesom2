@@ -87,10 +87,10 @@ save
 #endif /* (__oasis) || defined (__ifsinterface)*/
 
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: S_oc_array, T_oc_array
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_iceoce_x         
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_iceoce_y
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmice_x         
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmice_y
+!   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_iceoce_x         
+!   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_iceoce_y
+!   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmice_x         
+!   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmice_y
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: t_skin
  ! FCT implementation
 !  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: m_icel, a_icel, m_snowl

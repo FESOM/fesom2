@@ -129,14 +129,18 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   !_____________________________________________________________________________
   ! pointer on necessary derived types
   real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, u_w, v_w
+  real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y  
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-  u_ice => ice%uice(:)
-  v_ice => ice%vice(:)
-  u_w   => ice%srfoce_u(:)
-  v_w   => ice%srfoce_v(:)
+  u_ice           => ice%uice(:)
+  v_ice           => ice%vice(:)
+  u_w             => ice%srfoce_u(:)
+  v_w             => ice%srfoce_v(:)
+  stress_atmice_x => ice%stress_atmice_x(:)
+  stress_atmice_y => ice%stress_atmice_y(:)
+  
   
   t1=MPI_Wtime()
 #ifdef __oasis

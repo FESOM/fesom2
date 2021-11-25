@@ -418,28 +418,32 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice, rhs_a, rhs_m
     real(kind=WP), dimension(:), pointer  :: u_w, v_w
     real(kind=WP), dimension(:), pointer  :: elevation
+    real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y  
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-    u_ice        => ice%uice(:)
-    v_ice        => ice%vice(:)
-    a_ice        => ice%data(1)%values(:)
-    m_ice        => ice%data(2)%values(:)
-    m_snow       => ice%data(3)%values(:)
-    eps11        => ice%work%eps11(:)
-    eps12        => ice%work%eps12(:)
-    eps22        => ice%work%eps22(:)
-    sigma11      => ice%work%sigma11(:)
-    sigma12      => ice%work%sigma12(:)
-    sigma22      => ice%work%sigma22(:)
-    u_rhs_ice    => ice%uice_rhs(:)
-    v_rhs_ice    => ice%vice_rhs(:)
-    rhs_a        => ice%data(1)%values_rhs(:)
-    rhs_m        => ice%data(2)%values_rhs(:)
-    u_w          => ice%srfoce_u(:)
-    v_w          => ice%srfoce_v(:)
-    elevation    => ice%srfoce_ssh(:)
+    u_ice           => ice%uice(:)
+    v_ice           => ice%vice(:)
+    a_ice           => ice%data(1)%values(:)
+    m_ice           => ice%data(2)%values(:)
+    m_snow          => ice%data(3)%values(:)
+    eps11           => ice%work%eps11(:)
+    eps12           => ice%work%eps12(:)
+    eps22           => ice%work%eps22(:)
+    sigma11         => ice%work%sigma11(:)
+    sigma12         => ice%work%sigma12(:)
+    sigma22         => ice%work%sigma22(:)
+    u_rhs_ice       => ice%uice_rhs(:)
+    v_rhs_ice       => ice%vice_rhs(:)
+    rhs_a           => ice%data(1)%values_rhs(:)
+    rhs_m           => ice%data(2)%values_rhs(:)
+    u_w             => ice%srfoce_u(:)
+    v_w             => ice%srfoce_v(:)
+    elevation       => ice%srfoce_ssh(:)
+    stress_atmice_x => ice%stress_atmice_x(:)
+    stress_atmice_y => ice%stress_atmice_y(:)
+    
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
     vale=1.0_WP/(ellipse**2)
@@ -967,20 +971,23 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice
     real(kind=WP), dimension(:), pointer  :: u_w, v_w
+    real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y  
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-    u_ice        => ice%uice(:)
-    v_ice        => ice%vice(:)
-    a_ice        => ice%data(1)%values(:)
-    m_ice        => ice%data(2)%values(:)
-    m_snow       => ice%data(3)%values(:)
-    u_rhs_ice    => ice%uice_rhs(:)
-    v_rhs_ice    => ice%vice_rhs(:)
-    u_w          => ice%srfoce_u(:)
-    v_w          => ice%srfoce_v(:)
-    
+    u_ice           => ice%uice(:)
+    v_ice           => ice%vice(:)
+    a_ice           => ice%data(1)%values(:)
+    m_ice           => ice%data(2)%values(:)
+    m_snow          => ice%data(3)%values(:)
+    u_rhs_ice       => ice%uice_rhs(:)
+    v_rhs_ice       => ice%vice_rhs(:)
+    u_w             => ice%srfoce_u(:)
+    v_w             => ice%srfoce_v(:)
+    stress_atmice_x => ice%stress_atmice_x
+    stress_atmice_y => ice%stress_atmice_y
+  
     !___________________________________________________________________________
     steps=evp_rheol_steps
     rdt=ice_dt
