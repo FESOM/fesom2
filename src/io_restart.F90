@@ -203,8 +203,8 @@ subroutine ini_ice_io(year, ice, partit, mesh)
   call def_variable(iid, 'uice',       (/nod2D/), 'zonal velocity',             'm/s', ice%uice(:));
   call def_variable(iid, 'vice',       (/nod2D/), 'meridional velocity',        'm',   ice%vice(:));
 #if defined (__oifs)
-  call def_variable(iid, 'ice_albedo', (/nod2D/), 'ice albedo',                 '-',   ice_alb);
-  call def_variable(iid, 'ice_temp',(/nod2D/), 'ice surface temperature',  'K',   ice%data(4)%values);
+  call def_variable(iid, 'ice_albedo', (/nod2D/), 'ice albedo',                 '-',   ice%atmcoupl%ice_alb);
+  call def_variable(iid, 'ice_temp',   (/nod2D/), 'ice surface temperature',    'K',   ice%data(4)%values);
 #endif /* (__oifs) */
 
 end subroutine ini_ice_io

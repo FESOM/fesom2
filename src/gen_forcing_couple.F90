@@ -135,7 +135,7 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   real(kind=WP), dimension(:), pointer  ::  tmp_oce_heat_flux, tmp_ice_heat_flux 
 #endif 
 #if defined (__oifs) || defined (__ifsinterface)
-  real(kind=WP), dimension(:), pointer  :: ice_temp
+  real(kind=WP), dimension(:), pointer  :: ice_temp, ice_alb, enthalpyoffuse
 #endif
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -149,6 +149,8 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   stress_atmice_y  => ice%stress_atmice_y(:)
 #if defined (__oifs) || defined (__ifsinterface)
   ice_temp         => ice%data(4)%values(:)
+  ice_alb          => ice%atmcoupl%ice_alb(:)
+  enthalpyoffuse   => ice%atmcoupl%enthalpyoffuse(:)
 #endif      
 #if defined (__oasis) || defined (__ifsinterface)
   oce_heat_flux    => ice%atmcoupl%oce_flx_h(:)

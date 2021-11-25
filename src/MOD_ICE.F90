@@ -692,7 +692,7 @@ subroutine ice_init(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)  
     allocate(ice%atmcoupl%ice_alb(       node_size))
     allocate(ice%atmcoupl%enthalpyoffuse(node_size))
-    ice%atmcoupl%ice_alb       = 0.0_WP
+    ice%atmcoupl%ice_alb       = 0.6_WP
     ice%atmcoupl%enthalpyoffuse= 0.0_WP
 #endif /* (__oifs) */
 #endif /* (__oasis) */        
