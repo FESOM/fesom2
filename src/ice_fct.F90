@@ -214,10 +214,10 @@ subroutine ice_fct_init(ice, partit, mesh)
   dm_temp=0.0_WP
 #endif /* (__oifs) */
   
-  allocate(dm_ice(n_size), da_ice(n_size), dm_snow(n_size))  ! increments of high
-  dm_ice = 0.0_WP                                            ! order solutions
-  da_ice = 0.0_WP
-  dm_snow = 0.0_WP
+!   allocate(dm_ice(n_size), da_ice(n_size), dm_snow(n_size))  ! increments of high
+!   dm_ice = 0.0_WP                                            ! order solutions
+!   da_ice = 0.0_WP
+!   dm_snow = 0.0_WP
   
   ! Fill in  the mass matrix    
   call ice_mass_matrix_fill(ice, partit, mesh)
@@ -361,6 +361,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
   ! pointer on necessary derived types
   real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, rhs_ms
   real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
+  real(kind=WP), dimension(:), pointer  :: da_ice, dm_ice, dm_snow
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -371,6 +372,10 @@ subroutine ice_solve_high_order(ice, partit, mesh)
   a_icel       => ice%data(1)%valuesl(:)
   m_icel       => ice%data(2)%valuesl(:)
   m_snowl      => ice%data(3)%valuesl(:)
+  da_ice       => ice%data(1)%dvalues(:)
+  dm_ice       => ice%data(2)%dvalues(:)
+  dm_snow      => ice%data(3)%dvalues(:)
+  
   !_____________________________________________________________________________
   ! Does Taylor-Galerkin solution
   !
@@ -467,6 +472,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
+    real(kind=WP), dimension(:), pointer  :: da_ice, dm_ice, dm_snow
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -477,6 +483,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     a_icel       => ice%data(1)%valuesl(:)
     m_icel       => ice%data(2)%valuesl(:)
     m_snowl      => ice%data(3)%valuesl(:)
+    da_ice       => ice%data(1)%dvalues(:)
+    dm_ice       => ice%data(2)%dvalues(:)
+    dm_snow      => ice%data(3)%dvalues(:)
     
     !___________________________________________________________________________
     gamma=ice_gamma_fct        ! It should coinside with gamma in 
@@ -993,6 +1002,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:), pointer  :: rhs_adiv, rhs_mdiv, rhs_msdiv
     real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
+    real(kind=WP), dimension(:), pointer  :: da_ice, dm_ice, dm_snow
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -1006,6 +1016,9 @@ subroutine ice_update_for_div(ice, partit, mesh)
     a_icel       => ice%data(1)%valuesl(:)
     m_icel       => ice%data(2)%valuesl(:)
     m_snowl      => ice%data(3)%valuesl(:)
+    da_ice       => ice%data(1)%dvalues(:)
+    dm_ice       => ice%data(2)%dvalues(:)
+    dm_snow      => ice%data(3)%dvalues(:)
     
     !___________________________________________________________________________
     ! Does Taylor-Galerkin solution

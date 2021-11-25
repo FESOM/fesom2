@@ -94,7 +94,7 @@ save
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: t_skin
  ! FCT implementation
 !  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: m_icel, a_icel, m_snowl
- REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: dm_ice, da_ice, dm_snow
+!  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: dm_ice, da_ice, dm_snow
  REAL(kind=WP), ALLOCATABLE, DIMENSION(:,:)        :: icefluxes
  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: icepplus, icepminus
  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: mass_matrix  
