@@ -195,10 +195,10 @@ subroutine ice_fct_init(ice, partit, mesh)
   n_size=myDim_nod2D+eDim_nod2D
   
   ! Initialization of arrays necessary to implement FCT algorithm
-  allocate(m_icel(n_size), a_icel(n_size), m_snowl(n_size))  ! low-order solutions
-  m_icel=0.0_WP
-  a_icel=0.0_WP 
-  m_snowl=0.0_WP
+!   allocate(m_icel(n_size), a_icel(n_size), m_snowl(n_size))  ! low-order solutions
+!   m_icel=0.0_WP
+!   a_icel=0.0_WP 
+!   m_snowl=0.0_WP
 #if defined (__oifs)
   allocate(m_templ(n_size))  
   allocate(dm_temp(n_size))  
@@ -284,6 +284,7 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, rhs_ms
+    real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -294,6 +295,9 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     rhs_a        => ice%data(1)%values_rhs(:)
     rhs_m        => ice%data(2)%values_rhs(:)
     rhs_ms       => ice%data(3)%values_rhs(:)
+    a_icel       => ice%data(1)%valuesl(:)
+    m_icel       => ice%data(2)%valuesl(:)
+    m_snowl      => ice%data(3)%valuesl(:)
     
     !___________________________________________________________________________
     gamma=ice_gamma_fct         ! Added diffusivity parameter
@@ -356,6 +360,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
   !_____________________________________________________________________________
   ! pointer on necessary derived types
   real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, rhs_ms
+  real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -363,7 +368,9 @@ subroutine ice_solve_high_order(ice, partit, mesh)
   rhs_a        => ice%data(1)%values_rhs(:)
   rhs_m        => ice%data(2)%values_rhs(:)
   rhs_ms       => ice%data(3)%values_rhs(:)
-  
+  a_icel       => ice%data(1)%valuesl(:)
+  m_icel       => ice%data(2)%valuesl(:)
+  m_snowl      => ice%data(3)%valuesl(:)
   !_____________________________________________________________________________
   ! Does Taylor-Galerkin solution
   !
@@ -459,6 +466,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
+    real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -466,6 +474,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     a_ice        => ice%data(1)%values(:)
     m_ice        => ice%data(2)%values(:)
     m_snow       => ice%data(3)%values(:)
+    a_icel       => ice%data(1)%valuesl(:)
+    m_icel       => ice%data(2)%valuesl(:)
+    m_snowl      => ice%data(3)%valuesl(:)
     
     !___________________________________________________________________________
     gamma=ice_gamma_fct        ! It should coinside with gamma in 
@@ -981,6 +992,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:), pointer  :: rhs_adiv, rhs_mdiv, rhs_msdiv
+    real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -991,6 +1003,9 @@ subroutine ice_update_for_div(ice, partit, mesh)
     rhs_adiv     => ice%data(1)%values_div_rhs(:)
     rhs_mdiv     => ice%data(2)%values_div_rhs(:)
     rhs_msdiv    => ice%data(3)%values_div_rhs(:)
+    a_icel       => ice%data(1)%valuesl(:)
+    m_icel       => ice%data(2)%valuesl(:)
+    m_snowl      => ice%data(3)%valuesl(:)
     
     !___________________________________________________________________________
     ! Does Taylor-Galerkin solution
