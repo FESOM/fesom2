@@ -65,7 +65,7 @@ save
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: thdgr_old
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_rhs_ice, V_rhs_ice
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_m, rhs_a, rhs_ms, ths_temp
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: ths_temp
+!   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: ths_temp
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_w, V_w
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: u_ice_aux, v_ice_aux  ! of the size of u_ice, v_ice
 !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_mdiv, rhs_adiv, rhs_msdiv

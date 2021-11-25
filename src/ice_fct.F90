@@ -133,7 +133,7 @@ subroutine ice_TG_rhs(ice, partit, mesh)
         rhs_a(row)=0._WP
         rhs_ms(row)=0._WP        
 #if defined (__oifs) || defined (__ifsinterface)
-        ths_temp(row)=0._WP
+        rhs_temp(row)=0._WP
 #endif /* (__oifs) */
     END DO
     
