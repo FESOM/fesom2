@@ -3,7 +3,6 @@ subroutine setup_model(partit)
   USE MOD_PARTIT
   USE MOD_PARSUP
   use o_param
-  use i_param
   use i_therm_param
   use g_forcing_param
   use g_config

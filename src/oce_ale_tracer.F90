@@ -431,7 +431,6 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
     use MOD_DYN
     use o_PARAM
     use o_ARRAYS, only: Ki, Kv, heat_flux, water_flux, slope_tapered
-    use i_ARRAYS
     USE MOD_PARTIT
     USE MOD_PARSUP
     use g_CONFIG

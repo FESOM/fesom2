@@ -49,7 +49,6 @@ subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
   use o_PARAM
   use o_ARRAYS, only: water_flux, heat_flux, &
                  pgf_x, pgf_y, Av, Kv
-  use i_ARRAYS
   use g_comm_auto
   use g_support
   implicit none
@@ -259,7 +258,6 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
     use o_PARAM
     use o_ARRAYS, only: water_flux, stress_surf, &
                     heat_flux, Kv, Av
-    use i_ARRAYS
     use g_comm_auto
     use io_BLOWUP
     use g_forcing_arrays

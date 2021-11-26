@@ -26,7 +26,6 @@ end module
 !===================================================================
 subroutine cut_off(ice, partit, mesh)
     use o_param
-    use i_arrays
     use MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -115,8 +114,6 @@ subroutine thermodynamics(ice, partit, mesh)
   USE MOD_MESH
   use o_param
   use i_therm_param
-  use i_param
-  use i_arrays
   use g_config
   use g_forcing_param
   use g_forcing_arrays

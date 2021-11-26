@@ -22,7 +22,6 @@ USE MOD_DYN
 USE o_PARAM
 USE o_ARRAYS
 USE g_config
-use i_arrays
 IMPLICIT NONE
 
 type(t_mesh),   intent(in),    target :: mesh

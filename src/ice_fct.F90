@@ -91,8 +91,6 @@ subroutine ice_TG_rhs(ice, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_ICE
-    use i_Arrays
-    use i_PARAM
     use o_PARAM
     USE g_CONFIG
     implicit none 
@@ -184,7 +182,6 @@ end subroutine ice_TG_rhs
 !   USE MOD_PARSUP
 !   use MOD_MESH
 !   use o_PARAM
-!   use i_ARRAYS
 !   use ice_fct_interfaces
 !   implicit none
 !   integer   :: n_size
@@ -276,8 +273,6 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_MESH
-    use i_ARRAYS
-    use i_PARAM
     use g_comm_auto
     implicit none
     type(t_ice),    intent(inout), target :: ice
@@ -361,7 +356,6 @@ subroutine ice_solve_high_order(ice, partit, mesh)
   USE MOD_PARTIT
   USE MOD_PARSUP
   USE MOD_MESH
-  use i_ARRAYS
   use o_PARAM
   use g_comm_auto
   implicit none
@@ -479,8 +473,6 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_MESH
-    use i_arrays
-    use i_param
     use o_PARAM
     use g_comm_auto
     implicit none
@@ -820,8 +812,6 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
   USE MOD_PARSUP
   use MOD_TRACER
   use MOD_ICE
-  use i_PARAM
-  use i_ARRAYS
   !
   implicit none
   integer                             :: n, n1, n2, row
@@ -907,8 +897,6 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_ICE
-    use i_Arrays
-    use i_PARAM
     use o_PARAM
     USE g_CONFIG
     implicit none 
@@ -1031,8 +1019,6 @@ subroutine ice_update_for_div(ice, partit, mesh)
     USE MOD_PARSUP
     use MOD_TRACER
     use MOD_ICE
-    use i_Arrays
-    use i_PARAM
     use o_PARAM
     USE g_CONFIG
     use g_comm_auto

@@ -59,8 +59,6 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
     USE MOD_MESH
     use o_PARAM
     use o_ARRAYS
-    use i_ARRAYS
-    use i_PARAM
     USE g_CONFIG
     use g_comm_auto
 #if defined (__icepack)
@@ -148,7 +146,6 @@ subroutine ocean2ice(ice, dynamics, tracers, partit, mesh)
     ! transmits the relevant fields from the ocean to the ice model
 
     use o_PARAM
-    use i_ARRAYS
     use MOD_MESH
     use MOD_DYN
     use MOD_ICE
@@ -243,7 +240,6 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     use MOD_MESH
     USE g_CONFIG
     use o_ARRAYS
-    use i_ARRAYS
     use g_comm_auto
     use g_forcing_param, only: use_virt_salt
     use g_forcing_arrays

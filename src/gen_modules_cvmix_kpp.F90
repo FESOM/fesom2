@@ -30,7 +30,6 @@ module g_cvmix_kpp
     USE MOD_MESH
     use o_arrays
     use g_comm_auto 
-    use i_arrays
     use g_forcing_arrays
     use g_support
     use o_mixing_KPP_mod

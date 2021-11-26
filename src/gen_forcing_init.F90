@@ -40,7 +40,6 @@ subroutine forcing_array_setup(partit, mesh)
   use mod_mesh
   USE MOD_PARTIT
   USE MOD_PARSUP
-  use i_arrays
   use g_forcing_arrays
   use g_forcing_param
   use g_config

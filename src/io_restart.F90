@@ -9,7 +9,6 @@ MODULE io_RESTART
   use MOD_DYN
   use MOD_ICE
   use o_arrays
-  use i_arrays
   use g_cvmix_tke
   use g_cvmix_idemix
   implicit none

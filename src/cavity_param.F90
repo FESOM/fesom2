@@ -194,7 +194,6 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
     use MOD_ICE
     use o_PARAM , only: density_0, WP
     use o_ARRAYS, only: heat_flux, water_flux, density_m_rho0, density_ref
-    use i_ARRAYS
     implicit none
     !___________________________________________________________________________
     type(t_partit), intent(inout), target :: partit
@@ -392,7 +391,6 @@ subroutine cavity_heat_water_fluxes_2eq(ice, tracers, partit, mesh)
     use MOD_ICE
     use o_PARAM , only: WP
     use o_ARRAYS, only: heat_flux, water_flux
-    use i_ARRAYS
     implicit none
 
     type(t_partit), intent(inout), target :: partit

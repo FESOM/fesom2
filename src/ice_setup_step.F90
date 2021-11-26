@@ -65,8 +65,6 @@ end module
 ! ice initialization + array allocation + time stepping
 subroutine ice_setup(ice, tracers, partit, mesh)
     use o_param
-    use i_param
-    use i_arrays
     use g_CONFIG
     use mod_mesh
     USE MOD_PARTIT
@@ -119,11 +117,9 @@ end subroutine ice_setup
 ! ! back compatibility with FESOM input routines
 !  
 ! use o_param
-! use i_param
 ! use MOD_MESH
 ! USE MOD_PARTIT
 ! USE MOD_PARSUP
-! use i_arrays
 ! USE g_CONFIG
 ! 
 ! implicit none
@@ -241,7 +237,6 @@ subroutine ice_timestep(step, ice, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_ICE
-    use i_arrays
     use o_param
     use g_CONFIG
     use ice_EVPdynamics_interface
@@ -384,7 +379,6 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_MESH
-    use i_ARRAYs
     use o_PARAM   
     use o_arrays        
     use g_CONFIG

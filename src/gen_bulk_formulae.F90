@@ -5,7 +5,6 @@ MODULE gen_bulk
     USE MOD_PARSUP    
     USE MOD_ICE
     use i_therm_param
-    use i_arrays
     use g_forcing_arrays
     use g_forcing_param, only: ncar_bulk_z_wind, ncar_bulk_z_tair, ncar_bulk_z_shum
     use o_param, only: WP
@@ -339,7 +338,6 @@ subroutine cal_wind_drag_coeff(partit)
   ! Reviewed by ??
   !--------------------------------------------------
   
-  use i_arrays
   use g_forcing_arrays
   implicit none
 

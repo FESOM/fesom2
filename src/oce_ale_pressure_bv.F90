@@ -208,7 +208,6 @@ subroutine pressure_bv(tracers, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE o_ARRAYS
-    use i_arrays
     USE o_mixing_KPP_mod, only: dbsfc
     USE diagnostics,      only: ldiag_dMOC
     use densityJM_components_interface

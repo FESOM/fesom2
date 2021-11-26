@@ -89,10 +89,8 @@ subroutine stress_tensor_m(ice, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     use o_param
-    use i_param
     use mod_mesh
     use g_config
-    use i_arrays
 #if defined (__icepack)
     use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
 #endif
@@ -202,10 +200,8 @@ subroutine ssh2rhs(ice, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     use o_param
-    use i_param
     use mod_mesh
     use g_config
-    use i_arrays
     use i_therm_param
     implicit none
     type(t_ice)   , intent(inout), target :: ice
@@ -295,11 +291,9 @@ subroutine stress2rhs_m(ice, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     use o_param
-    use i_param
     use i_therm_param
     use mod_mesh
     use g_config
-    use i_arrays
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -384,10 +378,8 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     use o_param
-    use i_param
     use i_therm_param
     use g_config
-    use i_arrays
     use o_arrays
     use g_comm_auto
 #if defined (__icepack)
@@ -744,10 +736,8 @@ subroutine find_alpha_field_a(ice, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     use o_param
-    use i_param
     use i_therm_param
     use g_config
-    use i_arrays
 #if defined (__icepack)
     use icedrv_main,   only: strength
 #endif
@@ -841,10 +831,8 @@ subroutine stress_tensor_a(ice, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     use o_param
-    use i_param
     use mod_mesh
     use g_config
-    use i_arrays
 #if defined (__icepack)
     use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
 #endif
@@ -962,9 +950,7 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     use o_param
-    use i_arrays
     USE o_arrays
-    use i_param
     use o_PARAM
     use i_therm_param
     use g_config, only: use_cavity
@@ -1096,8 +1082,6 @@ subroutine find_beta_field_a(ice, partit, mesh)
     USE MOD_MESH
     USE MOD_ICE
     use o_param
-    USE i_param
-    use i_arrays
     Implicit none    
     type(t_mesh)  , intent(in)   , target :: mesh
     type(t_partit), intent(inout), target :: partit

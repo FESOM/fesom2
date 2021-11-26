@@ -8,9 +8,8 @@ MODULE io_BLOWUP
     USE MOD_TRACER  
     USE MOD_DYN
     USE MOD_ICE
-	use o_arrays
-	use i_arrays
-	implicit none
+    use o_arrays
+    implicit none
 #include "netcdf.inc"
 	!___________________________________________________________________________
 	type nc_dims

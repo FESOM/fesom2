@@ -10,7 +10,6 @@ module diagnostics
   use g_comm_auto
   use o_ARRAYS
   use g_forcing_arrays
-  use i_ARRAYS
   use o_mixing_KPP_mod
   use g_rotate_grid
   use g_support

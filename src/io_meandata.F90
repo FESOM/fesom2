@@ -592,7 +592,6 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
   USE MOD_ICE
   use fesom_version_info_module
   use g_config
-  use i_PARAM
   use o_PARAM
 
   implicit none

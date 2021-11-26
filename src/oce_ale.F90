@@ -1935,7 +1935,6 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     USE MOD_DYN
     use g_comm_auto
     use io_RESTART !!PS
-    use i_arrays !!PS
     use g_forcing_arrays !!PS
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -2827,7 +2826,6 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     USE MOD_PARSUP
     use g_comm_auto
     use io_RESTART !PS
-    use i_ARRAYS !PS
     use o_mixing_KPP_mod
     use g_cvmix_tke
     use g_cvmix_idemix

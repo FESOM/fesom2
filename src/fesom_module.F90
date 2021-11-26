@@ -9,8 +9,6 @@ module fesom_main_storage_module
   USE MOD_DYN
   USE o_ARRAYS
   USE o_PARAM
-  USE i_PARAM
-  use i_ARRAYS
   use g_clock
   use g_config
   use g_comm_auto

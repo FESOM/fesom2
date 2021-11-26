@@ -80,8 +80,6 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   use MOD_TRACER
   use MOD_ICE
   use o_arrays
-  use i_arrays
-  use i_param
   use i_therm_param
   use g_forcing_param
   use g_forcing_arrays

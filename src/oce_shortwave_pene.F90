@@ -13,8 +13,6 @@ subroutine cal_shortwave_rad(ice, partit, mesh)
     USE g_CONFIG
     use g_forcing_arrays
     use g_comm_auto
-    use i_param
-    use i_arrays
     use i_therm_param
     IMPLICIT NONE
     type(t_ice)   , intent(inout), target :: ice

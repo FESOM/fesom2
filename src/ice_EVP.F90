@@ -51,8 +51,6 @@ subroutine stress_tensor(ice_strength, ice, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     use o_param
-    use i_param
-    use i_arrays
     use g_CONFIG
 #if defined (__icepack)
     use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
@@ -170,8 +168,6 @@ end subroutine stress_tensor
 ! ! velocity field. They are stored as elemental arrays (sigma11, sigma22 and
 ! ! sigma12). The ocean velocity is at nodal locations.
 ! use o_param
-! use i_param
-! use i_arrays
 ! USE g_CONFIG
 ! USE MOD_MESH
 ! USE MOD_PARTIT
@@ -277,9 +273,7 @@ end subroutine stress_tensor
 ! ! The divergence is computed in a cysly over edges. It is slower that the
 ! ! approach in stress2rhs_e inherited from FESOM
 ! USE o_PARAM
-! USE i_PARAM
 ! USE i_therm_param
-! USE i_arrays
 ! use g_config, only: use_cavity
 ! USE MOD_MESH
 ! USE MOD_PARTIT
@@ -367,9 +361,7 @@ subroutine stress2rhs(inv_areamass, ice_strength, ice, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     USE o_PARAM
-    USE i_PARAM
     USE i_THERM_PARAM
-    USE i_arrays
     IMPLICIT NONE
     type(t_ice), intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -452,8 +444,6 @@ subroutine EVPdynamics(ice, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     USE o_PARAM
-    USE i_ARRAYS
-    USE i_PARAM
     USE i_therm_param
     USE o_ARRAYS
     USE g_CONFIG
