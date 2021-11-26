@@ -129,7 +129,7 @@ subroutine stress_tensor_m(ice, partit, mesh)
     
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
-    vale=1.0_WP/(ellipse**2)
+    vale=1.0_WP/(ice%ellipse**2)
     det2=1.0_WP/(1.0_WP+alpha_evp)
     det1=alpha_evp*det2
     do elem=1,myDim_elem2D
@@ -165,11 +165,11 @@ subroutine stress_tensor_m(ice, partit, mesh)
         delta=sqrt(delta)
         
 #if defined (__icepack)
-        pressure = sum(strength(elnodes))*val3/max(delta,delta_min)
+        pressure = sum(strength(elnodes))*val3/max(delta,ice%delta_min)
 #else
-        pressure=pstar*msum*exp(-c_pressure*(1.0_WP-asum))/max(delta,delta_min)
+        pressure=ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))/max(delta,ice%delta_min)
 #endif
-        r1=pressure*(eps1-max(delta,delta_min))
+        r1=pressure*(eps1-max(delta,ice%delta_min))
         r2=pressure*eps2*vale
         r3=pressure*eps12(elem)*vale
         si1=sigma11(elem)+sigma22(elem)
@@ -454,7 +454,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
-    vale=1.0_WP/(ellipse**2)
+    vale=1.0_WP/(ice%ellipse**2)
     det2=1.0_WP/(1.0_WP+alpha_evp)
     det1=alpha_evp*det2
     rdt=ice%ice_dt
@@ -572,7 +572,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
         if(msum > 0.01) then
             ice_el(el) = .true.
             asum=sum(a_ice(elnodes))*val3          
-            pressure_fac(el) = det2*pstar*msum*exp(-c_pressure*(1.0_WP-asum))
+            pressure_fac(el) = det2*ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
         endif
     end do
 
@@ -619,7 +619,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
                 ! ====== moduli:
                 delta = sqrt(eps1**2+vale*(eps2**2+4.0_WP*eps12(el)**2))
                 
-                pressure = pressure_fac(el)/(delta+delta_min)
+                pressure = pressure_fac(el)/(delta+ice%delta_min)
                 
                 !        si1 = det1*(sigma11(el)+sigma22(el)) + pressure*(eps1-delta) 
                 !        si2 = det1*(sigma11(el)-sigma22(el)) + pressure*eps2*vale
@@ -784,7 +784,7 @@ subroutine find_alpha_field_a(ice, partit, mesh)
     alpha_evp_array => ice%alpha_evp_array(:)
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
-    vale=1.0_WP/(ellipse**2)
+    vale=1.0_WP/(ice%ellipse**2)
     do elem=1,myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
         !_______________________________________________________________________
@@ -818,9 +818,9 @@ subroutine find_alpha_field_a(ice, partit, mesh)
         delta=sqrt(delta)
          
 #if defined (__icepack)
-        pressure = sum(strength(elnodes))*val3/(delta+delta_min)/msum
+        pressure = sum(strength(elnodes))*val3/(delta+ice%delta_min)/msum
 #else
-        pressure = pstar*exp(-c_pressure*(1.0_WP-asum))/(delta+delta_min) ! no multiplication
+        pressure = ice%pstar*exp(-ice%c_pressure*(1.0_WP-asum))/(delta+ice%delta_min) ! no multiplication
                                                                        ! with thickness (msum)
 #endif
         !adjust c_aevp such, that alpha_evp_array and beta_evp_array become in acceptable range
@@ -883,7 +883,7 @@ subroutine stress_tensor_a(ice, partit, mesh)
     
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
-    vale=1.0_WP/(ellipse**2)
+    vale=1.0_WP/(ice%ellipse**2)
     do elem=1,myDim_elem2D
         !__________________________________________________________________________
         ! if element has any cavity node skip it 
@@ -922,9 +922,9 @@ subroutine stress_tensor_a(ice, partit, mesh)
         delta=sqrt(delta)
    
 #if defined (__icepack)
-        pressure = sum(strength(elnodes))*val3/(delta+delta_min)
+        pressure = sum(strength(elnodes))*val3/(delta+ice%delta_min)
 #else
-        pressure=pstar*msum*exp(-c_pressure*(1.0_WP-asum))/(delta+delta_min)
+        pressure=ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))/(delta+ice%delta_min)
 #endif
     
         r1=pressure*(eps1-delta) 

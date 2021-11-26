@@ -16,11 +16,11 @@ MODULE i_PARAM
   SAVE
   ! ice model parameters:
   ! RHEOLOGY
-  REAL(kind=WP)             :: Pstar = 30000.0_WP        ![N/m^2]
-  REAL(kind=WP)             :: ellipse =2.0_WP           !
-  REAL(kind=WP)             :: c_pressure =20.0_WP       !
-  REAL(kind=WP)             :: delta_min=1.0e-11         ! [s^(-1)]
-  REAL(kind=WP)             :: Clim_evp=615              ! kg/m^2
+!   REAL(kind=WP)             :: Pstar = 30000.0_WP        ![N/m^2]
+!   REAL(kind=WP)             :: ellipse =2.0_WP           !
+!   REAL(kind=WP)             :: c_pressure =20.0_WP       !
+!   REAL(kind=WP)             :: delta_min=1.0e-11         ! [s^(-1)]
+!   REAL(kind=WP)             :: Clim_evp=615              ! kg/m^2
   REAL(kind=WP)             :: zeta_min=4.0e+8           ! kg/s
   INTEGER                   :: evp_rheol_steps=120       ! EVP rheology
                                                          ! cybcycling steps
@@ -42,8 +42,12 @@ MODULE i_PARAM
   integer                   :: whichEVP=0 !0=standart; 1=mEVP; 2=aEVP
 !   real(kind=WP)             :: ice_dt !ice step=ice_ave_steps*oce_step
 
-NAMELIST /ice_dyn/ whichEVP, Pstar, ellipse, c_pressure, delta_min, evp_rheol_steps, Cd_oce_ice, &
+! NAMELIST /ice_dyn/ whichEVP, Pstar, ellipse, c_pressure, delta_min, evp_rheol_steps, Cd_oce_ice, &
+! ice_gamma_fct, ice_diff, theta_io, ice_ave_steps, alpha_evp, beta_evp, c_aevp
+
+NAMELIST /ice_dyn/ whichEVP, evp_rheol_steps, Cd_oce_ice, &
 ice_gamma_fct, ice_diff, theta_io, ice_ave_steps, alpha_evp, beta_evp, c_aevp
+
 
 END MODULE i_PARAM
 !

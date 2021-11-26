@@ -87,7 +87,7 @@ subroutine stress_tensor(ice_strength, ice, partit, mesh)
     sigma22      => ice%work%sigma22(:)
     
     !___________________________________________________________________________
-    vale = 1.0_WP/(ellipse**2)
+    vale = 1.0_WP/(ice%ellipse**2)
     dte  = ice%ice_dt/(1.0_WP*evp_rheol_steps)
     det1 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte)
     det2 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte) !*ellipse**2 
@@ -130,7 +130,7 @@ subroutine stress_tensor(ice_strength, ice, partit, mesh)
             
             ! ===== if delta is too small or zero, viscosity will too large (unlimited)
             ! (limit delta_inv)
-            delta_inv = 1.0_WP/max(delta,delta_min) 
+            delta_inv = 1.0_WP/max(delta,ice%delta_min) 
             zeta = ice_strength(el)*delta_inv			     
             ! ===== Limiting pressure/Delta  (zeta): it may still happen that pressure/Delta 
             ! is too large in some regions and CFL criterion is violated.
@@ -191,7 +191,7 @@ end subroutine stress_tensor
 ! #include "associate_part_ass.h"
 ! #include "associate_mesh_ass.h"
 ! 
-!   vale = 1.0_WP/(ellipse**2)
+!   vale = 1.0_WP/(ice%ellipse**2)
 !    
 !   dte  = ice%ice_dt/(1.0_WP*evp_rheol_steps)
 !   det1 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte)
@@ -237,9 +237,9 @@ end subroutine stress_tensor
 !       
 !       ! ===== if delta is too small or zero, viscosity will too large (unlimited)
 !       ! (limit delta_inv)
-!         delta_inv = 1.0_WP/max(delta,delta_min)
+!         delta_inv = 1.0_WP/max(delta,ice%delta_min)
 !         
-! !!PS         delta_inv = delta/(delta+delta_min)
+! !!PS         delta_inv = delta/(delta+ice%delta_min)
 !         
 !         zeta = ice_strength(el)*delta_inv			     
 !       ! ===== Limiting pressure/Delta  (zeta): it may still happen that pressure/Delta 
@@ -588,9 +588,9 @@ subroutine EVPdynamics(ice, partit, mesh)
                 !_______________________________________________________________
                 ! Hunke and Dukowicz c*h*p*
 #if defined (__icepack)
-                ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
+                ice_strength(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
 #else
-                ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
+                ice_strength(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
 #endif
                 ice_strength(el) = 0.5_WP*ice_strength(el)
                 
@@ -638,9 +638,9 @@ subroutine EVPdynamics(ice, partit, mesh)
                 
                 ! ===== Hunke and Dukowicz c*h*p*
 #if defined (__icepack)
-                ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
+                ice_strength(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
 #else
-                ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
+                ice_strength(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
 #endif
                 ice_strength(el) = 0.5_WP*ice_strength(el)
                 
