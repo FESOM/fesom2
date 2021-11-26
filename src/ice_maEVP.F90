@@ -457,7 +457,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     vale=1.0_WP/(ellipse**2)
     det2=1.0_WP/(1.0_WP+alpha_evp)
     det1=alpha_evp*det2
-    rdt=ice_dt
+    rdt=ice%ice_dt
     steps=evp_rheol_steps
     
     u_ice_aux=u_ice    ! Initialize solver variables
@@ -824,7 +824,7 @@ subroutine find_alpha_field_a(ice, partit, mesh)
                                                                        ! with thickness (msum)
 #endif
         !adjust c_aevp such, that alpha_evp_array and beta_evp_array become in acceptable range
-        alpha_evp_array(elem)=max(50.0_WP,sqrt(ice_dt*c_aevp*pressure/rhoice/elem_area(elem)))
+        alpha_evp_array(elem)=max(50.0_WP,sqrt(ice%ice_dt*c_aevp*pressure/rhoice/elem_area(elem)))
         ! /voltriangle(elem) for FESOM1.4
         ! We do not allow alpha to be too small!
     end do !--> do elem=1,myDim_elem2D
@@ -1012,7 +1012,7 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     
     !___________________________________________________________________________
     steps=evp_rheol_steps
-    rdt=ice_dt
+    rdt=ice%ice_dt
     u_ice_aux=u_ice    ! Initialize solver variables
     v_ice_aux=v_ice
     call ssh2rhs(ice, partit, mesh)

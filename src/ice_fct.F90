@@ -161,10 +161,10 @@ subroutine ice_TG_rhs(ice, partit, mesh)
                 !entries(q)= vol*dt*((dx(n)*um+dy(n)*vm)/3.0_WP - &
                 !            diff*(dx(n)*dx(q)+ dy(n)*dy(q))- &
                 !	       0.5*dt*(um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q))) 
-                entries(q)= vol*ice_dt*((dx(n)*(um+u_ice(elnodes(q)))+ &
+                entries(q)= vol*ice%ice_dt*((dx(n)*(um+u_ice(elnodes(q)))+ &
                             dy(n)*(vm+v_ice(elnodes(q))))/12.0_WP - &
                             diff*(dx(n)*dx(q)+ dy(n)*dy(q))- &
-                            0.5_WP*ice_dt*(um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q))/9.0_WP)    
+                            0.5_WP*ice%ice_dt*(um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q))/9.0_WP)    
             END DO
             rhs_m(row)=rhs_m(row)+sum(entries*m_ice(elnodes))
             rhs_a(row)=rhs_a(row)+sum(entries*a_ice(elnodes))
@@ -990,19 +990,19 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
         row=elnodes(n)
 !!PS         if(ulevels_nod2D(row)>1) cycle !LK89140
         DO q = 1,3 
-            entries(q)= vol*ice_dt*((1.0_WP-0.5_WP*ice_dt*c4)*(dx(n)*(um+u_ice(elnodes(q)))+ &
+            entries(q)= vol*ice%ice_dt*((1.0_WP-0.5_WP*ice%ice_dt*c4)*(dx(n)*(um+u_ice(elnodes(q)))+ &
                         dy(n)*(vm+v_ice(elnodes(q))))/12.0_WP - &
-                        0.5_WP*ice_dt*(c1*dx(n)*dx(q)+c2*dy(n)*dy(q)+c3*(dx(n)*dy(q)+dx(q)*dy(n))))
+                        0.5_WP*ice%ice_dt*(c1*dx(n)*dx(q)+c2*dy(n)*dy(q)+c3*(dx(n)*dy(q)+dx(q)*dy(n))))
                        !um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q))/9.0)
-            entries2(q)=0.5_WP*ice_dt*(dx(n)*(um+u_ice(elnodes(q)))+ &
+            entries2(q)=0.5_WP*ice%ice_dt*(dx(n)*(um+u_ice(elnodes(q)))+ &
                         dy(n)*(vm+v_ice(elnodes(q)))-dx(q)*(um+u_ice(row))- &
                         dy(q)*(vm+v_ice(row)))  
         END DO
-        cx1=vol*ice_dt*c4*(sum(m_ice(elnodes))+m_ice(elnodes(n))+sum(entries2*m_ice(elnodes)))/12.0_WP
-        cx2=vol*ice_dt*c4*(sum(a_ice(elnodes))+a_ice(elnodes(n))+sum(entries2*a_ice(elnodes)))/12.0_WP
-        cx3=vol*ice_dt*c4*(sum(m_snow(elnodes))+m_snow(elnodes(n))+sum(entries2*m_snow(elnodes)))/12.0_WP
+        cx1=vol*ice%ice_dt*c4*(sum(m_ice(elnodes))+m_ice(elnodes(n))+sum(entries2*m_ice(elnodes)))/12.0_WP
+        cx2=vol*ice%ice_dt*c4*(sum(a_ice(elnodes))+a_ice(elnodes(n))+sum(entries2*a_ice(elnodes)))/12.0_WP
+        cx3=vol*ice%ice_dt*c4*(sum(m_snow(elnodes))+m_snow(elnodes(n))+sum(entries2*m_snow(elnodes)))/12.0_WP
 #if defined (__oifs) || defined (__ifsinterface)
-        cx4=vol*ice_dt*c4*(sum(ice_temp(elnodes))+ice_temp(elnodes(n))+sum(entries2*ice_temp(elnodes)))/12.0_WP
+        cx4=vol*ice%ice_dt*c4*(sum(ice_temp(elnodes))+ice_temp(elnodes(n))+sum(entries2*ice_temp(elnodes)))/12.0_WP
 #endif /* (__oifs) */
 
         rhs_m(row)=rhs_m(row)+sum(entries*m_ice(elnodes))+cx1

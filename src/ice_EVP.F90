@@ -88,9 +88,9 @@ subroutine stress_tensor(ice_strength, ice, partit, mesh)
     
     !___________________________________________________________________________
     vale = 1.0_WP/(ellipse**2)
-    dte  = ice_dt/(1.0_WP*evp_rheol_steps)
-    det1 = 1.0_WP/(1.0_WP + 0.5_WP*Tevp_inv*dte)
-    det2 = 1.0_WP/(1.0_WP + 0.5_WP*Tevp_inv*dte) !*ellipse**2 
+    dte  = ice%ice_dt/(1.0_WP*evp_rheol_steps)
+    det1 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte)
+    det2 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte) !*ellipse**2 
  
     do el=1,myDim_elem2D
         !_______________________________________________________________________
@@ -144,9 +144,9 @@ subroutine stress_tensor(ice_strength, ice, partit, mesh)
             !zeta=Clim_evp*voltriangle(el)
             !end if 
             
-            zeta = zeta*Tevp_inv
+            zeta = zeta*ice%Tevp_inv
                             
-            r1  = zeta*(eps11(el)+eps22(el)) - ice_strength(el)*Tevp_inv
+            r1  = zeta*(eps11(el)+eps22(el)) - ice_strength(el)*ice%Tevp_inv
             r2  = zeta*(eps11(el)-eps22(el))*vale
             r3  = zeta*eps12(el)*vale
             
@@ -193,9 +193,9 @@ end subroutine stress_tensor
 ! 
 !   vale = 1.0_WP/(ellipse**2)
 !    
-!   dte  = ice_dt/(1.0_WP*evp_rheol_steps)
-!   det1 = 1.0_WP/(1.0_WP + 0.5_WP*Tevp_inv*dte)
-!   det2 = 1.0_WP/(1.0_WP + 0.5_WP*Tevp_inv*dte) !*ellipse**2 
+!   dte  = ice%ice_dt/(1.0_WP*evp_rheol_steps)
+!   det1 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte)
+!   det2 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte) !*ellipse**2 
 !      
 ! 
 !   do el=1,myDim_elem2D
@@ -254,9 +254,9 @@ end subroutine stress_tensor
 !       !zeta=Clim_evp*voltriangle(el)
 !       !end if 
 !       
-!         zeta = zeta*Tevp_inv
+!         zeta = zeta*ice%Tevp_inv
 !         
-!         r1  = zeta*(eps11(el)+eps22(el)) - ice_strength(el)*Tevp_inv
+!         r1  = zeta*(eps11(el)+eps22(el)) - ice_strength(el)*ice%Tevp_inv
 !         r2  = zeta*(eps11(el)-eps22(el))*vale
 !         r3  = zeta*eps12(el)*vale
 !         
@@ -526,7 +526,7 @@ subroutine EVPdynamics(ice, partit, mesh)
                             vsno_out=m_snow)
 #endif
 
-    rdt=ice_dt/(1.0*evp_rheol_steps)
+    rdt=ice%ice_dt/(1.0*evp_rheol_steps)
     ax=cos(theta_io)
     ay=sin(theta_io)
     

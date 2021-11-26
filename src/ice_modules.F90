@@ -28,7 +28,7 @@ MODULE i_PARAM
                                                          ! in ice fct advection
   REAL(kind=WP)             :: ice_diff=10.0_WP          ! diffusion to stabilize
                                                          ! ice advection
-  REAL(kind=WP)             :: Tevp_inv                  
+!   REAL(kind=WP)             :: Tevp_inv                  
   real(kind=WP)             :: theta_io=0.0_WP           ! rotation angle
                                                          ! (ice-ocean), available
 						         ! in EVP
@@ -40,7 +40,7 @@ MODULE i_PARAM
 
   logical                   :: ice_free_slip=.false.
   integer                   :: whichEVP=0 !0=standart; 1=mEVP; 2=aEVP
-  real(kind=WP)             :: ice_dt !ice step=ice_ave_steps*oce_step
+!   real(kind=WP)             :: ice_dt !ice step=ice_ave_steps*oce_step
 
 NAMELIST /ice_dyn/ whichEVP, Pstar, ellipse, c_pressure, delta_min, evp_rheol_steps, Cd_oce_ice, &
 ice_gamma_fct, ice_diff, theta_io, ice_ave_steps, alpha_evp, beta_evp, c_aevp
