@@ -761,17 +761,18 @@ subroutine find_alpha_field_a(ice, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-    a_ice        => ice%data(1)%values(:)
-    m_ice        => ice%data(2)%values(:)
-    eps11        => ice%work%eps11(:)
-    eps12        => ice%work%eps12(:)
-    eps22        => ice%work%eps22(:)
-    sigma11      => ice%work%sigma11(:)
-    sigma12      => ice%work%sigma12(:)
-    sigma22      => ice%work%sigma22(:)
-    u_ice_aux    => ice%uice_aux(:)
-    v_ice_aux    => ice%vice_aux(:)
+    a_ice           => ice%data(1)%values(:)
+    m_ice           => ice%data(2)%values(:)
+    eps11           => ice%work%eps11(:)
+    eps12           => ice%work%eps12(:)
+    eps22           => ice%work%eps22(:)
+    sigma11         => ice%work%sigma11(:)
+    sigma12         => ice%work%sigma12(:)
+    sigma22         => ice%work%sigma22(:)
+    u_ice_aux       => ice%uice_aux(:)
+    v_ice_aux       => ice%vice_aux(:)
     alpha_evp_array => ice%alpha_evp_array(:)
+    
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
     vale=1.0_WP/(ice%ellipse**2)
@@ -873,11 +874,11 @@ subroutine stress_tensor_a(ice, partit, mesh)
     val3=1.0_WP/3.0_WP
     vale=1.0_WP/(ice%ellipse**2)
     do elem=1,myDim_elem2D
-        !__________________________________________________________________________
+        !_______________________________________________________________________
         ! if element has any cavity node skip it 
         if (ulevels(elem) > 1) cycle
         
-        !__________________________________________________________________________
+        !_______________________________________________________________________
         det2=1.0_WP/(1.0_WP+alpha_evp_array(elem))     ! Take alpha from array
         det1=alpha_evp_array(elem)*det2
     
@@ -1013,7 +1014,7 @@ subroutine EVPdynamics_a(ice, partit, mesh)
         call stress2rhs_m(ice, partit, mesh)    ! _m=_a, so no _m version is the only one!
         do i=1,myDim_nod2D 
         
-            !_______________________________________________________________________
+            !___________________________________________________________________
             ! if element has any cavity node skip it 
             if (ulevels_nod2d(i)>1) cycle
             
@@ -1038,17 +1039,17 @@ subroutine EVPdynamics_a(ice, partit, mesh)
             v_ice_aux(i)=det*((1.0_WP+beta_evp_array(i)+drag)*rhsv-fc*rhsu)
         end do
         
-        !___________________________________________________________________________ 
+        !_______________________________________________________________________
         ! apply sea ice velocity boundary condition 
         do ed=1,myDim_edge2D
-            !_______________________________________________________________________
+            !___________________________________________________________________
             ! apply coastal sea ice velocity boundary conditions
             if(myList_edge2D(ed) > edge2D_in) then
                 u_ice_aux(edges(:,ed))=0.0_WP
                 v_ice_aux(edges(:,ed))=0.0_WP
             end if
             
-            !_______________________________________________________________________
+            !___________________________________________________________________
             ! apply sea ice velocity boundary conditions at cavity-ocean edge
             if (use_cavity) then 
                 if ( (ulevels(edge_tri(1,ed))>1) .or. &
