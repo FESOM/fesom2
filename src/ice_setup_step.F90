@@ -56,7 +56,6 @@ subroutine ice_setup(ice, tracers, partit, mesh)
     USE MOD_MESH
     use o_param
     use g_CONFIG
-    use ice_array_setup_interface
     use ice_initial_state_interface
     use ice_fct_interfaces
     implicit none 
