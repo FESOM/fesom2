@@ -37,7 +37,7 @@ module ice_timestep_interface
         USE MOD_PARTIT
         USE MOD_PARSUP
         USE MOD_MESH
-        integer         intent(in)            :: istep
+        integer       , intent(in)            :: istep
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
@@ -110,10 +110,10 @@ subroutine ice_timestep(step, ice, partit, mesh)
     use icedrv_main,   only: step_icepack 
 #endif
     implicit none 
-    integer,        intent(in)            :: step
-    type(t_ice),    intent(inout), target :: ice
+    integer       , intent(in)            :: step
+    type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
-    type(t_mesh),   intent(in),    target :: mesh
+    type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
     integer                               :: i
     REAL(kind=WP)                         :: t0,t1, t2, t3
