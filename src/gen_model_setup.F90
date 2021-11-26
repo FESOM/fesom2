@@ -66,7 +66,7 @@ subroutine setup_model(partit)
   if(use_ice) then
   nmlfile ='namelist.ice'    ! name of ice namelist file
   open (newunit=fileunit, file=nmlfile)
-  read (fileunit, NML=ice_dyn)
+!   read (fileunit, NML=ice_dyn)
   read (fileunit, NML=ice_therm)
   close (fileunit)
   endif
