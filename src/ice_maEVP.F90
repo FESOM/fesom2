@@ -130,8 +130,8 @@ subroutine stress_tensor_m(ice, partit, mesh)
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
     vale=1.0_WP/(ice%ellipse**2)
-    det2=1.0_WP/(1.0_WP+alpha_evp)
-    det1=alpha_evp*det2
+    det2=1.0_WP/(1.0_WP+ice%alpha_evp)
+    det1=ice%alpha_evp*det2
     do elem=1,myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
         !_______________________________________________________________________
@@ -455,10 +455,10 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
     vale=1.0_WP/(ice%ellipse**2)
-    det2=1.0_WP/(1.0_WP+alpha_evp)
-    det1=alpha_evp*det2
+    det2=1.0_WP/(1.0_WP+ice%alpha_evp)
+    det1=ice%alpha_evp*det2
     rdt=ice%ice_dt
-    steps=evp_rheol_steps
+    steps=ice%evp_rheol_steps
     
     u_ice_aux=u_ice    ! Initialize solver variables
     v_ice_aux=v_ice
@@ -683,14 +683,14 @@ subroutine EVPdynamics_m(ice, partit, mesh)
                 drag = rdt*Cd_oce_ice*umod*density_0*inv_thickness(i)
                 
                 !rhs for water stress, air stress, and u_rhs_ice/v (internal stress + ssh)
-                rhsu = u_ice(i)+drag*u_w(i)+rdt*(inv_thickness(i)*stress_atmice_x(i)+u_rhs_ice(i)) + beta_evp*u_ice_aux(i)
-                rhsv = v_ice(i)+drag*v_w(i)+rdt*(inv_thickness(i)*stress_atmice_y(i)+v_rhs_ice(i)) + beta_evp*v_ice_aux(i)
+                rhsu = u_ice(i)+drag*u_w(i)+rdt*(inv_thickness(i)*stress_atmice_x(i)+u_rhs_ice(i)) + ice%beta_evp*u_ice_aux(i)
+                rhsv = v_ice(i)+drag*v_w(i)+rdt*(inv_thickness(i)*stress_atmice_y(i)+v_rhs_ice(i)) + ice%beta_evp*v_ice_aux(i)
                 
                 !solve (Coriolis and water stress are treated implicitly)        
-                det = bc_index_nod2D(i) / ((1.0_WP+beta_evp+drag)**2 + (rdt*coriolis_node(i))**2)
+                det = bc_index_nod2D(i) / ((1.0_WP+ice%beta_evp+drag)**2 + (rdt*coriolis_node(i))**2)
                 
-                u_ice_aux(i) = det*((1.0_WP+beta_evp+drag)*rhsu +rdt*coriolis_node(i)*rhsv)
-                v_ice_aux(i) = det*((1.0_WP+beta_evp+drag)*rhsv -rdt*coriolis_node(i)*rhsu)
+                u_ice_aux(i) = det*((1.0_WP+ice%beta_evp+drag)*rhsu +rdt*coriolis_node(i)*rhsv)
+                v_ice_aux(i) = det*((1.0_WP+ice%beta_evp+drag)*rhsv -rdt*coriolis_node(i)*rhsu)
             end if
         end do ! --> do i=1, myDim_nod2d 
 
@@ -1011,7 +1011,7 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     beta_evp_array  => ice%beta_evp_array(:)
     
     !___________________________________________________________________________
-    steps=evp_rheol_steps
+    steps=ice%evp_rheol_steps
     rdt=ice%ice_dt
     u_ice_aux=u_ice    ! Initialize solver variables
     v_ice_aux=v_ice

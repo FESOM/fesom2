@@ -88,7 +88,7 @@ subroutine stress_tensor(ice_strength, ice, partit, mesh)
     
     !___________________________________________________________________________
     vale = 1.0_WP/(ice%ellipse**2)
-    dte  = ice%ice_dt/(1.0_WP*evp_rheol_steps)
+    dte  = ice%ice_dt/(1.0_WP*ice%evp_rheol_steps)
     det1 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte)
     det2 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte) !*ellipse**2 
  
@@ -123,7 +123,7 @@ subroutine stress_tensor(ice_strength, ice, partit, mesh)
             ! ===== viscosity zeta should exceed zeta_min
             ! (done via limiting delta from above)
             
-            !if(delta>pressure/zeta_min) delta=pressure/zeta_min
+            !if(delta>pressure/ice%zeta_min) delta=pressure/ice%zeta_min
                 !It does not work properly by 
             !creating response where ice_strength is small
                 ! Uncomment and test if necessary
@@ -140,8 +140,8 @@ subroutine stress_tensor(ice_strength, ice, partit, mesh)
             ! remains stable), using it reduces viscosities too strongly.
             ! It is therefore commented
             
-            !if (zeta>Clim_evp*voltriangle(el)) then
-            !zeta=Clim_evp*voltriangle(el)
+            !if (zeta>ice%clim_evp*voltriangle(el)) then
+            !zeta=ice%clim_evp*voltriangle(el)
             !end if 
             
             zeta = zeta*ice%Tevp_inv
@@ -230,7 +230,7 @@ end subroutine stress_tensor
 !       ! ===== viscosity zeta should exceed zeta_min
 !       ! (done via limiting delta from above)
 !       
-!       !if(delta>pressure/zeta_min) delta=pressure/zeta_min
+!       !if(delta>pressure/ice%zeta_min) delta=pressure/ice%zeta_min
 !            !It does not work properly by 
 ! 	   !creating response where ice_strength is small
 !            ! Uncomment and test if necessary
@@ -250,8 +250,8 @@ end subroutine stress_tensor
 !       ! remains stable), using it reduces viscosities too strongly.
 !       ! It is therefore commented
 !       
-!       !if (zeta>Clim_evp*voltriangle(el)) then
-!       !zeta=Clim_evp*voltriangle(el)
+!       !if (zeta>ice%clim_evp*voltriangle(el)) then
+!       !zeta=ice%clim_evp*voltriangle(el)
 !       !end if 
 !       
 !         zeta = zeta*ice%Tevp_inv
@@ -526,9 +526,9 @@ subroutine EVPdynamics(ice, partit, mesh)
                             vsno_out=m_snow)
 #endif
 
-    rdt=ice%ice_dt/(1.0*evp_rheol_steps)
-    ax=cos(theta_io)
-    ay=sin(theta_io)
+    rdt=ice%ice_dt/(1.0*ice%evp_rheol_steps)
+    ax=cos(ice%theta_io)
+    ay=sin(ice%theta_io)
     
     !___________________________________________________________________________
     ! Precompute values that are never changed during the iteration
@@ -670,7 +670,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     rdg_conv_elem(:)  = 0.0_WP
     rdg_shear_elem(:) = 0.0_WP
 #endif
-    do shortstep=1, evp_rheol_steps 
+    do shortstep=1, ice%evp_rheol_steps 
         !_______________________________________________________________________
         call stress_tensor(ice_strength, ice, partit, mesh)
         call stress2rhs(inv_areamass, ice_strength, ice, partit, mesh) 
@@ -725,5 +725,5 @@ subroutine EVPdynamics(ice, partit, mesh)
         end do
         !_______________________________________________________________________
         call exchange_nod(U_ice,V_ice,partit)
-    END DO !--> do shortstep=1, evp_rheol_steps 
+    END DO !--> do shortstep=1, ice%evp_rheol_steps 
 end subroutine EVPdynamics

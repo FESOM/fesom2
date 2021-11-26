@@ -92,7 +92,7 @@ subroutine ice_setup(ice, tracers, partit, mesh)
     ice%ice_dt   = real(ice_ave_steps,WP)*dt
     ! ice_dt=dt
     ice%Tevp_inv = 3.0_WP/ice%ice_dt 
-    ice%Clim_evp = ice%Clim_evp*(evp_rheol_steps/ice%ice_dt)**2/ice%Tevp_inv  ! This is combination 
+    ice%Clim_evp = ice%Clim_evp*(ice%evp_rheol_steps/ice%ice_dt)**2/ice%Tevp_inv  ! This is combination 
                                                             ! it always ent
                                                             
     !___________________________________________________________________________

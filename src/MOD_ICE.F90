@@ -586,8 +586,8 @@ subroutine ice_init(ice, partit, mesh)
     if (ice%whichEVP == 2) then
         allocate(ice%alpha_evp_array(  node_size))
         allocate(ice%beta_evp_array(   node_size))
-        ice%alpha_evp_array = 0.0_WP
-        ice%beta_evp_array  = 0.0_WP
+        ice%alpha_evp_array = ice%alpha_evp
+        ice%beta_evp_array  = ice%alpha_evp
     end if
     !___________________________________________________________________________
     ! initialise surface ocean arrays in ice derived type 

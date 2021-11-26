@@ -154,7 +154,7 @@ subroutine ice_TG_rhs(ice, partit, mesh)
         vm=sum(V_ice(elnodes))
      
         !diffusivity
-        diff=ice_diff*sqrt(elem_area(elem)/scale_area)
+        diff=ice%ice_diff*sqrt(elem_area(elem)/scale_area)
         DO n=1,3
             row=elnodes(n)
             DO q = 1,3 
@@ -315,7 +315,7 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     m_templ      => ice%data(4)%valuesl(:)
 #endif       
     !___________________________________________________________________________
-    gamma=ice_gamma_fct         ! Added diffusivity parameter
+    gamma=ice%ice_gamma_fct         ! Added diffusivity parameter
                                 ! Adjust it to ensure posivity of solution    
     do row=1,myDim_nod2D
         !_______________________________________________________________________
@@ -526,7 +526,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     dm_temp      => ice%data(4)%dvalues(:)
 #endif   
     !___________________________________________________________________________
-    gamma=ice_gamma_fct        ! It should coinside with gamma in 
+    gamma=ice%ice_gamma_fct        ! It should coinside with gamma in 
                              ! ts_solve_low_order  
   
     !==========================
