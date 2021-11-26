@@ -1,12 +1,12 @@
 module ocean2ice_interface
     interface
         subroutine ocean2ice(ice, dynamics, tracers, partit, mesh)
-        use mod_mesh
+        USE MOD_ICE
+        USE MOD_DYN
+        USE MOD_TRACER
         USE MOD_PARTIT
         USE MOD_PARSUP
-        USE MOD_TRACER
-        USE MOD_DYN
-        USE MOD_ICE
+        USE MOD_MESH
         type(t_ice)   , intent(inout), target :: ice
         type(t_dyn)   , intent(in)   , target :: dynamics
         type(t_tracer), intent(inout), target :: tracers
@@ -49,9 +49,8 @@ end module
 !
 !
 !_______________________________________________________________________________
+! transmits the relevant fields from the ice to the ocean model
 subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
-    ! transmits the relevant fields from the ice to the ocean model
-    !
     USE MOD_ICE
     USE MOD_DYN
     USE MOD_PARTIT
@@ -97,7 +96,9 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
      call icepack_to_fesom(nx_in=(myDim_nod2D+eDim_nod2D), &
                            aice_out=a_ice)
 #endif
-
+    
+    !___________________________________________________________________________
+    ! compute total surface stress (iceoce+atmoce) on nodes 
     do n=1,myDim_nod2D+eDim_nod2D   
         !_______________________________________________________________________
         ! if cavity node skip it 
@@ -113,12 +114,12 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
             stress_iceoce_y(n)=0.0_WP
         end if
         
-        ! total surface stress (iceoce+atmoce) on nodes 
         stress_node_surf(1,n) = stress_iceoce_x(n)*a_ice(n) + stress_atmoce_x(n)*(1.0_WP-a_ice(n))
         stress_node_surf(2,n) = stress_iceoce_y(n)*a_ice(n) + stress_atmoce_y(n)*(1.0_WP-a_ice(n))
     end do
     
     !___________________________________________________________________________
+    ! compute total surface stress (iceoce+atmoce) on elements
     DO elem=1,myDim_elem2D
         !_______________________________________________________________________
         ! if cavity element skip it 
@@ -141,18 +142,16 @@ end subroutine oce_fluxes_mom
 !
 !
 !_______________________________________________________________________________
+! transmits the relevant fields from the ocean to the ice model
 subroutine ocean2ice(ice, dynamics, tracers, partit, mesh)
-  
-    ! transmits the relevant fields from the ocean to the ice model
-
-    use o_PARAM
-    use MOD_MESH
-    use MOD_DYN
-    use MOD_ICE
-    use MOD_TRACER
+    USE MOD_ICE
+    USE MOD_DYN
+    USE MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
-    USE g_CONFIG
+    USE MOD_MESH
+    use o_PARAM
+    use g_CONFIG
     use g_comm_auto
     implicit none
     type(t_ice)   , intent(inout), target :: ice
@@ -178,6 +177,7 @@ subroutine ocean2ice(ice, dynamics, tracers, partit, mesh)
     S_oc_array => ice%srfoce_salt(:)
     elevation  => ice%srfoce_ssh(:)
     
+    !___________________________________________________________________________
     ! the arrays in the ice model are renamed
     if (ice%ice_update) then
         do n=1, myDim_nod2d+eDim_nod2d  
@@ -192,11 +192,13 @@ subroutine ocean2ice(ice, dynamics, tracers, partit, mesh)
             T_oc_array(n) = (T_oc_array(n)*real(ice%ice_steps_since_upd,WP)+temp(1,n))/real(ice%ice_steps_since_upd+1,WP)
             S_oc_array(n) = (S_oc_array(n)*real(ice%ice_steps_since_upd,WP)+salt(1,n))/real(ice%ice_steps_since_upd+1,WP)
             elevation(n)  = (elevation(n) *real(ice%ice_steps_since_upd,WP)+  hbar(n))/real(ice%ice_steps_since_upd+1,WP)
-        !NR elevation(n)  = (elevation(n) *real(ice%ice_steps_since_upd,WP)+ eta_n(n))/real(ice%ice_steps_since_upd+1,WP)
-        !NR elevation(n)  = (elevation(n) *real(ice%ice_steps_since_upd,WP)+  hbar(n))/real(ice%ice_steps_since_upd+1,WP)
+            !NR elevation(n)  = (elevation(n) *real(ice%ice_steps_since_upd,WP)+ eta_n(n))/real(ice%ice_steps_since_upd+1,WP)
+            !NR elevation(n)  = (elevation(n) *real(ice%ice_steps_since_upd,WP)+  hbar(n))/real(ice%ice_steps_since_upd+1,WP)
         end do
     end if
     
+    !___________________________________________________________________________
+    ! surface ocean velocity at nodes 
     u_w = 0.0_WP
     v_w = 0.0_WP
     do n=1, myDim_nod2d  
@@ -233,12 +235,12 @@ end subroutine ocean2ice
 !_______________________________________________________________________________
 subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     USE MOD_ICE
-    use MOD_DYN
-    use MOD_TRACER
+    USE MOD_DYN
+    USE MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use MOD_MESH
-    USE g_CONFIG
+    USE MOD_MESH
+    use g_CONFIG
     use o_ARRAYS
     use g_comm_auto
     use g_forcing_param, only: use_virt_salt
@@ -267,7 +269,6 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     real(kind=WP), dimension(:)  , pointer :: a_ice_old
     real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn
     real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
-!     real(kind=WP), dimension(:)  , pointer :: net_heat_flux
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
