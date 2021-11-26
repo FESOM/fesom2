@@ -182,7 +182,7 @@ subroutine ocean2ice(ice, dynamics, tracers, partit, mesh)
     elevation  => ice%srfoce_ssh(:)
     
     ! the arrays in the ice model are renamed
-    if (ice_update) then
+    if (ice%ice_update) then
         do n=1, myDim_nod2d+eDim_nod2d  
             if (ulevels_nod2D(n)>1) cycle 
             T_oc_array(n) = temp(1,n)
@@ -192,13 +192,12 @@ subroutine ocean2ice(ice, dynamics, tracers, partit, mesh)
     else
         do n=1, myDim_nod2d+eDim_nod2d
             if (ulevels_nod2D(n)>1) cycle 
-            T_oc_array(n) = (T_oc_array(n)*real(ice_steps_since_upd,WP)+temp(1,n))/real(ice_steps_since_upd+1,WP)
-            S_oc_array(n) = (S_oc_array(n)*real(ice_steps_since_upd,WP)+salt(1,n))/real(ice_steps_since_upd+1,WP)
-            elevation(n)  = (elevation(n) *real(ice_steps_since_upd,WP)+      hbar(n))/real(ice_steps_since_upd+1,WP)
-        !NR !PS      elevation(n)=(elevation(n)*real(ice_steps_since_upd)+eta_n(n))/real(ice_steps_since_upd+1,WP)
-        !NR     elevation(n)=(elevation(n)*real(ice_steps_since_upd)+hbar(n))/real(ice_steps_since_upd+1,WP) !PS
+            T_oc_array(n) = (T_oc_array(n)*real(ice%ice_steps_since_upd,WP)+temp(1,n))/real(ice%ice_steps_since_upd+1,WP)
+            S_oc_array(n) = (S_oc_array(n)*real(ice%ice_steps_since_upd,WP)+salt(1,n))/real(ice%ice_steps_since_upd+1,WP)
+            elevation(n)  = (elevation(n) *real(ice%ice_steps_since_upd,WP)+  hbar(n))/real(ice%ice_steps_since_upd+1,WP)
+        !NR elevation(n)  = (elevation(n) *real(ice%ice_steps_since_upd,WP)+ eta_n(n))/real(ice%ice_steps_since_upd+1,WP)
+        !NR elevation(n)  = (elevation(n) *real(ice%ice_steps_since_upd,WP)+  hbar(n))/real(ice%ice_steps_since_upd+1,WP)
         end do
-!!PS         elevation(:)= (elevation(:)*real(ice_steps_since_upd)+hbar(:))/real(ice_steps_since_upd+1,WP)
     end if
     
     u_w = 0.0_WP
@@ -222,12 +221,12 @@ subroutine ocean2ice(ice, dynamics, tracers, partit, mesh)
         uw = uw/vol
         vw = vw/vol
         
-        if (ice_update) then
+        if (ice%ice_update) then
             u_w(n)=uw
             v_w(n)=vw
         else
-            u_w(n)=(u_w(n)*real(ice_steps_since_upd,WP)+uw)/real(ice_steps_since_upd+1,WP)
-            v_w(n)=(v_w(n)*real(ice_steps_since_upd,WP)+vw)/real(ice_steps_since_upd+1,WP)
+            u_w(n)=(u_w(n)*real(ice%ice_steps_since_upd,WP)+uw)/real(ice%ice_steps_since_upd+1,WP)
+            v_w(n)=(v_w(n)*real(ice%ice_steps_since_upd,WP)+vw)/real(ice%ice_steps_since_upd+1,WP)
         endif
     end do
     call exchange_nod(u_w, v_w, partit)

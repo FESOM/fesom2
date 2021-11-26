@@ -176,8 +176,8 @@ contains
         if (use_ice) then 
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_setup'//achar(27)//'[0m'
             call ice_setup(f%ice, f%tracers, f%partit, f%mesh)
-            ice_steps_since_upd = f%ice%ice_ave_steps-1
-            ice_update=.true.
+            f%ice%ice_steps_since_upd = f%ice%ice_ave_steps-1
+            f%ice%ice_update=.true.
             if (f%mype==0) write(*,*) 'EVP scheme option=', f%ice%whichEVP
         else 
             ! create a dummy ice derived type with only a_ice, m_ice, m_snow and 
@@ -352,15 +352,15 @@ contains
             call update_atm_forcing(n, f%ice, f%tracers, f%partit, f%mesh)
             f%t1_frc = MPI_Wtime()       
             !___compute ice step________________________________________________
-            if (ice_steps_since_upd>=f%ice%ice_ave_steps-1) then
-                ice_update=.true.
-                ice_steps_since_upd = 0
+            if (f%ice%ice_steps_since_upd>=f%ice%ice_ave_steps-1) then
+                f%ice%ice_update=.true.
+                f%ice%ice_steps_since_upd = 0
             else
-                ice_update=.false.
-                ice_steps_since_upd=ice_steps_since_upd+1
+                f%ice%ice_update=.false.
+                f%ice%ice_steps_since_upd=f%ice%ice_steps_since_upd+1
             endif
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_timestep(n)'//achar(27)//'[0m'
-            if (ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh)  
+            if (f%ice%ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh)  
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
             call oce_fluxes_mom(f%ice, f%dynamics, f%partit, f%mesh) ! momentum only
