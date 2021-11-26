@@ -680,7 +680,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
                 !============= stress2rhs_m ends ======================
                 !    do i=1,myDim_nod2D
                 umod = sqrt((u_ice_aux(i)-u_w(i))**2+(v_ice_aux(i)-v_w(i))**2)
-                drag = rdt*Cd_oce_ice*umod*density_0*inv_thickness(i)
+                drag = rdt*ice%cd_oce_ice*umod*density_0*inv_thickness(i)
                 
                 !rhs for water stress, air stress, and u_rhs_ice/v (internal stress + ssh)
                 rhsu = u_ice(i)+drag*u_w(i)+rdt*(inv_thickness(i)*stress_atmice_x(i)+u_rhs_ice(i)) + ice%beta_evp*u_ice_aux(i)
@@ -824,7 +824,7 @@ subroutine find_alpha_field_a(ice, partit, mesh)
                                                                        ! with thickness (msum)
 #endif
         !adjust c_aevp such, that alpha_evp_array and beta_evp_array become in acceptable range
-        alpha_evp_array(elem)=max(50.0_WP,sqrt(ice%ice_dt*c_aevp*pressure/rhoice/elem_area(elem)))
+        alpha_evp_array(elem)=max(50.0_WP,sqrt(ice%ice_dt*ice%c_aevp*pressure/rhoice/elem_area(elem)))
         ! /voltriangle(elem) for FESOM1.4
         ! We do not allow alpha to be too small!
     end do !--> do elem=1,myDim_elem2D
@@ -1036,7 +1036,7 @@ subroutine EVPdynamics_a(ice, partit, mesh)
             inv_thickness=1.0_WP/thickness
             
             umod=sqrt((u_ice_aux(i)-u_w(i))**2+(v_ice_aux(i)-v_w(i))**2)
-            drag=rdt*Cd_oce_ice*umod*density_0*inv_thickness
+            drag=rdt*ice%cd_oce_ice*umod*density_0*inv_thickness
             
             !rhs for water stress, air stress, and u_rhs_ice/v (internal stress + ssh)
             rhsu=u_ice(i)+drag*u_w(i)+rdt*(inv_thickness*stress_atmice_x(i)+u_rhs_ice(i))

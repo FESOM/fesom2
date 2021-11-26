@@ -89,7 +89,7 @@ subroutine ice_setup(ice, tracers, partit, mesh)
     
     !___________________________________________________________________________
     ! DO not change
-    ice%ice_dt   = real(ice_ave_steps,WP)*dt
+    ice%ice_dt   = real(ice%ice_ave_steps,WP)*dt
     ! ice_dt=dt
     ice%Tevp_inv = 3.0_WP/ice%ice_dt 
     ice%Clim_evp = ice%Clim_evp*(ice%evp_rheol_steps/ice%ice_dt)**2/ice%Tevp_inv  ! This is combination 
@@ -244,7 +244,6 @@ subroutine ice_timestep(step, ice, partit, mesh)
     use i_arrays
     use o_param
     use g_CONFIG
-    use i_PARAM, only: whichEVP
     use ice_EVPdynamics_interface
     use ice_maEVPdynamics_interface
     use ice_fct_interfaces
@@ -288,7 +287,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
     
     !___________________________________________________________________________
     ! ===== Dynamics
-    SELECT CASE (whichEVP)
+    SELECT CASE (ice%whichEVP)
     CASE (0)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'  
         call EVPdynamics  (ice, partit, mesh)

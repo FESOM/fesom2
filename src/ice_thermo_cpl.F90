@@ -127,7 +127,7 @@ subroutine thermodynamics(ice, partit, mesh)
      snow    = prec_snow(inod)
      runo    = runoff(inod)     
 
-     ustar   = sqrt(Cd_oce_ice)*sqrt((u_ice(inod)-u_w(inod))**2+(v_ice(inod)-v_w(inod))**2)
+     ustar   = sqrt(ice%cd_oce_ice)*sqrt((u_ice(inod)-u_w(inod))**2+(v_ice(inod)-v_w(inod))**2)
      T_oc    = T_oc_array(inod)      
      S_oc    = S_oc_array(inod)
      if (ref_sss_local) rsss = S_oc

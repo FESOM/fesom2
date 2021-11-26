@@ -475,7 +475,7 @@ module ice_init_interface
         USE MOD_MESH
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
+        type(t_mesh)  , intent(inout), target :: mesh
         end subroutine
     end interface
 end module
@@ -492,9 +492,9 @@ subroutine ice_init(ice, partit, mesh)
     IMPLICIT NONE
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
-    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_mesh)  , intent(inout), target :: mesh
     !___________________________________________________________________________
-    integer        :: elem_size, node_size, n
+    integer        :: elem_size, node_size, n, ed(2)
     integer, save  :: nm_unit  = 105       ! unit to open namelist file, skip 100-102 for cray
     integer        :: iost
     !___________________________________________________________________________
@@ -695,7 +695,23 @@ subroutine ice_init(ice, partit, mesh)
     ice%atmcoupl%ice_alb       = 0.6_WP
     ice%atmcoupl%enthalpyoffuse= 0.0_WP
 #endif /* (__oifs) */
-#endif /* (__oasis) */        
+#endif /* (__oasis) */       
+
+    !___________________________________________________________________________
+    ! --> took from oce_mesh.F90 --> subroutine mesh_auxiliary_arrays(partit, mesh)
+    ! to here since namelist.ice is now read in ice_init where whichEVP is not available
+    ! when  mesh_auxiliary_arrays is called
+    !array of 2D boundary conditions is used in ice_maEVP
+    if (ice%whichEVP > 0) then
+        allocate(mesh%bc_index_nod2D(myDim_nod2D+eDim_nod2D))
+        mesh%bc_index_nod2D=1._WP
+        do n=1, myDim_edge2D
+            ed=mesh%edges(:, n)
+            if (myList_edge2D(n) <= mesh%edge2D_in) cycle
+            mesh%bc_index_nod2D(ed)=0._WP
+        end do
+    end if
+    
 end subroutine ice_init  
 !
 !

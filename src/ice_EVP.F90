@@ -685,7 +685,7 @@ subroutine EVPdynamics(ice, partit, mesh)
             !___________________________________________________________________
             if (a_ice(n) >= 0.01_WP) then               ! Skip if ice is absent
                 umod = sqrt((U_ice(n)-U_w(n))**2+(V_ice(n)-V_w(n))**2)
-                drag = Cd_oce_ice*umod*density_0*inv_mass(n)
+                drag = ice%cd_oce_ice*umod*density_0*inv_mass(n)
                 
                 rhsu = U_ice(n) +rdt*(drag*(ax*U_w(n) - ay*V_w(n))+ &
                         inv_mass(n)*stress_atmice_x(n) + U_rhs_ice(n))

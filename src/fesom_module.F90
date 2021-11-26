@@ -176,9 +176,9 @@ contains
         if (use_ice) then 
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_setup'//achar(27)//'[0m'
             call ice_setup(f%ice, f%tracers, f%partit, f%mesh)
-            ice_steps_since_upd = ice_ave_steps-1
+            ice_steps_since_upd = f%ice%ice_ave_steps-1
             ice_update=.true.
-            if (f%mype==0) write(*,*) 'EVP scheme option=', whichEVP
+            if (f%mype==0) write(*,*) 'EVP scheme option=', f%ice%whichEVP
         else 
             ! create a dummy ice derived type with only a_ice, m_ice, m_snow and 
             ! uvice since oce_timesteps still needs in moment
@@ -352,7 +352,7 @@ contains
             call update_atm_forcing(n, f%ice, f%tracers, f%partit, f%mesh)
             f%t1_frc = MPI_Wtime()       
             !___compute ice step________________________________________________
-            if (ice_steps_since_upd>=ice_ave_steps-1) then
+            if (ice_steps_since_upd>=f%ice%ice_ave_steps-1) then
                 ice_update=.true.
                 ice_steps_since_upd = 0
             else

@@ -105,7 +105,6 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
   use g_cvmix_kpp
   use g_cvmix_tidal
   use diagnostics
-  use i_PARAM, only: whichEVP
   implicit none
   integer                   :: i, j
   integer, save             :: nm_io_unit  = 103       ! unit to open namelist file, skip 100-102 for cray
@@ -505,10 +504,10 @@ END DO
     end if
 
     !___________________________________________________________________________________________________________________________________
-    if (whichEVP==1) then
+    if (ice%whichEVP==1) then
     end if
     
-    if (whichEVP==2) then
+    if (ice%whichEVP==2) then
         call def_stream(elem2D, myDim_elem2D, 'alpha_EVP', 'alpha in EVP', 'n/a', ice%alpha_evp_array,  1, 'd', i_real4, partit, mesh)
         call def_stream(nod2D,  myDim_nod2D,  'beta_EVP',  'beta in EVP',  'n/a', ice%beta_evp_array,   1, 'd', i_real4, partit, mesh)
     end if
@@ -674,7 +673,7 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'force_rotation'   , NF_INT, 1,  force_rotation), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'include_fleapyear', NF_INT, 1,  include_fleapyear), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_floatice'     , NF_INT, 1,  use_floatice), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'whichEVP'         , NF_INT, 1,  whichEVP), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'whichEVP'         , NF_INT, 1,  ice%whichEVP), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'evp_rheol_steps'  , NF_INT, 1,  ice%evp_rheol_steps), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'opt_visc'         , NF_INT, 1,  dynamics%opt_visc), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_wsplit'       , NF_INT, 1,  dynamics%use_wsplit), __LINE__)

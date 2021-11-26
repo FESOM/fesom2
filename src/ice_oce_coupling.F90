@@ -107,7 +107,7 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
         
         !_______________________________________________________________________
         if(a_ice(n)>0.001_WP) then
-            aux=sqrt((u_ice(n)-u_w(n))**2+(v_ice(n)-v_w(n))**2)*density_0*Cd_oce_ice
+            aux=sqrt((u_ice(n)-u_w(n))**2+(v_ice(n)-v_w(n))**2)*density_0*ice%cd_oce_ice
             stress_iceoce_x(n) = aux * (u_ice(n)-u_w(n))
             stress_iceoce_y(n) = aux * (v_ice(n)-v_w(n))
         else

@@ -37,20 +37,20 @@ MODULE i_PARAM
 !   real(kind=WP)             :: alpha_evp=250, beta_evp=250
 
 
-  real(kind=WP)             :: c_aevp=0.15 ! 0.1--0.2, but should be adjusted experimentally   
+!   real(kind=WP)             :: c_aevp=0.15 ! 0.1--0.2, but should be adjusted experimentally   
   ! Ice forcing averaging
-  integer		    :: ice_ave_steps=1 !ice step=ice_ave_steps*oce_step
-  real(kind=WP)             :: cd_oce_ice = 5.5e-3       ! drag coef. oce - ice      
+!   integer		    :: ice_ave_steps=1 !ice step=ice_ave_steps*oce_step
+!   real(kind=WP)             :: cd_oce_ice = 5.5e-3       ! drag coef. oce - ice      
 
-  logical                   :: ice_free_slip=.false.
-  integer                   :: whichEVP=0 !0=standart; 1=mEVP; 2=aEVP
+!   logical                   :: ice_free_slip=.false.
+!   integer                   :: whichEVP=0 !0=standart; 1=mEVP; 2=aEVP
 !   real(kind=WP)             :: ice_dt !ice step=ice_ave_steps*oce_step
 
 ! NAMELIST /ice_dyn/ whichEVP, Pstar, ellipse, c_pressure, delta_min, evp_rheol_steps, Cd_oce_ice, &
 ! ice_gamma_fct, ice_diff, theta_io, ice_ave_steps, alpha_evp, beta_evp, c_aevp
 
-NAMELIST /ice_dyn/ whichEVP, Cd_oce_ice, &
-ice_ave_steps, c_aevp
+! NAMELIST /ice_dyn/ whichEVP, Cd_oce_ice, &
+! ice_ave_steps
 
 
 END MODULE i_PARAM
