@@ -52,69 +52,7 @@
 ! ! ! NAMELIST /ice_dyn/ whichEVP, Cd_oce_ice, &
 ! ! ! ice_ave_steps
 ! ! 
-! ! 
-! ! END MODULE i_PARAM
-! ! !
-! ! !=============================================================================
-! ! !
-! ! MODULE i_ARRAYS
-! ! !
-! ! ! Arrays used to store ice variables and organize coupling
-! ! !
-! ! USE o_PARAM
-! ! implicit none
-! ! save
-! ! !   logical                   :: ice_update = .true. !
-! ! !   integer                   :: ice_steps_since_upd = 0 !
-! ! !   real(kind=WP),allocatable,dimension(:,:)         :: ice_grad_vel
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice, V_ice
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: m_ice, a_ice, m_snow  
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice_old, V_ice_old, m_ice_old, a_ice_old, m_snow_old,thdgr_old !PS
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: thdgr_old
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_rhs_ice, V_rhs_ice
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_m, rhs_a, rhs_ms, ths_temp
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: ths_temp
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_w, V_w
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: u_ice_aux, v_ice_aux  ! of the size of u_ice, v_ice
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_mdiv, rhs_adiv, rhs_msdiv
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: elevation
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: sigma11, sigma12, sigma22
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: eps11, eps12, eps22
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: fresh_wa_flux
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: net_heat_flux
-! ! #if defined (__oasis) || defined (__ifsinterface)
-! ! !   real(kind=WP),target, allocatable, dimension(:)  :: ice_alb, ice_temp ! new fields for OIFS coupling
-! ! !   real(kind=WP),target, allocatable, dimension(:)  :: ice_alb ! new fields for OIFS coupling
-! ! !   real(kind=WP),target, allocatable, dimension(:)  :: oce_heat_flux, ice_heat_flux
-! ! !   real(kind=WP),target, allocatable, dimension(:)  :: tmp_oce_heat_flux, tmp_ice_heat_flux
-! ! 							!temporary flux fields
-! ! 							!(for flux correction)
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_temp, m_templ, dm_temp, rhs_tempdiv
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: m_templ, dm_temp, rhs_tempdiv
-! ! #if defined (__oifs) || defined (__ifsinterface)
-! ! !   real(kind=WP),target, allocatable, dimension(:)  :: enthalpyoffuse
-! ! #endif
-! ! #endif /* (__oasis) || defined (__ifsinterface)*/
-! ! 
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: S_oc_array, T_oc_array
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_iceoce_x         
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_iceoce_y
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmice_x         
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmice_y
-! ! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: t_skin
-! !  ! FCT implementation
-! ! !  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: m_icel, a_icel, m_snowl
-! ! !  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: dm_ice, da_ice, dm_snow
-! ! !  REAL(kind=WP), ALLOCATABLE, DIMENSION(:,:)        :: icefluxes
-! ! !  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: icepplus, icepminus
-! ! !  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: mass_matrix  
-! ! !  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: alpha_evp_array(:)   ! of myDim_elem2D
-! ! !  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: beta_evp_array(:)    ! of myDim_node2D+eDim_node2D
-! ! 
-! ! ! Mean arrays
-! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice_mean, V_ice_mean
-! !   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: m_ice_mean, a_ice_mean, m_snow_mean
-! !   END MODULE i_ARRAYS
+
 !=====================================================================
 module i_therm_param
 USE o_PARAM

@@ -51,6 +51,36 @@ TYPE T_ICE_THERMO
     !___________________________________________________________________________
     real(kind=WP), allocatable, dimension(:)    :: t_skin, thdgr, thdgrsn, thdgr_old, ustar
     !___________________________________________________________________________
+    real(kind=WP) :: rhoair=1.3  , inv_rhoair=1./1.3  ! Air density & inverse ,  LY2004 !1.3 AOMIP
+    real(kind=WP) :: rhowat=1025., inv_rhowat=1./1025.! Water density & inverse
+    real(kind=WP) :: rhoice=910. , inv_rhoice=1./910. ! Ice density & inverse, AOMIP
+    real(kind=WP) :: rhosno=290. , inv_rhosno=1./290. ! Snow density & inverse, AOMIP
+    ! Specific heat of air, ice, snow [J/(kg * K)] 
+    real(kind=WP) :: cpair=1005., cpice=2106., cpsno=2090. 
+!     real(kind=WP) :: cc=rhowat*4190.0  ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
+!     real(kind=WP) :: cl=rhoice*3.34e5  ! Volumetr. latent heat of ice fusion [J/m**3](cl=rhoice*Lf)
+! --> cl and cc are setted in subroutine ice_init(...)
+    real(kind=WP) :: cc=1025.*4190.0  ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
+    real(kind=WP) :: cl=910.*3.34e5  ! Volumetr. latent heat of ice fusion [J/m**3](cl=rhoice*Lf) 
+    real(kind=WP) :: clhw=2.501e6      ! Specific latent heat [J/kg]: water	-> water vapor
+    real(kind=WP) :: clhi=2.835e6      !                              sea ice-> water vapor
+    real(kind=WP) :: tmelt=273.15      ! 0 deg C expressed in K 
+    real(kind=WP) :: boltzmann=5.67E-8 ! S. Boltzmann const.*longw. emissivity
+    integer       :: iclasses=7        ! Number of ice thickness gradations for ice growth calcs.
+    real(kind=WP) :: hmin= 0.01        ! Cut-off ice thickness     !!
+    real(kind=WP) :: Armin=0.01        ! Minimum ice concentration !!
+    
+    ! --- namelist parameter /ice_therm/
+    real(kind=WP) :: con= 2.1656, consn = 0.31 ! Thermal conductivities: ice & snow; W/m/K
+    real(kind=WP) :: Sice = 4.0        ! Ice salinity 3.2--5.0 ppt.
+    real(kind=WP) :: h0=1.0	           ! Lead closing parameter [m] ! 0.5
+    real(kind=WP) :: emiss_ice=0.97    ! Emissivity of Snow/Ice, 
+    real(kind=WP) :: emiss_wat=0.97    ! Emissivity of open water
+    real(kind=WP) :: albsn = 0.81      ! Albedo: frozen snow
+    real(kind=WP) :: albsnm= 0.77      !         melting snow
+    real(kind=WP) :: albi  = 0.70      !         frozen ice
+    real(kind=WP) :: albim = 0.68      !         melting ice
+    real(kind=WP) :: albw  = 0.066     !         open water, LY2004
     contains
         procedure WRITE_T_ICE_THERMO
         procedure READ_T_ICE_THERMO
@@ -129,7 +159,8 @@ TYPE T_ICE
     !___________________________________________________________________________
     ! put ice arrays for coupled model
     type(t_ice_atmcoupl)                        :: atmcoupl
-#endif /* (__oasis) */    
+#endif /* (__oasis) */ 
+
     !___________________________________________________________________________
     ! set ice model parameters:
     ! --- RHEOLOGY ---
@@ -505,6 +536,11 @@ subroutine ice_init(ice, partit, mesh)
     namelist /ice_dyn/ whichEVP, Pstar, ellipse, c_pressure, delta_min, evp_rheol_steps, &
                        Cd_oce_ice, ice_gamma_fct, ice_diff, theta_io, ice_ave_steps, &
                        alpha_evp, beta_evp, c_aevp
+                       
+    real(kind=WP)  :: Sice, h0, emiss_ice, emiss_wat, albsn, albsnm, albi, &
+                      albim, albw, con, consn                   
+    namelist /ice_therm/ Sice, h0, emiss_ice, emiss_wat, albsn, albsnm, albi, &
+                         albim, albw, con, consn
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -522,11 +558,12 @@ subroutine ice_init(ice, partit, mesh)
         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
         stop
     end if
-    read(nm_unit, nml=ice_dyn,    iostat=iost)
+    read(nm_unit, nml=ice_dyn  , iostat=iost)
+    read(nm_unit, nml=ice_therm, iostat=iost)
     close(nm_unit)
     
     !___________________________________________________________________________
-    ! set parameters in ice derived type from namelist.ice
+    ! set parameters in ice derived type from namelist.ice --> namelist /ice_dyn/ 
     ice%whichEVP        = whichEVP 
     ice%pstar           = Pstar
     ice%ellipse         = ellipse
@@ -542,17 +579,26 @@ subroutine ice_init(ice, partit, mesh)
     ice%beta_evp        = beta_evp
     ice%c_aevp          = c_aevp
     
-    !!PS no namelist paramter  in moment 
-    !!PS ice%zeta_min        = zeta_min
-    !!PS ice%Tevp_inv        = Tevp_inv
-    !!PS ice%ice_free_slip   = ice_free_slip
-    !!PS ice%ice_dt          = ice_dt
-    !!PS ice%Tevp_inv        = Tevp_inv
+    ! set parameters in ice derived type from namelist.ice --> namelist /ice_therm/ 
+    ice%thermo%con      = con
+    ice%thermo%consn    = consn
+    ice%thermo%Sice     = Sice
+    ice%thermo%h0       = h0
+    ice%thermo%emiss_ice= emiss_ice    
+    ice%thermo%emiss_wat= emiss_wat
+    ice%thermo%albsn    = albsn 
+    ice%thermo%albsnm   = albsnm
+    ice%thermo%albi     = albi    
+    ice%thermo%albim    = albim
+    ice%thermo%albw     = albw
+    
+    ice%thermo%cc=ice%thermo%rhowat*4190.0  ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
+    ice%thermo%cl=ice%thermo%rhoice*3.34e5  ! Volumetr. latent heat of ice fusion [J/m**3](cl=rhoice*Lf)
     
     !___________________________________________________________________________
     ! define local vertice & elem array size
     elem_size=myDim_elem2D+eDim_elem2D
-    node_size=myDim_nod2D+eDim_nod2D
+    node_size=myDim_nod2D +eDim_nod2D
     
     !___________________________________________________________________________
     ! allocate/initialise arrays in ice derived type
@@ -589,6 +635,7 @@ subroutine ice_init(ice, partit, mesh)
         ice%alpha_evp_array = ice%alpha_evp
         ice%beta_evp_array  = ice%alpha_evp
     end if
+    
     !___________________________________________________________________________
     ! initialise surface ocean arrays in ice derived type 
     allocate(ice%srfoce_u(             node_size))
