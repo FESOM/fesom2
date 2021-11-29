@@ -1999,7 +1999,11 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
         ! do it with gauss-law: int( div(u_vec)*dV) = int( u_vec * n_vec * dS )
         nzmin = ulevels(el(1))
         nzmax = nlevels(el(1))-1
-        
+
+#if defined(_OPENMP)
+        call omp_set_lock(partit%plock(enodes(1)))
+        call omp_set_lock(partit%plock(enodes(2)))
+#endif
         do nz = nzmax, nzmin, -1
             ! --> h * u_vec * n_vec
             ! --> e_vec = (dx,dy), n_vec = (-dy,dx);
@@ -2012,20 +2016,15 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
             if (Fer_GM) then
                 c1=(fer_UV(2,nz,el(1))*deltaX1- &
                 fer_UV(1,nz,el(1))*deltaY1)*helem(nz,el(1))
-#if defined(_OPENMP)
-                call omp_set_lock(partit%plock(enodes(1)))
-#endif
                 fer_Wvel(nz,enodes(1))=fer_Wvel(nz,enodes(1))+c1
-#if defined(_OPENMP)
-                call omp_unset_lock(partit%plock(enodes(1)))
-                call omp_set_lock  (partit%plock(enodes(2)))
-#endif
                 fer_Wvel(nz,enodes(2))=fer_Wvel(nz,enodes(2))-c1
-#if defined(_OPENMP)
-                call omp_unset_lock(partit%plock(enodes(2)))
-#endif
-            end if  
+            end if
         end do
+#if defined(_OPENMP)
+        call omp_unset_lock(partit%plock(enodes(1)))
+        call omp_unset_lock(partit%plock(enodes(2)))
+#endif
+
         
         !_______________________________________________________________________
         ! if ed is not a boundary edge --> calc div(u_vec*h) for every layer
@@ -2035,7 +2034,10 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
             deltaY2=edge_cross_dxdy(4,ed)
             nzmin = ulevels(el(2))
             nzmax = nlevels(el(2))-1 
-            
+#if defined(_OPENMP)
+        call omp_set_lock(partit%plock(enodes(1)))
+        call omp_set_lock(partit%plock(enodes(2)))
+#endif            
             do nz = nzmax, nzmin, -1
                 c2=-(UV(2,nz,el(2))*deltaX2 - UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
                 Wvel(nz,enodes(1))=Wvel(nz,enodes(1))+c2
@@ -2043,20 +2045,14 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
                 if (Fer_GM) then
                     c2=-(fer_UV(2,nz,el(2))*deltaX2- &
                     fer_UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
-#if defined(_OPENMP)
-                    call omp_set_lock(partit%plock(enodes(1)))
-#endif
                     fer_Wvel(nz,enodes(1))=fer_Wvel(nz,enodes(1))+c2
-#if defined(_OPENMP)
-                    call omp_unset_lock(partit%plock(enodes(1)))
-                    call omp_set_lock  (partit%plock(enodes(2)))
-#endif
                     fer_Wvel(nz,enodes(2))=fer_Wvel(nz,enodes(2))-c2
-#if defined(_OPENMP)
-                    call omp_unset_lock(partit%plock(enodes(2)))
-#endif
-                end if  
+                end if
             end do
+#if defined(_OPENMP)
+        call omp_unset_lock(partit%plock(enodes(1)))
+        call omp_unset_lock(partit%plock(enodes(2)))
+#endif        
         end if
     end do ! --> do ed=1, myDim_edge2D
 !$OMP END PARALLEL DO
