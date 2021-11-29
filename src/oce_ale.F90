@@ -2021,8 +2021,8 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
             end if
         end do
 #if defined(_OPENMP)
-        call omp_unset_lock(partit%plock(enodes(1)))
         call omp_unset_lock(partit%plock(enodes(2)))
+        call omp_unset_lock(partit%plock(enodes(1)))
 #endif
 
         
@@ -2050,8 +2050,8 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
                 end if
             end do
 #if defined(_OPENMP)
-        call omp_unset_lock(partit%plock(enodes(1)))
         call omp_unset_lock(partit%plock(enodes(2)))
+        call omp_unset_lock(partit%plock(enodes(1)))
 #endif        
         end if
     end do ! --> do ed=1, myDim_edge2D

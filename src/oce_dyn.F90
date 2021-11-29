@@ -288,8 +288,8 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
             V_b(nz,el(2))=V_b(nz,el(2))+v1/elem_area(el(2))
         END DO 
 #if defined(_OPENMP)
-        call omp_unset_lock(partit%plock(el(1)))
         call omp_unset_lock(partit%plock(el(2)))
+        call omp_unset_lock(partit%plock(el(1)))
 #endif
     END DO
 !$OMP END DO
@@ -403,8 +403,8 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
             V_c(nz,el(2))=V_c(nz,el(2))+v1
         END DO
 #if defined(_OPENMP)
-        call omp_unset_lock(partit%plock(el(1)))
         call omp_unset_lock(partit%plock(el(2)))
+        call omp_unset_lock(partit%plock(el(1)))
 #endif
     END DO
 !$OMP END DO
@@ -450,8 +450,8 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
             UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
         END DO 
 #if defined(_OPENMP)
-        call omp_unset_lock(partit%plock(el(1)))
         call omp_unset_lock(partit%plock(el(2)))
+        call omp_unset_lock(partit%plock(el(1)))
 #endif
     END DO
 !$OMP END DO
@@ -530,8 +530,8 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
             V_c(nz,el(2))=V_c(nz,el(2))+v1
         END DO
 #if defined(_OPENMP)
-        call omp_unset_lock(partit%plock(el(1)))
         call omp_unset_lock(partit%plock(el(2)))
+        call omp_unset_lock(partit%plock(el(1)))
 #endif
     END DO
 !$OMP END DO
@@ -570,8 +570,8 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
             UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
         END DO
 #if defined(_OPENMP)
-        call omp_unset_lock(partit%plock(el(1)))
         call omp_unset_lock(partit%plock(el(2)))
+        call omp_unset_lock(partit%plock(el(1)))
 #endif
     END DO
 !$OMP END DO
