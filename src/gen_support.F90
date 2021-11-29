@@ -316,17 +316,24 @@ subroutine integrate_nod_2D(data, int2D, partit, mesh)
   real(kind=WP), intent(inout)      :: int2D
 
   integer       :: row
-  real(kind=WP) :: lval
+  real(kind=WP) :: lval_omp, lval
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-  lval=0.0_WP
-  do row=1, myDim_nod2D
-     !!PS lval=lval+data(row)*area(1,row)
-     lval=lval+data(row)*areasvol(ulevels_nod2D(row),row)
-  end do
 
+lval=0.0_WP
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row, lval_omp)
+  lval_omp=0.0_WP
+!$OMP DO
+  do row=1, myDim_nod2D
+     lval_omp=lval_omp+data(row)*areasvol(ulevels_nod2D(row),row)
+  end do
+!$OMP END DO
+!$OMP CRITICAL
+lval=lval+lval_omp
+!$OMP END CRITICAL
+!$OMP END PARALLEL
   int2D=0.0_WP
   call MPI_AllREDUCE(lval, int2D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
@@ -346,19 +353,26 @@ subroutine integrate_nod_3D(data, int3D, partit, mesh)
   real(kind=WP), intent(inout)    :: int3D
 
   integer       :: k, row
-  real(kind=WP) :: lval
+  real(kind=WP) :: lval_omp, lval
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
 
   lval=0.0_WP
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row, k, lval_omp)
+  lval_omp=0.0_WP
+!$OMP DO
   do row=1, myDim_nod2D
-     !!PS do k=1, nlevels_nod2D(row)-1
      do k=ulevels_nod2D(row), nlevels_nod2D(row)-1
         lval=lval+data(k, row)*areasvol(k,row)*hnode_new(k,row)  ! --> TEST_cavity
      end do
   end do
+!$OMP END DO
+!$OMP CRITICAL
+lval=lval+lval_omp
+!$OMP END CRITICAL
+!$OMP END PARALLEL
   int3D=0.0_WP
   call MPI_AllREDUCE(lval, int3D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
