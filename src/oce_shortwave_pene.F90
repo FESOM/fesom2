@@ -1,7 +1,6 @@
 subroutine cal_shortwave_rad(ice, partit, mesh)
   ! This routine is inherited from FESOM 1.4 and adopted appropreately. It calculates 
-  ! s
-  hortwave penetration into the ocean assuming the constant chlorophyll concentration.
+  ! shortwave penetration into the ocean assuming the constant chlorophyll concentration.
   ! No penetration under the ice is applied. A decent way for ice region is to be discussed.
   ! This routine should be called after ice2oce coupling done if ice model is used.
   ! Ref.: Morel and Antoine 1994, Sweeney et al. 2005
