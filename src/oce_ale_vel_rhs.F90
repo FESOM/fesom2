@@ -317,63 +317,63 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
             ! Do not calculate on Halo nodes, as the result will not be used. 
             ! The "if" is cheaper than the avoided computiations.
             if (nod(1) <= myDim_nod2d) then
-                do nz=min(ul1,ul2), max(nl1,nl2)
-                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
 #if defined(_OPENMP)
        call omp_set_lock(partit%plock(nod(1)))
 #endif
+                do nz=min(ul1,ul2), max(nl1,nl2)
+                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
                     UVnode_rhs(1,nz,nod(1)) = UVnode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1) + un2(nz)*UV(1,nz,el2) 
                     UVnode_rhs(2,nz,nod(1)) = UVnode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1) + un2(nz)*UV(2,nz,el2)
+                end do
 #if defined(_OPENMP)
        call omp_unset_lock(partit%plock(nod(1)))
 #endif
-                end do
             endif
             
             ! second edge node
             if (nod(2) <= myDim_nod2d) then
-                do nz=min(ul1,ul2), max(nl1,nl2)
-                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
 #if defined(_OPENMP)
        call omp_set_lock(partit%plock(nod(2)))
 #endif
+                do nz=min(ul1,ul2), max(nl1,nl2)
+                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
                     UVnode_rhs(1,nz,nod(2)) = UVnode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1) - un2(nz)*UV(1,nz,el2)
                     UVnode_rhs(2,nz,nod(2)) = UVnode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1) - un2(nz)*UV(2,nz,el2)
+                end do
 #if defined(_OPENMP)
        call omp_unset_lock(partit%plock(nod(2)))
 #endif
-                end do
             endif
             
         else  ! el2 is not a valid element --> ed is a boundary edge, there is only the contribution from el1
             ! first edge node
             if (nod(1) <= myDim_nod2d) then
-                do nz=ul1, nl1
-                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
 #if defined(_OPENMP)
        call omp_set_lock(partit%plock(nod(1)))
 #endif
+                do nz=ul1, nl1
+                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
                     UVnode_rhs(1,nz,nod(1)) = UVnode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1)
                     UVnode_rhs(2,nz,nod(1)) = UVnode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1)
+                end do ! --> do nz=ul1, nl1
 #if defined(_OPENMP)
        call omp_unset_lock(partit%plock(nod(1)))
 #endif
-                end do ! --> do nz=ul1, nl1
             endif 
             
             ! second edge node
             if  (nod(2) <= myDim_nod2d) then
-                do nz=ul1, nl1
-                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
 #if defined(_OPENMP)
        call omp_set_lock(partit%plock(nod(2)))
 #endif
+                do nz=ul1, nl1
+                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
                     UVnode_rhs(1,nz,nod(2)) = UVnode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1)
                     UVnode_rhs(2,nz,nod(2)) = UVnode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1)
+                end do ! --> do nz=ul1, nl1
 #if defined(_OPENMP)
        call omp_unset_lock(partit%plock(nod(2)))
 #endif
-                end do ! --> do nz=ul1, nl1
             endif
         endif ! --> if (el2>0) then
     end do ! --> do ed=1, myDim_edge2D

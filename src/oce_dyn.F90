@@ -267,6 +267,10 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
         len=sqrt(sum(elem_area(el)))
         nzmax = minval(nlevels(el))
         nzmin = maxval(ulevels(el))
+#if defined(_OPENMP)
+        call omp_set_lock(partit%plock(el(1)))
+        call omp_set_lock(partit%plock(el(2)))
+#endif
         DO  nz=nzmin,nzmax-1
             u1=UV(1,nz,el(1))-UV(1,nz,el(2))
             v1=UV(2,nz,el(1))-UV(2,nz,el(2))
@@ -278,21 +282,15 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
             !here dynamics%visc_gamma2 is dimensional (1/velocity). If it is 10, then the respective term dominates starting from |u|=0.1 m/s an so on.
             u1=u1*vi
             v1=v1*vi
-#if defined(_OPENMP)
-            call omp_set_lock(partit%plock(el(1)))
-#endif
             U_b(nz,el(1))=U_b(nz,el(1))-u1/elem_area(el(1))
             V_b(nz,el(1))=V_b(nz,el(1))-v1/elem_area(el(1))
-#if defined(_OPENMP)
-            call omp_unset_lock(partit%plock(el(1)))
-            call omp_set_lock(partit%plock(el(2)))
-#endif
             U_b(nz,el(2))=U_b(nz,el(2))+u1/elem_area(el(2))
             V_b(nz,el(2))=V_b(nz,el(2))+v1/elem_area(el(2))
-#if defined(_OPENMP)
-            call omp_unset_lock(partit%plock(el(2)))
-#endif
         END DO 
+#if defined(_OPENMP)
+        call omp_unset_lock(partit%plock(el(1)))
+        call omp_unset_lock(partit%plock(el(2)))
+#endif
     END DO
 !$OMP END DO
 !$OMP MASTER
@@ -392,6 +390,10 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
         el=edge_tri(:,ed)
         nzmin = maxval(ulevels(el))
         nzmax = minval(nlevels(el))
+#if defined(_OPENMP)
+        call omp_set_lock(partit%plock(el(1)))
+        call omp_set_lock(partit%plock(el(2)))
+#endif
         DO  nz=nzmin,nzmax-1
             u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
             v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
@@ -399,7 +401,11 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
             U_c(nz,el(2))=U_c(nz,el(2))+u1
             V_c(nz,el(1))=V_c(nz,el(1))-v1
             V_c(nz,el(2))=V_c(nz,el(2))+v1
-        END DO 
+        END DO
+#if defined(_OPENMP)
+        call omp_unset_lock(partit%plock(el(1)))
+        call omp_unset_lock(partit%plock(el(2)))
+#endif
     END DO
 !$OMP END DO
 !$OMP DO
@@ -431,24 +437,22 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
         el=edge_tri(:,ed)
         nzmin = maxval(ulevels(el))
         nzmax = minval(nlevels(el))
+#if defined(_OPENMP)
+        call omp_set_lock(partit%plock(el(1)))
+        call omp_set_lock(partit%plock(el(2)))
+#endif
         DO  nz=nzmin,nzmax-1
             u1=(U_c(nz,el(1))-U_c(nz,el(2)))
             v1=(V_c(nz,el(1))-V_c(nz,el(2)))
-#if defined(_OPENMP)
-            call omp_set_lock(partit%plock(el(1)))
-#endif
             UV_rhs(1,nz,el(1))=UV_rhs(1,nz,el(1))-u1/elem_area(el(1))
             UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
-#if defined(_OPENMP)
-            call omp_unset_lock(partit%plock(el(1)))
-            call omp_set_lock(partit%plock(el(2)))
-#endif
             UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
             UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
-#if defined(_OPENMP)
-            call omp_unset_lock(partit%plock(el(2)))
-#endif
         END DO 
+#if defined(_OPENMP)
+        call omp_unset_lock(partit%plock(el(1)))
+        call omp_unset_lock(partit%plock(el(2)))
+#endif
     END DO
 !$OMP END DO
 !$OMP END PARALLEL
@@ -505,6 +509,10 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
         len=sqrt(sum(elem_area(el)))
         nzmin = maxval(ulevels(el))
         nzmax = minval(nlevels(el))
+#if defined(_OPENMP)
+        call omp_set_lock(partit%plock(el(1)))
+        call omp_set_lock(partit%plock(el(2)))
+#endif
         DO  nz=nzmin,nzmax-1
             u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
             v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
@@ -520,7 +528,11 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
             U_c(nz,el(2))=U_c(nz,el(2))+u1
             V_c(nz,el(1))=V_c(nz,el(1))-v1
             V_c(nz,el(2))=V_c(nz,el(2))+v1
-        END DO 
+        END DO
+#if defined(_OPENMP)
+        call omp_unset_lock(partit%plock(el(1)))
+        call omp_unset_lock(partit%plock(el(2)))
+#endif
     END DO
 !$OMP END DO
 !$OMP MASTER
@@ -535,6 +547,10 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
         len=sqrt(sum(elem_area(el)))
         nzmin = maxval(ulevels(el))
         nzmax = minval(nlevels(el))
+#if defined(_OPENMP)
+        call omp_set_lock(partit%plock(el(1)))
+        call omp_set_lock(partit%plock(el(2)))
+#endif
         DO  nz=nzmin,nzmax-1
             u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
             v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
@@ -547,21 +563,16 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
             u1=vi*(U_c(nz,el(1))-U_c(nz,el(2)))
             v1=vi*(V_c(nz,el(1))-V_c(nz,el(2)))
 
-#if defined(_OPENMP)
-            call omp_set_lock(partit%plock(el(1)))
-#endif
+
             UV_rhs(1,nz,el(1))=UV_rhs(1,nz,el(1))-u1/elem_area(el(1))
             UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
-#if defined(_OPENMP)
-            call omp_unset_lock(partit%plock(el(1)))
-            call omp_set_lock(partit%plock(el(2)))
-#endif
             UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
             UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
+        END DO
 #if defined(_OPENMP)
-            call omp_unset_lock(partit%plock(el(2)))
+        call omp_unset_lock(partit%plock(el(1)))
+        call omp_unset_lock(partit%plock(el(2)))
 #endif
-        END DO 
     END DO
 !$OMP END DO
 !$OMP END PARALLEL
