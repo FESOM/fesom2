@@ -753,10 +753,12 @@
           interface
 
               ! Read icepack namelists, setup the model parameter and write diagnostics               
-              module subroutine set_icepack(partit)
+              module subroutine set_icepack(ice, partit)
                   use mod_partit
+                  use mod_ice
                   implicit none 
                   type(t_partit), intent(inout), target :: partit
+                  type(t_ice)   , intent(inout), target :: ice
               end subroutine set_icepack
 
               ! Set up hemispheric masks 
@@ -850,10 +852,12 @@
               end subroutine icepack_to_fesom_single_point
 
               ! Trancers advection 
-              module subroutine tracer_advection_icepack(mesh)
+              module subroutine tracer_advection_icepack(ice, mesh)
                   use mod_mesh
+                  use MOD_ICE
                   implicit none
                   type(t_mesh), intent(in), target :: mesh
+                  type(t_ice), intent(in), target :: ice
               end subroutine tracer_advection_icepack
 
               ! Advection initialization
@@ -868,7 +872,6 @@
                   use mod_mesh
                   use mod_ice
                   use g_config,              only: dt
-                  use i_PARAM,               only: whichEVP
                   use icepack_intfc,         only: icepack_ice_strength
                   implicit none
                   real (kind=dbl_kind), intent(out) :: &

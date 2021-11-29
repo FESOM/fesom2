@@ -295,7 +295,10 @@ subroutine EVPdynamics(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: u_ice_old, v_ice_old
     real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice, rhs_a, rhs_m
     real(kind=WP), dimension(:), pointer  :: u_w, v_w, elevation
-    real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y  
+    real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y 
+#if defined (__icepack)
+    real(kind=WP), dimension(:), pointer  :: a_ice_old, m_ice_old, m_snow_old
+#endif
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -316,7 +319,12 @@ subroutine EVPdynamics(ice, partit, mesh)
     elevation       => ice%srfoce_ssh(:)
     stress_atmice_x => ice%stress_atmice_x(:)
     stress_atmice_y => ice%stress_atmice_y(:)
-    
+#if defined (__icepack)
+    a_ice_old       => ice%data(1)%values_old(:)
+    m_ice_old       => ice%data(2)%values_old(:)
+    m_snow_old      => ice%data(3)%values_old(:)
+#endif
+
     !___________________________________________________________________________
     ! If Icepack is used, always update the tracers
 #if defined (__icepack)

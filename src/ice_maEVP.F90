@@ -417,6 +417,9 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: elevation
     real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y  
     real(kind=WP), dimension(:), pointer  :: u_ice_aux, v_ice_aux
+#if defined (__icepack)
+    real(kind=WP), dimension(:), pointer  :: a_ice_old, m_ice_old, m_snow_old
+#endif    
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -443,7 +446,12 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     stress_atmice_y => ice%stress_atmice_y(:)
     u_ice_aux       => ice%uice_aux(:)
     v_ice_aux       => ice%vice_aux(:)
-    
+#if defined (__icepack)
+    a_ice_old       => ice%data(1)%values_old(:)
+    m_ice_old       => ice%data(2)%values_old(:)
+    m_snow_old      => ice%data(3)%values_old(:)
+#endif
+
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
     vale=1.0_WP/(ice%ellipse**2)

@@ -1120,7 +1120,6 @@ submodule (icedrv_main) icedrv_step
 
           use icepack_intfc,          only: icepack_ice_strength
           use g_config,               only: dt
-          use i_PARAM,                only: whichEVP
           use mod_mesh    
           use mod_ice    
           use ice_EVPdynamics_interface
@@ -1240,7 +1239,7 @@ submodule (icedrv_main) icedrv_step
 
              t2 = MPI_Wtime()
 
-             select case (whichEVP)
+             select case (ice%whichEVP)
                 case (0)
                    call EVPdynamics  (ice, p_partit, mesh)
                 case (1)
@@ -1268,7 +1267,7 @@ submodule (icedrv_main) icedrv_step
 
              t2 = MPI_Wtime()
 
-             call tracer_advection_icepack(mesh)
+             call tracer_advection_icepack(ice, mesh)
 
              t3 = MPI_Wtime()
              time_advec = t3 - t2
