@@ -1999,7 +1999,8 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
         ! do it with gauss-law: int( div(u_vec)*dV) = int( u_vec * n_vec * dS )
         nzmin = ulevels(el(1))
         nzmax = nlevels(el(1))-1
-
+! loop over edges  (enodes(1), enodes(2)) at the interface between el(1) and el(2), 
+! we expect no deadlock here...but who knows :)
 #if defined(_OPENMP)
         call omp_set_lock(partit%plock(enodes(1)))
         call omp_set_lock(partit%plock(enodes(2)))
