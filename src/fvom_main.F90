@@ -123,9 +123,13 @@ type(t_mesh),             target, save :: mesh
             stop
         end if
     else
-        call MPI_INIT(i)
+
+! kh 05.08.21 iceberg version
+!       call MPI_INIT(i)
+
+! kh 05.08.21 wiso version
+        call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, provided, i)
     end if
-    !call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, provided, i)
 #endif
     
 
@@ -1084,12 +1088,21 @@ type(t_mesh), intent(in) , target :: mesh
     call compute_diagnostics(1, mesh)
     t4 = MPI_Wtime()
     !___prepare output______________________________________________________
+    if (mype==0) then
+        write(*,*) "LA DEBUG: start output"
+    end if
     call output (n, mesh)
     if (use_icebergs .and. bIcbCalcCycleCompleted) then
+        if (mype==0) then
+            write(*,*) "LA DEBUG: start reset_ib_fluxes"
+        end if
         call reset_ib_fluxes
     end if
 
     t5 = MPI_Wtime()
+    if (mype==0) then
+        write(*,*) "LA DEBUG: start restart"
+    end if
     call restart(n, .false., .false., mesh)
     t6 = MPI_Wtime()
 
