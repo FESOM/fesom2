@@ -59,11 +59,15 @@ subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
 
   !3-eq. formulation for bottom melting [m/s]    
   v_ibmino  = sqrt( (u_ib - uo_keel_ib)**2 + (v_ib - vo_keel_ib)**2 )
+  !write(*,*) "LA DEBUG: uo_keel_ib = ", uo_keel_ib, ", vo_keel_ib = ", vo_keel_ib, ", T_keel_ib = ", T_keel_ib
   call iceberg_heat_water_fluxes_3eq(ib, M_b, T_keel_ib,S_keel_ib,v_ibmino, depth_ib, tf)
+  !write(*,*) "LA DEBUG: M_b = ",M_b
 
   !3-eq. formulation for lateral 'basal' melting [m/s]
   v_ibmino  = sqrt( (u_ib - uo_ib)**2 + (v_ib - vo_ib)**2 ) ! depth-average rel. velocity
+  !write(*,*) "LA DEBUG: uo_ib = ", uo_ib, ", vo_ib = ", vo_ib, ", T_ave_ib = ", T_ave_ib
   call iceberg_heat_water_fluxes_3eq(ib, M_bv, T_ave_ib,S_ave_ib,v_ibmino, depth_ib/2.0, tf)
+  !write(*,*) "LA DEBUG: M_bv = ",M_bv
   
   !'thermal driving', defined as the elevation of ambient water 
   !temperature above freezing point' (Neshyba and Josberger, 1979).
@@ -500,9 +504,9 @@ subroutine potit_ib(ib,salz,pt,pres,rfpres,tin)
      if(abs(ptd).lt.tpmd) return
      epsi = epsi-ptd
   enddo
-  write(6,*) ' WARNING FOR ICEBERG #',ib
-  write(6,*) ' in-situ temperature calculation has not converged.'
-  write(6,*) ' values: salt ', salz,', pot. temp ',pt, ', pressure ', pres, ', refpressure ', rfpres, ', temp ', tin
+  write(*,*) ' WARNING FOR ICEBERG #',ib
+  write(*,*) ' in-situ temperature calculation has not converged.'
+  write(*,*) ' values: salt ', salz,', pot. temp ',pt, ', pressure ', pres, ', refpressure ', rfpres, ', temp ', tin
   stop
   return
 end subroutine potit_ib

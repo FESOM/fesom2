@@ -1200,7 +1200,6 @@ subroutine iceberg_restart_with_icesheet
   open(unit=icbID_ISM,file=IcebergRestartPath_ISM,status='old')
   do ib=1, num_non_melted_icb 
    !read all parameters that icb_step needs:			
-   write(*,*) "ib=",ib
    read(icbID_ISM,'(18e15.7,I,L,3e15.7,L)')						&
    	height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
 	Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&

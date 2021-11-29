@@ -74,7 +74,7 @@ type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
 
     do n=1, myDim_nod2d
-        water_flux(n) = water_flux(n)-ibfwbv(n)-ibfwb(n)-ibfwl(n)-ibfwe(n)
+        water_flux(n) = water_flux(n)-ibfwb(n)-ibfwl(n)-ibfwe(n)-ibfwbv(n)
         heat_flux(n) = heat_flux(n) - ibhf(n)
     end do
 end subroutine icb2fesom

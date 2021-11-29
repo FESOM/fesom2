@@ -404,7 +404,7 @@ real(kind=WP), allocatable :: Ki(:,:)
 
 ! kh 18.03.21
 real(kind=WP), allocatable,dimension(:,:)   :: hnode, hnode_new, zbar_3d_n, Z_3d_n
-real(kind=WP), allocatable,dimension(:,:)   :: zbar_3d_n_ib ! kh 18.03.21 additional array for asynchronous iceberg computations
+real(kind=WP), allocatable,dimension(:,:)   :: Z_3d_n_ib ! kh 18.03.21 additional array for asynchronous iceberg computations
 
 ! --> layer thinkness at elements, interpolated from hnode
 real(kind=WP), allocatable,dimension(:,:)   :: helem

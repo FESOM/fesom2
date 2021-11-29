@@ -393,7 +393,8 @@ type(t_mesh),             target, save :: mesh
 ! kh 18.03.21 support of different ocean ice and iceberg steps:
 ! if steps_per_ib_step is configured greater 1 then zbar_3d_n and eta_n might be changed while
 ! the same asynchronous iceberg computation is still active
-        zbar_3d_n_ib = zbar_3d_n
+        !zbar_3d_n_ib = zbar_3d_n
+        Z_3d_n_ib    = Z_3d_n
         eta_n_ib     = eta_n
 
 ! kh 16.03.21 not modified during overlapping ocean/ice and iceberg computations
