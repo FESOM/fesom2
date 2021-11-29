@@ -198,7 +198,7 @@ contains
         ! Setup icepack
         !=====================
         if (f%mype==0) write(*,*) 'Icepack: reading namelists from namelist.icepack'
-        call set_icepack(f%partit)
+        call set_icepack(f%ice, f%partit)
         call alloc_icepack
         call init_icepack(f%ice, f%tracers%data(1), f%mesh)
         if (f%mype==0) write(*,*) 'Icepack: setup complete'
