@@ -1941,7 +1941,8 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     type(t_mesh),   intent(inout), target :: mesh
     !___________________________________________________________________________
     integer       :: el(2), enodes(2), n, nz, ed, nzmin, nzmax, uln1, uln2, nln1, nln2
-    real(kind=WP) :: c1, c2, deltaX1, deltaY1, deltaX2, deltaY2, dd, dd1, dddt, cflmax
+    real(kind=WP) :: deltaX1, deltaY1, deltaX2, deltaY2, dd, dd1, dddt, cflmax
+    real(kind=WP) :: c1(mesh%nl-1), c2(mesh%nl-1)
     real(kind=WP) :: lcflmax !for OMP realization
     ! --> zlevel with local zstar
     real(kind=WP) :: dhbar_total, dhbar_rest, distrib_dhbar_int
@@ -1999,34 +2000,35 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
         ! do it with gauss-law: int( div(u_vec)*dV) = int( u_vec * n_vec * dS )
         nzmin = ulevels(el(1))
         nzmax = nlevels(el(1))-1
-! loop over edges  (enodes(1), enodes(2)) at the interface between el(1) and el(2), 
-! we expect no deadlock here...but who knows :)
-#if defined(_OPENMP)
-        call omp_set_lock(partit%plock(enodes(1)))
-        call omp_set_lock(partit%plock(enodes(2)))
-#endif
+! we introduced c1 & c2 as arrays here to avoid deadlocks when in OpenMP mode
         do nz = nzmax, nzmin, -1
             ! --> h * u_vec * n_vec
             ! --> e_vec = (dx,dy), n_vec = (-dy,dx);
             ! --> h * u*(-dy) + v*dx
-            c1=( UV(2,nz,el(1))*deltaX1 - UV(1,nz,el(1))*deltaY1 )*helem(nz,el(1))
+            c1(nz)=( UV(2,nz,el(1))*deltaX1 - UV(1,nz,el(1))*deltaY1 )*helem(nz,el(1))
             ! inflow(outflow) "flux" to control volume of node enodes1
-            Wvel(nz,enodes(1))=Wvel(nz,enodes(1))+c1
             ! is equal to outflow(inflow) "flux" to control volume of node enodes2
-            Wvel(nz,enodes(2))=Wvel(nz,enodes(2))-c1
             if (Fer_GM) then
-                c1=(fer_UV(2,nz,el(1))*deltaX1- &
-                fer_UV(1,nz,el(1))*deltaY1)*helem(nz,el(1))
-                fer_Wvel(nz,enodes(1))=fer_Wvel(nz,enodes(1))+c1
-                fer_Wvel(nz,enodes(2))=fer_Wvel(nz,enodes(2))-c1
+                c2(nz)=(fer_UV(2,nz,el(1))*deltaX1- fer_UV(1,nz,el(1))*deltaY1)*helem(nz,el(1))
             end if
         end do
 #if defined(_OPENMP)
-        call omp_unset_lock(partit%plock(enodes(2)))
+        call omp_set_lock  (partit%plock(enodes(1)))
+#endif
+        Wvel    (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+c1(nzmin:nzmax)
+        fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+c2(nzmin:nzmax)
+#if defined(_OPENMP)
         call omp_unset_lock(partit%plock(enodes(1)))
 #endif
 
-        
+#if defined(_OPENMP)
+        call omp_set_lock  (partit%plock(enodes(2)))
+#endif
+        Wvel    (nzmin:nzmax, enodes(2))= Wvel    (nzmin:nzmax, enodes(2))-c1(nzmin:nzmax)
+        fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-c2(nzmin:nzmax)
+#if defined(_OPENMP)
+        call omp_unset_lock(partit%plock(enodes(2)))
+#endif
         !_______________________________________________________________________
         ! if ed is not a boundary edge --> calc div(u_vec*h) for every layer
         ! for el(2)
@@ -2034,26 +2036,29 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
             deltaX2=edge_cross_dxdy(3,ed)
             deltaY2=edge_cross_dxdy(4,ed)
             nzmin = ulevels(el(2))
-            nzmax = nlevels(el(2))-1 
-#if defined(_OPENMP)
-        call omp_set_lock(partit%plock(enodes(1)))
-        call omp_set_lock(partit%plock(enodes(2)))
-#endif            
+            nzmax = nlevels(el(2))-1   
             do nz = nzmax, nzmin, -1
-                c2=-(UV(2,nz,el(2))*deltaX2 - UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
-                Wvel(nz,enodes(1))=Wvel(nz,enodes(1))+c2
-                Wvel(nz,enodes(2))=Wvel(nz,enodes(2))-c2
+                c1(nz)=-(UV(2,nz,el(2))*deltaX2 - UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
                 if (Fer_GM) then
-                    c2=-(fer_UV(2,nz,el(2))*deltaX2- &
-                    fer_UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
-                    fer_Wvel(nz,enodes(1))=fer_Wvel(nz,enodes(1))+c2
-                    fer_Wvel(nz,enodes(2))=fer_Wvel(nz,enodes(2))-c2
+                    c2(nz)=-(fer_UV(2,nz,el(2))*deltaX2-fer_UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
                 end if
             end do
 #if defined(_OPENMP)
-        call omp_unset_lock(partit%plock(enodes(2)))
-        call omp_unset_lock(partit%plock(enodes(1)))
-#endif        
+            call omp_set_lock  (partit%plock(enodes(1)))
+#endif
+            Wvel    (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+c1(nzmin:nzmax)
+            fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+c2(nzmin:nzmax)
+#if defined(_OPENMP)
+            call omp_unset_lock(partit%plock(enodes(1)))
+#endif
+#if defined(_OPENMP)
+            call omp_set_lock  (partit%plock(enodes(2)))
+#endif
+            Wvel    (nzmin:nzmax, enodes(2))= Wvel    (nzmin:nzmax, enodes(2))-c1(nzmin:nzmax)
+            fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-c2(nzmin:nzmax)
+#if defined(_OPENMP)
+            call omp_unset_lock(partit%plock(enodes(2)))
+#endif
         end if
     end do ! --> do ed=1, myDim_edge2D
 !$OMP END PARALLEL DO
@@ -2434,14 +2439,14 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
         nzmin = ulevels_nod2D(n)
         nzmax = nlevels_nod2D(n)-1
         do nz=nzmin,nzmax
-            c1=abs(Wvel(nz,n)  *dt/hnode_new(nz,n))
-            c2=abs(Wvel(nz+1,n)*dt/hnode_new(nz,n))
-            ! strong condition:
-            ! total volume change induced by the vertical motion
-            ! no matter, upwind or downwind !
-            CFL_z(nz,  n)=CFL_z(nz,n)+c1
-            CFL_z(nz+1,n)=c2
+            c1(nz)=abs(Wvel(nz,n)  *dt/hnode_new(nz,n))
+            c2(nz)=abs(Wvel(nz+1,n)*dt/hnode_new(nz,n))
         end do
+        ! strong condition:
+        ! total volume change induced by the vertical motion
+        ! no matter, upwind or downwind !
+        CFL_z(nzmin:nzmax, n)    =CFL_z(nzmin:nzmax, n)    +c1
+        CFL_z(nzmin+1:nzmax+1, n)=CFL_z(nzmin+1:nzmax+1, n)+c2
     end do
 !$OMP END PARALLEL DO
 
@@ -2496,16 +2501,16 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
         nzmin = ulevels_nod2D(n)
         nzmax = nlevels_nod2D(n)
         do nz=nzmin,nzmax
-            c1=1.0_WP
-            c2=0.0_WP
+            c1(nz)=1.0_WP
+            c2(nz)=0.0_WP
             if (dynamics%use_wsplit  .and. (CFL_z(nz, n) > dynamics%wsplit_maxcfl)) then
                 dd=max((CFL_z(nz, n)-dynamics%wsplit_maxcfl), 0.0_WP)/max(dynamics%wsplit_maxcfl, 1.e-12)
-                c1=1.0_WP/(1.0_WP+dd) !explicit part =1. if dd=0.
-                c2=dd    /(1.0_WP+dd) !implicit part =1. if dd=inf
+                c1(nz)=1.0_WP/(1.0_WP+dd) !explicit part =1. if dd=0.
+                c2(nz)=dd    /(1.0_WP+dd) !implicit part =1. if dd=inf
             end if
-            Wvel_e(nz,n)=c1*Wvel(nz,n)
-            Wvel_i(nz,n)=c2*Wvel(nz,n)
         end do
+        Wvel_e(nzmin:nzmax,n)=c1(nzmin:nzmax)*Wvel(nzmin:nzmax,n)
+        Wvel_i(nzmin:nzmax,n)=c2(nzmin:nzmax)*Wvel(nzmin:nzmax,n)
     end do
 !$OMP END PARALLEL DO
 end subroutine vert_vel_ale
