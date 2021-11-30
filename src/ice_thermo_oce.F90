@@ -22,8 +22,48 @@ module ice_thermodynamics_interfaces
     end interface  
 end module
 
+module ice_therm_interface
+    interface
+        subroutine therm_ice(ithermp, h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
+        ug,ustar,T_oc,S_oc,H_ML,t,ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
+        rsf, dhgrowth, dhsngrowth, iflice, hflatow, hfsenow, hflwrdout,lid_clo,subli)
+        USE MOD_ICE
+        type(t_ice_thermo), intent(in), target :: ithermp
+        real(kind=WP)  h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rsss, evap_in, &
+                       ug, ustar, T_oc, S_oc, H_ML, t, ice_dt, ch, ce, ch_i, ce_i, fw, ehf, &
+                       dhgrowth, dhsngrowth, ahf, prec, subli, subli_i, rsf, &
+                       rhow, show, rhice, shice, sh, thick, thact, lat, &
+                       rh, rA, qhst, sn, hsntmp, o2ihf, evap, iflice, hflatow, &
+                       hfsenow, hflwrdout, lid_clo
+        end subroutine
+    end interface
+end module
 
-!===================================================================
+module ice_budget_interfaces
+    interface
+        subroutine budget(ithermp, hice, hsn, t, ta, qa, fsh, flo, ug, S_oc, ch_i, ce_i, fh, subli)
+        USE MOD_ICE
+        type(t_ice_thermo), intent(in), target :: ithermp
+        real(kind=WP)  hice, hsn, t, ta, qa, fsh, flo, ug, S_oc, ch_i, ce_i, fh, subli
+        end subroutine
+        
+        subroutine obudget(ithermp, qa, fsh, flo, t, ug, ta, ch, ce, fh, evap, hflatow, hfsenow, hflwrdout) 
+        USE MOD_ICE
+        type(t_ice_thermo), intent(in), target :: ithermp
+        real(kind=WP)  qa, t, ta, fsh, flo, ug, ch, ce, fh, evap, hfsenow, &
+                       hfradow, hflatow, hftotow, hflwrdout
+        end subroutine
+        
+        subroutine flooding(ithermp, h, hsn)
+        USE MOD_ICE
+        type(t_ice_thermo), intent(in), target :: ithermp
+        real(kind=WP)   h, hsn
+        end subroutine
+    end interface
+end module
+!
+!
+!_______________________________________________________________________________
 subroutine cut_off(ice, partit, mesh)
     use o_param
     use MOD_MESH
@@ -117,6 +157,7 @@ subroutine thermodynamics(ice, partit, mesh)
   use g_forcing_arrays
   use g_comm_auto
   use g_sbf, only: l_snow
+  use ice_therm_interface
   implicit none
   type(t_ice),    intent(inout), target :: ice
   type(t_mesh),   intent(in),    target :: mesh
@@ -322,6 +363,7 @@ subroutine therm_ice(ithermp, h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
     USE MOD_ICE
     use g_forcing_param,  only: use_virt_salt  
     use o_param
+    use ice_budget_interfaces
     implicit none
     type(t_ice_thermo), intent(in), target :: ithermp
     integer k
@@ -382,7 +424,7 @@ subroutine therm_ice(ithermp, h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   if (thick.gt.hmin) then
      do k=1,iclasses
         thact = real((2*k-1),WP)*thick/real(iclasses,WP) ! Thicknesses of actual ice class
-        call budget(thact,hsn,t,Ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,shice,subli_i) 
+        call budget(ithermp, thact, hsn,t,Ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,shice,subli_i) 
         !Thick ice K-class growth rate
         rhice=rhice+shice      	! Add to average heat flux
         subli=subli+subli_i
