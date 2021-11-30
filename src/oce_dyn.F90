@@ -396,7 +396,6 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
             update_u(nz)=(UV(1,nz,el(1))-UV(1,nz,el(2)))
             update_v(nz)=(UV(2,nz,el(1))-UV(2,nz,el(2)))
         END DO
-    END DO
 #if defined(_OPENMP)
     call omp_set_lock(partit%plock(el(1)))
 #endif
@@ -411,7 +410,9 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
 #if defined(_OPENMP)
     call omp_unset_lock(partit%plock(el(2)))
 #endif
+    END DO
 !$OMP END DO
+
 !$OMP DO
     DO ed=1,myDim_elem2D
         len=sqrt(elem_area(ed))
@@ -459,8 +460,6 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
 #if defined(_OPENMP)
         call omp_unset_lock(partit%plock(el(2)))
 #endif
-!$OMP END DO
-!$OMP DO
     END DO
 !$OMP END DO
 !$OMP END PARALLEL
