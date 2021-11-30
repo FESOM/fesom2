@@ -1982,7 +1982,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     END DO
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ed, enodes, el, deltaX1, deltaY1, nz, nzmin, nzmax, c1, deltaX2, deltaY2, c2)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ed, enodes, el, deltaX1, deltaY1, nz, nzmin, nzmax, deltaX2, deltaY2, c1, c2)
     do ed=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,ed)   
@@ -2448,8 +2448,8 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
         ! strong condition:
         ! total volume change induced by the vertical motion
         ! no matter, upwind or downwind !
-        CFL_z(nzmin  :nzmax,   n)=CFL_z(nzmin  :nzmax,   n)+c1
-        CFL_z(nzmin+1:nzmax+1, n)=c2
+        CFL_z(nzmin  :nzmax,   n)=CFL_z(nzmin  :nzmax,   n)+c1(nzmin:nzmax)
+        CFL_z(nzmin+1:nzmax+1, n)=c2(nzmin:nzmax)
     end do
 !$OMP END PARALLEL DO
 
