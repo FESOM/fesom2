@@ -2442,11 +2442,13 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
         nzmin = ulevels_nod2D(n)
         nzmax = nlevels_nod2D(n)-1
         do nz=nzmin,nzmax
+            c1(1)=abs(Wvel(nz,n)  *dt/hnode_new(nz,n)) !c1->c1(1) is made for the sake of reproducibility with the master branch (rounding error)
+            c2(1)=abs(Wvel(nz+1,n)*dt/hnode_new(nz,n)) !otherwise just add these terms (c(1) & c(2)) to CFL_z, respectively!
             ! strong condition:
             ! total volume change induced by the vertical motion
             ! no matter, upwind or downwind !
-            CFL_z(nz,  n)=CFL_z(nz,n)+abs(Wvel(nz,n)  *dt/hnode_new(nz,n))
-            CFL_z(nz+1,n)=            abs(Wvel(nz+1,n)*dt/hnode_new(nz,n))
+            CFL_z(nz,  n)=CFL_z(nz,n)+c1(1)
+            CFL_z(nz+1,n)=            c2(1)
         end do
     end do
 !$OMP END PARALLEL DO
