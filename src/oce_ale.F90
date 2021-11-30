@@ -2508,8 +2508,8 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
             Wvel_i(nz,n)=0.0_WP
             if (dynamics%use_wsplit  .and. (CFL_z(nz, n) > dynamics%wsplit_maxcfl)) then
                 dd=max((CFL_z(nz, n)-dynamics%wsplit_maxcfl), 0.0_WP)/max(dynamics%wsplit_maxcfl, 1.e-12)
-                Wvel_e(nz,n)=1.0_WP/(1.0_WP+dd)*Wvel(nz,n) !explicit part =1. if dd=0.
-                Wvel_i(nz,n)=dd    /(1.0_WP+dd)*Wvel(nz,n) !implicit part =1. if dd=inf
+                Wvel_e(nz,n)=(1.0_WP/(1.0_WP+dd))*Wvel(nz,n) !explicit part =1. if dd=0.
+                Wvel_i(nz,n)=(dd    /(1.0_WP+dd))*Wvel(nz,n) !implicit part =1. if dd=inf
             end if
         end do
     end do
