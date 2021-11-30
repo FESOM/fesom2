@@ -2,8 +2,16 @@ cmake_minimum_required(VERSION 3.4)
 
 project(fesom C Fortran)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
-#add_compile_options(-craympich-mt) # alternative cray-mpich library
-   add_compile_options(-DDISABLE_PARALLEL_RESTART_READ) # work around issue on aleph
+   option(ALEPH_CRAYMPICH_WORKAROUNDS "workaround for performance issues on aleph" ON) # todo: enable this switch only on aleph, not with cray compilers in general
+endif()
+if(${ALEPH_CRAYMPICH_WORKAROUNDS})
+   # todo: enable these options only for our targets
+   add_compile_options(-craympich-mt) # alternative cray-mpich library
+   # make sure to also set these variables in the runtime environment:
+   #    MPICH_MAX_THREAD_SAFETY=multiple # allows highest MPI thread level (i.e. MPI_THREAD_MULTIPLE)
+   #    MPICH_CRAY_OPT_THREAD_SYNC=0 # the Cray MPICH library falls back to using the pthread_mutex-based thread-synchronization implementation
+   #    MPICH_OPT_THREAD_SYNC=0 # seems to be a duplicate variable which also appears in some documentation instead of MPICH_CRAY_OPT_THREAD_SYNC
+   add_compile_options(-DDISABLE_PARALLEL_RESTART_READ) # reading restarts is slow when doing it on parallel on aleph, switch it off for now
 endif()
 #add_compile_options(-DTRANSPOSE_OUTPUT)
 
