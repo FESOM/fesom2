@@ -2437,19 +2437,17 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, c1, c2)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax)
     do n=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(n)
         nzmax = nlevels_nod2D(n)-1
         do nz=nzmin,nzmax
-            c1(nz)=abs(Wvel(nz,n)  *dt/hnode_new(nz,n))
-            c2(nz)=abs(Wvel(nz+1,n)*dt/hnode_new(nz,n))
+            ! strong condition:
+            ! total volume change induced by the vertical motion
+            ! no matter, upwind or downwind !
+            CFL_z(nz,  n)=CFL_z(nz,n)+abs(Wvel(nz,n)  *dt/hnode_new(nz,n))
+            CFL_z(nz+1,n)=            abs(Wvel(nz+1,n)*dt/hnode_new(nz,n))
         end do
-        ! strong condition:
-        ! total volume change induced by the vertical motion
-        ! no matter, upwind or downwind !
-        CFL_z(nzmin  :nzmax,   n)=CFL_z(nzmin  :nzmax,   n)+c1(nzmin:nzmax)
-        CFL_z(nzmin+1:nzmax+1, n)=c2(nzmin:nzmax)
     end do
 !$OMP END PARALLEL DO
 
@@ -2499,21 +2497,19 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     ! wsplit_maxcfl=0 means   w_exp  is zero (everything computed implicitly)
     ! wsplit_maxcfl=inf menas w_impl is zero (everything computed explicitly)
     ! a guess for optimal choice of wsplit_maxcfl would be 0.95
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, c1, c2, dd)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, dd)
     do n=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(n)
         nzmax = nlevels_nod2D(n)
         do nz=nzmin,nzmax
-            c1(nz)=1.0_WP
-            c2(nz)=0.0_WP
+            Wvel_e(nz,n)=Wvel(nz,n)
+            Wvel_i(nz,n)=0.0_WP
             if (dynamics%use_wsplit  .and. (CFL_z(nz, n) > dynamics%wsplit_maxcfl)) then
                 dd=max((CFL_z(nz, n)-dynamics%wsplit_maxcfl), 0.0_WP)/max(dynamics%wsplit_maxcfl, 1.e-12)
-                c1(nz)=1.0_WP/(1.0_WP+dd) !explicit part =1. if dd=0.
-                c2(nz)=dd    /(1.0_WP+dd) !implicit part =1. if dd=inf
+                Wvel_e(nz,n)=1.0_WP/(1.0_WP+dd)*Wvel(nz,n) !explicit part =1. if dd=0.
+                Wvel_i(nz,n)=dd    /(1.0_WP+dd)*Wvel(nz,n) !implicit part =1. if dd=inf
             end if
         end do
-        Wvel_e(nzmin:nzmax,n)=c1(nzmin:nzmax)*Wvel(nzmin:nzmax,n)
-        Wvel_i(nzmin:nzmax,n)=c2(nzmin:nzmax)*Wvel(nzmin:nzmax,n)
     end do
 !$OMP END PARALLEL DO
 end subroutine vert_vel_ale
