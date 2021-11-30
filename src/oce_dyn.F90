@@ -260,7 +260,7 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
     END DO
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, nz, ed, el, nelem, k, elem, nzmin, nzmax)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, nz, ed, el, nelem, k, elem, nzmin, nzmax, update_u, update_v)
 !$OMP DO
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
