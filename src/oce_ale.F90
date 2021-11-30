@@ -2015,17 +2015,18 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
 #if defined(_OPENMP)
         call omp_set_lock  (partit%plock(enodes(1)))
 #endif
-        Wvel    (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+c1(nzmin:nzmax)
-        fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+c2(nzmin:nzmax)
+        Wvel       (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+c1(nzmin:nzmax)
+        if (Fer_GM) then
+           fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+c2(nzmin:nzmax)
+        end if
 #if defined(_OPENMP)
         call omp_unset_lock(partit%plock(enodes(1)))
-#endif
-
-#if defined(_OPENMP)
         call omp_set_lock  (partit%plock(enodes(2)))
 #endif
-        Wvel    (nzmin:nzmax, enodes(2))= Wvel    (nzmin:nzmax, enodes(2))-c1(nzmin:nzmax)
-        fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-c2(nzmin:nzmax)
+        Wvel       (nzmin:nzmax, enodes(2))= Wvel    (nzmin:nzmax, enodes(2))-c1(nzmin:nzmax)
+        if (Fer_GM) then
+           fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-c2(nzmin:nzmax)
+        end if
 #if defined(_OPENMP)
         call omp_unset_lock(partit%plock(enodes(2)))
 #endif
@@ -2046,16 +2047,18 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
 #if defined(_OPENMP)
             call omp_set_lock  (partit%plock(enodes(1)))
 #endif
-            Wvel    (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+c1(nzmin:nzmax)
-            fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+c2(nzmin:nzmax)
+            Wvel       (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+c1(nzmin:nzmax)
+            if (Fer_GM) then
+               fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+c2(nzmin:nzmax)
+            end if
 #if defined(_OPENMP)
             call omp_unset_lock(partit%plock(enodes(1)))
-#endif
-#if defined(_OPENMP)
             call omp_set_lock  (partit%plock(enodes(2)))
 #endif
-            Wvel    (nzmin:nzmax, enodes(2))= Wvel    (nzmin:nzmax, enodes(2))-c1(nzmin:nzmax)
-            fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-c2(nzmin:nzmax)
+            Wvel       (nzmin:nzmax, enodes(2))= Wvel    (nzmin:nzmax, enodes(2))-c1(nzmin:nzmax)
+            if (Fer_GM) then
+               fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-c2(nzmin:nzmax)
+            end if
 #if defined(_OPENMP)
             call omp_unset_lock(partit%plock(enodes(2)))
 #endif
@@ -2445,8 +2448,8 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
         ! strong condition:
         ! total volume change induced by the vertical motion
         ! no matter, upwind or downwind !
-        CFL_z(nzmin:nzmax, n)    =CFL_z(nzmin:nzmax, n)    +c1
-        CFL_z(nzmin+1:nzmax+1, n)=CFL_z(nzmin+1:nzmax+1, n)+c2
+        CFL_z(nzmin  :nzmax,   n)=CFL_z(nzmin  :nzmax,   n)+c1
+        CFL_z(nzmin+1:nzmax+1, n)=c2
     end do
 !$OMP END PARALLEL DO
 

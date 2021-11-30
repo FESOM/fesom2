@@ -277,29 +277,24 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
                     )*len
 !            vi=dt*max(dynamics%visc_gamma0, dynamics%visc_gamma1*max(sqrt(u1*u1+v1*v1), dynamics%visc_gamma2*(u1*u1+v1*v1)))*len 
             !here dynamics%visc_gamma2 is dimensional (1/velocity). If it is 10, then the respective term dominates starting from |u|=0.1 m/s an so on.
-            u1=u1*vi
-            v1=v1*vi
 !           U_b(nz,el(1))=U_b(nz,el(1))-u1/elem_area(el(1))
 !           V_b(nz,el(1))=V_b(nz,el(1))-v1/elem_area(el(1))
 !           U_b(nz,el(2))=U_b(nz,el(2))+u1/elem_area(el(2))
 !           V_b(nz,el(2))=V_b(nz,el(2))+v1/elem_area(el(2))
-            update_u(nz)=u1
-            update_v(nz)=v1
+            update_u(nz)=u1*vi
+            update_v(nz)=v1*vi
         END DO 
 #if defined(_OPENMP)
         call omp_set_lock(partit%plock(el(1)))
 #endif
-        U_b(nzmin:nzmax-1, el(1))=U_b(nzmin:nzmax-1, el(1))+update_u(nzmin:nzmax-1)/elem_area(el(1))
+        U_b(nzmin:nzmax-1, el(1))=U_b(nzmin:nzmax-1, el(1))-update_u(nzmin:nzmax-1)/elem_area(el(1))
         V_b(nzmin:nzmax-1, el(1))=V_b(nzmin:nzmax-1, el(1))-update_v(nzmin:nzmax-1)/elem_area(el(1))
 #if defined(_OPENMP)
         call omp_unset_lock(partit%plock(el(1)))
-#endif
-
-#if defined(_OPENMP)
-        call omp_set_lock(partit%plock(el(2)))
+        call omp_set_lock  (partit%plock(el(2)))
 #endif
         U_b(nzmin:nzmax-1, el(2))=U_b(nzmin:nzmax-1, el(2))+update_u(nzmin:nzmax-1)/elem_area(el(2))
-        V_b(nzmin:nzmax-1, el(2))=V_b(nzmin:nzmax-1, el(2))-update_v(nzmin:nzmax-1)/elem_area(el(2))
+        V_b(nzmin:nzmax-1, el(2))=V_b(nzmin:nzmax-1, el(2))+update_v(nzmin:nzmax-1)/elem_area(el(2))
 #if defined(_OPENMP)
         call omp_unset_lock(partit%plock(el(2)))
 #endif
