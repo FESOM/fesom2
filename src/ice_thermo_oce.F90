@@ -89,7 +89,7 @@ subroutine cut_off(ice, partit, mesh)
 end subroutine cut_off
 
 #if !defined (__oasis) && !defined (__ifsinterface)
-!===================================================================
+!_______________________________________________________________________________
 ! Sea-ice thermodynamics routines
 !
 ! Coded by N. Yakovlev and S. Danilov.
@@ -98,8 +98,7 @@ end subroutine cut_off
 ! by Ralph Timmermann.
 ! Adjusted for general forcing data and NlFs option, cleaned up, bug fixing,
 ! by Qiang Wang, 13.01.2009
-!----------------------------------------------------------------------------
-
+!_______________________________________________________________________________
 subroutine thermodynamics(ice, partit, mesh)
   !
   ! For every surface node, this subroutine extracts the information
@@ -113,7 +112,6 @@ subroutine thermodynamics(ice, partit, mesh)
   USE MOD_PARSUP
   USE MOD_MESH
   use o_param
-  use i_therm_param
   use g_config
   use g_forcing_param
   use g_forcing_arrays
@@ -236,14 +234,14 @@ subroutine thermodynamics(ice, partit, mesh)
 !!PS     h_ml    = 1.25_WP       	         ! 10.0 or 30. used previously
      fw      = 0.0_WP
      ehf     = 0.0_WP
-     lid_Clo=h0
+     lid_Clo=ice%thermo%h0
      if (geo_coord_nod2D(2,i)>0) then !TODO 2 separate pars for each hemisphere
        lid_clo=0.5_WP
      else
        lid_clo=0.5_WP
      endif
     
-     call therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
+     call therm_ice(ice%thermo,h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
           ug,ustar,T_oc,S_oc,h_ml,t,ice%ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
           rsf, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,lid_clo,subli)
     
@@ -282,59 +280,77 @@ subroutine thermodynamics(ice, partit, mesh)
     end do
 end subroutine thermodynamics
 !
-!===================================================================
 !
-subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
+!_______________________________________________________________________________
+subroutine therm_ice(ithermp, h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
      ug,ustar,T_oc,S_oc,H_ML,t,ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
      rsf, dhgrowth, dhsngrowth, iflice, hflatow, hfsenow, hflwrdout,lid_clo,subli)
-  ! Ice Thermodynamic growth model     
-  !
-  ! Input parameters:
-  !------------------
-  ! h - ice mass [m]
-  ! hsn - snow mass [m]
-  ! A - ice compactness
-  ! fsh - shortwave radiation
-  ! flo - longwave radiation
-  ! Ta - air temperature
-  ! qa - specific humidity
-  ! rain - precipitation rain
-  ! snow - precipitation snow
-  ! runo - runoff
-  ! ug - wind speed
-  ! ustar - friction velocity
-  ! T_oc, S_oc - ocean temperature and salinity beneath the ice (mixed layer)
-  ! H_ML - mixed layer depth - should be specified.
-  ! t - temperature of snow/ice top surface
-  ! ice_dt - time step [s]
-  ! ch - transfer coefficient for sensible heat (for open ocean)
-  ! ce - transfer coefficient for evaporation   (for open ocean)
-  ! ch_i - transfer coefficient for sensible heat (for ice)
-  ! ce_i - transfer coefficient for evaporation   (for ice)  
-  ! lid_clo - lid closing parameter
-  ! Output parameters:
-  !-------------------
-  ! h - ice mass
-  ! hsn - snow mass
-  ! A - ice compactness
-  ! t - temperature of snow/ice top surface
-  ! fw - freshwater flux due to ice melting [m water/ice_dt]
-  ! ehf - net heat flux at the ocean surface [W/m2]        !RTnew
+    ! Ice Thermodynamic growth model     
+    !
+    ! Input parameters:
+    !------------------
+    ! h - ice mass [m]
+    ! hsn - snow mass [m]
+    ! A - ice compactness
+    ! fsh - shortwave radiation
+    ! flo - longwave radiation
+    ! Ta - air temperature
+    ! qa - specific humidity
+    ! rain - precipitation rain
+    ! snow - precipitation snow
+    ! runo - runoff
+    ! ug - wind speed
+    ! ustar - friction velocity
+    ! T_oc, S_oc - ocean temperature and salinity beneath the ice (mixed layer)
+    ! H_ML - mixed layer depth - should be specified.
+    ! t - temperature of snow/ice top surface
+    ! ice_dt - time step [s]
+    ! ch - transfer coefficient for sensible heat (for open ocean)
+    ! ce - transfer coefficient for evaporation   (for open ocean)
+    ! ch_i - transfer coefficient for sensible heat (for ice)
+    ! ce_i - transfer coefficient for evaporation   (for ice)  
+    ! lid_clo - lid closing parameter
+    ! Output parameters:
+    !-------------------
+    ! h - ice mass
+    ! hsn - snow mass
+    ! A - ice compactness
+    ! t - temperature of snow/ice top surface
+    ! fw - freshwater flux due to ice melting [m water/ice_dt]
+    ! ehf - net heat flux at the ocean surface [W/m2]        !RTnew
 
-  use i_therm_param
-  use g_forcing_param,  only: use_virt_salt  
-  use o_param
-  implicit none
-
-  integer k
-  real(kind=WP)  h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss,evap_in
-  real(kind=WP)  ug,ustar,T_oc,S_oc,H_ML,t,ice_dt,ch,ce,ch_i,ce_i,fw,ehf
-  real(kind=WP)  dhgrowth,dhsngrowth,ahf,prec,subli,subli_i,rsf
-  real(kind=WP)  rhow,show,rhice,shice,sh,thick,thact,lat
-  real(kind=WP)  rh,rA,qhst,sn,hsntmp,o2ihf,evap
-  real(kind=WP)  iflice,hflatow,hfsenow,hflwrdout
-  real(kind=WP), external  :: TFrez  ! Sea water freeze temperature.
-  real(kind=WP)  lid_clo
+    USE MOD_ICE
+    use g_forcing_param,  only: use_virt_salt  
+    use o_param
+    implicit none
+    type(t_ice_thermo), intent(in), target :: ithermp
+    integer k
+    real(kind=WP)  h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss,evap_in
+    real(kind=WP)  ug,ustar,T_oc,S_oc,H_ML,t,ice_dt,ch,ce,ch_i,ce_i,fw,ehf
+    real(kind=WP)  dhgrowth,dhsngrowth,ahf,prec,subli,subli_i,rsf
+    real(kind=WP)  rhow,show,rhice,shice,sh,thick,thact,lat
+    real(kind=WP)  rh,rA,qhst,sn,hsntmp,o2ihf,evap
+    real(kind=WP)  iflice,hflatow,hfsenow,hflwrdout
+    real(kind=WP), external  :: TFrez  ! Sea water freeze temperature.
+    real(kind=WP)  lid_clo
+    !___________________________________________________________________________
+    real(kind=WP), pointer :: hmin, Sice, Armin, cc, cl, con, consn, rhosno, rhoice, inv_rhowat, inv_rhosno
+    integer      , pointer :: iclasses
+    hmin       => ithermp%hmin
+    Armin      => ithermp%Armin
+    Sice       => ithermp%Sice
+    cc         => ithermp%cc
+    cl         => ithermp%cl
+    con        => ithermp%con
+    consn      => ithermp%consn
+    iclasses   => ithermp%iclasses
+    rhosno     => ithermp%rhosno
+    rhoice     => ithermp%rhoice
+    inv_rhowat => ithermp%inv_rhowat
+    inv_rhosno => ithermp%inv_rhosno
+    
+    !___________________________________________________________________________
+    
   ! Store ice thickness at start of growth routine
   dhgrowth=h  	  
 
@@ -349,7 +365,7 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   ! Growth rate for ice in open ocean
   rhow=0.0_WP
   evap=0.0_WP
-  call obudget(qa,fsh,flo,T_oc,ug,ta,ch,ce,rhow,evap,hflatow,hfsenow,hflwrdout) 
+  call obudget(ithermp, qa,fsh,flo,T_oc,ug,ta,ch,ce,rhow,evap,hflatow,hfsenow,hflwrdout) 
   hflatow=hflatow*(1.0_WP-A)
   hfsenow=hfsenow*(1.0_WP-A)
   hflwrdout=hflwrdout*(1.0_WP-A)
@@ -495,7 +511,7 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
 
   ! Flooding (snow to ice conversion)
   iflice=h
-  call flooding(h,hsn)     
+  call flooding(ithermp, h, hsn)     
   iflice=(h-iflice)/ice_dt
   
   ! to maintain salt conservation for the current model version
@@ -510,45 +526,61 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   
 end subroutine therm_ice
 !
-!=====================================================================================
 !
-subroutine budget (hice,hsn,t,ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,fh,subli)
-  ! Thick ice growth rate [m ice/sec]
-  !
-  ! INPUT:
-  ! hice - actual ice thickness [m]
-  ! hsn - snow thickness, used for albedo parameterization [m]
-  ! t - temperature of snow/ice surface [C]
-  ! ta - air temperature [C]
-  ! qa - specific humidity [Kg/Kg]
-  ! fsh - shortwave radiation [W/m**2]
-  ! flo - longwave radiation  [W/m**2]
-  ! ug - wind speed [m/sec]
-  ! S_oc - ocean salinity for the temperature of the ice base calculation [ppt]
-  ! ch_i - transfer coefficient for sensible heat (for ice)
-  ! ce_i - transfer coefficient for evaporation   (for ice) 
-  !
-  ! OUTPUT: fh - growth rate
-  !
-  ! qiang: The formular for saturated humidity was modified according to Large/Yeager2004
-  ! to allow direct comparison with the CORE results (Griffies et al. 2009). The new
-  ! formular does not require sea level pressure.
-  ! A similar change was also made for the obudget routine.
-  ! It was found through experiments that the results are quite similar to that from the
-  ! original code, and the simulated ice volume is only slightly larger after modification. 
-  
-  use i_therm_param
-  use o_param, only: WP
-  implicit none
-
-  integer iter, imax      ! Number of iterations
-  real(kind=WP)  hice,hsn,t,ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,fh
-  real(kind=WP)  hfsen,hfrad,hflat,hftot,subli         
-  real(kind=WP)  alb             ! Albedo of sea ice
-  real(kind=WP)  q1, q2	  ! coefficients for saturated specific humidity
-  real(kind=WP)  A1,A2,A3,B,C, d1, d2, d3   
-  real(kind=WP), external :: TFrez
-
+!_______________________________________________________________________________
+subroutine budget (ithermp, hice,hsn,t,ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,fh,subli)
+    ! Thick ice growth rate [m ice/sec]
+    !
+    ! INPUT:
+    ! hice - actual ice thickness [m]
+    ! hsn - snow thickness, used for albedo parameterization [m]
+    ! t - temperature of snow/ice surface [C]
+    ! ta - air temperature [C]
+    ! qa - specific humidity [Kg/Kg]
+    ! fsh - shortwave radiation [W/m**2]
+    ! flo - longwave radiation  [W/m**2]
+    ! ug - wind speed [m/sec]
+    ! S_oc - ocean salinity for the temperature of the ice base calculation [ppt]
+    ! ch_i - transfer coefficient for sensible heat (for ice)
+    ! ce_i - transfer coefficient for evaporation   (for ice) 
+    !
+    ! OUTPUT: fh - growth rate
+    !
+    ! qiang: The formular for saturated humidity was modified according to Large/Yeager2004
+    ! to allow direct comparison with the CORE results (Griffies et al. 2009). The new
+    ! formular does not require sea level pressure.
+    ! A similar change was also made for the obudget routine.
+    ! It was found through experiments that the results are quite similar to that from the
+    ! original code, and the simulated ice volume is only slightly larger after modification. 
+    use MOD_ICE
+    use o_param, only: WP
+    implicit none
+    type(t_ice_thermo), intent(in), target :: ithermp
+    integer iter, imax      ! Number of iterations
+    real(kind=WP)  hice,hsn,t,ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,fh
+    real(kind=WP)  hfsen,hfrad,hflat,hftot,subli         
+    real(kind=WP)  alb             ! Albedo of sea ice
+    real(kind=WP)  q1, q2	  ! coefficients for saturated specific humidity
+    real(kind=WP)  A1,A2,A3,B,C, d1, d2, d3   
+    real(kind=WP), external :: TFrez
+    !___________________________________________________________________________
+    real(kind=WP), pointer :: boltzmann, emiss_ice, tmelt, cl, clhi, con, cpair, &
+                              inv_rhowat, inv_rhoair, rhoair, albim, albi, albsn, albsnm
+    boltzmann  => ithermp%boltzmann
+    emiss_ice  => ithermp%emiss_ice
+    tmelt      => ithermp%tmelt
+    cl         => ithermp%cl
+    clhi       => ithermp%clhi
+    con        => ithermp%con
+    cpair      => ithermp%cpair
+    inv_rhowat => ithermp%inv_rhowat
+    inv_rhoair => ithermp%inv_rhoair
+    rhoair     => ithermp%rhoair
+    albim      => ithermp%albim
+    albi       => ithermp%albi
+    albsn      => ithermp%albsn
+    albsnm     => ithermp%albsnm
+    !___________________________________________________________________________
 !!PS   data q1 /11637800.0/, q2 /-5897.8/ 
 !!PS   data imax /5/
   
@@ -615,109 +647,125 @@ subroutine budget (hice,hsn,t,ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,fh,subli)
   return
 end subroutine budget
 !
-!======================================================================================
 !
-subroutine obudget (qa,fsh,flo,t,ug,ta,ch,ce,fh,evap,hflatow,hfsenow,hflwrdout)  
-  ! Ice growth rate for open ocean [m ice/sec]
-  !
-  ! INPUT:
-  ! t - temperature of open water [C]
-  ! fsh - shortwave radiation
-  ! flo - longwave radiation
-  ! ta - air temperature [C]
-  ! qa  - specific humidity             
-  ! ug - wind speed [m/sec]
-  ! ch - transfer coefficient for sensible heat
-  ! ce - transfer coefficient for evaporation
-  !
-  ! OUTPUT: fh - growth rate
-  !         evap - evaporation
+!_______________________________________________________________________________
+subroutine obudget (ithermp, qa,fsh,flo,t,ug,ta,ch,ce,fh,evap,hflatow,hfsenow,hflwrdout)  
+    ! Ice growth rate for open ocean [m ice/sec]
+    !
+    ! INPUT:
+    ! t - temperature of open water [C]
+    ! fsh - shortwave radiation
+    ! flo - longwave radiation
+    ! ta - air temperature [C]
+    ! qa  - specific humidity             
+    ! ug - wind speed [m/sec]
+    ! ch - transfer coefficient for sensible heat
+    ! ce - transfer coefficient for evaporation
+    !
+    ! OUTPUT: fh - growth rate
+    !         evap - evaporation
+    use MOD_ICE  
+    use o_param, only: WP
+    implicit none
+    type(t_ice_thermo), intent(in), target :: ithermp
+    real(kind=WP) qa,t,ta,fsh,flo,ug,ch,ce,fh,evap
+    real(kind=WP) hfsenow,hfradow,hflatow,hftotow,hflwrdout,b
+    real(kind=WP) q1, q2 		! coefficients for saturated specific humidity
+    real(kind=WP) c1, c4, c5
+    logical :: standard_saturation_shum_formula = .true.
+    integer :: ii
+    !___________________________________________________________________________
+    real(kind=WP), pointer :: boltzmann, emiss_wat, inv_rhowat, inv_rhoair, rhoair, &
+                              tmelt, cl, clhw, cpair, albw
+    boltzmann  => ithermp%boltzmann
+    emiss_wat  => ithermp%emiss_wat
+    inv_rhowat => ithermp%inv_rhowat
+    inv_rhoair => ithermp%inv_rhoair
+    rhoair     => ithermp%rhoair
+    tmelt      => ithermp%tmelt
+    cl         => ithermp%cl
+    clhw       => ithermp%clhw
+    cpair      => ithermp%cpair
+    albw       => ithermp%albw
+    
+    !___________________________________________________________________________
+    c1 = 3.8e-3_WP    
+    c4 = 17.27_WP
+    c5 = 237.3_WP
+    q1 = 640380._WP
+    q2 = -5107.4_WP
 
-  use i_therm_param
-  use o_param, only: WP
-  implicit none
+    ! (saturated) surface specific humidity
+    if(standard_saturation_shum_formula) then
+        b=c1*exp(c4*t/(t+c5))                      ! a standard one
+    else
+        b=0.98_WP*q1*inv_rhoair*exp(q2/(t+tmelt)) 	! LY2004 NCAR version 
+    end if
+    
+    ! radiation heat fluxe [W/m**2]:
+    hfradow= (1.0_WP-albw)*fsh &	                ! absorbed short wave radiation
+        +flo             	                ! long wave radiation coming in !put emiss/check
+    hflwrdout=-emiss_wat*boltzmann*((t+tmelt)**4) ! long wave radiation going out !in LY2004 emiss=1
+    hfradow=hfradow+hflwrdout
 
-  real(kind=WP) qa,t,ta,fsh,flo,ug,ch,ce,fh,evap
-  real(kind=WP) hfsenow,hfradow,hflatow,hftotow,hflwrdout,b
-  real(kind=WP) q1, q2 		! coefficients for saturated specific humidity
-  real(kind=WP) c1, c4, c5
-  logical :: standard_saturation_shum_formula = .true.
-  integer :: ii
+    ! sensible heat fluxe [W/m**2]:
+    hfsenow=rhoair*cpair*ch*ug*(ta-t)             ! sensible heat 
+    
+    ! latent heat fluxe [W/m**2]:
+    evap =rhoair*ce*ug*(qa-b)  ! evaporation kg/m2/s
+    hflatow=clhw*evap                             ! latent heat W/m2
 
-  !data c1, c4, c5 /3.8e-3, 17.67, 243.5/
-!!PS   data c1, c4, c5 /3.8e-3, 17.27, 237.3/
-!!PS   data q1 /640380./, q2 /-5107.4/
-  
-  c1 = 3.8e-3_WP    
-  c4 = 17.27_WP
-  c5 = 237.3_WP
-  q1 = 640380._WP
-  q2 = -5107.4_WP
+    ! total heat fluxe [W/m**2]:
+    hftotow=hfradow+hfsenow+hflatow               ! total heat W/m2
+    
+    fh= -hftotow/cl                             	! growth rate [m ice/sec]
+    !                                           	+: ML gains energy, ice melts
+    !                                           	-: ML loses energy, ice grows
+    evap=evap*inv_rhowat 	 			! evaporation rate [m water/s],negative up !!!
 
-  ! (saturated) surface specific humidity
-  if(standard_saturation_shum_formula) then
-     b=c1*exp(c4*t/(t+c5))                      ! a standard one
-  else
-     b=0.98_WP*q1*inv_rhoair*exp(q2/(t+tmelt)) 	! LY2004 NCAR version 
-  end if
-  
-  ! radiation heat fluxe [W/m**2]:
-  hfradow= (1.0_WP-albw)*fsh &	                ! absorbed short wave radiation
-       +flo             	                ! long wave radiation coming in !put emiss/check
-  hflwrdout=-emiss_wat*boltzmann*((t+tmelt)**4) ! long wave radiation going out !in LY2004 emiss=1
-  hfradow=hfradow+hflwrdout
-
-  ! sensible heat fluxe [W/m**2]:
-  hfsenow=rhoair*cpair*ch*ug*(ta-t)             ! sensible heat 
-  
-  ! latent heat fluxe [W/m**2]:
-  evap =rhoair*ce*ug*(qa-b)  ! evaporation kg/m2/s
-  hflatow=clhw*evap                             ! latent heat W/m2
-
-  ! total heat fluxe [W/m**2]:
-  hftotow=hfradow+hfsenow+hflatow               ! total heat W/m2
-  
-  fh= -hftotow/cl                             	! growth rate [m ice/sec]
-  !                                           	+: ML gains energy, ice melts
-  !                                           	-: ML loses energy, ice grows
-  evap=evap*inv_rhowat 	 			! evaporation rate [m water/s],negative up !!!
-
-  return
+    return
 end subroutine obudget
 !
-!======================================================================================
 !
-subroutine flooding (h,hsn)
-  use i_therm_param
+!_______________________________________________________________________________
+subroutine flooding (ithermp, h, hsn)
+    use MOD_ICE
+    type(t_ice_thermo), intent(in), target :: ithermp
+    real(kind=WP) h,hsn,hdraft,hflood
+    !___________________________________________________________________________
+    real(kind=WP), pointer :: inv_rhowat, inv_rhosno, rhoice, rhosno
+    inv_rhowat => ithermp%inv_rhowat
+    inv_rhosno => ithermp%inv_rhosno
+    rhoice     => ithermp%rhoice
+    rhosno     => ithermp%rhosno
 
-  real(kind=WP) h,hsn,hdraft,hflood
+    !___________________________________________________________________________
+    hdraft=(rhosno*hsn+h*rhoice)*inv_rhowat ! Archimedes: displaced water
+    hflood=hdraft-min(hdraft,h)         ! Increase in mean ice thickness due to flooding
+    h=h+hflood                          ! Add converted snow to ice volume
+    hsn=hsn-hflood*rhoice*inv_rhosno        ! Subtract snow from snow layer
 
-  hdraft=(rhosno*hsn+h*rhoice)*inv_rhowat ! Archimedes: displaced water
-  hflood=hdraft-min(hdraft,h)         ! Increase in mean ice thickness due to flooding
-  h=h+hflood                          ! Add converted snow to ice volume
-  hsn=hsn-hflood*rhoice*inv_rhosno        ! Subtract snow from snow layer
+    !RT   This is what all AWI sea ice models do, but
+    !RT   I wonder whether it really is correct for the heat budget.
+    !RT   I suggest we initially keep it to allow for a comparison with BRIOS results
+    !RT   and rethink it at a later stage.
 
-  !RT   This is what all AWI sea ice models do, but
-  !RT   I wonder whether it really is correct for the heat budget.
-  !RT   I suggest we initially keep it to allow for a comparison with BRIOS results
-  !RT   and rethink it at a later stage.
-
-  return
+    return
 end subroutine flooding
 !
-!======================================================================================
 !
+!_______________________________________________________________________________
 function TFrez(S)
-  ! Nonlinear correlation for the water freezing temperature.
-  ! Millero (1978) - UNESCO. Reference - See A. Gill, 1982.
-  use o_param, only: WP
-  implicit none
-  real(kind=WP) :: S, TFrez
+    ! Nonlinear correlation for the water freezing temperature.
+    ! Millero (1978) - UNESCO. Reference - See A. Gill, 1982.
+    use o_param, only: WP
+    implicit none
+    real(kind=WP) :: S, TFrez
 
-  TFrez= -0.0575_WP*S+1.7105e-3_WP *sqrt(S**3)-2.155e-4_WP *S*S
+    TFrez= -0.0575_WP*S+1.7105e-3_WP *sqrt(S**3)-2.155e-4_WP *S*S
 
 end function TFrez
 !
-!======================================================================================
 !
+!_______________________________________________________________________________
 #endif /* #if !defined (__oasis) && !defined (__ifsinterface) */
