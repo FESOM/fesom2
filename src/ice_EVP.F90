@@ -174,7 +174,6 @@ subroutine stress2rhs(inv_areamass, ice_strength, ice, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     USE o_PARAM
-    USE i_THERM_PARAM
     IMPLICIT NONE
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -257,7 +256,6 @@ subroutine EVPdynamics(ice, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     USE o_PARAM
-    USE i_therm_param
     USE o_ARRAYS
     USE g_CONFIG
     USE g_comm_auto
@@ -299,6 +297,7 @@ subroutine EVPdynamics(ice, partit, mesh)
 #if defined (__icepack)
     real(kind=WP), dimension(:), pointer  :: a_ice_old, m_ice_old, m_snow_old
 #endif
+    real(kind=WP)              , pointer  :: inv_rhowat, rhosno, rhoice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -324,7 +323,10 @@ subroutine EVPdynamics(ice, partit, mesh)
     m_ice_old       => ice%data(2)%values_old(:)
     m_snow_old      => ice%data(3)%values_old(:)
 #endif
-
+    rhosno          => ice%thermo%rhosno
+    rhoice          => ice%thermo%rhoice
+    inv_rhowat      => ice%thermo%inv_rhowat
+    
     !___________________________________________________________________________
     ! If Icepack is used, always update the tracers
 #if defined (__icepack)

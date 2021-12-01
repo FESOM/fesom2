@@ -4,7 +4,6 @@ MODULE gen_bulk
     USE MOD_PARTIT
     USE MOD_PARSUP    
     USE MOD_ICE
-    use i_therm_param
     use g_forcing_arrays
     use g_forcing_param, only: ncar_bulk_z_wind, ncar_bulk_z_tair, ncar_bulk_z_shum
     use o_param, only: WP
@@ -51,9 +50,12 @@ subroutine ncar_ocean_fluxes_mode_fesom14(ice, partit, mesh)
     type(t_partit), intent(inout), target  :: partit
     type(t_ice)   , intent(inout), target  :: ice
     real(kind=WP), dimension(:)  , pointer :: T_oc_array, u_w, v_w
+    real(kind=WP)                , pointer :: inv_rhoair, tmelt
     u_w        => ice%srfoce_u(:)
     v_w        => ice%srfoce_v(:)
     T_oc_array => ice%srfoce_temp(:)
+    inv_rhoair => ice%thermo%inv_rhoair
+    tmelt      => ice%thermo%tmelt
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, m, cd_n10, ce_n10, ch_n10, cd_n10_rt, cd, ce, ch, cd_rt, zeta, x2, x, psi_m, psi_h, stab, &
 !$OMP                                                               t, ts, q, qs, u, u10, tv, xx, dux, dvy, tstar, qstar, ustar, bstar )
 !$OMP DO
@@ -164,10 +166,12 @@ subroutine ncar_ocean_fluxes_mode(ice, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_ice)   , intent(inout), target :: ice
     real(kind=WP), dimension(:)  , pointer :: T_oc_array, u_w, v_w
+    real(kind=WP)                , pointer :: inv_rhoair, tmelt
     u_w        => ice%srfoce_u(:)
     v_w        => ice%srfoce_v(:)
     T_oc_array => ice%srfoce_temp(:)
-    
+    inv_rhoair => ice%thermo%inv_rhoair
+    tmelt      => ice%thermo%tmelt
 
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, m, cd_n10, ce_n10, ch_n10, cd_n10_rt, hl1, cd, ce, ch, cd_rt, x2, x, stab, &

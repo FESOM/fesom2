@@ -80,7 +80,6 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   use MOD_TRACER
   use MOD_ICE
   use o_arrays
-  use i_therm_param
   use g_forcing_param
   use g_forcing_arrays
   use g_clock
@@ -135,6 +134,7 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
   real(kind=WP), dimension(:), pointer  :: ice_temp, ice_alb, enthalpyoffuse
 #endif
+  real(kind=WP)              , pointer  :: rhoair
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -156,7 +156,8 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   tmp_oce_heat_flux=> ice%atmcoupl%tmpoce_flx_h(:)
   tmp_ice_heat_flux=> ice%atmcoupl%tmpice_flx_h(:)
 #endif 
-
+  rhoair           => ice%thermo%rhoair
+  
   !_____________________________________________________________________________
   t1=MPI_Wtime()
 #if defined (__oasis)

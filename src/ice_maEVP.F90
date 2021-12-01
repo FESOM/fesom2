@@ -202,7 +202,6 @@ subroutine ssh2rhs(ice, partit, mesh)
     use o_param
     use mod_mesh
     use g_config
-    use i_therm_param
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -216,6 +215,7 @@ subroutine ssh2rhs(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: m_ice, m_snow
     real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m
     real(kind=WP), dimension(:), pointer  :: elevation
+    real(kind=WP)              , pointer  :: rhoice, rhosno, inv_rhowat
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -225,6 +225,9 @@ subroutine ssh2rhs(ice, partit, mesh)
     rhs_a        => ice%data(1)%values_rhs(:)
     rhs_m        => ice%data(2)%values_rhs(:)
     elevation    => ice%srfoce_ssh
+    rhoice       => ice%thermo%rhoice
+    rhosno       => ice%thermo%rhosno
+    inv_rhowat   => ice%thermo%inv_rhowat
     
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
@@ -291,7 +294,6 @@ subroutine stress2rhs_m(ice, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     use o_param
-    use i_therm_param
     use mod_mesh
     use g_config
     implicit none
@@ -308,6 +310,7 @@ subroutine stress2rhs_m(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
     real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice, rhs_a, rhs_m
+    real(kind=WP)              , pointer  :: rhoice, rhosno
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -322,6 +325,8 @@ subroutine stress2rhs_m(ice, partit, mesh)
     v_rhs_ice    => ice%vice_rhs(:)
     rhs_a        => ice%data(1)%values_rhs(:)
     rhs_m        => ice%data(2)%values_rhs(:)
+    rhoice       => ice%thermo%rhoice
+    rhosno       => ice%thermo%rhosno
     
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
@@ -378,7 +383,6 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     use o_param
-    use i_therm_param
     use g_config
     use o_arrays
     use g_comm_auto
@@ -420,6 +424,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
 #if defined (__icepack)
     real(kind=WP), dimension(:), pointer  :: a_ice_old, m_ice_old, m_snow_old
 #endif    
+    real(kind=WP)              , pointer  :: rhoice, rhosno, inv_rhowat
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -451,7 +456,10 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     m_ice_old       => ice%data(2)%values_old(:)
     m_snow_old      => ice%data(3)%values_old(:)
 #endif
-
+    rhoice          => ice%thermo%rhoice
+    rhosno          => ice%thermo%rhosno
+    inv_rhowat      => ice%thermo%inv_rhowat
+    
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
     vale=1.0_WP/(ice%ellipse**2)
@@ -460,9 +468,10 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     rdt=ice%ice_dt
     steps=ice%evp_rheol_steps
     
+    !___________________________________________________________________________
     u_ice_aux=u_ice    ! Initialize solver variables
     v_ice_aux=v_ice
-
+    
 #if defined (__icepack)
     a_ice_old(:)  = a_ice(:)
     m_ice_old(:)  = a_ice(:)
@@ -744,7 +753,6 @@ subroutine find_alpha_field_a(ice, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     use o_param
-    use i_therm_param
     use g_config
 #if defined (__icepack)
     use icedrv_main,   only: strength
@@ -765,6 +773,7 @@ subroutine find_alpha_field_a(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
     real(kind=WP), dimension(:), pointer  :: u_ice_aux, v_ice_aux
     real(kind=WP), dimension(:), pointer  :: alpha_evp_array
+    real(kind=WP)              , pointer  :: rhoice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -780,6 +789,7 @@ subroutine find_alpha_field_a(ice, partit, mesh)
     u_ice_aux       => ice%uice_aux(:)
     v_ice_aux       => ice%vice_aux(:)
     alpha_evp_array => ice%alpha_evp_array(:)
+    rhoice          => ice%thermo%rhoice
     
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
@@ -961,7 +971,6 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     use o_param
     USE o_arrays
     use o_PARAM
-    use i_therm_param
     use g_config, only: use_cavity
     use g_comm_auto
     use ice_maEVP_interfaces
@@ -986,6 +995,7 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
     real(kind=WP), dimension(:), pointer  :: u_ice_aux, v_ice_aux
     real(kind=WP), dimension(:), pointer  :: beta_evp_array
+    real(kind=WP)              , pointer  :: rhoice, rhosno
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -1004,6 +1014,8 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     u_ice_aux       => ice%uice_aux(:)
     v_ice_aux       => ice%vice_aux(:)
     beta_evp_array  => ice%beta_evp_array(:)
+    rhoice          => ice%thermo%rhoice
+    rhosno          => ice%thermo%rhosno
     
     !___________________________________________________________________________
     steps=ice%evp_rheol_steps
