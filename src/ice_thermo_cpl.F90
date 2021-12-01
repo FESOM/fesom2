@@ -20,7 +20,6 @@ subroutine thermodynamics(ice, partit, mesh)
   USE MOD_PARTIT
   USE MOD_PARSUP
   USE MOD_MESH
-  use i_therm_param
   use g_config
   use g_forcing_param
   use g_forcing_arrays
@@ -456,7 +455,7 @@ contains
 
 
 
- subroutine ice_surftemp(h,hsn,a2ihf,t)
+ subroutine ice_surftemp(ifthermp, h,hsn,a2ihf,t)
   ! INPUT:
   ! a2ihf - Total atmo heat flux to ice
   ! A  - Ice fraction
@@ -466,9 +465,8 @@ contains
   ! INPUT/OUTPUT:
   ! t     - Ice surface temperature
 
-  use i_therm_param
   implicit none
-
+  type(t_ice_thermo), intent(in), target :: ithermp
   !---- atmospheric heat net flux into to ice (provided by OpenIFS)
   real(kind=WP)  a2ihf
   !---- ocean variables (provided by FESOM)
@@ -487,6 +485,13 @@ contains
   real(kind=WP), parameter :: dice  = 0.10_WP                       ! Thickness for top ice "layer"
   !---- freezing temperature of sea-water [K]
   real(kind=WP)  :: TFrezs
+  
+  real(kind=WP), pointer :: con, consn, cpsno, rhoice, rhosno
+  con    => ice%thermo%con
+  consn  => ice%thermo%consn
+  cpsno  => ice%thermo%cpsno
+  rhoice => ice%thermo%rhoice
+  rhosno => ice%thermo%rhosno
 
   !---- compute freezing temperature of sea-water from salinity
   TFrezs = -0.0575_WP*S_oc + 1.7105e-3_WP*sqrt(S_oc**3) - 2.155e-4_WP*(S_oc**2)+273.15
@@ -502,7 +507,7 @@ contains
   t=min(273.15_WP,t)
  end subroutine ice_surftemp
 
- subroutine ice_albedo(h,hsn,t,alb,geolat)
+ subroutine ice_albedo(ifthermp, h,hsn,t,alb,geolat)
   ! INPUT:
   ! h      - ice thickness [m]
   ! hsn    - snow thickness [m]
@@ -511,16 +516,20 @@ contains
   ! 
   ! OUTPUT:
   ! alb    - selected broadband albedo
-  use i_therm_param
   implicit none
-
+  type(t_ice_thermo), intent(in), target :: ithermp
   real(kind=WP) :: h
   real(kind=WP) :: hsn    
   real(kind=WP) :: t    
   real(kind=WP) :: alb
   real(kind=WP) :: geolat
   real(kind=WP) :: melt_pool_alb_reduction
-
+  real(kind=WP), pointer :: albsn, albi, albsnm, albim
+  albsn  => ice%thermo%albsn
+  albi   => ice%thermo%albi
+  albsnm => ice%thermo%albsnm
+  albim  => ice%thermo%albim
+  
   ! set albedo
   ! ice and snow, freezing and melting conditions are distinguished
   if (geolat.gt.0.) then !SH does not have melt ponds
