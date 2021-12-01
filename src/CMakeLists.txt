@@ -1,10 +1,9 @@
 cmake_minimum_required(VERSION 3.4)
 
 project(fesom C Fortran)
-if(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
-   option(ALEPH_CRAYMPICH_WORKAROUNDS "workaround for performance issues on aleph" ON) # todo: enable this switch only on aleph, not with cray compilers in general
-endif()
-if(${ALEPH_CRAYMPICH_WORKAROUNDS})
+option(ALEPH_CRAYMPICH_WORKAROUNDS "workaround for performance issues on aleph" OFF)
+
+if(ALEPH_CRAYMPICH_WORKAROUNDS OR DEFINED ENV{ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS})
    # todo: enable these options only for our targets
    add_compile_options(-craympich-mt) # alternative cray-mpich library, about 5 % faster with cray-mpich/7.7.3 on aleph, not available for modules cray-mpich > 7.7.3; todo: test compiling and performance with cray-mpich > 7.7.3
    # make sure to also set these variables in the runtime environment:
