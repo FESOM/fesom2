@@ -1943,7 +1943,6 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     integer       :: el(2), enodes(2), n, nz, ed, nzmin, nzmax, uln1, uln2, nln1, nln2
     real(kind=WP) :: deltaX1, deltaY1, deltaX2, deltaY2, dd, dd1, dddt, cflmax
     real(kind=WP) :: c1(mesh%nl-1), c2(mesh%nl-1)
-    real(kind=WP) :: lcflmax !for OMP realization
     ! --> zlevel with local zstar
     real(kind=WP) :: dhbar_total, dhbar_rest, distrib_dhbar_int
     real(kind=WP), dimension(:), allocatable :: max_dhbar2distr, cumsum_maxdhbar, distrib_dhbar
@@ -2452,17 +2451,13 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
         end do
     end do
 !$OMP END PARALLEL DO
-cflmax=0.
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, lcflmax)
-    lcflmax=0.
+    cflmax=0.
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n) REDUCTION(max:cflmax)
 !$OMP DO
     do n=1, myDim_nod2D+eDim_nod2D
-       lcflmax=max(lcflmax, maxval(CFL_z(:, n)))
+       cflmax=max(cflmax, maxval(CFL_z(:, n)))
     end do
 !$OMP END DO
-!$OMP CRITICAL
-    cflmax=max(lcflmax, cflmax)
-!$OMP END CRITICAL
 !$OMP END PARALLEL
 
     if (cflmax > 1.0_WP .and. flag_warn_cflz) then
