@@ -499,7 +499,7 @@ FUNCTION omp_min_max_sum1(arr, pos1, pos2, what, partit, nan)
   character(3),  intent(in)   :: what
   real(kind=WP), optional     :: nan !to be implemented upon the need (for masked arrays)
   real(kind=WP)               :: omp_min_max_sum1
-  real(kind=WP)               :: loc, val
+  real(kind=WP)               :: val
   integer                     :: n
 
   type(t_partit),intent(in), &
@@ -508,48 +508,40 @@ FUNCTION omp_min_max_sum1(arr, pos1, pos2, what, partit, nan)
   SELECT CASE (trim(what))
     CASE ('sum')
        val=0.0_WP
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, loc)
-       loc=0.0_WP
-!$OMP DO
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n)
+!$OMP DO REDUCTION(+: val)
        do n=pos1, pos2
-          loc=loc+arr(n)
+          val=val+arr(n)
        end do
 !$OMP END DO
-!$OMP CRITICAL
-       val=val+loc
-!$OMP END CRITICAL
 !$OMP END PARALLEL
+
     CASE ('min')
        val=arr(1)
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, loc)
-       loc=val
-!$OMP DO
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n)
+!$OMP DO REDUCTION(min, val)
        do n=pos1, pos2
-          loc=min(loc, arr(n))
+          val=min(val, arr(n))
        end do
 !$OMP END DO
-!$OMP CRITICAL
-       val=min(val, loc)
-!$OMP END CRITICAL
 !$OMP END PARALLEL
+
     CASE ('max')
        val=arr(1)
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, loc)
-       loc=val
-!$OMP DO
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n)
+!$OMP DO REDUCTION(max: val)
        do n=pos1, pos2
-          loc=max(loc, arr(n))
+          val=max(val, arr(n))
        end do
 !$OMP END DO
-!$OMP CRITICAL
-       val=max(val, loc)
-!$OMP END CRITICAL
 !$OMP END PARALLEL
-   CASE DEFAULT
-      if (partit%mype==0) write(*,*) trim(what), ' is not implemented in omp_min_max_sum case!'
-      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
-      STOP
+
+    CASE DEFAULT
+       if (partit%mype==0) write(*,*) trim(what), ' is not implemented in omp_min_max_sum case!'
+       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       STOP
   END SELECT
+
   omp_min_max_sum1=val
 END FUNCTION
 !
@@ -562,7 +554,7 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
   character(3),  intent(in)   :: what
   real(kind=WP), optional     :: nan !to be implemented upon the need (for masked arrays)
   real(kind=WP)               :: omp_min_max_sum2
-  real(kind=WP)               :: loc, val, vmasked
+  real(kind=WP)               :: val, vmasked
   integer                     :: i, j
 
 
@@ -574,39 +566,34 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
       if (.not. present(nan)) vmasked=huge(vmasked) !just some crazy number
       val=arr(1,1)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, loc)
-      loc=val
+!$OMP DO REDUCTION(min: val)
       do i=pos11, pos12
-!$OMP DO
-      do j=pos21, pos22
-         if (arr(i,j)/=vmasked) loc=min(loc, arr(i,j))
+         do j=pos21, pos22
+            if (arr(i,j)/=vmasked) val=min(val, arr(i,j))
+         end do
       end do
 !$OMP END DO
-      end do
-!$OMP CRITICAL
-      val=min(val, loc)
-!$OMP END CRITICAL
 !$OMP END PARALLEL
+
     CASE ('max')
       if (.not. present(nan)) vmasked=tiny(vmasked) !just some crazy number
       val=arr(1,1)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, loc)
-      loc=val
+!$OMP DO REDUCTION(max: val)
       do i=pos11, pos12
-!$OMP DO
-      do j=pos21, pos22
-         if (arr(i,j)/=vmasked) loc=max(loc, arr(i,j))
+         do j=pos21, pos22
+            if (arr(i,j)/=vmasked) val=max(val, arr(i,j))
+         end do
       end do
 !$OMP END DO
-      end do
-!$OMP CRITICAL
-      val=max(val, loc)
-!$OMP END CRITICAL
 !$OMP END PARALLEL
+
    CASE DEFAULT
       if (partit%mype==0) write(*,*) trim(what), ' is not implemented in omp_min_max_sum case!'
       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
       STOP
    END SELECT
+
 omp_min_max_sum2=val
 END FUNCTION
 end module g_support
