@@ -57,6 +57,7 @@ subroutine muscl_adv_init(twork, partit, mesh)
     
     !___________________________________________________________________________
     nn_size=0
+    k=0
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n)
 !$OMP DO REDUCTION(max: k)
     do n=1, myDim_nod2D
