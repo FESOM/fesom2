@@ -2447,7 +2447,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
         end do
     end do
 !$OMP END PARALLEL DO
-
+cflmax=0.
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, lcflmax)
     lcflmax=0.
 !$OMP DO
