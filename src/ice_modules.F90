@@ -53,54 +53,54 @@
 ! ! ! ice_ave_steps
 ! ! 
 
-!=====================================================================
-module i_therm_param
-USE o_PARAM
-  implicit none
-REAL(kind=WP), parameter  :: rhoair=  1.3            ! Air density,  LY2004 !1.3 AOMIP
-REAL(kind=WP), parameter  :: inv_rhoair=  1./1.3     ! Air density,  LY2004 !1.3 AOMIP
-REAL(kind=WP), parameter  :: rhowat= 1025.            ! Water density
-REAL(kind=WP), parameter  :: inv_rhowat= 1./1025.     ! Inverse Water density
-REAL(kind=WP), parameter  :: rhoice=  910.            ! Ice density, AOMIP
-REAL(kind=WP), parameter  :: inv_rhoice=  1./910.     ! Ice density, AOMIP
-REAL(kind=WP), parameter  :: rhosno=  290.            ! Snow density, AOMIP
-REAL(kind=WP), parameter  :: inv_rhosno=  1./290.     ! Snow density, AOMIP
-
-REAL(kind=WP), parameter  :: cpair=1005.       ! Specific heat of air [J/(kg * K)] 
-REAL(kind=WP), parameter  :: cpice=2106.       ! Specific heat of ice [J/(kg * K)] 
-REAL(kind=WP), parameter  :: cpsno=2090.       ! Specific heat of snow [J/(kg * K)] 
-REAL(kind=WP), parameter  :: cc=rhowat*4190.0  ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
-REAL(kind=WP), parameter  :: cl=rhoice*3.34e5  ! Volumetr. latent heat of ice fusion [J/m**3](cl=rhoice*Lf) 
-REAL(kind=WP), parameter  :: clhw=2.501e6      ! Specific latent heat [J/kg]: water	-> water vapor
-REAL(kind=WP), parameter  :: clhi=2.835e6      !                              sea ice-> water vapor
- 
-REAL(kind=WP), parameter  :: tmelt=273.15      ! 0 deg C expressed in K 
-REAL(kind=WP), parameter  :: boltzmann=5.67E-8 ! S. Boltzmann const.*longw. emissivity
-
-REAL(kind=WP)    :: con   = 2.1656    ! Thermal conductivities: ice; W/m/K
-REAL(kind=WP)    :: consn = 0.31      !                         snow
-
-REAL(kind=WP)    :: Sice = 4.0        ! Ice salinity 3.2--5.0 ppt.
-
-integer          :: iclasses=7        ! Number of ice thickness gradations for ice growth calcs.
-REAL(kind=WP)    :: h0=1.0	      ! Lead closing parameter [m] ! 0.5
-
-REAL(kind=WP)    :: hmin= 0.01        ! Cut-off ice thickness     !!
-REAL(kind=WP)    :: Armin=0.01        ! Minimum ice concentration !!
-
-REAL(kind=WP)    :: emiss_ice=0.97        ! Emissivity of Snow/Ice, 
-REAL(kind=WP)    :: emiss_wat=0.97        ! Emissivity of open water
-
-REAL(kind=WP)    :: albsn=   0.81     ! Albedo: frozen snow
-REAL(kind=WP)    :: albsnm=  0.77     !         melting snow
-REAL(kind=WP)    :: albi=    0.70     !         frozen ice
-REAL(kind=WP)    :: albim=   0.68     !         melting ice
-REAL(kind=WP)    :: albw=    0.066    !         open water, LY2004
-
-  NAMELIST /ice_therm/ Sice, h0, emiss_ice, &
-  emiss_wat, albsn, albsnm, albi, albim, albw, con, consn
-
-end module i_therm_param
-
+! ! !=====================================================================
+! ! module i_therm_param
+! ! USE o_PARAM
+! !   implicit none
+! ! REAL(kind=WP), parameter  :: rhoair=  1.3            ! Air density,  LY2004 !1.3 AOMIP
+! ! REAL(kind=WP), parameter  :: inv_rhoair=  1./1.3     ! Air density,  LY2004 !1.3 AOMIP
+! ! REAL(kind=WP), parameter  :: rhowat= 1025.            ! Water density
+! ! REAL(kind=WP), parameter  :: inv_rhowat= 1./1025.     ! Inverse Water density
+! ! REAL(kind=WP), parameter  :: rhoice=  910.            ! Ice density, AOMIP
+! ! REAL(kind=WP), parameter  :: inv_rhoice=  1./910.     ! Ice density, AOMIP
+! ! REAL(kind=WP), parameter  :: rhosno=  290.            ! Snow density, AOMIP
+! ! REAL(kind=WP), parameter  :: inv_rhosno=  1./290.     ! Snow density, AOMIP
+! ! 
+! ! REAL(kind=WP), parameter  :: cpair=1005.       ! Specific heat of air [J/(kg * K)] 
+! ! REAL(kind=WP), parameter  :: cpice=2106.       ! Specific heat of ice [J/(kg * K)] 
+! ! REAL(kind=WP), parameter  :: cpsno=2090.       ! Specific heat of snow [J/(kg * K)] 
+! ! REAL(kind=WP), parameter  :: cc=rhowat*4190.0  ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
+! ! REAL(kind=WP), parameter  :: cl=rhoice*3.34e5  ! Volumetr. latent heat of ice fusion [J/m**3](cl=rhoice*Lf) 
+! ! REAL(kind=WP), parameter  :: clhw=2.501e6      ! Specific latent heat [J/kg]: water	-> water vapor
+! ! REAL(kind=WP), parameter  :: clhi=2.835e6      !                              sea ice-> water vapor
+! !  
+! ! REAL(kind=WP), parameter  :: tmelt=273.15      ! 0 deg C expressed in K 
+! ! REAL(kind=WP), parameter  :: boltzmann=5.67E-8 ! S. Boltzmann const.*longw. emissivity
+! ! 
+! ! REAL(kind=WP)    :: con   = 2.1656    ! Thermal conductivities: ice; W/m/K
+! ! REAL(kind=WP)    :: consn = 0.31      !                         snow
+! ! 
+! ! REAL(kind=WP)    :: Sice = 4.0        ! Ice salinity 3.2--5.0 ppt.
+! ! 
+! ! integer          :: iclasses=7        ! Number of ice thickness gradations for ice growth calcs.
+! ! REAL(kind=WP)    :: h0=1.0	      ! Lead closing parameter [m] ! 0.5
+! ! 
+! ! REAL(kind=WP)    :: hmin= 0.01        ! Cut-off ice thickness     !!
+! ! REAL(kind=WP)    :: Armin=0.01        ! Minimum ice concentration !!
+! ! 
+! ! REAL(kind=WP)    :: emiss_ice=0.97        ! Emissivity of Snow/Ice, 
+! ! REAL(kind=WP)    :: emiss_wat=0.97        ! Emissivity of open water
+! ! 
+! ! REAL(kind=WP)    :: albsn=   0.81     ! Albedo: frozen snow
+! ! REAL(kind=WP)    :: albsnm=  0.77     !         melting snow
+! ! REAL(kind=WP)    :: albi=    0.70     !         frozen ice
+! ! REAL(kind=WP)    :: albim=   0.68     !         melting ice
+! ! REAL(kind=WP)    :: albw=    0.066    !         open water, LY2004
+! ! 
+! !   NAMELIST /ice_therm/ Sice, h0, emiss_ice, &
+! !   emiss_wat, albsn, albsnm, albi, albim, albw, con, consn
+! ! 
+! ! end module i_therm_param
+! ! 
 
 !==============================================================================
