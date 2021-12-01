@@ -74,7 +74,7 @@
 ! ! REAL(kind=WP), parameter  :: clhw=2.501e6      ! Specific latent heat [J/kg]: water	-> water vapor
 ! ! REAL(kind=WP), parameter  :: clhi=2.835e6      !                              sea ice-> water vapor
 ! !  
-! ! REAL(kind=WP), parameter  :: tmelt=273.15      ! 0 deg C expressed in K 
+! ! REAL(kind=WP), parameter  :: tmelt=273.15  cd     ! 0 deg C expressed in K 
 ! ! REAL(kind=WP), parameter  :: boltzmann=5.67E-8 ! S. Boltzmann const.*longw. emissivity
 ! ! 
 ! ! REAL(kind=WP)    :: con   = 2.1656    ! Thermal conductivities: ice; W/m/K

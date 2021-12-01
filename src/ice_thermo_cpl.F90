@@ -150,13 +150,13 @@ subroutine thermodynamics(ice, partit, mesh)
      ! energy fluxes ---!
      t                   = ice_temp(inod)
      if(A>Aimin) then
-        call ice_surftemp(max(h/(max(A,Aimin)),0.05),hsn/(max(A,Aimin)),a2ihf,t)
+        call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, t)
         ice_temp(inod) = t
      else
         ! Freezing temp of saltwater in K
         ice_temp(inod) = -0.0575_WP*S_oc_array(inod) + 1.7105e-3_WP*sqrt(S_oc_array(inod)**3) -2.155e-4_WP*(S_oc_array(inod)**2)+273.15_WP
      endif
-     call ice_albedo(h,hsn,t,alb,geolat)
+     call ice_albedo(ice%thermo, h, hsn, t, alb, geolat)
      ice_alb(inod)       = alb
 #endif
      call ice_growth
@@ -455,7 +455,7 @@ contains
 
 
 
- subroutine ice_surftemp(ifthermp, h,hsn,a2ihf,t)
+ subroutine ice_surftemp(ithermp, h,hsn,a2ihf,t)
   ! INPUT:
   ! a2ihf - Total atmo heat flux to ice
   ! A  - Ice fraction
@@ -507,7 +507,7 @@ contains
   t=min(273.15_WP,t)
  end subroutine ice_surftemp
 
- subroutine ice_albedo(ifthermp, h,hsn,t,alb,geolat)
+ subroutine ice_albedo(ithermp, h, hsn, t, alb, geolat)
   ! INPUT:
   ! h      - ice thickness [m]
   ! hsn    - snow thickness [m]
