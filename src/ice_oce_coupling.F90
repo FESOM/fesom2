@@ -253,7 +253,6 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     use g_forcing_param, only: use_virt_salt
     use g_forcing_arrays
     use g_support
-    use i_therm_param
     use cavity_interfaces
 #if defined (__icepack)
     use icedrv_main,   only: icepack_to_fesom,    &
@@ -276,6 +275,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     real(kind=WP), dimension(:)  , pointer :: a_ice_old
     real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn
     real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
+    real(kind=WP)                , pointer :: rhoice, rhosno, inv_rhowat
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -290,6 +290,9 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     thdgrsn       => ice%thermo%thdgrsn(:)
     fresh_wa_flux => ice%flx_fw(:)
     net_heat_flux => ice%flx_h(:)
+    rhoice        => ice%thermo%rhoice
+    rhosno        => ice%thermo%rhosno
+    inv_rhowat    => ice%thermo%inv_rhowat
     
     !___________________________________________________________________________
     allocate(flux(myDim_nod2D+eDim_nod2D))
