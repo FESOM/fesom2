@@ -67,8 +67,9 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP), dimension(:)  , pointer :: ice_temp, ice_alb, enthalpyoffuse
 #endif
 #if defined (__oasis) || defined (__ifsinterface)
-  real(kind=WP), dimension(:), pointer   ::  oce_heat_flux, ice_heat_flux 
+  real(kind=WP), dimension(:)  , pointer ::  oce_heat_flux, ice_heat_flux 
 #endif 
+  real(kind=WP)                , pointer :: rhoice, rhosno, rhowat, Sice, cl, cc, cpice, consn, con 
   myDim_nod2d=>partit%myDim_nod2D
   eDim_nod2D =>partit%eDim_nod2D
   ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D
@@ -95,6 +96,18 @@ subroutine thermodynamics(ice, partit, mesh)
   oce_heat_flux => ice%atmcoupl%oce_flx_h(:)
   ice_heat_flux => ice%atmcoupl%ice_flx_h(:)
 #endif
+  rhoice        => ice%thermo%rhoice  
+  rhosno        => ice%thermo%rhosno
+  rhowat        => ice%thermo%rhowat
+  Sice          => ice%thermo%Sice
+  cl            => ice%thermo%cl
+  cc            => ice%thermo%cc
+  cpice         => ice%thermo%cpice
+  consn         => ice%thermo%consn
+  con           => ice%thermo%con
+  rhoice        => ice%thermo%rhoice
+
+
   !_____________________________________________________________________________  
   rsss = ref_sss
 
