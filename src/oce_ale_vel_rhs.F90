@@ -39,7 +39,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     use o_ARRAYS, only: coriolis, ssh_gp, pgf_x, pgf_y
-    use i_therm_param
+!     use i_therm_param
     use o_PARAM
     use g_CONFIG
     use g_forcing_param, only: use_virt_salt
@@ -64,16 +64,20 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB, UV_rhs
     real(kind=WP), dimension(:)    , pointer :: eta_n
     real(kind=WP), dimension(:)    , pointer :: m_ice, m_snow, a_ice
+    real(kind=WP)                  , pointer :: rhoice, rhosno, inv_rhowat
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    UV       => dynamics%uv(:,:,:)
-    UV_rhs   => dynamics%uv_rhs(:,:,:)
-    UV_rhsAB => dynamics%uv_rhsAB(:,:,:)
-    eta_n    => dynamics%eta_n(:)
-    m_ice    => ice%data(2)%values(:)
-    m_snow   => ice%data(3)%values(:)
+    UV        => dynamics%uv(:,:,:)
+    UV_rhs    => dynamics%uv_rhs(:,:,:)
+    UV_rhsAB  => dynamics%uv_rhsAB(:,:,:)
+    eta_n     => dynamics%eta_n(:)
+    m_ice     => ice%data(2)%values(:)
+    m_snow    => ice%data(3)%values(:)
+    rhoice    => ice%thermo%rhoice
+    rhosno    => ice%thermo%rhosno
+    inv_rhowat=> ice%thermo%inv_rhowat
     
     !___________________________________________________________________________
     use_pice=0
