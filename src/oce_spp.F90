@@ -16,7 +16,6 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 use g_comm_auto
 use o_tracers
-use i_therm_param,    only: rhoice, rhowat, Sice
 use g_config,         only: dt
 implicit none
 
@@ -26,12 +25,16 @@ type(t_ice)   , intent(in), target :: ice
 type(t_mesh)  , intent(in), target :: mesh
 type(t_partit), intent(in), target :: partit
 real(kind=WP), dimension(:)  , pointer :: thdgr, S_oc_array
+real(kind=WP)                , pointer :: rhoice, rhowat, Sice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 thdgr      => ice%thermo%thdgr
 S_oc_array => ice%srfoce_salt
+rhoice     => ice%thermo%rhoice
+rhowat     => ice%thermo%rhowat
+Sice       => ice%thermo%Sice
 
 aux=rhoice/rhowat*dt
 do row=1, myDim_nod2d +eDim_nod2D! myDim is sufficient

@@ -39,7 +39,6 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     use o_ARRAYS, only: coriolis, ssh_gp, pgf_x, pgf_y
-!     use i_therm_param
     use o_PARAM
     use g_CONFIG
     use g_forcing_param, only: use_virt_salt

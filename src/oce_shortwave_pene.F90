@@ -13,7 +13,6 @@ subroutine cal_shortwave_rad(ice, partit, mesh)
     USE g_CONFIG
     use g_forcing_arrays
     use g_comm_auto
-    use i_therm_param
     IMPLICIT NONE
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -26,11 +25,13 @@ subroutine cal_shortwave_rad(ice, partit, mesh)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: a_ice
+    real(kind=WP)              , pointer  :: albw
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     a_ice => ice%data(1)%values(:)
+    albw  => ice%thermo%albw
     
     !___________________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(m, n2, n3, k, nzmax, nzmin, swsurf, aux, c, c2, c3, c4, c5, v1, v2, sc1, sc2)
