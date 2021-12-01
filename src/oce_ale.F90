@@ -1980,7 +1980,8 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
        end if
     END DO
 !$OMP END PARALLEL DO
-
+    c1=0.0_WP
+    c2=0.0_WP
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ed, enodes, el, deltaX1, deltaY1, nz, nzmin, nzmax, deltaX2, deltaY2, c1, c2)
     do ed=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
