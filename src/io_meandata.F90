@@ -722,6 +722,10 @@ subroutine write_mean(entry, entry_index)
        if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(size2))
      end if
      do lev=1, size1
+#ifdef DENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
+        ! aleph cray-mpich workaround
+        call MPI_Barrier(this%comm, MPIERR)
+#endif
        if(.not. entry%is_elem_based) then
          call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
        else
@@ -746,6 +750,10 @@ subroutine write_mean(entry, entry_index)
        if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(size2))
      end if
      do lev=1, size1
+#ifdef DENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
+        ! aleph cray-mpich workaround
+        call MPI_Barrier(this%comm, MPIERR)
+#endif
        if(.not. entry%is_elem_based) then
          call gather_real4_nod2D (entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm)
        else
