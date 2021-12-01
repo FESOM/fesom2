@@ -519,7 +519,7 @@ FUNCTION omp_min_max_sum1(arr, pos1, pos2, what, partit, nan)
     CASE ('min')
        val=arr(1)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n)
-!$OMP DO REDUCTION(min, val)
+!$OMP DO REDUCTION(min: val)
        do n=pos1, pos2
           val=min(val, arr(n))
        end do
@@ -565,7 +565,7 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
     CASE ('min')
       if (.not. present(nan)) vmasked=huge(vmasked) !just some crazy number
       val=arr(1,1)
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, loc)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j)
 !$OMP DO REDUCTION(min: val)
       do i=pos11, pos12
          do j=pos21, pos22
@@ -578,7 +578,7 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
     CASE ('max')
       if (.not. present(nan)) vmasked=tiny(vmasked) !just some crazy number
       val=arr(1,1)
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, loc)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j)
 !$OMP DO REDUCTION(max: val)
       do i=pos11, pos12
          do j=pos21, pos22
