@@ -581,7 +581,7 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
         call omp_unset_lock(partit%plock(el(1)))
         call omp_set_lock  (partit%plock(el(2)))
 #endif
-        UV_rhs(1, nzmin:nzmax-1, el(2))=UV_rhs(2, nzmin:nzmax-1, el(2))+update_u(nzmin:nzmax-1)/elem_area(el(2))
+        UV_rhs(1, nzmin:nzmax-1, el(2))=UV_rhs(1, nzmin:nzmax-1, el(2))+update_u(nzmin:nzmax-1)/elem_area(el(2))
         UV_rhs(2, nzmin:nzmax-1, el(2))=UV_rhs(2, nzmin:nzmax-1, el(2))+update_v(nzmin:nzmax-1)/elem_area(el(2))
 #if defined(_OPENMP)
         call omp_unset_lock(partit%plock(el(2)))
