@@ -17,7 +17,14 @@ TYPE T_SOLVERINFO
     integer       :: fillin  = 3
     integer       :: lutype  = 2
     real(kind=WP) :: droptol = 1.e-8
-    real(kind=WP) :: soltol  = 1e-10  !1.e-10    
+!!! PARMS Solver
+   real(kind=WP) :: soltol  = 1e-10  ! default for PARMS
+   logical       :: use_parms = .TRUE.
+!!!
+!!! Sergey's Solver
+!   real(kind=WP)  :: soltol  = 1e-6  ! default for PARMS
+!   logical        :: use_parms = .FALSE.
+!!!
     contains
         procedure WRITE_T_SOLVERINFO
         procedure READ_T_SOLVERINFO

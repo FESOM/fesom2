@@ -2527,6 +2527,8 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     use g_comm_auto
     use g_config, only: which_ale
     use iso_c_binding, only: C_INT, C_DOUBLE
+    use ssh_solve_preconditioner_interface
+    use ssh_solve_cg_interface
     implicit none
 #include "fparms.h"
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -2536,6 +2538,7 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     logical, save        :: lfirst=.true.
     integer(kind=C_INT)  :: n3, reuse, new_values
     integer              :: n
+    
     !___________________________________________________________________________
     ! interface for solver
     interface
@@ -2571,6 +2574,13 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     fillin  => dynamics%solverinfo%fillin
     droptol => dynamics%solverinfo%droptol
     soltol  => dynamics%solverinfo%soltol
+
+if (.not. dynamics%solverinfo%use_parms) then
+if (lfirst) call ssh_solve_preconditioner(partit, mesh)
+call ssh_solve_cg(dynamics%d_eta, dynamics%ssh_rhs, soltol, maxiter, partit, mesh)
+lfirst=.false.
+return
+end if
 
     !___________________________________________________________________________
     if  (trim(which_ale)=='linfs') then
