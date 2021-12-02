@@ -169,6 +169,7 @@ contains
     integer last_rec_idx
     type(var_info), pointer :: var
     real(kind=8), allocatable :: laux(:)
+    integer mpierr
 
     last_rec_idx = this%rec_count()
     
@@ -187,7 +188,7 @@ contains
       end if
 
       do lvl=1, nlvl
-#ifdef DENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
+#ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
         ! aleph cray-mpich workaround
         call MPI_Barrier(this%comm, mpierr)
 #endif
@@ -225,6 +226,7 @@ contains
     logical is_2d
     real(kind=8), allocatable :: laux(:)
     type(var_info), pointer :: var
+    integer mpierr
 
     if(this%is_iorank()) this%rec_cnt = this%rec_count()+1
     
@@ -243,7 +245,7 @@ contains
       end if
 
       do lvl=1, nlvl
-#ifdef DENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
+#ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
         ! aleph cray-mpich workaround
         call MPI_Barrier(this%comm, mpierr)
 #endif
