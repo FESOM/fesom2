@@ -1943,8 +1943,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     integer       :: el(2), enodes(2), n, nz, ed, nzmin, nzmax, uln1, uln2, nln1, nln2
     real(kind=WP) :: deltaX1, deltaY1, deltaX2, deltaY2, dd, dd1, dddt, cflmax
     ! still to be understood but if you allocate these arrays statically the results will be different:
-    ! real(kind=WP) :: c1(mesh%nl-1), c2(mesh%nl-1)
-    real(kind=WP) :: c1(50), c2(50)
+    real(kind=WP) :: c1(mesh%nl-1), c2(mesh%nl-1)
     ! --> zlevel with local zstar
     real(kind=WP) :: dhbar_total, dhbar_rest, distrib_dhbar_int
     real(kind=WP), dimension(:), allocatable :: max_dhbar2distr, cumsum_maxdhbar, distrib_dhbar
@@ -2576,8 +2575,8 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     soltol  => dynamics%solverinfo%soltol
 
 if (.not. dynamics%solverinfo%use_parms) then
-if (lfirst) call ssh_solve_preconditioner(partit, mesh)
-call ssh_solve_cg(dynamics%d_eta, dynamics%ssh_rhs, soltol, maxiter, partit, mesh)
+if (lfirst) call ssh_solve_preconditioner(dynamics%solverinfo, partit, mesh)
+call ssh_solve_cg(dynamics%d_eta, dynamics%ssh_rhs, dynamics%solverinfo, partit, mesh)
 lfirst=.false.
 return
 end if

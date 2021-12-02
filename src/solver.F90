@@ -1,33 +1,34 @@
 module ssh_solve_preconditioner_interface
     interface
-        subroutine ssh_solve_preconditioner(partit, mesh)
+        subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
         use MOD_MESH
         USE MOD_PARTIT
         USE MOD_PARSUP
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
+        USE MOD_DYN
+        type(t_solverinfo),  intent(inout), target :: solverinfo
+        type(t_partit),      intent(inout), target :: partit
+        type(t_mesh),        intent(inout), target :: mesh
         end subroutine
     end interface
 end module
 
 module ssh_solve_cg_interface
     interface
-        subroutine ssh_solve_cg(x, rhs, tol, maxiter, partit, mesh)
+        subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
         use MOD_MESH
         USE MOD_PARTIT
         USE MOD_PARSUP
         USE MOD_DYN
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        real(kind=WP),  intent(inout) :: x(partit%myDim_nod2D+partit%eDim_nod2D)
-        real(kind=WP),  intent(in)    :: rhs(partit%myDim_nod2D+partit%eDim_nod2D)
-        real(kind=WP),  intent(in)    :: tol
-        integer,        intent(in)    :: maxiter
+        type(t_solverinfo),  intent(inout), target :: solverinfo
+        type(t_partit),      intent(inout), target :: partit
+        type(t_mesh),        intent(inout), target :: mesh
+        real(kind=WP),       intent(inout) :: x(partit%myDim_nod2D+partit%eDim_nod2D)
+        real(kind=WP),       intent(in)    :: rhs(partit%myDim_nod2D+partit%eDim_nod2D)
         end subroutine
     end interface
 end module
 !=========================================================================
-subroutine ssh_solve_preconditioner(partit, mesh)
+subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
   ! Preconditioner follows MITgcm (JGR, 102,5753-5766, 1997)
   ! If the row r of the ssh equation is a_r eta_r +\sum a_i\eta_i=rhs_row_r
   ! where summation is over all nodes neighboring node r,
@@ -45,8 +46,9 @@ subroutine ssh_solve_preconditioner(partit, mesh)
     USE MOD_DYN
     USE g_comm_auto
     IMPLICIT NONE
-    type(t_partit), intent(inout), target :: partit
-    type(t_mesh)  , intent(inout), target :: mesh
+    type(t_solverinfo),  intent(inout), target :: solverinfo
+    type(t_partit),      intent(inout), target :: partit
+    type(t_mesh),        intent(inout), target :: mesh
     integer                      :: nend, row, node, n, offset
     real(kind=WP), allocatable   :: diag_values(:)
     real(kind=WP), pointer       :: pr_values(:)
@@ -83,10 +85,17 @@ subroutine ssh_solve_preconditioner(partit, mesh)
        END DO
     END DO
    deallocate(diag_values)
+
+   n=myDim_nod2D+eDim_nod2D
+   allocate(solverinfo%rr(n), solverinfo%zz(n), solverinfo%pp(n), solverinfo%App(n))
+   solverinfo%rr =0.0_WP
+   solverinfo%zz =0.0_WP
+   solverinfo%pp =0.0_WP
+   solverinfo%App=0.0_WP
 end subroutine ssh_solve_preconditioner
 
 ! ========================================================
-subroutine ssh_solve_cg(x,rhs, tol, maxiter, partit, mesh)
+subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! Conjugate gradient solver
   ! Our ssh matrix is symmetric,  because we  compute divergencethe contributions as
   ! integrated over area of scalar control volume.
@@ -99,18 +108,17 @@ subroutine ssh_solve_cg(x,rhs, tol, maxiter, partit, mesh)
   USE MOD_DYN
   USE g_comm_auto
   IMPLICIT NONE
-  type(t_partit),intent(inout), target :: partit
-  type(t_mesh),  intent(inout), target :: mesh
-  real(kind=WP), intent(inout) :: x(partit%myDim_nod2D+partit%eDim_nod2D)
-  real(kind=WP), intent(in)    :: rhs(partit%myDim_nod2D+partit%eDim_nod2D)
-  real(kind=WP), intent(in)    :: tol
-  integer, intent(in)          :: maxiter
+  type(t_solverinfo),  intent(inout), target :: solverinfo
+  type(t_partit),      intent(inout), target :: partit
+  type(t_mesh),        intent(inout), target :: mesh
+  real(kind=WP),       intent(inout)         :: x(partit%myDim_nod2D+partit%eDim_nod2D)
+  real(kind=WP),       intent(in)            :: rhs(partit%myDim_nod2D+partit%eDim_nod2D)
   integer                      :: row, nini, nend, iter 
   real(kind=WP)                :: sprod(2), s_old, s_aux, al, be, rtol
   integer                      :: req
-  real(kind=WP), allocatable   :: rr(:), zz(:), pp(:), App(:)
-  real(kind=WP), pointer       :: pr_values(:)
+  real(kind=WP), pointer       :: pr_values(:), rr(:), zz(:), pp(:), App(:)
   integer,       pointer       :: rptr(:), cind(:)
+
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -121,113 +129,145 @@ subroutine ssh_solve_cg(x,rhs, tol, maxiter, partit, mesh)
   cind     =>mesh%ssh_stiff%colind_loc
   rptr     =>mesh%ssh_stiff%rowptr_loc
 
-  row=myDim_nod2D+eDim_nod2D
-  allocate(rr(row), zz(row), pp(row), App(row))
-  rr=0.0_WP
-  zz=0.0_WP
-  pp=0.0_WP
-  App=0.0_WP
-  
+  rr =>solverinfo%rr
+  zz =>solverinfo%zz
+  pp =>solverinfo%pp
+  App=>solverinfo%App
+ 
   ! ============== 
   ! Initialization. We solve AX=b, r_0=b-AX_0
   ! ============== 
   ! Define working tolerance: 
-  ! ============== 
-  s_old=sum(rhs(1:myDim_nod2D)*rhs(1:myDim_nod2D))
-  call MPI_Iallreduce(MPI_IN_PLACE, s_old, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, req, MPIerr)
+  ! ==============
+  s_old=0.0_WP
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:s_old)
+!$OMP DO
+  DO row=1, myDim_nod2D
+     s_old=s_old+rhs(row)*rhs(row)
+  END DO
+!$OMP END DO
+!$OMP END PARALLEL
+
+  call MPI_Iallreduce(MPI_IN_PLACE, s_old, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, req, MPIerr)
   call MPI_Wait(req, MPI_STATUS_IGNORE, MPIerr)
-  rtol=tol*sqrt(s_old/real(nod2D,WP))
+  rtol=solverinfo%soltol*sqrt(s_old/real(nod2D,WP))
   ! ==============
   ! Compute r0
   ! ==============
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) 
   DO row=1, myDim_nod2D
-     !nini=ssh_stiff%rowptr(row)-ssh_stiff%rowptr(1)+1
-     !nend=ssh_stiff%rowptr(row+1)-ssh_stiff%rowptr(1)
-     !rr(row)=rhs(row)-sum(ssh_stiff%values(nini:nend)*X(cind(nini:nend)))
      rr(row)=rhs(row)-sum(ssh_stiff%values(rptr(row):rptr(row+1)-1)* &
                       X(cind(rptr(row):rptr(row+1)-1)))
   END DO
+!$OMP END PARALLEL DO 
   call exchange_nod(rr, partit)
+!$OMP BARRIER
   ! =============
   ! z_0=M^{-1} r_0  (M^{-1} is the precondit. matrix)
   ! pp is the search direction
   ! =============
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) 
   DO row=1, myDim_nod2D
      zz(row)= sum(pr_values(rptr(row):rptr(row+1)-1)*rr(cind(rptr(row):rptr(row+1)-1)))
      pp(row)=zz(row)
   END DO
+!$OMP END PARALLEL DO 
   ! ===============
   ! Scalar product of r*z
   ! ===============
-  s_old=sum(rr(1:myDim_nod2D)*zz(1:myDim_nod2D))
-  call  MPI_Iallreduce(MPI_IN_PLACE, s_old, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, req, MPIerr)
+  s_old=0.0_WP
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:s_old)
+!$OMP DO
+  DO row=1, myDim_nod2D
+     s_old=s_old+rr(row)*zz(row)
+  END DO
+!$OMP END DO
+!$OMP END PARALLEL
+  call MPI_Iallreduce(MPI_IN_PLACE, s_old, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, req, MPIerr)
   call MPI_Wait(req, MPI_STATUS_IGNORE, MPIerr)
   
   ! ===============
   ! Iterations
   ! ===============
-  Do iter=1, maxiter
+  Do iter=1, solverinfo%maxiter
      ! ============
      ! Compute Ap
      ! ============
   call exchange_nod(pp, partit)     !  Update before matrix-vector multiplications
-
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) 
   DO row=1, myDim_nod2D
      App(row)=sum(ssh_stiff%values(rptr(row):rptr(row+1)-1)*pp(cind(rptr(row):rptr(row+1)-1)))
   END DO
+!$OMP END PARALLEL DO 
      ! ============
      ! Scalar products for alpha
      ! ============
  
-  s_aux=sum(pp(1:myDim_nod2D)*App(1:myDim_nod2D))
- 
-  call  MPI_Iallreduce(MPI_IN_PLACE, s_aux, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, req, MPIerr)
+  s_aux=0.0_WP
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:s_aux)
+!$OMP DO
+  DO row=1, myDim_nod2D
+     s_aux=s_aux+pp(row)*App(row)
+  END DO
+!$OMP END DO
+!$OMP END PARALLEL
+  call MPI_Iallreduce(MPI_IN_PLACE, s_aux, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, req, MPIerr)
   call MPI_Wait(req, MPI_STATUS_IGNORE, MPIerr)
   al=s_old/s_aux
      ! ===========
      ! New X and residual r
      ! ===========
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
   DO row=1, myDim_nod2D
-     X(row)=X(row)+al*pp(row)
+     X(row) =X(row) +al* pp(row)
      rr(row)=rr(row)-al*App(row)
   END DO
+!$OMP END PARALLEL DO
      ! =========== 
      ! New z
      ! ===========
   call exchange_nod(rr, partit)     ! Update before matrix-vector multiplications
- 
+!$OMP BARRIER
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
   DO row=1, myDim_nod2D
      zz(row)= sum(pr_values(rptr(row):rptr(row+1)-1)*rr(cind(rptr(row):rptr(row+1)-1)))
   END DO
-
+!$OMP END PARALLEL DO
      ! ===========
      ! Scalar products for beta
      ! ===========
-  sprod(1)=sum(rr(1:myDim_nod2D)*zz(1:myDim_nod2D))
-  sprod(2)=sum(rr(1:myDim_nod2D)*rr(1:myDim_nod2D))
+sprod(1)=0.0_WP
+sprod(2)=0.0_WP
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:sprod)
+  DO row=1, myDim_nod2D
+     sprod(1)=sprod(1)+rr(row)*zz(row)
+     sprod(2)=sprod(2)+rr(row)*rr(row)
+  END DO
+!$OMP END PARALLEL DO
   
-  call MPI_Iallreduce(MPI_IN_PLACE, sprod, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, req, MPIerr)
+  call MPI_Iallreduce(MPI_IN_PLACE, sprod, 2, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, req, MPIerr)
   call MPI_Wait(req, MPI_STATUS_IGNORE, MPIerr)
+!$OMP BARRIER
      ! ===========
      ! Exit if tolerance is achieved
      ! ===========
-  if(sqrt(sprod(2)/nod2D)< rtol) then
-  !write(*,*) mype, 'exit', iter
-  exit
+  if (sqrt(sprod(2)/nod2D)< rtol) then
+     exit
   endif
   be=sprod(1)/s_old
   s_old=sprod(1)
      ! ===========
      ! New p
      ! ===========
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
   DO row=1,myDim_nod2D
-  pp(row)=zz(row)+be*pp(row)
-  end do
+     pp(row)=zz(row)+be*pp(row)
   END DO
-  deallocate(App,zz,pp,rr)
-
+!$OMP END PARALLEL DO
+  END DO
  ! At the end: The result is in X, but it needs a halo exchange.
   call exchange_nod(x, partit)
+!$OMP BARRIER
 end subroutine ssh_solve_cg 
 
 ! ===================================================================

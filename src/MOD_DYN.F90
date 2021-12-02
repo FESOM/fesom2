@@ -18,13 +18,14 @@ TYPE T_SOLVERINFO
     integer       :: lutype  = 2
     real(kind=WP) :: droptol = 1.e-8
 !!! PARMS Solver
-   real(kind=WP) :: soltol  = 1e-10  ! default for PARMS
-   logical       :: use_parms = .TRUE.
+!    real(kind=WP) :: soltol  = 1e-10  ! default for PARMS
+!    logical       :: use_parms = .TRUE.
 !!!
 !!! Sergey's Solver
-!   real(kind=WP)  :: soltol  = 1e-6  ! default for PARMS
-!   logical        :: use_parms = .FALSE.
+   real(kind=WP)  :: soltol  = 1e-5  ! default for PARMS
+   logical        :: use_parms = .FALSE.
 !!!
+    real(kind=WP), allocatable   :: rr(:), zz(:), pp(:), App(:)
     contains
         procedure WRITE_T_SOLVERINFO
         procedure READ_T_SOLVERINFO
@@ -133,6 +134,10 @@ subroutine WRITE_T_SOLVERINFO(tsolverinfo, unit, iostat, iomsg)
     write(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%lutype
     write(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%droptol
     write(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%soltol
+    call write_bin_array(tsolverinfo%rr,  unit, iostat, iomsg)
+    call write_bin_array(tsolverinfo%zz,  unit, iostat, iomsg)
+    call write_bin_array(tsolverinfo%pp,  unit, iostat, iomsg)
+    call write_bin_array(tsolverinfo%App, unit, iostat, iomsg)
 end subroutine WRITE_T_SOLVERINFO
 
 subroutine READ_T_SOLVERINFO(tsolverinfo, unit, iostat, iomsg)
@@ -148,6 +153,10 @@ subroutine READ_T_SOLVERINFO(tsolverinfo, unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%lutype
     read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%droptol
     read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%soltol
+    call read_bin_array(tsolverinfo%rr,  unit, iostat, iomsg)
+    call read_bin_array(tsolverinfo%zz,  unit, iostat, iomsg)
+    call read_bin_array(tsolverinfo%pp,  unit, iostat, iomsg)
+    call read_bin_array(tsolverinfo%App, unit, iostat, iomsg)
 end subroutine READ_T_SOLVERINFO
 
 !

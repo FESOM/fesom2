@@ -231,8 +231,7 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
     real(kind=8)  :: u1, v1, len, vi
     integer       :: nz, ed, el(2), nelem(3),k, elem, nzmin, nzmax
     ! still to be understood but if you allocate these arrays statically the results will be different:
-    ! real(kind=8)  :: update_u(mesh%nl-1), update_v(mesh%nl-1)
-    real(kind=8)  :: update_u(50), update_v(50)
+    real(kind=8)  :: update_u(mesh%nl-1), update_v(mesh%nl-1)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
