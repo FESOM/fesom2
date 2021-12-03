@@ -264,7 +264,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     
     !___________________________________________________________________________
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(dz_inv, bv,  a, a_loc, rho_up, rho_dn, t, s, node, nz, nl1, nzmax, nzmin, &
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(dz_inv, bv,  a, rho_up, rho_dn, t, s, node, nz, nl1, nzmax, nzmin, &
 !$OMP                                  rhopot, bulk_0, bulk_pz, bulk_pz2, rho, dbsfc1, db_max, bulk_up, bulk_dn, &
 !$OMP                                  rho_surf, aux_rho, aux_rho1, flag1, flag2)
 !$OMP DO
