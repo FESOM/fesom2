@@ -1,5 +1,6 @@
 ##########
 module --force purge
+module load Stages/2020
 module load StdEnv
 module load CMake
 
