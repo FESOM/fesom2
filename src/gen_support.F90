@@ -580,6 +580,19 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
 !$OMP END DO
 !$OMP END PARALLEL
 
+    CASE ('sum')
+      if (.not. present(nan)) vmasked=huge(vmasked) !just some crazy number
+      val=0
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j)
+!$OMP DO REDUCTION(+: val)
+      do i=pos11, pos12
+         do j=pos21, pos22
+            if (arr(i,j)/=vmasked) val=val+arr(i,j)
+         end do
+      end do
+!$OMP END DO
+!$OMP END PARALLEL
+
    CASE DEFAULT
       if (partit%mype==0) write(*,*) trim(what), ' is not implemented in omp_min_max_sum case!'
       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
