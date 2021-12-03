@@ -349,25 +349,21 @@ subroutine integrate_nod_3D(data, int3D, partit, mesh)
   real(kind=WP), intent(inout)    :: int3D
 
   integer       :: k, row
-  real(kind=WP) :: lval_omp, lval
+  real(kind=WP) :: lval
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
 
   lval=0.0_WP
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row, k, lval_omp)
-  lval_omp=0.0_WP
-!$OMP DO
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row, k)
+!$OMP DO REDUCTION(+: lval)
   do row=1, myDim_nod2D
      do k=ulevels_nod2D(row), nlevels_nod2D(row)-1
         lval=lval+data(k, row)*areasvol(k,row)*hnode_new(k,row)  ! --> TEST_cavity
      end do
   end do
 !$OMP END DO
-!$OMP CRITICAL
-lval=lval+lval_omp
-!$OMP END CRITICAL
 !$OMP END PARALLEL
   int3D=0.0_WP
   call MPI_AllREDUCE(lval, int3D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
