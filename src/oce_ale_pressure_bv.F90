@@ -217,7 +217,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     type(t_mesh),   intent(in) ,    target  :: mesh
     type(t_partit), intent(inout),  target  :: partit
     type(t_tracer), intent(in),     target  :: tracers
-    real(kind=WP)                           :: dz_inv, bv,  a, a_loc, rho_up, rho_dn, t, s
+    real(kind=WP)                           :: dz_inv, bv,  a, rho_up, rho_dn, t, s
     integer                                 :: node, nz, nl1, nzmax, nzmin
     real(kind=WP)                           :: rhopot(mesh%nl), bulk_0(mesh%nl), bulk_pz(mesh%nl), bulk_pz2(mesh%nl), rho(mesh%nl), dbsfc1(mesh%nl), db_max
     real(kind=WP)                           :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf, aux_rho, aux_rho1
@@ -236,20 +236,16 @@ subroutine pressure_bv(tracers, partit, mesh)
     !___________________________________________________________________________
     ! Screen salinity
     a    =0.0_WP
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, a_loc)
-    a_loc=0.0_WP
-!$OMP DO
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax)
+!$OMP DO REDUCTION(min: a)
     do node=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(node)
         nzmax = nlevels_nod2D(node)
         do nz=nzmin,nzmax-1
-            a_loc=min(a_loc, salt(nz,node))
+            a=min(a, salt(nz,node))
         enddo
     enddo
 !$OMP END DO
-!$OMP CRITICAL
-    a=min(a, a_loc)
-!$OMP END CRITICAL
 !$OMP END PARALLEL
 
     !___________________________________________________________________________

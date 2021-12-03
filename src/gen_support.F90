@@ -316,23 +316,19 @@ subroutine integrate_nod_2D(data, int2D, partit, mesh)
   real(kind=WP), intent(inout)      :: int2D
 
   integer       :: row
-  real(kind=WP) :: lval_omp, lval
+  real(kind=WP) :: lval
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
 
 lval=0.0_WP
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row, lval_omp)
-  lval_omp=0.0_WP
-!$OMP DO
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row)
+!$OMP DO REDUCTION (+: lval)
   do row=1, myDim_nod2D
-     lval_omp=lval_omp+data(row)*areasvol(ulevels_nod2D(row),row)
+     lval=lval+data(row)*areasvol(ulevels_nod2D(row),row)
   end do
 !$OMP END DO
-!$OMP CRITICAL
-lval=lval+lval_omp
-!$OMP END CRITICAL
 !$OMP END PARALLEL
   int2D=0.0_WP
   call MPI_AllREDUCE(lval, int2D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
