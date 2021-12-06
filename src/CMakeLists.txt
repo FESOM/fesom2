@@ -1,11 +1,24 @@
 cmake_minimum_required(VERSION 3.4)
 
 project(fesom C Fortran)
-if(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
-#add_compile_options(-craympich-mt) # alternative cray-mpich library
-   add_compile_options(-DDISABLE_PARALLEL_RESTART_READ) # work around issue on aleph
+
+if(DEFINED ENV{ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS}) # be able to set the initial cache value from our env settings for aleph, not only via cmake command
+   option(ALEPH_CRAYMPICH_WORKAROUNDS "workaround for performance issues on aleph" ON)
+else()
+   option(ALEPH_CRAYMPICH_WORKAROUNDS "workaround for performance issues on aleph" OFF)
 endif()
-#add_compile_options(-DTRANSPOSE_OUTPUT)
+
+if(ALEPH_CRAYMPICH_WORKAROUNDS)
+   # todo: enable these options only for our targets
+   add_compile_options(-craympich-mt) # alternative cray-mpich library, about 5 % faster with cray-mpich/7.7.3 on aleph, not available for modules cray-mpich > 7.7.3; todo: test compiling and performance with cray-mpich > 7.7.3
+   # make sure to also set these variables in the runtime environment:
+   #    MPICH_MAX_THREAD_SAFETY=multiple # allows highest MPI thread level (i.e. MPI_THREAD_MULTIPLE)
+   #    MPICH_CRAY_OPT_THREAD_SYNC=0 # the Cray MPICH library falls back to using the pthread_mutex-based thread-synchronization implementation
+   #    MPICH_OPT_THREAD_SYNC=0 # seems to be a duplicate variable which also appears in some documentation instead of MPICH_CRAY_OPT_THREAD_SYNC (but this one brings a huge speed gain on aleph)
+   #add_compile_options(-DDISABLE_PARALLEL_RESTART_READ) # reading restarts is slow when doing it on parallel on aleph, switch it off for now
+   add_compile_options(-DENABLE_ALEPH_CRAYMPICH_WORKAROUNDS)
+   add_compile_options(-DTRANSPOSE_OUTPUT)
+endif()
 
 option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
 
@@ -80,7 +93,7 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 		target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
 	endif()
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
-       target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -hnoomp)
+       target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -hnoomp -N 1023)
 endif()
 target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES} ${OASIS_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
