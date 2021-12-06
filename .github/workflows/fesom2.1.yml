@@ -26,6 +26,7 @@ jobs:
     - name: Compile model (library)
       run: |
         bash ./test/ifs_interface/configure_lib.sh -l
+
     - name: Library exists
       run: |
         bash ./test/ifs_interface/check_exist.sh
@@ -33,6 +34,7 @@ jobs:
     - name: Create global test run
       run: |
         mkrun pi test_pi -m docker
+
     - name: FESOM2 global test run
       run: |    
         cd work_pi
@@ -42,15 +44,22 @@ jobs:
       run: |
         cd work_pi
         fcheck .
-    
+
+    - name: Check restarts
+      run: |
+        cd work_pi
+        ./job_docker_new
+
     - name: Create channel test run
       run: |
         mkrun souf test_souf -m docker
+
     - name: FESOM2 channel test run
       run: |    
         cd work_souf
         chmod +x job_docker_new
         ./job_docker_new
+
     - name: Check channel  results
       run: |
         cd work_souf
@@ -60,6 +69,7 @@ jobs:
       run: |
         cd mesh_part
         bash -l configure.sh ubuntu
+
     - name: Run partitioner
       run: |
         cd work_pi
