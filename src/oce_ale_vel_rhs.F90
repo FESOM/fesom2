@@ -1,45 +1,44 @@
 
 module compute_vel_rhs_interface
-  interface
-    subroutine compute_vel_rhs(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      type(t_dyn)   , intent(inout), target :: dynamics
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      
-    end subroutine
-  end interface
+    interface
+        subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
+        USE MOD_ICE
+        USE MOD_DYN
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice)   , intent(inout), target :: ice
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
 end module
 
 module momentum_adv_scalar_interface
-  interface
-    subroutine momentum_adv_scalar(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      type(t_dyn)   , intent(inout), target :: dynamics
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      
-    end subroutine
-  end interface
+    interface
+        subroutine momentum_adv_scalar(dynamics, partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_DYN
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
 end module
 
 !
 !
 !_______________________________________________________________________________
-subroutine compute_vel_rhs(dynamics, partit, mesh)
-    use MOD_MESH
+subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
+    USE MOD_ICE
+    USE MOD_DYN
     USE MOD_PARTIT
     USE MOD_PARSUP
-    USE MOD_DYN
+    USE MOD_MESH
     use o_ARRAYS, only: coriolis, ssh_gp, pgf_x, pgf_y
-    use i_ARRAYS
-    use i_therm_param
     use o_PARAM
     use g_CONFIG
     use g_forcing_param, only: use_virt_salt
@@ -48,6 +47,7 @@ subroutine compute_vel_rhs(dynamics, partit, mesh)
     use g_sbf, only: l_mslp
     use momentum_adv_scalar_interface
     implicit none 
+    type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
@@ -62,18 +62,26 @@ subroutine compute_vel_rhs(dynamics, partit, mesh)
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB, UV_rhs
     real(kind=WP), dimension(:)    , pointer :: eta_n
+    real(kind=WP), dimension(:)    , pointer :: m_ice, m_snow, a_ice
+    real(kind=WP)                  , pointer :: rhoice, rhosno, inv_rhowat
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    UV       =>dynamics%uv(:,:,:)
-    UV_rhs   =>dynamics%uv_rhs(:,:,:)
-    UV_rhsAB =>dynamics%uv_rhsAB(:,:,:)
-    eta_n    =>dynamics%eta_n(:)
-
+    UV        => dynamics%uv(:,:,:)
+    UV_rhs    => dynamics%uv_rhs(:,:,:)
+    UV_rhsAB  => dynamics%uv_rhsAB(:,:,:)
+    eta_n     => dynamics%eta_n(:)
+    m_ice     => ice%data(2)%values(:)
+    m_snow    => ice%data(3)%values(:)
+    rhoice    => ice%thermo%rhoice
+    rhosno    => ice%thermo%rhosno
+    inv_rhowat=> ice%thermo%inv_rhowat
+    
     !___________________________________________________________________________
     use_pice=0
     if (use_floatice .and.  .not. trim(which_ale)=='linfs') use_pice=1
+    if ((toy_ocean)  .and. (trim(which_toy)=="soufflet"))   use_pice=0
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax, elnodes, ff, mm, Fx, Fy, pre, p_ice, p_air, p_eta)
     do elem=1, myDim_elem2D
@@ -143,6 +151,7 @@ subroutine compute_vel_rhs(dynamics, partit, mesh)
         end do
     end do
 !$OMP END PARALLEL DO
+    
     !___________________________________________________________________________
     ! advection
     if (dynamics%momadv_opt==1) then
@@ -168,6 +177,7 @@ subroutine compute_vel_rhs(dynamics, partit, mesh)
         end do
     end do
 !$OMP END PARALLEL DO
+    
     ! =======================  
     ! U_rhs contains all contributions to velocity from old time steps   
     ! =======================

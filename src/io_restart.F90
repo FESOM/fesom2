@@ -7,8 +7,8 @@ MODULE io_RESTART
   USE MOD_PARSUP
   use mod_tracer
   use MOD_DYN
+  use MOD_ICE
   use o_arrays
-  use i_arrays
   use g_cvmix_tke
   use g_cvmix_idemix
   implicit none
@@ -166,7 +166,7 @@ end subroutine ini_ocean_io
 !--------------------------------------------------------------------------------------------
 ! ini_ice_io initializes iid datatype which contains information of all variables need to be written into 
 ! the ice restart file. This is the only place need to be modified if a new variable is added!
-subroutine ini_ice_io(year, partit, mesh)
+subroutine ini_ice_io(year, ice, partit, mesh)
   implicit none
 
   integer,      intent(in)  :: year
@@ -178,6 +178,7 @@ subroutine ini_ice_io(year, partit, mesh)
   character(4)              :: cyear
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
+  type(t_ice)   , intent(in)   , target :: ice
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -195,21 +196,21 @@ subroutine ini_ice_io(year, partit, mesh)
   !===================== Definition part =====================================
   !===========================================================================
   !___Define the netCDF variables for 2D fields_______________________________
-  call def_variable(iid, 'area',       (/nod2D/), 'ice concentration [0 to 1]', '%',   a_ice);
-  call def_variable(iid, 'hice',       (/nod2D/), 'effective ice thickness',    'm',   m_ice);
-  call def_variable(iid, 'hsnow',      (/nod2D/), 'effective snow thickness',   'm',   m_snow);
-  call def_variable(iid, 'uice',       (/nod2D/), 'zonal velocity',             'm/s', u_ice);
-  call def_variable(iid, 'vice',       (/nod2D/), 'meridional velocity',        'm',   v_ice);
+  call def_variable(iid, 'area',       (/nod2D/), 'ice concentration [0 to 1]', '%',   ice%data(1)%values(:));
+  call def_variable(iid, 'hice',       (/nod2D/), 'effective ice thickness',    'm',   ice%data(2)%values(:));
+  call def_variable(iid, 'hsnow',      (/nod2D/), 'effective snow thickness',   'm',   ice%data(3)%values(:));
+  call def_variable(iid, 'uice',       (/nod2D/), 'zonal velocity',             'm/s', ice%uice(:));
+  call def_variable(iid, 'vice',       (/nod2D/), 'meridional velocity',        'm',   ice%vice(:));
 #if defined (__oifs)
-  call def_variable(iid, 'ice_albedo', (/nod2D/), 'ice albedo',                 '-',   ice_alb);
-  call def_variable(iid, 'ice_temp',(/nod2D/), 'ice surface temperature',  'K',   ice_temp);
+  call def_variable(iid, 'ice_albedo', (/nod2D/), 'ice albedo',                 '-',   ice%atmcoupl%ice_alb);
+  call def_variable(iid, 'ice_temp',   (/nod2D/), 'ice surface temperature',    'K',   ice%data(4)%values);
 #endif /* (__oifs) */
 
 end subroutine ini_ice_io
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine restart(istep, l_write, l_read, dynamics, tracers, partit, mesh)
+subroutine restart(istep, l_write, l_read, ice, dynamics, tracers, partit, mesh)
 
 #if defined(__icepack)
   use icedrv_main,   only: init_restart_icepack
@@ -228,16 +229,17 @@ subroutine restart(istep, l_write, l_read, dynamics, tracers, partit, mesh)
   type(t_partit), intent(inout), target :: partit
   type(t_tracer), intent(in)   , target :: tracers
   type(t_dyn)   , intent(in)   , target :: dynamics
+  type(t_ice)   , intent(in)   , target :: ice
   ctime=timeold+(dayold-1.)*86400
   if (.not. l_read) then
                call ini_ocean_io(yearnew, dynamics, tracers, partit, mesh)
-  if (use_ice) call ini_ice_io  (yearnew, partit, mesh)
+  if (use_ice) call ini_ice_io  (yearnew, ice, partit, mesh)
 #if defined(__icepack)
   if (use_ice) call init_restart_icepack(yearnew, mesh) !icapack has its copy of p_partit => partit
 #endif
   else
                call ini_ocean_io(yearold, dynamics, tracers, partit, mesh)
-  if (use_ice) call ini_ice_io  (yearold, partit, mesh)
+  if (use_ice) call ini_ice_io  (yearold, ice, partit, mesh)
 #if defined(__icepack)
   if (use_ice) call init_restart_icepack(yearold, mesh) !icapack has its copy of p_partit => partit
 #endif

@@ -54,6 +54,7 @@ use_floatice = .false.
 use_sw_pene=.false.
 toy_ocean=.true.
 which_toy="soufflet"
+flag_debug=.true.
 /
 
 &machine

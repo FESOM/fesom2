@@ -1,49 +1,54 @@
+
 module write_step_info_interface
   interface
-    subroutine write_step_info(istep, outfreq, dynamics, tracers, partit, mesh)
+    subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
       use MOD_MESH
       USE MOD_PARTIT
       USE MOD_PARSUP
       use MOD_TRACER
       use MOD_DYN
+      use MOD_ICE
       integer              :: istep,outfreq
       type(t_mesh),   intent(in)   , target :: mesh
       type(t_partit), intent(inout), target :: partit
       type(t_tracer), intent(in)   , target :: tracers
       type(t_dyn)   , intent(in)   , target :: dynamics
+      type(t_ice)   , intent(in)   , target :: ice
     end subroutine
   end interface
 end module
 module check_blowup_interface
   interface
-    subroutine check_blowup(istep, dynamics, tracers, partit, mesh)
+    subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
       use MOD_MESH
       USE MOD_PARTIT
       USE MOD_PARSUP
       use MOD_TRACER
       use MOD_DYN
+      use MOD_ICE
       integer              :: istep
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
       type(t_tracer), intent(in),    target :: tracers
       type(t_dyn)   , intent(in)   , target :: dynamics
+      type(t_ice)   , intent(in)   , target :: ice
     end subroutine
   end interface
 end module
 !
 !
 !===============================================================================
-subroutine write_step_info(istep, outfreq, dynamics, tracers, partit, mesh)
+subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
   use g_config, only: dt, use_ice
   use MOD_MESH
   USE MOD_PARTIT
   USE MOD_PARSUP
   use MOD_TRACER
   use MOD_DYN
+  use MOD_ICE
   use o_PARAM
   use o_ARRAYS, only: water_flux, heat_flux, &
                  pgf_x, pgf_y, Av, Kv
-  use i_ARRAYS
   use g_comm_auto
   use g_support
   implicit none
@@ -63,9 +68,10 @@ subroutine write_step_info(istep, outfreq, dynamics, tracers, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_tracer), intent(in)   , target :: tracers
     type(t_dyn)   , intent(in)   , target :: dynamics
+    type(t_ice)   , intent(in)   , target :: ice
     real(kind=WP), dimension(:,:,:), pointer :: UV, UVnode
     real(kind=WP), dimension(:,:)  , pointer :: Wvel, CFL_z
-    real(kind=WP), dimension(:)    , pointer :: eta_n, d_eta
+    real(kind=WP), dimension(:)    , pointer :: eta_n, d_eta, m_ice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -76,7 +82,7 @@ subroutine write_step_info(istep, outfreq, dynamics, tracers, partit, mesh)
     CFL_z  => dynamics%cfl_z(:,:)
     eta_n  => dynamics%eta_n(:)
     d_eta  => dynamics%d_eta(:)
-    
+    m_ice  => ice%data(2)%values(:)
     if (mod(istep,outfreq)==0) then
     
     !_______________________________________________________________________
@@ -241,45 +247,62 @@ end subroutine write_step_info
 !
 !
 !===============================================================================
-subroutine check_blowup(istep, dynamics, tracers, partit, mesh)
-  use g_config, only: logfile_outfreq, which_ALE
-  use MOD_MESH
-    use MOD_TRACER
+subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
+    USE MOD_ICE
+    USE MOD_DYN
+    USE MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use MOD_DYN
-  use o_PARAM
-  use o_ARRAYS, only: water_flux, stress_surf, &
-                 heat_flux, Kv, Av
-  use i_ARRAYS
-  use g_comm_auto
-  use io_BLOWUP
-  use g_forcing_arrays
-  use diagnostics
-  use write_step_info_interface
-  implicit none
+    USE MOD_MESH
+    use g_config, only: logfile_outfreq, which_ALE
+    use o_PARAM
+    use o_ARRAYS, only: water_flux, stress_surf, &
+                    heat_flux, Kv, Av
+    use g_comm_auto
+    use io_BLOWUP
+    use g_forcing_arrays
+    use diagnostics
+    use write_step_info_interface
+    implicit none
   
-  integer                       :: n, nz, istep, found_blowup_loc=0, found_blowup=0
-  integer                      :: el, elidx
-    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_ice)   , intent(in)   , target :: ice
+    type(t_dyn)   , intent(in)   , target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_tracer), intent(in)   , target :: tracers
-    type(t_dyn)   , intent(in)   , target :: dynamics
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    integer                       :: n, nz, istep, found_blowup_loc=0, found_blowup=0
+    integer                      :: el, elidx
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV
     real(kind=WP), dimension(:,:)  , pointer :: Wvel, CFL_z
     real(kind=WP), dimension(:)    , pointer :: ssh_rhs, ssh_rhs_old
     real(kind=WP), dimension(:)    , pointer :: eta_n, d_eta
+    real(kind=WP), dimension(:)    , pointer :: u_ice, v_ice
+    real(kind=WP), dimension(:)    , pointer :: a_ice, m_ice, m_snow
+    real(kind=WP), dimension(:)    , pointer :: a_ice_old, m_ice_old, m_snow_old
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-    UV       => dynamics%uv(:,:,:)
-    Wvel     => dynamics%w(:,:)
-    CFL_z    => dynamics%cfl_z(:,:)
+    UV          => dynamics%uv(:,:,:)
+    Wvel        => dynamics%w(:,:)
+    CFL_z       => dynamics%cfl_z(:,:)
     ssh_rhs     => dynamics%ssh_rhs(:)
     ssh_rhs_old => dynamics%ssh_rhs_old(:)
-    eta_n    => dynamics%eta_n(:)
-    d_eta    => dynamics%d_eta(:)
+    eta_n       => dynamics%eta_n(:)
+    d_eta       => dynamics%d_eta(:)
+    u_ice       => ice%uice(:)
+    v_ice       => ice%vice(:)
+    a_ice       => ice%data(1)%values(:)
+    m_ice       => ice%data(2)%values(:)
+    m_snow      => ice%data(3)%values(:)
+    a_ice_old   => ice%data(1)%values_old(:)
+    m_ice_old   => ice%data(2)%values_old(:)
+    m_snow_old  => ice%data(3)%values_old(:)
+    
+    !___________________________________________________________________________
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz)
     do n=1, myDim_nod2d       
        !___________________________________________________________________
@@ -489,7 +512,7 @@ subroutine check_blowup(istep, dynamics, tracers, partit, mesh)
     ! moment only over CPU mype==0
     call MPI_AllREDUCE(found_blowup_loc  , found_blowup  , 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
     if (found_blowup==1) then
-       call write_step_info(istep, 1, dynamics, tracers,partit,mesh)
+       call write_step_info(istep, 1, ice, dynamics, tracers, partit, mesh)
        if (mype==0) then
           call sleep(1)
           write(*,*)
@@ -509,7 +532,7 @@ subroutine check_blowup(istep, dynamics, tracers, partit, mesh)
           write(*,*) '              _____.,-#%&$@%#&#~,._____'
           write(*,*)
        end if
-       call blowup(istep, dynamics, tracers, partit, mesh)
+       call blowup(istep, ice, dynamics, tracers, partit, mesh)
        if (mype==0) write(*,*) ' --> finished writing blow up file'
        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
     endif 

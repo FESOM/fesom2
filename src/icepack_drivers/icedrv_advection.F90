@@ -35,17 +35,17 @@ submodule (icedrv_main) icedrv_advection
 
     contains
 
-    subroutine tg_rhs_icepack(mesh, trc)
+    subroutine tg_rhs_icepack(ice, mesh, trc)
     
         use mod_mesh
-        use i_param
+        use MOD_ICE
         use o_param
         use g_config
     
         implicit none
     
         ! Input - output
-    
+        type(t_ice),        target,        intent(in)     :: ice
         type(t_mesh),        target,        intent(in)     :: mesh
         real(kind=dbl_kind), dimension(nx), intent(inout)  :: trc
     
@@ -79,14 +79,14 @@ submodule (icedrv_main) icedrv_advection
     
            ! Diffusivity
     
-           diff = ice_diff * sqrt( elem_area(elem) / scale_area )
+           diff =ice% ice_diff * sqrt( elem_area(elem) / scale_area )
            do n = 1, 3
               row = elnodes(n)
               do q = 1, 3
-                 entries(q) = vol*ice_dt*((dx(n)*(um+uvel(elnodes(q))) +      &
+                 entries(q) = vol*ice%ice_dt*((dx(n)*(um+uvel(elnodes(q))) +      &
                               dy(n)*(vm+vvel(elnodes(q))))/12.0_WP -          &
                               diff*(dx(n)*dx(q)+ dy(n)*dy(q)) -               &
-                              0.5_WP*ice_dt*(um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q))/9.0_WP)
+                              0.5_WP*ice%ice_dt*(um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q))/9.0_WP)
               enddo
               rhs_tr(row)=rhs_tr(row)+sum(entries*trc(elnodes))
            enddo
@@ -138,8 +138,7 @@ submodule (icedrv_main) icedrv_advection
     subroutine fill_mass_matrix_icepack(mesh)
     
         use mod_mesh
-        use i_param
-      
+        
         implicit none
       
         integer(kind=int_kind)                 :: n, n1, n2, row
@@ -198,7 +197,7 @@ submodule (icedrv_main) icedrv_advection
     
     !=======================================================================
     
-    subroutine solve_low_order_icepack(mesh, trc)
+    subroutine solve_low_order_icepack(ice, mesh, trc)
     
         !============================
         ! Low-order solution
@@ -210,20 +209,20 @@ submodule (icedrv_main) icedrv_advection
         ! is implemented as the difference between the consistent and lumped mass
         ! matrices acting on the field from the previous time step. The consistent
         ! mass matrix on the lhs is replaced with the lumped one.
-    
+        USE MOD_ICE
         use mod_mesh
-        use i_param  
-      
+        
         implicit none
       
         integer(kind=int_kind)           :: row, clo, clo2, cn, location(100)
         real   (kind=dbl_kind)           :: gamma
+        type(t_ice),        target,        intent(in)     :: ice
         type(t_mesh),        target,        intent(in)     :: mesh
         real(kind=dbl_kind), dimension(nx), intent(inout)  :: trc
     
 #include "associate_mesh.h"
       
-        gamma = ice_gamma_fct       ! Added diffusivity parameter
+        gamma = ice%ice_gamma_fct       ! Added diffusivity parameter
                                     ! Adjust it to ensure posivity of solution
       
         do row = 1, nx_nh
@@ -247,8 +246,7 @@ submodule (icedrv_main) icedrv_advection
     subroutine solve_high_order_icepack(mesh, trc)
     
         use mod_mesh
-        use i_param 
-    
+        
         implicit none
       
         integer(kind=int_kind)             :: n,i,clo,clo2,cn,location(100),row
@@ -288,7 +286,7 @@ submodule (icedrv_main) icedrv_advection
     
     !=======================================================================
     
-    subroutine fem_fct_icepack(mesh, trc)
+    subroutine fem_fct_icepack(ice, mesh, trc)
     
         !============================
         ! Flux corrected transport algorithm for tracer advection
@@ -298,20 +296,20 @@ submodule (icedrv_main) icedrv_advection
         ! transport (FEM-FCT) for the Euler and Navier-Stokes equation,
         ! Int. J. Numer. Meth. Fluids, 7 (1987), 1093--1109) as described by Kuzmin and
         ! Turek. (kuzmin@math.uni-dortmund.de)
-    
+        USE MOD_ICE
         use mod_mesh
         use o_param
-        use i_param 
-    
+        
         integer(kind=int_kind)                            :: icoef(3,3), n, q, elem, elnodes(3), row
         real   (kind=dbl_kind), allocatable, dimension(:) :: tmax, tmin
         real   (kind=dbl_kind)                            :: vol, flux, ae, gamma
         type(t_mesh),        target,        intent(in)     :: mesh  
         real(kind=dbl_kind), dimension(nx), intent(inout)  :: trc
-    
+        type(t_ice),        target,        intent(in)     :: ice  
+        
 #include "associate_mesh.h"
       
-        gamma = ice_gamma_fct        ! It should coinside with gamma in
+        gamma = ice%ice_gamma_fct        ! It should coinside with gamma in
                                      ! ts_solve_low_order
     
         !==========================
@@ -445,17 +443,17 @@ submodule (icedrv_main) icedrv_advection
     
     !=======================================================================
     
-    subroutine tg_rhs_div_icepack(mesh, trc)
-    
+    subroutine tg_rhs_div_icepack(ice, mesh, trc)
+        USE MOD_ICE
         use mod_mesh
         use o_param
-        use i_param
-    
+        
         implicit none
     
         real   (kind=dbl_kind)    :: diff, entries(3), um, vm, vol, dx(3), dy(3)
         integer(kind=int_kind)    :: n, q, row, elem, elnodes(3)
         real   (kind=dbl_kind)    :: c_1, c_2, c_3, c_4, c_x, entries2(3)
+        type(t_ice),        target,        intent(in)     :: ice
         type(t_mesh),        target,        intent(in)     :: mesh
         real(kind=dbl_kind), dimension(nx), intent(inout)  :: trc    
 
@@ -494,14 +492,14 @@ submodule (icedrv_main) icedrv_advection
               row = elnodes(n)
       
               do q = 1, 3
-                 entries(q)  = vol*ice_dt*((c1-p5*ice_dt*c_4)*(dx(n)*(um+uvel(elnodes(q)))+ &
+                 entries(q)  = vol*ice%ice_dt*((c1-p5*ice%ice_dt*c_4)*(dx(n)*(um+uvel(elnodes(q)))+ &
                                dy(n)*(vm+vvel(elnodes(q))))/12.0_dbl_kind                 - &
-                               p5*ice_dt*(c_1*dx(n)*dx(q)+c_2*dy(n)*dy(q)+c_3*(dx(n)*dy(q)+dx(q)*dy(n))))
-                 entries2(q) = p5*ice_dt*(dx(n)*(um+uvel(elnodes(q)))                     + &
+                               p5*ice%ice_dt*(c_1*dx(n)*dx(q)+c_2*dy(n)*dy(q)+c_3*(dx(n)*dy(q)+dx(q)*dy(n))))
+                 entries2(q) = p5*ice%ice_dt*(dx(n)*(um+uvel(elnodes(q)))                     + &
                                dy(n)*(vm+vvel(elnodes(q)))-dx(q)*(um+uvel(row))      - &
                                dy(q)*(vm+vvel(row)))
               enddo
-              c_x = vol*ice_dt*c_4*(sum(trc(elnodes))+trc(elnodes(n))+sum(entries2*trc(elnodes))) / 12.0_dbl_kind
+              c_x = vol*ice%ice_dt*c_4*(sum(trc(elnodes))+trc(elnodes(n))+sum(entries2*trc(elnodes))) / 12.0_dbl_kind
               rhs_tr(row)    = rhs_tr(row) + sum(entries * trc(elnodes)) + c_x
               rhs_trdiv(row) = rhs_trdiv(row) - c_x
            enddo
@@ -515,8 +513,7 @@ submodule (icedrv_main) icedrv_advection
     
         use mod_mesh
         use o_param
-        use i_param  
-    
+        
         implicit none
     
         integer(kind=int_kind)            :: n, i, clo, clo2, cn, &
@@ -560,31 +557,33 @@ submodule (icedrv_main) icedrv_advection
     
     !=======================================================================
     
-    subroutine fct_solve_icepack(mesh, trc)
+    subroutine fct_solve_icepack(ice, mesh, trc)
         
         use mod_mesh     
-     
+        use MOD_ICE
         implicit none
 
         real(kind=dbl_kind), dimension(nx), intent(inout) :: trc      
         type(t_mesh),        target,        intent(in)    :: mesh
+        type(t_ice),        target,        intent(in)     :: ice
       
         ! Driving sequence
-        call tg_rhs_div_icepack(mesh, trc)
+        call tg_rhs_div_icepack(ice, mesh, trc)
         call solve_high_order_icepack(mesh, trc) ! uses arrays of low-order solutions as temp
                                                  ! storage. It should preceed the call of low
                                                  ! order solution.
-        call solve_low_order_icepack(mesh, trc)
-        call fem_fct_icepack(mesh, trc)
+        call solve_low_order_icepack(ice, mesh, trc)
+        call fem_fct_icepack(ice, mesh, trc)
         call update_for_div_icepack(mesh, trc)
 
     end subroutine fct_solve_icepack
 
     !=======================================================================
 
-    module subroutine tracer_advection_icepack(mesh)
+    module subroutine tracer_advection_icepack(ice, mesh)
 
         use mod_mesh
+        use MOD_ICE
         use icepack_intfc,        only: icepack_aggregate
         use icepack_itd,          only: cleanup_itd
         use g_config,             only: dt
@@ -614,6 +613,7 @@ submodule (icedrv_main) icedrv_advection
                works
       
         type(t_mesh),        target,       intent(in)    :: mesh
+        type(t_ice),        target,       intent(in)    :: ice
 
         call icepack_query_parameters(heat_capacity_out=heat_capacity,    &
                                       puny_out=puny)
@@ -643,7 +643,7 @@ submodule (icedrv_main) icedrv_advection
         ! Advect each tracer
       
         do nt = 1, narr    
-              call fct_solve_icepack ( mesh, works(:,nt) )
+              call fct_solve_icepack (ice, mesh, works(:,nt) )
         end do
       
         call work_to_state (ntrcr, narr, works(:,:))

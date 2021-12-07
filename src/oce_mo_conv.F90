@@ -1,26 +1,32 @@
 !
 !
 !_______________________________________________________________________________
-subroutine mo_convect(partit, mesh)
+subroutine mo_convect(ice, partit, mesh)
     USE o_PARAM
     USE MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
+    USE MOD_ICE
     USE o_ARRAYS
     USE g_config
-    use i_arrays
     use g_comm_auto
     IMPLICIT NONE
-
-    integer                               :: node, elem, nz, elnodes(3), nzmin, nzmax
-    type(t_mesh),   intent(in),    target :: mesh
+    type(t_ice), intent(in), target :: ice
     type(t_partit), intent(inout), target :: partit
-
+    type(t_mesh),   intent(in),    target :: mesh
+    !___________________________________________________________________________
+    integer                               :: node, elem, nz, elnodes(3), nzmin, nzmax
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, a_ice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-
+    u_ice => ice%uice(:)
+    v_ice => ice%vice(:)
+    a_ice => ice%data(1)%values(:)
+    
     !___________________________________________________________________________
     ! add vertical mixing scheme of Timmermann and Beckmann, 2004,"Parameterization 
     ! of vertical mixing in the Weddell Sea!

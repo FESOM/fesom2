@@ -348,8 +348,8 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    USE par_kind ! in ifs_modules.F90
    USE fesom_main_storage_module, only: fesom => f
    !USE o_ARRAYS, ONLY : UV ! tr_arr is now tracers, UV in dynamics derived type
-   USE i_arrays, ONLY : m_ice, a_ice, m_snow
-   USE i_therm_param, ONLY : tmelt
+   !USE i_arrays, ONLY : m_ice, a_ice, m_snow
+   !USE i_therm_param, ONLY : tmelt
    USE g_rotate_grid, only: vector_r2g
    USE parinter
    USE scripremap
@@ -367,8 +367,9 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    integer, dimension(:,:)         , pointer :: elem2D_nodes
    integer, pointer :: myDim_nod2D, eDim_nod2D
    integer, pointer :: myDim_elem2D, eDim_elem2D, eXDim_elem2D
-
-
+   real(kind=wpIFS), dimension(:), pointer :: a_ice, m_ice, m_snow
+   real(kind=wpIFS)              , pointer :: tmelt
+   
    ! Message passing information
    INTEGER, INTENT(IN) :: mype, npes, icomm
    ! Number Gaussian grid points
@@ -385,16 +386,19 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
 
    !#include "associate_mesh.h"
    ! associate what is needed only
-   myDim_nod2D        => fesom%partit%myDim_nod2D
-   eDim_nod2D         => fesom%partit%eDim_nod2D
+   myDim_nod2D  => fesom%partit%myDim_nod2D
+   eDim_nod2D   => fesom%partit%eDim_nod2D
 
-   myDim_elem2D       => fesom%partit%myDim_elem2D
-   eDim_elem2D        => fesom%partit%eDim_elem2D
-   eXDim_elem2D       => fesom%partit%eXDim_elem2D
+   myDim_elem2D => fesom%partit%myDim_elem2D
+   eDim_elem2D  => fesom%partit%eDim_elem2D
+   eXDim_elem2D => fesom%partit%eXDim_elem2D
 
    coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)                  => fesom%mesh%coord_nod2D   
    elem2D_nodes(1:3, 1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => fesom%mesh%elem2D_nodes
-
+   a_ice        => fesom%ice%data(1)%values(:)
+   m_ice        => fesom%ice%data(2)%values(:)
+   m_snow       => fesom%ice%data(3)%values(:)
+   tmelt        => fesom%ice%thermo%tmelt ! scalar const.
 
 
    ! =================================================================== !
@@ -564,7 +568,8 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    USE g_rotate_grid, 	only: vector_r2g, vector_g2r
    USE g_forcing_arrays, only: 	shortwave, prec_rain, prec_snow, runoff, & 
       			&	evap_no_ifrac, sublimation !'longwave' only stand-alone, 'evaporation' filled later
-   USE i_ARRAYS, 	only: stress_atmice_x, stress_atmice_y, oce_heat_flux, ice_heat_flux 
+!    USE i_ARRAYS, 	only: stress_atmice_x, stress_atmice_y, oce_heat_flux, ice_heat_flux
+!    USE i_ARRAYS, 	only: oce_heat_flux, ice_heat_flux 
    USE o_ARRAYS,        only: stress_atmoce_x, stress_atmoce_y
    USE g_comm_auto	! exchange_nod does the halo exchange
    
@@ -613,10 +618,16 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    !#include "associate_mesh.h"
    ! associate only the necessary things
    real(kind=wpIFS), dimension(:,:), pointer :: coord_nod2D
+   real(kind=wpIFS), dimension(:)  , pointer :: stress_atmice_x, stress_atmice_y
+   real(kind=wpIFS), dimension(:)  , pointer :: oce_heat_flux, ice_heat_flux 
    myDim_nod2D        => fesom%partit%myDim_nod2D
    eDim_nod2D         => fesom%partit%eDim_nod2D
    coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => fesom%mesh%coord_nod2D  
-
+   stress_atmice_x    => fesom%ice%stress_atmice_x
+   stress_atmice_y    => fesom%ice%stress_atmice_y
+   oce_heat_flux      => fesom%ice%atmcoupl%oce_flx_h(:)
+   ice_heat_flux      => fesom%ice%atmcoupl%ice_flx_h(:)
+   
    ! =================================================================== !
    ! Sort out incoming arrays from the IFS and put them on the ocean grid
 

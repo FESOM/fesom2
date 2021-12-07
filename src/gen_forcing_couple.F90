@@ -44,18 +44,20 @@ module integrate_2D_interface
 end module
 
 module update_atm_forcing_interface
-  interface
-    subroutine update_atm_forcing(istep, tracers, partit,mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use mod_tracer
-      integer,        intent(in)            :: istep
-      type(t_tracer), intent(in),    target :: tracers
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine
-  end interface
+    interface
+        subroutine update_atm_forcing(istep, ice, tracers, partit,mesh)
+        USE MOD_TRACER
+        USE MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        integer,        intent(in)            :: istep
+        type(t_ice),    intent(inout), target :: ice
+        type(t_tracer), intent(in),    target :: tracers
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        end subroutine
+    end interface
 end module
 
 module net_rec_from_atm_interface
@@ -70,16 +72,14 @@ module net_rec_from_atm_interface
 end module
 ! Routines for updating ocean surface forcing fields
 !-------------------------------------------------------------------------
-subroutine update_atm_forcing(istep, tracers, partit, mesh)
+subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   use o_PARAM
   use MOD_MESH
   USE MOD_PARTIT
   USE MOD_PARSUP
   use MOD_TRACER
+  use MOD_ICE
   use o_arrays
-  use i_arrays
-  use i_param
-  use i_therm_param
   use g_forcing_param
   use g_forcing_arrays
   use g_clock
@@ -98,9 +98,11 @@ subroutine update_atm_forcing(istep, tracers, partit, mesh)
 
   implicit none
   integer,        intent(in)            :: istep
-  type(t_mesh),   intent(in),    target :: mesh
-  type(t_partit), intent(inout), target :: partit
+  type(t_ice)   , intent(inout), target :: ice
   type(t_tracer), intent(in),    target :: tracers
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh),   intent(in),    target :: mesh
+  !_____________________________________________________________________________
   integer		   :: i, itime,n2,n,nz,k,elem
   real(kind=WP)            :: i_coef, aux
   real(kind=WP)	           :: dux, dvy,tx,ty,tvol
@@ -121,12 +123,44 @@ subroutine update_atm_forcing(istep, tracers, partit, mesh)
   !integer, parameter                    :: nci=192, ncj=94 ! T62 grid
   !real(kind=WP), dimension(nci,ncj)     :: array_nc, array_nc2,array_nc3,x
   !character(500)                        :: file
+  !_____________________________________________________________________________
+  ! pointer on necessary derived types
+  real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, u_w, v_w
+  real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
+#if defined (__oasis) || defined (__ifsinterface)
+  real(kind=WP), dimension(:), pointer  ::  oce_heat_flux, ice_heat_flux 
+  real(kind=WP), dimension(:), pointer  ::  tmp_oce_heat_flux, tmp_ice_heat_flux 
+#endif 
+#if defined (__oifs) || defined (__ifsinterface)
+  real(kind=WP), dimension(:), pointer  :: ice_temp, ice_alb, enthalpyoffuse
+#endif
+  real(kind=WP)              , pointer  :: rhoair
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+  u_ice            => ice%uice(:)
+  v_ice            => ice%vice(:)
+  u_w              => ice%srfoce_u(:)
+  v_w              => ice%srfoce_v(:)
+  stress_atmice_x  => ice%stress_atmice_x(:)
+  stress_atmice_y  => ice%stress_atmice_y(:)
+#if defined (__oifs) || defined (__ifsinterface)
+  ice_temp         => ice%data(4)%values(:)
+  ice_alb          => ice%atmcoupl%ice_alb(:)
+  enthalpyoffuse   => ice%atmcoupl%enthalpyoffuse(:)
+#endif      
+#if defined (__oasis) || defined (__ifsinterface)
+  oce_heat_flux    => ice%atmcoupl%oce_flx_h(:)
+  ice_heat_flux    => ice%atmcoupl%ice_flx_h(:)
+  tmp_oce_heat_flux=> ice%atmcoupl%tmpoce_flx_h(:)
+  tmp_ice_heat_flux=> ice%atmcoupl%tmpice_flx_h(:)
+#endif 
+  rhoair           => ice%thermo%rhoair
+  
+  !_____________________________________________________________________________
   t1=MPI_Wtime()
-#ifdef __oasis
+#if defined (__oasis)
      if (firstcall) then
         allocate(exchange(myDim_nod2D+eDim_nod2D), mask(myDim_nod2D+eDim_nod2D))
         allocate(a2o_fcorr_stat(nrecv,6))
@@ -138,7 +172,7 @@ subroutine update_atm_forcing(istep, tracers, partit, mesh)
      do i=1,nsend
          exchange  =0.
          if (i.eq.1) then
-#if defined (__oifs) 
+#if defined (__oifs) || defined (__ifsinterface)
             ! AWI-CM3 outgoing state vectors
             do n=1,myDim_nod2D+eDim_nod2D
             exchange(n)=tracers%data(1)%values(1, n)+tmelt	           ! sea surface temperature [K]
@@ -264,7 +298,7 @@ subroutine update_atm_forcing(istep, tracers, partit, mesh)
                 mask=1.
                 call force_flux_consv(runoff, mask, i, 0,action, partit, mesh)
             end if
-#if defined (__oifs)
+#if defined (__oifs) || defined (__ifsinterface)
 
          elseif (i.eq.13) then
              if (action) then
@@ -338,7 +372,7 @@ subroutine update_atm_forcing(istep, tracers, partit, mesh)
 !     cd_atm_oce_arr=0.0_WP
 !     ch_atm_oce_arr=0.0_WP
 !     ce_atm_oce_arr=0.0_WP
-     call ncar_ocean_fluxes_mode(partit, mesh)
+     call ncar_ocean_fluxes_mode(ice, partit, mesh)
   elseif(AOMIP_drag_coeff) then
      cd_atm_oce_arr=cd_atm_ice_arr
   end if
