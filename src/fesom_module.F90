@@ -295,7 +295,6 @@ contains
     use fesom_main_storage_module
     integer, intent(in) :: current_nsteps 
     ! EO parameters
-
     integer n
 
     !=====================
@@ -436,30 +435,38 @@ contains
     call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime,  14, MPI_REAL, MPI_MIN, f%MPI_COMM_FESOM, f%MPIerr)
 
     if (f%mype==0) then
-        write(*,*) '___MODEL RUNTIME mean, min, max per task [seconds]________________________'
-        write(*,*) '  runtime ocean:',mean_rtime(1), min_rtime(1), max_rtime(1)
-        write(*,*) '    > runtime oce. mix,pres. :',mean_rtime(2), min_rtime(2), max_rtime(2)
-        write(*,*) '    > runtime oce. dyn. u,v,w:',mean_rtime(3), min_rtime(3), max_rtime(3)
-        write(*,*) '    > runtime oce. dyn. ssh  :',mean_rtime(4), min_rtime(4), max_rtime(4)
-        write(*,*) '        > runtime oce. solve ssh:',mean_rtime(5), min_rtime(5), max_rtime(5)
-        write(*,*) '    > runtime oce. GM/Redi   :',mean_rtime(6), min_rtime(6), max_rtime(6)
-        write(*,*) '    > runtime oce. tracer    :',mean_rtime(7), min_rtime(7), max_rtime(7)
-        write(*,*) '  runtime ice  :',mean_rtime(10), min_rtime(10), max_rtime(10)
-        write(*,*) '    > runtime ice step :',mean_rtime(8), min_rtime(8), max_rtime(8)
-        write(*,*) '  runtime diag:   ', mean_rtime(11), min_rtime(11), max_rtime(11)
-        write(*,*) '  runtime output: ', mean_rtime(12), min_rtime(12), max_rtime(12)
-        write(*,*) '  runtime restart:', mean_rtime(13), min_rtime(13), max_rtime(13)
-        write(*,*) '  runtime forcing:', mean_rtime(14), min_rtime(14), max_rtime(14)
-        write(*,*) '  runtime total (ice+oce):',mean_rtime(9), min_rtime(9), max_rtime(9)
+        41 format (a35,a10,2a15) !Format for table heading
+        42 format (a30,3f15.4)   !Format for table content
+
+        print 41, '___MODEL RUNTIME per task [seconds]','_____mean_','___________min_', '___________max_'
+        print 42, '  runtime ocean:              ',    mean_rtime(1),     min_rtime(1),      max_rtime(1)
+        print 42, '    > runtime oce. mix,pres. :',    mean_rtime(2),     min_rtime(2),      max_rtime(2)
+        print 42, '    > runtime oce. dyn. u,v,w:',    mean_rtime(3),     min_rtime(3),      max_rtime(3)
+        print 42, '    > runtime oce. dyn. ssh  :',    mean_rtime(4),     min_rtime(4),      max_rtime(4)
+        print 42, '    > runtime oce. solve ssh :',    mean_rtime(5),     min_rtime(5),      max_rtime(5)
+        print 42, '    > runtime oce. GM/Redi   :',    mean_rtime(6),     min_rtime(6),      max_rtime(6)
+        print 42, '    > runtime oce. tracer    :',    mean_rtime(7),     min_rtime(7),      max_rtime(7)
+        print 42, '  runtime ice  :              ',    mean_rtime(10),    min_rtime(10),     max_rtime(10)
+        print 42, '    > runtime ice step :      ',    mean_rtime(8),     min_rtime(8),      max_rtime(8)
+        print 42, '  runtime diag:               ',    mean_rtime(11),    min_rtime(11),     max_rtime(11)
+        print 42, '  runtime output:             ',    mean_rtime(12),    min_rtime(12),     max_rtime(12)
+        print 42, '  runtime restart:            ',    mean_rtime(13),    min_rtime(13),     max_rtime(13)
+        print 42, '  runtime forcing:            ',    mean_rtime(14),    min_rtime(14),     max_rtime(14)
+        print 42, '  runtime total (ice+oce):    ',    mean_rtime(9),     min_rtime(9),      max_rtime(9)
+
+        43 format (a33,i15)        !Format Ncores
+        44 format (a33,i15)        !Format OMP threads
+        45 format (a33,f15.4,a4)   !Format runtime
+
         write(*,*)
-        write(*,*) '============================================'
-        write(*,*) '=========== BENCHMARK RUNTIME =============='
-        write(*,*) '    Number of cores :    ',f%npes
+        write(*,*) '======================================================'
+        write(*,*) '================ BENCHMARK RUNTIME ==================='
+        print 43, '    Number of cores :            ',f%npes
 #if defined(_OPENMP)
-        write(*,*) '    Max OpenMP threads : ',OMP_GET_MAX_THREADS()
+        print 44, '    Max OpenMP threads :         ',OMP_GET_MAX_THREADS()
 #endif
-        write(*,*) '    Runtime for all timesteps :  ',f%runtime_alltimesteps,' sec'
-        write(*,*) '============================================'
+        print 45, '    Runtime for all timesteps :  ',f%runtime_alltimesteps,' sec'
+        write(*,*) '======================================================'
         write(*,*)
     end if    
 !   call clock_finish  

@@ -16,6 +16,7 @@ TYPE SPARSE_MATRIX
      integer(int32), allocatable,   dimension(:) :: rowptr
      integer(int32), allocatable,   dimension(:) :: colind_loc
      integer(int32), allocatable,   dimension(:) :: rowptr_loc
+     real(kind=WP),  allocatable,   dimension(:) :: pr_values !preconditioner values
 END TYPE SPARSE_MATRIX
 
 TYPE T_MESH

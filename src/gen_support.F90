@@ -316,23 +316,19 @@ subroutine integrate_nod_2D(data, int2D, partit, mesh)
   real(kind=WP), intent(inout)      :: int2D
 
   integer       :: row
-  real(kind=WP) :: lval_omp, lval
+  real(kind=WP) :: lval
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
 
 lval=0.0_WP
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row, lval_omp)
-  lval_omp=0.0_WP
-!$OMP DO
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row)
+!$OMP DO REDUCTION (+: lval)
   do row=1, myDim_nod2D
-     lval_omp=lval_omp+data(row)*areasvol(ulevels_nod2D(row),row)
+     lval=lval+data(row)*areasvol(ulevels_nod2D(row),row)
   end do
 !$OMP END DO
-!$OMP CRITICAL
-lval=lval+lval_omp
-!$OMP END CRITICAL
 !$OMP END PARALLEL
   int2D=0.0_WP
   call MPI_AllREDUCE(lval, int2D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
@@ -353,25 +349,21 @@ subroutine integrate_nod_3D(data, int3D, partit, mesh)
   real(kind=WP), intent(inout)    :: int3D
 
   integer       :: k, row
-  real(kind=WP) :: lval_omp, lval
+  real(kind=WP) :: lval
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
 
   lval=0.0_WP
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row, k, lval_omp)
-  lval_omp=0.0_WP
-!$OMP DO
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row, k)
+!$OMP DO REDUCTION(+: lval)
   do row=1, myDim_nod2D
      do k=ulevels_nod2D(row), nlevels_nod2D(row)-1
         lval=lval+data(k, row)*areasvol(k,row)*hnode_new(k,row)  ! --> TEST_cavity
      end do
   end do
 !$OMP END DO
-!$OMP CRITICAL
-lval=lval+lval_omp
-!$OMP END CRITICAL
 !$OMP END PARALLEL
   int3D=0.0_WP
   call MPI_AllREDUCE(lval, int3D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
@@ -499,7 +491,7 @@ FUNCTION omp_min_max_sum1(arr, pos1, pos2, what, partit, nan)
   character(3),  intent(in)   :: what
   real(kind=WP), optional     :: nan !to be implemented upon the need (for masked arrays)
   real(kind=WP)               :: omp_min_max_sum1
-  real(kind=WP)               :: loc, val
+  real(kind=WP)               :: val
   integer                     :: n
 
   type(t_partit),intent(in), &
@@ -508,48 +500,40 @@ FUNCTION omp_min_max_sum1(arr, pos1, pos2, what, partit, nan)
   SELECT CASE (trim(what))
     CASE ('sum')
        val=0.0_WP
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, loc)
-       loc=0.0_WP
-!$OMP DO
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n)
+!$OMP DO REDUCTION(+: val)
        do n=pos1, pos2
-          loc=loc+arr(n)
+          val=val+arr(n)
        end do
 !$OMP END DO
-!$OMP CRITICAL
-       val=val+loc
-!$OMP END CRITICAL
 !$OMP END PARALLEL
+
     CASE ('min')
        val=arr(1)
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, loc)
-       loc=val
-!$OMP DO
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n)
+!$OMP DO REDUCTION(min: val)
        do n=pos1, pos2
-          loc=min(loc, arr(n))
+          val=min(val, arr(n))
        end do
 !$OMP END DO
-!$OMP CRITICAL
-       val=min(val, loc)
-!$OMP END CRITICAL
 !$OMP END PARALLEL
+
     CASE ('max')
        val=arr(1)
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, loc)
-       loc=val
-!$OMP DO
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n)
+!$OMP DO REDUCTION(max: val)
        do n=pos1, pos2
-          loc=max(loc, arr(n))
+          val=max(val, arr(n))
        end do
 !$OMP END DO
-!$OMP CRITICAL
-       val=max(val, loc)
-!$OMP END CRITICAL
 !$OMP END PARALLEL
-   CASE DEFAULT
-      if (partit%mype==0) write(*,*) trim(what), ' is not implemented in omp_min_max_sum case!'
-      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
-      STOP
+
+    CASE DEFAULT
+       if (partit%mype==0) write(*,*) trim(what), ' is not implemented in omp_min_max_sum case!'
+       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       STOP
   END SELECT
+
   omp_min_max_sum1=val
 END FUNCTION
 !
@@ -562,7 +546,7 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
   character(3),  intent(in)   :: what
   real(kind=WP), optional     :: nan !to be implemented upon the need (for masked arrays)
   real(kind=WP)               :: omp_min_max_sum2
-  real(kind=WP)               :: loc, val, vmasked
+  real(kind=WP)               :: val, vmasked
   integer                     :: i, j
 
 
@@ -573,40 +557,48 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
     CASE ('min')
       if (.not. present(nan)) vmasked=huge(vmasked) !just some crazy number
       val=arr(1,1)
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, loc)
-      loc=val
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j)
+!$OMP DO REDUCTION(min: val)
       do i=pos11, pos12
-!$OMP DO
-      do j=pos21, pos22
-         if (arr(i,j)/=vmasked) loc=min(loc, arr(i,j))
+         do j=pos21, pos22
+            if (arr(i,j)/=vmasked) val=min(val, arr(i,j))
+         end do
       end do
 !$OMP END DO
-      end do
-!$OMP CRITICAL
-      val=min(val, loc)
-!$OMP END CRITICAL
 !$OMP END PARALLEL
+
     CASE ('max')
       if (.not. present(nan)) vmasked=tiny(vmasked) !just some crazy number
       val=arr(1,1)
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, loc)
-      loc=val
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j)
+!$OMP DO REDUCTION(max: val)
       do i=pos11, pos12
-!$OMP DO
-      do j=pos21, pos22
-         if (arr(i,j)/=vmasked) loc=max(loc, arr(i,j))
+         do j=pos21, pos22
+            if (arr(i,j)/=vmasked) val=max(val, arr(i,j))
+         end do
       end do
 !$OMP END DO
-      end do
-!$OMP CRITICAL
-      val=max(val, loc)
-!$OMP END CRITICAL
 !$OMP END PARALLEL
+
+    CASE ('sum')
+      if (.not. present(nan)) vmasked=huge(vmasked) !just some crazy number
+      val=0
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j)
+!$OMP DO REDUCTION(+: val)
+      do i=pos11, pos12
+         do j=pos21, pos22
+            if (arr(i,j)/=vmasked) val=val+arr(i,j)
+         end do
+      end do
+!$OMP END DO
+!$OMP END PARALLEL
+
    CASE DEFAULT
       if (partit%mype==0) write(*,*) trim(what), ' is not implemented in omp_min_max_sum case!'
       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
       STOP
    END SELECT
+
 omp_min_max_sum2=val
 END FUNCTION
 end module g_support
