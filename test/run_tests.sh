@@ -3,7 +3,7 @@ set -e
 cd ../
 
 machine="docker"
-tests="test_pi test_souf test_pi_linfs test_pi_zstar test_pi_partial test_pi_floatice test_pi_visc7 test_pi_zstar"
+tests="test_pi test_souf test_pi_linfs test_pi_zstar test_pi_partial test_pi_floatice test_pi_visc7"
 
 ./configure.sh ubuntu
 
@@ -15,6 +15,7 @@ echo $test
     cd work_pi
     chmod +x job_docker_new
     ./job_docker_new
+    echo "This was ${test}"
     fcheck .
     cd ../
 
