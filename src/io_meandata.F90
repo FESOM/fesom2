@@ -829,11 +829,9 @@ subroutine output(istep, mesh)
   ctime=timeold+(dayold-1.)*86400
   if (lfirst) then
      call ini_mean_io(mesh)
-     call init_io_gather()
 #if defined (__icepack)
      call init_io_icepack(mesh)
 #endif
-     call init_io_gather()
   end if
 
   call update_means
