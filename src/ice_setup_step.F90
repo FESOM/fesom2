@@ -170,9 +170,11 @@ subroutine ice_timestep(step, ice, partit, mesh)
     ! call cut_off
     ! new FCT routines from Sergey Danilov 08.05.2018
 #if defined (__oifs) || defined (__ifsinterface)
+!$OMP PARALLEL DO
     do i=1,myDim_nod2D+eDim_nod2D
         ice_temp(i) = ice_temp(i)*a_ice(i)
     end do
+!$OMP END PARALLEL DO
 #endif /* (__oifs) */
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
     call ice_TG_rhs_div    (ice, partit, mesh)  
@@ -184,9 +186,11 @@ subroutine ice_timestep(step, ice, partit, mesh)
     call ice_update_for_div(ice, partit, mesh)
     
 #if defined (__oifs) || defined (__ifsinterface)
+!$OMP PARALLEL DO
     do i=1,myDim_nod2D+eDim_nod2D
         if (a_ice(i)>0.0_WP) ice_temp(i) = ice_temp(i)/a_ice(i)
     end do
+!$OMP END PARALLEL DO
 #endif /* (__oifs) */
 
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call cut_off...'//achar(27)//'[0m'

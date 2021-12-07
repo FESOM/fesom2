@@ -61,11 +61,9 @@ subroutine stress_tensor(ice_strength, ice, partit, mesh)
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
     real(kind=WP), intent(in) :: ice_strength(partit%mydim_elem2D)
-    real(kind=WP)   :: eta, xi, delta, aa
-    integer         :: el, elnodes(3)
-    real(kind=WP)   :: asum, msum, vale, dx(3), dy(3)
-    real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2, dte 
-    real(kind=WP)   :: zeta, delta_inv, d1, d2
+    integer         :: el
+    real(kind=WP)   :: det1, det2, dte, vale, r1, r2, r3, si1, si2
+    real(kind=WP)   :: zeta, delta, delta_inv, d1, d2
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
@@ -90,6 +88,7 @@ subroutine stress_tensor(ice_strength, ice, partit, mesh)
     det1 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte)
     det2 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte) !*ellipse**2 
  
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, r1, r2, r3, si1, si2, zeta, delta, delta_inv, d1, d2)
     do el=1,myDim_elem2D
         !_______________________________________________________________________
         ! if element contains cavity node skip it 
@@ -161,6 +160,7 @@ subroutine stress_tensor(ice_strength, ice, partit, mesh)
 #endif
         endif
     end do
+!$OMP END PARALLEL DO
 end subroutine stress_tensor
 !
 !
@@ -201,11 +201,14 @@ subroutine stress2rhs(inv_areamass, ice_strength, ice, partit, mesh)
     !___________________________________________________________________________    
     val3=1/3.0_WP
 
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, el, k)
+!$OMP DO
     DO  n=1, myDim_nod2D
         U_rhs_ice(n)=0.0_WP
         V_rhs_ice(n)=0.0_WP
     END DO
-    
+!$OMP END DO
+!$OMP DO
     do el=1,myDim_elem2D
         ! ===== Skip if ice is absent
         !   if (any(m_ice(elnodes)<= 0.) .or. any(a_ice(elnodes) <=0.)) CYCLE 
@@ -215,8 +218,10 @@ subroutine stress2rhs(inv_areamass, ice_strength, ice, partit, mesh)
         
         !_______________________________________________________________________
         if (ice_strength(el) > 0._WP) then
-        !$IVDEP       
             DO k=1,3
+#if defined(_OPENMP)
+        call omp_set_lock  (partit%plock(elem2D_nodes(k,el)))
+#endif
                 U_rhs_ice(elem2D_nodes(k,el)) = U_rhs_ice(elem2D_nodes(k,el)) &
                 - elem_area(el) * &
                     (sigma11(el)*gradient_sca(k,el) + sigma12(el)*gradient_sca(k+3,el) &
@@ -226,10 +231,14 @@ subroutine stress2rhs(inv_areamass, ice_strength, ice, partit, mesh)
                     - elem_area(el) * &
                     (sigma12(el)*gradient_sca(k,el) + sigma22(el)*gradient_sca(k+3,el) &   
                     -sigma11(el)*val3*metric_factor(el))
+#if defined(_OPENMP)
+        call omp_unset_lock(partit%plock(elem2D_nodes(k,el)))
+#endif
             END DO
         endif
     end do 
-
+!$OMP END DO
+!$OMP DO
     DO n=1, myDim_nod2D
         !_______________________________________________________________________
         ! if cavity node skip it 
@@ -243,7 +252,9 @@ subroutine stress2rhs(inv_areamass, ice_strength, ice, partit, mesh)
             U_rhs_ice(n) = 0._WP
             V_rhs_ice(n) = 0._WP
         endif
-    END DO 
+    END DO
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine stress2rhs
 !
 !
@@ -279,13 +290,12 @@ subroutine EVPdynamics(ice, partit, mesh)
     real(kind=WP)   :: ice_strength(partit%myDim_elem2D), elevation_elem(3), p_ice(3)
     integer         :: use_pice
 
-    real(kind=WP)   :: eta, xi, delta
+    real(kind=WP)   :: eta, delta
     integer         :: k
     real(kind=WP)   :: vale, dx(3), dy(3), val3
     real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2, dte 
     real(kind=WP)   :: zeta, delta_inv, d1, d2
     INTEGER         :: elem
-    REAL(kind=WP)   :: mass, uc, vc,  deltaX1, deltaX2, deltaY1, deltaY2
     !_______________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
@@ -346,10 +356,16 @@ subroutine EVPdynamics(ice, partit, mesh)
     
     !___________________________________________________________________________
     ! Precompute values that are never changed during the iteration
-    inv_areamass =0.0_WP
-    inv_mass     =0.0_WP
-    rhs_a        =0.0_WP
-    rhs_m        =0.0_WP
+!$OMP PARALLEL DO
+    do n=1, myDim_nod2D+eDim_nod2D
+       inv_areamass(n) =0.0_WP
+       inv_mass(n)     =0.0_WP
+       rhs_a(n)        =0.0_WP
+       rhs_m(n)        =0.0_WP
+    end do
+!$OMP END PARALLEL DO
+
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
     do n=1,myDim_nod2D 
         !_______________________________________________________________________
         ! if cavity node skip it 
@@ -373,13 +389,15 @@ subroutine EVPdynamics(ice, partit, mesh)
         rhs_a(n)=0.0_WP       ! these are used as temporal storage here
         rhs_m(n)=0.0_WP       ! for the contribution due to ssh
     enddo
-    
+!$OMP END PARALLEL DO
+
     !___________________________________________________________________________
     use_pice=0
     if (use_floatice .and.  .not. trim(which_ale)=='linfs') use_pice=1
     if ( .not. trim(which_ALE)=='linfs') then
         ! for full free surface include pressure from ice mass
         ice_strength=0.0_WP
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum, aa, p_ice, elevation_elem, elevation_dx, elevation_dy)
         do el = 1,myDim_elem2D
             
             elnodes = elem2D_nodes(:,el)
@@ -431,10 +449,12 @@ subroutine EVPdynamics(ice, partit, mesh)
                 rhs_m(elnodes) = rhs_m(elnodes)-aa*elevation_dy
             end if
         enddo
+!$OMP END PARALLEL DO
     else
         ! for linear free surface
-        ice_strength=0.0_WP
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum, aa, elevation_elem, elevation_dx, elevation_dy)
         do el = 1,myDim_elem2D
+            ice_strength(el)=0.0_WP
             elnodes = elem2D_nodes(:,el)
             !___________________________________________________________________
             ! if element has any cavity node skip it 
@@ -468,15 +488,16 @@ subroutine EVPdynamics(ice, partit, mesh)
                 rhs_m(elnodes) = rhs_m(elnodes)-aa*elevation_dy
             end if
         enddo
+!$OMP END PARALLEL DO
     endif ! --> if ( .not. trim(which_ALE)=='linfs') then
-    
+!$OMP PARALLEL DO    
     !___________________________________________________________________________
     do n=1,myDim_nod2D 
         if (ulevels_nod2d(n)>1) cycle
         rhs_a(n) = rhs_a(n)/area(1,n)
         rhs_m(n) = rhs_m(n)/area(1,n)
     enddo
-    
+!$OMP END PARALLEL DO
     !___________________________________________________________________________
     ! End of Precomputing --> And the ice stepping starts
 #if defined (__icepack)
@@ -484,12 +505,23 @@ subroutine EVPdynamics(ice, partit, mesh)
     rdg_shear_elem(:) = 0.0_WP
 #endif
     do shortstep=1, ice%evp_rheol_steps 
+!write(*,*) partit%mype, shortstep, 'CP1'
         !_______________________________________________________________________
         call stress_tensor(ice_strength, ice, partit, mesh)
+!call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)
+!write(*,*) partit%mype, shortstep, 'CP2'
         call stress2rhs(inv_areamass, ice_strength, ice, partit, mesh) 
+!call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)
+!write(*,*) partit%mype, shortstep, 'CP3'
         !_______________________________________________________________________
-        U_ice_old = U_ice !PS
-        V_ice_old = V_ice !PS
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, ed, umod, drag, rhsu, rhsv, r_a, r_b, det)
+!$OMP DO
+        do n=1,myDim_nod2D+eDim_nod2D
+           U_ice_old(n) = U_ice(n) !PS
+           V_ice_old(n) = V_ice(n) !PS
+        end do
+!$OMP END DO
+!$OMP DO
         do n=1,myDim_nod2D 
             !___________________________________________________________________
             ! if cavity node skip it 
@@ -515,9 +547,10 @@ subroutine EVPdynamics(ice, partit, mesh)
                 V_ice(n) = 0.0_WP
             end if
         end do
-    
+!$OMP END DO
         !_______________________________________________________________________
-        ! apply sea ice velocity boundary condition 
+        ! apply sea ice velocity boundary condition
+!$OMP DO
         DO  ed=1,myDim_edge2D
             !___________________________________________________________________
             ! apply coastal sea ice velocity boundary conditions
@@ -530,13 +563,29 @@ subroutine EVPdynamics(ice, partit, mesh)
             ! apply sea ice velocity boundary conditions at cavity-ocean edge
             if (use_cavity) then 
                 if ( (ulevels(edge_tri(1,ed))>1) .or. &
-                    ( edge_tri(2,ed)>0 .and. ulevels(edge_tri(2,ed))>1) ) then 
-                    U_ice(edges(1:2,ed))=0.0_WP
-                    V_ice(edges(1:2,ed))=0.0_WP
+                    ( edge_tri(2,ed)>0 .and. ulevels(edge_tri(2,ed))>1) ) then
+#if defined(_OPENMP)
+        call omp_set_lock  (partit%plock(edges(1,ed)))
+#endif
+                    U_ice(edges(1,ed))=0.0_WP
+                    V_ice(edges(1,ed))=0.0_WP
+#if defined(_OPENMP)
+        call omp_unset_lock(partit%plock(edges(1,ed)))
+        call omp_set_lock  (partit%plock(edges(2,ed)))
+#endif
+                    U_ice(edges(2,ed))=0.0_WP
+                    V_ice(edges(2,ed))=0.0_WP
+#if defined(_OPENMP)
+        call omp_unset_lock(partit%plock(edges(2,ed)))
+#endif
                 end if 
             end if 
         end do
+!$OMP END DO
+!$OMP END PARALLEL
+!write(*,*) partit%mype, shortstep, 'CP4'
         !_______________________________________________________________________
         call exchange_nod(U_ice,V_ice,partit)
+!$OMP BARRIER
     END DO !--> do shortstep=1, ice%evp_rheol_steps 
 end subroutine EVPdynamics
