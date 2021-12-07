@@ -2452,7 +2452,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
         end do
     end do
 !$OMP END PARALLEL DO
-    cflmax=0.
+cflmax=0.
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n) REDUCTION(max:cflmax)
 !$OMP DO
     do n=1, myDim_nod2D+eDim_nod2D
