@@ -366,64 +366,67 @@ module g_cvmix_idemix
             ! to calculate edge contribution that crosses the halo
             call exchange_nod(iwe)
             
-            !___________________________________________________________________
-            ! calculate inverse volume and restrict iwe_v0 to fullfill stability 
-            ! criterium --> CFL
-            ! CFL Diffusion : CFL = v0^2 * dt/dx^2, CFL < 0.5
-            ! --> limit v0 to CFL=0.2
-            ! --> v0 = sqrt(CFL * dx^2 / dt)
-            cflfac = 0.2_WP
-            ! |--> FROM NILS: "fac=0.2 ist geschätzt. Würde ich erstmal so 
-            !      probieren. Der kommt aus dem stabilitätskriterium für Diffusion 
-            !      (ähnlich berechnet wie das CFL Kriterium nur halt für den 
-            !      Diffusions anstatt für den Advektionsterm). Normalerweise 
-            !      sollte der Grenzwert aber nicht zu oft auftreten. Ich hatte 
-            !      mal damit rum-experimentiert, aber letztendlich war die Lösung 
-            !      das Iterativ zu machen und ggf. idemix_n_hor_iwe_prop_iter zu erhöhen. 
-            !      Du kannst IDEMIX erstmal ohne den Term ausprobieren und sehen, 
-            !      ob es läuft, dann kannst du den dazuschalten und hoffen, dass 
-            !      es nicht explodiert. Eigentlich sollte der Term alles glatter 
-            !      machen, aber nahe der ML kann der schon Probleme machen".
-            do node = 1,node_size
-            
-                ! temporarily store old iwe values for diag
-                iwe_Thdi(:,node) = iwe(:,node)
+            ! temporarily store old iwe values for diag
+            iwe_Thdi = iwe
                 
-                ! number of above bottom levels at node
-                nln = nlevels_nod2D(node)-1
-                uln = ulevels_nod2D(node)
-                
-                ! thickness of mid-level to mid-level interface at node
-                dz_trr             = 0.0_WP
-                dz_trr(uln+1:nln)  = Z_3d_n(uln:nln-1,node)-Z_3d_n(uln+1:nln,node)
-                dz_trr(uln)        = hnode(uln,node)/2.0_WP
-                dz_trr(nln+1)      = hnode(nln,node)/2.0_WP
-                
-                ! surface cell 
-                vol_wcelli(uln,node) = 1/(areasvol(uln,node)*dz_trr(uln))
-                aux = sqrt(cflfac*(area(uln,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
-                iwe_v0(uln,node) = min(iwe_v0(uln,node),aux)
-                
-                ! bulk cells
-                !!PS do nz=2,nln
-                do nz=uln+1,nln
-                    ! inverse volumne 
-                    vol_wcelli(nz,node) = 1/(areasvol(nz-1,node)*dz_trr(nz))
-                    
-                    ! restrict iwe_v0
-                    aux = sqrt(cflfac*(area(nz-1,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
-                    !                  `--------+-------------´
-                    !                           |-> comes from mesh_resolution=sqrt(area(1, :)/pi)*2._WP
-                    iwe_v0(nz,node) = min(iwe_v0(nz,node),aux)
-                end do 
-                
-                ! bottom cell 
-                vol_wcelli(nln+1,node) = 1/(areasvol(nln,node)*dz_trr(nln+1))
-                aux = sqrt(cflfac*(area(nln,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
-                iwe_v0(nln+1,node) = min(iwe_v0(nln+1,node),aux)
-                
-            end do !-->do node = 1,node_size
-            call exchange_nod(vol_wcelli)
+! !             !___________________________________________________________________
+! !             ! calculate inverse volume and restrict iwe_v0 to fullfill stability 
+! !             ! criterium --> CFL
+! !             ! CFL Diffusion : CFL = v0^2 * dt/dx^2, CFL < 0.5
+! !             ! --> limit v0 to CFL=0.2
+! !             ! --> v0 = sqrt(CFL * dx^2 / dt)
+! !             cflfac = 0.2_WP
+! !             ! |--> FROM NILS: "fac=0.2 ist geschätzt. Würde ich erstmal so 
+! !             !      probieren. Der kommt aus dem stabilitätskriterium für Diffusion 
+! !             !      (ähnlich berechnet wie das CFL Kriterium nur halt für den 
+! !             !      Diffusions anstatt für den Advektionsterm). Normalerweise 
+! !             !      sollte der Grenzwert aber nicht zu oft auftreten. Ich hatte 
+! !             !      mal damit rum-experimentiert, aber letztendlich war die Lösung 
+! !             !      das Iterativ zu machen und ggf. idemix_n_hor_iwe_prop_iter zu erhöhen. 
+! !             !      Du kannst IDEMIX erstmal ohne den Term ausprobieren und sehen, 
+! !             !      ob es läuft, dann kannst du den dazuschalten und hoffen, dass 
+! !             !      es nicht explodiert. Eigentlich sollte der Term alles glatter 
+! !             !      machen, aber nahe der ML kann der schon Probleme machen".
+! !             do node = 1,node_size
+! !             
+! !                 !!PS ! temporarily store old iwe values for diag
+! !                 !!PS iwe_Thdi(:,node) = iwe(:,node)
+! !                 
+! !                 ! number of above bottom levels at node
+! !                 nln = nlevels_nod2D(node)-1
+! !                 uln = ulevels_nod2D(node)
+! !                 
+! !                 ! thickness of mid-level to mid-level interface at node
+! !                 dz_trr             = 0.0_WP
+! !                 dz_trr(uln+1:nln)  = Z_3d_n(uln:nln-1,node)-Z_3d_n(uln+1:nln,node)
+! !                 dz_trr(uln)        = hnode(uln,node)/2.0_WP
+! !                 dz_trr(nln+1)      = hnode(nln,node)/2.0_WP
+! !                 
+! !                 ! surface cell 
+! !                 vol_wcelli(uln,node) = 1/(areasvol(uln,node)*dz_trr(uln))
+! !                 aux = sqrt(cflfac*(area(uln,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
+! !                 iwe_v0(uln,node) = min(iwe_v0(uln,node),aux)
+! !                 
+! !                 ! bulk cells
+! !                 !!PS do nz=2,nln
+! !                 do nz=uln+1,nln
+! !                     ! inverse volumne 
+! !                     vol_wcelli(nz,node) = 1/(areasvol(nz-1,node)*dz_trr(nz))
+! !                     
+! !                     ! restrict iwe_v0
+! !                     aux = sqrt(cflfac*(area(nz-1,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
+! !                     !                  `--------+-------------´
+! !                     !                           |-> comes from mesh_resolution=sqrt(area(1, :)/pi)*2._WP
+! !                     iwe_v0(nz,node) = min(iwe_v0(nz,node),aux)
+! !                 end do 
+! !                 
+! !                 ! bottom cell 
+! !                 vol_wcelli(nln+1,node) = 1/(areasvol(nln,node)*dz_trr(nln+1))
+! !                 aux = sqrt(cflfac*(area(nln,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
+! !                 iwe_v0(nln+1,node) = min(iwe_v0(nln+1,node),aux)
+! !                 
+! !             end do !-->do node = 1,node_size
+! !             call exchange_nod(vol_wcelli)
             call exchange_nod(iwe_v0)
             
             !___________________________________________________________________

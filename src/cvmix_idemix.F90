@@ -323,19 +323,19 @@ subroutine calc_idemix_v0(nlev, Nsqr, dzw, coriolis, &
   ! calculate cstar from OE13 Eq. (13)
   bN0=0.0
   do k=2,nlev
-    bN0 = bN0 + max(0d0,Nsqr(k))**0.5*dzw(k) 
+    bN0 = bN0 + max(0.0_cvmix_r8,Nsqr(k))**0.5*dzw(k) 
   enddo
-  cstar = max(1d-2,bN0/(cvmix_PI*jstar) )
+  cstar = max(1e-2_cvmix_r8,bN0/(cvmix_PI*jstar) )
      
   ! calculate horizontal representative group velocity v0
   ! v0: OE13 Eq. (A9)
   do k=1,nlev+1
-    fxa = max(0d0,Nsqr(k))**0.5/(1d-22 + abs(coriolis) )
-    v0(k)=max(0d0, gamma*cstar*hofx2(fxa))
+    fxa = max(0.0_cvmix_r8,Nsqr(k))**0.5/(1d-22 + abs(coriolis) )
+    v0(k)=max(0.0_cvmix_r8, gamma*cstar*hofx2(fxa))
 
     ! set v0 to zero to prevent horizontal iwe propagation in mixed layer
-    if ( fxa<1d0 ) then
-      v0(k) = 0d0
+    if ( fxa<1.0_cvmix_r8 ) then
+      v0(k) = 0.0_cvmix_r8
     endif
 
     !! for debugging:
@@ -475,12 +475,29 @@ subroutine integrate_idemix( &
  
   type(idemix_type), pointer ::idemix_constants_in
  
-  ! initialize diagnostics
-  iwe_Ttot = 0.0
-  iwe_Tdif = 0.0
-  iwe_Tdis = 0.0
-  iwe_Tsur = 0.0
-  iwe_Tbot = 0.0
+  ! initialize variables
+  iwe_new     = 0.0_cvmix_r8
+  cvmix_int_1 = 0.0_cvmix_r8
+  cvmix_int_2 = 0.0_cvmix_r8
+  cvmix_int_3 = 0.0_cvmix_r8
+  iwe_Ttot    = 0.0_cvmix_r8
+  iwe_Tdif    = 0.0_cvmix_r8
+  iwe_Tdis    = 0.0_cvmix_r8
+  iwe_Tsur    = 0.0_cvmix_r8
+  iwe_Tbot    = 0.0_cvmix_r8
+  c0          = 0.0_cvmix_r8
+  v0          = 0.0_cvmix_r8
+  alpha_c     = 0.0_cvmix_r8
+  a_dif       = 0.0_cvmix_r8
+  b_dif       = 0.0_cvmix_r8
+  c_dif       = 0.0_cvmix_r8
+  a_tri       = 0.0_cvmix_r8
+  b_tri       = 0.0_cvmix_r8
+  c_tri       = 0.0_cvmix_r8
+  d_tri       = 0.0_cvmix_r8
+  delta       = 0.0_cvmix_r8
+  iwe_max     = 0.0_cvmix_r8
+  forc        = 0.0_cvmix_r8
  
   ! FIXME: nils: Is this necessary?
   idemix_constants_in => idemix_constants_saved
@@ -495,32 +512,32 @@ subroutine integrate_idemix( &
   mu0   = idemix_constants_in%mu0
   jstar = idemix_constants_in%jstar
  
-  ! calculate cstar from OE13 Eq. (13)
-  bN0=0.0
+   ! calculate cstar from OE13 Eq. (13)
+  bN0=0.0_cvmix_r8
   do k=2,nlev
-    bN0 = bN0 + max(0d0,Nsqr(k))**0.5*dzw(k) 
+    bN0 = bN0 + max(0.0_cvmix_r8,Nsqr(k))**0.5*dzw(k) 
   enddo
-  cstar = max(1d-2,bN0/(cvmix_PI*jstar) )
+  cstar = max(1e-2_cvmix_r8,bN0/(cvmix_PI*jstar) )
      
   ! calculate vertical and horizontal representative group velocities c0 and v0
   ! c0: OE13 Eq. (13) 
   ! alpha_c iwe**2: dissipation of internal wave energy (OE13 Eq. (15))
   do k=1,nlev+1
-    fxa = max(0d0,Nsqr(k))**0.5/(1d-22 + abs(coriolis) )
-    c0(k)=max(0d0, gamma*cstar*gofx2(fxa) )
-    v0(k)=max(0d0, gamma*cstar*hofx2(fxa))
+    fxa = max(0.0_cvmix_r8,Nsqr(k))**0.5/(1e-22_cvmix_r8 + abs(coriolis) )
+    c0(k)=max(0.0_cvmix_r8, gamma*cstar*gofx2(fxa) )
+    v0(k)=max(0.0_cvmix_r8, gamma*cstar*hofx2(fxa))
     !v0(k)=0.5
-    alpha_c(k) = max( 1d-4, mu0*acosh(max(1d0,fxa))*abs(coriolis)/cstar**2 )
+    alpha_c(k) = max( 1e-4_cvmix_r8, mu0*acosh(max(1.0_cvmix_r8,fxa))*abs(coriolis)/cstar**2 )
 
     ! set v0 to zero to prevent horizontal iwe propagation in mixed layer
-    if ( fxa<1d0 ) then
-      v0(k) = 0d0
+    if ( fxa<1.0_cvmix_r8 ) then
+      v0(k) = 0.0_cvmix_r8
     endif
   enddo
  
   !---------------------------------------------------------------------------------
   ! initialize forcing
-  forc(:)=0.d0
+  forc(:)=0.0_cvmix_r8
  
   ! add tendency of horizontal diffusion (is calculated externally)
   !forc(:) = forc(:) + iwe_Thdi(:)
@@ -528,7 +545,7 @@ subroutine integrate_idemix( &
   !---------------------------------------------------------------------------------
   ! prevent negative dissipation of IW energy
   ! FIXME: Carsten thinks we don't need this
-  iwe_max = max(0D0, iwe_old)
+  iwe_max = max(0.0_cvmix_r8, iwe_old)
  
  
   ! vertical diffusion and dissipation is solved implicitely 
@@ -614,9 +631,9 @@ subroutine integrate_idemix( &
   KappaH_out = 0.0
   KappaM_out = 0.0
   do k=2,nlev
-    KappaH_out(k) =  0.2/(1.0+0.2) * (-1*iwe_Tdis(k)) / max(1d-12, Nsqr(k))
-    KappaH_out(k) = max(1e-9, KappaH_out(k))
-    KappaH_out(k) = min(1.0, KappaH_out(k))
+    KappaH_out(k) =  0.2/(1.0+0.2) * (-1.0*iwe_Tdis(k)) / max(1e-12_cvmix_r8, Nsqr(k))
+    KappaH_out(k) = max(1e-9_cvmix_r8, KappaH_out(k))
+    KappaH_out(k) = min(1.0_cvmix_r8, KappaH_out(k))
     KappaM_out(k) =  10.0 * KappaH_out(k)
   enddo
  
@@ -629,40 +646,40 @@ subroutine integrate_idemix( &
  
   ! debugging: 
   !if (debug .eqv. debug) then
-  if (.false.) then
-  !if (i==45 .and. j==10) then
-  !if (i==45 .and. j==45) then
-     write(*,*) ' ===================== '
- 
-     write(*,*) 'dtime = ', dtime
-     write(*,*) 'delta = ', delta
-     write(*,*) 'dzw = ', dzw
-     write(*,*) 'c0 = ', c0
-     write(*,*) 'a_tri = ', a_tri
-     write(*,*) 'b_tri = ', b_tri
-     write(*,*) 'c_tri = ', c_tri
-     write(*,*) 'd_tri = ', d_tri
-     write(*,*) 'forc_iw_surface = ', forc_iw_surface
-     write(*,*) 'iwe_new = ', iwe_new
- 
-     write(*,*) 'iwe_Ttot = ', iwe_Ttot
-     write(*,*) 'iwe_Tdif = ', iwe_Tdif
-     write(*,*) 'iwe_Thdi = ', iwe_Thdi
-     write(*,*) 'iwe_Tdis = ', iwe_Tdis
-     write(*,*) 'iwe_Tsur = ', iwe_Tsur
-     write(*,*) 'iwe_Tbot = ', iwe_Tbot
-     write(*,*) 'iwe_Tres = ', iwe_Ttot-(iwe_Tdif+iwe_Thdi+iwe_Tdis+iwe_Tsur+iwe_Tbot)
- 
-    write(*,*) 'tau_v = ', tau_v
-    write(*,*) 'tau_h = ', tau_h
-    write(*,*) 'gamma = ', gamma
-    write(*,*) 'jstar = ', jstar
-    write(*,*) 'mu0 = ', mu0
- 
-    !stop
-  !endif
-  !endif
-  endif
+! !   if (.false.) then
+! !   !if (i==45 .and. j==10) then
+! !   !if (i==45 .and. j==45) then
+! !      write(*,*) ' ===================== '
+! !  
+! !      write(*,*) 'dtime = ', dtime
+! !      write(*,*) 'delta = ', delta
+! !      write(*,*) 'dzw = ', dzw
+! !      write(*,*) 'c0 = ', c0
+! !      write(*,*) 'a_tri = ', a_tri
+! !      write(*,*) 'b_tri = ', b_tri
+! !      write(*,*) 'c_tri = ', c_tri
+! !      write(*,*) 'd_tri = ', d_tri
+! !      write(*,*) 'forc_iw_surface = ', forc_iw_surface
+! !      write(*,*) 'iwe_new = ', iwe_new
+! !  
+! !      write(*,*) 'iwe_Ttot = ', iwe_Ttot
+! !      write(*,*) 'iwe_Tdif = ', iwe_Tdif
+! !      write(*,*) 'iwe_Thdi = ', iwe_Thdi
+! !      write(*,*) 'iwe_Tdis = ', iwe_Tdis
+! !      write(*,*) 'iwe_Tsur = ', iwe_Tsur
+! !      write(*,*) 'iwe_Tbot = ', iwe_Tbot
+! !      write(*,*) 'iwe_Tres = ', iwe_Ttot-(iwe_Tdif+iwe_Thdi+iwe_Tdis+iwe_Tsur+iwe_Tbot)
+! !  
+! !     write(*,*) 'tau_v = ', tau_v
+! !     write(*,*) 'tau_h = ', tau_h
+! !     write(*,*) 'gamma = ', gamma
+! !     write(*,*) 'jstar = ', jstar
+! !     write(*,*) 'mu0 = ', mu0
+! !  
+! !     !stop
+! !   !endif
+! !   !endif
+! !   endif
  
 end subroutine integrate_idemix
 
@@ -676,7 +693,7 @@ function gofx2(x1)
  implicit none
  real(cvmix_r8) :: gofx2,x1,x2,c
  real(cvmix_r8), parameter :: pi = 3.14159265358979323846264338327950588
- x2=max(3d0,x1)
+ x2=max(3.0_cvmix_r8,x1)
  c= 1.-(2./pi)*asin(1./x2)
  gofx2 = 2/pi/c*0.9*x2**(-2./3.)*(1-exp(-x2/4.3))
 end function gofx2
@@ -688,7 +705,7 @@ function hofx2(x1)
  implicit none
  real(cvmix_r8) :: hofx2,x1,x2
  real(cvmix_r8), parameter :: pi = 3.14159265358979323846264338327950588
- x2 = max(1d1, x1) ! by_nils: it has to be x2>1
+ x2 = max(10.0_cvmix_r8, x1) ! by_nils: it has to be x2>1
  hofx2 = (2./pi)/(1.-(2./pi)*asin(1./x2)) * (x2-1.)/(x2+1.)
 end function hofx2
 
