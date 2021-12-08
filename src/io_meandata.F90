@@ -112,7 +112,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
   integer,dimension(15)     :: sel_forcvar=0
   character(len=10)         :: id_string
 
-  type(t_mesh)  , intent(in)   , target :: mesh
+  type(t_mesh), intent(in) , target :: mesh
   type(t_partit), intent(inout), target :: partit
   type(t_tracer), intent(in)   , target :: tracers
   type(t_dyn)   , intent(in)   , target :: dynamics
@@ -595,7 +595,7 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
   use o_PARAM
 
   implicit none
-  character(2000)            :: att_text
+  character(2000)               :: att_text
   type(t_mesh)  , intent(in) :: mesh
   type(t_partit), intent(in) :: partit
   type(t_dyn)   , intent(in) :: dynamics
@@ -643,11 +643,14 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
   call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'axis', len_trim('T'), trim('T')), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'stored_direction', len_trim('increasing'), trim('increasing')), __LINE__)
   
+#ifndef TRANSPOSE_OUTPUT
+  call assert_nf( nf_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), entry%ndim+1, (/entry%dimid(1:entry%ndim), entry%recID/), entry%varID), __LINE__)
+#else
   call assert_nf( nf_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), entry%ndim+1, (/entry%dimid(entry%ndim:1:-1), entry%recID/), entry%varID), __LINE__)
-!CHUNKING stuff (netcdf libraries not always compited with it)
-!if (entry%ndim==2) then
-!     call assert_nf( nf_def_var_chunking(entry%ncid, entry%varID, NF_CHUNKED, (/1, entry%glsize(1)/)), __LINE__);
-!  end if
+#endif
+
+
+
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'description', len_trim(entry%description), entry%description), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'long_name', len_trim(entry%description), entry%description), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'units',       len_trim(entry%units),       entry%units), __LINE__)
@@ -668,15 +671,15 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
 ! call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_lim', len_trim(tra_adv_lim), trim(tra_adv_lim)), __LINE__)
  
  
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell' , NF_INT, 1,  use_partial_cell), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'force_rotation'   , NF_INT, 1,  force_rotation), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell', NF_INT, 1,  use_partial_cell), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'force_rotation', NF_INT, 1,  force_rotation), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'include_fleapyear', NF_INT, 1,  include_fleapyear), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_floatice'     , NF_INT, 1,  use_floatice), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_floatice', NF_INT, 1,  use_floatice), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'whichEVP'         , NF_INT, 1,  ice%whichEVP), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'evp_rheol_steps'  , NF_INT, 1,  ice%evp_rheol_steps), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'opt_visc'         , NF_INT, 1,  dynamics%opt_visc), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_wsplit'       , NF_INT, 1,  dynamics%use_wsplit), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell' , NF_INT, 1,  use_partial_cell), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell', NF_INT, 1,  use_partial_cell), __LINE__)
  
  
  
@@ -723,8 +726,8 @@ subroutine write_mean(entry, entry_index)
   use io_gather_module
   implicit none
   type(Meandata), intent(inout) :: entry
-  integer,        intent(in)    :: entry_index
-  integer                       :: tag
+  integer, intent(in) :: entry_index
+  integer tag
   integer                       :: i, size1, size2, size_gen, size_lev, order
   integer                       :: c, lev
 
@@ -744,6 +747,10 @@ subroutine write_mean(entry, entry_index)
        if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(size2))
      end if
      do lev=1, size1
+#ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
+        ! aleph cray-mpich workaround
+        call MPI_Barrier(entry%comm, MPIERR)
+#endif
        if(.not. entry%is_elem_based) then
          call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
        else
@@ -753,7 +760,11 @@ subroutine write_mean(entry, entry_index)
           if (entry%ndim==1) then
             call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r8, 1), __LINE__)
           elseif (entry%ndim==2) then
+#ifndef TRANSPOSE_OUTPUT
+            call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r8, 1), __LINE__)
+#else
             call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size2, 1, 1/), entry%aux_r8, 1), __LINE__)
+#endif
           end if
         end if
      end do
@@ -764,6 +775,10 @@ subroutine write_mean(entry, entry_index)
        if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(size2))
      end if
      do lev=1, size1
+#ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
+        ! aleph cray-mpich workaround
+        call MPI_Barrier(entry%comm, MPIERR)
+#endif
        if(.not. entry%is_elem_based) then
          call gather_real4_nod2D (entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
        else
@@ -773,11 +788,16 @@ subroutine write_mean(entry, entry_index)
            if (entry%ndim==1) then
              call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r4, 1), __LINE__)
            elseif (entry%ndim==2) then
+#ifndef TRANSPOSE_OUTPUT
+             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r4, 1), __LINE__)
+#else
              call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size2, 1, 1/), entry%aux_r4, 1), __LINE__)
+#endif
            end if
         end if
      end do
   end if
+
 end subroutine
 
 
@@ -786,6 +806,7 @@ subroutine update_means
   type(Meandata), pointer :: entry
   integer                 :: n
   integer                 :: I, J
+
   DO n=1, io_NSTREAMS
      entry=>io_stream(n)
 !_____________ compute in 8 byte accuracy _________________________
@@ -827,7 +848,7 @@ subroutine update_means
 !$OMP END PARALLEL DO
         END IF
      END IF
-    entry%addcounter=entry%addcounter+1
+     entry%addcounter=entry%addcounter+1
   END DO
 end subroutine
 !
@@ -852,14 +873,14 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
   integer       :: i, j !for OMP loops
   logical       :: do_output
   type(Meandata), pointer :: entry
-  type(t_mesh)  , intent(in)   , target :: mesh
+  type(t_mesh), intent(in) , target :: mesh
   type(t_partit), intent(inout), target :: partit
   type(t_tracer), intent(in)   , target :: tracers
   type(t_dyn)   , intent(in)   , target :: dynamics
   type(t_ice)   , intent(inout), target :: ice
   
-  character(:),   allocatable           :: filepath
-  real(real64)                          :: rtime !timestamp of the record
+  character(:), allocatable :: filepath
+  real(real64)                  :: rtime !timestamp of the record
 
   ctime=timeold+(dayold-1.)*86400
   if (lfirst) then
@@ -867,7 +888,6 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
 #if defined (__icepack)
      call init_io_icepack(mesh) !icapack has its copy of p_partit => partit
 #endif
-     call init_io_gather(partit)
   end if
 
   call update_means
@@ -969,7 +989,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
   integer, intent(in) :: entry_index
   ! EO args
-  type(Meandata), pointer               :: entry
+  type(Meandata), pointer :: entry
 
 
   entry=>io_stream(entry_index)
@@ -1010,7 +1030,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   type(t_mesh), intent(in), target     :: mesh
   logical, optional, intent(in)        :: flip_array
   integer i
-
+  
   do i = 1, rank(data)
     if ((ubound(data, dim = i)<=0)) then
       if (partit%mype==0) then
@@ -1108,13 +1128,14 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
 
   entry%dimname(1)=mesh_dimname_from_dimsize(glsize, partit, mesh)
   entry%dimname(2)='unknown'
+
   ! non dimension specific
   call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh)
 end subroutine
 
 
   subroutine associate_new_stream(name, entry)
-    type(Meandata),   pointer    :: entry
+    type(Meandata), pointer :: entry
     character(len=*), intent(in) :: name
     integer i
 
@@ -1142,12 +1163,12 @@ end subroutine
     USE MOD_PARTIT
     USE MOD_PARSUP
     use io_netcdf_workaround_module
-    type(Meandata),        intent(inout)  :: entry
-    character(len=*),      intent(in)     :: name, description, units
-    integer,               intent(in)     :: freq
-    character,             intent(in)     :: freq_unit
-    integer,               intent(in)     :: accuracy
-    type(t_mesh),   intent(in),    target :: mesh
+    type(Meandata), intent(inout) :: entry
+    character(len=*),      intent(in)    :: name, description, units
+    integer,               intent(in)    :: freq
+    character,             intent(in)    :: freq_unit
+    integer,               intent(in)    :: accuracy
+    type(t_mesh), intent(in), target     :: mesh
     type(t_partit), intent(inout), target :: partit
     ! EO args
     logical async_netcdf_allowed
