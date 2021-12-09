@@ -206,6 +206,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #endif /* (__icepack) */
 
     !___________________________________________________________________________
+!$OMP PARALLEL DO
     do i=1,myDim_nod2D+eDim_nod2D
         if ( ( U_ice(i)/=0.0_WP .and. mesh%ulevels_nod2d(i)>1) .or. (V_ice(i)/=0.0_WP .and. mesh%ulevels_nod2d(i)>1) ) then
             write(*,*) " --> found cavity velocity /= 0.0_WP , ", mype
@@ -215,6 +216,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
             write(*,*)
         end if 
     end do
+!$OMP END PARALLEL DO
     t3=MPI_Wtime()
     rtime_ice = rtime_ice + (t3-t0)
     rtime_tot = rtime_tot + (t3-t0)
