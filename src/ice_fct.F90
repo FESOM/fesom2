@@ -813,9 +813,8 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
-    integer                             :: n, row
-    integer                             :: elem, elnodes(3), q, offset, col, ipos 
-    integer, allocatable                :: col_pos(:)
+    integer                             :: n, k, row
+    integer                             :: elem, elnodes(3), q, offset, ipos 
     real(kind=WP)                       :: aa
     integer                             :: flag=0, iflag=0
     !___________________________________________________________________________
@@ -828,8 +827,7 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
     mass_matrix => ice%work%fct_massmatrix(:)
     !
     ! a)
-    allocate(col_pos(myDim_nod2D+eDim_nod2D))
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, row, elem, elnodes, q, offset, col, ipos, aa)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, row, elem, elnodes, q, offset, ipos, aa)
 !$OMP DO
     DO elem=1,myDim_elem2D
         elnodes=elem2D_nodes(:,elem) 
@@ -840,22 +838,31 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
             if(row>myDim_nod2D) cycle
             !___________________________________________________________________
             ! Global-to-local neighbourhood correspondence  
-            DO q=1,nn_num(row)
-                col_pos(nn_pos(q,row))=q
-            END DO 
+            ! we have to modify col_pos construction for OMP compatibility. The MPI version might become a bit slower :(
+            ! loop over number of neghbouring nodes of node-row
             offset=ssh_stiff%rowptr(row)-ssh_stiff%rowptr(1)
-            DO q=1,3 
-                col=elnodes(q)
-                !_______________________________________________________________
-                ! if element is cavity cycle over
-                if(ulevels(elem)>1) cycle
-                
-                ipos=offset+col_pos(col)
-                mass_matrix(ipos)=mass_matrix(ipos)+elem_area(elem)/12.0_WP
-                if(q==n) then                     
-                    mass_matrix(ipos)=mass_matrix(ipos)+elem_area(elem)/12.0_WP
-                end if
-            END DO
+            do q=1, 3
+               !_______________________________________________________________
+               ! if element is cavity cycle over
+               if(ulevels(elem)>1) cycle
+               do k=1, nn_num(row)
+                  if (nn_pos(k,row)==elnodes(q)) then
+                     ipos=offset+k
+                     exit
+                  end if
+                  if (k==nn_num(row)) write(*,*) 'FATAL ERROR'
+               end do
+#if defined(_OPENMP)
+               call omp_set_lock  (partit%plock(row)) ! it shall be sufficient to block writing into the same row of SSH_stiff
+#endif
+               mass_matrix(ipos)=mass_matrix(ipos)+elem_area(elem)/12.0_WP
+               if(q==n) then
+                   mass_matrix(ipos)=mass_matrix(ipos)+elem_area(elem)/12.0_WP
+               end if
+#if defined(_OPENMP)
+               call omp_unset_lock(partit%plock(row))
+#endif
+           END DO
         end do
     END DO
 !$OMP END DO
@@ -892,7 +899,6 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
 !$OMP END PARALLEL
         write(*,*) '#### MASS MATRIX PROBLEM', mype, iflag, aa, area(1,iflag), ulevels_nod2D(iflag)
     endif
-    deallocate(col_pos)
 END SUBROUTINE ice_mass_matrix_fill
 !
 !

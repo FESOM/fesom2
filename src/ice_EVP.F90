@@ -286,8 +286,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     integer         :: n, ed, ednodes(2), el,  elnodes(3)
     real(kind=WP)   :: ax, ay, aa, elevation_dx, elevation_dy
 
-    real(kind=WP)   :: inv_areamass(partit%myDim_nod2D), inv_mass(partit%myDim_nod2D)
-    real(kind=WP)   :: ice_strength(partit%myDim_elem2D), elevation_elem(3), p_ice(3)
+    real(kind=WP)   :: elevation_elem(3), p_ice(3)
     integer         :: use_pice
 
     real(kind=WP)   :: eta, delta
@@ -304,6 +303,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice, rhs_a, rhs_m
     real(kind=WP), dimension(:), pointer  :: u_w, v_w, elevation
     real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y 
+    real(kind=WP), dimension(:), pointer  :: inv_areamass, inv_mass, ice_strength
 #if defined (__icepack)
     real(kind=WP), dimension(:), pointer  :: a_ice_old, m_ice_old, m_snow_old
 #endif
@@ -336,6 +336,10 @@ subroutine EVPdynamics(ice, partit, mesh)
     rhosno          => ice%thermo%rhosno
     rhoice          => ice%thermo%rhoice
     inv_rhowat      => ice%thermo%inv_rhowat
+    
+    inv_areamass    => ice%work%inv_areamass(:)
+    inv_mass        => ice%work%inv_mass(:)
+    ice_strength    => ice%work%ice_strength(:)
     
     !___________________________________________________________________________
     ! If Icepack is used, always update the tracers
@@ -396,10 +400,14 @@ subroutine EVPdynamics(ice, partit, mesh)
     if (use_floatice .and.  .not. trim(which_ale)=='linfs') use_pice=1
     if ( .not. trim(which_ALE)=='linfs') then
         ! for full free surface include pressure from ice mass
-        ice_strength=0.0_WP
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum, aa, p_ice, elevation_elem, elevation_dx, elevation_dy)
-        do el = 1,myDim_elem2D
-            
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum, aa, p_ice, elevation_elem, elevation_dx, elevation_dy)
+!$OMP DO
+        do el = 1, myDim_elem2D + eDim_elem2D
+           ice_strength(el)=0.0_WP
+        end do
+!$OMP END DO
+!$OMP DO
+        do el = 1,myDim_elem2D           
             elnodes = elem2D_nodes(:,el)
             !___________________________________________________________________
             ! if element has any cavity node skip it 
@@ -449,7 +457,8 @@ subroutine EVPdynamics(ice, partit, mesh)
                 rhs_m(elnodes) = rhs_m(elnodes)-aa*elevation_dy
             end if
         enddo
-!$OMP END PARALLEL DO
+!$OMP END DO
+!$OMP END PARALLEL
     else
         ! for linear free surface
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum, aa, elevation_elem, elevation_dx, elevation_dy)
@@ -507,10 +516,10 @@ subroutine EVPdynamics(ice, partit, mesh)
     do shortstep=1, ice%evp_rheol_steps 
 !write(*,*) partit%mype, shortstep, 'CP1'
         !_______________________________________________________________________
-        call stress_tensor(ice_strength, ice, partit, mesh)
+        call stress_tensor(ice_strength(1:myDim_nod2D), ice, partit, mesh)
 !call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)
 !write(*,*) partit%mype, shortstep, 'CP2'
-        call stress2rhs(inv_areamass, ice_strength, ice, partit, mesh) 
+        call stress2rhs(inv_areamass(1:myDim_nod2D), ice_strength(1:myDim_elem2D), ice, partit, mesh) 
 !call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)
 !write(*,*) partit%mype, shortstep, 'CP3'
         !_______________________________________________________________________
