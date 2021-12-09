@@ -37,7 +37,6 @@ module io_fesom_file_module
     type(thread_type) thread
     logical :: thread_running = .false.
     integer :: comm
-    integer rank
     type(t_partit), pointer :: partit
     logical gather_and_write
   contains
@@ -69,7 +68,7 @@ contains
   function is_iorank(this) result(x)
     class(fesom_file_type), intent(in) :: this
     logical x
-    x = (this%rank == this%iorank)
+    x = (this%partit%mype == this%iorank)
   end function
 
 
