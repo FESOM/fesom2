@@ -1598,11 +1598,11 @@ subroutine update_stiff_mat_ale(partit, mesh)
                 ! on the rhs. So the sign is changed in the expression below.
                 ! npos... sparse matrix indices position of node points elnodes
 #if defined(_OPENMP)
-!                   call omp_set_lock(row) ! it shall be sufficient to block writing into the same row of SSH_stiff
+                   call omp_set_lock  (partit%plock(row)) ! it shall be sufficient to block writing into the same row of SSH_stiff
 #endif
                    SSH_stiff%values(npos)=SSH_stiff%values(npos) + fy*factor
 #if defined(_OPENMP)
-!                   call omp_unset_lock(row)
+                   call omp_unset_lock(partit%plock(row))
 #endif                
             end do ! --> do i=1,2
         end do ! --> do j=1,2 
@@ -1983,7 +1983,8 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     END DO
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ed, enodes, el, deltaX1, deltaY1, nz, nzmin, nzmax, deltaX2, deltaY2, c1, c2)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, enodes, el, deltaX1, deltaY1, nz, nzmin, nzmax, deltaX2, deltaY2, c1, c2)
+!$OMP DO
     do ed=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,ed)   
@@ -2065,7 +2066,8 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
 #endif
         end if
     end do ! --> do ed=1, myDim_edge2D
-!$OMP END PARALLEL DO
+!$OMP END DO
+!$OMP END PARALLEL
     ! |
     ! |
     ! +--> until here Wvel contains the thickness divergence div(u)
@@ -2512,6 +2514,7 @@ cflmax=0.
     end do
 !$OMP END PARALLEL DO
 end subroutine vert_vel_ale
+
 !
 !
 !===============================================================================
