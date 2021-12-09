@@ -97,11 +97,6 @@ contains
 #else
       print '(g0)', 'DISABLE_PARALLEL_RESTART_READ is OFF'
 #endif  
-#ifdef TRANSPOSE_OUTPUT
-      print '(g0)', 'TRANSPOSE_OUTPUT is ON'
-#else
-      print '(g0)', 'TRANSPOSE_OUTPUT is OFF'
-#endif  
 #ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
       print '(g0)', 'ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS is ON'
 #else
