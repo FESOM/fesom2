@@ -7,14 +7,14 @@ contains
   
 
   ! thread-safe procedure
-  subroutine scatter_nod2D(arr2D_global, arr2D_local, root_rank, comm)
-    use g_PARSUP
-    use o_mesh
+  subroutine scatter_nod2D(arr2D_global, arr2D_local, root_rank, comm, partit)
+    use MOD_PARTIT
     use, intrinsic :: iso_fortran_env, only: real64
     real(real64), intent(in) :: arr2D_global(:)
     real(real64), intent(out)  :: arr2D_local(:)
     integer, intent(in) :: root_rank ! rank of sending process
     integer, intent(in) :: comm
+    type(t_partit), intent(in) :: partit
     ! EO args
     integer :: tag = 0
     integer :: mpi_precision = MPI_DOUBLE_PRECISION
@@ -23,12 +23,13 @@ contains
     integer, allocatable :: remote_list_nod2d(:)
     real(real64), allocatable :: sendbuf(:)
     integer node_size
+    integer mpierr
 
-    call assert(size(arr2D_local) == size(mylist_nod2d), __LINE__) ! == mydim_nod2d+edim_nod2d, i.e. partition nodes + halo nodes
+    call assert(size(arr2D_local) == size(partit%mylist_nod2d), __LINE__) ! == mydim_nod2d+edim_nod2d, i.e. partition nodes + halo nodes
 
-    if(mype == root_rank) then
-      arr2D_local = arr2D_global(mylist_nod2d)
-      do remote_rank = 0, npes-1
+    if(partit%mype == root_rank) then
+      arr2D_local = arr2D_global(partit%mylist_nod2d)
+      do remote_rank = 0, partit%npes-1
         if(remote_rank == root_rank) cycle
         
         ! receive remote partition 2D size
@@ -47,9 +48,9 @@ contains
       end do
     
     else  
-      node_size = size(mylist_nod2d)
+      node_size = size(partit%mylist_nod2d)
       call mpi_send(node_size, 1, mpi_integer, root_rank, tag+0, comm, mpierr)
-      call mpi_send(mylist_nod2d(1), node_size, mpi_integer, root_rank, tag+1, comm, mpierr)
+      call mpi_send(partit%mylist_nod2d(1), node_size, mpi_integer, root_rank, tag+1, comm, mpierr)
       
       call mpi_recv(arr2D_local(1), node_size, mpi_precision, root_rank, tag+2, comm, status, mpierr) ! aleph blocks here
     end if
@@ -61,14 +62,14 @@ contains
 
 
   ! thread-safe procedure
-  subroutine scatter_elem2D(arr2D_global, arr2D_local, root_rank, comm)
-    use g_PARSUP
-    use o_mesh
+  subroutine scatter_elem2D(arr2D_global, arr2D_local, root_rank, comm, partit)
+    use MOD_PARTIT
     use, intrinsic :: iso_fortran_env, only: real64
     real(real64), intent(in) :: arr2D_global(:)
     real(real64), intent(out)  :: arr2D_local(:)
     integer, intent(in) :: root_rank ! rank of sending process
     integer, intent(in) :: comm
+    type(t_partit), intent(in) :: partit
     ! EO args
     integer :: tag = 0
     integer :: mpi_precision = MPI_DOUBLE_PRECISION
@@ -77,13 +78,14 @@ contains
     integer, allocatable :: remote_list_elem2d(:)
     real(real64), allocatable :: sendbuf(:)
     integer elem_size
+    integer mpierr
 
     elem_size = size(arr2D_local)
-    call assert(elem_size == mydim_elem2d+edim_elem2d, __LINE__) ! mylist_elem2d is larger and can not be used for comparison here
+    call assert(elem_size == partit%mydim_elem2d+partit%edim_elem2d, __LINE__) ! mylist_elem2d is larger and can not be used for comparison here
 
-    if(mype == root_rank) then
-      arr2D_local = arr2D_global(myList_elem2D(1:elem_size))
-      do remote_rank = 0, npes-1
+    if(partit%mype == root_rank) then
+      arr2D_local = arr2D_global(partit%myList_elem2D(1:elem_size))
+      do remote_rank = 0, partit%npes-1
         if(remote_rank == root_rank) cycle
 
         ! receive remote partition 2D size
@@ -103,7 +105,7 @@ contains
     
     else  
       call mpi_send(elem_size, 1, mpi_integer, root_rank, tag+0, comm, mpierr)
-      call mpi_send(mylist_elem2d(1), elem_size, mpi_integer, root_rank, tag+1, comm, mpierr)
+      call mpi_send(partit%mylist_elem2d(1), elem_size, mpi_integer, root_rank, tag+1, comm, mpierr)
       
       call mpi_recv(arr2D_local(1), elem_size, mpi_precision, root_rank, tag+2, comm, status, mpierr)
     end if

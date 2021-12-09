@@ -1,6 +1,7 @@
 ! helper module to treat split restart files similar as the previous single-file ones
 module restart_file_group_module
   use io_fesom_file_module
+  use MOD_PARTIT
   implicit none
   public restart_file_group
   private
@@ -33,67 +34,72 @@ module restart_file_group_module
 contains
 
 
-  subroutine def_node_var_2d(this, name, longname, units, local_data, mesh)
+  subroutine def_node_var_2d(this, name, longname, units, local_data, mesh, partit)
     use mod_mesh
     class(restart_file_group), target, intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
     real(kind=8), target, intent(inout) :: local_data(:) ! todo: be able to set precision
     type(t_mesh), intent(in) :: mesh
+    type(t_partit), intent(in) :: partit
     ! EO parameters
 
-    call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl)
+    call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
     call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
   end subroutine
 
 
-  subroutine def_node_var_3d(this, name, longname, units, local_data, mesh)
+  subroutine def_node_var_3d(this, name, longname, units, local_data, mesh, partit)
     use mod_mesh
     class(restart_file_group), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
     real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
     type(t_mesh), intent(in) :: mesh
+    type(t_partit), intent(in) :: partit
     ! EO parameters
 
-    call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl)
+    call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
     call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
   end subroutine
 
 
-  subroutine def_elem_var_2d(this, name, longname, units, local_data, mesh)
+  subroutine def_elem_var_2d(this, name, longname, units, local_data, mesh, partit)
     use mod_mesh
     class(restart_file_group), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
     real(kind=8), target, intent(inout) :: local_data(:) ! todo: be able to set precision
     type(t_mesh), intent(in) :: mesh
+    type(t_partit), intent(in) :: partit
     ! EO parameters
 
-    call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl)
+    call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
     call this%files(this%nfiles)%specify_elem_var(name, longname, units, local_data)
   end subroutine
 
 
-  subroutine def_elem_var_3d(this, name, longname, units, local_data, mesh)
+  subroutine def_elem_var_3d(this, name, longname, units, local_data, mesh, partit)
     use mod_mesh
     class(restart_file_group), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
     real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
     type(t_mesh), intent(in) :: mesh
+    type(t_partit), intent(in) :: partit
     ! EO parameters
 
-    call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl)
+    call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
     call this%files(this%nfiles)%specify_elem_var(name, longname, units, local_data)
   end subroutine
 
 
-  subroutine add_file(g, name, must_exist_on_read, mesh_nod2d, mesh_elem2d, mesh_nl)
+  subroutine add_file(g, name, must_exist_on_read, mesh_nod2d, mesh_elem2d, mesh_nl, partit)
     class(restart_file_group), target, intent(inout) :: g
     character(len=*), intent(in) :: name
     logical must_exist_on_read
     integer mesh_nod2d, mesh_elem2d, mesh_nl
+    type(t_partit), intent(in) :: partit
     ! EO parameters
     type(restart_file_type), pointer :: f
 
@@ -104,64 +110,68 @@ contains
     f%path = ""
     f%varname = name
     f%must_exist_on_read = must_exist_on_read
-    call f%fesom_file_type%init(mesh_nod2d, mesh_elem2d, mesh_nl)
+    call f%fesom_file_type%init(mesh_nod2d, mesh_elem2d, mesh_nl, partit)
     ! this is specific for a restart file
     f%iter_varindex = f%add_var_int('iter', [f%time_dimindex()])    
   end subroutine
 
 
-  subroutine def_node_var_2d_optional(this, name, longname, units, local_data, mesh)
+  subroutine def_node_var_2d_optional(this, name, longname, units, local_data, mesh, partit)
     use mod_mesh
     class(restart_file_group), target, intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
     real(kind=8), target, intent(inout) :: local_data(:) ! todo: be able to set precision
     type(t_mesh), intent(in) :: mesh
+    type(t_partit), intent(in) :: partit
     ! EO parameters
 
-    call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl)
+    call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
     call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
   end subroutine
 
 
-  subroutine def_node_var_3d_optional(this, name, longname, units, local_data, mesh)
+  subroutine def_node_var_3d_optional(this, name, longname, units, local_data, mesh, partit)
     use mod_mesh
     class(restart_file_group), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
     real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
     type(t_mesh), intent(in) :: mesh
+    type(t_partit), intent(in) :: partit
     ! EO parameters
 
-    call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl)
+    call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
     call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
   end subroutine
 
 
-  subroutine def_elem_var_2d_optional(this, name, longname, units, local_data, mesh)
+  subroutine def_elem_var_2d_optional(this, name, longname, units, local_data, mesh, partit)
     use mod_mesh
     class(restart_file_group), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
     real(kind=8), target, intent(inout) :: local_data(:) ! todo: be able to set precision
     type(t_mesh), intent(in) :: mesh
+    type(t_partit), intent(in) :: partit
     ! EO parameters
 
-    call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl)
+    call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
     call this%files(this%nfiles)%specify_elem_var(name, longname, units, local_data)
   end subroutine
 
 
-  subroutine def_elem_var_3d_optional(this, name, longname, units, local_data, mesh)
+  subroutine def_elem_var_3d_optional(this, name, longname, units, local_data, mesh, partit)
     use mod_mesh
     class(restart_file_group), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
     real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
     type(t_mesh), intent(in) :: mesh
+    type(t_partit), intent(in) :: partit
     ! EO parameters
 
-    call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl)
+    call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
     call this%files(this%nfiles)%specify_elem_var(name, longname, units, local_data)
   end subroutine
 

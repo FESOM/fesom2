@@ -2,6 +2,7 @@
 module io_fesom_file_module
   use io_netcdf_file_module
   use async_threads_module
+  use MOD_PARTIT
   implicit none
   public fesom_file_type
   private
@@ -36,6 +37,8 @@ module io_fesom_file_module
     type(thread_type) thread
     logical :: thread_running = .false.
     integer :: comm
+    integer rank
+    type(t_partit), pointer :: partit
     logical gather_and_write
   contains
     procedure, public :: async_read_and_scatter_variables, async_gather_and_write_variables, join, init, is_iorank, rec_count, time_varindex, time_dimindex
@@ -64,10 +67,9 @@ contains
 
 
   function is_iorank(this) result(x)
-    use g_PARSUP
     class(fesom_file_type), intent(in) :: this
     logical x
-    x = (mype == this%iorank)
+    x = (this%rank == this%iorank)
   end function
 
 
@@ -102,14 +104,15 @@ contains
   end function
   
   
-  subroutine init(this, mesh_nod2d, mesh_elem2d, mesh_nl) ! todo: would like to call it initialize but Fortran is rather cluncky with overwriting base type procedures
-    use g_PARSUP
+  subroutine init(this, mesh_nod2d, mesh_elem2d, mesh_nl, partit) ! todo: would like to call it initialize but Fortran is rather cluncky with overwriting base type procedures
     use io_netcdf_workaround_module
     use io_gather_module
+    use MOD_PARTIT
     class(fesom_file_type), target, intent(inout) :: this
     integer mesh_nod2d
     integer mesh_elem2d
     integer mesh_nl
+    type(t_partit), target, intent(in) :: partit
     ! EO parameters
     type(fesom_file_type_ptr), allocatable :: tmparr(:)
     logical async_netcdf_allowed
@@ -141,11 +144,12 @@ contains
     all_fesom_files(size(all_fesom_files))%ptr => this
     this%fesom_file_index = size(all_fesom_files)
 
+    this%partit => partit
     ! set up async output
     
-    this%iorank = next_io_rank(MPI_COMM_FESOM, async_netcdf_allowed)
+    this%iorank = next_io_rank(partit%MPI_COMM_FESOM, async_netcdf_allowed, partit)
 
-    call MPI_Comm_dup(MPI_COMM_FESOM, this%comm, err)
+    call MPI_Comm_dup(partit%MPI_COMM_FESOM, this%comm, err)
 
     call this%thread%initialize(async_worker, this%fesom_file_index)
     if(.not. async_netcdf_allowed) call this%thread%disable_async()
@@ -204,9 +208,9 @@ contains
         end if
 
         if(var%is_elem_based) then
-          call scatter_elem2D(var%global_level_data, laux, this%iorank, this%comm)
+          call scatter_elem2D(var%global_level_data, laux, this%iorank, this%comm, this%partit)
         else
-          call scatter_nod2D(var%global_level_data, laux, this%iorank, this%comm)
+          call scatter_nod2D(var%global_level_data, laux, this%iorank, this%comm, this%partit)
         end if
         ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
        var%external_local_data_ptr(lvl,:) = laux ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
@@ -251,9 +255,9 @@ contains
         laux = var%local_data_copy(lvl,:) ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
 
         if(var%is_elem_based) then
-          call gather_elem2D(laux, var%global_level_data, this%iorank, 42, this%comm)
+          call gather_elem2D(laux, var%global_level_data, this%iorank, 42, this%comm, this%partit)
         else
-          call gather_nod2D (laux, var%global_level_data, this%iorank, 42, this%comm)
+          call gather_nod2D (laux, var%global_level_data, this%iorank, 42, this%comm, this%partit)
         end if
 
         if(this%is_iorank()) then

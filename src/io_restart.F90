@@ -2,8 +2,9 @@ MODULE io_RESTART
   use restart_file_group_module
   use g_clock
   use o_arrays
-  use i_arrays
   use g_cvmix_tke
+  use MOD_TRACER
+  use MOD_ICE
   implicit none
   public :: restart, finalize_restart
   private
@@ -27,13 +28,16 @@ MODULE io_RESTART
 !--------------------------------------------------------------------------------------------
 ! ini_ocean_io initializes ocean_file datatype which contains information of all variables need to be written into 
 ! the ocean restart file. This is the only place need to be modified if a new variable is added!
-subroutine ini_ocean_io(year, mesh)
+subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
   integer, intent(in)       :: year
   integer                   :: j
   character(500)            :: longname
   character(500)            :: trname, units
   character(4)              :: cyear
-  type(t_mesh), intent(in) , target :: mesh
+  type(t_mesh), target :: mesh
+  type(t_partit), intent(inout), target :: partit
+  type(t_tracer), target :: tracers
+  type(t_dyn), target :: dynamics
   logical, save :: has_been_called = .false.
 
   write(cyear,'(i4)') year
@@ -47,32 +51,32 @@ subroutine ini_ocean_io(year, mesh)
   !===========================================================================
   !___Define the netCDF variables for 2D fields_______________________________
   !___SSH_____________________________________________________________________
-  call oce_files%def_node_var('ssh', 'sea surface elevation', 'm',   eta_n, mesh)
+  call oce_files%def_node_var('ssh', 'sea surface elevation', 'm',   dynamics%eta_n, mesh, partit)
   !___ALE related fields______________________________________________________
-  call oce_files%def_node_var('hbar', 'ALE surface elevation', 'm',   hbar, mesh)
-!!PS   call oce_files%def_node_var('ssh_rhs', 'RHS for the elevation', '?',   ssh_rhs, mesh)
-  call oce_files%def_node_var('ssh_rhs_old', 'RHS for the elevation', '?',   ssh_rhs_old, mesh)
-  call oce_files%def_node_var('hnode', 'nodal layer thickness', 'm',   hnode, mesh)
+  call oce_files%def_node_var('hbar', 'ALE surface elevation', 'm',   mesh%hbar, mesh, partit)
+!!PS   call oce_files%def_node_var('ssh_rhs', 'RHS for the elevation', '?',   ssh_rhs, mesh, partit)
+  call oce_files%def_node_var('ssh_rhs_old', 'RHS for the elevation', '?',   dynamics%ssh_rhs_old, mesh, partit)
+  call oce_files%def_node_var('hnode', 'nodal layer thickness', 'm',   mesh%hnode, mesh, partit)
   
   !___Define the netCDF variables for 3D fields_______________________________
-  call oce_files%def_elem_var('u', 'zonal velocity',        'm/s', UV(1,:,:), mesh)
-  call oce_files%def_elem_var('v', 'meridional velocity',   'm/s', UV(2,:,:), mesh)
-  call oce_files%def_elem_var('urhs_AB', 'Adams–Bashforth for u', 'm/s', UV_rhsAB(1,:,:), mesh)
-  call oce_files%def_elem_var('vrhs_AB', 'Adams–Bashforth for v', 'm/s', UV_rhsAB(2,:,:), mesh)
+  call oce_files%def_elem_var('u', 'zonal velocity',        'm/s', dynamics%uv(1,:,:), mesh, partit)
+  call oce_files%def_elem_var('v', 'meridional velocity',   'm/s', dynamics%uv(2,:,:), mesh, partit)
+  call oce_files%def_elem_var('urhs_AB', 'Adams–Bashforth for u', 'm/s', dynamics%uv_rhsAB(1,:,:), mesh, partit)
+  call oce_files%def_elem_var('vrhs_AB', 'Adams–Bashforth for v', 'm/s', dynamics%uv_rhsAB(2,:,:), mesh, partit)
   
   !___Save restart variables for TKE and IDEMIX_________________________________
   if (trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
-        call oce_files%def_node_var('tke', 'Turbulent Kinetic Energy', 'm2/s2', tke(:,:), mesh)
+        call oce_files%def_node_var('tke', 'Turbulent Kinetic Energy', 'm2/s2', tke(:,:), mesh, partit)
   endif
   if (trim(mix_scheme)=='cvmix_IDEMIX' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
-        call oce_files%def_node_var('iwe', 'Internal Wave eneryy', 'm2/s2', tke(:,:), mesh)
+        call oce_files%def_node_var('iwe', 'Internal Wave eneryy', 'm2/s2', tke(:,:), mesh, partit)
   endif 
-  if (visc_option==8) then
-        call oce_files%def_elem_var('uke', 'unresolved kinetic energy', 'm2/s2', uke(:,:), mesh)
-        call oce_files%def_elem_var('uke_rhs', 'unresolved kinetic energy rhs', 'm2/s2', uke_rhs(:,:), mesh)
+  if (dynamics%opt_visc==8) then
+        call oce_files%def_elem_var('uke', 'unresolved kinetic energy', 'm2/s2', uke(:,:), mesh, partit)
+        call oce_files%def_elem_var('uke_rhs', 'unresolved kinetic energy rhs', 'm2/s2', uke_rhs(:,:), mesh, partit)
   endif
   
-  do j=1,num_tracers
+  do j=1,tracers%num_tracers
      SELECT CASE (j) 
        CASE(1)
          trname='temp'
@@ -87,22 +91,24 @@ subroutine ini_ocean_io(year, mesh)
          write(longname,'(A15,i1)') 'passive tracer ', j
          units='none'
      END SELECT
-     call oce_files%def_node_var(trim(trname), trim(longname), trim(units), tr_arr(:,:,j), mesh)
+     call oce_files%def_node_var(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
      longname=trim(longname)//', Adams–Bashforth'
-     call oce_files%def_node_var(trim(trname)//'_AB', trim(longname), trim(units), tr_arr_old(:,:,j), mesh)
+     call oce_files%def_node_var(trim(trname)//'_AB', trim(longname), trim(units), tracers%data(j)%valuesAB(:,:), mesh, partit)
   end do
-  call oce_files%def_node_var('w', 'vertical velocity', 'm/s', Wvel, mesh)
-  call oce_files%def_node_var('w_expl', 'vertical velocity', 'm/s', Wvel_e, mesh)
-  call oce_files%def_node_var('w_impl', 'vertical velocity', 'm/s', Wvel_i, mesh)
+  call oce_files%def_node_var('w', 'vertical velocity', 'm/s', dynamics%w, mesh, partit)
+  call oce_files%def_node_var('w_expl', 'vertical velocity', 'm/s', dynamics%w_e, mesh, partit)
+  call oce_files%def_node_var('w_impl', 'vertical velocity', 'm/s', dynamics%w_i, mesh, partit)
 end subroutine ini_ocean_io
 !
 !--------------------------------------------------------------------------------------------
 ! ini_ice_io initializes ice_file datatype which contains information of all variables need to be written into 
 ! the ice restart file. This is the only place need to be modified if a new variable is added!
-subroutine ini_ice_io(year, mesh)
+subroutine ini_ice_io(year, ice, partit, mesh)
   integer,      intent(in)  :: year
   character(4)              :: cyear
   type(t_mesh), intent(in) , target :: mesh
+  type(t_partit), intent(inout), target :: partit
+  type(t_ice), target :: ice
   logical, save :: has_been_called = .false.
 
   write(cyear,'(i4)') year
@@ -115,21 +121,21 @@ subroutine ini_ice_io(year, mesh)
   !===================== Definition part =====================================
   !===========================================================================
   !___Define the netCDF variables for 2D fields_______________________________
-  call ice_files%def_node_var('area', 'ice concentration [0 to 1]', '%',   a_ice, mesh)
-  call ice_files%def_node_var('hice', 'effective ice thickness',    'm',   m_ice, mesh)
-  call ice_files%def_node_var('hsnow', 'effective snow thickness',   'm',   m_snow, mesh)
-  call ice_files%def_node_var('uice', 'zonal velocity',             'm/s', u_ice, mesh)
-  call ice_files%def_node_var('vice', 'meridional velocity',        'm',   v_ice, mesh)
+  call ice_files%def_node_var('area', 'ice concentration [0 to 1]', '%',   ice%data(1)%values(:), mesh, partit)
+  call ice_files%def_node_var('hice', 'effective ice thickness',    'm',   ice%data(2)%values(:), mesh, partit)
+  call ice_files%def_node_var('hsnow', 'effective snow thickness',  'm',   ice%data(3)%values(:), mesh, partit)
+  call ice_files%def_node_var('uice', 'zonal velocity',             'm/s', ice%uice, mesh, partit)
+  call ice_files%def_node_var('vice', 'meridional velocity',        'm',   ice%vice, mesh, partit)
 #if defined (__oifs)
-  call ice_files%def_node_var_optional('ice_albedo', 'ice albedo',                 '-',   ice_alb, mesh)
-  call ice_files%def_node_var_optional('ice_temp', 'ice surface temperature',  'K',   ice_temp, mesh)
+  call ice_files%def_node_var_optional('ice_albedo', 'ice albedo',    '-',   ice%atmcoupl%ice_alb, mesh, partit)
+  call ice_files%def_node_var_optional('ice_temp', 'ice surface temperature',  'K',   ice%data(4)%values, mesh, partit)
 #endif /* (__oifs) */
 
 end subroutine ini_ice_io
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine restart(istep, l_read, mesh)
+subroutine restart(istep, l_read, ice, dynamics, tracers, partit, mesh)
 
 #if defined(__icepack)
   icepack restart not merged here ! produce a compiler error if USE_ICEPACK=ON; todo: merge icepack restart from 68d8b8b
@@ -144,48 +150,53 @@ subroutine restart(istep, l_read, mesh)
   logical :: l_read
   logical :: is_portable_restart_write, is_raw_restart_write
   type(t_mesh), intent(in) , target :: mesh
+  type(t_partit), intent(inout), target :: partit
+  type(t_tracer), intent(in)   , target :: tracers
+  type(t_dyn)   , intent(in)   , target :: dynamics
+  type(t_ice)   , intent(in)   , target :: ice
   logical dumpfiles_exist
   logical, save :: initialized = .false.
   integer cstat, estat
   character(500) cmsg ! there seems to be no documentation about the max size of this text
+  integer mpierr
   
   if(.not. initialized) then
     initialized = .true.
-    raw_restart_dirpath = trim(ResultPath)//"/fesom_raw_restart/np"//int_to_txt(npes)
-    raw_restart_infopath = trim(ResultPath)//"/fesom_raw_restart/np"//int_to_txt(npes)//".info"
+    raw_restart_dirpath = trim(ResultPath)//"/fesom_raw_restart/np"//int_to_txt(partit%npes)
+    raw_restart_infopath = trim(ResultPath)//"/fesom_raw_restart/np"//int_to_txt(partit%npes)//".info"
     if(raw_restart_length_unit /= "off") then
-      if(mype == RAW_RESTART_METADATA_RANK) then
+      if(partit%mype == RAW_RESTART_METADATA_RANK) then
         ! inquire does not work for directories, the directory might already exist
         call execute_command_line("mkdir -p "//raw_restart_dirpath, exitstat=estat, cmdstat=cstat, cmdmsg=cmsg) ! sometimes does not work on aleph
         if(cstat /= 0) print *,"creating raw restart directory ERROR ", trim(cmsg)
       end if
-      call MPI_Barrier(MPI_COMM_FESOM, mpierr) ! make sure the dir has been created before we continue...
+      call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr) ! make sure the dir has been created before we continue...
     end if
   end if
 
   ctime=timeold+(dayold-1.)*86400
   if (.not. l_read) then
-               call ini_ocean_io(yearnew, mesh)
-  if (use_ice) call ini_ice_io  (yearnew, mesh)
+               call ini_ocean_io(yearnew, dynamics, tracers, partit, mesh)
+  if (use_ice) call ini_ice_io  (yearnew, ice, partit, mesh)
   else
-               call ini_ocean_io(yearold, mesh)
-  if (use_ice) call ini_ice_io  (yearold, mesh)
+               call ini_ocean_io(yearold, dynamics, tracers, partit, mesh)
+  if (use_ice) call ini_ice_io  (yearold, ice, partit, mesh)
   end if
 
   if (l_read) then
     ! determine if we can load raw restart dump files
-    if(mype == RAW_RESTART_METADATA_RANK) then
+    if(partit%mype == RAW_RESTART_METADATA_RANK) then
       inquire(file=raw_restart_infopath, exist=dumpfiles_exist)
     end if
-    call MPI_Bcast(dumpfiles_exist, 1, MPI_LOGICAL, RAW_RESTART_METADATA_RANK, MPI_COMM_FESOM, MPIerr)
+    call MPI_Bcast(dumpfiles_exist, 1, MPI_LOGICAL, RAW_RESTART_METADATA_RANK, partit%MPI_COMM_FESOM, mpierr)
     if(dumpfiles_exist) then
-      call read_all_raw_restarts()
+      call read_all_raw_restarts(partit%MPI_COMM_FESOM, partit%mype)
     else
-      call read_restart(oce_path, oce_files)
-      if (use_ice) call read_restart(ice_path, ice_files)
+      call read_restart(oce_path, oce_files, partit%MPI_COMM_FESOM, partit%mype)
+      if (use_ice) call read_restart(ice_path, ice_files, partit%MPI_COMM_FESOM, partit%mype)
       ! immediately create a raw restart
       if(raw_restart_length_unit /= "off") then
-        call write_all_raw_restarts(istep)
+        call write_all_raw_restarts(istep, partit%MPI_COMM_FESOM, partit%mype)
       end if
     end if
   end if
@@ -202,17 +213,17 @@ subroutine restart(istep, l_read, mesh)
 
   if(is_portable_restart_write) then
     ! write restart
-    if(mype==0) write(*,*)'Do output (netCDF, restart) ...'
+    if(partit%mype==0) write(*,*)'Do output (netCDF, restart) ...'
     call write_restart(oce_path, oce_files, istep)
     if(use_ice) call write_restart(ice_path, ice_files, istep)
   end if
 
   if(is_raw_restart_write) then
-    call write_all_raw_restarts(istep)
+    call write_all_raw_restarts(istep, partit%MPI_COMM_FESOM, partit%mype)
   end if
 
   ! actualize clock file to latest restart point
-  if (mype==0) then
+  if (partit%mype==0) then
     if(is_portable_restart_write .or. is_raw_restart_write) then
 		  write(*,*) ' --> actualize clock file to latest restart point'
 		  call clock_finish
@@ -273,13 +284,15 @@ subroutine write_restart(path, filegroup, istep)
 end subroutine
 
 
-subroutine write_all_raw_restarts(istep)
-  integer,  intent(in):: istep
+subroutine write_all_raw_restarts(istep, mpicomm, mype)
+  integer,  intent(in) :: istep
+  integer, intent(in) :: mpicomm
+  integer, intent(in) :: mype
   ! EO parameters
   integer cstep
   integer fileunit
 
-  open(newunit = fileunit, file = raw_restart_dirpath//'/'//mpirank_to_txt()//'.dump', form = 'unformatted')
+  open(newunit = fileunit, file = raw_restart_dirpath//'/'//mpirank_to_txt(mpicomm)//'.dump', form = 'unformatted')
   call write_raw_restart_group(oce_files, fileunit)
   if(use_ice) call write_raw_restart_group(ice_files, fileunit)
   close(fileunit)
@@ -311,11 +324,16 @@ subroutine write_raw_restart_group(filegroup, fileunit)
 end subroutine
 
 
-subroutine read_all_raw_restarts()
+subroutine read_all_raw_restarts(mpicomm, mype)
+  integer, intent(in) :: mpicomm
+  integer, intent(in) :: mype
+  ! EO parameters
   integer rstep
   real(kind=WP) rtime
   integer fileunit
   integer status
+  integer mpierr
+  include 'mpif.h'
 
   if(mype == RAW_RESTART_METADATA_RANK) then
     ! read metadata info for the raw restart
@@ -338,15 +356,15 @@ subroutine read_all_raw_restarts()
     print *,"reading raw restart from "//raw_restart_dirpath
   end if
   ! sync globalstep with the other processes to let all processes writing portable restart files know the globalstep
-  call MPI_Bcast(globalstep, 1, MPI_INTEGER, RAW_RESTART_METADATA_RANK, MPI_COMM_FESOM, MPIerr)
+  call MPI_Bcast(globalstep, 1, MPI_INTEGER, RAW_RESTART_METADATA_RANK, mpicomm, mpierr)
 
-  open(newunit = fileunit, status = 'old', iostat = status, file = raw_restart_dirpath//'/'//mpirank_to_txt()//'.dump', form = 'unformatted')
+  open(newunit = fileunit, status = 'old', iostat = status, file = raw_restart_dirpath//'/'//mpirank_to_txt(mpicomm)//'.dump', form = 'unformatted')
   if(status == 0) then
     call read_raw_restart_group(oce_files, fileunit)
     if(use_ice) call read_raw_restart_group(ice_files, fileunit)
     close(fileunit)
   else
-    print *,"can not open ",raw_restart_dirpath//'/'//mpirank_to_txt()//'.dump'
+    print *,"can not open ",raw_restart_dirpath//'/'//mpirank_to_txt(mpicomm)//'.dump'
     stop 1
   end if
 end subroutine
@@ -389,10 +407,11 @@ subroutine finalize_restart()
 end subroutine
 
 
-subroutine read_restart(path, filegroup)
-  use g_PARSUP
+subroutine read_restart(path, filegroup, mpicomm, mype)
   character(len=*), intent(in) :: path
   type(restart_file_group), intent(inout) :: filegroup
+  integer, intent(in) :: mpicomm
+  integer, intent(in) :: mype
   ! EO parameters
   real(kind=WP) rtime
   integer i
@@ -402,6 +421,8 @@ subroutine read_restart(path, filegroup)
   logical, allocatable :: skip_file(:)
   integer current_iorank_snd, current_iorank_rcv
   integer max_globalstep
+  integer mpierr
+  include 'mpif.h'
   
   allocate(skip_file(filegroup%nfiles))
   skip_file = .false.
@@ -442,8 +463,8 @@ subroutine read_restart(path, filegroup)
 
     ! iorank already knows if we skip the file, tell the others
     if(.not. filegroup%files(i)%must_exist_on_read) then
-      call MPI_Allreduce(current_iorank_snd, current_iorank_rcv, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-      call MPI_Bcast(skip_file(i), 1, MPI_LOGICAL, current_iorank_rcv, MPI_COMM_FESOM, MPIerr)
+      call MPI_Allreduce(current_iorank_snd, current_iorank_rcv, 1, MPI_INTEGER, MPI_SUM, mpicomm, mpierr)
+      call MPI_Bcast(skip_file(i), 1, MPI_LOGICAL, current_iorank_rcv, mpicomm, mpierr)
     end if      
 
     if(.not. skip_file(i)) call filegroup%files(i)%async_read_and_scatter_variables()
@@ -476,7 +497,7 @@ subroutine read_restart(path, filegroup)
 
   ! sync globalstep with processes which may have skipped a restart upon reading and thus need to know the globalstep when writing their restart 
   if( any(skip_file .eqv. .true.) ) then
-    call MPI_Allreduce(globalstep, max_globalstep, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+    call MPI_Allreduce(globalstep, max_globalstep, 1, MPI_INTEGER, MPI_MAX, mpicomm, mpierr)
     globalstep = max_globalstep
   end if
 
@@ -484,9 +505,9 @@ subroutine read_restart(path, filegroup)
   if(filegroup%nfiles >= 1) then
     ! use the first restart I/O process to send the globalstep
     if( filegroup%files(1)%is_iorank() .and. (mype .ne. RAW_RESTART_METADATA_RANK)) then
-      call MPI_Send(globalstep, 1, MPI_INTEGER, RAW_RESTART_METADATA_RANK, 42, MPI_COMM_FESOM, MPIerr)
+      call MPI_Send(globalstep, 1, MPI_INTEGER, RAW_RESTART_METADATA_RANK, 42, mpicomm, mpierr)
     else if((mype == RAW_RESTART_METADATA_RANK) .and. (.not. filegroup%files(1)%is_iorank())) then
-      call MPI_Recv(globalstep, 1, MPI_INTEGER, MPI_ANY_SOURCE, 42, MPI_COMM_FESOM, mpistatus, MPIerr)
+      call MPI_Recv(globalstep, 1, MPI_INTEGER, MPI_ANY_SOURCE, 42, mpicomm, mpistatus, mpierr)
     end if
   end if
 end subroutine
@@ -521,11 +542,18 @@ end subroutine
   end function
 
 
-  function mpirank_to_txt() result(txt)
-    use g_PARSUP
+  function mpirank_to_txt(mpicomm) result(txt)
     use fortran_utils
+    integer, intent(in) :: mpicomm
     character(:), allocatable :: txt
     ! EO parameters
+    integer mype
+    integer npes
+    integer mpierr
+    include 'mpif.h'
+  
+    call MPI_Comm_Rank(mpicomm, mype, mpierr)
+    call MPI_Comm_Size(mpicomm, npes, mpierr)
     txt = int_to_txt_pad(mype,int(log10(real(npes)))+1) ! pad to the width of the number of processes
   end function
 
