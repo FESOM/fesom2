@@ -74,7 +74,8 @@ subroutine cut_off(ice, partit, mesh)
     implicit none
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
-    type(t_ice), intent(inout), target :: ice
+    type(t_ice),    intent(inout), target :: ice
+    integer                               :: n
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
@@ -94,38 +95,39 @@ subroutine cut_off(ice, partit, mesh)
 
     !___________________________________________________________________________
     ! lower cutoff: a_ice
-    where(a_ice>1.0_WP)  a_ice=1.0_WP
-
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+DO n=1, myDim_nod2D+eDim_nod2D
+   if (a_ice(n) > 1.0_WP)   a_ice(n)=1.0_WP
     ! upper cutoff: a_ice
-    where(a_ice<0.1e-8_WP)
-        a_ice=0.0_WP
+   if (a_ice(n) < .1e-8_WP) then
+       a_ice(n)=0.0_WP
 #if defined (__oifs) || defined (__ifsinterface)
-        m_ice=0.0_WP
-        m_snow=0.0_WP
-        ice_temp=273.15_WP
+        m_ice(n)   =0.0_WP
+        m_snow(n)  =0.0_WP
+        ice_temp(n)=273.15_WP
 #endif /* (__oifs) */
-    end where
-
+   end if
     !___________________________________________________________________________
     ! lower cutoff: m_ice
-    where(m_ice<0.1e-8_WP)
-        m_ice=0.0_WP 
+   if (m_ice(n) < .1e-8_WP) then
+        m_ice(n)=0.0_WP 
 #if defined (__oifs) || defined (__ifsinterface)
-        m_snow=0.0_WP
-        a_ice=0.0_WP
-        ice_temp=273.15_WP
+        m_snow(n)  =0.0_WP
+        a_ice(n)   =0.0_WP
+        ice_temp(n)=273.15_WP
 #endif /* (__oifs) */
-    end where
+   end if
      
     !___________________________________________________________________________
 #if defined (__oifs) || defined (__ifsinterface)
-    where(ice_temp>273.15_WP) ice_temp=273.15_WP
+    if (ice_temp(n) > 273.15_WP) ice_temp(n)=273.15_WP
 #endif /* (__oifs) */
 
 #if defined (__oifs) || defined (__ifsinterface)
-    where(ice_temp < 173.15_WP .and. a_ice >= 0.1e-8_WP) ice_temp=271.35_WP
+    if (ice_temp(n) < 173.15_WP .and. a_ice(n) >= 0.1e-8_WP) ice_temp(n)=271.35_WP
 #endif /* (__oifs) */
-
+END DO
+!$OMP END PARALLEL DO
 end subroutine cut_off
 
 #if !defined (__oasis) && !defined (__ifsinterface)
@@ -213,16 +215,24 @@ subroutine thermodynamics(ice, partit, mesh)
     ! u_wind and v_wind are always at nodes
     !___________________________________________________________________________
     ! Friction velocity 
-    ustar_aux=0.0_WP
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, elem, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rsss, rsf, evap_in, ug, ustar, T_oc, S_oc, &
+!$OMP                                  h_ml, t, ch, ce, ch_i, ce_i, fw, ehf, evap, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,    &
+!$OMP                                  subli, lid_clo, lat)
+!$OMP DO
     do i=1, myDim_nod2D
         ustar=0.0_WP
         if(ulevels_nod2d(i)>1) cycle 
         ustar=((u_ice(i)-u_w(i))**2 + (v_ice(i)-v_w(i))**2)
         ustar_aux(i)=sqrt(ustar*ice%cd_oce_ice)
     end do
+!$OMP END DO
+!$OMP MASTER
     call exchange_nod(ustar_aux, partit)
-    
+!$OMP END MASTER
+!$OMP BARRIER
+
     !___________________________________________________________________________
+!$OMP DO
     do i=1, myDim_nod2d+eDim_nod2D
         !_______________________________________________________________________
         ! if there is a cavity no sea ice thermodynamics is apllied
@@ -246,7 +256,6 @@ subroutine thermodynamics(ice, partit, mesh)
             snow=prec_rain(i)
             endif
             evap_in=evaporation(i) !evap_in: positive up
-    !!PS         evap_in=0.0_WP
         else
             rain = prec_rain(i)
             snow = prec_snow(i)
@@ -263,14 +272,11 @@ subroutine thermodynamics(ice, partit, mesh)
         ce	     = Ce_atm_oce_arr(i)
         ch_i    = Ch_atm_ice
         ce_i    = Ce_atm_ice
-        !!PS     h_ml    = 10.0_WP               ! 10.0 or 30. used previously
-        !!PS     h_ml    = 5.0_WP                ! 10.0 or 30. used previously
         h_ml    = 2.5_WP                ! 10.0 or 30. used previously
-        !!PS     h_ml    = 1.25_WP               ! 10.0 or 30. used previously
         fw      = 0.0_WP
         ehf     = 0.0_WP
         lid_Clo=ice%thermo%h0
-        if (geo_coord_nod2D(2,i)>0) then !TODO 2 separate pars for each hemisphere
+        if (geo_coord_nod2D(2, i)>0) then !TODO 2 separate pars for each hemisphere
             lid_clo=0.5_WP
         else
             lid_clo=0.5_WP
@@ -316,9 +322,10 @@ subroutine thermodynamics(ice, partit, mesh)
         if (.not. l_snow) then
             prec_rain(i)     = rain
             prec_snow(i)     = snow
-        end if 
-     
+        end if
     end do
+!$OMP END DO
+!$OMP END PARALLEL 
 end subroutine thermodynamics
 !
 !
