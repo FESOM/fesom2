@@ -1,0 +1,3 @@
+[submodule "src/zarr_io/zarr-fortran"]
+	path = src/zarr_io/zarr-fortran
+	url = https://github.com/suvarchal/zarr-fortran.git
