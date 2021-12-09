@@ -1,6 +1,6 @@
 module ice_EVP_interfaces
     interface
-        subroutine stress_tensor(ice_strength, ice, partit, mesh)
+        subroutine stress_tensor(ice, partit, mesh)
         USE MOD_ICE
         USE MOD_PARTIT
         USE MOD_PARSUP
@@ -8,10 +8,9 @@ module ice_EVP_interfaces
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        real(kind=WP) , intent(in)            :: ice_strength(partit%mydim_elem2D)
         end subroutine
 
-        subroutine stress2rhs(inv_areamass, ice_strength, ice, partit, mesh)
+        subroutine stress2rhs(ice, partit, mesh)
         USE MOD_ICE
         USE MOD_PARTIT
         USE MOD_PARSUP
@@ -19,7 +18,6 @@ module ice_EVP_interfaces
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        real(kind=WP) , intent(in)            :: inv_areamass(partit%myDim_nod2D), ice_strength(partit%mydim_elem2D)
         end subroutine
     end interface  
 end module
@@ -45,7 +43,7 @@ end module
 ! EVP rheology. The routine computes stress tensor components based on ice 
 ! velocity field. They are stored as elemental arrays (sigma11, sigma22 and
 ! sigma12). The ocean velocity is at nodal locations.
-subroutine stress_tensor(ice_strength, ice, partit, mesh)
+subroutine stress_tensor(ice, partit, mesh)
     USE MOD_ICE
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -60,7 +58,6 @@ subroutine stress_tensor(ice_strength, ice, partit, mesh)
     type(t_ice)   , intent(inout), target :: ice
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
-    real(kind=WP), intent(in) :: ice_strength(partit%mydim_elem2D)
     integer         :: el
     real(kind=WP)   :: det1, det2, dte, vale, r1, r2, r3, si1, si2
     real(kind=WP)   :: zeta, delta, delta_inv, d1, d2
@@ -69,19 +66,20 @@ subroutine stress_tensor(ice_strength, ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
     real(kind=WP), dimension(:), pointer  :: eps11, eps12, eps22
     real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
+    real(kind=WP), dimension(:), pointer  :: ice_strength
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    u_ice   => ice%uice(:)
-    v_ice   => ice%vice(:)
-    eps11   => ice%work%eps11(:)
-    eps12   => ice%work%eps12(:)
-    eps22   => ice%work%eps22(:)
-    sigma11 => ice%work%sigma11(:)
-    sigma12 => ice%work%sigma12(:)
-    sigma22 => ice%work%sigma22(:)
-    
+    u_ice       => ice%uice(:)
+    v_ice       => ice%vice(:)
+    eps11       => ice%work%eps11(:)
+    eps12       => ice%work%eps12(:)
+    eps22       => ice%work%eps22(:)
+    sigma11     => ice%work%sigma11(:)
+    sigma12     => ice%work%sigma12(:)
+    sigma22     => ice%work%sigma22(:)
+    ice_strength=> ice%work%ice_strength(:)
     !___________________________________________________________________________
     vale = 1.0_WP/(ice%ellipse**2)
     dte  = ice%ice_dt/(1.0_WP*ice%evp_rheol_steps)
@@ -168,7 +166,7 @@ end subroutine stress_tensor
 ! EVP implementation:
 ! Computes the divergence of stress tensor and puts the result into the
 ! rhs vectors 
-subroutine stress2rhs(inv_areamass, ice_strength, ice, partit, mesh)
+subroutine stress2rhs(ice, partit, mesh)
     USE MOD_ICE
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -179,24 +177,26 @@ subroutine stress2rhs(inv_areamass, ice_strength, ice, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
-    REAL(kind=WP), intent(in) :: inv_areamass(partit%myDim_nod2D), ice_strength(partit%mydim_elem2D)
     INTEGER                   :: n, el,  k
     REAL(kind=WP)             :: val3
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
     real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice, rhs_a, rhs_m
+    real(kind=WP), dimension(:), pointer  :: inv_areamass, ice_strength
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    sigma11   => ice%work%sigma11(:)
-    sigma12   => ice%work%sigma12(:)
-    sigma22   => ice%work%sigma22(:)
-    u_rhs_ice => ice%uice_rhs(:)
-    v_rhs_ice => ice%vice_rhs(:)
-    rhs_a     => ice%data(1)%values_rhs(:)
-    rhs_m     => ice%data(2)%values_rhs(:)
+    sigma11      => ice%work%sigma11(:)
+    sigma12      => ice%work%sigma12(:)
+    sigma22      => ice%work%sigma22(:)
+    u_rhs_ice    => ice%uice_rhs(:)
+    v_rhs_ice    => ice%vice_rhs(:)
+    rhs_a        => ice%data(1)%values_rhs(:)
+    rhs_m        => ice%data(2)%values_rhs(:)
+    inv_areamass => ice%work%inv_areamass(:)
+    ice_strength => ice%work%ice_strength(:)
     
     !___________________________________________________________________________    
     val3=1/3.0_WP
@@ -402,13 +402,9 @@ subroutine EVPdynamics(ice, partit, mesh)
         ! for full free surface include pressure from ice mass
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum, aa, p_ice, elevation_elem, elevation_dx, elevation_dy)
 !$OMP DO
-        do el = 1, myDim_elem2D + eDim_elem2D
-           ice_strength(el)=0.0_WP
-        end do
-!$OMP END DO
-!$OMP DO
-        do el = 1,myDim_elem2D           
+        do el = 1,myDim_elem2D
             elnodes = elem2D_nodes(:,el)
+            ice_strength(el)=0.0_WP
             !___________________________________________________________________
             ! if element has any cavity node skip it 
             if (ulevels(el) > 1) cycle
@@ -514,14 +510,9 @@ subroutine EVPdynamics(ice, partit, mesh)
     rdg_shear_elem(:) = 0.0_WP
 #endif
     do shortstep=1, ice%evp_rheol_steps 
-!write(*,*) partit%mype, shortstep, 'CP1'
         !_______________________________________________________________________
-        call stress_tensor(ice_strength(1:myDim_nod2D), ice, partit, mesh)
-!call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)
-!write(*,*) partit%mype, shortstep, 'CP2'
-        call stress2rhs(inv_areamass(1:myDim_nod2D), ice_strength(1:myDim_elem2D), ice, partit, mesh) 
-!call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)
-!write(*,*) partit%mype, shortstep, 'CP3'
+        call stress_tensor(ice, partit, mesh)
+        call stress2rhs(ice, partit, mesh) 
         !_______________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, ed, umod, drag, rhsu, rhsv, r_a, r_b, det)
 !$OMP DO
