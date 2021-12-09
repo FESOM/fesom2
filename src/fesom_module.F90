@@ -206,12 +206,6 @@ contains
         call clock_newyear                        ! check if it is a new year
         if (f%mype==0) f%t6=MPI_Wtime()
         !___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
-        ! The interface to the restart module is made via call restart !
-        ! The inputs are: istep, l_write, l_create
-        ! if istep is not zero it will be decided whether restart shall be written
-        ! if l_write  is TRUE the restart will be forced
-        ! if l_read the restart will be read
-        ! as an example, for reading restart one does: call restart(0, .false., .false., .true., tracers, partit, mesh)
         call restart(0, .false., r_restart, f%ice, f%dynamics, f%tracers, f%partit, f%mesh) ! istep, l_write, l_read
         if (f%mype==0) f%t7=MPI_Wtime()
         ! store grid information into netcdf file
