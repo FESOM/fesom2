@@ -109,7 +109,7 @@ contains
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
-    if(.not. nod2D_lists_initialized) call init_nod2D_lists()
+    if(.not. nod2D_lists_initialized) call init_nod2D_lists(partit)
 
     include "io_gather_nod.inc"  
   end subroutine
@@ -138,7 +138,7 @@ contains
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
-    if(.not. nod2D_lists_initialized) call init_nod2D_lists()
+    if(.not. nod2D_lists_initialized) call init_nod2D_lists(partit)
 
     include "io_gather_nod.inc"  
   end subroutine
@@ -167,7 +167,7 @@ contains
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
-    if(.not. elem2D_lists_initialized) call init_elem2D_lists()
+    if(.not. elem2D_lists_initialized) call init_elem2D_lists(partit)
 
     include "io_gather_elem.inc"
   end subroutine
@@ -196,7 +196,7 @@ contains
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
-    if(.not. elem2D_lists_initialized) call init_elem2D_lists()
+    if(.not. elem2D_lists_initialized) call init_elem2D_lists(partit)
 
     include "io_gather_elem.inc"
   end subroutine
