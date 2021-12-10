@@ -13,6 +13,35 @@ if(${USE_ICEPACK})
 else()
    file(GLOB sources_Fortran ${src_home}/*.F90)
 endif()
+
+if(${USE_ZARRIO})
+   include(ExternalProject)
+
+   #ExternalProject_Add(
+     #ZARRIO
+     #GIT_REPOSITORY https://github.com/suvarchal/zarr-fortran.git
+     #SOURCE_DIR ${src_home}/zarr_io/zarr-fortran
+     #GIT_TAG origin/main
+     #CONFIGURE_COMMAND ""
+     #BUILD_COMMAND ""
+     #INSTALL_COMMAND ""
+     #)
+  # below, submodule is better because the library is also browsable on github
+  # todo: also use for icepack
+  ExternalProject_Add(
+     GIT_SUBMODULES zarr-fortran
+     SOURCE_DIR ${src_home}/zarr_io
+     GIT_TAG origin/main
+     #GIT_REMOTE_UPDATE_STRATEGY CHECKOUT
+     CONFIGURE_COMMAND ""
+     BUILD_COMMAND ""
+     INSTALL_COMMAND ""
+  )
+
+   list(APPEND sources_Fortran ${src_home}/zarr_io/io_zarrdata.F90 ${src_home}/zarr_io/zarr-fortran/src/zarr_util.F90)
+endif()
+
+
 #list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_partition_init.F90)
 file(GLOB sources_C ${src_home}/*.c)
 
@@ -61,6 +90,9 @@ if(${OIFS_COUPLED})
 endif()
 if(${USE_ICEPACK})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __icepack)
+endif()
+if(${USE_ZARRIO})
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __zarrio)
 endif()
 if(${VERBOSE})
    target_compile_definitions(${PROJECT_NAME} PRIVATE VERBOSE)
