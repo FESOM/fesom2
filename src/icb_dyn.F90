@@ -84,7 +84,9 @@ type(t_mesh), intent(in) , target :: mesh
  ! - T_ave_ib, S_ave_ib		: Mean T & S (integrated) at location of iceberg
  ! - T_keel_ib, S_keel_ib	: T & S below the draft of the iceberg (depth_ib)
  call FEM_3eval(mesh, T_ave_ib,S_ave_ib,lon,lat,T_dz,S_dz,iceberg_elem)
+ !write(*,*) "LA DEBUG: T_ave_ib = ", T_ave_ib, ", S_ave_ib = ", S_ave_ib, ", T_dz = ", T_dz, ", S_dz = ", S_dz, ", iceberg_elem = ", iceberg_elem
  call FEM_3eval(mesh, T_keel_ib,S_keel_ib,lon,lat,T_keel,S_keel,iceberg_elem)
+ !write(*,*) "LA DEBUG: T_keel_ib = ", T_keel_ib, ", S_keel_ib = ", S_keel_ib, ", T_keel = ", T_keel, ", S_keel = ", S_keel, ", iceberg_elem = ", iceberg_elem
 
 
  !ATMOSPHERIC VELOCITY ua_ib, va_ib
@@ -157,7 +159,6 @@ type(t_mesh), intent(in) , target :: mesh
 
   new_u_ib = u_ib + au_ib * dt_ib
   new_v_ib = v_ib + av_ib * dt_ib
-  !write(*,*) 'LA DEBUG 145: u_ib: ',u_ib,', new_u_ib: ',new_u_ib
 
  if (l_semiimplicit) then !a matrix multiplication is to be performed
   			  !for semiimpl. coriolis term and implicit
@@ -186,7 +187,6 @@ type(t_mesh), intent(in) , target :: mesh
    !now the velocity can be updated
    new_u_ib = SI_velo(1)
    new_v_ib = SI_velo(2)
- !write(*,*) 'LA DEBUG 174: u_ib: ',u_ib,', new_u_ib: ',new_u_ib
    
  else !compute only water drag implicitly, coriolis: AB
   
@@ -206,7 +206,6 @@ type(t_mesh), intent(in) , target :: mesh
    !now the velocity can be updated
    new_u_ib = SI_velo(1)
    new_v_ib = SI_velo(2)  
- !write(*,*) 'LA DEBUG 194: u_ib: ',u_ib,', new_u_ib: ',new_u_ib
     
  end if !matrix-multiplication
 
@@ -217,7 +216,6 @@ type(t_mesh), intent(in) , target :: mesh
       
  new_u_ib = (1-frozen_in) * new_u_ib + frozen_in * ui_ib
  new_v_ib = (1-frozen_in) * new_v_ib + frozen_in * vi_ib
- !write(*,*) 'LA DEBUG 205: u_ib: ',u_ib,', new_u_ib: ',new_u_ib
  
 end subroutine iceberg_dyn
 
@@ -625,7 +623,7 @@ subroutine iceberg_average_andkeel(mesh, uo_dz,vo_dz, uo_keel,vo_keel, T_dz,S_dz
   use g_parsup
   
 ! kh 17.03.21 specification of structures used
-  use o_arrays, only: UV_ib, tr_arr_ib, zbar_3d_n_ib
+  use o_arrays, only: UV_ib, tr_arr_ib, Z_3d_n_ib
 
   use g_clock
   use g_forcing_arrays
@@ -670,15 +668,19 @@ type(t_mesh), intent(in) , target :: mesh
 
    ! LOOP: consider all neighboring pairs (n_up,n_low) of 3D nodes
    ! below n2..
-   innerloop: do k=2, nl+1
+   innerloop: do k=1, nl+1
 
 
     !##################################################
     ! *** LA changed to zbar_3d_n ***
 
 ! kh 18.03.21 use zbar_3d_n_ib buffered values here
-    lev_up  = zbar_3d_n_ib(k-1, n2)
-    lev_low = zbar_3d_n_ib(k, n2)
+    if( k==1 ) then
+        lev_up = 0.0
+    else
+        lev_up  = Z_3d_n_ib(k-1, n2)
+    end if
+    lev_low = Z_3d_n_ib(k, n2)
     dz = abs( lev_low - lev_up )
     
     !if( abs(lev_up)>=abs(depth_ib) ) then
@@ -691,7 +693,8 @@ type(t_mesh), intent(in) , target :: mesh
 
 #ifdef use_cavity
     ! if cavity node ..
-    if( cavity_flag_nod2d(elem2D_nodes(m,iceberg_elem))==1 .AND. abs(depth_ib)<=abs(lev_up) ) then
+    if( cavity_flag_nod2d(elem2D_nodes(m,iceberg_elem))==1 .AND. abs(depth_ib)<abs(lev_up) ) then
+    ! LA: Never go here for k=1, because abs(depth_ib)>=0.0 for all icebergs
 
       !cavity_count=cavity_count + 1
       !if(cavity_count==3) then
@@ -715,36 +718,69 @@ type(t_mesh), intent(in) , target :: mesh
 
     ! if the lowest z coord is below the iceberg draft, exit
     !else if( abs(coord_nod3D(3, n_low))>=abs(depth_ib) .AND. abs(coord_nod3D(3, n_up))<=abs(depth_ib) ) then
-    else if( abs(lev_low)>=abs(depth_ib) .AND. (abs(lev_up)<=abs(depth_ib)) ) then
+    
+    !****************************************************************
+    ! LA 23.11.21 case if depth_ib<lev_up
+    else if( abs(lev_low)>=abs(depth_ib) ) then !.AND. (abs(lev_up)<=abs(depth_ib)) ) then
 #else
     !if( abs(coord_nod3D(3, n_low))>=abs(depth_ib) .AND. abs(coord_nod3D(3, n_up))<=abs(depth_ib) ) then
-    if( abs(lev_low)>=abs(depth_ib) .AND. (abs(lev_up)<=abs(depth_ib)) ) then
+    if( abs(lev_low)>=abs(depth_ib) ) then !.AND. (abs(lev_up)<=abs(depth_ib)) ) then
 #endif
-      dz = abs ( lev_up - depth_ib )
+      if( abs(lev_up)<abs(depth_ib) ) then
+        dz = abs ( lev_up - depth_ib )
+      else
+        ! LA: Never go here, when starting with k=1
+        dz = abs(depth_ib)
+      end if
+    !****************************************************************
 
       ! *** LA changed to tr_arr(nl-1,node_size,num_tr) ***
 ! kh 08.03.21 use UV_ib buffered values here
-      ufkeel1 = interpol1D(abs(lev_up),UV_ib(1,k-1,n2),abs(lev_low),UV_ib(1,k,n2),abs(depth_ib))
-      ufkeel2 = interpol1D(abs(lev_up),UV_ib(2,k-1,n2),abs(lev_low),UV_ib(2,k,n2),abs(depth_ib))
-
-! kh 15.03.21 use tr_arr_ib buffered values here
-      Temkeel = interpol1D(abs(lev_up),tr_arr_ib(k-1,n2,1),abs(lev_low),tr_arr_ib(k,n2,1),abs(depth_ib))
-      Salkeel = interpol1D(abs(lev_up),tr_arr_ib(k-1,n2,2),abs(lev_low),tr_arr_ib(k,n2,2),abs(depth_ib))
-
+      if( k==1 ) then
+        ufkeel1 = UV_ib(1,k,n2)
+        ufkeel2 = UV_ib(2,k,n2)
+        Temkeel = tr_arr_ib(k,n2,1)
+        Salkeel = tr_arr_ib(k,n2,2)
+        uo_dz(m)=ufkeel1*dz 
+        vo_dz(m)=ufkeel2*dz
+        T_dz(m)=Temkeel*dz
+        S_dz(m)=Salkeel*dz
+      else
+        ufkeel1 = interpol1D(abs(lev_up),UV_ib(1,k-1,n2),abs(lev_low),UV_ib(1,k,n2),abs(depth_ib))
+        ufkeel2 = interpol1D(abs(lev_up),UV_ib(2,k-1,n2),abs(lev_low),UV_ib(2,k,n2),abs(depth_ib))
+! kh 1  5.03.21 use tr_arr_ib buffered values here
+        Temkeel = interpol1D(abs(lev_up),tr_arr_ib(k-1,n2,1),abs(lev_low),tr_arr_ib(k,n2,1),abs(depth_ib))
+        Salkeel = interpol1D(abs(lev_up),tr_arr_ib(k-1,n2,2),abs(lev_low),tr_arr_ib(k,n2,2),abs(depth_ib))
 ! kh 08.03.21 use UV_ib buffered values here
-      uo_dz(m)=uo_dz(m)+ 0.5*(UV_ib(1,k-1,n2) + ufkeel1)*dz 
-      vo_dz(m)=vo_dz(m)+ 0.5*(UV_ib(2,k-1,n2) + ufkeel2)*dz
+        uo_dz(m)=uo_dz(m)+ 0.5*(UV_ib(1,k-1,n2) + ufkeel1)*dz 
+        vo_dz(m)=vo_dz(m)+ 0.5*(UV_ib(2,k-1,n2) + ufkeel2)*dz
+! kh 15.03.21 use tr_arr_ib buffered values here
+        T_dz(m)=T_dz(m)+ 0.5*(tr_arr_ib(k-1,n2,1)+ Temkeel)*dz
+        S_dz(m)=S_dz(m)+ 0.5*(tr_arr_ib(k-1,n2,2)+ Salkeel)*dz
+      end if
+
       uo_keel(m)=ufkeel1
       vo_keel(m)=ufkeel2
 
-! kh 15.03.21 use tr_arr_ib buffered values here
-      T_dz(m)=T_dz(m)+ 0.5*(tr_arr_ib(k-1,n2,1)+ Temkeel)*dz
-      S_dz(m)=S_dz(m)+ 0.5*(tr_arr_ib(k-1,n2,2)+ Salkeel)*dz
       T_keel(m)=Temkeel
       S_keel(m)=Salkeel
+      
+      if(S_dz(m)/abs(depth_ib)>70.) then
+       write(*,*) 'innerloop, dz:',dz,', depth:',depth_ib,',S_dz(m):',S_dz(m),"m:",m,", k:",k,", tr_arr_ib(k-1,n2,1):",tr_arr_ib(k-1,n2,1),", tr_arr_ib(k,n2,1):", tr_arr_ib(k,n2,1),", Salkeel:",Salkeel,", lev_low:",lev_low,", lev_up:",lev_up
+      end if
+      
+      if(T_dz(m)/abs(depth_ib)>70.) then
+       write(*,*) 'innerloop, dz:',dz,', depth:',depth_ib,',T_dz(m):',T_dz(m),"m:",m,", k:",k,", tr_arr_ib(k-1,n2,2):",tr_arr_ib(k-1,n2,2),", tr_arr_ib(k,n2,2):", tr_arr_ib(k,n2,2),",Temkeel:",Temkeel,", lev_low:",lev_low,", lev_up:",lev_up
+      end if
 
       exit innerloop
-	 
+    
+    !****************************************************************
+    ! LA 23.11.21 case if lev_low==0
+    else if(lev_low==lev_up) then
+      exit innerloop
+    !****************************************************************
+    
     else	
 
       ! .. and sum up the layer-integrated velocities ..
@@ -757,7 +793,16 @@ type(t_mesh), intent(in) , target :: mesh
       T_dz(m)=T_dz(m)+ 0.5*(tr_arr_ib(k-1,n2,1)+ tr_arr_ib(k,n2,1))*dz
       S_dz(m)=S_dz(m)+ 0.5*(tr_arr_ib(k-1,n2,2)+ tr_arr_ib(k,n2,2))*dz
 
-      ! save the current deepest values; will be overwritten most of the time in lines 707 to 713.
+   
+      if(S_dz(m)/abs(depth_ib)>70.) then
+       write(*,*) 'innerloop, dz:',dz,', depth:',depth_ib,',S_dz(m):',S_dz(m),"m:",m,", k:",k,", tr_arr_ib(k-1,n2,1):",tr_arr_ib(k-1,n2,1),", tr_arr_ib(k,n2,1):", tr_arr_ib(k,n2,1),", lev_low:",lev_low,", lev_up:",lev_up
+      end if
+      
+      if(T_dz(m)/abs(depth_ib)>70.) then
+       write(*,*) 'innerloop, dz:',dz,', depth:',depth_ib,',T_dz(m):',T_dz(m),"m:",m,", k:",k,", tr_arr_ib(k-1,n2,2):",tr_arr_ib(k-1,n2,2),", tr_arr_ib(k,n2,2):", tr_arr_ib(k,n2,2),", lev_low:",lev_low,", lev_up:",lev_up
+      end if
+
+! save the current deepest values; will be overwritten most of the time in lines 707 to 713.
 ! kh 08.03.21 use UV_ib buffered values here
       uo_keel(m)=UV_ib(1,k,n2)
       vo_keel(m)=UV_ib(2,k,n2)
@@ -775,8 +820,8 @@ type(t_mesh), intent(in) , target :: mesh
    T_dz(m)=T_dz(m)/abs(depth_ib)
    S_dz(m)=S_dz(m)/abs(depth_ib)
    
-   !if(S_dz(m)>70.) then
-   ! write(*,*) 'nodeloop, dz:',dz,'z_up:',coord_nod3D(3, n_up),'z_lo:',coord_nod3D(3, n_low),'depth:',depth_ib,'S_up:',tracer(n_up,2),'S_lo:',tracer(n_low,2)
+   !if(T_dz(m)>70.) then
+   ! write(*,*) 'nodeloop, dz:',dz,'z_up:',coord_nod3D(3, n_up),'z_lo:',coord_nod3D(3, n_low),'depth:',depth_ib,'T_up:',tracer(n_up,2),'T_lo:',tracer(n_low,2)
    !end if
 
  end do nodeloop !loop over all nodes of iceberg element
@@ -908,7 +953,7 @@ subroutine iceberg_avvelo(mesh, uo_dz,vo_dz,depth_ib,iceberg_elem)
   use g_parsup
   
 ! kh 17.03.21 specification of structures used
-  use o_arrays, only: UV_ib, tr_arr_ib, zbar_3d_n_ib
+  use o_arrays, only: UV_ib, tr_arr_ib, Z_3d_n_ib
 
   use g_clock
   use g_forcing_arrays
@@ -941,11 +986,15 @@ type(t_mesh), intent(in) , target :: mesh
 
    ! ..consider all neighboring pairs (n_up,n_low) of 3D nodes
    ! below n2..
-   do k=2, nl+1
+   do k=1, nl+1
 
 ! kh 18.03.21 use zbar_3d_n_ib buffered values here
-    lev_up  = zbar_3d_n_ib(k-1, n2)
-    lev_low = zbar_3d_n_ib(k, n2)
+    if( k==1 ) then
+        lev_up = 0.0
+    else
+        lev_up = Z_3d_n_ib(k-1, n2)
+    end if
+    lev_low = Z_3d_n_ib(k, n2)
     
     if (lev_up==lev_low) then
         exit
@@ -963,13 +1012,20 @@ type(t_mesh), intent(in) , target :: mesh
   
       dz = abs( lev_up - depth_ib )
 
+      if( k==1 ) then
+          ufkeel1 = UV_ib(1,k,n2)
+          ufkeel2 = UV_ib(2,k,n2)
+          uo_dz(m)= ufkeel1*dz 
+          vo_dz(m)= ufkeel2*dz
+      else
 ! kh 08.03.21 use UV_ib buffered values here
-      ufkeel1 = interpol1D(abs(lev_up),UV_ib(1,k-1,n2),abs(lev_low),UV_ib(1,k,n2),abs(depth_ib))
-      ufkeel2 = interpol1D(abs(lev_up),UV_ib(2,k-1,n2),abs(lev_low),UV_ib(2,k,n2),abs(depth_ib))
+          ufkeel1 = interpol1D(abs(lev_up),UV_ib(1,k-1,n2),abs(lev_low),UV_ib(1,k,n2),abs(depth_ib))
+          ufkeel2 = interpol1D(abs(lev_up),UV_ib(2,k-1,n2),abs(lev_low),UV_ib(2,k,n2),abs(depth_ib))
+! kh 08.03.21 use UV_ib buffered values here
+          uo_dz(m)=uo_dz(m)+0.5*(UV_ib(1,k-1,n2)+ ufkeel1)*dz 
+          vo_dz(m)=vo_dz(m)+0.5*(UV_ib(2,k-1,n2)+ ufkeel2)*dz
+      end if
 
-! kh 08.03.21 use UV_ib buffered values here
-      uo_dz(m)=uo_dz(m)+0.5*(UV_ib(1,k-1,n2)+ ufkeel1)*dz 
-      vo_dz(m)=vo_dz(m)+0.5*(UV_ib(2,k-1,n2)+ ufkeel2)*dz
       exit
 	 
     else	

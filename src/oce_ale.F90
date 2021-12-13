@@ -122,23 +122,29 @@ subroutine init_ale(mesh)
 
 ! kh 18.03.21
     if (ib_async_mode == 0) then
-        allocate(zbar_3d_n(nl,myDim_nod2D+eDim_nod2D))
-        allocate(zbar_3d_n_ib(nl,myDim_nod2D+eDim_nod2D))
+        !allocate(zbar_3d_n(nl,myDim_nod2D+eDim_nod2D))
+        !allocate(zbar_3d_n_ib(nl,myDim_nod2D+eDim_nod2D))
+        allocate(Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D))
+        allocate(Z_3d_n_ib(nl-1,myDim_nod2D+eDim_nod2D))
     else
 ! kh 18.03.21 support "first touch" idea
 !$omp parallel sections num_threads(2)
 !$omp section
-        allocate(zbar_3d_n(nl,myDim_nod2D+eDim_nod2D))
+        !allocate(zbar_3d_n(nl,myDim_nod2D+eDim_nod2D))
+        allocate(Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D))
         do i = 1, myDim_nod2D+eDim_nod2D
-            do j = 1, nl
-                zbar_3d_n(j, i) = 0._WP
+            do j = 1, nl-1
+                !zbar_3d_n(j, i) = 0._WP
+                Z_3d_n(j, i) = 0._WP
             end do
         end do
 !$omp section
-        allocate(zbar_3d_n_ib(nl,myDim_nod2D+eDim_nod2D))
+        !allocate(zbar_3d_n_ib(nl,myDim_nod2D+eDim_nod2D))
+        allocate(Z_3d_n_ib(nl-1,myDim_nod2D+eDim_nod2D))
         do i = 1, myDim_nod2D+eDim_nod2D
-            do j = 1, nl
-                zbar_3d_n_ib(j, i) = 0._WP
+            do j = 1, nl-1
+                !zbar_3d_n_ib(j, i) = 0._WP
+                Z_3d_n_ib(j, i) = 0._WP
             end do
         end do
 !$omp end parallel sections
@@ -146,7 +152,8 @@ subroutine init_ale(mesh)
     
     ! Z_n: mid depth of layers due to ale thinkness variactions at ervery node n 
     allocate(Z_n(nl-1))
-    allocate(Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
+    !allocate(Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
+    allocate(zbar_3d_n(nl,myDim_nod2D+eDim_nod2D))
     
     ! bottom_elem_tickness: changed bottom layer thinkness due to partial cells
     allocate(bottom_elem_thickness(myDim_elem2D))

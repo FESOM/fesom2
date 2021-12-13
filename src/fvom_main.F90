@@ -397,7 +397,8 @@ type(t_mesh),             target, save :: mesh
 ! kh 18.03.21 support of different ocean ice and iceberg steps:
 ! if steps_per_ib_step is configured greater 1 then zbar_3d_n and eta_n might be changed while
 ! the same asynchronous iceberg computation is still active
-        zbar_3d_n_ib = zbar_3d_n
+        !zbar_3d_n_ib = zbar_3d_n
+        Z_3d_n_ib    = Z_3d_n
         eta_n_ib     = eta_n
 
 ! kh 16.03.21 not modified during overlapping ocean/ice and iceberg computations
@@ -688,7 +689,7 @@ type(t_mesh),             target, save :: mesh
 
 ! kh 09.03.21
                 call iceberg_calculation(mesh,n_ib)
-!               call icb2fesom
+!                call icb2fesom
 !               t2_icb = MPI_Wtime()
             end if
 !           t2 = MPI_Wtime()
@@ -1087,12 +1088,21 @@ type(t_mesh), intent(in) , target :: mesh
     call compute_diagnostics(1, mesh)
     t4 = MPI_Wtime()
     !___prepare output______________________________________________________
+    if (mype==0) then
+        write(*,*) "LA DEBUG: start output"
+    end if
     call output (n, mesh)
     if (use_icebergs .and. bIcbCalcCycleCompleted) then
+        if (mype==0) then
+            write(*,*) "LA DEBUG: start reset_ib_fluxes"
+        end if
         call reset_ib_fluxes
     end if
 
     t5 = MPI_Wtime()
+    if (mype==0) then
+        write(*,*) "LA DEBUG: start restart"
+    end if
     call restart(n, .false., .false., mesh)
     t6 = MPI_Wtime()
 

@@ -1203,7 +1203,6 @@ subroutine iceberg_restart_with_icesheet
   open(unit=icbID_ISM,file=IcebergRestartPath_ISM,status='old')
   do ib=1, num_non_melted_icb 
    !read all parameters that icb_step needs:			
-   write(*,*) "ib=",ib
    read(icbID_ISM,'(18e15.7,I,L,3e15.7,L)')						&
    	height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
 	Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
@@ -1253,7 +1252,7 @@ subroutine iceberg_out
  integer :: icbID, icbID_ISM, ib, istep
  
  icbID = 42
- !icbID_ISM = 43
+ icbID_ISM = 43
  
  !calving_day has to be adjusted for restarts because calving_day gives the amount
  !of days (since the model FIRST has been started) after which icebergs are released
@@ -1268,7 +1267,7 @@ subroutine iceberg_out
 
  if(mype==0) then
   open(unit=icbID,file=IcebergRestartPath,position='append', status='replace')
-  !open(unit=icbID_ISM,file=IcebergRestartPath_ISM,position='append', status='replace')
+  open(unit=icbID_ISM,file=IcebergRestartPath_ISM,position='append', status='replace')
   
   do ib=1, ib_num 
   
@@ -1282,18 +1281,18 @@ subroutine iceberg_out
    
    !***************************************************************
    !write new restart file with only non melted icebergs
-   !if(melted(ib)==.false.) then
-   !    !write all parameters that icb_step needs:
-   !    write(icbID_ISM,'(18e15.7,I,L,3e15.7,L)')						&
-   !         height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
-   !         Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
-   !         conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
-   !         u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
-   !         f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), melted(ib)
-   !end if
+   if(melted(ib)==.false.) then
+       !write all parameters that icb_step needs:
+       write(icbID_ISM,'(18e15.7,I,L,3e15.7,L)')						&
+            height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
+            Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
+            conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
+            u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
+            f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), melted(ib)
+   end if
 
   end do
-  !close(icbID_ISM)
+  close(icbID_ISM)
   close(icbID)
  end if
 end subroutine iceberg_out

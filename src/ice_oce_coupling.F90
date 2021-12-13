@@ -158,6 +158,7 @@ subroutine oce_fluxes(mesh)
   use g_PARSUP
   use g_support
   use i_therm_param
+  use iceberg_params
 
 #if defined (__icepack)
   use icedrv_main,   only: icepack_to_fesom,    &
@@ -323,8 +324,16 @@ subroutine oce_fluxes(mesh)
     ! here the + sign must be used because we switched up the sign of the 
     ! water_flux with water_flux = -fresh_wa_flux, but evap, prec_... and runoff still
     ! have there original sign
-    water_flux=water_flux+net/ocean_area 
+   ! LA changed from + to - 
+   water_flux=water_flux+net/ocean_area 
     
+   !if(use_icebergs) then
+   !  do n=1, myDim_nod2D+eDim_nod2D
+   !     water_flux(n) = water_flux(n)-ibfwb(n)-ibfwl(n)-ibfwe(n)-ibfwbv(n)
+   !     heat_flux(n) = heat_flux(n) - ibhf(n)
+   !  end do
+   !end if
+
   !!!wiso-code
 
   ! atmospheric H216O flux =  total flux over open water + flux over sea ice

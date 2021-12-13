@@ -14,7 +14,7 @@ subroutine allocate_icb()
   ibfwbv=0
 
   allocate(calving_day(ib_num))
-  calving_day = 2 !271.0 	!28.0: September 29 for restart in 1 SEP 97 ! 271.0: September 29 for year 1997
+  calving_day = 2   !28.0: September 29 for restart in 1 SEP 97 ! 271.0: September 29 for year 1997
   allocate(height_ib(ib_num))
   height_ib = 1.0 ! 250.0 ! 360.0
   allocate(length_ib(ib_num))
