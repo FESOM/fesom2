@@ -782,6 +782,10 @@ type(t_mesh), intent(in) , target :: mesh
     !****************************************************************
     
     else	
+      if( k==1 ) then
+          write(*,*) "LA DEBUG: lev_low = ", lev_low, ", lev_up = ", lev_up, ", depth_ib = ", depth_ib
+          cycle
+      end if
 
       ! .. and sum up the layer-integrated velocities ..
 ! kh 08.03.21 use UV_ib buffered values here      
@@ -1029,6 +1033,9 @@ type(t_mesh), intent(in) , target :: mesh
       exit
 	 
     else	
+      if( k==1 ) then
+        cycle
+      end if
       ! .. and sum up the layer-integrated velocities:
 ! kh 08.03.21 use UV_ib buffered values here
       uo_dz(m)=uo_dz(m)+0.5*(UV_ib(1,k-1,n2)+UV_ib(1,k,n2))*dz
