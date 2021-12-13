@@ -2,7 +2,7 @@ module io_gather_module
   USE MOD_PARTIT
   USE MOD_PARSUP
   implicit none
-  public init_io_gather, gather_nod2D, gather_real4_nod2D, gather_elem2D, gather_real4_elem2D
+  public gather_nod2D, gather_real4_nod2D, gather_elem2D, gather_real4_elem2D
   private
 
   logical, save :: nod2D_lists_initialized = .false.
@@ -11,21 +11,9 @@ module io_gather_module
 
   logical, save :: elem2D_lists_initialized = .false.
   integer, save :: rank0Dim_elem2D
-  integer, save, allocatable, dimension(:) :: rank0List_elem2D
+  integer, save, allocatable, dimension(:) :: rank0List_elem2D  
   
 contains
-
-
-  subroutine init_io_gather(partit)
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    implicit none
-    type(t_partit), intent(inout), target  :: partit
-    integer err
-
-    if(.not.  nod2D_lists_initialized) call init_nod2D_lists (partit)
-    if(.not. elem2D_lists_initialized) call init_elem2D_lists(partit)
-  end subroutine
 
 
   subroutine init_nod2D_lists(partit)
@@ -34,6 +22,7 @@ contains
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
     ! EO args
+
     ! todo: initialize with the other comm arrays, probably in "init_gatherLists" subroutine 
     if(mype /= 0) then
       if(.not. allocated(partit%remPtr_nod2D)) allocate(partit%remPtr_nod2D(npes))
@@ -119,7 +108,8 @@ contains
     integer :: mpi_precision = MPI_DOUBLE_PRECISION
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
-    if(.not. nod2D_lists_initialized) stop "io_gather_module has not been initialized"
+
+    if(.not. nod2D_lists_initialized) call init_nod2D_lists(partit)
 
     include "io_gather_nod.inc"  
   end subroutine
@@ -132,8 +122,8 @@ contains
     use, intrinsic :: iso_fortran_env, only: real32
     implicit none
     type(t_partit), intent(inout), target  :: partit
-    real(real32),   intent(in)             :: arr2D(:)
-    real(real32),   intent(out)            :: arr2D_global(:)
+    real(real32), intent(in)  :: arr2D(:)
+    real(real32), intent(out) :: arr2D_global(:)
     integer, intent(in) :: root_rank ! rank of receiving process
     integer, intent(in) :: tag
     integer io_comm
@@ -147,7 +137,8 @@ contains
     integer :: mpi_precision = MPI_REAL
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
-    if(.not. nod2D_lists_initialized) stop "io_gather_module has not been initialized"
+
+    if(.not. nod2D_lists_initialized) call init_nod2D_lists(partit)
 
     include "io_gather_nod.inc"  
   end subroutine
@@ -160,8 +151,8 @@ contains
     use, intrinsic :: iso_fortran_env, only: real64
     implicit none
     type(t_partit), intent(inout), target  :: partit
-    real(real64),   intent(in)             :: arr2D(:)
-    real(real64),   intent(out)            :: arr2D_global(:)
+    real(real64), intent(in)  :: arr2D(:)
+    real(real64), intent(out) :: arr2D_global(:)
     integer, intent(in) :: root_rank ! rank of receiving process
     integer, intent(in) :: tag
     integer io_comm
@@ -175,7 +166,8 @@ contains
     integer :: mpi_precision = MPI_DOUBLE_PRECISION
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
-    if(.not. elem2D_lists_initialized) stop "io_gather_module has not been initialized"
+
+    if(.not. elem2D_lists_initialized) call init_elem2D_lists(partit)
 
     include "io_gather_elem.inc"
   end subroutine
@@ -188,8 +180,8 @@ contains
     use, intrinsic :: iso_fortran_env, only: real32
     implicit none
     type(t_partit), intent(inout), target  :: partit
-    real(real32),   intent(in)             :: arr2D(:)
-    real(real32),   intent(out)            :: arr2D_global(:)
+    real(real32), intent(in)  :: arr2D(:)
+    real(real32), intent(out) :: arr2D_global(:)
     integer, intent(in) :: root_rank ! rank of receiving process
     integer, intent(in) :: tag
     integer io_comm
@@ -203,7 +195,8 @@ contains
     integer :: mpi_precision = MPI_REAL
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
-    if(.not. elem2D_lists_initialized) stop "io_gather_module has not been initialized"
+
+    if(.not. elem2D_lists_initialized) call init_elem2D_lists(partit)
 
     include "io_gather_elem.inc"
   end subroutine
