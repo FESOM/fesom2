@@ -23,11 +23,11 @@ module cpl_driver
   !
 
 #if defined (__oifs)
-  integer, parameter         :: nsend = 8 !wiso-code 5->8
-  integer, parameter         :: nrecv = 19 !wiso-code 13->19
+  integer, parameter         :: nsend = 5 !wiso-code 5->8
+  integer, parameter         :: nrecv = 13 !wiso-code 13->19
 #else
-  integer, parameter         :: nsend = 7 !wiso-code 4->7
-  integer, parameter         :: nrecv = 18 !wiso-code 12->18
+  integer, parameter         :: nsend = 4 !wiso-code 4->7
+  integer, parameter         :: nrecv = 12 !wiso-code 12->18
 #endif
   
   integer, dimension(nsend)  :: send_id

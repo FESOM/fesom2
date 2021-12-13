@@ -129,20 +129,12 @@ type(t_mesh), intent(in) , target :: mesh
  call MPI_IAllREDUCE(arr_block, arr_block_red, 15*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)
 !$omp end critical
 
-!if (mype==0) then
-!    write(*,*) "LA DEBUG: finished MPI_IAllREDUCE"
-!end if
-
  completed = .false.
  do while (.not. completed)
 !$omp critical
 CALL MPI_TEST(req, completed, status, MPIERR_IB)
 !$omp end critical
  end do
-
-!if (mype==0) then
-!    write(*,*) "LA DEBUG: finished MPI_TEST"
-!end if
 
 ! kh 25.03.21 orig
 ! call MPI_AllREDUCE(elem_block, elem_block_red, ib_num, MPI_INTEGER, MPI_SUM, &
@@ -151,20 +143,12 @@ CALL MPI_TEST(req, completed, status, MPIERR_IB)
  call MPI_IAllREDUCE(elem_block, elem_block_red, ib_num, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)  
 !$omp end critical
 
-!if (mype==0) then
-!    write(*,*) "LA DEBUG: finished MPI_IAllREDUCE 2"
-!end if
-
 completed = .false.
  do while (.not. completed)
 !$omp critical
   CALL MPI_TEST(req, completed, status, MPIERR_IB)
 !$omp end critical
  end do
-
-!if (mype==0) then
-!    write(*,*) "LA DEBUG: finished MPI_TEST 2"
-!end if
 
  !ALLREDUCE: vl_block, containing the volume losses (IBs may switch PE during the output interval)
 ! kh 25.03.21 orig
@@ -174,20 +158,12 @@ completed = .false.
  call MPI_IAllREDUCE(vl_block, vl_block_red, 4*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)
 !$omp end critical
 
-!if (mype==0) then
-!    write(*,*) "LA DEBUG: finished MPI_IAllREDUCE 3"
-!end if
-
  completed = .false.
  do while (.not. completed)
 !$omp critical
   CALL MPI_TEST(req, completed, status, MPIERR_IB)
 !$omp end critical
  end do
-
-!if (mype==0) then
-!    write(*,*) "LA DEBUG: finished MPI_TEST 3"
-!end if
 
 ! call MPI_Barrier(MPI_COMM_WORLD,MPIerr)
 ! arr_block_red = 0.0
