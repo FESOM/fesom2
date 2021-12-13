@@ -12,5 +12,6 @@ set(FESOM_COUPLED ON CACHE BOOL "compile fesom standalone or with oasis support 
 #set(FESOM_COUPLED ON CACHE BOOL "compile fesom standalone or with oasis support (i.e. coupled)")
 #set(OIFS_COUPLED ON CACHE BOOL "compile fesom coupled to OpenIFS. Also needs FESOM_COUPLED to work)")
 #set(VERBOSE OFF CACHE BOOL "toggle debug output")
+set(ASYNC_ICEBERGS ON CACHE BOOL "compile fesom with or without support for asynchronous iceberg computations")
 #add_subdirectory(oasis3-mct/lib/psmile)
 add_subdirectory(src)

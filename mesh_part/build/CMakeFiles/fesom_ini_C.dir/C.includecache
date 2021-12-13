@@ -1,0 +1,22 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+../../lib/metis-5.1.0/include/metis.h
+limits.h
+-
+inttypes.h
+-
+
+/pf/a/a270124/awicm-2.0/fesom-2.0/src/fort_part.c
+stdio.h
+-
+stdlib.h
+-
+metis.h
+/pf/a/a270124/awicm-2.0/fesom-2.0/src/metis.h
+

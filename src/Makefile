@@ -31,7 +31,8 @@ OBJ_INI =  fvom_init.o \
 MODULES = oce_modules.o \
           MOD_MESH.o \
           ice_modules.o \
-          gen_modules_config.o \
+	  icb_models.o	\
+	  gen_modules_config.o \
           gen_modules_partitioning.o \
           gen_modules_clock.o \
           gen_modules_rotate_grid.o \
@@ -101,6 +102,11 @@ OBJECTS=  fvom_main.o 		\
           ice_fct.o 		\
           ice_oce_coupling.o 	\
           ice_thermo_oce.o      \
+	  icb_step.o		\
+	  icb_elem.o		\
+	  icb_dyn.o		\
+	  icb_thermo.o		\
+	  icb_coupling.o	\
           gen_model_setup.o 	\
           gen_forcing_init.o 	\
           gen_bulk_formulae.o 	\

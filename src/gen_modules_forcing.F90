@@ -43,7 +43,8 @@ real(kind=WP)  :: Swind     =0.0_WP  ! parameterization for coupled current feed
   character(MAX_PATH)           :: fwf_path='./mesh/'
 !---fwf-code-end
 
-  namelist /land_ice/ use_landice_water, landice_start_mon, landice_end_mon, fwf_path !---fwf-code, add fwf_path
+
+  namelist /land_ice/ use_landice_water, landice_start_mon, landice_end_mon, fwf_path
 
 end module g_forcing_param
 ! ====================================================================
@@ -54,6 +55,8 @@ use o_param
 
   ! forcing arrays
   real(kind=WP), allocatable, dimension(:)         :: u_wind, v_wind 
+  real(kind=WP), allocatable, dimension(:)         :: u_wind_ib, v_wind_ib ! kh 19.02.21 additional arrays for asynchronous iceberg computations
+
   real(kind=WP), allocatable, dimension(:)         :: Tair, shum
   real(kind=WP), allocatable, dimension(:,:)       :: u_wind_t, v_wind_t 
   real(kind=WP), allocatable, dimension(:,:)       :: Tair_t, shum_t
@@ -61,10 +64,10 @@ use o_param
   real(kind=WP), allocatable, dimension(:)         :: prec_rain, prec_snow
   real(kind=WP), allocatable, dimension(:)         :: runoff, evaporation, ice_sublimation
   real(kind=WP), allocatable, dimension(:)         :: cloudiness, press_air
-  !---wiso-code
+  !wiso-code!!!
   real(kind=WP), allocatable, dimension(:)         :: www1,www2,www3,iii1,iii2,iii3
   real(kind=WP), allocatable, dimension(:)         :: tmp_iii1,tmp_iii2,tmp_iii3
-  !---wiso-code-end
+  !wiso-code!!!
 
 #if defined (__oasis)
   real(kind=WP), target, allocatable, dimension(:) :: sublimation, evap_no_ifrac
