@@ -443,30 +443,30 @@ type(t_mesh), intent(in) , target :: mesh
       f_u_ib_old = coriolis(local_idx_of(iceberg_elem))*u_ib
       f_v_ib_old = coriolis(local_idx_of(iceberg_elem))*v_ib
       
-    else
-      write(*,*) 'Error local_idx_of(iceberg_elem) > myDim_elem2D, istep, local_idx_of(iceberg_elem), myDim_elem2D', istep, local_idx_of(iceberg_elem), myDim_elem2D
+    !else
+    !  write(*,*) 'Error local_idx_of(iceberg_elem) > myDim_elem2D, istep, local_idx_of(iceberg_elem), myDim_elem2D', istep, local_idx_of(iceberg_elem), myDim_elem2D
     endif
-  else
-    write(*,*) 'Error local_idx_of(iceberg_elem) <= 0, istep, local_idx_of(iceberg_elem)', istep, local_idx_of(iceberg_elem)
+  !else
+  !  write(*,*) 'Error local_idx_of(iceberg_elem) <= 0, istep, local_idx_of(iceberg_elem)', istep, local_idx_of(iceberg_elem)
   endif
  end if
  
- file_track='/work/ollie/lackerma/iceberg/iceberg_ICBref_'
- file_forces_u='/work/ollie/lackerma/iceberg/iceberg_ICBref_forces_u_'
- file_forces_v='/work/ollie/lackerma/iceberg/iceberg_ICBref_forces_v_'
- file_meltrates='/work/ollie/lackerma/iceberg/iceberg_ICBref_melt_'
+ !file_track='/work/ollie/lackerma/iceberg/iceberg_ICBref_'
+ !file_forces_u='/work/ollie/lackerma/iceberg/iceberg_ICBref_forces_u_'
+ !file_forces_v='/work/ollie/lackerma/iceberg/iceberg_ICBref_forces_v_'
+ !file_meltrates='/work/ollie/lackerma/iceberg/iceberg_ICBref_melt_'
 
- !convert ib integer to string
- write(ib_char,'(I10)') ib
- 
- !left-adjust the string..
- ib_char = adjustl(ib_char)
- 
- !.. and trim while concatenating:
- file_track	=  trim(file_track) // trim(ib_char) // '.dat'
- file_forces_u	=  trim(file_forces_u) // trim(ib_char) // '.dat'
- file_forces_v	=  trim(file_forces_v) // trim(ib_char) // '.dat'
- file_meltrates	=  trim(file_meltrates) // trim(ib_char) // '.dat' 
+ !!convert ib integer to string
+ !write(ib_char,'(I10)') ib
+ !
+ !!left-adjust the string..
+ !ib_char = adjustl(ib_char)
+ !
+ !!.. and trim while concatenating:
+ !file_track	=  trim(file_track) // trim(ib_char) // '.dat'
+ !file_forces_u	=  trim(file_forces_u) // trim(ib_char) // '.dat'
+ !file_forces_v	=  trim(file_forces_v) // trim(ib_char) // '.dat'
+ !file_meltrates	=  trim(file_meltrates) // trim(ib_char) // '.dat' 
  
  
  ! ================== START ICEBERG CALCULATION ====================

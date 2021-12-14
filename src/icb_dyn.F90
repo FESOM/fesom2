@@ -84,9 +84,7 @@ type(t_mesh), intent(in) , target :: mesh
  ! - T_ave_ib, S_ave_ib		: Mean T & S (integrated) at location of iceberg
  ! - T_keel_ib, S_keel_ib	: T & S below the draft of the iceberg (depth_ib)
  call FEM_3eval(mesh, T_ave_ib,S_ave_ib,lon,lat,T_dz,S_dz,iceberg_elem)
- !write(*,*) "LA DEBUG: T_ave_ib = ", T_ave_ib, ", S_ave_ib = ", S_ave_ib, ", T_dz = ", T_dz, ", S_dz = ", S_dz, ", iceberg_elem = ", iceberg_elem
  call FEM_3eval(mesh, T_keel_ib,S_keel_ib,lon,lat,T_keel,S_keel,iceberg_elem)
- !write(*,*) "LA DEBUG: T_keel_ib = ", T_keel_ib, ", S_keel_ib = ", S_keel_ib, ", T_keel = ", T_keel, ", S_keel = ", S_keel, ", iceberg_elem = ", iceberg_elem
 
 
  !ATMOSPHERIC VELOCITY ua_ib, va_ib
@@ -783,15 +781,17 @@ type(t_mesh), intent(in) , target :: mesh
     
     else	
       if( k==1 ) then
-          write(*,*) "LA DEBUG: lev_low = ", lev_low, ", lev_up = ", lev_up, ", depth_ib = ", depth_ib
+          !write(*,*) "LA DEBUG: lev_low = ", lev_low, ", lev_up = ", lev_up, ", depth_ib = ", depth_ib
           cycle
       end if
+
 
       ! .. and sum up the layer-integrated velocities ..
 ! kh 08.03.21 use UV_ib buffered values here      
       uo_dz(m)=uo_dz(m)+ 0.5*(UV_ib(1,k-1,n2)+UV_ib(1,k,n2))*dz
       vo_dz(m)=vo_dz(m)+ 0.5*(UV_ib(2,k-1,n2)+UV_ib(2,k,n2))*dz
       ! .. and T & S:
+
 
 ! kh 15.03.21 use tr_arr_ib buffered values here
       T_dz(m)=T_dz(m)+ 0.5*(tr_arr_ib(k-1,n2,1)+ tr_arr_ib(k,n2,1))*dz
@@ -817,7 +817,7 @@ type(t_mesh), intent(in) , target :: mesh
     end if
 
    end do innerloop
- 
+
    ! divide by depth over which was integrated
    uo_dz(m)=uo_dz(m)/abs(depth_ib)
    vo_dz(m)=vo_dz(m)/abs(depth_ib)
