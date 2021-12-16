@@ -714,7 +714,7 @@ subroutine write_mean(entry, entry_index)
 
   ! Serial output implemented so far
   if (mype==entry%root_rank) then
-     write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
+     !write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
      call assert_nf( nf_put_vara_double(entry%ncid, entry%Tid, entry%rec_count, 1, entry%ctime_copy, 1), __LINE__)
   end if
 ! !_______writing 2D and 3D fields________________________________________________
@@ -886,7 +886,7 @@ subroutine output(istep, mesh)
              end if
           end do
           entry%rec_count=max(entry%rec_count, 1)
-          write(*,*) trim(entry%name)//': current mean I/O counter = ', entry%rec_count
+          !write(*,*) trim(entry%name)//': current mean I/O counter = ', entry%rec_count
         end if
 
         if (entry%accuracy == i_real8) then

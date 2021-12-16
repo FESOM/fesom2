@@ -51,6 +51,14 @@ real(kind=real32) :: runtime_alltimesteps
 type(t_mesh),             target, save :: mesh
 character(LEN=MPI_MAX_LIBRARY_VERSION_STRING) :: mpi_version_txt
 integer mpi_version_len
+#if defined (__zarrio)
+integer :: fileunit
+logical :: lnetcdf_io = .true., lzarr_io = .true.
+namelist /io_ctl/ lnetcdf_io, lzarr_io
+  open (newunit=fileunit,file='namelist.io')
+  read (fileunit,NML=io_ctl)
+  close (fileunit)
+#endif
 
 
   if(command_argument_count() > 0) then
@@ -259,9 +267,13 @@ integer mpi_version_len
         t4 = MPI_Wtime()
         !___prepare output______________________________________________________
         if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
+#if !defined (__zarrio)         
         call output (n, mesh)
+#endif
+
 #if defined (__zarrio)
-        call output_zarr(n)
+        if (lnetcdf_io) call output(n, mesh)
+        if (lzarr_io) call output_zarr(n)
 #endif
         t5 = MPI_Wtime()
         call restart(n, .false., .false., mesh)
