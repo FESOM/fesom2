@@ -238,6 +238,7 @@ allocate(del_ttf_advhoriz(nl-1,node_size),del_ttf_advvert(nl-1,node_size))
 allocate(dtr_bf(nl-1,node_size)) !jh
 allocate(str_bf(nl-1,node_size)) !OG
 allocate(vert_sink(nl-1,node_size)) ! OG
+allocate(nss(nl-1,node_size)) ! OG
 
 del_ttf          = 0.0_WP
 del_ttf_advhoriz = 0.0_WP
@@ -245,6 +246,7 @@ del_ttf_advvert  = 0.0_WP
 dtr_bf           = 0.0_WP ! jh
 str_bf           = 0.0_WP ! OG
 vert_sink        = 0.0_WP ! OG
+nss              = 0.0_WP ! OG
 
 !!PS allocate(del_ttf_diff(nl-1,node_size))
 if (ldiag_DVD) then
