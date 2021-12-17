@@ -128,7 +128,7 @@ module g_config
   logical                       :: flag_debug=.false.    ! prints name of actual subroutine he is in 
   logical                       :: flag_warn_cflz=.true. ! switches off cflz warning
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
-                        use_cavity_partial_cell, cavity_partial_cell_thresh, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso !wiso-code add lwiso
+                        use_cavity_partial_cell, cavity_partial_cell_thresh, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso !---wiso-code add lwiso
   
   !_____________________________________________________________________________
   ! *** others ***

@@ -284,8 +284,7 @@ allocate(CFL_z(nl, node_size)) ! vertical CFL criteria
 allocate(T_rhs(nl-1, node_size))
 allocate(S_rhs(nl-1, node_size))
 
-! kh 15.03.21
-allocate(tr_arr_old(nl-1,node_size,num_tracers+num_wiso_tracers))
+allocate(tr_arr(nl-1,node_size,num_tracers+num_wiso_tracers),tr_arr_old(nl-1,node_size,num_tracers+num_wiso_tracers))
 
 !---wiso-code
 if (lwiso) then
@@ -294,31 +293,9 @@ end if
 !---wiso-code-end
 
 if (ib_async_mode == 0) then
-!   allocate(tr_arr(nl-1,node_size,num_tracers),tr_arr_old(nl-1,node_size,num_tracers))
-    allocate(tr_arr(nl-1,node_size,num_tracers+num_wiso_tracers))
     allocate(tr_arr_ib(nl-1,node_size,num_tracers+num_wiso_tracers))
 else
-! kh 15.03.21 support "first touch" idea
-!$omp parallel sections num_threads(2)
-!$omp section
-    allocate(tr_arr(nl-1,node_size,num_tracers+num_wiso_tracers))
-    do i = 1, num_tracers+num_wiso_tracers
-        do j = 1, node_size
-            do k = 1, nl-1
-                tr_arr(k, j, i) = 0._WP
-            end do
-        end do
-    end do
-!$omp section
-    allocate(tr_arr_ib(nl-1,node_size,num_tracers+num_wiso_tracers))
-    do i = 1, num_tracers+num_wiso_tracers
-        do j = 1, node_size
-            do k = 1, nl-1
-                tr_arr_ib(k, j, i) = 0._WP
-            end do
-        end do
-    end do
-!$omp end parallel sections
+    tr_arr_ib=0.0_WP
 end if
 
 allocate(del_ttf(nl-1,node_size))

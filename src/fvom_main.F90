@@ -24,7 +24,9 @@ use diagnostics
 use iceberg_params
 use mo_tidal
 use fesom_version_info_module
-
+!---wiso-code
+use g_ic3d
+!---wiso-code-end
 !---fwf-code
 use g_forcing_param, only: use_landice_water 
 use landice_water_init_interface
@@ -179,6 +181,22 @@ type(t_mesh),             target, save :: mesh
     time_1st_sections_per_rank  = 0.0_WP
     time_2nd_sections_per_rank  = 0.0_WP
     time_saved_by_par           = 0.0_WP
+
+!---wiso-code
+    !=====================
+    ! set necessary water isotope variables  
+    !=====================
+    IF (lwiso) THEN
+      num_wiso_tracers = 3    ! always assume 3 water isotope tracers in the order H218O, HD16O, H216O
+      tracer_id((num_tracers+1):(num_tracers+3)) = (/101, 102, 103/)
+      n_ic3d = n_ic3d + 3
+      idlist((num_tracers+1):(num_tracers+3)) = (/101, 102, 103/)
+      filelist((num_tracers+1):(num_tracers+3)) = (/'wiso.nc', 'wiso.nc', 'wiso.nc'/)
+      varlist((num_tracers+1):(num_tracers+3))  = (/'h2o18', 'hDo16', 'h2o16'/)
+      nsend = nsend + 6       ! add number of water isotope tracers to coupling parameter nsend, nrecv
+      nrecv = nrecv + 6
+    END IF
+!---wiso-code-end
 
     !=====================
     ! Allocate field variables 
