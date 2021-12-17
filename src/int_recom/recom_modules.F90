@@ -546,7 +546,7 @@ Module REcoM_locVar
   Real(kind=8) :: Loc_ice_conc(1)           ! Used to calculate flux of DIC in REcoM 0 -> 1
   Real(kind=8) :: LocAtmCO2(1)              ! [uatm]
   Real(kind=8) :: LocDiags2D(8)
-  Real(kind=8) :: LocDenit
+!  Real(kind=8) :: LocDenit
   Real(kind=8) :: LocRiverDIN, LocRiverDON, LocRiverDOC, LocRiverDSi, LocRiverDIC, LocRiverAlk
 !  if (REcoM_Second_Zoo) then
   Real(kind=8) :: res_zoo2_a, res_zoo2_f
