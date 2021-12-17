@@ -309,8 +309,8 @@ real :: net
     dtr_bf         = 0.0_WP
     str_bf         = 0.0_WP
     vert_sink      = 0.0_WP
+    nss = 0.0_WP
 #endif
-
     !___________________________________________________________________________
     ! convert tr_arr_old(:,:,tr_num)=ttr_n-0.5   --> prepare to calc ttr_n+0.5
     ! eliminate AB (adams bashfort) interpolates tracer, which is only needed for 
@@ -345,15 +345,12 @@ if (1) then
         tracer_id(tr_num) == 1003 .or.    &   ! Alk
         tracer_id(tr_num) == 1018 .or.    &   ! Si
         tracer_id(tr_num) == 1019 .or.    &   ! Fe
-
 #if defined(__ciso)
         tracer_id(tr_num) == 1033 .or.    &   ! DIC_13
         tracer_id(tr_num) == 1034 .or.    &   ! DIC_14
 #endif
         tracer_id(tr_num) == 1022     ) then  ! Oxy
-
         call diff_ver_recom_expl(tr_num,mesh)
-
 ! update tracer fields
         do n=1, myDim_nod2D 
             nzmax=nlevels_nod2D(n)-1
@@ -379,7 +376,6 @@ if (1) then
         tracer_id(tr_num) == 1014 .or.    &   !idiac
         tracer_id(tr_num) == 1016 .or.    &   !idiasi
         tracer_id(tr_num) == 1015 .or.    &   !idchl
-
 ! if (REcoM_Second_Zoo) then
         tracer_id(tr_num) == 1025 .or.    &   !idetz2n
         tracer_id(tr_num) == 1026 .or.    &   !idetz2c
@@ -391,9 +387,13 @@ if (1) then
        call recom_sinking_new(tr_num,mesh) !vert_sink
 
 ! sinking into the benthos
-        call ver_sinking_recom_benthos(tr_num,mesh) !str_bf
+       call ver_sinking_recom_benthos(tr_num,mesh) !str_bf
        
 ! update tracer fields
+
+!call integrate_nod(tr_arr(:,:,tr_num), net, mesh)
+!if (mype==0) write(*,*) 'before :', net 
+
         do n=1, myDim_nod2D 
             nzmax=nlevels_nod2D(n)-1
             nzmin=ulevels_nod2D(n)
@@ -401,8 +401,24 @@ tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
                                         vert_sink(nzmin:nzmax,n)
 tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
                                         str_bf(nzmin:nzmax,n)
+
+!call integrate_nod(tr_arr(:,:,tr_num), net, mesh)
+!if (mype==0) write(*,*) 'after :', net 
+
         end do                             
     end if
+
+! 3) Nitrogen SS
+    if (NitrogenSS .and. tracer_id(tr_num)==1008) then ! idetc
+call recom_nitogenss(mesh) !nss for idetc
+        do n=1, myDim_nod2D
+            nzmax=nlevels_nod2D(n)-1
+            nzmin=ulevels_nod2D(n)
+       tr_arr(nzmin:nzmax,n,3)=tr_arr(nzmin:nzmax,n,3)+ &   !!tracer_id(tr_num)==1001 !idin
+                                           nss(nzmin:nzmax,n)
+        end do  
+    end if
+                           
 end if
 
 #endif
@@ -884,7 +900,7 @@ use ver_sinking_recom_benthos_interface
     type(t_mesh), intent(in) , target  :: mesh
     integer                   :: elem,k, tr_num
     integer                   :: nl1,ul1,nz,n,nzmin, nzmax, net
-    real(kind=WP)             :: Vben(mesh%nl),  aux(mesh%nl-1), flux(mesh%nl), add_benthos_2d(myDim_nod2D)
+    real(kind=WP)             :: Vben(mesh%nl),  aux(mesh%nl-1),  flux(mesh%nl), add_benthos_2d(myDim_nod2D)
     integer                   :: nlevels_nod2D_minimum
     real(kind=WP)             :: tv
 #include "associate_mesh.h"
@@ -948,11 +964,12 @@ use ver_sinking_recom_benthos_interface
         nz=nl1
         tv = tr_arr(nz,n,tr_num)*Vben(nz)
         aux(nz)= - tv*(area(nz+1,n))
-        
+
         do nz=ul1,nl1
            str_bf(nz,n) = str_bf(nz,n) + (aux(nz))*dt/area(nz,n)/(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))
-           add_benthos_2d(n) = add_benthos_2d(n) - (aux(nz+1))*dt
-        end do
+           !add_benthos_2d(n) = add_benthos_2d(n) - (aux(nz+1))*dt
+           add_benthos_2d(n) = add_benthos_2d(n) - (aux(nz))*dt
+        end do                 
 
             ! N
             if( tracer_id(tr_num)==1004 .or. &  !iphyn
@@ -1053,28 +1070,28 @@ id = tracer_id(tr_num)
 
   SELECT CASE (id)
     CASE (1001)
-      bottom_flux = GlodecayBenthos(:,1) ! DIN [mmolN/m^2/s]
+      bottom_flux = GlodecayBenthos(:,1) !*** DIN [mmolN/m^2/s] ***
     CASE (1002)
-      bottom_flux = GlodecayBenthos(:,2) + GlodecayBenthos(:,4) ! DIC + calcification
+      bottom_flux = GlodecayBenthos(:,2) + GlodecayBenthos(:,4) !*** DIC + calcification ***
     CASE (1003)
-      bottom_flux = GlodecayBenthos(:,4) * 2.0_WP ! Alk
+      bottom_flux = GlodecayBenthos(:,4) * 2.0_WP !*** Alk ***
     CASE (1018)
-      bottom_flux = GlodecayBenthos(:,3) ! Si
+      bottom_flux = GlodecayBenthos(:,3) !*** Si ***
     CASE (1019)
       if(use_Fe2N) then 
-        bottom_flux = GlodecayBenthos(:,1) * Fe2N_benthos ! Fe
+        bottom_flux = GlodecayBenthos(:,1) * Fe2N_benthos !*** DFe ***
       else
         bottom_flux = GlodecayBenthos(:,2) * Fe2C_benthos
       end if
     CASE (1022)
-      bottom_flux = -GlodecayBenthos(:,2) * redO2C ! Oxy
+      bottom_flux = -GlodecayBenthos(:,2) * redO2C !*** O2 ***
     CASE (1033)
       if (ciso) then
-        bottom_flux = GlodecayBenthos(:,5) + GlodecayBenthos(:,7) ! DIC_13 and Calc: DIC_13
+        bottom_flux = GlodecayBenthos(:,5) + GlodecayBenthos(:,7) !*** DIC_13 and Calc: DIC_13 ***
       end if
     CASE (1034)
       if (ciso) then
-        bottom_flux = GlodecayBenthos(:,6) + GlodecayBenthos(:,8) ! DIC_14 and Calc: DIC_14
+        bottom_flux = GlodecayBenthos(:,6) + GlodecayBenthos(:,8) !*** DIC_14 and Calc: DIC_14 ***
       end if
     CASE DEFAULT
       if (mype==0) then
