@@ -55,6 +55,7 @@ MODULE g_sbf
    public  atmdata
    public  i_totfl, i_xwind, i_ywind, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow
    public  l_xwind, l_ywind, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
+   public  runoff_climatology
    private
 
    integer :: i_totfl = 10! total number of fluxes
