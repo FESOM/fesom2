@@ -199,7 +199,8 @@ type(t_partit), intent(inout), target :: partit
  character(len=MAX_PATH)  :: file_name
  character(len=MAX_PATH)  :: dist_mesh_dir
  integer        :: flag_wrongaux3d=0
- integer       :: ierror              ! return error code
+ integer        :: ierror              ! return error code
+ logical        :: file_exist
  integer, allocatable, dimension(:)         :: mapping
  integer, allocatable, dimension(:,:)       :: ibuff
  real(kind=WP), allocatable, dimension(:,:) :: rbuff
@@ -516,24 +517,117 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
  ! read depth data
  !==============================
  ! 0 proc reads header of aux3d.out and broadcasts it between procs
- if (mype==0) then !open the file for reading on 0 proc
+ !
+ !
+ !______________________________________________________________________________
+ ! read depth from aux3d.out
+ if (trim(use_depthfile)=='aux3d') then
+    ! check if aux3d.out file does exist
+    file_exist=.False.
     file_name=trim(meshpath)//'aux3d.out' 
-    open(fileID, file=file_name)
-    read(fileID,*) mesh%nl  ! the number of levels 
- end if
- call MPI_BCast(mesh%nl, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
- if (mesh%nl < 3) then
-    write(*,*) '!!!Number of levels is less than 3, model will stop!!!'
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-    stop
- end if
- allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
- if (mype==0) read(fileID,*) mesh%zbar
- call MPI_BCast(mesh%zbar, mesh%nl, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
- if(mesh%zbar(2)>0) mesh%zbar=-mesh%zbar   ! zbar is negative 
- allocate(mesh%Z(mesh%nl-1))
- mesh%Z=mesh%zbar(1:mesh%nl-1)+mesh%zbar(2:mesh%nl)  ! mid-depths of cells
- mesh%Z=0.5_WP*mesh%Z 
+    inquire(file=trim(file_name),exist=file_exist) 
+    !___________________________________________________________________________
+    if (file_exist) then
+        if (mype==0) then !open the file for reading on 0 proc
+            open(fileID, file=file_name)
+            read(fileID,*) mesh%nl  ! the number of levels 
+        end if
+        call MPI_BCast(mesh%nl, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+        if (mesh%nl < 3) then
+            write(*,*) '!!!Number of levels is less than 3, model will stop!!!'
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            stop
+        end if
+        allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
+        if (mype==0) read(fileID,*) mesh%zbar
+        call MPI_BCast(mesh%zbar, mesh%nl, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+        if(mesh%zbar(2)>0) mesh%zbar=-mesh%zbar   ! zbar is negative 
+        allocate(mesh%Z(mesh%nl-1))
+        mesh%Z=mesh%zbar(1:mesh%nl-1)+mesh%zbar(2:mesh%nl)  ! mid-depths of cells
+        mesh%Z=0.5_WP*mesh%Z
+    !___________________________________________________________________________
+    else
+        if (mype==0) then
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: You want to use aux3d.out file to define your depth, but '
+            write(*,*) '        the file seems not to exist'
+            write(*,*) '        --> check in namelist.config, the flag use_depthfile must be'
+            write(*,*) '            use_depthfile= "aux3d" or "depth@" '
+            write(*,*) '        --> model stops here'
+            write(*,*) '____________________________________________________________________'
+        end if
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+    end if
+    
+ !______________________________________________________________________________
+ ! read depth from depth@node.out or depth@elem.out    
+ elseif (trim(use_depthfile)=='depth@') then
+    !___________________________________________________________________________
+    ! load file depth_zlev.out --> contains number of model levels and full depth
+    ! levels
+    file_exist=.False.
+    file_name=trim(meshpath)//'depth_zlev.out' 
+    inquire(file=trim(file_name),exist=file_exist) 
+    if (file_exist) then
+        if (mype==0) then !open the file for reading on 0 proc
+            open(fileID, file=file_name)
+            read(fileID,*) mesh%nl  ! the number of levels 
+        end if
+        call MPI_BCast(mesh%nl, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+        if (mesh%nl < 3) then
+            write(*,*) '!!!Number of levels is less than 3, model will stop!!!'
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            stop
+        end if
+        allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
+        if (mype==0) read(fileID,*) mesh%zbar
+        call MPI_BCast(mesh%zbar, mesh%nl, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+        if(mesh%zbar(2)>0) mesh%zbar=-mesh%zbar   ! zbar is negative 
+        allocate(mesh%Z(mesh%nl-1))
+        mesh%Z=mesh%zbar(1:mesh%nl-1)+mesh%zbar(2:mesh%nl)  ! mid-depths of cells
+        mesh%Z=0.5_WP*mesh%Z
+        if (mype==0) close(fileID)
+    !___________________________________________________________________________
+    else
+        if (mype==0) then
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: You want to use depth@elem.out or depth@node.out file, therefore'
+            write(*,*) '        you also need the file depth_zlev.out which contains the model '
+            write(*,*) '        number of layers and the depth of model levels. This file seems '
+            write(*,*) '        not to exist'
+            write(*,*) '        --> check in namelist.config, the flag use_depthfile must be'
+            write(*,*) '            use_depthfile= "aux3d" or "depth@" and your meshfolder'
+            write(*,*) '        --> model stops here'
+            write(*,*) '____________________________________________________________________'
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+        end if 
+    end if 
+    
+    !___________________________________________________________________________
+    ! load file depth@elem.out or depth@node.out contains topography either at 
+    ! nodes or elements
+    file_exist=.False.
+    if (use_depthonelem) then 
+        file_name=trim(meshpath)//'depth@elem.out' 
+    else
+        file_name=trim(meshpath)//'depth@node.out' 
+    end if 
+    inquire(file=trim(file_name),exist=file_exist) 
+    if (file_exist) then 
+        if (mype==0) open(fileID, file=file_name)
+    else    
+        if (mype==0) then
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: You want to use depth@elem.out or depth@node.out file to '
+            write(*,*) '        define your depth, but the file seems not to exist'
+            write(*,*) '        --> check in namelist.config, the flag use_depthfile must be'
+            write(*,*) '            use_depthfile= "aux3d" or "depth@" and your meshfolder '
+            write(*,*) '        --> model stops here'
+            write(*,*) '____________________________________________________________________'
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+        end if
+    end if     
+ end if 
 
  ! 0 proc reads the data in chunks and distributes it between other procs
  !______________________________________________________________________________
@@ -554,7 +648,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
                 mapping(iofs)=n
             end if
         end do
-    
+        
         k=min(chunk_size, mesh%elem2D-nchunk*chunk_size)
         if (mype==0) then
             do n=1, k
@@ -566,7 +660,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
             if ( flag_wrongaux3d==0 .and. any(abs(rbuff(1:k,1))>11000.0_WP) ) flag_wrongaux3d=1
         end if
         call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-
+        
         do n=1, k
             x=rbuff(n,1)
             if (x>0) x=-x !deps must be negative!
@@ -607,7 +701,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
                 mapping(iofs)=n
             end if
         end do
-
+        
         k=min(chunk_size, mesh%nod2D-nchunk*chunk_size)
         if (mype==0) then
             do n=1, k
@@ -619,7 +713,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
             if ( flag_wrongaux3d==0 .and. any(abs(rbuff(1:k,1))>11000.0_WP) ) flag_wrongaux3d=1
         end if
         call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-
+        
         do n=1, k
             x=rbuff(n,1)
             if (x>0) x=-x !deps must be negative!
@@ -1296,7 +1390,11 @@ subroutine find_levels_cavity(partit, mesh)
     !___________________________________________________________________________
     ! Part IV: reading cavity depth at nodes
     if (mype==0)  then 
-        file_name=trim(meshpath)//'cavity_depth.out'
+        if (use_cavityonelem) then
+            file_name = trim(meshpath)//'cavity_depth@elem.out'
+        else
+            file_name = trim(meshpath)//'cavity_depth@node.out'
+        end if    
         file_exist=.False.
         inquire(file=trim(file_name),exist=file_exist)
         if (file_exist) then

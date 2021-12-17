@@ -81,13 +81,16 @@ module g_config
                                             ! Set to zeros to work with
                                             ! geographical coordinates
   integer                :: thers_zbar_lev=5     ! minimum number of levels to be                                            
-  character(len=5)       :: which_depth_n2e='mean'                                           
+  character(len=5)       :: which_depth_n2e='mean'    
+  
   logical                :: use_depthonelem =.false.
+  character(len=10)      :: use_depthfile='aux3d'   ! 'aux3d', 'depth@'        
   logical                :: use_cavityonelem=.false.
+  
   namelist /geometry/   cartesian, fplane, &
                         cyclic_length, rotated_grid, force_rotation, &
                         alphaEuler, betaEuler, gammaEuler, &
-                        which_depth_n2e, use_depthonelem, use_cavityonelem
+                        which_depth_n2e, use_depthonelem, use_cavityonelem, use_depthfile
 
   !_____________________________________________________________________________
   ! *** fleap_year ***
