@@ -167,7 +167,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forci
      GloHplus(n)                  = hplus
      AtmFeInput(n)                = FeDust
      AtmNInput(n)                 = NDust 
-     DenitBen(n)                  = LocDenit
+!     DenitBen(n)                  = LocDenit
 
      GlodecayBenthos(n, 1:benthos_num) = decayBenthos(1:benthos_num)/SecondsPerDay ! convert from [mmol/m2/d] to [mmol/m2/s]  
 
@@ -216,7 +216,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forci
   call exchange_nod(GloHplus)	
   call exchange_nod(AtmFeInput)	
   call exchange_nod(AtmNInput)	
-  call exchange_nod(DenitBen)	
+!  call exchange_nod(DenitBen)	
   call exchange_nod(PAR3D)	
 !  do n=1, 2
 !     call exchange_nod(Diags3D(:,:,n))	
