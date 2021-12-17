@@ -29,13 +29,13 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
 
     real(kind=8),dimension(mesh%nl-1)                       :: thick                !< [m] Vertical distance between two nodes = Thickness 
     real(kind=8),dimension(mesh%nl-1)                       :: recipthick           !< [1/m] reciprocal of thick
-    real(kind=8), intent(in)                                :: SurfSR               !< [W/m2] ShortWave radiation at surface
+    real(kind=8),intent(in)                                 :: SurfSR               !< [W/m2] ShortWave radiation at surface
 
     real(kind=8),dimension(mesh%nl-1,bgc_num),intent(inout) :: sms                  !< Source-Minus-Sinks term
     real(kind=8),dimension(mesh%nl-1)        ,intent(in)    :: Temp                 !< [degrees C] Ocean temperature
     real(kind=8),dimension(mesh%nl,4)        ,intent(in)    :: SinkVel
 
-    real(kind=8),dimension(mesh%nl),intent(in)              :: zF                   !< [m] Depth of fluxes
+    real(kind=8),dimension(mesh%nl)          ,intent(in)    :: zF                   !< [m] Depth of fluxes
     real(kind=8),dimension(mesh%nl-1),intent(inout)         :: PAR
 
     real(kind=8)                                            :: net                  
@@ -47,8 +47,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
     real(kind=8)                                            :: Fc                   !< Flux of labile C into sediment, used for denitrification calculation [umolC/cm2/s]
     real(kind=8)                                            :: recip_hetN_plus      !< MB's addition to heterotrophic respiration
     real(kind=8)                                            :: recip_res_het        !< [day] Reciprocal of respiration by heterotrophs and mortality (loss to detritus)
-
-    integer                                                 :: k,step,ii, idiags,n, aux
+    real(kind=8)                                            :: aux
+    integer                                                 :: k,step,ii, idiags,n
     real(kind=8)                                            :: & 
         DIN,     & !< Dissolved Inorganic Nitrogen 				[mmol/m3] 
         DIC,     & !< Dissolved Inorganic Carbon				[mmol/m3]
@@ -88,7 +88,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
         Cphot_z = zero                 ! initialize vertical profiles of
         Cphot_dia_z = zero             ! daily-mean photosynthesis rates
         if (.not. ciso_calcdiss) then  ! turn off isotopic fractionation
-            alpha_calc_13 = 1.d0   ! during calcification / dissolution
+            alpha_calc_13 = 1.d0       ! during calcification / dissolution
             alpha_calc_14 = 1.d0
             alpha_dcal_13 = 1.d0
             alpha_dcal_14 = 1.d0
@@ -97,13 +97,13 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
 
     sms = zero ! double precision
 
-    tiny_N   = tiny_chl/chl2N_max      ! 0.00001/ 3.15d0   Chl2N_max [mg CHL/mmol N] Maximum CHL a : N ratio = 0.3 gCHL gN^-1
-    tiny_N_d = tiny_chl/chl2N_max_d    ! 0.00001/ 4.2d0
-    tiny_C   = tiny_N  /NCmax          ! NCmax   = 0.2d0   [mmol N/mmol C] Maximum cell quota of nitrogen (N:C)
-    tiny_C_d = tiny_N_d/NCmax_d        ! NCmax_d = 0.2d0 
-    tiny_Si  = tiny_C_d/SiCmax         ! SiCmax = 0.8d0
+    tiny_N   = tiny_chl/chl2N_max      !< 0.00001/ 3.15d0   Chl2N_max [mg CHL/mmol N] Maximum CHL a : N ratio = 0.3 gCHL gN^-1
+    tiny_N_d = tiny_chl/chl2N_max_d    !< 0.00001/ 4.2d0
+    tiny_C   = tiny_N  /NCmax          !< NCmax   = 0.2d0   [mmol N/mmol C] Maximum cell quota of nitrogen (N:C)
+    tiny_C_d = tiny_N_d/NCmax_d        !< NCmax_d = 0.2d0 
+    tiny_Si  = tiny_C_d/SiCmax         !< SiCmax = 0.8d0
 
-    recip_res_het = 1.d0/res_het       ! res_het = 0.01d0  [1/day] Respiration by heterotrophs and mortality (loss to detritus)
+    recip_res_het = 1.d0/res_het       !< res_het = 0.01d0  [1/day] Respiration by heterotrophs and mortality (loss to detritus)
 
 !-------------------------------------------------------------------------------
 !> REcoM time steps [day]
@@ -153,22 +153,14 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
             DiaN   = max(tiny_N,state(k,idian)  	+ sms(k,idian ))
             DiaC   = max(tiny_C,state(k,idiac)  	+ sms(k,idiac ))
             DiaChl = max(tiny_chl,state(k,idchl)  	+ sms(k,idchl ))
-            DiaSi  = max(tiny_si,state(k,idiasi)      	 + sms(k,idiasi)) 
-            !DiaSi  = state(k,idiasi) 	+ sms(k,idiasi) 
-            DetSi  = max(tiny,state(k,idetsi) 		 + sms(k,idetsi)) 
-            Si     = max(tiny,state(k,isi)    		 + sms(k,isi   )) 
+            DiaSi  = max(tiny_si,state(k,idiasi)      	+ sms(k,idiasi)) 
+            DetSi  = max(tiny,state(k,idetsi) 		+ sms(k,idetsi)) 
+            Si     = max(tiny,state(k,isi)    		+ sms(k,isi   )) 
             Fe     = max(tiny,state(k,ife)    		+ sms(k,ife   ))
             O2     = max(tiny,state(k,ioxy)             + sms(k,ioxy  ))
             FreeFe = zero
-!! REcoM calcification
             PhyCalc= max(tiny,state(k,iphycal)		+ sms(k,iphycal))
             DetCalc= max(tiny,state(k,idetcal)		+ sms(k,idetcal))
-
-!            addtiny(k,1) = Si      - (state(k,isi)           + sms(k,isi  ))
-!            addtiny(k,2) = DetSi   - (state(k,idetsi)        + sms(k,idetsi  )) 
-!            addtiny(k,3) = DiaSi   - (state(k,idiasi)        + sms(k,idiasi  )) 
-!            addtiny(k,4) = DetZ2Si - (state(k,idetz2si)      + sms(k,idetz2si  ))
-
 
             calc_diss      = calc_diss_rate * SinkVel(k,ivdet) /20.d0 ! Dissolution rate of CaCO3 scaled by the sinking velocity at the current depth 0.005714   !20.d0/3500.d0
             calc_diss2     = calc_diss_rate2  ! Dissolution rate of CaCO3 for seczoo
@@ -281,9 +273,9 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
 !< Diatoms are additionally limited by silicon
 
     qlimitFac     	= recom_limiter(NMinSlope,NCmin,quota) ! Eqn A55
-    feLimitFac  	= Fe/(k_Fe + Fe) ! Use Michaelis–Menten kinetics
-    qlimitFac   	= min(qlimitFac,feLimitFac) ! Liebig law of the minimum
-    pMax          	= P_cm * qlimitFac * arrFunc ! Maximum value of C-specific rate of photosynthesis
+    feLimitFac  	= Fe/(k_Fe + Fe)                       ! Use Michaelis–Menten kinetics
+    qlimitFac   	= min(qlimitFac,feLimitFac)            ! Liebig law of the minimum
+    pMax          	= P_cm * qlimitFac * arrFunc           ! Maximum value of C-specific rate of photosynthesis
     
 !_______________________________________________________________________
 !< Diatoms
@@ -366,7 +358,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
             KOchl = max((deg_Chl*0.1d0), KOchl)
         end if
 
-!< Phyto Chla loss                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
+!< Phyto Chla loss                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
         if (pMax_dia .lt. tiny .OR. PARave /= PARave             &
             .OR. CHL2C_plast_dia /= CHL2C_plast_dia) then
             KOchl_dia = deg_Chl_d*0.1d0
@@ -415,7 +407,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
     V_cm           = V_cm_fact
     limitFacN      = recom_limiter(NMaxSlope,quota,NCmax)
     N_assim        = V_cm * pMax * NCuptakeRatio &                ! [mmol N / (mmol C * day)]
-                      * limitFacN * (DIN/(DIN + k_din)) ! Michaelis–Menten kinetics
+                      * limitFacN * (DIN/(DIN + k_din))           ! Michaelis–Menten kinetics
 
     V_cm           = V_cm_fact_d
     limitFacN_dia  = recom_limiter(NMaxSlope,quota_dia,NCmax_d)
@@ -446,7 +438,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
     ChlSynth_dia = zero
     if (PARave .ge. tiny .AND. PARave .eq. PARave) then
         ChlSynth_dia = N_assim_dia                        &
-            * Chl2N_max_d * min(real(one),                 &
+            * Chl2N_max_d * min(real(one),                &
             Cphot_dia /(alfa_d * Chl2C_dia * PARave))
     end if
 !-------------------------------------------------------------------------------
@@ -476,27 +468,27 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
 !< pzDet: Maximum small detritus prefence by first zooplankton
 !< pzDetZ2: Maximum large detritus preference by first zooplankton
 
-                varpzPhy    = pzPhy   * PhyN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
-                varpzDia    = pzDia   * DiaN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
-                varpzDet    = pzDet   * DetN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
-                varpzDetZ2  = pzDetZ2 * DetN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
-!                aux         = pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N
-!                varpzPhy    = pzPhy   * PhyN /aux
-!                varpzDia    = pzDia   * DiaN /aux
-!                varpzDet    = pzDet   * DetN /aux
-!                varpzDetZ2  = pzDetZ2 * DetN /aux
+!                varpzPhy    = pzPhy   * PhyN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
+!                varpzDia    = pzDia   * DiaN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
+!                varpzDet    = pzDet   * DetN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
+!                varpzDetZ2  = pzDetZ2 * DetN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
+                aux         = pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N
+                varpzPhy    = pzPhy   * PhyN /aux
+                varpzDia    = pzDia   * DiaN /aux
+                varpzDet    = pzDet   * DetN /aux
+                varpzDetZ2  = pzDetZ2 * DetN /aux
             else
-!                DiaNsq      = DiaN**2
-!                PhyNsq      = PhyN**2
-!                DetNsq      = DetN**2
-!                DetZ2Nsq    = DetZ2N**2
-                PhyNsq      = PhyN * PhyN
+                DiaNsq      = DiaN**2
+                PhyNsq      = PhyN**2
+                DetNsq      = DetN**2
+                DetZ2Nsq    = DetZ2N**2
+!                PhyNsq      = PhyN * PhyN
                 varpzPhy    = pzPhy * PhyNsq /(sPhyNsq + PhyNsq)
-                DiaNsq      = DiaN * DiaN
+!                DiaNsq      = DiaN * DiaN
                 varpzDia    = pzDia * DiaNsq /(sDiaNsq + DiaNsq)
-                DetNsq      = DetN * DetN
+!                DetNsq      = DetN * DetN
                 varpzDet    = pzDet * DetNsq /(sDetNsq + DetNsq)
-                DetZ2Nsq    = DetZ2N * DetZ2N
+!                DetZ2Nsq    = DetZ2N * DetZ2N
                 varpzDetZ2  = pzDetZ2 * DetZ2Nsq /(sDetZ2Nsq + DetZ2Nsq)
 
             endif
@@ -555,17 +547,17 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
     if (REcoM_Grazing_Variable_Preference) then
        if (Grazing_detritus) then
           if (Graz_pref_new) then
-             varpzDia2      = pzDia2   * DiaN   /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)
-             varpzPhy2      = pzPhy2   * PhyN   /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)
-             varpzHet       = pzHet    * HetN   /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)  
-             varpzDet2      = pzDet2   * DetN   /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)
-             varpzDetZ22    = pzDetZ22 * DetZ2N /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)
-!             aux            = pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N
-!             varpzDia2      = pzDia2   * DiaN   /aux
-!             varpzPhy2      = pzPhy2   * PhyN   /aux
-!             varpzHet       = pzHet    * HetN   /aux  
-!             varpzDet2      = pzDet2   * DetN   /aux
-!             varpzDetZ22    = pzDetZ22 * DetZ2N /aux
+!             varpzDia2      = pzDia2   * DiaN   /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)
+!             varpzPhy2      = pzPhy2   * PhyN   /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)
+!             varpzHet       = pzHet    * HetN   /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)  
+!             varpzDet2      = pzDet2   * DetN   /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)
+!             varpzDetZ22    = pzDetZ22 * DetZ2N /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)
+             aux            = pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N
+             varpzDia2      = pzDia2   * DiaN   /aux
+             varpzPhy2      = pzPhy2   * PhyN   /aux
+             varpzHet       = pzHet    * HetN   /aux  
+             varpzDet2      = pzDet2   * DetN   /aux
+             varpzDetZ22    = pzDetZ22 * DetZ2N /aux
           else
              DiaNsq2        = DiaN * DiaN
              varpzDia2      = pzDia2 * DiaNsq2 /(sDiaNsq2 + DiaNsq2)
@@ -588,13 +580,13 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
           fDetZ2N2       = varpzDetZ22 * DetZ2N
        else
           if (Graz_pref_new) then
-             varpzDia2      = pzDia2 * DiaN /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN)
-             varpzPhy2      = pzPhy2 * PhyN /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN)
-             varpzHet       = pzHet * HetN /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN)
-!             aux            = pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN
-!             varpzDia2      = pzDia2 * DiaN /aux
-!             varpzPhy2      = pzPhy2 * PhyN /aux
-!             varpzHet       = pzHet  * HetN /aux
+!             varpzDia2      = pzDia2 * DiaN /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN)
+!             varpzPhy2      = pzPhy2 * PhyN /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN)
+!             varpzHet       = pzHet * HetN /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN)
+             aux            = pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN
+             varpzDia2      = pzDia2 * DiaN /aux
+             varpzPhy2      = pzPhy2 * PhyN /aux
+             varpzHet       = pzHet  * HetN /aux
 
           else
              DiaNsq2        = DiaN * DiaN
@@ -716,45 +708,60 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
        qlimitFac     = min(qLimitFac,qlimitFacTmp)
        feLimitFac  = Fe/(k_Fe_d + Fe)
        qlimitFac   = min(qlimitFac,feLimitFac)
-       if (REcoM_Second_Zoo) then 
-          aggregationrate = agg_PD * DetN + agg_PD * DetZ2N &
-                             + agg_PP * PhyN + agg_PP * (1 - qlimitFac) * DiaN
-       else
-          aggregationrate = agg_PD * DetN + agg_PP * PhyN &
-                             + agg_PP * (1 - qlimitFac) * DiaN
-       endif
+
+
+!       if (REcoM_Second_Zoo) then 
+!          aggregationrate = agg_PD * DetN + agg_PD * DetZ2N + agg_PP * PhyN + agg_PP * (1 - qlimitFac) * DiaN
+!       else
+!          aggregationrate = agg_PD * DetN                   + agg_PP * PhyN + agg_PP * (1 - qlimitFac) * DiaN
+!       endif
+       aggregationrate = agg_PD * DetN + agg_PP * PhyN + agg_PP * (1 - qlimitFac) * DiaN
+       if (REcoM_Second_Zoo) aggregationrate = aggregationrate + agg_PD * DetZ2N
+
+
     else
-       if (REcoM_Second_Zoo) then
-          aggregationrate = agg_PD * DetN + agg_PD * DetZ2N &
-                             + agg_PP * PhyN + agg_PP * DiaN
-       else
-          aggregationrate = agg_PD * DetN + agg_PP * PhyN &
-                             + agg_PP * DiaN
-       endif
+
+!       if (REcoM_Second_Zoo) then
+!          aggregationrate = agg_PD * DetN + agg_PD * DetZ2N + agg_PP * PhyN + agg_PP * DiaN
+!       else
+!          aggregationrate = agg_PD * DetN                   + agg_PP * PhyN + agg_PP * DiaN
+!       endif
+       aggregationrate = agg_PD * DetN + agg_PP * PhyN + agg_PP * DiaN
+       if (REcoM_Second_Zoo) aggregationrate = aggregationrate + agg_PD * DetZ2N
+
     endif
+
 !-------------------------------------------------------------------------------
 ! Phytoplankton and detritus aggregation
-!    aggregationrate = agg_PD * DetN + agg_PP * PhyN &
-!                    + agg_PP * DiaN
+!    aggregationrate = agg_PD * DetN + agg_PP * PhyN + agg_PP * DiaN
+!                    
 !-------------------------------------------------------------------------------
+
 ! Terms required for the formation and dissolution of CaCO3
-!#ifdef REcoM_calcification
+
 !< calc_prod_ratio: Calcite production ratio, dimensionless
     calcification = calc_prod_ratio * Cphot * PhyC   ! Z in equations
-    calc_loss_agg = aggregationRate * PhyCalc
+    calc_loss_agg = aggregationrate * PhyCalc
 
-    if(REcoM_Second_Zoo)  then
-!     calc_loss_gra  = (grazingFlux_phy + grazingFlux_phy2)  &
-!                     * recipQuota/(PhyC + tiny)    * PhyCalc
-       calc_loss_gra  =  grazingFlux_phy   &
-                       * recipQuota/(PhyC + tiny)    * PhyCalc
-       calc_loss_gra2 = grazingFlux_phy2           &
-                       * recipQuota/(PhyC + tiny)    * PhyCalc
-    else
-       calc_loss_gra = grazingFlux_phy           &
-                       * recipQuota/(PhyC + tiny)    * PhyCalc
-    endif
- 
+!    if(REcoM_Second_Zoo)  then
+!       calc_loss_gra  =  grazingFlux_phy   &
+!                       * recipQuota/(PhyC + tiny)    * PhyCalc
+!       calc_loss_gra2 = grazingFlux_phy2   &
+!                       * recipQuota/(PhyC + tiny)    * PhyCalc
+!    else
+!
+!       calc_loss_gra = grazingFlux_phy     &
+!                       * recipQuota/(PhyC + tiny)    * PhyCalc
+!    endif
+
+    calc_loss_gra = grazingFlux_phy          &
+                  * recipQuota/(PhyC + tiny) &  
+                  * PhyCalc
+
+    if (REcoM_Second_Zoo) calc_loss_gra2 = grazingFlux_phy2         &
+                                         * recipQuota/(PhyC + tiny) &
+                                         * PhyCalc
+
  
     if (ciso) then
         calcification_13 = calc_prod_ratio * Cphot * PhyC_13 * alpha_calc_13
@@ -766,8 +773,6 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
         calc_loss_gra_14 = grazingFlux_phy *              &
             recipQuota_14/(PhyC_14 + tiny)   * PhyCalc_14
     end if
-
-!#endif
 		
 !-------------------------------------------------------------------------------
 ! Sources minus sinks are calculated
@@ -812,8 +817,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
             + calc_loss_gra2 * calc_diss_guts            &
             + calc_diss2                     * DetZ2Calc & 
             - calcification                              & ! --> Calcification
-!     + LocRiverDIC                             &
-                                                 ) * dt_b + sms(k,idic)
+                                                        ) * dt_b + sms(k,idic)
     else
         sms(k,idic)      = (                       &
             - Cphot                         * PhyC    &
@@ -822,13 +826,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
             + phyRespRate_Dia               * DiaC    &
             + rho_C1 * arrFunc              * EOC     &
             + HetRespFlux                             & 
-!#ifdef REcoM_calcification                     
+                    
             + calc_diss                     * DetCalc &
             + calc_loss_gra * calc_diss_guts          &
             - calcification                           &
-!     + LocRiverDIC                             &
-!#endif
-                                                 ) * dt_b + sms(k,idic)
+                                                      ) * dt_b + sms(k,idic)
     endif
 !  if((Latd(1)<-45.0) .and. ((state(k,idic)+sms(k,idic))>2500)) then
 !     !co2flux(1)=0.0  
@@ -855,26 +857,21 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
         sms(k,ialk)      = (                       &
             + 1.0625 * N_assim             * PhyC    &
             + 1.0625 * N_assim_Dia         * DiaC    &
-            - 1.0625 * rho_N * arrFunc     * DON     &
-!#ifdef REcoM_calcification     
+            - 1.0625 * rho_N * arrFunc     * DON     &     
             + 2.d0 * calc_diss             * DetCalc &
             + 2.d0 * calc_loss_gra * calc_diss_guts  &
             + 2.d0 * calc_loss_gra2 * calc_diss_guts &
             + 2.d0 * calc_diss2            * DetZ2Calc &
-            - 2.d0 * calcification                   &
-!#endif                       
+            - 2.d0 * calcification                   &                      
                                              ) * dt_b + sms(k,ialk)
     else
         sms(k,ialk)      = (                       &
             + 1.0625 * N_assim             * PhyC    &
             + 1.0625 * N_assim_Dia         * DiaC    &
             - 1.0625 * rho_N * arrFunc     * DON     &
-!#ifdef REcoM_calcification
             + 2.d0 * calc_diss             * DetCalc &
             + 2.d0 * calc_loss_gra * calc_diss_guts  &
             - 2.d0 * calcification                   &
-!      + LocRiverAlk                             &
-!#endif 
                                              ) * dt_b + sms(k,ialk) 
     endif
 !____________________________________________________________
@@ -1761,65 +1758,42 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
 
 !-------------------------------------------------------------------------------
 ! Remineralization from the sediments into the bottom layer
-!		kLoc = Nn      
-      
-!   if (mype==0) then
-!      write(*,*) '____________________________________________________________'
-!      write(*,*) ' --> Remineralization from the sediments'
-!      write(*,*) '     into the bottom layer'
-!   endif
 
 !*** DIN ***
 !< decayRateBenN: Remineralization rate for benthic N [day^-1]
 !< LocBenthos(1): Vertically integrated N concentration in benthos (1 layer) [mmolN/m^2]
-    decayBenthos(1) = decayRateBenN * LocBenthos(1)                                       ! flux
-    LocBenthos(1)   = LocBenthos(1)   - decaybenthos(1) * dt_b ! / depth of benthos    ! remove from benthos (flux)
+  decayBenthos(1) = decayRateBenN * LocBenthos(1)             
+  LocBenthos(1)   = LocBenthos(1)   - decaybenthos(1) * dt_b ! remove from benthos (flux)
 
 !*** DIC ***
 !< decayRateBenC: Remineralization rate for benthic C [day^-1]
 !< LocBenthos(2): Vertically integrated C concentration in benthos (1 layer) [mmolC/m^2]		
-    decayBenthos(2) = decayRateBenC * LocBenthos(2)
-    LocBenthos(2)   = LocBenthos(2)   - decaybenthos(2) * dt_b ! / depth of benthos
-
+  decayBenthos(2) = decayRateBenC * LocBenthos(2)
+  LocBenthos(2)   = LocBenthos(2)   - decaybenthos(2) * dt_b
 
 !*** Si ***
 !< decayRateBenSi: Remineralization rate for benthic Si [day^-1]
 !< LocBenthos(3) : Vertically integrated N concentration in benthos (1 layer) [mmolSi/m^2]		
-    decayBenthos(3) = decayRateBenSi * LocBenthos(3)                                      ! [1/day] * [mmolSi/m2] -> [mmolSi/m2/day]
-    LocBenthos(3)   = LocBenthos(3)   - decaybenthos(3) * dt_b ! / depth of benthos    ! [mmolSi/m2]
+  decayBenthos(3) = decayRateBenSi * LocBenthos(3) ! [1/day] * [mmolSi/m2] -> [mmolSi/m2/day]
+  LocBenthos(3)   = LocBenthos(3)   - decaybenthos(3) * dt_b 
 
 !*** Calc: DIC, Alk ***
+  decayBenthos(4) = calc_diss * LocBenthos(4)
+  LocBenthos(4)      = LocBenthos(4)   - decayBenthos(4) * dt_b
 
-    decayBenthos(4) = calc_diss * LocBenthos(4)
-    LocBenthos(4)      = LocBenthos(4)   - decayBenthos(4) * dt_b ! / depth of benthos
-
-    if (ciso) then
+  if (ciso) then
 !*** DIC_13 ***  We ignore isotopic fractionation during remineralization.
-        decayBenthos(5) = alpha_dcal_13   * decayRateBenC   * LocBenthos(5)
-        LocBenthos(5)   = LocBenthos(5)   - decayBenthos(5) * dt_b
+     decayBenthos(5) = alpha_dcal_13   * decayRateBenC   * LocBenthos(5)
+     LocBenthos(5)   = LocBenthos(5)   - decayBenthos(5) * dt_b
 !*** DIC_14 ***  We ignore isotopic fractionation during remineralization.
-        decayBenthos(6) = alpha_dcal_14   * decayRateBenC   * LocBenthos(6)
-        LocBenthos(6)   = LocBenthos(6)   - decayBenthos(6) * dt_b
-
+     decayBenthos(6) = alpha_dcal_14   * decayRateBenC   * LocBenthos(6)
+     LocBenthos(6)   = LocBenthos(6)   - decayBenthos(6) * dt_b
 !*** Calc: DIC_13,14 ***
-        decayBenthos(7) = calc_diss_13    * LocBenthos(7)
-        LocBenthos(7)   = LocBenthos(7)   - decayBenthos(7) * dt_b ! / depth of benthos
-
-        decayBenthos(8) = calc_diss_14    * LocBenthos(8)
-        LocBenthos(8)   = LocBenthos(8)   - decayBenthos(8) * dt_b ! / depth of benthos
-
-    end if ! ciso
-!*** DFe ***
-!  if(use_Fe2N) then 
-!    Ironflux          = decayRateBenN * LocBenthos(1) * Fe2N_benthos
-!  else
-!    Ironflux          = decayRateBenC * LocBenthos(2) * Fe2C_benthos
-!  end if
-!  sms(Nn,ife)       = sms(Nn,ife) + Ironflux * recipthick(Nn) * dt_b
-
-!*** O2 ***
-!   sms(Nn,ioxy)    = sms(Nn,ioxy) - decayBenthos(2) * redO2C *dt_b  &
-!                      * recipthick(Nn)
+     decayBenthos(7) = calc_diss_13    * LocBenthos(7)
+     LocBenthos(7)   = LocBenthos(7)   - decayBenthos(7) * dt_b ! / depth of benthos
+     decayBenthos(8) = calc_diss_14    * LocBenthos(8)
+     LocBenthos(8)   = LocBenthos(8)   - decayBenthos(8) * dt_b ! / depth of benthos
+  end if ! ciso
 
   end do ! Main time loop ends
 
