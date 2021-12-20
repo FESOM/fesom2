@@ -530,8 +530,8 @@ use REcoM_ciso
     endif
 
     if(DIC_PI) then 
-      filelist(5)='GLODAPv2.2016b.PI_TCO2_fesom2_fix_z_Fillvalue.nc'
-      varlist(5)='PI_TCO2'
+      filelist(5)='GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc'
+      varlist(5)='PI_TCO2_mmol'
       if (mype==0) then
         write(*,*) '____________________________________________________________'
         write(*,*) ' --> Reading REcoM2 preindustrial DIC for restart'
