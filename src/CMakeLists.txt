@@ -13,6 +13,34 @@ if(${USE_ICEPACK})
 else()
    file(GLOB sources_Fortran ${src_home}/*.F90)
 endif()
+
+### ADD options for HECUBA
+if(${USE_HECUBAIO})
+   include(ExternalProject)
+   
+   ## Option 1: use external GH link to hecuba
+   #ExternalProject_Add(
+     #HECUBAIO
+     #GIT_REPOSITORY https://github.com/bsc-dd/hecuba
+     #SOURCE_DIR ${src_home}/hecuba_io/hecuba
+     #GIT_TAG origin/master
+     #)
+    
+   ## Option 2: below, git submodule is better because the library is also browsable on github src of the branch
+  # cd fesom2/src/hecuba_io/
+  # git submodule add https://github.com/bsc-dd/hecuba
+  ExternalProject_Add(
+     GIT_SUBMODULES hecuba
+     SOURCE_DIR ${src_home}/hecuba_io
+     GIT_TAG origin/master
+  )
+
+   # Add any other F sources that need to be compiled, linked with the model.
+   list(APPEND sources_Fortran ${src_home}/hecuba_io/io_mod_hecuba.F90)
+   # optionally add any c sources to sources_C list like below.
+endif()
+
+
 #list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_partition_init.F90)
 file(GLOB sources_C ${src_home}/*.c)
 
@@ -62,6 +90,16 @@ endif()
 if(${USE_ICEPACK})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __icepack)
 endif()
+
+if(${USE_HECUBAIO})
+   # use this in the model using preprocesser as 
+   ##if defined (__hecubaio)
+     # do something hecuba specific like: use mod_hecuba
+   ##endif
+
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __hecubaio)
+endif()
+
 if(${VERBOSE})
    target_compile_definitions(${PROJECT_NAME} PRIVATE VERBOSE)
 endif()
