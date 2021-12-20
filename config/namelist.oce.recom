@@ -91,7 +91,7 @@ tracer_ID  =0,1,1001,1002,1003,1004,1005,1006,1007,1008,1009,1010,1011,1012,1013
 !varlist  = 'salt', 'temp'                 ! variables to read from specified files
 n_ic3d   = 8                              ! number of tracers to initialize
 idlist   = 1019, 1022, 1018, 1003, 1002, 1001, 1, 0            
-filelist = 'fe_pisces_opa_eq_init_3D_changed_name.nc', 'woa18_all_o00_01_fesom2.nc', 'woa13_all_i00_01_fesom2.nc', 'GLODAPv2.2016b.TAlk_fesom2_fix_z_Fillvalue.nc', 'GLODAPv2.2016b.TCO2_fesom2_fix_z_Fillvalue.nc', 'woa13_all_n00_01_fesom2.nc', 'phc3.0_winter.nc', 'phc3.0_winter.nc' 
-varlist  = 'Fe', 'o_an', 'i_an', 'TAlk', 'TCO2', 'n_an', 'salt', 'temp'
+filelist = 'fe_pisces_opa_eq_init_3D_changed_name.nc', 'woa18_all_o00_01_mmol_fesom2.nc', 'woa13_all_i00_01_fesom2.nc', 'GLODAPv2.2016b.TAlk_fesom2_mmol_fix_z_Fillvalue.nc', 'GLODAPv2.2016b.TCO2_fesom2_mmol_fix_z_Fillvalue.nc', 'woa13_all_n00_01_fesom2.nc', 'phc3.0_winter.nc', 'phc3.0_winter.nc' 
+varlist  = 'Fe', 'oxygen_mmol', 'i_an', 'TAlk_mmol', 'TCO2_mmol', 'n_an', 'salt', 'temp'
 t_insitu = .true.                         ! if T is insitu it will be converted to potential after reading it
 /
