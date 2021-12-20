@@ -331,14 +331,15 @@ real :: net
     ! derivatives and has to be computed explicitly!
     if (Redi) call diff_ver_part_redi_expl(mesh)
 
-! OG recom bottom boundary layer contribution
+! OG 20.12.2021
+! Exchange between sediment (REcoM) and ocean (FESOM)
+! Detritus sinking in water column is called here as well
+
 #if defined(__recom)
 
 ! 1) Remineralization from the benthos
 !    Nutrient fluxes come from the bottom boundary
 !    Unit [mmol/m2/s]
-
-if (1) then
 
     if (tracer_id(tr_num) == 1001 .or.    &   ! DIN
         tracer_id(tr_num) == 1002 .or.    &   ! DIC
@@ -356,12 +357,11 @@ if (1) then
             nzmax=nlevels_nod2D(n)-1
             nzmin=ulevels_nod2D(n)
             tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
-                                        dtr_bf(nzmin:nzmax,n)
+                                                dtr_bf(nzmin:nzmax,n)
         end do
     end if
 
 ! 2) Sinking in water column 
-
     if (tracer_id(tr_num) == 1007 .or.    &   ! idetn
         tracer_id(tr_num) == 1008 .or.    &   ! idetc
         tracer_id(tr_num) == 1017 .or.    &   ! idetsi
@@ -384,43 +384,32 @@ if (1) then
 ! endif
 
 ! sinking
-       call recom_sinking_new(tr_num,mesh) !vert_sink
+        call recom_sinking_new(tr_num,mesh) !--- vert_sink ---
 
 ! sinking into the benthos
-       call ver_sinking_recom_benthos(tr_num,mesh) !str_bf
+        call ver_sinking_recom_benthos(tr_num,mesh) !--- str_bf ---
        
 ! update tracer fields
-
-!call integrate_nod(tr_arr(:,:,tr_num), net, mesh)
-!if (mype==0) write(*,*) 'before :', net 
-
         do n=1, myDim_nod2D 
             nzmax=nlevels_nod2D(n)-1
             nzmin=ulevels_nod2D(n)
-tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
-                                        vert_sink(nzmin:nzmax,n)
-tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
-                                        str_bf(nzmin:nzmax,n)
-
-!call integrate_nod(tr_arr(:,:,tr_num), net, mesh)
-!if (mype==0) write(*,*) 'after :', net 
-
+            tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
+                                                vert_sink(nzmin:nzmax,n)
+            tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
+                                                str_bf(nzmin:nzmax,n)
         end do                             
     end if
 
 ! 3) Nitrogen SS
     if (NitrogenSS .and. tracer_id(tr_num)==1008) then ! idetc
-call recom_nitogenss(mesh) !nss for idetc
+        call recom_nitogenss(mesh) !--- nss for idetc ---
         do n=1, myDim_nod2D
             nzmax=nlevels_nod2D(n)-1
             nzmin=ulevels_nod2D(n)
-       tr_arr(nzmin:nzmax,n,3)=tr_arr(nzmin:nzmax,n,3)+ &   !!tracer_id(tr_num)==1001 !idin
+        tr_arr(nzmin:nzmax,n,3)=tr_arr(nzmin:nzmax,n,3)+ &   ! tracer_id(tr_num)==1001 !idin
                                            nss(nzmin:nzmax,n)
         end do  
     end if
-                           
-end if
-
 #endif
     
     !___________________________________________________________________________
