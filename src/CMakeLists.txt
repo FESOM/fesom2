@@ -3,7 +3,7 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9")
 
 project(fesom C Fortran)
 
-option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
+option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
@@ -74,7 +74,8 @@ endif()
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
     if(${ASYNC_ICEBERGS})
-        target_compile_options(${PROJECT_NAME} PRIVATE -heap-arrays -qopenmp -qopt-report -mcmodel=large -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip -g -traceback)
+        target_compile_options(${PROJECT_NAME} PRIVATE -qopenmp -qopt-report -mcmodel=large -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -xHost -ip -g -traceback)
+        #target_compile_options(${PROJECT_NAME} PRIVATE -heap-arrays -qopenmp -qopt-report -mcmodel=large -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip -g -traceback)
     
 # kh 10.08.21 use -heap-arrays to avoid stack size problems
         #target_compile_options(${PROJECT_NAME} PRIVATE -heap-arrays -qopenmp -qopt-report -mcmodel=large -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -xHost -ip -g -traceback)
