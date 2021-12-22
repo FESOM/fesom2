@@ -116,6 +116,8 @@ contains
     integer err
     integer provided_mpi_thread_support_level
 
+    call init_io_gather()
+
     ! get hold of our mesh data for later use (assume the mesh instance will not change)
     m_nod2d = mesh_nod2d
     m_elem2d = mesh_elem2d
