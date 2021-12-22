@@ -833,7 +833,6 @@ subroutine output(istep, mesh)
 #if defined (__icepack)
      call init_io_icepack(mesh)
 #endif
-     call init_io_gather()
   end if
 
   call update_means

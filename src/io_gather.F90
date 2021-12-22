@@ -14,6 +14,7 @@ module io_gather_module
 contains
 
 
+  ! procedure is not thread-safe
   subroutine init_io_gather()
     integer err
 
@@ -22,6 +23,7 @@ contains
   end subroutine
 
 
+  ! procedure is not thread-safe
   subroutine init_nod2D_lists()
     use g_PARSUP
     implicit none
@@ -52,6 +54,7 @@ contains
   end subroutine
 
 
+  ! procedure is not thread-safe
   subroutine init_elem2D_lists()
     use g_PARSUP
     implicit none
