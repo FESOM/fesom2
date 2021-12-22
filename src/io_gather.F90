@@ -1,6 +1,6 @@
 module io_gather_module
   implicit none
-  public gather_nod2D, gather_real4_nod2D, gather_elem2D, gather_real4_elem2D
+  public init_io_gather, gather_nod2D, gather_real4_nod2D, gather_elem2D, gather_real4_elem2D
   private
 
   logical, save :: nod2D_lists_initialized = .false.
@@ -9,10 +9,21 @@ module io_gather_module
 
   logical, save :: elem2D_lists_initialized = .false.
   integer, save :: rank0Dim_elem2D
-  integer, save, allocatable, dimension(:) :: rank0List_elem2D  
+  integer, save, allocatable, dimension(:) :: rank0List_elem2D
+  
 contains
 
 
+  ! procedure is not thread-safe
+  subroutine init_io_gather()
+    integer err
+
+    if(.not. nod2D_lists_initialized) call init_nod2D_lists()
+    if(.not. elem2D_lists_initialized) call init_elem2D_lists()
+  end subroutine
+
+
+  ! procedure is not thread-safe
   subroutine init_nod2D_lists()
     use g_PARSUP
     implicit none
@@ -43,6 +54,7 @@ contains
   end subroutine
 
 
+  ! procedure is not thread-safe
   subroutine init_elem2D_lists()
     use g_PARSUP
     implicit none
@@ -92,7 +104,7 @@ contains
     integer :: request_index
     integer :: mpi_precision = MPI_DOUBLE_PRECISION
 
-    if(.not. nod2D_lists_initialized) call init_nod2D_lists()
+    if(.not. nod2D_lists_initialized) stop "io_gather_module has not been initialized"
 
     include "io_gather_nod.inc"  
   end subroutine
@@ -117,7 +129,7 @@ contains
     integer :: request_index
     integer :: mpi_precision = MPI_REAL
 
-    if(.not. nod2D_lists_initialized) call init_nod2D_lists()
+    if(.not. nod2D_lists_initialized) stop "io_gather_module has not been initialized"
 
     include "io_gather_nod.inc"  
   end subroutine
@@ -142,7 +154,7 @@ contains
     integer :: request_index
     integer :: mpi_precision = MPI_DOUBLE_PRECISION
 
-    if(.not. elem2D_lists_initialized) call init_elem2D_lists()
+    if(.not. elem2D_lists_initialized) stop "io_gather_module has not been initialized"
 
     include "io_gather_elem.inc"
   end subroutine
@@ -167,7 +179,7 @@ contains
     integer :: request_index
     integer :: mpi_precision = MPI_REAL
 
-    if(.not. elem2D_lists_initialized) call init_elem2D_lists()
+    if(.not. elem2D_lists_initialized) stop "io_gather_module has not been initialized"
 
     include "io_gather_elem.inc"
   end subroutine
