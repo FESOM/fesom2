@@ -111,14 +111,14 @@ contains
     integer mesh_nod2d
     integer mesh_elem2d
     integer mesh_nl
-    type(t_partit), target, intent(in) :: partit
+    type(t_partit), target :: partit
     ! EO parameters
     type(fesom_file_type_ptr), allocatable :: tmparr(:)
     logical async_netcdf_allowed
     integer err
     integer provided_mpi_thread_support_level
 
-    call init_io_gather()
+    call init_io_gather(partit)
 
     ! get hold of our mesh data for later use (assume the mesh instance will not change)
     m_nod2d = mesh_nod2d
