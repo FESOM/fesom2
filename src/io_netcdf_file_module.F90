@@ -4,6 +4,23 @@ module io_netcdf_file_module
   public netcdf_file_type
   private
 
+  type dim_type
+    character(:), allocatable :: name
+    integer len
+    integer ncid
+  end type
+
+  type att_type_wrapper ! work around Fortran not being able to have polymorphic types in the same array
+    class(att_type), allocatable :: it
+  end type
+
+  type var_type ! todo: use variable type from io_netcdf_module here
+    character(:), allocatable :: name
+    integer, allocatable :: dim_indices(:)
+    integer datatype
+    type(att_type_wrapper), allocatable :: atts(:)
+    integer ncid
+  end type
 
   type netcdf_file_type
     private
@@ -27,29 +44,6 @@ module io_netcdf_file_module
     procedure, private :: add_global_att_text, add_global_att_int
   end type
   
-  
-  type dim_type
-    character(:), allocatable :: name
-    integer len
-    
-    integer ncid
-  end type
-
-
-  type var_type ! todo: use variable type from io_netcdf_module here
-    character(:), allocatable :: name
-    integer, allocatable :: dim_indices(:)
-    integer datatype
-    type(att_type_wrapper), allocatable :: atts(:)
-    
-    integer ncid
-  end type
-
-
-  type att_type_wrapper ! work around Fortran not being able to have polymorphic types in the same array
-    class(att_type), allocatable :: it
-  end type
- 
 contains
 
 
