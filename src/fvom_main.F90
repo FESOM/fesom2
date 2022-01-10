@@ -27,7 +27,7 @@ use fesom_version_info_module
 use g_ic3d
 !---wiso-code-end
 !---fwf-code
-use g_forcing_param, only: use_landice_water 
+use g_forcing_param, only: use_landice_water, use_pico
 use landice_water_init_interface
 !---fwf-code-end
 !---pico-code
@@ -144,7 +144,7 @@ type(t_mesh),             target, save :: mesh
     call init_icepack(mesh)
     if (mype==0) write(*,*) 'Icepack: setup complete'
 #endif
-    call init_picocpl(mesh)
+    if(use_pico) call init_picocpl(mesh)
     
     call clock_newyear                        ! check if it is a new year
     if (mype==0) t6=MPI_Wtime()
@@ -286,7 +286,7 @@ type(t_mesh),             target, save :: mesh
         rtime_write_means   = rtime_write_means   + t5 - t4   
         rtime_write_restart = rtime_write_restart + t6 - t5
         rtime_read_forcing  = rtime_read_forcing  + t1_frc - t0_frc
-        call fesom2pico(mesh)
+        if (use_pico) call fesom2pico(mesh)
     end do
     
     call finalize_output()

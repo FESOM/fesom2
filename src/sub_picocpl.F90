@@ -2,6 +2,7 @@ module g_picocpl
   USE mod_mesh
   use g_parsup
   use g_comm_auto
+  use g_forcing_param, only: gammaS, gammaT
   use o_arrays
   implicit none
   private
@@ -50,6 +51,7 @@ subroutine init_picocpl(mesh)
   !359. 10. 500. -1. 34.
 
   if (mype==0) then
+     write (*,*) '---> Initialize PICO Forcing'
      open(fileID, file='test.dat')
      read(fileID,*) pico_N
      write (*,*) 'start reading ', pico_N, ' data points!'
@@ -88,8 +90,8 @@ subroutine fesom2pico(mesh)
   type(t_mesh), intent(in), target :: mesh
   integer                          :: n, k, ipico
   real(kind=WP)                    :: x
-  real(kind=WP)                    :: gammaT=1.e-4, gammaS=1.e-4
 #include "associate_mesh.h"
+  write (*,*) '---> PICO Restoring is active with gammaT=', gammaT, 'gammaS=', gammaS
   f2pico_data_t=0.
   f2pico_data_s=0.
   f2pico_count =0.

@@ -45,6 +45,14 @@ real(kind=WP)  :: Swind     =0.0_WP  ! parameterization for coupled current feed
 
   namelist /land_ice/ use_landice_water, landice_start_mon, landice_end_mon, fwf_path !---fwf-code, add fwf_path
 
+!---pico-code-being
+   logical                      :: use_pico = .false.
+   real(kind=WP)                :: gammaS=1.e-4_WP
+   real(kind=WP)                :: gammaT=1.e-4_WP
+   namelist /pico/ use_pico, pico_gamma_s, pico_gamma_t
+!---pico-code-end
+
+
 end module g_forcing_param
 ! ====================================================================
 module g_forcing_arrays
