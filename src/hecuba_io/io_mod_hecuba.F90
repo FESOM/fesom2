@@ -33,14 +33,14 @@ subroutine output_hecuba(istep, mesh)
   integer, save :: counter=0
   
   ! write 2d variable sst
-  write(filename,'(A A I0)')  "data_", "sst", istep
+  write(filename,'(A I0 A I0)')  "data_", istep, "_sst_pe", mype
   open(newunit=fileunit,file=trim(filename), form="unformatted", access='stream', action='write')
   write(fileunit) tr_arr(1,1:myDim_nod2d,1) 
   flush(fileunit)
   close(fileunit)
 
   ! write a 3d variable
-  write(filename,'(A A I0)')  "data_", "temp", istep
+  write(filename,'(A I0 A I0)')  "data_", istep, "_temp_", mype
   open(newunit=fileunit,file=trim(filename), form="unformatted", access='stream', action='write')
   write(fileunit) tr_arr(:,1:myDim_nod2d,1) 
   flush(fileunit)

@@ -6,4 +6,5 @@ As an example module contains a contains a subroutine `output_hecuba(istep)` tha
 The module is used and subroutine is called in `src/fvom_main.F90` see modifications there which are wrapped around preprocessor option `USE_HECUBAIO` set in master CMakeLists.txt as `set(USE_HECUBAIO ON CACHE BOOL "compile fesom with hecuba interface to cassandra DB for IO.")`. this allows to enable and disable the interface safely without disturbing the model setup.
 
 similarly same flag `USE_HECUBAIO` is used in `src/CMakeLists.txt` to include sources specific to interface for compiling together with the fesom2 executable. You may optionally want to add hecuba's C API library to this cmakelist to also compile it along fesom2 src either as gitsubmodule or just subdirectory. 
- 
+
+fesom2's original way to setup remains same, e.g., `./configure.sh ubuntu` 
