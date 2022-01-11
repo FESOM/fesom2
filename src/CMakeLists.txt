@@ -33,6 +33,10 @@ if(${USE_HECUBAIO})
      GIT_SUBMODULES hecuba
      SOURCE_DIR ${src_home}/hecuba_io
      GIT_TAG origin/master
+     # temporarily disable building of hecuba, other wise hecuba will also be built
+     CONFIGURE_COMMAND ""
+     BUILD_COMMAND ""
+     INSTALL_COMMAND ""
   )
 
    # Add any other F sources that need to be compiled, linked with the model.

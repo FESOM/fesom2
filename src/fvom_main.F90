@@ -34,6 +34,10 @@ use icedrv_main,          only: set_icepack, init_icepack, alloc_icepack
 use cpl_driver
 #endif
 
+#if defined (__hecubaio)
+use mod_hecuba
+#endif
+
 IMPLICIT NONE
 
 integer :: n, nsteps, offset, row, i, provided
@@ -256,6 +260,9 @@ integer mpi_version_len
         !___prepare output______________________________________________________
         if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
         call output (n, mesh)
+#if defined (__hecubaio)
+        call output_hecuba(n, mesh)
+#endif
         t5 = MPI_Wtime()
         call restart(n, .false., .false., mesh)
         t6 = MPI_Wtime()

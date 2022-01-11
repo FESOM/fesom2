@@ -1,0 +1,3 @@
+[submodule "src/hecuba_io/hecuba"]
+	path = src/hecuba_io/hecuba
+	url = https://github.com/bsc-dd/hecuba
