@@ -1018,7 +1018,8 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   type(t_mesh), intent(in), target     :: mesh
   logical, optional, intent(in)        :: flip_array
   integer i
-  
+ 
+#if !defined(__PGI)  
   do i = 1, rank(data)
     if ((ubound(data, dim = i)<=0)) then
       if (partit%mype==0) then
@@ -1028,6 +1029,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
       return
     end if    
   end do
+#endif
 
   if (partit%mype==0) then
      write(*,*) 'adding I/O stream 3D for ', trim(name)
@@ -1083,7 +1085,8 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   type(t_mesh),          intent(in)    :: mesh
   type(t_partit),        intent(inout) :: partit
   integer i
-  
+
+#if !defined(__PGI)   
   do i = 1, rank(data)
     if ((ubound(data, dim = i)<=0)) then
       if (partit%mype==0) then
@@ -1093,6 +1096,7 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
       return
     end if    
   end do
+#endif
 
   if (partit%mype==0) then
      write(*,*) 'adding I/O stream 2D for ', trim(name)

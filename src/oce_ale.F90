@@ -222,13 +222,29 @@ subroutine init_ale(dynamics, partit, mesh)
     allocate(mesh%zbar_e_srf(myDim_elem2D+eDim_elem2D)) 
     
     ! also change bottom thickness at nodes due to partial cell --> bottom 
-    ! thickness at nodes is the volume weighted mean of sorounding elemental 
+    ! thickness at nodes is the volume weighted mean of sorounding elemental
     ! thicknesses
     allocate(mesh%bottom_node_thickness(myDim_nod2D+eDim_nod2D))
     allocate(mesh%zbar_n_bot(myDim_nod2D+eDim_nod2D)) 
     allocate(mesh%zbar_n_srf(myDim_nod2D+eDim_nod2D)) 
 
     ! reassociate after the allocation (no pointer exists before)
+#ifdef __PGI
+    hnode                 => mesh%hnode                 (1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)
+    hnode_new             => mesh%hnode_new             (1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)
+    zbar_3d_n             => mesh%zbar_3d_n             (1:mesh%nl, 1:myDim_nod2D+eDim_nod2D)
+    Z_3d_n                => mesh%Z_3d_n                (1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)
+    helem                 => mesh%helem                 (1:mesh%nl-1, 1:myDim_elem2D)
+    bottom_elem_thickness => mesh%bottom_elem_thickness (1:myDim_elem2D)
+    bottom_node_thickness => mesh%bottom_node_thickness (1:myDim_nod2D+eDim_nod2D)
+    dhe                   => mesh%dhe                   (1:myDim_elem2D)
+    hbar                  => mesh%hbar                  (1:myDim_nod2D+eDim_nod2D)
+    hbar_old              => mesh%hbar_old              (1:myDim_nod2D+eDim_nod2D)
+    zbar_n_bot            => mesh%zbar_n_bot            (1:myDim_nod2D+eDim_nod2D)
+    zbar_e_bot            => mesh%zbar_e_bot            (1:myDim_elem2D+eDim_elem2D)
+    zbar_n_srf            => mesh%zbar_n_srf            (1:myDim_nod2D+eDim_nod2D)
+    zbar_e_srf            => mesh%zbar_e_srf            (1:myDim_elem2D+eDim_elem2D)
+#else
     hnode(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)               => mesh%hnode
     hnode_new(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)           => mesh%hnode_new
     zbar_3d_n(1:mesh%nl, 1:myDim_nod2D+eDim_nod2D)             => mesh%zbar_3d_n
@@ -243,7 +259,7 @@ subroutine init_ale(dynamics, partit, mesh)
     zbar_e_bot(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_bot
     zbar_n_srf(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_srf
     zbar_e_srf(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_srf
-    
+#endif
     !___initialize______________________________________________________________
     hbar      = 0.0_WP
     hbar_old  = 0.0_WP
