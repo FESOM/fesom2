@@ -156,7 +156,13 @@ contains
     call move_alloc(tmparr, this%vars)
     
     varindex = size(this%vars)
-    this%vars(varindex) = var_type(name=name, dim_indices=dim_indices, datatype=netcdf_datatype, atts=empty_atts, ncid=-1)
+!   this%vars(varindex) = var_type(name=name, dim_indices=dim_indices, datatype=netcdf_datatype, atts=empty_atts, ncid=-1)
+!   NVIDIA 22.1 compiler didnt like the line above, hence we unfold it unelegantly:
+    this%vars(varindex)%name       = name
+    this%vars(varindex)%dim_indices= dim_indices
+    this%vars(varindex)%datatype   = netcdf_datatype
+    this%vars(varindex)%atts       = empty_atts
+    this%vars(varindex)%ncid       = -1    
   end function
 
 
