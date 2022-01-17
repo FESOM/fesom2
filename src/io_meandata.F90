@@ -100,6 +100,7 @@ subroutine ini_mean_io(mesh)
   use g_PARSUP
   use diagnostics
   use i_PARAM, only: whichEVP
+  use g_config, only : lwiso !---wiso-code
   implicit none
   integer                   :: i, j
   integer, save             :: nm_io_unit  = 103       ! unit to open namelist file, skip 100-102 for cray
@@ -190,11 +191,17 @@ CASE ('MLD2      ')
 !___________________________________________________________________________________________________________________________________
 ! output water isotopes in sea ice
 CASE ('h2o18_ice ')
+  if (lwiso) then
     call def_stream(nod2D,  myDim_nod2D,  'h2o18_ice',      'h2o18 concentration in sea ice',    'kmol/m**3',    tr_arr_ice(:,1),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+  end if
 CASE ('hDo16_ice ')
+  if (lwiso) then
     call def_stream(nod2D,  myDim_nod2D,  'hDo16_ice',      'hDo16 concentration in sea ice',    'kmol/m**3',    tr_arr_ice(:,2),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+  end if
 CASE ('h2o16_ice ')
+  if (lwiso) then
     call def_stream(nod2D,  myDim_nod2D,  'h2o16_ice',      'h2o16 concentration in sea ice',    'kmol/m**3',    tr_arr_ice(:,3),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+  end if
 !---wiso-code-end
 
 !---fwf-code-begin
@@ -301,11 +308,17 @@ CASE ('salt      ')
 !___________________________________________________________________________________________________________________________________
 ! output water isotopes in ocean water
 CASE ('h2o18     ')
+  if (lwiso) then
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'h2o18', 'h2o18 concentration',    'kmol/m**3',    tr_arr(:,:,3), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+  end if
 CASE ('hDo16     ')
+  if (lwiso) then
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'hDo16', 'hDo16 concentration',    'kmol/m**3',    tr_arr(:,:,4), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+  end if
 CASE ('h2o16     ')
+  if (lwiso) then
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'h2o16', 'h2o16 concentration',    'kmol/m**3',    tr_arr(:,:,5), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+  end if
 !---wiso-code-end
 
 CASE ('otracers  ')
