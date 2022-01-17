@@ -44,6 +44,10 @@ subroutine forcing_array_setup(mesh)
   implicit none
   type(t_mesh), intent(in)  , target :: mesh
   integer    :: n2
+
+! kh 19.02.21  
+  integer    :: i
+   
 #include "associate_mesh.h"
   n2=myDim_nod2D+eDim_nod2D      
   ! Allocate memory for atmospheric forcing 
@@ -51,9 +55,32 @@ subroutine forcing_array_setup(mesh)
   shortwave=0.0_WP
   longwave=0.0_WP
   allocate(prec_rain(n2), prec_snow(n2))
+
+! kh 19.02.21
+  if (ib_async_mode == 0) then
+      allocate(u_wind(n2), v_wind(n2))
+      allocate(u_wind_ib(n2), v_wind_ib(n2))
+  else
+! kh 19.02.21 support "first touch" idea
+!$omp parallel sections num_threads(2)
+!$omp section
+      allocate(u_wind(n2), v_wind(n2))
+      do i = 1, n2
+          u_wind(i) = 0._WP
+          v_wind(i) = 0._WP
+      end do
+!$omp section
+      allocate(u_wind_ib(n2), v_wind_ib(n2))
+      do i = 1, n2
+          u_wind_ib(i) = 0._WP
+          v_wind_ib(i) = 0._WP
+      end do
+!$omp end parallel sections
+  end if
+
   prec_rain=0.0_WP
   prec_snow=0.0_WP
-  allocate(u_wind(n2), v_wind(n2))
+  !allocate(u_wind(n2), v_wind(n2))
   u_wind=0.0_WP
   v_wind=0.0_WP
   allocate(Tair(n2), shum(n2))

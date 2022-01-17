@@ -194,27 +194,78 @@ integer     :: n
 integer     :: nt
 !---wiso-code-end
 
+! kh 19.02.21
+integer     :: i, j, k
 type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
-
 elem_size=myDim_elem2D+eDim_elem2D
 node_size=myDim_nod2D+eDim_nod2D
-
 
 ! ================
 ! Velocities
 ! ================     
 !allocate(stress_diag(2, elem_size))!delete me
-allocate(UV(2, nl-1, elem_size))
+
+! kh 19.02.21
+if (ib_async_mode == 0) then
+    allocate(UV(2, nl-1, elem_size))
+    allocate(UV_ib(2, nl-1, elem_size))
+else
+! kh 19.02.21 support "first touch" idea
+!$omp parallel sections num_threads(2)
+!$omp section
+    allocate(UV(2, nl-1, elem_size))
+    do i = 1, elem_size
+        do j = 1, nl-1
+            do k = 1, 2
+                UV(k, j, i) = 0._WP
+            end do
+        end do
+    end do
+!$omp section
+    allocate(UV_ib(2, nl-1, elem_size))
+    do i = 1, elem_size
+        do j = 1, nl-1
+            do k = 1, 2
+                UV_ib(k, j, i) = 0._WP
+            end do
+        end do
+    end do
+!$omp end parallel sections
+end if
+
 allocate(UV_rhs(2,nl-1, elem_size))
 allocate(UV_rhsAB(2,nl-1, elem_size))
 allocate(Visc(nl-1, elem_size))
 ! ================
 ! elevation and its rhs
 ! ================
-allocate(eta_n(node_size), d_eta(node_size))
+
+! kh 18.03.21
+allocate(d_eta(node_size))
+if (ib_async_mode == 0) then
+!   allocate(eta_n(node_size), d_eta(node_size))
+    allocate(eta_n(node_size))
+    allocate(eta_n_ib(node_size))
+else
+! kh 18.03.21 support "first touch" idea
+!$omp parallel sections num_threads(2)
+!$omp section
+!   allocate(eta_n(node_size), d_eta(node_size))
+    allocate(eta_n(node_size))
+    do i = 1, node_size
+        eta_n(i) = 0._WP
+    end do
+!$omp section
+    allocate(eta_n_ib(node_size))
+    do i = 1, node_size
+        eta_n_ib(i) = 0._WP
+    end do
+!$omp end parallel sections
+end if
+
 allocate(ssh_rhs(node_size))
 ! ================
 ! Monin-Obukhov
@@ -232,12 +283,21 @@ allocate(CFL_z(nl, node_size)) ! vertical CFL criteria
 ! ================
 allocate(T_rhs(nl-1, node_size))
 allocate(S_rhs(nl-1, node_size))
+
 allocate(tr_arr(nl-1,node_size,num_tracers+num_wiso_tracers),tr_arr_old(nl-1,node_size,num_tracers+num_wiso_tracers))
+
 !---wiso-code
 if (lwiso) then
   allocate(tr_arr_ice(node_size,num_wiso_tracers))  ! add sea ice tracers
 end if
 !---wiso-code-end
+
+if (ib_async_mode == 0) then
+    allocate(tr_arr_ib(nl-1,node_size,num_tracers+num_wiso_tracers))
+else
+    tr_arr_ib=0.0_WP
+end if
+
 allocate(del_ttf(nl-1,node_size))
 allocate(del_ttf_advhoriz(nl-1,node_size),del_ttf_advvert(nl-1,node_size))
 del_ttf          = 0.0_WP
@@ -257,19 +317,64 @@ allocate(bvfreq(nl,node_size),mixlay_dep(node_size),bv_ref(node_size))
 allocate(Tclim(nl-1,node_size), Sclim(nl-1, node_size))
 allocate(stress_surf(2,myDim_elem2D))    !!! Attention, it is shorter !!! 
 allocate(stress_atmoce_x(node_size), stress_atmoce_y(node_size)) 
-allocate(relax2clim(node_size)) 
-allocate(heat_flux(node_size), Tsurf(node_size))
-allocate(water_flux(node_size), Ssurf(node_size))
+allocate(relax2clim(node_size))
+
+! kh 15.03.21
+allocate(heat_flux(node_size))
+if (ib_async_mode == 0) then
+!   allocate(heat_flux(node_size), Tsurf(node_size))
+    allocate(Tsurf(node_size))
+    allocate(Tsurf_ib(node_size))
+else
+! kh 15.03.21 support "first touch" idea
+!$omp parallel sections num_threads(2)
+!$omp section
+!   allocate(heat_flux(node_size), Tsurf(node_size))
+    allocate(Tsurf(node_size))
+    do i = 1, node_size
+        Tsurf(i) = 0._WP
+    end do
+!$omp section
+    allocate(Tsurf_ib(node_size))
+    do i = 1, node_size
+        Tsurf_ib(i) = 0._WP
+    end do
+!$omp end parallel sections
+end if
+
+! kh 15.03.21
+allocate(water_flux(node_size))
+if (ib_async_mode == 0) then
+!   allocate(water_flux(node_size), Ssurf(node_size))
+    allocate(Ssurf(node_size))
+    allocate(Ssurf_ib(node_size))
+else
+!$omp parallel sections num_threads(2)
+!$omp section
+    allocate(Ssurf(node_size))
+    do i = 1, node_size
+        Ssurf(i) = 0._WP
+    end do
+!$omp section
+    allocate(Ssurf_ib(node_size))
+    do i = 1, node_size
+        Ssurf_ib(i) = 0._WP
+    end do
+!$omp end parallel sections
+end if
+
 allocate(relax_salt(node_size))
 allocate(virtual_salt(node_size))
 allocate(heat_flux_in(node_size))
 allocate(real_salt_flux(node_size)) !PS
+
 !---wiso-code
 if (lwiso) then
   allocate(wiso_flux_oce(node_size,num_wiso_tracers))
   allocate(wiso_flux_ice(node_size,num_wiso_tracers))
 end if
 !---wiso-code-end
+
 ! =================
 ! Arrays used to organize surface forcing
 ! =================
@@ -420,7 +525,7 @@ end if
     
     tr_arr=0.0_WP
     tr_arr_old=0.0_WP
-    
+
 !---wiso-code
     ! initialize sea ice isotopes with 0. permill
     ! absolute tracer values are increased by factor 1000. for numerical reasons

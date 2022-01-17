@@ -225,12 +225,14 @@ IMPLICIT NONE
 ! Arrays are described in subroutine array_setup  
 real(kind=WP), allocatable, target :: Wvel(:,:), Wvel_e(:,:), Wvel_i(:,:)
 real(kind=WP), allocatable         :: UV(:,:,:)
+real(kind=WP), allocatable         :: UV_ib(:,:,:) ! kh 08.03.21 additional array for asynchronous iceberg computations
 real(kind=WP), allocatable         :: UV_rhs(:,:,:), UV_rhsAB(:,:,:)
 real(kind=WP), allocatable         :: uke(:,:), v_back(:,:), uke_back(:,:), uke_dis(:,:), uke_dif(:,:) 
 real(kind=WP), allocatable         :: uke_rhs(:,:), uke_rhs_old(:,:)
 real(kind=WP), allocatable         :: UV_dis_tend(:,:,:), UV_back_tend(:,:,:), UV_total_tend(:,:,:), UV_dis_tend_node(:,:,:)
 real(kind=WP), allocatable         :: UV_dis_posdef_b2(:,:), UV_dis_posdef(:,:), UV_back_posdef(:,:)
 real(kind=WP), allocatable         :: eta_n(:), d_eta(:)
+real(kind=WP), allocatable         :: eta_n_ib(:) ! kh 18.03.21 additional array for asynchronous iceberg computations
 real(kind=WP), allocatable         :: ssh_rhs(:), hpressure(:,:)
 real(kind=WP), allocatable         :: CFL_z(:,:)
 real(kind=WP), allocatable         :: stress_surf(:,:)
@@ -238,14 +240,17 @@ REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_x(:)
 REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_y(:)
 real(kind=WP), allocatable         :: T_rhs(:,:) 
 real(kind=WP), allocatable         :: heat_flux(:), Tsurf(:) 
+real(kind=WP), allocatable         :: Tsurf_ib(:) ! kh 15.03.21 additional array for asynchronous iceberg computations
 real(kind=WP), allocatable         :: heat_flux_in(:) !to keep the unmodified (by SW penetration etc.) heat flux 
 real(kind=WP), allocatable         :: S_rhs(:,:)
 real(kind=WP), allocatable         :: tr_arr(:,:,:),tr_arr_old(:,:,:)
 real(kind=WP), allocatable         :: tr_arr_ice(:,:) !---wiso-code: add sea ice isotope tracers
+real(kind=WP), allocatable         :: tr_arr_ib(:,:,:) ! kh 15.03.21 additional array for asynchronous iceberg computations
 real(kind=WP), allocatable         :: del_ttf(:,:)
 real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:) !!PS ,del_ttf_diff(:,:)
 
 real(kind=WP), allocatable    :: water_flux(:), Ssurf(:)
+real(kind=WP), allocatable    :: Ssurf_ib(:) ! kh 15.03.21 additional array for asynchronous iceberg computations
 real(kind=WP), allocatable    :: virtual_salt(:), relax_salt(:)
 real(kind=WP), allocatable    :: wiso_flux_oce(:,:)   !---wiso-code: add isotope fluxes over open water
 real(kind=WP), allocatable    :: wiso_flux_ice(:,:)   !---wiso-code: add isotope fluxes over sea ice
@@ -290,6 +295,7 @@ real(kind=WP), allocatable :: Ki(:,:)
 ! Arrays added for ALE implementation:
 ! --> layer thinkness at node and depthlayer for t=n and t=n+1
 real(kind=WP), allocatable,dimension(:,:)   :: hnode, hnode_new, zbar_3d_n, Z_3d_n
+real(kind=WP), allocatable,dimension(:,:)   :: Z_3d_n_ib ! kh 18.03.21 additional array for asynchronous iceberg computations
 
 ! --> layer thinkness at elements, interpolated from hnode
 real(kind=WP), allocatable,dimension(:,:)   :: helem

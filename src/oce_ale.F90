@@ -84,11 +84,17 @@ subroutine init_ale(mesh)
     USE MOD_MESH
     USE g_PARSUP
     USE o_ARRAYS
-    USE g_config, only: which_ale, use_cavity, use_partial_cell
+
+! kh 18.03.21
+    USE g_config, only: which_ale, use_cavity, use_partial_cell, ib_async_mode
+
     USE g_forcing_param, only: use_virt_salt
     use oce_ale_interfaces
     Implicit NONE
     
+! kh 18.03.21
+    integer             :: i, j
+
     integer                  :: n, nzmax, nzmin, elnodes(3), elem
     type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
@@ -113,11 +119,41 @@ subroutine init_ale(mesh)
     
     ! zbar_n: depth of layers due to ale thinkness variactions at ervery node n 
     allocate(zbar_n(nl))
-    allocate(zbar_3d_n(nl,myDim_nod2D+eDim_nod2D))
+
+! kh 18.03.21
+    if (ib_async_mode == 0) then
+        !allocate(zbar_3d_n(nl,myDim_nod2D+eDim_nod2D))
+        !allocate(zbar_3d_n_ib(nl,myDim_nod2D+eDim_nod2D))
+        allocate(Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D))
+        allocate(Z_3d_n_ib(nl-1,myDim_nod2D+eDim_nod2D))
+    else
+! kh 18.03.21 support "first touch" idea
+!$omp parallel sections num_threads(2)
+!$omp section
+        !allocate(zbar_3d_n(nl,myDim_nod2D+eDim_nod2D))
+        allocate(Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D))
+        do i = 1, myDim_nod2D+eDim_nod2D
+            do j = 1, nl-1
+                !zbar_3d_n(j, i) = 0._WP
+                Z_3d_n(j, i) = 0._WP
+            end do
+        end do
+!$omp section
+        !allocate(zbar_3d_n_ib(nl,myDim_nod2D+eDim_nod2D))
+        allocate(Z_3d_n_ib(nl-1,myDim_nod2D+eDim_nod2D))
+        do i = 1, myDim_nod2D+eDim_nod2D
+            do j = 1, nl-1
+                !zbar_3d_n_ib(j, i) = 0._WP
+                Z_3d_n_ib(j, i) = 0._WP
+            end do
+        end do
+!$omp end parallel sections
+    end if
     
     ! Z_n: mid depth of layers due to ale thinkness variactions at ervery node n 
     allocate(Z_n(nl-1))
-    allocate(Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
+    !allocate(Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
+    allocate(zbar_3d_n(nl,myDim_nod2D+eDim_nod2D))
     
     ! bottom_elem_tickness: changed bottom layer thinkness due to partial cells
     allocate(bottom_elem_thickness(myDim_elem2D))
@@ -1029,7 +1065,7 @@ subroutine restart_thickness_ale(mesh)
             ! be sure that bottom layerthickness uses partial cell layer thickness
             ! in case its activated, especially when you make a restart from a non 
             ! partiall cell runs towards a simulation with partial cells
-            !hnode(nzmax,n) = bottom_node_thickness(n)
+            hnode(nzmax,n) = bottom_node_thickness(n)
             
             !___________________________________________________________________
             do nz=nzmax-1,nzmin,-1
@@ -1059,7 +1095,7 @@ subroutine restart_thickness_ale(mesh)
             !___________________________________________________________________
             ! be sure elemental bottom thickness has partial cells in it, when 
             ! its used after restart
-            !helem(nzmax,elem)=bottom_elem_thickness(elem)
+            helem(nzmax,elem)=bottom_elem_thickness(elem)
             
             !___________________________________________________________________
             ! for the first time steps of a restart or initialisation dhe must 
@@ -2674,7 +2710,7 @@ subroutine oce_timestep_ale(n, mesh)
     else
         call compute_vel_rhs_vinv(mesh)
     end if
-    
+
     !___________________________________________________________________________
     if (any(UV_rhs/=UV_rhs)) write(*,*) ' --> found NaN UV_rhs MARK 2'
     call viscosity_filter(visc_option, mesh)
@@ -2708,7 +2744,7 @@ subroutine oce_timestep_ale(n, mesh)
     
     ! --> eta_(n) --> eta_(n+1) = eta_(n) + deta = eta_(n) + (eta_(n+1) + eta_(n))
     t4=MPI_Wtime() 
-    
+
     ! Update to hbar(n+3/2) and compute dhe to be used on the next step
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_hbar_ale'//achar(27)//'[0m'
     call compute_hbar_ale(mesh)
@@ -2726,7 +2762,7 @@ subroutine oce_timestep_ale(n, mesh)
     if (Fer_GM .or. Redi) then
         call init_Redi_GM(mesh)
     end if
-    
+
     !___________________________________________________________________________
     ! Implementation of Gent & McWiliams parameterization after R. Ferrari et al., 2010
     ! does not belong directly to ALE formalism
@@ -2736,14 +2772,14 @@ subroutine oce_timestep_ale(n, mesh)
         call fer_gamma2vel(mesh)
     end if
     t6=MPI_Wtime() 
-    
+
     !___________________________________________________________________________
     ! The main step of ALE procedure --> this is were the magic happens --> here 
     ! is decided how change in hbar is distributed over the vertical layers
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call vert_vel_ale'//achar(27)//'[0m'
     call vert_vel_ale(mesh)
     t7=MPI_Wtime() 
-    
+
     !___________________________________________________________________________
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
@@ -2755,7 +2791,7 @@ subroutine oce_timestep_ale(n, mesh)
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_thickness_ale'//achar(27)//'[0m'
     call update_thickness_ale(mesh)
     t9=MPI_Wtime() 
-    
+
     !___________________________________________________________________________
     ! write out global fields for debugging
     call write_step_info(n,logfile_outfreq, mesh)

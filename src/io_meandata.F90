@@ -92,6 +92,7 @@ module io_MEANDATA
 
 
 subroutine ini_mean_io(mesh)
+  use iceberg_params
   use g_cvmix_tke
   use g_cvmix_idemix
   use g_cvmix_kpp
@@ -406,6 +407,16 @@ CASE ('qsi       ')
 CASE ('qso       ')
   call def_stream(nod2D, myDim_nod2D, 'qso',    'oce heat flux',           'W/m^2',  oce_heat_flux(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 #endif
+
+CASE ('icb       ')
+  if (use_icebergs) then
+    call def_stream(nod2D, myDim_nod2D, 'ibfwb',   'basal iceberg melting',            'm/s',    ibfwb(:),         1, 'm', i_real4, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'ibfwbv',  'basal iceberg melting',            'm/s',    ibfwbv(:),        1, 'm', i_real4, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'ibfwl',   'lateral iceberg melting',          'm/s',    ibfwl(:),         1, 'm', i_real4, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'ibfwe',   'iceberg erosion',                  'm/s',    ibfwe(:),         1, 'm', i_real4, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'ibhf',    'heat flux from iceberg melting',   'm/s',    ibhf(:),          1, 'm', i_real4, mesh)
+  end if
+
 !___________________________________________________________________________________________________________________________________
 
 
