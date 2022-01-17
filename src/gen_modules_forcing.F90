@@ -50,7 +50,7 @@ real(kind=WP)  :: Swind     =0.0_WP  ! parameterization for coupled current feed
    logical                      :: use_pico = .false.
    real(kind=WP)                :: gammaS=1.e-4_WP
    real(kind=WP)                :: gammaT=1.e-4_WP
-   namelist /pico/ use_pico, pico_gamma_s, pico_gamma_t
+   namelist /pico/ use_pico, gammaS, gammaT
 !---pico-code-end
 
 
