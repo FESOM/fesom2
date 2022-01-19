@@ -460,7 +460,8 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
      !rt  t_surf_flux(i,j)=gat*(tf-tin)
      !rt  s_surf_flux(i,j)=gas*(sf-(s(i,j,N,lrhs)+35.0))
 
-     heat_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)*scaling(ib)      ! [W/m2]  ! positive for upward
+     !heat_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)*scaling(ib)      ! [W/m2]  ! positive for upward
+     heat_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)*length_ib(ib)*width_ib(ib)*scaling(ib)      ! [W]  ! positive for upward
      !fw_flux_ib(ib) =          gas*(sf-sal)/sf   ! [m/s]   !
       M_b 	    =          gas*(sf-sal)/sf   ! [m/s]   ! m freshwater per second
      !fw_flux_ib(ib) = M_b
