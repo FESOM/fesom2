@@ -146,8 +146,6 @@ subroutine restart(istep, l_read, mesh)
   type(t_mesh), intent(in) , target :: mesh
   logical dumpfiles_exist
   logical, save :: initialized = .false.
-  integer cstat, estat
-  character(500) cmsg ! there seems to be no documentation about the max size of this text
   
   if(.not. initialized) then
     initialized = .true.
@@ -155,9 +153,9 @@ subroutine restart(istep, l_read, mesh)
     raw_restart_infopath = trim(ResultPath)//"/fesom_raw_restart/np"//int_to_txt(npes)//".info"
     if(raw_restart_length_unit /= "off") then
       if(mype == RAW_RESTART_METADATA_RANK) then
-        ! inquire does not work for directories, the directory might already exist
-        call execute_command_line("mkdir -p "//raw_restart_dirpath, exitstat=estat, cmdstat=cstat, cmdmsg=cmsg) ! sometimes does not work on aleph
-        if(cstat /= 0) print *,"creating raw restart directory ERROR ", trim(cmsg)
+        ! execute_command_line with mkdir sometimes fails, use a custom implementation around mkdir from C instead
+        call mkdir(trim(ResultPath)//"/fesom_raw_restart") ! we have no mkdir -p, create the intermediate dirs separately
+        call mkdir(raw_restart_dirpath)
       end if
       call MPI_Barrier(MPI_COMM_FESOM, mpierr) ! make sure the dir has been created before we continue...
     end if
@@ -223,6 +221,7 @@ end subroutine restart
 
 
 subroutine write_restart(path, filegroup, istep)
+  use fortran_utils
   character(len=*), intent(in) :: path
   type(restart_file_group), intent(inout) :: filegroup
   integer,  intent(in)          :: istep
@@ -254,7 +253,8 @@ subroutine write_restart(path, filegroup, istep)
         end if
       end if
       if(filegroup%files(i)%path .ne. filepath) then
-        call execute_command_line("mkdir -p "//dirpath)
+        ! execute_command_line with mkdir sometimes fails, use a custom implementation around mkdir from C instead
+        call mkdir(dirpath)
         filegroup%files(i)%path = filepath
         call filegroup%files(i)%open_write_create(filegroup%files(i)%path)
       else
