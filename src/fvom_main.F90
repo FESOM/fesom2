@@ -37,7 +37,7 @@ use cpl_driver
 #if defined(__recom)
   use REcoM_GloVar
   use recom_config
-  use recom_diag                                                                                           
+  use recom_diag
 #endif
 
 IMPLICIT NONE
@@ -56,7 +56,6 @@ real(kind=WP),  save,  target                 :: intDetSi
 real(kind=WP),  save,  target                 :: intDetz2Si
 real(kind=WP),  save,  target                 :: intBenSi
 real(kind=WP),  save,  target                 :: sumSi1, sumSi2
-
 #endif
 
 type(t_mesh),             target, save :: mesh
