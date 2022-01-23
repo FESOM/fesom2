@@ -1189,9 +1189,9 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
            v1=UV(2, nz,el(1))-UV(2, nz,el(2))
            vi=u1*u1+v1*v1
            tt=ttf(nz,en(1))-ttf(nz,en(2))
-           vi=sqrt(max(dynamics%visc_gamma0,            &
-                   max(dynamics%visc_gamma1*sqrt(vi),   & 
-                   dynamics%visc_gamma2*vi)             &
+           vi=sqrt(max(tracers%data(tr_num)%gamma0_tra,            &
+                   max(tracers%data(tr_num)%gamma1_tra*sqrt(vi),   & 
+                       tracers%data(tr_num)%gamma2_tra*vi)         &
                   )*len)       
            !vi=sqrt(max(sqrt(u1*u1+v1*v1),0.04)*le)  ! 10m^2/s for 10 km (0.04 h/50)
            !vi=sqrt(10.*le)
@@ -1219,10 +1219,10 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
               v1=UV(2, nz,el(1))-UV(2, nz,el(2))
               vi=u1*u1+v1*v1
               tt=temporary_ttf(nz,en(1))-temporary_ttf(nz,en(2))
-              vi=sqrt(max(dynamics%visc_gamma0,     &
-                      max(dynamics%visc_gamma1*sqrt(vi), &
-                      dynamics%visc_gamma2*vi)           &
-                     )*len)
+              vi=sqrt(max(tracers%data(tr_num)%gamma0_tra,            &
+                      max(tracers%data(tr_num)%gamma1_tra*sqrt(vi),   & 
+                          tracers%data(tr_num)%gamma2_tra*vi)         &
+                     )*len)                    
               !vi=sqrt(max(sqrt(u1*u1+v1*v1),0.04)*le)  ! 10m^2/s for 10 km (0.04 h/50)
               !vi=sqrt(10.*le) 
               tt=-tt*vi*dt
