@@ -319,7 +319,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     ! do vertical diffusion: explicit
-    if (.not. tracers%i_vert_diff) call diff_ver_part_expl_ale(tr_num, tracers, partit, mesh) 
+    if (.not. tracers%data(tr_num)%i_vert_diff) call diff_ver_part_expl_ale(tr_num, tracers, partit, mesh) 
     ! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
     ! derivatives and has to be computed explicitly!
     if (Redi) call diff_ver_part_redi_expl(tracers, partit, mesh)     
@@ -342,14 +342,13 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
     end do
 !$OMP END PARALLEL DO
     !___________________________________________________________________________
-    if (tracers%i_vert_diff) then
+    if (tracers%data(tr_num)%i_vert_diff) then
         ! do vertical diffusion: implicite 
         call diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh) 
-        
     end if
     !We DO not set del_ttf to zero because it will not be used in this timestep anymore
     !init_tracers_AB will set it to zero for the next timestep
-    if (tracers%smooth_bh_tra) then
+    if (tracers%data(tr_num)%smooth_bh_tra) then
        call diff_part_bh(tr_num, dynamics, tracers, partit, mesh)  ! alpply biharmonic diffusion (implemented as filter)                                                
     end if
 end subroutine diff_tracers_ale
