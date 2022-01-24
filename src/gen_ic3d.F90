@@ -18,7 +18,10 @@ MODULE g_ic3d
    USE g_comm_auto
    USE g_support
    USE g_config, only: dummy, ClimateDataPath, use_cavity
+#if defined (__recom)
    USE recom_config
+#endif
+
 
    IMPLICIT NONE
 
@@ -614,29 +617,30 @@ CONTAINS
       if (mype==0) write(*,*) '  |-> gobal max init. salt. =', glo
       call MPI_AllREDUCE(locSmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
       if (mype==0) write(*,*) '  `-> gobal min init. salt. =', glo
+
 #if defined(__recom)
     if(use_REcoM) then
-      if (mype==0) write(*,*) "Sanity check for REcoM variables"
-      call MPI_AllREDUCE(locDINmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal max init. DIN. =', glo
-      call MPI_AllREDUCE(locDINmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal min init. DIN. =', glo
-      call MPI_AllREDUCE(locDICmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal max init. DIC. =', glo
-      call MPI_AllREDUCE(locDICmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal min init. DIC. =', glo
-      call MPI_AllREDUCE(locAlkmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal max init. Alk. =', glo
-      call MPI_AllREDUCE(locAlkmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal min init. Alk. =', glo
-      call MPI_AllREDUCE(locDSimax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal max init. DSi. =', glo
-      call MPI_AllREDUCE(locDSimin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal min init. DSi. =', glo
-      call MPI_AllREDUCE(locDFemax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal max init. DFe. =', glo
-      call MPI_AllREDUCE(locDFemin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  `-> gobal min init. DFe. =', glo
+        if (mype==0) write(*,*) "Sanity check for REcoM variables"
+        call MPI_AllREDUCE(locDINmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal max init. DIN. =', glo
+        call MPI_AllREDUCE(locDINmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal min init. DIN. =', glo
+        call MPI_AllREDUCE(locDICmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal max init. DIC. =', glo
+        call MPI_AllREDUCE(locDICmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal min init. DIC. =', glo
+        call MPI_AllREDUCE(locAlkmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal max init. Alk. =', glo
+        call MPI_AllREDUCE(locAlkmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal min init. Alk. =', glo
+        call MPI_AllREDUCE(locDSimax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal max init. DSi. =', glo
+        call MPI_AllREDUCE(locDSimin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal min init. DSi. =', glo
+        call MPI_AllREDUCE(locDFemax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal max init. DFe. =', glo
+        call MPI_AllREDUCE(locDFemin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  `-> gobal min init. DFe. =', glo
     end if 
 #endif
   
