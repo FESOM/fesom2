@@ -90,37 +90,100 @@ subroutine read_namelist
 #ifdef __recom              
   nmlfile ='namelist.recom' ! name of recom namelist file
   open (20,file=nmlfile)
+  ! Deniz: after reading each section rewind the file pointer back to the
+  ! beginning, so that namelists that contain the sections in different order
+  ! does not crash the code. This is useful when namelist variables are added
+  ! with external software, ie. ESM-Tools
   read (20,NML=precom_diag_list)
+  call fseek(20, 0, 0, ierr) ! unit=20, offset=0, whence=0
+
   read (20,NML=pavariables)
+  call fseek(20, 0, 0, ierr)
+
   read (20,NML=pasinking)
+  call fseek(20, 0, 0, ierr)
+
   read (20,NML=painitialization_N)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=paArrhenius)
+  call fseek(20, 0, 0, ierr)
+
+  
   read (20,NML=palimiter_function)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=palight_calculations)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=paphotosynthesis)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=paassimilation)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=pairon_chem)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=pazooplankton)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=pasecondzooplankton)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=pagrazingdetritus)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=paaggregation)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=padin_rho_N)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=padic_rho_C1)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=paphytoplankton_N)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=paphytoplankton_C)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=paphytoplankton_ChlA)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=padetritus_N)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=padetritus_C)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=paheterotrophs)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=paseczooloss)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=pairon)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=pacalc)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=pabenthos_decay_rate)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=paco2_flux_param)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=paalkalinity_restoring)
+  call fseek(20, 0, 0, ierr)
+  
   read (20,NML=paciso)
+  call fseek(20, 0, 0, ierr)
+  
   close (20)
-#endif
+#endif  /* __recom */
 
   if(mype==0) write(*,*) 'Namelist files are read in'
   
