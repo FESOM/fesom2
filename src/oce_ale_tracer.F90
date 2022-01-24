@@ -1156,6 +1156,7 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
     type(t_mesh)  , intent(in)   , target    :: mesh
     type(t_partit), intent(inout), target    :: partit
     integer                                  :: n, nz, ed, el(2), en(2), k, elem, nl1, ul1
+    integer                                  :: elnodes1(3), elnodes2(3)
     real(kind=WP)                            :: u1, v1, len, vi, tt, ww 
     real(kind=WP), pointer                   :: temporary_ttf(:,:)
     real(kind=WP), pointer                   :: UV(:,:,:)
@@ -1187,6 +1188,11 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
            u1=UV(1, nz,el(1))-UV(1, nz,el(2))
            v1=UV(2, nz,el(1))-UV(2, nz,el(2))
            vi=u1*u1+v1*v1
+           elnodes1=elem2d_nodes(:,el(1))
+           elnodes2=elem2d_nodes(:,el(2))
+           u1=maxval(ttf(nz, elnodes1))-minval(ttf(nz, elnodes2))
+           v1=minval(ttf(nz, elnodes1))-maxval(ttf(nz, elnodes2))
+           vi=u1*u1+v1*v1
            tt=ttf(nz,en(1))-ttf(nz,en(2))
            vi=sqrt(max(tracers%data(tr_num)%gamma0_tra,            &
                    max(tracers%data(tr_num)%gamma1_tra*sqrt(vi),   & 
@@ -1214,8 +1220,10 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
           ul1=minval(ulevels_nod2D_max(en))
           nl1=maxval(nlevels_nod2D_min(en))-1
           DO  nz=ul1,nl1
-              u1=UV(1, nz,el(1))-UV(1, nz,el(2))
-              v1=UV(2, nz,el(1))-UV(2, nz,el(2))
+              elnodes1=elem2d_nodes(:,el(1))
+              elnodes2=elem2d_nodes(:,el(2))
+              u1=maxval(ttf(nz, elnodes1))-minval(ttf(nz, elnodes2))
+              v1=minval(ttf(nz, elnodes1))-maxval(ttf(nz, elnodes2))
               vi=u1*u1+v1*v1
               tt=temporary_ttf(nz,en(1))-temporary_ttf(nz,en(2))
               vi=sqrt(max(tracers%data(tr_num)%gamma0_tra,            &
