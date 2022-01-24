@@ -19,6 +19,7 @@ MODULE g_ic3d
    USE g_support
    USE g_config, only: dummy, ClimateDataPath, use_cavity
 #if defined (__recom)
+   use g_config, only: use_recom
    USE recom_config
 #endif
 
