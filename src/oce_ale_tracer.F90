@@ -6,6 +6,7 @@ module diff_part_hor_redi_interface
     end subroutine
   end interface
 end module
+
 module adv_tracers_muscle_ale_interface
   interface
     subroutine adv_tracers_muscle_ale(ttfAB, num_ord, do_Xmoment, mesh)
@@ -18,6 +19,7 @@ module adv_tracers_muscle_ale_interface
     end subroutine
   end interface
 end module
+
 module adv_tracers_vert_ppm_ale_interface
   interface
     subroutine adv_tracers_vert_ppm_ale(ttf, do_Xmoment, mesh)
@@ -29,6 +31,7 @@ module adv_tracers_vert_ppm_ale_interface
     end subroutine
   end interface
 end module
+
 module adv_tracers_ale_interface
   interface
     subroutine adv_tracers_ale(tr_num, mesh)
@@ -38,6 +41,7 @@ module adv_tracers_ale_interface
     end subroutine
   end interface
 end module
+
 module diff_ver_part_expl_ale_interface
   interface
     subroutine diff_ver_part_expl_ale(tr_num, mesh)
@@ -47,6 +51,7 @@ module diff_ver_part_expl_ale_interface
     end subroutine
   end interface
 end module
+
 module diff_ver_part_redi_expl_interface
   interface
     subroutine diff_ver_part_redi_expl(mesh)
@@ -55,6 +60,7 @@ module diff_ver_part_redi_expl_interface
     end subroutine
   end interface
 end module
+
 module diff_ver_part_impl_ale_interface
   interface
     subroutine diff_ver_part_impl_ale(tr_num, mesh)
@@ -64,6 +70,7 @@ module diff_ver_part_impl_ale_interface
     end subroutine
   end interface
 end module
+
 module diff_tracers_ale_interface
   interface
     subroutine diff_tracers_ale(tr_num, mesh)
@@ -73,6 +80,7 @@ module diff_tracers_ale_interface
     end subroutine
   end interface
 end module
+
 module bc_surface_interface
   interface
     function bc_surface(n, id, mesh)
@@ -83,6 +91,7 @@ module bc_surface_interface
     end function
   end interface
 end module
+
 module diff_part_bh_interface
   interface
     subroutine diff_part_bh(ttf, mesh)
@@ -93,6 +102,7 @@ module diff_part_bh_interface
     end subroutine
   end interface
 end module
+
 module diff_ver_recom_expl_interface
   interface
     subroutine diff_ver_recom_expl(tr_num, mesh)
@@ -103,6 +113,7 @@ module diff_ver_recom_expl_interface
     end subroutine
   end interface
 end module
+
 module ver_sinking_recom_benthos_interface
   interface
     subroutine ver_sinking_recom_benthos(tr_num, mesh)
@@ -114,6 +125,7 @@ module ver_sinking_recom_benthos_interface
     end subroutine
   end interface
 end module
+
 module integrate_bottom_interface
   interface
     subroutine integrate_bottom(tflux, mesh)
@@ -139,8 +151,10 @@ subroutine solve_tracers_ale(mesh)
     use Toy_Channel_Soufflet
     use adv_tracers_ale_interface
     use diff_tracers_ale_interface
+#if defined(__recom)
     use REcom_config, only: ciso     ! to calculation radioactive decay of 14C
     use REcoM_ciso, only: lambda_14  ! decay constant of 14C
+#endif
     
     implicit none
     type(t_mesh), intent(in) , target :: mesh
@@ -294,14 +308,14 @@ subroutine diff_tracers_ale(tr_num, mesh)
 #if defined(__recom)
     USE REcoM_GloVar
     use recom_config !, recom_debug
-use g_support
+    use g_support
 #endif
     implicit none
     
     integer, intent(in)      :: tr_num
     integer                  :: n, nzmax, nzmin
     type(t_mesh), intent(in) , target :: mesh
-real :: net
+    real :: net
 
 #include "associate_mesh.h"
 
@@ -410,7 +424,7 @@ real :: net
                                            nss(nzmin:nzmax,n)
         end do  
     end if
-#endif
+#endif   /* __recom  */
     
     !___________________________________________________________________________
     ! Update tracers --> calculate T* see Danilov etal "FESOM2 from finite elements
@@ -879,9 +893,9 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
     USE O_MESH
     use g_forcing_arrays
     use g_support
-use ver_sinking_recom_benthos_interface
+    use ver_sinking_recom_benthos_interface
 #if defined(__recom)
-    USE REcoM_GloVar
+    use REcoM_GloVar
     use recom_config !, recom_debug
     use g_support
 #endif
@@ -931,8 +945,8 @@ use ver_sinking_recom_benthos_interface
 ! Constant vertical sinking for the second detritus class
 ! *******************************************************
 
-!   if (REcoM_Second_Zoo) then ! No variable sinking
-        elseif(tracer_id(tr_num)==1025 .or. &  !idetz2n
+!       if (REcoM_Second_Zoo) then ! No variable sinking
+            elseif(tracer_id(tr_num)==1025 .or. &  !idetz2n
                tracer_id(tr_num)==1026 .or. &  !idetz2c
                tracer_id(tr_num)==1027 .or. &  !idetz2si
                tracer_id(tr_num)==1028 ) then  !idetz2calc
@@ -960,36 +974,36 @@ use ver_sinking_recom_benthos_interface
            add_benthos_2d(n) = add_benthos_2d(n) - (aux(nz))*dt
         end do                 
 
-            ! N
-            if( tracer_id(tr_num)==1004 .or. &  !iphyn
-                tracer_id(tr_num)==1007 .or. &  !idetn
-                tracer_id(tr_num)==1013 .or. &  !idian
-                tracer_id(tr_num)==1025 ) then  !idetz2n
-                Benthos(n,1)= Benthos(n,1) +  add_benthos_2d(n) ![mmol]
-            endif
-         
-            ! C
-            if( tracer_id(tr_num)==1005 .or. &  !iphyc
-                tracer_id(tr_num)==1008 .or. &  !idetc
-                tracer_id(tr_num)==1014 .or. &  !idiac
-                tracer_id(tr_num)==1026 ) then  !idetz2c
-                Benthos(n,2)= Benthos(n,2) + add_benthos_2d(n)
-            endif
+        ! N
+        if( tracer_id(tr_num)==1004 .or. &  !iphyn
+            tracer_id(tr_num)==1007 .or. &  !idetn
+            tracer_id(tr_num)==1013 .or. &  !idian
+            tracer_id(tr_num)==1025 ) then  !idetz2n
+            Benthos(n,1)= Benthos(n,1) +  add_benthos_2d(n) ![mmol]
+        endif
+     
+        ! C
+        if( tracer_id(tr_num)==1005 .or. &  !iphyc
+            tracer_id(tr_num)==1008 .or. &  !idetc
+            tracer_id(tr_num)==1014 .or. &  !idiac
+            tracer_id(tr_num)==1026 ) then  !idetz2c
+            Benthos(n,2)= Benthos(n,2) + add_benthos_2d(n)
+        endif
 
-            ! Si
-            if( tracer_id(tr_num)==1016 .or. &  !idiasi
-                tracer_id(tr_num)==1017 .or. &  !idetsi
-                tracer_id(tr_num)==1027 ) then  !idetz2si
-                Benthos(n,3)= Benthos(n,3) + add_benthos_2d(n)
-            endif
+        ! Si
+        if( tracer_id(tr_num)==1016 .or. &  !idiasi
+            tracer_id(tr_num)==1017 .or. &  !idetsi
+            tracer_id(tr_num)==1027 ) then  !idetz2si
+            Benthos(n,3)= Benthos(n,3) + add_benthos_2d(n)
+        endif
 
-            ! Cal
-            if( tracer_id(tr_num)==1020 .or. &  !iphycal
-                tracer_id(tr_num)==1021 .or. &  !idetcal
-                tracer_id(tr_num)==1028 ) then  !idetz2cal
-                Benthos(n,4)= Benthos(n,4) + add_benthos_2d(n) 
-            endif
-end do
+        ! Cal
+        if( tracer_id(tr_num)==1020 .or. &  !iphycal
+            tracer_id(tr_num)==1021 .or. &  !idetcal
+            tracer_id(tr_num)==1028 ) then  !idetz2cal
+            Benthos(n,4)= Benthos(n,4) + add_benthos_2d(n) 
+        endif
+   end do
 
     do n=1, benthos_num
       call exchange_nod(Benthos(:,n))
@@ -1054,44 +1068,44 @@ use diff_ver_recom_expl_interface
 
 #include "associate_mesh.h"
 
-bottom_flux = 0._WP
-id = tracer_id(tr_num)
+    bottom_flux = 0._WP
+    id = tracer_id(tr_num)
 
-  SELECT CASE (id)
-    CASE (1001)
-      bottom_flux = GlodecayBenthos(:,1) !*** DIN [mmolN/m^2/s] ***
-    CASE (1002)
-      bottom_flux = GlodecayBenthos(:,2) + GlodecayBenthos(:,4) !*** DIC + calcification ***
-    CASE (1003)
-      bottom_flux = GlodecayBenthos(:,4) * 2.0_WP  - 1.065_WP * GlodecayBenthos(:,1) !*** Alk ***
-    CASE (1018)
-      bottom_flux = GlodecayBenthos(:,3) !*** Si ***
-    CASE (1019)
-      if(use_Fe2N) then 
-        bottom_flux = GlodecayBenthos(:,1) * Fe2N_benthos !*** DFe ***
-      else
-        bottom_flux = GlodecayBenthos(:,2) * Fe2C_benthos
-      end if
-    CASE (1022)
-      bottom_flux = -GlodecayBenthos(:,2) * redO2C !*** O2 ***
-    CASE (1033)
-      if (ciso) then
-        bottom_flux = GlodecayBenthos(:,5) + GlodecayBenthos(:,7) !*** DIC_13 and Calc: DIC_13 ***
-      end if
-    CASE (1034)
-      if (ciso) then
-        bottom_flux = GlodecayBenthos(:,6) + GlodecayBenthos(:,8) !*** DIC_14 and Calc: DIC_14 ***
-      end if
-    CASE DEFAULT
-      if (mype==0) then
-         if (mype==0) write(*,*) 'check specified in boundary conditions'
-         if (mype==0) write(*,*) 'the model will stop!'
-      end if
-      call par_ex
-      stop
+    SELECT CASE (id)
+        CASE (1001)
+            bottom_flux = GlodecayBenthos(:,1) !*** DIN [mmolN/m^2/s] ***
+        CASE (1002)
+            bottom_flux = GlodecayBenthos(:,2) + GlodecayBenthos(:,4) !*** DIC + calcification ***
+        CASE (1003)
+            bottom_flux = GlodecayBenthos(:,4) * 2.0_WP  - 1.065_WP * GlodecayBenthos(:,1) !*** Alk ***
+        CASE (1018)
+            bottom_flux = GlodecayBenthos(:,3) !*** Si ***
+        CASE (1019)
+            if(use_Fe2N) then 
+                bottom_flux = GlodecayBenthos(:,1) * Fe2N_benthos !*** DFe ***
+            else
+                bottom_flux = GlodecayBenthos(:,2) * Fe2C_benthos
+            end if
+        CASE (1022)
+            bottom_flux = -GlodecayBenthos(:,2) * redO2C !*** O2 ***
+        CASE (1033)
+            if (ciso) then
+                bottom_flux = GlodecayBenthos(:,5) + GlodecayBenthos(:,7) !*** DIC_13 and Calc: DIC_13 ***
+            end if
+        CASE (1034)
+            if (ciso) then
+                bottom_flux = GlodecayBenthos(:,6) + GlodecayBenthos(:,8) !*** DIC_14 and Calc: DIC_14 ***
+            end if
+        CASE DEFAULT
+            if (mype==0) then
+                if (mype==0) write(*,*) 'check specified in boundary conditions'
+                if (mype==0) write(*,*) 'the model will stop!'
+            end if
+           call par_ex
+           stop
   END SELECT
 
-   do n=1, myDim_nod2D
+  do n=1, myDim_nod2D
 
         nl1=nlevels_nod2D(n)-1
         ul1=ulevels_nod2D(n)
@@ -1116,7 +1130,7 @@ id = tracer_id(tr_num)
 !            dtr_bf(nz,n) = dtr_bf(nz,n) + vd_flux(nz+1)*dt/area(nz,n)/(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))
             dtr_bf(nz,n) = dtr_bf(nz,n) + vd_flux(nz+1)*dt/areasvol(nz,n)/hnode_new(nz,n)
         end do
-    end do
+  end do
 end subroutine diff_ver_recom_expl
 !
 !
@@ -1420,10 +1434,10 @@ FUNCTION bc_surface(n, id, mesh)
   USE g_PARSUP, only: mype, par_ex
   USE g_config
 #if defined(__recom)
-USE REcoM_GloVar
-use recom_config, only: ciso, recom_debug
-use REcoM_declarations
-use REcoM_ciso
+  use REcoM_GloVar
+  use recom_config, only: ciso, recom_debug
+  use REcoM_declarations
+  use REcoM_ciso
 #endif
 
   implicit none
@@ -1516,7 +1530,7 @@ use REcoM_ciso
     CASE (1102:1299)
         bc_surface=0.0_WP  ! added by MB for ciso
 !ciso adapted by MB
-#endif 
+#endif    /*  __recom   */
     CASE (101) ! apply boundary conditions to tracer ID=101
         bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)
     CASE (301)
