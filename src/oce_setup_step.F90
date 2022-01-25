@@ -280,13 +280,13 @@ allocate(tau_x_t(node_size,2), tau_y_t(node_size,2))
 ! RECOM forcing arrays
 ! ================
 #if defined(__recom)
-  if(use_REcoM) then
+if(use_REcoM) then
     if (restore_alkalinity) then
-      allocate(Alk_surf(node_size))
-      allocate(relax_alk(node_size))
-      allocate(virtual_alk(node_size))
+        allocate(Alk_surf(node_size))
+        allocate(relax_alk(node_size))
+        allocate(virtual_alk(node_size))
     endif
-  end if
+end if
 #endif
 ! =================
 ! All auxiliary arrays
@@ -548,9 +548,9 @@ use REcoM_ciso
     if(mype==0) write(*,*) 'read Salt        climatology from:', trim(filelist(7))
     if(mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(8))
 #else
-  if(mype==0) write(*,*) 'read Salt       climatology from:', trim(filelist(1))
-  if(mype==0) write(*,*) 'read Temperatur climatology from:', trim(filelist(2))
-#endif
+    if(mype==0) write(*,*) 'read Salt       climatology from:', trim(filelist(1))
+    if(mype==0) write(*,*) 'read Temperatur climatology from:', trim(filelist(2))
+#endif  /*  __recom  */
 
   call do_ic3d(mesh)
   
@@ -562,12 +562,12 @@ use REcoM_ciso
 
 #if defined(__recom)
     if (restore_alkalinity) then
-      if (mype==0)  print *, achar(27)//'[46;1m'//'--> Set surface field for alkalinity restoring'//achar(27)//'[0m'
-      Alk_surf=tr_arr(1,:,5)
-      if(mype==0) write(*,*),'Alkalinity restoring = true. Field read in.'
+        if (mype==0)  print *, achar(27)//'[46;1m'//'--> Set surface field for alkalinity restoring'//achar(27)//'[0m'
+        Alk_surf=tr_arr(1,:,5)
+        if(mype==0) write(*,*),'Alkalinity restoring = true. Field read in.'
     endif
-  end if
-#endif
+  end if  ! use_REcoM
+#endif  /*  __recom  */
 
   ! count the passive tracers which require 3D source (ptracers_restore_total)
   ptracers_restore_total=0
