@@ -1196,8 +1196,8 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
            tt(nz)=ttf(nz,en(1))-ttf(nz,en(2))
            vi=sqrt(max(tracers%data(tr_num)%gamma0_tra,            &
                    max(tracers%data(tr_num)%gamma1_tra*sqrt(vi),   & 
-                       tracers%data(tr_num)%gamma2_tra*vi)         &
-                  )*len)       
+                       tracers%data(tr_num)%gamma2_tra*     vi)    &
+                                                         )*len)       
            tt(nz)=tt(nz)*vi
        END DO
 #if defined(_OPENMP)
@@ -1238,26 +1238,25 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
               tt(nz)=temporary_ttf(nz,en(1))-temporary_ttf(nz,en(2))
               vi=sqrt(max(tracers%data(tr_num)%gamma0_tra,            &
                       max(tracers%data(tr_num)%gamma1_tra*sqrt(vi),   & 
-                          tracers%data(tr_num)%gamma2_tra*vi)         &
-                     )*len)                    
+                          tracers%data(tr_num)%gamma2_tra*     vi)    &
+                                                            )*len)                    
               tt(nz)=-tt(nz)*vi*dt
           END DO 
 #if defined(_OPENMP)
           call omp_set_lock  (partit%plock(en(1)))
 #endif
-          ttf(nzmin:nzmax-1,en(1))=ttf(nzmin:nzmax-1,en(1))-tt/area(nzmin:nzmax-1,en(1))
+          ttf(nzmin:nzmax-1,en(1))=ttf(nzmin:nzmax-1,en(1))-tt(nzmin:nzmax-1)/area(nzmin:nzmax-1,en(1))
 #if defined(_OPENMP)
           call omp_unset_lock(partit%plock(en(1)))
           call omp_set_lock  (partit%plock(en(2)))
 #endif
-          ttf(nzmin:nzmax-1,en(2))=ttf(nzmin:nzmax-1,en(2))+tt/area(nzmin:nzmax-1,en(2))
+          ttf(nzmin:nzmax-1,en(2))=ttf(nzmin:nzmax-1,en(2))+tt(nzmin:nzmax-1)/area(nzmin:nzmax-1,en(2))
 #if defined(_OPENMP)
           call omp_unset_lock(partit%plock(en(2)))
 #endif
     END DO
 !$OMP END DO
 !$OMP END PARALLEL
-
 call exchange_nod(ttf, partit)
 !$OMP BARRIER
 end subroutine diff_part_bh
