@@ -416,7 +416,7 @@ subroutine diff_tracers_ale(tr_num, mesh)
 
 ! 3) Nitrogen SS
     if (NitrogenSS .and. tracer_id(tr_num)==1008) then ! idetc
-        call recom_nitogenss(mesh) !--- nss for idetc ---
+        call recom_nitrogenss(mesh) !--- nss for idetc ---
         do n=1, myDim_nod2D
             nzmax=nlevels_nod2D(n)-1
             nzmin=ulevels_nod2D(n)
