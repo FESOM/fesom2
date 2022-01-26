@@ -30,6 +30,7 @@ if(${USE_RECOM})
         # ${src_home}/recom_drivers/*.F90
     )
 endif()
+
 #list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_partition_init.F90)
 file(GLOB sources_C ${src_home}/*.c)
 
@@ -66,30 +67,38 @@ target_link_libraries(${PROJECT_NAME}_C parms) #metis
 # create our binary (set its name to name of this project)
 add_executable(${PROJECT_NAME} ${sources_Fortran})
 target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
+
 if(${DISABLE_MULTITHREADING})
    target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_MULTITHREADING)
 endif()
+
 if(${FESOM_COUPLED})
    include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindOASIS.cmake)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __oasis)
 endif()
+
 if(${OIFS_COUPLED})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __oifs)
 endif()
+
 if(${RECOM_COUPLED})
    # check for RECOM and retun RECOM_LIB_DIR else exit the build
    include(${CMAKE_CURRENT_LIST_DIR}/../cmake/find_recom.cmake)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2)
 endif()
+
 if(${CISO_COUPLED})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __ciso)
 endif()
+
 if(${USE_ICEPACK})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __icepack)
 endif()
+
 if(${VERBOSE})
    target_compile_definitions(${PROJECT_NAME} PRIVATE VERBOSE)
 endif()
+
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
 	target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip -init=zero -no-wrap-margin)
@@ -102,10 +111,13 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
        target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64)
 endif()
+
 target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES} ${OASIS_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
-    # INCLUDE and LINK settings for RECOM
+
+# INCLUDE and LINK settings for RECOM
+if(${RECOM_COUPLED})
     target_include_directories(${PROJECT_NAME} PRIVATE ${RECOM_LIB_DIR})
     target_link_libraries(${PROJECT_NAME} ${RECOM_LIB_DIR}/librecom.a)
 endif()
