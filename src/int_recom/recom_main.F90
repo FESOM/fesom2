@@ -164,7 +164,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forci
         GloCO2flux_seaicemask_14(n)     = co2flux_seaicemask_14(1)        !  [mmol/m2/s]
      end if
 
-     GloHplus(n)                  = hplus
+     GloHplus(n)                  = ph(1) !hplus
      AtmFeInput(n)                = FeDust
      AtmNInput(n)                 = NDust 
 !     DenitBen(n)                  = LocDenit
