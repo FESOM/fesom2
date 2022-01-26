@@ -532,10 +532,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
        grazingFlux_Det   = grazingFlux * fDetN / food
        grazingFlux_DetZ2 = grazingFlux * fDetZ2N / food
     else
-       food              = PhyN + fDiaN
+       food              = fPhyN + fDiaN
        foodsq            = food * food
        grazingFlux       = (Graz_max * foodsq)/(epsilonr + foodsq) * HetN * arrFunc
-       grazingFlux_phy   = grazingFlux * phyN / food
+       grazingFlux_phy   = grazingFlux * fphyN / food
        grazingFlux_Dia   = grazingFlux * fDiaN / food
     endif
 
