@@ -170,8 +170,10 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
        ! calc max,min increment from nz-1:nz+1 with respect to low order 
        ! solution at layer nz
        do nz=nu1+1,nl1-2  
-          fct_ttf_max(nz,n)=maxval(tvert_max(nz-1:nz+1))-LO(nz,n)
-          fct_ttf_min(nz,n)=minval(tvert_min(nz-1:nz+1))-LO(nz,n)
+!         fct_ttf_max(nz,n)=maxval(tvert_max(nz-1:nz+1))-LO(nz,n)
+!         fct_ttf_min(nz,n)=minval(tvert_min(nz-1:nz+1))-LO(nz,n)
+          fct_ttf_max(nz,n)=tvert_max(nz)-LO(nz,n)
+          fct_ttf_min(nz,n)=tvert_min(nz)-LO(nz,n)
        end do
        ! calc max,min increment of bottom layer -1 with respect to low order 
        ! solution 
