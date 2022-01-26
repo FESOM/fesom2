@@ -1155,9 +1155,9 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
     type(t_tracer), intent(inout), target    :: tracers
     type(t_mesh)  , intent(in)   , target    :: mesh
     type(t_partit), intent(inout), target    :: partit
-    integer                                  :: n, nz, ed, el(2), en(2), k, elem, nl1, ul1
+    integer                                  :: n, nz, ed, el(2), en(2), k, elem, nzmin, nzmax
     integer                                  :: elnodes1(3), elnodes2(3)
-    real(kind=WP)                            :: u1, v1, len, vi, tt, ww 
+    real(kind=WP)                            :: u1, v1, len, vi, ww, tt(mesh%nl-1)
     real(kind=WP), pointer                   :: temporary_ttf(:,:)
     real(kind=WP), pointer                   :: UV(:,:,:)
     real(kind=WP), pointer                   :: ttf(:,:)
@@ -1165,6 +1165,8 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
+
+
     UV            => dynamics%uv(:,:,:)
     ttf           => tracers%data(tr_num)%values
     temporary_ttf => tracers%work%del_ttf !use already allocated working array. could be fct_LO instead etc.
@@ -1175,74 +1177,89 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
         end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, ed, el, en, k, elem, nl1, ul1, u1, v1, len, vi, tt, ww)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, ed, el, en, k, elem, nzmin, nzmax, u1, v1, len, vi, tt, ww, &
+!$OMP elnodes1, elnodes2)
 !$OMP DO
-    DO ed=1, myDim_edge2D+eDim_edge2D
-       if (myList_edge2D(ed)>edge2D_in) cycle
+    DO ed=1, myDim_edge2D!+eDim_edge2D
+       if (myList_edge2D(ed) > edge2D_in) cycle
        el=edge_tri(:,ed)
        en=edges(:,ed)
        len=sqrt(sum(elem_area(el)))
-       ul1 = minval(nlevels(el))
-       nl1 = maxval(ulevels(el))
-!      ul1=minval(ulevels_nod2D_max(en))
-!      nl1=maxval(nlevels_nod2D_min(en))-1
+       nzmax = minval(nlevels(el))
+       nzmin = maxval(ulevels(el))
        elnodes1=elem2d_nodes(:,el(1))
        elnodes2=elem2d_nodes(:,el(2))
-       DO  nz=ul1,nl1
-           u1=UV(1, nz,el(1))-UV(1, nz,el(2))
-           v1=UV(2, nz,el(1))-UV(2, nz,el(2))
-           vi=u1*u1+v1*v1
+       DO  nz=nzmin, nzmax-1
            u1=maxval(ttf(nz, elnodes1))-minval(ttf(nz, elnodes2))
            v1=minval(ttf(nz, elnodes1))-maxval(ttf(nz, elnodes2))
            vi=u1*u1+v1*v1
-           tt=ttf(nz,en(1))-ttf(nz,en(2))
+           tt(nz)=ttf(nz,en(1))-ttf(nz,en(2))
            vi=sqrt(max(tracers%data(tr_num)%gamma0_tra,            &
                    max(tracers%data(tr_num)%gamma1_tra*sqrt(vi),   & 
                        tracers%data(tr_num)%gamma2_tra*vi)         &
                   )*len)       
-           !vi=sqrt(max(sqrt(u1*u1+v1*v1),0.04)*le)  ! 10m^2/s for 10 km (0.04 h/50)
-           !vi=sqrt(10.*le)
-           tt=tt*vi
-           temporary_ttf(nz,en(1))=temporary_ttf(nz,en(1))-tt
-           temporary_ttf(nz,en(2))=temporary_ttf(nz,en(2))+tt
-       END DO 
+           tt(nz)=tt(nz)*vi
+       END DO
+#if defined(_OPENMP)
+       call omp_set_lock  (partit%plock(en(1)))
+#endif
+       temporary_ttf(nzmin:nzmax-1,en(1))=temporary_ttf(nzmin:nzmax-1,en(1))-tt(nzmin:nzmax-1)
+#if defined(_OPENMP)
+       call omp_unset_lock(partit%plock(en(1)))
+       call omp_set_lock  (partit%plock(en(2)))
+#endif
+       temporary_ttf(nzmin:nzmax-1,en(2))=temporary_ttf(nzmin:nzmax-1,en(2))+tt(nzmin:nzmax-1)
+#if defined(_OPENMP)
+       call omp_unset_lock(partit%plock(en(2)))
+#endif
     END DO
 !$OMP END DO
+!$OMP MASTER
     call exchange_nod(temporary_ttf, partit)
+!$OMP END MASTER
 !$OMP BARRIER
     ! ===========
     ! Second round: 
     ! ===========
 !$OMP DO
-    DO ed=1, myDim_edge2D+eDim_edge2D
+    DO ed=1, myDim_edge2D!+eDim_edge2D
        if (myList_edge2D(ed)>edge2D_in) cycle
           el=edge_tri(:,ed)
           en=edges(:,ed)
           len=sqrt(sum(elem_area(el)))
-          ul1 = minval(nlevels(el))
-          nl1 = maxval(ulevels(el))
-!         ul1=minval(ulevels_nod2D_max(en))
-!         nl1=maxval(nlevels_nod2D_min(en))-1
+          nzmax = minval(nlevels(el))
+          nzmin = maxval(ulevels(el))
           elnodes1=elem2d_nodes(:,el(1))
           elnodes2=elem2d_nodes(:,el(2))
-          DO  nz=ul1,nl1
+          DO  nz=nzmin, nzmax-1
               u1=maxval(ttf(nz, elnodes1))-minval(ttf(nz, elnodes2))
               v1=minval(ttf(nz, elnodes1))-maxval(ttf(nz, elnodes2))
               vi=u1*u1+v1*v1
-              tt=temporary_ttf(nz,en(1))-temporary_ttf(nz,en(2))
+              tt(nz)=temporary_ttf(nz,en(1))-temporary_ttf(nz,en(2))
               vi=sqrt(max(tracers%data(tr_num)%gamma0_tra,            &
                       max(tracers%data(tr_num)%gamma1_tra*sqrt(vi),   & 
                           tracers%data(tr_num)%gamma2_tra*vi)         &
                      )*len)                    
-              !vi=sqrt(max(sqrt(u1*u1+v1*v1),0.04)*le)  ! 10m^2/s for 10 km (0.04 h/50)
-              !vi=sqrt(10.*le) 
-              tt=-tt*vi*dt
-              ttf(nz,en(1))=ttf(nz,en(1))-tt/area(nz,en(1))
-              ttf(nz,en(2))=ttf(nz,en(2))+tt/area(nz,en(2))
+              tt(nz)=-tt(nz)*vi*dt
           END DO 
+#if defined(_OPENMP)
+          call omp_set_lock  (partit%plock(en(1)))
+#endif
+          ttf(nzmin:nzmax-1,en(1))=ttf(nzmin:nzmax-1,en(1))-tt/area(nzmin:nzmax-1,en(1))
+#if defined(_OPENMP)
+          call omp_unset_lock(partit%plock(en(1)))
+          call omp_set_lock  (partit%plock(en(2)))
+#endif
+          ttf(nzmin:nzmax-1,en(2))=ttf(nzmin:nzmax-1,en(2))+tt/area(nzmin:nzmax-1,en(2))
+#if defined(_OPENMP)
+          call omp_unset_lock(partit%plock(en(2)))
+#endif
     END DO
 !$OMP END DO
 !$OMP END PARALLEL
+
+call exchange_nod(ttf, partit)
+!$OMP BARRIER
 end subroutine diff_part_bh
 !
 !
