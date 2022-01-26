@@ -21,11 +21,14 @@ execute_process(COMMAND ${LS} ${ls_opts} ${search_dir}  OUTPUT_VARIABLE ls_out)
 # convert multi-line output to a list for the foreach loop
 string(REPLACE "\n" ";" ls_out ${ls_out})
 
-# find RECOM
+# find RECOM library using regex. Directories with the substring 'recom' will
+# be added to the candidates list
 set(matches "")
 foreach(item ${ls_out})
     # the directories will have a trailing slash with ls -F
-    string(REGEX MATCH ".*recom.*/$" match ${item})
+    # CMake regex does not support case-insensitive search to fake it with []
+    #string(REGEX MATCH ".*recom.*/$" match ${item})
+    string(REGEX MATCH ".*[rR][eE][cC][oO][mM].*/$" match ${item})
     if (NOT ${match} STREQUAL "")
         list(APPEND matches ${match})
     endif()
@@ -43,7 +46,12 @@ find_path(RECOM_LIB_DIR librecom.a ${possible_recom_dirs})
 
 # check if RECOM_LIB_DIR is found. If not stop further execution.
 if (${RECOM_LIB_DIR} STREQUAL RECOM_LIB_DIR-NOTFOUND)
-    message(FATAL_ERROR "!!! ERROR: RECOM is not found. Exiting the compilation")
+    message(WARNING "!!! ERROR: RECOM is not found")
+    message(STATUS "These matches are found for Recom")
+    foreach(item ${matches})
+        message(STATUS "    ${item}")
+    endforeach()
+    message(FATAL_ERROR "find_recom.cmake: Exiting the compilation")
 else()
     message(STATUS "RECOM is found in: ${RECOM_LIB_DIR}")
 endif()
