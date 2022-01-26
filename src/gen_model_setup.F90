@@ -30,6 +30,7 @@ subroutine read_namelist
   implicit none
 
   character(len=MAX_PATH)   :: nmlfile
+  integer :: ierr
   namelist /clockinit/ timenew, daynew, yearnew
 
   nmlfile ='namelist.config'    ! name of general configuration namelist file
@@ -54,7 +55,7 @@ subroutine read_namelist
   ! degree2radian
   ! ==========
   cyclic_length=cyclic_length*rad
-  alphaEuler=alphaEuler*rad 	
+  alphaEuler=alphaEuler*rad
   betaEuler=betaEuler*rad
   gammaEuler=gammaEuler*rad
 
