@@ -620,7 +620,8 @@ contains
        !-----------------------------------------------------------------------
        !     find stability and buoyancy forcing for final hbl values
        !-----------------------------------------------------------------------      
-        IF (use_sw_pene)  THEN     
+        IF (use_sw_pene)  THEN    
+           coeff_sw = g * sw_alpha(nzmin,node)  ! @ the surface @ Z (m/s2/K)
        ! Linear interpolation of sw_3d to depth of hbl
            bfsfc(node) = Bo(node) + & 
                          coeff_sw * &
