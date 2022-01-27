@@ -2862,7 +2862,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     type(t_ice)   , intent(inout), target :: ice
     !___________________________________________________________________________
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
-    integer           :: node
+    integer           :: node, k
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer :: eta_n
@@ -2974,6 +2974,27 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         call mo_convect(ice, partit, mesh)
         
     end if     
+
+!    DO node=1, myDim_nod2D+eDim_nod2D
+!       do k=1, nlevels_nod2D(node)
+!          if ( k <=  5)                  Kv(k, node)=1.e-4 !1.e-3
+!          if ((k >   5) .and. (k <= 10)) Kv(k, node)=1.e-4
+!          if ((k >  10) .and. (k <= 14)) Kv(k, node)=5.e-5
+!          if (k  >  14)                  Kv(k, node)=1.e-5
+!       end do
+!    END DO
+
+where (Kv>1.e-2) !tried with 1.e-3 and it works nicely
+       Kv=1.e-2
+end where
+
+where (Av>1.e-2)
+       Av=1.e-2
+end where
+
+call smooth_nod (Kv, 5, partit, mesh)
+call smooth_elem(Av, 5, partit, mesh)
+
 
     !___EXTENSION OF MIXING SCHEMES_____________________________________________
     ! add CVMIX TIDAL mixing scheme of Simmons et al. 2004 "Tidally driven mixing 
