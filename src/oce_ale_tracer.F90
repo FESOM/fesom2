@@ -883,6 +883,7 @@ end subroutine diff_ver_part_impl_ale
 !
 !
 !===============================================================================
+#if defined(__recom)
 subroutine ver_sinking_recom_benthos(tr_num,mesh)
     use o_ARRAYS
     use g_PARSUP
@@ -894,11 +895,11 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
     use g_forcing_arrays
     use g_support
     use ver_sinking_recom_benthos_interface
-#if defined(__recom)
-    use REcoM_GloVar
-    use recom_config !, recom_debug
+    use REcoM_GloVar, only: Benthos, GlodecayBenthos   
+    use recom_config, only: VDet, allow_var_sinking, Vdet_a, VPhy, VDia, &
+        VDet_zoo2, SecondsPerDay, benthos_num !, recom_debug
     use g_support
-#endif
+
     IMPLICIT NONE
     type(t_mesh), intent(in) , target  :: mesh
     integer                   :: elem,k, tr_num
@@ -924,7 +925,7 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
             tracer_id(tr_num)==1021 ) then  !idetcal
             
             Vben = VDet
-	    if (allow_var_sinking) Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VDet
+        if (allow_var_sinking) Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VDet
 
         elseif(tracer_id(tr_num)==1004 .or. &  !iphyn
                tracer_id(tr_num)==1005 .or. &  !iphyc
@@ -932,7 +933,7 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
                tracer_id(tr_num)==1006 ) then  !ipchl
 
             Vben = VPhy
-	    if (allow_var_sinking) Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VPhy
+        if (allow_var_sinking) Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VPhy
 
         elseif(tracer_id(tr_num)==1013 .or. &  !idian
                tracer_id(tr_num)==1014 .or. &  !idiac
@@ -940,7 +941,7 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
                tracer_id(tr_num)==1015 ) then  !idchl
 
             Vben = VDia
-	    if (allow_var_sinking) Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VDia
+        if (allow_var_sinking) Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VDia
       
 ! Constant vertical sinking for the second detritus class
 ! *******************************************************
@@ -1009,7 +1010,9 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
       call exchange_nod(Benthos(:,n))
     end do
 end subroutine ver_sinking_recom_benthos
+#endif  /* __recom */
 
+#if defined(__recom)
 subroutine integrate_bottom(tflux,mesh)
     use o_ARRAYS
     use g_PARSUP
@@ -1020,10 +1023,9 @@ subroutine integrate_bottom(tflux,mesh)
     USE O_MESH
     use g_forcing_arrays
     use integrate_bottom_interface
-#if defined(__recom)
     USE REcoM_GloVar
     use recom_config !, recom_debug
-#endif
+
     IMPLICIT NONE
     type(t_mesh), intent(in) , target  :: mesh
     integer                            :: elem,k, tr_num
@@ -1041,9 +1043,11 @@ subroutine integrate_bottom(tflux,mesh)
    call MPI_AllREDUCE(tf, tflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
         MPI_COMM_FESOM, MPIerr)
 end subroutine integrate_bottom
+#endif  /* __recom */
 !
 !
 !===============================================================================
+#if defined(__recom)
 subroutine diff_ver_recom_expl(tr_num,mesh)
     use o_ARRAYS
     use g_PARSUP
@@ -1053,11 +1057,11 @@ subroutine diff_ver_recom_expl(tr_num,mesh)
     use g_comm_auto
     USE O_MESH
     use g_forcing_arrays
-use diff_ver_recom_expl_interface
-#if defined(__recom)
-    USE REcoM_GloVar
-    use recom_config !, recom_debug
-#endif
+    use diff_ver_recom_expl_interface
+    USE REcoM_GloVar, only: GlodecayBenthos
+    use recom_config, only: Fe2N_benthos, Fe2C_benthos, redO2C, ciso, &
+        use_Fe2N !, recom_debug
+
     IMPLICIT NONE
     type(t_mesh), intent(in) , target :: mesh
     integer                  :: elem,k,tr_num
@@ -1132,6 +1136,7 @@ use diff_ver_recom_expl_interface
         end do
   end do
 end subroutine diff_ver_recom_expl
+#endif
 !
 !
 !===============================================================================
