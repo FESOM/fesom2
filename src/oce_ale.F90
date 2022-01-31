@@ -2984,12 +2984,12 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 !       end do
 !    END DO
 
-where (Kv>1.e-2) !tried with 1.e-3 and it works nicely
-       Kv=1.e-2
+where (Kv>1.) !tried with 1.e-3 and it works nicely
+       Kv=1.
 end where
 
-where (Av>1.e-2)
-       Av=1.e-2
+where (Av>1.)
+       Av=1.
 end where
 
 call smooth_nod (Kv, 5, partit, mesh)

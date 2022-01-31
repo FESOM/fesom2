@@ -1,8 +1,8 @@
 &dynamics_visc
-visc_gamma0  = 0.003 ! [m/s],   backgroung viscosity= gamma0*len, it should be as small a s possible (keep it < 0.01 m/s).
-visc_gamma1  = 0.1   ! [nodim], for computation of the flow aware viscosity
+visc_gamma0  = 0.001  ! [m/s],   backgroung viscosity= gamma0*len, it should be as small a s possible (keep it < 0.01 m/s).
+visc_gamma1  = 0.02   ! [nodim], for computation of the flow aware viscosity
 visc_gamma2  = 0.285 ! [s/m],   is only used in easy backscatter option
-visc_easybsreturn= 1.5
+visc_easybsreturn= 1.0
 
 opt_visc     = 5          
 ! 5=Kinematic (easy) Backscatter

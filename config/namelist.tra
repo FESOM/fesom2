@@ -4,8 +4,8 @@ num_tracers=100 !number of tracers to allocate. shallbe large or equal to the nu
 
 &tracer_list
 nml_tracer_list =  
-1  , 'MFCT',       'QR4C',       'FCT ',        1.,          1., 
-2  , 'MFCT',       'QR4C',       'FCT ',        1.,          1., 
+1  , 'MFCT',       'QR4C',       'FCT ',        0.,          0., 
+2  , 'MFCT',       'QR4C',       'FCT ',        0.,          0., 
 !101, 'UPW1',       'UPW1',       'NON ',        0.,          0.
 /
 
@@ -19,9 +19,9 @@ t_insitu = .true.                         ! if T is insitu it will be converted 
 
 &tracer_general
 ! bharmonic diffusion for tracers. We recommend to use this option in very high resolution runs (Redi is generally off there).
-smooth_bh_tra =.false.     ! use biharmonic diffusion (filter implementation) for tracers
-gamma0_tra    = 0.0005     ! gammaX_tra are analogous to those in the dynamical part
-gamma1_tra    = 0.0125
+smooth_bh_tra =.true.     ! use biharmonic diffusion (filter implementation) for tracers
+gamma0_tra    = 0.0005    ! gammaX_tra are analogous to those in the dynamical part
+gamma1_tra    = 0.
 gamma2_tra    = 0.
 i_vert_diff   =.true.
 /
@@ -39,7 +39,7 @@ diff_sh_limit=5.0e-3       ! for KPP, max diff due to shear instability
 Kv0_const=.true.
 double_diffusion=.false.   ! for KPP,dd switch
 K_ver=1.0e-5
-K_hor=3000.
+K_hor=0.
 surf_relax_T=0.0
 surf_relax_S=1.929e-06     ! 50m/300days 6.43e-07! m/s 10./(180.*86400.)
 balance_salt_water =.true. ! balance virtual-salt or freshwater flux or not
