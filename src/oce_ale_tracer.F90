@@ -1136,7 +1136,7 @@ subroutine diff_ver_recom_expl(tr_num,mesh)
         end do
   end do
 end subroutine diff_ver_recom_expl
-#endif
+#endif  /* __recom  */
 !
 !
 !===============================================================================
