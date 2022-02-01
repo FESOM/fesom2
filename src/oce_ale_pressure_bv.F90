@@ -424,7 +424,7 @@ subroutine pressure_bv(tracers, partit, mesh)
         flag1=.true.
         flag2=.true.
         do nz=nzmin+1,nzmax-1
-            zmean   = 0.5_WP*sum(Z_3d_n(nz-1:nz, node), node))
+            zmean   = 0.5_WP*sum(Z_3d_n(nz-1:nz, node), node)
             bulk_up = bulk_0(nz-1) + zmean*(bulk_pz(nz-1) + zmean*bulk_pz2(nz-1)) 
             bulk_dn = bulk_0(nz)   + zmean*(bulk_pz(nz)   + zmean*bulk_pz2(nz))
             rho_up  = bulk_up*rhopot(nz-1) / (bulk_up + 0.1_WP*zmean*real(state_equation))  
