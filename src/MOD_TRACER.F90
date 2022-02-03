@@ -211,7 +211,7 @@ subroutine READ_T_TRACER(tracer, unit, iostat, iomsg)
 
     read(unit, iostat=iostat, iomsg=iomsg)    tracer%num_tracers
 !   write(*,*) 'number of tracers to read: ', tracer%num_tracers
-    allocate(tracer%data(tracer%num_tracers))
+    if (.not. allocated(tracer%data)) allocate(tracer%data(tracer%num_tracers))
     do i=1, tracer%num_tracers
        read(unit, iostat=iostat, iomsg=iomsg) tracer%data(i)
 !      write(*,*) 'tracer info:', tracer%data(i)%ID, TRIM(tracer%data(i)%tra_adv_hor), TRIM(tracer%data(i)%tra_adv_ver), TRIM(tracer%data(i)%tra_adv_lim)
