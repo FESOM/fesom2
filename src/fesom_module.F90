@@ -206,6 +206,7 @@ contains
         call clock_newyear                        ! check if it is a new year
         if (f%mype==0) f%t6=MPI_Wtime()
         !___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call restart'//achar(27)//'[0m'
         call restart(0, r_restart, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         if (f%mype==0) f%t7=MPI_Wtime()
         ! store grid information into netcdf file
@@ -214,6 +215,7 @@ contains
         !___IF RESTART WITH ZLEVEL OR ZSTAR IS DONE, ALSO THE ACTUAL LEVELS AND ____
         !___MIDDEPTH LEVELS NEEDS TO BE CALCULATET AT RESTART_______________________
         if (r_restart) then
+            if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call restart_thickness_ale'//achar(27)//'[0m'
             call restart_thickness_ale(f%partit, f%mesh)
         end if
         if (f%mype==0) then
