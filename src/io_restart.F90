@@ -162,8 +162,6 @@ subroutine restart(istep, l_read, ice, dynamics, tracers, partit, mesh)
   logical rawfiles_exist, binfiles_exist
   logical, save :: initialized_raw = .false.
   logical, save :: initialized_bin = .false.
-  integer cstat, estat
-  character(500) cmsg ! there seems to be no documentation about the max size of this text
   integer mpierr
   
   !_____________________________________________________________________________
@@ -173,12 +171,12 @@ subroutine restart(istep, l_read, ice, dynamics, tracers, partit, mesh)
     raw_restart_dirpath  = trim(ResultPath)//"/fesom_raw_restart/np"//int_to_txt(partit%npes)
     raw_restart_infopath = trim(ResultPath)//"/fesom_raw_restart/np"//int_to_txt(partit%npes)//".info"
     if(raw_restart_length_unit /= "off") then
-        if(partit%mype == RAW_RESTART_METADATA_RANK) then
-            ! inquire does not work for directories, the directory might already exist
-            call execute_command_line("mkdir -p "//raw_restart_dirpath, exitstat=estat, cmdstat=cstat, cmdmsg=cmsg) ! sometimes does not work on aleph
-            if(cstat /= 0) print *,"creating raw restart directory ERROR ", trim(cmsg)
-        end if
-        call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr) ! make sure the dir has been created before we continue...
+      if(partit%mype == RAW_RESTART_METADATA_RANK) then
+        ! execute_command_line with mkdir sometimes fails, use a custom implementation around mkdir from C instead
+        call mkdir(trim(ResultPath)//"/fesom_raw_restart") ! we have no mkdir -p, create the intermediate dirs separately
+        call mkdir(raw_restart_dirpath)
+      end if
+      call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr) ! make sure the dir has been created before we continue...
     end if
   end if
 
@@ -190,9 +188,9 @@ subroutine restart(istep, l_read, ice, dynamics, tracers, partit, mesh)
     bin_restart_infopath = trim(ResultPath)//"/fesom_bin_restart/np"//int_to_txt(partit%npes)//".info"
     if(bin_restart_length_unit /= "off") then
         if(partit%mype == RAW_RESTART_METADATA_RANK) then
-            ! inquire does not work for directories, the directory might already exist
-            call execute_command_line("mkdir -p "//bin_restart_dirpath, exitstat=estat, cmdstat=cstat, cmdmsg=cmsg) ! sometimes does not work on aleph
-            if(cstat /= 0) print *,"creating derived type binary restart directory ERROR ", trim(cmsg)
+            ! execute_command_line with mkdir sometimes fails, use a custom implementation around mkdir from C instead
+            call mkdir(trim(ResultPath)//"/fesom_bin_restart") ! we have no mkdir -p, create the intermediate dirs separately
+            call mkdir(bin_restart_dirpath)
         end if
         call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr) ! make sure the dir has been created before we continue...
     end if
@@ -246,13 +244,13 @@ subroutine restart(istep, l_read, ice, dynamics, tracers, partit, mesh)
         call read_restart(oce_path, oce_files, partit%MPI_COMM_FESOM, partit%mype)
         if (use_ice) call read_restart(ice_path, ice_files, partit%MPI_COMM_FESOM, partit%mype)
         ! immediately create a raw core dump restart
-!         if(raw_restart_length_unit /= "off") then
-!             call write_all_raw_restarts(istep, partit%MPI_COMM_FESOM, partit%mype)
-!         end if
-!         ! immediately create a derived type binary restart
-!         if(bin_restart_length_unit /= "off") then
-!             call write_all_bin_restarts(istep, ice, dynamics, tracers, partit, mesh)
-!         end if
+        if(raw_restart_length_unit /= "off") then
+            call write_all_raw_restarts(istep, partit%MPI_COMM_FESOM, partit%mype)
+        end if
+        ! immediately create a derived type binary restart
+        if(bin_restart_length_unit /= "off") then
+            call write_all_bin_restarts(istep, ice, dynamics, tracers, partit, mesh)
+        end if
     end if
   end if
 
@@ -309,6 +307,7 @@ end subroutine restart
 !
 !_______________________________________________________________________________
 subroutine write_restart(path, filegroup, istep)
+  use fortran_utils
   character(len=*), intent(in) :: path
   type(restart_file_group), intent(inout) :: filegroup
   integer,  intent(in)          :: istep
@@ -340,7 +339,8 @@ subroutine write_restart(path, filegroup, istep)
         end if
       end if
       if(filegroup%files(i)%path .ne. filepath) then
-        call execute_command_line("mkdir -p "//dirpath)
+        ! execute_command_line with mkdir sometimes fails, use a custom implementation around mkdir from C instead
+        call mkdir(dirpath)
         filegroup%files(i)%path = filepath
         call filegroup%files(i)%open_write_create(filegroup%files(i)%path)
       else
@@ -361,7 +361,7 @@ end subroutine
 !
 !_______________________________________________________________________________
 subroutine write_all_raw_restarts(istep, mpicomm, mype)
-  integer,  intent(in) :: istep
+  integer,  intent(in):: istep
   integer, intent(in) :: mpicomm
   integer, intent(in) :: mype
   ! EO parameters
