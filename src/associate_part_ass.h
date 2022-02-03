@@ -20,48 +20,6 @@ part            => partit%part
 lb=lbound(partit%s_mpitype_elem3D, 2)
 ub=ubound(partit%s_mpitype_elem3D, 2)
 
-#ifdef __PGIxx
-myList_nod2D            => partit%myList_nod2D(1:myDim_nod2D +eDim_nod2D)
-myList_elem2D           => partit%myList_elem2D(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)
-myList_edge2D           => partit%myList_edge2D(1:myDim_edge2D+eDim_edge2D)
-
-if (allocated(partit%remPtr_nod2D)) then
-   remPtr_nod2D         => partit%remPtr_nod2D(1:npes)
-   remList_nod2D        => partit%remList_nod2D(1:remPtr_nod2D(npes))
-end if
-
-if (allocated(partit%remPtr_elem2D)) then
-   remPtr_elem2D        => partit%remPtr_elem2D(1:npes)
-   remList_elem2D       => partit%remList_elem2D(1:remPtr_elem2D(npes))
-end if
-
-s_mpitype_elem2D        => partit%s_mpitype_elem2D(1:com_elem2D%sPEnum, 1:4)
-r_mpitype_elem2D        => partit%r_mpitype_elem2D(1:com_elem2D%rPEnum, 1:4)
-
-s_mpitype_elem2D_full_i => partit%s_mpitype_elem2D_full_i(1:com_elem2D_full%sPEnum)
-r_mpitype_elem2D_full_i => partit%r_mpitype_elem2D_full_i(1:com_elem2D_full%rPEnum)
-
-s_mpitype_elem2D_full   => partit%s_mpitype_elem2D_full(1:com_elem2D_full%sPEnum, 1:4)
-r_mpitype_elem2D_full   => partit%r_mpitype_elem2D_full(1:com_elem2D_full%rPEnum, 1:4)
-
-s_mpitype_elem3D        => partit%s_mpitype_elem3D(1:com_elem2D%sPEnum, lb:ub, 1:4)
-r_mpitype_elem3D        => partit%r_mpitype_elem3D(1:com_elem2D%rPEnum, lb:ub, 1:4)
-
-s_mpitype_elem3D_full   => partit%s_mpitype_elem3D_full(1:com_elem2D_full%sPEnum, lb:ub, 1:4)
-r_mpitype_elem3D_full   => partit%r_mpitype_elem3D_full(1:com_elem2D_full%rPEnum, lb:ub, 1:4)
-
-r_mpitype_elem3D        => partit%r_mpitype_elem3D(1:com_elem2D%rPEnum, lb:ub, 1:4)
-r_mpitype_elem3D_full   => partit%r_mpitype_elem3D_full(1:com_elem2D_full%rPEnum, lb:ub, 1:4)
-
-s_mpitype_nod2D         => partit%s_mpitype_nod2D(1:com_nod2D%sPEnum)
-r_mpitype_nod2D         => partit%r_mpitype_nod2D(1:com_nod2D%rPEnum)
-
-s_mpitype_nod2D_i       => partit%s_mpitype_nod2D_i(1:com_nod2D%sPEnum)
-r_mpitype_nod2D_i       => partit%r_mpitype_nod2D_i(1:com_nod2D%rPEnum)
-
-s_mpitype_nod3D         => partit%s_mpitype_nod3D(1:com_nod2D%sPEnum, lb:ub, 1:3)
-r_mpitype_nod3D         => partit%r_mpitype_nod3D(1:com_nod2D%rPEnum, lb:ub, 1:3)
-#else
 myList_nod2D (1:myDim_nod2D +eDim_nod2D)                => partit%myList_nod2D(:)
 myList_elem2D(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)  => partit%myList_elem2D(:)
 myList_edge2D(1:myDim_edge2D+eDim_edge2D)               => partit%myList_edge2D(:)
@@ -102,4 +60,3 @@ r_mpitype_nod2D_i(1:com_nod2D%rPEnum) => partit%r_mpitype_nod2D_i(:)
 
 s_mpitype_nod3D(1:com_nod2D%sPEnum, lb:ub, 1:3) => partit%s_mpitype_nod3D(:,:,:)
 r_mpitype_nod3D(1:com_nod2D%rPEnum, lb:ub, 1:3) => partit%r_mpitype_nod3D(:,:,:)
-#endif
