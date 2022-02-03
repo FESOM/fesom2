@@ -219,6 +219,12 @@ subroutine init_mpi_types(partit, mesh)
                blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nl1 
                displace_tmp(1:nb) = displace(1:nb)*n_val*nl1 
 
+               ! r_mpitype_elem3D shape is e.g. 7,2,4 but the args n,nl1,n_val are 1,47,1 and thus OUT OF BOUNDS
+               ! the second dimension of r_mpitype_elem3D is probably always 2 (from nl-1 to nl)
+               if(.not. all(shape(r_mpitype_elem3D) .ge. [n,nl1,n_val]) ) then
+                 print *,"out of bounds error ",shape(r_mpitype_elem3D), "vs", n,nl1,n_val, "in line ",__FILE__, __FILE__
+                 stop 1
+               end if
                call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
                     r_mpitype_elem3D(n,nl1,n_val),  MPIerr)
 
@@ -299,6 +305,12 @@ subroutine init_mpi_types(partit, mesh)
                blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nl1 
                displace_tmp(1:nb) = displace(1:nb)*n_val*nl1 
 
+               ! r_mpitype_elem3D shape is e.g. 7,2,4 but the args n,nl1,n_val are 1,47,1 and thus OUT OF BOUNDS
+               ! the second dimension of r_mpitype_elem3D is probably always 2 (from nl-1 to nl)
+               if(.not. all(shape(r_mpitype_elem3D) .ge. [n,nl1,n_val]) ) then
+                 print *,"out of bounds error ",shape(r_mpitype_elem3D), "vs", n,nl1,n_val, "in line ",__FILE__, __FILE__
+                 stop 1
+               end if
                call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
                     r_mpitype_elem3D_full(n,nl1,n_val),  MPIerr)
 
