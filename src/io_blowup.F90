@@ -147,7 +147,7 @@ MODULE io_BLOWUP
 		call def_variable(bid, 'w'			, (/nl, nod2D/)		, 'vertical velocity', 'm/s', dynamics%w);
 		call def_variable(bid, 'w_expl'		, (/nl, nod2D/)		, 'vertical velocity', 'm/s', dynamics%w_e);
 		call def_variable(bid, 'w_impl'		, (/nl, nod2D/)		, 'vertical velocity', 'm/s', dynamics%w_i);
-		call def_variable(bid, 'cfl_z'		, (/nl-1, nod2D/)		, 'vertical CFL criteria', '', dynamics%cfl_z);
+		call def_variable(bid, 'cfl_z'		, (/nl, nod2D/)		, 'vertical CFL criteria', '', dynamics%cfl_z);
 		
 		!_____________________________________________________________________________
 		! write snapshot ice variables to blowup file
