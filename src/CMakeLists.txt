@@ -145,6 +145,7 @@ target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C ${MCT_Fortran_LIBRARIES}
 target_link_libraries(${PROJECT_NAME} async_threads_cpp)
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 if(${ENABLE_OPENMP} AND NOT ${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray)
+   target_compile_options(${PROJECT_NAME} PRIVATE ${OpenMP_Fortran_FLAGS}) # currently we only have OpenMP in the Fortran part
    target_link_libraries(${PROJECT_NAME} OpenMP::OpenMP_Fortran)
 endif()
 
