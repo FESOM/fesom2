@@ -17,11 +17,15 @@ jobs:
     
     - name: Compile model (binary)
       run: |
+        module load cmake
         bash -l configure.sh ollie0
+        module purge
 
     - name: Compile model (library)
       run: |
+        module load cmake
         bash ./test/ifs_interface/configure_lib.sh -l
+        module purge
 
     - name: Library exists
       run: |
