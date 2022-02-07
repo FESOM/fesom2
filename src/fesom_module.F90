@@ -395,6 +395,7 @@ contains
     real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
 
     call finalize_output()
+    call finalize_restart()
 
     !___FINISH MODEL RUN________________________________________________________
 
