@@ -2578,12 +2578,12 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     droptol => dynamics%solverinfo%droptol
     soltol  => dynamics%solverinfo%soltol
 
-if (.not. dynamics%solverinfo%use_parms) then
-if (lfirst) call ssh_solve_preconditioner(dynamics%solverinfo, partit, mesh)
-call ssh_solve_cg(dynamics%d_eta, dynamics%ssh_rhs, dynamics%solverinfo, partit, mesh)
-lfirst=.false.
-return
-end if
+    if (.not. dynamics%solverinfo%use_parms) then
+        if (lfirst) call ssh_solve_preconditioner(dynamics%solverinfo, partit, mesh)
+        call ssh_solve_cg(dynamics%d_eta, dynamics%ssh_rhs, dynamics%solverinfo, partit, mesh)
+        lfirst=.false.
+        return
+    end if
 
     !___________________________________________________________________________
     if  (trim(which_ale)=='linfs') then
