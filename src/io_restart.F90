@@ -140,7 +140,7 @@ end subroutine ini_ice_io
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine restart(istep, l_read, ice, dynamics, tracers, partit, mesh)
+subroutine restart(istep, l_read, which_readr, ice, dynamics, tracers, partit, mesh)
 
 #if defined(__icepack)
   icepack restart not merged here ! produce a compiler error if USE_ICEPACK=ON; todo: merge icepack restart from 68d8b8b
@@ -164,6 +164,11 @@ subroutine restart(istep, l_read, ice, dynamics, tracers, partit, mesh)
   logical, save :: initialized_bin = .false.
   integer mpierr
   
+  !which_readr = ...
+  ! 0 ... read netcdf restart
+  ! 1 ... read dump file restart (binary)
+  ! 2 ... read derived type restart (binary) 
+  integer , intent(out):: which_readr
   !_____________________________________________________________________________
   ! initialize directory for core dump restart 
   if(.not. initialized_raw) then
@@ -231,26 +236,35 @@ subroutine restart(istep, l_read, ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! read core dump file restart
     if(rawfiles_exist) then
+        which_readr = 1
         call read_all_raw_restarts(partit%MPI_COMM_FESOM, partit%mype)
     
     !___________________________________________________________________________
     ! read derived type binary file restart
     elseif(binfiles_exist .and. bin_restart_length_unit /= "off") then
+        which_readr = 2
         call read_all_bin_restarts(ice, dynamics, tracers, partit, mesh)
         
     !___________________________________________________________________________
     ! read netcdf file restart
     else
+        which_readr = 0
+        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ocean'//achar(27)//'[0m'
         call read_restart(oce_path, oce_files, partit%MPI_COMM_FESOM, partit%mype)
-        if (use_ice) call read_restart(ice_path, ice_files, partit%MPI_COMM_FESOM, partit%mype)
+        if (use_ice) then
+            if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ice'//achar(27)//'[0m'
+            call read_restart(ice_path, ice_files, partit%MPI_COMM_FESOM, partit%mype)
+        end if 
+        
         ! immediately create a raw core dump restart
-!         if(raw_restart_length_unit /= "off") then
-!             call write_all_raw_restarts(istep, partit%MPI_COMM_FESOM, partit%mype)
-!         end if
-!         ! immediately create a derived type binary restart
-!         if(bin_restart_length_unit /= "off") then
-!             call write_all_bin_restarts(istep, ice, dynamics, tracers, partit, mesh)
-!         end if
+        if(raw_restart_length_unit /= "off") then
+            call write_all_raw_restarts(istep, partit%MPI_COMM_FESOM, partit%mype)
+        end if
+        
+        ! immediately create a derived type binary restart
+        if(bin_restart_length_unit /= "off") then
+            call write_all_bin_restarts(istep, ice, dynamics, tracers, partit, mesh)
+        end if
     end if
   end if
 
@@ -280,9 +294,12 @@ subroutine restart(istep, l_read, ice, dynamics, tracers, partit, mesh)
   ! write netcdf restart
   if(is_portable_restart_write) then
 !     if(partit%mype==0) write(*,*)'Do output (netCDF, restart) ...'
-    if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write traditional restarts to netcdf file'//achar(27)//'[0m'
+    if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ocean'//achar(27)//'[0m'
     call write_restart(oce_path, oce_files, istep)
-    if(use_ice) call write_restart(ice_path, ice_files, istep)
+    if(use_ice) then
+        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ice'//achar(27)//'[0m'
+        call write_restart(ice_path, ice_files, istep)
+    end if     
   end if
 
   ! write core dump
@@ -683,8 +700,6 @@ subroutine read_restart(path, filegroup, mpicomm, mype)
   
   allocate(skip_file(filegroup%nfiles))
   skip_file = .false.
-  
-  if (mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read traditional restarts from netcdf file'//achar(27)//'[0m'
   
   do i=1, filegroup%nfiles
     current_iorank_snd = 0
