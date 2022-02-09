@@ -243,8 +243,20 @@ subroutine restart(istep, l_read, which_readr, ice, dynamics, tracers, partit, m
     ! read derived type binary file restart
     elseif(binfiles_exist .and. bin_restart_length_unit /= "off") then
         which_readr = 2
-        call read_all_bin_restarts(ice, dynamics, tracers, partit, mesh)
-        
+        if (use_ice) then 
+            call read_all_bin_restarts(bin_restart_dirpath, &
+                                       ice      = ice,      &
+                                       dynamics = dynamics, &
+                                       tracers  = tracers,  &
+                                       partit   = partit,   &
+                                       mesh     = mesh)
+        else
+            call read_all_bin_restarts(bin_restart_dirpath, &
+                                       dynamics = dynamics, &
+                                       tracers  = tracers,  &
+                                       partit   = partit,   &
+                                       mesh     = mesh)
+        end if     
     !___________________________________________________________________________
     ! read netcdf file restart
     else
@@ -524,67 +536,79 @@ end subroutine
 !
 !
 !_______________________________________________________________________________
-subroutine read_all_bin_restarts(ice, dynamics, tracers, partit, mesh)
+subroutine read_all_bin_restarts(path_in, ice, dynamics, tracers, partit, mesh)
     implicit none 
-    type(t_ice)   , intent(inout), target :: ice
-    type(t_dyn)   , intent(inout), target :: dynamics
-    type(t_tracer), intent(inout), target :: tracers
-    type(t_partit), intent(inout), target :: partit
-    type(t_mesh)  , intent(inout), target :: mesh
+    
+    ! do optional here for the usage with dwarfs, since there only specific derived  
+    ! types will be needed
+    character(len=*), intent(in)                    :: path_in
+    type(t_ice)   , intent(inout), target, optional :: ice
+    type(t_dyn)   , intent(inout), target, optional :: dynamics
+    type(t_tracer), intent(inout), target, optional :: tracers
+    type(t_partit), intent(inout), target, optional :: partit
+    type(t_mesh)  , intent(inout), target, optional :: mesh
     integer fileunit
     
     if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from derived type binary'//achar(27)//'[0m'
     
     !___________________________________________________________________________
     ! mesh derived type 
-    fileunit = partit%mype+300
-    open(newunit = fileunit, &
-        file     = bin_restart_dirpath//'/'//'t_mesh.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
-        status   = 'old', &
-        form     = 'unformatted')
-    read(fileunit) mesh
-    close(fileunit)
-    if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[33m'//'     > read derived type t_mesh'//achar(27)//'[0m'
+    if (present(mesh)) then
+        fileunit = partit%mype+300
+        open(newunit = fileunit, &
+            file     = trim(path_in)//'/'//'t_mesh.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
+            status   = 'old', &
+            form     = 'unformatted')
+        read(fileunit) mesh
+        close(fileunit)
+        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[33m'//'     > read derived type t_mesh'//achar(27)//'[0m'
+    end if
     
     !___________________________________________________________________________
     ! partit derived type 
-    fileunit = partit%mype+300
-    open(newunit = fileunit, &
-        file     = bin_restart_dirpath//'/'//'t_partit.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
-        status   = 'old', &
-        form     = 'unformatted')
-    read(fileunit) partit
-    close(fileunit)
-    if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[33m'//'     > read derived type t_partit'//achar(27)//'[0m'
+    if (present(partit)) then
+        fileunit = partit%mype+300
+        open(newunit = fileunit, &
+            file     = trim(path_in)//'/'//'t_partit.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
+            status   = 'old', &
+            form     = 'unformatted')
+        read(fileunit) partit
+        close(fileunit)
+        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[33m'//'     > read derived type t_partit'//achar(27)//'[0m'
+    end if 
     
     !___________________________________________________________________________
     ! tracer derived type     
-    fileunit = partit%mype+300
-    open(newunit = fileunit, &
-        file     = bin_restart_dirpath//'/'//'t_tracer.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
-        status   = 'old', &
-        form     = 'unformatted')
-    read(fileunit) tracers  
-    close(fileunit)
-    if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[33m'//'     > read derived type t_tracer'//achar(27)//'[0m'
+    if (present(tracers)) then
+        fileunit = partit%mype+300
+        open(newunit = fileunit, &
+            file     = trim(path_in)//'/'//'t_tracer.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
+            status   = 'old', &
+            form     = 'unformatted')
+        read(fileunit) tracers  
+        close(fileunit)
+        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[33m'//'     > read derived type t_tracer'//achar(27)//'[0m'
+    end if 
     
     !___________________________________________________________________________
     ! dynamics derived type 
-    fileunit = partit%mype+300
-    open(newunit = fileunit, &
-        file     = bin_restart_dirpath//'/'//'t_dynamics.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
-        status   = 'old', &
-        form     = 'unformatted')
-    read(fileunit) dynamics
-    close(fileunit)
-    if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[33m'//'     > read derived type t_dynamics'//achar(27)//'[0m'
+    if (present(dynamics)) then
+        fileunit = partit%mype+300
+        open(newunit = fileunit, &
+            file     = trim(path_in)//'/'//'t_dynamics.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
+            status   = 'old', &
+            form     = 'unformatted')
+        read(fileunit) dynamics
+        close(fileunit)
+        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[33m'//'     > read derived type t_dynamics'//achar(27)//'[0m'
+    end if 
     
     !___________________________________________________________________________
     ! ice derived type 
-    if (use_ice) then
+    if (present(ice)) then
         fileunit = partit%mype+300
         open(newunit = fileunit, &
-            file    = bin_restart_dirpath//'/'//'t_ice.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
+            file    = trim(path_in)//'/'//'t_ice.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
             status  = 'old', &
             form    = 'unformatted')
         read(fileunit) ice
