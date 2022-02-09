@@ -270,10 +270,12 @@ endif
     if (useAeolianN) then
       i=1 ! A single time entry
       DustNfilename = trim(REcoMDataPath)//'AeolianNitrogenDep.nc'
-      if (yearnew .lt. 2010) then
-         Nvari      = 'NDep'//cyearnew
-      else
+      if (yearnew .gt. 2009) then
          Nvari      = 'NDep2009'
+      else if (yearnew .lt. 1850) then
+         Nvari      = 'NDep1850'
+      else
+         Nvari      =  'NDep'//cyearnew
       endif
 
       if (mype==0) write(*,*) 'Updating Nitrogen deposition data for month ', i     
