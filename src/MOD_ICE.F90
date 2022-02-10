@@ -458,6 +458,7 @@ subroutine READ_T_ICE(ice, unit, iostat, iomsg)
     end if     
     !___________________________________________________________________________
     read(unit, iostat=iostat, iomsg=iomsg) ice%num_itracers
+    if (.not. allocated(ice%data)) allocate(ice%data(ice%num_itracers))
     do i=1, ice%num_itracers
        read(unit, iostat=iostat, iomsg=iomsg) ice%data(i)
     end do
