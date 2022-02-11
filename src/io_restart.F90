@@ -1,14 +1,17 @@
 MODULE io_RESTART
   use restart_file_group_module
+  use restart_derivedtype_module
   use g_clock
   use o_arrays
   use g_cvmix_tke
   use MOD_TRACER
   use MOD_ICE
-!   use MOD_DYN
-!   use MOD_MESH
-!   USE MOD_PARTIT
-!   USE MOD_PARSUP
+  use MOD_DYN
+  use MOD_MESH
+  use MOD_PARTIT
+  use MOD_PARSUP
+  use fortran_utils
+  
   implicit none
   public :: restart, finalize_restart
   private
@@ -168,7 +171,9 @@ subroutine restart(istep, l_read, which_readr, ice, dynamics, tracers, partit, m
   ! 0 ... read netcdf restart
   ! 1 ... read dump file restart (binary)
   ! 2 ... read derived type restart (binary) 
-  integer , intent(out):: which_readr
+  integer, intent(out):: which_readr
+  
+  integer             :: cstep
   !_____________________________________________________________________________
   ! initialize directory for core dump restart 
   if(.not. initialized_raw) then
@@ -275,7 +280,15 @@ subroutine restart(istep, l_read, which_readr, ice, dynamics, tracers, partit, m
         
         ! immediately create a derived type binary restart
         if(bin_restart_length_unit /= "off") then
-            call write_all_bin_restarts(istep, ice, dynamics, tracers, partit, mesh)
+            ! current (total) model step --> cstep = globalstep+istep
+            call write_all_bin_restarts((/globalstep+istep, int(ctime), yearnew/),      &
+                                        bin_restart_dirpath,                 &
+                                        bin_restart_infopath,                &
+                                        ice,                                 &
+                                        dynamics,                            &
+                                        tracers,                             &
+                                        partit,                              &
+                                        mesh)
         end if
     end if
   end if
@@ -321,7 +334,15 @@ subroutine restart(istep, l_read, which_readr, ice, dynamics, tracers, partit, m
 
   ! write derived type binary
   if(is_bin_restart_write) then
-    call write_all_bin_restarts(istep, ice, dynamics, tracers, partit, mesh)
+    ! current (total) model step --> cstep = globalstep+istep
+    call write_all_bin_restarts((/globalstep+istep, int(ctime), yearnew/),      &
+                                bin_restart_dirpath,                 &
+                                bin_restart_infopath,                &
+                                ice,                                 &
+                                dynamics,                            &
+                                tracers,                             &
+                                partit,                              &
+                                mesh)
   end if
 
   ! actualize clock file to latest restart point
@@ -429,193 +450,193 @@ subroutine write_raw_restart_group(filegroup, fileunit)
     call filegroup%files(i)%write_variables_raw(fileunit)
   end do
 end subroutine
-!
-!
-!_______________________________________________________________________________
-subroutine write_all_bin_restarts(istep, ice, dynamics, tracers, partit, mesh)
-    integer, intent(in) :: istep
-    type(t_ice)   , target, intent(in) :: ice
-    type(t_dyn)   , target, intent(in) :: dynamics
-    type(t_tracer), target, intent(in) :: tracers
-    type(t_partit), target, intent(in) :: partit
-    type(t_mesh)  , target, intent(in) :: mesh
-    
-    ! EO parameters
-    integer cstep
-    integer fileunit, fileunit_i
-    
-    !___________________________________________________________________________
-    ! write info file
-    if(partit%mype == RAW_RESTART_METADATA_RANK) then
-        print *, achar(27)//'[1;33m'//' --> writing derived type binary restarts to '//bin_restart_dirpath//achar(27)//'[0m'
-        ! store metadata about the raw restart
-        cstep = globalstep+istep
-        fileunit_i = 299
-        open(newunit = fileunit_i, file = bin_restart_infopath)
-        write(fileunit_i, '(g0)') cstep
-        write(fileunit_i, '(g0)') ctime
-        write(fileunit_i, '(2(g0))') "! year: ",yearnew
-    end if 
-    
-    !___________________________________________________________________________
-    ! mesh derived type 
-    fileunit = partit%mype+300
-    open(newunit = fileunit, &
-        file     = bin_restart_dirpath//'/'//'t_mesh.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
-        status   = 'replace', &
-        form     = 'unformatted')
-    write(fileunit) mesh
-    close(fileunit)
-    if(partit%mype == RAW_RESTART_METADATA_RANK) then
-        write(fileunit_i, '(1(g0))') "!   t_mesh"
-        print *, achar(27)//'[33m'//'     > write derived type t_mesh'//achar(27)//'[0m'
-    end if     
-    
-    !___________________________________________________________________________
-    ! partit derived type 
-    fileunit = partit%mype+300
-    open(newunit = fileunit, &
-        file     = bin_restart_dirpath//'/'//'t_partit.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
-        status   = 'replace', &
-        form     = 'unformatted')
-    write(fileunit) partit
-    close(fileunit)
-    if(partit%mype == RAW_RESTART_METADATA_RANK) then 
-        write(fileunit_i, '(1(g0))') "!   t_partit"
-        print *, achar(27)//'[33m'//'     > write derived type t_partit'//achar(27)//'[0m'
-    end if 
-    
-    !___________________________________________________________________________
-    ! tracer derived type 
-    fileunit = partit%mype+300
-    open(newunit = fileunit, &
-        file     = bin_restart_dirpath//'/'//'t_tracer.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
-        status   = 'replace', &
-        form     = 'unformatted')
-    write(fileunit) tracers  
-    close(fileunit)
-    if(partit%mype == RAW_RESTART_METADATA_RANK) then 
-        write(fileunit_i, '(1(g0))') "!   t_tracer"
-        print *, achar(27)//'[33m'//'     > write derived type t_tracer'//achar(27)//'[0m'
-    end if     
-    
-    !___________________________________________________________________________
-    ! dynamics derived type 
-    fileunit = partit%mype+300
-    open(newunit = fileunit, &
-        file     = bin_restart_dirpath//'/'//'t_dynamics.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
-        status   = 'replace', &
-        form     = 'unformatted')
-    write(fileunit) dynamics
-    close(fileunit)
-    if(partit%mype == RAW_RESTART_METADATA_RANK) then 
-        write(fileunit_i, '(1(g0))') "!   t_dynamics"
-        print *, achar(27)//'[33m'//'     > write derived type t_dynamics'//achar(27)//'[0m'
-    end if     
-    
-    !___________________________________________________________________________
-    ! ice derived type 
-    if (use_ice) then
-        fileunit = partit%mype+300
-        open(newunit = fileunit, &
-            file    = bin_restart_dirpath//'/'//'t_ice.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
-            status  = 'replace', &
-            form    = 'unformatted')
-        write(fileunit) ice
-        close(fileunit)
-        if(partit%mype == RAW_RESTART_METADATA_RANK) then 
-            write(fileunit_i, '(1(g0))') "!   t_ice"
-            print *, achar(27)//'[33m'//'     > write derived type t_ice'//achar(27)//'[0m'
-        end if     
-    end if 
-    
-    !___________________________________________________________________________
-    if(partit%mype == RAW_RESTART_METADATA_RANK) close(fileunit_i)
-
-end subroutine
-!
-!
-!_______________________________________________________________________________
-subroutine read_all_bin_restarts(path_in, ice, dynamics, tracers, partit, mesh)
-    implicit none 
-    
-    ! do optional here for the usage with dwarfs, since there only specific derived  
-    ! types will be needed
-    character(len=*), intent(in)                    :: path_in
-    type(t_ice)   , intent(inout), target, optional :: ice
-    type(t_dyn)   , intent(inout), target, optional :: dynamics
-    type(t_tracer), intent(inout), target, optional :: tracers
-    type(t_partit), intent(inout), target, optional :: partit
-    type(t_mesh)  , intent(inout), target, optional :: mesh
-    integer fileunit
-    
-    if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from derived type binary'//achar(27)//'[0m'
-    
-    !___________________________________________________________________________
-    ! mesh derived type 
-    if (present(mesh)) then
-        fileunit = partit%mype+300
-        open(newunit = fileunit, &
-            file     = trim(path_in)//'/'//'t_mesh.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
-            status   = 'old', &
-            form     = 'unformatted')
-        read(fileunit) mesh
-        close(fileunit)
-        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[33m'//'     > read derived type t_mesh'//achar(27)//'[0m'
-    end if
-    
-    !___________________________________________________________________________
-    ! partit derived type 
-    if (present(partit)) then
-        fileunit = partit%mype+300
-        open(newunit = fileunit, &
-            file     = trim(path_in)//'/'//'t_partit.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
-            status   = 'old', &
-            form     = 'unformatted')
-        read(fileunit) partit
-        close(fileunit)
-        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[33m'//'     > read derived type t_partit'//achar(27)//'[0m'
-    end if 
-    
-    !___________________________________________________________________________
-    ! tracer derived type     
-    if (present(tracers)) then
-        fileunit = partit%mype+300
-        open(newunit = fileunit, &
-            file     = trim(path_in)//'/'//'t_tracer.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
-            status   = 'old', &
-            form     = 'unformatted')
-        read(fileunit) tracers  
-        close(fileunit)
-        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[33m'//'     > read derived type t_tracer'//achar(27)//'[0m'
-    end if 
-    
-    !___________________________________________________________________________
-    ! dynamics derived type 
-    if (present(dynamics)) then
-        fileunit = partit%mype+300
-        open(newunit = fileunit, &
-            file     = trim(path_in)//'/'//'t_dynamics.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
-            status   = 'old', &
-            form     = 'unformatted')
-        read(fileunit) dynamics
-        close(fileunit)
-        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[33m'//'     > read derived type t_dynamics'//achar(27)//'[0m'
-    end if 
-    
-    !___________________________________________________________________________
-    ! ice derived type 
-    if (present(ice)) then
-        fileunit = partit%mype+300
-        open(newunit = fileunit, &
-            file    = trim(path_in)//'/'//'t_ice.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
-            status  = 'old', &
-            form    = 'unformatted')
-        read(fileunit) ice
-        close(fileunit)
-        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[33m'//'     > read derived type t_ice'//achar(27)//'[0m'
-    end if 
-end subroutine
+! ! !
+! ! !
+! ! !_______________________________________________________________________________
+! ! subroutine write_all_bin_restarts(istep, ice, dynamics, tracers, partit, mesh)
+! !     integer, intent(in) :: istep
+! !     type(t_ice)   , target, intent(in) :: ice
+! !     type(t_dyn)   , target, intent(in) :: dynamics
+! !     type(t_tracer), target, intent(in) :: tracers
+! !     type(t_partit), target, intent(in) :: partit
+! !     type(t_mesh)  , target, intent(in) :: mesh
+! !     
+! !     ! EO parameters
+! !     integer cstep
+! !     integer fileunit, fileunit_i
+! !     
+! !     !___________________________________________________________________________
+! !     ! write info file
+! !     if(partit%mype == RAW_RESTART_METADATA_RANK) then
+! !         print *, achar(27)//'[1;33m'//' --> writing derived type binary restarts to '//bin_restart_dirpath//achar(27)//'[0m'
+! !         ! store metadata about the raw restart
+! !         cstep = globalstep+istep
+! !         fileunit_i = 299
+! !         open(newunit = fileunit_i, file = bin_restart_infopath)
+! !         write(fileunit_i, '(g0)') cstep
+! !         write(fileunit_i, '(g0)') ctime
+! !         write(fileunit_i, '(2(g0))') "! year: ",yearnew
+! !     end if 
+! !     
+! !     !___________________________________________________________________________
+! !     ! mesh derived type 
+! !     fileunit = partit%mype+300
+! !     open(newunit = fileunit, &
+! !         file     = bin_restart_dirpath//'/'//'t_mesh.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
+! !         status   = 'replace', &
+! !         form     = 'unformatted')
+! !     write(fileunit) mesh
+! !     close(fileunit)
+! !     if(partit%mype == RAW_RESTART_METADATA_RANK) then
+! !         write(fileunit_i, '(1(g0))') "!   t_mesh"
+! !         print *, achar(27)//'[33m'//'     > write derived type t_mesh'//achar(27)//'[0m'
+! !     end if     
+! !     
+! !     !___________________________________________________________________________
+! !     ! partit derived type 
+! !     fileunit = partit%mype+300
+! !     open(newunit = fileunit, &
+! !         file     = bin_restart_dirpath//'/'//'t_partit.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
+! !         status   = 'replace', &
+! !         form     = 'unformatted')
+! !     write(fileunit) partit
+! !     close(fileunit)
+! !     if(partit%mype == RAW_RESTART_METADATA_RANK) then 
+! !         write(fileunit_i, '(1(g0))') "!   t_partit"
+! !         print *, achar(27)//'[33m'//'     > write derived type t_partit'//achar(27)//'[0m'
+! !     end if 
+! !     
+! !     !___________________________________________________________________________
+! !     ! tracer derived type 
+! !     fileunit = partit%mype+300
+! !     open(newunit = fileunit, &
+! !         file     = bin_restart_dirpath//'/'//'t_tracer.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
+! !         status   = 'replace', &
+! !         form     = 'unformatted')
+! !     write(fileunit) tracers  
+! !     close(fileunit)
+! !     if(partit%mype == RAW_RESTART_METADATA_RANK) then 
+! !         write(fileunit_i, '(1(g0))') "!   t_tracer"
+! !         print *, achar(27)//'[33m'//'     > write derived type t_tracer'//achar(27)//'[0m'
+! !     end if     
+! !     
+! !     !___________________________________________________________________________
+! !     ! dynamics derived type 
+! !     fileunit = partit%mype+300
+! !     open(newunit = fileunit, &
+! !         file     = bin_restart_dirpath//'/'//'t_dynamics.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
+! !         status   = 'replace', &
+! !         form     = 'unformatted')
+! !     write(fileunit) dynamics
+! !     close(fileunit)
+! !     if(partit%mype == RAW_RESTART_METADATA_RANK) then 
+! !         write(fileunit_i, '(1(g0))') "!   t_dynamics"
+! !         print *, achar(27)//'[33m'//'     > write derived type t_dynamics'//achar(27)//'[0m'
+! !     end if     
+! !     
+! !     !___________________________________________________________________________
+! !     ! ice derived type 
+! !     if (use_ice) then
+! !         fileunit = partit%mype+300
+! !         open(newunit = fileunit, &
+! !             file    = bin_restart_dirpath//'/'//'t_ice.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
+! !             status  = 'replace', &
+! !             form    = 'unformatted')
+! !         write(fileunit) ice
+! !         close(fileunit)
+! !         if(partit%mype == RAW_RESTART_METADATA_RANK) then 
+! !             write(fileunit_i, '(1(g0))') "!   t_ice"
+! !             print *, achar(27)//'[33m'//'     > write derived type t_ice'//achar(27)//'[0m'
+! !         end if     
+! !     end if 
+! !     
+! !     !___________________________________________________________________________
+! !     if(partit%mype == RAW_RESTART_METADATA_RANK) close(fileunit_i)
+! ! 
+! ! end subroutine
+! ! !
+! ! !
+! ! !_______________________________________________________________________________
+! ! subroutine read_all_bin_restarts(path_in, ice, dynamics, tracers, partit, mesh)
+! !     implicit none 
+! !     
+! !     ! do optional here for the usage with dwarfs, since there only specific derived  
+! !     ! types will be needed
+! !     character(len=*), intent(in)                    :: path_in
+! !     type(t_ice)   , intent(inout), target, optional :: ice
+! !     type(t_dyn)   , intent(inout), target, optional :: dynamics
+! !     type(t_tracer), intent(inout), target, optional :: tracers
+! !     type(t_partit), intent(inout), target, optional :: partit
+! !     type(t_mesh)  , intent(inout), target, optional :: mesh
+! !     integer fileunit
+! !     
+! !     if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from derived type binary'//achar(27)//'[0m'
+! !     
+! !     !___________________________________________________________________________
+! !     ! mesh derived type 
+! !     if (present(mesh)) then
+! !         fileunit = partit%mype+300
+! !         open(newunit = fileunit, &
+! !             file     = trim(path_in)//'/'//'t_mesh.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
+! !             status   = 'old', &
+! !             form     = 'unformatted')
+! !         read(fileunit) mesh
+! !         close(fileunit)
+! !         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[33m'//'     > read derived type t_mesh'//achar(27)//'[0m'
+! !     end if
+! !     
+! !     !___________________________________________________________________________
+! !     ! partit derived type 
+! !     if (present(partit)) then
+! !         fileunit = partit%mype+300
+! !         open(newunit = fileunit, &
+! !             file     = trim(path_in)//'/'//'t_partit.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
+! !             status   = 'old', &
+! !             form     = 'unformatted')
+! !         read(fileunit) partit
+! !         close(fileunit)
+! !         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[33m'//'     > read derived type t_partit'//achar(27)//'[0m'
+! !     end if 
+! !     
+! !     !___________________________________________________________________________
+! !     ! tracer derived type     
+! !     if (present(tracers)) then
+! !         fileunit = partit%mype+300
+! !         open(newunit = fileunit, &
+! !             file     = trim(path_in)//'/'//'t_tracer.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
+! !             status   = 'old', &
+! !             form     = 'unformatted')
+! !         read(fileunit) tracers  
+! !         close(fileunit)
+! !         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[33m'//'     > read derived type t_tracer'//achar(27)//'[0m'
+! !     end if 
+! !     
+! !     !___________________________________________________________________________
+! !     ! dynamics derived type 
+! !     if (present(dynamics)) then
+! !         fileunit = partit%mype+300
+! !         open(newunit = fileunit, &
+! !             file     = trim(path_in)//'/'//'t_dynamics.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
+! !             status   = 'old', &
+! !             form     = 'unformatted')
+! !         read(fileunit) dynamics
+! !         close(fileunit)
+! !         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[33m'//'     > read derived type t_dynamics'//achar(27)//'[0m'
+! !     end if 
+! !     
+! !     !___________________________________________________________________________
+! !     ! ice derived type 
+! !     if (present(ice)) then
+! !         fileunit = partit%mype+300
+! !         open(newunit = fileunit, &
+! !             file    = trim(path_in)//'/'//'t_ice.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
+! !             status  = 'old', &
+! !             form    = 'unformatted')
+! !         read(fileunit) ice
+! !         close(fileunit)
+! !         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[33m'//'     > read derived type t_ice'//achar(27)//'[0m'
+! !     end if 
+! ! end subroutine
 !
 !
 !_______________________________________________________________________________
@@ -839,22 +860,23 @@ end subroutine
     stop
     end if
   end function
-!
-!
-!_______________________________________________________________________________
-  function mpirank_to_txt(mpicomm) result(txt)
-    use fortran_utils
-    integer, intent(in) :: mpicomm
-    character(:), allocatable :: txt
-    ! EO parameters
-    integer mype
-    integer npes
-    integer mpierr
-    include 'mpif.h'
-  
-    call MPI_Comm_Rank(mpicomm, mype, mpierr)
-    call MPI_Comm_Size(mpicomm, npes, mpierr)
-    txt = int_to_txt_pad(mype,int(log10(real(npes)))+1) ! pad to the width of the number of processes
-  end function
+! !
+! !
+! !_______________________________________________________________________________
+!   function mpirank_to_txt(mpicomm) result(txt)
+!     use fortran_utils
+!     integer, intent(in) :: mpicomm
+!     character(:), allocatable :: txt
+!     ! EO parameters
+!     integer mype
+!     integer npes
+!     integer mpierr
+!     include 'mpif.h'
+!   
+!     call MPI_Comm_Rank(mpicomm, mype, mpierr)
+!     call MPI_Comm_Size(mpicomm, npes, mpierr)
+!     txt = int_to_txt_pad(mype,int(log10(real(npes)))+1) ! pad to the width of the number of processes
+!   end function
+!!PS --> move this function also to fortran_utils.F90 
 
 end module
