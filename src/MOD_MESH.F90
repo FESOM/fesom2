@@ -332,8 +332,8 @@ subroutine read_t_mesh(mesh, unit, iostat, iomsg)
     call read_bin_array(mesh%zbar_n_srf,              unit, iostat, iomsg)
     call read_bin_array(mesh%zbar_e_srf,              unit, iostat, iomsg)
 !   call read_bin_array(mesh%representative_checksum, unit, iostat, iomsg)
-    call write_bin_array(mesh%coriolis,                unit, iostat, iomsg)
-    call write_bin_array(mesh%coriolis_node,           unit, iostat, iomsg)
+    call read_bin_array(mesh%coriolis,                unit, iostat, iomsg)
+    call read_bin_array(mesh%coriolis_node,           unit, iostat, iomsg)
     
 end subroutine read_t_mesh
 end module MOD_MESH
