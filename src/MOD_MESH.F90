@@ -86,6 +86,11 @@ real(kind=WP), allocatable, dimension(:,:)  :: cavity_nrst_cavlpnt_xyz
 
 !
 !
+!___coriolis force______________________________________________________________
+real(kind=WP), allocatable, dimension(:)    :: coriolis_node, coriolis
+
+!
+!
 !___Elevation stiffness matrix__________________________________________________
 type(sparse_matrix)                         :: ssh_stiff
 
