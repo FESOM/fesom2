@@ -730,7 +730,7 @@ module g_cvmix_kpp
                 zt_cntr    = Z_3d_n(    nun:nln  ,node), & ! (in) Height of cell centers (m) dim=(ke)
                 surf_fric  = aux_ustar,                & ! (in) Turbulent friction velocity at surface (m/s) dim=1
                 surf_buoy  = aux_surfbuoyflx_nl(1),    & ! (in) Buoyancy flux at surface (m2/s3) dim=1
-                Coriolis   = coriolis_node(node),      & ! (in) Coriolis parameter (1/s) dim=1
+                Coriolis   = mesh%coriolis_node(node), & ! (in) Coriolis parameter (1/s) dim=1
                 OBL_depth  = kpp_obldepth(node),       & ! (out) OBL depth (m) dim=1
                 kOBL_depth = kpp_nzobldepth(node)      & ! (out) level (+fraction) of OBL extent dim=1
                 )    

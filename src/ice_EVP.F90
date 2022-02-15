@@ -538,7 +538,7 @@ subroutine EVPdynamics(ice, partit, mesh)
                         inv_mass(n)*stress_atmice_y(n) + V_rhs_ice(n))
                 
                 r_a      = 1._WP + ax*drag*rdt
-                r_b      = rdt*(coriolis_node(n) + ay*drag)
+                r_b      = rdt*(mesh%coriolis_node(n) + ay*drag)
                 det      = 1.0_WP/(r_a*r_a + r_b*r_b)
                 U_ice(n) = det*(r_a*rhsu +r_b*rhsv)
                 V_ice(n) = det*(r_a*rhsv -r_b*rhsu)

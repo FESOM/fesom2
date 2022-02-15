@@ -1,0 +1,67 @@
+# make the contents as shell agnostic as possible so we can include them with bash, zsh and others
+
+module load gcc/4.8.2
+export LD_LIBRARY_PATH=/sw/rhel6-x64/gcc/gcc-4.8.2/lib64:$LD_LIBRARY_PATH # avoid GLIBCXX_3.4.15 not found error
+module unload intel && module load intel/18.0.1
+
+#export FC=mpiifort CC=mpiicc CXX=mpiicpc; module unload intelmpi && module load intelmpi/2018.1.163
+export FC=mpiifort CC=mpiicc CXX=mpiicpc; module unload intelmpi && module load intelmpi/2017.0.098
+#export FC=mpif90 CC=mpicc CXX=mpicxx; module load mxm/3.3.3002 fca/2.5.2393 bullxmpi_mlx/bullxmpi_mlx-1.2.8.3
+#export FC=mpif90 CC=mpicc CXX=mpicxx; module load mxm/3.4.3082 fca/2.5.2393 bullxmpi_mlx/bullxmpi_mlx-1.2.9.2
+#export FC=mpif90 CC=mpicc CXX=mpicxx OPENMPI=TRUE;  module unload intelmpi && module load openmpi/2.0.2p1_hpcx-intel14
+
+# intelmpi settings from DKRZ
+export I_MPI_FABRICS=shm:dapl
+export I_MPI_FALLBACK=disable
+export I_MPI_SLURM_EXT=1
+export I_MPI_LARGE_SCALE_THRESHOLD=8192 # Set to a value larger than the number of your MPI-tasks if you use 8192 or more tasks.
+export I_MPI_DYNAMIC_CONNECTION=0
+export DAPL_NETWORK_NODES=$SLURM_NNODES
+export DAPL_NETWORK_PPN=$SLURM_NTASKS_PER_NODE
+export DAPL_WR_MAX=500
+
+# bullxmpi settings from DKRZ
+# Settings for Open MPI and MXM (MellanoX Messaging) library
+export OMPI_MCA_pml=cm
+export OMPI_MCA_mtl=mxm
+export OMPI_MCA_mtl_mxm_np=0
+export MXM_RDMA_PORTS=mlx5_0:1
+export MXM_LOG_LEVEL=FATAL
+# Disable GHC algorithm for collective communication
+export OMPI_MCA_coll=^ghc
+
+# openmpi settings from DKRZ (note, that some of above variables will be redefined)
+if test "${OPENMPI}" == "TRUE"; then
+export OMPI_MCA_pml=cm         # sets the point-to-point management layer
+export OMPI_MCA_mtl=mxm        # sets the matching transport layer (MPI-2 one-sided comm.)
+export MXM_RDMA_PORTS=mlx5_0:1
+export MXM_LOG_LEVEL=ERROR
+export MXM_HANDLE_ERRORS=bt
+export UCX_HANDLE_ERRORS=bt
+
+# enable HCOLL based collectives
+export OMPI_MCA_coll=^fca              # disable FCA for collective MPI routines
+export OMPI_MCA_coll_hcoll_enable=1    # enable HCOLL for collective MPI routines
+export OMPI_MCA_coll_hcoll_priority=95
+export OMPI_MCA_coll_hcoll_np=8        # use HCOLL for all communications with more than 8 tasks
+export HCOLL_MAIN_IB=mlx5_0:1
+export HCOLL_ENABLE_MCAST=1
+export HCOLL_ENABLE_MCAST_ALL=1
+
+# disable specific HCOLL functions (strongly depends on the application)
+export HCOLL_ML_DISABLE_BARRIER=1
+export HCOLL_ML_DISABLE_IBARRIER=1
+export HCOLL_ML_DISABLE_BCAST=1
+export HCOLL_ML_DISABLE_REDUCE=1
+fi
+
+module unload netcdf && module load netcdf_c/4.3.2-gcc48
+module unload cmake && module load cmake
+# we will get a segfault at runtime if we use a gcc from any of the provided gcc modules
+export PATH=/sw/rhel6-x64/gcc/binutils-2.24-gccsys/bin:${PATH}
+
+export NETCDF_Fortran_INCLUDE_DIRECTORIES=/sw/rhel6-x64/netcdf/netcdf_fortran-4.4.2-intel14/include
+export NETCDF_C_INCLUDE_DIRECTORIES=/sw/rhel6-x64/netcdf/netcdf_c-4.3.2-intel14/include
+export NETCDF_CXX_INCLUDE_DIRECTORIES=/sw/rhel6-x64/netcdf/netcdf_cxx-4.2.1-gcc48/include
+
+export HDF5_C_INCLUDE_DIRECTORIES=/sw/rhel6-x64/hdf5/hdf5-1.8.14-threadsafe-intel14/include

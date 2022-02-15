@@ -696,10 +696,10 @@ subroutine EVPdynamics_m(ice, partit, mesh)
                 rhsv = v_ice(i)+drag*v_w(i)+rdt*(inv_thickness(i)*stress_atmice_y(i)+v_rhs_ice(i)) + ice%beta_evp*v_ice_aux(i)
                 
                 !solve (Coriolis and water stress are treated implicitly)        
-                det = bc_index_nod2D(i) / ((1.0_WP+ice%beta_evp+drag)**2 + (rdt*coriolis_node(i))**2)
+                det = bc_index_nod2D(i) / ((1.0_WP+ice%beta_evp+drag)**2 + (rdt*mesh%coriolis_node(i))**2)
                 
-                u_ice_aux(i) = det*((1.0_WP+ice%beta_evp+drag)*rhsu +rdt*coriolis_node(i)*rhsv)
-                v_ice_aux(i) = det*((1.0_WP+ice%beta_evp+drag)*rhsv -rdt*coriolis_node(i)*rhsu)
+                u_ice_aux(i) = det*((1.0_WP+ice%beta_evp+drag)*rhsu +rdt*mesh%coriolis_node(i)*rhsv)
+                v_ice_aux(i) = det*((1.0_WP+ice%beta_evp+drag)*rhsv -rdt*mesh%coriolis_node(i)*rhsu)
             end if
         end do ! --> do i=1, myDim_nod2d 
 
@@ -1052,7 +1052,7 @@ subroutine EVPdynamics_a(ice, partit, mesh)
             rhsu=beta_evp_array(i)*u_ice_aux(i)+rhsu
             rhsv=beta_evp_array(i)*v_ice_aux(i)+rhsv
             !solve (Coriolis and water stress are treated implicitly)
-            fc=rdt*coriolis_node(i)
+            fc=rdt*mesh%coriolis_node(i)
             det=(1.0_WP+beta_evp_array(i)+drag)**2+fc**2
             det=bc_index_nod2D(i)/det
             u_ice_aux(i)=det*((1.0_WP+beta_evp_array(i)+drag)*rhsu+fc*rhsv)
