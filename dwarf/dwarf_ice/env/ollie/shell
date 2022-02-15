@@ -1,0 +1,11 @@
+# make the contents as shell agnostic as possible so we can include them with bash, zsh and others
+
+module load intel.compiler intel.mpi netcdf/4.4.0_intel
+module load centoslibs # required on compute nodes
+
+# the netcdf c++ path given by the netcdf module is broken, we have to workaround this
+export NETCDF_CXX_INCLUDE_DIRECTORIES=/global/AWIsoft/tkleiner/netcdf/4.4.0_intel_impi/include
+
+export PATH=/home/ollie/dsidoren/cmake-3.13.2-Linux-x86_64/bin:$PATH
+
+export FC="mpiifort -mkl" CC=mpiicc CXX=mpiicpc

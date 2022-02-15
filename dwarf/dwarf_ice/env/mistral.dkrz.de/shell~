@@ -1,0 +1,40 @@
+# make the contents as shell agnostic as possible so we can include them with bash, zsh and others
+
+module load gcc/4.8.2
+export LD_LIBRARY_PATH=/sw/rhel6-x64/gcc/gcc-4.8.2/lib64:$LD_LIBRARY_PATH # avoid GLIBCXX_3.4.15 not found error
+module unload intel && module load intel/18.0.0
+
+export FC=mpiifort CC=mpiicc CXX=mpiicpc; module unload intelmpi && module load intelmpi/2017.0.098
+#export FC=mpif90 CC=mpicc CXX=mpicxx; module load mxm/3.3.3002 fca/2.5.2393 bullxmpi_mlx/bullxmpi_mlx-1.2.8.3
+#export FC=mpif90 CC=mpicc CXX=mpicxx; module load mxm/3.4.3082 fca/2.5.2393 bullxmpi_mlx/bullxmpi_mlx-1.2.9.2
+
+# intelmpi settings from DKRZ
+export I_MPI_FABRICS=shm:dapl
+export I_MPI_FALLBACK=disable
+export I_MPI_SLURM_EXT=1
+export I_MPI_LARGE_SCALE_THRESHOLD=8192 # Set to a value larger than the number of your MPI-tasks if you use 8192 or more tasks.
+export I_MPI_DYNAMIC_CONNECTION=0
+export DAPL_NETWORK_NODES=$SLURM_NNODES
+export DAPL_NETWORK_PPN=$SLURM_NTASKS_PER_NODE
+export DAPL_WR_MAX=500
+
+# bullxmpi settings from DKRZ
+# Settings for Open MPI and MXM (MellanoX Messaging) library
+export OMPI_MCA_pml=cm
+export OMPI_MCA_mtl=mxm
+export OMPI_MCA_mtl_mxm_np=0
+export MXM_RDMA_PORTS=mlx5_0:1
+export MXM_LOG_LEVEL=FATAL
+# Disable GHC algorithm for collective communication
+export OMPI_MCA_coll=^ghc
+
+module unload netcdf && module load netcdf_c/4.3.2-gcc48
+module unload cmake && module load cmake
+# we will get a segfault at runtime if we use a gcc from any of the provided gcc modules
+export PATH=/sw/rhel6-x64/gcc/binutils-2.24-gccsys/bin:${PATH}
+
+export NETCDF_Fortran_INCLUDE_DIRECTORIES=/sw/rhel6-x64/netcdf/netcdf_fortran-4.4.2-intel14/include
+export NETCDF_C_INCLUDE_DIRECTORIES=/sw/rhel6-x64/netcdf/netcdf_c-4.3.2-intel14/include
+export NETCDF_CXX_INCLUDE_DIRECTORIES=/sw/rhel6-x64/netcdf/netcdf_cxx-4.2.1-gcc48/include
+
+export HDF5_C_INCLUDE_DIRECTORIES=/sw/rhel6-x64/hdf5/hdf5-1.8.14-threadsafe-intel14/include
