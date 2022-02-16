@@ -1,8 +1,11 @@
 #!/bin/bash
+#_______________________________________________________________________________
+ln -s ../../env env
+ln -s ../../env.sh env.sh
+ln -s ../../configure.sh configure.sh
 
 #_______________________________________________________________________________
 if [ -d  "src/" ] ; then rm -r src/ ; fi 
-# fi
 mkdir src/
 cd src/
 
@@ -13,6 +16,7 @@ ln -s ../dwarf_ini/CMakeLists.txt CMakeLists.txt
 #_______________________________________________________________________________
 export which_path="../../../src/"
 
+# for downloading from specific github branch replace ln -s with wget
 # export which_branch=refactoring
 # export which_branch=refactoring_dwarf_ice
 # export which_path=https://raw.githubusercontent.com/FESOM/fesom2/${which_branch}/src
