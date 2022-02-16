@@ -1,15 +1,18 @@
 #!/bin/bash
 #_______________________________________________________________________________
+# link environment variables and configure.sh files from the main repository level
 ln -s ../../env env
 ln -s ../../env.sh env.sh
 ln -s ../../configure.sh configure.sh
 
 #_______________________________________________________________________________
+# create local source folder for the dwarf
 if [ -d  "src/" ] ; then rm -r src/ ; fi 
 mkdir src/
 cd src/
 
 #_______________________________________________________________________________
+# link main dwarf files to the local src/ folder
 ln -s ../dwarf_ini/fesom.F90 fesom.F90
 ln -s ../dwarf_ini/CMakeLists.txt CMakeLists.txt
 
@@ -44,7 +47,8 @@ export which_files="associate_mesh_def.h
                     fortran_utils.F90
                     oce_modules.F90
                     "
-#_______________________________________________________________________________                    
+#_______________________________________________________________________________
+# link the ther necessary main src files to local src directory 
 for file in ${which_files}; do
     ln -s ${which_path}/${file} ${file}
     # wget ${which_path}/${file}
