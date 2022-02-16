@@ -1,9 +1,0 @@
-# make the contents as shell agnostic as possible so we can include them with bash, zsh and others
-
-module load CMake Intel IntelMPI imkl netCDF netCDF-Fortran #intel.compiler intel.mpi netcdf/4.4.0_intel
-# the netcdf c++ path given by the netcdf module is broken, we have to workaround this
-export FC=mpiifort CC=mpiicc CXX=mpiicpc
-export NETCDF_Fortran_INCLUDE_DIRECTORIES=/usr/local/software/jureca/Stages/2018a/software/netCDF-Fortran/4.4.4-iimpi-2018a/include
-export NETCDF_C_INCLUDE_DIRECTORIES=/usr/local/software/jureca/Stages/2018a/software/netCDF/4.6.1-iimpi-2018a/include
-export NETCDF_CXX_INCLUDE_DIRECTORIES=/usr/local/software/jureca/Stages/2018a/software/netCDF/4.6.1-iimpi-2018a/include
-

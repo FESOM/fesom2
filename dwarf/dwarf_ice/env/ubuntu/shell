@@ -1,5 +1,0 @@
-export FC=mpifort CC=mpicc CXX=mpicxx
-export BLAS_LIBRARIES=/usr/lib/x86_64-linux-gnu/blas/
-export UBUNTU_BLAS_LIBRARY="libblas.a"
-
-
