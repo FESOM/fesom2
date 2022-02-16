@@ -1,7 +1,0 @@
-
-module load intel/2017.4 impi/2017.4 mkl/2017.4 bsc/1.0 netcdf/4.2
-
-export FC=mpiifort CC=mpiicc CXX=mpiicpc
-
-
-
