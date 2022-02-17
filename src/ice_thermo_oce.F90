@@ -185,13 +185,8 @@ subroutine thermodynamics(ice, partit, mesh)
     real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
     myDim_nod2d   => partit%myDim_nod2D
     eDim_nod2D    => partit%eDim_nod2D
-#ifdef __PGI
-    ulevels_nod2D   => mesh%ulevels_nod2D  (1     :myDim_nod2D+eDim_nod2D)
-    geo_coord_nod2D => mesh%geo_coord_nod2D(1:2, 1:myDim_nod2D+eDim_nod2D)    
-#else
-    ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D
-    geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => mesh%geo_coord_nod2D    
-#endif
+    ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D(:)
+    geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => mesh%geo_coord_nod2D(:,:)    
     u_ice         => ice%uice(:)
     v_ice         => ice%vice(:)
     a_ice         => ice%data(1)%values(:)

@@ -1105,7 +1105,7 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   call associate_new_stream(name, entry)
   
   ! 2d specific
-  entry%ptr3(1:1,1:size(data)) => data
+  entry%ptr3(1:1,1:size(data)) => data(:)
 
   if (accuracy == i_real8) then
     allocate(entry%local_values_r8(1, lcsize))
