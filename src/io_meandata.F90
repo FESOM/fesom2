@@ -50,9 +50,9 @@ module io_MEANDATA
     real(real32), allocatable, dimension(:,:) :: local_values_r4_copy
     real(kind=WP) :: ctime_copy
     integer :: mype_workaround
-    character :: long_description 
-    character :: defined_on
-    character :: mesh="fesom_mesh"
+    character(500) :: long_description="" 
+    character(100) :: defined_on=""
+    character(100) :: mesh="fesom_mesh"
   contains
     final destructor
   end type  
@@ -156,9 +156,9 @@ DO i=1, io_listsize
 SELECT CASE (trim(io_list(i)%id))
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!2D streams!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 CASE ('sst       ')
-    call def_stream(nod2D, myDim_nod2D, 'sst',      'sea surface temperature',        'C', tracers%data(1)%values(1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea surface temperature", "nodes")
+    call def_stream(nod2D, myDim_nod2D, 'sst',      'sea surface temperature',        'C', tracers%data(1)%values(1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea surface temperature")
 CASE ('sss       ')
-    call def_stream(nod2D, myDim_nod2D, 'sss',      'sea surface salinity',           'psu', tracers%data(2)%values(1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea surface salinity", "nodes")
+    call def_stream(nod2D, myDim_nod2D, 'sss',      'sea surface salinity',           'psu', tracers%data(2)%values(1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea surface salinity")
 CASE ('ssh       ')
     call def_stream(nod2D, myDim_nod2D, 'ssh',      'sea surface elevation',          'm',      dynamics%eta_n,                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('vve_5     ')
@@ -655,6 +655,8 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'description', len_trim(entry%description), entry%description), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'long_name', len_trim(entry%description), entry%description), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'units',       len_trim(entry%units),       entry%units), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'location',       len_trim(entry%defined_on),       entry%defined_on), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'mesh',       len_trim(entry%mesh),       entry%mesh), __LINE__)
   
  
 !___Global attributes________  
@@ -1008,7 +1010,7 @@ end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh, flip_array, long_description, defined_on)
+subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh, flip_array, long_description)
   use mod_mesh
   USE MOD_PARTIT
   USE MOD_PARSUP
@@ -1025,7 +1027,6 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   type(t_mesh), intent(in), target     :: mesh
   logical, optional, intent(in)        :: flip_array
   character(len=*), optional, intent(in) :: long_description
-  character(len=*), optional, intent(in) :: defined_on
   integer i
  
 #if !defined(__PGI)  
@@ -1073,12 +1074,12 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   entry%dimname(1)=mesh_dimname_from_dimsize(glsize(1), partit, mesh)     !2D! mesh_dimname_from_dimsize(glsize, mesh)
   entry%dimname(2)=mesh_dimname_from_dimsize(glsize(2), partit, mesh)     !2D! entry%dimname(2)='unknown'
   ! non dimension specific
-  call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh, long_description, defined_on)
+  call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh, long_description)
 end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh, long_description, defined_on)
+subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh, long_description)
   use mod_mesh
   USE MOD_PARTIT
   USE MOD_PARSUP
@@ -1094,7 +1095,6 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   type(t_mesh),          intent(in)    :: mesh
   type(t_partit),        intent(inout) :: partit
   character(len=*), optional, intent(in) :: long_description
-  character(len=*), optional, intent(in) :: defined_on
   integer i
 
 #if !defined(__PGI)   
@@ -1133,7 +1133,7 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   entry%dimname(2)='unknown'
 
   ! non dimension specific
-  call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh, long_description, defined_on)
+  call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh, long_description)
 end subroutine
 
 
@@ -1161,7 +1161,7 @@ end subroutine
   end subroutine
 
 
-  subroutine def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh, long_description, defined_on)
+  subroutine def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh, long_description)
     use mod_mesh
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -1174,7 +1174,6 @@ end subroutine
     type(t_mesh), intent(in), target     :: mesh
     type(t_partit), intent(inout), target :: partit
     character(len=*), intent(in) :: long_description
-    character(len=*), intent(in) :: defined_on
     ! EO args
     logical async_netcdf_allowed
     integer provided_mpi_thread_support_level
@@ -1198,7 +1197,6 @@ end subroutine
     entry%name = name
     entry%description = description
     entry%long_description = long_description
-    entry%defined_on = defined_on
     entry%mesh = "fesom_mesh";
     entry%units = units
     entry%filename = ""
@@ -1210,8 +1208,10 @@ end subroutine
 
     if(entry%glsize(1)==mesh%nod2D  .or. entry%glsize(2)==mesh%nod2D) then
       entry%is_elem_based = .false.
+      entry%defined_on = "nodes"
     else if(entry%glsize(1)==mesh%elem2D .or. entry%glsize(2)==mesh%elem2D) then
       entry%is_elem_based = .true.
+      entry%defined_on = "elements"
     else
       if(partit%mype == 0) print *,"can not determine if ",trim(name)," is node or elem based"
       stop
