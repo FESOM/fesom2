@@ -108,6 +108,7 @@ subroutine pressure_bv(mesh)
 ! in a single pass the using split form of the equation of state
 ! as proposed by NR
     use g_config
+    use g_support
     USE o_PARAM
     USE MOD_MESH
     USE o_ARRAYS
@@ -119,7 +120,7 @@ subroutine pressure_bv(mesh)
     use density_linear_interface
     IMPLICIT NONE
     type(t_mesh), intent(in) , target :: mesh    
-    real(kind=WP)            :: dz_inv, bv,  a, rho_up, rho_dn, t, s
+    real(kind=WP)            :: zmean, dz_inv, bv,  a, rho_up, rho_dn, t, s
     integer                  :: node, nz, nl1, nzmax, nzmin
     real(kind=WP)            :: rhopot(mesh%nl), bulk_0(mesh%nl), bulk_pz(mesh%nl), bulk_pz2(mesh%nl), rho(mesh%nl), dbsfc1(mesh%nl), db_max
     real(kind=WP)            :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf, aux_rho, aux_rho1
@@ -313,10 +314,11 @@ subroutine pressure_bv(mesh)
         flag1=.true.
         flag2=.true.
         do nz=nzmin+1,nzmax-1
-            bulk_up = bulk_0(nz-1) + zbar_3d_n(nz,node)*(bulk_pz(nz-1) + zbar_3d_n(nz,node)*bulk_pz2(nz-1)) 
-            bulk_dn = bulk_0(nz)   + zbar_3d_n(nz,node)*(bulk_pz(nz)   + zbar_3d_n(nz,node)*bulk_pz2(nz))
-            rho_up = bulk_up*rhopot(nz-1) / (bulk_up + 0.1_WP*zbar_3d_n(nz,node)*real(state_equation))  
-            rho_dn = bulk_dn*rhopot(nz)   / (bulk_dn + 0.1_WP*zbar_3d_n(nz,node)*real(state_equation))  
+            zmean   = 0.5_WP*sum(Z_3d_n(nz-1:nz, node))
+            bulk_up = bulk_0(nz-1) + zmean*(bulk_pz(nz-1) + zmean*bulk_pz2(nz-1)) 
+            bulk_dn = bulk_0(nz)   + zmean*(bulk_pz(nz)   + zmean*bulk_pz2(nz))
+            rho_up = bulk_up*rhopot(nz-1) / (bulk_up + 0.1_WP*zmean*real(state_equation))  
+            rho_dn = bulk_dn*rhopot(nz)   / (bulk_dn + 0.1_WP*zmean*real(state_equation))  
             dz_inv=1.0_WP/(Z_3d_n(nz-1,node)-Z_3d_n(nz,node))  
             
             !_______________________________________________________________
@@ -362,6 +364,7 @@ subroutine pressure_bv(mesh)
     end do
     !_______________________________________________________________________
     ! BV is defined on full levels except for the first and the last ones.
+    call smooth_nod(bvfreq, 1, mesh)
 end subroutine pressure_bv
 !
 !
