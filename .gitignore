@@ -10,3 +10,4 @@ src/icepack_drivers/Icepack
 lib/libfesom.a
 /work_*
 Makefile.in
+test/output_pi 

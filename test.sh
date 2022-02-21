@@ -3,7 +3,7 @@
 #
 # With singularity on ollie
 #
-# module load singularity/3.5.1
+# module load singularity/3.9.1
 # cd fesom2
 # singularity exec /home/ollie/nkolduno/SINGULARITY/fesom_refactoring.sif ./test.sh
 #

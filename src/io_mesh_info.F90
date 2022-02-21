@@ -85,6 +85,7 @@ implicit none
 
   !Define the variables
   ! 1D
+  call add_fesom_ugrid_info(ncid, partit)
   call my_def_var(ncid, 'nz',                NF_DOUBLE, 1, (/nl_id /),    zbar_id,              'depth of levels',                          partit)
   call my_def_var(ncid, 'nz1',               NF_DOUBLE, 1, (/nl1_id/),    z_id,                 'depth of layers',                          partit)
   call my_def_var(ncid, 'elem_area',         NF_DOUBLE, 1, (/elem_n_id/), elem_area_id,         'element areas',                            partit)
@@ -294,6 +295,82 @@ call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
 if (status .ne. nf_noerr) call handle_err(status, partit)
 
 end subroutine my_def_dim
+!
+!============================================================================
+!
+!
+subroutine add_fesom_ugrid_info(ncid, partit)
+IMPLICIT NONE
+type(t_partit), intent(inout) :: partit
+integer, intent(in)           :: ncid
+integer                       :: info_id
+integer                       :: fesom_mesh_id
+integer                       :: ierror, status
+
+call my_def_dim(ncid, "info", 1, info_id, partit)
+if (partit%mype==0) then
+   status = nf_def_var(ncid, 'fesom_mesh', NF_INT, 0, info_id, fesom_mesh_id)
+end if
+call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+if (status .ne. nf_noerr) call handle_err(status, partit)
+
+if (partit%mype==0) then
+  status = nf_put_att_text(ncid, fesom_mesh_id, 'cf_role', len_trim('mesh_topology'), trim('mesh_topology'));
+end if
+call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+if (status .ne. nf_noerr) call handle_err(status, partit)
+
+if (partit%mype==0) then
+  status = nf_put_att_text(ncid, fesom_mesh_id, 'long_name', len_trim('Topology data of 2D unstructured mesh'), trim('Topology data of 2D unstructured mesh'));
+end if
+call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+if (status .ne. nf_noerr) call handle_err(status, partit)
+
+if (partit%mype==0) then
+  status = nf_put_att_int(ncid, fesom_mesh_id, 'topology_dimension', NF_INT, 1, 2);
+end if
+call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+if (status .ne. nf_noerr) call handle_err(status, partit)
+
+if (partit%mype==0) then
+  status = nf_put_att_text(ncid, fesom_mesh_id, 'node_coordinates', len_trim('lon lat'), trim('lon lat'));
+end if
+call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+if (status .ne. nf_noerr) call handle_err(status, partit)
+
+if (partit%mype==0) then
+  status = nf_put_att_text(ncid, fesom_mesh_id, 'face_node_connectivity', len_trim('elements'), trim('elements'));
+end if
+call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+if (status .ne. nf_noerr) call handle_err(status, partit)
+
+if (partit%mype==0) then
+  status = nf_put_att_text(ncid, fesom_mesh_id, 'edge_node_connectivity', len_trim('edges'), trim('edges'));
+end if
+call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+if (status .ne. nf_noerr) call handle_err(status, partit)
+
+if (partit%mype==0) then
+  status = nf_put_att_text(ncid, fesom_mesh_id, 'edge_face_connectivity', len_trim('edge_tri'), trim('edge_tri'));
+end if
+call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+if (status .ne. nf_noerr) call handle_err(status, partit)
+
+if (partit%mype==0) then
+  status = nf_put_att_text(ncid, fesom_mesh_id, 'face_dimension', len_trim('elem') , trim('elem'));
+end if
+call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+if (status .ne. nf_noerr) call handle_err(status, partit)
+
+if (partit%mype==0) then
+  status = nf_put_att_text(ncid, fesom_mesh_id, 'edge_dimension', len_trim('edg_n'), trim('edg_n'));
+end if
+call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+if (status .ne. nf_noerr) call handle_err(status, partit)
+
+end subroutine add_fesom_ugrid_info
+!============================================================================
+!
 !
 !============================================================================
 !
