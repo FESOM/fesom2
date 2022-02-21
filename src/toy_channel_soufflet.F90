@@ -247,7 +247,7 @@ end subroutine compute_zonal_mean
 subroutine initial_state_soufflet(dynamics, tracers, partit, mesh)
  ! Profiles Soufflet 2016 (OM)
   implicit none
-  type(t_mesh)  , intent(in)   , target :: mesh
+  type(t_mesh)  , intent(inout), target :: mesh
   type(t_partit), intent(inout), target :: partit
   type(t_tracer), intent(inout), target :: tracers
   type(t_dyn)   , intent(inout), target :: dynamics
@@ -342,14 +342,14 @@ do n=1, myDim_nod2D+eDim_nod2D
   DO n=1,myDim_elem2D
   elnodes=elem2D_nodes(:,n)
   dst=(sum(coord_nod2D(2, elnodes))/3.0-lat0)*r_earth-ysize/2
-  coriolis(n)=1.0e-4+dst*1.6e-11	 
+  mesh%coriolis(n)=1.0e-4+dst*1.6e-11	 
   END DO
-  write(*,*) mype, 'COR', maxval(coriolis*10000.0), minval(coriolis*10000.0) 
+  write(*,*) mype, 'COR', maxval(mesh%coriolis*10000.0), minval(mesh%coriolis*10000.0) 
   DO n=1,myDim_elem2D 
     elnodes=elem2D_nodes(:,n)
     ! Thermal wind \partial_z UV(1,:,:)=(g/rho_0/f)\partial_y rho 
     DO nz=1,nlevels(n)-1
-        d_No(nz)=(-(0.00025_WP*density_0)*g/density_0/coriolis(n))*sum(gradient_sca(4:6,n)*Tclim(nz, elnodes))
+        d_No(nz)=(-(0.00025_WP*density_0)*g/density_0/mesh%coriolis(n))*sum(gradient_sca(4:6,n)*Tclim(nz, elnodes))
     !  d_N is used here as a placeholder
     ! -(sw_alpha*density_0) here is from the equation of state d\rho=-(sw_alpha*density_0) dT 
     END DO

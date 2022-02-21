@@ -2195,8 +2195,8 @@ t0=MPI_Wtime()
  allocate(mesh%gradient_vec(6,myDim_elem2D))
  allocate(mesh%metric_factor(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
  allocate(mesh%elem_cos(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
- allocate(coriolis(myDim_elem2D))
- allocate(coriolis_node(myDim_nod2D+eDim_nod2D))
+ allocate(mesh%coriolis(myDim_elem2D))
+ allocate(mesh%coriolis_node(myDim_nod2D+eDim_nod2D))
  allocate(mesh%geo_coord_nod2D(2,myDim_nod2D+eDim_nod2D))
  allocate(center_x(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
  allocate(center_y(myDim_elem2D+eDim_elem2D+eXDim_elem2D)) 
@@ -2207,7 +2207,7 @@ t0=MPI_Wtime()
  ! ============
  DO n=1,myDim_nod2D+eDim_nod2D 
     call r2g(lon, lat, mesh%coord_nod2D(1,n), mesh%coord_nod2D(2,n))
-    coriolis_node(n)=2*omega*sin(lat)	 
+    mesh%coriolis_node(n)=2*omega*sin(lat)	 
  END DO
 
  DO n=1,myDim_nod2D+eDim_nod2D 
@@ -2223,11 +2223,11 @@ t0=MPI_Wtime()
  DO n=1,myDim_elem2D 
     call elem_center(n, ax, ay, mesh)
     call r2g(lon, lat, ax, ay)
-    coriolis(n)=2*omega*sin(lat)	 
+    mesh%coriolis(n)=2*omega*sin(lat)	 
  END DO
   
  if(fplane) then 
-    coriolis=2*omega*0.71_WP
+    mesh%coriolis=2*omega*0.71_WP
  end if
 
  ! ============

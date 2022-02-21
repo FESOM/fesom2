@@ -38,7 +38,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_MESH
-    use o_ARRAYS, only: coriolis, ssh_gp, pgf_x, pgf_y
+    use o_ARRAYS, only: ssh_gp, pgf_x, pgf_y
     use o_PARAM
     use g_CONFIG
     use g_forcing_param, only: use_virt_salt
@@ -103,7 +103,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         !  p_eta=g*eta_n(elnodes)*(1-theta)        !! this place needs update (1-theta)!!!
         p_eta = g*eta_n(elnodes)   
         
-        ff  = coriolis(elem)*elem_area(elem)
+        ff  = mesh%coriolis(elem)*elem_area(elem)
         !mm=metric_factor(elem)*gg
         
         !___________________________________________________________________________
