@@ -50,6 +50,9 @@ module io_MEANDATA
     real(real32), allocatable, dimension(:,:) :: local_values_r4_copy
     real(kind=WP) :: ctime_copy
     integer :: mype_workaround
+    character :: long_description 
+    character :: defined_on
+    character :: mesh="fesom_mesh"
   contains
     final destructor
   end type  
