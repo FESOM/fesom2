@@ -208,7 +208,6 @@ subroutine pressure_bv(tracers, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE o_ARRAYS
-    use i_arrays
     USE o_mixing_KPP_mod, only: dbsfc
     USE diagnostics,      only: ldiag_dMOC
     use densityJM_components_interface
@@ -217,7 +216,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     type(t_mesh),   intent(in) ,    target  :: mesh
     type(t_partit), intent(inout),  target  :: partit
     type(t_tracer), intent(in),     target  :: tracers
-    real(kind=WP)                           :: dz_inv, bv,  a, a_loc, rho_up, rho_dn, t, s
+    real(kind=WP)                           :: dz_inv, bv,  a, rho_up, rho_dn, t, s
     integer                                 :: node, nz, nl1, nzmax, nzmin
     real(kind=WP)                           :: rhopot(mesh%nl), bulk_0(mesh%nl), bulk_pz(mesh%nl), bulk_pz2(mesh%nl), rho(mesh%nl), dbsfc1(mesh%nl), db_max
     real(kind=WP)                           :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf, aux_rho, aux_rho1
@@ -236,20 +235,16 @@ subroutine pressure_bv(tracers, partit, mesh)
     !___________________________________________________________________________
     ! Screen salinity
     a    =0.0_WP
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, a_loc)
-    a_loc=0.0_WP
-!$OMP DO
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax)
+!$OMP DO REDUCTION(min: a)
     do node=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(node)
         nzmax = nlevels_nod2D(node)
         do nz=nzmin,nzmax-1
-            a_loc=min(a_loc, salt(nz,node))
+            a=min(a, salt(nz,node))
         enddo
     enddo
 !$OMP END DO
-!$OMP CRITICAL
-    a=min(a, a_loc)
-!$OMP END CRITICAL
 !$OMP END PARALLEL
 
     !___________________________________________________________________________
@@ -268,7 +263,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     
     !___________________________________________________________________________
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(dz_inv, bv,  a, a_loc, rho_up, rho_dn, t, s, node, nz, nl1, nzmax, nzmin, &
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(dz_inv, bv,  a, rho_up, rho_dn, t, s, node, nz, nl1, nzmax, nzmin, &
 !$OMP                                  rhopot, bulk_0, bulk_pz, bulk_pz2, rho, dbsfc1, db_max, bulk_up, bulk_dn, &
 !$OMP                                  rho_surf, aux_rho, aux_rho1, flag1, flag2)
 !$OMP DO

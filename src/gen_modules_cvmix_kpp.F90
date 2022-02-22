@@ -22,14 +22,14 @@ module g_cvmix_kpp
     ! module calls from FESOM
     use g_config
     use o_param           
-    use mod_mesh
+    USE MOD_ICE
+    USE MOD_DYN
+    USE mod_tracer
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use mod_tracer
-    use MOD_DYN
+    USE MOD_MESH
     use o_arrays
     use g_comm_auto 
-    use i_arrays
     use g_forcing_arrays
     use g_support
     use o_mixing_KPP_mod
@@ -349,11 +349,13 @@ module g_cvmix_kpp
     !
     !===========================================================================
     ! calculate PP vertrical mixing coefficients from CVMIX library
-    subroutine calc_cvmix_kpp(dynamics, tracers, partit, mesh)
-        type(t_mesh),   intent(in),    target :: mesh
-        type(t_partit), intent(inout), target :: partit
-        type(t_tracer), intent(in),    target :: tracers
+    subroutine calc_cvmix_kpp(ice, dynamics, tracers, partit, mesh)
+        type(t_ice)   , intent(in),    target :: ice
         type(t_dyn)   , intent(in),    target :: dynamics
+        type(t_tracer), intent(in),    target :: tracers
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        !_______________________________________________________________________
         integer       :: node, elem, nz, nln, nun,  elnodes(3), aux_nz
         real(kind=WP) :: vshear2, dz2, aux, aux_wm(mesh%nl), aux_ws(mesh%nl)
         real(kind=WP) :: aux_coeff, sigma, stable
@@ -363,6 +365,9 @@ module g_cvmix_kpp
         real(kind=WP) :: sldepth, sfc_temp, sfc_salt, sfc_u, sfc_v, htot, delh, rho_sfc, rho_nz
         real(kind=WP) :: rhopot, bulk_0, bulk_pz, bulk_pz2
         real(kind=WP) :: sfc_rhopot, sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2
+        !_______________________________________________________________________
+        ! pointer on necessary derived types
+        real(kind=WP), dimension(:), pointer  :: a_ice
         real(kind=WP), dimension(:,:), pointer :: temp, salt
         real(kind=WP), dimension(:,:,:), pointer :: UVnode
 #include "associate_part_def.h"
@@ -372,6 +377,7 @@ module g_cvmix_kpp
         temp=>tracers%data(1)%values(:,:)
         salt=>tracers%data(2)%values(:,:)
         UVnode=>dynamics%uvnode(:,:,:)
+        a_ice        => ice%data(1)%values(:)
         
         !_______________________________________________________________________
         kpp_Av = 0.0_WP

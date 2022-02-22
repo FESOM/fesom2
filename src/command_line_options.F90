@@ -29,6 +29,12 @@ contains
       case('--info')
         print '(g0)', '# Definitions'
         call info%print_definitions()
+        print '(g0)', '# compiled with OpenMP?'
+#ifdef _OPENMP
+        print '(g0)', '_OPENMP is ON'
+#else
+        print '(g0)', '_OPENMP is OFF'
+#endif
       case default
         print *, 'unknown option: ', arg
         error stop

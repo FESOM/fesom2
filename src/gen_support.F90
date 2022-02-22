@@ -11,7 +11,7 @@ module g_support
   implicit none
 
   private
-  public :: smooth_nod, smooth_elem, integrate_nod, extrap_nod
+  public :: smooth_nod, smooth_elem, integrate_nod, extrap_nod, omp_min_max_sum1, omp_min_max_sum2
   real(kind=WP), dimension(:), allocatable  :: work_array
 !
 !--------------------------------------------------------------------------------------------
@@ -321,12 +321,15 @@ subroutine integrate_nod_2D(data, int2D, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
-  lval=0.0_WP
+
+lval=0.0_WP
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row)
+!$OMP DO REDUCTION (+: lval)
   do row=1, myDim_nod2D
-     !!PS lval=lval+data(row)*area(1,row)
      lval=lval+data(row)*areasvol(ulevels_nod2D(row),row)
   end do
-
+!$OMP END DO
+!$OMP END PARALLEL
   int2D=0.0_WP
   call MPI_AllREDUCE(lval, int2D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
@@ -353,12 +356,15 @@ subroutine integrate_nod_3D(data, int3D, partit, mesh)
 #include "associate_mesh_ass.h" 
 
   lval=0.0_WP
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row, k)
+!$OMP DO REDUCTION(+: lval)
   do row=1, myDim_nod2D
-     !!PS do k=1, nlevels_nod2D(row)-1
      do k=ulevels_nod2D(row), nlevels_nod2D(row)-1
         lval=lval+data(k, row)*areasvol(k,row)*hnode_new(k,row)  ! --> TEST_cavity
      end do
   end do
+!$OMP END DO
+!$OMP END PARALLEL
   int3D=0.0_WP
   call MPI_AllREDUCE(lval, int3D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
@@ -476,7 +482,125 @@ subroutine extrap_nod3D(arr, partit, mesh)
 end subroutine extrap_nod3D
 !
 !--------------------------------------------------------------------------------------------
+! returns min/max/sum of a one dimentional array (same as minval) but with the support of OpenMP
+FUNCTION omp_min_max_sum1(arr, pos1, pos2, what, partit, nan) 
+  USE MOD_PARTIT
+  implicit none
+  real(kind=WP), intent(in)   :: arr(:)
+  integer,       intent(in)   :: pos1, pos2
+  character(3),  intent(in)   :: what
+  real(kind=WP), optional     :: nan !to be implemented upon the need (for masked arrays)
+  real(kind=WP)               :: omp_min_max_sum1
+  real(kind=WP)               :: val
+  integer                     :: n
+
+  type(t_partit),intent(in), &
+                       target :: partit
+
+  SELECT CASE (trim(what))
+    CASE ('sum')
+       val=0.0_WP
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n)
+!$OMP DO REDUCTION(+: val)
+       do n=pos1, pos2
+          val=val+arr(n)
+       end do
+!$OMP END DO
+!$OMP END PARALLEL
+
+    CASE ('min')
+       val=arr(1)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n)
+!$OMP DO REDUCTION(min: val)
+       do n=pos1, pos2
+          val=min(val, arr(n))
+       end do
+!$OMP END DO
+!$OMP END PARALLEL
+
+    CASE ('max')
+       val=arr(1)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n)
+!$OMP DO REDUCTION(max: val)
+       do n=pos1, pos2
+          val=max(val, arr(n))
+       end do
+!$OMP END DO
+!$OMP END PARALLEL
+
+    CASE DEFAULT
+       if (partit%mype==0) write(*,*) trim(what), ' is not implemented in omp_min_max_sum case!'
+       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       STOP
+  END SELECT
+
+  omp_min_max_sum1=val
+END FUNCTION
 !
+!--------------------------------------------------------------------------------------------
+! returns min/max/sum of a two dimentional array (same as minval) but with the support of OpenMP
+FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan) 
+  implicit none
+  real(kind=WP), intent(in)   :: arr(:,:)
+  integer,       intent(in)   :: pos11, pos12, pos21, pos22
+  character(3),  intent(in)   :: what
+  real(kind=WP), optional     :: nan !to be implemented upon the need (for masked arrays)
+  real(kind=WP)               :: omp_min_max_sum2
+  real(kind=WP)               :: val, vmasked
+  integer                     :: i, j
+
+
+  type(t_partit),intent(in), &
+                       target :: partit
+
+  SELECT CASE (trim(what))
+    CASE ('min')
+      if (.not. present(nan)) vmasked=huge(vmasked) !just some crazy number
+      val=arr(1,1)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j)
+!$OMP DO REDUCTION(min: val)
+      do i=pos11, pos12
+         do j=pos21, pos22
+            if (arr(i,j)/=vmasked) val=min(val, arr(i,j))
+         end do
+      end do
+!$OMP END DO
+!$OMP END PARALLEL
+
+    CASE ('max')
+      if (.not. present(nan)) vmasked=tiny(vmasked) !just some crazy number
+      val=arr(1,1)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j)
+!$OMP DO REDUCTION(max: val)
+      do i=pos11, pos12
+         do j=pos21, pos22
+            if (arr(i,j)/=vmasked) val=max(val, arr(i,j))
+         end do
+      end do
+!$OMP END DO
+!$OMP END PARALLEL
+
+    CASE ('sum')
+      if (.not. present(nan)) vmasked=huge(vmasked) !just some crazy number
+      val=0
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j)
+!$OMP DO REDUCTION(+: val)
+      do i=pos11, pos12
+         do j=pos21, pos22
+            if (arr(i,j)/=vmasked) val=val+arr(i,j)
+         end do
+      end do
+!$OMP END DO
+!$OMP END PARALLEL
+
+   CASE DEFAULT
+      if (partit%mype==0) write(*,*) trim(what), ' is not implemented in omp_min_max_sum case!'
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+      STOP
+   END SELECT
+
+omp_min_max_sum2=val
+END FUNCTION
 end module g_support
 
 

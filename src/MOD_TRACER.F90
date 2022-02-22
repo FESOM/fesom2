@@ -18,6 +18,7 @@ real(kind=WP)                               :: tra_adv_pv  = 1.  ! a parameter t
 integer                                     :: ID
 
 contains
+  private
   procedure WRITE_T_TRACER_DATA
   procedure READ_T_TRACER_DATA
   generic :: write(unformatted) => WRITE_T_TRACER_DATA
@@ -45,6 +46,7 @@ integer,allocatable,dimension(:,:)            :: edge_up_dn_tri
 real(kind=WP),allocatable,dimension(:,:,:)    :: edge_up_dn_grad
 
 contains
+  private
   procedure WRITE_T_TRACER_WORK
   procedure READ_T_TRACER_WORK
   generic :: write(unformatted) => WRITE_T_TRACER_WORK
@@ -75,6 +77,7 @@ real(kind=WP)                 :: gamma2_tra    = 0.
 logical                       :: i_vert_diff   = .true.
 
 contains
+private
 procedure WRITE_T_TRACER
 procedure READ_T_TRACER
 generic :: write(unformatted) => WRITE_T_TRACER

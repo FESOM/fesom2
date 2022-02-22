@@ -1116,13 +1116,14 @@ submodule (icedrv_main) icedrv_step
 
 !=======================================================================
 
-      module subroutine step_icepack(mesh, time_evp, time_advec, time_therm)
+      module subroutine step_icepack(ice, mesh, time_evp, time_advec, time_therm)
 
           use icepack_intfc,          only: icepack_ice_strength
           use g_config,               only: dt
-          use i_PARAM,                only: whichEVP
           use mod_mesh    
-
+          use mod_ice    
+          use ice_EVPdynamics_interface
+          use ice_maEVPdynamics_interface
           implicit none
     
           integer (kind=int_kind) :: &
@@ -1140,9 +1141,10 @@ submodule (icedrv_main) icedrv_step
              time_therm,                       &
              time_advec,                       &
              time_evp
-
+          
+          type(t_ice), target, intent(inout) :: ice  
           type(t_mesh), target, intent(in) :: mesh    
-
+          
           character(len=*), parameter :: subname='(ice_step)'
 
 
@@ -1171,7 +1173,7 @@ submodule (icedrv_main) icedrv_step
           ! copy variables from fesom2 (also ice velocities)
           !-----------------------------------------------------------------
 
-          call fesom_to_icepack(mesh)
+          call fesom_to_icepack(ice, mesh)
 
           !-----------------------------------------------------------------
           ! tendencies needed by fesom
@@ -1237,13 +1239,13 @@ submodule (icedrv_main) icedrv_step
 
              t2 = MPI_Wtime()
 
-             select case (whichEVP)
+             select case (ice%whichEVP)
                 case (0)
-                   call EVPdynamics  (p_partit, mesh)
+                   call EVPdynamics  (ice, p_partit, mesh)
                 case (1)
-                   call EVPdynamics_m(p_partit, mesh)
+                   call EVPdynamics_m(ice, p_partit, mesh)
                 case (2)
-                   call EVPdynamics_a(p_partit, mesh)
+                   call EVPdynamics_a(ice, p_partit, mesh)
                 case default
                    if (mype==0) write(*,*) 'A non existing EVP scheme specified!'
                    call par_ex(p_partit%MPI_COMM_FESOM, p_partit%mype)
@@ -1257,7 +1259,7 @@ submodule (icedrv_main) icedrv_step
              ! update ice velocities
              !-----------------------------------------------------------------
 
-             call fesom_to_icepack(mesh)
+             call fesom_to_icepack(ice, mesh)
 
              !-----------------------------------------------------------------
              ! advect tracers
@@ -1265,7 +1267,7 @@ submodule (icedrv_main) icedrv_step
 
              t2 = MPI_Wtime()
 
-             call tracer_advection_icepack(mesh)
+             call tracer_advection_icepack(ice, mesh)
 
              t3 = MPI_Wtime()
              time_advec = t3 - t2

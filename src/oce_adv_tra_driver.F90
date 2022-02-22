@@ -140,12 +140,12 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 #endif
             do nz=nu12, nl12
                fct_LO(nz, enodes(1))=fct_LO(nz, enodes(1))+adv_flux_hor(nz, e)
-            end do
 #if defined(_OPENMP)
+            end do
             call omp_unset_lock(partit%plock(enodes(1)))
             call omp_set_lock  (partit%plock(enodes(2)))
-#endif
             do nz=nu12, nl12
+#endif
                fct_LO(nz, enodes(2))=fct_LO(nz, enodes(2))-adv_flux_hor(nz, e)
             end do
 #if defined(_OPENMP)
@@ -306,12 +306,12 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #endif
         do nz=nu12, nl12
             dttf_h(nz,enodes(1))=dttf_h(nz,enodes(1))+flux_h(nz,edge)*dt/areasvol(nz,enodes(1))
-        end do
 #if defined(_OPENMP)
+        end do
         call omp_unset_lock(partit%plock(enodes(1)))
         call omp_set_lock  (partit%plock(enodes(2)))
-#endif
         do nz=nu12, nl12
+#endif
             dttf_h(nz,enodes(2))=dttf_h(nz,enodes(2))-flux_h(nz,edge)*dt/areasvol(nz,enodes(2))
         end do
 #if defined(_OPENMP)

@@ -227,6 +227,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
            end if
        END SELECT
     else
+       if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call oce_initial_state'//achar(27)//'[0m' 
        call oce_initial_state(tracers, partit, mesh)   ! Use it if not running tests
     end if
 

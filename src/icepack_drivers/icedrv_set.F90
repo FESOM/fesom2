@@ -22,16 +22,17 @@
       
       contains 
 
-      module subroutine set_icepack(partit)
-
-          use i_param,             only: whichEVP
-          use i_param,             only: cd_oce_ice, Pstar, c_pressure  
-          use i_therm_param,       only: albw
+      module subroutine set_icepack(ice, partit)
+          use MOD_ICE
+!           use i_param,             only: whichEVP
+!           use i_param,             only: cd_oce_ice, Pstar, c_pressure  
+!           use i_therm_param,       only: albw
 
           implicit none
 
           ! local variables
           type(t_partit), intent(inout), target :: partit
+          type(t_ice), intent(inout), target :: ice
 
           character(len=char_len)     :: nml_filename, diag_filename
           character(len=*), parameter :: subname = '(set_icepack)'
@@ -432,13 +433,13 @@
           if (mype == 0) write(nu_diag,*) '-----------------------------------'
           if (mype == 0) write(nu_diag,*) ' '
 
-          if (whichEVP == 1 .or. whichEVP == 2) then
+          if (ice%whichEVP == 1 .or. ice%whichEVP == 2) then
              if (mype == 0) write (nu_diag,*) 'WARNING: whichEVP = 1 or 2'
              if (mype == 0) write (nu_diag,*) 'Adaptive or Modified EVP formulations'
              if (mype == 0) write (nu_diag,*) 'are not allowed when using Icepack (yet).'
              if (mype == 0) write (nu_diag,*) 'Standard EVP will be used instead'
              if (mype == 0) write (nu_diag,*) '         whichEVP = 0'
-             whichEVP = 0
+             ice%whichEVP = 0
           endif
     
           if (ncat == 1 .and. kitd == 1) then
@@ -817,10 +818,10 @@
           ! Make the namelists.ice and namelist.icepack consistent (icepack wins
           ! over fesom)
 
-          cd_oce_ice = dragio
-          albw       = albocn
-          Pstar      = P_star
-          c_pressure = C_star
+          ice%cd_oce_ice = dragio
+          ice%thermo%albw= albocn
+          ice%Pstar      = P_star
+          ice%c_pressure = C_star
 
     
           call icepack_init_parameters(ustar_min_in=ustar_min, Cf_in=Cf, &

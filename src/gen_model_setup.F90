@@ -3,8 +3,7 @@ subroutine setup_model(partit)
   USE MOD_PARTIT
   USE MOD_PARSUP
   use o_param
-  use i_param
-  use i_therm_param
+!   use i_therm_param
   use g_forcing_param
   use g_config
   use diagnostics, only: ldiag_solver,lcurt_stress_surf,lcurt_stress_surf, ldiag_energy, &
@@ -63,13 +62,13 @@ subroutine setup_model(partit)
   read (fileunit, NML=land_ice)
   close (fileunit)
 
-  if(use_ice) then
-  nmlfile ='namelist.ice'    ! name of ice namelist file
-  open (newunit=fileunit, file=nmlfile)
-  read (fileunit, NML=ice_dyn)
-  read (fileunit, NML=ice_therm)
-  close (fileunit)
-  endif
+!   if(use_ice) then
+!   nmlfile ='namelist.ice'    ! name of ice namelist file
+!   open (newunit=fileunit, file=nmlfile)
+! !   read (fileunit, NML=ice_dyn)
+!   read (fileunit, NML=ice_therm)
+!   close (fileunit)
+!   endif
   
   nmlfile ='namelist.io'    ! name of forcing namelist file
   open (newunit=fileunit, file=nmlfile)

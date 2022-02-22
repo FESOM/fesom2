@@ -17,8 +17,17 @@ TYPE T_SOLVERINFO
     integer       :: fillin  = 3
     integer       :: lutype  = 2
     real(kind=WP) :: droptol = 1.e-8
-    real(kind=WP) :: soltol  = 1e-10  !1.e-10    
+!!! PARMS Solver
+    real(kind=WP) :: soltol  = 1e-10  ! default for PARMS
+    logical       :: use_parms = .TRUE.
+!!!
+!!! Sergey's Solver
+!   real(kind=WP)  :: soltol  = 1e-5  ! default for PARMS
+!   logical        :: use_parms = .FALSE.
+!!!
+    real(kind=WP), allocatable   :: rr(:), zz(:), pp(:), App(:)
     contains
+        private
         procedure WRITE_T_SOLVERINFO
         procedure READ_T_SOLVERINFO
         generic :: write(unformatted) => WRITE_T_SOLVERINFO
@@ -34,6 +43,7 @@ TYPE T_DYN_WORK
     ! easy backscatter contribution
     real(kind=WP), allocatable, dimension(:,:)   :: u_b, v_b
     contains
+        private
         procedure WRITE_T_DYN_WORK
         procedure READ_T_DYN_WORK
         generic :: write(unformatted) => WRITE_T_DYN_WORK
@@ -100,6 +110,7 @@ TYPE T_DYN
 
     !___________________________________________________________________________
     contains
+        private
         procedure WRITE_T_DYN
         procedure READ_T_DYN
         generic :: write(unformatted) => WRITE_T_DYN
@@ -126,6 +137,10 @@ subroutine WRITE_T_SOLVERINFO(tsolverinfo, unit, iostat, iomsg)
     write(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%lutype
     write(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%droptol
     write(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%soltol
+    call write_bin_array(tsolverinfo%rr,  unit, iostat, iomsg)
+    call write_bin_array(tsolverinfo%zz,  unit, iostat, iomsg)
+    call write_bin_array(tsolverinfo%pp,  unit, iostat, iomsg)
+    call write_bin_array(tsolverinfo%App, unit, iostat, iomsg)
 end subroutine WRITE_T_SOLVERINFO
 
 subroutine READ_T_SOLVERINFO(tsolverinfo, unit, iostat, iomsg)
@@ -141,6 +156,10 @@ subroutine READ_T_SOLVERINFO(tsolverinfo, unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%lutype
     read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%droptol
     read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%soltol
+    call read_bin_array(tsolverinfo%rr,  unit, iostat, iomsg)
+    call read_bin_array(tsolverinfo%zz,  unit, iostat, iomsg)
+    call read_bin_array(tsolverinfo%pp,  unit, iostat, iomsg)
+    call read_bin_array(tsolverinfo%App, unit, iostat, iomsg)
 end subroutine READ_T_SOLVERINFO
 
 !

@@ -108,12 +108,14 @@ end module
 
 module solve_tracers_ale_interface
     interface
-        subroutine solve_tracers_ale(dynamics, tracers, partit, mesh) 
+        subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh) 
         use mod_mesh
         USE MOD_PARTIT
         USE MOD_PARSUP
         use mod_tracer     
         use MOD_DYN
+        USE MOD_ICE
+        type(t_ice)   , intent(inout), target :: ice
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
@@ -125,13 +127,14 @@ end module
 !
 !===============================================================================
 ! Driving routine    Here with ALE changes!!!
-subroutine solve_tracers_ale(dynamics, tracers, partit, mesh) 
+subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh) 
     use g_config
     use o_PARAM, only: SPP, Fer_GM
     use mod_mesh
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_DYN
+    USE MOD_ICE
     use mod_tracer
     use g_comm_auto
     use o_tracers
@@ -139,6 +142,7 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
     use diff_tracers_ale_interface
     use oce_adv_tra_driver_interfaces    
     implicit none
+    type(t_ice)   , intent(in)   , target    :: ice
     type(t_dyn)   , intent(inout), target    :: dynamics
     type(t_tracer), intent(inout), target    :: tracers
     type(t_partit), intent(inout), target    :: partit
@@ -165,7 +169,7 @@ subroutine solve_tracers_ale(dynamics, tracers, partit, mesh)
     del_ttf => tracers%work%del_ttf
 
     !___________________________________________________________________________
-    if (SPP) call cal_rejected_salt(partit, mesh)
+    if (SPP) call cal_rejected_salt(ice, partit, mesh)
     if (SPP) call app_rejected_salt(tracers%data(2)%values, partit, mesh)
     
     !___________________________________________________________________________
@@ -427,7 +431,6 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
     use MOD_DYN
     use o_PARAM
     use o_ARRAYS, only: Ki, Kv, heat_flux, water_flux, slope_tapered
-    use i_ARRAYS
     USE MOD_PARTIT
     USE MOD_PARSUP
     use g_CONFIG

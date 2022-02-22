@@ -57,8 +57,9 @@ subroutine muscl_adv_init(twork, partit, mesh)
     
     !___________________________________________________________________________
     nn_size=0
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k)
-!$OMP DO
+    k=0
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n)
+!$OMP DO REDUCTION(max: k)
     do n=1, myDim_nod2D
         ! get number of  neighbouring nodes from sparse stiffness matrix
         ! stiffnes matrix filled up in subroutine init_stiff_mat_ale
@@ -68,21 +69,20 @@ subroutine muscl_adv_init(twork, partit, mesh)
         !                             next value switches to a new row
         ! --> SSH_stiff%rowptr(n+1)-SSH_stiff%rowptr(n) gives maximum number of 
         !     neighbouring nodes within a single row of the sparse matrix
-        k=SSH_stiff%rowptr(n+1)-SSH_stiff%rowptr(n)
-
-!$OMP CRITICAL
-        if (k > nn_size) then
-           nn_size=k ! nnum maximum number of neighbouring nodes
-        end if
-!$OMP END CRITICAL
-
+        k=max(k, SSH_stiff%rowptr(n+1)-SSH_stiff%rowptr(n))
     end do
 !$OMP END DO    
 !$OMP END PARALLEL
+    nn_size=k
     !___________________________________________________________________________
     allocate(mesh%nn_num(myDim_nod2D), mesh%nn_pos(nn_size,myDim_nod2D))
+#ifdef __PGI
+    nn_num => mesh%nn_num(1:myDim_nod2D)
+    nn_pos => mesh%nn_pos(1:nn_size, 1:myDim_nod2D)
+#else
     nn_num(1:myDim_nod2D)            => mesh%nn_num
     nn_pos(1:nn_size, 1:myDim_nod2D) => mesh%nn_pos
+#endif
     ! These are the same arrays that we also use in quadratic reconstruction
     !MOVE IT TO SOMEWHERE ELSE
 !$OMP PARALLEL DO
