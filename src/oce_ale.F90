@@ -130,14 +130,16 @@ end module
 
 module oce_timestep_ale_interface
     interface
-        subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
+        subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         use mod_mesh
         USE MOD_PARTIT
         USE MOD_PARSUP
         use mod_tracer
         use MOD_DYN
+        use MOD_ICE
         integer       , intent(in)            :: n
         type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_ice), intent(inout), target :: ice
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
@@ -1596,11 +1598,11 @@ subroutine update_stiff_mat_ale(partit, mesh)
                 ! on the rhs. So the sign is changed in the expression below.
                 ! npos... sparse matrix indices position of node points elnodes
 #if defined(_OPENMP)
-!                   call omp_set_lock(row) ! it shall be sufficient to block writing into the same row of SSH_stiff
+                   call omp_set_lock  (partit%plock(row)) ! it shall be sufficient to block writing into the same row of SSH_stiff
 #endif
                    SSH_stiff%values(npos)=SSH_stiff%values(npos) + fy*factor
 #if defined(_OPENMP)
-!                   call omp_unset_lock(row)
+                   call omp_unset_lock(partit%plock(row))
 #endif                
             end do ! --> do i=1,2
         end do ! --> do j=1,2 
@@ -1933,7 +1935,6 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     USE MOD_DYN
     use g_comm_auto
     use io_RESTART !!PS
-    use i_arrays !!PS
     use g_forcing_arrays !!PS
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -1941,8 +1942,9 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     type(t_mesh),   intent(inout), target :: mesh
     !___________________________________________________________________________
     integer       :: el(2), enodes(2), n, nz, ed, nzmin, nzmax, uln1, uln2, nln1, nln2
-    real(kind=WP) :: c1, c2, deltaX1, deltaY1, deltaX2, deltaY2, dd, dd1, dddt, cflmax
-    real(kind=WP) :: lcflmax !for OMP realization
+    real(kind=WP) :: deltaX1, deltaY1, deltaX2, deltaY2, dd, dd1, dddt, cflmax
+    ! still to be understood but if you allocate these arrays statically the results will be different:
+    real(kind=WP) :: c1(mesh%nl-1), c2(mesh%nl-1)
     ! --> zlevel with local zstar
     real(kind=WP) :: dhbar_total, dhbar_rest, distrib_dhbar_int
     real(kind=WP), dimension(:), allocatable :: max_dhbar2distr, cumsum_maxdhbar, distrib_dhbar
@@ -1981,7 +1983,8 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     END DO
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ed, enodes, el, deltaX1, deltaY1, nz, nzmin, nzmax, c1, deltaX2, deltaY2, c2)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, enodes, el, deltaX1, deltaY1, nz, nzmin, nzmax, deltaX2, deltaY2, c1, c2)
+!$OMP DO
     do ed=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,ed)   
@@ -1999,34 +2002,36 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
         ! do it with gauss-law: int( div(u_vec)*dV) = int( u_vec * n_vec * dS )
         nzmin = ulevels(el(1))
         nzmax = nlevels(el(1))-1
-        
+! we introduced c1 & c2 as arrays here to avoid deadlocks when in OpenMP mode
         do nz = nzmax, nzmin, -1
             ! --> h * u_vec * n_vec
             ! --> e_vec = (dx,dy), n_vec = (-dy,dx);
             ! --> h * u*(-dy) + v*dx
-            c1=( UV(2,nz,el(1))*deltaX1 - UV(1,nz,el(1))*deltaY1 )*helem(nz,el(1))
+            c1(nz)=( UV(2,nz,el(1))*deltaX1 - UV(1,nz,el(1))*deltaY1 )*helem(nz,el(1))
             ! inflow(outflow) "flux" to control volume of node enodes1
-            Wvel(nz,enodes(1))=Wvel(nz,enodes(1))+c1
             ! is equal to outflow(inflow) "flux" to control volume of node enodes2
-            Wvel(nz,enodes(2))=Wvel(nz,enodes(2))-c1
             if (Fer_GM) then
-                c1=(fer_UV(2,nz,el(1))*deltaX1- &
-                fer_UV(1,nz,el(1))*deltaY1)*helem(nz,el(1))
-#if defined(_OPENMP)
-                call omp_set_lock(partit%plock(enodes(1)))
-#endif
-                fer_Wvel(nz,enodes(1))=fer_Wvel(nz,enodes(1))+c1
-#if defined(_OPENMP)
-                call omp_unset_lock(partit%plock(enodes(1)))
-                call omp_set_lock  (partit%plock(enodes(2)))
-#endif
-                fer_Wvel(nz,enodes(2))=fer_Wvel(nz,enodes(2))-c1
-#if defined(_OPENMP)
-                call omp_unset_lock(partit%plock(enodes(2)))
-#endif
-            end if  
+                c2(nz)=(fer_UV(2,nz,el(1))*deltaX1- fer_UV(1,nz,el(1))*deltaY1)*helem(nz,el(1))
+            end if
         end do
-        
+#if defined(_OPENMP)
+        call omp_set_lock  (partit%plock(enodes(1)))
+#endif
+        Wvel       (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+c1(nzmin:nzmax)
+        if (Fer_GM) then
+           fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+c2(nzmin:nzmax)
+        end if
+#if defined(_OPENMP)
+        call omp_unset_lock(partit%plock(enodes(1)))
+        call omp_set_lock  (partit%plock(enodes(2)))
+#endif
+        Wvel       (nzmin:nzmax, enodes(2))= Wvel    (nzmin:nzmax, enodes(2))-c1(nzmin:nzmax)
+        if (Fer_GM) then
+           fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-c2(nzmin:nzmax)
+        end if
+#if defined(_OPENMP)
+        call omp_unset_lock(partit%plock(enodes(2)))
+#endif
         !_______________________________________________________________________
         ! if ed is not a boundary edge --> calc div(u_vec*h) for every layer
         ! for el(2)
@@ -2034,32 +2039,35 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
             deltaX2=edge_cross_dxdy(3,ed)
             deltaY2=edge_cross_dxdy(4,ed)
             nzmin = ulevels(el(2))
-            nzmax = nlevels(el(2))-1 
-            
+            nzmax = nlevels(el(2))-1   
             do nz = nzmax, nzmin, -1
-                c2=-(UV(2,nz,el(2))*deltaX2 - UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
-                Wvel(nz,enodes(1))=Wvel(nz,enodes(1))+c2
-                Wvel(nz,enodes(2))=Wvel(nz,enodes(2))-c2
+                c1(nz)=-(UV(2,nz,el(2))*deltaX2 - UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
                 if (Fer_GM) then
-                    c2=-(fer_UV(2,nz,el(2))*deltaX2- &
-                    fer_UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
-#if defined(_OPENMP)
-                    call omp_set_lock(partit%plock(enodes(1)))
-#endif
-                    fer_Wvel(nz,enodes(1))=fer_Wvel(nz,enodes(1))+c2
-#if defined(_OPENMP)
-                    call omp_unset_lock(partit%plock(enodes(1)))
-                    call omp_set_lock  (partit%plock(enodes(2)))
-#endif
-                    fer_Wvel(nz,enodes(2))=fer_Wvel(nz,enodes(2))-c2
-#if defined(_OPENMP)
-                    call omp_unset_lock(partit%plock(enodes(2)))
-#endif
-                end if  
+                    c2(nz)=-(fer_UV(2,nz,el(2))*deltaX2-fer_UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+                end if
             end do
+#if defined(_OPENMP)
+            call omp_set_lock  (partit%plock(enodes(1)))
+#endif
+            Wvel       (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+c1(nzmin:nzmax)
+            if (Fer_GM) then
+               fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+c2(nzmin:nzmax)
+            end if
+#if defined(_OPENMP)
+            call omp_unset_lock(partit%plock(enodes(1)))
+            call omp_set_lock  (partit%plock(enodes(2)))
+#endif
+            Wvel       (nzmin:nzmax, enodes(2))= Wvel    (nzmin:nzmax, enodes(2))-c1(nzmin:nzmax)
+            if (Fer_GM) then
+               fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-c2(nzmin:nzmax)
+            end if
+#if defined(_OPENMP)
+            call omp_unset_lock(partit%plock(enodes(2)))
+#endif
         end if
     end do ! --> do ed=1, myDim_edge2D
-!$OMP END PARALLEL DO
+!$OMP END DO
+!$OMP END PARALLEL
     ! |
     ! |
     ! +--> until here Wvel contains the thickness divergence div(u)
@@ -2432,32 +2440,28 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, c1, c2)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax)
     do n=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(n)
         nzmax = nlevels_nod2D(n)-1
         do nz=nzmin,nzmax
-            c1=abs(Wvel(nz,n)  *dt/hnode_new(nz,n))
-            c2=abs(Wvel(nz+1,n)*dt/hnode_new(nz,n))
+            c1(1)=abs(Wvel(nz,n)  *dt/hnode_new(nz,n)) !c1->c1(1) is made for the sake of reproducibility with the master branch (rounding error)
+            c2(1)=abs(Wvel(nz+1,n)*dt/hnode_new(nz,n)) !otherwise just add these terms (c(1) & c(2)) to CFL_z, respectively!
             ! strong condition:
             ! total volume change induced by the vertical motion
             ! no matter, upwind or downwind !
-            CFL_z(nz,  n)=CFL_z(nz,n)+c1
-            CFL_z(nz+1,n)=c2
+            CFL_z(nz,  n)=CFL_z(nz,n)+c1(1)
+            CFL_z(nz+1,n)=            c2(1)
         end do
     end do
 !$OMP END PARALLEL DO
-
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, lcflmax)
-    lcflmax=0.
+cflmax=0.
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n) REDUCTION(max:cflmax)
 !$OMP DO
     do n=1, myDim_nod2D+eDim_nod2D
-       lcflmax=max(lcflmax, maxval(CFL_z(:, n)))
+       cflmax=max(cflmax, maxval(CFL_z(:, n)))
     end do
 !$OMP END DO
-!$OMP CRITICAL
-    cflmax=max(lcflmax, cflmax)
-!$OMP END CRITICAL
 !$OMP END PARALLEL
 
     if (cflmax > 1.0_WP .and. flag_warn_cflz) then
@@ -2494,24 +2498,23 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     ! wsplit_maxcfl=0 means   w_exp  is zero (everything computed implicitly)
     ! wsplit_maxcfl=inf menas w_impl is zero (everything computed explicitly)
     ! a guess for optimal choice of wsplit_maxcfl would be 0.95
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, c1, c2, dd)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, dd)
     do n=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(n)
         nzmax = nlevels_nod2D(n)
         do nz=nzmin,nzmax
-            c1=1.0_WP
-            c2=0.0_WP
+            Wvel_e(nz,n)=Wvel(nz,n)
+            Wvel_i(nz,n)=0.0_WP
             if (dynamics%use_wsplit  .and. (CFL_z(nz, n) > dynamics%wsplit_maxcfl)) then
                 dd=max((CFL_z(nz, n)-dynamics%wsplit_maxcfl), 0.0_WP)/max(dynamics%wsplit_maxcfl, 1.e-12)
-                c1=1.0_WP/(1.0_WP+dd) !explicit part =1. if dd=0.
-                c2=dd    /(1.0_WP+dd) !implicit part =1. if dd=inf
+                Wvel_e(nz,n)=(1.0_WP/(1.0_WP+dd))*Wvel(nz,n) !explicit part =1. if dd=0.
+                Wvel_i(nz,n)=(dd    /(1.0_WP+dd))*Wvel(nz,n) !implicit part =1. if dd=inf
             end if
-            Wvel_e(nz,n)=c1*Wvel(nz,n)
-            Wvel_i(nz,n)=c2*Wvel(nz,n)
         end do
     end do
 !$OMP END PARALLEL DO
 end subroutine vert_vel_ale
+
 !
 !
 !===============================================================================
@@ -2527,6 +2530,8 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     use g_comm_auto
     use g_config, only: which_ale
     use iso_c_binding, only: C_INT, C_DOUBLE
+    use ssh_solve_preconditioner_interface
+    use ssh_solve_cg_interface
     implicit none
 #include "fparms.h"
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -2536,6 +2541,7 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     logical, save        :: lfirst=.true.
     integer(kind=C_INT)  :: n3, reuse, new_values
     integer              :: n
+    
     !___________________________________________________________________________
     ! interface for solver
     interface
@@ -2571,6 +2577,13 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     fillin  => dynamics%solverinfo%fillin
     droptol => dynamics%solverinfo%droptol
     soltol  => dynamics%solverinfo%soltol
+
+    if (.not. dynamics%solverinfo%use_parms) then
+        if (lfirst) call ssh_solve_preconditioner(dynamics%solverinfo, partit, mesh)
+        call ssh_solve_cg(dynamics%d_eta, dynamics%ssh_rhs, dynamics%solverinfo, partit, mesh)
+        lfirst=.false.
+        return
+    end if
 
     !___________________________________________________________________________
     if  (trim(which_ale)=='linfs') then
@@ -2812,18 +2825,18 @@ end subroutine impl_vert_visc_ale
 !
 !
 !===============================================================================
-subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
+subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     use g_config
     use MOD_MESH
     use MOD_TRACER
     use MOD_DYN
+    USE MOD_ICE
     use o_ARRAYS
     use o_PARAM
     USE MOD_PARTIT
     USE MOD_PARSUP
     use g_comm_auto
     use io_RESTART !PS
-    use i_ARRAYS !PS
     use o_mixing_KPP_mod
     use g_cvmix_tke
     use g_cvmix_idemix
@@ -2846,6 +2859,7 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     type(t_tracer), intent(inout), target :: tracers
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
+    type(t_ice)   , intent(inout), target :: ice
     !___________________________________________________________________________
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
     integer           :: node
@@ -2927,20 +2941,20 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
         END DO
 !$OMP END PARALLEL DO
 
-        call mo_convect(partit, mesh)
+        call mo_convect(ice, partit, mesh)
         
     ! use FESOM2.0 tuned pacanowski & philander parameterization for vertical 
     ! mixing     
     else if(mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_PP'//achar(27)//'[0m' 
         call oce_mixing_PP(dynamics, partit, mesh)
-        call mo_convect(partit, mesh)
+        call mo_convect(ice, partit, mesh)
         
     ! use CVMIX KPP (Large at al. 1994) 
     else if(mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_kpp'//achar(27)//'[0m'
-        call calc_cvmix_kpp(dynamics, tracers, partit, mesh)
-        call mo_convect(partit, mesh)
+        call calc_cvmix_kpp(ice, dynamics, tracers, partit, mesh)
+        call mo_convect(ice, partit, mesh)
         
     ! use CVMIX PP (Pacanowski and Philander 1981) parameterisation for mixing
     ! based on Richardson number Ri = N^2/(du/dz)^2, using Brunt Väisälä frequency
@@ -2948,7 +2962,7 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     else if(mix_scheme_nmb==4 .or. mix_scheme_nmb==47) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_pp'//achar(27)//'[0m'
         call calc_cvmix_pp(dynamics, partit, mesh)
-        call mo_convect(partit, mesh)
+        call mo_convect(ice, partit, mesh)
         
     ! use CVMIX TKE (turbulent kinetic energy closure) parameterisation for 
     ! vertical mixing with or without the IDEMIX (dissipation of energy by 
@@ -2957,7 +2971,7 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     else if(mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then    
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tke'//achar(27)//'[0m'
         call calc_cvmix_tke(dynamics, partit, mesh)
-        call mo_convect(partit, mesh)
+        call mo_convect(ice, partit, mesh)
         
     end if     
 
@@ -2976,7 +2990,7 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'
-    call compute_vel_rhs(dynamics, partit, mesh)
+    call compute_vel_rhs(ice, dynamics, partit, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call viscosity_filter'//achar(27)//'[0m'
@@ -3002,7 +3016,10 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     t30=MPI_Wtime() 
     call solve_ssh_ale(dynamics, partit, mesh)
     
-    if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) call relax_zonal_vel(dynamics, partit, mesh)
+    if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) then
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call relax_zonal_vel'//achar(27)//'[0m'
+        call relax_zonal_vel(dynamics, partit, mesh)
+    end if     
     t3=MPI_Wtime() 
 
     ! estimate new horizontal velocity u^(n+1)
@@ -3060,7 +3077,7 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
-    call solve_tracers_ale(dynamics, tracers, partit, mesh)
+    call solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     t8=MPI_Wtime() 
     
     !___________________________________________________________________________
@@ -3071,12 +3088,12 @@ subroutine oce_timestep_ale(n, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! write out global fields for debugging
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call write_step_info'//achar(27)//'[0m'
-    call write_step_info(n,logfile_outfreq, dynamics, tracers, partit, mesh)
+    call write_step_info(n,logfile_outfreq, ice, dynamics, tracers, partit, mesh)
     
     ! check model for blowup --> ! write_step_info and check_blowup require 
     ! togeather around 2.5% of model runtime
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call check_blowup'//achar(27)//'[0m'
-    call check_blowup(n, dynamics, tracers, partit, mesh)
+    call check_blowup(n, ice, dynamics, tracers, partit, mesh)
     t10=MPI_Wtime()
 
     !___________________________________________________________________________

@@ -14,7 +14,6 @@ MODULE o_mixing_KPP_mod
   USE MOD_DYN
   USE o_ARRAYS
   USE g_config
-  USE i_arrays
   USE g_forcing_arrays
   USE g_comm_auto
   USE g_support
@@ -583,7 +582,7 @@ contains
         !!PS IF (bfsfc(node) > 0.0_WP) THEN
         IF (bfsfc(node) > 0.0_WP .and. nzmin==1) THEN
                                           !-> no ekman or monin-obukov when there is cavity  
-           hekman = cekman * ustar(node) / MAX( ABS (coriolis_node(node) ), epsln)
+           hekman = cekman * ustar(node) / MAX( ABS (mesh%coriolis_node(node) ), epsln)
            hmonob = cmonob * ustar(node) * ustar(node) * ustar(node)     &
                 /vonk / (bfsfc(node) + epsln) 
            hlimit = stable(node) * AMIN1( hekman, hmonob )  

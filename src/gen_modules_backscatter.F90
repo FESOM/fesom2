@@ -7,7 +7,7 @@ module g_backscatter
     USE MOD_DYN
 
     !___________________________________________________________________________
-    USE o_ARRAYS, only: bvfreq, coriolis_node
+    USE o_ARRAYS, only: bvfreq
 
     !___________________________________________________________________________
     USE o_param
@@ -350,7 +350,7 @@ module g_backscatter
                     END DO
                     c1=max(c_min, c1/pi) !ca. first baroclinic gravity wave speed limited from below by c_min
                     !Cutoff K_GM depending on (Resolution/Rossby radius) ratio
-                    rosb=rosb+min(c1/max(abs(coriolis_node(elnodes(kk))), f_min), r_max)
+                    rosb=rosb+min(c1/max(abs(mesh%coriolis_node(elnodes(kk))), f_min), r_max)
                 END DO
                 rosb=rosb/3._WP
                 scaling=1._WP/(1._WP+(uke_scaling_factor*reso/rosb))!(4._wp*reso/rosb))
@@ -374,11 +374,11 @@ module g_backscatter
                 len_reg=sqrt(dist_reg(1)**2+dist_reg(2)**2)
                 
                 !if(mype==0) write(*,*) 'len_reg ', len_reg , ' and dist_reg' , dist_reg, ' and ex, ey', ex, ey, ' and a ', a1, a2
-                rosb_array(nz,ed)=rosb_array(nz,ed)/max(abs(sum(coriolis_node(elnodes(:)))), f_min)
+                rosb_array(nz,ed)=rosb_array(nz,ed)/max(abs(sum(mesh%coriolis_node(elnodes(:)))), f_min)
                 !uke_dif(nz, ed)=scaling*(1-exp(-len_reg/300000))*1._8/(1._8+rosb_array(nz,ed)/rosb_dis)!UV_dif(1,ed)
                 uke_dis(nz,ed)=scaling*(1-exp(-len_reg/300000))*1._WP/(1._WP+rosb_array(nz,ed)/rosb_dis)*uke_dis(nz,ed)
                 else
-                rosb_array(nz,ed)=rosb_array(nz,ed)/max(abs(sum(coriolis_node(elnodes(:)))), f_min)
+                rosb_array(nz,ed)=rosb_array(nz,ed)/max(abs(sum(mesh%coriolis_node(elnodes(:)))), f_min)
                 !uke_dif(nz, ed)=scaling*1._8/(1._8+rosb_array(nz,ed)/rosb_dis)!UV_dif(1,ed)
                 uke_dis(nz,ed)=scaling*1._WP/(1._WP+rosb_array(nz,ed)/rosb_dis)*uke_dis(nz,ed)
                 end if

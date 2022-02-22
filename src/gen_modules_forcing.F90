@@ -77,7 +77,8 @@ use o_param
   real(kind=WP), allocatable, dimension(:)         :: chl
   real(kind=WP), allocatable, dimension(:,:)       :: sw_3d
 
-  real(kind=WP), allocatable, dimension(:)         :: thdgr, thdgrsn, flice
+!   real(kind=WP), allocatable, dimension(:)         :: thdgr, thdgrsn
+  real(kind=WP), allocatable, dimension(:)         :: flice
   real(kind=WP), allocatable, dimension(:)         :: olat_heat, osen_heat, olwout
   real(kind=WP), allocatable, dimension(:)         :: real_salt_flux !PS
 

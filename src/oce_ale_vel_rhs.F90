@@ -1,45 +1,44 @@
 
 module compute_vel_rhs_interface
-  interface
-    subroutine compute_vel_rhs(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      type(t_dyn)   , intent(inout), target :: dynamics
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      
-    end subroutine
-  end interface
+    interface
+        subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
+        USE MOD_ICE
+        USE MOD_DYN
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice)   , intent(inout), target :: ice
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
 end module
 
 module momentum_adv_scalar_interface
-  interface
-    subroutine momentum_adv_scalar(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      type(t_dyn)   , intent(inout), target :: dynamics
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      
-    end subroutine
-  end interface
+    interface
+        subroutine momentum_adv_scalar(dynamics, partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_DYN
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
 end module
 
 !
 !
 !_______________________________________________________________________________
-subroutine compute_vel_rhs(dynamics, partit, mesh)
-    use MOD_MESH
+subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
+    USE MOD_ICE
+    USE MOD_DYN
     USE MOD_PARTIT
     USE MOD_PARSUP
-    USE MOD_DYN
-    use o_ARRAYS, only: coriolis, ssh_gp, pgf_x, pgf_y
-    use i_ARRAYS
-    use i_therm_param
+    USE MOD_MESH
+    use o_ARRAYS, only: ssh_gp, pgf_x, pgf_y
     use o_PARAM
     use g_CONFIG
     use g_forcing_param, only: use_virt_salt
@@ -48,6 +47,7 @@ subroutine compute_vel_rhs(dynamics, partit, mesh)
     use g_sbf, only: l_mslp
     use momentum_adv_scalar_interface
     implicit none 
+    type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
@@ -62,18 +62,26 @@ subroutine compute_vel_rhs(dynamics, partit, mesh)
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB, UV_rhs
     real(kind=WP), dimension(:)    , pointer :: eta_n
+    real(kind=WP), dimension(:)    , pointer :: m_ice, m_snow, a_ice
+    real(kind=WP)                  , pointer :: rhoice, rhosno, inv_rhowat
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    UV       =>dynamics%uv(:,:,:)
-    UV_rhs   =>dynamics%uv_rhs(:,:,:)
-    UV_rhsAB =>dynamics%uv_rhsAB(:,:,:)
-    eta_n    =>dynamics%eta_n(:)
-
+    UV        => dynamics%uv(:,:,:)
+    UV_rhs    => dynamics%uv_rhs(:,:,:)
+    UV_rhsAB  => dynamics%uv_rhsAB(:,:,:)
+    eta_n     => dynamics%eta_n(:)
+    m_ice     => ice%data(2)%values(:)
+    m_snow    => ice%data(3)%values(:)
+    rhoice    => ice%thermo%rhoice
+    rhosno    => ice%thermo%rhosno
+    inv_rhowat=> ice%thermo%inv_rhowat
+    
     !___________________________________________________________________________
     use_pice=0
     if (use_floatice .and.  .not. trim(which_ale)=='linfs') use_pice=1
+    if ((toy_ocean)  .and. (trim(which_toy)=="soufflet"))   use_pice=0
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax, elnodes, ff, mm, Fx, Fy, pre, p_ice, p_air, p_eta)
     do elem=1, myDim_elem2D
@@ -95,7 +103,7 @@ subroutine compute_vel_rhs(dynamics, partit, mesh)
         !  p_eta=g*eta_n(elnodes)*(1-theta)        !! this place needs update (1-theta)!!!
         p_eta = g*eta_n(elnodes)   
         
-        ff  = coriolis(elem)*elem_area(elem)
+        ff  = mesh%coriolis(elem)*elem_area(elem)
         !mm=metric_factor(elem)*gg
         
         !___________________________________________________________________________
@@ -143,6 +151,7 @@ subroutine compute_vel_rhs(dynamics, partit, mesh)
         end do
     end do
 !$OMP END PARALLEL DO
+    
     !___________________________________________________________________________
     ! advection
     if (dynamics%momadv_opt==1) then
@@ -168,6 +177,7 @@ subroutine compute_vel_rhs(dynamics, partit, mesh)
         end do
     end do
 !$OMP END PARALLEL DO
+    
     ! =======================  
     ! U_rhs contains all contributions to velocity from old time steps   
     ! =======================
@@ -317,63 +327,63 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
             ! Do not calculate on Halo nodes, as the result will not be used. 
             ! The "if" is cheaper than the avoided computiations.
             if (nod(1) <= myDim_nod2d) then
-                do nz=min(ul1,ul2), max(nl1,nl2)
-                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
 #if defined(_OPENMP)
        call omp_set_lock(partit%plock(nod(1)))
 #endif
+                do nz=min(ul1,ul2), max(nl1,nl2)
+                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
                     UVnode_rhs(1,nz,nod(1)) = UVnode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1) + un2(nz)*UV(1,nz,el2) 
                     UVnode_rhs(2,nz,nod(1)) = UVnode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1) + un2(nz)*UV(2,nz,el2)
+                end do
 #if defined(_OPENMP)
        call omp_unset_lock(partit%plock(nod(1)))
 #endif
-                end do
             endif
             
             ! second edge node
             if (nod(2) <= myDim_nod2d) then
-                do nz=min(ul1,ul2), max(nl1,nl2)
-                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
 #if defined(_OPENMP)
        call omp_set_lock(partit%plock(nod(2)))
 #endif
+                do nz=min(ul1,ul2), max(nl1,nl2)
+                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
                     UVnode_rhs(1,nz,nod(2)) = UVnode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1) - un2(nz)*UV(1,nz,el2)
                     UVnode_rhs(2,nz,nod(2)) = UVnode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1) - un2(nz)*UV(2,nz,el2)
+                end do
 #if defined(_OPENMP)
        call omp_unset_lock(partit%plock(nod(2)))
 #endif
-                end do
             endif
             
         else  ! el2 is not a valid element --> ed is a boundary edge, there is only the contribution from el1
             ! first edge node
             if (nod(1) <= myDim_nod2d) then
-                do nz=ul1, nl1
-                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
 #if defined(_OPENMP)
        call omp_set_lock(partit%plock(nod(1)))
 #endif
+                do nz=ul1, nl1
+                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
                     UVnode_rhs(1,nz,nod(1)) = UVnode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1)
                     UVnode_rhs(2,nz,nod(1)) = UVnode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1)
+                end do ! --> do nz=ul1, nl1
 #if defined(_OPENMP)
        call omp_unset_lock(partit%plock(nod(1)))
 #endif
-                end do ! --> do nz=ul1, nl1
             endif 
             
             ! second edge node
             if  (nod(2) <= myDim_nod2d) then
-                do nz=ul1, nl1
-                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
 #if defined(_OPENMP)
        call omp_set_lock(partit%plock(nod(2)))
 #endif
+                do nz=ul1, nl1
+                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
                     UVnode_rhs(1,nz,nod(2)) = UVnode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1)
                     UVnode_rhs(2,nz,nod(2)) = UVnode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1)
+                end do ! --> do nz=ul1, nl1
 #if defined(_OPENMP)
        call omp_unset_lock(partit%plock(nod(2)))
 #endif
-                end do ! --> do nz=ul1, nl1
             endif
         endif ! --> if (el2>0) then
     end do ! --> do ed=1, myDim_edge2D

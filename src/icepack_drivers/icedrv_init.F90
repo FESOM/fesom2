@@ -910,7 +910,7 @@
 
 !=======================================================================
 
-      module subroutine init_icepack(tracer, mesh)
+      module subroutine init_icepack(ice, tracer, mesh)
 
           use icepack_intfc, only: icepack_init_itd
           use icepack_intfc, only: icepack_init_itd_hist
@@ -918,6 +918,7 @@
           use icepack_intfc, only: icepack_init_fsd_bounds
           use icepack_intfc, only: icepack_warnings_flush
           use mod_mesh
+          use mod_ice
           use mod_tracer
     
           implicit none
@@ -930,6 +931,7 @@
           character(len=*), parameter :: subname='(icedrv_initialize)'
           type(t_mesh),        intent(in), target :: mesh
           type(t_tracer_data), intent(in), target :: tracer
+          type(t_ice), intent(inout), target :: ice
           call icepack_query_parameters(wave_spec_out=wave_spec)
           call icepack_query_tracer_flags(tr_aero_out=tr_aero)
           call icepack_query_tracer_flags(tr_zaero_out=tr_zaero)
@@ -980,7 +982,7 @@
           endif
           call init_fsd
 
-          call fesom_to_icepack(mesh)    
+          call fesom_to_icepack(ice, mesh)    
           call init_state(tracer)   ! initialize the ice state
           call init_history_therm   ! initialize thermo history variables
 

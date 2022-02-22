@@ -68,11 +68,13 @@ type(t_tracer_data), allocatable            :: data(:)
 type(t_tracer_work)                         :: work
 ! general options for all tracers (can be moved to T_TRACER is needed)
 ! bharmonic diffusion for tracers. We recommend to use this option in very high resolution runs (Redi is generally off there).
-logical                       :: smooth_bh_tra = .false.
-real(kind=WP)                 :: gamma0_tra    = 0.0005
-real(kind=WP)                 :: gamma1_tra    = 0.0125
-real(kind=WP)                 :: gamma2_tra    = 0.
-logical                       :: i_vert_diff   = .true.
+! we keep these tracer characteristics for each tracer individually (contained in T_TRACER_DATA), although in
+! the namelist.tra they are define unique for all tracers.
+!logical                       :: smooth_bh_tra = .false.
+!real(kind=WP)                 :: gamma0_tra    = 0.0005
+!real(kind=WP)                 :: gamma1_tra    = 0.0125
+!real(kind=WP)                 :: gamma2_tra    = 0.
+!logical                       :: i_vert_diff   = .true.
 
 contains
 procedure WRITE_T_TRACER
@@ -193,11 +195,11 @@ subroutine WRITE_T_TRACER(tracer, unit, iostat, iomsg)
        write(unit, iostat=iostat, iomsg=iomsg) tracer%data(i)
     end do
     write(unit, iostat=iostat, iomsg=iomsg)    tracer%work
-    write(unit, iostat=iostat, iomsg=iomsg)    tracer%smooth_bh_tra
-    write(unit, iostat=iostat, iomsg=iomsg)    tracer%gamma0_tra
-    write(unit, iostat=iostat, iomsg=iomsg)    tracer%gamma1_tra
-    write(unit, iostat=iostat, iomsg=iomsg)    tracer%gamma2_tra
-    write(unit, iostat=iostat, iomsg=iomsg)    tracer%i_vert_diff
+!   write(unit, iostat=iostat, iomsg=iomsg)    tracer%smooth_bh_tra
+!   write(unit, iostat=iostat, iomsg=iomsg)    tracer%gamma0_tra
+!   write(unit, iostat=iostat, iomsg=iomsg)    tracer%gamma1_tra
+!   write(unit, iostat=iostat, iomsg=iomsg)    tracer%gamma2_tra
+!   write(unit, iostat=iostat, iomsg=iomsg)    tracer%i_vert_diff
 end subroutine WRITE_T_TRACER
 
 ! Unformatted reading for T_TRACER
@@ -211,17 +213,17 @@ subroutine READ_T_TRACER(tracer, unit, iostat, iomsg)
 
     read(unit, iostat=iostat, iomsg=iomsg)    tracer%num_tracers
 !   write(*,*) 'number of tracers to read: ', tracer%num_tracers
-    allocate(tracer%data(tracer%num_tracers))
+    if (.not. allocated(tracer%data)) allocate(tracer%data(tracer%num_tracers))
     do i=1, tracer%num_tracers
        read(unit, iostat=iostat, iomsg=iomsg) tracer%data(i)
 !      write(*,*) 'tracer info:', tracer%data(i)%ID, TRIM(tracer%data(i)%tra_adv_hor), TRIM(tracer%data(i)%tra_adv_ver), TRIM(tracer%data(i)%tra_adv_lim)
     end do
     read(unit, iostat=iostat, iomsg=iomsg)    tracer%work
-    read(unit, iostat=iostat, iomsg=iomsg)    tracer%smooth_bh_tra
-    read(unit, iostat=iostat, iomsg=iomsg)    tracer%gamma0_tra
-    read(unit, iostat=iostat, iomsg=iomsg)    tracer%gamma1_tra
-    read(unit, iostat=iostat, iomsg=iomsg)    tracer%gamma2_tra
-    read(unit, iostat=iostat, iomsg=iomsg)    tracer%i_vert_diff
+!   read(unit, iostat=iostat, iomsg=iomsg)    tracer%smooth_bh_tra
+!   read(unit, iostat=iostat, iomsg=iomsg)    tracer%gamma0_tra
+!   read(unit, iostat=iostat, iomsg=iomsg)    tracer%gamma1_tra
+!   read(unit, iostat=iostat, iomsg=iomsg)    tracer%gamma2_tra
+!   read(unit, iostat=iostat, iomsg=iomsg)    tracer%i_vert_diff
 end subroutine READ_T_TRACER
 end module MOD_TRACER
 !==========================================================

@@ -16,6 +16,7 @@ TYPE SPARSE_MATRIX
      integer(int32), allocatable,   dimension(:) :: rowptr
      integer(int32), allocatable,   dimension(:) :: colind_loc
      integer(int32), allocatable,   dimension(:) :: rowptr_loc
+     real(kind=WP),  allocatable,   dimension(:) :: pr_values !preconditioner values
 END TYPE SPARSE_MATRIX
 
 TYPE T_MESH
@@ -82,6 +83,11 @@ real(kind=WP), allocatable, dimension(:)    :: cavity_depth
 
 
 real(kind=WP), allocatable, dimension(:,:)  :: cavity_nrst_cavlpnt_xyz
+
+!
+!
+!___coriolis force______________________________________________________________
+real(kind=WP), allocatable, dimension(:)    :: coriolis_node, coriolis
 
 !
 !
@@ -229,6 +235,9 @@ subroutine write_t_mesh(mesh, unit, iostat, iomsg)
     call write_bin_array(mesh%zbar_n_srf,              unit, iostat, iomsg)
     call write_bin_array(mesh%zbar_e_srf,              unit, iostat, iomsg)
 !   call write_bin_array(mesh%representative_checksum, unit, iostat, iomsg)
+    call write_bin_array(mesh%coriolis,                unit, iostat, iomsg)
+    call write_bin_array(mesh%coriolis_node,           unit, iostat, iomsg)
+
 end subroutine write_t_mesh
 
 ! Unformatted reading for t_mesh
@@ -323,6 +332,9 @@ subroutine read_t_mesh(mesh, unit, iostat, iomsg)
     call read_bin_array(mesh%zbar_n_srf,              unit, iostat, iomsg)
     call read_bin_array(mesh%zbar_e_srf,              unit, iostat, iomsg)
 !   call read_bin_array(mesh%representative_checksum, unit, iostat, iomsg)
+    call read_bin_array(mesh%coriolis,                unit, iostat, iomsg)
+    call read_bin_array(mesh%coriolis_node,           unit, iostat, iomsg)
+    
 end subroutine read_t_mesh
 end module MOD_MESH
 !==========================================================

@@ -2,14 +2,13 @@
 !           so they can be reused after fesom_init
 module fesom_main_storage_module
   USE MOD_MESH
+  USE MOD_ICE
   USE MOD_TRACER
   USE MOD_PARTIT
   USE MOD_PARSUP
   USE MOD_DYN
   USE o_ARRAYS
   USE o_PARAM
-  USE i_PARAM
-  use i_ARRAYS
   use g_clock
   use g_config
   use g_comm_auto
@@ -44,6 +43,7 @@ module fesom_main_storage_module
   type :: fesom_main_storage_type
 
     integer           :: n, from_nstep, offset, row, i, provided
+    integer           :: which_readr ! read which restart files (0=netcdf, 1=core dump,2=dtype)
     integer, pointer  :: mype, npes, MPIerr, MPI_COMM_FESOM
     real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
     real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
@@ -56,6 +56,7 @@ module fesom_main_storage_module
     type(t_tracer) tracers
     type(t_dyn)    dynamics
     type(t_partit) partit
+    type(t_ice)    ice
 
 
     character(LEN=256)               :: dump_dir, dump_filename
@@ -63,6 +64,7 @@ module fesom_main_storage_module
     type(t_mesh)   mesh_copy
     type(t_tracer) tracers_copy
     type(t_dyn)    dynamics_copy
+    type(t_ice)    ice_copy
 
     character(LEN=MPI_MAX_LIBRARY_VERSION_STRING) :: mpi_version_txt
     integer mpi_version_len
@@ -173,11 +175,20 @@ contains
 
         if (f%mype==0) f%t4=MPI_Wtime()
         if (use_ice) then 
-            call ice_setup(f%tracers, f%partit, f%mesh)
-            ice_steps_since_upd = ice_ave_steps-1
-            ice_update=.true.
-            if (f%mype==0) write(*,*) 'EVP scheme option=', whichEVP
+            if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_setup'//achar(27)//'[0m'
+            call ice_setup(f%ice, f%tracers, f%partit, f%mesh)
+            f%ice%ice_steps_since_upd = f%ice%ice_ave_steps-1
+            f%ice%ice_update=.true.
+            if (f%mype==0) write(*,*) 'EVP scheme option=', f%ice%whichEVP
+        else 
+            ! create a dummy ice derived type with only a_ice, m_ice, m_snow and 
+            ! uvice since oce_timesteps still needs in moment
+            ! ice as an input for mo_convect(ice, partit, mesh), call 
+            ! compute_vel_rhs(ice, dynamics, partit, mesh),  
+            ! call write_step_info(...) and call check_blowup(...)
+            call ice_init_toyocean_dummy(f%ice, f%partit, f%mesh)
         endif
+        
         if (f%mype==0) f%t5=MPI_Wtime()
         call compute_diagnostics(0, f%dynamics, f%tracers, f%partit, f%mesh) ! allocate arrays for diagnostic
 #if defined (__oasis)
@@ -190,28 +201,22 @@ contains
         ! Setup icepack
         !=====================
         if (f%mype==0) write(*,*) 'Icepack: reading namelists from namelist.icepack'
-        call set_icepack(f%partit)
+        call set_icepack(f%ice, f%partit)
         call alloc_icepack
-        call init_icepack(f%tracers%data(1), f%mesh)
+        call init_icepack(f%ice, f%tracers%data(1), f%mesh)
         if (f%mype==0) write(*,*) 'Icepack: setup complete'
 #endif
         call clock_newyear                        ! check if it is a new year
         if (f%mype==0) f%t6=MPI_Wtime()
         !___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
-        ! The interface to the restart module is made via call restart !
-        ! The inputs are: istep, l_write, l_create
-        ! if istep is not zero it will be decided whether restart shall be written
-        ! if l_write  is TRUE the restart will be forced
-        ! if l_read the restart will be read
-        ! as an example, for reading restart one does: call restart(0, .false., .false., .true., tracers, partit, mesh)
-        call restart(0, .false., r_restart, f%dynamics, f%tracers, f%partit, f%mesh) ! istep, l_write, l_read
+        call restart(0, r_restart, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         if (f%mype==0) f%t7=MPI_Wtime()
         ! store grid information into netcdf file
         if (.not. r_restart) call write_mesh_info(f%partit, f%mesh)
 
         !___IF RESTART WITH ZLEVEL OR ZSTAR IS DONE, ALSO THE ACTUAL LEVELS AND ____
         !___MIDDEPTH LEVELS NEEDS TO BE CALCULATET AT RESTART_______________________
-        if (r_restart) then
+        if (r_restart .and. .not. f%which_readr==2) then
             call restart_thickness_ale(f%partit, f%mesh)
         end if
         if (f%mype==0) then
@@ -287,7 +292,6 @@ contains
     use fesom_main_storage_module
     integer, intent(in) :: current_nsteps 
     ! EO parameters
-
     integer n
 
     !=====================
@@ -334,34 +338,34 @@ contains
         if(use_ice) then
             !___compute fluxes from ocean to ice________________________________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ocean2ice(n)'//achar(27)//'[0m'
-            call ocean2ice(f%dynamics, f%tracers, f%partit, f%mesh)
+            call ocean2ice(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
             
             !___compute update of atmospheric forcing____________________________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call update_atm_forcing(n)'//achar(27)//'[0m'
             f%t0_frc = MPI_Wtime()
-            call update_atm_forcing(n, f%tracers, f%partit, f%mesh)
+            call update_atm_forcing(n, f%ice, f%tracers, f%partit, f%mesh)
             f%t1_frc = MPI_Wtime()       
             !___compute ice step________________________________________________
-            if (ice_steps_since_upd>=ice_ave_steps-1) then
-                ice_update=.true.
-                ice_steps_since_upd = 0
+            if (f%ice%ice_steps_since_upd>=f%ice%ice_ave_steps-1) then
+                f%ice%ice_update=.true.
+                f%ice%ice_steps_since_upd = 0
             else
-                ice_update=.false.
-                ice_steps_since_upd=ice_steps_since_upd+1
+                f%ice%ice_update=.false.
+                f%ice%ice_steps_since_upd=f%ice%ice_steps_since_upd+1
             endif
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_timestep(n)'//achar(27)//'[0m'
-            if (ice_update) call ice_timestep(n, f%partit, f%mesh)  
+            if (f%ice%ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh)  
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
-            call oce_fluxes_mom(f%dynamics, f%partit, f%mesh) ! momentum only
-            call oce_fluxes(f%dynamics, f%tracers, f%partit, f%mesh)
+            call oce_fluxes_mom(f%ice, f%dynamics, f%partit, f%mesh) ! momentum only
+            call oce_fluxes(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         end if
         call before_oce_step(f%dynamics, f%tracers, f%partit, f%mesh) ! prepare the things if required
         f%t2 = MPI_Wtime()
         
         !___model ocean step____________________________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_timestep_ale'//achar(27)//'[0m'
-        call oce_timestep_ale(n, f%dynamics, f%tracers, f%partit, f%mesh)
+        call oce_timestep_ale(n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
 
         f%t3 = MPI_Wtime()
         !___compute energy diagnostics..._______________________________________
@@ -371,10 +375,10 @@ contains
         f%t4 = MPI_Wtime()
         !___prepare output______________________________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
-        call output (n, f%dynamics, f%tracers, f%partit, f%mesh)
+        call output (n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
 
         f%t5 = MPI_Wtime()
-        call restart(n, .false., .false., f%dynamics, f%tracers, f%partit, f%mesh)
+        call restart(n, .false., f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         f%t6 = MPI_Wtime()
         
         f%rtime_fullice       = f%rtime_fullice       + f%t2 - f%t1
@@ -394,6 +398,7 @@ contains
     real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
 
     call finalize_output()
+    call finalize_restart()
 
     !___FINISH MODEL RUN________________________________________________________
 
@@ -428,30 +433,38 @@ contains
     call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime,  14, MPI_REAL, MPI_MIN, f%MPI_COMM_FESOM, f%MPIerr)
 
     if (f%mype==0) then
-        write(*,*) '___MODEL RUNTIME mean, min, max per task [seconds]________________________'
-        write(*,*) '  runtime ocean:',mean_rtime(1), min_rtime(1), max_rtime(1)
-        write(*,*) '    > runtime oce. mix,pres. :',mean_rtime(2), min_rtime(2), max_rtime(2)
-        write(*,*) '    > runtime oce. dyn. u,v,w:',mean_rtime(3), min_rtime(3), max_rtime(3)
-        write(*,*) '    > runtime oce. dyn. ssh  :',mean_rtime(4), min_rtime(4), max_rtime(4)
-        write(*,*) '        > runtime oce. solve ssh:',mean_rtime(5), min_rtime(5), max_rtime(5)
-        write(*,*) '    > runtime oce. GM/Redi   :',mean_rtime(6), min_rtime(6), max_rtime(6)
-        write(*,*) '    > runtime oce. tracer    :',mean_rtime(7), min_rtime(7), max_rtime(7)
-        write(*,*) '  runtime ice  :',mean_rtime(10), min_rtime(10), max_rtime(10)
-        write(*,*) '    > runtime ice step :',mean_rtime(8), min_rtime(8), max_rtime(8)
-        write(*,*) '  runtime diag:   ', mean_rtime(11), min_rtime(11), max_rtime(11)
-        write(*,*) '  runtime output: ', mean_rtime(12), min_rtime(12), max_rtime(12)
-        write(*,*) '  runtime restart:', mean_rtime(13), min_rtime(13), max_rtime(13)
-        write(*,*) '  runtime forcing:', mean_rtime(14), min_rtime(14), max_rtime(14)
-        write(*,*) '  runtime total (ice+oce):',mean_rtime(9), min_rtime(9), max_rtime(9)
+        41 format (a35,a10,2a15) !Format for table heading
+        42 format (a30,3f15.4)   !Format for table content
+
+        print 41, '___MODEL RUNTIME per task [seconds]','_____mean_','___________min_', '___________max_'
+        print 42, '  runtime ocean:              ',    mean_rtime(1),     min_rtime(1),      max_rtime(1)
+        print 42, '    > runtime oce. mix,pres. :',    mean_rtime(2),     min_rtime(2),      max_rtime(2)
+        print 42, '    > runtime oce. dyn. u,v,w:',    mean_rtime(3),     min_rtime(3),      max_rtime(3)
+        print 42, '    > runtime oce. dyn. ssh  :',    mean_rtime(4),     min_rtime(4),      max_rtime(4)
+        print 42, '    > runtime oce. solve ssh :',    mean_rtime(5),     min_rtime(5),      max_rtime(5)
+        print 42, '    > runtime oce. GM/Redi   :',    mean_rtime(6),     min_rtime(6),      max_rtime(6)
+        print 42, '    > runtime oce. tracer    :',    mean_rtime(7),     min_rtime(7),      max_rtime(7)
+        print 42, '  runtime ice  :              ',    mean_rtime(10),    min_rtime(10),     max_rtime(10)
+        print 42, '    > runtime ice step :      ',    mean_rtime(8),     min_rtime(8),      max_rtime(8)
+        print 42, '  runtime diag:               ',    mean_rtime(11),    min_rtime(11),     max_rtime(11)
+        print 42, '  runtime output:             ',    mean_rtime(12),    min_rtime(12),     max_rtime(12)
+        print 42, '  runtime restart:            ',    mean_rtime(13),    min_rtime(13),     max_rtime(13)
+        print 42, '  runtime forcing:            ',    mean_rtime(14),    min_rtime(14),     max_rtime(14)
+        print 42, '  runtime total (ice+oce):    ',    mean_rtime(9),     min_rtime(9),      max_rtime(9)
+
+        43 format (a33,i15)        !Format Ncores
+        44 format (a33,i15)        !Format OMP threads
+        45 format (a33,f15.4,a4)   !Format runtime
+
         write(*,*)
-        write(*,*) '============================================'
-        write(*,*) '=========== BENCHMARK RUNTIME =============='
-        write(*,*) '    Number of cores :    ',f%npes
+        write(*,*) '======================================================'
+        write(*,*) '================ BENCHMARK RUNTIME ==================='
+        print 43, '    Number of cores :            ',f%npes
 #if defined(_OPENMP)
-        write(*,*) '    Max OpenMP threads : ',OMP_GET_MAX_THREADS()
+        print 44, '    Max OpenMP threads :         ',OMP_GET_MAX_THREADS()
 #endif
-        write(*,*) '    Runtime for all timesteps :  ',f%runtime_alltimesteps,' sec'
-        write(*,*) '============================================'
+        print 45, '    Runtime for all timesteps :  ',f%runtime_alltimesteps,' sec'
+        write(*,*) '======================================================'
         write(*,*)
     end if    
 !   call clock_finish  

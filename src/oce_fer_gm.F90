@@ -61,7 +61,7 @@ subroutine fer_solve_Gamma(partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmax, nzmin, zinv1,zinv2, zinv, m, r, a, b, c, cp, tp, zbar_n, Z_n)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmax, nzmin, zinv1,zinv2, zinv, m, r, a, b, c, cp, tp, tr, zbar_n, Z_n)
 !$OMP DO
     DO n=1,myDim_nod2D
         tr=>fer_gamma(:,:,n)
@@ -215,7 +215,7 @@ end subroutine fer_gamma2vel
 subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
     USE MOD_MESH
     USE o_PARAM
-    USE o_ARRAYS, ONLY: fer_c, fer_k, fer_scal, Ki, bvfreq, MLD1_ind, neutral_slope, coriolis_node
+    USE o_ARRAYS, ONLY: fer_c, fer_k, fer_scal, Ki, bvfreq, MLD1_ind, neutral_slope
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE g_CONFIG
@@ -257,7 +257,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
             !___________________________________________________________________
             ! Cutoff K_GM depending on (Resolution/Rossby radius) ratio
             if (scaling_Rossby) then
-                rosb=min(c1/max(abs(coriolis_node(n)), f_min), r_max)
+                rosb=min(c1/max(abs(mesh%coriolis_node(n)), f_min), r_max)
                 rr_ratio=min(reso/rosb, 5._WP)
                 scaling=1._WP/(1._WP+exp(-(rr_ratio-x0)/sigma))
             end if
