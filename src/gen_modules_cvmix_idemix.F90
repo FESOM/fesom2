@@ -59,12 +59,15 @@ module g_cvmix_idemix
     
     ! filelocation for idemix surface forcing
     character(MAX_PATH):: idemix_surforc_file = './fourier_smooth_2005_cfsr_inert_rgrid.nc'
-
+    character(MAX_PATH):: idemix_surforc_vname= 'var706'
+    
     ! filelocation for idemix bottom forcing
     character(MAX_PATH):: idemix_botforc_file = './tidal_energy_gx1v6_20090205_rgrid.nc'
+    character(MAX_PATH):: idemix_botforc_vname= 'wave_dissipation'
 
     namelist /param_idemix/ idemix_tau_v, idemix_tau_h, idemix_gamma, idemix_jstar, idemix_mu0, idemix_n_hor_iwe_prop_iter, &
-                            idemix_sforcusage, idemix_surforc_file, idemix_botforc_file
+                            idemix_sforcusage, idemix_surforc_file, idemix_surforc_vname, &
+                            idemix_botforc_vname, idemix_botforc_file
                             
                             
     
@@ -220,7 +223,7 @@ module g_cvmix_idemix
         inquire(file=trim(idemix_surforc_file),exist=file_exist) 
         if (file_exist) then
             if (mype==0) write(*,*) ' --> read IDEMIX near inertial wave surface forcing'
-            call read_other_NetCDF(idemix_surforc_file, 'var706', 1, forc_iw_surface_2D, .true., mesh) 
+            call read_other_NetCDF(idemix_surforc_file, idemix_surforc_vname, 1, forc_iw_surface_2D, .true., mesh) 
             ! only 20% of the niw-input are available to penetrate into the deeper ocean
             forc_iw_surface_2D = forc_iw_surface_2D/density_0 * idemix_sforcusage 
             
@@ -243,10 +246,9 @@ module g_cvmix_idemix
         inquire(file=trim(idemix_surforc_file),exist=file_exist) 
         if (file_exist) then
             if (mype==0) write(*,*) ' --> read IDEMIX near tidal bottom forcing'
-            call read_other_NetCDF(idemix_botforc_file, 'wave_dissipation', 1, forc_iw_bottom_2D, .true., mesh) 
+            call read_other_NetCDF(idemix_botforc_file, idemix_botforc_vname, 1, forc_iw_bottom_2D, .true., mesh) 
             ! convert from W/m^2 to m^3/s^3
             forc_iw_bottom_2D  = forc_iw_bottom_2D/density_0
-            
         else
             if (mype==0) then
                 write(*,*) '____________________________________________________________________'
