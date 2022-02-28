@@ -29,7 +29,7 @@ logfile_outfreq=960     !in logfile info. output frequency, # steps
 /
 
 &ale_def
-which_ALE='zstar'       ! 'linfs','zlevel', 'zstar'
+which_ALE='linfs'       ! 'linfs','zlevel', 'zstar'
 use_partial_cell=.true.
 /
 
