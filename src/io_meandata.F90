@@ -725,6 +725,7 @@ subroutine write_mean(entry, entry_index)
   integer tag
   integer                       :: i, size1, size2, size_gen, size_lev, order
   integer                       :: c, lev
+  integer mpierr
 
 
   ! Serial output implemented so far
@@ -744,7 +745,7 @@ subroutine write_mean(entry, entry_index)
      do lev=1, size1
 #ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
         ! aleph cray-mpich workaround
-        call MPI_Barrier(entry%comm, MPIERR)
+        call MPI_Barrier(entry%comm, mpierr)
 #endif
        if(.not. entry%is_elem_based) then
          call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
@@ -768,7 +769,7 @@ subroutine write_mean(entry, entry_index)
      do lev=1, size1
 #ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
         ! aleph cray-mpich workaround
-        call MPI_Barrier(entry%comm, MPIERR)
+        call MPI_Barrier(entry%comm, mpierr)
 #endif
        if(.not. entry%is_elem_based) then
          call gather_real4_nod2D (entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
