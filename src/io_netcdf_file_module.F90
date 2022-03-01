@@ -205,13 +205,15 @@ contains
     character(len=*), intent(in) :: att_text
     ! EO parameters
     type(att_type_wrapper), allocatable :: tmparr(:)
+    type(att_type_text) att
 
     allocate( tmparr(size(this%vars(varindex)%atts)+1) )
     tmparr(1:size(this%vars(varindex)%atts)) = this%vars(varindex)%atts
     deallocate(this%vars(varindex)%atts)
     call move_alloc(tmparr, this%vars(varindex)%atts)
     
-    this%vars(varindex)%atts( size(this%vars(varindex)%atts) )%it = att_type_text(name=att_name, text=att_text)
+    att = att_type_text(name=att_name, text=att_text)
+    allocate( this%vars(varindex)%atts( size(this%vars(varindex)%atts) )%it, source=att )
   end subroutine
 
 
@@ -222,13 +224,15 @@ contains
     integer, intent(in) :: att_val
     ! EO parameters
     type(att_type_wrapper), allocatable :: tmparr(:)
+    type(att_type_int) att
     
     allocate( tmparr(size(this%vars(varindex)%atts)+1) )
     tmparr(1:size(this%vars(varindex)%atts)) = this%vars(varindex)%atts
     deallocate(this%vars(varindex)%atts)
     call move_alloc(tmparr, this%vars(varindex)%atts)
     
-    this%vars(varindex)%atts( size(this%vars(varindex)%atts) )%it = att_type_int(name=att_name, val=att_val)
+    att = att_type_int(name=att_name, val=att_val)
+    allocate( this%vars(varindex)%atts( size(this%vars(varindex)%atts) )%it, source=att )
   end subroutine
   
   
