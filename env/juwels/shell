@@ -15,7 +15,7 @@ export TMPDIR=/tmp
 export FC=mpifort
 export F77=mpifort
 export MPIFC=mpifort
-export FCFLAGS=-free
+#export FCFLAGS=-free
 export CC=mpicc
 export CXX=mpic++
 
