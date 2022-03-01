@@ -151,7 +151,7 @@ contains
 
     ! assume the vars array is allocated
     allocate( tmparr(size(this%vars)+1) )
-    tmparr(1:size(this%vars)) = this%vars
+    tmparr(1:size(this%vars)) = this%vars(:)
     deallocate(this%vars)
     call move_alloc(tmparr, this%vars)
     
