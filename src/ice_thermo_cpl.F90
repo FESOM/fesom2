@@ -133,15 +133,6 @@ subroutine thermodynamics(mesh)
      end if
 
 #if defined (__oifs)
-     !---- different lead closing parameter for NH and SH
-     call r2g(geolon, geolat, coord_nod2d(1,inod), coord_nod2d(2,inod))
-     if (geolat.lt.0.) then
-        h0min = 1.0
-        h0max = 1.5
-     else
-        h0min = 0.5
-        h0max = 1.5
-     endif
      !---- For AWI-CM3 we calculate ice surface temp and albedo in fesom,
      ! then send those to OpenIFS where they are used to calucate the 
      ! energy fluxes ---!
@@ -525,7 +516,7 @@ contains
       nh_winter_reduction = 0.0_WP
   else
       melt_pool_alb_reduction = 0.20_WP
-      nh_winter_reduction = 0.06_WP
+      nh_winter_reduction = 0.0_WP
   endif
   if (h>0.0_WP) then
      if (t<273.15_WP) then         ! freezing condition    
