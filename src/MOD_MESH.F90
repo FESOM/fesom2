@@ -136,7 +136,8 @@ real(kind=WP), allocatable,dimension(:)     :: zbar_e_srf
 character(:), allocatable :: representative_checksum
 
 contains
-   procedure write_t_mesh
+  private
+  procedure write_t_mesh
   procedure read_t_mesh
   generic :: write(unformatted) => write_t_mesh
   generic :: read(unformatted)  => read_t_mesh

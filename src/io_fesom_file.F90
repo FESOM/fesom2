@@ -371,7 +371,7 @@ contains
 
     level_diminfo = obtain_diminfo(this, m_nod2d)
    
-    external_local_data_ptr(1:1,1:size(local_data)) => local_data
+    external_local_data_ptr(1:1,1:size(local_data)) => local_data(:)
     call specify_variable(this, name, [level_diminfo%idx, this%time_dimidx], level_diminfo%len, external_local_data_ptr, .false., longname, units)    
   end subroutine
 
@@ -404,7 +404,7 @@ contains
 
     level_diminfo = obtain_diminfo(this, m_elem2d)
 
-    external_local_data_ptr(1:1,1:size(local_data)) => local_data
+    external_local_data_ptr(1:1,1:size(local_data)) => local_data(:)
     call specify_variable(this, name, [level_diminfo%idx, this%time_dimidx], level_diminfo%len, external_local_data_ptr, .true., longname, units)    
   end subroutine
 
