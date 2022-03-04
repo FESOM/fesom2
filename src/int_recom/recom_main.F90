@@ -274,7 +274,7 @@ subroutine bio_fluxes(mesh)
 !  end if
 
   ! Alkalinity restoring to climatology
-
+  if (.not. restore_alkalinity) return
   do n=1, myDim_nod2D+eDim_nod2D
      relax_alk(n)=surf_relax_Alk*(Alk_surf(n)-tr_arr(1,n,2+ialk)) ! 1 temp, 2 salt
   end do
