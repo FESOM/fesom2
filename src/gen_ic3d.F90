@@ -351,9 +351,9 @@ CONTAINS
          iost = nf_inq_varid(ncid, varname, id_data)
          iost = nf_inq_var_fill(ncid, id_data, NO_FILL, FILL_VALUE) ! FillValue defined?
          if (NO_FILL==1) then
-            print *, 'No _FillValue is set in ', filename, ', trying dummy =', dummy, FILL_VALUE
+            print *, 'No _FillValue is set in ', trim(filename), ', trying dummy =', dummy, FILL_VALUE
          else
-            print *, 'The FillValue in ', filename, ' is set to ', FILL_VALUE ! should set dummy accordingly
+            print *, 'The FillValue in ', trim(filename), ' is set to ', FILL_VALUE ! should set dummy accordingly
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
