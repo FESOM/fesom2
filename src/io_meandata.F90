@@ -101,6 +101,7 @@ subroutine ini_mean_io(mesh)
   use diagnostics
   use i_PARAM, only: whichEVP
   use g_config, only : lwiso !---wiso-code
+  use g_forcing_param, only: use_landice_water, use_iceberg_water !fwf-code, iceberg-fwf-code
   implicit none
   integer                   :: i, j
   integer, save             :: nm_io_unit  = 103       ! unit to open namelist file, skip 100-102 for cray
@@ -206,8 +207,16 @@ CASE ('h2o16_ice ')
 
 !---fwf-code-begin
 CASE ('landice   ')
+  if(use_landice_water) then
     call def_stream(nod2D,  myDim_nod2D,  'landice',      'freshwater flux',    'm/s',    runoff_landice,    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+  end if
 !---fwf-code-end
+!---iceberg-fwf-code-begin
+CASE ('ib_fwf    ')
+  if(use_iceberg_water) then
+    call def_stream(nod2D,  myDim_nod2D,  'ib_fwf',      'iceberg discharge',    'm/s',    runoff_iceberg,    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+  end if
+!---iceberg-fwf-code-end
 
 
 !___________________________________________________________________________________________________________________________________

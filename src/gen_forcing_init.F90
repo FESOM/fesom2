@@ -165,10 +165,18 @@ subroutine forcing_array_setup(mesh)
   Tair_t=0.0_WP
   shum_t=0.0_WP
 
+!---fwf-code---begin
   if(use_landice_water) then
     allocate(runoff_landice(n2))
     runoff_landice=0.0_WP
   end if
+!---fwf-code---end
+!---iceberg_fwf-code---begin
+  if(use_iceberg_water) then
+    allocate(runoff_iceberg(n2))
+    runoff_iceberg=0.0_WP
+  end if
+!---iceberg_fwf-code---end
  
   ! shortwave penetration
   if(use_sw_pene) then

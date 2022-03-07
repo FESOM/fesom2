@@ -42,9 +42,20 @@ real(kind=WP)  :: Swind     =0.0_WP  ! parameterization for coupled current feed
 !---fwf-code-begin
   character(MAX_PATH)           :: fwf_path='./mesh/'
 !---fwf-code-end
+!---iceberg-fwf-code-begin
+  logical                       :: use_iceberg_water=.false.
+  integer                       :: iceberg_start_mon=1
+  integer                       :: iceberg_end_mon=12
+  character(MAX_PATH)           :: iceberg_path='./mesh/'
+!---iceberg-fwf-code-end
 
 
-  namelist /land_ice/ use_landice_water, landice_start_mon, landice_end_mon, fwf_path
+!---fwf-code-begin
+  namelist /land_ice/ use_landice_water, landice_start_mon, landice_end_mon, fwf_path, use_iceberg_water, iceberg_start_mon, iceberg_end_mon, iceberg_path
+!---fwf-code-end
+!!---iceberg-fwf-code-begin
+!  namelist /iceberg/ use_iceberg_water, iceberg_start_mon, iceberg_end_mon, iceberg_path
+!!---iceberg-fwf-code-end
 
 end module g_forcing_param
 ! ====================================================================
@@ -78,8 +89,10 @@ use o_param
   real(kind=WP), allocatable, dimension(:)         :: flux_correction_north, flux_correction_south, flux_correction_total
 #endif
   
-  real(kind=WP), allocatable, dimension(:)         :: runoff_landice
-  real(kind=WP)                                    :: landice_season(12)
+  real(kind=WP), allocatable, dimension(:)         :: runoff_landice !---fwf-code
+  real(kind=WP), allocatable, dimension(:)         :: runoff_iceberg !---iceberg-fwf-code
+  real(kind=WP)                                    :: landice_season(12) !---fwf-code
+  real(kind=WP)                                    :: iceberg_season(12) !---iceberg-fwf-code
 
   ! shortwave penetration
   real(kind=WP), allocatable, dimension(:)         :: chl

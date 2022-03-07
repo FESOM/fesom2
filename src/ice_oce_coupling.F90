@@ -153,7 +153,7 @@ subroutine oce_fluxes(mesh)
   use o_ARRAYS
   use i_ARRAYS
   use g_comm_auto
-  use g_forcing_param, only: use_virt_salt,use_landice_water !---fwf-code, add use_landice_water
+  use g_forcing_param, only: use_virt_salt,use_landice_water, use_iceberg_water!---fwf-code,iceberg-fwf-code 
   use g_forcing_arrays
   use g_PARSUP
   use g_support
@@ -346,6 +346,23 @@ subroutine oce_fluxes(mesh)
         end if 
     end if 
             
+!---iceberg-fwf-code-begin
+   if(use_iceberg_water) then
+     do n=1, myDim_nod2D+eDim_nod2D
+        water_flux(n)=water_flux(n)-runoff_iceberg(n)*iceberg_season(month)
+        heat_flux(n)=heat_flux(n)+runoff_iceberg(n)*iceberg_season(month)*cl*rhowat/rhoice
+     end do
+   end if
+
+   if(lwiso .and. use_iceberg_water) then
+     do n=1, myDim_nod2D+eDim_nod2D
+     wiso_flux_oce(n,1)=wiso_flux_oce(n,1)+runoff_iceberg(n)*1000.0*wiso_smow(1)*(1-30.0/1000.0)*iceberg_season(month)
+     wiso_flux_oce(n,2)=wiso_flux_oce(n,2)+runoff_iceberg(n)*1000.0*wiso_smow(2)*(1-240.0/1000.0)*iceberg_season(month)
+     wiso_flux_oce(n,3)=wiso_flux_oce(n,3)+runoff_iceberg(n)*1000.0*iceberg_season(month)
+     end do
+   end if
+!---iceberg-fwf-code-end
+
     call integrate_nod(water_flux, net, mesh)
     ! here the + sign must be used because we switched up the sign of the 
     ! water_flux with water_flux = -fresh_wa_flux, but evap, prec_... and runoff still
@@ -490,6 +507,7 @@ subroutine oce_fluxes(mesh)
      end do
    end if
 !---fwf-code-end
+
 
     !___________________________________________________________________________
     if (use_sw_pene) call cal_shortwave_rad(mesh)
