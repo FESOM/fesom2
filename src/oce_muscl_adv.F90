@@ -76,8 +76,8 @@ subroutine muscl_adv_init(twork, partit, mesh)
     nn_size=k
     !___________________________________________________________________________
     allocate(mesh%nn_num(myDim_nod2D), mesh%nn_pos(nn_size,myDim_nod2D))
-    nn_num(1:myDim_nod2D)            => mesh%nn_num
-    nn_pos(1:nn_size, 1:myDim_nod2D) => mesh%nn_pos
+    nn_num(1:myDim_nod2D)            => mesh%nn_num(:)
+    nn_pos(1:nn_size, 1:myDim_nod2D) => mesh%nn_pos(:,:)
     ! These are the same arrays that we also use in quadratic reconstruction
     !MOVE IT TO SOMEWHERE ELSE
 !$OMP PARALLEL DO

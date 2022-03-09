@@ -324,6 +324,9 @@ int parms_PCCreate_Schurras(parms_PC self)
 
 
 
+int parms_OperatorGetU(parms_Operator, void **);
+int parms_MatGetOffDiag(parms_Mat, void **);
+int parms_CommGetOdvlist(parms_Comm, int **);
 static int parms_PC_GetS(parms_PC self, parms_Operator op,parms_Mat *mat)
 {
 

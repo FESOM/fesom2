@@ -28,6 +28,7 @@ type com_struct
      integer                                       :: nreq   ! number of requests for MPI_Wait
                                                              ! (to combine halo exchange of several fields)
      contains
+     private    
      procedure WRITE_T_COM_STRUCT
      procedure READ_T_COM_STRUCT
      generic :: write(unformatted) => WRITE_T_COM_STRUCT
@@ -82,6 +83,7 @@ TYPE T_PARTIT
     integer(omp_lock_kind), allocatable :: plock(:)
 #endif
   contains
+  private
   procedure WRITE_T_PARTIT
   procedure  READ_T_PARTIT
   generic :: write(unformatted) => WRITE_T_PARTIT
