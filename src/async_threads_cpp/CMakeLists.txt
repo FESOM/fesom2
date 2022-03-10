@@ -9,7 +9,7 @@ include(FortranCInterface)
 FortranCInterface_HEADER(ThreadsManagerFCMacros.h MACRO_NAMESPACE "ThreadsManagerFCMacros_" SYMBOLS init_ccall begin_ccall end_ccall)
 
 if(${BUILD_FESOM_AS_LIBRARY})
-  add_library(${PROJECT_NAME} SHARED ${sources_CXX})
+  add_library(${PROJECT_NAME} ${sources_CXX})
 else()
   add_library(${PROJECT_NAME} ${sources_CXX})
 endif()

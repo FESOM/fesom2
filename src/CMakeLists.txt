@@ -77,7 +77,7 @@ add_subdirectory(async_threads_cpp)
 include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindNETCDF.cmake)
 
 if(${BUILD_FESOM_AS_LIBRARY})
-  add_library(${PROJECT_NAME}_C SHARED ${sources_C})
+  add_library(${PROJECT_NAME}_C ${sources_C})
 else()
 add_library(${PROJECT_NAME}_C ${sources_C})
 endif()
@@ -89,7 +89,7 @@ target_link_libraries(${PROJECT_NAME}_C parms) #metis
 # we do not always build the library along with the executable to avoid having two targets here in the CMakeLists.txt
 # two targets would allow e.g. setting different compiler options or preprocessor definition, which would be error prone.
 if(${BUILD_FESOM_AS_LIBRARY})
-   add_library(${PROJECT_NAME} SHARED ${sources_Fortran})
+   add_library(${PROJECT_NAME} ${sources_Fortran})
 else()
    add_executable(${PROJECT_NAME} ${sources_Fortran} ${src_home}/fesom_main.F90)
 endif()
