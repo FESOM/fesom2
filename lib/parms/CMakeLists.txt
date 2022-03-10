@@ -10,7 +10,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/../../cmake/FindBLAS.cmake")
 
 # create our library (set its name to name of this project)
 if(${BUILD_FESOM_AS_LIBRARY})
-  add_library(${PROJECT_NAME} SHARED ${all_sources})
+  add_library(${PROJECT_NAME} ${all_sources})
 else()
   add_library(${PROJECT_NAME} ${all_sources})
 endif()
