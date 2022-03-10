@@ -704,20 +704,8 @@ end if
  deallocate(rbuff, ibuff)
  deallocate(mapping)
  
-  ! try to calculate checksum and distribute it to every process
-  ! the shell command is probably not very portable and might fail, in which case we just do not have a checksum
-  mesh%representative_checksum = '                                ' ! we use md5 which is 32 chars long, so set default value to the same length
-  if(mype==0) then
-    call execute_command_line("md5sum "//trim(MeshPath)//"nod2d.out | cut -d ' ' -f 1 > "//trim(ResultPath)//"mesh_checksum")
-    ! we can not check if execute_command_line succeeded (e.g. with cmdstat), as the pipe will swallow any error from the initial command
-    ! so we have to thoroughly check if the file exists and if it contains our checksum
-    open(newunit=fileunit, file=trim(ResultPath)//"mesh_checksum", action="READ", iostat=iostat)
-    if(iostat==0) read(fileunit, *, iostat=iostat) mesh_checksum
-    close(fileunit)      
-    if(iostat==0 .and. len_trim(mesh_checksum)==32) mesh%representative_checksum = mesh_checksum
-  end if
-  call MPI_BCAST(mesh%representative_checksum, len(mesh%representative_checksum), MPI_CHAR, 0, MPI_COMM_FESOM, MPIerr)
-  mesh%representative_checksum = trim(mesh%representative_checksum) ! if we did not get a checksum, the string is empty
+! no checksum for now, execute_command_line is failing too often. if you think it is important, please drop me a line and I will try to revive it: jan.hegewald@awi.de
+mesh%representative_checksum = ''
 
 CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
  t1=MPI_Wtime()
