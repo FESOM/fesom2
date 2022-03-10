@@ -1034,7 +1034,7 @@ subroutine restart_thickness_ale(mesh)
             ! be sure that bottom layerthickness uses partial cell layer thickness
             ! in case its activated, especially when you make a restart from a non 
             ! partiall cell runs towards a simulation with partial cells
-            !hnode(nzmax,n) = bottom_node_thickness(n)
+            hnode(nzmax,n) = bottom_node_thickness(n)
             
             !___________________________________________________________________
             do nz=nzmax-1,nzmin,-1
@@ -1064,7 +1064,7 @@ subroutine restart_thickness_ale(mesh)
             !___________________________________________________________________
             ! be sure elemental bottom thickness has partial cells in it, when 
             ! its used after restart
-            !helem(nzmax,elem)=bottom_elem_thickness(elem)
+            helem(nzmax,elem)=bottom_elem_thickness(elem)
             
             !___________________________________________________________________
             ! for the first time steps of a restart or initialisation dhe must 
