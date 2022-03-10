@@ -4,6 +4,24 @@ module io_netcdf_file_module
   public netcdf_file_type
   private
 
+  type dim_type
+    character(:), allocatable :: name
+    integer len
+    integer ncid
+  end type
+
+  type att_type_wrapper ! work around Fortran not being able to have polymorphic types in the same array
+    class(att_type), allocatable :: it
+  end type
+
+  type var_type ! todo: use variable type from io_netcdf_module here
+    character(:), allocatable :: name
+    integer, allocatable :: dim_indices(:)
+    integer datatype
+    type(att_type_wrapper) :: atts(15) ! use a fixed size array to store our netcdf variable attributes as nvfortran seems to loose allocation of derived types which contain allocatable types when copying the array
+    integer :: atts_count = 0
+    integer ncid
+  end type
 
   type netcdf_file_type
     private
@@ -27,29 +45,6 @@ module io_netcdf_file_module
     procedure, private :: add_global_att_text, add_global_att_int
   end type
   
-  
-  type dim_type
-    character(:), allocatable :: name
-    integer len
-    
-    integer ncid
-  end type
-
-
-  type var_type ! todo: use variable type from io_netcdf_module here
-    character(:), allocatable :: name
-    integer, allocatable :: dim_indices(:)
-    integer datatype
-    type(att_type_wrapper), allocatable :: atts(:)
-    
-    integer ncid
-  end type
-
-
-  type att_type_wrapper ! work around Fortran not being able to have polymorphic types in the same array
-    class(att_type), allocatable :: it
-  end type
- 
 contains
 
 
@@ -151,18 +146,20 @@ contains
     ! EO parameters
     include "netcdf.inc"
     type(var_type), allocatable :: tmparr(:)
-    type(att_type_wrapper), allocatable :: empty_atts(:)
-    
-    allocate(empty_atts(0)) ! if we use a fixed size array with size 0 there is a segfault at runtime when compiled with cray ftn
 
     ! assume the vars array is allocated
     allocate( tmparr(size(this%vars)+1) )
-    tmparr(1:size(this%vars)) = this%vars
+    tmparr(1:size(this%vars)) = this%vars(:)
     deallocate(this%vars)
     call move_alloc(tmparr, this%vars)
     
     varindex = size(this%vars)
-    this%vars(varindex) = var_type(name=name, dim_indices=dim_indices, datatype=netcdf_datatype, atts=empty_atts, ncid=-1)
+!   this%vars(varindex) = var_type(name=name, dim_indices=dim_indices, datatype=netcdf_datatype, atts=empty_atts, ncid=-1)
+!   NVIDIA 22.1 compiler didnt like the line above, hence we unfold it unelegantly:
+    this%vars(varindex)%name       = name
+    this%vars(varindex)%dim_indices= dim_indices
+    this%vars(varindex)%datatype   = netcdf_datatype
+    this%vars(varindex)%ncid       = -1    
   end function
 
 
@@ -205,13 +202,14 @@ contains
     character(len=*), intent(in) :: att_text
     ! EO parameters
     type(att_type_wrapper), allocatable :: tmparr(:)
+    type(att_type_text) att
 
-    allocate( tmparr(size(this%vars(varindex)%atts)+1) )
-    tmparr(1:size(this%vars(varindex)%atts)) = this%vars(varindex)%atts
-    deallocate(this%vars(varindex)%atts)
-    call move_alloc(tmparr, this%vars(varindex)%atts)
+    ! add this att_type instance to atts array
+    this%vars(varindex)%atts_count = this%vars(varindex)%atts_count +1
+    call assert(size(this%vars(varindex)%atts) >= this%vars(varindex)%atts_count, __LINE__)
     
-    this%vars(varindex)%atts( size(this%vars(varindex)%atts) )%it = att_type_text(name=att_name, text=att_text)
+    att = att_type_text(name=att_name, text=att_text)
+    allocate( this%vars(varindex)%atts( this%vars(varindex)%atts_count )%it, source=att )
   end subroutine
 
 
@@ -222,13 +220,14 @@ contains
     integer, intent(in) :: att_val
     ! EO parameters
     type(att_type_wrapper), allocatable :: tmparr(:)
+    type(att_type_int) att
     
-    allocate( tmparr(size(this%vars(varindex)%atts)+1) )
-    tmparr(1:size(this%vars(varindex)%atts)) = this%vars(varindex)%atts
-    deallocate(this%vars(varindex)%atts)
-    call move_alloc(tmparr, this%vars(varindex)%atts)
+    ! add this att_type instance to atts array
+    this%vars(varindex)%atts_count = this%vars(varindex)%atts_count +1
+    call assert(size(this%vars(varindex)%atts) >= this%vars(varindex)%atts_count, __LINE__)
     
-    this%vars(varindex)%atts( size(this%vars(varindex)%atts) )%it = att_type_int(name=att_name, val=att_val)
+    att = att_type_int(name=att_name, val=att_val)
+    allocate( this%vars(varindex)%atts( this%vars(varindex)%atts_count )%it, source=att )
   end subroutine
   
   
@@ -435,7 +434,7 @@ contains
       end do
       call assert_nc( nf_def_var(this%ncid, this%vars(i)%name, this%vars(i)%datatype, var_ndims, var_dimids, this%vars(i)%ncid) , __LINE__)
       
-      do ii=1, size(this%vars(i)%atts)
+      do ii=1, this%vars(i)%atts_count
         call this%vars(i)%atts(ii)%it%define_in_var(this%ncid, this%vars(i)%ncid)
       end do
     end do

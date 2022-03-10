@@ -1,0 +1,21 @@
+##########
+module --force purge
+module use $OTHERSTAGES
+module load Stages/2022
+module load Intel/2021.4.0
+module load ParaStationMPI/5.5.0-1
+module load CMake/3.21.1
+module load imkl/2021.4.0
+module load netCDF-Fortran/4.5.3
+module load netCDF/4.8.1
+module load Perl/5.34.0
+
+export LC_ALL=en_US.UTF-8
+export TMPDIR=/tmp
+export FC=mpifort
+export F77=mpifort
+export MPIFC=mpifort
+export CC=mpicc
+export CXX=mpic++
+
+export NETCDF_Fortran_INCLUDE_DIRECTORIES=$EBROOTNETCDFMINFORTRAN/include

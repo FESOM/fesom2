@@ -250,17 +250,17 @@ subroutine restart(istep, l_read, which_readr, ice, dynamics, tracers, partit, m
         which_readr = 2
         if (use_ice) then 
             call read_all_bin_restarts(bin_restart_dirpath, &
+                                       partit   = partit,   &
+                                       mesh     = mesh,     &
                                        ice      = ice,      &
                                        dynamics = dynamics, &
-                                       tracers  = tracers,  &
-                                       partit   = partit,   &
-                                       mesh     = mesh)
+                                       tracers  = tracers   )
         else
             call read_all_bin_restarts(bin_restart_dirpath, &
-                                       dynamics = dynamics, &
-                                       tracers  = tracers,  &
                                        partit   = partit,   &
-                                       mesh     = mesh)
+                                       mesh     = mesh,     &                    
+                                       dynamics = dynamics, &
+                                       tracers  = tracers   )
         end if     
     !___________________________________________________________________________
     ! read netcdf file restart
@@ -284,11 +284,11 @@ subroutine restart(istep, l_read, which_readr, ice, dynamics, tracers, partit, m
             call write_all_bin_restarts((/globalstep+istep, int(ctime), yearnew/),      &
                                         bin_restart_dirpath,                 &
                                         bin_restart_infopath,                &
+                                        partit,                              &
+                                        mesh,                                &                                        
                                         ice,                                 &
                                         dynamics,                            &
-                                        tracers,                             &
-                                        partit,                              &
-                                        mesh)
+                                        tracers                              )
         end if
     end if
   end if
@@ -338,11 +338,11 @@ subroutine restart(istep, l_read, which_readr, ice, dynamics, tracers, partit, m
     call write_all_bin_restarts((/globalstep+istep, int(ctime), yearnew/),      &
                                 bin_restart_dirpath,                 &
                                 bin_restart_infopath,                &
+                                partit,                              &
+                                mesh,                                &                                
                                 ice,                                 &
                                 dynamics,                            &
-                                tracers,                             &
-                                partit,                              &
-                                mesh)
+                                tracers                              )
   end if
 
   ! actualize clock file to latest restart point
