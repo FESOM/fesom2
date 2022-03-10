@@ -136,7 +136,9 @@ real(kind=WP), allocatable,dimension(:)     :: zbar_e_srf
 character(:), allocatable :: representative_checksum
 
 contains
+#if defined(__PGI)
   private
+#endif        
   procedure write_t_mesh
   procedure read_t_mesh
   generic :: write(unformatted) => write_t_mesh

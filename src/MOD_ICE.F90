@@ -18,7 +18,9 @@ TYPE T_ICE_DATA
     integer                                     :: ID
     !___________________________________________________________________________
     contains
-        private
+#if defined(__PGI)
+    private
+#endif            
         procedure WRITE_T_ICE_DATA
         procedure READ_T_ICE_DATA
         generic :: write(unformatted) => WRITE_T_ICE_DATA
@@ -39,7 +41,9 @@ TYPE T_ICE_WORK
     real(kind=WP), allocatable, dimension(:)    :: ice_strength, inv_areamass, inv_mass
     !___________________________________________________________________________
     contains
-        private
+#if defined(__PGI)
+    private
+#endif            
         procedure WRITE_T_ICE_WORK
         procedure READ_T_ICE_WORK
         generic :: write(unformatted) => WRITE_T_ICE_WORK
@@ -84,7 +88,9 @@ TYPE T_ICE_THERMO
     real(kind=WP) :: albim = 0.68      !         melting ice
     real(kind=WP) :: albw  = 0.066     !         open water, LY2004
     contains
-        private
+#if defined(__PGI)
+    private
+#endif            
         procedure WRITE_T_ICE_THERMO
         procedure READ_T_ICE_THERMO
         generic :: write(unformatted) => WRITE_T_ICE_THERMO
@@ -107,7 +113,9 @@ TYPE T_ICE_ATMCOUPL
 #endif /* (__oifs)  */
     !___________________________________________________________________________
     contains
-        private
+#if defined(__PGI)
+    private
+#endif            
         procedure WRITE_T_ICE_ATMCOUPL
         procedure READ_T_ICE_ATMCOUPL
         generic :: write(unformatted) => WRITE_T_ICE_ATMCOUPL
@@ -194,7 +202,9 @@ TYPE T_ICE
     logical                   :: ice_update = .true.
     !___________________________________________________________________________
     contains
-        private
+#if defined(__PGI)
+    private
+#endif            
         procedure WRITE_T_ICE
         procedure READ_T_ICE
         generic :: write(unformatted) => WRITE_T_ICE

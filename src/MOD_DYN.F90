@@ -27,11 +27,13 @@ TYPE T_SOLVERINFO
 !!!
     real(kind=WP), allocatable   :: rr(:), zz(:), pp(:), App(:)
     contains
-        private
-        procedure WRITE_T_SOLVERINFO
-        procedure READ_T_SOLVERINFO
-        generic :: write(unformatted) => WRITE_T_SOLVERINFO
-        generic :: read(unformatted)  => READ_T_SOLVERINFO
+#if defined(__PGI)
+    private
+#endif            
+    procedure WRITE_T_SOLVERINFO
+    procedure READ_T_SOLVERINFO
+    generic :: write(unformatted) => WRITE_T_SOLVERINFO
+    generic :: read(unformatted)  => READ_T_SOLVERINFO
 END TYPE T_SOLVERINFO
 !
 !
@@ -43,11 +45,13 @@ TYPE T_DYN_WORK
     ! easy backscatter contribution
     real(kind=WP), allocatable, dimension(:,:)   :: u_b, v_b
     contains
-        private
-        procedure WRITE_T_DYN_WORK
-        procedure READ_T_DYN_WORK
-        generic :: write(unformatted) => WRITE_T_DYN_WORK
-        generic :: read(unformatted)  => READ_T_DYN_WORK
+#if defined(__PGI)
+    private
+#endif            
+    procedure WRITE_T_DYN_WORK
+    procedure READ_T_DYN_WORK
+    generic :: write(unformatted) => WRITE_T_DYN_WORK
+    generic :: read(unformatted)  => READ_T_DYN_WORK
 END TYPE T_DYN_WORK
 !
 !
@@ -110,11 +114,13 @@ TYPE T_DYN
 
     !___________________________________________________________________________
     contains
-        private
-        procedure WRITE_T_DYN
-        procedure READ_T_DYN
-        generic :: write(unformatted) => WRITE_T_DYN
-        generic :: read(unformatted)  => READ_T_DYN
+#if defined(__PGI)
+     private
+#endif            
+     procedure WRITE_T_DYN
+     procedure READ_T_DYN
+     generic :: write(unformatted) => WRITE_T_DYN
+     generic :: read(unformatted)  => READ_T_DYN
 END TYPE T_DYN
 
 contains

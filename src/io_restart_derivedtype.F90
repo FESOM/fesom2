@@ -1,6 +1,6 @@
 module restart_derivedtype_module
     interface
-        subroutine write_all_bin_restarts(ctarr, path_in, pathi_in, ice, dynamics, tracers, partit, mesh)
+        subroutine write_all_bin_restarts(ctarr, path_in, pathi_in, partit, mesh, ice, dynamics, tracers)
             use MOD_ICE
             use MOD_DYN
             use MOD_TRACER
@@ -9,32 +9,32 @@ module restart_derivedtype_module
             integer, dimension(3) , intent(in)              :: ctarr
             character(len=*), intent(in)                    :: path_in
             character(len=*), intent(in)                    :: pathi_in
+            type(t_partit), intent(inout), target           :: partit
+            type(t_mesh)  , intent(inout), target           :: mesh
             type(t_ice)   , intent(inout), target, optional :: ice
             type(t_dyn)   , intent(inout), target, optional :: dynamics
-            type(t_tracer), intent(inout), target, optional :: tracers
-            type(t_partit), intent(inout), target, optional :: partit
-            type(t_mesh)  , intent(inout), target, optional :: mesh
+            type(t_tracer), intent(inout), target, optional :: tracers            
         end subroutine
         
-        subroutine read_all_bin_restarts(path_in, ice, dynamics, tracers, partit, mesh)
+        subroutine read_all_bin_restarts(path_in, partit, mesh, ice, dynamics, tracers)
             use MOD_ICE
             use MOD_DYN
             use MOD_TRACER
             use MOD_PARTIT
             use MOD_MESH
             character(len=*), intent(in)                    :: path_in
+            type(t_partit), intent(inout), target           :: partit
+            type(t_mesh)  , intent(inout), target           :: mesh
             type(t_ice)   , intent(inout), target, optional :: ice
             type(t_dyn)   , intent(inout), target, optional :: dynamics
-            type(t_tracer), intent(inout), target, optional :: tracers
-            type(t_partit), intent(inout), target, optional :: partit
-            type(t_mesh)  , intent(inout), target, optional :: mesh
+            type(t_tracer), intent(inout), target, optional :: tracers            
         end subroutine
     end interface
 end module    
 !
 !
 !_______________________________________________________________________________
-subroutine write_all_bin_restarts(ctarr, path_in, pathi_in, ice, dynamics, tracers, partit, mesh)
+subroutine write_all_bin_restarts(ctarr, path_in, pathi_in, partit, mesh, ice, dynamics, tracers)
     use MOD_ICE
     use MOD_DYN
     use MOD_TRACER
@@ -46,15 +46,22 @@ subroutine write_all_bin_restarts(ctarr, path_in, pathi_in, ice, dynamics, trace
     integer, dimension(3) , intent(in)           :: ctarr ! //cstep,ctime,cyear//
     character(len=*)      , intent(in)           :: path_in
     character(len=*)      , intent(in)           :: pathi_in
+    type(t_partit), target, intent(in)           :: partit
+    type(t_mesh)  , target, intent(in)           :: mesh
     type(t_ice)   , target, intent(in), optional :: ice
     type(t_dyn)   , target, intent(in), optional :: dynamics
     type(t_tracer), target, intent(in), optional :: tracers
-    type(t_partit), target, intent(in) :: partit
-    type(t_mesh)  , target, intent(in) :: mesh
-    
+
     ! EO parameters
     integer fileunit, fileunit_i
-    
+
+#if defined(__PGI)
+    if (partit%mype == 0) then
+       write(*,*) 'write_all_bin_restarts is deactivated for PGI compiler because of T_TRACER%DATA & T_ICE%DATA cause write call to crash'
+       write(*,*) '*** checked for NVHPC/22.1 ***'
+    end if
+#else
+
     !___________________________________________________________________________
     ! write info file
     if(partit%mype == 0) then
@@ -94,23 +101,23 @@ subroutine write_all_bin_restarts(ctarr, path_in, pathi_in, ice, dynamics, trace
         write(fileunit_i, '(1(g0))') "!   t_partit"
         print *, achar(27)//'[33m'//'     > write derived type t_partit'//achar(27)//'[0m'
     end if 
-    
+
     !___________________________________________________________________________
-    ! tracer derived type 
+    ! tracer derived type
     if (present(tracers)) then
         fileunit = partit%mype+300
         open(newunit = fileunit, &
             file     = trim(path_in)//'/'//'t_tracer.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
             status   = 'replace', &
             form     = 'unformatted')
-        write(fileunit) tracers  
+        write(fileunit) tracers
         close(fileunit)
-        if(partit%mype == 0) then 
+        if(partit%mype == 0) then
             write(fileunit_i, '(1(g0))') "!   t_tracer"
             print *, achar(27)//'[33m'//'     > write derived type t_tracer'//achar(27)//'[0m'
-        end if     
-    end if 
-    
+        end if
+    end if
+
     !___________________________________________________________________________
     ! dynamics derived type 
     if (present(dynamics)) then
@@ -142,10 +149,9 @@ subroutine write_all_bin_restarts(ctarr, path_in, pathi_in, ice, dynamics, trace
             print *, achar(27)//'[33m'//'     > write derived type t_ice'//achar(27)//'[0m'
         end if     
     end if 
-    
     !___________________________________________________________________________
     if(partit%mype == 0) close(fileunit_i)
-
+#endif !defined(__PGI)
 end subroutine
 !
 !
@@ -164,41 +170,44 @@ subroutine read_all_bin_restarts(path_in, ice, dynamics, tracers, partit, mesh)
     ! do optional here for the usage with dwarfs, since there only specific derived  
     ! types will be needed
     character(len=*), intent(in)                    :: path_in
+    type(t_partit), intent(inout), target           :: partit
+    type(t_mesh)  , intent(inout), target           :: mesh    
     type(t_ice)   , intent(inout), target, optional :: ice
     type(t_dyn)   , intent(inout), target, optional :: dynamics
     type(t_tracer), intent(inout), target, optional :: tracers
-    type(t_partit), intent(inout), target, optional :: partit
-    type(t_mesh)  , intent(inout), target, optional :: mesh
     integer fileunit
-        
+
+#if defined(__PGI)
+    if (partit%mype == 0) then
+       write(*,*) 'read_all_bin_restarts is deactivated for PGI compiler because of T_TRACER%DATA & T_ICE%DATA cause write call to crash'
+       write(*,*) '*** checked for NVHPC/22.1 ***'
+    end if
+#else
+
     !___________________________________________________________________________
     if (partit%mype==0) print *, achar(27)//'[1;33m'//' --> read restarts from derived type binary'//achar(27)//'[0m'
     
     !___________________________________________________________________________
     ! mesh derived type 
-    if (present(mesh)) then
-        fileunit = partit%mype+300
-        open(newunit = fileunit, &
-            file     = trim(path_in)//'/'//'t_mesh.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
-            status   = 'old', &
-            form     = 'unformatted')
-        read(fileunit) mesh
-        close(fileunit)
-        if (partit%mype==0) print *, achar(27)//'[33m'//'     > read derived type t_mesh'//achar(27)//'[0m'
-    end if
+    fileunit = partit%mype+300
+    open( newunit = fileunit, &
+          file     = trim(path_in)//'/'//'t_mesh.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
+          status   = 'old', &
+          form     = 'unformatted')
+          read(fileunit) mesh
+    close(fileunit)
+    if (partit%mype==0) print *, achar(27)//'[33m'//'     > read derived type t_mesh'//achar(27)//'[0m'
     
     !___________________________________________________________________________
     ! partit derived type 
-    if (present(partit)) then
-        fileunit = partit%mype+300
-        open(newunit = fileunit, &
-            file     = trim(path_in)//'/'//'t_partit.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
-            status   = 'old', &
-            form     = 'unformatted')
-        read(fileunit) partit
-        close(fileunit)
-        if (partit%mype==0) print *, achar(27)//'[33m'//'     > read derived type t_partit'//achar(27)//'[0m'
-    end if 
+    fileunit = partit%mype+300
+    open(newunit = fileunit, &
+         file     = trim(path_in)//'/'//'t_partit.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
+         status   = 'old', &
+         form     = 'unformatted')
+         read(fileunit) partit
+         close(fileunit)
+    if (partit%mype==0) print *, achar(27)//'[33m'//'     > read derived type t_partit'//achar(27)//'[0m'
     
     !___________________________________________________________________________
     ! tracer derived type     
@@ -237,6 +246,7 @@ subroutine read_all_bin_restarts(path_in, ice, dynamics, tracers, partit, mesh)
         read(fileunit) ice
         close(fileunit)
         if (partit%mype==0) print *, achar(27)//'[33m'//'     > read derived type t_ice'//achar(27)//'[0m'
-    end if 
+    end if
+#endif !defined(__PGI)
 end subroutine
   
