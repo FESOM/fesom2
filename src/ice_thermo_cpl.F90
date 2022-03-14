@@ -511,21 +511,18 @@ contains
 
   ! set albedo
   ! ice and snow, freezing and melting conditions are distinguished
-  melt_pool_alb_reduction = 0.20_WP
   if (h>0.0_WP) then                                    ! sea ice condition
-     if (t<273.15_WP) then                              ! freezing condition    
+     if (t<271_WP) then                                 ! freezing condition    
         if (hsn.gt.0.001_WP) then                       ! snow cover
            alb=albsn        
         else                                            ! no snow cover       
            alb=albi             
         endif
      else                                               ! melting condition     
-        if (hsn.gt.0.05_WP) then                        ! thick snow cover
+        if (hsn.gt.0.01_WP) then                        ! thick snow cover
            alb=albsnm  
-        elseif (hsn.lt.0.05_WP.and.hsn.gt.0.01_WP) then ! thin snow cover
-           alb=albsnm-melt_pool_alb_reduction/2
         else                                            ! no snow cover       
-           alb=albim-melt_pool_alb_reduction
+           alb=albim
         endif
      endif
    else
