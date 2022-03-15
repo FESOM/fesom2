@@ -369,7 +369,7 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    integer, dimension(:,:)         , pointer :: elem2D_nodes
    integer, pointer :: myDim_nod2D, eDim_nod2D
    integer, pointer :: myDim_elem2D, eDim_elem2D, eXDim_elem2D
-   real(kind=wpIFS), dimension(:), pointer :: a_ice, m_ice, m_snow
+   real(kind=wpIFS), dimension(:), pointer :: a_ice, m_ice, m_snow, ice_temp, ice_alb
    real(kind=wpIFS)              , pointer :: tmelt
    
    ! Message passing information
@@ -400,8 +400,9 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    a_ice        => fesom%ice%data(1)%values(:)
    m_ice        => fesom%ice%data(2)%values(:)
    m_snow       => fesom%ice%data(3)%values(:)
+   ice_temp     => fesom%ice%data(4)%values(:)
+   ice_alb      => fesom%ice%atmcoupl%ice_alb(:)
    tmelt        => fesom%ice%thermo%tmelt ! scalar const.
-
 
    ! =================================================================== !
    ! Pack SST data and convert to K. 'pgsst' is on Gauss grid.
@@ -426,7 +427,7 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
 
    ! =================================================================== !
    ! Pack ice temperature data (already in K)
-   zsend(:)=273.15
+   zsend(:)=ice_temp
 
    ! Interpolate ice surface temperature: 'pgist' on Gaussian grid. 
    CALL parinter_fld( mype, npes, icomm, Ttogauss, &
@@ -436,7 +437,7 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
 
    ! =================================================================== !
    ! Pack ice albedo data and interpolate: 'pgalb' on Gaussian grid.
-   zsend(:)=0.7
+   zsend(:)=ice_alb
    
    ! Interpolate ice albedo
    CALL parinter_fld( mype, npes, icomm, Ttogauss, &
