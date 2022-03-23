@@ -59,6 +59,9 @@ subroutine update_atm_forcing(istep, mesh)
 #if defined (__oasis)
   use cpl_driver
 #endif
+#if defined(__oifs)
+  use diagnostics
+#endif
   use gen_bulk
   use force_flux_consv_interface
 
@@ -111,6 +114,10 @@ subroutine update_atm_forcing(istep, mesh)
             exchange(:) = ice_temp(:)                               ! ice surface temperature
             elseif (i.eq.5) then
             exchange(:) = ice_alb(:)                                ! ice albedo
+            elseif (i.eq.6) then
+            exchange(:) = u_surf(:)                                 ! u component of surface velocity [m/s]
+            elseif (i.eq.7) then
+            exchange(:) = v_surf(:)                                 ! v component of surface velocity [m/s]
             else	    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
 #else
