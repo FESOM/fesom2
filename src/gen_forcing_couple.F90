@@ -104,20 +104,24 @@ subroutine update_atm_forcing(istep, mesh)
 #if defined (__oifs) 
             ! AWI-CM3 outgoing state vectors
             do n=1,myDim_nod2D+eDim_nod2D
-            exchange(n)=tr_arr(1, n, 1)+tmelt	                    ! sea surface temperature [K]
+                exchange(n)=tr_arr(1, n, 1)+tmelt	                    ! sea surface temperature [K]
             end do
             elseif (i.eq.2) then
-            exchange(:) = a_ice(:)                                  ! ice concentation [%]
+                exchange(:) = a_ice(:)                                  ! ice concentation [%]
             elseif (i.eq.3) then
-            exchange(:) = m_snow(:)                                 ! snow thickness
+                exchange(:) = m_snow(:)                                 ! snow thickness
             elseif (i.eq.4) then
-            exchange(:) = ice_temp(:)                               ! ice surface temperature
+                exchange(:) = ice_temp(:)                               ! ice surface temperature
             elseif (i.eq.5) then
-            exchange(:) = ice_alb(:)                                ! ice albedo
+                exchange(:) = ice_alb(:)                                ! ice albedo
             elseif (i.eq.6) then
-            exchange(:) = u_surf(:)                                 ! u component of surface velocity [m/s]
+                do n=1,myDim_nod2D+eDim_nod2D
+                    exchange(n) = UV(1,1,n)                             ! u component of surface velocity [m/s]
+                enddo
             elseif (i.eq.7) then
-            exchange(:) = v_surf(:)                                 ! v component of surface velocity [m/s]
+                do n=1,myDim_nod2D+eDim_nod2D
+                    exchange(n) = UV(2,1,n)                             ! v component of surface velocity [m/s]
+                enddo
             else	    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
 #else
