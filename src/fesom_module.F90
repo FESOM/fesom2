@@ -115,7 +115,7 @@ contains
     
 
 #if defined (__oasis)
-        call cpl_oasis3mct_init(partit%MPI_COMM_FESOM)
+        call cpl_oasis3mct_init(f%partit,f%partit%MPI_COMM_FESOM)
 #endif
         f%t1 = MPI_Wtime()
 

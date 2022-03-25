@@ -133,6 +133,8 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
 #endif 
 #if defined (__oifs) || defined (__ifsinterface)
   real(kind=WP), dimension(:), pointer  :: ice_temp, ice_alb, enthalpyoffuse
+  real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
+  real(kind=WP),               pointer  :: tmelt
 #endif
   real(kind=WP)              , pointer  :: rhoair
 #include "associate_part_def.h"
@@ -146,9 +148,13 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   stress_atmice_x  => ice%stress_atmice_x(:)
   stress_atmice_y  => ice%stress_atmice_y(:)
 #if defined (__oifs) || defined (__ifsinterface)
+  a_ice            => ice%data(1)%values(:)
+  m_ice            => ice%data(2)%values(:)
+  m_snow           => ice%data(3)%values(:)
   ice_temp         => ice%data(4)%values(:)
   ice_alb          => ice%atmcoupl%ice_alb(:)
   enthalpyoffuse   => ice%atmcoupl%enthalpyoffuse(:)
+  tmelt            => ice%thermo%tmelt
 #endif      
 #if defined (__oasis) || defined (__ifsinterface)
   oce_heat_flux    => ice%atmcoupl%oce_flx_h(:)
@@ -676,7 +682,7 @@ SUBROUTINE net_rec_from_atm(action, partit)
   type(t_partit), intent(inout), target           :: partit
   INTEGER                                         :: my_global_rank, ierror
   INTEGER                                         :: n  
-  INTEGER 					  :: status(MPI_STATUS_SIZE,npes) 
+  INTEGER 					  :: status(MPI_STATUS_SIZE,partit%npes) 
   INTEGER                                         :: request(2)
   real(kind=WP)                 		  :: aux(nrecv)
 #if defined (__oifs)
@@ -692,7 +698,7 @@ SUBROUTINE net_rec_from_atm(action, partit)
         CALL MPI_IRecv(atm_net_fluxes_south(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 112, MPI_COMM_WORLD, request(2), partit%MPIerr)
         CALL MPI_Waitall(2, request, status, partit%MPIerr)
      end if
-  call MPI_Barrier(partit%MPI_COMM_FESOM, MPIerr)     
+  call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)     
   call MPI_AllREDUCE(atm_net_fluxes_north(1), aux, nrecv, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
   atm_net_fluxes_north=aux
   call MPI_AllREDUCE(atm_net_fluxes_south(1), aux, nrecv, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)

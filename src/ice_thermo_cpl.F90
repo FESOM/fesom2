@@ -151,11 +151,11 @@ subroutine thermodynamics(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
      !---- different lead closing parameter for NH and SH
      if (geo_coord_nod2D(2, inod)>0) then
-        h0min = 0.3
-        h0max = 0.3
+        h0min = 0.5
+        h0max = 1.5
      else
         h0min = 1.0
-        h0max = 1.0
+        h0max = 1.5
      endif
 
      !---- For AWI-CM3 we calculate ice surface temp and albedo in fesom,
@@ -537,6 +537,7 @@ contains
   real(kind=WP) :: alb
   real(kind=WP) :: geolat
   real(kind=WP) :: melt_pool_alb_reduction
+  real(kind=WP) :: nh_winter_reduction
   real(kind=WP), pointer :: albsn, albi, albsnm, albim
   albsn  => ice%thermo%albsn
   albi   => ice%thermo%albi
@@ -545,17 +546,19 @@ contains
   
   ! set albedo
   ! ice and snow, freezing and melting conditions are distinguished
-  if (geolat.gt.0.) then !SH does not have melt ponds
+  if (geolat.lt.0.) then !SH does not have melt ponds
       melt_pool_alb_reduction = 0.0_WP
+      nh_winter_reduction = 0.0_WP
   else
-      melt_pool_alb_reduction = 0.12_WP
+      melt_pool_alb_reduction = 0.20_WP
+      nh_winter_reduction = 0.06_WP
   endif
   if (h>0.0_WP) then
      if (t<273.15_WP) then         ! freezing condition    
         if (hsn.gt.0.001_WP) then !   snow cover present  
-           alb=albsn            
+           alb=albsn-nh_winter_reduction            
         else                    !   no snow cover       
-           alb=albi             
+           alb=albi-nh_winter_reduction             
         endif
      else                               ! melting condition     
         if (hsn.gt.0.001_WP) then !   snow cover present  
