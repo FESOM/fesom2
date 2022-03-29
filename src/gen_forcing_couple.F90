@@ -45,17 +45,19 @@ end module
 
 module update_atm_forcing_interface
     interface
-        subroutine update_atm_forcing(istep, ice, tracers, partit,mesh)
+        subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
         USE MOD_TRACER
         USE MOD_ICE
         USE MOD_PARTIT
         USE MOD_PARSUP
         USE MOD_MESH
+        USE MOD_DYN
         integer,        intent(in)            :: istep
         type(t_ice),    intent(inout), target :: ice
         type(t_tracer), intent(in),    target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in),    target :: mesh
+        type(t_dyn)   , intent(inout), target :: dynamics
         end subroutine
     end interface
 end module
@@ -72,13 +74,14 @@ module net_rec_from_atm_interface
 end module
 ! Routines for updating ocean surface forcing fields
 !-------------------------------------------------------------------------
-subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
+subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   use o_PARAM
   use MOD_MESH
   USE MOD_PARTIT
   USE MOD_PARSUP
   use MOD_TRACER
   use MOD_ICE
+  use MOD_DYN
   use o_arrays
   use g_forcing_param
   use g_forcing_arrays
@@ -102,6 +105,7 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   type(t_tracer), intent(in),    target :: tracers
   type(t_partit), intent(inout), target :: partit
   type(t_mesh),   intent(in),    target :: mesh
+  type(t_dyn)   , intent(in), target :: dynamics
   !_____________________________________________________________________________
   integer		   :: i, itime,n2,n,nz,k,elem
   real(kind=WP)            :: i_coef, aux
@@ -135,6 +139,7 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   real(kind=WP), dimension(:), pointer  :: ice_temp, ice_alb, enthalpyoffuse
   real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
   real(kind=WP),               pointer  :: tmelt
+  real(kind=WP), dimension(:,:,:), pointer :: UVnode
 #endif
   real(kind=WP)              , pointer  :: rhoair
 #include "associate_part_def.h"
@@ -155,6 +160,7 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   ice_alb          => ice%atmcoupl%ice_alb(:)
   enthalpyoffuse   => ice%atmcoupl%enthalpyoffuse(:)
   tmelt            => ice%thermo%tmelt
+  UVnode           => dynamics%uvnode(:,:,:)
 #endif      
 #if defined (__oasis) || defined (__ifsinterface)
   oce_heat_flux    => ice%atmcoupl%oce_flx_h(:)
@@ -180,18 +186,26 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
          if (i.eq.1) then
 #if defined (__oifs) || defined (__ifsinterface)
             ! AWI-CM3 outgoing state vectors
-            do n=1,myDim_nod2D+eDim_nod2D
-            exchange(n)=tracers%data(1)%values(1, n)+tmelt	           ! sea surface temperature [K]
-            end do
+              do n=1,myDim_nod2D+eDim_nod2D
+              exchange(n)=tracers%data(1)%values(1, n)+tmelt	           ! sea surface temperature [K]
+              end do
             elseif (i.eq.2) then
-            exchange(:) = a_ice(:)                                  ! ice concentation [%]
+              exchange(:) = a_ice(:)                                  ! ice concentation [%]
             elseif (i.eq.3) then
-            exchange(:) = m_snow(:)                                 ! snow thickness
+              exchange(:) = m_snow(:)                                 ! snow thickness
             elseif (i.eq.4) then
-            exchange(:) = ice_temp(:)                               ! ice surface temperature
+              exchange(:) = ice_temp(:)                               ! ice surface temperature
             elseif (i.eq.5) then
-            exchange(:) = ice_alb(:)                                ! ice albedo
-            else	    
+              exchange(:) = ice_alb(:)                                ! ice albedo
+            elseif (i.eq.6) then
+              do n=1,myDim_nod2D+eDim_nod2D
+                exchange(n) = UVnode(1,1,n)
+              end do
+            elseif (i.eq.7) then
+              do n=1,myDim_nod2D+eDim_nod2D
+                exchange(n) = UVnode(2,1,n)
+              end do
+            else    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
 #else
             ! AWI-CM2 outgoing state vectors

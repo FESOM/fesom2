@@ -149,14 +149,6 @@ subroutine thermodynamics(ice, partit, mesh)
      end if
 
 #if defined (__oifs) || defined (__ifsinterface)
-     !---- different lead closing parameter for NH and SH
-     if (geo_coord_nod2D(2, inod)>0) then
-        h0min = 0.5
-        h0max = 1.5
-     else
-        h0min = 1.0
-        h0max = 1.5
-     endif
 
      !---- For AWI-CM3 we calculate ice surface temp and albedo in fesom,
      ! then send those to OpenIFS where they are used to calucate the 
@@ -169,7 +161,7 @@ subroutine thermodynamics(ice, partit, mesh)
         ! Freezing temp of saltwater in K
         ice_temp(inod) = -0.0575_WP*S_oc_array(inod) + 1.7105e-3_WP*sqrt(S_oc_array(inod)**3) -2.155e-4_WP*(S_oc_array(inod)**2)+273.15_WP
      endif
-     call ice_albedo(ice%thermo, h, hsn, t, alb, geolat)
+     call ice_albedo(ice%thermo, h, hsn, t, alb)
      ice_alb(inod)       = alb
 #endif
      call ice_growth
@@ -520,12 +512,11 @@ contains
   t=min(273.15_WP,t)
  end subroutine ice_surftemp
 
- subroutine ice_albedo(ithermp, h, hsn, t, alb, geolat)
+ subroutine ice_albedo(ithermp, h, hsn, t, alb)
   ! INPUT:
   ! h      - ice thickness [m]
   ! hsn    - snow thickness [m]
   ! t      - temperature of snow/ice surface [C]
-  ! geolat - lattitude 
   ! 
   ! OUTPUT:
   ! alb    - selected broadband albedo
@@ -546,25 +537,18 @@ contains
   
   ! set albedo
   ! ice and snow, freezing and melting conditions are distinguished
-  if (geolat.lt.0.) then !SH does not have melt ponds
-      melt_pool_alb_reduction = 0.0_WP
-      nh_winter_reduction = 0.0_WP
-  else
-      melt_pool_alb_reduction = 0.20_WP
-      nh_winter_reduction = 0.06_WP
-  endif
   if (h>0.0_WP) then
      if (t<273.15_WP) then         ! freezing condition    
         if (hsn.gt.0.001_WP) then !   snow cover present  
-           alb=albsn-nh_winter_reduction            
+           alb=albsn       
         else                    !   no snow cover       
-           alb=albi-nh_winter_reduction             
+           alb=albi           
         endif
      else                               ! melting condition     
         if (hsn.gt.0.001_WP) then !   snow cover present  
-           alb=albsnm-melt_pool_alb_reduction           
+           alb=albsnm          
         else                    !   no snow cover       
-           alb=albim-melt_pool_alb_reduction
+           alb=albim
         endif
      endif
    else
