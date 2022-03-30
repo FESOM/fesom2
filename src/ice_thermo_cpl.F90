@@ -476,9 +476,10 @@ contains
   real(kind=WP)  zsniced
   real(kind=WP)  zicefl
   real(kind=WP)  hcapice
-  real(kind=WP)  zcpdt
+  real(kind=WP)  hcapsno
+  real(kind=WP)  zcpidt
+  real(kind=WP)  zcpsndt
   real(kind=WP)  zcpdte
-  real(kind=WP)  zcprosn
   !---- local parameters
   real(kind=WP), parameter :: dice  = 0.10_WP                       ! Thickness for top ice "layer"
   !---- freezing temperature of sea-water [K]
@@ -490,10 +491,11 @@ contains
   snicecond = con/consn                 ! equivalence fraction thickness of ice/snow
   zsniced=h+snicecond*hsn               ! Ice + Snow-Ice-equivalent thickness [m]
   zicefl=con*TFrezs/zsniced             ! Conductive heat flux through sea ice [W/m²]
-  hcapice=rhoice*cpice*dice             ! heat capacity of upper 0.05 cm sea ice layer [J/(m²K)]
-  zcpdt=hcapice/dt                      ! Energy required to change temperature of top ice "layer" [J/(sm²K)]
-  zcprosn=rhosno*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
-  zcpdte=zcpdt+zcprosn*hsn              ! Combined Energy required to change temperature of snow + 0.05m of upper ice
+  hcapice=rhoice*cpice*max(dice-hsn,0.0_WP)  ! heat capacity of upper 0.1 m sea ice layer [J/(m²K)] unless there is snow
+  hcapsno=rhosno*cpsno*min(hsn,dice)    ! heat capacity of upper 0.1 m snow layer [J/(m²K)]
+  zcpidt=hcapice/dt                     ! Energy required to change temperature of 0.1m ice "layer" [J/(sm²K)]
+  zcpsndt=hcapsno/dt                    ! Energy required to change temperature of 0.1m snow on ice [J/(sm³K)]
+  zcpdte=zcpidt+zcpsndt                 ! Combined Energy required to change temperature of top 0.1m of snow and/or upper ice
   t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced) ! New sea ice surf temp [K]
   t=min(273.15_WP,t)
  end subroutine ice_surftemp
