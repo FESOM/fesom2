@@ -47,13 +47,13 @@ export EXECUTION_NAME=fesom2
 cd fesom_hecuba/
 mkrun pi test_pi -m docker
 cd work_pi/
-cp /fesom_hecuba/src/io_hecuba_cpp/fesom_datamodel.yaml .
+cp /fesom_hecuba/src/io_hecuba_cpp/*.yaml .
 ```
 The following files should be presented in the working dir:
 
 ```
  fcheck_values.csv
- fesom_datamodel.yaml
+ *.yaml (datamodel files)
  job_docker_new
  namelist.config
  namelist.cvmix
