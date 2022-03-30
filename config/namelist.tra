@@ -4,8 +4,8 @@ num_tracers=100 !number of tracers to allocate. shallbe large or equal to the nu
 
 &tracer_list
 nml_tracer_list =  
-1  , 'MFCT',       'QR4C',       'FCT ',        1.,          1., 
-2  , 'MFCT',       'QR4C',       'FCT ',        1.,          1., 
+1  , 'MFCT',       'QR4C',       'FCT ',        0.,          1., 
+2  , 'MFCT',       'QR4C',       'FCT ',        0.,          1., 
 !101, 'UPW1',       'UPW1',       'NON ',        0.,          0.
 /
 
