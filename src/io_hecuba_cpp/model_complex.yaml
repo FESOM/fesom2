@@ -1,0 +1,39 @@
+- "TypeSpec": [ "myclass", "StorageObject" ]
+  "ClassField":
+            - [ "sim_id", "text"]
+            - [ "sim_info", "model_complex.info" ]
+            - [ "submetrics","model_complex.metrics" ]
+
+- "TypeSpec": [ "info", "StorageObject" ]
+  "ClassField":
+            - [ "total_ts", "int" ]
+            - [ "output_freq", "int" ]
+
+- "TypeSpec": [ "metrics", "StorageDict" ]
+  "KeySpec":
+            - [ "lat", "float" ]
+            - [ "ts", "int" ]
+  "ValueSpec":
+            - [ "mvalues", "numpy.ndarray"]
+#
+# This model will generate the following Python file:
+
+#from hecuba import StorageObj
+#class myclass (StorageObj):
+#   '''
+#   @ClassField sim_id text
+#   @ClassField sim_info model_complex.info
+#   @ClassField submetrics model_complex.metrics
+#   '''
+#
+#class info (StorageObj):
+#   '''
+#   @ClassField total_ts int
+#   @ClassField output_freq int
+#   '''
+#
+#from hecuba import StorageDict
+#class metrics (StorageDict):
+#   '''
+#   @TypeSpec dict <<lat:float,ts:int>,mvalues:numpy.ndarray>
+#   '''

@@ -1112,7 +1112,7 @@ SUBROUTINE diff_part_bh(ttf, mesh)
            v1=UV(2, nz,el(1))-UV(2, nz,el(2))
            vi=u1*u1+v1*v1
            tt=ttf(nz,en(1))-ttf(nz,en(2))
-           vi=sqrt(max(gamma0_tra, max(gamma1_tra*sqrt(vi), gamma2_tra*vi))*len)
+           vi=sqrt(max(gamma0, max(gamma1*sqrt(vi), gamma2*vi))*len)
            !vi=sqrt(max(sqrt(u1*u1+v1*v1),0.04)*le)  ! 10m^2/s for 10 km (0.04 h/50)
            !vi=sqrt(10.*le)
            tt=tt*vi
@@ -1136,7 +1136,7 @@ SUBROUTINE diff_part_bh(ttf, mesh)
               v1=UV(2, nz,el(1))-UV(2, nz,el(2))
               vi=u1*u1+v1*v1
               tt=temporary_ttf(nz,en(1))-temporary_ttf(nz,en(2))
-              vi=sqrt(max(gamma0_tra, max(gamma1_tra*sqrt(vi), gamma2_tra*vi))*len)
+              vi=sqrt(max(gamma0, max(gamma1*sqrt(vi), gamma2*vi))*len)
               !vi=sqrt(max(sqrt(u1*u1+v1*v1),0.04)*le)  ! 10m^2/s for 10 km (0.04 h/50)
               !vi=sqrt(10.*le) 
               tt=-tt*vi*dt

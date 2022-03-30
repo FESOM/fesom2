@@ -4,6 +4,10 @@ module io_MEANDATA
   use, intrinsic :: iso_fortran_env, only: real64, real32
   use io_data_strategy_module
   use async_threads_module
+#if defined (__hecuba)
+  use hecuba_interface_module
+#endif
+ 
 
   implicit none
 #include "netcdf.inc"
@@ -134,7 +138,13 @@ subroutine ini_mean_io(mesh)
         EXIT
      end if
   end do
-  
+
+  ! initialize Hecuba datamodel (if the model is using Hecuba configuration)  
+#if defined (__hecuba)
+  call hecuba_init_datamodel(3)  
+#endif
+ 
+    
 DO i=1, io_listsize
 SELECT CASE (trim(io_list(i)%id))
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!2D streams!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -795,6 +805,8 @@ end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
+
+! todo: clone this function with name hecuba_output
 subroutine output(istep, mesh)
   use g_clock
   use mod_mesh
@@ -803,6 +815,10 @@ subroutine output(istep, mesh)
 #if defined (__icepack)
   use icedrv_main,    only: init_io_icepack
 #endif
+
+!#if defined (__hecuba)
+!  call hecuba_init_datamodel(3)  
+!#endif
 
   implicit none
 
@@ -866,8 +882,13 @@ subroutine output(istep, mesh)
             entry%filename = filepath
             ! use any existing file with this name or create a new one
             if( nf_open(entry%filename, nf_write, entry%ncid) /= nf_noerr ) then
+              ! todo: put the code here to save to Hecuba
+#if defined (__hecuba)
+              ! todo : saving to netcdf logic may be need to be removed
+              call hecuba_output(istep, entry%name, entry%description, entry%units, entry%freq, entry%freq_unit, entry%accuracy )
+#endif
               call create_new_file(entry, mesh)
-              call assert_nf( nf_open(entry%filename, nf_write, entry%ncid), __LINE__)
+              call assert_nf( nf_open(entry%filename, nf_write, entry%ncid), __LINE__)  
             end if
             call assoc_ids(entry)
           end if

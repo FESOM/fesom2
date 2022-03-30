@@ -1,7 +1,7 @@
 module command_line_options_module
 ! synopsis: read options passed to the main executable and trigger corresponding actions
 
-  implicit none  
+  implicit none
   public command_line_options
   private
 
@@ -19,7 +19,7 @@ contains
     character(len=:), allocatable :: arg
     integer arglength
 
-    do i = 1, command_argument_count()    
+    do i = 1, command_argument_count()
       call get_command_argument(i, length=arglength)
       allocate(character(arglength) :: arg)
       call get_command_argument(i, value=arg)

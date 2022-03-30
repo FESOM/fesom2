@@ -40,6 +40,24 @@ add_subdirectory(../lib/parms ${PROJECT_BINARY_DIR}/parms)
 
 add_subdirectory(async_threads_cpp)
 
+# Using FESOM2 alogside Hecuba database 
+if(${USE_HECUBA})
+   if(DOCKER_HECUBA)
+       message("Setting path to Hecuba includes for Docker container platform" )
+       set( HECUBA_ROOT "/usr/local/hecuba" )
+   else()
+       message("Setting path to Hecuba includes for Marenostrum IV platform")
+       set( HECUBA_ROOT "/apps/HECUBA/1.0_api" )   
+   endif()
+   
+   message("*******************Hecuba includes ${HECUBA_ROOT} ********************************" )
+   add_subdirectory(io_hecuba_cpp)   
+else()
+   list(REMOVE_ITEM sources_Fortran ${src_home}/hecuba_interface_module.F90)   
+endif()
+
+
+
 include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindNETCDF.cmake)
 
 add_library(${PROJECT_NAME}_C ${sources_C})
@@ -62,6 +80,10 @@ endif()
 if(${USE_ICEPACK})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __icepack)
 endif()
+if(${USE_HECUBA})
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __hecuba)
+endif()
+
 if(${VERBOSE})
    target_compile_definitions(${PROJECT_NAME} PRIVATE VERBOSE)
 endif()
@@ -80,9 +102,31 @@ endif()
 target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES} ${OASIS_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
+
+if(${USE_HECUBA})
+   set(HECUBA_INCLUDES -I${HECUBA_ROOT}/include -L${HECUBA_ROOT}/lib -lhfetch -Wl,-rpath,${HECUBA_ROOT}/lib )
+   if(DOCKER_HECUBA)
+      set(ALL_LIBS "")   
+   else()
+      # specify where to search the dependencies
+       FIND_LIBRARY(CASS NAMES cassandra PATHS ${HECUBA_ROOT}/lib ENV LD_LIBRARY_PATH)
+       FIND_LIBRARY(LIBUV NAMES uv PATHS ${HECUBA_ROOT}/lib ENV LD_LIBRARY_PATH)
+       FIND_LIBRARY(TBB NAMES tbb PATHS ${HECUBA_ROOT}/lib ENV LD_LIBRARY_PATH)
+       FIND_LIBRARY(ARROW NAMES arrow PATHS ${HECUBA_ROOT}/lib ENV LD_LIBRARY_PATH) 
+       set(ALL_LIBS ${CASS} ${LIBUV} ${ARROW} ${TBB})
+   endif()
+   target_link_libraries(${PROJECT_NAME} io_hecuba_cpp ${HECUBA_INCLUDES} ${ALL_LIBS})
+endif()
+
+#if(${USE_HECUBA})
+#   set(HECUBA_INCLUDES -I${HECUBA_ROOT}/include -L${HECUBA_ROOT}/lib -lhfetch -Wl,-rpath,${HECUBA_ROOT}/lib )
+#   target_link_libraries(${PROJECT_NAME} io_hecuba_cpp ${HECUBA_INCLUDES})
+#endif()
+      
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} async_threads_cpp)
+
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 
 set(FESOM_INSTALL_FILEPATH "${CMAKE_CURRENT_LIST_DIR}/../bin/fesom.x" CACHE FILEPATH "file path where the FESOM binary should be put")

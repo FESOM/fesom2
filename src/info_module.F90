@@ -1,7 +1,7 @@
 module info_module
 ! synopsis: query information from FESOM
 
-  implicit none  
+  implicit none
   public info
   private
 
@@ -21,72 +21,77 @@ contains
       print '(g0)', '__icepack is ON'
 #else
       print '(g0)', '__icepack is OFF'
-#endif  
+#endif
+#ifdef __hecuba
+      print '(g0)', '__hecuba is ON'
+#else
+      print '(g0)', '__hecuba is OFF'
+#endif
 #ifdef __oasis
       print '(g0)', '__oasis is ON'
 #else
       print '(g0)', '__oasis is OFF'
-#endif  
+#endif
 #ifdef __oifs
       print '(g0)', '__oifs is ON'
 #else
       print '(g0)', '__oifs is OFF'
-#endif  
+#endif
 #ifdef DEBUG
       print '(g0)', 'DEBUG is ON'
 #else
       print '(g0)', 'DEBUG is OFF'
-#endif  
+#endif
 #ifdef DISABLE_MULTITHREADING
       print '(g0)', 'DISABLE_MULTITHREADING is ON'
 #else
       print '(g0)', 'DISABLE_MULTITHREADING is OFF'
-#endif  
+#endif
 #ifdef false
       print '(g0)', 'false is ON'
 #else
       print '(g0)', 'false is OFF'
-#endif  
+#endif
 #ifdef FVOM_INIT
       print '(g0)', 'FVOM_INIT is ON'
 #else
       print '(g0)', 'FVOM_INIT is OFF'
-#endif  
+#endif
 #ifdef oifs
       print '(g0)', 'oifs is ON'
 #else
       print '(g0)', 'oifs is OFF'
-#endif  
+#endif
 #ifdef OMP_MAX_THREADS
       print '(g0)', 'OMP_MAX_THREADS is ON'
 #else
       print '(g0)', 'OMP_MAX_THREADS is OFF'
-#endif  
+#endif
 #ifdef PARMS
       print '(g0)', 'PARMS is ON'
 #else
       print '(g0)', 'PARMS is OFF'
-#endif  
+#endif
 #ifdef PETSC
       print '(g0)', 'PETSC is ON'
 #else
       print '(g0)', 'PETSC is OFF'
-#endif  
+#endif
 #ifdef use_cavity
       print '(g0)', 'use_cavity is ON'
 #else
       print '(g0)', 'use_cavity is OFF'
-#endif  
+#endif
 #ifdef use_fullfreesurf
       print '(g0)', 'use_fullfreesurf is ON'
 #else
       print '(g0)', 'use_fullfreesurf is OFF'
-#endif  
+#endif
 #ifdef VERBOSE
       print '(g0)', 'VERBOSE is ON'
 #else
       print '(g0)', 'VERBOSE is OFF'
-#endif  
+#endif
   end subroutine
 
 end module
