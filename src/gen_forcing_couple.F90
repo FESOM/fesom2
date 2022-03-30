@@ -116,11 +116,11 @@ subroutine update_atm_forcing(istep, mesh)
                 exchange(:) = ice_alb(:)                                ! ice albedo
             elseif (i.eq.6) then
                 do n=1,myDim_nod2D+eDim_nod2D
-                    exchange(n) = UV(1,1,n)                             ! u component of surface velocity [m/s]
+                    exchange(n) = Unode(1,1,n)                             ! u component of surface velocity [m/s]
                 enddo
             elseif (i.eq.7) then
                 do n=1,myDim_nod2D+eDim_nod2D
-                    exchange(n) = UV(2,1,n)                             ! v component of surface velocity [m/s]
+                    exchange(n) = Unode(2,1,n)                             ! v component of surface velocity [m/s]
                 enddo
             else	    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
