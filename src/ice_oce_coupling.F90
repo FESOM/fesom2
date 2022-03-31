@@ -250,13 +250,14 @@ subroutine oce_fluxes(mesh)
     heat_flux   = -net_heat_flux 
     water_flux  = -fresh_wa_flux
 #endif 
-    heat_flux_in=heat_flux ! sw_pene will change the heat_flux
    
     if (use_cavity) call cavity_heat_water_fluxes_3eq(mesh)
     !!PS if (use_cavity) call cavity_heat_water_fluxes_2eq(mesh)
     
 !!PS     where(ulevels_nod2D>1) heat_flux=0.0_WP
 !!PS     where(ulevels_nod2D>1) water_flux=0.0_WP
+
+    heat_flux_in=heat_flux ! sw_pene will change the heat_flux
     
     !___________________________________________________________________________
     call exchange_nod(heat_flux, water_flux) 
