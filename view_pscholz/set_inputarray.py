@@ -15,8 +15,8 @@ def set_inputarray():
 	#inputarray['data_dir1'		 ] = '/media/pscholz/data_ext_2/DATA_FESOM2.0/linfs/withoutPC-2/'    
 	
 	#____FESOM MESH INFO________________________________________________________
-	inputarray['mesh_id'		 ] = 'COREv2'
-	inputarray['mesh_dir'		 ] = '/work/ollie/pscholz/mesh_fesom2.0/mesh_CORE2_dsidorenko_meanval/'
+# 	inputarray['mesh_id'],inputarray['mesh_dir'] = 'COREv2','/work/ollie/pscholz/mesh_fesom2.0/mesh_CORE2_dsidorenko_meanval/'
+	inputarray['mesh_id'],inputarray['mesh_dir'] = 'COREv2','/work/ollie/pscholz/mesh_fesom2.0/core2_meanz/'
 	
 	# Euler-Angle:for poles at (phi,theta)=(-40,75)
 	inputarray['mesh_alpha'	 	 ] = np.float( 50.0)
@@ -42,6 +42,8 @@ def set_inputarray():
 	inputarray['proj'     ] 	   = 'cyl' # 'ortho', 'cyl', 'npstere'  
 	inputarray['proj_lon' ] 	   = 0 #only for ortho
 	inputarray['proj_lat' ] 	   = 75 #only for ortho
+	
+	inputarray['use_cavity' ] 	   = False #only for ortho
 	#___________________________________________________________________________
 	return inputarray
 
