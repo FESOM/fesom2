@@ -21,11 +21,7 @@ subroutine thermodynamics(mesh)
   use o_array,          only: real_salt_flux
 #endif
   use g_parsup,         only: myDim_nod2D, eDim_nod2D
-#ifdef use_cavity
   use o_mesh,           only: coord_nod2D, ulevels_nod2D
-#else
-  use o_mesh,           only: coord_nod2D
-#endif
 
   !---- variables from ice_modules.F90
   use i_dyn_parms,      only: Cd_oce_ice
@@ -101,9 +97,7 @@ subroutine thermodynamics(mesh)
   !---- loop over all surface node
   do inod=1,myDim_nod2d+eDim_nod2d
 
-#ifdef use_cavity
      if (ulevels_nod2D(inod) > 1) cycle
-#endif
 
      A       = a_ice(inod)
      h       = m_ice(inod)
