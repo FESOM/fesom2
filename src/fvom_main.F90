@@ -98,6 +98,7 @@ integer mpi_version_len
     !=====================
     ! set necessary water isotope variables  
     !=====================
+#if defined (__oasis)
     IF (lwiso) THEN
       num_wiso_tracers = 3    ! always assume 3 water isotope tracers in the order H218O, HD16O, H216O
       tracer_id((num_tracers+1):(num_tracers+3)) = (/101, 102, 103/)
@@ -108,6 +109,7 @@ integer mpi_version_len
       nsend = nsend + 6       ! add number of water isotope tracers to coupling parameter nsend, nrecv
       nrecv = nrecv + 6
     END IF
+#endif
 !---wiso-code-end
 
     !=====================
