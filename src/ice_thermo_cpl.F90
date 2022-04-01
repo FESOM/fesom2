@@ -133,15 +133,6 @@ subroutine thermodynamics(mesh)
      end if
 
 #if defined (__oifs)
-     !---- different lead closing parameter for NH and SH
-     call r2g(geolon, geolat, coord_nod2d(1,inod), coord_nod2d(2,inod))
-     if (geolat.lt.0.) then
-        h0min = 1.0
-        h0max = 1.5
-     else
-        h0min = 0.5
-        h0max = 1.5
-     endif
      !---- For AWI-CM3 we calculate ice surface temp and albedo in fesom,
      ! then send those to OpenIFS where they are used to calucate the 
      ! energy fluxes ---!
@@ -520,29 +511,22 @@ contains
 
   ! set albedo
   ! ice and snow, freezing and melting conditions are distinguished
-  if (geolat.lt.0.) then !SH does not have melt ponds
-      melt_pool_alb_reduction = 0.0_WP
-      nh_winter_reduction = 0.0_WP
-  else
-      melt_pool_alb_reduction = 0.20_WP
-      nh_winter_reduction = 0.06_WP
-  endif
-  if (h>0.0_WP) then
-     if (t<273.15_WP) then         ! freezing condition    
-        if (hsn.gt.0.001_WP) then !   snow cover present  
-           alb=albsn-nh_winter_reduction            
-        else                    !   no snow cover       
-           alb=albi-nh_winter_reduction             
+  if (h>0.0_WP) then                                    ! sea ice condition
+     if (t<271_WP) then                                 ! freezing condition    
+        if (hsn.gt.0.001_WP) then                       ! snow cover
+           alb=albsn        
+        else                                            ! no snow cover       
+           alb=albi             
         endif
-     else                               ! melting condition     
-        if (hsn.gt.0.001_WP) then !   snow cover present  
-           alb=albsnm-melt_pool_alb_reduction           
-        else                    !   no snow cover       
-           alb=albim-melt_pool_alb_reduction
+     else                                               ! melting condition     
+        if (hsn.gt.0.01_WP) then                        ! thick snow cover
+           alb=albsnm  
+        else                                            ! no snow cover       
+           alb=albim
         endif
      endif
    else
-      alb=0.066_WP            !  ocean albedo
+      alb=0.066_WP                                      !  ocean albedo (not used at the moment)
    endif
  end subroutine ice_albedo
 
