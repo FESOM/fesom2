@@ -34,6 +34,7 @@ use landice_water_init_interface
 !---iceberg-fwf-code
 use iceberg_water_init_interface
 !---iceberg-fwf-code-end
+use command_line_options_module
 
 ! Define icepack module
 #if defined (__icepack)
@@ -105,6 +106,14 @@ integer             :: fesom_thread_info
 logical             :: bIcbCalcCycleCompleted
 
 type(t_mesh),             target, save :: mesh
+character(LEN=MPI_MAX_LIBRARY_VERSION_STRING) :: mpi_version_txt
+integer mpi_version_len
+
+
+  if(command_argument_count() > 0) then
+    call command_line_options%parse()
+    stop
+  end if
 
 ! kh 26.03.21 get current values for ib_async_mode and thread_support_level_required
     call read_namelist_icebergs
@@ -157,6 +166,8 @@ type(t_mesh),             target, save :: mesh
     if(mype==0) then
         write(*,*)
         print *,"FESOM2 git SHA: "//fesom_git_sha()
+        call MPI_Get_library_version(mpi_version_txt, mpi_version_len, MPIERR)
+        print *,"MPI library version: "//trim(mpi_version_txt)
         print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
         print *, achar(27)//'[7;32m'//' --> FESOM BUILDS UP MODEL CONFIGURATION                    '//achar(27)//'[0m'
     end if

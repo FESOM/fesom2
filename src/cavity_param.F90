@@ -356,14 +356,14 @@ end subroutine cavity_heat_water_fluxes_2eq
 subroutine cavity_momentum_fluxes(mesh)
     use MOD_MESH
     use o_PARAM , only: density_0, C_d, WP
-    use o_ARRAYS, only: UV, stress_surf
+    use o_ARRAYS, only: UV, Unode, stress_surf, stress_node_surf
     use i_ARRAYS, only: u_w, v_w
     use g_PARSUP   
     implicit none
     
     !___________________________________________________________________________
     type(t_mesh), intent(inout) , target :: mesh
-    integer        :: elem, elnodes(3), nzmin
+    integer        :: elem, elnodes(3), nzmin, node
     real(kind=WP)  :: aux
 
 #include "associate_mesh.h" 
@@ -380,6 +380,19 @@ subroutine cavity_momentum_fluxes(mesh)
         aux=sqrt(UV(1,nzmin,elem)**2+UV(2,nzmin,elem)**2)*density_0*C_d 
         stress_surf(1,elem)=-aux*UV(1,nzmin,elem)
         stress_surf(2,elem)=-aux*UV(2,nzmin,elem)
+    end do
+    
+    !___________________________________________________________________________
+    do node=1,myDim_nod2D+eDim_nod2D   
+        nzmin  = ulevels_nod2d(node)
+        if(nzmin==1) cycle   
+        
+        ! momentum stress:
+        ! need to check the sensitivity to the drag coefficient
+        ! here I use the bottom stress coefficient, which is 3e-3, for this FO2 work.
+        aux=sqrt(Unode(1,nzmin,node)**2+Unode(2,nzmin,node)**2)*density_0*C_d 
+        stress_node_surf(1,node)=-aux*Unode(1,nzmin,node)
+        stress_node_surf(2,node)=-aux*Unode(2,nzmin,node)
     end do
 end subroutine cavity_momentum_fluxes
 !

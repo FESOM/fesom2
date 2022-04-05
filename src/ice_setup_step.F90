@@ -281,7 +281,7 @@ t0=MPI_Wtime()
     end do
 #endif /* (__oifs) */
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call cut_off...'//achar(27)//'[0m'
-    call cut_off
+    call cut_off(mesh)
     
     if (use_cavity) call cavity_ice_clean_ma(mesh)
     t2=MPI_Wtime()
@@ -291,6 +291,21 @@ t0=MPI_Wtime()
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
     call thermodynamics(mesh)
 #endif /* (__icepack) */
+
+
+    do i=1,myDim_nod2D+eDim_nod2D
+        if ( ( U_ice(i)/=0.0_WP .and. mesh%ulevels_nod2d(i)>1) .or. (V_ice(i)/=0.0_WP .and. mesh%ulevels_nod2d(i)>1) ) then
+            write(*,*) " --> found cavity velocity /= 0.0_WP , ", mype
+            write(*,*) " ulevels_nod2d(n) = ", mesh%ulevels_nod2d(i)
+            write(*,*) " U_ice(n) = ", U_ice(i)
+            write(*,*) " V_ice(n) = ", V_ice(i)
+            write(*,*)
+        end if 
+    end do
+
+
+
+
     t3=MPI_Wtime()
     rtime_ice = rtime_ice + (t3-t0)
     rtime_tot = rtime_tot + (t3-t0)
@@ -341,7 +356,11 @@ subroutine ice_initial_state(mesh)
     do i=1,myDim_nod2D+eDim_nod2D    
     
         !_______________________________________________________________________
-        if (ulevels_nod2d(i)>1) cycle ! --> if cavity, no sea ice, no initial state
+        if (ulevels_nod2d(i)>1) then
+            !!PS m_ice(i)  = 1.0e15_WP
+            !!PS m_snow(i) = 0.1e15_WP
+            cycle ! --> if cavity, no sea ice, no initial state
+        endif    
         
         !_______________________________________________________________________
         if (tr_arr(1,i,1)< 0.0_WP) then
