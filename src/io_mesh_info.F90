@@ -44,10 +44,10 @@ implicit none
   integer                    :: nod_area_id, elem_area_id
   integer, target            :: z_id, zbar_id
   integer                    :: edges_id, edge_tri_id, edge_cross_dxdy_id
-  integer                    :: nlevels_nod2D_id, nlevels_id
+  integer                    :: nlevels_nod2D_id, nlevels_id, ulevels_nod2D_id, ulevels_id
   integer                    :: nod_in_elem2D_num_id, nod_in_elem2D_id
   integer                    :: gradient_sca_x_id, gradient_sca_y_id
-  integer                    :: zbar_e_bot_id,zbar_n_bot_id
+  integer                    :: zbar_e_bot_id,zbar_n_bot_id,zbar_e_srf_id,zbar_n_srf_id
   integer                    :: elem_id
   integer                    :: nod_id
   character(100)             :: longname
@@ -89,6 +89,12 @@ implicit none
   call my_def_var(ncid, 'elem_part',         NF_INT,    1, (/elem_n_id/), elem_part_id,         'element partitioning at the cold start')
   call my_def_var(ncid, 'zbar_e_bottom',     NF_DOUBLE, 1, (/elem_n_id/), zbar_e_bot_id,        'element bottom depth')
   call my_def_var(ncid, 'zbar_n_bottom',     NF_DOUBLE, 1, (/nod_n_id/) , zbar_n_bot_id,        'nodal bottom depth')
+  if (use_cavity) then
+  call my_def_var(ncid, 'ulevels_nod2D',     NF_INT,    1, (/nod_n_id/),  ulevels_nod2D_id,     'number of levels above nodes'          )
+  call my_def_var(ncid, 'ulevels',           NF_INT,    1, (/elem_n_id/), ulevels_id,           'number of levels above elements'       )
+  call my_def_var(ncid, 'zbar_e_surface',    NF_DOUBLE, 1, (/elem_n_id/), zbar_e_srf_id,        'element surface depth')
+  call my_def_var(ncid, 'zbar_n_surface',    NF_DOUBLE, 1, (/nod_n_id/) , zbar_n_srf_id,        'nodal surface depth')
+  endif
   ! 2D
   call my_def_var(ncid, 'nod_area',          NF_DOUBLE, 2, (/nod_n_id, nl_id/), nod_area_id,        'nodal areas'                 )
   call my_def_var(ncid, 'elements',          NF_INT,    2, (/elem_n_id, id_3/), elem_id,            'elements'                    )
@@ -255,6 +261,32 @@ implicit none
   call gather_elem(zbar_e_bot(1:myDim_elem2D), rbuffer)
   call my_put_vara(ncid, zbar_e_bot_id, 1, elem2D, rbuffer)
   deallocate(rbuffer)
+
+  if (use_cavity) then
+  ! number of levels above elements
+  allocate(ibuffer(elem2D))
+  call gather_elem(ulevels(1:myDim_elem2D), ibuffer)
+  call my_put_vara(ncid, ulevels_id, 1, elem2D, ibuffer)
+  deallocate(ibuffer)
+
+  ! number of levels above nodes
+  allocate(ibuffer(nod2D))
+  call gather_nod(ulevels_nod2D(1:myDim_nod2D), ibuffer)
+  call my_put_vara(ncid, ulevels_nod2D_id, 1, nod2D, ibuffer)
+  deallocate(ibuffer)
+
+  ! nodal surface depth (take into account partial cells if used)
+  allocate(rbuffer(nod2D))
+  call gather_nod(zbar_n_srf(1:myDim_nod2D), rbuffer)
+  call my_put_vara(ncid, zbar_n_srf_id, 1, nod2D, rbuffer)
+  deallocate(rbuffer)
+
+  ! element surface depth (take into account partial cells if used)
+  allocate(rbuffer(elem2D))
+  call gather_elem(zbar_e_srf(1:myDim_elem2D), rbuffer)
+  call my_put_vara(ncid, zbar_e_srf_id, 1, elem2D, rbuffer)
+  deallocate(rbuffer)
+  endif
   
   call my_close(ncid)
   
