@@ -3,7 +3,6 @@ include ../../Makefile.in
 include Makefile.in
 
 libmetis.a:
-	make clean
 	make -C ./GKlib
 	make -C ./libmetis
 

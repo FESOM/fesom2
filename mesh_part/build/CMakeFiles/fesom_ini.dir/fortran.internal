@@ -1,8 +1,0 @@
-# The fortran modules provided by this target.
-provides
- g_config.mod
- g_parsup.mod
- g_rotate_grid.mod
- o_arrays.mod
- o_mesh.mod
- o_param.mod

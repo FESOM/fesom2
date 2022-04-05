@@ -1,0 +1,63 @@
+module forcing_provider_module_tests
+  use forcing_provider_async_module
+  use funit; implicit none
+  
+contains
+
+
+
+  @test
+  subroutine test_can_read_across_two_years()
+    real(4), allocatable :: forcingdata(:,:)
+    
+    allocate(forcingdata(3,4))
+    call forcing_provider%get_forcingdata(1, 1, .false., "fixtures/test.1948.nc", 2015, "q", 1, forcingdata)
+    @assertEqual(0.0000, forcingdata(1,1), tolerance=1.e-6)  
+    @assertEqual(0.0001, forcingdata(2,1), tolerance=1.e-6)  
+    @assertEqual(0.0007, forcingdata(2,3), tolerance=1.e-6)  
+
+    call forcing_provider%get_forcingdata(1, 1, .false., "fixtures/test.1948.nc", 2016, "q", 1, forcingdata)
+    @assertEqual(0.0000, forcingdata(1,1), tolerance=1.e-6)  
+    @assertEqual(0.0001, forcingdata(2,1), tolerance=1.e-6)  
+    @assertEqual(0.0007, forcingdata(2,3), tolerance=1.e-6)  
+  end subroutine
+
+
+  @test
+  subroutine test_netcdf_forcing_can_get_timestep1_twice()
+    real(4), allocatable :: forcingdata(:,:)
+    character(:), allocatable :: filepath
+    character(:), allocatable :: varname
+    
+    filepath = "fixtures/test.1948.nc"
+    varname = "q"
+    allocate(forcingdata(3,4))
+    call forcing_provider%get_forcingdata(1, 1, .false., filepath, 2015, varname, 1, forcingdata)
+    @assertEqual(0.0000, forcingdata(1,1), tolerance=1.e-6)  
+    @assertEqual(0.0001, forcingdata(2,1), tolerance=1.e-6)  
+    @assertEqual(0.0007, forcingdata(2,3), tolerance=1.e-6)  
+    
+    call forcing_provider%get_forcingdata(1, 1, .false., filepath, 2015, varname, 1, forcingdata)
+    @assertEqual(0.0000, forcingdata(1,1), tolerance=1.e-6)  
+    @assertEqual(0.0001, forcingdata(2,1), tolerance=1.e-6)  
+    @assertEqual(0.0007, forcingdata(2,3), tolerance=1.e-6)  
+  end subroutine
+
+
+  @test
+  subroutine test_netcdf_forcing_timestep5_equals_fixture()
+    real(4), allocatable :: forcingdata(:,:)
+    character(:), allocatable :: filepath
+    character(:), allocatable :: varname
+    
+    filepath = "fixtures/test.1948.nc"
+    varname = "q"
+    allocate(forcingdata(3,4))
+
+    call forcing_provider%get_forcingdata(1, 1, .false., filepath, 2015, varname, 5, forcingdata)
+    @assertEqual(0.0048, forcingdata(1,1), tolerance=1.e-6)  
+    @assertEqual(0.0049, forcingdata(2,1), tolerance=1.e-6)  
+    @assertEqual(0.0055, forcingdata(2,3), tolerance=1.e-6)
+  end subroutine
+
+end module

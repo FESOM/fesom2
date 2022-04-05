@@ -1,2 +1,0 @@
-/sw/rhel6-x64/gcc/binutils-2.24-gccsys/bin/ar qc libfesom_ini_C.a  CMakeFiles/fesom_ini_C.dir/pf/a/a270124/awicm-2.0/fesom-2.0/src/fort_part.c.o
-/sw/rhel6-x64/gcc/binutils-2.24-gccsys/bin/ranlib libfesom_ini_C.a

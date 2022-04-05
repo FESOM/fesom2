@@ -1,0 +1,91 @@
+ollie:
+    lnodename:
+        - 'ollie0*'
+        - 'ollie1*'
+    meshes:
+        test_global: ./test/meshes/pi/
+        test_souf: ./test/meshes/soufflet/
+        pi: /work/ollie/clidyn/FESOM2/meshes/pi/
+        core2: /work/ollie/clidyn/FESOM2/meshes/core2/
+        mr: /work/ollie/clidyn/FESOM2/meshes/mr/
+        hr: /work/ollie/clidyn/FESOM2/meshes/hr/
+        orca25: /work/ollie/clidyn/FESOM2/meshes/orca25/
+        farc: /work/ollie/clidyn/FESOM2/meshes/farc/
+    forcing:
+        test_global: ./test/input/global/
+        CORE2: /work/ollie/clidyn/forcing/CORE2/
+        JRA55: /work/ollie/clidyn/forcing/JRA55-do-v1.4.0/
+        ERA5: /work/ollie/clidyn/forcing/ERA5/inverted/
+    clim:
+        test_global: ./test/input/global/
+        phc: /work/ollie/clidyn/FESOM2/hydrography/phc3.0/
+        woa18: /work/ollie/clidyn/FESOM2/hydrography/woa18/
+        en4-2-0: /work/ollie/clidyn/FESOM2/hydrography/en4-2-0/
+        mit: /work/ollie/clidyn/FESOM2/hydrography/mit/
+        gur: /work/ollie/clidyn/FESOM2/hydrography/gur/
+    opath:
+        opath: /work/ollie/${USER}/
+
+mistral:
+    lnodename:
+        - 'mlogin*'
+        - 'mistralpp*'
+    meshes:
+        test_global: ./test/meshes/pi/
+        test_souf: ./test/meshes/soufflet/
+        pi: /pool/data/AWICM/FESOM2/MESHES_FESOM2.1/pi/
+        core2: /pool/data/AWICM/FESOM2/MESHES_FESOM2.1/core2/
+        mr: /pool/data/AWICM/FESOM2/MESHES_FESOM2.1/mr/
+        hr: /pool/data/AWICM/FESOM2/MESHES_FESOM2.1/hr/
+        orca25: /pool/data/AWICM/FESOM2/MESHES_FESOM2.1/orca25/
+        farc: /pool/data/AWICM/FESOM2/MESHES_FESOM2.1/farc/
+    forcing:
+        test_global: ./test/input/global/
+        CORE2: /pool/data/AWICM/FESOM2/FORCING/CORE2/
+        JRA55: /pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/
+        ERA5: /pool/data/AWICM/FESOM2/FORCING/
+    clim:
+        test_global: ./test/input/global/
+        phc: /pool/data/AWICM/FESOM2/INITIAL/phc3.0/
+    opath:
+        opath: /scratch/a/${USER}/
+
+docker:
+    lnodename:
+        - ' '
+    meshes:
+        pi: /fesom/pi/
+        test_souf: ./test/meshes/soufflet/
+        test_global: ./test/meshes/pi/
+    forcing:
+        CORE2: /fesom/dCORE2/
+        JRA55: /fesom/dJRA55/
+        test_global: ./test/input/global/
+    clim:
+        phc: /fesom/phc3/
+        test_global: ./test/input/global/
+    opath:
+        opath: ../results/
+
+juwels:
+    lnodename:
+        - 'jwlogin*'
+    meshes:
+        test_global: ./test/meshes/pi/
+        test_souf: ./test/meshes/soufflet/
+        pi: /p/project/chhb19/hhb192/meshes/POOL/FESOM2/meshes/pi/
+        core2: /p/project/chhb19/hhb192/meshes/POOL/FESOM2/meshes/core2/
+        mr: /p/project/chhb19/hhb192/meshes/POOL/FESOM2/meshes/mr/
+        hr: /p/project/chhb19/hhb192/meshes/POOL/FESOM2/meshes/hr/
+        orca25: /p/project/chhb19/hhb192/meshes/POOL/FESOM2/meshes/orca25/
+        farc: /p/project/chhb19/hhb192/meshes/POOL/FESOM2/meshes/farc/
+    forcing:
+        test_global: ./test/input/global/
+        CORE2: /p/project/chhb19/hhb192/forcing/forcing/CORE2/
+        JRA55: /p/project/chhb19/hhb192/forcing/forcing/JRA55-do-v1.4.0/
+    clim:
+        test_global: ./test/input/global/
+        phc: /p/project/chhb19/hhb192/meshes/POOL/FESOM2/hydrography/phc3.0/
+    opath:
+        opath: /p/scratch/chhb19/${USER}/
+
