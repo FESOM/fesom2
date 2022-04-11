@@ -9,7 +9,7 @@ MODULE nemogcmcoup_steps
    INTEGER :: substeps !per IFS timestep
 END MODULE nemogcmcoup_steps
 
-SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
+SUBROUTINE nemogcmcoup_init( mype, icomm, inidate, initime, itini, itend, zstp, &
    & lwaveonly, iatmunit, lwrite )
 
    ! Initialize the FESOM model for single executable coupling 
@@ -26,6 +26,7 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    ! Input arguments
 
    ! Message passing information
+   INTEGER, INTENT(IN) :: mype ! was added to ifs/nemo/ininemo.F90 to allow diagnostics based on the first tasks only
    INTEGER, INTENT(IN) :: icomm
    ! Initial date (e.g. 20170906), time, initial timestep and final time step
    INTEGER, INTENT(OUT) ::  inidate, initime, itini, itend
@@ -395,8 +396,8 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    eDim_elem2D  => fesom%partit%eDim_elem2D
    eXDim_elem2D => fesom%partit%eXDim_elem2D
 
-   coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)                  => fesom%mesh%coord_nod2D   
-   elem2D_nodes(1:3, 1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => fesom%mesh%elem2D_nodes
+   coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)                  => fesom%mesh%coord_nod2D(:,:)   
+   elem2D_nodes(1:3, 1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => fesom%mesh%elem2D_nodes(:,:)
    a_ice        => fesom%ice%data(1)%values(:)
    m_ice        => fesom%ice%data(2)%values(:)
    m_snow       => fesom%ice%data(3)%values(:)
@@ -625,7 +626,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    real(kind=wpIFS), dimension(:)  , pointer :: oce_heat_flux, ice_heat_flux 
    myDim_nod2D        => fesom%partit%myDim_nod2D
    eDim_nod2D         => fesom%partit%eDim_nod2D
-   coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => fesom%mesh%coord_nod2D  
+   coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => fesom%mesh%coord_nod2D(:,:)  
    stress_atmice_x    => fesom%ice%stress_atmice_x
    stress_atmice_y    => fesom%ice%stress_atmice_y
    oce_heat_flux      => fesom%ice%atmcoupl%oce_flx_h(:)
