@@ -172,7 +172,7 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
      do i=1,nsend
          exchange  =0.
          if (i.eq.1) then
-#if defined (__oifs) || defined (__ifsinterface)
+#if defined (__oifs)
             ! AWI-CM3 outgoing state vectors
             do n=1,myDim_nod2D+eDim_nod2D
             exchange(n)=tracers%data(1)%values(1, n)+tmelt	           ! sea surface temperature [K]
