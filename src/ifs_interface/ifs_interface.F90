@@ -396,8 +396,8 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    eDim_elem2D  => fesom%partit%eDim_elem2D
    eXDim_elem2D => fesom%partit%eXDim_elem2D
 
-   coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)                  => fesom%mesh%coord_nod2D   
-   elem2D_nodes(1:3, 1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => fesom%mesh%elem2D_nodes
+   coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)                  => fesom%mesh%coord_nod2D(:,:)   
+   elem2D_nodes(1:3, 1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => fesom%mesh%elem2D_nodes(:,:)
    a_ice        => fesom%ice%data(1)%values(:)
    m_ice        => fesom%ice%data(2)%values(:)
    m_snow       => fesom%ice%data(3)%values(:)
@@ -625,7 +625,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    real(kind=wpIFS), dimension(:)  , pointer :: oce_heat_flux, ice_heat_flux 
    myDim_nod2D        => fesom%partit%myDim_nod2D
    eDim_nod2D         => fesom%partit%eDim_nod2D
-   coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => fesom%mesh%coord_nod2D  
+   coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => fesom%mesh%coord_nod2D(:,:)  
    stress_atmice_x    => fesom%ice%stress_atmice_x
    stress_atmice_y    => fesom%ice%stress_atmice_y
    oce_heat_flux      => fesom%ice%atmcoupl%oce_flx_h(:)
