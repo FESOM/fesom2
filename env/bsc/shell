@@ -1,7 +1,5 @@
-
-module load intel/2020.1 impi/2018.4 mkl/2020.1 bsc/1.0 netcdf/4.2
+module load intel/2018.1 impi/2018.1 mkl/2018.1 bsc/1.0 netcdf/4.2
+# explicitly export Hecuba dependencies
+export LD_LIBRARY_PATH=/apps/YAML-CPP/0.7.0/GCC/lib64:/apps/BOOST/1.64.0/INTEL/IMPI/lib:/apps/OPENCV/4.1.2/GCC/lib64:/apps/PYTHON/3.6.4_ML/extras/.mujoco/mjpro150/bin:/apps/PYTHON/3.6.4_ML/extras/lib64:/apps/PYTHON/3.6.4_ML/extras/lib:$LD_LIBRARY_PATH
 
 export FC=mpiifort CC=mpiicc CXX=mpiicpc
-
-
-
