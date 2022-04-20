@@ -14,7 +14,7 @@ load the Hecuba modules:
 
 ```
 module use /apps/HECUBA/modulefiles
-module load Hecuba/1.0
+module load Hecuba/1.1
 ```
 Note that in the release version, the C++ API is still not present so you 
 have to use an special module specially created for such purpose:

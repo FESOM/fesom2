@@ -118,8 +118,6 @@ namespace Hecuba
         mydict->sync();
         myobj->sync();
     #endif
-
-
    }
 
     void Hecuba_interface::init_datamodel(int index_id)
@@ -136,9 +134,6 @@ namespace Hecuba
         //this->session.loadDataModel("fesom_datamodel.yaml","fesom_datamodel.py");
        this->session.loadDataModel("model_complex.yaml","model_complex.py");
         std::cout<< "+ Data Model loaded"<<std::endl;
-        std::cout<< "DEBUG " << this->session.getDataModel()->debug() << std::endl;
-        std::cout<< "+ Data Model loaded"<<std::endl;
-
       } catch (std::exception &e) {
         std::cerr << "Error running the test " << std::endl;
         std::cerr << e.what() << std::endl;

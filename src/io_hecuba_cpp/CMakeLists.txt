@@ -13,7 +13,7 @@ if(DOCKER_HECUBA)
     set( HECUBA_ROOT "/usr/local/" )
 else()
     message("Setting path to Hecuba includes for Marenostrum IV platform")
-    set( HECUBA_ROOT "/apps/HECUBA/1.0_api" )    
+    set( HECUBA_ROOT "/apps/HECUBA/1.1" )    
 endif()
 
 # set Hecuba compilation flags - c++

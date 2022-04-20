@@ -47,7 +47,7 @@ if(${USE_HECUBA})
        set( HECUBA_ROOT "/usr/local/hecuba" )
    else()
        message("Setting path to Hecuba includes for Marenostrum IV platform")
-       set( HECUBA_ROOT "/apps/HECUBA/1.0_api" )   
+       set( HECUBA_ROOT "/apps/HECUBA/1.1" )   
    endif()
    
    message("*******************Hecuba includes ${HECUBA_ROOT} ********************************" )
