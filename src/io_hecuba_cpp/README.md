@@ -14,13 +14,13 @@ load the Hecuba modules:
 
 ```
 module use /apps/HECUBA/modulefiles
-module load Hecuba/1.1
+module load Hecuba/1.0
 ```
 Note that in the release version, the C++ API is still not present so you 
 have to use an special module specially created for such purpose:
 ```
 module use /apps/HECUBA/modulefiles
-module load Hecuba/1.0_api
+module load Hecuba/1.1
 ```
 ```
 # set global var where the includes and libs of Hecuba where compiled and installed
@@ -47,13 +47,13 @@ export EXECUTION_NAME=fesom2
 cd fesom_hecuba/
 mkrun pi test_pi -m docker
 cd work_pi/
-cp /fesom_hecuba/src/io_hecuba_cpp/*.yaml .
+cp /fesom_hecuba/src/io_hecuba_cpp/fesom_datamodel.yaml .
 ```
 The following files should be presented in the working dir:
 
 ```
  fcheck_values.csv
- *.yaml (datamodel files)
+ datamodelfiles.yaml
  job_docker_new
  namelist.config
  namelist.cvmix
@@ -112,7 +112,7 @@ cqlsh -e "SELECT * from fesom2.sst"
    18  history
 ``` 
 
-## update Hecuba installation (container)
+## update Hecuba installation (container) for previous versions to 1.1
 ```  
      cd hecuba/
      git pull
@@ -129,13 +129,25 @@ cqlsh -e "SELECT * from fesom2.sst"
      ll
      python3 setup.py install --c_binding=/usr/local/
 ```
+## update Hecuba installation (container) from versions >= 1.1
+
+```  
+     cd hecuba/
+     git pull
+     rm -rf build/
+     python3 setup.py install --c_binding=/usr/local/
+```
 
 ------------------------------------- update docker container
 update docker container (eflows4hpc-wp5:wp5_dev_v4 is the new version)
 ```
 # get the id of the container currently running asuming the one you made the changes
 docker ps
-docker commit d7e7e076d01c jberlindocker/eflows4hpc-wp5:wp5_dev_v4
-docker push jberlindocker/eflows4hpc-wp5:wp5_dev_v4
+# the following will be displayed, you should take the CONTAINER ID column value
+CONTAINER ID   IMAGE                                     COMMAND       CREATED       STATUS       PORTS     NAMES
+becc0212555c   jberlindocker/eflows4hpc-wp5:wp5_dev_v5   "/bin/bash"   2 hours ago   Up 2 hours   22/tcp    brave_napier
+# commit to a new version
+docker commit becc0212555c jberlindocker/eflows4hpc-wp5:wp5_dev_v6
+docker push jberlindocker/eflows4hpc-wp5:wp5_dev_v6
 ```
 
