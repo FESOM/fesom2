@@ -41,6 +41,21 @@ contains
   end function
   
   
+  function mpirank_to_txt(mpicomm) result(txt)
+    integer, intent(in) :: mpicomm
+    character(:), allocatable :: txt
+    ! EO parameters
+    integer mype
+    integer npes
+    integer mpierr
+    include 'mpif.h'
+  
+    call MPI_Comm_Rank(mpicomm, mype, mpierr)
+    call MPI_Comm_Size(mpicomm, npes, mpierr)
+    txt = int_to_txt_pad(mype,int(log10(real(npes)))+1) ! pad to the width of the number of processes
+  end function
+  
+  
   ! using EXECUTE_COMMAND_LINE to call mkdir sometimes fail (EXECUTE_COMMAND_LINE is forked as an new process, which may be the problem)
   ! try to use the C mkdir as an alternative
   subroutine mkdir(path)

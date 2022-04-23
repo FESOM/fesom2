@@ -222,28 +222,27 @@ subroutine init_ale(dynamics, partit, mesh)
     allocate(mesh%zbar_e_srf(myDim_elem2D+eDim_elem2D)) 
     
     ! also change bottom thickness at nodes due to partial cell --> bottom 
-    ! thickness at nodes is the volume weighted mean of sorounding elemental 
+    ! thickness at nodes is the volume weighted mean of sorounding elemental
     ! thicknesses
     allocate(mesh%bottom_node_thickness(myDim_nod2D+eDim_nod2D))
     allocate(mesh%zbar_n_bot(myDim_nod2D+eDim_nod2D)) 
     allocate(mesh%zbar_n_srf(myDim_nod2D+eDim_nod2D)) 
 
     ! reassociate after the allocation (no pointer exists before)
-    hnode(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)               => mesh%hnode
-    hnode_new(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)           => mesh%hnode_new
-    zbar_3d_n(1:mesh%nl, 1:myDim_nod2D+eDim_nod2D)             => mesh%zbar_3d_n
-    Z_3d_n(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)              => mesh%Z_3d_n
-    helem(1:mesh%nl-1, 1:myDim_elem2D)                         => mesh%helem
-    bottom_elem_thickness(1:myDim_elem2D)                      => mesh%bottom_elem_thickness
-    bottom_node_thickness(1:myDim_nod2D+eDim_nod2D)            => mesh%bottom_node_thickness
-    dhe(1:myDim_elem2D)                                        => mesh%dhe
-    hbar(1:myDim_nod2D+eDim_nod2D)                             => mesh%hbar
-    hbar_old(1:myDim_nod2D+eDim_nod2D)                         => mesh%hbar_old
-    zbar_n_bot(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_bot
-    zbar_e_bot(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_bot
-    zbar_n_srf(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_srf
-    zbar_e_srf(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_srf
-    
+    hnode(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)               => mesh%hnode(:,:)
+    hnode_new(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)           => mesh%hnode_new(:,:)
+    zbar_3d_n(1:mesh%nl, 1:myDim_nod2D+eDim_nod2D)             => mesh%zbar_3d_n(:,:)
+    Z_3d_n(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)              => mesh%Z_3d_n(:,:)
+    helem(1:mesh%nl-1, 1:myDim_elem2D)                         => mesh%helem(:,:)
+    bottom_elem_thickness(1:myDim_elem2D)                      => mesh%bottom_elem_thickness(:)
+    bottom_node_thickness(1:myDim_nod2D+eDim_nod2D)            => mesh%bottom_node_thickness(:)
+    dhe(1:myDim_elem2D)                                        => mesh%dhe(:)
+    hbar(1:myDim_nod2D+eDim_nod2D)                             => mesh%hbar(:)
+    hbar_old(1:myDim_nod2D+eDim_nod2D)                         => mesh%hbar_old(:)
+    zbar_n_bot(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_bot(:)
+    zbar_e_bot(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_bot(:)
+    zbar_n_srf(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_srf(:)
+    zbar_e_srf(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_srf(:)
     !___initialize______________________________________________________________
     hbar      = 0.0_WP
     hbar_old  = 0.0_WP

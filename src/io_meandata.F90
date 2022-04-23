@@ -728,6 +728,7 @@ subroutine write_mean(entry, entry_index)
   integer tag
   integer                       :: i, size1, size2, size_gen, size_lev, order
   integer                       :: c, lev
+  integer mpierr
 
 
   ! Serial output implemented so far
@@ -747,7 +748,7 @@ subroutine write_mean(entry, entry_index)
      do lev=1, size1
 #ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
         ! aleph cray-mpich workaround
-        call MPI_Barrier(entry%comm, MPIERR)
+        call MPI_Barrier(entry%comm, mpierr)
 #endif
        if(.not. entry%is_elem_based) then
          call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
@@ -771,7 +772,7 @@ subroutine write_mean(entry, entry_index)
      do lev=1, size1
 #ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
         ! aleph cray-mpich workaround
-        call MPI_Barrier(entry%comm, MPIERR)
+        call MPI_Barrier(entry%comm, mpierr)
 #endif
        if(.not. entry%is_elem_based) then
          call gather_real4_nod2D (entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
@@ -1021,7 +1022,8 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   type(t_mesh), intent(in), target     :: mesh
   logical, optional, intent(in)        :: flip_array
   integer i
-  
+ 
+#if !defined(__PGI)  
   do i = 1, rank(data)
     if ((ubound(data, dim = i)<=0)) then
       if (partit%mype==0) then
@@ -1031,6 +1033,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
       return
     end if    
   end do
+#endif
 
   if (partit%mype==0) then
      write(*,*) 'adding I/O stream 3D for ', trim(name)
@@ -1086,7 +1089,8 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   type(t_mesh),          intent(in)    :: mesh
   type(t_partit),        intent(inout) :: partit
   integer i
-  
+
+#if !defined(__PGI)   
   do i = 1, rank(data)
     if ((ubound(data, dim = i)<=0)) then
       if (partit%mype==0) then
@@ -1096,6 +1100,7 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
       return
     end if    
   end do
+#endif
 
   if (partit%mype==0) then
      write(*,*) 'adding I/O stream 2D for ', trim(name)
@@ -1104,7 +1109,7 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   call associate_new_stream(name, entry)
   
   ! 2d specific
-  entry%ptr3(1:1,1:size(data)) => data
+  entry%ptr3(1:1,1:size(data)) => data(:)
 
   if (accuracy == i_real8) then
     allocate(entry%local_values_r8(1, lcsize))

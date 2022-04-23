@@ -215,7 +215,7 @@ end subroutine fer_gamma2vel
 subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
     USE MOD_MESH
     USE o_PARAM
-    USE o_ARRAYS, ONLY: fer_c, fer_k, fer_scal, Ki, bvfreq, MLD1_ind, neutral_slope, coriolis_node
+    USE o_ARRAYS, ONLY: fer_c, fer_k, fer_scal, Ki, bvfreq, MLD1_ind, neutral_slope
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE g_CONFIG
@@ -257,7 +257,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
             !___________________________________________________________________
             ! Cutoff K_GM depending on (Resolution/Rossby radius) ratio
             if (scaling_Rossby) then
-                rosb=min(c1/max(abs(coriolis_node(n)), f_min), r_max)
+                rosb=min(c1/max(abs(mesh%coriolis_node(n)), f_min), r_max)
                 rr_ratio=min(reso/rosb, 5._WP)
                 scaling=1._WP/(1._WP+exp(-(rr_ratio-x0)/sigma))
             end if

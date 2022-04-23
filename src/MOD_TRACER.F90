@@ -18,10 +18,13 @@ real(kind=WP)                               :: tra_adv_pv  = 1.  ! a parameter t
 integer                                     :: ID
 
 contains
-  procedure WRITE_T_TRACER_DATA
-  procedure READ_T_TRACER_DATA
-  generic :: write(unformatted) => WRITE_T_TRACER_DATA
-  generic :: read(unformatted)  => READ_T_TRACER_DATA
+#if defined(__PGI)
+private
+#endif        
+procedure WRITE_T_TRACER_DATA
+procedure READ_T_TRACER_DATA
+generic :: write(unformatted) => WRITE_T_TRACER_DATA
+generic :: read(unformatted)  => READ_T_TRACER_DATA
 END TYPE T_TRACER_DATA
 
 
@@ -45,10 +48,13 @@ integer,allocatable,dimension(:,:)            :: edge_up_dn_tri
 real(kind=WP),allocatable,dimension(:,:,:)    :: edge_up_dn_grad
 
 contains
-  procedure WRITE_T_TRACER_WORK
-  procedure READ_T_TRACER_WORK
-  generic :: write(unformatted) => WRITE_T_TRACER_WORK
-  generic :: read(unformatted)  => READ_T_TRACER_WORK
+#if defined(__PGI)
+private
+#endif        
+procedure WRITE_T_TRACER_WORK
+procedure READ_T_TRACER_WORK
+generic :: write(unformatted) => WRITE_T_TRACER_WORK
+generic :: read(unformatted)  => READ_T_TRACER_WORK
 END TYPE T_TRACER_WORK
 
 ! auxury type for reading namelist.tra
@@ -77,6 +83,9 @@ type(t_tracer_work)                         :: work
 !logical                       :: i_vert_diff   = .true.
 
 contains
+#if defined(__PGI)
+private
+#endif        
 procedure WRITE_T_TRACER
 procedure READ_T_TRACER
 generic :: write(unformatted) => WRITE_T_TRACER

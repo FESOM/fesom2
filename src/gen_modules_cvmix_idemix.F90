@@ -322,7 +322,7 @@ module g_cvmix_idemix
                 nlev            = nln-uln+1,                          &
                 max_nlev        = nl-1,                               &  
                 dtime           = dt,                                 &
-                coriolis        = coriolis_node(node),                &
+                coriolis        = mesh%coriolis_node(node),           &
                 ! essentials 
                 iwe_new         = iwe(uln:nln+1,node),                & ! out
                 iwe_old         = iwe_old(uln:nln+1),                 & ! in

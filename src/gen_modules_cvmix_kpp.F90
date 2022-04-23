@@ -730,7 +730,7 @@ module g_cvmix_kpp
                 zt_cntr    = Z_3d_n(    nun:nln  ,node), & ! (in) Height of cell centers (m) dim=(ke)
                 surf_fric  = aux_ustar,                & ! (in) Turbulent friction velocity at surface (m/s) dim=1
                 surf_buoy  = aux_surfbuoyflx_nl(1),    & ! (in) Buoyancy flux at surface (m2/s3) dim=1
-                Coriolis   = coriolis_node(node),      & ! (in) Coriolis parameter (1/s) dim=1
+                Coriolis   = mesh%coriolis_node(node), & ! (in) Coriolis parameter (1/s) dim=1
                 OBL_depth  = kpp_obldepth(node),       & ! (out) OBL depth (m) dim=1
                 kOBL_depth = kpp_nzobldepth(node)      & ! (out) level (+fraction) of OBL extent dim=1
                 )    
@@ -776,7 +776,7 @@ module g_cvmix_kpp
             ! --> interpolate contribution that comes from shortwave penetration
             ! to the depth of the obldepth
             aux_surfbuoyflx_nl(1) = kpp_sbuoyflx(node)
-            if (use_sw_pene .and. kpp_use_fesomkpp .eqv. .true.) then
+            if (use_sw_pene .and. kpp_use_fesomkpp) then
                 aux_nz = int(kpp_nzobldepth(node))
                 ! take only penetrated shortwave radiation heatflux into account 
                 ! that reached until the obldepth --> do linear interpolation 
@@ -791,7 +791,7 @@ module g_cvmix_kpp
             ! MOM6 provides different option how buoyancy flux is influenced by 
             ! short wave penetration flux
             ! --> mxl comes closest to what FESOM1.4 was doing 
-            elseif (use_sw_pene .and. kpp_use_fesomkpp .eqv. .false.) then
+            elseif (use_sw_pene .and. (.not. kpp_use_fesomkpp)) then
                 if     (trim(kpp_sw_method) == 'all')  then
                     aux_surfbuoyflx_nl(1) = aux_surfbuoyflx_nl(1)+aux_coeff*sw_3d(1,node) 
                 elseif (trim(kpp_sw_method) == 'mxl')  then
