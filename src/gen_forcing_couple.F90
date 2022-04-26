@@ -118,20 +118,15 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   INTEGER                                          :: my_global_rank, ierror
   INTEGER 					   :: status(MPI_STATUS_SIZE)
 #endif
-  !character(15)                         :: vari, filevari
-  !character(4)                          :: fileyear
-  !integer, parameter                    :: nci=192, ncj=94 ! T62 grid
-  !real(kind=WP), dimension(nci,ncj)     :: array_nc, array_nc2,array_nc3,x
-  !character(500)                        :: file
   !_____________________________________________________________________________
   ! pointer on necessary derived types
   real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, u_w, v_w
   real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
-#if defined (__oasis) || defined (__ifsinterface)
+#if defined (__oasis)
   real(kind=WP), dimension(:), pointer  ::  oce_heat_flux, ice_heat_flux 
   real(kind=WP), dimension(:), pointer  ::  tmp_oce_heat_flux, tmp_ice_heat_flux 
 #endif 
-#if defined (__oifs) || defined (__ifsinterface)
+#if defined (__oifs)
   real(kind=WP), dimension(:), pointer  :: ice_temp, ice_alb, enthalpyoffuse
 #endif
   real(kind=WP)              , pointer  :: rhoair
@@ -139,18 +134,23 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+
+#if defined (__ifsinterface) ! a dummy call when coupled with operational IFS
+  RETURN
+#endif
+
   u_ice            => ice%uice(:)
   v_ice            => ice%vice(:)
   u_w              => ice%srfoce_u(:)
   v_w              => ice%srfoce_v(:)
   stress_atmice_x  => ice%stress_atmice_x(:)
   stress_atmice_y  => ice%stress_atmice_y(:)
-#if defined (__oifs) || defined (__ifsinterface)
+#if defined (__oifs)
   ice_temp         => ice%data(4)%values(:)
   ice_alb          => ice%atmcoupl%ice_alb(:)
   enthalpyoffuse   => ice%atmcoupl%enthalpyoffuse(:)
 #endif      
-#if defined (__oasis) || defined (__ifsinterface)
+#if defined (__oasis)
   oce_heat_flux    => ice%atmcoupl%oce_flx_h(:)
   ice_heat_flux    => ice%atmcoupl%ice_flx_h(:)
   tmp_oce_heat_flux=> ice%atmcoupl%tmpoce_flx_h(:)
@@ -325,7 +325,6 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
         do_rotate_ice_wind=.false.
     end if
 #else
-#ifndef __ifsinterface
   call sbc_do(partit, mesh)
 !$OMP PARALLEL DO
   DO n=1, myDim_nod2D+eDim_nod2D
@@ -404,7 +403,6 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   end do
 !$OMP END PARALLEL DO
   ! heat and fresh water fluxes are treated in i_therm and ice2ocean
-#endif /* skip all in case of __ifsinterface */
 #endif /* (__oasis) */
 
   t2=MPI_Wtime()
