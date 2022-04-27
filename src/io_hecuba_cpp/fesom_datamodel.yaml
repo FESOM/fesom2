@@ -1,16 +1,6 @@
-- "TypeSpec": [ "fesom_outputs", "StorageDict" ]
+- "TypeSpec": [ "fesom_metrics", "StorageDict" ]
   "KeySpec":
-            - [ "lat", "float"]     #1st is partiion key
-            - [ "ts", "int" ]       #Remaining are the clustering
+            - [ "lat", "float" ]
+            - [ "ts", "int" ]
   "ValueSpec":
-            - [ "metrics", "numpy.ndarray" ]
-            - [ "description", "string" ]
-
-#
-# This model will generate the following Python file:
-#    from hecuba import StorageDict
-#    
-#    class fesom_outputs (StorageDict):
-#       '''
-#       @TypeSpec dict <<lat:float,ts:int>,metrics:numpy.ndarray>
-#       '''
+            - [ "mvalues", "numpy.ndarray"]
