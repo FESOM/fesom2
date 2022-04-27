@@ -1293,7 +1293,11 @@ end subroutine
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J)
     DO J=1, size(entry_x%local_values_r8,dim=2)
        DO I=1, size(entry_x%local_values_r8,dim=1)
-          call vector_r2g(entry_x%local_values_r8(I,J), entry_y%local_values_r8(I,J), mesh%coord_nod2D(1, n), mesh%coord_nod2D(2, n), 0)
+          if (entry_x%is_elem_based) then
+             call vector_r2g(entry_x%local_values_r8(I,J), entry_y%local_values_r8(I,J), sum(mesh%coord_nod2D(1, mesh%elem2D_nodes(:, J)))/3._WP, sum(mesh%coord_nod2D(2,  mesh%elem2D_nodes(:, J)))/3._WP, 0)
+          else
+             call vector_r2g(entry_x%local_values_r8(I,J), entry_y%local_values_r8(I,J), mesh%coord_nod2D(1, J), mesh%coord_nod2D(2, J), 0)
+          end if
        END DO
     END DO
 !$OMP END PARALLEL DO
@@ -1305,7 +1309,11 @@ end subroutine
        DO I=1, size(entry_x%local_values_r4,dim=1)
           temp_x=real(entry_x%local_values_r4(I,J), real64)
           temp_y=real(entry_y%local_values_r4(I,J), real64)
-          call vector_r2g(temp_x, temp_y, mesh%coord_nod2D(1, n), mesh%coord_nod2D(2, n), 0)
+          if (entry_x%is_elem_based) then
+             call vector_r2g(temp_x, temp_y, sum(mesh%coord_nod2D(1, mesh%elem2D_nodes(:, J)))/3._WP, sum(mesh%coord_nod2D(2,  mesh%elem2D_nodes(:, J)))/3._WP, 0)
+          else
+             call vector_r2g(temp_x, temp_y, mesh%coord_nod2D(1, J), mesh%coord_nod2D(2, J), 0)
+          end if
           entry_x%local_values_r4(I,J)=real(temp_x, real32)
           entry_y%local_values_r4(I,J)=real(temp_y, real32)
        END DO
