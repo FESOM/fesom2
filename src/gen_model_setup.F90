@@ -100,6 +100,7 @@ subroutine read_namelist
   read (20,NML=paphotosynthesis)
   read (20,NML=paassimilation)
   read (20,NML=pairon_chem)
+  read (20,NML=painteraction)
   read (20,NML=pazooplankton)
   read (20,NML=pasecondzooplankton)
   read (20,NML=pagrazingdetritus)

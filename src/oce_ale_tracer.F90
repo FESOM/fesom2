@@ -380,8 +380,14 @@ real :: net
         tracer_id(tr_num) == 1025 .or.    &   !idetz2n
         tracer_id(tr_num) == 1026 .or.    &   !idetz2c
         tracer_id(tr_num) == 1027 .or.    &   !idetz2si
-        tracer_id(tr_num) == 1028 ) then      !idetz2calc
+        tracer_id(tr_num) == 1028 .or.    &   !idetz2calc
 ! endif
+        tracer_id(tr_num) == 1029 .or.    &   !icocn
+        tracer_id(tr_num) == 1030 .or.    &   !icocc
+        tracer_id(tr_num) == 1031) then       !icchl      
+
+
+
 
 ! sinking
         call recom_sinking_new(tr_num,mesh) !--- vert_sink ---
@@ -914,7 +920,7 @@ use ver_sinking_recom_benthos_interface
 
         elseif(tracer_id(tr_num)==1004 .or. &  !iphyn
                tracer_id(tr_num)==1005 .or. &  !iphyc
-               tracer_id(tr_num)==1020 .or. &  !iphycal
+               !tracer_id(tr_num)==1020 .or. &  !iphycal
                tracer_id(tr_num)==1006 ) then  !ipchl
 
             Vben = VPhy
@@ -927,6 +933,14 @@ use ver_sinking_recom_benthos_interface
 
             Vben = VDia
 	    if (allow_var_sinking) Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VDia
+
+        elseif(tracer_id(tr_num)==1020 .or. &  !iphycal ! NEW
+               tracer_id(tr_num)==1029 .or. &  !icocn   ! NEW
+               tracer_id(tr_num)==1030 .or. &  !icocc   ! NEW
+               tracer_id(tr_num)==1031 ) then  !icchl   ! NEW
+
+            Vben = VDia
+	    if (allow_var_sinking) Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VCocco
       
 ! Constant vertical sinking for the second detritus class
 ! *******************************************************
@@ -964,7 +978,8 @@ use ver_sinking_recom_benthos_interface
             if( tracer_id(tr_num)==1004 .or. &  !iphyn
                 tracer_id(tr_num)==1007 .or. &  !idetn
                 tracer_id(tr_num)==1013 .or. &  !idian
-                tracer_id(tr_num)==1025 ) then  !idetz2n
+                tracer_id(tr_num)==1025 .or. &  !idetz2n 
+                tracer_id(tr_num)==1029 ) then  !icocn   ! NEW
                 Benthos(n,1)= Benthos(n,1) +  add_benthos_2d(n) ![mmol]
             endif
          
@@ -972,23 +987,27 @@ use ver_sinking_recom_benthos_interface
             if( tracer_id(tr_num)==1005 .or. &  !iphyc
                 tracer_id(tr_num)==1008 .or. &  !idetc
                 tracer_id(tr_num)==1014 .or. &  !idiac
-                tracer_id(tr_num)==1026 ) then  !idetz2c
+                tracer_id(tr_num)==1026 .or. &  !idetz2c
+                tracer_id(tr_num)==1029 ) then  !icocn   ! NEW
                 Benthos(n,2)= Benthos(n,2) + add_benthos_2d(n)
             endif
 
             ! Si
             if( tracer_id(tr_num)==1016 .or. &  !idiasi
                 tracer_id(tr_num)==1017 .or. &  !idetsi
+                tracer_id(tr_num)==1020 .or. &  !iphycal ! NEW
                 tracer_id(tr_num)==1027 ) then  !idetz2si
+
                 Benthos(n,3)= Benthos(n,3) + add_benthos_2d(n)
             endif
 
             ! Cal
-            if( tracer_id(tr_num)==1020 .or. &  !iphycal
-                tracer_id(tr_num)==1021 .or. &  !idetcal
+            if( tracer_id(tr_num)==1021 .or. &  !idetcal
                 tracer_id(tr_num)==1028 ) then  !idetz2cal
                 Benthos(n,4)= Benthos(n,4) + add_benthos_2d(n) 
             endif
+
+
 end do
 
     do n=1, benthos_num

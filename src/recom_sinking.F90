@@ -54,7 +54,7 @@ subroutine recom_sinking_new(tr_num,mesh)
           
     elseif(tracer_id(tr_num)==1004 .or. &  !iphyn
         tracer_id(tr_num)==1005 .or.    &  !iphyc
-        tracer_id(tr_num)==1020 .or.    &  !iphycal
+        !tracer_id(tr_num)==1020 .or.    &  !iphycal          ! VERY NEW (moved this part to Coccos)
         tracer_id(tr_num)==1006 ) then     !ipchl
 
             Vsink = VPhy
@@ -65,6 +65,13 @@ subroutine recom_sinking_new(tr_num,mesh)
         tracer_id(tr_num)==1015 ) then     !idchl
 
             Vsink = VDia
+
+    elseif(tracer_id(tr_num)==1029 .or. &  !icocn             ! NEW
+        tracer_id(tr_num)==1030 .or.    &  !icocc             ! NEW
+        tracer_id(tr_num)==1020 .or.    &  !iphycal           ! NEW
+        tracer_id(tr_num)==1031 ) then     !icchl             ! NEW
+
+            Vsink = VCocco
     end if
 
 !if (Vsink .lt. 0.1) return 

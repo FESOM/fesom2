@@ -26,10 +26,10 @@ module recom_config
              ihetc = 10, idon = 11, idoc = 12, idian = 13,       &
              idiac = 14, idchl = 15, idiasi = 16, idetsi = 17,   &
              isi = 18, ife = 19, iphycal = 20, idetcal = 21,     &
-             ioxy= 22, izoo2n = 23, izoo2c =24, idetz2n = 25,   &
-             idetz2c = 26, idetz2si = 27, idetz2calc = 28    
-
-  Integer :: ivphy = 1, ivdia = 2, ivdet = 3, ivdetsc = 4
+             ioxy= 22, izoo2n = 23, izoo2c =24, idetz2n = 25,    &
+             idetz2c = 26, idetz2si = 27, idetz2calc = 28,       &
+             icocn = 29, icocc = 30, icchl = 31                      ! NEW cocco tracer    
+  Integer :: ivphy = 1, ivdia = 2, ivdet = 3, ivdetsc = 4, ivcoc = 5 ! NEW ivcoc
 
   Real(kind=8)                 :: zero           = 0.d0
   Integer                      :: one            = 1
@@ -46,12 +46,13 @@ module recom_config
   logical                :: recom_binary_write   = .false.  ! Determines if tracervalue snapshots are saved. For fine grids it may crash the model to set this to true
 
   logical                :: recom_binary_init    = .false.  ! Restart from binary
-  Integer                :: bgc_num               = 22
-  Integer                :: diags3d_num           = 2       ! Number of diagnostic 3d tracers to be saved
+  Integer                :: bgc_num               = 22      ! NEW increased the number from 28 to 34 (added coccos and respiration)
+  Integer                :: diags3d_num           = 2       ! Number of diagnostic 3d tracers to be saved ! NEW: changed from 20 to 28
   Real(kind=8)           :: VDet                  = 20.d0   ! Sinking velocity, constant through the water column and positive downwards
   Real(kind=8)           :: VDet_zoo2             = 200.d0   ! Sinking velocity, constant through the water column 
   Real(kind=8)           :: VPhy                  = 0.d0    !!! If the number of sinking velocities are different from 3, code needs to be changed !!!
   Real(kind=8)           :: VDia                  = 0.d0 
+  Real(kind=8)           :: VCocco                = 0.d0    ! NEW 
   Logical                :: allow_var_sinking     = .true.   
   Integer                :: biostep               = 1                    ! Number of times biology should be stepped forward for each time step		 
   Logical                :: REcoM_Geider_limiter  = .false.              ! Decides what routine should be used to calculate limiters in sms
@@ -63,6 +64,9 @@ module recom_config
   Logical                :: het_resp_noredfield    = .true.    ! Decides respiratation of copepods              
   Logical                :: diatom_mucus    = .true.    ! Effect of nutrient limitation on the aggregation
   Logical                :: Graz_pref_new    = .true.    ! If it is true Fasham et 1990, otherwise original recom variable preference
+  Logical                :: OmegaC_diss           = .true.     ! NEW DISS Use mocsy calcite omega to compute calcite dissolution
+  Logical                :: CO2lim                = .true.     ! NEW Use CO2 dependence of growth and calcification
+  Logical                :: inter_CT_CL           = .true.     ! NEW inter use interaction between CO2 and both, temperature and light
   Logical                :: Diags                 = .true.    !!!!!!!!!!!!!!!!!!!!!!Change in recom.F90 Diagnostics -> Diags
   Logical                :: constant_CO2          = .true.
   Logical                :: UseFeDust             = .true.               ! Turns dust input of iron off when set to.false.
@@ -87,14 +91,15 @@ module recom_config
   logical                :: ciso                  = .false.   !MB main switch to enable/disable carbon isotopes (13|14C)
   integer                :: benthos_num           = 4         !MB number of sediment tracers = 8 if ciso = .true.
 
-  namelist /pavariables/ use_REcoM,                         REcoM_restart,         recom_binary_write,      &
+  namelist /pavariables/ use_REcoM,                       REcoM_restart,         recom_binary_write,      &
                        recom_binary_init,                 bgc_num,               diags3d_num,             &
                        VDet,          VDet_zoo2,     &
-                       VPhy,                              VDia,                    &
+                       VPhy,                              VDia,                  VCocco,                  & ! NEW added VCocco
                        allow_var_sinking,                 biostep,               REcoM_Geider_limiter,    &
                        REcoM_Grazing_Variable_Preference, REcoM_Second_Zoo,      Grazing_detritus,        &
                        zoo2_fecal_loss,                   zoo2_initial_field,    het_resp_noredfield,     &
                        diatom_mucus,                      Graz_pref_new,                &
+                       OmegaC_diss,                       CO2lim,                inter_CT_CL,             & ! NEW DISS added OmegaC_diss, NEW added CO2lim, NEW inter added inter_CT_CL
                        Diags      ,                       constant_CO2,            &
                        UseFeDust,                         UseDustClim,           UseDustClimAlbani,       &
                        use_Fe2N,                          use_photodamage,       HetRespFlux_plus,        &
@@ -128,13 +133,16 @@ module recom_config
   Real(kind=8)                 :: SiMinSlope     = 1000.d0
   Real(kind=8)                 :: NCmin          = 0.04d0
   Real(kind=8)                 :: NCmin_d        = 0.04d0
+  Real(kind=8)                 :: NCmin_c        = 0.04d0         ! NEW
   Real(kind=8)                 :: SiCmin         = 0.04d0
   Real(kind=8)                 :: k_Fe           = 0.04d0
   Real(kind=8)                 :: k_Fe_d         = 0.12d0
+  Real(kind=8)                 :: k_Fe_c         = 0.04           ! NEW
   Real(kind=8)                 :: k_si           = 4.d0
   Real(kind=8)                 :: P_cm           = 3.0d0          ! [1/day]   the rate of C-specific photosynthesis
   Real(kind=8)                 :: P_cm_d         = 3.5d0
-  namelist /palimiter_function/ NMinSlope, SiMinSlope, NCmin, NCmin_d, SiCmin, k_Fe, k_Fe_d, k_si, P_cm, P_cm_d   
+  Real(kind=8)                 :: P_cm_c         = 3.3d0          ! NEW
+  namelist /palimiter_function/ NMinSlope, SiMinSlope, NCmin, NCmin_d, NCmin_c, SiCmin, k_Fe, k_Fe_d, k_Fe_c, k_si, P_cm, P_cm_d, P_cm_c   
 !!------------------------------------------------------------------------------
 !! *** For light calculations ***
   Real(kind=8)                 :: k_w            = 0.04d0         ! [1/m]              Light attenuation coefficient
@@ -144,31 +152,49 @@ module recom_config
 !! *** Photosynthesis ***
   Real(kind=8)                 :: alfa           = 0.14d0	  ! [(mmol C*m2)/(mg Chl*W*day)] 
   Real(kind=8)                 :: alfa_d         = 0.19d0         ! An initial slope of the P-I curve
+  Real(kind=8)                 :: alfa_c         = 0.10d0         ! NEW
   Real(kind=8)                 :: parFrac        = 0.43d0
-  namelist /paphotosynthesis/ alfa, alfa_d, parFrac   
+  namelist /paphotosynthesis/ alfa, alfa_d, alfa_c, parFrac   
 !!------------------------------------------------------------------------------
 !! *** Assimilation ***
   Real(kind=8)                 :: V_cm_fact     = 0.7d0          ! scaling factor for temperature dependent maximum of C-specific N-uptake
-  Real(kind=8)                 :: V_cm_fact_d   = 0.7d0  
+  Real(kind=8)                 :: V_cm_fact_d   = 0.7d0
+  Real(kind=8)                 :: V_cm_fact_c   = 0.7d0           ! NEW  
   Real(kind=8)                 :: NMaxSlope     = 1000.d0       ! Max slope for limiting function
   Real(kind=8)                 :: SiMaxSlope    = 1000.d0
   Real(kind=8)                 :: NCmax         = 0.2d0         ! [mmol N/mmol C] Maximum cell quota of nitrogen (N:C)
   Real(kind=8)                 :: NCmax_d       = 0.2d0
+  Real(kind=8)                 :: NCmax_c       = 0.15d0           ! NEW
   Real(kind=8)                 :: SiCmax        = 0.8d0
   Real(kind=8)                 :: NCuptakeRatio = 0.2d0         ! [mmol N/mmol C] Maximum uptake ratio of N:C
   Real(kind=8)                 :: NCUptakeRatio_d = 0.2d0
+  Real(kind=8)                 :: NCUptakeRatio_c = 0.2d0         ! NEW
   Real(kind=8)                 :: SiCUptakeRatio= 0.2d0
   Real(kind=8)                 :: k_din         = 0.55d0          ! [mmol N/m3] Half-saturation constant for nitrate uptake
   Real(kind=8)                 :: k_din_d       = 1.0d0
+  Real(kind=8)                 :: k_din_c       = 0.55d0           ! NEW
   Real(kind=8)                 :: Chl2N_max     = 3.15d0           ! [mg CHL/mmol N] Maximum CHL a : N ratio = 0.3 gCHL gN^-1
   Real(kind=8)                 :: Chl2N_max_d   = 4.2d0
+  Real(kind=8)                 :: Chl2N_max_c   = 3.5d0           ! NEW
   Real(kind=8)                 :: res_phy       = 0.01d0          ! [1/day] Maintenance respiration rate constant
   Real(kind=8)                 :: res_phy_d     = 0.01d0
+  Real(kind=8)                 :: res_phy_c     = 0.0075d0          ! NEW
   Real(kind=8)                 :: biosynth      = 2.33d0          ! [mmol C/mmol N] Cost of biosynthesis
   Real(kind=8)                 :: biosynthSi    = 0.d0
-  namelist /paassimilation/ V_cm_fact, V_cm_fact_d, NMaxSlope, SiMaxSlope, NCmax, NCmax_d, SiCmax,        &
-                       NCuptakeRatio, NCUptakeRatio_d, SiCUptakeRatio, k_din, k_din_d,                    &
-                       Chl2N_max, Chl2N_max_d, res_phy, res_phy_d, biosynth, biosynthSi
+  namelist /paassimilation/ V_cm_fact, V_cm_fact_d, V_cm_fact_c, NMaxSlope, SiMaxSlope, NCmax, NCmax_d, NCmax_c, SiCmax,        &
+                       NCuptakeRatio, NCUptakeRatio_d, NCUptakeRatio_c, SiCUptakeRatio, k_din, k_din_d, k_din_c,                &
+                       Chl2N_max, Chl2N_max_d, Chl2N_max_c, res_phy, res_phy_d, res_phy_c, biosynth, biosynthSi
+!!------------------------------------------------------------------------------
+!! *** Driver interaction *** ! NEW inter
+  Real(kind=8)                 :: m_CT_coc       = -404796.60     ! Multiple driver effect between CO2 and temperature (changes d in CO2 function)
+  Real(kind=8)                 :: m_CT_dia       = -39137.83
+  Real(kind=8)                 :: m_CT_phy       = 241308.50
+  Real(kind=8)                 :: m_CL_coc       = 19542.44       ! Multiple driver effect between CO2 and light (changes d in CO2 function)
+  Real(kind=8)                 :: m_CL_dia       = 114095.60
+  Real(kind=8)                 :: m_CL_phy       = -117444.20
+  Real(kind=8)                 :: T0_CT          = 14.0           ! T0 for interaction (in degC)
+  Real(kind=8)                 :: L0_CL          = 11.30          ! L0 for interaction (in W m-2)
+  namelist /painteraction/ m_CT_coc, m_CT_dia, m_CT_phy, m_CL_coc, m_CL_dia, m_CL_phy, T0_CT, L0_CL     ! everything completely NEW inter
 !!------------------------------------------------------------------------------
 !! *** Iron chemistry ***
   Real(kind=8)                 :: totalligand     = 1.d0        ! [mumol/m3] order 1. Total free ligand
@@ -185,8 +211,10 @@ module recom_config
   Real(kind=8)                 :: sDiaNsq       = 0.d0
   Real(kind=8)                 :: pzPhy         = 1.0d0           ! Maximum nano-phytoplankton preference                                                                                           
   Real(kind=8)                 :: sPhyNsq       = 0.d0
+  Real(kind=8)                 :: pzCocco       = 0.5d0           ! NEW (value is just a guess)
+  Real(kind=8)                 :: sCoccoNsq     = 0.d0            ! NEW
   real(kind=8)                 :: tiny_het       = 1.d-5          ! for more stable computation of HetRespFlux (_plus). Value can be > tiny because HetRespFlux ~ hetC**2.
-  namelist /pazooplankton/ graz_max, epsilonr, res_het, Redfield, loss_het, pzDia, sDiaNsq, pzPhy, sPhyNsq, tiny_het
+  namelist /pazooplankton/ graz_max, epsilonr, res_het, Redfield, loss_het, pzDia, sDiaNsq, pzPhy, sPhyNsq, pzCocco, sCoccoNsq, tiny_het
 !-------------------------------------------------------------------------------                                   
                                                                                                                          
 ! Second Zooplankton                                                                                                                                                                                    
@@ -202,6 +230,9 @@ module recom_config
   Real(kind=8)                 :: sDiaNsq2       = 0.d0
   Real(kind=8)                 :: pzPhy2         = 0.5d0           ! Maximum diatom preference                                                                                                                
   Real(kind=8)                 :: sPhyNsq2       = 0.d0
+  Real(kind=8)                 :: pzCocco2       = 0.2d0           ! NEW (value is just a guess)
+  Real(kind=8)                 :: sCoccoNsq2     = 0.d0            ! NEW
+
   Real(kind=8)                 :: pzHet          = 0.8d0           ! Maximum diatom preference                                                                                                               
   Real(kind=8)                 :: sHetNsq        = 0.d0
   Real(kind=8)                 :: t1_zoo2        = 28145.d0           ! Krill temp. function constant1                                                                                                       
@@ -209,8 +240,8 @@ module recom_config
   Real(kind=8)                 :: t3_zoo2        = 105234.d0          ! Krill temp. function constant3                                                                                                      
   Real(kind=8)                 :: t4_zoo2        = 274.15d0          ! Krill temp. function constant3                                                                                              
   namelist /pasecondzooplankton/ graz_max2, epsilon2, res_zoo2, & !recip_res_zoo2 &                                                                                                                         
-                                 loss_zoo2, fecal_rate_n, fecal_rate_c, pzDia2, pzPhy2, pzHet,        &
-                                 sDiaNsq2, sPhyNsq2, sHetNsq,            &
+                                 loss_zoo2, fecal_rate_n, fecal_rate_c, pzDia2, pzPhy2, pzCocco2, pzHet,        &    ! NEW added coccos
+                                 sDiaNsq2, sPhyNsq2, sCoccoNsq2, sHetNsq,                                       &    ! NEW added coccos
                                  t1_zoo2, t2_zoo2, t3_zoo2, t4_zoo2
 !-------------------------------------------------------------------------------                                                                                                                          
 !! *** Detritus Grazing Params ***                                                                                                                                                                        
@@ -241,17 +272,20 @@ module recom_config
 !! *** Phytoplankton N ***
   Real(kind=8)                 :: lossN         = 0.05d0          ! [1/day] Phytoplankton loss of organic N compounds
   Real(kind=8)                 :: lossN_d       = 0.05d0
-  namelist /paphytoplankton_N/ lossN, lossN_d
+  Real(kind=8)                 :: lossN_c       = 0.05d0          ! NEW
+  namelist /paphytoplankton_N/ lossN, lossN_d, lossN_c
 !!------------------------------------------------------------------------------
 !! *** Phytoplankton C ***
   Real(kind=8)                 :: lossC         = 0.10d0          ! [1/day] Phytoplankton loss of carbon 
   Real(kind=8)                 :: lossC_d       = 0.10d0
-  namelist /paphytoplankton_C/ lossC, lossC_d
+  Real(kind=8)                 :: lossC_c       = 0.10d0          ! NEW
+  namelist /paphytoplankton_C/ lossC, lossC_d, lossC_c
 !!------------------------------------------------------------------------------
 !! *** Phytoplankton ChlA ***
   Real(8)                      :: deg_Chl       = 0.25d0        ! [1/day]
   Real(kind=8)                 :: deg_Chl_d     = 0.25d0
-  namelist /paphytoplankton_ChlA/ deg_Chl, deg_Chl_d
+  Real(kind=8)                 :: deg_Chl_c     = 0.20d0          ! NEW (value is just a guess)
+  namelist /paphytoplankton_ChlA/ deg_Chl, deg_Chl_d, deg_Chl_c
 !!------------------------------------------------------------------------------
 !! *** Detritus N ***
   Real(kind=8)                 :: grazEff       = 0.4d0         ! [] Grazing efficiency (fraction of grazing flux into zooplankton pool) 
@@ -290,7 +324,9 @@ module recom_config
   Real(kind=8)                 :: calc_diss_guts  = 0.0d0
   Real(kind=8)                 :: calc_diss_rate  = 0.005714d0   !20.d0/3500.d0
   Real(kind=8)                 :: calc_diss_rate2 = 0.005714d0
-  namelist /pacalc/ calc_prod_ratio, calc_diss_guts, calc_diss_rate, calc_diss_rate2
+  Real(kind=8)                 :: calc_diss_omegac = 0.197d0     ! NEW DISS value from Aumont et al. 2015, will be used with OmegaC_diss flag
+  Real(kind=8)                 :: calc_diss_exp    = 1.d0        ! NEW DISS exponent in the dissolution rate of calcite, will be used with OmegaC_diss flag
+  namelist /pacalc/ calc_prod_ratio, calc_diss_guts, calc_diss_rate, calc_diss_rate2, calc_diss_omegac, calc_diss_exp  ! NEW DISS added calc_diss_omegac, calc_diss_exp
 !!------------------------------------------------------------------------------
 !! *** Benthos ***
   Real(kind=8)                 :: decayRateBenN   = 0.005d0
@@ -322,25 +358,38 @@ Module REcoM_declarations
   Integer       :: save_count_recom
   Real(kind=8)  :: tiny_N                 ! Min PhyN
   Real(kind=8)  :: tiny_N_d               ! Min DiaN
+  Real(kind=8)  :: tiny_N_c               ! Min CocN                 ! NEW
   Real(kind=8)  :: tiny_C                 ! Min PhyC
   Real(kind=8)  :: tiny_C_d               ! Min DiaC
+  Real(kind=8)  :: tiny_C_c               ! Min CocC                 ! NEW
   Real(kind=8)  :: tiny_Si                ! Min DiaSi
 !-------------------------------------------------------------------------------
 ! Temperature dependence of rates
   Real(kind=8)  :: rTref                  ! [1/K] Reciproque value of reference temp for Arrhenius function
   Real(kind=8)  :: rTloc                  ! [1/K] Reciproque of local ocean temp
-  Real(kind=8)  :: arrFunc                ! []    Temp dependence of rates 
+  Real(kind=8)  :: arrFunc                ! []    Temp dependence of rates
+  Real(kind=8)  :: CoccoTFunc             ! []    NEW Temp dependence of coccolithophores 
 !  if (REcoM_Second_Zoo) then
   Real(kind=8)  :: arrFuncZoo2           ! []    Temperature function for krill     
 !  endif
   Real(kind=8)  :: reminSiT
 !-------------------------------------------------------------------------------
+! CO2 dependence of rates ! NEW CO2
+  Real(kind=8)  :: h_depth(1)             ! pH from mocsy is converted to proton concentration
+  Real(kind=8)  :: Cunits                 ! For unit conversion from mol/m3 to umol/kg
+  Real(kind=8)  :: d_CT_CL_phy            ! NEW inter For the interaction term between CO2 and both temperature and light
+  Real(kind=8)  :: d_CT_CL_dia
+  Real(kind=8)  :: d_CT_CL_coc
+  Real(kind=8)  :: CoccoCO2
+  Real(kind=8)  :: DiaCO2
+  Real(kind=8)  :: PhyCO2
+!-------------------------------------------------------------------------------
 ! Quotas
-  Real(kind=8)  :: quota, quota_dia           ! [mmol N/mmol C]  Quota between phytoplankton N and C
-  Real(kind=8)  :: recipQuota, recipQuota_dia ! [mmol C/mmol N]  Reciproque of 'quota'
-  Real(kind=8)  :: Chl2C, Chl2C_dia           ! [mg ChlA/mmol C] Quota between phytoplankton ChlA and C
-  Real(kind=8)  :: Chl2C_plast, Chl2C_plast_dia   ! [mg ChlA/mmol C] needed for photodamage
-  Real(kind=8)  :: Chl2N, Chl2N_dia           ! [mg ChlA/mmol N] Quota between phytoplankton ChlA and N
+  Real(kind=8)  :: quota, quota_dia, quota_cocco           ! [mmol N/mmol C]  Quota between phytoplankton N and C (NEW changed term) 
+  Real(kind=8)  :: recipQuota, recipQuota_dia, recipQuota_cocco ! [mmol C/mmol N]  Reciproque of 'quota' (NEW changed term) 
+  Real(kind=8)  :: Chl2C, Chl2C_dia, Chl2C_cocco           ! [mg ChlA/mmol C] Quota between phytoplankton ChlA and C (NEW changed term) 
+  Real(kind=8)  :: Chl2C_plast, Chl2C_plast_dia, CHL2C_plast_cocco    ! [mg ChlA/mmol C] needed for photodamage (NEW changed term) 
+  Real(kind=8)  :: Chl2N, Chl2N_dia, Chl2N_cocco           ! [mg ChlA/mmol N] Quota between phytoplankton ChlA and N (NEW changed term) 
   Real(kind=8)  :: qSiC
   Real(kind=8)  :: qSiN
   Real(kind=8)  :: recipQZoo                  ! [mmol C/mmol N]  Quota between heterotrophic C and N 
@@ -356,7 +405,7 @@ Module REcoM_declarations
   Real(kind=8)          :: qlimitFac, qlimitFacTmp !            Factor that regulates photosynthesis
   Real(kind=8),external :: recom_limiter           !            Function calculating qlimitFac
   Real(kind=8)          :: FeLimitFac              ! [Mumol/m3] Half sat constant for iron  
-  Real(kind=8)          :: pMax, pMax_dia          ! [1/day]    Maximum rate of C-specific photosynthesis 
+  Real(kind=8)          :: pMax, pMax_dia, pMax_cocco          ! [1/day]    Maximum rate of C-specific photosynthesis (NEW changed term) 
 !-------------------------------------------------------------------------------
 ! Light
   Real(kind=8)  :: kappar                  ! [1/m]  Light attenuation coefficient modified by chla
@@ -368,19 +417,19 @@ Module REcoM_declarations
   Real(kind=8)  :: PARave                 ! [?]    Average light in the control volumes
 !-------------------------------------------------------------------------------
 ! Photosynthesis
-  Real(kind=8)  :: Cphot, Cphot_dia       ! [1/day] C-specific rate of photosynthesis
+  Real(kind=8)  :: Cphot, Cphot_dia, Cphot_cocco       ! [1/day] C-specific rate of photosynthesis (NEW changed term)
 !-------------------------------------------------------------------------------
 ! Assimilation
   Real(kind=8)  :: V_cm                   ! scaling factor for temperature dependent maximum of C-specific N-uptake
-  Real(kind=8)  :: limitFacN,limitFacN_dia! Factor that regulates N-assimilation. Calc from function recom_limiter
+  Real(kind=8)  :: limitFacN,limitFacN_dia,limitFacN_cocco ! Factor that regulates N-assimilation. Calc from function recom_limiter (NEW changed term)
   Real(kind=8)  :: limitFacSi
-  Real(kind=8)  :: N_assim, N_assim_dia   ! [mmol N/(mmol C * day)] C specific N utilization rate
+  Real(kind=8)  :: N_assim, N_assim_dia, N_assim_cocco   ! [mmol N/(mmol C * day)] C specific N utilization rate (NEW changed term)
   Real(kind=8)  :: Si_assim
 !-------------------------------------------------------------------------------
 ! Chlorophyll
-  Real(kind=8)  :: ChlSynth, ChlSynth_dia           ! [mg CHL/ mmol N] CHL a synthesis regulation term 
-  Real(kind=8)  :: phyRespRate, phyRespRate_dia     ! [1/day] Phytoplankton respiration rate
-  Real(kind=8)  :: KOchl, KOchl_dia                 ! coefficient for damage to the photosynthetic apparatus 
+  Real(kind=8)  :: ChlSynth, ChlSynth_dia, ChlSynth_cocco           ! [mg CHL/ mmol N] CHL a synthesis regulation term (NEW changed term) 
+  Real(kind=8)  :: phyRespRate, phyRespRate_dia, phyRespRate_cocco  ! [1/day] Phytoplankton respiration rate (NEW changed term)
+  Real(kind=8)  :: KOchl, KOchl_dia, KOchl_cocco                    ! coefficient for damage to the photosynthetic apparatus (NEW changed term) 
 !-------------------------------------------------------------------------------
 ! Iron chemistry
   Real(kind=8),external :: iron_chemistry 
@@ -390,8 +439,10 @@ Module REcoM_declarations
   Real(kind=8)  :: varpzdia, fDiaN                  ! Part of Diatoms available for food
   Real(kind=8)  :: PhyNsq  
   Real(kind=8)  :: varpzPhy, fPhyN                  ! Part of Nano available for food
+  Real(kind=8)  :: CoccoNsq                                            ! NEW
+  Real(kind=8)  :: varpzCocco,fCoccoN                                  ! NEW
   Real(kind=8)  :: food, foodsq                     ! [(mmol N)2/m6]
-  Real(kind=8)  :: grazingFlux_phy, grazingFlux_Dia ! [mmol N / (m3 * day)]
+  Real(kind=8)  :: grazingFlux_phy, grazingFlux_Dia, grazingFlux_Cocco ! [mmol N / (m3 * day)] (NEW changed term)
   Real(kind=8)  :: grazingFlux
   Real(kind=8)  :: HetRespFlux                      ! Zooplankton respiration
   Real(kind=8)  :: HetLossFlux                      ! [(mmol N)2/(m6 * day)] Zooplankton mortality (quadratic loss)
@@ -399,10 +450,10 @@ Module REcoM_declarations
 !  if (REcoM_Second_Zoo) then
 ! Second Zooplankton                                                                                           
        
-  Real(kind=8)  :: DiaNsq2, PhyNsq2, HetNsq   
-  Real(kind=8)  :: varpzDia2, fDiaN2, varpzPhy2, fPhyN2, varpzHet, fHetN ! Part of Diatoms available for food   
+  Real(kind=8)  :: DiaNsq2, PhyNsq2, CoccoNsq2, HetNsq                   ! NEW (changed term)  
+  Real(kind=8)  :: varpzDia2, fDiaN2, varpzPhy2, fPhyN2, varpzCocco2, fCoccoN2, varpzHet, fHetN ! Part of Diatoms available for food (NEW changed term)  
   Real(kind=8)  :: food2, foodsq2                     ! [(mmol N)2/m6]                                   
-  Real(kind=8)  :: grazingFlux_phy2, grazingFlux_Dia2, grazingFlux_het2 ! [mmol N / (m3 * day)]        
+  Real(kind=8)  :: grazingFlux_phy2, grazingFlux_Dia2, grazingFlux_Cocco2, grazingFlux_het2 ! [mmol N / (m3 * day)] (NEW changed term)       
   Real(kind=8)  :: grazingFlux2
   Real(kind=8)  :: Zoo2RespFlux     ! Zooplankton respiration                   
   Real(kind=8)  :: Zoo2LossFlux    ! [(mmol N)2/(m6 * day)] Zooplankton mortality (quadratic loss)  
@@ -423,12 +474,16 @@ Module REcoM_declarations
   Real(kind=8)  :: AggregationRate                  ! [1/day] AggregationRate (of nitrogen)
 !-------------------------------------------------------------------------------
 ! Calcification
+  Real(kind=8)  :: calc_prod_ratio_cocco            ! NEW (before it was defined as a fixed value, but now dependent on cocco and T)
   Real(kind=8)  :: calcification
   Real(kind=8)  :: calc_loss_agg
   Real(kind=8)  :: calc_loss_gra
   Real(kind=8)  :: calc_diss
+  Real(kind=8)  :: calc_diss_ben                    ! NEW DISS
   Real(kind=8)  :: calc_loss_gra2 !zoo2 detritus
   Real(kind=8)  :: calc_diss2     !zoo2 detritus
+  Real(kind=8)  :: Ca                               ! NEW DISS (calcium ion concentration)
+  Real(kind=8)  :: CO3_sat                          ! NEW DISS (saturated CO3 concentration, calculated from kspc and Ca)
 !-------------------------------------------------------------------------------
 ! Diagnostics
   Real(kind=8)  :: recipbiostep                         ! 1/number of steps per recom cycle
@@ -437,12 +492,14 @@ Module REcoM_declarations
 ! Benthos
   Real(kind=8),allocatable,dimension(:) :: decayBenthos ! [1/day] Decay rate of detritus in the benthic layer
   Real(kind=8),allocatable,dimension(:) :: wFluxDet     ! [mmol/(m2 * day)] Flux of N,C,Si and calc through sinking of detritus
-  Real(kind=8),allocatable,dimension(:) :: wFluxPhy     ! [mmol/(m2 * day)] Flux of N,C, calc and chl through sinking of phytoplankton
-  Real(kind=8),allocatable,dimension(:) :: wFluxDia     ! [mmol/(m2 * day)] Flux of N,C, Si and chl through sinking of diatoms 	
+  Real(kind=8),allocatable,dimension(:) :: wFluxPhy     ! [mmol/(m2 * day)] Flux of N,C, calc and chl through sinking of phytoplankton NEW decreased it to 3 because calc is cocco
+  Real(kind=8),allocatable,dimension(:) :: wFluxDia     ! [mmol/(m2 * day)] Flux of N,C, Si and chl through sinking of diatoms
+  Real(kind=8),allocatable,dimension(:) :: wFluxCocco   ! NEW [mmol/(m2 * day)] Flux of N,C, calc and chl through sinking of coccos 	
   Real(kind=8)              :: Vben_det     ! [m/day] speed of sinking into benthos from water column
   Real(kind=8)              :: Vben_det_seczoo !second zooplankton sinking benthos  
   Real(kind=8)              :: Vben_phy
-  Real(kind=8)              :: Vben_dia 
+  Real(kind=8)              :: Vben_dia
+  Real(kind=8)              :: Vben_coc     ! NEW
   Real(kind=8)              :: Ironflux     ! [umol Fe/(m2*day)] Flux of Fe from sediment to water
 !_______________________________________________________________________________
 ! Arrays added for RECOM implementation:
@@ -478,6 +535,35 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:)   :: GloCO2flux_seaicemask       ! [mmol/m2/day] Positive downwards
   Real(kind=8),allocatable,dimension(:)   :: GloO2flux_seaicemask       ! [mmol/m2/day] Positive downwards
   Real(kind=8),allocatable,dimension(:)   :: GloHplus         ! [mol/kg] Concentrations of H-plus ions in the surface ocean
+
+  Real(kind=8),allocatable,dimension(:,:)   :: CO23D            ! NEW MOCSY: [mol/m3] Aqueous CO2 concentration for all depths
+  Real(kind=8),allocatable,dimension(:,:)   :: pH3D             ! NEW MOCSY: total scale
+  Real(kind=8),allocatable,dimension(:,:)   :: pCO23D           ! NEW MOCSY: [uatm] CO2 partial pressure
+  Real(kind=8),allocatable,dimension(:,:)   :: HCO33D           ! NEW MOCSY: [mol/m3] Bicarbonate ion concentration
+  Real(kind=8),allocatable,dimension(:,:)   :: CO33D            ! NEW DISS: [mol/m3] Carbonate ion concentration
+  Real(kind=8),allocatable,dimension(:,:)   :: OmegaC3D         ! NEW DISS: calcite saturation state
+  Real(kind=8),allocatable,dimension(:,:)   :: kspc3D           ! NEW DISS: [mol^2/kg^2] stoichiometric solubility product of calcite
+  Real(kind=8),allocatable,dimension(:,:)   :: rhoSW3D          ! NEW DISS: [mol/m3] in-situ density of seawater
+
+  Real(kind=8),allocatable,dimension(:,:)   :: Nutlim_phy3D     ! NEWOUT: nutrient limitation of small phytoplankton
+  Real(kind=8),allocatable,dimension(:,:)   :: Nutlim_dia3D     ! NEWOUT: nutrient limitation of diatoms
+  Real(kind=8),allocatable,dimension(:,:)   :: Nutlim_cocco3D   ! NEWOUT: nutrient limitation of coccolithophores
+  Real(kind=8),allocatable,dimension(:,:)   :: Tlim_arr3D       ! NEWOUT: temperature limitation according to Arrhenius function
+  Real(kind=8),allocatable,dimension(:,:)   :: Tlim_cocco3D     ! NEWOUT: temperature limitation of coccolithophores
+  Real(kind=8),allocatable,dimension(:,:)   :: Llim_phy3D       ! NEWOUT: light limitation of small phytoplankton
+  Real(kind=8),allocatable,dimension(:,:)   :: Llim_dia3D       ! NEWOUT: light limitation of diatoms
+  Real(kind=8),allocatable,dimension(:,:)   :: Llim_cocco3D     ! NEWOUT: light limitation of coccolithophores
+  Real(kind=8),allocatable,dimension(:,:)   :: CO2lim_phy3D     ! NEWOUT: CO2 limitation of small phytoplankton
+  Real(kind=8),allocatable,dimension(:,:)   :: CO2lim_dia3D     ! NEWOUT: CO2 limitation of diatoms
+  Real(kind=8),allocatable,dimension(:,:)   :: CO2lim_cocco3D   ! NEWOUT: CO2 limitation of coccolithophores
+  Real(kind=8),allocatable,dimension(:,:)   :: PR_phy3D         ! NEWOUT: Photosynthesis rate of small phytoplankton
+  Real(kind=8),allocatable,dimension(:,:)   :: PR_dia3D         ! NEWOUT: Photosynthesis rate of diatoms
+  Real(kind=8),allocatable,dimension(:,:)   :: PR_cocco3D       ! NEWOUT: Photosynthesis rate of coccolithophores
+  Real(kind=8),allocatable,dimension(:,:)   :: Cal_Tlim3D       ! NEWOUT: Temperature dependence of calcification
+  Real(kind=8),allocatable,dimension(:,:)   :: Cal_CO2lim3D     ! NEWOUT: CO2 dependence of calcification
+  Real(kind=8),allocatable,dimension(:,:)   :: Cal_Nlim3D       ! NEWOUT: Nitrate dependence of calcification
+  Real(kind=8),allocatable,dimension(:,:)   :: Cal_pure3D       ! NEWOUT: PIC only dependent on PICPOCmax, CoccoC, T, N, CO2
+
   Real(kind=8),allocatable,dimension(:)   :: GlodPCO2surf       ! [mmol/m2/day] ocean-atmosphere  
   Real(kind=8),allocatable,dimension(:,:) :: GlodecayBenthos  ! [1/day] Decay rate of detritus in the benthic layer saved for oce_ale_tracer.F90
 
@@ -490,9 +576,9 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:,:,:) :: auxy 
 
 !  Real(kind=8),allocatable,dimension(:,:)   :: GlowFlux         ! 
-  Real(kind=8),allocatable,dimension(:,:) :: diags2D          ! Diagnostics in 2D [8 n2d]
-  Real(kind=8),allocatable,dimension(:,:,:) :: diags3D          ! Diagnostics in 3D [2 nl-1 n2d]
-  Real(kind=8),allocatable,dimension(:)   :: DenitBen         ! Benthic denitrification Field in 2D [n2d 1]
+  Real(kind=8),allocatable,dimension(:,:)   :: diags2D          ! Diagnostics in 2D [8 n2d]                   (NEW now [12 n2d])
+  Real(kind=8),allocatable,dimension(:,:,:) :: diags3D          ! Diagnostics in 3D [2 nl-1 n2d]            (NEW now [3 nl-1 n2d])
+  Real(kind=8),allocatable,dimension(:)     :: DenitBen         ! Benthic denitrification Field in 2D [n2d 1]
 
   Real(kind=8), allocatable,dimension(:)  :: Alk_surf         ! Surface alkalinity field used for restoring
   Real(kind=8), allocatable,dimension(:)  :: relax_alk
@@ -537,6 +623,25 @@ Module REcoM_locVar
   Real(kind=8) :: kw660(1)                     ! gas transfer velocity (piston velocity) for CO2 [m/s] 
   Real(kind=8) :: co2flux_seaicemask(1)        ! air-to-sea flux of CO2 [mmol/m2/s]
   Real(kind=8) :: o2flux_seaicemask(1)        ! air-to-sea flux of CO2 [mmol/m2/s]
+
+! mocsy output entire depth range ------------------------------------------------------------------------------------------------------------  ! NEW MOCSY
+  Real(kind=8) :: ph_depth(1)                  ! NEW MOCSY pH on total scale
+  Real(kind=8) :: pco2_depth(1)                ! NEW MOCSY oceanic partial pressure of CO2 (uatm)
+  Real(kind=8) :: fco2_depth(1)                ! NEW MOCSY oceanic fugacity of CO2 (uatm)
+  Real(kind=8) :: co2_depth(1)                 ! NEW MOCSY aqueous CO2 concentration [mol/m^3]
+  Real(kind=8) :: hco3_depth(1)                ! NEW MOCSY bicarbonate (HCO3-) concentration [mol/m^3]
+  Real(kind=8) :: co3_depth(1)                 ! NEW MOCSY carbonate (CO3--) concentration [mol/m^3]
+  Real(kind=8) :: OmegaA_depth(1)              ! NEW MOCSY Omega for aragonite, i.e., the aragonite saturation state
+  Real(kind=8) :: OmegaC_depth(1)              ! NEW MOCSY Omega for calcite, i.e., the   calcite saturation state
+  Real(kind=8) :: BetaD_depth(1)               ! NEW MOCSY BetaD = Revelle factor   dpCO2/pCO2 / dDIC/DIC
+  Real(kind=8) :: kspc_depth(1)                ! NEW DISS  stoichiometric solubility product of calcite (mol^2/kg^2)
+  Real(kind=8) :: rhoSW_depth(1)               ! NEW MOCSY rhoSW  = in-situ density of seawater; rhoSW = f(s, t, p)
+  Real(kind=8) :: p_depth(1)                   ! NEW MOCSY pressure [decibars]; p = f(depth, latitude) if computed from depth [m] OR p = depth if [db]
+  Real(kind=8) :: tempis_depth(1)              ! NEW MOCSY in-situ temperature [degrees C]
+
+  Integer      :: logfile_outfreq_7            ! NEW MOCSY helper value to calculate the timesteps for the carbonate system (every 7th day)
+  Integer      :: logfile_outfreq_30           ! NEW MOCSY helper value to calculate the timesteps for the carbonate system (every 30th day)
+
 !-------------------------------------------------------------------------------
 
   Real(kind=8) :: bt, dic_molal, talk_molal ! Common block: Species
@@ -545,13 +650,17 @@ Module REcoM_locVar
   Real(kind=8) :: NDust                     ! [mmol/m2/s]
   Real(kind=8) :: Loc_ice_conc(1)           ! Used to calculate flux of DIC in REcoM 0 -> 1
   Real(kind=8) :: LocAtmCO2(1)              ! [uatm]
-  Real(kind=8) :: LocDiags2D(8)
+  Real(kind=8) :: LocDiags2D(12)            ! NEW (changed it from 8 to 12)
 !  Real(kind=8) :: LocDenit
   Real(kind=8) :: LocRiverDIN, LocRiverDON, LocRiverDOC, LocRiverDSi, LocRiverDIC, LocRiverAlk
 !  if (REcoM_Second_Zoo) then
   Real(kind=8) :: res_zoo2_a, res_zoo2_f
   Real(kind=8) :: grazingFluxcarbonzoo2                      ! grazingfluxcarbon 
 !  endif
+  Real(kind=8) :: PICPOCtemp                ! VERY NEW (added to make the calcification dependent on the temperature, after Krumhardt et al. 2017/2019)
+  Real(kind=8) :: PICPOCCO2                 ! VERY NEW (to make calcification dependent on CO2)
+  Real(kind=8) :: PICPOCN                   ! VERY NEW (to make calcification dependent on N-limitation)
+  Real(kind=8) :: calc_prod_final           ! VERY NEW (added to make the calcification dependent on nutrients (N, Fe), after Krumhardt et al. 2017/2019)
   Integer      :: currentCO2year
 	
 end module REcoM_LocVar
