@@ -1291,7 +1291,7 @@ end subroutine
     END IF
 
     IF ((entry_x%accuracy == i_real8) .AND. (entry_y%accuracy == i_real8)) THEN
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J, xmean, ymean)
     DO J=1, size(entry_x%local_values_r8,dim=2)
        if (entry_x%is_elem_based) then
           xmean=sum(mesh%coord_nod2D(1, mesh%elem2D_nodes(:, J)))/3._WP
@@ -1308,7 +1308,7 @@ end subroutine
     END IF
 
     IF ((entry_x%accuracy == i_real4) .AND. (entry_y%accuracy == i_real4)) THEN
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J, temp_x, temp_y)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J, temp_x, temp_y, xmean, ymean)
     DO J=1, size(entry_x%local_values_r4,dim=2)
        if (entry_x%is_elem_based) then
           xmean=sum(mesh%coord_nod2D(1, mesh%elem2D_nodes(:, J)))/3._WP
