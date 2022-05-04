@@ -613,6 +613,7 @@ subroutine integrate_tke( &
 
   tke_new = 0.0
   tke_upd = 0.0
+  tke_surf= 0.0
 
   a_dif = 0.0
   b_dif = 0.0
