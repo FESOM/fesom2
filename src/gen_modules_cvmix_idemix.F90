@@ -38,7 +38,8 @@ module g_cvmix_idemix
     !___________________________________________________________________________
     ! OCECTL/CVMIX_IDEMIX_PARAM namelist parameters
     ! time scale for vertical symmetrisation (sec)
-    real(kind=WP) :: idemix_tau_v = 86400.0
+    ! real(kind=WP) :: idemix_tau_v = 86400.0 ! old
+    real(kind=WP) :: idemix_tau_v = 172800.0  ! from Pollman et al. (2017), use 2days
     
     ! time scale for horizontal symmetrisation, only necessary for lateral diffusion (sec)
     real(kind=WP) :: idemix_tau_h = 1296000.0
@@ -47,25 +48,31 @@ module g_cvmix_idemix
     real(kind=WP) :: idemix_gamma = 1.570
     
     ! spectral bandwidth in modes (dimensionless)
-    real(kind=WP) :: idemix_jstar = 10.0
+    ! real(kind=WP) :: idemix_jstar = 10.0 ! old 
+    real(kind=WP) :: idemix_jstar = 5.0    ! from Pollman et al. (2017)
     
     ! dissipation parameter (dimensionless)
-    real(kind=WP) :: idemix_mu0   = 1.33333333
+    ! real(kind=WP) :: idemix_mu0   = 1.33333333 ! old 
+    real(kind=WP) :: idemix_mu0   = 0.33333333   ! from Pollman et al. (2017), use 2days
 
     ! amount of surface forcing that is used
     real(kind=WP) :: idemix_sforcusage = 0.2
     
     
-    integer       :: idemix_n_hor_iwe_prop_iter = 1
+    ! integer       :: idemix_n_hor_iwe_prop_iter = 1 ! old 
+    integer       :: idemix_n_hor_iwe_prop_iter = 5   ! from Pollman et al. (2017)
     
     ! filelocation for idemix surface forcing
     character(MAX_PATH):: idemix_surforc_file = './fourier_smooth_2005_cfsr_inert_rgrid.nc'
-
+    character(MAX_PATH):: idemix_surforc_vname= 'var706'
+    
     ! filelocation for idemix bottom forcing
     character(MAX_PATH):: idemix_botforc_file = './tidal_energy_gx1v6_20090205_rgrid.nc'
-
+    character(MAX_PATH):: idemix_botforc_vname= 'wave_dissipation'
+    
     namelist /param_idemix/ idemix_tau_v, idemix_tau_h, idemix_gamma, idemix_jstar, idemix_mu0, idemix_n_hor_iwe_prop_iter, &
-                            idemix_sforcusage, idemix_surforc_file, idemix_botforc_file
+                            idemix_sforcusage, idemix_surforc_file, idemix_surforc_vname, &
+                            idemix_botforc_file, idemix_botforc_vname
                             
                             
     
@@ -212,8 +219,8 @@ module g_cvmix_idemix
             write(*,*) "     idemix_jstar        = ", idemix_jstar
             write(*,*) "     idemix_mu0          = ", idemix_mu0
             write(*,*) "     idemix_n_hor_iwe_...= ", idemix_n_hor_iwe_prop_iter
-            write(*,*) "     idemix_surforc_file = ", idemix_surforc_file
-            write(*,*) "     idemix_botforc_file = ", idemix_botforc_file
+            write(*,*) "     idemix_surforc_file = ", trim(idemix_surforc_file)
+            write(*,*) "     idemix_botforc_file = ", trim(idemix_botforc_file)
             write(*,*)
         end if
         
@@ -224,7 +231,7 @@ module g_cvmix_idemix
         inquire(file=trim(idemix_surforc_file),exist=file_exist) 
         if (file_exist) then
             if (mype==0) write(*,*) ' --> read IDEMIX near inertial wave surface forcing'
-            call read_other_NetCDF(idemix_surforc_file, 'var706', 1, forc_iw_surface_2D, .true., partit, mesh) 
+            call read_other_NetCDF(idemix_surforc_file, idemix_surforc_vname, 1, forc_iw_surface_2D, .true., partit, mesh)
             ! only 20% of the niw-input are available to penetrate into the deeper ocean
             forc_iw_surface_2D = forc_iw_surface_2D/density_0 * idemix_sforcusage 
             
@@ -247,7 +254,7 @@ module g_cvmix_idemix
         inquire(file=trim(idemix_surforc_file),exist=file_exist) 
         if (file_exist) then
             if (mype==0) write(*,*) ' --> read IDEMIX near tidal bottom forcing'
-            call read_other_NetCDF(idemix_botforc_file, 'wave_dissipation', 1, forc_iw_bottom_2D, .true., partit, mesh) 
+            call read_other_NetCDF(idemix_botforc_file, idemix_botforc_vname, 1, forc_iw_bottom_2D, .true., partit, mesh)
             ! convert from W/m^2 to m^3/s^3
             forc_iw_bottom_2D  = forc_iw_bottom_2D/density_0
             
@@ -374,64 +381,68 @@ module g_cvmix_idemix
             ! to calculate edge contribution that crosses the halo
             call exchange_nod(iwe, partit)
             
-            !___________________________________________________________________
-            ! calculate inverse volume and restrict iwe_v0 to fullfill stability 
-            ! criterium --> CFL
-            ! CFL Diffusion : CFL = v0^2 * dt/dx^2, CFL < 0.5
-            ! --> limit v0 to CFL=0.2
-            ! --> v0 = sqrt(CFL * dx^2 / dt)
-            cflfac = 0.2_WP
-            ! |--> FROM NILS: "fac=0.2 ist geschätzt. Würde ich erstmal so 
-            !      probieren. Der kommt aus dem stabilitätskriterium für Diffusion 
-            !      (ähnlich berechnet wie das CFL Kriterium nur halt für den 
-            !      Diffusions anstatt für den Advektionsterm). Normalerweise 
-            !      sollte der Grenzwert aber nicht zu oft auftreten. Ich hatte 
-            !      mal damit rum-experimentiert, aber letztendlich war die Lösung 
-            !      das Iterativ zu machen und ggf. idemix_n_hor_iwe_prop_iter zu erhöhen. 
-            !      Du kannst IDEMIX erstmal ohne den Term ausprobieren und sehen, 
-            !      ob es läuft, dann kannst du den dazuschalten und hoffen, dass 
-            !      es nicht explodiert. Eigentlich sollte der Term alles glatter 
-            !      machen, aber nahe der ML kann der schon Probleme machen".
-            do node = 1,node_size
-            
-                ! temporarily store old iwe values for diag
-                iwe_Thdi(:,node) = iwe(:,node)
-                
-                ! number of above bottom levels at node
-                nln = nlevels_nod2D(node)-1
-                uln = ulevels_nod2D(node)
-                
-                ! thickness of mid-level to mid-level interface at node
-                dz_trr             = 0.0_WP
-                dz_trr(uln+1:nln)  = Z_3d_n(uln:nln-1,node)-Z_3d_n(uln+1:nln,node)
-                dz_trr(uln)        = hnode(uln,node)/2.0_WP
-                dz_trr(nln+1)      = hnode(nln,node)/2.0_WP
-                
-                ! surface cell 
-                vol_wcelli(uln,node) = 1/(areasvol(uln,node)*dz_trr(uln))
-                aux = sqrt(cflfac*(area(uln,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
-                iwe_v0(uln,node) = min(iwe_v0(uln,node),aux)
-                
-                ! bulk cells
-                !!PS do nz=2,nln
-                do nz=uln+1,nln
-                    ! inverse volumne 
-                    vol_wcelli(nz,node) = 1/(areasvol(nz-1,node)*dz_trr(nz))
-                    
-                    ! restrict iwe_v0
-                    aux = sqrt(cflfac*(area(nz-1,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
-                    !                  `--------+-------------´
-                    !                           |-> comes from mesh_resolution=sqrt(area(1, :)/pi)*2._WP
-                    iwe_v0(nz,node) = min(iwe_v0(nz,node),aux)
-                end do 
-                
-                ! bottom cell 
-                vol_wcelli(nln+1,node) = 1/(areasvol(nln,node)*dz_trr(nln+1))
-                aux = sqrt(cflfac*(area(nln,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
-                iwe_v0(nln+1,node) = min(iwe_v0(nln+1,node),aux)
-                
-            end do !-->do node = 1,node_size
-            call exchange_nod(vol_wcelli, partit)
+! !             !___________________________________________________________________
+! !             ! calculate inverse volume and restrict iwe_v0 to fullfill stability 
+! !             ! criterium --> CFL
+! !             ! CFL Diffusion : CFL = v0^2 * dt/dx^2, CFL < 0.5
+! !             ! --> limit v0 to CFL=0.2
+! !             ! --> v0 = sqrt(CFL * dx^2 / dt)
+! !             cflfac = 0.2_WP
+! !             ! |--> FROM NILS: "fac=0.2 ist geschätzt. Würde ich erstmal so 
+! !             !      probieren. Der kommt aus dem stabilitätskriterium für Diffusion 
+! !             !      (ähnlich berechnet wie das CFL Kriterium nur halt für den 
+! !             !      Diffusions anstatt für den Advektionsterm). Normalerweise 
+! !             !      sollte der Grenzwert aber nicht zu oft auftreten. Ich hatte 
+! !             !      mal damit rum-experimentiert, aber letztendlich war die Lösung 
+! !             !      das Iterativ zu machen und ggf. idemix_n_hor_iwe_prop_iter zu erhöhen. 
+! !             !      Du kannst IDEMIX erstmal ohne den Term ausprobieren und sehen, 
+! !             !      ob es läuft, dann kannst du den dazuschalten und hoffen, dass 
+! !             !      es nicht explodiert. Eigentlich sollte der Term alles glatter 
+! !             !      machen, aber nahe der ML kann der schon Probleme machen".
+! !             
+! !             ! temporarily store old iwe values for diag
+! !             iwe_Thdi = iwe
+! !             
+! !             do node = 1,node_size
+! !             
+! !                 ! temporarily store old iwe values for diag
+! !                 iwe_Thdi(:,node) = iwe(:,node)
+! !                 
+! !                 ! number of above bottom levels at node
+! !                 nln = nlevels_nod2D(node)-1
+! !                 uln = ulevels_nod2D(node)
+! !                 
+! !                 ! thickness of mid-level to mid-level interface at node
+! !                 dz_trr             = 0.0_WP
+! !                 dz_trr(uln+1:nln)  = Z_3d_n(uln:nln-1,node)-Z_3d_n(uln+1:nln,node)
+! !                 dz_trr(uln)        = hnode(uln,node)/2.0_WP
+! !                 dz_trr(nln+1)      = hnode(nln,node)/2.0_WP
+! !                 
+! !                 ! surface cell 
+! !                 vol_wcelli(uln,node) = 1/(areasvol(uln,node)*dz_trr(uln))
+! !                 aux = sqrt(cflfac*(area(uln,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
+! !                 iwe_v0(uln,node) = min(iwe_v0(uln,node),aux)
+! !                 
+! !                 ! bulk cells
+! !                 !!PS do nz=2,nln
+! !                 do nz=uln+1,nln
+! !                     ! inverse volumne 
+! !                     vol_wcelli(nz,node) = 1/(areasvol(nz-1,node)*dz_trr(nz))
+! !                     
+! !                     ! restrict iwe_v0
+! !                     aux = sqrt(cflfac*(area(nz-1,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
+! !                     !                  `--------+-------------´
+! !                     !                           |-> comes from mesh_resolution=sqrt(area(1, :)/pi)*2._WP
+! !                     iwe_v0(nz,node) = min(iwe_v0(nz,node),aux)
+! !                 end do 
+! !                 
+! !                 ! bottom cell 
+! !                 vol_wcelli(nln+1,node) = 1/(areasvol(nln,node)*dz_trr(nln+1))
+! !                 aux = sqrt(cflfac*(area(nln,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
+! !                 iwe_v0(nln+1,node) = min(iwe_v0(nln+1,node),aux)
+! !                 
+! !             end do !-->do node = 1,node_size
+! !             call exchange_nod(vol_wcelli, partit)
             call exchange_nod(iwe_v0, partit)
             
             !___________________________________________________________________
