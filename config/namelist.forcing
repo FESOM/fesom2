@@ -58,6 +58,6 @@ landice_end_mon=10
    sss_data_source    ='CORE2'
    nm_sss_data_file   ='/work/ollie/clidyn/forcing/JRA55-do-v1.4.0/PHC2_salx.nc'
    chl_data_source    ='None' !'Sweeney' monthly chlorophyll climatology or 'NONE' for constant chl_const (below). Make use_sw_pene=.TRUE. in namelist.config!
-   nm_chl_data_file   ='/work/ollie/dsidoren/input/forcing/Sweeney_2005.nc'
+   nm_chl_data_file   ='/work/ollie/clidyn/forcing/Sweeney/Sweeney_2005.nc'
    chl_const          = 0.1
 /
