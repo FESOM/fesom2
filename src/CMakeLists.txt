@@ -2,6 +2,12 @@ cmake_minimum_required(VERSION 3.4)
 
 project(fesom C Fortran)
 
+if(DEFINED ENV{FESOM_PLATFORM_STRATEGY})
+   set(FESOM_PLATFORM_STRATEGY $ENV{FESOM_PLATFORM_STRATEGY} CACHE STRING "switch to platform specific compile settings, this is usually determined via the env.sh script")
+else()
+   set(FESOM_PLATFORM_STRATEGY "notset" CACHE STRING "switch to platform specific compile settings, this is usually determined via the env.sh script")
+endif()
+
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
 file(GLOB sources_Fortran ${src_home}/*.F90)
@@ -41,8 +47,13 @@ if(${VERBOSE})
 endif()
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
-	target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip)
+	target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -ip)
 #	target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip  -g -traceback -check all,noarg_temp_created,bounds)
+   if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
+   else()
+      target_compile_options(${PROJECT_NAME} PRIVATE -xHost)
+   endif()
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 	target_compile_options(${PROJECT_NAME} PRIVATE -fdefault-real-8 -ffree-line-length-none)
 endif()
