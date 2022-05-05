@@ -76,5 +76,6 @@ if [ $BEING_EXECUTED = true ]; then
    echo $DIR/env/$STRATEGY
 else
    # file is being sourced
+   export FESOM_PLATFORM_STRATEGY=$STRATEGY
    source $DIR/env/$STRATEGY/shell
 fi
