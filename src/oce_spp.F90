@@ -87,7 +87,7 @@ subroutine app_rejected_salt(ttf, partit, mesh)
      nzmin = ulevels_nod2D(row)
      nzmax = nlevels_nod2D(row)
      if (ttf(nzmin,row) < 10.0_WP) cycle
-     if (geo_coord_nod2D(2,row)>0.0_WP) then  !NH
+     !if (geo_coord_nod2D(2,row)>0.0_WP) then  !NH
         kml=1
         !!PS spar(1)=0.0_WP
         spar(nzmin)=0.0_WP
@@ -95,7 +95,7 @@ subroutine app_rejected_salt(ttf, partit, mesh)
         !!PS do k=1, nlevels_nod2D(row)
         do k=nzmin, nzmax
            drhodz=bvfreq(k, row)*density_0/g
-           if (drhodz>=drhodz_cri .or. Z_3d_n(k,row)<-50.0_WP) exit
+           if (drhodz>=drhodz_cri .or. Z_3d_n(k,row)<-80.0_WP) exit
            kml=kml+1
            spar(k+1)=area(k+1,row)*hnode(k+1,row)*(Z_3d_n(1,row)-Z_3d_n(k+1,row))**n_distr
         end do
@@ -107,7 +107,7 @@ subroutine app_rejected_salt(ttf, partit, mesh)
               ttf(k,row)=ttf(k,row)+ice_rejected_salt(row)*spar(k)/areasvol(k,row)/hnode(k,row)
            end do
         endif
-      endif
+      !endif
   end do
 
 end subroutine app_rejected_salt
