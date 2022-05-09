@@ -20,6 +20,9 @@ subroutine read_namelist
                          ldiag_dMOC, ldiag_DVD, diag_list
   use g_clock, only: timenew, daynew, yearnew
   use g_ic3d 
+! Include namelist variables for transient tracer simulations:
+  use transit, only : transit_param, r14c_nh, xco2_a, xf12_nh, xsf6_nh
+
   implicit none
 
   character(len=MAX_PATH)   :: nmlfile
@@ -81,6 +84,13 @@ subroutine read_namelist
   open (20,file=nmlfile)
   read (20,NML=diag_list)
   close (20)
+
+  nmlfile ='namelist.transit'    ! name of namelist file for transient tracers
+  open (20,file=nmlfile)
+  read (20,NML=transit_param)
+  close (20)
+! Control output: atmospheric tracer concentrations in the Northern Hemisphere (CO2 values are global)
+  if(mype==0) print *, "r14c_nh, xco2_a, xf12_nh, xsf6_nh = ", r14c_nh, xco2_a, xf12_nh, xsf6_nh
 
   if(mype==0) write(*,*) 'Namelist files are read in'
   
