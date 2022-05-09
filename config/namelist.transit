@@ -1,24 +1,22 @@
 ! The namelist file for transient tracers
  
 &transit_param
-r14c_nh = 1.0196   	! atm. F14C ratio, 30°N-90°N
-r14c_tz = 1.0225   	! atm. F14C ratio, ITCZ
-r14c_sh = 1.0249   	! atm. F14C ratio, 30°S-90°S
+r14c_nh = 1.0000   	! atm. F14C ratio, 30°N-90°N
+r14c_tz = 1.0000   	! atm. F14C ratio, ITCZ
+r14c_sh = 1.0000   	! atm. F14C ratio, 30°S-90°S
 r39ar_a = 1.0000	! atm. 39Ar/Ar ratio, global mean
 xarg_a  = 9.34e-3	! atm. Argon concn. (mole fraction), global mean
-xco2_a  = 397.55e-6	! atm. CO2 concn. (mole fraction), global mean
-xf12_nh = 524.1   	! atm. CFC-12 concn. (ppt), 10°N-90°N
-xf12_sh = 522.12   	! atm. CFC_12 concn. (ppt), 10°S-90°S
-xsf6_nh = 8.25   	! atm. SF6 concn. (ppt), 10°N-90°N
-xsf6_sh = 7.92   	! atm. SF6 concn. (ppt), 10°S-90°S
-f12t_nh = -0.188   	! atm. CFC-12 trend (ppt / mon), 10°N-90°N
-f12t_sh = -0.188   	! atm. CFC-12 trend (ppt / mon), 10°S-90°S
-sf6t_nh = 0.026   	! atm. SF6 trend (ppt / mon), 10°N-90°N
-sf6t_sh = 0.032   	! atm. SF6 trend (ppt / mon), 10°S-90°S
+xco2_a  = 284.32e-6	! atm. CO2 concn. (mole fraction), global mean
+xf12_nh = 0.0e-12	! atm. CFC-12 concn. (ppt), 10°N-90°N
+xf12_sh = 0.0e-12	! atm. CFC_12 concn. (ppt), 10°S-90°S
+xsf6_nh = 0.0e-12	! atm. SF6 concn. (ppt), 10°N-90°N
+xsf6_sh = 0.0e-12	! atm. SF6 concn. (ppt), 10°S-90°S
+f12t_nh = 0.0e-12	! atm. CFC-12 trend (ppt / mon), 10°N-90°N
+f12t_sh = 0.0e-12	! atm. CFC-12 trend (ppt / mon), 10°S-90°S
+sf6t_nh = 0.0e-12	! atm. SF6 trend (ppt / mon), 10°N-90°N
+sf6t_sh = 0.0e-12	! atm. SF6 trend (ppt / mon), 10°S-90°S
 dic_0   = 2.00          ! mixed layer DIC concn. (mol / m**3), global mean
 arg_0   = 0.01          ! mixed layer Argon concn. (mol / m**3), global mean
 decay14 = 3.8561e-12    ! decay constant of 14C (1 / s), 1 a = 365.0 d
 decay39 = 8.1708e-11    ! decay constant of 39Ar (1 / s), 1 a = 365.0 d
-offline = .false.       ! off-line simulations
-online  = .true.        ! on-line simulations
 /
