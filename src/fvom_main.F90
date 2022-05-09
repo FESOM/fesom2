@@ -185,6 +185,7 @@ type(t_mesh),             target, save :: mesh
     time_2nd_sections_per_rank  = 0.0_WP
     time_saved_by_par           = 0.0_WP
 
+#if defined (__oasis)
 !---wiso-code
     !=====================
     ! set necessary water isotope variables  
@@ -200,6 +201,7 @@ type(t_mesh),             target, save :: mesh
       nrecv = nrecv + 6
     END IF
 !---wiso-code-end
+#endif
 
     !=====================
     ! Allocate field variables 
