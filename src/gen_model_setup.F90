@@ -21,7 +21,7 @@ subroutine read_namelist
   use g_clock, only: timenew, daynew, yearnew
   use g_ic3d 
 ! Include namelist variables for transient tracer simulations:
-  use transit, only : transit_param, r14c_nh, xco2_a, xf12_nh, xsf6_nh
+  use mod_transit, only : transit_param, r14c_nh, xco2_a, xf12_nh, xsf6_nh
 
   implicit none
 
@@ -39,7 +39,9 @@ subroutine read_namelist
   read (20,NML=geometry)
   read (20,NML=calendar)
   read (20,NML=run_config)
+#if defined (__async_icebergs)
   read (20,NML=icebergs)
+#endif
 !!$  read (20,NML=machine)
   close (20)
   ! ==========
@@ -69,7 +71,9 @@ subroutine read_namelist
   read (20,NML=forcing_exchange_coeff)
   read (20,NML=forcing_bulk)
   read (20,NML=land_ice)
-  read (20,NML=pico)
+  if (use_pico) then
+    read (20,NML=pico)
+  end if
   close (20)
 
   if(use_ice) then
@@ -85,13 +89,16 @@ subroutine read_namelist
   read (20,NML=diag_list)
   close (20)
 
-  nmlfile ='namelist.transit'    ! name of namelist file for transient tracers
-  open (20,file=nmlfile)
-  read (20,NML=transit_param)
-  close (20)
-! Control output: atmospheric tracer concentrations in the Northern Hemisphere (CO2 values are global)
-  if(mype==0) print *, "r14c_nh, xco2_a, xf12_nh, xsf6_nh = ", r14c_nh, xco2_a, xf12_nh, xsf6_nh
-
+  if (use_transit) then
+    if(mype==0) print *, "Transient tracers are ON."
+    nmlfile ='namelist.transit'    ! name of namelist file for transient tracers
+    open (20,file=nmlfile)
+    read (20,NML=transit_param)
+    close (20)
+!   Control output: atmospheric tracer concentrations in the Northern Hemisphere (CO2 values are global)
+!!    if(mype==0) print *, "r14c_nh, xco2_a, xf12_nh, xsf6_nh = ", r14c_nh, xco2_a, xf12_nh, xsf6_nh
+  end if
+  
   if(mype==0) write(*,*) 'Namelist files are read in'
   
   !_____________________________________________________________________________
