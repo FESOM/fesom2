@@ -18,6 +18,14 @@ set -e
 machine="docker"
 tests="test_pi"
 
+function red_echo() {
+    echo -e "\e[31m$1\e[0m"
+}
+
+function green_echo() {
+    echo -e "\e[32m$1\e[0m"
+}
+
 for test in $tests; do
 
     ./configure.sh ubuntu
@@ -26,7 +34,12 @@ for test in $tests; do
     cd work_pi
     chmod +x job_docker_new
     ./job_docker_new
-    fcheck .
+    fcheck . && green_echo "Test $test passed" || red_echo "Test $test failed"
     cd ../
-
 done
+
+echo "Performing UGRID Compliance Test"
+pip install ugrid-checks xarray
+# Needed to combine the mesh diag and output
+python3 -c "import xarray as xr; ds1 = xr.open_dataset('./test/output_pi/sst.fesom.1948.nc'); ds2 = xr.open_dataset('./test/output_pi/fesom.mesh.diag.nc'); xr.merge([ds1, ds2]).to_netcdf('./test/output_pi/merged_ugrid_check.nc')"
+ugrid-checker ./test/output_pi/merged_ugrid_check.nc && green_echo "UGRID Compliance Test Passed" || red_echo "UGRID Compliance Test Failed"

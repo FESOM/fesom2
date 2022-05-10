@@ -568,9 +568,9 @@ function mesh_dimname_from_dimsize(size, partit, mesh) result(name)
   character(50) :: name
 
   if (size==mesh%nod2D) then
-    name='nod2'
+    name='node'
   elseif (size==mesh%elem2D) then
-    name='elem'
+    name='face'
   elseif (size==mesh%nl) then
     name='nz'
   elseif (size==mesh%nl-1) then
@@ -1208,10 +1208,10 @@ end subroutine
 
     if(entry%glsize(1)==mesh%nod2D  .or. entry%glsize(2)==mesh%nod2D) then
       entry%is_elem_based = .false.
-      entry%defined_on = "nodes"
+      entry%defined_on = "node"
     else if(entry%glsize(1)==mesh%elem2D .or. entry%glsize(2)==mesh%elem2D) then
       entry%is_elem_based = .true.
-      entry%defined_on = "elements"
+      entry%defined_on = "face"
     else
       if(partit%mype == 0) print *,"can not determine if ",trim(name)," is node or elem based"
       stop

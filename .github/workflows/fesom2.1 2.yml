@@ -44,12 +44,6 @@ jobs:
       run: |
         cd work_pi
         fcheck .
-    - name: Check UGRID Compliance
-      run: |
-        pip install ugrid-checks xarray
-        # Needed to combine the mesh diag and output
-        python3 -c "import xarray as xr; ds1 = xr.open_dataset('./test/output_pi/sst.fesom.1948.nc'); ds2 = xr.open_dataset('./test/output_pi/fesom.mesh.diag.nc'); xr.merge([ds1, ds2]).to_netcdf('./test/output_pi/merged_ugrid_check.nc')"
-        ugrid-checker ./test/output_pi/merged_ugrid_check.nc
 
     - name: Check restarts
       run: |
