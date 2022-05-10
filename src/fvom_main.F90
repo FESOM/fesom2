@@ -106,8 +106,10 @@ logical             :: bIcbCalcCycleCompleted
 
 type(t_mesh),             target, save :: mesh
 
+#if defined (__async_icebergs)
 ! kh 26.03.21 get current values for ib_async_mode and thread_support_level_required
     call read_namelist_icebergs
+#endif
 
 #ifndef __oifs
     !ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
