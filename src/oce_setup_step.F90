@@ -663,6 +663,38 @@ USE g_ic3d
          end if
   !---wiso-code-end
 
+! Transient tracers
+       CASE (14)        ! initialize tracer ID=14, fractionation-corrected 14C/C
+!        this initialization can be overwritten by calling do_ic3d
+         tr_arr(:,:,i) = 0.85
+         if (mype==0) then
+            write (i_string,  "(I3)") i
+            write (id_string, "(I3)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+         end if
+       CASE (39)        ! initialize tracer ID=39, fractionation-corrected 39Ar/Ar
+         tr_arr(:,:,i) = 0.5
+         if (mype==0) then
+            write (i_string,  "(I3)") i
+            write (id_string, "(I3)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+         end if
+       CASE (12)        ! initialize tracer ID=12, CFC-12
+         tr_arr(:,:,i) = 0.
+         if (mype==0) then
+            write (i_string,  "(I3)") i
+            write (id_string, "(I3)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+         end if
+       CASE (6)         ! initialize tracer ID=6, SF6
+         tr_arr(:,:,i) = 0.
+         if (mype==0) then
+            write (i_string,  "(I3)") i
+            write (id_string, "(I3)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+         end if
+! Transient tracers end
+
        CASE (301) !Fram Strait 3d restored passive tracer
          tr_arr(:,:,i)=0.0_WP
          rcounter3    =rcounter3+1
