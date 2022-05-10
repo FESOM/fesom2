@@ -36,7 +36,9 @@ subroutine read_namelist
   read (20,NML=geometry)
   read (20,NML=calendar)
   read (20,NML=run_config)
+#if defined (__async_icebergs)
   read (20,NML=icebergs)
+#endif
 !!$  read (20,NML=machine)
   close (20)
   ! ==========
@@ -66,7 +68,9 @@ subroutine read_namelist
   read (20,NML=forcing_exchange_coeff)
   read (20,NML=forcing_bulk)
   read (20,NML=land_ice)
-  read (20,NML=pico)
+  if (use_pico) then
+    read (20,NML=pico)
+  end if
   close (20)
 
   if(use_ice) then
