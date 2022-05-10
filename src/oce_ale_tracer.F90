@@ -110,7 +110,7 @@ subroutine solve_tracers_ale(mesh)
     use adv_tracers_ale_interface
     use diff_tracers_ale_interface
 !   Include decay constants of 14C and 39Ar for (transient) tracer simulations:
-    use transit, only: decay14, decay39
+    use mod_transit, only: decay14, decay39
     
     implicit none
     type(t_mesh), intent(in) , target :: mesh
@@ -1017,7 +1017,7 @@ FUNCTION bc_surface(n, id, mesh)
   USE g_PARSUP, only: mype, par_ex
   USE g_config
 ! The following modules and variables are needed for (transient) abiotic tracer simulations
-  use transit
+  use mod_transit
   use o_mesh                ! MB needed for transient tracer simulations ??
   use g_clock, only: month
   use i_arrays, only: a_ice
