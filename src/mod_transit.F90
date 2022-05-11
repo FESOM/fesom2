@@ -42,11 +42,7 @@ MODULE mod_transit
 ! Latitude of atmospheric boundary conditions and latitudinal interpolation weight
   real(kind=8) :: y_abc, yy_nh
 ! Tracer indices of transient tracers
-  integer ::      id_r14c = 3, id_r39ar = 4, id_f12 = 5, id_sf6 = 6
-! Switches for off-line simulations
-  logical ::  offline = .false., online = .true. ! on-line simulations (default setup)
-! logical :: offline = .true., online = .true.  ! diagnose dynamic fields to be used in off-line simulations
-! logical :: offline = .true., online = .false. ! enable off-line simulations
+  integer ::      id_r14c, id_r39ar, id_f12, id_sf6
   
 ! Namelist to modify default parameter settings
   namelist / transit_param / r14c_nh, r14c_tz, r14c_sh, &  ! atmospheric F14C
@@ -58,9 +54,7 @@ MODULE mod_transit
                              f12t_nh, f12t_sh, &           ! atmospheric trends of CFC-12
                              sf6t_nh, sf6t_sh, &           ! atmospheric trends of SF6
                              dic_0, arg_0, &               ! mixed layer values of DIC and Argon
-                             decay14, decay39, &           ! decay constants of 14C and 39Ar
-                             id_r14c, id_r39ar, &          ! indices of (transient) tracers: 14C, 39Ar,
-                             id_f12, id_sf6                ! CFC-12, SF6
+                             decay14, decay39              ! decay constants of 14C and 39Ar
 
 
   contains
