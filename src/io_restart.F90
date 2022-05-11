@@ -146,11 +146,11 @@ subroutine ini_ocean_io(year, mesh)
            CASE(6)
              trname='sf6'
              longname='sulfur hexafluoride'
-             units='fmol / kg'
+             units='mol / m**3'
            CASE(12)
-             trname='f12'
+             trname='cfc12'
              longname='chlorofluorocarbon CFC-12'
-             units='pmol / kg'
+             units='mol / m**3'
            CASE(14)
              trname='r14c'
              longname='14C / C ratio of DIC'
