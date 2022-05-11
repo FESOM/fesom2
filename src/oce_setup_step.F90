@@ -187,6 +187,7 @@ use g_forcing_arrays
 use o_mixing_kpp_mod ! KPP
 USE g_forcing_param, only: use_virt_salt
 use diagnostics,     only: ldiag_dMOC, ldiag_DVD
+
 IMPLICIT NONE
 integer     :: elem_size, node_size
 integer     :: n
@@ -589,6 +590,8 @@ USE o_ARRAYS
 USE g_PARSUP
 USE g_config
 USE g_ic3d
+! for additional (transient) tracers:
+use mod_transit, only: id_r14c, id_r39ar, id_f12, id_sf6
   !
   ! reads the initial state or the restart file for the ocean
   !
@@ -666,6 +669,7 @@ USE g_ic3d
 ! Transient tracers
        CASE (14)        ! initialize tracer ID=14, fractionation-corrected 14C/C
 !        this initialization can be overwritten by calling do_ic3d
+         id_r14c = i
          tr_arr(:,:,i) = 0.85
          if (mype==0) then
             write (i_string,  "(I3)") i
@@ -673,6 +677,7 @@ USE g_ic3d
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
          end if
        CASE (39)        ! initialize tracer ID=39, fractionation-corrected 39Ar/Ar
+         id_r39ar = i
          tr_arr(:,:,i) = 0.5
          if (mype==0) then
             write (i_string,  "(I3)") i
@@ -680,6 +685,7 @@ USE g_ic3d
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
          end if
        CASE (12)        ! initialize tracer ID=12, CFC-12
+         id_f12 = i
          tr_arr(:,:,i) = 0.
          if (mype==0) then
             write (i_string,  "(I3)") i
@@ -687,6 +693,7 @@ USE g_ic3d
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
          end if
        CASE (6)         ! initialize tracer ID=6, SF6
+         id_sf6 = i
          tr_arr(:,:,i) = 0.
          if (mype==0) then
             write (i_string,  "(I3)") i
