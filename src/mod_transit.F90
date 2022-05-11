@@ -140,7 +140,7 @@ MODULE mod_transit
         b1 =  0.0335183; b2 = -0.0373942; b3 = 0.00774862; c1 = 0.
         con2con = 1000. ! convert to mol / (m**3 * atm)
       case("arg")
-!       Ar-39 in mol / kg (Jenkins et al. 2019, doi:10.1016/j.marchem.2019.03.007, Table 4)
+!       Argon in mol / kg (Jenkins et al. 2019, doi:10.1016/j.marchem.2019.03.007, Table 4)
         a1 = -227.4607; a2 = 305.4347;   a3 = 180.5278;   a4 = -27.99450; pow = 1
         b1 = -0.066942; b2 = 0.037201;   b3 = -0.0056364; c1 = -5.30e-6
         con2con = 1024.5  ! convert to mol / m**3 assuming homogeneous density of surface water
