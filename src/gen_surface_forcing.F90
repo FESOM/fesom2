@@ -43,7 +43,7 @@ MODULE g_sbf
    USE g_rotate_grid
    USE g_config, only: dummy, ClimateDataPath, dt
    USE g_clock,  only: timeold, timenew, dayold, daynew, yearold, yearnew, cyearnew
-   USE g_forcing_arrays,    only: runoff
+   USE g_forcing_arrays,    only: runoff, chl
    USE g_read_other_NetCDF, only: read_other_NetCDF, read_2ddata_on_grid_netcdf
    IMPLICIT NONE
 
@@ -82,11 +82,16 @@ MODULE g_sbf
    logical :: l_cloud = .false.
    logical :: l_snow  = .false.
 
-   character(10),      save   :: runoff_data_source='CORE2'
+   character(10),           save   :: runoff_data_source='CORE2'
    character(len=MAX_PATH), save   :: nm_runoff_file    ='runoff.nc'
 
-   character(10),      save   :: sss_data_source   ='CORE2'
+   character(10),           save   :: sss_data_source   ='CORE2'
    character(len=MAX_PATH), save   :: nm_sss_data_file  ='PHC2_salx.nc'
+
+   character(10),           save   :: chl_data_source   ='None' ! 'Sweeney' Chlorophyll climatology Sweeney et al. 2005
+   character(len=MAX_PATH), save   :: nm_chl_data_file  ='/work/ollie/dsidoren/input/forcing/Sweeney_2005.nc'
+   real(wp),                save   :: chl_const         = 0.1
+
 
    logical :: runoff_climatology =.false.
 
@@ -123,7 +128,7 @@ MODULE g_sbf
    character(len=256), save   :: nm_prec_file  = 'prec.dat'  ! name of file with total precipitation, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
    character(len=256), save   :: nm_snow_file  = 'snow.dat'  ! name of file with snow  precipitation, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
    character(len=256), save   :: nm_mslp_file  = 'mslp.dat'  ! name of file with mean sea level pressure, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
-   character(len=256), save   :: nm_cloud_file = 'cloud.dat'  ! name of file with clouds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
+   character(len=256), save   :: nm_cloud_file = 'cloud.dat' ! name of file with clouds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
 
    character(len=34), save   :: nm_xwind_var = 'uwnd' ! name of variable in file with wind
    character(len=34), save   :: nm_ywind_var = 'vwnd' ! name of variable in file with wind
@@ -907,7 +912,8 @@ CONTAINS
                         nm_qsr_var, nm_qlw_var, nm_tair_var, nm_prec_var, nm_snow_var, &
                         nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, y_perpetual, &
                         l_xwind, l_ywind, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
-                        nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source
+                        nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source, &
+                        chl_data_source, nm_chl_data_file, chl_const
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -1051,6 +1057,16 @@ CONTAINS
          runoff=runoff/1000.0_WP  ! Kg/s/m2 --> m/s
       end if
 
+      if (use_sw_pene) then
+         if (chl_data_source == 'Sweeney') then
+            if (mype==0) write(*,*) trim(chl_data_source) //' chlorophyll climatology will be used'
+            if (mype==0) write(*,*) 'nm_chl_data_file=', trim(nm_chl_data_file)
+         else
+            if (mype==0) write(*,*) 'using constant chlorophyll concentration: ', chl_const
+            chl=chl_const
+         end if          
+      end if
+
       if (mype==0) write(*,*) "DONE:  Ocean forcing inizialization."
       if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
    END SUBROUTINE sbc_ini
@@ -1134,6 +1150,19 @@ CONTAINS
                if (i > 12) i=1
                if (mype==0) write(*,*) 'Updating SSS restoring data for month ', i 
                call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true., partit, mesh) 
+            end if
+         end if
+      end if
+
+      ! read in CHL for applying shortwave penetration
+      if (use_sw_pene) then
+         if (chl_data_source=='Sweeney') then
+            if (update_monthly_flag) then
+               i=month
+               if (mstep > 1) i=i+1 
+               if (i > 12) i=1
+               if (mype==0) write(*,*) 'Updating chlorophyll climatology for month ', i 
+               call read_other_NetCDF(nm_chl_data_file, 'chl', i, chl, .true., partit, mesh) 
             end if
          end if
       end if
