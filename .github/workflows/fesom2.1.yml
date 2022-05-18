@@ -18,6 +18,8 @@ jobs:
     steps:
     # NK: this changes working directory to fesom2
     - uses: actions/checkout@v2
+      with:
+        submodules: recursive
     
     - name: Compile model
       run: |
