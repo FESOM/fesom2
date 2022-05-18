@@ -129,7 +129,7 @@ subroutine write_zarr_array(istep, variable, rarray, root) !, mensions, add_time
      !should we inquire? before?
      call execute_command_line ('mkdir -p ' // adjustl(trim(tmp)))
 
-     data_kind = sizeof(rarray)/size(rarray) !use storage_size intrensic?
+     data_kind = 8!sizeof(rarray)/size(rarray) !use storage_size intrensic?
      write(tmp, '(I0)') data_kind
      dtype = byteorder() // "f" // tmp
      
