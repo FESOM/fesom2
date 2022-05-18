@@ -30,6 +30,6 @@ example namelist.io file is in `results/namelist.io`
 
 Note: 
 1. Currently all IO is of real, kind=8, inline with kind used by a variable in memory, so for benchmarking it may be better to set netcdf io to also use the same kind like in namelist.io example above. While this saves some model memory will increase storage size.(This can  be fixed easily in future) 
-2. output is in `test2.zarr` (a hard coded name) in workdir/results dir. Post-processing code to load the data in Python will follow soon.
+2. output is in `test2.zarr` (a hard coded name) in workdir/results dir. Example post-processing code to load the zarr data in Python is in `results/zarr-fesom.py/ipynb`.
 3. current zarr-io implementation is syncronous IO (but parallel), unlike async-IO of netcdf using threads in fesom2. zarr-io subroutine output_zarr is called in fvom_main.F90. To add a new zarr output variable, see line 56 in  src/zarr_io/io_zarrdata.F90, adding another call to write_array should be enough. ( This can also be fixed easily in future in lines of what was done for hecuba/cassandra io) 
 
