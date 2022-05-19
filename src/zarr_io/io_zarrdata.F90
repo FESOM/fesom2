@@ -75,7 +75,8 @@ function create_zarr_group(group_name, root) result (group)
   else
      group = trim(group_name) 
   end if
-  call execute_command_line ('mkdir -p ' // adjustl(trim(group)))
+  !call execute_command_line ('mkdir -p ' // adjustl(trim(group)))
+  call mkdir(adjustl(trim(group))) ! fix for failing execute_command_line at times
 
   tmp=trim(group) // "/.zgroup"
   INQUIRE(FILE=trim(tmp), EXIST=file_exists)  
@@ -127,7 +128,8 @@ subroutine write_zarr_array(istep, variable, rarray, root) !, mensions, add_time
      write(mype_string,'(I0)') mype
      tmp=trim(variable_group) // "/" // trim(mype_string) 
      !should we inquire? before?
-     call execute_command_line ('mkdir -p ' // adjustl(trim(tmp)))
+     !call execute_command_line ('mkdir -p ' // adjustl(trim(tmp)))
+     call mkdir(adjustl(trim(tmp))) ! fix for failing execute_command_line at times
 
      data_kind = 8!sizeof(rarray)/size(rarray) !use storage_size intrensic?
      write(tmp, '(I0)') data_kind
@@ -182,6 +184,31 @@ subroutine write_real_array(path, rarray)
       close(fileunit)
            
 end subroutine write_real_array
+
+! from fesom's upstream branch https://github.com/FESOM/fesom2/commit/64029aa9a1a2fef52eca5a34090d5baf52f71821 by @hegish
+! using EXECUTE_COMMAND_LINE to call mkdir sometimes fail (EXECUTE_COMMAND_LINE is forked as an new process, which may be the problem)
+! try to use the C mkdir as an alternative
+subroutine mkdir(path)
+    use iso_c_binding
+    character(len=*), intent(in) :: path
+    ! EO parameters
+    integer result
+    character(:,kind=C_CHAR), allocatable :: pathcopy
+
+    interface
+      function mkdir_c(path, mode) bind(c,name="mkdir")
+        use iso_c_binding
+        integer(c_int) mkdir_c
+        character(kind=c_char,len=1) path(*)
+        integer(c_int), value :: mode
+      end function
+    end interface
+
+    pathcopy = path ! we need to pass an array of c_char to the C funcktion (this is not a correct type conversion, but Fortran characters seem to be of the same kind as c_char)
+    ! result is 0 if the dir has been created from this call, otherwise -1
+    ! the mode will not exactly be what we pass here, as it is subtracted by the umask bits (and possibly more)
+    result = mkdir_c(pathcopy//C_NULL_CHAR, int(o'777', c_int))
+  end subroutine mkdir
 
 end module
 
