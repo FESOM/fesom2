@@ -27,6 +27,8 @@ fi
 
 if [[ $LOGINHOST =~ ^m[A-Za-z0-9]+\.hpc\.dkrz\.de$ ]]; then
    STRATEGY="mistral.dkrz.de"
+elif [[ $LOGINHOST =~ ^l[A-Za-z0-9]+\.atos\.local$ ]]; then
+   STRATEGY="levante.dkrz.de"
 elif [[ $LOGINHOST =~ ^ollie[0-9]$ ]] || [[ $LOGINHOST =~ ^prod-[0-9]{4}$ ]]; then
    STRATEGY="ollie"
 elif [[ $LOGINHOST =~ ^h[A-Za-z0-9]+\.hsn\.hlrn\.de$ ]]; then
@@ -37,8 +39,18 @@ elif [[ $LOGINHOST =~ \.hww\.de$ ]] || [[ $LOGINHOST =~ ^nid[0-9]{5}$ ]]; then
    STRATEGY="hazelhen.hww.de"
 elif [[  $LOGINHOST =~ \.jureca$ ]]; then
    STRATEGY="jureca"
-elif [[  $LOGINHOST =~ ^juwels[0-9]+\.fz\-juelich\.de$ ]]; then
+elif [[  $LOGINHOST = ubuntu ]]; then
+   STRATEGY="ubuntu"
+elif [[  $LOGINHOST = bsc ]]; then
+   STRATEGY="bsc"
+elif [[  $LOGINHOST =~ ^juwels[0-9][0-9].ib.juwels.fzj.de$ ]]; then
    STRATEGY="juwels"
+elif [[  $LOGINHOST =~ ^jwlogin[0-9][0-9].juwels$ ]]; then
+   STRATEGY="juwels"
+elif [[ $LOGINHOST =~ ^cc[a-b]+-login[0-9]+\.ecmwf\.int$ ]]; then
+   STRATEGY="ecaccess.ecmwf.int"
+elif [[ $LOGINHOST =~ ^stco-esl[0-9]+$ ]]; then
+   STRATEGY="aleph"
 else
    echo "can not determine environment for host: "$LOGINHOST
    [ $BEING_EXECUTED = true ] && exit 1
@@ -60,5 +72,6 @@ if [ $BEING_EXECUTED = true ]; then
    echo $DIR/env/$STRATEGY
 else
    # file is being sourced
+   export FESOM_PLATFORM_STRATEGY=$STRATEGY
    source $DIR/env/$STRATEGY/shell
 fi
