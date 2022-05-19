@@ -1032,6 +1032,21 @@ FUNCTION bc_surface(n, id, mesh)
 
   !  --> is_nonlinfs=1.0 for zelvel,zstar ....                            
   !  --> is_nonlinfs=0.0 for linfs
+  
+  if (use_transit) then
+#if defined (__oasis)
+!   SLP and wind speed in coupled setups. This is a makeshift solution
+!   as long as the true values are not provided by the AGCM / OASIS.
+    press_a = mean_slp 
+    wind_2  = speed_2(stress_atmoce_x(n), stress_atmoce_y(n))
+#else
+    press_a = press_air(n)
+    wind_2  = u_wind(n)**2 + v_wind(n)**2
+#endif
+  
+  end if
+  
+  
   SELECT CASE (id)
     CASE (0)
         bc_surface=-dt*(heat_flux(n)/vcpw + tr_arr(mesh%ulevels_nod2D(n),n,1)*water_flux(n)*is_nonlinfs)
@@ -1060,7 +1075,7 @@ FUNCTION bc_surface(n, id, mesh)
 !     corrected for precipitation or evaporation fluxes with different isotopic signatures.
       bc_surface = dt * (iso_flux("co2",                                                                &
                                   tr_arr(mesh%ulevels_nod2D(n),n,1), tr_arr(mesh%ulevels_nod2D(n),n,2), &
-                                  u_wind(n), v_wind(n), a_ice(n), press_air(n), xco2_a, r14c_a,         & 
+                                  wind_2, a_ice(n), press_a, xco2_a, r14c_a,                            & 
                                   tr_arr(mesh%ulevels_nod2D(n),n,id_r14c), dic_0)                       &
                          - tr_arr(mesh%ulevels_nod2D(n),n,id_r14c) * water_flux(n) * is_nonlinfs)
 !   Argon-39:
@@ -1070,7 +1085,7 @@ FUNCTION bc_surface(n, id, mesh)
 !     corrected for precipitation or evaporation fluxes with different isotopic signatures.
       bc_surface = dt * (iso_flux("arg",                                                                &
                                   tr_arr(mesh%ulevels_nod2D(n),n,1), tr_arr(mesh%ulevels_nod2D(n),n,2), &
-                                  u_wind(n), v_wind(n), a_ice(n), press_air(n), xarg_a, r39ar_a,        &
+                                  wind_2, a_ice(n), press_a, xarg_a, r39ar_a,                           &
                                   tr_arr(mesh%ulevels_nod2D(n),n,id_r39ar), arg_0)                      &
                          - tr_arr(mesh%ulevels_nod2D(n),n,id_r39ar) * water_flux(n) * is_nonlinfs)
 !   CFC-12:
@@ -1089,13 +1104,14 @@ FUNCTION bc_surface(n, id, mesh)
          xf12_a = (1 - yy_nh) * xf12_nh + yy_nh * xf12_sh
          f12t_a = (1 - yy_nh) * f12t_nh + yy_nh * f12t_sh
       end if
-!!    Interpolate from annual to monthly values
+!     Interpolate from annual to monthly values
       xf12_a = xf12_a + month * f12t_a
 !     Local air-sea exchange gas flux of CFC-12 (in m / s):
-      bc_surface = dt * gas_flux("f12",                                                                 &
-                                 tr_arr(mesh%ulevels_nod2D(n),n,1), tr_arr(mesh%ulevels_nod2D(n),n,2),  &
-                                 u_wind(n), v_wind(n), a_ice(n), press_air(n), xf12_a,                  &
-                                 tr_arr(mesh%ulevels_nod2D(n),n,id_f12))
+      bc_surface = dt * (gas_flux("f12",                                                                 &
+                                  tr_arr(mesh%ulevels_nod2D(n),n,1), tr_arr(mesh%ulevels_nod2D(n),n,2),  &
+                                  wind_2, a_ice(n), press_a, xf12_a,                                     &
+                                  tr_arr(mesh%ulevels_nod2D(n),n,id_f12))                                &
+                         - tr_arr(mesh%ulevels_nod2D(n),n,id_f12) * water_flux(n) * is_nonlinfs)
 !   SF6:
     CASE (6)
 !     Select atmospheric input values corresponding to the latitude
@@ -1112,10 +1128,11 @@ FUNCTION bc_surface(n, id, mesh)
 !     Interpolate from annual to monthly values
       xsf6_a = xsf6_a + month * sf6t_a
 !     Local air-sea exchange gas flux of SF6 (in m / s):
-      bc_surface = dt * gas_flux("sf6",                                                                 &
-                                 tr_arr(mesh%ulevels_nod2D(n),n,1), tr_arr(mesh%ulevels_nod2D(n),n,2),  &
-                                 u_wind(n), v_wind(n), a_ice(n), press_air(n), xsf6_a,                  &
-                                 tr_arr(mesh%ulevels_nod2D(n),n,id_sf6))
+      bc_surface = dt * (gas_flux("sf6",                                                                 &
+                                  tr_arr(mesh%ulevels_nod2D(n),n,1), tr_arr(mesh%ulevels_nod2D(n),n,2),  &
+                                  wind_2, a_ice(n), press_a, xsf6_a,                                     &
+                                  tr_arr(mesh%ulevels_nod2D(n),n,id_sf6))                                &
+                         - tr_arr(mesh%ulevels_nod2D(n),n,id_sf6) * water_flux(n) * is_nonlinfs)
 !   Done with boundary conditions for (transient) tracers.
 
 !---wiso-code
