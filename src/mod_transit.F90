@@ -6,6 +6,10 @@ MODULE mod_transit
   implicit none
   save
 
+! Atmospheric pressure, local (dummy) variable, global-mean SLP, and local wind speed at 10 m
+  real(kind=8) :: press_a, mean_slp = 1.01325e5, wind_2
+
+
 ! Normalized and fractionation-corrected atmospheric 14CO2 / 12CO2 ratios
   real(kind=8) :: r14c_a  = 1.0, & ! Value passed in air-sea flux calculation
                   r14c_nh = 1.0, & ! Northern Hemisphere
@@ -59,8 +63,7 @@ MODULE mod_transit
 
   contains
 
-
-    function iso_flux(which_gas, temp_c, sal, u_10, v_10, f_ice, p_atm, x_gas, r_air, r_sea, c_surf)
+    function iso_flux(which_gas, temp_c, sal, wind_2, f_ice, p_atm, x_gas, r_air, r_sea, c_surf)
 !     Calculate isotopic air-sea exchange fluxes in 1 / (m**2 * s) assuming local solubility equilibrium
 !     for the abundant isotopologue. Positive values mean oceanic uptake.
       implicit none
@@ -70,21 +73,21 @@ MODULE mod_transit
       character(len=3), intent(in) :: which_gas  ! trace gas name
 
       real(kind=8), intent(in) :: temp_c, sal, &   ! SST (deg C) and SSS ("PSU" or permil)
-                                  u_10, v_10,  &   ! wind speed at 10 m height (m / s)
+                                  wind_2, &        ! wind speed at 10 m heigth squared
                                   f_ice, &         ! sea-ice fractional coverage
                                   p_atm, &         ! total atmospheric pressure (Pa)
                                   x_gas, &         ! atmospheric mole fraction of the abundant isotope
                                   r_air, r_sea, &  ! isotopic ratios in atmosphere and ocean
                                   c_surf           ! surface water concentration of the abundant isotope (mol / m**3)
 
-      iso_flux = transfer_vel(which_gas, temp_c, u_10, v_10) * &
+      iso_flux = transfer_vel(which_gas, temp_c, wind_2) * &
                  solub(which_gas, temp_c, sal) * p_atm / 1.01325e5 * x_gas * &
                  (r_air - r_sea) * (1. - f_ice) / c_surf
       return
     end function iso_flux
 
 
-    function gas_flux(which_gas, temp_c, sal, u_10, v_10, f_ice, p_atm, x_gas, c_surf)
+    function gas_flux(which_gas, temp_c, sal, wind_2, f_ice, p_atm, x_gas, c_surf)
 !     Computes air-sea exchange gas fluxes in mol / (m**2 * s) , positive values mean oceanic uptake.
       implicit none
 
@@ -92,7 +95,7 @@ MODULE mod_transit
 !     Input parameters
       character(len=3), intent(in) :: which_gas  ! trace gas name
       real(kind=8), intent(in) :: temp_c, sal, & ! SST (deg C) and SSS ("PSU" or permil)
-                                  u_10, v_10,  & ! wind speed at 10 m height (m / s)
+                                  wind_2,     &  ! wind speed at 10 m heigth squared
                                   f_ice, &       ! sea-ice fractional coverage
                                   p_atm, &       ! total atmospheric pressure (Pa)
                                   x_gas, &       ! atmospheric mole fraction 
@@ -100,7 +103,7 @@ MODULE mod_transit
 !     Internal variables
       real(kind=8) :: c_sat                      ! marine saturation concentration (mol / m**3)
       c_sat = solub(which_gas, temp_c, sal) * p_atm / 1.01325e5 * x_gas
-      gas_flux = transfer_vel(which_gas, temp_c, u_10, v_10) * (c_sat - c_surf) * (1. - f_ice)
+      gas_flux = transfer_vel(which_gas, temp_c, wind_2) * (c_sat - c_surf) * (1. - f_ice)
 
       return
     end function gas_flux
@@ -158,7 +161,6 @@ MODULE mod_transit
 !     Schmidt numbers of trace gases in sea water with S = 35 
 !     normalized to 20 degC (Sc(CO2) ~660; Wanninkhof 2014, tab. 1)).
       implicit none
-
 !     Result
       real(kind=8) :: sc_660                       ! Schmidt number
 !     Input parameters
@@ -184,21 +186,62 @@ MODULE mod_transit
     end function sc_660
 
 
-    function transfer_vel(which_gas, temp_c, u_10, v_10)
+    function transfer_vel(which_gas, temp_c, wind_2)
 !     Compute gas transfer velocities of / for tracers
+      implicit none
 !     Result
       real(kind=8) :: transfer_vel                 ! transfer velocity (m / s)
 !     Input parameters
       character(len=3), intent(in) :: which_gas    ! tracer name
       real(kind=8), intent(in) :: temp_c, &        ! temperature (deg C)
-                                  u_10, v_10       ! wind speed at 10 m height (m / s)
+                                  wind_2           ! wind speed squared at 10 m height (m / s)
 
 !     Wanninkhof (2014), eq. (4) with a = 0.251 (cm / h) / (m / s)**2 -> 6.9722e-7 s / m 
 !     to obtain the gas transfer velocity in m / s
-      transfer_vel = 6.9722e-7 * sc_660(which_gas, temp_c)**(-0.5) * (u_10**2 + v_10**2) 
+      transfer_vel = 6.9722e-7 * sc_660(which_gas, temp_c)**(-0.5) * wind_2
 
       return
     end function transfer_vel
+
+
+    function speed_2(windstr_x, windstr_y)
+!     Computes the square of wind speed at 10 m height from wind stress fields
+!     in coupled simulations as long as it is not provided by the AGCM / OASIS.
+!     We follow Peixoto & Oort (1992, Eq. (10.28), (10,29)) and Charnock (1955); 
+!     also see MPI report 349 (2003), Eq. (5.7).
+      implicit none
+      real(kind=8) :: speed_2
+
+!     Input
+      real(kind=8), intent(in) :: windstr_x, windstr_y
+
+!     Internal variables and parameters
+!     Zonal and meridional velocities at 10 m height
+      real(kind=8) :: u_10, v_10
+!     Zonal and meridional friction velocities
+      real(kind=8) :: u_fric, v_fric
+!     Zonal and meridional roughness lengths
+      real(kind=8) :: l_rough_x, l_rough_y
+!     Inverse von-Karman constant (0.4), Charnock constant (0.018) divided by g, inverse density of air (1.3), log(10)
+      real(kind=8), parameter :: inv_karm = 2.5, charn_g = 0.00173, inv_dens_air = 0.76923, log_10 = 2.30258
+     
+!     Calculate friction velocities (Peixoto & Oort, 1992, Eq. (10.28))
+      u_fric = sqrt(abs(windstr_x) * inv_dens_air)
+      v_fric = sqrt(abs(windstr_y) * inv_dens_air)
+
+!     Calculate roughness lengths (MPI report 349, 2003, Eq. (5.7), quoting Charnock, 1955)
+      l_rough_x = max((charn_g * u_fric**2), 1.5e-5)
+      l_rough_y = max((charn_g * v_fric**2), 1.5e-5)
+
+!     Calculate wind speed at 10 m (Peixoto & Oort, 1992, Eq. (10.29))
+      u_10 = inv_karm * u_fric * (log_10 - log(l_rough_x))
+      v_10 = inv_karm * v_fric * (log_10 - log(l_rough_y))
+     
+      speed_2 = u_10**2 + v_10**2
+      
+      return
+    end function speed_2
+
 
 END MODULE mod_transit
 !==========================================================
