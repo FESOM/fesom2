@@ -552,7 +552,9 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
 
   type(t_partit),intent(in), &
                        target :: partit
-
+  
+  IF (PRESENT(nan)) vmasked=nan
+  
   SELECT CASE (trim(what))
     CASE ('min')
       if (.not. present(nan)) vmasked=huge(vmasked) !just some crazy number
