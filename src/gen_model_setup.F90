@@ -64,6 +64,14 @@ subroutine read_namelist
   read (20,NML=oce_dyn)
   read (20,NML=oce_tra)
   read (20,NML=oce_init3d)
+  if (use_transit) then
+    if(mype==0) print *, "Transient tracers are ON."
+    read (20,NML=transit_param)
+!   Control output: atmospheric tracer concentrations in the Northern Hemisphere (CO2 values are global)
+!!  if(mype==0) print *, "r14c_nh, xco2_a, xf12_nh, xsf6_nh = ", r14c_nh, xco2_a, xf12_nh, xsf6_nh
+  end if
+  
+
   close (20)
 
   nmlfile ='namelist.forcing'    ! name of forcing namelist file
@@ -89,16 +97,6 @@ subroutine read_namelist
   read (20,NML=diag_list)
   close (20)
 
-  if (use_transit) then
-    if(mype==0) print *, "Transient tracers are ON."
-    nmlfile ='namelist.transit'    ! name of namelist file for transient tracers
-    open (20,file=nmlfile)
-    read (20,NML=transit_param)
-    close (20)
-!   Control output: atmospheric tracer concentrations in the Northern Hemisphere (CO2 values are global)
-!!    if(mype==0) print *, "r14c_nh, xco2_a, xf12_nh, xsf6_nh = ", r14c_nh, xco2_a, xf12_nh, xsf6_nh
-  end if
-  
   if(mype==0) write(*,*) 'Namelist files are read in'
   
   !_____________________________________________________________________________
