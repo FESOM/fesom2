@@ -64,10 +64,12 @@ module g_cvmix_idemix
     ! filelocation for idemix bottom forcing
     character(MAX_PATH):: idemix_botforc_file = './tidal_energy_gx1v6_20090205_rgrid.nc'
     character(MAX_PATH):: idemix_botforc_vname= 'wave_dissipation'
+    ! total global Energy input that should be conserved if 0.0 no conservation is applied
+    real(kind=WP)      :: idemix_botforc_Etot = 0.0_WP ! units W
 
     namelist /param_idemix/ idemix_tau_v, idemix_tau_h, idemix_gamma, idemix_jstar, idemix_mu0, idemix_n_hor_iwe_prop_iter, &
                             idemix_sforcusage, idemix_surforc_file, idemix_surforc_vname, &
-                            idemix_botforc_vname, idemix_botforc_file
+                            idemix_botforc_vname, idemix_botforc_file, idemix_botforc_Etot
                             
                             
     
@@ -121,7 +123,8 @@ module g_cvmix_idemix
         implicit none
         character(len=cvmix_strlen) :: nmlfile
         logical                  :: file_exist=.False.
-        integer                  :: node_size
+        integer                  :: node_size, n
+        real(kind=WP)            :: loc_Etot, Etot
 
         type(t_mesh), intent(in), target :: mesh
 
@@ -211,8 +214,8 @@ module g_cvmix_idemix
             write(*,*) "     idemix_jstar        = ", idemix_jstar
             write(*,*) "     idemix_mu0          = ", idemix_mu0
             write(*,*) "     idemix_n_hor_iwe_...= ", idemix_n_hor_iwe_prop_iter
-            write(*,*) "     idemix_surforc_file = ", idemix_surforc_file
-            write(*,*) "     idemix_botforc_file = ", idemix_botforc_file
+            write(*,*) "     idemix_surforc_file = ", trim(idemix_surforc_file)
+            write(*,*) "     idemix_botforc_file = ", trim(idemix_botforc_file)
             write(*,*)
         end if
         
@@ -248,7 +251,22 @@ module g_cvmix_idemix
             if (mype==0) write(*,*) ' --> read IDEMIX near tidal bottom forcing'
             call read_other_NetCDF(idemix_botforc_file, idemix_botforc_vname, 1, forc_iw_bottom_2D, .true., mesh) 
             ! convert from W/m^2 to m^3/s^3
-            forc_iw_bottom_2D  = forc_iw_bottom_2D/density_0
+            
+            if (idemix_botforc_Etot==0.0_WP) then
+                forc_iw_bottom_2D  = forc_iw_bottom_2D/density_0
+            else
+                loc_Etot = 0.0_WP
+                do n=1, myDim_nod2D
+                    loc_Etot = loc_Etot + areasvol(nlevels_nod2D(n)-1, n)*forc_iw_bottom_2D(n)
+                end do
+                call MPI_AllREDUCE(loc_Etot  , Etot  , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+                write(*,*)
+                write(*,*) 'Etot = ', Etot
+                write(*,*) 'idemix_botforc_Etot = ', idemix_botforc_Etot
+                write(*,*)
+                forc_iw_bottom_2D  = forc_iw_bottom_2D*idemix_botforc_Etot/Etot/density_0
+            endif 
+        
         else
             if (mype==0) then
                 write(*,*) '____________________________________________________________________'

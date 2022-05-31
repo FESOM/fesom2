@@ -2655,6 +2655,8 @@ subroutine oce_timestep_ale(n, mesh)
     end if
     t1=MPI_Wtime()    
     
+    KvN2 = Kv*bvfreq
+    
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'
     

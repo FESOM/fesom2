@@ -276,10 +276,11 @@ vorticity=0.0_WP
 ! Visc and Diff coefs
 ! =================
 
-allocate(Av(nl,elem_size), Kv(nl,node_size))
+allocate(Av(nl,elem_size), Kv(nl,node_size), KvN2(nl,node_size))
 
 Av=0.0_WP
 Kv=0.0_WP
+KvN2=0.0_WP
 if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
    allocate(Kv_double(nl,node_size,num_tracers))
    Kv_double=0.0_WP
