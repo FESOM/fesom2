@@ -62,8 +62,10 @@ subroutine output_zarr(istep)
 
   call write_zarr_array(istep, 'temp','vector',reshape(tr_arr(:,1:myDim_nod2d,1),[size(tr_arr(:,1:myDim_nod2d,1))]), filename)
   call write_zarr_array(istep, 'salt','vector',reshape(tr_arr(:,1:myDim_nod2d,2),[size(tr_arr(:,1:myDim_nod2d,2))]), filename)
-  call write_zarr_array(istep, 'unod','vector',reshape(Unode(1,:,1:myDim_nod2d),[size(Unode(1,:,1:myDim_nod2d))]), filename)
-  call write_zarr_array(istep, 'vnod','vector',reshape(Unode(2,:,1:myDim_nod2d),[size(Unode(2,:,1:myDim_nod2d))]), filename)
+
+! disabling for now as we dont know how to control it for netcdf-io
+!  call write_zarr_array(istep, 'unod','vector',reshape(Unode(1,:,1:myDim_nod2d),[size(Unode(1,:,1:myDim_nod2d))]), filename)
+!  call write_zarr_array(istep, 'vnod','vector',reshape(Unode(2,:,1:myDim_nod2d),[size(Unode(2,:,1:myDim_nod2d))]), filename)
 
   
 end subroutine output_zarr
