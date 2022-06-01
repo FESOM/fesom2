@@ -7,6 +7,7 @@ module io_zarrdata
   implicit none
   public:: output_zarr
   private
+  integer, save:: nsteps
 contains
 
 subroutine output_zarr(istep)
@@ -24,7 +25,7 @@ subroutine output_zarr(istep)
 
   integer       :: istep
   logical, save :: lfirst=.true.
-  integer       :: n, k, i, nsteps
+  integer       :: n, k, i!, nsteps
   logical       :: do_output
   !type(t_mesh), intent(in) , target :: mesh
   character(:), allocatable :: filepath
@@ -45,7 +46,9 @@ subroutine output_zarr(istep)
       root = create_zarr_group(trim(filename))
      else
       root = filename 
-     end if 
+     end if
+     
+     call get_run_steps(nsteps)
      ! not necessary
      !variable_path = create_zarr_group('sst',root) ! also adds dirs for each pe to hold its arrays
      ! testing
@@ -126,7 +129,7 @@ subroutine write_zarr_array(istep, variable, vartype, rarray, root) !, dimension
   character(6)                 :: vartype ! scalar(1d per time) or 3d
   real(kind=WP), intent(in) :: rarray(:) 
   character(2000)               ::  tmp
-  integer          :: data_kind, fileunit, nsteps
+  integer          :: data_kind, fileunit !, nsteps
   character(1), parameter :: endianess="<" ! later find from func
   logical,save :: lfirst=.true.
   character(5), save :: mype_string
@@ -148,7 +151,7 @@ subroutine write_zarr_array(istep, variable, vartype, rarray, root) !, dimension
   write(tmp, '(I0)') data_kind
   dtype = byteorder() // "f" // tmp
      
-  call get_run_steps(nsteps)
+  !call get_run_steps(nsteps)
 
   !should we inquire? before or replace?
   tmp=trim(variable_group) // "/" // trim(mype_string) 
