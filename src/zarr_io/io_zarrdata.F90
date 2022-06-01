@@ -144,8 +144,8 @@ subroutine write_zarr_array(istep, variable, vartype, rarray, root) !, dimension
   write(mype_string,'(I0)') mype
   tmp=trim(variable_group) // "/" // trim(mype_string) 
   !should we inquire? before?
-  !call execute_command_line ('mkdir -p ' // adjustl(trim(tmp)))
-  call mkdir(adjustl(trim(tmp))) ! fix for failing execute_command_line at times
+  call execute_command_line ('mkdir -p ' // adjustl(trim(tmp)))
+  !call mkdir(adjustl(trim(tmp))) ! fix for failing execute_command_line at times
 
   data_kind = 8!sizeof(rarray)/size(rarray) !use storage_size intrensic?
   write(tmp, '(I0)') data_kind
