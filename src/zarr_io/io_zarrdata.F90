@@ -39,7 +39,7 @@ subroutine output_zarr(istep)
 !  type(Meandata), pointer :: entry
 !
   filename = "test2.zarr"
-  dirnames = trim(root) // "/sst"  
+  !dirnames = trim(root) // "/sst"  
   if (lfirst) then
      if (mype==0) then
       root = create_zarr_group(trim(filename))
@@ -52,9 +52,17 @@ subroutine output_zarr(istep)
      !call write_zarr_array(istep, 'sst', reshape(tr_arr(1,1:myDim_nod2d,1),[size(tr_arr(1,1:myDim_nod2d,1))]), filename)
      lfirst=.false.
   end if
+  ! reshape, inefficient but because we dont have interface for diffrernt dims
+  call write_zarr_array(istep, 'sst','scalar', reshape(tr_arr(1,1:myDim_nod2d,1),[size(tr_arr(1,1:myDim_nod2d,1))]), filename)
+  call write_zarr_array(istep, 'ssh','scalar', eta_n(1:myDim_nod2d), filename)
+  
 
-  call write_zarr_array(istep, 'sst', reshape(tr_arr(1,1:myDim_nod2d,1),[size(tr_arr(1,1:myDim_nod2d,1))]), filename)
+  call write_zarr_array(istep, 'temp','vector',reshape(tr_arr(:,1:myDim_nod2d,1),[size(tr_arr(:,1:myDim_nod2d,1))]), filename)
+  call write_zarr_array(istep, 'salt','vector',reshape(tr_arr(:,1:myDim_nod2d,2),[size(tr_arr(:,1:myDim_nod2d,2))]), filename)
+  call write_zarr_array(istep, 'unod','vector',reshape(Unode(1,:,1:myDim_nod2d),[size(Unode(1,:,1:myDim_nod2d))]), filename)
+  call write_zarr_array(istep, 'vnod','vector',reshape(Unode(2,:,1:myDim_nod2d),[size(Unode(2,:,1:myDim_nod2d))]), filename)
 
+  
 end subroutine output_zarr
 
 function create_zarr_group(group_name, root) result (group)
@@ -103,14 +111,19 @@ end function create_zarr_group
 
 
 !writes and appends in time
-subroutine write_zarr_array(istep, variable, rarray, root) !, mensions, add_time_dim)
+subroutine write_zarr_array(istep, variable, vartype, rarray, root) !, dimensions, add_time_dim)
   use zarr_util 
+  use mod_mesh
   use g_PARSUP
+  use o_arrays
+  use diagnostics
+
   implicit none
   character(len=*), intent(in)               :: variable, root
   integer, intent(in)           :: istep
   character(1000)               :: variable_group, group
-  character(9999)               :: text 
+  character(9999)               :: text
+  character(6)                 :: vartype ! scalar(1d per time) or 3d
   real(kind=WP), intent(in) :: rarray(:) 
   character(2000)               ::  tmp
   integer          :: data_kind, fileunit, nsteps
@@ -121,49 +134,62 @@ subroutine write_zarr_array(istep, variable, rarray, root) !, mensions, add_time
   !logical                 :: add_time_dim=.true.
   !character(len=*), intent(in) :: dimensions(:)
    
-
-  if (lfirst) then
-     variable_group = create_zarr_group(variable, root) 
+  ! this redundant block will run on every call should be only done once for a variable, 
+  ! for that, we need to track variable IO lists
+  variable_group = create_zarr_group(variable, root) 
      
-     write(mype_string,'(I0)') mype
-     tmp=trim(variable_group) // "/" // trim(mype_string) 
-     !should we inquire? before?
-     !call execute_command_line ('mkdir -p ' // adjustl(trim(tmp)))
-     call mkdir(adjustl(trim(tmp))) ! fix for failing execute_command_line at times
+  write(mype_string,'(I0)') mype
+  tmp=trim(variable_group) // "/" // trim(mype_string) 
+  !should we inquire? before?
+  !call execute_command_line ('mkdir -p ' // adjustl(trim(tmp)))
+  call mkdir(adjustl(trim(tmp))) ! fix for failing execute_command_line at times
 
-     data_kind = 8!sizeof(rarray)/size(rarray) !use storage_size intrensic?
-     write(tmp, '(I0)') data_kind
-     dtype = byteorder() // "f" // tmp
+  data_kind = 8!sizeof(rarray)/size(rarray) !use storage_size intrensic?
+  write(tmp, '(I0)') data_kind
+  dtype = byteorder() // "f" // tmp
      
-     call get_run_steps(nsteps)
+  call get_run_steps(nsteps)
 
-     !should we inquire? before or replace?
-     tmp=trim(variable_group) // "/" // trim(mype_string) 
-     tmp=trim(tmp) // "/.zarray"
-     open(newunit=fileunit, file=trim(tmp)) 
-     !call get_zarray_json(text, shape(rarray), shape(rarray), dtype) !dtype)
-     !call get_zarray_json(text, [1,shape(rarray)], [nsteps, shape(rarray)], dtype)
-     call get_zarray_json(text, [shape(rarray),1], [shape(rarray),nsteps], dtype)
-     write(fileunit, '(a)') trim(text)
-     flush(fileunit)
-     close(fileunit)
+  !should we inquire? before or replace?
+  tmp=trim(variable_group) // "/" // trim(mype_string) 
+  tmp=trim(tmp) // "/.zarray"
+  open(newunit=fileunit, file=trim(tmp)) 
+  !call get_zarray_json(text, shape(rarray), shape(rarray), dtype) !dtype)
+  !call get_zarray_json(text, [1,shape(rarray)], [nsteps, shape(rarray)], dtype)
+  if (vartype == "scalar") then
+     !call get_zarray_json(text, [shape(rarray),1], [shape(rarray),nsteps], dtype)
+     call get_zarray_json(text, [myDim_nod2d,1], [myDim_nod2d,nsteps], dtype)
+  else
+     call get_zarray_json(text, [size(rarray)/myDim_nod2d,myDim_nod2d,1], [size(rarray)/myDim_nod2d,myDim_nod2d,nsteps], dtype)
+  end if
+             
+  write(fileunit, '(a)') trim(text)
+  flush(fileunit)
+  close(fileunit)
 
-     tmp=trim(variable_group) // "/" // trim(mype_string) 
-     tmp=trim(tmp) // "/.zattrs"
-     open(newunit=fileunit, file=trim(tmp))
-     !text = '{"_ARRAY_DIMENSIONS":["nod2d"]}'
-     !text = '{"_ARRAY_DIMENSIONS":["time","nod2d"]}'
+  tmp=trim(variable_group) // "/" // trim(mype_string) 
+  tmp=trim(tmp) // "/.zattrs"
+  open(newunit=fileunit, file=trim(tmp))
+  !text = '{"_ARRAY_DIMENSIONS":["nod2d"]}'
+  !text = '{"_ARRAY_DIMENSIONS":["time","nod2d"]}' 
+  if (vartype == "scalar") then
      text = '{"_ARRAY_DIMENSIONS":["nod2d", "time"]}' ! works for dask.array.concatinate
-     write(fileunit, '(a)') trim(text)
-     flush(fileunit)
-     close(fileunit)
-     lfirst = .false. 
-  end if  
-  
+  else
+     text = '{"_ARRAY_DIMENSIONS":["lev", "nod2d", "time"]}' ! works for dask.array.concatinate
+  end if ! missing if nothing?
+
+  write(fileunit, '(a)') trim(text)
+  flush(fileunit)
+  close(fileunit)
+  ! end block redundant 
   write(tmp, '(I0)') istep-1  
   !tmp=trim(root) // '/' //trim(variable) // "/" // trim(mype_string) // '/0'
   !tmp=trim(root) // '/' //trim(variable) // "/" // trim(mype_string) // '/' // trim(tmp)// '.0'
-  tmp=trim(root) // '/' //trim(variable) // "/" // trim(mype_string) // '/0.' // trim(tmp)
+  if (vartype == "scalar") then 
+        tmp=trim(root) // '/' //trim(variable) // "/" // trim(mype_string) // '/0.' // trim(tmp)
+  else
+        tmp=trim(root) // '/' //trim(variable) // "/" // trim(mype_string) // '/0.0.' // trim(tmp)
+  end if
   call write_real_array(tmp, rarray)
 
 end subroutine write_zarr_array
