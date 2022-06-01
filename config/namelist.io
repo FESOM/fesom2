@@ -20,6 +20,11 @@ io_listsize=100 !number of streams to allocate. shallbe large or equal to the nu
 ! for 'dMOC' to work ldiag_dMOC must be .true. otherwise no output
 &nml_list
 io_list =  'sst       ',1, 's', 8,
+           'ssh       ',1, 's', 8,
+           'temp      ',1, 's', 8,
+           'salt      ',1, 's', 8,
+           'unod      ',1, 's', 8,
+           'vnod      ',1, 's', 8,
 /
 !flags to enable and disable zarr and netcdf io
 &io_ctl
