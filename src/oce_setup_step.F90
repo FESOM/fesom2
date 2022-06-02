@@ -281,11 +281,11 @@ allocate(tau_x_t(node_size,2), tau_y_t(node_size,2))
 ! ================
 #if defined(__recom)
   if(use_REcoM) then
-    if (restore_alkalinity) then
+    !if (restore_alkalinity) then
       allocate(Alk_surf(node_size))
       allocate(relax_alk(node_size))
       allocate(virtual_alk(node_size))
-    endif
+    !endif
   end if
 #endif
 ! =================
@@ -450,11 +450,11 @@ end if
 ! ================
 #if defined(__recom)
   if(use_REcoM) then
-    if (restore_alkalinity) then
+    !if (restore_alkalinity) then
       Alk_surf=0.0_WP
       relax_alk=0.0_WP
       virtual_alk=0.0_WP
-    endif
+    !endif
   end if
 #endif        
     ! init field for pressure force 
