@@ -162,7 +162,9 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
             PhyCalc= max(tiny,state(k,iphycal)		+ sms(k,iphycal))
             DetCalc= max(tiny,state(k,idetcal)		+ sms(k,idetcal))
 
-            calc_diss      = calc_diss_rate * SinkVel(k,ivdet) /20.d0 ! Dissolution rate of CaCO3 scaled by the sinking velocity at the current depth 0.005714   !20.d0/3500.d0
+            Sink_Vel = Vdet_a* abs(zF(k)) + Vdet
+            calc_diss = calc_diss_rate * SinkVel /20.d0
+            !calc_diss      = calc_diss_rate * SinkVel(k,ivdet) /20.d0 ! Dissolution rate of CaCO3 scaled by the sinking velocity at the current depth 0.005714   !20.d0/3500.d0
             calc_diss2     = calc_diss_rate2  ! Dissolution rate of CaCO3 for seczoo
 
             quota          =  PhyN / PhyC ! include variability of the N: C ratio, cellular chemical composition 
