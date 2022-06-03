@@ -3,6 +3,12 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9")
 
 project(fesom C Fortran)
 
+if(DEFINED ENV{FESOM_PLATFORM_STRATEGY})
+   set(FESOM_PLATFORM_STRATEGY $ENV{FESOM_PLATFORM_STRATEGY} CACHE STRING "switch to platform specific compile settings, this is usually determined via the env.sh script")
+else()
+   set(FESOM_PLATFORM_STRATEGY "notset" CACHE STRING "switch to platform specific compile settings, this is usually determined via the env.sh script")
+endif()
+
 option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
 
 # get our source files
@@ -68,7 +74,12 @@ if(${VERBOSE})
 endif()
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
-	target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -xHost -ip -init=zero -no-wrap-margin)
+	target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -ip -init=zero -no-wrap-margin)
+   if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
+   else()
+      target_compile_options(${PROJECT_NAME} PRIVATE -xHost)
+   endif()
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 	target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -march=native -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
 	if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
