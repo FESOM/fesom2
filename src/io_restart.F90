@@ -37,6 +37,9 @@ MODULE io_RESTART
 ! ini_ocean_io initializes ocean_file datatype which contains information of all variables need to be written into 
 ! the ocean restart file. This is the only place need to be modified if a new variable is added!
 subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
+#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+  use nvfortran_subarray_workaround_module
+#endif
   integer, intent(in)       :: year
   integer                   :: j
   character(500)            :: longname
@@ -67,6 +70,9 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
   call oce_files%def_node_var('hnode', 'nodal layer thickness', 'm',   mesh%hnode, mesh, partit)
   
   !___Define the netCDF variables for 3D fields_______________________________
+#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+  dynamics_workaround => dynamics
+#endif
   call oce_files%def_elem_var('u', 'zonal velocity',        'm/s', dynamics%uv(1,:,:), mesh, partit)
   call oce_files%def_elem_var('v', 'meridional velocity',   'm/s', dynamics%uv(2,:,:), mesh, partit)
   call oce_files%def_elem_var('urhs_AB', 'Adams–Bashforth for u', 'm/s', dynamics%uv_rhsAB(1,:,:), mesh, partit)

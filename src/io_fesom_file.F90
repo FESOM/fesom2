@@ -164,6 +164,9 @@ contains
   
   
   subroutine read_and_scatter_variables(this)
+#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+    use nvfortran_subarray_workaround_module
+#endif
     use io_scatter_module
     class(fesom_file_type), target :: this
     ! EO parameters
@@ -208,8 +211,22 @@ contains
         else
           call scatter_nod2D(var%global_level_data, laux, this%iorank, this%comm, this%partit)
         end if
+#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+  if(var%varname=='u') then
+    dynamics_workaround%uv(1,lvl,:) = laux
+  else if(var%varname=='v') then
+    dynamics_workaround%uv(2,lvl,:) = laux
+  else if(var%varname=='urhs_AB') then
+    dynamics_workaround%uv_rhsAB(1,lvl,:) = laux
+  else if(var%varname=='vrhs_AB') then
+    dynamics_workaround%uv_rhsAB(2,lvl,:) = laux
+  else
+#endif
         ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
        var%external_local_data_ptr(lvl,:) = laux ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
+#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+  end if
+#endif
       end do
       deallocate(laux)
     end do
