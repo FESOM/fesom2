@@ -134,7 +134,7 @@ module g_cvmix_tidal
         inquire(file=trim(tidal_botforc_file),exist=file_exist) 
         if (file_exist) then
             if (mype==0) write(*,*) ' --> read TIDAL near tidal bottom forcing'
-            call read_other_NetCDF(tidal_botforc_file, 'wave_dissipation', 1, tidal_forc_bottom_2D, .true., mesh) 
+            call read_other_NetCDF(tidal_botforc_file, 'wave_dissipation', 1, tidal_forc_bottom_2D, .true., mesh, .true.) 
             !!PS ! convert from W/m^2 to m^3/s^3
             !!PS tidal_forc_bottom_2D  = tidal_forc_bottom_2D/density_0
             ! --> the tidal energy for dissipation is divided by rho0 in 

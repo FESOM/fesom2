@@ -15,11 +15,11 @@ module diagnostics
 
   private
 !!PS   
-  public :: ldiag_solver, lcurt_stress_surf, ldiag_energy, ldiag_dMOC, ldiag_DVD, ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, &
+  public :: ldiag_solver, lcurt_stress_surf, ldiag_energy, ldiag_dMOC, ldiag_DVD, ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, ldiag_trflx, &
             compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, wrhof, rhof, &
             u_x_u, u_x_v, v_x_v, v_x_w, u_x_w, dudx, dudy, dvdx, dvdy, dudz, dvdz, utau_surf, utau_bott, av_dudz_sq, av_dudz, av_dvdz, stress_bott, u_surf, v_surf, u_bott, v_bott, &
             std_dens_min, std_dens_max, std_dens_N, std_dens, std_dens_UVDZ, std_dens_DIV, std_dens_Z, std_dens_dVdT, std_dens_flux, dens_flux_e, &
-            compute_diag_dvd_2ndmoment_klingbeil_etal_2014, compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd
+            compute_diag_dvd_2ndmoment_klingbeil_etal_2014, compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd, tuv, suv
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
   ! A=ssh_stiff, x=d_eta, rhs=ssh_rhs; rhs_diag=A*x;
@@ -31,6 +31,7 @@ module diagnostics
   real(kind=WP),  save, allocatable, target      :: dudx(:,:), dudy(:,:), dvdx(:,:), dvdy(:,:), dudz(:,:), dvdz(:,:), av_dudz(:,:), av_dvdz(:,:), av_dudz_sq(:,:)
   real(kind=WP),  save, allocatable, target      :: utau_surf(:), utau_bott(:)
   real(kind=WP),  save, allocatable, target      :: stress_bott(:,:), u_bott(:), v_bott(:), u_surf(:), v_surf(:)
+  real(kind=WP),  save, allocatable, target      :: tuv(:,:,:), suv(:,:,:)
 
 ! defining a set of standard density bins which will be used for computing densMOC
 ! integer,        parameter                      :: std_dens_N  = 100
@@ -102,8 +103,10 @@ module diagnostics
   
   logical                                       :: ldiag_forc       =.false.
   
+  logical                                       :: ldiag_trflx      =.false.
+  
   namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_energy, &
-                       ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc
+                       ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, ldiag_trflx
   
   contains
 
@@ -671,6 +674,47 @@ subroutine diag_densMOC(mode, mesh)
   std_dens_VOL1=std_dens_VOL2
   firstcall_e=.false.
 end subroutine diag_densMOC
+
+
+!
+!
+!_______________________________________________________________________________
+subroutine diag_trflx(mode, mesh)
+    implicit none
+    integer, intent(in)           :: mode
+    integer                       :: node, nz, nzu, nzl
+    logical, save                 :: firstcall=.true.
+    type(t_mesh), intent(in)     , target :: mesh
+#include "associate_mesh.h"
+
+    !___________________________________________________________________________
+    ! On first call allocate
+    if (firstcall) then !allocate the stuff at the first call
+        allocate(tuv(2,nl-1,myDim_nod2D))
+        allocate(suv(2,nl-1,myDim_nod2D))
+        tuv = 0.0_WP
+        suv = 0.0_WP
+        firstcall=.false.
+        if (mode==0) return
+    end if
+    
+    !___________________________________________________________________________
+    ! compute tracer fluxes
+    do node=1, myDim_nod2D
+        nzu = ulevels_nod2D(node)
+        nzl = nlevels_nod2D(node)-1
+        do nz = nzu, nzl
+            tuv(1, nz, node) = Unode(1, nz, node)*tr_arr(nz, node, 1)
+            tuv(2, nz, node) = Unode(2, nz, node)*tr_arr(nz, node, 1)
+            suv(1, nz, node) = Unode(1, nz, node)*tr_arr(nz, node, 2)
+            suv(2, nz, node) = Unode(2, nz, node)*tr_arr(nz, node, 2)
+        end do
+    end do
+  
+end subroutine diag_trflx
+
+
+
 ! ==============================================================
 
 subroutine compute_diagnostics(mode, mesh)
@@ -697,6 +741,8 @@ subroutine compute_diagnostics(mode, mesh)
   end if
   !6. MOC in density coordinate
   if (ldiag_dMOC)        call diag_densMOC(mode, mesh)
+  !7. compute zonal, meridional tracer fluxes
+  if (ldiag_trflx)       call diag_trflx(mode, mesh)
 
 end subroutine compute_diagnostics
 
