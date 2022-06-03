@@ -73,7 +73,7 @@ subroutine thermodynamics(ice, partit, mesh)
   myDim_nod2d=>partit%myDim_nod2D
   eDim_nod2D =>partit%eDim_nod2D
   ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D
-  geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => mesh%geo_coord_nod2D
+  geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => mesh%geo_coord_nod2D(:,:)
   u_ice         => ice%uice(:)
   v_ice         => ice%vice(:)
   a_ice         => ice%data(1)%values(:)

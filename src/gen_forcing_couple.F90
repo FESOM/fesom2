@@ -184,7 +184,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
      do i=1,nsend
          exchange  =0.
          if (i.eq.1) then
-#if defined (__oifs) || defined (__ifsinterface)
+#if defined (__oifs)
             ! AWI-CM3 outgoing state vectors
               do n=1,myDim_nod2D+eDim_nod2D
               exchange(n)=tracers%data(1)%values(1, n)+tmelt	           ! sea surface temperature [K]
@@ -318,7 +318,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
                 mask=1.
                 call force_flux_consv(runoff, mask, i, 0,action, partit, mesh)
             end if
-#if defined (__oifs) || defined (__ifsinterface)
+#if defined (__oifs)
 
          elseif (i.eq.13) then
              if (action) then
@@ -362,7 +362,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
      end if
   END DO
 !$OMP END PARALLEL DO
-#endif
+
   if (use_cavity) then 
 !$OMP PARALLEL DO
     do i=1,myDim_nod2d+eDim_nod2d
@@ -424,6 +424,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   end do
 !$OMP END PARALLEL DO
   ! heat and fresh water fluxes are treated in i_therm and ice2ocean
+#endif /* skip all in case of __ifsinterface */
 #endif /* (__oasis) */
 
   t2=MPI_Wtime()
