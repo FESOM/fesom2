@@ -1,0 +1,13 @@
+# make the contents as shell agnostic as possible so we can include them with bash, zsh and others
+export LC_ALL=en_US.UTF-8
+export CPU_MODEL=AMD_EPYC_ZEN3
+
+module load intel-oneapi-compilers/2022.0.1-gcc-11.2.0
+module load intel-oneapi-mkl/2022.0.1-gcc-11.2.0
+module load openmpi/4.1.2-intel-2021.5.0
+export FC=mpif90 CC=mpicc CXX=mpicxx ;
+export LD_LIBRARY_PATH=/sw/spack-levante/intel-oneapi-mkl-2022.0.1-ttdktf/mkl/2022.0.1/lib/intel64:$LD_LIBRARY_PATH
+
+module load netcdf-c/4.8.1-openmpi-4.1.2-intel-2021.5.0
+module load netcdf-fortran/4.5.3-openmpi-4.1.2-intel-2021.5.0
+module load git # to be able to determine the fesom git SHA when compiling
