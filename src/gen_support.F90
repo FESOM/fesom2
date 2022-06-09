@@ -353,10 +353,8 @@ subroutine integrate_nod_3D(data, int3D, partit, mesh)
 
   integer       :: k, row
   real(kind=WP) :: lval
-#if defined(__openmp_reproducible)  
   real(kind=WP) :: lval_row
-  integer       :: k_ul, k_nl
-#endif
+
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
