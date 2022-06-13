@@ -150,7 +150,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, mesh
             if(temp_x(n)<0._WP) temp_x(n)=temp_x(n) + 360.0_WP  
         end do
     else
-        num = myDim_elem2D+eDim_elem2D
+        num = myDim_elem2D
         allocate(temp_x(num), temp_y(num))  
         do n=1, num
             ! compute points of element centroids in geo frame use them here for interpolation
