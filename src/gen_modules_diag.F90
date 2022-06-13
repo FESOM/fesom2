@@ -11,6 +11,7 @@ module diagnostics
   use o_mixing_KPP_mod
   use g_rotate_grid
   use g_support
+  use o_param, only: tra_adv_ph
   implicit none
 
   private
@@ -675,7 +676,6 @@ subroutine diag_densMOC(mode, mesh)
   firstcall_e=.false.
 end subroutine diag_densMOC
 
-
 !
 !
 !_______________________________________________________________________________
@@ -684,14 +684,14 @@ subroutine diag_trflx(mode, mesh)
     integer, intent(in)           :: mode
     integer                       :: node, nz, nzu, nzl
     logical, save                 :: firstcall=.true.
-    type(t_mesh), intent(in)     , target :: mesh
+    type(t_mesh), intent(in), target :: mesh
 #include "associate_mesh.h"
 
     !___________________________________________________________________________
     ! On first call allocate
     if (firstcall) then !allocate the stuff at the first call
-        allocate(tuv(2,nl-1,myDim_nod2D))
-        allocate(suv(2,nl-1,myDim_nod2D))
+        allocate(tuv(2,nl-1,myDim_nod2D+eDim_nod2D))
+        allocate(suv(2,nl-1,myDim_nod2D+eDim_nod2D))
         tuv = 0.0_WP
         suv = 0.0_WP
         firstcall=.false.
@@ -700,23 +700,15 @@ subroutine diag_trflx(mode, mesh)
     
     !___________________________________________________________________________
     ! compute tracer fluxes
-    do node=1, myDim_nod2D
-        nzu = ulevels_nod2D(node)
-        nzl = nlevels_nod2D(node)-1
-        do nz = nzu, nzl
-            tuv(1, nz, node) = Unode(1, nz, node)*tr_arr(nz, node, 1)
-            tuv(2, nz, node) = Unode(2, nz, node)*tr_arr(nz, node, 1)
-            suv(1, nz, node) = Unode(1, nz, node)*tr_arr(nz, node, 2)
-            suv(2, nz, node) = Unode(2, nz, node)*tr_arr(nz, node, 2)
-        end do
-    end do
-  
+    call compute_hor_trflx4mfct(tr_arr(:,:,1), UV, mesh, tra_adv_ph, tuv(1,:,:), tuv(2,:,:))
+    call compute_hor_trflx4mfct(tr_arr(:,:,2), UV, mesh, tra_adv_ph, suv(1,:,:), suv(2,:,:))
+!     call compute_hor_trflx4upw1(tr_arr(:,:,1), UV, mesh, tra_adv_ph, tuv(1,:,:), tuv(2,:,:))
+!     call compute_hor_trflx4upw1(tr_arr(:,:,2), UV, mesh, tra_adv_ph, suv(1,:,:), suv(2,:,:))
 end subroutine diag_trflx
 
-
-
-! ==============================================================
-
+!
+!
+!_______________________________________________________________________________
 subroutine compute_diagnostics(mode, mesh)
   implicit none
   integer, intent(in)           :: mode !constructor mode (0=only allocation; any other=do diagnostic)
@@ -746,6 +738,382 @@ subroutine compute_diagnostics(mode, mesh)
 
 end subroutine compute_diagnostics
 
+!
+!
+!_______________________________________________________________________________
+subroutine compute_hor_trflx4mfct(ttf, vel, mesh, num_ord, trflx_x, trflx_y)
+    use o_mesh
+    implicit none
+    type(t_mesh),  intent(in), target :: mesh    
+    real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
+    real(kind=WP), intent(in)         :: ttf(mesh%nl-1,  myDim_nod2D+eDim_nod2D)
+    real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
+    real(kind=WP), intent(inout)      :: trflx_x(mesh%nl-1, myDim_nod2D+eDim_nod2D), trflx_y(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP)                     :: deltaX1, deltaY1, deltaX2, deltaY2
+    real(kind=WP)                     :: Tmean1, Tmean2, cHO
+    real(kind=WP)                     :: a, vflx_x, vflx_y, tvflx_x, tvflx_y
+    integer                           :: el(2), enodes(2), nz, edge
+    integer                           :: nu12, nl12, nl1, nl2, nu1, nu2
+
+#include "associate_mesh.h"
+    trflx_x = 0.0_WP
+    trflx_y = 0.0_WP
+    ! The result is the low-order solution horizontal fluxes
+    ! They are put into flux
+    !___________________________________________________________________________
+    do edge=1, myDim_edge2D
+        ! local indice of nodes that span up edge ed
+        enodes=edges(:,edge)  
+        
+        ! local index of element that contribute to edge
+        el=edge_tri(:,edge)    
+        
+        ! number of layers -1 at elem el(1)
+        nl1=nlevels(el(1))-1      
+        
+        ! index off surface layer in case of cavity !=1
+        nu1=ulevels(el(1))
+        
+        ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to 
+        ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
+        deltaX1=edge_cross_dxdy(1,edge)
+        deltaY1=edge_cross_dxdy(2,edge)
+        a=r_earth*elem_cos(el(1))        
+        
+        !_______________________________________________________________________
+        ! same parameter but for other element el(2) that contributes to edge ed
+        ! if el(2)==0 than edge is boundary edge
+        nl2=0
+        nu2=0
+        if(el(2)>0) then
+            deltaX2=edge_cross_dxdy(3,edge)
+            deltaY2=edge_cross_dxdy(4,edge)
+            ! number of layers -1 at elem el(2)
+            nl2=nlevels(el(2))-1
+            nu2=ulevels(el(2))
+            a=0.5_WP*(a+r_earth*elem_cos(el(2)))
+        end if 
+        
+        !_______________________________________________________________________
+        ! n2 ... minimum number of layers -1 between element el(1) & el(2) that 
+        ! contribute to edge ed
+        ! nu12 ... upper index of layers between element el(1) & el(2) that 
+        ! contribute to edge ed
+        ! be carefull !!! --> if ed is a boundary edge than el(1)~=0 and el(2)==0
+        !                     that means nl1>0, nl2==0, n2=min(nl1,nl2)=0 !!!
+        nl12=min(nl1,nl2) 
+        nu12=max(nu1,nu2) 
+        
+        !_______________________________________________________________________
+        ! (A) goes only into this loop when the edge has only facing element
+        ! el(1) --> so the edge is a boundary edge --> this is for ocean 
+        ! surface in case of cavity
+        do nz=nu1, nu12-1
+            !____________________________________________________________________
+            Tmean2=ttf(nz, enodes(2))- &
+                    (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
+                    edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
+                    edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP
+                    
+            Tmean1=ttf(nz, enodes(1))+ &
+                    (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
+                    edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
+                    edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP
+            !____________________________________________________________________
+            ! volume flux across the segments
+            vflx_x  = VEL(1,nz,el(1))*deltaY1*helem(nz,el(1))
+            vflx_y  =-VEL(2,nz,el(1))*deltaX1*helem(nz,el(1)) 
+            cHO     = (sign(1.0_WP,vflx_x+vflx_y)+1.0_WP)*(Tmean1)*0.5 + &
+                      (sign(1.0_WP,vflx_x+vflx_y)-1.0_WP)*(Tmean2)*0.5
+            tvflx_x = -(1.0_WP-num_ord)*cHO*vflx_x - num_ord*( 0.5_WP*(Tmean1+Tmean2))*vflx_x
+            tvflx_y = -(1.0_WP-num_ord)*cHO*vflx_y - num_ord*( 0.5_WP*(Tmean1+Tmean2))*vflx_y
+            trflx_x(nz,enodes(1)) = trflx_x(nz,enodes(1))+tvflx_x! /areasvol(nz,enodes(1))!*dt
+            trflx_x(nz,enodes(2)) = trflx_x(nz,enodes(2))-tvflx_x! /areasvol(nz,enodes(2))!*dt
+            trflx_y(nz,enodes(1)) = trflx_y(nz,enodes(1))+tvflx_y! /areasvol(nz,enodes(1))!*dt
+            trflx_y(nz,enodes(2)) = trflx_y(nz,enodes(2))-tvflx_y! /areasvol(nz,enodes(2))!*dt
+        end do
+        
+        !_______________________________________________________________________
+        ! (B) goes only into this loop when the edge has only facing elemenmt
+        ! el(2) --> so the edge is a boundary edge --> this is for ocean 
+        ! surface in case of cavity
+        if (nu2 > 0) then 
+            do nz=nu2,nu12-1
+                !___________________________________________________________________
+                Tmean2=ttf(nz, enodes(2))- &
+                        (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
+                        edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
+                        edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP
+                        
+                Tmean1=ttf(nz, enodes(1))+ &
+                        (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
+                        edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
+                        edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP
+                !___________________________________________________________________
+                ! volume flux across the segments
+                vflx_x  =-VEL(1,nz,el(2))*deltaY2*helem(nz,el(2))
+                vflx_y  = VEL(2,nz,el(2))*deltaX2*helem(nz,el(2)) 
+                cHO     = (sign(1.0_WP,vflx_x+vflx_y)+1.0_WP)*(Tmean1)*0.5 + &
+                          (sign(1.0_WP,vflx_x+vflx_y)-1.0_WP)*(Tmean2)*0.5
+                tvflx_x = -(1.0_WP-num_ord)*cHO*vflx_x - num_ord*( 0.5_WP*(Tmean1+Tmean2))*vflx_x
+                tvflx_y = -(1.0_WP-num_ord)*cHO*vflx_y - num_ord*( 0.5_WP*(Tmean1+Tmean2))*vflx_y
+                trflx_x(nz,enodes(1)) = trflx_x(nz,enodes(1))+tvflx_x ! /areasvol(nz,enodes(1))!*dt
+                trflx_x(nz,enodes(2)) = trflx_x(nz,enodes(2))-tvflx_x ! /areasvol(nz,enodes(2))!*dt
+                trflx_y(nz,enodes(1)) = trflx_y(nz,enodes(1))+tvflx_y ! /areasvol(nz,enodes(1))!*dt
+                trflx_y(nz,enodes(2)) = trflx_y(nz,enodes(2))-tvflx_y ! /areasvol(nz,enodes(2))!*dt
+            end do
+        end if
+        
+        !_______________________________________________________________________
+        ! (C) Both segments
+        ! loop over depth layers from top to n2
+        ! be carefull !!! --> if ed is a boundary edge, el(2)==0 than n2=0 so 
+        !                     you wont enter in this loop
+        do nz=nu12, nl12
+            Tmean2=ttf(nz, enodes(2))- &
+                  (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
+                  edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
+                  edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP
+            Tmean1=ttf(nz, enodes(1))+ &
+                   (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
+                   edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
+                   edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP
+            !___________________________________________________________________
+            ! volume flux across the segments
+            vflx_x  = VEL(1,nz,el(1))*deltaY1*helem(nz,el(1))-VEL(1,nz,el(2))*deltaY2*helem(nz,el(2))
+            vflx_y  =-VEL(2,nz,el(1))*deltaX1*helem(nz,el(1))+VEL(2,nz,el(2))*deltaX2*helem(nz,el(2))
+            cHO     = (sign(1.0_WP,vflx_x+vflx_y)+1.0_WP)*(Tmean1)*0.5 + &
+                      (sign(1.0_WP,vflx_x+vflx_y)-1.0_WP)*(Tmean2)*0.5
+            tvflx_x = -(1.0_WP-num_ord)*cHO*vflx_x - num_ord*( 0.5_WP*(Tmean1+Tmean2))*vflx_x
+            tvflx_y = -(1.0_WP-num_ord)*cHO*vflx_y - num_ord*( 0.5_WP*(Tmean1+Tmean2))*vflx_y
+            trflx_x(nz,enodes(1)) = trflx_x(nz,enodes(1))+tvflx_x ! /areasvol(nz,enodes(1))!*dt
+            trflx_x(nz,enodes(2)) = trflx_x(nz,enodes(2))-tvflx_x ! /areasvol(nz,enodes(2))!*dt
+            trflx_y(nz,enodes(1)) = trflx_y(nz,enodes(1))+tvflx_y ! /areasvol(nz,enodes(1))!*dt
+            trflx_y(nz,enodes(2)) = trflx_y(nz,enodes(2))-tvflx_y ! /areasvol(nz,enodes(2))!*dt
+        end do
+        
+        !_______________________________________________________________________
+        ! (D) remaining segments on the left or on the right
+        do nz=nl12+1, nl1
+            !____________________________________________________________________
+            Tmean2=ttf(nz, enodes(2))- &
+                    (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
+                    edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
+                    edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP
+                    
+            Tmean1=ttf(nz, enodes(1))+ &
+                    (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
+                    edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
+                    edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP
+            !____________________________________________________________________
+            ! volume flux across the segments
+            vflx_x  = VEL(1,nz,el(1))*deltaY1*helem(nz,el(1))
+            vflx_y  =-VEL(2,nz,el(1))*deltaX1*helem(nz,el(1)) 
+            cHO     = (sign(1.0_WP,vflx_x+vflx_y)+1.0_WP)*(Tmean1)*0.5 + &
+                      (sign(1.0_WP,vflx_x+vflx_y)-1.0_WP)*(Tmean2)*0.5
+            tvflx_x = -(1.0_WP-num_ord)*cHO*vflx_x - num_ord*( 0.5_WP*(Tmean1+Tmean2))*vflx_x
+            tvflx_y = -(1.0_WP-num_ord)*cHO*vflx_y - num_ord*( 0.5_WP*(Tmean1+Tmean2))*vflx_y
+            trflx_x(nz,enodes(1)) = trflx_x(nz,enodes(1))+tvflx_x ! /areasvol(nz,enodes(1))!*dt
+            trflx_x(nz,enodes(2)) = trflx_x(nz,enodes(2))-tvflx_x ! /areasvol(nz,enodes(2))!*dt
+            trflx_y(nz,enodes(1)) = trflx_y(nz,enodes(1))+tvflx_y ! /areasvol(nz,enodes(1))!*dt
+            trflx_y(nz,enodes(2)) = trflx_y(nz,enodes(2))-tvflx_y ! /areasvol(nz,enodes(2))!*dt
+        end do
+        
+        !_______________________________________________________________________
+        ! (E) remaining segments on the left or on the right
+        do nz=nl12+1, nl2
+            !____________________________________________________________________
+            Tmean2=ttf(nz, enodes(2))- &
+                    (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
+                    edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
+                    edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP
+                    
+            Tmean1=ttf(nz, enodes(1))+ &
+                    (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
+                    edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
+                    edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP
+            !____________________________________________________________________
+            ! volume flux across the segments
+            vflx_x  =-VEL(1,nz,el(2))*deltaY2*helem(nz,el(2))
+            vflx_y  = VEL(2,nz,el(2))*deltaX2*helem(nz,el(2)) 
+            cHO     = (sign(1.0_WP,vflx_x+vflx_y)+1.0_WP)*(Tmean1)*0.5 + &
+                      (sign(1.0_WP,vflx_x+vflx_y)-1.0_WP)*(Tmean2)*0.5
+            tvflx_x = -(1.0_WP-num_ord)*cHO*vflx_x - num_ord*( 0.5_WP*(Tmean1+Tmean2))*vflx_x
+            tvflx_y = -(1.0_WP-num_ord)*cHO*vflx_y - num_ord*( 0.5_WP*(Tmean1+Tmean2))*vflx_y
+            trflx_x(nz,enodes(1)) = trflx_x(nz,enodes(1))+tvflx_x ! /areasvol(nz,enodes(1))!*dt
+            trflx_x(nz,enodes(2)) = trflx_x(nz,enodes(2))-tvflx_x ! /areasvol(nz,enodes(2))!*dt
+            trflx_y(nz,enodes(1)) = trflx_y(nz,enodes(1))+tvflx_y ! /areasvol(nz,enodes(1))!*dt
+            trflx_y(nz,enodes(2)) = trflx_y(nz,enodes(2))-tvflx_y ! /areasvol(nz,enodes(2))!*dt
+        end do
+    end do
+end subroutine compute_hor_trflx4mfct
+!
+!
+!_______________________________________________________________________________
+subroutine compute_hor_trflx4upw1(ttf, vel, mesh, num_ord, trflx_x, trflx_y)
+    use o_mesh
+    implicit none
+    type(t_mesh),  intent(in), target :: mesh    
+    real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
+    real(kind=WP), intent(in)         :: ttf(mesh%nl-1,  myDim_nod2D+eDim_nod2D)
+    real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
+    real(kind=WP), intent(inout)      :: trflx_x(mesh%nl-1, myDim_nod2D+eDim_nod2D), trflx_y(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP)                     :: deltaX1, deltaY1, deltaX2, deltaY2
+    real(kind=WP)                     :: Tmean1
+    real(kind=WP)                     :: a, vflx_x, vflx_y, tvflx_x, tvflx_y
+    integer                           :: el(2), enodes(2), nz, edge
+    integer                           :: nu12, nl12, nl1, nl2, nu1, nu2
+
+#include "associate_mesh.h"
+    trflx_x = 0.0_WP
+    trflx_y = 0.0_WP
+    ! The result is the low-order solution horizontal fluxes
+    ! They are put into flux
+    !___________________________________________________________________________
+    do edge=1, myDim_edge2D
+        ! local indice of nodes that span up edge ed
+        enodes=edges(:,edge)  
+        
+        ! local index of element that contribute to edge
+        el=edge_tri(:,edge)    
+        
+        ! number of layers -1 at elem el(1)
+        nl1=nlevels(el(1))-1      
+        
+        ! index off surface layer in case of cavity !=1
+        nu1=ulevels(el(1))
+        
+        ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to 
+        ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
+        deltaX1=edge_cross_dxdy(1,edge)
+        deltaY1=edge_cross_dxdy(2,edge)
+        a=r_earth*elem_cos(el(1))        
+        
+        !_______________________________________________________________________
+        ! same parameter but for other element el(2) that contributes to edge ed
+        ! if el(2)==0 than edge is boundary edge
+        nl2=0
+        nu2=0
+        if(el(2)>0) then
+            deltaX2=edge_cross_dxdy(3,edge)
+            deltaY2=edge_cross_dxdy(4,edge)
+            ! number of layers -1 at elem el(2)
+            nl2=nlevels(el(2))-1
+            nu2=ulevels(el(2))
+            a=0.5_WP*(a+r_earth*elem_cos(el(2)))
+        end if 
+        
+        !_______________________________________________________________________
+        ! n2 ... minimum number of layers -1 between element el(1) & el(2) that 
+        ! contribute to edge ed
+        ! nu12 ... upper index of layers between element el(1) & el(2) that 
+        ! contribute to edge ed
+        ! be carefull !!! --> if ed is a boundary edge than el(1)~=0 and el(2)==0
+        !                     that means nl1>0, nl2==0, n2=min(nl1,nl2)=0 !!!
+        nl12=min(nl1,nl2) 
+        nu12=max(nu1,nu2) 
+        
+        !_______________________________________________________________________
+        ! (A) goes only into this loop when the edge has only facing element
+        ! el(1) --> so the edge is a boundary edge --> this is for ocean 
+        ! surface in case of cavity
+        do nz=nu1, nu12-1
+            !____________________________________________________________________
+            ! volume flux across the segments
+            vflx_x  = VEL(1,nz,el(1))*deltaY1*helem(nz,el(1))
+            vflx_y  =-VEL(2,nz,el(1))*deltaX1*helem(nz,el(1)) 
+!             Tmean1  =(sign(1.0_WP,vflx_x+vflx_y)+1.0_WP)*ttf(nz, enodes(1))*0.5 + &
+!                      (sign(1.0_WP,vflx_x+vflx_y)-1.0_WP)*ttf(nz, enodes(2))*0.5
+            Tmean1  = ( ttf(nz, enodes(1)) + ttf(nz, enodes(2)) )*0.5         
+            tvflx_x = -Tmean1*vflx_x
+            tvflx_y = -Tmean1*vflx_y
+            trflx_x(nz,enodes(1)) = trflx_x(nz,enodes(1))+tvflx_x
+            trflx_x(nz,enodes(2)) = trflx_x(nz,enodes(2))-tvflx_x
+            trflx_y(nz,enodes(1)) = trflx_y(nz,enodes(1))+tvflx_y
+            trflx_y(nz,enodes(2)) = trflx_y(nz,enodes(2))-tvflx_y
+        end do
+        
+        !_______________________________________________________________________
+        ! (B) goes only into this loop when the edge has only facing elemenmt
+        ! el(2) --> so the edge is a boundary edge --> this is for ocean 
+        ! surface in case of cavity
+        if (nu2 > 0) then 
+            do nz=nu2,nu12-1
+                !___________________________________________________________________
+                ! volume flux across the segments
+                vflx_x  =-VEL(1,nz,el(2))*deltaY2*helem(nz,el(2))
+                vflx_y  = VEL(2,nz,el(2))*deltaX2*helem(nz,el(2)) 
+!                 Tmean1  =(sign(1.0_WP,vflx_x+vflx_y)+1.0_WP)*ttf(nz, enodes(1))*0.5 + &
+!                          (sign(1.0_WP,vflx_x+vflx_y)-1.0_WP)*ttf(nz, enodes(2))*0.5
+                Tmean1  = ( ttf(nz, enodes(1)) + ttf(nz, enodes(2)) )*0.5         
+                tvflx_x = -Tmean1*vflx_x
+                tvflx_y = -Tmean1*vflx_y
+                trflx_x(nz,enodes(1)) = trflx_x(nz,enodes(1))+tvflx_x
+                trflx_x(nz,enodes(2)) = trflx_x(nz,enodes(2))-tvflx_x
+                trflx_y(nz,enodes(1)) = trflx_y(nz,enodes(1))+tvflx_y
+                trflx_y(nz,enodes(2)) = trflx_y(nz,enodes(2))-tvflx_y
+            end do
+        end if
+        
+        !_______________________________________________________________________
+        ! (C) Both segments
+        ! loop over depth layers from top to n2
+        ! be carefull !!! --> if ed is a boundary edge, el(2)==0 than n2=0 so 
+        !                     you wont enter in this loop
+        do nz=nu12, nl12
+            !___________________________________________________________________
+            ! volume flux across the segments
+            vflx_x  = VEL(1,nz,el(1))*deltaY1*helem(nz,el(1))-VEL(1,nz,el(2))*deltaY2*helem(nz,el(2))
+            vflx_y  =-VEL(2,nz,el(1))*deltaX1*helem(nz,el(1))+VEL(2,nz,el(2))*deltaX2*helem(nz,el(2))
+!             Tmean1  =(sign(1.0_WP,vflx_x+vflx_y)+1.0_WP)*ttf(nz, enodes(1))*0.5 + &
+!                      (sign(1.0_WP,vflx_x+vflx_y)-1.0_WP)*ttf(nz, enodes(2))*0.5
+            Tmean1  = ( ttf(nz, enodes(1)) + ttf(nz, enodes(2)) )*0.5         
+            tvflx_x = -Tmean1*vflx_x
+            tvflx_y = -Tmean1*vflx_y
+            trflx_x(nz,enodes(1)) = trflx_x(nz,enodes(1))+tvflx_x
+            trflx_x(nz,enodes(2)) = trflx_x(nz,enodes(2))-tvflx_x
+            trflx_y(nz,enodes(1)) = trflx_y(nz,enodes(1))+tvflx_y
+            trflx_y(nz,enodes(2)) = trflx_y(nz,enodes(2))-tvflx_y
+        end do
+        
+        !_______________________________________________________________________
+        ! (D) remaining segments on the left or on the right
+        do nz=nl12+1, nl1
+            !____________________________________________________________________
+            ! volume flux across the segments
+            vflx_x  = VEL(1,nz,el(1))*deltaY1*helem(nz,el(1))
+            vflx_y  =-VEL(2,nz,el(1))*deltaX1*helem(nz,el(1)) 
+!             Tmean1  =(sign(1.0_WP,vflx_x+vflx_y)+1.0_WP)*ttf(nz, enodes(1))*0.5 + &
+!                      (sign(1.0_WP,vflx_x+vflx_y)-1.0_WP)*ttf(nz, enodes(2))*0.5
+            Tmean1  = ( ttf(nz, enodes(1)) + ttf(nz, enodes(2)) )*0.5         
+            tvflx_x = -Tmean1*vflx_x
+            tvflx_y = -Tmean1*vflx_y
+            trflx_x(nz,enodes(1)) = trflx_x(nz,enodes(1))+tvflx_x 
+            trflx_x(nz,enodes(2)) = trflx_x(nz,enodes(2))-tvflx_x
+            trflx_y(nz,enodes(1)) = trflx_y(nz,enodes(1))+tvflx_y
+            trflx_y(nz,enodes(2)) = trflx_y(nz,enodes(2))-tvflx_y
+        end do
+        
+        !_______________________________________________________________________
+        ! (E) remaining segments on the left or on the right
+        do nz=nl12+1, nl2
+            !____________________________________________________________________
+            ! volume flux across the segments
+            vflx_x  =-VEL(1,nz,el(2))*deltaY2*helem(nz,el(2))
+            vflx_y  = VEL(2,nz,el(2))*deltaX2*helem(nz,el(2)) 
+!             Tmean1  =(sign(1.0_WP,vflx_x+vflx_y)+1.0_WP)*ttf(nz, enodes(1))*0.5 + &
+!                      (sign(1.0_WP,vflx_x+vflx_y)-1.0_WP)*ttf(nz, enodes(2))*0.5
+            Tmean1  = ( ttf(nz, enodes(1)) + ttf(nz, enodes(2)) )*0.5         
+            tvflx_x = -Tmean1*vflx_x
+            tvflx_y = -Tmean1*vflx_y
+            trflx_x(nz,enodes(1)) = trflx_x(nz,enodes(1))+tvflx_x
+            trflx_x(nz,enodes(2)) = trflx_x(nz,enodes(2))-tvflx_x
+            trflx_y(nz,enodes(1)) = trflx_y(nz,enodes(1))+tvflx_y
+            trflx_y(nz,enodes(2)) = trflx_y(nz,enodes(2))-tvflx_y
+        end do
+    end do
+
+end subroutine compute_hor_trflx4upw1
 !
 !
 !_______________________________________________________________________________
