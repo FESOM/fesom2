@@ -40,7 +40,7 @@ subroutine thermodynamics(ice, partit, mesh)
   !---- add residual freshwater flux over ice to freshwater (setted in ice_growth)
   real(kind=WP)  :: resid
   !---- precipitation and runoff (provided by ECHAM)
-  real(kind=WP)  :: rain, snow, runo, residualifwflx
+  real(kind=WP)  :: rain, snow, runo
   !---- ocean variables (provided by FESOM)
   real(kind=WP)  :: T_oc, S_oc, ustar
   !---- local variables (set in this subroutine)
@@ -194,8 +194,10 @@ subroutine thermodynamics(ice, partit, mesh)
      ice_sublimation(inod)= subli
      prec_rain(inod)      = rain
      prec_snow(inod)      = snow
-     runoff(inod)         = runo     
+     runoff(inod)         = runo
+#if defined (__oifs)  
      residualifwflx(inod) = resid
+#endif     
   enddo
   return
 
