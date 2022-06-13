@@ -115,9 +115,9 @@ module g_cvmix_idemix
     subroutine init_cvmix_idemix(mesh)
         implicit none
         character(len=cvmix_strlen) :: nmlfile
-        logical                  :: file_exist=.False.
-        integer                  :: node_size, elem_size, elem
-        real(kind=WP)            :: loc_Etot, glb_Etot=0.0
+        logical                     :: file_exist=.False.
+        integer                     :: node_size, elem_size, elem
+        real(kind=WP)               :: loc_Etot=0.0_WP, glb_Etot=0.0_WP
 
         type(t_mesh), intent(in), target :: mesh
 
@@ -151,7 +151,7 @@ module g_cvmix_idemix
         iwe_old(:)          = 0.0_WP
         
         allocate(vol_wcelli(nl,node_size))
-        vol_wcelli(:,:)  = 0.0_WP        
+        vol_wcelli(:,:)     = 0.0_WP        
         
         allocate(cvmix_dummy_1(nl,elem_size))
         allocate(cvmix_dummy_2(nl,elem_size))
