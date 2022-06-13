@@ -94,7 +94,7 @@ USE MOD_PARTIT
 
 #ifndef __oasis
   if (present(abort)) then
-     if (partit%mype==0) write(*,*) 'Run finished unexpectedly!'
+     if (mype==0) write(*,*) 'Run finished unexpectedly!'
      call MPI_ABORT(COMM, 1 )
   else
      call  MPI_Barrier(COMM, error)
@@ -102,17 +102,17 @@ USE MOD_PARTIT
   endif
 #else
   if (.not. present(abort)) then
-     if (partit%mype==0) print *, 'FESOM calls MPI_Barrier before calling prism_terminate'
+     if (mype==0) print *, 'FESOM calls MPI_Barrier before calling prism_terminate'
      call  MPI_Barrier(MPI_COMM_WORLD, error)
   end if
   call prism_terminate_proto(error)
-  if (partit%mype==0) print *, 'FESOM calls MPI_Barrier before calling MPI_Finalize'
+  if (mype==0) print *, 'FESOM calls MPI_Barrier before calling MPI_Finalize'
   call  MPI_Barrier(MPI_COMM_WORLD, error)
   
-  if (partit%mype==0) print *, 'FESOM calls MPI_Finalize'
+  if (mype==0) print *, 'FESOM calls MPI_Finalize'
   call MPI_Finalize(error)
 #endif
-  if (partit%mype==0) print *, 'fesom should stop with exit status = 0'
+  if (mype==0) print *, 'fesom should stop with exit status = 0'
 #endif
 #if defined (__oifs)
 !OIFS coupling doesnt call prism_terminate_proto and uses COMM instead of MPI_COMM_WORLD
