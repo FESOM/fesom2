@@ -557,8 +557,6 @@ contains
   real(kind=WP) :: t    
   real(kind=WP) :: alb
   real(kind=WP) :: geolat
-  real(kind=WP) :: melt_pool_alb_reduction
-  real(kind=WP) :: nh_winter_reduction
   real(kind=WP), pointer :: albsn, albi, albsnm, albim
   albsn  => ice%thermo%albsn
   albi   => ice%thermo%albi
