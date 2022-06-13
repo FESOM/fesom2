@@ -138,6 +138,7 @@ subroutine thermodynamics(ice, partit, mesh)
      rain    = prec_rain(inod)
      snow    = prec_snow(inod)
      runo    = runoff(inod)     
+     residualifwflx = runoff(inod)     
 
      ustar   = sqrt(ice%cd_oce_ice)*sqrt((u_ice(inod)-u_w(inod))**2+(v_ice(inod)-v_w(inod))**2)
      T_oc    = T_oc_array(inod)      
