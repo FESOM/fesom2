@@ -266,10 +266,10 @@ module g_cvmix_tidal
                  Mdiff_out       = tidal_Av(nun:nln,elem),    &
                  Tdiff_out       = tidal_Kv(nun:nln,elem),    &
                  Nsqr            = bvfreq2(nun:nln),          & !FIXME: limit to N2 > 10^-8 ? as in Simmons et al.
-                 OceanDepth      = -zbar_n_bot(elem),         & !FIXME: neglecting free surface contribution
+                 OceanDepth      = -zbar_e_bot(elem),         & !FIXME: neglecting free surface contribution
                  SimmonsCoeff    = simmonscoeff,              &
                  vert_dep        = vertdep(nun:nln),          &
-                 nlev            = nln,                       &
+                 nlev            = nln-nun+1,                 &
                  max_nlev        = nl-1,                      &
                  CVmix_params    = CVmix_tidal_params) ! FIXME: Simmons et al. use Prandtl=10.0 (atm its 1.0)
                  
