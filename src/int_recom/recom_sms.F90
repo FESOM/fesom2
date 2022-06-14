@@ -47,6 +47,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
     real(kind=8)                                            :: Fc                   !< Flux of labile C into sediment, used for denitrification calculation [umolC/cm2/s]
     real(kind=8)                                            :: recip_hetN_plus      !< MB's addition to heterotrophic respiration
     real(kind=8)                                            :: recip_res_het        !< [day] Reciprocal of respiration by heterotrophs and mortality (loss to detritus)
+    real(kind=8)                                            :: Sink_Vel
     real(kind=8)                                            :: aux
     integer                                                 :: k,step,ii, idiags,n
     real(kind=8)                                            :: & 
