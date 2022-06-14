@@ -35,15 +35,15 @@ implicit none
   integer                    :: i, k, N_max
   integer                    :: nod_area_id, elem_area_id
   integer, target            :: z_id, zbar_id
-  integer                    :: edges_id, edge_tri_id, edge_cross_dxdy_id
+  integer                    :: edge_face_links_id, edge_cross_dxdy_id
   integer                    :: nlevels_nod2D_id, nlevels_id
   integer                    :: nod_in_elem2D_num_id, nod_in_elem2D_id
   integer                    :: gradient_sca_x_id, gradient_sca_y_id
   integer                    :: zbar_e_bot_id,zbar_n_bot_id
-  integer                    :: elem_id
   integer                    :: nod_id
   integer                    :: lon_id, lat_id
-  integer                    :: face_node_id, face_edges_id, face_links_id, edge_face_links_id
+  ! UGRID NAMES START HERE
+  integer                    :: face_node_id, edge_nodes_id, face_edges_id, face_links_id, edge_face_links_id
   character(100)             :: longname
   character(2000)            :: filename
   real(kind=WP), allocatable :: rbuffer(:), lrbuffer(:)
@@ -314,8 +314,6 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   )
 
   call my_def_var(ncid, 'nod_in_elem2D',     NF_INT,    2, (/nod_n_id, id_N/),  nod_in_elem2D_id,   'elements containing the node', partit)
-  call my_def_var(ncid, 'edges',             NF_INT,    2, (/edge_n_id, id_2/), edges_id,           'edges', partit, "edges", "", "mesh_topology")
-  call my_def_var(ncid, 'edge_tri',          NF_INT,    2, (/edge_n_id, id_2/), edge_tri_id,        'edge triangles', partit, "edges of triangles", "", "mesh_topology")
   call my_def_var(ncid, 'edge_cross_dxdy',   NF_DOUBLE, 2, (/edge_n_id, id_4/), edge_cross_dxdy_id, 'edge cross distancess',        partit)
   call my_def_var(ncid, 'gradient_sca_x',    NF_DOUBLE, 2, (/id_3, elem_n_id/), gradient_sca_x_id,  'x component of a gradient at nodes of an element', partit)
   call my_def_var(ncid, 'gradient_sca_y',    NF_DOUBLE, 2, (/id_3, elem_n_id/), gradient_sca_y_id,  'y component of a gradient at nodes of an element', partit)
@@ -410,18 +408,20 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   deallocate(rbuffer)
 
   WRITE(*,*) "face_nodes"
+  ! used to be called: elements
+  allocate(ibuffer(elem2D))
+  allocate(lbuffer(myDim_elem2D))
+  do i=1, 3
+     do k=1, myDim_elem2D
+        lbuffer(k)=myList_nod2D(elem2d_nodes(i, k))
+     end do
+     call gather_elem(lbuffer, ibuffer)
+     call my_put_vara(ncid, face_node_id, (/i, 1/), (/1, elem2D/), ibuffer)
+  end do
+  deallocate(lbuffer, ibuffer)
 
   WRITE(*,*) "edge_nodes"
-
-  WRITE(*,*) "face_edges"
-
-  WRITE(*,*) "face_links"
-
-  WRITE(*,*) "edge_face_links"
-
-  WRITE(*,*) "nod_in_elem2D"
-
-  WRITE(*,*) "edges"
+  ! This used to be called "edges" before UGRID Change
   allocate(ibuffer(edge2D))
   allocate(lbuffer(myDim_edge2D))
   do i=1, 2
@@ -429,27 +429,76 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
         lbuffer(k)=myList_nod2D(edges(i, k))
      end do
      call gather_edge(lbuffer, ibuffer, partit)
-     call my_put_vara(ncid, edges_id, (/1, i/), (/edge2D, 1/), ibuffer, partit)
+     call my_put_vara(ncid, edges_id, (/i, 1/), (/1, edge2D/), ibuffer, partit)
   end do
   deallocate(lbuffer, ibuffer)
 
-  WRITE(*,*) "edge_tri"
-  ! QUESTION(PG): What is this?
-  ! edge triangles
+  WRITE(*,*) "face_edges"
+  ! This used to be called elem_edge
+  allocate(ibuffer(elem2D))
+  do i=1, 3
+     call gather_edge(elem_edges(i,1:myDim_elem2D), ibuffer, partit)
+     call my_put_vara(ncid, face_edges_id, (/1, i/), (/elem2D, 1/), ibuffer, partit)
+  end do
+  deallocate(ibuffer)
+
+
+  WRITE(*,*) "face_links"
+  ! This used to be called elem_neighbors
+  allocate(lbuffer(myDim_elem2D), ibuffer(elem2D))
+  do i=1, 3
+     lbuffer(1:myDim_elem2D)=elem_neighbors(i, 1:myDim_elem2D)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(k)
+     do k=1, myDim_elem2D
+        if (elem_neighbors(i, k) > 0) then
+           lbuffer(k)=elem_neighbors(i, k)
+        else
+          lbuffer(k)=-999
+        end if
+     end do
+!$OMP END PARALLEL DO
+     call gather_elem(lbuffer, ibuffer, partit)
+     call my_put_vara(ncid, face_links_id, (/1, i/), (/elem2D, 1/), ibuffer, partit)
+  end do
+  deallocate(lbuffer, ibuffer)
+  
+  WRITE(*,*) "edge_face_links"
+  ! Used to be called edge_tri
   allocate(ibuffer(edge2D))
   allocate(lbuffer(myDim_edge2D))
   do i=1, 2
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(k)
      do k=1, myDim_edge2D
         if (edge_tri(i,k) > 0) then
            lbuffer(k) = myList_elem2D(edge_tri(i,k))
         else
-           lbuffer(k) = 0
+           lbuffer(k) = -999  ! Changed from missing value of 0 before
         endif
      end do
+!$OMP END PARALLEL DO     
      call gather_edge(lbuffer, ibuffer, partit)
-     call my_put_vara(ncid, edge_tri_id, (/1, i/), (/edge2D, 1/), ibuffer, partit)
+     call my_put_vara(ncid, edge_face_links_id, (/1, i/), (/edge2D, 1/), ibuffer, partit)
   end do
   deallocate(lbuffer, ibuffer)
+
+  WRITE(*,*) "nod_in_elem2D"
+  ! elements containing the node
+  allocate(ibuffer(nod2D))
+  allocate(lbuffer(myDim_nod2D))
+  DO i=1, N_max
+     lbuffer=0
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(k)     
+     do k=1, myDim_nod2D
+        if ((nod_in_elem2D_num(k)>=i)) then
+           lbuffer(k)=myList_elem2D(nod_in_elem2D(i, k))
+        end if
+     end do
+!$OMP END PARALLEL DO     
+     call gather_nod(lbuffer, ibuffer, partit)
+     call my_put_vara(ncid, nod_in_elem2D_id, (/1, i/), (/nod2D, 1/), ibuffer, partit)
+  END DO
+  deallocate(lbuffer, ibuffer)
+
 
   WRITE(*,*) "edge_cross_dxdy"
   allocate(rbuffer(edge2D))
