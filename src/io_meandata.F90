@@ -568,9 +568,9 @@ function mesh_dimname_from_dimsize(size, partit, mesh) result(name)
   character(50) :: name
 
   if (size==mesh%nod2D) then
-    name='node'
+    name='nnode'
   elseif (size==mesh%elem2D) then
-    name='face'
+    name='nface'
   elseif (size==mesh%nl) then
     name='nz'
   elseif (size==mesh%nl-1) then
@@ -660,6 +660,7 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
   
  
 !___Global attributes________  
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'Conventions', len_trim('UGRID-1.0'),'UGRID-1.0'), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'model', len_trim('FESOM2'),'FESOM2'), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'website', len_trim('fesom.de'), trim('fesom.de')), __LINE__)
  

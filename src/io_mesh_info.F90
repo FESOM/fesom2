@@ -35,7 +35,7 @@ implicit none
   integer                    :: i, k, N_max
   integer                    :: nod_area_id, elem_area_id
   integer, target            :: z_id, zbar_id
-  integer                    :: edge_face_links_id, edge_cross_dxdy_id
+  integer                    :: edge_cross_dxdy_id
   integer                    :: nlevels_nod2D_id, nlevels_id
   integer                    :: nod_in_elem2D_num_id, nod_in_elem2D_id
   integer                    :: gradient_sca_x_id, gradient_sca_y_id
@@ -90,8 +90,7 @@ implicit none
     'depth of levels',                                 &  ! Long Name. NOTE(PG): Taken from https://ugrid-conventions.github.io/ugrid-conventions/#2d-triangular-mesh-topology
     partit,                                            &  ! Partitioning
     "",                                                &  ! Standard Name
-    "meters",                                          &  ! Units
-    ""                                                 &  ! CF Role
+    "meters"                                           &  ! Units
   )
   ! PG: Add `positive` attribute according to CF-Conventions for depth:
   ! https://cfconventions.org/cf-conventions/cf-conventions.html#vertical-coordinate
@@ -246,25 +245,28 @@ implicit none
     ! Everything after partit is an optional argument
     "face",                                                   &  ! Standard Name
     "",                                                       &  ! Units
-    "face_node_connectivity"                                  &  ! CF Role 
+    "face_node_connectivity",                                 &  ! CF Role 
+    start_index = 1                                           &  ! Start index
   )
+  if (partit%mype==0) then
+    status = nf_put_att_text(ncid, face_node_id, 'location', len_trim("face"), trim("face"));
+  end if
   
   call my_def_var(ncid,                                       &  ! NetCDF Variable File Handle ID
   "edge_nodes",                                               &  ! Short Name
   NF_INT,                                                     &  ! Variable Type
   2,                                                          &  ! Variable Dimensionality
-  (/nod_n_id,  id_2/),                                        &  ! Dimension IDs
-  nod_id,                                                     &  ! ID
+  (/edge_n_id, id_2/),                                        &  ! Dimension IDs
+  edge_nodes_id,                                              &  ! ID
   "Maps every edge to the two nodes that it connects",        &  ! Long Name
   partit,                                                     &  ! Partitioning
   ! Everything after partit is an optional argument
   "edge",                                                     &  ! Standard Name
   "",                                                         &  ! Units
-  "edge_node_connectivity"                                    &  ! CF Role
+  "edge_node_connectivity",                                   &  ! CF Role
+  start_index = 1                                             &  ! Start index
   )
 
-! TODO(PG): Find out if we want this one
-! FIXME(PG): Not sure how to actually calculate this one
   call my_def_var(ncid,                                       &  ! NetCDF Variable File Handle ID
   'face_edges',                                               &  ! Short Name
   NF_INT,                                                     &  ! Variable Type
@@ -279,8 +281,6 @@ implicit none
   "face_edge_connectivity"                                    &  ! CF Role
   )
 
-! TODO(PG): Find out if we want this one
-! FIXME(PG): Not sure how to actually calculate this one
 call my_def_var(ncid,                                         &  ! NetCDF Variable File Handle ID
   "face_links",                                               &  ! Short Name
   NF_INT,                                                     &  ! Variable Type
@@ -292,17 +292,16 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   ! Everything after partit is an optional argument
   "face_links",                                               &  ! Standard Name
   "",                                                         &  ! Units
-  "face_edge_connectivity",                                   &  ! CF Role
+  "face_face_connectivity",                                   &  ! CF Role
   "missing neighbor faces are indicated using _FillValue",    &  ! Comment
   -999                                                        &  ! Missing Value
   )
 
-!TODO(PG): Find out if we want this one
 call my_def_var(ncid,                                         &  ! NetCDF Variable File Handle ID
   "edge_face_links",                                          &  ! Short Name
   NF_INT,                                                     &  ! Variable Type
   2,                                                          &  ! Variable Dimensionality
-  (/nod_n_id,  id_2/),                                        &  ! Dimension IDs
+  (/edge_n_id,  id_2/),                                       &  ! Dimension IDs
   edge_face_links_id,                                         &  ! ID
   "neighbor faces for edges",                                 &  ! Long Name
   partit,                                                     &  ! Partitioning
@@ -310,13 +309,14 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   "",                                                         &  ! Units
   "edge_face_connectivity",                                   &  ! CF Role
   "missing neighbor faces are indicated using _FillValue",    &  ! Comment
-  -999                                                        &  ! Missing Value
+  -999,                                                       &  ! Missing Value
+  1                                                           &  ! Start index
   )
 
   call my_def_var(ncid, 'nod_in_elem2D',     NF_INT,    2, (/nod_n_id, id_N/),  nod_in_elem2D_id,   'elements containing the node', partit)
   call my_def_var(ncid, 'edge_cross_dxdy',   NF_DOUBLE, 2, (/edge_n_id, id_4/), edge_cross_dxdy_id, 'edge cross distancess',        partit)
-  call my_def_var(ncid, 'gradient_sca_x',    NF_DOUBLE, 2, (/id_3, elem_n_id/), gradient_sca_x_id,  'x component of a gradient at nodes of an element', partit)
-  call my_def_var(ncid, 'gradient_sca_y',    NF_DOUBLE, 2, (/id_3, elem_n_id/), gradient_sca_y_id,  'y component of a gradient at nodes of an element', partit)
+  call my_def_var(ncid, 'gradient_sca_x',    NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_x_id,  'x component of a gradient at nodes of an element', partit)
+  call my_def_var(ncid, 'gradient_sca_y',    NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_y_id,  'y component of a gradient at nodes of an element', partit)
   call my_nf_enddef(ncid, partit)
   WRITE(*,*) 'DEBUG(PG): Finished with defining variables'
 
@@ -390,7 +390,6 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   do i=1, 2
      call gather_nod(geo_coord_nod2D(i, 1:myDim_nod2D), rbuffer, partit)
      rbuffer = rbuffer/rad
-     call my_put_vara(ncid, nod_id, (/1, i/), (/nod2D, 1/), rbuffer, partit)
      if (i == 1) then
         call my_put_vara(ncid, lon_id, 1, nod2D, rbuffer, partit)
      else
@@ -415,8 +414,8 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
      do k=1, myDim_elem2D
         lbuffer(k)=myList_nod2D(elem2d_nodes(i, k))
      end do
-     call gather_elem(lbuffer, ibuffer)
-     call my_put_vara(ncid, face_node_id, (/i, 1/), (/1, elem2D/), ibuffer)
+     call gather_elem(lbuffer, ibuffer, partit)
+     call my_put_vara(ncid, face_node_id, (/1, i/), (/elem2D, 1/), ibuffer, partit)
   end do
   deallocate(lbuffer, ibuffer)
 
@@ -429,7 +428,7 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
         lbuffer(k)=myList_nod2D(edges(i, k))
      end do
      call gather_edge(lbuffer, ibuffer, partit)
-     call my_put_vara(ncid, edges_id, (/i, 1/), (/1, edge2D/), ibuffer, partit)
+     call my_put_vara(ncid, edge_nodes_id, (/1, i/), (/edge2D, 1/), ibuffer, partit)
   end do
   deallocate(lbuffer, ibuffer)
 
@@ -437,23 +436,23 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   ! This used to be called elem_edge
   allocate(ibuffer(elem2D))
   do i=1, 3
-     call gather_edge(elem_edges(i,1:myDim_elem2D), ibuffer, partit)
+     call gather_elem(elem_edges(i,1:myDim_elem2D), ibuffer, partit)
      call my_put_vara(ncid, face_edges_id, (/1, i/), (/elem2D, 1/), ibuffer, partit)
   end do
   deallocate(ibuffer)
-
 
   WRITE(*,*) "face_links"
   ! This used to be called elem_neighbors
   allocate(lbuffer(myDim_elem2D), ibuffer(elem2D))
   do i=1, 3
-     lbuffer(1:myDim_elem2D)=elem_neighbors(i, 1:myDim_elem2D)
+     lbuffer(1:myDim_elem2D) = elem_neighbors(i, 1:myDim_elem2D)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(k)
      do k=1, myDim_elem2D
+        !WRITE(*,*) "k = ", k
         if (elem_neighbors(i, k) > 0) then
-           lbuffer(k)=elem_neighbors(i, k)
+          lbuffer(k) = elem_neighbors(i, k)
         else
-          lbuffer(k)=-999
+          lbuffer(k) = -999
         end if
      end do
 !$OMP END PARALLEL DO
@@ -515,7 +514,7 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   allocate(rbuffer(elem2D))
   do i=1, 3
      call gather_elem(gradient_sca(i, 1:myDim_elem2D), rbuffer, partit)
-     call my_put_vara(ncid, gradient_sca_x_id, (/4-i, 1/), (/1, elem2D/), rbuffer, partit) ! (4-i), NETCDF will permute otherwise
+     call my_put_vara(ncid, gradient_sca_x_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit) ! (4-i), NETCDF will permute otherwise
   end do
   deallocate(rbuffer)
 
@@ -524,7 +523,7 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   allocate(rbuffer(elem2D))
   do i=1, 3
      call gather_elem(gradient_sca(i+3, 1:myDim_elem2D), rbuffer, partit)
-     call my_put_vara(ncid, gradient_sca_y_id, (/4-i, 1/), (/1, elem2D/), rbuffer, partit)! (4-i), NETCDF will permute otherwise
+     call my_put_vara(ncid, gradient_sca_y_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit)! (4-i), NETCDF will permute otherwise
   end do
   deallocate(rbuffer)
 
@@ -628,10 +627,18 @@ if (status .ne. nf_noerr) call handle_err(status, partit)
 !Mesh2:edge_coordinates = "Mesh2_edge_x Mesh2_edge_y" ; // optional attribute (requires edge_node_connectivity)
 !FIXME(PG): face coordinates missing
 !Mesh2:face_coordinates = "Mesh2_face_x Mesh2_face_y" ; // optional attribute
-!FIXME(PG): face_edge_connectivity
-!Mesh2:face_edge_connectivity = "Mesh2_face_edges" ; // optional attribute (requires edge_node_connectivity)
-!FIXME(PG): face_face_connectivity missing
-!Mesh2:face_face_connectivity = "Mesh2_face_links" ; // optional attribute
+if (partit%mype==0) then
+  status = nf_put_att_text(ncid, fesom_mesh_id, 'face_edge_connectivity', len_trim('face_edges'), trim('face_edges'));
+end if
+call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+if (status .ne. nf_noerr) call handle_err(status, partit)
+
+if (partit%mype==0) then
+  status = nf_put_att_text(ncid, fesom_mesh_id, 'face_face_connectivity', len_trim('face_links'), trim('face_links'));
+end if
+call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+if (status .ne. nf_noerr) call handle_err(status, partit)
+
 if (partit%mype==0) then
   status = nf_put_att_text(ncid, fesom_mesh_id, 'edge_face_connectivity', len_trim('edge_face_links'), trim('edge_face_links'));
 end if
@@ -645,7 +652,7 @@ end subroutine add_fesom_ugrid_info
 !============================================================================
 !
 ! NOTE/IDEA(CR, PG): This could be an INTERFACE subroutine (overloading) to give either missing value as int or real.
-subroutine my_def_var(ncid, short_name, vtype, dsize, dids, id, att_text, partit, standard_name, units, cf_role, comment, missing_value)
+subroutine my_def_var(ncid, short_name, vtype, dsize, dids, id, att_text, partit, standard_name, units, cf_role, comment, missing_value, start_index)
 IMPLICIT NONE
 
 type(t_partit), intent(inout):: partit
@@ -656,6 +663,7 @@ integer                      :: ierror, status
 character(*), intent(in), optional :: standard_name, units, cf_role
 character(*), intent(in), optional :: comment
 integer,      intent(in), optional :: missing_value
+integer,      intent(in), optional :: start_index
 
 WRITE(*,*) 'DEBUG(PG): my_def_var: short_name=', short_name, " varid=", id
 
@@ -694,12 +702,18 @@ endif
 
 if (partit%mype==0) then
   if (present(missing_value)) then
-      write(*,*) 'DEBUG(PG): variable ', short_name, ' has missing value ', missing_value, 'with KIND=', kind(missing_value)
       status = nf_put_att_int(ncid, id, '_FillValue', NF_INT, 1, missing_value);
   endif
 endif
 
-write(*,*) 'DEBUG(PG): status = ', status
+if (partit%mype==0) then
+  if (present(start_index)) then
+    status = nf_put_att_int(ncid, id, 'start_index', NF_INT, 1, start_index);
+  endif
+end if
+call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+if (status .ne. nf_noerr) call handle_err(status, partit)
+
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
 if (status .ne. nf_noerr) call handle_err(status, partit)
 
