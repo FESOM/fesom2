@@ -170,7 +170,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
 !  addtiny(1:nn,3) = state(1:nn,idiasi)
 !  addtiny(1:nn,4) = state(1:nn,idetz2si)
 
-  call REcoM_sms(n, Nn, state, thick, recipthick, SurfSW, sms, Temp, SinkVel, zF, PAR, mesh)
+  call REcoM_sms(n, Nn, state, thick, recipthick, SurfSW, sms, Temp, zF, PAR, mesh)
 
 !  addtiny(1:nn,1) = (state(1:nn,isi)           - aux(1:nn,isi))
 !  addtiny(1:nn,2) = (state(1:nn,idetsi)        - aux(1:nn,idetsi))
