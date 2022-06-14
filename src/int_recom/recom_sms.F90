@@ -1809,14 +1809,14 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
       - aggregationRate               * CoccoN &                        ! NEW
       - grazingFlux_Cocco                      &                        ! NEW
       - grazingFlux_Cocco2                     &                        ! NEW
-                                             ) * dt + sms(k,icocn)      ! NEW
+                                             ) * dt_b + sms(k,icocn)      ! NEW
    else                                                                 ! NEW
     sms(k,icocn)      = (                      &                        ! NEW
       + N_assim_cocco                 * CoccoC &                        ! NEW
       - lossN_c * limitFacN_cocco     * CoccoN &                        ! NEW
       - aggregationRate               * CoccoN &                        ! NEW
       - grazingFlux_Cocco                      &                        ! NEW
-                                                 ) * dt + sms(k,icocn)  ! NEW
+                                                 ) * dt_b + sms(k,icocn)  ! NEW
    endif                                                                ! NEW
 !-------------------------------------------------------------------------------
 ! Coccolithophore C (NEW!!!)
@@ -1828,7 +1828,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
       - aggregationRate               * CoccoC &                        ! NEW
       - grazingFlux_cocco * recipQuota_cocco   &                        ! NEW
       - grazingFlux_Cocco2* recipQuota_cocco   &                        ! NEW
-                                             ) * dt + sms(k,icocc)      ! NEW
+                                             ) * dt_b + sms(k,icocc)      ! NEW
    else                                                                 ! NEW
     sms(k,icocc)      = (                      &                        ! NEW
       + Cphot_cocco                   * CoccoC &                        ! NEW
@@ -1836,7 +1836,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
       - phyRespRate_cocco             * CoccoC &                        ! NEW
       - aggregationRate               * CoccoC &                        ! NEW
       - grazingFlux_cocco * recipQuota_cocco   &                        ! NEW
-                                             ) * dt + sms(k,icocc)      ! NEW
+                                             ) * dt_b + sms(k,icocc)      ! NEW
    endif
 
 !-------------------------------------------------------------------------------
@@ -1848,14 +1848,14 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
       - aggregationRate                * CoccoChl &                     ! NEW
       - grazingFlux_cocco * Chl2N_cocco           &                     ! NEW
       - grazingFlux_Cocco2* Chl2N_cocco           &                     ! NEW
-                                             ) * dt + sms(k,icchl)      ! NEW
+                                             ) * dt_b + sms(k,icchl)      ! NEW
    else                                                                 ! NEW
     sms(k,icchl)      = (                         &                     ! NEW
       + chlSynth_cocco                 * CoccoC   &                     ! NEW
       - KOchl_cocco                    * CoccoChl &                     ! NEW
       - aggregationRate                * CoccoChl &                     ! NEW
       - grazingFlux_cocco * Chl2N_cocco           &                     ! NEW
-                                             ) * dt + sms(k,icchl)      ! NEW
+                                             ) * dt_b + sms(k,icchl)      ! NEW
    endif 
 !-------------------------------------------------------------------------------
 ! Detritus Si
