@@ -397,8 +397,13 @@ CASE ('TKE       ')
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/),   'tke_Tbck', 'background forcing for TKE'                  , 'm^2/s^3', tke_Tbck(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/),   'tke_Lmix', 'mixing length scale of TKE'                  , 'm'      , tke_Lmix(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/),   'tke_Pr'  , 'Prantl number'                               , ''       , tke_Pr(:,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/),   'tke_Kv'  , 'TKE diffusivity'                             , ''       , tke_Kv(:,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/),   'tke_Av'  , 'TKE viscosity'                               , ''       , tke_Av(:,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
         if (mix_scheme_nmb==56) then ! TKE-IDEMIX diagnostic 
-            call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/),'tke_Tiwf', 'TKE production by internal waves (IDEMIX)', 'm^2/s^3', tke_Tiwf(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+            call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/),'tke_Tiwf'   , 'TKE production by internal waves (IDEMIX)'  , 'm^2/s^3', tke_Tiwf(:,:)          , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+            call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/),'tke_iwe'    , 'iwe_n --> TKE'                               , ''       , tke_in3d_iwe(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+            call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/),'tke_iwdiss' , 'iwe_Tdis_n --> TKE'                       , ''       , tke_in3d_iwdis(:,:)    , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+            call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/),'tke_iwalphc', 'iwe_alpha_c_n --> TKE'                   , ''       , tke_in3d_iwealphac(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
         end if 
     end if 
 !___________________________________________________________________________________________________________________________________        

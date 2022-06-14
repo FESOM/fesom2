@@ -16,11 +16,13 @@ module diagnostics
 
   private
 !!PS   
-  public :: ldiag_solver, lcurt_stress_surf, ldiag_energy, ldiag_dMOC, ldiag_DVD, ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, ldiag_trflx, &
+  public :: ldiag_solver, lcurt_stress_surf, ldiag_energy, ldiag_dMOC, ldiag_DVD, &
+            ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, ldiag_trflx, &
+            ldiag_KvN2, &
             compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, wrhof, rhof, &
             u_x_u, u_x_v, v_x_v, v_x_w, u_x_w, dudx, dudy, dvdx, dvdy, dudz, dvdz, utau_surf, utau_bott, av_dudz_sq, av_dudz, av_dvdz, stress_bott, u_surf, v_surf, u_bott, v_bott, &
             std_dens_min, std_dens_max, std_dens_N, std_dens, std_dens_UVDZ, std_dens_DIV, std_dens_Z, std_dens_dVdT, std_dens_flux, dens_flux_e, &
-            compute_diag_dvd_2ndmoment_klingbeil_etal_2014, compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd, tuv, suv
+            compute_diag_dvd_2ndmoment_klingbeil_etal_2014, compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd, tuv, suv, KvN2
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
   ! A=ssh_stiff, x=d_eta, rhs=ssh_rhs; rhs_diag=A*x;
@@ -33,6 +35,7 @@ module diagnostics
   real(kind=WP),  save, allocatable, target      :: utau_surf(:), utau_bott(:)
   real(kind=WP),  save, allocatable, target      :: stress_bott(:,:), u_bott(:), v_bott(:), u_surf(:), v_surf(:)
   real(kind=WP),  save, allocatable, target      :: tuv(:,:,:), suv(:,:,:)
+  real(kind=WP),  save, allocatable, target      :: KvN2(:,:)
 
 ! defining a set of standard density bins which will be used for computing densMOC
 ! integer,        parameter                      :: std_dens_N  = 100
@@ -103,11 +106,11 @@ module diagnostics
   logical                                       :: ldiag_DVD        =.false.
   
   logical                                       :: ldiag_forc       =.false.
-  
   logical                                       :: ldiag_trflx      =.false.
+  logical                                       :: ldiag_KvN2       =.false.
   
   namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_energy, &
-                       ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, ldiag_trflx
+                       ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, ldiag_trflx, ldiag_KvN2
   
   contains
 
@@ -709,6 +712,30 @@ end subroutine diag_trflx
 !
 !
 !_______________________________________________________________________________
+subroutine diag_KvN2(mode, mesh)
+    implicit none
+    integer, intent(in)           :: mode
+    integer                       :: node, nz, nzu, nzl
+    logical, save                 :: firstcall=.true.
+    type(t_mesh), intent(in), target :: mesh
+#include "associate_mesh.h"
+
+    !___________________________________________________________________________
+    ! On first call allocate
+    if (firstcall) then !allocate the stuff at the first call
+        allocate(KvN2(nl,myDim_nod2D+eDim_nod2D))
+        KvN2 = 0.0_WP
+        if (mode==0) return
+    end if
+    
+    !___________________________________________________________________________
+    ! compte mixing efficiency
+    KvN2 = Kv*bvfreq
+end subroutine diag_KvN2
+
+!
+!
+!_______________________________________________________________________________
 subroutine compute_diagnostics(mode, mesh)
   implicit none
   integer, intent(in)           :: mode !constructor mode (0=only allocation; any other=do diagnostic)
@@ -735,7 +762,9 @@ subroutine compute_diagnostics(mode, mesh)
   if (ldiag_dMOC)        call diag_densMOC(mode, mesh)
   !7. compute zonal, meridional tracer fluxes
   if (ldiag_trflx)       call diag_trflx(mode, mesh)
-
+  !8. compute mixing efficiency
+  if (ldiag_KvN2)        call diag_KvN2(mode, mesh) 
+    
 end subroutine compute_diagnostics
 
 !
