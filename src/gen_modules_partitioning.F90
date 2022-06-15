@@ -115,15 +115,18 @@ USE MOD_PARTIT
   if (mype==0) print *, 'fesom should stop with exit status = 0'
 #endif
 #if defined (__oifs)
-!OIFS coupling doesnt call prism_terminate_proto and uses MPI_COMM_FESOM
+!OIFS coupling doesnt call prism_terminate_proto and uses COMM instead of MPI_COMM_WORLD
   implicit none
-  integer,optional :: abort
+  integer,           intent(in)   :: COMM
+  integer,           intent(in)   :: mype
+  integer, optional, intent(in)   :: abort
+  integer                         :: error
   if (present(abort)) then
-	if (mype==0) write(*,*) 'Run finished unexpectedly!'
-	call MPI_ABORT(COMM, 1 )
+    if (mype==0) write(*,*) 'Run finished unexpectedly!'
+    call MPI_ABORT(COMM, 1 )
   else
-	call  MPI_Barrier(COMM, error)
-	call  MPI_Finalize(error)
+    call  MPI_Barrier(COMM, error)
+    call  MPI_Finalize(error)
   endif
 #endif
 

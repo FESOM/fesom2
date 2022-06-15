@@ -15,6 +15,7 @@ module cpl_driver
   use mod_oasis                    ! oasis module
   use g_config, only : dt
   use o_param,  only : rad
+  USE MOD_PARTIT
   implicit none
   save   
   !
@@ -22,7 +23,7 @@ module cpl_driver
   !
 
 #if defined (__oifs)
-  integer, parameter         :: nsend = 5
+  integer, parameter         :: nsend = 7
   integer, parameter         :: nrecv = 13
 #else
   integer, parameter         :: nsend = 4
@@ -91,7 +92,8 @@ module cpl_driver
 
 contains
 
-  subroutine cpl_oasis3mct_init( localCommunicator )
+  subroutine cpl_oasis3mct_init(partit, localCommunicator )
+    USE MOD_PARTIT
     implicit none   
     save
 
@@ -103,6 +105,7 @@ contains
     ! Arguments
     !
     integer, intent(OUT)       :: localCommunicator
+    type(t_partit), intent(inout), target :: partit
     !
     ! Local declarations
     !
@@ -141,12 +144,12 @@ contains
     ENDIF
 
     ! Get MPI size and rank
-    CALL MPI_Comm_Size ( localCommunicator, npes, ierror )
+    CALL MPI_Comm_Size ( localCommunicator, partit%npes, ierror )
     IF (ierror /= 0) THEN
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'comm_size failed.')
     ENDIF
     
-    CALL MPI_Comm_Rank ( localCommunicator, mype, ierror )
+    CALL MPI_Comm_Rank ( localCommunicator, partit%mype, ierror )
     IF (ierror /= 0) THEN
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'comm_rank failed.')
     ENDIF
@@ -210,8 +213,8 @@ contains
 
     integer                    :: my_number_of_points
     integer                    :: number_of_all_points
-    integer                    :: counts_from_all_pes(npes)
-    integer                    :: displs_from_all_pes(npes)
+    integer                    :: counts_from_all_pes(partit%npes)
+    integer                    :: displs_from_all_pes(partit%npes)
     integer                    :: my_displacement
 
     integer,allocatable        :: unstr_mask(:,:)
@@ -231,6 +234,7 @@ contains
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+
 
 #ifdef VERBOSE
       print *, '=============================================================='
@@ -389,6 +393,8 @@ contains
     cpl_send( 3)='snt_feom' ! 3. snow thickness [m]                ->
     cpl_send( 4)='ist_feom' ! 4. sea ice surface temperature [K]   ->
     cpl_send( 5)='sia_feom' ! 5. sea ice albedo [%-100]            ->
+    cpl_send( 6)='u_feom'   ! 6. eastward  surface velocity [m/s]  ->
+    cpl_send( 7)='v_feom'   ! 7. northward surface velocity [m/s]  ->
 #else
     cpl_send( 1)='sst_feom' ! 1. sea surface temperature [°C]      ->
     cpl_send( 2)='sit_feom' ! 2. sea ice thickness [m]             ->
@@ -595,6 +601,7 @@ contains
     integer, intent( IN )  :: ind       ! variable Id
     logical, intent( OUT ) :: action    ! 
     real(kind=WP), intent( OUT )    :: data_array(:)
+    type(t_partit), intent(inout), target :: partit
     !
     ! Local declarations
     !
@@ -624,7 +631,7 @@ contains
  ! and delivered back to FESOM.
    action=(info==3 .OR. info==10 .OR. info==11 .OR. info==12 .OR. info==13)
    if (action) then
-      data_array(1:myDim_nod2d) = exfld
+      data_array(1:partit%myDim_nod2d) = exfld
       call exchange_nod(data_array, partit)
    end if   
    t3=MPI_Wtime()
