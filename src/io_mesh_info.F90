@@ -565,6 +565,14 @@ integer                       :: info_id
 integer                       :: fesom_mesh_id
 integer                       :: ierror, status
 
+! NOTE(PG): Adds global Conventions attribute
+if (partit%mype==0) then
+   status = nf_put_att_text(ncid, NF_GLOBAL, 'Conventions', len_trim('UGRID-1.0'), 'UGRID-1.0')
+end if
+call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+if (status .ne. nf_noerr) call handle_err(status, partit)
+
+
 
 ! NOTE(PG): Order of calls should mirror the UGRID website; otherwise I cannot keep track:
 
