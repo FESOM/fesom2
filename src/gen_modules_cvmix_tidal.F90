@@ -147,7 +147,7 @@ module g_cvmix_tidal
         inquire(file=trim(tidal_botforc_file),exist=file_exist) 
         if (file_exist) then
             if (mype==0) write(*,*) ' --> read TIDAL near tidal bottom forcing'
-            call read_other_NetCDF(tidal_botforc_file, 'wave_dissipation', 1, tidal_fbot, .true., .false.,  partit, mesh) 
+            call read_other_NetCDF(tidal_botforc_file, tidal_botforc_vname, 1, tidal_fbot, .true., .false.,  partit, mesh) 
             !                                                                                                  |           
             !                                 .false.=interpolate on element centroids instead of vertices <---+   
             
@@ -264,7 +264,7 @@ module g_cvmix_tidal
             ! Compute the time-invariant portion of the tidal mixing coefficient
             ! using the Simmons et al.(2004) scheme.
             call cvmix_compute_Simmons_invariant_low(         &
-                 nlev            = nln ,                      &
+                 nlev            = nln-uln+1 ,                &
                  energy_flux     = tidal_fbot(elem),          & !in W m-2  
                  rho             = density_0,                 &
                  SimmonsCoeff    = simmonscoeff,              &
@@ -278,11 +278,11 @@ module g_cvmix_tidal
             call cvmix_coeffs_tidal_low(                      &
                  Mdiff_out       = tidal_Av(uln:nln,elem),    &
                  Tdiff_out       = tidal_Kv(uln:nln,elem),    &
-                 Nsqr            = bvfreq2,                   & !FIXME: limit to N2 > 10^-8 ? as in Simmons et al.
+                 Nsqr            = bvfreq2(uln:nln),          & !FIXME: limit to N2 > 10^-8 ? as in Simmons et al.
                  OceanDepth      = -zbar_e_bot(elem),         & !FIXME: neglecting free surface contribution
                  SimmonsCoeff    = simmonscoeff,              &
                  vert_dep        = vertdep(uln:nln),          &
-                 nlev            = nln,                       &
+                 nlev            = nln-uln+1,                       &
                  max_nlev        = nl-1,                      &
                  CVmix_params    = CVmix_tidal_params) ! FIXME: Simmons et al. use Prandtl=10.0 (atm its 1.0)
                  
@@ -294,6 +294,10 @@ module g_cvmix_tidal
 !!PS                 write(*,*) 'tidal_Kv     = ',tidal_Kv(1:nln+1,node)
 !!PS                 write(*,*) 'tidal_Av     = ',tidal_Av(1:nln+1,node)
 !!PS             end if 
+                tidal_Av(uln,elem)   = 0.0_WP
+                tidal_Kv(uln,elem)   = 0.0_WP
+                tidal_Av(nln+1,elem) = 0.0_WP
+                tidal_Kv(nln+1,elem) = 0.0_WP
         end do !-->do elem = 1,elem_size
             
         !_______________________________________________________________________
@@ -311,14 +315,14 @@ module g_cvmix_tidal
         ! write out tidal diffusivity tidal_Kv --> convert from elem to vertices 
         ! --> add it to main diffusivity Kv
         do node=1, node_size 
-            uln = ulevels_nod2D(node)
+            uln = ulevels_nod2D(node)+1
             nln = nlevels_nod2D(node)-1
             do nz=uln, nln
                 tvol =0.0_WP
                 tsum1=0.0_WP
                 do ki=1, nod_in_elem2D_num(node)
                     elem = nod_in_elem2D(ki,node)
-                    ule  = ulevels(elem)
+                    ule  = ulevels(elem)+1
                     nle  = nlevels(elem)-1
                     if (nle<nz .or. nz<ule) cycle
                     tvol = tvol  +                   elem_area(elem)
