@@ -318,45 +318,41 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   call my_def_var(ncid, 'gradient_sca_x',    NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_x_id,  'x component of a gradient at nodes of an element', partit)
   call my_def_var(ncid, 'gradient_sca_y',    NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_y_id,  'y component of a gradient at nodes of an element', partit)
   call my_nf_enddef(ncid, partit)
-  WRITE(*,*) 'DEBUG(PG): Finished with defining variables'
 
-  WRITE(*,*) 'DEBUG(PG): Writing data'
   ! NOTE(PG): Same order as definition!
   ! NOTE(PG): We invert the sign of ``zbar`` here to conform with CF-Conventions
   ! https://cfconventions.org/cf-conventions/cf-conventions.html#vertical-coordinate
-  WRITE(*,*) "nz"
   call my_put_vara(ncid, zbar_id, 1, nl, -zbar, partit)
 
   ! NOTE(PG): We invert the sign of ``Z`` here to conform with CF-Conventions
   ! https://cfconventions.org/cf-conventions/cf-conventions.html#vertical-coordinate
-  WRITE(*,*) "nz1"
   call my_put_vara(ncid, z_id, 1, nl-1, -Z, partit)
 
-  WRITE(*,*) "elem_area"
+  ! WRITE(*,*) "elem_area"
   allocate(rbuffer(elem2D))
   call gather_elem(elem_area(1:myDim_elem2D), rbuffer, partit)
   call my_put_vara(ncid, elem_area_id, 1, elem2D, rbuffer, partit)
   deallocate(rbuffer)
 
-  WRITE(*,*) "nlevels_nod2D"
+  ! WRITE(*,*) "nlevels_nod2D"
   allocate(ibuffer(nod2D))
   call gather_nod(nlevels_nod2D(1:myDim_nod2D), ibuffer, partit)
   call my_put_vara(ncid, nlevels_nod2D_id, 1, nod2D, ibuffer, partit)
   deallocate(ibuffer)
   
-  WRITE(*,*) "nlevels"
+  ! WRITE(*,*) "nlevels"
   allocate(ibuffer(elem2D))
   call gather_elem(nlevels(1:myDim_elem2D), ibuffer, partit)
   call my_put_vara(ncid, nlevels_id, 1, elem2D, ibuffer, partit)
   deallocate(ibuffer)
 
-  WRITE(*,*) "nod_in_elem2D_num"
+  ! WRITE(*,*) "nod_in_elem2D_num"
   allocate(ibuffer(nod2D))
   call gather_nod(nod_in_elem2D_num(1:myDim_nod2D), ibuffer, partit)
   call my_put_vara(ncid, nod_in_elem2D_num_id, 1, nod2D, ibuffer, partit)
   deallocate(ibuffer)
 
-  WRITE(*,*) "nod_part"
+  ! WRITE(*,*) "nod_part"
   allocate(ibuffer(nod2D))
   allocate(lbuffer(myDim_nod2D))  
   lbuffer=mype
@@ -364,7 +360,7 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   call my_put_vara(ncid, nod_part_id, 1, nod2D, ibuffer, partit)
   deallocate(lbuffer, ibuffer)
 
-  WRITE(*,*) "elem_part"
+  ! WRITE(*,*) "elem_part"
   allocate(ibuffer(elem2D))
   allocate(lbuffer(myDim_elem2D))  
   lbuffer=mype
@@ -372,19 +368,19 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   call my_put_vara(ncid, elem_part_id, 1, elem2D, ibuffer, partit)
   deallocate(lbuffer, ibuffer)
 
-  WRITE(*,*) "zbar_e_bottom"
+  ! WRITE(*,*) "zbar_e_bottom"
   allocate(rbuffer(elem2D))
   call gather_elem(zbar_e_bot(1:myDim_elem2D), rbuffer, partit)
   call my_put_vara(ncid, zbar_e_bot_id, 1, elem2D, rbuffer, partit)
   deallocate(rbuffer)
 
-  WRITE(*,*) "zbar_n_bottom"
+  ! WRITE(*,*) "zbar_n_bottom"
   allocate(rbuffer(nod2D))
   call gather_nod(zbar_n_bot(1:myDim_nod2D), rbuffer, partit)
   call my_put_vara(ncid, zbar_n_bot_id, 1, nod2D, rbuffer, partit)
   deallocate(rbuffer)
 
-  WRITE(*,*) "lon and lat"
+  ! WRITE(*,*) "lon and lat"
   ! nodes (GEO coordinates)
   allocate(rbuffer(nod2D))
   do i=1, 2
@@ -398,7 +394,7 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   end do
   deallocate(rbuffer)
 
-  WRITE(*,*) "nod_area"
+  ! WRITE(*,*) "nod_area"
   allocate(rbuffer(nod2D))
   do k=1, nl
      call gather_nod(area(k, :), rbuffer, partit)
@@ -406,7 +402,7 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   end do
   deallocate(rbuffer)
 
-  WRITE(*,*) "face_nodes"
+  ! WRITE(*,*) "face_nodes"
   ! used to be called: elements
   allocate(ibuffer(elem2D))
   allocate(lbuffer(myDim_elem2D))
@@ -419,7 +415,7 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   end do
   deallocate(lbuffer, ibuffer)
 
-  WRITE(*,*) "edge_nodes"
+  ! WRITE(*,*) "edge_nodes"
   ! This used to be called "edges" before UGRID Change
   allocate(ibuffer(edge2D))
   allocate(lbuffer(myDim_edge2D))
@@ -432,7 +428,7 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   end do
   deallocate(lbuffer, ibuffer)
 
-  WRITE(*,*) "face_edges"
+  ! WRITE(*,*) "face_edges"
   ! This used to be called elem_edge
   allocate(ibuffer(elem2D))
   do i=1, 3
@@ -441,14 +437,13 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   end do
   deallocate(ibuffer)
 
-  WRITE(*,*) "face_links"
+  ! WRITE(*,*) "face_links"
   ! This used to be called elem_neighbors
   allocate(lbuffer(myDim_elem2D), ibuffer(elem2D))
   do i=1, 3
      lbuffer(1:myDim_elem2D) = elem_neighbors(i, 1:myDim_elem2D)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(k)
      do k=1, myDim_elem2D
-        !WRITE(*,*) "k = ", k
         if (elem_neighbors(i, k) > 0) then
           lbuffer(k) = elem_neighbors(i, k)
         else
@@ -461,7 +456,7 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   end do
   deallocate(lbuffer, ibuffer)
   
-  WRITE(*,*) "edge_face_links"
+  ! WRITE(*,*) "edge_face_links"
   ! Used to be called edge_tri
   allocate(ibuffer(edge2D))
   allocate(lbuffer(myDim_edge2D))
@@ -480,7 +475,7 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   end do
   deallocate(lbuffer, ibuffer)
 
-  WRITE(*,*) "nod_in_elem2D"
+  ! WRITE(*,*) "nod_in_elem2D"
   ! elements containing the node
   allocate(ibuffer(nod2D))
   allocate(lbuffer(myDim_nod2D))
@@ -499,7 +494,7 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   deallocate(lbuffer, ibuffer)
 
 
-  WRITE(*,*) "edge_cross_dxdy"
+  ! WRITE(*,*) "edge_cross_dxdy"
   allocate(rbuffer(edge2D))
   allocate(lrbuffer(myDim_edge2D))
   do i=1, 4
@@ -509,7 +504,7 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   end do
   deallocate(rbuffer, lrbuffer)
 
-  WRITE(*,*) "gradient_sca_x"
+  ! WRITE(*,*) "gradient_sca_x"
     ! X component of gadient at elements
   allocate(rbuffer(elem2D))
   do i=1, 3
@@ -518,7 +513,7 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   end do
   deallocate(rbuffer)
 
-  WRITE(*,*) "gradient_sca_y"
+  ! WRITE(*,*) "gradient_sca_y"
     ! Y component of gadient at elements
   allocate(rbuffer(elem2D))
   do i=1, 3
@@ -673,7 +668,6 @@ character(*), intent(in), optional :: comment
 integer,      intent(in), optional :: missing_value
 integer,      intent(in), optional :: start_index
 
-WRITE(*,*) 'DEBUG(PG): my_def_var: short_name=', short_name, " varid=", id
 
 if (partit%mype==0) then
    status = nf_def_var(ncid, trim(short_name), vtype, dsize, dids, id)
@@ -756,7 +750,6 @@ integer, intent(in)           :: ncid, varid, start, N
 real(kind=WP)                 :: var(:)
 integer                       :: ierror, status
 
-  ! WRITE(*,*) 'DEBUG(PG): my_put_vara_double_1D:', varid
   if (partit%mype==0) status=nf_put_vara_double(ncid, varid, start, N, var)
   call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
   if (status .ne. nf_noerr) call handle_err(status, partit)
