@@ -389,10 +389,10 @@ module g_cvmix_tke
                 langmuir_hlc(node) = 0.0_wp
                 do nz=nun+1,nln
                     !!PS k_hlc = nz
-                    aux = sum( bvfreq2(2:nz+1)*zbar_3d_n(2:nz+1,node) )
+                    aux = sum(-bvfreq2(2:nz+1)*zbar_3d_n(2:nz+1,node) )
                     if(aux > 0.5_wp*langmuir_ustoke(node)**2.0_wp) then
                         !!PS k_hlc = nz
-                        langmuir_hlc(node) = zbar_3d_n(nz,node)
+                        langmuir_hlc(node) = -zbar_3d_n(nz,node)
                         exit
                     end if 
                 end do
@@ -403,9 +403,9 @@ module g_cvmix_tke
                 ! Axell (2002); results in deeper MLDs and better spatial MLD pattern.
                 langmuir_wlc(:,node) = 0.0_wp
                 do nz=nun+1,nln    
-                    if(zbar_3d_n(nz,node) <= langmuir_hlc(node)) then
+                    if(-zbar_3d_n(nz,node) <= langmuir_hlc(node)) then
                         langmuir_wlc(nz,node) = tke_clangmuir * langmuir_ustoke(node) * &
-                        sin(pi*zbar_3d_n(nz,node)/langmuir_hlc(node))
+                        sin(-pi*zbar_3d_n(nz,node)/langmuir_hlc(node))
                     !!PS else
                     !!PS     langmuir_wlc(nz,node) = 0.0_wp
                     endif
