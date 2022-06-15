@@ -115,7 +115,7 @@ contains
     
 
 #if defined (__oasis)
-        call cpl_oasis3mct_init(partit%MPI_COMM_FESOM)
+        call cpl_oasis3mct_init(f%partit,f%partit%MPI_COMM_FESOM)
 #endif
         f%t1 = MPI_Wtime()
 
@@ -343,7 +343,7 @@ contains
             !___compute update of atmospheric forcing____________________________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call update_atm_forcing(n)'//achar(27)//'[0m'
             f%t0_frc = MPI_Wtime()
-            call update_atm_forcing(n, f%ice, f%tracers, f%partit, f%mesh)
+            call update_atm_forcing(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
             f%t1_frc = MPI_Wtime()       
             !___compute ice step________________________________________________
             if (f%ice%ice_steps_since_upd>=f%ice%ice_ave_steps-1) then
