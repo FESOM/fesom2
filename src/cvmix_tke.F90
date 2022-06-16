@@ -132,73 +132,73 @@ type(tke_type), intent(inout),target, optional :: &
 
 ! FIXME: not sure about the allowed ranges for TKE parameters
 if (present(c_k)) then
-  if(c_k.lt. 0.0d0 .or. c_k .gt. 1.5d0) then
+  if(c_k.lt. 0.0 .or. c_k .gt. 1.5) then
     print*, "ERROR:c_k can only be allowed_range"
     stop 1
   end if
   call put_tke('c_k', c_k, tke_userdef_constants)
 else
-  call put_tke('c_k',0.1d0 , tke_userdef_constants)
+  call put_tke('c_k',0.1_cvmix_r8 , tke_userdef_constants)
 end if
 
 if (present(c_eps)) then
-  if(c_eps.lt. 0.d0 .or. c_eps .gt. 10.d0) then
+  if(c_eps.lt. 0.0 .or. c_eps .gt. 10.0) then
     print*, "ERROR:c_eps can only be allowed_range"
     stop 1
   end if
   call put_tke('c_eps', c_eps, tke_userdef_constants)
 else
-  call put_tke('c_eps', 0.7d0, tke_userdef_constants)
+  call put_tke('c_eps', 0.7_cvmix_r8, tke_userdef_constants)
 end if
 
 if (present(cd)) then
-  if(cd.lt. 0.1d0 .or. cd .gt. 30.d0) then
+  if(cd.lt. 0.1 .or. cd .gt. 30.0) then
     print*, "ERROR:cd can only be allowed_range"
     stop 1
   end if
   call put_tke('cd', cd, tke_userdef_constants)
 else
-  call put_tke('cd', 3.75d0, tke_userdef_constants)
+  call put_tke('cd', 3.75_cvmix_r8, tke_userdef_constants)
 end if
 
 if (present(alpha_tke)) then
-  if(alpha_tke.lt. 1.d0 .or. alpha_tke .gt. 90.d0) then
+  if(alpha_tke.lt. 1.0 .or. alpha_tke .gt. 90.0) then
     print*, "ERROR:alpha_tke can only be allowed_range"
     stop 1
   end if
   call put_tke('alpha_tke', alpha_tke, tke_userdef_constants)
 else
-  call put_tke('alpha_tke', 30.d0, tke_userdef_constants)
+  call put_tke('alpha_tke', 30._cvmix_r8, tke_userdef_constants)
 end if
 
 if (present(mxl_min)) then
-  if(mxl_min.lt. 1.d-12 .or. mxl_min .gt. 0.4d0) then
+  if(mxl_min.lt. 1.0d-12 .or. mxl_min .gt. 0.4) then
     print*, "ERROR:mxl_min can only be allowed_range"
     stop 1
   end if
   call put_tke('mxl_min', mxl_min, tke_userdef_constants)
 else
-  call put_tke('mxl_min', 1.d-8, tke_userdef_constants)
+  call put_tke('mxl_min', 1.0e-8_cvmix_r8, tke_userdef_constants)
 end if
 
 if (present(KappaM_min)) then
-  if(KappaM_min.lt. 0.d0 .or. KappaM_min .gt. 1.d0) then
+  if(KappaM_min.lt. 0.0 .or. KappaM_min .gt. 1.0) then
     print*, "ERROR:KappaM_min can only be allowed_range"
     stop 1
   end if
   call put_tke('kappaM_min', KappaM_min, tke_userdef_constants)
 else
-  call put_tke('kappaM_min', 0.d0, tke_userdef_constants)
+  call put_tke('kappaM_min', 0.0_cvmix_r8, tke_userdef_constants)
 end if
 
 if (present(KappaM_max)) then
-  if(KappaM_max.lt. 10.d0 .or. KappaM_max .gt. 1000.d0) then
+  if(KappaM_max.lt. 10.0 .or. KappaM_max .gt. 1000.0) then
     print*, "ERROR:kappaM_max can only be allowed_range"
     stop 1
   end if
   call put_tke('kappaM_max', KappaM_max, tke_userdef_constants)
 else
-  call put_tke('kappaM_max', 100.d0, tke_userdef_constants)
+  call put_tke('kappaM_max', 100.0_cvmix_r8, tke_userdef_constants)
 end if
 
 if (present(tke_mxl_choice)) then
@@ -228,28 +228,28 @@ if (present(clc)) then
   end if
   call put_tke('clc', clc, tke_userdef_constants)
 else
-  call put_tke('clc',0.15d0 , tke_userdef_constants)
+  call put_tke('clc',0.15_cvmix_r8 , tke_userdef_constants)
 end if
 
 
 if (present(tke_min)) then
-  if(tke_min.lt. 1.d-9 .or. tke_min.gt. 1.d-2 ) then
+  if(tke_min.lt. 1.0d-9 .or. tke_min.gt. 1.0d-2 ) then
     print*, "ERROR:tke_min can only be allowed_range"
     stop 1
   end if
   call put_tke('tke_min', tke_min, tke_userdef_constants)
 else
-  call put_tke('tke_min', 1.d-6, tke_userdef_constants)
+  call put_tke('tke_min', 1.0e-6_cvmix_r8, tke_userdef_constants)
 end if
 
 if (present(tke_surf_min)) then
-  if(tke_surf_min.lt. 1.d-7 .or. tke_surf_min.gt. 1.d-2 ) then
+  if(tke_surf_min.lt. 1.0d-7 .or. tke_surf_min.gt. 1.0d-2 ) then
     print*, "ERROR:tke_surf_min can only be allowed_range"
     stop 1
   end if
   call put_tke('tke_surf_min', tke_surf_min, tke_userdef_constants)
 else
-  call put_tke('tke_surf_min', 1.d-4, tke_userdef_constants)
+  call put_tke('tke_surf_min', 1.0e-4_cvmix_r8, tke_userdef_constants)
 end if
 
 if (present(use_ubound_dirichlet)) then
