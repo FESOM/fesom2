@@ -321,6 +321,9 @@ contains
 
 
   subroutine write_variables_raw(this, fileunit)
+#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+    use nvfortran_subarray_workaround_module
+#endif
     class(fesom_file_type), target :: this
     integer, intent(in) :: fileunit
     ! EO parameters
@@ -329,7 +332,21 @@ contains
     
     do i=1, this%nvar_infos
       var => this%var_infos(i)
+#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+      if(var%varname=='u') then
+        write(fileunit) dynamics_workaround%uv(1,:,:)
+      else if(var%varname=='v') then
+        write(fileunit) dynamics_workaround%uv(2,:,:)
+      else if(var%varname=='urhs_AB') then
+        write(fileunit) dynamics_workaround%uv_rhsAB(1,:,:)
+      else if(var%varname=='vrhs_AB') then
+        write(fileunit) dynamics_workaround%uv_rhsAB(2,:,:)
+      else
+#endif
       write(fileunit) var%external_local_data_ptr ! directly use external_local_data_ptr, use the local_data_copy only when called asynchronously
+#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+      end if
+#endif
     end do
   end subroutine
 
@@ -355,6 +372,9 @@ contains
 
 
   subroutine async_gather_and_write_variables(this)
+#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+use nvfortran_subarray_workaround_module
+#endif
     class(fesom_file_type), target :: this
     ! EO parameters
     integer i
@@ -366,7 +386,21 @@ contains
     do i=1, this%nvar_infos
       var => this%var_infos(i)
       if(.not. allocated(var%local_data_copy)) allocate( var%local_data_copy(size(var%external_local_data_ptr,dim=1), size(var%external_local_data_ptr,dim=2)) )
+#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+      if(var%varname=='u') then
+        var%local_data_copy = dynamics_workaround%uv(1,:,:)
+      else if(var%varname=='v') then
+        var%local_data_copy = dynamics_workaround%uv(2,:,:)
+      else if(var%varname=='urhs_AB') then
+        var%local_data_copy = dynamics_workaround%uv_rhsAB(1,:,:)
+      else if(var%varname=='vrhs_AB') then
+        var%local_data_copy = dynamics_workaround%uv_rhsAB(2,:,:)
+      else
+#endif
       var%local_data_copy = var%external_local_data_ptr
+#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+      end if
+#endif
     end do
     
     this%gather_and_write = .true.
