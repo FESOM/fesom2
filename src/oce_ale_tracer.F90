@@ -964,9 +964,9 @@ use ver_sinking_recom_benthos_interface
            tv = tr_arr(nz,n,tr_num)*Vben(nz)
            aux(nz)= - tv*(area(nz,n)-area(nz+1,n))
         end do
-        nz=nl1
-        tv = tr_arr(nz,n,tr_num)*Vben(nz)
-        aux(nz)= - tv*(area(nz+1,n))
+        !nz=nl1
+        !tv = tr_arr(nz,n,tr_num)*Vben(nz)
+        !aux(nz)= - tv*(area(nz+1,n))
 
         do nz=ul1,nl1
            str_bf(nz,n) = str_bf(nz,n) + (aux(nz))*dt/area(nz,n)/(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))
