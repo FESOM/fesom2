@@ -178,7 +178,7 @@ subroutine oce_fluxes(mesh)
 
 #include  "associate_mesh.h"
     
-    allocate(flux(myDim_nod2D+eDim_nod2D))
+allocate(flux(myDim_nod2D+eDim_nod2D))
     flux = 0.0_WP
     
     ! ==================
@@ -339,8 +339,41 @@ subroutine oce_fluxes(mesh)
     
     !___________________________________________________________________________
     deallocate(flux)
-    
 end subroutine oce_fluxes
 !
 !
 !_______________________________________________________________________________
+! converted from Qiyun's (qiyun.ma@awi.de)  python code to create the waterhosing scenario
+subroutine fw_forcing(hSv, L, lat0, lat1, lon0, lon1, mesh)
+
+    use o_PARAM
+    use o_ARRAYS
+    use i_ARRAYS
+    use MOD_MESH
+    use g_PARSUP
+    USE g_CONFIG
+    use g_comm_auto
+    use g_support
+    implicit none    
+    type(t_mesh),  intent(in) , target :: mesh
+    real(kind=WP), intent(in)          :: hSv,  L, lat0, lat1, lon0, lon1
+    real(kind=WP)                      :: k, x, y, net
+    real(kind=WP)                      :: flux(myDim_nod2D+eDim_nod2D)
+    integer                            :: i
+#include  "associate_mesh.h"
+
+        k = pi/2./L
+        flux=0.
+        do i=1, myDim_nod2D+eDim_nod2D
+           x = geo_coord_nod2D(1,i) - 0.5*(lon0 + lon1)
+           y = geo_coord_nod2D(2,i) - 0.5*(lat0 + lat1)
+           if (abs(x)<L) flux(i)=cos(k*x)
+           flux(i) = flux(i)*exp(-0.01*y*y)
+        end do
+        call integrate_nod(flux, net, mesh)
+        if (abs(net)>1.e-6) then
+           flux=flux/net*hSv*1.e6 ! hSv*1.e6 in m/s
+        end if
+        water_flux=water_flux+flux
+end subroutine fw_forcing
+

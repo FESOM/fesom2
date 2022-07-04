@@ -241,6 +241,9 @@ integer mpi_version_len
             if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
             call oce_fluxes_mom(mesh) ! momentum only
             call oce_fluxes(mesh)
+            !   add waterhosing for the Labrador Sea: hSv=0.05 Sv
+            !   hSv=0.05, L=30, lat0=47, lat1=65, lon0=-70, lon1=-40
+            call fw_forcing(0.05, 30., 47., 65., 70., -40., mesh)            
         end if
         call before_oce_step(mesh) ! prepare the things if required
         t2 = MPI_Wtime()
