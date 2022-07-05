@@ -387,8 +387,31 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
            virtual_salt(n)=virtual_salt(n)-net/ocean_area
         end do
 !$OMP END PARALLEL DO
+
+    !___________________________________________________________________________
+    ! do virtual salt flux under the cavity also when zstar is switched on 
+    ! since under the cavity nothing is allowed to move  --> linfs --> and linfs
+    ! reequires virtual salt
+    elseif (.not. use_virt_salt) .and. (use_cavity) then ! will remain zero otherwise
+        rsss=ref_sss
+!$OMP PARALLEL DO         
+        do n=1, myDim_nod2D+eDim_nod2D
+            if (ulevels_nod2d(n) == 1) cycle
+            if (ref_sss_local) rsss = salt(ulevels_nod2d(n),n)
+            virtual_salt(n)=rsss*water_flux(n) 
+        end do
+!$OMP END PARALLEL DO        
+        flux = virtual_salt
+        call integrate_nod(flux, net, partit, mesh)
+!$OMP PARALLEL DO         
+        do n=1, myDim_nod2D+eDim_nod2D
+            if (ulevels_nod2d(n) == 1) cycle 
+            virtual_salt(n)=virtual_salt(n)-net/(ocean_areawithcav-ocean_area)
+        end do
+!$OMP END PARALLEL DO        
     end if
 
+    !___________________________________________________________________________
 !$OMP PARALLEL DO
     do n=1, myDim_nod2D+eDim_nod2D    
       if (ulevels_nod2d(n) == 1) then
@@ -398,12 +421,13 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
       end if
     end do
 !$OMP END PARALLEL DO
+
     !___________________________________________________________________________
     ! balance SSS restoring to climatology
     if (use_cavity) then
         do n=1, myDim_nod2D+eDim_nod2D
             relax_salt(n) = 0.0_WP
-            if (ulevels_nod2d(n) > 1) cycle
+            if (ulevels_nod2d(n) > 1) cycle ! -> only do salt relaxation in open ocean
             relax_salt(n)=surf_relax_S*(Ssurf(n)-salt(ulevels_nod2d(n),n))
         end do
     else
@@ -417,9 +441,11 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     ! --> if use_cavity=.true. relax_salt anyway zero where is cavity see above
     call integrate_nod(relax_salt, net, partit, mesh)
 !$OMP PARALLEL DO
-        do n=1, myDim_nod2D+eDim_nod2D
-           relax_salt(n)=relax_salt(n)-net/ocean_area
-        end do
+    do n=1, myDim_nod2D+eDim_nod2D
+        !--> only balance salt_relaxation in open ocean under the cavity it remains zero
+        if (ulevels_nod2d(n) > 1) cycle
+        relax_salt(n)=relax_salt(n)-net/ocean_area
+    end do
 !$OMP END PARALLEL DO
     
     !___________________________________________________________________________
