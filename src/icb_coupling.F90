@@ -36,22 +36,59 @@ subroutine prepare_icb2fesom(mesh, ib,i_have_element,localelement,depth_ib)
     use iceberg_params
 
     integer   			:: iceberg_node  
+    integer, dimension(3)   :: ib_nods_in_ib_elem
+    integer                 :: num_ib_nods_in_ib_elem
 type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
 
     if(i_have_element) then 
-        iceberg_node=elem2D_nodes(1,localelement)
+        ! ##############################################################
+        ! LA: spread fluxes over all nodes of element, 25.04.2022
+        call get_iceberg_nodes_for_element(mesh, localelement, ib_nods_in_ib_elem, num_ib_nods_in_ib_elem)
+        !write(*,*) "LA DEBUG: ib_nods_in_ib_elem=",ib_nods_in_ib_elem,", num_ib_nods_in_ib_elem=",num_ib_nods_in_ib_elem 
+        do i=1, 3
+            iceberg_node=ib_nods_in_ib_elem(i)
+
+            if (iceberg_node>0) then
+                ibfwbv(iceberg_node) = ibfwbv(iceberg_node) - fwbv_flux_ib(ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
+                ibfwb(iceberg_node) = ibfwb(iceberg_node) - fwb_flux_ib(ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
+                ibfwl(iceberg_node) = ibfwl(iceberg_node) - fwl_flux_ib(ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
+                ibfwe(iceberg_node) = ibfwe(iceberg_node) - fwe_flux_ib(ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
+                ibhf(iceberg_node) = ibhf(iceberg_node) - heat_flux_ib(ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
+            !else
+            !    write(*,*) 'iceberg_node only communication node. iceberg_node=',iceberg_node,', mydim_nod2d=',mydim_nod2d
+            end if
+        end do
+    end if
+end subroutine prepare_icb2fesom
+
+subroutine get_iceberg_nodes_for_element(mesh, localelement, ib_nods_in_ib_elem, num_ib_nods_in_ib_elem)
+    use o_param
+    use o_mesh
+    use MOD_MESH
+    use g_config
+    use g_parsup
+    use i_arrays
+    use iceberg_params
+
+    integer, intent(in)                     :: localelement
+    integer, dimension(3), intent(inout)    :: ib_nods_in_ib_elem
+    integer, intent(inout)                  :: num_ib_nods_in_ib_elem
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
+
+    num_ib_nods_in_ib_elem=0
+
+    do i=1,3
+        iceberg_node=elem2d_nodes(i,localelement)
 
         if (iceberg_node<=mydim_nod2d) then
-            ibfwbv(iceberg_node) = ibfwbv(iceberg_node) - fwbv_flux_ib(ib) / area(1,iceberg_node)
-            ibfwb(iceberg_node) = ibfwb(iceberg_node) - fwb_flux_ib(ib) / area(1,iceberg_node)
-            ibfwl(iceberg_node) = ibfwl(iceberg_node) - fwl_flux_ib(ib) / area(1,iceberg_node)
-            ibfwe(iceberg_node) = ibfwe(iceberg_node) - fwe_flux_ib(ib) / area(1,iceberg_node)
-            ibhf(iceberg_node) = ibhf(iceberg_node) - heat_flux_ib(ib) / area(1,iceberg_node)
+            ib_nods_in_ib_elem(i)   = iceberg_node
+            num_ib_nods_in_ib_elem  = num_ib_nods_in_ib_elem + 1
         else
-            write(*,*) 'iceberg_node only communication node'
+            ib_nods_in_ib_elem(i)   = 0
         end if
-    end if
+    end do
 end subroutine prepare_icb2fesom
 
 
@@ -74,8 +111,8 @@ type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
 
     do n=1, myDim_nod2d+eDim_nod2D
-        water_flux(n) = water_flux(n) - (ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n))
-        heat_flux(n) = heat_flux(n) - ibhf(n)
+        water_flux(n)   = water_flux(n) - (ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n)) * steps_per_ib_step
+        heat_flux(n)    = heat_flux(n)  - ibhf(n) * steps_per_ib_step
     end do
 !---wiso-code-begin
    if(lwiso) then

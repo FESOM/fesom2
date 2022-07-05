@@ -468,6 +468,11 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
      !fw = -M_b
      M_b = - (rhow / rhoi) * M_b 		 ! [m (ice) per second], positive for melting? NOW positive for melting
 
+     !LA avoid basal freezing for grounded icebergs
+     if(M_b.lt.0.) then
+         M_b = 0.0
+     endif
+
      !      qo=-rhor*seta*oofw
      !      if(seta.le.0.) then
      !         qc=rhor*seta*hemw
