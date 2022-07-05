@@ -621,16 +621,20 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         do q=1,3
             n=elnodes(q) 
             flux=icefluxes(elem,q)
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_set_lock  (partit%plock(n))
+#else
+!$OMP ORDERED
 #endif
             if (flux>0) then
                 icepplus(n)=icepplus(n)+flux
             else
                 icepminus(n)=icepminus(n)+flux
             end if
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(n))
+#else
+!$OMP END ORDERED
 #endif
         end do  
     end do   
@@ -698,12 +702,16 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
             elnodes=elem2D_nodes(:,elem)
             do q=1,3
                 n=elnodes(q)  
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_set_lock  (partit%plock(n))
+#else
+!$OMP ORDERED
 #endif
                 m_ice(n)=m_ice(n)+icefluxes(elem,q)
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_unset_lock(partit%plock(n))
+#else
+!$OMP END ORDERED
 #endif
             end do
         end do
@@ -725,12 +733,16 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
             elnodes=elem2D_nodes(:,elem)
             do q=1,3
                 n=elnodes(q)
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_set_lock  (partit%plock(n))
+#else
+!$OMP ORDERED
 #endif
                 a_ice(n)=a_ice(n)+icefluxes(elem,q)
-#if defined(_OPENMP)
+#if defined(_OPENMP) && !defined(__openmp_reproducible) 
                 call omp_unset_lock(partit%plock(n))
+#else
+!$OMP END ORDERED
 #endif
             end do
         end do
@@ -752,12 +764,16 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
             elnodes=elem2D_nodes(:,elem)
             do q=1,3
                 n=elnodes(q)  
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_set_lock  (partit%plock(n))
+#else
+!$OMP ORDERED
 #endif
                 m_snow(n)=m_snow(n)+icefluxes(elem,q)
-#if defined(_OPENMP)
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
                 call omp_unset_lock(partit%plock(n))
+#else
+!$OMP END ORDERED
 #endif
             end do
         end do
@@ -780,12 +796,16 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
             elnodes=elem2D_nodes(:,elem)
             do q=1,3
                 n=elnodes(q)
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_set_lock  (partit%plock(n))
+#else
+!$OMP ORDERED
 #endif
                 ice_temp(n)=ice_temp(n)+icefluxes(elem,q)
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_unset_lock(partit%plock(n))
+#else
+!$OMP END ORDERED
 #endif
             end do
         end do
@@ -852,15 +872,19 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
                   end if
                   if (k==nn_num(row)) write(*,*) 'FATAL ERROR'
                end do
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
                call omp_set_lock  (partit%plock(row)) ! it shall be sufficient to block writing into the same row of SSH_stiff
+#else
+!$OMP ORDERED
 #endif
                mass_matrix(ipos)=mass_matrix(ipos)+elem_area(elem)/12.0_WP
                if(q==n) then
                    mass_matrix(ipos)=mass_matrix(ipos)+elem_area(elem)/12.0_WP
                end if
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
                call omp_unset_lock(partit%plock(row))
+#else 
+!$OMP END ORDERED
 #endif
            END DO
         end do
@@ -889,6 +913,7 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
     if(flag>0) then
         offset=ssh_stiff%rowptr(iflag)-ssh_stiff%rowptr(1)+1
         n=ssh_stiff%rowptr(iflag+1)-ssh_stiff%rowptr(1)
+#if !defined(__openmp_reproducible)
         aa=0
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:aa)
 !$OMP DO
@@ -897,6 +922,9 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
         end do
 !$OMP END DO
 !$OMP END PARALLEL
+#else
+     aa = sum(mass_matrix(offset:n))
+#endif
         write(*,*) '#### MASS MATRIX PROBLEM', mype, iflag, aa, area(1,iflag), ulevels_nod2D(iflag)
     endif
 END SUBROUTINE ice_mass_matrix_fill
@@ -1008,8 +1036,10 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 #endif /* (__oifs) */
 
             !___________________________________________________________________
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_set_lock  (partit%plock(row))
+#else
+!$OMP ORDERED
 #endif
             rhs_m(row)=rhs_m(row)+sum(entries*m_ice(elnodes))+cx1
             rhs_a(row)=rhs_a(row)+sum(entries*a_ice(elnodes))+cx2
@@ -1025,8 +1055,10 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
             rhs_tempdiv(row)=rhs_tempdiv(row)-cx4
 #endif /* (__oifs) */
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_unset_lock(partit%plock(row))
+#else
+!$OMP END ORDERED
 #endif
         end do
     end do
