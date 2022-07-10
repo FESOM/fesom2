@@ -128,6 +128,8 @@ subroutine ice_TG_rhs(ice, partit, mesh)
 #endif    
     !___________________________________________________________________________
     ! Taylor-Galerkin (Lax-Wendroff) rhs
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, q, row, elem, elnodes, diff, entries,  um, vm, vol, dx, dy)
+!$OMP DO
     DO row=1, myDim_nod2D
         rhs_m(row)=0._WP
         rhs_a(row)=0._WP
@@ -136,8 +138,9 @@ subroutine ice_TG_rhs(ice, partit, mesh)
         rhs_temp(row)=0._WP
 #endif /* (__oifs) */
     END DO
-    
+!$OMP END DO
     ! Velocities at nodes
+!$OMP DO
     do elem=1,myDim_elem2D          !assembling rhs over elements
         elnodes=elem2D_nodes(:,elem)
         !_______________________________________________________________________
@@ -174,6 +177,8 @@ subroutine ice_TG_rhs(ice, partit, mesh)
 #endif /* (__oifs) */
         END DO
     end do
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine ice_TG_rhs   
 !
 !
@@ -260,7 +265,8 @@ subroutine ice_solve_low_order(ice, partit, mesh)
 #endif       
     !___________________________________________________________________________
     gamma=ice%ice_gamma_fct         ! Added diffusivity parameter
-                                ! Adjust it to ensure posivity of solution    
+                                ! Adjust it to ensure posivity of solution
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row, clo, clo2, cn, location)
     do row=1,myDim_nod2D
         !_______________________________________________________________________
         ! if there is cavity no ice fxt low order
@@ -286,12 +292,13 @@ subroutine ice_solve_low_order(ice, partit, mesh)
                   (1.0_WP-gamma)*ice_temp(row)
 #endif /* (__oifs) */
     end do
-    
+!$OMP END PARALLEL DO
     ! Low-order solution must be known to neighbours
     call exchange_nod(m_icel,a_icel,m_snowl, partit)
 #if defined (__oifs) || defined (__ifsinterface)
     call exchange_nod(m_templ, partit)
 #endif /* (__oifs) */
+!$OMP BARRIER
 end subroutine ice_solve_low_order     
 !
 !
@@ -309,7 +316,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
-    integer                               :: n,i,clo,clo2,cn,location(100),row
+    integer                               :: n,clo,clo2,cn,location(100),row
     real(kind=WP)                         :: rhs_new
     integer                               :: num_iter_solve=3
     !___________________________________________________________________________
@@ -344,6 +351,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
     ! Does Taylor-Galerkin solution
     !
     !the first approximation
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
     do row=1,myDim_nod2D
         ! if cavity node skip it 
         if (ulevels_nod2d(row)>1) cycle
@@ -355,14 +363,17 @@ subroutine ice_solve_high_order(ice, partit, mesh)
         dm_temp(row)=rhs_temp(row)/area(1,row)
 #endif /* (__oifs) */
     end do
-
+!$OMP END PARALLEL DO
     call exchange_nod(dm_ice, da_ice, dm_snow, partit)
 #if defined (__oifs) || defined (__ifsinterface)
     call exchange_nod(dm_temp, partit)
 #endif /* (__oifs) */
+!$OMP BARRIER
     !___________________________________________________________________________
-    !iterate 
+    !iterate
     do n=1,num_iter_solve-1
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, clo, clo2, cn, location, row, rhs_new)
+!$OMP DO
         do row=1,myDim_nod2D
             ! if cavity node skip it 
             if (ulevels_nod2d(row)>1) cycle
@@ -383,7 +394,9 @@ subroutine ice_solve_high_order(ice, partit, mesh)
             m_templ(row)= dm_temp(row)+rhs_new/area(1,row)
 #endif /* (__oifs) */
         end do
+!$OMP END DO
         !_______________________________________________________________________
+!$OMP DO
         do row=1,myDim_nod2D
             ! if cavity node skip it 
             if (ulevels_nod2d(row)>1) cycle
@@ -394,12 +407,14 @@ subroutine ice_solve_high_order(ice, partit, mesh)
             dm_temp(row)=m_templ(row)
 #endif /* (__oifs) */
         end do
-        
+!$OMP END DO
+!$OMP END PARALLEL
         !_______________________________________________________________________
         call exchange_nod(dm_ice, da_ice, dm_snow, partit)
 #if defined (__oifs) || defined (__ifsinterface)
         call exchange_nod(dm_temp, partit)
 #endif /* (__oifs) */
+!$OMP BARRIER
     end do
 end subroutine ice_solve_high_order
 !
@@ -423,7 +438,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
     integer       :: tr_array_id
-    integer       :: icoef(3,3),n,q, elem,elnodes(3),row
+    integer       :: icoef(3,3), n, q, elem, elnodes(3), row
     real(kind=WP) :: vol, flux, ae, gamma
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -477,7 +492,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         ! Cycle over rows  row=elnodes(n)
         icoef(n,n)=-2
     end do	    
-    
+
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, q, elem, elnodes, row, vol, flux, ae)
+!$OMP DO
     do elem=1, myDim_elem2D
         !_______________________________________________________________________
         elnodes=elem2D_nodes(:,elem)
@@ -518,7 +535,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         end if
 #endif /* (__oifs) */
     end do
-     
+!$OMP END DO
     !___________________________________________________________________________
     ! Screening the low-order solution
     ! TO BE ADDED IF FOUND NECESSARY
@@ -529,6 +546,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     !___________________________________________________________________________
     ! Cluster min/max
     if (tr_array_id==1) then
+!$OMP DO
         do row=1, myDim_nod2D
             if (ulevels_nod2d(row)>1) cycle
             n=nn_num(row)
@@ -538,9 +556,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
             tmax(row)=tmax(row)-m_icel(row)
             tmin(row)=tmin(row)-m_icel(row)
         end do
+!$OMP END DO
     end if
     
     if (tr_array_id==2) then
+!$OMP DO
         do row=1, myDim_nod2D
             if (ulevels_nod2d(row)>1) cycle
             n=nn_num(row)
@@ -550,9 +570,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
             tmax(row)=tmax(row)-a_icel(row)
             tmin(row)=tmin(row)-a_icel(row)
         end do
+!$OMP END DO
     end if
  
     if (tr_array_id==3) then
+!$OMP DO
         do row=1, myDim_nod2D
             if (ulevels_nod2d(row)>1) cycle
             n=nn_num(row)
@@ -562,10 +584,12 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
             tmax(row)=tmax(row)-m_snowl(row)
             tmin(row)=tmin(row)-m_snowl(row)
         end do
+!$OMP END DO
     end if
 
 #if defined (__oifs) || defined (__ifsinterface)
     if (tr_array_id==4) then
+!$OMP DO
         do row=1, myDim_nod2D
             if (ulevels_nod2d(row)>1) cycle
             n=nn_num(row)
@@ -575,13 +599,19 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
             tmax(row)=tmax(row)-m_templ(row)
             tmin(row)=tmin(row)-m_templ(row)
         end do
+!$OMP END DO
     end if
 #endif /* (__oifs) */
  
     !___________________________________________________________________________
     ! Sums of positive/negative fluxes to node row
-    icepplus=0._WP
-    icepminus=0._WP
+!$OMP DO
+    do n=1, myDim_nod2D+eDim_nod2D
+       icepplus (n)=0._WP
+       icepminus(n)=0._WP
+    end do
+!$OMP END DO
+!$OMP DO
     do elem=1, myDim_elem2D
         ! if cavity cycle over
         if(ulevels(elem)>1) cycle !LK89140
@@ -591,16 +621,27 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         do q=1,3
             n=elnodes(q) 
             flux=icefluxes(elem,q)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+        call omp_set_lock  (partit%plock(n))
+#else
+!$OMP ORDERED
+#endif
             if (flux>0) then
                 icepplus(n)=icepplus(n)+flux
             else
-                icepminus(n)=icepminus(n)+flux	  
+                icepminus(n)=icepminus(n)+flux
             end if
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+        call omp_unset_lock(partit%plock(n))
+#else
+!$OMP END ORDERED
+#endif
         end do  
     end do   
-        
+!$OMP END DO
     !___________________________________________________________________________
     ! The least upper bound for the correction factors
+!$OMP DO
     do n=1,myDim_nod2D
         ! if cavity cycle over
         if(ulevels_nod2D(n)>1) cycle !LK89140
@@ -619,11 +660,15 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
             icepminus(n)=0._WP
         end if
     end do
+!$OMP END DO
     ! pminus and pplus are to be known to neighbouting PE
+!$OMP MASTER
     call exchange_nod(icepminus, icepplus, partit)
-    
+!$OMP END MASTER
+!$OMP BARRIER
     !___________________________________________________________________________
     ! Limiting
+!$OMP DO
     do elem=1, myDim_elem2D
         ! if cavity cycle over
         if(ulevels(elem)>1) cycle !LK89140
@@ -639,14 +684,17 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         end do
         icefluxes(elem,:)=ae*icefluxes(elem,:)
     end do   
-  
+!$OMP END DO  
     !___________________________________________________________________________
     ! Update the solution 
     if(tr_array_id==1) then
+!$OMP DO
         do n=1,myDim_nod2D
             if(ulevels_nod2D(n)>1) cycle !LK89140
             m_ice(n)=m_icel(n)
-        end do      
+        end do
+!$OMP END DO
+!$OMP DO
         do elem=1, myDim_elem2D
             ! if cavity cycle over
             if(ulevels(elem)>1) cycle !LK89140
@@ -654,51 +702,30 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
             elnodes=elem2D_nodes(:,elem)
             do q=1,3
                 n=elnodes(q)  
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+                call omp_set_lock  (partit%plock(n))
+#else
+!$OMP ORDERED
+#endif
                 m_ice(n)=m_ice(n)+icefluxes(elem,q)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+                call omp_unset_lock(partit%plock(n))
+#else
+!$OMP END ORDERED
+#endif
             end do
-        end do   
+        end do
+!$OMP END DO
     end if
     
     if(tr_array_id==2) then
+!$OMP DO
         do n=1,myDim_nod2D
             if(ulevels_nod2D(n)>1) cycle !LK89140
             a_ice(n)=a_icel(n)
-        end do      
-        do elem=1, myDim_elem2D
-            ! if cavity cycle over
-            if(ulevels(elem)>1) cycle !LK89140
-            
-            elnodes=elem2D_nodes(:,elem)
-            do q=1,3
-                n=elnodes(q)  
-                a_ice(n)=a_ice(n)+icefluxes(elem,q)
-            end do
-        end do   
-    end if
-    
-    if(tr_array_id==3) then
-        do n=1,myDim_nod2D
-            if(ulevels_nod2D(n)>1) cycle !LK89140
-            m_snow(n)=m_snowl(n)
-        end do      
-        do elem=1, myDim_elem2D
-            ! if cavity cycle over
-            if(ulevels(elem)>1) cycle !LK89140
-            
-            elnodes=elem2D_nodes(:,elem)
-            do q=1,3
-                n=elnodes(q)  
-                m_snow(n)=m_snow(n)+icefluxes(elem,q)
-            end do
-        end do   
-    end if
-    
-#if defined (__oifs) || defined (__ifsinterface)
-    if(tr_array_id==4) then
-        do n=1,myDim_nod2D
-            if(ulevels_nod2D(n)>1) cycle !LK89140
-            ice_temp(n)=m_templ(n)
         end do
+!$OMP END DO
+!$OMP DO
         do elem=1, myDim_elem2D
             ! if cavity cycle over
             if(ulevels(elem)>1) cycle !LK89140
@@ -706,16 +733,91 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
             elnodes=elem2D_nodes(:,elem)
             do q=1,3
                 n=elnodes(q)
-                ice_temp(n)=ice_temp(n)+icefluxes(elem,q)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+                call omp_set_lock  (partit%plock(n))
+#else
+!$OMP ORDERED
+#endif
+                a_ice(n)=a_ice(n)+icefluxes(elem,q)
+#if defined(_OPENMP) && !defined(__openmp_reproducible) 
+                call omp_unset_lock(partit%plock(n))
+#else
+!$OMP END ORDERED
+#endif
             end do
         end do
+!$OMP END DO
+    end if
+    
+    if(tr_array_id==3) then
+!$OMP DO
+        do n=1,myDim_nod2D
+            if(ulevels_nod2D(n)>1) cycle !LK89140
+            m_snow(n)=m_snowl(n)
+        end do
+!$OMP END DO
+!$OMP DO
+        do elem=1, myDim_elem2D
+            ! if cavity cycle over
+            if(ulevels(elem)>1) cycle !LK89140
+            
+            elnodes=elem2D_nodes(:,elem)
+            do q=1,3
+                n=elnodes(q)  
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+                call omp_set_lock  (partit%plock(n))
+#else
+!$OMP ORDERED
+#endif
+                m_snow(n)=m_snow(n)+icefluxes(elem,q)
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+                call omp_unset_lock(partit%plock(n))
+#else
+!$OMP END ORDERED
+#endif
+            end do
+        end do
+!$OMP END DO
+    end if
+    
+#if defined (__oifs) || defined (__ifsinterface)
+    if(tr_array_id==4) then
+!$OMP DO
+        do n=1,myDim_nod2D
+            if(ulevels_nod2D(n)>1) cycle !LK89140
+            ice_temp(n)=m_templ(n)
+        end do
+!$OMP END DO
+!$OMP DO
+        do elem=1, myDim_elem2D
+            ! if cavity cycle over
+            if(ulevels(elem)>1) cycle !LK89140
+            
+            elnodes=elem2D_nodes(:,elem)
+            do q=1,3
+                n=elnodes(q)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+                call omp_set_lock  (partit%plock(n))
+#else
+!$OMP ORDERED
+#endif
+                ice_temp(n)=ice_temp(n)+icefluxes(elem,q)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+                call omp_unset_lock(partit%plock(n))
+#else
+!$OMP END ORDERED
+#endif
+            end do
+        end do
+!$OMP END DO
     end if
 #endif /* (__oifs) */ || defined (__ifsinterface)
-    
+!$OMP END PARALLEL    
     call exchange_nod(m_ice, a_ice, m_snow, partit)
 #if defined (__oifs) || defined (__ifsinterface)
     call exchange_nod(ice_temp, partit)
 #endif /* (__oifs) */
+!$OMP BARRIER
 end subroutine ice_fem_fct
 !
 !
@@ -731,11 +833,10 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
-    integer                             :: n, n1, n2, row
-    integer                             :: elem, elnodes(3), q, offset, col, ipos 
-    integer, allocatable                :: col_pos(:)
+    integer                             :: n, k, row
+    integer                             :: elem, elnodes(3), q, offset, ipos 
     real(kind=WP)                       :: aa
-    integer                             :: flag=0,iflag=0
+    integer                             :: flag=0, iflag=0
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: mass_matrix
@@ -746,8 +847,8 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
     mass_matrix => ice%work%fct_massmatrix(:)
     !
     ! a)
-    allocate(col_pos(myDim_nod2D+eDim_nod2D))
-    
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, row, elem, elnodes, q, offset, ipos, aa)
+!$OMP DO
     DO elem=1,myDim_elem2D
         elnodes=elem2D_nodes(:,elem) 
         
@@ -757,26 +858,40 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
             if(row>myDim_nod2D) cycle
             !___________________________________________________________________
             ! Global-to-local neighbourhood correspondence  
-            DO q=1,nn_num(row)
-                col_pos(nn_pos(q,row))=q
-            END DO 
+            ! we have to modify col_pos construction for OMP compatibility. The MPI version might become a bit slower :(
+            ! loop over number of neghbouring nodes of node-row
             offset=ssh_stiff%rowptr(row)-ssh_stiff%rowptr(1)
-            DO q=1,3 
-                col=elnodes(q)
-                !_______________________________________________________________
-                ! if element is cavity cycle over
-                if(ulevels(elem)>1) cycle
-                
-                ipos=offset+col_pos(col)
-                mass_matrix(ipos)=mass_matrix(ipos)+elem_area(elem)/12.0_WP
-                if(q==n) then                     
-                    mass_matrix(ipos)=mass_matrix(ipos)+elem_area(elem)/12.0_WP
-                end if
-            END DO
+            do q=1, 3
+               !_______________________________________________________________
+               ! if element is cavity cycle over
+               if(ulevels(elem)>1) cycle
+               do k=1, nn_num(row)
+                  if (nn_pos(k,row)==elnodes(q)) then
+                     ipos=offset+k
+                     exit
+                  end if
+                  if (k==nn_num(row)) write(*,*) 'FATAL ERROR'
+               end do
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+               call omp_set_lock  (partit%plock(row)) ! it shall be sufficient to block writing into the same row of SSH_stiff
+#else
+!$OMP ORDERED
+#endif
+               mass_matrix(ipos)=mass_matrix(ipos)+elem_area(elem)/12.0_WP
+               if(q==n) then
+                   mass_matrix(ipos)=mass_matrix(ipos)+elem_area(elem)/12.0_WP
+               end if
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+               call omp_unset_lock(partit%plock(row))
+#else 
+!$OMP END ORDERED
+#endif
+           END DO
         end do
     END DO
-  
+!$OMP END DO
     ! TEST: area==sum of row entries in mass_matrix:
+!$OMP DO
     DO q=1,myDim_nod2D
         ! if cavity cycle over
         if(ulevels_nod2d(q)>1) cycle
@@ -787,17 +902,31 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
         aa=sum(mass_matrix(offset:n))  
         !!PS if(abs(area(1,q)-aa)>.1_WP) then
         if(abs(area(ulevels_nod2d(q),q)-aa)>.1_WP) then
+!$OMP CRITICAL
             iflag=q
             flag=1
+!$OMP END CRITICAL
         endif
     END DO
+!$OMP END DO
+!$OMP END PARALLEL
     if(flag>0) then
         offset=ssh_stiff%rowptr(iflag)-ssh_stiff%rowptr(1)+1
         n=ssh_stiff%rowptr(iflag+1)-ssh_stiff%rowptr(1)
-        aa=sum(mass_matrix(offset:n))
+#if !defined(__openmp_reproducible)
+        aa=0
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:aa)
+!$OMP DO
+        do row=offset, n
+           aa=aa+mass_matrix(row)
+        end do
+!$OMP END DO
+!$OMP END PARALLEL
+#else
+     aa = sum(mass_matrix(offset:n))
+#endif
         write(*,*) '#### MASS MATRIX PROBLEM', mype, iflag, aa, area(1,iflag), ulevels_nod2D(iflag)
     endif
-    deallocate(col_pos)
 END SUBROUTINE ice_mass_matrix_fill
 !
 !
@@ -865,7 +994,8 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
         rhs_tempdiv(row)=0.0_WP        
 #endif /* (__oifs) */
     end do
-    
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(diff, entries, um, vm, vol, dx, dy, n, q, row, elem, elnodes, c1, c2, c3, c4, cx1, cx2, cx3, cx4, entries2)
+!$OMP DO
     do elem=1,myDim_elem2D          !assembling rhs over elements
         elnodes=elem2D_nodes(:,elem)
         
@@ -906,6 +1036,11 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 #endif /* (__oifs) */
 
             !___________________________________________________________________
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+                call omp_set_lock  (partit%plock(row))
+#else
+!$OMP ORDERED
+#endif
             rhs_m(row)=rhs_m(row)+sum(entries*m_ice(elnodes))+cx1
             rhs_a(row)=rhs_a(row)+sum(entries*a_ice(elnodes))+cx2
             rhs_ms(row)=rhs_ms(row)+sum(entries*m_snow(elnodes))+cx3
@@ -920,8 +1055,15 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
             rhs_tempdiv(row)=rhs_tempdiv(row)-cx4
 #endif /* (__oifs) */
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+                call omp_unset_lock(partit%plock(row))
+#else
+!$OMP END ORDERED
+#endif
         end do
     end do
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine ice_TG_rhs_div 
 !
 !
@@ -939,7 +1081,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
     type(t_partit), intent(inout), target   :: partit
     type(t_mesh)  , intent(in)   , target   :: mesh
     !___________________________________________________________________________
-    integer                                 :: n,i,clo,clo2,cn,location(100),row
+    integer                                 :: n,clo,clo2,cn,location(100),row
     real(kind=WP)                           :: rhs_new
     integer                                 :: num_iter_solve=3
     !___________________________________________________________________________
@@ -978,6 +1120,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
     !___________________________________________________________________________
     ! Does Taylor-Galerkin solution
     ! the first approximation
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
     do row=1,myDim_nod2D
         !! row=myList_nod2D(m)
         ! if cavity node skip it 
@@ -990,16 +1133,19 @@ subroutine ice_update_for_div(ice, partit, mesh)
         dm_temp(row)=rhs_tempdiv(row)/area(1,row)
 #endif /* (__oifs) */
     end do
+!$OMP END PARALLEL DO 
     call exchange_nod(dm_ice, partit)
     call exchange_nod(da_ice, partit)
     call exchange_nod(dm_snow, partit)
 #if defined (__oifs) || defined (__ifsinterface)
     call exchange_nod(dm_temp, partit)
 #endif /* (__oifs) */
-
+!$OMP BARRIER
     !___________________________________________________________________________
     !iterate 
     do n=1,num_iter_solve-1
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row, n, clo, clo2, cn, location, rhs_new)
+!$OMP DO
         do row=1,myDim_nod2D
             ! if cavity node skip it 
             if (ulevels_nod2d(row)>1) cycle
@@ -1022,6 +1168,8 @@ subroutine ice_update_for_div(ice, partit, mesh)
             m_templ(row)= dm_temp(row)+rhs_new/area(1,row)
 #endif /* (__oifs) */
         end do
+!$OMP END DO
+!$OMP DO
         do row=1,myDim_nod2D
             ! if cavity node skip it 
             if (ulevels_nod2d(row)>1) cycle
@@ -1032,18 +1180,26 @@ subroutine ice_update_for_div(ice, partit, mesh)
             dm_temp(row) = m_templ(row)
 #endif /* (__oifs) */
         end do
+!$OMP END DO
+!$OMP END PARALLEL
         call exchange_nod(dm_ice, partit)
         call exchange_nod(da_ice, partit)
         call exchange_nod(dm_snow, partit)
 #if defined (__oifs) || defined (__ifsinterface)
         call exchange_nod(dm_temp, partit)
 #endif /* (__oifs) */
+!$OMP BARRIER
     end do
-    m_ice   = m_ice+dm_ice
-    a_ice   = a_ice+da_ice
-    m_snow  = m_snow+dm_snow
+
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
+    do row=1, myDim_nod2D+eDim_nod2D
+       m_ice(row)   = m_ice (row)+dm_ice (row)
+       a_ice(row)   = a_ice (row)+da_ice (row)
+       m_snow(row)  = m_snow(row)+dm_snow(row)     
 #if defined (__oifs) || defined (__ifsinterface)
-    ice_temp= ice_temp+dm_temp
+       ice_temp(row)= ice_temp(row)+dm_temp(row)
 #endif /* (__oifs) */
+    end do
+!$OMP END PARALLEL DO 
 end subroutine ice_update_for_div
 ! =============================================================

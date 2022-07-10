@@ -11,8 +11,9 @@ target_include_directories(${LIB_TARGET} PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${C
 target_link_libraries(${LIB_TARGET} ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES})
 set_target_properties(${LIB_TARGET} PROPERTIES Fortran_MODULE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
+file(GLOB sources_pfunit RELATIVE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/*.pf)
 add_pfunit_ctest (${PROJECT_NAME}
-  TEST_SOURCES mpi_topology_module_tests.pf # must be a path relative to CMAKE_CURRENT_SOURCE_DIR, then the generated files will be placed in CMAKE_CURRENT_BINARY_DIR (see add_pfunit_ctest.cmake)
+  TEST_SOURCES ${sources_pfunit} # must be a path relative to CMAKE_CURRENT_SOURCE_DIR, then the generated files will be placed in CMAKE_CURRENT_BINARY_DIR (see add_pfunit_ctest.cmake)
   LINK_LIBRARIES ${LIB_TARGET}
   MAX_PES 6
   )

@@ -1,0 +1,747 @@
+module io_netcdf_file_module_tests
+  use io_netcdf_file_module
+  use funit; implicit none
+  
+  character(len=*), parameter :: TMPPATHPREFIX = "./io_netcdf_file_module_tests_DAEA1C34_F042_4243_AA88_273E4AA9D4A6__"
+  
+contains
+
+  ! utility procedure to grep a NetCDF file for a string
+  function is_in_file_header(filepath, searchtext) result(is_in)
+    character(len=*), intent(in) :: filepath
+    character(len=*), intent(in) :: searchtext
+    logical is_in
+    ! EO parameters
+    integer exitstat
+
+    call execute_command_line("ncdump -h -p9,17 "//filepath//" | grep -q '"//searchtext//"'", exitstat=exitstat)    
+    is_in = (exitstat == 0)
+  end function
+
+
+  ! utility procedure to grep a NetCDF file for a string
+  function is_in_file(filepath, searchtext) result(is_in)
+    character(len=*), intent(in) :: filepath
+    character(len=*), intent(in) :: searchtext
+    logical is_in
+    ! EO parameters
+    integer exitstat
+
+    call execute_command_line("ncdump -p9,17 "//filepath//" | grep -q '"//searchtext//"'", exitstat=exitstat)    
+    is_in = (exitstat == 0)
+  end function
+
+
+  @test
+  subroutine test_can_initialize_without_filepath()
+    type(netcdf_file_type) f
+    
+    call f%initialize()
+  end subroutine
+
+
+  @test
+  subroutine test_can_add_dims()
+    type(netcdf_file_type) f
+    integer nz_dimidx, node_dimidx
+
+    call f%initialize()
+    nz_dimidx = f%add_dim("nz", 47)
+    @assertEqual(1, nz_dimidx)
+    node_dimidx = f%add_dim("node", 47)
+    @assertEqual(2, node_dimidx)
+  end subroutine
+
+
+  @test
+  subroutine test_can_add_unlimited_dim()
+    type(netcdf_file_type) f
+    integer dimidx
+
+    call f%initialize()
+    dimidx = f%add_dim_unlimited("time")
+    @assertEqual(1, dimidx)
+  end subroutine
+
+
+  @test
+  subroutine test_can_query_ndims()
+    type(netcdf_file_type) f
+    integer nz_dimidx, node_dimidx
+
+    call f%initialize()
+    nz_dimidx = f%add_dim("nz", 48)
+    node_dimidx = f%add_dim("nz_1", 47)
+    
+    @assertEqual(2, f%ndims())
+    
+  end subroutine
+
+
+  @test
+  subroutine test_can_add_vars_with_attributes()
+    type(netcdf_file_type) f
+    integer nz_dimidx, node_dimidx
+    integer salt_varid
+
+    call f%initialize()
+    nz_dimidx = f%add_dim("nz", 47)
+    @assertEqual(1, nz_dimidx)
+    node_dimidx = f%add_dim("node", 47)
+    @assertEqual(2, node_dimidx)
+
+    salt_varid = f%add_var_real("salt", [1,2])
+    call f%add_var_att(salt_varid, "units", "psu")
+    call f%add_var_att(salt_varid, "long_name", "salinity")
+  end subroutine
+
+
+  @test
+  subroutine test_can_add_global_attribute_text()
+    type(netcdf_file_type) f
+
+    call f%initialize()
+    call f%add_global_att("FESOM_model", "FESOM2")
+  end subroutine
+
+
+  @test
+  subroutine test_can_add_global_attribute_int()
+    type(netcdf_file_type) f
+
+    call f%initialize()
+    call f%add_global_att("FESOM_force_rotation", 0)
+  end subroutine
+
+
+  @test
+  subroutine test_can_open_file_in_readmode_without_expecting_dims_and_vars()
+    type(netcdf_file_type) f
+
+    call f%initialize()
+    call f%open_read("fixtures/io_netcdf/columnwise_3d_salt.nc")
+    call f%close_file()
+  end subroutine
+
+
+  @test
+  subroutine test_can_open_file_with_unlimited_dim()
+    type(netcdf_file_type) f
+    integer dimidx
+
+    call f%initialize()
+    dimidx = f%add_dim_unlimited("time")
+
+    call f%open_read("fixtures/io_netcdf/columnwise_3d_salt.nc")
+    
+    call f%close_file()
+  end subroutine
+
+
+  @test
+  subroutine test_can_open_file_with_variable()
+    type(netcdf_file_type) f
+    integer nz_dimidx, node_dimidx, time_dimidx
+    integer salt_varid
+    call f%initialize()
+    nz_dimidx = f%add_dim("nz1", 3)
+    @assertEqual(1, nz_dimidx)
+    node_dimidx = f%add_dim("nod2", 5)
+    @assertEqual(2, node_dimidx)
+    time_dimidx = f%add_dim_unlimited("time")
+    @assertEqual(3, time_dimidx)
+
+    salt_varid = f%add_var_real("salt", [nz_dimidx,node_dimidx,time_dimidx])
+    call f%add_var_att(salt_varid, "units", "psu")
+    call f%add_var_att(salt_varid, "long_name", "salinity")
+    
+    call f%open_read("fixtures/io_netcdf/columnwise_3d_salt.nc")
+    
+    call f%close_file()
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_2d_variable_real4()
+    type(netcdf_file_type) f
+    real(4), allocatable :: values(:)
+    
+    integer node_dimidx, time_dimidx
+    integer sss_varindex
+    call f%initialize()
+    node_dimidx = f%add_dim("nod2", 5)
+    time_dimidx = f%add_dim_unlimited("time")
+
+    sss_varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
+    call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc")
+    
+    allocate(values(5))
+    call f%read_var(sss_varindex, [1,1], [5,1], values)
+    ! check level 1 values
+    @assertEqual(1.001, values(1), tolerance=1.e-6)  
+    @assertEqual(1.002, values(2), tolerance=1.e-6)  
+    @assertEqual(1.003, values(3), tolerance=1.e-6)  
+    @assertEqual(1.004, values(4), tolerance=1.e-6)  
+    @assertEqual(1.005, values(5), tolerance=1.e-6)  
+    
+    call f%close_file()
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_2d_variable_real8()
+    type(netcdf_file_type) f
+    real(8), allocatable :: values(:)
+    
+    integer node_dimidx, time_dimidx
+    integer sss_varindex
+    call f%initialize()
+    node_dimidx = f%add_dim("nod2", 5)
+    time_dimidx = f%add_dim_unlimited("time")
+
+    sss_varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
+    call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc")
+    
+    allocate(values(5))
+    call f%read_var(sss_varindex, [1,1], [5,1], values)
+    ! check level 1 values
+    @assertEqual(1.001, values(1), tolerance=1.e-6)  
+    @assertEqual(1.002, values(2), tolerance=1.e-6)  
+    @assertEqual(1.003, values(3), tolerance=1.e-6)  
+    @assertEqual(1.004, values(4), tolerance=1.e-6)  
+    @assertEqual(1.005, values(5), tolerance=1.e-6)  
+    
+    call f%close_file()
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_3d_variable_real4()
+    type(netcdf_file_type) f
+    real(4), allocatable :: values(:,:)
+    
+    integer node_dimidx, time_dimidx, z_dimidx
+    integer varindex
+
+    call f%initialize()
+    node_dimidx = f%add_dim("nod2", 5)
+    z_dimidx = f%add_dim("nz1", 3)
+    time_dimidx = f%add_dim_unlimited("time")
+
+    varindex = f%add_var_real("salt", [z_dimidx, node_dimidx,time_dimidx])
+    call f%open_read("fixtures/io_netcdf/columnwise_3d_salt.nc")
+    
+    allocate(values(3,5))
+    call f%read_var(varindex, [1,1,1], [3,5,1], values)
+    ! check level 1 values
+    @assertEqual(1.001, values(1,1), tolerance=1.e-6)  
+    @assertEqual(1.002, values(1,2), tolerance=1.e-6)  
+    @assertEqual(1.003, values(1,3), tolerance=1.e-6)  
+    @assertEqual(1.004, values(1,4), tolerance=1.e-6)  
+    @assertEqual(1.005, values(1,5), tolerance=1.e-6)  
+
+    ! check level 2 values
+    @assertEqual(2.001, values(2,1), tolerance=1.e-6)  
+    @assertEqual(2.002, values(2,2), tolerance=1.e-6)  
+    @assertEqual(2.003, values(2,3), tolerance=1.e-6)  
+    @assertEqual(2.004, values(2,4), tolerance=1.e-6)  
+    @assertEqual(2.005, values(2,5), tolerance=1.e-6)  
+    
+    call f%close_file()
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_3d_variable_real8()
+    type(netcdf_file_type) f
+    real(8), allocatable :: values(:,:)
+    
+    integer node_dimidx, time_dimidx, z_dimidx
+    integer varindex
+
+    call f%initialize()
+    node_dimidx = f%add_dim("nod2", 5)
+    z_dimidx = f%add_dim("nz1", 3)
+    time_dimidx = f%add_dim_unlimited("time")
+
+    varindex = f%add_var_real("salt", [z_dimidx, node_dimidx,time_dimidx])
+    call f%open_read("fixtures/io_netcdf/columnwise_3d_salt.nc")
+    
+    allocate(values(3,5))
+    call f%read_var(varindex, [1,1,1], [3,5,1], values)
+    ! check level 1 values
+    @assertEqual(1.001, values(1,1), tolerance=1.e-6)  
+    @assertEqual(1.002, values(1,2), tolerance=1.e-6)  
+    @assertEqual(1.003, values(1,3), tolerance=1.e-6)  
+    @assertEqual(1.004, values(1,4), tolerance=1.e-6)  
+    @assertEqual(1.005, values(1,5), tolerance=1.e-6)  
+
+    ! check level 2 values
+    @assertEqual(2.001, values(2,1), tolerance=1.e-6)  
+    @assertEqual(2.002, values(2,2), tolerance=1.e-6)  
+    @assertEqual(2.003, values(2,3), tolerance=1.e-6)  
+    @assertEqual(2.004, values(2,4), tolerance=1.e-6)  
+    @assertEqual(2.005, values(2,5), tolerance=1.e-6)  
+    
+    call f%close_file()
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_2d_variable_integer()
+    type(netcdf_file_type) f
+    integer, allocatable :: values(:)
+    
+    integer node_dimidx, time_dimidx
+    integer sss_varindex
+    call f%initialize()
+    node_dimidx = f%add_dim("nod2", 5)
+    time_dimidx = f%add_dim_unlimited("time")
+
+    sss_varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
+    call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc")
+    
+    allocate(values(5))
+    call f%read_var(sss_varindex, [1,2], [5,1], values)
+    ! check level 1 values
+    @assertEqual(10, values(1))  
+    @assertEqual(10, values(2))  
+    @assertEqual(10, values(3))  
+    @assertEqual(10, values(4))  
+    @assertEqual(10, values(5))  
+    
+    call f%close_file()
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_single_variable_integer()
+    type(netcdf_file_type) f
+    integer value
+    
+    integer node_dimidx, time_dimidx
+    integer sss_varindex
+    call f%initialize()
+    node_dimidx = f%add_dim("nod2", 5)
+    time_dimidx = f%add_dim_unlimited("time")
+
+    sss_varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
+    call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc")
+    
+    call f%read_var1(sss_varindex, [1,2], value)
+    ! check level 1 values
+    @assertEqual(10, value)
+    
+    call f%close_file()
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_single_variable_real4()
+    type(netcdf_file_type) f
+    real(4) value
+    
+    integer node_dimidx, time_dimidx
+    integer sss_varindex
+    call f%initialize()
+    node_dimidx = f%add_dim("nod2", 5)
+    time_dimidx = f%add_dim_unlimited("time")
+
+    sss_varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
+    call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc")
+    
+    call f%read_var1(sss_varindex, [1,2], value)
+    ! check level 1 values
+    @assertEqual(10.001, value, tolerance=1.e-6)
+    
+    call f%close_file()
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_single_variable_real8()
+    type(netcdf_file_type) f
+    real(8) value
+    
+    integer node_dimidx, time_dimidx
+    integer sss_varindex
+    call f%initialize()
+    node_dimidx = f%add_dim("nod2", 5)
+    time_dimidx = f%add_dim_unlimited("time")
+
+    sss_varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
+    call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc")
+    
+    call f%read_var1(sss_varindex, [1,2], value)
+    ! check level 1 values
+    @assertEqual(10.001_8, value, tolerance=1.e-6)
+    
+    call f%close_file()
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_variable_with_less_dims_than_in_file()
+    type(netcdf_file_type) f
+    real(8) value
+    
+    integer node_dimidx, time_dimidx, unused_dimidx
+    integer varindex
+    call f%initialize()
+    ! 2 dims in file
+    node_dimidx = f%add_dim("nod2", 5)
+    time_dimidx = f%add_dim_unlimited("time")
+
+    ! read var with 1 dim
+    varindex = f%add_var_double("time", [time_dimidx])
+    call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc")
+    
+    call f%read_var(varindex, [1], [1], value)
+    @assertEqual(10800.0_8, value, tolerance=1.e-6)  
+    
+    call f%close_file()
+  end subroutine
+
+
+  @test
+  subroutine test_can_create_empty_file()
+    type(netcdf_file_type) f
+    integer exitstat
+    character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_create_empty_file.nc"
+
+    call execute_command_line("rm -f "//filepath) ! silently remove the file if it exists from an aborted previous run
+
+    call f%initialize()
+    call f%open_write_create(filepath)
+    call f%close_file()
+    
+    ! test if the file has been written correctly
+    @assertTrue( is_in_file_header(filepath, '}') )
+
+    call execute_command_line("rm "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+  end subroutine
+
+
+  @test
+  subroutine test_can_create_file_with_global_attributes_text()
+    type(netcdf_file_type) f
+    integer exitstat
+    character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_create_file_with_global_attributes_text.nc"
+
+    call execute_command_line("rm -f "//filepath) ! silently remove the file if it exists from an aborted previous run
+
+    call f%initialize()
+    call f%add_global_att("FESOM_model", "FESOM2")
+    call f%open_write_create(filepath)
+    call f%close_file()
+    
+    ! test if the file has been written correctly
+    @assertTrue( is_in_file_header(filepath, ':FESOM_model = "FESOM2" ;') )
+
+    call execute_command_line("rm "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+  end subroutine
+
+
+  @test
+  subroutine test_can_create_file_with_global_attributes_int()
+    type(netcdf_file_type) f
+    integer exitstat
+    character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_create_file_with_global_attributes_int.nc"
+
+    call execute_command_line("rm -f "//filepath) ! silently remove the file if it exists from an aborted previous run
+
+    call f%initialize()
+    call f%add_global_att("FESOM_force_rotation", 0)
+    call f%open_write_create(filepath)
+    call f%close_file()
+    
+    ! test if the file has been written correctly
+    @assertTrue( is_in_file_header(filepath, ':FESOM_force_rotation = 0 ;') )
+
+    call execute_command_line("rm "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+  end subroutine
+
+
+  @test
+  subroutine test_can_create_file_with_dims_and_vars()
+    type(netcdf_file_type) f
+    integer z_dimidx, time_dimidx
+    integer varindex, time_varindex
+    integer exitstat
+    character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_create_file_with_dims_and_vars.nc"
+
+    call execute_command_line("rm -f "//filepath, exitstat=exitstat) ! silently remove the file if it exists from an aborted previous run
+
+    call f%initialize()
+    z_dimidx = f%add_dim("nz1", 3)
+    time_dimidx = f%add_dim_unlimited("time")
+    time_varindex = f%add_var_double("time", [time_dimidx])
+    varindex = f%add_var_real("salt", [z_dimidx, time_dimidx])
+    
+    call f%open_write_create(filepath)
+    call f%close_file()
+    
+    ! test if the file has been written correctly
+    @assertTrue( is_in_file_header(filepath, 'nz1 = 3 ;') )
+    @assertTrue( is_in_file_header(filepath, 'time = UNLIMITED') )
+    @assertTrue( is_in_file_header(filepath, 'double time(time) ;') )
+    @assertTrue( is_in_file_header(filepath, 'float salt(time, nz1) ;') )
+
+    call execute_command_line("rm "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+  end subroutine
+
+
+  @test
+  subroutine test_can_create_file_and_var_text_attributes()
+    type(netcdf_file_type) f
+    integer z_dimidx, time_dimidx
+    integer varindex
+    integer exitstat
+    character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_create_file_and_var_text_attributes.nc"
+    
+    call execute_command_line("rm -f "//filepath, exitstat=exitstat) ! silently remove the file if it exists from an aborted previous run
+
+    call f%initialize()
+    z_dimidx = f%add_dim("nz1", 3)
+    time_dimidx = f%add_dim_unlimited("time")
+    varindex = f%add_var_real("salt", [z_dimidx, time_dimidx])
+    call f%add_var_att(varindex, "units", "psu")
+    call f%add_var_att(varindex, "long_name", "sea surface salinity")
+    
+    call f%open_write_create(filepath)
+    call f%close_file()
+    
+    ! test if the file has been written correctly   
+    @assertTrue( is_in_file_header(filepath, 'salt:units = "psu"') )
+    @assertTrue( is_in_file_header(filepath, 'salt:long_name = "sea surface salinity"') )
+
+    call execute_command_line("rm "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+  end subroutine
+
+
+  @test
+  subroutine test_can_create_file_and_var_int_attributes()
+    type(netcdf_file_type) f
+    integer z_dimidx, time_dimidx
+    integer varindex
+    integer exitstat
+    character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_create_file_and_var_int_attributes.nc"
+    
+    call execute_command_line("rm -f "//filepath, exitstat=exitstat) ! silently remove the file if it exists from an aborted previous run
+
+    call f%initialize()
+    z_dimidx = f%add_dim("nz1", 3)
+    time_dimidx = f%add_dim_unlimited("time")
+    varindex = f%add_var_real("salt", [z_dimidx, time_dimidx])
+    call f%add_var_att(varindex, "number", 42)
+    
+    call f%open_write_create(filepath)
+    call f%close_file()
+    
+    ! test if the file has been written correctly   
+    @assertTrue( is_in_file_header(filepath, 'salt:number = 42 ;') )
+
+    call execute_command_line("rm "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+  end subroutine
+
+
+  @test
+  subroutine test_can_write_to_new_file_int()
+    type(netcdf_file_type) f
+    
+    integer time_dimidx
+    integer varindex, time_varindex
+    integer exitstat
+    character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_write_to_new_file_int.nc"
+
+    call f%initialize()
+    time_dimidx = f%add_dim_unlimited("time")
+
+    call execute_command_line("rm -f "//filepath, exitstat=exitstat) ! silently remove the file if it exists from an aborted previous run
+
+    time_varindex = f%add_var_double("time", [time_dimidx])
+    varindex = f%add_var_int("iter", [time_dimidx])
+    call f%open_write_create(filepath)
+    
+    call f%write_var(time_varindex, [1], [1], [10800.0_8])
+    call f%write_var(varindex, [1], [1], [42])
+    
+    call f%close_file()
+    
+    @assertTrue( is_in_file(filepath, 'iter = 42 ;') )
+
+    call execute_command_line("rm "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+  end subroutine
+
+
+  @test
+  subroutine test_can_append_to_existing_file_real4()
+    type(netcdf_file_type) f
+    real(4), allocatable :: values(:)
+    
+    integer node_dimidx, time_dimidx
+    integer varindex, time_varindex
+    integer exitstat
+    character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_append_to_existing_file_real4.nc"
+
+    call f%initialize()
+    node_dimidx = f%add_dim("nod2", 5)
+    time_dimidx = f%add_dim_unlimited("time")
+
+    call execute_command_line("rm -f "//filepath, exitstat=exitstat) ! silently remove the file if it exists from an aborted previous run
+
+    call execute_command_line("cp fixtures/io_netcdf/columnwise_2d_sss.nc "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+
+    time_varindex = f%add_var_double("time", [time_dimidx])
+    varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
+    call f%open_write_append(filepath)
+    
+    allocate(values(5))
+    values(1) = 100.001
+    values(2) = 100.002
+    values(3) = 100.003
+    values(4) = 100.004
+    values(5) = 100.005
+
+    ! the file has 2 timesteps, we append a 3rd one
+    call f%write_var(time_varindex, [3], [1], [32400.0_8])
+    call f%write_var(varindex, [1,3], [5,1], values)
+    
+    call f%close_file()
+    
+    ! test if the file has been written correctly
+    @assertTrue( is_in_file_header(filepath, 'time = UNLIMITED ; // (3 currently)') )
+    ! todo: check if the values have been written correctly
+    @assertTrue( is_in_file(filepath, '32400') )
+    @assertTrue( is_in_file(filepath, '100.00') )
+
+    call execute_command_line("rm "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+  end subroutine
+
+
+  @test
+  subroutine test_can_append_to_existing_file_real8()
+    type(netcdf_file_type) f
+    real(8), allocatable :: values(:)
+    
+    integer node_dimidx, time_dimidx
+    integer varindex, time_varindex
+    integer exitstat
+    character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_append_to_existing_file_real8.nc"
+
+    call f%initialize()
+    node_dimidx = f%add_dim("nod2", 5)
+    time_dimidx = f%add_dim_unlimited("time")
+
+    call execute_command_line("rm -f "//filepath, exitstat=exitstat) ! silently remove the file if it exists from an aborted previous run
+
+    call execute_command_line("cp fixtures/io_netcdf/columnwise_2d_sss.nc "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+
+    time_varindex = f%add_var_double("time", [time_dimidx])
+    varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
+    call f%open_write_append(filepath)
+    
+    allocate(values(5))
+    values(1) = 100.001_8
+    values(2) = 100.002_8
+    values(3) = 100.003_8
+    values(4) = 100.004_8
+    values(5) = 100.005_8
+
+    ! the file has 2 timesteps, we append a 3rd one
+    call f%write_var(time_varindex, [3], [1], [32400.0_8])
+    call f%write_var(varindex, [1,3], [5,1], values)
+    
+    call f%close_file()
+    
+    ! test if the file has been written correctly
+    @assertTrue( is_in_file_header(filepath, 'time = UNLIMITED ; // (3 currently)') )
+    ! todo: check if the values have been written correctly
+    @assertTrue( is_in_file(filepath, '32400') )
+    @assertTrue( is_in_file(filepath, '100.00') )
+
+    call execute_command_line("rm "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_var_shape_from_file()
+    type(netcdf_file_type) f
+    integer, allocatable :: varshape(:)
+    integer node_dimidx, time_dimidx
+    integer varindex
+    
+    call f%initialize()
+    node_dimidx = f%add_dim("nod2", 5)
+    time_dimidx = f%add_dim_unlimited("time")
+
+    varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
+    call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc")
+    
+    call f%read_var_shape(varindex, varshape)
+    @assertEqual([5,2], varshape)
+    call f%close_file()
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_var_shape_from_file_with_reverse_dim_index_order()
+    type(netcdf_file_type) f
+    integer, allocatable :: varshape(:)
+    integer node_dimidx, time_dimidx
+    integer varindex
+    
+    call f%initialize()
+    time_dimidx = f%add_dim_unlimited("time")
+    node_dimidx = f%add_dim("nod2", 5)
+    
+    varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
+    
+    call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc")
+    call f%read_var_shape(varindex, varshape)
+    @assertEqual([5,2], varshape)
+    call f%close_file()
+  end subroutine
+
+
+  @test
+  subroutine test_file_is_attached_is_false_after_initializing()
+    type(netcdf_file_type) f
+    
+    call f%initialize()
+    @assertFalse(f%is_attached())
+  end subroutine
+
+
+  @test
+  subroutine test_file_is_attached_is_true_after_opening_a_file()
+    type(netcdf_file_type) f
+    integer, allocatable :: varshape(:)
+    integer node_dimidx, time_dimidx
+    integer varindex
+    
+    call f%initialize()
+    time_dimidx = f%add_dim_unlimited("time")
+    node_dimidx = f%add_dim("nod2", 5)
+    
+    varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
+
+    call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc")
+    
+    call f%read_var_shape(varindex, varshape)
+    @assertTrue(f%is_attached())
+    call f%close_file()
+  end subroutine
+
+end module

@@ -319,7 +319,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     ! do vertical diffusion: explicit
-    if (.not. tracers%i_vert_diff) call diff_ver_part_expl_ale(tr_num, tracers, partit, mesh) 
+    if (.not. tracers%data(tr_num)%i_vert_diff) call diff_ver_part_expl_ale(tr_num, tracers, partit, mesh) 
     ! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
     ! derivatives and has to be computed explicitly!
     if (Redi) call diff_ver_part_redi_expl(tracers, partit, mesh)     
@@ -342,14 +342,13 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
     end do
 !$OMP END PARALLEL DO
     !___________________________________________________________________________
-    if (tracers%i_vert_diff) then
+    if (tracers%data(tr_num)%i_vert_diff) then
         ! do vertical diffusion: implicite 
         call diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh) 
-        
     end if
     !We DO not set del_ttf to zero because it will not be used in this timestep anymore
     !init_tracers_AB will set it to zero for the next timestep
-    if (tracers%smooth_bh_tra) then
+    if (tracers%data(tr_num)%smooth_bh_tra) then
        call diff_part_bh(tr_num, dynamics, tracers, partit, mesh)  ! alpply biharmonic diffusion (implemented as filter)                                                
     end if
 end subroutine diff_tracers_ale
@@ -1121,17 +1120,21 @@ subroutine diff_part_hor_redi(tracers, partit, mesh)
         nl12=max(nl1,nl2)
         ul12 = ul1
         if (ul2>0) ul12=min(ul1,ul2)
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_set_lock(partit%plock(enodes(1)))
+#else
+!$OMP ORDERED
 #endif
         del_ttf(ul12:nl12,enodes(1))=del_ttf(ul12:nl12,enodes(1))+rhs1(ul12:nl12)*dt/areasvol(ul12:nl12,enodes(1))
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(enodes(1)))
         call omp_set_lock  (partit%plock(enodes(2)))
 #endif
         del_ttf(ul12:nl12,enodes(2))=del_ttf(ul12:nl12,enodes(2))+rhs2(ul12:nl12)*dt/areasvol(ul12:nl12,enodes(2))
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(enodes(2)))
+#else
+!$OMP END ORDERED
 #endif
     end do
 !$OMP END DO
@@ -1156,8 +1159,9 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
     type(t_tracer), intent(inout), target    :: tracers
     type(t_mesh)  , intent(in)   , target    :: mesh
     type(t_partit), intent(inout), target    :: partit
-    integer                                  :: n, nz, ed, el(2), en(2), k, elem, nl1, ul1
-    real(kind=WP)                            :: u1, v1, len, vi, tt, ww 
+    integer                                  :: n, nz, ed, el(2), en(2), k, elem, nzmin, nzmax
+    integer                                  :: elnodes1(3), elnodes2(3)
+    real(kind=WP)                            :: u1, v1, len, vi, ww, tt(mesh%nl-1)
     real(kind=WP), pointer                   :: temporary_ttf(:,:)
     real(kind=WP), pointer                   :: UV(:,:,:)
     real(kind=WP), pointer                   :: ttf(:,:)
@@ -1165,6 +1169,8 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
+
+
     UV            => dynamics%uv(:,:,:)
     ttf           => tracers%data(tr_num)%values
     temporary_ttf => tracers%work%del_ttf !use already allocated working array. could be fct_LO instead etc.
@@ -1175,63 +1181,96 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
         end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, ed, el, en, k, elem, nl1, ul1, u1, v1, len, vi, tt, ww)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, ed, el, en, k, elem, nzmin, nzmax, u1, v1, len, vi, tt, ww, &
+!$OMP elnodes1, elnodes2)
 !$OMP DO
-    DO ed=1, myDim_edge2D+eDim_edge2D
-       if (myList_edge2D(ed)>edge2D_in) cycle
+    DO ed=1, myDim_edge2D!+eDim_edge2D
+       if (myList_edge2D(ed) > edge2D_in) cycle
        el=edge_tri(:,ed)
        en=edges(:,ed)
        len=sqrt(sum(elem_area(el)))
-       ul1=minval(ulevels_nod2D_max(en))
-       nl1=maxval(nlevels_nod2D_min(en))-1
-       DO  nz=ul1,nl1
-           u1=UV(1, nz,el(1))-UV(1, nz,el(2))
-           v1=UV(2, nz,el(1))-UV(2, nz,el(2))
+       nzmax = minval(nlevels(el))
+       nzmin = maxval(ulevels(el))
+       elnodes1=elem2d_nodes(:,el(1))
+       elnodes2=elem2d_nodes(:,el(2))
+       DO  nz=nzmin, nzmax-1
+           u1=maxval(ttf(nz, elnodes1))-minval(ttf(nz, elnodes2))
+           v1=minval(ttf(nz, elnodes1))-maxval(ttf(nz, elnodes2))
            vi=u1*u1+v1*v1
-           tt=ttf(nz,en(1))-ttf(nz,en(2))
-           vi=sqrt(max(dynamics%visc_gamma0,            &
-                   max(dynamics%visc_gamma1*sqrt(vi),   & 
-                   dynamics%visc_gamma2*vi)             &
-                  )*len)       
-           !vi=sqrt(max(sqrt(u1*u1+v1*v1),0.04)*le)  ! 10m^2/s for 10 km (0.04 h/50)
-           !vi=sqrt(10.*le)
-           tt=tt*vi
-           temporary_ttf(nz,en(1))=temporary_ttf(nz,en(1))-tt
-           temporary_ttf(nz,en(2))=temporary_ttf(nz,en(2))+tt
-       END DO 
+           tt(nz)=ttf(nz,en(1))-ttf(nz,en(2))
+           vi=sqrt(max(tracers%data(tr_num)%gamma0_tra,            &
+                   max(tracers%data(tr_num)%gamma1_tra*sqrt(vi),   & 
+                       tracers%data(tr_num)%gamma2_tra*     vi)    &
+                                                         )*len)       
+           tt(nz)=tt(nz)*vi
+       END DO
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+       call omp_set_lock  (partit%plock(en(1)))
+#else
+!$OMP ORDERED
+#endif
+       temporary_ttf(nzmin:nzmax-1,en(1))=temporary_ttf(nzmin:nzmax-1,en(1))-tt(nzmin:nzmax-1)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+       call omp_unset_lock(partit%plock(en(1)))
+       call omp_set_lock  (partit%plock(en(2)))
+#endif
+       temporary_ttf(nzmin:nzmax-1,en(2))=temporary_ttf(nzmin:nzmax-1,en(2))+tt(nzmin:nzmax-1)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+       call omp_unset_lock(partit%plock(en(2)))
+#else
+!$OMP END ORDERED
+#endif
     END DO
 !$OMP END DO
+!$OMP MASTER
     call exchange_nod(temporary_ttf, partit)
+!$OMP END MASTER
 !$OMP BARRIER
     ! ===========
     ! Second round: 
     ! ===========
 !$OMP DO
-    DO ed=1, myDim_edge2D+eDim_edge2D
+    DO ed=1, myDim_edge2D!+eDim_edge2D
        if (myList_edge2D(ed)>edge2D_in) cycle
           el=edge_tri(:,ed)
           en=edges(:,ed)
           len=sqrt(sum(elem_area(el)))
-          ul1=minval(ulevels_nod2D_max(en))
-          nl1=maxval(nlevels_nod2D_min(en))-1
-          DO  nz=ul1,nl1
-              u1=UV(1, nz,el(1))-UV(1, nz,el(2))
-              v1=UV(2, nz,el(1))-UV(2, nz,el(2))
+          nzmax = minval(nlevels(el))
+          nzmin = maxval(ulevels(el))
+          elnodes1=elem2d_nodes(:,el(1))
+          elnodes2=elem2d_nodes(:,el(2))
+          DO  nz=nzmin, nzmax-1
+              u1=maxval(ttf(nz, elnodes1))-minval(ttf(nz, elnodes2))
+              v1=minval(ttf(nz, elnodes1))-maxval(ttf(nz, elnodes2))
               vi=u1*u1+v1*v1
-              tt=temporary_ttf(nz,en(1))-temporary_ttf(nz,en(2))
-              vi=sqrt(max(dynamics%visc_gamma0,     &
-                      max(dynamics%visc_gamma1*sqrt(vi), &
-                      dynamics%visc_gamma2*vi)           &
-                     )*len)
-              !vi=sqrt(max(sqrt(u1*u1+v1*v1),0.04)*le)  ! 10m^2/s for 10 km (0.04 h/50)
-              !vi=sqrt(10.*le) 
-              tt=-tt*vi*dt
-              ttf(nz,en(1))=ttf(nz,en(1))-tt/area(nz,en(1))
-              ttf(nz,en(2))=ttf(nz,en(2))+tt/area(nz,en(2))
+              tt(nz)=temporary_ttf(nz,en(1))-temporary_ttf(nz,en(2))
+              vi=sqrt(max(tracers%data(tr_num)%gamma0_tra,            &
+                      max(tracers%data(tr_num)%gamma1_tra*sqrt(vi),   & 
+                          tracers%data(tr_num)%gamma2_tra*     vi)    &
+                                                            )*len)                    
+              tt(nz)=-tt(nz)*vi*dt
           END DO 
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+          call omp_set_lock  (partit%plock(en(1)))
+#else
+!$OMP ORDERED
+#endif
+          ttf(nzmin:nzmax-1,en(1))=ttf(nzmin:nzmax-1,en(1))-tt(nzmin:nzmax-1)/area(nzmin:nzmax-1,en(1))
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+          call omp_unset_lock(partit%plock(en(1)))
+          call omp_set_lock  (partit%plock(en(2)))
+#endif
+          ttf(nzmin:nzmax-1,en(2))=ttf(nzmin:nzmax-1,en(2))+tt(nzmin:nzmax-1)/area(nzmin:nzmax-1,en(2))
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+          call omp_unset_lock(partit%plock(en(2)))
+#else
+!$OMP END ORDERED
+#endif
     END DO
 !$OMP END DO
 !$OMP END PARALLEL
+call exchange_nod(ttf, partit)
+!$OMP BARRIER
 end subroutine diff_part_bh
 !
 !

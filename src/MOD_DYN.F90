@@ -27,10 +27,13 @@ TYPE T_SOLVERINFO
 !!!
     real(kind=WP), allocatable   :: rr(:), zz(:), pp(:), App(:)
     contains
-        procedure WRITE_T_SOLVERINFO
-        procedure READ_T_SOLVERINFO
-        generic :: write(unformatted) => WRITE_T_SOLVERINFO
-        generic :: read(unformatted)  => READ_T_SOLVERINFO
+#if defined(__PGI)
+    private
+#endif            
+    procedure WRITE_T_SOLVERINFO
+    procedure READ_T_SOLVERINFO
+    generic :: write(unformatted) => WRITE_T_SOLVERINFO
+    generic :: read(unformatted)  => READ_T_SOLVERINFO
 END TYPE T_SOLVERINFO
 !
 !
@@ -42,10 +45,13 @@ TYPE T_DYN_WORK
     ! easy backscatter contribution
     real(kind=WP), allocatable, dimension(:,:)   :: u_b, v_b
     contains
-        procedure WRITE_T_DYN_WORK
-        procedure READ_T_DYN_WORK
-        generic :: write(unformatted) => WRITE_T_DYN_WORK
-        generic :: read(unformatted)  => READ_T_DYN_WORK
+#if defined(__PGI)
+    private
+#endif            
+    procedure WRITE_T_DYN_WORK
+    procedure READ_T_DYN_WORK
+    generic :: write(unformatted) => WRITE_T_DYN_WORK
+    generic :: read(unformatted)  => READ_T_DYN_WORK
 END TYPE T_DYN_WORK
 !
 !
@@ -108,10 +114,13 @@ TYPE T_DYN
 
     !___________________________________________________________________________
     contains
-        procedure WRITE_T_DYN
-        procedure READ_T_DYN
-        generic :: write(unformatted) => WRITE_T_DYN
-        generic :: read(unformatted)  => READ_T_DYN
+#if defined(__PGI)
+     private
+#endif            
+     procedure WRITE_T_DYN
+     procedure READ_T_DYN
+     generic :: write(unformatted) => WRITE_T_DYN
+     generic :: read(unformatted)  => READ_T_DYN
 END TYPE T_DYN
 
 contains
@@ -201,28 +210,6 @@ subroutine WRITE_T_DYN(dynamics, unit, iostat, iomsg)
     character(*),         intent(inout)  :: iomsg
     
     !___________________________________________________________________________
-    call write_bin_array(dynamics%uv        , unit, iostat, iomsg)
-    call write_bin_array(dynamics%uv_rhs    , unit, iostat, iomsg)
-    call write_bin_array(dynamics%uv_rhsAB  , unit, iostat, iomsg)
-    call write_bin_array(dynamics%uvnode    , unit, iostat, iomsg)
-    
-    call write_bin_array(dynamics%w         , unit, iostat, iomsg)
-    call write_bin_array(dynamics%w_e       , unit, iostat, iomsg)
-    call write_bin_array(dynamics%w_i       , unit, iostat, iomsg)
-    call write_bin_array(dynamics%cfl_z     , unit, iostat, iomsg)
-    
-    if (Fer_GM) then
-        call write_bin_array(dynamics%fer_w , unit, iostat, iomsg)
-        call write_bin_array(dynamics%fer_uv, unit, iostat, iomsg)
-    end if 
-    
-    !___________________________________________________________________________
-    write(unit, iostat=iostat, iomsg=iomsg) dynamics%work
-    
-    !___________________________________________________________________________
-    write(unit, iostat=iostat, iomsg=iomsg) dynamics%solverinfo
-    
-    !___________________________________________________________________________
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%opt_visc
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%visc_gamma0
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%visc_gamma1
@@ -238,6 +225,27 @@ subroutine WRITE_T_DYN(dynamics, unit, iostat, iomsg)
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%use_wsplit
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%wsplit_maxcfl
     
+    !___________________________________________________________________________
+    write(unit, iostat=iostat, iomsg=iomsg) dynamics%solverinfo
+    
+    !___________________________________________________________________________
+    write(unit, iostat=iostat, iomsg=iomsg) dynamics%work
+    
+    !___________________________________________________________________________
+    call write_bin_array(dynamics%uv        , unit, iostat, iomsg)
+    call write_bin_array(dynamics%uv_rhs    , unit, iostat, iomsg)
+    call write_bin_array(dynamics%uv_rhsAB  , unit, iostat, iomsg)
+    call write_bin_array(dynamics%uvnode    , unit, iostat, iomsg)
+    call write_bin_array(dynamics%w         , unit, iostat, iomsg)
+    call write_bin_array(dynamics%w_e       , unit, iostat, iomsg)
+    call write_bin_array(dynamics%w_i       , unit, iostat, iomsg)
+    call write_bin_array(dynamics%cfl_z     , unit, iostat, iomsg)
+    if (Fer_GM) then
+        call write_bin_array(dynamics%fer_w , unit, iostat, iomsg)
+        call write_bin_array(dynamics%fer_uv, unit, iostat, iomsg)
+    end if 
+    
+    
 end subroutine WRITE_T_DYN
 
 subroutine READ_T_DYN(dynamics, unit, iostat, iomsg)
@@ -246,25 +254,6 @@ subroutine READ_T_DYN(dynamics, unit, iostat, iomsg)
     integer,              intent(in)     :: unit
     integer,              intent(out)    :: iostat
     character(*),         intent(inout)  :: iomsg
-    
-    !___________________________________________________________________________
-    call read_bin_array(dynamics%uv        , unit, iostat, iomsg)
-    call read_bin_array(dynamics%uv_rhs    , unit, iostat, iomsg)
-    call read_bin_array(dynamics%uv_rhsAB  , unit, iostat, iomsg)
-    call read_bin_array(dynamics%uvnode    , unit, iostat, iomsg)
-    
-    call read_bin_array(dynamics%w         , unit, iostat, iomsg)
-    call read_bin_array(dynamics%w_e       , unit, iostat, iomsg)
-    call read_bin_array(dynamics%w_i       , unit, iostat, iomsg)
-    call read_bin_array(dynamics%cfl_z     , unit, iostat, iomsg)
-    
-    if (Fer_GM) then
-        call read_bin_array(dynamics%fer_w     , unit, iostat, iomsg)
-        call read_bin_array(dynamics%fer_uv    , unit, iostat, iomsg)
-    end if
-    
-    !___________________________________________________________________________
-    read(unit, iostat=iostat, iomsg=iomsg) dynamics%work
     
     !___________________________________________________________________________
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%opt_visc
@@ -281,6 +270,26 @@ subroutine READ_T_DYN(dynamics, unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%use_freeslip
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%use_wsplit
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%wsplit_maxcfl
+    
+    !___________________________________________________________________________
+    read(unit, iostat=iostat, iomsg=iomsg) dynamics%solverinfo
+    
+    !___________________________________________________________________________
+    read(unit, iostat=iostat, iomsg=iomsg) dynamics%work
+    
+    !___________________________________________________________________________
+    call read_bin_array(dynamics%uv        , unit, iostat, iomsg)
+    call read_bin_array(dynamics%uv_rhs    , unit, iostat, iomsg)
+    call read_bin_array(dynamics%uv_rhsAB  , unit, iostat, iomsg)
+    call read_bin_array(dynamics%uvnode    , unit, iostat, iomsg)
+    call read_bin_array(dynamics%w         , unit, iostat, iomsg)
+    call read_bin_array(dynamics%w_e       , unit, iostat, iomsg)
+    call read_bin_array(dynamics%w_i       , unit, iostat, iomsg)
+    call read_bin_array(dynamics%cfl_z     , unit, iostat, iomsg)
+    if (Fer_GM) then
+        call read_bin_array(dynamics%fer_w     , unit, iostat, iomsg)
+        call read_bin_array(dynamics%fer_uv    , unit, iostat, iomsg)
+    end if
     
 end subroutine READ_T_DYN
 

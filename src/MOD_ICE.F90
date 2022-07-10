@@ -18,6 +18,9 @@ TYPE T_ICE_DATA
     integer                                     :: ID
     !___________________________________________________________________________
     contains
+#if defined(__PGI)
+    private
+#endif            
         procedure WRITE_T_ICE_DATA
         procedure READ_T_ICE_DATA
         generic :: write(unformatted) => WRITE_T_ICE_DATA
@@ -38,6 +41,9 @@ TYPE T_ICE_WORK
     real(kind=WP), allocatable, dimension(:)    :: ice_strength, inv_areamass, inv_mass
     !___________________________________________________________________________
     contains
+#if defined(__PGI)
+    private
+#endif            
         procedure WRITE_T_ICE_WORK
         procedure READ_T_ICE_WORK
         generic :: write(unformatted) => WRITE_T_ICE_WORK
@@ -82,6 +88,9 @@ TYPE T_ICE_THERMO
     real(kind=WP) :: albim = 0.68      !         melting ice
     real(kind=WP) :: albw  = 0.066     !         open water, LY2004
     contains
+#if defined(__PGI)
+    private
+#endif            
         procedure WRITE_T_ICE_THERMO
         procedure READ_T_ICE_THERMO
         generic :: write(unformatted) => WRITE_T_ICE_THERMO
@@ -104,6 +113,9 @@ TYPE T_ICE_ATMCOUPL
 #endif /* (__oifs)  */
     !___________________________________________________________________________
     contains
+#if defined(__PGI)
+    private
+#endif            
         procedure WRITE_T_ICE_ATMCOUPL
         procedure READ_T_ICE_ATMCOUPL
         generic :: write(unformatted) => WRITE_T_ICE_ATMCOUPL
@@ -190,6 +202,9 @@ TYPE T_ICE
     logical                   :: ice_update = .true.
     !___________________________________________________________________________
     contains
+#if defined(__PGI)
+    private
+#endif            
         procedure WRITE_T_ICE
         procedure READ_T_ICE
         generic :: write(unformatted) => WRITE_T_ICE
@@ -363,31 +378,6 @@ subroutine WRITE_T_ICE(ice, unit, iostat, iomsg)
     character(*),           intent(inout)  :: iomsg
     integer                                :: i
     !___________________________________________________________________________
-    call write_bin_array(ice%uice, unit, iostat, iomsg)
-    call write_bin_array(ice%uice_rhs, unit, iostat, iomsg)
-    call write_bin_array(ice%uice_old, unit, iostat, iomsg)
-    if (ice%whichEVP /= 0) call write_bin_array(ice%uice_aux, unit, iostat, iomsg)
-    call write_bin_array(ice%vice, unit, iostat, iomsg)
-    call write_bin_array(ice%vice_rhs, unit, iostat, iomsg)
-    call write_bin_array(ice%vice_old, unit, iostat, iomsg)
-    if (ice%whichEVP /= 0) call write_bin_array(ice%vice_aux, unit, iostat, iomsg)
-    call write_bin_array(ice%stress_atmice_x, unit, iostat, iomsg)
-    call write_bin_array(ice%stress_iceoce_x, unit, iostat, iomsg)
-    call write_bin_array(ice%stress_atmice_y, unit, iostat, iomsg)
-    call write_bin_array(ice%stress_iceoce_y, unit, iostat, iomsg)
-    call write_bin_array(ice%srfoce_u, unit, iostat, iomsg)
-    call write_bin_array(ice%srfoce_v, unit, iostat, iomsg)
-    call write_bin_array(ice%srfoce_temp, unit, iostat, iomsg)
-    call write_bin_array(ice%srfoce_salt, unit, iostat, iomsg)
-    call write_bin_array(ice%srfoce_ssh, unit, iostat, iomsg)
-    call write_bin_array(ice%flx_fw, unit, iostat, iomsg)
-    call write_bin_array(ice%flx_h, unit, iostat, iomsg)
-        if (ice%whichEVP > 0) then
-        call write_bin_array(ice%alpha_evp_array, unit, iostat, iomsg)
-        call write_bin_array(ice%beta_evp_array, unit, iostat, iomsg)
-    end if     
-
-    !___________________________________________________________________________
     write(unit, iostat=iostat, iomsg=iomsg) ice%num_itracers
     do i=1, ice%num_itracers
        write(unit, iostat=iostat, iomsg=iomsg) ice%data(i)
@@ -422,6 +412,32 @@ subroutine WRITE_T_ICE(ice, unit, iostat, iomsg)
     write(unit, iostat=iostat, iomsg=iomsg) ice%Tevp_inv
     write(unit, iostat=iostat, iomsg=iomsg) ice%ice_steps_since_upd
     write(unit, iostat=iostat, iomsg=iomsg) ice%ice_update
+    
+    !___________________________________________________________________________
+    call write_bin_array(ice%uice           , unit, iostat, iomsg)
+    call write_bin_array(ice%uice_rhs       , unit, iostat, iomsg)
+    call write_bin_array(ice%uice_old       , unit, iostat, iomsg)
+    if (ice%whichEVP /= 0) call write_bin_array(ice%uice_aux        , unit, iostat, iomsg)
+    call write_bin_array(ice%vice           , unit, iostat, iomsg)
+    call write_bin_array(ice%vice_rhs       , unit, iostat, iomsg)
+    call write_bin_array(ice%vice_old       , unit, iostat, iomsg)
+    if (ice%whichEVP /= 0) call write_bin_array(ice%vice_aux        , unit, iostat, iomsg)
+    call write_bin_array(ice%stress_atmice_x, unit, iostat, iomsg)
+    call write_bin_array(ice%stress_iceoce_x, unit, iostat, iomsg)
+    call write_bin_array(ice%stress_atmice_y, unit, iostat, iomsg)
+    call write_bin_array(ice%stress_iceoce_y, unit, iostat, iomsg)
+    call write_bin_array(ice%srfoce_u       , unit, iostat, iomsg)
+    call write_bin_array(ice%srfoce_v       , unit, iostat, iomsg)
+    call write_bin_array(ice%srfoce_temp    , unit, iostat, iomsg)
+    call write_bin_array(ice%srfoce_salt    , unit, iostat, iomsg)
+    call write_bin_array(ice%srfoce_ssh     , unit, iostat, iomsg)
+    call write_bin_array(ice%flx_fw         , unit, iostat, iomsg)
+    call write_bin_array(ice%flx_h          , unit, iostat, iomsg)
+    if (ice%whichEVP > 0) then
+        call write_bin_array(ice%alpha_evp_array        , unit, iostat, iomsg)
+        call write_bin_array(ice%beta_evp_array         , unit, iostat, iomsg)
+    end if     
+    
 end subroutine WRITE_T_ICE
 
 ! Unformatted reading for T_ICE
@@ -432,32 +448,10 @@ subroutine READ_T_ICE(ice, unit, iostat, iomsg)
     integer,                intent(out)    :: iostat
     character(*),           intent(inout)  :: iomsg
     integer                                :: i
-    !___________________________________________________________________________
-    call read_bin_array(ice%uice, unit, iostat, iomsg)
-    call read_bin_array(ice%uice_rhs, unit, iostat, iomsg)
-    call read_bin_array(ice%uice_old, unit, iostat, iomsg)
-    if (ice%whichEVP /= 0) call read_bin_array(ice%uice_aux, unit, iostat, iomsg)
-    call read_bin_array(ice%vice, unit, iostat, iomsg)
-    call read_bin_array(ice%vice_rhs, unit, iostat, iomsg)
-    call read_bin_array(ice%vice_old, unit, iostat, iomsg)
-    if (ice%whichEVP /= 0) call read_bin_array(ice%vice_aux, unit, iostat, iomsg)
-    call read_bin_array(ice%stress_atmice_x, unit, iostat, iomsg)
-    call read_bin_array(ice%stress_iceoce_x, unit, iostat, iomsg)
-    call read_bin_array(ice%stress_atmice_y, unit, iostat, iomsg)
-    call read_bin_array(ice%stress_iceoce_y, unit, iostat, iomsg)
-    call read_bin_array(ice%srfoce_u, unit, iostat, iomsg)
-    call read_bin_array(ice%srfoce_v, unit, iostat, iomsg)
-    call read_bin_array(ice%srfoce_temp, unit, iostat, iomsg)
-    call read_bin_array(ice%srfoce_salt, unit, iostat, iomsg)
-    call read_bin_array(ice%srfoce_ssh, unit, iostat, iomsg)
-    call read_bin_array(ice%flx_fw, unit, iostat, iomsg)
-    call read_bin_array(ice%flx_h, unit, iostat, iomsg)
-    if (ice%whichEVP > 0) then
-        call read_bin_array(ice%alpha_evp_array, unit, iostat, iomsg)
-        call read_bin_array(ice%beta_evp_array, unit, iostat, iomsg)
-    end if     
+    
     !___________________________________________________________________________
     read(unit, iostat=iostat, iomsg=iomsg) ice%num_itracers
+    if (.not. allocated(ice%data)) allocate(ice%data(ice%num_itracers))
     do i=1, ice%num_itracers
        read(unit, iostat=iostat, iomsg=iomsg) ice%data(i)
     end do
@@ -491,6 +485,32 @@ subroutine READ_T_ICE(ice, unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg) ice%Tevp_inv
     read(unit, iostat=iostat, iomsg=iomsg) ice%ice_steps_since_upd
     read(unit, iostat=iostat, iomsg=iomsg) ice%ice_update
+    
+    !___________________________________________________________________________
+    call read_bin_array(ice%uice            , unit, iostat, iomsg)
+    call read_bin_array(ice%uice_rhs        , unit, iostat, iomsg)
+    call read_bin_array(ice%uice_old        , unit, iostat, iomsg)
+    if (ice%whichEVP /= 0) call read_bin_array(ice%uice_aux     , unit, iostat, iomsg)
+    call read_bin_array(ice%vice            , unit, iostat, iomsg)
+    call read_bin_array(ice%vice_rhs        , unit, iostat, iomsg)
+    call read_bin_array(ice%vice_old        , unit, iostat, iomsg)
+    if (ice%whichEVP /= 0) call read_bin_array(ice%vice_aux     , unit, iostat, iomsg)
+    call read_bin_array(ice%stress_atmice_x , unit, iostat, iomsg)
+    call read_bin_array(ice%stress_iceoce_x , unit, iostat, iomsg)
+    call read_bin_array(ice%stress_atmice_y , unit, iostat, iomsg)
+    call read_bin_array(ice%stress_iceoce_y , unit, iostat, iomsg)
+    call read_bin_array(ice%srfoce_u        , unit, iostat, iomsg)
+    call read_bin_array(ice%srfoce_v        , unit, iostat, iomsg)
+    call read_bin_array(ice%srfoce_temp     , unit, iostat, iomsg)
+    call read_bin_array(ice%srfoce_salt     , unit, iostat, iomsg)
+    call read_bin_array(ice%srfoce_ssh      , unit, iostat, iomsg)
+    call read_bin_array(ice%flx_fw          , unit, iostat, iomsg)
+    call read_bin_array(ice%flx_h           , unit, iostat, iomsg)
+    if (ice%whichEVP > 0) then
+        call read_bin_array(ice%alpha_evp_array     , unit, iostat, iomsg)
+        call read_bin_array(ice%beta_evp_array      , unit, iostat, iomsg)
+    end if     
+    
 end subroutine READ_T_ICE
 END MODULE MOD_ICE
 !

@@ -62,7 +62,8 @@ module io_MEANDATA
 !
 !--------------------------------------------------------------------------------------------
 !
-  integer, save                  :: io_listsize=0
+  integer, save                  :: io_listsize   =0
+  logical, save                  :: vec_autorotate=.FALSE.
   type io_entry
         CHARACTER(len=15)        :: id        ='unknown   '
         INTEGER                  :: freq      =0
@@ -112,12 +113,12 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
   integer,dimension(15)     :: sel_forcvar=0
   character(len=10)         :: id_string
 
-  type(t_mesh)  , intent(in)   , target :: mesh
+  type(t_mesh), intent(in) , target :: mesh
   type(t_partit), intent(inout), target :: partit
   type(t_tracer), intent(in)   , target :: tracers
   type(t_dyn)   , intent(in)   , target :: dynamics
   type(t_ice)   , intent(in)   , target :: ice
-  namelist /nml_listsize/ io_listsize
+  namelist /nml_general / io_listsize, vec_autorotate
   namelist /nml_list    / io_list
 
 #include "associate_part_def.h"
@@ -134,7 +135,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
      stop
   endif
-  READ(nm_io_unit, nml=nml_listsize, iostat=iost )
+  READ(nm_io_unit, nml=nml_general,  iostat=iost )
   allocate(io_list(io_listsize))
   READ(nm_io_unit, nml=nml_list,     iostat=iost )
   close(nm_io_unit )
@@ -316,15 +317,19 @@ CASE ('slope_z   ')
 CASE ('N2        ')
     call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'N2',        'brunt väisälä',      '1/s2', bvfreq(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('Kv        ')
-    call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'Kv',        'vertical diffusivity Kv',  'm2/s', Kv(:,:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'Kv',        'vertical diffusivity Kv',  'm2/s', Kv(:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('u         ')
-    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u',         'horizontal velocity','m/s',  dynamics%uv(1,:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u',         'horizontal velocity','m/s',           dynamics%uv(1,:,:),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('v         ')
-    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v',         'meridional velocity','m/s',  dynamics%uv(2,:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v',         'meridional velocity','m/s',           dynamics%uv(2,:,:),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('unod      ')
+    call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/),'unod',      'horizontal velocity at nodes', 'm/s', dynamics%uvnode(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('vnod      ')
+    call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/),'vnod',      'meridional velocity at nodes', 'm/s', dynamics%uvnode(2,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('w         ')
-    call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'w',         'vertical velocity',  'm/s',  dynamics%w(:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'w',         'vertical velocity',  'm/s',           dynamics%w(:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('Av        ')
-    call def_stream((/nl,   elem2D/), (/nl,   myDim_elem2D/), 'Av',        'vertical viscosity Av',  'm2/s', Av(:,:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream((/nl,   elem2D/), (/nl,   myDim_elem2D/), 'Av',        'vertical viscosity Av',  'm2/s',      Av(:,:),                io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('u_dis_tend')
     if(dynamics%opt_visc==8) then
     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u_dis_tend',    'horizontal velocity viscosity tendency', 'm/s', UV_dis_tend(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -429,9 +434,7 @@ END DO
      call def_stream((/nl,  elem2D/),  (/nl,     myDim_elem2D/), 'av_dvdz', 'int(Av * dv/dz)',        'm3/s2',   av_dvdz(:,:),    1, 'm', i_real4, partit, mesh)
      call def_stream((/nl,  elem2D/),  (/nl,     myDim_elem2D/), 'av_dudz_sq',  'Av * (du/dz)^2',     'm^2/s^3', av_dudz_sq(:,:), 1, 'm', i_real4, partit, mesh)
      call def_stream((/nl,   elem2D/), (/nl,     myDim_elem2D/), 'Av',    'Vertical mixing A',         'm2/s',            Av(:,:), 1, 'm', i_real4, partit, mesh)
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/),  'unod',  'horizontal velocity at nodes', 'm/s', dynamics%uvnode(1,:,:), 1, 'm', i_real8, partit, mesh)
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/),  'vnod',  'meridional velocity at nodes', 'm/s', dynamics%uvnode(2,:,:), 1, 'm', i_real8, partit, mesh)
-    
+   
      call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'um',  'horizontal velocity', 'm/s', dynamics%uv(1,:,:),     1, 'm', i_real4, partit, mesh)
      call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'vm',  'meridional velocity', 'm/s', dynamics%uv(2,:,:),     1, 'm', i_real4, partit, mesh)
      call def_stream((/nl, nod2D/),    (/nl,     myDim_nod2D/),  'wm',  'vertical velocity',   'm/s', dynamics%w(:,:),     1, 'm', i_real8, partit, mesh)
@@ -538,7 +541,7 @@ END DO
         call def_stream(nod2D , myDim_nod2D , 'ch',    'transfer coeff. sensible heat', '',     ch_atm_oce_arr(:), 1, 'm', i_real4, partit, mesh)
         call def_stream(nod2D , myDim_nod2D , 'ce',    'transfer coeff. evaporation ' , '',     ce_atm_oce_arr(:), 1, 'm', i_real4, partit, mesh)
 #if defined (__oasis)
-        call def_stream(nod2D,  myDim_nod2D,  'subli', 'sublimation',                   'm/s',  sublimation(:),   1, 'm',  i_real4,  mesh)
+        call def_stream(nod2D,  myDim_nod2D,  'subli', 'sublimation',                   'm/s',  sublimation(:),   1, 'm',  i_real4, partit, mesh)
 #endif
     end if
     
@@ -595,7 +598,7 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
   use o_PARAM
 
   implicit none
-  character(2000)            :: att_text
+  character(2000)               :: att_text
   type(t_mesh)  , intent(in) :: mesh
   type(t_partit), intent(in) :: partit
   type(t_dyn)   , intent(in) :: dynamics
@@ -644,10 +647,8 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
   call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'stored_direction', len_trim('increasing'), trim('increasing')), __LINE__)
   
   call assert_nf( nf_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), entry%ndim+1, (/entry%dimid(entry%ndim:1:-1), entry%recID/), entry%varID), __LINE__)
-!CHUNKING stuff (netcdf libraries not always compited with it)
-!if (entry%ndim==2) then
-!     call assert_nf( nf_def_var_chunking(entry%ncid, entry%varID, NF_CHUNKED, (/1, entry%glsize(1)/)), __LINE__);
-!  end if
+
+
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'description', len_trim(entry%description), entry%description), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'long_name', len_trim(entry%description), entry%description), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'units',       len_trim(entry%units),       entry%units), __LINE__)
@@ -668,16 +669,16 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
 ! call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_lim', len_trim(tra_adv_lim), trim(tra_adv_lim)), __LINE__)
  
  
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell' , NF_INT, 1,  use_partial_cell), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'force_rotation'   , NF_INT, 1,  force_rotation), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell', NF_INT, 1,  use_partial_cell), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'force_rotation', NF_INT, 1,  force_rotation), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'include_fleapyear', NF_INT, 1,  include_fleapyear), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_floatice'     , NF_INT, 1,  use_floatice), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_floatice', NF_INT, 1,  use_floatice), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'whichEVP'         , NF_INT, 1,  ice%whichEVP), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'evp_rheol_steps'  , NF_INT, 1,  ice%evp_rheol_steps), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'opt_visc'         , NF_INT, 1,  dynamics%opt_visc), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_wsplit'       , NF_INT, 1,  dynamics%use_wsplit), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell' , NF_INT, 1,  use_partial_cell), __LINE__)
- 
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell', NF_INT, 1,  use_partial_cell), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'autorotate_back_to_geo', NF_INT, 1,  vec_autorotate), __LINE__)
  
  
   
@@ -723,10 +724,11 @@ subroutine write_mean(entry, entry_index)
   use io_gather_module
   implicit none
   type(Meandata), intent(inout) :: entry
-  integer,        intent(in)    :: entry_index
-  integer                       :: tag
+  integer, intent(in) :: entry_index
+  integer tag
   integer                       :: i, size1, size2, size_gen, size_lev, order
   integer                       :: c, lev
+  integer mpierr
 
 
   ! Serial output implemented so far
@@ -744,6 +746,10 @@ subroutine write_mean(entry, entry_index)
        if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(size2))
      end if
      do lev=1, size1
+#ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
+        ! aleph cray-mpich workaround
+        call MPI_Barrier(entry%comm, mpierr)
+#endif
        if(.not. entry%is_elem_based) then
          call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
        else
@@ -764,6 +770,10 @@ subroutine write_mean(entry, entry_index)
        if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(size2))
      end if
      do lev=1, size1
+#ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
+        ! aleph cray-mpich workaround
+        call MPI_Barrier(entry%comm, mpierr)
+#endif
        if(.not. entry%is_elem_based) then
          call gather_real4_nod2D (entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
        else
@@ -778,6 +788,7 @@ subroutine write_mean(entry, entry_index)
         end if
      end do
   end if
+
 end subroutine
 
 
@@ -786,6 +797,7 @@ subroutine update_means
   type(Meandata), pointer :: entry
   integer                 :: n
   integer                 :: I, J
+
   DO n=1, io_NSTREAMS
      entry=>io_stream(n)
 !_____________ compute in 8 byte accuracy _________________________
@@ -827,7 +839,7 @@ subroutine update_means
 !$OMP END PARALLEL DO
         END IF
      END IF
-    entry%addcounter=entry%addcounter+1
+     entry%addcounter=entry%addcounter+1
   END DO
 end subroutine
 !
@@ -852,22 +864,22 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
   integer       :: i, j !for OMP loops
   logical       :: do_output
   type(Meandata), pointer :: entry
-  type(t_mesh)  , intent(in)   , target :: mesh
+  type(t_mesh), intent(in) , target :: mesh
   type(t_partit), intent(inout), target :: partit
   type(t_tracer), intent(in)   , target :: tracers
   type(t_dyn)   , intent(in)   , target :: dynamics
   type(t_ice)   , intent(inout), target :: ice
   
-  character(:),   allocatable           :: filepath
-  real(real64)                          :: rtime !timestamp of the record
+  character(:), allocatable :: filepath
+  real(real64)                  :: rtime !timestamp of the record
 
   ctime=timeold+(dayold-1.)*86400
   if (lfirst) then
      call ini_mean_io(ice, dynamics, tracers, partit, mesh)
+     call init_io_gather(partit)
 #if defined (__icepack)
      call init_io_icepack(mesh) !icapack has its copy of p_partit => partit
 #endif
-     call init_io_gather(partit)
   end if
 
   call update_means
@@ -900,7 +912,7 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
      endif
 
      if (do_output) then
-
+        if (vec_autorotate) call io_r2g(n, partit, mesh) ! automatically detect if a vector field and rotate if makes sense!
         if(entry%thread_running) call entry%thread%join()
         entry%thread_running = .false.
 
@@ -969,7 +981,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
   integer, intent(in) :: entry_index
   ! EO args
-  type(Meandata), pointer               :: entry
+  type(Meandata), pointer :: entry
 
 
   entry=>io_stream(entry_index)
@@ -1010,7 +1022,8 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   type(t_mesh), intent(in), target     :: mesh
   logical, optional, intent(in)        :: flip_array
   integer i
-
+ 
+#if !defined(__PGI)  
   do i = 1, rank(data)
     if ((ubound(data, dim = i)<=0)) then
       if (partit%mype==0) then
@@ -1020,6 +1033,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
       return
     end if    
   end do
+#endif
 
   if (partit%mype==0) then
      write(*,*) 'adding I/O stream 3D for ', trim(name)
@@ -1075,7 +1089,8 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   type(t_mesh),          intent(in)    :: mesh
   type(t_partit),        intent(inout) :: partit
   integer i
-  
+
+#if !defined(__PGI)   
   do i = 1, rank(data)
     if ((ubound(data, dim = i)<=0)) then
       if (partit%mype==0) then
@@ -1085,6 +1100,7 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
       return
     end if    
   end do
+#endif
 
   if (partit%mype==0) then
      write(*,*) 'adding I/O stream 2D for ', trim(name)
@@ -1093,7 +1109,7 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   call associate_new_stream(name, entry)
   
   ! 2d specific
-  entry%ptr3(1:1,1:size(data)) => data
+  entry%ptr3(1:1,1:size(data)) => data(:)
 
   if (accuracy == i_real8) then
     allocate(entry%local_values_r8(1, lcsize))
@@ -1108,13 +1124,14 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
 
   entry%dimname(1)=mesh_dimname_from_dimsize(glsize, partit, mesh)
   entry%dimname(2)='unknown'
+
   ! non dimension specific
   call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh)
 end subroutine
 
 
   subroutine associate_new_stream(name, entry)
-    type(Meandata),   pointer    :: entry
+    type(Meandata), pointer :: entry
     character(len=*), intent(in) :: name
     integer i
 
@@ -1142,12 +1159,12 @@ end subroutine
     USE MOD_PARTIT
     USE MOD_PARSUP
     use io_netcdf_workaround_module
-    type(Meandata),        intent(inout)  :: entry
-    character(len=*),      intent(in)     :: name, description, units
-    integer,               intent(in)     :: freq
-    character,             intent(in)     :: freq_unit
-    integer,               intent(in)     :: accuracy
-    type(t_mesh),   intent(in),    target :: mesh
+    type(Meandata), intent(inout) :: entry
+    character(len=*),      intent(in)    :: name, description, units
+    integer,               intent(in)    :: freq
+    character,             intent(in)    :: freq_unit
+    integer,               intent(in)    :: accuracy
+    type(t_mesh), intent(in), target     :: mesh
     type(t_partit), intent(inout), target :: partit
     ! EO args
     logical async_netcdf_allowed
@@ -1236,5 +1253,79 @@ end subroutine
     end if
   end subroutine
 
-end module
 
+  subroutine io_r2g(n, partit, mesh)
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE g_rotate_grid
+    implicit none
+    integer,        intent(in)            :: n
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+    integer                               :: I, J
+    type(Meandata), pointer               :: entry_x, entry_y
+    real(kind=WP)                         :: temp_x, temp_y
+    real(kind=WP)                         :: xmean, ymean
+    logical                               :: do_rotation
+
+    if (n==io_NSTREAMS) RETURN
+    entry_x=>io_stream(n)
+    entry_y=>io_stream(n+1)
+    IF (.NOT. (entry_x%freq_unit==entry_y%freq_unit) .and. ((entry_x%freq==entry_y%freq))) RETURN
+    IF (entry_x%accuracy /= entry_y%accuracy) RETURN
+    do_rotation=.FALSE.
+! we need to improve the logistic here in order to use this routinely. a new argument in def_stream
+! will be needed.
+    IF ((trim(entry_x%name)=='u'       ) .AND. ((trim(entry_y%name)=='v'       ))) do_rotation=.TRUE.
+    IF ((trim(entry_x%name)=='uice'    ) .AND. ((trim(entry_y%name)=='vice'    ))) do_rotation=.TRUE.
+    IF ((trim(entry_x%name)=='unod'    ) .AND. ((trim(entry_y%name)=='vnod'    ))) do_rotation=.TRUE.
+    IF ((trim(entry_x%name)=='tau_x'   ) .AND. ((trim(entry_y%name)=='tau_y   '))) do_rotation=.TRUE.
+    IF ((trim(entry_x%name)=='atmice_x') .AND. ((trim(entry_y%name)=='atmice_y'))) do_rotation=.TRUE.
+    IF ((trim(entry_x%name)=='atmoce_x') .AND. ((trim(entry_y%name)=='atmoce_y'))) do_rotation=.TRUE.    
+    IF ((trim(entry_x%name)=='iceoce_x') .AND. ((trim(entry_y%name)=='iceoce_y'))) do_rotation=.TRUE.    
+
+    IF (.NOT. (do_rotation)) RETURN
+   
+    IF (partit%mype==0) THEN
+       write(*,*) trim(entry_x%name)//' and '//trim(entry_y%name)//' will be rotated before output!'
+    END IF
+
+    IF ((entry_x%accuracy == i_real8) .AND. (entry_y%accuracy == i_real8)) THEN
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J, xmean, ymean)
+    DO J=1, size(entry_x%local_values_r8,dim=2)
+       if (entry_x%is_elem_based) then
+          xmean=sum(mesh%coord_nod2D(1, mesh%elem2D_nodes(:, J)))/3._WP
+          ymean=sum(mesh%coord_nod2D(2, mesh%elem2D_nodes(:, J)))/3._WP
+       else
+          xmean=mesh%coord_nod2D(1, J)
+          ymean=mesh%coord_nod2D(2, J)
+       end if
+       DO I=1, size(entry_x%local_values_r8,dim=1)
+          call vector_r2g(entry_x%local_values_r8(I,J), entry_y%local_values_r8(I,J), xmean, ymean, 0)
+       END DO
+    END DO
+!$OMP END PARALLEL DO
+    END IF
+
+    IF ((entry_x%accuracy == i_real4) .AND. (entry_y%accuracy == i_real4)) THEN
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J, temp_x, temp_y, xmean, ymean)
+    DO J=1, size(entry_x%local_values_r4,dim=2)
+       if (entry_x%is_elem_based) then
+          xmean=sum(mesh%coord_nod2D(1, mesh%elem2D_nodes(:, J)))/3._WP
+          ymean=sum(mesh%coord_nod2D(2, mesh%elem2D_nodes(:, J)))/3._WP
+       else
+          xmean=mesh%coord_nod2D(1, J)
+          ymean=mesh%coord_nod2D(2, J)
+       end if
+       DO I=1, size(entry_x%local_values_r4,dim=1)
+          temp_x=real(entry_x%local_values_r4(I,J), real64)
+          temp_y=real(entry_y%local_values_r4(I,J), real64)
+          call vector_r2g(temp_x, temp_y, xmean, ymean, 0)
+          entry_x%local_values_r4(I,J)=real(temp_x, real32)
+          entry_y%local_values_r4(I,J)=real(temp_y, real32)
+       END DO
+    END DO
+!$OMP END PARALLEL DO
+    END IF
+  end subroutine
+end module
