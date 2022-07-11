@@ -313,7 +313,7 @@ subroutine init_bottom_elem_thickness(partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     use o_ARRAYS
-    use g_config,only: use_partial_cell, partial_cell_thresh
+    use g_config,only: use_partial_cell, partial_cell_thresh, use_depthonelem
     use g_comm_auto
     use g_support
     implicit none
@@ -336,10 +336,15 @@ subroutine init_bottom_elem_thickness(partit, mesh)
     if(use_partial_cell) then 
         !Adjust the thickness of elemental bottom cells
         do elem=1, myDim_elem2D
-            elnodes=elem2D_nodes(:,elem) 
             
-            ! elemental topographic depth
-            dd=sum(depth(elnodes))/3.0_WP
+            !___________________________________________________________________
+            if (use_depthonelem) then 
+                dd=depth(elem)
+            else
+                elnodes=elem2D_nodes(:,elem) 
+                ! elemental topographic depth
+                dd=sum(depth(elnodes))/3.0_WP
+            end if 
             
             ! number of full depth levels at elem
             nle=nlevels(elem)
@@ -551,7 +556,7 @@ subroutine init_surface_elem_depth(partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     use o_ARRAYS
-    use g_config,only: use_cavity, use_cavity_partial_cell, cavity_partial_cell_thresh
+    use g_config,only: use_cavity, use_cavity_partial_cell, cavity_partial_cell_thresh, use_cavityonelem
     use g_comm_auto
     use g_support
     implicit none
@@ -580,14 +585,19 @@ subroutine init_surface_elem_depth(partit, mesh)
             if (ule==1) cycle
             
             !___________________________________________________________________
-            elnodes=elem2D_nodes(:,elem) 
-            
-            !___________________________________________________________________
             ! elemental cavity depth
             if (use_cavity_partial_cell) then 
-                dd=sum(cavity_depth(elnodes))/3.0_WP
+            
+                !_______________________________________________________________
+                if (use_cavityonelem) then 
+                    dd=cavity_depth(elem)
+                else
+                    elnodes=elem2D_nodes(:,elem) 
+                    ! elemental cavity depth
+                    dd=sum(cavity_depth(elnodes))/3.0_WP
+                end if 
                 
-                !___________________________________________________________________
+                !_______________________________________________________________
                 ! Only apply Surface Partial Cells when the initial full cell surface
                 ! layer thickness is above the treshhold cavity_partial_cell_thresh
                 if (zbar(ule)-zbar(ule+1)<=cavity_partial_cell_thresh) then
