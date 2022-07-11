@@ -287,9 +287,9 @@ subroutine iceberg_step1(mesh, ib, height_ib,length_ib,width_ib, lon_deg,lat_deg
  use g_config, only: steps_per_ib_step
  !=
 #ifdef use_cavity
- use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, melted	!=
+ use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, melted, grounded !, length_ib, width_ib
 #else
- use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, melted			!=
+ use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, melted, grounded !, length_ib, width_ib
 #endif
  												!=
  implicit none											!=
@@ -602,7 +602,7 @@ subroutine get_total_iceberg_area(mesh, iceberg_elem, area_ib_tot)
  USE MOD_MESH
  use g_parsup		!for myDim_elem2D, myList_nod2D						!=
  use g_rotate_grid	!for subroutine g2r, logfile_outfreq					!=
- use iceberg_params, only: arr_block, elem_block, max_ib_in_elem, length_ib, width_ib
+ use iceberg_params, only: arr_block, elem_block, length_ib, width_ib
  
  implicit none											!=
  
@@ -646,9 +646,9 @@ subroutine iceberg_step2(mesh, arr, elem_from_block, ib, height_ib,length_ib,wid
  use g_config, only: steps_per_ib_step
 !=
 #ifdef use_cavity
- use iceberg_params, only: smallestvol_icb, buoy_props, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, ascii_out, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem	!=
+ use iceberg_params, only: smallestvol_icb, buoy_props, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, ascii_out, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, elem_block
 #else
- use iceberg_params, only: smallestvol_icb, buoy_props, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, ascii_out, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale		!=
+ use iceberg_params, only: smallestvol_icb, buoy_props, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, ascii_out, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, elem_block
 #endif
  												!=
  implicit none											!=
