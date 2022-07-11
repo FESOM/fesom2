@@ -35,7 +35,10 @@ subroutine prepare_icb2fesom(mesh, ib,i_have_element,localelement,depth_ib)
     use i_arrays
     use iceberg_params
 
-    integer   			:: iceberg_node  
+    logical                 :: i_have_element
+    real                    :: depth_ib
+    integer                 :: localelement
+    integer                 :: iceberg_node  
     integer, dimension(3)   :: ib_nods_in_ib_elem
     integer                 :: num_ib_nods_in_ib_elem
 type(t_mesh), intent(in) , target :: mesh
@@ -89,7 +92,7 @@ type(t_mesh), intent(in) , target :: mesh
             ib_nods_in_ib_elem(i)   = 0
         end if
     end do
-end subroutine prepare_icb2fesom
+end subroutine get_iceberg_nodes_for_element
 
 
 subroutine icb2fesom(mesh)
