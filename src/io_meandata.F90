@@ -565,6 +565,22 @@ function mesh_dimname_from_dimsize(size, mesh) result(name)
     if (mype==0) write(*,*) 'WARNING: unknown dimension in mean I/O with size of ', size
   end if
 end function
+
+
+function skip_level_in_output(lvl) result(should_skip)
+  integer lvl
+  logical should_skip
+  ! EO parameters
+  integer keep_nth_level
+  
+  keep_nth_level = 1 ! todo: use a value from namelist
+
+  if(mod((lvl-1),keep_nth_level) .ne. 0) then
+    should_skip = .true.
+  else
+    should_skip = .false.
+  end if
+end function
 !
 !--------------------------------------------------------------------------------------------
 !
