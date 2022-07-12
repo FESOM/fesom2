@@ -160,7 +160,9 @@ set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 if(${ENABLE_OPENMP} AND NOT ${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray)
    target_compile_options(${PROJECT_NAME} PRIVATE ${OpenMP_Fortran_FLAGS}) # currently we only have OpenMP in the Fortran part
    target_link_libraries(${PROJECT_NAME} OpenMP::OpenMP_Fortran)
-   target_link_libraries(${PROJECT_NAME} -mp=gpu)
+   if(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
+      target_link_libraries(${PROJECT_NAME} -mp=gpu)
+   endif()
 endif()
 
 
