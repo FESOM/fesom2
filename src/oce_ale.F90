@@ -313,7 +313,7 @@ subroutine init_bottom_elem_thickness(partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     use o_ARRAYS
-    use g_config,only: use_partial_cell, partial_cell_thresh
+    use g_config,only: use_partial_cell, partial_cell_thresh, use_depthonelem
     use g_comm_auto
     use g_support
     implicit none
@@ -336,10 +336,15 @@ subroutine init_bottom_elem_thickness(partit, mesh)
     if(use_partial_cell) then 
         !Adjust the thickness of elemental bottom cells
         do elem=1, myDim_elem2D
-            elnodes=elem2D_nodes(:,elem) 
             
-            ! elemental topographic depth
-            dd=sum(depth(elnodes))/3.0_WP
+            !___________________________________________________________________
+            if (use_depthonelem) then 
+                dd=depth(elem)
+            else
+                elnodes=elem2D_nodes(:,elem) 
+                ! elemental topographic depth
+                dd=sum(depth(elnodes))/3.0_WP
+            end if 
             
             ! number of full depth levels at elem
             nle=nlevels(elem)
@@ -551,7 +556,7 @@ subroutine init_surface_elem_depth(partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     use o_ARRAYS
-    use g_config,only: use_cavity, use_cavity_partial_cell, cavity_partial_cell_thresh
+    use g_config,only: use_cavity, use_cavity_partial_cell, cavity_partial_cell_thresh, use_cavityonelem
     use g_comm_auto
     use g_support
     implicit none
@@ -580,14 +585,19 @@ subroutine init_surface_elem_depth(partit, mesh)
             if (ule==1) cycle
             
             !___________________________________________________________________
-            elnodes=elem2D_nodes(:,elem) 
-            
-            !___________________________________________________________________
             ! elemental cavity depth
             if (use_cavity_partial_cell) then 
-                dd=sum(cavity_depth(elnodes))/3.0_WP
+            
+                !_______________________________________________________________
+                if (use_cavityonelem) then 
+                    dd=cavity_depth(elem)
+                else
+                    elnodes=elem2D_nodes(:,elem) 
+                    ! elemental cavity depth
+                    dd=sum(cavity_depth(elnodes))/3.0_WP
+                end if 
                 
-                !___________________________________________________________________
+                !_______________________________________________________________
                 ! Only apply Surface Partial Cells when the initial full cell surface
                 ! layer thickness is above the treshhold cavity_partial_cell_thresh
                 if (zbar(ule)-zbar(ule+1)<=cavity_partial_cell_thresh) then
@@ -1596,12 +1606,16 @@ subroutine update_stiff_mat_ale(partit, mesh)
                 ! In the computation above, I've used rules from ssh_rhs (where it is 
                 ! on the rhs. So the sign is changed in the expression below.
                 ! npos... sparse matrix indices position of node points elnodes
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
                    call omp_set_lock  (partit%plock(row)) ! it shall be sufficient to block writing into the same row of SSH_stiff
+#else
+!$OMP ORDERED
 #endif
                    SSH_stiff%values(npos)=SSH_stiff%values(npos) + fy*factor
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
                    call omp_unset_lock(partit%plock(row))
+#else
+!$OMP END ORDERED
 #endif                
             end do ! --> do i=1,2
         end do ! --> do j=1,2 
@@ -1714,17 +1728,21 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
         
         !_______________________________________________________________________
         ! calc netto "flux"
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call   omp_set_lock(partit%plock(enodes(1)))
+#else
+!$OMP ORDERED
 #endif
         ssh_rhs(enodes(1))=ssh_rhs(enodes(1))+(c1+c2)
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(enodes(1)))
         call   omp_set_lock(partit%plock(enodes(2)))
 #endif
         ssh_rhs(enodes(2))=ssh_rhs(enodes(2))-(c1+c2)
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(enodes(2)))
+#else
+!$OMP END ORDERED
 #endif
 
     end do
@@ -1854,17 +1872,21 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
             end do
         end if
         !_______________________________________________________________________
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call   omp_set_lock(partit%plock(enodes(1)))
+#else
+!$OMP ORDERED
 #endif
         ssh_rhs_old(enodes(1))=ssh_rhs_old(enodes(1))+(c1+c2)
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(enodes(1)))
         call   omp_set_lock(partit%plock(enodes(2)))
 #endif
         ssh_rhs_old(enodes(2))=ssh_rhs_old(enodes(2))-(c1+c2)
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(enodes(2)))
+#else
+!$OMP END ORDERED
 #endif
     end do
 !$OMP END DO
@@ -2013,14 +2035,16 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
                 c2(nz)=(fer_UV(2,nz,el(1))*deltaX1- fer_UV(1,nz,el(1))*deltaY1)*helem(nz,el(1))
             end if
         end do
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_set_lock  (partit%plock(enodes(1)))
+#else
+!$OMP ORDERED
 #endif
         Wvel       (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+c1(nzmin:nzmax)
         if (Fer_GM) then
            fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+c2(nzmin:nzmax)
         end if
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(enodes(1)))
         call omp_set_lock  (partit%plock(enodes(2)))
 #endif
@@ -2028,8 +2052,10 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
         if (Fer_GM) then
            fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-c2(nzmin:nzmax)
         end if
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(enodes(2)))
+#else
+!$OMP END ORDERED
 #endif
         !_______________________________________________________________________
         ! if ed is not a boundary edge --> calc div(u_vec*h) for every layer
@@ -2045,14 +2071,16 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
                     c2(nz)=-(fer_UV(2,nz,el(2))*deltaX2-fer_UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
                 end if
             end do
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
             call omp_set_lock  (partit%plock(enodes(1)))
+#else
+!$OMP ORDERED
 #endif
             Wvel       (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+c1(nzmin:nzmax)
             if (Fer_GM) then
                fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+c2(nzmin:nzmax)
             end if
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
             call omp_unset_lock(partit%plock(enodes(1)))
             call omp_set_lock  (partit%plock(enodes(2)))
 #endif
@@ -2060,8 +2088,10 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
             if (Fer_GM) then
                fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-c2(nzmin:nzmax)
             end if
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
             call omp_unset_lock(partit%plock(enodes(2)))
+#else
+!$OMP END ORDERED
 #endif
         end if
     end do ! --> do ed=1, myDim_edge2D
@@ -2862,6 +2892,9 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
     integer           :: node
+!NR
+    integer, save     :: n_check=0
+    real(kind=8)      :: temp_check, sali_check
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer :: eta_n
@@ -3124,5 +3157,21 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         write(*,*)
         write(*,*)
     end if
+
+
+!NR Checksum for tracers, as they are most sensitive
+
+    n_check = n_check+1
+    temp_check = 0.
+    sali_check = 0.  
+    do node=1,myDim_nod2D+eDim_nod2D
+        temp_check = temp_check + sum(tracers%data(1)%values(nlevels_nod2D(node)-1:ulevels_nod2D(node),node))
+        sali_check = sali_check + sum(tracers%data(2)%values(nlevels_nod2D(node)-1:ulevels_nod2D(node),node))
+    end do
+    call MPI_Allreduce(MPI_IN_PLACE, temp_check, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+    call MPI_Allreduce(MPI_IN_PLACE, sali_check, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+
+    print *,'Check',n_check,temp_check,sali_check
+
 end subroutine oce_timestep_ale
 
