@@ -139,6 +139,9 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
    endif()
    if(${ENABLE_OPENMP})
       target_compile_options(${PROJECT_NAME} PRIVATE -Mipa=fast)
+      # OMPGPU
+      target_compile_options(${PROJECT_NAME} PRIVATE -Minfo=mp,accel)
+      set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/ice_EVP.F90 PROPERTIES COMPILE_OPTIONS "-mp=gpu")
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE -Mipa=fast,inline)
    endif()
@@ -157,6 +160,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 if(${ENABLE_OPENMP} AND NOT ${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray)
    target_compile_options(${PROJECT_NAME} PRIVATE ${OpenMP_Fortran_FLAGS}) # currently we only have OpenMP in the Fortran part
    target_link_libraries(${PROJECT_NAME} OpenMP::OpenMP_Fortran)
+   target_link_libraries(${PROJECT_NAME} -mp=gpu)
 endif()
 
 
