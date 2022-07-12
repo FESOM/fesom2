@@ -369,7 +369,8 @@ subroutine EVPdynamics(ice, partit, mesh)
     end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+!$OMP TARGET TEAMS DISTRIBUTE PARALLEL DO DEFAULT(SHARED) PRIVATE(n) map(to:ulevels_nod2d,m_ice,area,a_ice,m_snow) map(from:rhs_a,rhs_m,inv_mass,inv_areamass)
+! todo: copy ulevels_nod2d only once, I think it does not change after ocean setup
     do n=1,myDim_nod2D 
         !_______________________________________________________________________
         ! if cavity node skip it 
@@ -393,7 +394,6 @@ subroutine EVPdynamics(ice, partit, mesh)
         rhs_a(n)=0.0_WP       ! these are used as temporal storage here
         rhs_m(n)=0.0_WP       ! for the contribution due to ssh
     enddo
-!$OMP END PARALLEL DO
 
     !___________________________________________________________________________
     use_pice=0
