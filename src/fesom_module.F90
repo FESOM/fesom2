@@ -43,6 +43,7 @@ module fesom_main_storage_module
   type :: fesom_main_storage_type
 
     integer           :: n, from_nstep, offset, row, i, provided
+    integer           :: which_readr ! read which restart files (0=netcdf, 1=core dump,2=dtype)
     integer, pointer  :: mype, npes, MPIerr, MPI_COMM_FESOM
     real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
     real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
@@ -91,10 +92,12 @@ contains
       ! EO parameters
       logical mpi_is_initialized
 
+#if !defined  __ifsinterface
       if(command_argument_count() > 0) then
         call command_line_options%parse()
         stop
       end if
+#endif
       
       mpi_is_initialized = .false.
       f%fesom_did_mpi_init = .false.
@@ -112,7 +115,7 @@ contains
     
 
 #if defined (__oasis)
-        call cpl_oasis3mct_init(partit%MPI_COMM_FESOM)
+        call cpl_oasis3mct_init(f%partit,f%partit%MPI_COMM_FESOM)
 #endif
         f%t1 = MPI_Wtime()
 
@@ -206,20 +209,14 @@ contains
         call clock_newyear                        ! check if it is a new year
         if (f%mype==0) f%t6=MPI_Wtime()
         !___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
-        ! The interface to the restart module is made via call restart !
-        ! The inputs are: istep, l_write, l_create
-        ! if istep is not zero it will be decided whether restart shall be written
-        ! if l_write  is TRUE the restart will be forced
-        ! if l_read the restart will be read
-        ! as an example, for reading restart one does: call restart(0, .false., .false., .true., tracers, partit, mesh)
-        call restart(0, .false., r_restart, f%ice, f%dynamics, f%tracers, f%partit, f%mesh) ! istep, l_write, l_read
+        call restart(0, r_restart, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         if (f%mype==0) f%t7=MPI_Wtime()
         ! store grid information into netcdf file
         if (.not. r_restart) call write_mesh_info(f%partit, f%mesh)
 
         !___IF RESTART WITH ZLEVEL OR ZSTAR IS DONE, ALSO THE ACTUAL LEVELS AND ____
         !___MIDDEPTH LEVELS NEEDS TO BE CALCULATET AT RESTART_______________________
-        if (r_restart) then
+        if (r_restart .and. .not. f%which_readr==2) then
             call restart_thickness_ale(f%partit, f%mesh)
         end if
         if (f%mype==0) then
@@ -346,7 +343,7 @@ contains
             !___compute update of atmospheric forcing____________________________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call update_atm_forcing(n)'//achar(27)//'[0m'
             f%t0_frc = MPI_Wtime()
-            call update_atm_forcing(n, f%ice, f%tracers, f%partit, f%mesh)
+            call update_atm_forcing(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
             f%t1_frc = MPI_Wtime()       
             !___compute ice step________________________________________________
             if (f%ice%ice_steps_since_upd>=f%ice%ice_ave_steps-1) then
@@ -381,7 +378,7 @@ contains
         call output (n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
 
         f%t5 = MPI_Wtime()
-        call restart(n, .false., .false., f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        call restart(n, .false., f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         f%t6 = MPI_Wtime()
         
         f%rtime_fullice       = f%rtime_fullice       + f%t2 - f%t1
@@ -401,6 +398,7 @@ contains
     real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
 
     call finalize_output()
+    call finalize_restart()
 
     !___FINISH MODEL RUN________________________________________________________
 
@@ -434,6 +432,7 @@ contains
     call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime,  14, MPI_REAL, MPI_MAX, f%MPI_COMM_FESOM, f%MPIerr)
     call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime,  14, MPI_REAL, MPI_MIN, f%MPI_COMM_FESOM, f%MPIerr)
 
+    if(f%fesom_did_mpi_init) call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype) ! finalize MPI before FESOM prints its stats block, otherwise there is sometimes output from other processes from an earlier time in the programm AFTER the starts block (with parastationMPI)
     if (f%mype==0) then
         41 format (a35,a10,2a15) !Format for table heading
         42 format (a30,3f15.4)   !Format for table content
@@ -470,7 +469,6 @@ contains
         write(*,*)
     end if    
 !   call clock_finish  
-    if(f%fesom_did_mpi_init) call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
   end subroutine
 
 end module

@@ -1,0 +1,44 @@
+module fortran_utils_tests
+  use fortran_utils
+  use funit; implicit none
+  
+contains
+
+
+  @test
+  subroutine test_2_digits_results_in_2_characters_string()
+    @assertEqual("12", int_to_txt(12))
+  end subroutine
+
+  
+  @test
+  subroutine test_1_digit_results_in_1_character_string
+    @assertEqual("1", int_to_txt(1))
+  end subroutine
+
+
+  @test
+  subroutine test_0_results_in_0_character_string
+    @assertEqual("0", int_to_txt(0))
+  end subroutine
+
+  
+  @test
+  subroutine test_1_digit_padded_to_3_results_in_3_character_string
+    @assertEqual("001", int_to_txt_pad(1,3))
+  end subroutine
+
+  @test
+  subroutine test_3_digit_padded_to_1_results_in_3_character_string
+    @assertEqual("123", int_to_txt_pad(123,1))
+  end subroutine
+
+
+  @test
+  subroutine test_0_padded_to_0_results_in_0_character_string
+    @assertEqual("0", int_to_txt_pad(0,0))
+  end subroutine
+
+
+
+end module

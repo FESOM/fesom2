@@ -1,11 +1,46 @@
-export PATH=/home/rd/natr/cmake-3.11.2-Linux-x86_64/bin:$PATH
-
+module unload grib_api
+module unload eccodes
+module unload emos
+module unload cmake
+module unload fftw
+module unload fcm
+module unload netcdf4
+module unload netcdf4-parallel
+module unload hdf5-parallel
+module unload cray-netcdf-hdf5parallel
+module unload cray-hdf5-parallel
+module unload cray-netcdf
 module unload cray-hdf5
-module load cray-netcdf
-module load cray-hdf5
+module unload python
+module unload python3
+module unload boost
+module unload ecbuild
+module unload ifs-support
+module unload fcm
+module unload cdt
+module unload cmake
+module unload gcc
+
+export EC_CRAYPE_INTEGRATION=off
+
+# Load modules
+module load cdt/18.12
+module load gcc/6.3.0
+module load fftw/3.3.4.5
+module load netcdf4-parallel/4.6.2
+module load hdf5-parallel/1.10.4
+module load fcm/2015.02.0
+module load python/2.7.12-01
+module load python3/3.6.8-01
+module load boost/1.61.0
+module load eigen/3.2.0
+module load nag
+module load parmetis
+module load cray-snplauncher
+module load atp
+module load ninja
+module load cmake/3.15.0
 
 #export CRAYPE_LINK_TYPE=dynamic
 
-# enable full MPI thread support level (MPI_THREAD_MULTIPLE)
-export MPICH_MAX_THREAD_SAFETY=multiple # to also switch to an alternative (probably with faster locking) multi threading implementation of the cray-mpich library, use the compiler flag -craympich-mt
 export FC=ftn CC=cc CXX=CC

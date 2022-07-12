@@ -864,20 +864,8 @@ end if
  deallocate(rbuff, ibuff)
  deallocate(mapping)
  
-  ! try to calculate checksum and distribute it to every process
-  ! the shell command is probably not very portable and might fail, in which case we just do not have a checksum
-  mesh%representative_checksum = '                                ' ! we use md5 which is 32 chars long, so set default value to the same length
-  if(mype==0) then
-    call execute_command_line("md5sum "//trim(MeshPath)//"nod2d.out | cut -d ' ' -f 1 > "//trim(ResultPath)//"mesh_checksum")
-    ! we can not check if execute_command_line succeeded (e.g. with cmdstat), as the pipe will swallow any error from the initial command
-    ! so we have to thoroughly check if the file exists and if it contains our checksum
-    open(newunit=fileunit, file=trim(ResultPath)//"mesh_checksum", action="READ", iostat=iostat)
-    if(iostat==0) read(fileunit, *, iostat=iostat) mesh_checksum
-    close(fileunit)      
-    if(iostat==0 .and. len_trim(mesh_checksum)==32) mesh%representative_checksum = mesh_checksum
-  end if
-  call MPI_BCAST(mesh%representative_checksum, len(mesh%representative_checksum), MPI_CHAR, 0, MPI_COMM_FESOM, MPIerr)
-  mesh%representative_checksum = trim(mesh%representative_checksum) ! if we did not get a checksum, the string is empty
+! no checksum for now, execute_command_line is failing too often. if you think it is important, please drop me a line and I will try to revive it: jan.hegewald@awi.de
+mesh%representative_checksum = ''
 
 CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
  t1=MPI_Wtime()
@@ -2434,8 +2422,8 @@ t0=MPI_Wtime()
  allocate(mesh%gradient_vec(6,myDim_elem2D))
  allocate(mesh%metric_factor(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
  allocate(mesh%elem_cos(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
- allocate(coriolis(myDim_elem2D))
- allocate(coriolis_node(myDim_nod2D+eDim_nod2D))
+ allocate(mesh%coriolis(myDim_elem2D))
+ allocate(mesh%coriolis_node(myDim_nod2D+eDim_nod2D))
  allocate(mesh%geo_coord_nod2D(2,myDim_nod2D+eDim_nod2D))
  allocate(center_x(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
  allocate(center_y(myDim_elem2D+eDim_elem2D+eXDim_elem2D)) 
@@ -2446,7 +2434,7 @@ t0=MPI_Wtime()
  ! ============
  DO n=1,myDim_nod2D+eDim_nod2D 
     call r2g(lon, lat, mesh%coord_nod2D(1,n), mesh%coord_nod2D(2,n))
-    coriolis_node(n)=2*omega*sin(lat)	 
+    mesh%coriolis_node(n)=2*omega*sin(lat)	 
  END DO
 
  DO n=1,myDim_nod2D+eDim_nod2D 
@@ -2462,11 +2450,11 @@ t0=MPI_Wtime()
  DO n=1,myDim_elem2D 
     call elem_center(n, ax, ay, mesh)
     call r2g(lon, lat, ax, ay)
-    coriolis(n)=2*omega*sin(lat)	 
+    mesh%coriolis(n)=2*omega*sin(lat)	 
  END DO
   
  if(fplane) then 
-    coriolis=2*omega*0.71_WP
+    mesh%coriolis=2*omega*0.71_WP
  end if
 
  ! ============

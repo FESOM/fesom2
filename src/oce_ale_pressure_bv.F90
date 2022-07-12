@@ -208,6 +208,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE o_ARRAYS
+    USE g_support
     USE o_mixing_KPP_mod, only: dbsfc
     USE diagnostics,      only: ldiag_dMOC
     use densityJM_components_interface
@@ -216,7 +217,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     type(t_mesh),   intent(in) ,    target  :: mesh
     type(t_partit), intent(inout),  target  :: partit
     type(t_tracer), intent(in),     target  :: tracers
-    real(kind=WP)                           :: dz_inv, bv,  a, rho_up, rho_dn, t, s
+    real(kind=WP)                           :: zmean, dz_inv, bv,  a, rho_up, rho_dn, t, s
     integer                                 :: node, nz, nl1, nzmax, nzmin
     real(kind=WP)                           :: rhopot(mesh%nl), bulk_0(mesh%nl), bulk_pz(mesh%nl), bulk_pz2(mesh%nl), rho(mesh%nl), dbsfc1(mesh%nl), db_max
     real(kind=WP)                           :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf, aux_rho, aux_rho1
@@ -263,7 +264,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     
     !___________________________________________________________________________
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(dz_inv, bv,  a, rho_up, rho_dn, t, s, node, nz, nl1, nzmax, nzmin, &
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(zmean, dz_inv, bv,  a, rho_up, rho_dn, t, s, node, nz, nl1, nzmax, nzmin, &
 !$OMP                                  rhopot, bulk_0, bulk_pz, bulk_pz2, rho, dbsfc1, db_max, bulk_up, bulk_dn, &
 !$OMP                                  rho_surf, aux_rho, aux_rho1, flag1, flag2)
 !$OMP DO
@@ -423,24 +424,21 @@ subroutine pressure_bv(tracers, partit, mesh)
         flag1=.true.
         flag2=.true.
         do nz=nzmin+1,nzmax-1
-            bulk_up = bulk_0(nz-1) + zbar_3d_n(nz,node)*(bulk_pz(nz-1) + zbar_3d_n(nz,node)*bulk_pz2(nz-1)) 
-            bulk_dn = bulk_0(nz)   + zbar_3d_n(nz,node)*(bulk_pz(nz)   + zbar_3d_n(nz,node)*bulk_pz2(nz))
-            rho_up = bulk_up*rhopot(nz-1) / (bulk_up + 0.1_WP*zbar_3d_n(nz,node)*real(state_equation))  
-            rho_dn = bulk_dn*rhopot(nz)   / (bulk_dn + 0.1_WP*zbar_3d_n(nz,node)*real(state_equation))  
-            dz_inv=1.0_WP/(Z_3d_n(nz-1,node)-Z_3d_n(nz,node))  
-            
+            zmean   = 0.5_WP*sum(Z_3d_n(nz-1:nz, node))
+            bulk_up = bulk_0(nz-1) + zmean*(bulk_pz(nz-1) + zmean*bulk_pz2(nz-1)) 
+            bulk_dn = bulk_0(nz)   + zmean*(bulk_pz(nz)   + zmean*bulk_pz2(nz))
+            rho_up  = bulk_up*rhopot(nz-1) / (bulk_up + 0.1_WP*zmean*real(state_equation))  
+            rho_dn  = bulk_dn*rhopot(nz)   / (bulk_dn + 0.1_WP*zmean*real(state_equation))
+            dz_inv  = 1.0_WP/(Z_3d_n(nz-1,node)-Z_3d_n(nz,node))  
             !_______________________________________________________________
             ! squared brunt väisälä frequence N^2 --> N^2>0 stratification is 
             ! stable, vertical elongated parcel is accelaratedtowards 
             ! initial point --> does oscillation with frequency N. 
             ! N^2<0 stratification is unstable vertical elongated parcel is 
             ! accelerated away from initial point 
-            bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/density_0
-!!PS             bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/density_ref(nz,node)
-            
+            bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/density_0          
             !!PS !--> Why not like this ?
-            !!PS bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/(rho_dn)
-            
+            !!PS bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/(rho_dn)            
             !_______________________________________________________________
             ! define MLD following Large et al. 1997
             ! MLD is the shallowest depth where the local buoyancy gradient matches the maximum buoyancy gradient 
@@ -474,6 +472,8 @@ subroutine pressure_bv(tracers, partit, mesh)
     end do
 !$OMP END DO
 !$OMP END PARALLEL
+call smooth_nod (bvfreq, 1, partit, mesh)
+!$OMP BARRIER
 end subroutine pressure_bv
 !
 !

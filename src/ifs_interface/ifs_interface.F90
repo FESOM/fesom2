@@ -9,13 +9,14 @@ MODULE nemogcmcoup_steps
    INTEGER :: substeps !per IFS timestep
 END MODULE nemogcmcoup_steps
 
-SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
+SUBROUTINE nemogcmcoup_init( mype, icomm, inidate, initime, itini, itend, zstp, &
    & lwaveonly, iatmunit, lwrite )
 
    ! Initialize the FESOM model for single executable coupling 
 
    USE par_kind !in ifs_modules.F90
    USE fesom_main_storage_module, only: fesom => f ! only: MPI_COMM_FESOM, mype (previously in g_parsup)
+   USE fesom_module, ONLY : fesom_init
    USE g_config, only: dt
    USE g_clock, only: timenew, daynew, yearnew, month, day_in_month
    USE nemogcmcoup_steps, ONLY : substeps
@@ -25,6 +26,7 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    ! Input arguments
 
    ! Message passing information
+   INTEGER, INTENT(IN) :: mype ! was added to ifs/nemo/ininemo.F90 to allow diagnostics based on the first tasks only
    INTEGER, INTENT(IN) :: icomm
    ! Initial date (e.g. 20170906), time, initial timestep and final time step
    INTEGER, INTENT(OUT) ::  inidate, initime, itini, itend
@@ -49,7 +51,8 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    READ(9,namfesomstep)
    CLOSE(9)
 
-   fesom%MPI_COMM_FESOM=icomm
+   fesom%partit%MPI_COMM_FESOM=icomm
+
    itini = 1
    CALL fesom_init(itend_fesom) !also sets mype and npes 
    itend=itend_fesom/substeps
@@ -367,7 +370,7 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    integer, dimension(:,:)         , pointer :: elem2D_nodes
    integer, pointer :: myDim_nod2D, eDim_nod2D
    integer, pointer :: myDim_elem2D, eDim_elem2D, eXDim_elem2D
-   real(kind=wpIFS), dimension(:), pointer :: a_ice, m_ice, m_snow
+   real(kind=wpIFS), dimension(:), pointer :: a_ice, m_ice, m_snow, ice_temp, ice_alb
    real(kind=wpIFS)              , pointer :: tmelt
    
    ! Message passing information
@@ -393,13 +396,14 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    eDim_elem2D  => fesom%partit%eDim_elem2D
    eXDim_elem2D => fesom%partit%eXDim_elem2D
 
-   coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)                  => fesom%mesh%coord_nod2D   
-   elem2D_nodes(1:3, 1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => fesom%mesh%elem2D_nodes
+   coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)                  => fesom%mesh%coord_nod2D(:,:)   
+   elem2D_nodes(1:3, 1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => fesom%mesh%elem2D_nodes(:,:)
    a_ice        => fesom%ice%data(1)%values(:)
    m_ice        => fesom%ice%data(2)%values(:)
    m_snow       => fesom%ice%data(3)%values(:)
+   ice_temp     => fesom%ice%data(4)%values(:)
+   ice_alb      => fesom%ice%atmcoupl%ice_alb(:)
    tmelt        => fesom%ice%thermo%tmelt ! scalar const.
-
 
    ! =================================================================== !
    ! Pack SST data and convert to K. 'pgsst' is on Gauss grid.
@@ -424,7 +428,7 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
 
    ! =================================================================== !
    ! Pack ice temperature data (already in K)
-   zsend(:)=273.15
+   zsend(:)=ice_temp
 
    ! Interpolate ice surface temperature: 'pgist' on Gaussian grid. 
    CALL parinter_fld( mype, npes, icomm, Ttogauss, &
@@ -434,7 +438,7 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
 
    ! =================================================================== !
    ! Pack ice albedo data and interpolate: 'pgalb' on Gaussian grid.
-   zsend(:)=0.7
+   zsend(:)=ice_alb
    
    ! Interpolate ice albedo
    CALL parinter_fld( mype, npes, icomm, Ttogauss, &
@@ -622,7 +626,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    real(kind=wpIFS), dimension(:)  , pointer :: oce_heat_flux, ice_heat_flux 
    myDim_nod2D        => fesom%partit%myDim_nod2D
    eDim_nod2D         => fesom%partit%eDim_nod2D
-   coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => fesom%mesh%coord_nod2D  
+   coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => fesom%mesh%coord_nod2D(:,:)  
    stress_atmice_x    => fesom%ice%stress_atmice_x
    stress_atmice_y    => fesom%ice%stress_atmice_y
    oce_heat_flux      => fesom%ice%atmcoupl%oce_flx_h(:)
@@ -1470,6 +1474,7 @@ SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )
 
    USE g_clock, only: yearnew, month, day_in_month
    USE fesom_main_storage_module, only: fesom => f ! mype
+   USE fesom_module, ONLY : fesom_runloop
    USE nemogcmcoup_steps, ONLY : substeps
    IMPLICIT NONE
 
@@ -1512,6 +1517,7 @@ END SUBROUTINE nemogcmcoup_step
 SUBROUTINE nemogcmcoup_final
 
    USE fesom_main_storage_module, only: fesom => f ! mype
+   USE fesom_module, ONLY : fesom_finalize
 
    ! Finalize the FESOM model
 

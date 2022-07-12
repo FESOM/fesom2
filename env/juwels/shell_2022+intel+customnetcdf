@@ -1,0 +1,22 @@
+##########
+module --force purge 
+module use $OTHERSTAGES
+module load Stages/2022
+module load Intel/2021.4.0
+module load ParaStationMPI/5.5.0-1
+module load CMake/3.21.1
+module load imkl/2021.4.0
+
+export LC_ALL=en_US.UTF-8
+export TMPDIR=/tmp
+export FC=mpifort
+export F77=mpifort
+export MPIFC=mpifort
+export CC=mpicc
+export CXX=mpic++
+
+export IO_LIB_ROOT=/p/project/pra127/rackow1/RAPS20_fesom/flexbuild/external/intel.juwels/install
+export LD_LIBRARY_PATH=${IO_LIB_ROOT}/lib:$LD_LIBRARY_PATH
+export NETCDF_Fortran_INCLUDE_DIRECTORIES=${IO_LIB_ROOT}/include
+export NETCDF_C_INCLUDE_DIRECTORIES=${IO_LIB_ROOT}/include
+export NETCDF_CXX_INCLUDE_DIRECTORIES=${IO_LIB_ROOT}/include

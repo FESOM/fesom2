@@ -1,0 +1,35 @@
+module unload craype
+module load craype/2.6.2
+
+module load PrgEnv-cray/6.0.4
+module load alps pbs
+module load cray-mpich/7.7.3
+module load craype-x86-skylake
+module load cmake/3.14.0
+module load cray-hdf5-parallel/1.10.2.0
+module load cray-netcdf-hdf5parallel/4.6.1.3
+module load fftw/2.1.5.9
+module load proj4/5.1.0
+
+export HDF5ROOT=$HDF5_ROOT
+export NETCDFFROOT=$NETCDF_DIR
+export NETCDFROOT=$NETCDF_DIR
+export NETCDF_Fortran_INCLUDE_DIRECTORIES=$NETCDFROOT/include
+export NETCDF_CXX_INCLUDE_DIRECTORIES=$NETCDFROOT/include
+export NETCDF_CXX_LIBRARIES=$NETCDFROOT/lib
+export PERL5LIB=/usr/lib64/perl5
+export XML2ROOT=/usr
+export ZLIBROOT=/usr
+export TMPDIR=/tmp
+export PMI_LABEL_ERROUT=1
+export DR_HOOK_IGNORE_SIGNALS=-1
+
+
+# enable full MPI thread support level (MPI_THREAD_MULTIPLE)
+export MPICH_MAX_THREAD_SAFETY=multiple # to also switch to an alternative (probably with faster locking) multi threading implementation of the cray-mpich library, use the compiler flag -craympich-mt
+export MPICH_CRAY_OPT_THREAD_SYNC=0 # the Cray MPICH library falls back to using the pthread_mutex-based thread-synchronization implementation
+export MPICH_OPT_THREAD_SYNC=0 # seems to be a duplicate variable which also appears in some documentation instead of MPICH_CRAY_OPT_THREAD_SYNC (but this one brings a huge speed gain on aleph)
+
+export ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS=''
+
+export FC=ftn CC=cc CXX=CC

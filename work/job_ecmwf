@@ -1,0 +1,47 @@
+#!/bin/bash
+#PBS -S /usr/bin/ksh
+#PBS -N fesom2-LandG
+#PBS -q np
+#PBS -l EC_total_tasks=288
+
+# optionally, specifiy that no OpenMP is used
+#PBS -l EC_threads_per_task=1
+
+#PBS -l EC_hyperthreading=1
+#PBS -l EC_user_defined_priority=99
+#PBS -l walltime=00:57:00
+
+##PBS -j oe #join out and err
+#PBD -n
+#PBS -o /scratch/rd/natr/run_core2_LandG/pbs.out
+#PBS -e /scratch/rd/natr/run_core2_LandG/pbs.err
+
+#PBS -m abe
+#PBS -M thomas.rackow@ecmwf.int
+	
+#queue	suitable for	target	processors min/max			processors per node	memory limit	wall-clock	
+#np	parallel	MOM+CN	1/72			not shared	72			120 GB		48 hours
+
+path=`pwd`
+echo Initial path: $path
+
+cd /scratch/rd/natr/run_core2_LandG/
+
+# debug
+set -x
+
+cp    $HOME/fesom2/bin/fesom.x . 		#
+# did manually
+#cp -n $HOME/fesom2/config/namelist.config  .	#
+#cp -n $HOME/fesom2/config/namelist.cvmix   .	#
+#cp -n $HOME/fesom2/config/namelist.forcing .	#
+#cp -n $HOME/fesom2/config/namelist.oce     .	#
+#cp -n $HOME/fesom2/config/namelist.io      .	#
+#cp -n $HOME/fesom2/config/namelist.ice     .	#
+#cp -n $HOME/fesom2/config/namelist.tra     .	#
+#cp -n $HOME/fesom2/config/namelist.dyn     .	#
+
+date
+echo tasks_per_node, total_tasks, HT: $EC_tasks_per_node $EC_total_tasks $EC_hyperthreads
+aprun -N $EC_tasks_per_node -n $EC_total_tasks -j $EC_hyperthreads ./fesom.x > "fesom2.out"
+date

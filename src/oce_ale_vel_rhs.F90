@@ -38,7 +38,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_MESH
-    use o_ARRAYS, only: coriolis, ssh_gp, pgf_x, pgf_y
+    use o_ARRAYS, only: ssh_gp, pgf_x, pgf_y
     use o_PARAM
     use g_CONFIG
     use g_forcing_param, only: use_virt_salt
@@ -103,7 +103,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         !  p_eta=g*eta_n(elnodes)*(1-theta)        !! this place needs update (1-theta)!!!
         p_eta = g*eta_n(elnodes)   
         
-        ff  = coriolis(elem)*elem_area(elem)
+        ff  = mesh%coriolis(elem)*elem_area(elem)
         !mm=metric_factor(elem)*gg
         
         !___________________________________________________________________________
@@ -322,12 +322,16 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
             un2(nl2+1:max(nl1,nl2)) = 0._WP
             un1(1:ul1-1)            = 0._WP
             un2(1:ul2-1)            = 0._WP
+
+#if defined(__openmp_reproducible)
+!$OMP ORDERED
+#endif
             
             ! first edge node
             ! Do not calculate on Halo nodes, as the result will not be used. 
             ! The "if" is cheaper than the avoided computiations.
             if (nod(1) <= myDim_nod2d) then
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_set_lock(partit%plock(nod(1)))
 #endif
                 do nz=min(ul1,ul2), max(nl1,nl2)
@@ -335,14 +339,14 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
                     UVnode_rhs(1,nz,nod(1)) = UVnode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1) + un2(nz)*UV(1,nz,el2) 
                     UVnode_rhs(2,nz,nod(1)) = UVnode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1) + un2(nz)*UV(2,nz,el2)
                 end do
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_unset_lock(partit%plock(nod(1)))
 #endif
             endif
             
             ! second edge node
             if (nod(2) <= myDim_nod2d) then
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_set_lock(partit%plock(nod(2)))
 #endif
                 do nz=min(ul1,ul2), max(nl1,nl2)
@@ -350,7 +354,7 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
                     UVnode_rhs(1,nz,nod(2)) = UVnode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1) - un2(nz)*UV(1,nz,el2)
                     UVnode_rhs(2,nz,nod(2)) = UVnode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1) - un2(nz)*UV(2,nz,el2)
                 end do
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_unset_lock(partit%plock(nod(2)))
 #endif
             endif
@@ -358,7 +362,7 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
         else  ! el2 is not a valid element --> ed is a boundary edge, there is only the contribution from el1
             ! first edge node
             if (nod(1) <= myDim_nod2d) then
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_set_lock(partit%plock(nod(1)))
 #endif
                 do nz=ul1, nl1
@@ -366,14 +370,14 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
                     UVnode_rhs(1,nz,nod(1)) = UVnode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1)
                     UVnode_rhs(2,nz,nod(1)) = UVnode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1)
                 end do ! --> do nz=ul1, nl1
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_unset_lock(partit%plock(nod(1)))
 #endif
             endif 
             
             ! second edge node
             if  (nod(2) <= myDim_nod2d) then
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_set_lock(partit%plock(nod(2)))
 #endif
                 do nz=ul1, nl1
@@ -381,11 +385,16 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
                     UVnode_rhs(1,nz,nod(2)) = UVnode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1)
                     UVnode_rhs(2,nz,nod(2)) = UVnode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1)
                 end do ! --> do nz=ul1, nl1
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_unset_lock(partit%plock(nod(2)))
 #endif
             endif
         endif ! --> if (el2>0) then
+
+#if defined(__openmp_reproducible)
+!$OMP END ORDERED
+#endif
+
     end do ! --> do ed=1, myDim_edge2D
 !$OMP END DO
 
