@@ -110,6 +110,7 @@ save
   integer,dimension(:), allocatable:: scaling   !scaling factor
 
   logical,dimension(:), allocatable::   melted  !1 if iceberg melted, 0 otherwise
+  logical,dimension(:), allocatable::   grounded    !1 if iceberg grounded, 0 otherwise
   integer   :: num_non_melted_icb = 0 !1 if iceberg melted, 0 otherwise
   !for communication
   real,dimension(:), allocatable:: arr_block

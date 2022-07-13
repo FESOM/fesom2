@@ -287,9 +287,9 @@ subroutine iceberg_step1(mesh, ib, height_ib,length_ib,width_ib, lon_deg,lat_deg
  use g_config, only: steps_per_ib_step
  !=
 #ifdef use_cavity
- use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, melted	!=
+ use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, melted, grounded !, length_ib, width_ib
 #else
- use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, melted			!=
+ use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, melted, grounded !, length_ib, width_ib
 #endif
  												!=
  implicit none											!=
@@ -532,6 +532,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 !   if (mod(istep,logfile_outfreq)==0) then 
     if (mod(istep_end_synced,logfile_outfreq)==0) then 
         write(*,*) 'iceberg ib ', ib, 'is grounded'
+        grounded(ib) = .true.
     end if
  	
  else 
@@ -593,6 +594,34 @@ end if !... and first node belongs to processor?
  ! =================== END OF ICEBERG CALCULATION ==================
  
  end subroutine iceberg_step1
+
+! LA
+subroutine get_total_iceberg_area(mesh, iceberg_elem, area_ib_tot)
+ 
+ use o_param 		!for rad								!=
+ USE MOD_MESH
+ use g_parsup		!for myDim_elem2D, myList_nod2D						!=
+ use g_rotate_grid	!for subroutine g2r, logfile_outfreq					!=
+ use iceberg_params, only: arr_block, elem_block, length_ib, width_ib
+ 
+ implicit none											!=
+ 
+ integer, intent(inout) :: iceberg_elem !global
+ real, intent(inout)    :: area_ib_tot
+ integer                :: idx
+
+type(t_mesh), intent(in) , target :: mesh
+!========================= MODULES & DECLARATIONS =====================================!=
+#include "associate_mesh.h"
+
+  area_ib_tot = 0.0
+  do idx = 1, size(elem_block)
+      if (elem_block(idx) == iceberg_elem) then
+          area_ib_tot = area_ib_tot + length_ib(idx) * width_ib(idx)
+      end if
+  end do
+  !###########################################
+end subroutine get_total_iceberg_area
  
  
 subroutine iceberg_step2(mesh, arr, elem_from_block, ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
@@ -617,9 +646,9 @@ subroutine iceberg_step2(mesh, arr, elem_from_block, ib, height_ib,length_ib,wid
  use g_config, only: steps_per_ib_step
 !=
 #ifdef use_cavity
- use iceberg_params, only: smallestvol_icb, buoy_props, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, ascii_out, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem	!=
+ use iceberg_params, only: smallestvol_icb, buoy_props, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, ascii_out, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, elem_block
 #else
- use iceberg_params, only: smallestvol_icb, buoy_props, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, ascii_out, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale		!=
+ use iceberg_params, only: smallestvol_icb, buoy_props, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, ascii_out, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, elem_block
 #endif
  												!=
  implicit none											!=
@@ -655,6 +684,11 @@ subroutine iceberg_step2(mesh, arr, elem_from_block, ib, height_ib,length_ib,wid
 ! kh 16.03.21
  integer :: istep_end_synced
  
+! LA: add threshold for number of icebergs in one elemt
+ integer                        :: num_ib_in_elem, idx
+ real                           :: area_ib_tot
+ real                           :: local_elem_area
+
  !iceberg output 
  character 			:: ib_char*10
  character 			:: file_track*80
@@ -722,28 +756,54 @@ type(t_mesh), intent(in) , target :: mesh
  !**** check if iceberg melted in step 1 ****!
 
  t2=MPI_Wtime()
+
+  !**** LA: check if iceberg changed element and new element is too full 
+  !if(local_idx_of(iceberg_elem) > 0 .and. iceberg_elem .ne. old_element) then !IB left model domain
+  if(iceberg_elem .ne. old_element) then
+    if (firstcall) then
+      allocate(local_idx_of(elem2D))
+      !creates mapping
+      call global2local(mesh, local_idx_of, elem2D)
+      firstcall=.false.
+    end if 
+    num_ib_in_elem = count(elem_block==iceberg_elem)
+    area_ib_tot = 0.0
+    call get_total_iceberg_area(mesh, iceberg_elem, area_ib_tot)
+  
+    idx = local_idx_of(iceberg_elem)
+    local_elem_area = elem_area(idx)
+    if(area_ib_tot > local_elem_area) then
+           write(*,*) "LA DEBUG: local_idx_of(iceberg_elem)=",idx
+           write(*,*) "LA DEBUG: global idx of iceberg_elem=",iceberg_elem
+           write(*,*) "LA DEBUG: size(elem_area)=",size(elem_area)
+           write(*,*) "LA DEBUG: num_ib_in_elem=",num_ib_in_elem
+           write(*,*) "LA DEBUG: area_ib_tot=",area_ib_tot,", elem_area=",local_elem_area
+           write(*,*) "LA DEBUG: old_element=",old_element,", iceberg_elem=",iceberg_elem
+           write(*,*) "LA DEBUG: set iceberg ", ib, " to old position"
+           lon_rad = old_lon
+           lat_rad = old_lat 
+           lon_deg = lon_rad/rad
+           lat_deg = lat_rad/rad
+           iceberg_elem = old_element
+           u_ib    = 0.
+           v_ib    = 0.  
+    end if
+  end if
+  !**** LA: check if iceberg changed element and new element is too full 
  
  if(left_mype > 0.) then
- call iceberg_elem4all(mesh, iceberg_elem, lon_deg, lat_deg) !Just PE changed?
- 
-  if(iceberg_elem == 0) then !IB left model domain
-   !if (mod(istep,logfile_outfreq)==0 .and. mype==0 .and. lastsubstep) write(*,*) 'iceberg ',ib, ' left model domain'
-   lon_rad = old_lon
-   lat_rad = old_lat 
-   lon_deg = lon_rad/rad
-   lat_deg = lat_rad/rad
-   iceberg_elem = old_element
-   u_ib    = 0.
-   v_ib    = 0.  
-   !if(i_have_element) then
-    !OCEAN VELOCITY uo_ib, voib is new velocity
-    !call iceberg_avvelo(startu,startv,depth_ib,local_idx_of(iceberg_elem))
-    !call FEM_3eval(u_ib,v_ib,lon_rad,lat_rad,startu,startv,local_idx_of(iceberg_elem))
-   !end if
-   
-  else
-   !if (mype==0) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
-  end if
+   call iceberg_elem4all(mesh, iceberg_elem, lon_deg, lat_deg) !Just PE changed?
+   if(iceberg_elem == 0 ) then
+           lon_rad = old_lon
+           lat_rad = old_lat 
+           lon_deg = lon_rad/rad
+           lat_deg = lat_rad/rad
+           iceberg_elem = old_element
+           u_ib    = 0.
+           v_ib    = 0.
+   else
+     if (mype==0) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
+   end if
  end if
  
  t3=MPI_Wtime()
@@ -807,6 +867,7 @@ type(t_mesh), intent(in) , target :: mesh
   buoy_props(ib,10) = height_ib
   buoy_props(ib,11) = length_ib 
   buoy_props(ib,12) = width_ib
+  buoy_props(ib,13) = iceberg_elem
 
  end if
 
@@ -1135,12 +1196,12 @@ subroutine iceberg_restart
   do ib=1, ib_num 
   
    !read all parameters that icb_step needs:			
-   read(icbID,'(18e15.7,I,L,3e15.7)')						&
+   read(icbID,'(18e15.7,I,L,3e15.7,L,I)')						&
    	height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
 	Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
 	conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
 	u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
-	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib) 
+	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib)
 
   end do
   close(icbID)
@@ -1200,12 +1261,12 @@ subroutine iceberg_restart_with_icesheet
   open(unit=icbID_ISM,file=IcebergRestartPath_ISM,status='old')
   do ib=1, num_non_melted_icb 
    !read all parameters that icb_step needs:			
-   read(icbID_ISM,'(18e15.7,I,L,3e15.7,L)')						&
+   read(icbID_ISM,'(18e15.7,I,L,3e15.7,L,I,L)')						&
    	height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
 	Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
 	conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
 	u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
-	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), melted(ib) 
+	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib), melted(ib) 
   end do
   close(icbID_ISM)
 
@@ -1229,7 +1290,7 @@ subroutine iceberg_restart_with_icesheet
 
   !call init_buoys ! all PEs read LON,LAT from files  
   !write(*,*) 'initialized positions from file'
-  call init_icebergs_with_icesheet ! all PEs read LON,LAT,LENGTH from files
+  call init_icebergs !_with_icesheet ! all PEs read LON,LAT,LENGTH from files
   !write(*,*) 'initialized positions and length/width from file'
   !write(*,*) '*************************************************************'
  end if
@@ -1269,23 +1330,23 @@ subroutine iceberg_out
   do ib=1, ib_num 
   
    !write all parameters that icb_step needs:
-   write(icbID,'(18e15.7,I,L,3e15.7,L)')						&
+   write(icbID,'(18e15.7,I,L,3e15.7,L,I,L)')						&
    	height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
 	Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
 	conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
 	u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
-	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), melted(ib)
+	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib), melted(ib)
    
    !***************************************************************
    !write new restart file with only non melted icebergs
    if(melted(ib)==.false.) then
        !write all parameters that icb_step needs:
-       write(icbID_ISM,'(18e15.7,I,L,3e15.7,L)')						&
+       write(icbID_ISM,'(18e15.7,I,L,3e15.7,L,I,L)')						&
             height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
             Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
             conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
             u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
-            f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), melted(ib)
+            f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib), melted(ib)
    end if
 
   end do

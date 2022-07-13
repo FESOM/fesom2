@@ -742,120 +742,30 @@ subroutine com_integer(i_have_element, iceberg_element)
  logical, intent(in):: i_have_element
  integer, intent(inout):: iceberg_element
  
- logical:: he_has_element
- integer:: i, sender, status(MPI_STATUS_SIZE)
-
+ integer:: status(MPI_STATUS_SIZE)
  integer:: req
  logical:: completed
 
- if (mype==0) then
-    do i=1, npes-1
-
-! kh 25.03.21 orig
-!     CALL MPI_RECV(he_has_element, 1, MPI_LOGICAL, MPI_ANY_SOURCE, 0, MPI_COMM_FESOM_IB, status, MPIERR_IB)
-
+! kh 10.02.22
+ if(i_have_element) then
 !$omp critical
-      CALL MPI_IRECV(he_has_element, 1, MPI_LOGICAL, MPI_ANY_SOURCE, 0, MPI_COMM_FESOM_IB, req, MPIERR_IB)
+     call MPI_IAllreduce(MPI_IN_PLACE, iceberg_element, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)
 !$omp end critical
-
-      completed = .false.
-      do while (.not. completed)
-!$omp critical
-        CALL MPI_TEST(req, completed, status, MPIERR_IB)
-!$omp end critical
-      end do
-
-      sender = status(MPI_SOURCE)
-      if (he_has_element) then
-
-! kh 25.03.21 orig
-!       CALL MPI_RECV(iceberg_element, 1, MPI_DOUBLE_PRECISION, sender, 2, MPI_COMM_FESOM_IB, status, MPIERR_IB)
-
-!$omp critical
-        CALL MPI_IRECV(iceberg_element, 1, MPI_DOUBLE_PRECISION, sender, 2, MPI_COMM_FESOM_IB, req, MPIERR_IB)
-!$omp end critical
-
-        completed = .false.
-        do while (.not. completed)
-!$omp critical
-          CALL MPI_TEST(req, completed, status, MPIERR_IB)
-!$omp end critical
-        end do
-      end if
-    end do ! i=1, npes-1
  else
-! kh 25.03.21 orig
-!   CALL MPI_SEND(i_have_element, 1, MPI_LOGICAL, 0, 0, MPI_COMM_FESOM_IB, MPIERR_IB)
-
 !$omp critical
-    CALL MPI_ISEND(i_have_element, 1, MPI_LOGICAL, 0, 0, MPI_COMM_FESOM_IB, req, MPIERR_IB)
+     call MPI_IAllreduce(0,            iceberg_element, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)
 !$omp end critical
+ end if
 
-    completed = .false.
-    do while (.not. completed)
+ completed = .false.
+ do while (.not. completed)
 !$omp critical
-      CALL MPI_TEST(req, completed, status, MPIERR_IB)
+     CALL MPI_TEST(req, completed, status, MPIERR_IB)
 !$omp end critical
-    end do
-
-    if (i_have_element) then
-
-! kh 25.03.21 orig
-!      CALL MPI_SEND(iceberg_element, 1, MPI_INTEGER,0, 2, MPI_COMM_FESOM_IB, MPIERR_IB)
-
-!$omp critical
-       CALL MPI_ISEND(iceberg_element, 1, MPI_INTEGER,0, 2, MPI_COMM_FESOM_IB, req, MPIERR_IB)
-!$omp end critical
-
-       completed = .false.
-       do while (.not. completed)
-!$omp critical
-         CALL MPI_TEST(req, completed, status, MPIERR_IB)
-!$omp end critical
-       end do
-    end if 
- end if ! (mype==0)
-
-! if (mype==0) then
-!    do i=1, npes-1
-!       CALL MPI_RECV(he_has_element, 1, MPI_LOGICAL, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, status, MPIerr )		      
-!       sender = status(MPI_SOURCE)
-!       if (he_has_element) then
-!	  CALL MPI_RECV(iceberg_element, 1, MPI_DOUBLE_PRECISION, sender, 2, MPI_COMM_WORLD, status, MPIerr )
-!       end if
-!    end do
-! else
-!       CALL MPI_SEND(i_have_element, 1, MPI_LOGICAL, 0, 0, MPI_COMM_WORLD, MPIerr )
-!       if (i_have_element) then
-!	  CALL MPI_SEND(iceberg_element, 1, MPI_INTEGER,0, 2, MPI_COMM_WORLD, MPIerr )
-!       end if 
-! end if
- 
- ! *** PROC 0 SENDS ICEBERG ELEMENT TO ALL OTHERS ***
- !
- !1. buffer - Startadresse des Datenpuffers
- !2. count - Anzahl der Elemente im Puffer (integer)
- !3. datatype - Datentyp der Pufferelemente (handle)
- !4. root - Wurzelproze�; der, welcher sendet (integer)
- !5. comm - Kommunikator (handle)
-
-! kh 25.03.21 orig
- !CALL MPI_BCAST(iceberg_element, 1, MPI_INTEGER, 0, MPI_COMM_FESOM_IB, MPIERR_IB)
-
-!$omp critical
-  CALL MPI_IBCAST(iceberg_element, 1, MPI_INTEGER, 0, MPI_COMM_FESOM_IB, req, MPIERR_IB)
-!$omp end critical
-
-  completed = .false.
-  do while (.not. completed)
-!$omp critical
-    CALL MPI_TEST(req, completed, status, MPIERR_IB)
-!$omp end critical
-  end do
-
- !CALL MPI_BCAST(iceberg_element, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, MPIerr)
+ end do
 
  end subroutine com_integer
+
 
 
  !***************************************************************************************************************************
