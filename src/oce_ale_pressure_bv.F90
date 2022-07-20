@@ -1865,14 +1865,16 @@ subroutine pressure_force_4_zxxxx(tracers, partit, mesh)
     elseif (trim(which_pgf)=='cubicspline') then
         call pressure_force_4_zxxxx_cubicspline(partit, mesh)
     elseif (trim(which_pgf)=='easypgf'    ) then
-        call pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)    
+        call pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
+    elseif (trim(which_pgf)=='easypgf_fullbc'    ) then
+        call pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)        
     else
         write(*,*) '________________________________________________________'
         write(*,*) ' --> ERROR: the choosen form of pressure gradient       '
         write(*,*) '            calculation (PGF) is not supported for      '
         write(*,*) '            zlevel/zstar !!!                            '
         write(*,*) '            see in namelist.oce --> which_pgf =         '
-        write(*,*) '            shchepetkin, cubicspline, easypgf                   '
+        write(*,*) '            shchepetkin, cubicspline, easypgf, easypgf_fullbc                   '
         write(*,*) '________________________________________________________'
         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     end if
@@ -2771,6 +2773,368 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine pressure_force_4_zxxxx_easypgf
+
+
+
+!
+!
+!
+!===============================================================================
+subroutine pressure_force_4_zxxxx_easypgf_fullbc(tracers, partit, mesh)
+    use o_PARAM
+    use MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use MOD_TRACER
+    use o_ARRAYS
+    use g_config
+    use densityJM_components_interface
+    use density_linear_interface
+    implicit none
+    type(t_mesh),   intent(in) ,    target  :: mesh
+    type(t_partit), intent(inout),  target  :: partit
+    type(t_tracer), intent(in),     target  :: tracers    
+    integer                                 :: elem, elnodes(3), nle, ule, nlz, nln(3), ni, nlc, nlce, idx(3)
+    real(kind=WP)                           :: int_dp_dx(2), drho_dx, dz_dx, drho_dy, dz_dy, aux_sum 
+    real(kind=WP)                           :: dx10(3), dx20(3), dx21(3)
+    real(kind=WP)                           :: f0(3), df10(3), df21(3)
+    real(kind=WP)                           :: t0(3), dt10(3), dt21(3)
+    real(kind=WP)                           :: s0(3), ds10(3), ds21(3)
+    real(kind=WP)                           :: rho_at_Zn(3), temp_at_Zn(3), salt_at_Zn(3), drho_dz(3), aux_dref
+    real(kind=WP)                           :: rhopot(3), bulk_0(3), bulk_pz(3), bulk_pz2(3)
+    real(kind=WP)                           :: dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2
+    real(kind=WP)                           :: zbar_n(mesh%nl), z_n(mesh%nl-1)
+    real(kind=WP),  dimension(:,:), pointer :: temp, salt
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    temp=>tracers%data(1)%values(:,:)
+    salt=>tracers%data(2)%values(:,:)
+    !___________________________________________________________________________
+    ! loop over triangular elemments
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nlz, nln, ni, nlc, nlce, idx, int_dp_dx, drho_dx, drho_dy, dz_dx, dz_dy, aux_sum, dx10, dx20, dx21, &
+!$OMP                                  f0, df10, df21, t0, dt10, dt21, s0, ds10, ds21, rho_at_Zn, temp_at_Zn, salt_at_Zn, drho_dz, aux_dref, rhopot,                &
+!$OMP                                  bulk_0, bulk_pz, bulk_pz2, dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, zbar_n, z_n                                )
+!$OMP DO
+    do elem=1, myDim_elem2D
+        !_______________________________________________________________________
+        ! nle...number of mid-depth levels at elem
+        nle          = nlevels(elem)-1
+        ule          = ulevels(elem)
+        
+        ! node indices of elem 
+        elnodes      = elem2D_nodes(:,elem) 
+        
+        !_______________________________________________________________________
+        ! calculate mid depth element level --> Z_e
+        ! nle...number of mid-depth levels at elem
+        zbar_n       = 0.0_WP
+        Z_n          = 0.0_WP
+        zbar_n(nle+1)= zbar_e_bot(elem)
+        Z_n(nle)     = zbar_n(nle+1) + helem(nle,elem)*0.5_WP
+        do nlz=nle,ule+1,-1
+            zbar_n(nlz) = zbar_n(nlz+1) + helem(nlz,elem)
+            Z_n(nlz-1)  = zbar_n(nlz)   + helem(nlz-1,elem)*0.5_WP
+        end do
+        zbar_n(ule)  = zbar_n(ule+1) + helem(ule,elem)
+        
+        !_______________________________________________________________________
+        aux_dref     = density_0
+        if (use_cavity .and. .not. use_density_ref) then
+            select case(state_equation)
+                case(0)
+                    call density_linear(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot, partit, mesh)
+                case(1)
+                    call densityJM_components(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot, partit, mesh)
+                case default !unknown
+                    if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            end select
+        end if     
+        
+        !_______________________________________________________________________
+        ! vertical gradient --> with average density and average 
+        ! mid-depth level on element
+        !       x0        x1               x2
+        !  -----o---------o----------------o-------
+        !       f0        f1               f2
+        ! --> use Newtonsche interpolation polynom of second order to calculate 
+        ! central difference quotient for not equidestant distributed values
+        ! f(x) = a0 + a1*(x-x0) + a2*(x-x0)*(x-x1)
+        !  | |
+        !  | +--> derivative : f'(x) = a1 + a2*[(x-x1)+(x-x0)]
+        !  |
+        !  +--> determine Coefficients a0, a1, a2 for f(x)=f1,f2,f3
+        !  |
+        !  +--> a0 = f0 , 
+        !       a1 = (f1-f0)/(x1-x0) , 
+        !       a2 = ((x1-x0)*(f2-f1)-(x2-x1)*(f1-f0))/((x2-x0)*(x2-x1)*(x1-x0))
+        !
+        ! f(x) = f0 
+        !        + (f1-f0)/(x1-x0)*(x-x0) 
+        !        + [(x1-x0)*(f2-f1)-(x2-x1)*(f1-f0)]/[(x2-x0)*(x2-x1)*(x1-x0)]
+        !          *[(x-x1)+(x-x0)]
+        !
+        !_______________________________________________________________________
+        ! calculate pressure gradient for surface layer 
+        
+        ! account for reference density when using cavities
+        if (use_cavity .and. .not. use_density_ref) then
+            aux_dref = dref_bulk_0   + Z_n(nlz)*dref_bulk_pz   + Z_n(nlz)*dref_bulk_pz2
+            aux_dref = aux_dref*dref_rhopot/(aux_dref+0.1_WP*Z_n(nlz))
+        end if 
+        
+        nlz = ule
+        idx = (/1, 1, 1/)*nlz
+        idx = idx - ulevels_nod2D(elnodes)
+        do ni=1,3
+            if (idx(ni)==0) then
+                ! elemental surface index nlz ist also surface index of vertice ni
+                ! --> do second order newtonian surface boundary interpolation
+                !___________________________________________________________________
+                ! compute interpolation coefficients
+                dx10(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
+                dx21(ni)   = Z_3d_n(nlz+2,elnodes(ni))-Z_3d_n(nlz+1,elnodes(ni))
+                dx20(ni)   = Z_3d_n(nlz+2,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
+                
+                !!PS f0(ni)     = density_m_rho0(nlz  ,elnodes(ni))
+                !!PS df10(ni)   = density_m_rho0(nlz+1,elnodes(ni))-density_m_rho0(nlz  ,elnodes(ni))
+                !!PS df21(ni)   = density_m_rho0(nlz+2,elnodes(ni))-density_m_rho0(nlz+1,elnodes(ni))
+                
+                t0(ni)     = temp(nlz  ,elnodes(ni))
+                dt10(ni)   = temp(nlz+1,elnodes(ni))-temp(nlz  ,elnodes(ni))
+                dt21(ni)   = temp(nlz+2,elnodes(ni))-temp(nlz+1,elnodes(ni))
+                
+                s0(ni)     = salt(nlz  ,elnodes(ni))
+                ds10(ni)   = salt(nlz+1,elnodes(ni))-salt(nlz  ,elnodes(ni))
+                ds21(ni)   = salt(nlz+2,elnodes(ni))-salt(nlz+1,elnodes(ni))
+                !___________________________________________________________________
+                ! interpoalte vertice temp and salinity to elemental level Z_n
+                temp_at_Zn(ni) = t0(ni) &
+                                + dt10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n(nlz,elnodes(ni))) & 
+                                + (dx10(ni)*dt21(ni)-dx21(ni)*dt10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))* &
+                                  (Z_n(nlz)-Z_3d_n(nlz+1,elnodes(ni)))*(Z_n(nlz)-Z_3d_n(nlz,elnodes(ni)))
+                salt_at_Zn(ni) = s0(ni) &
+                                + ds10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n(nlz,elnodes(ni))) & 
+                                + (dx10(ni)*ds21(ni)-dx21(ni)*ds10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))* &
+                                  (Z_n(nlz)-Z_3d_n(nlz+1,elnodes(ni)))*(Z_n(nlz)-Z_3d_n(nlz,elnodes(ni)))
+                !___________________________________________________________________
+                ! compute density from state equation 
+                select case(state_equation)
+                    case(0)
+                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
+                    case(1)
+                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
+                    case default !unknown
+                        if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                end select
+                rho_at_Zn(ni) = bulk_0(ni) + Z_n(nlz)*(bulk_pz(ni) + Z_n(nlz)*bulk_pz2(ni))
+                rho_at_Zn(ni) = rho_at_Zn(ni)*rhopot(ni)/(rho_at_Zn(ni)+0.1_WP*Z_n(nlz)*real(state_equation))-aux_dref
+                
+                !!PS rho_at_Zn(ni) = f0(ni) &
+                !!PS                 + df10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n(nlz,elnodes(ni))) & 
+                !!PS                 + (dx10(ni)*df21(ni)-dx21(ni)*df10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))* &
+                !!PS                   (Z_n(nlz)-Z_3d_n(nlz+1,elnodes(ni)))*(Z_n(nlz)-Z_3d_n(nlz,elnodes(ni)))
+                
+            elseif (idx(ni)>0) then
+                ! elemental surface index nlz ist deeper than surface index of vertices ni
+                ! --> do normal interpolation
+                !___________________________________________________________________
+                ! compute interpolation coefficients
+                dx10(ni)   = Z_3d_n(nlz  ,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
+                dx21(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
+                dx20(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
+                
+                !!PS f0(ni)     = density_m_rho0(nlz-1,elnodes(ni))
+                !!PS df10(ni)   = density_m_rho0(nlz  ,elnodes(ni))-density_m_rho0(nlz-1,elnodes(ni))
+                !!PS df21(ni)   = density_m_rho0(nlz+1,elnodes(ni))-density_m_rho0(nlz  ,elnodes(ni))
+                
+                t0(ni)     = temp(nlz-1,elnodes(ni))
+                dt10(ni)   = temp(nlz  ,elnodes(ni))-temp(nlz-1,elnodes(ni))
+                dt21(ni)   = temp(nlz+1,elnodes(ni))-temp(nlz  ,elnodes(ni))
+                
+                s0(ni)     = salt(nlz-1,elnodes(ni))
+                ds10(ni)   = salt(nlz  ,elnodes(ni))-salt(nlz-1,elnodes(ni))
+                ds21(ni)   = salt(nlz+1,elnodes(ni))-salt(nlz  ,elnodes(ni))
+                !___________________________________________________________________               
+                ! interpoalte vertice temp and salinity to elemental level Z_n
+                temp_at_Zn(ni) = t0(ni) &
+                                + dt10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni))) & 
+                                + (dx10(ni)*dt21(ni)-dx21(ni)*dt10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))* &
+                                  (Z_n(nlz)-Z_3d_n(nlz,elnodes(ni)))*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni)))
+                salt_at_Zn(ni) = s0(ni) &
+                                + ds10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni))) & 
+                                + (dx10(ni)*ds21(ni)-dx21(ni)*ds10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))* &
+                                  (Z_n(nlz)-Z_3d_n(nlz,elnodes(ni)))*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni)))
+                !___________________________________________________________________
+                ! compute density from state equation 
+                select case(state_equation)
+                    case(0)
+                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
+                    case(1)
+                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
+                    case default !unknown
+                        if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                end select
+                rho_at_Zn(ni) = bulk_0(ni) + Z_n(nlz)*(bulk_pz(ni) + Z_n(nlz)*bulk_pz2(ni))
+                rho_at_Zn(ni) = rho_at_Zn(ni)*rhopot(ni)/(rho_at_Zn(ni)+0.1_WP*Z_n(nlz)*real(state_equation))-aux_dref
+                
+                !!PS rho_at_Zn(ni) = f0(ni) &
+                !!PS                 + df10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni))) & 
+                !!PS                 + (dx10(ni)*df21(ni)-dx21(ni)*df10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))* &
+                !!PS                   (Z_n(nlz)-Z_3d_n(nlz,elnodes(ni)))*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni)))
+            else
+                ! would do second order Newtonian surface boundary extrapolation 
+                ! --> this is not wanted !!!
+                write(*,*) ' --> would do second order surface boundary density extrapolation'
+                write(*,*) '     This is not wanted, model stops here'
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)    
+            end if 
+        end do
+        !_______________________________________________________________________
+        ! zonal surface pressure gradients
+        drho_dx         = sum(gradient_sca(1:3,elem)*rho_at_Zn)
+        aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+        pgf_x(nlz,elem) = aux_sum*0.5_WP
+        int_dp_dx(1)    = aux_sum
+        !_______________________________________________________________________
+        ! meridional surface pressure gradients
+        drho_dy         = sum(gradient_sca(4:6,elem)*rho_at_Zn)
+        aux_sum         = drho_dy*helem(nlz,elem)*g/density_0
+        pgf_y(nlz,elem) = aux_sum*0.5_WP
+        int_dp_dx(2)    = aux_sum
+        
+        !_______________________________________________________________________
+        ! calculate pressure gradient for subsurface layer until one layer above 
+        ! the bottom 
+        do nlz=ule+1,nle-1
+        
+            !___________________________________________________________________
+            ! elemental bottom index nlz ist shallower than bottom index of vertice ni
+            if (use_cavity .and. .not. use_density_ref) then
+                aux_dref = dref_bulk_0   + Z_n(nlz)*dref_bulk_pz   + Z_n(nlz)*dref_bulk_pz2
+                aux_dref = aux_dref*dref_rhopot/(aux_dref+0.1_WP*Z_n(nlz))
+            end if 
+            
+            !___________________________________________________________________
+            ! compute interpolation coefficients
+            dx10   = Z_3d_n(nlz  ,elnodes)-Z_3d_n(nlz-1,elnodes)
+            dx21   = Z_3d_n(nlz+1,elnodes)-Z_3d_n(nlz  ,elnodes)
+            dx20   = Z_3d_n(nlz+1,elnodes)-Z_3d_n(nlz-1,elnodes)
+            
+            !!PS f0     = density_m_rho0(nlz-1,elnodes)
+            !!PS df10   = density_m_rho0(nlz  ,elnodes)-density_m_rho0(nlz-1,elnodes)
+            !!PS df21   = density_m_rho0(nlz+1,elnodes)-density_m_rho0(nlz  ,elnodes)
+            
+            t0     = temp(nlz-1,elnodes)
+            dt10   = temp(nlz  ,elnodes)-temp(nlz-1,elnodes)
+            dt21   = temp(nlz+1,elnodes)-temp(nlz  ,elnodes)
+            
+            s0     = salt(nlz-1,elnodes)
+            ds10   = salt(nlz  ,elnodes)-salt(nlz-1,elnodes)
+            ds21   = salt(nlz+1,elnodes)-salt(nlz  ,elnodes)
+            !___________________________________________________________________               
+            ! interpoalte vertice temp and salinity to elemental level Z_n
+            temp_at_Zn = t0 &
+                            + dt10/dx10*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes)) & 
+                            + (dx10*dt21-dx21*dt10)/(dx20*dx21*dx10)* &
+                                ((/1.0_WP,1.0_WP,1.0_WP/)*Z_n(nlz)-Z_3d_n(nlz,elnodes))*&
+                                ((/1.0_WP,1.0_WP,1.0_WP/)*Z_n(nlz)-Z_3d_n(nlz-1,elnodes))
+            salt_at_Zn = s0 &
+                            + ds10/dx10*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes)) & 
+                            + (dx10*ds21-dx21*ds10)/(dx20*dx21*dx10)* &
+                                ((/1.0_WP,1.0_WP,1.0_WP/)*Z_n(nlz)-Z_3d_n(nlz,elnodes))*&
+                                ((/1.0_WP,1.0_WP,1.0_WP/)*Z_n(nlz)-Z_3d_n(nlz-1,elnodes))
+            !___________________________________________________________________
+            ! compute density from state equation 
+            select case(state_equation)
+                case(0)
+                    call density_linear(temp_at_Zn(1), salt_at_Zn(1), bulk_0(1), bulk_pz(1), bulk_pz2(1), rhopot(1), partit, mesh)             
+                    call density_linear(temp_at_Zn(2), salt_at_Zn(2), bulk_0(2), bulk_pz(2), bulk_pz2(2), rhopot(2), partit, mesh)             
+                    call density_linear(temp_at_Zn(3), salt_at_Zn(3), bulk_0(3), bulk_pz(3), bulk_pz2(3), rhopot(3), partit, mesh)             
+                case(1)
+                    call densityJM_components(temp_at_Zn(1), salt_at_Zn(1), bulk_0(1), bulk_pz(1), bulk_pz2(1), rhopot(1), partit, mesh)             
+                    call densityJM_components(temp_at_Zn(2), salt_at_Zn(2), bulk_0(2), bulk_pz(2), bulk_pz2(2), rhopot(2), partit, mesh)             
+                    call densityJM_components(temp_at_Zn(3), salt_at_Zn(3), bulk_0(3), bulk_pz(3), bulk_pz2(3), rhopot(3), partit, mesh)             
+                case default !unknown
+                    if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            end select
+            rho_at_Zn = bulk_0 + Z_n(nlz)*(bulk_pz + Z_n(nlz)*bulk_pz2)
+            rho_at_Zn = rho_at_Zn*rhopot/(rho_at_Zn+0.1_WP*Z_n(nlz)*real(state_equation))-aux_dref
+            
+            !!PS rho_at_Zn = f0 &
+            !!PS                 + df10/dx10*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes)) & 
+            !!PS                 + (dx10*df21-dx21*df10)/(dx20*dx21*dx10)* &
+            !!PS                     (Z_n(nlz)-Z_3d_n(nlz,elnodes))*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes))
+            
+            !___________________________________________________________________
+            ! zonal gradients
+            drho_dx         = sum(gradient_sca(1:3,elem)*rho_at_Zn)
+            aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+            pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
+            int_dp_dx(1)    = int_dp_dx(1) + aux_sum
+            
+            !___________________________________________________________________
+            ! meridional gradients
+            drho_dy         = sum(gradient_sca(4:6,elem)*rho_at_Zn)
+            aux_sum         = drho_dy*helem(nlz,elem)*g/density_0
+            pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
+            int_dp_dx(2)    = int_dp_dx(2) + aux_sum
+        end do ! --> do nlz=2,nle-1
+        
+        !_______________________________________________________________________
+        ! calculate pressure gradient for bottom layer
+        ! vertical gradient --> with average density and average mid-depth level 
+        ! on element
+        ! f(x) = a0 + a1(x-x0) + a2*(x-x1)(x-x0)
+        ! f(x) = f0 + df10/dx10*(x-x0) + (dx10*df21-dx21*df10)/(dx20*dx21*dx10)*(x-x1)(x-x0)
+        
+        ! account for reference density when using cavities
+        if (use_cavity .and. .not. use_density_ref) then
+            aux_dref = dref_bulk_0 + Z_n(nlz)*dref_bulk_pz + Z_n(nlz)*dref_bulk_pz2
+            aux_dref = aux_dref*dref_rhopot/(aux_dref+0.1_WP*Z_n(nlz))
+        end if 
+        
+        nlz = nle 
+        do ni=1,3
+            !___________________________________________________________________               
+            ! interpoalte vertice temp and salinity to elemental level Z_n
+            temp_at_Zn(ni) = temp(nlz, elnodes(ni))
+            salt_at_Zn(ni) = salt(nlz, elnodes(ni))
+            !__________________________________________________________________
+            ! compute density from state equation 
+            select case(state_equation)
+                case(0)
+                    call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
+                case(1)
+                    call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
+                case default !unknown
+                    if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            end select
+            rho_at_Zn(ni) = bulk_0(ni) + Z(nlz)*(bulk_pz(ni) + Z(nlz)*bulk_pz2(ni))
+            rho_at_Zn(ni) = rho_at_Zn(ni)*rhopot(ni)/(rho_at_Zn(ni)+0.1_WP*Z(nlz)*real(state_equation))-aux_dref
+        end do
+        !_______________________________________________________________________
+        ! zonal bottom pressure gradients
+        drho_dx         = sum(gradient_sca(1:3,elem)*rho_at_Zn)
+        aux_sum         = drho_dx*(zbar(nlz)-zbar(nlz+1))*g/density_0
+        pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
+        
+        !_______________________________________________________________________
+        ! meridional bottom pressure gradients
+        drho_dy         = sum(gradient_sca(4:6,elem)*rho_at_Zn)
+        aux_sum         = drho_dy*(zbar(nlz)-zbar(nlz+1))*g/density_0
+        pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
+       
+    end do ! --> do elem=1, myDim_elem2D
+!$OMP END DO
+!$OMP END PARALLEL
+end subroutine pressure_force_4_zxxxx_easypgf_fullbc
 !
 !
 !
