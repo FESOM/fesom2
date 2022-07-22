@@ -62,6 +62,8 @@ module io_MEANDATA
 !--------------------------------------------------------------------------------------------
 !
   integer, save                  :: io_listsize=0
+  integer, save :: keep_nth_level
+
   type io_entry
         CHARACTER(len=15)        :: id        ='unknown   '
         INTEGER                  :: freq      =0
@@ -110,6 +112,7 @@ subroutine ini_mean_io(mesh)
   type(t_mesh), intent(in) , target :: mesh
   namelist /nml_listsize/ io_listsize
   namelist /nml_list    / io_list
+  namelist /nml_output_settings/ keep_nth_level
 
 #include  "associate_mesh.h"
 
@@ -122,6 +125,9 @@ subroutine ini_mean_io(mesh)
      call par_ex
      stop
   endif
+  
+  read(nm_io_unit,  nml=nml_output_settings)
+  
   READ(nm_io_unit, nml=nml_listsize, iostat=iost )
   allocate(io_list(io_listsize))
   READ(nm_io_unit, nml=nml_list,     iostat=iost )
@@ -572,9 +578,6 @@ function skip_level_in_output(lvl) result(should_skip)
   integer lvl
   logical should_skip
   ! EO parameters
-  integer keep_nth_level
-  
-  keep_nth_level = 1 ! todo: use a value from namelist
 
   if(mod((lvl-1),keep_nth_level) .ne. 0) then
     should_skip = .true.
