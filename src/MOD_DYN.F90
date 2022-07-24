@@ -110,8 +110,11 @@ TYPE T_DYN
     logical                                     :: use_wsplit    = .false.
     ! maximum allowed CFL criteria in vertical (0.5 < w_max_cfl < 1.) 
     ! in older FESOM it used to be w_exp_max=1.e-3
-    real(kind=WP)                               :: wsplit_maxcfl= 1.0     
-
+    real(kind=WP)                               :: wsplit_maxcfl= 1.0
+    ! energy diagnostic part: will be computed inside the model ("hard integration"):
+    logical                                      :: diag_ke       = .true.
+    real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv, ke_cor, ke_pre, ke_hvis, ke_vvis, ke_total
+    real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv_AB, ke_cor_AB
     !___________________________________________________________________________
     contains
 #if defined(__PGI)

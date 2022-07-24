@@ -486,6 +486,17 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
         dynamics%work%u_b = 0.0_WP
         dynamics%work%v_b = 0.0_WP
     end if 
+   
+    if (dynamics%diag_ke) then
+       allocate(dynamics%ke_adv    (2, nl-1, elem_size))
+       allocate(dynamics%ke_cor    (2, nl-1, elem_size))
+       allocate(dynamics%ke_pre    (2, nl-1, elem_size))
+       allocate(dynamics%ke_hvis   (2, nl-1, elem_size))
+       allocate(dynamics%ke_vvis   (2, nl-1, elem_size))
+       allocate(dynamics%ke_total  (2, nl-1, elem_size))
+       allocate(dynamics%ke_adv_AB (2, nl-1, elem_size))
+       allocate(dynamics%ke_cor_AB (2, nl-1, elem_size))
+    end if
 END SUBROUTINE dynamics_init
 !
 !

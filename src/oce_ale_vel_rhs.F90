@@ -94,6 +94,14 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
             UV_rhs(1,nz,elem)=-(0.5_WP+epsilon)*UV_rhsAB(1,nz,elem)   
             UV_rhs(2,nz,elem)=-(0.5_WP+epsilon)*UV_rhsAB(2,nz,elem)
         end do
+        if (dynamics%diag_ke) then
+           do nz=nzmin,nzmax-1
+              dynamics%ke_adv(1,nz,elem)=-(0.5_WP+epsilon)*dynamics%ke_adv_AB(1,nz,elem)   
+              dynamics%ke_adv(2,nz,elem)=-(0.5_WP+epsilon)*dynamics%ke_adv_AB(2,nz,elem)
+              dynamics%ke_cor(1,nz,elem)=-(0.5_WP+epsilon)*dynamics%ke_cor_AB(1,nz,elem)   
+              dynamics%ke_cor(2,nz,elem)=-(0.5_WP+epsilon)*dynamics%ke_cor_AB(2,nz,elem)
+           end do
+        end if
         
         !___________________________________________________________________________
         ! Sea level and pressure contribution   -\nabla(\eta +hpressure/rho_0)
@@ -149,6 +157,20 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
             UV_rhsAB(1,nz,elem) = UV(2,nz,elem)*ff! + mm*UV(1,nz,elem)*UV(2,nz,elem)
             UV_rhsAB(2,nz,elem) =-UV(1,nz,elem)*ff! - mm*UV(1,nz,elem)*UV(2,nz,elem)
         end do
+
+        if (dynamics%diag_ke) then
+           do nz=nzmin,nzmax-1
+              dynamics%ke_pre(1,nz,elem)= (Fx-pgf_x(nz,elem))!*elem_area(elem) !not to divide it aterwards (at the end of this subroutine)
+              dynamics%ke_pre(2,nz,elem)= (Fy-pgf_y(nz,elem))!*elem_area(elem)
+
+              dynamics%ke_cor_AB(1,nz,elem)= UV(2,nz,elem)*ff
+              dynamics%ke_cor_AB(2,nz,elem)=-UV(1,nz,elem)*ff
+
+              dynamics%ke_adv_AB(1,nz,elem)= 0.0_WP
+              dynamics%ke_adv_AB(2,nz,elem)= 0.0_WP
+           end do
+        end if
+
     end do
 !$OMP END PARALLEL DO
     
@@ -176,6 +198,17 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
             UV_rhs(2,nz,elem)=dt*(UV_rhs(2,nz,elem)+UV_rhsAB(2,nz,elem)*ff)/elem_area(elem)
         end do
     end do
+
+    if (dynamics%diag_ke) then
+        nzmax = nlevels(elem)
+        nzmin = ulevels(elem)
+        do nz=nzmin,nzmax-1
+            dynamics%ke_adv(1,nz,elem)=(dynamics%ke_adv(1,nz,elem)+dynamics%ke_adv_AB(1,nz,elem)*ff)/elem_area(elem)
+            dynamics%ke_adv(2,nz,elem)=(dynamics%ke_adv(2,nz,elem)+dynamics%ke_adv_AB(2,nz,elem)*ff)/elem_area(elem)
+            dynamics%ke_cor(1,nz,elem)=(dynamics%ke_cor(1,nz,elem)+dynamics%ke_cor_AB(1,nz,elem)*ff)/elem_area(elem)
+            dynamics%ke_cor(2,nz,elem)=(dynamics%ke_cor(2,nz,elem)+dynamics%ke_cor_AB(2,nz,elem)*ff)/elem_area(elem)
+        end do       
+    end if
 !$OMP END PARALLEL DO
     
     ! =======================  
@@ -425,6 +458,18 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
                 + UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(3,el))) / 3.0_WP     
     
     end do ! --> do el=1, myDim_elem2D
+
+    if (dynamics%diag_ke) then !we repeat the computation here and there are multiple ways to speed it up
+       do el=1, myDim_elem2D
+          nl1 = nlevels(el)-1
+          ul1 = ulevels(el)
+          dynamics%ke_adv_AB(1:2,ul1:nl1,el) = dynamics%ke_adv_AB(1:2,ul1:nl1,el) &
+                + elem_area(el)*(UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(1,el)) &
+                + UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(2,el)) & 
+                + UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(3,el))) / 3.0_WP     
+       end do
+    end if
+
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine momentum_adv_scalar
