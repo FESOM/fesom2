@@ -2893,8 +2893,8 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
     integer           :: node
 !NR
-    integer, save     :: n_check=0
-    real(kind=8)      :: temp_check, sali_check
+!    integer, save     :: n_check=0
+!    real(kind=8)      :: temp_check, sali_check
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer :: eta_n
