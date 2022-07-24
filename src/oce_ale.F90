@@ -3160,18 +3160,17 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 
 
 !NR Checksum for tracers, as they are most sensitive
-
-    n_check = n_check+1
-    temp_check = 0.
-    sali_check = 0.  
-    do node=1,myDim_nod2D+eDim_nod2D
-        temp_check = temp_check + sum(tracers%data(1)%values(nlevels_nod2D(node)-1:ulevels_nod2D(node),node))
-        sali_check = sali_check + sum(tracers%data(2)%values(nlevels_nod2D(node)-1:ulevels_nod2D(node),node))
-    end do
-    call MPI_Allreduce(MPI_IN_PLACE, temp_check, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
-    call MPI_Allreduce(MPI_IN_PLACE, sali_check, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
-
-    print *,'Check',n_check,temp_check,sali_check
-
+!    n_check = n_check+1
+!    temp_check = 0.
+!    sali_check = 0.  
+!    do node=1,myDim_nod2D+eDim_nod2D
+!        temp_check = temp_check + sum(tracers%data(1)%values(nlevels_nod2D(node)-1:ulevels_nod2D(node),node))
+!        sali_check = sali_check + sum(tracers%data(2)%values(nlevels_nod2D(node)-1:ulevels_nod2D(node),node))
+!    end do
+!    call MPI_Allreduce(MPI_IN_PLACE, temp_check, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+!    call MPI_Allreduce(MPI_IN_PLACE, sali_check, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+!
+!    print *,'Check',n_check,temp_check,sali_check
+!
 end subroutine oce_timestep_ale
 
