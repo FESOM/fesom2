@@ -198,8 +198,11 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
             UV_rhs(2,nz,elem)=dt*(UV_rhs(2,nz,elem)+UV_rhsAB(2,nz,elem)*ff)/elem_area(elem)
         end do
     end do
+!$OMP END PARALLEL DO
 
     if (dynamics%diag_ke) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
+    do elem=1, myDim_elem2D
         nzmax = nlevels(elem)
         nzmin = ulevels(elem)
         do nz=nzmin,nzmax-1
@@ -207,9 +210,10 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
             dynamics%ke_adv(2,nz,elem)=(dynamics%ke_adv(2,nz,elem)+dynamics%ke_adv_AB(2,nz,elem)*ff)/elem_area(elem)
             dynamics%ke_cor(1,nz,elem)=(dynamics%ke_cor(1,nz,elem)+dynamics%ke_cor_AB(1,nz,elem)*ff)/elem_area(elem)
             dynamics%ke_cor(2,nz,elem)=(dynamics%ke_cor(2,nz,elem)+dynamics%ke_cor_AB(2,nz,elem)*ff)/elem_area(elem)
-        end do       
-    end if
+        end do
+    end do
 !$OMP END PARALLEL DO
+    end if
     
     ! =======================  
     ! U_rhs contains all contributions to velocity from old time steps   
@@ -458,8 +462,10 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
                 + UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(3,el))) / 3.0_WP     
     
     end do ! --> do el=1, myDim_elem2D
+!$OMP END DO
 
     if (dynamics%diag_ke) then !we repeat the computation here and there are multiple ways to speed it up
+!$OMP DO
        do el=1, myDim_elem2D
           nl1 = nlevels(el)-1
           ul1 = ulevels(el)
@@ -468,9 +474,8 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
                 + UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(2,el)) & 
                 + UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(3,el))) / 3.0_WP     
        end do
-    end if
-
 !$OMP END DO
+    end if
 !$OMP END PARALLEL
 end subroutine momentum_adv_scalar
 
