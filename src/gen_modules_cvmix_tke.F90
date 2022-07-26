@@ -19,7 +19,7 @@ module g_cvmix_tke
     use cvmix_tke,         only: init_tke, cvmix_coeffs_tke
     use cvmix_put_get,     only: cvmix_put
     use cvmix_kinds_and_types
-    use g_cvmix_idemix,    only: iwe, iwe_Tdis, iwe_alpha_c
+    use g_cvmix_idemix,    only: iwe_n, iwe_Tdis_n, iwe_alpha_c_n
     
     !___________________________________________________________________________
     ! module calls from FESOM
@@ -242,12 +242,12 @@ module g_cvmix_tke
         
         !_______________________________________________________________________
         !langmuir parameterisation
+        allocate(tke_langmuir(nl,node_size))
+        tke_langmuir    = 0.0_WP
         if (tke_dolangmuir) then
-            allocate(tke_langmuir(nl,node_size))
             allocate(langmuir_wlc(nl,node_size))
             allocate(langmuir_hlc(node_size))
             allocate(langmuir_ustoke(node_size))
-            tke_langmuir    = 0.0_WP
             langmuir_wlc    = 0.0_WP
             langmuir_hlc    = 0.0_WP
             langmuir_ustoke = 0.0_WP
@@ -302,9 +302,9 @@ module g_cvmix_tke
         
         ! load things from idemix when selected
         if (.not. tke_only) then
-            tke_in3d_iwe       = iwe
-            tke_in3d_iwdis     = -iwe_Tdis
-            tke_in3d_iwealphac = iwe_alpha_c
+            tke_in3d_iwe       = iwe_n
+            tke_in3d_iwdis     = -iwe_Tdis_n
+            tke_in3d_iwealphac = iwe_alpha_c_n
         endif
         
         !_______________________________________________________________________
@@ -389,7 +389,7 @@ module g_cvmix_tke
                 langmuir_hlc(node) = 0.0_wp
                 do nz=nun+1,nln
                     !!PS k_hlc = nz
-                    aux = sum(-bvfreq2(2:nz+1)*zbar_3d_n(2:nz+1,node) )
+                    aux = sum( -bvfreq2(2:nz+1)*zbar_3d_n(2:nz+1,node) )
                     if(aux > 0.5_wp*langmuir_ustoke(node)**2.0_wp) then
                         !!PS k_hlc = nz
                         langmuir_hlc(node) = -zbar_3d_n(nz,node)
@@ -496,5 +496,6 @@ module g_cvmix_tke
                 Av(nz,elem) = sum(tke_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do
+        
     end subroutine calc_cvmix_tke
 end module g_cvmix_tke

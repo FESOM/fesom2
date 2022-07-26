@@ -1053,7 +1053,7 @@ CONTAINS
       if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
          ! runoff in CORE is constant in time
          ! Warning: For a global mesh, conservative scheme is to be updated!!
-         call read_other_NetCDF(nm_runoff_file, 'Foxx_o_roff', 1, runoff, .false., partit, mesh) 
+         call read_other_NetCDF(nm_runoff_file, 'Foxx_o_roff', 1, runoff, .false., .true., partit, mesh) 
          runoff=runoff/1000.0_WP  ! Kg/s/m2 --> m/s
       end if
 
@@ -1149,7 +1149,7 @@ CONTAINS
                if (mstep > 1) i=i+1 
                if (i > 12) i=1
                if (mype==0) write(*,*) 'Updating SSS restoring data for month ', i 
-               call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true., partit, mesh) 
+               call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true., .true., partit, mesh) 
             end if
          end if
       end if
@@ -1162,7 +1162,7 @@ CONTAINS
                if (mstep > 1) i=i+1 
                if (i > 12) i=1
                if (mype==0) write(*,*) 'Updating chlorophyll climatology for month ', i 
-               call read_other_NetCDF(nm_chl_data_file, 'chl', i, chl, .true., partit, mesh) 
+               call read_other_NetCDF(nm_chl_data_file, 'chl', i, chl, .true., .true., partit, mesh) 
             end if
          end if
       end if
