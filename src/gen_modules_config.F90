@@ -128,11 +128,14 @@ module g_config
   logical                       :: flag_debug=.false.    ! prints name of actual subroutine he is in 
   logical                       :: flag_warn_cflz=.true. ! switches off cflz warning
 ! enable (disable) transient tracers:
-  logical                       :: use_transit = .false.
+  logical                       :: use_transit = .false., &                          ! enable / disable transient tracers
+                                   anthro_transit = .false., paleo_transit = .false. ! specify tracer input scenario
+  integer                       :: length_transit = 1, ti_start_transit = 1          ! length (years) of transient tracer input, index of the first tracer input year in ifile_transit
+  character(300)                :: ifile_transit = 'namelist.oce'                    ! tracer input file; use 'namelist.oce' only for constant tracer input (e.g., for model spinup)
 
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
                         use_cavity_partial_cell, cavity_partial_cell_thresh, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, & !---wiso-code add lwiso
-                        use_transit
+                        use_transit, anthro_transit, paleo_transit, length_transit, ti_start_transit, ifile_transit
   
   !_____________________________________________________________________________
   ! *** others ***
