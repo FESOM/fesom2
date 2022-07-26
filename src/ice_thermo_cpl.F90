@@ -135,13 +135,13 @@ subroutine thermodynamics(mesh)
 #if defined (__oifs)
      !---- different lead closing parameter for NH and SH
      call r2g(geolon, geolat, coord_nod2d(1,inod), coord_nod2d(2,inod))
-     if (geolat.lt.0.) then
-        h0min = 1.0
-        h0max = 1.0
-     else
-        h0min = 0.3
-        h0max = 0.3
-     endif
+     !if (geolat.lt.0.) then
+     !   h0min = 1.0
+     !   h0max = 1.0
+     !else
+     !   h0min = 0.3
+     !   h0max = 0.3
+     !endif
      !---- For AWI-CM3 we calculate ice surface temp and albedo in fesom,
      ! then send those to OpenIFS where they are used to calucate the 
      ! energy fluxes ---!
@@ -519,11 +519,11 @@ contains
 
   ! set albedo
   ! ice and snow, freezing and melting conditions are distinguished
-  if (geolat.gt.0.) then !SH does not have melt ponds
-      melt_pool_alb_reduction = 0.0_WP
-  else
+  !if (geolat.gt.0.) then !SH does not have melt ponds
+  !    melt_pool_alb_reduction = 0.0_WP
+  !else
       melt_pool_alb_reduction = 0.12_WP
-  endif
+  !endif
   if (h>0.0_WP) then
      if (t<273.15_WP) then         ! freezing condition    
         if (hsn.gt.0.001_WP) then !   snow cover present  
@@ -532,11 +532,19 @@ contains
            alb=albi             
         endif
      else                               ! melting condition     
+       if (h.gt.1.0_WP) then ! only apply melt pool albedo reduction when sea ice thickness more than 1 m
         if (hsn.gt.0.001_WP) then !   snow cover present  
-           alb=albsnm-melt_pool_alb_reduction           
+           alb=albsnm-melt_pool_alb_reduction
         else                    !   no snow cover       
            alb=albim-melt_pool_alb_reduction
         endif
+       else ! no melt pool albedo reduction
+        if (hsn.gt.0.001_WP) then !   snow cover present  
+           alb=albsnm
+        else                    !   no snow cover       
+           alb=albim
+        endif
+       endif
      endif
    else
       alb=0.066_WP            !  ocean albedo
