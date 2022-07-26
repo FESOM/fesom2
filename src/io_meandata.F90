@@ -18,6 +18,7 @@ module io_MEANDATA
     private
     integer                                            :: ndim
     integer                                            :: glsize(2)
+    integer                                            :: output_level_count
     integer                                            :: accuracy
     real(real64), allocatable, dimension(:,:) :: local_values_r8
     real(real32), allocatable, dimension(:,:) :: local_values_r4
@@ -61,6 +62,8 @@ module io_MEANDATA
 !--------------------------------------------------------------------------------------------
 !
   integer, save                  :: io_listsize=0
+  integer, save :: keep_nth_level
+
   type io_entry
         CHARACTER(len=15)        :: id        ='unknown   '
         INTEGER                  :: freq      =0
@@ -109,6 +112,7 @@ subroutine ini_mean_io(mesh)
   type(t_mesh), intent(in) , target :: mesh
   namelist /nml_listsize/ io_listsize
   namelist /nml_list    / io_list
+  namelist /nml_output_settings/ keep_nth_level
 
 #include  "associate_mesh.h"
 
@@ -121,6 +125,9 @@ subroutine ini_mean_io(mesh)
      call par_ex
      stop
   endif
+  
+  read(nm_io_unit,  nml=nml_output_settings)
+  
   READ(nm_io_unit, nml=nml_listsize, iostat=iost )
   allocate(io_list(io_listsize))
   READ(nm_io_unit, nml=nml_list,     iostat=iost )
@@ -565,6 +572,19 @@ function mesh_dimname_from_dimsize(size, mesh) result(name)
     if (mype==0) write(*,*) 'WARNING: unknown dimension in mean I/O with size of ', size
   end if
 end function
+
+
+function skip_level_in_output(lvl) result(should_skip)
+  integer lvl
+  logical should_skip
+  ! EO parameters
+
+  if(mod((lvl-1),keep_nth_level) .ne. 0) then
+    should_skip = .true.
+  else
+    should_skip = .false.
+  end if
+end function
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -583,6 +603,8 @@ subroutine create_new_file(entry, mesh)
  
   type(Meandata), intent(inout) :: entry
   character(len=*), parameter :: global_attributes_prefix = "FESOM_"
+  integer, allocatable :: output_levels(:)
+  integer lvl, file_lvl
   ! Serial output implemented so far
   if (mype/=entry%root_rank) return
   ! create an ocean output file
@@ -594,7 +616,7 @@ subroutine create_new_file(entry, mesh)
   if (entry%ndim==1) then
      call assert_nf( nf_def_dim(entry%ncid, entry%dimname(1), entry%glsize(2), entry%dimID(1)), __LINE__)
   else if (entry%ndim==2) then
-     call assert_nf( nf_def_dim(entry%ncid,  entry%dimname(1), entry%glsize(1), entry%dimID(1)), __LINE__)
+     call assert_nf( nf_def_dim(entry%ncid,  entry%dimname(1), entry%output_level_count, entry%dimID(1)), __LINE__)
      call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
      if (entry%dimname(1)=='nz') then
        call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer interface'),'depth at layer interface'), __LINE__)
@@ -666,10 +688,18 @@ subroutine create_new_file(entry, mesh)
   
 !___This ends definition part of the file, below filling in variables is possible
   call assert_nf( nf_enddef(entry%ncid), __LINE__)
+
+  allocate(output_levels(entry%output_level_count))
+  file_lvl = 0
+  do lvl=1, entry%glsize(1)
+    if(skip_level_in_output(lvl)) cycle
+    file_lvl = file_lvl +1
+    output_levels(file_lvl) = lvl
+  end do
   if (entry%dimname(1)=='nz') then
-      call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%zbar)), __LINE__)
+      call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%zbar(output_levels))), __LINE__)
   elseif (entry%dimname(1)=='nz1') then
-      call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%Z)), __LINE__)
+      call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%Z(output_levels))), __LINE__)
   else
       if (mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
   end if 
@@ -711,8 +741,8 @@ subroutine write_mean(entry, entry_index)
   integer, intent(in) :: entry_index
   integer tag
   integer                       :: i, size1, size2, size_gen, size_lev, order
-  integer                       :: c, lev
 
+  integer                       :: c, lev, file_lvl
 
   ! Serial output implemented so far
   if (mype==entry%root_rank) then
@@ -728,7 +758,10 @@ subroutine write_mean(entry, entry_index)
      if(mype==entry%root_rank) then
        if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(size2))
      end if
+     file_lvl = 0
      do lev=1, size1
+        if(skip_level_in_output(lev)) cycle
+        file_lvl = file_lvl +1
 #ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
         ! aleph cray-mpich workaround
         call MPI_Barrier(entry%comm, MPIERR)
@@ -743,9 +776,9 @@ subroutine write_mean(entry, entry_index)
             call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r8, 1), __LINE__)
           elseif (entry%ndim==2) then
 #ifndef TRANSPOSE_OUTPUT
-            call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r8, 1), __LINE__)
+            call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/file_lvl, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r8, 1), __LINE__)
 #else
-            call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size2, 1, 1/), entry%aux_r8, 1), __LINE__)
+            call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, file_lvl, entry%rec_count/), (/size2, 1, 1/), entry%aux_r8, 1), __LINE__)
 #endif
           end if
         end if
@@ -756,7 +789,10 @@ subroutine write_mean(entry, entry_index)
      if(mype==entry%root_rank) then
        if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(size2))
      end if
+     file_lvl = 0
      do lev=1, size1
+        if(skip_level_in_output(lev)) cycle
+        file_lvl = file_lvl +1
 #ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
         ! aleph cray-mpich workaround
         call MPI_Barrier(entry%comm, MPIERR)
@@ -771,9 +807,9 @@ subroutine write_mean(entry, entry_index)
              call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r4, 1), __LINE__)
            elseif (entry%ndim==2) then
 #ifndef TRANSPOSE_OUTPUT
-             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r4, 1), __LINE__)
+             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/file_lvl, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r4, 1), __LINE__)
 #else
-             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size2, 1, 1/), entry%aux_r4, 1), __LINE__)
+             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, file_lvl, entry%rec_count/), (/size2, 1, 1/), entry%aux_r4, 1), __LINE__)
 #endif
            end if
         end if
@@ -967,6 +1003,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   type(t_mesh), intent(in), target     :: mesh
   logical, optional, intent(in)        :: flip_array
   integer i
+  integer lvl
   
   do i = 1, rank(data)
     if ((ubound(data, dim = i)<=0)) then
@@ -999,6 +1036,11 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
 
   entry%ndim=2
   entry%glsize=glsize                     !2D! entry%glsize=(/1, glsize/)
+  entry%output_level_count = 0
+  do lvl=1, entry%glsize(1)
+    if(skip_level_in_output(lvl)) cycle
+    entry%output_level_count = entry%output_level_count +1
+  end do
 
   if (accuracy == i_real8) then
     allocate(entry%local_values_r8(lcsize(1), lcsize(2)))
@@ -1031,6 +1073,7 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   type(Meandata),        pointer       :: entry
   type(t_mesh), intent(in), target     :: mesh
   integer i
+  integer lvl
   
   do i = 1, rank(data)
     if ((ubound(data, dim = i)<=0)) then
@@ -1061,6 +1104,11 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
 
   entry%ndim=1
   entry%glsize=(/1, glsize/)
+  entry%output_level_count = 0
+  do lvl=1, entry%glsize(1)
+    if(skip_level_in_output(lvl)) cycle
+    entry%output_level_count = entry%output_level_count +1
+  end do
 
   entry%dimname(1)=mesh_dimname_from_dimsize(glsize, mesh)
   entry%dimname(2)='unknown'

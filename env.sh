@@ -27,6 +27,8 @@ fi
 
 if [[ $LOGINHOST =~ ^m[A-Za-z0-9]+\.hpc\.dkrz\.de$ ]]; then
    STRATEGY="mistral.dkrz.de"
+elif [[ $LOGINHOST =~ ^l[A-Za-z0-9]+\.atos\.local$ ]]; then
+   STRATEGY="levante.dkrz.de"
 elif [[ $LOGINHOST =~ ^ollie[0-9]$ ]] || [[ $LOGINHOST =~ ^prod-[0-9]{4}$ ]]; then
    STRATEGY="ollie"
 elif [[ $LOGINHOST =~ ^h[A-Za-z0-9]+\.hsn\.hlrn\.de$ ]]; then
@@ -70,5 +72,6 @@ if [ $BEING_EXECUTED = true ]; then
    echo $DIR/env/$STRATEGY
 else
    # file is being sourced
+   export FESOM_PLATFORM_STRATEGY=$STRATEGY
    source $DIR/env/$STRATEGY/shell
 fi

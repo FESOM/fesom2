@@ -676,7 +676,7 @@ CONTAINS
          delta_t = 1.0_wp
          if (mype==0) then
             write(*,*) 'WARNING: no temporal extrapolation into future (nearest neighbour is used): ', trim(var_name), ' !'
-            write(*,*) file_name
+            write(*,*) trim(file_name)
             write(*,*) nc_time(1), nc_time(nc_Ntime), now_date
          end if
       elseif (t_indx < 1) then ! NO extrapolation back in time
@@ -685,7 +685,7 @@ CONTAINS
          delta_t = 1.0_wp
          if (mype==0) then 
             write(*,*) 'WARNING: no temporal extrapolation back in time (nearest neighbour is used): ', trim(var_name), ' !'
-            write(*,*) file_name
+            write(*,*) trim(file_name)
             write(*,*) nc_time(1), nc_time(nc_Ntime), now_date
          end if
       end if
