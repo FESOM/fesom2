@@ -9,54 +9,46 @@ MODULE mod_transit
 ! Atmospheric pressure, local (dummy) variable, global-mean SLP, and local wind speed at 10 m
   real(kind=8) :: press_a, mean_slp = 1.01325e5, wind_2
 
+! Atmospheric trace gas (dummy) values used in air-sea flux calculations
+! Isotopic ratios are normalized and fractionation-corrected,
+! volume mixing ratios are mole fractions in dry air.
+  real(kind=8) :: r14c_a  = 1.0, &       ! 14CO2 / 12CO2 (may vary with latitude in transient runs)
+                  r39ar_a = 1.0, &       ! 39Ar / 40 Ar (homogeneous)
+                  xarg_a  = 9.34e-3, &   ! Argon (homogeneous)
+                  xCO2_a  = 284.32e-6, & ! CO2 (CMIP6 & OMIP-BGC: 284.32e-6 for 1700-1850, PMIP4: 190.00e-6 for 21 ka BP)
+                  xf12_a  = 0.0, &       ! CFC-12 (latitude dependent)
+                  xsf6_a  = 0.0          ! SF6 (latitude dependent)
 
-! Normalized and fractionation-corrected atmospheric 14CO2 / 12CO2 ratios
-  real(kind=8) :: r14c_a  = 1.0, & ! Value passed in air-sea flux calculation
-                  r14c_nh = 1.0, & ! Northern Hemisphere
-                  r14c_tz = 1.0, & ! Tropics
-                  r14c_sh = 1.0    ! Southern Hemisphere
-! Normalized and fractionation-corrected atmospheric 39Ar/40Ar ratio
-  real(kind=8) :: r39ar_a  = 1.0   ! Global average and/or value in air-sea flux calculation
-! Atmospheric CO2 concentration (mole fraction in dry air)
-! CMIP6 & OMIP-BGC: xCO2_a = 284.32 ppm for 1700-1850 CE
-! PMIP4:            xCO2_a = 190.00 ppm for 21 kcal BP
-  real(kind=8) :: xCO2_a = 284.32e-6
-! Atmospheric concentrations of CFC-12 and SF6 (ppt in dry air)
-  real(kind=8) :: xf12_a  = 0.00, &  ! CFC-12, value passed in air-sea flux calculations
-                  xf12_nh = 0.00, &  ! CFC-12, Northern Hemisphere
-                  xf12_sh = 0.00, &  ! CFC-12, Southern Hemisphere
-                  xsf6_a  = 0.00, &  ! SF6, value passed in air-sea flux calculations
-                  xsf6_nh = 0.00, &  ! SF6, Northern Hemisphere
-                  xsf6_sh = 0.00     ! SF6, Southern Hemisphere
-! Atmospheric concentration trends of atmospheric CFC-12 and SF6 (ppt / year)
-  real(kind=8) :: f12t_a  = 0.00, &  ! CFC-12, value passed in air-sea flux calculations
-                  f12t_nh = 0.00, &  ! CFC-12, Northern Hemisphere
-                  f12t_sh = 0.00, &  ! CFC-12, Southern Hemisphere
-                  sf6t_a  = 0.00, &  ! SF6, value passed in air-sea flux calculations
-                  sf6t_nh = 0.00, &  ! SF6, Northern Hemisphere
-                  sf6t_sh = 0.00     ! SF6, Southern Hemisphere
-! Atmospheric Argon concentration (mole fraction in dry air)
-  real(kind=8) :: xarg_a  = 9.34e-3      ! value passed in air-sea flux calculation
+! Transient values of atmospheric trace gases (1d-arrays of variable length to be specified in namelist.config -> length_transit)
+  real(kind=8), allocatable, dimension(:) :: r14c_nh, r14c_tz, r14c_sh, & ! 14CO2 / 12CO2, latitude-dependent (e.g., bomb 14C)
+                                             r14c_ti, &                   ! 14CO2 / 12CO2, homogenous (e.g., IntCal)
+                                             xCO2_ti, &                   ! CO2
+                                             xf12_nh, xf12_sh, &          ! CFC-12, latitude-dependent
+                                             xsf6_nh, xsf6_sh             ! SF6, latitude-dependent 
+  integer, allocatable, dimension(:)      :: year_ce                      ! current year in anthropenic runs (control output)
+
+! Parameters which can be changed via namelist.oce (-> transit_param)
 ! Global-mean concentrations of DIC and Argon in the mixed layer (mol / m**3)
   real(kind=8) :: dic_0 = 2.00, &        ! GLODAPv2, 0-50 m: TCO2 ~ 2050 umol / kg
                   arg_0 = 0.01           ! Hamme et al. 2019, doi:10.1146/annurev-marine-121916-063604
 ! Radioactive decay constants (1 / s; default values assume that 1 year = 365.00 days)
   real(kind=8) :: decay14 = 3.8561e-12 , & ! 14C; t1/2 = 5700 a following OMIP-BGC
                   decay39 = 8.1708e-11     ! 39Ar; t1/2 = 269 a
+
+! Further internal parameters
 ! Latitude of atmospheric boundary conditions and latitudinal interpolation weight
   real(kind=8) :: y_abc, yy_nh
 ! Tracer indices of transient tracers
   integer ::      id_r14c, id_r39ar, id_f12, id_sf6
-  
+! Time index (=year) in transient simulations
+  integer ::      ti_transit
+
+
 ! Namelist to modify default parameter settings
-  namelist / transit_param / r14c_nh, r14c_tz, r14c_sh, &  ! atmospheric F14C
+  namelist / transit_param / r14c_a, &                     ! atmospheric F14C dummy value
                              r39ar_a, &                    ! atmospheric 39Ar/Ar ratio
                              xarg_a, &                     ! atmospheric mole fraction of Argon
                              xco2_a, &                     ! atmospheric mole fraction of CO2
-                             xf12_nh, xf12_sh, &           ! atmospheric mole fractions of CFC-12
-                             xsf6_nh, xsf6_sh, &           ! atmospheric mole fractions of SF6
-                             f12t_nh, f12t_sh, &           ! atmospheric trends of CFC-12
-                             sf6t_nh, sf6t_sh, &           ! atmospheric trends of SF6
                              dic_0, arg_0, &               ! mixed layer values of DIC and Argon
                              decay14, decay39              ! decay constants of 14C and 39Ar
 
@@ -243,5 +235,71 @@ MODULE mod_transit
     end function speed_2
 
 
+    subroutine read_transit_input
+!   Read atmospheric input of isoCO2 and / or other tracers
+      use g_config, only: anthro_transit, paleo_transit, length_transit
+      implicit none
+
+!     Internal variables
+      integer :: jj
+      real(kind=8), allocatable, dimension(:) :: d14c_nh, d14c_tz, d14c_sh, d14c_ti, d13c_dummy
+
+      if (anthro_transit) then
+!       Anthropogenic input for 1850 - 2015 CE
+        allocate(d14c_nh(length_transit))
+        allocate(d14c_tz(length_transit))
+        allocate(d14c_sh(length_transit))
+        allocate(r14c_nh(length_transit))
+        allocate(r14c_tz(length_transit))
+        allocate(r14c_sh(length_transit))
+        allocate(xCO2_ti(length_transit))
+        allocate(xf12_nh(length_transit))
+        allocate(xf12_sh(length_transit))
+        allocate(xsf6_nh(length_transit))
+        allocate(xsf6_sh(length_transit))
+        allocate(year_ce(length_transit))
+        allocate(d13c_dummy(length_transit))
+
+!       Skip header lines
+        do jj = 1,15
+          read (20, fmt=*)
+        end do
+!       Read input values
+        do jj = 1, length_transit
+          read (20, fmt=*) year_ce(jj), &
+                           xCO2_ti(jj), &
+                           d14c_nh(jj), d14c_tz(jj), d14c_sh(jj), &
+                           d13c_dummy(jj), &
+                           xf12_nh(jj), xf12_sh(jj), & 
+                           xsf6_nh(jj), xsf6_sh(jj)
+        end do
+
+!       Convert Delta14C to F14C
+        r14c_nh = 1. + 0.001 * d14c_nh
+        r14c_tz = 1. + 0.001 * d14c_tz
+        r14c_sh = 1. + 0.001 * d14c_sh
+!       Convert volume mixing ratios
+        xCO2_ti = xCO2_ti * 1.e-6
+        xf12_nh = xf12_nh * 1.e-12
+        xf12_sh = xf12_sh * 1.e-12
+        xsf6_nh = xsf6_nh * 1.e-12
+        xsf6_sh = xsf6_sh * 1.e-12
+      elseif (paleo_transit) then
+!       UNDER CONSTRUCTION
+        allocate(d14c_ti(length_transit))
+        allocate(r14c_ti(length_transit))
+        allocate(xCO2_ti(length_transit))
+!        
+      else
+!       Read constant parameter values from namelist.oce.
+!       This is done in subroutine gen_model_setup.
+        allocate(d14c_ti(1))
+        allocate(r14c_ti(1))
+        allocate(xCO2_ti(1))
+      end if
+
+      return
+      end subroutine read_transit_input
+    
 END MODULE mod_transit
 !==========================================================
