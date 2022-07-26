@@ -35,6 +35,9 @@ use landice_water_init_interface
 use g_picocpl
 !---pico-code-end
 
+! Transient tracers
+use mod_transit, only: year_ce, r14c_nh, r14c_tz, r14c_sh, r14c_ti, xCO2_ti, xf12_nh, xf12_sh, xsf6_nh, xsf6_sh, ti_transit
+
 ! Define icepack module
 #if defined (__icepack)
 use icedrv_main,          only: set_icepack, init_icepack, alloc_icepack
@@ -174,6 +177,19 @@ type(t_mesh),             target, save :: mesh
     call mesh_setup(mesh)
 
     if (mype==0) write(*,*) 'FESOM mesh_setup... complete'
+
+!   Transient tracers: control output of initial input values
+    if(mype==0 .and. use_transit .and. anthro_transit) then
+      write (*,*)
+      write (*,*) "*** Transient tracers: initial input values >>>"
+      write (*,*) "Year CE, xCO2, D14C_NH, D14C_TZ, D14C_SH, xCFC-12_NH, xCFC-12_SH, xSF6_NH, xSF6_SH"
+      write (*, fmt="(2x,i4,8(2x,f6.2))"), &
+                  year_ce(ti_transit), xCO2_ti(ti_transit) * 1.e6, &
+                  (r14c_nh(ti_transit) - 1.) * 1000., (r14c_tz(ti_transit) - 1.) * 1000., (r14c_sh(ti_transit) - 1.) * 1000., &
+                  xf12_nh(ti_transit) * 1.e12, xf12_sh(ti_transit) * 1.e12, &
+                  xsf6_nh(ti_transit) * 1.e12, xsf6_sh(ti_transit) * 1.e12
+      write (*,*)
+    end if
 
 ! kh 23.02.21 explicit profiling support of asynchronous iceberg computations
     allocate (time_1st_sections(nsteps), time_2nd_sections(nsteps)) !, time_buffer(nsteps))
@@ -783,6 +799,22 @@ type(t_mesh),             target, save :: mesh
         else
             write(*,*) 'ib_async_mode < 0 is not supported: ', ib_async_mode 
         end if ! (ib_async_mode == 0) then
+
+!       Transient tracers: update of input values between restarts
+        if(use_transit .and. anthro_transit .and. (daynew == ndpyr) .and. (timenew==86400.)) then
+          ti_transit = ti_transit + 1
+          if (mype==0) then
+            write (*,*)
+            write (*,*) "*** Transient tracers: updated input values >>>"
+            write (*,*) "Year CE, xCO2, D14C_NH, D14C_TZ, D14C_SH, xCFC-12_NH, xCFC-12_SH, xSF6_NH, xSF6_SH"
+            write (*, fmt="(2x,i4,8(2x,f6.2))"), &
+                        year_ce(ti_transit), xCO2_ti(ti_transit) * 1.e6, &
+                        (r14c_nh(ti_transit) - 1.) * 1000., (r14c_tz(ti_transit) - 1.) * 1000., (r14c_sh(ti_transit) - 1.) * 1000., &
+                        xf12_nh(ti_transit) * 1.e12, xf12_sh(ti_transit) * 1.e12, &
+                        xsf6_nh(ti_transit) * 1.e12, xsf6_sh(ti_transit) * 1.e12
+            write (*,*)
+          end if
+        endif
 
         call loop_end_part (mesh, .true., bIcbCalcCycleCompleted, n, t1, time_1st_section, time_2nd_section, &
                             t1_icb, t2_icb, t1_par_sections, t2_par_sections, &
