@@ -96,10 +96,8 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         end do
         if (dynamics%diag_ke) then
            do nz=nzmin,nzmax-1
-              dynamics%ke_adv(1,nz,elem)=-(0.5_WP+epsilon)*dynamics%ke_adv_AB(1,nz,elem)   
-              dynamics%ke_adv(2,nz,elem)=-(0.5_WP+epsilon)*dynamics%ke_adv_AB(2,nz,elem)
-              dynamics%ke_cor(1,nz,elem)=-(0.5_WP+epsilon)*dynamics%ke_cor_AB(1,nz,elem)   
-              dynamics%ke_cor(2,nz,elem)=-(0.5_WP+epsilon)*dynamics%ke_cor_AB(2,nz,elem)
+              dynamics%ke_adv(:,nz,elem)=-(0.5_WP+epsilon)*dynamics%ke_adv_AB(:,nz,elem)   
+              dynamics%ke_cor(:,nz,elem)=-(0.5_WP+epsilon)*dynamics%ke_cor_AB(:,nz,elem)   
            end do
         end if
         
@@ -160,8 +158,8 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
 
         if (dynamics%diag_ke) then
            do nz=nzmin,nzmax-1
-              dynamics%ke_pre(1,nz,elem)= (Fx-pgf_x(nz,elem))!*elem_area(elem) !not to divide it aterwards (at the end of this subroutine)
-              dynamics%ke_pre(2,nz,elem)= (Fy-pgf_y(nz,elem))!*elem_area(elem)
+              dynamics%ke_pre(1,nz,elem)= (Fx-pgf_x(nz,elem))*dt!*elem_area(elem) !not to divide it aterwards (at the end of this subroutine)
+              dynamics%ke_pre(2,nz,elem)= (Fy-pgf_y(nz,elem))*dt!*elem_area(elem) !but account for DT here
 
               dynamics%ke_cor_AB(1,nz,elem)= UV(2,nz,elem)*ff
               dynamics%ke_cor_AB(2,nz,elem)=-UV(1,nz,elem)*ff
@@ -206,10 +204,8 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         nzmax = nlevels(elem)
         nzmin = ulevels(elem)
         do nz=nzmin,nzmax-1
-            dynamics%ke_adv(1,nz,elem)=(dynamics%ke_adv(1,nz,elem)+dynamics%ke_adv_AB(1,nz,elem)*ff)/elem_area(elem)
-            dynamics%ke_adv(2,nz,elem)=(dynamics%ke_adv(2,nz,elem)+dynamics%ke_adv_AB(2,nz,elem)*ff)/elem_area(elem)
-            dynamics%ke_cor(1,nz,elem)=(dynamics%ke_cor(1,nz,elem)+dynamics%ke_cor_AB(1,nz,elem)*ff)/elem_area(elem)
-            dynamics%ke_cor(2,nz,elem)=(dynamics%ke_cor(2,nz,elem)+dynamics%ke_cor_AB(2,nz,elem)*ff)/elem_area(elem)
+            dynamics%ke_adv(:,nz,elem)=dt*(dynamics%ke_adv(:,nz,elem)+dynamics%ke_adv_AB(:,nz,elem)*ff)/elem_area(elem)
+            dynamics%ke_cor(:,nz,elem)=dt*(dynamics%ke_cor(:,nz,elem)+dynamics%ke_cor_AB(:,nz,elem)*ff)/elem_area(elem)
         end do
     end do
 !$OMP END PARALLEL DO

@@ -74,6 +74,7 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
     integer       :: n, elem, elnodes(3), nz, nzmin, nzmax
     real(kind=WP) :: eta(3) 
     real(kind=WP) :: Fx, Fy
+    real(kind=WP) :: usum(2), udiff(2)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
@@ -88,7 +89,7 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
     d_eta  => dynamics%d_eta(:)
     
     !___________________________________________________________________________    
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax, eta, Fx, Fy)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax, eta, Fx, Fy, usum, udiff)
     DO elem=1, myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
         eta=-g*theta*dt*d_eta(elnodes)
@@ -96,6 +97,27 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
         Fy=sum(gradient_sca(4:6,elem)*eta)
         nzmin = ulevels(elem)
         nzmax = nlevels(elem)
+
+        if (dynamics%diag_ke) then
+           DO nz=nzmin, nzmax-1
+              dynamics%ke_pre(1,nz,elem)  =dynamics%ke_pre(1,nz,elem)   + Fx
+              dynamics%ke_pre(2,nz,elem)  =dynamics%ke_pre(2,nz,elem)   + Fy
+           
+              usum(1)=2.0_WP*UV(1,nz,elem)+(UV_rhs(1,nz,elem) + Fx)
+              usum(2)=2.0_WP*UV(2,nz,elem)+(UV_rhs(2,nz,elem) + Fy)
+
+              udiff(1)=UV_rhs(1,nz,elem) + Fx
+              udiff(2)=UV_rhs(2,nz,elem) + Fy
+
+              dynamics%ke_du2 (:,nz,elem)  = usum*udiff/2.0_WP
+              dynamics%ke_pre (:,nz,elem)  = usum*dynamics%ke_pre (:,nz,elem)/2.0_WP
+              dynamics%ke_adv (:,nz,elem)  = usum*dynamics%ke_adv (:,nz,elem)/2.0_WP
+              dynamics%ke_cor (:,nz,elem)  = usum*dynamics%ke_cor (:,nz,elem)/2.0_WP
+              dynamics%ke_hvis(:,nz,elem)  = usum*dynamics%ke_hvis(:,nz,elem)/2.0_WP
+              dynamics%ke_vvis(:,nz,elem)  = usum*dynamics%ke_vvis(:,nz,elem)/2.0_WP
+        END DO  
+        end if
+
         DO nz=nzmin, nzmax-1
             UV(1,nz,elem)= UV(1,nz,elem) + UV_rhs(1,nz,elem) + Fx
             UV(2,nz,elem)= UV(2,nz,elem) + UV_rhs(2,nz,elem) + Fy

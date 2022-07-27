@@ -2891,10 +2891,9 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     type(t_ice)   , intent(inout), target :: ice
     !___________________________________________________________________________
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
+    real(kind=8)      :: budget(2)
     integer           :: node
-!NR
-!    integer, save     :: n_check=0
-!    real(kind=8)      :: temp_check, sali_check
+    integer           :: nz, elem, nzmin, nzmax !for KE diagnostic
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer :: eta_n
@@ -3026,11 +3025,55 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call viscosity_filter'//achar(27)//'[0m'
+    if (dynamics%diag_ke) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
+       do elem=1, myDim_elem2D
+          nzmax = nlevels(elem)
+          nzmin = ulevels(elem)
+          do nz=nzmin,nzmax-1
+             dynamics%ke_rhs_bak(:,nz,elem)=dynamics%UV_rhs(:,nz,elem)
+          end do
+       end do
+!$OMP END PARALLEL DO
+    end if
     call viscosity_filter(dynamics%opt_visc, dynamics, partit, mesh)
+    if (dynamics%diag_ke) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
+       do elem=1, myDim_elem2D
+          nzmax = nlevels(elem)
+          nzmin = ulevels(elem)
+          do nz=nzmin,nzmax-1
+             dynamics%ke_hvis(:,nz,elem)=dynamics%UV_rhs(:,nz,elem)-dynamics%ke_rhs_bak(:,nz,elem)
+          end do
+       end do
+!$OMP END PARALLEL DO
+    end if
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call impl_vert_visc_ale'//achar(27)//'[0m'
+    if (dynamics%diag_ke) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
+       do elem=1, myDim_elem2D
+          nzmax = nlevels(elem)
+          nzmin = ulevels(elem)
+          do nz=nzmin,nzmax-1
+             dynamics%ke_rhs_bak(:,nz,elem)=dynamics%UV_rhs(:,nz,elem)
+          end do
+       end do
+!$OMP END PARALLEL DO
+    end if
     if(dynamics%use_ivertvisc) call impl_vert_visc_ale(dynamics,partit, mesh)
+    if (dynamics%diag_ke) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
+       do elem=1, myDim_elem2D
+          nzmax = nlevels(elem)
+          nzmin = ulevels(elem)
+          do nz=nzmin,nzmax-1
+             dynamics%ke_vvis(:,nz,elem)=dynamics%UV_rhs(:,nz,elem)-dynamics%ke_rhs_bak(:,nz,elem)
+          end do
+       end do
+!$OMP END PARALLEL DO
+    end if
     t2=MPI_Wtime()
         
     !___________________________________________________________________________
@@ -3057,6 +3100,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! estimate new horizontal velocity u^(n+1)
     ! u^(n+1) = u* + [-g * tau * theta * grad(eta^(n+1)-eta^(n)) ]
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_vel'//achar(27)//'[0m'
+    ! ke will be computed inside there if dynamics%diag_ke is .TRUE.
     call update_vel(dynamics, partit, mesh)
     
     ! --> eta_(n) --> eta_(n+1) = eta_(n) + deta = eta_(n) + (eta_(n+1) + eta_(n))
@@ -3157,20 +3201,26 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         write(*,*)
         write(*,*)
     end if
-
-
-!NR Checksum for tracers, as they are most sensitive
-!    n_check = n_check+1
-!    temp_check = 0.
-!    sali_check = 0.  
-!    do node=1,myDim_nod2D+eDim_nod2D
-!        temp_check = temp_check + sum(tracers%data(1)%values(nlevels_nod2D(node)-1:ulevels_nod2D(node),node))
-!        sali_check = sali_check + sum(tracers%data(2)%values(nlevels_nod2D(node)-1:ulevels_nod2D(node),node))
-!    end do
-!    call MPI_Allreduce(MPI_IN_PLACE, temp_check, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
-!    call MPI_Allreduce(MPI_IN_PLACE, sali_check, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
-!
-!    print *,'Check',n_check,temp_check,sali_check
-!
+    
+    if (mype==0) write(*,*) '*****energy budget...*****'
+    call integrate_elem_3D(dynamics%ke_du2(1,:,:),  budget(1), partit, mesh)
+    call integrate_elem_3D(dynamics%ke_du2(2,:,:),  budget(2), partit, mesh)
+    if (mype==0) write(*,*) 'ke. du^2=', budget
+    call integrate_elem_3D(dynamics%ke_pre(1,:,:),  budget(1), partit, mesh)
+    call integrate_elem_3D(dynamics%ke_pre(2,:,:),  budget(2), partit, mesh)
+    if (mype==0) write(*,*) 'ke. pre=', budget
+    call integrate_elem_3D(dynamics%ke_adv(1,:,:),  budget(1), partit, mesh)
+    call integrate_elem_3D(dynamics%ke_adv(2,:,:),  budget(2), partit, mesh)
+    if (mype==0) write(*,*) 'ke. adv=', budget
+    call integrate_elem_3D(dynamics%ke_hvis(1,:,:), budget(1), partit, mesh)
+    call integrate_elem_3D(dynamics%ke_hvis(2,:,:), budget(2), partit, mesh)
+    if (mype==0) write(*,*) 'ke.  ah=', budget
+    call integrate_elem_3D(dynamics%ke_vvis(1,:,:), budget(1), partit, mesh)
+    call integrate_elem_3D(dynamics%ke_vvis(2,:,:), budget(2), partit, mesh)
+    if (mype==0) write(*,*) 'ke.  av=', budget
+    call integrate_elem_3D(dynamics%ke_cor(1,:,:),  budget(1), partit, mesh)
+    call integrate_elem_3D(dynamics%ke_cor(2,:,:),  budget(2), partit, mesh)
+    if (mype==0) write(*,*) 'ke. cor=', budget
+    if (mype==0) write(*,*) '*********************'
 end subroutine oce_timestep_ale
 

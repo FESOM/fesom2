@@ -545,7 +545,25 @@ END DO
 #endif
     end if
     
-    
+    if (dynamics%diag_ke) then
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_adv_u', 'kinetic energy contribution from advection   [u]', 'm2/s2', dynamics%ke_adv(1,:,:), io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_adv_v', 'kinetic energy contribution from advection   [v]', 'm2/s2', dynamics%ke_adv(2,:,:), io_list(i)%freq, 'm', 8, partit, mesh)
+
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_cor_u', 'kinetic energy contribution from Coriolis    [u]', 'm2/s2', dynamics%ke_cor(1,:,:), io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_cor_v', 'kinetic energy contribution from Coriolis    [v]', 'm2/s2', dynamics%ke_cor(2,:,:), io_list(i)%freq, 'm', 8, partit, mesh)
+
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_pre_u', 'kinetic energy contribution from advection   [u]', 'm2/s2', dynamics%ke_pre(1,:,:), io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_pre_v', 'kinetic energy contribution from advection   [v]', 'm2/s2', dynamics%ke_pre(2,:,:), io_list(i)%freq, 'm', 8, partit, mesh)
+
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_hvis_u', 'kinetic energy contribution from hor. visc. [u]', 'm2/s2', dynamics%ke_hvis(1,:,:), io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_hvis_v', 'kinetic energy contribution from hor. visc. [v]', 'm2/s2', dynamics%ke_hvis(2,:,:), io_list(i)%freq, 'm', 8, partit, mesh)
+
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_vvis_u', 'kinetic energy contribution from ver. visc. [u]', 'm2/s2', dynamics%ke_vvis(1,:,:), io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_vvis_v', 'kinetic energy contribution from ver. visc. [v]', 'm2/s2', dynamics%ke_vvis(2,:,:), io_list(i)%freq, 'm', 8, partit, mesh)
+
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_du2',    'kinetic energy change [0.5 du2]',                 'm2/s2', dynamics%ke_du2(1,:,:), io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_dv2',    'kinetic energy change [0.5 dv2]',                 'm2/s2', dynamics%ke_du2(2,:,:), io_list(i)%freq, 'm', 8, partit, mesh)
+    end if   
 end subroutine
 !
 !--------------------------------------------------------------------------------------------

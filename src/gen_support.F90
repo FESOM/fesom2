@@ -11,7 +11,7 @@ module g_support
   implicit none
 
   private
-  public :: smooth_nod, smooth_elem, integrate_nod, extrap_nod, omp_min_max_sum1, omp_min_max_sum2
+  public :: smooth_nod, smooth_elem, integrate_nod, integrate_elem_3D, extrap_nod, omp_min_max_sum1, omp_min_max_sum2
   real(kind=WP), dimension(:), allocatable  :: work_array
 !
 !--------------------------------------------------------------------------------------------
@@ -627,6 +627,51 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
 
 omp_min_max_sum2=val
 END FUNCTION
+!
+!--------------------------------------------------------------------------------------------
+!
+subroutine integrate_elem_3D(data, int3D, partit, mesh)
+  USE MOD_PARTIT
+  USE MOD_PARSUP
+  use g_comm_auto
+
+  IMPLICIT NONE
+  type(t_mesh),  intent(in), target :: mesh
+  type(t_partit),intent(in), target :: partit
+  real(kind=WP), intent(in)       :: data(:,:)
+  real(kind=WP), intent(inout)    :: int3D
+
+  integer       :: k, row
+  real(kind=WP) :: lval
+  real(kind=WP) :: lval_row
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
+
+  lval=0.0_WP
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row, k, lval_row) REDUCTION(+: lval)
+  do row=1, myDim_elem2D
+     if(elem2D_nodes(1, row) > myDim_nod2D) cycle
+     lval_row = 0.
+     do k=ulevels(row), nlevels(row)-1
+        lval_row=lval_row+data(k, row)*elem_area(row)*helem(k,row)
+     end do
+#if defined(__openmp_reproducible)
+!$OMP ORDERED
+#endif
+     lval = lval + lval_row
+#if defined(__openmp_reproducible)
+!$OMP END ORDERED
+#endif
+  end do
+!$OMP END PARALLEL DO
+
+  int3D=0.0_WP
+  call MPI_AllREDUCE(lval, int3D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+       MPI_COMM_FESOM, MPIerr)
+end subroutine integrate_elem_3D
 end module g_support
 
 
