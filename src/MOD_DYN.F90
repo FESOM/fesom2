@@ -113,8 +113,9 @@ TYPE T_DYN
     real(kind=WP)                               :: wsplit_maxcfl= 1.0
     ! energy diagnostic part: will be computed inside the model ("hard integration"):
     logical                                      :: diag_ke       = .true.
-    real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv, ke_cor, ke_pre, ke_hvis, ke_vvis, ke_total
+    real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv, ke_cor, ke_pre, ke_hvis, ke_vvis, ke_du2
     real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv_AB, ke_cor_AB
+    real(kind=WP), allocatable, dimension(:,:,:) :: ke_rhs_bak
     !___________________________________________________________________________
     contains
 #if defined(__PGI)
