@@ -3200,27 +3200,34 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         write(*,"(A, ES10.3)") '     Oce. TOTAL       :', t10-t0
         write(*,*)
         write(*,*)
+    end if    
+    if (dynamics%diag_ke) then
+       if (mype==0) write(*,*) '*******KE budget analysis...*******'
+       if (mype==0) write(*,*) '     U     |     V     |     TOTAL'
+       call integrate_elem_3D(dynamics%ke_du2(1,:,:),  budget(1), partit, mesh)
+       call integrate_elem_3D(dynamics%ke_du2(2,:,:),  budget(2), partit, mesh)
+       if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. du2=', budget(1),' | ',  budget(2), ' | ', sum(budget)
+
+       call integrate_elem_3D(dynamics%ke_pre(1,:,:),  budget(1), partit, mesh)
+       call integrate_elem_3D(dynamics%ke_pre(2,:,:),  budget(2), partit, mesh)
+       if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. pre=', budget(1), ' | ', budget(2), ' | ', sum(budget)
+
+       call integrate_elem_3D(dynamics%ke_adv(1,:,:),  budget(1), partit, mesh)
+       call integrate_elem_3D(dynamics%ke_adv(2,:,:),  budget(2), partit, mesh)
+       if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. adv=', budget(1), ' | ', budget(2), ' | ', sum(budget)
+
+       call integrate_elem_3D(dynamics%ke_hvis(1,:,:), budget(1), partit, mesh)
+       call integrate_elem_3D(dynamics%ke_hvis(2,:,:), budget(2), partit, mesh)
+       if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke.  ah=', budget(1), ' | ', budget(2), ' | ', sum(budget)
+
+       call integrate_elem_3D(dynamics%ke_vvis(1,:,:), budget(1), partit, mesh)
+       call integrate_elem_3D(dynamics%ke_vvis(2,:,:), budget(2), partit, mesh)
+       if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke.  av=', budget(1), ' | ', budget(2), ' | ', sum(budget)
+
+       call integrate_elem_3D(dynamics%ke_cor(1,:,:),  budget(1), partit, mesh)
+       call integrate_elem_3D(dynamics%ke_cor(2,:,:),  budget(2), partit, mesh)
+       if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. cor=', budget(1), ' | ', budget(2), ' | ', sum(budget)
+       if (mype==0) write(*,*) '***********************************'
     end if
-    
-    if (mype==0) write(*,*) '*****energy budget...*****'
-    call integrate_elem_3D(dynamics%ke_du2(1,:,:),  budget(1), partit, mesh)
-    call integrate_elem_3D(dynamics%ke_du2(2,:,:),  budget(2), partit, mesh)
-    if (mype==0) write(*,*) 'ke. du^2=', budget
-    call integrate_elem_3D(dynamics%ke_pre(1,:,:),  budget(1), partit, mesh)
-    call integrate_elem_3D(dynamics%ke_pre(2,:,:),  budget(2), partit, mesh)
-    if (mype==0) write(*,*) 'ke. pre=', budget
-    call integrate_elem_3D(dynamics%ke_adv(1,:,:),  budget(1), partit, mesh)
-    call integrate_elem_3D(dynamics%ke_adv(2,:,:),  budget(2), partit, mesh)
-    if (mype==0) write(*,*) 'ke. adv=', budget
-    call integrate_elem_3D(dynamics%ke_hvis(1,:,:), budget(1), partit, mesh)
-    call integrate_elem_3D(dynamics%ke_hvis(2,:,:), budget(2), partit, mesh)
-    if (mype==0) write(*,*) 'ke.  ah=', budget
-    call integrate_elem_3D(dynamics%ke_vvis(1,:,:), budget(1), partit, mesh)
-    call integrate_elem_3D(dynamics%ke_vvis(2,:,:), budget(2), partit, mesh)
-    if (mype==0) write(*,*) 'ke.  av=', budget
-    call integrate_elem_3D(dynamics%ke_cor(1,:,:),  budget(1), partit, mesh)
-    call integrate_elem_3D(dynamics%ke_cor(2,:,:),  budget(2), partit, mesh)
-    if (mype==0) write(*,*) 'ke. cor=', budget
-    if (mype==0) write(*,*) '*********************'
 end subroutine oce_timestep_ale
 
