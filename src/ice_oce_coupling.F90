@@ -344,15 +344,22 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
 #endif
 
+    !___________________________________________________________________________
+    ! add heat and fresh water flux from cavity 
+    if (use_cavity) then
+        call cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)   
+        call exchange_nod(heat_flux, water_flux, partit)
+!$OMP BARRIER
+    end if 
+    !___________________________________________________________________________
+    ! save total heat flux (heat_flux_in) since heat_flux will be alternated by 
+    ! sw_pene
 !$OMP PARALLEL DO
     do n=1, myDim_nod2d+eDim_nod2d  
        heat_flux_in(n)=heat_flux(n) ! sw_pene will change the heat_flux
     end do
 !$OMP END PARALLEL DO
-    if (use_cavity) call cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)   
-    !___________________________________________________________________________
-    call exchange_nod(heat_flux, water_flux, partit)
-!$OMP BARRIER
+    
     !___________________________________________________________________________
     ! on freshwater inflow/outflow or virtual salinity:
     ! 1. In zlevel & zstar the freshwater flux is applied in the update of the 
@@ -391,8 +398,8 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! do virtual salt flux under the cavity also when zstar is switched on 
     ! since under the cavity nothing is allowed to move  --> linfs --> and linfs
-    ! reequires virtual salt
-    elseif (.not. use_virt_salt) .and. (use_cavity) then ! will remain zero otherwise
+    ! requires virtual salt
+    elseif ( (.not. use_virt_salt) .and. (use_cavity) ) then ! will remain zero otherwise
         rsss=ref_sss
 !$OMP PARALLEL DO         
         do n=1, myDim_nod2D+eDim_nod2D
@@ -485,7 +492,9 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     if (use_cavity) then
         if (.not. use_virt_salt) then !zstar, zlevel
             ! only for full-free surface approach otherwise total ocean volume will drift
-            where (ulevels_nod2d > 1) flux = -water_flux
+            !! where (ulevels_nod2d > 1) flux = -water_flux
+            ! --> we treat cavity as linfs --> therefor flux=0.0_WP
+            where (ulevels_nod2d > 1) flux =  0.0_WP
         else ! linfs 
             where (ulevels_nod2d > 1) flux =  0.0_WP
         end if 
@@ -504,7 +513,13 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         ! due to rigid lid approximation under the cavity we to not add freshwater
         ! under the cavity for the freshwater balancing we do this only for the open
         ! ocean
-        where (ulevels_nod2d == 1) water_flux=water_flux+net/ocean_area
+        !! where (ulevels_nod2d == 1) water_flux=water_flux+net/ocean_area
+!$OMP PARALLEL DO
+        do n=1, myDim_nod2D+eDim_nod2D
+            if (ulevels_nod2d(n) > 1) cycle
+            water_flux(n)=water_flux(n)+net/ocean_area
+        end do
+!$OMP END PARALLEL DO
     else
 !$OMP PARALLEL DO
         do n=1, myDim_nod2D+eDim_nod2D
