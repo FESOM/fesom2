@@ -20,6 +20,8 @@ subroutine read_namelist
                          ldiag_dMOC, ldiag_DVD, diag_list
   use g_clock, only: timenew, daynew, yearnew
   use g_ic3d 
+! Include namelist variables for transient tracer simulations:
+  use mod_transit
   implicit none
 
   character(len=MAX_PATH)   :: nmlfile
@@ -79,6 +81,20 @@ subroutine read_namelist
   open (20,file=nmlfile)
   read (20,NML=diag_list)
   close (20)
+
+  if (use_transit) then
+! Transient tracer input, input file names have to be specified in
+! namelist.config, nml=run_config
+    if(mype==0) print *, "Transient tracers are ON. Tracer input file: ", ifile_transit
+    open (20,file=ifile_transit)
+    if (anthro_transit .or. paleo_transit) then
+      call read_transit_input
+    else
+!     Spinup / equilibrium runs with constant tracer input,
+!     read parameter values from namelist.oce
+      read (20,nml=transit_param)
+    end if
+  end if
 
   if(mype==0) write(*,*) 'Namelist files are read in'
   

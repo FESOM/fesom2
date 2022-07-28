@@ -83,9 +83,30 @@ subroutine ini_ocean_io(year, mesh)
          longname='salinity'
          units='psu'
        CASE DEFAULT
-         write(trname,'(A3,i1)') 'tra_', j
-         write(longname,'(A15,i1)') 'passive tracer ', j
-         units='none'
+         select case(tracer_id(j))
+!          additional (transient) tracers
+           CASE(6)
+             trname='sf6'
+             longname='sulfur hexafluoride'
+             units='mol / m**3'
+           CASE(12)
+             trname='cfc12'
+             longname='chlorofluorocarbon CFC-12'
+             units='mol / m**3'
+           CASE(14)
+             trname='r14c'
+             longname='14C / C ratio of DIC'
+             units='none'
+           CASE(39)
+             trname='r39ar'
+             longname='39Ar / Ar ratio'
+             units='none'
+           case default
+!            other passive tracers
+             write(trname,'(A3,i1)') 'tra_', j
+             write(longname,'(A15,i1)') 'passive tracer ', j
+             units='none'
+         end select
      END SELECT
      call oce_files%def_node_var(trim(trname), trim(longname), trim(units), tr_arr(:,:,j), mesh)
      longname=trim(longname)//', Adams–Bashforth'

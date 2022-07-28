@@ -24,6 +24,8 @@ use diagnostics
 use mo_tidal
 use fesom_version_info_module
 use command_line_options_module
+! Transient tracers
+use mod_transit, only: year_ce, r14c_nh, r14c_tz, r14c_sh, r14c_ti, xCO2_ti, xf12_nh, xf12_sh, xsf6_nh, xsf6_sh, ti_transit
 
 ! Define icepack module
 #if defined (__icepack)
@@ -87,6 +89,19 @@ integer mpi_version_len
 
     if (mype==0) write(*,*) 'FESOM mesh_setup... complete'
     
+!   Transient tracers: control output of initial input values
+    if(mype==0 .and. use_transit .and. anthro_transit) then
+      write (*,*)
+      write (*,*) "*** Transient tracers: initial input values >>>"
+      write (*,*) "Year CE, xCO2, D14C_NH, D14C_TZ, D14C_SH, xCFC-12_NH, xCFC-12_SH, xSF6_NH, xSF6_SH"
+      write (*, fmt="(2x,i4,8(2x,f6.2))"), &
+                  year_ce(ti_transit), xCO2_ti(ti_transit) * 1.e6, &
+                  (r14c_nh(ti_transit) - 1.) * 1000., (r14c_tz(ti_transit) - 1.) * 1000., (r14c_sh(ti_transit) - 1.) * 1000., &
+                  xf12_nh(ti_transit) * 1.e12, xf12_sh(ti_transit) * 1.e12, &
+                  xsf6_nh(ti_transit) * 1.e12, xsf6_sh(ti_transit) * 1.e12
+      write (*,*)
+    end if
+
     !=====================
     ! Allocate field variables 
     ! and additional arrays needed for 
@@ -259,6 +274,22 @@ integer mpi_version_len
         rtime_write_means   = rtime_write_means   + t5 - t4   
         rtime_write_restart = rtime_write_restart + t6 - t5
         rtime_read_forcing  = rtime_read_forcing  + t1_frc - t0_frc
+
+!       Transient tracers: update of input values between restarts
+        if(use_transit .and. anthro_transit .and. (daynew == ndpyr) .and. (timenew==86400.)) then
+          ti_transit = ti_transit + 1
+          if (mype==0) then
+            write (*,*)
+            write (*,*) "*** Transient tracers: updated input values >>>"
+            write (*,*) "Year CE, xCO2, D14C_NH, D14C_TZ, D14C_SH, xCFC-12_NH, xCFC-12_SH, xSF6_NH, xSF6_SH"
+            write (*, fmt="(2x,i4,8(2x,f6.2))"), &
+                        year_ce(ti_transit), xCO2_ti(ti_transit) * 1.e6, &
+                        (r14c_nh(ti_transit) - 1.) * 1000., (r14c_tz(ti_transit) - 1.) * 1000., (r14c_sh(ti_transit) - 1.) * 1000., &
+                        xf12_nh(ti_transit) * 1.e12, xf12_sh(ti_transit) * 1.e12, &
+                        xsf6_nh(ti_transit) * 1.e12, xsf6_sh(ti_transit) * 1.e12
+            write (*,*)
+          end if
+        endif
     end do
     
     call finalize_output()

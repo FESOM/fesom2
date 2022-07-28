@@ -109,6 +109,8 @@ subroutine solve_tracers_ale(mesh)
     use Toy_Channel_Soufflet
     use adv_tracers_ale_interface
     use diff_tracers_ale_interface
+!   Include decay constants of 14C and 39Ar for (transient) tracer simulations:
+    use mod_transit, only: decay14, decay39
     
     implicit none
     type(t_mesh), intent(in) , target :: mesh
@@ -144,6 +146,13 @@ subroutine solve_tracers_ale(mesh)
         ! diffuse tracers 
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
         call diff_tracers_ale(tr_num, mesh)
+
+!       Radioactive decay of 14C and 39Ar
+!!      if (tracer_id(tr_num) == 14) tr_arr(:,:,tr_num) = tr_arr(:,:,tr_num) * exp(-decay14 * dt)
+        if (tracer_id(tr_num) == 14) tr_arr(:,:,tr_num) = tr_arr(:,:,tr_num) * (1. - decay14 * dt)
+!!      if (tracer_id(tr_num) == 39) tr_arr(:,:,tr_num) = tr_arr(:,:,tr_num) * exp(-decay39 * dt)
+        if (tracer_id(tr_num) == 39) tr_arr(:,:,tr_num) = tr_arr(:,:,tr_num) * (1. - decay39 * dt)
+
         
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
@@ -1011,6 +1020,13 @@ FUNCTION bc_surface(n, id, mesh)
   USE g_forcing_arrays
   USE g_PARSUP, only: mype, par_ex
   USE g_config
+! The following modules and variables are needed for (transient) abiotic tracer simulations
+  use mod_transit
+  use o_mesh                         ! MB needed for transient tracer simulations ??
+  use g_clock, only: month, yearnew  ! MB yearnew is needed for transient tracer simulations
+  use i_arrays, only: a_ice
+  use o_param
+
   implicit none
   
   type(t_mesh), intent(in) , target :: mesh  
@@ -1020,6 +1036,19 @@ FUNCTION bc_surface(n, id, mesh)
 
   !  --> is_nonlinfs=1.0 for zelvel,zstar ....                            
   !  --> is_nonlinfs=0.0 for linfs
+
+  if (use_transit) then
+#if defined (__oasis)
+!   SLP and wind speed in coupled setups. This is a makeshift solution
+!   as long as the true values are not provided by the AGCM / OASIS.
+    press_a = mean_slp 
+    wind_2  = speed_2(stress_atmoce_x(n), stress_atmoce_y(n))
+#else
+    press_a = press_air(n)
+    wind_2  = u_wind(n)**2 + v_wind(n)**2
+#endif  
+  end if
+
   SELECT CASE (id)
     CASE (0)
         bc_surface=-dt*(heat_flux(n)/vcpw + tr_arr(mesh%ulevels_nod2D(n),n,1)*water_flux(n)*is_nonlinfs)
@@ -1036,6 +1065,103 @@ FUNCTION bc_surface(n, id, mesh)
         bc_surface=0.0_WP
     CASE (303)
         bc_surface=0.0_WP
+!   Boundary conditions for additional (transient) tracers (14C, 39Ar, CFC-12, and SF6)
+!   Radiocarbon (more precisely, fractionation-corrected 14C/C):
+    CASE (14)
+      if (anthro_transit) then
+!       Select atmospheric input values corresponding to the latitude
+        if (y_abc > 30.)  then
+!         Northern Hemisphere
+          r14c_a = r14c_nh(ti_transit)
+        else if (y_abc <- 30.) then  
+!         Southern Hemisphere
+          r14c_a = r14c_sh(ti_transit)
+        else                         
+!         Tropical zone
+          r14c_a = r14c_tz(ti_transit)
+        end if
+        xCO2_a = xCO2_ti(ti_transit)
+      else if (paleo_transit) then
+        r14c_a = r14c_ti(ti_transit)
+        xCO2_a = xCO2_ti(ti_transit)
+      else 
+!       Constant (global-mean) namelist values are taken
+      end if
+!     Local isotopic 14CO2/CO2 air-sea exchange flux (in m / s),
+!     since F14C is normalized to atmospheric (water) values the isotopic flux has to be 
+!     corrected for precipitation or evaporation fluxes with different isotopic signatures.
+      bc_surface = dt * (iso_flux("co2",                                                                &
+                                  tr_arr(mesh%ulevels_nod2D(n),n,1), tr_arr(mesh%ulevels_nod2D(n),n,2), &
+                                  wind_2, a_ice(n), press_a, xco2_a, r14c_a,                            & 
+                                  tr_arr(mesh%ulevels_nod2D(n),n,id_r14c), dic_0)                       &
+                         - tr_arr(mesh%ulevels_nod2D(n),n,id_r14c) * water_flux(n) * is_nonlinfs)
+!   Argon-39:
+    CASE (39) ! Apply boundary conditions to tracer ID=39 (fractionationation-corrected 39Ar/Ar)
+!     Local isotopic 39Ar/Ar air-sea exchange flux (in m / s),
+!     since F39Ar is normalized to atmospheric (water) values the isotopic flux has to be 
+!     corrected for precipitation or evaporation fluxes with different isotopic signatures.
+      bc_surface = dt * (iso_flux("arg",                                                                &
+                                  tr_arr(mesh%ulevels_nod2D(n),n,1), tr_arr(mesh%ulevels_nod2D(n),n,2), &
+                                  wind_2, a_ice(n), press_a, xarg_a, r39ar_a,                           &
+                                  tr_arr(mesh%ulevels_nod2D(n),n,id_r39ar), arg_0)                      &
+                         - tr_arr(mesh%ulevels_nod2D(n),n,id_r39ar) * water_flux(n) * is_nonlinfs)
+!   CFC-12:
+    CASE (12)
+      if (anthro_transit) then
+!       Select atmospheric input values corresponding to the latitude
+!       Annual values are interpolated to monthly values, this is omitted in the last simulation year
+        if (y_abc > 10.)  then       ! Northern Hemisphere
+!          Northern Hemisphere
+           xf12_a = xf12_nh(ti_transit)
+           if (ti_transit < length_transit) xf12_a = xf12_a + month * (xf12_nh(ti_transit + 1) - xf12_a) / 12.
+        else if (y_abc <- 10.) then  
+!          Southern Hemisphere
+           xf12_a = xf12_sh(ti_transit)
+           if (ti_transit < length_transit) xf12_a = xf12_a + month * (xf12_sh(ti_transit + 1) - xf12_a) / 12.
+        else                         
+!          Tropical zone, interpolate between NH and SH
+           xf12_a = (1 - yy_nh) * xf12_nh(ti_transit) + yy_nh * xf12_sh(ti_transit)
+           if (ti_transit < length_transit) xf12_a = xf12_a + month * ((1 - yy_nh) * xf12_nh(ti_transit + 1) + &
+                                                                        yy_nh * xf12_sh(ti_transit + 1) - xf12_a) / 12.
+        end if
+      else 
+!       Constant (global-mean) namelist values are taken
+      end if
+!     Local air-sea exchange gas flux of CFC-12 (in m / s):
+      bc_surface = dt * (gas_flux("f12",                                                                 &
+                                  tr_arr(mesh%ulevels_nod2D(n),n,1), tr_arr(mesh%ulevels_nod2D(n),n,2),  &
+                                  wind_2, a_ice(n), press_a, xf12_a,                                     &
+                                  tr_arr(mesh%ulevels_nod2D(n),n,id_f12))                                &
+                         - tr_arr(mesh%ulevels_nod2D(n),n,id_f12) * water_flux(n) * is_nonlinfs)
+!   SF6:
+    CASE (6)
+      if (anthro_transit) then
+!       Select atmospheric input values corresponding to the latitude
+!       Annual values are interpolated to monthly values, this is omitted in the last simulation year
+        if (y_abc > 10.)  then       ! Northern Hemisphere
+!         Northern Hemisphere
+          xsf6_a = xsf6_nh(ti_transit)
+          if (ti_transit < length_transit) xsf6_a = xsf6_a + month * (xsf6_nh(ti_transit + 1) - xsf6_a) / 12.
+        else if (y_abc <- 10.) then  
+!         Southern Hemisphere
+          xsf6_a = xsf6_sh(ti_transit)
+          if (ti_transit < length_transit) xsf6_a = xsf6_a + month * (xsf6_sh(ti_transit + 1) - xsf6_a) / 12.
+        else                         
+!         Tropical zone, interpolate between NH and SH
+          xsf6_a = (1 - yy_nh) * xsf6_nh(ti_transit) + yy_nh * xsf6_sh(ti_transit)
+          if (ti_transit < length_transit) xsf6_a = xsf6_a + month * ((1 - yy_nh) * xsf6_nh(ti_transit + 1) + &
+                                                                        yy_nh * xsf6_sh(ti_transit + 1) - xsf6_a) / 12.
+        end if
+      else 
+!       Constant (global-mean) namelist values are taken
+      end if
+!     Local air-sea exchange gas flux of SF6 (in m / s):
+      bc_surface = dt * (gas_flux("sf6",                                                                 &
+                                  tr_arr(mesh%ulevels_nod2D(n),n,1), tr_arr(mesh%ulevels_nod2D(n),n,2),  &
+                                  wind_2, a_ice(n), press_a, xsf6_a,                                     &
+                                  tr_arr(mesh%ulevels_nod2D(n),n,id_sf6))                                &
+                         - tr_arr(mesh%ulevels_nod2D(n),n,id_sf6) * water_flux(n) * is_nonlinfs)
+!   Done with boundary conditions for (transient) tracers.
     CASE DEFAULT
       if (mype==0) then
          write (id_string, "(I3)") id

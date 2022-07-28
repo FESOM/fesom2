@@ -68,6 +68,7 @@ contains
   subroutine clock_init
     use g_parsup
     use g_config
+    use mod_transit, only: ti_transit
     implicit none
     integer          :: i, daystart, yearstart
     real(kind=WP)    :: aux1, aux2, timestart
@@ -91,6 +92,8 @@ contains
     else
        r_restart=.true.
     end if
+!   For simulations with transient tracer input data
+    if (use_transit) ti_transit = yearnew - yearstart + ti_start_transit
 
     ! year as character string 
     write(cyearold,'(i4)') yearold
