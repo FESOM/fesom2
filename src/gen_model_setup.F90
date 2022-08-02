@@ -94,6 +94,7 @@ subroutine read_namelist
 !     read parameter values from namelist.oce
       read (20,nml=transit_param)
     end if
+    close (20)
   end if
 
   if(mype==0) write(*,*) 'Namelist files are read in'
