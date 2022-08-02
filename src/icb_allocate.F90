@@ -89,7 +89,7 @@ subroutine allocate_icb()
   allocate(arr_block(15*ib_num))
   allocate(elem_block(ib_num))
   allocate(vl_block(4*ib_num))
-  allocate(buoy_props(ib_num,12))
+  allocate(buoy_props(ib_num,13))
   buoy_props = 0.0
   allocate(melted(ib_num))
   melted = .false.
