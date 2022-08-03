@@ -41,6 +41,7 @@ subroutine prepare_icb2fesom(mesh, ib,i_have_element,localelement,depth_ib)
     integer                 :: iceberg_node  
     integer, dimension(3)   :: ib_nods_in_ib_elem
     integer                 :: num_ib_nods_in_ib_elem
+    integer                 :: i, ib
 type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
 
@@ -77,6 +78,7 @@ subroutine get_iceberg_nodes_for_element(mesh, localelement, ib_nods_in_ib_elem,
     integer, intent(in)                     :: localelement
     integer, dimension(3), intent(inout)    :: ib_nods_in_ib_elem
     integer, intent(inout)                  :: num_ib_nods_in_ib_elem
+    integer                                 :: i, iceberg_node
 type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
 
@@ -110,6 +112,7 @@ subroutine icb2fesom(mesh)
     use g_parsup
     use i_arrays
     use iceberg_params
+    integer                                 :: n
 type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
 
