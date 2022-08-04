@@ -473,8 +473,11 @@ use mod_transit, only: id_r14c, id_r39ar, id_f12, id_sf6
   !
   ! read ocean state
   ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
-  if(mype==0) write(*,*) 'read Temperatur climatology from:', trim(filelist(1))
-  if(mype==0) write(*,*) 'read Salt       climatology from:', trim(filelist(2))
+  if(mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(1))
+  if(mype==0) write(*,*) 'read Salt        climatology from:', trim(filelist(2))
+  if(init14_3d .and. mype==0) write(*,*) 
+                         'read 14C      initial values from:', trim(filelist(3))
+  
   call do_ic3d(mesh)
   
   Tclim=tr_arr(:,:,1)
@@ -596,12 +599,14 @@ use mod_transit, only: id_r14c, id_r39ar, id_f12, id_sf6
 !      Transient tracers
        CASE (14)        ! initialize tracer ID=14, fractionation-corrected 14C/C
 !        this initialization can be overwritten by calling do_ic3d
-         id_r14c = i
-         tr_arr(:,:,i) = 0.85
-         if (mype==0) then
-            write (i_string,  "(I3)") i
-            write (id_string, "(I3)") id
-            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+         if (.not. init14_3d) then
+           id_r14c = i
+           tr_arr(:,:,i) = 0.85
+           if (mype==0) then
+              write (i_string,  "(I3)") i
+              write (id_string, "(I3)") id
+              write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+           end if
          end if
        CASE (39)        ! initialize tracer ID=39, fractionation-corrected 39Ar/Ar
          id_r39ar = i
