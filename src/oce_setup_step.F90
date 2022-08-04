@@ -456,7 +456,7 @@ USE g_PARSUP
 USE g_config
 USE g_ic3d
 ! for additional (transient) tracers:
-use mod_transit, only: id_r14c, id_r39ar, id_f12, id_sf6
+use mod_transit, only: id_r14c, id_r39ar, id_f12, id_sf6, init14_3d
   !
   ! reads the initial state or the restart file for the ocean
   !
@@ -475,8 +475,7 @@ use mod_transit, only: id_r14c, id_r39ar, id_f12, id_sf6
   ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
   if(mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(1))
   if(mype==0) write(*,*) 'read Salt        climatology from:', trim(filelist(2))
-  if(init14_3d .and. mype==0) write(*,*) 
-                         'read 14C      initial values from:', trim(filelist(3))
+  if(init14_3d .and. mype==0) write(*,*) 'read 14C      initial values from:', trim(filelist(3))
   
   call do_ic3d(mesh)
   
