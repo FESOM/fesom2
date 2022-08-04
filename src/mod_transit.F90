@@ -43,6 +43,9 @@ MODULE mod_transit
 ! Time index (=year) in transient simulations
   integer ::      ti_transit
 
+! Initialize R14C with gridded 3d field
+  logical :: init14_3d = .false.
+
 
 ! Namelist to modify default parameter settings
   namelist / transit_param / r14c_a, &                     ! atmospheric F14C dummy value
@@ -50,7 +53,8 @@ MODULE mod_transit
                              xarg_a, &                     ! atmospheric mole fraction of Argon
                              xco2_a, &                     ! atmospheric mole fraction of CO2
                              dic_0, arg_0, &               ! mixed layer values of DIC and Argon
-                             decay14, decay39              ! decay constants of 14C and 39Ar
+                             decay14, decay39, &           ! decay constants of 14C and 39Ar
+                             init14_3d                     ! initialize R14C with 3d field
 
 
   contains
