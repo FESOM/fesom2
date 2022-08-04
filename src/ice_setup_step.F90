@@ -235,9 +235,20 @@ real(kind=WP)              :: time_evp, time_advec, time_therm
 t0=MPI_Wtime()
 
 #if defined (__icepack)
+
+! kh 31.01.22 increase granularity to reduce overall wait for entering critical sections
+! kh 13.07.22 omp critical section already entered in call path
+    !!$omp critical
     call step_icepack(mesh, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts    
-#else     
+! kh 13.07.22 omp critical section already entered in call path
+    !!$omp end critical
+
+#else
     
+! kh 31.01.22 increase granularity to reduce overall wait for entering critical sections
+! kh 13.07.22 omp critical section already entered in call path
+    !!$omp critical
+
     !___________________________________________________________________________
     ! ===== Dynamics
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'  
@@ -253,8 +264,12 @@ t0=MPI_Wtime()
         call par_ex
         stop
     END SELECT
-    
+
+! kh 13.07.22 omp critical section already entered in call path
+    !!$omp end critical
+
     if (use_cavity) call cavity_ice_clean_vel(mesh)
+
     t1=MPI_Wtime()   
     
     !___________________________________________________________________________
@@ -270,11 +285,26 @@ t0=MPI_Wtime()
     end do
 #endif /* (__oifs) */
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
+
     call ice_TG_rhs_div(mesh)   
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_solve...'//achar(27)//'[0m' 
+
+! kh 31.01.22 increase granularity to reduce overall wait for entering critical sections
+! kh 13.07.22 omp critical section already entered in call path
+    !!$omp critical
     call ice_fct_solve(mesh)
+! kh 13.07.22 omp critical section already entered in call path
+    !!$omp end critical
+
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_update_for_div...'//achar(27)//'[0m'
+
+! kh 31.01.22 increase granularity to reduce overall wait for entering critical sections
+! kh 13.07.22 omp critical section already entered in call path
+    !!$omp critical
     call ice_update_for_div(mesh)
+! kh 13.07.22 omp critical section already entered in call path
+    !!$omp end critical
+
 #if defined (__oifs)
     do i=1,myDim_nod2D+eDim_nod2D
         if (a_ice(i)>0.0_WP) ice_temp(i) = ice_temp(i)/a_ice(i)
@@ -289,7 +319,15 @@ t0=MPI_Wtime()
     !___________________________________________________________________________
     ! ===== Thermodynamic part
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
+
+    
+! kh 31.01.22 increase granularity to reduce overall wait for entering critical sections
+! kh 13.07.22 omp critical section already entered in call path
+    !!$omp critical
     call thermodynamics(mesh)
+! kh 13.07.22 omp critical section already entered in call path
+    !!$omp end critical
+
 #endif /* (__icepack) */
     t3=MPI_Wtime()
     rtime_ice = rtime_ice + (t3-t0)

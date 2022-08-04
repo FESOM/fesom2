@@ -346,31 +346,35 @@ subroutine restart(istep, l_write, l_read, mesh)
 
   if (.not. is_restart) return
 
-  ! write restart
-  if(mype==0) write(*,*)'Do output (netCDF, restart) ...'
-  call assoc_ids(oid);                  call was_error(oid)  
-  call write_restart(oid, istep, mesh); call was_error(oid)
-  if (use_ice) then
-     call assoc_ids(iid);                  call was_error(iid)  
-     call write_restart(iid, istep, mesh); call was_error(iid)
+! kh 26.11.21
+  if(my_fesom_group == 0) then
+
+      ! write restart
+      if(mype==0) write(*,*)'Do output (netCDF, restart) ...'
+      call assoc_ids(oid);                  call was_error(oid)
+      call write_restart(oid, istep, mesh); call was_error(oid)
+      if (use_ice) then
+          call assoc_ids(iid);                  call was_error(iid)
+          call write_restart(iid, istep, mesh); call was_error(iid)
 #if defined(__icepack)
-     call assoc_ids(ip_id);                  call was_error(ip_id)
-     call write_restart(ip_id, istep, mesh); call was_error(ip_id)
+          call assoc_ids(ip_id);                  call was_error(ip_id)
+          call write_restart(ip_id, istep, mesh); call was_error(ip_id)
 #endif
-  end if
+      end if
 !---wiso-code
-  if (lwiso) then
-     call assoc_ids(wid);            call was_error(wid)
-     call write_restart(wid, istep, mesh); call was_error(wid)
-  end if
+      if (lwiso) then
+          call assoc_ids(wid);            call was_error(wid)
+          call write_restart(wid, istep, mesh); call was_error(wid)
+      end if
 !---wiso-code-end
 
-  
-  ! actualize clock file to latest restart point
-  if (mype==0) then
-		write(*,*) ' --> actualize clock file to latest restart point'
-		call clock_finish  
-  end if
+      ! actualize clock file to latest restart point
+      if (mype==0) then
+          write(*,*) ' --> actualize clock file to latest restart point'
+          call clock_finish  
+      end if
+
+  end if ! (my_fesom_group == 0) then
   
 end subroutine restart
 !

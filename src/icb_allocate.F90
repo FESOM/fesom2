@@ -16,11 +16,17 @@ subroutine allocate_icb()
   allocate(calving_day(ib_num))
   calving_day = 1   !28.0: September 29 for restart in 1 SEP 97 ! 271.0: September 29 for year 1997
   allocate(height_ib(ib_num))
+  allocate(height_ib_buf(ib_num)) ! kh 17.12.21
   height_ib = 1.0 ! 250.0 ! 360.0
+  height_ib_buf = 1.0 ! kh 17.12.21
   allocate(length_ib(ib_num))
+  allocate(length_ib_buf(ib_num)) ! kh 17.12.21
   length_ib = 1.0
+  length_ib_buf = 1.0 ! kh 17.12.21
   allocate(width_ib(ib_num))
+  allocate(width_ib_buf(ib_num)) ! kh 17.12.21
   width_ib = 1.0
+  width_ib_buf = 1.0 ! kh 17.12.21
   allocate(lon_deg(ib_num))
   lon_deg = 0.0
   allocate(lat_deg(ib_num))
@@ -62,12 +68,33 @@ subroutine allocate_icb()
   allocate(rho_ice(ib_num))
   rho_ice = 910.0        !910 RT, 945.0 bei Lichey, aus Lemke (1993)
   allocate(u_ib(ib_num))
+  allocate(u_ib_buf(ib_num)) ! kh 17.12.21
   allocate(v_ib(ib_num))
+  allocate(v_ib_buf(ib_num)) ! kh 17.12.21
+
+! kh 22.07.22
+  u_ib     = 0.0
+  u_ib_buf = 0.0
+  v_ib     = 0.0
+  v_ib_buf = 0.0
+
   allocate(iceberg_elem(ib_num))
+  allocate(iceberg_elem_buf(ib_num)) ! kh 17.12.21
   allocate(find_iceberg_elem(ib_num))
+  allocate(find_iceberg_elem_buf(ib_num)) ! kh 17.12.21
   find_iceberg_elem = .true.
+  find_iceberg_elem_buf = .true. ! kh 17.12.21
   allocate(f_u_ib_old(ib_num))
+  allocate(f_u_ib_old_buf(ib_num)) ! 17.12.21
   allocate(f_v_ib_old(ib_num))
+  allocate(f_v_ib_old_buf(ib_num)) ! 17.12.21
+
+! kh 22.07.22
+  f_u_ib_old     = 0.0
+  f_u_ib_old_buf = 0.0
+  f_v_ib_old     = 0.0
+  f_v_ib_old_buf = 0.0
+
   allocate(bvl_mean(ib_num))
   bvl_mean = 0.0
   allocate(lvlv_mean(ib_num))
@@ -77,22 +104,51 @@ subroutine allocate_icb()
   allocate(lvlb_mean(ib_num))
   lvlb_mean = 0.0 !averaged volume losses
   allocate(fwe_flux_ib(ib_num))
+  allocate(fwe_flux_ib_buf(ib_num)) ! kh 17.12.21
   allocate(fwl_flux_ib(ib_num))
+  allocate(fwl_flux_ib_buf(ib_num)) ! kh 17.12.21
   allocate(fwb_flux_ib(ib_num))
+  allocate(fwb_flux_ib_buf(ib_num)) ! kh 17.12.21
   allocate(fwbv_flux_ib(ib_num))
+  allocate(fwbv_flux_ib_buf(ib_num)) ! kh 17.12.21
   allocate(heat_flux_ib(ib_num))
+  allocate(heat_flux_ib_buf(ib_num)) ! kh 17.12.21
   fwe_flux_ib = 0.0
+  fwe_flux_ib_buf = 0.0 ! kh 17.12.21
   fwl_flux_ib = 0.0
+  fwl_flux_ib_buf = 0.0 ! kh 17.12.21
   fwb_flux_ib = 0.0
+  fwb_flux_ib_buf = 0.0 ! kh 17.12.21
   fwbv_flux_ib = 0.0
+  fwbv_flux_ib_buf = 0.0 ! kh 17.12.21
   heat_flux_ib = 0.0
+  heat_flux_ib_buf = 0.0 ! kh 17.12.21
+
+! kh 17.12.21
+  allocate(flux_iceberg_node_ib(3, ib_num))
+  allocate(flux_iceberg_node_ib_buf(3, ib_num))
+  flux_iceberg_node_ib = 0
+  flux_iceberg_node_ib_buf = 0
+
+! kh 15.07.22
+  allocate(flux_iceberg_num_nodes_ib(ib_num))
+  allocate(flux_iceberg_num_nodes_ib_buf(ib_num))
+  flux_iceberg_num_nodes_ib = 0
+  flux_iceberg_num_nodes_ib_buf = 0
+
   allocate(arr_block(15*ib_num))
+  allocate(arr_block_buf(15*ib_num)) ! kh 17.12.21
+
   allocate(elem_block(ib_num))
+  allocate(elem_block_buf(ib_num)) ! kh 17.12.21
   allocate(vl_block(4*ib_num))
+  allocate(vl_block_buf(4*ib_num)) ! kh 17.12.21
   allocate(buoy_props(ib_num,13))
   buoy_props = 0.0
   allocate(melted(ib_num))
+  allocate(melted_buf(ib_num)) ! kh 17.12.21
   melted = .false.
+  melted_buf = .false. ! kh 17.12.21
   allocate(grounded(ib_num))
   grounded = .false.
   allocate(scaling(ib_num))

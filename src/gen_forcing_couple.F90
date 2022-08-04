@@ -81,6 +81,10 @@ subroutine update_atm_forcing(istep, mesh)
   logical                                          :: do_rotate_ice_wind=.false.
   INTEGER                                          :: my_global_rank, ierror
   INTEGER 					   :: status(MPI_STATUS_SIZE)
+
+! kh 01.12.21
+  integer                                :: n_size
+
 #endif
   !character(15)                         :: vari, filevari
   !character(4)                          :: fileyear
@@ -93,6 +97,10 @@ subroutine update_atm_forcing(istep, mesh)
   zwisomin= 1.e-6_WP
   !---wiso-code-end
   
+
+! kh 01.12.21
+      n_size = myDim_nod2D + eDim_nod2D
+
 #ifdef __oasis
      if (firstcall) then
         allocate(exchange(myDim_nod2D+eDim_nod2D), mask(myDim_nod2D+eDim_nod2D))
@@ -102,6 +110,12 @@ subroutine update_atm_forcing(istep, mesh)
         mask          =0.
         firstcall=.false.
      end if
+
+
+! kh 24.01.22 increase granularity to reduce overall wait for entering critical sections
+! kh 24.01.22 also advantageous if MPI_THREAD_MULTIPLE is used
+     !$omp critical
+
      do i=1,nsend
          exchange  =0.
          if (i.eq.1) then
@@ -174,14 +188,27 @@ subroutine update_atm_forcing(istep, mesh)
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
 #endif
          endif
-         call cpl_oasis3mct_send(i, exchange, action)
-      enddo
+
+! kh 30.11.21
+         if(my_fesom_group == 0) then
+             call cpl_oasis3mct_send(i, exchange, action)
+         end if
+      enddo ! i=1,nsend
+
+! kh 24.01.22 increase granularity to reduce overall wait for entering critical sections
+! kh 11.07.22 also advantageous if MPI_THREAD_MULTIPLE is used
+      !$omp end critical
+
 #ifdef VERBOSE
       do i=1, nsend 
         if (mype==0) write(*,*) 'SEND: field ', i, ' max val:', maxval(exchange), ' . ACTION? ', action 
       enddo
 #endif
       mask=1.
+
+! kh 24.01.22 increase granularity to reduce overall wait for entering critical sections
+! kh 11.07.22 also advantageous if MPI_THREAD_MULTIPLE is used
+      !$omp critical
       do i=1,nrecv
          exchange =0.0
          call cpl_oasis3mct_recv (i,exchange,action)
@@ -351,7 +378,11 @@ subroutine update_atm_forcing(istep, mesh)
 		write(*,*) 'FESOM RECV: flux ', i, ', max val: ', maxval(exchange)
 	  end if
 #endif
-      end do
+      end do ! i=1,nrecv
+
+! kh 24.01.22 increase granularity to reduce overall wait for entering critical sections
+! kh 11.07.22 also advantageous if MPI_THREAD_MULTIPLE is used
+     !$omp end critical
 
       if ((do_rotate_oce_wind .AND. do_rotate_ice_wind) .AND. rotated_grid) then
          do n=1, myDim_nod2D+eDim_nod2D
@@ -625,7 +656,10 @@ SUBROUTINE integrate_2D(flux_global, flux_local, eff_vol, field2d, mask, mesh)
   use g_parsup !myDim_nod2D, eDim_nod2D, MPI stuff
   use MOD_MESH
   use o_PARAM, only: WP
- 
+
+! kh 24.01.22
+  use g_config, only: thread_support_level_required
+
   IMPLICIT NONE
 
   real(kind=WP), INTENT(OUT)  :: flux_global(2), flux_local(2)
@@ -640,15 +674,20 @@ SUBROUTINE integrate_2D(flux_global, flux_local, eff_vol, field2d, mask, mesh)
 
   flux_local(1)=sum(lump2d_north*field2d(1:myDim_nod2D)*mask(1:myDim_nod2D))
   flux_local(2)=sum(lump2d_south*field2d(1:myDim_nod2D)*mask(1:myDim_nod2D))
-  call MPI_AllREDUCE(flux_local, flux_global, 2, &
-  		     MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-		     
-		     
+
+! kh 13.07.22 omp critical section already entered in call path
+  !!$omp critical
+  call MPI_AllREDUCE(flux_local, flux_global, 2, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+  !!$omp end critical
+
   eff_vol_local(1)=sum(lump2d_north*mask(1:myDim_nod2D))
   eff_vol_local(2)=sum(lump2d_south*mask(1:myDim_nod2D))
-  call MPI_AllREDUCE(eff_vol_local, eff_vol,  2, & 
-  		     MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-		     
+
+! kh 13.07.22 omp critical section already entered in call path
+  !!$omp critical
+  call MPI_AllREDUCE(eff_vol_local, eff_vol, 2, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+  !!$omp end critical
+
 END SUBROUTINE integrate_2D
 
 !
@@ -688,32 +727,76 @@ SUBROUTINE net_rec_from_atm(action)
   use cpl_driver
   use o_PARAM, only: WP
 
+! kh 10.21.21
+  use g_config, only: num_fesom_groups, prefer_allreduce_in_fesom_groups
+
   IMPLICIT NONE
 
-  LOGICAL,      INTENT (IN)   		          :: action
+  LOGICAL,      INTENT (IN)                       :: action
   INTEGER                                         :: my_global_rank, ierror
-  INTEGER                                         :: n  
-  INTEGER 					  :: status(MPI_STATUS_SIZE,npes) 
+
+! kh 10.12.21
+  INTEGER                                         :: my_global_rank_test
+
+  INTEGER                                         :: n
+  INTEGER                                         :: status(MPI_STATUS_SIZE,npes) 
   INTEGER                                         :: request(2)
-  real(kind=WP)                 			  :: aux(nrecv)
+  real(kind=WP)                                   :: aux(nrecv)
 #if defined (__oifs)
   return  !OIFS-FESOM2 coupling uses OASIS3MCT conservative remapping and recieves no net fluxes here.
 #endif
 
   if (action) then
+
+! kh 24.01.22 increase granularity to reduce overall wait for entering critical sections
+! kh 13.07.22 omp critical section already entered in call path
+     !!$omp critical
+
      CALL MPI_COMM_RANK(MPI_COMM_WORLD, my_global_rank, ierror)
      atm_net_fluxes_north=0.
      atm_net_fluxes_south=0.
-     if (my_global_rank==target_root) then
-	CALL MPI_IRecv(atm_net_fluxes_north(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 111, MPI_COMM_WORLD, request(1), MPIerr)
-        CALL MPI_IRecv(atm_net_fluxes_south(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 112, MPI_COMM_WORLD, request(2), MPIerr)
-        CALL MPI_Waitall(2, request, status, MPIerr)
+
+! kh 10.12.21
+     my_global_rank_test = my_global_rank - (my_fesom_group * npes)
+
+! kh 10.12.21 check for is root in group
+     if (my_global_rank_test==target_root) then
+        if(my_fesom_group == 0) then
+           CALL MPI_IRecv(atm_net_fluxes_north(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 111, MPI_COMM_WORLD, request(1), MPIerr)
+           CALL MPI_IRecv(atm_net_fluxes_south(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 112, MPI_COMM_WORLD, request(2), MPIerr)
+           CALL MPI_Waitall(2, request, status, MPIerr)
+        end if
+
+        if((num_fesom_groups > 1) .and. prefer_allreduce_in_fesom_groups) then
+
+! kh 01.07.22 prepare allreduce operations below for my_fesom_group ids greater 0
+           call MPI_Bcast(atm_net_fluxes_north(1), nrecv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIerr)
+           call MPI_Bcast(atm_net_fluxes_south(1), nrecv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIerr)
+        end if
+
+     end if ! (my_global_rank_test==target_root) then
+
+     if((my_fesom_group == 0) .or. prefer_allreduce_in_fesom_groups) then
+        call MPI_Barrier(MPI_COMM_FESOM, MPIerr)
+        call MPI_AllREDUCE(atm_net_fluxes_north(1), aux, nrecv, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        atm_net_fluxes_north=aux
+        call MPI_AllREDUCE(atm_net_fluxes_south(1), aux, nrecv, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        atm_net_fluxes_south=aux
      end if
-  call MPI_Barrier(MPI_COMM_FESOM, MPIerr)     
-  call MPI_AllREDUCE(atm_net_fluxes_north(1), aux, nrecv, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-  atm_net_fluxes_north=aux
-  call MPI_AllREDUCE(atm_net_fluxes_south(1), aux, nrecv, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-  atm_net_fluxes_south=aux
-  end if
+
+     if((num_fesom_groups > 1) .and. .not. prefer_allreduce_in_fesom_groups) then
+
+! kh 01.07.22 use additional broadcast step instead of allreduce operations for my_fesom_group ids greater 0. for large numbers of cores this seems 
+! to be advantageous on levante for some experiments
+        call MPI_Bcast(atm_net_fluxes_north(1), nrecv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIerr)
+        call MPI_Bcast(atm_net_fluxes_south(1), nrecv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIerr)
+     end if
+
+! kh 13.07.22 omp critical section already entered in call path
+     !!$omp end critical
+
+  end if ! (action) then
+
 END SUBROUTINE net_rec_from_atm
+
 #endif

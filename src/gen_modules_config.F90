@@ -114,6 +114,13 @@ module g_config
   integer                       :: ib_async_mode=0
   integer                       :: thread_support_level_required=3 ! 2 = MPI_THREAD_SERIALIZED, 3 = MPI_THREAD_MULTIPLE
 
+! kh 11.11.21 number of groups for multi FESOM group loop parallelization 
+  integer                       :: num_fesom_groups=1
+
+! kh 01.07.22 prefer allreduce operations for my_fesom_group ids greater 0 (used so far in net_rec_from_atm). for large numbers of cores (e.g. > 1000)
+! it seems to be advantageous on levante to use an additional broadcast step instead
+  logical                       :: prefer_allreduce_in_fesom_groups=.true.
+
   namelist /icebergs/ use_icebergs, use_icesheet_coupling, ib_num, steps_per_ib_step, ib_async_mode, thread_support_level_required
 
 !wiso-code!!!
@@ -128,7 +135,10 @@ module g_config
   logical                       :: flag_debug=.false.    ! prints name of actual subroutine he is in 
   logical                       :: flag_warn_cflz=.true. ! switches off cflz warning
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
-                        use_cavity_partial_cell, cavity_partial_cell_thresh, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso !---wiso-code add lwiso
+                        use_cavity_partial_cell, cavity_partial_cell_thresh, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, & !---wiso-code add lwiso
+                        num_fesom_groups, &              ! kh 11.11.21 parallel iceberg loop (MPI)
+                        prefer_allreduce_in_fesom_groups ! kh 01.07.22 parallel iceberg (MPI, tuning)
+
   
   !_____________________________________________________________________________
   ! *** others ***
@@ -138,6 +148,10 @@ module g_config
   real(kind=WP)                 :: rtime_ice=0.0, rtime_tot=0.0
   real(kind=WP)                 :: rtime_oce=0.0, rtime_oce_dyn=0.0, rtime_oce_dynssh=0.0,  rtime_oce_solvessh=0.0
   real(kind=WP)                 :: rtime_oce_solvetra=0.0, rtime_oce_GMRedi=0.0, rtime_oce_mixpres=0.0
+
+  ! kh 07.12.21
+  real(kind=WP)                 :: rtime_icb_step1=0.0, rtime_icb_step2=0.0, rtime_icb_comm=0.0
+
   real(kind=WP)                 :: dummy=1.e10
   
   

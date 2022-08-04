@@ -22,12 +22,40 @@ use g_parsup
  integer	:: ib, times, istep
 
 ! kh 16.03.21
- integer	:: istep_end_synced
+ integer :: istep_end_synced
 
 ! kh 25.03.21
- integer:: req, status(MPI_STATUS_SIZE)
- logical:: completed
+ integer :: req, status(MPI_STATUS_SIZE)
+ logical :: completed
 
+ ! kh 21.12.21
+ integer, dimension(50) :: req_list
+
+ ! kh 07.12.21
+ integer :: group_i
+ integer :: group_j
+ integer :: buoy_props_j
+
+ ! kh 13.12.21
+ integer :: ib_start
+ integer :: ib_end
+ integer :: ib_step
+! integer :: ib_send
+ integer :: group_for_ib
+ integer :: ib_count_in_group
+ logical :: has_one_added_ib
+ integer :: ib_start_adjusted
+ integer :: ib_end_adjusted
+ integer :: i_start
+ integer :: i_end
+ integer :: j_start
+ integer :: j_end
+ integer :: step
+ 
+ logical, dimension (ib_num)      :: buffer_logical
+ integer, dimension (ib_num)      :: buffer_integer
+ real,    dimension (ib_num * 15) :: buffer_double
+ 
  real(kind=8) 	:: t0, t1, t2, t3, t4, t0_restart, t1_restart   	!=
  logical	:: firstcall=.true. 					!=
  logical	:: lastsubstep  					!=
@@ -60,7 +88,7 @@ type(t_mesh), intent(in) , target :: mesh
   firstcall = .false.
   !call init_global_tides
   !call tides_distr
- end if  
+ end if
 
  t0=MPI_Wtime()
  
@@ -81,9 +109,16 @@ type(t_mesh), intent(in) , target :: mesh
  
  
  !============================= STEP 1 =================================!
+
+ ! kh 17.12.21
+ flux_iceberg_node_ib = 0
+   
+! kh 15.12.21
+ ib_start = my_fesom_group + 1
+ ib_end   = ib_num
+ ib_step  = num_fesom_groups
  
- 
- do ib=1, ib_num
+ do ib = ib_start, ib_end, ib_step
   lastsubstep = .false.
   if( real(istep) > real(step_per_day)*calving_day(ib) ) then !iceberg calved
   
@@ -105,9 +140,173 @@ type(t_mesh), intent(in) , target :: mesh
   end if
  end do
 
+ if(num_fesom_groups > 1) then
+! kh 21.12.21 step == 1: group_0 receives partial results from all other groups
+! kh 21.12.21 step == 2: group_0 sends    to   all other groups (step 2 is currently no longer being used)
+    do step = 1, 1
+        if(step == 1) then
+            i_start = 1
+            i_end   = num_fesom_groups - 1
+            j_start = 0
+            j_end   = 0
+        else 
+            if(step == 2) then
+                i_start = 0
+                i_end   = 0
+                j_start = 1
+                j_end   = num_fesom_groups - 1
+            else
+              ! kh 21.12.21 internal error
+            end if
+        end if
+
+        do group_i = i_start, i_end
+            do group_j = j_start, j_end
+                if(group_i == group_j) then
+                    ! kh 21.12.21 skip merge with oneself (never reached)
+                else
+                    if(my_fesom_group == group_i) then
+                        !$omp critical
+                        call MPI_Isend(melted(:),                      ib_num, MPI_LOGICAL,          group_j, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 1), MPIERR_IB)
+                        call MPI_Isend(height_ib(:),                   ib_num, MPI_DOUBLE_PRECISION, group_j, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 2), MPIERR_IB)
+                        call MPI_Isend(length_ib(:),                   ib_num, MPI_DOUBLE_PRECISION, group_j, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 3), MPIERR_IB)
+                        call MPI_Isend(width_ib(:),                    ib_num, MPI_DOUBLE_PRECISION, group_j, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 4), MPIERR_IB)
+                        call MPI_Isend(u_ib(:),                        ib_num, MPI_DOUBLE_PRECISION, group_j, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 5), MPIERR_IB)
+                        call MPI_Isend(v_ib(:),                        ib_num, MPI_DOUBLE_PRECISION, group_j, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 6), MPIERR_IB)
+                        call MPI_Isend(f_u_ib_old(:),                  ib_num, MPI_DOUBLE_PRECISION, group_j, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 7), MPIERR_IB)
+                        call MPI_Isend(f_v_ib_old(:),                  ib_num, MPI_DOUBLE_PRECISION, group_j, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 8), MPIERR_IB)
+                        call MPI_Isend(iceberg_elem(:),                ib_num, MPI_INTEGER,          group_j, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 9), MPIERR_IB)
+                        call MPI_Isend(find_iceberg_elem(:),           ib_num, MPI_LOGICAL,          group_j, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(10), MPIERR_IB)
+                        call MPI_Isend(elem_block(:),                  ib_num, MPI_INTEGER,          group_j, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(11), MPIERR_IB)
+
+                        call MPI_Isend(flux_iceberg_node_ib(:, :), ib_num * 3, MPI_INTEGER,          group_j, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(12), MPIERR_IB)
+                        call MPI_Isend(flux_iceberg_num_nodes_ib(:),   ib_num, MPI_INTEGER,          group_j, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(13), MPIERR_IB)
+                        call MPI_Isend(fwbv_flux_ib(:),                ib_num, MPI_DOUBLE_PRECISION, group_j, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(14), MPIERR_IB)
+                        call MPI_Isend(fwb_flux_ib(:),                 ib_num, MPI_DOUBLE_PRECISION, group_j, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(15), MPIERR_IB)
+                        call MPI_Isend(fwl_flux_ib(:),                 ib_num, MPI_DOUBLE_PRECISION, group_j, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(16), MPIERR_IB)
+                        call MPI_Isend(fwe_flux_ib(:),                 ib_num, MPI_DOUBLE_PRECISION, group_j, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(17), MPIERR_IB)
+                        call MPI_Isend(heat_flux_ib(:),                ib_num, MPI_DOUBLE_PRECISION, group_j, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(18), MPIERR_IB)
+
+                        call MPI_Isend(arr_block(:),              ib_num * 15, MPI_DOUBLE_PRECISION, group_j, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(19), MPIERR_IB)
+                        call MPI_Isend(vl_block(:),               ib_num *  4, MPI_DOUBLE_PRECISION, group_j, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(20), MPIERR_IB)
+                        !$omp end critical
+
+! kh 21.12.21 avoid any blocking
+                        completed = .false.
+                        do while (.not. completed)
+                            !$omp critical
+                            call MPI_TESTALL(20, req_list, completed, MPI_STATUSES_IGNORE, MPIERR_IB)
+                            !$omp end critical
+                        end do
+                        
+                    else
+                        if(my_fesom_group == group_j) then
+                            !$omp critical
+                            call MPI_Irecv(melted_buf(:),                      ib_num, MPI_LOGICAL,          group_i, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 1), MPIERR_IB)
+                            call MPI_Irecv(height_ib_buf(:),                   ib_num, MPI_DOUBLE_PRECISION, group_i, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 2), MPIERR_IB)
+                            call MPI_Irecv(length_ib_buf(:),                   ib_num, MPI_DOUBLE_PRECISION, group_i, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 3), MPIERR_IB)
+                            call MPI_Irecv(width_ib_buf(:),                    ib_num, MPI_DOUBLE_PRECISION, group_i, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 4), MPIERR_IB)
+                            call MPI_Irecv(u_ib_buf(:),                        ib_num, MPI_DOUBLE_PRECISION, group_i, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 5), MPIERR_IB)
+                            call MPI_Irecv(v_ib_buf(:),                        ib_num, MPI_DOUBLE_PRECISION, group_i, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 6), MPIERR_IB)
+                            call MPI_Irecv(f_u_ib_old_buf(:),                  ib_num, MPI_DOUBLE_PRECISION, group_i, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 7), MPIERR_IB)
+                            call MPI_Irecv(f_v_ib_old_buf(:),                  ib_num, MPI_DOUBLE_PRECISION, group_i, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 8), MPIERR_IB)
+                            call MPI_Irecv(iceberg_elem_buf(:),                ib_num, MPI_INTEGER,          group_i, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 9), MPIERR_IB)
+                            call MPI_Irecv(find_iceberg_elem_buf(:),           ib_num, MPI_LOGICAL,          group_i, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(10), MPIERR_IB)
+                            call MPI_Irecv(elem_block_buf(:),                  ib_num, MPI_INTEGER,          group_i, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(11), MPIERR_IB)
+
+                            call MPI_Irecv(flux_iceberg_node_ib_buf(:, :), ib_num * 3, MPI_INTEGER,          group_i, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(12), MPIERR_IB)
+                            call MPI_Irecv(flux_iceberg_num_nodes_ib_buf(:),   ib_num, MPI_INTEGER,          group_i, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(13), MPIERR_IB)
+                            call MPI_Irecv(fwbv_flux_ib_buf(:),                ib_num, MPI_DOUBLE_PRECISION, group_i, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(14), MPIERR_IB)
+                            call MPI_Irecv(fwb_flux_ib_buf(:),                 ib_num, MPI_DOUBLE_PRECISION, group_i, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(15), MPIERR_IB)
+                            call MPI_Irecv(fwl_flux_ib_buf(:),                 ib_num, MPI_DOUBLE_PRECISION, group_i, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(16), MPIERR_IB)
+                            call MPI_Irecv(fwe_flux_ib_buf(:),                 ib_num, MPI_DOUBLE_PRECISION, group_i, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(17), MPIERR_IB)
+                            call MPI_Irecv(heat_flux_ib_buf(:),                ib_num, MPI_DOUBLE_PRECISION, group_i, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(18), MPIERR_IB)
+
+                            call MPI_Irecv(arr_block_buf(:),              ib_num * 15, MPI_DOUBLE_PRECISION, group_i, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(19), MPIERR_IB)
+                            call MPI_Irecv(vl_block_buf(:),               ib_num *  4, MPI_DOUBLE_PRECISION, group_i, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(20), MPIERR_IB)
+                            !$omp end critical
+
+! kh 21.12.21 avoid any blocking
+                            completed = .false.
+                            do while (.not. completed)
+                                !$omp critical
+                                call MPI_TESTALL(20, req_list, completed, MPI_STATUSES_IGNORE, MPIERR_IB)
+                                !$omp end critical
+                            end do
+                            
+                            do ib = group_i + 1, ib_end, num_fesom_groups
+                                melted(ib)                    = melted_buf(ib)
+                                height_ib(ib)                 = height_ib_buf(ib)
+                                length_ib(ib)                 = length_ib_buf(ib)
+                                width_ib(ib)                  = width_ib_buf(ib)
+                                u_ib(ib)                      = u_ib_buf(ib)
+                                v_ib(ib)                      = v_ib_buf(ib)
+                                f_u_ib_old(ib)                = f_u_ib_old_buf(ib)
+                                f_v_ib_old(ib)                = f_v_ib_old_buf(ib)
+                                iceberg_elem(ib)              = iceberg_elem_buf(ib)
+                                find_iceberg_elem(ib)         = find_iceberg_elem_buf(ib)
+                                elem_block(ib)                = elem_block_buf(ib)
+        
+                                flux_iceberg_node_ib(:, ib)   = flux_iceberg_node_ib_buf(:, ib)
+                                flux_iceberg_num_nodes_ib(ib) = flux_iceberg_num_nodes_ib_buf(ib)
+                                fwbv_flux_ib(ib)              = fwbv_flux_ib_buf(ib)
+                                fwb_flux_ib(ib)               = fwb_flux_ib_buf(ib)
+                                fwl_flux_ib(ib)               = fwl_flux_ib_buf(ib)
+                                fwe_flux_ib(ib)               = fwe_flux_ib_buf(ib)
+                                heat_flux_ib(ib)              = heat_flux_ib_buf(ib)
+        
+                                arr_block((ib - 1) * 15 + 1 : ib * 15) = arr_block_buf((ib - 1) * 15 + 1 : ib * 15)
+                                vl_block ((ib - 1) *  4 + 1 : ib *  4) = vl_block_buf ((ib - 1) *  4 + 1 : ib *  4)
+                            end do
+                        end if
+                    end if
+                end if
+            end do
+        end do
+    end do
+ end if
+
+ if(num_fesom_groups > 1) then
+    !$omp critical
+    call MPI_Ibcast(melted(:),                      ib_num, MPI_LOGICAL,          0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 1), MPIERR_IB)
+    call MPI_Ibcast(height_ib(:),                   ib_num, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 2), MPIERR_IB)
+    call MPI_Ibcast(length_ib(:),                   ib_num, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 3), MPIERR_IB)
+    call MPI_Ibcast(width_ib(:),                    ib_num, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 4), MPIERR_IB)
+    call MPI_Ibcast(u_ib(:),                        ib_num, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 5), MPIERR_IB)
+    call MPI_Ibcast(v_ib(:),                        ib_num, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 6), MPIERR_IB)
+    call MPI_Ibcast(f_u_ib_old(:),                  ib_num, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 7), MPIERR_IB)
+    call MPI_Ibcast(f_v_ib_old(:),                  ib_num, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 8), MPIERR_IB)
+    call MPI_Ibcast(iceberg_elem(:),                ib_num, MPI_INTEGER,          0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list( 9), MPIERR_IB)
+    call MPI_Ibcast(find_iceberg_elem(:),           ib_num, MPI_LOGICAL,          0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(10), MPIERR_IB)
+    call MPI_Ibcast(elem_block(:),                  ib_num, MPI_INTEGER,          0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(11), MPIERR_IB)
+
+    call MPI_Ibcast(flux_iceberg_node_ib(:, :), ib_num * 3, MPI_INTEGER,          0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(12), MPIERR_IB)
+    call MPI_Ibcast(flux_iceberg_num_nodes_ib(:),   ib_num, MPI_INTEGER,          0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(13), MPIERR_IB)
+    call MPI_Ibcast(fwbv_flux_ib(:),                ib_num, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(14), MPIERR_IB)
+    call MPI_Ibcast(fwb_flux_ib(:),                 ib_num, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(15), MPIERR_IB)
+    call MPI_Ibcast(fwl_flux_ib(:),                 ib_num, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(16), MPIERR_IB)
+    call MPI_Ibcast(fwe_flux_ib(:),                 ib_num, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(17), MPIERR_IB)
+    call MPI_Ibcast(heat_flux_ib(:),                ib_num, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(18), MPIERR_IB)
+
+    call MPI_Ibcast(arr_block(:),              ib_num * 15, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(19), MPIERR_IB)
+    call MPI_Ibcast(vl_block(:),               ib_num *  4, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req_list(20), MPIERR_IB)
+    !$omp end critical
+
+! kh 21.12.21 avoid any blocking
+    completed = .false.
+    do while (.not. completed)
+        !$omp critical
+        call MPI_TESTALL(20, req_list, completed, MPI_STATUSES_IGNORE, MPIERR_IB)
+        !$omp end critical
+    end do
+
+ end if
+
+! kh 17.12.21
+ call prepare_icb2fesom_part_2(mesh)
+
  t1=MPI_Wtime()
- 
- 
+  
  !========================== COMMUNICATION =============================!
 
  !all PEs need the array arr(15) and the iceberg element
@@ -125,45 +324,143 @@ type(t_mesh), intent(in) , target :: mesh
 ! call MPI_AllREDUCE(arr_block, arr_block_red, 15*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, &
 !       MPI_COMM_FESOM_IB, MPIERR_IB)
 
-!$omp critical 
- call MPI_IAllREDUCE(arr_block, arr_block_red, 15*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)
+!$omp critical
+
+! kh 13.12.21 orig no fesom groups
+! call MPI_IAllREDUCE(arr_block, arr_block_red, 15*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)
+
+ call calc_slice(ib_num, num_fesom_groups, my_fesom_group, ib_start, ib_end, ib_count_in_group, has_one_added_ib)
+ ib_start_adjusted = (ib_start - 1) * 15 + 1
+ ib_end_adjusted   = ib_end * 15
+ call MPI_IAllreduce(arr_block(ib_start_adjusted), arr_block_red(ib_start_adjusted), 15 * ib_count_in_group, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)
+
 !$omp end critical
 
  completed = .false.
  do while (.not. completed)
-!$omp critical
-CALL MPI_TEST(req, completed, status, MPIERR_IB)
-!$omp end critical
+    !$omp critical
+    CALL MPI_TEST(req, completed, status, MPIERR_IB)
+    !$omp end critical
  end do
+
+! kh 13.12.21 broadcast allreduce result to fesom groups
+if(num_fesom_groups > 1) then
+    do group_i = 0, num_fesom_groups - 1
+        call calc_slice(ib_num, num_fesom_groups, group_i, ib_start, ib_end, ib_count_in_group, has_one_added_ib)
+        ib_start_adjusted = (ib_start - 1) * 15 + 1
+        ib_end_adjusted   = ib_end * 15
+       
+!       write(*,*) 'group_i, tr_num_start_memo, tr_num_actual, num_tracers_end, has_one_added_tracer, tr_num_start_local, num_tracers_to_use_local, tr_num_to_send', &
+!                   group_i, tr_num_start_memo, tr_num_actual, num_tracers_end, has_one_added_tracer, tr_num_start_local, num_tracers_to_use_local, tr_num_to_send
+
+        !$omp critical
+        call MPI_IBcast(arr_block_red(ib_start_adjusted), 15 * ib_count_in_group, MPI_DOUBLE_PRECISION, group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req, MPIERR_IB)
+        !$omp end critical
+
+        completed = .false.
+        do while (.not. completed)
+            !$omp critical
+            CALL MPI_TEST(req, completed, status, MPIERR_IB)
+            !$omp end critical
+            if(.not. completed) then
+!                call sleepqq(1)
+            end if
+        end do
+    end do
+end if
+
 
 ! kh 25.03.21 orig
 ! call MPI_AllREDUCE(elem_block, elem_block_red, ib_num, MPI_INTEGER, MPI_SUM, &
 !       MPI_COMM_FESOM_IB, MPIERR_IB)  
-!$omp critical 
- call MPI_IAllREDUCE(elem_block, elem_block_red, ib_num, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)  
+!$omp critical
+
+! kh 13.12.21 orig no fesom groups
+!call MPI_IAllREDUCE(elem_block, elem_block_red, ib_num, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)  
+
+ call calc_slice(ib_num, num_fesom_groups, my_fesom_group, ib_start, ib_end, ib_count_in_group, has_one_added_ib)
+ call MPI_IAllreduce(elem_block(ib_start), elem_block_red(ib_start), ib_count_in_group, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)
+
 !$omp end critical
 
 completed = .false.
- do while (.not. completed)
-!$omp critical
-  CALL MPI_TEST(req, completed, status, MPIERR_IB)
-!$omp end critical
- end do
+do while (.not. completed)
+    !$omp critical
+    CALL MPI_TEST(req, completed, status, MPIERR_IB)
+    !$omp end critical
+    if(.not. completed) then
+!        call sleepqq(1)
+    end if
+end do
+  
+  ! kh 13.12.21 broadcast allreduce result to fesom groups
+ if(num_fesom_groups > 1) then
+  do group_i = 0, num_fesom_groups - 1
+      call calc_slice(ib_num, num_fesom_groups, group_i, ib_start, ib_end, ib_count_in_group, has_one_added_ib)
+      !$omp critical
+      call MPI_IBcast(elem_block_red(ib_start), ib_count_in_group, MPI_INTEGER, group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req, MPIERR_IB)
+      !$omp end critical
+
+      completed = .false.
+      do while (.not. completed)
+          !$omp critical
+           CALL MPI_TEST(req, completed, status, MPIERR_IB)
+          !$omp end critical
+
+          if(.not. completed) then
+!              call sleepqq(1)
+          end if
+      end do
+  end do
+end if
+
 
  !ALLREDUCE: vl_block, containing the volume losses (IBs may switch PE during the output interval)
 ! kh 25.03.21 orig
 ! call MPI_AllREDUCE(vl_block, vl_block_red, 4*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, &
 !       MPI_COMM_FESOM_IB, MPIERR_IB)
+
 !$omp critical 
- call MPI_IAllREDUCE(vl_block, vl_block_red, 4*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)
+
+! kh 13.12.21 orig no fesom groups
+!call MPI_IAllREDUCE(vl_block, vl_block_red, 4*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)
+
+ call calc_slice(ib_num, num_fesom_groups, my_fesom_group, ib_start, ib_end, ib_count_in_group, has_one_added_ib)
+ ib_start_adjusted = (ib_start - 1) * 4 + 1
+ ib_end_adjusted   = ib_end * 4
+ call MPI_IAllreduce(vl_block(ib_start_adjusted), vl_block_red(ib_start_adjusted), 4 * ib_count_in_group, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)
 !$omp end critical
 
  completed = .false.
  do while (.not. completed)
-!$omp critical
-  CALL MPI_TEST(req, completed, status, MPIERR_IB)
-!$omp end critical
+    !$omp critical
+    CALL MPI_TEST(req, completed, status, MPIERR_IB)
+    !$omp end critical
  end do
+
+! kh 13.12.21 broadcast allreduce result to fesom groups
+ if(num_fesom_groups > 1) then
+  do group_i = 0, num_fesom_groups - 1
+      call calc_slice(ib_num, num_fesom_groups, group_i, ib_start, ib_end, ib_count_in_group, has_one_added_ib)
+      ib_start_adjusted = (ib_start - 1) * 4 + 1
+      ib_end_adjusted   = ib_end * 4
+     
+      !$omp critical
+      call MPI_IBcast(vl_block_red(ib_start_adjusted), 4 * ib_count_in_group, MPI_DOUBLE_PRECISION, group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, req, MPIERR_IB)
+      !$omp end critical
+
+      completed = .false.
+      do while (.not. completed)
+          !$omp critical
+          CALL MPI_TEST(req, completed, status, MPIERR_IB)
+          !$omp end critical
+          if(.not. completed) then
+!              call sleepqq(1)
+          end if
+      end do
+  end do
+end if
+
 
 ! call MPI_Barrier(MPI_COMM_WORLD,MPIerr)
 ! arr_block_red = 0.0
@@ -235,7 +532,10 @@ end do
 !if (mod(istep,icb_outfreq)==0 .AND. ascii_out==.false.) then
  if (mod(istep_end_synced,icb_outfreq)==0 .AND. ascii_out==.false.) then
 
-   if (mype==0 .AND. (real(istep) > real(step_per_day)*calving_day(1) ) ) call write_buoy_props_netcdf
+! kh 06.12.21
+   if(my_fesom_group == 0) then
+     if (mype==0 .AND. (real(istep) > real(step_per_day)*calving_day(1) ) ) call write_buoy_props_netcdf
+   end if
        
    ! all PEs: set back to zero for next round
    bvl_mean=0.0
@@ -257,6 +557,10 @@ end do
 ! write(*,*) 'reading restart took', t1_restart-t0_restart
 ! write(*,*) '*************************************************************'
 ! end if
+
+rtime_icb_step1 = rtime_icb_step1 + t1 - t0
+rtime_icb_comm  = rtime_icb_comm  + t2 - t1
+rtime_icb_step2 = rtime_icb_step2 + t3 - t2
  
 end subroutine iceberg_calculation
 
@@ -445,9 +749,17 @@ type(t_mesh), intent(in) , target :: mesh
       
     !else
     !  write(*,*) 'Error local_idx_of(iceberg_elem) > myDim_elem2D, istep, local_idx_of(iceberg_elem), myDim_elem2D', istep, local_idx_of(iceberg_elem), myDim_elem2D
+
+! kh 09.12.21 set at least a defined value (e.g. for debug purposes in regards to the iceberg.restart file)
+! use special pattern 0.1234 for debug purposes, could be replaced by 0.0 for release use 
+!     f_u_ib_old = 0.1234
     endif
   !else
   !  write(*,*) 'Error local_idx_of(iceberg_elem) <= 0, istep, local_idx_of(iceberg_elem)', istep, local_idx_of(iceberg_elem)
+
+! kh 09.12.21 set at least a defined value (e.g. for debug purposes in regards to the iceberg.restart file)
+! use special pattern 0.1235 for debug purposes, could be replaced by 0.0 for release use 
+!   f_u_ib_old = 0.1235
   endif
  end if
  
@@ -497,7 +809,8 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 		   f_v_ib_old, l_semiimplicit, semiimplicit_coeff, &
 		   AB_coeff, file_meltrates, rho_icb)
 
-  call prepare_icb2fesom(mesh,ib,i_have_element,local_idx_of(iceberg_elem),depth_ib)
+! kh 17.12.21
+  call prepare_icb2fesom_part_1(mesh,ib,i_have_element,local_idx_of(iceberg_elem),depth_ib)
   !new_u_ib = 2.0
   !new_v_ib = 0.0
 
@@ -622,8 +935,8 @@ type(t_mesh), intent(in) , target :: mesh
   end do
   !###########################################
 end subroutine get_total_iceberg_area
- 
- 
+
+
 subroutine iceberg_step2(mesh, arr, elem_from_block, ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
 			Co,Ca,Ci, Cdo_skin,Cda_skin, rho_icb, 		   &
 			conc_sill,P_sill, rho_h2o,rho_air,rho_ice,	   & 
@@ -683,7 +996,7 @@ subroutine iceberg_step2(mesh, arr, elem_from_block, ib, height_ib,length_ib,wid
 
 ! kh 16.03.21
  integer :: istep_end_synced
- 
+
 ! LA: add threshold for number of icebergs in one elemt
  integer                        :: num_ib_in_elem, idx
  real                           :: area_ib_tot
@@ -805,7 +1118,7 @@ type(t_mesh), intent(in) , target :: mesh
      if (mype==0) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
    end if
  end if
- 
+
  t3=MPI_Wtime()
  
 
@@ -835,25 +1148,31 @@ type(t_mesh), intent(in) , target :: mesh
    end if
 
  if(ascii_out) then !use old ASCII output
-  
- file_track='/work/ollie/lackerma/iceberg/iceberg_ICBref_'
- !convert ib integer to string
- write(ib_char,'(I10)') ib
- !left-adjust the string..
- ib_char = adjustl(ib_char)
- !.. and trim while concatenating:
- file_track	=  trim(file_track) // trim(ib_char) // '.dat'
-   
-   open(unit=42,file=file_track,position='append')
 
-! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
-!  write(42,'(I,12e15.7)') 	istep, lon_rad_out, lat_rad_out, lon_deg_out, lat_deg_out, &
-!  				u_ib_out, v_ib_out, frozen_in, P_sill, P_ib, conci_ib, dudt_out, dvdt_out
-   write(42,'(I,12e15.7)') 	istep_end_synced, lon_rad_out, lat_rad_out, lon_deg_out, lat_deg_out, &
-   				u_ib_out, v_ib_out, frozen_in, P_sill, P_ib, conci_ib, dudt_out, dvdt_out
-   close(42)
+! kh 15.07.22
+   if(my_fesom_group == 0) then
+
+    file_track='/work/ollie/lackerma/iceberg/iceberg_ICBref_'
+    !convert ib integer to string
+    write(ib_char,'(I10)') ib
+    !left-adjust the string..
+    ib_char = adjustl(ib_char)
+    !.. and trim while concatenating:
+    file_track	=  trim(file_track) // trim(ib_char) // '.dat'
+    
+    open(unit=42,file=file_track,position='append')
+
+    ! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
+    !  write(42,'(I,12e15.7)') 	istep, lon_rad_out, lat_rad_out, lon_deg_out, lat_deg_out, &
+    !  				u_ib_out, v_ib_out, frozen_in, P_sill, P_ib, conci_ib, dudt_out, dvdt_out
+    write(42,'(I,12e15.7)') 	istep_end_synced, lon_rad_out, lat_rad_out, lon_deg_out, lat_deg_out, &
+                    u_ib_out, v_ib_out, frozen_in, P_sill, P_ib, conci_ib, dudt_out, dvdt_out
+    close(42)
+   end if ! (my_fesom_group == 0) then
 
  else !write in array for faster netcdf output
+
+! kh 15.07.22 output is done only if my_fesom_group == 0. this will be checked later: before call write_buoy_props_netcdf
 
   buoy_props(ib, 1) = lon_rad_out
   buoy_props(ib, 2) = lat_rad_out
@@ -869,7 +1188,7 @@ type(t_mesh), intent(in) , target :: mesh
   buoy_props(ib,12) = width_ib
   buoy_props(ib,13) = iceberg_elem
 
- end if
+ end if ! (ascii_out) then
 
  end if 
  
@@ -1187,49 +1506,57 @@ subroutine iceberg_restart
  LOGICAL :: file_exists
  INQUIRE(FILE=IcebergRestartPath, EXIST=file_exists) 
  icbID = mype+10
- 
+
  !call allocate_icb
- 
+
  if(file_exists) then
   open(unit=icbID,file=IcebergRestartPath,status='old')
-  
+
   do ib=1, ib_num 
-  
-   !read all parameters that icb_step needs:			
-   read(icbID,'(18e15.7,I,L,3e15.7,L,I)')						&
-   	height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
-	Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
-	conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
-	u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
-	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib)
+
+   !read all parameters that icb_step needs:
+   read(icbID,'(18e15.7,I,L,3e15.7,L,I)')                              &
+    height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib), &
+    Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib),      &
+    conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),     &
+    u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),        &
+    f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib)
 
   end do
   close(icbID)
 
-  if(mype==0) then
-  !write(*,*) 'read iceberg restart file'
+! kh 01.12.21
+  if(my_fesom_group == 0) then
 
-  !if(.NOT.ascii_out) call determine_save_count ! computed from existing records in netcdf file
-  if(.NOT.ascii_out) call init_buoy_output
-  !call init_icebergs_with_icesheet ! all PEs read LON,LAT,LENGTH from files
+    if(mype==0) then
+      !write(*,*) 'read iceberg restart file'
 
-  !write(*,*) '*************************************************************'
-  end if
+      !if(.NOT.ascii_out) call determine_save_count ! computed from existing records in netcdf file
+      if(.NOT.ascii_out) call init_buoy_output
+      !call init_icebergs_with_icesheet ! all PEs read LON,LAT,LENGTH from files
+
+      !write(*,*) '*************************************************************'
+    end if
+  end if ! (my_fesom_group == 0) then
  else
 
-  if(mype==0) then
-  write(*,*) 'no iceberg restart'
+! kh 01.12.21
+  if(my_fesom_group == 0) then
+    if(mype==0) then
+      write(*,*) 'no iceberg restart'
 
-  if(.NOT.ascii_out) call init_buoy_output
+      if(.NOT.ascii_out) call init_buoy_output
 
-  end if
+    end if
+  end if ! if(my_fesom_group == 0) then
 
   !call init_buoys ! all PEs read LON,LAT from files  
   !write(*,*) 'initialized positions from file'
+
   call init_icebergs ! all PEs read LON,LAT,LENGTH from files
   !write(*,*) 'initialized positions and length/width from file'
   !write(*,*) '*************************************************************'
- end if
+ end if ! (file_exists) then
 
 end subroutine iceberg_restart
 
@@ -1252,7 +1579,7 @@ subroutine iceberg_restart_with_icesheet
  icbID_non_melted_icb = mype+11
 
  !call allocate_icb
- 
+
  open(unit=icbID_non_melted_icb,file=num_non_melted_icb_file,status='old')
     read(icbID_non_melted_icb,*) num_non_melted_icb
  close(icbID_non_melted_icb)
@@ -1260,40 +1587,49 @@ subroutine iceberg_restart_with_icesheet
  if(file_exists) then
   open(unit=icbID_ISM,file=IcebergRestartPath_ISM,status='old')
   do ib=1, num_non_melted_icb 
-   !read all parameters that icb_step needs:			
-   read(icbID_ISM,'(18e15.7,I,L,3e15.7,L,I,L)')						&
-   	height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
-	Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
-	conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
-	u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
-	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib), melted(ib) 
+   !read all parameters that icb_step needs:
+   read(icbID_ISM,'(18e15.7,I,L,3e15.7,L,I,L)')                        &
+    height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib), &
+    Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib),      &
+    conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),     &
+    u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),        &
+    f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib), melted(ib) 
   end do
   close(icbID_ISM)
 
-  if(mype==0) then
-  write(*,*) 'read iceberg restart file'
+! kh 01.12.21
+  if(my_fesom_group == 0) then
+    if(mype==0) then
+      write(*,*) 'read iceberg restart file'
 
-  !if(.NOT.ascii_out) call determine_save_count ! computed from existing records in netcdf file
-  if(.NOT.ascii_out) call init_buoy_output
-  end if
+      !if(.NOT.ascii_out) call determine_save_count ! computed from existing records in netcdf file
+      if(.NOT.ascii_out) call init_buoy_output
+    end if
+  end if ! (my_fesom_group == 0) then
+
   call init_icebergs_with_icesheet
   !write(*,*) 'initialized positions and length/width from file'
   !write(*,*) '*************************************************************'
  else
 
-  if(mype==0) then
-  write(*,*) 'no iceberg restart'
+! kh 01.12.21
+  if(my_fesom_group == 0) then
+    if(mype==0) then
+      write(*,*) 'no iceberg restart'
 
-  if(.NOT.ascii_out) call init_buoy_output
+      if(.NOT.ascii_out) call init_buoy_output
 
-  end if
+    end if
+  end if ! (my_fesom_group == 0) then
 
   !call init_buoys ! all PEs read LON,LAT from files  
   !write(*,*) 'initialized positions from file'
+
   call init_icebergs !_with_icesheet ! all PEs read LON,LAT,LENGTH from files
+
   !write(*,*) 'initialized positions and length/width from file'
   !write(*,*) '*************************************************************'
- end if
+ end if ! (file_exists) then
 
 end subroutine iceberg_restart_with_icesheet
 
@@ -1323,36 +1659,39 @@ subroutine iceberg_out
  calving_day = 0.0	!to avoid negative calving_days
  end where
 
- if(mype==0) then
-  open(unit=icbID,file=IcebergRestartPath,position='append', status='replace')
-  open(unit=icbID_ISM,file=IcebergRestartPath_ISM,position='append', status='replace')
-  
-  do ib=1, ib_num 
-  
-   !write all parameters that icb_step needs:
-   write(icbID,'(18e15.7,I,L,3e15.7,L,I,L)')						&
-   	height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
-	Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
-	conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
-	u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
-	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib), melted(ib)
-   
-   !***************************************************************
-   !write new restart file with only non melted icebergs
-   if(melted(ib)==.false.) then
-       !write all parameters that icb_step needs:
-       write(icbID_ISM,'(18e15.7,I,L,3e15.7,L,I,L)')						&
-            height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
-            Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
-            conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
-            u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
-            f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib), melted(ib)
-   end if
+! kh 12.07.21
+ if(my_fesom_group == 0) then
+   if(mype==0) then
+     open(unit=icbID,file=IcebergRestartPath,position='append', status='replace')
+     open(unit=icbID_ISM,file=IcebergRestartPath_ISM,position='append', status='replace')
 
-  end do
-  close(icbID_ISM)
-  close(icbID)
- end if
+     do ib=1, ib_num 
+
+       !write all parameters that icb_step needs:
+       write(icbID,'(18e15.7,I,L,3e15.7,L,I,L)')                                &
+             height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib), &
+             Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib),      &
+             conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),     &
+             u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),        &
+             f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib), melted(ib)
+
+       !***************************************************************
+       !write new restart file with only non melted icebergs
+       if(melted(ib)==.false.) then
+         !write all parameters that icb_step needs:
+         write(icbID_ISM,'(18e15.7,I,L,3e15.7,L,I,L)')                            &
+               height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib), &
+               Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib),      &
+               conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),     &
+               u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),        &
+               f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib), melted(ib)
+       end if
+
+     end do
+     close(icbID_ISM)
+     close(icbID)
+   end if ! (mype==0) then
+ end if ! (my_fesom_group == 0) then
 end subroutine iceberg_out
 
 !========================================================================
@@ -2078,3 +2417,38 @@ subroutine write_buoy_props_netcdf
 
 
 end subroutine write_buoy_props_netcdf
+
+! kh 11.11.21 divide the range specified by indexcount into fesom_group_count equal slices and calculate
+! the start_index and end_index for the given fesom_group_id.
+! if necessary to compensate for fragmentation, the end index of the first n slices 
+! might be one higher than for the remaining slices. this is indicated by end_index_is_one_higher
+subroutine calc_slice(index_count, fesom_group_count, fesom_group_id, start_index, end_index, index_count_in_group, end_index_is_one_higher)
+!   use g_config
+
+    implicit none
+    integer, intent(in)      :: index_count
+    integer, intent(in)      :: fesom_group_count
+    integer, intent(in)      :: fesom_group_id
+    integer, intent(out)     :: start_index
+    integer, intent(out)     :: end_index
+    integer, intent(out)     :: index_count_in_group
+    logical, intent(out)     :: end_index_is_one_higher
+
+    integer                  :: group_id_limit_to_adjust_end_index
+
+    index_count_in_group               = index_count / fesom_group_count
+    group_id_limit_to_adjust_end_index = mod(index_count, fesom_group_count)
+    start_index                        = (fesom_group_id * index_count_in_group) + 1
+
+! kh 11.11.21 adjust loop start and number of loop iterations by 1 if necessary
+    if(fesom_group_id < group_id_limit_to_adjust_end_index) then
+      start_index = start_index + fesom_group_id
+      index_count_in_group = index_count_in_group + 1
+      end_index_is_one_higher = .true.
+    else
+      start_index = start_index + group_id_limit_to_adjust_end_index
+      end_index_is_one_higher = .false.
+    end if
+
+    end_index  = start_index + index_count_in_group - 1
+end subroutine calc_slice

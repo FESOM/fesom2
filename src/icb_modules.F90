@@ -13,10 +13,13 @@ save
   !        from the article 'Near-coastal circum-Antarctic iceberg size distributions determined from Synthetic Aperture Radar images'
   !        by Wesche and Dierking (2014).
   real,dimension(:), allocatable:: height_ib
+  real,dimension(:), allocatable:: height_ib_buf ! kh 17.12.21
 
   !read from file in init_icebergs
   real,dimension(:), allocatable:: length_ib
+  real,dimension(:), allocatable:: length_ib_buf ! kh 17.12.21
   real,dimension(:), allocatable:: width_ib
+  real,dimension(:), allocatable:: width_ib_buf ! kh 17.12.21
   real,dimension(:), allocatable:: lon_deg
   real,dimension(:), allocatable:: lat_deg
   !in case (l_initial .AND. l_iniuser) = .true. ;
@@ -94,29 +97,53 @@ save
   real :: AB_coeff = 1.53               !1.5 original AB (amplifying), 1.6 stabilized
   !===== NOTHING MUST BE CHANGED BELOW THIS LINE =====
   real,dimension(:), allocatable:: u_ib, v_ib
+  real,dimension(:), allocatable:: u_ib_buf, v_ib_buf ! kh 17.12.21
   integer,dimension(:), allocatable:: iceberg_elem
+  integer,dimension(:), allocatable:: iceberg_elem_buf ! kh 17.12.21
   logical,dimension(:), allocatable:: find_iceberg_elem
+  logical,dimension(:), allocatable:: find_iceberg_elem_buf ! kh 17.12.21
   real,dimension(:), allocatable:: f_u_ib_old, f_v_ib_old
+  real,dimension(:), allocatable:: f_u_ib_old_buf, f_v_ib_old_buf ! kh 17.12.21
   real,dimension(:), allocatable:: bvl_mean, lvlv_mean, lvle_mean, lvlb_mean !averaged volume losses
   !real,dimension(:), allocatable:: fw_flux_ib, heat_flux_ib
   real,dimension(:), allocatable:: fwe_flux_ib, fwl_flux_ib, fwb_flux_ib, fwbv_flux_ib, heat_flux_ib
-  
+  real,dimension(:), allocatable:: fwe_flux_ib_buf, fwl_flux_ib_buf, fwb_flux_ib_buf, fwbv_flux_ib_buf, heat_flux_ib_buf ! kh 17.12.21
+
+  ! kh 17.12.21
+  integer, dimension(:, :), allocatable :: flux_iceberg_node_ib
+  integer, dimension(:, :), allocatable :: flux_iceberg_node_ib_buf
+
+! kh 15.07.22
+  integer, dimension(:), allocatable :: flux_iceberg_num_nodes_ib
+  integer, dimension(:), allocatable :: flux_iceberg_num_nodes_ib_buf
+
   !===== FRESHWATER AND HEAT ARRAYS ON FESOM GRID =====
-  real,dimension(:), allocatable:: ibhf    !icb heat flux into ocean 
+  real,dimension(:), allocatable:: ibhf    !icb heat flux into ocean
+  !real,dimension(:), allocatable:: ibhf_buf ! kh 17.12.21
   real,dimension(:), allocatable:: ibfwb   !freshwater flux into ocean from basal melting
+  !real,dimension(:), allocatable:: ibfwb_buf ! kh 17.12.21
   real,dimension(:), allocatable:: ibfwbv   !freshwater flux into ocean from basal melting
+  !real,dimension(:), allocatable:: ibfwbv_buf ! kh 17.12.21
   real,dimension(:), allocatable:: ibfwl   !freshwater flux into ocean from lateral melting
+  !real,dimension(:), allocatable:: ibfwl_buf ! kh 17.12.21
   real,dimension(:), allocatable:: ibfwe   !freshwater flux into ocean from erosion
+  !real,dimension(:), allocatable:: ibfwe_buf ! kh 17.12.21
   integer,dimension(:), allocatable:: scaling   !scaling factor
 
   logical,dimension(:), allocatable::   melted  !1 if iceberg melted, 0 otherwise
+  logical,dimension(:), allocatable::   melted_buf  ! kh 17.12.21
   logical,dimension(:), allocatable::   grounded    !1 if iceberg grounded, 0 otherwise
   integer   :: num_non_melted_icb = 0 !1 if iceberg melted, 0 otherwise
   !for communication
+
   real,dimension(:), allocatable:: arr_block
+  real,dimension(:), allocatable:: arr_block_buf ! kh 17.12.21
+
   !real,dimension(15*ib_num):: arr_block
   integer,dimension(:), allocatable:: elem_block
+  integer,dimension(:), allocatable:: elem_block_buf ! kh 17.12.21
   real,dimension(:), allocatable:: vl_block
+  real,dimension(:), allocatable:: vl_block_buf ! kh 17.12.21
   !real,dimension(4*ib_num):: vl_block
 
   !array for output in netcdf

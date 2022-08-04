@@ -16,6 +16,18 @@ save
  ! kh 10.02.21 communicator for async iceberg computations based on OpenMP
  integer                                :: MPI_COMM_FESOM_IB
 
+ ! kh 26.11.21 communicator for multi FESOM group loop parallelization
+ integer                                :: MPI_COMM_FESOM_WORLD
+
+ ! kh 01.12.21 communicator for communicator swaps
+ integer                                :: MPI_COMM_FESOM_MEMO
+
+! kh 26.11.21 communicator for multi FESOM group loop parallelization
+ integer                                :: MPI_COMM_FESOM_SAME_RANK_IN_GROUPS
+
+ integer                                :: MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB
+
+
  !====================================================
  ! from iceberg coupling
  !integer, parameter   :: MAX_LAENDERECK=8
@@ -67,6 +79,10 @@ save
 
   integer            :: npes
   integer            :: mype
+
+! kh 26.11.21 multi FESOM loop parallelization
+  integer            :: my_fesom_group
+
   integer            :: maxPEnum=100
   integer, allocatable, dimension(:)  :: part
 
