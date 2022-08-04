@@ -591,7 +591,7 @@ USE g_PARSUP
 USE g_config
 USE g_ic3d
 ! for additional (transient) tracers:
-use mod_transit, only: id_r14c, id_r39ar, id_f12, id_sf6, init14_3d
+use mod_transit, only: id_r14c, id_r39ar, id_f12, id_sf6
   !
   ! reads the initial state or the restart file for the ocean
   !
@@ -611,9 +611,10 @@ use mod_transit, only: id_r14c, id_r39ar, id_f12, id_sf6, init14_3d
   !
   ! read ocean state
   ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
-  if(mype==0) write(*,*) 'read Temperatur climatology from:', trim(filelist(1))
-  if(mype==0) write(*,*) 'read Salt       climatology from:', trim(filelist(2))
-  if(init14_3d .and. mype==0) write(*,*) 'read initial R14C   field   from:', trim(filelist(3))
+  if(mype==0) write(*,*) 'read temperature climatology from:', trim(filelist(1))
+  if(mype==0) write(*,*) 'read salinity    climatology from:', trim(filelist(2))
+  if(any(idlist == 14) .and. mype==0) write(*,*) 'read radiocarbon climatology from:', trim(filelist(3))
+
   call do_ic3d(mesh)
   
   Tclim=tr_arr(:,:,1)
@@ -670,7 +671,7 @@ use mod_transit, only: id_r14c, id_r39ar, id_f12, id_sf6, init14_3d
 ! Transient tracers
        CASE (14)        ! initialize tracer ID=14, fractionation-corrected 14C/C
 !        this initialization can be overwritten by calling do_ic3d
-         if (.not. init14_3d) then 
+         if (.not. any(idlist == 14)) then 
            id_r14c = i
            tr_arr(:,:,i) = 0.85
            if (mype==0) then
