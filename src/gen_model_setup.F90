@@ -142,6 +142,27 @@ subroutine read_namelist_icebergs
 ! if(mype==0) write(*,*) 'icebergs namelist is read in'
 end subroutine read_namelist_icebergs
 ! =================================================================
+! kh 11.11.21 read num_fesom_groups for multi FESOM group loop parallelization
+! =================================================================
+subroutine read_namelist_run_config
+  ! Reads rin_config namelist and overwrite default parameters.
+  !
+  ! kh 11.11.21 Copied by Kai Himstedt (based on read_namelist)
+  !--------------------------------------------------------------
+  use g_parsup
+  use g_config
+  implicit none
+
+  character(len=100)   :: nmlfile
+
+  nmlfile ='namelist.config'    ! name of general configuration namelist file
+  open (20,file=nmlfile)
+  read (20,NML=run_config)
+!!$  read (20,NML=machine)
+  close (20)
+! if(mype==0) write(*,*) 'run_config namelist is read in'
+end subroutine read_namelist_run_config
+! =================================================================
 subroutine get_run_steps(nsteps)
   ! Coded by Qiang Wang
   ! Reviewed by ??

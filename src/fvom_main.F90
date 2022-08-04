@@ -52,7 +52,7 @@ IMPLICIT NONE
 ! kh 01.03.21
 integer :: n, n_ib, nsub, nsteps, offset, row, i, provided
 
-real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc, t1_icb, t1b_icb, t2_icb, t2b_icb, t3_icb, t4_icb
+real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc, t1_icb, t1b_icb, t2_icb, t2b_icb, t3_icb, t4_icb, t1_upd_atm, t2_upd_atm
 
 ! kh 09.02.21 
 real(kind=WP)     :: t1_1st_section, t2_1st_section, t1_2nd_section, t2_2nd_section
@@ -60,7 +60,7 @@ real(kind=WP)     :: t1_1st_section, t2_1st_section, t1_2nd_section, t2_2nd_sect
 ! kh 24.02.21
 real(kind=WP)     :: t1_par_sections, t2_par_sections
 
-real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_icb_calc, rtime_icb_write, rtime_read_forcing
+real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_icb_calc, rtime_icb_write, rtime_upd_atm, rtime_read_forcing
 
 ! kh 09.02.21
 real(kind=WP)     :: time_1st_section, time_2nd_section, rtime_1st_section, rtime_2nd_section
@@ -81,7 +81,7 @@ real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing
 real(kind=real32) :: rtime_setup_ice,  rtime_setup_other, rtime_setup_restart
 
 ! kh 10.02.21
-real(kind=real32) :: mean_rtime(19), max_rtime(19), min_rtime(19)
+real(kind=real32) :: mean_rtime(22), max_rtime(22), min_rtime(22)
 
 real(kind=real32) :: runtime_alltimesteps
 
@@ -105,6 +105,17 @@ integer             :: fesom_thread_info
 logical             :: bIcbCalcCycleCompleted
 
 type(t_mesh),             target, save :: mesh
+
+
+! kh 26.11.21 multi FESOM group loop parallelization
+integer             :: npes_fesom_world
+integer             :: mype_fesom_world
+integer             :: processes_per_group
+integer             :: npes_check
+integer             :: mype_check
+
+! kh 26.11.21 get current values for num_fesom_groups
+    call read_namelist_run_config
 
 #if defined (__async_icebergs)
 ! kh 26.03.21 get current values for ib_async_mode and thread_support_level_required
@@ -142,11 +153,109 @@ type(t_mesh),             target, save :: mesh
     
 
 #if defined (__oasis)
-    call cpl_oasis3mct_init(MPI_COMM_FESOM)
+    call cpl_oasis3mct_init(MPI_COMM_FESOM, num_fesom_groups)
 #endif
     t1 = MPI_Wtime()
 
     call par_init
+
+! kh 26.11.21 prepare communicator splitting for multi FESOM group loop parallelization
+    MPI_COMM_FESOM_WORLD = MPI_COMM_FESOM
+    npes_fesom_world     = npes
+    mype_fesom_world     = mype
+    if(mype_fesom_world == 0) then
+        write(*,*) 'npes_fesom_world, num_fesom_groups', npes_fesom_world, num_fesom_groups
+    end if
+
+    if(mod(npes_fesom_world, num_fesom_groups) /= 0) then
+        if(mype_fesom_world == 0) then
+            write(*,*) 'MPI_comm_split mismatch npes_fesom_world, num_fesom_groups', npes_fesom_world, num_fesom_groups
+        end if
+        call par_ex
+        stop
+    end if
+
+    processes_per_group = npes_fesom_world / num_fesom_groups
+    if(mype_fesom_world == 0) then
+        write(*,*) 'processes_per_group', processes_per_group
+    end if
+    npes           = processes_per_group
+    my_fesom_group = mype_fesom_world / processes_per_group
+    mype           = mod(mype_fesom_world, processes_per_group)
+
+    write(*,*) 'my_fesom_group, mype_fesom_world, mype', my_fesom_group, mype_fesom_world, mype
+
+! kh 26.11.21 split to num_fesom_groups
+    call MPI_comm_split(MPI_COMM_FESOM_WORLD, my_fesom_group, 0, MPI_COMM_FESOM, MPIERR)
+    if (MPIERR /= MPI_SUCCESS) then
+        write(*,*) 'MPI_comm_split(MPI_COMM_FESOM_WORLD, my_fesom_group, 0, MPI_COMM_FESOM, MPIERR) failed'
+        call par_ex
+        stop
+    end if
+
+    call MPI_comm_size(MPI_COMM_FESOM, npes_check, MPIERR)
+    if(MPIERR /= MPI_SUCCESS) then
+        write(*,*) 'MPI_comm_size(MPI_COMM_FESOM, npes_check, MPIERR) failed'
+        call par_ex
+        stop
+    end if
+
+    call MPI_comm_rank(MPI_COMM_FESOM, mype_check, MPIERR)
+    if(MPIERR /= MPI_SUCCESS) then
+        write(*,*) 'MPI_comm_rank(MPI_COMM_FESOM, mype_check, MPIERR) failed'
+        call par_ex
+        stop
+    end if
+
+    if(npes_check /= npes) then
+        write(*,*) 'npes mismatch, npes, npes_check', npes, npes_check
+        call par_ex
+        stop
+    end if
+
+    if(mype_check /= mype) then
+        write(*,*) 'mype mismatch, mype, mype_check', mype, mype_check
+        call par_ex
+        stop
+    end if
+
+! kh 17.11.21 group same ranks in each group for broadcasting
+
+    write(*,*) 'mype, my_fesom_group', mype, my_fesom_group
+
+    call MPI_comm_split(MPI_COMM_FESOM_WORLD, mype, my_fesom_group, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIERR)
+    if (MPIERR /= MPI_SUCCESS) then
+        write(*,*) 'MPI_comm_split(MPI_COMM_FESOM_WORLD, mype, my_fesom_group, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIERR) failed'
+        call par_ex
+        stop
+    end if
+
+    call MPI_comm_size(MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, npes_check, MPIERR)
+    if(MPIERR /= MPI_SUCCESS) then
+        write(*,*) 'MPI_comm_size(MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, npes_check, MPIERR) failed'
+        call par_ex
+        stop
+    end if
+
+    call MPI_comm_rank(MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, mype_check, MPIERR)
+    if(MPIERR /= MPI_SUCCESS) then
+        write(*,*) 'MPI_comm_rank(MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, mype_check, MPIERR) failed'
+        call par_ex
+        stop
+    end if
+
+    if(npes_check /= num_fesom_groups) then
+        write(*,*) 'npes mismatch, num_fesom_groups, npes_check', num_fesom_groups, npes_check
+        call par_ex
+        stop
+    end if
+
+    if(mype_check /= my_fesom_group) then
+        write(*,*) 'mype mismatch, my_fesom_group, mype_check', my_fesom_group, mype_check
+        call par_ex
+        stop
+    end if
+
 
 ! kh 26.03.21
     if(ib_async_mode > 0) then
@@ -233,10 +342,34 @@ type(t_mesh),             target, save :: mesh
 !---fwf-code-end
 
 #if defined (__oasis)
-    call cpl_oasis3mct_define_unstr(mesh)
-    if(mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
+
+! kh 30.11.21 only mype == 0 in my_fesom_group == 0 handles coupling with extern models
+    if(my_fesom_group == 0) then
+
+        call cpl_oasis3mct_define_unstr(mesh)
+        if(mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
+
+    else
+
+! kh 21.07.22 minimal initialization is required (also see comment on target_root below)
+!---wiso-code
+        ALLOCATE(cpl_send(nsend))
+        ALLOCATE(cpl_recv(nrecv))
+!---wiso-code-end
+    end if
+
+! kh 03.12.21
+    call MPI_Barrier(MPI_COMM_FESOM_WORLD, MPIERR)
+    if(num_fesom_groups > 1) then
+        call MPI_Bcast(cpl_send, sizeof(cpl_send), MPI_CHARACTER, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIerr)
+        call MPI_Bcast(cpl_recv, sizeof(cpl_recv), MPI_CHARACTER, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIerr)
+
+! kh 10.12.21 needed in SUBROUTINE net_rec_from_atm(action)
+        call MPI_Bcast(target_root,             1, MPI_INTEGER,   0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIerr)
+    end if
+
 #endif
-   
+
     !LA: allocate arrays for icebergs
     if (use_icebergs) then
         call allocate_icb
@@ -267,7 +400,11 @@ type(t_mesh),             target, save :: mesh
     if (mype==0) t7=MPI_Wtime()
     
     ! store grid information into netcdf file
-    if (.not. r_restart) call write_mesh_info(mesh)
+
+! kh 26.11.21
+    if(my_fesom_group == 0) then
+        if (.not. r_restart) call write_mesh_info(mesh)
+    end if
 
     !___IF RESTART WITH ZLEVEL OR ZSTAR IS DONE, ALSO THE ACTUAL LEVELS AND ____
     !___MIDDEPTH LEVELS NEEDS TO BE CALCULATET AT RESTART_______________________
@@ -309,6 +446,9 @@ type(t_mesh),             target, save :: mesh
     rtime_icb_calc              = 0._WP
     rtime_icb_write             = 0._WP
 
+! kh 05.01.22
+    rtime_upd_atm               = 0._WP
+
 ! kh 10.02.21
     time_1st_section            = 0._WP
     time_2nd_section            = 0._WP
@@ -325,7 +465,7 @@ type(t_mesh),             target, save :: mesh
 !   limit_list_mype = 1
     limit_list_mype = -1 ! kh 04.02.21 a value < 0 means "off"
 
-! kh 10.02.21 duplicate communicator to be used in parallel section for async iceberg computations based on OpenMP
+! kh 10.02.21 duplicate communicators to be used in parallel section for async iceberg computations based on OpenMP
     if (ib_async_mode > 0) then
         call MPI_comm_dup(MPI_COMM_FESOM, MPI_COMM_FESOM_IB, MPIERR)
         if (MPIERR /= MPI_SUCCESS) then
@@ -366,9 +506,26 @@ type(t_mesh),             target, save :: mesh
             call par_ex
             stop
         end if
+
+! kh 05.01.22
+        call MPI_comm_dup(MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, MPIERR)
+
+! kh 05.01.22
+!       write(*,*) 'duplicated: MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB is', MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB
+
+        if (MPIERR /= MPI_SUCCESS) then
+            write(*,*) 'MPI_comm_dup(MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB, MPIERR) failed'
+            call par_ex
+            stop
+        end if
     else
-        MPI_COMM_FESOM_IB = MPI_COMM_FESOM
-    end if
+        MPI_COMM_FESOM_IB                     = MPI_COMM_FESOM
+        MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB = MPI_COMM_FESOM_SAME_RANK_IN_GROUPS
+
+! kh 05.01.22
+        write(*,*) 'NOT duplicated: MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB is', MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS_IB
+    end if ! (ib_async_mode > 0) then
+
     rtime_fullice       = 0._WP
     rtime_write_restart = 0._WP
     rtime_write_means   = 0._WP
@@ -406,6 +563,7 @@ type(t_mesh),             target, save :: mesh
     if (use_global_tides) then
        call foreph_ini(yearnew, month)
     end if
+
 
     n = 1
     do while (n <= nsteps)
@@ -475,7 +633,11 @@ type(t_mesh),             target, save :: mesh
 !           t1 = MPI_Wtime()
             if(use_ice) then
                 call ocean2ice(mesh)
+
+! kh 05.02.22 check time used for update_atm_forcing
+                t1_upd_atm = MPI_Wtime()
                 call update_atm_forcing(n, mesh)
+                t2_upd_atm = MPI_Wtime()
                 
                 if (ice_steps_since_upd>=ice_ave_steps-1) then
                     ice_update=.true.
@@ -523,10 +685,10 @@ type(t_mesh),             target, save :: mesh
 !$omp parallel sections default (none) &
 !$omp&  shared(first_section_done, ib_async_1st_section_first, ib_async_2nd_section_first, mype_copy, limit_list_mype, &
 !$omp&  mype, &
-!$omp&  n, n_ib, mesh, nsteps, steps_per_ib_step, t1, t1_icb, t2_icb, use_ice, use_icebergs, ice_steps_since_upd, ice_ave_steps, ice_update, &
+!$omp&  n, n_ib, mesh, nsteps, steps_per_ib_step, t1, t1_icb, t2_icb, t1_upd_atm, t2_upd_atm, use_ice, use_icebergs, ice_steps_since_upd, ice_ave_steps, ice_update, &
 !$omp&  t1_1st_section, t1_2nd_section, t2_1st_section, t2_2nd_section, &
 !$omp&  time_1st_section, time_2nd_section, t1_par_sections, t2_par_sections, rtime_par_sections, &
-!$omp&  rtime_fullice, rtime_icb_calc, rtime_1st_section, rtime_2nd_section, rtime_compute_diag, rtime_write_means, rtime_write_restart, &
+!$omp&  rtime_fullice, rtime_icb_calc, rtime_upd_atm, rtime_1st_section, rtime_2nd_section, rtime_compute_diag, rtime_write_means, rtime_write_restart, &
 !$omp&  ib_async_mode, icb_wait_iterations_counter_min, icb_wait_iterations_counter_max, thread_support_level_required, bIcbCalcCycleCompleted) &
 !$omp&  private(nsub, bBreak, icb_wait_iterations_counter, still_waiting) &
 !$omp&  num_threads(2)
@@ -555,8 +717,9 @@ type(t_mesh),             target, save :: mesh
                 end if
 
 ! kh 26.03.21 alternatively, a preprocessor definition could be used here
-                    if (thread_support_level_required == MPI_THREAD_SERIALIZED) then
-                        !$omp critical 
+! kh 11.07.22 also advantageous if MPI_THREAD_MULTIPLE is used
+                    if (thread_support_level_required == MPI_THREAD_SERIALIZED .or. .true.) then
+                        !$omp critical
                         call compute_vel_nodes(mesh)
                         !$omp end critical
                     else
@@ -573,22 +736,29 @@ type(t_mesh),             target, save :: mesh
                 if(use_ice) then
 
 ! kh 26.03.21 alternatively, a preprocessor definition could be used here
-                    if (thread_support_level_required == MPI_THREAD_SERIALIZED) then
-                        !$omp critical 
+! kh 11.07.22 also advantageous if MPI_THREAD_MULTIPLE is used
+                    if (thread_support_level_required == MPI_THREAD_SERIALIZED .or. .true.) then
+                        !$omp critical
                         call ocean2ice(mesh)
                         !$omp end critical
                     else
                         call ocean2ice(mesh)
                     end if
 
-! kh 26.03.21 alternatively, a preprocessor defi(mesh)nition could be used here
-                    if (thread_support_level_required == MPI_THREAD_SERIALIZED) then
-                        !$omp critical 
+! kh 05.02.22 check time used for update_atm_forcing
+                    t1_upd_atm = MPI_Wtime()
+! kh 26.03.21 alternatively, a preprocessor definition could be used here
+! kh 11.07.22 also advantageous if MPI_THREAD_MULTIPLE is used
+                    if (thread_support_level_required == MPI_THREAD_SERIALIZED .or. .true.) then
+
+! kh 24.01.22 increase granularity at lower level to reduce overall wait for entering critical sections
+                        !!$omp critical
                         call update_atm_forcing(n, mesh)
-                        !$omp end critical
+                        !!$omp end critical
                     else
                         call update_atm_forcing(n, mesh)
                     end if
+                    t2_upd_atm = MPI_Wtime()
 
                     if (ice_steps_since_upd>=ice_ave_steps-1) then
                         ice_update=.true.
@@ -599,8 +769,9 @@ type(t_mesh),             target, save :: mesh
                     endif
 
 ! kh 26.03.21 alternatively, a preprocessor definition could be used here
-                    if (thread_support_level_required == MPI_THREAD_SERIALIZED) then
-                        !$omp critical 
+! kh 11.07.22 also advantageous if MPI_THREAD_MULTIPLE is used
+                    if (thread_support_level_required == MPI_THREAD_SERIALIZED .or. .true.) then
+                        !$omp critical
                         if (ice_update) call ice_timestep(n, mesh)
                         !$omp end critical
                     else
@@ -610,8 +781,9 @@ type(t_mesh),             target, save :: mesh
                     call oce_fluxes_mom(mesh) ! momentum only
 
 ! kh 26.03.21 alternatively, a preprocessor definition could be used here
-                    if (thread_support_level_required == MPI_THREAD_SERIALIZED) then
-                        !$omp critical 
+! kh 11.07.22 also advantageous if MPI_THREAD_MULTIPLE is used
+                    if (thread_support_level_required == MPI_THREAD_SERIALIZED .or. .true.) then
+                        !$omp critical
                         call oce_fluxes(mesh)
                         !$omp end critical
                     else
@@ -631,17 +803,18 @@ type(t_mesh),             target, save :: mesh
                     else 
 
 ! kh 26.03.21 alternatively, a preprocessor definition could be used here
-                        if (thread_support_level_required == MPI_THREAD_SERIALIZED) then
+! kh 11.07.22 also advantageous if MPI_THREAD_MULTIPLE is used
+                        if (thread_support_level_required == MPI_THREAD_SERIALIZED .or. .true.) then
                             !$omp critical 
                             call loop_end_part (mesh, .false., bIcbCalcCycleCompleted, n, t1, time_1st_section, time_2nd_section, &
-                                                t1_icb, t2_icb, t1_par_sections, t2_par_sections, &
-                                                rtime_fullice, rtime_compute_diag, rtime_write_means, rtime_write_restart, rtime_icb_calc, & 
+                                                t1_icb, t2_icb, t1_upd_atm, t2_upd_atm, t1_par_sections, t2_par_sections, &
+                                                rtime_fullice, rtime_compute_diag, rtime_write_means, rtime_write_restart, rtime_icb_calc, rtime_upd_atm, & 
                                                 rtime_1st_section, rtime_2nd_section, rtime_par_sections)
                             !$omp end critical
                         else
                             call loop_end_part (mesh, .false., bIcbCalcCycleCompleted, n, t1, time_1st_section, time_2nd_section, &
-                                                t1_icb, t2_icb, t1_par_sections, t2_par_sections, &
-                                                rtime_fullice, rtime_compute_diag, rtime_write_means, rtime_write_restart, rtime_icb_calc, & 
+                                                t1_icb, t2_icb, t1_upd_atm, t2_upd_atm, t1_par_sections, t2_par_sections, &
+                                                rtime_fullice, rtime_compute_diag, rtime_write_means, rtime_write_restart, rtime_icb_calc, rtime_upd_atm, & 
                                                 rtime_1st_section, rtime_2nd_section, rtime_par_sections)
                         end if
 
@@ -724,7 +897,7 @@ type(t_mesh),             target, save :: mesh
 
 ! kh 09.03.21
                 call iceberg_calculation(mesh,n_ib)
-!                call icb2fesom
+!               call icb2fesom
 !               t2_icb = MPI_Wtime()
             end if
 !           t2 = MPI_Wtime()
@@ -785,8 +958,8 @@ type(t_mesh),             target, save :: mesh
         end if ! (ib_async_mode == 0) then
 
         call loop_end_part (mesh, .true., bIcbCalcCycleCompleted, n, t1, time_1st_section, time_2nd_section, &
-                            t1_icb, t2_icb, t1_par_sections, t2_par_sections, &
-                            rtime_fullice, rtime_compute_diag, rtime_write_means, rtime_write_restart, rtime_icb_calc, & 
+                            t1_icb, t2_icb, t1_upd_atm, t2_upd_atm, t1_par_sections, t2_par_sections, &
+                            rtime_fullice, rtime_compute_diag, rtime_write_means, rtime_write_restart, rtime_icb_calc, rtime_upd_atm, & 
                             rtime_1st_section, rtime_2nd_section, rtime_par_sections)
 
         n = n + 1
@@ -796,165 +969,190 @@ type(t_mesh),             target, save :: mesh
     if (use_icebergs) then
         t3_icb = MPI_Wtime()
 
-        call iceberg_out
-        !call reset_ib_fluxes        
+! kh 07.12.21
+        if(my_fesom_group == 0) then
+            call iceberg_out
+            !call reset_ib_fluxes
+        end if
         t4_icb = MPI_Wtime()
 
         rtime_icb_write = rtime_icb_write + t4_icb - t3_icb
     end if
 
-    
-    call finalize_output()
+! kh 26.11.21
+    if(my_fesom_group == 0) then
+        call finalize_output()
+    end if
     
     !___FINISH MODEL RUN________________________________________________________
 
     call MPI_Barrier(MPI_COMM_FESOM, MPIERR)
-    if (mype==0) then
-       t1 = MPI_Wtime()
-       runtime_alltimesteps = real(t1-t0,real32)
-    endif
-    
-    mean_rtime(1)  = rtime_oce
-    mean_rtime(2)  = rtime_oce_mixpres 
-    mean_rtime(3)  = rtime_oce_dyn     
-    mean_rtime(4)  = rtime_oce_dynssh  
-    mean_rtime(5)  = rtime_oce_solvessh
-    mean_rtime(6)  = rtime_oce_GMRedi  
-    mean_rtime(7)  = rtime_oce_solvetra
-    mean_rtime(8)  = rtime_ice         
-    mean_rtime(9)  = rtime_tot  
-    mean_rtime(10) = rtime_fullice - rtime_read_forcing 
-    mean_rtime(11) = rtime_compute_diag
-    mean_rtime(12) = rtime_write_means
-    mean_rtime(13) = rtime_write_restart
-    mean_rtime(14) = rtime_icb_calc
-    mean_rtime(15) = rtime_icb_write
+
+! kh 16.11.21 list statistics for all fesom_groups
+! fesom groups are listet backwards, so info for the main fesom group 0 is at the end in the log
+    do i = num_fesom_groups - 1, 0, -1
+!       call MPI_Barrier(MPI_COMM_FESOM_WORLD, MPIERR)
+        call MPI_Barrier(MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIERR)
+
+        if(i == my_fesom_group) then
+        
+            if (mype==0) then
+                t1 = MPI_Wtime()
+                runtime_alltimesteps = real(t1-t0,real32)
+            endif
+            
+            mean_rtime(1)  = rtime_oce
+            mean_rtime(2)  = rtime_oce_mixpres
+            mean_rtime(3)  = rtime_oce_dyn
+            mean_rtime(4)  = rtime_oce_dynssh
+            mean_rtime(5)  = rtime_oce_solvessh
+            mean_rtime(6)  = rtime_oce_GMRedi
+            mean_rtime(7)  = rtime_oce_solvetra
+            mean_rtime(8)  = rtime_ice
+            mean_rtime(9)  = rtime_tot
+            mean_rtime(10) = rtime_fullice - rtime_read_forcing
+            mean_rtime(11) = rtime_compute_diag
+            mean_rtime(12) = rtime_write_means
+            mean_rtime(13) = rtime_write_restart
+            mean_rtime(14) = rtime_icb_calc
+            mean_rtime(15) = rtime_icb_write
 
 ! kh 10.02.21
-    mean_rtime(16) = rtime_1st_section
-    mean_rtime(17) = rtime_2nd_section
-    mean_rtime(18) = rtime_par_sections
+            mean_rtime(16) = rtime_1st_section
+            mean_rtime(17) = rtime_2nd_section
+            mean_rtime(18) = rtime_par_sections
 
-    max_rtime(1:18) = mean_rtime(1:18)
-    min_rtime(1:18) = mean_rtime(1:18)
+            mean_rtime(19) = rtime_icb_step1
+            mean_rtime(20) = rtime_icb_comm
+            mean_rtime(21) = rtime_icb_step2
 
-    call MPI_AllREDUCE(MPI_IN_PLACE, mean_rtime, 18, MPI_REAL, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    mean_rtime(1:18) = mean_rtime(1:18) / real(npes,real32)
-    call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime,  18, MPI_REAL, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime,  18, MPI_REAL, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+            mean_rtime(22) = rtime_upd_atm
+
+! kh 07.12.21 todo (add on demand)
+!           mean_rtime(...23) = rtime_read_forcing
+            
+            max_rtime(1:22) = mean_rtime(1:22)
+            min_rtime(1:22) = mean_rtime(1:22)
+
+            call MPI_AllREDUCE(MPI_IN_PLACE, mean_rtime, 22, MPI_REAL, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+            mean_rtime(1:22) = mean_rtime(1:22) / real(npes,real32)
+            call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime,  22, MPI_REAL, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+            call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime,  22, MPI_REAL, MPI_MIN, MPI_COMM_FESOM, MPIerr)
 
 ! kh 23.02.21 start collecting profiling data of omp sections
-    if(mype == 0) then
-        time_1st_sections_per_rank(:, 1) = time_1st_sections
-        time_2nd_sections_per_rank(:, 1) = time_2nd_sections
-        do ir = 1, npes - 1
-            call MPI_recv(time_1st_sections_per_rank(:, ir + 1), nsteps, MPI_DOUBLE, ir, 0, MPI_COMM_FESOM, status, MPIerr)
-        end do
-        do ir = 1, npes - 1
-            call MPI_recv(time_2nd_sections_per_rank(:, ir + 1), nsteps, MPI_DOUBLE, ir, 0, MPI_COMM_FESOM, status, MPIerr)
-        end do
-    else
-        call MPI_send(time_1st_sections, nsteps, MPI_DOUBLE, 0, 0, MPI_COMM_FESOM, MPIerr)
-        call MPI_send(time_2nd_sections, nsteps, MPI_DOUBLE, 0, 0, MPI_COMM_FESOM, MPIerr)
-    end if
-
-    if (ib_async_mode > 0) then
-        if(mype == 0) then
-            do js = 1, nsteps
-                time_sections_seq_max(js) = 0.0_WP
-                time_sections_par_max(js) = 0.0_WP
-                do ir = 0, npes - 1
-                    time_seq = time_1st_sections_per_rank(js, ir + 1) + time_2nd_sections_per_rank(js, ir + 1)
-                    if (time_1st_sections_per_rank(js, ir + 1) > time_2nd_sections_per_rank(js, ir + 1)) then
-                        time_par = time_1st_sections_per_rank(js, ir + 1)
-                    else
-                        time_par = time_2nd_sections_per_rank(js, ir + 1)
-                    end if
-                    if(time_seq > time_sections_seq_max(js)) then
-                        time_sections_seq_max(js) = time_seq
-                    end if
-                    if(time_par > time_sections_par_max(js)) then
-                        time_sections_par_max(js) = time_par
-                    end if
+            if(mype == 0) then
+                time_1st_sections_per_rank(:, 1) = time_1st_sections
+                time_2nd_sections_per_rank(:, 1) = time_2nd_sections
+                do ir = 1, npes - 1
+                    call MPI_recv(time_1st_sections_per_rank(:, ir + 1), nsteps, MPI_DOUBLE, ir, 0, MPI_COMM_FESOM, status, MPIerr)
                 end do
-            end do
+                do ir = 1, npes - 1
+                    call MPI_recv(time_2nd_sections_per_rank(:, ir + 1), nsteps, MPI_DOUBLE, ir, 0, MPI_COMM_FESOM, status, MPIerr)
+                end do
+            else
+                call MPI_send(time_1st_sections, nsteps, MPI_DOUBLE, 0, 0, MPI_COMM_FESOM, MPIerr)
+                call MPI_send(time_2nd_sections, nsteps, MPI_DOUBLE, 0, 0, MPI_COMM_FESOM, MPIerr)
+            end if
 
-            total_time_seq = 0.0_WP
-            total_time_par = 0.0_WP
+            if (ib_async_mode > 0) then
+                if(mype == 0) then
+                    do js = 1, nsteps
+                        time_sections_seq_max(js) = 0.0_WP
+                        time_sections_par_max(js) = 0.0_WP
+                        do ir = 0, npes - 1
+                            time_seq = time_1st_sections_per_rank(js, ir + 1) + time_2nd_sections_per_rank(js, ir + 1)
+                            if (time_1st_sections_per_rank(js, ir + 1) > time_2nd_sections_per_rank(js, ir + 1)) then
+                                time_par = time_1st_sections_per_rank(js, ir + 1)
+                            else
+                                time_par = time_2nd_sections_per_rank(js, ir + 1)
+                            end if
+                            if(time_seq > time_sections_seq_max(js)) then
+                                time_sections_seq_max(js) = time_seq
+                            end if
+                            if(time_par > time_sections_par_max(js)) then
+                                time_sections_par_max(js) = time_par
+                            end if
+                        end do
+                    end do
 
-            total_time_saved_by_par = 0.0_WP
-            do js = 1, nsteps
-                time_saved_by_par(js) = time_sections_seq_max(js) - time_sections_par_max(js)
+                    total_time_seq = 0.0_WP
+                    total_time_par = 0.0_WP
+
+                    total_time_saved_by_par = 0.0_WP
+                    do js = 1, nsteps
+                        time_saved_by_par(js) = time_sections_seq_max(js) - time_sections_par_max(js)
 
 ! kh 24.02.21 assert time_saved_by_par(js) >= 0.0
-                if(time_saved_by_par(js) < 0.0) then
-                    write(*,*) 'Error: time_saved_by_par(js) < 0.0', time_saved_by_par
-                end if
+                        if(time_saved_by_par(js) < 0.0) then
+                            write(*,*) 'Error: time_saved_by_par(js) < 0.0', time_saved_by_par
+                        end if
 
-                total_time_saved_by_par = total_time_saved_by_par + time_saved_by_par(js)
+                        total_time_saved_by_par = total_time_saved_by_par + time_saved_by_par(js)
 
-                total_time_seq = total_time_seq + time_sections_seq_max(js)
-                total_time_par = total_time_par + time_sections_par_max(js)
+                        total_time_seq = total_time_seq + time_sections_seq_max(js)
+                        total_time_par = total_time_par + time_sections_par_max(js)
 
 ! kh 23.03.21 write only the last line
-                if (js == nsteps) then
-                    write(*,*) 'time_saved_by_par(js), time_sections_seq_max(js), time_sections_par_max(js), js, total_time_saved_by_par:', &
-                               time_saved_by_par(js), time_sections_seq_max(js), time_sections_par_max(js), js, total_time_saved_by_par
-                end if
-            end do
+                        if (js == nsteps) then
+                            write(*,*) 'time_saved_by_par(js), time_sections_seq_max(js), time_sections_par_max(js), js, total_time_saved_by_par:', &
+                                    time_saved_by_par(js), time_sections_seq_max(js), time_sections_par_max(js), js, total_time_saved_by_par
+                        end if
+                    end do
 
-            write(*,*) 'total_time_seq, total_time_par, total_time_saved_by_par', total_time_seq, total_time_par, total_time_saved_by_par
-            write(*,*)
-        end if ! (mype == 0) then
-    end if !(ib_async_mode > 0) then
+                    write(*,*) 'total_time_seq, total_time_par, total_time_saved_by_par', total_time_seq, total_time_par, total_time_saved_by_par
+                    write(*,*)
+                end if ! (mype == 0) then
+            end if !(ib_async_mode > 0) then
 ! kh 23.02.21 end collecting profiling data of omp sections
-    mean_rtime(14) = rtime_read_forcing   
-    
-    max_rtime(1:14) = mean_rtime(1:14)
-    min_rtime(1:14) = mean_rtime(1:14)
 
-    call MPI_AllREDUCE(MPI_IN_PLACE, mean_rtime, 14, MPI_REAL, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    mean_rtime(1:14) = mean_rtime(1:14) / real(npes,real32)
-    call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime,  14, MPI_REAL, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime,  14, MPI_REAL, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) then
+                write(*,*) '___MODEL RUNTIME mean, min, max per task [seconds]________________________'
+                write(*,*) '  runtime ocean:',mean_rtime(1), min_rtime(1), max_rtime(1)
+                write(*,*) '    > runtime oce. mix,pres. :',mean_rtime(2), min_rtime(2), max_rtime(2)
+                write(*,*) '    > runtime oce. dyn. u,v,w:',mean_rtime(3), min_rtime(3), max_rtime(3)
+                write(*,*) '    > runtime oce. dyn. ssh  :',mean_rtime(4), min_rtime(4), max_rtime(4)
+                write(*,*) '        > runtime oce. solve ssh:',mean_rtime(5), min_rtime(5), max_rtime(5)
+                write(*,*) '    > runtime oce. GM/Redi   :',mean_rtime(6), min_rtime(6), max_rtime(6)
+                write(*,*) '    > runtime oce. tracer    :',mean_rtime(7), min_rtime(7), max_rtime(7)
+                write(*,*) '  runtime ice  :',mean_rtime(10), min_rtime(10), max_rtime(10)
+                write(*,*) '    > runtime ice step :',mean_rtime(8), min_rtime(8), max_rtime(8)
+                write(*,*) '    > runtime upd atm:', mean_rtime(22), min_rtime(22), max_rtime(22)
+                write(*,*) '  runtime diag:   ', mean_rtime(11), min_rtime(11), max_rtime(11)
+                write(*,*) '  runtime output: ', mean_rtime(12), min_rtime(12), max_rtime(12)
+                write(*,*) '  runtime restart:', mean_rtime(13), min_rtime(13), max_rtime(13)
+                write(*,*) '  runtime icb calc:', mean_rtime(14), min_rtime(14), max_rtime(14)
+                write(*,*) '    > runtime icb step1:', mean_rtime(19), min_rtime(19), max_rtime(19)
+                write(*,*) '    > runtime icb comm: ', mean_rtime(20), min_rtime(20), max_rtime(20)
+                write(*,*) '    > runtime icb step2:', mean_rtime(21), min_rtime(21), max_rtime(21)
+                write(*,*) '  runtime icb write:', mean_rtime(15), min_rtime(15), max_rtime(15)
 
-    if (mype==0) then
-        write(*,*) '___MODEL RUNTIME mean, min, max per task [seconds]________________________'
-        write(*,*) '  runtime ocean:',mean_rtime(1), min_rtime(1), max_rtime(1)
-        write(*,*) '    > runtime oce. mix,pres. :',mean_rtime(2), min_rtime(2), max_rtime(2)
-        write(*,*) '    > runtime oce. dyn. u,v,w:',mean_rtime(3), min_rtime(3), max_rtime(3)
-        write(*,*) '    > runtime oce. dyn. ssh  :',mean_rtime(4), min_rtime(4), max_rtime(4)
-        write(*,*) '        > runtime oce. solve ssh:',mean_rtime(5), min_rtime(5), max_rtime(5)
-        write(*,*) '    > runtime oce. GM/Redi   :',mean_rtime(6), min_rtime(6), max_rtime(6)
-        write(*,*) '    > runtime oce. tracer    :',mean_rtime(7), min_rtime(7), max_rtime(7)
-        write(*,*) '  runtime ice  :',mean_rtime(10), min_rtime(10), max_rtime(10)
-        write(*,*) '    > runtime ice step :',mean_rtime(8), min_rtime(8), max_rtime(8)
-        write(*,*) '  runtime diag:   ', mean_rtime(11), min_rtime(11), max_rtime(11)
-        write(*,*) '  runtime output: ', mean_rtime(12), min_rtime(12), max_rtime(12)
-        write(*,*) '  runtime restart:', mean_rtime(13), min_rtime(13), max_rtime(13)
-        write(*,*) '  runtime icb calc:', mean_rtime(14), min_rtime(14), max_rtime(14)
-        write(*,*) '  runtime icb write:', mean_rtime(15), min_rtime(15), max_rtime(15)
+                if (ib_async_mode > 0) then
+                    write(*,*) '  runtime par. sections:', mean_rtime(18), min_rtime(18), max_rtime(18)
 
-        if (ib_async_mode > 0) then
-            write(*,*) '  runtime par. sections:', mean_rtime(18), min_rtime(18), max_rtime(18)
+                    write(*,*) '  runtime 1st par. section:', mean_rtime(16), min_rtime(16), max_rtime(16)
+                    write(*,*) '  runtime 2nd par. section:', mean_rtime(17), min_rtime(17), max_rtime(17)
+                else
+                    write(*,*) '  runtime potential par. sections:', mean_rtime(18), min_rtime(18), max_rtime(18)
+                end if
+                
+                write(*,*) '  runtime total (ice+oce):',mean_rtime(9), min_rtime(9), max_rtime(9)
+                write(*,*)
+                write(*,*) '============================================'
+                write(*,*) '=========== BENCHMARK RUNTIME =============='
+                write(*,*) '    Number of cores : ',npes
+                write(*,*) '    Runtime for all timesteps : ',runtime_alltimesteps,' sec'
+                write(*,*) '============================================'
+                write(*,*)
+            end if ! if (mype==0) then
 
-            write(*,*) '  runtime 1st par. section:', mean_rtime(16), min_rtime(16), max_rtime(16)
-            write(*,*) '  runtime 2nd par. section:', mean_rtime(17), min_rtime(17), max_rtime(17)
-        else
-            write(*,*) '  runtime potential par. sections:', mean_rtime(18), min_rtime(18), max_rtime(18)
-        end if
-        
-        write(*,*) '  runtime total (ice+oce):',mean_rtime(9), min_rtime(9), max_rtime(9)
-        write(*,*)
-        write(*,*) '============================================'
-        write(*,*) '=========== BENCHMARK RUNTIME =============='
-        write(*,*) '    Number of cores : ',npes
-        write(*,*) '    Runtime for all timesteps : ',runtime_alltimesteps,' sec'
-        write(*,*) '============================================'
-        write(*,*)
-    end if    
+        end if !(i == my_fesom_group) then
+    end do ! i = num_fesom_groups - 1, 0, -1
 
-!   call clock_finish
+! kh 11.11.21 multi FESOM group loop parallelization
+    call MPI_Barrier(MPI_COMM_FESOM_WORLD, MPIERR)
+
+! kh 26.11.21 if enabled, do it only if my_fesom_group == 0
+!    call clock_finish
 
 ! kh 19.03.21
     deallocate (time_1st_sections, time_2nd_sections) !, time_buffer)
@@ -1013,8 +1211,8 @@ end subroutine loop_start_part
 
 ! kh 25.02.21 end part from main loop factored out for the async iceberg implementation
 subroutine loop_end_part (mesh, bOuterLoopCall, bIcbCalcCycleCompleted, n, t1, time_1st_section, time_2nd_section, &
-                          t1_icb, t2_icb, t1_par_sections, t2_par_sections, &
-                          rtime_fullice, rtime_compute_diag, rtime_write_means, rtime_write_restart, rtime_icb_calc, & 
+                          t1_icb, t2_icb, t1_upd_atm, t2_upd_atm, t1_par_sections, t2_par_sections, &
+                          rtime_fullice, rtime_compute_diag, rtime_write_means, rtime_write_restart, rtime_icb_calc, rtime_upd_atm, & 
                           rtime_1st_section, rtime_2nd_section, rtime_par_sections)
     use o_PARAM         ! WP
     use g_PARSUP        ! MPI_Wtime()
@@ -1036,8 +1234,8 @@ subroutine loop_end_part (mesh, bOuterLoopCall, bIcbCalcCycleCompleted, n, t1, t
     logical, intent(inout)          :: bIcbCalcCycleCompleted
     integer, intent(in)             :: n
     real(kind=WP), intent(in)       :: t1, time_1st_section, time_2nd_section
-    real(kind=WP), intent(in)       :: t1_icb, t2_icb, t1_par_sections, t2_par_sections
-    real(kind=WP), intent(inout)    :: rtime_fullice, rtime_compute_diag, rtime_write_means, rtime_write_restart, rtime_icb_calc
+    real(kind=WP), intent(in)       :: t1_icb, t2_icb, t1_upd_atm, t2_upd_atm, t1_par_sections, t2_par_sections
+    real(kind=WP), intent(inout)    :: rtime_fullice, rtime_compute_diag, rtime_write_means, rtime_write_restart, rtime_icb_calc, rtime_upd_atm
     real(kind=WP), intent(inout)    :: rtime_1st_section, rtime_2nd_section, rtime_par_sections
 
     real(kind=WP)                   :: t2, t3, t4, t5, t6
@@ -1052,7 +1250,17 @@ type(t_mesh), intent(in) , target :: mesh
     call compute_diagnostics(1, mesh)
     t4 = MPI_Wtime()
     !___prepare output______________________________________________________
-    call output (n, mesh)
+
+! kh 27.06.21 ibfwb, ibfwbv, ibfwe, ibfwl, ... are potentially modified concurrently in parallel section 2 (iceberg computations)
+! and therefore cannot be used during an inner loop call in parallel section 1 (ocean ice computations)
+    if(bOuterLoopCall) then
+
+! kh 26.11.21
+        if(my_fesom_group == 0) then
+            call output (n, mesh)
+        end if
+    end if
+
     if (use_icebergs .and. bIcbCalcCycleCompleted) then
         call reset_ib_fluxes
     end if
@@ -1067,8 +1275,11 @@ type(t_mesh), intent(in) , target :: mesh
     end if 
 
     rtime_compute_diag  = rtime_compute_diag  + t4 - t3
-    rtime_write_means   = rtime_write_means   + t5 - t4   
+    rtime_write_means   = rtime_write_means   + t5 - t4
     rtime_write_restart = rtime_write_restart + t6 - t5
+
+! kh 07.12.21 todo (on demand)
+!   rtime_read_forcing  = rtime_read_forcing  + t1_frc - t0_frc
 
 ! kh 08.03.21 do it only once per iceberg step to include the iceberg calculation time (like in former FESOM2 paleodyn_icb versions)
     if (bIcbCalcCycleCompleted) then
@@ -1083,6 +1294,9 @@ type(t_mesh), intent(in) , target :: mesh
 ! kh 24.02.21        
         rtime_par_sections = rtime_par_sections + t2_par_sections - t1_par_sections
     end if
+
+! kh 05.01.22
+    rtime_upd_atm = rtime_upd_atm + t2_upd_atm - t1_upd_atm
 
     bIcbCalcCycleCompleted = .false.
     if (use_pico) call fesom2pico(mesh)

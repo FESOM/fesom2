@@ -2733,8 +2733,15 @@ subroutine oce_timestep_ale(n, mesh)
     
     ! Take updated ssh matrix and solve --> new ssh!
     t30=MPI_Wtime() 
+
+! kh 13.07.22 omp critical section already entered in call path
+    !!$omp critical
     call solve_ssh_ale(mesh)
     if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) call relax_zonal_vel(mesh)
+! kh 28.01.22
+! kh 13.07.22 omp critical section already entered in call path
+    !!$omp end critical
+
     t3=MPI_Wtime() 
 
     ! estimate new horizontal velocity u^(n+1)

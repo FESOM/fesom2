@@ -19,7 +19,9 @@ subroutine reset_ib_fluxes()
 end subroutine
 
 
-subroutine prepare_icb2fesom(mesh, ib,i_have_element,localelement,depth_ib)
+! kh 17.12.21 iceberg indices are at first just buffered in prepare_icb2fesom_part_1 and processed deferred in prepare_icb2fesom_part_2, 
+! so that bit identical results are achieved even when the loop over all icebergs is processed in parallel in a "random order"
+subroutine prepare_icb2fesom_part_1(mesh, ib,i_have_element,localelement,depth_ib)
     !transmits the relevant fields from the iceberg to the ocean model
     !Lars Ackermann, 17.03.2020
 
@@ -45,25 +47,33 @@ type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
 
     if(i_have_element) then 
+
         ! ##############################################################
         ! LA: spread fluxes over all nodes of element, 25.04.2022
         call get_iceberg_nodes_for_element(mesh, localelement, ib_nods_in_ib_elem, num_ib_nods_in_ib_elem)
-        !write(*,*) "LA DEBUG: ib_nods_in_ib_elem=",ib_nods_in_ib_elem,", num_ib_nods_in_ib_elem=",num_ib_nods_in_ib_elem 
+        !write(*,*) "LA DEBUG: ib_nods_in_ib_elem=",ib_nods_in_ib_elem,", num_ib_nods_in_ib_elem=",num_ib_nods_in_ib_elem
+
+! kh 17.12.21 just buffer the number of nodes
+        flux_iceberg_num_nodes_ib(ib) = num_ib_nods_in_ib_elem
         do i=1, 3
             iceberg_node=ib_nods_in_ib_elem(i)
 
             if (iceberg_node>0) then
-                ibfwbv(iceberg_node) = ibfwbv(iceberg_node) - fwbv_flux_ib(ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
-                ibfwb(iceberg_node) = ibfwb(iceberg_node) - fwb_flux_ib(ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
-                ibfwl(iceberg_node) = ibfwl(iceberg_node) - fwl_flux_ib(ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
-                ibfwe(iceberg_node) = ibfwe(iceberg_node) - fwe_flux_ib(ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
-                ibhf(iceberg_node) = ibhf(iceberg_node) - heat_flux_ib(ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
+
+! kh 17.12.21 just buffer the index
+                flux_iceberg_node_ib(i, ib) = iceberg_node
+
+!               ibfwbv(iceberg_node) = ibfwbv(iceberg_node) - fwbv_flux_ib(ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
+!               ibfwb (iceberg_node) = ibfwb (iceberg_node) - fwb_flux_ib (ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
+!               ibfwl (iceberg_node) = ibfwl (iceberg_node) - fwl_flux_ib (ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
+!               ibfwe (iceberg_node) = ibfwe (iceberg_node) - fwe_flux_ib (ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
+!               ibhf  (iceberg_node) = ibhf  (iceberg_node) - heat_flux_ib(ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
             !else
-            !    write(*,*) 'iceberg_node only communication node. iceberg_node=',iceberg_node,', mydim_nod2d=',mydim_nod2d
+            !   write(*,*) 'iceberg_node only communication node. iceberg_node=',iceberg_node,', mydim_nod2d=',mydim_nod2d
             end if
         end do
     end if
-end subroutine prepare_icb2fesom
+end subroutine prepare_icb2fesom_part_1
 
 subroutine get_iceberg_nodes_for_element(mesh, localelement, ib_nods_in_ib_elem, num_ib_nods_in_ib_elem)
     use o_param
@@ -93,6 +103,42 @@ type(t_mesh), intent(in) , target :: mesh
         end if
     end do
 end subroutine get_iceberg_nodes_for_element
+
+! kh 17.12.21
+subroutine prepare_icb2fesom_part_2(mesh)
+    !transmits the relevant fields from the iceberg to the ocean model
+    !Lars Ackermann, 17.03.2020
+
+    use o_param
+    use o_mesh
+    use MOD_MESH
+    use g_config
+    use g_parsup
+    use i_arrays
+    use iceberg_params
+
+    integer :: iceberg_node
+    integer :: num_ib_nods_in_ib_elem
+    integer :: i
+
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
+    
+! kh 17.12.21
+    do ib = 1, ib_num
+        num_ib_nods_in_ib_elem = flux_iceberg_num_nodes_ib(ib)
+        do i = 1, 3
+            iceberg_node = flux_iceberg_node_ib(i, ib)
+            if(iceberg_node > 0) then
+                ibfwbv(iceberg_node) = ibfwbv(iceberg_node) - fwbv_flux_ib(ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
+                ibfwb (iceberg_node) = ibfwb (iceberg_node) - fwb_flux_ib (ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
+                ibfwl (iceberg_node) = ibfwl (iceberg_node) - fwl_flux_ib (ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
+                ibfwe (iceberg_node) = ibfwe (iceberg_node) - fwe_flux_ib (ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
+                ibhf  (iceberg_node) = ibhf  (iceberg_node) - heat_flux_ib(ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
+            end if
+        end do
+    end do
+end subroutine prepare_icb2fesom_part_2
 
 
 subroutine icb2fesom(mesh)
