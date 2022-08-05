@@ -48,7 +48,22 @@ type(t_mesh), intent(in) , target :: mesh
     if(i_have_element) then 
         ! ##############################################################
         ! LA: spread fluxes over all nodes of element, 25.04.2022
-        call get_iceberg_nodes_for_element(mesh, localelement, ib_nods_in_ib_elem, num_ib_nods_in_ib_elem)
+        !call get_iceberg_nodes_for_element(mesh, localelement, ib_nods_in_ib_elem, num_ib_nods_in_ib_elem)
+        !call get_iceberg_nodes_for_element(elem2d_nodes, localelement, ib_nods_in_ib_elem, num_ib_nods_in_ib_elem)
+        num_ib_nods_in_ib_elem=0
+
+        do i=1,3
+            iceberg_node=elem2d_nodes(i,localelement)
+
+            if (iceberg_node<=mydim_nod2d) then
+                ib_nods_in_ib_elem(i)   = iceberg_node
+                num_ib_nods_in_ib_elem  = num_ib_nods_in_ib_elem + 1
+            else
+                ib_nods_in_ib_elem(i)   = 0
+            end if
+        end do
+        ! ##############################################################
+        
         !write(*,*) "LA DEBUG: ib_nods_in_ib_elem=",ib_nods_in_ib_elem,", num_ib_nods_in_ib_elem=",num_ib_nods_in_ib_elem 
         do i=1, 3
             iceberg_node=ib_nods_in_ib_elem(i)
@@ -66,35 +81,37 @@ type(t_mesh), intent(in) , target :: mesh
     end if
 end subroutine prepare_icb2fesom
 
-subroutine get_iceberg_nodes_for_element(mesh, localelement, ib_nods_in_ib_elem, num_ib_nods_in_ib_elem)
-    use o_param
-    use o_mesh
-    use MOD_MESH
-    use g_config
-    use g_parsup
-    use i_arrays
-    use iceberg_params
-
-    integer, intent(in)                     :: localelement
-    integer, dimension(3), intent(inout)    :: ib_nods_in_ib_elem
-    integer, intent(inout)                  :: num_ib_nods_in_ib_elem
-    integer                                 :: i, iceberg_node
-type(t_mesh), intent(in) , target :: mesh
-#include "associate_mesh.h"
-
-    num_ib_nods_in_ib_elem=0
-
-    do i=1,3
-        iceberg_node=elem2d_nodes(i,localelement)
-
-        if (iceberg_node<=mydim_nod2d) then
-            ib_nods_in_ib_elem(i)   = iceberg_node
-            num_ib_nods_in_ib_elem  = num_ib_nods_in_ib_elem + 1
-        else
-            ib_nods_in_ib_elem(i)   = 0
-        end if
-    end do
-end subroutine get_iceberg_nodes_for_element
+!subroutine get_iceberg_nodes_for_element(elem2d_nodes, localelement, ib_nods_in_ib_elem, num_ib_nods_in_ib_elem)
+!    use o_param
+!    use o_mesh
+!    use MOD_MESH
+!    use g_config
+!    use g_parsup
+!    use i_arrays
+!    use iceberg_params
+!
+!    integer, intent(in)                     :: localelement
+!    integer, dimension(3), intent(inout)    :: ib_nods_in_ib_elem
+!    integer, intent(inout)                  :: num_ib_nods_in_ib_elem
+!    integer                                 :: i, iceberg_node
+!    integer, dimension(:,:), intent(in)     :: elem2d_nodes
+!!    integer, intent(in)                     :: mydim_nod2d
+!!type(t_mesh), intent(in)                :: mesh
+!!#include "associate_mesh.h"
+!
+!    num_ib_nods_in_ib_elem=0
+!
+!    do i=1,3
+!        iceberg_node=elem2d_nodes(i,localelement)
+!
+!        if (iceberg_node<=mydim_nod2d) then
+!            ib_nods_in_ib_elem(i)   = iceberg_node
+!            num_ib_nods_in_ib_elem  = num_ib_nods_in_ib_elem + 1
+!        else
+!            ib_nods_in_ib_elem(i)   = 0
+!        end if
+!    end do
+!end subroutine get_iceberg_nodes_for_element
 
 
 subroutine icb2fesom(mesh)
