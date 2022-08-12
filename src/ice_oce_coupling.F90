@@ -402,18 +402,27 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     elseif ( (.not. use_virt_salt) .and. (use_cavity) ) then ! will remain zero otherwise
         rsss=ref_sss
 !$OMP PARALLEL DO         
+        virtual_salt = 0.0_WP
         do n=1, myDim_nod2D+eDim_nod2D
             if (ulevels_nod2d(n) == 1) cycle
             if (ref_sss_local) rsss = salt(ulevels_nod2d(n),n)
             virtual_salt(n)=rsss*water_flux(n) 
         end do
 !$OMP END PARALLEL DO        
+        
+        ! Introducing here in zstar a virtual salt flux in the cavity , will mess 
+        ! up our global salinity conservation, we also cant do our usual global 
+        ! virtual salt balancing since this will mess our local virtual_salt 
+        ! flux, since we have no counter salt fluxes anywhere else in the ocean. 
+        ! So what we try is to introduce an artifical very small counter virtual 
+        ! saltflux at every open ocean vertice, to counter balance the virtual 
+        ! salt flux in the cavity and to conserve the global salt budget   
         flux = virtual_salt
         call integrate_nod(flux, net, partit, mesh)
 !$OMP PARALLEL DO         
         do n=1, myDim_nod2D+eDim_nod2D
-            if (ulevels_nod2d(n) == 1) cycle 
-            virtual_salt(n)=virtual_salt(n)-net/(ocean_areawithcav-ocean_area)
+            if (ulevels_nod2d(n) /= 1) cycle 
+            virtual_salt(n)=virtual_salt(n)-net/ocean_area
         end do
 !$OMP END PARALLEL DO        
     end if
