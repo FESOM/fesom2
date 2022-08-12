@@ -400,9 +400,18 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     ! since under the cavity nothing is allowed to move  --> linfs --> and linfs
     ! requires virtual salt
     elseif ( (.not. use_virt_salt) .and. (use_cavity) ) then ! will remain zero otherwise
+        ! Introducing here in zstar a virtual salt flux in the cavity , will mess 
+        ! up our global salinity conservation, we also cant do our usual global 
+        ! virtual salt balancing since this will mess our local virtual_salt 
+        ! flux, since we have no counter salt fluxes anywhere else in the ocean. 
+        ! So what we try is to introduce an artificial very small counter virtual 
+        ! saltflux at every open ocean vertice, to counter balance the virtual 
+        ! salt flux in the cavity and to conserve the global salt budget   
         rsss=ref_sss
-!$OMP PARALLEL DO         
         virtual_salt = 0.0_WP
+        
+        ! compute virtual salt flux within the cavity
+!$OMP PARALLEL DO         
         do n=1, myDim_nod2D+eDim_nod2D
             if (ulevels_nod2d(n) == 1) cycle
             if (ref_sss_local) rsss = salt(ulevels_nod2d(n),n)
@@ -410,15 +419,12 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         end do
 !$OMP END PARALLEL DO        
         
-        ! Introducing here in zstar a virtual salt flux in the cavity , will mess 
-        ! up our global salinity conservation, we also cant do our usual global 
-        ! virtual salt balancing since this will mess our local virtual_salt 
-        ! flux, since we have no counter salt fluxes anywhere else in the ocean. 
-        ! So what we try is to introduce an artifical very small counter virtual 
-        ! saltflux at every open ocean vertice, to counter balance the virtual 
-        ! salt flux in the cavity and to conserve the global salt budget   
+        ! integrate salt flux in the cavity(outside cavity virtual_salt is 0.0)
         flux = virtual_salt
         call integrate_nod(flux, net, partit, mesh)
+        
+        ! counter balance the integrated cavity salt flux only in the open ocean 
+        ! --> ensure global salt conservation !!!
 !$OMP PARALLEL DO         
         do n=1, myDim_nod2D+eDim_nod2D
             if (ulevels_nod2d(n) /= 1) cycle 
