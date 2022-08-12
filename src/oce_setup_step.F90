@@ -110,12 +110,13 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     if ( .not. trim(which_ALE)=='linfs') then
         use_virt_salt=.false.
         ! this will force the virtual saltinity flux to be zero
-        ref_sss_local=.false.
-        ref_sss=0._WP
-        is_nonlinfs = 1.0_WP
+        !!PS --> anyway ref_sss or rsss is not used when using zstar 
+        !!PS ref_sss_local=.false.
+        !!PS ref_sss      = 0.0_WP
+        is_nonlinfs  = 1.0_WP
     else
         use_virt_salt=.true.
-        is_nonlinfs = 0.0_WP
+        is_nonlinfs  = 0.0_WP
     end if
    
     !___________________________________________________________________________
