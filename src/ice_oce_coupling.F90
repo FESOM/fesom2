@@ -408,11 +408,11 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         ! saltflux at every open ocean vertice, to counter balance the virtual 
         ! salt flux in the cavity and to conserve the global salt budget   
         rsss=ref_sss
-        virtual_salt = 0.0_WP
         
         ! compute virtual salt flux within the cavity
 !$OMP PARALLEL DO         
         do n=1, myDim_nod2D+eDim_nod2D
+            virtual_salt(n)=0.0_WP
             if (ulevels_nod2d(n) == 1) cycle
             if (ref_sss_local) rsss = salt(ulevels_nod2d(n),n)
             virtual_salt(n)=rsss*water_flux(n) 
