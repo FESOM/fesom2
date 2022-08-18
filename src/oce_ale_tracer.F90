@@ -148,11 +148,8 @@ subroutine solve_tracers_ale(mesh)
         call diff_tracers_ale(tr_num, mesh)
 
 !       Radioactive decay of 14C and 39Ar
-!!      if (tracer_id(tr_num) == 14) tr_arr(:,:,tr_num) = tr_arr(:,:,tr_num) * exp(-decay14 * dt)
-        if (tracer_id(tr_num) == 14) tr_arr(:,:,tr_num) = tr_arr(:,:,tr_num) * (1. - decay14 * dt)
-!!      if (tracer_id(tr_num) == 39) tr_arr(:,:,tr_num) = tr_arr(:,:,tr_num) * exp(-decay39 * dt)
-        if (tracer_id(tr_num) == 39) tr_arr(:,:,tr_num) = tr_arr(:,:,tr_num) * (1. - decay39 * dt)
-
+        if (tracer_id(tr_num) == 14) tr_arr(:,:,tr_num) = tr_arr(:,:,tr_num) * exp(-decay14 * dt)
+        if (tracer_id(tr_num) == 39) tr_arr(:,:,tr_num) = tr_arr(:,:,tr_num) * exp(-decay39 * dt)
         
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
