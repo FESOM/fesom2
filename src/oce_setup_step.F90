@@ -597,9 +597,9 @@ use mod_transit, only: id_r14c, id_r39ar, id_f12, id_sf6
          end if
 !      Transient tracers
        CASE (14)        ! initialize tracer ID=14, fractionation-corrected 14C/C
+         id_r14c = i
 !        this initialization can be overwritten by calling do_ic3d
          if (.not. any(idlist == 14)) then 
-           id_r14c = i
            tr_arr(:,:,i) = 0.85
            if (mype==0) then
               write (i_string,  "(I3)") i
