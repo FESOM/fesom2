@@ -249,6 +249,7 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
     use o_PARAM   
     use o_arrays        
     use g_CONFIG
+    USE g_read_other_NetCDF, only: read_other_NetCDF
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_tracer), intent(in)   , target :: tracers
@@ -258,6 +259,18 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
     integer                               :: i
     character(MAX_PATH)                   :: filename
     real(kind=WP), external               :: TFrez  ! Sea water freeze temperature.
+!============== namelistatmdata variables ================
+   integer, save                                :: nm_ic_unit     = 107 ! unit to open namelist file
+   integer                                      :: iost                 !I/O status 
+   integer, parameter                           :: ic_max=10
+   logical                                      :: ic_cyclic=.true.
+   integer,             save                    :: n_ic2d
+   integer,             save, dimension(ic_max) :: idlist
+   character(MAX_PATH), save, dimension(ic_max) :: filelist
+   logical                                      :: ini_ice_from_file=.false.
+   character(50),       save, dimension(ic_max) :: varlist
+   namelist / tracer_init2d / n_ic2d, idlist, filelist, varlist, ini_ice_from_file
+
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
@@ -270,18 +283,30 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
     v_ice        => ice%vice(:)
     a_ice        => ice%data(1)%values(:)
     m_ice        => ice%data(2)%values(:)
-    m_snow       => ice%data(3)%values(:)
-    
+    m_snow       => ice%data(3)%values(:)    
     !___________________________________________________________________________
     m_ice =0._WP
     a_ice =0._WP
     u_ice =0._WP
     v_ice =0._WP
     m_snow=0._WP
-    if(mype==0) write(*,*) 'initialize the sea ice'
     !___________________________________________________________________________
-    do i=1,myDim_nod2D+eDim_nod2D    
-    
+    ! OPEN and read namelist for I/O
+    open( unit=nm_ic_unit, file='namelist.tra', form='formatted', access='sequential', status='old', iostat=iost )
+    if (iost == 0) then
+        if (mype==0) WRITE(*,*) '     file   : ', 'namelist.tra',' open ok'
+        else
+        if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.tra',' ; iostat=',iost
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        stop
+    end if
+    read(nm_ic_unit, nml=tracer_init2d,   iostat=iost)
+    close(nm_ic_unit)
+
+    if (.not. ini_ice_from_file) then
+    if(mype==0) write(*,*) 'initialize the sea ice: cold start'
+    !___________________________________________________________________________
+    do i=1,myDim_nod2D+eDim_nod2D        
         !_______________________________________________________________________
         if (ulevels_nod2d(i)>1) then
             !!PS m_ice(i)  = 1.0e15_WP
@@ -303,4 +328,14 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
             v_ice(i) = 0.0_WP
         endif
     enddo
+    else
+    if (mype==0) write(*,*) 'initialize the sea ice: from file'
+       DO i=1, n_ic2d 
+          if (mype==0) then
+             write(*,*) 'reading 2D variable  : ', trim(varlist(i))
+             write(*,*) 'from ',                   trim(filelist(i))
+          end if
+          call read_other_NetCDF(trim(ClimateDataPath)//trim(filelist(i)), varlist(i),  1, ice%data(i)%values(:), .true., .true., partit, mesh)
+       END DO
+    end if
 end subroutine ice_initial_state
