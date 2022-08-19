@@ -22,7 +22,7 @@ n_ic2d   = 3                                        ! number of tracers to initi
 idlist   = 1, 2, 3                                  ! their IDs (0 is temperature, 1 is salinity, etc.). The reading order is defined here!
 filelist = 'Sweeney_2005.nc', 'Sweeney_2005.nc', 'Sweeney_2005.nc' ! list of files in ClimateDataPath to read (one file per tracer), same order as idlist
 varlist  = 'chl', 'chl', 'chl'                 ! variables to read from specified files
-ini_ice_from_file=.true.
+ini_ice_from_file=.false.
 /
 
 &tracer_general

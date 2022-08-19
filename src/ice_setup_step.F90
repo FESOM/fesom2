@@ -269,6 +269,7 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
    character(MAX_PATH), save, dimension(ic_max) :: filelist
    logical                                      :: ini_ice_from_file=.false.
    character(50),       save, dimension(ic_max) :: varlist
+   integer                                      :: current_tracer
    namelist / tracer_init2d / n_ic2d, idlist, filelist, varlist, ini_ice_from_file
 
     !___________________________________________________________________________
@@ -331,11 +332,16 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
     else
     if (mype==0) write(*,*) 'initialize the sea ice: from file'
        DO i=1, n_ic2d 
-          if (mype==0) then
-             write(*,*) 'reading 2D variable  : ', trim(varlist(i))
-             write(*,*) 'from ',                   trim(filelist(i))
-          end if
-          call read_other_NetCDF(trim(ClimateDataPath)//trim(filelist(i)), varlist(i),  1, ice%data(i)%values(:), .true., .true., partit, mesh)
+          DO current_tracer=1, ice%num_itracers
+             IF (ice%data(current_tracer)%ID==idlist(i)) then
+                IF (mype==0) then
+                   write(*,*) 'reading 2D variable  : ', trim(varlist(i)), ' into 2D tracer ID=', current_tracer
+                   write(*,*) 'from ',                   trim(filelist(i))
+                END IF
+             call read_other_NetCDF(trim(ClimateDataPath)//trim(filelist(i)), varlist(i),  1, ice%data(current_tracer)%values(:), .true., .true., partit, mesh)
+             EXIT
+             END IF
+          END DO
        END DO
     end if
 end subroutine ice_initial_state
