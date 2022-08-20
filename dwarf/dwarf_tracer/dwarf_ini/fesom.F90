@@ -19,7 +19,7 @@ USE restart_derivedtype_module
 USE fortran_utils
 IMPLICIT NONE
 
-character(LEN=500)                :: resultpath, npepath
+character(LEN=500)               :: resultpath, npepath
 character(LEN=256)               :: npes_string
 logical                          :: dir_exist
 logical                          :: L_EXISTS
@@ -34,8 +34,7 @@ integer                          :: i, n, nzmax, nzmin
 call MPI_INIT(i)
 call par_init(partit)
 
-resultpath='/work/ollie/pscholz/results_fesom2.0/test_binaryrestart'
-
+resultpath='../'
 ! check if resultpath exist
 INQUIRE(directory=trim(resultpath), EXIST=dir_exist)
 if (.not. dir_exist) then 
@@ -54,8 +53,7 @@ end if
 
 !_______________________________________________________________________________
 ! read derived type binary restart files
-call read_all_bin_restarts(npepath, dynamics=dyn, tracers=tracers, partit=partit, mesh=mesh)
-
+call read_all_bin_restarts(npepath, partit=partit, mesh=mesh, dynamics=dyn, tracers=tracers)
 ! even though the partitioning has been read some things regarding MPI shall be computed during the runtime
 ! these include: MPI_TYPE_COMMIT etc.
 ! used to be call set_par_support(partit, mesh)
