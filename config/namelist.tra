@@ -19,9 +19,9 @@ t_insitu = .true.                         ! if T is insitu it will be converted 
 
 &tracer_init2d                                      ! initial conditions for 2D tracers (sea ice)
 n_ic2d   = 3                                        ! number of tracers to initialize
-idlist   = 1, 2, 3                                  ! their IDs (0 is temperature, 1 is salinity, etc.). The reading order is defined here!
-filelist = 'Sweeney_2005.nc', 'Sweeney_2005.nc', 'Sweeney_2005.nc' ! list of files in ClimateDataPath to read (one file per tracer), same order as idlist
-varlist  = 'chl', 'chl', 'chl'                 ! variables to read from specified files
+idlist   = 1, 2, 3                                  ! their IDs (0 is a_ice, 1 is m_ice, 3 m_snow). The reading order is defined here!
+filelist = 'a_ice.nc', 'm_ice.nc', 'm_snow.nc' ! list of files in ClimateDataPath to read (one file per tracer), same order as idlist
+varlist  = 'a_ice', 'm_ice', 'm_snow'                 ! variables to read from specified files
 ini_ice_from_file=.false.
 /
 
