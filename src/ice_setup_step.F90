@@ -338,7 +338,7 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
                    write(*,*) 'reading 2D variable  : ', trim(varlist(i)), ' into 2D tracer ID=', current_tracer
                    write(*,*) 'from ',                   trim(filelist(i))
                 END IF
-             call read_other_NetCDF(trim(ClimateDataPath)//trim(filelist(i)), varlist(i),  1, ice%data(current_tracer)%values(:), .true., .true., partit, mesh)
+             call read_other_NetCDF(trim(ClimateDataPath)//trim(filelist(i)), varlist(i),  1, ice%data(current_tracer)%values(:), .false., .true., partit, mesh)
              EXIT
              END IF
           END DO
