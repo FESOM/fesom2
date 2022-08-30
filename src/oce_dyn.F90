@@ -115,7 +115,15 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
               dynamics%ke_cor (:,nz,elem)  = usum*dynamics%ke_cor (:,nz,elem)/2.0_WP
               dynamics%ke_hvis(:,nz,elem)  = usum*dynamics%ke_hvis(:,nz,elem)/2.0_WP
               dynamics%ke_vvis(:,nz,elem)  = usum*dynamics%ke_vvis(:,nz,elem)/2.0_WP
-        END DO  
+              
+              if (nz==nzmin) then
+                 dynamics%ke_wind(:,elem)=usum*dynamics%ke_wind(:,elem)/2.0_WP
+              end if
+
+              if (nz==nzmax) then
+                 dynamics%ke_drag(:,elem)=usum*dynamics%ke_drag(:,elem)/2.0_WP
+              end if
+        END DO
         end if
 
         DO nz=nzmin, nzmax-1

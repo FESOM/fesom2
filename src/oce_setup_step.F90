@@ -499,6 +499,8 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
        allocate(dynamics%ke_cor_AB (2, nl-1, elem_size))
        allocate(dynamics%ke_rhs_bak(2, nl-1, elem_size))
        allocate(dynamics%ke_wrho      (nl-1, node_size))
+       allocate(dynamics%ke_wind         (2, elem_size))
+       allocate(dynamics%ke_drag         (2, elem_size))
     end if
 END SUBROUTINE dynamics_init
 !

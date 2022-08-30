@@ -117,6 +117,8 @@ TYPE T_DYN
     real(kind=WP), allocatable, dimension(:,:)   :: ke_wrho
     real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv_AB, ke_cor_AB
     real(kind=WP), allocatable, dimension(:,:,:) :: ke_rhs_bak
+    real(kind=WP), allocatable, dimension(:,:)   :: ke_wind
+    real(kind=WP), allocatable, dimension(:,:)   :: ke_drag
     !___________________________________________________________________________
     contains
 #if defined(__PGI)

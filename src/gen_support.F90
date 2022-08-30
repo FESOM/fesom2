@@ -11,7 +11,7 @@ module g_support
   implicit none
 
   private
-  public :: smooth_nod, smooth_elem, integrate_nod, integrate_elem_3D, extrap_nod, omp_min_max_sum1, omp_min_max_sum2
+  public :: smooth_nod, smooth_elem, integrate_nod, integrate_elem, extrap_nod, omp_min_max_sum1, omp_min_max_sum2
   real(kind=WP), dimension(:), allocatable  :: work_array
 !
 !--------------------------------------------------------------------------------------------
@@ -30,6 +30,12 @@ module g_support
 ! computes 2D integral of a nodal field
   INTERFACE integrate_nod
             MODULE PROCEDURE integrate_nod_2D, integrate_nod_3D
+  END INTERFACE
+!
+!--------------------------------------------------------------------------------------------
+! computes 2D integral of a nodal field
+  INTERFACE integrate_elem
+            MODULE PROCEDURE integrate_elem_2D, integrate_elem_3D
   END INTERFACE
 !
 !--------------------------------------------------------------------------------------------
@@ -672,6 +678,46 @@ subroutine integrate_elem_3D(data, int3D, partit, mesh)
   call MPI_AllREDUCE(lval, int3D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 end subroutine integrate_elem_3D
+!
+!--------------------------------------------------------------------------------------------
+!
+subroutine integrate_elem_2D(data, int2D, partit, mesh)
+  USE MOD_PARTIT
+  USE MOD_PARSUP
+  use g_comm_auto
+
+  IMPLICIT NONE
+  type(t_mesh),  intent(in), target :: mesh
+  type(t_partit),intent(in), target :: partit
+  real(kind=WP), intent(in)         :: data(:)
+  real(kind=WP), intent(inout)      :: int2D
+
+  integer       :: row
+  real(kind=WP) :: lval
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
+
+  lval=0.0_WP
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+: lval)
+  do row=1, myDim_elem2D
+     if(elem2D_nodes(1, row) > myDim_nod2D) cycle
+#if defined(__openmp_reproducible)
+!$OMP ORDERED
+#endif
+     lval = lval + data(row)*elem_area(row)
+#if defined(__openmp_reproducible)
+!$OMP END ORDERED
+#endif
+  end do
+!$OMP END PARALLEL DO
+
+  int2D=0.0_WP
+  call MPI_AllREDUCE(lval, int2D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+       MPI_COMM_FESOM, MPIerr)
+end subroutine integrate_elem_2D
 end module g_support
 
 

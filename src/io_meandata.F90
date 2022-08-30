@@ -565,6 +565,13 @@ END DO
        call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_dv2',    'KE change [0.5 dv2]',           'm2/s2', dynamics%ke_du2(2,:,:),  io_list(i)%freq, 'm', 8, partit, mesh)
 
        call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'W_x_RHO',   'buoyancy work = ke_pre',        'm2/s2', dynamics%ke_wrho(:,:),   io_list(i)%freq, 'm', 8, partit, mesh)
+
+     call def_stream(elem2D, myDim_elem2D,   'ke_wind_x',     'work of wind [x]', 'm2/s2', dynamics%ke_wind(1,:),  io_list(i)%freq, 'm', 8, partit, mesh)
+     call def_stream(elem2D, myDim_elem2D,   'ke_wind_y',     'work of wind [y]', 'm2/s2', dynamics%ke_wind(2,:),  io_list(i)%freq, 'm', 8, partit, mesh)
+
+     call def_stream(elem2D, myDim_elem2D,   'ke_drag_x',     'work of drag [x]', 'm2/s2', dynamics%ke_drag(1,:),  io_list(i)%freq, 'm', 8, partit, mesh)
+     call def_stream(elem2D, myDim_elem2D,   'ke_drag_y',     'work of drag [y]', 'm2/s2', dynamics%ke_drag(2,:),  io_list(i)%freq, 'm', 8, partit, mesh)
+
     end if   
 end subroutine
 !
