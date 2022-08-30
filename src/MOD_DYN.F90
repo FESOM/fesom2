@@ -67,7 +67,7 @@ TYPE T_DYN
     real(kind=WP), allocatable, dimension(:,:,:):: uvnode
     
     ! instant vertical vel arrays
-    real(kind=WP), allocatable, dimension(:,:)  :: w, w_e, w_i, cfl_z, fer_w
+    real(kind=WP), allocatable, dimension(:,:)  :: w, w_e, w_i, w_old, cfl_z, fer_w
     
     ! sea surface height arrays
     real(kind=WP), allocatable, dimension(:)    :: eta_n, d_eta, ssh_rhs, ssh_rhs_old
@@ -114,6 +114,7 @@ TYPE T_DYN
     ! energy diagnostic part: will be computed inside the model ("hard integration"):
     logical                                      :: diag_ke       = .true.
     real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv, ke_cor, ke_pre, ke_hvis, ke_vvis, ke_du2
+    real(kind=WP), allocatable, dimension(:,:)   :: ke_wrho
     real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv_AB, ke_cor_AB
     real(kind=WP), allocatable, dimension(:,:,:) :: ke_rhs_bak
     !___________________________________________________________________________

@@ -634,3 +634,40 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
 !$OMP END PARALLEL
 end subroutine visc_filt_bidiff
 
+SUBROUTINE compute_ke_wrho(dynamics, partit, mesh)
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use MOD_DYN
+    USE o_PARAM
+    USE g_CONFIG
+    USE g_comm_auto
+    USE o_ARRAYS
+    IMPLICIT NONE
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    real(kind=WP) , pointer               :: inv_rhowat
+    !___________________________________________________________________________
+    integer        :: n, nz, nzmin, nzmax
+    real(kind=WP)  :: r, wu, wl
+    !___________________________________________________________________________
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+  ! we use pressure to compute this term as it appeares much easier (P*dW) instead of (dP*w)
+  dynamics%ke_wrho=0.0_WP
+  DO n=1, myDim_nod2D
+     nzmin=ulevels_nod2D(n)
+     nzmax=nlevels_nod2D(n)
+     do nz=nzmin, nzmax-1
+        wu=0.5*(dynamics%w(nz,   n)+dynamics%w_old(nz,   n))
+        wl=0.5*(dynamics%w(nz+1, n)+dynamics%w_old(nz+1, n))
+        r=(g*dynamics%eta_n(n)+hpressure(nz, n)/density_0)*(wu*area(nz, n)-wl*area(nz+1, n))
+!       r=(g*dynamics%eta_n(n)+hpressure(nz, n)/density_0)*(wu*area(nz, n)-wl*area(nz+1, n)+0.5_WP*(hnode_new(nz, n)-mesh%hnode_old(nz, n))/dt*area(nz, n) )
+        dynamics%ke_wrho(nz, n) = r*dt/area(nz, n)/hnode_new(nz,n)
+     end do
+  END DO
+  call exchange_nod(dynamics%ke_wrho, partit)
+END SUBROUTINE compute_ke_wrho

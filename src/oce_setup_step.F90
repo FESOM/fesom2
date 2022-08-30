@@ -449,6 +449,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! allocate/initialise vertical velocity arrays in derived type
     allocate(dynamics%w(              nl, node_size))
+    allocate(dynamics%w_old(          nl, node_size))
     allocate(dynamics%w_e(            nl, node_size))
     allocate(dynamics%w_i(            nl, node_size))
     allocate(dynamics%cfl_z(          nl, node_size))
@@ -497,6 +498,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
        allocate(dynamics%ke_adv_AB (2, nl-1, elem_size))
        allocate(dynamics%ke_cor_AB (2, nl-1, elem_size))
        allocate(dynamics%ke_rhs_bak(2, nl-1, elem_size))
+       allocate(dynamics%ke_wrho      (nl-1, node_size))
     end if
 END SUBROUTINE dynamics_init
 !

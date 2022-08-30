@@ -195,7 +195,6 @@ subroutine init_ale(dynamics, partit, mesh)
     ! hnode and hnode_new: layer thicknesses at nodes. 
     allocate(mesh%hnode(1:nl-1, myDim_nod2D+eDim_nod2D))
     allocate(mesh%hnode_new(1:nl-1, myDim_nod2D+eDim_nod2D))
-    
     ! ssh_rhs_old: auxiliary array to store an intermediate part of the rhs computations.
     allocate(dynamics%ssh_rhs_old(myDim_nod2D+eDim_nod2D))
     dynamics%ssh_rhs_old = 0.0_WP
@@ -2891,7 +2890,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     type(t_ice)   , intent(inout), target :: ice
     !___________________________________________________________________________
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
-    real(kind=8)      :: budget(2)
+    real(kind=WP)     :: budget(2)
     integer           :: node
     integer           :: nz, elem, nzmin, nzmax !for KE diagnostic
     !___________________________________________________________________________
@@ -3123,7 +3122,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     !   rigid lid.
 !$OMP PARALLEL DO
     do node=1, myDim_nod2D+eDim_nod2D
-        if (ulevels_nod2D(node)==1) eta_n(node)=alpha*hbar(node)+(1.0_WP-alpha)*hbar_old(node)
+       if (ulevels_nod2D(node)==1) eta_n(node)=alpha*hbar(node)+(1.0_WP-alpha)*hbar_old(node)
     end do
 !$OMP END PARALLEL DO
     ! --> eta_(n)
@@ -3142,14 +3141,19 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         call fer_solve_Gamma(partit, mesh)
         call fer_gamma2vel(dynamics, partit, mesh)
     end if
-    t6=MPI_Wtime()    
+    t6=MPI_Wtime() 
+
     !___________________________________________________________________________
     ! The main step of ALE procedure --> this is were the magic happens --> here 
     ! is decided how change in hbar is distributed over the vertical layers
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call vert_vel_ale'//achar(27)//'[0m'
+!!!
+    dynamics%w_old=dynamics%w
+!!!
     call vert_vel_ale(dynamics, partit, mesh)
-    t7=MPI_Wtime() 
+    t7=MPI_Wtime()   
 
+    call compute_ke_wrho(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
@@ -3212,6 +3216,9 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
        call integrate_elem_3D(dynamics%ke_pre(2,:,:),  budget(2), partit, mesh)
        if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. pre=', budget(1), ' | ', budget(2), ' | ', sum(budget)
 
+       call integrate_nod(dynamics%ke_wrho,  budget(1), partit, mesh)
+       if (mype==0) write(*,"(A, ES14.7)") 'w * rho=', budget(1)
+
        call integrate_elem_3D(dynamics%ke_adv(1,:,:),  budget(1), partit, mesh)
        call integrate_elem_3D(dynamics%ke_adv(2,:,:),  budget(2), partit, mesh)
        if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. adv=', budget(1), ' | ', budget(2), ' | ', sum(budget)
@@ -3227,6 +3234,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
        call integrate_elem_3D(dynamics%ke_cor(1,:,:),  budget(1), partit, mesh)
        call integrate_elem_3D(dynamics%ke_cor(2,:,:),  budget(2), partit, mesh)
        if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. cor=', budget(1), ' | ', budget(2), ' | ', sum(budget)
+
        if (mype==0) write(*,*) '***********************************'
     end if
 end subroutine oce_timestep_ale
