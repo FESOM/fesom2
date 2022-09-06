@@ -68,9 +68,7 @@ subroutine read_namelist
   read (20,NML=forcing_exchange_coeff)
   read (20,NML=forcing_bulk)
   read (20,NML=land_ice)
-  if (use_pico) then
-    read (20,NML=pico)
-  end if
+  read (20,NML=pico)
   close (20)
 
   if(use_ice) then
