@@ -609,7 +609,7 @@ call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
 if (status .ne. nf_noerr) call handle_err(status, partit)
 
 if (partit%mype==0) then
-  status = nf_put_att_text(ncid, fesom_mesh_id, 'face_dimension', len_trim('nface') , trim('nface'));
+  status = nf_put_att_text(ncid, fesom_mesh_id, 'face_dimension', len_trim('elem') , trim('elem'));
 end if
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
 if (status .ne. nf_noerr) call handle_err(status, partit)
@@ -621,7 +621,7 @@ call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
 if (status .ne. nf_noerr) call handle_err(status, partit)
 
 if (partit%mype==0) then
-  status = nf_put_att_text(ncid, fesom_mesh_id, 'edge_dimension', len_trim('nedge'), trim('nedge'));
+  status = nf_put_att_text(ncid, fesom_mesh_id, 'edge_dimension', len_trim('edg_n'), trim('edg_n'));
 end if
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
 if (status .ne. nf_noerr) call handle_err(status, partit)
