@@ -199,7 +199,8 @@ type(t_partit), intent(inout), target :: partit
  character(len=MAX_PATH)  :: file_name
  character(len=MAX_PATH)  :: dist_mesh_dir
  integer        :: flag_wrongaux3d=0
- integer       :: ierror              ! return error code
+ integer        :: ierror              ! return error code
+ logical        :: file_exist
  integer, allocatable, dimension(:)         :: mapping
  integer, allocatable, dimension(:,:)       :: ibuff
  real(kind=WP), allocatable, dimension(:,:) :: rbuff
@@ -516,67 +517,226 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
  ! read depth data
  !==============================
  ! 0 proc reads header of aux3d.out and broadcasts it between procs
- allocate(mesh%depth(myDim_nod2D+eDim_nod2D))
- if (mype==0) then !open the file for reading on 0 proc
+ !
+ !
+ !______________________________________________________________________________
+ ! read depth from aux3d.out
+ if (trim(use_depthfile)=='aux3d') then
+    ! check if aux3d.out file does exist
+    file_exist=.False.
     file_name=trim(meshpath)//'aux3d.out' 
-    open(fileID, file=file_name)
-    read(fileID,*) mesh%nl  ! the number of levels 
- end if
- call MPI_BCast(mesh%nl, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
- if (mesh%nl < 3) then
-    write(*,*) '!!!Number of levels is less than 3, model will stop!!!'
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-    stop
- end if
- allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
- if (mype==0) read(fileID,*) mesh%zbar
- call MPI_BCast(mesh%zbar, mesh%nl, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
- if(mesh%zbar(2)>0) mesh%zbar=-mesh%zbar   ! zbar is negative 
- allocate(mesh%Z(mesh%nl-1))
- mesh%Z=mesh%zbar(1:mesh%nl-1)+mesh%zbar(2:mesh%nl)  ! mid-depths of cells
- mesh%Z=0.5_WP*mesh%Z 
+    inquire(file=trim(file_name),exist=file_exist) 
+    !___________________________________________________________________________
+    if (file_exist) then
+        if (mype==0) then !open the file for reading on 0 proc
+            open(fileID, file=file_name)
+            read(fileID,*) mesh%nl  ! the number of levels 
+        end if
+        call MPI_BCast(mesh%nl, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+        if (mesh%nl < 3) then
+            write(*,*) '!!!Number of levels is less than 3, model will stop!!!'
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            stop
+        end if
+        allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
+        if (mype==0) read(fileID,*) mesh%zbar
+        call MPI_BCast(mesh%zbar, mesh%nl, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+        if(mesh%zbar(2)>0) mesh%zbar=-mesh%zbar   ! zbar is negative 
+        allocate(mesh%Z(mesh%nl-1))
+        mesh%Z=mesh%zbar(1:mesh%nl-1)+mesh%zbar(2:mesh%nl)  ! mid-depths of cells
+        mesh%Z=0.5_WP*mesh%Z
+    !___________________________________________________________________________
+    else
+        if (mype==0) then
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: You want to use aux3d.out file to define your depth, but '
+            write(*,*) '        the file seems not to exist'
+            write(*,*) '        --> check in namelist.config, the flag use_depthfile must be'
+            write(*,*) '            use_depthfile= "aux3d" or "depth@" '
+            write(*,*) '        --> model stops here'
+            write(*,*) '____________________________________________________________________'
+        end if
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+    end if
+    
+ !______________________________________________________________________________
+ ! read depth from depth@node.out or depth@elem.out    
+ elseif (trim(use_depthfile)=='depth@') then
+    !___________________________________________________________________________
+    ! load file depth_zlev.out --> contains number of model levels and full depth
+    ! levels
+    file_exist=.False.
+    file_name=trim(meshpath)//'depth_zlev.out' 
+    inquire(file=trim(file_name),exist=file_exist) 
+    if (file_exist) then
+        if (mype==0) then !open the file for reading on 0 proc
+            open(fileID, file=file_name)
+            read(fileID,*) mesh%nl  ! the number of levels 
+        end if
+        call MPI_BCast(mesh%nl, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+        if (mesh%nl < 3) then
+            write(*,*) '!!!Number of levels is less than 3, model will stop!!!'
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            stop
+        end if
+        allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
+        if (mype==0) read(fileID,*) mesh%zbar
+        call MPI_BCast(mesh%zbar, mesh%nl, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+        if(mesh%zbar(2)>0) mesh%zbar=-mesh%zbar   ! zbar is negative 
+        allocate(mesh%Z(mesh%nl-1))
+        mesh%Z=mesh%zbar(1:mesh%nl-1)+mesh%zbar(2:mesh%nl)  ! mid-depths of cells
+        mesh%Z=0.5_WP*mesh%Z
+        if (mype==0) close(fileID)
+    !___________________________________________________________________________
+    else
+        if (mype==0) then
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: You want to use depth@elem.out or depth@node.out file, therefore'
+            write(*,*) '        you also need the file depth_zlev.out which contains the model '
+            write(*,*) '        number of layers and the depth of model levels. This file seems '
+            write(*,*) '        not to exist'
+            write(*,*) '        --> check in namelist.config, the flag use_depthfile must be'
+            write(*,*) '            use_depthfile= "aux3d" or "depth@" and your meshfolder'
+            write(*,*) '        --> model stops here'
+            write(*,*) '____________________________________________________________________'
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+        end if 
+    end if 
+    
+    !___________________________________________________________________________
+    ! load file depth@elem.out or depth@node.out contains topography either at 
+    ! nodes or elements
+    file_exist=.False.
+    if (use_depthonelem) then 
+        file_name=trim(meshpath)//'depth@elem.out' 
+    else
+        file_name=trim(meshpath)//'depth@node.out' 
+    end if 
+    inquire(file=trim(file_name),exist=file_exist) 
+    if (file_exist) then 
+        if (mype==0) open(fileID, file=file_name)
+    else    
+        if (mype==0) then
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: You want to use depth@elem.out or depth@node.out file to '
+            write(*,*) '        define your depth, but the file seems not to exist'
+            write(*,*) '        --> check in namelist.config, the flag use_depthfile must be'
+            write(*,*) '            use_depthfile= "aux3d" or "depth@" and your meshfolder '
+            write(*,*) '        --> model stops here'
+            write(*,*) '____________________________________________________________________'
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+        end if
+    end if     
+ end if 
 
  ! 0 proc reads the data in chunks and distributes it between other procs
- mesh_check=0
- do nchunk=0, (mesh%nod2D-1)/chunk_size
-    mapping(1:chunk_size)=0
-    do n=1, myDim_nod2D+eDim_nod2D
-       ipos=(myList_nod2D(n)-1)/chunk_size
-       if (ipos==nchunk) then
-          iofs=myList_nod2D(n)-nchunk*chunk_size
-          mapping(iofs)=n
-       end if
-    end do
-
-    k=min(chunk_size, mesh%nod2D-nchunk*chunk_size)
-    if (mype==0) then
-       do n=1, k
-          read(fileID,*) rbuff(n,1)
-       end do
-       ! check here if aux3d.out contains depth levels (FESOM2.0) or 3d indices
-       ! (FESOM1.4) like that check if the proper mesh is loaded. 11000.0 is here 
-       ! the maximum depth on earth in marianen trench
-       if ( flag_wrongaux3d==0 .and. any(abs(rbuff(1:k,1))>11000.0_WP) ) flag_wrongaux3d=1
-    end if
-    call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-
-    do n=1, k
-       x=rbuff(n,1)
-       if (x>0) x=-x !deps must be negative!
-       if (x>mesh%zbar(5)) x=mesh%zbar(5) !threshold for depth
-       if (mapping(n)>0) then
-          mesh_check=mesh_check+1
-          mesh%depth(mapping(n))=x
+ !______________________________________________________________________________
+ ! bottom topography is defined on elements 
+ if (use_depthonelem) then
+    !___________________________________________________________________________
+    ! allocate mesh%depth at elements 
+    allocate(mesh%depth(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
+    
+    !___________________________________________________________________________
+    mesh_check=0
+    do nchunk=0, (mesh%elem2D-1)/chunk_size
+        mapping(1:chunk_size)=0
+        do n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
+            ipos=(myList_elem2D(n)-1)/chunk_size
+            if (ipos==nchunk) then
+                iofs=myList_elem2D(n)-nchunk*chunk_size
+                mapping(iofs)=n
+            end if
+        end do
+        
+        k=min(chunk_size, mesh%elem2D-nchunk*chunk_size)
+        if (mype==0) then
+            do n=1, k
+                read(fileID,*) rbuff(n,1)
+            end do
+            ! check here if aux3d.out contains depth levels (FESOM2.0) or 3d indices
+            ! (FESOM1.4) like that check if the proper mesh is loaded. 11000.0 is here 
+            ! the maximum depth on earth in marianen trench
+            if ( flag_wrongaux3d==0 .and. any(abs(rbuff(1:k,1))>11000.0_WP) ) flag_wrongaux3d=1
         end if
-     end do
- end do
-
- if (mype==0) close(fileID)
- if (mesh_check/=myDim_nod2D+eDim_nod2D) then
-    write(*,*) 'ERROR while reading aux3d.out on mype=', mype
-    write(*,*) mesh_check, ' values have been read in according to partitioning'
-    write(*,*) 'it does not equal to myDim_nod2D+eDim_nod2D = ', myDim_nod2D+eDim_nod2D
- end if
+        call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+        
+        do n=1, k
+            x=rbuff(n,1)
+            if (x>0) x=-x !deps must be negative!
+            if (x>mesh%zbar(thers_zbar_lev)) x=mesh%zbar(thers_zbar_lev) !threshold for depth
+            if (mapping(n)>0) then
+                mesh_check=mesh_check+1
+                mesh%depth(mapping(n))=x
+            end if
+        end do ! --> do n=1, k
+    end do ! --> do nchunk=0, (mesh%elem2D-1)/chunk_size
+    
+    !___________________________________________________________________________
+    if (mype==0) close(fileID)
+    
+    !___________________________________________________________________________
+    if (mesh_check/=myDim_elem2D+eDim_elem2D+eXDim_elem2D) then
+        write(*,*) 'ERROR while reading aux3d.out on mype=', mype
+        write(*,*) mesh_check, ' values have been read in according to partitioning'
+        write(*,*) 'it does not equal to myDim_elem2D+eDim_elem2D+eXDim_elem2D = ', myDim_elem2D+eDim_elem2D+eXDim_elem2D
+    end if
+        
+ !______________________________________________________________________________
+ ! bottom topography is defined on nodes 
+ else
+    !___________________________________________________________________________
+    ! allocate mesh%depth at nodes 
+    allocate(mesh%depth(myDim_nod2D+eDim_nod2D))
+ 
+    !___________________________________________________________________________
+    ! fill mesh%depth from file with neighborhood information 
+    mesh_check=0
+    do nchunk=0, (mesh%nod2D-1)/chunk_size
+        mapping(1:chunk_size)=0
+        do n=1, myDim_nod2D+eDim_nod2D
+            ipos=(myList_nod2D(n)-1)/chunk_size
+            if (ipos==nchunk) then
+                iofs=myList_nod2D(n)-nchunk*chunk_size
+                mapping(iofs)=n
+            end if
+        end do
+        
+        k=min(chunk_size, mesh%nod2D-nchunk*chunk_size)
+        if (mype==0) then
+            do n=1, k
+                read(fileID,*) rbuff(n,1)
+            end do
+            ! check here if aux3d.out contains depth levels (FESOM2.0) or 3d indices
+            ! (FESOM1.4) like that check if the proper mesh is loaded. 11000.0 is here 
+            ! the maximum depth on earth in marianen trench
+            if ( flag_wrongaux3d==0 .and. any(abs(rbuff(1:k,1))>11000.0_WP) ) flag_wrongaux3d=1
+        end if
+        call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+        
+        do n=1, k
+            x=rbuff(n,1)
+            if (x>0) x=-x !deps must be negative!
+            if (x>mesh%zbar(thers_zbar_lev)) x=mesh%zbar(thers_zbar_lev) !threshold for depth
+            if (mapping(n)>0) then
+                mesh_check=mesh_check+1
+                mesh%depth(mapping(n))=x
+            end if
+        end do ! --> do n=1, k
+    end do ! --> do nchunk=0, (mesh%nod2D-1)/chunk_size
+    
+    !___________________________________________________________________________
+    if (mype==0) close(fileID)
+    
+    !___________________________________________________________________________
+    if (mesh_check/=myDim_nod2D+eDim_nod2D) then
+        write(*,*) 'ERROR while reading aux3d.out on mype=', mype
+        write(*,*) mesh_check, ' values have been read in according to partitioning'
+        write(*,*) 'it does not equal to myDim_nod2D+eDim_nod2D = ', myDim_nod2D+eDim_nod2D
+    end if
+ end if ! --> if (use_depthonelem) then    
+ 
+ 
 !_______________________________________________________________________________
 ! check if the mesh structure of FESOM2.0 and of FESOM1.4 is loaded
 if ((mype==0) .and. (flag_wrongaux3d==1)) then
@@ -942,6 +1102,7 @@ subroutine find_levels_cavity(partit, mesh)
     integer                             :: nchunk, chunk_size, ipos, iofs, mesh_check
     integer, allocatable, dimension(:)  :: mapping
     integer, allocatable, dimension(:)  :: ibuff
+    real(kind=WP), allocatable, dimension(:)  :: rbuff
     real(kind=WP)                       :: t0, t1
     logical                             :: file_exist=.False.
     integer                             :: elem, elnodes(3), ule,  uln(3), node, j, nz
@@ -954,7 +1115,6 @@ subroutine find_levels_cavity(partit, mesh)
     ! allocate arrays, reset pointers
 !!PS     allocate(mesh%cavity_flag_e(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
 !!PS     allocate(mesh%cavity_flag_n(myDim_nod2D+eDim_nod2D))
-    allocate(mesh%cavity_depth(myDim_nod2D+eDim_nod2D))
     
     !___________________________________________________________________________
     ! mesh related files will be read in chunks of chunk_size
@@ -1137,6 +1297,8 @@ subroutine find_levels_cavity(partit, mesh)
         print *, achar(27)//'[0m'
     end if
     
+    deallocate(ibuff)
+    
     !___________________________________________________________________________
     ! Part III: computing cavity flag at nodes and elements
 !!PS     mesh%cavity_flag_e = 0
@@ -1216,7 +1378,11 @@ subroutine find_levels_cavity(partit, mesh)
     !___________________________________________________________________________
     ! Part IV: reading cavity depth at nodes
     if (mype==0)  then 
-        file_name=trim(meshpath)//'cavity_depth.out'
+        if (use_cavityonelem) then
+            file_name = trim(meshpath)//'cavity_depth@elem.out'
+        else
+            file_name = trim(meshpath)//'cavity_depth@node.out'
+        end if    
         file_exist=.False.
         inquire(file=trim(file_name),exist=file_exist)
         if (file_exist) then
@@ -1236,69 +1402,142 @@ subroutine find_levels_cavity(partit, mesh)
         end if 
     end if
     
-    ! 0 proc reads the data in chunks and distributes it between other procs
-    mesh_check=0
-    do nchunk=0, (mesh%nod2D-1)/chunk_size
+    !___________________________________________________________________________
+    ! cavity topography is defined on elements 
+    if (use_cavityonelem) then 
         !_______________________________________________________________________
-        !create the mapping for the current chunk
-        mapping(1:chunk_size)=0
-        do n=1, myDim_nod2D+eDim_nod2D
-            ! myList_nod2D(n) contains global vertice index of the local
-            ! vertice on that CPU
-            ! ipos is integer, (myList_nod2D(n)-1)/chunk_size always rounds 
-            ! off to integer values
-            ! --> ipos is an index to which chunk a global vertice on a local CPU 
-            !     belongs
-            ipos=(myList_nod2D(n)-1)/chunk_size
-            
-            ! if global vertice chunk index (ipos) lies within the actual chunk
-            if (ipos==nchunk) then
-                iofs=myList_nod2D(n)-nchunk*chunk_size
-                ! connect chunk reduced (iofs) global vertice index with local
-                ! vertice index n --> mapping(iofs)=n
-                mapping(iofs)=n
-            end if
-        end do
+        ! allocate mesh%depth at elements 
+        allocate(mesh%cavity_depth(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
         
         !_______________________________________________________________________
-        ! read the chunk piece into the buffer --> done only by one CPU (mype==0)
-        ! k ... is actual chunk size, considers also possible change in chunk size
-        !       at the end i.e nod2d=130000, nchunk_0 = 100000, nchunk_1=30000
-        k=min(chunk_size, mesh%nod2D-nchunk*chunk_size)
-        if (mype==0) then
-            do n=1, k
-                read(fileID,*) ibuff(n)
+        ! fill mesh%cavity_depth from file with neighborhood information 
+        mesh_check=0
+        do nchunk=0, (mesh%elem2D-1)/chunk_size
+            mapping(1:chunk_size)=0
+            do n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
+                ipos=(myList_elem2D(n)-1)/chunk_size
+                if (ipos==nchunk) then
+                    iofs=myList_elem2D(n)-nchunk*chunk_size
+                    mapping(iofs)=n
+                end if
             end do
+            
+            !___________________________________________________________________
+            ! read the chunk piece into the buffer --> done only by one 
+            ! CPU (mype==0)
+            k=min(chunk_size, mesh%elem2D-nchunk*chunk_size)
+            if (mype==0) then
+                do n=1, k
+                    read(fileID,*) rbuff(n)
+                end do
+            end if
+            
+            !___________________________________________________________________
+            ! broadcast chunk buffer to all other CPUs (k...size of buffer)
+            call MPI_BCast(rbuff(1:k), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+            
+            !___________________________________________________________________
+            ! fill the local arrays
+            do n=1, k      
+                if (mapping(n)>0) then
+                    mesh_check=mesh_check+1
+                    mesh%cavity_depth(mapping(n))=rbuff(n)
+                end if
+            end do
+        end do ! --> do nchunk=0, (mesh%elem2D-1)/chunk_size
+        
+        !_______________________________________________________________________
+        if (mype==0) close(fileID)
+        
+        !_______________________________________________________________________
+        if (mesh_check/=myDim_elem2D+eDim_elem2D+eXDim_elem2D) then
+            write(*,*)
+            print *, achar(27)//'[33m'
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: while reading cavity_depth.out on mype=', mype
+            write(*,*) '        ',mesh_check, ' values have been read in according to partitioning'
+            write(*,*) '        it does not equal to myDim_elem2D+eDim_elem2D+eXDim_elem2D = ', myDim_elem2D+eDim_elem2D+eXDim_elem2D
+            write(*,*) '____________________________________________________________________'
+            print *, achar(27)//'[0m'
         end if
         
+    !___________________________________________________________________________
+    ! cavity topography is defined on nodes 
+    else
         !_______________________________________________________________________
-        ! broadcast chunk buffer to all other CPUs (k...size of buffer)
-        call MPI_BCast(ibuff(1:k), k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+        ! allocate mesh%depth at nodes 
+        allocate(mesh%cavity_depth(myDim_nod2D+eDim_nod2D))
         
         !_______________________________________________________________________
-        ! fill the local arrays
-        do n=1, k      
-            if (mapping(n)>0) then
-                mesh_check=mesh_check+1
-                mesh%cavity_depth(mapping(n))=ibuff(n)
+        ! fill mesh%cavity_depth from file with neighborhood information 
+        ! 0 proc reads the data in chunks and distributes it between other procs
+        mesh_check=0
+        do nchunk=0, (mesh%nod2D-1)/chunk_size
+            !___________________________________________________________________
+            !create the mapping for the current chunk
+            mapping(1:chunk_size)=0
+            do n=1, myDim_nod2D+eDim_nod2D
+                ! myList_nod2D(n) contains global vertice index of the local
+                ! vertice on that CPU
+                ! ipos is integer, (myList_nod2D(n)-1)/chunk_size always rounds 
+                ! off to integer values
+                ! --> ipos is an index to which chunk a global vertice on a local CPU 
+                !     belongs
+                ipos=(myList_nod2D(n)-1)/chunk_size
+                
+                ! if global vertice chunk index (ipos) lies within the actual chunk
+                if (ipos==nchunk) then
+                    iofs=myList_nod2D(n)-nchunk*chunk_size
+                    ! connect chunk reduced (iofs) global vertice index with local
+                    ! vertice index n --> mapping(iofs)=n
+                    mapping(iofs)=n
+                end if
+            end do
+            
+            !_______________________________________________________________________
+            ! read the chunk piece into the buffer --> done only by one CPU (mype==0)
+            ! k ... is actual chunk size, considers also possible change in chunk size
+            !       at the end i.e nod2d=130000, nchunk_0 = 100000, nchunk_1=30000
+            k=min(chunk_size, mesh%nod2D-nchunk*chunk_size)
+            if (mype==0) then
+                do n=1, k
+                    read(fileID,*) rbuff(n)
+                end do
             end if
-        end do
-    end do ! --> do nchunk=0, (mesh%nod2D-1)/chunk_size
-    if (mype==0) close(fileID)
-    if (mesh_check/=myDim_nod2D+eDim_nod2D) then
-        write(*,*)
-        print *, achar(27)//'[33m'
-        write(*,*) '____________________________________________________________________'
-        write(*,*) ' ERROR: while reading cavity_depth.out on mype=', mype
-        write(*,*) '        ',mesh_check, ' values have been read in according to partitioning'
-        write(*,*) '        it does not equal to myDim_nod2D+eDim_nod2D = ', myDim_nod2D+eDim_nod2D
-        write(*,*) '____________________________________________________________________'
-        print *, achar(27)//'[0m'
-    end if
+            
+            !___________________________________________________________________
+            ! broadcast chunk buffer to all other CPUs (k...size of buffer)
+            call MPI_BCast(rbuff(1:k), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+            
+            !___________________________________________________________________
+            ! fill the local arrays
+            do n=1, k      
+                if (mapping(n)>0) then
+                    mesh_check=mesh_check+1
+                    mesh%cavity_depth(mapping(n))=rbuff(n)
+                end if
+            end do
+        end do ! --> do nchunk=0, (mesh%nod2D-1)/chunk_size
+        
+        !_______________________________________________________________________
+        if (mype==0) close(fileID)
+        
+        !_______________________________________________________________________
+        if (mesh_check/=myDim_nod2D+eDim_nod2D) then
+            write(*,*)
+            print *, achar(27)//'[33m'
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: while reading cavity_depth.out on mype=', mype
+            write(*,*) '        ',mesh_check, ' values have been read in according to partitioning'
+            write(*,*) '        it does not equal to myDim_nod2D+eDim_nod2D = ', myDim_nod2D+eDim_nod2D
+            write(*,*) '____________________________________________________________________'
+            print *, achar(27)//'[0m'
+        end if
+    end if ! --> if (use_cavityonelem) then 
     
     !___________________________________________________________________________
     ! deallocate mapping and buffer array
-    deallocate(ibuff)
+    deallocate(rbuff)
     deallocate(mapping)
 
     !___________________________________________________________________________
