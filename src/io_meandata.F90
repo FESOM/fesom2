@@ -568,9 +568,9 @@ function mesh_dimname_from_dimsize(size, partit, mesh) result(name)
   character(50) :: name
 
   if (size==mesh%nod2D) then
-    name='nnode'
+    name='nod2'
   elseif (size==mesh%elem2D) then
-    name='nface'
+    name='elem'
   elseif (size==mesh%nl) then
     name='nz'
   elseif (size==mesh%nl-1) then

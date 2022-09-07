@@ -67,9 +67,9 @@ implicit none
   ! https://tinyurl.com/43z4m6cd
   !
   ! Define the dimensions
-  call my_def_dim(ncid, 'nnode', nod2D,  nod_n_id,  partit)
-  call my_def_dim(ncid, 'nedge', edge2D, edge_n_id, partit)
-  call my_def_dim(ncid, 'nface', elem2D, elem_n_id, partit)
+  call my_def_dim(ncid, 'nod2', nod2D,  nod_n_id,  partit)
+  call my_def_dim(ncid, 'edg_n', edge2D, edge_n_id, partit)
+  call my_def_dim(ncid, 'elem', elem2D, elem_n_id, partit)
   call my_def_dim(ncid, 'nz',    nl,     nl_id,     partit)
   call my_def_dim(ncid, 'nz1',   nl-1,   nl1_id,    partit)
   call my_def_dim(ncid, 'n2',    2,      id_2,      partit)
