@@ -924,8 +924,8 @@ subroutine output(istep, mesh)
             if( nf_open(entry%filename, nf_write, entry%ncid) /= nf_noerr ) then
               call create_new_file(entry, mesh)
               call assert_nf( nf_open(entry%filename, nf_write, entry%ncid), __LINE__)
-              call assert_nf( nf_set_fill(entry%ncid, nf_nofill, old_mode), __LINE__)
             end if
+            call assert_nf( nf_set_fill(entry%ncid, nf_nofill, old_mode), __LINE__)
             call assoc_ids(entry)
           end if
 
