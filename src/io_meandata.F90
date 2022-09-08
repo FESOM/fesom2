@@ -605,12 +605,14 @@ subroutine create_new_file(entry, mesh)
   character(len=*), parameter :: global_attributes_prefix = "FESOM_"
   integer, allocatable :: output_levels(:)
   integer lvl, file_lvl
+  integer old_mode
   ! Serial output implemented so far
   if (mype/=entry%root_rank) return
   ! create an ocean output file
   write(*,*) 'initializing I/O file for ', trim(entry%name)
 
   call assert_nf( nf_create(entry%filename, IOR(NF_NOCLOBBER,IOR(NF_NETCDF4,NF_CLASSIC_MODEL)), entry%ncid), __LINE__)
+  call assert_nf( nf_set_fill(entry%ncid, nf_nofill, old_mode), __LINE__)
 
 !___Create mesh related dimensions__________________________________________
   if (entry%ndim==1) then
@@ -868,6 +870,7 @@ subroutine output(istep, mesh)
   type(t_mesh), intent(in) , target :: mesh
   character(:), allocatable :: filepath
   real(real64)                  :: rtime !timestamp of the record
+  integer old_mode
 
   ctime=timeold+(dayold-1.)*86400
   if (lfirst) then
@@ -921,6 +924,7 @@ subroutine output(istep, mesh)
             if( nf_open(entry%filename, nf_write, entry%ncid) /= nf_noerr ) then
               call create_new_file(entry, mesh)
               call assert_nf( nf_open(entry%filename, nf_write, entry%ncid), __LINE__)
+              call assert_nf( nf_set_fill(entry%ncid, nf_nofill, old_mode), __LINE__)
             end if
             call assoc_ids(entry)
           end if
