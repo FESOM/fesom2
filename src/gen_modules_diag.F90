@@ -27,7 +27,7 @@ module diagnostics
   real(kind=WP),  save, allocatable, target      :: curl_stress_surf(:)
   real(kind=WP),  save, allocatable, target      :: curl_vel3(:,:)
   real(kind=WP),  save, allocatable, target      :: wrhof(:,:), rhof(:,:)
-  real(kind=WP),  save, allocatable, target      :: u_x_u(:,:), u_x_v(:,:), v_x_v(:,:), v_x_w(:,:), u_x_w(:,:)
+  real(kind=WP),  save, allocatable, target      :: u_x_u(:,:), u_x_v(:,:), v_x_v(:,:), v_x_w(:,:), u_x_w(:,:), T_x_u(:,:), T_x_v(:,:), T_x_w(:,:), S_x_u(:,:), S_x_v(:,:), S_x_w(:,:)
   real(kind=WP),  save, allocatable, target      :: dudx(:,:), dudy(:,:), dvdx(:,:), dvdy(:,:), dudz(:,:), dvdz(:,:), av_dudz(:,:), av_dvdz(:,:), av_dudz_sq(:,:)
   real(kind=WP),  save, allocatable, target      :: utau_surf(:), utau_bott(:)
   real(kind=WP),  save, allocatable, target      :: stress_bott(:,:), u_bott(:), v_bott(:), u_surf(:), v_surf(:)
@@ -229,7 +229,7 @@ subroutine diag_energy(mode, mesh)
 !=====================
   if (firstcall) then  !allocate the stuff at the first call
      allocate(wrhof(nl, myDim_nod2D), rhof(nl, myDim_nod2D))
-     allocate(u_x_u(nl-1, myDim_nod2D), u_x_v(nl-1, myDim_nod2D), v_x_v(nl-1, myDim_nod2D), v_x_w(nl-1, myDim_elem2D), u_x_w(nl-1, myDim_elem2D), T_x_u(nl-1, myDim_nod2D), T_x_v(nl-1, myDim_nod2D), T_x_w(nl-1, myDim_elem2D), S_x_u(nl-1, myDim_nod2D), S_x_v(nl-1, myDim_nod2D), S_x_w(nl-1, myDim_elem2D))
+     allocate(u_x_u(nl-1, myDim_nod2D), u_x_v(nl-1, myDim_nod2D), v_x_v(nl-1, myDim_nod2D), v_x_w(nl, myDim_elem2D), u_x_w(nl, myDim_elem2D), T_x_u(nl-1, myDim_nod2D), T_x_v(nl-1, myDim_nod2D), T_x_w(nl, myDim_elem2D), S_x_u(nl-1, myDim_nod2D), S_x_v(nl-1, myDim_nod2D), S_x_w(nl, myDim_elem2D))
      allocate(dudx(nl-1, myDim_nod2D), dudy(nl-1, myDim_nod2D), dvdx(nl-1, myDim_nod2D), dvdy(nl-1, myDim_nod2D), dudz(nl, myDim_elem2D), dvdz(nl, myDim_elem2D))
      allocate(utau_surf(myDim_elem2D), utau_bott(myDim_elem2D), av_dudz_sq(nl, myDim_elem2D), av_dudz(nl, myDim_elem2D), av_dvdz(nl, myDim_elem2D))
      allocate(u_surf(myDim_elem2D), v_surf(myDim_elem2D), u_bott(myDim_elem2D), v_bott(myDim_elem2D), stress_bott(2, myDim_elem2D))
@@ -274,10 +274,10 @@ subroutine diag_energy(mode, mesh)
   u_x_u=Unode(1,1:nl-1,1:myDim_nod2D)*Unode(1,1:nl-1,1:myDim_nod2D)
   u_x_v=Unode(1,1:nl-1,1:myDim_nod2D)*Unode(2,1:nl-1,1:myDim_nod2D)
   v_x_v=Unode(2,1:nl-1,1:myDim_nod2D)*Unode(2,1:nl-1,1:myDim_nod2D)
-  T_x_u=Unode(1,1:nl-1,1:myDim_nod2D)*tracers...(1 for temperature, 2 for salinity)
-  T_x_v=
-  S_x_u=
-  S_x_v=
+  T_x_u=Unode(1,1:nl-1,1:myDim_nod2D)*tr_arr(1:nl-1,1:myDim_nod2D,1)
+  T_x_v=Unode(2,1:nl-1,1:myDim_nod2D)*tr_arr(1:nl-1,1:myDim_nod2D,1)
+  S_x_u=Unode(1,1:nl-1,1:myDim_nod2D)*tr_arr(1:nl-1,1:myDim_nod2D,2)
+  S_x_v=Unode(2,1:nl-1,1:myDim_nod2D)*tr_arr(1:nl-1,1:myDim_nod2D,2)
   ! this loop might be very expensive
   DO n=1, myDim_elem2D
      nzmax = nlevels(n)
@@ -367,7 +367,8 @@ subroutine diag_energy(mode, mesh)
      !!PS wrhof(1:nzmax, n) = rhof(1:nzmax, n)*Wvel(1:nzmax, n)
      zbar_n(nzmin)         = zbar_n(nzmin+1) + hnode_new(nzmin,n)
      wrhof(nzmin:nzmax, n) = rhof(nzmin:nzmax, n)*Wvel(nzmin:nzmax, n)
-     T_x_w .... = tracers .... * Wvel(nzmin:nzmax, n)
+     T_x_w(nzmin:nzmax, n) = tr_arr(nzmin:nzmax, n, 1) * Wvel(nzmin:nzmax, n)
+     S_x_w(nzmin:nzmax, n) = tr_arr(nzmin:nzmax, n, 2) * Wvel(nzmin:nzmax, n)
 
      !!PS DO nz=1, nzmax-1
      DO nz=nzmin, nzmax-1
