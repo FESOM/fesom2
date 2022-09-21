@@ -2346,9 +2346,12 @@ type(t_partit), intent(inout), target :: partit
     vol = 0.0_WP
     vol2= 0.0_WP
     do n=1, myDim_nod2D
-        vol2=vol2+mesh%area(mesh%ulevels_nod2D(n), n) ! area also under cavity
+!!PS         vol2=vol2+mesh%area(mesh%ulevels_nod2D(n), n) ! area also under cavity
+!!PS         if (mesh%ulevels_nod2D(n)>1) cycle
+!!PS         vol=vol+mesh%area(1, n) ! area only surface
+        vol2=vol2+mesh%areasvol(mesh%ulevels_nod2D(n), n) ! area also under cavity
         if (mesh%ulevels_nod2D(n)>1) cycle
-        vol=vol+mesh%area(1, n) ! area only surface  
+        vol=vol+mesh%areasvol(1, n) ! area only surface  
     end do
     mesh%ocean_area=0.0
     mesh%ocean_areawithcav=0.0
