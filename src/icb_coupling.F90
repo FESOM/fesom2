@@ -135,7 +135,7 @@ type(t_mesh), intent(in) , target :: mesh
 
     do n=1, myDim_nod2d+eDim_nod2D
         water_flux(n)   = water_flux(n) - (ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n)) * steps_per_ib_step
-        heat_flux(n)    = heat_flux(n)  - ibhf(n) * steps_per_ib_step
+        heat_flux(n)    = heat_flux(n)  - ibhf(n) * steps_per_ib_step !LA: reversed sign!!!
     end do
 !---wiso-code-begin
    if(lwiso) then

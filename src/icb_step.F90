@@ -320,7 +320,10 @@ integer :: istep_end_synced
  real				:: lon_deg_out, lat_deg_out  !for unrotated output
  integer   			:: i, iceberg_node  
  real 				:: dudt, dvdt
- 
+!! LA: add threshold for number of icebergs in one elemt
+ integer                        :: num_ib_in_elem, idx
+ real                           :: area_ib_tot
+
  !iceberg output 
  character 			:: ib_char*10
  character 			:: file_track*80
@@ -524,7 +527,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
     left_mype = 0.0 
     u_ib = 0.0
     v_ib = 0.0
-    !write(*,*) 'A DEBUG: draft_scale(ib): ',abs(draft_scale(ib)),', depth_ib: ',depth_ib,', Zdepth: ',Zdepth
+    !write(*,*) 'LA DEBUG: draft_scale(ib): ',abs(draft_scale(ib)),', depth_ib: ',depth_ib,', Zdepth: ',Zdepth
     old_lon = lon_rad
     old_lat = lat_rad
 
@@ -538,6 +541,11 @@ if( local_idx_of(iceberg_elem) > 0 ) then
  else 
   !===================...ELSE CALCULATE TRAJECTORY====================
 
+ !!###########################################
+ !! LA: prevent too many icebergs in one element
+ old_element = iceberg_elem !save if iceberg left model domain
+ !!###########################################
+ 
  t0=MPI_Wtime()
   call trajectory( lon_rad,lat_rad, u_ib,v_ib, new_u_ib,new_v_ib, &
 		   lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
@@ -571,11 +579,42 @@ if( local_idx_of(iceberg_elem) > 0 ) then
   !================END OF TRAJECTORY CALCULATION=====================
  end if ! iceberg stationary?
 
+  !###########################################
+  ! LA: prevent too many icebergs in one element
+  !num_ib_in_elem = count(elem_block==iceberg_elem)
+  
+  area_ib_tot = 0.0
+  call get_total_iceberg_area(mesh, iceberg_elem, area_ib_tot)
+  !do idx = 1, size(elem_block)
+  !    if (elem_block(idx) == iceberg_elem) then
+  !        area_ib_tot = area_ib_tot + length_ib(idx) * width_ib(idx)
+  !    end if
+  !end do
+
+  !if(num_ib_in_elem >= max_ib_in_elem) then
+  if((area_ib_tot > elem_area(local_idx_of(iceberg_elem))) .and. (iceberg_elem .ne. old_element) .and. (old_element .ne. 0)) then
+      !write(*,*) "LA DEBUG: area_ib_tot=",area_ib_tot,", elem_area=",elem_area(local_idx_of(iceberg_elem))
+      !write(*,*) "LA DEBUG: old_element=",old_element,", iceberg_elem=",iceberg_elem
+  !    write(*,*) "LA DEBUG: set iceberg to old position"
+      lon_rad = old_lon
+      lat_rad = old_lat 
+      lon_deg = lon_rad/rad
+      lat_deg = lat_rad/rad
+      iceberg_elem = old_element
+      u_ib    = 0.
+      v_ib    = 0.  
+  end if
+  !###########################################
+ 
+  !write(*,*) "LA DEBUG: write arr"
   !values for communication
   arr= (/ height_ib,length_ib,width_ib, u_ib,v_ib, lon_rad,lat_rad, &
           left_mype, old_lon,old_lat, frozen_in, dudt, dvdt, P_ib, conci_ib/) 
 
   !save in larger array	  
+  !write(*,*) "LA DEBUG: save in larger array"
+  !write(*,*) "LA DEBUG: ib = ", ib
+  !write(*,*) "LA DEBUG: size(arr_block) = ", size(arr_block)
   arr_block((ib-1)*15+1 : ib*15)=arr
   elem_block(ib)=iceberg_elem
   	  
@@ -615,6 +654,7 @@ type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
 
   area_ib_tot = 0.0
+  !write(*,*) "LA DEBUG: get size of elem_block=",size(elem_block)
   do idx = 1, size(elem_block)
       if (elem_block(idx) == iceberg_elem) then
           area_ib_tot = area_ib_tot + length_ib(idx) * width_ib(idx)
@@ -757,39 +797,42 @@ type(t_mesh), intent(in) , target :: mesh
 
  t2=MPI_Wtime()
 
-  !**** LA: check if iceberg changed element and new element is too full 
-  !if(local_idx_of(iceberg_elem) > 0 .and. iceberg_elem .ne. old_element) then !IB left model domain
-  if(iceberg_elem .ne. old_element) then
+  !!**** LA: check if iceberg changed element and new element is too full 
+  !!if(local_idx_of(iceberg_elem) > 0 .and. iceberg_elem .ne. old_element) then !IB left model domain
+  !if(iceberg_elem .ne. old_element) then
     if (firstcall) then
+      write(*,*) "LA DEBUG: firstcall = ", firstcall
       allocate(local_idx_of(elem2D))
       !creates mapping
       call global2local(mesh, local_idx_of, elem2D)
       firstcall=.false.
     end if 
-    num_ib_in_elem = count(elem_block==iceberg_elem)
-    area_ib_tot = 0.0
-    call get_total_iceberg_area(mesh, iceberg_elem, area_ib_tot)
-  
-    idx = local_idx_of(iceberg_elem)
-    local_elem_area = elem_area(idx)
-    if(area_ib_tot > local_elem_area) then
-           write(*,*) "LA DEBUG: local_idx_of(iceberg_elem)=",idx
-           write(*,*) "LA DEBUG: global idx of iceberg_elem=",iceberg_elem
-           write(*,*) "LA DEBUG: size(elem_area)=",size(elem_area)
-           write(*,*) "LA DEBUG: num_ib_in_elem=",num_ib_in_elem
-           write(*,*) "LA DEBUG: area_ib_tot=",area_ib_tot,", elem_area=",local_elem_area
-           write(*,*) "LA DEBUG: old_element=",old_element,", iceberg_elem=",iceberg_elem
-           write(*,*) "LA DEBUG: set iceberg ", ib, " to old position"
-           lon_rad = old_lon
-           lat_rad = old_lat 
-           lon_deg = lon_rad/rad
-           lat_deg = lat_rad/rad
-           iceberg_elem = old_element
-           u_ib    = 0.
-           v_ib    = 0.  
-    end if
-  end if
-  !**** LA: check if iceberg changed element and new element is too full 
+  !  num_ib_in_elem = count(elem_block==iceberg_elem)
+  !  area_ib_tot = 0.0
+  !  call get_total_iceberg_area(mesh, iceberg_elem, area_ib_tot)
+  !
+  !  idx = local_idx_of(iceberg_elem)
+  !  local_elem_area = elem_area(idx)
+  !  write(*,*) "LA DEBUG: local_elem_area = ",local_elem_area
+  !  write(*,*) "LA DEBUG: area_ib_tot = ", area_ib_tot
+  !  if(area_ib_tot > local_elem_area) then
+  !         write(*,*) "LA DEBUG: local_idx_of(iceberg_elem)=",idx
+  !         write(*,*) "LA DEBUG: global idx of iceberg_elem=",iceberg_elem
+  !         write(*,*) "LA DEBUG: size(elem_area)=",size(elem_area)
+  !         write(*,*) "LA DEBUG: num_ib_in_elem=",num_ib_in_elem
+  !         write(*,*) "LA DEBUG: area_ib_tot=",area_ib_tot,", elem_area=",local_elem_area
+  !         write(*,*) "LA DEBUG: old_element=",old_element,", iceberg_elem=",iceberg_elem
+  !         write(*,*) "LA DEBUG: set iceberg ", ib, " to old position"
+  !         lon_rad = old_lon
+  !         lat_rad = old_lat 
+  !         lon_deg = lon_rad/rad
+  !         lat_deg = lat_rad/rad
+  !         iceberg_elem = old_element
+  !         u_ib    = 0.
+  !         v_ib    = 0.  
+  !  end if
+  !end if
+  !!**** LA: check if iceberg changed element and new element is too full 
  
  if(left_mype > 0.) then
    call iceberg_elem4all(mesh, iceberg_elem, lon_deg, lat_deg) !Just PE changed?
@@ -803,6 +846,28 @@ type(t_mesh), intent(in) , target :: mesh
            v_ib    = 0.
    else
      if (mype==0) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
+     !call get_total_iceberg_area(mesh, myList_elem2D(iceberg_elem), area_ib_tot)
+     call get_total_iceberg_area(mesh, iceberg_elem, area_ib_tot)
+     !write(*,*) "LA DEBUG: FINISHED get_total_iceberg_area"
+     !write(*,*) "LA DEBUG: iceberg_elem = ", iceberg_elem
+     !write(*,*) "LA DEBUG: local_idx_of(iceberg_elem) = ", local_idx_of(iceberg_elem)
+     !write(*,*) "LA DEBUG: myList_elem2D(iceberg_elem) = ", myList_elem2D(iceberg_elem)
+     !write(*,*) "LA DEBUG: size(elem_area) = ", size(elem_area)
+     !write(*,*) "LA DEBUG: max(local_idx_of) = ", maxval(local_idx_of)
+     !write(*,*) "LA DEBUG: local_idx_of = ", local_idx_of
+     !write(*,*) "LA DEBUG: max(myList_elem2D) = ", maxval(myList_elem2D)
+     if(area_ib_tot > elem_area(local_idx_of(iceberg_elem))) then
+         !write(*,*) "LA DEBUG: area_ib_tot=",area_ib_tot,", elem_area=",elem_area(local_idx_of(iceberg_elem))
+         !write(*,*) "LA DEBUG: old_element=",old_element,", iceberg_elem=",iceberg_elem
+         write(*,*) "LA DEBUG: set iceberg to old position"
+         lon_rad = old_lon
+         lat_rad = old_lat 
+         lon_deg = lon_rad/rad
+         lat_deg = lat_rad/rad
+         iceberg_elem = old_element
+         u_ib    = 0.
+         v_ib    = 0.  
+     end if
    end if
  end if
  
@@ -1580,7 +1645,7 @@ subroutine init_buoy_output
   integer                   :: frozen_id, dudt_id, dvdt_id
   integer                   :: uib_id, vib_id
   integer                   :: height_id, length_id, width_id
-  integer                   :: bvl_id, lvlv_id, lvle_id, lvlb_id
+  integer                   :: bvl_id, lvlv_id, lvle_id, lvlb_id, felem_id
   character(100)            :: longname, att_text, description
 
  if (mype==0) then
@@ -1663,6 +1728,9 @@ subroutine init_buoy_output
   status = nf_def_var(ncid, 'lvlb', NF_DOUBLE, 2, dimids, lvlb_id)
   if (status .ne. nf_noerr) call handle_err(status)
 
+  ! LA: add felem
+  status = nf_def_var(ncid, 'felem', NF_DOUBLE, 2, dimids, felem_id)
+  if (status .ne. nf_noerr) call handle_err(status)
 
   ! Assign long_name and units attributes to variables.
   longname='time' ! use NetCDF Climate and Forecast (CF) Metadata Convention
@@ -1861,6 +1929,17 @@ subroutine init_buoy_output
   status = nf_PUT_ATT_TEXT(ncid, lvlb_id, 'Coordinates', 23, 'pos_lon_deg pos_lat_deg') ! arcGIS 
   if (status .ne. nf_noerr) call handle_err(status)
 
+  ! LA: add felem
+  longname='fesom element'
+  status = nf_PUT_ATT_TEXT(ncid, felem_id, 'long_name', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status)
+  status = nf_put_att_text(ncid, felem_id, 'units', 18, '')
+  if (status .ne. nf_noerr) call handle_err(status)
+  description=''
+  status = nf_put_att_text(ncid, felem_id, 'description', len_trim(description), trim(description)) 
+  if (status .ne. nf_noerr) call handle_err(status)
+  status = nf_PUT_ATT_TEXT(ncid, felem_id, 'Coordinates', 23, 'pos_lon_deg pos_lat_deg') ! arcGIS 
+  if (status .ne. nf_noerr) call handle_err(status)
 
   status = nf_enddef(ncid)
   if (status .ne. nf_noerr) call handle_err(status)
@@ -1910,7 +1989,7 @@ subroutine write_buoy_props_netcdf
   integer                   :: frozen_id, dudt_id, dvdt_id
   integer                   :: uib_id, vib_id  
   integer                   :: height_id, length_id, width_id
-  integer                   :: bvl_id, lvlv_id, lvle_id, lvlb_id
+  integer                   :: bvl_id, lvlv_id, lvle_id, lvlb_id, felem_id
   integer                   :: start(2), count(2)
   real(kind=8)              :: sec_in_year
 
@@ -1986,6 +2065,9 @@ subroutine write_buoy_props_netcdf
      status = nf_inq_varid(ncid, 'lvlb',  lvlb_id)
      if (status .ne. nf_noerr) call handle_err(status) 
 
+     ! * LA: include fesom elemt in output
+     status = nf_inq_varid(ncid, 'felem', felem_id)
+     if (status .ne. nf_noerr) call handle_err(status) 
 
      !buoy_props(ib, 1) = lon_rad_out
      !buoy_props(ib, 2) = lat_rad_out
@@ -2066,6 +2148,9 @@ subroutine write_buoy_props_netcdf
      status=nf_put_vara_double(ncid, lvlb_id, start, count, lvlb_mean(:)*step_per_day) 
      if (status .ne. nf_noerr) call handle_err(status)
 
+     ! LA: add felem
+     status=nf_put_vara_double(ncid, felem_id, start, count, buoy_props(:,13)) 
+     if (status .ne. nf_noerr) call handle_err(status)
 
      !close file
      status=nf_close(ncid)

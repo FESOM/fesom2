@@ -229,6 +229,7 @@ type(t_mesh),             target, save :: mesh
     call compute_diagnostics(0, mesh) ! allocate arrays for diagnostic
 
 !---fwf-code-begin
+  if (mype==0) write(*,*) 'use_landice_water=', use_landice_water
   if(use_landice_water) call landice_water_init(mesh)
 !---fwf-code-end
 
