@@ -1123,6 +1123,7 @@ subroutine find_levels_cavity(partit, mesh)
     ! Allocate mapping array (chunk_size) --> It will be used for several purposes 
     allocate(mapping(chunk_size))
     allocate(ibuff(chunk_size))
+    allocate(rbuff(chunk_size))
     
     !___________________________________________________________________________
     ! Part I: reading cavity levels at elements...
@@ -1392,7 +1393,7 @@ subroutine find_levels_cavity(partit, mesh)
             write(*,*)
             print *, achar(27)//'[33m'
             write(*,*) '____________________________________________________________________'
-            write(*,*) ' ERROR: could not find file: cavity_depth.out '
+            write(*,*) ' ERROR: could not find file:', file_name
             write(*,*) '        Wrong mesh path ? This file provides the necessary depth'
             write(*,*) '        information of the cavity.'
             write(*,*) '____________________________________________________________________'
