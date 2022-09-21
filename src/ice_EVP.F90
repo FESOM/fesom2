@@ -567,10 +567,32 @@ subroutine EVPdynamics(ice, partit, mesh)
             !___________________________________________________________________
             ! apply sea ice velocity boundary conditions at cavity-ocean edge
             if (use_cavity) then 
-                if ( (ulevels(edge_tri(1,ed))>1) .or. &
-                    ( edge_tri(2,ed)>0 .and. ulevels(edge_tri(2,ed))>1) ) then
+!                 if ( (ulevels(edge_tri(1,ed))>1) .or. &
+!                     ( edge_tri(2,ed)>0 .and. ulevels(edge_tri(2,ed))>1) ) then
+! #if defined(_OPENMP)  && !defined(__openmp_reproducible)
+!                     call omp_set_lock  (partit%plock(edges(1,ed)))
+! #else
+! !$OMP ORDERED
+! #endif
+!                     U_ice(edges(1,ed))=0.0_WP
+!                     V_ice(edges(1,ed))=0.0_WP
+! 
+! #if defined(_OPENMP) && !defined(__openmp_reproducible)
+!                     call omp_unset_lock(partit%plock(edges(1,ed)))
+!                     call omp_set_lock  (partit%plock(edges(2,ed)))
+! #endif
+!                     U_ice(edges(2,ed))=0.0_WP
+!                     V_ice(edges(2,ed))=0.0_WP
+! 
+! #if defined(_OPENMP)  && !defined(__openmp_reproducible)
+!                     call omp_unset_lock(partit%plock(edges(2,ed)))
+! #else
+! !$OMP END ORDERED
+! #endif
+!                 end if
+                if (ulevels(edge_tri(1,ed))>1) then
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_set_lock  (partit%plock(edges(1,ed)))
+                    call omp_set_lock  (partit%plock(edges(1,ed)))
 #else
 !$OMP ORDERED
 #endif
@@ -578,17 +600,41 @@ subroutine EVPdynamics(ice, partit, mesh)
                     V_ice(edges(1,ed))=0.0_WP
 
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(edges(1,ed)))
-        call omp_set_lock  (partit%plock(edges(2,ed)))
+                    call omp_unset_lock(partit%plock(edges(1,ed)))
+                    call omp_set_lock  (partit%plock(edges(2,ed)))
 #endif
                     U_ice(edges(2,ed))=0.0_WP
                     V_ice(edges(2,ed))=0.0_WP
 
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(edges(2,ed)))
+                    call omp_unset_lock(partit%plock(edges(2,ed)))
 #else
 !$OMP END ORDERED
 #endif
+                elseif ( edge_tri(2,ed)>0) then 
+                    if (ulevels(edge_tri(2,ed))>1) then
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+                    call omp_set_lock  (partit%plock(edges(1,ed)))
+#else
+!$OMP ORDERED
+#endif
+                    U_ice(edges(1,ed))=0.0_WP
+                    V_ice(edges(1,ed))=0.0_WP
+
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+                    call omp_unset_lock(partit%plock(edges(1,ed)))
+                    call omp_set_lock  (partit%plock(edges(2,ed)))
+#endif
+                    U_ice(edges(2,ed))=0.0_WP
+                    V_ice(edges(2,ed))=0.0_WP
+
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+                    call omp_unset_lock(partit%plock(edges(2,ed)))
+#else
+!$OMP END ORDERED
+#endif                    
+                    
+                    end if 
                 end if 
             end if 
         end do
