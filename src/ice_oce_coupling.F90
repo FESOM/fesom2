@@ -422,6 +422,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         ! integrate salt flux in the cavity(outside cavity virtual_salt is 0.0)
         flux = virtual_salt
         call integrate_nod(flux, net, partit, mesh)
+        if (mype==0) write(*,*) ' >-))))°> net cavity virtual_salt:', net
         
         ! counter balance the integrated cavity salt flux only in the open ocean 
         ! --> ensure global salt conservation !!!
@@ -430,7 +431,12 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
             if (ulevels_nod2d(n) /= 1) cycle 
             virtual_salt(n)=virtual_salt(n)-net/ocean_area
         end do
-!$OMP END PARALLEL DO        
+!$OMP END PARALLEL DO
+
+        flux = virtual_salt
+        call integrate_nod(flux, net, partit, mesh)
+        if (mype==0) write(*,*) ' >-))))°> net global virtual_salt:', net
+        
     end if
 
     !___________________________________________________________________________
