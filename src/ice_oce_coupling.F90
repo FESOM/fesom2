@@ -426,8 +426,8 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         
         ! counter balance the integrated cavity salt flux only in the open ocean 
         ! --> ensure global salt conservation !!!
-!$OMP PARALLEL DO         
         net = net/ocean_area
+!$OMP PARALLEL DO         
         do n=1, myDim_nod2D+eDim_nod2D
             if (ulevels_nod2d(n) /= 1) cycle 
             virtual_salt(n)=virtual_salt(n)-net
