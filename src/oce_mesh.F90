@@ -2353,8 +2353,8 @@ type(t_partit), intent(inout), target :: partit
         if (mesh%ulevels_nod2D(n)>1) cycle
         vol=vol+mesh%areasvol(1, n) ! area only surface  
     end do
-    mesh%ocean_area=0.0
-    mesh%ocean_areawithcav=0.0
+    mesh%ocean_area=0.0_WP
+    mesh%ocean_areawithcav=0.0_WP
     call MPI_AllREDUCE(vol, mesh%ocean_area, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
         MPI_COMM_FESOM, MPIerr)
     call MPI_AllREDUCE(vol2, mesh%ocean_areawithcav, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
@@ -2370,7 +2370,7 @@ type(t_partit), intent(inout), target :: partit
         write(*,*)  mype, 'Edges:    ', mesh%edge2D, ' internal ', mesh%edge2D_in
         if (mype==0) then
             write(*,*) '     > Total ocean surface area is           : ', mesh%ocean_area, ' m^2'
-            write(*,*) '     > Total ocean surface area wth cavity is: ', mesh%ocean_areawithcav, ' m^2'
+            write(*,*) '     > Total ocean surface area with cavity is: ', mesh%ocean_areawithcav, ' m^2'
         end if
     endif
 
