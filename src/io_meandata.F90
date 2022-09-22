@@ -1008,6 +1008,32 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   logical, optional, intent(in)        :: flip_array
   integer i
   integer lvl
+  integer full_lvl_count ! i.e. nz or nz1
+  
+  full_lvl_count = glsize(1)
+  call def_stream3D_lvl_limit(glsize, full_lvl_count, lcsize, name, description, units, data, freq, freq_unit, accuracy, mesh, flip_array)
+end subroutine
+
+
+! additional way to add 3D output, here we can limit the number of levels
+! the additional parameter full_lvl_count specifies the original max depth for this variable (i.e. nz or nz1)
+subroutine def_stream3D_lvl_limit(glsize, full_lvl_count, lcsize, name, description, units, data, freq, freq_unit, accuracy, mesh, flip_array)
+  use mod_mesh
+  use g_PARSUP
+  implicit none
+  integer,               intent(in)    :: glsize(2), lcsize(2)
+  character(len=*),      intent(in)    :: name, description, units
+  real(kind=WP), target, intent(inout) :: data(:,:)
+  integer,               intent(in)    :: freq
+  character,             intent(in)    :: freq_unit
+  integer,               intent(in)    :: accuracy
+  type(Meandata),        allocatable   :: tmparr(:)
+  type(Meandata),        pointer       :: entry
+  type(t_mesh), intent(in), target     :: mesh
+  logical, optional, intent(in)        :: flip_array
+  integer i
+  integer lvl
+  integer full_lvl_count ! i.e. nz or nz1
   
   do i = 1, rank(data)
     if ((ubound(data, dim = i)<=0)) then
@@ -1018,6 +1044,12 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
       return
     end if    
   end do
+  
+  ! make sure the number of the given local and global levels match the number of levels in the data
+  call assert(size(data,dim=1) == glsize(1), __LINE__)
+  call assert(size(data,dim=1) == lcsize(1), __LINE__)
+  ! the number of levels in the data might be reduced, see that it is not more than the full_lvl_count, i.e. nz or nz1 
+  call assert(glsize(1) <= full_lvl_count, __LINE__)
 
   if (mype==0) then
      write(*,*) 'adding I/O stream 3D for ', trim(name)
@@ -1054,7 +1086,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
     entry%local_values_r4 = 0._real32
   end if
 
-  entry%dimname(1)=mesh_dimname_from_dimsize(glsize(1), mesh)     !2D! mesh_dimname_from_dimsize(glsize, mesh)
+  entry%dimname(1)=mesh_dimname_from_dimsize(full_lvl_count, mesh)     !2D! mesh_dimname_from_dimsize(glsize, mesh)
   entry%dimname(2)=mesh_dimname_from_dimsize(glsize(2), mesh)     !2D! entry%dimname(2)='unknown'
 
   ! non dimension specific
