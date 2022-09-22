@@ -123,7 +123,11 @@ implicit none
   ! nodal areas
   allocate(rbuffer(nod2D))
   do k=1, nl
-!      call gather_nod(area(k, :), rbuffer, partit)
+     ! area     ...area of prism top face
+     ! areasvol ...area of scalar volume cell
+     ! better write areasvol to meshdiag, without cavity area==areasvol but with 
+     ! cavity area!=areasvol, at least where is cavity
+     !!PS      call gather_nod(area(k, :), rbuffer, partit)
      call gather_nod(areasvol(k, :), rbuffer, partit)
      call my_put_vara(ncid, nod_area_id, (/1, k/), (/nod2D, 1/), rbuffer, partit)
   end do
