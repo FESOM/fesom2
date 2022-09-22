@@ -13,6 +13,8 @@ module io_MEANDATA
 !--------------------------------------------------------------------------------------------
 !
   integer, parameter  :: i_real8=8, i_real4=4
+  integer, parameter :: lvl_limit = 31
+  character(4), parameter :: lvl_limit_name = "1-31"
 
   type Meandata
     private
@@ -294,8 +296,12 @@ CASE ('fer_C     ')
 !___________________________________________________________________________________________________________________________________
 CASE ('temp      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp',      'temperature', 'C',      tr_arr(:,:,1),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('temp'//lvl_limit_name//'  ')
+    call def_stream3D_lvl_limit((/lvl_limit, nod2D/), nl-1,  (/lvl_limit, myDim_nod2D/),  'temp'//lvl_limit_name,      'temperature', 'C',      tr_arr(1:lvl_limit,:,1),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('salt      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt',      'salinity',    'psu',    tr_arr(:,:,2),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('salt'//lvl_limit_name//'  ')
+    call def_stream3D_lvl_limit((/lvl_limit, nod2D/), nl-1,  (/lvl_limit, myDim_nod2D/),  'salt'//lvl_limit_name,      'salinity',    'psu',    tr_arr(1:lvl_limit,:,2),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('otracers  ')
     do j=3, num_tracers
     write (id_string, "(I3.3)") tracer_id(j)
@@ -313,10 +319,16 @@ CASE ('Kv        ')
     call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'Kv',        'vertical diffusivity Kv',  'm2/s', Kv(:,:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('u         ')
     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u',         'horizontal velocity','m/s',  uv(1,:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('u'//lvl_limit_name//'     ')
+    call def_stream3D_lvl_limit((/lvl_limit, elem2D/), nl-1, (/lvl_limit, myDim_elem2D/), 'u'//lvl_limit_name,         'horizontal velocity','m/s',  uv(1,1:lvl_limit,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('v         ')
     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v',         'meridional velocity','m/s',  uv(2,:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('v'//lvl_limit_name//'     ')
+    call def_stream3D_lvl_limit((/lvl_limit, elem2D/), nl-1, (/lvl_limit, myDim_elem2D/), 'v'//lvl_limit_name,         'meridional velocity','m/s',  uv(2,1:lvl_limit,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('w         ')
     call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'w',         'vertical velocity',  'm/s',  Wvel(:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('w'//lvl_limit_name//'     ')
+    call def_stream3D_lvl_limit((/lvl_limit,    nod2D/), nl, (/lvl_limit,   myDim_nod2D/),  'w'//lvl_limit_name,         'vertical velocity',  'm/s',  Wvel(1:lvl_limit,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('Av        ')
     call def_stream((/nl,   elem2D/), (/nl,   myDim_elem2D/), 'Av',        'vertical viscosity Av',  'm2/s', Av(:,:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('u_dis_tend')
