@@ -17,7 +17,7 @@ module diagnostics
 !!PS   
   public :: ldiag_solver, lcurt_stress_surf, ldiag_energy, ldiag_dMOC, ldiag_DVD, ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, &
             compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, wrhof, rhof, &
-            u_x_u, u_x_v, v_x_v, v_x_w, u_x_w, dudx, dudy, dvdx, dvdy, dudz, dvdz, utau_surf, utau_bott, av_dudz_sq, av_dudz, av_dvdz, stress_bott, u_surf, v_surf, u_bott, v_bott, &
+            u_x_u, u_x_v, v_x_v, v_x_w, u_x_w, T_x_u, T_x_v, T_x_w, S_x_u, S_x_v, S_x_w, dudx, dudy, dvdx, dvdy, dudz, dvdz, utau_surf, utau_bott, av_dudz_sq, av_dudz, av_dvdz, stress_bott, u_surf, v_surf, u_bott, v_bott, &
             std_dens_min, std_dens_max, std_dens_N, std_dens, std_dens_UVDZ, std_dens_DIV, std_dens_Z, std_dens_dVdT, std_dens_flux, dens_flux, &
             compute_diag_dvd_2ndmoment_klingbeil_etal_2014, compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd
   ! Arrays used for diagnostics, some shall be accessible to the I/O
@@ -27,11 +27,11 @@ module diagnostics
   real(kind=WP),  save, allocatable, target      :: curl_stress_surf(:)
   real(kind=WP),  save, allocatable, target      :: curl_vel3(:,:)
   real(kind=WP),  save, allocatable, target      :: wrhof(:,:), rhof(:,:)
-  real(kind=WP),  save, allocatable, target      :: u_x_u(:,:), u_x_v(:,:), v_x_v(:,:), v_x_w(:,:), u_x_w(:,:)
+  real(kind=WP),  save, allocatable, target      :: u_x_u(:,:), u_x_v(:,:), v_x_v(:,:), v_x_w(:,:), u_x_w(:,:), T_x_u(:,:), T_x_v(:,:), T_x_w(:,:), S_x_u(:,:), S_x_v(:,:), S_x_w(:,:)
   real(kind=WP),  save, allocatable, target      :: dudx(:,:), dudy(:,:), dvdx(:,:), dvdy(:,:), dudz(:,:), dvdz(:,:), av_dudz(:,:), av_dvdz(:,:), av_dudz_sq(:,:)
   real(kind=WP),  save, allocatable, target      :: utau_surf(:), utau_bott(:)
   real(kind=WP),  save, allocatable, target      :: stress_bott(:,:), u_bott(:), v_bott(:), u_surf(:), v_surf(:)
-
+  real(kind=WP),  allocatable  :: aux1(:), aux2(:)
 ! defining a set of standard density bins which will be used for computing densMOC
 ! integer,        parameter                      :: std_dens_N  = 100
 ! real(kind=WP),  save, target                   :: std_dens(std_dens_N)
@@ -229,10 +229,11 @@ subroutine diag_energy(mode, mesh)
 !=====================
   if (firstcall) then  !allocate the stuff at the first call
      allocate(wrhof(nl, myDim_nod2D), rhof(nl, myDim_nod2D))
-     allocate(u_x_u(nl-1, myDim_nod2D), u_x_v(nl-1, myDim_nod2D), v_x_v(nl-1, myDim_nod2D), v_x_w(nl-1, myDim_elem2D), u_x_w(nl-1, myDim_elem2D))
+     allocate(u_x_u(nl-1, myDim_nod2D), u_x_v(nl-1, myDim_nod2D), v_x_v(nl-1, myDim_nod2D), v_x_w(nl-1, myDim_elem2D), u_x_w(nl-1, myDim_elem2D), T_x_u(nl-1, myDim_nod2D), T_x_v(nl-1, myDim_nod2D), T_x_w(nl, myDim_nod2D), S_x_u(nl-1, myDim_nod2D), S_x_v(nl-1, myDim_nod2D), S_x_w(nl, myDim_nod2D))
      allocate(dudx(nl-1, myDim_nod2D), dudy(nl-1, myDim_nod2D), dvdx(nl-1, myDim_nod2D), dvdy(nl-1, myDim_nod2D), dudz(nl, myDim_elem2D), dvdz(nl, myDim_elem2D))
      allocate(utau_surf(myDim_elem2D), utau_bott(myDim_elem2D), av_dudz_sq(nl, myDim_elem2D), av_dudz(nl, myDim_elem2D), av_dvdz(nl, myDim_elem2D))
      allocate(u_surf(myDim_elem2D), v_surf(myDim_elem2D), u_bott(myDim_elem2D), v_bott(myDim_elem2D), stress_bott(2, myDim_elem2D))
+     allocate(aux1(nl),aux2(nl))
      rhof  =0.
      wrhof=0.
      u_x_u=0.
@@ -240,6 +241,12 @@ subroutine diag_energy(mode, mesh)
      v_x_v=0.
      u_x_w=0.
      v_x_w=0.
+     T_x_u=0.
+     T_x_v=0.
+     T_x_w=0.
+     S_x_u=0.
+     S_x_v=0.
+     S_x_w=0.
      dudx=0.
      dudy=0.
      dvdx=0.
@@ -268,6 +275,11 @@ subroutine diag_energy(mode, mesh)
   u_x_u=Unode(1,1:nl-1,1:myDim_nod2D)*Unode(1,1:nl-1,1:myDim_nod2D)
   u_x_v=Unode(1,1:nl-1,1:myDim_nod2D)*Unode(2,1:nl-1,1:myDim_nod2D)
   v_x_v=Unode(2,1:nl-1,1:myDim_nod2D)*Unode(2,1:nl-1,1:myDim_nod2D)
+  T_x_u=Unode(1,1:nl-1,1:myDim_nod2D)*tr_arr(1:nl-1,1:myDim_nod2D,1)
+  T_x_v=Unode(2,1:nl-1,1:myDim_nod2D)*tr_arr(1:nl-1,1:myDim_nod2D,1)
+  S_x_u=Unode(1,1:nl-1,1:myDim_nod2D)*tr_arr(1:nl-1,1:myDim_nod2D,2)
+  S_x_v=Unode(2,1:nl-1,1:myDim_nod2D)*tr_arr(1:nl-1,1:myDim_nod2D,2)
+
   ! this loop might be very expensive
   DO n=1, myDim_elem2D
      nzmax = nlevels(n)
@@ -346,17 +358,26 @@ subroutine diag_energy(mode, mesh)
      !!PS rhof(1,n)     =density_m_rho0(1, n)
      rhof(nzmin,n)     =density_m_rho0(nzmin, n)
 
+     aux1(nzmin)= tr_arr(nzmin, n, 1)
+     aux1(nzmax)= tr_arr(nzmax-1, n, 1)
+     aux2(nzmin)= tr_arr(nzmin, n, 2)
+     aux2(nzmax)= tr_arr(nzmax-1, n, 2)
+
      Z_n(nzmax-1) =zbar_n(nzmax)  + hnode_new(nzmax-1,n)/2.0_WP
      !!PS do nz=nzmax-1,2,-1
      do nz=nzmax-1,nzmin+1,-1
         zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
         Z_n(nz-1)  = zbar_n(nz)   + hnode_new(nz-1,n)/2.0_WP
         rhof(nz,n) = (hnode_new(nz,n)*density_m_rho0(nz, n)+hnode_new(nz-1,n)*density_m_rho0(nz-1, n))/(hnode_new(nz,n)+hnode_new(nz-1,n))
+        aux1(nz,n) = (hnode_new(nz-1,n)* tr_arr(nz, n, 1)+hnode_new(nz,n)*tr_arr(nz-1, n,1))/(hnode_new(nz,n)+hnode_new(nz-1,n))
+        aux2(nz,n) = (hnode_new(nz-1,n)* tr_arr(nz, n, 2)+hnode_new(nz,n)*tr_arr(nz-1, n,2))/(hnode_new(nz,n)+hnode_new(nz-1,n))
      end do
      !!PS zbar_n(1)         = zbar_n(2) + hnode_new(1,n)
      !!PS wrhof(1:nzmax, n) = rhof(1:nzmax, n)*Wvel(1:nzmax, n)
      zbar_n(nzmin)         = zbar_n(nzmin+1) + hnode_new(nzmin,n)
      wrhof(nzmin:nzmax, n) = rhof(nzmin:nzmax, n)*Wvel(nzmin:nzmax, n)
+     T_x_w(nzmin:nzmax, n) = aux1(nzmin:nzmax) * Wvel(nzmin:nzmax, n)
+     S_x_w(nzmin:nzmax, n) = aux2(nzmin:nzmax) * Wvel(nzmin:nzmax, n)
 
      !!PS DO nz=1, nzmax-1
      DO nz=nzmin, nzmax-1
@@ -381,6 +402,7 @@ subroutine diag_energy(mode, mesh)
         dvdy(nz,n)=vy/tvol
      END DO
   END DO
+  deallocate(aux1,aux2)
 end subroutine diag_energy
 ! ==============================================================
 subroutine diag_densMOC(mode, mesh)
