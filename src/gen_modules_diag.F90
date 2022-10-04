@@ -369,8 +369,8 @@ subroutine diag_energy(mode, mesh)
         zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
         Z_n(nz-1)  = zbar_n(nz)   + hnode_new(nz-1,n)/2.0_WP
         rhof(nz,n) = (hnode_new(nz,n)*density_m_rho0(nz, n)+hnode_new(nz-1,n)*density_m_rho0(nz-1, n))/(hnode_new(nz,n)+hnode_new(nz-1,n))
-        aux1(nz,n) = (hnode_new(nz-1,n)* tr_arr(nz, n, 1)+hnode_new(nz,n)*tr_arr(nz-1, n,1))/(hnode_new(nz,n)+hnode_new(nz-1,n))
-        aux2(nz,n) = (hnode_new(nz-1,n)* tr_arr(nz, n, 2)+hnode_new(nz,n)*tr_arr(nz-1, n,2))/(hnode_new(nz,n)+hnode_new(nz-1,n))
+        aux1(nz) = (hnode_new(nz-1,n)* tr_arr(nz, n, 1)+hnode_new(nz,n)*tr_arr(nz-1, n,1))/(hnode_new(nz,n)+hnode_new(nz-1,n))
+        aux2(nz) = (hnode_new(nz-1,n)* tr_arr(nz, n, 2)+hnode_new(nz,n)*tr_arr(nz-1, n,2))/(hnode_new(nz,n)+hnode_new(nz-1,n))
      end do
      !!PS zbar_n(1)         = zbar_n(2) + hnode_new(1,n)
      !!PS wrhof(1:nzmax, n) = rhof(1:nzmax, n)*Wvel(1:nzmax, n)
