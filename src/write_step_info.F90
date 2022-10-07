@@ -56,12 +56,11 @@ subroutine write_step_info(istep,outfreq, mesh)
 		loc       =0.
 		!_______________________________________________________________________
 		do n=1, myDim_nod2D
-!!PS             if (ulevels_nod2D(n)>1) cycle
-			loc_eta   = loc_eta   + areasvol(ulevels_nod2D(n), n)*eta_n(n)
-			loc_hbar  = loc_hbar  + areasvol(ulevels_nod2D(n), n)*hbar(n)
-			loc_deta  = loc_deta  + areasvol(ulevels_nod2D(n), n)*d_eta(n)
-			loc_dhbar = loc_dhbar + areasvol(ulevels_nod2D(n), n)*(hbar(n)-hbar_old(n))
-			loc_wflux = loc_wflux + areasvol(ulevels_nod2D(n), n)*water_flux(n)
+			loc_eta   = loc_eta   + area(1, n)*eta_n(n)
+			loc_hbar  = loc_hbar  + area(1, n)*hbar(n)
+			loc_deta  = loc_deta  + area(1, n)*d_eta(n)
+			loc_dhbar = loc_dhbar + area(1, n)*(hbar(n)-hbar_old(n))
+			loc_wflux = loc_wflux + area(1, n)*water_flux(n)
 !!PS 			loc_hflux = loc_hflux + area(1, n)*heat_flux(n)
 !!PS 			loc_temp  = loc_temp  + area(1, n)*sum(tr_arr(:,n,1))/(nlevels_nod2D(n)-1)
 !!PS 			loc_salt  = loc_salt  + area(1, n)*sum(tr_arr(:,n,2))/(nlevels_nod2D(n)-1)
@@ -76,19 +75,11 @@ subroutine write_step_info(istep,outfreq, mesh)
 !!PS 		call MPI_AllREDUCE(loc_hflux, int_hflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 !!PS 		call MPI_AllREDUCE(loc_temp , int_temp , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 !!PS 		call MPI_AllREDUCE(loc_salt , int_salt , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-! 
-!!PS  		int_eta  = int_eta  /ocean_area
-!!PS  		int_hbar = int_hbar /ocean_area
-!!PS  		int_deta = int_deta /ocean_area
-!!PS  		int_dhbar= int_dhbar/ocean_area
-!!PS  		int_wflux= int_wflux/ocean_area
-		
- 		int_eta  = int_eta  /ocean_areawithcav
- 		int_hbar = int_hbar /ocean_areawithcav
- 		int_deta = int_deta /ocean_areawithcav
- 		int_dhbar= int_dhbar/ocean_areawithcav
- 		int_wflux= int_wflux/ocean_areawithcav
-		
+		int_eta  = int_eta  /ocean_area
+		int_hbar = int_hbar /ocean_area
+		int_deta = int_deta /ocean_area
+		int_dhbar= int_dhbar/ocean_area
+		int_wflux= int_wflux/ocean_area
 !!PS 		int_hflux= int_hflux/ocean_area
 !!PS 		int_temp = int_temp /ocean_area
 !!PS 		int_salt = int_salt /ocean_area
@@ -246,8 +237,7 @@ subroutine check_blowup(istep, mesh)
 			!___________________________________________________________________
 			! check ssh
 			if ( ((eta_n(n) /= eta_n(n)) .or. &
-				eta_n(n)<-50.0 .or. eta_n(n)>50.0 .or. &
-				(d_eta(n) /= d_eta(n)) ) ) then
+				eta_n(n)<-50.0 .or. eta_n(n)>50.0)) then
 !!PS 				eta_n(n)<-10.0 .or. eta_n(n)>10.0)) then
 				found_blowup_loc=1
 				write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
@@ -278,50 +268,48 @@ subroutine check_blowup(istep, mesh)
 				write(*,*)
 				write(*,*) 'm_ice = ',m_ice(n),', m_ice_old = ',m_ice_old(n)
 				write(*,*) 'a_ice = ',a_ice(n),', a_ice_old = ',a_ice_old(n)
-!!PS 				write(*,*) 'thdgr = ',thdgr(n),', thdgr_old = ',thdgr_old(n)
-!!PS 				write(*,*) 'thdgrsn = ',thdgrsn(n)
+				write(*,*) 'thdgr = ',thdgr(n),', thdgr_old = ',thdgr_old(n)
+				write(*,*) 'thdgrsn = ',thdgrsn(n)
 				write(*,*)
-!!PS 				if (lcurt_stress_surf) then
-!!PS                     write(*,*) 'curl_stress_surf = ',curl_stress_surf(n)
-!!PS                     write(*,*)
-!!PS 				endif 
-!!PS  				do el=1,nod_in_elem2d_num(n)
-!!PS  					elidx = nod_in_elem2D(el,n)
-!!PS  					write(*,*) ' elem#=',el,', elemidx=',elidx
-!!PS  					write(*,*) ' 	 pgf_x =',pgf_x(:,elidx)
-!!PS  					write(*,*) ' 	 pgf_y =',pgf_y(:,elidx)
-!!PS ! 					write(*,*) ' 	     U =',UV(1,:,elidx)
-!!PS ! 					write(*,*) ' 	     V =',UV(2,:,elidx)
-!!PS                     write(*,*)
-!!PS  				enddo
-!!PS 				write(*,*) 'Wvel(1, n)  = ',Wvel(,n)
-				write(*,*) 'Wvel(:, n)  = ',Wvel(ulevels_nod2D(n):nlevels_nod2D(n),n)
+				if (lcurt_stress_surf) then
+                    write(*,*) 'curl_stress_surf = ',curl_stress_surf(n)
+                    write(*,*)
+				endif 
+ 				do el=1,nod_in_elem2d_num(n)
+ 					elidx = nod_in_elem2D(el,n)
+ 					write(*,*) ' elem#=',el,', elemidx=',elidx
+ 					write(*,*) ' 	 pgf_x =',pgf_x(:,elidx)
+ 					write(*,*) ' 	 pgf_y =',pgf_y(:,elidx)
+! 					write(*,*) ' 	     U =',UV(1,:,elidx)
+! 					write(*,*) ' 	     V =',UV(2,:,elidx)
+                    write(*,*)
+ 				enddo
+				write(*,*) 'Wvel(1, n)  = ',Wvel(1,n)
+				write(*,*) 'Wvel(:, n)  = ',Wvel(:,n)
 				write(*,*)
-				write(*,*) 'CFL_z(:,n)  = ',CFL_z(ulevels_nod2D(n):nlevels_nod2D(n),n)
+				write(*,*) 'CFL_z(:,n)  = ',CFL_z(:,n)
 				write(*,*)
-!!PS 				write(*,*) 'hnode(1, n)  = ',hnode(1,n)
-				write(*,*) 'hnode(:, n)  = ',hnode(ulevels_nod2D(n):nlevels_nod2D(n),n)
+				write(*,*) 'hnode(1, n)  = ',hnode(1,n)
+				write(*,*) 'hnode(:, n)  = ',hnode(:,n)
 				write(*,*)
-				
-            endif
+			endif
 			
 			!___________________________________________________________________
 			! check surface vertical velocity --> in case of zlevel and zstar 
 			! vertical coordinate its indicator if Volume is conserved  for 
 			! Wvel(1,n)~maschine preccision
-!!PS 			if ( .not. trim(which_ALE)=='linfs' .and. ( Wvel(1, n) /= Wvel(1, n)  .or. abs(Wvel(1,n))>1e-12 )) then
-			if ( .not. trim(which_ALE)=='linfs' .and. ( Wvel(1, n) /= Wvel(1, n)  )) then
+			if ( .not. trim(which_ALE)=='linfs' .and. ( Wvel(1, n) /= Wvel(1, n)  .or. abs(Wvel(1,n))>1e-12 )) then
 				found_blowup_loc=1
 				write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
 				write(*,*) ' --STOP--> found surface layer vertical velocity becomes NaN or >1e-12'
 				write(*,*) 'mype        = ',mype
 				write(*,*) 'mstep       = ',istep
 				write(*,*) 'node        = ',n
-				write(*,*) 'uln, nln    = ',ulevels_nod2D(n), nlevels_nod2D(n)
-				write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,n)/rad
 				write(*,*)
 				write(*,*) 'Wvel(1, n)  = ',Wvel(1,n)
 				write(*,*) 'Wvel(:, n)  = ',Wvel(:,n)
+				write(*,*)
+				write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,n)/rad
 				write(*,*)
 				write(*,*) 'hnode(1, n) = ',hnode(1,n)
 				write(*,*) 'hnode(:, n) = ',hnode(:,n)

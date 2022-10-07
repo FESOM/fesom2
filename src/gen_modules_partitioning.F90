@@ -12,6 +12,13 @@ save
 #endif
 
  integer                                :: MPI_COMM_FESOM
+
+! kh 11.11.21 communicator for multi FESOM group loop parallelization
+ integer                                :: MPI_COMM_FESOM_WORLD
+
+! kh 17.11.21 communicator for multi FESOM group loop parallelization
+ integer                                :: MPI_COMM_FESOM_SAME_RANK_IN_GROUPS
+
  integer, parameter   :: MAX_LAENDERECK=16
  integer, parameter   :: MAX_NEIGHBOR_PARTITIONS=32
   type com_struct
@@ -55,6 +62,10 @@ save
   integer            :: MPIERR
   integer            :: npes
   integer            :: mype
+
+! kh 11.11.21 multi FESOM group loop parallelization
+  integer            :: my_fesom_group
+
   integer            :: maxPEnum=100
   integer, allocatable, dimension(:)  :: part
 
@@ -72,6 +83,12 @@ save
   integer, allocatable ::  remPtr_elem2D(:), remList_elem2D(:)
 
   logical :: elem_full_flag  
+!$OMP threadprivate(com_nod2D,com_elem2D,com_elem2D_full)
+!$OMP threadprivate(mype)
+!$OMP threadprivate(myDim_nod2D, eDim_nod2D, myList_nod2D)
+!$OMP threadprivate(myDim_elem2D, eDim_elem2D, eXDim_elem2D, myList_elem2D)
+!$OMP threadprivate(myDim_edge2D, eDim_edge2D, myList_edge2D)
+  
 
 contains
 subroutine par_init    ! initializes MPI

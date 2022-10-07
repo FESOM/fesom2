@@ -937,14 +937,18 @@
               file=__FILE__,line= __LINE__)
     
           ! generate some output
-          if (mype==0) then
-             call icepack_write_tracer_flags(nu_diag)
-             call icepack_write_tracer_sizes(nu_diag)
-             call icepack_write_tracer_indices(nu_diag)
-             call icepack_warnings_flush(ice_stderr)
-             if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
-                 file=__FILE__,line= __LINE__)
-          endif
+
+! kh 19.11.21
+          if(my_fesom_group == 0) then
+              if (mype==0) then
+                  call icepack_write_tracer_flags(nu_diag)
+                  call icepack_write_tracer_sizes(nu_diag)
+                  call icepack_write_tracer_indices(nu_diag)
+                  call icepack_warnings_flush(ice_stderr)
+                  if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
+                      file=__FILE__,line= __LINE__)
+              endif
+          end if 
     
           call set_grid_icepack(mesh)
           call init_advection_icepack(mesh)

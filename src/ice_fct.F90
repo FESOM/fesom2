@@ -62,11 +62,11 @@ subroutine ice_TG_rhs(mesh)
     
     ! Velocities at nodes
     do elem=1,myDim_elem2D          !assembling rhs over elements
-        elnodes=elem2D_nodes(:,elem)
         !_______________________________________________________________________
         ! if cavity element skip it 
         if (ulevels(elem)>1) cycle
         
+        elnodes=elem2D_nodes(:,elem)
         !derivatives
         dx=gradient_sca(1:3,elem)
         dy=gradient_sca(4:6,elem)
@@ -372,6 +372,7 @@ subroutine ice_fem_fct(tr_array_id, mesh)
         
         !_______________________________________________________________________
         ! if cavity cycle over
+        !!PS if(any(ulevels_nod2D(elnodes)>1)) cycle !LK89140
         if(ulevels(elem)>1) cycle !LK89140
         
         !_______________________________________________________________________
@@ -420,7 +421,6 @@ subroutine ice_fem_fct(tr_array_id, mesh)
     !==========================
     if (tr_array_id==1) then
         do row=1, myDim_nod2D
-            if (ulevels_nod2d(row)>1) cycle
             n=nn_num(row)
             tmax(row)=maxval(m_icel(nn_pos(1:n,row)))
             tmin(row)=minval(m_icel(nn_pos(1:n,row)))
@@ -432,7 +432,6 @@ subroutine ice_fem_fct(tr_array_id, mesh)
     
     if (tr_array_id==2) then
         do row=1, myDim_nod2D
-            if (ulevels_nod2d(row)>1) cycle
             n=nn_num(row)
             tmax(row)=maxval(a_icel(nn_pos(1:n,row)))
             tmin(row)=minval(a_icel(nn_pos(1:n,row)))
@@ -444,7 +443,6 @@ subroutine ice_fem_fct(tr_array_id, mesh)
  
     if (tr_array_id==3) then
         do row=1, myDim_nod2D
-            if (ulevels_nod2d(row)>1) cycle
             n=nn_num(row)
             tmax(row)=maxval(m_snowl(nn_pos(1:n,row)))
             tmin(row)=minval(m_snowl(nn_pos(1:n,row)))
@@ -457,7 +455,6 @@ subroutine ice_fem_fct(tr_array_id, mesh)
 #if defined (__oifs)
     if (tr_array_id==4) then
         do row=1, myDim_nod2D
-            if (ulevels_nod2d(row)>1) cycle
             n=nn_num(row)
             tmax(row)=maxval(m_templ(nn_pos(1:n,row)))
             tmin(row)=minval(m_templ(nn_pos(1:n,row)))
@@ -479,6 +476,7 @@ subroutine ice_fem_fct(tr_array_id, mesh)
         
         !_______________________________________________________________________
         ! if cavity cycle over
+        !!PS if(any(ulevels_nod2D(elnodes)>1)) cycle !LK89140
         if(ulevels(elem)>1) cycle !LK89140
         
         !_______________________________________________________________________
@@ -527,6 +525,7 @@ subroutine ice_fem_fct(tr_array_id, mesh)
         
         !_______________________________________________________________________
         ! if cavity cycle over
+        !!PS if(any(ulevels_nod2D(elnodes)>1)) cycle !LK89140
         if(ulevels(elem)>1) cycle !LK89140
         
         !_______________________________________________________________________
@@ -549,12 +548,12 @@ subroutine ice_fem_fct(tr_array_id, mesh)
             m_ice(n)=m_icel(n)
         end do      
         do elem=1, myDim_elem2D
-            elnodes=elem2D_nodes(:,elem)
-            
             !___________________________________________________________________
             ! if cavity cycle over
+            !PS if(any(ulevels_nod2D(elnodes)>1)) cycle !LK89140
             if(ulevels(elem)>1) cycle !LK89140
             
+            elnodes=elem2D_nodes(:,elem)
             do q=1,3
                 n=elnodes(q)  
                 m_ice(n)=m_ice(n)+icefluxes(elem,q)
@@ -568,12 +567,12 @@ subroutine ice_fem_fct(tr_array_id, mesh)
             a_ice(n)=a_icel(n)
         end do      
         do elem=1, myDim_elem2D
-            elnodes=elem2D_nodes(:,elem)
-            
             !___________________________________________________________________
             ! if cavity cycle over
+            !!PS if(any(ulevels_nod2D(elnodes)>1)) cycle !LK89140
             if(ulevels(elem)>1) cycle !LK89140
             
+            elnodes=elem2D_nodes(:,elem)
             do q=1,3
                 n=elnodes(q)  
                 a_ice(n)=a_ice(n)+icefluxes(elem,q)
@@ -588,14 +587,14 @@ subroutine ice_fem_fct(tr_array_id, mesh)
         end do      
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)
-            
             !___________________________________________________________________
             ! if cavity cycle over
+            !!PS if(any(ulevels_nod2D(elnodes)>1)) cycle !LK89140
             if(ulevels(elem)>1) cycle !LK89140
             
             do q=1,3
-                n=elnodes(q)  
-                m_snow(n)=m_snow(n)+icefluxes(elem,q)
+            n=elnodes(q)  
+            m_snow(n)=m_snow(n)+icefluxes(elem,q)
             end do
         end do   
     end if
@@ -603,7 +602,6 @@ subroutine ice_fem_fct(tr_array_id, mesh)
 #if defined (__oifs)
     if(tr_array_id==4) then
         do n=1,myDim_nod2D
-            if(ulevels_nod2D(n)>1) cycle !LK89140
             ice_temp(n)=m_templ(n)
         end do
         do elem=1, myDim_elem2D
@@ -658,11 +656,13 @@ SUBROUTINE ice_mass_matrix_fill(mesh)
     DO elem=1,myDim_elem2D
         elnodes=elem2D_nodes(:,elem) 
         
-        !_______________________________________________________________________
+        !___________________________________________________________________
+        ! if cavity cycle over
+        if(ulevels(elem)>1) cycle
+        
         do n=1,3
             row=elnodes(n)
             if(row>myDim_nod2D) cycle
-            !___________________________________________________________________
             ! Global-to-local neighbourhood correspondence  
             DO q=1,nn_num(row)
                 col_pos(nn_pos(q,row))=q
@@ -670,10 +670,6 @@ SUBROUTINE ice_mass_matrix_fill(mesh)
             offset=ssh_stiff%rowptr(row)-ssh_stiff%rowptr(1)
             DO q=1,3 
                 col=elnodes(q)
-                !_______________________________________________________________
-                ! if element is cavity cycle over
-                if(ulevels(elem)>1) cycle
-                
                 ipos=offset+col_pos(col)
                 mass_matrix(ipos)=mass_matrix(ipos)+elem_area(elem)/12.0_WP
                 if(q==n) then                     
@@ -693,8 +689,7 @@ SUBROUTINE ice_mass_matrix_fill(mesh)
         offset=ssh_stiff%rowptr(q)-ssh_stiff%rowptr(1)+1
         n=ssh_stiff%rowptr(q+1)-ssh_stiff%rowptr(1)
         aa=sum(mass_matrix(offset:n))  
-        !!PS if(abs(area(1,q)-aa)>.1_WP) then
-        if(abs(area(ulevels_nod2d(q),q)-aa)>.1_WP) then
+        if(abs(area(1,q)-aa)>.1_WP) then
             iflag=q
             flag=1
         endif
@@ -703,7 +698,7 @@ SUBROUTINE ice_mass_matrix_fill(mesh)
         offset=ssh_stiff%rowptr(iflag)-ssh_stiff%rowptr(1)+1
         n=ssh_stiff%rowptr(iflag+1)-ssh_stiff%rowptr(1)
         aa=sum(mass_matrix(offset:n))
-        write(*,*) '#### MASS MATRIX PROBLEM', mype, iflag, aa, area(1,iflag), ulevels_nod2D(iflag)
+        write(*,*) '#### MASS MATRIX PROBLEM', mype, iflag, aa, area(1,iflag)
     endif
     deallocate(col_pos)
 END SUBROUTINE ice_mass_matrix_fill
@@ -745,11 +740,12 @@ subroutine ice_TG_rhs_div(mesh)
 #endif /* (__oifs) */
   END DO
   do elem=1,myDim_elem2D          !assembling rhs over elements
-     elnodes=elem2D_nodes(:,elem)
      !___________________________________________________________________________
      ! if cavity element skip it 
      if (ulevels(elem)>1) cycle
      
+                  !! elem=myList_elem2D(m)
+     elnodes=elem2D_nodes(:,elem)
       !derivatives
      dx=gradient_sca(1:3,elem)
      dy=gradient_sca(4:6,elem)
@@ -764,7 +760,6 @@ subroutine ice_TG_rhs_div(mesh)
      c4=sum(dx*u_ice(elnodes)+dy*v_ice(elnodes))
      DO n=1,3
         row=elnodes(n)
-!!PS         if(ulevels_nod2D(row)>1) cycle !LK89140
         DO q = 1,3 
             entries(q)= vol*ice_dt*((1.0_WP-0.5_WP*ice_dt*c4)*(dx(n)*(um+u_ice(elnodes(q)))+ &
                         dy(n)*(vm+v_ice(elnodes(q))))/12.0_WP - &

@@ -354,7 +354,7 @@ CONTAINS
       call check_nferr(iost,flf%file_name)
       
       ! digg for calendar attribute in time axis variable
-      if (mype==0 .and. use_flpyrcheck) then
+      if (mype==0) then
          iost = nf_inq_attlen(ncid, id_time,'calendar',aux_len)
          iost = nf_get_att(ncid, id_time,'calendar',aux_calendar)
          aux_calendar = aux_calendar(1:aux_len)
@@ -676,7 +676,7 @@ CONTAINS
          delta_t = 1.0_wp
          if (mype==0) then
             write(*,*) 'WARNING: no temporal extrapolation into future (nearest neighbour is used): ', trim(var_name), ' !'
-            write(*,*) trim(file_name)
+            write(*,*) file_name
             write(*,*) nc_time(1), nc_time(nc_Ntime), now_date
          end if
       elseif (t_indx < 1) then ! NO extrapolation back in time
@@ -685,7 +685,7 @@ CONTAINS
          delta_t = 1.0_wp
          if (mype==0) then 
             write(*,*) 'WARNING: no temporal extrapolation back in time (nearest neighbour is used): ', trim(var_name), ' !'
-            write(*,*) trim(file_name)
+            write(*,*) file_name
             write(*,*) nc_time(1), nc_time(nc_Ntime), now_date
          end if
       end if
@@ -1099,14 +1099,13 @@ CONTAINS
       !==========================================================================
 
       ! prepare a flag which checks whether to update monthly data (SSS, river runoff)
-      update_monthly_flag=( (day_in_month==num_day_in_month(fleapyear,month) .AND. timenew==86400._WP) .OR. mstep==1  )
+      update_monthly_flag=((day_in_month==num_day_in_month(fleapyear,month) .and. timenew==86400._WP))
 
       ! read in SSS for applying SSS restoring
       if (surf_relax_S > 0._WP) then
          if (sss_data_source=='CORE1' .or. sss_data_source=='CORE2') then
             if (update_monthly_flag) then
-               i=month
-               if (mstep > 1) i=i+1 
+               i=month+1
                if (i > 12) i=1
                if (mype==0) write(*,*) 'Updating SSS restoring data for month ', i 
                call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true., mesh) 
@@ -1120,8 +1119,7 @@ CONTAINS
        if(update_monthly_flag) then
          if(runoff_climatology) then
            !climatology monthly mean
-           i=month
-           if (mstep > 1) i=i+1 
+           i=month+1
            if (i > 12) i=1
            if (mype==0) write(*,*) 'Updating monthly climatology runoff for month ', i 
            filename=trim(nm_runoff_file)
@@ -1132,8 +1130,8 @@ CONTAINS
 
          else
            !monthly data
-           i=month
-           if (mstep > 1) i=i+1 
+
+           i=month+1
            if (i > 12) i=1
            if (mype==0) write(*,*) 'Updating monthly runoff for month ', i 
            filename=trim(nm_runoff_file)//cyearnew//'.nc' 

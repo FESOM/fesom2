@@ -28,7 +28,7 @@ type(t_mesh), intent(in), target :: mesh
 
 aux=rhoice/rhowat*dt
 do row=1, myDim_nod2d +eDim_nod2D! myDim is sufficient
-   if (thdgr(row)>0.0_WP .and. ulevels_nod2D(row)==1) then
+   if (thdgr(row)>0.0_WP) then
       ice_rejected_salt(row)= &
       (S_oc_array(row)-Sice)*thdgr(row)*aux*area(1, row)
       !unit: psu m3
@@ -63,7 +63,6 @@ subroutine app_rejected_salt(mesh)
 #include "associate_mesh.h"
 
   do row=1,myDim_nod2d+eDim_nod2D   ! myDim is sufficient
-     if (ulevels_nod2D(row)>1) cycle
      if (ice_rejected_salt(row)<=0.0_WP) cycle
      ! do not parameterize brine rejection in regions with low salinity
      ! 1. it leads to further decrease of SSS
@@ -93,10 +92,10 @@ subroutine app_rejected_salt(mesh)
         !!PS    end do
         !!PS endif
         if (kml>nzmin) then
-           tr_arr(nzmin,row,2)=tr_arr(nzmin,row,2)-ice_rejected_salt(row)/areasvol(1,row)/hnode(1,row)
+           tr_arr(nzmin,row,2)=tr_arr(nzmin,row,2)-ice_rejected_salt(row)/area(1,row)/hnode(1,row)
            spar(nzmin+1:kml)=spar(nzmin+1:kml)/sum(spar(nzmin+1:kml))
            do k=nzmin+1,kml
-              tr_arr(k,row,2)=tr_arr(k,row,2)+ice_rejected_salt(row)*spar(k)/areasvol(k,row)/hnode(k,row)
+              tr_arr(k,row,2)=tr_arr(k,row,2)+ice_rejected_salt(row)*spar(k)/area(k,row)/hnode(k,row)
            end do
         endif
       endif

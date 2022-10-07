@@ -4,7 +4,6 @@ MODULE Toy_Channel_Soufflet
   USE o_PARAM
   USE g_PARSUP
   USE g_config
-  use g_comm_auto
 
   implicit none
   SAVE 
@@ -71,8 +70,6 @@ subroutine relax_zonal_vel(mesh)
         UV_rhs(1,nz,elem) = UV_rhs(1,nz,elem)+dt*tau_inv*(Uclim(nz,elem)-Uzon)
      END DO
   END DO
-  call exchange_elem(UV_rhs)
-   
 end subroutine relax_zonal_vel
 !==========================================================================
 subroutine relax_zonal_temp(mesh)
@@ -82,7 +79,7 @@ subroutine relax_zonal_temp(mesh)
   type(t_mesh), intent(in) , target :: mesh
 #include  "associate_mesh.h"
 
-  do n=1, myDim_nod2D+eDim_nod2D
+  do n=1, myDim_nod2D
      yy=coord_nod2D(2,n)-lat0
      a=0 
     if (yy<dy/2) then  ! southward from the center of the first bin
@@ -231,12 +228,12 @@ subroutine initial_state_soufflet(mesh)
   dy=ysize/nybins/r_earth
 
   ! Default values
-  stress_surf   = 0.0_WP
-  heat_flux     = 0.0_WP
-  tr_arr(:,:,2) = 35.0_WP
-  Ssurf         = tr_arr(1,:,2)
-  water_flux    = 0.0_WP
-  relax2clim    = 0.0_WP
+  stress_surf   = 0.0
+  heat_flux     = 0.0_8
+  tr_arr(:,:,2) = 35.0_8
+  Ssurf         = tr_arr(1,:,1)
+  water_flux    = 0.0_8
+  relax2clim    = 0.0_8
 
 ! Have to set density_0=1028._WP in oce_modules.F90
 ! ========
@@ -310,35 +307,22 @@ do n=1, myDim_nod2D+eDim_nod2D
   END DO
   write(*,*) mype, 'COR', maxval(coriolis*10000.0), minval(coriolis*10000.0) 
   DO n=1,myDim_elem2D 
-    elnodes=elem2D_nodes(:,n)
-    ! Thermal wind \partial_z UV(1,:,:)=(g/rho_0/f)\partial_y rho 
-    DO nz=1,nlevels(n)-1
-        d_No(nz)=(-(0.00025_WP*density_0)*g/density_0/coriolis(n))*sum(gradient_sca(4:6,n)*Tclim(nz, elnodes))
-    !  d_N is used here as a placeholder
-    ! -(sw_alpha*density_0) here is from the equation of state d\rho=-(sw_alpha*density_0) dT 
-    END DO
-    ! Vertical integration
-    nz=nlevels(n)-1
-    UV(1,nz,n)=d_No(nz)*(Z(nz)-zbar(nz+1)) 
-    DO nz=nlevels(n)-2,1,-1
-        UV(1,nz,n)=UV(1,nz+1,n)+d_No(nz+1)*(zbar(nz+1)-Z(nz+1))+d_No(nz)*(Z(nz)-zbar(nz+1)) 
-    END DO 
+  elnodes=elem2D_nodes(:,n)
+  ! Thermal wind \partial_z UV(1,:,:)=(g/rho_0/f)\partial_y rho 
+  DO nz=1,nlevels(n)-1
+     d_No(nz)=(-(0.00025_WP*density_0)*g/density_0/coriolis(n))*sum(gradient_sca(4:6,n)*Tclim(nz, elnodes))
+  !  d_N is used here as a placeholder
+  ! -(sw_alpha*density_0) here is from the equation of state d\rho=-(sw_alpha*density_0) dT 
   END DO
-  call exchange_elem(UV)
-  
-  allocate(Uclim(nl-1,myDim_elem2D+eDim_elem2D))
+  ! Vertical integration
+  nz=nlevels(n)-1
+  UV(1,nz,n)=d_No(nz)*(Z(nz)-zbar(nz+1)) 
+  DO nz=nlevels(n)-2,1,-1
+  UV(1,nz,n)=UV(1,nz+1,n)+d_No(nz+1)*(zbar(nz+1)-Z(nz+1))+d_No(nz)*(Z(nz)-zbar(nz+1)) 
+  END DO 
+  END DO
+  allocate(Uclim(nl-1,myDim_elem2D))
   Uclim=UV(1,:,:)
-  
-!!PS  tr_arr(:,:,1) = 16.0_WP
-!!PS  tr_arr(:,:,2) = 35.0_WP
-!!PS  Ssurf         = tr_arr(1,:,2)
-!!PS  Tsurf         = tr_arr(1,:,1)
-!!PS  Tclim         = tr_arr(:,:,1)
-  
-!!PS  UV            = 0.0_WP
-!!PS  UV(1,:,:)     = 0.01_WP
-!!PS  Uclim         = UV(1,:,:)
-  
   write(*,*) mype, 'Vel', maxval(UV(1,:,:)), minval(UV(1,:,:))
  END subroutine initial_state_soufflet
 ! ===============================================================================

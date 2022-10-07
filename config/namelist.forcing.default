@@ -1,0 +1,60 @@
+! This is the namelist file for forcing
+
+&forcing_exchange_coeff
+Ce_atm_oce=0.00175 ! exchange coeff. of latent heat over open water
+Ch_atm_oce=0.00175 ! exchange coeff. of sensible heat over open water
+Cd_atm_oce=0.001  ! drag coefficient between atmosphere and water
+Ce_atm_ice=0.00175 ! exchange coeff. of latent heat over ice
+Ch_atm_ice=0.00175 ! exchange coeff. of sensible heat over ice
+Cd_atm_ice=0.0012  ! drag coefficient between atmosphere and ice 
+Swind     =0.0     ! parameterization for coupled current feedback
+/
+
+&forcing_bulk
+AOMIP_drag_coeff=.false.
+ncar_bulk_formulae=.true.
+ncar_bulk_z_wind=10.0 ! height at which wind forcing is located (CORE, JRA-do: 10m, JRA, NCEP:2m)
+ncar_bulk_z_tair=10.0 ! height at which temp forcing is located (CORE, JRA-do: 10m, JRA, NCEP:2m)
+ncar_bulk_z_shum=10.0 ! height at which humi forcing is located (CORE, JRA-do: 10m, JRA, NCEP:2m)
+
+/
+
+&land_ice
+use_landice_water=.false.
+landice_start_mon=5
+landice_end_mon=10
+/
+
+&nam_sbc
+   nm_xwind_file = '/work/ollie/clidyn/forcing/JRA55-do-v1.4.0/uas.'        ! name of file with winds, if nm_sbc=2
+   nm_ywind_file = '/work/ollie/clidyn/forcing/JRA55-do-v1.4.0/vas.'        ! name of file with winds, if nm_sbc=2
+   nm_humi_file  = '/work/ollie/clidyn/forcing/JRA55-do-v1.4.0/huss.'        ! name of file with humidity
+   nm_qsr_file   = '/work/ollie/clidyn/forcing/JRA55-do-v1.4.0/rsds.'    ! name of file with solar heat
+   nm_qlw_file   = '/work/ollie/clidyn/forcing/JRA55-do-v1.4.0/rlds.'    ! name of file with Long wave
+   nm_tair_file  = '/work/ollie/clidyn/forcing/JRA55-do-v1.4.0/tas.'        ! name of file with 2m air temperature
+   nm_prec_file  = '/work/ollie/clidyn/forcing/JRA55-do-v1.4.0/prra.' ! name of file with total precipitation
+   nm_snow_file  = '/work/ollie/clidyn/forcing/JRA55-do-v1.4.0/prsn.' ! name of file with snow  precipitation
+   nm_mslp_file  = '/work/ollie/clidyn/forcing/JRA55-do-v1.4.0/psl.'         ! air_pressure_at_sea_level
+   nm_xwind_var  = 'uas'   ! name of variable in file with wind
+   nm_ywind_var  = 'vas'   ! name of variable in file with wind
+   nm_humi_var   = 'huss'   ! name of variable in file with humidity
+   nm_qsr_var    = 'rsds'   ! name of variable in file with solar heat
+   nm_qlw_var    = 'rlds'   ! name of variable in file with Long wave
+   nm_tair_var   = 'tas'   ! name of variable in file with 2m air temperature
+   nm_prec_var   = 'prra'       ! name of variable in file with total precipitation
+   nm_snow_var   = 'prsn'       ! name of variable in file with total precipitation
+   nm_mslp_var   = 'psl'        ! name of variable in file with air_pressure_at_sea_level
+   nm_nc_iyear   = 1900
+   nm_nc_imm     = 1            ! initial month of time axis in netCDF 
+   nm_nc_idd     = 1            ! initial day of time axis in netCDF
+   nm_nc_freq    = 1            ! data points per day (i.e. 86400 if the time axis is in seconds)
+   nm_nc_tmid    = 0            ! 1 if the time stamps are given at the mid points of the netcdf file, 0 otherwise (i.e. 1 in CORE1, CORE2; 0 in JRA55)
+   l_xwind=.true. l_ywind=.true. l_humi=.true. l_qsr=.true. l_qlw=.true. l_tair=.true. l_prec=.true. l_mslp=.false. l_cloud=.false. l_snow=.true.
+   nm_runoff_file     ='/work/ollie/clidyn/forcing/JRA55-do-v1.4.0/CORE2_runoff.nc'
+   runoff_data_source ='CORE2'	!Dai09, CORE2
+   !nm_runoff_file     ='/work/ollie/qwang/FESOM2_input/mesh/CORE2_finaltopo_mean/forcing_data_on_grid/runoff_clim.nc'
+   !runoff_data_source ='Dai09'  !Dai09, CORE2, JRA55
+   !runoff_climatology =.true.
+   nm_sss_data_file   ='/work/ollie/clidyn/forcing/JRA55-do-v1.4.0/PHC2_salx.nc'
+   sss_data_source    ='CORE2'
+/

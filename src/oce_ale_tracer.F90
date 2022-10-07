@@ -93,7 +93,37 @@ module diff_part_bh_interface
     end subroutine
   end interface
 end module
-
+module diff_ver_recom_expl_interface
+  interface
+    subroutine diff_ver_recom_expl(tr_num, mesh)
+      use mod_mesh
+      use g_PARSUP
+      integer, intent(in)      :: tr_num
+      type(t_mesh), intent(in) , target :: mesh
+    end subroutine
+  end interface
+end module
+module ver_sinking_recom_benthos_interface
+  interface
+    subroutine ver_sinking_recom_benthos(tr_num, mesh)
+      use mod_mesh
+      use g_PARSUP
+      type(t_mesh), intent(in) , target :: mesh
+      integer, intent(in)      :: tr_num
+!      real(kind=WP), intent(inout), target :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    end subroutine
+  end interface
+end module
+module integrate_bottom_interface
+  interface
+    subroutine integrate_bottom(tflux, mesh)
+      use mod_mesh
+      use g_PARSUP
+      type(t_mesh), intent(in) , target :: mesh
+      integer, intent(inout)      :: tflux
+    end subroutine
+  end interface
+end module
 !
 !
 !===============================================================================
@@ -109,11 +139,48 @@ subroutine solve_tracers_ale(mesh)
     use Toy_Channel_Soufflet
     use adv_tracers_ale_interface
     use diff_tracers_ale_interface
+#if defined(__recom)
+    use REcoM_GloVar, only: SinkFlx, & ! to initialse with 0 before loop over tracers
+                            SinkFlx_tr, Benthos, Benthos_tr ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                            
+    use REcom_config, only: use_atbox, ciso, &       ! to calculate prognostic 14CO2 and the radioactive decay of 14C
+                            bottflx_num, benthos_num ! kh 28.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+
+    use REcoM_ciso, only: ciso_14, ciso_organic_14, c14_tracer_id, lambda_14, ciso_warp, warp_tracer_id
+#endif
     
     implicit none
     type(t_mesh), intent(in) , target :: mesh
     integer                  :: tr_num, node, nzmax, nzmin
     real(kind=WP)            :: aux_tr(mesh%nl-1,myDim_nod2D+eDim_nod2D)
+
+! kh 11.11.21 multi FESOM group loop parallelization
+    integer             :: tr_num_start_memo
+
+! kh 15.11.21
+    integer             :: group_i
+    integer             :: tr_num_start
+
+! kh 19.11.21
+    logical             :: has_one_added_tracer
+    logical             :: has_one_added_tracer_local_dummy
+    logical             :: tr_num_end_local_dummy
+    logical             :: tr_num_in_group_local_dummy
+    integer             :: tr_num_end
+    logical             :: tr_num_in_group_dummy
+    integer             :: tr_arr_slice_count_fix_1
+
+! kh 28.03.22
+    integer             :: Sinkflx_tr_slice_count_fix_1
+    integer             :: Benthos_tr_slice_count_fix_1
+
+    integer             :: tr_num_start_local
+    integer             :: tr_num_to_send
+
+! kh 22.11.21
+    logical             :: completed
+
+    logical             :: bBreak
 
 #include "associate_mesh.h"
     !___________________________________________________________________________
@@ -131,12 +198,44 @@ subroutine solve_tracers_ale(mesh)
     end if
     !___________________________________________________________________________
     ! loop over all tracers 
-    do tr_num=1,num_tracers
+    ! set sinking flux to the benthic layer to 0 before the loop over tracers
+#if defined(__recom)
+    SinkFlx = 0.0d0 
+#endif
+
+! kh 11.11.21 multi FESOM group loop parallelization
+    call calc_slice(num_tracers, num_fesom_groups, my_fesom_group, tr_num_start, tr_num_end, tr_num_in_group_dummy, has_one_added_tracer)
+
+! kh 19.11.21
+    tr_arr_slice_count_fix_1 = 1 * (nl - 1) * (myDim_nod2D + eDim_nod2D)
+
+! kh 28.03.22
+    Sinkflx_tr_slice_count_fix_1 = 1 * (myDim_nod2D + eDim_nod2D) * bottflx_num
+    Benthos_tr_slice_count_fix_1 = 1 * (myDim_nod2D + eDim_nod2D) * benthos_num
+
+    tr_num_start_memo = tr_num_start
+
+! kh 22.11.21
+    request_count = 0
+
+    do tr_num = tr_num_start, tr_num_end
+
+! kh 25.03.22 SinkFlx and Benthos values are buffered per tracer index and summed up after the loop to
+! avoid non bit identical results regarding global sums when running the tracer loop in parallel
+        SinkFlx_tr(:, :, tr_num) = 0.0d0
+        Benthos_tr(:, :, tr_num) = 0.0d0
+
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part 
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
         call init_tracers_AB(tr_num, mesh)
         
+#if defined(__recom)
+if (ciso_warp .and. any(warp_tracer_id == tracer_id(tr_num))) then
+!       WARP - Highly experimental acceleration of P/DOC simulations
+!       Skip advection and diffusion of P/DOC
+else
+#endif
         ! advect tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
         call adv_tracers_ale(tr_num, mesh)
@@ -144,19 +243,113 @@ subroutine solve_tracers_ale(mesh)
         ! diffuse tracers 
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
         call diff_tracers_ale(tr_num, mesh)
-        
+#if defined(__recom)
+end if ! WARP
+#endif        
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
-        if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) then
-            call relax_zonal_temp(mesh)
-        else
-            call relax_to_clim(tr_num, mesh)
-        end if 
+        call relax_to_clim(tr_num, mesh)
+
+#if defined(__recom)
+        ! radioactive decay of 14C
+        if (ciso_14 .and. any(c14_tracer_id == tracer_id(tr_num))) then
+          tr_arr(:,:,tr_num) = tr_arr(:,:,tr_num) * (1 - lambda_14 * dt)
+        end if    ! ciso & ciso_14
+#endif
+        if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) call relax_zonal_temp(mesh)
         call exchange_nod(tr_arr(:,:,tr_num))
+
+! kh 19.11.21 broadcast tracer results to fesom groups
+        if(num_fesom_groups > 1) then
+
+            do group_i = 0, num_fesom_groups - 1
+                call calc_slice(num_tracers, num_fesom_groups, group_i, tr_num_start_local, tr_num_end_local_dummy, tr_num_in_group_local_dummy, has_one_added_tracer_local_dummy)
+
+                tr_num_to_send = tr_num_start_local + (tr_num - tr_num_start_memo)
+
+                if((tr_num == tr_num_end) .and. has_one_added_tracer) then
+                    ! skip: if last tracer in group was added to compensate for fragementation it is skipped here and handled after the loop
+                else
+                    request_count = request_count + 1
+
+! kh 22.11.21 non-blocking communication overlapped with computation in loop
+                    call MPI_IBcast(tr_arr     (:, :, tr_num_to_send), tr_arr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                                group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, tr_arr_requests(request_count),     MPIerr)
+
+! kh 30.03.22 tr_arr_old for this index is not really needed in other groups
+!                   call MPI_IBcast(tr_arr_old (:, :, tr_num_to_send), tr_arr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+!                                               group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, tr_arr_old_requests(request_count), MPIerr)
+
+                    call MPI_IBcast(Sinkflx_tr (:, :, tr_num_to_send), Sinkflx_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                                group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, SinkFlx_tr_requests(request_count), MPIerr)
+
+                    call MPI_IBcast(Benthos_tr (:, :, tr_num_to_send), Benthos_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                                group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, Benthos_tr_requests(request_count), MPIerr)
+
+                end if
+            end do
+        end if ! (num_fesom_groups > 1) then
+    end do ! tr_num = tr_num_start, tr_num_end
+
+
+! kh 19.11.21 if tracer in group was added to compensate for fragmentation its broadcast of the last index is handled here
+    if(num_fesom_groups > 1) then
+        do group_i = 0, num_fesom_groups - 1
+            call calc_slice(num_tracers, num_fesom_groups, group_i, tr_num_start, tr_num_end, tr_num_in_group_dummy, has_one_added_tracer)
+
+            if(has_one_added_tracer) then
+
+                request_count = request_count + 1
+
+                call MPI_Ibcast(tr_arr     (:, :, tr_num_end), tr_arr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, tr_arr_requests(request_count),     MPIerr)
+
+! kh 30.03.22 tr_arr_old for this index is not really needed in other groups
+!               call MPI_Ibcast(tr_arr_old (:, :, tr_num_end), tr_arr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+!                               group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, tr_arr_old_requests(request_count), MPIerr)
+
+                call MPI_IBcast(Sinkflx_tr (:, :, tr_num_end), Sinkflx_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, SinkFlx_tr_requests(request_count), MPIerr)
+
+                call MPI_IBcast(Benthos_tr (:, :, tr_num_end), Benthos_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, Benthos_tr_requests(request_count), MPIerr)
+            end if
+        end do
+    end if !(num_fesom_groups > 1) then
+
+    if(num_fesom_groups > 1) then
+        completed = .false.
+        do while (.not. completed)
+            call MPI_TESTALL(request_count, tr_arr_requests(:),     completed, MPI_STATUSES_IGNORE, MPIerr)
+        end do
+
+! kh 30.03.22 not really needed (also see above)
+!       completed = .false.
+!       do while (.not. completed)
+!           call MPI_TESTALL(request_count, tr_arr_old_requests(:), completed, MPI_STATUSES_IGNORE, MPIerr)
+!       end do
+
+        completed = .false.
+        do while (.not. completed)
+            call MPI_TESTALL(request_count, SinkFlx_tr_requests(:), completed, MPI_STATUSES_IGNORE, MPIerr)
+        end do
+
+        completed = .false.
+        do while (.not. completed)
+            call MPI_TESTALL(request_count, Benthos_tr_requests(:), completed, MPI_STATUSES_IGNORE, MPIerr)
+        end do
+
+    end if ! (num_fesom_groups > 1) then
+
+! kh 25.03.22 SinkFlx and Benthos values are buffered per tracer index in the loop above and now summed up to
+! avoid non bit identical results regarding global sums when running the tracer loop in parallel
+    do tr_num = 1, num_tracers
+        SinkFlx = SinkFlx + SinkFlx_tr(:, :, tr_num)
+        Benthos = Benthos + Benthos_tr(:, :, tr_num)
     end do
-    
+
     !___________________________________________________________________________
-    do tr_num=1, ptracers_restore_total           
+    do tr_num=1, ptracers_restore_total
         tr_arr(:,ptracers_restore(tr_num)%ind2,ptracers_restore(tr_num)%locid)=1.0_WP
     end do
     
@@ -255,18 +448,37 @@ subroutine diff_tracers_ale(tr_num, mesh)
     use g_PARSUP
     use o_arrays
     use o_tracers
+    use g_config,only: dt                   ! CV: needed? 
     use diff_part_hor_redi_interface
     use diff_ver_part_expl_ale_interface
     use diff_ver_part_redi_expl_interface
     use diff_ver_part_impl_ale_interface
     use diff_part_bh_interface
+    use diff_ver_recom_expl_interface
+    use ver_sinking_recom_benthos_interface
+#if defined(__recom)
+    USE REcoM_GloVar
+    use recom_config !, recom_debug
+    use g_support
+!#if defined(__ciso)
+    use recom_ciso
+!#endif
+#endif
     implicit none
     
     integer, intent(in)      :: tr_num
     integer                  :: n, nzmax, nzmin
     type(t_mesh), intent(in) , target :: mesh
+real :: net
 
 #include "associate_mesh.h"
+
+#if defined(__recom)
+    dtr_bf         = 0.0_WP
+    str_bf         = 0.0_WP
+    vert_sink      = 0.0_WP
+    nss = 0.0_WP
+#endif
     !___________________________________________________________________________
     ! convert tr_arr_old(:,:,tr_num)=ttr_n-0.5   --> prepare to calc ttr_n+0.5
     ! eliminate AB (adams bashfort) interpolates tracer, which is only needed for 
@@ -286,6 +498,127 @@ subroutine diff_tracers_ale(tr_num, mesh)
     ! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
     ! derivatives and has to be computed explicitly!
     if (Redi) call diff_ver_part_redi_expl(mesh)
+
+! OG 20.12.2021
+! Exchange between sediment (REcoM) and ocean (FESOM)
+! Detritus sinking in water column is called here as well
+
+#if defined(__recom)
+
+! 1) Remineralization from the benthos
+!    Nutrient fluxes come from the bottom boundary
+!    Unit [mmol/m2/s]
+
+
+!!MB TEST
+!!    if (tracer_id(tr_num) == 1001 .or.    &   ! DIN
+!!        tracer_id(tr_num) == 1002 .or.    &   ! DIC
+!!        tracer_id(tr_num) == 1003 .or.    &   ! Alk
+!!        tracer_id(tr_num) == 1018 .or.    &   ! Si
+!!        tracer_id(tr_num) == 1019 .or.    &   ! Fe
+!! !#if defined(__ciso)
+!!        tracer_id(tr_num) == 1302 .or.    &   ! DIC_13  ! CV: Ozgurs code has 1033
+!!        tracer_id(tr_num) == 1402 .or.    &   ! DIC_14  ! CV: Ozgurs code has 1034
+!! !#endif
+!!        tracer_id(tr_num) == 1022     ) then  ! Oxy
+if (any(recom_remin_tracer_id == tracer_id(tr_num))) then
+
+! call bottom boundary 
+        call diff_ver_recom_expl(tr_num,mesh)
+! update tracer fields
+        do n=1, myDim_nod2D 
+            nzmax=nlevels_nod2D(n)-1
+! CV: This has changed in Ozgurs code: nzmin was not present before           
+            nzmin=ulevels_nod2D(n)
+            tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
+                                                dtr_bf(nzmin:nzmax,n)
+!            tr_arr(1:nzmax,n,tr_num)=tr_arr(1:nzmax,n,tr_num)+ &
+!                                        dtr_bf(1:nzmax,n)
+        end do
+end if
+
+! CV: Sinking (both within the water column and into the sediment) has
+! been moved by Ozgur from recom_sms.F90 to here; I have basically
+! copied it, but adapted the tracer_id of which tracers sink: Rather
+! than a second detritus we have the sinking carbon isotope tracers
+    
+! 2) Sinking in water column 
+
+! Name the 13C and 14C tracer_id here as well; we do not need to
+! enclose them into if (ciso) here, I believe, since if ciso or
+! ciso_organic_14 is not activated, the if will never be fulfilled
+       
+    
+!!MB TEST
+!!    if (tracer_id(tr_num) == 1007 .or.    & ! idetn
+!!        tracer_id(tr_num) == 1008 .or.    & ! idetc
+!!        tracer_id(tr_num) == 1017 .or.    & ! idetsi
+!!        tracer_id(tr_num) == 1021 .or.    & ! idetcal
+!!
+!!        tracer_id(tr_num) == 1004 .or.    & !iphyn
+!!        tracer_id(tr_num) == 1005 .or.    & !iphyc
+!!        tracer_id(tr_num) == 1020 .or.    & !iphycal
+!!        tracer_id(tr_num) == 1006 .or.    & !ipchl
+!!
+!!        tracer_id(tr_num) == 1013 .or.    & !idian
+!!        tracer_id(tr_num) == 1014 .or.    & !idiac
+!!        tracer_id(tr_num) == 1016 .or.    & !idiasi
+!!        tracer_id(tr_num) == 1015 .or.    & !idchl
+!!
+!!        tracer_id(tr_num) == 1308 .or.    &   ! idetc_13
+!!        tracer_id(tr_num) == 1321 .or.    &   ! idetcal_13
+!!        tracer_id(tr_num) == 1305 .or.    &   ! iphyc_13
+!!        tracer_id(tr_num) == 1320 .or.    &   ! iphycal_13
+!!        tracer_id(tr_num) == 1314 .or.    &   ! idiac_13
+!!        tracer_id(tr_num) == 1408 .or.    &   ! idetc_14
+!!        tracer_id(tr_num) == 1421 .or.    &   ! idetcal_14
+!!        tracer_id(tr_num) == 1405 .or.    &   ! iphyc_14
+!!        tracer_id(tr_num) == 1420 .or.    &   ! iphycal_14
+!!        tracer_id(tr_num) == 1414 ) then      ! idiac_14       
+        
+! if (REcoM_Second_Zoo) then
+!        tracer_id(tr_num) == 1025 .or.    &   !idetz2n
+!        tracer_id(tr_num) == 1026 .or.    &   !idetz2c
+!        tracer_id(tr_num) == 1027 .or.    &   !idetz2si
+!        tracer_id(tr_num) == 1028 ) then      !idetz2calc
+! endif
+!!MB TEST
+if (any(recom_sinking_tracer_id == tracer_id(tr_num))) then
+
+! sinking
+        call recom_sinking_new(tr_num,mesh) !--- vert_sink ---
+
+! sinking into the benthos
+        call ver_sinking_recom_benthos(tr_num,mesh) !--- str_bf ---
+
+! update tracer fields
+        do n=1, myDim_nod2D 
+            nzmax=nlevels_nod2D(n)-1
+            nzmin=ulevels_nod2D(n)
+            tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
+                                                vert_sink(nzmin:nzmax,n)
+            tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
+                                                str_bf(nzmin:nzmax,n)
+        end do                             
+end if
+
+
+    
+! CV: Ozgur also has the following code. I don't understand what
+! it is, but have copied it, and commented it out. 
+    
+! 3) Nitrogen SS
+!    if (NitrogenSS .and. tracer_id(tr_num)==1008) then ! idetc
+!        call recom_nitogenss(mesh) !--- nss for idetc ---
+!        do n=1, myDim_nod2D
+!            nzmax=nlevels_nod2D(n)-1
+!            nzmin=ulevels_nod2D(n)
+!        tr_arr(nzmin:nzmax,n,3)=tr_arr(nzmin:nzmax,n,3)+ &   ! tracer_id(tr_num)==1001 !idin
+!                                           nss(nzmin:nzmax,n)
+!        end do  
+!    end if
+
+#endif
     
     !___________________________________________________________________________
     ! Update tracers --> calculate T* see Danilov etal "FESOM2 from finite elements
@@ -342,9 +675,6 @@ subroutine diff_ver_part_expl_ale(tr_num, mesh)
     real(kind=WP)            :: zinv1,Ty
 
 #include "associate_mesh.h"
-
-    Ty = 0.0_WP
-    
     !___________________________________________________________________________    
     do n=1, myDim_nod2D
         nl1=nlevels_nod2D(n)-1
@@ -403,8 +733,7 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
     use g_PARSUP
     use g_CONFIG
     use g_forcing_arrays
-    use o_mixing_KPP_mod !for ghats _GO_   
-    use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
+    use o_mixing_KPP_mod !for ghats _GO_    
     use bc_surface_interface
         
     implicit none
@@ -429,80 +758,36 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
     Ty1   =0.0_WP
     
     ! solve equation diffusion equation implicite part: 
-    ! -->   h^(n+0.5)* (T^(n+0.5)-Tstar) = dt*( K_33*d/dz*(T^(n+0.5)-Tstar) + K_33*d/dz*Tstar )
-    ! -->   Tnew = T^(n+0.5)-Tstar
-    ! -->   h^(n+0.5)* (Tnew) = dt*(K_33*d/dz*Tnew) + K_33*dt*d/dz*Tstar 
-    ! -->   h^(n+0.5)* (Tnew) = dt*(K_33*d/dz*Tnew) + RHS        
-    ! -->   solve for T_new                                      
-    ! -->   V_1 (Skalar Volume), A_1 (Area of edge),              .                 
-    !       no Cavity A1==V1, yes Cavity A1 !=V1                 /I\ nvec_up (+1)
-    !                                                             I
-    !    ----------- zbar_1, A_1                             *----I----*
-    ! Z_1 o T_1, V1                                          |\   I  ./|
-    !    ----------- zbar_2, A_2                             | \   ./  |   Gaus Theorem:
-    ! Z_2 o T_2, V2                                          |  \ /    |    --> Flux form
-    !    ----------- zbar_3, A_3                             |   |     |    --> normal vec outwards facing
-    ! Z_3 o T_3, V3                                          *---|-----*
-    !    ----------- zbar_4                                   \  | I ./
-    !        :                                                 \ | I/ 
-    !                                                           \|/I   
-    !                                                            * I
-    !                                                             \I/
-    !                                                              *  nvec_dwn (-1)
-    ! --> 1st. solve homogenouse part:
-    ! f(Tnew) = h^(n+0.5)* (Tnew) - dt*(K_33*dTnew/dz) = 0
+    ! --> h^(n+0.5)* (T^(n+0.5)-Tstar) = dt*( K_33*d/dz*(T^(n+0.5)-Tstar) + K_33*d/dz*Tstar )
+    ! -->   dTnew = T^(n+0.5)-Tstar
+    ! -->   h^(n+0.5)* (dTnew) = dt*(K_33*d/dz*dTnew) + K_33*dt*d/dz*Tstar 
+    ! -->   h^(n+0.5)* (dTnew) = dt*(K_33*d/dz*dTnew) + RHS 
+    ! -->   solve for dT_new
+    !    
+    !    ----------- zbar_1, V_1 (Skalar Volume), A_1 (Area of edge),  no Cavity A1==V1, yes Cavity A1 !=V1
+    ! Z_1 o T_1
+    !    ----------- zbar_2, V_2
+    ! Z_2 o T_2
+    !    ----------- zbar_3, V_3
+    ! Z_3 o T_3
+    !    ----------- zbar_4
+    !        :
+    ! --> Difference Quotient at Volume _2:  ddTnew_2/dt + d/dz*K_33 d/dz*dTnew_2 = 0 --> homogene solution 
+    ! V2*dTnew_2 *h^(n+0.5) = -dt * [ (dTnew_1-dTnew_2)/(Z_1-Z_2)*A_2 + (dTnew_2-dTnew_3)/(Z_2-Z_3)*A_3 ] + RHS
+    !    dTnew_2 *h^(n+0.5) = -dt * [ (dTnew_1-dTnew_2)/(Z_1-Z_2)*A_2/V_2 + (dTnew_2-dTnew_3)/(Z_2-Z_3)*A_3/V_2 ] + RHS
+    !                                                  |                                 |
+    !                                                  v                                 v
+    !                                         diffusive flux towards             diffusive flux towards
+    !                                         T_2 trough boundary V2             T_2 trough boundary V3 
+    !    
+    ! --> solve coefficents for homogene part   
+    !    dTnew_2 *h^(n+0.5) = -dt * [ a*dTnew_1 + b*dTnew_2 + c*dTnew_3 ] 
     !
-    ! --> 2nd. Difference Quotient at Tnew_i in flux form (Gaus Theorem, dont forget normal vectors!!!):  
-    ! V_i*Tnew_i *h_i = -dt * [ K_33 * (Tnew_i-1 - Tnew_i)/(Z_i-1 - Z_i) * A_i * nvec_up 
-    !                          +K_33 * (Tnew_i - Tnew_i+1)/(Z_i - Z_i+1) * A_i+1 * nvec_dwn ]
-    !     Tnew_i *h_i = -dt * [ K_33 * (Tnew_i-1 - Tnew_i)/(Z_i-1 - Z_i) * A_i  /V_i * nvec_up 
-    !                          +K_33 * (Tnew_i - Tnew_i+1)/(Z_i - Z_i+1) * A_i+1/V_i * nvec_dwn ]
-    !
-    ! --> 3rd. solve for coefficents a, b, c:
-    ! f(Tnew) = [ a*dTnew_i-1 + b*dTnew_i + c*dTnew_i+1 ] 
-    !
-    !     df(Tnew)/dTnew_i-1 = a = -dt*K_33/(Z_i-1 - Z_i) * A_i/V_i * (nvec_up =1)
+    ! --> a = -dt*K_33/(Z_1-Z_2)*A_2/V_2
     ! 
-    !     df(Tnew)/dTnew_i+1 = c =  dt * K_33 * 1/(Z_i - Z_i+1) * A_i+1/V_i * (nvec_dwn=-1)
-    !                            = -dt * K_33 * 1/(Z_i - Z_i+1) * A_i+1/V_i
+    ! --> c = -dt*K_33/(Z_2-Z_3)*A_3/V_2
     !
-    !     df(Tnew)/dTnew_i   = b = h_i + dt*K_33/(Z_i-1 - Z_i) * A_i/V_i   * (nvec_up=+1)
-    !                                  - dt*K_33/(Z_i - Z_i+1) * A_i+1/V_i * (nvec_dwn=-1)
-    !                            = h_i + dt*K_33/(Z_i-1 - Z_i) * A_i/V_i
-    !                                  + dt*K_33/(Z_i - Z_i+1) * A_i+1/V_i
-    !                            = h_i -(a+c)
-    !
-    ! --> 4th. solve inhomogenous part:
-    ! [ a*dTnew_i-1 + b*dTnew_i + c*dTnew_i+1 ] = RHS/V_i
-    !
-    ! RHS     = K_33*dt*d/dz*Tstar
-    !
-    ! --> write as Difference Quotient in flux form
-    ! RHS/V_i =  K_33 * dt * (Tstar_i-1 - Tstar_i)/(Z_i-1 - Z_i) * A_i/V_i   * (nvec_up=1)
-    !          + K_33 * dt * (Tstar_i - Tstar_i+1)/(Z_i - Z_i+1) * A_i+1/V_i * (nvec_dwn=-1)
-    !
-    !         =  K_33*dt/(Z_i-1 - Z_i) * A_i/V_i   * Tstar_i-1
-    !          - K_33*dt/(Z_i-1 - Z_i) * A_i/V_i   * Tstar_i
-    !          - K_33*dt/(Z_i - Z_i+1) * A_i+1/V_i * Tstar_i
-    !          + K_33*dt/(Z_i - Z_i+1) * A_i+1/V_i * Tstar_i+1
-    !         
-    !         = -a*Tstar_i-1 + (a+c)*Tstar_i - c * Tstar_i+1
-    !                            |-> b = h_i - (a+c), a+c = h_i-b
-    !
-    !         = -a*Tstar_i-1 - (b-h_i)*Tstar_i - c * Tstar_i+1
-    !
-    ! --> 5th. solve for Tnew_i --> forward sweep algorithm --> see lower
-    !  | b_1 c_1 ...            |   |dTnew_1|
-    !  | a_2 b_2 c_2 ...        |   |dTnew_2|
-    !  |     a_3 b_3 c_3 ...    | * |dTnew_3| = RHS/V_i
-    !  |         a_4 b_4 c_4 ...|   |dTnew_4| 
-    !  |              :         |   |   :   |   
-    !
-    ! --> a = -dt*K_33 / (Z_i-1 - Z_i) * A_i/V_i
-    ! 
-    ! --> c = -dt*K_33 / (Z_i - Z_i+1) * A_i+1/V_i
-    !
-    ! --> b = h^(n+0.5) -[ dt*K_33/(Z_i-1 - Z_i)*A_i/V_i + dt*K_33/(Z_i - Z_i+1) * A_i+1/V_i ] = -(a+c) + h^(n+0.5)
+    ! --> b = h^(n+0.5) -[ dt*K_33/(Z_1-Z_2)*A_2/V_2 + dt*K_33/(Z_2-Z_3)*A_3/V_2 ] = -(a+c) + h^(n+0.5)
     
     !___________________________________________________________________________
     ! loop over local nodes
@@ -528,16 +813,20 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         ! Be carefull here vertical operation have to be done on NEW vertical mesh !!!
         zbar_n=0.0_WP
         Z_n=0.0_WP
+!         zbar_n(nzmax)=zbar(nzmax)
         zbar_n(nzmax)=zbar_n_bot(n)
         Z_n(nzmax-1)=zbar_n(nzmax) + hnode_new(nzmax-1,n)/2.0_WP
+        !!PS do nz=nzmax-1,2,-1
         do nz=nzmax-1,nzmin+1,-1
             zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
             Z_n(nz-1)  = zbar_n(nz) + hnode_new(nz-1,n)/2.0_WP
         end do
+        !!PS zbar_n(1) = zbar_n(2) + hnode_new(1,n)
         zbar_n(nzmin) = zbar_n(nzmin+1) + hnode_new(nzmin,n)
         
         !_______________________________________________________________________
         ! Regular part of coefficients: --> surface layer 
+        !!PS nz=1
         nz=nzmin
         
         ! 1/dz(nz)
@@ -551,22 +840,25 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         
         ! layer dependent coefficients for for solving dT(1)/dt+d/dz*K_33*d/dz*T(1) = ...
         a(nz)=0.0_WP
-        !!PS c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv * (area(nz+1,n)/areasvol(nz,n))
-        c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv * area(nz+1,n)/areasvol(nz,n) 
+        !!PS c(nz)=-(Kv(2,n)+Ty1)*zinv2*zinv*area(nz+1,n)/area(nz,n)
+        c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv*area(nz+1,n)/areasvol(nz,n)
         b(nz)=-c(nz)+hnode_new(nz,n)      ! ale
         
         ! update from the vertical advection --> comes from splitting of vert 
         ! velocity into explicite and implicite contribution
         if (do_wimpl) then
+            !!PS v_adv =zinv*area(nz+1,n)/areasvol(nz,n)
+            !!PS b(nz) =b(nz)+Wvel_i(nz, n)*zinv-min(0._WP, Wvel_i(nz+1, n))*v_adv
+            !!PS c(nz) =c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
+            
             !___________________________________________________________________
             ! use brackets when computing ( area(nz  ,n)/areasvol(nz,n) ) for 
             ! numerical reasons, to gurante that area/areasvol in case of no 
             ! cavity is ==1.0_WP
-            v_adv =zinv * ( area(nz  ,n)/areasvol(nz,n) )
+            v_adv =zinv* ( area(nz  ,n)/areasvol(nz,n) )
             b(nz) =b(nz)+Wvel_i(nz, n)*v_adv
             
-            !!PS v_adv =zinv * ( area(nz+1,n)/areasvol(nz,n) )
-            v_adv =zinv * area(nz+1,n)/areasvol(nz,n)
+            v_adv =zinv*area(nz+1,n)/areasvol(nz,n)
             b(nz) =b(nz)-min(0._WP, Wvel_i(nz+1, n))*v_adv
             c(nz) =c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
         end if        
@@ -575,6 +867,7 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         
         !_______________________________________________________________________
         ! Regular part of coefficients: --> 2nd...nl-2 layer
+        !!PS do nz=2, nzmax-2
         do nz=nzmin+1, nzmax-2
         
             ! 1/dz(nz)
@@ -592,9 +885,8 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
             ! use brackets when computing ( area(nz  ,n)/areasvol(nz,n) ) for 
             ! numerical reasons, to gurante that area/areasvol in case of no 
             ! cavity is ==1.0_WP   
-            a(nz)=-(Kv(nz,n)  +Ty )*zinv1*zinv * ( area(nz  ,n)/areasvol(nz,n) ) 
-            !!PS c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv * ( area(nz+1,n)/areasvol(nz,n) )
-            c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv * area(nz+1,n)/areasvol(nz,n)
+            a(nz)=-(Kv(nz,n)  +Ty )*zinv1*zinv* ( area(nz  ,n)/areasvol(nz,n) ) 
+            c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv*area(nz+1,n)/areasvol(nz,n)
             b(nz)=-a(nz)-c(nz)+hnode_new(nz,n)
             
             ! backup zinv2 for next depth level
@@ -606,16 +898,15 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
                 ! use brackets when computing ( area(nz  ,n)/areasvol(nz,n) ) for 
                 ! numerical reasons, to gurante that area/areasvol in case of no 
                 ! cavity is ==1.0_WP   
-                v_adv=zinv * ( area(nz  ,n)/areasvol(nz,n) )
+                v_adv=zinv* ( area(nz  ,n)/areasvol(nz,n) )
                 a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv
                 b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
                 !!PS v_adv=v_adv*areasvol(nz+1,n)/areasvol(nz,n)
-                !!PS v_adv=zinv * ( area(nz+1,n)/areasvol(nz,n) )
-                v_adv=zinv * area(nz+1,n)/areasvol(nz,n) 
+                v_adv=zinv*area(nz+1,n)/areasvol(nz,n)
                 b(nz)=b(nz)-min(0._WP, Wvel_i(nz+1, n))*v_adv
                 c(nz)=c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
             end if
-        end do ! --> do nz=nzmin+1, nzmax-2
+        end do ! --> do nz=2, nzmax-2
         
         !_______________________________________________________________________
         ! Regular part of coefficients: --> nl-1 layer
@@ -624,8 +915,8 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         zinv=1.0_WP*dt   ! no ... /(zbar(nzmax-1)-zbar(nzmax)) because of ale
         
         ! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
-        Ty= (Z_n(nz-1) -zbar_n(nz)) * zinv1 * slope_tapered(3,nz-1,n)**2 * Ki(nz-1,n) + &
-            (zbar_n(nz)-Z_n(nz)   ) * zinv1 * slope_tapered(3,nz  ,n)**2 * Ki(nz,n)
+        Ty= (Z_n(nz-1)-zbar_n(nz))   *zinv1 *slope_tapered(3,nz-1,n)**2*Ki(nz-1,n) + &
+            (zbar_n(nz)-Z_n(nz)) *zinv1 *slope_tapered(3,nz,n)**2  *Ki(nz,n)
         Ty =Ty *isredi
         ! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...
         
@@ -658,135 +949,56 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         !
         ! -+--> tr(1) =(a(1)+c(1))*tr_arr(1,n,tr_num)-c(1)*tr_arr(2,n,tr_num)
         !  |--> a(1)=0
+        !!PS nz=1
         nz=nzmin
         dz=hnode_new(nz,n) ! It would be (zbar(nz)-zbar(nz+1)) if not ALE
         tr(nz)=-(b(nz)-dz)*tr_arr(nz,n,tr_num)-c(nz)*tr_arr(nz+1,n,tr_num)
         !tr(nz)=c(nz)*(tr_arr(nz,n,tr_num) - tr_arr(nz+1,n,tr_num))
         
+        
+        ! *******************************************************************
+        ! nonlocal transport to the rhs (only T and S currently) _GO_
+        ! *******************************************************************
+        ! rsss will be used later to compute:
+        ! 1. the virtual salinity flux 
+        ! 2. the contribution from the nonlocal term in KPP for salinity
+        if (tr_num==2) then 
+            rsss=ref_sss
+                if (ref_sss_local) rsss=tr_arr(1,n,2)
+        end if
+        
+        !!PS do nz=2,nzmax-2
         do nz=nzmin+1,nzmax-2
             dz=hnode_new(nz,n)
-            tr(nz)= -a(nz)     * tr_arr(nz-1,n,tr_num) &
-                    -(b(nz)-dz)* tr_arr(nz,n,tr_num) &
-                    -c(nz)     * tr_arr(nz+1,n,tr_num)
-            !tr(nz)=-a(nz)        * tr_arr(nz-1,n,tr_num) &
-            !       +(a(nz)+c(nz))* tr_arr(nz,n,tr_num)   &
-            !       -c(nz)        * tr_arr(nz+1,n,tr_num)
+            tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)-(b(nz)-dz)*tr_arr(nz,n,tr_num)-c(nz)*tr_arr(nz+1,n,tr_num)
+            !tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num) &
+            !       -c(nz)*tr_arr(nz+1,n,tr_num) &
+            !       +(a(nz)+c(nz))*tr_arr(nz,n,tr_num)
             
+            ! *******************************************************************
+            ! nonlocal transport to the rhs (only T and S currently) _GO_
+            ! *******************************************************************
+!leads to non conservation in 8th digit. needs to be checked!
+!            if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
+!                if (tr_num==1) then ! T
+!                    tr(nz)=tr(nz)+(MIN(ghats(nz,n)*Kv(nz,n), 1.0_WP)-MIN(ghats(nz+1,n)*Kv(nz+1,n), 1.0_WP)*area(nz+1,n)/area(nz,n))*heat_flux(n)/vcpw
+!                elseif (tr_num==2) then ! S
+!                    tr(nz)=tr(nz)-(MIN(ghats(nz,n)*Kv(nz,n), 1.0_WP)-MIN(ghats(nz+1,n)*Kv(nz+1,n), 1.0_WP)*area(nz+1,n)/area(nz,n))*rsss*water_flux(n)
+!                end if
+!            end if 
         end do
-        
         nz=nzmax-1
         dz=hnode_new(nz,n)
         tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)-(b(nz)-dz)*tr_arr(nz,n,tr_num)
         !tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)+a(nz)*tr_arr(nz,n,tr_num)
         
         !_______________________________________________________________________
-        ! Add KPP nonlocal fluxes to the rhs (only T and S currently)
-        ! use here blmc or kpp_oblmixc instead of Kv, since Kv already contains 
-        ! at this point the mixing enhancments from momix, instable
-        ! mixing or windmixing which are to much for nonlocal 
-        ! transports and lead to instability of the model
-        if (use_kpp_nonlclflx) then
-            if (tr_num==2) then 
-                rsss=ref_sss
-                if (ref_sss_local) rsss=tr_arr(1,n,2)
-            end if
-            
-            !___________________________________________________________________
-            ! use fesom1.4 KPP
-            if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
-                if     (tr_num==1) then ! temperature
-                    ! --> no fluxes to the top out of the surface, no fluxes 
-                    !     downwards out of the bottom
-                    !___surface_________________________________________________
-                    nz = nzmin
-                    tr(nz)=tr(nz) &
-                               +(-MIN(ghats(nz+1,n)*blmc(nz+1,n,2), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
-                                ) * heat_flux(n) / vcpw * dt
-                    !___bulk____________________________________________________
-                    do nz=nzmin+1, nzmax-2
-                        tr(nz)=tr(nz) &
-                               +( MIN(ghats(nz  ,n)*blmc(nz  ,n,2), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
-                                 -MIN(ghats(nz+1,n)*blmc(nz+1,n,2), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
-                                ) * heat_flux(n) / vcpw * dt
-                    end do
-                    !___bottom__________________________________________________
-                    nz = nzmax-1
-                    tr(nz)=tr(nz) &
-                               +( MIN(ghats(nz  ,n)*blmc(nz  ,n,2), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
-                                ) * heat_flux(n) / vcpw * dt
-                                
-                elseif (tr_num==2) then ! salinity
-                    ! --> no fluxes to the top out of the surface, no fluxes 
-                    !     downwards out of the bottom
-                    !___surface_________________________________________________
-                    nz = nzmin
-                    tr(nz)=tr(nz) &
-                               -(-MIN(ghats(nz+1,n)*blmc(nz+1,n,3), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
-                                ) * rsss * water_flux(n) * dt
-                    !___bulk____________________________________________________            
-                    do nz=nzmin+1, nzmax-2
-                        tr(nz)=tr(nz) &
-                               -( MIN(ghats(nz  ,n)*blmc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
-                                 -MIN(ghats(nz+1,n)*blmc(nz+1,n,3), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
-                                ) * rsss * water_flux(n) * dt
-                    end do
-                    !___bottom__________________________________________________
-                    nz = nzmax-1
-                    tr(nz)=tr(nz) &
-                               -( MIN(ghats(nz  ,n)*blmc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
-                                ) * rsss * water_flux(n) * dt
-                end if 
-            !___________________________________________________________________
-            ! use cvmix KPP
-            elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
-                if     (tr_num==1) then ! temperature
-                    !___surface_________________________________________________
-                    nz = nzmin
-                    tr(nz)=tr(nz) &
-                               +(-MIN(kpp_nonlcltranspT(nz+1,n)*kpp_oblmixc(nz+1,n,2), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
-                                ) * heat_flux(n) / vcpw * dt
-                    !___bulk____________________________________________________
-                    do nz=nzmin+1, nzmax-2
-                        tr(nz)=tr(nz) &
-                               +( MIN(kpp_nonlcltranspT(nz  ,n)*kpp_oblmixc(nz  ,n,2), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
-                                 -MIN(kpp_nonlcltranspT(nz+1,n)*kpp_oblmixc(nz+1,n,2), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
-                                ) * heat_flux(n) / vcpw * dt
-                    end do
-                    !___bottom__________________________________________________
-                    nz = nzmax-1
-                    tr(nz)=tr(nz) &
-                               +( MIN(kpp_nonlcltranspT(nz  ,n)*kpp_oblmixc(nz  ,n,2), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
-                                ) * heat_flux(n) / vcpw * dt
-                                
-                elseif (tr_num==2) then ! salinity
-                    !___surface_________________________________________________
-                    nz = nzmin
-                    tr(nz)=tr(nz) &
-                               -(-MIN(kpp_nonlcltranspS(nz+1,n)*kpp_oblmixc(nz+1,n,3), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
-                                ) * rsss * water_flux(n) * dt
-                    !___bulk____________________________________________________            
-                    do nz=nzmin+1, nzmax-2
-                        tr(nz)=tr(nz) &
-                               -( MIN(kpp_nonlcltranspS(nz  ,n)*kpp_oblmixc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
-                                 -MIN(kpp_nonlcltranspS(nz+1,n)*kpp_oblmixc(nz+1,n,3), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
-                                ) * rsss * water_flux(n) * dt
-                    end do
-                    !___bottom__________________________________________________
-                    nz = nzmax-1
-                    tr(nz)=tr(nz) &
-                               -( MIN(kpp_nonlcltranspS(nz  ,n)*kpp_oblmixc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
-                                ) * rsss * water_flux(n) * dt
-                end if
-            end if
-        end if ! --> if (use_kpp_nonlclflx) then
-        
-        !_______________________________________________________________________
         ! case of activated shortwave penetration into the ocean, ad 3d contribution
         if (use_sw_pene .and. tr_num==1) then
+            !!PS do nz=1, nzmax-1
             do nz=nzmin, nzmax-1
                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
-                !!PS tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n) * ( area(nz+1,n)/areasvol(nz,n)) ) * zinv
-                tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n) * area(nz+1,n)/areasvol(nz,n)) * zinv
+                tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n)*area(nz+1,n)/areasvol(nz,n))*zinv
             end do
         end if
         
@@ -802,6 +1014,7 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         !  (BUT CHECK!)              |    |                         |    |
         !                            v   (+)                        v   (+) 
         !                            
+        !!PS tr(1)= tr(1)+bc_surface(n, tracer_id(tr_num))        
         tr(nzmin)= tr(nzmin)+bc_surface(n, tracer_id(tr_num),mesh) 
         
         !_______________________________________________________________________
@@ -825,10 +1038,13 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         !      --> dTnew_i = rhs'_i-c'_i*dTnew_i+1 ; i = n-1,n-2,...,1
         !
         ! initialize c-prime and s,t-prime
+        !!PS cp(1) = c(1)/b(1)
+        !!PS tp(1) = tr(1)/b(1)
         cp(nzmin) = c(nzmin)/b(nzmin)
         tp(nzmin) = tr(nzmin)/b(nzmin)
         
         ! solve for vectors c-prime and t, s-prime
+        !!PS do nz = 2,nzmax-1
         do nz = nzmin+1,nzmax-1
             m = b(nz)-cp(nz-1)*a(nz)
             cp(nz) = c(nz)/m
@@ -839,6 +1055,7 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         tr(nzmax-1) = tp(nzmax-1)
         
         ! solve for x from the vectors c-prime and d-prime
+        !!PS do nz = nzmax-2, 1, -1
         do nz = nzmax-2, nzmin, -1
             tr(nz) = tp(nz)-cp(nz)*tr(nz+1)
         end do
@@ -846,14 +1063,460 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         !_______________________________________________________________________
         ! update tracer
         ! tr ... dTnew = T^(n+0.5) - T*
+        !!PS do nz=1,nzmax-1
         do nz=nzmin,nzmax-1
             ! tr_arr - before ... T*
             tr_arr(nz,n,tr_num)=tr_arr(nz,n,tr_num)+tr(nz)
             ! tr_arr - after ... T^(n+0.5) = dTnew + T* = T^(n+0.5) - T* + T* 
+            
         end do
         
     end do ! --> do n=1,myDim_nod2D   
 end subroutine diff_ver_part_impl_ale
+!
+! CV: This is a new routine by Ozgur that calculates sinking into the
+! benthos layer. I adapter it for the tracer_ids (no second detritus,
+! but carbon isotopes instead
+!===============================================================================
+subroutine ver_sinking_recom_benthos(tr_num,mesh)
+    use o_ARRAYS
+    use g_PARSUP
+    use MOD_MESH
+    USE o_param
+    use g_config
+    use g_comm_auto
+    USE O_MESH
+    use g_forcing_arrays
+    use g_support
+    use ver_sinking_recom_benthos_interface
+#if defined(__recom)
+    USE REcoM_GloVar
+    use REcoM_ciso
+    use recom_config !, recom_debug
+    use g_support
+#endif
+    IMPLICIT NONE
+    type(t_mesh), intent(in) , target  :: mesh
+    integer                   :: elem,k, tr_num
+    integer                   :: nl1,ul1,nz,n,nzmin, nzmax, net
+    real(kind=WP)             :: Vben(mesh%nl),  aux(mesh%nl-1),  flux(mesh%nl), add_benthos_2d(myDim_nod2D)
+    integer                   :: nlevels_nod2D_minimum
+    real(kind=WP)             :: tv
+#include "associate_mesh.h"
+
+   do n=1, myDim_nod2D ! needs exchange_nod in the end
+        nl1=nlevels_nod2D(n)-1
+        ul1=ulevels_nod2D(n)
+        
+        aux=0._WP
+        Vben=0._WP
+        add_benthos_2d=0._WP
+
+! 1) Calculate sinking velocity for vertical sinking case
+! ******************************************************
+!!MB TEST
+!!        if (tracer_id(tr_num)==1007 .or. &  !idetn
+!!            tracer_id(tr_num)==1008 .or. &  !idetc
+!!            tracer_id(tr_num)==1017 .or. &  !idetsi
+!!            tracer_id(tr_num)==1021 .or. &  !idetcal
+!!            tracer_id(tr_num)==1308 .or. &  !idetc_13
+!!            tracer_id(tr_num)==1321 .or. &  !idetcal_13
+!!            tracer_id(tr_num)==1408 .or. &  !idetc_14
+!!            tracer_id(tr_num)==1421 ) then  !idetcal_14
+!!            
+!!            Vben = VDet
+!!	    if (allow_var_sinking) Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VDet
+!!
+!!        elseif(tracer_id(tr_num)==1004 .or. &  !iphyn
+!!               tracer_id(tr_num)==1005 .or. &  !iphyc
+!!               tracer_id(tr_num)==1020 .or. &  !iphycal
+!!               tracer_id(tr_num)==1305 .or. &  !iphyc_13
+!!               tracer_id(tr_num)==1320 .or. &  !iphycal_13
+!!               tracer_id(tr_num)==1405 .or. &  !iphyc_14
+!!               tracer_id(tr_num)==1420 .or. &  !iphycal_14
+!!               tracer_id(tr_num)==1006 ) then  !ipchl
+!!
+!!            Vben = VPhy
+!!	    if (allow_var_sinking) Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VPhy
+!!
+!!        elseif(tracer_id(tr_num)==1013 .or. &  !idian
+!!               tracer_id(tr_num)==1014 .or. &  !idiac
+!!               tracer_id(tr_num)==1314 .or. &  !idiac_13
+!!               tracer_id(tr_num)==1414 .or. &  !idiac_14
+!!               tracer_id(tr_num)==1016 .or. &  !idiasi
+!!               tracer_id(tr_num)==1015 ) then  !idchl
+!!
+!!            Vben = VDia
+!!	    if (allow_var_sinking) Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VDia
+!!end if
+if (allow_var_sinking) then
+  if (any(recom_det_tracer_id == tracer_id(tr_num))) Vben = Vdet
+  if (any(recom_phy_tracer_id == tracer_id(tr_num))) Vben = VPhy
+  if (any(recom_dia_tracer_id == tracer_id(tr_num))) Vben = VDia
+  Vben = Vdet_a * abs(zbar_3d_n(:,n)) + Vben
+end if
+      
+! Constant vertical sinking for the second detritus class
+! *******************************************************
+
+!   if (REcoM_Second_Zoo) then ! No variable sinking
+!        elseif(tracer_id(tr_num)==1025 .or. &  !idetz2n
+!               tracer_id(tr_num)==1026 .or. &  !idetz2c
+!               tracer_id(tr_num)==1027 .or. &  !idetz2si
+!               tracer_id(tr_num)==1028 ) then  !idetz2calc
+!
+!               Vben = VDet_zoo2
+!!        endif
+
+        Vben= Vben/SecondsPerDay ! conversion [m/d] --> [m/s] (vertical velocity, note that it is positive here)
+
+        k=nod_in_elem2D_num(n)
+        ! Screening minimum depth in neigbouring nodes around node n
+        nlevels_nod2D_minimum=minval(nlevels(nod_in_elem2D(1:k, n))-1)
+
+        do nz=nlevels_nod2D_minimum, nl1
+           tv = tr_arr(nz,n,tr_num)*Vben(nz)
+           aux(nz)= - tv*(area(nz,n)-area(nz+1,n))
+        end do
+
+        do nz=ul1,nl1
+           str_bf(nz,n) = str_bf(nz,n) + (aux(nz))*dt/area(nz,n)/(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))
+           !add_benthos_2d(n) = add_benthos_2d(n) - (aux(nz+1))*dt
+           add_benthos_2d(n) = add_benthos_2d(n) - (aux(nz))*dt
+        end do                 
+
+        ! Initialize sinking fluxes to zero at first call of
+        ! subroutine. This assumes that the routine is called for the
+        ! phytoplankton N tracer before it is called for all other
+        ! tracers, i.e. that the subroutine is called for the
+        ! different tracers in the order of how they are sorted in
+        ! REcoM. Not very clean, find a better solution later.
+!        if (tracer_id(tr_num)==1004 .and. use_MEDUSA) then
+!           SinkFlx(n,:) = 0.0d0 
+!        endif
+        
+        ! Particulate Organic Nitrogen
+        if(tracer_id(tr_num)==1004 .or. &  !iphyn
+             tracer_id(tr_num)==1007 .or. &  !idetn
+             tracer_id(tr_num)==1013 ) then  !idian
+           if (use_MEDUSA) then
+
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+              SinkFlx_tr(n,1,tr_num) = SinkFlx_tr(n,1,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+                             ![mmol/m2]
+        ! now SinkFlx hat the unit mmol/time step 
+        ! but mmol/sec is needed for output
+!             if (n .eq. 4) then
+!              if(tracer_id(tr_num)==1004) print *, "sink flux of phyN =", SinkFlx(n,1)
+!              if(tracer_id(tr_num)==1007) print *, "sink flux of phyN/detN =", SinkFlx(n,1)
+!              if(tracer_id(tr_num)==1013) print *, "sink flux of phyN/detN/diaN =", SinkFlx(n,1)
+!             endif
+           endif
+           if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then  
+           
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+              Benthos_tr(n,1,tr_num)= Benthos_tr(n,1,tr_num) +  add_benthos_2d(n) ![mmol]
+           endif
+        endif
+         
+        ! Particulate Organic Carbon
+        if( tracer_id(tr_num)==1005 .or. &  !iphyc
+             tracer_id(tr_num)==1008 .or. &  !idetc
+             tracer_id(tr_num)==1014 ) then  !idiac
+           if (use_MEDUSA) then
+
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+              SinkFlx_tr(n,2,tr_num) = SinkFlx_tr(n,2,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+           endif
+           if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+              Benthos_tr(n,2,tr_num)= Benthos_tr(n,2,tr_num) + add_benthos_2d(n)
+           endif
+        endif
+
+        ! Particulate Organic Silicon
+        if( tracer_id(tr_num)==1016 .or. &  !idiasi
+             tracer_id(tr_num)==1017 ) then  !idetsi
+           if (use_MEDUSA) then
+
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+              SinkFlx_tr(n,3,tr_num) = SinkFlx_tr(n,3,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+           endif
+           if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+              Benthos_tr(n,3,tr_num)= Benthos_tr(n,3,tr_num) + add_benthos_2d(n)
+           endif
+        endif
+
+        ! Calcium Carbonate
+        if( tracer_id(tr_num)==1020 .or. &  !iphycal
+             tracer_id(tr_num)==1021 ) then  !idetcal
+           if (use_MEDUSA) then
+
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+              SinkFlx_tr(n,4,tr_num) = SinkFlx_tr(n,4,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+           endif
+           if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+              Benthos_tr(n,4,tr_num)= Benthos_tr(n,4,tr_num) + add_benthos_2d(n)
+           endif
+        endif
+             
+        ! flux of 13C into the sediment
+        if (ciso) then             
+           if( tracer_id(tr_num)==1305 .or. & !iphyc_13
+                tracer_id(tr_num)==1308 .or. & !idetc_13
+                tracer_id(tr_num)==1314 ) then !idiac_14
+              if (use_MEDUSA) then
+
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                SinkFlx_tr(n,5,tr_num) = SinkFlx_tr(n,5,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+              endif
+              if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                 Benthos_tr(n,5,tr_num)= Benthos_tr(n,5,tr_num) + add_benthos_2d(n)
+              endif
+           endif
+           if( tracer_id(tr_num)==1320 .or. &  !iphycal
+                tracer_id(tr_num)==1321 ) then  !idetcal
+              if (use_MEDUSA) then
+
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                 SinkFlx_tr(n,6,tr_num) = SinkFlx_tr(n,6,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+              endif
+              if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                 Benthos_tr(n,6,tr_num)= Benthos_tr(n,6,tr_num) + add_benthos_2d(n)
+              endif
+           endif
+        endif
+        
+        ! flux of 14C into the sediment
+        if (ciso .and. ciso_organic_14) then             
+           if( tracer_id(tr_num)==1405 .or. & !iphyc_13
+                tracer_id(tr_num)==1408 .or. & !idetc_13
+                tracer_id(tr_num)==1414 ) then !idiac_14
+              if (use_MEDUSA) then
+
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                 SinkFlx_tr(n,7,tr_num) = SinkFlx_tr(n,7,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+              endif
+              if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                 Benthos_tr(n,7,tr_num)= Benthos_tr(n,7,tr_num) + add_benthos_2d(n)
+              endif
+           endif
+           if( tracer_id(tr_num)==1420 .or. &  !iphycal
+                tracer_id(tr_num)==1421 ) then  !idetcal
+              if (use_MEDUSA) then
+
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                 SinkFlx_tr(n,8,tr_num) = SinkFlx_tr(n,8,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+              endif
+              if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                 Benthos_tr(n,8,tr_num)= Benthos_tr(n,8,tr_num) + add_benthos_2d(n)
+              endif
+           endif
+        endif
+     end do
+     
+     if(use_MEDUSA) then
+        do n=1, bottflx_num
+!           SinkFlx(:,n) = Sinkflx(:,n)/dt
+
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+           call exchange_nod(SinkFlx_tr(:,n,tr_num))
+        end do
+     end if ! use_MEDUSA
+
+     do n=1, benthos_num
+
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+        call exchange_nod(Benthos_tr(:,n,tr_num))
+     end do
+end subroutine ver_sinking_recom_benthos
+
+! kh 25.03.22 integrate_bottom is apparently not really used at the moment. if it should be used, the access to Benthos(n,3) should be checked
+! because Benthos and SinkFlx values are buffered per tracer index in the meantime to avoid non bit identical results when running the tracer loop in parallel.
+subroutine integrate_bottom(tflux,mesh)
+    use o_ARRAYS
+    use g_PARSUP
+    use MOD_MESH
+    USE o_param
+    use g_config
+    use g_comm_auto
+    USE O_MESH
+    use g_forcing_arrays
+    use integrate_bottom_interface
+#if defined(__recom)
+    USE REcoM_GloVar
+    use recom_config !, recom_debug
+#endif
+    IMPLICIT NONE
+    type(t_mesh), intent(in) , target  :: mesh
+    integer                            :: elem,k, tr_num
+    integer                            :: nl1,ul1,nz,n
+    real(kind=WP)                      :: tf, aux(mesh%nl-1)
+    real(kind=WP), intent(inout)       :: tflux
+    integer                            :: nlevels_nod2D_minimum
+#include "associate_mesh.h"
+
+   tf =0._WP
+   do n=1, myDim_nod2D 
+         tf=tf+Benthos(n,3)
+   end do
+   tflux=0.0_WP
+   call MPI_AllREDUCE(tf, tflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+        MPI_COMM_FESOM, MPIerr)
+end subroutine integrate_bottom
+!
+!
+!===============================================================================
+subroutine diff_ver_recom_expl(tr_num,mesh)
+    use o_ARRAYS
+    use g_PARSUP
+    use MOD_MESH
+    USE o_param
+    use g_config
+    use g_comm_auto
+    USE O_MESH
+    use g_forcing_arrays
+    use diff_ver_recom_expl_interface
+#if defined(__recom)
+    USE REcoM_GloVar
+    use recom_config !, recom_debug
+!#if defined(__ciso)
+    use recom_ciso
+!#endif
+#endif
+    IMPLICIT NONE
+    type(t_mesh), intent(in) , target :: mesh
+    integer                  :: elem,k,tr_num
+    integer                  :: n2,nl1,nl2,nz,n,id,ul1
+    real(kind=WP)            :: vd_flux(mesh%nl)
+    integer                  :: nlevels_nod2D_minimum
+    real(kind=WP)            :: bottom_flux(myDim_nod2D+eDim_nod2D)
+
+#include "associate_mesh.h"
+
+bottom_flux = 0._WP
+id = tracer_id(tr_num)
+!if (mype==0) write (*,*) "id= ", id
+
+#if defined(__recom)
+if (use_MEDUSA .and. (sedflx_num .ne. 0)) then
+   !CV update: the calculation later has been changed by Ozgur in such
+   !a way  that now the  variable bottom_flux is in  (mol/time) units,
+   !rather than  a flux in  (mol/time/area). I therefore  multiply the
+   !Medusa fluxes by the area to get the same unit.
+   
+   SELECT CASE (id)
+    CASE (1001)
+      bottom_flux = GloSed(:,1) * area(1,:) ! DIN
+    CASE (1002)
+      bottom_flux = GloSed(:,2) * area(1,:) ! DIC
+    CASE (1003)
+      bottom_flux = GloSed(:,3) * area(1,:) ! Alk
+    CASE (1018)
+      bottom_flux = GloSed(:,4) * area(1,:) ! Si
+    CASE (1019)
+      if(use_Fe2N) then 
+        bottom_flux = GloSed(:,1) * Fe2N_benthos * area(1,:)
+      else
+        bottom_flux = GloSed(:,2) * Fe2C_benthos * area(1,:)
+      end if
+    CASE (1022)
+      bottom_flux = GloSed(:,5) * area(1,:) ! Oxy
+    CASE (1302)
+      if (ciso) then
+        bottom_flux = GloSed(:,6) * area(1,:) ! DIC_13 and Calc: DIC_13
+      end if
+    CASE (1402)
+      if (ciso) then
+        bottom_flux = GloSed(:,7) * area(1,:) ! DIC_14 and Calc: DIC_14
+      end if
+    CASE DEFAULT
+      if (mype==0) then
+         if (mype==0) write(*,*) 'check specified in boundary conditions'
+         if (mype==0) write(*,*) 'the model will stop!'
+      end if
+      call par_ex
+      stop
+  END SELECT
+else
+   SELECT CASE (id)
+    CASE (1001)
+      bottom_flux = GlodecayBenthos(:,1) !*** DIN [mmolN/m^2/s] ***
+    CASE (1002)
+      bottom_flux = GlodecayBenthos(:,2) + GlodecayBenthos(:,4) !*** DIC + calcification ***
+    CASE (1003)
+      bottom_flux = GlodecayBenthos(:,4) * 2.0_WP - 1.065 * GlodecayBenthos(:,1) !*** Alk ***
+    CASE (1018)
+      bottom_flux = GlodecayBenthos(:,3) !*** Si ***
+    CASE (1019)
+      if(use_Fe2N) then 
+        bottom_flux = GlodecayBenthos(:,1) * Fe2N_benthos !*** DFe ***
+      else
+        bottom_flux = GlodecayBenthos(:,2) * Fe2C_benthos
+      end if
+    CASE (1022)
+      bottom_flux = -GlodecayBenthos(:,2) * redO2C !*** O2 ***
+    CASE (1302)
+      if (ciso) then
+        bottom_flux = GlodecayBenthos(:,5) + GlodecayBenthos(:,6) ! DIC_13 and Calc: DIC_13
+      end if
+    CASE (1402)
+      if (ciso) then
+        bottom_flux = GlodecayBenthos(:,7) + GlodecayBenthos(:,8) ! DIC_14 and Calc: DIC_14
+      end if
+    CASE DEFAULT
+      if (mype==0) then
+         if (mype==0) write(*,*) 'check specified in boundary conditions'
+         if (mype==0) write(*,*) 'the model will stop!'
+      end if
+      call par_ex
+      stop
+  END SELECT
+endif ! (use_MEDUSA .and. (sedflux_num .gt. 0))  
+#endif
+   do n=1, myDim_nod2D
+        nl1=nlevels_nod2D(n)-1
+        ul1=ulevels_nod2D(n)
+
+        vd_flux=0._WP
+
+        k=nod_in_elem2D_num(n)
+        ! Screening minimum depth in neigbouring nodes around node n
+        nlevels_nod2D_minimum=minval(nlevels(nod_in_elem2D(1:k, n))-1)
+
+        !_______________________________________________________________________
+        ! Bottom flux
+        do nz=nlevels_nod2D_minimum, nl1
+! CV An important change by Ozgur (also changes the unit)!
+!           vd_flux(nz)=(area(nz,n)-area(nz+1,n))* bottom_flux(n)
+           vd_flux(nz)=(area(nz,n)-area(nz+1,n))* bottom_flux(n)/(area(1,n))           
+        end do
+        nz=nl1
+!        vd_flux(nz+1)= (area(nz+1,n))* bottom_flux(n)
+        vd_flux(nz+1)= (area(nz+1,n))* bottom_flux(n)/(area(1,n))
+        !_______________________________________________________________________
+        ! writing flux into rhs
+! CV vertical index has changed!
+        do nz=ul1,nl1
+            ! flux contribute only the cell through its bottom !!!
+!            dtr_bf(nz,n) = dtr_bf(nz,n) + vd_flux(nz+1)*dt/area(nz,n)/(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))
+            dtr_bf(nz,n) = dtr_bf(nz,n) + vd_flux(nz+1)*dt/areasvol(nz,n)/hnode_new(nz,n)
+        end do
+    end do
+end subroutine diff_ver_recom_expl
 !
 !
 !===============================================================================
@@ -1091,7 +1754,7 @@ SUBROUTINE diff_part_bh(ttf, mesh)
     type(t_mesh),  intent(in),    target :: mesh
     real(kind=WP), intent(inout), target :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP)                        :: u1, v1, len, vi, tt, ww 
-    integer                              :: nz, ed, el(2), en(2), k, elem, nl1, ul1
+    integer                              :: nz, ed, el(2), en(2), k, elem, nl1
     real(kind=WP), allocatable           :: temporary_ttf(:,:)
 
 #include "associate_mesh.h"
@@ -1105,14 +1768,13 @@ SUBROUTINE diff_part_bh(ttf, mesh)
        el=edge_tri(:,ed)
        en=edges(:,ed)
        len=sqrt(sum(elem_area(el)))
-       ul1=minval(ulevels_nod2D_max(en))
        nl1=maxval(nlevels_nod2D_min(en))-1
-       DO  nz=ul1,nl1
+       DO  nz=1,nl1
            u1=UV(1, nz,el(1))-UV(1, nz,el(2))
            v1=UV(2, nz,el(1))-UV(2, nz,el(2))
            vi=u1*u1+v1*v1
            tt=ttf(nz,en(1))-ttf(nz,en(2))
-           vi=sqrt(max(gamma0_tra, max(gamma1_tra*sqrt(vi), gamma2_tra*vi))*len)
+           vi=sqrt(max(gamma0, max(gamma1*sqrt(vi), gamma2*vi))*len)
            !vi=sqrt(max(sqrt(u1*u1+v1*v1),0.04)*le)  ! 10m^2/s for 10 km (0.04 h/50)
            !vi=sqrt(10.*le)
            tt=tt*vi
@@ -1129,14 +1791,13 @@ SUBROUTINE diff_part_bh(ttf, mesh)
           el=edge_tri(:,ed)
           en=edges(:,ed)
           len=sqrt(sum(elem_area(el)))
-          ul1=minval(ulevels_nod2D_max(en))
           nl1=maxval(nlevels_nod2D_min(en))-1
-          DO  nz=ul1,nl1
+          DO  nz=1,nl1
               u1=UV(1, nz,el(1))-UV(1, nz,el(2))
               v1=UV(2, nz,el(1))-UV(2, nz,el(2))
               vi=u1*u1+v1*v1
               tt=temporary_ttf(nz,en(1))-temporary_ttf(nz,en(2))
-              vi=sqrt(max(gamma0_tra, max(gamma1_tra*sqrt(vi), gamma2_tra*vi))*len)
+              vi=sqrt(max(gamma0, max(gamma1*sqrt(vi), gamma2*vi))*len)
               !vi=sqrt(max(sqrt(u1*u1+v1*v1),0.04)*le)  ! 10m^2/s for 10 km (0.04 h/50)
               !vi=sqrt(10.*le) 
               tt=-tt*vi*dt
@@ -1157,6 +1818,11 @@ FUNCTION bc_surface(n, id, mesh)
   USE g_forcing_arrays
   USE g_PARSUP, only: mype, par_ex
   USE g_config
+#if defined(__recom)
+USE REcoM_GloVar
+use recom_config, only: ciso,use_MEDUSA,add_loopback,useRivers,recom_debug
+use REcoM_ciso
+#endif
   implicit none
   
   type(t_mesh), intent(in) , target :: mesh  
@@ -1174,14 +1840,111 @@ FUNCTION bc_surface(n, id, mesh)
         !     by forming/melting of sea ice
         bc_surface= dt*(virtual_salt(n) & !--> is zeros for zlevel/zstar
                     + relax_salt(n) - real_salt_flux(n)*is_nonlinfs)
-    CASE (101) ! apply boundary conditions to tracer ID=101
-        bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)
+!!!wiso-code!!!
+    CASE (101) ! apply boundary conditions to tracer ID=101 (H218O)
+        bc_surface = dt*o18_flux(n)
+    CASE (102)  ! apply boundary conditions to tracer ID=102 (HDO)
+        bc_surface = dt*hdo_flux(n)
+    CASE (103)  ! apply boundary conditions to tracer ID=103 (H216O)
+        bc_surface = dt*o16_flux(n)
+!!!wiso-code-end!!!
     CASE (301)
         bc_surface=0.0_WP
     CASE (302)
         bc_surface=0.0_WP
     CASE (303)
         bc_surface=0.0_WP
+#if defined(__recom)
+    CASE (1001) ! DIN
+        if (use_MEDUSA .and. add_loopback) then
+           bc_surface= dt*(AtmNInput(n) + lb_flux(n,1))
+        else
+           bc_surface= dt*(AtmNInput(n))
+        end if
+!       if (mype==0) then
+!         write(*,*) '____________________________________________________________'
+!         write(*,*) ' --> DIN_surface,  = ', bc_surface
+!       endif
+    CASE (1002) ! DIC
+        if (use_MEDUSA .and. add_loopback) then
+            bc_surface= dt*(GloCO2flux_seaicemask(n) &
+                        + lb_flux(n,2) + lb_flux(n,5))
+        else
+            bc_surface= dt*(GloCO2flux_seaicemask(n))
+        end if
+!       if (mype==0) then
+!         write(*,*) '____________________________________________________________'
+!         write(*,*) ' --> DIC_surface,  = ', bc_surface
+!       endif
+    CASE (1003) ! Alk
+        if (use_MEDUSA .and. add_loopback) then
+            bc_surface= dt*(virtual_alk(n) + relax_alk(n)     &
+                        + lb_flux(n,3) + lb_flux(n,5)*2)
+                ! 1 mole CaCO3 burial removes 2 moles Alk
+        else
+            bc_surface= dt*(virtual_alk(n) + relax_alk(n))
+        end if
+!       if (mype==0) then
+!         write(*,*) '____________________________________________________________'
+!         write(*,*) ' --> Alk_surface,  = ', bc_surface
+!       endif
+    CASE (1004:1017)
+        bc_surface=0.0_WP
+    CASE (1018) ! Si
+        if (use_MEDUSA .and. add_loopback) then
+            bc_surface= dt*(lb_flux(n,4))
+        else
+            bc_surface=0.0_WP
+        end if
+!       if (mype==0) then
+!         write(*,*)'____________________________________________________________'
+!         write(*,*) ' --> DSi_surface,  = ', bc_surface
+!       endif
+    CASE (1019) ! Fei
+        if (useRivers) then
+            bc_surface= dt*(AtmFeInput(n) + RiverFe(n))
+        else
+            bc_surface= dt*(AtmFeInput(n))
+        end if
+!       if (mype==0) then
+!         write(*,*) '____________________________________________________________'
+!         write(*,*) ' --> Fe_surface,  = ', bc_surface
+!       endif
+    CASE (1020:1021) ! Si (Ying: really Si? not Calc?) 
+        bc_surface=0.0_WP  ! OG added bc for recom fields 
+    CASE (1022) ! OXY
+        bc_surface= dt*GloO2flux_seaicemask(n)
+    CASE (1023:1099) ! Si (Ying: Si again?)
+        bc_surface=0.0_WP  ! OG added bc for recom fields 
+!ciso added by MB
+    CASE (1302) ! DIC_13
+         if (ciso) then 
+            if (use_MEDUSA .and. add_loopback) then
+               bc_surface= dt*(GloCO2flux_seaicemask_13(n) &
+                           + lb_flux(n,6) + lb_flux(n,7))
+            else
+               bc_surface= dt*(GloCO2flux_seaicemask_13(n))
+            end if
+         else
+           bc_surface=0.0_WP
+         end if
+    CASE (1305:1321)
+         bc_surface=0.0_WP ! organic 13C
+    CASE (1402) ! DIC_14
+         if (ciso .and. ciso_14) then
+             if (use_MEDUSA .and. add_loopback .and. ciso_organic_14) then
+                 bc_surface= dt*(GloCO2flux_seaicemask_14(n) &
+                             + lb_flux(n,8) + lb_flux(n,9))
+             else
+                 bc_surface= dt*GloCO2flux_seaicemask_14(n)
+             end if
+         else
+           bc_surface=0.0_WP
+         end if
+    CASE (1405:1421)
+         bc_surface=0.0_WP ! organic 14C
+!ciso added by MB
+#endif 
     CASE DEFAULT
       if (mype==0) then
          write (id_string, "(I3)") id
@@ -1193,3 +1956,39 @@ FUNCTION bc_surface(n, id, mesh)
   END SELECT
   RETURN
 END FUNCTION
+
+
+! kh 11.11.21 divide the range specified by indexcount into fesom_group_count equal slices and calculate
+! the start_index and end_index for the given fesom_group_id.
+! if necessary to compensate for fragmentation, the end index of the first n slices 
+! might be one higher than for the remaining slices. this is indicated by end_index_is_one_higher
+subroutine calc_slice(index_count, fesom_group_count, fesom_group_id, start_index, end_index, index_count_in_group, end_index_is_one_higher)
+!   use g_config
+
+    implicit none
+    integer, intent(in)      :: index_count
+    integer, intent(in)      :: fesom_group_count
+    integer, intent(in)      :: fesom_group_id
+    integer, intent(out)     :: start_index
+    integer, intent(out)     :: end_index
+    integer, intent(out)     :: index_count_in_group
+    logical, intent(out)     :: end_index_is_one_higher
+
+    integer                  :: group_id_limit_to_adjust_end_index
+
+    index_count_in_group               = index_count / fesom_group_count
+    group_id_limit_to_adjust_end_index = mod(index_count, fesom_group_count)
+    start_index                        = (fesom_group_id * index_count_in_group) + 1
+
+! kh 11.11.21 adjust loop start and number of loop iterations by 1 if necessary
+    if(fesom_group_id < group_id_limit_to_adjust_end_index) then
+      start_index = start_index + fesom_group_id
+      index_count_in_group = index_count_in_group + 1
+      end_index_is_one_higher = .true.
+    else
+      start_index = start_index + group_id_limit_to_adjust_end_index
+      end_index_is_one_higher = .false.
+    end if
+
+    end_index  = start_index + index_count_in_group - 1
+end subroutine calc_slice

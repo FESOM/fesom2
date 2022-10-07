@@ -572,10 +572,7 @@ subroutine init_thickness_ale(mesh)
     end if
     !___________________________________________________________________________
     ! Fill in ssh_rhs_old
-    !!PS ssh_rhs_old=(hbar-hbar_old)*area(1,:)/dt
-    do n=1,myDim_nod2D+eDim_nod2D
-        ssh_rhs_old(n)=(hbar(n)-hbar_old(n))*areasvol(ulevels_nod2D(n),n)/dt  ! --> TEST_cavity
-    end do
+    ssh_rhs_old=(hbar-hbar_old)*area(1,:)/dt
     
     ! -->see equation (14) FESOM2:from finite elements to finie volume
     eta_n=alpha*hbar_old+(1.0_WP-alpha)*hbar   
@@ -790,8 +787,6 @@ subroutine init_thickness_ale(mesh)
     !___________________________________________________________________________
     hnode_new=hnode  ! Should be initialized, because only variable part is updated.
    
-    !!PS call check_total_volume(mesh)
-    
 end subroutine init_thickness_ale
 !
 !
@@ -1026,6 +1021,11 @@ subroutine restart_thickness_ale(mesh)
             nzmax = nlevels_nod2D(n)-1
             
             !___________________________________________________________________
+            ! if there is a cavity layer thickness is not updated, its 
+            ! kept fixed 
+            if (nzmin > 1) cycle
+            
+            !___________________________________________________________________
             ! be sure that bottom layerthickness uses partial cell layer thickness
             ! in case its activated, especially when you make a restart from a non 
             ! partiall cell runs towards a simulation with partial cells
@@ -1044,6 +1044,11 @@ subroutine restart_thickness_ale(mesh)
         do elem=1, myDim_elem2D
             nzmin = ulevels(elem)
             nzmax = nlevels(elem)-1
+            
+            !___________________________________________________________________
+            ! if there is a cavity layer thickness is not updated, its 
+            ! kept fixed 
+            if (nzmin > 1) cycle
             
             !___________________________________________________________________
             elnodes=elem2D_nodes(:, elem)
@@ -1209,7 +1214,7 @@ subroutine init_stiff_mat_ale(mesh)
             
             if (el(i)<1) cycle ! if el(i)<1, it means its an outer boundary edge this
                             ! has only one triangle element to which it contribute
-                            
+            
             ! which three nodes span up triangle el(i)
             ! elnodes ... node indices 
             elnodes=elem2D_nodes(:,el(i))
@@ -1261,12 +1266,8 @@ subroutine init_stiff_mat_ale(mesh)
     ! 2nd do first term of lhs od equation (18) of "FESOM2 from finite element to finite volumes"
     ! Mass matrix part
     do row=1, myDim_nod2D
-        ! if cavity no time derivative for eta in case of rigid lid approximation at
-        ! thee cavity-ocean interface, which means cavity-ocean interface is not allowed 
-        ! to move vertically.
-        if (ulevels_nod2D(row)>1) cycle
         offset = ssh_stiff%rowptr(row)
-        SSH_stiff%values(offset) = SSH_stiff%values(offset)+ areasvol(ulevels_nod2D(row),row)/dt
+        SSH_stiff%values(offset) = SSH_stiff%values(offset)+ area(1,row)/dt
     end do
     deallocate(n_pos,n_num)
     
@@ -1555,15 +1556,11 @@ subroutine compute_ssh_rhs_ale(mesh)
     if ( .not. trim(which_ALE)=='linfs') then
         do n=1,myDim_nod2D
             nzmin = ulevels_nod2D(n)
-            if (ulevels_nod2D(n)>1) then
-                ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)
-            else
-                ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)+(1.0_WP-alpha)*ssh_rhs_old(n)
-            end if 
+            ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*area(nzmin,n)+(1.0_WP-alpha)*ssh_rhs_old(n)
+            !!PS ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*area(1,n)+(1.0_WP-alpha)*ssh_rhs_old(n)
         end do
     else
         do n=1,myDim_nod2D
-            if (ulevels_nod2D(n)>1) cycle
             ssh_rhs(n)=ssh_rhs(n)+(1.0_WP-alpha)*ssh_rhs_old(n)
         end do
     end if
@@ -1643,22 +1640,30 @@ subroutine compute_hbar_ale(mesh)
         !_______________________________________________________________________
         ssh_rhs_old(enodes(1))=ssh_rhs_old(enodes(1))+(c1+c2)
         ssh_rhs_old(enodes(2))=ssh_rhs_old(enodes(2))-(c1+c2)
+        
     end do
     
     !___________________________________________________________________________
     ! take into account water flux
+!!PS     if (.not. trim(which_ALE)=='linfs') then
+!!PS         ssh_rhs_old(1:myDim_nod2D)=ssh_rhs_old(1:myDim_nod2D)-water_flux(1:myDim_nod2D)*area(1,1:myDim_nod2D)
+!!PS         call exchange_nod(ssh_rhs_old) 
+!!PS     end if
     if (.not. trim(which_ALE)=='linfs') then
         do n=1,myDim_nod2D
-            ssh_rhs_old(n)=ssh_rhs_old(n)-water_flux(n)*areasvol(ulevels_nod2D(n),n)
+            ssh_rhs_old(n)=ssh_rhs_old(n)-water_flux(n)*area(ulevels_nod2D(n),n)
         end do
         call exchange_nod(ssh_rhs_old) 
     end if 
     
     !___________________________________________________________________________
     ! update the thickness
+!!PS     hbar_old=hbar
+!!PS     hbar(1:myDim_nod2D)=hbar_old(1:myDim_nod2D)+ssh_rhs_old(1:myDim_nod2D)*dt/area(1,1:myDim_nod2D)
+!!PS     call exchange_nod(hbar)
     hbar_old=hbar
     do n=1,myDim_nod2D
-        hbar(n)=hbar_old(n)+ssh_rhs_old(n)*dt/areasvol(ulevels_nod2D(n),n)
+        hbar(n)=hbar_old(n)+ssh_rhs_old(n)*dt/area(ulevels_nod2D(n),n)
     end do
     call exchange_nod(hbar)  
         
@@ -1702,7 +1707,7 @@ subroutine vert_vel_ale(mesh)
     use g_forcing_arrays !!PS
     implicit none
     
-    integer       :: el(2), enodes(2), n, nz, ed, nzmin, nzmax, uln1, uln2, nln1, nln2
+    integer       :: el(2), enodes(2), n, nz, ed, nzmin, nzmax
     real(kind=WP) :: c1, c2, deltaX1, deltaY1, deltaX2, deltaY2, dd, dd1, dddt, cflmax
     
     !_______________________________
@@ -1738,7 +1743,7 @@ subroutine vert_vel_ale(mesh)
         ! do it with gauss-law: int( div(u_vec)*dV) = int( u_vec * n_vec * dS )
         nzmin = ulevels(el(1))
         nzmax = nlevels(el(1))-1
-        
+        !!PS do nz=nlevels(el(1))-1,1,-1
         do nz = nzmax, nzmin, -1
             ! --> h * u_vec * n_vec
             ! --> e_vec = (dx,dy), n_vec = (-dy,dx);
@@ -1754,6 +1759,7 @@ subroutine vert_vel_ale(mesh)
                 fer_Wvel(nz,enodes(1))=fer_Wvel(nz,enodes(1))+c1
                 fer_Wvel(nz,enodes(2))=fer_Wvel(nz,enodes(2))-c1
             end if  
+            
         end do
         
         !_______________________________________________________________________
@@ -1763,8 +1769,8 @@ subroutine vert_vel_ale(mesh)
             deltaX2=edge_cross_dxdy(3,ed)
             deltaY2=edge_cross_dxdy(4,ed)
             nzmin = ulevels(el(2))
-            nzmax = nlevels(el(2))-1 
-            
+            nzmax = nlevels(el(2))-1
+            !!PS do nz=nlevels(el(2))-1,1,-1
             do nz = nzmax, nzmin, -1
                 c2=-(UV(2,nz,el(2))*deltaX2 - UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
                 Wvel(nz,enodes(1))=Wvel(nz,enodes(1))+c2
@@ -1789,7 +1795,7 @@ subroutine vert_vel_ale(mesh)
     do n=1, myDim_nod2D
         nzmin = ulevels_nod2D(n)
         nzmax = nlevels_nod2d(n)-1
-        
+        !!PS do nz=nl-1,1,-1
         do nz=nzmax,nzmin,-1
             Wvel(nz,n)=Wvel(nz,n)+Wvel(nz+1,n)
             if (Fer_GM) then 
@@ -1804,13 +1810,12 @@ subroutine vert_vel_ale(mesh)
     do n=1, myDim_nod2D
         nzmin = ulevels_nod2D(n)
         nzmax = nlevels_nod2d(n)-1
-        
+        !!PS do nz=1,nlevels_nod2D(n)-1
         do nz=nzmin,nzmax
             Wvel(nz,n)=Wvel(nz,n)/area(nz,n)
             if (Fer_GM) then 
-                fer_Wvel(nz,n)=fer_Wvel(nz,n)/area(nz,n)
+                fer_Wvel(nz,n)=fer_Wvel(nz,n)/area(nz,n)          
             end if
-            
         end do
     end do
     ! |
@@ -2400,7 +2405,16 @@ DO elem=1,myDim_elem2D
         
         b(nz)=b(nz)-min(0._WP, wd)*zinv
         c(nz)=c(nz)-max(0._WP, wd)*zinv
-        
+        if (a(nz)/=a(nz) .or. b(nz)/=b(nz) .or. c(nz)/=c(nz)) then 
+            write(*,*) ' --> found a,b,c is NaN'
+            write(*,*) 'mype=',mype
+            write(*,*) 'nz=',nz
+            write(*,*) 'a(nz), b(nz), c(nz)=',a(nz), b(nz), c(nz)
+            write(*,*) 'Av(nz,elem)=',Av(nz,elem)
+            write(*,*) 'Av(nz+1,elem)=',Av(nz+1,elem)
+            write(*,*) 'Z_n(nz-1:nz+1)=',Z_n(nz-1:nz+1)
+            write(*,*) 'zbar_n(nz:nz+1)=',zbar_n(nz:nz+1)
+        endif 
     end do
     ! The last row
     zinv=1.0_WP*dt/(zbar_n(nzmax-1)-zbar_n(nzmax))
@@ -2545,11 +2559,9 @@ subroutine oce_timestep_ale(n, mesh)
 
     t0=MPI_Wtime()
     
-!     water_flux = 0.0_WP
-!     heat_flux  = 0.0_WP
-!     stress_surf= 0.0_WP
-!     stress_node_surf= 0.0_WP
-    
+!!PS     water_flux = 0.0_WP
+!!PS     heat_flux  = 0.0_WP
+!!PS     stress_surf= 0.0_WP
     !___________________________________________________________________________
     ! calculate equation of state, density, pressure and mixed layer depths
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_bv'//achar(27)//'[0m'
@@ -2657,13 +2669,6 @@ subroutine oce_timestep_ale(n, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'
-    
-!!PS         if (any(UV_rhs/=UV_rhs))           write(*,*) n, mype,' --> found NaN UV_rhs before compute_vel_rhs'
-!!PS         if (any(UV/=UV))                   write(*,*) n, mype,' --> found NaN UV before compute_vel_rhs'
-!!PS         if (any(ssh_rhs/=ssh_rhs))         write(*,*) n, mype,' --> found NaN ssh_rhs before compute_vel_rhs'
-!!PS         if (any(ssh_rhs_old/=ssh_rhs_old)) write(*,*) n, mype,' --> found NaN ssh_rhs_old before compute_vel_rhs'
-!!PS         if (any(abs(Wvel_e)>1.0e20))       write(*,*) n, mype,' --> found Inf Wvel_e before compute_vel_rhs'
-    
     if(mom_adv/=3) then
         call compute_vel_rhs(mesh)
     else
@@ -2671,13 +2676,14 @@ subroutine oce_timestep_ale(n, mesh)
     end if
     
     !___________________________________________________________________________
+    if (any(UV_rhs/=UV_rhs)) write(*,*) ' --> found NaN UV_rhs MARK 2'
     call viscosity_filter(visc_option, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call impl_vert_visc_ale'//achar(27)//'[0m'
     if(i_vert_visc) call impl_vert_visc_ale(mesh)
     t2=MPI_Wtime()
-        
+    
     !___________________________________________________________________________
     ! >->->->->->->->->->->->->     ALE-part starts     <-<-<-<-<-<-<-<-<-<-<-<-
     !___________________________________________________________________________
@@ -2692,7 +2698,6 @@ subroutine oce_timestep_ale(n, mesh)
     ! Take updated ssh matrix and solve --> new ssh!
     t30=MPI_Wtime() 
     call solve_ssh_ale(mesh)
-    
     if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) call relax_zonal_vel(mesh)
     t3=MPI_Wtime() 
 
@@ -2709,27 +2714,20 @@ subroutine oce_timestep_ale(n, mesh)
     call compute_hbar_ale(mesh)
     
     !___________________________________________________________________________
-    ! - Current dynamic elevation alpha*hbar(n+1/2)+(1-alpha)*hbar(n-1/2)
-    !   equation (14) Danlov et.al "the finite volume sea ice ocean model FESOM2
-    !   ...if we do it here we don't need to write hbar_old into a restart file...
-    ! - where(ulevels_nod2D==1) is used here because of the rigid lid 
-    !   approximation under the cavity 
-    ! - at points in the cavity the time derivative term in ssh matrix will be 
-    !   omitted; and (14) will not be applied at cavity points. Additionally,
-    !   since there is no real elevation, but only surface pressure, there is 
-    !   no layer motion under the cavity. In this case the ice sheet acts as a 
-    !   rigid lid.
-    where(ulevels_nod2D==1) eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old
+    ! Current dynamic elevation alpha*hbar(n+1/2)+(1-alpha)*hbar(n-1/2)
+    ! equation (14) Danlov et.al "the finite volume sea ice ocean model FESOM2
+    ! ...if we do it here we don't need to write hbar_old into a restart file...
+    eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old
+
     ! --> eta_(n)
     ! call zero_dynamics !DS, zeros several dynamical variables; to be used for testing new implementations!
     t5=MPI_Wtime() 
     
-    !___________________________________________________________________________
-    ! Do horizontal and vertical scaling of GM/Redi  diffusivity 
     if (Fer_GM .or. Redi) then
         call init_Redi_GM(mesh)
     end if
     
+    !___________________________________________________________________________
     ! Implementation of Gent & McWiliams parameterization after R. Ferrari et al., 2010
     ! does not belong directly to ALE formalism
     if (Fer_GM) then
@@ -2760,11 +2758,16 @@ subroutine oce_timestep_ale(n, mesh)
     
     !___________________________________________________________________________
     ! write out global fields for debugging
-    call write_step_info(n,logfile_outfreq, mesh)
-    
-    ! check model for blowup --> ! write_step_info and check_blowup require 
-    ! togeather around 2.5% of model runtime
-    call check_blowup(n, mesh)
+
+! kh 19.11.21
+    if(my_fesom_group == 0) then
+        call write_step_info(n,logfile_outfreq, mesh)
+        
+        ! check model for blowup --> ! write_step_info and check_blowup require 
+        ! togeather around 2.5% of model runtime
+        call check_blowup(n, mesh)
+    end if
+
     t10=MPI_Wtime()
     !___________________________________________________________________________
     ! write out execution times for ocean step parts
@@ -2776,24 +2779,28 @@ subroutine oce_timestep_ale(n, mesh)
     rtime_oce_GMRedi   = rtime_oce_GMRedi + (t6-t5)
     rtime_oce_solvetra = rtime_oce_solvetra + (t8-t7)
     rtime_tot          = rtime_tot + (t10-t0)-(t10-t9)
-    if(mod(n,logfile_outfreq)==0 .and. mype==0) then  
-        write(*,*) '___ALE OCEAN STEP EXECUTION TIMES______________________'
-        write(*,"(A, ES10.3)") '     Oce. Mix,Press.. :', t1-t0
-        write(*,"(A, ES10.3)") '     Oce. Dynamics    :', t2-t1
-        write(*,"(A, ES10.3)") '     Oce. Update Vel. :', t4-t3
-        write(*,"(A, ES10.3)") '     Oce. Fer-GM.     :', t6-t5
-        write(*,*) '    _______________________________'
-        write(*,"(A, ES10.3)") '     ALE-Solve SSH    :', t3-t2
-        write(*,"(A, ES10.3)") '     ALE-Calc. hbar   :', t5-t4
-        write(*,"(A, ES10.3)") '     ALE-Update+W     :', t7-t6
-        write(*,"(A, ES10.3)") '     ALE-Solve Tracer :', t8-t7
-        write(*,"(A, ES10.3)") '     ALE-Update hnode :', t9-t8
-        write(*,*) '    _______________________________'
-        write(*,"(A, ES10.3)") '     check for blowup :', t10-t9
-        write(*,*) '    _______________________________'
-        write(*,"(A, ES10.3)") '     Oce. TOTAL       :', t10-t0
-        write(*,*)
-        write(*,*)
+
+! kh 19.11.21
+    if(my_fesom_group == 0) then
+        if(mod(n,logfile_outfreq)==0 .and. mype==0) then  
+            write(*,*) '___ALE OCEAN STEP EXECUTION TIMES______________________'
+            write(*,"(A, ES10.3)") '     Oce. Mix,Press.. :', t1-t0
+            write(*,"(A, ES10.3)") '     Oce. Dynamics    :', t2-t1
+            write(*,"(A, ES10.3)") '     Oce. Update Vel. :', t4-t3
+            write(*,"(A, ES10.3)") '     Oce. Fer-GM.     :', t6-t5
+            write(*,*) '    _______________________________'
+            write(*,"(A, ES10.3)") '     ALE-Solve SSH    :', t3-t2
+            write(*,"(A, ES10.3)") '     ALE-Calc. hbar   :', t5-t4
+            write(*,"(A, ES10.3)") '     ALE-Update+W     :', t7-t6
+            write(*,"(A, ES10.3)") '     ALE-Solve Tracer :', t8-t7
+            write(*,"(A, ES10.3)") '     ALE-Update hnode :', t9-t8
+            write(*,*) '    _______________________________'
+            write(*,"(A, ES10.3)") '     check for blowup :', t10-t9
+            write(*,*) '    _______________________________'
+            write(*,"(A, ES10.3)") '     Oce. TOTAL       :', t10-t0
+            write(*,*)
+            write(*,*)
+        end if
     end if
 
 end subroutine oce_timestep_ale

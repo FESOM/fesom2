@@ -372,8 +372,6 @@ subroutine init_fields_na_test(mesh)
 
 #include "associate_mesh.h"
 
-  c_status = .false.
-
   ! ===================
   ! Fill the model fields with dummy values
   ! ===================
@@ -479,8 +477,6 @@ subroutine init_fields_global_test(mesh)
   type(t_mesh), intent(in)           , target :: mesh
 
 #include "associate_mesh.h"
-
-  c_status = .false.
 
   ! ===================
   ! Fill the model fields with dummy values

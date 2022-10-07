@@ -115,7 +115,7 @@ MODULE io_BLOWUP
 !!PS 		call def_variable(bid, 'pgf_y'	, (/nl-1, elem2D/)	, 'meridional pressure gradient force', '???', pgf_y(:,:));
 !!PS 		call def_variable(bid, 'density_m_rho0'	, (/nl-1, nod2D/)	, 'density minus rho0', '???', density_m_rho0(:,:));
 		
-		do j=1,num_tracers
+		do j=1,num_tracers 
 			SELECT CASE (j) 
 			CASE(1)
 				trname='temp'
@@ -126,8 +126,8 @@ MODULE io_BLOWUP
 				longname='salinity'
 				units='psu'
 			CASE DEFAULT
-				write(trname,'(A3,i1)') 'ptr', j
-				write(longname,'(A15,i1)') 'passive tracer ', j
+				write(trname,'(A3,i4.4)') 'ptr', j
+				write(longname,'(A15,i4.4)') 'passive tracer ', j
 				units='none'
 			END SELECT
 			call def_variable(bid, trim(trname),       (/nl-1, nod2D/), trim(longname), trim(units), tr_arr(:,:,j));

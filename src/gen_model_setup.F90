@@ -20,6 +20,10 @@ subroutine read_namelist
                          ldiag_dMOC, ldiag_DVD, diag_list
   use g_clock, only: timenew, daynew, yearnew
   use g_ic3d 
+#ifdef __recom                   
+  use recom_config
+  use REcoM_ciso
+#endif 
   implicit none
 
   character(len=MAX_PATH)   :: nmlfile
@@ -79,7 +83,38 @@ subroutine read_namelist
   open (20,file=nmlfile)
   read (20,NML=diag_list)
   close (20)
-
+#ifdef __recom              
+  nmlfile ='namelist.recom' ! name of recom namelist file
+  open (20,file=nmlfile)
+  read (20,NML=pavariables)
+  read (20,NML=pasinking)
+  read (20,NML=painitialization_N)
+  read (20,NML=paArrhenius)
+  read (20,NML=palimiter_function)
+  read (20,NML=palight_calculations)
+  read (20,NML=paphotosynthesis)
+  read (20,NML=paassimilation)
+  read (20,NML=pairon_chem)
+  read (20,NML=pazooplankton)
+  read (20,NML=pasecondzooplankton)
+  read (20,NML=paaggregation)
+  read (20,NML=padin_rho_N)
+  read (20,NML=padic_rho_C1)
+  read (20,NML=paphytoplankton_N)
+  read (20,NML=paphytoplankton_C)
+  read (20,NML=paphytoplankton_ChlA)
+  read (20,NML=padetritus_N)
+  read (20,NML=padetritus_C)
+  read (20,NML=paheterotrophs)
+  read (20,NML=paseczooloss)
+  read (20,NML=pairon)
+  read (20,NML=pacalc)
+  read (20,NML=pabenthos_decay_rate)
+  read (20,NML=paco2_flux_param)
+  read (20,NML=paalkalinity_restoring)
+  read (20,NML=paciso)
+  close (20)
+#endif
   if(mype==0) write(*,*) 'Namelist files are read in'
   
   !_____________________________________________________________________________
@@ -116,6 +151,31 @@ subroutine read_namelist
 
 ! if ((output_length_unit=='s').or.(int(real(step_per_day)/24.0)<=1)) use_means=.false.
 end subroutine read_namelist
+
+! kh 11.11.21 read num_fesom_groups for multi FESOM group loop parallelization
+! =================================================================
+subroutine read_namelist_run_config
+  ! Reads run_config namelist and overwrite default parameters.
+  !
+  ! kh 11.11.21 Copied by Kai Himstedt (based on read_namelist)
+  !--------------------------------------------------------------
+  use g_parsup
+  use g_config
+  implicit none
+
+  character(len=100)   :: nmlfile
+
+  nmlfile ='namelist.config'    ! name of general configuration namelist file
+  open (20,file=nmlfile)
+  read (20,NML=run_config)
+!!$  read (20,NML=machine)
+  close (20)
+! if(mype==0) write(*,*) 'run_config namelist is read in'
+end subroutine read_namelist_run_config
+! =================================================================
+
+
+
 ! =================================================================
 subroutine get_run_steps(nsteps)
   ! Coded by Qiang Wang

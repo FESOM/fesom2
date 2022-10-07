@@ -58,6 +58,7 @@ type(t_mesh), intent(in), target  :: mesh
   do el=1,myDim_elem2D
      !__________________________________________________________________________
      ! if element contains cavity node skip it 
+     !!PS if ( any(ulevels_nod2d(elem2D_nodes(:,el)) > 1) ) cycle
      if (ulevels(el) > 1) cycle
      
      ! ===== Check if there is ice on elem
@@ -165,6 +166,7 @@ type(t_mesh), intent(in)              , target :: mesh
   do el=1,myDim_elem2D
      !__________________________________________________________________________
      ! if element contains cavity node skip it 
+     !!PS if ( any(ulevels_nod2d(elem2D_nodes(:,el)) > 1) ) cycle
      if (ulevels(el) > 1) cycle
       ! ===== Check if there is ice on elem
 
@@ -201,10 +203,7 @@ type(t_mesh), intent(in)              , target :: mesh
       
       ! ===== if delta is too small or zero, viscosity will too large (unlimited)
       ! (limit delta_inv)
-        delta_inv = 1.0_WP/max(delta,delta_min)
-        
-!!PS         delta_inv = delta/(delta+delta_min)
-        
+        delta_inv = 1.0_WP/max(delta,delta_min) 
         zeta = ice_strength(el)*delta_inv			     
       ! ===== Limiting pressure/Delta  (zeta): it may still happen that pressure/Delta 
       ! is too large in some regions and CFL criterion is violated.
@@ -219,7 +218,7 @@ type(t_mesh), intent(in)              , target :: mesh
       !end if 
       
         zeta = zeta*Tevp_inv
-        
+      				     
         r1  = zeta*(eps11(el)+eps22(el)) - ice_strength(el)*Tevp_inv
         r2  = zeta*(eps11(el)-eps22(el))*vale
         r3  = zeta*eps12(el)*vale
@@ -248,7 +247,6 @@ USE i_PARAM
 USE i_therm_param
 USE i_arrays
 USE g_PARSUP
-use g_config, only: use_cavity
 
 
 IMPLICIT NONE
@@ -268,13 +266,7 @@ type(t_mesh), intent(in)              , target :: mesh
  DO  ed=1,myDim_edge2D
     ednodes=edges(:,ed) 
     el=edge_tri(:,ed)
-    if(myList_edge2D(ed)>edge2D_in) cycle    
-
-    ! stress boundary condition at ocean cavity boundary edge ==0
-    if (use_cavity) then 
-        if ( (ulevels(el(1))>1) .or.  ( el(2)>0 .and. ulevels(el(2))>1) ) cycle
-    end if 
-    
+    if(myList_edge2D(ed)>edge2D_in) cycle     
     ! elements on both sides
     uc = - sigma12(el(1))*edge_cross_dxdy(1,ed) + sigma11(el(1))*edge_cross_dxdy(2,ed) &
          + sigma12(el(2))*edge_cross_dxdy(3,ed) - sigma11(el(2))*edge_cross_dxdy(4,ed)
@@ -353,6 +345,7 @@ do el=1,myDim_elem2D
 !   if (any(m_ice(elnodes)<= 0.) .or. any(a_ice(elnodes) <=0.)) CYCLE 
    !____________________________________________________________________________
    ! if element contains cavity node skip it 
+   !!OS if ( any(ulevels_nod2d(elem2D_nodes(:,el)) > 1) ) cycle
    if (ulevels(el) > 1) cycle
    
    !____________________________________________________________________________
@@ -495,6 +488,7 @@ if ( .not. trim(which_ALE)=='linfs') then
 		elnodes = elem2D_nodes(:,el)
 		!_______________________________________________________________________
 		! if element has any cavity node skip it 
+		!!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
 		if (ulevels(el) > 1) cycle
 		
 		!_______________________________________________________________________
@@ -548,6 +542,7 @@ else
         elnodes = elem2D_nodes(:,el)
         !_______________________________________________________________________
         ! if element has any cavity node skip it 
+        !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
         if (ulevels(el) > 1) cycle
         
         !_______________________________________________________________________
@@ -606,7 +601,7 @@ do shortstep=1, evp_rheol_steps
    do n=1,myDim_nod2D 
    
       !_________________________________________________________________________
-      ! if cavity node skip it 
+      ! if cavity ndoe skip it 
       if ( ulevels_nod2d(n)>1 ) cycle
       
       !_________________________________________________________________________
@@ -636,31 +631,15 @@ do shortstep=1, evp_rheol_steps
       end if
 
    end do
-   
-    !___________________________________________________________________________
-    ! apply sea ice velocity boundary condition 
-    DO  ed=1,myDim_edge2D
-        !_______________________________________________________________________
-        ! apply coastal sea ice velocity boundary conditions
-        if(myList_edge2D(ed) > edge2D_in) then
-            U_ice(edges(1:2,ed))=0.0_WP
-            V_ice(edges(1:2,ed))=0.0_WP
-        endif
-        
-        !_______________________________________________________________________
-        ! apply sea ice velocity boundary conditions at cavity-ocean edge
-        if (use_cavity) then 
-            if ( (ulevels(edge_tri(1,ed))>1) .or. &
-                 ( edge_tri(2,ed)>0 .and. ulevels(edge_tri(2,ed))>1) ) then 
-                U_ice(edges(1:2,ed))=0.0_WP
-                V_ice(edges(1:2,ed))=0.0_WP
-            end if 
-        end if 
-      
-    end do
-    
-    !___________________________________________________________________________
-    call exchange_nod(U_ice,V_ice)
+   DO  ed=1,myDim_edge2D
+   ! boundary conditions
+      if(myList_edge2D(ed) > edge2D_in) then
+         U_ice(edges(1:2,ed))=0.0_WP
+         V_ice(edges(1:2,ed))=0.0_WP
+      endif
+   end do
+ 
+   call exchange_nod(U_ice,V_ice)
 END DO
 
 

@@ -80,7 +80,6 @@ module g_config
   real(kind=WP)          :: gammaEuler=-90. ! then around new z.
                                             ! Set to zeros to work with
                                             ! geographical coordinates
-  integer                :: thers_zbar_lev=5     ! minimum number of levels to be                                            
   character(len=5)       :: which_depth_n2e='mean'                                           
   namelist /geometry/  cartesian, fplane, &
        cyclic_length, rotated_grid, alphaEuler, betaEuler, gammaEuler, force_rotation, which_depth_n2e
@@ -88,8 +87,7 @@ module g_config
   !_____________________________________________________________________________
   ! *** fleap_year ***
   logical                       :: include_fleapyear=.false.
-  logical                       :: use_flpyrcheck   =.true.
-  namelist /calendar/ include_fleapyear, use_flpyrcheck
+  namelist /calendar/ include_fleapyear
   
   !_____________________________________________________________________________
   ! *** machine ***
@@ -101,6 +99,9 @@ module g_config
   ! *** configuration***
   logical                       :: use_sw_pene=.true.
   logical                       :: use_ice=.false.  
+!wiso-code!!!
+  logical                       :: lwiso  =.false.  ! enable isotope?
+!wiso-code!!!
   logical                       :: use_floatice = .false.
   logical                       :: use_cavity = .false. ! switch on/off cavity usage
   logical                       :: use_cavity_partial_cell = .false. ! switch on/off cavity usage
@@ -109,9 +110,15 @@ module g_config
   character(100)                :: which_toy="soufflet" 
   logical                       :: flag_debug=.false.    ! prints name of actual subroutine he is in 
   logical                       :: flag_warn_cflz=.true. ! switches off cflz warning
+
+
+! kh 11.11.21 number of groups for multi FESOM group loop parallelization 
+  integer                       :: num_fesom_groups=1
+
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
-                        use_cavity_partial_cell, cavity_partial_cell_thresh, toy_ocean, which_toy, flag_debug, flag_warn_cflz
-  
+                        use_cavity_partial_cell, cavity_partial_cell_thresh, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, & !wiso-code add lwiso
+                        num_fesom_groups ! kh 11.11.21
+
   !_____________________________________________________________________________
   ! *** others ***
   real(kind=WP)                 :: dt
