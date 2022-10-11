@@ -19,7 +19,7 @@ module diagnostics
             compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, wrhof, rhof, &
             u_x_u, u_x_v, v_x_v, v_x_w, u_x_w, T_x_u, T_x_v, T_x_w, S_x_u, S_x_v, S_x_w, dudx, dudy, dvdx, dvdy, dudz, dvdz, utau_surf, utau_bott, av_dudz_sq, av_dudz, av_dvdz, stress_bott, u_surf, v_surf, u_bott, v_bott, &
             std_dens_min, std_dens_max, std_dens_N, std_dens, std_dens_UVDZ, std_dens_DIV, std_dens_Z, std_dens_dVdT, std_dens_flux, dens_flux, &
-            compute_diag_dvd_2ndmoment_klingbeil_etal_2014, compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd
+            compute_diag_dvd_2ndmoment_klingbeil_etal_2014, compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd, aux1, aux2
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
   ! A=ssh_stiff, x=d_eta, rhs=ssh_rhs; rhs_diag=A*x;
@@ -31,7 +31,7 @@ module diagnostics
   real(kind=WP),  save, allocatable, target      :: dudx(:,:), dudy(:,:), dvdx(:,:), dvdy(:,:), dudz(:,:), dvdz(:,:), av_dudz(:,:), av_dvdz(:,:), av_dudz_sq(:,:)
   real(kind=WP),  save, allocatable, target      :: utau_surf(:), utau_bott(:)
   real(kind=WP),  save, allocatable, target      :: stress_bott(:,:), u_bott(:), v_bott(:), u_surf(:), v_surf(:)
-  real(kind=WP),  allocatable  :: aux1(:), aux2(:)
+  real(kind=WP),  save, allocatable, target      :: aux1(:), aux2(:)
 ! defining a set of standard density bins which will be used for computing densMOC
 ! integer,        parameter                      :: std_dens_N  = 100
 ! real(kind=WP),  save, target                   :: std_dens(std_dens_N)
@@ -233,7 +233,7 @@ subroutine diag_energy(mode, mesh)
      allocate(dudx(nl-1, myDim_nod2D), dudy(nl-1, myDim_nod2D), dvdx(nl-1, myDim_nod2D), dvdy(nl-1, myDim_nod2D), dudz(nl, myDim_elem2D), dvdz(nl, myDim_elem2D))
      allocate(utau_surf(myDim_elem2D), utau_bott(myDim_elem2D), av_dudz_sq(nl, myDim_elem2D), av_dudz(nl, myDim_elem2D), av_dvdz(nl, myDim_elem2D))
      allocate(u_surf(myDim_elem2D), v_surf(myDim_elem2D), u_bott(myDim_elem2D), v_bott(myDim_elem2D), stress_bott(2, myDim_elem2D))
-     allocate(aux1(nl),aux2(nl))
+     allocate(aux1(nl), aux2(nl))
      rhof  =0.
      wrhof=0.
      u_x_u=0.
@@ -247,6 +247,8 @@ subroutine diag_energy(mode, mesh)
      S_x_u=0.
      S_x_v=0.
      S_x_w=0.
+     aux1=0.
+     aux2=0.
      dudx=0.
      dudy=0.
      dvdx=0.
@@ -402,7 +404,7 @@ subroutine diag_energy(mode, mesh)
         dvdy(nz,n)=vy/tvol
      END DO
   END DO
-  deallocate(aux1,aux2)
+!  deallocate(aux1,aux2)
 end subroutine diag_energy
 ! ==============================================================
 subroutine diag_densMOC(mode, mesh)
