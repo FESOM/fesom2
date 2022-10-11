@@ -219,7 +219,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     type(t_tracer), intent(in),     target  :: tracers
     real(kind=WP)                           :: zmean, dz_inv, bv,  a, rho_up, rho_dn, t, s
     integer                                 :: node, nz, nl1, nzmax, nzmin
-    real(kind=WP)                           :: rhopot(mesh%nl), bulk_0(mesh%nl), bulk_pz(mesh%nl), bulk_pz2(mesh%nl), rho(mesh%nl), dbsfc1(mesh%nl), db_max
+    real(kind=WP)                           :: rhopot(mesh%nl), bulk_0(mesh%nl), bulk_pz(mesh%nl), bulk_pz2(mesh%nl), rho(mesh%nl), dbsfc1(mesh%nl), bv1(mesh%nl), db_max
     real(kind=WP)                           :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf, aux_rho, aux_rho1
     real(kind=WP)                           :: sigma_theta_crit=0.125_WP   !kg/m3, Levitus threshold for computing MLD2
     logical                                 :: flag1, flag2, mixing_kpp
@@ -266,7 +266,7 @@ subroutine pressure_bv(tracers, partit, mesh)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(zmean, dz_inv, bv,  a, rho_up, rho_dn, t, s, node, nz, nl1, nzmax, nzmin, &
 !$OMP                                  rhopot, bulk_0, bulk_pz, bulk_pz2, rho, dbsfc1, db_max, bulk_up, bulk_dn, &
-!$OMP                                  rho_surf, aux_rho, aux_rho1, flag1, flag2)
+!$OMP                                  rho_surf, aux_rho, aux_rho1, flag1, flag2, bv1)
 !$OMP DO
     do node=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(node)
@@ -469,6 +469,14 @@ subroutine pressure_bv(tracers, partit, mesh)
         ! bv_ref
         !_______________________________________________________________________
         ! BV is defined on full levels except for the first and the last ones.
+        do nz=nzmin+1,nzmax-1
+           bv1(nz)=        (zbar_3d_n(nz-1,node)-zbar_3d_n(nz,  node))*(bvfreq(nz-1,node)+bvfreq(nz,  node))
+           bv1(nz)=bv1(nz)+(zbar_3d_n(nz,  node)-zbar_3d_n(nz+1,node))*(bvfreq(nz,  node)+bvfreq(nz+1,node))
+           bv1(nz)=0.5_WP*bv1(nz)/(zbar_3d_n(nz-1,node)-zbar_3d_n(nz+1,  node))
+        end do
+        do nz=nzmin+1,nzmax-1
+           bvfreq(nz,node)=bv1(nz)
+        end do
     end do
 !$OMP END DO
 !$OMP END PARALLEL
