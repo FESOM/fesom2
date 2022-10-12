@@ -1,10 +1,15 @@
 module ioserver_module
+  use MOD_MESH
 
   implicit none  
-  public ioserver
+  public ioserver, comm_fesom_with_ioserver, ioserver_rank, ioserver_mesh, comm_fesom_npes
   private
   
   logical, save :: is_ioserver_ = .false.
+  integer, save :: comm_fesom_with_ioserver
+  integer, save :: comm_fesom_npes
+  integer, save :: ioserver_rank
+  type(t_mesh), save :: ioserver_mesh
 
   type :: ioserver_type
   contains
