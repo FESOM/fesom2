@@ -1,6 +1,6 @@
 module io_gather_module
   implicit none
-  public init_io_gather, gather_nod2D, gather_real4_nod2D, gather_elem2D, gather_real4_elem2D
+  public init_io_gather, gather_nod2D, gather_real4_nod2D, gather_elem2D, gather_real4_elem2D , gather_real4_nod3D
   private
 
   logical, save :: nod2D_lists_initialized = .false.
@@ -180,6 +180,48 @@ contains
     if(.not. nod2D_lists_initialized) stop "io_gather_module has not been initialized"
 
     include "io_gather_nod.inc"  
+  end subroutine
+
+
+  ! thread-safe procedure
+  subroutine gather_real4_nod3D(arr3D, arr3D_global, root_rank, tag, io_comm)
+    use, intrinsic :: ISO_C_BINDING
+    use g_PARSUP
+    use ioserver_module
+    use, intrinsic :: iso_fortran_env, only: real32
+    implicit none
+    real(real32), target  :: arr3D(:,:)
+    real(real32), intent(out) :: arr3D_global(:,:)
+    integer, intent(in) :: root_rank ! rank of receiving process
+    integer, intent(in) :: tag
+    integer io_comm
+    ! EO args
+    integer  ::  remote_rank = -1
+    integer :: remote_node_count = -1
+!    real(real32), allocatable :: sendbuf(:,:)
+    real(real32), pointer :: sb_ptr(:)
+!    real(real32), allocatable :: recvbuf(:) ! todo: alloc only for root_rank
+!    real(real32), allocatable :: recvbufs(:,:)
+    real(real32), target, allocatable :: recvbuf3D(:,:)
+    real(real32), target, allocatable :: rb(:)
+    real(real32), pointer :: rb_ptr(:)
+    integer                   :: req(npes-1)
+    integer :: request_index
+    integer :: mpi_precision = MPI_REAL
+    integer lvl
+    integer nlvl
+    integer f,t,start,count
+    integer i,ii
+
+    if(.not. nod2D_lists_initialized) stop "io_gather_module has not been initialized"
+    
+    if( mype == root_rank ) then
+      nlvl = size(arr3D_global,dim=1)
+    else
+      nlvl = size(arr3D,dim=1)
+    end if
+    
+    include "io_gather_nod3d.inc"  
   end subroutine
 
 
