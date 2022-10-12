@@ -24,6 +24,7 @@ use diagnostics
 use mo_tidal
 use fesom_version_info_module
 use command_line_options_module
+use ioserver_module
 
 ! Define icepack module
 #if defined (__icepack)
@@ -51,7 +52,7 @@ integer mpi_version_len
 
   if(command_argument_count() > 0) then
     call command_line_options%parse()
-    stop
+    if(.not. ioserver%is_ioserver()) stop
   end if
 
 #ifndef __oifs

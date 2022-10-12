@@ -15,6 +15,7 @@ contains
 
   subroutine parse()
     use info_module
+    use ioserver_module
     integer i
     character(len=:), allocatable :: arg
     integer arglength
@@ -29,6 +30,9 @@ contains
       case('--info')
         print '(g0)', '# Definitions'
         call info%print_definitions()
+      case('--ioserver')
+        print *,"ioserver"
+        call ioserver%enable()
       case default
         print *, 'unknown option: ', arg
         error stop
