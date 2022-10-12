@@ -25,10 +25,13 @@ contains
 
   ! procedure is not thread-safe
   subroutine init_nod2D_lists()
+    use ioserver_module
     use g_PARSUP
     implicit none
     ! EO args
+    integer status(MPI_STATUS_SIZE)
 
+    if(.not. ioserver%is_ioserver()) then
     ! todo: initialize with the other comm arrays, probably in "init_gatherLists" subroutine 
     if(mype /= 0) then
       if(.not. allocated(remPtr_nod2D)) allocate(remPtr_nod2D(npes))
@@ -49,6 +52,27 @@ contains
       allocate(rank0List_nod2D(rank0Dim_nod2D))
       call mpi_bcast(rank0List_nod2D, size(rank0List_nod2D), MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
     end if
+    end if
+
+#ifdef ENABLE_IOSERVER
+    if(ioserver%is_ioserver()) then
+      if(.not. allocated(remPtr_nod2D)) allocate(remPtr_nod2D(comm_fesom_npes))
+      call mpi_recv(remPtr_nod2D, size(remPtr_nod2D), MPI_INTEGER, 0, 42, comm_fesom_with_ioserver, status, MPIerr)
+      
+      if(.not. allocated(remList_nod2D)) allocate(remList_nod2D(remPtr_nod2D(comm_fesom_npes)))
+      call mpi_recv(remList_nod2D, size(remList_nod2D), MPI_INTEGER, 0, 42, comm_fesom_with_ioserver, status, MPIerr)
+
+      call mpi_recv(rank0Dim_nod2D, 1, MPI_INTEGER, 0, 42, comm_fesom_with_ioserver, status, MPIerr)
+      
+      allocate(rank0List_nod2D(rank0Dim_nod2D))
+      call mpi_recv(rank0List_nod2D, size(rank0List_nod2D), MPI_INTEGER, 0, 42, comm_fesom_with_ioserver, status, MPIerr)
+    else if(mype==0) then
+      call mpi_send(remPtr_nod2D, size(remPtr_nod2D), MPI_INTEGER, ioserver_rank, 42, comm_fesom_with_ioserver, MPIerr)
+      call mpi_send(remList_nod2D, size(remList_nod2D), MPI_INTEGER, ioserver_rank, 42, comm_fesom_with_ioserver, MPIerr)
+      call mpi_send(rank0Dim_nod2D, 1, MPI_INTEGER, ioserver_rank, 42, comm_fesom_with_ioserver, MPIerr)
+      call mpi_send(myList_nod2D, myDim_nod2D, MPI_INTEGER, ioserver_rank, 42, comm_fesom_with_ioserver, MPIerr)
+    end if
+#endif
     
     nod2D_lists_initialized = .true.
   end subroutine
