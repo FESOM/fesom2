@@ -51,6 +51,7 @@ type(t_mesh),             target, save :: mesh
 character(LEN=MPI_MAX_LIBRARY_VERSION_STRING) :: mpi_version_txt
 integer mpi_version_len
 integer err
+integer status(MPI_STATUS_SIZE)
 integer comp_id
 character(len=16) comp_name
 
@@ -98,6 +99,17 @@ character(len=16) comp_name
     
     ! from here on the ioserver behaves differently than a normal Fesom process
     if(ioserver%is_ioserver()) then
+      ! sync global mesh info
+      call mpi_recv(ioserver_mesh%nod2D, 1, mpi_integer, 0, 42, comm_fesom_with_ioserver, status, err)
+      call mpi_recv(ioserver_mesh%elem2D, 1, mpi_integer, 0, 42, comm_fesom_with_ioserver, status, err)
+      call mpi_recv(ioserver_mesh%edge2D, 1, mpi_integer, 0, 42, comm_fesom_with_ioserver, status, err)
+      call mpi_recv(ioserver_mesh%edge2D_in, 1, mpi_integer, 0, 42, comm_fesom_with_ioserver, status, err)
+      call mpi_recv(ioserver_mesh%ocean_area, 1, mpi_double_precision, 0, 42, comm_fesom_with_ioserver, status, err)
+      call mpi_recv(ioserver_mesh%nl, 1, mpi_integer, 0, 42, comm_fesom_with_ioserver, status, err)
+      allocate(ioserver_mesh%zbar(ioserver_mesh%nl))
+      call mpi_recv(ioserver_mesh%zbar, size(ioserver_mesh%zbar), mpi_double_precision, 0, 42, comm_fesom_with_ioserver, status, err)
+      allocate(ioserver_mesh%Z(ioserver_mesh%nl-1))
+      call mpi_recv(ioserver_mesh%Z, size(ioserver_mesh%Z), mpi_double_precision, 0, 42, comm_fesom_with_ioserver, status, err)
 
       call clock_newyear
       ! call restart() implicitly calls init_io_gather in fesom_file_type#init
@@ -117,6 +129,17 @@ character(len=16) comp_name
     end if
     
     call mesh_setup(mesh)
+    ! sync global meshinfo with ioserver
+    if(mype==0) then
+      call mpi_send(mesh%nod2D, 1, mpi_integer, ioserver_rank, 42, comm_fesom_with_ioserver, err)
+      call mpi_send(mesh%elem2D, 1, mpi_integer, ioserver_rank, 42, comm_fesom_with_ioserver, err)
+      call mpi_send(mesh%edge2D, 1, mpi_integer, ioserver_rank, 42, comm_fesom_with_ioserver, err)
+      call mpi_send(mesh%edge2D_in, 1, mpi_integer, ioserver_rank, 42, comm_fesom_with_ioserver, err)
+      call mpi_send(mesh%ocean_area, 1, mpi_double_precision, ioserver_rank, 42, comm_fesom_with_ioserver, err)
+      call mpi_send(mesh%nl, 1, mpi_integer, ioserver_rank, 42, comm_fesom_with_ioserver, err)
+      call mpi_send(mesh%zbar, size(mesh%zbar), mpi_double_precision, ioserver_rank, 42, comm_fesom_with_ioserver, err)
+      call mpi_send(mesh%Z, size(mesh%Z), mpi_double_precision, ioserver_rank, 42, comm_fesom_with_ioserver, err)
+    end if
 
     if (mype==0) write(*,*) 'FESOM mesh_setup... complete'
     
