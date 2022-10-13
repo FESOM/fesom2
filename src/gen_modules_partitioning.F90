@@ -75,17 +75,38 @@ save
 
 contains
 subroutine par_init    ! initializes MPI
+  use ioserver_module
   implicit none
 
 
   integer :: i
   integer provided_mpi_thread_support_level
   character(:), allocatable :: provided_mpi_thread_support_level_name
+  integer communicator_color
+  integer err
+  integer tmp_rank
 
 #ifndef __oasis
-  call MPI_Comm_Size(MPI_COMM_WORLD,npes,i)
-  call MPI_Comm_Rank(MPI_COMM_WORLD,mype,i)
-  MPI_COMM_FESOM=MPI_COMM_WORLD
+  comm_fesom_with_ioserver = MPI_COMM_WORLD
+  communicator_color = merge(MPI_UNDEFINED, 1,ioserver%is_ioserver()) ! set color of ioserver to MPI_UNDEFINED
+  call MPI_Comm_Rank(comm_fesom_with_ioserver, tmp_rank, err)
+  ! remove the ioserver from the regular fesom processes in MPI_COMM_FESOM
+  ! keep the rank ordering so we can use the fesom mype in MPI_COMM_FESOM and comm_fesom_with_ioserver
+  call MPI_Comm_split(comm_fesom_with_ioserver, communicator_color, tmp_rank, MPI_COMM_FESOM, err)
+  if(ioserver%is_ioserver()) then
+    ioserver_rank = tmp_rank
+    mype = ioserver_rank
+    call MPI_Comm_Size(comm_fesom_with_ioserver, comm_fesom_npes, err) ! MPI_COMM_FESOM is invalid here
+    comm_fesom_npes = comm_fesom_npes -1
+    npes = comm_fesom_npes
+    return
+  end if
+  
+  call MPI_Comm_Size(MPI_COMM_FESOM, npes, err)
+  call MPI_Comm_Rank(MPI_COMM_FESOM, mype, err)
+  if(.not. ioserver%is_ioserver()) then
+    ioserver_rank = npes
+  end if
 #else
   call MPI_Comm_Size(MPI_COMM_FESOM,npes,i)
   call MPI_Comm_Rank(MPI_COMM_FESOM,mype,i)
