@@ -25,6 +25,7 @@ use mo_tidal
 use fesom_version_info_module
 use command_line_options_module
 use ioserver_module
+use io_gather_module
 
 ! Define icepack module
 #if defined (__icepack)
@@ -33,6 +34,7 @@ use icedrv_main,          only: set_icepack, init_icepack, alloc_icepack
 
 #if defined (__oasis)
 use cpl_driver
+use mod_oasis
 #endif
 
 IMPLICIT NONE
@@ -48,6 +50,10 @@ real(kind=real32) :: runtime_alltimesteps
 type(t_mesh),             target, save :: mesh
 character(LEN=MPI_MAX_LIBRARY_VERSION_STRING) :: mpi_version_txt
 integer mpi_version_len
+integer err
+integer comp_id
+character(len=16) comp_name
+
 
 
   if(command_argument_count() > 0) then
@@ -63,7 +69,12 @@ integer mpi_version_len
     
 
 #if defined (__oasis)
-    call cpl_oasis3mct_init(MPI_COMM_FESOM)
+    if(.not. ioserver%is_ioserver()) then
+      call cpl_oasis3mct_init(MPI_COMM_FESOM)
+    else
+      comp_name = "fio" ! this name should (probably) appear in the $NBMODEL list of the oasis namcouple file
+      call oasis_init_comp(comp_id, comp_name, i, .false.)
+    end if
 #endif
     t1 = MPI_Wtime()
 
@@ -84,6 +95,27 @@ integer mpi_version_len
     call setup_model          ! Read Namelists, always before clock_init
     call clock_init           ! read the clock file 
     call get_run_steps(nsteps)
+    
+    ! from here on the ioserver behaves differently than a normal Fesom process
+    if(ioserver%is_ioserver()) then
+
+      call clock_newyear
+      ! call restart() implicitly calls init_io_gather in fesom_file_type#init
+      ! so also call init_io_gather here to avoid a deadlock
+      call init_io_gather()
+      do n=1, nsteps        
+        mstep = n
+        call clock
+        call output (n, ioserver_mesh)
+      end do
+      
+      call finalize_output()
+      call finalize_restart()
+      call MPI_Barrier(comm_fesom_with_ioserver, err)
+      print *,"Fesom ioserver finished as planned"
+      stop "exiting Fesom ioserver as planned" ! we can not use return within a Fortran program
+    end if
+    
     call mesh_setup(mesh)
 
     if (mype==0) write(*,*) 'FESOM mesh_setup... complete'
@@ -322,6 +354,7 @@ integer mpi_version_len
         write(*,*)
     end if    
 !   call clock_finish  
+    call MPI_Barrier(comm_fesom_with_ioserver, err)
     call par_ex
 end program main
     
