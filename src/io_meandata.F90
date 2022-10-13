@@ -116,7 +116,19 @@ subroutine ini_mean_io(mesh)
   namelist /nml_list    / io_list
   namelist /nml_output_settings/ keep_nth_level
 
-#include  "associate_mesh.h"
+  ! do not include the full associate_mesh.h here as it contains shaped pointers to arrays we have not allocated on the ioserver
+  integer         , pointer :: nod2D 
+  integer         , pointer :: elem2D   
+  integer         , pointer :: edge2D   
+  integer         , pointer :: edge2D_in
+  real(kind=WP)   , pointer :: ocean_area
+  integer         , pointer :: nl
+  nod2D              => mesh%nod2D              
+  elem2D             => mesh%elem2D             
+  edge2D             => mesh%edge2D             
+  edge2D_in          => mesh%edge2D_in          
+  ocean_area         => mesh%ocean_area         
+  nl                 => mesh%nl  
 
   ! OPEN and read namelist for I/O
   open( unit=nm_io_unit, file='namelist.io', form='formatted', access='sequential', status='old', iostat=iost )
