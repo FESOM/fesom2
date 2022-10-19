@@ -67,25 +67,4 @@ docker:
     opath:
         opath: ../results/
 
-juwels:
-    lnodename:
-        - 'jwlogin*'
-    meshes:
-        test_global: ./test/meshes/pi/
-        test_souf: ./test/meshes/soufflet/
-        pi: /p/project/chhb19/hhb192/meshes/POOL/FESOM2/meshes/pi/
-        core2: /p/project/chhb19/hhb192/meshes/POOL/FESOM2/meshes/core2/
-        mr: /p/project/chhb19/hhb192/meshes/POOL/FESOM2/meshes/mr/
-        hr: /p/project/chhb19/hhb192/meshes/POOL/FESOM2/meshes/hr/
-        orca25: /p/project/chhb19/hhb192/meshes/POOL/FESOM2/meshes/orca25/
-        farc: /p/project/chhb19/hhb192/meshes/POOL/FESOM2/meshes/farc/
-    forcing:
-        test_global: ./test/input/global/
-        CORE2: /p/project/chhb19/hhb192/forcing/forcing/CORE2/
-        JRA55: /p/project/chhb19/hhb192/forcing/forcing/JRA55-do-v1.4.0/
-    clim:
-        test_global: ./test/input/global/
-        phc: /p/project/chhb19/hhb192/meshes/POOL/FESOM2/hydrography/phc3.0/
-    opath:
-        opath: /p/scratch/chhb19/${USER}/
 
