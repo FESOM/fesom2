@@ -432,7 +432,8 @@ contains
     call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime,  14, MPI_REAL, MPI_MAX, f%MPI_COMM_FESOM, f%MPIerr)
     call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime,  14, MPI_REAL, MPI_MIN, f%MPI_COMM_FESOM, f%MPIerr)
     
-#if defined (__oifs) ! OpenIFS has call oasis_terminate through par_ex
+#if defined (__oifs) 
+    ! OpenIFS coupled version has to call oasis_terminate through par_ex
     call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
 #endif
     if(f%fesom_did_mpi_init) call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype) ! finalize MPI before FESOM prints its stats block, otherwise there is sometimes output from other processes from an earlier time in the programm AFTER the starts block (with parastationMPI)
