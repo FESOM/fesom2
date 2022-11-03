@@ -79,10 +79,15 @@ subroutine par_init(partit)    ! initializes MPI
   end if
 end subroutine par_init
 !=================================================================
+
+
+
 subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
 USE MOD_PARTIT
+
+
 #ifndef __oifs
-!For standalone and coupled ECHAM runs
+! MPI finalization for standalone and coupled ECHAM runs
 #if defined (__oasis)
   use mod_prism 
 #endif
@@ -114,8 +119,11 @@ USE MOD_PARTIT
 #endif
   if (mype==0) print *, 'fesom should stop with exit status = 0'
 #endif
+
+
 #if defined (__oifs)
-!OIFS coupling doesnt call prism_terminate_proto and uses COMM instead of MPI_COMM_WORLD
+!OIFS coupling doesnt call prism_terminate_proto but cpl_oasis3mct_finalize through which it calls oasis_terminate
+  use cpl_driver 
   implicit none
   integer,           intent(in)   :: COMM
   integer,           intent(in)   :: mype
@@ -125,8 +133,9 @@ USE MOD_PARTIT
     if (mype==0) write(*,*) 'Run finished unexpectedly!'
     call MPI_ABORT(COMM, 1 )
   else
-    call  MPI_Barrier(COMM, error)
-    call  MPI_Finalize(error)
+    if (mype==0) write(*,*) 'Finalizing MPI communication through oasis'
+    call cpl_oasis3mct_finalize
+    if (mype==0) write(*,*) 'MPI communication closed down'
   endif
 #endif
 
