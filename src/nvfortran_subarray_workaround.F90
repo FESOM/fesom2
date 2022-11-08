@@ -1,4 +1,4 @@
-#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+#ifdef ENABLE_NVHPC_WORKAROUNDS
 module nvfortran_subarray_workaround_module
   use MOD_DYN
   implicit none

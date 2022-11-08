@@ -164,7 +164,7 @@ contains
   
   
   subroutine read_and_scatter_variables(this)
-#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+#ifdef ENABLE_NVHPC_WORKAROUNDS
     use nvfortran_subarray_workaround_module
 #endif
     use io_scatter_module
@@ -211,7 +211,7 @@ contains
         else
           call scatter_nod2D(var%global_level_data, laux, this%iorank, this%comm, this%partit)
         end if
-#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+#ifdef ENABLE_NVHPC_WORKAROUNDS
   if(var%varname=='u') then
     dynamics_workaround%uv(1,lvl,:) = laux
   else if(var%varname=='v') then
@@ -224,7 +224,7 @@ contains
 #endif
         ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
        var%external_local_data_ptr(lvl,:) = laux ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
-#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+#ifdef ENABLE_NVHPC_WORKAROUNDS
   end if
 #endif
       end do
@@ -289,7 +289,7 @@ contains
 
 
   subroutine read_variables_raw(this, fileunit)
-#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+#ifdef ENABLE_NVHPC_WORKAROUNDS
     use nvfortran_subarray_workaround_module
 #endif
     class(fesom_file_type), target :: this
@@ -301,7 +301,7 @@ contains
     
     do i=1, this%nvar_infos
       var => this%var_infos(i)
-#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+#ifdef ENABLE_NVHPC_WORKAROUNDS
       if(var%varname=='u') then
         read(fileunit) dynamics_workaround%uv(1,:,:)
       else if(var%varname=='v') then
@@ -313,7 +313,7 @@ contains
       else
 #endif
       read(fileunit) var%external_local_data_ptr ! directly use external_local_data_ptr, use the local_data_copy only when called asynchronously
-#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+#ifdef ENABLE_NVHPC_WORKAROUNDS
       end if
 #endif
     end do
@@ -321,7 +321,7 @@ contains
 
 
   subroutine write_variables_raw(this, fileunit)
-#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+#ifdef ENABLE_NVHPC_WORKAROUNDS
     use nvfortran_subarray_workaround_module
 #endif
     class(fesom_file_type), target :: this
@@ -332,7 +332,7 @@ contains
     
     do i=1, this%nvar_infos
       var => this%var_infos(i)
-#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+#ifdef ENABLE_NVHPC_WORKAROUNDS
       if(var%varname=='u') then
         write(fileunit) dynamics_workaround%uv(1,:,:)
       else if(var%varname=='v') then
@@ -344,7 +344,7 @@ contains
       else
 #endif
       write(fileunit) var%external_local_data_ptr ! directly use external_local_data_ptr, use the local_data_copy only when called asynchronously
-#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+#ifdef ENABLE_NVHPC_WORKAROUNDS
       end if
 #endif
     end do
@@ -372,7 +372,7 @@ contains
 
 
   subroutine async_gather_and_write_variables(this)
-#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+#ifdef ENABLE_NVHPC_WORKAROUNDS
 use nvfortran_subarray_workaround_module
 #endif
     class(fesom_file_type), target :: this
@@ -386,7 +386,7 @@ use nvfortran_subarray_workaround_module
     do i=1, this%nvar_infos
       var => this%var_infos(i)
       if(.not. allocated(var%local_data_copy)) allocate( var%local_data_copy(size(var%external_local_data_ptr,dim=1), size(var%external_local_data_ptr,dim=2)) )
-#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+#ifdef ENABLE_NVHPC_WORKAROUNDS
       if(var%varname=='u') then
         var%local_data_copy = dynamics_workaround%uv(1,:,:)
       else if(var%varname=='v') then
@@ -398,7 +398,7 @@ use nvfortran_subarray_workaround_module
       else
 #endif
       var%local_data_copy = var%external_local_data_ptr
-#ifdef ENABLE_JUWELS_NVHPC_WORKAROUNDS
+#ifdef ENABLE_NVHPC_WORKAROUNDS
       end if
 #endif
     end do
