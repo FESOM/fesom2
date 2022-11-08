@@ -2636,6 +2636,7 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     if (.not. dynamics%solverinfo%use_parms) then
         if (lfirst) call ssh_solve_preconditioner(dynamics%solverinfo, partit, mesh)
         call ssh_solve_cg(dynamics%d_eta, dynamics%ssh_rhs, dynamics%solverinfo, partit, mesh)
+        call exchange_nod(dynamics%d_eta, partit) !is this required after calling psolve ?
         lfirst=.false.
         return
     end if
