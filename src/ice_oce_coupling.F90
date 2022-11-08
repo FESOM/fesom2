@@ -267,7 +267,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
     integer                    :: n, elem, elnodes(3),n1
-    real(kind=WP)              :: rsss, net
+    real(kind=WP)              :: rsss, net, net1
     real(kind=WP), allocatable :: flux(:)
     !___________________________________________________________________________
     real(kind=WP), dimension(:,:), pointer :: temp, salt
@@ -382,16 +382,24 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
             virtual_salt(n)=rsss*water_flux(n) 
         end do
 !$OMP END PARALLEL DO        
-        if (use_cavity) then
-            flux = virtual_salt
-            where (ulevels_nod2d > 1) flux = 0.0_WP
-            call integrate_nod(flux, net, partit, mesh)
-        else   
-            call integrate_nod(virtual_salt, net, partit, mesh)
-        end if
+
+!PS         if (use_cavity) then
+!PS             flux = virtual_salt
+!PS             where (ulevels_nod2d > 1) flux = 0.0_WP
+!PS             call integrate_nod(flux, net, partit, mesh)
+!PS         else   
+        call integrate_nod(virtual_salt, net, partit, mesh)
+!PS         end if
+        
+        ! we try not to change the virtual_salt flux values under the cavity from
+        ! the balancing --> but we balance the contribution under the cavity over 
+        ! the rest of the ocean
+        ! ocean_area in case of cavity contains only the open ocean area
+        net = net/ocean_area
 !$OMP PARALLEL DO 
         do n=1, myDim_nod2D+eDim_nod2D
-           virtual_salt(n)=virtual_salt(n)-net/ocean_area
+            if (ulevels_nod2d(n) /= 1) cycle 
+            virtual_salt(n)=virtual_salt(n)-net
         end do
 !$OMP END PARALLEL DO
 
@@ -433,11 +441,10 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
             virtual_salt(n)=virtual_salt(n)-net
         end do
 !$OMP END PARALLEL DO
-
-        !!PS flux = virtual_salt
-        !!PS call integrate_nod(flux, net, partit, mesh)
-        !!PS if (mype==0) write(*,*) ' >-))))°> net global virtual_salt:', net        
     end if
+    
+!PS     call integrate_nod(virtual_salt, net, partit, mesh)
+!PS     if (mype==0) write(*,*) ' >-))))°> net global virtual_salt:', net        
 
     !___________________________________________________________________________
 !$OMP PARALLEL DO
@@ -467,14 +474,19 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     end if 
     
     ! --> if use_cavity=.true. relax_salt anyway zero where is cavity see above
-    call integrate_nod(relax_salt, net, partit, mesh)
+    flux = relax_salt
+    call integrate_nod(flux, net, partit, mesh)
+    net = net/ocean_area
 !$OMP PARALLEL DO
     do n=1, myDim_nod2D+eDim_nod2D
         !--> only balance salt_relaxation in open ocean under the cavity it remains zero
         if (ulevels_nod2d(n) > 1) cycle
-        relax_salt(n)=relax_salt(n)-net/ocean_area
+        relax_salt(n)=relax_salt(n)-net
     end do
 !$OMP END PARALLEL DO
+    
+!PS     call integrate_nod(relax_salt, net, partit, mesh)
+!PS     if (mype==0) write(*,*) ' >-))))°> net global relax_salt:', net        
     
     !___________________________________________________________________________
     ! enforce the total freshwater/salt flux be zero
@@ -509,17 +521,18 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
     end if     
     
-    ! Also balance freshwater flux that come from ocean-cavity boundary
-    if (use_cavity) then
-        if (.not. use_virt_salt) then !zstar, zlevel
-            ! only for full-free surface approach otherwise total ocean volume will drift
-            !! where (ulevels_nod2d > 1) flux = -water_flux
-            ! --> we treat cavity as linfs --> therefor flux=0.0_WP
-            where (ulevels_nod2d > 1) flux =  0.0_WP
-        else ! linfs 
-            where (ulevels_nod2d > 1) flux =  0.0_WP
-        end if 
-    end if 
+!PS     ! Also balance freshwater flux that come from ocean-cavity boundary
+!PS     if (use_cavity) then
+!PS         if (.not. use_virt_salt) then !zstar, zlevel
+!PS             ! only for full-free surface approach otherwise total ocean volume will drift
+                where (ulevels_nod2d > 1) flux = -water_flux
+!PS                  where (ulevels_nod2d > 1) flux = water_flux
+!PS             ! --> we treat cavity as linfs --> therefor flux=0.0_WP
+!PS             where (ulevels_nod2d > 1) flux =  0.0_WP
+!PS         else ! linfs 
+!PS             where (ulevels_nod2d > 1) flux =  0.0_WP
+!PS         end if 
+!PS     end if 
     
     ! compute total global net freshwater flux into the ocean 
     call integrate_nod(flux, net, partit, mesh)
@@ -535,10 +548,11 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         ! under the cavity for the freshwater balancing we do this only for the open
         ! ocean
         !! where (ulevels_nod2d == 1) water_flux=water_flux+net/ocean_area
+        net = net/ocean_area
 !$OMP PARALLEL DO
         do n=1, myDim_nod2D+eDim_nod2D
             if (ulevels_nod2d(n) > 1) cycle
-            water_flux(n)=water_flux(n)+net/ocean_area
+            water_flux(n)=water_flux(n)+net
         end do
 !$OMP END PARALLEL DO
     else
@@ -548,6 +562,31 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         end do
 !$OMP END PARALLEL DO
     end if 
+    
+!PS     flux = water_flux
+!PS     if (use_cavity) where (ulevels_nod2d > 1) flux =  0.0_WP
+!PS     call integrate_nod(flux, net, partit, mesh)
+!PS     if (use_cavity) then 
+!PS         if (mype==0) write(*,*) ' >-))))°> net global open ocean water_flux:', net        
+!PS     else
+!PS         if (mype==0) write(*,*) ' >-))))°> net global water_flux:', net        
+!PS     end if     
+    
+    !___________________________________________________________________________
+    ! balance also the real_salt_flux that comes from the ice only there for zstar  
+    if (.not. use_virt_salt) then
+        call integrate_nod(real_salt_flux, net, partit, mesh)
+        net = net/ocean_area
+        do n=1, myDim_nod2D+eDim_nod2D
+            if (ulevels_nod2d(n) > 1) cycle
+            real_salt_flux(n)=real_salt_flux(n)-net
+        end do
+    end if 
+    
+    !___________________________________________________________________________
+    virtual_salt  = 0.0_WP
+    relax_salt    = 0.0_WP
+    real_salt_flux= 0.0_WP
     
     !___________________________________________________________________________
     if (use_sw_pene) call cal_shortwave_rad(ice, partit, mesh)
