@@ -219,8 +219,10 @@ subroutine stress2rhs(ice, partit, mesh)
         !_______________________________________________________________________
         if (ice_strength(el) > 0._WP) then
             DO k=1,3
-#if defined(_OPENMP)
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
         call omp_set_lock  (partit%plock(elem2D_nodes(k,el)))
+#else
+!$OMP ORDERED
 #endif
                 U_rhs_ice(elem2D_nodes(k,el)) = U_rhs_ice(elem2D_nodes(k,el)) &
                 - elem_area(el) * &
@@ -231,8 +233,11 @@ subroutine stress2rhs(ice, partit, mesh)
                     - elem_area(el) * &
                     (sigma12(el)*gradient_sca(k,el) + sigma22(el)*gradient_sca(k+3,el) &   
                     -sigma11(el)*val3*metric_factor(el))
-#if defined(_OPENMP)
+
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(elem2D_nodes(k,el)))
+#else
+!$OMP END ORDERED
 #endif
             END DO
         endif
@@ -564,19 +569,25 @@ subroutine EVPdynamics(ice, partit, mesh)
             if (use_cavity) then 
                 if ( (ulevels(edge_tri(1,ed))>1) .or. &
                     ( edge_tri(2,ed)>0 .and. ulevels(edge_tri(2,ed))>1) ) then
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_set_lock  (partit%plock(edges(1,ed)))
+#else
+!$OMP ORDERED
 #endif
                     U_ice(edges(1,ed))=0.0_WP
                     V_ice(edges(1,ed))=0.0_WP
-#if defined(_OPENMP)
+
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(edges(1,ed)))
         call omp_set_lock  (partit%plock(edges(2,ed)))
 #endif
                     U_ice(edges(2,ed))=0.0_WP
                     V_ice(edges(2,ed))=0.0_WP
-#if defined(_OPENMP)
+
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(edges(2,ed)))
+#else
+!$OMP END ORDERED
 #endif
                 end if 
             end if 

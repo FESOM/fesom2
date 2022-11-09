@@ -19,7 +19,7 @@ module g_cvmix_tke
     use cvmix_tke,         only: init_tke, cvmix_coeffs_tke
     use cvmix_put_get,     only: cvmix_put
     use cvmix_kinds_and_types
-    use g_cvmix_idemix,    only: iwe, iwe_Tdis, iwe_alpha_c
+    use g_cvmix_idemix,    only: iwe_n, iwe_Tdis_n, iwe_alpha_c_n
     
     !___________________________________________________________________________
     ! module calls from FESOM
@@ -54,6 +54,9 @@ module g_cvmix_tke
     logical       :: use_ubound_dirichlet = .false.           
     logical       :: use_lbound_dirichlet = .false.
     
+    logical       :: tke_dolangmuir       = .false.             
+    real(kind=WP) :: tke_clangmuir        = 0.3
+    
     ! apply time relaxation to avo/dvo
     ! FIXME: nils: Do we need that
     logical       :: timerelax_tke = .false.
@@ -64,7 +67,7 @@ module g_cvmix_tke
     namelist /param_tke/ tke_c_k, tke_c_eps, tke_alpha, tke_mxl_min, tke_kappaM_min, tke_kappaM_max, &
                          tke_cd, tke_surf_min, tke_min, tke_mxl_choice, &
                          use_ubound_dirichlet, use_lbound_dirichlet, & 
-                         timerelax_tke, relne, relax
+                         timerelax_tke, relne, relax, tke_dolangmuir, tke_clangmuir
      
     !___________________________________________________________________________
     ! CVMIX-TKE 3D variables
@@ -110,7 +113,13 @@ module g_cvmix_tke
 
     ! nils
     integer :: tstep_count
-  
+    
+    !___________________________________________________________________________
+    ! Langmuir parameterisation
+    real(kind=WP), allocatable, dimension(:,:) :: tke_langmuir, langmuir_wlc
+    real(kind=WP), allocatable, dimension(:)   :: langmuir_hlc, langmuir_ustoke
+    
+    
     contains
     !
     !
@@ -227,8 +236,22 @@ module g_cvmix_tke
             write(*,*) "     tke_kappaM_min = ", tke_kappaM_min
             write(*,*) "     tke_kappaM_max = ", tke_kappaM_max
             write(*,*) "     tke_mxl_choice = ", tke_mxl_choice
+            write(*,*) "     tke_dolangmuir = ", tke_dolangmuir
             write(*,*)
         end if
+        
+        !_______________________________________________________________________
+        !langmuir parameterisation
+        allocate(tke_langmuir(nl,node_size))
+        tke_langmuir    = 0.0_WP
+        if (tke_dolangmuir) then
+            allocate(langmuir_wlc(nl,node_size))
+            allocate(langmuir_hlc(node_size))
+            allocate(langmuir_ustoke(node_size))
+            langmuir_wlc    = 0.0_WP
+            langmuir_hlc    = 0.0_WP
+            langmuir_ustoke = 0.0_WP
+        end if 
         
         !_______________________________________________________________________
         ! call tke initialisation routine from cvmix library
@@ -243,6 +266,8 @@ module g_cvmix_tke
                       use_ubound_dirichlet = use_ubound_dirichlet, &
                       use_lbound_dirichlet = use_lbound_dirichlet, &
                       only_tke       = tke_only,           &
+                      l_lc           = tke_dolangmuir,     &
+                      clc            = tke_clangmuir,      &
                       tke_min        = tke_min,            &
                       tke_surf_min   = tke_surf_min    )
     end subroutine init_cvmix_tke
@@ -257,7 +282,7 @@ module g_cvmix_tke
         type(t_partit), intent(inout), target :: partit
         type(t_dyn), intent(inout), target :: dynamics
         integer       :: node, elem, nelem, nz, nln, nun, elnodes(3), node_size
-        real(kind=WP) :: tvol
+        real(kind=WP) :: tvol, aux
         real(kind=WP) :: dz_trr(mesh%nl), bvfreq2(mesh%nl), vshear2(mesh%nl)
         real(kind=WP) :: tke_Av_old(mesh%nl), tke_Kv_old(mesh%nl), tke_old(mesh%nl)
         real(kind=WP), dimension(:,:,:), pointer :: UVnode
@@ -277,9 +302,9 @@ module g_cvmix_tke
         
         ! load things from idemix when selected
         if (.not. tke_only) then
-            tke_in3d_iwe       = iwe
-            tke_in3d_iwdis     = -iwe_Tdis
-            tke_in3d_iwealphac = iwe_alpha_c
+            tke_in3d_iwe       = iwe_n
+            tke_in3d_iwdis     = -iwe_Tdis_n
+            tke_in3d_iwealphac = iwe_alpha_c_n
         endif
         
         !_______________________________________________________________________
@@ -330,6 +355,73 @@ module g_cvmix_tke
             dz_trr(nln+1)     = hnode(nln,node)/2.0_WP
             
             !___________________________________________________________________
+            ! calculate Langmuir cell additional term after Axell (2002)
+            ! --> adapted from ICON and Oliver Gutjahr
+            if (tke_dolangmuir) then
+                !_______________________________________________________________
+                ! calculate Stoke's drift
+                ! Approximation if there is no information about the wave field
+                ! As done in Nemo
+                ! FIXME: do we need to divide tau by rho?
+                
+                ! Option used in NEMO model (https://www.nemo-ocean.eu/wp-content/
+                ! uploads/NEMO_book.pdf, p.197) see also Breivik et al. (2015)
+                ! They assume rhoair=1.2 kg/m3 and cd=1.5e-03:
+                ! u_stokes = 0.016/(1.2 * 1.5e-03)^0.5 * |tau|^0.5; although they 
+                ! seem to use rhoair=1.2 kg/m3
+                !   langmuir_ustoke(node) = 0.377_wp * SQRT(tau_abs)  ! [tau]=N2/m2
+                !   langmuir_ustoke(node) = 0.016_wp/SQRT(1.2_wp * 1.5e-03_wp)*SQRT(tau_abs)           
+                !   [tau]=N2/m2, rhoair=1.2, cd=1.5*10e-03
+                langmuir_ustoke(node) = 0.016_WP/sqrt(1.2_WP * 1.5e-03_WP)*sqrt(tke_forc2d_normstress(node)*density_0)         
+                
+                ! --> This is done in Coulevard et al (2020, doi:10.5194/gmd-13-3067-2020), see Fig.2
+                !   langmuir_ustoke(node) = 0.377_wp * SQRT(forc_tke_surf_2D(jc,blockNo))
+                ! --> other option from Li and Garrett (1993)
+                !   langmuir_ustoke(node) = 0.016_wp * fu10(jc,blockNo)  
+                ! --> or original version from Axell (2002)
+                !   LLC = 0.12_wp*(u10**2/g)
+                !   langmuir_ustoke(node) = 0.0016*u10*EXP(depth/LLC)
+                
+                !_______________________________________________________________
+                ! find depth of langmuir cell (hlc). hlc is the depth to which a water
+                ! parcel with kinetic energy 0.5*u_stokes**2 can reach on its own by
+                ! converting its kinetic energy to potential energy.
+                langmuir_hlc(node) = 0.0_wp
+                do nz=nun+1,nln
+                    !!PS k_hlc = nz
+                    aux = sum( -bvfreq2(2:nz+1)*zbar_3d_n(2:nz+1,node) )
+                    if(aux > 0.5_wp*langmuir_ustoke(node)**2.0_wp) then
+                        !!PS k_hlc = nz
+                        langmuir_hlc(node) = -zbar_3d_n(nz,node)
+                        exit
+                    end if 
+                end do
+                
+                !_______________________________________________________________
+                ! calculate langmuir cell velocity scale (wlc)
+                ! Note: Couvelard et al (2020) set clc=0.3 instead of default 0.15 from
+                ! Axell (2002); results in deeper MLDs and better spatial MLD pattern.
+                langmuir_wlc(:,node) = 0.0_wp
+                do nz=nun+1,nln    
+                    if(-zbar_3d_n(nz,node) <= langmuir_hlc(node)) then
+                        langmuir_wlc(nz,node) = tke_clangmuir * langmuir_ustoke(node) * &
+                        sin(-pi*zbar_3d_n(nz,node)/langmuir_hlc(node))
+                    !!PS else
+                    !!PS     langmuir_wlc(nz,node) = 0.0_wp
+                    endif
+                end do
+                
+                !_______________________________________________________________
+                ! calculate langmuir turbulence term (tke_plc)
+                if (langmuir_hlc(node) > 0.0_wp) then
+                    tke_langmuir(:,node) = langmuir_wlc(:,node)**3.0_wp / langmuir_hlc(node)
+                else
+                    tke_langmuir(:,node) = 0.0_wp
+                end if 
+                
+            end if 
+            
+            !___________________________________________________________________
             ! main cvmix call to calculate tke
             tke_Av_old = tke_Av(:,node)
             tke_Kv_old = tke_Kv(:,node)
@@ -362,6 +454,7 @@ module g_cvmix_tke
                 bottom_fric  = tke_forc2d_botfrict(     node), & ! in
                 iw_diss      = tke_in3d_iwdis(nun:nln+1,node), & ! in
                 ! diagnostics
+                tke_plc      = tke_langmuir(nun:nln+1,node),   & ! in   
                 tke_Tbpr     = tke_Tbpr(nun:nln+1,node),            & ! buoyancy production
                 tke_Tspr     = tke_Tspr(nun:nln+1,node),            & ! shear production 
                 tke_Tdif     = tke_Tdif(nun:nln+1,node),            & ! vertical diffusion d/dz(k d/dz)TKE
@@ -403,5 +496,6 @@ module g_cvmix_tke
                 Av(nz,elem) = sum(tke_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do
+        
     end subroutine calc_cvmix_tke
 end module g_cvmix_tke

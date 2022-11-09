@@ -23,11 +23,11 @@ subroutine communication_nodn(partit, mesh)
   ! Assume we have 2D partitioning vector in part. Find communication rules
   ! Reduce allocation: find all neighboring PE
   nd_count = count(part(1:nod2d) == mype)
-write(*,*) nod2d
-write(*,*) MAX_LAENDERECK
-write(*,*) nd_count
-write(*,*) allocated(partit%myList_nod2D)
-write(*,*) partit%mype
+! write(*,*) nod2d
+! write(*,*) MAX_LAENDERECK
+! write(*,*) nd_count
+! write(*,*) allocated(partit%myList_nod2D)
+! write(*,*) partit%mype
   allocate(recv_from_pe(nod2d), send_to_pes(MAX_LAENDERECK,nd_count), &
            partit%myList_nod2D(nd_count), STAT=IERR)
   if (IERR /= 0) then

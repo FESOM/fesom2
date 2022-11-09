@@ -158,7 +158,7 @@ end subroutine
 !_______________________________________________________________________________
 ! read derived type binary restart files, depending on input (see optional) not 
 ! all derived type binaries are read --> functionalitiy for dwarfs !
-subroutine read_all_bin_restarts(path_in, ice, dynamics, tracers, partit, mesh)
+subroutine read_all_bin_restarts(path_in, partit, mesh, ice, dynamics, tracers)
     use MOD_ICE
     use MOD_DYN
     use MOD_TRACER
@@ -186,7 +186,6 @@ subroutine read_all_bin_restarts(path_in, ice, dynamics, tracers, partit, mesh)
 
     !___________________________________________________________________________
     if (partit%mype==0) print *, achar(27)//'[1;33m'//' --> read restarts from derived type binary'//achar(27)//'[0m'
-    
     !___________________________________________________________________________
     ! mesh derived type 
     fileunit = partit%mype+300
@@ -194,7 +193,7 @@ subroutine read_all_bin_restarts(path_in, ice, dynamics, tracers, partit, mesh)
           file     = trim(path_in)//'/'//'t_mesh.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
           status   = 'old', &
           form     = 'unformatted')
-          read(fileunit) mesh
+    read(fileunit) mesh
     close(fileunit)
     if (partit%mype==0) print *, achar(27)//'[33m'//'     > read derived type t_mesh'//achar(27)//'[0m'
     
@@ -205,8 +204,8 @@ subroutine read_all_bin_restarts(path_in, ice, dynamics, tracers, partit, mesh)
          file     = trim(path_in)//'/'//'t_partit.'//mpirank_to_txt(partit%MPI_COMM_FESOM), &
          status   = 'old', &
          form     = 'unformatted')
-         read(fileunit) partit
-         close(fileunit)
+    read(fileunit) partit
+    close(fileunit)
     if (partit%mype==0) print *, achar(27)//'[33m'//'     > read derived type t_partit'//achar(27)//'[0m'
     
     !___________________________________________________________________________

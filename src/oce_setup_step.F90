@@ -720,8 +720,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     !
     ! read ocean state
     ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
-    if(mype==0) write(*,*) 'read Temperatur climatology from:', trim(filelist(1))
-    if(mype==0) write(*,*) 'read Salt       climatology from:', trim(filelist(2))
+    if(mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(1))
+    if(mype==0) write(*,*) 'read Salinity    climatology from:', trim(filelist(2))
     call do_ic3d(tracers, partit, mesh)
     
     Tclim=tracers%data(1)%values

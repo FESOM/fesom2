@@ -4,6 +4,7 @@ MODULE io_RESTART
   use g_clock
   use o_arrays
   use g_cvmix_tke
+  use g_cvmix_idemix
   use MOD_TRACER
   use MOD_ICE
   use MOD_DYN
@@ -79,11 +80,13 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
   call oce_files%def_elem_var('vrhs_AB', 'Adams–Bashforth for v', 'm/s', dynamics%uv_rhsAB(2,:,:), mesh, partit)
   
   !___Save restart variables for TKE and IDEMIX_________________________________
-  if (trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
+!   if (trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
+  if (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
         call oce_files%def_node_var('tke', 'Turbulent Kinetic Energy', 'm2/s2', tke(:,:), mesh, partit)
   endif
-  if (trim(mix_scheme)=='cvmix_IDEMIX' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
-        call oce_files%def_node_var('iwe', 'Internal Wave eneryy', 'm2/s2', tke(:,:), mesh, partit)
+!   if (trim(mix_scheme)=='cvmix_IDEMIX' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
+  if (mix_scheme_nmb==6 .or. mix_scheme_nmb==56) then
+        call oce_files%def_elem_var('iwe', 'Internal Wave Energy'    , 'm2/s2', iwe(:,:), mesh, partit)
   endif 
   if (dynamics%opt_visc==8) then
         call oce_files%def_elem_var('uke', 'unresolved kinetic energy', 'm2/s2', uke(:,:), mesh, partit)

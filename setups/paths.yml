@@ -26,10 +26,9 @@ ollie:
     opath:
         opath: /work/ollie/${USER}/
 
-mistral:
+levante:
     lnodename:
-        - 'mlogin*'
-        - 'mistralpp*'
+        - 'levante*'
     meshes:
         test_global: ./test/meshes/pi/
         test_souf: ./test/meshes/soufflet/

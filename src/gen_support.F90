@@ -212,7 +212,6 @@ subroutine smooth_elem2D(arr, N, partit, mesh)
             work_array(node)=0._WP
             DO j=1, nod_in_elem2D_num(node)
                 elem=nod_in_elem2D(j, node)
-                elnodes=elem2D_nodes(:,elem)
                 work_array(node)=work_array(node)+arr(elem)*elem_area(elem)
                 vol=vol+elem_area(elem)
             END DO
@@ -323,13 +322,17 @@ subroutine integrate_nod_2D(data, int2D, partit, mesh)
 #include "associate_mesh_ass.h" 
 
 lval=0.0_WP
+#if !defined(__openmp_reproducible)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row)
 !$OMP DO REDUCTION (+: lval)
+#endif
   do row=1, myDim_nod2D
      lval=lval+data(row)*areasvol(ulevels_nod2D(row),row)
   end do
+#if !defined(__openmp_reproducible) 
 !$OMP END DO
 !$OMP END PARALLEL
+#endif
   int2D=0.0_WP
   call MPI_AllREDUCE(lval, int2D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
@@ -350,21 +353,31 @@ subroutine integrate_nod_3D(data, int3D, partit, mesh)
 
   integer       :: k, row
   real(kind=WP) :: lval
+  real(kind=WP) :: lval_row
+
+
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
 
   lval=0.0_WP
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row, k)
-!$OMP DO REDUCTION(+: lval)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row, k, lval_row) REDUCTION(+: lval)
   do row=1, myDim_nod2D
+     lval_row = 0.
      do k=ulevels_nod2D(row), nlevels_nod2D(row)-1
-        lval=lval+data(k, row)*areasvol(k,row)*hnode_new(k,row)  ! --> TEST_cavity
+        lval_row=lval_row+data(k, row)*areasvol(k,row)*hnode_new(k,row)  ! --> TEST_cavity
      end do
+#if defined(__openmp_reproducible)
+!$OMP ORDERED
+#endif
+     lval = lval + lval_row
+#if defined(__openmp_reproducible)
+!$OMP END ORDERED
+#endif
   end do
-!$OMP END DO
-!$OMP END PARALLEL
+!$OMP END PARALLEL DO
+
   int3D=0.0_WP
   call MPI_AllREDUCE(lval, int3D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
@@ -500,13 +513,17 @@ FUNCTION omp_min_max_sum1(arr, pos1, pos2, what, partit, nan)
   SELECT CASE (trim(what))
     CASE ('sum')
        val=0.0_WP
+#if !defined(__openmp_reproducible)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n)
 !$OMP DO REDUCTION(+: val)
+#endif
        do n=pos1, pos2
           val=val+arr(n)
        end do
+#if !defined(__openmp_reproducible)
 !$OMP END DO
 !$OMP END PARALLEL
+#endif
 
     CASE ('min')
        val=arr(1)
@@ -546,21 +563,23 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
   character(3),  intent(in)   :: what
   real(kind=WP), optional     :: nan !to be implemented upon the need (for masked arrays)
   real(kind=WP)               :: omp_min_max_sum2
-  real(kind=WP)               :: val, vmasked
+  real(kind=WP)               :: val, vmasked, val_part(pos11:pos12)
   integer                     :: i, j
-
+  
 
   type(t_partit),intent(in), &
                        target :: partit
-
+  
+  IF (PRESENT(nan)) vmasked=nan
+  
   SELECT CASE (trim(what))
     CASE ('min')
       if (.not. present(nan)) vmasked=huge(vmasked) !just some crazy number
       val=arr(1,1)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j)
 !$OMP DO REDUCTION(min: val)
-      do i=pos11, pos12
-         do j=pos21, pos22
+      do j=pos21, pos22
+         do i=pos11, pos12
             if (arr(i,j)/=vmasked) val=min(val, arr(i,j))
          end do
       end do
@@ -572,8 +591,8 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
       val=arr(1,1)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j)
 !$OMP DO REDUCTION(max: val)
-      do i=pos11, pos12
-         do j=pos21, pos22
+      do j=pos21, pos22
+         do i=pos11, pos12
             if (arr(i,j)/=vmasked) val=max(val, arr(i,j))
          end do
       end do
@@ -582,16 +601,23 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
 
     CASE ('sum')
       if (.not. present(nan)) vmasked=huge(vmasked) !just some crazy number
-      val=0
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j)
-!$OMP DO REDUCTION(+: val)
-      do i=pos11, pos12
-         do j=pos21, pos22
+      val=0.
+#if  !defined(__openmp_reproducible)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i, j) REDUCTION(+: val)
+      do j=pos21, pos22
+         do i=pos11, pos12
             if (arr(i,j)/=vmasked) val=val+arr(i,j)
          end do
       end do
-!$OMP END DO
-!$OMP END PARALLEL
+!$OMP END PARALLEL DO
+#else
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(j) 
+      do j=pos21, pos22
+         val_part(j) = sum(arr(pos11:pos12,j), mask=(arr(pos11:pos12,j)/=vmasked))
+      end do
+!$OMP END PARALLEL DO 
+      val = sum(val_part(pos21:pos22))
+#endif
 
    CASE DEFAULT
       if (partit%mype==0) write(*,*) trim(what), ' is not implemented in omp_min_max_sum case!'

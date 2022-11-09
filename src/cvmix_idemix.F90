@@ -476,12 +476,29 @@ subroutine integrate_idemix( &
   type(idemix_type), pointer ::idemix_constants_in
  
   ! initialize diagnostics
-  iwe_Ttot = 0.0
-  iwe_Tdif = 0.0
-  iwe_Tdis = 0.0
-  iwe_Tsur = 0.0
-  iwe_Tbot = 0.0
- 
+  iwe_new     = 0.0
+  cvmix_int_1 = 0.0
+  cvmix_int_2 = 0.0
+  cvmix_int_3 = 0.0
+  iwe_Ttot    = 0.0
+  iwe_Tdif    = 0.0
+  iwe_Tdis    = 0.0
+  iwe_Tsur    = 0.0
+  iwe_Tbot    = 0.0
+  c0          = 0.0
+  v0          = 0.0
+  alpha_c     = 0.0
+  a_dif       = 0.0
+  b_dif       = 0.0
+  c_dif       = 0.0
+  a_tri       = 0.0
+  b_tri       = 0.0
+  c_tri       = 0.0
+  d_tri       = 0.0
+  delta       = 0.0
+  iwe_max     = 0.0
+  forc        = 0.0
+  
   ! FIXME: nils: Is this necessary?
   idemix_constants_in => idemix_constants_saved
   if (present(idemix_userdef_constants)) then

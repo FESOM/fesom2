@@ -97,26 +97,31 @@ subroutine muscl_adv_init(twork, partit, mesh)
         ! n1 and n2 are local indices 
         n1=edges(1,n)
         n2=edges(2,n)
+
+#if defined(__openmp_reproducible)
+!$OMP ORDERED
+#endif
+
         ! ... if(n1<=myDim_nod2D) --> because dont use extended nodes
         if(n1<=myDim_nod2D) then
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
            call omp_set_lock(partit%plock(n1))
 #endif
             nn_pos(nn_num(n1)+1,n1)=n2
             nn_num(n1)=nn_num(n1)+1
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
            call omp_unset_lock(partit%plock(n1))
 #endif
         end if
         
         ! ... if(n2<=myDim_nod2D) --> because dont use extended nodes
         if(n2<=myDim_nod2D) then
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
            call omp_set_lock(partit%plock(n2))
 #endif
             nn_pos(nn_num(n2)+1,n2)=n1
             nn_num(n2)=nn_num(n2)+1
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
            call omp_unset_lock(partit%plock(n2))
 #endif
         end if
@@ -130,19 +135,23 @@ subroutine muscl_adv_init(twork, partit, mesh)
             ! this edge nodes become boundary edge with increasing depth due to bottom topography
             ! at the depth twork%nboundary_lay the edge (edgepoints) still has two valid ocean triangles
             ! below that depth, edge becomes boundary edge
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
            call omp_set_lock  (partit%plock(edges(1,n)))
 #endif
             twork%nboundary_lay(edges(1,n))=min(twork%nboundary_lay(edges(1,n)), minval(nlevels(edge_tri(:,n)))-1)
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
            call omp_unset_lock(partit%plock(edges(1,n)))
            call omp_set_lock  (partit%plock(edges(2,n)))
 #endif
             twork%nboundary_lay(edges(2,n))=min(twork%nboundary_lay(edges(2,n)), minval(nlevels(edge_tri(:,n)))-1)
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
            call omp_unset_lock(partit%plock(edges(2,n)))
 #endif
         end if
+
+#if defined(__openmp_reproducible)
+!$OMP END ORDERED
+#endif
     end do
 !$OMP END DO
 !$OMP END PARALLEL

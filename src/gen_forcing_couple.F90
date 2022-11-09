@@ -45,17 +45,19 @@ end module
 
 module update_atm_forcing_interface
     interface
-        subroutine update_atm_forcing(istep, ice, tracers, partit,mesh)
+        subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
         USE MOD_TRACER
         USE MOD_ICE
         USE MOD_PARTIT
         USE MOD_PARSUP
         USE MOD_MESH
+        USE MOD_DYN
         integer,        intent(in)            :: istep
         type(t_ice),    intent(inout), target :: ice
         type(t_tracer), intent(in),    target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in),    target :: mesh
+        type(t_dyn)   , intent(inout), target :: dynamics
         end subroutine
     end interface
 end module
@@ -72,13 +74,14 @@ module net_rec_from_atm_interface
 end module
 ! Routines for updating ocean surface forcing fields
 !-------------------------------------------------------------------------
-subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
+subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   use o_PARAM
   use MOD_MESH
   USE MOD_PARTIT
   USE MOD_PARSUP
   use MOD_TRACER
   use MOD_ICE
+  use MOD_DYN
   use o_arrays
   use g_forcing_param
   use g_forcing_arrays
@@ -88,8 +91,8 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   use g_rotate_grid
   use net_rec_from_atm_interface
   use g_sbf, only: sbc_do
-  use g_sbf, only: atmdata, i_totfl, i_xwind, i_ywind, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow, &
-                                     l_xwind, l_ywind, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
+  use g_sbf, only: atmdata, i_totfl, i_xwind, i_ywind, i_xstre, i_ystre, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow, &
+                                     l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
 #if defined (__oasis)
   use cpl_driver
 #endif
@@ -102,6 +105,7 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   type(t_tracer), intent(in),    target :: tracers
   type(t_partit), intent(inout), target :: partit
   type(t_mesh),   intent(in),    target :: mesh
+  type(t_dyn)   , intent(in), target :: dynamics
   !_____________________________________________________________________________
   integer		   :: i, itime,n2,n,nz,k,elem
   real(kind=WP)            :: i_coef, aux
@@ -133,6 +137,9 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
 #endif 
 #if defined (__oifs) || defined (__ifsinterface)
   real(kind=WP), dimension(:), pointer  :: ice_temp, ice_alb, enthalpyoffuse
+  real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
+  real(kind=WP),               pointer  :: tmelt
+  real(kind=WP), dimension(:,:,:), pointer :: UVnode
 #endif
   real(kind=WP)              , pointer  :: rhoair
 #include "associate_part_def.h"
@@ -146,9 +153,14 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   stress_atmice_x  => ice%stress_atmice_x(:)
   stress_atmice_y  => ice%stress_atmice_y(:)
 #if defined (__oifs) || defined (__ifsinterface)
+  a_ice            => ice%data(1)%values(:)
+  m_ice            => ice%data(2)%values(:)
+  m_snow           => ice%data(3)%values(:)
   ice_temp         => ice%data(4)%values(:)
   ice_alb          => ice%atmcoupl%ice_alb(:)
   enthalpyoffuse   => ice%atmcoupl%enthalpyoffuse(:)
+  tmelt            => ice%thermo%tmelt
+  UVnode           => dynamics%uvnode(:,:,:)
 #endif      
 #if defined (__oasis) || defined (__ifsinterface)
   oce_heat_flux    => ice%atmcoupl%oce_flx_h(:)
@@ -174,18 +186,26 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
          if (i.eq.1) then
 #if defined (__oifs)
             ! AWI-CM3 outgoing state vectors
-            do n=1,myDim_nod2D+eDim_nod2D
-            exchange(n)=tracers%data(1)%values(1, n)+tmelt	           ! sea surface temperature [K]
-            end do
+              do n=1,myDim_nod2D+eDim_nod2D
+              exchange(n)=tracers%data(1)%values(1, n)+tmelt	           ! sea surface temperature [K]
+              end do
             elseif (i.eq.2) then
-            exchange(:) = a_ice(:)                                  ! ice concentation [%]
+              exchange(:) = a_ice(:)                                  ! ice concentation [%]
             elseif (i.eq.3) then
-            exchange(:) = m_snow(:)                                 ! snow thickness
+              exchange(:) = m_snow(:)                                 ! snow thickness
             elseif (i.eq.4) then
-            exchange(:) = ice_temp(:)                               ! ice surface temperature
+              exchange(:) = ice_temp(:)                               ! ice surface temperature
             elseif (i.eq.5) then
-            exchange(:) = ice_alb(:)                                ! ice albedo
-            else	    
+              exchange(:) = ice_alb(:)                                ! ice albedo
+            elseif (i.eq.6) then
+              do n=1,myDim_nod2D+eDim_nod2D
+                exchange(n) = UVnode(1,1,n)
+              end do
+            elseif (i.eq.7) then
+              do n=1,myDim_nod2D+eDim_nod2D
+                exchange(n) = UVnode(2,1,n)
+              end do
+            else    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
 #else
             ! AWI-CM2 outgoing state vectors
@@ -331,6 +351,12 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   DO n=1, myDim_nod2D+eDim_nod2D
      u_wind(n)    = atmdata(i_xwind,n)
      v_wind(n)    = atmdata(i_ywind,n)
+     if (l_xstre) then
+        stress_atmoce_x(n)=atmdata(i_xstre, n)
+     end if
+     if (l_ystre) then
+        stress_atmoce_y(n)=atmdata(i_ystre, n)
+     end if
      shum(n)      = atmdata(i_humi ,n)
      longwave(n)  = atmdata(i_qlw  ,n)
      shortwave(n) = atmdata(i_qsr  ,n)
@@ -378,6 +404,7 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
   end if
   ! third, compute wind stress
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i, dux, dvy, aux)
+
   do i=1,myDim_nod2d+eDim_nod2d   
      !__________________________________________________________________________
      if (ulevels_nod2d(i)>1) then
@@ -392,9 +419,12 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
      dux=u_wind(i)-(1.0_WP-Swind)*u_w(i) 
      dvy=v_wind(i)-(1.0_WP-Swind)*v_w(i)
      aux=sqrt(dux**2+dvy**2)*rhoair
-     stress_atmoce_x(i) = Cd_atm_oce_arr(i)*aux*dux
-     stress_atmoce_y(i) = Cd_atm_oce_arr(i)*aux*dvy
-     
+     if ( .not. l_xstre) then
+        stress_atmoce_x(i) = Cd_atm_oce_arr(i)*aux*dux
+     end if
+     if ( .not. l_ystre) then
+        stress_atmoce_y(i) = Cd_atm_oce_arr(i)*aux*dvy
+     end if
      !__________________________________________________________________________
      dux=u_wind(i)-u_ice(i) 
      dvy=v_wind(i)-v_ice(i)
@@ -412,10 +442,6 @@ subroutine update_atm_forcing(istep, ice, tracers, partit, mesh)
 #ifdef VERBOSE
   if (mod(istep,logfile_outfreq)==0 .and. mype==0) then
      write(*,*) 'update forcing data took', t2-t1
-#ifdef __oasis     
-     write(*,*) 'oasis part + exchange mesh:', time_recv(1)+time_send(1)
-     write(*,*) 'exchange mesh             :', time_recv(2)+time_send(2)
-#endif /* (__oasis) */     
   end if
 #endif
 
@@ -677,7 +703,7 @@ SUBROUTINE net_rec_from_atm(action, partit)
   type(t_partit), intent(inout), target           :: partit
   INTEGER                                         :: my_global_rank, ierror
   INTEGER                                         :: n  
-  INTEGER 					  :: status(MPI_STATUS_SIZE,npes) 
+  INTEGER 					  :: status(MPI_STATUS_SIZE,partit%npes) 
   INTEGER                                         :: request(2)
   real(kind=WP)                 		  :: aux(nrecv)
 #if defined (__oifs)
@@ -693,7 +719,7 @@ SUBROUTINE net_rec_from_atm(action, partit)
         CALL MPI_IRecv(atm_net_fluxes_south(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 112, MPI_COMM_WORLD, request(2), partit%MPIerr)
         CALL MPI_Waitall(2, request, status, partit%MPIerr)
      end if
-  call MPI_Barrier(partit%MPI_COMM_FESOM, MPIerr)     
+  call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)     
   call MPI_AllREDUCE(atm_net_fluxes_north(1), aux, nrecv, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
   atm_net_fluxes_north=aux
   call MPI_AllREDUCE(atm_net_fluxes_south(1), aux, nrecv, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
