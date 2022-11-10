@@ -268,14 +268,17 @@ subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
     end if
     if (l_init_zero) then
 !$OMP PARALLEL DO
-       do n=1, myDim_nod2D
+        !$ACC PARALLEL LOOP GANG
+        do n=1, myDim_nod2D
           flux(:, n)=0.0_WP
-       end do
+        end do
+        !$ACC END PARALLEL LOOP
 !$OMP END PARALLEL DO
     end if
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tvert, n, nz, nzmax, nzmin)
 !$OMP DO
 
+    !$ACC PARALLEL LOOP GANG
     do n=1, myDim_nod2D
        !_______________________________________________________________________
        nzmax=nlevels_nod2D(n)
@@ -297,12 +300,15 @@ subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
        ! mesh information)
        !_______________________________________________________________________
        ! vert. flux at remaining levels    
+       !$ACC LOOP VECTOR
        do nz=nzmin+1,nzmax-1
           flux(nz,n)=-0.5*(                                                        &
                       ttf(nz  ,n)*(W(nz,n)+abs(W(nz,n)))+ &
                       ttf(nz-1,n)*(W(nz,n)-abs(W(nz,n))))*area(nz,n)-flux(nz,n)
        end do
+       !$ACC END LOOP
     end do
+    !$ACC END PARALLEL LOOP
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine adv_tra_ver_upw1
@@ -340,14 +346,16 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
     end if
     if (l_init_zero) then
 !$OMP PARALLEL DO
+       !$ACC PARALLEL LOOP GANG
        do n=1, myDim_nod2D
           flux(:, n)=0.0_WP
        end do
+       !$ACC END PARALLEL LOOP
 !$OMP END PARALLEL DO
     end if
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tvert,n, nz, nzmax, nzmin, Tmean, Tmean1, Tmean2, qc, qu,qd)
 !$OMP DO
-
+    !$ACC PARALLEL LOOP GANG
     do n=1, myDim_nod2D
        !_______________________________________________________________________
        nzmax=nlevels_nod2D(n)
@@ -378,6 +386,7 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
        ! mesh information)
        !_______________________________________________________________________
        ! vert. flux at remaining levels    
+       !$ACC LOOP VECTOR
        do nz=nzmin+2,nzmax-2
             !centered (4th order)
             qc=(ttf(nz-1,n)-ttf(nz  ,n))/(Z_3d_n(nz-1,n)-Z_3d_n(nz  ,n))
@@ -389,7 +398,9 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
             Tmean =(W(nz,n)+abs(W(nz,n)))*Tmean1+(W(nz,n)-abs(W(nz,n)))*Tmean2
             flux(nz,n)=(-0.5_WP*(1.0_WP-num_ord)*Tmean - num_ord*(0.5_WP*(Tmean1+Tmean2))*W(nz,n))*area(nz,n)-flux(nz,n)
        end do
+       !$ACC END LOOP
     end do
+   !$ACC END PARALLEL LOOP
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine adv_tra_ver_qr4c
