@@ -47,7 +47,7 @@ endif()
 
 option(ENABLE_OPENACC "compile with OpenACC support" OFF)
 set(GPU_COMPUTE_CAPABILITY "cc80" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
-set(GPU_FLAGS "autocompare,math_uniform,cuda11.7,${GPU_COMPUTE_CAPABILITY}" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
+set(GPU_FLAGS "redundant,autocompare,math_uniform,cuda11.7,${GPU_COMPUTE_CAPABILITY}" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
 
 option(ENABLE_OPENMP "build FESOM with OpenMP" OFF)
 if(${ENABLE_OPENMP})
