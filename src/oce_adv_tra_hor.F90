@@ -90,9 +90,11 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
     end if
     if (l_init_zero) then
 !$OMP PARALLEL DO
+       !$ACC PARALLEL LOOP GANG VECTOR
        do edge=1, myDim_edge2D
           flux(:,edge)=0.0_WP
        end do
+       !$ACC END PARALLEL LOOP
 !$OMP END PARALLEL DO
     end if
 
@@ -102,6 +104,7 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, &
 !$OMP                       a, vflux, el, enodes, nz, nu12, nl12, nl1, nl2, nu1, nu2)
 !$OMP DO
+    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el)
     do edge=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,edge)      
@@ -149,6 +152,7 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
         ! (A) goes only into this loop when the edge has only facing element
         ! el(1) --> so the edge is a boundary edge --> this is for ocean 
         ! surface in case of cavity
+        !$ACC LOOP VECTOR
         do nz=nu1, nu12-1              
            !____________________________________________________________________
            ! volume flux across the segments
@@ -161,12 +165,14 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
                          ttf(nz, enodes(2))*(vflux-abs(vflux))  &
                          )-flux(nz, edge)
         end do
+        !$ACC END LOOP
         
         !_______________________________________________________________________
         ! (B) goes only into this loop when the edge has only facing elemenmt
         ! el(2) --> so the edge is a boundary edge --> this is for ocean 
         ! surface in case of cavity
         if (nu2 > 0) then 
+            !$ACC LOOP VECTOR
             do nz=nu2, nu12-1
                 !___________________________________________________________
                 ! volume flux across the segments
@@ -178,6 +184,7 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
                             ttf(nz, enodes(1))*(vflux+abs(vflux))+ &
                             ttf(nz, enodes(2))*(vflux-abs(vflux)))-flux(nz, edge)
             end do
+            !$ACC END LOOP
         end if     
         
         !_______________________________________________________________________
@@ -185,6 +192,7 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
         ! loop over depth layers from top (nu12) to nl12
         ! be carefull !!! --> if ed is a boundary edge, el(2)==0 than nl12=0 so 
         !                     you wont enter in this loop
+        !$ACC LOOP VECTOR
         do nz=nu12, nl12
             !___________________________________________________________________
             ! 1st. low order upwind solution
@@ -196,9 +204,11 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
                          ttf(nz, enodes(1))*(vflux+abs(vflux))+ &
                          ttf(nz, enodes(2))*(vflux-abs(vflux)))-flux(nz, edge)
         end do
+        !$ACC END LOOP
         
         !_______________________________________________________________________
         ! (D) remaining segments on the left or on the right
+        !$ACC LOOP VECTOR
         do nz=nl12+1, nl1              
            !____________________________________________________________________
            ! volume flux across the segments
@@ -210,9 +220,11 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
                          ttf(nz, enodes(2))*(vflux-abs(vflux))  &
                          )-flux(nz, edge)
         end do
+        !$ACC END LOOP
         
         !_______________________________________________________________________
         ! (E) remaining segments on the left or on the right
+        !$ACC LOOP VECTOR
         do nz=nl12+1, nl2
                 !_______________________________________________________________
                 ! volume flux across the segments
@@ -223,7 +235,9 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
                              ttf(nz, enodes(1))*(vflux+abs(vflux))+ &
                              ttf(nz, enodes(2))*(vflux-abs(vflux)))-flux(nz, edge)
         end do
+        !$ACC END LOOP
     end do
+    !$ACC END PARALLEL LOOP
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine adv_tra_hor_upw1

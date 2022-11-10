@@ -113,9 +113,11 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         call adv_tra_hor_upw1(vel, ttf, partit, mesh, adv_flux_hor, o_init_zero=.true.)
         ! update the LO solution for horizontal contribution
 !$OMP PARALLEL DO
+        !$ACC PARALLEL LOOP GANG VECTOR
         do n=1, myDim_nod2D+eDim_nod2D
            fct_LO(:,n) = 0.0_WP
         end do
+        !$ACC END PARALLEL LOOP
 !$OMP END PARALLEL DO
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(e, enodes, el, nl1, nu1, nl2, nu2, nu12, nl12, nz)
         do e=1, myDim_edge2D
