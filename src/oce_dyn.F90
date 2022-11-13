@@ -108,13 +108,12 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
 
               udiff(1)=UV_rhs(1,nz,elem) + Fx
               udiff(2)=UV_rhs(2,nz,elem) + Fy
-
               dynamics%ke_du2 (:,nz,elem)  = usum*udiff/2.0_WP
-              dynamics%ke_pre (:,nz,elem)  = usum*dynamics%ke_pre (:,nz,elem)/2.0_WP
-              dynamics%ke_adv (:,nz,elem)  = usum*dynamics%ke_adv (:,nz,elem)/2.0_WP
-              dynamics%ke_cor (:,nz,elem)  = usum*dynamics%ke_cor (:,nz,elem)/2.0_WP
-              dynamics%ke_hvis(:,nz,elem)  = usum*dynamics%ke_hvis(:,nz,elem)/2.0_WP
-              dynamics%ke_vvis(:,nz,elem)  = usum*dynamics%ke_vvis(:,nz,elem)/2.0_WP
+              dynamics%ke_pre_xVEL (:,nz,elem)  = usum*dynamics%ke_pre (:,nz,elem)/2.0_WP
+              dynamics%ke_adv_xVEL (:,nz,elem)  = usum*dynamics%ke_adv (:,nz,elem)/2.0_WP
+              dynamics%ke_cor_xVEL (:,nz,elem)  = usum*dynamics%ke_cor (:,nz,elem)/2.0_WP
+              dynamics%ke_hvis_xVEL(:,nz,elem)  = usum*dynamics%ke_hvis(:,nz,elem)/2.0_WP
+              dynamics%ke_vvis_xVEL(:,nz,elem)  = usum*dynamics%ke_vvis(:,nz,elem)/2.0_WP
               
               if (nz==nzmin) then
                  dynamics%ke_wind(:,elem)=usum*dynamics%ke_wind(:,elem)/2.0_WP
@@ -658,7 +657,8 @@ SUBROUTINE compute_ke_wrho(dynamics, partit, mesh)
     real(kind=WP) , pointer               :: inv_rhowat
     !___________________________________________________________________________
     integer        :: n, nz, nzmin, nzmax
-    real(kind=WP)  :: r, wu, wl
+    real(kind=WP)  :: wu, wl
+    real(kind=WP)  :: dW, P
     !___________________________________________________________________________
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -672,9 +672,13 @@ SUBROUTINE compute_ke_wrho(dynamics, partit, mesh)
      do nz=nzmin, nzmax-1
         wu=0.5*(dynamics%w(nz,   n)+dynamics%w_old(nz,   n))
         wl=0.5*(dynamics%w(nz+1, n)+dynamics%w_old(nz+1, n))
-        r=(g*dynamics%eta_n(n)+hpressure(nz, n)/density_0)*(wu*area(nz, n)-wl*area(nz+1, n))
+        P =(g*dynamics%eta_n(n)+hpressure(nz, n)/density_0)
+        dW=(wu*area(nz, n)-wl*area(nz+1, n))
+        dW=dW/area(nz, n)/hnode_new(nz,n)
 !       r=(g*dynamics%eta_n(n)+hpressure(nz, n)/density_0)*(wu*area(nz, n)-wl*area(nz+1, n)+0.5_WP*(hnode_new(nz, n)-mesh%hnode_old(nz, n))/dt*area(nz, n) )
-        dynamics%ke_wrho(nz, n) = r*dt/area(nz, n)/hnode_new(nz,n)
+        dynamics%ke_Pfull(nz, n) = P
+        dynamics%ke_dW   (nz, n) = dW
+        dynamics%ke_wrho (nz, n) = P*dW*dt
      end do
   END DO
   call exchange_nod(dynamics%ke_wrho, partit)

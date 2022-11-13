@@ -113,12 +113,16 @@ TYPE T_DYN
     real(kind=WP)                               :: wsplit_maxcfl= 1.0
     ! energy diagnostic part: will be computed inside the model ("hard integration"):
     logical                                      :: diag_ke       = .true.
-    real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv, ke_cor, ke_pre, ke_hvis, ke_vvis, ke_du2
-    real(kind=WP), allocatable, dimension(:,:)   :: ke_wrho
+    ! different contributions to velocity change. will be computed inside the code.
+    real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv, ke_cor, ke_pre, ke_hvis, ke_vvis, ke_du2, ke_umean
+    real(kind=WP), allocatable, dimension(:,:)   :: ke_wind, ke_drag
+    ! same as above but multiplied by velocity. we need both for later computation of turbulent fluxes
+    real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv_xVEL, ke_cor_xVEL, ke_pre_xVEL, ke_hvis_xVEL, ke_vvis_xVEL
+    real(kind=WP), allocatable, dimension(:,:)   :: ke_wind_xVEL, ke_drag_xVEL
+    real(kind=WP), allocatable, dimension(:,:)   :: ke_wrho         !we use pressure to compute (W*dens) as it appeares much easier to compute (P*dW) instead of (dP*w)
+    real(kind=WP), allocatable, dimension(:,:)   :: ke_dW, ke_Pfull !for later computation of turbulent fluxes from the term above
     real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv_AB, ke_cor_AB
     real(kind=WP), allocatable, dimension(:,:,:) :: ke_rhs_bak
-    real(kind=WP), allocatable, dimension(:,:)   :: ke_wind
-    real(kind=WP), allocatable, dimension(:,:)   :: ke_drag
     !___________________________________________________________________________
     contains
 #if defined(__PGI)

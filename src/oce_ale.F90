@@ -3222,39 +3222,35 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
        call integrate_elem(dynamics%ke_du2(2,:,:),  budget(2), partit, mesh)
        if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. du2=', budget(1),' | ',  budget(2), ' | ', sum(budget)
 
-       call integrate_elem(dynamics%ke_pre(1,:,:),  budget(1), partit, mesh)
-       call integrate_elem(dynamics%ke_pre(2,:,:),  budget(2), partit, mesh)
+       call integrate_elem(dynamics%ke_pre_xVEL(1,:,:),  budget(1), partit, mesh)
+       call integrate_elem(dynamics%ke_pre_xVEL(2,:,:),  budget(2), partit, mesh)
        if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. pre=', budget(1), ' | ', budget(2), ' | ', sum(budget)
 
        call integrate_nod(dynamics%ke_wrho,  budget(1), partit, mesh)
        if (mype==0) write(*,"(A, ES14.7)") 'w * rho=', budget(1)
 
-       call integrate_elem(dynamics%ke_adv(1,:,:),  budget(1), partit, mesh)
-       call integrate_elem(dynamics%ke_adv(2,:,:),  budget(2), partit, mesh)
+       call integrate_elem(dynamics%ke_adv_xVEL(1,:,:),  budget(1), partit, mesh)
+       call integrate_elem(dynamics%ke_adv_xVEL(2,:,:),  budget(2), partit, mesh)
        if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. adv=', budget(1), ' | ', budget(2), ' | ', sum(budget)
 
-       call integrate_elem(dynamics%ke_hvis(1,:,:), budget(1), partit, mesh)
-       call integrate_elem(dynamics%ke_hvis(2,:,:), budget(2), partit, mesh)
+       call integrate_elem(dynamics%ke_hvis_xVEL(1,:,:), budget(1), partit, mesh)
+       call integrate_elem(dynamics%ke_hvis_xVEL(2,:,:), budget(2), partit, mesh)
        if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke.  ah=', budget(1), ' | ', budget(2), ' | ', sum(budget)
 
-       call integrate_elem(dynamics%ke_vvis(1,:,:), budget(1), partit, mesh)
-       call integrate_elem(dynamics%ke_vvis(2,:,:), budget(2), partit, mesh)
+       call integrate_elem(dynamics%ke_vvis_xVEL(1,:,:), budget(1), partit, mesh)
+       call integrate_elem(dynamics%ke_vvis_xVEL(2,:,:), budget(2), partit, mesh)
        if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke.  av=', budget(1), ' | ', budget(2), ' | ', sum(budget)
 
-       call integrate_elem(dynamics%ke_cor(1,:,:),  budget(1), partit, mesh)
-       call integrate_elem(dynamics%ke_cor(2,:,:),  budget(2), partit, mesh)
+       call integrate_elem(dynamics%ke_cor_xVEL(1,:,:),  budget(1), partit, mesh)
+       call integrate_elem(dynamics%ke_cor_xVEL(2,:,:),  budget(2), partit, mesh)
        if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. cor=', budget(1), ' | ', budget(2), ' | ', sum(budget)
 
-       call integrate_elem(dynamics%ke_cor(1,:,:),  budget(1), partit, mesh)
-       call integrate_elem(dynamics%ke_cor(2,:,:),  budget(2), partit, mesh)
-       if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. cor=', budget(1), ' | ', budget(2), ' | ', sum(budget)
-
-       call integrate_elem(dynamics%ke_wind(1,:),  budget(1), partit, mesh)
-       call integrate_elem(dynamics%ke_wind(2,:),  budget(2), partit, mesh)
+       call integrate_elem(dynamics%ke_wind_xVEL(1,:),  budget(1), partit, mesh)
+       call integrate_elem(dynamics%ke_wind_xVEL(2,:),  budget(2), partit, mesh)
        if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. wind=', budget(1), ' | ', budget(2), ' | ', sum(budget)
 
-       call integrate_elem(dynamics%ke_drag(1,:),  budget(1), partit, mesh)
-       call integrate_elem(dynamics%ke_drag(2,:),  budget(2), partit, mesh)
+       call integrate_elem(dynamics%ke_drag_xVEL(1,:),  budget(1), partit, mesh)
+       call integrate_elem(dynamics%ke_drag_xVEL(2,:),  budget(2), partit, mesh)
        if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. drag=', budget(1), ' | ', budget(2), ' | ', sum(budget)
 
        if (mype==0) write(*,*) '***********************************'

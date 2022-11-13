@@ -494,13 +494,47 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
        allocate(dynamics%ke_pre    (2, nl-1, elem_size))
        allocate(dynamics%ke_hvis   (2, nl-1, elem_size))
        allocate(dynamics%ke_vvis   (2, nl-1, elem_size))
+       allocate(dynamics%ke_umean  (2, nl-1, elem_size))
        allocate(dynamics%ke_du2    (2, nl-1, elem_size))
        allocate(dynamics%ke_adv_AB (2, nl-1, elem_size))
        allocate(dynamics%ke_cor_AB (2, nl-1, elem_size))
        allocate(dynamics%ke_rhs_bak(2, nl-1, elem_size))
-       allocate(dynamics%ke_wrho      (nl-1, node_size))
-       allocate(dynamics%ke_wind         (2, elem_size))
-       allocate(dynamics%ke_drag         (2, elem_size))
+       allocate(dynamics%ke_wrho   (nl-1, node_size))
+       allocate(dynamics%ke_dW     (nl-1, node_size))
+       allocate(dynamics%ke_Pfull  (nl-1, node_size))
+       allocate(dynamics%ke_wind   (2, elem_size))
+       allocate(dynamics%ke_drag   (2, elem_size))
+
+       allocate(dynamics%ke_pre_xVEL (2, nl-1, elem_size))
+       allocate(dynamics%ke_adv_xVEL (2, nl-1, elem_size))
+       allocate(dynamics%ke_cor_xVEL (2, nl-1, elem_size))
+       allocate(dynamics%ke_hvis_xVEL(2, nl-1, elem_size))
+       allocate(dynamics%ke_vvis_xVEL(2, nl-1, elem_size))
+       allocate(dynamics%ke_wind_xVEL(2, elem_size))
+       allocate(dynamics%ke_drag_xVEL(2, elem_size))
+
+       dynamics%ke_adv      =0.0_WP
+       dynamics%ke_cor      =0.0_WP
+       dynamics%ke_pre      =0.0_WP
+       dynamics%ke_hvis     =0.0_WP
+       dynamics%ke_vvis     =0.0_WP
+       dynamics%ke_du2      =0.0_WP
+       dynamics%ke_umean    =0.0_WP
+       dynamics%ke_adv_AB   =0.0_WP
+       dynamics%ke_cor_AB   =0.0_WP
+       dynamics%ke_rhs_bak  =0.0_WP
+       dynamics%ke_wrho     =0.0_WP
+       dynamics%ke_wind     =0.0_WP
+       dynamics%ke_drag     =0.0_WP
+       dynamics%ke_pre_xVEL =0.0_WP
+       dynamics%ke_adv_xVEL =0.0_WP
+       dynamics%ke_cor_xVEL =0.0_WP
+       dynamics%ke_hvis_xVEL=0.0_WP
+       dynamics%ke_vvis_xVEL=0.0_WP
+       dynamics%ke_wind_xVEL=0.0_WP
+       dynamics%ke_drag_xVEL=0.0_WP
+       dynamics%ke_dW       =0.0_WP
+       dynamics%ke_Pfull    =0.0_WP
     end if
 END SUBROUTINE dynamics_init
 !
