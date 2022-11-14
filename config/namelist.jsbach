@@ -1,0 +1,26 @@
+&jsbach_ctl
+    standalone = .false.
+    ntiles = 11
+    use_bethy = .true.
+    use_phenology = .true.
+    use_albedo = .true.
+    with_yasso = .true.
+    with_hd = .true.
+    use_roughness_lai = .true.
+    use_roughness_oro = .false.
+    veg_at_1200 = .false.
+    file_type = 1
+    file_ztype = 1
+    lpost_echam = .false.
+    debug = .false.
+    use_dynveg = .true.
+/
+
+&soil_ctl
+    nsoil = 5
+/
+
+&hydrology_ctl
+    ldebughd = .false.
+    diag_water_budget = .true.
+/

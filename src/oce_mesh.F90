@@ -90,14 +90,7 @@ module find_levels_min_e2n_interface
     end subroutine
   end interface
 end module
-module check_total_volume_interface
-  interface
-    subroutine check_total_volume(mesh)
-      use mod_mesh
-      type(t_mesh), intent(inout)  , target :: mesh
-    end subroutine
-  end interface
-end module
+
 
 ! Driving routine. The distributed mesh information and mesh proper 
 ! are read from files.
@@ -125,17 +118,13 @@ IMPLICIT NONE
       call set_mesh_transform_matrix  !(rotated grid)
       call read_mesh(mesh)
       call set_par_support(mesh)
-!!PS       call find_levels(mesh)
-!!PS       
-!!PS       if (use_cavity) call find_levels_cavity(mesh)
-!!PS         
+      call find_levels(mesh)
+      
+      if (use_cavity) call find_levels_cavity(mesh)
+        
       call test_tri(mesh)
       call load_edges(mesh)
       call find_neighbors(mesh)
-      
-      call find_levels(mesh)
-      if (use_cavity) call find_levels_cavity(mesh)
-      
       call find_levels_min_e2n(mesh)
       call mesh_areas(mesh)
       call mesh_auxiliary_arrays(mesh)
@@ -915,8 +904,7 @@ subroutine find_levels_cavity(mesh)
     integer, allocatable, dimension(:)  :: ibuff
     real(kind=WP)                       :: t0, t1
     logical                             :: file_exist=.False.
-    integer                             :: elem, elnodes(3), ule,  uln(3), node, j, nz
-    integer, allocatable, dimension(:) :: numelemtonode
+    integer                             :: elem, elnodes(3), ule,  uln(3)
 !NR Cannot include the pointers before the targets are allocated...
 !NR #include "associate_mesh.h"
     
@@ -1294,32 +1282,6 @@ subroutine find_levels_cavity(mesh)
             write(*,*) ' --> found cavity elem depth shallower than valid cavity node depth, mype=', mype
         end if 
     end do 
-    
-    
-    !___________________________________________________________________________
-    allocate(numelemtonode(mesh%nl))
-    do node=1, myDim_nod2D+eDim_nod2D
-        numelemtonode=0
-        !_______________________________________________________________________
-        do j=1,mesh%nod_in_elem2D_num(node)
-            elem=mesh%nod_in_elem2D(j,node)
-            do nz=mesh%ulevels(elem),mesh%nlevels(elem)-1
-                numelemtonode(nz) = numelemtonode(nz) + 1
-            end do
-        end do
-        
-        !_______________________________________________________________________
-        ! check how many triangle elements contribute to every vertice in every layer
-        ! every vertice in every layer should be connected to at least two triangle 
-        ! elements !
-        do nz=mesh%ulevels_nod2D(node),mesh%nlevels_nod2D(node)-1
-            if (numelemtonode(nz)== 1) then 
-                write(*,*) 'ERROR A: found vertice with just one triangle:', mype, node, nz
-            end if 
-        end do 
-        
-    end do
-    deallocate(numelemtonode)
     
 end subroutine find_levels_cavity
 !
@@ -1840,7 +1802,7 @@ end subroutine elem_center
 SUBROUTINE mesh_areas(mesh)
     USE MOD_MESH
     USE o_PARAM
-    USE o_arrays, only: dum_3d_n
+!    USE o_arrays, only: dum_3d_n
     USE g_PARSUP
     USE g_ROTATE_GRID
     use g_comm_auto
@@ -2422,10 +2384,10 @@ deallocate(center_y, center_x)
   do i=1, myDim_nod2D
      if (mesh%geo_coord_nod2D(2, i) > 0) then
         nn=nn+1
-        mesh%lump2d_north(i)=mesh%areasvol(mesh%ulevels_nod2d(i), i)
+        mesh%lump2d_north(i)=mesh%area(1, i)
      else
         ns=ns+1     
-        mesh%lump2d_south(i)=mesh%area(mesh%ulevels_nod2d(i), i)
+        mesh%lump2d_south(i)=mesh%area(1, i)
      end if	   
   end do   
 
@@ -2451,9 +2413,9 @@ deallocate(center_y, center_x)
     endif
 
 END SUBROUTINE mesh_auxiliary_arrays
-!
-!
-!_______________________________________________________________________________
+
+!===================================================================
+
 SUBROUTINE check_mesh_consistency(mesh)
 USE MOD_MESH
 USE o_PARAM
@@ -2476,7 +2438,7 @@ real(kind=WP)	            :: vol_n(mesh%nl), vol_e(mesh%nl), aux(mesh%nl)
    aux=0._WP
    do n=1, myDim_nod2D
       do nz=mesh%ulevels_nod2D(n), mesh%nlevels_nod2D(n)-1
-         aux(nz)=aux(nz)+mesh%areasvol(nz, n)
+         aux(nz)=aux(nz)+mesh%area(nz, n)
       end do
    end do
    call MPI_AllREDUCE(aux, vol_n, mesh%nl, MPI_DOUBLE_PRECISION, MPI_SUM, &
@@ -2486,7 +2448,7 @@ real(kind=WP)	            :: vol_n(mesh%nl), vol_e(mesh%nl), aux(mesh%nl)
    do elem=1, myDim_elem2D
       elnodes=mesh%elem2D_nodes(:, elem)
       if (elnodes(1) > myDim_nod2D) CYCLE
-      do nz=mesh%ulevels(elem), mesh%nlevels(elem)-1         
+      do nz=mesh%ulevels(elem), mesh%nlevels(elem)         
          aux(nz)=aux(nz)+mesh%elem_area(elem)
       end do
    end do
@@ -2504,57 +2466,4 @@ end if
 !call par_ex
 !stop
 END SUBROUTINE check_mesh_consistency
-!
-!
-!_______________________________________________________________________________
-subroutine check_total_volume(mesh)
-    USE MOD_MESH
-    USE o_PARAM
-    USE g_PARSUP
-    use g_comm_auto
-    use o_ARRAYS
-    
-    IMPLICIT NONE
-    type(t_mesh), intent(inout), target :: mesh
-    integer                     :: nz, n, elem , elnodes(3)
-    real(kind=WP)	            :: vol_n, vol_e, aux
-    
-#include "associate_mesh.h"
-
-    !___________________________________________________________________________
-    vol_n=0._WP
-    vol_e=0._WP
-    !___________________________________________________________________________
-    ! total ocean volume on nodes
-    aux=0._WP
-    do n=1, myDim_nod2D
-        do nz=ulevels_nod2D(n), nlevels_nod2D(n)-1
-            aux=aux+areasvol(nz, n)*hnode(nz,n)
-        end do
-    end do
-    call MPI_AllREDUCE(aux, vol_n, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    !___________________________________________________________________________
-    ! total ocean volume on elements
-    aux=0._WP
-    do elem=1, myDim_elem2D
-        elnodes=elem2D_nodes(:, elem)
-        if (elnodes(1) > myDim_nod2D) cycle
-        do nz=ulevels(elem), nlevels(elem)-1         
-            aux=aux+elem_area(elem)*helem(nz,elem)
-        end do
-    end do
-    call MPI_AllREDUCE(aux, vol_e, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-
-    !___write mesh statistics___________________________________________________
-    if (mype==0) then
-        write(*,*) '____________________________________________________________________'
-        write(*,*) ' --> ocean volume check:', mype
-        write(*,*) '     > Total ocean volume node:', vol_n, ' m^3'
-        write(*,*) '     > Total ocean volume elem:', vol_e, ' m^3'
-        
-    end if
-
-end subroutine check_total_volume
-!
-!
-!_______________________________________________________________________________
+!==================================================================

@@ -45,6 +45,7 @@ subroutine recom_sinking_new(tr_num,mesh)
 
     Vsink=0.0_WP
 
+if (1==2) then
     if (tracer_id(tr_num)==1007 .or.    &  !idetn
         tracer_id(tr_num)==1008 .or.    &  !idetc
         tracer_id(tr_num)==1017 .or.    &  !idetsi
@@ -73,6 +74,11 @@ subroutine recom_sinking_new(tr_num,mesh)
             
             Vsink = VDet_zoo2            
     end if
+end if
+
+if (any(recom_det_tracer_id == tracer_id(tr_num))) Vsink = VDet
+if (any(recom_phy_tracer_id == tracer_id(tr_num))) Vsink = VPhy
+if (any(recom_dia_tracer_id == tracer_id(tr_num))) Vsink = VDia
 
 !if (Vsink .lt. 0.1) return 
 if (Vsink .gt. 0.1) then ! No sinking if Vsink < 0.1 m/day

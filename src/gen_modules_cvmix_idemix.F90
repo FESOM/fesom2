@@ -272,7 +272,7 @@ module g_cvmix_idemix
         implicit none
         type(t_mesh), intent(in), target :: mesh
         integer       :: node, elem, edge, node_size
-        integer       :: nz, nln, nl1, nl2, nl12, nu1, nu2, nu12, uln 
+        integer       :: nz, nln, nl1, nl2, nl12, nu1, nu2, nu12
         integer       :: elnodes1(3), elnodes2(3), el(2), ednodes(2) 
         real(kind=WP) :: dz_trr(mesh%nl), dz_trr2(mesh%nl), bvfreq2(mesh%nl), vflux, dz_el, aux, cflfac
         real(kind=WP) :: grad_v0Eiw(2), deltaX1, deltaY1, deltaX2, deltaY2
@@ -286,20 +286,19 @@ module g_cvmix_idemix
         node_size = myDim_nod2D
         do node = 1,node_size
             nln = nlevels_nod2D(node)-1
-            uln = ulevels_nod2D(node)
             
             !___________________________________________________________________
             ! calculate for TKE square of Brünt-Väisälä frequency, be aware that
             ! bvfreq contains already the squared brünt Väisälä frequency ...
             bvfreq2        = 0.0_WP
-            bvfreq2(uln:nln) = bvfreq(uln:nln,node)
+            bvfreq2(2:nln) = bvfreq(2:nln,node)
             
             !___________________________________________________________________
             ! dz_trr distance between tracer points, surface and bottom dz_trr is half 
             ! the layerthickness ...
             dz_trr         = 0.0_WP
-            dz_trr(uln+1:nln)  = abs(Z_3d_n(uln:nln-1,node)-Z_3d_n(uln+1:nln,node))
-            dz_trr(uln)      = hnode(uln,node)/2.0_WP
+            dz_trr(2:nln)  = abs(Z_3d_n(1:nln-1,node)-Z_3d_n(2:nln,node))
+            dz_trr(1)      = hnode(1,node)/2.0_WP
             dz_trr(nln+1)  = hnode(nln,node)/2.0_WP
             
             !___________________________________________________________________
@@ -390,24 +389,23 @@ module g_cvmix_idemix
                 
                 ! number of above bottom levels at node
                 nln = nlevels_nod2D(node)-1
-                uln = ulevels_nod2D(node)
                 
                 ! thickness of mid-level to mid-level interface at node
                 dz_trr         = 0.0_WP
-                dz_trr(uln+1:nln)  = Z_3d_n(uln:nln-1,node)-Z_3d_n(uln+1:nln,node)
-                dz_trr(uln)      = hnode(uln,node)/2.0_WP
+                dz_trr(2:nln)  = Z_3d_n(1:nln-1,node)-Z_3d_n(2:nln,node)
+                dz_trr(1)      = hnode(1,node)/2.0_WP
                 dz_trr(nln+1)  = hnode(nln,node)/2.0_WP
                 
                 ! surface cell 
-                vol_wcelli(uln,node) = 1/(areasvol(uln,node)*dz_trr(uln))
-                aux = sqrt(cflfac*(area(uln,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
-                iwe_v0(uln,node) = min(iwe_v0(uln,node),aux)
+                vol_wcelli(1,node) = 1/(area(1,node)*dz_trr(1))
+                aux = sqrt(cflfac*(area(1,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
+                iwe_v0(1,node) = min(iwe_v0(1,node),aux)
                 
                 ! bulk cells
                 !!PS do nz=2,nln
-                do nz=uln+1,nln
+                do nz=ulevels_nod2D(node)+1,nln
                     ! inverse volumne 
-                    vol_wcelli(nz,node) = 1/(areasvol(nz-1,node)*dz_trr(nz))
+                    vol_wcelli(nz,node) = 1/(area(nz-1,node)*dz_trr(nz))
                     
                     ! restrict iwe_v0
                     aux = sqrt(cflfac*(area(nz-1,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
@@ -417,7 +415,7 @@ module g_cvmix_idemix
                 end do 
                 
                 ! bottom cell 
-                vol_wcelli(nln+1,node) = 1/(areasvol(nln,node)*dz_trr(nln+1))
+                vol_wcelli(nln+1,node) = 1/(area(nln,node)*dz_trr(nln+1))
                 aux = sqrt(cflfac*(area(nln,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
                 iwe_v0(nln+1,node) = min(iwe_v0(nln+1,node),aux)
                 

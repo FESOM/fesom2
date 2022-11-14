@@ -3,7 +3,6 @@ integer         , pointer :: elem2D
 integer         , pointer :: edge2D   
 integer         , pointer :: edge2D_in
 real(kind=WP)   , pointer :: ocean_area
-real(kind=WP)   , pointer :: ocean_areawithcav
 integer         , pointer :: nl
 real(kind=WP), dimension(:,:), pointer :: coord_nod2D, geo_coord_nod2D
 integer, dimension(:,:)      , pointer :: elem2D_nodes
@@ -36,8 +35,7 @@ nod2D              => mesh%nod2D
 elem2D             => mesh%elem2D             
 edge2D             => mesh%edge2D             
 edge2D_in          => mesh%edge2D_in          
-ocean_area         => mesh%ocean_area
-ocean_areawithcav  => mesh%ocean_areawithcav         
+ocean_area         => mesh%ocean_area         
 nl                 => mesh%nl  
 
 !!$coord_nod2D        => mesh%coord_nod2D        
@@ -47,7 +45,6 @@ nl                 => mesh%nl
 !!$edge_tri           => mesh%edge_tri           
 !!$elem_edges         => mesh%elem_edges         
 !!$elem_area          => mesh%elem_area          
-!!$node_area          => mesh%node_area  
 !!$edge_dxdy          => mesh%edge_dxdy          
 !!$edge_cross_dxdy    => mesh%edge_cross_dxdy    
 !!$elem_cos           => mesh%elem_cos           
@@ -67,8 +64,7 @@ nl                 => mesh%nl
 !!$nlevels            => mesh%nlevels            
 !!$nlevels_nod2D      => mesh%nlevels_nod2D
 !!$nlevels_nod2D_min  => mesh%nlevels_nod2D_min
-!!$area               => mesh%area  
-!!$area2               => mesh%area2 
+!!$area               => mesh%area     
 !!$area_inv           => mesh%area_inv     
 !!$mesh_resolution    => mesh%mesh_resolution    
 !!$ssh_stiff          => mesh%ssh_stiff          

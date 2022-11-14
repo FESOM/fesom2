@@ -233,6 +233,15 @@ allocate(CFL_z(nl, node_size)) ! vertical CFL criteria
 allocate(T_rhs(nl-1, node_size))
 allocate(S_rhs(nl-1, node_size))
 allocate(tr_arr(nl-1,node_size,num_tracers),tr_arr_old(nl-1,node_size,num_tracers))
+
+! kh 22.11.21
+allocate(tr_arr_requests(num_tracers),tr_arr_old_requests(num_tracers))
+
+! kh 28.03.22
+allocate(SinkFlx_tr_requests(num_tracers))
+allocate(Benthos_tr_requests(num_tracers))
+
+allocate(tr_arr_ice(node_size,num_tracers_ice)) !!!wiso-code!!! add ice tracers
 allocate(del_ttf(nl-1,node_size))
 allocate(del_ttf_advhoriz(nl-1,node_size),del_ttf_advvert(nl-1,node_size))
 allocate(dtr_bf(nl-1,node_size)) !jh
@@ -261,14 +270,14 @@ allocate(bvfreq(nl,node_size),mixlay_dep(node_size),bv_ref(node_size))
 ! ================
 allocate(Tclim(nl-1,node_size), Sclim(nl-1, node_size))
 allocate(stress_surf(2,myDim_elem2D))    !!! Attention, it is shorter !!! 
-allocate(stress_node_surf(2,node_size))
 allocate(stress_atmoce_x(node_size), stress_atmoce_y(node_size)) 
 allocate(relax2clim(node_size)) 
 allocate(heat_flux(node_size), Tsurf(node_size))
 allocate(water_flux(node_size), Ssurf(node_size))
 allocate(relax_salt(node_size))
 allocate(virtual_salt(node_size))
-
+!!!wiso-code!!! allocate isotope fluxes
+allocate(o16_flux(node_size), o18_flux(node_size), hdo_flux(node_size))
 allocate(heat_flux_in(node_size))
 allocate(real_salt_flux(node_size)) !PS
 ! =================
@@ -370,10 +379,8 @@ sigma_xy=0.0_WP
 
 ! alpha and beta in the EoS
 allocate(sw_beta(nl-1, node_size), sw_alpha(nl-1, node_size))
-allocate(dens_flux(node_size))
-sw_beta  =0.0_WP
-sw_alpha =0.0_WP
-dens_flux=0.0_WP
+sw_beta=0.0_WP
+sw_alpha=0.0_WP
 
 if (Fer_GM) then
    allocate(fer_c(node_size),fer_scal(node_size), fer_gamma(2, nl, node_size), fer_K(nl, node_size))
@@ -418,17 +425,28 @@ end if
     relax_salt=0.0_WP
     virtual_salt=0.0_WP
 
+!!!wiso-code!!!
+    o16_flux=0.0_WP
+    o18_flux=0.0_WP
+    hdo_flux=0.0_WP
+!!!wiso-code!!!
+
     Ssurf=0.0_WP
     
     real_salt_flux=0.0_WP
-    
-    stress_surf      =0.0_WP
-    stress_node_surf =0.0_WP
-    stress_atmoce_x  =0.0_WP
-    stress_atmoce_y  =0.0_WP
+    stress_atmoce_x=0.
+    stress_atmoce_y=0.
     
     tr_arr=0.0_WP
     tr_arr_old=0.0_WP
+
+! kh 23.03.22
+    tr_arr_requests     = 0
+    tr_arr_old_requests = 0
+
+! kh 28.03.22
+    SinkFlx_tr_requests = 0
+    Benthos_tr_requests = 0
 
     bvfreq=0.0_WP
     mixlay_dep=0.0_WP
@@ -537,6 +555,8 @@ use REcoM_ciso
         write(*,*) ' --> Reading REcoM2 preindustrial DIC for restart'
         write(*,*)
       end if
+    else
+       if (mype==0) print *, "DIC_PI = .false. <-> ", DIC_PI
     end if
 
     if(mype==0) write(*,*) 'read Iron        climatology from:', trim(filelist(1))
@@ -588,8 +608,11 @@ use REcoM_ciso
   rcounter3=0         ! counter for tracers with 3D source
   DO i=3, num_tracers
      id=tracer_ID(i)
-     if (any(id == idlist)) cycle ! OG recom tracers id's start from 1001
+
+     if (any(id == idlist)) cycle ! OG recom tracers id's start from 1001 
+
      SELECT CASE (id)
+#if defined(__recom)
 ! Read recom variables (hardcoded IDs) OG
        CASE (1004:1017)
          tr_arr(:,:,i)=0.0_WP
@@ -605,78 +628,70 @@ use REcoM_ciso
             write (id_string, "(I4)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
          end if
-   CASE (1023:1028)
+       CASE (1023:1028)
          tr_arr(:,:,i)=0.0_WP
         if (mype==0) then
             write (i_string,  "(I4)") i
             write (id_string, "(I4)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
          end if
-!MB preliminary extension for carbon isotopes which should be refactored in later versions
-       CASE (1033:1034)       ! initialize tracer ID=33-34 = DIC_13|14
-         tr_arr(:,:,25:26)=0.0_WP
+! Carbon isotopes, added by MB
+! Carbon-13
+       CASE (1302) 
+         tr_arr(:,:,(idic_13+2))=0.0_WP
          if (mype==0) then
             write (i_string,  "(I4)") i
             write (id_string, "(I4)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
          end if
-       CASE (1093:1094)       ! initialize tracer ID=93:94 = phyC_13|14
-         tr_arr(:,:,27:28)=0.0_WP
+       CASE (1305:1321)
+         tr_arr(:,:,(iphyc_13+2):(idetcal_13+2))=0.0_WP
          if (mype==0) then
             write (i_string,  "(I4)") i
             write (id_string, "(I4)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
          end if
-       CASE (1123:1124)       ! initialize tracer ID=123:124 = detC_13|14
-         tr_arr(:,:,29:30)=0.0_WP
+! Radiocarbon
+       CASE (1402)       ! initialize tracer ID=34 = DIC_14
+         tr_arr(:,:,(idic_14+2))=0.0_WP
          if (mype==0) then
             write (i_string,  "(I4)") i
             write (id_string, "(I4)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
          end if
-       CASE (1143:1144)       ! initialize tracer ID=143:144 = hetC_13|14
-         tr_arr(:,:,31:32)=0.0_WP
+       CASE (1405:1421)
+         tr_arr(:,:,(iphyc_14+2):(idetcal_14+2))=0.0_WP
          if (mype==0) then
             write (i_string,  "(I4)") i
             write (id_string, "(I4)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
          end if
-       CASE (1163:1164)       ! initialize tracer ID=163:164 = DOC_13|14
-         tr_arr(:,:,33:34)=0.0_WP
+! End of carbon isotopes section
+#endif
+  !wiso-code for tracers 101, 102, 103
+       CASE (101)       ! initialize tracer ID=101 h2o18 ysun
+         if (mype==0) then
+            write (i_string,  "(I3)") i
+            write (id_string, "(I3)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            write (*,*) tr_arr(1,1,i)
+         end if
+       CASE (102)       ! initialize tracer ID=102 hDo16 ysun
+         if (mype==0) then
+            write (i_string,  "(I3)") i
+            write (id_string, "(I3)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            write (*,*) tr_arr(1,1,i)
+         end if
+       CASE (103)       ! initialize tracer ID=103 h2o16 ysun
          if (mype==0) then
             write (i_string,  "(I4)") i
             write (id_string, "(I4)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            write (*,*) tr_arr(1,1,i)
          end if
-       CASE (1183:1184)       ! initialize tracer ID=183:184 = diaC_13|14
-         tr_arr(:,:,35:36)=0.0_WP
-         if (mype==0) then
-            write (i_string,  "(I4)") i
-            write (id_string, "(I4)") id
-            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
-         end if
-       CASE (1223:1224)       ! initialize tracer ID=223:224 = phyCalc_13|14
-         tr_arr(:,:,37:38)=0.0_WP
-         if (mype==0) then
-            write (i_string,  "(I4)") i
-            write (id_string, "(I4)") id
-            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
-         end if
-       CASE (1233:1234)       ! initialize tracer ID=233:234 = detCalc_13|14
-         tr_arr(:,:,39:40)=0.0_WP
-         if (mype==0) then
-            write (i_string,  "(I4)") i
-            write (id_string, "(I4)") id
-            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
-         end if
+  !wiso-code for tracers 101, 102, 103
 
-       CASE (101)       ! initialize tracer ID=101
-         tr_arr(:,:,i)=0.0_WP
-         if (mype==0) then
-            write (i_string,  "(I4)") i
-            write (id_string, "(I4)") id
-            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
-         end if
        CASE (301) !Fram Strait 3d restored passive tracer
          tr_arr(:,:,i)=0.0_WP
          rcounter3    =rcounter3+1

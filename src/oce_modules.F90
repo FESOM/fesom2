@@ -97,6 +97,13 @@ TYPE tracer_source3d_type
 END TYPE tracer_source3d_type
 
 integer	                       :: num_tracers=2
+!!!wiso-code!!! add ice tracers
+integer                        :: num_tracers_ice=3
+integer                        :: ih2o18_ice=1
+integer                        :: ihDo16_ice=2
+integer                        :: ih2o16_ice=3
+!!!wiso-code!!! add ice tracers
+
 integer, dimension(100)        :: tracer_ID  = RESHAPE((/0, 1/), (/100/), (/0/)) ! ID for each tracer for treating the initialization and surface boundary condition
                                                                                  ! 0=temp, 1=salt etc.
 type(tracer_source3d_type), &
@@ -228,7 +235,6 @@ real(kind=WP), allocatable         :: eta_n(:), d_eta(:)
 real(kind=WP), allocatable         :: ssh_rhs(:), hpressure(:,:)
 real(kind=WP), allocatable         :: CFL_z(:,:)
 real(kind=WP), allocatable         :: stress_surf(:,:)
-real(kind=WP), allocatable         :: stress_node_surf(:,:)
 REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_x(:)
 REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_y(:)
 real(kind=WP), allocatable         :: T_rhs(:,:) 
@@ -236,6 +242,16 @@ real(kind=WP), allocatable         :: heat_flux(:), Tsurf(:)
 real(kind=WP), allocatable         :: heat_flux_in(:) !to keep the unmodified (by SW penetration etc.) heat flux 
 real(kind=WP), allocatable         :: S_rhs(:,:)
 real(kind=WP), allocatable         :: tr_arr(:,:,:),tr_arr_old(:,:,:)
+
+! kh 22.11.21
+integer                            :: request_count
+integer, allocatable               :: tr_arr_requests(:), tr_arr_old_requests(:)
+
+! kh 28.03.22
+integer, allocatable               :: SinkFlx_tr_requests(:)
+integer, allocatable               :: Benthos_tr_requests(:)
+
+real(kind=WP), allocatable         :: tr_arr_ice(:,:) !!!wiso-code!!! add ice tracers
 real(kind=WP), allocatable         :: del_ttf(:,:)
 real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:) !!PS ,del_ttf_diff(:,:)
 
@@ -245,6 +261,7 @@ real(kind=WP), allocatable    :: nss(:,:)   ! OG -> vertical sinking
 
 real(kind=WP), allocatable    :: water_flux(:), Ssurf(:)
 real(kind=WP), allocatable    :: virtual_salt(:), relax_salt(:)
+real(kind=WP), allocatable    :: o16_flux(:), o18_flux(:), hdo_flux(:) !!!wiso-code!!! add isotope fluxes
 real(kind=WP), allocatable    :: Tclim(:,:), Sclim(:,:)
 real(kind=WP), allocatable    :: Visc(:,:)
 real(kind=WP), allocatable    :: Tsurf_t(:,:), Ssurf_t(:,:)
@@ -277,7 +294,6 @@ real(kind=WP), allocatable,dimension(:,:,:) :: neutral_slope
 real(kind=WP), allocatable,dimension(:,:,:) :: slope_tapered
 real(kind=WP), allocatable,dimension(:,:,:) :: sigma_xy
 real(kind=WP), allocatable,dimension(:,:)   :: sw_beta, sw_alpha
-real(kind=WP), allocatable,dimension(:)     :: dens_flux
 !real(kind=WP), allocatable,dimension(:,:,:) :: tsh, tsv, tsh_nodes
 !real(kind=WP), allocatable,dimension(:,:)   :: hd_flux,vd_flux
 !Isoneutral diffusivities (or xy diffusivities if Redi=.false)
@@ -331,7 +347,7 @@ real(kind=WP), allocatable,dimension(:,:)   :: pgf_x, pgf_y
 
 !_______________________________________________________________________________
 !!PS ! dummy arrays
-real(kind=WP), allocatable,dimension(:,:)   :: dum_3d_n !, dum_3d_e
+!!PS real(kind=WP), allocatable,dimension(:,:)   :: dum_3d_n, dum_3d_e
 !!PS real(kind=WP), allocatable,dimension(:)     :: dum_2d_n, dum_2d_e
 
 !_______________________________________________________________________________
