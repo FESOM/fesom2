@@ -1,4 +1,4 @@
-# spheRlab README file
+# spheRlab
 
 spheRlab is an R package with numerous functions related to spherical geometry. The package is intended in particular for analysis and plotting of geophysical unstructured-grid data, for example data produced by the Finite Element (or volumE) Sea-ice Ocean Model (FESOM).
 
