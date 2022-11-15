@@ -1,6 +1,4 @@
-pyfesom2
-========
-
+# pyfesom2
 
 [![Build Status](https://travis-ci.org/koldunovn/pyfesom2.svg?branch=master)](https://travis-ci.org/koldunovn/pyfesom2)
 [![Documentation Status](https://readthedocs.org/projects/pyfesom2/badge/?version=latest)](https://pyfesom2.readthedocs.io/en/latest/?badge=latest)
