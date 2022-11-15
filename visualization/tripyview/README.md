@@ -1,4 +1,4 @@
-# tripyview README file
+# tripyview
 
 If you want you use my plot routines please download them from the tripyview 
 repository (https://github.com/FESOM/tripyview). If you use the package please 
