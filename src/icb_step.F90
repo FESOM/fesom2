@@ -641,7 +641,7 @@ subroutine get_total_iceberg_area(mesh, iceberg_elem, area_ib_tot)
  USE MOD_MESH
  use g_parsup		!for myDim_elem2D, myList_nod2D						!=
  use g_rotate_grid	!for subroutine g2r, logfile_outfreq					!=
- use iceberg_params, only: arr_block, elem_block, length_ib, width_ib
+ use iceberg_params, only: arr_block, elem_block, length_ib, width_ib, scaling
  
  implicit none											!=
  
@@ -657,7 +657,7 @@ type(t_mesh), intent(in) , target :: mesh
   !write(*,*) "LA DEBUG: get size of elem_block=",size(elem_block)
   do idx = 1, size(elem_block)
       if (elem_block(idx) == iceberg_elem) then
-          area_ib_tot = area_ib_tot + length_ib(idx) * width_ib(idx)
+          area_ib_tot = area_ib_tot + length_ib(idx) * width_ib(idx) * scaling(idx)
       end if
   end do
   !###########################################
@@ -846,8 +846,10 @@ type(t_mesh), intent(in) , target :: mesh
            v_ib    = 0.
    else
      if (mype==0) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
+     ! LA test which one to take
      !call get_total_iceberg_area(mesh, myList_elem2D(iceberg_elem), area_ib_tot)
      call get_total_iceberg_area(mesh, iceberg_elem, area_ib_tot)
+     !-----------------------------
      !write(*,*) "LA DEBUG: FINISHED get_total_iceberg_area"
      !write(*,*) "LA DEBUG: iceberg_elem = ", iceberg_elem
      !write(*,*) "LA DEBUG: local_idx_of(iceberg_elem) = ", local_idx_of(iceberg_elem)
@@ -1266,7 +1268,7 @@ subroutine iceberg_restart
 	Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
 	conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
 	u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
-	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib)
+	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib), melted(ib)
 
   end do
   close(icbID)

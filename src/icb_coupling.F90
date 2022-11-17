@@ -134,8 +134,8 @@ type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
 
     do n=1, myDim_nod2d+eDim_nod2D
-        water_flux(n)   = water_flux(n) - (ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n)) * steps_per_ib_step
-        heat_flux(n)    = heat_flux(n)  - ibhf(n) * steps_per_ib_step !LA: reversed sign!!!
+        water_flux(n)   = water_flux(n) - (ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n)) * steps_per_ib_step !sign needs to be negative
+        heat_flux(n)    = heat_flux(n)  - ibhf(n) * steps_per_ib_step !LA: reversed sign!!! needs to be negative
     end do
 !---wiso-code-begin
    if(lwiso) then

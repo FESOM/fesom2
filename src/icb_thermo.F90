@@ -212,7 +212,12 @@ subroutine iceberg_newdimensions(ib, depth_ib,height_ib,length_ib,width_ib,M_b,M
 	    force_last_output = .true.
         end if
     end if
-    
+  
+
+    !if (mype == 0) then
+    !write(*,*) "LA DEBUG: scaling for iceberg ",ib," = ", scaling(ib)
+    !end if
+
     fwb_flux_ib(ib) = -bvl*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)
     fwe_flux_ib(ib) = -lvl_e*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)
     fwbv_flux_ib(ib) = -lvl_b*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)
