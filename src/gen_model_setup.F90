@@ -102,6 +102,7 @@ subroutine read_namelist
   read (20,NML=pairon_chem)
   read (20,NML=pazooplankton)
   read (20,NML=pasecondzooplankton)
+  read (20,NML=pathirdzooplankton)       ! NEW 3Zoo
   read (20,NML=pagrazingdetritus)
   read (20,NML=paaggregation)
   read (20,NML=padin_rho_N)
@@ -113,11 +114,14 @@ subroutine read_namelist
   read (20,NML=padetritus_C)
   read (20,NML=paheterotrophs)
   read (20,NML=paseczooloss)
+  read (20,NML=pathirdzooloss)           ! NEW 3Zoo
+  read (20,NML=paco2lim)                 ! NEW
   read (20,NML=pairon)
   read (20,NML=pacalc)
   read (20,NML=pabenthos_decay_rate)
   read (20,NML=paco2_flux_param)
   read (20,NML=paalkalinity_restoring)
+  read (20,NML=paballasting)             ! NEW BALL
   read (20,NML=paciso)
   close (20)
 #endif

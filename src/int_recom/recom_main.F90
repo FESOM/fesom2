@@ -52,12 +52,26 @@ subroutine recom(mesh)
   integer                    :: idiags
 
   real(kind=8)               :: Sali, net, net1, net2
-  real (kind=8), allocatable :: Temp(:),  zr(:), PAR(:)
+  real (kind=8), allocatable :: Temp(:), Sali_depth(:),  zr(:), PAR(:)
   real(kind=8),  allocatable :: C(:,:)
+  real(kind=8),  allocatable :: CO2_watercolumn(:)                                        ! NEW MOCSY
+  real(kind=8),  allocatable :: pH_watercolumn(:)                                         ! NEW MOCSY
+  real(kind=8),  allocatable :: pCO2_watercolumn(:)                                       ! NEW MOCSY
+  real(kind=8),  allocatable :: HCO3_watercolumn(:)                                       ! NEW MOCSY
+  real(kind=8),  allocatable :: CO3_watercolumn(:)                                        ! NEW DISS
+  real(kind=8),  allocatable :: OmegaC_watercolumn(:)                                     ! NEW DISS
+  real(kind=8),  allocatable :: kspc_watercolumn(:)                                       ! NEW DISS
+  real(kind=8),  allocatable :: rhoSW_watercolumn(:)                                      ! NEW DISS
+!  real(kind=8),  allocatable :: rho_det1(:), rho_det2(:)                                  ! NEW BALL
+!  real(kind=8),  allocatable :: scaling_density1(:), scaling_density2(:), scaling_visc(:) ! NEW BALL
   character(len=2)           :: tr_num_name
 #include "../associate_mesh.h"
 
-  allocate(Temp(nl-1), zr(nl-1) , PAR(nl-1))
+  allocate(Temp(nl-1), Sali_depth(nl-1), zr(nl-1) , PAR(nl-1))
+  allocate(CO2_watercolumn(nl-1), pH_watercolumn(nl-1), pCO2_watercolumn(nl-1) , HCO3_watercolumn(nl-1))
+  allocate(CO3_watercolumn(nl-1), OmegaC_watercolumn(nl-1), kspc_watercolumn(nl-1) , rhoSW_watercolumn(nl-1))
+!  allocate(rho_det1(nl-1), rho_det2(nl-1))
+!  allocate(scaling_density1(nl-1), scaling_density2(nl-1), scaling_visc(nl-1))
   allocate(C(nl-1,bgc_num))
 
 
@@ -121,6 +135,24 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> bio_fluxes'
 
      !!---- Surface salinity
      Sali = tr_arr(1,       n, 2)
+     Sali_depth(1:nzmax)= tr_arr(1:nzmax, n, 2)                                    ! NEW MOCSY
+
+     !!---- CO2 in the watercolumn                                                 ! NEW MOCSY
+     CO2_watercolumn(1:nzmax)    = CO23D(1:nzmax, n)                               ! NEW MOCSY
+     pH_watercolumn(1:nzmax)     = pH3D(1:nzmax, n)                                ! NEW MOCSY
+     pCO2_watercolumn(1:nzmax)   = pCO23D(1:nzmax, n)                              ! NEW MOCSY
+     HCO3_watercolumn(1:nzmax)   = HCO33D(1:nzmax, n)                              ! NEW MOCSY
+     CO3_watercolumn(1:nzmax)    = CO33D(1:nzmax, n)                               ! NEW DISS
+     OmegaC_watercolumn(1:nzmax) = OmegaC3D(1:nzmax, n)                            ! NEW DISS
+     kspc_watercolumn(1:nzmax)   = kspc3D(1:nzmax, n)                              ! NEW DISS
+     rhoSW_watercolumn(1:nzmax)  = rhoSW3D(1:nzmax, n)                             ! NEW DISS
+
+     !!---- Diagnostics for ballasting                                             ! NEW BALL
+!     rho_det1(1:nzmax)         = 0.d0                                              ! NEW BALL
+!     rho_det2(1:nzmax)         = 0.d0                                              ! NEW BALL
+!     scaling_density1(1:nzmax) = 0.d0                                              ! NEW BALL
+!     scaling_density2(1:nzmax) = 0.d0                                              ! NEW BALL
+!     scaling_visc(1:nzmax)     = 0.d0                                              ! NEW BALL
 
      !!---- Biogeochemical tracers
      C(1:nzmax,1:bgc_num) = tr_arr(1:nzmax, n, 3:num_tracers)             
@@ -135,7 +167,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> bio_fluxes'
      FeDust = GloFeDust(n) * (1 - a_ice(n)) * dust_sol    
      NDust = GloNDust(n)  * (1 - a_ice(n))
 
-     allocate(Diags3Dloc(nzmax,8))
+     allocate(Diags3Dloc(nzmax,28))
      Diags3Dloc(:,:) = 0.d0
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forcing'//achar(27)//'[0m'
@@ -144,14 +176,25 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forci
 ! ======================================================================================
 !******************************** RECOM FORCING ****************************************
 
-     call REcoM_Forcing(zr, n, nzmax, C, SW, Loc_slp, Temp, Sali, PAR, mesh)
+     call REcoM_Forcing(zr, n, nzmax, C, SW, Loc_slp, Temp, Sali, Sali_depth &
+           , CO2_watercolumn                                     & ! NEW MOCSY CO2 for the whole watercolumn
+           , pH_watercolumn                                      & ! NEW MOCSY pH for the whole watercolumn
+           , pCO2_watercolumn                                    & ! NEW MOCSY pCO2 for the whole watercolumn
+           , HCO3_watercolumn                                    & ! NEW MOCSY HCO3 for the whole watercolumn
+           , CO3_watercolumn                                     & ! NEW DISS CO3 for the whole watercolumn
+           , OmegaC_watercolumn                                  & ! NEW DISS OmegaC for the whole watercolumn
+           , kspc_watercolumn                                    & ! NEW DISS stoichiometric solubility product for calcite [mol^2/kg^2]
+           , rhoSW_watercolumn                                   & ! NEW DISS in-situ density of seawater [mol/m^3]
+!           , rho_det1, rho_det2                                  & ! NEW BALL
+!           , scaling_density1, scaling_density2, scaling_visc    & ! NEW BALL
+           , PAR, mesh)
 
      tr_arr(1:nzmax, n, 3:num_tracers)       = C(1:nzmax, 1:bgc_num)
 
      !!---- Local variables that have been changed during the time-step are stored so they can be saved
      Benthos(n,1:benthos_num)     = LocBenthos(1:benthos_num)                                ! Updating Benthos values
 
-     Diags2D(n,1:8)               = LocDiags2D(1:8)                                ! Updating diagnostics
+     Diags2D(n,1:12)               = LocDiags2D(1:12)                                ! Updating diagnostics
      GloPCO2surf(n)               = pco2surf(1)
      GlodPCO2surf(n)              = dpco2surf(1)
 
@@ -172,6 +215,20 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forci
      GlodecayBenthos(n, 1:benthos_num) = decayBenthos(1:benthos_num)/SecondsPerDay ! convert from [mmol/m2/d] to [mmol/m2/s]  
 
      PAR3D(1:nzmax,n)             = PAR(1:nzmax) !     PAR3D(inds(1:nn))   = PAR(1:nn)
+     CO23D(1:nzmax,n)             = CO2_watercolumn(1:nzmax)       ! NEW MOCSY
+     pH3D(1:nzmax,n)              = pH_watercolumn(1:nzmax)        ! NEW MOCSY
+     pCO23D(1:nzmax,n)            = pCO2_watercolumn(1:nzmax)      ! NEW MOCSY 
+     HCO33D(1:nzmax,n)            = HCO3_watercolumn(1:nzmax)      ! NEW MOCSY
+     CO33D(1:nzmax,n)             = CO3_watercolumn(1:nzmax)       ! NEW MOCSY
+     OmegaC3D(1:nzmax,n)          = OmegaC_watercolumn(1:nzmax)    ! NEW DISS
+     kspc3D(1:nzmax,n)            = kspc_watercolumn(1:nzmax)      ! NEW DISS
+     rhoSW3D(1:nzmax,n)           = rhoSW_watercolumn(1:nzmax)     ! NEW DISS
+
+!     rho_particle1(1:nzmax,n)       = rho_det1(1:nzmax)            ! NEW BALL
+!     rho_particle2(1:nzmax,n)       = rho_det2(1:nzmax)            ! NEW BALL
+!     scaling_density1_3D(1:nzmax,n) = scaling_density1(1:nzmax)    ! NEW BALL
+!     scaling_density2_3D(1:nzmax,n) = scaling_density2(1:nzmax)    ! NEW BALL
+!     scaling_visc_3D(1:nzmax,n)     = scaling_visc(1:nzmax)        ! NEW BALL
    
      do idiags = 1,diags3d_num
        Diags3D(1:nzmax,n,idiags)  = Diags3Dloc(1:nzmax,idiags) ! 1=NPPnano, 2=NPPdia
@@ -217,7 +274,16 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forci
   call exchange_nod(AtmFeInput)	
   call exchange_nod(AtmNInput)	
 !  call exchange_nod(DenitBen)	
-  call exchange_nod(PAR3D)	
+
+  call exchange_nod(PAR3D)
+  call exchange_nod(CO23D)       ! NEW ms
+  call exchange_nod(pH3D)        ! NEW ms
+  call exchange_nod(pCO23D)      ! NEW ms
+  call exchange_nod(HCO33D)      ! NEW ms
+  call exchange_nod(CO33D)       ! NEW ms
+  call exchange_nod(OmegaC3D)    ! NEW ms
+  call exchange_nod(kspc3D)      ! NEW ms
+  call exchange_nod(rhoSW3D)	 ! NEW ms	
 !  do n=1, 2
 !     call exchange_nod(Diags3D(:,:,n))	
 !  end do

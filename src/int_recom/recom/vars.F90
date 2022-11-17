@@ -236,10 +236,10 @@ SUBROUTINE vars(ph, pco2, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rhoSW, p,
 ! Local variables
   ! practical salinity (psu)
   REAL(kind=rx), DIMENSION(N) :: salprac
-
+  REAL(kind=rx), DIMENSION(N) :: kspc_out     ! NEW
   
   ! Call the subroutine that actually computes
-  call vars_sprac (ph, pco2, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rhoSW, p, tempis,  &
+  call vars_sprac (ph, pco2, fco2, co2, hco3, co3, OmegaA, OmegaC, kspc_out, BetaD, rhoSW, p, tempis,  & ! NEW: added kspc_out
                 temp, sal, alk, dic, sil, phos, Patm, depth, lat, N,                         &
                 optCON, optT, optP, optB, optK1K2, optKf, optGAS, optS, lon, salprac, verbose   )
                 
@@ -251,7 +251,7 @@ END SUBROUTINE vars
 !!    Its output parameter is "Practical Salinity", when Absolute Salinity is passed in,
 !!    is used by those internal calling routines.
 !!
-SUBROUTINE vars_sprac (ph, pco2, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rhoSW, p, tempis,  &
+SUBROUTINE vars_sprac (ph, pco2, fco2, co2, hco3, co3, OmegaA, OmegaC, kspc_out, BetaD, rhoSW, p, tempis,  & ! NEW: added kspc_out
                 temp, sal, alk, dic, sil, phos, Patm, depth, lat, N,                             &
                 optCON, optT, optP, optB, optK1K2, optKf, optGAS, optS, lon, salprac, verbose    )
 
@@ -342,6 +342,8 @@ SUBROUTINE vars_sprac (ph, pco2, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rh
   REAL(kind=rx), INTENT(out), DIMENSION(N) :: OmegaA
   !> Omega for calcite, i.e., the calcite saturation state
   REAL(kind=rx), INTENT(out), DIMENSION(N) :: OmegaC
+  !> Stoichiometric solubility product of calcite        ! NEW
+  REAL(kind=rx), INTENT(out), DIMENSION(N) :: kspc_out   ! NEW
   !> Revelle factor, i.e., dpCO2/pCO2 / dDIC/DIC
   REAL(kind=rx), INTENT(out), DIMENSION(N) :: BetaD
   !> in-situ density of seawater; rhoSW = f(s, t, p) in <b>[kg/m3]</b>
@@ -657,6 +659,7 @@ SUBROUTINE vars_sprac (ph, pco2, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rh
         pCO2(i)   = SGLE(dpCO2)
         OmegaA(i) = SGLE(dOmegaA)
         OmegaC(i) = SGLE(dOmegaC)
+        kspc_out(i)=SGLE(aKspc(1)) ! NEW
 
 !       Compute Revelle factor numerically (derivative using centered-difference scheme)
         DO j=1,2
@@ -688,6 +691,7 @@ SUBROUTINE vars_sprac (ph, pco2, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rh
         co3(i)    = 1.e20_rx
         OmegaA(i) = 1.e20_rx
         OmegaC(i) = 1.e20_rx
+        kspc_out(i)=1.e20_rx   ! NEW
         BetaD(i)  = 1.e20_rx
         rhoSW(i)  = 1.e20_rx
         p(i)      = 1.e20_rx

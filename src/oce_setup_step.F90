@@ -605,7 +605,7 @@ use REcoM_ciso
             write (id_string, "(I4)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
          end if
-   CASE (1023:1028)
+   CASE (1023:1035)
          tr_arr(:,:,i)=0.0_WP
         if (mype==0) then
             write (i_string,  "(I4)") i
@@ -613,14 +613,14 @@ use REcoM_ciso
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
          end if
 !MB preliminary extension for carbon isotopes which should be refactored in later versions
-       CASE (1033:1034)       ! initialize tracer ID=33-34 = DIC_13|14
+       CASE (1133:1134)       ! initialize tracer ID=33-34 = DIC_13|14
          tr_arr(:,:,25:26)=0.0_WP
          if (mype==0) then
             write (i_string,  "(I4)") i
             write (id_string, "(I4)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
          end if
-       CASE (1093:1094)       ! initialize tracer ID=93:94 = phyC_13|14
+       CASE (1193:1194)       ! initialize tracer ID=93:94 = phyC_13|14
          tr_arr(:,:,27:28)=0.0_WP
          if (mype==0) then
             write (i_string,  "(I4)") i

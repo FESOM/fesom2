@@ -30,7 +30,6 @@ subroutine recom_init(mesh)
     character(100)                     :: filename
     character(2)                       :: trind
     character(4)                       :: tr_name
-    real(kind=8), allocatable          :: aux2(:), aux3(:)
     real(kind=8), allocatable          :: ncdata(:)
     character(100)                     :: CO2filename
     character(20)                      :: CO2vari
@@ -46,19 +45,29 @@ subroutine recom_init(mesh)
 
     if (.not. use_REcoM) return
     
-    !___allocate________________________________________________________________
+    ! *** allocate and initialize ***
+
     ! GloFeDust and AtmFeInput: atm dep of iron and arrays for diagnostics.
     ! When felimit is not used, arrays are set to zero.
+
     allocate(GloFeDust(node_size))
+    GloFeDust = 0.d0
+
     allocate(AtmFeInput(node_size))
+    AtmFeInput = 0.d0
 
     ! GloNDust AtmNInput: atm dep of nitrogen sources and sinks. 
     ! They are allocated even nitrogen sources and sinks are not used
+
     allocate(GloNDust(node_size))
+    GloNDust = 0.d0
+
     allocate(AtmNInput(node_size))
+    AtmNInput = 0.d0
     
     ! cosAI: cos of angle of incidence
     allocate(cosAI(node_size))
+    cosAI = 0.d0
 
     allocate(GloPCO2surf(node_size))
     allocate(GloCO2flux(node_size))
@@ -72,12 +81,8 @@ subroutine recom_init(mesh)
     allocate(LocBenthos(benthos_num))
     allocate(decayBenthos(benthos_num)) ! [1/day] Decay rate of detritus in the benthic layer
 
-!    allocate(wFluxDet(benthos_num))     ! [mmol/(m2 * day)] Flux of N,C,Si and calc through sinking of detritus
     allocate(wFluxPhy(benthos_num))     ! [mmol/(m2 * day)] Flux of N,C, calc and chl through sinking of phytoplankton
     allocate(wFluxDia(benthos_num))     ! [mmol/(m2 * day)] Flux of N,C, Si and chl through sinking of diatoms 	
-
-!    allocate(GlowFlux(node_size,2))     ! 
-!    GlowFlux=0.0d0
 
 if (REcoM_Second_Zoo) then
     allocate(GlowFluxDet(node_size,benthos_num*2))
@@ -92,13 +97,6 @@ end if
     GlowFluxDet=0.0d0
     GlowFluxPhy=0.0d0
     GlowFluxDia=0.0d0    
-
-    allocate(addtiny(nl-1,8))
-    addtiny=0.0d0
-    allocate(Gloaddtiny(nl-1,node_size,8))
-    allocate(auxy(nl-1,node_size,bgc_num))
-    Gloaddtiny=0.0d0
-    auxy=0.0d0
 
     allocate(GloHplus(node_size))
 
@@ -144,14 +142,6 @@ end if
     allocate(ErosionTOC2D(node_size))
     allocate(ErosionTSi2D(node_size))
 
-    !___initialize______________________________________________________________
-    GloFeDust = 0.d0
-    AtmFeInput = 0.d0
-
-    GloNDust = 0.d0
-    AtmNInput = 0.d0
-
-    cosAI = 0.d0
 
     ! initialise 2d field of CO2 related diagnostics
     GloPCO2surf = 0.d0
@@ -170,13 +160,62 @@ end if
     co2flux_seaicemask = 0.d0
     o2flux_seaicemask = 0.d0
     dpco2surf= 0.d0
+    co2      = 0.d0                                    ! NEW
 
     if (Diags) then
-        allocate(diags2D(node_size,8))
+        allocate(diags2D(node_size,12))   ! NEW  (8 -> 12 added 3rd zoo and ballasting)
         diags2D(:,:)      = 0.d0
         allocate(diags3D(nl-1,node_size,diags3d_num))
         diags3D(:,:,:)      = 0.d0
     end if  
+
+    allocate(CO23D(nl-1,node_size))                   !NEW MOCSY
+    CO23D(:,:)          = 0.d0
+
+    allocate(pH3D(nl-1,node_size))                    !NEW MOCSY 
+    pH3D(:,:)           = 0.d0
+
+    allocate(pCO23D(nl-1,node_size))                  !NEW MOCSY 
+    pCO23D(:,:)         = 0.d0
+
+    allocate(HCO33D(nl-1,node_size))                  !NEW MOCSY 
+    HCO33D(:,:)         = 0.d0
+
+    allocate(CO33D(nl-1,node_size))                   !NEW DISS
+    CO33D(:,:)          = 0.d0
+
+    allocate(OmegaC3D(nl-1,node_size))                !NEW DISS
+    OmegaC3D(:,:)       = 0.d0
+
+    allocate(kspc3D(nl-1,node_size))                  !NEW DISS
+    kspc3D(:,:)         = 0.d0
+
+    allocate(rhoSW3D(nl-1,node_size))                 !NEW DISS
+    rhoSW3D(:,:)        = 0.d0
+
+    allocate(rho_particle1(nl-1,node_size))           !NEW BALL
+    rho_particle1(:,:)  = 0.d0
+
+    allocate(rho_particle2(nl-1,node_size))           !NEW BALL
+    rho_particle2(:,:)  = 0.d0
+    
+    allocate(sinkVel1(nl,node_size))                !NEW BALL nl-1 -> nl OG
+    sinkVel1(:,:)       = 0.d0
+    
+    allocate(sinkVel2(nl,node_size))                !NEW BALL nl-1 -> nl
+    sinkVel2(:,:)       = 0.d0
+
+    allocate(scaling_density1_3D(nl,node_size))     !NEW BALL nl-1 -> nl
+    scaling_density1_3D(:,:) = 0.d0
+ 
+    allocate(scaling_density2_3D(nl,node_size))     !NEW BALL nl-1 -> nl
+    scaling_density2_3D(:,:) = 0.d0
+
+    allocate(scaling_visc_3D(nl,node_size))         !NEW BALL nl-1 -> nl
+    scaling_visc_3D(:,:)     = 0.d0
+
+    allocate(seawater_visc_3D(nl-1,node_size))        !NEW BALL
+    seawater_visc_3D(:,:)     = 0.d0
 
     PAR3D(:,:) = 0.d0
     DenitBen(:) = 0.d0
@@ -261,22 +300,41 @@ end if
     !tr_arr(:,:,20)                        ! tracer 20 = DSi     
     tr_arr(:,:,21) = tr_arr(:,:,21) * 1.e9 ! Fe [mol/L] => [umol/m3] Check the units again!
 
-
-
 !!#ifdef REcoM_calcification
-    tr_arr(:,:,22) = tiny !cPhyN * 0.25d0        ! tracer 22 = PhyCalc
+!    tr_arr(:,:,22) = tiny !cPhyN * 0.25d0        ! tracer 22 = PhyCalc 
+    tr_arr(:,:,22) = tiny * Redfield       ! tracer 22 = PhyCalc ! NEW now dependent on Cocco biomass
     tr_arr(:,:,23) = tiny                  ! tracer 23 = DetCalc
 !!#endif
     !tr_arr(:,:,24)                        ! tracer 24 = Oxy     ! read from the file
 
-!if (REcoM_Second_Zoo) then
-    tr_arr(:,:,25) = tiny                   ! tracer 25 = Zoo2N
-    tr_arr(:,:,26) = tiny * Redfield        ! tracer 26 = Zoo2C
-    tr_arr(:,:,27) = tiny                   ! tracer 26 = DetZ2N                              
-    tr_arr(:,:,28) = tiny                   ! tracer 27 = DetZ2C                                    
-    tr_arr(:,:,29) = tiny                   ! tracer 28 = DetZ2Si                            
-    tr_arr(:,:,30) = tiny                   ! tracer 29 = DetZ2Calc 
-!endif
+    if (REcoM_Second_Zoo) then
+       tr_arr(:,:,25) = tiny                   ! tracer 25 = Zoo2N
+       tr_arr(:,:,26) = tiny * Redfield        ! tracer 26 = Zoo2C
+       tr_arr(:,:,27) = tiny                   ! tracer 26 = DetZ2N                              
+       tr_arr(:,:,28) = tiny                   ! tracer 27 = DetZ2C                                    
+       tr_arr(:,:,29) = tiny                   ! tracer 28 = DetZ2Si                            
+       tr_arr(:,:,30) = tiny                   ! tracer 29 = DetZ2Calc 
+    endif
+
+   ! NEW: Attention with the flags use_coccos and use_third_zoo: they only work without cisco!!
+
+    if (use_coccos) then    ! NEW switch
+       tr_arr(:,:,31) = tiny_chl/chl2N_max        ! tiny             ! tracer 29 = CoccoN    ! NEW, changed from tracer to tr_arr
+       tr_arr(:,:,32) = tiny_chl/chl2N_max/NCmax  ! tiny * Redfield  ! tracer 30 = CoccoC    ! NEW
+       tr_arr(:,:,33) = tiny_chl                  ! tiny * 1.56d0    ! tracer 31 = CoccoChl  ! NEW
+    else
+       tr_arr(:,:,31) = 0.d0
+       tr_arr(:,:,32) = 0.d0
+       tr_arr(:,:,33) = 0.d0
+    endif
+
+    if (REcoM_Third_Zoo) then                     ! NEW 3Zoo
+       tr_arr(:,:,34) = tiny                      ! tracer 32 = Zoo3N
+       tr_arr(:,:,35) = tiny * Redfield           ! tracer 33 = Zoo3C
+    else
+       tr_arr(:,:,34) = 0.d0
+       tr_arr(:,:,35) = 0.d0
+    endif
 
 if (ciso) then
    tr_arr(:,:,27) = (1. + 0.001 * (2.3 - 0.06 * tr_arr(:,:,3))) * tr_arr(:,:,4) ! DIC_13, GLODAP2 > 500 m 

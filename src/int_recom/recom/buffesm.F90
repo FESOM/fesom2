@@ -240,6 +240,7 @@ SUBROUTINE buffesm(gammaDIC, betaDIC, omegaDIC, gammaALK, betaALK, omegaALK, Rf,
   REAL(kind=rx), DIMENSION(N) :: co3
   REAL(kind=rx), DIMENSION(N) :: OmegaA
   REAL(kind=rx), DIMENSION(N) :: OmegaC
+  REAL(kind=rx), DIMENSION(N) :: kspc_out   ! NEW
   REAL(kind=rx), DIMENSION(N) :: BetaD
   REAL(kind=rx), DIMENSION(N) :: rhoSW
   REAL(kind=rx), DIMENSION(N) :: p
@@ -299,7 +300,7 @@ SUBROUTINE buffesm(gammaDIC, betaDIC, omegaDIC, gammaALK, betaALK, omegaALK, Rf,
   print *, 'Calling vars_sprac'
 !  Compute carbonate system variables from DIC, ALK, T, S, nutrients, etc
 !  -------------------------------------------------------------------------------------
-  CALL vars_sprac(ph, pco2, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rhoSW, p, tempis,  &
+  CALL vars_sprac(ph, pco2, fco2, co2, hco3, co3, OmegaA, OmegaC, kspc_out,BetaD, rhoSW, p, tempis,  &   ! NEW: added kspc_out
              temp, sal, alk, dic, sil, phos, Patm, depth, lat, N,                      &
              optCON, optT, optP, opB, opK1K2, opKf, opGAS, opS, lon, salprac      )
 

@@ -250,6 +250,7 @@ SUBROUTINE flxco2(co2flux, co2ex, dpco2,                                        
   
   ! practical salinity [psu] computed when absolute saliniry is given 
   REAL(kind=rx), DIMENSION(N) :: salprac
+  REAL(kind=rx), DIMENSION(N) :: kspc_out    ! NEW
 
   INTEGER :: i
   INTEGER :: kcomp
@@ -320,11 +321,11 @@ SUBROUTINE flxco2(co2flux, co2ex, dpco2,                                        
 
 ! Compute derived variables from input (DIC, ALK, ...)
   IF (PRESENT(lat)) THEN
-    CALL vars_sprac(ph, pco2, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rhoSW, p, tempis,  &
+    CALL vars_sprac(ph, pco2, fco2, co2, hco3, co3, OmegaA, OmegaC, kspc_out, BetaD, rhoSW, p, tempis,  & ! NEW: added kspc_out
               temp, sal, alk, dic, sil, phos, Patm, depth0, lat, N,                     &
               opCON, opT, opP, opB, opK1K2, opKf, opGAS, opS, lon, salprac              )
   ELSE
-    CALL vars_sprac(ph, pco2, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rhoSW, p, tempis,  &
+    CALL vars_sprac(ph, pco2, fco2, co2, hco3, co3, OmegaA, OmegaC, kspc_out, BetaD, rhoSW, p, tempis,  & ! NEW: added kspc_out
               temp, sal, alk, dic, sil, phos, Patm, depth0, lat0, N,                    &
               opCON, opT, opP, opB, opK1K2, opKf, opGAS, opS, lon, salprac              )
   ENDIF
