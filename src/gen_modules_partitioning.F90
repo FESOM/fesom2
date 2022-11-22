@@ -94,6 +94,22 @@ contains
     integer worldgroup
     integer fesom_iogroup
 
+! algorithm draft to connect the ioserver to Fesom processes starting with any rank, currently the first Fesom process has to be rank0 in comm world
+!   if(ioserver%is_ioserver()) then
+!     !
+!     !call MPI_Probe(MPI_ANY_SOURCE, 55555, MPI_COMM_WORLD, status, err)
+!     !call mpi_recv(val, 1, mpi_integer, MPI_ANY_SOURCE, 55555, MPI_COMM_WORLD, status, err)
+!   else 
+!     ! contact our ioserver
+!     if(mype==0) then
+!       !call mpi_send(val, 1, mpi_integer, ??, 55555, MPI_COMM_WORLD, err)
+!       for all rank in comm_world:
+!         req = mpi_isend(ioserverrank_in_comm_world,1,mpi_integer,55555, mpi_any_source rank comm_world,err)
+!         req.wait(5 sec)
+!         mpi_cancel(req)
+!     end if
+!   end if
+
     call MPI_Comm_group(MPI_COMM_WORLD, worldgroup, err)
     if(ioserver%is_ioserver()) then
       call MPI_Group_Rank(worldgroup, ioserverrank_in_world, err)
