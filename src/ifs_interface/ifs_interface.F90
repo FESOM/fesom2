@@ -554,52 +554,6 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
 
 #endif
 
-#ifndef FESOM_TODO
-
-   if(mype==0) then
-   WRITE(0,*)'Everything implemented except ice level temperatures (licelvls).'
-   endif
-
-#else
-
-   ! Ice level temperatures
-
-   IF (licelvls) THEN
-
-#if defined key_lim2
-
-      DO jl = 1, 3
-         
-         ! Pack ice temperatures data at level jl(already in K)
-         
-         jk = 0 
-         DO jj = nldj, nlej
-            DO ji = nldi, nlei
-               jk = jk + 1
-               zsend(jk) = tbif (ji,jj,jl)
-            ENDDO
-         ENDDO
-         
-         ! Interpolate ice temperature  at level jl
-         
-         CALL parinter_fld( mype, npes, icomm, Ttogauss, &
-            &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zsend, &
-            &               nopoints, pgistl(:,jl) )
-         
-      ENDDO
-
-#else
-      WRITE(0,*)'licelvls needs to be sorted for LIM3'
-      CALL abort
-#endif     
-
-   ENDIF
-
-   IF(nn_timing == 1) CALL timing_stop('nemogcmcoup_lim2_get')
-   IF(lhook) CALL dr_hook('nemogcmcoup_lim2_get',1,zhook_handle)
-
-#endif
-
 END SUBROUTINE nemogcmcoup_lim2_get
 
 
@@ -917,17 +871,6 @@ SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )
    if(fesom%mype==0) then
    WRITE(0,*)'! FESOM date at end of timestep is ', icdate ,' ======'
    endif
-
-#ifdef FESOM_TODO
-   iye = ndastp / 10000
-   imo = ndastp / 100 - iye * 100
-   ida = MOD( ndastp, 100 )
-   CALL greg2jul( 0, 0, 0, ida, imo, iye, zjul )
-   zjul = zjul + ( nsec_day + 0.5_wpIFS * rdttra(1) ) / 86400.0_wpIFS
-   CALL jul2greg( iss, imm, ihh, ida, imo, iye, zjul )
-   icdate = iye * 10000 + imo * 100 + ida
-   ictime = ihh * 10000 + imm * 100 + iss
-#endif
 
 END SUBROUTINE nemogcmcoup_step
 
