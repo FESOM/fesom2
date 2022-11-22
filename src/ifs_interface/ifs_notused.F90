@@ -211,6 +211,7 @@ SUBROUTINE nemogcmcoup_update_add( mype, npes, icomm, &
    ! interpolation of the input gaussian grid data
    
    USE par_kind
+   USE fesom_main_storage_module, only: fesom => f ! only: MPI_COMM_FESOM, mype (previously in g_parsup)
 
    IMPLICIT NONE
 
@@ -229,9 +230,10 @@ SUBROUTINE nemogcmcoup_update_add( mype, npes, icomm, &
 
    ! Local variables
 
+   if(fesom%mype==0) then
    WRITE(0,*)'nemogcmcoup_update_add should not be called when coupling to fesom. Commented ABORT. Proceeding...'
    !CALL abort
-   
+   endif   
 
 END SUBROUTINE nemogcmcoup_update_add
 
