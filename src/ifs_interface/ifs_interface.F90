@@ -20,7 +20,7 @@ SUBROUTINE nemogcmcoup_init( mype, icomm, inidate, initime, itini, itend, zstp, 
    USE g_config, only: dt
    USE g_clock, only: timenew, daynew, yearnew, month, day_in_month
    USE nemogcmcoup_steps, ONLY : substeps
-
+   
    IMPLICIT NONE
 
    ! Input arguments
@@ -61,7 +61,7 @@ SUBROUTINE nemogcmcoup_init( mype, icomm, inidate, initime, itini, itend, zstp, 
    WRITE(0,*)'! FESOM is initialized from within IFS.'
    WRITE(0,*)'! get MPI_COMM_FESOM. ================='
    WRITE(0,*)'! main_initialize done. ==============='
-   WRITE(0,*)'Thomas/Kristian neu'
+   WRITE(0,*)'Thomas/Kristian parinter_mult version'
    endif
 
    ! Set more information for the caller
@@ -611,15 +611,15 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    !type(t_mesh), target :: mesh
 
    ! Local variables
-   INTEGER		:: n
+   INTEGER		:: n, jf
    integer, pointer     :: myDim_nod2D, eDim_nod2D
    REAL(wpIFS), parameter 	:: rhofwt = 1000. ! density of freshwater
 
-
-   ! Packed receive buffer
-   REAL(wpIFS), DIMENSION(fesom%partit%myDim_nod2D) :: zrecv
-   REAL(wpIFS), DIMENSION(fesom%partit%myDim_elem2D):: zrecvU, zrecvV
-
+   ! Packed send/receive buffers
+   INTEGER , PARAMETER :: maxnfield = 11
+   INTEGER :: nfield = 0
+   REAL(wpIFS), DIMENSION(npoints,maxnfield) :: zsendnf
+   REAL(wpIFS), DIMENSION(fesom%partit%myDim_nod2D,maxnfield) :: zrecvnf
 
    !#include "associate_mesh.h"
    ! associate only the necessary things
@@ -657,15 +657,120 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    stress_atmoce_x=0.   ! Done, taux_oce
    stress_atmoce_y=0.   ! Done, tauy_oce
 
+   ! =================================================================== !
+   ! Pack all arrays
+   nfield = 0
+   !1. Ocean solar radiation to T grid
+   nfield = nfield + 1
+   zsendnf(:,nfield) = qs___oce(:)
 
    ! =================================================================== !
-   !1. Interpolate ocean solar radiation to T grid
+   !2. Ice solar radiation to T grid
+   ! DO NOTHING
 
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, qs___oce,  &
-      &               myDim_nod2D, zrecv )
+   ! =================================================================== !
+   !3. Ocean non-solar radiation to T grid (is this non-solar heat flux?)
+   nfield = nfield + 1
+   zsendnf(:,nfield) = qns__oce(:)
+
+   ! =================================================================== !
+   !4. Non-solar radiation over ice to T grid (is this non-solar heat flux?)
+   nfield = nfield + 1
+   zsendnf(:,nfield) = qns__ice(:)
+
+   ! =================================================================== !
+   !5. D(q)/dT to T grid
+   ! DO NOTHING
+
+
+   ! =================================================================== !
+   !6. Total evaporation to T grid
+   ! =================================================================== !
+   !ice_thermo_cpl.F90:  total evaporation (needed in oce_salt_balance.F90)
+   !ice_thermo_cpl.F90:  evaporation = evap_no_ifrac*(1.-a_ice) + sublimation*a_ice
+   ! =================================================================== !
+   nfield = nfield + 1
+   zsendnf(:,nfield) = evap_tot(:)
+
+   ! =================================================================== !
+   !7. Sublimation (evaporation over ice) to T grid
+   nfield = nfield + 1
+   zsendnf(:,nfield) = evap_ice(:)
+
+   ! =================================================================== !
+   !8. Interpolate liquid precipitation to T grid
+   nfield = nfield + 1
+   zsendnf(:,nfield) = prcp_liq(:)
+
+   ! =================================================================== !
+   !9. Interpolate solid precipitation to T grid
+   nfield = nfield + 1
+   zsendnf(:,nfield) = prcp_sol(:)
    
-   ! Unpack ocean solar radiation, without halo
-   shortwave(1:myDim_nod2D)=zrecv(1:myDim_nod2D)
+   ! =================================================================== !
+   !10. Interpolate runoff to T grid
+   !
+   !CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, runoff,  &
+   !   &               myDim_nod2D, zrecv )
+   !
+   ! Unpack runoff, without halo
+   !runoff(1:myDim_nod2D)=zrecv(1:myDim_nod2D) !conversion??
+   !
+   ! Do the halo exchange
+   !call exchange_nod(runoff,fesom%partit)
+   !
+   !11. Interpolate ocean runoff to T grid
+   !
+   !CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, ocerunoff,  &
+   !   &               myDim_nod2D, zrecv )
+   !
+   ! Unpack ocean runoff
+   ! ??
+
+   !12. Interpolate total cloud fractions to T grid (tcc)
+   !
+   !13. Interpolate low cloud fractions to T grid (lcc)
+
+
+   ! =================================================================== !
+   ! STRESSES
+
+   ! OVER OCEAN:
+   nfield = nfield + 1
+   zsendnf(:,nfield) = taux_oce(:)
+
+   nfield = nfield + 1
+   zsendnf(:,nfield) = tauy_oce(:)
+
+   ! =================================================================== !
+   ! OVER ICE:
+   nfield = nfield + 1
+   zsendnf(:,nfield) = taux_ice(:)
+
+   nfield = nfield + 1
+   zsendnf(:,nfield) = tauy_ice(:)
+   
+   ! =================================================================== !
+   ! Interpolate arrays
+   IF (lparintmultatm) THEN
+      CALL parinter_fld_mult( nfield, mype, npes, icomm, gausstoT, npoints, &
+         &                    zsendnf, myDim_nod2D, &
+         &                    zrecvnf )
+   ELSE
+      DO jf = 1, nfield
+         CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, &
+            &               zsendnf(:,jf), myDim_nod2D, &
+            &               zrecvnf(:,jf) )
+      ENDDO
+   ENDIF
+   
+   ! =================================================================== !
+   ! Unpack all arrays
+   nfield = 0
+   ! =================================================================== !
+   !1. Unpack ocean solar radiation, without halo
+   nfield = nfield + 1
+   shortwave(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)
 
    ! Do the halo exchange
    call exchange_nod(shortwave,fesom%partit)
@@ -677,26 +782,18 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
 
 
    ! =================================================================== !
-   !3. Interpolate ocean non-solar radiation to T grid (is this non-solar heat flux?)
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, qns__oce,  &
-      &               myDim_nod2D, zrecv )
-   
-   ! Unpack ocean non-solar, without halo
-   oce_heat_flux(1:myDim_nod2D)=zrecv(1:myDim_nod2D)
+   !3. Unpack ocean non-solar, without halo
+   nfield = nfield + 1
+   oce_heat_flux(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)
 
    ! Do the halo exchange
    call exchange_nod(oce_heat_flux,fesom%partit)
 
 
    ! =================================================================== !
-   !4. Interpolate non-solar radiation over ice to T grid (is this non-solar heat flux?)
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, qns__ice,  &
-      &               myDim_nod2D, zrecv )
-   
-   ! Unpack ice non-solar
-   ice_heat_flux(1:myDim_nod2D)=zrecv(1:myDim_nod2D)
+   !4. Unpack ice non-solar
+   nfield = nfield + 1
+   ice_heat_flux(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)
 
    ! Do the halo exchange
    call exchange_nod(ice_heat_flux,fesom%partit)
@@ -708,28 +805,21 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
 
 
    ! =================================================================== !
-   !6. Interpolate total evaporation to T grid
+   !6. Unpack total evaporation to T grid
    ! =================================================================== !
    !ice_thermo_cpl.F90:  total evaporation (needed in oce_salt_balance.F90)
    !ice_thermo_cpl.F90:  evaporation = evap_no_ifrac*(1.-a_ice) + sublimation*a_ice
    ! =================================================================== !
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, evap_tot,  &
-      &               myDim_nod2D, zrecv )
-   
    ! Unpack total evaporation, without halo
-   evap_no_ifrac(1:myDim_nod2D)=-zrecv(1:myDim_nod2D)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
+   nfield = nfield + 1
+   evap_no_ifrac(1:myDim_nod2D)=-zrecvnf(1:myDim_nod2D,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
 
    ! Do the halo exchange
    call exchange_nod(evap_no_ifrac,fesom%partit)
 
-   !7. Interpolate sublimation (evaporation over ice) to T grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, evap_ice,  &
-      &               myDim_nod2D, zrecv )
-   
-   ! Unpack sublimation (evaporation over ice), without halo
-   sublimation(1:myDim_nod2D)=-zrecv(1:myDim_nod2D)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
+   !7. Unpack sublimation (evaporation over ice), without halo
+   nfield = nfield + 1
+   sublimation(1:myDim_nod2D)=-zrecvnf(1:myDim_nod2D,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
 
    ! Do the halo exchange
    call exchange_nod(sublimation,fesom%partit)
@@ -738,26 +828,18 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
 
 
    ! =================================================================== !
-   !8. Interpolate liquid precipitation to T grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, prcp_liq,  &
-      &               myDim_nod2D, zrecv )
-   
-   ! Unpack liquid precipitation, without halo
-   prec_rain(1:myDim_nod2D)=zrecv(1:myDim_nod2D)/rhofwt	! kg m^(-2) s^(-1) -> m/s
+   !8. Unpack liquid precipitation, without halo
+   nfield = nfield + 1
+   prec_rain(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s
    
    ! Do the halo exchange
    call exchange_nod(prec_rain,fesom%partit)
 
 
    ! =================================================================== !
-   !9. Interpolate solid precipitation to T grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, prcp_sol,  &
-      &               myDim_nod2D, zrecv )
-   
-   ! Unpack solid precipitation, without halo
-   prec_snow(1:myDim_nod2D)=zrecv(1:myDim_nod2D)/rhofwt	! kg m^(-2) s^(-1) -> m/s
+   !9. Unpack solid precipitation, without halo
+   nfield = nfield + 1
+   prec_snow(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s
 
    ! Do the halo exchange
    call exchange_nod(prec_snow,fesom%partit)
@@ -792,38 +874,26 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! STRESSES
 
    ! OVER OCEAN:
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, taux_oce,  &
-      &               myDim_nod2D, zrecv )
-   
+   nfield = nfield + 1
    ! Unpack x stress atm->oce, without halo; then do halo exchange
-   stress_atmoce_x(1:myDim_nod2D)=zrecv(1:myDim_nod2D)
+   stress_atmoce_x(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)
    call exchange_nod(stress_atmoce_x,fesom%partit)
-
    !
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, tauy_oce,  &
-      &               myDim_nod2D, zrecv )
-   
    ! Unpack y stress atm->oce, without halo; then do halo exchange
-   stress_atmoce_y(1:myDim_nod2D)=zrecv(1:myDim_nod2D)
+   nfield = nfield + 1
+   stress_atmoce_y(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)
    call exchange_nod(stress_atmoce_y,fesom%partit)
 
    ! =================================================================== !
    ! OVER ICE:
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, taux_ice,  &
-      &               myDim_nod2D, zrecv )
-   
    ! Unpack x stress atm->ice, without halo; then do halo exchange
-   stress_atmice_x(1:myDim_nod2D)=zrecv(1:myDim_nod2D)
+   nfield = nfield + 1
+   stress_atmice_x(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)
    call exchange_nod(stress_atmice_x,fesom%partit)
-
    !
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, tauy_ice,  &
-      &               myDim_nod2D, zrecv )
-   
    ! Unpack y stress atm->ice, without halo; then do halo exchange
-   stress_atmice_y(1:myDim_nod2D)=zrecv(1:myDim_nod2D)
+   nfield = nfield + 1
+   stress_atmice_y(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)
    call exchange_nod(stress_atmice_y,fesom%partit)
 
 
