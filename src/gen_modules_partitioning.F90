@@ -74,6 +74,14 @@ save
   logical :: elem_full_flag  
 
 contains
+  ! create a communicator which contains MPI_COMM_FESOM and the ioserver rank
+  ! this currently assumes the ranks in MPI_COMM_FESOM are the first ranks in MPI_COMM_WORLD
+  function create_ioserver_communicator() result(ioserver_communicator)
+    use ioserver_module
+    integer ioserver_communicator
+    ! EO parameters
+  end function
+
 subroutine par_init    ! initializes MPI
   use ioserver_module
   implicit none
@@ -108,8 +116,24 @@ subroutine par_init    ! initializes MPI
     ioserver_rank = npes
   end if
 #else
-  call MPI_Comm_Size(MPI_COMM_FESOM,npes,i)
-  call MPI_Comm_Rank(MPI_COMM_FESOM,mype,i)
+
+    comm_fesom_with_ioserver = create_ioserver_communicator()
+
+    if(ioserver%is_ioserver()) then
+      call MPI_Comm_Rank(comm_fesom_with_ioserver, ioserver_rank, err)
+      mype = ioserver_rank
+      call MPI_Comm_Size(comm_fesom_with_ioserver, comm_fesom_npes, err) ! MPI_COMM_FESOM is invalid here
+      comm_fesom_npes = comm_fesom_npes -1
+      npes = comm_fesom_npes
+      return
+    end if
+  
+    call MPI_Comm_Size(MPI_COMM_FESOM, npes, err)
+    call MPI_Comm_Rank(MPI_COMM_FESOM, mype, err)
+    if(.not. ioserver%is_ioserver()) then
+      ioserver_rank = npes
+    end if
+    
 #endif  
 
   if(mype==0) then
