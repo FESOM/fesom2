@@ -851,6 +851,19 @@ subroutine write_mean(entry, entry_index)
 end subroutine
 
 
+subroutine write_mean_ioserver(entry, entry_index)
+  use mod_mesh
+  use g_PARSUP
+  use io_gather_module
+  use ioserver_module
+  implicit none
+  type(Meandata), intent(inout) :: entry
+  integer, intent(in) :: entry_index
+  ! EO parameters
+
+end subroutine
+
+
 subroutine update_means
   use g_PARSUP
   implicit none
@@ -882,6 +895,7 @@ end subroutine
 !--------------------------------------------------------------------------------------------
 !
 subroutine output(istep, mesh)
+  use ioserver_module
   use g_clock
   use mod_mesh
   use g_PARSUP
@@ -911,7 +925,7 @@ subroutine output(istep, mesh)
 #endif
   end if
 
-  call update_means
+  if(.not. ioserver%is_ioserver()) call update_means
 
   do n=1, io_NSTREAMS
      entry=>io_stream(n)
@@ -976,12 +990,14 @@ subroutine output(istep, mesh)
           write(*,*) trim(entry%name)//': current mean I/O counter = ', entry%rec_count
         end if
 
+        if(.not. ioserver%is_ioserver()) then
         if (entry%accuracy == i_real8) then
           entry%local_values_r8_copy = entry%local_values_r8 /real(entry%addcounter,real64)  ! compute_means
           entry%local_values_r8 = 0._real64 ! clean_meanarrays
         else if (entry%accuracy == i_real4) then
           entry%local_values_r4_copy = entry%local_values_r4 /real(entry%addcounter,real32)  ! compute_means
           entry%local_values_r4 = 0._real32 ! clean_meanarrays
+        end if
         end if
         entry%addcounter   = 0  ! clean_meanarrays
         entry%ctime_copy = ctime
@@ -1004,7 +1020,11 @@ use mod_mesh
   entry=>io_stream(entry_index)
   mype=entry%mype_workaround ! for the thread callback, copy back the value of our mype as a workaround for errors with the cray envinronment (at least with ftn 2.5.9 and cray-mpich 7.5.3)
 
+#ifdef ENABLE_IOSERVER
+  call write_mean_ioserver(entry, entry_index)
+#else
   call write_mean(entry, entry_index)
+#endif
   if(mype == entry%root_rank) call assert_nf( nf_sync(entry%ncid), __LINE__ ) ! flush the file to disk after each write
 end subroutine
 
@@ -1050,6 +1070,7 @@ end subroutine
 subroutine def_stream3D_lvl_limit(glsize, full_lvl_count, lcsize, name, description, units, data, freq, freq_unit, accuracy, mesh, flip_array)
   use mod_mesh
   use g_PARSUP
+  use ioserver_module
   implicit none
   integer,               intent(in)    :: glsize(2), lcsize(2)
   character(len=*),      intent(in)    :: name, description, units
@@ -1065,6 +1086,9 @@ subroutine def_stream3D_lvl_limit(glsize, full_lvl_count, lcsize, name, descript
   integer lvl
   integer full_lvl_count ! i.e. nz or nz1
   
+  ! todo: the ioserver passes an invalid data parameter, but all compilers seem to be OK with it
+
+   if(.not. ioserver%is_ioserver()) then
   do i = 1, rank(data)
     if ((ubound(data, dim = i)<=0)) then
       if (mype==0) then
@@ -1074,12 +1098,15 @@ subroutine def_stream3D_lvl_limit(glsize, full_lvl_count, lcsize, name, descript
       return
     end if    
   end do
+    end if
   
   ! make sure the number of the given local and global levels match the number of levels in the data
+  if(.not. ioserver%is_ioserver()) then
   call assert(size(data,dim=1) == glsize(1), __LINE__)
   call assert(size(data,dim=1) == lcsize(1), __LINE__)
   ! the number of levels in the data might be reduced, see that it is not more than the full_lvl_count, i.e. nz or nz1 
   call assert(glsize(1) <= full_lvl_count, __LINE__)
+  end if
 
   if (mype==0) then
      write(*,*) 'adding I/O stream 3D for ', trim(name)
@@ -1128,6 +1155,7 @@ end subroutine
 subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, mesh)
   use mod_mesh
   use g_PARSUP
+  use ioserver_module
   implicit none
   integer,               intent(in)    :: glsize, lcsize
   character(len=*),      intent(in)    :: name, description, units
@@ -1141,6 +1169,9 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   integer i
   integer lvl
   
+  ! todo: the ioserver passes an invalid data parameter, but all compilers seem to be OK with it
+
+   if(.not. ioserver%is_ioserver()) then
   do i = 1, rank(data)
     if ((ubound(data, dim = i)<=0)) then
       if (mype==0) then
@@ -1150,6 +1181,7 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
       return
     end if    
   end do
+   end if
 
   if (mype==0) then
      write(*,*) 'adding I/O stream 2D for ', trim(name)
@@ -1212,6 +1244,7 @@ end subroutine
     use mod_mesh
     use g_PARSUP
     use io_netcdf_workaround_module
+    use ioserver_module
     type(Meandata), intent(inout) :: entry
     character(len=*),      intent(in)    :: name, description, units
     integer,               intent(in)    :: freq
@@ -1257,17 +1290,32 @@ end subroutine
       stop
     end if
 
+    if(.not. ioserver%is_ioserver()) then
     if (accuracy == i_real8) then
       allocate(entry%local_values_r8_copy(size(entry%local_values_r8, dim=1), size(entry%local_values_r8, dim=2)))
     else if (accuracy == i_real4) then
       allocate(entry%local_values_r4_copy(size(entry%local_values_r4, dim=1), size(entry%local_values_r4, dim=2)))
     end if
+    end if
 
     ! set up async output
     
+#ifdef ENABLE_IOSERVER
+    entry%root_rank = ioserver_rank
+    if(ioserver%is_ioserver()) then
+      ! the ioserver is detached from the Fesom runloop anyway, disable async to save thread resources and avoid trouble with the non thread safe parts of netcdf
+      async_netcdf_allowed = .false.
+    else
+      async_netcdf_allowed = .true.
+    end if
+
+    call MPI_Comm_dup(comm_fesom_with_ioserver, entry%comm, err)
+    call assert(err==MPI_SUCCESS, __LINE__)
+#else
     entry%root_rank = next_io_rank(MPI_COMM_FESOM, async_netcdf_allowed)
 
     call MPI_Comm_dup(MPI_COMM_FESOM, entry%comm, err)
+#endif
 
     call entry%thread%initialize(do_output_callback, entry_index)
     if(.not. async_netcdf_allowed) call entry%thread%disable_async()
