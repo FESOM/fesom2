@@ -80,6 +80,59 @@ contains
     use ioserver_module
     integer ioserver_communicator
     ! EO parameters
+    integer :: i
+    integer provided_mpi_thread_support_level
+    character(:), allocatable :: provided_mpi_thread_support_level_name
+    integer communicator_color
+    integer err
+    integer status(MPI_STATUS_SIZE)
+    integer rank0rank_in_comm_world
+    integer ioserverrank_in_world
+    integer iocommfesom_nranks
+    integer, allocatable :: world_ioranks(:)
+    integer fesom_npes
+    integer worldgroup
+    integer fesom_iogroup
+
+    call MPI_Comm_group(MPI_COMM_WORLD, worldgroup, err)
+    if(ioserver%is_ioserver()) then
+      call MPI_Group_Rank(worldgroup, ioserverrank_in_world, err)
+      ! for now we assume comm_world rank0 is a fesom process
+      ! see above for a possible general solution with mpi_isend to all in comm_world
+      rank0rank_in_comm_world = 0
+      call mpi_send(ioserverrank_in_world, 1, mpi_integer, rank0rank_in_comm_world, 32000, MPI_COMM_WORLD, err)
+      call mpi_recv(fesom_npes, 1, mpi_integer, rank0rank_in_comm_world, 42, MPI_COMM_WORLD, status, err)
+      allocate(world_ioranks(fesom_npes+1)) ! fesom ranks + ioserver
+      world_ioranks(fesom_npes+1) = ioserverrank_in_world
+      call mpi_recv(world_ioranks(1), fesom_npes, mpi_integer, rank0rank_in_comm_world, 42, MPI_COMM_WORLD, status, err)
+    else
+      ! the MPI_COMM_FESOM is determined via oasis
+      call MPI_Comm_Size(MPI_COMM_FESOM, npes, err)
+      call MPI_Comm_Rank(MPI_COMM_FESOM, mype, err)
+
+      ! contact our ioserver
+      if(mype==0) then
+        call mpi_recv(ioserverrank_in_world, 1, mpi_integer, MPI_ANY_SOURCE, 32000, MPI_COMM_WORLD, status, err)
+        print *,"ioserver global rank",ioserverrank_in_world
+        call mpi_send(npes, 1, mpi_integer, ioserverrank_in_world, 42, MPI_COMM_WORLD, err)
+        allocate(world_ioranks(npes+1)) ! fesom ranks + ioserver
+        do i = 1, npes
+          world_ioranks(i) = i-1 ! assume a consecutive range of fesom ranks, TODO: make this work with any rank ordering
+        end do
+        world_ioranks(size(world_ioranks)) = ioserverrank_in_world
+        call mpi_send(world_ioranks(1), npes, mpi_integer, ioserverrank_in_world, 42, MPI_COMM_WORLD, err)
+      else
+        allocate(world_ioranks(npes+1)) ! fesom ranks + ioserver
+      end if
+      call MPI_Bcast(ioserverrank_in_world, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, err)
+      call MPI_Bcast(world_ioranks(1), size(world_ioranks), MPI_INTEGER, 0, MPI_COMM_FESOM, err)
+    end if
+
+    ! build a comm we can share with the ioserver
+    ! MPI_Comm_create_group is only collective over the group of processes contained in group
+    
+    call MPI_Group_incl(worldgroup, size(world_ioranks), world_ioranks, fesom_iogroup, err)  
+    call MPI_Comm_create_group(MPI_COMM_WORLD, fesom_iogroup, 42, ioserver_communicator, err)  
   end function
 
 subroutine par_init    ! initializes MPI
