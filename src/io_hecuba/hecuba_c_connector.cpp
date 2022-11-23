@@ -1,8 +1,8 @@
 #include <hecuba/HecubaSession.h>
 #include <hecuba/IStorage.h>
+#include <hecuba/UUID.h>
 #include <iostream>
 #include "hecuba_c_connector.h"
-
 
 #ifdef __cplusplus
 extern "C" {
@@ -107,7 +107,8 @@ void hecuba_put_array_val_C2(char *varname, double ctime, int chunk, void *value
    std::string random_str = varname;
    //use substring
    random_str.append("_");
-   random_str.append((hsession->UUID2str(hsession->generateUUID())).substr(24));
+   //random_str.append((hsession->UUID2str(hsession->generateUUID())).substr(24));
+   random_str.append((UUID::UUID2str(UUID::generateUUID())).substr(24));
    //cast as char array
    random_key= &random_str[0];
    
