@@ -1702,7 +1702,6 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
         
         nzmin = ulevels(el(1))
         nzmax = nlevels(el(1))-1
-        !!PS do nz=1, nlevels(el(1))-1
         do nz=nzmin, nzmax
             c1=c1+alpha*((UV(2,nz,el(1))+UV_rhs(2,nz,el(1)))*deltaX1- &
                          (UV(1,nz,el(1))+UV_rhs(1,nz,el(1)))*deltaY1)*helem(nz,el(1))
@@ -1719,7 +1718,6 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
             deltaY2=edge_cross_dxdy(4,ed)
             nzmin = ulevels(el(2))
             nzmax = nlevels(el(2))-1
-            !!PS do nz=1, nlevels(el(2))-1
             do nz=nzmin, nzmax
                 c2=c2-alpha*((UV(2,nz,el(2))+UV_rhs(2,nz,el(2)))*deltaX2- &
                              (UV(1,nz,el(2))+UV_rhs(1,nz,el(2)))*deltaY2)*helem(nz,el(2))
@@ -1899,7 +1897,6 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
     if (.not. trim(which_ALE)=='linfs') then
 !$OMP PARALLEL DO
         do n=1,myDim_nod2D
-            if (ulevels_nod2D(n) > 1) cycle !!PS
             ssh_rhs_old(n)=ssh_rhs_old(n)-water_flux(n)*areasvol(ulevels_nod2D(n),n)
         end do
 !$OMP END PARALLEL DO
@@ -1916,7 +1913,7 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
 
 !$OMP PARALLEL DO
     do n=1,myDim_nod2D
-        if (ulevels_nod2D(n) > 1) cycle !!PS
+        if (ulevels_nod2D(n) > 1) cycle ! --> if cavity node hbar == hbar_old
         hbar(n)=hbar_old(n)+ssh_rhs_old(n)*dt/areasvol(ulevels_nod2D(n),n)
     end do
 !$OMP END PARALLEL DO
@@ -2406,15 +2403,14 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
                     
                     hnode_new(nz,n)=hnode(nz,n)+(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))*dd
                 end do
-            
+                
                 !___________________________________________________________________
                 ! Add surface fresh water flux as upper boundary condition for 
                 ! continutity
-                !!PS Wvel(1,n)=Wvel(1,n)-water_flux(n)
-!!PS                 Wvel(nzmin,n)=Wvel(nzmin,n)-water_flux(n) 
-            
+                Wvel(nzmin,n)=Wvel(nzmin,n)-water_flux(n) 
+                
             endif ! --> if (nzmin==1) then
-            Wvel(nzmin,n)=Wvel(nzmin,n)-water_flux(n) 
+            
         end do ! --> do n=1, myDim_nod2D
 !$OMP END PARALLEL DO
         ! The implementation here is a bit strange, but this is to avoid 
