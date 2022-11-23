@@ -557,6 +557,143 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
 END SUBROUTINE nemogcmcoup_lim2_get
 
 
+SUBROUTINE nemogcmcoup_exflds_get( mype, npes, icomm, &
+   &                               nopoints, pgssh, pgmld, pg20d, pgsss, &
+   &                               pgtem300, pgsal300 )
+
+   ! Interpolate SSH, MLD, 20C isotherm, sea surface salinity, average T&S over upper 300m
+   ! from the FESOM grid to IFS's Gaussian grid. 
+   
+   ! This routine can be called at any point in time since it does
+   ! the necessary message passing in parinter_fld. 
+
+   USE par_kind
+   USE scripremap
+   USE parinter
+   USE interinfo
+   USE fesom_main_storage_module, only: fesom => f
+   USE o_ARRAYS, only : MLD1
+   IMPLICIT NONE
+   
+   ! Arguments
+   REAL(wpIFS), DIMENSION(nopoints) :: pgssh, pgmld, pg20d, pgsss, &
+      & pgtem300, pgsal300
+   ! Message passing information
+   INTEGER, INTENT(IN) :: mype, npes, icomm
+   ! Number Gaussian grid points
+   INTEGER, INTENT(IN) :: nopoints
+
+   ! Local variables
+   INTEGER , PARAMETER :: maxnfield = 6
+   INTEGER :: nfield = 0
+   REAL(wpIFS), DIMENSION(fesom%partit%myDim_nod2D,maxnfield)  :: zsendnf
+   REAL(wpIFS), DIMENSION(nopoints,maxnfield)  :: zrecvnf	
+   real(kind=wpIFS), dimension(:,:), pointer :: coord_nod2D
+   integer, pointer :: myDim_nod2D, eDim_nod2D
+
+   ! Loop variables
+   INTEGER :: n, elem, ierr, jf
+
+   !#include "associate_mesh.h"
+   ! associate what is needed only
+   myDim_nod2D  => fesom%partit%myDim_nod2D
+   eDim_nod2D   => fesom%partit%eDim_nod2D
+   coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => fesom%mesh%coord_nod2D   
+   
+
+   nfield = 0
+   ! =================================================================== !
+   ! Pack SSH data 'pgssh' is on Gauss grid.
+   nfield = nfield + 1
+   DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=fesom%dynamics%eta_n(n)  ! in meters
+   ENDDO
+
+   ! =================================================================== !
+   ! Pack MLD data
+   nfield = nfield + 1
+   DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=-MLD1(n) ! depth at which the density over depth differs 
+        			 ! by 0.125 sigma units from the surface density (Griffies et al., 2009)
+   ENDDO
+   
+   ! =================================================================== !
+   ! Pack depth of 20C isotherm
+   nfield = nfield + 1
+   DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=-1. ! compute later, set to -1 for the moment
+   ENDDO
+
+   ! =================================================================== !
+   ! Pack sea surface salinity data: 'pgsss' on Gaussian grid.
+   nfield = nfield + 1
+   DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=fesom%tracers%data(2)%values(1,n) ! in psu
+   ENDDO
+
+   ! =================================================================== !
+   ! Pack average temp over upper 300m: 'pgtem300' on Gaussian grid.
+   nfield = nfield + 1
+   DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=-1. ! compute later, set to -1
+   ENDDO
+   
+   ! =================================================================== !
+   ! Pack average salinity over upper 300m: 'pgsal300' on Gaussian grid.
+   nfield = nfield + 1
+   DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=-1. ! compute later, set to -1
+   ENDDO
+
+   ! =================================================================== !
+   ! Interpolate all fields
+   IF (lparintmultatm) THEN
+      CALL parinter_fld_mult( nfield, mype, npes, icomm, Ttogauss, &
+         &                    myDim_nod2D, zsendnf, &
+         &                    nopoints, zrecvnf )
+   ELSE
+      DO jf = 1, nfield
+         CALL parinter_fld( mype, npes, icomm, Ttogauss, &
+            &               myDim_nod2D, zsendnf(:,jf), &
+            &               nopoints, zrecvnf(:,jf) )
+      ENDDO
+   ENDIF
+
+   nfield = 0
+   ! =================================================================== !
+   ! Unpack 'pgssh' on Gauss.
+   nfield = nfield + 1
+   pgssh(:) = zrecvnf(:,nfield)
+   !
+   ! =================================================================== !
+   ! Unpack 'pgmld' on Gauss.
+   nfield = nfield + 1
+   pgmld(:) = zrecvnf(:,nfield)
+   !
+   ! =================================================================== !
+   ! Unpack depth of 20C isotherm data
+   nfield = nfield + 1
+   pg20d(:) = zrecvnf(:,nfield)
+
+   ! =================================================================== !
+   ! Unpack sea surface salinity pgsss on Gaussian grid.
+   nfield = nfield + 1
+   pgsss(:) = zrecvnf(:,nfield)
+
+   ! =================================================================== !
+   ! Unpack average temp over upper 300m pgtem300 on Gaussian grid.
+   nfield = nfield + 1
+   pgtem300(:) = zrecvnf(:,nfield)
+
+   ! =================================================================== !
+   ! Unpack average salinity over upper 300m on Gaussian grid.
+   nfield = nfield + 1
+   pgsal300(:) = zrecvnf(:,nfield)
+
+
+END SUBROUTINE nemogcmcoup_exflds_get
+
+
 SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    &                                npoints,  &
    &                                taux_oce, tauy_oce, taux_ice, tauy_ice, &
