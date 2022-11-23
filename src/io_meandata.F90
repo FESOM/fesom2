@@ -877,9 +877,9 @@ subroutine write_mean_ioserver(entry, entry_index)
   if(entry%accuracy == i_real4) then
     if(mype==entry%root_rank) then
       if(entry%ndim==1) then ! i.e. a 2D field
-        if(.not. allocated(entry%aux3d_r4)) allocate(entry%aux3d_r4(size1,size2)) ! lvl is first so it will be the wrong order if we dump the whole array to netcdf without transposing it
+        if(.not. allocated(entry%aux3d_r4)) allocate(entry%aux3d_r4(size1,size2)) ! todo: change index order here, lvl is first so it will be the wrong order if we dump the whole array to netcdf without transposing it
       else ! i.e. a 3D field
-        if(.not. allocated(entry%aux3d_r4)) allocate(entry%aux3d_r4(size1,size2)) ! lvl is first so it will be the wrong order if we dump the whole array to netcdf without transposing it
+        if(.not. allocated(entry%aux3d_r4)) allocate(entry%aux3d_r4(size1,size2)) ! todo: change index order here, lvl is first so it will be the wrong order if we dump the whole array to netcdf without transposing it
       end if
     end if
     
