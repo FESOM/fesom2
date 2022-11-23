@@ -26,6 +26,7 @@ module io_MEANDATA
     real(real32), allocatable, dimension(:,:) :: local_values_r4
     real(real64), allocatable :: aux_r8(:)
     real(real32), allocatable :: aux_r4(:)
+    real(real32), allocatable :: aux3d_r4(:,:)
     integer                                            :: addcounter=0
     real(kind=WP), pointer                             :: ptr3(:,:) ! todo: use netcdf types, not WP
     character(500)                                     :: filename
@@ -860,6 +861,56 @@ subroutine write_mean_ioserver(entry, entry_index)
   type(Meandata), intent(inout) :: entry
   integer, intent(in) :: entry_index
   ! EO parameters
+  integer tag
+  integer                       :: size1, size2
+
+  if (mype==entry%root_rank) then
+     write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
+     call assert_nf( nf_put_vara_double(entry%ncid, entry%Tid, entry%rec_count, 1, entry%ctime_copy, 1), __LINE__)
+  end if
+! !_______writing 2D and 3D fields________________________________________________
+  size1=entry%glsize(1)
+  size2=entry%glsize(2)
+  tag = entry_index
+
+!___________writing 4 byte real _________________________________________ 
+  if(entry%accuracy == i_real4) then
+    if(mype==entry%root_rank) then
+      if(entry%ndim==1) then ! i.e. a 2D field
+        if(.not. allocated(entry%aux3d_r4)) allocate(entry%aux3d_r4(size1,size2)) ! lvl is first so it will be the wrong order if we dump the whole array to netcdf without transposing it
+      else ! i.e. a 3D field
+        if(.not. allocated(entry%aux3d_r4)) allocate(entry%aux3d_r4(size1,size2)) ! lvl is first so it will be the wrong order if we dump the whole array to netcdf without transposing it
+      end if
+    end if
+    
+    if(.not. entry%is_elem_based) then
+      call gather_real4_nod3D (entry%local_values_r4_copy, entry%aux3d_r4, entry%root_rank, tag, entry%comm)
+    else
+      call gather_real4_elem3D(entry%local_values_r4_copy, entry%aux3d_r4, entry%root_rank, tag, entry%comm)
+    end if
+    
+    ! write to file
+    if (mype==entry%root_rank) then
+      if (entry%ndim==1) then
+        ! todo: treat 2d identical to 3d for complete 3d dump
+        call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, 1, entry%rec_count/), (/size2, size1, 1/), transpose(entry%aux3d_r4)), __LINE__)
+      else if (entry%ndim==2) then
+#ifndef TRANSPOSE_OUTPUT
+!             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/file_lvl, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r4), __LINE__)
+#else
+        ! transpose the global aux array when writing all levels at once, otherwise it is transposed in the netcdf file
+        ! we can either use transpose(entry%aux3d_r4) or use nf_put_varm with an imap=(/size1,1/) to transpose the data
+        ! nf_put_varm was very slow on aleph in a test with dart mesh
+        call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, 1, entry%rec_count/), (/size2, size1, 1/), transpose(entry%aux3d_r4)), __LINE__)
+        ! for reference and probably further testing here the code for transposing during writing via put_varam
+        ! stride = (/1,1/) ! every element
+        ! imap = (/size1,1/) ! transpose the data, untransposed would be /1,size2/
+        ! nf_put_varm_real with a transposing imap takes forever to write
+        ! call assert_nf( nf_put_varm_real(entry%ncid, entry%varID, (/1, 1, entry%rec_count/), (/size2, size1, 1/), stride, imap, entry%aux3d_r4), __LINE__)
+#endif
+      end if
+    end if
+  end if
 
 end subroutine
 
