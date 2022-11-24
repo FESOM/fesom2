@@ -1,0 +1,14 @@
+- "TypeSpec": [ "midict", "StorageDict" ]
+  "KeySpec":
+            - [ "time", "float"]     #1st is partiion key
+            - [ "chunk", "int" ]       #Remaining are the clustering
+  "ValueSpec":
+            - [ "metrics", "numpy.ndarray" ]
+#
+# This model will generate the following Python file:
+#    from hecuba import StorageDict
+#    
+#    class midict (StorageDict):
+#       '''
+#       @TypeSpec dict <<time:float,chunk:int>,metrics:numpy.ndarray>
+#       '''
