@@ -143,7 +143,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 #else
 !$OMP ORDERED
 #endif
-            !$ACC PARALLEL LOOP GANG VECTOR
+            !!$ACC PARALLEL LOOP GANG VECTOR
             do nz=nu12, nl12
                !!$ACC ATOMIC UPDATE
                fct_LO(nz, enodes(1))=fct_LO(nz, enodes(1))+adv_flux_hor(nz, e)
@@ -156,7 +156,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
                !!$ACC ATOMIC UPDATE
                fct_LO(nz, enodes(2))=fct_LO(nz, enodes(2))-adv_flux_hor(nz, e)
             end do
-            !$ACC END PARALLEL LOOP
+            !!$ACC END PARALLEL LOOP
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
             call omp_unset_lock(partit%plock(enodes(2)))
 #else
@@ -331,7 +331,7 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #else
 !$OMP ORDERED
 #endif
-        !$ACC LOOP GANG VECTOR
+        !!$ACC LOOP GANG VECTOR
         do nz=nu12, nl12
             !!$ACC ATOMIC UPDATE
             dttf_h(nz,enodes(1))=dttf_h(nz,enodes(1))+flux_h(nz,edge)*dt/areasvol(nz,enodes(1))
@@ -344,7 +344,7 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
             !!$ACC ATOMIC UPDATE
             dttf_h(nz,enodes(2))=dttf_h(nz,enodes(2))-flux_h(nz,edge)*dt/areasvol(nz,enodes(2))
         end do
-        !$ACC END LOOP
+        !!$ACC END LOOP
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(enodes(2)))
 #else
