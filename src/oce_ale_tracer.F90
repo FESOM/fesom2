@@ -833,7 +833,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
         !  (BUT CHECK!)              |    |                         |    |
         !                            v   (+)                        v   (+) 
         !                            
-        tr(nzmin)= tr(nzmin)+bc_surface(n, tracers%data(tr_num)%ID, trarr(mesh%ulevels_nod2D(n),n), partit)  
+        tr(nzmin)= tr(nzmin)+bc_surface(n, tracers%data(tr_num)%ID, trarr(nzmin,n), partit)  
         
         !_______________________________________________________________________
         ! The forward sweep algorithm to solve the three-diagonal matrix 
@@ -1275,7 +1275,7 @@ end subroutine diff_part_bh
 !
 !
 !===============================================================================
-! this function returns a boundary conditions for a specified thacer ID and surface node
+! this function returns a boundary conditions for a specified tracer ID and surface node
 ! ID = 0 and 1 are reserved for temperature and salinity
 FUNCTION bc_surface(n, id, sval, partit) 
   use MOD_MESH
@@ -1296,7 +1296,7 @@ FUNCTION bc_surface(n, id, sval, partit)
   !  --> is_nonlinfs=0.0 for linfs
   SELECT CASE (id)
     CASE (1)
-        bc_surface=-dt*(heat_flux(n)/vcpw + sval*water_flux(n)*is_nonlinfs)
+        bc_surface=-dt*(heat_flux(n)/vcpw + sval*water_flux(n)*is_nonlinfs)    
     CASE (2)
         ! --> real_salt_flux(:): salt flux due to containment/releasing of salt
         !     by forming/melting of sea ice
