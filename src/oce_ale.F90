@@ -1646,7 +1646,7 @@ end subroutine update_stiff_mat_ale
 ! ssh_rhs=-alpha*\nabla\int(U_n+U_rhs)dz-(1-alpha)*...
 ! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
 subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
-    use g_config,only: which_ALE,dt
+    use g_config,only: which_ALE, dt, use_cavity_fw2press
     use MOD_MESH
     use o_ARRAYS, only: water_flux
     use o_PARAM
@@ -1759,13 +1759,13 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
 !$OMP DO
         do n=1,myDim_nod2D
             nzmin = ulevels_nod2D(n)
-            if (ulevels_nod2D(n)>1) then
+            if (ulevels_nod2D(n)>1 .and. use_cavity_fw2press ) then
+                ! use_cavity_fw2press=.true.: adds freshwater under the cavity thereby 
+                ! increasing the local pressure
                 ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)
             else
                 ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)+(1.0_WP-alpha)*ssh_rhs_old(n)
             end if 
-!             if (ulevels_nod2D(n)>1) cycle ! --> in case of cavity 
-!             ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)+(1.0_WP-alpha)*ssh_rhs_old(n)            
         end do
 !$OMP END DO
     else
