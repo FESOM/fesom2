@@ -383,7 +383,7 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    INTEGER, INTENT(IN) :: nopoints
 
    ! Local variables
-   INTEGER , PARAMETER :: maxnfield = 6
+   INTEGER , PARAMETER :: maxnfield = 8
    INTEGER , PARAMETER :: maxnfielduv = 2
    INTEGER :: nfield = 0
    INTEGER :: nfielduv = 0
@@ -461,6 +461,27 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    ENDDO
 
    ! =================================================================== !
+   ! Pack U surface currents; need to be rotated to geographical grid
+   nfield = nfield + 1
+   DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=fesom%dynamics%uvnode(1,1,n) ! (u/v,level,nod2D)
+   ENDDO
+
+   ! =================================================================== !
+   ! Pack V surface currents; need to be rotated to geographical grid
+   nfield = nfield + 1
+   DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=fesom%dynamics%uvnode(2,1,n) ! (u/v,level,nod2D)
+   ENDDO
+
+   ! Rotate vectors (U,V) to geographical coordinates (r2g)
+   DO n=1,myDim_nod2D
+      rlon=coord_nod2D(1,n)
+      rlat=coord_nod2D(2,n)
+      CALL vector_r2g(zsendnf(n,nfield-1), zsendnf(n,nfield), rlon, rlat, 0) ! 0-flag for rot. coord
+   ENDDO
+
+   ! =================================================================== !
    ! Interpolate all fields
    IF (lparintmultatm) THEN
       CALL parinter_fld_mult( nfield, mype, npes, icomm, Ttogauss, &
@@ -508,24 +529,28 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    pghsn(:) = zrecvnf(:,nfield)
 
    ! =================================================================== !
-   ! Surface currents need to be rotated to geographical grid
+   ! Unpack surface currents data pgucur/pgvcur on Gaussian grid.
+   nfield = nfield + 1
+   pgucur(:) = zrecvnf(:,nfield)
+   nfield = nfield + 1
+   pgvcur(:) = zrecvnf(:,nfield)
 
-   ! Pack u(v) surface currents
-   zsendnfUV(:,1)=fesom%dynamics%UV(1,1,1:myDim_elem2D)
-   zsendnfUV(:,2)=fesom%dynamics%UV(2,1,1:myDim_elem2D) !UV includes eDim, leave those away here
-   nfielduv = 2
-   
-   do elem=1, myDim_elem2D
-
-      ! compute element midpoints
-      elnodes=elem2D_nodes(:,elem)
-      rlon=sum(coord_nod2D(1,elnodes))/3.0_wpIFS
-      rlat=sum(coord_nod2D(2,elnodes))/3.0_wpIFS
-
-      ! Rotate vectors to geographical coordinates (r2g)
-      CALL vector_r2g(zsendnfUV(elem,1), zsendnfUV(elem,2), rlon, rlat, 0) ! 0-flag for rot. coord
-
-   end do
+   ! Pack u(v) surface currents on elements
+   !zsendnfUV(:,1)=fesom%dynamics%UV(1,1,1:myDim_elem2D)
+   !zsendnfUV(:,2)=fesom%dynamics%UV(2,1,1:myDim_elem2D) !UV includes eDim, leave those away here
+   !nfielduv = 2
+   !
+   !do elem=1, myDim_elem2D
+   !
+   !   ! compute element midpoints
+   !   elnodes=elem2D_nodes(:,elem)
+   !   rlon=sum(coord_nod2D(1,elnodes))/3.0_wpIFS
+   !   rlat=sum(coord_nod2D(2,elnodes))/3.0_wpIFS
+   !
+   !   ! Rotate vectors to geographical coordinates (r2g)
+   !   CALL vector_r2g(zsendnfUV(elem,1), zsendnfUV(elem,2), rlon, rlat, 0) ! 0-flag for rot. coord
+   !
+   !end do
    
 #ifdef FESOM_TODO
 
@@ -549,8 +574,8 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    
 #else
 
-   pgucur(:) = 0.0
-   pgvcur(:) = 0.0
+   !pgucur(:) = 0.0
+   !pgvcur(:) = 0.0
 
 #endif
 
