@@ -593,7 +593,8 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     neutral_slope=0.0_WP
     slope_tapered=0.0_WP
 
-    allocate(MLD1(node_size), MLD2(node_size), MLD1_ind(node_size), MLD2_ind(node_size))
+    allocate(MLD1(node_size), MLD2(node_size), MLD3(node_size))
+    allocate(MLD1_ind(node_size), MLD2_ind(node_size), MLD3_ind(node_size))
     if (use_global_tides) then
     allocate(ssh_gp(node_size))
     ssh_gp=0.

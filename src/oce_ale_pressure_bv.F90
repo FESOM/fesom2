@@ -222,7 +222,8 @@ subroutine pressure_bv(tracers, partit, mesh)
     real(kind=WP)                           :: rhopot(mesh%nl), bulk_0(mesh%nl), bulk_pz(mesh%nl), bulk_pz2(mesh%nl), rho(mesh%nl), dbsfc1(mesh%nl), bv1(mesh%nl), db_max
     real(kind=WP)                           :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf, aux_rho, aux_rho1
     real(kind=WP)                           :: sigma_theta_crit=0.125_WP   !kg/m3, Levitus threshold for computing MLD2
-    logical                                 :: flag1, flag2, mixing_kpp
+    real(kind=WP)                           :: sigma_theta_crit_cmor=0.03_WP   !kg/m3, Griffies threshold for computing MLD3
+    logical                                 :: flag1, flag2, flag3, mixing_kpp
     real(kind=WP),  dimension(:,:), pointer :: temp, salt
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -415,14 +416,19 @@ subroutine pressure_bv(tracers, partit, mesh)
         ! as the shallowest depth where the vertical derivative of buoyancy 
         ! is equal to a local critical buoyancy gradient (Griffies et al., 
         ! 2009) (-->MLD1). 
+        ! To be CMOR compliant we add MLD3, which is identical to MLD2, except 
+        ! for the critical density threshold at 0.03, rather than 0.125 kg/m³
         ! BV frequency:  bvfreq(nl,:), squared value is stored   
         MLD1(node)=Z_3d_n(nzmin+1,node)
         MLD2(node)=Z_3d_n(nzmin+1,node)
+        MLD3(node)=Z_3d_n(nzmin+1,node)
         MLD1_ind(node)=nzmin+1
         MLD2_ind(node)=nzmin+1
+        MLD3_ind(node)=nzmin+1
         
         flag1=.true.
         flag2=.true.
+        flag3=.true.
         do nz=nzmin+1,nzmax-1
             zmean   = 0.5_WP*sum(Z_3d_n(nz-1:nz, node))
             bulk_up = bulk_0(nz-1) + zmean*(bulk_pz(nz-1) + zmean*bulk_pz2(nz-1)) 
@@ -457,9 +463,18 @@ subroutine pressure_bv(tracers, partit, mesh)
             elseif (flag2) then
                 MLD2(node)=Z_3d_n(nz,node)
             end if
+            ! another definition of MLD after Griffies 2016 (https://doi.org/10.5194/gmd-9-3231-2016)
+            if ((rhopot(nz)-rhopot(nzmin) > sigma_theta_crit_cmor) .and. flag3) then
+                MLD3(node)=MLD3(node)+(Z_3d_n(nz,node)-MLD3(node))/(rhopot(nz)-rhopot(nz-1)+1.e-20)*(rhopot(1)+sigma_theta_crit_cmor-rhopot(nz-1))
+                MLD3_ind(node)=nz
+                flag3=.false.
+            elseif (flag3) then
+                MLD3(node)=Z_3d_n(nz,node)
+            end if
         end do
         
         if (flag2) MLD2_ind(node)=nzmax-1
+        if (flag3) MLD3_ind(node)=nzmax-1
                 
         bvfreq(nzmin,node)=bvfreq(nzmin+1,node)
         bvfreq(nzmax,node)=bvfreq(nzmax-1,node) 
