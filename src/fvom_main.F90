@@ -468,8 +468,10 @@ type(t_mesh),             target, save :: mesh
                 if (mype==0) write(*,*) '*** step n=',n
                 t1_icb = MPI_Wtime()
                 call iceberg_calculation(mesh,n)
-
-!!LA 20221023 ----------------
+            end if
+!
+!!!LA 20221023 ----------------
+!!            if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
 !                t1b_icb = MPI_Wtime()
 !                call icb2fesom(mesh)
 !                t2b_icb = MPI_Wtime()
@@ -477,8 +479,8 @@ type(t_mesh),             target, save :: mesh
 !                t2_icb = t2_icb + t2b_icb - t1b_icb
 !                bIcbCalcCycleCompleted = .true.
 !                t2_icb = MPI_Wtime()
+!            end if
 !!----------------------------
-            end if
             !___model sea-ice step__________________________________________________
 
 ! kh 08.03.21 t1 moved up to include the iceberg calculation time (like in former FESOM2 paleodyn_icb versions)
@@ -497,6 +499,17 @@ type(t_mesh),             target, save :: mesh
                 
                 if (ice_update) call ice_timestep(n, mesh)
                 
+!LA 20221023 ----------------
+            if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
+                t1b_icb = MPI_Wtime()
+                call icb2fesom(mesh)
+                t2b_icb = MPI_Wtime()
+!               t2_icb = MPI_Wtime()
+                t2_icb = t2_icb + t2b_icb - t1b_icb
+                bIcbCalcCycleCompleted = .true.
+                t2_icb = MPI_Wtime()
+            end if
+!----------------------------
                 call oce_fluxes_mom(mesh) ! momentum only
                 call oce_fluxes(mesh)
             end if  
@@ -511,14 +524,14 @@ type(t_mesh),             target, save :: mesh
                 !call iceberg_calculation(n)
 
 ! kh 08.03.21 add time for call icb2fesom to the end of t2_icb (i.e. time is calculated like in former FESOM2 paleodyn_icb  versions, also see above)
-! LA 20221023
-                t1b_icb = MPI_Wtime()
-                call icb2fesom(mesh)
-                t2b_icb = MPI_Wtime()
-!               t2_icb = MPI_Wtime()
-                t2_icb = t2_icb + t2b_icb - t1b_icb
-                bIcbCalcCycleCompleted = .true.
-!----------------------------
+!! LA 20221023
+!                t1b_icb = MPI_Wtime()
+!                call icb2fesom(mesh) !now in ice_oce_coupling
+!                t2b_icb = MPI_Wtime()
+!!               t2_icb = MPI_Wtime()
+!                t2_icb = t2_icb + t2b_icb - t1b_icb
+!                bIcbCalcCycleCompleted = .true.
+!!----------------------------
             end if
 
 ! kh 10.03.21 it is not the end of a real parallel section here, but the value of the timer is still of interest
@@ -790,7 +803,7 @@ type(t_mesh),             target, save :: mesh
 !               t1_icb = MPI_Wtime()
 !               call iceberg_calculation(n)
 ! LA 20221023 ----------------------------
-                call icb2fesom(mesh)
+                call icb2fesom(mesh) !now in ice_oce_coupling
                 t2_icb = MPI_Wtime()
                 bIcbCalcCycleCompleted = .true.
 !-----------------------------------------
