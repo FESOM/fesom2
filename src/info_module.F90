@@ -72,11 +72,6 @@ contains
 #else
       print '(g0)', 'PETSC is OFF'
 #endif  
-#ifdef use_cavity
-      print '(g0)', 'use_cavity is ON'
-#else
-      print '(g0)', 'use_cavity is OFF'
-#endif  
 #ifdef use_fullfreesurf
       print '(g0)', 'use_fullfreesurf is ON'
 #else
