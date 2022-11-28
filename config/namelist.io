@@ -7,6 +7,7 @@ ldiag_salt3D     =.false.
 ldiag_dMOC       =.false.
 ldiag_DVD        =.false.
 ldiag_forc       =.false.
+ldiag_extflds    =.true.
 /
 
 &nml_listsize
