@@ -6,14 +6,14 @@ module restart_derivedtype_module
             use MOD_TRACER
             use MOD_PARTIT
             use MOD_MESH
-            integer, dimension(3) , intent(in)              :: ctarr
-            character(len=*), intent(in)                    :: path_in
-            character(len=*), intent(in)                    :: pathi_in
-            type(t_partit), intent(inout), target           :: partit
-            type(t_mesh)  , intent(inout), target           :: mesh
-            type(t_ice)   , intent(inout), target, optional :: ice
-            type(t_dyn)   , intent(inout), target, optional :: dynamics
-            type(t_tracer), intent(inout), target, optional :: tracers            
+            integer, dimension(3) , intent(in)                   :: ctarr
+            character(len=*),       intent(in)                   :: path_in
+            character(len=*),       intent(in)                   :: pathi_in
+            type(t_partit),         intent(in), target           :: partit
+            type(t_mesh)  ,         intent(in), target           :: mesh
+            type(t_ice)   ,         intent(in), target, optional :: ice
+            type(t_dyn)   ,         intent(in), target, optional :: dynamics
+            type(t_tracer),         intent(in), target, optional :: tracers            
         end subroutine
         
         subroutine read_all_bin_restarts(path_in, partit, mesh, ice, dynamics, tracers)

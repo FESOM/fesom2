@@ -736,6 +736,7 @@ end subroutine
 !
 !_______________________________________________________________________________
 subroutine read_restart(path, filegroup, mpicomm, mype)
+  include 'mpif.h'        
   character(len=*), intent(in) :: path
   type(restart_file_group), intent(inout) :: filegroup
   integer, intent(in) :: mpicomm
@@ -750,7 +751,6 @@ subroutine read_restart(path, filegroup, mpicomm, mype)
   integer current_iorank_snd, current_iorank_rcv
   integer max_globalstep
   integer mpierr
-  include 'mpif.h'
   
   allocate(skip_file(filegroup%nfiles))
   skip_file = .false.
