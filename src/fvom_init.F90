@@ -222,7 +222,7 @@ subroutine read_mesh_cavity(mesh)
     implicit none
 
     type(t_mesh), intent(inout), target :: mesh
-    integer                             :: node
+    integer                             :: node, auxi
     character(len=MAX_PATH)             :: fname
     logical                             :: file_exist=.False.
 #include "associate_mesh_ini.h"
@@ -233,12 +233,20 @@ subroutine read_mesh_cavity(mesh)
   
     !___________________________________________________________________________
     ! read depth of cavity-ocean boundary
-    fname = trim(meshpath)//'cavity_depth.out'
+    if (use_cavityonelem) then
+        fname = trim(meshpath)//'cavity_depth@elem.out'
+    else
+        fname = trim(meshpath)//'cavity_depth@node.out'
+    end if     
     file_exist=.False.
     inquire(file=trim(fname),exist=file_exist) 
     if (file_exist) then
         open (21,file=fname, status='old')
-        allocate(mesh%cavity_depth(mesh%nod2D))
+        if (use_cavityonelem) then
+            allocate(mesh%cavity_depth(mesh%elem2d))
+        else
+            allocate(mesh%cavity_depth(mesh%nod2D))
+        end if 
         cavity_depth => mesh%cavity_depth 
     else
         write(*,*) '____________________________________________________________________'
@@ -249,7 +257,9 @@ subroutine read_mesh_cavity(mesh)
     end if
     
     !___________________________________________________________________________
-    do node=1, mesh%nod2D
+    auxi=mesh%nod2D
+    if (use_cavityonelem) auxi=mesh%elem2d
+    do node=1, auxi
         read(21,*) mesh%cavity_depth(node)
     end do
     
@@ -643,9 +653,10 @@ subroutine find_levels(mesh)
     use mod_mesh
     implicit none
     INTEGER :: nodes(3), elems(3), eledges(3)
-    integer :: elem, elem1, j, n, nneighb, q, node, i, nz
+    integer :: elem1, j, n, nneighb, q, node, i, nz, auxi
     integer :: count_iter, count_neighb_open, exit_flag, fileID=111
     real(kind=WP) :: x, dmean
+    logical :: file_exist
     integer :: max_iter=1000
     character(MAX_PATH) :: file_name
     type(t_mesh), intent(inout), target :: mesh
@@ -655,29 +666,134 @@ subroutine find_levels(mesh)
     print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
     print *, achar(27)//'[7;1m' //' -->: read bottom depth                                     '//achar(27)//'[0m'
     
-    ALLOCATE(mesh%depth(nod2D))
+    !___________________________________________________________________________
+    ! allocate depth
+    if (use_depthonelem) then 
+        allocate(mesh%depth(elem2D))
+    else    
+        allocate(mesh%depth(nod2D))
+    end if     
     depth => mesh%depth !required after the allocation, otherwise the pointer remains undefined
-    file_name=trim(meshpath)//'aux3d.out'
-    open(fileID, file=file_name)
-    read(fileID,*) nl          ! the number of levels 
-    allocate(mesh%zbar(nl))         ! their standard depths
     
-    zbar => mesh%zbar !required after the allocation, otherwise the pointer remains undefined
-    read(fileID,*) zbar
-    if(zbar(2)>0) zbar=-zbar   ! zbar is negative 
+    !______________________________________________________________________________
+    ! read depth from aux3d.out
+    if (trim(use_depthfile)=='aux3d') then
+        ! check if aux3d.out file does exist
+        file_exist=.False.
+        file_name=trim(meshpath)//'aux3d.out' 
+        inquire(file=trim(file_name),exist=file_exist)
+        !_______________________________________________________________________
+        if (file_exist) then
+            write(*," (A, A)") ' read file:',trim(file_name)
+            !___________________________________________________________________
+            ! load fesom2.0 aux3d.out file 
+            open(fileID, file=file_name)
+            
+            ! read the number of levels 
+            read(fileID,*) nl          
+            allocate(mesh%zbar(nl))         ! their standard depths
+            
+            ! read full depth levels
+            zbar => mesh%zbar !required after the allocation, otherwise the pointer remains undefined
+            read(fileID,*) zbar
+            if(zbar(2)>0) zbar=-zbar   ! zbar is negative 
+            
+            ! compute mid depth levels
+            allocate(mesh%Z(nl-1))
+            Z => mesh%Z !required after the allocation, otherwise the pointer remains undefined
+            Z=zbar(1:nl-1)+zbar(2:nl)  ! mid-depths of cells
+            Z=0.5_WP*Z
+        else
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: You want to use aux3d.out file to define your depth, but '
+            write(*,*) '        the file seems not to exist'
+            write(*,*) '        --> check in namelist.config, the flag use_depthfile must be'
+            write(*,*) '            use_depthfile= "aux3d" or "depth@" '
+            write(*,*) '        --> model stops here'
+            write(*,*) '____________________________________________________________________'
+            stop
+        end if 
+    !___________________________________________________________________________
+    ! read depth from depth@node.out or depth@elem.out    
+    elseif (trim(use_depthfile)=='depth@') then
+        !_______________________________________________________________________
+        ! load file depth_zlev.out --> contains number of model levels and full depth
+        ! levels
+        file_exist=.False.
+        file_name=trim(meshpath)//'depth_zlev.out' 
+        inquire(file=trim(file_name),exist=file_exist) 
+        if (file_exist) then
+            write(*," (A, A)") ' read file:',trim(file_name)
+            !___________________________________________________________________
+            ! load fesom2.0 aux3d.out file 
+            open(fileID, file=file_name)
+            
+            ! read the number of levels 
+            read(fileID,*) nl          
+            allocate(mesh%zbar(nl))         ! their standard depths
+            
+            ! read full depth levels
+            zbar => mesh%zbar !required after the allocation, otherwise the pointer remains undefined
+            read(fileID,*) zbar
+            if(zbar(2)>0) zbar=-zbar   ! zbar is negative 
+            
+            ! compute mid depth levels
+            allocate(mesh%Z(nl-1))
+            Z => mesh%Z !required after the allocation, otherwise the pointer remains undefined
+            Z=zbar(1:nl-1)+zbar(2:nl)  ! mid-depths of cells
+            Z=0.5_WP*Z
+            
+            close(fileID)
+        else
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: You want to use depth@elem.out or depth@node.out file, therefore'
+            write(*,*) '        you also need the file depth_zlev.out which contains the model '
+            write(*,*) '        number of layers and the depth of model levels. This file seems '
+            write(*,*) '        not to exist'
+            write(*,*) '        --> check in namelist.config, the flag use_depthfile must be'
+            write(*,*) '            use_depthfile= "aux3d" or "depth@" and your meshfolder'
+            write(*,*) '        --> model stops here'
+            write(*,*) '____________________________________________________________________'
+            stop
+        endif 
+        
+        !_______________________________________________________________________
+        ! load file depth@elem.out or depth@node.out contains topography either at 
+        ! nodes or elements
+        if (use_depthonelem) then 
+            file_name=trim(meshpath)//'depth@elem.out' 
+        else
+            file_name=trim(meshpath)//'depth@node.out' 
+        end if 
+        inquire(file=trim(file_name),exist=file_exist) 
+        if (file_exist) then 
+            write(*," (A, A)") ' read file:',trim(file_name)
+            open(fileID, file=file_name)
+        else    
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: You want to use depth@elem.out or depth@node.out file to '
+            write(*,*) '        define your depth, but the file seems not to exist'
+            write(*,*) '        --> check in namelist.config, the flag use_depthfile must be'
+            write(*,*) '            use_depthfile= "aux3d" or "depth@" and your meshfolder '
+            write(*,*) '        --> model stops here'
+            write(*,*) '____________________________________________________________________'
+            stop
+        end if 
+    end if 
     
-    allocate(mesh%Z(nl-1))
-    Z => mesh%Z !required after the allocation, otherwise the pointer remains undefined
-    Z=zbar(1:nl-1)+zbar(2:nl)  ! mid-depths of cells
-    Z=0.5_WP*Z
-    DO n=1,nod2D
+    !___________________________________________________________________________
+    ! read topography from file
+    auxi = nod2d
+    if (use_depthonelem) auxi = elem2d
+!     write(*,*) ' use_depthonelem = ',use_depthonelem
+!     write(*,*)  ' auxi =',auxi 
+    DO n = 1, auxi
         read(fileID,*) x
         if (x>0) x=-x
-        if (x>zbar(thers_zbar_lev)) x=zbar(thers_zbar_lev) !TODO KK threshholding for depth
+        if (x>zbar(thers_zbar_lev)) x=zbar(thers_zbar_lev) !TODO KK thresholding for depth
         depth(n)=x
     END DO
     close(fileID)
-            
     if(depth(2)>0) depth=-depth  ! depth is negative
 
     !___________________________________________________________________________
@@ -693,18 +809,23 @@ subroutine find_levels(mesh)
     ! Compute the initial number number of elementa levels, based on the vertice
     ! depth information 
     do n=1, elem2D
-        nodes=elem2D_nodes(1:3,n)
         
-        !_________________________________________________________________________
-        ! depth of element is  shallowest depth of sorounding vertices
-        if     (trim(which_depth_n2e) .eq. 'min') then ; dmean=maxval(depth(nodes))
-        ! depth of element is deepest depth of sorounding vertices    
-        elseif (trim(which_depth_n2e) .eq. 'max') then ; dmean=minval(depth(nodes))
-        ! DEFAULT: depth of element is  mean depth of sorounding vertices
-        elseif (trim(which_depth_n2e) .eq. 'mean') then; dmean=sum(depth(nodes))/3.0
+        !_______________________________________________________________________
+        if (use_depthonelem) then 
+            dmean = depth(n) ! depth is already defined on elements 
+        else
+            nodes=elem2D_nodes(1:3,n)
+            !___________________________________________________________________
+            ! depth of element is  shallowest depth of sorounding vertices
+            if     (trim(which_depth_n2e) .eq. 'min') then ; dmean=maxval(depth(nodes))
+            ! depth of element is deepest depth of sorounding vertices    
+            elseif (trim(which_depth_n2e) .eq. 'max') then ; dmean=minval(depth(nodes))
+            ! DEFAULT: depth of element is  mean depth of sorounding vertices
+            elseif (trim(which_depth_n2e) .eq. 'mean') then; dmean=sum(depth(nodes))/3.0
+            end if 
         end if 
         
-        !_________________________________________________________________________
+        !_______________________________________________________________________
         exit_flag=0
         do nz=1,nl-1
             if(Z(nz)<dmean) then
@@ -730,6 +851,7 @@ subroutine find_levels(mesh)
          write(fileID,*) nlevels(n)
       end do
     close(fileID)
+    
     !___________________________________________________________________________
     ! check for isolated cells (cells with at least two boundary faces or three 
     ! boundary vertices) and eliminate them --> FESOM2.0 doesn't like these kind
@@ -820,14 +942,13 @@ subroutine find_levels(mesh)
 
     !___________________________________________________________________________
     ! write vertical level indices into file
-    !_______________________________________________________________________
     file_name=trim(meshpath)//'elvls.out'
     open(fileID, file=file_name)
     do n=1,elem2D
        write(fileID,*) nlevels(n)
     end do
     close(fileID)
-    !_______________________________________________________________________
+    
     file_name=trim(meshpath)//'nlvls.out'
     open(fileID, file=file_name)
       do n=1,nod2D
@@ -864,7 +985,8 @@ subroutine find_levels_cavity(mesh)
 #include "associate_mesh_ini.h"
     !___________________________________________________________________________
     print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
-    print *, achar(27)//'[7;1m' //' -->: compute elem,vertice cavity depth index               '//achar(27)//'[0m'   
+    print *, achar(27)//'[7;1m' //' -->: compute elem, vertice cavity depth index               '//achar(27)//'[0m'
+    
     !___________________________________________________________________________
     allocate(mesh%ulevels(elem2D))
     ulevels => mesh%ulevels 
@@ -875,14 +997,20 @@ subroutine find_levels_cavity(mesh)
     ! Compute level position of ocean-cavity boundary
     cavity_maxlev=0
     do elem=1, elem2D
-        nodes=elem2D_nodes(1:3,elem)
+        
         !_______________________________________________________________________
-        ! depth of element is  shallowest depth of sorounding vertices
-        if     (trim(which_depth_n2e) .eq. 'min')  then ; dmean=maxval(cavity_depth(nodes))
-        ! depth of element is deepest depth of sorounding vertices    
-        elseif (trim(which_depth_n2e) .eq. 'max')  then ; dmean=minval(cavity_depth(nodes))
-        ! DEFAULT: depth of element is  mean depth of sorounding vertices
-        elseif (trim(which_depth_n2e) .eq. 'mean') then ; dmean=sum(cavity_depth(nodes))/3.0
+        if (use_cavityonelem) then 
+            dmean = cavity_depth(elem)
+        else
+            nodes=elem2D_nodes(1:3,elem)
+            !_______________________________________________________________________
+            ! depth of element is  shallowest depth of sorounding vertices
+            if     (trim(which_depth_n2e) .eq. 'min')  then ; dmean=maxval(cavity_depth(nodes))
+            ! depth of element is deepest depth of sorounding vertices    
+            elseif (trim(which_depth_n2e) .eq. 'max')  then ; dmean=minval(cavity_depth(nodes))
+            ! DEFAULT: depth of element is  mean depth of sorounding vertices
+            elseif (trim(which_depth_n2e) .eq. 'mean') then ; dmean=sum(cavity_depth(nodes))/3.0
+            end if 
         end if 
         
         !_______________________________________________________________________
@@ -1042,7 +1170,7 @@ subroutine find_levels_cavity(mesh)
         do node=1,nod2D
             !___________________________________________________________________
             if (ulevels_nod2D(node)>=nlevels_nod2D(node)) then 
-                write(*,*) ' -[check]->:  vertice cavity depth deeper or equal bottom depth, node=', node
+                write(*,*) ' -[check]->: vertice cavity depth deeper or equal bottom depth, node=', node
                 exit_flag2 = 0
             end if
             
@@ -1055,7 +1183,7 @@ subroutine find_levels_cavity(mesh)
         
         do elem=1,elem2D
             if (ulevels(elem)< maxval(ulevels_nod2D(elem2D_nodes(:,elem))) ) then 
-                write(*,*) ' -[check]->:  found elem cavity shallower than its valid maximum cavity vertice depths, elem=', elem2d
+                write(*,*) ' -[check]->: found elem cavity shallower than its valid maximum cavity vertice depths, elem=', elem2d
                 exit_flag2 = 0
             end if 
         end do ! --> do elem=1,elem2D
@@ -1159,6 +1287,7 @@ subroutine find_levels_cavity(mesh)
          write(20,*) ulevels(elem)
       enddo
     close(20)
+    
     ! write out vertice cavity-ocean boundary level + yes/no cavity flag
     file_name=trim(meshpath)//'cavity_nlvls.out'
     open(20, file=file_name)

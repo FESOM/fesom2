@@ -80,18 +80,28 @@ subroutine par_init(partit)    ! initializes MPI
 end subroutine par_init
 !=================================================================
 subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
-USE MOD_PARTIT
-#ifndef __oifs
-!For standalone and coupled ECHAM runs
+  use MOD_PARTIT
+
+! In case we are letting oasis orchestrate MPI, we need to shut down through
+! oasis as well, thus we are including it here.
 #if defined (__oasis)
+#if defined (__oifs)
+  !For OpenIFS coupled runs we use the new OASIS nameing scheme (oasis)
+  use mod_oasis
+#else
+  !For ECHAM coupled runs we use the old OASIS nameing scheme (prism / prism_proto)
   use mod_prism 
-#endif
+#endif ! oifs/echam
+#endif ! oasis
+
   implicit none
   integer,           intent(in)   :: COMM
   integer,           intent(in)   :: mype
   integer, optional, intent(in)   :: abort
   integer                         :: error
 
+! For standalone runs we directly call the MPI_barrier and MPI_finalize
+!---------------------------------------------------------------
 #ifndef __oasis
   if (present(abort)) then
      if (mype==0) write(*,*) 'Run finished unexpectedly!'
@@ -100,7 +110,20 @@ USE MOD_PARTIT
      call  MPI_Barrier(COMM, error)
      call  MPI_Finalize(error)
   endif
+#else ! standalone
+
+! From here on the two coupled options
+!-------------------------------------
+#if defined (__oifs)
+  !For OpenIFS coupled runs we use the new OASIS nameing scheme (oasis)
+  if (present(abort)) then
+    if (mype==0) write(*,*) 'Run finished unexpectedly!'
+    call MPI_ABORT(COMM, 1 )
+  else
+    call oasis_terminate
+  endif
 #else
+  !For ECHAM coupled runs we use the old OASIS nameing scheme (prism / prism_proto)
   if (.not. present(abort)) then
      if (mype==0) print *, 'FESOM calls MPI_Barrier before calling prism_terminate'
      call  MPI_Barrier(MPI_COMM_WORLD, error)
@@ -111,21 +134,12 @@ USE MOD_PARTIT
   
   if (mype==0) print *, 'FESOM calls MPI_Finalize'
   call MPI_Finalize(error)
-#endif
-  if (mype==0) print *, 'fesom should stop with exit status = 0'
-#endif
-#if defined (__oifs)
-!OIFS coupling doesnt call prism_terminate_proto and uses MPI_COMM_FESOM
-  implicit none
-  integer,optional :: abort
-  if (present(abort)) then
-	if (mype==0) write(*,*) 'Run finished unexpectedly!'
-	call MPI_ABORT(COMM, 1 )
-  else
-	call  MPI_Barrier(COMM, error)
-	call  MPI_Finalize(error)
-  endif
-#endif
+#endif ! oifs/echam
+#endif ! oasis
+
+! Regardless of standalone, OpenIFS oder ECHAM coupling, if we reach to this point
+! we should be fine shutting the whole model down
+if (mype==0) print *, 'fesom should stop with exit status = 0'
 
 end subroutine par_ex
 !=======================================================================

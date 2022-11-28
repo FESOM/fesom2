@@ -115,7 +115,7 @@ module solve_tracers_ale_interface
         use mod_tracer     
         use MOD_DYN
         USE MOD_ICE
-        type(t_ice)   , intent(inout), target :: ice
+        type(t_ice)   , intent(in),    target :: ice
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
@@ -1120,17 +1120,21 @@ subroutine diff_part_hor_redi(tracers, partit, mesh)
         nl12=max(nl1,nl2)
         ul12 = ul1
         if (ul2>0) ul12=min(ul1,ul2)
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_set_lock(partit%plock(enodes(1)))
+#else
+!$OMP ORDERED
 #endif
         del_ttf(ul12:nl12,enodes(1))=del_ttf(ul12:nl12,enodes(1))+rhs1(ul12:nl12)*dt/areasvol(ul12:nl12,enodes(1))
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(enodes(1)))
         call omp_set_lock  (partit%plock(enodes(2)))
 #endif
         del_ttf(ul12:nl12,enodes(2))=del_ttf(ul12:nl12,enodes(2))+rhs2(ul12:nl12)*dt/areasvol(ul12:nl12,enodes(2))
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(enodes(2)))
+#else
+!$OMP END ORDERED
 #endif
     end do
 !$OMP END DO
@@ -1200,17 +1204,21 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
                                                          )*len)       
            tt(nz)=tt(nz)*vi
        END DO
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_set_lock  (partit%plock(en(1)))
+#else
+!$OMP ORDERED
 #endif
        temporary_ttf(nzmin:nzmax-1,en(1))=temporary_ttf(nzmin:nzmax-1,en(1))-tt(nzmin:nzmax-1)
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_unset_lock(partit%plock(en(1)))
        call omp_set_lock  (partit%plock(en(2)))
 #endif
        temporary_ttf(nzmin:nzmax-1,en(2))=temporary_ttf(nzmin:nzmax-1,en(2))+tt(nzmin:nzmax-1)
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_unset_lock(partit%plock(en(2)))
+#else
+!$OMP END ORDERED
 #endif
     END DO
 !$OMP END DO
@@ -1242,17 +1250,21 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
                                                             )*len)                    
               tt(nz)=-tt(nz)*vi*dt
           END DO 
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
           call omp_set_lock  (partit%plock(en(1)))
+#else
+!$OMP ORDERED
 #endif
           ttf(nzmin:nzmax-1,en(1))=ttf(nzmin:nzmax-1,en(1))-tt(nzmin:nzmax-1)/area(nzmin:nzmax-1,en(1))
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
           call omp_unset_lock(partit%plock(en(1)))
           call omp_set_lock  (partit%plock(en(2)))
 #endif
           ttf(nzmin:nzmax-1,en(2))=ttf(nzmin:nzmax-1,en(2))+tt(nzmin:nzmax-1)/area(nzmin:nzmax-1,en(2))
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
           call omp_unset_lock(partit%plock(en(2)))
+#else
+!$OMP END ORDERED
 #endif
     END DO
 !$OMP END DO

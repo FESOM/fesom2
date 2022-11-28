@@ -51,7 +51,7 @@ module cavity_interfaces
         USE MOD_PARTIT
         USE MOD_PARSUP
         USE MOD_MESH
-        type(t_dyn),    intent(inout), target :: dynamics
+        type(t_dyn),    intent(in), target    :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in),    target :: mesh
         end subroutine
@@ -452,7 +452,7 @@ subroutine cavity_momentum_fluxes(dynamics, partit, mesh)
     implicit none
     
     !___________________________________________________________________________
-    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_dyn)   , intent(in),    target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     integer        :: elem, elnodes(3), nzmin, node

@@ -10,8 +10,9 @@ ldiag_forc       =.false.
 ldiag_extflds    =.true.
 /
 
-&nml_listsize
-io_listsize=100 !number of streams to allocate. shallbe large or equal to the number of streams in &nml_list
+&nml_general
+io_listsize    =100 !number of streams to allocate. shallbe large or equal to the number of streams in &nml_list
+vec_autorotate =.false.
 /
 
 ! for sea ice related variables use_ice should be true, otherewise there will be no output
@@ -23,13 +24,14 @@ io_listsize=100 !number of streams to allocate. shallbe large or equal to the nu
 io_list =  'sst       ',1, 'm', 4,
            'sss       ',1, 'm', 4,
     	   'ssh       ',1, 'm', 4,
-           'uice      ',1, 'm', 4,
-           'vice      ',1, 'm', 4,
+           'uice      ',1, 'd', 4,
+           'vice      ',1, 'd', 4,
            'a_ice     ',1, 'm', 4,
            'm_ice     ',1, 'm', 4,
            'm_snow    ',1, 'm', 4,
            'MLD1      ',1, 'm', 4,
            'MLD2      ',1, 'm', 4,
+           'MLD3      ',1, 'm', 4,
            'tx_sur    ',1, 'm', 4,
            'ty_sur    ',1, 'm', 4,
            'temp      ',1, 'y', 4,
@@ -38,6 +40,8 @@ io_list =  'sst       ',1, 'm', 4,
            'Kv        ',1, 'y', 4,
            'u         ',1, 'y', 4,
            'v         ',1, 'y', 4,
+           'unod      ',1, 'y', 4,
+           'vnod      ',1, 'y', 4,
            'w         ',1, 'y', 4,
            'Av        ',1, 'y', 4,
            'bolus_u   ',1, 'y', 4,

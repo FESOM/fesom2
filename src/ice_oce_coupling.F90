@@ -60,6 +60,7 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
     use o_ARRAYS
     USE g_CONFIG
     use g_comm_auto
+    use cavity_interfaces    
 #if defined (__icepack)
     use icedrv_main,   only: icepack_to_fesom
 #endif
@@ -427,12 +428,16 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     ! 1. water flux ! if (.not. use_virt_salt) can be used!
     ! we conserve only the fluxes from the database plus evaporation.
 !$OMP PARALLEL DO
-        do n=1, myDim_nod2D+eDim_nod2D
-           flux(n) = evaporation(n)-ice_sublimation(n)  & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
-            +prec_rain(n)                               &
-            +prec_snow(n)*(1.0_WP-a_ice_old(n))         &
-            +runoff(n)
-        end do
+    do n=1, myDim_nod2D+eDim_nod2D
+        flux(n) = evaporation(n)                      &
+                  -ice_sublimation(n)                 & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
+                  +prec_rain(n)                       &
+                  +prec_snow(n)*(1.0_WP-a_ice_old(n)) &
+#if defined (__oifs)        
+                  +residualifwflx(n)                  & ! balance residual ice flux only in coupled case
+#endif
+                  +runoff(n)                                  
+    end do
 !$OMP END PARALLEL DO
     ! --> In case of zlevel and zstar and levitating sea ice, sea ice is just sitting 
     ! on top of the ocean without displacement of water, there the thermodynamic 
