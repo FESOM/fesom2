@@ -751,6 +751,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     DO i=3, tracers%num_tracers
         id=tracers%data(i)%ID
         SELECT CASE (id)
+        !_______________________________________________________________________
         CASE (101)       ! initialize tracer ID=101
             tracers%data(i)%values(:,:)=0.0_WP
             if (mype==0) then
@@ -758,6 +759,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
+            
+        !_______________________________________________________________________            
         CASE (301) !Fram Strait 3d restored passive tracer
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
@@ -785,7 +788,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-
+            
+        !_______________________________________________________________________
         CASE (302) !Bering Strait 3d restored passive tracer
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
@@ -813,7 +817,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-        
+            
+        !_______________________________________________________________________            
         CASE (303) !BSO 3d restored passive tracer
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
@@ -841,6 +846,17 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
+            
+        !_______________________________________________________________________
+        CASE (501) ! ice-shelf water due to basal melting
+            tracers%data(i)%values(:,:)=0.0_WP
+            if (mype==0) then
+                write (i_string,  "(I3)") i
+                write (id_string, "(I3)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
+            
+        !_______________________________________________________________________
         CASE DEFAULT
             if (mype==0) then
                 write (i_string,  "(I3)") i
