@@ -60,6 +60,7 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
     use o_ARRAYS
     USE g_CONFIG
     use g_comm_auto
+    use cavity_interfaces    
 #if defined (__icepack)
     use icedrv_main,   only: icepack_to_fesom
 #endif
