@@ -896,7 +896,7 @@ subroutine write_mean_ioserver(entry, entry_index)
         call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), transpose(entry%aux3d_r4)), __LINE__)
       else if (entry%ndim==2) then
 #ifndef TRANSPOSE_OUTPUT
-!             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/file_lvl, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r4), __LINE__)
+        call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, 1, entry%rec_count/), (/size1, size2, 1/), entry%aux3d_r4), __LINE__)
 #else
         ! transpose the global aux array when writing all levels at once, otherwise it is transposed in the netcdf file
         ! we can either use transpose(entry%aux3d_r4) or use nf_put_varm with an imap=(/size1,1/) to transpose the data
