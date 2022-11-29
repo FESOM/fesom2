@@ -893,7 +893,7 @@ subroutine write_mean_ioserver(entry, entry_index)
     if (mype==entry%root_rank) then
       if (entry%ndim==1) then
         ! todo: treat 2d identical to 3d for complete 3d dump
-        call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, 1, entry%rec_count/), (/size2, size1, 1/), transpose(entry%aux3d_r4)), __LINE__)
+        call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), transpose(entry%aux3d_r4)), __LINE__)
       else if (entry%ndim==2) then
 #ifndef TRANSPOSE_OUTPUT
 !             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/file_lvl, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r4), __LINE__)
