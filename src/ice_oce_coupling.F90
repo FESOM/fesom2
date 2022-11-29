@@ -437,17 +437,6 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     end if
     
     !___________________________________________________________________________
-!$OMP PARALLEL DO
-    do n=1, myDim_nod2D+eDim_nod2D    
-        if (ulevels_nod2d(n) == 1) then ! --> is open ocean node 
-            dens_flux(n)=sw_alpha(1,n) * heat_flux_in(n) / vcpw + sw_beta(1, n) * (relax_salt(n) + water_flux(n) * salt(1,n))
-        else
-            dens_flux(n)=0.0_WP
-        end if
-    end do
-!$OMP END PARALLEL DO
-
-    !___________________________________________________________________________
     ! balance SSS restoring to climatology
     if (use_cavity) then
 !$OMP PARALLEL DO    
@@ -556,6 +545,19 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
     end if 
     
+    !___________________________________________________________________________
+    ! use the balanced water_flux and relax_salt flux (same as in the tracer 
+    ! boundary condition) to compute the dens_flux for MOC diagnostic
+!$OMP PARALLEL DO
+    do n=1, myDim_nod2D+eDim_nod2D    
+        if (ulevels_nod2d(n) == 1) then ! --> is open ocean node 
+            dens_flux(n)=sw_alpha(1,n) * heat_flux_in(n) / vcpw + sw_beta(1, n) * (relax_salt(n) + water_flux(n) * salt(1,n))
+        else
+            dens_flux(n)=0.0_WP
+        end if
+    end do
+!$OMP END PARALLEL DO
+
     !___________________________________________________________________________
     if (use_sw_pene) call cal_shortwave_rad(ice, partit, mesh)
     
