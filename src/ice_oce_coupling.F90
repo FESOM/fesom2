@@ -498,18 +498,16 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
     end if     
     
-    ! Also balance freshwater flux that come from ocean-cavity boundary
+    !___________________________________________________________________________
     if (use_cavity) then
+        ! with zstar we do not balance the freshwater flux under the cavity since its
+        ! not contributing to the ocean volume increase/decrease since under the
+        ! cavity ist linfs 
         if (.not. use_virt_salt) then !zstar, zlevel
-            if (use_cavity_fw2press) then 
-                ! use_cavity_fw2press=.true.: adds freshwater under the cavity thereby 
-                ! increasing the local pressure
-                where (ulevels_nod2d > 1) flux = -water_flux
-            else    
-                ! use_cavity_fw2press=.false.: pressure under cavity is unaffected
-                ! by freshwater input under the cavity
-                where (ulevels_nod2d > 1) flux = 0.0_WP
-            end if   
+            where (ulevels_nod2d > 1) flux = 0.0_WP
+            
+        ! with linfs we balance the freshwater flux globally, thereby ot changeing
+        ! the freshwater flux under the cavity
         else ! linfs 
             where (ulevels_nod2d > 1) flux = -water_flux
         end if 
