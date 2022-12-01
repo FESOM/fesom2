@@ -129,7 +129,9 @@ character(len=16) comp_name
     end if
     
     call mesh_setup(mesh)
+
     ! sync global meshinfo with ioserver
+#ifdef ENABLE_IOSERVER
     if(mype==0) then
       call mpi_send(mesh%nod2D, 1, mpi_integer, ioserver_rank, 42, comm_fesom_with_ioserver, err)
       call mpi_send(mesh%elem2D, 1, mpi_integer, ioserver_rank, 42, comm_fesom_with_ioserver, err)
@@ -140,6 +142,7 @@ character(len=16) comp_name
       call mpi_send(mesh%zbar, size(mesh%zbar), mpi_double_precision, ioserver_rank, 42, comm_fesom_with_ioserver, err)
       call mpi_send(mesh%Z, size(mesh%Z), mpi_double_precision, ioserver_rank, 42, comm_fesom_with_ioserver, err)
     end if
+#endif
 
     if (mype==0) write(*,*) 'FESOM mesh_setup... complete'
     
