@@ -726,7 +726,13 @@ subroutine create_new_file(entry, mesh)
   allocate(output_levels(entry%output_level_count))
   file_lvl = 0
   do lvl=1, entry%glsize(1)
-    if(skip_level_in_output(lvl)) cycle
+    if(skip_level_in_output(lvl)) then
+#ifdef ENABLE_IOSERVER
+      print *, "error, can not skip levels ",lvl," when running with iosever",__LINE__, __FILE__
+      stop 1
+#endif
+      cycle
+    end if
     file_lvl = file_lvl +1
     output_levels(file_lvl) = lvl
   end do
