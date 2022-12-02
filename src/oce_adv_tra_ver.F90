@@ -343,13 +343,14 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
+    !$ACC DATA COPY(flux, myDim_nod2D, ulevels_nod2D, nlevels_nod2D, zbar_3d_n, z_3d_n, area) COPYIN(w, ttf)
     l_init_zero=.true.
     if (present(o_init_zero)) then
        l_init_zero=o_init_zero
     end if
     if (l_init_zero) then
 !$OMP PARALLEL DO
-       !$ACC PARALLEL LOOP GANG
+       !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
        do n=1, myDim_nod2D
           flux(:, n)=0.0_WP
        end do
@@ -358,7 +359,7 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
     end if
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tvert,n, nz, nzmax, nzmin, Tmean, Tmean1, Tmean2, qc, qu,qd)
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     do n=1, myDim_nod2D
        !_______________________________________________________________________
        nzmax=nlevels_nod2D(n)
@@ -404,6 +405,8 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
        !$ACC END LOOP
     end do
    !$ACC END PARALLEL LOOP
+    !$ACC UPDATE SELF(flux)
+    !$ACC END DATA
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine adv_tra_ver_qr4c
