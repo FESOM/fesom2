@@ -130,8 +130,8 @@ character(len=16) comp_name
     
     call mesh_setup(mesh)
 
-    ! sync global meshinfo with ioserver
 #ifdef ENABLE_IOSERVER
+    ! sync global meshinfo with ioserver
     if(mype==0) then
       call mpi_send(mesh%nod2D, 1, mpi_integer, ioserver_rank, 42, comm_fesom_with_ioserver, err)
       call mpi_send(mesh%elem2D, 1, mpi_integer, ioserver_rank, 42, comm_fesom_with_ioserver, err)
