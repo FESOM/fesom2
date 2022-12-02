@@ -84,13 +84,14 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
+    !$ACC DATA COPY(flux, myDim_edge2D, vel, helem, ttf, ulevels, edge_tri, edges, nlevels, edge_cross_dxdy, elem_cos)
     l_init_zero=.true.
     if (present(o_init_zero)) then
        l_init_zero=o_init_zero
     end if
     if (l_init_zero) then
 !$OMP PARALLEL DO
-       !$ACC PARALLEL LOOP GANG VECTOR
+       !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(NONE)
        do edge=1, myDim_edge2D
           flux(:,edge)=0.0_WP
        end do
@@ -104,7 +105,7 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, &
 !$OMP                       a, vflux, el, enodes, nz, nu12, nl12, nl1, nl2, nu1, nu2)
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el)
+    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(NONE)
     do edge=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,edge)      
@@ -238,6 +239,7 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
         !$ACC END LOOP
     end do
     !$ACC END PARALLEL LOOP
+    !$ACC END DATA
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine adv_tra_hor_upw1
