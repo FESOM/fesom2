@@ -728,7 +728,7 @@ subroutine create_new_file(entry, mesh)
   do lvl=1, entry%glsize(1)
     if(skip_level_in_output(lvl)) then
 #ifdef ENABLE_IOSERVER
-      print *, "error, can not skip levels ",lvl," when running with iosever",__LINE__, __FILE__
+      print *, "error, can not skip levels ",lvl," when running with ioserver",__LINE__, __FILE__
       stop 1
 #endif
       cycle
