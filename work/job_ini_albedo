@@ -1,0 +1,29 @@
+#!/bin/bash
+#SBATCH --account=clidyn.p_fesom # edit your account
+#SBATCH --partition=mpp
+#SBATCH --time=12:00:00
+#SBATCH --ntasks=128            # Number of tasks (MPI) tasks to be launched
+#SBATCH --job-name=fesom2.0_INI
+#SBATCH -o slurm-out.out
+#SBATCH -e slurm-err.out
+
+set -x
+
+ulimit -s unlimited
+
+source ../env/albedo/shell
+
+ln -s ../bin/fesom_ini.x         .           # cp -n ../bin/fvom_ini.x
+cp -n ../config/namelist.config  .
+cp -n ../config/namelist.forcing .
+cp -n ../config/namelist.oce     .
+cp -n ../config/namelist.ice     .
+
+
+# determine JOBID
+JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
+
+date
+srun --mpi=pmi2 --ntasks=1 ./fesom_ini.x > "fvom_ini.out"
+date
+
