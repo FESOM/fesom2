@@ -1,0 +1,9 @@
+# make the contents as shell agnostic as possible so we can include them with bash, zsh and others
+
+module load intel-oneapi-compilers 
+module load intel-oneapi-mkl/2022.1.0
+module load intel-oneapi-mpi/2021.6.0
+export FC=mpiifort CC=mpiicc CXX=mpiicpc
+
+module load netcdf-fortran/4.5.4-intel-oneapi-mpi2021.6.0-oneapi2022.1.0
+module load netcdf-c/4.8.1-intel-oneapi-mpi2021.6.0-oneapi2022.1.0
