@@ -121,7 +121,7 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
               end if
               
               if (nz==nzmax) then
-                 dynamics%ke_drag(:,elem)=usum*dynamics%ke_drag(:,elem)/2.0_WP
+                 dynamics%ke_drag_xVEL(:,elem)=usum*dynamics%ke_drag(:,elem)/2.0_WP
               end if
         END DO
         end if
