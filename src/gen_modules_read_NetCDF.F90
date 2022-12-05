@@ -3,7 +3,7 @@
 !
 module g_read_other_NetCDF
 contains
-subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, partit, mesh)
+subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_onvert, partit, mesh)
   ! Read 2D data and interpolate to the model grid.
   ! Currently used to read runoff and SSS.
   ! First, missing values are filled in on the raw regular grid;
@@ -27,15 +27,15 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, part
   integer                    :: itime, latlen, lonlen
   integer                    :: status, ncid, varid
   integer                    :: lonid, latid
-  integer                    :: istart(3), icount(3)
-  real(real64)               :: x, y, miss, aux
+  integer                    :: istart(3), icount(3), elnodes(3)
+  real(real64)               :: x, y, miss, aux, xmin, elnodes_x(3)
   real(real64), allocatable  :: lon(:), lat(:)
   real(real64), allocatable  :: ncdata(:,:), ncdata_temp(:,:)
   real(real64), allocatable  :: temp_x(:), temp_y(:)
   real(real64)               :: model_2Darray(partit%myDim_nod2d+partit%eDim_nod2D)   
   character(*)               :: vari
   character(*)               :: file
-  logical                    :: check_dummy
+  logical                    :: check_dummy, do_onvert
   integer                    :: ierror           ! return error code
 
 #include "associate_part_def.h"
@@ -51,8 +51,8 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, part
 
   call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (status.ne.nf_noerr)then
-     print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
-     print*,'Error in opening netcdf file'//file
+     print*,'ERROR: CANNOT READ 2D netCDF FILE CORRECTLY !!!!!'
+     print*,'Error in opening netcdf file '//file
      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
      stop
   endif
@@ -137,21 +137,50 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, part
         end if
      end do
   end do
-  !write(*,*) 'post',minval(ncdata), maxval(ncdata)
-  ! model grid coordinates
-  num=myDim_nod2d+eDim_nod2d
-  allocate(temp_x(num), temp_y(num))  
-  do n=1, num
-     temp_x(n)=geo_coord_nod2d(1,n)/rad              
-     temp_y(n)=geo_coord_nod2d(2,n)/rad             
-     ! change lon range to [0 360]
-     if(temp_x(n)<0._WP) temp_x(n)=temp_x(n) + 360.0_WP  
-  end do
-  ! interpolation
-  flag=0
-  call interp_2d_field(lonlen, latlen, lon, lat, ncdata, num, temp_x, temp_y, & 
-       model_2Darray, flag, partit) 
-  deallocate(temp_y, temp_x, ncdata_temp, ncdata, lon, lat)
+    !write(*,*) 'post',minval(ncdata), maxval(ncdata)
+    
+    !___________________________________________________________________________
+    ! create interpolation coordinates
+    ! do data interpolation on vertices
+    if (do_onvert) then
+        num=myDim_nod2d+eDim_nod2d
+        allocate(temp_x(num), temp_y(num))  
+        do n=1, num
+            temp_x(n)=geo_coord_nod2d(1,n)/rad              
+            temp_y(n)=geo_coord_nod2d(2,n)/rad             
+            ! change lon range to [0 360]
+            if(temp_x(n)<0._WP) temp_x(n)=temp_x(n) + 360.0_WP  
+        end do
+        
+    ! do data interpolation on element centroids
+    else
+        num = myDim_elem2D
+        allocate(temp_x(num), temp_y(num))  
+        do n=1, num
+            ! compute points of element centroids in geo frame use them here for interpolation
+            elnodes  = elem2D_nodes(:,n)
+            elnodes_x= geo_coord_nod2D(1, elnodes)
+            xmin     = minval(elnodes_x)
+            do k=1,3
+                if(elnodes_x(k)-xmin>=cyclic_length/2.0_WP) elnodes_x(k)=elnodes_x(k)-cyclic_length
+                if(elnodes_x(k)-xmin<-cyclic_length/2.0_WP) elnodes_x(k)=elnodes_x(k)+cyclic_length
+            end do
+            ! compute in units [deg], in geo frame
+            temp_x(n)=sum(elnodes_x)/3.0_WP/rad
+            temp_y(n)=sum(geo_coord_nod2D(2,elnodes))/3.0_WP/rad
+            
+            ! change lon range to [0 360]
+            if(temp_x(n)<0._WP) temp_x(n)=temp_x(n) + 360.0_WP  
+        end do
+    end if   
+    
+    !___________________________________________________________________________
+    ! do interpolation
+    flag=0
+    call interp_2d_field(lonlen, latlen, lon, lat, ncdata, num, temp_x, temp_y, & 
+                         model_2Darray, flag, partit) 
+    deallocate(temp_y, temp_x, ncdata_temp, ncdata, lon, lat)
+    
 end subroutine read_other_NetCDF
 !
 !------------------------------------------------------------------------------------
@@ -201,7 +230,7 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
   call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (status.ne.nf_noerr)then
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
-     print*,'Error in opening netcdf file'//file
+     print*,'Error in opening netcdf file '//file
      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
      stop
   endif
@@ -318,7 +347,7 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, 
   call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (status.ne.nf_noerr)then
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
-     print*,'Error in opening netcdf file'//file
+     print*,'Error in opening netcdf file '//file
      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
      stop
   endif

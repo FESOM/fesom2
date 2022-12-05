@@ -313,7 +313,7 @@ subroutine init_bottom_elem_thickness(partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     use o_ARRAYS
-    use g_config,only: use_partial_cell, partial_cell_thresh
+    use g_config,only: use_partial_cell, partial_cell_thresh, use_depthonelem
     use g_comm_auto
     use g_support
     implicit none
@@ -336,10 +336,15 @@ subroutine init_bottom_elem_thickness(partit, mesh)
     if(use_partial_cell) then 
         !Adjust the thickness of elemental bottom cells
         do elem=1, myDim_elem2D
-            elnodes=elem2D_nodes(:,elem) 
             
-            ! elemental topographic depth
-            dd=sum(depth(elnodes))/3.0_WP
+            !___________________________________________________________________
+            if (use_depthonelem) then 
+                dd=depth(elem)
+            else
+                elnodes=elem2D_nodes(:,elem) 
+                ! elemental topographic depth
+                dd=sum(depth(elnodes))/3.0_WP
+            end if 
             
             ! number of full depth levels at elem
             nle=nlevels(elem)
@@ -551,7 +556,7 @@ subroutine init_surface_elem_depth(partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     use o_ARRAYS
-    use g_config,only: use_cavity, use_cavity_partial_cell, cavity_partial_cell_thresh
+    use g_config,only: use_cavity, use_cavity_partial_cell, cavity_partial_cell_thresh, use_cavityonelem
     use g_comm_auto
     use g_support
     implicit none
@@ -580,14 +585,19 @@ subroutine init_surface_elem_depth(partit, mesh)
             if (ule==1) cycle
             
             !___________________________________________________________________
-            elnodes=elem2D_nodes(:,elem) 
-            
-            !___________________________________________________________________
             ! elemental cavity depth
             if (use_cavity_partial_cell) then 
-                dd=sum(cavity_depth(elnodes))/3.0_WP
+            
+                !_______________________________________________________________
+                if (use_cavityonelem) then 
+                    dd=cavity_depth(elem)
+                else
+                    elnodes=elem2D_nodes(:,elem) 
+                    ! elemental cavity depth
+                    dd=sum(cavity_depth(elnodes))/3.0_WP
+                end if 
                 
-                !___________________________________________________________________
+                !_______________________________________________________________
                 ! Only apply Surface Partial Cells when the initial full cell surface
                 ! layer thickness is above the treshhold cavity_partial_cell_thresh
                 if (zbar(ule)-zbar(ule+1)<=cavity_partial_cell_thresh) then
@@ -1205,6 +1215,32 @@ subroutine restart_thickness_ale(partit, mesh)
             dhe(elem)=sum(hbar(elnodes))/3.0_WP
             
         end do
+        
+    !___________________________________________________________________________
+    ! >->->->->->->->->->->->->->->       linfs      <-<-<-<-<-<-<-<-<-<-<-->->-
+    !___________________________________________________________________________
+    ! for the case you make a restart from zstar --> linfs, hnode that comes with
+    ! the restart needs to be overwritten with the standard layer thicknesses. 
+    ! Since zbar_3d_n and Z_3d_n are initialised with standard levels
+    else ! --> which_ale == 'linfs'
+        do n=1,myDim_nod2D+eDim_nod2D
+            nzmin = ulevels_nod2D(n)
+            nzmax = nlevels_nod2D(n)-1
+            do nz=nzmin,nzmax-1
+                hnode(nz,n)=(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))
+            end do      
+            hnode(nzmax,n)=bottom_node_thickness(n)
+        end do
+        
+        do elem=1,myDim_elem2D
+            nzmin = ulevels(elem)
+            nzmax = nlevels(elem)-1
+            helem(nzmin,elem)=(zbar_e_srf(elem)-zbar(nzmin+1))
+            do nz = nzmin+1, nzmax-1
+                helem(nz,elem)=(zbar(nz)-zbar(nz+1))
+            end do
+            helem(nzmax,elem)=bottom_elem_thickness(elem)
+        end do    
     endif
 
 end subroutine restart_thickness_ale
@@ -2600,6 +2636,7 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     if (.not. dynamics%solverinfo%use_parms) then
         if (lfirst) call ssh_solve_preconditioner(dynamics%solverinfo, partit, mesh)
         call ssh_solve_cg(dynamics%d_eta, dynamics%ssh_rhs, dynamics%solverinfo, partit, mesh)
+        call exchange_nod(dynamics%d_eta, partit) !is this required after calling psolve ?
         lfirst=.false.
         return
     end if
@@ -2882,9 +2919,6 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
     integer           :: node
-!NR
-    integer, save     :: n_check=0
-    real(kind=8)      :: temp_check, sali_check
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer :: eta_n
@@ -3147,21 +3181,5 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         write(*,*)
         write(*,*)
     end if
-
-
-!NR Checksum for tracers, as they are most sensitive
-
-! !     n_check = n_check+1
-! !     temp_check = 0.
-! !     sali_check = 0.  
-! !     do node=1,myDim_nod2D+eDim_nod2D
-! !         temp_check = temp_check + sum(tracers%data(1)%values(nlevels_nod2D(node)-1:ulevels_nod2D(node),node))
-! !         sali_check = sali_check + sum(tracers%data(2)%values(nlevels_nod2D(node)-1:ulevels_nod2D(node),node))
-! !     end do
-! !     call MPI_Allreduce(MPI_IN_PLACE, temp_check, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
-! !     call MPI_Allreduce(MPI_IN_PLACE, sali_check, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
-! !     if (mype==0) then 
-! !         print *,'Check',n_check,temp_check,sali_check
-! !     end if 
 end subroutine oce_timestep_ale
 
