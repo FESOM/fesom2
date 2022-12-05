@@ -31,6 +31,6 @@ cp -n ../config/namelist.cvmix   .
 JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
 
 date
-srun --mpi=pmi2 --ntasks=1 ./fesom_ini.x > "fvom_ini.out"
+srun --mpi=pmi2 --ntasks=1 ./fesom_ini.x > "fesom2_ini.out"
 date
 
