@@ -36,7 +36,11 @@ call par_init(partit)
 
 resultpath='../'
 ! check if resultpath exist
+#if defined(__PGI)
+INQUIRE(file=trim(resultpath), EXIST=dir_exist)
+#else
 INQUIRE(directory=trim(resultpath), EXIST=dir_exist)
+#endif
 if (.not. dir_exist) then 
     if (partit%mype==0) print *, achar(27)//'[1;31m'//' -ERROR-> could not find:'//trim(resultpath)//achar(27)//'[0m'
     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
@@ -44,7 +48,11 @@ if (.not. dir_exist) then
 end if 
 
 npepath =trim(resultpath)//"/fesom_bin_restart/np"//int_to_txt(partit%npes)
+#if defined(__PGI)
+INQUIRE(file=trim(npepath), EXIST=dir_exist)
+#else
 INQUIRE(directory=trim(npepath), EXIST=dir_exist)
+#endif
 if (.not. dir_exist) then 
     if (partit%mype==0) print *, achar(27)//'[1;31m'//' -ERROR-> could not find:'//trim(npepath)//achar(27)//'[0m'
     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
