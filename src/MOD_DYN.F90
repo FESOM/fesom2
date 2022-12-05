@@ -27,13 +27,8 @@ TYPE T_SOLVERINFO
 !!!
     real(kind=WP), allocatable   :: rr(:), zz(:), pp(:), App(:)
     contains
-#if defined(__PGI)
-    private
-#endif            
     procedure WRITE_T_SOLVERINFO
     procedure READ_T_SOLVERINFO
-    generic :: write(unformatted) => WRITE_T_SOLVERINFO
-    generic :: read(unformatted)  => READ_T_SOLVERINFO
 END TYPE T_SOLVERINFO
 !
 !
@@ -45,13 +40,8 @@ TYPE T_DYN_WORK
     ! easy backscatter contribution
     real(kind=WP), allocatable, dimension(:,:)   :: u_b, v_b
     contains
-#if defined(__PGI)
-    private
-#endif            
     procedure WRITE_T_DYN_WORK
     procedure READ_T_DYN_WORK
-    generic :: write(unformatted) => WRITE_T_DYN_WORK
-    generic :: read(unformatted)  => READ_T_DYN_WORK
 END TYPE T_DYN_WORK
 !
 !
@@ -128,10 +118,12 @@ TYPE T_DYN
     !___________________________________________________________________________
     contains
 #if defined(__PGI)
-     private
-#endif            
+     procedure, private WRITE_T_DYN
+     procedure, private READ_T_DYN
+#else            
      procedure WRITE_T_DYN
      procedure READ_T_DYN
+#endif
      generic :: write(unformatted) => WRITE_T_DYN
      generic :: read(unformatted)  => READ_T_DYN
 END TYPE T_DYN
@@ -142,12 +134,12 @@ contains
 !
 !_______________________________________________________________________________
 ! set unformatted writing and reading for T_DYN_WORK
-subroutine WRITE_T_SOLVERINFO(tsolverinfo, unit, iostat, iomsg)
+subroutine WRITE_T_SOLVERINFO(tsolverinfo, unit)
     IMPLICIT NONE
     class(T_SOLVERINFO),  intent(in)     :: tsolverinfo
     integer,              intent(in)     :: unit
-    integer,              intent(out)    :: iostat
-    character(*),         intent(inout)  :: iomsg
+    integer                              :: iostat
+    character(len=1024)                  :: iomsg
     !___________________________________________________________________________
     write(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%ident
     write(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%maxiter
@@ -162,12 +154,12 @@ subroutine WRITE_T_SOLVERINFO(tsolverinfo, unit, iostat, iomsg)
     call write_bin_array(tsolverinfo%App, unit, iostat, iomsg)
 end subroutine WRITE_T_SOLVERINFO
 
-subroutine READ_T_SOLVERINFO(tsolverinfo, unit, iostat, iomsg)
+subroutine READ_T_SOLVERINFO(tsolverinfo, unit)
     IMPLICIT NONE
     class(T_SOLVERINFO),  intent(inout)     :: tsolverinfo
     integer,              intent(in)     :: unit
-    integer,              intent(out)    :: iostat
-    character(*),         intent(inout)  :: iomsg
+    integer                              :: iostat
+    character(len=1024)                  :: iomsg
     read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%ident
     read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%maxiter
     read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%restart
@@ -185,12 +177,12 @@ end subroutine READ_T_SOLVERINFO
 !
 !_______________________________________________________________________________
 ! set unformatted writing and reading for T_DYN_WORK
-subroutine WRITE_T_DYN_WORK(twork, unit, iostat, iomsg)
+subroutine WRITE_T_DYN_WORK(twork, unit)
     IMPLICIT NONE
     class(T_DYN_WORK), intent(in)        :: twork
     integer,              intent(in)     :: unit
-    integer,              intent(out)    :: iostat
-    character(*),         intent(inout)  :: iomsg
+    integer                              :: iostat
+    character(len=1024)                  :: iomsg
     call write_bin_array(twork%uvnode_rhs, unit, iostat, iomsg)
     call write_bin_array(twork%u_c,        unit, iostat, iomsg)
     call write_bin_array(twork%v_c,        unit, iostat, iomsg)
@@ -198,12 +190,12 @@ subroutine WRITE_T_DYN_WORK(twork, unit, iostat, iomsg)
     call write_bin_array(twork%v_b,        unit, iostat, iomsg)
 end subroutine WRITE_T_DYN_WORK
 
-subroutine READ_T_DYN_WORK(twork, unit, iostat, iomsg)
+subroutine READ_T_DYN_WORK(twork, unit)
     IMPLICIT NONE
     class(T_DYN_WORK), intent(inout)        :: twork
     integer,              intent(in)     :: unit
-    integer,              intent(out)    :: iostat
-    character(*),         intent(inout)  :: iomsg
+    integer                              :: iostat
+    character(len=1024)                  :: iomsg
     call read_bin_array(twork%uvnode_rhs, unit, iostat, iomsg)
     call read_bin_array(twork%u_c,        unit, iostat, iomsg)
     call read_bin_array(twork%v_c,        unit, iostat, iomsg)
@@ -239,10 +231,10 @@ subroutine WRITE_T_DYN(dynamics, unit, iostat, iomsg)
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%wsplit_maxcfl
     
     !___________________________________________________________________________
-    write(unit, iostat=iostat, iomsg=iomsg) dynamics%solverinfo
+    call dynamics%solverinfo%WRITE_T_SOLVERINFO(unit)
     
     !___________________________________________________________________________
-    write(unit, iostat=iostat, iomsg=iomsg) dynamics%work
+    call dynamics%work%WRITE_T_DYN_WORK(unit)
     
     !___________________________________________________________________________
     call write_bin_array(dynamics%uv        , unit, iostat, iomsg)
@@ -285,10 +277,10 @@ subroutine READ_T_DYN(dynamics, unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%wsplit_maxcfl
     
     !___________________________________________________________________________
-    read(unit, iostat=iostat, iomsg=iomsg) dynamics%solverinfo
+    call dynamics%solverinfo%READ_T_SOLVERINFO(unit)
     
     !___________________________________________________________________________
-    read(unit, iostat=iostat, iomsg=iomsg) dynamics%work
+    call dynamics%work%READ_T_DYN_WORK(unit)
     
     !___________________________________________________________________________
     call read_bin_array(dynamics%uv        , unit, iostat, iomsg)

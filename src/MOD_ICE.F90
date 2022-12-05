@@ -18,13 +18,8 @@ TYPE T_ICE_DATA
     integer                                     :: ID
     !___________________________________________________________________________
     contains
-#if defined(__PGI)
-    private
-#endif            
         procedure WRITE_T_ICE_DATA
         procedure READ_T_ICE_DATA
-        generic :: write(unformatted) => WRITE_T_ICE_DATA
-        generic :: read(unformatted)  => READ_T_ICE_DATA
 END TYPE T_ICE_DATA
 !
 ! 
@@ -41,13 +36,8 @@ TYPE T_ICE_WORK
     real(kind=WP), allocatable, dimension(:)    :: ice_strength, inv_areamass, inv_mass
     !___________________________________________________________________________
     contains
-#if defined(__PGI)
-    private
-#endif            
         procedure WRITE_T_ICE_WORK
         procedure READ_T_ICE_WORK
-        generic :: write(unformatted) => WRITE_T_ICE_WORK
-        generic :: read(unformatted)  => READ_T_ICE_WORK
 END TYPE T_ICE_WORK
 !
 ! 
@@ -88,13 +78,8 @@ TYPE T_ICE_THERMO
     real(kind=WP) :: albim = 0.68      !         melting ice
     real(kind=WP) :: albw  = 0.066     !         open water, LY2004
     contains
-#if defined(__PGI)
-    private
-#endif            
         procedure WRITE_T_ICE_THERMO
         procedure READ_T_ICE_THERMO
-        generic :: write(unformatted) => WRITE_T_ICE_THERMO
-        generic :: read(unformatted)  => READ_T_ICE_THERMO
 END TYPE T_ICE_THERMO
 !
 ! 
@@ -113,13 +98,8 @@ TYPE T_ICE_ATMCOUPL
 #endif /* (__oifs)  */
     !___________________________________________________________________________
     contains
-#if defined(__PGI)
-    private
-#endif            
         procedure WRITE_T_ICE_ATMCOUPL
         procedure READ_T_ICE_ATMCOUPL
-        generic :: write(unformatted) => WRITE_T_ICE_ATMCOUPL
-        generic :: read(unformatted)  => READ_T_ICE_ATMCOUPL
 END TYPE T_ICE_ATMCOUPL
 #endif /* (__oasis) */
 
@@ -203,10 +183,12 @@ TYPE T_ICE
     !___________________________________________________________________________
     contains
 #if defined(__PGI)
-    private
-#endif            
+        procedure, private WRITE_T_ICE
+        procedure, private READ_T_ICE
+#else            
         procedure WRITE_T_ICE
         procedure READ_T_ICE
+#endif
         generic :: write(unformatted) => WRITE_T_ICE
         generic :: read(unformatted)  => READ_T_ICE
 END TYPE T_ICE
@@ -216,12 +198,12 @@ contains
 !
 !_______________________________________________________________________________
 ! Unformatted writing for T_ICE_DATA
-subroutine WRITE_T_ICE_DATA(tdata, unit, iostat, iomsg)
+subroutine WRITE_T_ICE_DATA(tdata, unit)
     IMPLICIT NONE
     class(T_ICE_DATA),      intent(in)     :: tdata
     integer,                intent(in)     :: unit
-    integer,                intent(out)    :: iostat
-    character(*),           intent(inout)  :: iomsg
+    integer                                :: iostat
+    character(len=1024)                    :: iomsg
     call write_bin_array(tdata%values,         unit, iostat, iomsg)
     call write_bin_array(tdata%values_old,     unit, iostat, iomsg)
     call write_bin_array(tdata%values_rhs,     unit, iostat, iomsg)
@@ -232,12 +214,12 @@ subroutine WRITE_T_ICE_DATA(tdata, unit, iostat, iomsg)
 end subroutine WRITE_T_ICE_DATA  
 
 ! Unformatted reading for T_ICE_DATA
-subroutine READ_T_ICE_DATA(tdata, unit, iostat, iomsg)
+subroutine READ_T_ICE_DATA(tdata, unit)
     IMPLICIT NONE
     class(T_ICE_DATA),      intent(inout)  :: tdata
     integer,                intent(in)     :: unit
-    integer,                intent(out)    :: iostat
-    character(*),           intent(inout)  :: iomsg
+    integer                                :: iostat
+    character(len=1024)                    :: iomsg
     call read_bin_array(tdata%values,         unit, iostat, iomsg)
     call read_bin_array(tdata%values_old,     unit, iostat, iomsg)
     call read_bin_array(tdata%values_rhs,     unit, iostat, iomsg)
@@ -250,12 +232,12 @@ end subroutine READ_T_ICE_DATA
 !
 !_______________________________________________________________________________
 ! Unformatted writing for T_ICE_WORK
-subroutine WRITE_T_ICE_WORK(twork, unit, iostat, iomsg)
+subroutine WRITE_T_ICE_WORK(twork, unit)
     IMPLICIT NONE
     class(T_ICE_WORK),      intent(in)     :: twork
     integer,                intent(in)     :: unit
-    integer,                intent(out)    :: iostat
-    character(*),           intent(inout)  :: iomsg
+    integer                                :: iostat
+    character(len=1024)                    :: iomsg
     call write_bin_array(twork%fct_tmax,     unit, iostat, iomsg)
     call write_bin_array(twork%fct_tmin,     unit, iostat, iomsg)
     call write_bin_array(twork%fct_plus,     unit, iostat, iomsg)
@@ -274,12 +256,12 @@ subroutine WRITE_T_ICE_WORK(twork, unit, iostat, iomsg)
 end subroutine WRITE_T_ICE_WORK    
 
 ! Unformatted reading for T_ICE_WORK
-subroutine READ_T_ICE_WORK(twork, unit, iostat, iomsg)
+subroutine READ_T_ICE_WORK(twork, unit)
     IMPLICIT NONE
     class(T_ICE_WORK),      intent(inout)  :: twork
     integer,                intent(in)     :: unit
-    integer,                intent(out)    :: iostat
-    character(*),           intent(inout)  :: iomsg
+    integer                                :: iostat
+    character(len=1024)                    :: iomsg
     call read_bin_array(twork%fct_tmax,     unit, iostat, iomsg)
     call read_bin_array(twork%fct_tmin,     unit, iostat, iomsg)
     call read_bin_array(twork%fct_plus,     unit, iostat, iomsg)
@@ -300,12 +282,12 @@ end subroutine READ_T_ICE_WORK
 !
 !_______________________________________________________________________________
 ! Unformatted writing for T_ICE_WORK
-subroutine WRITE_T_ICE_THERMO(ttherm, unit, iostat, iomsg)
+subroutine WRITE_T_ICE_THERMO(ttherm, unit)
     IMPLICIT NONE
     class(T_ICE_THERMO),    intent(in)     :: ttherm
     integer,                intent(in)     :: unit
-    integer,                intent(out)    :: iostat
-    character(*),           intent(inout)  :: iomsg
+    integer                                :: iostat
+    character(len=1024)                    :: iomsg
     call write_bin_array(ttherm%t_skin,       unit, iostat, iomsg)
     call write_bin_array(ttherm%thdgr,        unit, iostat, iomsg)
     call write_bin_array(ttherm%thdgrsn,      unit, iostat, iomsg)
@@ -314,12 +296,12 @@ subroutine WRITE_T_ICE_THERMO(ttherm, unit, iostat, iomsg)
 end subroutine WRITE_T_ICE_THERMO    
 
 ! Unformatted reading for T_ICE_WORK
-subroutine READ_T_ICE_THERMO(ttherm, unit, iostat, iomsg)
+subroutine READ_T_ICE_THERMO(ttherm, unit)
     IMPLICIT NONE
     class(T_ICE_THERMO),    intent(inout)  :: ttherm
     integer,                intent(in)     :: unit
-    integer,                intent(out)    :: iostat
-    character(*),           intent(inout)  :: iomsg
+    integer                                :: iostat
+    character(len=1024)                    :: iomsg
     call read_bin_array(ttherm%t_skin,       unit, iostat, iomsg)
     call read_bin_array(ttherm%thdgr,        unit, iostat, iomsg)
     call read_bin_array(ttherm%thdgrsn,      unit, iostat, iomsg)
@@ -331,12 +313,12 @@ end subroutine READ_T_ICE_THERMO
 !_______________________________________________________________________________
 ! Unformatted writing for T_ICE_ATMCOUPL
 #if defined (__oasis) || defined (__ifsinterface)    
-subroutine WRITE_T_ICE_ATMCOUPL(tcoupl, unit, iostat, iomsg)
+subroutine WRITE_T_ICE_ATMCOUPL(tcoupl, unit)
     IMPLICIT NONE
     class(T_ICE_ATMCOUPL),  intent(in)     :: tcoupl
     integer,                intent(in)     :: unit
-    integer,                intent(out)    :: iostat
-    character(*),           intent(inout)  :: iomsg
+    integer                                :: iostat
+    character(len=1024)                    :: iomsg
     call write_bin_array(tcoupl%oce_flx_h,      unit, iostat, iomsg)
     call write_bin_array(tcoupl%ice_flx_h,      unit, iostat, iomsg)
     call write_bin_array(tcoupl%tmpoce_flx_h,   unit, iostat, iomsg)
@@ -350,12 +332,12 @@ end subroutine WRITE_T_ICE_ATMCOUPL
 
 ! Unformatted reading for T_ICE_ATMCOUPL
 #if defined (__oasis) || defined (__ifsinterface)
-subroutine READ_T_ICE_ATMCOUPL(tcoupl, unit, iostat, iomsg)
+subroutine READ_T_ICE_ATMCOUPL(tcoupl, unit)
     IMPLICIT NONE
     class(T_ICE_ATMCOUPL),  intent(inout)  :: tcoupl
     integer,                intent(in)     :: unit
-    integer,                intent(out)    :: iostat
-    character(*),           intent(inout)  :: iomsg
+    integer                                :: iostat
+    character(len=1024)                    :: iomsg
     call read_bin_array(tcoupl%oce_flx_h, unit, iostat, iomsg)
     call read_bin_array(tcoupl%ice_flx_h, unit, iostat, iomsg)
     call read_bin_array(tcoupl%tmpoce_flx_h, unit, iostat, iomsg)
@@ -380,13 +362,13 @@ subroutine WRITE_T_ICE(ice, unit, iostat, iomsg)
     !___________________________________________________________________________
     write(unit, iostat=iostat, iomsg=iomsg) ice%num_itracers
     do i=1, ice%num_itracers
-       write(unit, iostat=iostat, iomsg=iomsg) ice%data(i)
+       call ice%data(i)%WRITE_T_ICE_DATA(unit)
     end do
     !___________________________________________________________________________
-    write(unit, iostat=iostat, iomsg=iomsg) ice%thermo
-    write(unit, iostat=iostat, iomsg=iomsg) ice%work
+    call ice%thermo%WRITE_T_ICE_THERMO(unit)
+    call ice%work%WRITE_T_ICE_WORK(unit)
 #if defined (__oasis) || defined (__ifsinterface)
-    write(unit, iostat=iostat, iomsg=iomsg) ice%atmcoupl
+    call ice%atmcoupl%WRITE_T_ICE_ATMCOUPL(unit)
 #endif /* (__oasis) */       
 
     !___________________________________________________________________________
@@ -453,13 +435,13 @@ subroutine READ_T_ICE(ice, unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg) ice%num_itracers
     if (.not. allocated(ice%data)) allocate(ice%data(ice%num_itracers))
     do i=1, ice%num_itracers
-       read(unit, iostat=iostat, iomsg=iomsg) ice%data(i)
+       call ice%data(i)%READ_T_ICE_DATA(unit)
     end do
     !___________________________________________________________________________
-    read(unit, iostat=iostat, iomsg=iomsg) ice%thermo
-    read(unit, iostat=iostat, iomsg=iomsg) ice%work
+    call ice%thermo%READ_T_ICE_THERMO(unit)
+    call ice%work%READ_T_ICE_WORK(unit)
 #if defined (__oasis) || defined (__ifsinterface)
-    read(unit, iostat=iostat, iomsg=iomsg) ice%atmcoupl
+    call ice%atmcoupl%READ_T_ICE_ATMCOUPL(unit)
 #endif /* (__oasis) */       
 
     !___________________________________________________________________________
