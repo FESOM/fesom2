@@ -404,8 +404,7 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
        end do
        !$ACC END LOOP
     end do
-   !$ACC END PARALLEL LOOP
-    !$ACC UPDATE SELF(flux)
+    !$ACC END PARALLEL LOOP
     !$ACC END DATA
 !$OMP END DO
 !$OMP END PARALLEL

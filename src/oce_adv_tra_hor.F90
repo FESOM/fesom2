@@ -558,6 +558,9 @@ end subroutine adv_tra_hor_muscl
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
+    !$ACC DATA CREATE(enodes, el) COPY(flux, ttf, edge_up_dn_grad, edge_dxdy, helem, vel, ulevels, edge_tri, edges, nlevels, &
+    !$ACC             edge_cross_dxdy, elem_cos, myDim_edge2D)
+
     l_init_zero=.true.
     if (present(o_init_zero)) then
        l_init_zero=o_init_zero
@@ -578,7 +581,7 @@ end subroutine adv_tra_hor_muscl
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, Tmean1, Tmean2, cHO, &
 !$OMP                                     a, vflux, el, enodes, nz, nu12, nl12, nl1, nl2, nu1, nu2)
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el)
+    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(NONE)
     do edge=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,edge)  
@@ -805,6 +808,7 @@ end subroutine adv_tra_hor_muscl
         !$ACC END LOOP
     end do
     !$ACC END PARALLEL LOOP
+    !$ACC END DATA
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine adv_tra_hor_mfct
