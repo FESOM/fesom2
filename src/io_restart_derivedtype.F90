@@ -55,13 +55,6 @@ subroutine write_all_bin_restarts(ctarr, path_in, pathi_in, partit, mesh, ice, d
     ! EO parameters
     integer fileunit, fileunit_i
 
-#if defined(__PGI)
-    if (partit%mype == 0) then
-       write(*,*) 'write_all_bin_restarts is deactivated for PGI compiler because of T_TRACER%DATA & T_ICE%DATA cause write call to crash'
-       write(*,*) '*** checked for NVHPC/22.1 ***'
-    end if
-#else
-
     !___________________________________________________________________________
     ! write info file
     if(partit%mype == 0) then
@@ -151,7 +144,6 @@ subroutine write_all_bin_restarts(ctarr, path_in, pathi_in, partit, mesh, ice, d
     end if 
     !___________________________________________________________________________
     if(partit%mype == 0) close(fileunit_i)
-#endif !defined(__PGI)
 end subroutine
 !
 !
@@ -176,13 +168,6 @@ subroutine read_all_bin_restarts(path_in, partit, mesh, ice, dynamics, tracers)
     type(t_dyn)   , intent(inout), target, optional :: dynamics
     type(t_tracer), intent(inout), target, optional :: tracers
     integer fileunit
-
-#if defined(__PGI)
-    if (partit%mype == 0) then
-       write(*,*) 'read_all_bin_restarts is deactivated for PGI compiler because of T_TRACER%DATA & T_ICE%DATA cause write call to crash'
-       write(*,*) '*** checked for NVHPC/22.1 ***'
-    end if
-#else
 
     !___________________________________________________________________________
     if (partit%mype==0) print *, achar(27)//'[1;33m'//' --> read restarts from derived type binary'//achar(27)//'[0m'
@@ -246,6 +231,4 @@ subroutine read_all_bin_restarts(path_in, partit, mesh, ice, dynamics, tracers)
         close(fileunit)
         if (partit%mype==0) print *, achar(27)//'[33m'//'     > read derived type t_ice'//achar(27)//'[0m'
     end if
-#endif !defined(__PGI)
 end subroutine
-  
