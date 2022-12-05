@@ -1,16 +1,19 @@
 #!/bin/bash
 #SBATCH --account=clidyn.p_fesom # edit your account
 #SBATCH --partition=mpp
-#SBATCH --time=12:00:00
-#SBATCH --ntasks=128            # Number of tasks (MPI) tasks to be launched
+#SBATCH --time=00:30:00
+#SBATCH --ntasks=1            # Number of tasks (MPI) tasks to be launched
+#SBATCH --cpus-per-task 1
+#SBATCH --hint=nomultithread
+
 #SBATCH --job-name=fesom2.0_INI
 #SBATCH -o slurm-out.out
 #SBATCH -e slurm-err.out
 
-set -x
+#set -x
+#ulimit -s unlimited
 
-ulimit -s unlimited
-
+export OMP_NUM_THREADS=1
 source ../env/albedo/shell
 
 ln -s ../bin/fesom_ini.x         .           # cp -n ../bin/fvom_ini.x
@@ -18,6 +21,10 @@ cp -n ../config/namelist.config  .
 cp -n ../config/namelist.forcing .
 cp -n ../config/namelist.oce     .
 cp -n ../config/namelist.ice     .
+cp -n ../config/namelist.io      .
+cp -n ../config/namelist.dyn     .
+cp -n ../config/namelist.tra     .
+cp -n ../config/namelist.cvmix   .
 
 
 # determine JOBID
