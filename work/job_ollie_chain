@@ -210,7 +210,7 @@ if [ $is_newsimul -eq 1 ] ; then
         
         #___BACKUP NAMELIST.* FILES INTO RESULT DIRECTORY_______________________
         cp namelist.config namelist.oce namelist.ice namelist.forcing namelist.io \
-           namelist.cvmix ${dname_result}/.
+           namelist.cvmix namelist.tra namelist.dyn ${dname_result}/.
         cp fesom.x ${dname_result}/.
 
     #___BACKUP SRC FILES INTO RESULT DIRECTORY______________________________
@@ -266,7 +266,7 @@ if [ $is_newsimul -eq 1 ] ; then
         # backup namelist.* & fesom.x in case they dont exist
         if [ ! -f "${dname_result}/namelist.config" ]; then
             cp namelist.config namelist.oce namelist.ice namelist.forcing namelist.io \
-                namelist.cvmix ${dname_result}/.
+            namelist.cvmix namelist.tra namelist.dyn ${dname_result}/.
         fi
         if [ ! -f "${dname_result}/fesom.x" ]; then 
             cp fesom.x ${dname_result}/. 
