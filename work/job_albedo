@@ -1,0 +1,41 @@
+#!/bin/bash
+#SBATCH --account=clidyn.p_fesom # edit your account
+#SBATCH --partition=mpp
+#SBATCH --time=12:00:00
+#SBATCH --qos=12h                  # Slurm QOS; Default: 30min
+#SBATCH --ntasks=256            # Number of tasks (MPI) tasks to be launched
+#SBATCH --cpus-per-task 1
+#SBATCH --hint=nomultithread
+
+#SBATCH --job-name=fesom2
+#SBATCH -o slurm-out.out
+#SBATCH -e slurm-err.out
+
+#set -x
+#ulimit -s unlimited
+
+export OMP_NUM_THREADS=1
+source ../env/albedo/shell
+
+# determine JOBID
+JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
+
+ln -s ../bin/fesom.x .           # cp -n ../bin/fesom.x
+cp -n ../config/namelist.config  .
+cp -n ../config/namelist.forcing .
+cp -n ../config/namelist.oce     .
+cp -n ../config/namelist.dyn     .
+cp -n ../config/namelist.tra     .
+cp -n ../config/namelist.ice     .
+cp -n ../config/namelist.io      .
+cp -n ../config/namelist.icepack .
+
+date
+srun --mpi=pmi2 ./fesom.x > "fesom2.out"
+date
+
+#qstat -f $PBS_JOBID
+#export EXITSTATUS=$?
+#if [ ${EXITSTATUS} -eq 0 ] || [ ${EXITSTATUS} -eq 127 ] ; then
+#sbatch job_ollie
+#fi
