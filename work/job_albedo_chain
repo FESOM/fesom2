@@ -8,6 +8,7 @@
 #SBATCH --hint=nomultithread
 
 #SBATCH --time=10:00:00
+#SBATCH --qos=12h     
 #SBATCH --mail-type=END
 #SBATCH --mail-user=Patrick.Scholz@awi.de
 #SBATCH -o fesom2_%x_%j.out

@@ -1,7 +1,8 @@
 #!/bin/bash
 #SBATCH --account=clidyn.p_fesom # edit your account
 #SBATCH --partition=mpp
-#SBATCH --time=00:30:00
+#SBATCH --time=12:00:00
+#SBATCH --qos=12h                  # Slurm QOS; Default: 30min
 #SBATCH --ntasks=256            # Number of tasks (MPI) tasks to be launched
 #SBATCH --cpus-per-task 1
 #SBATCH --hint=nomultithread
