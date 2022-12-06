@@ -459,7 +459,7 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
           !_______________________________________________________________
           ! check salt
           if ( (tracers%data(2)%values(nz, n) /= tracers%data(2)%values(nz, n)) .or.  &
-             tracers%data(2)%values(nz, n) < 0 .or. tracers%data(2)%values(nz, n)>50 ) then
+             tracers%data(2)%values(nz, n) <= 3.0 .or. tracers%data(2)%values(nz, n)>50.0 ) then
 !$OMP CRITICAL
              found_blowup_loc=1
              write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
@@ -520,9 +520,9 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
        if (mype==0) then
           call sleep(1)
           write(*,*)
-          write(*,*) '                MODEL BLOW UP !!!'
-          write(*,*) '                     ____'
-          write(*,*) '               __,-~~/~    `---.'
+          write(*,*) '                   MODEL BLOW UP !!!'
+          write(*,*) '                         ____'
+          write(*,*) '                  __,-~~/~    `---.'
           write(*,*) '                _/_,---(      ,    )'
           write(*,*) '            __ /     <    /   )  \___'
           write(*,*) '- -- ----===;;;`====------------------===;;;===---- -- -'
