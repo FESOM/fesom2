@@ -25,7 +25,7 @@ w_split=.false.
 w_max_cfl=1.0          ! maximum allowed CFL criteria in vertical (0.5 < w_max_cfl < 1.) ! in older FESOM it used to be w_exp_max=1.e-3
 SPP=.false.            ! Salt Plume Parameterization
 Fer_GM=.true.          ! to swith on/off GM after Ferrari et al. 2010
-K_GM_max     = 2000.0  ! for CORE mesh and 1000 for PI mesh ! max. GM thickness diffusivity (m2/s)
+K_GM_max     = 1000.0  ! for CORE mesh and 1000 for PI mesh ! max. GM thickness diffusivity (m2/s)
 K_GM_min     = 2.0     ! min. GM thickness diffusivity (m2/s)
 K_GM_bvref   = 2       ! def of bvref in ferreira scaling 0=srf,1=bot mld,2=mean over mld,3=weighted mean over mld
 K_GM_rampmax = -1.0    ! Resol >K_GM_rampmax[km] GM on
@@ -65,7 +65,7 @@ double_diffusion=.false.               ! for KPP,dd switch
 K_ver=1.0e-5
 K_hor=3000.
 surf_relax_T=0.0
-surf_relax_S=0.0       !1.929e-06, 50m/300days 6.43e-07! m/s 10./(180.*86400.)
+surf_relax_S=1.929e-06       !1.929e-06, 50m/300days 6.43e-07! m/s 10./(180.*86400.)
 balance_salt_water =.true.   ! balance virtual-salt or freshwater flux or not
 clim_relax=0.0	                    ! 1/s, geometrical information has to be supplied
 ref_sss_local=.true.
@@ -108,6 +108,3 @@ varlist  = 'Fe', 'oxygen_mmol', 'i_an', 'TAlk_mmol', 'TCO2_mmol', 'n_an', 'salt'
 t_insitu = .true.
 /
 
-&boundary
-restore_s_surf = 0
-/

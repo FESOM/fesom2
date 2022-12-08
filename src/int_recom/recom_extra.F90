@@ -513,14 +513,13 @@ subroutine Sed_input(mesh)
    else
 
 !-Checking if files need to be opened---------------------------------------------
-     call annual_event(do_read)
-!     call monthly_event(do_read)
+     call monthly_event(do_read)
      if(do_read) then ! file is opened and read every year
-!      i=month
-!      if (i > 12) i=1
-!      if (mype==0) write(*,*) 'Updating sedimentary input for month', i, 'from', sedfilename
-      if (mype==0) write(*,*) 'Yearly updating sedimentary input from', sedfilename
- 
+      i=month
+      if (i > 12) i=1
+      if (mype==0) write(*,*) 'Updating sedimentary input for month', i, 'from',
+sedfilename
+
       call read_2ddata_on_grid_NetCDF(sedfilename, 'df_din', 1, GloSed(:,1), mesh)
 !      if (mype==0) write(*,*) mype, 'sediment DIN flux:', maxval(GloSed(:,1)), minval(GloSed(:,1))
 
@@ -550,7 +549,7 @@ subroutine Sed_input(mesh)
 
 ! read loopback fluxes from the same file
       if(add_loopback) then
-        if (mype==0) write(*,*) 'adding loopback fluxes into the ocean yearly'
+        if (mype==0) write(*,*) 'adding loopback fluxes into the ocean monthly'
 
         istart = (/1,1/)
         icount = (/1,1/)
