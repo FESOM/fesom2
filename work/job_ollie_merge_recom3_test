@@ -1,0 +1,36 @@
+#!/bin/bash
+#SBATCH --job-name=core
+#SBATCH -p mpp
+##SBATCH -N 1
+#SBATCH --ntasks=576
+#SBATCH --time=02:30:00
+##SBATCH --mem=10000
+##SBATCH --qos=short
+#SBATCH -o fesom-out.%j.out
+#SBATCH -e fesom-err.%j.out
+
+#-----------------
+# modules needed
+#-----------------
+module load centoslibs
+module load nco
+module unload netcdf
+module load intel.compiler intel.mpi netcdf/4.4.0_intel
+module load centoslibs
+
+set -x
+
+#umask 022
+ulimit -s unlimited
+
+cp /home/ollie/yye/fesom2/bin/fesom.x .
+cp /work/ollie/yye/fesom2/nml/fesom.clock.init ./fesom.clock
+#cp /home/ollie/yye/fesom2/config/namelist.* .
+
+#---------------------
+# run fesom/recom
+#---------------------
+date
+srun --mpi=pmi2 ./fesom.x > "fesom.out"
+date
+
