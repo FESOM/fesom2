@@ -113,9 +113,9 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !___________________________________________________________________________
     ! a1. max, min between old solution and updated low-order solution per node
 
-    !$ACC DATA CREATE(tvert_max, tvert_min) COPY(nlevels_nod2D, ulevels_nod2D, aux, nod_in_elem2D, nod_in_elem2D_num, myDim_nod2D, &
+    !$ACC DATA CREATE(tvert_max, tvert_min) PRESENT(nlevels_nod2D, ulevels_nod2D, aux, nod_in_elem2D, nod_in_elem2D_num, myDim_nod2D, &
     !$ACC fct_ttf_min, fct_ttf_max, edim_nod2d, fct_minus, fct_plus, adf_v, ulevels, edge_tri, edges, nlevels, adf_h, &
-    !$ACC myDim_edge2D, areasvol) COPYIN(lo, ttf)
+    !$ACC myDim_edge2D, areasvol) PRESENT(lo, ttf)
 
 !$OMP DO
     !$ACC PARALLEL LOOP GANG DEFAULT(NONE)

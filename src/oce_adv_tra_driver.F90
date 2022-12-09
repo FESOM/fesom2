@@ -240,8 +240,17 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     !
     if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
        !edge_up_dn_grad will be used as an auxuary array here
+
+       !$ACC DATA COPYIN(ttf, fct_LO) &
+       !$ACC      COPY(nlevels_nod2D, ulevels_nod2D, nod_in_elem2D, nod_in_elem2D_num, myDim_nod2D, edim_nod2d) &
+       !$ACC      COPY(ulevels, edge_tri, edges, nlevels, myDim_edge2D, edge_up_dn_grad, hnode, hnode_new) &
+       !$ACC      COPY(fct_ttf_min, fct_ttf_max, fct_minus, fct_plus, adv_flux_hor, adv_flux_ver, areasvol) &
+       !$ACC      COPY(dttf_v, dttf_h)
+
        call oce_tra_adv_fct(dt, ttf, fct_LO, adv_flux_hor, adv_flux_ver, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, edge_up_dn_grad, partit, mesh)
        call oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, partit, mesh, use_lo=.TRUE., ttf=ttf, lo=fct_LO)
+
+       !$ACC END DATA
     else
        call oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, partit, mesh)
     end if
@@ -275,7 +284,7 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
     ! c. Update the solution
     ! Vertical
 
-    !$ACC DATA COPY(nlevels_nod2D, ulevels_nod2D, areasvol, flux_v, dttf_v, myDim_nod2d, ttf, hnode, lo, hnode_new, &
+    !$ACC DATA PRESENT(nlevels_nod2D, ulevels_nod2D, areasvol, flux_v, dttf_v, myDim_nod2d, ttf, hnode, lo, hnode_new, &
     !$ACC nlevels, edges, edge_tri, ulevels, dttf_h, flux_h, mydim_edge2d)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, k, elem, enodes, num, el, nu12, nl12, nu1, nu2, nl1, nl2, edge)
