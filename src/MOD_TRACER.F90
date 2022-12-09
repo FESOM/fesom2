@@ -76,7 +76,7 @@ contains
 #if defined(__PGI)
 procedure, private WRITE_T_TRACER
 procedure, private READ_T_TRACER
-#else       
+#else
 procedure WRITE_T_TRACER
 procedure READ_T_TRACER
 #endif
@@ -228,4 +228,3 @@ subroutine READ_T_TRACER(tracer, unit, iostat, iomsg)
 end subroutine READ_T_TRACER
 end module MOD_TRACER
 !==========================================================
-

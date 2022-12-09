@@ -8,7 +8,7 @@ IMPLICIT NONE
 SAVE
 integer, parameter    :: MAX_ADJACENT=32 ! Max allowed number of adjacent nodes
 
-TYPE SPARSE_MATRIX 
+TYPE SPARSE_MATRIX
      integer :: nza
      integer :: dim
      real(kind=WP),  allocatable,   dimension(:) :: values
@@ -28,12 +28,12 @@ real(kind=WP), allocatable, dimension(:,:)  :: geo_coord_nod2D
 integer                                     :: edge2D       ! the number of 2D edges
 integer                                     :: edge2D_in    ! the number of internal 2D edges
 integer                                     :: elem2D       ! the number of 2D elements
-integer, allocatable, dimension(:,:)        :: elem2D_nodes ! elem2D_nodes(:,n) lists; 3 nodes of element n   
+integer, allocatable, dimension(:,:)        :: elem2D_nodes ! elem2D_nodes(:,n) lists; 3 nodes of element n
 integer, allocatable, dimension(:,:)        :: edges        ! edge(:,n) lists 2 nodes; edge n
-integer, allocatable, dimension(:,:)        :: edge_tri     ! edge_tri(:,n) lists 2 
-                                                            ! elements containing edge n: the first one is to left 
+integer, allocatable, dimension(:,:)        :: edge_tri     ! edge_tri(:,n) lists 2
+                                                            ! elements containing edge n: the first one is to left
                                                             ! of the line directed to the second node
-integer,       allocatable, dimension(:,:)  :: elem_edges   ! elem_edges(:,n) are edges of element n.  
+integer,       allocatable, dimension(:,:)  :: elem_edges   ! elem_edges(:,n) are edges of element n.
 real(kind=WP), allocatable, dimension(:)    :: elem_area
 real(kind=WP), allocatable, dimension(:,:)  :: edge_dxdy
 real(kind=WP), allocatable, dimension(:,:)  :: edge_cross_dxdy
@@ -44,17 +44,17 @@ integer,       allocatable, dimension(:,:)  :: nod_in_elem2D
 real(kind=WP), allocatable, dimension(:,:)  :: x_corners
 real(kind=WP), allocatable, dimension(:,:)  :: y_corners ! cornes for the scalar points
 integer,       allocatable, dimension(:)    :: nod_in_elem2D_num
-real(kind=WP), allocatable, dimension(:)    :: depth                ! depth(n) is the depths at node n 
-real(kind=WP), allocatable, dimension(:,:)  :: gradient_vec 
+real(kind=WP), allocatable, dimension(:)    :: depth                ! depth(n) is the depths at node n
+real(kind=WP), allocatable, dimension(:,:)  :: gradient_vec
                                                            ! coefficients of linear reconstruction
                                                            ! of velocities on elements
 real(kind=WP), allocatable, dimension(:,:)  :: gradient_sca ! Coefficients to compute gradient of scalars
                                                            ! on elements
 INTEGER,       ALLOCATABLE, DIMENSION(:)    :: bc_index_nod2D(:)
-                                                           ! vertical structure     
+                                                           ! vertical structure
 !
 !
-!___vertical mesh info__________________________________________________________                                                           
+!___vertical mesh info__________________________________________________________
 ! total number of layers
 integer                                     :: nl
 
@@ -63,7 +63,7 @@ real(kind=WP), allocatable, dimension(:)    :: zbar
 real(kind=WP), allocatable, dimension(:)    :: Z
 real(kind=WP), allocatable, dimension(:)    :: elem_depth
 
-! upper boudnary index of all vertical vertice/element loops, default==1 but when 
+! upper boudnary index of all vertical vertice/element loops, default==1 but when
 ! cavity is used becomes index of cavity-ocean boundary at vertices and elements
 integer,       allocatable, dimension(:)    :: ulevels
 integer,       allocatable, dimension(:)    :: ulevels_nod2D
@@ -87,7 +87,7 @@ real(kind=WP), allocatable, dimension(:)    :: mesh_resolution
 !
 !___cavity mesh info____________________________________________________________
 ! level index of cavity-ocean boundary at vertices and elements
-! --> see: ulevels, ulevels_nod2D (fvom_main) 
+! --> see: ulevels, ulevels_nod2D (fvom_main)
 
 ! vertice/element yes=1/no=0 flag if cavity exists
 integer,       allocatable, dimension(:)    :: cavity_flag_n
@@ -106,9 +106,9 @@ type(sparse_matrix)                         :: ssh_stiff
 
 !#if defined (__oasis)
 real(kind=WP), allocatable, dimension(:)    :: lump2d_south
-real(kind=WP), allocatable, dimension(:)    :: lump2d_north  
+real(kind=WP), allocatable, dimension(:)    :: lump2d_north
 integer,       allocatable, dimension(:)    :: ind_south
-integer,       allocatable, dimension(:)    :: ind_north    
+integer,       allocatable, dimension(:)    :: ind_north
 !#endif
 
 integer                                       :: nn_size
@@ -127,8 +127,8 @@ real(kind=WP), allocatable,dimension(:,:)   :: Z_3d_n
 real(kind=WP), allocatable,dimension(:,:)   :: helem
 
 ! --> thinkness of bottom elem (important for partial cells)
-real(kind=WP), allocatable,dimension(:)     :: bottom_elem_thickness 
-real(kind=WP), allocatable,dimension(:)     :: bottom_node_thickness 
+real(kind=WP), allocatable,dimension(:)     :: bottom_elem_thickness
+real(kind=WP), allocatable,dimension(:)     :: bottom_node_thickness
 
 ! --> The increment of total fluid depth on elements. It is used to update the matrix
 real(kind=WP), allocatable,dimension(:)     :: dhe
@@ -137,7 +137,7 @@ real(kind=WP), allocatable,dimension(:)     :: dhe
 real(kind=WP), allocatable,dimension(:)     :: hbar
 real(kind=WP), allocatable,dimension(:)     :: hbar_old
 
-! --> auxiliary array to store depth of layers and depth of mid level due to changing 
+! --> auxiliary array to store depth of layers and depth of mid level due to changing
 !     layer thinkness at every node
 !real(kind=WP), allocatable,dimension(:)     :: zbar_n
 !real(kind=WP), allocatable,dimension(:)     :: Z_n
@@ -232,7 +232,7 @@ subroutine write_t_mesh(mesh, unit, iostat, iomsg)
 
     write(unit, iostat=iostat, iomsg=iomsg) mesh%ssh_stiff%dim
     write(unit, iostat=iostat, iomsg=iomsg) mesh%ssh_stiff%nza
- 
+
     call write_bin_array(mesh%ssh_stiff%rowptr,     unit, iostat, iomsg)
     call write_bin_array(mesh%ssh_stiff%colind,     unit, iostat, iomsg)
     call write_bin_array(mesh%ssh_stiff%values,     unit, iostat, iomsg)
@@ -365,4 +365,3 @@ subroutine read_t_mesh(mesh, unit, iostat, iomsg)
 end subroutine read_t_mesh
 end module MOD_MESH
 !==========================================================
-

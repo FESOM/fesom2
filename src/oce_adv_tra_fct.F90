@@ -48,13 +48,13 @@ subroutine oce_adv_tra_fct_init(twork, partit, mesh)
 #include "associate_mesh_ass.h"
 
     my_size=myDim_nod2D+eDim_nod2D
-    allocate(twork%fct_LO(nl-1, my_size))        ! Low-order solution 
+    allocate(twork%fct_LO(nl-1, my_size))        ! Low-order solution
     allocate(twork%adv_flux_hor(nl-1,partit%myDim_edge2D)) ! antidiffusive hor. contributions / from edges
     allocate(twork%adv_flux_ver(nl, partit%myDim_nod2D))   ! antidiffusive ver. fluxes / from nodes
 
     allocate(twork%fct_ttf_max(nl-1, my_size),twork%fct_ttf_min(nl-1, my_size))
     allocate(twork%fct_plus(nl-1, my_size),   twork%fct_minus(nl-1, my_size))
-    ! Initialize with zeros: 
+    ! Initialize with zeros:
     twork%fct_LO=0.0_WP
     twork%adv_flux_hor=0.0_WP
     twork%adv_flux_ver=0.0_WP
@@ -62,7 +62,7 @@ subroutine oce_adv_tra_fct_init(twork, partit, mesh)
     twork%fct_ttf_min=0.0_WP
     twork%fct_plus=0.0_WP
     twork%fct_minus=0.0_WP
-    
+
     if (mype==0) write(*,*) 'FCT is initialized'
 end subroutine oce_adv_tra_fct_init
 
@@ -75,7 +75,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     ! Limits antidiffusive fluxes==the difference in flux HO-LO
     ! LO ==Low-order  (first-order upwind)
     ! HO ==High-order (3rd/4th order gradient reconstruction method)
-    ! Adds limited fluxes to the LO solution   
+    ! Adds limited fluxes to the LO solution
     use MOD_MESH
     use MOD_TRACER
     USE MOD_PARTIT
@@ -107,7 +107,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 !$OMP                          flux, ae,tvert_max, tvert_min)
     ! --------------------------------------------------------------------------
     ! ttf is the tracer field on step n
-    ! del_ttf is the increment 
+    ! del_ttf is the increment
     ! vlimit sets the version of limiting, see below
     ! --------------------------------------------------------------------------
     !___________________________________________________________________________
@@ -123,14 +123,14 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
         nu1 = ulevels_nod2D(n)
         nl1 = nlevels_nod2D(n)
         !$ACC LOOP VECTOR
-        do nz=nu1, nl1-1 
+        do nz=nu1, nl1-1
             fct_ttf_max(nz,n)=max(LO(nz,n), ttf(nz,n))
             fct_ttf_min(nz,n)=min(LO(nz,n), ttf(nz,n))
         end do
         !$ACC END LOOP
     end do
     !$ACC END PARALLEL LOOP
-!$OMP END DO        
+!$OMP END DO
     !___________________________________________________________________________
     ! a2. Admissible increments on elements
     !     (only layers below the first and above the last layer)
@@ -162,22 +162,22 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !___________________________________________________________________________
     ! a3. Bounds on clusters and admissible increments
     ! Vertical1: In this version we look at the bounds on the clusters
-    !            above and below, which leaves wide bounds because typically 
-    !            vertical gradients are larger.  
+    !            above and below, which leaves wide bounds because typically
+    !            vertical gradients are larger.
         !Horizontal
 !$OMP DO
 
     !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     do n=1, myDim_nod2D
        nu1 = ulevels_nod2D(n)
-       nl1 = nlevels_nod2D(n)      
+       nl1 = nlevels_nod2D(n)
        !___________________________________________________________________
        !$ACC LOOP VECTOR
        do nz=nu1,nl1-1
-          ! max,min horizontal bound in cluster around node n in every 
+          ! max,min horizontal bound in cluster around node n in every
           ! vertical layer
           ! nod_in_elem2D     --> elem indices of which node n is surrounded
-          ! nod_in_elem2D_num --> max number of surrounded elem 
+          ! nod_in_elem2D_num --> max number of surrounded elem
           tvert_max(nz, n) = AUX(1,nz, nod_in_elem2D(1, n))
           tvert_min(nz, n) = AUX(2,nz, nod_in_elem2D(1, n))
           !$ACC LOOP SEQ
@@ -186,7 +186,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
               tvert_min(nz, n) = dmin1(tvert_min(nz, n), AUX(2,nz, nod_in_elem2D(elem,n)))
           end do
           !$ACC END LOOP
-       end do            
+       end do
        !$ACC END LOOP
     end do
     !$ACC END PARALLEL LOOP
@@ -196,18 +196,18 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
        nu1 = ulevels_nod2D(n)
        nl1 = nlevels_nod2D(n)
        !___________________________________________________________________
-       ! calc max,min increment of surface layer with respect to low order 
-       ! solution 
+       ! calc max,min increment of surface layer with respect to low order
+       ! solution
        fct_ttf_max(nu1,n)=tvert_max(nu1, n)-LO(nu1,n)
        fct_ttf_min(nu1,n)=tvert_min(nu1, n)-LO(nu1,n)
-       ! calc max,min increment from nz-1:nz+1 with respect to low order 
+       ! calc max,min increment from nz-1:nz+1 with respect to low order
        ! solution at layer nz
-       do nz=nu1+1,nl1-2  
+       do nz=nu1+1,nl1-2
           fct_ttf_max(nz,n)=maxval(tvert_max(nz-1:nz+1, n))-LO(nz,n)
           fct_ttf_min(nz,n)=minval(tvert_min(nz-1:nz+1, n))-LO(nz,n)
        end do
-       ! calc max,min increment of bottom layer -1 with respect to low order 
-       ! solution 
+       ! calc max,min increment of bottom layer -1 with respect to low order
+       ! solution
        nz=nl1-1
        fct_ttf_max(nz,n)=tvert_max(nz, n)-LO(nz,n)
        fct_ttf_min(nz,n)=tvert_min(nz, n)-LO(nz,n)
@@ -216,7 +216,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 !$OMP END DO
     !___________________________________________________________________________
     ! b1. Split positive and negative antidiffusive contributions
-    ! --> sum all positive (fct_plus), negative (fct_minus) antidiffusive 
+    ! --> sum all positive (fct_plus), negative (fct_minus) antidiffusive
     !     horizontal element and vertical node contribution to node n and layer nz
     !     see. R. Löhner et al. "finite element flux corrected transport (FEM-FCT)
     !     for the euler and navier stoke equation
@@ -254,7 +254,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !Horizontal
     !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(NONE)
     do edge=1, myDim_edge2D
-       enodes(1:2)=edges(:,edge)   
+       enodes(1:2)=edges(:,edge)
        el=edge_tri(:,edge)
        nl1=nlevels(el(1))-1
        nu1=ulevels(el(1))
@@ -263,8 +263,8 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
        if (el(2)>0) then
           nl2=nlevels(el(2))-1
           nu2=ulevels(el(2))
-       end if  
-        
+       end if
+
        nl12 = max(nl1,nl2)
        nu12 = nu1
        if (nu2>0) nu12 = min(nu1,nu2)
@@ -283,12 +283,12 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
        end do
        call omp_unset_lock(partit%plock(enodes(1)))
        call omp_set_lock  (partit%plock(enodes(2)))
-       do nz=nu12, nl12  
+       do nz=nu12, nl12
 #endif
           !$ACC ATOMIC UPDATE
           fct_plus (nz,enodes(2))=fct_plus (nz,enodes(2)) + max(0.0_WP,-adf_h(nz,edge))
           !$ACC ATOMIC UPDATE
-          fct_minus(nz,enodes(2))=fct_minus(nz,enodes(2)) + min(0.0_WP,-adf_h(nz,edge)) 
+          fct_minus(nz,enodes(2))=fct_minus(nz,enodes(2)) + min(0.0_WP,-adf_h(nz,edge))
        end do
        !$ACC END LOOP
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
@@ -298,7 +298,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 #endif
     end do
     !$ACC END PARALLEL LOOP
-!$OMP END DO 
+!$OMP END DO
     !___________________________________________________________________________
     ! b2. Limiting factors
 !$OMP DO
@@ -314,7 +314,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
             fct_minus(nz,n)=min(1.0_WP,fct_ttf_min(nz,n)/flux)
         end do
         !$ACC END LOOP
-    end do 
+    end do
     !$ACC END PARALLEL LOOP
 !$OMP END DO
     ! fct_minus and fct_plus must be known to neighbouring PE
@@ -323,41 +323,41 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 !$OMP END MASTER
 !$OMP BARRIER
     !___________________________________________________________________________
-    ! b3. Limiting   
+    ! b3. Limiting
     !Vertical
 !$OMP DO
     !$ACC PARALLEL LOOP GANG
     do n=1, myDim_nod2D
         nu1=ulevels_nod2D(n)
         nl1=nlevels_nod2D(n)
-        
+
         !_______________________________________________________________________
         nz=nu1
         ae=1.0_WP
         flux=adf_v(nz,n)
-        if(flux>=0.0_WP) then 
+        if(flux>=0.0_WP) then
             ae=min(ae,fct_plus(nz,n))
         else
             ae=min(ae,fct_minus(nz,n))
         end if
-        adf_v(nz,n)=ae*adf_v(nz,n) 
-        
+        adf_v(nz,n)=ae*adf_v(nz,n)
+
         !_______________________________________________________________________
         !$ACC LOOP VECTOR
         do nz=nu1+1,nl1-1
             ae=1.0_WP
             flux=adf_v(nz,n)
-            if(flux>=0._WP) then 
+            if(flux>=0._WP) then
                 ae=min(ae,fct_minus(nz-1,n))
                 ae=min(ae,fct_plus(nz,n))
             else
                 ae=min(ae,fct_plus(nz-1,n))
                 ae=min(ae,fct_minus(nz,n))
-            end if            
+            end if
             adf_v(nz,n)=ae*adf_v(nz,n)
         end do
         !$ACC END LOOP
-    ! the bottom flux is always zero 
+    ! the bottom flux is always zero
     end do
     !$ACC END PARALLEL LOOP
 !$OMP END DO
@@ -374,17 +374,17 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
         if(el(2)>0) then
             nu2=ulevels(el(2))
             nl2=nlevels(el(2))-1
-        end if  
-        
+        end if
+
         nl12 = max(nl1,nl2)
         nu12 = nu1
         if (nu2>0) nu12 = min(nu1,nu2)
-        
+
         !$ACC LOOP VECTOR
         do nz=nu12, nl12
             ae=1.0_WP
             flux=adf_h(nz,edge)
-            
+
             if(flux>=0._WP) then
                 ae=min(ae,fct_plus(nz,enodes(1)))
                 ae=min(ae,fct_minus(nz,enodes(2)))
@@ -392,7 +392,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
                 ae=min(ae,fct_minus(nz,enodes(1)))
                 ae=min(ae,fct_plus(nz,enodes(2)))
             endif
-            
+
             adf_h(nz,edge)=ae*adf_h(nz,edge)
         end do
         !$ACC END LOOP
