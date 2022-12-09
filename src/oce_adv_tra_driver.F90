@@ -217,6 +217,14 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     else
        pwvel=>we
     end if
+
+    !$ACC DATA COPYIN(pwvel, ttf, fct_LO) &
+    !$ACC      COPY(nlevels_nod2D, ulevels_nod2D, nod_in_elem2D, nod_in_elem2D_num, myDim_nod2D, edim_nod2d) &
+    !$ACC      COPY(ulevels, edge_tri, edges, nlevels, myDim_edge2D, edge_up_dn_grad, hnode, hnode_new) &
+    !$ACC      COPY(zbar_3d_n, z_3d_n, area, areasvol) &
+    !$ACC      COPY(fct_ttf_min, fct_ttf_max, fct_minus, fct_plus, adv_flux_hor, adv_flux_ver) &
+    !$ACC      COPY(dttf_v, dttf_h)
+
     !___________________________________________________________________________
     ! do vertical tracer advection, in case of FCT high order solution
     SELECT CASE(trim(tracers%data(tr_num)%tra_adv_ver))
@@ -240,20 +248,15 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     !
     if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
        !edge_up_dn_grad will be used as an auxuary array here
-
-       !$ACC DATA COPYIN(ttf, fct_LO) &
-       !$ACC      COPY(nlevels_nod2D, ulevels_nod2D, nod_in_elem2D, nod_in_elem2D_num, myDim_nod2D, edim_nod2d) &
-       !$ACC      COPY(ulevels, edge_tri, edges, nlevels, myDim_edge2D, edge_up_dn_grad, hnode, hnode_new) &
-       !$ACC      COPY(fct_ttf_min, fct_ttf_max, fct_minus, fct_plus, adv_flux_hor, adv_flux_ver, areasvol) &
-       !$ACC      COPY(dttf_v, dttf_h)
-
        call oce_tra_adv_fct(dt, ttf, fct_LO, adv_flux_hor, adv_flux_ver, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, edge_up_dn_grad, partit, mesh)
        call oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, partit, mesh, use_lo=.TRUE., ttf=ttf, lo=fct_LO)
 
-       !$ACC END DATA
     else
        call oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, partit, mesh)
     end if
+
+    !$ACC END DATA
+
 end subroutine do_oce_adv_tra
 !
 !

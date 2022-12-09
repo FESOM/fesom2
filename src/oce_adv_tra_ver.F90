@@ -343,7 +343,8 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-    !$ACC DATA COPY(flux, myDim_nod2D, ulevels_nod2D, nlevels_nod2D, zbar_3d_n, z_3d_n, area) COPYIN(w, ttf)
+    !$ACC DATA PRESENT(flux, myDim_nod2D, ulevels_nod2D, nlevels_nod2D, zbar_3d_n, z_3d_n, area) COPYIN(w, ttf)
+
     l_init_zero=.true.
     if (present(o_init_zero)) then
        l_init_zero=o_init_zero
