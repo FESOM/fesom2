@@ -274,11 +274,15 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
     !___________________________________________________________________________
     ! c. Update the solution
     ! Vertical
+
+    !$ACC DATA COPY(nlevels_nod2D, ulevels_nod2D, areasvol, flux_v, dttf_v, myDim_nod2d, ttf, hnode, lo, hnode_new, &
+    !$ACC nlevels, edges, edge_tri, ulevels, dttf_h, flux_h, mydim_edge2d)
+
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, k, elem, enodes, num, el, nu12, nl12, nu1, nu2, nl1, nl2, edge)
     if (present(use_lo)) then
        if (use_lo) then
 !$OMP DO
-        !$ACC PARALLEL LOOP GANG
+        !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
           do n=1, myDim_nod2d
              nu1 = ulevels_nod2D(n)
              nl1 = nlevels_nod2D(n)
@@ -294,7 +298,7 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
        end if
     end if
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     do n=1, myDim_nod2d
         nu1 = ulevels_nod2D(n)
         nl1 = nlevels_nod2D(n)
@@ -308,7 +312,7 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 !$OMP END DO  
     ! Horizontal
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el)
+    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(NONE)
     do edge=1, myDim_edge2D
         enodes(1:2)=edges(:,edge)
         el=edge_tri(:,edge)
@@ -352,6 +356,7 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #endif
     end do
     !$ACC END PARALLEL LOOP
+    !$ACC END DATA
 !$OMP END DO
 !$OMP END PARALLEL 
 end subroutine oce_tra_adv_flux2dtracer
