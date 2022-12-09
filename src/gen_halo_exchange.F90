@@ -55,24 +55,25 @@ END SUBROUTINE check_mpi_comm
 #endif
 
 
-subroutine exchange_nod2D_i(nod_array2D, partit)
+subroutine exchange_nod2D_i(nod_array2D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 integer,        intent(inout)         :: nod_array2D(:)
+logical,        intent(in),optional   :: luse_g2g
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 if (npes > 1) then
-    call exchange_nod2D_i_begin(nod_array2D, partit)
+    call exchange_nod2D_i_begin(nod_array2D, partit, luse_g2g)
     call exchange_nod_end(partit)
 endif
 END SUBROUTINE exchange_nod2D_i
 
 !=============================================================================
 ! General version of the communication routine for 2D nodal fields
-subroutine exchange_nod2D_i_begin(nod_array2D, partit)
+subroutine exchange_nod2D_i_begin(nod_array2D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
@@ -80,8 +81,16 @@ IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 integer,        intent(inout)         :: nod_array2D(:)
 integer                               :: n, sn, rn
+logical,        intent(in),optional   :: luse_g2g
+logical                               :: lg2g
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
+
+if(present(luse_g2g)) then
+   lg2g = luse_g2g
+else
+   lg2g = .false.
+end if
 
   if (npes > 1) then
 
@@ -94,7 +103,9 @@ integer                               :: n, sn, rn
           com_nod2D%rPE, com_nod2D%sPE)
 #endif
 
-     DO n=1,rn    
+     !$ACC HOST_DATA USE_DEVICE(nod_array2D) IF(lg2g)
+
+     DO n=1,rn
 
         call MPI_IRECV(nod_array2D, 1, r_mpitype_nod2D_i(n), com_nod2D%rPE(n), &
              com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr) 
@@ -106,6 +117,8 @@ integer                               :: n, sn, rn
              mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
      END DO
 
+     !$ACC END HOST_DATA
+
      com_nod2D%nreq = rn+sn
 
   endif
@@ -113,26 +126,27 @@ END SUBROUTINE exchange_nod2D_i_begin
 
 ! ========================================================================
 ! General version of the communication routine for 2D nodal fields
-subroutine exchange_nod2D(nod_array2D, partit)
+subroutine exchange_nod2D(nod_array2D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)      :: nod_array2D(:)
+real(real64),   intent(inout)         :: nod_array2D(:)
+logical,        intent(in),optional   :: luse_g2g
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
  if (npes > 1) then
-    call exchange_nod2D_begin(nod_array2D, partit)  
+    call exchange_nod2D_begin(nod_array2D, partit, luse_g2g)
     call exchange_nod_end(partit)
  end if
- 
+
 END SUBROUTINE exchange_nod2D
 
 ! ========================================================================
 ! General version of the communication routine for 2D nodal fields
-subroutine exchange_nod2D_begin(nod_array2D, partit)
+subroutine exchange_nod2D_begin(nod_array2D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
@@ -140,8 +154,16 @@ IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(real64),   intent(inout)         :: nod_array2D(:)
 integer                               :: n, sn, rn
+logical,        intent(in),optional   :: luse_g2g
+logical                               :: lg2g
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
+
+if(present(luse_g2g)) then
+   lg2g = luse_g2g
+else
+   lg2g = .false.
+end if
 
   if (npes > 1) then
 
@@ -154,7 +176,9 @@ integer                               :: n, sn, rn
           com_nod2D%rPE, com_nod2D%sPE)
 #endif
 
-     DO n=1,rn         
+     !$ACC HOST_DATA USE_DEVICE(nod_array2D) IF(lg2g)
+
+     DO n=1,rn
         call MPI_IRECV(nod_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
              com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr) 
      END DO
@@ -163,6 +187,8 @@ integer                               :: n, sn, rn
              mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
      END DO
 
+     !$ACC END HOST_DATA
+
      com_nod2D%nreq = rn+sn
 
   end if
@@ -170,28 +196,28 @@ integer                               :: n, sn, rn
 END SUBROUTINE exchange_nod2D_begin
 !===============================================
 ! General version of the communication routine for 2D nodal fields
-subroutine exchange_nod2D_2fields(nod1_array2D, nod2_array2D, partit)
+subroutine exchange_nod2D_2fields(nod1_array2D, nod2_array2D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)      :: nod1_array2D(:)
-real(real64),   intent(inout)      :: nod2_array2D(:)
+real(real64),   intent(inout)         :: nod1_array2D(:)
+real(real64),   intent(inout)         :: nod2_array2D(:)
+logical,        intent(in),optional   :: luse_g2g
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
-
  if (npes > 1) then
-    call exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D, partit)  
+    call exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D, partit, luse_g2g)
     call exchange_nod_end(partit)
  end if
- 
+
 END SUBROUTINE exchange_nod2D_2fields
 
 ! ========================================================================
 ! General version of the communication routine for 2D nodal fields
-subroutine exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D, partit)
+subroutine exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
@@ -200,8 +226,16 @@ type(t_partit), intent(inout), target :: partit
 real(real64),   intent(inout)         :: nod1_array2D(:)
 real(real64),   intent(inout)         :: nod2_array2D(:)
 integer                               :: n, sn, rn
+logical,        intent(in),optional   :: luse_g2g
+logical                               :: lg2g
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
+
+if(present(luse_g2g)) then
+   lg2g = luse_g2g
+else
+   lg2g = .false.
+end if
 
 if (npes > 1) then
 
@@ -214,7 +248,9 @@ if (npes > 1) then
           com_nod2D%rPE, com_nod2D%sPE)
 #endif
 
-  DO n=1,rn         
+  !$ACC HOST_DATA USE_DEVICE(nod1_array2D, nod2_array2D) IF(lg2g)
+
+  DO n=1,rn
      call MPI_IRECV(nod1_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
                com_nod2D%rPE(n),      MPI_COMM_FESOM, com_nod2D%req(2*n-1), MPIerr) 
  
@@ -229,48 +265,59 @@ if (npes > 1) then
                     mype+npes, MPI_COMM_FESOM, com_nod2D%req(2*rn+2*n),   MPIerr)
   END DO
 
+  !$ACC END HOST_DATA
+
    com_nod2D%nreq = 2*(rn+sn)
 
 end if
- 
+
 END SUBROUTINE exchange_nod2D_2fields_begin
 
 !===============================================
-subroutine exchange_nod2D_3fields(nod1_array2D, nod2_array2D, nod3_array2D, partit)
+subroutine exchange_nod2D_3fields(nod1_array2D, nod2_array2D, nod3_array2D, partit, luse_g2g)
 ! General version of the communication routine for 2D nodal fields
 use MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)      :: nod1_array2D(:)
-real(real64),   intent(inout)      :: nod2_array2D(:)
-real(real64),   intent(inout)      :: nod3_array2D(:)
+real(real64),   intent(inout)         :: nod1_array2D(:)
+real(real64),   intent(inout)         :: nod2_array2D(:)
+real(real64),   intent(inout)         :: nod3_array2D(:)
+logical,        intent(in),optional   :: luse_g2g
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
 
  if (npes > 1) then
-    call exchange_nod2D_3fields_begin(nod1_array2D, nod2_array2D, nod3_array2D, partit)  
+    call exchange_nod2D_3fields_begin(nod1_array2D, nod2_array2D, nod3_array2D, partit, luse_g2g)
     call exchange_nod_end(partit)
  end if
- 
+
 END SUBROUTINE exchange_nod2D_3fields
 
 ! ========================================================================
-subroutine exchange_nod2D_3fields_begin(nod1_array2D, nod2_array2D, nod3_array2D, partit)
+subroutine exchange_nod2D_3fields_begin(nod1_array2D, nod2_array2D, nod3_array2D, partit, luse_g2g)
 ! General version of the communication routine for 2D nodal fields
 use MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)      :: nod1_array2D(:)
-real(real64),   intent(inout)      :: nod2_array2D(:)
-real(real64),   intent(inout)      :: nod3_array2D(:)
-integer                            :: n, sn, rn
+real(real64),   intent(inout)         :: nod1_array2D(:)
+real(real64),   intent(inout)         :: nod2_array2D(:)
+real(real64),   intent(inout)         :: nod3_array2D(:)
+integer                               :: n, sn, rn
+logical,        intent(in),optional   :: luse_g2g
+logical                               :: lg2g
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
+
+if(present(luse_g2g)) then
+   lg2g = luse_g2g
+else
+   lg2g = .false.
+end if
 
  if (npes > 1) then
 
@@ -283,7 +330,9 @@ integer                            :: n, sn, rn
           com_nod2D%rPE, com_nod2D%sPE)
 #endif
 
-  DO n=1,rn         
+  !$ACC HOST_DATA USE_DEVICE(nod1_array2D, nod2_array2D, nod3_array2D) IF(lg2g)
+
+  DO n=1,rn
      call MPI_IRECV(nod1_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
                com_nod2D%rPE(n),        MPI_COMM_FESOM, com_nod2D%req(3*n-2), MPIerr) 
  
@@ -304,25 +353,28 @@ integer                            :: n, sn, rn
                     mype+2*npes, MPI_COMM_FESOM, com_nod2D%req(3*rn+3*n),   MPIerr)
   END DO
 
+  !$ACC END HOST_DATA
+
    com_nod2D%nreq = 3*(rn+sn)
 
 end if
- 
+
 END SUBROUTINE exchange_nod2D_3fields_begin
 
 ! ========================================================================
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
-subroutine exchange_nod3D(nod_array3D, partit)
+subroutine exchange_nod3D(nod_array3D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod_array3D(:,:) 
+real(real64),   intent(inout)         :: nod_array3D(:,:)
+logical,        intent(in),optional   :: luse_g2g
 
 if (partit%npes > 1) then
-   call exchange_nod3D_begin(nod_array3D, partit)
+   call exchange_nod3D_begin(nod_array3D, partit, luse_g2g)
    call exchange_nod_end(partit)
 endif
 
@@ -331,17 +383,25 @@ END SUBROUTINE exchange_nod3D
 ! ========================================================================
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
-subroutine exchange_nod3D_begin(nod_array3D, partit)
+subroutine exchange_nod3D_begin(nod_array3D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)      :: nod_array3D(:,:) 
-integer                            :: n, sn, rn
-integer                            :: nz, nl1
+real(real64),   intent(inout)         :: nod_array3D(:,:)
+integer                               :: n, sn, rn
+integer                               :: nz, nl1
+logical,        intent(in),optional   :: luse_g2g
+logical                               :: lg2g
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
+
+if(present(luse_g2g)) then
+   lg2g = luse_g2g
+else
+   lg2g = .false.
+end if
 
  if (npes > 1) then
     sn=com_nod2D%sPEnum
@@ -362,7 +422,10 @@ integer                            :: nz, nl1
     call check_mpi_comm(rn, sn, r_mpitype_nod3D(:,nl1,1), s_mpitype_nod3D(:,nl1,1), &
          com_nod2D%rPE, com_nod2D%sPE)
 #endif
-    DO n=1,rn    
+
+    !$ACC HOST_DATA USE_DEVICE(nod_array3D) IF(lg2g)
+
+    DO n=1,rn
        call MPI_IRECV(nod_array3D, 1, r_mpitype_nod3D(n,nl1,1), com_nod2D%rPE(n), &
             com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr) 
     END DO
@@ -370,6 +433,9 @@ integer                            :: nz, nl1
        call MPI_ISEND(nod_array3D, 1, s_mpitype_nod3D(n,nl1,1), com_nod2D%sPE(n), &
             mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
     END DO
+
+    !$ACC END HOST_DATA
+
     com_nod2D%nreq = rn+sn
 
  endif
@@ -378,25 +444,26 @@ END SUBROUTINE exchange_nod3D_begin
 ! ========================================================================
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
-subroutine exchange_nod3D_2fields(nod1_array3D,nod2_array3D, partit)
+subroutine exchange_nod3D_2fields(nod1_array3D,nod2_array3D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod1_array3D(:,:) 
-real(real64),   intent(inout)         :: nod2_array3D(:,:) 
+real(real64),   intent(inout)         :: nod1_array3D(:,:)
+real(real64),   intent(inout)         :: nod2_array3D(:,:)
+logical,        intent(in),optional   :: luse_g2g
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
 if (npes > 1) then
-   call exchange_nod3D_2fields_begin(nod1_array3D,nod2_array3D, partit)
+   call exchange_nod3D_2fields_begin(nod1_array3D,nod2_array3D, partit, luse_g2g)
    call exchange_nod_end(partit)
 endif
 END SUBROUTINE exchange_nod3D_2fields
 
 ! ========================================================================
-subroutine exchange_nod3D_2fields_begin(nod1_array3D,nod2_array3D, partit)
+subroutine exchange_nod3D_2fields_begin(nod1_array3D,nod2_array3D, partit, luse_g2g)
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
 use MOD_MESH
@@ -404,12 +471,20 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod1_array3D(:,:) 
-real(real64),   intent(inout)         :: nod2_array3D(:,:) 
+real(real64),   intent(inout)         :: nod1_array3D(:,:)
+real(real64),   intent(inout)         :: nod2_array3D(:,:)
 integer                               :: n, sn, rn
 integer                               :: nz, nl1, nl2
+logical,        intent(in),optional   :: luse_g2g
+logical                               :: lg2g
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
+
+if(present(luse_g2g)) then
+   lg2g = luse_g2g
+else
+   lg2g = .false.
+end if
 
  if (npes > 1) then
     sn=com_nod2D%sPEnum
@@ -439,7 +514,9 @@ integer                               :: nz, nl1, nl2
          com_nod2D%rPE, com_nod2D%sPE)
 #endif
 
-    DO n=1,rn    
+     !$ACC HOST_DATA USE_DEVICE(nod1_array3D, nod2_array3D) IF(lg2g)
+
+    DO n=1,rn
        call MPI_IRECV(nod1_array3D, 1, r_mpitype_nod3D(n,nl1,1), com_nod2D%rPE(n), &
             com_nod2D%rPE(n),      MPI_COMM_FESOM, com_nod2D%req(2*n-1), MPIerr)  
 
@@ -455,18 +532,21 @@ integer                               :: nz, nl1, nl2
             mype+npes, MPI_COMM_FESOM, com_nod2D%req(2*rn+2*n), MPIerr)
     END DO
 
+     !$ACC END HOST_DATA
+
     com_nod2D%nreq = 2*(rn+sn)
 
  endif
 END SUBROUTINE exchange_nod3D_2fields_begin
 ! ========================================================================
-subroutine exchange_nod3D_n(nod_array3D, partit)
+subroutine exchange_nod3D_n(nod_array3D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
-type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod_array3D(:,:,:) 
+type(t_partit), intent(inout), target  :: partit
+real(real64),   intent(inout)          :: nod_array3D(:,:,:)
+logical,        intent(in),optional    :: luse_g2g
 if (partit%npes>1) then
    call exchange_nod3D_n_begin(nod_array3D, partit)
    call exchange_nod_end(partit)
@@ -477,17 +557,26 @@ END SUBROUTINE exchange_nod3D_n
 !=================================================
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
-subroutine exchange_nod3D_n_begin(nod_array3D, partit)
+subroutine exchange_nod3D_n_begin(nod_array3D, partit, luse_g2g)
 use MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
-real(real64),   intent(inout)       :: nod_array3D(:,:,:)
-integer                             :: n, sn, rn
-integer                             :: nz, nl1, n_val
+real(real64),   intent(inout)          :: nod_array3D(:,:,:)
+integer                                :: n, sn, rn
+integer                                :: nz, nl1, n_val
+logical,        intent(in),optional    :: luse_g2g
+logical                                :: lg2g
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
+
+if(present(luse_g2g)) then
+   lg2g = luse_g2g
+else
+   lg2g = .false.
+end if
+
 if (npes>1) then
  ! nod_array3D(n_val,nl1,nod2D_size)
   nl1   = ubound(nod_array3D,2)
@@ -515,7 +604,9 @@ if (npes>1) then
        s_mpitype_nod3D(:,nl1,n_val), com_nod2D%rPE, com_nod2D%sPE)
 #endif
 
-  DO n=1,rn    
+  !$ACC HOST_DATA USE_DEVICE(nod_array3D) IF(lg2g)
+
+  DO n=1,rn
      call MPI_IRECV(nod_array3D, 1, r_mpitype_nod3D(n,nl1,n_val), com_nod2D%rPE(n), &
           com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr) 
   END DO
@@ -524,6 +615,8 @@ if (npes>1) then
      call MPI_ISEND(nod_array3D, 1, s_mpitype_nod3D(n,nl1,n_val), com_nod2D%sPE(n), &
           mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
   END DO
+
+  !$ACC END HOST_DATA
 
   com_nod2D%nreq = rn+sn
 
