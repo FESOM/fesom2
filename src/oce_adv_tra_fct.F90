@@ -319,9 +319,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 !$OMP END DO
     ! fct_minus and fct_plus must be known to neighbouring PE
 !$OMP MASTER
-    !$ACC UPDATE SELF(fct_plus, fct_minus)
-    call exchange_nod(fct_plus, fct_minus, partit)
-    !$ACC UPDATE DEVICE(fct_plus, fct_minus)
+    call exchange_nod(fct_plus, fct_minus, partit, luse_g2g = .true.)
 !$OMP END MASTER
 !$OMP BARRIER
     !___________________________________________________________________________
