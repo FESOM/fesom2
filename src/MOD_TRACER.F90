@@ -196,7 +196,6 @@ subroutine WRITE_T_TRACER(tracer, unit, iostat, iomsg)
         call tracer%data(i)%WRITE_T_TRACER_DATA(unit)
     end do
     call tracer%work%WRITE_T_TRACER_WORK(unit)
-    write(unit, iostat=iostat, iomsg=iomsg)    tracer%work
 !   write(unit, iostat=iostat, iomsg=iomsg)    tracer%smooth_bh_tra
 !   write(unit, iostat=iostat, iomsg=iomsg)    tracer%gamma0_tra
 !   write(unit, iostat=iostat, iomsg=iomsg)    tracer%gamma1_tra
