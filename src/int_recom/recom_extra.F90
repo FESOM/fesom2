@@ -517,8 +517,7 @@ subroutine Sed_input(mesh)
      if(do_read) then ! file is opened and read every year
       i=month
       if (i > 12) i=1
-      if (mype==0) write(*,*) 'Updating sedimentary input for month', i, 'from',
-sedfilename
+      if (mype==0) write(*,*) 'Updating sedimentary input for month', i, 'from', sedfilename
 
       call read_2ddata_on_grid_NetCDF(sedfilename, 'df_din', 1, GloSed(:,1), mesh)
 !      if (mype==0) write(*,*) mype, 'sediment DIN flux:', maxval(GloSed(:,1)), minval(GloSed(:,1))

@@ -1,0 +1,37 @@
+#!/bin/bash
+#SBATCH --job-name=num1
+#SBATCH -p compute
+##SBATCH --ntasks-per-node=128
+#SBATCH --ntasks=2048
+#SBATCH --time=00:30:00
+#SBATCH -o slurm-out.out
+#SBATCH -e slurm-err.out
+#SBATCH --acount=bm1030
+#SBATCH --exclusive
+
+source /sw/etc/profile.levante
+source ../env/levante.dkrz.de/shell
+
+#ulimit -s 102400
+ulimit -s unlimited
+
+echo Submitted job: $jobid
+squeue -u $USER
+
+# determine JOBID
+JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
+
+ln -s ../bin/fesom.x .
+cp /home/a/a270105/fesom_nml/fesom.clock.init ./fesom.clock
+cp ../config/namelist.config.coremesh.levante ./namelist.config
+cp ../config/namelist.forcing.CYNF_v2.levante ./namelist.forcing
+cp ../config/namelist.oce.recom.ciso.coremesh ./namelist.oce
+cp ../config/namelist.ice .
+cp ../config/namelist.icepack .
+cp ../config/namelist.recom.awiesm2.levante ./namelist.recom
+
+date
+srun -l fesom.x > "fesom.out"
+date
+
+
