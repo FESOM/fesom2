@@ -262,7 +262,7 @@ subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-    !$ACC DATA COPY(ulevels_nod2D, nlevels_nod2D, area, flux, mydim_nod2d) COPYIN(w, ttf)
+    !$ACC DATA PRESENT(ulevels_nod2D, nlevels_nod2D, area, flux, mydim_nod2d) PRESENT(w, ttf)
 
     l_init_zero=.true.
     if (present(o_init_zero)) then
@@ -343,7 +343,7 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-    !$ACC DATA PRESENT(flux, myDim_nod2D, ulevels_nod2D, nlevels_nod2D, zbar_3d_n, z_3d_n, area) COPYIN(w, ttf)
+    !$ACC DATA PRESENT(flux, myDim_nod2D, ulevels_nod2D, nlevels_nod2D, zbar_3d_n, z_3d_n, area) PRESENT(w, ttf)
 
     l_init_zero=.true.
     if (present(o_init_zero)) then

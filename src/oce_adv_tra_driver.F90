@@ -103,6 +103,21 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     fct_minus       => tracers%work%fct_minus
     dttf_h          => tracers%work%del_ttf_advhoriz
     dttf_v          => tracers%work%del_ttf_advvert
+
+    if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
+       pwvel=>w
+    else
+       pwvel=>we
+    end if
+
+    !$ACC DATA COPY(pwvel, ttf, ttfAB, fct_LO, vel, we) &
+    !$ACC      COPY(helem, elem_cos, edge_cross_dxdy) &
+    !$ACC      COPY(nlevels_nod2D, ulevels_nod2D, nod_in_elem2D, nod_in_elem2D_num, myDim_nod2D, edim_nod2d) &
+    !$ACC      COPY(ulevels, edge_tri, edge_dxdy, edges, nlevels, myDim_edge2D, edge_up_dn_grad, hnode, hnode_new) &
+    !$ACC      COPY(zbar_3d_n, z_3d_n, area, areasvol) &
+    !$ACC      COPY(fct_ttf_min, fct_ttf_max, fct_minus, fct_plus, adv_flux_hor, adv_flux_ver) &
+    !$ACC      COPY(dttf_v, dttf_h)
+
     !___________________________________________________________________________
     ! compute FCT horzontal and vertical low order solution as well as lw order
     ! part of antidiffusive flux
@@ -113,14 +128,15 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         call adv_tra_hor_upw1(vel, ttf, partit, mesh, adv_flux_hor, o_init_zero=.true.)
         ! update the LO solution for horizontal contribution
 !$OMP PARALLEL DO
-        !$ACC PARALLEL LOOP GANG VECTOR
+        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(NONE)
         do n=1, myDim_nod2D+eDim_nod2D
            fct_LO(:,n) = 0.0_WP
         end do
         !$ACC END PARALLEL LOOP
 !$OMP END PARALLEL DO
+
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(e, enodes, el, nl1, nu1, nl2, nu2, nu12, nl12, nz)
-        !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el)
+        !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(NONE)
         do e=1, myDim_edge2D
             enodes=edges(:,e)
             el=edge_tri(:,e)
@@ -165,12 +181,14 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         end do
         !$ACC END PARALLEL LOOP
 !$OMP END PARALLEL DO
+
         ! compute the low order upwind vertical flux (explicit part only)
         ! zero the input/output flux before computation
         call adv_tra_ver_upw1(we, ttf, partit, mesh, adv_flux_ver, o_init_zero=.true.)
         ! update the LO solution for vertical contribution
+
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nu1, nl1, nz)
-        !$ACC PARALLEL LOOP GANG
+        !$ACC PARALLEL LOOP GANG PRESENT(fct_LO) DEFAULT(NONE)
         do n=1, myDim_nod2D
             nu1 = ulevels_nod2D(n)
             nl1 = nlevels_nod2D(n)
@@ -193,7 +211,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
             !     has to be done on the full vertical velocity w
             call adv_tra_ver_upw1(w, ttf, partit, mesh, adv_flux_ver, o_init_zero=.true.)
         end if
-        call exchange_nod(fct_LO, partit)
+        call exchange_nod(fct_LO, partit, luse_g2g = .true.)
 !$OMP BARRIER
     end if
     do_zero_flux=.true.
@@ -212,19 +230,6 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
             if (mype==0) write(*,*) 'Unknown horizontal advection type ',  trim(tracers%data(tr_num)%tra_adv_hor), '! Check your namelists!'
             call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     END SELECT
-    if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
-       pwvel=>w
-    else
-       pwvel=>we
-    end if
-
-    !$ACC DATA COPYIN(pwvel, ttf, fct_LO) &
-    !$ACC      COPY(nlevels_nod2D, ulevels_nod2D, nod_in_elem2D, nod_in_elem2D_num, myDim_nod2D, edim_nod2d) &
-    !$ACC      COPY(ulevels, edge_tri, edges, nlevels, myDim_edge2D, edge_up_dn_grad, hnode, hnode_new) &
-    !$ACC      COPY(zbar_3d_n, z_3d_n, area, areasvol) &
-    !$ACC      COPY(fct_ttf_min, fct_ttf_max, fct_minus, fct_plus, adv_flux_hor, adv_flux_ver) &
-    !$ACC      COPY(dttf_v, dttf_h)
-
     !___________________________________________________________________________
     ! do vertical tracer advection, in case of FCT high order solution
     SELECT CASE(trim(tracers%data(tr_num)%tra_adv_ver))

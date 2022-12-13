@@ -84,7 +84,7 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-    !$ACC DATA COPY(flux, myDim_edge2D, helem, ulevels, edge_tri, edges, nlevels, edge_cross_dxdy, elem_cos) COPYIN(vel, ttf)
+    !$ACC DATA PRESENT(flux, myDim_edge2D, helem, ulevels, edge_tri, edges, nlevels, edge_cross_dxdy, elem_cos) PRESENT(vel, ttf)
     l_init_zero=.true.
     if (present(o_init_zero)) then
        l_init_zero=o_init_zero
@@ -558,8 +558,8 @@ end subroutine adv_tra_hor_muscl
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-    !$ACC DATA CREATE(enodes, el) COPY(flux, edge_dxdy, helem, ulevels, edge_tri, edges, nlevels, &
-    !$ACC             edge_cross_dxdy, elem_cos, myDim_edge2D) COPYIN(ttf, edge_up_dn_grad, vel)
+    !$ACC DATA CREATE(enodes, el) PRESENT(flux, edge_dxdy, helem, ulevels, edge_tri, edges, nlevels, &
+    !$ACC             edge_cross_dxdy, elem_cos, myDim_edge2D) PRESENT(ttf, edge_up_dn_grad, vel)
 
     l_init_zero=.true.
     if (present(o_init_zero)) then
