@@ -567,7 +567,7 @@ end subroutine adv_tra_hor_muscl
     end if
     if (l_init_zero) then
 !$OMP PARALLEL DO
-       !$ACC PARALLEL LOOP GANG
+       !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
        do edge=1, myDim_edge2D
           flux(:,edge)=0.0_WP
        end do
