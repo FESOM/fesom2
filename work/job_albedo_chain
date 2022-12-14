@@ -1,18 +1,23 @@
 #!/bin/bash
 #___SET SLURM OPTIONS___________________________________________________________
-#SBATCH --account=clidyn.p_fesom
+#SBATCH --account=clidyn.p_fesom    # edit your account
+#SBATCH --job-name=chain
 #SBATCH --partition=mpp
-#SBATCH -J chain
-#SBATCH --ntasks=256
-#SBATCH --cpus-per-task 1
-#SBATCH --hint=nomultithread
 
-#SBATCH --time=10:00:00
-#SBATCH --qos=12h     
-#SBATCH --mail-type=END
-#SBATCH --mail-user=Patrick.Scholz@awi.de
+# disable hyperthreading
+#SBATCH --hint=nomultithread
+#SBATCH --nodes=48                  # Number of tasks (MPI) tasks to be launched
+#SBATCH --tasks-per-node 127        # using all 128CPus we exceed the maxload limit (>130) of many used nodes
+#SBATCH --cpus-per-task 1
+
+#SBATCH --time=12:00:00
+#SBATCH --qos=12h
+
 #SBATCH -o fesom2_%x_%j.out
 #SBATCH -e fesom2_%x_%j.out
+
+##SBATCH --mail-type=END
+##SBATCH --mail-user=Patrick.Scholz@awi.de
 
 
 #___DEFAULT INPUT_______________________________________________________________
@@ -221,7 +226,7 @@ if [ $is_newsimul -eq 1 ] ; then
         
         #___BACKUP NAMELIST.* FILES INTO RESULT DIRECTORY_______________________
         cp namelist.config namelist.oce namelist.ice namelist.forcing namelist.io \
-           namelist.cvmix namelist.dyn namelisst.tra ${dname_result}/.
+           namelist.cvmix ${dname_result}/.
         cp fesom.x ${dname_result}/.
 
     #___BACKUP SRC FILES INTO RESULT DIRECTORY______________________________
@@ -265,7 +270,7 @@ if [ $is_newsimul -eq 1 ] ; then
         else
             echo -e "\033[1;31m --> ERROR: could not find ice restart file \033[0m"
             exit
-        fi     
+        fi
         
         #_______________________________________________________________________
         # adapt year new in namelist.config otherwise fesom is not doing a 
@@ -277,7 +282,7 @@ if [ $is_newsimul -eq 1 ] ; then
         # backup namelist.* & fesom.x in case they dont exist
         if [ ! -f "${dname_result}/namelist.config" ]; then
             cp namelist.config namelist.oce namelist.ice namelist.forcing namelist.io \
-                namelist.cvmix namelist.tra namelist.dyn ${dname_result}/.
+               namelist.tra namelist.dyn namelist.cvmix ${dname_result}/.
         fi
         if [ ! -f "${dname_result}/fesom.x" ]; then 
             cp fesom.x ${dname_result}/. 
