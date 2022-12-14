@@ -17,6 +17,7 @@ USE g_comm_auto
 USE par_support_interfaces
 USE restart_derivedtype_module
 USE fortran_utils
+USE nvtx
 IMPLICIT NONE
 
 character(LEN=500)               :: resultpath, npepath
@@ -28,7 +29,7 @@ type(t_tracer),     target, save :: tracers
 type(t_partit),     target, save :: partit
 type(t_dyn),        target, save :: dyn
 type(t_ice),        target, save :: ice
-integer                          :: i, n, nzmax, nzmin
+integer                          :: i, n, nz, nzmax, nzmin
 
 
 call MPI_INIT(i)
@@ -68,28 +69,73 @@ call read_all_bin_restarts(npepath, partit=partit, mesh=mesh, dynamics=dyn, trac
 call init_mpi_types(partit, mesh)
 call init_gatherLists(partit)
 
+    !$ACC DATA COPY(mesh, partit, tracers, dyn) &
+    !$ACC      COPY(mesh%helem, mesh%elem_cos, mesh%edge_cross_dxdy, mesh%elem2d_nodes, mesh%nl, partit%mydim_elem2d) &
+    !$ACC      COPY(mesh%nlevels_nod2D, mesh%ulevels_nod2D, mesh%nod_in_elem2D, mesh%nod_in_elem2D_num, partit%myDim_nod2D, partit%edim_nod2d) &
+    !$ACC      COPY(mesh%ulevels, mesh%edge_tri, mesh%edge_dxdy, mesh%edges, mesh%nlevels, partit%myDim_edge2D,  mesh%hnode, mesh%hnode_new) &
+    !$ACC      COPY(mesh%zbar_3d_n, mesh%z_3d_n, mesh%area, mesh%areasvol) &
+    !$ACC      COPY(dyn%w, dyn%w_e, dyn%uv) &
+    !$ACC      COPY(tracers%data(1), tracers%work) &
+    !$ACC      COPY(tracers%data(1)%values, tracers%data(1)%valuesAB) &
+    !$ACC      COPY(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus) &
+    !$ACC      COPY(tracers%work%adv_flux_hor, tracers%work%adv_flux_ver, tracers%work%fct_LO) &
+    !$ACC      COPY(tracers%work%del_ttf_advvert, tracers%work%del_ttf_advhoriz, tracers%work%edge_up_dn_grad) &
+    ! only needed for the kernel on line 101
+    !$ACC      COPY(tracers%work%del_ttf)
+
+    call nvtxStartRange("main_loop")
+
 do i=1, 10
+
     !___________________________________________________________________________
     ! ale tracer advection
-    tracers%work%del_ttf_advhoriz = 0.0_WP
-    tracers%work%del_ttf_advvert  = 0.0_WP
+    !$ACC PARALLEL LOOP GANG COLLAPSE(2) DEFAULT(NONE)
+    do n=1, partit%myDim_nod2D + partit%eDim_nod2D
+        do nz = 1, mesh%nl
+        tracers%work%del_ttf_advhoriz(nz, n) = 0.0_WP
+        tracers%work%del_ttf_advvert(nz, n)  = 0.0_WP
+        end do
+    end do
+    !$ACC END LOOP
 !   if (mype==0) write(*,*) 'start advection part.......'
+
     call do_oce_adv_tra(1.e-3, dyn%uv, dyn%w, dyn%w_i, dyn%w_e, 1, dyn, tracers, partit, mesh)
+
+    !$ACC UPDATE SELF(tracers%data(1)%values)
 !   if (mype==0) write(*,*) 'advection part completed...'
     if (partit%mype==0) write(*,*) minval(tracers%data(1)%values), maxval(tracers%data(1)%values), sum(tracers%data(1)%values)
     !_____________________________________________________
     !___________________________________________________________________________
     ! update array for total tracer flux del_ttf with the fluxes from horizontal
     ! and vertical advection
-    tracers%work%del_ttf=tracers%work%del_ttf+tracers%work%del_ttf_advhoriz+tracers%work%del_ttf_advvert
 
-   do n=1, partit%myDim_nod2D
-      nzmax=mesh%nlevels_nod2D(n)-1
-      nzmin=mesh%ulevels_nod2D(n)
-      tracers%data(1)%values(nzmin:nzmax,n)=tracers%data(1)%values(nzmin:nzmax,n)+tracers%work%del_ttf(nzmin:nzmax,n)/mesh%hnode_new(nzmin:nzmax,n) ! LINFS
-   end do
-   call exchange_nod(tracers%data(1)%values(:,:), partit)
-   call exchange_nod(tracers%data(2)%values(:,:), partit)
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
+    do n = 1, partit%myDim_nod2D + partit%eDim_nod2D
+        nzmax=mesh%nlevels_nod2D(n)-1
+        nzmin=mesh%ulevels_nod2D(n)
+        do nz = nzmin, nzmax
+            tracers%work%del_ttf(nz, n) = tracers%work%del_ttf(nz, n) + tracers%work%del_ttf_advhoriz(nz, n) + tracers%work%del_ttf_advvert(nz, n)
+        end do
+    end do
+    !$ACC END LOOP
+
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
+    do n=1, partit%myDim_nod2D
+        nzmax=mesh%nlevels_nod2D(n)-1
+        nzmin=mesh%ulevels_nod2D(n)
+        do nz = nzmin, nzmax
+            tracers%data(1)%values(nz ,n) = tracers%data(1)%values(nz ,n) + tracers%work%del_ttf(nz ,n) / mesh%hnode_new(nz ,n) ! LINFS
+        end do
+    end do
+    !$ACC END PARALLEL LOOP
+
+   call exchange_nod(tracers%data(1)%values(:,:), partit, luse_g2g = .true.)
+   !call exchange_nod(tracers%data(2)%values(:,:), partit, luse_g2g = .true.)
 end do
+
+call nvtxEndRange
+
+!$ACC END DATA
+
 call par_ex(partit%MPI_COMM_FESOM, partit%mype)
 end program main

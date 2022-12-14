@@ -4,9 +4,9 @@ project(fesom Fortran)
 
 option(ENABLE_OPENACC "compile with OpenACC support" ON)
 set(GPU_COMPUTE_CAPABILITY "cc80" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
-set(GPU_FLAGS "autocompare,math_uniform,cuda11.7,${GPU_COMPUTE_CAPABILITY}" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
+set(GPU_FLAGS "cuda11.7,${GPU_COMPUTE_CAPABILITY}" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
 
-option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
+option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
@@ -70,6 +70,7 @@ if(${VERBOSE})
    target_compile_definitions(${PROJECT_NAME} PRIVATE VERBOSE)
 endif()
 
+set(CMAKE_VERBOSE_MAKEFILE ON)
 
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
@@ -82,17 +83,19 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
         endif()
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
        target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -hnoomp)
-   elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL PGI OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC)
-       if(${ENABLE_OPENACC})
-           set(GPU_COMPUTE_CAPABILITY "cc80" CACHE STRING "GPU Arch for PGI Compiler (cc35,cc50,cc60,cc70,cc80,...)")
-           set(GPU_FLAGS "autocompare,math_uniform,cuda11.7,${GPU_COMPUTE_CAPABILITY}" CACHE STRING "Flags to be passed to \"-gpu\" when building gpu code")
-           target_compile_options(${PROJECT_NAME} PRIVATE -Mallocatable=95 -Mr8 -pgf90libs -Mnofma -Minfo=all -acc=verystrict -gpu=${GPU_FLAGS})
-           set(CMAKE_EXE_LINKER_FLAGS "-acc=verystrict -gpu=${GPU_FLAGS}")
-       else()
-           target_compile_options(${PROJECT_NAME} PRIVATE -Mallocatable=95 -Mr8 -pgf90libs -Mnofma)
-       endif()
+elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL PGI OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC)
+   if(${ENABLE_OPENACC})
+       set(GPU_COMPUTE_CAPABILITY "cc80" CACHE STRING "GPU Arch for PGI Compiler (cc35,cc50,cc60,cc70,cc80,...)")
+       set(GPU_FLAGS "cuda11.7,${GPU_COMPUTE_CAPABILITY}" CACHE STRING "Flags to be passed to \"-gpu\" when building gpu code")
+       target_compile_options(${PROJECT_NAME} PRIVATE -Mallocatable=95 -Mr8 -pgf90libs -Mnofma -Minfo=all -acc=verystrict -gpu=${GPU_FLAGS})
+       # target_compile_options(${PROJECT_NAME} PRIVATE -Mallocatable=95 -Mr8 -pgf90libs -Minfo=all -O3 -fast -acc=verystrict -gpu=${GPU_FLAGS})
+       set(CMAKE_EXE_LINKER_FLAGS "-acc=verystrict -gpu=${GPU_FLAGS}")
+   else()
+       target_compile_options(${PROJECT_NAME} PRIVATE -Mallocatable=95 -Mr8 -pgf90libs -Mnofma)
+   endif()
 endif()
 
+target_link_libraries(${PROJECT_NAME} nvhpcwrapnvtx)
 
 #elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
 #       target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -hnoomp)
