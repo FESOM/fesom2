@@ -104,19 +104,13 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     dttf_h          => tracers%work%del_ttf_advhoriz
     dttf_v          => tracers%work%del_ttf_advvert
 
-    if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
-       pwvel=>w
-    else
-       pwvel=>we
-    end if
-
-    !$ACC DATA COPY(pwvel, ttf, ttfAB, fct_LO, vel, we) &
-    !$ACC      COPY(helem, elem_cos, edge_cross_dxdy) &
-    !$ACC      COPY(nlevels_nod2D, ulevels_nod2D, nod_in_elem2D, nod_in_elem2D_num, myDim_nod2D, edim_nod2d) &
-    !$ACC      COPY(ulevels, edge_tri, edge_dxdy, edges, nlevels, myDim_edge2D, edge_up_dn_grad, hnode, hnode_new) &
-    !$ACC      COPY(zbar_3d_n, z_3d_n, area, areasvol) &
-    !$ACC      COPY(fct_ttf_min, fct_ttf_max, fct_minus, fct_plus, adv_flux_hor, adv_flux_ver) &
-    !$ACC      COPY(dttf_v, dttf_h)
+    !$ACC DATA PRESENT(w, ttf, ttfAB, fct_LO, vel, we) &
+    !$ACC      PRESENT(helem, elem_cos, edge_cross_dxdy, elem2d_nodes, nl, mydim_elem2d) &
+    !$ACC      PRESENT(nlevels_nod2D, ulevels_nod2D, nod_in_elem2D, nod_in_elem2D_num, myDim_nod2D, edim_nod2d) &
+    !$ACC      PRESENT(ulevels, edge_tri, edge_dxdy, edges, nlevels, myDim_edge2D, edge_up_dn_grad, hnode, hnode_new) &
+    !$ACC      PRESENT(zbar_3d_n, z_3d_n, area, areasvol) &
+    !$ACC      PRESENT(fct_ttf_min, fct_ttf_max, fct_minus, fct_plus, adv_flux_hor, adv_flux_ver) &
+    !$ACC      PRESENT(dttf_v, dttf_h)
 
     !___________________________________________________________________________
     ! compute FCT horzontal and vertical low order solution as well as lw order
@@ -230,6 +224,12 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
             if (mype==0) write(*,*) 'Unknown horizontal advection type ',  trim(tracers%data(tr_num)%tra_adv_hor), '! Check your namelists!'
             call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     END SELECT
+    if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
+       pwvel=>w
+    else
+       pwvel=>we
+    end if
+
     !___________________________________________________________________________
     ! do vertical tracer advection, in case of FCT high order solution
     SELECT CASE(trim(tracers%data(tr_num)%tra_adv_ver))
