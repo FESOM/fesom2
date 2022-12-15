@@ -190,7 +190,9 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
        !$ACC END LOOP
     end do
     !$ACC END PARALLEL LOOP
+!$OMP END DO
 
+!$OMP DO
     !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     do n=1, myDim_nod2D
        nu1 = ulevels_nod2D(n)
