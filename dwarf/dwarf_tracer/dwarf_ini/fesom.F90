@@ -91,7 +91,7 @@ do i=1, 10
     ! ale tracer advection
     !$ACC PARALLEL LOOP GANG COLLAPSE(2) DEFAULT(NONE)
     do n=1, partit%myDim_nod2D + partit%eDim_nod2D
-        do nz = 1, mesh%nl
+        do nz = 1, mesh%nl - 1
         tracers%work%del_ttf_advhoriz(nz, n) = 0.0_WP
         tracers%work%del_ttf_advvert(nz, n)  = 0.0_WP
         end do
