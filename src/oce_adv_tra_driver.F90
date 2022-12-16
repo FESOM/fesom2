@@ -130,7 +130,11 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 !$OMP END PARALLEL DO
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(e, enodes, el, nl1, nu1, nl2, nu2, nu12, nl12, nz)
+        #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(NONE)
+        #else
+        !$ACC UPDATE SELF(fct_lo, adv_flux_hor)
+        #endif
         do e=1, myDim_edge2D
             enodes=edges(:,e)
             el=edge_tri(:,e)
@@ -153,9 +157,13 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 #else
 !$OMP ORDERED
 #endif
+            #if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC LOOP VECTOR
+            #endif
             do nz=nu12, nl12
+               #if !defined(DISABLE_OPENACC_ATOMICS)
                !$ACC ATOMIC UPDATE
+               #endif
                fct_LO(nz, enodes(1))=fct_LO(nz, enodes(1))+adv_flux_hor(nz, e)
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
             end do
@@ -163,17 +171,25 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
             call omp_set_lock  (partit%plock(enodes(2)))
             do nz=nu12, nl12
 #endif
+               #if !defined(DISABLE_OPENACC_ATOMICS)
                !$ACC ATOMIC UPDATE
+               #endif
                fct_LO(nz, enodes(2))=fct_LO(nz, enodes(2))-adv_flux_hor(nz, e)
             end do
+            #if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC END LOOP
+            #endif
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
             call omp_unset_lock(partit%plock(enodes(2)))
 #else
 !$OMP END ORDERED
 #endif
         end do
+        #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC END PARALLEL LOOP
+        #else
+        !$ACC UPDATE DEVICE(fct_lo)
+        #endif
 !$OMP END PARALLEL DO
 
         ! compute the low order upwind vertical flux (explicit part only)
@@ -329,7 +345,11 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 !$OMP END DO
     ! Horizontal
 !$OMP DO
+    #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(NONE)
+    #else
+    !$ACC UPDATE SELF(dttf_h, flux_h)
+    #endif
     do edge=1, myDim_edge2D
         enodes(1:2)=edges(:,edge)
         el=edge_tri(:,edge)
@@ -352,9 +372,13 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #else
 !$OMP ORDERED
 #endif
-        !$ACC LOOP GANG VECTOR
+        #if !defined(DISABLE_OPENACC_ATOMICS)
+        !$ACC LOOP VECTOR
+        #endif
         do nz=nu12, nl12
+            #if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC ATOMIC UPDATE
+            #endif
             dttf_h(nz,enodes(1))=dttf_h(nz,enodes(1))+flux_h(nz,edge)*dt/areasvol(nz,enodes(1))
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
         end do
@@ -362,17 +386,27 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
         call omp_set_lock  (partit%plock(enodes(2)))
         do nz=nu12, nl12
 #endif
+            #if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC ATOMIC UPDATE
+            #endif
             dttf_h(nz,enodes(2))=dttf_h(nz,enodes(2))-flux_h(nz,edge)*dt/areasvol(nz,enodes(2))
         end do
+        #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC END LOOP
+        #endif
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(enodes(2)))
 #else
 !$OMP END ORDERED
 #endif
     end do
+
+    #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC END PARALLEL LOOP
+    #else
+    !$ACC UPDATE DEVICE(dttf_h)
+    #endif
+
     !$ACC END DATA
 !$OMP END DO
 !$OMP END PARALLEL
