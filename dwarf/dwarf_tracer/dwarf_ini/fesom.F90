@@ -17,10 +17,9 @@ USE g_comm_auto
 USE par_support_interfaces
 USE restart_derivedtype_module
 USE fortran_utils
-USE nvtx
 IMPLICIT NONE
 
-character(LEN=500)               :: resultpath, npepath
+character(LEN=500)               :: resultpath, npepath, meta
 character(LEN=256)               :: npes_string
 logical                          :: dir_exist
 logical                          :: L_EXISTS
@@ -30,6 +29,7 @@ type(t_partit),     target, save :: partit
 type(t_dyn),        target, save :: dyn
 type(t_ice),        target, save :: ice
 integer                          :: i, n, nz, nzmax, nzmin
+integer, dimension(3)            :: time=(/0, 0, 0/)
 
 
 call MPI_INIT(i)
@@ -83,7 +83,6 @@ call init_gatherLists(partit)
     ! only needed for the kernel on line 101
     !$ACC      COPY(tracers%work%del_ttf)
 
-    call nvtxStartRange("main_loop")
 
 do i=1, 10
 
@@ -133,9 +132,13 @@ do i=1, 10
    !call exchange_nod(tracers%data(2)%values(:,:), partit, luse_g2g = .true.)
 end do
 
-call nvtxEndRange
 
 !$ACC END DATA
+
+meta=trim(resultpath)//"/fesom_bin_restart/meta.time"
+!_______________________________________________________________________________
+! write derived type binary restart files
+call write_all_bin_restarts(time, npepath, meta, partit=partit, mesh=mesh, dynamics=dyn, tracers=tracers)
 
 call par_ex(partit%MPI_COMM_FESOM, partit%mype)
 end program main
