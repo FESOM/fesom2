@@ -95,7 +95,6 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL PGI OR ${CMAKE_Fortran_COMPILER_ID}
    endif()
 endif()
 
-target_link_libraries(${PROJECT_NAME} nvhpcwrapnvtx)
 
 #elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
 #       target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -hnoomp)
