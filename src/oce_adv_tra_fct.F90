@@ -254,11 +254,11 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 
 !$OMP DO
     !Horizontal
-    #if !defined(DISABLE_OPENACC_ATOMICS)
+#if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(NONE)
-    #else
+#else
     !$ACC UPDATE SELF(fct_plus, fct_minus, adf_h)
-    #endif
+#endif
     do edge=1, myDim_edge2D
        enodes(1:2)=edges(:,edge)
        el=edge_tri(:,edge)
@@ -279,17 +279,17 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 #else
 !$OMP ORDERED
 #endif
-       #if !defined(DISABLE_OPENACC_ATOMICS)
+#if !defined(DISABLE_OPENACC_ATOMICS)
        !$ACC LOOP VECTOR
-       #endif
+#endif
        do nz=nu12, nl12
-          #if !defined(DISABLE_OPENACC_ATOMICS)
+#if !defined(DISABLE_OPENACC_ATOMICS)
           !$ACC ATOMIC UPDATE
-          #endif
+#endif
           fct_plus (nz,enodes(1))=fct_plus (nz,enodes(1)) + max(0.0_WP, adf_h(nz,edge))
-          #if !defined(DISABLE_OPENACC_ATOMICS)
+#if !defined(DISABLE_OPENACC_ATOMICS)
           !$ACC ATOMIC UPDATE
-          #endif
+#endif
           fct_minus(nz,enodes(1))=fct_minus(nz,enodes(1)) + min(0.0_WP, adf_h(nz,edge))
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
        end do
@@ -297,29 +297,29 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
        call omp_set_lock  (partit%plock(enodes(2)))
        do nz=nu12, nl12
 #endif
-          #if !defined(DISABLE_OPENACC_ATOMICS)
+#if !defined(DISABLE_OPENACC_ATOMICS)
           !$ACC ATOMIC UPDATE
-          #endif
+#endif
           fct_plus (nz,enodes(2))=fct_plus (nz,enodes(2)) + max(0.0_WP,-adf_h(nz,edge))
-          #if !defined(DISABLE_OPENACC_ATOMICS)
+#if !defined(DISABLE_OPENACC_ATOMICS)
           !$ACC ATOMIC UPDATE
-          #endif
+#endif
           fct_minus(nz,enodes(2))=fct_minus(nz,enodes(2)) + min(0.0_WP,-adf_h(nz,edge))
        end do
-       #if !defined(DISABLE_OPENACC_ATOMICS)
+#if !defined(DISABLE_OPENACC_ATOMICS)
        !$ACC END LOOP
-       #endif
+#endif
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_unset_lock(partit%plock(enodes(2)))
 #else
 !$OMP END ORDERED
 #endif
     end do
-    #if !defined(DISABLE_OPENACC_ATOMICS)
+#if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC END PARALLEL LOOP
-    #else
+#else
     !$ACC UPDATE DEVICE(fct_plus, fct_minus)
-    #endif
+#endif
 !$OMP END DO
     !___________________________________________________________________________
     ! b2. Limiting factors
