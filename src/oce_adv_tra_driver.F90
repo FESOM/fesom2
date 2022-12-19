@@ -104,14 +104,6 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     dttf_h          => tracers%work%del_ttf_advhoriz
     dttf_v          => tracers%work%del_ttf_advvert
 
-    !$ACC DATA PRESENT(w, ttf, ttfAB, fct_LO, vel, we) &
-    !$ACC      PRESENT(helem, elem_cos, edge_cross_dxdy, elem2d_nodes, nl, mydim_elem2d) &
-    !$ACC      PRESENT(nlevels_nod2D, ulevels_nod2D, nod_in_elem2D, nod_in_elem2D_num, myDim_nod2D, edim_nod2d) &
-    !$ACC      PRESENT(ulevels, edge_tri, edge_dxdy, edges, nlevels, myDim_edge2D, edge_up_dn_grad, hnode, hnode_new) &
-    !$ACC      PRESENT(zbar_3d_n, z_3d_n, area, areasvol) &
-    !$ACC      PRESENT(fct_ttf_min, fct_ttf_max, fct_minus, fct_plus, adv_flux_hor, adv_flux_ver) &
-    !$ACC      PRESENT(dttf_v, dttf_h)
-
     !___________________________________________________________________________
     ! compute FCT horzontal and vertical low order solution as well as lw order
     ! part of antidiffusive flux
@@ -277,8 +269,6 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     else
        call oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, partit, mesh)
     end if
-
-    !$ACC END DATA
 
 end subroutine do_oce_adv_tra
 !
