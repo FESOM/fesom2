@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.4)
 project(fesom Fortran)
 
 option(ENABLE_OPENACC "compile with OpenACC support" ON)
+option(DISABLE_OPENACC_ATOMICS "disable kernels using atomic statement for reproducible results" OFF)
+option(ENABLE_NVTX "enable use of nvtx tools" OFF)
 set(GPU_COMPUTE_CAPABILITY "cc80" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
 set(GPU_FLAGS "cuda11.7,${GPU_COMPUTE_CAPABILITY}" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
 
@@ -90,8 +92,14 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL PGI OR ${CMAKE_Fortran_COMPILER_ID}
        target_compile_options(${PROJECT_NAME} PRIVATE -Mallocatable=95 -Mr8 -pgf90libs -Mnofma -Minfo=all -acc=verystrict -gpu=${GPU_FLAGS})
        # target_compile_options(${PROJECT_NAME} PRIVATE -Mallocatable=95 -Mr8 -pgf90libs -Minfo=all -O3 -fast -acc=verystrict -gpu=${GPU_FLAGS})
        set(CMAKE_EXE_LINKER_FLAGS "-acc=verystrict -gpu=${GPU_FLAGS}")
+       if(${DISABLE_OPENACC_ATOMICS})
+          target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_OPENACC_ATOMICS)
+       endif()
    else()
        target_compile_options(${PROJECT_NAME} PRIVATE -Mallocatable=95 -Mr8 -pgf90libs -Mnofma)
+   endif()
+   if(${ENABLE_NVTX})
+       target_link_libraries(${PROJECT_NAME} nvhpcwrapnvtx)
    endif()
 endif()
 
