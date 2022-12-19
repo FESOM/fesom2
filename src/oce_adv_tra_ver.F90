@@ -268,9 +268,11 @@ subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
     end if
     if (l_init_zero) then
 !$OMP PARALLEL DO
-        !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
+        !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT)
         do n=1, myDim_nod2D
-          flux(:, n)=0.0_WP
+          do nz=1,mesh%nl
+            flux(nz, n)=0.0_WP
+          end do
         end do
         !$ACC END PARALLEL LOOP
 !$OMP END PARALLEL DO
@@ -346,9 +348,11 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
     end if
     if (l_init_zero) then
 !$OMP PARALLEL DO
-       !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
+       !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT)
        do n=1, myDim_nod2D
-          flux(:, n)=0.0_WP
+          do nz=1, mesh%nl
+             flux(nz, n)=0.0_WP
+          end do
        end do
        !$ACC END PARALLEL LOOP
 !$OMP END PARALLEL DO

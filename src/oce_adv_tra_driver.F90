@@ -122,9 +122,11 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         call adv_tra_hor_upw1(vel, ttf, partit, mesh, adv_flux_hor, o_init_zero=.true.)
         ! update the LO solution for horizontal contribution
 !$OMP PARALLEL DO
-        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
+        !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT)
         do n=1, myDim_nod2D+eDim_nod2D
-           fct_LO(:,n) = 0.0_WP
+           do nz=1, mesh%nl - 1
+              fct_LO(nz,n) = 0.0_WP
+           end do
         end do
         !$ACC END PARALLEL LOOP
 !$OMP END PARALLEL DO

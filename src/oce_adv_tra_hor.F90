@@ -90,9 +90,11 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
     end if
     if (l_init_zero) then
 !$OMP PARALLEL DO
-       !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
+       !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT)
        do edge=1, myDim_edge2D
-          flux(:,edge)=0.0_WP
+          do nz=1, mesh%nl-1
+             flux(nz,edge)=0.0_WP
+          end do
        end do
        !$ACC END PARALLEL LOOP
 !$OMP END PARALLEL DO
