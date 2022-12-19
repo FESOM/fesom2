@@ -113,12 +113,10 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !___________________________________________________________________________
     ! a1. max, min between old solution and updated low-order solution per node
 
-    !$ACC DATA CREATE(tvert_max, tvert_min) PRESENT(nlevels_nod2D, ulevels_nod2D, aux, nod_in_elem2D, nod_in_elem2D_num, myDim_nod2D, &
-    !$ACC fct_ttf_min, fct_ttf_max, edim_nod2d, fct_minus, fct_plus, adf_v, ulevels, edge_tri, edges, nlevels, adf_h, &
-    !$ACC myDim_edge2D, areasvol) PRESENT(lo, ttf, elem2d_nodes, nl, myDim_elem2D)
+    !$ACC DATA CREATE(tvert_max, tvert_min)
 
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
     do n=1,myDim_nod2D + edim_nod2d
         nu1 = ulevels_nod2D(n)
         nl1 = nlevels_nod2D(n)
@@ -137,7 +135,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !     look for max, min bounds for each element --> AUX here auxilary array
 !$OMP DO
 
-    !$ACC PARALLEL LOOP GANG PRIVATE(enodes) DEFAULT(NONE)
+    !$ACC PARALLEL LOOP GANG PRIVATE(enodes) DEFAULT(PRESENT)
     do elem=1, myDim_elem2D
         enodes=elem2D_nodes(:,elem)
         nu1 = ulevels(elem)
@@ -167,7 +165,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
         !Horizontal
 !$OMP DO
 
-    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
     do n=1, myDim_nod2D
        nu1 = ulevels_nod2D(n)
        nl1 = nlevels_nod2D(n)
@@ -193,7 +191,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 !$OMP END DO
 
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
     do n=1, myDim_nod2D
        nu1 = ulevels_nod2D(n)
        nl1 = nlevels_nod2D(n)
@@ -223,7 +221,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !     see. R. Löhner et al. "finite element flux corrected transport (FEM-FCT)
     !     for the euler and navier stoke equation
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
     do n=1, myDim_nod2D
         nu1 = ulevels_nod2D(n)
         nl1 = nlevels_nod2D(n)
@@ -238,7 +236,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 !$OMP END DO
     !Vertical
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
     do n=1, myDim_nod2D
        nu1 = ulevels_nod2D(n)
        nl1 = nlevels_nod2D(n)
@@ -255,7 +253,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 !$OMP DO
     !Horizontal
 #if !defined(DISABLE_OPENACC_ATOMICS)
-    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(NONE)
+    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT)
 #else
     !$ACC UPDATE SELF(fct_plus, fct_minus, adf_h)
 #endif
@@ -324,7 +322,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !___________________________________________________________________________
     ! b2. Limiting factors
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
     do n=1,myDim_nod2D
         nu1=ulevels_nod2D(n)
         nl1=nlevels_nod2D(n)
@@ -348,7 +346,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     ! b3. Limiting
     !Vertical
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
     do n=1, myDim_nod2D
         nu1=ulevels_nod2D(n)
         nl1=nlevels_nod2D(n)
@@ -387,7 +385,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !Horizontal
 !$OMP DO
 
-    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(NONE)
+    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT)
     do edge=1, myDim_edge2D
         enodes(1:2)=edges(:,edge)
         el=edge_tri(:,edge)

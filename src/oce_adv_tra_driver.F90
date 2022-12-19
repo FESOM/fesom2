@@ -122,7 +122,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         call adv_tra_hor_upw1(vel, ttf, partit, mesh, adv_flux_hor, o_init_zero=.true.)
         ! update the LO solution for horizontal contribution
 !$OMP PARALLEL DO
-        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(NONE)
+        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
         do n=1, myDim_nod2D+eDim_nod2D
            fct_LO(:,n) = 0.0_WP
         end do
@@ -131,7 +131,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(e, enodes, el, nl1, nu1, nl2, nu2, nu12, nl12, nz)
 #if !defined(DISABLE_OPENACC_ATOMICS)
-        !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(NONE)
+        !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT)
 #else
         !$ACC UPDATE SELF(fct_lo, adv_flux_hor)
 #endif
@@ -198,7 +198,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         ! update the LO solution for vertical contribution
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nu1, nl1, nz)
-        !$ACC PARALLEL LOOP GANG PRESENT(fct_LO) DEFAULT(NONE)
+        !$ACC PARALLEL LOOP GANG PRESENT(fct_LO) DEFAULT(PRESENT)
         do n=1, myDim_nod2D
             nu1 = ulevels_nod2D(n)
             nl1 = nlevels_nod2D(n)
@@ -308,14 +308,11 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
     ! c. Update the solution
     ! Vertical
 
-    !$ACC DATA PRESENT(nlevels_nod2D, ulevels_nod2D, areasvol, flux_v, dttf_v, myDim_nod2d, ttf, hnode, lo, hnode_new, &
-    !$ACC nlevels, edges, edge_tri, ulevels, dttf_h, flux_h, mydim_edge2d)
-
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, k, elem, enodes, num, el, nu12, nl12, nu1, nu2, nl1, nl2, edge)
     if (present(use_lo)) then
        if (use_lo) then
 !$OMP DO
-        !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
+        !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
           do n=1, myDim_nod2d
              nu1 = ulevels_nod2D(n)
              nl1 = nlevels_nod2D(n)
@@ -331,7 +328,7 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
        end if
     end if
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
     do n=1, myDim_nod2d
         nu1 = ulevels_nod2D(n)
         nl1 = nlevels_nod2D(n)
@@ -346,7 +343,7 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
     ! Horizontal
 !$OMP DO
 #if !defined(DISABLE_OPENACC_ATOMICS)
-    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(NONE)
+    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT)
 #else
     !$ACC UPDATE SELF(dttf_h, flux_h)
 #endif
@@ -407,7 +404,6 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
     !$ACC UPDATE DEVICE(dttf_h)
 #endif
 
-    !$ACC END DATA
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine oce_tra_adv_flux2dtracer
