@@ -77,6 +77,8 @@ real(kind=WP)                 :: epsilon=0.1_WP  ! AB2 offset
 
 logical                       :: SPP=.false.
 
+integer                       :: acc_vl = 64
+
 TYPE tracer_source3d_type
     integer                             :: locID
     integer                             :: ID

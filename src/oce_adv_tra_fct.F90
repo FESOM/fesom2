@@ -116,7 +116,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !$ACC DATA CREATE(tvert_max, tvert_min)
 
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     do n=1,myDim_nod2D + edim_nod2d
         nu1 = ulevels_nod2D(n)
         nl1 = nlevels_nod2D(n)
@@ -135,7 +135,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !     look for max, min bounds for each element --> AUX here auxilary array
 !$OMP DO
 
-    !$ACC PARALLEL LOOP GANG PRIVATE(enodes) DEFAULT(PRESENT)
+    !$ACC PARALLEL LOOP GANG PRIVATE(enodes) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     do elem=1, myDim_elem2D
         enodes=elem2D_nodes(:,elem)
         nu1 = ulevels(elem)
@@ -165,7 +165,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
         !Horizontal
 !$OMP DO
 
-    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     do n=1, myDim_nod2D
        nu1 = ulevels_nod2D(n)
        nl1 = nlevels_nod2D(n)
@@ -191,7 +191,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 !$OMP END DO
 
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     do n=1, myDim_nod2D
        nu1 = ulevels_nod2D(n)
        nl1 = nlevels_nod2D(n)
@@ -202,10 +202,12 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
        fct_ttf_min(nu1,n)=tvert_min(nu1, n)-LO(nu1,n)
        ! calc max,min increment from nz-1:nz+1 with respect to low order
        ! solution at layer nz
+       !$ACC LOOP VECTOR
        do nz=nu1+1,nl1-2
-          fct_ttf_max(nz,n)=maxval(tvert_max(nz-1:nz+1, n))-LO(nz,n)
-          fct_ttf_min(nz,n)=minval(tvert_min(nz-1:nz+1, n))-LO(nz,n)
+          fct_ttf_max(nz,n)=dmax1(tvert_max(nz-1, n), tvert_max(nz, n), tvert_max(nz+1, n))-LO(nz,n)
+          fct_ttf_min(nz,n)=dmin1(tvert_min(nz-1, n), tvert_min(nz, n), tvert_min(nz+1, n))-LO(nz,n)
        end do
+       !$ACC END LOOP
        ! calc max,min increment of bottom layer -1 with respect to low order
        ! solution
        nz=nl1-1
@@ -221,7 +223,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !     see. R. Löhner et al. "finite element flux corrected transport (FEM-FCT)
     !     for the euler and navier stoke equation
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     do n=1, myDim_nod2D
         nu1 = ulevels_nod2D(n)
         nl1 = nlevels_nod2D(n)
@@ -236,7 +238,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 !$OMP END DO
     !Vertical
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     do n=1, myDim_nod2D
        nu1 = ulevels_nod2D(n)
        nl1 = nlevels_nod2D(n)
@@ -253,7 +255,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 !$OMP DO
     !Horizontal
 #if !defined(DISABLE_OPENACC_ATOMICS)
-    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT)
+    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #else
     !$ACC UPDATE SELF(fct_plus, fct_minus, adf_h)
 #endif
@@ -322,7 +324,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !___________________________________________________________________________
     ! b2. Limiting factors
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     do n=1,myDim_nod2D
         nu1=ulevels_nod2D(n)
         nl1=nlevels_nod2D(n)
@@ -346,7 +348,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     ! b3. Limiting
     !Vertical
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     do n=1, myDim_nod2D
         nu1=ulevels_nod2D(n)
         nl1=nlevels_nod2D(n)
@@ -385,7 +387,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !Horizontal
 !$OMP DO
 
-    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT)
+    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     do edge=1, myDim_edge2D
         enodes(1:2)=edges(:,edge)
         el=edge_tri(:,edge)

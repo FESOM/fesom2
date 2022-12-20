@@ -90,7 +90,7 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
     end if
     if (l_init_zero) then
 !$OMP PARALLEL DO
-       !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT)
+       !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
        do edge=1, myDim_edge2D
           do nz=1, mesh%nl-1
              flux(nz,edge)=0.0_WP
@@ -106,7 +106,7 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, &
 !$OMP                       a, vflux, el, enodes, nz, nu12, nl12, nl1, nl2, nu1, nu2)
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT)
+    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     do edge=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,edge)
@@ -564,7 +564,7 @@ end subroutine adv_tra_hor_muscl
     end if
     if (l_init_zero) then
 !$OMP PARALLEL DO
-       !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
+       !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
        do edge=1, myDim_edge2D
           flux(:,edge)=0.0_WP
        end do
@@ -578,7 +578,7 @@ end subroutine adv_tra_hor_muscl
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, Tmean1, Tmean2, cHO, &
 !$OMP                                     a, vflux, el, enodes, nz, nu12, nl12, nl1, nl2, nu1, nu2)
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT)
+    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     do edge=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,edge)

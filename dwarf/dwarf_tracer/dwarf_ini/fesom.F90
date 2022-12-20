@@ -30,6 +30,7 @@ type(t_dyn),        target, save :: dyn
 type(t_ice),        target, save :: ice
 integer                          :: i, n, nz, nzmax, nzmin
 integer, dimension(3)            :: time=(/0, 0, 0/)
+real (kind=WP)          :: t1, t2
 
 
 call MPI_INIT(i)
@@ -80,48 +81,47 @@ call init_gatherLists(partit)
     !$ACC      COPY(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus) &
     !$ACC      COPY(tracers%work%adv_flux_hor, tracers%work%adv_flux_ver, tracers%work%fct_LO) &
     !$ACC      COPY(tracers%work%del_ttf_advvert, tracers%work%del_ttf_advhoriz, tracers%work%edge_up_dn_grad) &
-    ! only needed for the kernel on line 101
     !$ACC      COPY(tracers%work%del_ttf)
 
+call MPI_Barrier( partit%MPI_COMM_FESOM, i )
+t1=MPI_Wtime()
 
 do i=1, 10
 
     !___________________________________________________________________________
     ! ale tracer advection
-    !$ACC PARALLEL LOOP GANG COLLAPSE(2) DEFAULT(NONE)
+    !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     do n=1, partit%myDim_nod2D + partit%eDim_nod2D
         do nz = 1, mesh%nl - 1
         tracers%work%del_ttf_advhoriz(nz, n) = 0.0_WP
         tracers%work%del_ttf_advvert(nz, n)  = 0.0_WP
         end do
     end do
-    !$ACC END LOOP
-!   if (mype==0) write(*,*) 'start advection part.......'
+    !$ACC END PARALLEL LOOP
 
     call do_oce_adv_tra(1.e-3, dyn%uv, dyn%w, dyn%w_i, dyn%w_e, 1, dyn, tracers, partit, mesh)
 
-    !$ACC UPDATE SELF(tracers%data(1)%values)
-!   if (mype==0) write(*,*) 'advection part completed...'
-    if (partit%mype==0) write(*,*) minval(tracers%data(1)%values), maxval(tracers%data(1)%values), sum(tracers%data(1)%values)
     !_____________________________________________________
     !___________________________________________________________________________
     ! update array for total tracer flux del_ttf with the fluxes from horizontal
     ! and vertical advection
 
-    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     do n = 1, partit%myDim_nod2D + partit%eDim_nod2D
         nzmax=mesh%nlevels_nod2D(n)-1
         nzmin=mesh%ulevels_nod2D(n)
+        !$ACC LOOP VECTOR
         do nz = nzmin, nzmax
             tracers%work%del_ttf(nz, n) = tracers%work%del_ttf(nz, n) + tracers%work%del_ttf_advhoriz(nz, n) + tracers%work%del_ttf_advvert(nz, n)
         end do
     end do
-    !$ACC END LOOP
+    !$ACC END PARALLEL LOOP
 
-    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     do n=1, partit%myDim_nod2D
         nzmax=mesh%nlevels_nod2D(n)-1
         nzmin=mesh%ulevels_nod2D(n)
+        !$ACC LOOP VECTOR
         do nz = nzmin, nzmax
             tracers%data(1)%values(nz ,n) = tracers%data(1)%values(nz ,n) + tracers%work%del_ttf(nz ,n) / mesh%hnode_new(nz ,n) ! LINFS
         end do
@@ -129,9 +129,12 @@ do i=1, 10
     !$ACC END PARALLEL LOOP
 
    call exchange_nod(tracers%data(1)%values(:,:), partit, luse_g2g = .true.)
-   !call exchange_nod(tracers%data(2)%values(:,:), partit, luse_g2g = .true.)
 end do
 
+call MPI_Barrier( partit%MPI_COMM_FESOM, i )
+t2=MPI_Wtime()
+
+if (partit%mype==0) write(*,*) "Main loop time:", t2-t1
 
 !$ACC END DATA
 
