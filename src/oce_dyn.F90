@@ -115,6 +115,7 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
               dynamics%ke_hvis_xVEL(:,nz,elem)  = usum*dynamics%ke_hvis(:,nz,elem)/2.0_WP
               dynamics%ke_vvis_xVEL(:,nz,elem)  = usum*dynamics%ke_vvis(:,nz,elem)/2.0_WP
               dynamics%ke_umean(:,nz,elem)      = usum/2.0_WP
+              dynamics%ke_u2mean(:,nz,elem)     = (usum*usum)/4.0_WP
               
               if (nz==nzmin) then
                  dynamics%ke_wind_xVEL(:,elem)=usum*dynamics%ke_wind(:,elem)/2.0_WP
@@ -684,3 +685,60 @@ SUBROUTINE compute_ke_wrho(dynamics, partit, mesh)
   END DO
   call exchange_nod(dynamics%ke_wrho, partit)
 END SUBROUTINE compute_ke_wrho
+! APE generation stuff
+SUBROUTINE compute_apegen(dynamics, tracers, partit, mesh)
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_TRACER
+    USE MOD_PARSUP
+    use MOD_DYN
+    USE o_PARAM
+    USE g_comm_auto
+    USE o_ARRAYS
+    IMPLICIT NONE
+    type(t_dyn)   , intent(inout), target   :: dynamics
+    type(t_tracer), intent(in)   , target   :: tracers
+    type(t_partit), intent(inout), target   :: partit
+    type(t_mesh)  , intent(in)   , target   :: mesh
+    real(kind=WP), dimension(:,:), pointer  :: salt
+    !___________________________________________________________________________
+    integer        :: n, nzmin
+    real(kind=WP)  :: JS, GS, D
+    !___________________________________________________________________________
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+salt   => tracers%data(2)%values(:,:)
+
+  DO n=1, myDim_nod2D
+     nzmin=ulevels_nod2D(n)
+     ! heat and salinity fluxes at node=n
+     JS= heat_flux_in(n) / vcpw
+     GS=(relax_salt(n) + water_flux(n) * salt(nzmin,n))
+     D=density_m_rho0(nzmin,n)
+     dynamics%ke_J   (n)=JS
+     dynamics%ke_G   (n)=GS
+     dynamics%ke_D   (n)=D
+     dynamics%ke_D2  (n)=D**2
+     dynamics%ke_n0  (n)=-bvfreq (nzmin,n)*density_0/g
+     dynamics%ke_JD(n)  =JS*D
+     dynamics%ke_GD(n)  =GS*D
+     dynamics%ke_D (n)  =D
+     dynamics%ke_swA (n)=sw_alpha(nzmin, n)
+     dynamics%ke_swB (n)=sw_beta (nzmin, n)
+  END DO
+  call exchange_nod(dynamics%ke_J, partit)
+  call exchange_nod(dynamics%ke_G, partit)
+  call exchange_nod(dynamics%ke_D, partit)
+
+  call exchange_nod(dynamics%ke_D2, partit)
+  call exchange_nod(dynamics%ke_n0, partit)
+
+  call exchange_nod(dynamics%ke_JD, partit)
+  call exchange_nod(dynamics%ke_GD, partit)
+
+  call exchange_nod(dynamics%ke_swA, partit)
+  call exchange_nod(dynamics%ke_swB, partit)
+END SUBROUTINE compute_apegen

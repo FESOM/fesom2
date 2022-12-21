@@ -3162,8 +3162,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 !!!
     call vert_vel_ale(dynamics, partit, mesh)
     t7=MPI_Wtime()   
-
-    call compute_ke_wrho(dynamics, partit, mesh)
+    if (dynamics%diag_ke) then
+       call compute_ke_wrho(dynamics, partit, mesh)
+       call compute_apegen (dynamics, tracers, partit, mesh)
+    end if
     !___________________________________________________________________________
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'

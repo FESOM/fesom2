@@ -495,6 +495,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
        allocate(dynamics%ke_hvis   (2, nl-1, elem_size))
        allocate(dynamics%ke_vvis   (2, nl-1, elem_size))
        allocate(dynamics%ke_umean  (2, nl-1, elem_size))
+       allocate(dynamics%ke_u2mean (2, nl-1, elem_size))
        allocate(dynamics%ke_du2    (2, nl-1, elem_size))
        allocate(dynamics%ke_adv_AB (2, nl-1, elem_size))
        allocate(dynamics%ke_cor_AB (2, nl-1, elem_size))
@@ -512,6 +513,9 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
        allocate(dynamics%ke_vvis_xVEL(2, nl-1, elem_size))
        allocate(dynamics%ke_wind_xVEL(2, elem_size))
        allocate(dynamics%ke_drag_xVEL(2, elem_size))
+       allocate(dynamics%ke_J(node_size),  dynamics%ke_D(node_size),   dynamics%ke_G(node_size),  &
+                dynamics%ke_D2(node_size), dynamics%ke_n0(node_size),  dynamics%ke_JD(node_size), &
+                dynamics%ke_GD(node_size), dynamics%ke_swA(node_size), dynamics%ke_swB(node_size))
 
        dynamics%ke_adv      =0.0_WP
        dynamics%ke_cor      =0.0_WP
@@ -520,6 +524,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
        dynamics%ke_vvis     =0.0_WP
        dynamics%ke_du2      =0.0_WP
        dynamics%ke_umean    =0.0_WP
+       dynamics%ke_u2mean   =0.0_WP
        dynamics%ke_adv_AB   =0.0_WP
        dynamics%ke_cor_AB   =0.0_WP
        dynamics%ke_rhs_bak  =0.0_WP
@@ -535,6 +540,15 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
        dynamics%ke_drag_xVEL=0.0_WP
        dynamics%ke_dW       =0.0_WP
        dynamics%ke_Pfull    =0.0_WP
+       dynamics%ke_J        =0.0_WP
+       dynamics%ke_D        =0.0_WP
+       dynamics%ke_G        =0.0_WP
+       dynamics%ke_D2       =0.0_WP
+       dynamics%ke_n0       =0.0_WP
+       dynamics%ke_JD       =0.0_WP
+       dynamics%ke_GD       =0.0_WP
+       dynamics%ke_swA      =0.0_WP
+       dynamics%ke_swB      =0.0_WP
     end if
 END SUBROUTINE dynamics_init
 !
