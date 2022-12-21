@@ -142,8 +142,8 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
         nl1 = nlevels(elem)
         !$ACC LOOP VECTOR
         do nz=nu1, nl1-1
-            AUX(1,nz,elem)=maxval(fct_ttf_max(nz,enodes))
-            AUX(2,nz,elem)=minval(fct_ttf_min(nz,enodes))
+            AUX(1,nz,elem)=max(fct_ttf_max(nz,enodes(1)), fct_ttf_max(nz,enodes(2)), fct_ttf_max(nz,enodes(3)))
+            AUX(2,nz,elem)=min(fct_ttf_min(nz,enodes(1)), fct_ttf_min(nz,enodes(2)), fct_ttf_min(nz,enodes(3)))
         end do
         !$ACC END LOOP
         if (nl1<=nl-1) then
