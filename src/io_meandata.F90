@@ -56,9 +56,9 @@ module io_MEANDATA
 !
 !--------------------------------------------------------------------------------------------
 !
-  type(Meandata), save, target :: io_stream(150) ! todo: find a way to increase the array withhout move_alloc to keep the derived types in Meandata intact
-  integer, save                             :: io_NSTREAMS=0
-  real(kind=WP)                             :: ctime !current time in seconds from the beginning of the year
+  type(Meandata), save, target   :: io_stream(150) ! todo: find a way to increase the array withhout move_alloc to keep the derived types in Meandata intact
+  integer, save                  :: io_NSTREAMS=0
+  real(kind=WP)                  :: ctime !current time in seconds from the beginning of the year
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -87,68 +87,82 @@ module io_MEANDATA
 !--------------------------------------------------------------------------------------------
 !
 
-  subroutine destructor(this)
+!
+!
+!_______________________________________________________________________________
+! not sure why this is needed --> seems to become method of meandata stream object
+! type Meandata
+!   private
+!   ...  
+!   contains
+!       final destructor
+! end type  
+subroutine destructor(this)
     type(Meandata), intent(inout) :: this
     ! EO args
     call assert_nf(nf_close(this%ncid), __LINE__)
-  end subroutine
-
-
+end subroutine
+!
+!
+!_______________________________________________________________________________
+! define 2d/3d meandata stream parameter
 subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
-  use MOD_MESH
-  use MOD_TRACER
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  USE MOD_DYN
-  USE MOD_ICE
-  use g_cvmix_tke
-  use g_cvmix_idemix
-  use g_cvmix_kpp
-  use g_cvmix_tidal
-  use diagnostics
-  implicit none
-  integer                   :: i, j
-  integer, save             :: nm_io_unit  = 103       ! unit to open namelist file, skip 100-102 for cray
-  integer                   :: iost
-  integer,dimension(15)     :: sel_forcvar=0
-  character(len=10)         :: id_string
+    use MOD_MESH
+    use MOD_TRACER
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_DYN
+    USE MOD_ICE
+    use g_cvmix_tke
+    use g_cvmix_idemix
+    use g_cvmix_kpp
+    use g_cvmix_tidal
+    use diagnostics
+    implicit none
+    integer                   :: i, j
+    integer, save             :: nm_io_unit  = 103       ! unit to open namelist file, skip 100-102 for cray
+    integer                   :: iost
+    integer,dimension(15)     :: sel_forcvar=0
+    character(len=10)         :: id_string
 
-  type(t_mesh), intent(in) , target :: mesh
-  type(t_partit), intent(inout), target :: partit
-  type(t_tracer), intent(in)   , target :: tracers
-  type(t_dyn)   , intent(in)   , target :: dynamics
-  type(t_ice)   , intent(in)   , target :: ice
-  namelist /nml_general / io_listsize, vec_autorotate
-  namelist /nml_list    / io_list
+    type(t_mesh), intent(in) , target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_tracer), intent(in)   , target :: tracers
+    type(t_dyn)   , intent(in)   , target :: dynamics
+    type(t_ice)   , intent(in)   , target :: ice
+    namelist /nml_general / io_listsize, vec_autorotate
+    namelist /nml_list    / io_list
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-  ! OPEN and read namelist for I/O
-  open( unit=nm_io_unit, file='namelist.io', form='formatted', access='sequential', status='old', iostat=iost )
-  if (iost == 0) then
-  if (mype==0) WRITE(*,*) '     file   : ', 'namelist.io',' open ok'
-     else
-  if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.io',' ; iostat=',iost
-     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-     stop
-  endif
-  READ(nm_io_unit, nml=nml_general,  iostat=iost )
-  allocate(io_list(io_listsize))
-  READ(nm_io_unit, nml=nml_list,     iostat=iost )
-  close(nm_io_unit )
+    !___________________________________________________________________________
+    ! OPEN and read namelist for I/O
+    open( unit=nm_io_unit, file='namelist.io', form='formatted', access='sequential', status='old', iostat=iost )
+    if (iost == 0) then
+    if (mype==0) WRITE(*,*) '     file   : ', 'namelist.io',' open ok'
+        else
+    if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.io',' ; iostat=',iost
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        stop
+    endif
+    READ(nm_io_unit, nml=nml_general,  iostat=iost )
+    allocate(io_list(io_listsize))
+    READ(nm_io_unit, nml=nml_list,     iostat=iost )
+    close(nm_io_unit )
 
+    !___________________________________________________________________________
+    do i=1, io_listsize
+        if (trim(io_list(i)%id)=='unknown   ') then
+            if (mype==0) write(*,*) 'io_listsize will be changed from ', io_listsize, ' to ', i-1, '!'
+            io_listsize=i-1
+            EXIT
+        end if
+    end do
 
-  do i=1, io_listsize
-     if (trim(io_list(i)%id)=='unknown   ') then
-        if (mype==0) write(*,*) 'io_listsize will be changed from ', io_listsize, ' to ', i-1, '!'
-        io_listsize=i-1
-        EXIT
-     end if
-  end do
-  
+!_______________________________________________________________________________    
 DO i=1, io_listsize
 SELECT CASE (trim(io_list(i)%id))
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!2D streams!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -166,7 +180,7 @@ CASE ('ssh_rhs       ')
 CASE ('ssh_rhs_old   ')
     call def_stream(nod2D, myDim_nod2D, 'ssh_rhs_old',      'ssh rhs',          '?',      dynamics%ssh_rhs_old,                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
-!___________________________________________________________________________________________________________________________________
+!_______________________________________________________________________________
 ! output sea ice 
 CASE ('uice      ')
     if (use_ice) then
@@ -201,7 +215,7 @@ CASE ('m_snow    ')
     call def_stream(nod2D, myDim_nod2D, 'm_snow',   'snow height',                     'm',      ice%data(3)%values(1:myDim_nod2D),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
     
-!___________________________________________________________________________________________________________________________________
+!_______________________________________________________________________________
 ! output mixed layer depth    
 CASE ('MLD1      ')
     call def_stream(nod2D, myDim_nod2D, 'MLD1',     'Mixed Layer Depth',               'm',      MLD1(1:myDim_nod2D),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -210,7 +224,7 @@ CASE ('MLD2      ')
 CASE ('MLD3      ')
     call def_stream(nod2D, myDim_nod2D, 'MLD3',     'Mixed Layer Depth',               'm',      MLD3(1:myDim_nod2D),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     
-!___________________________________________________________________________________________________________________________________
+!_______________________________________________________________________________
 ! output surface forcing
 CASE ('fh        ')
     call def_stream(nod2D, myDim_nod2D, 'fh',       'heat flux',                       'W',      heat_flux_in(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -265,7 +279,7 @@ CASE ('vwind ')
     sel_forcvar(2) = 1
     call def_stream(nod2D, myDim_nod2D, 'vwind',    '10m merid. surface wind velocity','m/s',    v_wind(:),               io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
-!___________________________________________________________________________________________________________________________________
+!_______________________________________________________________________________
 ! output KPP vertical mixing schemes
 CASE ('kpp_obldepth   ')
     if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then! fesom KPP
@@ -349,7 +363,7 @@ CASE ('v_total_tend')
     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v_total_tend',    'meridional velocity total viscosity tendency', 'm/s', UV_total_tend(2,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) 
     end if
     
-!___________________________________________________________________________________________________________________________________
+!_______________________________________________________________________________
 ! output Ferrari/GM parameterisation
 CASE ('bolus_u   ')
     if (Fer_GM) then
@@ -376,7 +390,7 @@ CASE ('fer_C     ')
     call def_stream(        nod2D   ,         myDim_nod2D   , 'fer_C',     'GM,   depth independent speed',  'm/s' ,   fer_c(:),                  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
     
-!___________________________________________________________________________________________________________________________________    
+!_______________________________________________________________________________
 ! Density MOC diagnostics
 CASE ('dMOC      ')
     if (ldiag_dMOC) then
@@ -392,14 +406,14 @@ CASE ('dMOC      ')
        call def_stream(elem2D,                                myDim_elem2D  , 'density_flux_e', 'density flux at elems ', 'm',      dens_flux_e(:),         1, 'y', i_real4, partit, mesh)
     end if
     
-!___________________________________________________________________________________________________________________________________
+!_______________________________________________________________________________
 ! PGF (pressure gradient force) diagnostic
 CASE ('pgf_x     ')    
     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'pgf_x', 'zonal pressure gradient force'     , 'm/s^2', pgf_x(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('pgf_y     ')    
     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'pgf_y', 'meridional pressure gradient force', 'm/s^2', pgf_y(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
-!___________________________________________________________________________________________________________________________________    
+!_______________________________________________________________________________
 #if defined (__oifs)
 CASE ('alb       ')
   call def_stream(nod2D, myDim_nod2D, 'alb',    'ice albedo',              'none',   ice%atmcoupl%ice_alb(:),                   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -411,7 +425,7 @@ CASE ('qso       ')
   call def_stream(nod2D, myDim_nod2D, 'qso',    'oce heat flux',           'W/m^2',  ice%atmcoupl%oce_flx_h(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 #endif
 
-!___________________________________________________________________________________________________________________________________
+!_______________________________________________________________________________
 ! TKE mixing diagnostic 
 CASE ('TKE       ')
     if (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
@@ -431,7 +445,7 @@ CASE ('TKE       ')
         end if 
     end if
     
-!___________________________________________________________________________________________________________________________________    
+!_______________________________________________________________________________
 ! IDEMIX mixing Internal-Wave-Energy diagnostics
 CASE ('IDEMIX    ')
     if (mod(mix_scheme_nmb,10)==6) then
@@ -448,7 +462,7 @@ CASE ('IDEMIX    ')
         call def_stream(elem2D       , myDim_elem2D       , 'iwe_fsrf', 'IDEMIX surface forcing'                    , 'm^3/s^3', iwe_fsrf(:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
     
-!___________________________________________________________________________________________________________________________________    
+!_______________________________________________________________________________
 ! TIDAL mixing diagnostics
 CASE ('TIDAL     ')
     if (mod(mix_scheme_nmb,10)==7) then
@@ -458,7 +472,7 @@ CASE ('TIDAL     ')
         call def_stream(elem2D       , myDim_elem2D       , 'tidal_fbot', 'near tidal bottom forcing'               , 'W/m^2'  , tidal_fbot   , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if 
 
-!___________________________________________________________________________________________________________________________________    
+!_______________________________________________________________________________
 ! TIDAL mixing diagnostics
 CASE ('FORC      ')
     if (ldiag_forc) then
@@ -481,74 +495,68 @@ CASE ('FORC      ')
         call def_stream(nod2D,  myDim_nod2D,  'subli', 'sublimation',                   'm/s',  sublimation(:),io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 #endif
     end if    
-!___________________________________________________________________________________________________________________________________    
+!_______________________________________________________________________________
 CASE DEFAULT
     if (mype==0) write(*,*) 'stream ', io_list(i)%id, ' is not defined !'
 END SELECT ! --> SELECT CASE (trim(io_list(i)%id))
 END DO ! --> DO i=1, io_listsize
 
 
-!3D
-  if (ldiag_energy) then
-     call def_stream((/nl,   nod2D/),  (/nl,     myDim_nod2D/), 'rhof',     'in-situ density at faces',    'kg/m3',     rhof(:,:),  1, 'm', i_real8, partit, mesh)
-     call def_stream((/nl,   nod2D/),  (/nl,     myDim_nod2D/), 'wrhof',    'vertical velocity x density', 'kg/(s*m2)', wrhof(:,:), 1, 'm', i_real8, partit, mesh)
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'uu',   'u times u', 'm2/s2', u_x_u(:,:), 1, 'm', i_real8, partit, mesh)
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'uv',   'u times v', 'm2/s2', u_x_v(:,:), 1, 'm', i_real8, partit, mesh)
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'vv',   'v times v', 'm2/s2', v_x_v(:,:), 1, 'm', i_real8, partit, mesh)
-     call def_stream((/nl,  elem2D/),  (/nl-1,   myDim_elem2D/),'uw',   'u times w', 'm2/s2', u_x_w(:,:), 1, 'm', i_real8, partit, mesh)
-     call def_stream((/nl,  elem2D/),  (/nl-1,   myDim_elem2D/),'vw',   'v times w', 'm2/s2', v_x_w(:,:), 1, 'm', i_real8, partit, mesh)
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dudx', 'du/dx',     '1/s',   dudx(:,:),  1, 'm', i_real8, partit, mesh)
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dudy', 'du/dy',     '1/s',   dudy(:,:),  1, 'm', i_real8, partit, mesh)
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dvdx', 'dv/dx',     '1/s',   dvdx(:,:),  1, 'm', i_real8, partit, mesh)
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dvdy', 'dv/dy',     '1/s',   dvdy(:,:),  1, 'm', i_real8, partit, mesh)
-     call def_stream((/nl,  elem2D/),  (/nl,     myDim_elem2D/), 'dudz', 'du/dz',     '1/s',   dudz(:,:),  1, 'm', i_real8, partit, mesh)
-     call def_stream((/nl,  elem2D/),  (/nl,     myDim_elem2D/), 'dvdz', 'dv/dz',     '1/s',   dvdz(:,:),  1, 'm', i_real8, partit, mesh)
-     call def_stream((/nl,  elem2D/),  (/nl,     myDim_elem2D/), 'av_dudz', 'int(Av * du/dz)',        'm3/s2',   av_dudz(:,:),    1, 'm', i_real4, partit, mesh)
-     call def_stream((/nl,  elem2D/),  (/nl,     myDim_elem2D/), 'av_dvdz', 'int(Av * dv/dz)',        'm3/s2',   av_dvdz(:,:),    1, 'm', i_real4, partit, mesh)
-     call def_stream((/nl,  elem2D/),  (/nl,     myDim_elem2D/), 'av_dudz_sq',  'Av * (du/dz)^2',     'm^2/s^3', av_dudz_sq(:,:), 1, 'm', i_real4, partit, mesh)
-     call def_stream((/nl,   elem2D/), (/nl,     myDim_elem2D/), 'Av',    'Vertical mixing A',         'm2/s',            Av(:,:), 1, 'm', i_real4, partit, mesh)
-   
-     call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'um',  'horizontal velocity', 'm/s', dynamics%uv(1,:,:),     1, 'm', i_real4, partit, mesh)
-     call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'vm',  'meridional velocity', 'm/s', dynamics%uv(2,:,:),     1, 'm', i_real4, partit, mesh)
-     call def_stream((/nl, nod2D/),    (/nl,     myDim_nod2D/),  'wm',  'vertical velocity',   'm/s', dynamics%w(:,:),     1, 'm', i_real8, partit, mesh)
+    !___________________________________________________________________________
+    ! 3d energy diagnostic
+    if (ldiag_energy) then
+        call def_stream((/nl,   nod2D/),  (/nl,     myDim_nod2D/), 'rhof',     'in-situ density at faces',    'kg/m3',     rhof(:,:),  1, 'm', i_real8, partit, mesh)
+        call def_stream((/nl,   nod2D/),  (/nl,     myDim_nod2D/), 'wrhof',    'vertical velocity x density', 'kg/(s*m2)', wrhof(:,:), 1, 'm', i_real8, partit, mesh)
+        call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'uu',   'u times u', 'm2/s2', u_x_u(:,:), 1, 'm', i_real8, partit, mesh)
+        call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'uv',   'u times v', 'm2/s2', u_x_v(:,:), 1, 'm', i_real8, partit, mesh)
+        call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'vv',   'v times v', 'm2/s2', v_x_v(:,:), 1, 'm', i_real8, partit, mesh)
+        call def_stream((/nl,  elem2D/),  (/nl-1,   myDim_elem2D/),'uw',   'u times w', 'm2/s2', u_x_w(:,:), 1, 'm', i_real8, partit, mesh)
+        call def_stream((/nl,  elem2D/),  (/nl-1,   myDim_elem2D/),'vw',   'v times w', 'm2/s2', v_x_w(:,:), 1, 'm', i_real8, partit, mesh)
+        call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dudx', 'du/dx',     '1/s',   dudx(:,:),  1, 'm', i_real8, partit, mesh)
+        call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dudy', 'du/dy',     '1/s',   dudy(:,:),  1, 'm', i_real8, partit, mesh)
+        call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dvdx', 'dv/dx',     '1/s',   dvdx(:,:),  1, 'm', i_real8, partit, mesh)
+        call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dvdy', 'dv/dy',     '1/s',   dvdy(:,:),  1, 'm', i_real8, partit, mesh)
+        call def_stream((/nl,  elem2D/),  (/nl,     myDim_elem2D/), 'dudz', 'du/dz',     '1/s',   dudz(:,:),  1, 'm', i_real8, partit, mesh)
+        call def_stream((/nl,  elem2D/),  (/nl,     myDim_elem2D/), 'dvdz', 'dv/dz',     '1/s',   dvdz(:,:),  1, 'm', i_real8, partit, mesh)
+        call def_stream((/nl,  elem2D/),  (/nl,     myDim_elem2D/), 'av_dudz', 'int(Av * du/dz)',        'm3/s2',   av_dudz(:,:),    1, 'm', i_real4, partit, mesh)
+        call def_stream((/nl,  elem2D/),  (/nl,     myDim_elem2D/), 'av_dvdz', 'int(Av * dv/dz)',        'm3/s2',   av_dvdz(:,:),    1, 'm', i_real4, partit, mesh)
+        call def_stream((/nl,  elem2D/),  (/nl,     myDim_elem2D/), 'av_dudz_sq',  'Av * (du/dz)^2',     'm^2/s^3', av_dudz_sq(:,:), 1, 'm', i_real4, partit, mesh)
+        call def_stream((/nl,   elem2D/), (/nl,     myDim_elem2D/), 'Av',    'Vertical mixing A',         'm2/s',            Av(:,:), 1, 'm', i_real4, partit, mesh)
+        
+        call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'um',  'horizontal velocity', 'm/s', dynamics%uv(1,:,:),     1, 'm', i_real4, partit, mesh)
+        call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'vm',  'meridional velocity', 'm/s', dynamics%uv(2,:,:),     1, 'm', i_real4, partit, mesh)
+        call def_stream((/nl, nod2D/),    (/nl,     myDim_nod2D/),  'wm',  'vertical velocity',   'm/s', dynamics%w(:,:),     1, 'm', i_real8, partit, mesh)
+        
+        call def_stream(elem2D, myDim_elem2D,   'utau_surf',  '(u, tau) at the surface',      'N/(m s)', utau_surf(1:myDim_elem2D),     1, 'm', i_real4, partit, mesh)
+        call def_stream(elem2D, myDim_elem2D,   'utau_bott',  '(u, tau) at the bottom',       'N/(m s)', utau_bott(1:myDim_elem2D),     1, 'm', i_real4, partit, mesh)
+        call def_stream(elem2D, myDim_elem2D,   'u_bott',     'bottom velocity',                  'm/s', u_bott(1:myDim_elem2D),        1, 'm', i_real4, partit, mesh)
+        call def_stream(elem2D, myDim_elem2D,   'v_bott',     'bottom velocity',                  'm/s', v_bott(1:myDim_elem2D),        1, 'm', i_real4, partit, mesh)
+        call def_stream(elem2D, myDim_elem2D,   'u_surf',     'surface velocity',                 'm/s', u_surf(1:myDim_elem2D),        1, 'm', i_real4, partit, mesh)
+        call def_stream(elem2D, myDim_elem2D,   'v_surf',     'surface velocity',                 'm/s', v_surf(1:myDim_elem2D),        1, 'm', i_real4, partit, mesh)
+        call def_stream(elem2D, myDim_elem2D,   'tx_bot',     'bottom stress x',                 'N/m2', stress_bott(1, 1:myDim_elem2D),1, 'm', i_real4, partit, mesh)
+        call def_stream(elem2D, myDim_elem2D,   'ty_bot',     'bottom stress y',                 'N/m2', stress_bott(2, 1:myDim_elem2D),1, 'm', i_real4, partit, mesh)
+        if (sel_forcvar(11)==0) call def_stream(elem2D, myDim_elem2D,   'tx_sur',     'zonal wind stress to ocean',     'm/s2', stress_surf(1, 1:myDim_elem2D),1, 'm', i_real4, partit, mesh) ; sel_forcvar(11)=1
+        if (sel_forcvar(12)==0) call def_stream(elem2D, myDim_elem2D,   'ty_sur',     'meridional wind stress to ocean','m/s2', stress_surf(2, 1:myDim_elem2D),1, 'm', i_real4, partit, mesh) ; sel_forcvar(12)=1
+    end if
 
-     call def_stream(elem2D, myDim_elem2D,   'utau_surf',  '(u, tau) at the surface',      'N/(m s)', utau_surf(1:myDim_elem2D),     1, 'm', i_real4, partit, mesh)
-     call def_stream(elem2D, myDim_elem2D,   'utau_bott',  '(u, tau) at the bottom',       'N/(m s)', utau_bott(1:myDim_elem2D),     1, 'm', i_real4, partit, mesh)
-     call def_stream(elem2D, myDim_elem2D,   'u_bott',     'bottom velocity',                  'm/s', u_bott(1:myDim_elem2D),        1, 'm', i_real4, partit, mesh)
-     call def_stream(elem2D, myDim_elem2D,   'v_bott',     'bottom velocity',                  'm/s', v_bott(1:myDim_elem2D),        1, 'm', i_real4, partit, mesh)
-     call def_stream(elem2D, myDim_elem2D,   'u_surf',     'surface velocity',                 'm/s', u_surf(1:myDim_elem2D),        1, 'm', i_real4, partit, mesh)
-     call def_stream(elem2D, myDim_elem2D,   'v_surf',     'surface velocity',                 'm/s', v_surf(1:myDim_elem2D),        1, 'm', i_real4, partit, mesh)
-     call def_stream(elem2D, myDim_elem2D,   'tx_bot',     'bottom stress x',                 'N/m2', stress_bott(1, 1:myDim_elem2D),1, 'm', i_real4, partit, mesh)
-     call def_stream(elem2D, myDim_elem2D,   'ty_bot',     'bottom stress y',                 'N/m2', stress_bott(2, 1:myDim_elem2D),1, 'm', i_real4, partit, mesh)
-     if (sel_forcvar(11)==0) call def_stream(elem2D, myDim_elem2D,   'tx_sur',     'zonal wind stress to ocean',     'm/s2', stress_surf(1, 1:myDim_elem2D),1, 'm', i_real4, partit, mesh) ; sel_forcvar(11)=1
-     if (sel_forcvar(12)==0) call def_stream(elem2D, myDim_elem2D,   'ty_sur',     'meridional wind stress to ocean','m/s2', stress_surf(2, 1:myDim_elem2D),1, 'm', i_real4, partit, mesh) ; sel_forcvar(12)=1
-  end if
+    !___________________________________________________________________________
+    ! output Redi parameterisation
+    if (Redi) then
+        call def_stream((/nl-1  , nod2D /), (/nl-1,   myDim_nod2D /), 'Redi_K',   'Redi diffusion coefficient', 'm2/s', Ki(:,:),    1, 'y', i_real4, partit, mesh)
+    end if
 
-    
-    
-    
-   
-    
-    
-    
-  !___________________________________________________________________________________________________________________________________
-  ! output Redi parameterisation
-  if (Redi) then
-     call def_stream((/nl-1  , nod2D /), (/nl-1,   myDim_nod2D /), 'Redi_K',   'Redi diffusion coefficient', 'm2/s', Ki(:,:),    1, 'y', i_real4, partit, mesh)
-  end if
-
-  !___________________________________________________________________________________________________________________________________
-  ! output Monin-Obukov (TB04) mixing length
-  if (use_momix) then
-     call def_stream(nod2D, myDim_nod2D, 'momix_length',   'Monin-Obukov mixing length', 'm', mixlength(:),    1, 'm', i_real4, partit, mesh)
-  end if
+    !___________________________________________________________________________
+    ! output Monin-Obukov (TB04) mixing length
+    if (use_momix) then
+        call def_stream(nod2D, myDim_nod2D, 'momix_length',   'Monin-Obukov mixing length', 'm', mixlength(:),    1, 'm', i_real4, partit, mesh)
+    end if
   
-    !___________________________________________________________________________________________________________________________________
+    !___________________________________________________________________________
     if (ldiag_curl_vel3) then
         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'curl_u',     'relative vorticity',          '1/s',   vorticity,                   1, 'm', i_real4, partit, mesh)
     end if
 
-    !___________________________________________________________________________________________________________________________________
+    !___________________________________________________________________________
     if (ice%whichEVP==1) then
     end if
     
@@ -588,613 +596,754 @@ END DO ! --> DO i=1, io_listsize
     end if        
 end subroutine
 !
-!--------------------------------------------------------------------------------------------
 !
+!_______________________________________________________________________________
 function mesh_dimname_from_dimsize(size, partit, mesh) result(name)
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use diagnostics
+    use mod_mesh
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use diagnostics
 #if defined (__icepack)
-  use icedrv_main,   only: ncat ! number of ice thickness cathegories
+    use icedrv_main,   only: ncat ! number of ice thickness cathegories
 #endif
-  implicit none
-  integer       :: size
-  type(t_mesh)  , intent(in) :: mesh
-  type(t_partit), intent(in) :: partit
-  character(50) :: name
+    implicit none
+    integer       :: size
+    type(t_mesh)  , intent(in) :: mesh
+    type(t_partit), intent(in) :: partit
+    character(50) :: name
 
-  if (size==mesh%nod2D) then
-    name='nod2'
-  elseif (size==mesh%elem2D) then
-    name='elem'
-  elseif (size==mesh%nl) then
-    name='nz'
-  elseif (size==mesh%nl-1) then
-    name='nz1'
-  elseif (size==std_dens_N) then
-    name='ndens'
+    if (size==mesh%nod2D) then
+        name='nod2'
+    elseif (size==mesh%elem2D) then
+        name='elem'
+    elseif (size==mesh%nl) then
+        name='nz'
+    elseif (size==mesh%nl-1) then
+        name='nz1'
+    elseif (size==std_dens_N) then
+        name='ndens'
 #if defined (__icepack)
-  elseif (size==ncat) then
-    name='ncat'
+    elseif (size==ncat) then
+        name='ncat'
 #endif
-  else
-    name='unknown'
-    if (partit%mype==0) write(*,*) 'WARNING: unknown dimension in mean I/O with size of ', size
-  end if
+    else
+        name='unknown'
+        if (partit%mype==0) write(*,*) 'WARNING: unknown dimension in mean I/O with size of ', size
+    end if
 end function
 !
-!--------------------------------------------------------------------------------------------
 !
+!_______________________________________________________________________________
 subroutine create_new_file(entry, ice, dynamics, partit, mesh)
-  use g_clock
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  USE MOD_DYN
-  USE MOD_ICE
-  use fesom_version_info_module
-  use g_config
-  use o_PARAM
+    use g_clock
+    use mod_mesh
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_DYN
+    USE MOD_ICE
+    use fesom_version_info_module
+    use g_config
+    use o_PARAM
 
-  implicit none
-  character(2000)               :: att_text
-  type(t_mesh)  , intent(in) :: mesh
-  type(t_partit), intent(in) :: partit
-  type(t_dyn)   , intent(in) :: dynamics
-  type(t_ice)   , intent(in) :: ice
- 
-  type(Meandata), intent(inout) :: entry
-  character(len=*), parameter :: global_attributes_prefix = "FESOM_"
-  ! Serial output implemented so far
-  if (partit%mype/=entry%root_rank) return
-  ! create an ocean output file
-  write(*,*) 'initializing I/O file for ', trim(entry%name)
+    implicit none
+    character(2000)               :: att_text
+    type(t_mesh)  , intent(in) :: mesh
+    type(t_partit), intent(in) :: partit
+    type(t_dyn)   , intent(in) :: dynamics
+    type(t_ice)   , intent(in) :: ice
+    
+    type(Meandata), intent(inout) :: entry
+    character(len=*), parameter :: global_attributes_prefix = "FESOM_"
+    ! Serial output implemented so far
+    if (partit%mype/=entry%root_rank) return
+    ! create an ocean output file
+    write(*,*) 'initializing I/O file for ', trim(entry%name)
+    
+    !___________________________________________________________________________
+    ! Create file
+    call assert_nf( nf_create(entry%filename, IOR(NF_NOCLOBBER,IOR(NF_NETCDF4,NF_CLASSIC_MODEL)), entry%ncid), __LINE__)
 
-  call assert_nf( nf_create(entry%filename, IOR(NF_NOCLOBBER,IOR(NF_NETCDF4,NF_CLASSIC_MODEL)), entry%ncid), __LINE__)
-
-!___Create mesh related dimensions__________________________________________
-  if (entry%ndim==1) then
-     call assert_nf( nf_def_dim(entry%ncid, entry%dimname(1), entry%glsize(2), entry%dimID(1)), __LINE__)
-  else if (entry%ndim==2) then
-     call assert_nf( nf_def_dim(entry%ncid,  entry%dimname(1), entry%glsize(1), entry%dimID(1)), __LINE__)
-     call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
-     if (entry%dimname(1)=='nz') then
-       call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer interface'),'depth at layer interface'), __LINE__)
-     elseif (entry%dimname(1)=='nz1') then
-       call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer midpoint'),'depth at layer midpoint'), __LINE__)
-     elseif (entry%dimname(1)=='ncat') then
-       call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('sea-ice thickness class'),'sea-ice thickness class'), __LINE__)
-     else
-       if (partit%mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
-     end if 
-     call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'units', len_trim('m'),'m'), __LINE__)
-     call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'positive', len_trim('down'),'down'), __LINE__)
-     call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'axis', len_trim('Z'),'Z'), __LINE__)
-     
-     call assert_nf( nf_def_dim(entry%ncid, entry%dimname(2), entry%glsize(2), entry%dimID(2)), __LINE__)
-  end if
-!___Create time related dimensions__________________________________________
-  call assert_nf( nf_def_dim(entry%ncid, 'time', NF_UNLIMITED, entry%recID), __LINE__)
-!___Define the time and iteration variables_________________________________
-  call assert_nf( nf_def_var(entry%ncid, 'time', NF_DOUBLE, 1, entry%recID, entry%tID), __LINE__)
-  att_text='time'
-  call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'long_name', len_trim(att_text), trim(att_text)), __LINE__)
-  call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'standard_name', len_trim(att_text), trim(att_text)), __LINE__)
-  write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)') 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
-  call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'units', len_trim(att_text), trim(att_text)), __LINE__)
-  call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'axis', len_trim('T'), trim('T')), __LINE__)
-  call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'stored_direction', len_trim('increasing'), trim('increasing')), __LINE__)
+    !___________________________________________________________________________
+    ! Create mesh related dimensions
+    if (entry%ndim==1) then
+        call assert_nf( nf_def_dim(entry%ncid, entry%dimname(1), entry%glsize(2), entry%dimID(1)), __LINE__)
+        
+    else if (entry%ndim==2) then
+        call assert_nf( nf_def_dim(entry%ncid,  entry%dimname(1), entry%glsize(1), entry%dimID(1)), __LINE__)
+        call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
+        if (entry%dimname(1)=='nz') then
+            call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer interface'),'depth at layer interface'), __LINE__)
+        elseif (entry%dimname(1)=='nz1') then
+            call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer midpoint'),'depth at layer midpoint'), __LINE__)
+        elseif (entry%dimname(1)=='ncat') then
+            call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('sea-ice thickness class'),'sea-ice thickness class'), __LINE__)
+        else
+            if (partit%mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
+        end if 
+        call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'units', len_trim('m'),'m'), __LINE__)
+        call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'positive', len_trim('down'),'down'), __LINE__)
+        call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'axis', len_trim('Z'),'Z'), __LINE__)
+        
+        call assert_nf( nf_def_dim(entry%ncid, entry%dimname(2), entry%glsize(2), entry%dimID(2)), __LINE__)
+    end if
   
-  call assert_nf( nf_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), entry%ndim+1, (/entry%dimid(entry%ndim:1:-1), entry%recID/), entry%varID), __LINE__)
-
-
-  call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'description', len_trim(entry%description), entry%description), __LINE__)
-  call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'long_name', len_trim(entry%description), entry%description), __LINE__)
-  call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'units',       len_trim(entry%units),       entry%units), __LINE__)
+    !___________________________________________________________________________
+    ! Create time related dimensions
+    call assert_nf( nf_def_dim(entry%ncid, 'time', NF_UNLIMITED, entry%recID), __LINE__)
   
- 
-!___Global attributes________  
-  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'model', len_trim('FESOM2'),'FESOM2'), __LINE__)
-  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'website', len_trim('fesom.de'), trim('fesom.de')), __LINE__)
- 
-  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'git_SHA', len_trim(fesom_git_sha()), fesom_git_sha()), __LINE__)
-  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'MeshPath', len_trim(MeshPath), trim(MeshPath)), __LINE__)
-  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'mesh_representative_checksum', len(mesh%representative_checksum), mesh%representative_checksum), __LINE__)
-  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'ClimateDataPath', len_trim(ClimateDataPath), trim(ClimateDataPath)), __LINE__)
-  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'which_ALE', len_trim(which_ALE), trim(which_ALE)), __LINE__)
-  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'mix_scheme', len_trim(mix_scheme), trim(mix_scheme)), __LINE__)
+    !___________________________________________________________________________
+    ! Define the time and iteration variables
+    call assert_nf( nf_def_var(entry%ncid, 'time', NF_DOUBLE, 1, entry%recID, entry%tID), __LINE__)
+    att_text='time'
+    call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'long_name', len_trim(att_text), trim(att_text)), __LINE__)
+    call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'standard_name', len_trim(att_text), trim(att_text)), __LINE__)
+    write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)') 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
+    call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'units', len_trim(att_text), trim(att_text)), __LINE__)
+    call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'axis', len_trim('T'), trim('T')), __LINE__)
+    call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'stored_direction', len_trim('increasing'), trim('increasing')), __LINE__)
+    
+    call assert_nf( nf_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), entry%ndim+1, (/entry%dimid(entry%ndim:1:-1), entry%recID/), entry%varID), __LINE__)
+
+    call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'description', len_trim(entry%description), entry%description), __LINE__)
+    call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'long_name', len_trim(entry%description), entry%description), __LINE__)
+    call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'units',       len_trim(entry%units),       entry%units), __LINE__)
+  
+    !___Global attributes_______________________________________________________  
+    call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'model', len_trim('FESOM2'),'FESOM2'), __LINE__)
+    call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'website', len_trim('fesom.de'), trim('fesom.de')), __LINE__)
+    
+    call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'git_SHA', len_trim(fesom_git_sha()), fesom_git_sha()), __LINE__)
+    call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'MeshPath', len_trim(MeshPath), trim(MeshPath)), __LINE__)
+    call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'mesh_representative_checksum', len(mesh%representative_checksum), mesh%representative_checksum), __LINE__)
+    call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'ClimateDataPath', len_trim(ClimateDataPath), trim(ClimateDataPath)), __LINE__)
+    call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'which_ALE', len_trim(which_ALE), trim(which_ALE)), __LINE__)
+    call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'mix_scheme', len_trim(mix_scheme), trim(mix_scheme)), __LINE__)
 ! call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_hor', len_trim(tra_adv_hor), trim(tra_adv_hor)), __LINE__)
 ! call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_ver', len_trim(tra_adv_ver), trim(tra_adv_ver)), __LINE__)
 ! call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_lim', len_trim(tra_adv_lim), trim(tra_adv_lim)), __LINE__)
  
+    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell', NF_INT, 1,  use_partial_cell), __LINE__)
+    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'force_rotation', NF_INT, 1,  force_rotation), __LINE__)
+    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'include_fleapyear', NF_INT, 1,  include_fleapyear), __LINE__)
+    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_floatice', NF_INT, 1,  use_floatice), __LINE__)
+    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'whichEVP'         , NF_INT, 1,  ice%whichEVP), __LINE__)
+    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'evp_rheol_steps'  , NF_INT, 1,  ice%evp_rheol_steps), __LINE__)
+    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'opt_visc'         , NF_INT, 1,  dynamics%opt_visc), __LINE__)
+    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_wsplit'       , NF_INT, 1,  dynamics%use_wsplit), __LINE__)
+    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell', NF_INT, 1,  use_partial_cell), __LINE__)
+    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'autorotate_back_to_geo', NF_INT, 1,  vec_autorotate), __LINE__)
  
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell', NF_INT, 1,  use_partial_cell), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'force_rotation', NF_INT, 1,  force_rotation), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'include_fleapyear', NF_INT, 1,  include_fleapyear), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_floatice', NF_INT, 1,  use_floatice), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'whichEVP'         , NF_INT, 1,  ice%whichEVP), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'evp_rheol_steps'  , NF_INT, 1,  ice%evp_rheol_steps), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'opt_visc'         , NF_INT, 1,  dynamics%opt_visc), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_wsplit'       , NF_INT, 1,  dynamics%use_wsplit), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell', NF_INT, 1,  use_partial_cell), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'autorotate_back_to_geo', NF_INT, 1,  vec_autorotate), __LINE__)
- 
- 
-  
-!___This ends definition part of the file, below filling in variables is possible
-  call assert_nf( nf_enddef(entry%ncid), __LINE__)
-  if (entry%dimname(1)=='nz') then
-      call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%zbar)), __LINE__)
-  elseif (entry%dimname(1)=='nz1') then
-      call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%Z)), __LINE__)
-  else
-      if (partit%mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
-  end if 
- 
-  call assert_nf( nf_close(entry%ncid), __LINE__)
+    !___________________________________________________________________________
+    ! This ends definition part of the file, below filling in variables is possible
+    call assert_nf( nf_enddef(entry%ncid), __LINE__)
+    if (entry%dimname(1)=='nz') then
+        call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%zbar)), __LINE__)
+    elseif (entry%dimname(1)=='nz1') then
+        call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%Z)), __LINE__)
+    else
+        if (partit%mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
+    end if 
+    
+    !___________________________________________________________________________
+    call assert_nf( nf_close(entry%ncid), __LINE__)
 end subroutine
 !
-!--------------------------------------------------------------------------------------------
 !
+!_______________________________________________________________________________
 subroutine assoc_ids(entry)
-  implicit none
+    implicit none
+    type(Meandata), intent(inout) :: entry
+    integer                       :: j
 
-  type(Meandata), intent(inout) :: entry
-  integer                       :: j
+    write(*,*) 'associating mean I/O file ', trim(entry%filename)
 
-  write(*,*) 'associating mean I/O file ', trim(entry%filename)
-
-  do j=1, entry%ndim
-     call assert_nf( nf_inq_dimid(entry%ncid, entry%dimname(j), entry%dimID(j)), __LINE__)
-  end do
-!___Associate time related dimensions_______________________________________
-  call assert_nf( nf_inq_dimid (entry%ncid, 'time', entry%recID), __LINE__)
-  call assert_nf( nf_inq_dimlen(entry%ncid, entry%recID, entry%rec_count), __LINE__)
-!___Associate the time and iteration variables______________________________
-  call assert_nf( nf_inq_varid(entry%ncid, 'time', entry%tID), __LINE__)
-!___Associate physical variables____________________________________________
-  call assert_nf( nf_inq_varid(entry%ncid, entry%name, entry%varID), __LINE__)
+    do j=1, entry%ndim
+        call assert_nf( nf_inq_dimid(entry%ncid, entry%dimname(j), entry%dimID(j)), __LINE__)
+    end do
+    !___Associate time related dimensions_______________________________________
+    call assert_nf( nf_inq_dimid (entry%ncid, 'time', entry%recID), __LINE__)
+    call assert_nf( nf_inq_dimlen(entry%ncid, entry%recID, entry%rec_count), __LINE__)
+    !___Associate the time and iteration variables______________________________
+    call assert_nf( nf_inq_varid(entry%ncid, 'time', entry%tID), __LINE__)
+    !___Associate physical variables____________________________________________
+    call assert_nf( nf_inq_varid(entry%ncid, entry%name, entry%varID), __LINE__)
 end subroutine
 !
-!--------------------------------------------------------------------------------------------
 !
+!_______________________________________________________________________________
+! collect local mean output data (entry%local_values_r8_copy) into global 2d 
+! array (entry%aux_r8) and use the root_rank CPU/Task to write them into netcdf
+! file. In case of 3data write horizontal slices level wise.
 subroutine write_mean(entry, entry_index)
-  use mod_mesh
-  use io_gather_module
-  implicit none
-  type(Meandata), intent(inout) :: entry
-  integer, intent(in) :: entry_index
-  integer tag
-  integer                       :: i, size1, size2, size_gen, size_lev, order
-  integer                       :: c, lev
-  integer mpierr
+    use mod_mesh
+    use io_gather_module
+    implicit none
+    type(Meandata), intent(inout) :: entry
+    integer, intent(in) :: entry_index
+    integer tag
+    integer                       :: i, size1, size2, size_gen, size_lev, order
+    integer                       :: c, lev
+    real(kind=8)                  :: t0,t1
+    integer mpierr
 
-
-  ! Serial output implemented so far
-  if (entry%p_partit%mype==entry%root_rank) then
-     write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
-     call assert_nf( nf_put_vara_double(entry%ncid, entry%Tid, entry%rec_count, 1, entry%ctime_copy, 1), __LINE__)
-  end if
-! !_______writing 2D and 3D fields________________________________________________
-  size1=entry%glsize(1)
-  size2=entry%glsize(2)
-  tag = 2 ! we can use a fixed tag here as we have an individual communicator for each output field
-!___________writing 8 byte real_________________________________________ 
-  if (entry%accuracy == i_real8) then
-     if(entry%p_partit%mype==entry%root_rank) then
-       if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(size2))
-     end if
-     do lev=1, size1
-#ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
-        ! aleph cray-mpich workaround
-        call MPI_Barrier(entry%comm, mpierr)
-#endif
-       if(.not. entry%is_elem_based) then
-         call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
-       else
-         call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
-       end if
-        if (entry%p_partit%mype==entry%root_rank) then
-          if (entry%ndim==1) then
-            call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r8, 1), __LINE__)
-          elseif (entry%ndim==2) then
-            call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size2, 1, 1/), entry%aux_r8, 1), __LINE__)
-          end if
-        end if
-     end do
-
-!___________writing 4 byte real _________________________________________ 
-  else if (entry%accuracy == i_real4) then
-     if(entry%p_partit%mype==entry%root_rank) then
-       if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(size2))
-     end if
-     do lev=1, size1
-#ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
-        ! aleph cray-mpich workaround
-        call MPI_Barrier(entry%comm, mpierr)
-#endif
-       if(.not. entry%is_elem_based) then
-         call gather_real4_nod2D (entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
-       else
-         call gather_real4_elem2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
-       end if
-        if (entry%p_partit%mype==entry%root_rank) then
-           if (entry%ndim==1) then
-             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r4, 1), __LINE__)
-           elseif (entry%ndim==2) then
-             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size2, 1, 1/), entry%aux_r4, 1), __LINE__)
-           end if
-        end if
-     end do
-  end if
-
-end subroutine
-
-
-subroutine update_means
-  implicit none
-  type(Meandata), pointer :: entry
-  integer                 :: n
-  integer                 :: I, J
-
-  DO n=1, io_NSTREAMS
-     entry=>io_stream(n)
-!_____________ compute in 8 byte accuracy _________________________
-     IF (entry%accuracy == i_real8) then
-        IF (entry%flip) then
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
-           DO J=1, size(entry%local_values_r8,dim=2)
-              DO I=1, size(entry%local_values_r8,dim=1)
-                 entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(J,I)
-              END DO
-           END DO
-!$OMP END PARALLEL DO
-        ELSE
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
-           DO J=1, size(entry%local_values_r8,dim=2)
-              DO I=1, size(entry%local_values_r8,dim=1)
-                 entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(I,J)
-              END DO
-           END DO
-!$OMP END PARALLEL DO
-        END IF
-!_____________ compute in 4 byte accuracy _________________________
-     ELSE IF (entry%accuracy == i_real4) then
-        IF (entry%flip) then
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
-           DO J=1, size(entry%local_values_r4,dim=2)
-              DO I=1, size(entry%local_values_r4,dim=1)
-                 entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(J,I), real32)
-              END DO
-           END DO
-!$OMP END PARALLEL DO
-        ELSE
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J)
-           DO J=1, size(entry%local_values_r4,dim=2)
-              DO I=1, size(entry%local_values_r4,dim=1)
-                 entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(I,J), real32)
-              END DO
-           END DO
-!$OMP END PARALLEL DO
-        END IF
-     END IF
-     entry%addcounter=entry%addcounter+1
-  END DO
-end subroutine
-!
-!--------------------------------------------------------------------------------------------
-!
-subroutine output(istep, ice, dynamics, tracers, partit, mesh)
-  use g_clock
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use MOD_DYN
-  use MOD_ICE
-  use mod_tracer
-  use io_gather_module
-#if defined (__icepack)
-  use icedrv_main,    only: init_io_icepack
-#endif
-  implicit none
-  integer       :: istep
-  logical, save :: lfirst=.true.
-  integer       :: n, k
-  integer       :: i, j !for OMP loops
-  logical       :: do_output
-  type(Meandata), pointer :: entry
-  type(t_mesh), intent(in) , target :: mesh
-  type(t_partit), intent(inout), target :: partit
-  type(t_tracer), intent(in)   , target :: tracers
-  type(t_dyn)   , intent(in)   , target :: dynamics
-  type(t_ice)   , intent(inout), target :: ice
+    ! Serial output implemented so far
+    !___________________________________________________________________________
+    ! write new time index ctime_copy to file --> expand time array in nc file
+    if (entry%p_partit%mype==entry%root_rank) then
+        write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
+        call assert_nf( nf_put_vara_double(entry%ncid, entry%Tid, entry%rec_count, 1, entry%ctime_copy, 1), __LINE__)
+    end if
   
-  character(:), allocatable :: filepath
-  real(real64)                  :: rtime !timestamp of the record
-
-  ctime=timeold+(dayold-1.)*86400
-  if (lfirst) then
-     call ini_mean_io(ice, dynamics, tracers, partit, mesh)
-     call init_io_gather(partit)
-#if defined (__icepack)
-     call init_io_icepack(mesh) !icapack has its copy of p_partit => partit
+    !_______writing 2D and 3D fields____________________________________________
+    size1=entry%glsize(1)
+    size2=entry%glsize(2)
+    tag = 2 ! we can use a fixed tag here as we have an individual communicator for each output field
+    
+    !___________writing 8 byte real_____________________________________________
+    if (entry%accuracy == i_real8) then
+        
+        !_______________________________________________________________________
+        ! allocate global 2d array in which local data are gathered
+        if(entry%p_partit%mype==entry%root_rank) then
+            if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(size2))
+        end if
+        
+        !_______________________________________________________________________
+        ! loop over vertical layers --> do gather 3d variables layerwise in 2d
+        ! slices
+        do lev=1, size1
+#ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
+            ! aleph cray-mpich workaround
+            call MPI_Barrier(entry%comm, mpierr)
+#elif ENABLE_ALBEDO_INTELMPI_WORKAROUNDS     
+            call MPI_Barrier(entry%comm, mpierr)
 #endif
-  end if
-
-  call update_means
-
-  do n=1, io_NSTREAMS
-     entry=>io_stream(n)
-     !check whether restart will be written
-     do_output=.false.
-
-     if (entry%freq_unit.eq.'y') then
-        call annual_event(do_output)
-
-     else if (entry%freq_unit == 'm') then 
-        call monthly_event(do_output) 
-
-     else if (entry%freq_unit == 'd') then
-        call daily_event(do_output, entry%freq)
-
-     else if (entry%freq_unit == 'h') then
-        call hourly_event(do_output, entry%freq)
-
-     else if (entry%freq_unit == 's') then
-        call step_event(do_output, istep, entry%freq)
-
-     else
-        write(*,*) 'You did not specify a supported outputflag.'
-        write(*,*) 'The program will stop to give you opportunity to do it.'
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
-        stop
-     endif
-
-     if (do_output) then
-        if (vec_autorotate) call io_r2g(n, partit, mesh) ! automatically detect if a vector field and rotate if makes sense!
-        if(entry%thread_running) call entry%thread%join()
-        entry%thread_running = .false.
-
-        filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
-        if(partit%mype == entry%root_rank) then
-          if(filepath /= trim(entry%filename)) then
-            if("" /= trim(entry%filename)) call assert_nf(nf_close(entry%ncid), __LINE__)   
-            entry%filename = filepath
-            ! use any existing file with this name or create a new one
-            if( nf_open(entry%filename, nf_write, entry%ncid) /= nf_noerr ) then
-              call create_new_file(entry, ice, dynamics, partit, mesh)
-              call assert_nf( nf_open(entry%filename, nf_write, entry%ncid), __LINE__)
+            !___________________________________________________________________
+            ! local output variables are gahtered in 2d shaped entry%aux_r8 
+            ! either for vertices or elements
+            if(.not. entry%is_elem_based) then
+                call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
+            else
+                call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
             end if
-            call assoc_ids(entry)
-          end if
+            
+            !___________________________________________________________________
+            ! use root_rank CPU/Task to write 2d slice into netcdf file for 3d 
+            ! variables into specific layer position lev
+            if (entry%p_partit%mype==entry%root_rank) then
+                if (entry%ndim==1) then
+                    call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r8, 1), __LINE__)
+                elseif (entry%ndim==2) then
+                    call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size2, 1, 1/), entry%aux_r8, 1), __LINE__)
+                end if
+            end if
+        end do ! --> do lev=1, size1
 
-          !___if the time rtime at the rec_count is larger than ctime we look for the closest record with the timestamp less than ctime
-          do k=entry%rec_count, 1, -1
-             call assert_nf( nf_get_vara_double(entry%ncid, entry%tID, k, 1, rtime, 1), __LINE__)
-             if (ctime > rtime) then
-                entry%rec_count=k+1
-                exit ! a proper rec_count detected, exit the loop
-             end if
-             if (k==1) then
-                write(*,*) 'I/O '//trim(entry%name)//' WARNING: the existing output file will be overwritten'//'; ', entry%rec_count, ' records in the file;'
-                entry%rec_count=1
-                exit ! no appropriate rec_count detected
-             end if
-          end do
-          entry%rec_count=max(entry%rec_count, 1)
-          write(*,*) trim(entry%name)//': current mean I/O counter = ', entry%rec_count
+    !___________writing 4 byte real ____________________________________________ 
+    else if (entry%accuracy == i_real4) then
+    
+        !_______________________________________________________________________
+        ! allocate global 2d array in which local data are gathered
+        if(entry%p_partit%mype==entry%root_rank) then
+            if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(size2))
         end if
-
-        if (entry%accuracy == i_real8) then
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
-           DO J=1, size(entry%local_values_r8,dim=2)
-              DO I=1, size(entry%local_values_r8,dim=1)
-                 entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64)  ! compute_means
-                 entry%local_values_r8(I,J) = 0._real64 ! clean_meanarrays
-              END DO
-           END DO
-!$OMP END PARALLEL DO
-        else if (entry%accuracy == i_real4) then
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
-           DO J=1, size(entry%local_values_r4,dim=2)
-              DO I=1, size(entry%local_values_r4,dim=1)
-                 entry%local_values_r4_copy(I,J) = entry%local_values_r4(I,J) /real(entry%addcounter,real32)  ! compute_means
-                 entry%local_values_r4(I,J) = 0._real32 ! clean_meanarrays
-              END DO
-           END DO
-!$OMP END PARALLEL DO
-        end if
-        entry%addcounter   = 0  ! clean_meanarrays
-        entry%ctime_copy = ctime
-        call entry%thread%run()
-        entry%thread_running = .true.
-     endif
-  end do
-  lfirst=.false.
-end subroutine
-
-
-subroutine do_output_callback(entry_index)
-use mod_mesh
-USE MOD_PARTIT
-USE MOD_PARSUP
-  integer, intent(in) :: entry_index
-  ! EO args
-  type(Meandata), pointer :: entry
-
-
-  entry=>io_stream(entry_index)
-  entry%p_partit%mype=entry%mype_workaround ! for the thread callback, copy back the value of our mype as a workaround for errors with the cray envinronment (at least with ftn 2.5.9 and cray-mpich 7.5.3)
-
-  call write_mean(entry, entry_index)
-  if(entry%p_partit%mype == entry%root_rank) call assert_nf( nf_sync(entry%ncid), __LINE__ ) ! flush the file to disk after each write
-end subroutine
-
-
-subroutine finalize_output()
-  integer i
-  type(Meandata), pointer :: entry
-
-  do i=1, io_NSTREAMS
-    entry=>io_stream(i)
-    if(entry%thread_running) call entry%thread%join()
-    entry%thread_running = .false.    
-  end do
-end subroutine
-!
-!--------------------------------------------------------------------------------------------
-!
-subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh, flip_array)
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  implicit none
-  type(t_partit),        intent(inout), target :: partit
-  integer,               intent(in)    :: glsize(2), lcsize(2)
-  character(len=*),      intent(in)    :: name, description, units
-  real(kind=WP), target, intent(in)    :: data(:,:)
-  integer,               intent(in)    :: freq
-  character,             intent(in)    :: freq_unit
-  integer,               intent(in)    :: accuracy
-  type(Meandata),        allocatable   :: tmparr(:)
-  type(Meandata),        pointer       :: entry
-  type(t_mesh), intent(in), target     :: mesh
-  logical, optional, intent(in)        :: flip_array
-  integer i
- 
-#if !defined(__PGI)  
-  do i = 1, rank(data)
-    if ((ubound(data, dim = i)<=0)) then
-      if (partit%mype==0) then
-        write(*,*) 'WARNING: adding I/O stream for ', trim(name), ' failed (contains 0 dimension)'
-        write(*,*) 'upper bound is: ', ubound(data, dim = i)
-      end if
-      return
-    end if    
-  end do
+        
+        !_______________________________________________________________________
+        ! loop over vertical layers --> do gather 3d variables layerwise in 2d
+        ! slices
+        do lev=1, size1
+            if (entry%p_partit%mype==entry%root_rank) t0=MPI_Wtime()  
+#ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
+            ! aleph cray-mpich workaround
+            call MPI_Barrier(entry%comm, mpierr)
+#elif ENABLE_ALBEDO_INTELMPI_WORKAROUNDS     
+            call MPI_Barrier(entry%comm, mpierr)
 #endif
-
-  if (partit%mype==0) then
-     write(*,*) 'adding I/O stream 3D for ', trim(name)
-  end if
-
-  call associate_new_stream(name, entry)
-
-  ! 3d specific
-  entry%ptr3 => data                      !2D! entry%ptr3(1:1,1:size(data)) => data
-
-  if (present(flip_array)) then
-      if (flip_array) then
-          entry%flip = .true.
-      else
-          entry%flip = .false.
-      end if
-  else
-      entry%flip = .false.
-  end if
-
-  entry%ndim=2
-  entry%glsize=glsize                     !2D! entry%glsize=(/1, glsize/)
-
-  if (accuracy == i_real8) then
-    allocate(entry%local_values_r8(lcsize(1), lcsize(2)))
-    entry%local_values_r8 = 0._real64
-  elseif (accuracy == i_real4) then
-    allocate(entry%local_values_r4(lcsize(1), lcsize(2)))
-    entry%local_values_r4 = 0._real32
-  end if
-
-  entry%dimname(1)=mesh_dimname_from_dimsize(glsize(1), partit, mesh)     !2D! mesh_dimname_from_dimsize(glsize, mesh)
-  entry%dimname(2)=mesh_dimname_from_dimsize(glsize(2), partit, mesh)     !2D! entry%dimname(2)='unknown'
-  ! non dimension specific
-  call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh)
+            t0=MPI_Wtime()  
+            !___________________________________________________________________
+            ! local output variables are gahtered in 2d shaped entry%aux_r8 
+            ! either for vertices or elements
+            if(.not. entry%is_elem_based) then
+                call gather_real4_nod2D (entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
+            else
+                call gather_real4_elem2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
+            end if
+            
+            !___________________________________________________________________
+            ! use root_rank CPU/Task to write 2d slice into netcdf file for 3d 
+            ! variables into specific layer position lev
+            if (entry%p_partit%mype==entry%root_rank) then
+                if (entry%ndim==1) then
+                    call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r4, 1), __LINE__)
+                    t1=MPI_Wtime()  
+                    !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> after nf_put_vara_real'//achar(27)//'[0m', entry%p_partit%mype, t1-t0
+                elseif (entry%ndim==2) then
+                    call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size2, 1, 1/), entry%aux_r4, 1), __LINE__)
+                    t1=MPI_Wtime()  
+                    !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> after nf_put_vara_real'//achar(27)//'[0m', entry%p_partit%mype, lev, t1-t0
+                end if
+            end if
+        end do ! --> do lev=1, size1
+    end if ! --> if (entry%accuracy == i_real8) then
 end subroutine
 !
-!--------------------------------------------------------------------------------------------
 !
-subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh)
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  implicit none
-  integer,               intent(in)    :: glsize, lcsize
-  character(len=*),      intent(in)    :: name, description, units
-  real(kind=WP), target, intent(in)    :: data(:)
-  integer,               intent(in)    :: freq
-  character,             intent(in)    :: freq_unit
-  integer,               intent(in)    :: accuracy
-  type(Meandata),        allocatable   :: tmparr(:)
-  type(Meandata),        pointer       :: entry
-  type(t_mesh),          intent(in)    :: mesh
-  type(t_partit),        intent(inout) :: partit
-  integer i
-
-#if !defined(__PGI)   
-  do i = 1, rank(data)
-    if ((ubound(data, dim = i)<=0)) then
-      if (partit%mype==0) then
-        write(*,*) 'WARNING: adding I/O stream for ', trim(name), ' failed (contains 0 dimension)'
-        write(*,*) 'upper bound is: ', ubound(data, dim = i)
-      end if
-      return
-    end if    
-  end do
-#endif
-
-  if (partit%mype==0) then
-     write(*,*) 'adding I/O stream 2D for ', trim(name)
-  end if
-
-  call associate_new_stream(name, entry)
-  
-  ! 2d specific
-  entry%ptr3(1:1,1:size(data)) => data(:)
-
-  if (accuracy == i_real8) then
-    allocate(entry%local_values_r8(1, lcsize))
-    entry%local_values_r8 = 0._real64
-  elseif (accuracy == i_real4) then
-    allocate(entry%local_values_r4(1, lcsize))
-    entry%local_values_r4 = 0._real32
-  end if
-
-  entry%ndim=1
-  entry%glsize=(/1, glsize/)
-
-  entry%dimname(1)=mesh_dimname_from_dimsize(glsize, partit, mesh)
-  entry%dimname(2)='unknown'
-
-  ! non dimension specific
-  call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh)
-end subroutine
-
-
-  subroutine associate_new_stream(name, entry)
+!_______________________________________________________________________________
+subroutine update_means
+    implicit none
     type(Meandata), pointer :: entry
+    integer                 :: n
+    integer                 :: I, J
+
+    DO n=1, io_NSTREAMS
+        entry=>io_stream(n)
+        
+        !_____________ compute in 8 byte accuracy ______________________________
+        IF (entry%accuracy == i_real8) then
+            IF (entry%flip) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+                DO J=1, size(entry%local_values_r8,dim=2)
+                    DO I=1, size(entry%local_values_r8,dim=1)
+                        entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(J,I)
+                    END DO
+                END DO
+!$OMP END PARALLEL DO
+            ELSE
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+                DO J=1, size(entry%local_values_r8,dim=2)
+                    DO I=1, size(entry%local_values_r8,dim=1)
+                        entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(I,J)
+                    END DO
+                END DO
+!$OMP END PARALLEL DO
+            END IF
+            
+        !_____________ compute in 4 byte accuracy ______________________________
+        ELSE IF (entry%accuracy == i_real4) then
+            IF (entry%flip) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+                DO J=1, size(entry%local_values_r4,dim=2)
+                    DO I=1, size(entry%local_values_r4,dim=1)
+                        entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(J,I), real32)
+                    END DO
+                END DO
+!$OMP END PARALLEL DO
+            ELSE
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J)
+                DO J=1, size(entry%local_values_r4,dim=2)
+                    DO I=1, size(entry%local_values_r4,dim=1)
+                        entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(I,J), real32)
+                    END DO
+                END DO
+!$OMP END PARALLEL DO
+            END IF
+        END IF ! --> IF (entry%accuracy == i_real8) then
+        
+        entry%addcounter=entry%addcounter+1
+    END DO ! --> DO n=1, io_NSTREAMS
+end subroutine
+!
+!
+!_______________________________________________________________________________
+! main output routine called at the end of each time step --> here is decided if 
+! output event is triggered
+subroutine output(istep, ice, dynamics, tracers, partit, mesh)
+    use g_clock
+    use mod_mesh
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use MOD_DYN
+    use MOD_ICE
+    use mod_tracer
+    use io_gather_module
+#if defined (__icepack)
+    use icedrv_main,    only: init_io_icepack
+#endif
+    implicit none
+    integer       :: istep
+    logical, save :: lfirst=.true.
+    integer       :: n, k
+    integer       :: i, j !for OMP loops
+    logical       :: do_output
+    type(Meandata), pointer :: entry
+    type(t_mesh), intent(in) , target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_tracer), intent(in)   , target :: tracers
+    type(t_dyn)   , intent(in)   , target :: dynamics
+    type(t_ice)   , intent(inout), target :: ice
+    
+    character(:), allocatable :: filepath
+    real(real64)                  :: rtime !timestamp of the record
+
+    ctime=timeold+(dayold-1.)*86400
+    
+    !___________________________________________________________________________
+    if (lfirst) then
+        ! define output streams-->dimension, variable, long_name, units, array, freq, unit, precision
+        !PS if (partit%flag_debug .and. partit%mype==0)  print *, achar(27)//'[32m'//' -I/O-> call ini_mean_io'//achar(27)//'[0m'
+        call ini_mean_io(ice, dynamics, tracers, partit, mesh)
+        
+        !PS if (partit%flag_debug .and. partit%mype==0)  print *, achar(27)//'[33m'//' -I/O-> call init_io_gather'//achar(27)//'[0m'
+        call init_io_gather(partit)
+#if defined (__icepack)
+        call init_io_icepack(mesh) !icapack has its copy of p_partit => partit
+#endif
+    end if ! --> if (lfirst) then
+    
+    !___________________________________________________________________________
+    !PS if (partit%flag_debug .and. partit%mype==0)  print *, achar(27)//'[33m'//' -I/O-> call update_means'//achar(27)//'[0m'  
+    call update_means
+    
+    !___________________________________________________________________________
+    ! loop over defined streams
+    do n=1, io_NSTREAMS
+        !_______________________________________________________________________
+        ! make pointer for entry onto io_stream object
+        entry=>io_stream(n)
+        
+        !_______________________________________________________________________
+        !check whether output will be written based on event frequency
+        do_output=.false.
+        if (entry%freq_unit.eq.'y') then
+            call annual_event(do_output)
+        else if (entry%freq_unit == 'm') then 
+            call monthly_event(do_output) 
+        else if (entry%freq_unit == 'd') then
+            call daily_event(do_output, entry%freq)
+        else if (entry%freq_unit == 'h') then
+            call hourly_event(do_output, entry%freq)
+        else if (entry%freq_unit == 's') then
+            call step_event(do_output, istep, entry%freq)
+        else
+            write(*,*) 'You did not specify a supported outputflag.'
+            write(*,*) 'The program will stop to give you opportunity to do it.'
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            stop
+        endif
+        
+        !_______________________________________________________________________
+        ! if its time for output --> do_output==.true.
+        if (do_output) then
+            if (vec_autorotate) call io_r2g(n, partit, mesh) ! automatically detect if a vector field and rotate if makes sense!
+            if(entry%thread_running) call entry%thread%join()
+            entry%thread_running = .false.
+            
+            ! define filepath
+            filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
+            
+            !___________________________________________________________________
+            ! only root rank task does output
+            if(partit%mype == entry%root_rank) then
+                !_______________________________________________________________
+                ! create new output file ?!
+                if(filepath /= trim(entry%filename)) then
+                    if("" /= trim(entry%filename)) call assert_nf(nf_close(entry%ncid), __LINE__)   
+                    entry%filename = filepath
+                    !___________________________________________________________
+                    ! use any existing file with this name or create a new one
+                    if( nf_open(entry%filename, nf_write, entry%ncid) /= nf_noerr ) then
+                        !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call create_new_file'//achar(27)//'[0m'  
+                        call create_new_file(entry, ice, dynamics, partit, mesh)
+                        
+                        !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf A'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank    
+                        call assert_nf( nf_open(entry%filename, nf_write, entry%ncid), __LINE__)
+                    end if
+                    
+                    !___________________________________________________________
+                    ! setup all dimension definition and attributes of the netcdf
+                    ! file 
+                    !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assoc_ids'//achar(27)//'[0m'  
+                    call assoc_ids(entry)
+                    
+                end if ! --> if(filepath /= trim(entry%filename)) then
+                
+                !_______________________________________________________________
+                ! if the time rtime at the rec_count is larger than ctime we 
+                ! look for the closest record with the timestamp less than ctime
+                do k=entry%rec_count, 1, -1
+                    !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf B'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank  
+                    ! determine rtime from exiting file
+                    call assert_nf( nf_get_vara_double(entry%ncid, entry%tID, k, 1, rtime, 1), __LINE__)
+                    if (ctime > rtime) then
+                        entry%rec_count=k+1
+                        exit ! a proper rec_count detected, exit the loop
+                    end if
+                    if (k==1) then
+                        write(*,*) 'I/O '//trim(entry%name)//' WARNING: the existing output file will be overwritten'//'; ', entry%rec_count, ' records in the file;'
+                        entry%rec_count=1
+                        exit ! no appropriate rec_count detected
+                    end if
+                end do
+                entry%rec_count=max(entry%rec_count, 1)
+                write(*,*) trim(entry%name)//': current mean I/O counter = ', entry%rec_count
+            end if ! --> if(partit%mype == entry%root_rank) then
+            
+            !___________________________________________________________________
+            ! write double precision output
+            if (entry%accuracy == i_real8) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+                DO J=1, size(entry%local_values_r8,dim=2)
+                    DO I=1, size(entry%local_values_r8,dim=1)
+                        entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64)  ! compute_means
+                        entry%local_values_r8(I,J) = 0._real64 ! clean_meanarrays
+                    END DO ! --> DO I=1, size(entry%local_values_r8,dim=1)
+                END DO ! --> DO J=1, size(entry%local_values_r8,dim=2)
+!$OMP END PARALLEL DO
+                
+            !___________________________________________________________________
+            ! write single precision output
+            else if (entry%accuracy == i_real4) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+                DO J=1, size(entry%local_values_r4,dim=2)
+                    DO I=1, size(entry%local_values_r4,dim=1)
+                        entry%local_values_r4_copy(I,J) = entry%local_values_r4(I,J) /real(entry%addcounter,real32)  ! compute_means
+                        entry%local_values_r4(I,J) = 0._real32 ! clean_meanarrays
+                    END DO ! --> DO I=1, size(entry%local_values_r4,dim=1)
+                END DO ! --> DO J=1, size(entry%local_values_r4,dim=2)
+!$OMP END PARALLEL DO
+            end if ! --> if (entry%accuracy == i_real8) then
+            
+            !___________________________________________________________________
+            entry%addcounter   = 0  ! clean_meanarrays
+            entry%ctime_copy = ctime
+            
+            !___________________________________________________________________
+            ! this is where the magic happens --> here do_output_callback is
+            ! triggered as a method of the io_stream object --> call write_mean(...)
+            call entry%thread%run()
+            entry%thread_running = .true.
+            
+        endif ! --> if (do_output) then
+    end do ! --> do n=1, io_NSTREAMS
+    lfirst=.false.
+end subroutine
+!
+!
+!_______________________________________________________________________________
+! this becomes the output callback functions that becomes part of the IOstream(idx).thread 
+! object
+! --> this callback function becomes initialised in def_stream_after_dimension_specific(...)
+!     by call IOstream(idx)%thread%initialize(do_output_callback, entry_index)
+! --> the execution of this function can be triggered by IOstream(idx)%thread%run()
+! --> do_output_callback becomes an executable method of the object 
+!     IOstream(idx)%thread
+subroutine do_output_callback(entry_index)
+    use mod_mesh
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    integer, intent(in) :: entry_index ! index of variable in def_stream array 
+    ! EO args
+    type(Meandata), pointer :: entry
+
+    entry=>io_stream(entry_index)
+    entry%p_partit%mype=entry%mype_workaround ! for the thread callback, copy back the value of our mype as a workaround for errors with the cray envinronment (at least with ftn 2.5.9 and cray-mpich 7.5.3)
+    !___________________________________________________________________________
+    ! collect local mean output data (entry%local_values_r8_copy) into global 2d 
+    ! array (entry%aux_r8) and use the root_rank CPU/Task to write them into netcdf
+    ! file. In case of 3data write horizontal slices level wise.
+    call write_mean(entry, entry_index)
+  
+    !___________________________________________________________________________
+    ! The function NF_SYNC offers a way to synchronize the disk copy of a netCDF 
+    ! dataset with in-memory buffers. There are two reasons you might want to 
+    ! synchronize after writes:
+    ! To minimize data loss in case of abnormal termination, or To make data 
+    ! available to other processes for reading immediately after it is written. 
+    if(entry%p_partit%mype == entry%root_rank) then 
+        !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> call nf_sync'//achar(27)//'[0m', entry%p_partit%mype
+        call assert_nf( nf_sync(entry%ncid), __LINE__ ) ! flush the file to disk after each write
+    end if   
+    
+end subroutine
+!
+!
+!_______________________________________________________________________________
+! Why this is done?! --> executed in fesom_main.F90 in call fesom_finalize() 
+! after the run lop is finished --> stop/cleanup threads?
+subroutine finalize_output()
+    integer i
+    type(Meandata), pointer :: entry
+    do i=1, io_NSTREAMS
+        entry=>io_stream(i)
+        if(entry%thread_running) call entry%thread%join()
+        entry%thread_running = .false.    
+    end do
+end subroutine
+!
+!
+!_______________________________________________________________________________
+! build 3d meandata streaming object
+subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh, flip_array)
+    use mod_mesh
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    implicit none
+    type(t_partit),        intent(inout), target :: partit
+    integer,               intent(in)    :: glsize(2), lcsize(2)
+    character(len=*),      intent(in)    :: name, description, units
+    real(kind=WP), target, intent(in)    :: data(:,:)
+    integer,               intent(in)    :: freq
+    character,             intent(in)    :: freq_unit
+    integer,               intent(in)    :: accuracy
+    type(Meandata),        allocatable   :: tmparr(:)
+    type(Meandata),        pointer       :: entry
+    type(t_mesh), intent(in), target     :: mesh
+    logical, optional, intent(in)        :: flip_array
+    integer i
+ 
+    !___________________________________________________________________________
+#if !defined(__PGI)  
+    do i = 1, rank(data)
+        if ((ubound(data, dim = i)<=0)) then
+            if (partit%mype==0) then
+                write(*,*) 'WARNING: adding I/O stream for ', trim(name), ' failed (contains 0 dimension)'
+                write(*,*) 'upper bound is: ', ubound(data, dim = i)
+            end if
+            return
+        end if    
+    end do
+#endif
+
+    !___________________________________________________________________________
+    if (partit%mype==0) then
+        write(*,*) 'adding I/O stream 3D for ', trim(name)
+    end if
+    
+    !___________________________________________________________________________
+    ! initialise meandata streaming object
+    call associate_new_stream(name, entry)
+
+    !___________________________________________________________________________
+    ! fill up 3d meandata streaming object
+    ! 3d specific
+    entry%ptr3 => data                      !2D! entry%ptr3(1:1,1:size(data)) => data
+
+    if (present(flip_array)) then
+        if (flip_array) then
+            entry%flip = .true.
+        else
+            entry%flip = .false.
+        end if
+    else
+        entry%flip = .false.
+    end if
+
+    entry%ndim=2
+    entry%glsize=glsize                     !2D! entry%glsize=(/1, glsize/)
+
+    if (accuracy == i_real8) then
+        allocate(entry%local_values_r8(lcsize(1), lcsize(2)))
+        entry%local_values_r8 = 0._real64
+    elseif (accuracy == i_real4) then
+        allocate(entry%local_values_r4(lcsize(1), lcsize(2)))
+        entry%local_values_r4 = 0._real32
+    end if
+
+    entry%dimname(1)=mesh_dimname_from_dimsize(glsize(1), partit, mesh)     !2D! mesh_dimname_from_dimsize(glsize, mesh)
+    entry%dimname(2)=mesh_dimname_from_dimsize(glsize(2), partit, mesh)     !2D! entry%dimname(2)='unknown'
+    
+    ! non dimension specific
+    call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh)
+end subroutine
+!
+!
+!_______________________________________________________________________________
+! build 2d meandata streaming object
+subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh)
+    use mod_mesh
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    implicit none
+    integer,               intent(in)    :: glsize, lcsize
+    character(len=*),      intent(in)    :: name, description, units
+    real(kind=WP), target, intent(in)    :: data(:)
+    integer,               intent(in)    :: freq
+    character,             intent(in)    :: freq_unit
+    integer,               intent(in)    :: accuracy
+    type(Meandata),        allocatable   :: tmparr(:)
+    type(Meandata),        pointer       :: entry
+    type(t_mesh),          intent(in)    :: mesh
+    type(t_partit),        intent(inout) :: partit
+    integer i
+
+    !___________________________________________________________________________
+#if !defined(__PGI)   
+    do i = 1, rank(data)
+        if ((ubound(data, dim = i)<=0)) then
+        if (partit%mype==0) then
+            write(*,*) 'WARNING: adding I/O stream for ', trim(name), ' failed (contains 0 dimension)'
+            write(*,*) 'upper bound is: ', ubound(data, dim = i)
+        end if
+        return
+        end if    
+    end do
+#endif
+
+    !___________________________________________________________________________
+    if (partit%mype==0) then
+        write(*,*) 'adding I/O stream 2D for ', trim(name)
+    end if
+
+    !___________________________________________________________________________
+    ! initialise meandata streaming object
+    call associate_new_stream(name, entry)
+    
+    !___________________________________________________________________________
+    ! fill up 3d meandata streaming object
+    ! 2d specific
+    entry%ptr3(1:1,1:size(data)) => data(:)
+
+    if (accuracy == i_real8) then
+        allocate(entry%local_values_r8(1, lcsize))
+        entry%local_values_r8 = 0._real64
+    elseif (accuracy == i_real4) then
+        allocate(entry%local_values_r4(1, lcsize))
+        entry%local_values_r4 = 0._real32
+    end if
+
+    entry%ndim=1
+    entry%glsize=(/1, glsize/)
+
+    entry%dimname(1)=mesh_dimname_from_dimsize(glsize, partit, mesh)
+    entry%dimname(2)='unknown'
+
+    ! non dimension specific
+    call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh)
+end subroutine
+!
+!
+!_______________________________________________________________________________
+! initialse new meandata streaming object
+subroutine associate_new_stream(name, entry)
+    type(Meandata), pointer      :: entry
     character(len=*), intent(in) :: name
     integer i
 
     entry => null()
     
+    !___________________________________________________________________________
     ! check if we already have this variable
     do i=1, io_NSTREAMS
-      if(trim(io_stream(i)%name) .eq. name) then
-          print *,"variable '"//name//"' already exists, &
-              &check if you define it multiple times, for example in namelist.io, &
-              &namelist.icepack, io_meandata.F90 or other place that add I/O stream."
-          call assert(.false., __LINE__) 
-      end if
+        if(trim(io_stream(i)%name) .eq. name) then
+            print *,"variable '"//name//"' already exists, &
+                &check if you define it multiple times, for example in namelist.io, &
+                &namelist.icepack, io_meandata.F90 or other place that add I/O stream."
+            call assert(.false., __LINE__) 
+        end if
     end do
-        
+    
+    !___________________________________________________________________________
     ! add this instance to io_stream array
     io_NSTREAMS = io_NSTREAMS +1
     call assert(size(io_stream) >= io_NSTREAMS, __LINE__)
     entry=>io_stream(io_NSTREAMS)
-  end subroutine
-
-
-  subroutine def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh)
+end subroutine
+!
+!
+!_______________________________________________________________________________
+! further fill up 2d/3d meandata streaming object --> link output callback routine
+! as stream object method
+subroutine def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh)
     use mod_mesh
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -1214,6 +1363,7 @@ end subroutine
     
     entry_index = io_NSTREAMS
     
+    !___________________________________________________________________________
     entry%accuracy = accuracy
 
     if (accuracy == i_real8) then
@@ -1226,6 +1376,7 @@ end subroutine
        stop
     endif ! accuracy
 
+    !___________________________________________________________________________
     entry%name = name
     entry%description = description
     entry%units = units
@@ -1236,6 +1387,7 @@ end subroutine
     entry%addcounter   = 0
     entry%is_in_use=.true.
 
+    !___________________________________________________________________________
     if(entry%glsize(1)==mesh%nod2D  .or. entry%glsize(2)==mesh%nod2D) then
       entry%is_elem_based = .false.
     else if(entry%glsize(1)==mesh%elem2D .or. entry%glsize(2)==mesh%elem2D) then
@@ -1244,19 +1396,21 @@ end subroutine
       if(partit%mype == 0) print *,"can not determine if ",trim(name)," is node or elem based"
       stop
     end if
-
+    
+    !___________________________________________________________________________
     if (accuracy == i_real8) then
       allocate(entry%local_values_r8_copy(size(entry%local_values_r8, dim=1), size(entry%local_values_r8, dim=2)))
     else if (accuracy == i_real4) then
       allocate(entry%local_values_r4_copy(size(entry%local_values_r4, dim=1), size(entry%local_values_r4, dim=2)))
     end if
 
+    !___________________________________________________________________________
     ! set up async output
-    
     entry%root_rank = next_io_rank(partit%MPI_COMM_FESOM, async_netcdf_allowed, partit)
 
     call MPI_Comm_dup(partit%MPI_COMM_FESOM, entry%comm, err)
 
+    ! initialise output callback routine as meandata stream object method
     call entry%thread%initialize(do_output_callback, entry_index)
     if(.not. async_netcdf_allowed) call entry%thread%disable_async()
   
@@ -1268,33 +1422,37 @@ end subroutine
     
     entry%mype_workaround = partit%mype ! make a copy of the mype variable as there is an error with the cray compiler or environment which voids the global mype for our threads
     entry%p_partit=>partit
-  end subroutine
-
-
-  subroutine assert_nf(status, line)
+end subroutine
+!
+!
+!_______________________________________________________________________________
+subroutine assert_nf(status, line)
     integer, intent(in) :: status
     integer, intent(in) :: line
     ! EO args
     include "netcdf.inc" ! old netcdf fortran interface required?
     if(status /= NF_NOERR) then
-      print *, "error in line ",line, __FILE__, ' ', trim(nf_strerror(status))
-      stop 1
+        print *, "error in line ",line, __FILE__, ' ', trim(nf_strerror(status))
+        stop 1
     end if   
-  end subroutine
-
-
-  subroutine assert(val, line)
+end subroutine
+!
+!
+!_______________________________________________________________________________
+subroutine assert(val, line)
     logical, intent(in) :: val
     integer, intent(in) :: line
     ! EO args
     if(.NOT. val) then
-      print *, "error in line ",line, __FILE__
-      stop 1
+        print *, "error in line ",line, __FILE__
+        stop 1
     end if
-  end subroutine
-
-
-  subroutine io_r2g(n, partit, mesh)
+end subroutine
+!
+!
+!_______________________________________________________________________________
+! do vector rotation on the fly 
+subroutine io_r2g(n, partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
     USE g_rotate_grid
@@ -1330,42 +1488,44 @@ end subroutine
        write(*,*) trim(entry_x%name)//' and '//trim(entry_y%name)//' will be rotated before output!'
     END IF
 
+    !___________________________________________________________________________
     IF ((entry_x%accuracy == i_real8) .AND. (entry_y%accuracy == i_real8)) THEN
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J, xmean, ymean)
-    DO J=1, size(entry_x%local_values_r8,dim=2)
-       if (entry_x%is_elem_based) then
-          xmean=sum(mesh%coord_nod2D(1, mesh%elem2D_nodes(:, J)))/3._WP
-          ymean=sum(mesh%coord_nod2D(2, mesh%elem2D_nodes(:, J)))/3._WP
-       else
-          xmean=mesh%coord_nod2D(1, J)
-          ymean=mesh%coord_nod2D(2, J)
-       end if
-       DO I=1, size(entry_x%local_values_r8,dim=1)
-          call vector_r2g(entry_x%local_values_r8(I,J), entry_y%local_values_r8(I,J), xmean, ymean, 0)
-       END DO
-    END DO
+        DO J=1, size(entry_x%local_values_r8,dim=2)
+            if (entry_x%is_elem_based) then
+                xmean=sum(mesh%coord_nod2D(1, mesh%elem2D_nodes(:, J)))/3._WP
+                ymean=sum(mesh%coord_nod2D(2, mesh%elem2D_nodes(:, J)))/3._WP
+            else
+                xmean=mesh%coord_nod2D(1, J)
+                ymean=mesh%coord_nod2D(2, J)
+            end if
+            DO I=1, size(entry_x%local_values_r8,dim=1)
+                call vector_r2g(entry_x%local_values_r8(I,J), entry_y%local_values_r8(I,J), xmean, ymean, 0)
+            END DO
+        END DO
 !$OMP END PARALLEL DO
     END IF
 
+    !___________________________________________________________________________
     IF ((entry_x%accuracy == i_real4) .AND. (entry_y%accuracy == i_real4)) THEN
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J, temp_x, temp_y, xmean, ymean)
-    DO J=1, size(entry_x%local_values_r4,dim=2)
-       if (entry_x%is_elem_based) then
-          xmean=sum(mesh%coord_nod2D(1, mesh%elem2D_nodes(:, J)))/3._WP
-          ymean=sum(mesh%coord_nod2D(2, mesh%elem2D_nodes(:, J)))/3._WP
-       else
-          xmean=mesh%coord_nod2D(1, J)
-          ymean=mesh%coord_nod2D(2, J)
-       end if
-       DO I=1, size(entry_x%local_values_r4,dim=1)
-          temp_x=real(entry_x%local_values_r4(I,J), real64)
-          temp_y=real(entry_y%local_values_r4(I,J), real64)
-          call vector_r2g(temp_x, temp_y, xmean, ymean, 0)
-          entry_x%local_values_r4(I,J)=real(temp_x, real32)
-          entry_y%local_values_r4(I,J)=real(temp_y, real32)
-       END DO
-    END DO
+        DO J=1, size(entry_x%local_values_r4,dim=2)
+            if (entry_x%is_elem_based) then
+                xmean=sum(mesh%coord_nod2D(1, mesh%elem2D_nodes(:, J)))/3._WP
+                ymean=sum(mesh%coord_nod2D(2, mesh%elem2D_nodes(:, J)))/3._WP
+            else
+                xmean=mesh%coord_nod2D(1, J)
+                ymean=mesh%coord_nod2D(2, J)
+            end if
+            DO I=1, size(entry_x%local_values_r4,dim=1)
+                temp_x=real(entry_x%local_values_r4(I,J), real64)
+                temp_y=real(entry_y%local_values_r4(I,J), real64)
+                call vector_r2g(temp_x, temp_y, xmean, ymean, 0)
+                entry_x%local_values_r4(I,J)=real(temp_x, real32)
+                entry_y%local_values_r4(I,J)=real(temp_y, real32)
+            END DO
+        END DO
 !$OMP END PARALLEL DO
     END IF
-  end subroutine
+end subroutine
 end module
