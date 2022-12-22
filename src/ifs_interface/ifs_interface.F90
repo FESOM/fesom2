@@ -598,7 +598,7 @@ SUBROUTINE nemogcmcoup_exflds_get( mype, npes, icomm, &
    USE interinfo
    USE fesom_main_storage_module, only: fesom => f
    USE o_ARRAYS, only : MLD1
-   USE diagnostics, only : ldiag_extflds, zisotherm
+   USE diagnostics, only : ldiag_extflds, zisotherm, saltzavg, tempzavg
    IMPLICIT NONE
    
    ! Arguments
@@ -666,16 +666,28 @@ SUBROUTINE nemogcmcoup_exflds_get( mype, npes, icomm, &
    ! =================================================================== !
    ! Pack average temp over upper 300m: 'pgtem300' on Gaussian grid.
    nfield = nfield + 1
-   DO n=1,myDim_nod2D
-      zsendnf(n,nfield)=-1. ! compute later, set to -1
-   ENDDO
-   
+   if (ldiag_extflds) then
+     DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=tempzavg(n) ! extra diagnostic active
+     ENDDO
+   else
+     DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=-1. ! set to -1 as placeholder
+     ENDDO
+   end if
+
    ! =================================================================== !
    ! Pack average salinity over upper 300m: 'pgsal300' on Gaussian grid.
    nfield = nfield + 1
-   DO n=1,myDim_nod2D
-      zsendnf(n,nfield)=-1. ! compute later, set to -1
-   ENDDO
+   if (ldiag_extflds) then
+     DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=saltzavg(n) ! extra diagnostic active
+     ENDDO
+   else
+     DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=-1. ! set to -1 as placeholder
+     ENDDO
+   end if
 
    ! =================================================================== !
    ! Interpolate all fields
