@@ -229,7 +229,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !     horizontal element and vertical node contribution to node n and layer nz
     !     see. R. Löhner et al. "finite element flux corrected transport (FEM-FCT)
     !     for the euler and navier stoke equation
-!$OMP DO
+!!$OMP DO
     ! !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     ! do n=1, myDim_nod2D
     !     do nz=1, nl
@@ -244,8 +244,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !     end do
     ! end do
     ! !$ACC END PARALLEL LOOP
-!$OMP END DO
-
+!!$OMP END DO
     !Vertical
 !$OMP DO
     !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
