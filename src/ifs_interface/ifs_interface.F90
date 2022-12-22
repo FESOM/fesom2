@@ -598,6 +598,7 @@ SUBROUTINE nemogcmcoup_exflds_get( mype, npes, icomm, &
    USE interinfo
    USE fesom_main_storage_module, only: fesom => f
    USE o_ARRAYS, only : MLD1
+   USE diagnostics, only : ldiag_extflds, zisotherm
    IMPLICIT NONE
    
    ! Arguments
@@ -645,9 +646,15 @@ SUBROUTINE nemogcmcoup_exflds_get( mype, npes, icomm, &
    ! =================================================================== !
    ! Pack depth of 20C isotherm
    nfield = nfield + 1
-   DO n=1,myDim_nod2D
-      zsendnf(n,nfield)=-1. ! compute later, set to -1 for the moment
-   ENDDO
+   if (ldiag_extflds) then 
+     DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=zisotherm(n) ! extra diagnostics active
+     ENDDO
+   else
+     DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=-1. ! set to -1 as placeholder
+     ENDDO
+   end if
 
    ! =================================================================== !
    ! Pack sea surface salinity data: 'pgsss' on Gaussian grid.
