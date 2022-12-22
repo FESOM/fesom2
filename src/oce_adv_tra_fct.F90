@@ -286,12 +286,14 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
             nl12 = max(nl1,nl2)
             nu12 = nu1
             if (nu2>0) nu12 = min(nu1,nu2)
+
+            if(nu12 <= nz .and. nz <= nl12) then
+
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-           call omp_set_lock(partit%plock(enodes(1)))
+                call omp_set_lock(partit%plock(enodes(1)))
 #else
 !$OMP ORDERED
 #endif
-            if(nu12 <= nz .and. nz <= nl12) then
                 ! do nz=nu12, nl12
 #if !defined(DISABLE_OPENACC_ATOMICS)
                 !$ACC ATOMIC UPDATE
@@ -317,12 +319,11 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
                 fct_minus(nz,enodes(2))=fct_minus(nz,enodes(2)) + min(0.0_WP,-adf_h(nz,edge))
                 ! end do
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-               call omp_unset_lock(partit%plock(enodes(2)))
-            end if
+                call omp_unset_lock(partit%plock(enodes(2)))
 #else
-            end if
 !$OMP END ORDERED
 #endif
+            end if
         end do
     end do
 #if !defined(DISABLE_OPENACC_ATOMICS)
