@@ -852,14 +852,13 @@ subroutine write_mean(entry, entry_index)
         ! loop over vertical layers --> do gather 3d variables layerwise in 2d
         ! slices
         do lev=1, size1
-            if (entry%p_partit%mype==entry%root_rank) t0=MPI_Wtime()  
+            !PS if (entry%p_partit%mype==entry%root_rank) t0=MPI_Wtime()  
 #ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
             ! aleph cray-mpich workaround
             call MPI_Barrier(entry%comm, mpierr)
 #elif ENABLE_ALBEDO_INTELMPI_WORKAROUNDS     
             call MPI_Barrier(entry%comm, mpierr)
 #endif
-            t0=MPI_Wtime()  
             !___________________________________________________________________
             ! local output variables are gahtered in 2d shaped entry%aux_r8 
             ! either for vertices or elements
@@ -875,11 +874,11 @@ subroutine write_mean(entry, entry_index)
             if (entry%p_partit%mype==entry%root_rank) then
                 if (entry%ndim==1) then
                     call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r4, 1), __LINE__)
-                    t1=MPI_Wtime()  
+                    !PS t1=MPI_Wtime()  
                     !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> after nf_put_vara_real'//achar(27)//'[0m', entry%p_partit%mype, t1-t0
                 elseif (entry%ndim==2) then
                     call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size2, 1, 1/), entry%aux_r4, 1), __LINE__)
-                    t1=MPI_Wtime()  
+                    !PS t1=MPI_Wtime()  
                     !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> after nf_put_vara_real'//achar(27)//'[0m', entry%p_partit%mype, lev, t1-t0
                 end if
             end if
