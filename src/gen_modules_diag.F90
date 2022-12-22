@@ -806,6 +806,9 @@ subroutine compute_extflds(mode, dynamics, tracers, partit, mesh)
     if (firstcall) then  !allocate the stuff at the first call
         allocate(zisotherm(myDim_nod2D+eDim_nod2D))
         allocate(tempzavg(myDim_nod2D+eDim_nod2D), saltzavg(myDim_nod2D+eDim_nod2D))
+        zisotherm=0.0_WP
+        tempzavg =0.0_WP
+        saltzavg =0.0_WP
         firstcall=.false.
         if (mode==0) return
     end if  
@@ -820,16 +823,15 @@ subroutine compute_extflds(mode, dynamics, tracers, partit, mesh)
        zn  =0.0_WP
        do nz=nzmin+1, nzmax-1
           tup=temp(nz-1, n)
-          tlo=temp(nz,   n)
-          if (tup==tlo) cycle          
-          if ((tup-whichtemp)*(tlo-whichtemp)<=0) then
+          if (tup < whichtemp) exit
+          tlo=temp(nz,   n)                 
+          if ((tup-whichtemp)*(tlo-whichtemp)<0) then
              zn=zn+0.5_WP*(hnode(nz-1, n)+(whichtemp-tup)*sum(hnode(nz-1:nz, n))/(tlo-tup))
-             zisotherm(n)=zn
              exit
           end if
           zn=zn+hnode(nz-1, n) 
        end do
-!      if (tlo > whichtemp .AND. depth<=1.e-12) zisotherm=depth+hnode(nz, node) set the depth to the total depth if the isotherm is not found
+       zisotherm(n)=zn
     END DO
 !$OMP END PARALLEL DO 
 
