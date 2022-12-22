@@ -1,17 +1,23 @@
 #!/bin/bash
 #___SET SLURM OPTIONS___________________________________________________________
-#SBATCH --account=clidyn.p_fesom
+#SBATCH --account=clidyn.p_fesom    # edit your account
+#SBATCH --job-name=chain
 #SBATCH --partition=mpp
-#SBATCH -J chain
-#SBATCH --ntasks=256
-#SBATCH --cpus-per-task 1
-#SBATCH --hint=nomultithread
 
-#SBATCH --time=10:00:00
-#SBATCH --mail-type=END
-#SBATCH --mail-user=Patrick.Scholz@awi.de
+# disable hyperthreading
+#SBATCH --hint=nomultithread
+#SBATCH --nodes=48                  # Number of tasks (MPI) tasks to be launched
+#SBATCH --tasks-per-node 127        # using all 128CPus we exceed the maxload limit (>130) of many used nodes
+#SBATCH --cpus-per-task 1
+
+#SBATCH --time=12:00:00
+#SBATCH --qos=12h
+
 #SBATCH -o fesom2_%x_%j.out
 #SBATCH -e fesom2_%x_%j.out
+
+##SBATCH --mail-type=END
+##SBATCH --mail-user=Patrick.Scholz@awi.de
 
 
 #___DEFAULT INPUT_______________________________________________________________
@@ -244,23 +250,26 @@ if [ $is_newsimul -eq 1 ] ; then
         prev_chain_id=$(( $chain_id - 1 ))
         
         #_______________________________________________________________________
-        # copy restart ocean files from previous spinup cycle 
-        prev_rfile=${dname_result}${prev_chain_id}/fesom.${year_e}.oce.restart.nc
-        if [ ! -f "$prev_rfile" ]; then
+        # copy restart ocean files/directories from previous spinup cycle 
+        prev_rfile=${dname_result}${prev_chain_id}/fesom.${year_e}.oce.restart
+        if   [ -d "${prev_rfile}"    ]; then
+            cp -r $prev_rfile $dname_result_link/fesom.${aux_yr}.oce.restart
+        elif [ -f "${prev_rfile}.nc" ]; then
+            cp $prev_rfile $dname_result_link/fesom.${aux_yr}.oce.restart.nc
+        else
             echo -e "\033[1;31m --> ERROR: could not find ocean restart file \033[0m"
             exit
-        else
-            echo -e "\033[33m --> create ocean warm start files \033[0m"
-            cp $prev_rfile $dname_result_link/fesom.${aux_yr}.oce.restart.nc
         fi
-        # copy restart ice files from previous spinup cycle 
-        prev_rfile=${dname_result}${prev_chain_id}/fesom.${year_e}.ice.restart.nc
-        if [ ! -f "$prev_rfile" ]; then
+        
+        # copy restart ice files/files/directories from previous spinup cycle 
+        prev_rfile=${dname_result}${prev_chain_id}/fesom.${year_e}.ice.restart
+        if   [ -d "${prev_rfile}"    ]; then
+            cp -r $prev_rfile $dname_result_link/fesom.${aux_yr}.ice.restart
+        elif [ -f "${prev_rfile}.nc" ]; then
+            cp $prev_rfile $dname_result_link/fesom.${aux_yr}.ice.restart.nc
+        else
             echo -e "\033[1;31m --> ERROR: could not find ice restart file \033[0m"
             exit
-        else
-            echo -e "\033[33m --> create ice warm start files \033[0m"
-            cp $prev_rfile $dname_result_link/fesom.${aux_yr}.ice.restart.nc
         fi
         
         #_______________________________________________________________________
