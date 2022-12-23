@@ -88,17 +88,17 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
     if (present(o_init_zero)) then
        l_init_zero=o_init_zero
     end if
-    if (l_init_zero) then
-!$OMP PARALLEL DO
-       !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
-       do edge=1, myDim_edge2D
-          do nz=1, mesh%nl-1
-             flux(nz,edge)=0.0_WP
-          end do
-       end do
-       !$ACC END PARALLEL LOOP
-!$OMP END PARALLEL DO
-    end if
+!     if (l_init_zero) then
+! !$OMP PARALLEL DO
+!        !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+!        do edge=1, myDim_edge2D
+!           do nz=1, mesh%nl-1
+!              flux(nz,edge)=0.0_WP
+!           end do
+!        end do
+!        !$ACC END PARALLEL LOOP
+! !$OMP END PARALLEL DO
+!     end if
 
     ! The result is the low-order solution horizontal fluxes
     ! They are put into flux
@@ -106,128 +106,133 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, &
 !$OMP                       a, vflux, el, enodes, nz, nu12, nl12, nl1, nl2, nu1, nu2)
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+    !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     do edge=1, myDim_edge2D
-        ! local indice of nodes that span up edge ed
-        enodes=edges(:,edge)
+        do nz=1, nl
+            ! do nz=1, mesh%nl-1
+            if (l_init_zero .and. nz < nl) flux(nz,edge)=0.0_WP
+            ! end do
 
-        ! local index of element that contribute to edge
-        el=edge_tri(:,edge)
+            ! local indice of nodes that span up edge ed
+            enodes=edges(:,edge)
 
-        ! number of layers -1 at elem el(1)
-        nl1=nlevels(el(1))-1
+            ! local index of element that contribute to edge
+            el=edge_tri(:,edge)
 
-        ! index off surface layer in case of cavity !=1
-        nu1=ulevels(el(1))
+            ! number of layers -1 at elem el(1)
+            nl1=nlevels(el(1))-1
 
-        ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to
-        ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
-        deltaX1=edge_cross_dxdy(1,edge)
-        deltaY1=edge_cross_dxdy(2,edge)
-        a=r_earth*elem_cos(el(1))
+            ! index off surface layer in case of cavity !=1
+            nu1=ulevels(el(1))
 
-        !_______________________________________________________________________
-        ! same parameter but for other element el(2) that contributes to edge ed
-        ! if el(2)==0 than edge is boundary edge
-        nl2=0
-        nu2=0
-        if(el(2)>0) then
-            deltaX2=edge_cross_dxdy(3,edge)
-            deltaY2=edge_cross_dxdy(4,edge)
-            ! number of layers -1 at elem el(2)
-            nl2=nlevels(el(2))-1
-            nu2=ulevels(el(2))
-            a=0.5_WP*(a+r_earth*elem_cos(el(2)))
-        end if
+            ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to
+            ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
+            deltaX1=edge_cross_dxdy(1,edge)
+            deltaY1=edge_cross_dxdy(2,edge)
+            a=r_earth*elem_cos(el(1))
 
-        !_______________________________________________________________________
-        ! nl12 ... minimum number of layers -1 between element el(1) & el(2) that
-        ! contribute to edge ed
-        ! nu12 ... upper index of layers between element el(1) & el(2) that
-        ! contribute to edge ed
-        ! be carefull !!! --> if ed is a boundary edge than el(1)~=0 and el(2)==0
-        !                     that means nl1>0, nl2==0, n2=min(nl1,nl2)=0 !!!
-        nl12=min(nl1,nl2)
-        nu12=max(nu1,nu2)
+            !_______________________________________________________________________
+            ! same parameter but for other element el(2) that contributes to edge ed
+            ! if el(2)==0 than edge is boundary edge
+            nl2=0
+            nu2=0
+            if(el(2)>0) then
+                deltaX2=edge_cross_dxdy(3,edge)
+                deltaY2=edge_cross_dxdy(4,edge)
+                ! number of layers -1 at elem el(2)
+                nl2=nlevels(el(2))-1
+                nu2=ulevels(el(2))
+                a=0.5_WP*(a+r_earth*elem_cos(el(2)))
+            end if
 
-        !_______________________________________________________________________
-        ! (A) goes only into this loop when the edge has only facing element
-        ! el(1) --> so the edge is a boundary edge --> this is for ocean
-        ! surface in case of cavity
-        !$ACC LOOP VECTOR
-        do nz=nu1, nu12-1
-           !____________________________________________________________________
-           ! volume flux across the segments
-           vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*helem(nz,el(1))
+            !_______________________________________________________________________
+            ! nl12 ... minimum number of layers -1 between element el(1) & el(2) that
+            ! contribute to edge ed
+            ! nu12 ... upper index of layers between element el(1) & el(2) that
+            ! contribute to edge ed
+            ! be carefull !!! --> if ed is a boundary edge than el(1)~=0 and el(2)==0
+            !                     that means nl1>0, nl2==0, n2=min(nl1,nl2)=0 !!!
+            nl12=min(nl1,nl2)
+            nu12=max(nu1,nu2)
 
-           !____________________________________________________________________
-           ! 1st. low order upwind solution
-           flux(nz, edge)=-0.5_WP*(                                                     &
-                         ttf(nz, enodes(1))*(vflux+abs(vflux))+ &
-                         ttf(nz, enodes(2))*(vflux-abs(vflux))  &
-                         )-flux(nz, edge)
-        end do
-        !$ACC END LOOP
-
-        !_______________________________________________________________________
-        ! (B) goes only into this loop when the edge has only facing elemenmt
-        ! el(2) --> so the edge is a boundary edge --> this is for ocean
-        ! surface in case of cavity
-        if (nu2 > 0) then
-            !$ACC LOOP VECTOR
-            do nz=nu2, nu12-1
-                !___________________________________________________________
+            !_______________________________________________________________________
+            ! (A) goes only into this loop when the edge has only facing element
+            ! el(1) --> so the edge is a boundary edge --> this is for ocean
+            ! surface in case of cavity
+            if (nu1 <= nz .and. nz < nu12) then
+                ! do nz=nu1, nu12-1
+                !____________________________________________________________________
                 ! volume flux across the segments
-                vflux=(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+                vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*helem(nz,el(1))
 
-                !___________________________________________________________
+                !____________________________________________________________________
                 ! 1st. low order upwind solution
-                flux(nz, edge)=-0.5_WP*(                                           &
-                            ttf(nz, enodes(1))*(vflux+abs(vflux))+ &
-                            ttf(nz, enodes(2))*(vflux-abs(vflux)))-flux(nz, edge)
-            end do
-            !$ACC END LOOP
-        end if
+                flux(nz, edge)=-0.5_WP*(                                                     &
+                             ttf(nz, enodes(1))*(vflux+abs(vflux))+ &
+                             ttf(nz, enodes(2))*(vflux-abs(vflux))  &
+                             )-flux(nz, edge)
+                ! end do
+            end if
 
-        !_______________________________________________________________________
-        ! (C) Both segments
-        ! loop over depth layers from top (nu12) to nl12
-        ! be carefull !!! --> if ed is a boundary edge, el(2)==0 than nl12=0 so
-        !                     you wont enter in this loop
-        !$ACC LOOP VECTOR
-        do nz=nu12, nl12
-            !___________________________________________________________________
-            ! 1st. low order upwind solution
-            ! here already assumed that ed is NOT! a boundary edge so el(2) should exist
-            vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*helem(nz,el(1)) &
-                  +(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+            !_______________________________________________________________________
+            ! (B) goes only into this loop when the edge has only facing elemenmt
+            ! el(2) --> so the edge is a boundary edge --> this is for ocean
+            ! surface in case of cavity
+            if (nu2 > 0) then
+                if (nu2 <= nz .and. nz < nu12) then
+                    ! do nz=nu2, nu12-1
+                    !___________________________________________________________
+                    ! volume flux across the segments
+                    vflux=(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*helem(nz,el(2))
 
-            flux(nz, edge)=-0.5_WP*(                                                     &
-                         ttf(nz, enodes(1))*(vflux+abs(vflux))+ &
-                         ttf(nz, enodes(2))*(vflux-abs(vflux)))-flux(nz, edge)
-        end do
-        !$ACC END LOOP
+                    !___________________________________________________________
+                    ! 1st. low order upwind solution
+                    flux(nz, edge)=-0.5_WP*(                                           &
+                                ttf(nz, enodes(1))*(vflux+abs(vflux))+ &
+                                ttf(nz, enodes(2))*(vflux-abs(vflux)))-flux(nz, edge)
+                    ! end do
+                end if
+            end if
 
-        !_______________________________________________________________________
-        ! (D) remaining segments on the left or on the right
-        !$ACC LOOP VECTOR
-        do nz=nl12+1, nl1
-           !____________________________________________________________________
-           ! volume flux across the segments
-           vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*helem(nz,el(1))
-           !____________________________________________________________________
-           ! 1st. low order upwind solution
-           flux(nz, edge)=-0.5_WP*(                                                     &
-                         ttf(nz, enodes(1))*(vflux+abs(vflux))+ &
-                         ttf(nz, enodes(2))*(vflux-abs(vflux))  &
-                         )-flux(nz, edge)
-        end do
-        !$ACC END LOOP
+            !_______________________________________________________________________
+            ! (C) Both segments
+            ! loop over depth layers from top (nu12) to nl12
+            ! be carefull !!! --> if ed is a boundary edge, el(2)==0 than nl12=0 so
+            !                     you wont enter in this loop
+            if (nu12 <= nz .and. nz <= nl12) then
+                ! do nz=nu12, nl12
+                !___________________________________________________________________
+                ! 1st. low order upwind solution
+                ! here already assumed that ed is NOT! a boundary edge so el(2) should exist
+                vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*helem(nz,el(1)) &
+                      +(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*helem(nz,el(2))
 
-        !_______________________________________________________________________
-        ! (E) remaining segments on the left or on the right
-        !$ACC LOOP VECTOR
-        do nz=nl12+1, nl2
+                flux(nz, edge)=-0.5_WP*(                                                     &
+                             ttf(nz, enodes(1))*(vflux+abs(vflux))+ &
+                             ttf(nz, enodes(2))*(vflux-abs(vflux)))-flux(nz, edge)
+                ! end do
+            end if
+
+            !_______________________________________________________________________
+            ! (D) remaining segments on the left or on the right
+            if(nl12 < nz .and. nz <= nl1) then
+                ! do nz=nl12+1, nl1
+                !____________________________________________________________________
+                ! volume flux across the segments
+                vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*helem(nz,el(1))
+                !____________________________________________________________________
+                ! 1st. low order upwind solution
+                flux(nz, edge)=-0.5_WP*(                                                     &
+                             ttf(nz, enodes(1))*(vflux+abs(vflux))+ &
+                             ttf(nz, enodes(2))*(vflux-abs(vflux))  &
+                             )-flux(nz, edge)
+                ! end do
+            end if
+
+            !_______________________________________________________________________
+            ! (E) remaining segments on the left or on the right
+            if (nl12 < nz .and. nz <= nl2) then
+                ! do nz=nl12+1, nl2
                 !_______________________________________________________________
                 ! volume flux across the segments
                 vflux=(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*helem(nz,el(2))
@@ -236,6 +241,8 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
                 flux(nz, edge)=-0.5_WP*(                                           &
                              ttf(nz, enodes(1))*(vflux+abs(vflux))+ &
                              ttf(nz, enodes(2))*(vflux-abs(vflux)))-flux(nz, edge)
+                ! end do
+            end if
         end do
         !$ACC END LOOP
     end do
