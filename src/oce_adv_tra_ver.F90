@@ -359,50 +359,49 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
     end if
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tvert,n, nz, nzmax, nzmin, Tmean, Tmean1, Tmean2, qc, qu,qd)
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+    !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     do n=1, myDim_nod2D
-       !_______________________________________________________________________
-       nzmax=nlevels_nod2D(n)
-       nzmin=ulevels_nod2D(n)
-       !_______________________________________________________________________
-       ! vert. flux at surface layer
-       nz=nzmin
-       flux(nz,n)=-ttf(nz,n)*W(nz,n)*area(nz,n)-flux(nz,n)
+        do nz=1, nl
+            !_______________________________________________________________________
+            nzmax=nlevels_nod2D(n)
+            nzmin=ulevels_nod2D(n)
 
-       !_______________________________________________________________________
-       ! vert. flux 2nd layer --> centered differences
-       nz=nzmin+1
-       flux(nz,n)=-0.5_WP*(ttf(nz-1,n)+ttf(nz,n))*W(nz,n)*area(nz,n)-flux(nz,n)
+            !_______________________________________________________________________
+            ! Be carefull have to do vertical tracer advection here on old vertical grid
+            ! also horizontal advection is done on old mesh (see helem contains old
+            ! mesh information)
+            !_______________________________________________________________________
+            ! vert. flux at remaining levels
+            if (nzmin + 2 <= nz .and. nz <= nzmax - 2) then
+                ! do nz=nzmin+2,nzmax-2
+                !centered (4th order)
+                qc=(ttf(nz-1,n)-ttf(nz  ,n))/(Z_3d_n(nz-1,n)-Z_3d_n(nz  ,n))
+                qu=(ttf(nz  ,n)-ttf(nz+1,n))/(Z_3d_n(nz  ,n)-Z_3d_n(nz+1,n))
+                qd=(ttf(nz-2,n)-ttf(nz-1,n))/(Z_3d_n(nz-2,n)-Z_3d_n(nz-1,n))
 
-       !_______________________________________________________________________
-       ! vert. flux at bottom - 1 layer --> centered differences
-       nz=nzmax-1
-       flux(nz,n)=-0.5_WP*(ttf(nz-1,n)+ttf(nz,n))*W(nz,n)*area(nz,n)-flux(nz,n)
-
-       !_______________________________________________________________________
-       ! vert. flux at bottom layer --> zero bottom flux
-       nz=nzmax
-       flux(nz,n)= 0.0_WP-flux(nz,n)
-
-       !_______________________________________________________________________
-       ! Be carefull have to do vertical tracer advection here on old vertical grid
-       ! also horizontal advection is done on old mesh (see helem contains old
-       ! mesh information)
-       !_______________________________________________________________________
-       ! vert. flux at remaining levels
-       !$ACC LOOP VECTOR
-       do nz=nzmin+2,nzmax-2
-            !centered (4th order)
-            qc=(ttf(nz-1,n)-ttf(nz  ,n))/(Z_3d_n(nz-1,n)-Z_3d_n(nz  ,n))
-            qu=(ttf(nz  ,n)-ttf(nz+1,n))/(Z_3d_n(nz  ,n)-Z_3d_n(nz+1,n))
-            qd=(ttf(nz-2,n)-ttf(nz-1,n))/(Z_3d_n(nz-2,n)-Z_3d_n(nz-1,n))
-
-            Tmean1=ttf(nz  ,n)+(2*qc+qu)*(zbar_3d_n(nz,n)-Z_3d_n(nz  ,n))/3.0_WP
-            Tmean2=ttf(nz-1,n)+(2*qc+qd)*(zbar_3d_n(nz,n)-Z_3d_n(nz-1,n))/3.0_WP
-            Tmean =(W(nz,n)+abs(W(nz,n)))*Tmean1+(W(nz,n)-abs(W(nz,n)))*Tmean2
-            flux(nz,n)=(-0.5_WP*(1.0_WP-num_ord)*Tmean - num_ord*(0.5_WP*(Tmean1+Tmean2))*W(nz,n))*area(nz,n)-flux(nz,n)
-       end do
-       !$ACC END LOOP
+                Tmean1=ttf(nz  ,n)+(2*qc+qu)*(zbar_3d_n(nz,n)-Z_3d_n(nz  ,n))/3.0_WP
+                Tmean2=ttf(nz-1,n)+(2*qc+qd)*(zbar_3d_n(nz,n)-Z_3d_n(nz-1,n))/3.0_WP
+                Tmean =(W(nz,n)+abs(W(nz,n)))*Tmean1+(W(nz,n)-abs(W(nz,n)))*Tmean2
+                flux(nz,n)=(-0.5_WP*(1.0_WP-num_ord)*Tmean - num_ord*(0.5_WP*(Tmean1+Tmean2))*W(nz,n))*area(nz,n)-flux(nz,n)
+                ! end do
+            else if (nzmin + 1 == nz .or. nz == nzmax - 1) then
+                !_______________________________________________________________________
+                ! vert. flux 2nd layer --> centered differences
+                !_______________________________________________________________________
+                ! vert. flux at bottom - 1 layer --> centered differences
+                flux(nz,n)=-0.5_WP*(ttf(nz-1,n)+ttf(nz,n))*W(nz,n)*area(nz,n)-flux(nz,n)
+            else if( nzmin == nz ) then
+                !_______________________________________________________________________
+                ! vert. flux at surface layer
+                ! nz=nzmin
+                flux(nz,n)=-ttf(nz,n)*W(nz,n)*area(nz,n)-flux(nz,n)
+            else if( nzmax == nz ) then
+                !_______________________________________________________________________
+                ! vert. flux at bottom layer --> zero bottom flux
+                ! nz=nzmax
+                flux(nz,n)= 0.0_WP-flux(nz,n)
+            end if
+        end do
     end do
     !$ACC END PARALLEL LOOP
 !$OMP END DO
