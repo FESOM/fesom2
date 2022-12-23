@@ -340,66 +340,64 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
                 ! end do
             end if
         end do
-        !$ACC END LOOP
     end do
     !$ACC END PARALLEL LOOP
 !!$OMP END DO
     ! Horizontal
 !$OMP DO
 #if !defined(DISABLE_OPENACC_ATOMICS)
-    !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+    !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #else
     !$ACC UPDATE SELF(dttf_h, flux_h)
 #endif
     do edge=1, myDim_edge2D
-        enodes(1:2)=edges(:,edge)
-        el=edge_tri(:,edge)
-        nl1=nlevels(el(1))-1
-        nu1=ulevels(el(1))
+        do nz=1, nl
+            enodes(1:2)=edges(:,edge)
+            el=edge_tri(:,edge)
+            nl1=nlevels(el(1))-1
+            nu1=ulevels(el(1))
 
-        nl2=0
-        nu2=0
-        if(el(2)>0) then
-            nl2=nlevels(el(2))-1
-            nu2=ulevels(el(2))
-        end if
+            nl2=0
+            nu2=0
+            if(el(2)>0) then
+                nl2=nlevels(el(2))-1
+                nu2=ulevels(el(2))
+            end if
 
-        nl12 = max(nl1,nl2)
-        nu12 = nu1
-        if (nu2>0) nu12 = min(nu1,nu2)
+            nl12 = max(nl1,nl2)
+            nu12 = nu1
+            if (nu2>0) nu12 = min(nu1,nu2)
+
+            if(nu12 <= nz .and. nz <= nl12) then
 
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_set_lock(partit%plock(enodes(1)))
+                call omp_set_lock(partit%plock(enodes(1)))
 #else
 !$OMP ORDERED
 #endif
+                ! do nz=nu12, nl12
 #if !defined(DISABLE_OPENACC_ATOMICS)
-        !$ACC LOOP VECTOR
+                !$ACC ATOMIC UPDATE
 #endif
-        do nz=nu12, nl12
-#if !defined(DISABLE_OPENACC_ATOMICS)
-            !$ACC ATOMIC UPDATE
-#endif
-            dttf_h(nz,enodes(1))=dttf_h(nz,enodes(1))+flux_h(nz,edge)*dt/areasvol(nz,enodes(1))
+                dttf_h(nz,enodes(1))=dttf_h(nz,enodes(1))+flux_h(nz,edge)*dt/areasvol(nz,enodes(1))
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        end do
-        call omp_unset_lock(partit%plock(enodes(1)))
-        call omp_set_lock  (partit%plock(enodes(2)))
-        do nz=nu12, nl12
+                ! end do
+                call omp_unset_lock(partit%plock(enodes(1)))
+                call omp_set_lock  (partit%plock(enodes(2)))
+                ! do nz=nu12, nl12
 #endif
 #if !defined(DISABLE_OPENACC_ATOMICS)
-            !$ACC ATOMIC UPDATE
+                !$ACC ATOMIC UPDATE
 #endif
-            dttf_h(nz,enodes(2))=dttf_h(nz,enodes(2))-flux_h(nz,edge)*dt/areasvol(nz,enodes(2))
-        end do
-#if !defined(DISABLE_OPENACC_ATOMICS)
-        !$ACC END LOOP
-#endif
+                dttf_h(nz,enodes(2))=dttf_h(nz,enodes(2))-flux_h(nz,edge)*dt/areasvol(nz,enodes(2))
+                ! end do
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(enodes(2)))
+                call omp_unset_lock(partit%plock(enodes(2)))
 #else
 !$OMP END ORDERED
 #endif
+            end if
+        end do
     end do
 
 #if !defined(DISABLE_OPENACC_ATOMICS)
