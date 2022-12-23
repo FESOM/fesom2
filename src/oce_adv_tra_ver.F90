@@ -266,49 +266,52 @@ subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
     if (present(o_init_zero)) then
        l_init_zero=o_init_zero
     end if
-    if (l_init_zero) then
-!$OMP PARALLEL DO
-        !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
-        do n=1, myDim_nod2D
-          do nz=1,mesh%nl
-            flux(nz, n)=0.0_WP
-          end do
-        end do
-        !$ACC END PARALLEL LOOP
-!$OMP END PARALLEL DO
-    end if
+!     if (l_init_zero) then
+! !$OMP PARALLEL DO
+!         !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+!         do n=1, myDim_nod2D
+!           do nz=1,mesh%nl
+!             flux(nz, n)=0.0_WP
+!           end do
+!         end do
+!         !$ACC END PARALLEL LOOP
+! !$OMP END PARALLEL DO
+!     end if
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tvert, n, nz, nzmax, nzmin)
 !$OMP DO
 
-    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+    !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     do n=1, myDim_nod2D
-       !_______________________________________________________________________
-       nzmax=nlevels_nod2D(n)
-       nzmin=ulevels_nod2D(n)
+        do nz=1, nl
+            !_______________________________________________________________________
+            nzmax=nlevels_nod2D(n)
+            nzmin=ulevels_nod2D(n)
+            if(l_init_zero) flux(nz, n) = 0.0_WP
 
-       !_______________________________________________________________________
-       ! vert. flux at surface layer
-       nz=nzmin
-       flux(nz,n)=-W(nz,n)*ttf(nz,n)*area(nz,n)-flux(nz,n)
-
-       !_______________________________________________________________________
-       ! vert. flux at bottom layer --> zero bottom flux
-       nz=nzmax
-       flux(nz,n)= 0.0_WP-flux(nz,n)
-
-       !_______________________________________________________________________
-       ! Be carefull have to do vertical tracer advection here on old vertical grid
-       ! also horizontal advection is done on old mesh (see helem contains old
-       ! mesh information)
-       !_______________________________________________________________________
-       ! vert. flux at remaining levels
-       !$ACC LOOP VECTOR
-       do nz=nzmin+1,nzmax-1
-          flux(nz,n)=-0.5*(                                                        &
-                      ttf(nz  ,n)*(W(nz,n)+abs(W(nz,n)))+ &
-                      ttf(nz-1,n)*(W(nz,n)-abs(W(nz,n))))*area(nz,n)-flux(nz,n)
-       end do
-       !$ACC END LOOP
+            !_______________________________________________________________________
+            ! Be carefull have to do vertical tracer advection here on old vertical grid
+            ! also horizontal advection is done on old mesh (see helem contains old
+            ! mesh information)
+            !_______________________________________________________________________
+            ! vert. flux at remaining levels
+            if ( nzmin < nz .and. nz < nzmax ) then
+                ! do nz=nzmin+1,nzmax-1
+                flux(nz,n)=-0.5*(                                                        &
+                                 ttf(nz  ,n)*(W(nz,n)+abs(W(nz,n)))+ &
+                                 ttf(nz-1,n)*(W(nz,n)-abs(W(nz,n))))*area(nz,n)-flux(nz,n)
+                ! end do
+            else if ( nzmin == nz ) then
+                !_______________________________________________________________________
+                ! vert. flux at surface layer
+                ! nz=nzmin
+                flux(nz,n)=-W(nz,n)*ttf(nz,n)*area(nz,n)-flux(nz,n)
+            else if ( nzmax == nz ) then
+                !_______________________________________________________________________
+                ! vert. flux at bottom layer --> zero bottom flux
+                ! nz=nzmax
+                flux(nz,n)= 0.0_WP-flux(nz,n)
+            end if
+        end do
     end do
     !$ACC END PARALLEL LOOP
 !$OMP END DO
