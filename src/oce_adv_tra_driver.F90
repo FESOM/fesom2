@@ -292,6 +292,7 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
     real(kind=WP), intent(inout)      :: flux_h(mesh%nl-1, partit%myDim_edge2D)
     real(kind=WP), intent(inout)      :: flux_v(mesh%nl,   partit%myDim_nod2D)
     logical,       optional           :: use_lo
+    logical                           :: use_lo_present
     real(kind=WP), optional           :: lo (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP), optional           :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     integer                           :: n, nz, k, elem, enodes(3), num, el(2), nu12, nl12, nu1, nu2, nl1, nl2, edge
@@ -303,33 +304,42 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
     ! c. Update the solution
     ! Vertical
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, k, elem, enodes, num, el, nu12, nl12, nu1, nu2, nl1, nl2, edge)
-    if (present(use_lo)) then
-       if (use_lo) then
-!$OMP DO
-        !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
-          do n=1, myDim_nod2d
-             nu1 = ulevels_nod2D(n)
-             nl1 = nlevels_nod2D(n)
-             !!PS do nz=1,nlevels_nod2D(n)-1
-             !$ACC LOOP VECTOR
-             do nz=nu1, nl1-1
-                dttf_v(nz,n)=dttf_v(nz,n)-ttf(nz,n)*hnode(nz,n)+LO(nz,n)*hnode_new(nz,n)
-             end do
-             !$ACC END LOOP
-          end do
-         !$ACC END PARALLEL LOOP
-!$OMP END DO
-       end if
-    end if
-!$OMP DO
-    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+! !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, k, elem, enodes, num, el, nu12, nl12, nu1, nu2, nl1, nl2, edge)
+!     if (present(use_lo)) then
+!         if (use_lo) then
+! !$OMP DO
+!             !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+!             do n=1, myDim_nod2d
+!                 do nz=1, nl
+!                     nu1 = ulevels_nod2D(n)
+!                     nl1 = nlevels_nod2D(n)
+!                     !!PS do nz=1,nlevels_nod2D(n)-1
+!                     if (nu1 <= nz .and. nz < nl1) then
+!                         ! do nz=nu1, nl1-1
+!                         dttf_v(nz,n)=dttf_v(nz,n)-ttf(nz,n)*hnode(nz,n)+LO(nz,n)*hnode_new(nz,n)
+!                         ! end do
+!                     end if
+!                 end do
+!             end do
+!             !$ACC END PARALLEL LOOP
+! !$OMP END DO
+!         end if
+!     end if
+! !$OMP DO
+    use_lo_present = present(use_lo) .and. use_lo
+    !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     do n=1, myDim_nod2d
-        nu1 = ulevels_nod2D(n)
-        nl1 = nlevels_nod2D(n)
-        !$ACC LOOP VECTOR
-        do nz=nu1,nl1-1
-            dttf_v(nz,n)=dttf_v(nz,n) + (flux_v(nz,n)-flux_v(nz+1,n))*dt/areasvol(nz,n)
+        do nz=1, nl
+            nu1 = ulevels_nod2D(n)
+            nl1 = nlevels_nod2D(n)
+            if (nu1 <= nz .and. nz < nl1) then
+                ! do nz=nu1,nl1-1
+                if (use_lo_present) then
+                    dttf_v(nz,n)=dttf_v(nz,n)-ttf(nz,n)*hnode(nz,n)+LO(nz,n)*hnode_new(nz,n)
+                end if
+                dttf_v(nz,n)=dttf_v(nz,n) + (flux_v(nz,n)-flux_v(nz+1,n))*dt/areasvol(nz,n)
+                ! end do
+            end if
         end do
         !$ACC END LOOP
     end do
