@@ -343,7 +343,7 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
         !$ACC END LOOP
     end do
     !$ACC END PARALLEL LOOP
-!$OMP END DO
+!!$OMP END DO
     ! Horizontal
 !$OMP DO
 #if !defined(DISABLE_OPENACC_ATOMICS)
