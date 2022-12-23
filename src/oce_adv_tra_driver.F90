@@ -125,59 +125,58 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(e, enodes, el, nl1, nu1, nl2, nu2, nu12, nl12, nz)
 #if !defined(DISABLE_OPENACC_ATOMICS)
-        !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+        !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #else
         !$ACC UPDATE SELF(fct_lo, adv_flux_hor)
 #endif
         do e=1, myDim_edge2D
-            enodes=edges(:,e)
-            el=edge_tri(:,e)
-            nl1=nlevels(el(1))-1
-            nu1=ulevels(el(1))
-            nl2=0
-            nu2=0
-            if(el(2)>0) then
-                nl2=nlevels(el(2))-1
-                nu2=ulevels(el(2))
-            end if
+            do nz=1, nl
+                enodes=edges(:,e)
+                el=edge_tri(:,e)
+                nl1=nlevels(el(1))-1
+                nu1=ulevels(el(1))
+                nl2=0
+                nu2=0
+                if(el(2)>0) then
+                    nl2=nlevels(el(2))-1
+                    nu2=ulevels(el(2))
+                end if
 
-            nl12 = max(nl1,nl2)
-            nu12 = nu1
-            if (nu2>0) nu12 = min(nu1,nu2)
+                nl12 = max(nl1,nl2)
+                nu12 = nu1
+                if (nu2>0) nu12 = min(nu1,nu2)
+
+                if(nu12 <= nz .and. nz <= nl12) then
 
             !!PS do  nz=1, max(nl1, nl2)
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_set_lock(partit%plock(enodes(1)))
+                    call omp_set_lock(partit%plock(enodes(1)))
 #else
 !$OMP ORDERED
 #endif
-#if !defined(DISABLE_OPENACC_ATOMICS)
-            !$ACC LOOP VECTOR
-#endif
-            do nz=nu12, nl12
+            ! do nz=nu12, nl12
 #if !defined(DISABLE_OPENACC_ATOMICS)
                !$ACC ATOMIC UPDATE
 #endif
-               fct_LO(nz, enodes(1))=fct_LO(nz, enodes(1))+adv_flux_hor(nz, e)
+                   fct_LO(nz, enodes(1))=fct_LO(nz, enodes(1))+adv_flux_hor(nz, e)
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            end do
-            call omp_unset_lock(partit%plock(enodes(1)))
-            call omp_set_lock  (partit%plock(enodes(2)))
-            do nz=nu12, nl12
+                    ! end do
+                    call omp_unset_lock(partit%plock(enodes(1)))
+                    call omp_set_lock  (partit%plock(enodes(2)))
+                    ! do nz=nu12, nl12
 #endif
 #if !defined(DISABLE_OPENACC_ATOMICS)
-               !$ACC ATOMIC UPDATE
+                   !$ACC ATOMIC UPDATE
 #endif
-               fct_LO(nz, enodes(2))=fct_LO(nz, enodes(2))-adv_flux_hor(nz, e)
-            end do
-#if !defined(DISABLE_OPENACC_ATOMICS)
-            !$ACC END LOOP
-#endif
+                   fct_LO(nz, enodes(2))=fct_LO(nz, enodes(2))-adv_flux_hor(nz, e)
+                ! end do
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(enodes(2)))
+                call omp_unset_lock(partit%plock(enodes(2)))
 #else
 !$OMP END ORDERED
 #endif
+                end if
+            end do
         end do
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC END PARALLEL LOOP
