@@ -192,16 +192,20 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         ! update the LO solution for vertical contribution
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nu1, nl1, nz)
-        !$ACC PARALLEL LOOP GANG PRESENT(fct_LO) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+        !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) PRESENT(fct_LO) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
         do n=1, myDim_nod2D
-            nu1 = ulevels_nod2D(n)
-            nl1 = nlevels_nod2D(n)
-            !!PS do  nz=1, nlevels_nod2D(n)-1
-            !$ACC LOOP VECTOR
-            do  nz= nu1, nl1-1
-                fct_LO(nz,n)=(ttf(nz,n)*hnode(nz,n)+(fct_LO(nz,n)+(adv_flux_ver(nz, n)-adv_flux_ver(nz+1, n)))*dt/areasvol(nz,n))/hnode_new(nz,n)
+            do  nz= 1, nl
+                nu1 = ulevels_nod2D(n)
+                nl1 = nlevels_nod2D(n)
+                !!PS do  nz=1, nlevels_nod2D(n)-1
+                if (nu1 <= nz .and. nz < nl1) then
+                    ! do  nz= nu1, nl1-1
+                    fct_LO(nz,n)=(ttf(nz,n)*hnode(nz,n)+(fct_LO(nz,n)          &
+                                 +(adv_flux_ver(nz, n)-adv_flux_ver(nz+1, n))) &
+                                 *dt/areasvol(nz,n))/hnode_new(nz,n)
+                    ! end do
+                end if
             end do
-            !$ACC END LOOP
         end do
         !$ACC END PARALLEL LOOP
 !$OMP END PARALLEL DO
