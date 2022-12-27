@@ -118,6 +118,8 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     use g_cvmix_kpp
     use g_cvmix_tidal
     use diagnostics
+    use g_config,        only: use_cavity
+    use g_forcing_param, only: use_virt_salt
     implicit none
     integer                   :: i, j
     integer, save             :: nm_io_unit  = 103       ! unit to open namelist file, skip 100-102 for cray
