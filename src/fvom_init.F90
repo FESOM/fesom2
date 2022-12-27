@@ -790,7 +790,7 @@ subroutine find_levels(mesh)
     DO n = 1, auxi
         read(fileID,*) x
         if (x>0) x=-x
-        if (x>zbar(thers_zbar_lev)) x=zbar(thers_zbar_lev) !TODO KK threshholding for depth
+        if (x>zbar(thers_zbar_lev)) x=zbar(thers_zbar_lev) !TODO KK thresholding for depth
         depth(n)=x
     END DO
     close(fileID)

@@ -30,6 +30,9 @@ subroutine setup_model(partit)
   read (fileunit, NML=run_config)
 !!$  read (fileunit, NML=machine)
   close (fileunit)
+  
+!PS   partit%flag_debug=flag_debug
+  
   ! ==========
   ! compute dt
   ! ========== 

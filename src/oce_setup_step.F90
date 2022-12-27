@@ -594,7 +594,8 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     neutral_slope=0.0_WP
     slope_tapered=0.0_WP
 
-    allocate(MLD1(node_size), MLD2(node_size), MLD1_ind(node_size), MLD2_ind(node_size))
+    allocate(MLD1(node_size), MLD2(node_size), MLD3(node_size))
+    allocate(MLD1_ind(node_size), MLD2_ind(node_size), MLD3_ind(node_size))
     if (use_global_tides) then
     allocate(ssh_gp(node_size))
     ssh_gp=0.
@@ -721,8 +722,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     !
     ! read ocean state
     ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
-    if(mype==0) write(*,*) 'read Temperatur climatology from:', trim(filelist(1))
-    if(mype==0) write(*,*) 'read Salt       climatology from:', trim(filelist(2))
+    if(mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(1))
+    if(mype==0) write(*,*) 'read Salinity    climatology from:', trim(filelist(2))
     call do_ic3d(tracers, partit, mesh)
     
     Tclim=tracers%data(1)%values

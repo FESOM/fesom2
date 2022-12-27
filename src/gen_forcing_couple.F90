@@ -57,7 +57,7 @@ module update_atm_forcing_interface
         type(t_tracer), intent(in),    target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in),    target :: mesh
-        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_dyn)   , intent(in),    target :: dynamics
         end subroutine
     end interface
 end module
@@ -91,8 +91,8 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   use g_rotate_grid
   use net_rec_from_atm_interface
   use g_sbf, only: sbc_do
-  use g_sbf, only: atmdata, i_totfl, i_xwind, i_ywind, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow, &
-                                     l_xwind, l_ywind, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
+  use g_sbf, only: atmdata, i_totfl, i_xwind, i_ywind, i_xstre, i_ystre, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow, &
+                                     l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
 #if defined (__oasis)
   use cpl_driver
 #endif
@@ -351,6 +351,12 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   DO n=1, myDim_nod2D+eDim_nod2D
      u_wind(n)    = atmdata(i_xwind,n)
      v_wind(n)    = atmdata(i_ywind,n)
+     if (l_xstre) then
+        stress_atmoce_x(n)=atmdata(i_xstre, n)
+     end if
+     if (l_ystre) then
+        stress_atmoce_y(n)=atmdata(i_ystre, n)
+     end if
      shum(n)      = atmdata(i_humi ,n)
      longwave(n)  = atmdata(i_qlw  ,n)
      shortwave(n) = atmdata(i_qsr  ,n)
@@ -398,6 +404,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   end if
   ! third, compute wind stress
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i, dux, dvy, aux)
+
   do i=1,myDim_nod2d+eDim_nod2d   
      !__________________________________________________________________________
      if (ulevels_nod2d(i)>1) then
@@ -412,9 +419,12 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
      dux=u_wind(i)-(1.0_WP-Swind)*u_w(i) 
      dvy=v_wind(i)-(1.0_WP-Swind)*v_w(i)
      aux=sqrt(dux**2+dvy**2)*rhoair
-     stress_atmoce_x(i) = Cd_atm_oce_arr(i)*aux*dux
-     stress_atmoce_y(i) = Cd_atm_oce_arr(i)*aux*dvy
-     
+     if ( .not. l_xstre) then
+        stress_atmoce_x(i) = Cd_atm_oce_arr(i)*aux*dux
+     end if
+     if ( .not. l_ystre) then
+        stress_atmoce_y(i) = Cd_atm_oce_arr(i)*aux*dvy
+     end if
      !__________________________________________________________________________
      dux=u_wind(i)-u_ice(i) 
      dvy=v_wind(i)-v_ice(i)
@@ -432,10 +442,6 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #ifdef VERBOSE
   if (mod(istep,logfile_outfreq)==0 .and. mype==0) then
      write(*,*) 'update forcing data took', t2-t1
-#ifdef __oasis     
-     write(*,*) 'oasis part + exchange mesh:', time_recv(1)+time_send(1)
-     write(*,*) 'exchange mesh             :', time_recv(2)+time_send(2)
-#endif /* (__oasis) */     
   end if
 #endif
 

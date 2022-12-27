@@ -21,7 +21,7 @@ module unload gcc
 
 # Load modules
 module load prgenv/intel
-module load intel/2021.2.0
+module load intel/2021.4.0
 module load hpcx-openmpi/2.9.0
 module load intel-mkl/19.0.5
 module load fftw/3.3.9

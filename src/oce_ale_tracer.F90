@@ -115,7 +115,7 @@ module solve_tracers_ale_interface
         use mod_tracer     
         use MOD_DYN
         USE MOD_ICE
-        type(t_ice)   , intent(inout), target :: ice
+        type(t_ice)   , intent(in),    target :: ice
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
