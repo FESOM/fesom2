@@ -19,7 +19,7 @@ module ice_EVP_interfaces
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
         end subroutine
-    end interface  
+    end interface
 end module
 
 module ice_EVPdynamics_interface
@@ -33,14 +33,14 @@ module ice_EVPdynamics_interface
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
         end subroutine
-    end interface  
+    end interface
 end module
 
 !
 ! Contains routines of EVP dynamics
 !
 !_______________________________________________________________________________
-! EVP rheology. The routine computes stress tensor components based on ice 
+! EVP rheology. The routine computes stress tensor components based on ice
 ! velocity field. They are stored as elemental arrays (sigma11, sigma22 and
 ! sigma12). The ocean velocity is at nodal locations.
 subroutine stress_tensor(ice, partit, mesh)
@@ -84,75 +84,75 @@ subroutine stress_tensor(ice, partit, mesh)
     vale = 1.0_WP/(ice%ellipse**2)
     dte  = ice%ice_dt/(1.0_WP*ice%evp_rheol_steps)
     det1 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte)
-    det2 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte) !*ellipse**2 
- 
+    det2 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte) !*ellipse**2
+
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, r1, r2, r3, si1, si2, zeta, delta, delta_inv, d1, d2)
     !$ACC PARALLEL LOOP GANG
     do el=1,myDim_elem2D
         !_______________________________________________________________________
-        ! if element contains cavity node skip it 
+        ! if element contains cavity node skip it
         if (ulevels(el) > 1) cycle
-        
+
         ! ===== Check if there is ice on elem
-        ! There is no ice in elem 
-        ! if (any(m_ice(elnodes)<= 0.) .or. any(a_ice(elnodes) <=0.)) CYCLE     
+        ! There is no ice in elem
+        ! if (any(m_ice(elnodes)<= 0.) .or. any(a_ice(elnodes) <=0.)) CYCLE
         if (ice_strength(el) > 0.) then
-            ! =====	
+            ! =====
             ! ===== Deformation rate tensor on element elem:
                 !du/dx
             eps11(el) = sum(gradient_sca(1:3,el)*U_ice(elem2D_nodes(1:3,el))) &
                 - metric_factor(el) * sum(V_ice(elem2D_nodes(1:3,el)))/3.0_WP
-            
+
             eps22(el) = sum(gradient_sca(4:6, el)*V_ice(elem2D_nodes(1:3,el)))
-            
+
             eps12(el) = 0.5_WP*(sum(gradient_sca(4:6,el)*U_ice(elem2D_nodes(1:3,el))) &
                         + sum(gradient_sca(1:3,el)*V_ice(elem2D_nodes(1:3,el))) &
                         + metric_factor(el) * sum(U_ice(elem2D_nodes(1:3,el)))/3.0_WP)
             ! ===== moduli:
             delta = sqrt((eps11(el)*eps11(el) + eps22(el)*eps22(el))*(1.0_WP+vale) + 4.0_WP*vale*eps12(el)*eps12(el) + &
                                 2.0_WP*eps11(el)*eps22(el)*(1.0_WP-vale))
-            
+
             ! =======================================
             ! ===== Here the EVP rheology piece starts
             ! =======================================
-            
+
             ! ===== viscosity zeta should exceed zeta_min
             ! (done via limiting delta from above)
-            
+
             !if(delta>pressure/ice%zeta_min) delta=pressure/ice%zeta_min
-                !It does not work properly by 
+                !It does not work properly by
             !creating response where ice_strength is small
                 ! Uncomment and test if necessary
-            
+
             ! ===== if delta is too small or zero, viscosity will too large (unlimited)
             ! (limit delta_inv)
-            delta_inv = 1.0_WP/max(delta,ice%delta_min) 
-            zeta = ice_strength(el)*delta_inv			     
-            ! ===== Limiting pressure/Delta  (zeta): it may still happen that pressure/Delta 
+            delta_inv = 1.0_WP/max(delta,ice%delta_min)
+            zeta = ice_strength(el)*delta_inv
+            ! ===== Limiting pressure/Delta  (zeta): it may still happen that pressure/Delta
             ! is too large in some regions and CFL criterion is violated.
-            ! The regularization below was introduced by Hunke, 
-            ! but seemingly is not used in the current CICE. 
-            ! Without it divergence and zeta can be noisy (but code 
+            ! The regularization below was introduced by Hunke,
+            ! but seemingly is not used in the current CICE.
+            ! Without it divergence and zeta can be noisy (but code
             ! remains stable), using it reduces viscosities too strongly.
             ! It is therefore commented
-            
+
             !if (zeta>ice%clim_evp*voltriangle(el)) then
             !zeta=ice%clim_evp*voltriangle(el)
-            !end if 
-            
+            !end if
+
             zeta = zeta*ice%Tevp_inv
-                            
+
             r1  = zeta*(eps11(el)+eps22(el)) - ice_strength(el)*ice%Tevp_inv
             r2  = zeta*(eps11(el)-eps22(el))*vale
             r3  = zeta*eps12(el)*vale
-            
+
             si1 = det1*(sigma11(el) + sigma22(el) + dte*r1)
             si2 = det2*(sigma11(el) - sigma22(el) + dte*r2)
-            
+
             sigma12(el) = det2*(sigma12(el)+dte*r3)
             sigma11(el) = 0.5_WP*(si1+si2)
             sigma22(el) = 0.5_WP*(si1-si2)
-            
+
 #if defined (__icepack)
             rdg_conv_elem(el)  = -min((eps11(el)+eps22(el)),0.0_WP)
             rdg_shear_elem(el) = 0.5_WP*(delta - abs(eps11(el)+eps22(el)))
@@ -167,7 +167,7 @@ end subroutine stress_tensor
 !_______________________________________________________________________________
 ! EVP implementation:
 ! Computes the divergence of stress tensor and puts the result into the
-! rhs vectors 
+! rhs vectors
 subroutine stress2rhs(ice, partit, mesh)
     USE MOD_ICE
     USE MOD_PARTIT
@@ -199,8 +199,8 @@ subroutine stress2rhs(ice, partit, mesh)
     rhs_m        => ice%data(2)%values_rhs(:)
     inv_areamass => ice%work%inv_areamass(:)
     ice_strength => ice%work%ice_strength(:)
-    
-    !___________________________________________________________________________    
+
+    !___________________________________________________________________________
     val3=1/3.0_WP
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, el, k)
@@ -220,11 +220,11 @@ subroutine stress2rhs(ice, partit, mesh)
 #endif
     do el=1,myDim_elem2D
         ! ===== Skip if ice is absent
-        !   if (any(m_ice(elnodes)<= 0.) .or. any(a_ice(elnodes) <=0.)) CYCLE 
+        !   if (any(m_ice(elnodes)<= 0.) .or. any(a_ice(elnodes) <=0.)) CYCLE
         !_______________________________________________________________________
-        ! if element contains cavity node skip it 
+        ! if element contains cavity node skip it
         if (ulevels(el) > 1) cycle
-        
+
         !_______________________________________________________________________
         if (ice_strength(el) > 0._WP) then
             DO k=1,3
@@ -246,7 +246,7 @@ subroutine stress2rhs(ice, partit, mesh)
 #endif
                 V_rhs_ice(elem2D_nodes(k,el)) = V_rhs_ice(elem2D_nodes(k,el)) &
                     - elem_area(el) * &
-                    (sigma12(el)*gradient_sca(k,el) + sigma22(el)*gradient_sca(k+3,el) &   
+                    (sigma12(el)*gradient_sca(k,el) + sigma22(el)*gradient_sca(k+3,el) &
                     -sigma11(el)*val3*metric_factor(el))
 
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
@@ -267,9 +267,9 @@ subroutine stress2rhs(ice, partit, mesh)
     !$ACC PARALLEL LOOP GANG
     DO n=1, myDim_nod2D
         !_______________________________________________________________________
-        ! if cavity node skip it 
+        ! if cavity node skip it
         if (ulevels_nod2d(n)>1) cycle
-        
+
         !_______________________________________________________________________
         if (inv_areamass(n) > 0._WP) then
             U_rhs_ice(n) = U_rhs_ice(n)*inv_areamass(n) + rhs_a(n)
@@ -286,7 +286,7 @@ end subroutine stress2rhs
 !
 !
 !_______________________________________________________________________________
-! EVP implementation. Does subcycling and boundary conditions.  
+! EVP implementation. Does subcycling and boundary conditions.
 ! Velocities at nodes
 subroutine EVPdynamics(ice, partit, mesh)
     USE MOD_ICE
@@ -300,7 +300,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     use ice_EVP_interfaces
 #if defined (__icepack)
     use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
-    use icedrv_main,   only: icepack_to_fesom   
+    use icedrv_main,   only: icepack_to_fesom
 #endif
     IMPLICIT NONE
     type(t_ice)   , intent(inout), target :: ice
@@ -319,7 +319,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     real(kind=WP)   :: eta, delta
     integer         :: k
     real(kind=WP)   :: vale, dx(3), dy(3), val3
-    real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2, dte 
+    real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2, dte
     real(kind=WP)   :: zeta, delta_inv, d1, d2
     INTEGER         :: elem
     !_______________________________________________________________________________
@@ -329,7 +329,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: u_ice_old, v_ice_old
     real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice, rhs_a, rhs_m
     real(kind=WP), dimension(:), pointer  :: u_w, v_w, elevation
-    real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y 
+    real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
     real(kind=WP), dimension(:), pointer  :: inv_areamass, inv_mass, ice_strength
 #if defined (__icepack)
     real(kind=WP), dimension(:), pointer  :: a_ice_old, m_ice_old, m_snow_old
@@ -363,11 +363,11 @@ subroutine EVPdynamics(ice, partit, mesh)
     rhosno          => ice%thermo%rhosno
     rhoice          => ice%thermo%rhoice
     inv_rhowat      => ice%thermo%inv_rhowat
-    
+
     inv_areamass    => ice%work%inv_areamass(:)
     inv_mass        => ice%work%inv_mass(:)
     ice_strength    => ice%work%ice_strength(:)
-    
+
     !___________________________________________________________________________
     ! If Icepack is used, always update the tracers
 #if defined (__icepack)
@@ -384,7 +384,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     rdt=ice%ice_dt/(1.0*ice%evp_rheol_steps)
     ax=cos(ice%theta_io)
     ay=sin(ice%theta_io)
-    
+
     !___________________________________________________________________________
     ! Precompute values that are never changed during the iteration
 !$OMP PARALLEL DO
@@ -402,12 +402,12 @@ subroutine EVPdynamics(ice, partit, mesh)
     !$ACC PARALLEL LOOP GANG
     do n=1,myDim_nod2D
         !_______________________________________________________________________
-        ! if cavity node skip it 
+        ! if cavity node skip it
         if (ulevels_nod2d(n)>1) cycle
 
         !_______________________________________________________________________
         if ((rhoice*m_ice(n)+rhosno*m_snow(n)) > 1.e-3_WP) then
-            inv_areamass(n) = 1._WP/(area(1,n)*(rhoice*m_ice(n)+rhosno*m_snow(n))) 
+            inv_areamass(n) = 1._WP/(area(1,n)*(rhoice*m_ice(n)+rhosno*m_snow(n)))
         else
             inv_areamass(n) = 0._WP
         endif
@@ -417,7 +417,7 @@ subroutine EVPdynamics(ice, partit, mesh)
             inv_mass(n) = 0._WP
         else
             inv_mass(n) = (rhoice*m_ice(n)+rhosno*m_snow(n))/a_ice(n)
-            inv_mass(n) = 1.0_WP/max(inv_mass(n), 9.0_WP)        ! Limit the mass 
+            inv_mass(n) = 1.0_WP/max(inv_mass(n), 9.0_WP)        ! Limit the mass
                                         ! if it is too small
         endif
         rhs_a(n)=0.0_WP       ! these are used as temporal storage here
@@ -437,21 +437,21 @@ subroutine EVPdynamics(ice, partit, mesh)
             elnodes = elem2D_nodes(:,el)
             ice_strength(el)=0.0_WP
             !___________________________________________________________________
-            ! if element has any cavity node skip it 
+            ! if element has any cavity node skip it
             if (ulevels(el) > 1) cycle
-            
+
             !___________________________________________________________________
             if (any(m_ice(elnodes)<=0._WP) .or. &
                 any(a_ice(elnodes)<=0._WP)) then
-                
+
                 ! There is no ice in elem
                 ice_strength(el) = 0._WP
-                
+
             !___________________________________________________________________
             else
                 msum = sum(m_ice(elnodes))/3.0_WP
                 asum = sum(a_ice(elnodes))/3.0_WP
-                
+
                 !_______________________________________________________________
                 ! Hunke and Dukowicz c*h*p*
 #if defined (__icepack)
@@ -460,11 +460,11 @@ subroutine EVPdynamics(ice, partit, mesh)
                 ice_strength(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
 #endif
                 ice_strength(el) = 0.5_WP*ice_strength(el)
-                
+
                 !_______________________________________________________________
                 ! use rhs_m and rhs_a for storing the contribution from elevation:
                 aa = 9.81_WP*elem_area(el)/3.0_WP
-                
+
                 !_______________________________________________________________
                 ! add and limit pressure from ice weight in case of floating ice
                 ! like in FESOM 1.4
@@ -473,12 +473,12 @@ subroutine EVPdynamics(ice, partit, mesh)
                     p_ice(n)=min(p_ice(n),max_ice_loading)
                 end do
                 !!PS p_ice= 0.0_WP
-                
+
                 !_______________________________________________________________
                 elevation_elem = elevation(elnodes)
-                elevation_dx   = sum(gradient_sca(1:3,el)*(elevation_elem+p_ice*use_pice))   
+                elevation_dx   = sum(gradient_sca(1:3,el)*(elevation_elem+p_ice*use_pice))
                 elevation_dy   = sum(gradient_sca(4:6,el)*(elevation_elem+p_ice*use_pice))
-                
+
                 !_______________________________________________________________
                 rhs_a(elnodes) = rhs_a(elnodes)-aa*elevation_dx
                 rhs_m(elnodes) = rhs_m(elnodes)-aa*elevation_dy
@@ -498,19 +498,19 @@ subroutine EVPdynamics(ice, partit, mesh)
             ice_strength(el)=0.0_WP
             elnodes = elem2D_nodes(:,el)
             !___________________________________________________________________
-            ! if element has any cavity node skip it 
+            ! if element has any cavity node skip it
             if (ulevels(el) > 1) cycle
-            
+
             !___________________________________________________________________
             if (any(m_ice(elnodes) <= 0._WP) .or. &
                 any(a_ice(elnodes) <=0._WP)) then
-            
+
                 ! There is no ice in elem
                 ice_strength(el) = 0._WP
             else
                 msum = sum(m_ice(elnodes))/3.0_WP
                 asum = sum(a_ice(elnodes))/3.0_WP
-                
+
                 ! ===== Hunke and Dukowicz c*h*p*
 #if defined (__icepack)
                 ice_strength(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
@@ -518,10 +518,10 @@ subroutine EVPdynamics(ice, partit, mesh)
                 ice_strength(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
 #endif
                 ice_strength(el) = 0.5_WP*ice_strength(el)
-                
+
                 ! use rhs_m and rhs_a for storing the contribution from elevation:
                 aa = 9.81_WP*elem_area(el)/3.0_WP
-                
+
                 elevation_dx = sum(gradient_sca(1:3,el)*elevation(elnodes))
                 elevation_dy = sum(gradient_sca(4:6,el)*elevation(elnodes))
 
@@ -544,7 +544,7 @@ subroutine EVPdynamics(ice, partit, mesh)
 #endif
 !$OMP END PARALLEL DO
     endif ! --> if ( .not. trim(which_ALE)=='linfs') then
-!$OMP PARALLEL DO    
+!$OMP PARALLEL DO
     !___________________________________________________________________________
     !$ACC PARALLEL LOOP GANG
     do n=1,myDim_nod2D
@@ -560,10 +560,10 @@ subroutine EVPdynamics(ice, partit, mesh)
     rdg_conv_elem(:)  = 0.0_WP
     rdg_shear_elem(:) = 0.0_WP
 #endif
-    do shortstep=1, ice%evp_rheol_steps 
+    do shortstep=1, ice%evp_rheol_steps
         !_______________________________________________________________________
         call stress_tensor(ice, partit, mesh)
-        call stress2rhs(ice, partit, mesh) 
+        call stress2rhs(ice, partit, mesh)
         !_______________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, ed, umod, drag, rhsu, rhsv, r_a, r_b, det)
 !$OMP DO
@@ -578,25 +578,25 @@ subroutine EVPdynamics(ice, partit, mesh)
         !$ACC PARALLEL LOOP GANG
         do n=1,myDim_nod2D
             !___________________________________________________________________
-            ! if cavity node skip it 
+            ! if cavity node skip it
             if ( ulevels_nod2d(n)>1 ) cycle
-            
+
             !___________________________________________________________________
             if (a_ice(n) >= 0.01_WP) then               ! Skip if ice is absent
                 umod = sqrt((U_ice(n)-U_w(n))**2+(V_ice(n)-V_w(n))**2)
                 drag = ice%cd_oce_ice*umod*density_0*inv_mass(n)
-                
+
                 rhsu = U_ice(n) +rdt*(drag*(ax*U_w(n) - ay*V_w(n))+ &
                         inv_mass(n)*stress_atmice_x(n) + U_rhs_ice(n))
                 rhsv = V_ice(n) +rdt*(drag*(ax*V_w(n) + ay*U_w(n))+ &
                         inv_mass(n)*stress_atmice_y(n) + V_rhs_ice(n))
-                
+
                 r_a      = 1._WP + ax*drag*rdt
                 r_b      = rdt*(mesh%coriolis_node(n) + ay*drag)
                 det      = 1.0_WP/(r_a*r_a + r_b*r_b)
                 U_ice(n) = det*(r_a*rhsu +r_b*rhsv)
                 V_ice(n) = det*(r_a*rhsv -r_b*rhsu)
-            else  ! Set velocities to 0 if ice is absent 
+            else  ! Set velocities to 0 if ice is absent
                 U_ice(n) = 0.0_WP
                 V_ice(n) = 0.0_WP
             end if
@@ -615,10 +615,10 @@ subroutine EVPdynamics(ice, partit, mesh)
                 U_ice(edges(1:2,ed))=0.0_WP
                 V_ice(edges(1:2,ed))=0.0_WP
             endif
-            
+
             !___________________________________________________________________
             ! apply sea ice velocity boundary conditions at cavity-ocean edge
-            if (use_cavity) then 
+            if (use_cavity) then
 !                 if ( (ulevels(edge_tri(1,ed))>1) .or. &
 !                     ( edge_tri(2,ed)>0 .and. ulevels(edge_tri(2,ed))>1) ) then
 ! #if defined(_OPENMP)  && !defined(__openmp_reproducible)
@@ -628,14 +628,14 @@ subroutine EVPdynamics(ice, partit, mesh)
 ! #endif
 !                     U_ice(edges(1,ed))=0.0_WP
 !                     V_ice(edges(1,ed))=0.0_WP
-! 
+!
 ! #if defined(_OPENMP) && !defined(__openmp_reproducible)
 !                     call omp_unset_lock(partit%plock(edges(1,ed)))
 !                     call omp_set_lock  (partit%plock(edges(2,ed)))
 ! #endif
 !                     U_ice(edges(2,ed))=0.0_WP
 !                     V_ice(edges(2,ed))=0.0_WP
-! 
+!
 ! #if defined(_OPENMP)  && !defined(__openmp_reproducible)
 !                     call omp_unset_lock(partit%plock(edges(2,ed)))
 ! #else
@@ -663,7 +663,7 @@ subroutine EVPdynamics(ice, partit, mesh)
 #else
 !$OMP END ORDERED
 #endif
-                elseif ( edge_tri(2,ed)>0) then 
+                elseif ( edge_tri(2,ed)>0) then
                     if (ulevels(edge_tri(2,ed))>1) then
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
                     call omp_set_lock  (partit%plock(edges(1,ed)))
@@ -684,11 +684,11 @@ subroutine EVPdynamics(ice, partit, mesh)
                     call omp_unset_lock(partit%plock(edges(2,ed)))
 #else
 !$OMP END ORDERED
-#endif                    
-                    
-                    end if 
-                end if 
-            end if 
+#endif
+
+                    end if
+                end if
+            end if
         end do
         !$ACC END PARALLEL LOOP
 !$OMP END DO
@@ -697,5 +697,5 @@ subroutine EVPdynamics(ice, partit, mesh)
         !_______________________________________________________________________
         call exchange_nod(U_ice,V_ice,partit)
 !$OMP BARRIER
-    END DO !--> do shortstep=1, ice%evp_rheol_steps 
+    END DO !--> do shortstep=1, ice%evp_rheol_steps
 end subroutine EVPdynamics
