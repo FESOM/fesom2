@@ -15,9 +15,10 @@ USE g_comm_auto
 USE par_support_interfaces
 USE restart_derivedtype_module
 use fortran_utils
+use nvtx
 IMPLICIT NONE
 
-character(LEN=500)           :: resultpath, npepath
+character(LEN=500)           :: resultpath, npepath, meta
 character(LEN=256)           :: npes_string
 logical                      :: dir_exist
 type(t_mesh)  , target, save :: mesh
@@ -26,6 +27,7 @@ type(t_ice)   , target, save :: ice
 integer                      :: i, n, nzmax, nzmin
 real(kind=WP) , allocatable  :: UV(:,:,:), wvel(:,:), wvel_i(:,:), wvel_e(:,:)
 integer                      :: node_size, elem_size
+integer, dimension(3)        :: time=(/0, 0, 0/)
 
 !_______________________________________________________________________________
 resultpath='../'
@@ -81,13 +83,15 @@ do i=1, 10
     ! Dynamics
     select case (ice%whichEVP)
         case (0)
-            if (partit%mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'  
+            if (partit%mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'
+            call nvtxStartRange('EVP')
             call EVPdynamics  (ice, partit, mesh)
+            call nvtxEndRange()
         case (1)
-            if (partit%mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics_m...'//achar(27)//'[0m'  
+            if (partit%mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics_m...'//achar(27)//'[0m'
             call EVPdynamics_m(ice, partit, mesh)
         case (2)
-            if (partit%mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics_a...'//achar(27)//'[0m'  
+            if (partit%mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics_a...'//achar(27)//'[0m'
             call EVPdynamics_a(ice, partit, mesh)
         case default
             if (partit%mype==0) write(*,*) 'a non existing EVP scheme specified!'
@@ -98,17 +102,28 @@ do i=1, 10
     !___________________________________________________________________________
     ! Advection
     if (partit%mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
-    call ice_TG_rhs_div    (ice, partit, mesh)  
-    
-    if (partit%mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_solve...'//achar(27)//'[0m' 
+    call nvtxStartRange('ice_TG')
+    call ice_TG_rhs_div    (ice, partit, mesh)
+    call nvtxEndRange()
+
+    if (partit%mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_solve...'//achar(27)//'[0m'
+    call nvtxStartRange('ice_fct')
     call ice_fct_solve     (ice, partit, mesh)
-    
+    call nvtxEndRange()
+
     if (partit%mype==0)  print *, achar(27)//'[36m'//'     --> call ice_update_for_div...'//achar(27)//'[0m'
+    call nvtxStartRange('ice_update')
     call ice_update_for_div(ice, partit, mesh)
-    
+    call nvtxEndRange()
+
 end do
+
+meta=trim(resultpath)//"/fesom_bin_restart/meta.time"
+
+!_______________________________________________________________________________
+! write derived type binary restart files
+call write_all_bin_restarts(time, npepath, meta, partit=partit, mesh=mesh, ice=ice)
 
 call par_ex(partit%MPI_COMM_FESOM, partit%mype)
 
 end program main
-  
