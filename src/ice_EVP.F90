@@ -489,11 +489,11 @@ subroutine EVPdynamics(ice, partit, mesh)
     else
         ! for linear free surface
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum, aa, elevation_elem, elevation_dx, elevation_dy)
-        #if !defined(DISABLE_OPENACC_ATOMICS)
+#if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC PARALLEL LOOP GANG
-        ! #else
+! #else
         !     !$ACC UPDATE SELF(fct_plus, fct_minus, adf_h)
-        #endif
+#endif
         do el = 1,myDim_elem2D
             ice_strength(el)=0.0_WP
             elnodes = elem2D_nodes(:,el)
@@ -537,11 +537,11 @@ subroutine EVPdynamics(ice, partit, mesh)
                 end do
             end if
         enddo
-        #if !defined(DISABLE_OPENACC_ATOMICS)
+#if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC END PARALLEL LOOP
-        ! #else
+! #else
         !     !$ACC UPDATE DEVICE(fct_plus, fct_minus)
-        #endif
+#endif
 !$OMP END PARALLEL DO
     endif ! --> if ( .not. trim(which_ALE)=='linfs') then
 !$OMP PARALLEL DO    
