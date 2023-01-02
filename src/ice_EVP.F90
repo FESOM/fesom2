@@ -87,6 +87,7 @@ subroutine stress_tensor(ice, partit, mesh)
     det2 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte) !*ellipse**2 
  
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, r1, r2, r3, si1, si2, zeta, delta, delta_inv, d1, d2)
+    !$ACC PARALLEL LOOP GANG
     do el=1,myDim_elem2D
         !_______________________________________________________________________
         ! if element contains cavity node skip it 
@@ -158,6 +159,7 @@ subroutine stress_tensor(ice, partit, mesh)
 #endif
         endif
     end do
+    !$ACC END PARALLEL LOOP
 !$OMP END PARALLEL DO
 end subroutine stress_tensor
 !
@@ -203,12 +205,19 @@ subroutine stress2rhs(ice, partit, mesh)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, el, k)
 !$OMP DO
+    !$ACC PARALLEL LOOP GANG
     DO  n=1, myDim_nod2D
         U_rhs_ice(n)=0.0_WP
         V_rhs_ice(n)=0.0_WP
     END DO
+    !$ACC END PARALLEL LOOP
 !$OMP END DO
 !$OMP DO
+#if !defined(DISABLE_OPENACC_ATOMICS)
+    !$ACC PARALLEL LOOP GANG
+! #else
+!     !$ACC UPDATE SELF(fct_plus, fct_minus, adf_h)
+#endif
     do el=1,myDim_elem2D
         ! ===== Skip if ice is absent
         !   if (any(m_ice(elnodes)<= 0.) .or. any(a_ice(elnodes) <=0.)) CYCLE 
@@ -224,12 +233,18 @@ subroutine stress2rhs(ice, partit, mesh)
 #else
 !$OMP ORDERED
 #endif
+#if !defined(DISABLE_OPENACC_ATOMICS)
+                !$ACC ATOMIC UPDATE
+#endif
                 U_rhs_ice(elem2D_nodes(k,el)) = U_rhs_ice(elem2D_nodes(k,el)) &
                 - elem_area(el) * &
                     (sigma11(el)*gradient_sca(k,el) + sigma12(el)*gradient_sca(k+3,el) &
                     +sigma12(el)*val3*metric_factor(el))            !metrics
-                
-                V_rhs_ice(elem2D_nodes(k,el)) = V_rhs_ice(elem2D_nodes(k,el)) & 
+
+#if !defined(DISABLE_OPENACC_ATOMICS)
+                !$ACC ATOMIC UPDATE
+#endif
+                V_rhs_ice(elem2D_nodes(k,el)) = V_rhs_ice(elem2D_nodes(k,el)) &
                     - elem_area(el) * &
                     (sigma12(el)*gradient_sca(k,el) + sigma22(el)*gradient_sca(k+3,el) &   
                     -sigma11(el)*val3*metric_factor(el))
@@ -241,9 +256,15 @@ subroutine stress2rhs(ice, partit, mesh)
 #endif
             END DO
         endif
-    end do 
+    end do
+#if !defined(DISABLE_OPENACC_ATOMICS)
+    !$ACC END PARALLEL LOOP
+! #else
+!     !$ACC UPDATE DEVICE(fct_plus, fct_minus)
+#endif
 !$OMP END DO
 !$OMP DO
+    !$ACC PARALLEL LOOP GANG
     DO n=1, myDim_nod2D
         !_______________________________________________________________________
         ! if cavity node skip it 
@@ -258,6 +279,7 @@ subroutine stress2rhs(ice, partit, mesh)
             V_rhs_ice(n) = 0._WP
         endif
     END DO
+    !$ACC END PARALLEL LOOP
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine stress2rhs
@@ -366,16 +388,19 @@ subroutine EVPdynamics(ice, partit, mesh)
     !___________________________________________________________________________
     ! Precompute values that are never changed during the iteration
 !$OMP PARALLEL DO
+    !$ACC PARALLEL LOOP GANG
     do n=1, myDim_nod2D+eDim_nod2D
        inv_areamass(n) =0.0_WP
        inv_mass(n)     =0.0_WP
        rhs_a(n)        =0.0_WP
        rhs_m(n)        =0.0_WP
     end do
+    !$ACC END PARALLEL LOOP
 !$OMP END PARALLEL DO
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
-    do n=1,myDim_nod2D 
+    !$ACC PARALLEL LOOP GANG
+    do n=1,myDim_nod2D
         !_______________________________________________________________________
         ! if cavity node skip it 
         if (ulevels_nod2d(n)>1) cycle
@@ -398,6 +423,7 @@ subroutine EVPdynamics(ice, partit, mesh)
         rhs_a(n)=0.0_WP       ! these are used as temporal storage here
         rhs_m(n)=0.0_WP       ! for the contribution due to ssh
     enddo
+    !$ACC END PARALLEL LOOP
 !$OMP END PARALLEL DO
 
     !___________________________________________________________________________
@@ -463,6 +489,11 @@ subroutine EVPdynamics(ice, partit, mesh)
     else
         ! for linear free surface
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum, aa, elevation_elem, elevation_dx, elevation_dy)
+        #if !defined(DISABLE_OPENACC_ATOMICS)
+            !$ACC PARALLEL LOOP GANG
+        ! #else
+        !     !$ACC UPDATE SELF(fct_plus, fct_minus, adf_h)
+        #endif
         do el = 1,myDim_elem2D
             ice_strength(el)=0.0_WP
             elnodes = elem2D_nodes(:,el)
@@ -493,20 +524,35 @@ subroutine EVPdynamics(ice, partit, mesh)
                 
                 elevation_dx = sum(gradient_sca(1:3,el)*elevation(elnodes))
                 elevation_dy = sum(gradient_sca(4:6,el)*elevation(elnodes))
-                
-                rhs_a(elnodes) = rhs_a(elnodes)-aa*elevation_dx
-                rhs_m(elnodes) = rhs_m(elnodes)-aa*elevation_dy
+
+                do k=1, 3
+#if !defined(DISABLE_OPENACC_ATOMICS)
+                    !$ACC ATOMIC UPDATE
+#endif
+                    rhs_a(elnodes(k)) = rhs_a(elnodes(k))-aa*elevation_dx
+#if !defined(DISABLE_OPENACC_ATOMICS)
+                    !$ACC ATOMIC UPDATE
+#endif
+                    rhs_m(elnodes(k)) = rhs_m(elnodes(k))-aa*elevation_dy
+                end do
             end if
         enddo
+        #if !defined(DISABLE_OPENACC_ATOMICS)
+            !$ACC END PARALLEL LOOP
+        ! #else
+        !     !$ACC UPDATE DEVICE(fct_plus, fct_minus)
+        #endif
 !$OMP END PARALLEL DO
     endif ! --> if ( .not. trim(which_ALE)=='linfs') then
 !$OMP PARALLEL DO    
     !___________________________________________________________________________
-    do n=1,myDim_nod2D 
+    !$ACC PARALLEL LOOP GANG
+    do n=1,myDim_nod2D
         if (ulevels_nod2d(n)>1) cycle
         rhs_a(n) = rhs_a(n)/area(1,n)
         rhs_m(n) = rhs_m(n)/area(1,n)
     enddo
+    !$ACC END PARALLEL LOOP
 !$OMP END PARALLEL DO
     !___________________________________________________________________________
     ! End of Precomputing --> And the ice stepping starts
@@ -521,13 +567,16 @@ subroutine EVPdynamics(ice, partit, mesh)
         !_______________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, ed, umod, drag, rhsu, rhsv, r_a, r_b, det)
 !$OMP DO
+        !$ACC PARALLEL LOOP GANG
         do n=1,myDim_nod2D+eDim_nod2D
            U_ice_old(n) = U_ice(n) !PS
            V_ice_old(n) = V_ice(n) !PS
         end do
+        !$ACC END PARALLEL LOOP
 !$OMP END DO
 !$OMP DO
-        do n=1,myDim_nod2D 
+        !$ACC PARALLEL LOOP GANG
+        do n=1,myDim_nod2D
             !___________________________________________________________________
             ! if cavity node skip it 
             if ( ulevels_nod2d(n)>1 ) cycle
@@ -552,10 +601,13 @@ subroutine EVPdynamics(ice, partit, mesh)
                 V_ice(n) = 0.0_WP
             end if
         end do
+        !$ACC END PARALLEL LOOP
 !$OMP END DO
         !_______________________________________________________________________
         ! apply sea ice velocity boundary condition
 !$OMP DO
+        ! With the binary data of np2 goes only inside the first if
+        !$ACC PARALLEL LOOP GANG
         DO  ed=1,myDim_edge2D
             !___________________________________________________________________
             ! apply coastal sea ice velocity boundary conditions
@@ -638,6 +690,7 @@ subroutine EVPdynamics(ice, partit, mesh)
                 end if 
             end if 
         end do
+        !$ACC END PARALLEL LOOP
 !$OMP END DO
 !$OMP END PARALLEL
 !write(*,*) partit%mype, shortstep, 'CP4'
