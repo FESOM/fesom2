@@ -637,7 +637,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     end do
     !$ACC END PARALLEL LOOP
 !$OMP END DO
+
 !$OMP DO
+#if !defined(DISABLE_OPENACC_ATOMICS)
+    !$ACC PARALLEL LOOP GANG COPY(icepminus) PRIVATE(elnodes)
+#endif
     do elem=1, myDim_elem2D
         ! if cavity cycle over
         if(ulevels(elem)>1) cycle !LK89140
@@ -653,8 +657,14 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 !$OMP ORDERED
 #endif
             if (flux>0) then
+#if !defined(DISABLE_OPENACC_ATOMICS)
+                !$ACC ATOMIC UPDATE
+#endif
                 icepplus(n)=icepplus(n)+flux
             else
+#if !defined(DISABLE_OPENACC_ATOMICS)
+                !$ACC ATOMIC UPDATE
+#endif
                 icepminus(n)=icepminus(n)+flux
             end if
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
@@ -664,6 +674,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #endif
         end do
     end do
+#if !defined(DISABLE_OPENACC_ATOMICS)
+    !$ACC END PARALLEL LOOP
+#endif
 !$OMP END DO
     !___________________________________________________________________________
     ! The least upper bound for the correction factors
@@ -727,6 +740,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         !$ACC END PARALLEL LOOP
 !$OMP END DO
 !$OMP DO
+#if !defined(DISABLE_OPENACC_ATOMICS)
+        !$ACC PARALLEL LOOP GANG PRIVATE(elnodes)
+#endif
         do elem=1, myDim_elem2D
             ! if cavity cycle over
             if(ulevels(elem)>1) cycle !LK89140
@@ -739,6 +755,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
 !$OMP ORDERED
 #endif
+#if !defined(DISABLE_OPENACC_ATOMICS)
+                !$ACC ATOMIC UPDATE
+#endif
                 m_ice(n)=m_ice(n)+icefluxes(elem,q)
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_unset_lock(partit%plock(n))
@@ -747,6 +766,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #endif
             end do
         end do
+#if !defined(DISABLE_OPENACC_ATOMICS)
+        !$ACC END PARALLEL LOOP
+#endif
 !$OMP END DO
     end if
 
@@ -760,6 +782,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         !$ACC END PARALLEL LOOP
 !$OMP END DO
 !$OMP DO
+#if !defined(DISABLE_OPENACC_ATOMICS)
+        !$ACC PARALLEL LOOP GANG PRIVATE(elnodes)
+#endif
         do elem=1, myDim_elem2D
             ! if cavity cycle over
             if(ulevels(elem)>1) cycle !LK89140
@@ -772,6 +797,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
 !$OMP ORDERED
 #endif
+#if !defined(DISABLE_OPENACC_ATOMICS)
+                !$ACC ATOMIC UPDATE
+#endif
                 a_ice(n)=a_ice(n)+icefluxes(elem,q)
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
                 call omp_unset_lock(partit%plock(n))
@@ -780,6 +808,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #endif
             end do
         end do
+#if !defined(DISABLE_OPENACC_ATOMICS)
+        !$ACC END PARALLEL LOOP
+#endif
 !$OMP END DO
     end if
 
@@ -793,6 +824,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         !$ACC END PARALLEL LOOP
 !$OMP END DO
 !$OMP DO
+#if !defined(DISABLE_OPENACC_ATOMICS)
+        !$ACC PARALLEL LOOP GANG PRIVATE(elnodes)
+#endif
         do elem=1, myDim_elem2D
             ! if cavity cycle over
             if(ulevels(elem)>1) cycle !LK89140
@@ -805,6 +839,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
 !$OMP ORDERED
 #endif
+#if !defined(DISABLE_OPENACC_ATOMICS)
+                !$ACC ATOMIC UPDATE
+#endif
                 m_snow(n)=m_snow(n)+icefluxes(elem,q)
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
                 call omp_unset_lock(partit%plock(n))
@@ -813,6 +850,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #endif
             end do
         end do
+#if !defined(DISABLE_OPENACC_ATOMICS)
+        !$ACC END PARALLEL LOOP
+#endif
 !$OMP END DO
     end if
 
@@ -827,6 +867,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         !$ACC END PARALLEL LOOP
 !$OMP END DO
 !$OMP DO
+#if !defined(DISABLE_OPENACC_ATOMICS)
+        !$ACC PARALLEL LOOP GANG PRIVATE(elnodes)
+#endif
         do elem=1, myDim_elem2D
             ! if cavity cycle over
             if(ulevels(elem)>1) cycle !LK89140
@@ -839,6 +882,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
 !$OMP ORDERED
 #endif
+#if !defined(DISABLE_OPENACC_ATOMICS)
+                !$ACC ATOMIC UPDATE
+#endif
                 ice_temp(n)=ice_temp(n)+icefluxes(elem,q)
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_unset_lock(partit%plock(n))
@@ -847,6 +893,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #endif
             end do
         end do
+#if !defined(DISABLE_OPENACC_ATOMICS)
+        !$ACC END PARALLEL LOOP
+#endif
 !$OMP END DO
     end if
 #endif /* (__oifs) */ || defined (__ifsinterface)
