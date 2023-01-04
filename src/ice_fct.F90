@@ -1034,7 +1034,7 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
-    real(kind=WP)            :: diff, entries(3),  um, vm, vol, dx(3), dy(3)
+    real(kind=WP)            :: diff, entries(3),  um, vm, vol, dx(3), dy(3), tmp_sum
     integer                  :: n, q, row, elem, elnodes(3)
     real(kind=WP)            :: c1, c2, c3, c4, cx1, cx2, cx3, cx4, entries2(3)
     !___________________________________________________________________________
@@ -1091,6 +1091,9 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(diff, entries, um, vm, vol, dx, dy, n, q, row, elem, elnodes, c1, c2, c3, c4, cx1, cx2, cx3, cx4, entries2)
 !$OMP DO
+#if !defined(DISABLE_OPENACC_ATOMICS)
+    !$ACC PARALLEL LOOP GANG PRIVATE(elnodes, dx, dy, entries, entries2)
+#endif
     do elem=1,myDim_elem2D          !assembling rhs over elements
         elnodes=elem2D_nodes(:,elem)
 
@@ -1136,18 +1139,49 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 #else
 !$OMP ORDERED
 #endif
-            rhs_m(row)=rhs_m(row)+sum(entries*m_ice(elnodes))+cx1
-            rhs_a(row)=rhs_a(row)+sum(entries*a_ice(elnodes))+cx2
-            rhs_ms(row)=rhs_ms(row)+sum(entries*m_snow(elnodes))+cx3
+            tmp_sum = sum(entries*m_ice(elnodes))
+#if !defined(DISABLE_OPENACC_ATOMICS)
+            !$ACC ATOMIC WRITE
+#endif
+            rhs_m(row)=rhs_m(row)+tmp_sum+cx1
+
+            tmp_sum = sum(entries*a_ice(elnodes))
+#if !defined(DISABLE_OPENACC_ATOMICS)
+            !$ACC ATOMIC WRITE
+#endif
+            rhs_a(row)=rhs_a(row)+tmp_sum+cx2
+
+            tmp_sum = sum(entries*m_snow(elnodes))
+#if !defined(DISABLE_OPENACC_ATOMICS)
+            !$ACC ATOMIC WRITE
+#endif
+            rhs_ms(row)=rhs_ms(row)+tmp_sum+cx3
+
 #if defined (__oifs) || defined (__ifsinterface)
-            rhs_temp(row)=rhs_temp(row)+sum(entries*ice_temp(elnodes))+cx4
+            tmp_sum = sum(entries*ice_temp(elnodes))
+#if !defined(DISABLE_OPENACC_ATOMICS)
+            !$ACC ATOMIC UPDATE
+#endif
+            rhs_temp(row)=rhs_temp(row)+tmp_sum+cx4
 #endif /* (__oifs) */
 
             !___________________________________________________________________
+#if !defined(DISABLE_OPENACC_ATOMICS)
+            !$ACC ATOMIC UPDATE
+#endif
             rhs_mdiv(row)=rhs_mdiv(row)-cx1
+#if !defined(DISABLE_OPENACC_ATOMICS)
+            !$ACC ATOMIC UPDATE
+#endif
             rhs_adiv(row)=rhs_adiv(row)-cx2
+#if !defined(DISABLE_OPENACC_ATOMICS)
+            !$ACC ATOMIC UPDATE
+#endif
             rhs_msdiv(row)=rhs_msdiv(row)-cx3
 #if defined (__oifs) || defined (__ifsinterface)
+#if !defined(DISABLE_OPENACC_ATOMICS)
+            !$ACC ATOMIC UPDATE
+#endif
             rhs_tempdiv(row)=rhs_tempdiv(row)-cx4
 #endif /* (__oifs) */
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
@@ -1157,6 +1191,9 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 #endif
         end do
     end do
+#if !defined(DISABLE_OPENACC_ATOMICS)
+    !$ACC END PARALLEL LOOP
+#endif
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine ice_TG_rhs_div
