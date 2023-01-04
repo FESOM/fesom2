@@ -267,6 +267,7 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     gamma=ice%ice_gamma_fct         ! Added diffusivity parameter
                                 ! Adjust it to ensure posivity of solution
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row, clo, clo2, cn, location)
+    !$ACC PARALLEL LOOP GANG VECTOR COPY(ssh_stiff, ssh_stiff%rowptr) PRIVATE(location)
     do row=1,myDim_nod2D
         !_______________________________________________________________________
         ! if there is cavity no ice fxt low order
@@ -292,6 +293,7 @@ subroutine ice_solve_low_order(ice, partit, mesh)
                   (1.0_WP-gamma)*ice_temp(row)
 #endif /* (__oifs) */
     end do
+    !$ACC END PARALLEL LOOP
 !$OMP END PARALLEL DO
     ! Low-order solution must be known to neighbours
     call exchange_nod(m_icel,a_icel,m_snowl, partit)
@@ -378,6 +380,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
     do n=1,num_iter_solve-1
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, clo, clo2, cn, location, row, rhs_new)
 !$OMP DO
+        !$ACC PARALLEL LOOP GANG VECTOR COPY(ssh_stiff, ssh_stiff%rowptr) PRIVATE(location)
         do row=1,myDim_nod2D
             ! if cavity node skip it
             if (ulevels_nod2d(row)>1) cycle
@@ -398,6 +401,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
             m_templ(row)= dm_temp(row)+rhs_new/area(1,row)
 #endif /* (__oifs) */
         end do
+        !$ACC END PARALLEL LOOP
 !$OMP END DO
         !_______________________________________________________________________
 !$OMP DO
@@ -1172,7 +1176,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
     type(t_partit), intent(inout), target   :: partit
     type(t_mesh)  , intent(in)   , target   :: mesh
     !___________________________________________________________________________
-    integer                                 :: n,clo,clo2,cn,location(100),row
+    integer                                 :: n,clo,clo2,cn,location(100),row, tmp_it
     real(kind=WP)                           :: rhs_new
     integer                                 :: num_iter_solve=3
     !___________________________________________________________________________
@@ -1241,6 +1245,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
     do n=1,num_iter_solve-1
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row, n, clo, clo2, cn, location, rhs_new)
 !$OMP DO
+        !$ACC PARALLEL LOOP GANG VECTOR COPY(ssh_stiff, ssh_stiff%rowptr) PRIVATE(location)
         do row=1,myDim_nod2D
             ! if cavity node skip it
             if (ulevels_nod2d(row)>1) cycle
@@ -1249,7 +1254,9 @@ subroutine ice_update_for_div(ice, partit, mesh)
             clo=ssh_stiff%rowptr(row)-ssh_stiff%rowptr(1)+1
             clo2=ssh_stiff%rowptr(row+1)-ssh_stiff%rowptr(1)
             cn=clo2-clo+1
-            location(1:cn)=nn_pos(1:cn, row)
+            do tmp_it = 1, cn
+                location(tmp_it)=nn_pos(tmp_it, row)
+            end do
 
             !___________________________________________________________________
             rhs_new     = rhs_mdiv(row) - sum(mass_matrix(clo:clo2)*dm_ice(location(1:cn)))
@@ -1263,6 +1270,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
             m_templ(row)= dm_temp(row)+rhs_new/area(1,row)
 #endif /* (__oifs) */
         end do
+        !$ACC END PARALLEL LOOP
 !$OMP END DO
 !$OMP DO
         !$ACC PARALLEL LOOP GANG
