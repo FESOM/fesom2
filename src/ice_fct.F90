@@ -355,7 +355,11 @@ subroutine ice_solve_high_order(ice, partit, mesh)
     !the first approximation
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
 
-    !$ACC PARALLEL LOOP GANG
+    !$ACC DATA COPY(myDim_nod2D, ulevels_nod2D, area, nn_pos, mass_matrix) &
+    !$ACC      COPY(m_icel, a_icel, m_snowl, dm_ice, da_ice, dm_snow) &
+    !$ACC      COPY(rhs_a, rhs_m, rhs_ms)
+
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     do row=1,myDim_nod2D
         ! if cavity node skip it
         if (ulevels_nod2d(row)>1) cycle
@@ -370,17 +374,19 @@ subroutine ice_solve_high_order(ice, partit, mesh)
     !$ACC END PARALLEL LOOP
 
 !$OMP END PARALLEL DO
-    call exchange_nod(dm_ice, da_ice, dm_snow, partit)
+    call exchange_nod(dm_ice, da_ice, dm_snow, partit, luse_g2g = .true.)
 #if defined (__oifs) || defined (__ifsinterface)
-    call exchange_nod(dm_temp, partit)
+    call exchange_nod(dm_temp, partit, luse_g2g = .true.)
 #endif /* (__oifs) */
 !$OMP BARRIER
     !___________________________________________________________________________
     !iterate
+
     do n=1,num_iter_solve-1
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, clo, clo2, cn, location, row, rhs_new)
 !$OMP DO
-        !$ACC PARALLEL LOOP GANG VECTOR COPY(ssh_stiff, ssh_stiff%rowptr) PRIVATE(location)
+
+        !$ACC PARALLEL LOOP GANG VECTOR COPY(ssh_stiff, ssh_stiff%rowptr) PRIVATE(location) DEFAULT(NONE)
         do row=1,myDim_nod2D
             ! if cavity node skip it
             if (ulevels_nod2d(row)>1) cycle
@@ -402,10 +408,12 @@ subroutine ice_solve_high_order(ice, partit, mesh)
 #endif /* (__oifs) */
         end do
         !$ACC END PARALLEL LOOP
+
 !$OMP END DO
         !_______________________________________________________________________
 !$OMP DO
-        !$ACC PARALLEL LOOP GANG
+
+        !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
         do row=1,myDim_nod2D
             ! if cavity node skip it
             if (ulevels_nod2d(row)>1) cycle
@@ -417,15 +425,19 @@ subroutine ice_solve_high_order(ice, partit, mesh)
 #endif /* (__oifs) */
         end do
         !$ACC END PARALLEL LOOP
+
+
 !$OMP END DO
 !$OMP END PARALLEL
         !_______________________________________________________________________
-        call exchange_nod(dm_ice, da_ice, dm_snow, partit)
+        call exchange_nod(dm_ice, da_ice, dm_snow, partit, luse_g2g = .true.)
 #if defined (__oifs) || defined (__ifsinterface)
-        call exchange_nod(dm_temp, partit)
+        call exchange_nod(dm_temp, partit, luse_g2g = .true.)
 #endif /* (__oifs) */
 !$OMP BARRIER
     end do
+
+    !$ACC END DATA
 end subroutine ice_solve_high_order
 !
 !
