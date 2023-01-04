@@ -1254,7 +1254,12 @@ subroutine ice_update_for_div(ice, partit, mesh)
     ! the first approximation
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
 
-    !$ACC PARALLEL LOOP GANG
+    !$ACC DATA COPY(myDim_nod2D, eDim_nod2D, ulevels_nod2d, area, nn_pos, mass_matrix) &
+    !$ACC      COPY(m_icel, a_icel, m_snowl, dm_ice, da_ice, dm_snow) &
+    !$ACC      COPY(m_ice, a_ice, m_snow, rhs_mdiv, rhs_adiv, rhs_msdiv) &
+    !$ACC      COPY(ssh_stiff, ssh_stiff%rowptr)
+
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     do row=1,myDim_nod2D
         !! row=myList_nod2D(m)
         ! if cavity node skip it
@@ -1270,11 +1275,11 @@ subroutine ice_update_for_div(ice, partit, mesh)
     !$ACC END PARALLEL LOOP
 
 !$OMP END PARALLEL DO
-    call exchange_nod(dm_ice, partit)
-    call exchange_nod(da_ice, partit)
-    call exchange_nod(dm_snow, partit)
+    call exchange_nod(dm_ice, partit, luse_g2g = .true.)
+    call exchange_nod(da_ice, partit, luse_g2g = .true.)
+    call exchange_nod(dm_snow, partit, luse_g2g = .true.)
 #if defined (__oifs) || defined (__ifsinterface)
-    call exchange_nod(dm_temp, partit)
+    call exchange_nod(dm_temp, partit, luse_g2g = .true.)
 #endif /* (__oifs) */
 !$OMP BARRIER
     !___________________________________________________________________________
@@ -1282,7 +1287,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
     do n=1,num_iter_solve-1
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row, n, clo, clo2, cn, location, rhs_new)
 !$OMP DO
-        !$ACC PARALLEL LOOP GANG VECTOR COPY(ssh_stiff, ssh_stiff%rowptr) PRIVATE(location)
+        !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(location) DEFAULT(NONE)
         do row=1,myDim_nod2D
             ! if cavity node skip it
             if (ulevels_nod2d(row)>1) cycle
@@ -1308,9 +1313,11 @@ subroutine ice_update_for_div(ice, partit, mesh)
 #endif /* (__oifs) */
         end do
         !$ACC END PARALLEL LOOP
+
 !$OMP END DO
 !$OMP DO
-        !$ACC PARALLEL LOOP GANG
+
+        !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
         do row=1,myDim_nod2D
             ! if cavity node skip it
             if (ulevels_nod2d(row)>1) cycle
@@ -1322,19 +1329,21 @@ subroutine ice_update_for_div(ice, partit, mesh)
 #endif /* (__oifs) */
         end do
         !$ACC END PARALLEL LOOP
+
 !$OMP END DO
 !$OMP END PARALLEL
-        call exchange_nod(dm_ice, partit)
-        call exchange_nod(da_ice, partit)
-        call exchange_nod(dm_snow, partit)
+        call exchange_nod(dm_ice, partit, luse_g2g = .true.)
+        call exchange_nod(da_ice, partit, luse_g2g = .true.)
+        call exchange_nod(dm_snow, partit, luse_g2g = .true.)
 #if defined (__oifs) || defined (__ifsinterface)
-        call exchange_nod(dm_temp, partit)
+        call exchange_nod(dm_temp, partit, luse_g2g = .true.)
 #endif /* (__oifs) */
 !$OMP BARRIER
     end do
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
-    !$ACC PARALLEL LOOP GANG
+
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     do row=1, myDim_nod2D+eDim_nod2D
        m_ice(row)   = m_ice (row)+dm_ice (row)
        a_ice(row)   = a_ice (row)+da_ice (row)
@@ -1344,6 +1353,8 @@ subroutine ice_update_for_div(ice, partit, mesh)
 #endif /* (__oifs) */
     end do
     !$ACC END PARALLEL LOOP
+
+    !$ACC END DATA
 !$OMP END PARALLEL DO
 end subroutine ice_update_for_div
 ! =============================================================
