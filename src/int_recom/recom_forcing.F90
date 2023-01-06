@@ -70,7 +70,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
 ! Subroutine Depth
 
   Real(kind=8),dimension(mesh%nl)           :: zF                   ! [m] Depth of fluxes
-  Real(kind=8),dimension(mesh%nl,4)         :: SinkVel              ! [m/day]
+  Real(kind=8),dimension(mesh%nl,5)         :: SinkVel              ! [m/day]
   Real(kind=8),dimension(mesh%nl-1)         :: thick                ! [m] Vertical distance between two nodes = Thickness 
   Real(kind=8),dimension(mesh%nl-1)         :: recipthick           ! [1/m] reciprocal of thick
 

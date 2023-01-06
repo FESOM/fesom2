@@ -45,7 +45,8 @@ subroutine recom_sinking_new(tr_num,mesh)
 !< scaling_visc_3D
 !< .OG. 04.11.2022
 
-   if (use_ballasting) then      ! NEW BALL
+!< Activate ballasting
+   if (use_ballasting) then      
       call ballast(tr_num,mesh)
    end if
 
@@ -108,7 +109,7 @@ if (Vsink .gt. 0.1) then ! No sinking if Vsink < 0.1 m/day
       nzmax = nlevels_nod2D(n)-1
 
       ! distance between tracer points, surface and bottom dz_trr is half 
-      ! the layerthickness
+      ! the layer thickness
       dz_trr                = 0.0d0
       dz_trr(nzmin+1:nzmax) = abs(Z_3d_n(nzmin:nzmax-1,n)-Z_3d_n(nzmin+1:nzmax,n))
       dz_trr(nzmin)         = hnode(nzmin,n)/2.0d0
@@ -118,18 +119,22 @@ if (Vsink .gt. 0.1) then ! No sinking if Vsink < 0.1 m/day
                                                                      
       do nz=nzmin,nzmax+1
          if (allow_var_sinking) then 
-            if (use_ballasting) then      ! NEW BALL
-                if (depth_scaling1.gt.0.0) then
-                    Wvel_flux(nz) = -((w_ref1*scaling_density1_3D(nz,n)*scaling_visc_3D(nz,n)/SecondsPerDay) + (depth_scaling1 * abs(zbar_3d_n(nz,n))/SecondsPerDay))
-                else
-                    Wvel_flux(nz) = -(w_ref1*scaling_density1_3D(nz,n)*scaling_visc_3D(nz,n)/SecondsPerDay)
-                endif
-                if (abs(Wvel_flux(nz)).gt.max_sinking_velocity) then   ! Bugfix  Wvel_flux(nz).gt.max_sinking_velocity I need a max function here
-                    Wvel_flux(nz) = -(max_sinking_velocity) ! set maximum sinking speed for numerical stability
-                endif
+
+            if (use_ballasting) then 
+
+                Wvel_flux(nz) = w_ref1 * scaling_density1_3D(nz,n) * scaling_visc_3D(nz,n)
+
+                if (depth_scaling1.gt.0.0) Wvel_flux(nz) = Wvel_flux(nz) + (depth_scaling1 * abs(zbar_3d_n(nz,n)))
+
+                if (abs(Wvel_flux(nz)) .gt. max_sinking_velocity) Wvel_flux(nz) = max_sinking_velocity
+
+                ! sinking velocity [m d-1] surface --> bottom (negative)
+                Wvel_flux(nz) = -1.0d0 * Wvel_flux(nz)/SecondsPerDay ! now in [m s-1]
+
             else ! use_ballasting = .false.
                Wvel_flux(nz) = -((Vdet_a * abs(zbar_3d_n(nz,n))/SecondsPerDay) + Vsink/SecondsPerDay)
             endif
+
          else ! allow_var_sinking = .false.
             Wvel_flux(nz) = -Vsink/SecondsPerDay
          end if
@@ -138,36 +143,28 @@ if (Vsink .gt. 0.1) then ! No sinking if Vsink < 0.1 m/day
             if(tracer_id(tr_num)==1025 .or. &  !idetz2n
                tracer_id(tr_num)==1026 .or. &  !idetz2c
                tracer_id(tr_num)==1027 .or. &  !idetz2si
-               tracer_id(tr_num)==1028 ) then  !idetz2calc   
+               tracer_id(tr_num)==1028 ) then  !idetz2calc  
+ 
                if (use_ballasting) then    ! NEW BALL
-                  if (depth_scaling2.gt.0.0) then
-                     Wvel_flux(nz) = -((w_ref2*scaling_density2_3D(nz,n)*scaling_visc_3D(nz,n)/SecondsPerDay) + (depth_scaling2 * abs(zbar_3d_n(nz,n))/SecondsPerDay))
-                  else 
-                     Wvel_flux(nz) = -(w_ref2*scaling_density2_3D(nz,n)*scaling_visc_3D(nz,n)/SecondsPerDay) 
-                  endif
-                  if (abs(Wvel_flux(nz)).gt.max_sinking_velocity) then  ! Bugfix  Wvel_flux(nz).gt.max_sinking_velocity I need a max function here
-                     Wvel_flux(nz) = -(max_sinking_velocity) ! set maximum sinking speed for numerical stability
-                  endif
+
+                  Wvel_flux(nz) = w_ref2*scaling_density2_3D(nz,n)*scaling_visc_3D(nz,n)
+
+                  if (depth_scaling2.gt.0.0) Wvel_flux(nz) = Wvel_flux(nz) + (depth_scaling2 * abs(zbar_3d_n(nz,n)))
+
+                  if (abs(Wvel_flux(nz)) .gt. max_sinking_velocity) Wvel_flux(nz) = max_sinking_velocity
+
+                ! sinking velocity [m d-1] surface --> bottom (negative)
+                  Wvel_flux(nz) = -1.0d0 * Wvel_flux(nz)/SecondsPerDay ! now in [m s-1]
+
                else ! use_ballasting = .false.
                   Wvel_flux(nz) = -VDet_zoo2/SecondsPerDay ! --> VDet_zoo2 ! NEW BALL changed -Vsink to -VDet_zoo2
                end if
             endif ! second detritus tracers
-      end do
 
-      if (use_ballasting) then     ! NEW BALL
-         ! store in array to write as diagnostic
-         if (tracer_id(tr_num)==1007 .or. &  !idetn
-             tracer_id(tr_num)==1008 .or. &  !idetc
-             tracer_id(tr_num)==1017 .or. &  !idetsi
-             tracer_id(tr_num)==1021 ) then  !idetcal
-                 sinkVel1(:,n)=Wvel_flux(:)
-         elseif(tracer_id(tr_num)==1025 .or. &  !idetz2n
-                tracer_id(tr_num)==1026 .or. &  !idetz2c
-                tracer_id(tr_num)==1027 .or. &  !idetz2si
-                tracer_id(tr_num)==1028 ) then  !idetz2calc
-                 sinkVel2(:,n)=Wvel_flux(:)
-         endif
-      endif
+         if (tracer_id(tr_num)==1021) sinkVel1(nz,n)= Wvel_flux(nz) !-1.0d0/SecondsPerDay  !idetcal              
+         if (tracer_id(tr_num)==1028) sinkVel2(nz,n)= Wvel_flux(nz)  !idetz2calc
+
+      end do
 
       wflux   = 0.d0
       dt_sink = dt
@@ -241,9 +238,9 @@ end if ! simple upwind
 end if ! Vsink .gt. 0.1
 
 end subroutine recom_sinking_new
-
-
-!subroutine ballast(n,Nn,wF,zF,thick,recipthick,mesh)
+!-------------------------------------------------------------------------------  
+! Subroutine calculate ballasting
+!-------------------------------------------------------------------------------  
 subroutine ballast(tr_num,mesh)
   use recom_config
   use recom_GloVar
@@ -302,7 +299,7 @@ subroutine ballast(tr_num,mesh)
         do k=nzmin, nzmax
 
            !! level depth 
-           depth_pos(1) = abs(zbar_3d_n(k,row))
+           depth_pos(1) = abs(Z_3d_n(k,row))  ! take depth of tracers instead of levels !abs(zbar_3d_n(k,row))
 
            call depth2press(depth_pos(1), Lat_degree(1), pres, 1)  ! pres is output of function,1=number of records
            sa           = gsw_sa_from_sp(tr_arr(k,row,2), pres, Lon_degree(1), Lat_degree(1))
@@ -332,6 +329,8 @@ subroutine ballast(tr_num,mesh)
               endif
            !end do
 
+            scaling_visc_3D(k,row)=1.0
+
             if (use_viscosity_scaling) then
                 if (seawater_visc_3D(k,row)==0) then 
                     scaling_visc_3D(k,row)=1.0
@@ -339,82 +338,12 @@ subroutine ballast(tr_num,mesh)
                     scaling_visc_3D(k,row)= visc_ref_water/seawater_visc_3D(k,row)
                 endif
             endif
+!           print*,'scaling_visc_3D(k,row)= ',scaling_visc_3D(k,row)
         end do
         rho_particle1(nzmax+1,row) = rho_particle1(nzmax,row)
         rho_particle2(nzmax+1,row) = rho_particle2(nzmax,row)
         scaling_visc_3D(nzmax+1,row) = scaling_visc_3D(nzmax,row)
      end do
-
-  ! For ballasting, calculate scaling factors here and pass them to FESOM, where sinking velocities are calculated
-  !if (use_ballasting) then
-     ! -----
-     ! If ballasting is used, sinking velocities are a function of a) particle composition (=density),
-     ! b) sea water viscosity, c) depth (currently for small detritus only), and d) a constant reference sinking speed
-     ! -----
-     ! small detritus
-!     call get_seawater_viscosity(mesh,Nn,Temp,seawater_visc)
-!     call get_particle_density(mesh,Nn,state(:,idetc),state(:,idetN),state(:,idetsi),state(:,idetcal),rho_particle) ! rho_particle = density of particle class 1 
-!     rho_det1(1:Nn)=rho_particle ! store in array to write as diagnostic
-!     if (RECoM_Second_Zoo) then
-        ! large detritus
-!        call get_particle_density(mesh,Nn,state(:,idetz2c),state(:,idetz2n),state(:,idetz2si),state(:,idetz2calc),rho_particle) ! rho_particle = density of particle class 2 
-!        rho_det2(1:Nn)=rho_particle ! store in array to write as diagnostic
-!        if(rho_det2(1) /= rho_det2(1)) then
-!           print*,'rho_det2,idetz2c,idetz2n,idetz2si,idetz2calc:',rho_det2(1),state(1,idetz2c),state(1,idetz2n),state(1,idetz2si),state(1,idetz2calc)
-!        end if
-!     endif
-
-     ! get scaling vectors -> these need to be passed to FESOM to get sinking velocities
-!     do k = one, Nn             ! vertical loop
-        !depth_pos(1) = -1*zF(k) ! zF is negative downwards
-        
-!        ! get local seawater density
-!        call depth2press(depth_pos, Latd(1), pres, 1)  ! pres is output of function,1=number of records
-!        sa           = gsw_sa_from_sp(Sali_depth(k), pres, Lond(1), Latd(1))
-!        ct           = gsw_ct_from_pt(sa, Temp(k))
-!        rho_seawater = gsw_rho(sa, ct, pres)
-
-        ! scale sinking velocities with particle density ( = ballasting)
-!        if (use_density_scaling) then
-!           if (state(k,idetc)>0.001) then ! only apply ballasting above a certain biomass
-!              scaling_density1(k) = (rho_det1(k)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
-!           else
-!              scaling_density1(k)=1.0
-!           endif
-!           if (REcoM_Second_Zoo) then
-!              if (state(k,idetz2c)>0.001) then ! only apply ballasting above a certain biomass
-!                 scaling_density2(k) = (rho_det2(k)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
-!              else
-!                 scaling_density2(k)=1.0
-!              endif
-!           endif
-!        else  ! (i.e. no density scaling)
-!           scaling_density1(k)=1.0
-!           scaling_density2(k)=1.0
-!        endif
-        ! in the unlikely (if possible at all...) case that rho_particle(k)-rho_seawater(1)<0, prevent the scaling factor from being negative
-!        if (scaling_density1(k).lt.0.0) then
-!           scaling_density1(k)=1.0
-!        endif
-!        if (REcoM_Second_Zoo) then
-!           if (scaling_density2(k).lt.0.0) then
-!              scaling_density2(k)=1.0
-!           endif
-!        endif
-        ! scale sinking velocities with seawater viscosity
-!        if (use_viscosity_scaling) then
-!           if (seawater_visc(k)==0) then
-!              scaling_visc(k)=1.0
-!           else
-!              scaling_visc(k)= visc_ref_water/seawater_visc(k)
-!           endif
-!        else
-!           scaling_visc(k)=1.0
-!        endif
-!     end do
-!end do
-!end do
-  !endif ! ends use_ballasting
 
     ! in the unlikely (if possible at all...) case that rho_particle(k)-rho_seawater(1)<0, prevent the scaling factor from being negative
 
@@ -422,12 +351,10 @@ subroutine ballast(tr_num,mesh)
     if (REcoM_Second_Zoo .and. any(scaling_density2_3D(:,:) <= tiny)) scaling_density2_3D(:,:) = 1.0_WP      ! tiny = 2.23D-16    
 
 end subroutine ballast
-
 !-------------------------------------------------------------------------------  
-! Subroutine calculate density of particle depending on composition (detC, detOpal, detCaCO3) based on Cram et al. (2018)
+! Subroutine calculate density of particle 
+! depending on composition (detC, detOpal, detCaCO3) based on Cram et al. (2018)
 !-------------------------------------------------------------------------------  
-
-!subroutine get_particle_density(mesh,Nn,conc_detC,conc_detN,conc_detSi,conc_detCaCO3,rho_particle)          ! NEW BALL developed by Cara and Onur
 subroutine get_particle_density(mesh)          ! NEW BALL developed by Cara and Onur  
   use recom_config
   use recom_GloVar
@@ -461,14 +388,6 @@ subroutine get_particle_density(mesh)          ! NEW BALL developed by Cara and 
   real(kind=8)                                            :: aux(mesh%nl-1, myDim_nod2D+eDim_nod2D)
 
 #include "../associate_mesh.h"
-!  integer, intent(in)                                     :: Nn !< Total number of nodes in the vertical
-!  real(kind=8),dimension(mesh%nl-1)        ,intent(in)    :: conc_detC     ! [mmol m-3] detritus carbon
-!  real(kind=8),dimension(mesh%nl-1)        ,intent(in)    :: conc_detN     ! [mmol m-3] detritus nitrogen
-!  real(kind=8),dimension(mesh%nl-1)        ,intent(in)    :: conc_detSi    ! [mmol m-3] detritus Si
-!  real(kind=8),dimension(mesh%nl-1)        ,intent(in)    :: conc_detCaCO3 ! [mmol m-3] detritus CaCO3
-  
-!  real(kind=8),dimension(mesh%nl-1)                       :: rho_particle  ! [kg m-3] particle density
-
 
   rho_particle1 = 0.0
   b1 = 0.0
@@ -485,7 +404,6 @@ subroutine get_particle_density(mesh)          ! NEW BALL developed by Cara and 
   end do
 
   do row=1,myDim_nod2d
-     !if (ulevels_nod2D(row)>1) cycle
      nzmin = ulevels_nod2D(row)
      nzmax = nlevels_nod2D(row)
      aux(nzmin:nzmax,row) = b1(nzmin:nzmax,row)+b2(nzmin:nzmax,row)+b3(nzmin:nzmax,row)+b4(nzmin:nzmax,row)
@@ -523,31 +441,16 @@ subroutine get_particle_density(mesh)          ! NEW BALL developed by Cara and 
      end do
   endif
 
-!  rho_particle = 0.0
-!  do k = one,Nn
-     ! check for zeros (to avoid division by zero)
-!     b1              = max(tiny,conc_detC(k))
-!     b2              = max(tiny,conc_detN(k))
-!     b3              = max(tiny,conc_detSi(k))
-!     b4              = max(tiny,conc_detCaCO3(k))
-!     a1              = b1/(b1+b2+b3+b4) 
-!     a2              = b2/(b1+b2+b3+b4) 
-!     a3              = b3/(b1+b2+b3+b4) 
-!     a4              = b4/(b1+b2+b3+b4) 
-!     rho_particle(k) = rho_CaCO3*a4 + rho_opal*a3 + rho_POC*a1 + rho_PON*a2
-!  enddo
-
 end subroutine get_particle_density
-
-
 !-------------------------------------------------------------------------------   
-! Subroutine to approximate seawater viscosity with current temperature based on Cram et al. (2018)
+! Subroutine to approximate seawater viscosity with current temperature 
+! based on Cram et al. (2018)
 !------------------------------------------------------------------------------- 
 
 ! neglecting salinity effects, which are much smaller than those of temperature
 ! https://bitbucket.org/ohnoplus/ballasted-sinking/src/master/tools/waterviscosity.m
 
-subroutine get_seawater_viscosity(mesh)!,Nn,Temp,Salt,seawater_visc,mesh)                                      ! NEW BALL developed by Cara and Onur    
+subroutine get_seawater_viscosity(mesh)!,Nn,Temp,Salt,seawater_visc,mesh) ! NEW BALL developed by Cara and Onur    
   
   use recom_config
   use recom_GloVar
@@ -575,7 +478,6 @@ subroutine get_seawater_viscosity(mesh)!,Nn,Temp,Salt,seawater_visc,mesh)       
   real(kind=8),dimension(1)                               :: A,B,mu_w
   integer                                                 :: row, k, nzmin, nzmax
 
-
   type(t_mesh), intent(in) , target :: mesh
 
 #include "../associate_mesh.h"
@@ -598,6 +500,7 @@ subroutine get_seawater_viscosity(mesh)!,Nn,Temp,Salt,seawater_visc,mesh)       
         B(1)             = 7.974 - 7.561*0.01*tr_arr(k,row,1) + 4.724*1e-4*tr_arr(k,row,1)*tr_arr(k,row,1)
         mu_w(1)          = 4.2844*1.0e-5 + (1.0/(0.157*(tr_arr(k,row,1)+64.993)*(tr_arr(k,row,1)+64.993)-91.296))
         seawater_visc_3D(k,row) = mu_w(1) * (1.0 + A(1)*tr_arr(k,row,2)*0.001 + B(1)*tr_arr(k,row,2)*0.001*tr_arr(k,row,2)*0.001)
+!           print*,'seawater_visc_3D(k,row)= ',seawater_visc_3D(k,row)
      enddo
   end do
 

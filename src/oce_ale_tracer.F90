@@ -294,6 +294,7 @@ subroutine diff_tracers_ale(tr_num, mesh)
 #if defined(__recom)
     USE REcoM_GloVar
     use recom_config !, recom_debug
+    use g_comm_auto
 use g_support
 #endif
     implicit none
@@ -410,6 +411,9 @@ real :: net
                                            nss(nzmin:nzmax,n)
         end do  
     end if
+
+        call exchange_nod(sinkVel1(:,:))
+        call exchange_nod(sinkVel2(:,:))
 #endif
     
     !___________________________________________________________________________
