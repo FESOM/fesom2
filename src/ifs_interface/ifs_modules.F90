@@ -1105,6 +1105,7 @@ MODULE parinter
       INTEGER :: nrecvtot
       INTEGER, POINTER, DIMENSION(:) :: nrecv,nrdisp
    END TYPE parinterinfo
+   LOGICAL, PUBLIC :: lparinterp2p = .TRUE.
 
 CONTAINS
 
@@ -1503,9 +1504,18 @@ CONTAINS
       ! Local variables
 
       ! MPI send/recv buffers
+#if defined key_parinter_alloc
+      REAL(scripdp) , ALLOCATABLE :: zsend(:),zrecv(:)
+#else
       REAL(scripdp) :: zsend(pinfo%nsendtot),zrecv(pinfo%nrecvtot)
+#endif
       ! Misc variables
-      INTEGER :: i,istatus
+      INTEGER :: i,iproc,istatus,ierr,off,itag,irq,nreqs
+      INTEGER :: reqs(0:2*(nproc-1))
+
+#if defined key_parinter_alloc
+      ALLOCATE(zsend(pinfo%nsendtot),zrecv(pinfo%nrecvtot))
+#endif
 
       ! Pack the sending buffer
 
@@ -1517,13 +1527,57 @@ CONTAINS
 
 #if defined key_mpp_mpi
 
-      CALL mpi_alltoallv(&
-         & zsend,pinfo%nsend(0:nproc-1),&
-         & pinfo%nsdisp(0:nproc-1),mpi_double_precision, &
-         & zrecv,pinfo%nrecv(0:nproc-1), &
-         & pinfo%nrdisp(0:nproc-1),mpi_double_precision, &
-         & mpi_comm,istatus)
+      IF (lparinterp2p) THEN
 
+         ! total num of reqs ( recv + send )
+         nreqs = 2*(nproc-1)
+         ! post irecvs first
+         irq = 0
+         DO iproc=0,nproc-1
+            IF( pinfo%nrecv(iproc) > 0 .AND. iproc /= mype ) THEN
+               off = pinfo%nrdisp(iproc)
+               itag=100
+               CALL mpi_irecv(zrecv(off+1),pinfo%nrecv(iproc),mpi_double_precision, &
+                  & iproc,itag,mpi_comm,reqs(irq),ierr) 
+               irq = irq + 1
+               IF( irq > nreqs ) THEN
+                  WRITE(0,*)'parinter_fld_mult: exceeded number of reqs when posting recvs',mype
+                  CALL abort
+               ENDIF
+            ENDIF
+         ENDDO
+         ! post isends
+         DO iproc=0,nproc-1
+            IF( pinfo%nsend(iproc) > 0 )  THEN
+               IF( iproc == mype ) THEN
+                  zrecv( pinfo%nrdisp(iproc)+1:pinfo%nrdisp(iproc)+pinfo%nsend(iproc) ) = &
+                     & zsend( pinfo%nsdisp(iproc)+1:pinfo%nsdisp(iproc)+pinfo%nsend(iproc) )
+               ELSE
+                  off = pinfo%nsdisp(iproc)
+                  itag=100
+                  CALL mpi_isend(zsend(off+1),pinfo%nsend(iproc),mpi_double_precision, &
+                     & iproc,itag,mpi_comm,reqs(irq),ierr)
+                  irq = irq + 1 
+                  IF( irq > nreqs ) THEN
+                     WRITE(0,*)'parinter_fld_mult: exceeded number of reqs when posting sends',mype
+                     CALL abort
+                  ENDIF
+               ENDIF
+            ENDIF
+         ENDDO
+         ! wait on requests
+         CALL mpi_waitall(irq,reqs,MPI_STATUSES_IGNORE,ierr)
+
+      ELSE
+
+         CALL mpi_alltoallv(&
+            & zsend,pinfo%nsend(0:nproc-1),&
+            & pinfo%nsdisp(0:nproc-1),mpi_double_precision, &
+            & zrecv,pinfo%nrecv(0:nproc-1), &
+            & pinfo%nrdisp(0:nproc-1),mpi_double_precision, &
+            & mpi_comm,istatus)
+
+      ENDIF
 #else
 
       zrecv(:)=zsend(:)
@@ -1538,7 +1592,188 @@ CONTAINS
             & pinfo%remap_matrix(1,i)*zrecv(pinfo%src_address(i))
       END DO
 
+#if defined key_parinter_alloc
+      DEALLOCATE(zsend,zrecv)
+#endif
+
    END SUBROUTINE parinter_fld
+
+   SUBROUTINE parinter_fld_mult( nfield, &
+      & mype, nproc, mpi_comm, &
+      & pinfo, nsrclocpoints, zsrc, ndstlocpoints, zdst )
+
+      ! Perform nfield interpolations from the zsrc fields
+      ! to zdst fields based on the information in pinfo
+
+      ! Input arguments
+
+      ! Message passing information
+      INTEGER, INTENT(IN) :: mype, nproc, mpi_comm, nfield
+      ! Interpolation setup
+      TYPE(parinterinfo), INTENT(IN) :: pinfo
+      ! Source data/
+      INTEGER, INTENT(IN) :: nsrclocpoints
+      REAL, INTENT(IN), DIMENSION(nsrclocpoints,nfield) :: zsrc
+
+      ! Output arguments
+
+      ! Destination data
+      INTEGER, INTENT(IN):: ndstlocpoints
+      REAL, DIMENSION(ndstlocpoints,nfield) :: zdst
+
+      INTEGER :: nsend(0:nproc-1), nrecv(0:nproc-1),nrdisp(0:nproc-1), nsdisp(0:nproc-1)
+
+      ! Local variables
+
+      ! MPI send/recv buffers
+#if defined key_parinter_alloc
+      REAL(scripdp), ALLOCATABLE, DIMENSION(:,:) :: zrecvnf
+      REAL(scripdp), ALLOCATABLE, DIMENSION(:) :: zsend, zrecv
+#else
+      REAL(scripdp) :: zrecvnf(pinfo%nrecvtot,nfield)
+      REAL(scripdp) :: zsend(pinfo%nsendtot*nfield), &
+         & zrecv(pinfo%nrecvtot*nfield)
+#endif
+      ! Misc variables
+      INTEGER :: i,istatus,ierr
+      INTEGER :: nf, ibases, ibaser, np, iproc, off, itag, irq, nreqs
+      INTEGER :: reqs(0:2*(nproc-1))
+      INTEGER, DIMENSION(nfield,0:nproc-1) :: ibaseps, ibasepr
+
+      ! Allocate temporary arrays on heap
+      
+#if defined key_parinter_alloc
+      ALLOCATE(zrecvnf(pinfo%nrecvtot,nfield),&
+         & zsend(pinfo%nsendtot*nfield),zrecv(pinfo%nrecvtot*nfield))
+#endif
+
+      ! Compute starts for packing
+
+      ibases=0
+      ibaser=0
+      DO np=0,nproc-1
+         DO nf=1,nfield
+            ibaseps(nf,np) = ibases
+            ibasepr(nf,np) = ibaser
+            ibases = ibases + pinfo%nsend(np)
+            ibaser = ibaser + pinfo%nrecv(np)
+         ENDDO
+      ENDDO
+
+      ! Pack the sending buffer
+
+      !$omp parallel default(shared) private(nf,np,i)
+      !$omp do schedule(dynamic)
+      DO np=0,nproc-1
+         DO nf=1,nfield
+            DO i=1,pinfo%nsend(np)
+               zsend(i+ibaseps(nf,np))=&
+                  & zsrc(pinfo%send_address(i+pinfo%nsdisp(np)),nf)
+            ENDDO
+         ENDDO
+         nsend(np)=pinfo%nsend(np)*nfield
+         nrecv(np)=pinfo%nrecv(np)*nfield
+         nrdisp(np)=pinfo%nrdisp(np)*nfield
+         nsdisp(np)=pinfo%nsdisp(np)*nfield
+      ENDDO
+      !$omp end do
+      !$omp end parallel
+
+      ! Do the message passing
+
+#if defined key_mpp_mpi
+
+      IF (lparinterp2p) THEN
+
+         ! total num of reqs ( recv + send )
+         nreqs = 2*(nproc-1)
+         ! post irecvs first
+         irq = 0
+         DO iproc=0,nproc-1
+            IF( nrecv(iproc) > 0 .AND. iproc /= mype ) THEN
+               off = nrdisp(iproc)
+               itag=100
+               CALL mpi_irecv(zrecv(off+1),nrecv(iproc),mpi_double_precision, &
+                  & iproc,itag,mpi_comm,reqs(irq),ierr) 
+               irq = irq + 1
+               IF( irq > nreqs ) THEN
+                  WRITE(0,*)'parinter_fld_mult: exceeded number of reqs when posting recvs',mype
+                  CALL abort
+               ENDIF
+            ENDIF
+         ENDDO
+         ! post isends
+         DO iproc=0,nproc-1
+            IF( nsend(iproc) > 0 )  THEN
+               IF( iproc == mype ) THEN
+                  zrecv( nrdisp(iproc)+1:nrdisp(iproc)+nsend(iproc) ) = &
+                     & zsend( nsdisp(iproc)+1:nsdisp(iproc)+nsend(iproc) )
+               ELSE
+                  off = nsdisp(iproc)
+                  itag=100
+                  CALL mpi_isend(zsend(off+1),nsend(iproc),mpi_double_precision, &
+                     & iproc,itag,mpi_comm,reqs(irq),ierr)
+                  irq = irq + 1 
+                  IF( irq > nreqs ) THEN
+                     WRITE(0,*)'parinter_fld_mult: exceeded number of reqs when posting sends',mype
+                     CALL abort
+                  ENDIF
+               ENDIF
+            ENDIF
+         ENDDO
+         ! wait on requests
+         CALL mpi_waitall(irq,reqs,MPI_STATUSES_IGNORE,ierr)
+
+      ELSE
+
+         IF(mype==0)WRITE(0,*)'lparinterp2p off'
+         CALL mpi_alltoallv(&
+            & zsend,nsend(0:nproc-1),&
+            & nsdisp(0:nproc-1),mpi_double_precision, &
+            & zrecv,nrecv(0:nproc-1), &
+            & nrdisp(0:nproc-1),mpi_double_precision, &
+            & mpi_comm,istatus)
+
+      ENDIF
+#else
+
+      zrecv(:)=zsend(:)
+
+#endif
+ 
+      ! Unpack individual fields
+
+      !$omp parallel default(shared) private(nf,np,i)
+
+      !$omp do schedule (dynamic)
+      DO np=0,nproc-1
+         DO nf=1,nfield
+            DO i=1,pinfo%nrecv(np)
+               zrecvnf(i+pinfo%nrdisp(np),nf)=zrecv(i+ibasepr(nf,np))
+            ENDDO
+         ENDDO
+      ENDDO
+      !omp end do
+
+      ! Do the interpolation
+
+      !$omp do
+      DO nf=1,nfield
+         zdst(:,nf)=0.0
+         DO i=1,pinfo%num_links
+            zdst(pinfo%dst_address(i),nf) = zdst(pinfo%dst_address(i),nf) + &
+               & pinfo%remap_matrix(1,i)*zrecvnf(pinfo%src_address(i),nf)
+         END DO
+      END DO
+      !$omp end do
+
+      !$omp end parallel
+
+#if defined key_parinter_alloc
+      DEALLOCATE( zrecvnf, zsend, zrecv )
+#endif
+
+   END SUBROUTINE parinter_fld_mult
 
    SUBROUTINE parinter_write( mype, nproc, &
       & nsrcglopoints, ndstglopoints, &
@@ -1854,4 +2089,8 @@ MODULE interinfo
 
    LOGICAL :: lparbcast = .FALSE.
 
+   ! Use multiple fields option
+
+   LOGICAL :: lparintmultatm = .FALSE.
+   
 END MODULE interinfo
