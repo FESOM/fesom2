@@ -13,6 +13,12 @@ if(DEFINED ENV{ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS}) # be able to set the initial
 else()
    option(ALEPH_CRAYMPICH_WORKAROUNDS "workaround for performance issues on aleph" OFF)
 endif()
+if(DEFINED ENV{ENABLE_ALBEDO_INTELMPI_WORKAROUNDS}) # be able to set the initial cache value from our env settings for aleph, not only via cmake command
+   option(ALBEDO_INTELMPI_WORKAROUNDS "workaround for performance issues on albedo" ON)
+else()
+   option(ALBEDO_INTELMPI_WORKAROUNDS "workaround for performance issues on albedo" OFF)
+endif()
+
 
 if(ALEPH_CRAYMPICH_WORKAROUNDS)
    # todo: enable these options only for our targets
@@ -24,8 +30,11 @@ if(ALEPH_CRAYMPICH_WORKAROUNDS)
    #add_compile_options(-DDISABLE_PARALLEL_RESTART_READ) # reading restarts is slow when doing it on parallel on aleph, switch it off for now
    add_compile_options(-DENABLE_ALEPH_CRAYMPICH_WORKAROUNDS)
 endif()
+if(ALBEDO_INTELMPI_WORKAROUNDS)
+   add_compile_options(-DENABLE_ALBEDO_INTELMPI_WORKAROUNDS)
+endif()
 
-option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
+option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 option(ENABLE_OPENACC "compile with OpenACC support" OFF)
 set(NV_GPU_ARCH "cc80" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
 
@@ -129,12 +138,17 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
    else()
         target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -ip -init=zero -no-wrap-margin)
    endif()
-#    target_compile_options(${PROJECT_NAME} PRIVATE -qopenmp -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -xHost -ip -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
    if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
       target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
+   elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  albedo)
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -O3 -ip -fPIC -qopt-malloc-options=2 -qopt-prefetch=5 -unroll-aggressive) #NEC mpi option
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE -xHost)
    endif()
+#    target_compile_options(${PROJECT_NAME} PRIVATE -g -traceback ) #-check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
+#    target_compile_options(${PROJECT_NAME} PRIVATE -qopenmp -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -xHost -ip -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
+#    target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -ip -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
+
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 #    target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
    target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
