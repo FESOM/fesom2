@@ -407,7 +407,13 @@ subroutine EVPdynamics(ice, partit, mesh)
     !___________________________________________________________________________
     ! Precompute values that are never changed during the iteration
 !$OMP PARALLEL DO
-    !$ACC PARALLEL LOOP GANG
+
+    !$ACC DATA COPY(ice, ice%pstar, ice%c_pressure) &
+    !$ACC      COPY(myDim_elem2D, elem2D_nodes, myDim_nod2D, eDim_nod2D, ulevels, ulevels_nod2d) &
+    !$ACC      COPY(elevation, elem_area, ice_strength, gradient_sca, area, rhosno, rhoice) &
+    !$ACC      COPY(inv_areamass, inv_mass, a_ice, m_ice, m_snow, rhs_a, rhs_m)
+
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     do n=1, myDim_nod2D+eDim_nod2D
        inv_areamass(n) =0.0_WP
        inv_mass(n)     =0.0_WP
@@ -418,7 +424,7 @@ subroutine EVPdynamics(ice, partit, mesh)
 !$OMP END PARALLEL DO
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
-    !$ACC PARALLEL LOOP GANG
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     do n=1,myDim_nod2D
         !_______________________________________________________________________
         ! if cavity node skip it
@@ -450,6 +456,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     if (use_floatice .and.  .not. trim(which_ale)=='linfs') use_pice=1
     if ( .not. trim(which_ALE)=='linfs') then
         ! for full free surface include pressure from ice mass
+
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum, aa, p_ice, elevation_elem, elevation_dx, elevation_dy)
 !$OMP DO
         do el = 1,myDim_elem2D
@@ -509,9 +516,9 @@ subroutine EVPdynamics(ice, partit, mesh)
         ! for linear free surface
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum, aa, elevation_elem, elevation_dx, elevation_dy)
 #if !defined(DISABLE_OPENACC_ATOMICS)
-            !$ACC PARALLEL LOOP GANG
-! #else
-        !     !$ACC UPDATE SELF(fct_plus, fct_minus, adf_h)
+            !$ACC PARALLEL LOOP GANG PRIVATE(elnodes) DEFAULT(NONE)
+#else
+            !$ACC UPDATE SELF(rhs_a, rhs_m, ice_strength)
 #endif
         do el = 1,myDim_elem2D
             ice_strength(el)=0.0_WP
@@ -558,20 +565,24 @@ subroutine EVPdynamics(ice, partit, mesh)
         enddo
 #if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC END PARALLEL LOOP
-! #else
-        !     !$ACC UPDATE DEVICE(fct_plus, fct_minus)
+#else
+            !$ACC UPDATE DEVICE(rhs_a, rhs_m, ice_strength)
 #endif
 !$OMP END PARALLEL DO
     endif ! --> if ( .not. trim(which_ALE)=='linfs') then
 !$OMP PARALLEL DO
+
     !___________________________________________________________________________
-    !$ACC PARALLEL LOOP GANG
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     do n=1,myDim_nod2D
         if (ulevels_nod2d(n)>1) cycle
         rhs_a(n) = rhs_a(n)/area(1,n)
         rhs_m(n) = rhs_m(n)/area(1,n)
     enddo
     !$ACC END PARALLEL LOOP
+
+    !$ACC END DATA
+
 !$OMP END PARALLEL DO
     !___________________________________________________________________________
     ! End of Precomputing --> And the ice stepping starts
@@ -586,15 +597,23 @@ subroutine EVPdynamics(ice, partit, mesh)
         !_______________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, ed, umod, drag, rhsu, rhsv, r_a, r_b, det)
 !$OMP DO
-        !$ACC PARALLEL LOOP GANG
+
+        !$ACC DATA COPY(ice, ice%cd_oce_ice) &
+        !$ACC      COPY(mesh, mesh%coriolis_node) &
+        !$ACC      COPY(myDim_nod2D, eDim_nod2D, myDim_edge2D, myList_edge2D, edge2D_in, edges, edge_tri) &
+        !$ACC      COPY(ulevels, ulevels_nod2d, inv_mass, stress_atmice_x, stress_atmice_y) &
+        !$ACC      COPY(u_w, v_w, u_ice, v_ice, u_rhs_ice, v_rhs_ice, u_ice_old, v_ice_old, a_ice)
+
+        !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
         do n=1,myDim_nod2D+eDim_nod2D
            U_ice_old(n) = U_ice(n) !PS
            V_ice_old(n) = V_ice(n) !PS
         end do
         !$ACC END PARALLEL LOOP
 !$OMP END DO
+
 !$OMP DO
-        !$ACC PARALLEL LOOP GANG
+        !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
         do n=1,myDim_nod2D
             !___________________________________________________________________
             ! if cavity node skip it
@@ -624,9 +643,10 @@ subroutine EVPdynamics(ice, partit, mesh)
 !$OMP END DO
         !_______________________________________________________________________
         ! apply sea ice velocity boundary condition
+
 !$OMP DO
         ! With the binary data of np2 goes only inside the first if
-        !$ACC PARALLEL LOOP GANG
+        !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
         DO  ed=1,myDim_edge2D
             !___________________________________________________________________
             ! apply coastal sea ice velocity boundary conditions
@@ -710,11 +730,15 @@ subroutine EVPdynamics(ice, partit, mesh)
             end if
         end do
         !$ACC END PARALLEL LOOP
+
 !$OMP END DO
 !$OMP END PARALLEL
 !write(*,*) partit%mype, shortstep, 'CP4'
         !_______________________________________________________________________
-        call exchange_nod(U_ice,V_ice,partit)
+        call exchange_nod(U_ice,V_ice,partit, luse_g2g = .true.)
+
+        !$ACC END DATA
+
 !$OMP BARRIER
     END DO !--> do shortstep=1, ice%evp_rheol_steps
 end subroutine EVPdynamics
