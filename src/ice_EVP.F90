@@ -88,9 +88,9 @@ subroutine stress_tensor(ice, partit, mesh)
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, r1, r2, r3, si1, si2, zeta, delta, delta_inv, d1, d2)
 
-    !$ACC DATA COPY(ice, ice%delta_min, ice%Tevp_inv, ice_strength) &
-    !$ACC      COPY(myDim_elem2D, elem2D_nodes, ulevels, gradient_sca, metric_factor) &
-    !$ACC      COPY(u_ice, v_ice, eps11, eps12, eps22, sigma11, sigma12, sigma22)
+    !$ACC DATA PRESENT(ice, ice%delta_min, ice%Tevp_inv, ice_strength) &
+    !$ACC      PRESENT(myDim_elem2D, elem2D_nodes, ulevels, gradient_sca, metric_factor) &
+    !$ACC      PRESENT(u_ice, v_ice, eps11, eps12, eps22, sigma11, sigma12, sigma22)
 
     !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     do el=1,myDim_elem2D
@@ -214,9 +214,9 @@ subroutine stress2rhs(ice, partit, mesh)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, el, k)
 !$OMP DO
 
-    !$ACC DATA COPY(myDim_elem2D, elem2D_nodes, myDim_nod2D, ulevels, ulevels_nod2d, elem_area, gradient_sca, metric_factor) &
-    !$ACC      COPY( inv_areamass, ice_strength, u_rhs_ice, v_rhs_ice, sigma11, sigma12, sigma22) &
-    !$ACC      COPY(rhs_a, rhs_m)
+    !$ACC DATA PRESENT(myDim_elem2D, elem2D_nodes, myDim_nod2D, ulevels, ulevels_nod2d, elem_area, gradient_sca, metric_factor) &
+    !$ACC      PRESENT(inv_areamass, ice_strength, u_rhs_ice, v_rhs_ice, sigma11, sigma12, sigma22) &
+    !$ACC      PRESENT(rhs_a, rhs_m)
 
     !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     DO  n=1, myDim_nod2D
@@ -230,7 +230,7 @@ subroutine stress2rhs(ice, partit, mesh)
 #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
 #else
-    !$ACC UPDATE SELF(u_rhs_ice, v_rhs_ice)
+    !$ACC UPDATE SELF(u_rhs_ice, v_rhs_ice, sigma11, sigma12, sigma22)
 #endif
     do el=1,myDim_elem2D
         ! ===== Skip if ice is absent
@@ -406,13 +406,20 @@ subroutine EVPdynamics(ice, partit, mesh)
 
     !___________________________________________________________________________
     ! Precompute values that are never changed during the iteration
+
+    !$ACC DATA COPY(mesh, mesh%coriolis_node) &
+    !$ACC      COPY(ice, ice%delta_min, ice%Tevp_inv, ice%cd_oce_ice) &
+    !$ACC      COPY(ice%work%eps11, ice%work%eps12, ice%work%eps22) &
+    !$ACC      COPY(ice%work%sigma11, ice%work%sigma12, ice%work%sigma22) &
+    !$ACC      COPY(ice_strength, stress_atmice_x, stress_atmice_y) &
+    !$ACC      COPY(elevation, rhosno, rhoice, ice%pstar, ice%c_pressure) &
+    !$ACC      COPY(gradient_sca, metric_factor, elem_area, area, inv_areamass, inv_mass) &
+    !$ACC      COPY(myDim_elem2D, elem2D_nodes, myDim_nod2D, ulevels_nod2d, ulevels) &
+    !$ACC      COPY(eDim_nod2D, myDim_edge2D, myList_edge2D, edge2D_in, edges, edge_tri) &
+    !$ACC      COPY(u_ice, v_ice, a_ice, u_w, v_w, u_ice_old, v_ice_old, m_ice, m_snow) &
+    !$ACC      COPY(u_rhs_ice, v_rhs_ice, rhs_a, rhs_m)
+
 !$OMP PARALLEL DO
-
-    !$ACC DATA COPY(ice, ice%pstar, ice%c_pressure) &
-    !$ACC      COPY(myDim_elem2D, elem2D_nodes, myDim_nod2D, eDim_nod2D, ulevels, ulevels_nod2d) &
-    !$ACC      COPY(elevation, elem_area, ice_strength, gradient_sca, area, rhosno, rhoice) &
-    !$ACC      COPY(inv_areamass, inv_mass, a_ice, m_ice, m_snow, rhs_a, rhs_m)
-
     !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     do n=1, myDim_nod2D+eDim_nod2D
        inv_areamass(n) =0.0_WP
@@ -581,8 +588,6 @@ subroutine EVPdynamics(ice, partit, mesh)
     enddo
     !$ACC END PARALLEL LOOP
 
-    !$ACC END DATA
-
 !$OMP END PARALLEL DO
     !___________________________________________________________________________
     ! End of Precomputing --> And the ice stepping starts
@@ -592,17 +597,13 @@ subroutine EVPdynamics(ice, partit, mesh)
 #endif
     do shortstep=1, ice%evp_rheol_steps
         !_______________________________________________________________________
+
         call stress_tensor(ice, partit, mesh)
         call stress2rhs(ice, partit, mesh)
+
         !_______________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, ed, umod, drag, rhsu, rhsv, r_a, r_b, det)
 !$OMP DO
-
-        !$ACC DATA COPY(ice, ice%cd_oce_ice) &
-        !$ACC      COPY(mesh, mesh%coriolis_node) &
-        !$ACC      COPY(myDim_nod2D, eDim_nod2D, myDim_edge2D, myList_edge2D, edge2D_in, edges, edge_tri) &
-        !$ACC      COPY(ulevels, ulevels_nod2d, inv_mass, stress_atmice_x, stress_atmice_y) &
-        !$ACC      COPY(u_w, v_w, u_ice, v_ice, u_rhs_ice, v_rhs_ice, u_ice_old, v_ice_old, a_ice)
 
         !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
         do n=1,myDim_nod2D+eDim_nod2D
@@ -736,9 +737,9 @@ subroutine EVPdynamics(ice, partit, mesh)
 !write(*,*) partit%mype, shortstep, 'CP4'
         !_______________________________________________________________________
         call exchange_nod(U_ice,V_ice,partit, luse_g2g = .true.)
-
-        !$ACC END DATA
-
 !$OMP BARRIER
     END DO !--> do shortstep=1, ice%evp_rheol_steps
+
+    !$ACC END DATA
+
 end subroutine EVPdynamics
