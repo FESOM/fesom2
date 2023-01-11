@@ -257,7 +257,6 @@ end do
 ! write(*,*) 'reading restart took', t1_restart-t0_restart
 ! write(*,*) '*************************************************************'
 ! end if
- 
 end subroutine iceberg_calculation
 
 
@@ -287,9 +286,9 @@ subroutine iceberg_step1(mesh, ib, height_ib,length_ib,width_ib, lon_deg,lat_deg
  use g_config, only: steps_per_ib_step
  !=
 #ifdef use_cavity
- use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, melted, grounded !, length_ib, width_ib
+ use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, melted, grounded, scaling !, length_ib, width_ib, scaling
 #else
- use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, melted, grounded !, length_ib, width_ib
+ use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, melted, grounded, scaling !, length_ib, width_ib, scaling
 #endif
  												!=
  implicit none											!=
@@ -499,7 +498,6 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 		   dt*REAL(steps_per_ib_step), l_output, f_u_ib_old, &
 		   f_v_ib_old, l_semiimplicit, semiimplicit_coeff, &
 		   AB_coeff, file_meltrates, rho_icb)
-
   call prepare_icb2fesom(mesh,ib,i_have_element,local_idx_of(iceberg_elem),depth_ib)
   !new_u_ib = 2.0
   !new_v_ib = 0.0
@@ -527,10 +525,14 @@ if( local_idx_of(iceberg_elem) > 0 ) then
     left_mype = 0.0 
     u_ib = 0.0
     v_ib = 0.0
-    !write(*,*) 'LA DEBUG: draft_scale(ib): ',abs(draft_scale(ib)),', depth_ib: ',depth_ib,', Zdepth: ',Zdepth
     old_lon = lon_rad
     old_lat = lat_rad
 
+    !!###########################################
+    !! LA: prevent too many icebergs in one element
+    old_element = iceberg_elem !save if iceberg left model domain
+    !!###########################################
+ 
 ! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
 !   if (mod(istep,logfile_outfreq)==0) then 
     if (mod(istep_end_synced,logfile_outfreq)==0) then 
@@ -541,10 +543,11 @@ if( local_idx_of(iceberg_elem) > 0 ) then
  else 
   !===================...ELSE CALCULATE TRAJECTORY====================
 
- !!###########################################
- !! LA: prevent too many icebergs in one element
+! uncomment for original code, LA 2022-12-29
+ !###########################################
+ ! LA: prevent too many icebergs in one element
  old_element = iceberg_elem !save if iceberg left model domain
- !!###########################################
+ !###########################################
  
  t0=MPI_Wtime()
   call trajectory( lon_rad,lat_rad, u_ib,v_ib, new_u_ib,new_v_ib, &
@@ -579,23 +582,33 @@ if( local_idx_of(iceberg_elem) > 0 ) then
   !================END OF TRAJECTORY CALCULATION=====================
  end if ! iceberg stationary?
 
+! uncomment for original code, LA 2022-12-29
   !###########################################
   ! LA: prevent too many icebergs in one element
   !num_ib_in_elem = count(elem_block==iceberg_elem)
   
   area_ib_tot = 0.0
-  call get_total_iceberg_area(mesh, iceberg_elem, area_ib_tot)
-  !do idx = 1, size(elem_block)
-  !    if (elem_block(idx) == iceberg_elem) then
-  !        area_ib_tot = area_ib_tot + length_ib(idx) * width_ib(idx)
-  !    end if
-  !end do
+  !call get_total_iceberg_area(mesh, iceberg_elem, area_ib_tot)
+
+  !-----------------------------
+  ! LA 2022-11-30
+  !area_ib_tot = 0.0
+  do idx = 1, size(elem_block)
+      if (elem_block(idx) == iceberg_elem) then
+          area_ib_tot = area_ib_tot + length_ib * width_ib * scaling(idx)
+      end if
+  end do
+  !-----------------------------
 
   !if(num_ib_in_elem >= max_ib_in_elem) then
-  if((area_ib_tot > elem_area(local_idx_of(iceberg_elem))) .and. (iceberg_elem .ne. old_element) .and. (old_element .ne. 0)) then
-      !write(*,*) "LA DEBUG: area_ib_tot=",area_ib_tot,", elem_area=",elem_area(local_idx_of(iceberg_elem))
-      !write(*,*) "LA DEBUG: old_element=",old_element,", iceberg_elem=",iceberg_elem
-  !    write(*,*) "LA DEBUG: set iceberg to old position"
+  if((area_ib_tot > elem_area(local_idx_of(iceberg_elem))) .and. &  
+                (iceberg_elem .ne. old_element) .and. &
+                (old_element .ne. 0) .and. &
+                (grounded(ib) .ne. .true.)) then
+      !write(*,*) "area_ib_tot = ",area_ib_tot
+      !write(*,*) "local_idx_of(iceberg_elem)) = ",local_idx_of(iceberg_elem)
+      !write(*,*) "elem_area(local_idx_of(iceberg_elem))) = ",elem_area(local_idx_of(iceberg_elem)) 
+      !write(*,*) "Set iceberg from ",iceberg_elem," to old position ",old_element
       lon_rad = old_lon
       lat_rad = old_lat 
       lon_deg = lon_rad/rad
@@ -606,15 +619,11 @@ if( local_idx_of(iceberg_elem) > 0 ) then
   end if
   !###########################################
  
-  !write(*,*) "LA DEBUG: write arr"
   !values for communication
   arr= (/ height_ib,length_ib,width_ib, u_ib,v_ib, lon_rad,lat_rad, &
           left_mype, old_lon,old_lat, frozen_in, dudt, dvdt, P_ib, conci_ib/) 
 
   !save in larger array	  
-  !write(*,*) "LA DEBUG: save in larger array"
-  !write(*,*) "LA DEBUG: ib = ", ib
-  !write(*,*) "LA DEBUG: size(arr_block) = ", size(arr_block)
   arr_block((ib-1)*15+1 : ib*15)=arr
   elem_block(ib)=iceberg_elem
   	  
@@ -654,7 +663,6 @@ type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
 
   area_ib_tot = 0.0
-  !write(*,*) "LA DEBUG: get size of elem_block=",size(elem_block)
   do idx = 1, size(elem_block)
       if (elem_block(idx) == iceberg_elem) then
           area_ib_tot = area_ib_tot + length_ib(idx) * width_ib(idx) * scaling(idx)
@@ -801,38 +809,11 @@ type(t_mesh), intent(in) , target :: mesh
   !!if(local_idx_of(iceberg_elem) > 0 .and. iceberg_elem .ne. old_element) then !IB left model domain
   !if(iceberg_elem .ne. old_element) then
     if (firstcall) then
-      write(*,*) "LA DEBUG: firstcall = ", firstcall
       allocate(local_idx_of(elem2D))
       !creates mapping
       call global2local(mesh, local_idx_of, elem2D)
       firstcall=.false.
     end if 
-  !  num_ib_in_elem = count(elem_block==iceberg_elem)
-  !  area_ib_tot = 0.0
-  !  call get_total_iceberg_area(mesh, iceberg_elem, area_ib_tot)
-  !
-  !  idx = local_idx_of(iceberg_elem)
-  !  local_elem_area = elem_area(idx)
-  !  write(*,*) "LA DEBUG: local_elem_area = ",local_elem_area
-  !  write(*,*) "LA DEBUG: area_ib_tot = ", area_ib_tot
-  !  if(area_ib_tot > local_elem_area) then
-  !         write(*,*) "LA DEBUG: local_idx_of(iceberg_elem)=",idx
-  !         write(*,*) "LA DEBUG: global idx of iceberg_elem=",iceberg_elem
-  !         write(*,*) "LA DEBUG: size(elem_area)=",size(elem_area)
-  !         write(*,*) "LA DEBUG: num_ib_in_elem=",num_ib_in_elem
-  !         write(*,*) "LA DEBUG: area_ib_tot=",area_ib_tot,", elem_area=",local_elem_area
-  !         write(*,*) "LA DEBUG: old_element=",old_element,", iceberg_elem=",iceberg_elem
-  !         write(*,*) "LA DEBUG: set iceberg ", ib, " to old position"
-  !         lon_rad = old_lon
-  !         lat_rad = old_lat 
-  !         lon_deg = lon_rad/rad
-  !         lat_deg = lat_rad/rad
-  !         iceberg_elem = old_element
-  !         u_ib    = 0.
-  !         v_ib    = 0.  
-  !  end if
-  !end if
-  !!**** LA: check if iceberg changed element and new element is too full 
  
  if(left_mype > 0.) then
    call iceberg_elem4all(mesh, iceberg_elem, lon_deg, lat_deg) !Just PE changed?
@@ -846,21 +827,12 @@ type(t_mesh), intent(in) , target :: mesh
            v_ib    = 0.
    else
      if (mype==0) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
+! uncomment for original code, LA 2022-12-29
+     !#############################################
      ! LA test which one to take
      !call get_total_iceberg_area(mesh, myList_elem2D(iceberg_elem), area_ib_tot)
      call get_total_iceberg_area(mesh, iceberg_elem, area_ib_tot)
-     !-----------------------------
-     !write(*,*) "LA DEBUG: FINISHED get_total_iceberg_area"
-     !write(*,*) "LA DEBUG: iceberg_elem = ", iceberg_elem
-     !write(*,*) "LA DEBUG: local_idx_of(iceberg_elem) = ", local_idx_of(iceberg_elem)
-     !write(*,*) "LA DEBUG: myList_elem2D(iceberg_elem) = ", myList_elem2D(iceberg_elem)
-     !write(*,*) "LA DEBUG: size(elem_area) = ", size(elem_area)
-     !write(*,*) "LA DEBUG: max(local_idx_of) = ", maxval(local_idx_of)
-     !write(*,*) "LA DEBUG: local_idx_of = ", local_idx_of
-     !write(*,*) "LA DEBUG: max(myList_elem2D) = ", maxval(myList_elem2D)
      if(area_ib_tot > elem_area(local_idx_of(iceberg_elem))) then
-         !write(*,*) "LA DEBUG: area_ib_tot=",area_ib_tot,", elem_area=",elem_area(local_idx_of(iceberg_elem))
-         !write(*,*) "LA DEBUG: old_element=",old_element,", iceberg_elem=",iceberg_elem
          write(*,*) "LA DEBUG: set iceberg to old position"
          lon_rad = old_lon
          lat_rad = old_lat 
@@ -870,6 +842,7 @@ type(t_mesh), intent(in) , target :: mesh
          u_ib    = 0.
          v_ib    = 0.  
      end if
+     !#############################################
    end if
  end if
  
@@ -1311,7 +1284,7 @@ subroutine iceberg_restart_with_icesheet
  use g_config, only : ib_num
 
  implicit none
- integer :: icbID_ISM, icbID_non_melted_icb, ib
+ integer :: icbID_ISM, icbID_non_melted_icb, ib, st
  LOGICAL :: file_exists, file_exists_non_melted
  INQUIRE(FILE=num_non_melted_icb_file, EXIST=file_exists_non_melted) 
  INQUIRE(FILE=IcebergRestartPath_ISM, EXIST=file_exists) 
@@ -1328,12 +1301,16 @@ subroutine iceberg_restart_with_icesheet
   open(unit=icbID_ISM,file=IcebergRestartPath_ISM,status='old')
   do ib=1, num_non_melted_icb 
    !read all parameters that icb_step needs:			
-   read(icbID_ISM,'(18e15.7,I,L,3e15.7,L,I,L)')						&
+   read(icbID_ISM,'(18e15.7,I,L,3e15.7,L,I,L)',iostat=st)						&
    	height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
 	Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
 	conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
 	u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
-	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib), melted(ib) 
+	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib), melted(ib)
+   if(st .gt. 0) then
+        write(*,*) "LA DEBUG: read status = ", st
+        write(*,*) "LA DEBUG: iceberg = ", ib
+   end if 
   end do
   close(icbID_ISM)
 

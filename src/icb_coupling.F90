@@ -48,8 +48,6 @@ type(t_mesh), intent(in) , target :: mesh
     if(i_have_element) then 
         ! ##############################################################
         ! LA: spread fluxes over all nodes of element, 25.04.2022
-        !call get_iceberg_nodes_for_element(mesh, localelement, ib_nods_in_ib_elem, num_ib_nods_in_ib_elem)
-        !call get_iceberg_nodes_for_element(elem2d_nodes, localelement, ib_nods_in_ib_elem, num_ib_nods_in_ib_elem)
         num_ib_nods_in_ib_elem=0
 
         do i=1,3
@@ -134,8 +132,6 @@ type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
 
     do n=1, myDim_nod2d+eDim_nod2D
-        !water_flux(n)   = water_flux(n) - (ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n)) * steps_per_ib_step !sign needs to be negative
-        !heat_flux(n)    = heat_flux(n)  - ibhf(n) * steps_per_ib_step !LA: reversed sign!!! needs to be negative
         fresh_wa_flux(n)   = fresh_wa_flux(n) + (ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n)) * steps_per_ib_step !sign needs to be negative
         net_heat_flux(n)   = net_heat_flux(n) + ibhf(n) * steps_per_ib_step !LA: reversed sign!!! needs to be negative
     end do

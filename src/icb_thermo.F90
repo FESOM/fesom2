@@ -59,15 +59,11 @@ subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
 
   !3-eq. formulation for bottom melting [m/s]    
   v_ibmino  = sqrt( (u_ib - uo_keel_ib)**2 + (v_ib - vo_keel_ib)**2 )
-  !write(*,*) "LA DEBUG: uo_keel_ib = ", uo_keel_ib, ", vo_keel_ib = ", vo_keel_ib, ", T_keel_ib = ", T_keel_ib
   call iceberg_heat_water_fluxes_3eq(ib, M_b, T_keel_ib,S_keel_ib,v_ibmino, depth_ib, tf)
-  !write(*,*) "LA DEBUG: M_b = ",M_b
 
   !3-eq. formulation for lateral 'basal' melting [m/s]
   v_ibmino  = sqrt( (u_ib - uo_ib)**2 + (v_ib - vo_ib)**2 ) ! depth-average rel. velocity
-  !write(*,*) "LA DEBUG: uo_ib = ", uo_ib, ", vo_ib = ", vo_ib, ", T_ave_ib = ", T_ave_ib
   call iceberg_heat_water_fluxes_3eq(ib, M_bv, T_ave_ib,S_ave_ib,v_ibmino, depth_ib/2.0, tf)
-  !write(*,*) "LA DEBUG: M_bv = ",M_bv
   
   !'thermal driving', defined as the elevation of ambient water 
   !temperature above freezing point' (Neshyba and Josberger, 1979).
@@ -212,11 +208,6 @@ subroutine iceberg_newdimensions(ib, depth_ib,height_ib,length_ib,width_ib,M_b,M
 	    force_last_output = .true.
         end if
     end if
-  
-
-    !if (mype == 0) then
-    !write(*,*) "LA DEBUG: scaling for iceberg ",ib," = ", scaling(ib)
-    !end if
 
     fwb_flux_ib(ib) = -bvl*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)
     fwe_flux_ib(ib) = -lvl_e*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)
