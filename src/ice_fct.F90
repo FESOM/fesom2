@@ -266,8 +266,13 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     !___________________________________________________________________________
     gamma=ice%ice_gamma_fct         ! Added diffusivity parameter
                                 ! Adjust it to ensure posivity of solution
+
+!$ACC DATA COPY(myDim_nod2D, ulevels_nod2D, area, nn_pos, mass_matrix) &
+!$ACC      COPY(m_icel, a_icel, m_snowl, m_ice, a_ice, m_snow) &
+!$ACC      COPY(rhs_a, rhs_m, rhs_ms)
+
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row, clo, clo2, cn, location)
-    !$ACC PARALLEL LOOP GANG VECTOR COPY(ssh_stiff, ssh_stiff%rowptr) PRIVATE(location)
+    !$ACC PARALLEL LOOP GANG VECTOR COPY(ssh_stiff, ssh_stiff%rowptr) PRIVATE(location) DEFAULT(NONE)
     do row=1,myDim_nod2D
         !_______________________________________________________________________
         ! if there is cavity no ice fxt low order
@@ -296,10 +301,13 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     !$ACC END PARALLEL LOOP
 !$OMP END PARALLEL DO
     ! Low-order solution must be known to neighbours
-    call exchange_nod(m_icel,a_icel,m_snowl, partit)
+    call exchange_nod(m_icel,a_icel,m_snowl, partit, luse_g2g = .true.)
 #if defined (__oifs) || defined (__ifsinterface)
-    call exchange_nod(m_templ, partit)
+    call exchange_nod(m_templ, partit, luse_g2g = .true.)
 #endif /* (__oifs) */
+
+!$ACC END DATA
+
 !$OMP BARRIER
 end subroutine ice_solve_low_order
 !
