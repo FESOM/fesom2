@@ -213,18 +213,24 @@ subroutine stress2rhs(ice, partit, mesh)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, el, k)
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG
+
+    !$ACC DATA COPY(myDim_elem2D, elem2D_nodes, myDim_nod2D, ulevels, ulevels_nod2d, elem_area, gradient_sca, metric_factor) &
+    !$ACC      COPY( inv_areamass, ice_strength, u_rhs_ice, v_rhs_ice, sigma11, sigma12, sigma22) &
+    !$ACC      COPY(rhs_a, rhs_m)
+
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     DO  n=1, myDim_nod2D
         U_rhs_ice(n)=0.0_WP
         V_rhs_ice(n)=0.0_WP
     END DO
     !$ACC END PARALLEL LOOP
+
 !$OMP END DO
 !$OMP DO
 #if !defined(DISABLE_OPENACC_ATOMICS)
-    !$ACC PARALLEL LOOP GANG
-! #else
-!     !$ACC UPDATE SELF(fct_plus, fct_minus, adf_h)
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
+#else
+    !$ACC UPDATE SELF(u_rhs_ice, v_rhs_ice)
 #endif
     do el=1,myDim_elem2D
         ! ===== Skip if ice is absent
@@ -267,12 +273,14 @@ subroutine stress2rhs(ice, partit, mesh)
     end do
 #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC END PARALLEL LOOP
-! #else
-!     !$ACC UPDATE DEVICE(fct_plus, fct_minus)
+#else
+    !$ACC UPDATE DEVICE(u_rhs_ice, v_rhs_ice)
 #endif
+
 !$OMP END DO
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG
+
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     DO n=1, myDim_nod2D
         !_______________________________________________________________________
         ! if cavity node skip it
@@ -288,6 +296,9 @@ subroutine stress2rhs(ice, partit, mesh)
         endif
     END DO
     !$ACC END PARALLEL LOOP
+
+    !$ACC END DATA
+
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine stress2rhs
