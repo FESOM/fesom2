@@ -1124,7 +1124,11 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
     ! correction for the advection operator)
     ! In this version I tr to split divergent term off, so that FCT works without it.
 
-    !$ACC PARALLEL LOOP GANG
+    !$ACC DATA COPY(myDim_elem2D, elem2D_nodes, myDim_nod2D, ulevels, elem_area) &
+    !$ACC      COPY(ice, a_ice, m_ice, m_snow, u_ice, v_ice, gradient_sca) &
+    !$ACC      COPY(rhs_a, rhs_m, rhs_ms, rhs_adiv, rhs_mdiv, rhs_msdiv)
+
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     do row=1, myDim_nod2D
                     !! row=myList_nod2D(m)
         rhs_m(row)=0.0_WP
@@ -1145,7 +1149,9 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(diff, entries, um, vm, vol, dx, dy, n, q, row, elem, elnodes, c1, c2, c3, c4, cx1, cx2, cx3, cx4, entries2)
 !$OMP DO
 #if !defined(DISABLE_OPENACC_ATOMICS)
-    !$ACC PARALLEL LOOP GANG PRIVATE(elnodes, dx, dy, entries, entries2)
+    !$ACC PARALLEL LOOP GANG PRIVATE(elnodes, dx, dy, entries, entries2) DEFAULT(NONE)
+#else
+    !$ACC UPDATE SELF(rhs_a, rhs_m, rhs_ms, rhs_adiv, rhs_mdiv, rhs_msdiv)
 #endif
     do elem=1,myDim_elem2D          !assembling rhs over elements
         elnodes=elem2D_nodes(:,elem)
@@ -1246,7 +1252,10 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
     end do
 #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC END PARALLEL LOOP
+#else
+    !$ACC UPDATE DEVICE(rhs_a, rhs_m, rhs_ms, rhs_adiv, rhs_mdiv, rhs_msdiv)
 #endif
+    !$ACC END DATA
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine ice_TG_rhs_div
