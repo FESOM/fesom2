@@ -513,7 +513,12 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     ! it takes memory and time. For every element
     ! we need its antidiffusive contribution to
     ! each of its 3 nodes
-    !$ACC PARALLEL LOOP GANG
+
+    !$ACC DATA COPY(myDim_nod2D, eDim_nod2D, myDim_elem2D, elem2D_nodes, ulevels, ulevels_nod2d) &
+    !$ACC      COPY(elem_area, area, nn_num, nn_pos, tmax, tmin, icoef, icefluxes, icepplus, icepminus) &
+    !$ACC      COPY(m_ice, a_ice, m_snow, dm_ice, da_ice, dm_snow, m_icel, a_icel, m_snowl)
+
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(NONE)
     do n = 1, myDim_nod2D + eDim_nod2D
         tmax(n) = 0.0_WP
         tmin(n) = 0.0_WP
@@ -521,10 +526,12 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     !$ACC END PARALLEL LOOP
 
     ! Auxiliary elemental operator (mass matrix- lumped mass matrix)
+
     !$ACC KERNELS
-    icoef=1
+    icoef = 1
     !$ACC END KERNELS
-    !$ACC PARALLEL LOOP GANG COPY(icoef)
+
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     do n=1,3   ! three upper nodes
         ! Cycle over rows  row=elnodes(n)
         icoef(n,n)=-2
@@ -533,7 +540,8 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, q, elem, elnodes, row, vol, flux, ae)
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG PRIVATE(elnodes)
+
+    !$ACC PARALLEL LOOP GANG PRIVATE(elnodes) DEFAULT(NONE)
     do elem=1, myDim_elem2D
         !_______________________________________________________________________
         elnodes=elem2D_nodes(:,elem)
@@ -587,7 +595,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     ! Cluster min/max
     if (tr_array_id==1) then
 !$OMP DO
-        !$ACC PARALLEL LOOP GANG
+        !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
         do row=1, myDim_nod2D
             if (ulevels_nod2d(row)>1) cycle
             n=nn_num(row)
@@ -603,7 +611,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 
     if (tr_array_id==2) then
 !$OMP DO
-        !$ACC PARALLEL LOOP GANG
+        !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
         do row=1, myDim_nod2D
             if (ulevels_nod2d(row)>1) cycle
             n=nn_num(row)
@@ -619,7 +627,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 
     if (tr_array_id==3) then
 !$OMP DO
-        !$ACC PARALLEL LOOP GANG
+        !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
         do row=1, myDim_nod2D
             if (ulevels_nod2d(row)>1) cycle
             n=nn_num(row)
@@ -636,7 +644,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     if (tr_array_id==4) then
 !$OMP DO
-        !$ACC PARALLEL LOOP GANG
+        !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
         do row=1, myDim_nod2D
             if (ulevels_nod2d(row)>1) cycle
             n=nn_num(row)
@@ -654,17 +662,21 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     !___________________________________________________________________________
     ! Sums of positive/negative fluxes to node row
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG
+
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     do n=1, myDim_nod2D+eDim_nod2D
        icepplus (n)=0._WP
        icepminus(n)=0._WP
     end do
     !$ACC END PARALLEL LOOP
+
 !$OMP END DO
 
 !$OMP DO
 #if !defined(DISABLE_OPENACC_ATOMICS)
-    !$ACC PARALLEL LOOP GANG COPY(icepminus) PRIVATE(elnodes)
+    !$ACC PARALLEL LOOP GANG PRIVATE(elnodes) DEFAULT(NONE)
+#else
+    !$ACC UPDATE SELF(icefluxes, icepplus, icepminus)
 #endif
     do elem=1, myDim_elem2D
         ! if cavity cycle over
@@ -700,12 +712,16 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     end do
 #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC END PARALLEL LOOP
+#else
+    !$ACC UPDATE DEVICE(icepplus, icepminus)
 #endif
 !$OMP END DO
+
     !___________________________________________________________________________
     ! The least upper bound for the correction factors
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG
+
+    !$ACC PARALLEL LOOP GANG COPY(icepplus, icepminus) DEFAULT(NONE)
     do n=1,myDim_nod2D
         ! if cavity cycle over
         if(ulevels_nod2D(n)>1) cycle !LK89140
@@ -725,16 +741,18 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         end if
     end do
     !$ACC END PARALLEL LOOP
+
 !$OMP END DO
     ! pminus and pplus are to be known to neighbouting PE
 !$OMP MASTER
-    call exchange_nod(icepminus, icepplus, partit)
+    call exchange_nod(icepminus, icepplus, partit, luse_g2g = .true.)
 !$OMP END MASTER
 !$OMP BARRIER
     !___________________________________________________________________________
     ! Limiting
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG PRIVATE(elnodes)
+
+    !$ACC PARALLEL LOOP GANG COPY(icepplus, icepminus) PRIVATE(elnodes) DEFAULT(NONE)
     do elem=1, myDim_elem2D
         ! if cavity cycle over
         if(ulevels(elem)>1) cycle !LK89140
@@ -751,12 +769,13 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         icefluxes(elem,:)=ae*icefluxes(elem,:)
     end do
     !$ACC END PARALLEL LOOP
+
 !$OMP END DO
     !___________________________________________________________________________
     ! Update the solution
     if(tr_array_id==1) then
 !$OMP DO
-        !$ACC PARALLEL LOOP GANG
+        !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
         do n=1,myDim_nod2D
             if(ulevels_nod2D(n)>1) cycle !LK89140
             m_ice(n)=m_icel(n)
@@ -765,7 +784,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 !$OMP END DO
 !$OMP DO
 #if !defined(DISABLE_OPENACC_ATOMICS)
-        !$ACC PARALLEL LOOP GANG PRIVATE(elnodes)
+        !$ACC PARALLEL LOOP GANG PRIVATE(elnodes) DEFAULT(NONE)
+#else
+        !$ACC UPDATE SELF(m_ice, icefluxes)
 #endif
         do elem=1, myDim_elem2D
             ! if cavity cycle over
@@ -792,13 +813,15 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         end do
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC END PARALLEL LOOP
+#else
+        !$ACC UPDATE DEVICE(m_ice)
 #endif
 !$OMP END DO
     end if
 
     if(tr_array_id==2) then
 !$OMP DO
-        !$ACC PARALLEL LOOP GANG
+        !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
         do n=1,myDim_nod2D
             if(ulevels_nod2D(n)>1) cycle !LK89140
             a_ice(n)=a_icel(n)
@@ -807,7 +830,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 !$OMP END DO
 !$OMP DO
 #if !defined(DISABLE_OPENACC_ATOMICS)
-        !$ACC PARALLEL LOOP GANG PRIVATE(elnodes)
+        !$ACC PARALLEL LOOP GANG PRIVATE(elnodes) DEFAULT(NONE)
+#else
+        !$ACC UPDATE SELF(a_ice, icefluxes)
 #endif
         do elem=1, myDim_elem2D
             ! if cavity cycle over
@@ -834,13 +859,15 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         end do
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC END PARALLEL LOOP
+#else
+        !$ACC UPDATE DEVICE(a_ice)
 #endif
 !$OMP END DO
     end if
 
     if(tr_array_id==3) then
 !$OMP DO
-        !$ACC PARALLEL LOOP GANG
+        !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
         do n=1,myDim_nod2D
             if(ulevels_nod2D(n)>1) cycle !LK89140
             m_snow(n)=m_snowl(n)
@@ -849,7 +876,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 !$OMP END DO
 !$OMP DO
 #if !defined(DISABLE_OPENACC_ATOMICS)
-        !$ACC PARALLEL LOOP GANG PRIVATE(elnodes)
+        !$ACC PARALLEL LOOP GANG PRIVATE(elnodes) DEFAULT(NONE)
+#else
+        !$ACC UPDATE SELF(m_snow, icefluxes)
 #endif
         do elem=1, myDim_elem2D
             ! if cavity cycle over
@@ -876,14 +905,18 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         end do
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC END PARALLEL LOOP
+#else
+        !$ACC UPDATE DEVICE(m_snow)
 #endif
 !$OMP END DO
     end if
 
+    !$ACC END DATA
+
 #if defined (__oifs) || defined (__ifsinterface)
     if(tr_array_id==4) then
 !$OMP DO
-        !$ACC PARALLEL LOOP GANG
+        !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
         do n=1,myDim_nod2D
             if(ulevels_nod2D(n)>1) cycle !LK89140
             ice_temp(n)=m_templ(n)
