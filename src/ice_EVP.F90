@@ -87,7 +87,12 @@ subroutine stress_tensor(ice, partit, mesh)
     det2 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte) !*ellipse**2
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, r1, r2, r3, si1, si2, zeta, delta, delta_inv, d1, d2)
-    !$ACC PARALLEL LOOP GANG
+
+    !$ACC DATA COPY(ice, ice%delta_min, ice%Tevp_inv, ice_strength) &
+    !$ACC      COPY(myDim_elem2D, elem2D_nodes, ulevels, gradient_sca, metric_factor) &
+    !$ACC      COPY(u_ice, v_ice, eps11, eps12, eps22, sigma11, sigma12, sigma22)
+
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     do el=1,myDim_elem2D
         !_______________________________________________________________________
         ! if element contains cavity node skip it
@@ -160,6 +165,9 @@ subroutine stress_tensor(ice, partit, mesh)
         endif
     end do
     !$ACC END PARALLEL LOOP
+
+    !$ACC END DATA
+
 !$OMP END PARALLEL DO
 end subroutine stress_tensor
 !
