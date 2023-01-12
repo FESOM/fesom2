@@ -193,8 +193,23 @@ subroutine ice_fct_solve(ice, partit, mesh)
   type(t_ice),    intent(inout), target :: ice
   type(t_partit), intent(inout), target :: partit
   type(t_mesh),   intent(in),    target :: mesh
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
   !_____________________________________________________________________________
   ! Driving routine
+
+    !$ACC DATA COPY(myDim_nod2D, eDim_nod2D, ulevels, ulevels_nod2d) &
+    !$ACC      COPY(elem_area, area, nn_num, nn_pos, myDim_elem2D, elem2D_nodes) &
+    !$ACC      COPY(ice, ice%data, ice%work, ice%work%fct_massmatrix) &
+    !$ACC      COPY(ice%work%fct_tmax, ice%work%fct_tmin) &
+    !$ACC      COPY(ice%work%fct_fluxes, ice%work%fct_plus, ice%work%fct_minus) &
+    !$ACC      COPY(ice%data(1)%values, ice%data(2)%values, ice%data(3)%values) &
+    !$ACC      COPY(ice%data(1)%valuesl(:), ice%data(2)%valuesl(:), ice%data(3)%valuesl(:)) &
+    !$ACC      COPY(ice%data(1)%dvalues, ice%data(2)%dvalues, ice%data(3)%dvalues) &
+    !$ACC      COPY(ice%data(1)%values_rhs, ice%data(2)%values_rhs, ice%data(3)%values_rhs)
+
   call ice_solve_high_order(ice, partit, mesh)   ! uses arrays of low-order solutions as temp
                                     ! storage. It should preceed the call of low
                                     ! order solution.
@@ -203,6 +218,9 @@ subroutine ice_fct_solve(ice, partit, mesh)
   call ice_fem_fct(1, ice, partit, mesh)    ! m_ice
   call ice_fem_fct(2, ice, partit, mesh)    ! a_ice
   call ice_fem_fct(3, ice, partit, mesh)    ! m_snow
+
+    !$ACC END DATA
+
 #if defined (__oifs) || defined (__ifsinterface)
   call ice_fem_fct(4, ice, partit, mesh)    ! ice_temp
 #endif /* (__oifs) */
@@ -267,9 +285,9 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     gamma=ice%ice_gamma_fct         ! Added diffusivity parameter
                                 ! Adjust it to ensure posivity of solution
 
-!$ACC DATA COPY(myDim_nod2D, ulevels_nod2D, area, nn_pos, mass_matrix) &
-!$ACC      COPY(m_icel, a_icel, m_snowl, m_ice, a_ice, m_snow) &
-!$ACC      COPY(rhs_a, rhs_m, rhs_ms)
+!$ACC DATA PRESENT(myDim_nod2D, ulevels_nod2D, area, nn_pos, mass_matrix) &
+!$ACC      PRESENT(m_icel, a_icel, m_snowl, m_ice, a_ice, m_snow) &
+!$ACC      PRESENT(rhs_a, rhs_m, rhs_ms)
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row, clo, clo2, cn, location)
     !$ACC PARALLEL LOOP GANG VECTOR COPY(ssh_stiff, ssh_stiff%rowptr) PRIVATE(location) DEFAULT(NONE)
@@ -363,9 +381,9 @@ subroutine ice_solve_high_order(ice, partit, mesh)
     !the first approximation
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
 
-    !$ACC DATA COPY(myDim_nod2D, ulevels_nod2D, area, nn_pos, mass_matrix) &
-    !$ACC      COPY(m_icel, a_icel, m_snowl, dm_ice, da_ice, dm_snow) &
-    !$ACC      COPY(rhs_a, rhs_m, rhs_ms)
+    !$ACC DATA PRESENT(myDim_nod2D, ulevels_nod2D, area, nn_pos, mass_matrix) &
+    !$ACC      PRESENT(m_icel, a_icel, m_snowl, dm_ice, da_ice, dm_snow) &
+    !$ACC      PRESENT(rhs_a, rhs_m, rhs_ms)
 
     !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     do row=1,myDim_nod2D
@@ -514,9 +532,10 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     ! we need its antidiffusive contribution to
     ! each of its 3 nodes
 
-    !$ACC DATA COPY(myDim_nod2D, eDim_nod2D, myDim_elem2D, elem2D_nodes, ulevels, ulevels_nod2d) &
-    !$ACC      COPY(elem_area, area, nn_num, nn_pos, tmax, tmin, icoef, icefluxes, icepplus, icepminus) &
-    !$ACC      COPY(m_ice, a_ice, m_snow, dm_ice, da_ice, dm_snow, m_icel, a_icel, m_snowl)
+    !$ACC DATA CREATE(icoef, elnodes) &
+    !$ACC      PRESENT(myDim_nod2D, eDim_nod2D, myDim_elem2D, elem2D_nodes, ulevels, ulevels_nod2d) &
+    !$ACC      PRESENT(elem_area, area, nn_num, nn_pos, tmax, tmin, icefluxes, icepplus, icepminus) &
+    !$ACC      PRESENT(dm_ice, da_ice, dm_snow, m_icel, a_icel, m_snowl, m_ice, a_ice, m_snow)
 
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(NONE)
     do n = 1, myDim_nod2D + eDim_nod2D
@@ -721,7 +740,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     ! The least upper bound for the correction factors
 !$OMP DO
 
-    !$ACC PARALLEL LOOP GANG COPY(icepplus, icepminus) DEFAULT(NONE)
+    !$ACC PARALLEL LOOP GANG PRESENT(icepplus, icepminus) DEFAULT(NONE)
     do n=1,myDim_nod2D
         ! if cavity cycle over
         if(ulevels_nod2D(n)>1) cycle !LK89140
@@ -752,7 +771,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     ! Limiting
 !$OMP DO
 
-    !$ACC PARALLEL LOOP GANG COPY(icepplus, icepminus) PRIVATE(elnodes) DEFAULT(NONE)
+    !$ACC PARALLEL LOOP GANG PRESENT(icepplus, icepminus) PRIVATE(elnodes) DEFAULT(NONE)
     do elem=1, myDim_elem2D
         ! if cavity cycle over
         if(ulevels(elem)>1) cycle !LK89140
