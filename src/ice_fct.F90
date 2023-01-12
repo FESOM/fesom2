@@ -911,8 +911,6 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 !$OMP END DO
     end if
 
-    !$ACC END DATA
-
 #if defined (__oifs) || defined (__ifsinterface)
     if(tr_array_id==4) then
 !$OMP DO
@@ -957,10 +955,13 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     end if
 #endif /* (__oifs) */ || defined (__ifsinterface)
 !$OMP END PARALLEL
-    call exchange_nod(m_ice, a_ice, m_snow, partit)
+    call exchange_nod(m_ice, a_ice, m_snow, partit, luse_g2g = .true.)
 #if defined (__oifs) || defined (__ifsinterface)
     call exchange_nod(ice_temp, partit)
 #endif /* (__oifs) */
+
+!$ACC END DATA
+
 !$OMP BARRIER
 end subroutine ice_fem_fct
 !
