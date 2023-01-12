@@ -13,7 +13,7 @@ use_REcoM             =.true.
 REcoM_restart         =.true.
 recom_binary_write    =.false.      ! Determines if tracervalue snapshots are saved. For fine grids it may crash the model to set this to true
 recom_binary_init     = .false.     ! Restart from binary
-bgc_num               = 31          ! if (ciso==.false.): 22; if (ciso_14==.false.): 30; if (ciso_14):: 31; if (ciso_14 .and. ciso_organic_14): 38
+bgc_num               = 31          ! if (ciso==.false.): 22; if (ciso_14):: 31; if (ciso_14 .and. ciso_organic_14): 38
 bgc_base_num          = 22          ! number of RECOM base model tracers
 diags3d_num           = 2           ! Number of diagnostic 3d tracers to be saved
 VDet                  = 20.d0       ! Sinking velocity, constant through the water column and positive downwards
