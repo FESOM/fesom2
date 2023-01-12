@@ -29,8 +29,6 @@ endif()
 option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
 option(ENABLE_IOSERVER "enable external io-server support" OFF)
 
-add_compile_options(-DTRANSPOSE_OUTPUT)
-
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
 if(${USE_ICEPACK})
