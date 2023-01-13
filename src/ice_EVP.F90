@@ -525,7 +525,7 @@ subroutine EVPdynamics(ice, partit, mesh)
 #if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC PARALLEL LOOP GANG PRIVATE(elnodes) DEFAULT(NONE)
 #else
-            !$ACC UPDATE SELF(rhs_a, rhs_m, ice_strength)
+            !$ACC UPDATE SELF(rhs_a, rhs_m, ice_strength, m_ice, a_ice)
 #endif
         do el = 1,myDim_elem2D
             ice_strength(el)=0.0_WP
