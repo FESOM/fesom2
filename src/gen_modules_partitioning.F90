@@ -186,6 +186,7 @@ subroutine par_init    ! initializes MPI
   end if
 #else
 
+#ifdef ENABLE_IOSERVER
     comm_fesom_with_ioserver = create_ioserver_communicator()
 
     if(ioserver%is_ioserver()) then
@@ -196,6 +197,7 @@ subroutine par_init    ! initializes MPI
       npes = comm_fesom_npes
       return
     end if
+#endif
   
     call MPI_Comm_Size(MPI_COMM_FESOM, npes, err)
     call MPI_Comm_Rank(MPI_COMM_FESOM, mype, err)
