@@ -88,7 +88,7 @@ subroutine stress_tensor(ice, partit, mesh)
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, r1, r2, r3, si1, si2, zeta, delta, delta_inv, d1, d2)
 
-    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
     do el=1,myDim_elem2D
         !_______________________________________________________________________
         ! if element contains cavity node skip it
@@ -208,7 +208,7 @@ subroutine stress2rhs(ice, partit, mesh)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, el, k)
 !$OMP DO
 
-    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
     DO  n=1, myDim_nod2D
         U_rhs_ice(n)=0.0_WP
         V_rhs_ice(n)=0.0_WP
@@ -218,7 +218,7 @@ subroutine stress2rhs(ice, partit, mesh)
 !$OMP END DO
 !$OMP DO
 #if !defined(DISABLE_OPENACC_ATOMICS)
-    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #else
     !$ACC UPDATE SELF(u_rhs_ice, v_rhs_ice, sigma11, sigma12, sigma22)
 #endif
@@ -270,7 +270,7 @@ subroutine stress2rhs(ice, partit, mesh)
 !$OMP END DO
 !$OMP DO
 
-    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
     DO n=1, myDim_nod2D
         !_______________________________________________________________________
         ! if cavity node skip it
@@ -396,7 +396,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     ! Precompute values that are never changed during the iteration
 
 !$OMP PARALLEL DO
-    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
     do n=1, myDim_nod2D+eDim_nod2D
        inv_areamass(n) =0.0_WP
        inv_mass(n)     =0.0_WP
@@ -407,7 +407,7 @@ subroutine EVPdynamics(ice, partit, mesh)
 !$OMP END PARALLEL DO
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
-    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
     do n=1,myDim_nod2D
         !_______________________________________________________________________
         ! if cavity node skip it
@@ -499,7 +499,7 @@ subroutine EVPdynamics(ice, partit, mesh)
         ! for linear free surface
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum, aa, elevation_elem, elevation_dx, elevation_dy)
 #if !defined(DISABLE_OPENACC_ATOMICS)
-            !$ACC PARALLEL LOOP GANG PRIVATE(elnodes) DEFAULT(PRESENT)
+            !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes) DEFAULT(PRESENT)
 #else
             !$ACC UPDATE SELF(rhs_a, rhs_m, ice_strength, m_ice, a_ice)
 #endif
@@ -556,7 +556,7 @@ subroutine EVPdynamics(ice, partit, mesh)
 !$OMP PARALLEL DO
 
     !___________________________________________________________________________
-    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
     do n=1,myDim_nod2D
         if (ulevels_nod2d(n)>1) cycle
         rhs_a(n) = rhs_a(n)/area(1,n)
@@ -581,7 +581,7 @@ subroutine EVPdynamics(ice, partit, mesh)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, ed, umod, drag, rhsu, rhsv, r_a, r_b, det)
 !$OMP DO
 
-        !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
+        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
         do n=1,myDim_nod2D+eDim_nod2D
            U_ice_old(n) = U_ice(n) !PS
            V_ice_old(n) = V_ice(n) !PS
@@ -590,7 +590,7 @@ subroutine EVPdynamics(ice, partit, mesh)
 !$OMP END DO
 
 !$OMP DO
-        !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
+        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
         do n=1,myDim_nod2D
             !___________________________________________________________________
             ! if cavity node skip it
@@ -623,7 +623,7 @@ subroutine EVPdynamics(ice, partit, mesh)
 
 !$OMP DO
         ! With the binary data of np2 goes only inside the first if
-        !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
+        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
         DO  ed=1,myDim_edge2D
             !___________________________________________________________________
             ! apply coastal sea ice velocity boundary conditions
