@@ -407,17 +407,17 @@ subroutine EVPdynamics(ice, partit, mesh)
     !___________________________________________________________________________
     ! Precompute values that are never changed during the iteration
 
-    !$ACC DATA COPY(mesh, mesh%coriolis_node) &
-    !$ACC      COPY(ice, ice%delta_min, ice%Tevp_inv, ice%cd_oce_ice) &
-    !$ACC      COPY(ice%work%eps11, ice%work%eps12, ice%work%eps22) &
-    !$ACC      COPY(ice%work%sigma11, ice%work%sigma12, ice%work%sigma22) &
-    !$ACC      COPY(ice_strength, stress_atmice_x, stress_atmice_y) &
-    !$ACC      COPY(elevation, rhosno, rhoice, ice%pstar, ice%c_pressure) &
-    !$ACC      COPY(gradient_sca, metric_factor, elem_area, area, inv_areamass, inv_mass) &
-    !$ACC      COPY(myDim_elem2D, elem2D_nodes, myDim_nod2D, ulevels_nod2d, ulevels) &
-    !$ACC      COPY(eDim_nod2D, myDim_edge2D, myList_edge2D, edge2D_in, edges, edge_tri) &
-    !$ACC      COPY(u_ice, v_ice, a_ice, u_w, v_w, u_ice_old, v_ice_old, m_ice, m_snow) &
-    !$ACC      COPY(u_rhs_ice, v_rhs_ice, rhs_a, rhs_m)
+    !$ACC DATA PRESENT(mesh, mesh%coriolis_node) &
+    !$ACC      PRESENT(ice, ice%delta_min, ice%Tevp_inv, ice%cd_oce_ice) &
+    !$ACC      PRESENT(ice%work%eps11, ice%work%eps12, ice%work%eps22) &
+    !$ACC      PRESENT(ice%work%sigma11, ice%work%sigma12, ice%work%sigma22) &
+    !$ACC      PRESENT(ice_strength, stress_atmice_x, stress_atmice_y) &
+    !$ACC      PRESENT(elevation, rhosno, rhoice, ice%pstar, ice%c_pressure) &
+    !$ACC      PRESENT(gradient_sca, metric_factor, elem_area, area, inv_areamass, inv_mass) &
+    !$ACC      PRESENT(myDim_elem2D, elem2D_nodes, myDim_nod2D, ulevels_nod2d, ulevels) &
+    !$ACC      PRESENT(eDim_nod2D, myDim_edge2D, myList_edge2D, edge2D_in, edges, edge_tri) &
+    !$ACC      PRESENT(u_ice, v_ice, a_ice, u_w, v_w, u_ice_old, v_ice_old, m_ice, m_snow) &
+    !$ACC      PRESENT(u_rhs_ice, v_rhs_ice, rhs_a, rhs_m)
 
 !$OMP PARALLEL DO
     !$ACC PARALLEL LOOP GANG DEFAULT(NONE)

@@ -200,15 +200,15 @@ subroutine ice_fct_solve(ice, partit, mesh)
   !_____________________________________________________________________________
   ! Driving routine
 
-    !$ACC DATA COPY(myDim_nod2D, eDim_nod2D, ulevels, ulevels_nod2d) &
-    !$ACC      COPY(elem_area, area, nn_num, nn_pos, myDim_elem2D, elem2D_nodes) &
-    !$ACC      COPY(ice, ice%data, ice%work, ice%work%fct_massmatrix) &
-    !$ACC      COPY(ice%work%fct_tmax, ice%work%fct_tmin) &
-    !$ACC      COPY(ice%work%fct_fluxes, ice%work%fct_plus, ice%work%fct_minus) &
-    !$ACC      COPY(ice%data(1)%values, ice%data(2)%values, ice%data(3)%values) &
-    !$ACC      COPY(ice%data(1)%valuesl(:), ice%data(2)%valuesl(:), ice%data(3)%valuesl(:)) &
-    !$ACC      COPY(ice%data(1)%dvalues, ice%data(2)%dvalues, ice%data(3)%dvalues) &
-    !$ACC      COPY(ice%data(1)%values_rhs, ice%data(2)%values_rhs, ice%data(3)%values_rhs)
+    !$ACC DATA PRESENT(myDim_nod2D, eDim_nod2D, ulevels, ulevels_nod2d) &
+    !$ACC      PRESENT(elem_area, area, nn_num, nn_pos, myDim_elem2D, elem2D_nodes) &
+    !$ACC      PRESENT(ice, ice%data, ice%work, ice%work%fct_massmatrix) &
+    !$ACC      PRESENT(ice%work%fct_tmax, ice%work%fct_tmin) &
+    !$ACC      PRESENT(ice%work%fct_fluxes, ice%work%fct_plus, ice%work%fct_minus) &
+    !$ACC      PRESENT(ice%data(1)%values, ice%data(2)%values, ice%data(3)%values) &
+    !$ACC      PRESENT(ice%data(1)%valuesl(:), ice%data(2)%valuesl(:), ice%data(3)%valuesl(:)) &
+    !$ACC      PRESENT(ice%data(1)%dvalues, ice%data(2)%dvalues, ice%data(3)%dvalues) &
+    !$ACC      PRESENT(ice%data(1)%values_rhs, ice%data(2)%values_rhs, ice%data(3)%values_rhs)
 
   call ice_solve_high_order(ice, partit, mesh)   ! uses arrays of low-order solutions as temp
                                     ! storage. It should preceed the call of low
@@ -1144,9 +1144,9 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
     ! correction for the advection operator)
     ! In this version I tr to split divergent term off, so that FCT works without it.
 
-    !$ACC DATA COPY(myDim_elem2D, elem2D_nodes, myDim_nod2D, ulevels, elem_area) &
-    !$ACC      COPY(ice, a_ice, m_ice, m_snow, u_ice, v_ice, gradient_sca) &
-    !$ACC      COPY(rhs_a, rhs_m, rhs_ms, rhs_adiv, rhs_mdiv, rhs_msdiv)
+    !$ACC DATA PRESENT(myDim_elem2D, elem2D_nodes, myDim_nod2D, ulevels, elem_area) &
+    !$ACC      PRESENT(ice, a_ice, m_ice, m_snow, u_ice, v_ice, gradient_sca) &
+    !$ACC      PRESENT(rhs_a, rhs_m, rhs_ms, rhs_adiv, rhs_mdiv, rhs_msdiv)
 
     !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     do row=1, myDim_nod2D
@@ -1336,10 +1336,10 @@ subroutine ice_update_for_div(ice, partit, mesh)
     ! the first approximation
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
 
-    !$ACC DATA COPY(myDim_nod2D, eDim_nod2D, ulevels_nod2d, area, nn_pos, mass_matrix) &
-    !$ACC      COPY(m_icel, a_icel, m_snowl, dm_ice, da_ice, dm_snow) &
-    !$ACC      COPY(m_ice, a_ice, m_snow, rhs_mdiv, rhs_adiv, rhs_msdiv) &
-    !$ACC      COPY(ssh_stiff, ssh_stiff%rowptr)
+    !$ACC DATA PRESENT(myDim_nod2D, eDim_nod2D, ulevels_nod2d, area, nn_pos, mass_matrix) &
+    !$ACC      PRESENT(m_icel, a_icel, m_snowl, dm_ice, da_ice, dm_snow) &
+    !$ACC      PRESENT(m_ice, a_ice, m_snow, rhs_mdiv, rhs_adiv, rhs_msdiv) &
+    !$ACC      PRESENT(ssh_stiff, ssh_stiff%rowptr)
 
     !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     do row=1,myDim_nod2D
