@@ -912,7 +912,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 !$OMP END DO
 !$OMP DO
 #if !defined(DISABLE_OPENACC_ATOMICS)
-        !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes)
+        !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes) DEFAULT(NONE)
+#else
+        !$ACC UPDATE SELF(ice_temp, icefluxes)
 #endif
         do elem=1, myDim_elem2D
             ! if cavity cycle over
@@ -939,6 +941,8 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         end do
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC END PARALLEL LOOP
+#else
+        !$ACC UPDATE DEVICE(ice_temp)
 #endif
 !$OMP END DO
     end if
@@ -946,7 +950,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 !$OMP END PARALLEL
     call exchange_nod(m_ice, a_ice, m_snow, partit, luse_g2g = .true.)
 #if defined (__oifs) || defined (__ifsinterface)
-    call exchange_nod(ice_temp, partit)
+    call exchange_nod(ice_temp, partit, luse_g2g = .true.)
 #endif /* (__oifs) */
 
 !$ACC END DATA
