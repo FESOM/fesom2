@@ -16,14 +16,14 @@ module diagnostics
   implicit none
 
   private
-  public :: ldiag_solver, lcurt_stress_surf, ldiag_energy, ldiag_dMOC, ldiag_DVD,       &
-            ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, ldiag_vorticity,      &
-            compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, wrhof, rhof,    &
-            u_x_u, u_x_v, v_x_v, v_x_w, u_x_w, dudx, dudy, dvdx, dvdy, dudz, dvdz,      & 
-            utau_surf, utau_bott, av_dudz_sq, av_dudz, av_dvdz, stress_bott, u_surf,    &
-            v_surf, u_bott, v_bott, std_dens_min, std_dens_max, std_dens_N, std_dens,   &
-            std_dens_UVDZ, std_dens_DIV, std_dens_Z, std_dens_H, std_dens_dVdT, std_dens_flux,      &
-            dens_flux_e, vorticity, compute_diag_dvd_2ndmoment_klingbeil_etal_2014,                &
+  public :: ldiag_solver, lcurt_stress_surf, ldiag_energy, ldiag_dMOC, ldiag_DVD,                  &
+            ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, ldiag_vorticity, ldiag_extflds,  &
+            compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, wrhof, rhof,               &
+            u_x_u, u_x_v, v_x_v, v_x_w, u_x_w, dudx, dudy, dvdx, dvdy, dudz, dvdz,                 & 
+            utau_surf, utau_bott, av_dudz_sq, av_dudz, av_dvdz, stress_bott, u_surf,               &
+            v_surf, u_bott, v_bott, std_dens_min, std_dens_max, std_dens_N, std_dens,              &
+            std_dens_UVDZ, std_dens_DIV, std_dens_Z, std_dens_H, std_dens_dVdT, std_dens_flux,     &
+            dens_flux_e, vorticity, zisotherm, compute_diag_dvd_2ndmoment_klingbeil_etal_2014,     &
             compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
@@ -37,7 +37,8 @@ module diagnostics
   real(kind=WP),  save, allocatable, target      :: utau_surf(:), utau_bott(:)
   real(kind=WP),  save, allocatable, target      :: stress_bott(:,:), u_bott(:), v_bott(:), u_surf(:), v_surf(:)
   real(kind=WP),  save, allocatable, target      :: vorticity(:,:)
-
+  real(kind=WP),  save, allocatable, target      :: zisotherm(:)             !target temperature is specified as whichtemp in compute_extflds
+  real(kind=WP),  save, allocatable, target      :: tempzavg(:), saltzavg(:)  !target depth for averaging is specified as whichdepth in compute_extflds
 ! defining a set of standard density bins which will be used for computing densMOC
 ! integer,        parameter                      :: std_dens_N  = 100
 ! real(kind=WP),  save, target                   :: std_dens(std_dens_N)
@@ -74,9 +75,10 @@ module diagnostics
   logical                                       :: ldiag_forc       =.false.
   
   logical                                       :: ldiag_vorticity  =.false.
+  logical                                       :: ldiag_extflds    =.false.
   
   namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_energy, &
-                       ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, ldiag_vorticity
+                       ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, ldiag_vorticity, ldiag_extflds
   
   contains
 
@@ -557,8 +559,11 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
 
         if (std_dens(is)>=dmax) is=ie
         if (std_dens(ie)<=dmin) ie=is
-
-        uvdz_el=(UV(:,nz,elem)+fer_uv(:,nz,elem))*helem(nz,elem)
+        if (Fer_GM) then
+           uvdz_el=(UV(:,nz,elem)+fer_uv(:,nz,elem))*helem(nz,elem)
+        else
+           uvdz_el=UV(:,nz,elem)*helem(nz,elem)
+        end if
         rhoz_el=(dens(nz)-dens(nz+1))/helem(nz,elem)
         vol_el =helem(nz,elem)*elem_area(elem)
         if (ie-is > 0) then
@@ -795,6 +800,81 @@ subroutine relative_vorticity(mode, dynamics, partit, mesh)
     
 ! Now it the relative vorticity known on neighbors too
 end subroutine relative_vorticity
+!
+!
+!_______________________________________________________________________________
+subroutine compute_extflds(mode, dynamics, tracers, partit, mesh)
+    IMPLICIT NONE
+    integer,        intent(in)              :: mode
+    logical,        save                    :: firstcall=.true.
+    type(t_dyn)   , intent(in),     target  :: dynamics
+    type(t_tracer), intent(in)   ,  target  :: tracers
+    type(t_partit), intent(inout),  target  :: partit
+    type(t_mesh)  , intent(in)   ,  target  :: mesh
+    real(kind=WP),  dimension(:,:), pointer :: temp, salt
+    real(kind=WP)                           :: zn, zint, tup, tlo
+    integer                                 :: n, nz, nzmin, nzmax
+    real(kind=WP)                           :: whichtemp=  20.0_WP ! which isotherm to compute (set 20 per default)
+    real(kind=WP)                           :: whichdepth=300.0_WP ! for which tepth to average for tempzavg & saltzavg
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
+    if (firstcall) then  !allocate the stuff at the first call
+        allocate(zisotherm(myDim_nod2D+eDim_nod2D))
+        allocate(tempzavg(myDim_nod2D+eDim_nod2D), saltzavg(myDim_nod2D+eDim_nod2D))
+        zisotherm=0.0_WP
+        tempzavg =0.0_WP
+        saltzavg =0.0_WP
+        firstcall=.false.
+        if (mode==0) return
+    end if  
+    temp   => tracers%data(1)%values(:,:)
+    salt   => tracers%data(2)%values(:,:)    
+
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, zn, tup, tlo)
+    DO n=1, myDim_nod2D
+       saltzavg(n) =0.0_WP
+       nzmax=nlevels_nod2D(n)
+       nzmin=ulevels_nod2D(n)
+       zn  =0.0_WP
+       do nz=nzmin+1, nzmax-1
+          tup=temp(nz-1, n)
+          if (tup < whichtemp) exit
+          tlo=temp(nz,   n)                 
+          if ((tup-whichtemp)*(tlo-whichtemp)<0) then
+             zn=zn+0.5_WP*(hnode(nz-1, n)+(whichtemp-tup)*sum(hnode(nz-1:nz, n))/(tlo-tup))
+             exit
+          end if
+          zn=zn+hnode(nz-1, n) 
+       end do
+       zisotherm(n)=zn
+    END DO
+!$OMP END PARALLEL DO 
+
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, zint)
+    DO n=1, myDim_nod2D
+       tempzavg(n) =0.0_WP
+       saltzavg(n) =0.0_WP
+       nzmax=nlevels_nod2D(n)
+       nzmin=ulevels_nod2D(n)
+       zint=0.0_WP
+       do nz=nzmin, nzmax-1
+          zint=zint+hnode(nz, n) 
+          tempzavg(n)=tempzavg(n)+temp(nz,   n)*hnode(nz, n)
+          saltzavg(n)=saltzavg(n)+salt(nz,   n)*hnode(nz, n)
+          if (zint>=whichdepth) exit
+       end do
+       tempzavg(n)=tempzavg(n)/zint
+       saltzavg(n)=saltzavg(n)/zint
+    END DO
+!$OMP END PARALLEL DO 
+
+  call exchange_nod(zisotherm, partit)
+  call exchange_nod(tempzavg, partit)
+  call exchange_nod(saltzavg, partit)
+end subroutine compute_extflds
 
 
 
@@ -828,6 +908,8 @@ subroutine compute_diagnostics(mode, dynamics, tracers, partit, mesh)
   
   ! compute relative vorticity
   if (ldiag_vorticity)   call relative_vorticity(mode, dynamics, partit, mesh)
+  ! soe exchanged fields requested by IFS/FESOM in NextGEMS.
+  if (ldiag_extflds)     call compute_extflds(mode, dynamics, tracers, partit, mesh)
 
 end subroutine compute_diagnostics
 

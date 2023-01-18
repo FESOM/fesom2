@@ -110,12 +110,13 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     if ( .not. trim(which_ALE)=='linfs') then
         use_virt_salt=.false.
         ! this will force the virtual saltinity flux to be zero
-        ref_sss_local=.false.
-        ref_sss=0._WP
-        is_nonlinfs = 1.0_WP
+        !!PS --> anyway ref_sss or rsss is not used when using zstar 
+        !!PS ref_sss_local=.false.
+        !!PS ref_sss      = 0.0_WP
+        is_nonlinfs  = 1.0_WP
     else
         use_virt_salt=.true.
-        is_nonlinfs = 0.0_WP
+        is_nonlinfs  = 0.0_WP
     end if
    
     !___________________________________________________________________________
@@ -593,7 +594,8 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     neutral_slope=0.0_WP
     slope_tapered=0.0_WP
 
-    allocate(MLD1(node_size), MLD2(node_size), MLD1_ind(node_size), MLD2_ind(node_size))
+    allocate(MLD1(node_size), MLD2(node_size), MLD3(node_size))
+    allocate(MLD1_ind(node_size), MLD2_ind(node_size), MLD3_ind(node_size))
     if (use_global_tides) then
     allocate(ssh_gp(node_size))
     ssh_gp=0.
@@ -750,6 +752,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     DO i=3, tracers%num_tracers
         id=tracers%data(i)%ID
         SELECT CASE (id)
+        !_______________________________________________________________________
         CASE (101)       ! initialize tracer ID=101
             tracers%data(i)%values(:,:)=0.0_WP
             if (mype==0) then
@@ -757,6 +760,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
+            
+        !_______________________________________________________________________            
         CASE (301) !Fram Strait 3d restored passive tracer
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
@@ -784,7 +789,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-
+            
+        !_______________________________________________________________________
         CASE (302) !Bering Strait 3d restored passive tracer
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
@@ -812,7 +818,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-        
+            
+        !_______________________________________________________________________            
         CASE (303) !BSO 3d restored passive tracer
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
@@ -840,6 +847,17 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
+            
+        !_______________________________________________________________________
+        CASE (501) ! ice-shelf water due to basal melting
+            tracers%data(i)%values(:,:)=0.0_WP
+            if (mype==0) then
+                write (i_string,  "(I3)") i
+                write (id_string, "(I3)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
+            
+        !_______________________________________________________________________
         CASE DEFAULT
             if (mype==0) then
                 write (i_string,  "(I3)") i

@@ -57,7 +57,7 @@ module update_atm_forcing_interface
         type(t_tracer), intent(in),    target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in),    target :: mesh
-        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_dyn)   , intent(in),    target :: dynamics
         end subroutine
     end interface
 end module
@@ -442,10 +442,6 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #ifdef VERBOSE
   if (mod(istep,logfile_outfreq)==0 .and. mype==0) then
      write(*,*) 'update forcing data took', t2-t1
-#ifdef __oasis     
-     write(*,*) 'oasis part + exchange mesh:', time_recv(1)+time_send(1)
-     write(*,*) 'exchange mesh             :', time_recv(2)+time_send(2)
-#endif /* (__oasis) */     
   end if
 #endif
 

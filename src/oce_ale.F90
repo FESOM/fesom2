@@ -1215,6 +1215,32 @@ subroutine restart_thickness_ale(partit, mesh)
             dhe(elem)=sum(hbar(elnodes))/3.0_WP
             
         end do
+        
+    !___________________________________________________________________________
+    ! >->->->->->->->->->->->->->->       linfs      <-<-<-<-<-<-<-<-<-<-<-->->-
+    !___________________________________________________________________________
+    ! for the case you make a restart from zstar --> linfs, hnode that comes with
+    ! the restart needs to be overwritten with the standard layer thicknesses. 
+    ! Since zbar_3d_n and Z_3d_n are initialised with standard levels
+    else ! --> which_ale == 'linfs'
+        do n=1,myDim_nod2D+eDim_nod2D
+            nzmin = ulevels_nod2D(n)
+            nzmax = nlevels_nod2D(n)-1
+            do nz=nzmin,nzmax-1
+                hnode(nz,n)=(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))
+            end do      
+            hnode(nzmax,n)=bottom_node_thickness(n)
+        end do
+        
+        do elem=1,myDim_elem2D
+            nzmin = ulevels(elem)
+            nzmax = nlevels(elem)-1
+            helem(nzmin,elem)=(zbar_e_srf(elem)-zbar(nzmin+1))
+            do nz = nzmin+1, nzmax-1
+                helem(nz,elem)=(zbar(nz)-zbar(nz+1))
+            end do
+            helem(nzmax,elem)=bottom_elem_thickness(elem)
+        end do    
     endif
 
 end subroutine restart_thickness_ale
@@ -1646,7 +1672,7 @@ end subroutine update_stiff_mat_ale
 ! ssh_rhs=-alpha*\nabla\int(U_n+U_rhs)dz-(1-alpha)*...
 ! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
 subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
-    use g_config,only: which_ALE,dt
+    use g_config,only: which_ALE, dt, use_cavity_fw2press
     use MOD_MESH
     use o_ARRAYS, only: water_flux
     use o_PARAM
@@ -1702,7 +1728,6 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
         
         nzmin = ulevels(el(1))
         nzmax = nlevels(el(1))-1
-        !!PS do nz=1, nlevels(el(1))-1
         do nz=nzmin, nzmax
             c1=c1+alpha*((UV(2,nz,el(1))+UV_rhs(2,nz,el(1)))*deltaX1- &
                          (UV(1,nz,el(1))+UV_rhs(1,nz,el(1)))*deltaY1)*helem(nz,el(1))
@@ -1719,7 +1744,6 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
             deltaY2=edge_cross_dxdy(4,ed)
             nzmin = ulevels(el(2))
             nzmax = nlevels(el(2))-1
-            !!PS do nz=1, nlevels(el(2))-1
             do nz=nzmin, nzmax
                 c2=c2-alpha*((UV(2,nz,el(2))+UV_rhs(2,nz,el(2)))*deltaX2- &
                              (UV(1,nz,el(2))+UV_rhs(1,nz,el(2)))*deltaY2)*helem(nz,el(2))
@@ -1756,12 +1780,14 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     ! (eta_(n+1)-eta_n)/dt = ssh_rhs - alpha*water_flux*area + (1-alpha)*ssh_rhs_old
     !                      = ssh_rhs
     !                      
-    ! shown in eq (11) rhs of "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
+    ! shown in eq (12) rhs of "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
     if ( .not. trim(which_ALE)=='linfs') then
 !$OMP DO
         do n=1,myDim_nod2D
             nzmin = ulevels_nod2D(n)
-            if (ulevels_nod2D(n)>1) then
+            if (ulevels_nod2D(n)>1 .and. use_cavity_fw2press ) then
+                ! use_cavity_fw2press=.true.: adds freshwater under the cavity thereby 
+                ! increasing the local pressure
                 ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)
             else
                 ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)+(1.0_WP-alpha)*ssh_rhs_old(n)
@@ -1771,7 +1797,7 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     else
 !$OMP DO
         do n=1,myDim_nod2D
-            if (ulevels_nod2D(n)>1) cycle
+            if (ulevels_nod2D(n)>1) cycle ! --> in case of cavity 
             ssh_rhs(n)=ssh_rhs(n)+(1.0_WP-alpha)*ssh_rhs_old(n)
         end do
 !$OMP END DO
@@ -1913,6 +1939,7 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
 
 !$OMP PARALLEL DO
     do n=1,myDim_nod2D
+        if (ulevels_nod2D(n) > 1) cycle ! --> if cavity node hbar == hbar_old
         hbar(n)=hbar_old(n)+ssh_rhs_old(n)*dt/areasvol(ulevels_nod2D(n),n)
     end do
 !$OMP END PARALLEL DO
@@ -2173,7 +2200,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
             
             !_______________________________________________________________________
             ! compute new surface vertical velocity and layer thickness only when 
-            ! there is no cavity 
+            ! there is no cavity --> when there is cavity treat like linfs
             if (nzmin==1) then 
                 !___________________________________________________________________
                 ! total ssh change to distribute
@@ -2338,11 +2365,12 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
                     
                 end if ! --> if (dhbar_total<0 .and. hnode(1,n)+dhbar_total<=... ) then 
                 
+                !___________________________________________________________________
+                ! Add surface fresh water flux as upper boundary condition for continutity
+                !!PS Wvel(1,n) = Wvel(1,n)-water_flux(n)
+                Wvel(nzmin,n) = Wvel(nzmin,n)-water_flux(n)
+            
             end if ! --> if (nzmin==1) then 
-            !___________________________________________________________________
-            ! Add surface fresh water flux as upper boundary condition for continutity
-            !!PS Wvel(1,n) = Wvel(1,n)-water_flux(n)
-            Wvel(nzmin,n) = Wvel(nzmin,n)-water_flux(n)
             
         end do ! --> do n=1, myDim_nod2D
 !$OMP END DO
@@ -2361,7 +2389,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
             
             !_______________________________________________________________________
             ! compute new surface vertical velocity and layer thickness only when 
-            ! there is no cavity 
+            ! there is no cavity --> when there is cavity treat like linfs
             if (nzmin==1) then 
                 
                 !___________________________________________________________________
@@ -2401,14 +2429,13 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
                     
                     hnode_new(nz,n)=hnode(nz,n)+(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))*dd
                 end do
-            
-            endif ! --> if (nzmin==1) then 
-            
-            !___________________________________________________________________
-            ! Add surface fresh water flux as upper boundary condition for 
-            ! continutity
-            !!PS Wvel(1,n)=Wvel(1,n)-water_flux(n)
-            Wvel(nzmin,n)=Wvel(nzmin,n)-water_flux(n) 
+                
+                !___________________________________________________________________
+                ! Add surface fresh water flux as upper boundary condition for 
+                ! continutity
+                Wvel(nzmin,n)=Wvel(nzmin,n)-water_flux(n) 
+                
+            endif ! --> if (nzmin==1) then
             
         end do ! --> do n=1, myDim_nod2D
 !$OMP END PARALLEL DO
@@ -2610,6 +2637,7 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     if (.not. dynamics%solverinfo%use_parms) then
         if (lfirst) call ssh_solve_preconditioner(dynamics%solverinfo, partit, mesh)
         call ssh_solve_cg(dynamics%d_eta, dynamics%ssh_rhs, dynamics%solverinfo, partit, mesh)
+        call exchange_nod(dynamics%d_eta, partit) !is this required after calling psolve ?
         lfirst=.false.
         return
     end if

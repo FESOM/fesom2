@@ -250,7 +250,7 @@ subroutine read_mesh_cavity(mesh)
         cavity_depth => mesh%cavity_depth 
     else
         write(*,*) '____________________________________________________________________'
-        write(*,*) ' ERROR: could not find cavity file: cavity_depth.out'    
+        write(*,*) ' ERROR: could not find cavity file:', fname
         write(*,*) '        --> stop partitioning here !'
         write(*,*) '____________________________________________________________________'    
         stop 
@@ -790,7 +790,7 @@ subroutine find_levels(mesh)
     DO n = 1, auxi
         read(fileID,*) x
         if (x>0) x=-x
-        if (x>zbar(thers_zbar_lev)) x=zbar(thers_zbar_lev) !TODO KK threshholding for depth
+        if (x>zbar(thers_zbar_lev)) x=zbar(thers_zbar_lev) !TODO KK thresholding for depth
         depth(n)=x
     END DO
     close(fileID)
