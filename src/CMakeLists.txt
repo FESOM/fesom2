@@ -34,7 +34,7 @@ if(ALBEDO_INTELMPI_WORKAROUNDS)
    add_compile_options(-DENABLE_ALBEDO_INTELMPI_WORKAROUNDS)
 endif()
 
-option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
+option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 option(ENABLE_OPENACC "compile with OpenACC support" OFF)
 set(NV_GPU_ARCH "cc80" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
 
