@@ -114,6 +114,9 @@ module g_config
   ! *** configuration***
   logical                       :: use_sw_pene=.true.
   logical                       :: use_ice=.false.  
+!---wiso-code
+  logical                       :: lwiso = .false.  ! switch on/off water isotope diagnostics
+!---wiso-code-end
   logical                       :: use_floatice = .false.
   logical                       :: use_cavity = .false. ! switch on/off cavity usage
   logical                       :: use_cavity_partial_cell = .false. ! switch on/off cavity usage
@@ -125,7 +128,7 @@ module g_config
   logical                       :: flag_warn_cflz=.true. ! switches off cflz warning
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
-                        use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz
+                        use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso !---wiso-code: add lwiso
   
   !_____________________________________________________________________________
   ! *** others ***

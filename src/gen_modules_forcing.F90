@@ -39,8 +39,11 @@ real(kind=WP)  :: Swind     =0.0_WP  ! parameterization for coupled current feed
   logical                       :: use_landice_water=.false.
   integer                       :: landice_start_mon=1
   integer                       :: landice_end_mon=12
+  !---fwf-code-begin
+  character(MAX_PATH)           :: fwf_path='./mesh/'
+  !---fwf-code-end
 
-  namelist /land_ice/ use_landice_water, landice_start_mon, landice_end_mon
+  namelist /land_ice/ use_landice_water, landice_start_mon, landice_end_mon, fwf_path !---fwf-code, add fwf_path
 
 end module g_forcing_param
 ! ====================================================================
@@ -58,6 +61,10 @@ use o_param
   real(kind=WP), allocatable, dimension(:)         :: prec_rain, prec_snow
   real(kind=WP), allocatable, dimension(:)         :: runoff, evaporation, ice_sublimation
   real(kind=WP), allocatable, dimension(:)         :: cloudiness, press_air
+  !---wiso-code
+  real(kind=WP), allocatable, dimension(:)         :: www1,www2,www3,iii1,iii2,iii3
+  real(kind=WP), allocatable, dimension(:)         :: tmp_iii1,tmp_iii2,tmp_iii3
+  !---wiso-code-end
 
 #if defined (__oasis) || defined (__ifsinterface) /* todo: use a single shared definition */
   real(kind=WP), target, allocatable, dimension(:) :: sublimation, evap_no_ifrac

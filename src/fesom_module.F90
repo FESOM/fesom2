@@ -29,6 +29,11 @@ module fesom_main_storage_module
   use read_mesh_interface
   use fesom_version_info_module
   use command_line_options_module
+  !---fwf-code
+  use g_forcing_param, only: use_landice_water
+  use landice_water_init_interface
+  !---fwf-code-end
+
   ! Define icepack module
 #if defined (__icepack)
   use icedrv_main,          only: set_icepack, init_icepack, alloc_icepack
@@ -151,6 +156,15 @@ contains
         ! and additional arrays needed for 
         ! fancy advection etc.  
         !=====================
+#if defined (__oasis)
+        !---wiso-code
+        IF (lwiso) THEN
+          nsend = nsend + 6       ! add number of water isotope tracers to coupling parameter nsend, nrecv
+          nrecv = nrecv + 6
+        END IF
+        !---wiso-code-end
+#endif
+
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call check_mesh_consistency'//achar(27)//'[0m'
         call check_mesh_consistency(f%partit, f%mesh)
         if (f%mype==0) f%t2=MPI_Wtime()
@@ -191,6 +205,12 @@ contains
         
         if (f%mype==0) f%t5=MPI_Wtime()
         call compute_diagnostics(0, f%dynamics, f%tracers, f%partit, f%mesh) ! allocate arrays for diagnostic
+
+        !---fwf-code-begin
+        if(f%mype==0)  write(*,*) 'use_landice_water', use_landice_water
+        if(use_landice_water) call landice_water_init(f%partit, f%mesh)
+        !---fwf-code-end
+
 #if defined (__oasis)
         call cpl_oasis3mct_define_unstr(f%partit, f%mesh)
         if(f%mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv

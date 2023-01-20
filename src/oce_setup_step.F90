@@ -272,6 +272,7 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     USE MOD_TRACER
     USE DIAGNOSTICS, only: ldiag_DVD
     USE g_ic3d
+    use g_config, only : lwiso   ! add lwiso switch
     IMPLICIT NONE
     type(t_tracer), intent(inout), target               :: tracers
     type(t_partit), intent(inout), target               :: partit
@@ -322,6 +323,38 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
         EXIT
     end if
     end do
+
+    !---wiso-code
+    !=====================
+    ! set necessary water isotope variables
+    !=====================
+    IF (lwiso) THEN
+      ! always assume 3 water isotope tracers in the order H218O, HD16O, H216O
+      ! tracers simulated in the model
+      nml_tracer_list(num_tracers+1) = nml_tracer_list(1) ! use the same scheme as temperature
+      nml_tracer_list(num_tracers+2) = nml_tracer_list(1)
+      nml_tracer_list(num_tracers+3) = nml_tracer_list(1)
+
+      nml_tracer_list(num_tracers+1)%id = 101
+      nml_tracer_list(num_tracers+2)%id = 102
+      nml_tracer_list(num_tracers+3)%id = 103
+
+      index_wiso_tracers(1) = num_tracers+1
+      index_wiso_tracers(2) = num_tracers+2
+      index_wiso_tracers(3) = num_tracers+3
+
+      num_tracers = num_tracers + 3
+
+      ! tracers initialised from file
+      idlist((n_ic3d+1):(n_ic3d+3)) = (/101, 102, 103/)
+      filelist((n_ic3d+1):(n_ic3d+3)) = (/'wiso.nc', 'wiso.nc', 'wiso.nc'/)
+      varlist((n_ic3d+1):(n_ic3d+3))  = (/'h2o18', 'hDo16', 'h2o16'/)
+
+      n_ic3d = n_ic3d + 3
+
+      if (mype==0) write(*,*) '3 water isotope tracers will be used in FESOM'
+    END IF
+    !---wiso-code-end
 
     if (mype==0) write(*,*) 'total number of tracers is: ', num_tracers
 
@@ -509,7 +542,7 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     type(t_mesh),   intent(in),    target :: mesh
     !___________________________________________________________________________
     integer                               :: elem_size, node_size
-    integer                               :: n
+    integer                               :: n, nt
     !___________________________________________________________________________
     ! define dynamics namelist parameter
 #include "associate_part_def.h"
@@ -555,6 +588,7 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
 
     allocate(heat_flux_in(node_size))
     allocate(real_salt_flux(node_size)) !PS
+
     ! =================
     ! Arrays used to organize surface forcing
     ! =================
@@ -686,6 +720,26 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
 !!PS     dum_3d_n = 0.0_WP
 !!PS     dum_2d_e = 0.0_WP
 !!PS     dum_3d_e = 0.0_WP
+
+    !---wiso-code
+    if (lwiso) then
+      allocate(tr_arr_ice(node_size,3))  ! add sea ice tracers
+      allocate(wiso_flux_oce(node_size,3))
+      allocate(wiso_flux_ice(node_size,3))
+
+      ! initialize sea ice isotopes with 0. permill
+      ! absolute tracer values are increased by factor 1000. for numerical reasons
+      ! (see also routine oce_fluxes in ice_oce_coupling.F90)
+      do nt = 1,3
+         tr_arr_ice(:,nt)=wiso_smow(nt) * 1000.0_WP
+      end do
+
+      ! initialize atmospheric fluxes over open ocean and sea ice
+      wiso_flux_oce=0.0_WP
+      wiso_flux_ice=0.0_WP
+    end if
+    !---wiso-code-end
+
 END SUBROUTINE arrays_init
 !
 !
@@ -752,15 +806,31 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     DO i=3, tracers%num_tracers
         id=tracers%data(i)%ID
         SELECT CASE (id)
-        !_______________________________________________________________________
-        CASE (101)       ! initialize tracer ID=101
-            tracers%data(i)%values(:,:)=0.0_WP
-            if (mype==0) then
-                write (i_string,  "(I3)") i
-                write (id_string, "(I3)") id
-                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
-            end if
-            
+        !---wiso-code
+        ! FESOM tracers with code id 101, 102, 103 are used as water isotopes
+        CASE (101)       ! initialize tracer ID=101 H218O
+          if (mype==0) then
+             write (i_string,  "(I3)") i
+             write (id_string, "(I3)") id
+             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+             write (*,*) tracers%data(i)%values(1,1)
+          end if
+        CASE (102)       ! initialize tracer ID=102 HD16O
+          if (mype==0) then
+             write (i_string,  "(I3)") i
+             write (id_string, "(I3)") id
+             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+             write (*,*) tracers%data(i)%values(1,1)
+          end if
+        CASE (103)       ! initialize tracer ID=103 H216O
+          if (mype==0) then
+             write (i_string,  "(I3)") i
+             write (id_string, "(I3)") id
+             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+             write (*,*) tracers%data(i)%values(1,1)
+          end if
+        !---wiso-code-end
+
         !_______________________________________________________________________            
         CASE (301) !Fram Strait 3d restored passive tracer
             tracers%data(i)%values(:,:)=0.0_WP
