@@ -92,6 +92,9 @@ integer                        :: ptracers_restore_total=0
 real(kind=WP), dimension(3)    :: wiso_smow = (/2005.2e-6_WP, 155.76e-6_WP, 1.0_WP/)  ! water isotope SMOW values
 integer, dimension(3)          :: index_wiso_tracers = (/-1, -1, -1/)  ! water isotope index in all tracers
 !---wiso-code-end
+!---age-code-begin
+integer                        :: index_age_tracer = -1 ! water age tracer index in all tracers
+!---age-code-end
 
 ! Momentum
 !!PS logical                       :: free_slip=.false.

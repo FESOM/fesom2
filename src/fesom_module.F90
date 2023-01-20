@@ -29,10 +29,11 @@ module fesom_main_storage_module
   use read_mesh_interface
   use fesom_version_info_module
   use command_line_options_module
-  !---fwf-code
-  use g_forcing_param, only: use_landice_water
+  !---fwf-code, age-code
+  use g_forcing_param, only: use_landice_water, use_age_tracer
   use landice_water_init_interface
-  !---fwf-code-end
+  use age_tracer_init_interface
+  !---fwf-code-end, age-code-end
 
   ! Define icepack module
 #if defined (__icepack)
@@ -210,6 +211,11 @@ contains
         if(f%mype==0)  write(*,*) 'use_landice_water', use_landice_water
         if(use_landice_water) call landice_water_init(f%partit, f%mesh)
         !---fwf-code-end
+
+        !---age-code-begin
+        if(f%mype==0)  write(*,*) 'use_age_tracer', use_age_tracer
+        if(use_age_tracer) call age_tracer_init(f%partit, f%mesh)
+        !---age-code-end
 
 #if defined (__oasis)
         call cpl_oasis3mct_define_unstr(f%partit, f%mesh)

@@ -272,6 +272,7 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     USE MOD_TRACER
     USE DIAGNOSTICS, only: ldiag_DVD
     USE g_ic3d
+    use g_forcing_param, only: use_age_tracer !---age-code
     use g_config, only : lwiso   ! add lwiso switch
     IMPLICIT NONE
     type(t_tracer), intent(inout), target               :: tracers
@@ -355,6 +356,18 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
       if (mype==0) write(*,*) '3 water isotope tracers will be used in FESOM'
     END IF
     !---wiso-code-end
+
+    !---age-code-begin
+    if (use_age_tracer) then
+      ! add age tracer in the model
+      nml_tracer_list(num_tracers+1) = nml_tracer_list(1)
+      nml_tracer_list(num_tracers+1)%id = 100
+      index_age_tracer = num_tracers+1
+      num_tracers = num_tracers + 1
+
+      if (mype==0) write(*,*) '1 water age tracer will be used in FESOM'
+    endif
+    !---age-code-end
 
     if (mype==0) write(*,*) 'total number of tracers is: ', num_tracers
 
@@ -806,6 +819,16 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     DO i=3, tracers%num_tracers
         id=tracers%data(i)%ID
         SELECT CASE (id)
+        !---age-code-begin
+        ! FESOM tracers with code id 100 are used as water age
+        CASE (100)
+          if (mype==0) then
+             write (i_string,  "(I3)") i
+             write (id_string, "(I3)") id
+             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+             write (*,*) tracers%data(i)%values(1,1)
+          end if
+        !---age-code-end
         !---wiso-code
         ! FESOM tracers with code id 101, 102, 103 are used as water isotopes
         CASE (101)       ! initialize tracer ID=101 H218O

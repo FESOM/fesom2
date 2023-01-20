@@ -251,7 +251,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     use g_CONFIG
     use o_ARRAYS
     use g_comm_auto
-    use g_forcing_param, only: use_virt_salt, use_landice_water !---fwf-code, add use_landice_water
+    use g_forcing_param, only: use_virt_salt, use_landice_water, use_age_tracer, use_age_mask, age_start_year !---fwf-code, age-code
     use g_forcing_arrays
     use g_support
     use cavity_interfaces
@@ -749,6 +749,22 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
       end do
     end if
     !---fwf-code-end
+
+    !---age-code-begin
+    if (use_age_tracer) then
+       tracers%data(index_age_tracer)%values(:,:) = tracers%data(index_age_tracer)%values(:,:) + dt/(86400.0*(365+fleapyear))
+
+       if (use_age_mask) then
+          tracers%data(index_age_tracer)%values(1,:) = tracers%data(index_age_tracer)%values(1,:) * (1-age_tracer_loc_index(:))
+       else
+          tracers%data(index_age_tracer)%values(1,:) = 0.0
+       end if
+
+       where (tracers%data(index_age_tracer)%values(:,:) .gt. yearnew-age_start_year+1)
+          tracers%data(index_age_tracer)%values(:,:) = yearnew-age_start_year+1
+       end where
+    end if
+    !---age-code-end
 
     !___________________________________________________________________________
     if (use_sw_pene) call cal_shortwave_rad(ice, partit, mesh)

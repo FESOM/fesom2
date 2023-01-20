@@ -153,6 +153,12 @@ subroutine forcing_array_setup(partit, mesh)
     allocate(runoff_landice(n2))
     runoff_landice=0.0_WP
   end if
+  !---age-code-begin
+  if(use_age_tracer) then
+    allocate(age_tracer_loc_index(n2))
+    age_tracer_loc_index=0
+  end if
+  !---age-code-end
  
   ! shortwave penetration
   if(use_sw_pene) then

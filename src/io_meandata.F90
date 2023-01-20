@@ -119,7 +119,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     use g_cvmix_tidal
     use diagnostics
     use g_config,        only: use_cavity
-    use g_forcing_param, only: use_virt_salt, use_landice_water !---fwf-code
+    use g_forcing_param, only: use_virt_salt, use_landice_water, use_age_tracer !---fwf-code, age-code
     use g_config, only : lwiso !---wiso-code
     implicit none
     integer                   :: i, j
@@ -333,6 +333,14 @@ CASE ('landice   ')
     call def_stream(nod2D,  myDim_nod2D,  'landice',      'freshwater flux',    'm/s',    runoff_landice,    io_list(i)%freq,    io_list(i)%unit, io_list(i)%precision, partit, mesh)
     endif
 !---fwf-code-end
+
+!---age-code-begin
+CASE ('age       ')
+    if (use_age_tracer) then
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'age',      'water age tracer',    'year',    tracers%data(index_age_tracer)%values(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+!---age-code-end
+
 !_______________________________________________________________________________
 ! output surface forcing
 CASE ('fh        ')

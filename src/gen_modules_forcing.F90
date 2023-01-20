@@ -45,6 +45,15 @@ real(kind=WP)  :: Swind     =0.0_WP  ! parameterization for coupled current feed
 
   namelist /land_ice/ use_landice_water, landice_start_mon, landice_end_mon, fwf_path !---fwf-code, add fwf_path
 
+  !---age-code-begin
+  logical                       :: use_age_tracer=.false.
+  logical                       :: use_age_mask=.false.
+  character(MAX_PATH)           :: age_tracer_path='./mesh/'
+  integer                       :: age_start_year=2000
+
+  namelist /age_tracer/ use_age_tracer, use_age_mask, age_tracer_path, age_start_year
+  !---age-code-end
+
 end module g_forcing_param
 ! ====================================================================
 module g_forcing_arrays
@@ -65,6 +74,9 @@ use o_param
   real(kind=WP), allocatable, dimension(:)         :: www1,www2,www3,iii1,iii2,iii3
   real(kind=WP), allocatable, dimension(:)         :: tmp_iii1,tmp_iii2,tmp_iii3
   !---wiso-code-end
+  !---age-code-begin
+  integer, allocatable, dimension(:)               :: age_tracer_loc_index
+  !---age-code-end
 
 #if defined (__oasis) || defined (__ifsinterface) /* todo: use a single shared definition */
   real(kind=WP), target, allocatable, dimension(:) :: sublimation, evap_no_ifrac
