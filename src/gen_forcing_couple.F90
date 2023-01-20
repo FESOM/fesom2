@@ -131,13 +131,13 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   ! pointer on necessary derived types
   real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, u_w, v_w
   real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
+  real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
 #if defined (__oasis) || defined (__ifsinterface)
   real(kind=WP), dimension(:), pointer  ::  oce_heat_flux, ice_heat_flux 
   real(kind=WP), dimension(:), pointer  ::  tmp_oce_heat_flux, tmp_ice_heat_flux 
 #endif 
 #if defined (__oifs) || defined (__ifsinterface)
   real(kind=WP), dimension(:), pointer  :: ice_temp, ice_alb, enthalpyoffuse
-  real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
   real(kind=WP),               pointer  :: tmelt
   real(kind=WP), dimension(:,:,:), pointer :: UVnode
 #endif
@@ -152,10 +152,10 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   v_w              => ice%srfoce_v(:)
   stress_atmice_x  => ice%stress_atmice_x(:)
   stress_atmice_y  => ice%stress_atmice_y(:)
-#if defined (__oifs) || defined (__ifsinterface)
   a_ice            => ice%data(1)%values(:)
   m_ice            => ice%data(2)%values(:)
   m_snow           => ice%data(3)%values(:)
+#if defined (__oifs) || defined (__ifsinterface)
   ice_temp         => ice%data(4)%values(:)
   ice_alb          => ice%atmcoupl%ice_alb(:)
   enthalpyoffuse   => ice%atmcoupl%enthalpyoffuse(:)
