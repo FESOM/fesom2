@@ -16,9 +16,9 @@ module diagnostics
   implicit none
 
   private
-  public :: ldiag_solver, lcurt_stress_surf, ldiag_Ri, ldiag_dMOC, ldiag_DVD,                        &
+  public :: ldiag_solver, lcurt_stress_surf, ldiag_Ri, ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD,        &
             ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, ldiag_vorticity, ldiag_extflds,    &
-            compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, shear, Ri,                   & 
+            compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, shear, Ri, KvdTdZ, KvdSdZ,   & 
             std_dens_min, std_dens_max, std_dens_N, std_dens,                                        &
             std_dens_UVDZ, std_dens_DIV, std_dens_Z, std_dens_H, std_dens_dVdT, std_dens_flux,       &
             dens_flux_e, vorticity, zisotherm, compute_diag_dvd_2ndmoment_klingbeil_etal_2014,       &
@@ -30,7 +30,7 @@ module diagnostics
   real(kind=WP),  save, allocatable, target      :: curl_stress_surf(:)
   real(kind=WP),  save, allocatable, target      :: curl_vel3(:,:)
 
-  real(kind=WP),  save, allocatable, target      :: shear(:,:), Ri(:,:)
+  real(kind=WP),  save, allocatable, target      :: shear(:,:), Ri(:,:), KvdTdZ(:,:), KvdSdZ(:,:)
   real(kind=WP),  save, allocatable, target      :: stress_bott(:,:), u_bott(:), v_bott(:), u_surf(:), v_surf(:)
   real(kind=WP),  save, allocatable, target      :: vorticity(:,:)
   real(kind=WP),  save, allocatable, target      :: zisotherm(:)             !target temperature is specified as whichtemp in compute_extflds
@@ -59,6 +59,7 @@ module diagnostics
   logical                                       :: lcurt_stress_surf=.false.
   logical                                       :: ldiag_curl_vel3  =.false.
   logical                                       :: ldiag_Ri         =.false.
+  logical                                       :: ldiag_TurbFlux   =.false.
   logical                                       :: ldiag_salt3D     =.false.
   ! this option activates writing the horizintal velocity transports within the density bins (U_rho_x_DZ and V_rho_x_DZ)
   ! an additional field (RHO_Z) will be computed which allows for diagnosing the numerical diapycnal mixing after A. Megann 2018
@@ -73,7 +74,7 @@ module diagnostics
   logical                                       :: ldiag_vorticity  =.false.
   logical                                       :: ldiag_extflds    =.false.
   
-  namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_Ri, ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, ldiag_vorticity, ldiag_extflds
+  namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_Ri, ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, ldiag_vorticity, ldiag_extflds
   
   contains
 
@@ -236,6 +237,49 @@ subroutine diag_curl_vel3(mode, dynamics, partit, mesh)
         END DO
     END DO
 end subroutine diag_curl_vel3
+! ==============================================================
+! 
+subroutine diag_turbflux(mode, dynamics, tracers, partit, mesh)
+  implicit none
+  type(t_dyn)   , intent(inout), target :: dynamics
+  type(t_tracer), intent(in)   , target :: tracers
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh)  , intent(in)   , target :: mesh
+  integer,        intent(in)            :: mode
+  logical,        save                     :: firstcall=.true.
+  integer                                  :: n, nz, nzmax, nzmin
+  real(kind=WP), dimension(:,:,:), pointer :: UVnode
+  real(kind=WP), dimension(:,:),   pointer :: temp, salt
+  real(kind=WP)                            :: val, dz_inv
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+UVnode=>dynamics%uvnode(:,:,:)
+temp   => tracers%data(1)%values(:,:)
+salt   => tracers%data(2)%values(:,:)
+!=====================
+  if (firstcall) then  !allocate the stuff at the first call
+     allocate(KvdTdZ(nl, myDim_nod2D+eDim_nod2D), KvdSdZ(nl, myDim_nod2D+eDim_nod2D))
+     KvdTdZ =0.0_WP
+     KvdSdZ =0.0_WP
+     firstcall=.false.
+     if (mode==0) return
+  end if  
+
+  do n=1, myDim_nod2D+eDim_nod2D
+     nzmin = ulevels_nod2d(n)
+     nzmax = nlevels_nod2d(n)
+     do nz=nzmin+1,nzmax-1
+        dz_inv=1.0_WP/(Z_3d_n(nz-1,n)-Z_3d_n(nz,n))
+        val = Kv(nz,n)*(temp(nz-1,n)-temp(nz,n))*dz_inv
+        KvdTdZ(nz,n) = val*dz_inv
+        val = Kv(nz,n)*(salt(nz-1,n)-salt(nz,n))*dz_inv
+        KvdSdZ(nz,n) = val*dz_inv
+     end do
+  end do
+end subroutine diag_turbflux
 ! ==============================================================
 ! 
 subroutine diag_Ri(mode, dynamics, partit, mesh)
@@ -758,6 +802,8 @@ subroutine compute_diagnostics(mode, dynamics, tracers, partit, mesh)
   end if
   !6. MOC in density coordinate
   if (ldiag_dMOC)        call diag_densMOC(mode, dynamics, tracers, partit, mesh)
+  !7. compute turbulent fluxes
+  if (ldiag_turbflux)    call diag_turbflux(mode, dynamics, tracers, partit, mesh)
   ! compute relative vorticity
   if (ldiag_vorticity)   call relative_vorticity(mode, dynamics, partit, mesh)
   ! soe exchanged fields requested by IFS/FESOM in NextGEMS.

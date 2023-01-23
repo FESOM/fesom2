@@ -617,12 +617,17 @@ END DO ! --> DO i=1, io_listsize
 
 
     !___________________________________________________________________________
-    ! Richardson number diagnostic
+    ! Richardson number diagnostics
     if (ldiag_Ri) then
         call def_stream((/nl,  nod2D/), (/nl, myDim_nod2D/), 'shear',   'du2/dz2',           '1/s2',     shear(:,:), 1, 'm', i_real8, partit, mesh)
         call def_stream((/nl,  nod2D/), (/nl, myDim_nod2D/), 'Ri',      'Richardson number', 'no dim.',  Ri(:,:),    1, 'm', i_real8, partit, mesh)
     end if
-
+    !___________________________________________________________________________
+    ! Turbulent flux diagnostics
+    if (ldiag_turbflux) then
+        call def_stream((/nl,  nod2D/), (/nl, myDim_nod2D/), 'KvdTdz',   'KvdTdz',           'K m/s',     KvdTdz(:,:), 1, 'm', i_real8, partit, mesh)
+        call def_stream((/nl,  nod2D/), (/nl, myDim_nod2D/), 'KvdSdz',   'KvdSdz',           'PSU m/s',   KvdSdz(:,:), 1, 'm', i_real8, partit, mesh)
+    end if
     !___________________________________________________________________________
     ! output Redi parameterisation
     if (Redi) then
