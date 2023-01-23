@@ -22,8 +22,8 @@ module diagnostics
             u_x_u, u_x_v, v_x_v, v_x_w, u_x_w, dudx, dudy, dvdx, dvdy, dudz, dvdz,                 & 
             utau_surf, utau_bott, av_dudz_sq, av_dudz, av_dvdz, stress_bott, u_surf,               &
             v_surf, u_bott, v_bott, std_dens_min, std_dens_max, std_dens_N, std_dens,              &
-            std_dens_UVDZ, std_dens_DIV, std_dens_Z, std_dens_dVdT, std_dens_flux,                 &
-            dens_flux_e, vorticity, zisotherm, compute_diag_dvd_2ndmoment_klingbeil_etal_2014,  &
+            std_dens_UVDZ, std_dens_DIV, std_dens_Z, std_dens_H, std_dens_dVdT, std_dens_flux,     &
+            dens_flux_e, vorticity, zisotherm, compute_diag_dvd_2ndmoment_klingbeil_etal_2014,     &
             compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
@@ -56,7 +56,7 @@ module diagnostics
                                                             37.11979, 37.13630, 37.15257, 37.16861, 37.18441, 37.50000, 37.75000, 40.00000/)
   real(kind=WP),  save, target                   :: std_dd(std_dens_N-1)
   real(kind=WP),  save, target                   :: std_dens_min=1030., std_dens_max=1040.
-  real(kind=WP),  save, allocatable, target      :: std_dens_UVDZ(:,:,:), std_dens_flux(:,:,:), std_dens_dVdT(:,:), std_dens_DIV(:,:), std_dens_Z(:,:)
+  real(kind=WP),  save, allocatable, target      :: std_dens_UVDZ(:,:,:), std_dens_flux(:,:,:), std_dens_dVdT(:,:), std_dens_DIV(:,:), std_dens_Z(:,:), std_dens_H(:,:)
   real(kind=WP),  save, allocatable, target      :: dens_flux_e(:)
 
   logical                                       :: ldiag_solver     =.false.
@@ -459,6 +459,7 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
      allocate(std_dens_VOL2(  std_dens_N, myDim_elem2D))
      allocate(std_dens_flux(3,std_dens_N, myDim_elem2D))
      allocate(std_dens_Z   (  std_dens_N, myDim_elem2D))
+     allocate(std_dens_H   (  std_dens_N, myDim_elem2D))
      allocate(dens_flux_e(elem2D))
      allocate(aux  (nl-1))
      allocate(dens (nl))
@@ -480,6 +481,7 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
      std_dens_VOL2=0.
      std_dens_flux=0. !bouyancy flux for computation of surface bouyancy transformations
      std_dens_Z   =0. !will be the vertical position of the density class (for convertion between dAMOC <-> zMOC)
+     std_dens_H   =0. !will be the vertical layerthickness of the density class (for convertion between dAMOC <-> zMOC)
      depth        =0.
      el_depth     =0.
      firstcall_s=.false.
@@ -493,6 +495,7 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
   std_dens_VOL2=0.
   std_dens_DIV =0.
   std_dens_Z   =0.
+  std_dens_H   =0.
   ! proceed with fields at elements...
   do elem=1, myDim_elem2D
      elnodes=elem2D_nodes(:,elem)     
@@ -570,22 +573,22 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
            std_dens_VOL2(   is, elem)=std_dens_VOL2(   is, elem)+weight*vol_el
            locz=el_depth(nz+1)+weight*helem(nz,elem)
            std_dens_Z   (   is, elem)=std_dens_Z   (   is, elem)+locz*weight
-           std_dens_w(      is, elem)   =std_dens_w(   is, elem)+weight
+           std_dens_w(      is, elem)=std_dens_w   (   is, elem)+weight
            do snz=is+1, ie-1
               weight=(sum(std_dd(snz-1:snz))/2.)/ddiff
               std_dens_UVDZ(:, snz, elem)=std_dens_UVDZ(:, snz, elem)+weight*uvdz_el
               std_dens_VOL2(   snz, elem)=std_dens_VOL2(   snz, elem)+weight*vol_el
               locz=locz+weight*helem(nz,elem)
-              std_dens_Z   (   snz, elem) =std_dens_Z    (  snz, elem)+locz*weight
-              std_dens_w   (   snz, elem) =std_dens_w    (  snz, elem)+weight
+              std_dens_Z   (   snz, elem)=std_dens_Z   (   snz, elem)+locz*weight
+              std_dens_w   (   snz, elem)=std_dens_w   (   snz, elem)+weight
            end do
            weight=(dmax-std_dens(ie))+std_dd(ie-1)/2.
            weight=max(weight, 0.)/ddiff
            std_dens_UVDZ(:, ie, elem)=std_dens_UVDZ(:, ie, elem)+weight*uvdz_el
            std_dens_VOL2(   ie, elem)=std_dens_VOL2(   ie, elem)+weight*vol_el
            locz=locz+weight*helem(nz,elem)
-           std_dens_Z   (   ie, elem) =std_dens_Z   (  ie, elem)+locz*weight
-           std_dens_w   (   ie, elem) =std_dens_w   (  ie, elem)+weight
+           std_dens_Z   (   ie, elem)=std_dens_Z   (   ie, elem)+locz*weight
+           std_dens_w   (   ie, elem)=std_dens_w   (   ie, elem)+weight
         else
            std_dens_UVDZ(:, is, elem)=std_dens_UVDZ(:, is, elem)+uvdz_el
            std_dens_VOL2(   is, elem)=std_dens_VOL2(   is, elem)+vol_el
@@ -672,15 +675,27 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
       end do
     end do
   end do
-
+  
+  !_____________________________________________________________________________
   where (std_dens_w > 0.)
-        std_dens_Z   =std_dens_Z   /std_dens_w
+        std_dens_Z   =std_dens_Z / std_dens_w
   end where
-
+  
+  !_____________________________________________________________________________
+  ! compute density class volume change over time 
   if (.not. firstcall_e) then
      std_dens_dVdT=(std_dens_VOL2-std_dens_VOL1)/dt
   end if
   std_dens_VOL1=std_dens_VOL2
+  
+  !_____________________________________________________________________________
+  ! compute mean thickness of density class, try to extract better vertical position
+  ! when do projection into zcoord. 
+  std_dens_H = std_dens_VOL2
+  do jj = 1, std_dens_N
+        std_dens_H(jj,1:myDim_elem2D) = std_dens_H(jj,1:myDim_elem2D)/elem_area(1:myDim_elem2D)
+  end do
+  
   firstcall_e=.false.
 end subroutine diag_densMOC
 !
