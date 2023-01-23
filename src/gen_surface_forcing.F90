@@ -54,25 +54,29 @@ MODULE g_sbf
    public  sbc_end  ! routine called after last time step
    public  julday   ! get julian day from date
    public  atmdata
-   public  i_totfl, i_xwind, i_ywind, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow
-   public  l_xwind, l_ywind, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
+   public  i_totfl, i_xwind, i_ywind, i_xstre, i_ystre, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow
+   public  l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
    private
 
-   integer :: i_totfl = 10! total number of fluxes
-   integer :: i_xwind = 1 ! index of 10m wind velocity (x-component) [m/s]
-   integer :: i_ywind = 2 ! index of 10m wind velocity (y-component) [m/s]
-   integer :: i_humi  = 3 ! index of specific humidity               [kg/kg]
-   integer :: i_qsr   = 4 ! index of solar heat                      [W/m2]
-   integer :: i_qlw   = 5 ! index of Long wave                       [W/m2]
-   integer :: i_tair  = 6 ! index of 2m air temperature              [degK]
-   integer :: i_prec  = 7 ! index of total precipitation (rain+snow) [Kg/m^2/s]
-   integer :: i_mslp  = 8 ! index of mean sea level pressure         [Pascals]
-   integer :: i_cloud = 9 ! index of mean sea level pressure         [0-1]
-   integer :: i_snow  = 10! index of mean sea level pressure         [Kg/m^2/s]
+   integer :: i_totfl = 12 ! total number of fluxes
+   integer :: i_xwind = 1  ! index of 10m wind velocity (x-component) [m/s]
+   integer :: i_ywind = 2  ! index of 10m wind velocity (y-component) [m/s]
+   integer :: i_xstre = 3  ! index of surface wind stress (x-component) [N/m2]
+   integer :: i_ystre = 4  ! index of surface wind stress (y-component) [N/m2]
+   integer :: i_humi  = 5  ! index of specific humidity               [kg/kg]
+   integer :: i_qsr   = 6  ! index of solar heat                      [W/m2]
+   integer :: i_qlw   = 7  ! index of Long wave                       [W/m2]
+   integer :: i_tair  = 8  ! index of 2m air temperature              [degK]
+   integer :: i_prec  = 9  ! index of total precipitation (rain+snow) [Kg/m^2/s]
+   integer :: i_mslp  = 10 ! index of mean sea level pressure         [Pascals]
+   integer :: i_cloud = 11 ! index of mean sea level pressure         [0-1]
+   integer :: i_snow  = 12 ! index of mean sea level pressure         [Kg/m^2/s]
 
    logical :: l_totfl = .false. 
    logical :: l_xwind = .false. 
    logical :: l_ywind = .false. 
+   logical :: l_xstre = .false.
+   logical :: l_ystre = .false.
    logical :: l_humi  = .false.
    logical :: l_qsr   = .false.
    logical :: l_qlw   = .false.
@@ -118,9 +122,10 @@ MODULE g_sbf
    integer, save  :: nm_sbc_unit     = 103       ! unit to open namelist file, skip 100-102 for cray fortran
    logical        :: ic_cyclic=.true.
   !============== namelistatmdata variables ================
-   integer, save  :: nm_sbc       = 1        ! data  1= constant, 2=from file
-   character(len=256), save   :: nm_xwind_file = 'xwind.dat' ! name of file with winds/stress, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
-   character(len=256), save   :: nm_ywind_file = 'ywind.dat' ! name of file with winds/stress, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
+   character(len=256), save   :: nm_xwind_file = 'xwind.dat' ! name of file with winds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
+   character(len=256), save   :: nm_ywind_file = 'ywind.dat' ! name of file with winds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
+   character(len=256), save   :: nm_xstre_file = 'xstre.dat' ! name of file with stress, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
+   character(len=256), save   :: nm_ystre_file = 'ystre.dat' ! name of file with stress, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
    character(len=256), save   :: nm_humi_file  = 'humidity.dat' ! name of file with humidity,  if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
    character(len=256), save   :: nm_qsr_file   = 'qsr.dat'   ! name of file with solar heat,   if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
    character(len=256), save   :: nm_qlw_file   = 'qlw.dat'   ! name of file with Long wave,    if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
@@ -132,6 +137,8 @@ MODULE g_sbf
 
    character(len=34), save   :: nm_xwind_var = 'uwnd' ! name of variable in file with wind
    character(len=34), save   :: nm_ywind_var = 'vwnd' ! name of variable in file with wind
+   character(len=34), save   :: nm_xstre_var = 'xstr' ! name of variable in file with wind stress
+   character(len=34), save   :: nm_ystre_var = 'ystr' ! name of variable in file with wind stress
    character(len=34), save   :: nm_humi_var  = 'shum' ! name of variable in file with humidity
    character(len=34), save   :: nm_qsr_var   = 'dswrf'! name of variable in file with solar heat
    character(len=34), save   :: nm_qlw_var   = 'dlwrf'! name of variable in file with Long wave
@@ -484,6 +491,8 @@ CONTAINS
       !prepare proper nc file (add year and .nc to the end of the file name from namelist
       if (l_xwind) write(sbc_flfi(i_xwind)%file_name, *) trim(nm_xwind_file),trim(yyear),'.nc'
       if (l_ywind) write(sbc_flfi(i_ywind)%file_name, *) trim(nm_ywind_file),trim(yyear),'.nc'
+      if (l_xstre) write(sbc_flfi(i_xstre)%file_name, *) trim(nm_xstre_file),trim(yyear),'.nc'
+      if (l_ystre) write(sbc_flfi(i_ystre)%file_name, *) trim(nm_ystre_file),trim(yyear),'.nc'
       if (l_humi)  write(sbc_flfi(i_humi)%file_name,  *) trim(nm_humi_file), trim(yyear),'.nc'
       if (l_qsr)   write(sbc_flfi(i_qsr)%file_name,   *) trim(nm_qsr_file),  trim(yyear),'.nc'
       if (l_qlw)   write(sbc_flfi(i_qlw)%file_name,   *) trim(nm_qlw_file),  trim(yyear),'.nc'
@@ -495,6 +504,8 @@ CONTAINS
 
       if (l_xwind) sbc_flfi(i_xwind)%file_name=ADJUSTL(trim(sbc_flfi(i_xwind)%file_name))
       if (l_ywind) sbc_flfi(i_ywind)%file_name=ADJUSTL(trim(sbc_flfi(i_ywind)%file_name))
+      if (l_xstre) sbc_flfi(i_xstre)%file_name=ADJUSTL(trim(sbc_flfi(i_xstre)%file_name))
+      if (l_ystre) sbc_flfi(i_ystre)%file_name=ADJUSTL(trim(sbc_flfi(i_ystre)%file_name))
       if (l_humi)  sbc_flfi(i_humi)%file_name=ADJUSTL(trim(sbc_flfi(i_humi)%file_name))
       if (l_qsr)   sbc_flfi(i_qsr)%file_name=ADJUSTL(trim(sbc_flfi(i_qsr)%file_name))
       if (l_qlw)   sbc_flfi(i_qlw)%file_name=ADJUSTL(trim(sbc_flfi(i_qlw)%file_name))
@@ -506,6 +517,8 @@ CONTAINS
 
       if (l_xwind) sbc_flfi(i_xwind)%var_name=ADJUSTL(trim(nm_xwind_var))
       if (l_ywind) sbc_flfi(i_ywind)%var_name=ADJUSTL(trim(nm_ywind_var))
+      if (l_xstre) sbc_flfi(i_xstre)%var_name=ADJUSTL(trim(nm_xstre_var))
+      if (l_ystre) sbc_flfi(i_ystre)%var_name=ADJUSTL(trim(nm_ystre_var))
       if (l_humi)  sbc_flfi(i_humi)%var_name=ADJUSTL(trim(nm_humi_var))
       if (l_qsr)   sbc_flfi(i_qsr)%var_name=ADJUSTL(trim(nm_qsr_var))
       if (l_qlw)   sbc_flfi(i_qlw)%var_name=ADJUSTL(trim(nm_qlw_var))
@@ -906,12 +919,12 @@ CONTAINS
       type(t_mesh),   intent(in)   , target :: mesh
       type(t_partit), intent(inout), target :: partit
 
-      namelist /nam_sbc/ nm_xwind_file, nm_ywind_file, nm_humi_file, nm_qsr_file, &
+      namelist /nam_sbc/ nm_xwind_file, nm_ywind_file, nm_xstre_file, nm_ystre_file, nm_humi_file, nm_qsr_file, &
                         nm_qlw_file, nm_tair_file, nm_prec_file, nm_snow_file, &
-                        nm_mslp_file, nm_xwind_var, nm_ywind_var, nm_humi_var, &
+                        nm_mslp_file, nm_xwind_var, nm_ywind_var, nm_xstre_var, nm_ystre_var, nm_humi_var, &
                         nm_qsr_var, nm_qlw_var, nm_tair_var, nm_prec_var, nm_snow_var, &
                         nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, y_perpetual, &
-                        l_xwind, l_ywind, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
+                        l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
                         nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source, &
                         chl_data_source, nm_chl_data_file, chl_const
 
@@ -961,6 +974,24 @@ CONTAINS
          end if
          i_totfl=i_totfl+1
          i_ywind=i_totfl
+      end if
+
+      if (l_xstre) then
+         if (mype==0) then
+            write(*,*) "      nm_xstre_file = ", trim(nm_xstre_file) ," ! name of file with X stress"
+            write(*,*) "      nm_xstre_var  = ", trim(nm_xstre_var)  ," ! name of variable in file with wind stress "
+         end if
+         i_totfl=i_totfl+1
+         i_xstre=i_totfl
+      end if
+
+      if (l_ystre) then
+         if (mype==0) then
+            write(*,*) "      nm_ystre_file = ", trim(nm_ystre_file) ," ! name of file with Y stress"
+            write(*,*) "      nm_ystre_var  = ", trim(nm_ystre_var)  ," ! name of variable in file with wind stress "
+         end if
+         i_totfl=i_totfl+1
+         i_ystre=i_totfl
       end if
 
       if (l_humi) then
@@ -1053,7 +1084,7 @@ CONTAINS
       if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
          ! runoff in CORE is constant in time
          ! Warning: For a global mesh, conservative scheme is to be updated!!
-         call read_other_NetCDF(nm_runoff_file, 'Foxx_o_roff', 1, runoff, .false., partit, mesh) 
+         call read_other_NetCDF(nm_runoff_file, 'Foxx_o_roff', 1, runoff, .false., .true., partit, mesh) 
          runoff=runoff/1000.0_WP  ! Kg/s/m2 --> m/s
       end if
 
@@ -1084,7 +1115,7 @@ CONTAINS
 
       real(wp)     :: rdate ! date
       integer      :: fld_idx, i
-      logical      :: do_rotation, force_newcoeff, update_monthly_flag
+      logical      :: do_rotation_wind, do_rotation_stre, force_newcoeff, update_monthly_flag
       integer      :: yyyy, dd, mm
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
       real(wp),  pointer   :: nc_time(:)
@@ -1113,7 +1144,8 @@ CONTAINS
 
       rdate = real(julday(yearnew,1,1),WP)
       rdate = rdate+real(daynew-1,WP)+timenew/86400._WP-dt/86400._WP/2._WP
-      do_rotation=.false.
+      do_rotation_wind=.false.
+      do_rotation_stre=.false.
 
       do fld_idx = 1, i_totfl
          nc_time  =>sbc_flfi(fld_idx)%nc_time
@@ -1123,15 +1155,25 @@ CONTAINS
          if ( ((rdate > nc_time(t_indx_p1)) .and. (nc_time(t_indx) < nc_time(nc_Ntime))) .or. force_newcoeff) then
             ! get new coefficients for time interpolation on model grid for all data
             call getcoeffld(fld_idx, rdate, partit, mesh)
-            if (fld_idx==i_xwind) do_rotation=.true.
+            if ((l_xwind .and. (fld_idx==i_xwind)) .and. rotated_grid) do_rotation_wind=.true.
+            if ((l_xstre .and. (fld_idx==i_xstre)) .and. rotated_grid) do_rotation_stre=.true.
          endif
       end do
 
-      if (do_rotation) then
+      if (do_rotation_wind) then
 !$OMP PARALLEL DO
          do i=1, myDim_nod2D+eDim_nod2D
             call vector_g2r(coef_a(i_xwind,i), coef_a(i_ywind,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
             call vector_g2r(coef_b(i_xwind,i), coef_b(i_ywind,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
+         end do
+!$OMP END PARALLEL DO
+      end if
+
+      if (do_rotation_stre) then
+!$OMP PARALLEL DO
+         do i=1, myDim_nod2D+eDim_nod2D
+            call vector_g2r(coef_a(i_xstre,i), coef_a(i_ystre,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
+            call vector_g2r(coef_b(i_xstre,i), coef_b(i_ystre,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
          end do
 !$OMP END PARALLEL DO
       end if
@@ -1149,7 +1191,7 @@ CONTAINS
                if (mstep > 1) i=i+1 
                if (i > 12) i=1
                if (mype==0) write(*,*) 'Updating SSS restoring data for month ', i 
-               call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true., partit, mesh) 
+               call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true., .true., partit, mesh) 
             end if
          end if
       end if
@@ -1162,7 +1204,7 @@ CONTAINS
                if (mstep > 1) i=i+1 
                if (i > 12) i=1
                if (mype==0) write(*,*) 'Updating chlorophyll climatology for month ', i 
-               call read_other_NetCDF(nm_chl_data_file, 'chl', i, chl, .true., partit, mesh) 
+               call read_other_NetCDF(nm_chl_data_file, 'chl', i, chl, .true., .true., partit, mesh) 
             end if
          end if
       end if

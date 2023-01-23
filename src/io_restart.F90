@@ -4,6 +4,7 @@ MODULE io_RESTART
   use g_clock
   use o_arrays
   use g_cvmix_tke
+  use g_cvmix_idemix
   use MOD_TRACER
   use MOD_ICE
   use MOD_DYN
@@ -37,6 +38,9 @@ MODULE io_RESTART
 ! ini_ocean_io initializes ocean_file datatype which contains information of all variables need to be written into 
 ! the ocean restart file. This is the only place need to be modified if a new variable is added!
 subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
+#ifdef ENABLE_NVHPC_WORKAROUNDS
+  use nvfortran_subarray_workaround_module
+#endif
   integer, intent(in)       :: year
   integer                   :: j
   character(500)            :: longname
@@ -67,17 +71,22 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
   call oce_files%def_node_var('hnode', 'nodal layer thickness', 'm',   mesh%hnode, mesh, partit)
   
   !___Define the netCDF variables for 3D fields_______________________________
+#ifdef ENABLE_NVHPC_WORKAROUNDS
+  dynamics_workaround => dynamics
+#endif
   call oce_files%def_elem_var('u', 'zonal velocity',        'm/s', dynamics%uv(1,:,:), mesh, partit)
   call oce_files%def_elem_var('v', 'meridional velocity',   'm/s', dynamics%uv(2,:,:), mesh, partit)
   call oce_files%def_elem_var('urhs_AB', 'Adams–Bashforth for u', 'm/s', dynamics%uv_rhsAB(1,:,:), mesh, partit)
   call oce_files%def_elem_var('vrhs_AB', 'Adams–Bashforth for v', 'm/s', dynamics%uv_rhsAB(2,:,:), mesh, partit)
   
   !___Save restart variables for TKE and IDEMIX_________________________________
-  if (trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
+!   if (trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
+  if (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
         call oce_files%def_node_var('tke', 'Turbulent Kinetic Energy', 'm2/s2', tke(:,:), mesh, partit)
   endif
-  if (trim(mix_scheme)=='cvmix_IDEMIX' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
-        call oce_files%def_node_var('iwe', 'Internal Wave eneryy', 'm2/s2', tke(:,:), mesh, partit)
+!   if (trim(mix_scheme)=='cvmix_IDEMIX' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
+  if (mix_scheme_nmb==6 .or. mix_scheme_nmb==56) then
+        call oce_files%def_elem_var('iwe', 'Internal Wave Energy'    , 'm2/s2', iwe(:,:), mesh, partit)
   endif 
   if (dynamics%opt_visc==8) then
         call oce_files%def_elem_var('uke', 'unresolved kinetic energy', 'm2/s2', uke(:,:), mesh, partit)
@@ -727,6 +736,7 @@ end subroutine
 !
 !_______________________________________________________________________________
 subroutine read_restart(path, filegroup, mpicomm, mype)
+  include 'mpif.h'        
   character(len=*), intent(in) :: path
   type(restart_file_group), intent(inout) :: filegroup
   integer, intent(in) :: mpicomm
@@ -741,7 +751,6 @@ subroutine read_restart(path, filegroup, mpicomm, mype)
   integer current_iorank_snd, current_iorank_rcv
   integer max_globalstep
   integer mpierr
-  include 'mpif.h'
   
   allocate(skip_file(filegroup%nfiles))
   skip_file = .false.

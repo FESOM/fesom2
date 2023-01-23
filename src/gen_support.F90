@@ -103,7 +103,7 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
   integer, intent(in)            :: N_smooth
   real(KIND=WP), intent(inout)   :: arr(:,:)
 
-  integer                        :: n, el, nz, j, q, num_el, nlev, nl_loc, nu_loc
+  integer                        :: n, q, el, nz, j, nlev
   integer                        :: uln, nln, ule, nle
   real(kind=WP)                  :: vol(mesh%nl, partit%myDim_nod2D)
   real(kind=WP), allocatable     :: work_array(:,:)
@@ -115,10 +115,10 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
 
   nlev=ubound(arr,1)
   allocate(work_array(nlev,myDim_nod2D))
-  
+
 ! Precompute area of patches on all levels (at the bottom, some neighbouring
 ! nodes may vanish in the bathymetry) in the first smoothing step
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, el, nz, j, q, num_el, nlev, nl_loc, nu_loc, uln, nln, ule, nle)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, q, el, nz, j, uln, nln, ule, nle)
 !$OMP DO
   DO n=1, myDim_nod2D
      uln = ulevels_nod2d(n)

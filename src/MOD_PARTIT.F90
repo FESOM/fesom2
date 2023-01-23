@@ -64,6 +64,7 @@ TYPE T_PARTIT
   integer            :: npes
   integer            :: mype
   integer            :: maxPEnum=100
+!PS   logical            :: flag_debug=.false.
   integer, allocatable, dimension(:)  :: part
 
   ! Mesh partition
@@ -151,6 +152,7 @@ subroutine WRITE_T_PARTIT(partit, unit, iostat, iomsg)
     write(unit, iostat=iostat, iomsg=iomsg) partit%npes
     write(unit, iostat=iostat, iomsg=iomsg) partit%mype
     write(unit, iostat=iostat, iomsg=iomsg) partit%maxPEnum
+!PS     write(unit, iostat=iostat, iomsg=iomsg) partit%flag_debug
     call write_bin_array(partit%part,           unit, iostat, iomsg)
 
     write(unit, iostat=iostat, iomsg=iomsg) partit%myDim_nod2D
@@ -182,6 +184,7 @@ subroutine READ_T_PARTIT(partit, unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg) partit%npes
     read(unit, iostat=iostat, iomsg=iomsg) partit%mype
     read(unit, iostat=iostat, iomsg=iomsg) partit%maxPEnum
+!PS     read(unit, iostat=iostat, iomsg=iomsg) partit%flag_debug
     call read_bin_array(partit%part,           unit, iostat, iomsg)
 
     read(unit, iostat=iostat, iomsg=iomsg) partit%myDim_nod2D

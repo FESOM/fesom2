@@ -66,7 +66,6 @@ module cpl_driver
   REAL(kind=WP), POINTER                          :: exfld(:)          ! buffer for receiving global exchange fields
   real(kind=WP), allocatable, dimension(:,:)      :: cplsnd
 
-  real(kind=WP)              :: time_send(2), time_recv(2)
 
   integer, dimension(1,3)    :: iextent    
   integer, dimension(1,3)    :: ioffset   
@@ -571,13 +570,6 @@ contains
     end if
     t3=MPI_Wtime()
     
-    if (ind==1) then
-       time_send(1)=t3-t1       
-       time_send(2)=t2-t1
-    else
-       time_send(1)=time_send(1)+t3-t1
-       time_send(2)=time_send(2)+t2-t1
-    endif	         
   end subroutine cpl_oasis3mct_send
 
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -618,7 +610,7 @@ contains
     ! receive data from OASIS3-MCT on local root
     !
 #ifdef VERBOSE
-    if (mype==0) then
+    if (partit%mype==0) then
         print *, 'oasis_get: ', cpl_recv(ind)
     endif    
 #endif
@@ -635,13 +627,6 @@ contains
       call exchange_nod(data_array, partit)
    end if   
    t3=MPI_Wtime()
-   if (ind==1) then
-      time_recv(1)=t3-t1
-      time_recv(2)=t3-t2
-   else      
-      time_recv(1)=time_recv(1)+t3-t1
-      time_recv(2)=time_recv(2)+t3-t2
-   endif
   end subroutine cpl_oasis3mct_recv
   
 !

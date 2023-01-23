@@ -77,11 +77,11 @@ end module
 
 module bc_surface_interface
     interface
-        function bc_surface(n, id, sval, partit) 
+        function bc_surface(n, id, sval, nzmin, partit) 
         use mod_mesh
         USE MOD_PARTIT
         USE MOD_PARSUP
-        integer , intent(in)                  :: n, id
+        integer , intent(in)                  :: n, id, nzmin
         type(t_partit), intent(inout), target :: partit
         real(kind=WP)                         :: bc_surface
         real(kind=WP), intent(in)             :: sval
@@ -115,7 +115,7 @@ module solve_tracers_ale_interface
         use mod_tracer     
         use MOD_DYN
         USE MOD_ICE
-        type(t_ice)   , intent(inout), target :: ice
+        type(t_ice)   , intent(in),    target :: ice
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
@@ -833,7 +833,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
         !  (BUT CHECK!)              |    |                         |    |
         !                            v   (+)                        v   (+) 
         !                            
-        tr(nzmin)= tr(nzmin)+bc_surface(n, tracers%data(tr_num)%ID, trarr(mesh%ulevels_nod2D(n),n), partit)  
+        tr(nzmin)= tr(nzmin)+bc_surface(n, tracers%data(tr_num)%ID, trarr(nzmin,n), nzmin, partit)  
         
         !_______________________________________________________________________
         ! The forward sweep algorithm to solve the three-diagonal matrix 
@@ -1275,9 +1275,9 @@ end subroutine diff_part_bh
 !
 !
 !===============================================================================
-! this function returns a boundary conditions for a specified thacer ID and surface node
+! this function returns a boundary conditions for a specified tracer ID and surface node
 ! ID = 0 and 1 are reserved for temperature and salinity
-FUNCTION bc_surface(n, id, sval, partit) 
+FUNCTION bc_surface(n, id, sval, nzmin, partit) 
   use MOD_MESH
   USE MOD_PARTIT
   USE MOD_PARSUP
@@ -1286,7 +1286,7 @@ FUNCTION bc_surface(n, id, sval, partit)
   USE g_config
   implicit none
   
-  integer,       intent(in)            :: n, id
+  integer,       intent(in)            :: n, id, nzmin 
   real(kind=WP), intent(in)            :: sval
   type(t_partit),intent(inout), target :: partit
   REAL(kind=WP)                        :: bc_surface
@@ -1296,7 +1296,7 @@ FUNCTION bc_surface(n, id, sval, partit)
   !  --> is_nonlinfs=0.0 for linfs
   SELECT CASE (id)
     CASE (1)
-        bc_surface=-dt*(heat_flux(n)/vcpw + sval*water_flux(n)*is_nonlinfs)
+        bc_surface=-dt*(heat_flux(n)/vcpw + sval*water_flux(n)*is_nonlinfs)    
     CASE (2)
         ! --> real_salt_flux(:): salt flux due to containment/releasing of salt
         !     by forming/melting of sea ice
@@ -1310,6 +1310,12 @@ FUNCTION bc_surface(n, id, sval, partit)
         bc_surface=0.0_WP
     CASE (303)
         bc_surface=0.0_WP
+    CASE (501) ! ice-shelf water due to basal melting
+        if (nzmin==1) then
+           bc_surface = 0.0_WP
+        else
+           bc_surface = dt*water_flux(n)*(sval-1.0)
+        end if
     CASE DEFAULT
       if (partit%mype==0) then
          write (id_string, "(I3)") id
