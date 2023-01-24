@@ -6,7 +6,7 @@ subroutine setup_model(partit)
 !   use i_therm_param
   use g_forcing_param
   use g_config
-  use diagnostics, only: ldiag_solver,lcurt_stress_surf,lcurt_stress_surf, ldiag_energy, &
+  use diagnostics, only: ldiag_solver,lcurt_stress_surf,lcurt_stress_surf, ldiag_Ri, &
                          ldiag_dMOC, ldiag_DVD, diag_list
   use g_clock,     only: timenew, daynew, yearnew
   use g_ic3d 
