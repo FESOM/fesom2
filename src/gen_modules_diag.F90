@@ -60,6 +60,7 @@ module diagnostics
   logical                                       :: ldiag_curl_vel3  =.false.
   logical                                       :: ldiag_Ri         =.false.
   logical                                       :: ldiag_TurbFlux   =.false.
+  logical                                       :: ldiag_KE         =.false.
   logical                                       :: ldiag_salt3D     =.false.
   ! this option activates writing the horizintal velocity transports within the density bins (U_rho_x_DZ and V_rho_x_DZ)
   ! an additional field (RHO_Z) will be computed which allows for diagnosing the numerical diapycnal mixing after A. Megann 2018

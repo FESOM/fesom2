@@ -112,7 +112,7 @@ TYPE T_DYN
     ! in older FESOM it used to be w_exp_max=1.e-3
     real(kind=WP)                               :: wsplit_maxcfl= 1.0
     ! energy diagnostic part: will be computed inside the model ("hard integration"):
-    logical                                      :: diag_ke       = .true.
+    logical                                      :: ldiag_ke       = .true.
     ! different contributions to velocity change. will be computed inside the code.
     real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv, ke_cor, ke_pre, ke_hvis, ke_vvis, ke_du2, ke_umean, ke_u2mean
     real(kind=WP), allocatable, dimension(:,:)   :: ke_wind, ke_drag

@@ -2812,7 +2812,7 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         ur(nzmin)= ur(nzmin)+zinv*stress_surf(1,elem)/density_0
         vr(nzmin)= vr(nzmin)+zinv*stress_surf(2,elem)/density_0
 
-        if (dynamics%diag_ke) then
+        if (dynamics%ldiag_ke) then
            dynamics%ke_wind(1,elem)=stress_surf(1,elem)/density_0*dt
            dynamics%ke_wind(2,elem)=stress_surf(2,elem)/density_0*dt
         end if
@@ -2826,7 +2826,7 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         ur(nzmax-1)=ur(nzmax-1)+zinv*friction*UV(1,nzmax-1,elem)
         vr(nzmax-1)=vr(nzmax-1)+zinv*friction*UV(2,nzmax-1,elem)
 
-        if (dynamics%diag_ke) then
+        if (dynamics%ldiag_ke) then
            dynamics%ke_drag(1,elem)=friction*UV(1,nzmax-1,elem)*dt
            dynamics%ke_drag(2,elem)=friction*UV(2,nzmax-1,elem)*dt
         end if
@@ -2928,7 +2928,6 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     type(t_ice)   , intent(inout), target :: ice
     !___________________________________________________________________________
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
-    real(kind=WP)     :: budget(2)
     integer           :: node
     integer           :: nz, elem, nzmin, nzmax !for KE diagnostic
     !___________________________________________________________________________
@@ -3062,7 +3061,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call viscosity_filter'//achar(27)//'[0m'
-    if (dynamics%diag_ke) then
+    if (dynamics%ldiag_ke) then
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
        do elem=1, myDim_elem2D
           nzmax = nlevels(elem)
@@ -3074,7 +3073,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
     end if
     call viscosity_filter(dynamics%opt_visc, dynamics, partit, mesh)
-    if (dynamics%diag_ke) then
+    if (dynamics%ldiag_ke) then
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
        do elem=1, myDim_elem2D
           nzmax = nlevels(elem)
@@ -3088,7 +3087,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call impl_vert_visc_ale'//achar(27)//'[0m'
-    if (dynamics%diag_ke) then
+    if (dynamics%ldiag_ke) then
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
        do elem=1, myDim_elem2D
           nzmax = nlevels(elem)
@@ -3100,7 +3099,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
     end if
     if(dynamics%use_ivertvisc) call impl_vert_visc_ale(dynamics,partit, mesh)
-    if (dynamics%diag_ke) then
+    if (dynamics%ldiag_ke) then
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
        do elem=1, myDim_elem2D
           nzmax = nlevels(elem)
@@ -3137,7 +3136,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! estimate new horizontal velocity u^(n+1)
     ! u^(n+1) = u* + [-g * tau * theta * grad(eta^(n+1)-eta^(n)) ]
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_vel'//achar(27)//'[0m'
-    ! ke will be computed inside there if dynamics%diag_ke is .TRUE.
+    ! ke will be computed inside there if dynamics%ldiag_ke is .TRUE.
     call update_vel(dynamics, partit, mesh)
     
     ! --> eta_(n) --> eta_(n+1) = eta_(n) + deta = eta_(n) + (eta_(n+1) + eta_(n))
@@ -3190,7 +3189,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 !!!
     call vert_vel_ale(dynamics, partit, mesh)
     t7=MPI_Wtime()   
-    if (dynamics%diag_ke) then
+    if (dynamics%ldiag_ke) then
        call compute_ke_wrho(dynamics, partit, mesh)
        call compute_apegen (dynamics, tracers, partit, mesh)
     end if
@@ -3209,6 +3208,11 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! write out global fields for debugging
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call write_step_info'//achar(27)//'[0m'
     call write_step_info(n,logfile_outfreq, ice, dynamics, tracers, partit, mesh)
+    !___________________________________________________________________________
+    ! write energy diagnostic info (dynamics%ldiag_ke = .true.)
+    if (dynamics%ldiag_ke) then
+        call write_enegry_info(dynamics, partit, mesh)
+    end if
     
     ! check model for blowup --> ! write_step_info and check_blowup require 
     ! togeather around 2.5% of model runtime
@@ -3245,44 +3249,5 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         write(*,*)
         write(*,*)
     end if    
-    if (dynamics%diag_ke) then
-       if (mype==0) write(*,*) '*******KE budget analysis...*******'
-       if (mype==0) write(*,*) '     U     |     V     |     TOTAL'
-       call integrate_elem(dynamics%ke_du2(1,:,:),  budget(1), partit, mesh)
-       call integrate_elem(dynamics%ke_du2(2,:,:),  budget(2), partit, mesh)
-       if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. du2=', budget(1),' | ',  budget(2), ' | ', sum(budget)
-
-       call integrate_elem(dynamics%ke_pre_xVEL(1,:,:),  budget(1), partit, mesh)
-       call integrate_elem(dynamics%ke_pre_xVEL(2,:,:),  budget(2), partit, mesh)
-       if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. pre=', budget(1), ' | ', budget(2), ' | ', sum(budget)
-
-       call integrate_nod(dynamics%ke_wrho,  budget(1), partit, mesh)
-       if (mype==0) write(*,"(A, ES14.7)") 'w * rho=', budget(1)
-
-       call integrate_elem(dynamics%ke_adv_xVEL(1,:,:),  budget(1), partit, mesh)
-       call integrate_elem(dynamics%ke_adv_xVEL(2,:,:),  budget(2), partit, mesh)
-       if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. adv=', budget(1), ' | ', budget(2), ' | ', sum(budget)
-
-       call integrate_elem(dynamics%ke_hvis_xVEL(1,:,:), budget(1), partit, mesh)
-       call integrate_elem(dynamics%ke_hvis_xVEL(2,:,:), budget(2), partit, mesh)
-       if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke.  ah=', budget(1), ' | ', budget(2), ' | ', sum(budget)
-
-       call integrate_elem(dynamics%ke_vvis_xVEL(1,:,:), budget(1), partit, mesh)
-       call integrate_elem(dynamics%ke_vvis_xVEL(2,:,:), budget(2), partit, mesh)
-       if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke.  av=', budget(1), ' | ', budget(2), ' | ', sum(budget)
-
-       call integrate_elem(dynamics%ke_cor_xVEL(1,:,:),  budget(1), partit, mesh)
-       call integrate_elem(dynamics%ke_cor_xVEL(2,:,:),  budget(2), partit, mesh)
-       if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. cor=', budget(1), ' | ', budget(2), ' | ', sum(budget)
-
-       call integrate_elem(dynamics%ke_wind_xVEL(1,:),  budget(1), partit, mesh)
-       call integrate_elem(dynamics%ke_wind_xVEL(2,:),  budget(2), partit, mesh)
-       if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. wind=', budget(1), ' | ', budget(2), ' | ', sum(budget)
-
-       call integrate_elem(dynamics%ke_drag_xVEL(1,:),  budget(1), partit, mesh)
-       call integrate_elem(dynamics%ke_drag_xVEL(2,:),  budget(2), partit, mesh)
-       if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. drag=', budget(1), ' | ', budget(2), ' | ', sum(budget)
-       if (mype==0) write(*,*) '***********************************'
-    end if
 end subroutine oce_timestep_ale
 

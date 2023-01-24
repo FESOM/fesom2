@@ -385,14 +385,15 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     integer        :: opt_visc
     real(kind=WP)  :: visc_gamma0, visc_gamma1, visc_gamma2
     real(kind=WP)  :: visc_easybsreturn
-    logical        :: use_ivertvisc
+    logical        :: use_ivertvisc=.true.
     integer        :: momadv_opt
-    logical        :: use_freeslip
-    logical        :: use_wsplit
+    logical        :: use_freeslip =.false.
+    logical        :: use_wsplit   =.false.
+    logical        :: ldiag_KE     =.false.
     real(kind=WP)  :: wsplit_maxcfl
     namelist /dynamics_visc   / opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
                                 use_ivertvisc, visc_easybsreturn
-    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl 
+    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, ldiag_KE
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -426,7 +427,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     dynamics%use_freeslip      = use_freeslip
     dynamics%use_wsplit        = use_wsplit
     dynamics%wsplit_maxcfl     = wsplit_maxcfl
-
+    dynamics%ldiag_KE          = ldiag_KE
     !___________________________________________________________________________
     ! define local vertice & elem array size
     elem_size=myDim_elem2D+eDim_elem2D
@@ -489,7 +490,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
         dynamics%work%v_b = 0.0_WP
     end if 
    
-    if (dynamics%diag_ke) then
+    if (dynamics%ldiag_ke) then
        allocate(dynamics%ke_adv    (2, nl-1, elem_size))
        allocate(dynamics%ke_cor    (2, nl-1, elem_size))
        allocate(dynamics%ke_pre    (2, nl-1, elem_size))

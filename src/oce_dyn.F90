@@ -98,7 +98,7 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
         nzmin = ulevels(elem)
         nzmax = nlevels(elem)
 
-        if (dynamics%diag_ke) then
+        if (dynamics%ldiag_ke) then
            DO nz=nzmin, nzmax-1
               dynamics%ke_pre(1,nz,elem)  =dynamics%ke_pre(1,nz,elem)   + Fx
               dynamics%ke_pre(2,nz,elem)  =dynamics%ke_pre(2,nz,elem)   + Fy
