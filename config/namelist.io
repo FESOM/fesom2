@@ -2,7 +2,8 @@
 ldiag_solver     =.false.
 lcurt_stress_surf=.false.
 ldiag_curl_vel3  =.false.
-ldiag_energy     =.false.
+ldiag_Ri         =.false.
+ldiag_turbflux   =.false.
 ldiag_salt3D     =.false.
 ldiag_dMOC       =.false.
 ldiag_DVD        =.false.
