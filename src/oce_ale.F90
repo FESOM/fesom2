@@ -3184,9 +3184,14 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! The main step of ALE procedure --> this is were the magic happens --> here 
     ! is decided how change in hbar is distributed over the vertical layers
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call vert_vel_ale'//achar(27)//'[0m'
-!!!
-    dynamics%w_old=dynamics%w
-!!!
+    ! keep the old vertical velocity for computation of the mean between the timesteps (is used in compute_ke_wrho)
+    if (dynamics%ldiag_ke) then
+!$OMP PARALLEL DO
+    do node=1, myDim_nod2D+eDim_nod2D
+       dynamics%w_old(:, node)=dynamics%w(:, node)
+    end do
+!$OMP END PARALLEL DO
+    end if
     call vert_vel_ale(dynamics, partit, mesh)
     t7=MPI_Wtime()   
     if (dynamics%ldiag_ke) then
