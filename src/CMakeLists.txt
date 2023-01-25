@@ -226,6 +226,13 @@ endif()
 if(${ASYNC_ICEBERGS})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __async_icebergs)
 endif()
+
+if(${USE_YAC})
+  include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindYAC.cmake)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE __yac)
+  list(APPEND sources_Fortran ${src_home}/cpl_yac_driver.F90)
+endif()
+
 if(${OIFS_COUPLED})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __oifs)
 endif()
