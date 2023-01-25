@@ -19,6 +19,9 @@ yearnew=2000
 &paths
 MeshPath='/work/ollie/projects/clidyn/FESOM2/meshes/core2/'
 ClimateDataPath='/work/ollie/yye/fesom2/initial_files/pi_init/'
+!For levante:
+!MeshPath='/work/k20200/k202138/bb1029/AWIESM2.1-EXP/mesh_core2/'
+!ClimateDataPath='/home/a/a270105/initial_files/pi_init/'
 ResultPath='./'
 /
 

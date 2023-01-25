@@ -1,19 +1,36 @@
 This is the namelist recom 
 
+&precom_diag_list
+ldiag_carbon          =.true.
+ldiag_silicate        =.true.
+recom_diag_freq       = 1          !only required for d,h,s cases,  y, m take 1
+recom_diag_freq_unit  = 'm'        !output period: y,  d, h, s
+recom_logfile_outfreq = 2700       !in recom logfile info. output frequency, # steps
+/
+
 &pavariables
 use_REcoM             =.true.
 REcoM_restart         =.true.
-bgc_num               = 22          ! if (ciso==.false.): 22; if (ciso_14==.false.): 30; if (ciso_14):: 31; if (ciso_14 .and. ciso_organic_14): 38
-bgc_base_num          = 22          ! number of RECOM base model tracers 
+recom_binary_write    =.false.      ! Determines if tracervalue snapshots are saved. For fine grids it may crash the model to set this to true
+recom_binary_init     = .false.     ! Restart from binary
+bgc_num               = 31          ! if (ciso==.false.): 22; if (ciso_14):: 31; if (ciso_14 .and. ciso_organic_14): 38
+bgc_base_num          = 22          ! number of RECOM base model tracers
 diags3d_num           = 2           ! Number of diagnostic 3d tracers to be saved
 VDet                  = 20.d0       ! Sinking velocity, constant through the water column and positive downwards
+VDet_zoo2             = 200.d0       ! Sinking velocity, constant through the water column
 VPhy                  = 0.d0        !!! If the number of sinking velocities are different from 3, code needs to be changed !!!
 VDia                  = 0.d0 
 allow_var_sinking     = .true.   
-biostep               = 1           ! Number of times biology should be stepped forward for each time step
+biostep               = 1           ! Number of times biology should be stepped forward for each time step		 
 REcoM_Geider_limiter  = .false.     ! Decides what routine should be used to calculate limiters in sms
-REcoM_Grazing_Variable_Preference = .false. ! Decides if grazing should have preference for phyN or DiaN 
+REcoM_Grazing_Variable_Preference = .true. ! Decides if grazing should have preference for phyN or DiaN 
 REcoM_Second_Zoo      = .false.     ! Decides second zooplankton or no 
+Grazing_detritus      = .false.
+zoo2_fecal_loss       = .false.
+zoo2_initial_field    = .false.
+het_resp_noredfield   = .false.     ! Decides respiratation of copepod group
+diatom_mucus          = .false.     ! Decides nutrient limitation effect on aggregation
+Graz_pref_new         = .false.     ! If it is true Fasham 1990, if not recom original variable preference
 Diags                 = .true.
 constant_CO2          = .true.
 UseFeDust             = .true.      ! Turns dust input of iron off when set to.false.
@@ -21,27 +38,30 @@ UseDustClim           = .true.
 UseDustClimAlbani     = .true.      ! Use Albani dustclim field (If it is false Mahowald will be used)
 use_Fe2N              = .true.      ! use Fe2N instead of Fe2C, as in MITgcm version
 use_photodamage       = .true.      ! use Alvarez et al (2018) for chlorophyll degradation
-HetRespFlux_plus      = .true.      ! More stable computation of zooplankton respiration fluxes adding a small number to HetN
-REcoMDataPath         = '/work/ollie/mbutzin/fesom2/input/dust/pi-mesh/'
+HetRespFlux_plus      = .true.      !MB More stable computation of zooplankton respiration fluxes adding a small number to HetN
+REcoMDataPath         = '/work/ollie/yye/fesom2/initial_files/pi_init/dust_coremesh/'
+!REcoMDataPath         = '/work/ollie/yye/fesom2/initial_files/pi_init/dust_pimesh/'  ! pi mesh
 restore_alkalinity    = .true.
-useRivers             = .true.
+useRivers             = .false.
+useRivFe	      = .true.      ! When set to true, riverine Fe source is activated
+useErosion            = .false.
 NitrogenSS            = .false.     ! When set to true, external sources and sinks of nitrogen are activated (Riverine, aeolian and denitrification)
 useAeolianN           = .false.     ! When set to true, aeolian nitrogen deposition is activated
-firstyearoffesomcycle = 1984        ! The first year of the actual physical forcing (e.g. JRA-55) used
-lastyearoffesomcycle  = 1985        ! Last year of the actual physical forcing used
+firstyearoffesomcycle = 1958        ! The first year of the actual physical forcing (e.g. JRA-55) used
+lastyearoffesomcycle  = 2020        ! Last year of the actual physical forcing used
 numofCO2cycles        = 1           ! Number of cycles of the forcing planned 
 currentCO2cycle       = 1           ! Which CO2 cycle we are currently running
 DIC_PI                = .false.     ! Use preindustrial DIC concentration for initialization
 Nmocsy                = 1           ! Length of the vector that is passed to mocsy (always one for recom)
-recom_debug           = .false.
-ciso                  = .false.      ! Main switch to enable/disable carbon isotopes (13|14C)
-benthos_num           = 4           ! number of benthic BGC tracers -> 4 if (ciso == .false.), -> 6 if (ciso_14 == .false.)
+recom_debug           =.false.
+ciso                  =.true.       ! Main switch to enable/disable carbon isotopes (13|14C)
+benthos_num           = 8           ! number of benthic BGC tracers -> 4 if (ciso == .false.), -> 6 if (ciso_14 == .false.)
 use_MEDUSA            = .true.      ! Main switch for the sediment model MEDUSA
 sedflx_num            = 0           ! if 0: no file from MEDUSA is read but default sediment
-bottflx_num           = 4           ! if ciso&ciso_14: =8; if .not.ciso_14: =6; no ciso: =4
+bottflx_num           = 8           ! if ciso&ciso_14: =8; if .not.ciso_14: =6; no ciso: =4
 use_atbox             = .true.
-add_loopback          = .false.      ! add loopback fluxes through rivers to the surface
-lb_tscale             = 0.001         ! /year: fraction of loopback fluxes yearly added to the surface
+add_loopback          = .false.     ! add loopback fluxes through rivers to the surface
+lb_tscale             = 1.0         ! /year: fraction of loopback fluxes yearly added to the surface
 /
 
 &pasinking
@@ -129,7 +149,9 @@ tiny_het              = 1.d-5       ! for more stable computation of HetRespFlux
 graz_max2      = 0.1d0              ! [mmol N/(m3 * day)] Maximum grazing loss parameter                                                                                        
 epsilon2       = 0.0144d0           ! [(mmol N)2 /m6] Half saturation constant for grazing loss                                                                              
 res_zoo2       = 0.0107d0           ! [1/day] Respiration by heterotrophs and mortality (loss to detritus)                                                            
-loss_zoo2      = 0.003d0            ! [1/day] Temperature dependent N degradation of extracellular organic N (EON)                                                            
+loss_zoo2      = 0.003d0            ! [1/day] Temperature dependent N degradation of extracellular organic N (EON)
+fecal_rate_n      = 0.104d0         ! [1/day] Temperature dependent N degradation of \
+fecal_rate_c      = 0.236d0                                                            
 pzDia2         = 1.d0               ! Maximum diatom preference                                                                                                                 
 sDiaNsq2       = 0.d0
 pzPhy2         = 0.5d0              ! Maximum diatom preference                                                                                                                
@@ -140,6 +162,17 @@ t1_zoo2        = 28145.d0           ! Krill temp. function constant1
 t2_zoo2        = 272.5d0            ! Krill temp. function constant2                                                                                                         
 t3_zoo2        = 105234.d0          ! Krill temp. function constant3                                                                                                      
 t4_zoo2        = 274.15d0           ! Krill temp. function constant3
+/
+
+&pagrazingdetritus
+pzDet         = 0.5d0           ! Maximum small detritus prefence by first zooplankton
+sDetNsq       = 0.d0
+pzDetZ2       = 0.5d0         ! Maximum large detritus preference by first zooplankton                                 
+sDetZ2Nsq     = 0.d0
+pzDet2         = 0.5d0           ! Maximum small detritus prefence by second zooplankton                               
+sDetNsq2       = 0.d0
+pzDetZ22       = 0.5d0           ! Maximum large detritus preference by second zooplankton
+sDetZ2Nsq2     = 0.d0
 /
 
 &paaggregation
@@ -166,8 +199,8 @@ lossC_d               = 0.10d0
 /
 
 &paphytoplankton_ChlA
-deg_Chl               = 0.25d0      ! [1/day]
-deg_Chl_d             = 0.15d0
+deg_Chl               = 0.2d0 !0.25d0      ! [1/day]
+deg_Chl_d             = 0.2d0 !0.15d0
 /
 
 &padetritus_N
@@ -198,13 +231,14 @@ Fe2C                  = 0.005d0
 Fe2C_benthos          = 0.02125     ! 0.68d0/32.d0 ! [umol/m2/day]
 kScavFe               = 0.07d0
 dust_sol              = 0.02d0      ! Dissolution of Dust for bioavaliable
-RiverFeConc           = 1000
+RiverFeConc           = 100
 /
 
 &pacalc
 calc_prod_ratio       = 0.02
 calc_diss_guts        = 0.0d0
 calc_diss_rate        = 0.005714    ! 20.d0/3500.d0
+calc_diss_rate2       = 0.005714d0
 /
 
 &pabenthos_decay_rate
@@ -220,7 +254,7 @@ permeg                = 1.e-6                       ! [atm/uatm] Changes units f
 !X1                    = exp(-5.d0*log(10.d0))       ! Lowest ph-value = 7.7 (phlo)
 !X2                    = exp(-9.d0*log(10.d0))       ! Highest ph-value = 9.5 (phhi)
 Xacc                  = 1.e-12                      ! Accuracy for ph-iteration (phacc)
-CO2_for_spinup        = 185.0 ! [uatm] Atmospheric partial pressure of CO2, CMIP6 value for 1850 ! 278.d0
+CO2_for_spinup        = 185. ! [uatm] Atmospheric partial pressure of CO2, CMIP6 value for 1850 ! 278.d0
 /
 
 &paalkalinity_restoring
@@ -228,8 +262,8 @@ surf_relax_Alk      = 0. !!3.2e-07 !10.d0/31536000.d0
 /
 
 &paciso
-ciso_init         = .false.      ! initial fractionation of bulk organic matter
-ciso_14           = .false.      ! include inorganic radiocarbon
+ciso_init         = .false.     ! initial fractionation of bulk organic matter
+ciso_14           = .true.      ! include inorganic radiocarbon
 ciso_organic_14   = .false.     ! include organic radiocarbon
 ciso_warp         = .false.     ! accelerate RECOM -- HIGHLY EXPERIMENTAL
 warp_file         = "warptracers.nc"
