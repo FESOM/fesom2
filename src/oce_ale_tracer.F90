@@ -1887,7 +1887,7 @@ use REcoM_ciso
 !     write(*,*) '____________________________________________________________'
 !     write(*,*) ' --> O2_surface,  = ', bc_surface
 !  endif
-    CASE (1023:1032)
+    CASE (1023:1028)
         bc_surface=0.0_WP  ! OG added bc for recom fields 
 !ciso 
     CASE (1302) ! DIC_13
