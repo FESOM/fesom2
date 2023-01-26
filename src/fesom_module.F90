@@ -47,7 +47,7 @@ module fesom_main_storage_module
   use cpl_driver
 #endif
 #if defined (__yac)
-use cpl_yac_driver, only: cpl_yac_init, cpl_yac_finalize
+use cpl_yac_driver
 #endif
 
 ! define recom module
@@ -282,6 +282,11 @@ contains
             call allocate_icb(f%partit, f%mesh)
         endif
         ! --------------
+
+#if defined (__yac)
+        call cpl_yac_define_unstr(f%partit, f%mesh)
+        if(f%mype==0)  write(*,*) 'FESOM ---->     cpl_yac_define_unstr nsend, nrecv:',nsend, nrecv
+#endif
 
 #if defined (__icepack)
         !=====================
@@ -649,10 +654,6 @@ contains
          call iceberg_out(f%partit)
     end if
     ! --------------
-
-#if defined (__yac)
-    call cpl_yac_finalize()
-#endif
 
     call finalize_output()
     call finalize_restart()
