@@ -229,7 +229,7 @@ endif()
 
 if(${USE_YAC})
   include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindYAC.cmake)
-  target_compile_definitions(${PROJECT_NAME} PRIVATE __yac)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE __yac __coupled)
   list(APPEND sources_Fortran ${src_home}/cpl_yac_driver.F90)
 endif()
 
