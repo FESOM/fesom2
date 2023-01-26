@@ -118,7 +118,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   integer                  :: nt1, nt2
   real(kind=WP), parameter :: zwisomin = 1.e-6_WP
   !---wiso-code-end
-#ifdef __oasis
+#if defined(__coupled)
   real(kind=WP)        				   :: flux_global(2), flux_local(2), eff_vol(2)
   real(kind=WP), dimension(:), allocatable , save  :: exchange
   real(kind=WP), dimension(:), allocatable , save  :: mask !, weight
@@ -139,11 +139,11 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, u_w, v_w
   real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
   real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
-#if defined (__oasis) || defined (__ifsinterface)
+#if defined (__coupled) || defined (__ifsinterface)
   real(kind=WP), dimension(:), pointer  ::  oce_heat_flux, ice_heat_flux 
   real(kind=WP), dimension(:), pointer  ::  tmp_oce_heat_flux, tmp_ice_heat_flux 
 #endif 
-#if defined (__oifs) || defined (__ifsinterface)
+#if defined (__oifs) || defined (__ifsinterface) || defined(__yac)
   real(kind=WP), dimension(:), pointer  :: ice_temp, ice_alb, enthalpyoffuse
   real(kind=WP),               pointer  :: tmelt
   real(kind=WP), dimension(:,:,:), pointer :: UVnode
@@ -159,6 +159,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   v_w              => ice%srfoce_v(:)
   stress_atmice_x  => ice%stress_atmice_x(:)
   stress_atmice_y  => ice%stress_atmice_y(:)
+#if defined (__oifs) || defined (__ifsinterface) || defined(__yac)
   a_ice            => ice%data(1)%values(:)
   m_ice            => ice%data(2)%values(:)
   m_snow           => ice%data(3)%values(:)
@@ -169,7 +170,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   tmelt            => ice%thermo%tmelt
   UVnode           => dynamics%uvnode(:,:,:)
 #endif      
-#if defined (__oasis) || defined (__ifsinterface)
+#if defined (__coupled) || defined (__ifsinterface)
   oce_heat_flux    => ice%atmcoupl%oce_flx_h(:)
   ice_heat_flux    => ice%atmcoupl%ice_flx_h(:)
   tmp_oce_heat_flux=> ice%atmcoupl%tmpoce_flx_h(:)
@@ -179,7 +180,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   
   !_____________________________________________________________________________
   t1=MPI_Wtime()
-#if defined (__oasis)
+#if defined (__coupled)
      if (firstcall) then
         allocate(exchange(myDim_nod2D+eDim_nod2D), mask(myDim_nod2D+eDim_nod2D))
         allocate(a2o_fcorr_stat(nrecv,6))
@@ -609,7 +610,7 @@ end subroutine update_atm_forcing
 !
 !------------------------------------------------------------------------------------
 !
-#if defined (__oasis)
+#if defined (__coupled)
 !
 !=================================================================
 !
@@ -633,7 +634,11 @@ SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats, partit, mesh)
   use mod_mesh
   USE MOD_PARTIT
   USE MOD_PARSUP
+#if defined(__oasis)
   use cpl_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
+#elif defined(__yac)
+  use cpl_yac_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
+#endif
   use o_PARAM,           only : mstep, WP
   use compute_residual_interface
   use integrate_2D_interface
@@ -853,7 +858,11 @@ END SUBROUTINE integrate_2D
 SUBROUTINE net_rec_from_atm(action, partit)
 !
   use g_forcing_arrays
+#if defined(__oasis)
   use cpl_driver
+#elif defined(__yac)
+  use cpl_yac_driver
+#endif
   use o_PARAM, only: WP
   USE MOD_PARTIT
   USE MOD_PARSUP
@@ -866,7 +875,7 @@ SUBROUTINE net_rec_from_atm(action, partit)
   INTEGER 					  :: status(MPI_STATUS_SIZE,partit%npes) 
   INTEGER                                         :: request(2)
   real(kind=WP)                 		  :: aux(nrecv)
-#if defined (__oifs)
+#if defined (__oifs) || defined(__yac)
   return  !OIFS-FESOM2 coupling uses OASIS3MCT conservative remapping and recieves no net fluxes here.
 #endif
 
