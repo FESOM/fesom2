@@ -30,8 +30,6 @@ type(t_dyn),        target, save :: dyn
 type(t_ice),        target, save :: ice
 integer                          :: i, n, nz, nzmax, nzmin
 integer, dimension(3)            :: time=(/0, 0, 0/)
-real (kind=WP)          :: t1, t2
-
 
 call MPI_INIT(i)
 call par_init(partit)
@@ -71,10 +69,11 @@ call init_mpi_types(partit, mesh)
 call init_gatherLists(partit)
 
     !$ACC DATA COPY(mesh, partit, tracers, dyn) &
-    !$ACC      COPY(mesh%helem, mesh%elem_cos, mesh%edge_cross_dxdy, mesh%elem2d_nodes, mesh%nl, partit%mydim_elem2d) &
-    !$ACC      COPY(mesh%nlevels_nod2D, mesh%ulevels_nod2D, mesh%nod_in_elem2D, mesh%nod_in_elem2D_num, partit%myDim_nod2D, partit%edim_nod2d) &
-    !$ACC      COPY(mesh%ulevels, mesh%edge_tri, mesh%edge_dxdy, mesh%edges, mesh%nlevels, partit%myDim_edge2D,  mesh%hnode, mesh%hnode_new) &
+    !$ACC      COPY(mesh%helem, mesh%elem_cos, mesh%edge_cross_dxdy, mesh%elem2d_nodes, mesh%nl) &
+    !$ACC      COPY(mesh%nlevels_nod2D, mesh%ulevels_nod2D, mesh%nod_in_elem2D, mesh%nod_in_elem2D_num) &
+    !$ACC      COPY(mesh%ulevels, mesh%edge_tri, mesh%edge_dxdy, mesh%edges, mesh%nlevels, mesh%hnode, mesh%hnode_new) &
     !$ACC      COPY(mesh%zbar_3d_n, mesh%z_3d_n, mesh%area, mesh%areasvol) &
+    !$ACC      COPY(partit%mydim_elem2d, partit%myDim_nod2D, partit%edim_nod2d, partit%myDim_edge2D) &
     !$ACC      COPY(dyn%w, dyn%w_e, dyn%uv) &
     !$ACC      COPY(tracers%data(1), tracers%work) &
     !$ACC      COPY(tracers%data(1)%values, tracers%data(1)%valuesAB) &
@@ -83,11 +82,7 @@ call init_gatherLists(partit)
     !$ACC      COPY(tracers%work%del_ttf_advvert, tracers%work%del_ttf_advhoriz, tracers%work%edge_up_dn_grad) &
     !$ACC      COPY(tracers%work%del_ttf)
 
-call MPI_Barrier( partit%MPI_COMM_FESOM, i )
-t1=MPI_Wtime()
-
 do i=1, 10
-
     !___________________________________________________________________________
     ! ale tracer advection
     !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
@@ -101,11 +96,12 @@ do i=1, 10
 
     call do_oce_adv_tra(1.e-3, dyn%uv, dyn%w, dyn%w_i, dyn%w_e, 1, dyn, tracers, partit, mesh)
 
+    if ( partit%mype == 0 ) write(*,*) minval(tracers%data(1)%values), maxval(tracers%data(1)%values), sum(tracers%data(1)%values)
+
     !_____________________________________________________
     !___________________________________________________________________________
     ! update array for total tracer flux del_ttf with the fluxes from horizontal
     ! and vertical advection
-
     !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     do n = 1, partit%myDim_nod2D + partit%eDim_nod2D
         nzmax=mesh%nlevels_nod2D(n)-1
@@ -128,13 +124,8 @@ do i=1, 10
     end do
     !$ACC END PARALLEL LOOP
 
-   call exchange_nod(tracers%data(1)%values(:,:), partit, luse_g2g = .true.)
+    call exchange_nod(tracers%data(1)%values(:,:), partit, luse_g2g = .true.)
 end do
-
-call MPI_Barrier( partit%MPI_COMM_FESOM, i )
-t2=MPI_Wtime()
-
-if (partit%mype==0) write(*,*) "Main loop time:", t2-t1
 
 !$ACC END DATA
 

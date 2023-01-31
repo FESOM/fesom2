@@ -134,7 +134,6 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !     (only layers below the first and above the last layer)
     !     look for max, min bounds for each element --> AUX here auxilary array
 !$OMP DO
-
     !$ACC PARALLEL LOOP GANG PRIVATE(enodes) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     do elem=1, myDim_elem2D
         enodes=elem2D_nodes(:,elem)
@@ -164,7 +163,6 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !            vertical gradients are larger.
         !Horizontal
 !$OMP DO
-
     !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
     do n=1, myDim_nod2D
        nu1 = ulevels_nod2D(n)
@@ -236,6 +234,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     end do
     !$ACC END PARALLEL LOOP
 !$OMP END DO
+
     !Vertical
 !$OMP DO
     !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
@@ -321,6 +320,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !$ACC UPDATE DEVICE(fct_plus, fct_minus)
 #endif
 !$OMP END DO
+
     !___________________________________________________________________________
     ! b2. Limiting factors
 !$OMP DO
@@ -339,11 +339,13 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     end do
     !$ACC END PARALLEL LOOP
 !$OMP END DO
+
     ! fct_minus and fct_plus must be known to neighbouring PE
 !$OMP MASTER
     call exchange_nod(fct_plus, fct_minus, partit, luse_g2g = .true.)
 !$OMP END MASTER
 !$OMP BARRIER
+
     !___________________________________________________________________________
     ! b3. Limiting
     !Vertical
@@ -382,8 +384,8 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     ! the bottom flux is always zero
     end do
     !$ACC END PARALLEL LOOP
-
 !$OMP END DO
+
     !Horizontal
 !$OMP DO
 
@@ -422,9 +424,8 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
         !$ACC END LOOP
     end do
     !$ACC END PARALLEL LOOP
+!$OMP END DO
 
 !$ACC END DATA
-
-!$OMP END DO
 !$OMP END PARALLEL
 end subroutine oce_tra_adv_fct
