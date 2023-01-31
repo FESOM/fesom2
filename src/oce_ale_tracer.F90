@@ -200,8 +200,25 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 
         ! advect tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
+
+        !$ACC DATA COPY(mesh, partit, dynamics, tracers) &
+        !$ACC      COPY(mesh%helem, mesh%elem_cos, mesh%edge_cross_dxdy, mesh%elem2d_nodes, mesh%nl) &
+        !$ACC      COPY(mesh%nlevels_nod2D, mesh%ulevels_nod2D, mesh%nod_in_elem2D, mesh%nod_in_elem2D_num) &
+        !$ACC      COPY(mesh%ulevels, mesh%edge_tri, mesh%edge_dxdy, mesh%edges, mesh%nlevels, mesh%hnode, mesh%hnode_new) &
+        !$ACC      COPY(mesh%zbar_3d_n, mesh%z_3d_n, mesh%area, mesh%areasvol) &
+        !$ACC      COPY(partit%mydim_elem2d, partit%myDim_nod2D, partit%edim_nod2d, partit%myDim_edge2D) &
+        !$ACC      COPY(dynamics%w, dynamics%w_e, dynamics%uv) &
+        !$ACC      COPY(tracers%data, tracers%work) &
+        !$ACC      COPY(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB) &
+        !$ACC      COPY(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus) &
+        !$ACC      COPY(tracers%work%adv_flux_hor, tracers%work%adv_flux_ver, tracers%work%fct_LO) &
+        !$ACC      COPY(tracers%work%del_ttf_advvert, tracers%work%del_ttf_advhoriz, tracers%work%edge_up_dn_grad) &
+        !$ACC      COPY(tracers%work%del_ttf)
+
         ! it will update del_ttf with contributions from horizontal and vertical advection parts (del_ttf_advhoriz and del_ttf_advvert)
         call do_oce_adv_tra(dt, UV, Wvel, Wvel_i, Wvel_e, tr_num, dynamics, tracers, partit, mesh)
+
+        !$ACC END DATA
 
         !___________________________________________________________________________
         ! update array for total tracer flux del_ttf with the fluxes from horizontal
