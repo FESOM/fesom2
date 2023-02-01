@@ -292,48 +292,6 @@ end if
         allocate(big_delta_dic_14_init(nl-1,nod2D))
       end if    ! ciso_14
 
-      if (ciso_warp) then
-! individual warp tracers
-        allocate(tra04(nl-1,nod2D,12), tra05(nl-1,nod2D,12), tra06(nl-1,nod2D,12), tra07(nl-1,nod2D,12), &
-                 tra08(nl-1,nod2D,12), tra09(nl-1,nod2D,12), tra10(nl-1,nod2D,12), tra11(nl-1,nod2D,12), &
-                 tra12(nl-1,nod2D,12), tra13(nl-1,nod2D,12), tra14(nl-1,nod2D,12), tra15(nl-1,nod2D,12), &
-                 tra16(nl-1,nod2D,12), tra17(nl-1,nod2D,12), &
-                 tra19(nl-1,nod2D,12), tra20(nl-1,nod2D,12), tra21(nl-1,nod2D,12), tra22(nl-1,nod2D,12), &
-                 tra24(nl-1,nod2D,12), tra25(nl-1,nod2D,12), tra26(nl-1,nod2D,12), tra27(nl-1,nod2D,12), &
-                 tra28(nl-1,nod2D,12), tra29(nl-1,nod2D,12), tra30(nl-1,nod2D,12))
-! all warp tracers stacked in a 4d array
-        allocate(trall(nl-1,nod2D,12,25))
-! broadcasted 3d-array of warp tracers
-        allocate(tr_arr_warp(nl-1,node_size,25))
-
-        trall(:,:,:,1) = tra04
-        trall(:,:,:,2) = tra05
-        trall(:,:,:,3) = tra06
-        trall(:,:,:,4) = tra07
-        trall(:,:,:,5) = tra08
-        trall(:,:,:,6) = tra09
-        trall(:,:,:,7) = tra10
-        trall(:,:,:,8) = tra11
-        trall(:,:,:,9) = tra12
-        trall(:,:,:,10) = tra13
-        trall(:,:,:,11) = tra14
-        trall(:,:,:,12) = tra15
-        trall(:,:,:,13) = tra16
-        trall(:,:,:,14) = tra17
-        trall(:,:,:,15) = tra19
-        trall(:,:,:,16) = tra20
-        trall(:,:,:,17) = tra21
-        trall(:,:,:,18) = tra22
-        trall(:,:,:,19) = tra24
-        trall(:,:,:,20) = tra25
-        trall(:,:,:,21) = tra26
-        trall(:,:,:,22) = tra27
-        trall(:,:,:,23) = tra28
-        trall(:,:,:,24) = tra29
-        trall(:,:,:,25) = tra30
-
-        tr_arr_warp = 0.
-      end if    ! ciso_warp
     end if      ! ciso
 
     !___________________________________________________________________________
@@ -441,9 +399,6 @@ endif
     end if
 !   ciso_14
 
-! Initialize warp tracers
-    if (ciso_warp) call recom_ciso_warp_init(mesh, warp_file)
-  end if
 ! ciso
 
 ! Mask hydrothermal vent in Eastern Equatorial Pacific GO
