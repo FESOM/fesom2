@@ -43,38 +43,7 @@ subroutine recom_sinking_new(tr_num,mesh)
 !< This hardcoded part is temporary 
 !< .OG. 07.07.2021
 
-    Vsink=0.0_WP
-
-if (1==2) then
-    if (tracer_id(tr_num)==1007 .or.    &  !idetn
-        tracer_id(tr_num)==1008 .or.    &  !idetc
-        tracer_id(tr_num)==1017 .or.    &  !idetsi
-        tracer_id(tr_num)==1021 ) then     !idetcal
-	   
-            Vsink = VDet 
-          
-    elseif(tracer_id(tr_num)==1004 .or. &  !iphyn
-        tracer_id(tr_num)==1005 .or.    &  !iphyc
-        tracer_id(tr_num)==1020 .or.    &  !iphycal
-        tracer_id(tr_num)==1006 ) then     !ipchl
-
-            Vsink = VPhy
-
-    elseif(tracer_id(tr_num)==1013 .or. &  !idian
-        tracer_id(tr_num)==1014 .or.    &  !idiac
-        tracer_id(tr_num)==1016 .or.    &  !idiasi
-        tracer_id(tr_num)==1015 ) then     !idchl
-
-            Vsink = VDia
-            
-    elseif(tracer_id(tr_num)==1025 .or. &  !idetz2n
-         tracer_id(tr_num)==1026 .or. &  !idetz2c
-         tracer_id(tr_num)==1027 .or. &  !idetz2si
-         tracer_id(tr_num)==1028 ) then  !idetz2calc 
-            
-            Vsink = VDet_zoo2            
-    end if
-end if
+Vsink=0.0_WP
 
 if (any(recom_det_tracer_id == tracer_id(tr_num))) Vsink = VDet
 if (any(recom_phy_tracer_id == tracer_id(tr_num))) Vsink = VPhy
