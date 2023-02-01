@@ -78,8 +78,8 @@ subroutine recom_init(mesh)
     allocate(wFluxDia(benthos_num))     ! [mmol/(m2 * day)] Flux of N,C, Si and chl through sinking of diatoms  
 
 if (REcoM_Second_Zoo) then
-    allocate(GlowFluxDet(node_size,benthos_num*2))
-    allocate(wFluxDet(benthos_num*2))     ! [mmol/(m2 * day)] Flux of N,C,Si and calc through sinking of detritus
+    allocate(GlowFluxDet(node_size,benthos_num+4))
+    allocate(wFluxDet(benthos_num+4))     ! [mmol/(m2 * day)] Flux of N,C,Si and calc through sinking of detritus
 else
     allocate(GlowFluxDet(node_size,benthos_num))
     allocate(wFluxDet(benthos_num))     ! [mmol/(m2 * day)] Flux of N,C,Si and calc through sinking of detritus

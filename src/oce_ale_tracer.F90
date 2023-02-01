@@ -171,8 +171,10 @@ subroutine solve_tracers_ale(mesh)
     integer             :: tr_arr_slice_count_fix_1
 
 ! kh 28.03.22
+#if defined(__recom)
     integer             :: Sinkflx_tr_slice_count_fix_1
     integer             :: Benthos_tr_slice_count_fix_1
+#endif
 
     integer             :: tr_num_start_local
     integer             :: tr_num_to_send
@@ -210,8 +212,10 @@ subroutine solve_tracers_ale(mesh)
     tr_arr_slice_count_fix_1 = 1 * (nl - 1) * (myDim_nod2D + eDim_nod2D)
 
 ! kh 28.03.22
+#if defined(__recom)
     Sinkflx_tr_slice_count_fix_1 = 1 * (myDim_nod2D + eDim_nod2D) * bottflx_num
     Benthos_tr_slice_count_fix_1 = 1 * (myDim_nod2D + eDim_nod2D) * benthos_num
+#endif
 
     tr_num_start_memo = tr_num_start
 
@@ -222,8 +226,10 @@ subroutine solve_tracers_ale(mesh)
 
 ! kh 25.03.22 SinkFlx and Benthos values are buffered per tracer index and summed up after the loop to
 ! avoid non bit identical results regarding global sums when running the tracer loop in parallel
+#if defined(__recom)
         SinkFlx_tr(:, :, tr_num) = 0.0d0
         Benthos_tr(:, :, tr_num) = 0.0d0
+#endif
 
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part 
         ! needed
@@ -280,11 +286,13 @@ end if ! WARP
 !                   call MPI_IBcast(tr_arr_old (:, :, tr_num_to_send), tr_arr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
 !                                               group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, tr_arr_old_requests(request_count), MPIerr)
 
+#if defined(__recom)
                     call MPI_IBcast(Sinkflx_tr (:, :, tr_num_to_send), Sinkflx_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
                                                 group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, SinkFlx_tr_requests(request_count), MPIerr)
 
                     call MPI_IBcast(Benthos_tr (:, :, tr_num_to_send), Benthos_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
                                                 group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, Benthos_tr_requests(request_count), MPIerr)
+#endif
 
                 end if
             end do
@@ -308,11 +316,13 @@ end if ! WARP
 !               call MPI_Ibcast(tr_arr_old (:, :, tr_num_end), tr_arr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
 !                               group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, tr_arr_old_requests(request_count), MPIerr)
 
+#if defined(__recom)
                 call MPI_IBcast(Sinkflx_tr (:, :, tr_num_end), Sinkflx_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
                                 group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, SinkFlx_tr_requests(request_count), MPIerr)
 
                 call MPI_IBcast(Benthos_tr (:, :, tr_num_end), Benthos_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
                                 group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, Benthos_tr_requests(request_count), MPIerr)
+#endif
             end if
         end do
     end if !(num_fesom_groups > 1) then
@@ -334,19 +344,23 @@ end if ! WARP
             call MPI_TESTALL(request_count, SinkFlx_tr_requests(:), completed, MPI_STATUSES_IGNORE, MPIerr)
         end do
 
+#if defined(__recom)
         completed = .false.
         do while (.not. completed)
             call MPI_TESTALL(request_count, Benthos_tr_requests(:), completed, MPI_STATUSES_IGNORE, MPIerr)
         end do
+#endif
 
     end if ! (num_fesom_groups > 1) then
 
 ! kh 25.03.22 SinkFlx and Benthos values are buffered per tracer index in the loop above and now summed up to
 ! avoid non bit identical results regarding global sums when running the tracer loop in parallel
+#if defined(__recom)
     do tr_num = 1, num_tracers
         SinkFlx = SinkFlx + SinkFlx_tr(:, :, tr_num)
         Benthos = Benthos + Benthos_tr(:, :, tr_num)
     end do
+#endif
 
     !___________________________________________________________________________
     do tr_num=1, ptracers_restore_total
@@ -1029,10 +1043,9 @@ end subroutine diff_ver_part_impl_ale
 !
 !
 !===============================================================================
-!
-! CV: This is a new routine by Ozgur that calculates sinking into the
-! benthos layer. I adapter it for the tracer_ids (no second detritus,
-! but carbon isotopes instead
+! YY: sinking of second detritus adapted from Ozgur's code
+! code structure different: not using recom_det_tracer_id, since 
+! second detritus could have a different sinking speed than the first
 !===============================================================================
 subroutine ver_sinking_recom_benthos(tr_num,mesh)
     use o_ARRAYS
@@ -1115,14 +1128,14 @@ end if
 ! Constant vertical sinking for the second detritus class
 ! *******************************************************
 
-!   if (REcoM_Second_Zoo) then ! No variable sinking
-!        elseif(tracer_id(tr_num)==1025 .or. &  !idetz2n
-!               tracer_id(tr_num)==1026 .or. &  !idetz2c
-!               tracer_id(tr_num)==1027 .or. &  !idetz2si
-!               tracer_id(tr_num)==1028 ) then  !idetz2calc
-!
-!               Vben = VDet_zoo2
-!!        endif
+!if (REcoM_Second_Zoo) then ! No variable sinking
+  if(tracer_id(tr_num)==1025 .or. &  !idetz2n
+     tracer_id(tr_num)==1026 .or. &  !idetz2c
+     tracer_id(tr_num)==1027 .or. &  !idetz2si
+     tracer_id(tr_num)==1028 ) then  !idetz2calc
+
+     Vben = VDet_zoo2
+  endif
 
         Vben= Vben/SecondsPerDay ! conversion [m/d] --> [m/s] (vertical velocity, note that it is positive here)
 
@@ -1141,35 +1154,17 @@ end if
            add_benthos_2d(n) = add_benthos_2d(n) - (aux(nz))*dt
         end do                 
 
-        ! Initialize sinking fluxes to zero at first call of
-        ! subroutine. This assumes that the routine is called for the
-        ! phytoplankton N tracer before it is called for all other
-        ! tracers, i.e. that the subroutine is called for the
-        ! different tracers in the order of how they are sorted in
-        ! REcoM. Not very clean, find a better solution later.
-!        if (tracer_id(tr_num)==1004 .and. use_MEDUSA) then
-!           SinkFlx(n,:) = 0.0d0 
-!        endif
-        
         ! Particulate Organic Nitrogen
         if(tracer_id(tr_num)==1004 .or. &  !iphyn
-             tracer_id(tr_num)==1007 .or. &  !idetn
-             tracer_id(tr_num)==1013 ) then  !idian
+           tracer_id(tr_num)==1007 .or. &  !idetn
+           tracer_id(tr_num)==1013 .or. &  !idian
+           tracer_id(tr_num)==1025 ) then  !idetz2n
            if (use_MEDUSA) then
-
 ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
               SinkFlx_tr(n,1,tr_num) = SinkFlx_tr(n,1,tr_num) + add_benthos_2d(n) / area(1,n)/dt
                              ![mmol/m2]
-        ! now SinkFlx hat the unit mmol/time step 
-        ! but mmol/sec is needed for output
-!             if (n .eq. 4) then
-!              if(tracer_id(tr_num)==1004) print *, "sink flux of phyN =", SinkFlx(n,1)
-!              if(tracer_id(tr_num)==1007) print *, "sink flux of phyN/detN =", SinkFlx(n,1)
-!              if(tracer_id(tr_num)==1013) print *, "sink flux of phyN/detN/diaN =", SinkFlx(n,1)
-!             endif
            endif
            if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then  
-           
 ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
               Benthos_tr(n,1,tr_num)= Benthos_tr(n,1,tr_num) +  add_benthos_2d(n) ![mmol]
            endif
@@ -1177,8 +1172,9 @@ end if
          
         ! Particulate Organic Carbon
         if( tracer_id(tr_num)==1005 .or. &  !iphyc
-             tracer_id(tr_num)==1008 .or. &  !idetc
-             tracer_id(tr_num)==1014 ) then  !idiac
+            tracer_id(tr_num)==1008 .or. &  !idetc
+            tracer_id(tr_num)==1014 .or. &  !idiac
+            tracer_id(tr_num)==1026 ) then  !idetz2c
            if (use_MEDUSA) then
 
 ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
@@ -1193,7 +1189,8 @@ end if
 
         ! Particulate Organic Silicon
         if( tracer_id(tr_num)==1016 .or. &  !idiasi
-             tracer_id(tr_num)==1017 ) then  !idetsi
+            tracer_id(tr_num)==1017 .or. &  !idetsi
+            tracer_id(tr_num)==1027 ) then  !idetz2si
            if (use_MEDUSA) then
 
 ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
@@ -1208,7 +1205,8 @@ end if
 
         ! Calcium Carbonate
         if( tracer_id(tr_num)==1020 .or. &  !iphycal
-             tracer_id(tr_num)==1021 ) then  !idetcal
+            tracer_id(tr_num)==1021 .or. &  !idetcal
+            tracer_id(tr_num)==1028 ) then  !idetz2cal
            if (use_MEDUSA) then
 
 ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
