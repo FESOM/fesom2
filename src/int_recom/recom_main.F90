@@ -52,10 +52,6 @@ subroutine recom(mesh)
   integer                    :: idiags
 
   real(kind=8)               :: Sali, net, net1, net2
-
-!! WARP
-  logical :: do_update = .false.
-!!
   
   real (kind=8), allocatable :: Temp(:),  zr(:), PAR(:)
   real(kind=8),  allocatable :: C(:,:)
@@ -92,16 +88,6 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> bio_fluxes'
                                          'Year, xCO2 (ppm), cosmic 14C flux (at / cm² / s):', &
                                           yearold, x_co2atm(1), x_co2atm_13(1), x_co2atm_14(1), cosmic_14(1) * production_rate_to_flux_14
     end if
-  end if
-
-  if (ciso .and. ciso_warp) then
-!   Periodic update of WARP tracers
-    call recom_ciso_warp_update(do_update)
-    if (do_update) then
-      do tr_num = 1,25
-        call broadcast_nod3D(tr_arr_warp(:,:,tr_num), trall(:,:,month,tr_num))
-      end do
-    endif
   end if
 
 ! ======================================================================================
@@ -189,16 +175,6 @@ end if ! use_MEDUSA and sedflx_num not 0
 
      !!---- Biogeochemical tracers
      C(1:nzmax,1:bgc_num) = tr_arr(1:nzmax, n, 3:num_tracers)             
-
-     if (ciso .and. ciso_warp) then
-!      Replace warp tracer concentrations with climatological-mean (monthly) values
-!      Original WARP -- transporting DIN, DIC|13|14, Alk, Si
-       C(1:nzmax, 4:17 ) = tr_arr_warp(1:nzmax, n, 1:14)
-!      C(1:nzmax, 18   ) = Si
-       C(1:nzmax, 19:22) = tr_arr_warp(1:nzmax, n, 15:18)
-!      C(1:nzmax, 23)    = DIC_13
-       C(1:nzmax, 24:30) = tr_arr_warp(1:nzmax, n, 19:25)
-     end if
 
      !!---- Depth of the nodes in the water column 
      zr(1:nzmax)          = Z_3d_n(1:nzmax, n)                          
