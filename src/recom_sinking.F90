@@ -80,8 +80,8 @@ if (Vsink .gt. 0.1) then ! No sinking if Vsink < 0.1 m/day
                tracer_id(tr_num)==1026 .or. &  !idetz2c
                tracer_id(tr_num)==1027 .or. &  !idetz2si
                tracer_id(tr_num)==1028 ) then  !idetz2calc      
+               Vsink = VDet_zoo2
                Wvel_flux(nz) = -Vsink/SecondsPerDay ! --> VDet_zoo2
-
             endif
       end do
 

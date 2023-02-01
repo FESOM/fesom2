@@ -37,7 +37,7 @@ module recom_config
                                                         1016, 1017, 1020, 1021, 1025, 1026, 1027, 1028, &
                                                         1308, 1321, 1305, 1320, & 
                                                         1314, 1408, 1421, 1405, 1420, 1414/)
-  integer, dimension(12)  :: recom_det_tracer_id     = (/1007, 1008, 1017, 1021, 1025, 1026, 1027, 1028, &
+  integer, dimension(8)  :: recom_det_tracer_id     = (/1007, 1008, 1017, 1021,& 
                                                         1308, 1321, 1408, 1421/)
   integer, dimension(8)  :: recom_phy_tracer_id     = (/1004, 1005, 1020, 1305, 1320, 1405, 1420, 1006/)
   integer, dimension(6)  :: recom_dia_tracer_id     = (/1013, 1014, 1314, 1414, 1016, 1015/)

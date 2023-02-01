@@ -52,7 +52,9 @@ subroutine recom(mesh)
   integer                    :: idiags
 
   real(kind=8)               :: Sali, net, net1, net2
-  
+
+  logical :: do_update = .false. 
+
   real (kind=8), allocatable :: Temp(:),  zr(:), PAR(:)
   real(kind=8),  allocatable :: C(:,:)
   character(len=2)           :: tr_num_name
@@ -78,17 +80,17 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//' --> Erosion_input'/
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> bio_fluxes'//achar(27)//'[0m'
   call bio_fluxes(mesh)       !<  alkalinity restoring/ virtual flux is possible
 
-  if (use_atbox) then
+if (use_atbox) then
 ! Prognostic atmospheric isoCO2
-    call recom_atbox(mesh)
-!   optional I/O of isoCO2 and inferred cosmogenic 14C production; this may cost some CPU time
+  call recom_atbox(mesh)
+! optional I/O of isoCO2 and inferred cosmogenic 14C production; this may cost some CPU time
     if (ciso .and. ciso_14) then
       call annual_event(do_update)
       if (do_update .and. mype==0) write (*, fmt = '(a50,2x,i6,4(2x,f6.2))') &
                                          'Year, xCO2 (ppm), cosmic 14C flux (at / cm² / s):', &
                                           yearold, x_co2atm(1), x_co2atm_13(1), x_co2atm_14(1), cosmic_14(1) * production_rate_to_flux_14
     end if
-  end if
+end if
 
 ! ======================================================================================
 !************************* READ BOTTOM BOUNDARY FILES*********************************

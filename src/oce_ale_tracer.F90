@@ -547,9 +547,8 @@ if (any(recom_sinking_tracer_id == tracer_id(tr_num))) then
                                                 vert_sink(nzmin:nzmax,n)
             tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
                                                 str_bf(nzmin:nzmax,n)
-!YY: why not in one equation?
         end do                             
- end if
+end if
 
 ! 3) Nitrogen SS
     if (NitrogenSS .and. tracer_id(tr_num)==1008) then ! idetc
