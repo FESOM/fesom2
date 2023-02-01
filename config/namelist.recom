@@ -266,8 +266,6 @@ surf_relax_Alk      = 0. !!3.2e-07 !10.d0/31536000.d0
 ciso_init         = .false.     ! initial fractionation of bulk organic matter
 ciso_14           = .true.      ! include inorganic radiocarbon
 ciso_organic_14   = .false.     ! include organic radiocarbon
-ciso_warp         = .false.     ! accelerate RECOM -- HIGHLY EXPERIMENTAL
-warp_file         = "warptracers.nc"
 lambda_14         = 3.8561e-12  ! corresponding to 1 year = 365.00 days
 delta_CO2_13      = -6.61       ! atmospheric d13C (permil), global-mean value
 big_delta_CO2_14(1)  = 0. ! atmospheric D14C (permil), northern hemisphere polewards of 30°N
