@@ -607,17 +607,15 @@ module REcoM_ciso
   logical :: ciso_init             = .false.  ! Initial fractionation of bulk organic matter
   logical :: ciso_14               = .false.  ! Include radiocarbon (-> 31 or 38 tracers)
   logical :: ciso_organic_14       = .false.  ! Include organic radiocarbon (-> 38 tracers)
-  logical :: ciso_warp             = .false.  ! Accelerate RECOM simulations -- HIGHLY EXPERIMENTAL
-  character(300) :: warp_file = ' '
   real(kind=8) :: delta_co2_13        = -6.61
   real(kind=8) :: big_delta_co2_14(3) = (/0., 0., 0./) 
   real(kind=8) :: lambda_14 = 3.8561e-12      ! Decay constant of carbon-14
-! UNDER CONSTRUCTION - for revised atbox 14CO2 implementation
+! for revised atbox 14CO2 implementation
   logical      :: atbox_spinup    = .true.
   real(kind=8) :: cosmic_14_init  = 2.0       ! Initial 14C production flux (atoms / s / cm**2)
 
 
-  namelist / paciso / ciso_init, ciso_14, ciso_organic_14, ciso_warp, warp_file, &
+  namelist / paciso / ciso_init, ciso_14, ciso_organic_14, &
                       lambda_14, delta_co2_13, big_delta_co2_14, &
                       atbox_spinup, cosmic_14_init
 
@@ -671,8 +669,6 @@ module REcoM_ciso
                   PhyCalc_13, PhyCalc_14,         & ! [mmol/m3] Conc of 13|14C in calcite of phytoplankton
                   DetCalc_13, DetCalc_14            ! [mmol/m3] Conc of 13|14C in calcite of detritus
   real(kind=8),allocatable,dimension(:) :: Cphot_z, Cphot_dia_z ! Vertical profiles of photosynthesis rates
-!!  real(kind=8),dimension(47) :: Cphot_z, Cphot_dia_z ! Vertical profiles of
-!photosynthesis rates, fesom1: 46 -> 47 in fesom2
 
 ! Subroutine REcoM_init:
   real(kind=8),allocatable,dimension(:,:) :: delta_dic_13_init, &     ! auxiliary initial
@@ -711,28 +707,9 @@ module REcoM_ciso
 ! if 1 year := 365.25 days:  lambda_14 = 3.8534e-12 / second
 ! if 1 year := 365.00 days:  lambda_14 = 3.8561e-12 / second
 ! if 1 year := 360    days:  lambda_14 = 3.9096e-12 / second
-!!  real(kind=8) :: radio_decay_14
+
 ! Tracer IDs to be considered in decay calculations (oce_ale_tracer.F90)
   integer, dimension(8) :: c14_tracer_id = (/1402, 1405, 1408, 1410, 1412, 1414, 1420, 1421/)
-
-! WARP - Highly experimental acceleration of plankton tracers
-! IDs of tracers to be omitted in transport calculations (oce_ale_tracer.F90)
-! tracer_ID  =0,1,1001,1002,1003,1004,1005,1006,1007,1008,1009,1010,1011,1012,1013,1014,1015,1016,1017,1018,1019,1020,1021,1022,1302,1305,1308,1310,1312,1314,1320,1321,1402
-
-!! New template for WARP tracers (31 March 2021)
- integer, dimension(25) :: warp_tracer_id = (/          1004,1005,1006,1007,1008,1009,1010,1011,1012,1013,1014,1015,1016,1017,     1019,1020,1021,1022, &
-                                                             1305,          1308,     1310,     1312,     1314,                         1320,1321 /)
-
-
-! 3d-arrays of individual warp tracers
-  real(kind=8),allocatable,dimension(:,:,:) :: tra04,tra05,tra06,tra07,tra08,tra09,tra10, &
-                                               tra11,tra12,tra13,tra14,tra15,tra16,tra17, &
-                                               tra19,tra20,tra21,tra22, &
-                                               tra24,tra25,tra26,tra27,tra28,tra29,tra30
-! 4d-array including all warp tracers
-  real(kind=8),allocatable,dimension(:,:,:,:) :: trall
-! 3d-array used to replace default tracer concentrations with warp tracer values
-  real(kind=8),allocatable,dimension(:,:,:) :: tr_arr_warp
 
   contains
 
@@ -846,93 +823,9 @@ module REcoM_ciso
 
     return
     end subroutine recom_ciso_photo
-!   ----------------------------------------------------------------------------------
-
-    subroutine recom_ciso_warp_init(mesh, warpfile)
-!   ----------------------------------------------------------------------------------
-!      Subroutine to initialize monthly warp tracers reading 4D netCDF input fields
-!   ----------------------------------------------------------------------------------
-      use g_clock
-      use g_PARSUP
-      use mod_MESH
-      use o_mesh
-      use io_mesh_info
-
-      implicit none
-
-#include "netcdf.inc"
-      integer                   :: status, ncid, in, mm
-      integer                   :: j, jd
-      integer, dimension(25)    :: varid 
-      integer, dimension(3)     :: dimid, istart, icount
-      
-      character(300),intent(in) :: warpfile
-      character(300)            :: filename
-      character(10)             :: varname
-      character(2)              :: jstring
-      
-      type(t_mesh), intent(in) , target :: mesh
-#include "../associate_mesh.h"
-
-! Recap of tracer codes and names
-! tracer_ID = 0,1,1001,1002,1003,1004,1005,1006,1007,1008,1009,1010,1011,1012,1013,1014,1015,1016, 1017, 1018,1019,1020,  1021,  1022,1033,  1093,   1123,   1143,   1163,  1183,   1223,     1233,     1034
-! bgc_name  = t,s,din, dic, alk, phyn,phyc,pchl,detn,detc,hetn,hetc,don, doc, dian,diac,dchl,diasi,detsi,si,  fe  ,phycal,detcal,oxy, dic_13,phyc_13,detc_13,hetc_13,doc_13,diac_13,phycal_13,detcal_13,dic_14
-! bgc_num   =     1,   2,   3,   4,   5,   6,   7,   8,   9,   10,  11,  12,  13,  14,  15,  16,   17,   18,  19,  20,    21,    22,  23,    24,     25,     26,     27,    28,     29 ,      30,       31
-! warp_id   = (/                 1004,1005,1006,1007,1008,1009,1010,1011,1012,1013,1014,1015,1016,1017,       1019,1020,  1021, 1022,        1093,   1123,   1143,   1163,  1183,   1223,     1233           /)
+!   ----------------------------------------------------------------------------------  
  
-      filename = trim(ResultPath)//trim(warpfile)
-
-      istart= (/1, 1, 1/)
-      icount= (/nl-1,nod2D,12/)
-
-!     Open file
-      if (mype==0) print *, "Loading WARP tracers from ", warpfile
-      status = nf_open(filename, nf_nowrite, ncid);    if(status /= nf_noerr) call handle_err(status)
-
-!     Get dimension IDs
-      status = nf_inq_dimid(ncid, 'time',  dimid(1));  if(status /= nf_noerr) call handle_err(status)
-      status = nf_inq_dimid(ncid, 'node',  dimid(2));  if(status /= nf_noerr) call handle_err(status)
-      status = nf_inq_dimid(ncid, 'nz_1',  dimid(3));  if(status /= nf_noerr) call handle_err(status)
-
-!     Get variables (skipping time as variable)
-!     We need 'jd' as auxiliary index because we have skip two variables in between 
-!     'trall' is allocated and defined in recom_init
-      jd = 1
-      do j = 4,30
-        write (jstring, '(i2)') j
-        varname = trim('tra0')//trim(adjustl(jstring))
-        if  (j >= 10) varname = trim('tra')//trim(jstring)
-        if ((j == 18) .or. (j == 23)) cycle 
-        status = nf_inq_varid(ncid, varname, varid(jd)); if(status /= nf_noerr) call handle_err(status)
-        status = nf_get_vara_double(ncid, varid(jd), istart, icount, trall(:,:,:,jd)); if (status /= nf_noerr) call handle_err(status)
-        jd = jd + 1
-      end do
-      status = nf_close(filename, nf_nowrite, ncid)  !! not needed for datasets which are open only for reading
-
-    end subroutine recom_ciso_warp_init
-!   ----------------------------------------------------------------------------------
-
-
-    subroutine recom_ciso_warp_update(do_update)
-!   ----------------------------------------------------------------------------------
-!       Subroutine to update WARP tracers in the beginning of the month, adopted
-!       from subroutine "monthly_event" doing the update at the end of the month
-!   ----------------------------------------------------------------------------------
-      use g_clock
-      implicit none
-
-      logical :: do_update
-
-      if (day_in_month==1 .and. timenew==86400.) then
-        do_update=.true.
-      else
-        do_update=.false.
-      end if
-
-    end subroutine recom_ciso_warp_update
-!   ----------------------------------------------------------------------------------
-
-
+ 
     function lat_zone(lat_n)
 !   ----------------------------------------------------------------------------------
 !   Assign latitude zones from nodal latitude values 
