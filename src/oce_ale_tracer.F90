@@ -515,20 +515,6 @@ real :: net
 !    Nutrient fluxes come from the bottom boundary
 !    Unit [mmol/m2/s]
 
-
-!YY: the following is replaced by using recom_remin_tracer_id (defined in
-!recom_modules.F90) AND ciso starts from 1301 now
-
-!!    if (tracer_id(tr_num) == 1001 .or.    &   ! DIN
-!!        tracer_id(tr_num) == 1002 .or.    &   ! DIC
-!!        tracer_id(tr_num) == 1003 .or.    &   ! Alk
-!!        tracer_id(tr_num) == 1018 .or.    &   ! Si
-!!        tracer_id(tr_num) == 1019 .or.    &   ! Fe
-!! !#if defined(__ciso)
-!!        tracer_id(tr_num) == 1302 .or.    &   ! DIC_13  ! CV: Ozgurs code has 1033
-!!        tracer_id(tr_num) == 1402 .or.    &   ! DIC_14  ! CV: Ozgurs code has 1034
-!! !#endif
-!!        tracer_id(tr_num) == 1022     ) then  ! Oxy
 if (any(recom_remin_tracer_id == tracer_id(tr_num))) then
 
 ! call bottom boundary 
