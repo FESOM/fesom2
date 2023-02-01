@@ -5,7 +5,11 @@ module io_netcdf_file_module
   private
 
   type dim_type
+#if !defined(_CRAYFTN)
     character(:), allocatable :: name
+#else
+    character(1000)           :: name
+#endif
     integer len
     integer ncid
   end type
@@ -15,7 +19,11 @@ module io_netcdf_file_module
   end type
 
   type var_type ! todo: use variable type from io_netcdf_module here
+#if !defined(_CRAYFTN)
     character(:), allocatable :: name
+#else
+    character(1000)           :: name
+#endif
     integer, allocatable :: dim_indices(:)
     integer datatype
     type(att_type_wrapper) :: atts(15) ! use a fixed size array to store our netcdf variable attributes as nvfortran seems to loose allocation of derived types which contain allocatable types when copying the array
