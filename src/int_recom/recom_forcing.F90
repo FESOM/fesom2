@@ -199,14 +199,13 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
 
 !   Biogenic fractionation due to photosynthesis of plankton
 !   phyc_13|14 and diac_13|14 are only used in REcoM_sms to calculate DIC_13|14, DOC_13|14 and DetC_13|14
-!   This step has to be bypassed in WARP calculations
-    if (.not. ciso_warp) then
-      call recom_ciso_photo(co2(1)) ! -> alpha_p
-      r_phyc_13 = r_co2s_13 / alpha_p_13
-      r_diac_13 = r_co2s_13 / alpha_p_dia_13
-      state(1:nn,iphyc_13)   = max((tiny_C   * r_phyc_13), (state(1:nn,iphyc) * r_phyc_13))
-      state(1:nn,idiac_13)   = max((tiny_C_d * r_diac_13), (state(1:nn,idiac) * r_diac_13))
-    end if
+
+    call recom_ciso_photo(co2(1)) ! -> alpha_p
+    r_phyc_13 = r_co2s_13 / alpha_p_13
+    r_diac_13 = r_co2s_13 / alpha_p_dia_13
+    state(1:nn,iphyc_13)   = max((tiny_C   * r_phyc_13), (state(1:nn,iphyc) * r_phyc_13))
+    state(1:nn,idiac_13)   = max((tiny_C_d * r_diac_13), (state(1:nn,idiac) * r_diac_13))
+
 !   The same for radiocarbon, fractionation factors have been already derived above
     if (ciso_14) then
 !   Air-sea exchange
@@ -217,7 +216,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
       co2flux_14 = (alpha_k_14 * alpha_aq_14 - 0.0004) * kwco2 * (r_atm_14 * co2sat - r_dic_14 * co2(1) / alpha_dic_14)
       co2flux_seaicemask_14 = co2flux_14 * 1.e3
 !   Biogenic fractionation
-      if (ciso_organic_14 .and. (.not. ciso_warp)) then
+      if (ciso_organic_14) then
         r_phyc_14 = r_co2s_14 / alpha_p_14
         r_diac_14 = r_co2s_14 / alpha_p_dia_14
         state(1:nn,iphyc_14) = max((tiny_C   * r_phyc_14), (state(1:nn,iphyc) * r_phyc_14))
