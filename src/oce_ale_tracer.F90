@@ -146,7 +146,7 @@ subroutine solve_tracers_ale(mesh)
     use REcom_config, only: use_atbox, ciso, &       ! to calculate prognostic 14CO2 and the radioactive decay of 14C
                             bottflx_num, benthos_num ! kh 28.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
 
-    use REcoM_ciso, only: ciso_14, ciso_organic_14, c14_tracer_id, lambda_14, ciso_warp, warp_tracer_id
+    use REcoM_ciso, only: ciso_14, ciso_organic_14, c14_tracer_id, lambda_14
 #endif
     
     implicit none
@@ -236,12 +236,6 @@ subroutine solve_tracers_ale(mesh)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
         call init_tracers_AB(tr_num, mesh)
         
-#if defined(__recom)
-if (ciso_warp .and. any(warp_tracer_id == tracer_id(tr_num))) then
-!       WARP - Highly experimental acceleration of P/DOC simulations
-!       Skip advection and diffusion of P/DOC
-else
-#endif
         ! advect tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
         call adv_tracers_ale(tr_num, mesh)
@@ -249,9 +243,7 @@ else
         ! diffuse tracers 
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
         call diff_tracers_ale(tr_num, mesh)
-#if defined(__recom)
-end if ! WARP
-#endif        
+       
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
         call relax_to_clim(tr_num, mesh)
