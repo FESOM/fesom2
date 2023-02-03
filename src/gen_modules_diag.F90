@@ -251,7 +251,7 @@ subroutine diag_turbflux(mode, dynamics, tracers, partit, mesh)
   integer                                  :: n, nz, nzmax, nzmin
   real(kind=WP), dimension(:,:,:), pointer :: UVnode
   real(kind=WP), dimension(:,:),   pointer :: temp, salt
-  real(kind=WP)                            :: val, dz_inv
+  real(kind=WP)                            :: dz_inv
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
