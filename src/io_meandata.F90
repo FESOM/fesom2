@@ -1,5 +1,10 @@
 module io_MEANDATA
 
+#if defined(__recom)
+  use REcoM_GloVar
+  use recom_config
+  use REcoM_ciso
+#endif
   use o_PARAM, only : WP
   use, intrinsic :: iso_fortran_env, only: real64, real32
   use io_data_strategy_module
@@ -104,6 +109,7 @@ subroutine ini_mean_io(mesh)
 !  use REcoM_ciso
 #endif
   use i_PARAM, only: whichEVP
+  use g_forcing_arrays !wiso-code
   implicit none
   integer                   :: i, j
   integer, save             :: nm_io_unit  = 103       ! unit to open namelist file, skip 100-102 for cray
@@ -441,6 +447,79 @@ CASE ('GNAc     ')
     if (use_REcoM) then
     call def_stream(nod2D,  myDim_nod2D,   'GNAc','Gross N-assimilation coccolithophores','mmolN/(m2*d)', diags2D(:,12), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh) ! NEW
     endif
+
+!_________________________________________________________________________________________________
+! output of sinking fluxes for MEDUSA
+CASE ('sinkPON  ')
+    if (use_REcoM)  then
+    if (use_MEDUSA) then
+    call def_stream(nod2D,  myDim_nod2D,   'sinkPON','sinking flux of particulate organic nitrogen','mmolN/(m2*s)', SinkFlx(:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    end if
+    end if
+
+CASE ('sinkPOC  ')
+    if (use_REcoM)  then
+    if (use_MEDUSA) then
+    call def_stream(nod2D,  myDim_nod2D,   'sinkPOC','sinking flux of particulate organic carbon','mmolC/(m2*s)', SinkFlx(:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    end if
+    end if
+
+CASE ('sinkOpal ')
+    if (use_REcoM)  then
+    if (use_MEDUSA) then
+    call def_stream(nod2D,  myDim_nod2D,   'sinkOpal','sinking flux of opal','mmol/(m2*s)', SinkFlx(:,3), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    end if
+    end if
+
+CASE ('sinkCalc ')
+    if (use_REcoM)  then
+    if (use_MEDUSA) then
+    call def_stream(nod2D,  myDim_nod2D,   'sinkCalc','sinking flux of CaCO3','mmol/(m2*s)', SinkFlx(:,4), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    end if
+    end if
+
+CASE ('sinkC13  ')
+    if (use_REcoM)  then
+    if (use_MEDUSA) then
+    if (ciso) then
+    call def_stream(nod2D,  myDim_nod2D,   'sinkC13','sinking flux of particulate organic carbon-13','mmol/(m2*s)', SinkFlx(:,5), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    end if
+    end if
+    end if
+
+CASE ('sinkCal13')
+    if (use_REcoM)  then
+    if (use_MEDUSA) then
+    if (ciso) then
+    call def_stream(nod2D,  myDim_nod2D,   'sinkCal13','sinking flux of CaCO3-13','mmol/(m2*s)', SinkFlx(:,6), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    end if
+    end if
+    end if
+
+CASE ('sinkC14  ')
+    if (use_REcoM)  then
+    if (use_MEDUSA) then
+    if (ciso .and. ciso_14) then  
+    call def_stream(nod2D,  myDim_nod2D,   'sinkC14','sinking flux of particulate organic carbon-14','mmol/(m2*s)', SinkFlx(:,7), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    end if
+    end if
+    end if
+    
+CASE ('sinkCal14')
+    if (use_REcoM)  then
+    if (use_MEDUSA) then
+    if (ciso .and. ciso_14) then  
+    call def_stream(nod2D,  myDim_nod2D,   'sinkCal14','sinking flux of CaCO3-14','mmol/(m2*s)', SinkFlx(:,8), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    end if
+    end if
+    end if
+
+CASE ('SedDIC   ')
+    if (use_REcoM)  then
+    if (use_MEDUSA) then
+    call def_stream(nod2D,  myDim_nod2D,   'SedDIC','sediment flux of DIC from MEDUSA','mmol/(m2*s)', GloSed(:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    end if
+    end if
 #endif
 !___________________________________________________________________________________________________________________________________    
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>   3D streams   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -497,7 +576,20 @@ CASE ('scaling_rho_2   ')
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'scaling_rho_2', 'scaling factor for sinking of particles in class 2', 'n.d.',  scaling_density2_3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('scaling_visc   ')
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'scaling_visc', 'scaling factor of particle sinking speed', 'n.d.',  scaling_visc_3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-
+!wiso-code!
+CASE ('h2o18     ')
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'h2o18', 'h2o18 concentration',    'kmol/m**3',    tr_arr(:,:,3), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('hDo16     ')
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'hDo16', 'hDo16 concentration',    'kmol/m**3',    tr_arr(:,:,4), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('h2o16     ')
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'h2o16', 'h2o16 concentration',    'kmol/m**3',    tr_arr(:,:,5), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('h2o18_ice ')
+    call def_stream(nod2D,  myDim_nod2D,  'h2o18_ice',      'h2o18 concentration in sea ice',    'kmol/m**3',    tr_arr_ice(:,1),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('hDo16_ice ')
+    call def_stream(nod2D,  myDim_nod2D,  'hDo16_ice',      'hDo16 concentration in sea ice',    'kmol/m**3',    tr_arr_ice(:,2),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('h2o16_ice ')
+    call def_stream(nod2D,  myDim_nod2D,  'h2o16_ice',      'h2o16 concentration in sea ice',    'kmol/m**3',    tr_arr_ice(:,3),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+!wiso-code-end!
 CASE ('otracers  ')
     do j=3, num_tracers
     write (id_string, "(I4.4)") tracer_id(j)

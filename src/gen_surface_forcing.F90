@@ -362,12 +362,14 @@ CONTAINS
          
          if (iost .ne. NF_NOERR) then
             flf%calendar='none'
+            if (my_fesom_group == 0) then !OG
             write(*,*) ' --> could not find/read calendar attribute in the time axis'
             write(*,*) '     of the forcing file (Is this right?). I assume there is'
             write(*,*) '     none and proceed in CORE2 style without leap years!'
+            endif
          else
             flf%calendar=lowercase(aux_calendar)
-            write(*,*) ' --> found calendar attr. in time axis: |',trim(flf%calendar),'|' 
+            if (my_fesom_group == 0) write(*,*) ' --> found calendar attr. in time axis: |',trim(flf%calendar),'|'  !OG
          end if 
          
          ! check for calendar and include_fleapyear consistency
@@ -451,7 +453,7 @@ CONTAINS
          if ( flf%nc_lat(1) > flf%nc_lat(flf%nc_Nlat) ) then
             flip_lat = 1
             flf%nc_lat=flf%nc_lat(flf%nc_Nlat:1:-1)
-            if (mype==0) write(*,*) "fv_sbc: nc_readTimeGrid: FLIP lat and data while lat from -90 to 90"
+            if (mype==0 .and. my_fesom_group == 0) write(*,*) "fv_sbc: nc_readTimeGrid: FLIP lat and data while lat from -90 to 90" !OG
          endif
       endif
 
@@ -903,7 +905,7 @@ CONTAINS
       ! OPEN and read namelist for SBC
       open( unit=nm_sbc_unit, file='namelist.forcing', form='formatted', access='sequential', status='old', iostat=iost )
       if (iost == 0) then
-         if (mype==0) WRITE(*,*) '     file   : ', 'namelist_bc.nml',' open ok'
+         if (mype==0 .and. my_fesom_group == 0) WRITE(*,*) '     file   : ', 'namelist_bc.nml',' open ok' !OG
       else
          if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist_bc.nml',' ; iostat=',iost
          call par_ex
@@ -912,19 +914,19 @@ CONTAINS
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
       close( nm_sbc_unit )
       
-      if (mype==0) write(*,*) "Start: Ocean forcing inizialization."
+      if (mype==0 .and. my_fesom_group == 0) write(*,*) "Start: Ocean forcing inizialization." !OG
       rdate = real(julday(yearnew,1,1))
       rdate = rdate+real(daynew-1,WP)+timenew/86400._WP
       idate = int(rdate)
 
-      if (mype==0) then
+      if (mype==0 .and. my_fesom_group == 0) then !OG
          write(*,*) "Start: Ocean forcing inizialization."
          write(*,*) "Surface boundary conditions parameters:"
       end if
 
       i_totfl=0
       if (l_xwind) then
-         if (mype==0) then
+         if (mype==0 .and. my_fesom_group == 0) then !OG
             write(*,*) "      nm_xwind_file = ", trim(nm_xwind_file) ," ! name of file with X winds"
             write(*,*) "      nm_xwind_var  = ", trim(nm_xwind_var)  ," ! name of variable in file with wind "
          end if
@@ -933,7 +935,7 @@ CONTAINS
       end if
 
       if (l_ywind) then
-         if (mype==0) then
+         if (mype==0 .and. my_fesom_group == 0) then !OG
             write(*,*) "      nm_ywind_file = ", trim(nm_ywind_file) ," ! name of file with Y winds"
             write(*,*) "      nm_ywind_var  = ", trim(nm_ywind_var)  ," ! name of variable in file with wind "
          end if
@@ -942,7 +944,7 @@ CONTAINS
       end if
 
       if (l_humi) then
-         if (mype==0) then
+         if (mype==0 .and. my_fesom_group == 0) then !OG
             write(*,*) "      nm_humi_file = ", trim(nm_humi_file) ," ! name of file with humidity"
             write(*,*) "      nm_humi_var   = ", trim(nm_humi_var) ," ! name of variable in file with humidity  "
          end if
@@ -951,7 +953,7 @@ CONTAINS
       end if
 
       if (l_qsr) then
-         if (mype==0) then
+         if (mype==0 .and. my_fesom_group == 0) then !OG
             write(*,*) "      nm_qsr_file = ", trim(nm_qsr_file) ," ! name of file with solar heat "
             write(*,*) "      nm_qsr_var  = ", trim(nm_qsr_var)  ," ! name of variable in file with solar heat "
          end if
@@ -960,7 +962,7 @@ CONTAINS
       end if
 
       if (l_qlw) then
-         if (mype==0) then
+         if (mype==0 .and. my_fesom_group == 0) then !OG
             write(*,*) "      nm_qlw_file   = ", trim(nm_qlw_file) ," ! name of file with Long wave "
             write(*,*) "      nm_qlw_var    = ", trim(nm_qlw_var)  ," ! name of variable in file with Long wave "
          end if
@@ -969,7 +971,7 @@ CONTAINS
       end if
 
       if (l_tair) then
-         if (mype==0) then
+         if (mype==0 .and. my_fesom_group == 0) then !OG
             write(*,*) "      nm_tair_file  = ", trim(nm_tair_file) ," ! name of file with 2m air temperature "
             write(*,*) "      nm_tair_var   = ", trim(nm_tair_var)  ," ! name of variable in file with 2m air temperature "
          end if
@@ -978,7 +980,7 @@ CONTAINS
       end if
 
       if (l_prec) then
-         if (mype==0) then
+         if (mype==0 .and. my_fesom_group == 0) then !OG
             write(*,*) "      nm_prec_file  = ", trim(nm_prec_file) ," ! name of file with total precipitation "
             write(*,*) "      nm_prec_var   = ", trim(nm_prec_var)  ," ! name of variable in file with total precipitation  "
          end if
@@ -987,7 +989,7 @@ CONTAINS
       end if
 
       if (l_snow) then
-         if (mype==0) then
+         if (mype==0 .and. my_fesom_group == 0) then !OG
             write(*,*) "      nm_snow_file  = ", trim(nm_snow_file) ," ! name of file with snow precipitation "
             write(*,*) "      nm_snow_var   = ", trim(nm_snow_var) , " !name of variable in file with air_pressure_at_sea_level "
          end if
@@ -996,7 +998,7 @@ CONTAINS
       end if
 
       if (l_mslp) then
-         if (mype==0) then
+         if (mype==0 .and. my_fesom_group == 0) then !OG
             write(*,*) "      nm_mslp_file  = ", trim(nm_mslp_file)," !air_pressure_at_sea_level "
             write(*,*) "      nm_mslp_var   = ", trim(nm_mslp_var) ," !name of variable in file with air_pressure_at_sea_level "
          end if
@@ -1004,7 +1006,7 @@ CONTAINS
          i_mslp  =i_totfl
       end if
 
-      if (mype==0) then
+      if (mype==0 .and. my_fesom_group == 0) then !OG
          write(*,*) 'total fluxes to read: ', i_totfl
       end if
 
@@ -1034,8 +1036,8 @@ CONTAINS
          runoff=runoff/1000.0_WP  ! Kg/s/m2 --> m/s
       end if
 
-      if (mype==0) write(*,*) "DONE:  Ocean forcing inizialization."
-      if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
+      if (mype==0 .and. my_fesom_group == 0) write(*,*) "DONE:  Ocean forcing inizialization." !OG
+      if (mype==0 .and. my_fesom_group == 0) write(*,*) 'Parts of forcing data (only constant in time fields) are read' !OG
    END SUBROUTINE sbc_ini
 
    SUBROUTINE sbc_do(mesh)
@@ -1112,7 +1114,7 @@ CONTAINS
                i=month
                if (mstep > 1) i=i+1 
                if (i > 12) i=1
-               if (mype==0) write(*,*) 'Updating SSS restoring data for month ', i 
+               if (mype==0 .and. my_fesom_group == 0) write(*,*) 'Updating SSS restoring data for month ', i !OG
                call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true., mesh) 
             end if
          end if
@@ -1128,7 +1130,7 @@ CONTAINS
            i=month
            if (mstep > 1) i=i+1 
            if (i > 12) i=1
-           if (mype==0) write(*,*) 'Updating monthly climatology runoff for month ', i 
+           if (mype==0 .and. my_fesom_group == 0) write(*,*) 'Updating monthly climatology runoff for month ', i !OG
            filename=trim(nm_runoff_file)
            call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, mesh)
 
@@ -1142,7 +1144,7 @@ CONTAINS
            i=month
            if (mstep > 1) i=i+1 
            if (i > 12) i=1
-           if (mype==0) write(*,*) 'Updating monthly runoff for month ', i 
+           if (mype==0 .and. my_fesom_group == 0) write(*,*) 'Updating monthly runoff for month ', i !OG
            filename=trim(nm_runoff_file)//cyearnew//'.nc' 
            call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, mesh)
 

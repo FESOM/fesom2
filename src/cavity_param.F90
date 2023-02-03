@@ -69,7 +69,7 @@ subroutine compute_nrst_pnt2cavline(mesh)
     call MPI_AllREDUCE(lcl_cavl_lon, cavl_lon, nod2d, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, MPIerr)
     call MPI_AllREDUCE(lcl_cavl_lat, cavl_lat, nod2d, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, MPIerr)
     call MPI_AllREDUCE(lcl_cavl_dep, cavl_dep, nod2d, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, MPIerr)
-  
+
     !___________________________________________________________________________
     ! deallocate local arrays
     deallocate(lcl_cavl_idx, lcl_cavl_lon, lcl_cavl_lat, lcl_cavl_dep)

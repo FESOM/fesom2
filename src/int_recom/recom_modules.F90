@@ -34,13 +34,26 @@ module recom_config
 
   Integer :: ivphy = 1, ivdia = 2, ivdet = 3, ivdetsc = 4, ivcoc = 5 ! NEW ivcoc
 
-  Real(kind=8)                 :: zero           = 0.d0
-  Integer                      :: one            = 1
-  Real(kind=8)                 :: tiny           = 2.23D-16
-  Real(kind=8)                 :: tiny_chl       = 0.00001 
-  Real(kind=8)                 :: SecondsPerDay  = 86400.d0     ! [s/day]
-  Real(kind=8)                 :: Pa2atm         = 101325.d0    ! [Pa/atm] 
-  Real(kind=8)                 :: redO2C         = 1.453        ! O2:C ratio Anderson and Sarmiento, 1994
+!!MB TEST: tracer ids for revised remineralization and sinking in oce_ale_tracer.F90
+  integer, dimension(8)  :: recom_remin_tracer_id   = (/1001, 1002, 1003, 1018, 1019, 1022, 1302, 1402/)
+  integer, dimension(29) :: recom_sinking_tracer_id = (/1007, 1008, 1017, 1021, 1004, 1005, 1020, 1006, &
+                                                        1013, 1014, 1016, 1015, 1025, 1026, 1027, 1028, &
+                                                        1029, 1030, 1031, &  ! OG Cocco
+                                                        1308, 1321, 1305, 1320, & 
+                                                        1314, 1408, 1421, 1405, 1420, 1414/)
+  integer, dimension(8)  :: recom_det_tracer_id     = (/1007, 1008, 1017, 1021, 1308, 1321, 1408, 1421/)
+  integer, dimension(8)  :: recom_phy_tracer_id     = (/1004, 1005, 1020, 1305, 1320, 1405, 1420, 1006/)
+  integer, dimension(6)  :: recom_dia_tracer_id     = (/1013, 1014, 1314, 1414, 1016, 1015/)
+  integer, dimension(3)  :: recom_cocco_tracer_id   = (/1029, 1030, 1031/)
+  integer, dimension(4)  :: recom_det2_tracer_id    = (/1025, 1026, 1027, 1028/)
+
+  Real(kind=8), parameter :: zero           = 0.d0
+  Integer     , parameter :: one            = 1
+  Real(kind=8), parameter :: tiny           = 2.23D-16
+  Real(kind=8), parameter :: tiny_chl       = 0.00001 
+  Real(kind=8), parameter :: SecondsPerDay  = 86400.d0     ! [s/day]
+  Real(kind=8), parameter :: Pa2atm         = 101325.d0    ! [Pa/atm] 
+  Real(kind=8), parameter :: redO2C         = 1.453        ! O2:C ratio Anderson and Sarmiento, 1994
 
 !! *** General configuration ***
 
@@ -50,6 +63,7 @@ module recom_config
 
   logical                :: recom_binary_init    = .false.  ! Restart from binary
   Integer                :: bgc_num               = 33      ! NEW increased the number from 28 to 34 (added coccos and respiration) ! NEW 3Zoo changed from 31 to 33
+  integer                :: bgc_base_num          = 22      ! standard tracers
   Integer                :: diags3d_num           = 28      ! Number of diagnostic 3d tracers to be saved
   Real(kind=8)           :: VDet                  = 20.d0   ! Sinking velocity, constant through the water column and positive downwards
   Real(kind=8)           :: VDet_zoo2             = 200.d0  ! Sinking velocity, constant through the water column 
@@ -87,6 +101,7 @@ module recom_config
   character(100)         :: REcoMDataPath         = '/work/ollie/jhauck/forcing/core_new_REcoMforcing/'
   logical                :: restore_alkalinity    = .true.
   logical                :: useRivers             = .false.
+  logical                :: useRivFe              = .false.    ! river input of Fe
   logical                :: useErosion            = .false.
   logical                :: NitrogenSS            = .false.    ! This one only activates rivers! And in principle denitrification, but denitrification is commented out. When set to true, external sources and sinks of nitrogen are activated (Riverine, aeolian and denitrification)
   logical                :: useAeolianN           = .false.    ! When set to true, aeolian nitrogen deposition is activated
@@ -99,10 +114,17 @@ module recom_config
   logical                :: recom_debug           = .true.
   logical                :: ciso                  = .false.    !MB main switch to enable/disable carbon isotopes (13|14C)
   integer                :: benthos_num           = 4          !MB number of sediment tracers = 8 if ciso = .true.
+  Logical                :: use_MEDUSA            = .true.    ! main switch for sediment model
+  integer                :: sedflx_num            = 0         ! number of sedimentary fluxs from MEDUSA, = 7 if ciso
+  Logical                :: add_loopback          = .false.
+  real(kind=8)           :: lb_tscale             = 1.d0      ! time scale to balance the burial loss
+  integer                :: bottflx_num           = 4         ! number of stored sinking fluxes from the bottom layer, = 6 if C13 and = 8 if C14
+  Logical                :: use_atbox             = .false.   ! switch for atmospheric box model for CO2
 
-  namelist /pavariables/ use_REcoM,                         REcoM_restart,         recom_binary_write,      &
-                       recom_binary_init,                 bgc_num,               diags3d_num,             &
-                       VDet,          VDet_zoo2,      &
+  namelist /pavariables/ use_REcoM,                       REcoM_restart,         recom_binary_write,      &
+                       recom_binary_init,                 bgc_num,               bgc_base_num,            &
+                       diags3d_num,                                                                       &
+                       VDet,                              VDet_zoo2,                                      &
                        VPhy,                              VDia,                  VCocco,                  & ! NEW added VCocco
                        allow_var_sinking,                 biostep,               REcoM_Geider_limiter,    &
                        REcoM_Grazing_Variable_Preference, REcoM_Second_Zoo,      REcoM_Third_Zoo,         & ! NEW 3Zoo
@@ -111,19 +133,22 @@ module recom_config
                        diatom_mucus,                      Graz_pref_new,         use_coccos,              & ! NEW added use_coccos     
                        O2dep_remin,                       use_ballasting,        use_density_scaling,     & ! NEW O2remin, NEW BALL
                        use_viscosity_scaling,             OmegaC_diss,           CO2lim,                  & ! NEW BALL, NEW DISS added OmegaC_diss, NEW added CO2lim
-                       Diags      ,                       constant_CO2,            &
+                       Diags      ,                       constant_CO2,                                   &
                        UseFeDust,                         UseDustClim,           UseDustClimAlbani,       &
                        use_Fe2N,                          use_photodamage,       HetRespFlux_plus,        &
-                       REcoMDataPath,                     restore_alkalinity,    useRivers,  useErosion,  &
+                       REcoMDataPath,                     restore_alkalinity,                             &
+                       useRivers,                         useErosion,            useRivFe,                &
                        NitrogenSS,                        useAeolianN,           firstyearoffesomcycle,   &
                        lastyearoffesomcycle,              numofCO2cycles,        currentCO2cycle,         &
                        DIC_PI,                            Nmocsy,                recom_debug,             &
-                       ciso,                              benthos_num
+                       ciso,                              benthos_num,                                    &
+                       use_MEDUSA,                        sedflx_num,            bottflx_num,             &
+                       add_loopback,                      lb_tscale,             use_atbox
 !!------------------------------------------------------------------------------
 !! *** Sinking ***
   Real(kind=8)                 :: Vdet_a         = 0.0288       ! [1/day]
-                                                                                                                           
-  namelist /pasinking/ Vdet_a
+  Real(kind=8)                 :: Vcalc          = 0.0216       ! [1/day] depth dependence of calc_diss               
+  namelist /pasinking/ Vdet_a, Vcalc
 !!------------------------------------------------------------------------------
 !! *** Initialization ***
   Real(kind=8)                 :: cPhyN          = 0.2d0
@@ -198,8 +223,8 @@ module recom_config
                        Chl2N_max, Chl2N_max_d, Chl2N_max_c, res_phy, res_phy_d, res_phy_c, biosynth, biosynthSi
 !!------------------------------------------------------------------------------
 !! *** Iron chemistry ***
-  Real(kind=8)                 :: totalligand     = 1.d0        ! [mumol/m3] order 1. Total free ligand
-  Real(kind=8)                 :: ligandStabConst = 100.d0      ! [m3/mumol] order 100. Ligand-free iron stability constant
+  Real(kind=8)                 :: totalligand     = 1.d0          ! [mumol/m3] order 1. Total free ligand
+  Real(kind=8)                 :: ligandStabConst = 100.d0        ! [m3/mumol] order 100. Ligand-free iron stability constant
   namelist /pairon_chem/ totalligand, ligandStabConst
 !!------------------------------------------------------------------------------
 !! *** Zooplankton ***
@@ -238,10 +263,10 @@ module recom_config
   Real(kind=8)                 :: sHetNsq        = 0.d0
   Real(kind=8)                 :: pzMicZoo2      = 0.8d0          ! NEW Zoo3 Maximum microzooplankton preference
   Real(kind=8)                 :: sMicZooNsq2    = 0.d0           ! NEW Zoo3
-  Real(kind=8)                 :: t1_zoo2        = 28145.d0       ! Krill temp. function constant1                                                                                                       
+  Real(kind=8)                 :: t1_zoo2        = 28145.d0       ! Krill temp. function constant1
   Real(kind=8)                 :: t2_zoo2        = 272.5d0        ! Krill temp. function constant2
-  Real(kind=8)                 :: t3_zoo2        = 105234.d0      ! Krill temp. function constant3                                                                                                      
-  Real(kind=8)                 :: t4_zoo2        = 274.15d0       ! Krill temp. function constant3                                                                                              
+  Real(kind=8)                 :: t3_zoo2        = 105234.d0      ! Krill temp. function constant3
+  Real(kind=8)                 :: t4_zoo2        = 274.15d0       ! Krill temp. function constant4
   namelist /pasecondzooplankton/ graz_max2, epsilon2, res_zoo2, & 
                                  loss_zoo2, fecal_rate_n, fecal_rate_c, fecal_rate_n_mes, fecal_rate_c_mes,     &    ! NEW 3Zoo
                                  pzDia2, sDiaNsq2, pzPhy2, sPhyNsq2, pzCocco2, sCoccoNsq2, pzHet, sHetNsq,      &
@@ -310,9 +335,6 @@ module recom_config
   Real(kind=8)                 :: grazEff2      = 0.8d0         ! NEW 3Zoo [] Grazing efficiency (fraction of grazing flux into second zooplankton pool) 
   Real(kind=8)                 :: grazEff3      = 0.8d0         ! NEW 3Zoo [] Grazing efficiency (fraction of grazing flux into microzooplankton pool)
   Real(kind=8)                 :: reminN        = 0.165d0       ! NEW 3Zoo [1/day] Temperature dependent remineralisation rate of detritus 
-!  Real(kind=8)                 :: grazEff       = 0.4d0         ! [] Grazing efficiency (fraction of grazing flux into zooplankton pool) 
-!  Real(kind=8)                 :: grazEff2      = 0.8d0        ! [] Grazing efficiency (fraction of grazing flux into second zooplankton pool)
-!  Real(kind=8)                 :: reminN        = 0.165d0      ! [1/day] Temperature dependent remineralisation rate of detritus	
   namelist /padetritus_N/ gfin, grazEff2, grazEff3, reminN      !, grazEff
 !!------------------------------------------------------------------------------
 !! *** Detritus C ***
@@ -367,7 +389,9 @@ module recom_config
   Real(kind=8)                 :: Fe2C_benthos   = 0.02125       !0.68d0/32.d0       ! [umol/m2/day]
   Real(kind=8)                 :: kScavFe        = 0.07d0
   Real(kind=8)                 :: dust_sol       = 0.02d0        !Dissolution of Dust for bioavaliable
-  namelist /pairon/ Fe2N, Fe2N_benthos, Fe2C, Fe2C_benthos, kScavFe, dust_sol
+  Real(kind=8)                 :: RiverFeConc   = 1000d0        ! mean DFe concentration in rivers   
+  namelist /pairon/ Fe2N, Fe2N_benthos, Fe2C, Fe2C_benthos, kScavFe,    &
+            dust_sol, RiverFeConc
 !!------------------------------------------------------------------------------
 !! *** Calcification ***
   Real(kind=8)                 :: calc_prod_ratio = 0.02d0
@@ -518,9 +542,9 @@ Module REcoM_declarations
   Real(kind=8)  :: grazingFlux_phy, grazingFlux_Dia, grazingFlux_Cocco ! [mmol N / (m3 * day)] (NEW changed term)
   Real(kind=8)  :: grazingFlux_miczoo               ! NEW 3Zoo
   Real(kind=8)  :: grazingFlux
-  Real(kind=8)  :: grazEff                              ! NEW 3Zoo
-  Real(kind=8)  :: HetRespFlux                           ! Zooplankton respiration
-  Real(kind=8)  :: HetLossFlux                           ! [(mmol N)2/(m6 * day)] Zooplankton mortality (quadratic loss)
+  Real(kind=8)  :: grazEff                          ! NEW 3Zoo
+  Real(kind=8)  :: HetRespFlux                      ! Zooplankton respiration
+  Real(kind=8)  :: HetLossFlux                      ! [(mmol N)2/(m6 * day)] Zooplankton mortality (quadratic loss)
 !!------------------------------------------------------------------------------
 !! *** Second Zooplankton  ***                                                                                          
 !  if (REcoM_Second_Zoo) then       
@@ -616,7 +640,9 @@ Module REcoM_GloVar
   implicit none
   save
 	
-  Real(kind=8),allocatable,dimension(:,:) :: Benthos          ! 4 types of benthos-tracers with size [4 n2d]
+  Real(kind=8),allocatable,dimension(:,:)   :: Benthos        ! 4 types of benthos-tracers with size [4 n2d]
+  Real(kind=8),allocatable,dimension(:,:,:) :: Benthos_tr     ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+
   Real(kind=8),allocatable,dimension(:)   :: GloFeDust        ! [umol/m2/s] Monthly 2D field of iron soluted in surface water from dust
   Real(kind=8),allocatable,dimension(:)   :: GloNDust         ! [mmol/m2/s] 10-year mean 2D fields of nitrogen soluted in surface water from dust
   Real(kind=8),dimension(12)              :: AtmCO2           ! [uatm] Atmospheric CO2 partial pressure. One value for the whole planet for each month
@@ -659,15 +685,25 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:,:,:) :: diags3D          ! Diagnostics in 3D [2 nl-1 n2d]
   Real(kind=8),allocatable,dimension(:)     :: DenitBen         ! Benthic denitrification Field in 2D [n2d 1]
 
-  Real(kind=8), allocatable,dimension(:)    :: Alk_surf         ! Surface alkalinity field used for restoring
-  Real(kind=8), allocatable,dimension(:)    :: relax_alk
-  Real(kind=8), allocatable,dimension(:)    :: virtual_alk
+!  for using MEDUSA
+  Real(kind=8),allocatable,dimension(:,:)   :: SinkFlx        ! Diagnostics in 2D [4 n2d] or [6 n2d] with ciso
+  Real(kind=8),allocatable,dimension(:,:,:) :: SinkFlx_tr     ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+
+  Real(kind=8),allocatable,dimension(:,:) :: GloSed           ! Yearly input into bottom water from sediments [n2d 5] or [n2d 7] with ciso
+  Real(kind=8),allocatable,dimension(:,:) :: lb_flux            ! Yearly burial from medusa: [n2d 5] or [n2d 9] with ciso_14 
+
+! atmospheric box model:
+  real(kind=8),allocatable,dimension(:)   :: x_co2atm         ! atmospheric CO2 mixing ratio (mole fraction)
+
+  Real(kind=8), allocatable,dimension(:)  :: Alk_surf         ! Surface alkalinity field used for restoring
+  Real(kind=8), allocatable,dimension(:)  :: relax_alk
+  Real(kind=8), allocatable,dimension(:)  :: virtual_alk
   real(kind=8), allocatable,dimension(:,:)  :: PAR3D            ! Light in the water column [nl-1 n2d]
-  real(kind=8), allocatable,dimension(:)    :: RiverineLonOrig, RiverineLatOrig, RiverineDINOrig, RiverineDONOrig, RiverineDOCOrig, RiverineDSiOrig ! Variables to save original values for riverine nutrients
-  real(kind=8), allocatable,dimension(:)    :: RiverDIN2D, RiverDON2D, RiverDOC2D, RiverDSi2D, RiverAlk2D, RiverDIC2D
-  real(kind=8), allocatable,dimension(:)    :: ErosionTSi2D, ErosionTON2D, ErosionTOC2D
+  real(kind=8), allocatable,dimension(:)  :: RiverineLonOrig, RiverineLatOrig, RiverineDINOrig, RiverineDONOrig, RiverineDOCOrig, RiverineDSiOrig ! Variables to save original values for riverine nutrients
+  real(kind=8), allocatable,dimension(:)  :: RiverDIN2D, RiverDON2D, RiverDOC2D, RiverDSi2D, RiverAlk2D, RiverDIC2D, RiverFe
+  real(kind=8), allocatable,dimension(:)  :: ErosionTSi2D, ErosionTON2D, ErosionTOC2D
 !! Cobeta, Cos(Angle of incidence)
-  Real(kind=8), allocatable,dimension(:)    ::  cosAI
+  Real(kind=8), allocatable,dimension(:)  ::  cosAI
 end module REcoM_GloVar
 
 !===============================================================================
@@ -677,10 +713,10 @@ Module REcoM_locVar
 
   Real(kind=8),allocatable,dimension(:) :: LocBenthos ! Storing the values for benthos in current watercolumn: N,C,Si and Calc
   Real(kind=8) :: Hplus                     ! [mol/kg] Concentrations of H-plus ions in the surface node
-  Real(kind=8) :: pCO2surf(1)                  ! [uatm] Partial pressure of CO2 in surface layer at current 2D node	
-  Real(kind=8) :: dflux(1)                     ! [mmol/m2/day] Flux of CO2 into the ocean
-  Real(kind=8) :: o2ex(1)                     ! [mmol/m2/s] Flux of O2 into the ocean
-  Real(kind=8) :: ULoc(1)                      ! Wind strength above current 2D node, change array size if used with mocsy input vector longer than one
+  Real(kind=8) :: pCO2surf(1)               ! [uatm] Partial pressure of CO2 in surface layer at current 2D node	
+  Real(kind=8) :: dflux(1)                  ! [mmol/m2/day] Flux of CO2 into the ocean
+  Real(kind=8) :: o2ex(1)                   ! [mmol/m2/s] Flux of O2 into the ocean
+  Real(kind=8) :: ULoc(1)                   ! Wind strength above current 2D node, change array size if used with mocsy input vector longer than one
   Real(kind=8) :: dpCO2surf(1)              ! [uatm] difference of oceanic pCO2 minus atmospheric pCO2
 
 ! mocsy output -----------------------------------------------------------------------------------------------------------------------------
@@ -723,19 +759,19 @@ Module REcoM_locVar
 
 !-------------------------------------------------------------------------------
 
-  Real(kind=8) :: bt, dic_molal, talk_molal    ! Common block: Species
-  Real(kind=8) :: k1, k2, kw, kb, ff           ! Common block: Equilibrium_constants
-  Real(kind=8) :: FeDust                       ! [umol/m2/s]
-  Real(kind=8) :: NDust                        ! [mmol/m2/s]
-  Real(kind=8) :: Loc_ice_conc(1)              ! Used to calculate flux of DIC in REcoM 0 -> 1
-  Real(kind=8) :: LocAtmCO2(1)                 ! [uatm]
-  Real(kind=8) :: LocDiags2D(12)               ! NEW (changed it from 8 to 12)
+  Real(kind=8) :: bt, dic_molal, talk_molal ! Common block: Species
+  Real(kind=8) :: k1, k2, kw, kb, ff        ! Common block: Equilibrium_constants
+  Real(kind=8) :: FeDust                    ! [umol/m2/s]
+  Real(kind=8) :: NDust                     ! [mmol/m2/s]
+  Real(kind=8) :: Loc_ice_conc(1)           ! Used to calculate flux of DIC in REcoM 0 -> 1
+  Real(kind=8) :: LocAtmCO2(1)              ! [uatm]
+  Real(kind=8) :: LocDiags2D(12)            ! NEW (changed it from 8 to 12)
 !  Real(kind=8) :: LocDenit                     ! NEW BALL
   Real(kind=8) :: LocRiverDIN, LocRiverDON, LocRiverDOC, LocRiverDSi, LocRiverDIC, LocRiverAlk
 !  if (REcoM_Second_Zoo) then
-     Real(kind=8) :: res_zoo2_a, res_zoo2_f
-     Real(kind=8) :: grazingFluxcarbonzoo2     ! grazingfluxcarbon 
-  Real(kind=8) :: grazingFluxcarbon_mes     ! NEW Zoo3
+  Real(kind=8) :: res_zoo2_a, res_zoo2_f
+  Real(kind=8) :: grazingFluxcarbonzoo2                      ! grazingfluxcarbon
+  Real(kind=8) :: grazingFluxcarbon_mes        ! NEW Zoo3
 !  endif
   Real(kind=8) :: PICPOCtemp                   ! VERY NEW (added to make the calcification dependent on the temperature, after Krumhardt et al. 2017/2019)
   Real(kind=8) :: PICPOCCO2                    ! VERY NEW (to make calcification dependent on CO2)
@@ -753,24 +789,26 @@ module REcoM_ciso
 
 
 ! Options for carbon isotope simulations (see namelist.recom)
-  logical :: ciso_airsea           = .false.  ! Fractionation during air-sea exchange
-  logical :: ciso_calcdiss         = .false.  ! Fractionation during calcification / dissolution
   logical :: ciso_init             = .false.  ! Initial fractionation of bulk organic matter
-  logical :: ciso_photo_Laws       = .false.  ! Fractionation during photosynthesis according to Laws et al.
-  logical :: ciso_photo_Rau        = .false.  ! Fractionation during photosynthesis according to Rau
-  real(kind=8) :: CO2_for_spinup_13  = 284.3, CO2_for_spinup_14 = 284.3
-  real(kind=8) :: lambda_14 = 3.8561e-12      ! decay constant of carbon-14
+  logical :: ciso_14               = .false.  ! Include radiocarbon (-> 31 or 38 tracers)
+  logical :: ciso_organic_14       = .false.  ! Include organic radiocarbon (-> 38 tracers)
+  real(kind=8) :: delta_co2_13        = -6.61
+  real(kind=8) :: big_delta_co2_14(3) = (/0., 0., 0./) 
+  real(kind=8) :: lambda_14 = 3.8561e-12      ! Decay constant of carbon-14
+! for revised atbox 14CO2 implementation
+  logical      :: atbox_spinup    = .true.
+  real(kind=8) :: cosmic_14_init  = 2.0       ! Initial 14C production flux (atoms / s / cm**2)
 
-  namelist / paciso / ciso_airsea, ciso_calcdiss, ciso_init, ciso_photo_Laws, ciso_photo_Rau, &
-                      lambda_14, CO2_for_spinup_13, CO2_for_spinup_14
 
+  namelist / paciso / ciso_init, ciso_14, ciso_organic_14, &
+                      lambda_14, delta_co2_13, big_delta_co2_14, &
+                      atbox_spinup, cosmic_14_init
 
 ! Extensions of other modules or subroutines
-! Module REcoM_constants:
-  integer, parameter :: idic_13  = 25, idic_14  = 26, iphyc_13 = 27, iphyc_14 = 28, &
-                        idetc_13 = 29, idetc_14 = 30, ihetc_13 = 31, ihetc_14 = 32, &
-                        idoc_13  = 33, idoc_14  = 34, idiac_13 = 35, idiac_14 = 36, &
-                        iphycal_13 = 37, iphycal_14 = 38, idetcal_13 = 39, idetcal_14 = 40
+! Module REcoM_constants: ciso tracer indices
+  integer :: idic_13, iphyc_13, idetc_13, ihetc_13, idoc_13, idiac_13, iphycal_13, idetcal_13, &
+             idic_14, iphyc_14, idetc_14, ihetc_14, idoc_14, idiac_14, iphycal_14, idetcal_14
+
 ! Module REcoM_declarations:
   real(kind=8)  :: quota_13, quota_14, quota_dia_13, quota_dia_14,                     &  ! quotas
                    recipQuota_13, recipQuota_14, recipQuota_dia_13, recipQuota_dia_14, &  ! reciprocal quotas
@@ -780,28 +818,33 @@ module REcoM_ciso
                    calc_loss_agg_13, calc_loss_agg_14, &
                    calc_loss_gra_13, calc_loss_gra_14, &
                    calc_diss_13, calc_diss_14
+
 ! Module REcoM_GloVar:
-  real(kind=8),dimension(12)              :: AtmCO2_13, AtmCO2_14               ! [uatm] Atmospheric 13|14CO2 partial pressure. One value for the whole planet for each month
-  real(kind=8),allocatable,dimension(:)   :: GloPCO2surf_13, GloPCO2surf_14     ! [uatm] Surface ocean 13|14CO2 partial pressure
-  real(kind=8),allocatable,dimension(:)   :: GloCO2flux_13, GloCO2flux_14       ! [mmol/m2/day] Positive downwards
+  real(kind=8),dimension(12)              :: AtmCO2_13                       ! [uatm] Atmospheric 13CO2 partial pressure. One value for the whole planet for each month
+  real(kind=8),dimension(3,12)            :: AtmCO2_14                       ! [uatm] Atmospheric 14CO2 partial pressure. Three latitude zones for each month
+  real(kind=8),allocatable,dimension(:)   :: GloPCO2surf_13, GloPCO2surf_14  ! [uatm] Surface ocean 13|14CO2 partial pressure
+  real(kind=8),allocatable,dimension(:)   :: GloCO2flux_13, GloCO2flux_14    ! [mmol/m2/day] Positive downwards
   real(kind=8),allocatable,dimension(:)   :: GloCO2flux_seaicemask_13, GloCO2flux_seaicemask_14
-  real(kind=8), allocatable,dimension(:)  :: RiverineDOCOrig_13, RiverineDOCOrig_14, RiverDOC2D_13, RiverDOC2D_14 
+  real(kind=8),allocatable,dimension(:)   :: RiverineDOCOrig_13, RiverineDOCOrig_14, RiverDOC2D_13, RiverDOC2D_14 
+
 ! Module REcoM_LocVar:
   real(kind=8) :: pCO2surf_13(1), pCO2surf_14(1), & ! [uatm] Partial pressure of 13|14CO2 in surface layer at current 2D node
                   co2flux_13(1), co2flux_14(1), &      ! mocsy output: air-to-sea flux of 13|14CO2 [mol/(m^2 * s)]
                   co2flux_seaicemask_13(1), co2flux_seaicemask_14(1) ! air-to-sea flux of CO2 [mmol/m2/s]
   real(kind=8) :: LocAtmCO2_13(1), LocAtmCO2_14(1)  ! [uatm]
   real(kind=8) :: LocRiverDOC_13, LocRiverDOC_14    ! CHECK
+
+! Subroutines REcoM_main & REcoM_extra:
+  real(kind=8) :: lat_val                           ! nodal latitude (of atmospheric input)
+
+! Subroutine REcoM_extra:
+  real(kind=8) :: delta_co2_14                      ! atmospheric Delta14CO2
+
 ! Subroutine REcoM_forcing:
-  real(kind=8) :: REcoM_DIC_13(1),REcoM_DIC_14(1),& ! local concentrations of DI(13|14)C,
-                  co2sat, co2s,                   & ! dissolved CO2 at saturation (CO2*air) and in situ (CO2*) [mol / m**3]
-                  kwco2,                          & ! piston velocity of CO2
-                  prt,                            & ! total pressure in atm
-                  vco2rgas = 0.39362709             ! partial molar volume of CO2 / gas constant
-  integer ::      kj                                ! do loop index
+  real(kind=8) :: co2sat,                         & ! dissolved CO2 at saturation (CO2*air) [mol / m**3]
+                  kwco2                             ! piston velocity of CO2
+
 ! Subroutine REcoM_sms:
-  real(kind=8),allocatable,dimension(:) :: Cphot_z, Cphot_dia_z ! Vertical profiles of photosynthesis rates
-!!  real(kind=8),dimension(47) :: Cphot_z, Cphot_dia_z ! Vertical profiles of photosynthesis rates, fesom1: 46 -> 47 in fesom2
   real(kind=8) :: DIC_13, DIC_14,                 & ! [mmol/m3] Dissolved Inorganic 13|14Carbon
                   PhyC_13, PhyC_14,               & ! [mmol/m3] Intracellular conc of 13|14Carbon in small phytoplankton
                   DetC_13, DetC_14,               & ! [mmol/m3] Conc of 13|14C in Detritus
@@ -810,12 +853,29 @@ module REcoM_ciso
                   DiaC_13, DiaC_14,               & ! [mmol/m3] Intracellular conc of 13|14Carbon in diatoms
                   PhyCalc_13, PhyCalc_14,         & ! [mmol/m3] Conc of 13|14C in calcite of phytoplankton
                   DetCalc_13, DetCalc_14            ! [mmol/m3] Conc of 13|14C in calcite of detritus
+  real(kind=8),allocatable,dimension(:) :: Cphot_z, Cphot_dia_z ! Vertical profiles of photosynthesis rates, fesom1: 46 -> 47 in fesom2
+
+! Subroutine REcoM_init:
+  real(kind=8),allocatable,dimension(:,:) :: delta_dic_13_init, &     ! auxiliary initial
+                                             delta_dic_14_init, &     ! d|Delta13|14C
+                                             big_delta_dic_14_init    ! fields
+
+! Atmospheric box model (global variables):
+  real(kind=8),allocatable,dimension(:) ::   x_co2atm_13, x_co2atm_14, & ! atmospheric CO2 mixing ratio (mole fraction)
+                                             cosmic_14                   ! cosmogenic 14 production (mol / s)
+  real(kind=8) :: production_rate_to_flux_14, &                          ! conversion factor
+                  r_atm_spinup_13, r_atm_spinup_14                       ! 13|14CO2 / 12CO2 spinup ratios
 
 ! Specific factors related the carbon-isotopic composition
 ! Isotopic ratios
-  real(kind=8) :: r_atm_13, r_atm_14,             & ! (13|14)CO2 / CO2 in the atmosphere
-                  r_co2s_13, r_co2s_14,           & ! (13|14)CO2* / CO2* in seawater
-                  r_dic_13, r_dic_14                ! DI(13|14)C / DIC in seawater
+  real(kind=8) :: r_atm_13, r_atm_14,             & ! atmospheric CO2
+                  r_co2s_13, r_co2s_14,           & ! dissolved CO2
+                  r_dic_13, r_dic_14,             & ! DIC in seawater
+                  r_phyc_13, r_phyc_14,           & ! nanophytoplankton
+                  r_diac_13, r_diac_14,           & ! diatoms
+                  r_iorg_13 = 0.975,              & ! initial ratios of organic matter
+                  r_iorg_14 = 0.950
+                  
 ! Fractionation factors
   real(kind=8) :: alpha_k_13 = 0.99912,           & ! gas transfer (kinetic fractionation,
                   alpha_k_14 = 0.99824,           & ! mean values for 5-21C by Zhang et al., 1995)
@@ -823,19 +883,18 @@ module REcoM_ciso
                   alpha_dic_13, alpha_dic_14,     & ! hydrolysis / dissociation of CO2 <-> DIC (equilibrium fract.)
                   alpha_p_13, alpha_p_14,         & ! photosynthesis of nanophytoplankton
                   alpha_p_dia_13, alpha_p_dia_14, & ! photosynthesis of diatoms
-                  alpha_calc_13 = 1.001,          & ! calcification (Romanek et al., 1992)
-                  alpha_calc_14 = 1.002,          &
-                  alpha_dcal_13 = 0.999,          & ! dissolution of calcite (Romanek et al., 1992)
-                  alpha_dcal_14 = 0.998,          &
-                  alpha_iorg_13 = 0.975,          & ! initial fractionation of organic matter
-                  alpha_iorg_14 = 0.950
+                  alpha_calc_13 = 1.000,          & ! calcification (Romanek et al., 1992: 1.001, 1.002)
+                  alpha_calc_14 = 1.000,          &
+                  alpha_dcal_13 = 1.000,          & ! dissolution of calcite (Romanek et al., 1992: 0.999, 0.998)
+                  alpha_dcal_14 = 1.000
 ! Radioactive decay constant of carbon-14
 ! t1/2 = 5700 years (Bé et al., 2013; recommended by Orr et al., 2017, for OMIP-BGC)
 ! if 1 year := 365.25 days:  lambda_14 = 3.8534e-12 / second
 ! if 1 year := 365.00 days:  lambda_14 = 3.8561e-12 / second
 ! if 1 year := 360    days:  lambda_14 = 3.9096e-12 / second
-  real(kind=8) :: radio_decay_14
 
+! Tracer IDs to be considered in decay calculations (oce_ale_tracer.F90)
+  integer, dimension(8) :: c14_tracer_id = (/1402, 1405, 1408, 1410, 1412, 1414, 1420, 1421/)
 
   contains
 
@@ -897,79 +956,51 @@ module REcoM_ciso
       epsilon_dic_13 = (0.014 * fco3 - 0.107 ) * tempc + 10.53
       alpha_dic_13 = 1. + 0.001 * epsilon_dic_13
 
-!     Turn off isotopic fractionation
-      if (.not. ciso_airsea) then
-        alpha_k_13   = 1.
-        alpha_k_14   = 1.
-        alpha_aq_13  = 1.
-        alpha_dic_13 = 1.
-      endif
-
-      alpha_aq_14  = 2. * alpha_aq_13 - 1.
-      alpha_dic_14 = 2. * alpha_dic_13 - 1.
+!     Fractionation of radiocarbon
+      if (ciso_organic_14) then
+        alpha_aq_14  = 2. * alpha_aq_13  - 1.
+        alpha_dic_14 = 2. * alpha_dic_13 - 1.
+      else
+!       no fractionation in the inorganic approximation
+        alpha_aq_14  = 1.
+        alpha_dic_14 = 1.
+      end if
 
     return
     end subroutine recom_ciso_airsea
 !   ----------------------------------------------------------------------------------
 
-
-    subroutine recom_ciso_photo (mu, mu_dia, co2star, r_co2star_13, r_co2star_14, densw)
+    subroutine recom_ciso_photo (co2st)
 !   ----------------------------------------------------------------------------------
 !        Subroutine calculating carbon-isotopic fractionation during photosynthesis
 !   ----------------------------------------------------------------------------------
 !     Input:
-!     daily-mean photosynthesis rates at depth (mu, mu_dia)
-!     dissolved CO2 (co2star) and the ratios (13|14)CO2* / CO2* (r_co2star_13|14)
-!     density of seawater (densw)
+!     dissolved CO2 (co2st) in mol / m**3
 !
 !     Output:
 !     isotopic fractionation factors for phytoplankton and diatoms due to
 !     photosynthesis (alpha_p_13|14, declared at the head of the module)
 !
-!     mbutzin, 2017 - 2018.
+!     Note that we are interested in effective values (implictly including the 
+!     fractionation of dissolved CO2) which are actually derived in field studies
+!     or lab experiments. Young et al. 2013, eq. (5) with values from paragraph [35]
+!
+!     Here, we follow Young et al. 2013, eq. (5) with values from paragraph [35]
+!     eps_p = eps_pm * (1. - rho / co2aq) = 17.6 * (1 - 2.02 / co2aq)
+!     where co2aq is in umol / L
+!
+!     mbutzin, 2017 - 2021.
 
       implicit none
-      real(kind=8), intent(in)::  mu, mu_dia, r_co2star_13, r_co2star_14, densw
-      real(kind=8)            ::  co2star
+      real(kind=8), intent(in):: co2st
+      real(kind=8)            :: co2aq
 
-!     Safe inital values
-      alpha_p_13 = 1.
-      alpha_p_14 = 1.
-      alpha_p_dia_13 = 1.
-      alpha_p_dia_14 = 1.
-      co2star = co2star + 1.d-8
+!     Convert dissolved CO2 from mol / m**3 to umol / L and prevent from division by zero
+      co2aq = max(1.d-8, co2st * 1000.)
 
-      if (ciso_photo_Rau) then
-!       Rau (1994):  d13C_org = -0.628 * co2star - 13.8
-!       with [co2star] = umol / l = mmol / m**3
-
-!       convert co2star from mol / m**3 to umol / l
-        co2star = co2star * 1000
-
-!       Compute isotopic fractionation factors of 13C to determine fractionation wrt 14C.
-!       alpha_p_13 = (d13C_co2star + 1000) / (d13C_org + 1000)
-!                  = r_co2star_13 / (1 + 0.001 d13C_org)
-        alpha_p_13      = r_co2star_13 / (1 - 0.001 * (0.628 * co2star + 13.8))
-        alpha_p_dia_13  = alpha_p_13
-      elseif (ciso_photo_Laws) then
-!       Laws et al. (1997, equation (13)):
-!       mu / co2star = 0.225 * {(26.8 - epsilon_p) / (epsilon_p - 5.5)},
-!       where mu = photosynthesis rate (1 / d) and with [co2star] = umol / kg.
-
-!       Convert co2star from mol / m**3 to umol / kg.
-!       We assume that density = 1024.5 kg / m**3 (same as in subroutine flxco2)
-        co2star = co2star / densw * 1.d6
-
-!       Rearranging (13), with 0.225 * 26.8 = 6.03:
-!       epsilon_p = (6.030 * co2star + 5.5 * mu) / (0.225 * co2star + mu)
-!       alpha_p   = 1 + 0.001 * epsilon_p_13
-        alpha_p_13      = 1 + 0.001 * (6.030 * co2star + 5.5 * mu) / (0.225 * co2star + mu)
-        alpha_p_dia_13  = 1 + 0.001 * (6.030 * co2star + 5.5 * mu_dia) / (0.225 * co2star + mu_dia)
-      else
-!       no biogenic fractionation
-        alpha_p_13 = 1.
-        alpha_p_dia_13 = 1.
-      endif
+!     Fractionation wrt carbon-13
+      alpha_p_13     = max(1., 1. + 0.001 * (17.6 * (1 - 2.02 / co2aq)))
+      alpha_p_dia_13 = alpha_p_13 
 
 !     Fractionation wrt carbon-14
       alpha_p_14     = 2. * alpha_p_13 - 1.
@@ -977,7 +1008,75 @@ module REcoM_ciso
 
     return
     end subroutine recom_ciso_photo
+!   ----------------------------------------------------------------------------------  
+ 
+ 
+    function lat_zone(lat_n)
 !   ----------------------------------------------------------------------------------
+!   Assign latitude zones from nodal latitude values 
+!   ----------------------------------------------------------------------------------
+    
+      implicit none
+      integer                  :: lat_zone
+    
+!     Input: Latitude value corresponding to node n
+      real(kind=8), intent(in) :: lat_n
 
+!     Binning of latitudes to three zones
+      if (lat_n > 30.)  then       ! Northern Hemisphere polewards of 30°N
+        lat_zone = 1
+      else if (lat_n <- 30.) then  ! Southern Hemisphere polewards of 30°S
+        lat_zone = 3
+      else                         ! (Sub-) Tropical zone
+        lat_zone = 2
+      end if
+    
+      return
+    end function lat_zone
+
+
+    function wind_10(windstr_x, windstr_y)
+!   ----------------------------------------------------------------------------------
+!    computes wind speed at 10 m height "wind10" from wind stress fields tau_x, tau_y
+!    as long as wind10 is not properly passed from ECHAM in coupled simulations.
+!    We follow Peixoto & Oort (1992, Eq. (10.28), (10,29)) and Charnock (1955); 
+!    also see MPI report 349 (2003), Eq. (5.7).
+!   ----------------------------------------------------------------------------------
+      implicit none
+     
+      real(kind=8) :: wind_10
+
+!     Input
+      real(kind=8), intent(in) :: windstr_x, windstr_y
+
+!     Internal variables and parameters
+!     Zonal and meridional velocities at 10 m height
+      real(kind=8) :: u_10, v_10
+!     Zonal and meridional friction velocities
+      real(kind=8) :: u_fric, v_fric
+!     Zonal and meridional roughness lengths
+      real(kind=8) :: l_rough_x, l_rough_y
+!     Inverse von-Karman constant (0.4), Charnock constant (0.018) divided by g, inverse density of air (1.3), log(10)
+      real(kind=8), parameter :: inv_karm = 2.5, charn_g = 0.00173, inv_dens_air = 0.76923, log_10 = 2.30258
+     
+!     Calculate friction velocities (Peixoto & Oort, 1992, Eq. (10.28))
+      u_fric = sqrt(abs(windstr_x) * inv_dens_air)
+      v_fric = sqrt(abs(windstr_y) * inv_dens_air)
+
+!     Calculate roughness lengths (MPI report 349, 2003, Eq. (5.7), quoting Charnock, 1955)
+      l_rough_x = max((charn_g * u_fric**2), 1.5e-5)
+      l_rough_y = max((charn_g * v_fric**2), 1.5e-5)
+
+!     Calculate wind speed at 10 m (Peixoto & Oort, 1992, Eq. (10.29))
+      u_10 = inv_karm * u_fric * (log_10 - log(l_rough_x))
+      v_10 = inv_karm * v_fric * (log_10 - log(l_rough_y))
+     
+      wind_10 = sqrt(u_10**2 + v_10**2)
+     
+      return
+    end function wind_10
+!   ----------------------------------------------------------------------------------
+   
+   
 end module REcoM_ciso
 

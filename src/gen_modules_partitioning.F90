@@ -12,6 +12,13 @@ save
 #endif
 
  integer                                :: MPI_COMM_FESOM
+
+! kh 11.11.21 communicator for multi FESOM group loop parallelization
+ integer                                :: MPI_COMM_FESOM_WORLD
+
+! kh 17.11.21 communicator for multi FESOM group loop parallelization
+ integer                                :: MPI_COMM_FESOM_SAME_RANK_IN_GROUPS
+
  integer, parameter   :: MAX_LAENDERECK=16
  integer, parameter   :: MAX_NEIGHBOR_PARTITIONS=32
   type com_struct
@@ -55,6 +62,10 @@ save
   integer            :: MPIERR
   integer            :: npes
   integer            :: mype
+
+! kh 11.11.21 multi FESOM group loop parallelization
+  integer            :: my_fesom_group
+
   integer            :: maxPEnum=100
   integer, allocatable, dimension(:)  :: part
 

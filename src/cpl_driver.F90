@@ -14,6 +14,10 @@ module cpl_driver
   !
   use mod_oasis                    ! oasis module
   use g_config, only : dt
+
+  use g_config, only : lwiso, & !wiso-code add lwiso
+                       num_fesom_groups ! kh 03.12.21
+
   use o_param,  only : rad
   use g_PARSUP
   implicit none
@@ -23,11 +27,11 @@ module cpl_driver
   !
 
 #if defined (__oifs)
-  integer, parameter         :: nsend = 5
-  integer, parameter         :: nrecv = 13
+  integer, parameter         :: nsend = 8 !wiso-code 5->8
+  integer, parameter         :: nrecv = 19 !wiso-code 13->19
 #else
-  integer, parameter         :: nsend = 4
-  integer, parameter         :: nrecv = 12
+  integer, parameter         :: nsend = 7 !wiso-code 4->7
+  integer, parameter         :: nrecv = 18 !wiso-code 12->18
 #endif
   
   integer, dimension(nsend)  :: send_id
@@ -92,7 +96,9 @@ module cpl_driver
 
 contains
 
-  subroutine cpl_oasis3mct_init( localCommunicator )
+! kh 02.12.21
+!  subroutine cpl_oasis3mct_init( localCommunicator )
+  subroutine cpl_oasis3mct_init(localCommunicator, num_fesom_groups)
     implicit none
     save
 
@@ -104,6 +110,9 @@ contains
     ! Arguments
     !
     integer, intent(OUT)       :: localCommunicator
+
+! kh 02.12.21
+    integer, intent(inout)     :: num_fesom_groups
     !
     ! Local declarations
     !
@@ -125,7 +134,9 @@ contains
     !------------------------------------------------------------------
     ! 1st Initialize the OASIS3-MCT coupling system for the application
     !------------------------------------------------------------------
-    CALL oasis_init_comp(comp_id, comp_name, ierror )
+! kh 02.12.21
+!    CALL oasis_init_comp(comp_id, comp_name, ierror )
+    CALL oasis_init_comp(comp_id, comp_name, ierror, num_program_groups = num_fesom_groups)
     IF (ierror /= 0) THEN
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'Init_comp failed.')
     ENDIF
@@ -136,7 +147,9 @@ contains
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'comm_rank failed.')
     ENDIF
 
-    CALL oasis_get_localcomm( localCommunicator, ierror )
+! kh 02.12.21
+    !CALL oasis_get_localcomm( localCommunicator, ierror )
+    CALL oasis_get_localcomm_all_groups( localCommunicator, ierror )
     IF (ierror /= 0) THEN
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'get_local_comm failed.')
     ENDIF
@@ -344,30 +357,31 @@ contains
       print *, 'FESOM after Barrier'
     endif
 
-    if (mype .eq. localroot) then
-      print *, 'FESOM before start_grids_writing'
-       CALL oasis_start_grids_writing(il_flag)
-       IF (il_flag .NE. 0) THEN
+! kh 30.11.21
+    if(my_fesom_group == 0) then
+        if (mype .eq. localroot) then
+            print *, 'FESOM before start_grids_writing'
+            CALL oasis_start_grids_writing(il_flag)
+            IF (il_flag .NE. 0) THEN
 
-          print *, 'FESOM before write grid'
-          CALL oasis_write_grid (grid_name, number_of_all_points, 1, all_x_coords(:,:), all_y_coords(:,:))
+                print *, 'FESOM before write grid'
+                CALL oasis_write_grid (grid_name, number_of_all_points, 1, all_x_coords(:,:), all_y_coords(:,:))
 
-          ALLOCATE(unstr_mask(number_of_all_points, 1))
-          unstr_mask=0
-          print *, 'FESOM before write mask'
-          CALL oasis_write_mask(grid_name, number_of_all_points, 1, unstr_mask)
-          DEALLOCATE(unstr_mask)
+                ALLOCATE(unstr_mask(number_of_all_points, 1))
+                unstr_mask=0
+                print *, 'FESOM before write mask'
+                CALL oasis_write_mask(grid_name, number_of_all_points, 1, unstr_mask)
+                DEALLOCATE(unstr_mask)
 
-          print *, 'FESOM before write area'
-          CALL oasis_write_area(grid_name, number_of_all_points, 1, all_area)
+                print *, 'FESOM before write area'
+                CALL oasis_write_area(grid_name, number_of_all_points, 1, all_area)
 
-       end if
-      print *, 'FESOM before terminate_grids_writing'
-      call oasis_terminate_grids_writing()
-      print *, 'FESOM after terminate_grids_writing'
-    endif !localroot
-     
-
+            end if
+            print *, 'FESOM before terminate_grids_writing'
+            call oasis_terminate_grids_writing()
+            print *, 'FESOM after terminate_grids_writing'
+        endif !localroot
+    end if !(my_fesom_group == 0) then
 
     DEALLOCATE(all_x_coords, all_y_coords, my_x_coords, my_y_coords) 
 !------------------------------------------------------------------
@@ -384,11 +398,19 @@ contains
     cpl_send( 3)='snt_feom' ! 3. snow thickness [m]                ->
     cpl_send( 4)='ist_feom' ! 4. sea ice surface temperature [K]   ->
     cpl_send( 5)='sia_feom' ! 5. sea ice albedo [%-100]            ->
+!!!!!!wiso-code!!!!!!! add more coupling fields
+    cpl_send( 6)='o18_feom' !                 -> h2o18
+    cpl_send( 7)='hdo_feom' !                 -> hdo16
+    cpl_send( 8)='o16_feom' !                 -> h2o16
 #else
     cpl_send( 1)='sst_feom' ! 1. sea surface temperature [°C]      ->
     cpl_send( 2)='sit_feom' ! 2. sea ice thickness [m]             ->
     cpl_send( 3)='sie_feom' ! 3. sea ice extent [%-100]            ->
     cpl_send( 4)='snt_feom' ! 4. snow thickness [m]                ->
+!!!!!!wiso-code!!!!!!! add more coupling fields
+    cpl_send( 5)='o18_feom' !                 -> h2o18
+    cpl_send( 6)='hdo_feom' !                 -> hdo16
+    cpl_send( 7)='o16_feom' !                 -> h2o16
 #endif
 
 
@@ -411,6 +433,13 @@ contains
     cpl_recv(11) = 'heat_swo'    
     cpl_recv(12) = 'hydr_oce'
     cpl_recv(13) = 'enth_oce'
+!!!!!!wiso-code!!!!!!! add more coupling fields
+    cpl_recv(14) = 'w1_oce'
+    cpl_recv(15) = 'w2_oce'
+    cpl_recv(16) = 'w3_oce'
+    cpl_recv(17) = 'i1_oce'
+    cpl_recv(18) = 'i2_oce'
+    cpl_recv(19) = 'i3_oce'
 #else
     cpl_recv(1)  = 'taux_oce'
     cpl_recv(2)  = 'tauy_oce'
@@ -424,6 +453,13 @@ contains
     cpl_recv(10) = 'heat_ico'
     cpl_recv(11) = 'heat_swo'    
     cpl_recv(12) = 'hydr_oce'
+!!!!!!wiso-code!!!!!!! add more coupling fields
+    cpl_recv(13) = 'w1_oce'
+    cpl_recv(14) = 'w2_oce'
+    cpl_recv(15) = 'w3_oce'
+    cpl_recv(16) = 'i1_oce'
+    cpl_recv(17) = 'i2_oce'
+    cpl_recv(18) = 'i3_oce'
 #endif
 
     if (mype .eq. 0) then 
@@ -607,15 +643,43 @@ contains
     endif    
 #endif
 
-    call oasis_get(recv_id(ind), seconds_til_now, exfld,info)
+
+! kh 06.12.21 the coupling is in principle as it was before, i.e. the fesom processes - in group 0 - receive their data from echam
+    if(my_fesom_group == 0) then
+        call oasis_get(recv_id(ind), seconds_til_now, exfld,info)
+    else
+
+! kh 06.12.21 defensive: assignment statement "action=(info==3 ..." below is "don't care" in this case, because the actual value for action
+! is received via MPI_Bcast anyway
+        info = 0
+
+    end if
+
     t2=MPI_Wtime()
+ 
  !
  ! FESOM's interpolation routine interpolates structured
  ! VarStrLoc coming from OASIS3MCT to local unstructured data_array
  ! and delivered back to FESOM.
    action=(info==3 .OR. info==10 .OR. info==11 .OR. info==12 .OR. info==13)
+
+! kh 03.12.21
+   if(num_fesom_groups > 1) then
+      call MPI_Bcast(action, 1, MPI_LOGICAL, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIerr)
+   end if
+
    if (action) then
-      data_array(1:myDim_nod2d) = exfld
+
+! kh 03.12.21
+      if(my_fesom_group == 0) then
+          data_array(1:myDim_nod2d) = exfld
+      end if
+
+! kh 03.12.21
+      if(num_fesom_groups > 1) then
+          call MPI_Bcast(data_array, myDim_nod2d, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIerr)
+      end if
+
       call exchange_nod(data_array)
    end if   
    t3=MPI_Wtime()

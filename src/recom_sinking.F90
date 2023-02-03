@@ -47,51 +47,60 @@ subroutine recom_sinking_new(tr_num,mesh)
 
 !< Activate ballasting
    if (use_ballasting) then      
-      call ballast(tr_num,mesh)
+      call get_scale_ballasting(tr_num,mesh)
    end if
 
 !< Constant sinking velocities (we prescribe them under namelist recom)
 !< This hardcoded part is temporary 
 !< .OG. 07.07.2021
 
-    Vsink=0.0_WP
+  Vsink=0.0_WP
 
-    if (tracer_id(tr_num)==1007 .or.    &  !idetn
-        tracer_id(tr_num)==1008 .or.    &  !idetc
-        tracer_id(tr_num)==1017 .or.    &  !idetsi
-        tracer_id(tr_num)==1021 ) then     !idetcal
+  if (any(recom_det_tracer_id == tracer_id(tr_num))) Vsink = Vdet
+  if (any(recom_phy_tracer_id == tracer_id(tr_num))) Vsink = VPhy
+  if (any(recom_dia_tracer_id == tracer_id(tr_num))) Vsink = VDia
+  if (any(recom_cocco_tracer_id == tracer_id(tr_num))) Vsink = VCocco
+
+  if(tracer_id(tr_num)==1020) Vsink = VCocco !iphycal
+
+!    if (tracer_id(tr_num)==1007 .or.    &  !idetn
+!        tracer_id(tr_num)==1008 .or.    &  !idetc
+!        tracer_id(tr_num)==1017 .or.    &  !idetsi
+!        tracer_id(tr_num)==1021 ) then     !idetcal
 	   
-            Vsink = VDet 
+!            Vsink = VDet 
           
-    elseif(tracer_id(tr_num)==1004 .or. &  !iphyn
-        tracer_id(tr_num)==1005 .or.    &  !iphyc
-        !tracer_id(tr_num)==1020 .or.    &  !iphycal
-        tracer_id(tr_num)==1006 ) then     !ipchl
+!    elseif(tracer_id(tr_num)==1004 .or. &  !iphyn
+!        tracer_id(tr_num)==1005 .or.    &  !iphyc
+!        !tracer_id(tr_num)==1020 .or.    &  !iphycal
+!        tracer_id(tr_num)==1006 ) then     !ipchl
 
-            Vsink = VPhy
+!            Vsink = VPhy
 
-    elseif(tracer_id(tr_num)==1013 .or. &  !idian
-        tracer_id(tr_num)==1014 .or.    &  !idiac
-        tracer_id(tr_num)==1016 .or.    &  !idiasi
-        tracer_id(tr_num)==1015 ) then     !idchl
+!    elseif(tracer_id(tr_num)==1013 .or. &  !idian
+!        tracer_id(tr_num)==1014 .or.    &  !idiac
+!        tracer_id(tr_num)==1016 .or.    &  !idiasi
+!        tracer_id(tr_num)==1015 ) then     !idchl
 
-            Vsink = VDia
+!            Vsink = VDia
 
-    elseif(tracer_id(tr_num)==1029 .or. &  !icocn             ! NEW
-        tracer_id(tr_num)==1030 .or.    &  !icocc             ! NEW
-        tracer_id(tr_num)==1031 ) then     !icchl             ! NEW
+!    elseif(tracer_id(tr_num)==1029 .or. &  !icocn             ! NEW
+!        tracer_id(tr_num)==1030 .or.    &  !icocc             ! NEW
+!        tracer_id(tr_num)==1031 ) then     !icchl             ! NEW
 
-            Vsink = VCocco
+!            Vsink = VCocco
 
-    elseif(tracer_id(tr_num)==1020) then   !iphycal
+!    elseif(tracer_id(tr_num)==1020) then   !iphycal
        
-            if (use_coccos) then                              ! NEW switch
-               Vsink = VCocco
-            else
-               Vsink = VPhy
-            endif
+!            if (use_coccos) then                              ! NEW switch
+!               Vsink = VCocco
+!            else
+!               Vsink = VPhy
+!            endif
             
-    elseif(tracer_id(tr_num)==1025 .or. &  !idetz2n
+!    elseif(tracer_id(tr_num)==1025 .or. &  !idetz2n
+
+    if(tracer_id(tr_num)==1025 .or. &  !idetz2n
          tracer_id(tr_num)==1026 .or. &  !idetz2c
          tracer_id(tr_num)==1027 .or. &  !idetz2si
          tracer_id(tr_num)==1028 ) then  !idetz2calc 
@@ -160,9 +169,15 @@ if (Vsink .gt. 0.1) then ! No sinking if Vsink < 0.1 m/day
                   Wvel_flux(nz) = -VDet_zoo2/SecondsPerDay ! --> VDet_zoo2 ! NEW BALL changed -Vsink to -VDet_zoo2
                end if
             endif ! second detritus tracers
+! OG 02.02.23
+! We calculate correct but write wrong out
+! MPI_Bcast is needed for sinkVel1|2
 
          if (tracer_id(tr_num)==1021) sinkVel1(nz,n)= Wvel_flux(nz) !-1.0d0/SecondsPerDay  !idetcal              
          if (tracer_id(tr_num)==1028) sinkVel2(nz,n)= Wvel_flux(nz)  !idetz2calc
+
+         !if (mype==0 .and. tracer_id(tr_num)==1021) write(*,*) 'sinkVel1= ', sinkVel1(nz,n)
+         !if (mype==0 .and. tracer_id(tr_num)==1028) write(*,*) 'sinkVel2= ', sinkVel2(nz,n)
 
       end do
 
@@ -241,7 +256,7 @@ end subroutine recom_sinking_new
 !-------------------------------------------------------------------------------  
 ! Subroutine calculate ballasting
 !-------------------------------------------------------------------------------  
-subroutine ballast(tr_num,mesh)
+subroutine get_scale_ballasting(tr_num,mesh)
   use recom_config
   use recom_GloVar
   USE mod_MESH
@@ -350,7 +365,7 @@ subroutine ballast(tr_num,mesh)
     if (any(scaling_density1_3D(:,:) <= tiny)) scaling_density1_3D(:,:) = 1.0_WP      ! tiny = 2.23D-16
     if (REcoM_Second_Zoo .and. any(scaling_density2_3D(:,:) <= tiny)) scaling_density2_3D(:,:) = 1.0_WP      ! tiny = 2.23D-16    
 
-end subroutine ballast
+end subroutine get_scale_ballasting
 !-------------------------------------------------------------------------------  
 ! Subroutine calculate density of particle 
 ! depending on composition (detC, detOpal, detCaCO3) based on Cram et al. (2018)

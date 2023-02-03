@@ -52,7 +52,10 @@ subroutine recom(mesh)
   integer                    :: idiags
 
   real(kind=8)               :: Sali, net, net1, net2
-  real (kind=8), allocatable :: Temp(:), Sali_depth(:),  zr(:), PAR(:)
+
+  logical :: do_update = .false. 
+
+  real(kind=8),  allocatable :: Temp(:), Sali_depth(:),  zr(:), PAR(:)
   real(kind=8),  allocatable :: C(:,:)
   real(kind=8),  allocatable :: CO2_watercolumn(:)                                        ! NEW MOCSY
   real(kind=8),  allocatable :: pH_watercolumn(:)                                         ! NEW MOCSY
@@ -62,18 +65,13 @@ subroutine recom(mesh)
   real(kind=8),  allocatable :: OmegaC_watercolumn(:)                                     ! NEW DISS
   real(kind=8),  allocatable :: kspc_watercolumn(:)                                       ! NEW DISS
   real(kind=8),  allocatable :: rhoSW_watercolumn(:)                                      ! NEW DISS
-!  real(kind=8),  allocatable :: rho_det1(:), rho_det2(:)                                  ! NEW BALL
-!  real(kind=8),  allocatable :: scaling_density1(:), scaling_density2(:), scaling_visc(:) ! NEW BALL
   character(len=2)           :: tr_num_name
 #include "../associate_mesh.h"
 
   allocate(Temp(nl-1), Sali_depth(nl-1), zr(nl-1) , PAR(nl-1))
   allocate(CO2_watercolumn(nl-1), pH_watercolumn(nl-1), pCO2_watercolumn(nl-1) , HCO3_watercolumn(nl-1))
   allocate(CO3_watercolumn(nl-1), OmegaC_watercolumn(nl-1), kspc_watercolumn(nl-1) , rhoSW_watercolumn(nl-1))
-!  allocate(rho_det1(nl-1), rho_det2(nl-1))
-!  allocate(scaling_density1(nl-1), scaling_density2(nl-1), scaling_visc(nl-1))
   allocate(C(nl-1,bgc_num))
-
 
   if (.not. use_REcoM) return
 
@@ -81,14 +79,36 @@ subroutine recom(mesh)
 !************************* READ SURFACE BOUNDARY FILES *********************************			
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'//achar(27)//'[0m'
-
   call Atm_input(mesh)        !<  read surface atmospheric deposition for Fe, N, CO2
+
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'   --> River_input'//achar(27)//'[0m'
   call River_input(mesh)      !<  read riverine input
+
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//' --> Erosion_input'//achar(27)//'[0m'
   call Erosion_input(mesh)    !<  read erosion input
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> bio_fluxes'//achar(27)//'[0m'
-
   call bio_fluxes(mesh)       !<  alkalinity restoring/ virtual flux is possible
+
+  if (use_atbox) then    ! MERGE
+! Prognostic atmospheric isoCO2
+    call recom_atbox(mesh)
+!   optional I/O of isoCO2 and inferred cosmogenic 14C production; this may cost some CPU time
+    if (ciso .and. ciso_14) then
+      call annual_event(do_update)
+      if (do_update .and. mype==0) write (*, fmt = '(a50,2x,i6,4(2x,f6.2))') &
+                                         'Year, xCO2 (ppm), cosmic 14C flux (at / cm² / s):', &
+                                          yearold, x_co2atm(1), x_co2atm_13(1), x_co2atm_14(1), cosmic_14(1) * production_rate_to_flux_14
+    end if
+  end if
+
+! MERGE
+! ======================================================================================
+!************************* READ BOTTOM BOUNDARY FILES*********************************
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Sed_input'//achar(27)//'[0m'
+if (use_MEDUSA .and. (sedflx_num .ne. 0)) then
+   call Sed_input(mesh) !! --> sedimentary input from MEDUSA
+end if ! use_MEDUSA and sedflx_num not 0
 
 ! ======================================================================================
 !********************************* LOOP STARTS *****************************************			
@@ -103,11 +123,18 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> bio_fluxes'
      !!---- This is needed for piston velocity 
      Loc_ice_conc = a_ice(n) 
 
-     !!---- Mean sea level pressure 
-     Loc_slp = press_air(n)
+     !!---- Mean sea level pressure ! MERGE
+#if defined (__oasis) 
+!!   MB: This is an ad-hoc patch for AWIESM-2.1 and needs to be improved:
+!!   We should consider air pressure provided by ECHAM.
+     Loc_slp           = pa2atm
+#else
+     Loc_slp           = press_air(n)
+#endif 
 
      !!---- Benthic layers
      LocBenthos(1:benthos_num) = Benthos(n,1:benthos_num)
+!CV: It is not clear to me whether this is still needed
 
      !!---- Local conc of [H+]-ions from last time time step. Stored in LocVar
      !!---- used as first guess for H+ conc.in subroutine CO2flux (provided by recom_init)
@@ -115,15 +142,41 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> bio_fluxes'
 
      !!---- Interpolated wind from atmospheric forcing 
      !!---- temporarily stored in module LocVar
-     ULoc = sqrt(u_wind(n)**2+v_wind(n)**2)
+#if defined (__oasis)
+!    Derive 10m-wind speed from wind stress fields, see module recom_ciso.
+!    This is an ad-hoc solution as long as 10m-winds are not handled from OASIS.
+     Uloc              = wind_10(stress_atmoce_x(n), stress_atmoce_y(n))
+#else
+     ULoc              = sqrt(u_wind(n)**2+v_wind(n)**2)
+#endif
 
      !!---- Atmospheric CO2 in LocVar                                                                        
-     LocAtmCO2         = AtmCO2(month)   
+     LocAtmCO2         = AtmCO2(month)
+
+! Update of prognostic atmospheric CO2 values
+     if (use_atbox) then
+       LocAtmCO2                   = x_co2atm(1)
+       if (ciso) then
+         LocAtmCO2_13              = x_co2atm_13(1)
+         if (ciso_14) LocAtmCO2_14 = x_co2atm_14(1)
+       end if
+     else
+! Consider prescribed atmospheric CO2 values
+       if (ciso) then
+         LocAtmCO2_13              = AtmCO2_13(month)
+         if (ciso_14) then
+!          Latitude of nodal point n 
+           lat_val = geo_coord_nod2D(2,n) / rad
+!          Zonally binned NH / SH / TZ 14CO2 input values
+           LocAtmCO2_14 = AtmCO2_14(lat_zone(lat_val), month)
+         end if
+       end if
+     end if  ! use_atbox
+
+! Atmospheric isoCO2 ratios
      if (ciso) then
-        LocAtmCO2_13 = AtmCO2_13(month)
-        LocAtmCO2_14 = AtmCO2_14(month)
-        r_atm_13 = LocAtmCO2_13(1) / LocAtmCO2(1)
-        r_atm_14 = LocAtmCO2_14(1) / LocAtmCO2(1)
+       r_atm_13                    = LocAtmCO2_13(1) / LocAtmCO2(1)
+       if (ciso_14) r_atm_14       = LocAtmCO2_14(1) / LocAtmCO2(1)
      end if
 
      !!---- Shortwave penetration
@@ -134,7 +187,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> bio_fluxes'
      Temp(1:nzmax) = tr_arr(1:nzmax, n, 1)
 
      !!---- Surface salinity
-     Sali = tr_arr(1,       n, 2)
+     Sali = tr_arr(1, n, 2)
      Sali_depth(1:nzmax)= tr_arr(1:nzmax, n, 2)                                    ! NEW MOCSY
 
      !!---- CO2 in the watercolumn                                                 ! NEW MOCSY
@@ -146,13 +199,6 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> bio_fluxes'
      OmegaC_watercolumn(1:nzmax) = OmegaC3D(1:nzmax, n)                            ! NEW DISS
      kspc_watercolumn(1:nzmax)   = kspc3D(1:nzmax, n)                              ! NEW DISS
      rhoSW_watercolumn(1:nzmax)  = rhoSW3D(1:nzmax, n)                             ! NEW DISS
-
-     !!---- Diagnostics for ballasting                                             ! NEW BALL
-!     rho_det1(1:nzmax)         = 0.d0                                              ! NEW BALL
-!     rho_det2(1:nzmax)         = 0.d0                                              ! NEW BALL
-!     scaling_density1(1:nzmax) = 0.d0                                              ! NEW BALL
-!     scaling_density2(1:nzmax) = 0.d0                                              ! NEW BALL
-!     scaling_visc(1:nzmax)     = 0.d0                                              ! NEW BALL
 
      !!---- Biogeochemical tracers
      C(1:nzmax,1:bgc_num) = tr_arr(1:nzmax, n, 3:num_tracers)             
@@ -185,26 +231,25 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forci
            , OmegaC_watercolumn                                  & ! NEW DISS OmegaC for the whole watercolumn
            , kspc_watercolumn                                    & ! NEW DISS stoichiometric solubility product for calcite [mol^2/kg^2]
            , rhoSW_watercolumn                                   & ! NEW DISS in-situ density of seawater [mol/m^3]
-!           , rho_det1, rho_det2                                  & ! NEW BALL
-!           , scaling_density1, scaling_density2, scaling_visc    & ! NEW BALL
            , PAR, mesh)
 
      tr_arr(1:nzmax, n, 3:num_tracers)       = C(1:nzmax, 1:bgc_num)
 
      !!---- Local variables that have been changed during the time-step are stored so they can be saved
-     Benthos(n,1:benthos_num)     = LocBenthos(1:benthos_num)                                ! Updating Benthos values
+     Benthos(n,1:benthos_num)     = LocBenthos(1:benthos_num)             ! Update Benthos
 
-     Diags2D(n,1:12)               = LocDiags2D(1:12)                                ! Updating diagnostics
+     Diags2D(n,1:12)              = LocDiags2D(1:12)                      ! Update diagnostics
      GloPCO2surf(n)               = pco2surf(1)
      GlodPCO2surf(n)              = dpco2surf(1)
 
-     GloCO2flux(n)                = dflux(1)
+     GloCO2flux(n)                = dflux(1)                              !  [mmol/m2/d]
      GloCO2flux_seaicemask(n)     = co2flux_seaicemask(1)                 !  [mmol/m2/s]
      GloO2flux_seaicemask(n)      = o2flux_seaicemask(1)                  !  [mmol/m2/s]
      if (ciso) then
-!        tr_arr(1:nzmax, n, 25:40)    = C(1:nzmax,23:38)
         GloCO2flux_seaicemask_13(n)     = co2flux_seaicemask_13(1)        !  [mmol/m2/s]
-        GloCO2flux_seaicemask_14(n)     = co2flux_seaicemask_14(1)        !  [mmol/m2/s]
+        if (ciso_14) then
+            GloCO2flux_seaicemask_14(n) = co2flux_seaicemask_14(1)        !  [mmol/m2/s]
+        end if
      end if
 
      GloHplus(n)                  = ph(1) !hplus
@@ -214,7 +259,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forci
 
      GlodecayBenthos(n, 1:benthos_num) = decayBenthos(1:benthos_num)/SecondsPerDay ! convert from [mmol/m2/d] to [mmol/m2/s]  
 
-     PAR3D(1:nzmax,n)             = PAR(1:nzmax) !     PAR3D(inds(1:nn))   = PAR(1:nn)
+     PAR3D(1:nzmax,n)             = PAR(1:nzmax)
      CO23D(1:nzmax,n)             = CO2_watercolumn(1:nzmax)       ! NEW MOCSY
      pH3D(1:nzmax,n)              = pH_watercolumn(1:nzmax)        ! NEW MOCSY
      pCO23D(1:nzmax,n)            = pCO2_watercolumn(1:nzmax)      ! NEW MOCSY 
@@ -223,12 +268,6 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forci
      OmegaC3D(1:nzmax,n)          = OmegaC_watercolumn(1:nzmax)    ! NEW DISS
      kspc3D(1:nzmax,n)            = kspc_watercolumn(1:nzmax)      ! NEW DISS
      rhoSW3D(1:nzmax,n)           = rhoSW_watercolumn(1:nzmax)     ! NEW DISS
-
-!     rho_particle1(1:nzmax,n)       = rho_det1(1:nzmax)            ! NEW BALL
-!     rho_particle2(1:nzmax,n)       = rho_det2(1:nzmax)            ! NEW BALL
-!     scaling_density1_3D(1:nzmax,n) = scaling_density1(1:nzmax)    ! NEW BALL
-!     scaling_density2_3D(1:nzmax,n) = scaling_density2(1:nzmax)    ! NEW BALL
-!     scaling_visc_3D(1:nzmax,n)     = scaling_visc(1:nzmax)        ! NEW BALL
    
      do idiags = 1,diags3d_num
        Diags3D(1:nzmax,n,idiags)  = Diags3Dloc(1:nzmax,idiags) ! 1=NPPnano, 2=NPPdia
@@ -256,26 +295,28 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forci
   call exchange_nod(GloPCO2surf)	
   call exchange_nod(GloCO2flux)	
   call exchange_nod(GloCO2flux_seaicemask)
+  if (ciso) then
+    call exchange_nod(GloPCO2surf_13)
+    call exchange_nod(GloCO2flux_13)
+    call exchange_nod(GloCO2flux_seaicemask_13)
+    if (ciso_14) then
+      call exchange_nod(GloPCO2surf_14)
+      call exchange_nod(GloCO2flux_14)
+      call exchange_nod(GloCO2flux_seaicemask_14)
+    end if 
+  end if
 
-  do n=1, 4
+  do n=1, benthos_num  !4
     call exchange_nod(GlodecayBenthos(:,n))
   end do
 
-  if (ciso) then
-    call exchange_nod(GloPCO2surf_13)
-    call exchange_nod(GloPCO2surf_14)
-    call exchange_nod(GloCO2flux_13)
-    call exchange_nod(GloCO2flux_14)
-    call exchange_nod(GloCO2flux_seaicemask_13)
-    call exchange_nod(GloCO2flux_seaicemask_14)  
-  end if
   call exchange_nod(GloO2flux_seaicemask)	
   call exchange_nod(GloHplus)	
   call exchange_nod(AtmFeInput)	
-  call exchange_nod(AtmNInput)	
+  call exchange_nod(AtmNInput)
+  call exchange_nod(PAR3D)
 !  call exchange_nod(DenitBen)	
 
-  call exchange_nod(PAR3D)
   call exchange_nod(CO23D)       ! NEW ms
   call exchange_nod(pH3D)        ! NEW ms
   call exchange_nod(pCO23D)      ! NEW ms

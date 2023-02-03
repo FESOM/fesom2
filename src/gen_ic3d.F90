@@ -231,7 +231,7 @@ CONTAINS
       
       warn = 0
 
-      if (mype==0) then
+      if (mype==0 .and. my_fesom_group == 0) then !OG
          write(*,*) 'reading input tracer file for tracer ID= ', tracer_ID(current_tracer)
          write(*,*) 'input file: ', trim(filename)
          write(*,*) 'variable  : ', trim(varname)
@@ -480,7 +480,7 @@ CONTAINS
       real(kind=WP)                 :: locDINmax, locDINmin, locDICmax, locDICmin, locAlkmax
       real(kind=WP)                 :: locAlkmin, locDSimax, locDSimin, locDFemax, locDFemin
 
-      if (mype==0) write(*,*) "Start: Initial conditions  for tracers"
+      if (mype==0 .and. my_fesom_group == 0) write(*,*) "Start: Initial conditions  for tracers" !OG
 
       ALLOCATE(bilin_indx_i(myDim_nod2d+eDim_nod2D), bilin_indx_j(myDim_nod2d+eDim_nod2D))
       DO n=1, n_ic3d
@@ -496,8 +496,8 @@ CONTAINS
             call extrap_nod(tr_arr(:,:,current_tracer), mesh)
             exit
          elseif (current_tracer==num_tracers) then
-            if (mype==0) write(*,*) "idlist contains tracer which is not listed in tracer_id!"
-            if (mype==0) write(*,*) "check your namelists!"
+            if (mype==0 .and. my_fesom_group == 0) write(*,*) "idlist contains tracer which is not listed in tracer_id!" !OG
+            if (mype==0 .and. my_fesom_group == 0) write(*,*) "check your namelists!" !OG
             call par_ex
             stop
          end if
@@ -516,6 +516,10 @@ CONTAINS
       where (tr_arr(:,:,1) > 100._WP)
          tr_arr(:,:,1)=tr_arr(:,:,1)-273.15_WP
       end where
+    !!!wiso-code!!! ice tracers
+    tr_arr_ice=0.
+    !!!wiso-code!!! ice tracers
+
       
       !_________________________________________________________________________
       ! eliminate values within cavity that result from the extrapolation of 
@@ -529,10 +533,10 @@ CONTAINS
       
       !_________________________________________________________________________
       if (t_insitu) then
-         if (mype==0) write(*,*) "converting insitu temperature to potential..."
+         if (mype==0 .and. my_fesom_group == 0) write(*,*) "converting insitu temperature to potential..." !OG
          call insitu2pot(mesh)
       end if
-      if (mype==0) write(*,*) "DONE:  Initial conditions for tracers"
+      if (mype==0 .and. my_fesom_group == 0) write(*,*) "DONE:  Initial conditions for tracers" !OG
       
       !_________________________________________________________________________
       ! Homogenous temp salt initialisation --> for testing and debuging
@@ -607,36 +611,36 @@ CONTAINS
 #endif
       end do
       call MPI_AllREDUCE(locTmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal max init. temp. =', glo
+      if (mype==0 .and. my_fesom_group == 0) write(*,*) '  |-> global max init. temp. =', glo !OG
       call MPI_AllREDUCE(locTmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal min init. temp. =', glo
+      if (mype==0 .and. my_fesom_group == 0) write(*,*) '  |-> global min init. temp. =', glo
       call MPI_AllREDUCE(locSmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal max init. salt. =', glo
+      if (mype==0 .and. my_fesom_group == 0) write(*,*) '  |-> global max init. salt. =', glo
       call MPI_AllREDUCE(locSmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  `-> gobal min init. salt. =', glo
+      if (mype==0 .and. my_fesom_group == 0) write(*,*) '  `-> global min init. salt. =', glo
 #if defined(__recom)
     if(use_REcoM) then
-      if (mype==0) write(*,*) "Sanity check for REcoM variables"
+      if (mype==0 .and. my_fesom_group == 0) write(*,*) "Sanity check for REcoM variables"
       call MPI_AllREDUCE(locDINmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal max init. DIN. =', glo
+      if (mype==0 .and. my_fesom_group == 0) write(*,*) '  |-> global max init. DIN. =', glo
       call MPI_AllREDUCE(locDINmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal min init. DIN. =', glo
+      if (mype==0 .and. my_fesom_group == 0) write(*,*) '  |-> global min init. DIN. =', glo
       call MPI_AllREDUCE(locDICmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal max init. DIC. =', glo
+      if (mype==0 .and. my_fesom_group == 0) write(*,*) '  |-> global max init. DIC. =', glo
       call MPI_AllREDUCE(locDICmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal min init. DIC. =', glo
+      if (mype==0 .and. my_fesom_group == 0) write(*,*) '  |-> global min init. DIC. =', glo
       call MPI_AllREDUCE(locAlkmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal max init. Alk. =', glo
+      if (mype==0 .and. my_fesom_group == 0) write(*,*) '  |-> global max init. Alk. =', glo
       call MPI_AllREDUCE(locAlkmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal min init. Alk. =', glo
+      if (mype==0 .and. my_fesom_group == 0) write(*,*) '  |-> global min init. Alk. =', glo
       call MPI_AllREDUCE(locDSimax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal max init. DSi. =', glo
+      if (mype==0 .and. my_fesom_group == 0) write(*,*) '  |-> global max init. DSi. =', glo
       call MPI_AllREDUCE(locDSimin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal min init. DSi. =', glo
+      if (mype==0 .and. my_fesom_group == 0) write(*,*) '  |-> global min init. DSi. =', glo
       call MPI_AllREDUCE(locDFemax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal max init. DFe. =', glo
+      if (mype==0 .and. my_fesom_group == 0) write(*,*) '  |-> global max init. DFe. =', glo
       call MPI_AllREDUCE(locDFemin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  `-> gobal min init. DFe. =', glo
+      if (mype==0 .and. my_fesom_group == 0) write(*,*) '  `-> global min init. DFe. =', glo
     end if 
 #endif
   
