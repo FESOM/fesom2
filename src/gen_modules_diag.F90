@@ -274,8 +274,8 @@ salt   => tracers%data(2)%values(:,:)
      nzmax = nlevels_nod2d(n)
      do nz=nzmin+1,nzmax-1
         dz_inv=1.0_WP/(Z_3d_n(nz-1,n)-Z_3d_n(nz,n))
-        KvdTdZ(nz,n) = Kv(nz,n)*(temp(nz-1,n)-temp(nz,n))*dz_inv
-        KvdSdZ(nz,n) = Kv(nz,n)*(salt(nz-1,n)-salt(nz,n))*dz_inv
+        KvdTdZ(nz,n) = -Kv(nz,n)*(temp(nz-1,n)-temp(nz,n))*dz_inv
+        KvdSdZ(nz,n) = -Kv(nz,n)*(salt(nz-1,n)-salt(nz,n))*dz_inv
      end do
   end do
 end subroutine diag_turbflux
