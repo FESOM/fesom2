@@ -251,7 +251,7 @@ subroutine diag_turbflux(mode, dynamics, tracers, partit, mesh)
   integer                                  :: n, nz, nzmax, nzmin
   real(kind=WP), dimension(:,:,:), pointer :: UVnode
   real(kind=WP), dimension(:,:),   pointer :: temp, salt
-  real(kind=WP)                            :: val, dz_inv
+  real(kind=WP)                            :: dz_inv
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -274,10 +274,8 @@ salt   => tracers%data(2)%values(:,:)
      nzmax = nlevels_nod2d(n)
      do nz=nzmin+1,nzmax-1
         dz_inv=1.0_WP/(Z_3d_n(nz-1,n)-Z_3d_n(nz,n))
-        val = Kv(nz,n)*(temp(nz-1,n)-temp(nz,n))*dz_inv
-        KvdTdZ(nz,n) = val*dz_inv
-        val = Kv(nz,n)*(salt(nz-1,n)-salt(nz,n))*dz_inv
-        KvdSdZ(nz,n) = val*dz_inv
+        KvdTdZ(nz,n) = -Kv(nz,n)*(temp(nz-1,n)-temp(nz,n))*dz_inv
+        KvdSdZ(nz,n) = -Kv(nz,n)*(salt(nz-1,n)-salt(nz,n))*dz_inv
      end do
   end do
 end subroutine diag_turbflux
