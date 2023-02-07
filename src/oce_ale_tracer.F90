@@ -1460,11 +1460,11 @@ else
       bottom_flux = -GlodecayBenthos(:,2) * redO2C !*** O2 ***
     CASE (1033)
       if (ciso) then
-        bottom_flux = GlodecayBenthos(:,5) + GlodecayBenthos(:,7) !*** DIC_13 and Calc: DIC_13 ***
+        bottom_flux = GlodecayBenthos(:,5) + GlodecayBenthos(:,6) !*** DIC_13 and Calc: DIC_13 ***
       end if
     CASE (1034)
       if (ciso) then
-        bottom_flux = GlodecayBenthos(:,6) + GlodecayBenthos(:,8) !*** DIC_14 and Calc: DIC_14 ***
+        bottom_flux = GlodecayBenthos(:,7) + GlodecayBenthos(:,8) !*** DIC_14 and Calc: DIC_14 ***
       end if
     CASE DEFAULT
       if (mype==0) then
