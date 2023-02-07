@@ -42,8 +42,10 @@ subroutine par_init(partit)    ! initializes MPI
   USE o_PARAM
   USE MOD_PARTIT
   USE MOD_PARSUP
+#ifdef __MULTIO
   use multio_config
   use multio_api
+#endif
   implicit none
   type(t_partit), intent(inout), target :: partit
   integer                               :: i, mycolor
