@@ -94,6 +94,12 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
             UV_rhs(1,nz,elem)=-(0.5_WP+epsilon)*UV_rhsAB(1,nz,elem)   
             UV_rhs(2,nz,elem)=-(0.5_WP+epsilon)*UV_rhsAB(2,nz,elem)
         end do
+        if (dynamics%ldiag_ke) then
+           do nz=nzmin,nzmax-1
+              dynamics%ke_adv(:,nz,elem)=-(0.5_WP+epsilon)*dynamics%ke_adv_AB(:,nz,elem)   
+              dynamics%ke_cor(:,nz,elem)=-(0.5_WP+epsilon)*dynamics%ke_cor_AB(:,nz,elem)   
+           end do
+        end if
         
         !___________________________________________________________________________
         ! Sea level and pressure contribution   -\nabla(\eta +hpressure/rho_0)
@@ -149,6 +155,20 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
             UV_rhsAB(1,nz,elem) = UV(2,nz,elem)*ff! + mm*UV(1,nz,elem)*UV(2,nz,elem)
             UV_rhsAB(2,nz,elem) =-UV(1,nz,elem)*ff! - mm*UV(1,nz,elem)*UV(2,nz,elem)
         end do
+
+        if (dynamics%ldiag_ke) then
+           do nz=nzmin,nzmax-1
+              dynamics%ke_pre(1,nz,elem)= (Fx-pgf_x(nz,elem))*dt!*elem_area(elem) !not to divide it aterwards (at the end of this subroutine)
+              dynamics%ke_pre(2,nz,elem)= (Fy-pgf_y(nz,elem))*dt!*elem_area(elem) !but account for DT here
+
+              dynamics%ke_cor_AB(1,nz,elem)= UV(2,nz,elem)*ff
+              dynamics%ke_cor_AB(2,nz,elem)=-UV(1,nz,elem)*ff
+
+              dynamics%ke_adv_AB(1,nz,elem)= 0.0_WP
+              dynamics%ke_adv_AB(2,nz,elem)= 0.0_WP
+           end do
+        end if
+
     end do
 !$OMP END PARALLEL DO
     
@@ -177,6 +197,19 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         end do
     end do
 !$OMP END PARALLEL DO
+
+    if (dynamics%ldiag_ke) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
+    do elem=1, myDim_elem2D
+        nzmax = nlevels(elem)
+        nzmin = ulevels(elem)
+        do nz=nzmin,nzmax-1
+            dynamics%ke_adv(:,nz,elem)=dt*(dynamics%ke_adv(:,nz,elem)+dynamics%ke_adv_AB(:,nz,elem)*ff)/elem_area(elem)
+            dynamics%ke_cor(:,nz,elem)=dt*(dynamics%ke_cor(:,nz,elem)+dynamics%ke_cor_AB(:,nz,elem)*ff)/elem_area(elem)
+        end do
+    end do
+!$OMP END PARALLEL DO
+    end if
     
     ! =======================  
     ! U_rhs contains all contributions to velocity from old time steps   
@@ -426,6 +459,19 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
     
     end do ! --> do el=1, myDim_elem2D
 !$OMP END DO
+
+    if (dynamics%ldiag_ke) then !we repeat the computation here and there are multiple ways to speed it up
+!$OMP DO
+       do el=1, myDim_elem2D
+          nl1 = nlevels(el)-1
+          ul1 = ulevels(el)
+          dynamics%ke_adv_AB(1:2,ul1:nl1,el) = dynamics%ke_adv_AB(1:2,ul1:nl1,el) &
+                + elem_area(el)*(UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(1,el)) &
+                + UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(2,el)) & 
+                + UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(3,el))) / 3.0_WP     
+       end do
+!$OMP END DO
+    end if
 !$OMP END PARALLEL
 end subroutine momentum_adv_scalar
 

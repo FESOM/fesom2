@@ -74,6 +74,7 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
     integer       :: n, elem, elnodes(3), nz, nzmin, nzmax
     real(kind=WP) :: eta(3) 
     real(kind=WP) :: Fx, Fy
+    real(kind=WP) :: usum(2), udiff(2)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
@@ -88,7 +89,7 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
     d_eta  => dynamics%d_eta(:)
     
     !___________________________________________________________________________    
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax, eta, Fx, Fy)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax, eta, Fx, Fy, usum, udiff)
     DO elem=1, myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
         eta=-g*theta*dt*d_eta(elnodes)
@@ -96,6 +97,36 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
         Fy=sum(gradient_sca(4:6,elem)*eta)
         nzmin = ulevels(elem)
         nzmax = nlevels(elem)
+
+        if (dynamics%ldiag_ke) then
+           DO nz=nzmin, nzmax-1
+              dynamics%ke_pre(1,nz,elem)  =dynamics%ke_pre(1,nz,elem)   + Fx
+              dynamics%ke_pre(2,nz,elem)  =dynamics%ke_pre(2,nz,elem)   + Fy
+           
+              usum(1)=2.0_WP*UV(1,nz,elem)+(UV_rhs(1,nz,elem) + Fx)
+              usum(2)=2.0_WP*UV(2,nz,elem)+(UV_rhs(2,nz,elem) + Fy)
+
+              udiff(1)=UV_rhs(1,nz,elem) + Fx
+              udiff(2)=UV_rhs(2,nz,elem) + Fy
+              dynamics%ke_du2 (:,nz,elem)  = usum*udiff/2.0_WP
+              dynamics%ke_pre_xVEL (:,nz,elem)  = usum*dynamics%ke_pre (:,nz,elem)/2.0_WP
+              dynamics%ke_adv_xVEL (:,nz,elem)  = usum*dynamics%ke_adv (:,nz,elem)/2.0_WP
+              dynamics%ke_cor_xVEL (:,nz,elem)  = usum*dynamics%ke_cor (:,nz,elem)/2.0_WP
+              dynamics%ke_hvis_xVEL(:,nz,elem)  = usum*dynamics%ke_hvis(:,nz,elem)/2.0_WP
+              dynamics%ke_vvis_xVEL(:,nz,elem)  = usum*dynamics%ke_vvis(:,nz,elem)/2.0_WP
+              dynamics%ke_umean(:,nz,elem)      = usum/2.0_WP
+              dynamics%ke_u2mean(:,nz,elem)     = (usum*usum)/4.0_WP
+              
+              if (nz==nzmin) then
+                 dynamics%ke_wind_xVEL(:,elem)=usum*dynamics%ke_wind(:,elem)/2.0_WP
+              end if
+              
+              if (nz==nzmax-1) then
+                 dynamics%ke_drag_xVEL(:,elem)=usum*dynamics%ke_drag(:,elem)/2.0_WP
+              end if
+        END DO
+        end if
+
         DO nz=nzmin, nzmax-1
             UV(1,nz,elem)= UV(1,nz,elem) + UV_rhs(1,nz,elem) + Fx
             UV(2,nz,elem)= UV(2,nz,elem) + UV_rhs(2,nz,elem) + Fy
@@ -103,11 +134,15 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
     END DO
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO
-    DO n=1, myDim_nod2D+eDim_nod2D
-       eta_n(n)=eta_n(n)+d_eta(n)
-    END DO
-!$OMP END PARALLEL DO
+!!PS Why we do this here eta_n is anyway overwriten through ...
+!!PS do node=1, myDim_nod2D+eDim_nod2D
+!!PS     if (ulevels_nod2D(node)==1) eta_n(node)=alpha*hbar(node)+(1.0_WP-alpha)*hbar_old(node)
+!!PS end do
+!!PS !$OMP PARALLEL DO
+!!PS     DO n=1, myDim_nod2D+eDim_nod2D
+!!PS        eta_n(n)=eta_n(n)+d_eta(n)
+!!PS     END DO
+!!PS !$OMP END PARALLEL DO
     call exchange_elem(UV, partit)
 !$OMP BARRIER
 end subroutine update_vel
@@ -612,3 +647,102 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
 !$OMP END PARALLEL
 end subroutine visc_filt_bidiff
 
+SUBROUTINE compute_ke_wrho(dynamics, partit, mesh)
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use MOD_DYN
+    USE o_PARAM
+    USE g_CONFIG
+    USE g_comm_auto
+    USE o_ARRAYS
+    IMPLICIT NONE
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    real(kind=WP) , pointer               :: inv_rhowat
+    !___________________________________________________________________________
+    integer        :: n, nz, nzmin, nzmax
+    real(kind=WP)  :: wu, wl
+    real(kind=WP)  :: dW, P
+    !___________________________________________________________________________
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+  ! we use pressure to compute this term as it appeares much easier (P*dW) instead of (dP*w)
+  dynamics%ke_wrho=0.0_WP
+  DO n=1, myDim_nod2D
+     nzmin=ulevels_nod2D(n)
+     nzmax=nlevels_nod2D(n)
+     do nz=nzmin, nzmax-1
+        wu=0.5*(dynamics%w(nz,   n)+dynamics%w_old(nz,   n))
+        wl=0.5*(dynamics%w(nz+1, n)+dynamics%w_old(nz+1, n))
+        P =(g*dynamics%eta_n(n)+hpressure(nz, n)/density_0)
+        dW=(wu*area(nz, n)-wl*area(nz+1, n))
+        dW=dW/area(nz, n)/hnode_new(nz,n)
+!       r=(g*dynamics%eta_n(n)+hpressure(nz, n)/density_0)*(wu*area(nz, n)-wl*area(nz+1, n)+0.5_WP*(hnode_new(nz, n)-mesh%hnode_old(nz, n))/dt*area(nz, n) )
+        dynamics%ke_Pfull(nz, n) = P
+        dynamics%ke_dW   (nz, n) = dW
+        dynamics%ke_wrho (nz, n) = P*dW*dt
+     end do
+  END DO
+  call exchange_nod(dynamics%ke_wrho, partit)
+END SUBROUTINE compute_ke_wrho
+! APE generation stuff
+SUBROUTINE compute_apegen(dynamics, tracers, partit, mesh)
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_TRACER
+    USE MOD_PARSUP
+    use MOD_DYN
+    USE o_PARAM
+    USE g_comm_auto
+    USE o_ARRAYS
+    IMPLICIT NONE
+    type(t_dyn)   , intent(inout), target   :: dynamics
+    type(t_tracer), intent(in)   , target   :: tracers
+    type(t_partit), intent(inout), target   :: partit
+    type(t_mesh)  , intent(in)   , target   :: mesh
+    real(kind=WP), dimension(:,:), pointer  :: salt
+    !___________________________________________________________________________
+    integer        :: n, nzmin
+    real(kind=WP)  :: JS, GS, D
+    !___________________________________________________________________________
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+salt   => tracers%data(2)%values(:,:)
+
+  DO n=1, myDim_nod2D
+     nzmin=ulevels_nod2D(n)
+     ! heat and salinity fluxes at node=n
+     JS= heat_flux_in(n) / vcpw
+     GS=(relax_salt(n) + water_flux(n) * salt(nzmin,n))
+     D=density_m_rho0(nzmin,n)
+     dynamics%ke_J   (n)=JS
+     dynamics%ke_G   (n)=GS
+     dynamics%ke_D   (n)=D
+     dynamics%ke_D2  (n)=D**2
+     dynamics%ke_n0  (n)=-bvfreq (nzmin,n)*density_0/g
+     dynamics%ke_JD(n)  =JS*D
+     dynamics%ke_GD(n)  =GS*D
+     dynamics%ke_D (n)  =D
+     dynamics%ke_swA (n)=sw_alpha(nzmin, n)
+     dynamics%ke_swB (n)=sw_beta (nzmin, n)
+  END DO
+  call exchange_nod(dynamics%ke_J, partit)
+  call exchange_nod(dynamics%ke_G, partit)
+  call exchange_nod(dynamics%ke_D, partit)
+
+  call exchange_nod(dynamics%ke_D2, partit)
+  call exchange_nod(dynamics%ke_n0, partit)
+
+  call exchange_nod(dynamics%ke_JD, partit)
+  call exchange_nod(dynamics%ke_GD, partit)
+
+  call exchange_nod(dynamics%ke_swA, partit)
+  call exchange_nod(dynamics%ke_swB, partit)
+END SUBROUTINE compute_apegen

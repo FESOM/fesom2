@@ -250,7 +250,7 @@ subroutine read_mesh_cavity(mesh)
         cavity_depth => mesh%cavity_depth 
     else
         write(*,*) '____________________________________________________________________'
-        write(*,*) ' ERROR: could not find cavity file: cavity_depth.out'    
+        write(*,*) ' ERROR: could not find cavity file:', fname
         write(*,*) '        --> stop partitioning here !'
         write(*,*) '____________________________________________________________________'    
         stop 

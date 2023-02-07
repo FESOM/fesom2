@@ -72,11 +72,6 @@ contains
 #else
       print '(g0)', 'PETSC is OFF'
 #endif  
-#ifdef use_cavity
-      print '(g0)', 'use_cavity is ON'
-#else
-      print '(g0)', 'use_cavity is OFF'
-#endif  
 #ifdef use_fullfreesurf
       print '(g0)', 'use_fullfreesurf is ON'
 #else
@@ -96,6 +91,11 @@ contains
       print '(g0)', 'ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS is ON'
 #else
       print '(g0)', 'ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS is OFF'
+#endif  
+#ifdef ENABLE_ALBEDO_INTELMPI_WORKAROUNDS
+      print '(g0)', 'ENABLE_ALBEDO_INTELMPI_WORKAROUNDS is ON'
+#else
+      print '(g0)', 'ENABLE_ALBEDO_INTELMPI_WORKAROUNDS is OFF'
 #endif  
 #ifdef ENABLE_NVHPC_WORKAROUNDS
       print '(g0)', 'ENABLE_NVHPC_WORKAROUNDS is ON'
