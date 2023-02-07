@@ -1,0 +1,41 @@
+client:
+  on-error: abort-all-transports
+  plans:
+    - name : fesom-output
+      actions :
+        - type : select
+          match :
+           - category : [fesom-domain-nodemap, fesom-domain-elemmap]
+        - type : transport
+          target : server
+
+    - name : fesom-stream
+      actions :
+        - type : select
+          match :
+          - category : [fesom-node-output]
+        - type : transport
+          target : server
+          hash-keys: [category, name]
+        - type : single-field-sink
+        - type : aggregation
+
+server:
+  transport : mpi
+  on-error: abort-transport
+  plans :
+    - name : ocean-fields
+      actions :
+        - type : select
+          match :
+           - category : [fesom-node-output]
+        - type : aggregation
+        - type : encode
+          format : raw
+
+        - type : sink
+          sinks :
+            - type : file
+              append : true
+#             per-server : true
+              path : ocean-output-field.bin # read in python as np.fromfile("..ocean-outpur-field.bin", np.double)
