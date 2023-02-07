@@ -29,7 +29,9 @@ module fesom_main_storage_module
   use read_mesh_interface
   use fesom_version_info_module
   use command_line_options_module
+#ifdef __MULTIO  
   use multio_api
+#endif
   ! Define icepack module
 #if defined (__icepack)
   use icedrv_main,          only: set_icepack, init_icepack, alloc_icepack
