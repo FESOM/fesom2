@@ -29,6 +29,7 @@ module fesom_main_storage_module
   use read_mesh_interface
   use fesom_version_info_module
   use command_line_options_module
+  use multio_api
   ! Define icepack module
 #if defined (__icepack)
   use icedrv_main,          only: set_icepack, init_icepack, alloc_icepack
@@ -51,6 +52,9 @@ module fesom_main_storage_module
     real(kind=real32) :: rtime_setup_ice,  rtime_setup_other, rtime_setup_restart
     real(kind=real32) :: runtime_alltimesteps
 
+#if defined(__MULTIO)
+    type(multio_handle) :: mio
+#endif
 
     type(t_mesh)   mesh
     type(t_tracer) tracers
@@ -300,11 +304,17 @@ contains
 
     if (f%mype==0) write(*,*) 'FESOM start iteration before the barrier...'
     call MPI_Barrier(f%MPI_COMM_FESOM, f%MPIERR)
-    
     if (f%mype==0) then
        write(*,*) 'FESOM start iteration after the barrier...'
        f%t0 = MPI_Wtime()
     endif
+
+#if defined(__MULTIO)
+    call init_client(f%mio, f%partit, f%mesh)
+#endif
+
+!call MPI_Barrier(MPI_COMM_WORLD, f%MPIERR)
+
     if(f%mype==0) then
         write(*,*)
         print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
@@ -314,6 +324,7 @@ contains
     if (use_global_tides) then
        call foreph_ini(yearnew, month, f%partit)
     end if
+
     do n=f%from_nstep, f%from_nstep-1+current_nsteps        
         if (use_global_tides) then
            call foreph(f%partit, f%mesh)
@@ -375,8 +386,11 @@ contains
         f%t4 = MPI_Wtime()
         !___prepare output______________________________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
+#if defined(__MULTIO)
+        call output (n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh, f%mio)
+#else
         call output (n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
-
+#endif
         f%t5 = MPI_Wtime()
         call restart(n, .false., f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         f%t6 = MPI_Wtime()
@@ -389,6 +403,9 @@ contains
     end do
 
     f%from_nstep = f%from_nstep+current_nsteps
+#if defined(__MULTIO)
+    n=f%mio%close_connections()     
+#endif
   end subroutine
 
 

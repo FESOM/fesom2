@@ -70,8 +70,8 @@ TYPE T_PARTIT
   ! Mesh partition
   integer                             :: myDim_nod2D, eDim_nod2D
   integer, allocatable, dimension(:)  :: myList_nod2D
-  integer                             :: myDim_elem2D, eDim_elem2D, eXDim_elem2D
-  integer, allocatable, dimension(:)  :: myList_elem2D
+  integer                             :: myDim_elem2D, eDim_elem2D, eXDim_elem2D, myDim_elem2D_shrinked
+  integer, allocatable, dimension(:)  :: myList_elem2D, myInd_elem2D_shrinked
   integer                             :: myDim_edge2D, eDim_edge2D
   integer, allocatable, dimension(:)  :: myList_edge2D
 

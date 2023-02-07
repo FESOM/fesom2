@@ -33,7 +33,7 @@ module par_support_interfaces
      USE MOD_PARTIT
      USE MOD_PARSUP
      implicit none
-     type(t_partit), intent(inout), target :: partit    
+     type(t_partit), intent(inout), target :: partit
   end subroutine
   end interface
 end module
@@ -42,21 +42,58 @@ subroutine par_init(partit)    ! initializes MPI
   USE o_PARAM
   USE MOD_PARTIT
   USE MOD_PARSUP
+  use multio_config
+  use multio_api
   implicit none
   type(t_partit), intent(inout), target :: partit
-  integer                               :: i
+  integer                               :: i, mycolor
   integer                               :: provided_mpi_thread_support_level
   character(:), allocatable             :: provided_mpi_thread_support_level_name
-
+  character(len=255)                    :: oce_npes_str, mio_npes_str
+  integer                               :: oce_npes_int, mio_npes_int, oce_status, mio_status
 #if defined __oasis || defined  __ifsinterface
   ! use comm from coupler or ifs
 #else
-  partit%MPI_COMM_FESOM=MPI_COMM_WORLD ! use global comm if not coupled (e.g. no __oasis or __ifsinterface)
-#endif  
+#if !defined(__MULTIO)
+   partit%MPI_COMM_FESOM=MPI_COMM_WORLD ! use global comm if not coupled (e.g. no __oasis or __ifsinterface)
+#else
+   CALL MPI_Comm_Size(MPI_COMM_WORLD, partit%npes, i)
+   CALL MPI_Comm_Rank(MPI_COMM_WORLD, partit%mype, i)
+   CALL get_environment_variable('OCE_NPES', oce_npes_str, status=oce_status)
+   CALL get_environment_variable('MIO_NPES', mio_npes_str, status=mio_status)
+   if ((oce_status/=0) .or. (mio_status/=0)) then
+      if (oce_status/=0) then
+         if (partit%mype==0) write(*,*) '$OCE_NPES variable is not set!'
+      end if
+      if (mio_status/=0) then
+         if (partit%mype==0) write(*,*) '$MIO_NPES variable is not set!'
+      end if
+      call par_ex(MPI_COMM_WORLD, partit%mype, i)
+      stop
+   end if
+   read(oce_npes_str,*,iostat=oce_status) oce_npes_int
+   read(mio_npes_str,*,iostat=mio_status) mio_npes_int
+   if (partit%mype==0) write(*,*) 'Total number of processes: ', partit%npes
+   if (partit%mype==0) write(*,*) 'FESOM wil run on           ', oce_npes_int, ' processes'
+   if (partit%mype==0) write(*,*) 'MULTIO Server will run on  ', mio_npes_int, ' processes'
+   if (oce_npes_int+mio_npes_int /= partit%npes) then
+      if (partit%mype==0) write(*,*) '$OCE_NPES + $MIO_NPES is not equal to the total amount, the model will stop'
+      call par_ex(MPI_COMM_WORLD, partit%mype, i)
+      stop
+   end if
+   mycolor=0
+   if (partit%mype > oce_npes_int-1) mycolor=1
+   CALL MPI_COMM_SPLIT(MPI_COMM_WORLD, mycolor, 0, partit%MPI_COMM_FESOM)
+   IF (multio_initialise() /= MULTIO_SUCCESS) then
+      write(error_unit, *) 'Failed to initialise MULTIO api'
+   END IF
+   IF (mycolor==1) then
+      call init_server(MPI_COMM_WORLD, partit)
+   END IF
+#endif
+#endif
   call MPI_Comm_Size(partit%MPI_COMM_FESOM,partit%npes,i)
   call MPI_Comm_Rank(partit%MPI_COMM_FESOM,partit%mype,i)
- 
-
   if(partit%mype==0) then
     call MPI_Query_thread(provided_mpi_thread_support_level, i)
     if(provided_mpi_thread_support_level == MPI_THREAD_SINGLE) then
@@ -90,7 +127,7 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
   use mod_oasis
 #else
   !For ECHAM coupled runs we use the old OASIS nameing scheme (prism / prism_proto)
-  use mod_prism 
+  use mod_prism
 #endif ! oifs/echam
 #endif ! oasis
 
@@ -131,7 +168,7 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
   call prism_terminate_proto(error)
   if (mype==0) print *, 'FESOM calls MPI_Barrier before calling MPI_Finalize'
   call  MPI_Barrier(MPI_COMM_WORLD, error)
-  
+
   if (mype==0) print *, 'FESOM calls MPI_Finalize'
   call MPI_Finalize(error)
 #endif ! oifs/echam
@@ -161,10 +198,10 @@ subroutine init_mpi_types(partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
   !
-  ! In the distributed memory version, most of the job is already done 
+  ! In the distributed memory version, most of the job is already done
   ! at the initialization phase and is taken into account in read_mesh
   ! routine. Here, MPI datatypes are built and buffers for MPI wait requests
-  ! are allocated. 
+  ! are allocated.
 
    if (npes > 1) then
 
@@ -564,4 +601,89 @@ if (res /= 0 ) then
     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
 endif
 end subroutine status_check
+!===================================================================
+#if defined(__MULTIO)
+subroutine init_server(mio_parent_comm, partit)
+   use multio_config
+   use multio_api
+   use mpi_f08, only: c_int
+   USE MOD_PARTIT   
+   implicit none
 
+   integer(kind=c_int) :: cerr
+   integer(4), intent(in) :: mio_parent_comm
+   type(multio_configurationcontext) :: cc
+   type(t_partit), intent(in),    target :: partit
+   
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+
+   cerr = cc%new()
+
+   cerr = cc%mpi_allow_world_default_comm(.TRUE._1)
+   cerr = cc%mpi_parent_comm(mio_parent_comm)
+
+   cerr = multio_start_server(cc)
+
+   cerr = cc%delete()
+!  call par_ex(MPI_COMM_WORLD, partit%mype, cerr)
+   stop   
+end subroutine init_server
+
+subroutine init_client(mio, partit, mesh)
+   use multio_config
+   use multio_api
+   use mpi_f08, only: c_int
+   use MOD_MESH
+   USE MOD_PARTIT
+   implicit none
+
+   type(multio_handle), intent(inout):: mio
+   type(multio_metadata)             :: md
+   type(multio_configurationcontext) :: cc
+   integer(kind=c_int)               :: cerr
+   integer                           :: elem, elnodes(3), aux
+   type(t_partit), intent(in),    target :: partit
+   type(t_mesh),   intent(in),    target :: mesh
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+   cerr = cc%new()
+   if (cerr /= MULTIO_SUCCESS) ERROR STOP "Error creating default configuration context"
+   cerr = cc%mpi_client_id("oce")
+   cerr = mio%new(cc)
+   cerr = mio%open_connections()
+   !declare grid at nodes
+   cerr = md%new()
+   cerr = md%set_string_value("name", "ngrid")
+   if (cerr /= MULTIO_SUCCESS) ERROR STOP 10
+   cerr = md%set_string_value("category", "fesom-domain-nodemap")
+   if (cerr /= MULTIO_SUCCESS) ERROR STOP 11
+   cerr = md%set_string_value("representation", "unstructured")
+   if (cerr /= MULTIO_SUCCESS) ERROR STOP 12
+   cerr = md%set_int_value("globalSize", mesh%nod2D)
+   cerr = md%set_bool_value("toAllServers", .TRUE._1)
+   if (cerr /= MULTIO_SUCCESS) ERROR STOP 14
+   cerr = mio%write_domain(md, partit%myList_nod2D-1, partit%myDim_nod2D)
+   cerr = md%delete()
+
+   cerr = md%new()
+   cerr = md%set_string_value("name", "egrid")
+   if (cerr /= MULTIO_SUCCESS) ERROR STOP 10
+   cerr = md%set_string_value("category", "fesom-domain-nodemap")
+   if (cerr /= MULTIO_SUCCESS) ERROR STOP 11
+   cerr = md%set_string_value("representation", "unstructured")
+   if (cerr /= MULTIO_SUCCESS) ERROR STOP 12
+   cerr = md%set_int_value("globalSize", mesh%elem2D)
+   cerr = md%set_bool_value("toAllServers", .TRUE._1)
+   if (cerr /= MULTIO_SUCCESS) ERROR STOP 14
+   cerr = mio%write_domain(md, partit%myList_elem2D(partit%myInd_elem2D_shrinked)-1, partit%myDim_elem2D_shrinked)
+   cerr = md%delete()
+!   aux=sum(partit%myList_elem2D(1:partit%myDim_elem2D_shrinked))
+!   call MPI_AllREDUCE(aux, elem, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, cerr)
+!   write(*,*) 'total elem client=', elem, ((1+mesh%elem2D)*mesh%elem2D)/2
+end subroutine init_client
+#endif

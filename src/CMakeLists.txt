@@ -89,7 +89,7 @@ list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_main.F90)
 
 # depends on the metis library
 #add_subdirectory(../lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
-#include_directories(../lib/metis-5.1.0/include)
+include_directories($ENV{inc_multio})
 # depends on the parms library
 add_subdirectory(../lib/parms ${PROJECT_BINARY_DIR}/parms)
 
@@ -137,6 +137,11 @@ endif()
 if(${OPENMP_REPRODUCIBLE})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __openmp_reproducible)
 endif()
+
+if(${USE_MULTIO})
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __MULTIO)
+endif()
+
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
    if(${BUILD_FESOM_AS_LIBRARY})
@@ -190,6 +195,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTO
 target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} -L$ENV{lib_multio} -L$ENV{lib_eccodes} -lmultio-api -lmultio-fapi -lmultio-server -lmultio -leccodes_f90 -leccodes)
 target_link_libraries(${PROJECT_NAME} async_threads_cpp)
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 if(${ENABLE_OPENMP} AND NOT ${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray)
