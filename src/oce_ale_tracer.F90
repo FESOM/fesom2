@@ -174,10 +174,10 @@ subroutine solve_tracers_ale(mesh)
 #if defined(__recom)
     integer             :: Sinkflx_tr_slice_count_fix_1
     integer             :: Benthos_tr_slice_count_fix_1
+#endif
 
     integer             :: tr_num_start_local
     integer             :: tr_num_to_send
-#endif
 
 ! kh 22.11.21
     logical             :: completed
@@ -463,7 +463,8 @@ subroutine diff_tracers_ale(tr_num, mesh)
     USE REcoM_GloVar
     use recom_config !, recom_debug
     use g_comm_auto
-use g_support
+    use g_support
+    use recom_ciso
 #endif
     implicit none
     
@@ -511,19 +512,6 @@ real :: net
 !    Unit [mmol/m2/s]
 
 
-!YY: the following is replaced by using recom_remin_tracer_id (defined in
-!recom_modules.F90) AND ciso starts from 1301 now
-
-!!    if (tracer_id(tr_num) == 1001 .or.    &   ! DIN
-!!        tracer_id(tr_num) == 1002 .or.    &   ! DIC
-!!        tracer_id(tr_num) == 1003 .or.    &   ! Alk
-!!        tracer_id(tr_num) == 1018 .or.    &   ! Si
-!!        tracer_id(tr_num) == 1019 .or.    &   ! Fe
-!! !#if defined(__ciso)
-!!        tracer_id(tr_num) == 1302 .or.    &   ! DIC_13  ! CV: Ozgurs code has 1033
-!!        tracer_id(tr_num) == 1402 .or.    &   ! DIC_14  ! CV: Ozgurs code has 1034
-!! !#endif
-!!        tracer_id(tr_num) == 1022     ) then  ! Oxy
 if (any(recom_remin_tracer_id == tracer_id(tr_num))) then
 
 ! call bottom boundary 
@@ -535,29 +523,9 @@ if (any(recom_remin_tracer_id == tracer_id(tr_num))) then
             tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
                                                 dtr_bf(nzmin:nzmax,n)
         end do
-    end if
+end if
 
 ! 2) Sinking in water column
-!!    if (tracer_id(tr_num) == 1007 .or.    &   ! idetn
-!!        tracer_id(tr_num) == 1008 .or.    &   ! idetc
-!!        tracer_id(tr_num) == 1017 .or.    &   ! idetsi
-!!        tracer_id(tr_num) == 1021 .or.    &   ! idetcal
-
-!!        tracer_id(tr_num) == 1004 .or.    &   !iphyn
-!!        tracer_id(tr_num) == 1005 .or.    &   !iphyc
-!!        tracer_id(tr_num) == 1020 .or.    &   !iphycal
-!!        tracer_id(tr_num) == 1006 .or.    &   !ipchl
-
-!!        tracer_id(tr_num) == 1013 .or.    &   !idian
-!!        tracer_id(tr_num) == 1014 .or.    &   !idiac
-!!        tracer_id(tr_num) == 1016 .or.    &   !idiasi
-!!        tracer_id(tr_num) == 1015 .or.    &   !idchl
-! if (REcoM_Second_Zoo) then
-!!        tracer_id(tr_num) == 1025 .or.    &   !idetz2n
-!!        tracer_id(tr_num) == 1026 .or.    &   !idetz2c
-!!        tracer_id(tr_num) == 1027 .or.    &   !idetz2si
-!!        tracer_id(tr_num) == 1028 ) then      !idetz2calc
-! endif
 !YY: recom_sinking_tracer_id in recom_modules extended for 2. zooplankton
 ! but not for the combination ciso + 2. zoo!
 if (any(recom_sinking_tracer_id == tracer_id(tr_num))) then 
@@ -577,7 +545,7 @@ if (any(recom_sinking_tracer_id == tracer_id(tr_num))) then
             tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
                                                 str_bf(nzmin:nzmax,n)
         end do                             
-    end if
+end if
 
 ! 3) Nitrogen SS
     if (NitrogenSS .and. tracer_id(tr_num)==1008) then ! idetc
@@ -590,8 +558,6 @@ if (any(recom_sinking_tracer_id == tracer_id(tr_num))) then
         end do  
     end if
 
-        !call exchange_nod(sinkVel1(:,:))
-        !call exchange_nod(sinkVel2(:,:))
 #endif
     
     !___________________________________________________________________________
@@ -1048,13 +1014,12 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
     end do ! --> do n=1,myDim_nod2D   
 end subroutine diff_ver_part_impl_ale
 
-!
-!
+
 !===============================================================================
-!
-! CV: This is a new routine by Ozgur that calculates sinking into the
-! benthos layer. I adapter it for the tracer_ids (no second detritus,
-! but carbon isotopes instead
+! YY: sinking of second detritus adapted from Ozgur's code
+! but not using recom_det_tracer_id, since 
+! second detritus has a different sinking speed than the first
+! define recom_det2_tracer_id to make it consistent???
 !===============================================================================
 subroutine ver_sinking_recom_benthos(tr_num,mesh)
     use o_ARRAYS
@@ -1066,7 +1031,7 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
     USE O_MESH
     use g_forcing_arrays
     use g_support
-use ver_sinking_recom_benthos_interface
+    use ver_sinking_recom_benthos_interface
 #if defined(__recom)
     USE REcoM_GloVar
     use REcoM_ciso
@@ -1092,61 +1057,24 @@ use ver_sinking_recom_benthos_interface
 
 ! 1) Calculate sinking velociy for vertical sinking case
 ! ******************************************************
-!!MB TEST
-!!        if (tracer_id(tr_num)==1007 .or. &  !idetn
-!!            tracer_id(tr_num)==1008 .or. &  !idetc
-!!            tracer_id(tr_num)==1017 .or. &  !idetsi
-!!            tracer_id(tr_num)==1021 .or. &  !idetcal
-!!            tracer_id(tr_num)==1308 .or. &  !idetc_13
-!!            tracer_id(tr_num)==1321 .or. &  !idetcal_13
-!!            tracer_id(tr_num)==1408 .or. &  !idetc_14
-!!            tracer_id(tr_num)==1421 ) then  !idetcal_14
-!!            
-!!            Vben = VDet
-!!	    if (allow_var_sinking) Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VDet
-!!
-!!        elseif(tracer_id(tr_num)==1004 .or. &  !iphyn
-!!               tracer_id(tr_num)==1005 .or. &  !iphyc
-!!               tracer_id(tr_num)==1020 .or. &  !iphycal
-!!               tracer_id(tr_num)==1305 .or. &  !iphyc_13
-!!               tracer_id(tr_num)==1320 .or. &  !iphycal_13
-!!               tracer_id(tr_num)==1405 .or. &  !iphyc_14
-!!               tracer_id(tr_num)==1420 .or. &  !iphycal_14
-!!               tracer_id(tr_num)==1006 ) then  !ipchl
-!!
-!!            Vben = VPhy
-!!	    if (allow_var_sinking) Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VPhy
-!!
-!!        elseif(tracer_id(tr_num)==1013 .or. &  !idian
-!!               tracer_id(tr_num)==1014 .or. &  !idiac
-!!               tracer_id(tr_num)==1314 .or. &  !idiac_13
-!!               tracer_id(tr_num)==1414 .or. &  !idiac_14
-!!               tracer_id(tr_num)==1016 .or. &  !idiasi
-!!               tracer_id(tr_num)==1015 ) then  !idchl
-!!
-!!            Vben = VDia
-!!	    if (allow_var_sinking) Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VDia
-
-if (allow_var_sinking) then
-  if (any(recom_det_tracer_id == tracer_id(tr_num))) Vben = Vdet
-  if (any(recom_phy_tracer_id == tracer_id(tr_num))) Vben = VPhy
-  if (any(recom_dia_tracer_id == tracer_id(tr_num))) Vben = VDia
-  Vben = Vdet_a * abs(zbar_3d_n(:,n)) + Vben
-end if
+        if (allow_var_sinking) then
+          if (any(recom_det_tracer_id == tracer_id(tr_num))) Vben = Vdet
+          if (any(recom_phy_tracer_id == tracer_id(tr_num))) Vben = VPhy
+          if (any(recom_dia_tracer_id == tracer_id(tr_num))) Vben = VDia
+          Vben = Vdet_a * abs(zbar_3d_n(:,n)) + Vben
+        end if
       
 ! Constant vertical sinking for the second detritus class
 ! *******************************************************
-
-   if (REcoM_Second_Zoo) then ! No variable sinking
+        if (REcoM_Second_Zoo) then ! No variable sinking
 !        elseif(tracer_id(tr_num)==1025 .or. &  !idetz2n
-        if(tracer_id(tr_num)==1025 .or. &  !idetz2n
-               tracer_id(tr_num)==1026 .or. &  !idetz2c
-               tracer_id(tr_num)==1027 .or. &  !idetz2si
-               tracer_id(tr_num)==1028 ) then  !idetz2calc
-
-               Vben = VDet_zoo2
+          if(tracer_id(tr_num)==1025 .or. &  !idetz2n
+             tracer_id(tr_num)==1026 .or. &  !idetz2c
+             tracer_id(tr_num)==1027 .or. &  !idetz2si
+             tracer_id(tr_num)==1028 ) then  !idetz2calc
+             Vben = VDet_zoo2
+          endif
         endif
-   endif
 
         Vben= Vben/SecondsPerDay ! conversion [m/d] --> [m/s] (vertical velocity, note that it is positive here)
 
@@ -1158,9 +1086,6 @@ end if
            tv = tr_arr(nz,n,tr_num)*Vben(nz)
            aux(nz)= - tv*(area(nz,n)-area(nz+1,n))
         end do
-        !nz=nl1
-        !tv = tr_arr(nz,n,tr_num)*Vben(nz)
-        !aux(nz)= - tv*(area(nz+1,n))
 
         do nz=ul1,nl1
            str_bf(nz,n) = str_bf(nz,n) + (aux(nz))*dt/area(nz,n)/(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))
@@ -1168,176 +1093,164 @@ end if
            add_benthos_2d(n) = add_benthos_2d(n) - (aux(nz))*dt
         end do                 
 
-        ! Initialize sinking fluxes to zero at first call of
-        ! subroutine. This assumes that the routine is called for the
-        ! phytoplankton N tracer before it is called for all other
-        ! tracers, i.e. that the subroutine is called for the
-        ! different tracers in the order of how they are sorted in
-        ! REcoM. Not very clean, find a better solution later.
-!        if (tracer_id(tr_num)==1004 .and. use_MEDUSA) then
-!           SinkFlx(n,:) = 0.0d0 
-!        endif
-
         ! Particulate Organic Nitrogen
-            if( tracer_id(tr_num)==1004 .or. &  !iphyn
-                tracer_id(tr_num)==1007 .or. &  !idetn
-                tracer_id(tr_num)==1013 .or. &  !idian
-                tracer_id(tr_num)==1025 ) then  !idetz2n
-                !Benthos(n,1)= Benthos(n,1) +  add_benthos_2d(n) ![mmol]
-               if (use_MEDUSA) then
+        if( tracer_id(tr_num)==1004 .or. &  !iphyn
+            tracer_id(tr_num)==1007 .or. &  !idetn
+            tracer_id(tr_num)==1013 .or. &  !idian
+            tracer_id(tr_num)==1025 ) then  !idetz2n
+            !Benthos(n,1)= Benthos(n,1) +  add_benthos_2d(n) ![mmol]
 
+            if (use_MEDUSA) then
 ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
-                  SinkFlx_tr(n,1,tr_num) = SinkFlx_tr(n,1,tr_num) + add_benthos_2d(n) / area(1,n)/dt
-                             ![mmol/m2]
+               SinkFlx_tr(n,1,tr_num) = SinkFlx_tr(n,1,tr_num) + add_benthos_2d(n) / area(1,n)/dt ![mmol/m2]
         ! now SinkFlx hat the unit mmol/time step 
-        ! but mmol/sec is needed for output
-!             if (n .eq. 4) then
-!              if(tracer_id(tr_num)==1004) print *, "sink flux of phyN =", SinkFlx(n,1)
-!              if(tracer_id(tr_num)==1007) print *, "sink flux of phyN/detN =", SinkFlx(n,1)
-!              if(tracer_id(tr_num)==1013) print *, "sink flux of phyN/detN/diaN =", SinkFlx(n,1)
-!             endif
-               endif
-               if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then  
-           
-! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
-                   Benthos_tr(n,1,tr_num)= Benthos_tr(n,1,tr_num) +  add_benthos_2d(n) ![mmol]
-               endif
-
+        ! but mmol/m2/time is needed for MEDUSA: thus /area
             endif
+            if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then  
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+               Benthos_tr(n,1,tr_num)= Benthos_tr(n,1,tr_num) +  add_benthos_2d(n) ![mmol]
+            endif
+
+        endif
          
         ! Particulate Organic Carbon
-            if( tracer_id(tr_num)==1005 .or. &  !iphyc
-                tracer_id(tr_num)==1008 .or. &  !idetc
-                tracer_id(tr_num)==1014 .or. &  !idiac
-                tracer_id(tr_num)==1026 ) then  !idetz2c
-                !Benthos(n,2)= Benthos(n,2) + add_benthos_2d(n)
-               if (use_MEDUSA) then
+        if( tracer_id(tr_num)==1005 .or. &  !iphyc
+            tracer_id(tr_num)==1008 .or. &  !idetc
+            tracer_id(tr_num)==1014 .or. &  !idiac
+            tracer_id(tr_num)==1026 ) then  !idetz2c
+            !Benthos(n,2)= Benthos(n,2) + add_benthos_2d(n)
 
+            if (use_MEDUSA) then
 ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
-                  SinkFlx_tr(n,2,tr_num) = SinkFlx_tr(n,2,tr_num) + add_benthos_2d(n) / area(1,n)/dt
-               endif
-               if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
-
-! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
-                  Benthos_tr(n,2,tr_num)= Benthos_tr(n,2,tr_num) + add_benthos_2d(n)
-               endif
+               SinkFlx_tr(n,2,tr_num) = SinkFlx_tr(n,2,tr_num) + add_benthos_2d(n) / area(1,n)/dt
             endif
+            if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+               Benthos_tr(n,2,tr_num)= Benthos_tr(n,2,tr_num) + add_benthos_2d(n)
+            endif
+
+        endif
 
         ! Particulate Organic Silicon
-            if( tracer_id(tr_num)==1016 .or. &  !idiasi
-                tracer_id(tr_num)==1017 .or. &  !idetsi
-                tracer_id(tr_num)==1027 ) then  !idetz2si
-                !Benthos(n,3)= Benthos(n,3) + add_benthos_2d(n)
-               if (use_MEDUSA) then
+        if( tracer_id(tr_num)==1016 .or. &  !idiasi
+            tracer_id(tr_num)==1017 .or. &  !idetsi
+            tracer_id(tr_num)==1027 ) then  !idetz2si
+            !Benthos(n,3)= Benthos(n,3) + add_benthos_2d(n)
 
+            if (use_MEDUSA) then
 ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
-                  SinkFlx_tr(n,3,tr_num) = SinkFlx_tr(n,3,tr_num) + add_benthos_2d(n) / area(1,n)/dt
-               endif
-               if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
-
+               SinkFlx_tr(n,3,tr_num) = SinkFlx_tr(n,3,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+            endif
+            if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
 ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
-                  Benthos_tr(n,3,tr_num)= Benthos_tr(n,3,tr_num) + add_benthos_2d(n)
-               endif
+               Benthos_tr(n,3,tr_num)= Benthos_tr(n,3,tr_num) + add_benthos_2d(n)
             endif
 
-            ! Cal
-            if( tracer_id(tr_num)==1020 .or. &  !iphycal
-                tracer_id(tr_num)==1021 .or. &  !idetcal
-                tracer_id(tr_num)==1028 ) then  !idetz2cal
-                !Benthos(n,4)= Benthos(n,4) + add_benthos_2d(n) 
-               if (use_MEDUSA) then
+        endif
 
-! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
-                  SinkFlx_tr(n,4,tr_num) = SinkFlx_tr(n,4,tr_num) + add_benthos_2d(n) / area(1,n)/dt
-               endif
-               if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+        ! Cal
+        if( tracer_id(tr_num)==1020 .or. &  !iphycal
+            tracer_id(tr_num)==1021 .or. &  !idetcal
+            tracer_id(tr_num)==1028 ) then  !idetz2cal
+            !Benthos(n,4)= Benthos(n,4) + add_benthos_2d(n) 
 
+            if (use_MEDUSA) then
 ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
-                  Benthos_tr(n,4,tr_num)= Benthos_tr(n,4,tr_num) + add_benthos_2d(n)
-               endif
+               SinkFlx_tr(n,4,tr_num) = SinkFlx_tr(n,4,tr_num) + add_benthos_2d(n) / area(1,n)/dt
             endif
+            if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+               Benthos_tr(n,4,tr_num)= Benthos_tr(n,4,tr_num) + add_benthos_2d(n)
+            endif
+        endif
 
         ! flux of 13C into the sediment
         if (ciso) then             
-           if( tracer_id(tr_num)==1305 .or. & !iphyc_13
+            if( tracer_id(tr_num)==1305 .or. & !iphyc_13
                 tracer_id(tr_num)==1308 .or. & !idetc_13
                 tracer_id(tr_num)==1314 ) then !idiac_14
-              if (use_MEDUSA) then
 
+                if (use_MEDUSA) then
 ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
-                SinkFlx_tr(n,5,tr_num) = SinkFlx_tr(n,5,tr_num) + add_benthos_2d(n) / area(1,n)/dt
-              endif
-              if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+                   SinkFlx_tr(n,5,tr_num) = SinkFlx_tr(n,5,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+                endif
+                if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                   Benthos_tr(n,5,tr_num)= Benthos_tr(n,5,tr_num) + add_benthos_2d(n)
+                endif
 
-! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
-                 Benthos_tr(n,5,tr_num)= Benthos_tr(n,5,tr_num) + add_benthos_2d(n)
-              endif
-           endif
+            endif
+
            if( tracer_id(tr_num)==1320 .or. &  !iphycal
-                tracer_id(tr_num)==1321 ) then  !idetcal
-              if (use_MEDUSA) then
+               tracer_id(tr_num)==1321 ) then  !idetcal
 
+               if (use_MEDUSA) then
 ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
-                 SinkFlx_tr(n,6,tr_num) = SinkFlx_tr(n,6,tr_num) + add_benthos_2d(n) / area(1,n)/dt
-              endif
-              if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+                  SinkFlx_tr(n,6,tr_num) = SinkFlx_tr(n,6,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+               endif
+               if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                  Benthos_tr(n,6,tr_num)= Benthos_tr(n,6,tr_num) + add_benthos_2d(n)
+               endif
 
-! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
-                 Benthos_tr(n,6,tr_num)= Benthos_tr(n,6,tr_num) + add_benthos_2d(n)
-              endif
            endif
+
         endif
         
         ! flux of 14C into the sediment
         if (ciso .and. ciso_organic_14) then             
            if( tracer_id(tr_num)==1405 .or. & !iphyc_13
-                tracer_id(tr_num)==1408 .or. & !idetc_13
-                tracer_id(tr_num)==1414 ) then !idiac_14
-              if (use_MEDUSA) then
+               tracer_id(tr_num)==1408 .or. & !idetc_13
+               tracer_id(tr_num)==1414 ) then !idiac_14
 
+               if (use_MEDUSA) then
 ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
-                 SinkFlx_tr(n,7,tr_num) = SinkFlx_tr(n,7,tr_num) + add_benthos_2d(n) / area(1,n)/dt
-              endif
-              if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+                  SinkFlx_tr(n,7,tr_num) = SinkFlx_tr(n,7,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+               endif
+               if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                  Benthos_tr(n,7,tr_num)= Benthos_tr(n,7,tr_num) + add_benthos_2d(n)
+               endif
 
-! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
-                 Benthos_tr(n,7,tr_num)= Benthos_tr(n,7,tr_num) + add_benthos_2d(n)
-              endif
            endif
+
            if( tracer_id(tr_num)==1420 .or. &  !iphycal
-                tracer_id(tr_num)==1421 ) then  !idetcal
-              if (use_MEDUSA) then
-
+               tracer_id(tr_num)==1421 ) then  !idetcal
+               if (use_MEDUSA) then
 ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
-                 SinkFlx_tr(n,8,tr_num) = SinkFlx_tr(n,8,tr_num) + add_benthos_2d(n) / area(1,n)/dt
-              endif
-              if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
-
+                  SinkFlx_tr(n,8,tr_num) = SinkFlx_tr(n,8,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+               endif
+               if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
 ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
-                 Benthos_tr(n,8,tr_num)= Benthos_tr(n,8,tr_num) + add_benthos_2d(n)
-              endif
+                  Benthos_tr(n,8,tr_num)= Benthos_tr(n,8,tr_num) + add_benthos_2d(n)
+               endif
            endif
+
         endif
+
    end do
      
-     if(use_MEDUSA) then
+   if(use_MEDUSA) then
         do n=1, bottflx_num
 !           SinkFlx(:,n) = Sinkflx(:,n)/dt
-
 ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
            call exchange_nod(SinkFlx_tr(:,n,tr_num))
         end do
-     end if ! use_MEDUSA
+   end if ! use_MEDUSA
 
-    do n=1, benthos_num
-
+   do n=1, benthos_num
 ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
       call exchange_nod(Benthos_tr(:,n,tr_num))
       !call exchange_nod(Benthos(:,n))
-    end do
+   end do
 
 end subroutine ver_sinking_recom_benthos
 
+! kh 25.03.22 integrate_bottom is apparently not really used at the moment. if
+! it should be used, the access to Benthos(n,3) should be checked
+! because Benthos and SinkFlx values are buffered per tracer index in the
+! meantime to avoid non bit identical results when running the tracer loop in
+! parallel.
 subroutine integrate_bottom(tflux,mesh)
     use o_ARRAYS
     use g_PARSUP
@@ -1381,7 +1294,7 @@ subroutine diff_ver_recom_expl(tr_num,mesh)
     use g_comm_auto
     USE O_MESH
     use g_forcing_arrays
-use diff_ver_recom_expl_interface
+    use diff_ver_recom_expl_interface
 #if defined(__recom)
     USE REcoM_GloVar
     use recom_config !, recom_debug
@@ -1447,7 +1360,7 @@ else
     CASE (1002)
       bottom_flux = GlodecayBenthos(:,2) + GlodecayBenthos(:,4) !*** DIC + calcification ***
     CASE (1003)
-      bottom_flux = GlodecayBenthos(:,4) * 2.0_WP  - 1.065_WP * GlodecayBenthos(:,1) !*** Alk ***
+      bottom_flux = GlodecayBenthos(:,4) * 2.0_WP - 1.065_WP * GlodecayBenthos(:,1) !*** Alk ***
     CASE (1018)
       bottom_flux = GlodecayBenthos(:,3) !*** Si ***
     CASE (1019)
@@ -1458,11 +1371,11 @@ else
       end if
     CASE (1022)
       bottom_flux = -GlodecayBenthos(:,2) * redO2C !*** O2 ***
-    CASE (1033)
+    CASE (1302)
       if (ciso) then
         bottom_flux = GlodecayBenthos(:,5) + GlodecayBenthos(:,6) !*** DIC_13 and Calc: DIC_13 ***
       end if
-    CASE (1034)
+    CASE (1402)
       if (ciso) then
         bottom_flux = GlodecayBenthos(:,7) + GlodecayBenthos(:,8) !*** DIC_14 and Calc: DIC_14 ***
       end if
@@ -1490,7 +1403,7 @@ endif ! (use_MEDUSA .and. (sedflux_num .gt. 0))
         !_______________________________________________________________________
         ! Bottom flux
         do nz=nlevels_nod2D_minimum, nl1
-            vd_flux(nz)=(area(nz,n)-area(nz+1,n))* bottom_flux(n)/(area(1,n))           
+            vd_flux(nz)=(area(nz,n)-area(nz+1,n))* bottom_flux(n)/(area(1,n)) 
         end do
         nz=nl1
         vd_flux(nz+1)= (area(nz+1,n))* bottom_flux(n)/(area(1,n))
@@ -1842,12 +1755,9 @@ use REcoM_ciso
                 bc_surface= dt*(AtmNInput(n)  + RiverDIN2D(n) * is_riverinput &
                                 + ErosionTON2D(n) * is_erosioninput + lb_flux(n,1))
         else
-                bc_surface= dt*(AtmNInput(n)  + RiverDIN2D(n) * is_riverinput + ErosionTON2D(n) * is_erosioninput)
+                bc_surface= dt*(AtmNInput(n)  + RiverDIN2D(n) * is_riverinput &
+                                + ErosionTON2D(n) * is_erosioninput)
         endif 
-!  if (mype==0) then
-!     write(*,*) '____________________________________________________________'
-!     write(*,*) ' --> DIN_surface,  = ', bc_surface
-!  endif
     CASE (1002) ! DIC
         if (use_MEDUSA .and. add_loopback) then
                 bc_surface= dt*(GloCO2flux_seaicemask(n)            &
@@ -1855,12 +1765,10 @@ use REcoM_ciso
                                 + ErosionTOC2D(n) * is_erosioninput &
                                 + lb_flux(n,2) + lb_flux(n,5))
         else
-                bc_surface= dt*(GloCO2flux_seaicemask(n) + RiverDIC2D(n) * is_riverinput + ErosionTOC2D(n) * is_erosioninput)
+                bc_surface= dt*(GloCO2flux_seaicemask(n)            &
+                                + RiverDIC2D(n) * is_riverinput     &
+                                + ErosionTOC2D(n) * is_erosioninput)
         end if 
-!  if (mype==0) then
-!     write(*,*) '____________________________________________________________'
-!     write(*,*) ' --> DIC_surface,  = ', bc_surface
-!  endif
     CASE (1003) ! Alk
         ! --> Here we need the alkalinity flux
         if (use_MEDUSA .and. add_loopback) then
@@ -1868,13 +1776,9 @@ use REcoM_ciso
                                 + RiverAlk2D(n) * is_riverinput     &
                                 + lb_flux(n,3) + lb_flux(n,5)*2) !CaCO3:Alk burial=1:2
         else
-                bc_surface= dt*(virtual_alk(n) &  
-                            + relax_alk(n) + RiverAlk2D(n) * is_riverinput)
+                bc_surface= dt*(virtual_alk(n) + relax_alk(n)       &  
+                                + RiverAlk2D(n) * is_riverinput)
         end if
-!  if (mype==0) then
-!     write(*,*) '____________________________________________________________'
-!     write(*,*) ' --> Alk_surface,  = ', bc_surface
-!  endif
     CASE (1004:1010)
         bc_surface=0.0_WP
     CASE (1011) ! DON
@@ -1897,21 +1801,12 @@ use REcoM_ciso
         else
             bc_surface= dt*AtmFeInput(n)
         end if
-!  if (mype==0) then
-!     write(*,*) '____________________________________________________________'
-!     write(*,*) ' --> Fe_surface,  = ', bc_surface
-!  endif
-    CASE (1020:1021) ! Si
+    CASE (1020:1021) ! Cal
         bc_surface=0.0_WP  ! OG added bc for recom fields 
     CASE (1022) ! OXY
         bc_surface= dt*GloO2flux_seaicemask(n)
-!  if (mype==0) then
-!     write(*,*) '____________________________________________________________'
-!     write(*,*) ' --> DIC_surface,  = ', bc_surface
-!  endif
     CASE (1023:1032)
         bc_surface=0.0_WP  ! OG added bc for recom fields 
-!ciso adapted by MB
     CASE (1302) ! Before (1033) ! DIC_13
          if (ciso) then
             if (use_MEDUSA .and. add_loopback) then
@@ -1921,12 +1816,8 @@ use REcoM_ciso
                bc_surface= dt*(GloCO2flux_seaicemask_13(n))
             end if
          else
-           bc_surface=0.0_WP
+            bc_surface=0.0_WP
          end if
-         if (recom_debug .and. mype==0) then
-             write(*,*) '____________________________________________________________'
-             write(*,*) ' --> DIC_13_surface,  = ', bc_surface
-         endif
     CASE (1305:1321)
          bc_surface=0.0_WP ! organic 13C
     CASE (1402) ! Before (1034) ! DIC_14
@@ -1938,19 +1829,13 @@ use REcoM_ciso
                  bc_surface= dt*GloCO2flux_seaicemask_14(n)
              end if
          else
-           bc_surface=0.0_WP
+             bc_surface=0.0_WP
          end if
-         if (recom_debug .and. mype==0) then
-             write(*,*) '____________________________________________________________'
-             write(*,*) ' --> DIC_14_surface,  = ', bc_surface
-         endif
     CASE (1405:1421)
          bc_surface=0.0_WP ! organic 14C
     CASE (1033:1299)
         bc_surface=0.0_WP  ! OG added bc for recom fields - adapted to ciso by MB 
 #endif 
-!    CASE (101) ! apply boundary conditions to tracer ID=101
-!        bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)
     CASE (301)
         bc_surface=0.0_WP
     CASE (302)
