@@ -244,7 +244,6 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
                 ! end do
             end if
         end do
-        !$ACC END LOOP
     end do
     !$ACC END PARALLEL LOOP
 !$OMP END DO
@@ -800,7 +799,6 @@ end subroutine adv_tra_hor_muscl
                 flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
             end if
         end do
-        !$ACC END LOOP
     end do
     !$ACC END PARALLEL LOOP
 !$OMP END DO
