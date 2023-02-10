@@ -38,10 +38,37 @@ module par_support_interfaces
   end interface
 end module
 
+module MIO_INTERFACES
+   interface
+   subroutine init_server(mio_parent_comm, partit)
+      use multio_config
+      use multio_api
+      USE MOD_PARTIT   
+      implicit none
+   
+      integer(4),     intent(in)            :: mio_parent_comm
+      type(t_partit), intent(in),    target :: partit
+     end subroutine
+    
+     subroutine init_client(mio, partit, mesh)
+      use multio_config
+      use multio_api
+      use MOD_MESH
+      USE MOD_PARTIT
+      implicit none
+   
+      type(multio_handle), intent(inout)         :: mio
+      type(t_partit),      intent(in),    target :: partit
+      type(t_mesh),        intent(in),    target :: mesh
+     end subroutine
+     end interface
+end module    
+
 subroutine par_init(partit)    ! initializes MPI
   USE o_PARAM
   USE MOD_PARTIT
   USE MOD_PARSUP
+  USE MIO_INTERFACES
 #ifdef __MULTIO
   use multio_config
   use multio_api
@@ -85,7 +112,7 @@ subroutine par_init(partit)    ! initializes MPI
    end if
    mycolor=0
    if (partit%mype > oce_npes_int-1) mycolor=1
-   CALL MPI_COMM_SPLIT(MPI_COMM_WORLD, mycolor, 0, partit%MPI_COMM_FESOM)
+   CALL MPI_COMM_SPLIT(MPI_COMM_WORLD, mycolor, 0, partit%MPI_COMM_FESOM, mio_status)
    IF (multio_initialise() /= MULTIO_SUCCESS) then
       write(error_unit, *) 'Failed to initialise MULTIO api'
    END IF
@@ -608,34 +635,28 @@ end subroutine status_check
 subroutine init_server(mio_parent_comm, partit)
    use multio_config
    use multio_api
-   use mpi_f08, only: c_int
    USE MOD_PARTIT   
    implicit none
 
-   integer(kind=c_int) :: cerr
-   integer(4), intent(in) :: mio_parent_comm
-   type(multio_configurationcontext) :: cc
+   integer :: cerr
+   integer(4), intent(in)                :: mio_parent_comm
+   type(multio_configurationcontext)     :: cc
    type(t_partit), intent(in),    target :: partit
    
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
    cerr = cc%new()
-
    cerr = cc%mpi_allow_world_default_comm(.TRUE._1)
    cerr = cc%mpi_parent_comm(mio_parent_comm)
-
    cerr = multio_start_server(cc)
-
    cerr = cc%delete()
-!  call par_ex(MPI_COMM_WORLD, partit%mype, cerr)
    stop   
 end subroutine init_server
 
 subroutine init_client(mio, partit, mesh)
    use multio_config
    use multio_api
-   use mpi_f08, only: c_int
    use MOD_MESH
    USE MOD_PARTIT
    implicit none
@@ -643,7 +664,7 @@ subroutine init_client(mio, partit, mesh)
    type(multio_handle), intent(inout):: mio
    type(multio_metadata)             :: md
    type(multio_configurationcontext) :: cc
-   integer(kind=c_int)               :: cerr
+   integer                           :: cerr
    integer                           :: elem, elnodes(3), aux
    type(t_partit), intent(in),    target :: partit
    type(t_mesh),   intent(in),    target :: mesh
@@ -658,34 +679,32 @@ subroutine init_client(mio, partit, mesh)
    cerr = cc%mpi_client_id("oce")
    cerr = mio%new(cc)
    cerr = mio%open_connections()
-   !declare grid at nodes
+   !declare grid at nodes   
    cerr = md%new()
-   cerr = md%set_string_value("name", "ngrid")
+   cerr = md%set_string("name", "ngrid")
    if (cerr /= MULTIO_SUCCESS) ERROR STOP 10
-   cerr = md%set_string_value("category", "fesom-domain-nodemap")
+   cerr = md%set_string("category", "fesom-domain-nodemap")
    if (cerr /= MULTIO_SUCCESS) ERROR STOP 11
-   cerr = md%set_string_value("representation", "unstructured")
+   cerr = md%set_string("representation", "unstructured")
    if (cerr /= MULTIO_SUCCESS) ERROR STOP 12
-   cerr = md%set_int_value("globalSize", mesh%nod2D)
-   cerr = md%set_bool_value("toAllServers", .TRUE._1)
+   cerr = md%set_int("globalSize", mesh%nod2D)
+   cerr = md%set_bool("toAllServers", .TRUE._1)
    if (cerr /= MULTIO_SUCCESS) ERROR STOP 14
    cerr = mio%write_domain(md, partit%myList_nod2D-1, partit%myDim_nod2D)
    cerr = md%delete()
 
+   !declare grid at elements
    cerr = md%new()
-   cerr = md%set_string_value("name", "egrid")
+   cerr = md%set_string("name", "egrid")
    if (cerr /= MULTIO_SUCCESS) ERROR STOP 10
-   cerr = md%set_string_value("category", "fesom-domain-nodemap")
+   cerr = md%set_string("category", "fesom-domain-nodemap")
    if (cerr /= MULTIO_SUCCESS) ERROR STOP 11
-   cerr = md%set_string_value("representation", "unstructured")
+   cerr = md%set_string("representation", "unstructured")
    if (cerr /= MULTIO_SUCCESS) ERROR STOP 12
-   cerr = md%set_int_value("globalSize", mesh%elem2D)
-   cerr = md%set_bool_value("toAllServers", .TRUE._1)
+   cerr = md%set_int("globalSize", mesh%elem2D)
+   cerr = md%set_bool("toAllServers", .TRUE._1)
    if (cerr /= MULTIO_SUCCESS) ERROR STOP 14
    cerr = mio%write_domain(md, partit%myList_elem2D(partit%myInd_elem2D_shrinked)-1, partit%myDim_elem2D_shrinked)
    cerr = md%delete()
-!   aux=sum(partit%myList_elem2D(1:partit%myDim_elem2D_shrinked))
-!   call MPI_AllREDUCE(aux, elem, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, cerr)
-!   write(*,*) 'total elem client=', elem, ((1+mesh%elem2D)*mesh%elem2D)/2
 end subroutine init_client
 #endif
