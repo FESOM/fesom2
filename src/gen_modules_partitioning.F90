@@ -690,7 +690,7 @@ subroutine init_client(mio, partit, mesh)
    cerr = md%set_int("globalSize", mesh%nod2D)
    cerr = md%set_bool("toAllServers", .TRUE._1)
    if (cerr /= MULTIO_SUCCESS) ERROR STOP 14
-   cerr = mio%write_domain(md, partit%myList_nod2D-1, partit%myDim_nod2D)
+   cerr = mio%write_domain(md, partit%myList_nod2D(1:partit%myDim_nod2D)-1, partit%myDim_nod2D)
    cerr = md%delete()
 
    !declare grid at elements
