@@ -70,8 +70,8 @@ subroutine par_init(partit)    ! initializes MPI
   USE o_PARAM
   USE MOD_PARTIT
   USE MOD_PARSUP
-  USE MIO_INTERFACES
 #ifdef __MULTIO
+  USE MIO_INTERFACES
   use multio_config
   use multio_api
 #endif
