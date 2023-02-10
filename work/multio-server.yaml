@@ -29,7 +29,7 @@ server:
         - type : select
           match :
            - category : [fesom-node-output]
-        - type : aggregation
+        - type : aggregate
         - type : encode
           format : raw
 
@@ -37,5 +37,5 @@ server:
           sinks :
             - type : file
               append : true
-#             per-server : true
-              path : ocean-output-field.bin # read in python as np.fromfile("..ocean-outpur-field.bin", np.double)
+              #              per-server : true
+              path : /work/ab0995/a270029/ocean-output-field.bin # read in python as np.fromfile("..ocean-outpur-field.bin", np.double)
