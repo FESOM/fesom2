@@ -38,6 +38,7 @@ module par_support_interfaces
   end interface
 end module
 
+#if defined(__MULTIO)
 module MIO_INTERFACES
    interface
    subroutine init_server(mio_parent_comm, partit)
@@ -63,6 +64,7 @@ module MIO_INTERFACES
      end subroutine
      end interface
 end module    
+#enddef
 
 subroutine par_init(partit)    ! initializes MPI
   USE o_PARAM
