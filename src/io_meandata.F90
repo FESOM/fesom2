@@ -965,6 +965,8 @@ subroutine write_mean(entry, entry_index)
         ! allocate global 2d array in which local data are gathered
         if(entry%p_partit%mype==entry%root_rank) then
             if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(size2))
+        else
+            if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(0))
         end if
         
         !_______________________________________________________________________
@@ -1003,8 +1005,10 @@ subroutine write_mean(entry, entry_index)
     
         !_______________________________________________________________________
         ! allocate global 2d array in which local data are gathered
-        if(entry%p_partit%mype==entry%root_rank) then
+        if (entry%p_partit%mype==entry%root_rank) then
             if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(size2))
+        else
+            if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(0))
         end if
         
         !_______________________________________________________________________
@@ -1566,7 +1570,7 @@ subroutine def_stream_after_dimension_specific(entry, name, description, units, 
     !___________________________________________________________________________
     if(entry%glsize(1)==mesh%nod2D  .or. entry%glsize(2)==mesh%nod2D) then
       entry%is_elem_based = .false.
-      entry%shrinked_size=partit%myDim_nod2D      
+      entry%shrinked_size=partit%myDim_nod2D
     else if(entry%glsize(1)==mesh%elem2D .or. entry%glsize(2)==mesh%elem2D) then
       entry%is_elem_based = .true.
       entry%shrinked_size=partit%myDim_elem2D_shrinked
@@ -1722,39 +1726,43 @@ subroutine mio_write_nod(mio, entry)
     integer                            :: size1, size2, lev
     integer                            :: cerr
     type(multio_metadata)              :: md
-
     !_______writing 2D and 3D fields____________________________________________
     size1=entry%glsize(1)
     size2=entry%glsize(2)
-    if (size2==1) return
+    ! if (size2==1) return
     !_______________________________________________________________________
     ! loop over vertical layers --> do gather 3d variables layerwise in 2d
     ! slices
     entry%rec_count=entry%rec_count+1 !not really needed we use time in seconds
+    ! lev=1
     do lev=1, size1
         cerr = md%new()
         if (cerr /= MULTIO_SUCCESS) ERROR STOP 19
-        cerr = md%set_string_value("category", "fesom-node-output")
+        cerr = md%set_string("category", "fesom-node-output")
         if (cerr /= MULTIO_SUCCESS) ERROR STOP 20
-        cerr = md%set_int_value("globalSize", entry%glsize(2))
+        cerr = md%set_int("globalSize", entry%glsize(2))
         if (cerr /= MULTIO_SUCCESS) ERROR STOP 21
-        cerr = md%set_int_value("level", lev)
-        cerr = md%set_bool_value("toAllServers", .FALSE._1)
+        cerr = md%set_int("level", lev)
+        cerr = md%set_bool("toAllServers", .FALSE._1)
         if (cerr /= MULTIO_SUCCESS) ERROR STOP 34
-        cerr = md%set_string_value("name", trim(entry%name))
+        cerr = md%set_string("name", trim(entry%name))
         if (.not. entry%is_elem_based) then
-           cerr = md%set_string_value("gridSubType", "ngrid")
+           cerr = md%set_string("gridSubType", "ngrid")
            if (cerr /= MULTIO_SUCCESS) ERROR STOP 27
-           cerr = md%set_string_value("domain", "ngrid")
+           cerr = md%set_string("domain", "ngrid")
            if (cerr /= MULTIO_SUCCESS) ERROR STOP 29
         else
-            cerr = md%set_string_value("gridSubType", "egrid")
+            cerr = md%set_string("gridSubType", "egrid")
             if (cerr /= MULTIO_SUCCESS) ERROR STOP 27
-            cerr = md%set_string_value("domain", "egrid")
+            cerr = md%set_string("domain", "egrid")
             if (cerr /= MULTIO_SUCCESS) ERROR STOP 29
         end if
-        cerr = md%set_int_value("step", int(entry%ctime_copy)) !entry%rec_count
-        cerr = mio%write_field(md, entry%local_values_r8_copy(lev, entry%shrinked_indx), entry%shrinked_size)
+        cerr = md%set_int("step", int(entry%ctime_copy)) !entry%rec_count
+        if (.not. entry%is_elem_based) then
+           cerr = mio%write_field(md, entry%local_values_r8_copy(lev, 1:entry%shrinked_size), entry%shrinked_size)
+        else
+           cerr = mio%write_field(md, entry%local_values_r8_copy(lev,   entry%shrinked_indx), entry%shrinked_size)
+        end if
         if (cerr /= MULTIO_SUCCESS) ERROR STOP 35
         cerr = md%delete()
     end do ! --> do lev=1, size1
