@@ -64,7 +64,7 @@ module MIO_INTERFACES
      end subroutine
      end interface
 end module    
-#enddef
+#endif
 
 subroutine par_init(partit)    ! initializes MPI
   USE o_PARAM
