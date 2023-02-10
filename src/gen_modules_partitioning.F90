@@ -38,7 +38,7 @@ module par_support_interfaces
   end interface
 end module
 
-#if defined(__MULTIO)
+#ifdef __MULTIO
 module MIO_INTERFACES
    interface
    subroutine init_server(mio_parent_comm, partit)
