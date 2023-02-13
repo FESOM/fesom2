@@ -421,7 +421,7 @@ contains
 
     !___FINISH MODEL RUN________________________________________________________
 
-    call MPI_Barrier(f%MPI_COMM_FESOM, f%MPIERR)
+    call MPI_Barrier(f%partit%MPI_COMM_FESOM, f%MPIERR)
     if (f%mype==0) then
        f%t1 = MPI_Wtime()
        f%runtime_alltimesteps = real(f%t1-f%t0,real32)

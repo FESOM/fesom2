@@ -1,17 +1,23 @@
 #!/bin/bash
 #SBATCH --job-name=ref
-#SBATCH -p shared
-##SBATCH --ntasks-per-node=128
-#SBATCH --ntasks=38
+#SBATCH -p compute
+#SBATCH --ntasks-per-node=128
+#SBATCH --ntasks=74
 #SBATCH --time=00:15:00
 #SBATCH -o slurm-out.out
 #SBATCH -e slurm-err.out
 #SBATCH -A ab0995
 
+ulimit -s 204800
+
 source /sw/etc/profile.levante
 source ../env/levante.dkrz.de/shell
 
-ulimit -s 102400
+#export I_MPI_PMI=pmi
+#export I_MPI_PMI_LIBRARY=/usr/lib64/libpmi.so
+
+export I_MPI_PMI=pmi2
+export I_MPI_PMI_LIBRARY=/usr/lib64/libpmi2.so
 
 echo Submitted job: $jobid
 squeue -u $USER
@@ -26,20 +32,20 @@ cp -n ../config/namelist.oce     .
 cp -n ../config/namelist.ice     .
 cp -n ../config/namelist.icepack .
 
-export OCE_NPES=36
+export OCE_NPES=72
 export MIO_NPES=2
 
 export MULTIO_SERVER_CONFIG_PATH=./
-export ECKIT_DEBUG=TRUE
-export MULTIO_DEBUG=TRUE
+#export ECKIT_DEBUG=TRUE
+#export MULTIO_DEBUG=TRUE
 
-export lib_multio=/home/a/a270029/fesom2.0/lib/multio/lib/lib64/
-export lib_eccodes=/sw/spack-levante/eccodes-2.21.0-3ehkbb/lib64/
+export lib_multio=/home/a/a270029/fesom2.0_impi/lib/multio/lib/lib64/
+export lib_eccodes=/home/a/a270029/fesom2.0_impi/lib/eccodes/lib/lib64/
 
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$lib_multio:$lib_eccodes
 
 date
-srun -l fesom.x > "fesom2.0.out"
+srun --mpi=pmi2 -l fesom.x > "fesom2.0.out"
 date
 
 # qstat -f $PBS_JOBID

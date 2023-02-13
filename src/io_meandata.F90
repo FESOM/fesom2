@@ -963,10 +963,10 @@ subroutine write_mean(entry, entry_index)
         
         !_______________________________________________________________________
         ! allocate global 2d array in which local data are gathered
-        if(entry%p_partit%mype==entry%root_rank) then
-            if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(size2))
-        else
-            if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(0))
+        if (entry%p_partit%mype==entry%root_rank) then
+           if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(size2))
+!       else
+!           if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(0))
         end if
         
         !_______________________________________________________________________
@@ -1006,9 +1006,9 @@ subroutine write_mean(entry, entry_index)
         !_______________________________________________________________________
         ! allocate global 2d array in which local data are gathered
         if (entry%p_partit%mype==entry%root_rank) then
-            if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(size2))
-        else
-            if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(0))
+           if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(size2))
+!        else
+!            if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(0))
         end if
         
         !_______________________________________________________________________
@@ -1764,8 +1764,10 @@ subroutine mio_write_nod(mio, entry)
            cerr = mio%write_field(md, entry%local_values_r8_copy(lev,   entry%shrinked_indx), entry%shrinked_size)
         end if
         if (cerr /= MULTIO_SUCCESS) ERROR STOP 35
-        cerr = md%delete()
-    end do ! --> do lev=1, size1
+        cerr= mio%write_step_complete(md)
+        if (cerr /= MULTIO_SUCCESS) ERROR STOP 45
+        cerr = md%delete()        
+     end do ! --> do lev=1, size1
 end subroutine
 
 #endif
