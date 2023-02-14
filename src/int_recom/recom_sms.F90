@@ -2802,10 +2802,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
      	- PhyRespRate_dia         * DiaC  &
      	) * recipbiostep
 
-        Diags3Dloc(k,21) = Diags3Dloc(k,21) + (   &                      ! NEW
-        + Cphot_cocco             * CoccoC  &                            ! NEW
-        - PhyRespRate_cocco       * CoccoC  &                            ! NEW
-        ) * recipbiostep
+        if (use_coccos) then
+          Diags3Dloc(k,21) = Diags3Dloc(k,21) + (   &                      ! NEW
+          + Cphot_cocco             * CoccoC  &                            ! NEW
+          - PhyRespRate_cocco       * CoccoC  &                            ! NEW
+          ) * recipbiostep
+        end if 
 
 !*** Gross primary production [mmol C /(m3 * day)]
 	Diags3Dloc(k,3) = Diags3Dloc(k,3) + (   &
@@ -2816,9 +2818,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
      	+ Cphot_dia               * DiaC  &
      	) * recipbiostep
 
-        Diags3Dloc(k,22) = Diags3Dloc(k,22) + (   &                       ! NEW    
-        + Cphot_cocco             * CoccoC  &
-        ) * recipbiostep
+        if (use_coccos) then
+          Diags3Dloc(k,22) = Diags3Dloc(k,22) + (   &                       ! NEW    
+          + Cphot_cocco             * CoccoC  &
+          ) * recipbiostep
+        end if
 
 !*** Net N-assimilation [mmol N/(m3 * day)]
 	Diags3Dloc(k,5) = Diags3Dloc(k,5) + (   &
@@ -2831,10 +2835,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
      	- lossN * limitFacN_dia   * DiaN  &
      	) * recipbiostep
 
-        Diags3Dloc(k,23) = Diags3Dloc(k,23) + (   &                       ! NEW                                                      
-        + N_assim_cocco           * CoccoC  &
-        - lossN * limitFacN_cocco * CoccoN  &
-        ) * recipbiostep
+        if (use_coccos) then
+          Diags3Dloc(k,23) = Diags3Dloc(k,23) + (   &                       ! NEW                                                      
+          + N_assim_cocco           * CoccoC  &
+          - lossN * limitFacN_cocco * CoccoN  &
+          ) * recipbiostep
+        end if
 
 !*** Changed to chlorophyll degradation (commented out gross N-assimilation below)
         Diags3Dloc(k,7) = Diags3Dloc(k,7) + (   &
@@ -2845,9 +2851,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         + KOchl_dia  &
         ) * recipbiostep
 
-        Diags3Dloc(k,24) = Diags3Dloc(k,24) + ( &                         ! NEW
-        + KOchl_cocco &                                                   ! NEW
-        ) * recipbiostep                                                  ! NEW
+        if (use_coccos) then
+          Diags3Dloc(k,24) = Diags3Dloc(k,24) + ( &                         ! NEW
+          + KOchl_cocco &                                                   ! NEW
+          ) * recipbiostep                                                  ! NEW
+        end if
 
 ! diagnostics, combined from Onur and Cara
 !*** Total grazing of first zooplankton (with graz_eff, i.e. what reaches ZOO)
@@ -2867,10 +2875,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         + grazingFlux_dia * recipQuota_dia       & 
         ) * recipbiostep  
 
+        if (use_coccos) then
 !*** Grazing on cocclithophores by First Zooplankton (without grazeff, i.e. loss term for COCCO)
-        Diags3Dloc(k,25) = Diags3Dloc(k,25) +(   &                         ! NEW
-        + grazingFlux_Cocco * recipQuota_cocco   &                         ! NEW
-        ) * recipbiostep                                                   ! NEW
+          Diags3Dloc(k,25) = Diags3Dloc(k,25) +(   &                         ! NEW
+          + grazingFlux_Cocco * recipQuota_cocco   &                         ! NEW
+          ) * recipbiostep                                                   ! NEW
+        end if
 
 !*** zooplankton1 respiration
         Diags3Dloc(k,12) = Diags3Dloc(k,12) + (   &
@@ -2892,10 +2902,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         + aggregationrate * DiaC                  &
         ) * recipbiostep  
 
+        if (use_coccos) then
 !***    aggregation by coccolithophores
-        Diags3Dloc(k,26) = Diags3Dloc(k,26) + (   &                         ! NEW
-        + aggregationrate * CoccoC                &                         ! NEW
-        ) * recipbiostep                                                    ! NEW
+          Diags3Dloc(k,26) = Diags3Dloc(k,26) + (   &                         ! NEW
+          + aggregationrate * CoccoC                &                         ! NEW
+          ) * recipbiostep                                                    ! NEW
+        end if
 
 !*** excrection of DOC by phytoplankton
         Diags3Dloc(k,16) = Diags3Dloc(k,16) + (   &
@@ -2907,10 +2919,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         + lossC_d * limitFacN_dia        * DiaC   &
         ) * recipbiostep  
 
+        if (use_coccos) then
 !*** excretion of DOC by coccolithophores
-        Diags3Dloc(k,27) = Diags3Dloc(k,27) + (   &                          ! NEW
-        + lossC_c * limitFacN_cocco      * CoccoC &                          ! NEW
-        ) * recipbiostep                                                     ! NEW
+          Diags3Dloc(k,27) = Diags3Dloc(k,27) + (   &                          ! NEW
+          + lossC_c * limitFacN_cocco      * CoccoC &                          ! NEW
+          ) * recipbiostep                                                     ! NEW
+        end if
 
 !*** calcification
         Diags3Dloc(k,18) = Diags3Dloc(k,18) + (   &
@@ -2927,10 +2941,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
      	+ PhyRespRate_dia         * DiaC          &
      	) * recipbiostep
 
+        if (use_coccos) then
 ! cocco resipration
-        Diags3Dloc(k,28) = Diags3Dloc(k,28) + (   &                          ! NEW
-        + PhyRespRate_cocco       * CoccoC        &                          ! NEW
-        ) * recipbiostep                                                     ! NEW
+          Diags3Dloc(k,28) = Diags3Dloc(k,28) + (   &                          ! NEW
+          + PhyRespRate_cocco       * CoccoC        &                          ! NEW
+          ) * recipbiostep                                                     ! NEW
+        end if
 
   end do ! Main vertikal loop ends
 

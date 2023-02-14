@@ -213,7 +213,7 @@ end if ! use_MEDUSA and sedflx_num not 0
      FeDust = GloFeDust(n) * (1 - a_ice(n)) * dust_sol    
      NDust = GloNDust(n)  * (1 - a_ice(n))
 
-     allocate(Diags3Dloc(nzmax,28))
+     allocate(Diags3Dloc(nzmax,diags3d_num))
      Diags3Dloc(:,:) = 0.d0
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forcing'//achar(27)//'[0m'

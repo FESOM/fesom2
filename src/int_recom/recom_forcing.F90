@@ -314,13 +314,15 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
 !-------------------------------------------------------------------------------
 ! Diagnostics
   if (Diags) then
-	do idiags = one,8
-	  LocDiags2D(idiags) = sum(diags3Dloc(1:nn,idiags) * thick(1:nn))
+      do idiags = one,8
+        LocDiags2D(idiags) = sum(diags3Dloc(1:nn,idiags) * thick(1:nn))
+      end do
+      if (use_coccos) then
         LocDiags2D(9)        = sum(diags3Dloc(1:nn,21) * thick(1:nn))      ! NEW cocco NPP (hard-coded, because cocco NPP etc. are appended to the numbers of 3D fields)
         LocDiags2D(10)       = sum(diags3Dloc(1:nn,22) * thick(1:nn))      ! NEW cocco GPP
         LocDiags2D(11)       = sum(diags3Dloc(1:nn,23) * thick(1:nn))      ! NEW cocco NNA
         LocDiags2D(12)       = sum(diags3Dloc(1:nn,24) * thick(1:nn))      ! NEW cocco GNA or chl deg
-	end do
+      end if !coccos
   end if
 
 end subroutine REcoM_Forcing
