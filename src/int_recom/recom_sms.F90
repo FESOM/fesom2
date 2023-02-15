@@ -190,6 +190,13 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 DetZ2C = max(tiny,state(k,idetz2c)      + sms(k,idetz2c))
                 DetZ2Si = max(tiny,state(k,idetz2si)    + sms(k,idetz2si)) 
                 DetZ2Calc = max(tiny,state(k,idetz2calc)+ sms(k,idetz2calc))
+            else
+                Zoo2N  = 0.d0
+                Zoo2C  = 0.d0
+                DetZ2N = 0.d0
+                DetZ2C = 0.d0
+                DetZ2Si = 0.d0
+                DetZ2Calc = 0.d0
             endif
             if (REcoM_Third_Zoo) then                                      ! NEW 3Zoo
                MicZooN  = max(tiny,state(k,imiczoon)    + sms(k,imiczoon))
@@ -268,6 +275,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 
             if (REcoM_Second_Zoo) then  
                 recipQZoo2  =  Zoo2C / Zoo2N
+            else
+                recipQZoo2  =  0.d0
             endif
 
             if (REcoM_Third_Zoo) then                    ! NEW 3Zoo
@@ -342,6 +351,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             endif
             if (REcoM_Second_Zoo) then !#if defined (Second_Zoo)
                 arrFuncZoo2 = exp(t1_zoo2/t2_zoo2 - t1_zoo2*rTloc)/(1 + exp(t3_zoo2/t4_zoo2 - t3_zoo2*rTloc))
+            else
+                arrFuncZoo2 = 0.d0
             endif !#endif
 
 !< Silicate temperature dependence 
@@ -1207,8 +1218,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !-------------------------------------------------------------------------------   
 !< Third Zooplankton (Microzooplankton) ! NEW 3Zoo (entire section)
 !! feeding on small small phytoplankton and diatoms
-
-    if (REcoM_Grazing_Variable_Preference) then
+    if (REcoM_Third_Zoo) then    ! NEW 3Zoo
+      if (REcoM_Grazing_Variable_Preference) then
         if (Graz_pref_new) then
             if (use_coccos) then
 ! Bugfix: OG
@@ -1235,7 +1246,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 varpzCocco3 = 0.0d0
             endif
 
-        endif
+        endif !Graz_pref_new
 
         fPhyN3 = varpzPhy3 * PhyN
         fDiaN3 = varpzDia3 * DiaN
@@ -1244,7 +1255,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         fPhyN3 = pzPhy3 * PhyN
         fDiaN3 = pzDia3 * DiaN
         if (use_coccos) fCoccoN3 = pzCocco3 * CoccoN
-    endif
+    endif !REcoM_Grazing_Variable_Preference
 
 !< *** Grazing fluxes ***
 !< **********************
@@ -1265,7 +1276,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     else 
         grazingFlux_Cocco3 = 0.d0
     endif
-
+endif ! REcoM_Third_Zoo
 !-------------------------------------------------------------------------------
 ! Heterotrophic respiration is assumed to drive zooplankton back to Redfield C:N
 ! if their C:N becomes higher than Redfield
@@ -1329,6 +1340,9 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             Zoo2fecalloss_n   = 0.0
             Zoo2fecalloss_c   = 0.0
         end if
+else
+Zoo2RespFlux   = 0.0
+Zoo2LossFlux   = 0.0
     end if
 !------------------------------------------------------------------------------- 
 ! Third zooplankton (microzooplankton) respiration ! NEW 3Zoo
@@ -1388,6 +1402,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         calc_loss_gra      = grazingFlux_Cocco  * aux      ! NEW changed to Coccos
         if (REcoM_Second_Zoo) then
             calc_loss_gra2 = grazingFlux_Cocco2 * aux     ! NEW changed to Coccos
+else 
+            calc_loss_gra2 = 0.d0
         endif
         if (REcoM_Third_Zoo) then ! NEW 3Zoo
             calc_loss_gra3 = grazingFlux_Cocco3 * aux
@@ -1400,6 +1416,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         calc_loss_gra       = grazingFlux_phy  * aux
        if (REcoM_Second_Zoo) then
              calc_loss_gra2 = grazingFlux_phy2 * aux
+else 
+            calc_loss_gra2 = 0.d0
        endif
        if (REcoM_Third_Zoo) then ! NEW 3Zoo
             calc_loss_gra3 = grazingFlux_phy3 * aux
@@ -1419,7 +1437,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         calc_loss_gra_14 = grazingFlux_phy * recipQuota_14/(PhyC_14 + tiny) * PhyCalc_14
       end if
     end if
-		
+
     if (.not. use_coccos) then              ! NEW
        CoccoC             = 0.d0
        CoccoN             = 0.d0
@@ -1831,10 +1849,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
          - Zoo2fecalloss_n                            & 
                                                ) * dt_b + sms(k,izoo2n)
  !-------------------------------------------------------------------------------                       
-  ! Second Zooplankton C                                                                                 
-                  
-     if (Grazing_detritus) then
-             
+  ! Second Zooplankton C                                                                                                   
+     if (Grazing_detritus) then             
      sms(k,izoo2c)      = (                             &
          + grazingFlux_phy2 * recipQuota * grazEff2     &
          + grazingFlux_Dia2 * recipQuota_Dia * grazEff2 &
@@ -1847,7 +1863,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
          - Zoo2RespFlux                                 &
          - Zoo2fecalloss_c                              &
                                                 ) * dt_b + sms(k,izoo2c)  
-     else
+     else ! Grazing_detritus = .false.
       sms(k,izoo2c)      = (                             &
          + grazingFlux_phy2 * recipQuota * grazEff2     &
          + grazingFlux_Dia2 * recipQuota_Dia * grazEff2 &
@@ -1858,9 +1874,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
          - Zoo2RespFlux                                 &
          - Zoo2fecalloss_c                              &
                                                 ) * dt_b + sms(k,izoo2c)
-     end if 
+     end if  ! Grazing_detritus
 !-------------------------------------------------------------------------------
   ! Third Zooplankton (Microzooplankton) N             ! NEW 3Zoo
+  if (REcoM_Third_Zoo) then   ! NEW 3Zoo
      if (REcoM_Second_Zoo) then
         sms(k,imiczoon)       = (                      &
              + grazingFlux3 * grazEff3                 &
@@ -1902,6 +1919,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
              - MicZooRespFlux                                   &
                                               ) * dt_b + sms(k,imiczooc)
      endif  
+endif
 !---------------------------------------------------------------------------------
   ! Second Zooplankton Detritus N
      if (Grazing_detritus) then
@@ -1950,7 +1968,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 - reminN * arrFunc * O2Func    * DetZ2N  &                ! NEW O2remin
                                                ) * dt_b + sms(k,idetz2n)
         endif
-     else
+     else ! Grazing_detritus = .false.
         if (REcoM_Third_Zoo) then     ! NEW 3Zoo
            sms(k,idetz2n)       = (                      &
                 + grazingFlux_phy2                       &
@@ -1982,7 +2000,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 - reminN * arrFunc * O2Func    * DetZ2N  &                ! NEW O2remin
                                                ) * dt_b + sms(k,idetz2n)
         endif
-     end if
+     end if ! Grazing_detritus 
  !---------------------------------------------------------------------------------                                                                                                                                           
   ! Second Zooplankton Detritus C
      if (Grazing_detritus) then
@@ -2031,7 +2049,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 - reminC * arrFunc * O2Func    * DetZ2C        &           ! NEW O2remin
                                                      )   * dt_b + sms(k,idetz2c)
         endif
-     else
+     else  ! Grazing_detritus = .false.
         if (REcoM_Third_Zoo) then     ! NEW Zoo
            sms(k,idetz2c)       = (                              &
                 + grazingFlux_phy2 * recipQuota                  &
@@ -2073,7 +2091,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                  - reminC * arrFunc * O2Func    * DetZ2C        &           ! NEW O2remin
                                                      )   * dt_b + sms(k,idetz2c)
          endif
-     end if
+     end if  ! Grazing_detritus
 
  !-------------------------------------------------------------------------------------
   !Second Zooplankton  Detritus Si 
@@ -2106,7 +2124,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                - calc_diss2     * DetZ2Calc      &
                                            ) * dt_b + sms(k,idetz2calc)
        endif
-   endif                                                                                
+   endif ! REcoM_Second_Zoo                                                  
 !-------------------------------------------------------------------------------
 ! DON (Extracellular organic N)
    if (REcoM_Second_Zoo) then
@@ -2261,6 +2279,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     endif
 !-------------------------------------------------------------------------------
 ! Coccolithophore N (NEW!!!)
+      if (use_coccos) then
    if (REcoM_Second_Zoo) then                                           ! NEW
     sms(k,icocn)      = (                      &                        ! NEW
       + N_assim_cocco                 * CoccoC &                        ! NEW
@@ -2343,6 +2362,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
       - grazingFlux_cocco3 * Chl2N_cocco          &                     ! NEW 3Zoo
                                              ) * dt_b + sms(k,icchl)      ! NEW
    endif 
+endif ! use_coccos
 !-------------------------------------------------------------------------------
 ! Detritus Si
    if (REcoM_Third_Zoo) then

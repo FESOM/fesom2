@@ -99,7 +99,7 @@ subroutine recom_sinking_new(tr_num,mesh)
 !            endif
             
 !    elseif(tracer_id(tr_num)==1025 .or. &  !idetz2n
-
+        if (REcoM_Second_Zoo) then ! No variable sinking
     if(tracer_id(tr_num)==1025 .or. &  !idetz2n
          tracer_id(tr_num)==1026 .or. &  !idetz2c
          tracer_id(tr_num)==1027 .or. &  !idetz2si
@@ -107,6 +107,7 @@ subroutine recom_sinking_new(tr_num,mesh)
             
             Vsink = VDet_zoo2            
     end if
+endif
 
 if (Vsink .gt. 0.1) then ! No sinking if Vsink < 0.1 m/day
 
@@ -356,7 +357,7 @@ subroutine get_scale_ballasting(tr_num,mesh)
 !           print*,'scaling_visc_3D(k,row)= ',scaling_visc_3D(k,row)
         end do
         rho_particle1(nzmax+1,row) = rho_particle1(nzmax,row)
-        rho_particle2(nzmax+1,row) = rho_particle2(nzmax,row)
+        if (REcoM_Second_Zoo) rho_particle2(nzmax+1,row) = rho_particle2(nzmax,row)
         scaling_visc_3D(nzmax+1,row) = scaling_visc_3D(nzmax,row)
      end do
 

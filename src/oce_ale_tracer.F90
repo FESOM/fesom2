@@ -1096,8 +1096,9 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
         ! Particulate Organic Nitrogen
         if( tracer_id(tr_num)==1004 .or. &  !iphyn
             tracer_id(tr_num)==1007 .or. &  !idetn
-            tracer_id(tr_num)==1013 .or. &  !idian
-            tracer_id(tr_num)==1025 ) then  !idetz2n
+            tracer_id(tr_num)==1013 ) then  !idian
+!            tracer_id(tr_num)==1013 .or. &  !idian
+!            tracer_id(tr_num)==1025 ) then  !idetz2n
             !Benthos(n,1)= Benthos(n,1) +  add_benthos_2d(n) ![mmol]
 
             if (use_MEDUSA) then
@@ -1116,8 +1117,9 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
         ! Particulate Organic Carbon
         if( tracer_id(tr_num)==1005 .or. &  !iphyc
             tracer_id(tr_num)==1008 .or. &  !idetc
-            tracer_id(tr_num)==1014 .or. &  !idiac
-            tracer_id(tr_num)==1026 ) then  !idetz2c
+            tracer_id(tr_num)==1014 ) then
+!            tracer_id(tr_num)==1014 .or. &  !idiac
+!            tracer_id(tr_num)==1026 ) then  !idetz2c
             !Benthos(n,2)= Benthos(n,2) + add_benthos_2d(n)
 
             if (use_MEDUSA) then
@@ -1133,8 +1135,9 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
 
         ! Particulate Organic Silicon
         if( tracer_id(tr_num)==1016 .or. &  !idiasi
-            tracer_id(tr_num)==1017 .or. &  !idetsi
-            tracer_id(tr_num)==1027 ) then  !idetz2si
+            tracer_id(tr_num)==1017 ) then
+!            tracer_id(tr_num)==1017 .or. &  !idetsi
+!            tracer_id(tr_num)==1027 ) then  !idetz2si
             !Benthos(n,3)= Benthos(n,3) + add_benthos_2d(n)
 
             if (use_MEDUSA) then
@@ -1150,8 +1153,9 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
 
         ! Cal
         if( tracer_id(tr_num)==1020 .or. &  !iphycal
-            tracer_id(tr_num)==1021 .or. &  !idetcal
-            tracer_id(tr_num)==1028 ) then  !idetz2cal
+            tracer_id(tr_num)==1021 ) then   !idetcal
+!            tracer_id(tr_num)==1021 .or. &  !idetcal
+!            tracer_id(tr_num)==1028 ) then  !idetz2cal
             !Benthos(n,4)= Benthos(n,4) + add_benthos_2d(n) 
 
             if (use_MEDUSA) then
