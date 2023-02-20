@@ -13,12 +13,11 @@ client:
       actions :
         - type : select
           match :
-          - category : [fesom-node-output]
+          - category : [fesom-grid-output]
         - type : transport
           target : server
           hash-keys: [category, name]
-        - type : single-field-sink
-        - type : aggregation
+
 
 server:
   transport : mpi
@@ -28,7 +27,7 @@ server:
       actions :
         - type : select
           match :
-           - category : [fesom-node-output]
+           - category : [fesom-grid-output]
         - type : aggregate
         - type : encode
           format : raw
