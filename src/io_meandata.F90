@@ -1738,7 +1738,7 @@ subroutine mio_write_nod(mio, entry)
     do lev=1, size1
         cerr = md%new()
         if (cerr /= MULTIO_SUCCESS) ERROR STOP 19
-        cerr = md%set_string("category", "fesom-node-output")
+        cerr = md%set_string("category", "fesom-grid-output")
         if (cerr /= MULTIO_SUCCESS) ERROR STOP 20
         cerr = md%set_int("globalSize", entry%glsize(2))
         if (cerr /= MULTIO_SUCCESS) ERROR STOP 21
@@ -1764,7 +1764,7 @@ subroutine mio_write_nod(mio, entry)
            cerr = mio%write_field(md, entry%local_values_r8_copy(lev,   entry%shrinked_indx), entry%shrinked_size)
         end if
         if (cerr /= MULTIO_SUCCESS) ERROR STOP 35
-        cerr= mio%write_step_complete(md)
+        ! cerr= mio%write_step_complete(md)
         if (cerr /= MULTIO_SUCCESS) ERROR STOP 45
         cerr = md%delete()        
      end do ! --> do lev=1, size1

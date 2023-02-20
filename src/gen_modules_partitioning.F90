@@ -699,7 +699,7 @@ subroutine init_client(mio, partit, mesh)
    cerr = md%new()
    cerr = md%set_string("name", "egrid")
    if (cerr /= MULTIO_SUCCESS) ERROR STOP 10
-   cerr = md%set_string("category", "fesom-domain-nodemap")
+   cerr = md%set_string("category", "fesom-domain-elemmap")
    if (cerr /= MULTIO_SUCCESS) ERROR STOP 11
    cerr = md%set_string("representation", "unstructured")
    if (cerr /= MULTIO_SUCCESS) ERROR STOP 12
