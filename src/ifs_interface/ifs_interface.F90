@@ -855,9 +855,9 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    zsendnf(:,nfield) = qns__oce(:)
 
    ! =================================================================== !
-   !4. Non-solar radiation over ice to T grid (is this non-solar heat flux?)
+   !4. Total flux over sea ice to T grid
    nfield = nfield + 1
-   zsendnf(:,nfield) = qns__ice(:)
+   zsendnf(:,nfield) = qns__ice(:)+qs___ice(:)
 
    ! =================================================================== !
    !5. D(q)/dT to T grid
