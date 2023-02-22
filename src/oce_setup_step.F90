@@ -385,14 +385,15 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     integer        :: opt_visc
     real(kind=WP)  :: visc_gamma0, visc_gamma1, visc_gamma2
     real(kind=WP)  :: visc_easybsreturn
-    logical        :: use_ivertvisc
+    logical        :: use_ivertvisc=.true.
     integer        :: momadv_opt
-    logical        :: use_freeslip
-    logical        :: use_wsplit
+    logical        :: use_freeslip =.false.
+    logical        :: use_wsplit   =.false.
+    logical        :: ldiag_KE     =.false.
     real(kind=WP)  :: wsplit_maxcfl
     namelist /dynamics_visc   / opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
                                 use_ivertvisc, visc_easybsreturn
-    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl 
+    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, ldiag_KE
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -426,7 +427,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     dynamics%use_freeslip      = use_freeslip
     dynamics%use_wsplit        = use_wsplit
     dynamics%wsplit_maxcfl     = wsplit_maxcfl
-
+    dynamics%ldiag_KE          = ldiag_KE
     !___________________________________________________________________________
     ! define local vertice & elem array size
     elem_size=myDim_elem2D+eDim_elem2D
@@ -450,6 +451,9 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! allocate/initialise vertical velocity arrays in derived type
     allocate(dynamics%w(              nl, node_size))
+    if (dynamics%ldiag_ke) then
+       allocate(dynamics%w_old(       nl, node_size))
+    end if
     allocate(dynamics%w_e(            nl, node_size))
     allocate(dynamics%w_i(            nl, node_size))
     allocate(dynamics%cfl_z(          nl, node_size))
@@ -487,6 +491,69 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
         dynamics%work%u_b = 0.0_WP
         dynamics%work%v_b = 0.0_WP
     end if 
+   
+    if (dynamics%ldiag_ke) then
+       allocate(dynamics%ke_adv    (2, nl-1, elem_size))
+       allocate(dynamics%ke_cor    (2, nl-1, elem_size))
+       allocate(dynamics%ke_pre    (2, nl-1, elem_size))
+       allocate(dynamics%ke_hvis   (2, nl-1, elem_size))
+       allocate(dynamics%ke_vvis   (2, nl-1, elem_size))
+       allocate(dynamics%ke_umean  (2, nl-1, elem_size))
+       allocate(dynamics%ke_u2mean (2, nl-1, elem_size))
+       allocate(dynamics%ke_du2    (2, nl-1, elem_size))
+       allocate(dynamics%ke_adv_AB (2, nl-1, elem_size))
+       allocate(dynamics%ke_cor_AB (2, nl-1, elem_size))
+       allocate(dynamics%ke_rhs_bak(2, nl-1, elem_size))
+       allocate(dynamics%ke_wrho   (nl-1, node_size))
+       allocate(dynamics%ke_dW     (nl-1, node_size))
+       allocate(dynamics%ke_Pfull  (nl-1, node_size))
+       allocate(dynamics%ke_wind   (2, elem_size))
+       allocate(dynamics%ke_drag   (2, elem_size))
+
+       allocate(dynamics%ke_pre_xVEL (2, nl-1, elem_size))
+       allocate(dynamics%ke_adv_xVEL (2, nl-1, elem_size))
+       allocate(dynamics%ke_cor_xVEL (2, nl-1, elem_size))
+       allocate(dynamics%ke_hvis_xVEL(2, nl-1, elem_size))
+       allocate(dynamics%ke_vvis_xVEL(2, nl-1, elem_size))
+       allocate(dynamics%ke_wind_xVEL(2, elem_size))
+       allocate(dynamics%ke_drag_xVEL(2, elem_size))
+       allocate(dynamics%ke_J(node_size),  dynamics%ke_D(node_size),   dynamics%ke_G(node_size),  &
+                dynamics%ke_D2(node_size), dynamics%ke_n0(node_size),  dynamics%ke_JD(node_size), &
+                dynamics%ke_GD(node_size), dynamics%ke_swA(node_size), dynamics%ke_swB(node_size))
+
+       dynamics%ke_adv      =0.0_WP
+       dynamics%ke_cor      =0.0_WP
+       dynamics%ke_pre      =0.0_WP
+       dynamics%ke_hvis     =0.0_WP
+       dynamics%ke_vvis     =0.0_WP
+       dynamics%ke_du2      =0.0_WP
+       dynamics%ke_umean    =0.0_WP
+       dynamics%ke_u2mean   =0.0_WP
+       dynamics%ke_adv_AB   =0.0_WP
+       dynamics%ke_cor_AB   =0.0_WP
+       dynamics%ke_rhs_bak  =0.0_WP
+       dynamics%ke_wrho     =0.0_WP
+       dynamics%ke_wind     =0.0_WP
+       dynamics%ke_drag     =0.0_WP
+       dynamics%ke_pre_xVEL =0.0_WP
+       dynamics%ke_adv_xVEL =0.0_WP
+       dynamics%ke_cor_xVEL =0.0_WP
+       dynamics%ke_hvis_xVEL=0.0_WP
+       dynamics%ke_vvis_xVEL=0.0_WP
+       dynamics%ke_wind_xVEL=0.0_WP
+       dynamics%ke_drag_xVEL=0.0_WP
+       dynamics%ke_dW       =0.0_WP
+       dynamics%ke_Pfull    =0.0_WP
+       dynamics%ke_J        =0.0_WP
+       dynamics%ke_D        =0.0_WP
+       dynamics%ke_G        =0.0_WP
+       dynamics%ke_D2       =0.0_WP
+       dynamics%ke_n0       =0.0_WP
+       dynamics%ke_JD       =0.0_WP
+       dynamics%ke_GD       =0.0_WP
+       dynamics%ke_swA      =0.0_WP
+       dynamics%ke_swB      =0.0_WP
+    end if
 END SUBROUTINE dynamics_init
 !
 !
