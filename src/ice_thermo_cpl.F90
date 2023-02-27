@@ -279,8 +279,14 @@ contains
 
     !---- total atmospheric and oceanic heat fluxes
     !---- average over grid cell [W/m**2]
+#if not defined (__ifsinterface)
     ahf = A*Qatmice + (1._WP-A)*Qatmocn
+#else
+    ahf =   Qatmice + (1._WP-A)*Qatmocn
+#endif
     ohf = A*Qocnice + (1._WP-A)*Qocnatm
+
+
 
     !---- convert heat fluxes [W/m**2] into growth per time step dt [m]
     Qicecon = Qicecon*dt/cl
