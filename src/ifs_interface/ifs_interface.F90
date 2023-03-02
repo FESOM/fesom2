@@ -794,7 +794,8 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! Local variables
    INTEGER		:: n, jf
    integer, pointer     :: myDim_nod2D, eDim_nod2D
-   REAL(wpIFS), parameter 	:: rhofwt = 1000. ! density of freshwater
+   REAL(wpIFS), parameter :: rhofwt = 1000.     ! density of freshwater
+   REAL(wpIFS), parameter :: lfus = 0.3337e+6   ! latent heat of fusion 
 
    ! Packed send/receive buffers
    INTEGER , PARAMETER :: maxnfield = 11
@@ -806,7 +807,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! associate only the necessary things
    real(kind=wpIFS), dimension(:,:), pointer :: coord_nod2D
    real(kind=wpIFS), dimension(:)  , pointer :: stress_atmice_x, stress_atmice_y
-   real(kind=wpIFS), dimension(:)  , pointer :: oce_heat_flux, ice_heat_flux 
+   real(kind=wpIFS), dimension(:)  , pointer :: oce_heat_flux, ice_heat_flux, a_ice 
    myDim_nod2D        => fesom%partit%myDim_nod2D
    eDim_nod2D         => fesom%partit%eDim_nod2D
    coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => fesom%mesh%coord_nod2D(:,:)  
@@ -814,6 +815,8 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    stress_atmice_y    => fesom%ice%stress_atmice_y
    oce_heat_flux      => fesom%ice%atmcoupl%oce_flx_h(:)
    ice_heat_flux      => fesom%ice%atmcoupl%ice_flx_h(:)
+   a_ice              => fesom%ice%data(1)%values(:)
+
    
    ! =================================================================== !
    ! Sort out incoming arrays from the IFS and put them on the ocean grid
@@ -967,8 +970,8 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    nfield = nfield + 1
    oce_heat_flux(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)
 
-   ! Do the halo exchange
-   call exchange_nod(oce_heat_flux,fesom%partit)
+   ! Snow falling into the ocean takes heat from the ocean to melt; 
+   ! this is done below along with the halo exchange
 
 
    ! =================================================================== !
@@ -1089,6 +1092,16 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    !do_rotate_oce_wind=.false.
    !do_rotate_ice_wind=.false.
    !end if
+
+   ! =================================================================== !
+   ! FURTHER MODIFICATION OF FLUXES
+
+   ! take heat from the ocean in order to melt the snow that is falling into the ocean
+   oce_heat_flux(:)=oce_heat_flux(:) - (prec_snow(:) * rhofwt * lfus * (1 - a_ice(:))) ! prec_snow*rho [kg/m2/s] * lfus [J/kg] = W/m2
+
+   ! Do the halo exchange
+   call exchange_nod(oce_heat_flux,fesom%partit)
+
 
 END SUBROUTINE nemogcmcoup_lim2_update
 
