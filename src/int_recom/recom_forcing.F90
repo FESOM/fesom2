@@ -94,18 +94,14 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
 
     tiny_N   = tiny_chl/chl2N_max      ! 0.00001/ 3.15d0   Chl2N_max [mg CHL/mmol N] Maximum CHL a : N ratio = 0.3 gCHL gN^-1
     tiny_N_d = tiny_chl/chl2N_max_d    ! 0.00001/ 4.2d0
-    if (use_coccos) then     ! NEW switch
+#if defined (__coccos)
        tiny_N_c = tiny_chl/chl2N_max_c    ! 0.00001/ 3.5d0    NEW
-    else
-       tiny_N_c = 0.d0
-    endif
+#endif
     tiny_C   = tiny_N  /NCmax          ! NCmax   = 0.2d0   [mmol N/mmol C] Maximum cell quota of nitrogen (N:C)
     tiny_C_d = tiny_N_d/NCmax_d        ! NCmax_d = 0.2d0 
-   if (use_coccos) then     ! NEW switch
+#if defined (__coccos)
        tiny_C_c = tiny_N_c/NCmax_c        ! NCmax_c = 0.15d0  NEW
-    else
-       tiny_C_c = 0.d0
-    endif
+#endif
     tiny_Si  = tiny_C_d/SiCmax         ! SiCmax = 0.8d0
 
 
@@ -242,21 +238,18 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
   state(1:nn,idiac)  = max(tiny_C_d,state(1:nn,idiac))
   state(1:nn,idiasi) = max(tiny_Si, state(1:nn,idiasi))
 
-  if (use_coccos) then    ! NEW switch
+#if defined (__coccos)
      state(1:nn,icchl)  = max(tiny_chl,state(1:nn,icchl))                         ! NEW
      state(1:nn,icocn)  = max(tiny_N_c,state(1:nn,icocn))                         ! NEW
      state(1:nn,icocc)  = max(tiny_C_c,state(1:nn,icocc))                         ! NEW
-  else
-     state(1:nn,icchl)  = 0.d0
-     state(1:nn,icocn)  = 0.d0
-     state(1:nn,icocc)  = 0.d0
-  endif
+#endif
+
   if (REcoM_Third_Zoo) then   ! NEW 3Zoo
      state(1:nn,imiczoon)  = max(tiny,state(1:nn,imiczoon))
      state(1:nn,imiczooc)  = max(tiny,state(1:nn,imiczooc))
-  else
-     state(1:nn,imiczoon)  = 0.d0
-     state(1:nn,imiczooc)  = 0.d0
+!  else
+!     state(1:nn,imiczoon)  = 0.d0
+!     state(1:nn,imiczooc)  = 0.d0
   endif
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
@@ -317,12 +310,12 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
       do idiags = one,8
         LocDiags2D(idiags) = sum(diags3Dloc(1:nn,idiags) * thick(1:nn))
       end do
-      if (use_coccos) then
+#if defined (__coccos)
         LocDiags2D(9)        = sum(diags3Dloc(1:nn,21) * thick(1:nn))      ! NEW cocco NPP (hard-coded, because cocco NPP etc. are appended to the numbers of 3D fields)
         LocDiags2D(10)       = sum(diags3Dloc(1:nn,22) * thick(1:nn))      ! NEW cocco GPP
         LocDiags2D(11)       = sum(diags3Dloc(1:nn,23) * thick(1:nn))      ! NEW cocco NNA
         LocDiags2D(12)       = sum(diags3Dloc(1:nn,24) * thick(1:nn))      ! NEW cocco GNA or chl deg
-      end if !coccos
+#endif
   end if
 
 end subroutine REcoM_Forcing

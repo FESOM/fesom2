@@ -419,35 +419,20 @@ end if
        tr_arr(:,:,28) = tiny                   ! tracer 27 = DetZ2C                                    
        tr_arr(:,:,29) = tiny                   ! tracer 28 = DetZ2Si                            
        tr_arr(:,:,30) = tiny                   ! tracer 29 = DetZ2Calc 
-    else 
-       tr_arr(:,:,25) = 0.d0
-       tr_arr(:,:,26) = 0.d0
-       tr_arr(:,:,27) = 0.d0                            
-       tr_arr(:,:,28) = 0.d0                                  
-       tr_arr(:,:,29) = 0.d0                          
-       tr_arr(:,:,30) = 0.d0
     endif
 
    ! NEW: Attention with the flags use_coccos and use_third_zoo: they only work without cisco!!
 
-    if (use_coccos) then    ! NEW switch
+#if defined (__coccos)
        tr_arr(:,:,31) = tiny_chl/chl2N_max        ! tiny             ! tracer 29 = CoccoN    ! NEW, changed from tracer to tr_arr
        tr_arr(:,:,32) = tiny_chl/chl2N_max/NCmax  ! tiny * Redfield  ! tracer 30 = CoccoC    ! NEW
        tr_arr(:,:,33) = tiny_chl                  ! tiny * 1.56d0    ! tracer 31 = CoccoChl  ! NEW
-    else
-       tr_arr(:,:,31) = 0.d0
-       tr_arr(:,:,32) = 0.d0
-       tr_arr(:,:,33) = 0.d0
-    endif
+#endif
 
     if (REcoM_Third_Zoo) then                     ! NEW 3Zoo
        tr_arr(:,:,34) = tiny                      ! tracer 32 = Zoo3N
        tr_arr(:,:,35) = tiny * Redfield           ! tracer 33 = Zoo3C
-    else
-       tr_arr(:,:,34) = 0.d0
-       tr_arr(:,:,35) = 0.d0
     endif
-
 
   if (ciso) then
 

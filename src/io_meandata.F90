@@ -430,22 +430,22 @@ CASE ('GNAd     ')
     end if
 CASE ('NPPc     ')
     if (use_REcoM) then
-    call def_stream(nod2D,  myDim_nod2D,   'NPPc','Mean NPP coccolithophores','mmolC/(m2*d)', diags2D(:,9), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)     ! NEW
+      call def_stream(nod2D,  myDim_nod2D,   'NPPc','Mean NPP coccolithophores','mmolC/(m2*d)', diags2D(:,9), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)     ! NEW
     end if
 
 CASE ('GPPc     ')
     if (use_REcoM) then
-    call def_stream(nod2D,  myDim_nod2D,   'GPPc','Mean GPP coccolithophores','mmolC/(m2*d)', diags2D(:,10), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)    ! NEW
+      call def_stream(nod2D,  myDim_nod2D,   'GPPc','Mean GPP coccolithophores','mmolC/(m2*d)', diags2D(:,10), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)    ! NEW
     end if
 
 CASE ('NNAc     ')
     if (use_REcoM) then
-    call def_stream(nod2D,  myDim_nod2D,   'NNAc','Net N-assimilation coccolithophores','mmolN/(m2*d)', diags2D(:,11), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)   ! NEW
+      call def_stream(nod2D,  myDim_nod2D,   'NNAc','Net N-assimilation coccolithophores','mmolN/(m2*d)', diags2D(:,11), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)   ! NEW
     endif
 
 CASE ('GNAc     ')
     if (use_REcoM) then
-    call def_stream(nod2D,  myDim_nod2D,   'GNAc','Gross N-assimilation coccolithophores','mmolN/(m2*d)', diags2D(:,12), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh) ! NEW
+      call def_stream(nod2D,  myDim_nod2D,   'GNAc','Gross N-assimilation coccolithophores','mmolN/(m2*d)', diags2D(:,12), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh) ! NEW
     endif
 
 !_________________________________________________________________________________________________
@@ -529,7 +529,9 @@ CASE ('temp      ')
 CASE ('salt      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt',      'salinity',    'psu',    tr_arr(:,:,2),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('PAR       ')
+    if (use_REcoM) then
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'PAR', 'PAR', 'W/m2',      PAR3D(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    endif
 CASE ('CO2       ')
     if (use_REcoM) then
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'CO2', 'Aqueous CO2 concentration', 'mol/m3',     CO23D(:,:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
@@ -563,33 +565,33 @@ CASE ('rhoSW     ')
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'rhoSW','in-situ density of seawater', 'mol/m3',  rhoSW3D(:,:),         io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
    end if
 CASE ('rho_det1       ')
+   if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'rho_det1', 'rho of particles in class 1', 'kg/m3',  rho_particle1(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
 CASE ('rho_det2       ')
+   if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'rho_det2', 'rho of particles in class 2', 'kg/m3',  rho_particle2(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
 CASE ('wsink_det1')
+   if (use_REcoM) then
    call def_stream((/nl, nod2D/),  (/nl, myDim_nod2D/),  'wsink_det1', 'sinking speed of particles in class 1', 'm s-1',  sinkVel1(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
 CASE ('wsink_det2')
+   if (use_REcoM) then
    call def_stream((/nl, nod2D/),  (/nl, myDim_nod2D/),  'wsink_det2', 'sinking speed of particles in class 2', 'm s-1',  sinkVel2(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
 CASE ('scaling_rho_1   ')
+   if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'scaling_rho_1', 'scaling factor for sinking of particles in class 1', 'n.d.',  scaling_density1_3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
 CASE ('scaling_rho_2   ')
+   if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'scaling_rho_2', 'scaling factor for sinking of particles in class 2', 'n.d.',  scaling_density2_3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
 CASE ('scaling_visc   ')
+   if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'scaling_visc', 'scaling factor of particle sinking speed', 'n.d.',  scaling_visc_3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-!wiso-code!
-CASE ('h2o18     ')
-    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'h2o18', 'h2o18 concentration',    'kmol/m**3',    tr_arr(:,:,3), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-CASE ('hDo16     ')
-    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'hDo16', 'hDo16 concentration',    'kmol/m**3',    tr_arr(:,:,4), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-CASE ('h2o16     ')
-    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'h2o16', 'h2o16 concentration',    'kmol/m**3',    tr_arr(:,:,5), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-CASE ('h2o18_ice ')
-    call def_stream(nod2D,  myDim_nod2D,  'h2o18_ice',      'h2o18 concentration in sea ice',    'kmol/m**3',    tr_arr_ice(:,1),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-CASE ('hDo16_ice ')
-    call def_stream(nod2D,  myDim_nod2D,  'hDo16_ice',      'hDo16 concentration in sea ice',    'kmol/m**3',    tr_arr_ice(:,2),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-CASE ('h2o16_ice ')
-    call def_stream(nod2D,  myDim_nod2D,  'h2o16_ice',      'h2o16 concentration in sea ice',    'kmol/m**3',    tr_arr_ice(:,3),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-!wiso-code-end!
+   endif
 CASE ('otracers  ')
     do j=3, num_tracers
     write (id_string, "(I4.4)") tracer_id(j)

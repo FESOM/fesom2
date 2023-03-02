@@ -46,17 +46,17 @@ subroutine recom_sinking_new(tr_num,mesh)
 !< .OG. 04.11.2022
 
 !< Activate ballasting
-   if (use_ballasting) then      
-      call get_scale_ballasting(tr_num,mesh)
-   end if
+    if (use_ballasting) then      
+        call get_scale_ballasting(tr_num,mesh)
+    end if
 
 !< Constant sinking velocities (we prescribe them under namelist recom)
 !< This hardcoded part is temporary 
 !< .OG. 07.07.2021
 
-  Vsink=0.0_WP
+    Vsink=0.0_WP
 
-  if (any(recom_det_tracer_id == tracer_id(tr_num))) Vsink = Vdet
+  if (any(recom_det_tracer_id == tracer_id(tr_num))) Vsink = VDet
   if (any(recom_phy_tracer_id == tracer_id(tr_num))) Vsink = VPhy
   if (any(recom_dia_tracer_id == tracer_id(tr_num))) Vsink = VDia
   if (any(recom_cocco_tracer_id == tracer_id(tr_num))) Vsink = VCocco
@@ -72,7 +72,7 @@ subroutine recom_sinking_new(tr_num,mesh)
           
 !    elseif(tracer_id(tr_num)==1004 .or. &  !iphyn
 !        tracer_id(tr_num)==1005 .or.    &  !iphyc
-!        !tracer_id(tr_num)==1020 .or.    &  !iphycal
+        !tracer_id(tr_num)==1020 .or.    &  !iphycal
 !        tracer_id(tr_num)==1006 ) then     !ipchl
 
 !            Vsink = VPhy
@@ -97,94 +97,95 @@ subroutine recom_sinking_new(tr_num,mesh)
 !            else
 !               Vsink = VPhy
 !            endif
-            
-!    elseif(tracer_id(tr_num)==1025 .or. &  !idetz2n
-        if (REcoM_Second_Zoo) then ! No variable sinking
-    if(tracer_id(tr_num)==1025 .or. &  !idetz2n
-         tracer_id(tr_num)==1026 .or. &  !idetz2c
-         tracer_id(tr_num)==1027 .or. &  !idetz2si
-         tracer_id(tr_num)==1028 ) then  !idetz2calc 
-            
-            Vsink = VDet_zoo2            
-    end if
-endif
+!    endif
+
+    if (REcoM_Second_Zoo) then ! No variable sinking
+        if(tracer_id(tr_num)==1025 .or. &  !idetz2n
+           tracer_id(tr_num)==1026 .or. &  !idetz2c
+           tracer_id(tr_num)==1027 .or. &  !idetz2si
+           tracer_id(tr_num)==1028 ) then  !idetz2calc 
+               Vsink = VDet_zoo2            
+        end if
+    endif
 
 if (Vsink .gt. 0.1) then ! No sinking if Vsink < 0.1 m/day
 
-!   vd_flux = 0.0d0
+    do n = 1,myDim_nod2D
+        if (ulevels_nod2D(n)>1) cycle 
+        nzmin = ulevels_nod2D(n)
+        nzmax = nlevels_nod2D(n)-1
 
-   do n = 1,myDim_nod2D
-      if (ulevels_nod2D(n)>1) cycle 
-      nzmin = ulevels_nod2D(n)
-      nzmax = nlevels_nod2D(n)-1
+        ! distance between tracer points, surface and bottom dz_trr is half 
+        ! the layer thickness
+        dz_trr                = 0.0d0
+        dz_trr(nzmin+1:nzmax) = abs(Z_3d_n(nzmin:nzmax-1,n)-Z_3d_n(nzmin+1:nzmax,n))
+        dz_trr(nzmin)         = hnode(nzmin,n)/2.0d0
+        dz_trr(nzmax+1)       = hnode(nzmax,n)/2.0d0
 
-      ! distance between tracer points, surface and bottom dz_trr is half 
-      ! the layer thickness
-      dz_trr                = 0.0d0
-      dz_trr(nzmin+1:nzmax) = abs(Z_3d_n(nzmin:nzmax-1,n)-Z_3d_n(nzmin+1:nzmax,n))
-      dz_trr(nzmin)         = hnode(nzmin,n)/2.0d0
-      dz_trr(nzmax+1)       = hnode(nzmax,n)/2.0d0
-
-      Wvel_flux(nzmin:nzmax+1)= 0.d0  ! Vertical velocity for BCG tracers
+        Wvel_flux(nzmin:nzmax+1)= 0.d0  ! Vertical velocity for BCG tracers
                                                                      
-      do nz=nzmin,nzmax+1
-         if (allow_var_sinking) then 
+        do nz=nzmin,nzmax+1
+            if (allow_var_sinking) then 
 
-            if (use_ballasting) then 
+                if (use_ballasting) then 
 
-                Wvel_flux(nz) = w_ref1 * scaling_density1_3D(nz,n) * scaling_visc_3D(nz,n)
+                    Wvel_flux(nz) = w_ref1 * scaling_density1_3D(nz,n) * scaling_visc_3D(nz,n)
 
-                if (depth_scaling1.gt.0.0) Wvel_flux(nz) = Wvel_flux(nz) + (depth_scaling1 * abs(zbar_3d_n(nz,n)))
+                    if (depth_scaling1.gt.0.0) Wvel_flux(nz) = Wvel_flux(nz) + (depth_scaling1 * abs(zbar_3d_n(nz,n)))
 
-                if (abs(Wvel_flux(nz)) .gt. max_sinking_velocity) Wvel_flux(nz) = max_sinking_velocity
+                    if (abs(Wvel_flux(nz)) .gt. max_sinking_velocity) Wvel_flux(nz) = max_sinking_velocity
 
-                ! sinking velocity [m d-1] surface --> bottom (negative)
-                Wvel_flux(nz) = -1.0d0 * Wvel_flux(nz)/SecondsPerDay ! now in [m s-1]
+                    ! sinking velocity [m d-1] surface --> bottom (negative)
+                    Wvel_flux(nz) = -1.0d0 * Wvel_flux(nz)/SecondsPerDay ! now in [m s-1]
 
-            else ! use_ballasting = .false.
-               Wvel_flux(nz) = -((Vdet_a * abs(zbar_3d_n(nz,n))/SecondsPerDay) + Vsink/SecondsPerDay)
+                else ! use_ballasting = .false.
+                    Wvel_flux(nz) = -((Vdet_a * abs(zbar_3d_n(nz,n))/SecondsPerDay) + Vsink/SecondsPerDay)
+                endif
+
+            else ! allow_var_sinking = .false.
+                Wvel_flux(nz) = -Vsink/SecondsPerDay
+            end if
+
+            if (REcoM_Second_Zoo) then
+            ! We assume constant sinking for second detritus
+                if(tracer_id(tr_num)==1025 .or. &  !idetz2n
+                    tracer_id(tr_num)==1026 .or. &  !idetz2c
+                    tracer_id(tr_num)==1027 .or. &  !idetz2si
+                    tracer_id(tr_num)==1028 ) then  !idetz2calc  
+ 
+                    if (use_ballasting) then    ! NEW BALL
+
+                        Wvel_flux(nz) = w_ref2*scaling_density2_3D(nz,n)*scaling_visc_3D(nz,n)
+
+                        if (depth_scaling2.gt.0.0) Wvel_flux(nz) = Wvel_flux(nz) + (depth_scaling2 * abs(zbar_3d_n(nz,n)))
+
+                        if (abs(Wvel_flux(nz)) .gt. max_sinking_velocity) Wvel_flux(nz) = max_sinking_velocity
+
+                        ! sinking velocity [m d-1] surface --> bottom (negative)
+                        Wvel_flux(nz) = -1.0d0 * Wvel_flux(nz)/SecondsPerDay ! now in [m s-1]
+
+                    else ! use_ballasting = .false.
+                        Wvel_flux(nz) = -VDet_zoo2/SecondsPerDay ! --> VDet_zoo2 ! NEW BALL changed -Vsink to -VDet_zoo2
+                    end if
+                endif ! second detritus tracers
             endif
 
-         else ! allow_var_sinking = .false.
-            Wvel_flux(nz) = -Vsink/SecondsPerDay
-         end if
-
-            ! We assume constant sinking for second detritus
-            if(tracer_id(tr_num)==1025 .or. &  !idetz2n
-               tracer_id(tr_num)==1026 .or. &  !idetz2c
-               tracer_id(tr_num)==1027 .or. &  !idetz2si
-               tracer_id(tr_num)==1028 ) then  !idetz2calc  
- 
-               if (use_ballasting) then    ! NEW BALL
-
-                  Wvel_flux(nz) = w_ref2*scaling_density2_3D(nz,n)*scaling_visc_3D(nz,n)
-
-                  if (depth_scaling2.gt.0.0) Wvel_flux(nz) = Wvel_flux(nz) + (depth_scaling2 * abs(zbar_3d_n(nz,n)))
-
-                  if (abs(Wvel_flux(nz)) .gt. max_sinking_velocity) Wvel_flux(nz) = max_sinking_velocity
-
-                ! sinking velocity [m d-1] surface --> bottom (negative)
-                  Wvel_flux(nz) = -1.0d0 * Wvel_flux(nz)/SecondsPerDay ! now in [m s-1]
-
-               else ! use_ballasting = .false.
-                  Wvel_flux(nz) = -VDet_zoo2/SecondsPerDay ! --> VDet_zoo2 ! NEW BALL changed -Vsink to -VDet_zoo2
-               end if
-            endif ! second detritus tracers
 ! OG 02.02.23
 ! We calculate correct but write wrong out
 ! MPI_Bcast is needed for sinkVel1|2
 
-         if (tracer_id(tr_num)==1021) sinkVel1(nz,n)= Wvel_flux(nz) !-1.0d0/SecondsPerDay  !idetcal              
-         if (tracer_id(tr_num)==1028) sinkVel2(nz,n)= Wvel_flux(nz)  !idetz2calc
+            if (tracer_id(tr_num)==1021) sinkVel1(nz,n)= Wvel_flux(nz) !-1.0d0/SecondsPerDay  !idetcal              
+            if (REcoM_Second_Zoo) then         
+                if (tracer_id(tr_num)==1028) sinkVel2(nz,n)= Wvel_flux(nz)  !idetz2calc
+            endif
 
-         !if (mype==0 .and. tracer_id(tr_num)==1021) write(*,*) 'sinkVel1= ', sinkVel1(nz,n)
-         !if (mype==0 .and. tracer_id(tr_num)==1028) write(*,*) 'sinkVel2= ', sinkVel2(nz,n)
+! Here BCast routines
 
-      end do
+        end do
 
-      wflux   = 0.d0
-      dt_sink = dt
-      vd_flux = 0.0d0
+        wflux   = 0.d0
+        dt_sink = dt
+        vd_flux = 0.0d0
 
 if (1) then ! 3rd Order DST Sceheme with flux limiting. This code comes from old recom
 
@@ -325,7 +326,7 @@ subroutine get_scale_ballasting(tr_num,mesh)
            ! (i.e. no density scaling)
 
            scaling_density1_3D(k,row)=1.0
-           scaling_density2_3D(k,row)=1.0
+           if (REcoM_Second_Zoo) scaling_density2_3D(k,row)=1.0
 
            !do tr_num=1,num_tracers
 
@@ -430,7 +431,7 @@ subroutine get_particle_density(mesh)          ! NEW BALL developed by Cara and 
      rho_particle1(nzmin:nzmax,row) = rho_CaCO3*a4(nzmin:nzmax,row) + rho_opal*a3(nzmin:nzmax,row) + rho_POC*a1(nzmin:nzmax,row) + rho_PON*a2(nzmin:nzmax,row)
   end do
 
-  if (RECoM_Second_Zoo) then
+  if (REcoM_Second_Zoo) then
      rho_particle2 = 0.0
      b1 = 0.0
      b2 = 0.0
