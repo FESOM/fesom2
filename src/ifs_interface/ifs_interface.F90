@@ -794,8 +794,8 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! Local variables
    INTEGER		:: n, jf
    integer, pointer     :: myDim_nod2D, eDim_nod2D
-   REAL(wpIFS), parameter :: rhofwt = 1000.     ! density of freshwater
-   REAL(wpIFS), parameter :: lfus = 0.3337e+6   ! latent heat of fusion 
+   REAL(wpIFS), parameter :: rhofwt = 1000._WP          ! density of freshwater
+   REAL(wpIFS), parameter :: lfus = 0.3337e+6_WP        ! latent heat of fusion 
 
    ! Packed send/receive buffers
    INTEGER , PARAMETER :: maxnfield = 11
@@ -1097,7 +1097,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! FURTHER MODIFICATION OF FLUXES
 
    ! take heat from the ocean in order to melt the snow that is falling into the ocean
-   oce_heat_flux(:)=oce_heat_flux(:) - (prec_snow(:) * rhofwt * lfus * (1 - a_ice(:))) ! prec_snow*rho [kg/m2/s] * lfus [J/kg] = W/m2
+   oce_heat_flux(1:myDim_nod2D)=oce_heat_flux(1:myDim_nod2D) - (prec_snow(1:myDim_nod2D) * rhofwt * lfus * (1.0_WP - a_ice(1:myDim_nod2D))) ! prec_snow*rho [kg/m2/s] * lfus [J/kg] = W/m2
 
    ! Do the halo exchange
    call exchange_nod(oce_heat_flux,fesom%partit)
