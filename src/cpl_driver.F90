@@ -206,7 +206,7 @@ contains
     logical                    :: new_points
 
     integer                    :: i, j, k        ! local loop indicees
-    integer                    :: l,m            ! local loop indicees
+    integer                    :: l,m,n            ! local loop indicees
 
     character(len=32)          :: point_name     ! name of the grid points
 
@@ -215,18 +215,26 @@ contains
     integer                    :: counts_from_all_pes(partit%npes)
     integer                    :: displs_from_all_pes(partit%npes)
     integer                    :: my_displacement
+    integer                    :: mymax(partit%npes)
+    integer                    :: rmax
 
     integer,allocatable        :: unstr_mask(:,:)
     real(kind=WP)              :: this_x_coord          ! longitude coordinates
     real(kind=WP)              :: this_y_coord          ! latitude coordinates
+    real(kind=WP)              :: this_x_corners        ! longitude node corners
+    real(kind=WP)              :: this_y_corners        ! latitude node corners
     !
     ! Corner data structure for a OASIS3-MCT Reglonlatvrt grid
     !
     real(kind=WP), allocatable :: my_x_coords(:)     ! longitude coordinates
     real(kind=WP), allocatable :: my_y_coords(:)     ! latitude  coordinates
+    real(kind=WP), allocatable :: my_x_corners(:,:)     ! longitude node corners
+    real(kind=WP), allocatable :: my_y_corners(:,:)     ! latitude node corners
 
     real(kind=WP), allocatable :: all_x_coords(:, :)     ! longitude coordinates
     real(kind=WP), allocatable :: all_y_coords(:, :)     ! latitude  coordinates
+    real(kind=WP), allocatable :: all_x_corners(:,:,:)    ! longitude node corners
+    real(kind=WP), allocatable :: all_y_corners(:,:,:)    ! latitude node corners
     real(kind=WP), allocatable :: all_area(:,:)    
 
 #include "associate_part_def.h"
@@ -282,6 +290,17 @@ contains
       my_displacement = SUM(counts_from_all_pes(1:mype))
     endif
 
+    CALL MPI_BARRIER(MPI_COMM_FESOM, ierror)
+
+    mymax=0
+    rmax=0
+    mymax(mype+1)=maxval(nod_in_elem2D_num(1:myDim_nod2D))
+    call MPI_AllREDUCE( mymax, rmax, &
+          npes, MPI_INTEGER,MPI_SUM, &
+          MPI_COMM_FESOM, MPIerr)
+    !rmax=rmax+1
+    print *, 'rmax', rmax
+
     ig_paral(1) = 1                       ! Apple Partition
     ig_paral(2) = my_displacement         ! Global Offset
     ig_paral(3) = my_number_of_points     ! Local Extent
@@ -300,11 +319,29 @@ contains
       
     ALLOCATE(my_x_coords(my_number_of_points))
     ALLOCATE(my_y_coords(my_number_of_points))
+    ALLOCATE(my_x_corners(my_number_of_points,rmax))
+    ALLOCATE(my_y_corners(my_number_of_points,rmax))
 
     do i = 1, my_number_of_points
       this_x_coord = coord_nod2D(1, i)
       this_y_coord = coord_nod2D(2, i)
       call r2g(my_x_coords(i), my_y_coords(i), this_x_coord, this_y_coord)
+    end do   
+
+
+    do i = 1, my_number_of_points
+      do j = 1, rmax
+        if (nod_in_elem2D_num(i) < j) then
+          print *, ' j, i, x, y', j, i, x_corners(i,nod_in_elem2D_num(i)), y_corners(i,nod_in_elem2D_num(i))
+          this_x_corners = x_corners(i,nod_in_elem2D_num(i))
+          this_y_corners = y_corners(i,nod_in_elem2D_num(i))
+        else
+          print *, ' j, i, x, y', j, i, x_corners(i,j), y_corners(i,j)
+          this_x_corners = x_corners(i,j)
+          this_y_corners = y_corners(i,j)
+        end if
+        call r2g(my_x_corners(j,i), my_y_corners(j,i), this_x_corners, this_y_corners)
+      end do
     end do   
 
     my_x_coords=my_x_coords/rad
