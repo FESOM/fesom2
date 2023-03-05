@@ -324,12 +324,11 @@ contains
     do i = 1, my_number_of_points
       this_x_coord = coord_nod2D(1, i)
       this_y_coord = coord_nod2D(2, i)
-      !print *, ' xmax_coord:', this_x_coord
       call r2g(my_x_coords(i), my_y_coords(i), this_x_coord, this_y_coord)
     end do   
 
-    
-
+    ! We can have a variable number of corner points
+    ! Luckly oasis can deal with that by just repeating the last one
     do i = 1, my_number_of_points
       do j = 1, rmax
         if (nod_in_elem2D_num(i) < j) then
@@ -345,11 +344,6 @@ contains
     my_x_coords=my_x_coords/rad
     my_y_coords=my_y_coords/rad
     
-    !print *, ' my_x_coords', my_x_coords(1)   
-    !print *, ' my_y_coords', my_y_coords(1)  
-    !print *, ' my_x_corners', my_x_corners(1,:)
-    !print *, ' my_y_corners', my_y_corners(1,:)
-
     if (mype .eq. localroot) then
       ALLOCATE(all_x_coords(number_of_all_points, 1))
       ALLOCATE(all_y_coords(number_of_all_points, 1))
@@ -409,11 +403,6 @@ contains
       print *, 'FESOM after Barrier'
     endif
 
-    !print *, 'all_x_coords', all_x_coords(1,1)
-    !print *, 'all_y_coords', all_y_coords(1,1)
-    !print *, 'all_x_corners', all_x_corners(1,:,1)
-    !print *, 'all_y_corners', all_y_corners(1,:,1)
-
     if (mype .eq. localroot) then
       print *, 'FESOM before start_grids_writing'
        CALL oasis_start_grids_writing(il_flag)
@@ -422,7 +411,7 @@ contains
           print *, 'FESOM before write grid'
           CALL oasis_write_grid (grid_name, number_of_all_points, 1, all_x_coords(:,:), all_y_coords(:,:))
 
-          print *, 'FESOM before write corners'
+          print *, 'FESOM before write corner'
           CALL oasis_write_corner (grid_name, number_of_all_points, 1, rmax, all_x_corners(:,:,:), all_y_corners(:,:,:))
 
           ALLOCATE(unstr_mask(number_of_all_points, 1))
@@ -443,6 +432,7 @@ contains
 
 
     DEALLOCATE(all_x_coords, all_y_coords, my_x_coords, my_y_coords) 
+    DEALLOCATE(all_x_corners, all_y_corners, my_x_corners, my_y_coreners) 
 !------------------------------------------------------------------
 ! 3rd Declare the transient variables
 !------------------------------------------------------------------
