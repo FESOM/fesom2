@@ -298,8 +298,6 @@ contains
     call MPI_AllREDUCE( mymax, rmax, &
           npes, MPI_INTEGER,MPI_SUM, &
           MPI_COMM_FESOM, MPIerr)
-    !rmax=rmax+1
-    print *, 'rmax', rmax
 
     ig_paral(1) = 1                       ! Apple Partition
     ig_paral(2) = my_displacement         ! Global Offset
@@ -322,38 +320,47 @@ contains
     ALLOCATE(my_x_corners(my_number_of_points,rmax))
     ALLOCATE(my_y_corners(my_number_of_points,rmax))
 
+
     do i = 1, my_number_of_points
       this_x_coord = coord_nod2D(1, i)
       this_y_coord = coord_nod2D(2, i)
+      !print *, ' xmax_coord:', this_x_coord
       call r2g(my_x_coords(i), my_y_coords(i), this_x_coord, this_y_coord)
     end do   
 
+    
 
     do i = 1, my_number_of_points
       do j = 1, rmax
         if (nod_in_elem2D_num(i) < j) then
-          print *, ' j, i, x, y', j, i, x_corners(i,nod_in_elem2D_num(i)), y_corners(i,nod_in_elem2D_num(i))
-          this_x_corners = x_corners(i,nod_in_elem2D_num(i))
-          this_y_corners = y_corners(i,nod_in_elem2D_num(i))
+          my_x_corners(i,j) = x_corners(i,nod_in_elem2D_num(i))
+          my_y_corners(i,j) = y_corners(i,nod_in_elem2D_num(i))
         else
-          print *, ' j, i, x, y', j, i, x_corners(i,j), y_corners(i,j)
-          this_x_corners = x_corners(i,j)
-          this_y_corners = y_corners(i,j)
+          my_x_corners(i,j) = x_corners(i,j)
+          my_y_corners(i,j) = y_corners(i,j)
         end if
-        call r2g(my_x_corners(j,i), my_y_corners(j,i), this_x_corners, this_y_corners)
       end do
     end do   
 
     my_x_coords=my_x_coords/rad
     my_y_coords=my_y_coords/rad
+    
+    !print *, ' my_x_coords', my_x_coords(1)   
+    !print *, ' my_y_coords', my_y_coords(1)  
+    !print *, ' my_x_corners', my_x_corners(1,:)
+    !print *, ' my_y_corners', my_y_corners(1,:)
 
     if (mype .eq. localroot) then
       ALLOCATE(all_x_coords(number_of_all_points, 1))
       ALLOCATE(all_y_coords(number_of_all_points, 1))
+      ALLOCATE(all_x_corners(number_of_all_points, rmax,1))
+      ALLOCATE(all_y_corners(number_of_all_points, rmax,1))
       ALLOCATE(all_area(number_of_all_points, 1))
     else 
       ALLOCATE(all_x_coords(1, 1))
       ALLOCATE(all_y_coords(1, 1))
+      ALLOCATE(all_x_corners(1, 1, 1))
+      ALLOCATE(all_y_corners(1, 1, 1))
       ALLOCATE(all_area(1, 1))
     endif
 
@@ -375,19 +382,37 @@ contains
                     counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
 
     if (mype .eq. 0) then 
-      print *, 'FESOM before 3rd GatherV'
+      print *, 'FESOM before 3rd GatherV', displs_from_all_pes(npes), counts_from_all_pes(npes), number_of_all_points
+    endif
+    CALL MPI_GATHERV(my_x_corners, my_number_of_points*rmax, MPI_DOUBLE_PRECISION, all_x_corners,  &
+                    counts_from_all_pes*rmax, displs_from_all_pes+rmax, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+
+    if (mype .eq. 0) then 
+      print *, 'FESOM before 4th GatherV'
+    endif
+    CALL MPI_GATHERV(my_y_corners, my_number_of_points*rmax, MPI_DOUBLE_PRECISION, all_y_corners,  &
+                    counts_from_all_pes*rmax, displs_from_all_pes*rmax, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+
+    if (mype .eq. 0) then 
+      print *, 'FESOM before 5th GatherV'
     endif
     CALL MPI_GATHERV(area(1,:), my_number_of_points, MPI_DOUBLE_PRECISION, all_area,  &
                     counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
 
     if (mype .eq. 0) then 
-      print *, 'FESOM after 3rd GatherV'
+      print *, 'FESOM after 5th GatherV'
     endif
+
 
     CALL MPI_Barrier(MPI_COMM_FESOM, ierror)
     if (mype .eq. 0) then 
       print *, 'FESOM after Barrier'
     endif
+
+    print *, 'all_x_coords', all_x_coords(1,1)
+    print *, 'all_y_coords', all_y_coords(1,1)
+    print *, 'all_x_corners', all_x_corners(1,:,1)
+    print *, 'all_y_corners', all_y_corners(1,:,1)
 
     if (mype .eq. localroot) then
       print *, 'FESOM before start_grids_writing'
