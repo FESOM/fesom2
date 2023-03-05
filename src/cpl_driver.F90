@@ -353,8 +353,8 @@ contains
     if (mype .eq. localroot) then
       ALLOCATE(all_x_coords(number_of_all_points, 1))
       ALLOCATE(all_y_coords(number_of_all_points, 1))
-      ALLOCATE(all_x_corners(number_of_all_points, rmax,1))
-      ALLOCATE(all_y_corners(number_of_all_points, rmax,1))
+      ALLOCATE(all_x_corners(number_of_all_points, 1, rmax))
+      ALLOCATE(all_y_corners(number_of_all_points, 1, rmax))
       ALLOCATE(all_area(number_of_all_points, 1))
     else 
       ALLOCATE(all_x_coords(1, 1))
@@ -409,10 +409,10 @@ contains
       print *, 'FESOM after Barrier'
     endif
 
-    print *, 'all_x_coords', all_x_coords(1,1)
-    print *, 'all_y_coords', all_y_coords(1,1)
-    print *, 'all_x_corners', all_x_corners(1,:,1)
-    print *, 'all_y_corners', all_y_corners(1,:,1)
+    !print *, 'all_x_coords', all_x_coords(1,1)
+    !print *, 'all_y_coords', all_y_coords(1,1)
+    !print *, 'all_x_corners', all_x_corners(1,:,1)
+    !print *, 'all_y_corners', all_y_corners(1,:,1)
 
     if (mype .eq. localroot) then
       print *, 'FESOM before start_grids_writing'
@@ -421,6 +421,9 @@ contains
 
           print *, 'FESOM before write grid'
           CALL oasis_write_grid (grid_name, number_of_all_points, 1, all_x_coords(:,:), all_y_coords(:,:))
+
+          print *, 'FESOM before write corners'
+          CALL oasis_write_corner (grid_name, number_of_all_points, 1, rmax, all_x_corners(:,:,:), all_y_corners(:,:,:))
 
           ALLOCATE(unstr_mask(number_of_all_points, 1))
           unstr_mask=0
