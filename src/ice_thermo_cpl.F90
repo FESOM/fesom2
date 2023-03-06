@@ -107,12 +107,16 @@ subroutine thermodynamics(ice, partit, mesh)
   con           => ice%thermo%con
   rhoice        => ice%thermo%rhoice
 
-
   !_____________________________________________________________________________  
   rsss = ref_sss
 
   !---- total evaporation (needed in oce_salt_balance.F90)
+#if defined (__ifsinterface)
+  evaporation = evap_no_ifrac ! already total weighted evaporation in IFS-FESOM
+  evap_no_ifrac = max(evaporation - sublimation*a_ice, 0.0_WP) ! reconstruct (weighted) evap over oce
+#else
   evaporation = evap_no_ifrac*(1.-a_ice) + sublimation*a_ice
+#endif
 
   !---- loop over all surface node
   do inod=1,myDim_nod2d+eDim_nod2d
@@ -125,13 +129,13 @@ subroutine thermodynamics(ice, partit, mesh)
      h       = m_ice(inod)
      hsn     = m_snow(inod)
 
-#if defined (__oifs) || defined (__ifsinterface)
+#if defined (__oifs)
      a2ohf   = oce_heat_flux(inod) + shortwave(inod) + enthalpyoffuse(inod)
 #else
      a2ohf   = oce_heat_flux(inod) + shortwave(inod)
 #endif
      a2ihf   = ice_heat_flux(inod)
-     evap    = evap_no_ifrac(inod)
+     evap    = evap_no_ifrac(inod) ! weighted in IFS-FESOM
      subli   = sublimation(inod)
      rain    = prec_rain(inod)
      snow    = prec_snow(inod)
@@ -282,7 +286,11 @@ contains
     !---- must be area-weighted (like the heat fluxes); in contrast,
     !---- precipitation (snow and rain) and runoff are effective fluxes
     PmEice = A*snow + A*subli
+#if defined (__ifsinterface)
+    PmEocn = rain + runo + (1._WP-A)*snow + evap !---- evap is weighted
+#else
     PmEocn = rain + runo + (1._WP-A)*snow + (1._WP-A)*evap
+#endif
 
     !---- convert freshwater fluxes [m/s] into growth per time step dt [m]
     PmEice = PmEice*dt
