@@ -794,8 +794,9 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! Local variables
    INTEGER		:: n, jf
    integer, pointer     :: myDim_nod2D, eDim_nod2D
-   REAL(wpIFS), parameter :: rhofwt = 1000._wpIFS          ! density of freshwater
-   REAL(wpIFS), parameter :: lfus = 0.3337e+6_wpIFS       ! latent heat of fusion 
+   REAL(wpIFS), parameter :: rhofwt = 1000.             ! density of freshwater
+   REAL(wpIFS), parameter :: lfus = 333700.             ! latent heat of fusion
+   REAL(wpIFS), parameter :: cplinterval = 3600.        ! hardcoded coup interval (CHANGE!) 
 
    ! Packed send/receive buffers
    INTEGER , PARAMETER :: maxnfield = 11
@@ -996,14 +997,14 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! =================================================================== !
    ! Unpack total evaporation, without halo
    nfield = nfield + 1
-   evap_no_ifrac(1:myDim_nod2D)=-zrecvnf(1:myDim_nod2D,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
+   evap_no_ifrac(1:myDim_nod2D)=-zrecvnf(1:myDim_nod2D,nfield)/cplinterval ! m [1000 kg/m2] -> m/s; change sign
 
    ! Do the halo exchange
    call exchange_nod(evap_no_ifrac,fesom%partit)
 
    !7. Unpack sublimation (evaporation over ice), without halo
    nfield = nfield + 1
-   sublimation(1:myDim_nod2D)=-zrecvnf(1:myDim_nod2D,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
+   sublimation(1:myDim_nod2D)=-zrecvnf(1:myDim_nod2D,nfield)/cplinterval ! m [1000 kg/m2] -> m/s; change sign
 
    ! Do the halo exchange
    call exchange_nod(sublimation,fesom%partit)
@@ -1014,7 +1015,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! =================================================================== !
    !8. Unpack liquid precipitation, without halo
    nfield = nfield + 1
-   prec_rain(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s
+   prec_rain(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)/cplinterval   ! m [1000 kg/m2] -> m/s
    
    ! Do the halo exchange
    call exchange_nod(prec_rain,fesom%partit)
@@ -1023,7 +1024,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! =================================================================== !
    !9. Unpack solid precipitation, without halo
    nfield = nfield + 1
-   prec_snow(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s
+   prec_snow(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)/cplinterval   ! m [1000 kg/m2] -> m/s
 
    ! Do the halo exchange
    call exchange_nod(prec_snow,fesom%partit)
@@ -1097,7 +1098,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! FURTHER MODIFICATION OF FLUXES
 
    ! take heat from the ocean in order to melt the snow that is falling into the ocean
-   oce_heat_flux(1:myDim_nod2D)=oce_heat_flux(1:myDim_nod2D) - (prec_snow(1:myDim_nod2D) * rhofwt * lfus * (1.0_wpIFS - a_ice(1:myDim_nod2D))) ! prec_snow*rho [kg/m2/s] * lfus [J/kg] = W/m2
+   oce_heat_flux(1:myDim_nod2D)=oce_heat_flux(1:myDim_nod2D) - (prec_snow(1:myDim_nod2D) * cplinterval * lfus) 
 
    ! Do the halo exchange
    call exchange_nod(oce_heat_flux,fesom%partit)
