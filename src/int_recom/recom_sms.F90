@@ -672,7 +672,19 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !-------------------------------------------------------------------------------
 !< *** Iron chemistry ***
 !< ********************** 
-            freeFe = iron_chemistry(Fe,totalligand,ligandStabConst)
+! select the method to calculate freeFe
+            if (fe_2ligands) then
+               if (fe_compl_nica) then
+                   logK1 = max(tiny, 24.36 - 1.67 * pH_watercolumn(k)  &
+                           + EOC * (-2.e-4 * EOC + 0.034))
+                   logK2 =  logK1 + 2.67
+                   Klig1 = 10 ** (logK1 - 9)
+                   Klig2 = 10 ** (logK2 - 9)
+                   freeFe = iron_chemistry_2ligands(Fe,1.7,0.6,Klig1,Klig2)
+               endif
+            else
+                    freeFe = iron_chemistry(Fe,totalligand,ligandStabConst)
+            endif
 !-------------------------------------------------------------------------------
 !< *** Chlorophyll synthesis ***
 !< *****************************
@@ -3099,6 +3111,48 @@ function recom_limiter(slope,qa,qb)
 !-------------------------------------------------------------------------------
 ! Function for iron chemistry
 !-------------------------------------------------------------------------------
+function iron_chemistry_2ligands(fet,l1t,l2t,k1,k2)
+      implicit none
+
+      Real(kind=8) :: iron_chemistry_2ligands
+      Real(kind=8) :: l1t,l2t,fet,k1,k2
+      Real(kind=8) :: a3,a2,a1,a0,a,b,c,p,q,discr,rho,phi,amp,pi
+      Real(kind=8) :: one3rd, one27th
+      Real(kind=8) :: fe1,fe2,fe3
+
+! coefficients of the 4th-order polynomial
+      a3 = k1*k2
+      a2 = ( k1*k2*(l1t + l2t - fet) + k1 + k2 )
+      a1 = ( 1 - (k1 + k2)*fet + k1*l1t + k2*l2t )
+      a0 = -fet
+
+! coefficients of the normalized polynomial
+      a = a2/a3
+      b = a1/a3
+      c = a0/a3
+
+! some numbers that are used several times
+      one3rd = 1.0/3.0
+      one27th = 1.0/27.0
+
+! now solve the polynomial stepwise
+      p = b - a*a*one3rd
+      q = c - a*b*one3rd + 2.0*a*a*a*one27th
+      discr = q*q/4.0 + p*p*p*one27th
+
+      rho = sqrt(-(p*p*p*one27th))
+      phi = acos(-q/(2.0*rho))
+      amp = 2.0*rho**one3rd
+      pi = 3.1415926535897931
+
+! the equation has three real roots
+      fe1 = amp*cos(phi*one3rd) - a*one3rd
+      fe2 = amp*cos((phi + 2.0*pi)*one3rd) - a*one3rd
+      fe3 = amp*cos((phi + 4.0*pi)*one3rd) - a*one3rd
+
+      iron_chemistry_2ligands = max(fe1,fe2,fe3)
+
+end function iron_chemistry_2ligands
 
 function iron_chemistry(Fe, totalLigand, ligandStabConst)
   implicit none
@@ -3125,5 +3179,5 @@ function iron_chemistry(Fe, totalLigand, ligandStabConst)
   iron_chemistry = freeFe
 
   return
-  end
+end function iron_chemistry
 

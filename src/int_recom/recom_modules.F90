@@ -96,6 +96,8 @@ module recom_config
   Logical                :: UseDustClim           = .true.
   Logical                :: UseDustClimAlbani     = .false.    ! Use Albani dustclim field (If it is false Mahowald will be used)
   Logical                :: use_Fe2N              = .true.     ! use Fe2N instead of Fe2C, as in MITgcm version
+  Logical                :: fe_2ligands           = .false.    ! consider Fe-ligand binding with two ligands
+  Logical                :: fe_compl_nica         = .false.    ! use Fe-ligand parameterisation dependent on DOC and pH (NICA: Ye2020) 
   Logical                :: use_photodamage       = .false.    ! use Alvarez et al (2018) for chlorophyll degradation
   logical                :: HetRespFlux_plus      = .true.     !MB More stable computation of zooplankton respiration fluxes adding a small number to HetN
   character(100)         :: REcoMDataPath         = '/work/ollie/jhauck/forcing/core_new_REcoMforcing/'
@@ -135,7 +137,8 @@ module recom_config
                        use_viscosity_scaling,             OmegaC_diss,           CO2lim,                  & ! NEW BALL, NEW DISS added OmegaC_diss, NEW added CO2lim
                        Diags      ,                       constant_CO2,                                   &
                        UseFeDust,                         UseDustClim,           UseDustClimAlbani,       &
-                       use_Fe2N,                          use_photodamage,       HetRespFlux_plus,        &
+                       use_Fe2N,                          fe_2ligands,           fe_compl_nica,           &
+                       use_photodamage,                   HetRespFlux_plus,                               &
                        REcoMDataPath,                     restore_alkalinity,                             &
                        useRivers,                         useErosion,            useRivFe,                &
                        NitrogenSS,                        useAeolianN,           firstyearoffesomcycle,   &
@@ -389,7 +392,7 @@ module recom_config
   Real(kind=8)                 :: Fe2C_benthos   = 0.02125       !0.68d0/32.d0       ! [umol/m2/day]
   Real(kind=8)                 :: kScavFe        = 0.07d0
   Real(kind=8)                 :: dust_sol       = 0.02d0        !Dissolution of Dust for bioavaliable
-  Real(kind=8)                 :: RiverFeConc   = 1000d0        ! mean DFe concentration in rivers   
+  Real(kind=8)                 :: RiverFeConc    = 100d0        ! mean DFe concentration in rivers   
   namelist /pairon/ Fe2N, Fe2N_benthos, Fe2C, Fe2C_benthos, kScavFe,    &
             dust_sol, RiverFeConc
 !!------------------------------------------------------------------------------
@@ -527,7 +530,8 @@ Module REcoM_declarations
   Real(kind=8)  :: KOchl, KOchl_dia, KOchl_cocco                      ! coefficient for damage to the photosynthetic apparatus 
 !!------------------------------------------------------------------------------
 !! *** Iron chemistry ***
-  Real(kind=8),external :: iron_chemistry 
+  Real(kind=8),external :: iron_chemistry, iron_chemistry_2ligands 
+  Real(kind=8)  :: logK1, logK2, Klig1, Klig2
 !!------------------------------------------------------------------------------
 !! *** Zooplankton ***
   Real(kind=8)  :: DiaNsq  
