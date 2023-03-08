@@ -1097,7 +1097,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! FURTHER MODIFICATION OF FLUXES
 
    ! take heat from the ocean in order to melt the snow that is falling into the ocean
-   oce_heat_flux(1:myDim_nod2D)=oce_heat_flux(1:myDim_nod2D) - (prec_snow(1:myDim_nod2D) * rhofwt * lfus * (1.0_wpIFS - a_ice(1:myDim_nod2D))) ! prec_snow*rho [kg/m2/s] * lfus [J/kg] = W/m2
+   oce_heat_flux(1:myDim_nod2D)=oce_heat_flux(1:myDim_nod2D) - (prec_snow(1:myDim_nod2D) * rhofwt * lfus) ! prec_snow*rho [kg/m2/s] * lfus [J/kg] = W/m2
 
    ! Do the halo exchange
    call exchange_nod(oce_heat_flux,fesom%partit)
