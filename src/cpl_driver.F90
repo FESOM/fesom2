@@ -378,23 +378,22 @@ contains
     if (mype .eq. 0) then 
       print *, 'FESOM before 3rd GatherV', displs_from_all_pes(npes), counts_from_all_pes(npes), number_of_all_points
     endif
-    CALL MPI_GATHERV(my_x_corners, my_number_of_points*rmax, MPI_DOUBLE_PRECISION, all_x_corners,  &
-                    counts_from_all_pes*rmax, displs_from_all_pes+rmax, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+
+    do j = 1, rmax
+      CALL MPI_GATHERV(my_x_corners(:,j), my_number_of_points, MPI_DOUBLE_PRECISION, all_x_corners(:,:,j),  &
+                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+      CALL MPI_GATHERV(my_y_corners(:,j), my_number_of_points, MPI_DOUBLE_PRECISION, all_y_corners(:,:,j),  &
+                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+    end do
 
     if (mype .eq. 0) then 
       print *, 'FESOM before 4th GatherV'
-    endif
-    CALL MPI_GATHERV(my_y_corners, my_number_of_points*rmax, MPI_DOUBLE_PRECISION, all_y_corners,  &
-                    counts_from_all_pes*rmax, displs_from_all_pes*rmax, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
-
-    if (mype .eq. 0) then 
-      print *, 'FESOM before 5th GatherV'
     endif
     CALL MPI_GATHERV(area(1,:), my_number_of_points, MPI_DOUBLE_PRECISION, all_area,  &
                     counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
 
     if (mype .eq. 0) then 
-      print *, 'FESOM after 5th GatherV'
+      print *, 'FESOM after 4th GatherV'
     endif
 
 
