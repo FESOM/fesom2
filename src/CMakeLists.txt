@@ -11,12 +11,16 @@ if(${RECOM_COUPLED})
 		file(GLOB sources_Fortran ${src_home}/*.F90 
                                           ${src_home}/int_recom/*.F90 
                                           ${src_home}/int_recom/recom/*.F90)
+
 elseif(${USE_ICEPACK})
    file(GLOB sources_Fortran ${src_home}/*.F90
                              ${src_home}/icepack_drivers/*.F90
                              ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90)
 else()
    file(GLOB sources_Fortran ${src_home}/*.F90)
+   list(REMOVE_ITEM sources_Fortran ${src_home}/recom_nitrogenss.F90)    # REcoM
+   list(REMOVE_ITEM sources_Fortran ${src_home}/recom_sinking.F90)       # REcoM
+   list(REMOVE_ITEM sources_Fortran ${src_home}/recom_modules_diag.F90)  # REcoM
 endif()
 #list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_partition_init.F90)
 file(GLOB sources_C ${src_home}/*.c)
@@ -65,7 +69,7 @@ if(${OIFS_COUPLED})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __oifs)
 endif()
 if(${RECOM_COUPLED})
-   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __coccos __3Zoo2Det)
 endif()
 if(${CISO_COUPLED})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __ciso)

@@ -34,6 +34,19 @@ module recom_config
 
   Integer :: ivphy = 1, ivdia = 2, ivdet = 3, ivdetsc = 4, ivcoc = 5 ! NEW ivcoc
 
+!!MB TEST: tracer ids for revised remineralization and sinking in oce_ale_tracer.F90
+  integer, dimension(8)  :: recom_remin_tracer_id   = (/1001, 1002, 1003, 1018, 1019, 1022, 1302, 1402/)
+  integer, dimension(29) :: recom_sinking_tracer_id = (/1007, 1008, 1017, 1021, 1004, 1005, 1020, 1006, &
+                                                        1013, 1014, 1016, 1015, 1025, 1026, 1027, 1028, &
+                                                        1029, 1030, 1031, &  ! OG Cocco
+                                                        1308, 1321, 1305, 1320, & 
+                                                        1314, 1408, 1421, 1405, 1420, 1414/)
+  integer, dimension(8)  :: recom_det_tracer_id     = (/1007, 1008, 1017, 1021, 1308, 1321, 1408, 1421/)
+  integer, dimension(8)  :: recom_phy_tracer_id     = (/1004, 1005, 1020, 1305, 1320, 1405, 1420, 1006/)
+  integer, dimension(6)  :: recom_dia_tracer_id     = (/1013, 1014, 1314, 1414, 1016, 1015/)
+  integer, dimension(3)  :: recom_cocco_tracer_id   = (/1029, 1030, 1031/)
+  integer, dimension(4)  :: recom_det2_tracer_id    = (/1025, 1026, 1027, 1028/)
+
   Real(kind=8)                 :: zero           = 0.d0
   Integer                      :: one            = 1
   Real(kind=8)                 :: tiny           = 2.23D-16
@@ -46,9 +59,7 @@ module recom_config
 
   Logical                :: use_REcoM            = .true.
   Logical                :: REcoM_restart        = .false.
-  logical                :: recom_binary_write   = .false.  ! Determines if tracervalue snapshots are saved. For fine grids it may crash the model to set this to true
 
-  logical                :: recom_binary_init    = .false.  ! Restart from binary
   Integer                :: bgc_num               = 33      ! NEW increased the number from 28 to 34 (added coccos and respiration) ! NEW 3Zoo changed from 31 to 33
   Integer                :: diags3d_num           = 28      ! Number of diagnostic 3d tracers to be saved
   Real(kind=8)           :: VDet                  = 20.d0   ! Sinking velocity, constant through the water column and positive downwards
@@ -64,7 +75,6 @@ module recom_config
   Logical                :: REcoM_Third_Zoo       = .false.    ! Decides whether having a third zooplankton (=microzoo) NEW 3Zoo
   Logical                :: Grazing_detritus      = .false.    ! Decides grazing on detritus                            
   Logical                :: zoo2_fecal_loss       = .false.    ! Decides fecalloss for the second zooplankton            
-  Logical                :: zoo2_initial_field    = .false.    ! Decides initialization of secondzoo        ! NOT CODED YET OG
   Logical                :: het_resp_noredfield   = .true.     ! Decides respiratation of copepods              
   Logical                :: diatom_mucus          = .true.           ! Effect of nutrient limitation on the aggregation
   Logical                :: Graz_pref_new         = .true.     ! If it is true Fasham et 1990, otherwise original recom variable preference
@@ -81,7 +91,6 @@ module recom_config
   Logical                :: UseFeDust             = .true.     ! Turns dust input of iron off when set to.false.
   Logical                :: UseDustClim           = .true.
   Logical                :: UseDustClimAlbani     = .false.    ! Use Albani dustclim field (If it is false Mahowald will be used)
-  Logical                :: use_Fe2N              = .true.     ! use Fe2N instead of Fe2C, as in MITgcm version
   Logical                :: use_photodamage       = .false.    ! use Alvarez et al (2018) for chlorophyll degradation
   logical                :: HetRespFlux_plus      = .true.     !MB More stable computation of zooplankton respiration fluxes adding a small number to HetN
   character(100)         :: REcoMDataPath         = '/work/ollie/jhauck/forcing/core_new_REcoMforcing/'
@@ -100,20 +109,20 @@ module recom_config
   logical                :: ciso                  = .false.    !MB main switch to enable/disable carbon isotopes (13|14C)
   integer                :: benthos_num           = 4          !MB number of sediment tracers = 8 if ciso = .true.
 
-  namelist /pavariables/ use_REcoM,                         REcoM_restart,         recom_binary_write,      &
-                       recom_binary_init,                 bgc_num,               diags3d_num,             &
+  namelist /pavariables/ use_REcoM,                       REcoM_restart,                                  &
+                                                          bgc_num,               diags3d_num,             &
                        VDet,          VDet_zoo2,      &
                        VPhy,                              VDia,                  VCocco,                  & ! NEW added VCocco
                        allow_var_sinking,                 biostep,               REcoM_Geider_limiter,    &
                        REcoM_Grazing_Variable_Preference, REcoM_Second_Zoo,      REcoM_Third_Zoo,         & ! NEW 3Zoo
                        Grazing_detritus,        &
-                       zoo2_fecal_loss,                   zoo2_initial_field,    het_resp_noredfield,     &
+                       zoo2_fecal_loss,                                          het_resp_noredfield,     &
                        diatom_mucus,                      Graz_pref_new,         use_coccos,              & ! NEW added use_coccos     
                        O2dep_remin,                       use_ballasting,        use_density_scaling,     & ! NEW O2remin, NEW BALL
                        use_viscosity_scaling,             OmegaC_diss,           CO2lim,                  & ! NEW BALL, NEW DISS added OmegaC_diss, NEW added CO2lim
                        Diags      ,                       constant_CO2,            &
                        UseFeDust,                         UseDustClim,           UseDustClimAlbani,       &
-                       use_Fe2N,                          use_photodamage,       HetRespFlux_plus,        &
+                                                          use_photodamage,       HetRespFlux_plus,        &
                        REcoMDataPath,                     restore_alkalinity,    useRivers,  useErosion,  &
                        NitrogenSS,                        useAeolianN,           firstyearoffesomcycle,   &
                        lastyearoffesomcycle,              numofCO2cycles,        currentCO2cycle,         &
@@ -360,14 +369,11 @@ module recom_config
                       d_co2_phy, d_co2_dia, d_co2_cocco, d_co2_calc
 !!------------------------------------------------------------------------------
 !! *** Iron ***
-!! only Fe2C or Fe2N is used, but I am not allowed to introduce an if-statement here
-  Real(kind=8)                 :: Fe2N           = 0.033d0       ! Fe2C * 6.625
-  Real(kind=8)                 :: Fe2N_benthos   = 0.15d0        ! test, default was 0.14 Fe2C_benthos * 6.625 - will have to be tuned. [umol/m2/day]
-  Real(kind=8)                 :: Fe2C           = 0.005d0
-  Real(kind=8)                 :: Fe2C_benthos   = 0.02125       !0.68d0/32.d0       ! [umol/m2/day]
+  Real(kind=8)                 :: Fe2N           = 0.033d0       ! Fe2C * 6.625 (Fe2C = 0.005d0)
+  Real(kind=8)                 :: Fe2N_benthos   = 0.15d0        ! default was 0.14 Fe2C_benthos (=0.02125=0.68d0/32.d0) * 6.625 - will have to be tuned. [umol/m2/day]
   Real(kind=8)                 :: kScavFe        = 0.07d0
   Real(kind=8)                 :: dust_sol       = 0.02d0        !Dissolution of Dust for bioavaliable
-  namelist /pairon/ Fe2N, Fe2N_benthos, Fe2C, Fe2C_benthos, kScavFe, dust_sol
+  namelist /pairon/ Fe2N, Fe2N_benthos, kScavFe, dust_sol
 !!------------------------------------------------------------------------------
 !! *** Calcification ***
   Real(kind=8)                 :: calc_prod_ratio = 0.02d0
@@ -581,6 +587,18 @@ Module REcoM_declarations
 !! *** Diagnostics  ***
   Real(kind=8)  :: recipbiostep                         ! 1/number of steps per recom cycle
   Real(kind=8),allocatable,dimension(:,:) :: Diags3Dloc
+  Real(kind=8)  :: locNPPn, locGPPn, locNNAn, locChldegn
+  Real(kind=8)  :: locNPPd, locGPPd, locNNAd, locChldegd
+  Real(kind=8)  :: locNPPc, locGPPc, locNNAc, locChldegc
+  Real(kind=8),allocatable,dimension(:) :: vertNPPn, vertGPPn, vertNNAn, vertChldegn
+  Real(kind=8),allocatable,dimension(:) :: vertNPPd, vertGPPd, vertNNAd, vertChldegd
+  Real(kind=8),allocatable,dimension(:) :: vertNPPc, vertGPPc, vertNNAc, vertChldegc
+  Real(kind=8),allocatable,dimension(:) :: vertgrazmeso_tot, vertgrazmeso_n, vertgrazmeso_d, vertgrazmeso_c
+  Real(kind=8),allocatable,dimension(:) :: vertrespmeso, vertrespmacro, vertrespmicro
+  Real(kind=8),allocatable,dimension(:) :: vertcalcdiss, vertcalcif
+  Real(kind=8),allocatable,dimension(:) :: vertaggn, vertaggd, vertaggc
+  Real(kind=8),allocatable,dimension(:) :: vertdocexn, vertdocexd, vertdocexc
+  Real(kind=8),allocatable,dimension(:) :: vertrespn, vertrespd, vertrespc
 !!------------------------------------------------------------------------------                                                                                
 !! *** Benthos  ***
   Real(kind=8),allocatable,dimension(:) :: decayBenthos ! [1/day] Decay rate of detritus in the benthic layer
@@ -656,7 +674,41 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:,:)   :: GlowFluxCocco  ! 
 
   Real(kind=8),allocatable,dimension(:,:)   :: diags2D          ! Diagnostics in 2D [8 n2d]
-  Real(kind=8),allocatable,dimension(:,:,:) :: diags3D          ! Diagnostics in 3D [2 nl-1 n2d]
+!  Real(kind=8),allocatable,dimension(:,:,:) :: diags3D          ! Diagnostics in 3D [2 nl-1 n2d]
+  Real(kind=8),allocatable,dimension(:)     :: NPPn
+  Real(kind=8),allocatable,dimension(:)     :: NPPd
+  Real(kind=8),allocatable,dimension(:)     :: GPPn
+  Real(kind=8),allocatable,dimension(:)     :: GPPd
+  Real(kind=8),allocatable,dimension(:)     :: NNAn
+  Real(kind=8),allocatable,dimension(:)     :: NNAd
+  Real(kind=8),allocatable,dimension(:)     :: Chldegn
+  Real(kind=8),allocatable,dimension(:)     :: Chldegd
+  Real(kind=8),allocatable,dimension(:)     :: NPPc
+  Real(kind=8),allocatable,dimension(:)     :: GPPc
+  Real(kind=8),allocatable,dimension(:)     :: NNAc
+  Real(kind=8),allocatable,dimension(:)     :: Chldegc
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_tot
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_n
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_d
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_c
+  Real(kind=8),allocatable,dimension(:,:)   :: respmeso
+  Real(kind=8),allocatable,dimension(:,:)   :: respmacro
+  Real(kind=8),allocatable,dimension(:,:)   :: respmicro
+  Real(kind=8),allocatable,dimension(:,:)   :: calcdiss
+  Real(kind=8),allocatable,dimension(:,:)   :: calcif
+  Real(kind=8),allocatable,dimension(:,:)   :: aggn
+  Real(kind=8),allocatable,dimension(:,:)   :: aggd
+  Real(kind=8),allocatable,dimension(:,:)   :: aggc
+  Real(kind=8),allocatable,dimension(:,:)   :: docexn
+  Real(kind=8),allocatable,dimension(:,:)   :: docexd
+  Real(kind=8),allocatable,dimension(:,:)   :: docexc
+  Real(kind=8),allocatable,dimension(:,:)   :: respn
+  Real(kind=8),allocatable,dimension(:,:)   :: respd
+  Real(kind=8),allocatable,dimension(:,:)   :: respc
+  Real(kind=8),allocatable,dimension(:,:)   :: NPPn3D
+  Real(kind=8),allocatable,dimension(:,:)   :: NPPd3D
+  Real(kind=8),allocatable,dimension(:,:)   :: NPPc3D
+
   Real(kind=8),allocatable,dimension(:)     :: DenitBen         ! Benthic denitrification Field in 2D [n2d 1]
 
   Real(kind=8), allocatable,dimension(:)    :: Alk_surf         ! Surface alkalinity field used for restoring

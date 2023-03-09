@@ -11,9 +11,7 @@ recom_logfile_outfreq = 2700       !in recom logfile info. output frequency, # s
 &pavariables
 use_REcoM             =.true.
 REcoM_restart         =.true.
-recom_binary_write    =.false.      ! Determines if tracervalue snapshots are saved. For fine grids it may crash the model to set this to true
 
-recom_binary_init     = .false.     ! Restart from binary
 bgc_num               = 28 !24 !38
 diags3d_num           = 8           ! Number of diagnostic 3d tracers to be saved
 VDet                  = 20.d0       ! Sinking velocity, constant through the water column and positive downwards
@@ -27,7 +25,6 @@ REcoM_Grazing_Variable_Preference = .true. ! Decides if grazing should have pref
 REcoM_Second_Zoo      = .true.     ! Decides second zooplankton or no 
 Grazing_detritus      = .true.
 zoo2_fecal_loss       = .true.
-zoo2_initial_field    = .false.
 het_resp_noredfield   = .true.    ! Decides respiratation of copepod group
 diatom_mucus          = .true.    ! Decides nutrient limitation effect on aggregation
 Graz_pref_new         = .true.    ! If it is true Fasham 1990, if not recom original variable preference
@@ -36,7 +33,6 @@ constant_CO2          = .true.
 UseFeDust             = .true.      ! Turns dust input of iron off when set to.false.
 UseDustClim           = .true.
 UseDustClimAlbani     = .true.     ! Use Albani dustclim field (If it is false Mahowald will be used)
-use_Fe2N              = .true.      ! use Fe2N instead of Fe2C, as in MITgcm version
 use_photodamage       = .true.      ! use Alvarez et al (2018) for chlorophyll degradation
 HetRespFlux_plus      = .true.      !MB More stable computation of zooplankton respiration fluxes adding a small number to HetN
 REcoMDataPath         = '/work/ollie/ogurses/input/mesh_CORE2_finaltopo_mean/' !'/work/ollie/projects/MarESys/forcing/CORE2mesh/'
@@ -218,8 +214,6 @@ lossC_z2              = 0.02d0
 &pairon
 Fe2N                  = 0.033d0     ! Fe2C * 6.625
 Fe2N_benthos          = 0.15d0      ! test, default was 0.14 Fe2C_benthos * 6.625 - will have to be tuned. [umol/m2/day]
-Fe2C                  = 0.005d0
-Fe2C_benthos          = 0.02125     ! 0.68d0/32.d0 ! [umol/m2/day]
 kScavFe               = 0.07d0
 dust_sol              = 0.02d0      ! Dissolution of Dust for bioavaliable
 /

@@ -139,8 +139,10 @@ subroutine solve_tracers_ale(mesh)
     use Toy_Channel_Soufflet
     use adv_tracers_ale_interface
     use diff_tracers_ale_interface
+#if defined(__recom)
     use REcom_config, only: ciso     ! to calculation radioactive decay of 14C
     use REcoM_ciso, only: lambda_14  ! decay constant of 14C
+#endif
     
     implicit none
     type(t_mesh), intent(in) , target :: mesh
@@ -289,13 +291,13 @@ subroutine diff_tracers_ale(tr_num, mesh)
     use diff_ver_part_redi_expl_interface
     use diff_ver_part_impl_ale_interface
     use diff_part_bh_interface
+#if defined(__recom)
     use diff_ver_recom_expl_interface
     use ver_sinking_recom_benthos_interface
-#if defined(__recom)
     USE REcoM_GloVar
     use recom_config !, recom_debug
     use g_comm_auto
-use g_support
+    use g_support
 #endif
     implicit none
     
@@ -869,10 +871,10 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         
     end do ! --> do n=1,myDim_nod2D   
 end subroutine diff_ver_part_impl_ale
-
 !
 !
 !===============================================================================
+#if defined(__recom)
 subroutine ver_sinking_recom_benthos(tr_num,mesh)
     use o_ARRAYS
     use g_PARSUP
@@ -883,12 +885,12 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
     USE O_MESH
     use g_forcing_arrays
     use g_support
-use ver_sinking_recom_benthos_interface
-#if defined(__recom)
+!  Nit needed OG
+    use ver_sinking_recom_benthos_interface
     USE REcoM_GloVar
     use recom_config !, recom_debug
     use g_support
-#endif
+
     IMPLICIT NONE
     type(t_mesh), intent(in) , target  :: mesh
     integer                   :: elem,k, tr_num
@@ -1043,11 +1045,11 @@ subroutine diff_ver_recom_expl(tr_num,mesh)
     use g_comm_auto
     USE O_MESH
     use g_forcing_arrays
-use diff_ver_recom_expl_interface
-#if defined(__recom)
+!#if defined(__recom)
+    use diff_ver_recom_expl_interface
     USE REcoM_GloVar
     use recom_config !, recom_debug
-#endif
+!#endif
     IMPLICIT NONE
     type(t_mesh), intent(in) , target :: mesh
     integer                  :: elem,k,tr_num
@@ -1071,11 +1073,7 @@ id = tracer_id(tr_num)
     CASE (1018)
       bottom_flux = GlodecayBenthos(:,3) !*** Si ***
     CASE (1019)
-      if(use_Fe2N) then 
         bottom_flux = GlodecayBenthos(:,1) * Fe2N_benthos !*** DFe ***
-      else
-        bottom_flux = GlodecayBenthos(:,2) * Fe2C_benthos
-      end if
     CASE (1022)
       bottom_flux = -GlodecayBenthos(:,2) * redO2C !*** O2 ***
     CASE (1033)
@@ -1122,6 +1120,7 @@ id = tracer_id(tr_num)
         end do
     end do
 end subroutine diff_ver_recom_expl
+#endif
 !
 !
 !===============================================================================
@@ -1424,10 +1423,10 @@ FUNCTION bc_surface(n, id, mesh)
   USE g_PARSUP, only: mype, par_ex
   USE g_config
 #if defined(__recom)
-USE REcoM_GloVar
-use recom_config, only: ciso, recom_debug
-use REcoM_declarations
-use REcoM_ciso
+  USE REcoM_GloVar
+  use recom_config, only: ciso, recom_debug
+  use REcoM_declarations
+  use REcoM_ciso
 #endif
 
   implicit none

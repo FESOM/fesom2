@@ -85,11 +85,11 @@ subroutine recom_sinking_new(tr_num,mesh)
 
     elseif(tracer_id(tr_num)==1020) then   !iphycal
        
-            if (use_coccos) then                              ! NEW switch
+#if defined (__coccos)
                Vsink = VCocco
-            else
+#else
                Vsink = VPhy
-            endif
+#endif
             
     elseif(tracer_id(tr_num)==1025 .or. &  !idetz2n
          tracer_id(tr_num)==1026 .or. &  !idetz2c

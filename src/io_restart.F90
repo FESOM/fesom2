@@ -87,6 +87,7 @@ subroutine ini_ocean_io(year, mesh)
   integer, intent(in)       :: year
   integer                   :: ncid, j
   integer                   :: varid
+  integer                   :: end_num_tracers
   character(500)            :: longname
   character(500)            :: filename
   character(500)            :: trname, units
@@ -98,6 +99,11 @@ subroutine ini_ocean_io(year, mesh)
   write(cyear,'(i4)') year
   ! create an ocean restart file; serial output implemented so far
   oid%filename=trim(ResultPath)//trim(runid)//'.'//cyear//'.oce.restart.nc'
+   
+!#if defined (__recom)
+!  if (use_REcoM .and. .not. REcoM_restart .and. oid%is_in_use == .false. ) num_tracers = num_tracers - bgc_num  ! recom is off
+!#endif
+
   if (oid%is_in_use) return
   oid%is_in_use=.true.
   call def_dim(oid, 'node', nod2d)
@@ -134,8 +140,12 @@ subroutine ini_ocean_io(year, mesh)
         call def_variable(oid, 'uke',      (/nl-1, elem2D/), 'unresolved kinetic energy', 'm2/s2', uke(:,:));
         call def_variable(oid, 'uke_rhs',  (/nl-1, elem2D/), 'unresolved kinetic energy rhs', 'm2/s2', uke_rhs(:,:));
   endif
-  
-  do j=1,num_tracers
+#if defined(__recom)
+  if (use_REcoM) then
+      end_num_tracers = num_tracers - bgc_num 
+  end if
+#endif
+  do j=1,end_num_tracers !num_tracers
      SELECT CASE (j) 
        CASE(1)
          trname='temp'
@@ -146,11 +156,15 @@ subroutine ini_ocean_io(year, mesh)
          longname='salinity'
          units='psu'
        CASE DEFAULT
+#if defined(__recom)
+       if (.not. use_REcoM) then
 !         write(trname,'(A3,i1)') 'tra_', j
 !         write(longname,'(A15,i1)') 'passive tracer ', j
   	 write(trname,'(A3,i4.4)') 'tra', j		 ! OG i1 -> i4
          write(longname,'(A15,i4.4)') 'passive tracer ', j
          units='none'
+      end if 
+#endif
      END SELECT
      call def_variable(oid, trim(trname),       (/nl-1, nod2D/), trim(longname), trim(units), tr_arr(:,:,j));
      longname=trim(longname)//', Adams–Bashforth'
@@ -241,6 +255,16 @@ subroutine ini_bio_io(year, mesh)
     call def_variable(bid, 'BenCalc_13',    (/nod2D/), 'Benthos Calcite-13',  'mmol/m3',   Benthos(:,7)); 
     call def_variable(bid, 'BenCalc_14',    (/nod2D/), 'Benthos Calcite-14',  'mmol/m3',   Benthos(:,8)); 
   end if
+  !___Define the netCDF variables for 3D fields_______________________________
+
+  do j=num_tracers-bgc_num,num_tracers
+  	 write(trname,'(A3,i4.4)') 'tra', j		 ! OG i1 -> i4
+         write(longname,'(A15,i4.4)') 'passive tracer ', j
+         units='none'
+     call def_variable(oid, trim(trname),       (/nl-1, nod2D/), trim(longname), trim(units), tr_arr(:,:,j));  ! I use oid to write into restart.oce.nc OG
+     longname=trim(longname)//', Adams–Bashforth'
+     call def_variable(oid, trim(trname)//'_AB',(/nl-1, nod2D/), trim(longname), trim(units), tr_arr_old(:,:,j));
+  end do
 end subroutine ini_bio_io
 #endif
 !
@@ -265,48 +289,47 @@ subroutine restart(istep, l_write, l_read, mesh)
 
   ctime=timeold+(dayold-1.)*86400
   if (.not. l_read) then
-               call ini_ocean_io(yearnew, mesh)
-  if (use_ice) call ini_ice_io  (yearnew, mesh)
+                         call ini_ocean_io(yearnew, mesh)
+      if (use_ice)       call ini_ice_io  (yearnew, mesh)
 #if defined(__recom)
-  if (use_REcoM) then
-               call ini_bio_io  (yearnew, mesh)
-  end if 
+!      if (mype==0) write(*,*) 'restart file for year: ', yearnew
+      if (use_REcoM)     call ini_bio_io  (yearnew, mesh)
 #endif
 #if defined(__icepack)
-  if (use_ice) call init_restart_icepack(yearnew, mesh)
+      if (use_ice)       call init_restart_icepack(yearnew, mesh)
 #endif
   else
-               call ini_ocean_io(yearold, mesh)
-  if (use_ice) call ini_ice_io  (yearold, mesh)
-#if defined(__recom)
-  if (REcoM_restart) then
-               call ini_bio_io(yearold, mesh)
-  end if 
-#endif
-#if defined(__icepack)
-  if (use_ice) call init_restart_icepack(yearold, mesh)
-#endif
-  end if
+                         call ini_ocean_io(yearold, mesh)
+      if (use_ice)       call ini_ice_io  (yearold, mesh)
 
-  if (l_read) then
-   call assoc_ids(oid);          call was_error(oid)
-   call read_restart(oid, mesh); call was_error(oid)
-   if (use_ice) then
-      call assoc_ids(iid);          call was_error(iid)
-      call read_restart(iid, mesh); call was_error(iid)
-#if defined(__icepack)
-      call assoc_ids(ip_id);          call was_error(ip_id)
-      call read_restart(ip_id, mesh); call was_error(ip_id)
+#if defined(__recom)
+!      if (mype==0) write(*,*) 'restart file for year: ', yearold
+      if (REcoM_restart) call ini_bio_io(yearold, mesh)
 #endif
-    end if
+#if defined(__icepack)
+      if (use_ice)       call init_restart_icepack(yearold, mesh)
+#endif
+
+  end if
+  if (l_read) then
+      call assoc_ids(oid);          call was_error(oid)
+      call read_restart(oid, mesh); call was_error(oid)
+      if (use_ice) then
+          call assoc_ids(iid);          call was_error(iid)
+          call read_restart(iid, mesh); call was_error(iid)
+#if defined(__icepack)
+          call assoc_ids(ip_id);          call was_error(ip_id)
+          call read_restart(ip_id, mesh); call was_error(ip_id)
+#endif
+      end if
 #if defined(__recom)
 !RECOM restart
 !read here
-if(mype==0)  write(*,*) 'REcoM_restart= ',REcoM_restart 
-   if (REcoM_restart) then
-      call assoc_ids(bid);          call was_error(bid)
-      call read_restart(bid, mesh); call was_error(bid)
-   end if 
+      if(mype==0)  write(*,*) 'REcoM_restart= ',REcoM_restart 
+      if (REcoM_restart) then
+          call assoc_ids(bid);          call was_error(bid)
+          call read_restart(bid, mesh); call was_error(bid)
+      end if 
 #endif
   end if
 

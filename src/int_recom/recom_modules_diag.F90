@@ -17,8 +17,8 @@ module recom_diag
   use o_mixing_KPP_mod
   use g_rotate_grid
   use g_support
-  use REcoM_GloVar
   use io_mesh_info
+  use REcoM_GloVar
   use recom_config
 
   implicit none

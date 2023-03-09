@@ -84,13 +84,16 @@ subroutine recom_init(mesh)
     allocate(wFluxPhy(benthos_num))     ! [mmol/(m2 * day)] Flux of N,C, calc and chl through sinking of phytoplankton
     allocate(wFluxDia(benthos_num))     ! [mmol/(m2 * day)] Flux of N,C, Si and chl through sinking of diatoms 	
 
-if (REcoM_Second_Zoo) then
+!if (REcoM_Second_Zoo) then
+#if defined (__3Zoo2Det)
     allocate(GlowFluxDet(node_size,benthos_num*2))
     allocate(wFluxDet(benthos_num*2))     ! [mmol/(m2 * day)] Flux of N,C,Si and calc through sinking of detritus
-else
+#else
+!else
     allocate(GlowFluxDet(node_size,benthos_num))
     allocate(wFluxDet(benthos_num))     ! [mmol/(m2 * day)] Flux of N,C,Si and calc through sinking of detritus
-end if 
+#endif
+!end if 
     allocate(GlowFluxPhy(node_size,benthos_num))
     allocate(GlowFluxDia(node_size,benthos_num))
 
@@ -165,8 +168,78 @@ end if
     if (Diags) then
         allocate(diags2D(node_size,12))   ! NEW  (8 -> 12 added 3rd zoo and ballasting)
         diags2D(:,:)      = 0.d0
-        allocate(diags3D(nl-1,node_size,diags3d_num))
-        diags3D(:,:,:)      = 0.d0
+!        allocate(diags3D(nl-1,node_size,diags3d_num))
+!        diags3D(:,:,:)      = 0.d0
+
+!--- Allocate 2D diagnostics
+  allocate(NPPn(node_size))
+  NPPn = 0.d0
+  allocate(NPPd(node_size))
+  NPPd = 0.d0
+  allocate(GPPn(node_size))
+  GPPn = 0.d0
+  allocate(GPPd(node_size))
+  GPPd = 0.d0
+  allocate(NNAn(node_size))
+  NNAn = 0.d0
+  allocate(NNAd(node_size))
+  NNAd = 0.d0
+  allocate(Chldegn(node_size))
+  Chldegn = 0.d0
+  allocate(Chldegd(node_size))
+  Chldegd = 0.d0
+  allocate(NPPc(node_size))
+  NPPc = 0.d0
+  allocate(GPPc(node_size))
+  GPPc = 0.d0
+  allocate(NNAc(node_size))
+  NNAc = 0.d0
+  allocate(Chldegc(node_size))
+  Chldegc = 0.d0
+!--- Allocate 3D diagnostics
+  allocate(grazmeso_tot(nl-1,node_size))
+  grazmeso_tot(:,:) = 0.d0
+  allocate(grazmeso_n(nl-1,node_size))
+  grazmeso_n(:,:) = 0.d0
+  allocate(grazmeso_d(nl-1,node_size))
+  grazmeso_d(:,:) = 0.d0
+  allocate(grazmeso_c(nl-1,node_size))
+  grazmeso_c(:,:) = 0.d0
+  allocate(respmeso(nl-1,node_size))
+  respmeso(:,:) = 0.d0
+  allocate(respmacro(nl-1,node_size))
+  respmacro(:,:) = 0.d0
+  allocate(respmicro(nl-1,node_size))
+  respmicro(:,:) = 0.d0
+  allocate(calcdiss(nl-1,node_size))
+  calcdiss(:,:) = 0.d0
+  allocate(calcif(nl-1,node_size))
+  calcif(:,:) = 0.d0
+  allocate(aggn(nl-1,node_size))
+  aggn(:,:) = 0.d0
+  allocate(aggd(nl-1,node_size))
+  aggd(:,:) = 0.d0
+  allocate(aggc(nl-1,node_size))
+  aggc(:,:) = 0.d0
+  allocate(docexn(nl-1,node_size))
+  docexn(:,:) = 0.d0
+  allocate(docexd(nl-1,node_size))
+  docexd(:,:) = 0.d0
+  allocate(docexc(nl-1,node_size))
+  docexc(:,:) = 0.d0
+  allocate(respn(nl-1,node_size))
+  respn(:,:) = 0.d0
+  allocate(respd(nl-1,node_size))
+  respd(:,:) = 0.d0
+  allocate(respc(nl-1,node_size))
+  respc(:,:) = 0.d0
+  allocate(NPPn3D(nl-1,node_size))
+  NPPn3D(:,:) = 0.d0
+  allocate(NPPd3D(nl-1,node_size))
+  NPPd3D(:,:) = 0.d0
+  allocate(NPPc3D(nl-1,node_size))
+  NPPc3D(:,:) = 0.d0
+
     end if  
 
     allocate(CO23D(nl-1,node_size))                   !NEW MOCSY
@@ -307,34 +380,41 @@ end if
 !!#endif
     !tr_arr(:,:,24)                        ! tracer 24 = Oxy     ! read from the file
 
-    if (REcoM_Second_Zoo) then
+!    if (REcoM_Second_Zoo) then
+#if defined (__3Zoo2Det)
        tr_arr(:,:,25) = tiny                   ! tracer 25 = Zoo2N
        tr_arr(:,:,26) = tiny * Redfield        ! tracer 26 = Zoo2C
        tr_arr(:,:,27) = tiny                   ! tracer 26 = DetZ2N                              
        tr_arr(:,:,28) = tiny                   ! tracer 27 = DetZ2C                                    
        tr_arr(:,:,29) = tiny                   ! tracer 28 = DetZ2Si                            
        tr_arr(:,:,30) = tiny                   ! tracer 29 = DetZ2Calc 
-    endif
+#endif
+!    else
+!       tr_arr(:,:,25) = 0.d0  
+!       tr_arr(:,:,26) = 0.d0 
+!       tr_arr(:,:,27) = 0.d0                     
+!       tr_arr(:,:,28) = 0.d0                         
+!       tr_arr(:,:,29) = 0.d0                      
+!       tr_arr(:,:,30) = 0.d0
+!    endif
 
    ! NEW: Attention with the flags use_coccos and use_third_zoo: they only work without cisco!!
 
-    if (use_coccos) then    ! NEW switch
+#if defined (__coccos)
        tr_arr(:,:,31) = tiny_chl/chl2N_max        ! tiny             ! tracer 29 = CoccoN    ! NEW, changed from tracer to tr_arr
        tr_arr(:,:,32) = tiny_chl/chl2N_max/NCmax  ! tiny * Redfield  ! tracer 30 = CoccoC    ! NEW
        tr_arr(:,:,33) = tiny_chl                  ! tiny * 1.56d0    ! tracer 31 = CoccoChl  ! NEW
-    else
-       tr_arr(:,:,31) = 0.d0
-       tr_arr(:,:,32) = 0.d0
-       tr_arr(:,:,33) = 0.d0
-    endif
+#endif
 
-    if (REcoM_Third_Zoo) then                     ! NEW 3Zoo
+!    if (REcoM_Third_Zoo) then                     ! NEW 3Zoo
+#if defined (__3Zoo2Det)
        tr_arr(:,:,34) = tiny                      ! tracer 32 = Zoo3N
        tr_arr(:,:,35) = tiny * Redfield           ! tracer 33 = Zoo3C
-    else
-       tr_arr(:,:,34) = 0.d0
-       tr_arr(:,:,35) = 0.d0
-    endif
+#endif
+!    else
+!       tr_arr(:,:,34) = 0.d0
+!       tr_arr(:,:,35) = 0.d0
+!    endif
 
 if (ciso) then
    tr_arr(:,:,27) = (1. + 0.001 * (2.3 - 0.06 * tr_arr(:,:,3))) * tr_arr(:,:,4) ! DIC_13, GLODAP2 > 500 m 
