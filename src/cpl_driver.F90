@@ -461,7 +461,7 @@ contains
 
 
     DEALLOCATE(all_x_coords, all_y_coords, my_x_coords, my_y_coords) 
-    DEALLOCATE(all_x_corners, all_y_corners, my_x_corners, my_y_corners) 
+    DEALLOCATE(all_x_corners, all_y_corners, my_x_corners, my_y_corners, angle) 
 !------------------------------------------------------------------
 ! 3rd Declare the transient variables
 !------------------------------------------------------------------
