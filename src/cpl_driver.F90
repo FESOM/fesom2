@@ -219,6 +219,7 @@ contains
     integer                    :: rmax
 
     integer,allocatable        :: unstr_mask(:,:)
+    real(kind=WP)              :: temp                  ! temp storage for corner sorting
     real(kind=WP)              :: this_x_coord          ! longitude coordinates
     real(kind=WP)              :: this_y_coord          ! latitude coordinates
     real(kind=WP)              :: this_x_corners        ! longitude node corners
@@ -228,6 +229,7 @@ contains
     !
     real(kind=WP), allocatable :: my_x_coords(:)     ! longitude coordinates
     real(kind=WP), allocatable :: my_y_coords(:)     ! latitude  coordinates
+    real(kind=WP), allocatable :: angle(:,:)         ! array for holding corner angle for sorting
     real(kind=WP), allocatable :: my_x_corners(:,:)     ! longitude node corners
     real(kind=WP), allocatable :: my_y_corners(:,:)     ! latitude node corners
 
@@ -314,18 +316,21 @@ contains
        print *, 'FESOM commRank def_partition failed'
        call oasis_abort(comp_id, 'cpl_oasis3mct_define_unstr', 'def_partition failed')
     endif
+
       
     ALLOCATE(my_x_coords(my_number_of_points))
     ALLOCATE(my_y_coords(my_number_of_points))
-    ALLOCATE(my_x_corners(my_number_of_points,rmax))
-    ALLOCATE(my_y_corners(my_number_of_points,rmax))
-
 
     do i = 1, my_number_of_points
       this_x_coord = coord_nod2D(1, i)
       this_y_coord = coord_nod2D(2, i)
       call r2g(my_x_coords(i), my_y_coords(i), this_x_coord, this_y_coord)
     end do   
+
+
+    ALLOCATE(angle(my_number_of_points,rmax))
+    ALLOCATE(my_x_corners(my_number_of_points,rmax))
+    ALLOCATE(my_y_corners(my_number_of_points,rmax))
 
     ! We can have a variable number of corner points
     ! Luckly oasis can deal with that by just repeating the last one
@@ -338,11 +343,36 @@ contains
           my_x_corners(i,j) = x_corners(i,j)
           my_y_corners(i,j) = y_corners(i,j)
         end if
+        ! To sort the corners counterclockwise we calculate the
+        ! arctangent to the center 
+        angle(i,j) = atan2(my_x_corners(i,j)*rad - my_x_coords(i), my_y_corners(i,j)*rad - my_y_coords(i))
+        print *, 'angles',i,j,my_x_corners(i,j)*rad,my_x_coords(i),my_y_corners(i,j)*rad,my_y_coords(i),angle(i,j)
+      end do
+      do l = 1, rmax-1
+        do m = l+1, rmax
+          if (angle(i,l) < angle(i,m)) then
+            print *, 'swaping, m and l', m,l,my_x_corners(i,m),my_x_corners(i,l)
+            ! Swap angle
+            temp = angle(i,m)
+            angle(i,m) = angle(i,l)
+            angle(i,l) = temp
+            ! Swap lon
+            temp = my_x_corners(i,m)
+            my_x_corners(i,m) = my_x_corners(i,l)
+            my_x_corners(i,l) = temp
+            ! Swap lat
+            temp = my_y_corners(i,m)
+            my_y_corners(i,m) = my_y_corners(i,l)
+            my_y_corners(i,l) = temp
+          end if
+        end do
       end do
     end do   
 
+
     my_x_coords=my_x_coords/rad
     my_y_coords=my_y_coords/rad
+
     
     if (mype .eq. localroot) then
       ALLOCATE(all_x_coords(number_of_all_points, 1))
