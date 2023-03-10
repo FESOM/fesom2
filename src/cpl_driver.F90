@@ -346,12 +346,10 @@ contains
         ! To sort the corners counterclockwise we calculate the
         ! arctangent to the center 
         angle(i,j) = atan2(my_x_corners(i,j)*rad - my_x_coords(i), my_y_corners(i,j)*rad - my_y_coords(i))
-        print *, 'angles',i,j,my_x_corners(i,j)*rad,my_x_coords(i),my_y_corners(i,j)*rad,my_y_coords(i),angle(i,j)
       end do
       do l = 1, rmax-1
         do m = l+1, rmax
           if (angle(i,l) < angle(i,m)) then
-            print *, 'swaping, m and l', m,l,my_x_corners(i,m),my_x_corners(i,l)
             ! Swap angle
             temp = angle(i,m)
             angle(i,m) = angle(i,l)
