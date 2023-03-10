@@ -526,7 +526,7 @@ CASE ('grazmeso_d     ')
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmeso_d','Grazing of mesozooplankton on diatoms', 'mmolC/(m2*d)', grazmeso_d(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
    endif
 CASE ('grazmeso_c     ')
-   if (use_REcoM .and. use_coccos) then
+   if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmeso_c','Grazing of mesozooplankton on coccolithophores', 'mmolC/(m2*d)', grazmeso_c(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
    endif
 CASE ('respmeso       ')
@@ -558,7 +558,7 @@ CASE ('aggd           ')
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'aggd','Aggregation of diatoms', 'mmolC/(m2*d)', aggd(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
    endif
 CASE ('aggc           ')
-   if (use_REcoM .and. use_coccos) then
+   if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'aggc','Aggregation of coccolithophores', 'mmolC/(m2*d)', aggc(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
    endif
 CASE ('docexn         ')
@@ -570,7 +570,7 @@ CASE ('docexd         ')
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'docexd','DOC excretion by diatoms', 'mmolC/(m2*d)', docexd(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
    endif
 CASE ('docexc         ')
-   if (use_REcoM .and. use_coccos) then
+   if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'docexc','DOC excretion by coccolithophores', 'mmolC/(m2*d)', docexc(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
    endif
 CASE ('respn          ')
@@ -582,7 +582,7 @@ CASE ('respd          ')
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'respd','Respiration by diatoms', 'mmolC/(m2*d)', respd(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
    endif
 CASE ('respc          ')
-   if (use_REcoM .and. use_coccos) then
+   if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'respc','Respiration by coccolithophores', 'mmolC/(m2*d)', respc(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
    endif
 CASE ('NPPn3D         ')
@@ -594,7 +594,7 @@ CASE ('NPPd3D         ')
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPd3D','Net primary production of diatoms', 'mmolC/(m2*d)', NPPd3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
    endif
 CASE ('NPPc3D         ')
-   if (use_REcoM .and. use_coccos) then
+   if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPc3D','Net primary production of coccolithophores', 'mmolC/(m2*d)', NPPc3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
    endif
 

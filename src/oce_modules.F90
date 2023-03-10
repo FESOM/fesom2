@@ -236,6 +236,15 @@ real(kind=WP), allocatable         :: heat_flux(:), Tsurf(:)
 real(kind=WP), allocatable         :: heat_flux_in(:) !to keep the unmodified (by SW penetration etc.) heat flux 
 real(kind=WP), allocatable         :: S_rhs(:,:)
 real(kind=WP), allocatable         :: tr_arr(:,:,:),tr_arr_old(:,:,:)
+
+! kh 22.11.21
+integer                            :: request_count
+integer, allocatable               :: tr_arr_requests(:), tr_arr_old_requests(:)
+
+! kh 28.03.22
+integer, allocatable               :: SinkFlx_tr_requests(:)
+integer, allocatable               :: Benthos_tr_requests(:)
+
 real(kind=WP), allocatable         :: del_ttf(:,:)
 real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:) !!PS ,del_ttf_diff(:,:)
 

@@ -26,7 +26,7 @@ subroutine recom_sinking_new(tr_num,mesh)
   type(t_mesh), intent(in) , target :: mesh
 
   Integer                           :: node, nz,  id, nzmin, nzmax, n,  tr_num, k, nlevels_nod2D_minimum
-  Real(kind=8)                      :: wflux(mesh%nl)      ! NEW BALL
+  Real(kind=8)                      :: wflux(mesh%nl)      ! BALL
   Real(kind=WP)                     :: vd_flux(mesh%nl)
   Real(kind=8)                      :: dz_trr(mesh%nl), aux
   Real(kind=8)                      :: wLoc,wM,wPs
@@ -34,7 +34,7 @@ subroutine recom_sinking_new(tr_num,mesh)
 
   Real(kind=8)                      :: cfl, d0, d1, thetaP, thetaM, psiP, psiM
   Real(kind=8)                      :: onesixth	= 	1.d0/6.d0
-  Real(kind=8)                      :: dt_sink, c1, c2     ! NEW BALL added dt_sink
+  Real(kind=8)                      :: dt_sink, c1, c2     ! BALL added dt_sink
   Real(kind=8)                      :: Vsink, tv
   Real(kind=8),dimension(mesh%nl)   :: Wvel_flux
 
@@ -319,13 +319,14 @@ subroutine ballast(tr_num,mesh)
                        scaling_density1_3D(k,row) = (rho_particle1(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
                     endif 
                  endif
-                 if (REcoM_Second_Zoo) then
+#if defined (__3Zoo2Det)
+
                     if (tracer_id(tr_num)==1026)then
                        if (tr_arr(k,row,tr_num)>0.001) then ! only apply ballasting above a certain biomass
                           scaling_density2_3D(k,row) = (rho_particle2(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
                        endif 
                     endif
-                 endif
+#endif
               endif
            !end do
 
@@ -348,8 +349,9 @@ subroutine ballast(tr_num,mesh)
     ! in the unlikely (if possible at all...) case that rho_particle(k)-rho_seawater(1)<0, prevent the scaling factor from being negative
 
     if (any(scaling_density1_3D(:,:) <= tiny)) scaling_density1_3D(:,:) = 1.0_WP      ! tiny = 2.23D-16
-    if (REcoM_Second_Zoo .and. any(scaling_density2_3D(:,:) <= tiny)) scaling_density2_3D(:,:) = 1.0_WP      ! tiny = 2.23D-16    
-
+#if defined (__3Zoo2Det)
+    if (any(scaling_density2_3D(:,:) <= tiny)) scaling_density2_3D(:,:) = 1.0_WP      ! tiny = 2.23D-16    
+#endif
 end subroutine ballast
 !-------------------------------------------------------------------------------  
 ! Subroutine calculate density of particle 
@@ -414,7 +416,7 @@ subroutine get_particle_density(mesh)          ! NEW BALL developed by Cara and 
      rho_particle1(nzmin:nzmax,row) = rho_CaCO3*a4(nzmin:nzmax,row) + rho_opal*a3(nzmin:nzmax,row) + rho_POC*a1(nzmin:nzmax,row) + rho_PON*a2(nzmin:nzmax,row)
   end do
 
-  if (RECoM_Second_Zoo) then
+#if defined (__3Zoo2Det)
      rho_particle2 = 0.0
      b1 = 0.0
      b2 = 0.0
@@ -439,7 +441,7 @@ subroutine get_particle_density(mesh)          ! NEW BALL developed by Cara and 
         a4(nzmin:nzmax,row)  = b4(nzmin:nzmax,row)/aux(nzmin:nzmax,row)
         rho_particle2(nzmin:nzmax,row) = rho_CaCO3*a4(nzmin:nzmax,row) + rho_opal*a3(nzmin:nzmax,row) + rho_POC*a1(nzmin:nzmax,row) + rho_PON*a2(nzmin:nzmax,row)
      end do
-  endif
+#endif
 
 end subroutine get_particle_density
 !-------------------------------------------------------------------------------   

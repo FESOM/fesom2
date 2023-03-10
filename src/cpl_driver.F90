@@ -14,6 +14,9 @@ module cpl_driver
   !
   use mod_oasis                    ! oasis module
   use g_config, only : dt
+
+  use g_config, only : num_fesom_groups ! kh 03.12.21
+
   use o_param,  only : rad
   use g_PARSUP
   implicit none
@@ -92,7 +95,9 @@ module cpl_driver
 
 contains
 
-  subroutine cpl_oasis3mct_init( localCommunicator )
+! kh 02.12.21
+!  subroutine cpl_oasis3mct_init( localCommunicator )
+  subroutine cpl_oasis3mct_init(localCommunicator, num_fesom_groups)
     implicit none
     save
 
@@ -104,6 +109,9 @@ contains
     ! Arguments
     !
     integer, intent(OUT)       :: localCommunicator
+
+! kh 02.12.21
+    integer, intent(inout)     :: num_fesom_groups
     !
     ! Local declarations
     !
@@ -125,7 +133,9 @@ contains
     !------------------------------------------------------------------
     ! 1st Initialize the OASIS3-MCT coupling system for the application
     !------------------------------------------------------------------
-    CALL oasis_init_comp(comp_id, comp_name, ierror )
+! kh 02.12.21
+!    CALL oasis_init_comp(comp_id, comp_name, ierror )
+    CALL oasis_init_comp(comp_id, comp_name, ierror, num_program_groups = num_fesom_groups)
     IF (ierror /= 0) THEN
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'Init_comp failed.')
     ENDIF
@@ -136,7 +146,9 @@ contains
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'comm_rank failed.')
     ENDIF
 
-    CALL oasis_get_localcomm( localCommunicator, ierror )
+! kh 02.12.21
+    !CALL oasis_get_localcomm( localCommunicator, ierror )
+    CALL oasis_get_localcomm_all_groups( localCommunicator, ierror )
     IF (ierror /= 0) THEN
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'get_local_comm failed.')
     ENDIF
@@ -344,30 +356,31 @@ contains
       print *, 'FESOM after Barrier'
     endif
 
-    if (mype .eq. localroot) then
-      print *, 'FESOM before start_grids_writing'
-       CALL oasis_start_grids_writing(il_flag)
-       IF (il_flag .NE. 0) THEN
+! kh 30.11.21
+    if(my_fesom_group == 0) then
+        if (mype .eq. localroot) then
+            print *, 'FESOM before start_grids_writing'
+            CALL oasis_start_grids_writing(il_flag)
+            IF (il_flag .NE. 0) THEN
 
-          print *, 'FESOM before write grid'
-          CALL oasis_write_grid (grid_name, number_of_all_points, 1, all_x_coords(:,:), all_y_coords(:,:))
+                print *, 'FESOM before write grid'
+                CALL oasis_write_grid (grid_name, number_of_all_points, 1, all_x_coords(:,:), all_y_coords(:,:))
 
-          ALLOCATE(unstr_mask(number_of_all_points, 1))
-          unstr_mask=0
-          print *, 'FESOM before write mask'
-          CALL oasis_write_mask(grid_name, number_of_all_points, 1, unstr_mask)
-          DEALLOCATE(unstr_mask)
+                ALLOCATE(unstr_mask(number_of_all_points, 1))
+                unstr_mask=0
+                print *, 'FESOM before write mask'
+                CALL oasis_write_mask(grid_name, number_of_all_points, 1, unstr_mask)
+                DEALLOCATE(unstr_mask)
 
-          print *, 'FESOM before write area'
-          CALL oasis_write_area(grid_name, number_of_all_points, 1, all_area)
+                print *, 'FESOM before write area'
+                CALL oasis_write_area(grid_name, number_of_all_points, 1, all_area)
 
-       end if
-      print *, 'FESOM before terminate_grids_writing'
-      call oasis_terminate_grids_writing()
-      print *, 'FESOM after terminate_grids_writing'
-    endif !localroot
-     
-
+            end if
+            print *, 'FESOM before terminate_grids_writing'
+            call oasis_terminate_grids_writing()
+            print *, 'FESOM after terminate_grids_writing'
+        endif !localroot
+    end if !(my_fesom_group == 0) then
 
     DEALLOCATE(all_x_coords, all_y_coords, my_x_coords, my_y_coords) 
 !------------------------------------------------------------------
@@ -607,15 +620,43 @@ contains
     endif    
 #endif
 
-    call oasis_get(recv_id(ind), seconds_til_now, exfld,info)
+
+! kh 06.12.21 the coupling is in principle as it was before, i.e. the fesom processes - in group 0 - receive their data from echam
+    if(my_fesom_group == 0) then
+        call oasis_get(recv_id(ind), seconds_til_now, exfld,info)
+    else
+
+! kh 06.12.21 defensive: assignment statement "action=(info==3 ..." below is "don't care" in this case, because the actual value for action
+! is received via MPI_Bcast anyway
+        info = 0
+
+    end if
+
     t2=MPI_Wtime()
+
  !
  ! FESOM's interpolation routine interpolates structured
  ! VarStrLoc coming from OASIS3MCT to local unstructured data_array
  ! and delivered back to FESOM.
    action=(info==3 .OR. info==10 .OR. info==11 .OR. info==12 .OR. info==13)
+
+! kh 03.12.21
+   if(num_fesom_groups > 1) then
+      call MPI_Bcast(action, 1, MPI_LOGICAL, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIerr)
+   end if
+
    if (action) then
-      data_array(1:myDim_nod2d) = exfld
+
+! kh 03.12.21
+      if(my_fesom_group == 0) then
+          data_array(1:myDim_nod2d) = exfld
+      end if
+
+! kh 03.12.21
+      if(num_fesom_groups > 1) then
+          call MPI_Bcast(data_array, myDim_nod2d, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIerr)
+      end if
+
       call exchange_nod(data_array)
    end if   
    t3=MPI_Wtime()

@@ -171,12 +171,10 @@ subroutine compute_silicate_diag(mode,mesh)
         if (mype==0 .and. mod(mstep,recom_logfile_outfreq)==0) write(*,*) 'total integral of DetSi at timestep :', mstep, valDetSi
         total_silicate=total_silicate+valDetSi
 
-!if (REcoM_Second_Zoo) then
         !Detz2Si
         call integrate_nod(tr_arr(:,:,29), valDetz2Si, mesh)
         if (mype==0 .and. mod(mstep,recom_logfile_outfreq)==0) write(*,*) 'total integral of Detz2Si at timestep :', mstep, valDetSi
         total_silicate=total_silicate+valDetz2Si
-!end if 
         !BenSi
 !        call integrate_nod(Benthos(:,3), valBenSi, mesh)
          call integrate_bottom(valBenSi,mesh)

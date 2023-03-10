@@ -218,14 +218,14 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
 !  call REcoM_sms(n, Nn, state, thick, recipthick, SurfSW, sms, Temp ,zF, PAR, mesh)
 
   call REcoM_sms(n, Nn, state, thick, recipthick, SurfSW, sms, Temp, Sali_depth &
-        , CO2_watercolumn                                              & ! NEW MOCSY [mol/m3]
-        , pH_watercolumn                                               & ! NEW MOCSY on total scale
-        , pCO2_watercolumn                                             & ! NEW MOCSY [uatm]
-        , HCO3_watercolumn                                             & ! NEW MOCSY [mol/m3]
-        , CO3_watercolumn                                              & ! NEW DISS [mol/m3]
-        , OmegaC_watercolumn                                           & ! NEW DISS calcite saturation state
-        , kspc_watercolumn                                             & ! NEW DISS stoichiometric solubility product [mol^2/kg^2]
-        , rhoSW_watercolumn                                            & ! NEW DISS in-situ density of seawater [kg/m3]
+        , CO2_watercolumn                                              & ! MOCSY [mol/m3]
+        , pH_watercolumn                                               & ! MOCSY on total scale
+        , pCO2_watercolumn                                             & ! MOCSY [uatm]
+        , HCO3_watercolumn                                             & ! MOCSY [mol/m3]
+        , CO3_watercolumn                                              & ! DISS [mol/m3]
+        , OmegaC_watercolumn                                           & ! DISS calcite saturation state
+        , kspc_watercolumn                                             & ! DISS stoichiometric solubility product [mol^2/kg^2]
+        , rhoSW_watercolumn                                            & ! DISS in-situ density of seawater [kg/m3]
         , Loc_slp & !, SinkVel
         , zF, PAR, Lond, Latd, mesh)
 
@@ -239,66 +239,66 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
   state(1:nn,idiasi) = max(tiny_Si, state(1:nn,idiasi))
 
 #if defined (__coccos)
-  state(1:nn,icchl)  = max(tiny_chl,state(1:nn,icchl))                         ! NEW
-  state(1:nn,icocn)  = max(tiny_N_c,state(1:nn,icocn))                         ! NEW
-  state(1:nn,icocc)  = max(tiny_C_c,state(1:nn,icocc))                         ! NEW
+  state(1:nn,icchl)  = max(tiny_chl,state(1:nn,icchl))
+  state(1:nn,icocn)  = max(tiny_N_c,state(1:nn,icocn))
+  state(1:nn,icocc)  = max(tiny_C_c,state(1:nn,icocc))
 #endif
 
-!  if (REcoM_Third_Zoo) then   ! NEW 3Zoo
 #if defined (__3Zoo2Det)
   state(1:nn,imiczoon)  = max(tiny,state(1:nn,imiczoon))
   state(1:nn,imiczooc)  = max(tiny,state(1:nn,imiczooc))
 #endif
-!  endif
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
+
   if (ciso) then
-!    Calculcate isotopic fractionation of 13|14C, radioactive decay of 14C is calculated in oce_ale_tracer.F90
-     kwco2  = kw660(1) * (660/scco2(REcoM_T(1)))**0.5 ! piston velocity (via mocsy)
-     co2sat = co2flux(1) / (kwco2 + tiny) + co2(1)    ! saturation concentration of CO2 (via mocsy)
+!   Calculate carbon-isotopic fractionation, radioactive decay is calculated in oce_ale_tracer.F90
 
-     do kj = one, nn
-        recom_dic    = max(tiny*1e-3,state(kj,idic)*1e-3)    ! overriding REcoM_DIC from above!
-        recom_dic_13 = max(tiny*1e-3,state(kj,idic_13)*1e-3)
-        recom_dic_14 = max(tiny*1e-3,state(kj,idic_14)*1e-3)
-        r_dic_13     = recom_dic_13(1) / recom_dic(1)
-        r_dic_14     = recom_dic_14(1) / recom_dic(1)
+!   Fractionation due to air-sea exchange and chemical speciation of CO2
+    call recom_ciso_airsea(recom_t(1), co3(1), recom_dic(1)) ! -> alpha_aq, alpha_dic. CO3 is taken from mocsy
 
-!       Air-sea exchange and chemical speciation of CO2, fco3 is taken from mocsy
-!       First calculate fractionation factors alpha_aq and alpha_dic. We ignore
-!       vertical fco3 variations, because the effect on alpha_dic (and hence on alpha_p)
-!       is much smaller than the effect of vertical temperature variations.
-        call recom_ciso_airsea(temp(kj), co3(1), recom_dic(1))
+!   Isotopic ratios of dissolved CO2, also needed to calculate biogenic fractionation
+    r_dic_13     = max(tiny*1e-3,state(1,idic_13)*1e-3) / recom_dic(1)
+    r_co2s_13    = alpha_aq_13 / alpha_dic_13 * r_dic_13
+!   Calculate air-sea fluxes of 13|14CO2 in mmol / m**2 / s
+    kwco2  = kw660(1) * (660/scco2(REcoM_T(1)))**0.5  ! Piston velocity (via mocsy)
+    co2sat = co2flux(1) / (kwco2 + tiny) + co2(1)     ! Saturation concentration of CO2 (via mocsy)
+!   co2flux_13   = kwco2 * alpha_k_13 * (alpha_aq_13 * r_atm_13 * co2sat - r_co2s_13 * co2(1))
+!   co2flux_13   = alpha_k_13 * alpha_aq_13 * kwco2 * (r_atm_13 * co2sat - r_dic_13 * co2(1) / alpha_dic_13)
+!   Fractionation factors were determined for freshwater, include a correction for enhanced fractionation in seawater
+    co2flux_13   = (alpha_k_13 * alpha_aq_13 - 0.0002) * kwco2 * (r_atm_13 * co2sat - r_dic_13 * co2(1) / alpha_dic_13)
+    co2flux_seaicemask_13 = co2flux_13 * 1.e3
 
-        r_co2s_13 = alpha_aq_13 / alpha_dic_13 * r_dic_13  ! for biogenic fractionation further below
-        r_co2s_14 = alpha_aq_14 / alpha_dic_14 * r_dic_14
+!   Biogenic fractionation due to photosynthesis of plankton
+!   phyc_13|14 and diac_13|14 are only used in REcoM_sms to calculate DIC_13|14, DOC_13|14 and DetC_13|14
 
-        if (kj == one) then
-           co2flux_13 = alpha_k_13 * alpha_aq_13 * kwco2 * (r_atm_13 * co2sat - r_dic_13 * co2(1) / alpha_dic_13)
-           co2flux_14 = alpha_k_14 * alpha_aq_14 * kwco2 * (r_atm_14 * co2sat - r_dic_14 * co2(1) / alpha_dic_14)
-           co2flux_seaicemask_13 = co2flux_13 * 1.e3 !  [mmol/m2/s]
-           co2flux_seaicemask_14 = co2flux_14 * 1.e3 !  [mmol/m2/s]
-        end if
-!       Biogenic fractionation due to photosynthesis
-!       Vertical variations of CO2* are estimated by a pressure correction (Weiss 1974, eq. 5)
-!       involving the surface density provided by flxco2 (mind that znodes(k) < 0):
-        prt = Patm(1) - 1.0e-5 * rhoSW(1) * 9.81 * znodes(kj)        ! total pressure at level k in atm
-!       CO2* at depth, pressure correction following Weiss (1974, eq. 5) and mocsy
-        co2s = co2(1) * exp((1 - prt) * vco2rgas / (Temp(kj) + C2K)) ! CO2* at depth
-        call recom_ciso_photo(Cphot_z(kj), Cphot_dia_z(kj), co2s, r_co2s_13, r_co2s_14, rhoSW(1)) ! -> alpha_p
-!       Now incorporate biogenic fractionation
-!       iphyc_13|14 and idiac_13|14 are only used in REcoM_sms to calculate
-!       DIC_13|14, DOC_13|14 and DetC_13|14
-        state(kj,iphyc_13) = state(kj,iphyc) * r_co2s_13 / alpha_p_13
-        state(kj,iphyc_14) = state(kj,iphyc) * r_co2s_14 / alpha_p_14
-        state(kj,idiac_13) = state(kj,idiac) * r_co2s_13 / alpha_p_dia_13
-        state(kj,idiac_14) = state(kj,idiac) * r_co2s_14 / alpha_p_dia_14
-     end do
-     state(:,iphyc_13)  = max(tiny_C,  state(:,iphyc_13))
-     state(:,iphyc_14)  = max(tiny_C,  state(:,iphyc_14))
-     state(:,idiac_13)  = max(tiny_C_d,state(:,idiac_13))
-     state(:,idiac_14)  = max(tiny_C_d,state(:,idiac_14))
+    call recom_ciso_photo(co2(1)) ! -> alpha_p
+    r_phyc_13 = r_co2s_13 / alpha_p_13
+    r_diac_13 = r_co2s_13 / alpha_p_dia_13
+    state(1:nn,iphyc_13)   = max((tiny_C   * r_phyc_13), (state(1:nn,iphyc) * r_phyc_13))
+    state(1:nn,idiac_13)   = max((tiny_C_d * r_diac_13), (state(1:nn,idiac) * r_diac_13))
+
+!   The same for radiocarbon, fractionation factors have been already derived above
+    if (ciso_14) then
+!   Air-sea exchange
+      r_dic_14   = max(tiny*1e-3,state(1,idic_14)*1e-3) / recom_dic(1)
+      r_co2s_14  = alpha_aq_14 / alpha_dic_14 * r_dic_14
+!     co2flux_14 = kwco2 * alpha_k_14 * (alpha_aq_14 * r_atm_14 * co2sat - r_co2s_14 * co2(1))
+!     Fractionation factors were determined for freshwater, include a correction for enhanced fractionation seawater
+      co2flux_14 = (alpha_k_14 * alpha_aq_14 - 0.0004) * kwco2 * (r_atm_14 * co2sat - r_dic_14 * co2(1) / alpha_dic_14)
+      co2flux_seaicemask_14 = co2flux_14 * 1.e3
+!   Biogenic fractionation
+      if (ciso_organic_14) then
+        r_phyc_14 = r_co2s_14 / alpha_p_14
+        r_diac_14 = r_co2s_14 / alpha_p_dia_14
+        state(1:nn,iphyc_14) = max((tiny_C   * r_phyc_14), (state(1:nn,iphyc) * r_phyc_14))
+        state(1:nn,idiac_14) = max((tiny_C_d * r_diac_14), (state(1:nn,idiac) * r_diac_14))
+      end if
+    end if
+!   Radiocarbon
   end if
+! ciso
+
 
  if (recom_debug .and. mype==0) write(*,*), "REcoM_forcing worked until here"      ! NEW: added print statement
 

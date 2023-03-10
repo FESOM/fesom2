@@ -52,6 +52,9 @@ subroutine recom(mesh)
   integer                    :: idiags
 
   real(kind=8)               :: Sali, net, net1, net2
+
+  logical :: do_update = .false. 
+
   real(kind=8), allocatable  :: Temp(:), Sali_depth(:), zr(:), PAR(:)
   real(kind=8),  allocatable :: C(:,:)
   real(kind=8),  allocatable :: CO2_watercolumn(:)                                        ! NEW MOCSY
@@ -77,14 +80,36 @@ subroutine recom(mesh)
 !************************* READ SURFACE BOUNDARY FILES *********************************			
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'//achar(27)//'[0m'
-
   call Atm_input(mesh)        !<  read surface atmospheric deposition for Fe, N, CO2
+
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'   --> River_input'//achar(27)//'[0m'
   call River_input(mesh)      !<  read riverine input
+
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//' --> Erosion_input'//achar(27)//'[0m'
   call Erosion_input(mesh)    !<  read erosion input
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> bio_fluxes'//achar(27)//'[0m'
-
   call bio_fluxes(mesh)       !<  alkalinity restoring/ virtual flux is possible
+
+  if (use_atbox) then    ! MERGE
+! Prognostic atmospheric isoCO2
+    call recom_atbox(mesh)
+!   optional I/O of isoCO2 and inferred cosmogenic 14C production; this may cost some CPU time
+    if (ciso .and. ciso_14) then
+      call annual_event(do_update)
+      if (do_update .and. mype==0) write (*, fmt = '(a50,2x,i6,4(2x,f6.2))') &
+                                         'Year, xCO2 (ppm), cosmic 14C flux (at / cm² / s):', &
+                                          yearold, x_co2atm(1), x_co2atm_13(1), x_co2atm_14(1), cosmic_14(1) * production_rate_to_flux_14
+    end if
+  end if
+
+! MERGE
+! ======================================================================================
+!************************* READ BOTTOM BOUNDARY FILES*********************************
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Sed_input'//achar(27)//'[0m'
+if (use_MEDUSA .and. (sedflx_num .ne. 0)) then
+   call Sed_input(mesh) !! --> sedimentary input from MEDUSA
+end if ! use_MEDUSA and sedflx_num not 0
 
 ! ======================================================================================
 !********************************* LOOP STARTS *****************************************			
@@ -99,11 +124,18 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> bio_fluxes'
      !!---- This is needed for piston velocity 
      Loc_ice_conc = a_ice(n) 
 
-     !!---- Mean sea level pressure 
+     !!---- Mean sea level pressure ! MERGE
+#if defined (__oasis) 
+!!   MB: This is an ad-hoc patch for AWIESM-2.1 and needs to be improved:
+!!   We should consider air pressure provided by ECHAM.
+     Loc_slp           = pa2atm
+#else
      Loc_slp = press_air(n)
+#endif 
 
      !!---- Benthic layers
      LocBenthos(1:benthos_num) = Benthos(n,1:benthos_num)
+!CV: It is not clear to me whether this is still needed
 
      !!---- Local conc of [H+]-ions from last time time step. Stored in LocVar
      !!---- used as first guess for H+ conc.in subroutine CO2flux (provided by recom_init)
@@ -111,15 +143,40 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> bio_fluxes'
 
      !!---- Interpolated wind from atmospheric forcing 
      !!---- temporarily stored in module LocVar
+#if defined (__oasis)
+!    Derive 10m-wind speed from wind stress fields, see module recom_ciso.
+!    This is an ad-hoc solution as long as 10m-winds are not handled from OASIS.
+     Uloc              = wind_10(stress_atmoce_x(n), stress_atmoce_y(n))
+#else
      ULoc = sqrt(u_wind(n)**2+v_wind(n)**2)
+#endif
 
      !!---- Atmospheric CO2 in LocVar                                                                        
-     LocAtmCO2         = AtmCO2(month)   
+     LocAtmCO2         = AtmCO2(month)
+
+! Update of prognostic atmospheric CO2 values
+     if (use_atbox) then
+       LocAtmCO2                   = x_co2atm(1)
+       if (ciso) then
+         LocAtmCO2_13              = x_co2atm_13(1)
+         if (ciso_14) LocAtmCO2_14 = x_co2atm_14(1)
+       end if
+     else
+! Consider prescribed atmospheric CO2 values
+       if (ciso) then
+         LocAtmCO2_13              = AtmCO2_13(month)
+         if (ciso_14) then
+!          Latitude of nodal point n 
+           lat_val = geo_coord_nod2D(2,n) / rad
+!          Zonally binned NH / SH / TZ 14CO2 input values
+           LocAtmCO2_14 = AtmCO2_14(lat_zone(lat_val), month)
+         end if
+       end if
+     end if  ! use_atbox
+
      if (ciso) then
-        LocAtmCO2_13 = AtmCO2_13(month)
-        LocAtmCO2_14 = AtmCO2_14(month)
-        r_atm_13 = LocAtmCO2_13(1) / LocAtmCO2(1)
-        r_atm_14 = LocAtmCO2_14(1) / LocAtmCO2(1)
+       r_atm_13                    = LocAtmCO2_13(1) / LocAtmCO2(1)
+       if (ciso_14) r_atm_14       = LocAtmCO2_14(1) / LocAtmCO2(1)
      end if
 
      !!---- Shortwave penetration
@@ -157,8 +214,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> bio_fluxes'
      NDust = GloNDust(n)  * (1 - a_ice(n))
 
 if (Diags) then
-!     allocate(Diags3Dloc(nzmax,diags3d_num))
-!     Diags3Dloc(:,:) = 0.d0
+
      !!---- Allocate 3D diagnostics
      allocate(vertgrazmeso_tot(nl-1), vertgrazmeso_n(nl-1), vertgrazmeso_d(nl-1), vertgrazmeso_c(nl-1))
      vertgrazmeso_tot = 0.d0
@@ -269,12 +325,6 @@ if (Diags) then
      NPPn3D(1:nzmax,n)       = vertNPPn(1:nzmax)
      NPPd3D(1:nzmax,n)       = vertNPPd(1:nzmax)
      NPPc3D(1:nzmax,n)       = vertNPPc(1:nzmax)
-   
-!     do idiags = 1,diags3d_num
-!       Diags3D(1:nzmax,n,idiags)  = Diags3Dloc(1:nzmax,idiags) ! 1=NPPnano, 2=NPPdia
-!     end do
-
-!     deallocate(Diags3Dloc)
 
      !!---- Deallocating 2D diagnostics
      deallocate(vertNPPn,vertGPPn,vertNNAn,vertChldegn) 
@@ -298,7 +348,9 @@ endif
      GloO2flux_seaicemask(n)      = o2flux_seaicemask(1)                  !  [mmol/m2/s]
      if (ciso) then
         GloCO2flux_seaicemask_13(n)     = co2flux_seaicemask_13(1)        !  [mmol/m2/s]
-        GloCO2flux_seaicemask_14(n)     = co2flux_seaicemask_14(1)        !  [mmol/m2/s]
+        if (ciso_14) then
+            GloCO2flux_seaicemask_14(n) = co2flux_seaicemask_14(1)        !  [mmol/m2/s]
+        end if
      end if
 
      GloHplus(n)                  = ph(1) !hplus
@@ -356,19 +408,21 @@ endif
   call exchange_nod(GloPCO2surf)	
   call exchange_nod(GloCO2flux)	
   call exchange_nod(GloCO2flux_seaicemask)
-
-  do n=1, 4
-    call exchange_nod(GlodecayBenthos(:,n))
-  end do
-
   if (ciso) then
     call exchange_nod(GloPCO2surf_13)
-    call exchange_nod(GloPCO2surf_14)
     call exchange_nod(GloCO2flux_13)
-    call exchange_nod(GloCO2flux_14)
     call exchange_nod(GloCO2flux_seaicemask_13)
-    call exchange_nod(GloCO2flux_seaicemask_14)  
+    if (ciso_14) then
+      call exchange_nod(GloPCO2surf_14)
+      call exchange_nod(GloCO2flux_14)
+      call exchange_nod(GloCO2flux_seaicemask_14)
+    end if 
   end if
+
+  do n=1, benthos_num  !4
+    call exchange_nod(GlodecayBenthos(:,n))
+  end do
+ 
   call exchange_nod(GloO2flux_seaicemask)	
   call exchange_nod(GloHplus)	
   call exchange_nod(AtmFeInput)	

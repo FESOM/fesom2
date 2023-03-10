@@ -58,12 +58,14 @@ MODULE io_RESTART
 !
 !--------------------------------------------------------------------------------------------
 ! id will keep the IDs of all required dimentions and variables
+! Recom: add bid
   type(nc_file), save       :: oid, iid, bid
   integer,       save       :: globalstep=0
   type(nc_file), save       :: ip_id
   real(kind=WP)             :: ctime !current time in seconds from the beginning of the year
 
   PRIVATE
+! Recom: add bid
   PUBLIC :: restart, oid, iid, bid
   PUBLIC :: ip_id, def_dim, def_variable_1d, def_variable_2d 
 !
@@ -99,11 +101,6 @@ subroutine ini_ocean_io(year, mesh)
   write(cyear,'(i4)') year
   ! create an ocean restart file; serial output implemented so far
   oid%filename=trim(ResultPath)//trim(runid)//'.'//cyear//'.oce.restart.nc'
-   
-!#if defined (__recom)
-!  if (use_REcoM .and. .not. REcoM_restart .and. oid%is_in_use == .false. ) num_tracers = num_tracers - bgc_num  ! recom is off
-!#endif
-
   if (oid%is_in_use) return
   oid%is_in_use=.true.
   call def_dim(oid, 'node', nod2d)
@@ -214,6 +211,7 @@ subroutine ini_ice_io(year, mesh)
 #endif /* (__oifs) */
 
 end subroutine ini_ice_io
+!
 #if defined(__recom)
 !
 !--------------------------------------------------------------------------------------------
@@ -251,10 +249,23 @@ subroutine ini_bio_io(year, mesh)
   call def_variable(bid, 'HPlus',      (/nod2D/), 'Conc. of H-plus ions in the surface water', 'mol/kg',   GloHplus);
   if (ciso) then
     call def_variable(bid, 'BenC_13',       (/nod2D/), 'Benthos Carbon-13',   'mmol/m3',   Benthos(:,5));
-    call def_variable(bid, 'BenC_14',       (/nod2D/), 'Benthos Carbon-14',   'mmol/m3',   Benthos(:,6));
-    call def_variable(bid, 'BenCalc_13',    (/nod2D/), 'Benthos Calcite-13',  'mmol/m3',   Benthos(:,7)); 
-    call def_variable(bid, 'BenCalc_14',    (/nod2D/), 'Benthos Calcite-14',  'mmol/m3',   Benthos(:,8)); 
-  end if
+    call def_variable(bid, 'BenCalc_13',    (/nod2D/), 'Benthos Calcite-13',  'mmol/m3',   Benthos(:,6)); 
+    if (ciso_14 .and. ciso_organic_14) then
+      call def_variable(bid, 'BenC_14',       (/nod2D/), 'Benthos Carbon-14',   'mmol/m3',   Benthos(:,7));
+      call def_variable(bid, 'BenCalc_14',    (/nod2D/), 'Benthos Calcite-14',  'mmol/m3',   Benthos(:,8)); 
+    end if ! ciso_14
+  end if   ! ciso
+  if (use_atbox) then
+    call def_variable(bid, 'xCO2', (/nod2D/), 'Atm. CO2 mixing ratio', 'mol / mol', x_co2atm(:));
+    if (ciso) then
+      call def_variable(bid, 'xCO2_13', (/nod2D/), 'Atm. 13CO2 mixing ratio', 'mol / mol', x_co2atm_13(:));
+      if (ciso_14) then
+        call def_variable(bid, 'xCO2_14', (/nod2D/), 'Atm. 14CO2 mixing ratio', 'mol / mol', x_co2atm_14(:));
+        call def_variable(bid, 'cosmic_14', (/nod2D/), 'Cosmic 14C production', 'mol / s', cosmic_14(:));
+      end if
+    end if
+  end if  ! use_atbox
+
   !___Define the netCDF variables for 3D fields_______________________________
 
   do j=num_tracers-bgc_num,num_tracers
@@ -276,6 +287,10 @@ subroutine restart(istep, l_write, l_read, mesh)
   use icedrv_main,   only: init_restart_icepack
 #endif
 
+
+! kh 31.03.22
+  use o_ARRAYS,      only: tr_arr_old
+
   implicit none
   ! this is the main restart subroutine
   ! if l_write  is TRUE writing restart file will be forced
@@ -287,12 +302,22 @@ subroutine restart(istep, l_write, l_read, mesh)
   integer :: mpierr
   type(t_mesh), intent(in) , target :: mesh
 
+! kh 31.03.22
+  integer :: tr_arr_slice_count_fix_1
+  integer :: group_i
+  integer :: tr_num_start
+  integer :: tr_num_end
+  integer :: tr_num_in_group
+  logical :: has_one_added_tracer
+
+! kh 31.03.22 nl is required
+#include  "associate_mesh.h"
+
   ctime=timeold+(dayold-1.)*86400
   if (.not. l_read) then
                          call ini_ocean_io(yearnew, mesh)
       if (use_ice)       call ini_ice_io  (yearnew, mesh)
 #if defined(__recom)
-!      if (mype==0) write(*,*) 'restart file for year: ', yearnew
       if (use_REcoM)     call ini_bio_io  (yearnew, mesh)
 #endif
 #if defined(__icepack)
@@ -303,7 +328,6 @@ subroutine restart(istep, l_write, l_read, mesh)
       if (use_ice)       call ini_ice_io  (yearold, mesh)
 
 #if defined(__recom)
-!      if (mype==0) write(*,*) 'restart file for year: ', yearold
       if (REcoM_restart) call ini_bio_io(yearold, mesh)
 #endif
 #if defined(__icepack)
@@ -325,7 +349,7 @@ subroutine restart(istep, l_write, l_read, mesh)
 #if defined(__recom)
 !RECOM restart
 !read here
-      if(mype==0)  write(*,*) 'REcoM_restart= ',REcoM_restart 
+      if(my_fesom_group == 0 .and. mype==0)  write(*,*) 'REcoM_restart= ',REcoM_restart !OG
       if (REcoM_restart) then
           call assoc_ids(bid);          call was_error(bid)
           call read_restart(bid, mesh); call was_error(bid)
@@ -359,32 +383,49 @@ subroutine restart(istep, l_write, l_read, mesh)
 
   if (.not. is_restart) return
 
+
   ! write restart
-  if(mype==0) write(*,*)'Do output (netCDF, restart) ...'
-  call assoc_ids(oid);                  call was_error(oid)  
-  call write_restart(oid, istep, mesh); call was_error(oid)
-  if (use_ice) then
-     call assoc_ids(iid);                  call was_error(iid)  
-     call write_restart(iid, istep, mesh); call was_error(iid)
-#if defined(__icepack)
-     call assoc_ids(ip_id);                  call was_error(ip_id)
-     call write_restart(ip_id, istep, mesh); call was_error(ip_id)
-#endif
+
+  if(num_fesom_groups > 1) then
+     tr_arr_slice_count_fix_1 = 1 * (nl - 1) * (myDim_nod2D + eDim_nod2D)
+
+     do group_i = 0, num_fesom_groups - 1
+        call calc_slice(num_tracers, num_fesom_groups, group_i, tr_num_start, tr_num_end, tr_num_in_group, has_one_added_tracer)
+
+        call MPI_Bcast(tr_arr_old(:, :, tr_num_start), tr_arr_slice_count_fix_1 * tr_num_in_group, MPI_DOUBLE_PRECISION, group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIerr)
+     end do
   end if
+
+! kh 21.11.21
+  if(my_fesom_group == 0) then
+     if(mype==0) write(*,*)'Do output (netCDF, restart) ...'
+     call assoc_ids(oid);                  call was_error(oid)  
+     call write_restart(oid, istep, mesh); call was_error(oid)
+     if (use_ice) then
+        call assoc_ids(iid);                  call was_error(iid)  
+        call write_restart(iid, istep, mesh); call was_error(iid)
+#if defined(__icepack)
+        call assoc_ids(ip_id);                  call was_error(ip_id)
+        call write_restart(ip_id, istep, mesh); call was_error(ip_id)
+#endif
+     end if
 #if defined(__recom)
 !RECOM restart
 !write here
-   if (REcoM_restart .or. use_REcoM) then
-     call assoc_ids(bid);                  call was_error(bid)
-     call write_restart(bid, istep, mesh); call was_error(bid)
-   end if
-#endif     
+     if (REcoM_restart .or. use_REcoM) then
+        call assoc_ids(bid);                  call was_error(bid)
+        call write_restart(bid, istep, mesh); call was_error(bid)
+     end if
+#endif
+ 
   ! actualize clock file to latest restart point
-  if (mype==0) then
-		write(*,*) ' --> actualize clock file to latest restart point'
-		call clock_finish  
-  end if
-  
+     if (mype==0) then
+        write(*,*) ' --> actualize clock file to latest restart point'
+        call clock_finish  
+     end if
+
+  end if ! (my_fesom_group == 0) then  
+
 end subroutine restart
 !
 !--------------------------------------------------------------------------------------------

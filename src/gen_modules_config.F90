@@ -108,9 +108,15 @@ module g_config
   character(100)                :: which_toy="soufflet" 
   logical                       :: flag_debug=.false.    ! prints name of actual subroutine he is in 
   logical                       :: flag_warn_cflz=.true. ! switches off cflz warning
+
+
+! kh 11.11.21 number of groups for multi FESOM group loop parallelization 
+  integer                       :: num_fesom_groups=1
+
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
-                        use_cavity_partial_cell, cavity_partial_cell_thresh, toy_ocean, which_toy, flag_debug, flag_warn_cflz
-  
+                        use_cavity_partial_cell, cavity_partial_cell_thresh, toy_ocean, which_toy, flag_debug, flag_warn_cflz, &
+                        num_fesom_groups ! kh 11.11.21
+
   !_____________________________________________________________________________
   ! *** others ***
   real(kind=WP)                 :: dt

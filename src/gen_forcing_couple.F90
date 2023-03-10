@@ -128,7 +128,11 @@ subroutine update_atm_forcing(istep, mesh)
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
 #endif
          endif
-         call cpl_oasis3mct_send(i, exchange, action)
+
+! kh 30.11.21
+         if(my_fesom_group == 0) then
+            call cpl_oasis3mct_send(i, exchange, action)
+         end if
       enddo
 #ifdef VERBOSE
       do i=1, nsend 
@@ -575,14 +579,21 @@ SUBROUTINE net_rec_from_atm(action)
   use cpl_driver
   use o_PARAM, only: WP
 
+! kh 10.21.21
+  use g_config, only: num_fesom_groups
+
   IMPLICIT NONE
 
-  LOGICAL,      INTENT (IN)   		          :: action
+  LOGICAL,      INTENT (IN)                       :: action
   INTEGER                                         :: my_global_rank, ierror
-  INTEGER                                         :: n  
-  INTEGER 					  :: status(MPI_STATUS_SIZE,npes) 
+
+! kh 10.12.21
+  INTEGER                                         :: my_global_rank_test
+
+  INTEGER                                         :: n
+  INTEGER                                         :: status(MPI_STATUS_SIZE,npes)
   INTEGER                                         :: request(2)
-  real(kind=WP)                 			  :: aux(nrecv)
+  real(kind=WP)                                   :: aux(nrecv)
 #if defined (__oifs)
   return  !OIFS-FESOM2 coupling uses OASIS3MCT conservative remapping and recieves no net fluxes here.
 #endif
@@ -591,16 +602,31 @@ SUBROUTINE net_rec_from_atm(action)
      CALL MPI_COMM_RANK(MPI_COMM_WORLD, my_global_rank, ierror)
      atm_net_fluxes_north=0.
      atm_net_fluxes_south=0.
-     if (my_global_rank==target_root) then
-	CALL MPI_IRecv(atm_net_fluxes_north(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 111, MPI_COMM_WORLD, request(1), MPIerr)
-        CALL MPI_IRecv(atm_net_fluxes_south(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 112, MPI_COMM_WORLD, request(2), MPIerr)
-        CALL MPI_Waitall(2, request, status, MPIerr)
-     end if
-  call MPI_Barrier(MPI_COMM_FESOM, MPIerr)     
-  call MPI_AllREDUCE(atm_net_fluxes_north(1), aux, nrecv, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-  atm_net_fluxes_north=aux
-  call MPI_AllREDUCE(atm_net_fluxes_south(1), aux, nrecv, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-  atm_net_fluxes_south=aux
-  end if
+
+! kh 10.12.21
+     my_global_rank_test = my_global_rank - (my_fesom_group * npes)
+
+!     if (my_global_rank==target_root) then
+! kh 10.12.21 check for is root in group
+     if (my_global_rank_test==target_root) then
+        if(my_fesom_group == 0) then
+           CALL MPI_IRecv(atm_net_fluxes_north(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 111, MPI_COMM_WORLD, request(1), MPIerr)
+           CALL MPI_IRecv(atm_net_fluxes_south(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 112, MPI_COMM_WORLD, request(2), MPIerr)
+           CALL MPI_Waitall(2, request, status, MPIerr)
+        end if
+
+        if(num_fesom_groups > 1) then
+           call MPI_Bcast(atm_net_fluxes_north(1), nrecv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIerr)
+           call MPI_Bcast(atm_net_fluxes_south(1), nrecv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIerr)
+        end if
+
+     end if ! (my_global_rank_test==target_root) then
+
+     call MPI_Barrier(MPI_COMM_FESOM, MPIerr)     
+     call MPI_AllREDUCE(atm_net_fluxes_north(1), aux, nrecv, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+     atm_net_fluxes_north=aux
+     call MPI_AllREDUCE(atm_net_fluxes_south(1), aux, nrecv, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+     atm_net_fluxes_south=aux
+  end if ! (action) then
 END SUBROUTINE net_rec_from_atm
 #endif

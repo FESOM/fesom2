@@ -2763,11 +2763,15 @@ subroutine oce_timestep_ale(n, mesh)
     
     !___________________________________________________________________________
     ! write out global fields for debugging
-    call write_step_info(n,logfile_outfreq, mesh)
-    
-    ! check model for blowup --> ! write_step_info and check_blowup require 
-    ! togeather around 2.5% of model runtime
-    call check_blowup(n, mesh)
+! kh 19.11.21
+    if(my_fesom_group == 0) then
+        call write_step_info(n,logfile_outfreq, mesh)
+
+        ! check model for blowup --> ! write_step_info and check_blowup require 
+        ! togeather around 2.5% of model runtime
+        call check_blowup(n, mesh)
+    end if
+
     t10=MPI_Wtime()
     !___________________________________________________________________________
     ! write out execution times for ocean step parts
@@ -2779,24 +2783,28 @@ subroutine oce_timestep_ale(n, mesh)
     rtime_oce_GMRedi   = rtime_oce_GMRedi + (t6-t5)
     rtime_oce_solvetra = rtime_oce_solvetra + (t8-t7)
     rtime_tot          = rtime_tot + (t10-t0)-(t10-t9)
-    if(mod(n,logfile_outfreq)==0 .and. mype==0) then  
-        write(*,*) '___ALE OCEAN STEP EXECUTION TIMES______________________'
-        write(*,"(A, ES10.3)") '     Oce. Mix,Press.. :', t1-t0
-        write(*,"(A, ES10.3)") '     Oce. Dynamics    :', t2-t1
-        write(*,"(A, ES10.3)") '     Oce. Update Vel. :', t4-t3
-        write(*,"(A, ES10.3)") '     Oce. Fer-GM.     :', t6-t5
-        write(*,*) '    _______________________________'
-        write(*,"(A, ES10.3)") '     ALE-Solve SSH    :', t3-t2
-        write(*,"(A, ES10.3)") '     ALE-Calc. hbar   :', t5-t4
-        write(*,"(A, ES10.3)") '     ALE-Update+W     :', t7-t6
-        write(*,"(A, ES10.3)") '     ALE-Solve Tracer :', t8-t7
-        write(*,"(A, ES10.3)") '     ALE-Update hnode :', t9-t8
-        write(*,*) '    _______________________________'
-        write(*,"(A, ES10.3)") '     check for blowup :', t10-t9
-        write(*,*) '    _______________________________'
-        write(*,"(A, ES10.3)") '     Oce. TOTAL       :', t10-t0
-        write(*,*)
-        write(*,*)
+
+! kh 19.11.21
+    if(my_fesom_group == 0) then
+        if(mod(n,logfile_outfreq)==0 .and. mype==0) then  
+            write(*,*) '___ALE OCEAN STEP EXECUTION TIMES______________________'
+            write(*,"(A, ES10.3)") '     Oce. Mix,Press.. :', t1-t0
+            write(*,"(A, ES10.3)") '     Oce. Dynamics    :', t2-t1
+            write(*,"(A, ES10.3)") '     Oce. Update Vel. :', t4-t3
+            write(*,"(A, ES10.3)") '     Oce. Fer-GM.     :', t6-t5
+            write(*,*) '    _______________________________'
+            write(*,"(A, ES10.3)") '     ALE-Solve SSH    :', t3-t2
+            write(*,"(A, ES10.3)") '     ALE-Calc. hbar   :', t5-t4
+            write(*,"(A, ES10.3)") '     ALE-Update+W     :', t7-t6
+            write(*,"(A, ES10.3)") '     ALE-Solve Tracer :', t8-t7
+            write(*,"(A, ES10.3)") '     ALE-Update hnode :', t9-t8
+            write(*,*) '    _______________________________'
+            write(*,"(A, ES10.3)") '     check for blowup :', t10-t9
+            write(*,*) '    _______________________________'
+            write(*,"(A, ES10.3)") '     Oce. TOTAL       :', t10-t0
+            write(*,*)
+            write(*,*)
+        end if
     end if
 
 end subroutine oce_timestep_ale

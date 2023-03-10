@@ -224,7 +224,8 @@ type(t_mesh), intent(inout), target :: mesh
      allocate(part(npes+1))
   end if
   call MPI_BCast(part, npes+1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-  if (mype==0) write(*,*) mype,'rpart is read'
+  if (mype==0 .and. my_fesom_group == 0) write(*,*) mype,'rpart is read' !OG
+!  if (mype==0) write(*,*) mype,'rpart is read'
 
   !===========================
   ! Lists of nodes and elements in global indexing. 
@@ -254,7 +255,8 @@ type(t_mesh), intent(inout), target :: mesh
   read(fileID,*) myList_edge2D ! m
 
   close(fileID)
-  if (mype==0) write(*,*) 'myLists are read'
+  if (mype==0 .and. my_fesom_group == 0 ) write(*,*) 'myLists are read' !OG
+!  if (mype==0) write(*,*) 'myLists are read'
 
   !==============================
   ! read 2d node data
@@ -268,7 +270,8 @@ type(t_mesh), intent(inout), target :: mesh
     read(fileID,*) n      ! nod2D, we know it already
      error_status=0
      if (n/=mesh%nod2D) error_status=1 !set the error status for consistency between rpart and nod2D
-    write(*,*) 'reading '// trim(file_name)   
+!    write(*,*) 'reading '// trim(file_name)   
+    if (my_fesom_group == 0) write(*,*) 'reading '// trim(file_name)   !OG
   end if
   ! check the error status
   call MPI_BCast(error_status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
@@ -413,7 +416,8 @@ type(t_mesh), intent(inout), target :: mesh
      file_name=trim(meshpath)//'elem2d.out'
      open(fileID, file=file_name)
      read(fileID,*) mesh%elem2d
-     write(*,*) 'reading '// trim(file_name)   
+!     write(*,*) 'reading '// trim(file_name)   
+     if (my_fesom_group == 0) write(*,*) 'reading '// trim(file_name) ! OG
   end if
   call MPI_BCast(mesh%elem2d, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   allocate(mesh%elem2D_nodes(3, myDim_elem2D+eDim_elem2D+eXDim_elem2D))
@@ -473,7 +477,8 @@ type(t_mesh), intent(inout), target :: mesh
      end do
   end do
   mesh%elem2D_nodes=-mesh%elem2D_nodes
- if (mype==0) write(*,*) 'elements are read' 
+! if (mype==0) write(*,*) 'elements are read' 
+ if (my_fesom_group == 0 .and. mype==0) write(*,*) 'elements are read' !OG
  !==============================
  ! read depth data
  !==============================
@@ -661,7 +666,8 @@ end if
 !!$ ALLOCATE(com_edge2D%slist(n))
 !!$ read(fileID,*) com_edge2D%slist
  close(fileID)
- if (mype==0) write(*,*) 'communication arrays are read'
+! if (mype==0) write(*,*) 'communication arrays are read'
+ if (my_fesom_group == 0 .and. mype == 0) write(*,*) 'communication arrays are read' !OG
  deallocate(rbuff, ibuff)
  deallocate(mapping)
  
@@ -682,7 +688,8 @@ end if
 
 CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
  t1=MPI_Wtime()
- if (mype==0) then
+! if (mype==0) then
+ if (my_fesom_group == 0 .and. mype == 0) then
     write(*,*) '========================='
     write(*,*) '2D mesh was read in ', t1-t0, ' seconds'
     write(*,*) '2D mesh info : ', 'nod2D=', mesh%nod2D,' elem2D=', mesh%elem2D,'checksum= ',mesh%representative_checksum
@@ -1360,7 +1367,8 @@ subroutine find_levels_min_e2n(mesh)
     
     !___________________________________________________________________________
     t1=MPI_Wtime()
-    if (mype==0) then
+!    if (mype==0) then
+    if (my_fesom_group == 0 .and. mype==0) then !OG
         write(*,*) '____________________________________________________________________'
         write(*,*) ' --> find min/max level e2n in', t1-t0, ' seconds'
     end if
@@ -1409,7 +1417,8 @@ real(kind=WP)               :: t0, t1
       end if
    END DO
    t1=MPI_Wtime()
-   if (mype==0) then
+!   if (mype==0) then
+   if (my_fesom_group == 0 .and. mype==0) then !OG
       write(*,*) 'test_tri finished in ', t1-t0, ' seconds'
       write(*,*) '========================='
    endif
@@ -1472,11 +1481,13 @@ chunk_size=100000
   if (mype==0) then
      file_name=trim(meshpath)//'edges.out'
      open(fileID,   file=trim(file_name))
-     write(*,*) 'reading '// trim(file_name)
+!     write(*,*) 'reading '// trim(file_name)
+     if (my_fesom_group == 0) write(*,*) 'reading '// trim(file_name) !OG
 
      file_name=trim(meshpath)//'edge_tri.out'
      open(fileID+1, file=trim(file_name))
-     write(*,*) 'reading '// trim(file_name)
+!     write(*,*) 'reading '// trim(file_name)
+     if (my_fesom_group == 0) write(*,*) 'reading '// trim(file_name) !OG
   end if
 
  mesh_check=0
@@ -1640,7 +1651,8 @@ deallocate(ibuff)
 deallocate(mapping)
 
 t1=MPI_Wtime()
-if (mype==0) then
+!if (mype==0) then
+if (my_fesom_group == 0 .and. mype==0) then !OG
    write(*,*) 'load_edges finished in ', t1-t0, ' seconds'
    write(*,*) '========================='
 endif
@@ -2073,7 +2085,7 @@ SUBROUTINE mesh_areas(mesh)
         MPI_COMM_FESOM, MPIerr)
     
     !___write mesh statistics___________________________________________________
-    if (mype==0) then
+    if (my_fesom_group == 0 .and. mype==0) then
         write(*,*) '____________________________________________________________________'
         write(*,*) ' --> mesh statistics:', mype
         write(*,*)  mype, 'maxArea ',maxval(mesh%elem_area), '   MinArea ', minval(mesh%elem_area)
@@ -2087,7 +2099,7 @@ SUBROUTINE mesh_areas(mesh)
     endif
 
     t1=MPI_Wtime()
-    if (mype==0) then
+    if (my_fesom_group == 0 .and. mype==0) then
         write(*,*) '     > mesh_areas finished in ', t1-t0, ' seconds'
     endif
 END SUBROUTINE mesh_areas
@@ -2445,7 +2457,7 @@ deallocate(center_y, center_x)
 #endif 
 
     t1=MPI_Wtime()
-    if (mype==0) then
+    if (my_fesom_group == 0 .and. mype==0) then
        write(*,*) 'mesh_auxiliary_arrays finished in ', t1-t0, ' seconds'
        write(*,*) '========================='
     endif
@@ -2493,7 +2505,8 @@ real(kind=WP)	            :: vol_n(mesh%nl), vol_e(mesh%nl), aux(mesh%nl)
    call MPI_AllREDUCE(aux, vol_e, mesh%nl, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 
-if (mype==0) then
+!if (mype==0) then
+if (my_fesom_group == 0 .and. mype==0) then !OG
 write(*,*) '***start level area_test***'
 do nz=1, mesh%nl
    write(*,*) vol_n(nz), vol_e(nz)
@@ -2546,7 +2559,8 @@ subroutine check_total_volume(mesh)
     call MPI_AllREDUCE(aux, vol_e, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 
     !___write mesh statistics___________________________________________________
-    if (mype==0) then
+!    if (mype==0) then
+    if (my_fesom_group == 0 .and. mype==0) then !OG
         write(*,*) '____________________________________________________________________'
         write(*,*) ' --> ocean volume check:', mype
         write(*,*) '     > Total ocean volume node:', vol_n, ' m^3'
