@@ -450,14 +450,14 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    ! Pack ice thickness data and interpolate: 'pghic' on Gaussian grid.
    nfield = nfield + 1
    DO n=1,myDim_nod2D
-      zsendnf(n,nfield)=m_ice(n)/MAX(a_ice(n),0.01) ! ice thickness (mean over ice)
+      zsendnf(n,nfield)=m_ice(n)!/MAX(a_ice(n),0.01) ! ice thickness (mean over ice)
    ENDDO
    
    ! =================================================================== !
    ! Pack snow thickness data and interpolate: 'pghsn' on Gaussian grid.
    nfield = nfield + 1
    DO n=1,myDim_nod2D
-      zsendnf(n,nfield)=m_snow(n)/MAX(a_ice(n),0.01) ! snow thickness (mean over ice)
+      zsendnf(n,nfield)=m_snow(n)!/MAX(a_ice(n),0.01) ! snow thickness (mean over ice)
    ENDDO
 
    ! =================================================================== !
@@ -775,7 +775,8 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! Local variables
    INTEGER		:: n, jf
    integer, pointer     :: myDim_nod2D, eDim_nod2D
-   REAL(wpIFS), parameter 	:: rhofwt = 1000. ! density of freshwater
+   REAL(wpIFS), parameter 	:: rhofwt = 1000.        ! density of freshwater
+   REAL(wpIFS), parameter  :: lfus = 333.7          ! latent heat of fusion [J/g]
 
    ! Packed send/receive buffers
    INTEGER , PARAMETER :: maxnfield = 11
@@ -787,7 +788,8 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! associate only the necessary things
    real(kind=wpIFS), dimension(:,:), pointer :: coord_nod2D
    real(kind=wpIFS), dimension(:)  , pointer :: stress_atmice_x, stress_atmice_y
-   real(kind=wpIFS), dimension(:)  , pointer :: oce_heat_flux, ice_heat_flux 
+   real(kind=wpIFS), dimension(:)  , pointer :: oce_heat_flux, ice_heat_flux, a_ice
+   real(kind=wpIFS), dimension(:)  , pointer :: enthalpyoffuse
    myDim_nod2D        => fesom%partit%myDim_nod2D
    eDim_nod2D         => fesom%partit%eDim_nod2D
    coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => fesom%mesh%coord_nod2D(:,:)  
@@ -795,7 +797,8 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    stress_atmice_y    => fesom%ice%stress_atmice_y
    oce_heat_flux      => fesom%ice%atmcoupl%oce_flx_h(:)
    ice_heat_flux      => fesom%ice%atmcoupl%ice_flx_h(:)
-   
+   a_ice              => fesom%ice%data(1)%values(:)
+   enthalpyoffuse     => fesom%ice%atmcoupl%enthalpyoffuse(:)
    ! =================================================================== !
    ! Sort out incoming arrays from the IFS and put them on the ocean grid
 
@@ -956,7 +959,9 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    !4. Unpack ice non-solar
    nfield = nfield + 1
    ice_heat_flux(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)
-
+   where (a_ice<=1.e-12)
+         ice_heat_flux=0.0
+   end where
    ! Do the halo exchange
    call exchange_nod(ice_heat_flux,fesom%partit)
 
@@ -976,18 +981,17 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    nfield = nfield + 1
    evap_no_ifrac(1:myDim_nod2D)=-zrecvnf(1:myDim_nod2D,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
 
-   ! Do the halo exchange
-   call exchange_nod(evap_no_ifrac,fesom%partit)
-
    !7. Unpack sublimation (evaporation over ice), without halo
    nfield = nfield + 1
    sublimation(1:myDim_nod2D)=-zrecvnf(1:myDim_nod2D,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
 
-   ! Do the halo exchange
-   call exchange_nod(sublimation,fesom%partit)
    ! =================================================================== !
-   ! =================================================================== !
+   sublimation(1:myDim_nod2D)  =sublimation(1:myDim_nod2D)*a_ice(1:myDim_nod2D)     ! sublimation   -> sublimation weighted with A
+   evap_no_ifrac(1:myDim_nod2D)=evap_no_ifrac(1:myDim_nod2D)-sublimation(1:myDim_nod2D)            ! evap_no_ifrac -> evap weighted with (1-A)
 
+   ! Do the halo exchange
+   call exchange_nod(evap_no_ifrac,fesom%partit)
+   call exchange_nod(sublimation,  fesom%partit)
 
    ! =================================================================== !
    !8. Unpack liquid precipitation, without halo
@@ -1064,13 +1068,16 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
 
    !if ((do_rotate_oce_wind .AND. do_rotate_ice_wind) .AND. rotated_grid) then
    do n=1, myDim_nod2D+eDim_nod2D
-	call vector_g2r(stress_atmoce_x(n), stress_atmoce_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0) !0-flag for rot. coord.
-	call vector_g2r(stress_atmice_x(n), stress_atmice_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
+	   call vector_g2r(stress_atmoce_x(n), stress_atmoce_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0) !0-flag for rot. coord.
+	   call vector_g2r(stress_atmice_x(n), stress_atmice_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
    end do
    !do_rotate_oce_wind=.false.
    !do_rotate_ice_wind=.false.
    !end if
-
+   ! Enthalpy heat of fusion: take heat from the ocean in order to melt the snow that is falling into the ocean
+   ! prec_snow*rho [kg/m2/s] * lfus [J/kg] = W/m2
+   enthalpyoffuse(1:myDim_nod2D)= - rhofwt * prec_snow(1:myDim_nod2D) * lfus * 1000.
+   call exchange_nod(enthalpyoffuse, fesom%partit)
 END SUBROUTINE nemogcmcoup_lim2_update
 
 
