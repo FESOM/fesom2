@@ -832,7 +832,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ice_heat_flux=0. 	! Done. This is qns__ice currently. Is this the non-solar heat flux?    !   non solar heat fluxes below  !  (qns)
    oce_heat_flux=0. 	! Done. This is qns__oce currently. Is this the non-solar heat flux?
    !
-   runoff(:)=0.		! not used apparently. What is runoffIN, ocerunoff?
+   !runoff(:)=0.		! not used apparently. What is runoffIN, ocerunoff?
    !evaporation(:)=0.
    !ice_thermo_cpl.F90:  !---- total evaporation (needed in oce_salt_balance.F90)
    !ice_thermo_cpl.F90:  evaporation = evap_no_ifrac*(1.-a_ice) + sublimation*a_ice
