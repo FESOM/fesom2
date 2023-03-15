@@ -1,11 +1,8 @@
 module densityJM_components_interface
   interface
-    subroutine densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
+    subroutine densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot)
       USE MOD_PARSUP
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
+      USE o_param
       real(kind=WP),  intent(IN)             :: t,s
       real(kind=WP),  intent(OUT)            :: bulk_0, bulk_pz, bulk_pz2, rhopot
     end subroutine
@@ -14,12 +11,9 @@ end module
 
 module density_linear_interface
   interface
-    subroutine density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
+    subroutine density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out)
       USE MOD_PARSUP
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
+      USE o_param
       real(kind=WP),  intent(IN)             :: t,s
       real(kind=WP),  intent(OUT)            :: bulk_0, bulk_pz, bulk_pz2, rho_out
     end subroutine
@@ -292,9 +286,9 @@ subroutine pressure_bv(tracers, partit, mesh)
             s=salt(nz, node)
             select case(state_equation)
                 case(0)
-                    call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), partit, mesh)
+                    call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
                 case(1)
-                    call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), partit, mesh)
+                    call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
                 case default !unknown
                     if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
@@ -356,9 +350,9 @@ subroutine pressure_bv(tracers, partit, mesh)
             do nz=1, nzmin-1
                 select case(state_equation)
                     case(0)
-                        call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), partit, mesh)
+                        call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
                     case(1)
-                        call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), partit, mesh)
+                        call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
@@ -764,9 +758,9 @@ subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
                 ! salinity
                 select case(state_equation)
                     case(0)
-                        call density_linear(interp_n_temp, interp_n_salt, bulk_0, bulk_pz, bulk_pz2, rhopot, partit, mesh)
+                        call density_linear(interp_n_temp, interp_n_salt, bulk_0, bulk_pz, bulk_pz2, rhopot)
                     case(1)
-                        call densityJM_components(interp_n_temp, interp_n_salt, bulk_0, bulk_pz, bulk_pz2, rhopot, partit, mesh)
+                        call densityJM_components(interp_n_temp, interp_n_salt, bulk_0, bulk_pz, bulk_pz2, rhopot)
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
@@ -1136,9 +1130,9 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
         if (use_cavity .and. .not. use_density_ref) then
             select case(state_equation)
                 case(0)
-                    call density_linear(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot, partit, mesh)
+                    call density_linear(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot)
                 case(1)
-                    call densityJM_components(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot, partit, mesh)
+                    call densityJM_components(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot)
                 case default !unknown
                     if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
@@ -1226,9 +1220,9 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                     ! compute density from state equation
                     select case(state_equation)
                         case(0)
-                            call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)
+                            call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                         case(1)
-                            call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)
+                            call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                         case default !unknown
                             if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                             call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
@@ -1265,9 +1259,9 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                     ! compute density from state equation
                     select case(state_equation)
                         case(0)
-                            call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)
+                            call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                         case(1)
-                            call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)
+                            call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                         case default !unknown
                             if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                             call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
@@ -1368,9 +1362,9 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                 ! compute density from state equation
                 select case(state_equation)
                     case(0)
-                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)
+                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                     case(1)
-                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)
+                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
@@ -1407,9 +1401,9 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                 ! compute density from state equation
                 select case(state_equation)
                     case(0)
-                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)
+                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                     case(1)
-                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)
+                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
@@ -2414,9 +2408,9 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
         if (use_cavity .and. .not. use_density_ref) then
             select case(state_equation)
                 case(0)
-                    call density_linear(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot, partit, mesh)
+                    call density_linear(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot)
                 case(1)
-                    call densityJM_components(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot, partit, mesh)
+                    call densityJM_components(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot)
                 case default !unknown
                     if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
@@ -2493,9 +2487,9 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                 ! compute density from state equation
                 select case(state_equation)
                     case(0)
-                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)
+                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                     case(1)
-                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)
+                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
@@ -2542,9 +2536,9 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                 ! compute density from state equation
                 select case(state_equation)
                     case(0)
-                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)
+                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                     case(1)
-                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)
+                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
@@ -2622,13 +2616,13 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
             ! compute density from state equation
             select case(state_equation)
                 case(0)
-                    call density_linear(temp_at_Zn(1), salt_at_Zn(1), bulk_0(1), bulk_pz(1), bulk_pz2(1), rhopot(1), partit, mesh)
-                    call density_linear(temp_at_Zn(2), salt_at_Zn(2), bulk_0(2), bulk_pz(2), bulk_pz2(2), rhopot(2), partit, mesh)
-                    call density_linear(temp_at_Zn(3), salt_at_Zn(3), bulk_0(3), bulk_pz(3), bulk_pz2(3), rhopot(3), partit, mesh)
+                    call density_linear(temp_at_Zn(1), salt_at_Zn(1), bulk_0(1), bulk_pz(1), bulk_pz2(1), rhopot(1))
+                    call density_linear(temp_at_Zn(2), salt_at_Zn(2), bulk_0(2), bulk_pz(2), bulk_pz2(2), rhopot(2))
+                    call density_linear(temp_at_Zn(3), salt_at_Zn(3), bulk_0(3), bulk_pz(3), bulk_pz2(3), rhopot(3))
                 case(1)
-                    call densityJM_components(temp_at_Zn(1), salt_at_Zn(1), bulk_0(1), bulk_pz(1), bulk_pz2(1), rhopot(1), partit, mesh)
-                    call densityJM_components(temp_at_Zn(2), salt_at_Zn(2), bulk_0(2), bulk_pz(2), bulk_pz2(2), rhopot(2), partit, mesh)
-                    call densityJM_components(temp_at_Zn(3), salt_at_Zn(3), bulk_0(3), bulk_pz(3), bulk_pz2(3), rhopot(3), partit, mesh)
+                    call densityJM_components(temp_at_Zn(1), salt_at_Zn(1), bulk_0(1), bulk_pz(1), bulk_pz2(1), rhopot(1))
+                    call densityJM_components(temp_at_Zn(2), salt_at_Zn(2), bulk_0(2), bulk_pz(2), bulk_pz2(2), rhopot(2))
+                    call densityJM_components(temp_at_Zn(3), salt_at_Zn(3), bulk_0(3), bulk_pz(3), bulk_pz2(3), rhopot(3))
                 case default !unknown
                     if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
@@ -2707,9 +2701,9 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                 ! compute density from state equation
                 select case(state_equation)
                     case(0)
-                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)
+                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                     case(1)
-                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)
+                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
@@ -2756,9 +2750,9 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                 ! compute density from state equation
                 select case(state_equation)
                     case(0)
-                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)
+                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                     case(1)
-                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)
+                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
@@ -2830,7 +2824,7 @@ IMPLICIT NONE
 #include "associate_mesh_ass.h"
   !compute secant bulk modulus
 
-  call densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot, partit, mesh)
+  call densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot)
 
   bulk = bulk_0 + pz*(bulk_pz + pz*bulk_pz2)
 
@@ -2840,9 +2834,7 @@ end subroutine densityJM_local
 !
 !
 !===============================================================================
-SUBROUTINE densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot, partit, mesh)
-USE MOD_MESH
-USE MOD_PARTIT
+SUBROUTINE densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot)
 USE MOD_PARSUP !, only: par_ex,pe_status
 USE o_ARRAYS
 USE o_PARAM
@@ -2859,8 +2851,6 @@ IMPLICIT NONE
   !---------------------------------------------------------------------------
   ! N. Rakowski 2014 the split form
   !---------------------------------------------------------------------------
-  type(t_mesh),   intent(in) ,   target :: mesh
-  type(t_partit), intent(inout), target :: partit
   real(kind=WP),  intent(IN)            :: t,s
   real(kind=WP),  intent(OUT)           :: bulk_0, bulk_pz, bulk_pz2, rhopot
   real(kind=WP)                         :: s_sqrt
@@ -2889,11 +2879,6 @@ IMPLICIT NONE
   real(kind=WP), parameter   :: bst4 = 5.38750e-9
   real(kind=WP), parameter   :: bss = -5.72466e-3,  bsst = 1.02270e-4
   real(kind=WP), parameter   :: bsst2 = -1.65460e-6,bss2 = 4.8314e-4
-
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
   !compute secant bulk modulus
 
@@ -3286,25 +3271,18 @@ end subroutine insitu2pot
 !
 !
 !===============================================================================
-SUBROUTINE density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out, partit, mesh)
+SUBROUTINE density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out)
 !coded by Margarita Smolentseva, 21.05.2020
-USE MOD_MESH
-USE MOD_PARTIT
 USE MOD_PARSUP !, only: par_ex,pe_status
 USE o_ARRAYS
 USE o_PARAM
 use g_config !, only: which_toy, toy_ocean
 IMPLICIT NONE
-  type(t_mesh),   intent(in) ,    target :: mesh
-  type(t_partit), intent(inout),  target :: partit
   real(kind=WP),  intent(IN)             :: t,s
   real(kind=WP),  intent(OUT)            :: rho_out
   real(kind=WP)                          :: rhopot, bulk
   real(kind=WP), intent(OUT)             :: bulk_0, bulk_pz, bulk_pz2
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+
   !compute secant bulk modulus
 
   bulk_0   = 1
@@ -3355,7 +3333,7 @@ subroutine init_ref_density(partit, mesh)
         auxz=min(0.0,Z_3d_n(nzmin,node))
 
         !_______________________________________________________________________
-        call densityJM_components(density_ref_T, density_ref_S, bulk_0, bulk_pz, bulk_pz2, rhopot, partit, mesh)
+        call densityJM_components(density_ref_T, density_ref_S, bulk_0, bulk_pz, bulk_pz2, rhopot)
         rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
         density_ref(nzmin, node) = rho*rhopot/(rho+0.1_WP*auxz)
 
