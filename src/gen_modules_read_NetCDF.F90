@@ -45,7 +45,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, mesh
 
   call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (status.ne.nf_noerr)then
-     print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
+     print*,'ERROR: CANNOT READ FORCING FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file'//file
      call par_ex
      stop
@@ -150,7 +150,7 @@ end subroutine read_other_NetCDF
 !
 !------------------------------------------------------------------------------------
 !
-  subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, mesh)
+subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, mesh)
     ! Read WOA (NetCDF) surface T/S and interpolate to the model grid.
     ! Currently used for surface restoring in case of ocean-alone models
     ! Calling interp_2d_field_v2 to do interpolation, which also treats the dummy value.
@@ -302,7 +302,7 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, mesh)
   end if
   call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (status.ne.nf_noerr)then
-     print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
+     print*,'ERROR: CANNOT READ FORCING FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file'//file
      call par_ex
      stop

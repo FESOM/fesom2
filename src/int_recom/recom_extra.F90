@@ -266,14 +266,15 @@ endif
 
     else  
 
-     CO2filename = trim(REcoMDataPath)//'MonthlyAtmCO2_gcb2021.nc'
+     CO2filename = trim(REcoMDataPath)//'MonthlyAtmCO2_gcb2020.nc'
+!     CO2filename = trim(REcoMDataPath)//'MonthlyAtmCO2_2019.nc'
+!     CO2filename = trim(REcoMDataPath)//CO2file
 
      totnumyear                 = lastyearoffesomcycle-firstyearoffesomcycle+1
      firstyearofcurrentCO2cycle = lastyearoffesomcycle-numofCO2cycles*totnumyear+(currentCO2cycle-1)*totnumyear
     
      currentCO2year = firstyearofcurrentCO2cycle + (yearnew-firstyearoffesomcycle)+1
      if(mype==0 .and. my_fesom_group == 0) write(*,*),currentCO2year, firstyearofcurrentCO2cycle, yearnew, firstyearoffesomcycle !OG
-     write(currentCO2year_char,'(i4)') currentCO2year
      CO2vari     = 'AtmCO2_'//currentCO2year_char
 
 ! fesom2.1_recom:

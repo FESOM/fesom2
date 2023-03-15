@@ -1364,7 +1364,7 @@ else
     CASE (1002)
       bottom_flux = GlodecayBenthos(:,2) + GlodecayBenthos(:,4) !*** DIC + calcification ***
     CASE (1003)
-      bottom_flux = GlodecayBenthos(:,4) * 2.0_WP - 1.065_WP * GlodecayBenthos(:,1) !*** Alk ***
+      bottom_flux = GlodecayBenthos(:,4) * 2.0_WP - 1.0625_WP * GlodecayBenthos(:,1) !*** Alk ***
     CASE (1018)
       bottom_flux = GlodecayBenthos(:,3) !*** Si ***
     CASE (1019)
