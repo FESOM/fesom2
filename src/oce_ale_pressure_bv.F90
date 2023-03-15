@@ -229,6 +229,12 @@ subroutine pressure_bv(tracers, partit, mesh)
     smallvalue=1.0e-20
     buoyancy_crit=0.0003_WP
     mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==17)
+
+    if( state_equation > 1 ) then
+        if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end if
+
     !___________________________________________________________________________
     ! Screen salinity
     a    =0.0_WP
@@ -289,9 +295,9 @@ subroutine pressure_bv(tracers, partit, mesh)
                     call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
                 case(1)
                     call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
-                case default !unknown
-                    if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                ! case default !unknown
+                !     if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                !     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
             end select
         end do
 
@@ -353,9 +359,9 @@ subroutine pressure_bv(tracers, partit, mesh)
                         call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
                     case(1)
                         call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
-                    case default !unknown
-                        if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                    ! case default !unknown
+                    !     if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                    !     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
                 end select
                 !_______________________________________________________________
                 rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
