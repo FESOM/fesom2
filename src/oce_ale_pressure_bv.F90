@@ -220,6 +220,8 @@ subroutine pressure_bv(tracers, partit, mesh)
     logical                                 :: flag1, flag2, flag3, mixing_kpp
     logical                                 :: smooth_bv_vertical=.false. ! smoothing Bv in vertical is sometimes necessary in order to avoid vertival noise in Kv/Av
     real(kind=WP),  dimension(:,:), pointer :: temp, salt
+    character(20)                           :: which_ale_trimmed
+
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -229,6 +231,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     smallvalue=1.0e-20
     buoyancy_crit=0.0003_WP
     mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==17)
+    which_ale_trimmed = trim(which_ale)
 
     if( state_equation > 1 ) then
         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
@@ -372,7 +375,7 @@ subroutine pressure_bv(tracers, partit, mesh)
 
         !_______________________________________________________________________
         ! calculate pressure
-        if (trim(which_ale)=='linfs' .or. use_cavity .eqv. .true.) then
+        if (which_ale_trimmed == 'linfs' .or. use_cavity .eqv. .true.) then
             !!PS hpressure(1, node)=-Z_3d_n(1,node)*rho(1)*g
             !!PS hpressure(1, node)=0.5_WP*hnode(1,node)*rho(1)*g
             !___________________________________________________________________
@@ -3059,7 +3062,9 @@ IMPLICIT NONE
   bulk_pz  = 0
   bulk_pz2 = 0
 
-  IF((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) THEN
+  ! trim removed for GPU execution
+  ! IF((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) THEN
+  IF(toy_ocean .AND. which_toy == "soufflet") THEN
       rho_out  = density_0 - 0.00025_WP*(t - 10.0_WP)*density_0
   ELSE
       rho_out  = density_0 + 0.8_WP*(s - 34.0_WP) - 0.2*(t - 20.0_WP)
