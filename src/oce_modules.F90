@@ -244,6 +244,8 @@ integer, allocatable               :: tr_arr_requests(:), tr_arr_old_requests(:)
 ! kh 28.03.22
 integer, allocatable               :: SinkFlx_tr_requests(:)
 integer, allocatable               :: Benthos_tr_requests(:)
+integer, allocatable               :: Sinkvel1_tr_requests(:) ! OG 16.03.23
+integer, allocatable               :: Sinkvel2_tr_requests(:) ! OG 16.03.23
 
 real(kind=WP), allocatable         :: del_ttf(:,:)
 real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:) !!PS ,del_ttf_diff(:,:)

@@ -657,8 +657,6 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:,:)   :: kspc3D           ! DISS: [mol^2/kg^2] stoichiometric solubility product of calcite
   Real(kind=8),allocatable,dimension(:,:)   :: rhoSW3D          ! DISS: [mol/m3] in-situ density of seawater
 
-  Real(kind=8),allocatable,dimension(:,:)   :: sinkVel1            ! BALL: sinking speed of particle class 1
-  Real(kind=8),allocatable,dimension(:,:)   :: sinkVel2            ! BALL: sinking speed of particle class 2
   Real(kind=8),allocatable,dimension(:,:)   :: rho_particle1       ! BALL: density of particle class 1
   Real(kind=8),allocatable,dimension(:,:)   :: rho_particle2       ! BALL: density of particle class 2
   Real(kind=8),allocatable,dimension(:,:)   :: scaling_density1_3D ! BALL: scaling factor
@@ -714,6 +712,10 @@ Module REcoM_GloVar
 !  for using MEDUSA
   Real(kind=8),allocatable,dimension(:,:)   :: SinkFlx        ! Diagnostics in 2D [4 n2d] or [6 n2d] with ciso
   Real(kind=8),allocatable,dimension(:,:,:) :: SinkFlx_tr     ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+  Real(kind=8),allocatable,dimension(:,:)   :: Sinkingvel1     ! Diagnostics for vertical sinking
+  Real(kind=8),allocatable,dimension(:,:)   :: Sinkingvel2     ! Diagnostics for vertical sinking  
+  Real(kind=8),allocatable,dimension(:,:,:) :: Sinkvel1_tr     ! Sinking speed of particle class 1 OG 16.03.23 
+  Real(kind=8),allocatable,dimension(:,:,:) :: Sinkvel2_tr     ! Sinking speed of particle class 2 OG 16.03.23 
 
   Real(kind=8),allocatable,dimension(:,:) :: GloSed           ! Yearly input into bottom water from sediments [n2d 5] or [n2d 7] with ciso
   Real(kind=8),allocatable,dimension(:,:) :: lb_flux            ! Yearly burial from medusa: [n2d 5] or [n2d 9] with ciso_14 

@@ -141,8 +141,9 @@ subroutine solve_tracers_ale(mesh)
     use diff_tracers_ale_interface
 #if defined(__recom)
     use REcoM_GloVar, only: SinkFlx, & ! to initialse with 0 before loop over tracers
-                            SinkFlx_tr, Benthos, Benthos_tr ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
-                            
+                            SinkFlx_tr, Benthos, Benthos_tr, & ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                            Sinkingvel1, Sinkingvel2, Sinkvel1_tr, Sinkvel2_tr ! OG 16.03.23 
+
     use REcom_config, only: use_atbox, ciso, &       ! to calculate prognostic 14CO2 and the radioactive decay of 14C
                             bottflx_num, benthos_num ! kh 28.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
 
@@ -174,6 +175,7 @@ subroutine solve_tracers_ale(mesh)
 #if defined(__recom)
     integer             :: Sinkflx_tr_slice_count_fix_1
     integer             :: Benthos_tr_slice_count_fix_1
+    integer             :: Sinkvel_tr_slice_count_fix_1 ! OG 16.03.23
 #endif
 
     integer             :: tr_num_start_local
@@ -203,6 +205,8 @@ subroutine solve_tracers_ale(mesh)
     ! set sinking flux to the benthic layer to 0 before the loop over tracers
 #if defined(__recom)
     SinkFlx = 0.0d0 
+    SinkingVel1 = 0.0d0 ! OG 16.03.23 
+    SinkingVel2 = 0.0d0 ! OG 16.03.23 
 #endif
 
 ! kh 11.11.21 multi FESOM group loop parallelization
@@ -215,6 +219,7 @@ subroutine solve_tracers_ale(mesh)
 #if defined(__recom)
     Sinkflx_tr_slice_count_fix_1 = 1 * (myDim_nod2D + eDim_nod2D) * bottflx_num
     Benthos_tr_slice_count_fix_1 = 1 * (myDim_nod2D + eDim_nod2D) * benthos_num
+    Sinkvel_tr_slice_count_fix_1 = 1 * (nl - 1) * (myDim_nod2D + eDim_nod2D) ! OG 16.03.23
 #endif
 
     tr_num_start_memo = tr_num_start
@@ -230,6 +235,8 @@ subroutine solve_tracers_ale(mesh)
 #if defined(__recom)
         SinkFlx_tr(:, :, tr_num) = 0.0d0
         Benthos_tr(:, :, tr_num) = 0.0d0
+        Sinkvel1_tr(:, :, tr_num) = 0.0d0
+        Sinkvel2_tr(:, :, tr_num) = 0.0d0
 #endif
 
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part 
@@ -286,6 +293,12 @@ subroutine solve_tracers_ale(mesh)
 
                     call MPI_IBcast(Benthos_tr (:, :, tr_num_to_send), Benthos_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
                                                 group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, Benthos_tr_requests(request_count), MPIerr)
+
+                    call MPI_IBcast(Sinkvel1_tr (:, :, tr_num_to_send), Sinkvel_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                                group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, Sinkvel1_tr_requests(request_count), MPIerr)
+
+                    call MPI_IBcast(Sinkvel2_tr (:, :, tr_num_to_send), Sinkvel_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                                group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, Sinkvel2_tr_requests(request_count), MPIerr)
 #endif
                 end if
             end do
@@ -314,6 +327,13 @@ subroutine solve_tracers_ale(mesh)
 
                 call MPI_IBcast(Benthos_tr (:, :, tr_num_end), Benthos_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
                                 group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, Benthos_tr_requests(request_count), MPIerr)
+
+                call MPI_IBcast(Sinkvel1_tr (:, :, tr_num_end), Sinkvel_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, Sinkvel1_tr_requests(request_count), MPIerr)
+
+                call MPI_IBcast(Sinkvel2_tr (:, :, tr_num_end), Sinkvel_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, Sinkvel2_tr_requests(request_count), MPIerr)
+
 #endif
             end if
         end do
@@ -340,6 +360,16 @@ subroutine solve_tracers_ale(mesh)
         do while (.not. completed)
             call MPI_TESTALL(request_count, Benthos_tr_requests(:), completed, MPI_STATUSES_IGNORE, MPIerr)
         end do
+
+        completed = .false.
+        do while (.not. completed)
+            call MPI_TESTALL(request_count, Sinkvel1_tr_requests(:), completed, MPI_STATUSES_IGNORE, MPIerr)
+        end do
+
+        completed = .false.
+        do while (.not. completed)
+            call MPI_TESTALL(request_count, Sinkvel2_tr_requests(:), completed, MPI_STATUSES_IGNORE, MPIerr)
+        end do
 #endif
     end if ! (num_fesom_groups > 1) then
 
@@ -349,6 +379,8 @@ subroutine solve_tracers_ale(mesh)
     do tr_num = 1, num_tracers
         SinkFlx = SinkFlx + SinkFlx_tr(:, :, tr_num)
         Benthos = Benthos + Benthos_tr(:, :, tr_num)
+        Sinkingvel1(:,:) = Sinkingvel1(:,:) + Sinkvel1_tr(:, :, tr_num)
+        Sinkingvel2(:,:) = Sinkingvel2(:,:) + Sinkvel2_tr(:, :, tr_num)
     end do
 #endif
     

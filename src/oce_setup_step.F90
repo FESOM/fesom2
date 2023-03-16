@@ -240,6 +240,8 @@ allocate(tr_arr_requests(num_tracers),tr_arr_old_requests(num_tracers))
 ! kh 28.03.22
 allocate(SinkFlx_tr_requests(num_tracers))
 allocate(Benthos_tr_requests(num_tracers))
+allocate(Sinkvel1_tr_requests(num_tracers)) ! OG 16.03.23
+allocate(Sinkvel2_tr_requests(num_tracers)) ! OG 16.03.23
 
 allocate(del_ttf(nl-1,node_size))
 allocate(del_ttf_advhoriz(nl-1,node_size),del_ttf_advvert(nl-1,node_size))
@@ -445,6 +447,8 @@ end if
 ! kh 28.03.22
     SinkFlx_tr_requests = 0
     Benthos_tr_requests = 0
+    Sinkvel1_tr_requests = 0 ! OG 16.03.23
+    Sinkvel2_tr_requests = 0 ! OG 16.03.23
 
     bvfreq=0.0_WP
     mixlay_dep=0.0_WP

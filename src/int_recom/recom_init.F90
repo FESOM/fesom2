@@ -270,12 +270,6 @@ subroutine recom_init(mesh)
 
     allocate(rho_particle2(nl-1,node_size))           !NEW BALL
     rho_particle2(:,:)  = 0.d0
-    
-    allocate(sinkVel1(nl,node_size))                !NEW BALL nl-1 -> nl OG
-    sinkVel1(:,:)       = 0.d0
-    
-    allocate(sinkVel2(nl,node_size))                !NEW BALL nl-1 -> nl
-    sinkVel2(:,:)       = 0.d0
 
     allocate(scaling_density1_3D(nl,node_size))     !NEW BALL nl-1 -> nl
     scaling_density1_3D(:,:) = 0.d0
@@ -324,11 +318,17 @@ subroutine recom_init(mesh)
     ErosionTON2D = 0.d0
     ErosionTSi2D = 0.d0
 
+        allocate(Sinkingvel1(nl,node_size), Sinkingvel2(nl,node_size))  ! OG 16.03.23
+        allocate(Sinkvel1_tr(nl,node_size,num_tracers), Sinkvel2_tr(nl,node_size,num_tracers))  ! OG 16.03.23
     if (use_MEDUSA) then
         allocate(GloSed(node_size,sedflx_num))
         allocate(SinkFlx(node_size,bottflx_num))
         allocate(SinkFlx_tr(node_size,bottflx_num,num_tracers)) ! kh 25.03.22 buffer sums per tracer index
 
+Sinkingvel1(:,:)      = 0.d0  ! OG 16.03.23
+Sinkingvel2(:,:)      = 0.d0  ! OG 16.03.23
+Sinkvel1_tr(:,:,:)    = 0.0d0 ! OG 16.03.23
+Sinkvel2_tr(:,:,:)    = 0.0d0 ! OG 16.03.23
 !        allocate(LocSinkFlx(bottflx_num))
 !        allocate(LocSed(sedflx_num))
         SinkFlx(:,:)      = 0.d0
@@ -338,6 +338,7 @@ subroutine recom_init(mesh)
         allocate(lb_flux(node_size,9))
         lb_flux(:,:)      = 0.d0
     end if
+
 
     if (useRivFe) then
        allocate(RiverFe(node_size))

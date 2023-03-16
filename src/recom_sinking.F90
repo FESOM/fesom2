@@ -161,8 +161,8 @@ if (Vsink .gt. 0.1) then ! No sinking if Vsink < 0.1 m/day
                end if
             endif ! second detritus tracers
 
-         if (tracer_id(tr_num)==1021) sinkVel1(nz,n)= Wvel_flux(nz) !-1.0d0/SecondsPerDay  !idetcal              
-         if (tracer_id(tr_num)==1028) sinkVel2(nz,n)= Wvel_flux(nz)  !idetz2calc
+         if (tracer_id(tr_num)==1021) Sinkvel1_tr(nz,n,tr_num) = Wvel_flux(nz) !-1.0d0/SecondsPerDay  !idetcal   
+         if (tracer_id(tr_num)==1028) Sinkvel2_tr(nz,n,tr_num) = Wvel_flux(nz)  !idetz2calc
 
       end do
 
