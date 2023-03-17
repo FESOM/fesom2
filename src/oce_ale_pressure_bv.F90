@@ -298,9 +298,6 @@ subroutine pressure_bv(tracers, partit, mesh)
                     call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
                 case(1)
                     call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
-                ! case default !unknown
-                !     if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                !     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
             end select
         end do
 
@@ -362,9 +359,6 @@ subroutine pressure_bv(tracers, partit, mesh)
                         call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
                     case(1)
                         call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
-                    ! case default !unknown
-                    !     if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                    !     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
                 end select
                 !_______________________________________________________________
                 rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
