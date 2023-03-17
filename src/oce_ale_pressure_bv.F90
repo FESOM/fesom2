@@ -211,7 +211,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     type(t_mesh),   intent(in) ,    target  :: mesh
     type(t_partit), intent(inout),  target  :: partit
     type(t_tracer), intent(in),     target  :: tracers
-    real(kind=WP)                           :: zmean, dz_inv, bv,  a, rho_up, rho_dn, t, s
+    real(kind=WP)                           :: zmean, dz_inv, bv,  a, rho_up, rho_dn
     integer                                 :: node, nz, nl1, nzmax, nzmin
     real(kind=WP)                           :: rhopot(mesh%nl), bulk_0(mesh%nl), bulk_pz(mesh%nl), bulk_pz2(mesh%nl), rho(mesh%nl), dbsfc1(mesh%nl), bv1(mesh%nl), db_max
     real(kind=WP)                           :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf, aux_rho, aux_rho1
@@ -269,7 +269,7 @@ subroutine pressure_bv(tracers, partit, mesh)
 
     !___________________________________________________________________________
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(zmean, dz_inv, bv,  a, rho_up, rho_dn, t, s, node, nz, nl1, nzmax, nzmin, &
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(zmean, dz_inv, bv,  a, rho_up, rho_dn, node, nz, nl1, nzmax, nzmin, &
 !$OMP                                  rhopot, bulk_0, bulk_pz, bulk_pz2, rho, dbsfc1, db_max, bulk_up, bulk_dn, &
 !$OMP                                  rho_surf, aux_rho, aux_rho1, flag1, flag2, bv1)
 !$OMP DO
@@ -293,13 +293,11 @@ subroutine pressure_bv(tracers, partit, mesh)
         !_______________________________________________________________________
         ! apply equation of state
         do nz=nzmin, nzmax-1
-            t=temp(nz, node)
-            s=salt(nz, node)
             select case(state_equation)
                 case(0)
-                    call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
+                    call density_linear(temp(nz, node), salt(nz, node), bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
                 case(1)
-                    call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
+                    call densityJM_components(temp(nz, node), salt(nz, node), bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
             end select
         end do
 
@@ -355,14 +353,12 @@ subroutine pressure_bv(tracers, partit, mesh)
         ! like at the cavity-ocean interface --> compute water mass density that
         ! is replaced by the cavity
         if (nzmin>1) then
-            t=temp(nzmin, node)
-            s=salt(nzmin, node)
             do nz=1, nzmin-1
                 select case(state_equation)
                     case(0)
-                        call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
+                        call density_linear(temp(nz, node), salt(nz, node), bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
                     case(1)
-                        call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
+                        call densityJM_components(temp(nz, node), salt(nz, node), bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
                 end select
                 !_______________________________________________________________
                 rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
