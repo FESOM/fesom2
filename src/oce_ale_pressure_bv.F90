@@ -2608,6 +2608,8 @@ end subroutine densityJM_local
 !
 !===============================================================================
 SUBROUTINE densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot)
+
+!$ACC ROUTINE SEQ
 USE MOD_PARSUP !, only: par_ex,pe_status
 USE o_ARRAYS
 USE o_PARAM
@@ -2671,6 +2673,7 @@ IMPLICIT NONE
                + s*(bs + t*(bst + t*(bst2 + t*(bst3 + t*bst4)))  &
                   + s_sqrt*(bss + t*(bsst + t*bsst2))            &
                        + s* bss2)
+
 end subroutine densityJM_components
 !
 !
@@ -3046,6 +3049,8 @@ end subroutine insitu2pot
 !===============================================================================
 SUBROUTINE density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out)
 !coded by Margarita Smolentseva, 21.05.2020
+
+!$ACC ROUTINE SEQ
 USE MOD_PARSUP !, only: par_ex,pe_status
 USE o_ARRAYS
 USE o_PARAM

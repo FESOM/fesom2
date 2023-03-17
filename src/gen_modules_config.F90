@@ -127,6 +127,8 @@ module g_config
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz
 
+  !$ACC DECLARE COPYIN(toy_ocean, which_toy)
+
   !_____________________________________________________________________________
   ! *** others ***
   real(kind=WP)                 :: dt
