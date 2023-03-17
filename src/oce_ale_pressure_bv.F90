@@ -273,11 +273,17 @@ subroutine pressure_bv(tracers, partit, mesh)
 !$OMP                                  rhopot, bulk_0, bulk_pz, bulk_pz2, rho, dbsfc1, db_max, bulk_up, bulk_dn, &
 !$OMP                                  rho_surf, aux_rho, aux_rho1, flag1, flag2, bv1)
 !$OMP DO
+
+    !$ACC PARALLEL LOOP GANG &
+    !$ACC PRIVATE(rhopot, bulk_0, bulk_pz, bulk_pz2, rho, dbsfc1, bv1)
+
     do node=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(node)
         nzmax = nlevels_nod2D(node)
 
         !!PS nl1= nlevels_nod2d(node)-1
+
+        !$ACC LOOP VECTOR
         do nz = 1, mesh%nl
             rho     (nz) = 0.0_WP
             bulk_0  (nz) = 0.0_WP
@@ -288,10 +294,12 @@ subroutine pressure_bv(tracers, partit, mesh)
             ! it will be used for computing MLD according to FESOM 1.4 implementation (after Large et al. 1997)
             dbsfc1  (nz) = 0.0_WP
         end do
-        db_max   = 0.0_WP
+        !$ACC END LOOP
+        db_max = 0.0_WP
 
         !_______________________________________________________________________
         ! apply equation of state
+        !$ACC LOOP VECTOR
         do nz=nzmin, nzmax-1
             select case(state_equation)
                 case(0)
@@ -300,6 +308,7 @@ subroutine pressure_bv(tracers, partit, mesh)
                     call densityJM_components(temp(nz, node), salt(nz, node), bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
             end select
         end do
+        !$ACC END LOOP
 
         !NR split the loop here. The Intel compiler could not resolve that there is no dependency
         !NR and did not vectorize the full loop.
@@ -307,16 +316,19 @@ subroutine pressure_bv(tracers, partit, mesh)
         ! calculate density for MOC
         if (ldiag_dMOC) then
             !!PS do nz=1, nl1
+            !$ACC LOOP VECTOR
             do nz=nzmin, nzmax-1
                 rho(nz)              = bulk_0(nz) - 2000._WP*(bulk_pz(nz)   -2000._WP*bulk_pz2(nz))
                 density_dmoc(nz,node)= rho(nz)*rhopot(nz)/(rho(nz)-200._WP)
                         !           density_dmoc(nz,node)   = rhopot(nz)
             end do
+            !$ACC END LOOP
         end if
 
         !_______________________________________________________________________
         ! compute density for PGF
         !!PS do nz=1, nl1
+        !$ACC LOOP VECTOR REDUCTION(max:db_max)
         do nz=nzmin, nzmax-1
             !___________________________________________________________________
             rho(nz) = bulk_0(nz) + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
@@ -339,12 +351,15 @@ subroutine pressure_bv(tracers, partit, mesh)
 
             db_max = max(dbsfc1(nz)/abs(Z_3d_n(nzmin,node)-Z_3d_n(max(nz, nzmin+1),node)), db_max)
         end do
+        !$ACC END LOOP
 
         dbsfc1(nzmax)=dbsfc1(nzmax-1)
         if (mixing_kpp) then ! in case KPP is ON store the buoyancy difference with respect to the surface (m/s2)
-            do nz = 1, mesh%nl
+            !$ACC LOOP VECTOR
+            do nz = nzmin, nzmax
                 dbsfc(nz, node) = dbsfc1(nz)
             end do
+            !$ACC END LOOP
         end if
 
         !_______________________________________________________________________
@@ -353,6 +368,7 @@ subroutine pressure_bv(tracers, partit, mesh)
         ! like at the cavity-ocean interface --> compute water mass density that
         ! is replaced by the cavity
         if (nzmin>1) then
+            !$ACC LOOP VECTOR
             do nz=1, nzmin-1
                 select case(state_equation)
                     case(0)
@@ -365,6 +381,7 @@ subroutine pressure_bv(tracers, partit, mesh)
                 rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node)*real(state_equation))-density_ref(nz,node)
                 density_m_rho0(nz,node) = rho(nz)
             end do
+            !$ACC END LOOP
         end if
 
         !_______________________________________________________________________
@@ -381,10 +398,12 @@ subroutine pressure_bv(tracers, partit, mesh)
                 ! homogenous ocean, with no fluxes and boundary condition creates
                 ! no pressure gradient errors
                 hpressure(nzmin, node)=0.5_WP*(zbar_3d_n(1,node)-zbar_3d_n(2,node))*rho(1)*g
+                !$ACC LOOP VECTOR
                 do nz=2,nzmin
                     a=0.5_WP*g*(rho(nz-1)*(zbar_3d_n(nz-1,node)-zbar_3d_n(nz,node))+rho(nz)*(zbar_3d_n(nz,node)-zbar_3d_n(nz+1,node)))
                     hpressure(nzmin, node)=hpressure(nzmin, node)+a
                 end do
+                !$ACC END LOOP
 
                 !  --> this as a upper pressure boundary condition incase of a
                 ! homogenous ocean, with no fluxes and boundary condition creates
@@ -396,6 +415,7 @@ subroutine pressure_bv(tracers, partit, mesh)
 
             !___________________________________________________________________
             ! compute pressure below surface boundary
+            !$ACC LOOP VECTOR
             do nz=nzmin+1,nzmax-1
                 ! why 0.5 ... integrate g*rho*dz vertically, integrate half layer
                 ! thickness of previouse layer and half layer thickness of actual
@@ -403,6 +423,7 @@ subroutine pressure_bv(tracers, partit, mesh)
                 a=0.5_WP*g*(rho(nz-1)*hnode(nz-1,node)+rho(nz)*hnode(nz,node))
                 hpressure(nz, node)=hpressure(nz-1, node)+a
             end do
+            !$ACC END LOOP
         end if
 
         !___________________________________________________________________
@@ -427,6 +448,7 @@ subroutine pressure_bv(tracers, partit, mesh)
         flag1=.true.
         flag2=.true.
         flag3=.true.
+        !$ACC LOOP SEQ
         do nz=nzmin+1,nzmax-1
             zmean   = 0.5_WP*sum(Z_3d_n(nz-1:nz, node))
             bulk_up = bulk_0(nz-1) + zmean*(bulk_pz(nz-1) + zmean*bulk_pz2(nz-1))
@@ -470,6 +492,7 @@ subroutine pressure_bv(tracers, partit, mesh)
                 MLD3(node)=Z_3d_n(nz,node)
             end if
         end do
+        !$ACC END LOOP
 
         if (flag2) MLD2_ind(node)=nzmax-1
         if (flag3) MLD3_ind(node)=nzmax-1
@@ -483,16 +506,23 @@ subroutine pressure_bv(tracers, partit, mesh)
         !_______________________________________________________________________
         ! BV is defined on full levels except for the first and the last ones.
         if (smooth_bv_vertical) then
+           !$ACC LOOP VECTOR
            do nz=nzmin+1,nzmax-1
               bv1(nz)=        (zbar_3d_n(nz-1,node)-zbar_3d_n(nz,  node))*(bvfreq(nz-1,node)+bvfreq(nz,  node))
               bv1(nz)=bv1(nz)+(zbar_3d_n(nz,  node)-zbar_3d_n(nz+1,node))*(bvfreq(nz,  node)+bvfreq(nz+1,node))
               bv1(nz)=0.5_WP*bv1(nz)/(zbar_3d_n(nz-1,node)-zbar_3d_n(nz+1,  node))
            end do
+           !$ACC END LOOP
+           !$ACC LOOP VECTOR
            do nz=nzmin+1,nzmax-1
               bvfreq(nz,node)=bv1(nz)
            end do
+           !$ACC END LOOP
         end if
     end do
+
+    !$ACC END PARALLEL LOOP
+
 !$OMP END DO
 !$OMP END PARALLEL
 call smooth_nod (bvfreq, 1, partit, mesh)
