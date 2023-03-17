@@ -278,15 +278,17 @@ subroutine pressure_bv(tracers, partit, mesh)
         nzmax = nlevels_nod2D(node)
 
         !!PS nl1= nlevels_nod2d(node)-1
-        rho      = 0.0_WP
-        bulk_0   = 0.0_WP
-        bulk_pz  = 0.0_WP
-        bulk_pz2 = 0.0_WP
-        rhopot   = 0.0_WP
-        ! also compute the maximum buoyancy gradient between the surface and any depth
-        ! it will be used for computing MLD according to FESOM 1.4 implementation (after Large et al. 1997)
+        do nz = 1, mesh%nl
+            rho     (nz) = 0.0_WP
+            bulk_0  (nz) = 0.0_WP
+            bulk_pz (nz) = 0.0_WP
+            bulk_pz2(nz) = 0.0_WP
+            rhopot  (nz) = 0.0_WP
+            ! also compute the maximum buoyancy gradient between the surface and any depth
+            ! it will be used for computing MLD according to FESOM 1.4 implementation (after Large et al. 1997)
+            dbsfc1  (nz) = 0.0_WP
+        end do
         db_max   = 0.0_WP
-        dbsfc1   = 0.0_WP
 
         !_______________________________________________________________________
         ! apply equation of state
@@ -342,7 +344,9 @@ subroutine pressure_bv(tracers, partit, mesh)
 
         dbsfc1(nzmax)=dbsfc1(nzmax-1)
         if (mixing_kpp) then ! in case KPP is ON store the buoyancy difference with respect to the surface (m/s2)
-            dbsfc(nzmin:nzmax, node )=dbsfc1(nzmin:nzmax)
+            do nz = 1, mesh%nl
+                dbsfc(nz, node) = dbsfc1(nz)
+            end do
         end if
 
         !_______________________________________________________________________
