@@ -300,6 +300,7 @@ contains
     call MPI_AllREDUCE( mymax, rmax, &
           npes, MPI_INTEGER,MPI_SUM, &
           MPI_COMM_FESOM, MPIerr)
+    !rmax = rmax*2 ! Because we use element centers & edge centers
 
     ig_paral(1) = 1                       ! Apple Partition
     ig_paral(2) = my_displacement         ! Global Offset
@@ -317,10 +318,12 @@ contains
        call oasis_abort(comp_id, 'cpl_oasis3mct_define_unstr', 'def_partition failed')
     endif
 
+
       
     ALLOCATE(my_x_coords(my_number_of_points))
     ALLOCATE(my_y_coords(my_number_of_points))
 
+    ! Element center coordinates
     do i = 1, my_number_of_points
       this_x_coord = coord_nod2D(1, i)
       this_y_coord = coord_nod2D(2, i)
@@ -328,27 +331,49 @@ contains
     end do   
 
 
-    ALLOCATE(angle(my_number_of_points,rmax))
-    ALLOCATE(my_x_corners(my_number_of_points,rmax))
-    ALLOCATE(my_y_corners(my_number_of_points,rmax))
+    ALLOCATE(angle(my_number_of_points,rmax*2))
+    ALLOCATE(my_x_corners(my_number_of_points,rmax*2))
+    ALLOCATE(my_y_corners(my_number_of_points,rmax*2))
+
+
+    ! For every node, loop over neighbours, find mean of center and neighbour coords.
+    do i = 1, my_number_of_points
+      do n = 1, nn_num(i)
+        call edge_center(i, nn_pos(n), coord_e_edge_center(1,i,n), coord_e_edge_center(2,i,n), mesh)
+      end do
+    end do
 
     ! We can have a variable number of corner points
     ! Luckly oasis can deal with that by just repeating the last one
+    ! Note, the last one is not an element center, but an edge center
     do i = 1, my_number_of_points
       do j = 1, rmax
         if (nod_in_elem2D_num(i) < j) then
           my_x_corners(i,j) = x_corners(i,nod_in_elem2D_num(i))
           my_y_corners(i,j) = y_corners(i,nod_in_elem2D_num(i))
         else
-          my_x_corners(i,j) = x_corners(i,j)
-          my_y_corners(i,j) = y_corners(i,j)
+          my_x_corners(i,j) = coord_e_edge_center(1,i,j)
+          my_y_corners(i,j) = coord_e_edge_center(1,i,j)
         end if
         ! To sort the corners counterclockwise we calculate the
         ! arctangent to the center 
         angle(i,j) = atan2(my_x_corners(i,j)*rad - my_x_coords(i), my_y_corners(i,j)*rad - my_y_coords(i))
       end do
-      do l = 1, rmax-1
-        do m = l+1, rmax
+      ! We repeat the procedure with edge center coordinates, and calculate their angles
+      ! No need to worry about the order here, as we will sort the angles in the next step
+      do j = 1, rmax
+        if (nod_in_elem2D_num(i) < j) then
+          my_x_corners(i,j+rmax) = coord_e_edge_center(1,nod_in_elem2D_num(i),j)
+          my_y_corners(i,j+rmax) = coord_e_edge_center(2,nod_in_elem2D_num(i),j)
+        else
+          my_x_corners(i,j+rmax) = coord_e_edge_center(1,i,j)
+          my_y_corners(i,j+rmax) = coord_e_edge_center(2,i,j)
+        end if
+        angle(i,j+rmax) = atan2(my_x_corners(i,j+rmax)*rad - my_x_coords(i), my_y_corners(i,j+rmax)*rad - my_y_coords(i))
+      end do
+      ! Oasis requires angles sorted counterclockwise
+      do l = 1, rmax*2-1
+        do m = l+1, rmax*2
           if (angle(i,l) < angle(i,m)) then
             ! Swap angle
             temp = angle(i,m)
@@ -375,8 +400,8 @@ contains
     if (mype .eq. localroot) then
       ALLOCATE(all_x_coords(number_of_all_points, 1))
       ALLOCATE(all_y_coords(number_of_all_points, 1))
-      ALLOCATE(all_x_corners(number_of_all_points, 1, rmax))
-      ALLOCATE(all_y_corners(number_of_all_points, 1, rmax))
+      ALLOCATE(all_x_corners(number_of_all_points, 1, rmax*2))
+      ALLOCATE(all_y_corners(number_of_all_points, 1, rmax*2))
       ALLOCATE(all_area(number_of_all_points, 1))
     else 
       ALLOCATE(all_x_coords(1, 1))
@@ -407,7 +432,7 @@ contains
       print *, 'FESOM before 3rd GatherV', displs_from_all_pes(npes), counts_from_all_pes(npes), number_of_all_points
     endif
 
-    do j = 1, rmax
+    do j = 1, rmax*2
       CALL MPI_GATHERV(my_x_corners(:,j), my_number_of_points, MPI_DOUBLE_PRECISION, all_x_corners(:,:,j),  &
                     counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
       CALL MPI_GATHERV(my_y_corners(:,j), my_number_of_points, MPI_DOUBLE_PRECISION, all_y_corners(:,:,j),  &
@@ -439,7 +464,7 @@ contains
           CALL oasis_write_grid (grid_name, number_of_all_points, 1, all_x_coords(:,:), all_y_coords(:,:))
 
           print *, 'FESOM before write corner'
-          CALL oasis_write_corner (grid_name, number_of_all_points, 1, rmax, all_x_corners(:,:,:), all_y_corners(:,:,:))
+          CALL oasis_write_corner (grid_name, number_of_all_points, 1, rmax*2, all_x_corners(:,:,:), all_y_corners(:,:,:))
 
           ALLOCATE(unstr_mask(number_of_all_points, 1))
           unstr_mask=0
