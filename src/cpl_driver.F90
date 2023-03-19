@@ -232,7 +232,7 @@ contains
     real(kind=WP), allocatable :: angle(:,:)         ! array for holding corner angle for sorting
     real(kind=WP), allocatable :: my_x_corners(:,:)     ! longitude node corners
     real(kind=WP), allocatable :: my_y_corners(:,:)     ! latitude node corners
-
+    real(kind=WP), allocatable :: coord_e_edge_center(:,:,:)   ! edge center coords
     real(kind=WP), allocatable :: all_x_coords(:, :)     ! longitude coordinates
     real(kind=WP), allocatable :: all_y_coords(:, :)     ! latitude  coordinates
     real(kind=WP), allocatable :: all_x_corners(:,:,:)    ! longitude node corners
@@ -334,12 +334,14 @@ contains
     ALLOCATE(angle(my_number_of_points,rmax*2))
     ALLOCATE(my_x_corners(my_number_of_points,rmax*2))
     ALLOCATE(my_y_corners(my_number_of_points,rmax*2))
+    ALLOCATE(coord_e_edge_center(2,my_number_of_points,rmax))
 
 
     ! For every node, loop over neighbours, find mean of center and neighbour coords.
     do i = 1, my_number_of_points
       do n = 1, nn_num(i)
-        call edge_center(i, nn_pos(n), coord_e_edge_center(1,i,n), coord_e_edge_center(2,i,n), mesh)
+        call edge_center(i, nn_pos(n+1,i), this_x_coord, this_y_coord, mesh)
+        call r2g(coord_e_edge_center(1,i,n), coord_e_edge_center(2,i,n), this_x_coord, this_y_coord)
       end do
     end do
 
@@ -349,27 +351,28 @@ contains
     do i = 1, my_number_of_points
       do j = 1, rmax
         if (nod_in_elem2D_num(i) < j) then
-          my_x_corners(i,j) = x_corners(i,nod_in_elem2D_num(i))
-          my_y_corners(i,j) = y_corners(i,nod_in_elem2D_num(i))
+          my_x_corners(i,j) = coord_e_edge_center(1,i,nod_in_elem2D_num(i))
+          my_y_corners(i,j) = coord_e_edge_center(2,i,nod_in_elem2D_num(i))
+          angle(i,j) = atan2(my_x_corners(i,j) - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
         else
-          my_x_corners(i,j) = coord_e_edge_center(1,i,j)
-          my_y_corners(i,j) = coord_e_edge_center(1,i,j)
+          my_x_corners(i,j) = x_corners(i,j)*rad ! atan2 takes radian angles
+          my_y_corners(i,j) = y_corners(i,j)*rad
         end if
+        angle(i,j) = atan2(my_x_corners(i,j) - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
         ! To sort the corners counterclockwise we calculate the
         ! arctangent to the center 
-        angle(i,j) = atan2(my_x_corners(i,j)*rad - my_x_coords(i), my_y_corners(i,j)*rad - my_y_coords(i))
       end do
       ! We repeat the procedure with edge center coordinates, and calculate their angles
       ! No need to worry about the order here, as we will sort the angles in the next step
       do j = 1, rmax
         if (nod_in_elem2D_num(i) < j) then
-          my_x_corners(i,j+rmax) = coord_e_edge_center(1,nod_in_elem2D_num(i),j)
-          my_y_corners(i,j+rmax) = coord_e_edge_center(2,nod_in_elem2D_num(i),j)
+          my_x_corners(i,j+rmax) = coord_e_edge_center(1,i,nod_in_elem2D_num(i))
+          my_y_corners(i,j+rmax) = coord_e_edge_center(2,i,nod_in_elem2D_num(i))
         else
           my_x_corners(i,j+rmax) = coord_e_edge_center(1,i,j)
           my_y_corners(i,j+rmax) = coord_e_edge_center(2,i,j)
         end if
-        angle(i,j+rmax) = atan2(my_x_corners(i,j+rmax)*rad - my_x_coords(i), my_y_corners(i,j+rmax)*rad - my_y_coords(i))
+        angle(i,j+rmax) = atan2(my_x_corners(i,j+rmax) - my_x_coords(i), my_y_corners(i,j+rmax) - my_y_coords(i))
       end do
       ! Oasis requires angles sorted counterclockwise
       do l = 1, rmax*2-1
@@ -392,9 +395,11 @@ contains
       end do
     end do   
 
-
+    ! Oasis takes grad angles
     my_x_coords=my_x_coords/rad
     my_y_coords=my_y_coords/rad
+    my_x_corners=my_x_corners/rad
+    my_y_corners=my_y_corners/rad
 
     
     if (mype .eq. localroot) then
