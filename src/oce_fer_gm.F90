@@ -247,11 +247,11 @@ call flush()
        !nzmax=minval(nlevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
        !nzmin=maxval(ulevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
        !Intel vectorisation did something strange in the above lines hence we had to code it more explicitely
-        nzmax=1
-        nzmin=mesh%nl
+        nzmax=mesh%nl
+        nzmin=1
         do k=1, nod_in_elem2D_num(n)
-           nzmax=max(nzmax, nlevels(nod_in_elem2D(k, n)))
-           nzmin=min(nzmin, ulevels(nod_in_elem2D(k, n)))
+           nzmax=min(nzmax, nlevels(nod_in_elem2D(k, n)))
+           nzmin=max(nzmin, ulevels(nod_in_elem2D(k, n)))
         end do
         reso=mesh_resolution(n)
         if (Fer_GM) then
