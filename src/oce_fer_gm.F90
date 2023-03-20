@@ -235,10 +235,6 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-write(*,*) 'K_GM_rampmin=', K_GM_rampmin
-write(*,*) 'K_GM_rampmax=', K_GM_rampmax
-write(*,*) 'mesh_resolution=', minval(mesh_resolution, 1), maxval(mesh_resolution, 1)
-call flush()    
     ! fill arrays for 3D Redi and GM coefficients: F1(xy)*F2(z)
     !******************************* F1(x,y) ***********************************
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, nz, nzmax, nzmin, reso, c1, rosb, scaling, rr_ratio, aux, aux_zz, zscaling, bvref)
