@@ -973,6 +973,8 @@ subroutine write_mean(entry, entry_index)
         ! allocate global 2d array in which local data are gathered
         if(entry%p_partit%mype==entry%root_rank) then
             if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(size2))
+        else
+            if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(0))
         end if
         
         !_______________________________________________________________________
@@ -1013,6 +1015,8 @@ subroutine write_mean(entry, entry_index)
         ! allocate global 2d array in which local data are gathered
         if(entry%p_partit%mype==entry%root_rank) then
             if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(size2))
+        else
+            if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(0))
         end if
         
         !_______________________________________________________________________
