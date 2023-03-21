@@ -8,10 +8,10 @@ LD = $(MPIFC)
 # Optimization specs for compiler - used for FESOM an parms.
 # Metis falls back to conservative and non-compiler specific -O2, as
 # it is only used in the less runtime-critical setup phase. 
-OPT  = -O3 -march=native -funroll-loops -ffree-line-length-none
+#OPT  = -O3 -march=native -funroll-loops -ffree-line-length-none
 COPT = -O3 -march=native -funroll-loops -DLINUX -DUNDER_ -DMPI2 -Iinclude
 ## Options for debugging:
-# OPT = -g -fbounds-check -fbacktrace
+OPT = -g -fbounds-check -fbacktrace
 
 # Preprocessor flags for FESOM2
 CPP_DEFS = -DDISABLE_MULTITHREADING
