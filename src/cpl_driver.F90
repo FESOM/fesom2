@@ -339,9 +339,13 @@ contains
 
     ! For every node, loop over neighbours, find mean of center and neighbour coords.
     do i = 1, my_number_of_points
-      do n = 1, nn_num(i)
-        call edge_center(i, nn_pos(n+1,i), this_x_coord, this_y_coord, mesh)
-        call r2g(coord_e_edge_center(1,i,n), coord_e_edge_center(2,i,n), this_x_coord, this_y_coord)
+      do n = 2, nn_num(i)
+        if (n-1 <= rmax) then
+          call edge_center(i, nn_pos(n,i), this_x_coord, this_y_coord, mesh)
+          call r2g(coord_e_edge_center(1,i,n-1), coord_e_edge_center(2,i,n-1), this_x_coord, this_y_coord)
+        else
+          print*, 'n edges > n elements', n, rmax
+        end if
       end do
     end do
 
@@ -353,12 +357,19 @@ contains
         if (nod_in_elem2D_num(i) < j) then
           my_x_corners(i,j) = coord_e_edge_center(1,i,nod_in_elem2D_num(i))
           my_y_corners(i,j) = coord_e_edge_center(2,i,nod_in_elem2D_num(i))
-          angle(i,j) = atan2(my_x_corners(i,j) - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
         else
           my_x_corners(i,j) = x_corners(i,j)*rad ! atan2 takes radian angles
           my_y_corners(i,j) = y_corners(i,j)*rad
         end if
-        angle(i,j) = atan2(my_x_corners(i,j) - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
+        if (my_x_coords(i) <=0 .and. my_x_corners(i,j) <=0 .or. my_x_coords(i) >0 .and. my_x_corners(i,j) >0) then ! fixes angles around dateline
+          angle(i,j) = atan2(my_x_corners(i,j) - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
+        else
+          if (my_x_coords(i) <=0) then
+            angle(i,j) = atan2(my_x_corners(i,j) - 2*3.141592653589793_WP - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
+          else
+            angle(i,j) = atan2(my_x_corners(i,j) + 2*3.141592653589793_WP - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
+          end if
+        end if
         ! To sort the corners counterclockwise we calculate the
         ! arctangent to the center 
       end do
@@ -372,7 +383,15 @@ contains
           my_x_corners(i,j+rmax) = coord_e_edge_center(1,i,j)
           my_y_corners(i,j+rmax) = coord_e_edge_center(2,i,j)
         end if
-        angle(i,j+rmax) = atan2(my_x_corners(i,j+rmax) - my_x_coords(i), my_y_corners(i,j+rmax) - my_y_coords(i))
+        if (my_x_coords(i) <=0 .and. my_x_corners(i,j+rmax) <=0 .or. my_x_coords(i) >0 .and. my_x_corners(i,j+rmax) >0) then ! fixes angles around dateline
+          angle(i,j+rmax) = atan2(my_x_corners(i,j+rmax) - my_x_coords(i), my_y_corners(i,j+rmax) - my_y_coords(i))
+        else
+          if (my_x_coords(i) <=0) then
+            angle(i,j+rmax) = atan2(my_x_corners(i,j+rmax) - 2*3.141592653589793_WP - my_x_coords(i), my_y_corners(i,j+rmax) - my_y_coords(i))
+          else
+            angle(i,j+rmax) = atan2(my_x_corners(i,j+rmax) + 2*3.141592653589793_WP - my_x_coords(i), my_y_corners(i,j+rmax) - my_y_coords(i))
+          end if
+        end if
       end do
       ! Oasis requires angles sorted counterclockwise
       do l = 1, rmax*2-1
@@ -411,8 +430,8 @@ contains
     else 
       ALLOCATE(all_x_coords(1, 1))
       ALLOCATE(all_y_coords(1, 1))
-      ALLOCATE(all_x_corners(1, 1, 1))
-      ALLOCATE(all_y_corners(1, 1, 1))
+      ALLOCATE(all_x_corners(1, 1, rmax*2))
+      ALLOCATE(all_y_corners(1, 1, rmax*2))
       ALLOCATE(all_area(1, 1))
     endif
 
@@ -606,6 +625,9 @@ contains
    call exchange_roots(source_root, target_root, 1, partit%MPI_COMM_FESOM, MPI_COMM_WORLD)
    if (commRank) print *, 'FESOM source/target roots: ', source_root, target_root
 #endif
+   if (mype .eq. 0) then 
+      print *, 'After enddef'
+   endif   
 
    ! WAS VOM FOLGENDEN BRAUCHE ICH NOCH ??? 
 
@@ -613,6 +635,9 @@ contains
    allocate(exfld(myDim_nod2D))
    cplsnd=0.
    o2a_call_count=0
+   if (mype .eq. 0) then 
+      print *, 'Before last barrier'
+   endif   
 
    CALL MPI_BARRIER(MPI_COMM_FESOM, ierror)
    if (mype .eq. 0) then 
