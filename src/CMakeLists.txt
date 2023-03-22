@@ -144,7 +144,7 @@ endif()
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
    if(${BUILD_FESOM_AS_LIBRARY})
-        target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -xHost -ip -init=zero -no-wrap-margin -fpe0) # add -fpe0 for RAPS environment
+        target_compile_options(${PROJECT_NAME} PRIVATE -O2 -march=core-avx2 -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -ip -init=zero -no-wrap-margin -fpe0) # add -fpe0 for RAPS environment
    else()
         target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -ip -init=zero -no-wrap-margin)
    endif()
@@ -152,6 +152,8 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
       target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  albedo)
       target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -O3 -ip -fPIC -qopt-malloc-options=2 -qopt-prefetch=5 -unroll-aggressive) #NEC mpi option
+   elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL atosecmwf )
+      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -march=core-avx2) # Do not use xHost with Intel compilers on AMD CPUs
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE -xHost)
    endif()
