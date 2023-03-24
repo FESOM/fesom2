@@ -2408,6 +2408,12 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
 #include "associate_mesh_ass.h"
     temp=>tracers%data(1)%values(:,:)
     salt=>tracers%data(2)%values(:,:)
+
+    if( state_equation > 1 ) then
+        if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end if
+
     !___________________________________________________________________________
     ! loop over triangular elemments
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nlz, nln, ni, nlc, nlce, idx, int_dp_dx, drho_dx, drho_dy, dz_dx, dz_dy, aux_sum, dx10, dx20, dx21, &
@@ -2445,9 +2451,6 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                     call density_linear(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot)
                 case(1)
                     call densityJM_components(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot)
-                case default !unknown
-                    if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
             end select
         end if
 
@@ -2557,9 +2560,6 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                         call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                     case(1)
                         call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
-                    case default !unknown
-                        if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
                 end select
                 rho_at_Zn(ni, nlz) = bulk_0(ni) + Z_n(nlz) * (bulk_pz(ni) + Z_n(nlz) * bulk_pz2(ni))
                 rho_at_Zn(ni, nlz) = rho_at_Zn(ni, nlz) * rhopot(ni)                                   &
