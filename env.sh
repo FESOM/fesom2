@@ -17,19 +17,20 @@ else
    BEING_EXECUTED=false
 fi
 
-# if an arg is given, use it as hostname
-if [ -z "$1" ]; then
+# if an arg is given and doesn't start with - use it as hostname, arguments with - are passed on to cmake
+if [[ ! -z "$1" ]] && [[ ! "$1" = ^- ]]; then
+   LOGINHOST=$1 # arg exists and doesn't start with -
+   shift # pop the argument as we already stored it
+else
    # no argument given
    LOGINHOST="$(hostname -f)"
-else
-   LOGINHOST=$1
 fi
 
 if [[ $LOGINHOST =~ ^m[A-Za-z0-9]+\.hpc\.dkrz\.de$ ]]; then
    STRATEGY="mistral.dkrz.de"
 elif [[ $LOGINHOST =~ ^levante ]] || [[ $LOGINHOST =~ ^l[:alnum:]+\.lvt\.dkrz\.de$ ]]; then 
    STRATEGY="levante.dkrz.de"
-   # following regex only matches if input is 2 word like levante.nvhpc
+   # following regex only matches if input is 2 word like levante.nvhpc, this enables using different shells for a machine directly
    compid_regex="^([[:alnum:]]+)\.([[:alnum:]]+)$"
    if [[ $LOGINHOST =~ $compid_regex ]]; then
      COMPILERID="${BASH_REMATCH[2]}"
