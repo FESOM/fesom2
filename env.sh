@@ -27,8 +27,13 @@ fi
 
 if [[ $LOGINHOST =~ ^m[A-Za-z0-9]+\.hpc\.dkrz\.de$ ]]; then
    STRATEGY="mistral.dkrz.de"
-elif [[ $LOGINHOST =~ ^l[A-Za-z0-9]+\.lvt\.dkrz\.de$ ]]; then
+elif [[ $LOGINHOST =~ ^levante ]] || [[ $LOGINHOST =~ ^l[:alnum:]+\.lvt\.dkrz\.de$ ]]; then 
    STRATEGY="levante.dkrz.de"
+   # following regex only matches if input is 2 word like levante.nvhpc
+   compid_regex="^([[:alnum:]]+)\.([[:alnum:]]+)$"
+   if [[ $LOGINHOST =~ $compid_regex ]]; then
+     COMPILERID="${BASH_REMATCH[2]}"
+   fi
 elif [[ $LOGINHOST =~ ^ollie[0-9]$ ]] || [[ $LOGINHOST =~ ^prod-[0-9]{4}$ ]]; then
    STRATEGY="ollie"
 elif [[ $LOGINHOST =~ ^albedo[0-9]$ ]] || [[ $LOGINHOST =~ ^prod-[0-9]{4}$ ]]; then
@@ -74,10 +79,18 @@ fi
 DIR="$( cd "$( dirname "${SOURCE}" )" && pwd )"
 
 if [ $BEING_EXECUTED = true ]; then
-   # file is being executed
+   # file is being executed, why is this here?
    echo $DIR/env/$STRATEGY
 else
    # file is being sourced
    export FESOM_PLATFORM_STRATEGY=$STRATEGY
-   source $DIR/env/$STRATEGY/shell
+   SHELLFILE="${DIR}/env/${STRATEGY}/shell"
+   if [[ -n ${COMPILERID} ]]; then
+      SHELLFILE="${SHELLFILE}.${COMPILERID}"
+   fi
+   if [[ ! -e ${SHELLFILE} ]]; then 
+       echo "Shell file for ${LOGINHOST} doesnt exist: "$SHELLFILE
+       exit 1
+   fi
+   source $SHELLFILE
 fi
