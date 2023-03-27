@@ -216,7 +216,7 @@ contains
     integer                    :: displs_from_all_pes(partit%npes)
     integer                    :: my_displacement
     integer                    :: mymax(partit%npes)
-    integer                    :: rmax
+    integer                    :: rmax, start_i
 
     integer,allocatable        :: unstr_mask(:,:)
     real(kind=WP)              :: temp                  ! temp storage for corner sorting
@@ -339,10 +339,20 @@ contains
 
     ! For every node, loop over neighbours, find mean of center and neighbour coords.
     do i = 1, my_number_of_points
-      do n = 2, nn_num(i)
+      print *, 'myList_edge2D(i), edge2D_in',myList_edge2D(i), edge2D_in
+      print *, 'nn_num(i), nn_pos(:,i)',nn_num(i), nn_pos(:,i)
+      
+      if (myList_edge2D(i)>edge2D_in) then ! if we are on coastal node, include node center as corner
+        start_i=1
+        print *, 'Coastal'
+      else
+        start_i=2
+        print *, 'Open ocean'
+      end if
+      do n = start_i, nn_num(i)
         if (n-1 <= rmax) then
           call edge_center(i, nn_pos(n,i), this_x_coord, this_y_coord, mesh)
-          call r2g(coord_e_edge_center(1,i,n-1), coord_e_edge_center(2,i,n-1), this_x_coord, this_y_coord)
+          call r2g(coord_e_edge_center(1,i,n-start_i+1), coord_e_edge_center(2,i,n-start_i+1), this_x_coord, this_y_coord)
         else
           print*, 'n edges > n elements', n, rmax
         end if
