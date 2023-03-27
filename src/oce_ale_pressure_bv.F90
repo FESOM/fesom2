@@ -2948,7 +2948,7 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tx, ty, sx, sy, vol, testino, n, nz, elnodes, el, k, nln, uln, nle, ule)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tx, ty, sx, sy, vol, n, nz, elnodes, el, k, nln, uln, nle, ule)
 !$OMP DO
 
     !$ACC PARALLEL LOOP GANG &
