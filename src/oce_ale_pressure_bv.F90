@@ -2950,6 +2950,10 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tx, ty, sx, sy, vol, testino, n, nz, elnodes, el, k, nln, uln, nle, ule)
 !$OMP DO
+
+    !$ACC PARALLEL LOOP GANG &
+    !$ACC PRIVATE(elnodes, tx, ty, sx, sy, vol)
+
     do n=1, myDim_nod2D
         nln = nlevels_nod2D(n)-1
         uln = ulevels_nod2D(n)
@@ -2959,6 +2963,7 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
         !!PS sx(1:nl1)  = 0.0_WP
         !!PS sy(1:nl1)  = 0.0_WP
 
+        !$ACC LOOP VECTOR
         do nz = uln, nln
             vol(nz) = 0.0_WP
             tx (nz) = 0.0_WP
@@ -2966,12 +2971,14 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
             sx (nz) = 0.0_WP
             sy (nz) = 0.0_WP
         end do
+        !$ACC END LOOP
 
         do k=1, nod_in_elem2D_num(n)
            el=nod_in_elem2D(k, n)
            nle = nlevels(el)-1
            ule = ulevels(el)
            !!PS DO nz=1, nlevels(el)-1
+           !$ACC LOOP VECTOR
            do nz=ule, nle
               vol(nz) = vol(nz)+elem_area(el)
 
@@ -2993,15 +3000,21 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
                              + gradient_sca(5,el)*SF1(nz,elem2D_nodes(2,el)) &
                              + gradient_sca(6,el)*SF1(nz,elem2D_nodes(3,el)))*elem_area(el)
            end do
+           !$ACC END LOOP
         end do
 
         !!PS sigma_xy(1,1:nl1,n) = (-sw_alpha(1:nl1,n)*tx(1:nl1)+sw_beta(1:nl1,n)*sx(1:nl1))/vol(1:nl1)*density_0
         !!PS sigma_xy(2,1:nl1,n) = (-sw_alpha(1:nl1,n)*ty(1:nl1)+sw_beta(1:nl1,n)*sy(1:nl1))/vol(1:nl1)*density_0
+        !$ACC LOOP VECTOR
         do nz = uln, nln
             sigma_xy(1, nz, n) = (-sw_alpha(nz, n)*tx(nz)+sw_beta(nz, n)*sx(nz))/vol(nz)*density_0
             sigma_xy(2, nz, n) = (-sw_alpha(nz, n)*ty(nz)+sw_beta(nz, n)*sy(nz))/vol(nz)*density_0
         end do
+        !$ACC END LOOP
     end do
+
+    !$ACC END PARALLEL LOOP
+
 !$OMP END DO
 !$OMP END PARALLEL
   call exchange_nod(sigma_xy, partit)
