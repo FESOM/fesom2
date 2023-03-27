@@ -215,8 +215,10 @@ contains
     integer                    :: counts_from_all_pes(partit%npes)
     integer                    :: displs_from_all_pes(partit%npes)
     integer                    :: my_displacement
-    integer                    :: mymax(partit%npes)
-    integer                    :: rmax, start_i
+    integer                    :: my_max_elem(partit%npes)
+    integer                    :: my_max_edge(partit%npes)
+    integer                    :: all_max_elem, all_max_edge
+    integer                    :: el(2), enodes(2), edge
 
     integer,allocatable        :: unstr_mask(:,:)
     real(kind=WP)              :: temp                  ! temp storage for corner sorting
@@ -238,6 +240,8 @@ contains
     real(kind=WP), allocatable :: all_x_corners(:,:,:)    ! longitude node corners
     real(kind=WP), allocatable :: all_y_corners(:,:,:)    ! latitude node corners
     real(kind=WP), allocatable :: all_area(:,:)    
+    logical, allocatable       :: coastal_nodes(:)    
+
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -294,19 +298,26 @@ contains
 
     CALL MPI_BARRIER(MPI_COMM_FESOM, ierror)
 
-    mymax=0
-    rmax=0
-    mymax(mype+1)=maxval(nod_in_elem2D_num(1:myDim_nod2D))
-    call MPI_AllREDUCE( mymax, rmax, &
+    my_max_elem=0
+    all_max_elem=0
+    my_max_elem(mype+1)=maxval(nod_in_elem2D_num(1:myDim_nod2D))
+    call MPI_AllREDUCE( my_max_elem, all_max_elem, &
           npes, MPI_INTEGER,MPI_SUM, &
           MPI_COMM_FESOM, MPIerr)
-    !rmax = rmax*2 ! Because we use element centers & edge centers
+
+    my_max_edge=0
+    all_max_edge=0
+    my_max_edge(mype+1)=maxval(nn_num)
+    call MPI_AllREDUCE( my_max_edge, all_max_edge, &
+          npes, MPI_INTEGER,MPI_SUM, &
+          MPI_COMM_FESOM, MPIerr)
 
     ig_paral(1) = 1                       ! Apple Partition
     ig_paral(2) = my_displacement         ! Global Offset
     ig_paral(3) = my_number_of_points     ! Local Extent
 
     if (mype .eq. 0) then
+      print *, 'Max elements per node:', all_max_elem, 'Max edges per node:', all_max_edge
       print *, 'FESOM before def partition'
     endif
     CALL oasis_def_partition( part_id(1), ig_paral, ierror )
@@ -331,42 +342,56 @@ contains
     end do   
 
 
-    ALLOCATE(angle(my_number_of_points,rmax*2))
-    ALLOCATE(my_x_corners(my_number_of_points,rmax*2))
-    ALLOCATE(my_y_corners(my_number_of_points,rmax*2))
-    ALLOCATE(coord_e_edge_center(2,my_number_of_points,rmax))
-
-
-    ! For every node, loop over neighbours, find mean of center and neighbour coords.
+    ALLOCATE(coastal_nodes(number_of_all_points))
+    ALLOCATE(angle(my_number_of_points,all_max_elem+all_max_edge))
+    ALLOCATE(my_x_corners(my_number_of_points,all_max_elem+all_max_edge))
+    ALLOCATE(my_y_corners(my_number_of_points,all_max_elem+all_max_edge))
+    ALLOCATE(coord_e_edge_center(2,my_number_of_points, all_max_edge))
+   
+    ! We need to know for every node if any of it's edges are coastal
+    ! in this case the center point will by a corner of the nodal area
+    coastal_nodes=.False.
+    do edge=1, myDim_edge2D
+      ! local indice of nodes that span up edge ed
+      enodes=edges(:,edge)      
+      ! local index of element that contribute to edge
+      el=edge_tri(:,edge)        
+      if(el(2)>0) then
+        ! it must be an inner edge
+        continue
+      else   
+        ! it must be a boundary edge
+        coastal_nodes(enodes(1))=.True.
+        coastal_nodes(enodes(2))=.True.
+      end if  
+    end do
+    
+    ! For every node, loop over neighbours, find mean of node center and neighbour node center.
+    coord_e_edge_center=0
     do i = 1, my_number_of_points
-      print *, 'myList_edge2D(i), edge2D_in',myList_edge2D(i), edge2D_in
-      print *, 'nn_num(i), nn_pos(:,i)',nn_num(i), nn_pos(:,i)
-      
-      if (myList_edge2D(i)>edge2D_in) then ! if we are on coastal node, include node center as corner
-        start_i=1
-        print *, 'Coastal'
-      else
-        start_i=2
-        print *, 'Open ocean'
-      end if
-      do n = start_i, nn_num(i)
-        if (n-1 <= rmax) then
+      ! if we are on coastal node, include node center n=1 as corner
+      if (coastal_nodes(i)==.True.) then 
+        do n = 1, nn_num(i)
           call edge_center(i, nn_pos(n,i), this_x_coord, this_y_coord, mesh)
-          call r2g(coord_e_edge_center(1,i,n-start_i+1), coord_e_edge_center(2,i,n-start_i+1), this_x_coord, this_y_coord)
-        else
-          print*, 'n edges > n elements', n, rmax
-        end if
-      end do
+          call r2g(coord_e_edge_center(1,i,n), coord_e_edge_center(2,i,n), this_x_coord, this_y_coord)
+        end do
+      ! else we skip n=1 and use only the edge centers n=2:nn_num(i)
+      else
+        do n = 2, nn_num(i)
+          call edge_center(i, nn_pos(n,i), this_x_coord, this_y_coord, mesh)
+          call r2g(coord_e_edge_center(1,i,n-1), coord_e_edge_center(2,i,n-1), this_x_coord, this_y_coord)
+        end do
+      end if
     end do
 
     ! We can have a variable number of corner points
     ! Luckly oasis can deal with that by just repeating the last one
     ! Note, the last one is not an element center, but an edge center
     do i = 1, my_number_of_points
-      do j = 1, rmax
+      do j = 1, all_max_elem
         if (nod_in_elem2D_num(i) < j) then
-          my_x_corners(i,j) = coord_e_edge_center(1,i,nod_in_elem2D_num(i))
-          my_y_corners(i,j) = coord_e_edge_center(2,i,nod_in_elem2D_num(i))
+          my_x_corners(i,j) = coord_e_edge_center(1,i,2)
+          my_y_corners(i,j) = coord_e_edge_center(2,i,2)
         else
           my_x_corners(i,j) = x_corners(i,j)*rad ! atan2 takes radian angles
           my_y_corners(i,j) = y_corners(i,j)*rad
@@ -385,27 +410,42 @@ contains
       end do
       ! We repeat the procedure with edge center coordinates, and calculate their angles
       ! No need to worry about the order here, as we will sort the angles in the next step
-      do j = 1, rmax
-        if (nod_in_elem2D_num(i) < j) then
-          my_x_corners(i,j+rmax) = coord_e_edge_center(1,i,nod_in_elem2D_num(i))
-          my_y_corners(i,j+rmax) = coord_e_edge_center(2,i,nod_in_elem2D_num(i))
+      do j = 1, all_max_edge
+        if (nn_num(i) < j) then
+          my_x_corners(i,j+all_max_elem) = coord_e_edge_center(1,i,2)
+          my_y_corners(i,j+all_max_elem) = coord_e_edge_center(2,i,2)
         else
-          my_x_corners(i,j+rmax) = coord_e_edge_center(1,i,j)
-          my_y_corners(i,j+rmax) = coord_e_edge_center(2,i,j)
+          ! If we are coastal we take j=1, which is node center
+          if ((coastal_nodes(i)==.True.) .and. (j==1)) then
+            my_x_corners(i,j+all_max_elem) = coord_e_edge_center(1,i,1)
+            my_y_corners(i,j+all_max_elem) = coord_e_edge_center(2,i,1)
+          ! Else we take j=2, which is the first edge center
+          elseif ((coastal_nodes(i)==.False.) .and. (j==1)) then
+            my_x_corners(i,j+all_max_elem) = coord_e_edge_center(1,i,2)
+            my_y_corners(i,j+all_max_elem) = coord_e_edge_center(2,i,2)
+          ! Default case when j /= 1 and <= nn_num(i)
+          else
+            my_x_corners(i,j+all_max_elem) = coord_e_edge_center(1,i,j)
+            my_y_corners(i,j+all_max_elem) = coord_e_edge_center(2,i,j)
+          end if
         end if
-        if (my_x_coords(i) <=0 .and. my_x_corners(i,j+rmax) <=0 .or. my_x_coords(i) >0 .and. my_x_corners(i,j+rmax) >0) then ! fixes angles around dateline
-          angle(i,j+rmax) = atan2(my_x_corners(i,j+rmax) - my_x_coords(i), my_y_corners(i,j+rmax) - my_y_coords(i))
+        ! Default calculation of angle between center and corner
+        if (my_x_coords(i) <=0 .and. my_x_corners(i,j+all_max_elem) <=0 .or. my_x_coords(i) >0 .and. my_x_corners(i,j+all_max_elem) >0) then 
+          angle(i,j+all_max_elem) = atan2(my_x_corners(i,j+all_max_elem) - my_x_coords(i), my_y_corners(i,j+all_max_elem) - my_y_coords(i))
+        ! Fixing angles around dateline by adding or subtractic 2*Pi to corner coords in case the center point is the in other hemisphere than the corner
         else
           if (my_x_coords(i) <=0) then
-            angle(i,j+rmax) = atan2(my_x_corners(i,j+rmax) - 2*3.141592653589793_WP - my_x_coords(i), my_y_corners(i,j+rmax) - my_y_coords(i))
+            angle(i,j+all_max_elem) = atan2(my_x_corners(i,j+all_max_elem) - 2*3.141592653589793_WP - my_x_coords(i), my_y_corners(i,j+all_max_elem) - my_y_coords(i))
           else
-            angle(i,j+rmax) = atan2(my_x_corners(i,j+rmax) + 2*3.141592653589793_WP - my_x_coords(i), my_y_corners(i,j+rmax) - my_y_coords(i))
+            angle(i,j+all_max_elem) = atan2(my_x_corners(i,j+all_max_elem) + 2*3.141592653589793_WP - my_x_coords(i), my_y_corners(i,j+all_max_elem) - my_y_coords(i))
           end if
         end if
       end do
-      ! Oasis requires angles sorted counterclockwise
-      do l = 1, rmax*2-1
-        do m = l+1, rmax*2
+
+      
+      ! Oasis requires corners sorted counterclockwise, so we sort by angle
+      do l = 1, all_max_elem+all_max_edge-1
+        do m = l+1, all_max_elem+all_max_edge
           if (angle(i,l) < angle(i,m)) then
             ! Swap angle
             temp = angle(i,m)
@@ -434,14 +474,14 @@ contains
     if (mype .eq. localroot) then
       ALLOCATE(all_x_coords(number_of_all_points, 1))
       ALLOCATE(all_y_coords(number_of_all_points, 1))
-      ALLOCATE(all_x_corners(number_of_all_points, 1, rmax*2))
-      ALLOCATE(all_y_corners(number_of_all_points, 1, rmax*2))
+      ALLOCATE(all_x_corners(number_of_all_points, 1, all_max_elem+all_max_edge))
+      ALLOCATE(all_y_corners(number_of_all_points, 1, all_max_elem+all_max_edge))
       ALLOCATE(all_area(number_of_all_points, 1))
     else 
       ALLOCATE(all_x_coords(1, 1))
       ALLOCATE(all_y_coords(1, 1))
-      ALLOCATE(all_x_corners(1, 1, rmax*2))
-      ALLOCATE(all_y_corners(1, 1, rmax*2))
+      ALLOCATE(all_x_corners(1, 1, all_max_elem+all_max_edge))
+      ALLOCATE(all_y_corners(1, 1, all_max_elem+all_max_edge))
       ALLOCATE(all_area(1, 1))
     endif
 
@@ -466,7 +506,7 @@ contains
       print *, 'FESOM before 3rd GatherV', displs_from_all_pes(npes), counts_from_all_pes(npes), number_of_all_points
     endif
 
-    do j = 1, rmax*2
+    do j = 1, all_max_elem+all_max_edge
       CALL MPI_GATHERV(my_x_corners(:,j), my_number_of_points, MPI_DOUBLE_PRECISION, all_x_corners(:,:,j),  &
                     counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
       CALL MPI_GATHERV(my_y_corners(:,j), my_number_of_points, MPI_DOUBLE_PRECISION, all_y_corners(:,:,j),  &
@@ -498,7 +538,7 @@ contains
           CALL oasis_write_grid (grid_name, number_of_all_points, 1, all_x_coords(:,:), all_y_coords(:,:))
 
           print *, 'FESOM before write corner'
-          CALL oasis_write_corner (grid_name, number_of_all_points, 1, rmax*2, all_x_corners(:,:,:), all_y_corners(:,:,:))
+          CALL oasis_write_corner (grid_name, number_of_all_points, 1, all_max_elem+all_max_edge, all_x_corners(:,:,:), all_y_corners(:,:,:))
 
           ALLOCATE(unstr_mask(number_of_all_points, 1))
           unstr_mask=0
