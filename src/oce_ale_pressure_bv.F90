@@ -2929,7 +2929,7 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
   ! based on thermal expansion and saline contraction coefficients
   ! computes density gradient sigma_xy
   !-------------------------------------------------------------------
-  use mod_mesh
+  use MOD_MESH
   USE MOD_PARTIT
   USE MOD_PARSUP
   use o_param
@@ -2940,7 +2940,7 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
   type(t_mesh),   intent(in) ,    target :: mesh
   type(t_partit), intent(inout),  target :: partit
   real(kind=WP),  intent(IN)             :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D), SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-  real(kind=WP)                          :: tx(mesh%nl-1), ty(mesh%nl-1), sx(mesh%nl-1), sy(mesh%nl-1), vol(mesh%nl-1), testino(2)
+  real(kind=WP)                          :: tx(mesh%nl - 1), ty(mesh%nl - 1), sx(mesh%nl - 1), sy(mesh%nl - 1), vol(mesh%nl - 1)
   integer                                :: n, nz, elnodes(3),el, k, nln, uln, nle, ule
 
 #include "associate_part_def.h"
@@ -2950,7 +2950,7 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tx, ty, sx, sy, vol, testino, n, nz, elnodes, el, k, nln, uln, nle, ule)
 !$OMP DO
-  DO n=1, myDim_nod2D
+    do n=1, myDim_nod2D
         nln = nlevels_nod2D(n)-1
         uln = ulevels_nod2D(n)
         !!PS vol(1:nl1) = 0.0_WP
@@ -2958,17 +2958,21 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
         !!PS ty(1:nl1)  = 0.0_WP
         !!PS sx(1:nl1)  = 0.0_WP
         !!PS sy(1:nl1)  = 0.0_WP
-        vol(uln:nln) = 0.0_WP
-        tx(uln:nln)  = 0.0_WP
-        ty(uln:nln)  = 0.0_WP
-        sx(uln:nln)  = 0.0_WP
-        sy(uln:nln)  = 0.0_WP
-        DO k=1, nod_in_elem2D_num(n)
+
+        do nz = uln, nln
+            vol(nz) = 0.0_WP
+            tx (nz) = 0.0_WP
+            ty (nz) = 0.0_WP
+            sx (nz) = 0.0_WP
+            sy (nz) = 0.0_WP
+        end do
+
+        do k=1, nod_in_elem2D_num(n)
            el=nod_in_elem2D(k, n)
            nle = nlevels(el)-1
            ule = ulevels(el)
            !!PS DO nz=1, nlevels(el)-1
-           DO nz=ule, nle
+           do nz=ule, nle
               vol(nz) = vol(nz)+elem_area(el)
 
               !NR  writing the sum over elem2D_nodes explicitly helps the compiler to vectorize the nz-loop
@@ -2988,13 +2992,16 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
               sy(nz) = sy(nz)+(gradient_sca(4,el)*SF1(nz,elem2D_nodes(1,el)) &
                              + gradient_sca(5,el)*SF1(nz,elem2D_nodes(2,el)) &
                              + gradient_sca(6,el)*SF1(nz,elem2D_nodes(3,el)))*elem_area(el)
-           END DO
-        enddo
+           end do
+        end do
+
         !!PS sigma_xy(1,1:nl1,n) = (-sw_alpha(1:nl1,n)*tx(1:nl1)+sw_beta(1:nl1,n)*sx(1:nl1))/vol(1:nl1)*density_0
         !!PS sigma_xy(2,1:nl1,n) = (-sw_alpha(1:nl1,n)*ty(1:nl1)+sw_beta(1:nl1,n)*sy(1:nl1))/vol(1:nl1)*density_0
-        sigma_xy(1,uln:nln,n) = (-sw_alpha(uln:nln,n)*tx(uln:nln)+sw_beta(uln:nln,n)*sx(uln:nln))/vol(uln:nln)*density_0
-        sigma_xy(2,uln:nln,n) = (-sw_alpha(uln:nln,n)*ty(uln:nln)+sw_beta(uln:nln,n)*sy(uln:nln))/vol(uln:nln)*density_0
-  END DO
+        do nz = uln, nln
+            sigma_xy(1, nz, n) = (-sw_alpha(nz, n)*tx(nz)+sw_beta(nz, n)*sx(nz))/vol(nz)*density_0
+            sigma_xy(2, nz, n) = (-sw_alpha(nz, n)*ty(nz)+sw_beta(nz, n)*sy(nz))/vol(nz)*density_0
+        end do
+    end do
 !$OMP END DO
 !$OMP END PARALLEL
   call exchange_nod(sigma_xy, partit)
