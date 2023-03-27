@@ -3050,6 +3050,10 @@ subroutine compute_neutral_slope(partit, mesh)
     S_d=1.0e-3_WP
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, n, nz, nl1, ul1, el, elnodes, enodes, c, ro_z_inv)
 !$OMP DO
+
+    ! WARNING: apparently the hyperbolic tangent makes math_uniform not work properly
+    !$ACC PARALLEL LOOP GANG VECTOR
+
     do n=1, myDim_nod2D
         slope_tapered(: , :, n)=0._WP
         nl1=nlevels_nod2d(n)-1
@@ -3066,6 +3070,9 @@ subroutine compute_neutral_slope(partit, mesh)
             slope_tapered(:,nz,n)=neutral_slope(:,nz,n)*c
         enddo
     enddo
+
+    !$ACC END PARALLEL LOOP
+
 !$OMP END DO
 !$OMP END PARALLEL
     call exchange_nod(neutral_slope, partit)
