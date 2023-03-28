@@ -91,7 +91,6 @@ else
    # file is being sourced
    export FESOM_PLATFORM_STRATEGY=$STRATEGY
    SHELLFILE="${DIR}/env/${STRATEGY}/shell"
-   echo "Sourcing $(realpath $SHELLFILE) for environment" 
    if [[ -n ${COMPILERID} ]]; then
       SHELLFILE="${SHELLFILE}.${COMPILERID}"
    fi
@@ -99,5 +98,6 @@ else
        echo "Shell file for ${LOGINHOST} doesnt exist: "$SHELLFILE
        exit 1
    fi
+   echo "Sourcing $(realpath $SHELLFILE) for environment" 
    source $SHELLFILE
 fi
