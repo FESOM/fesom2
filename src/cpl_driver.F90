@@ -334,7 +334,7 @@ contains
     ALLOCATE(my_x_coords(my_number_of_points))
     ALLOCATE(my_y_coords(my_number_of_points))
 
-    ! Element center coordinates
+    ! Node center coordinates
     do i = 1, my_number_of_points
       this_x_coord = coord_nod2D(1, i)
       this_y_coord = coord_nod2D(2, i)
@@ -348,19 +348,19 @@ contains
     ALLOCATE(my_y_corners(my_number_of_points,all_max_elem+all_max_edge))
     ALLOCATE(coord_e_edge_center(2,my_number_of_points, all_max_edge))
    
-    ! We need to know for every node if any of it's edges are coastal
-    ! in this case the center point will by a corner of the nodal area
+    ! We need to know for every node if any of it's edges are coastal, because 
+    ! in case they are the center point will be a corner of the nodal area
     coastal_nodes=.False.
     do edge=1, myDim_edge2D
-      ! local indice of nodes that span up edge ed
+      ! local indice of nodes that span up edge
       enodes=edges(:,edge)      
       ! local index of element that contribute to edge
       el=edge_tri(:,edge)        
       if(el(2)>0) then
-        ! it must be an inner edge
+        ! Inner edge
         continue
       else   
-        ! it must be a boundary edge
+        ! Boundary/coastal edge
         coastal_nodes(enodes(1))=.True.
         coastal_nodes(enodes(2))=.True.
       end if  
@@ -384,22 +384,26 @@ contains
       end if
     end do
 
-    ! We can have a variable number of corner points
-    ! Luckly oasis can deal with that by just repeating the last one
-    ! Note, the last one is not an element center, but an edge center
+    ! We can have a variable number of corner points.
+    ! Luckly oasis can deal with that by just repeating the last one.
+    ! Note, we are only allowed to repeat one coordinate and 
+    ! the last one is not an element center, but an edge center
     do i = 1, my_number_of_points
       do j = 1, all_max_elem
         if (nod_in_elem2D_num(i) < j) then
           my_x_corners(i,j) = coord_e_edge_center(1,i,2)
           my_y_corners(i,j) = coord_e_edge_center(2,i,2)
         else
-          my_x_corners(i,j) = x_corners(i,j)*rad ! atan2 takes radian angles
+          my_x_corners(i,j) = x_corners(i,j)*rad ! atan2 takes radian and elem corners come in grad
           my_y_corners(i,j) = y_corners(i,j)*rad
         end if
-        ! To sort the corners counterclockwise we calculate the
+        ! To allow for sorting the corners counterclockwise later we calculate the
         ! arctangent to the center 
-        if (my_x_coords(i) <=0 .and. my_x_corners(i,j) <=0 .or. my_x_coords(i) >0 .and. my_x_corners(i,j) >0) then ! fixes angles around dateline
+        ! Default case is that center and corner coords have same sign
+        if (my_x_coords(i) <=0 .and. my_x_corners(i,j) <=0 .or. my_x_coords(i) >0 .and. my_x_corners(i,j) >0) then 
           angle(i,j) = atan2(my_x_corners(i,j) - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
+        ! If they have different sign we are near the dateline and need to bring the corner onto
+        ! the same hemisphere as the center (only for angle calc, the coord for oasis remains as before)
         else
           if (my_x_coords(i) <=0) then
             angle(i,j) = atan2(my_x_corners(i,j) - 2*3.141592653589793_WP - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
@@ -415,7 +419,7 @@ contains
           my_x_corners(i,j+all_max_elem) = coord_e_edge_center(1,i,2)
           my_y_corners(i,j+all_max_elem) = coord_e_edge_center(2,i,2)
         else
-          ! If we are not on coastal, we don't have the last point, as we wrote into n-1 above
+          ! If we are on open ocean, we don't have the last point, as we wrote into n-1 above
           if ((coastal_nodes(i)==.False.) .and. (j==nn_num(i))) then
             my_x_corners(i,j+all_max_elem) = coord_e_edge_center(1,i,2)
             my_y_corners(i,j+all_max_elem) = coord_e_edge_center(2,i,2)
@@ -425,10 +429,11 @@ contains
             my_y_corners(i,j+all_max_elem) = coord_e_edge_center(2,i,j)
           end if
         end if
-        ! Default calculation of angle between center and corner
+        ! Default case is that center and corner coords have same sign
         if (my_x_coords(i) <=0 .and. my_x_corners(i,j+all_max_elem) <=0 .or. my_x_coords(i) >0 .and. my_x_corners(i,j+all_max_elem) >0) then 
           angle(i,j+all_max_elem) = atan2(my_x_corners(i,j+all_max_elem) - my_x_coords(i), my_y_corners(i,j+all_max_elem) - my_y_coords(i))
-        ! Fixing angles around dateline by adding or subtractic 2*Pi to corner coords in case the center point is the in other hemisphere than the corner
+        ! If they have different sign we are near the dateline and need to bring the corner onto
+        ! the same hemisphere as the center (only for angle calc, the coord for oasis remains as before)
         else
           if (my_x_coords(i) <=0) then
             angle(i,j+all_max_elem) = atan2(my_x_corners(i,j+all_max_elem) - 2*3.141592653589793_WP - my_x_coords(i), my_y_corners(i,j+all_max_elem) - my_y_coords(i))
@@ -481,6 +486,7 @@ contains
       ALLOCATE(all_area(1, 1))
     endif
 
+    ! For MPI_GATHERV we need the location of the local segment in the global vector
     displs_from_all_pes(1) = 0
     do i = 2, npes
       displs_from_all_pes(i) = SUM(counts_from_all_pes(1:(i-1)))
@@ -550,11 +556,10 @@ contains
       call oasis_terminate_grids_writing()
       print *, 'FESOM after terminate_grids_writing'
     endif !localroot
-     
-
 
     DEALLOCATE(all_x_coords, all_y_coords, my_x_coords, my_y_coords) 
     DEALLOCATE(all_x_corners, all_y_corners, my_x_corners, my_y_corners, angle) 
+    DEALLOCATE(coastal_nodes, coord_e_edge_center) 
 !------------------------------------------------------------------
 ! 3rd Declare the transient variables
 !------------------------------------------------------------------
