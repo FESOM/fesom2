@@ -17,6 +17,15 @@ else
    BEING_EXECUTED=false
 fi
 
+if [ -n "$BASH_VERSION" ]; then
+   # assume bash
+   SOURCE="${BASH_SOURCE[0]}"
+elif [ -n "$ZSH_VERSION" ]; then
+   # assume zsh
+   SOURCE=${(%):-%N}
+fi
+
+DIR="$( cd "$( dirname "${SOURCE}" )" && pwd )"
 
 # if an arg is given and doesn't start with - use it as hostname, arguments stating with - are passed on later to cmake
 if [[ -z "$1" ]] || [[  "$1" =~ ^- ]]; then
@@ -65,21 +74,15 @@ elif [[ $LOGINHOST =~ ^[A-Za-z0-9]+\.ecmwf\.int$ ]]; then
 STRATEGY="wsecmwf"
 elif [[ $LOGINHOST =~ \.bullx$ ]]; then
 STRATEGY="atosecmwf"
+elif [[ -d $DIR/env/$LOGINHOST ]]; then # check if directory with LOGINHOST exists in env
+STRATEGY=$LOGINHOST
 else
-   echo "can not determine environment for host: "$LOGINHOST
+   echo "can not determine environment for host: "$LOGINHOST 
+   echo "To quickly add a new environment create a directory $DIR/env/$LOGINHOST with a shell file with instructions to find compiler, dependencies and runtime settings."
    [ $BEING_EXECUTED = true ] && exit 1
    return # if we are being sourced, return from this script here
 fi
 
-if [ -n "$BASH_VERSION" ]; then
-   # assume bash
-   SOURCE="${BASH_SOURCE[0]}"
-elif [ -n "$ZSH_VERSION" ]; then
-   # assume zsh
-   SOURCE=${(%):-%N}
-fi
-
-DIR="$( cd "$( dirname "${SOURCE}" )" && pwd )"
 
 if [ $BEING_EXECUTED = true ]; then
    # file is being executed, why is this here?
@@ -88,6 +91,7 @@ else
    # file is being sourced
    export FESOM_PLATFORM_STRATEGY=$STRATEGY
    SHELLFILE="${DIR}/env/${STRATEGY}/shell"
+   echo "Sourcing $(realpath $SHELLFILE) for environment" 
    if [[ -n ${COMPILERID} ]]; then
       SHELLFILE="${SHELLFILE}.${COMPILERID}"
    fi
