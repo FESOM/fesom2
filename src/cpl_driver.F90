@@ -396,6 +396,8 @@ contains
           my_x_corners(i,j) = x_corners(i,j)*rad ! atan2 takes radian angles
           my_y_corners(i,j) = y_corners(i,j)*rad
         end if
+        ! To sort the corners counterclockwise we calculate the
+        ! arctangent to the center 
         if (my_x_coords(i) <=0 .and. my_x_corners(i,j) <=0 .or. my_x_coords(i) >0 .and. my_x_corners(i,j) >0) then ! fixes angles around dateline
           angle(i,j) = atan2(my_x_corners(i,j) - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
         else
@@ -405,8 +407,6 @@ contains
             angle(i,j) = atan2(my_x_corners(i,j) + 2*3.141592653589793_WP - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
           end if
         end if
-        ! To sort the corners counterclockwise we calculate the
-        ! arctangent to the center 
       end do
       ! We repeat the procedure with edge center coordinates, and calculate their angles
       ! No need to worry about the order here, as we will sort the angles in the next step
@@ -415,15 +415,11 @@ contains
           my_x_corners(i,j+all_max_elem) = coord_e_edge_center(1,i,2)
           my_y_corners(i,j+all_max_elem) = coord_e_edge_center(2,i,2)
         else
-          ! If we are coastal we take j=1, which is node center
-          if ((coastal_nodes(i)==.True.) .and. (j==1)) then
-            my_x_corners(i,j+all_max_elem) = coord_e_edge_center(1,i,1)
-            my_y_corners(i,j+all_max_elem) = coord_e_edge_center(2,i,1)
-          ! Else we take j=2, which is the first edge center
-          elseif ((coastal_nodes(i)==.False.) .and. (j==1)) then
+          ! If we are not on coastal, we don't have the last point, as we wrote into n-1 above
+          if ((coastal_nodes(i)==.False.) .and. (j==nn_num(i))) then
             my_x_corners(i,j+all_max_elem) = coord_e_edge_center(1,i,2)
             my_y_corners(i,j+all_max_elem) = coord_e_edge_center(2,i,2)
-          ! Default case when j /= 1 and <= nn_num(i)
+          ! Default case
           else
             my_x_corners(i,j+all_max_elem) = coord_e_edge_center(1,i,j)
             my_y_corners(i,j+all_max_elem) = coord_e_edge_center(2,i,j)
