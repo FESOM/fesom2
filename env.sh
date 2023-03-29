@@ -100,4 +100,5 @@ else
    fi
    echo "Sourcing $(realpath $SHELLFILE) for environment" 
    source $SHELLFILE
+   echo "$(realpath ${SHELLFILE})" > $DIR/bin/current_shell_path
 fi
