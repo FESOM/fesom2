@@ -106,9 +106,7 @@ do i=1, 10
     select case (ice%whichEVP)
         case (0)
             if (partit%mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'
-            call nvtxStartRange('EVP')
             call EVPdynamics  (ice, partit, mesh)
-            call nvtxEndRange()
         case (1)
             if (partit%mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics_m...'//achar(27)//'[0m'
             call EVPdynamics_m(ice, partit, mesh)
@@ -124,19 +122,13 @@ do i=1, 10
     !___________________________________________________________________________
     ! Advection
     if (partit%mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
-    call nvtxStartRange('ice_TG')
     call ice_TG_rhs_div    (ice, partit, mesh)
-    call nvtxEndRange()
 
     if (partit%mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_solve...'//achar(27)//'[0m'
-    call nvtxStartRange('ice_fct')
     call ice_fct_solve     (ice, partit, mesh)
-    call nvtxEndRange()
 
     if (partit%mype==0)  print *, achar(27)//'[36m'//'     --> call ice_update_for_div...'//achar(27)//'[0m'
-    call nvtxStartRange('ice_update')
     call ice_update_for_div(ice, partit, mesh)
-    call nvtxEndRange()
 
 end do
 
