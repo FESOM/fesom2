@@ -39,7 +39,7 @@ module io_MEANDATA
     integer                                            :: freq=1
     character                                          :: freq_unit='m'
     logical                                            :: is_in_use=.false.
-    logical :: is_elem_based = .false.
+    logical :: is_elem_based = .false.      
     logical :: flip
     class(data_strategy_type), allocatable :: data_strategy
     integer :: comm
@@ -50,6 +50,11 @@ module io_MEANDATA
     real(real32), allocatable, dimension(:,:) :: local_values_r4_copy
     real(kind=WP) :: ctime_copy
     integer :: mype_workaround
+!   shorten the output for nextGEMs type simulatuions
+    logical                            :: is_nextGEMs   = .false.
+    INTEGER                            :: nlev_short
+    INTEGER, ALLOCATABLE, DIMENSION(:) :: ilev_short
+
   contains
     final destructor
   end type  
@@ -65,7 +70,7 @@ module io_MEANDATA
   integer, save                  :: io_listsize   =0
   logical, save                  :: vec_autorotate=.FALSE.
   logical, save                  :: lnextGEMS=.FALSE.
-  integer, save                  :: nlev_upper=1
+
   type io_entry
         CHARACTER(len=15)        :: id        ='unknown   '
         INTEGER                  :: freq      =0
@@ -134,7 +139,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     type(t_tracer), intent(in)   , target :: tracers
     type(t_dyn)   , intent(in)   , target :: dynamics
     type(t_ice)   , intent(in)   , target :: ice
-    namelist /nml_general / io_listsize, vec_autorotate, lnextGEMS, nlev_upper
+    namelist /nml_general / io_listsize, vec_autorotate, lnextGEMS
     namelist /nml_list    / io_list
 
 #include "associate_part_def.h"
@@ -620,11 +625,41 @@ END SELECT ! --> SELECT CASE (trim(io_list(i)%id))
 END DO ! --> DO i=1, io_listsize
 
     if (lnextGEMS) then        
-        call def_stream((/nlev_upper,   nod2D/),  (/nlev_upper,   myDim_nod2D/),  'temp_upper',   'temperature', 'C',         tracers%data(1)%values(:nlev_upper,:),  3, 'h', 4, partit, mesh)
-        call def_stream((/nlev_upper,   nod2D/),  (/nlev_upper,   myDim_nod2D/),  'salt_upper',  'salinity',    'psu',        tracers%data(2)%values(:nlev_upper,:),  3, 'h', 8, partit, mesh)
-        call def_stream((/nlev_upper,   elem2D/), (/nlev_upper,   myDim_elem2D/), 'u_upper',     'zonal velocity','m/s',      dynamics%uv(1,:nlev_upper,:),           3, 'h', 4, partit, mesh)
-        call def_stream((/nlev_upper,   elem2D/), (/nlev_upper,   myDim_elem2D/), 'v_upper',     'meridional velocity','m/s', dynamics%uv(2,:nlev_upper,:),           3, 'h', 4, partit, mesh)
-        call def_stream((/nlev_upper+1, nod2D/),  (/nlev_upper+1, myDim_nod2D/),  'w_upper',     'vertical velocity',  'm/s', dynamics%w(:nlev_upper+1,:),            3, 'h', 4, partit, mesh)
+        call def_stream((/5,   nod2D/),  (/5,   myDim_nod2D/),  'temp_upper',     'temperature',         'C',    tracers%data(1)%values(:,:),  3, 'h', 4, partit, mesh)
+        ! activate shortening of the IO for the nextGEMs field
+        io_stream(io_NSTREAMS)%is_nextGEMs=.true.
+        io_stream(io_NSTREAMS)%nlev_short = 5
+        allocate(io_stream(io_NSTREAMS)%ilev_short(5))
+        io_stream(io_NSTREAMS)%ilev_short=[1, 2, 3, 10, 20]
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        call def_stream((/5,   nod2D/),  (/5,   myDim_nod2D/),  'salt_upper',     'salinity',            'psu',   tracers%data(2)%values(:,:),  3, 'h', 8, partit, mesh)
+        ! activate shortening of the IO for the nextGEMs field
+        io_stream(io_NSTREAMS)%is_nextGEMs=.true.
+        io_stream(io_NSTREAMS)%nlev_short = 5
+        allocate(io_stream(io_NSTREAMS)%ilev_short(5))
+        io_stream(io_NSTREAMS)%ilev_short=[1, 2, 3, 10, 20]
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        call def_stream((/5,   elem2D/), (/5,   myDim_elem2D/), 'u_upper',        'zonal velocity',      'm/s',   dynamics%uv(1,:,:),           3, 'h', 4, partit, mesh)
+        ! activate shortening of the IO for the nextGEMs field
+        io_stream(io_NSTREAMS)%is_nextGEMs=.true.
+        io_stream(io_NSTREAMS)%nlev_short = 5
+        allocate(io_stream(io_NSTREAMS)%ilev_short(5))
+        io_stream(io_NSTREAMS)%ilev_short=[1, 2, 3, 10, 20]
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        call def_stream((/5,   elem2D/), (/5,   myDim_elem2D/), 'v_upper',        'meridional velocity', 'm/s',   dynamics%uv(2,:,:),           3, 'h', 4, partit, mesh)
+        ! activate shortening of the IO for the nextGEMs field
+        io_stream(io_NSTREAMS)%is_nextGEMs=.true.
+        io_stream(io_NSTREAMS)%nlev_short = 5
+        allocate(io_stream(io_NSTREAMS)%ilev_short(5))
+        io_stream(io_NSTREAMS)%ilev_short=[1, 2, 3, 10, 20]
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        call def_stream((/7, nod2D/),  (/7, myDim_nod2D/),      'w_upper',        'vertical velocity',  'm/s',    dynamics%w(:,:),              3, 'h', 4, partit, mesh)
+        ! activate shortening of the IO for the nextGEMs field
+        io_stream(io_NSTREAMS)%is_nextGEMs=.true.
+        io_stream(io_NSTREAMS)%nlev_short = 7
+        allocate(io_stream(io_NSTREAMS)%ilev_short(5))
+        io_stream(io_NSTREAMS)%ilev_short=[1, 2, 3, 10, 15, 20, 21]
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     end if
     !___________________________________________________________________________
     ! Richardson number diagnostics
@@ -794,7 +829,7 @@ function mesh_dimname_from_dimsize(size, partit, mesh) result(name)
         name='ncat'
 #endif
     else
-        name='unknown'
+        name='nz_user_defined'
         if (partit%mype==0) write(*,*) 'WARNING: unknown dimension in mean I/O with size of ', size
     end if
 end function
@@ -1063,7 +1098,7 @@ subroutine update_means
     implicit none
     type(Meandata), pointer :: entry
     integer                 :: n
-    integer                 :: I, J
+    integer                 :: I, J, II, JJ
 
     DO n=1, io_NSTREAMS
         entry=>io_stream(n)
@@ -1071,18 +1106,22 @@ subroutine update_means
         !_____________ compute in 8 byte accuracy ______________________________
         IF (entry%accuracy == i_real8) then
             IF (entry%flip) then
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J,II,JJ)
                 DO J=1, size(entry%local_values_r8,dim=2)
+                    JJ=J
+                    IF (entry%is_nextGEMs) JJ=entry%ilev_short(J)
                     DO I=1, size(entry%local_values_r8,dim=1)
-                        entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(J,I)
+                        entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(JJ,I)
                     END DO
                 END DO
 !$OMP END PARALLEL DO
             ELSE
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J,II,JJ)
                 DO J=1, size(entry%local_values_r8,dim=2)
                     DO I=1, size(entry%local_values_r8,dim=1)
-                        entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(I,J)
+                        II=I
+                        IF (entry%is_nextGEMs) II=entry%ilev_short(I)
+                        entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(II,J)
                     END DO
                 END DO
 !$OMP END PARALLEL DO
@@ -1091,18 +1130,22 @@ subroutine update_means
         !_____________ compute in 4 byte accuracy ______________________________
         ELSE IF (entry%accuracy == i_real4) then
             IF (entry%flip) then
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J,II,JJ)
                 DO J=1, size(entry%local_values_r4,dim=2)
+                    JJ=J
+                    IF (entry%is_nextGEMs) JJ=entry%ilev_short(J)
                     DO I=1, size(entry%local_values_r4,dim=1)
-                        entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(J,I), real32)
+                        entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(JJ,I), real32)
                     END DO
                 END DO
 !$OMP END PARALLEL DO
             ELSE
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J,II,JJ)
                 DO J=1, size(entry%local_values_r4,dim=2)
                     DO I=1, size(entry%local_values_r4,dim=1)
-                        entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(I,J), real32)
+                        II=I
+                        IF (entry%is_nextGEMs) II=entry%ilev_short(I)
+                        entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(II,J), real32)
                     END DO
                 END DO
 !$OMP END PARALLEL DO
