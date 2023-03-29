@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.9)
 
 # set default build type cache entry (do so before project(...) is called, which would create this cache entry on its own)
 if(NOT CMAKE_BUILD_TYPE)
@@ -7,6 +7,10 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 project(FESOM2.0)
+
+set(CMAKE_VERBOSE_MAKEFILE ON)
+
+option(BUILD_SHARED_LIBS "Build using shared libraries" OFF) # cmake-internal switch to toggle if library targets are being build as STATIC or SHARED, see https://cmake.org/cmake/help/latest/guide/tutorial/Selecting%20Static%20or%20Shared%20Libraries.html
 set(TOPLEVEL_DIR ${CMAKE_CURRENT_LIST_DIR})
 set(FESOM_COUPLED OFF CACHE BOOL "compile fesom standalone or with oasis support (i.e. coupled)")
 set(OIFS_COUPLED OFF CACHE BOOL "compile fesom coupled to OpenIFS. (Also needs FESOM_COUPLED to work)")
@@ -14,6 +18,8 @@ set(RECOM_COUPLED ON CACHE BOOL "compile fesom including biogeochemistry, REcoM2
 set(CISO_COUPLED OFF CACHE BOOL "compile ciso coupled to REcoM2. RECOM_COUPLED have to be active")
 set(CRAY OFF CACHE BOOL "compile with cray ftn")
 set(USE_ICEPACK OFF CACHE BOOL "compile fesom with the Iceapck modules for sea ice column physics.")
+set(OPENMP_REPRODUCIBLE OFF CACHE BOOL "serialize OpenMP loops that are critical for reproducible results")
+
 #set(VERBOSE OFF CACHE BOOL "toggle debug output")
 #add_subdirectory(oasis3-mct/lib/psmile)
 add_subdirectory(src)
