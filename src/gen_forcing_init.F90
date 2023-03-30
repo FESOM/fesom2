@@ -121,10 +121,10 @@ subroutine forcing_array_setup(partit, mesh)
      allocate(cloudiness(n2))
      cloudiness=0.0_WP
   end if
-  if (l_mslp) then
+!  if (l_mslp) then
      allocate(press_air(n2))
      press_air=0.0_WP
-  end if
+!  end if
  
   allocate(u_wind_t(2,n2),v_wind_t(2,n2))
   allocate(Tair_t(2,n2), shum_t(2,n2))
@@ -144,6 +144,23 @@ subroutine forcing_array_setup(partit, mesh)
     allocate(sw_3d(nl,n2))
     chl=0.1_WP
   endif
+
+!#if defined (__recom)
+!    allocate(GloFeDust(n2), GloNDust(n2))
+!    GloFeDust=0.0_WP
+!    GloNDust=0.0_WP
+!    allocate(RiverDIN2D(n2), RiverDON2D(n2), RiverDOC2D(n2), RiverDSi2D(n2), RiverAlk2D(n2), RiverDIC2D(n2))
+!    RiverDIN2D=0.0_WP
+!    RiverDOC2D=0.0_WP
+!    RiverDON2D=0.0_WP
+!    RiverDSi2D=0.0_WP
+!    RiverAlk2D=0.0_WP
+!    RiverDIC2D=0.0_WP
+!    allocate(ErosionTSi2D(n2), ErosionTON2D(n2), ErosionTOC2D(n2))
+!    ErosionTSi2D=0.0_WP
+!    ErosionTON2D=0.0_WP
+!    ErosionTOC2D=0.0_WP
+!#endif
 
   !for ice diagnose
   if(use_ice) then

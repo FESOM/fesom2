@@ -368,7 +368,6 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
      end if
   END DO
 !$OMP END PARALLEL DO
-
   if (use_cavity) then 
 !$OMP PARALLEL DO
     do i=1,myDim_nod2d+eDim_nod2d

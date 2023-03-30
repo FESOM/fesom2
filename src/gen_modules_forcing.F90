@@ -78,6 +78,12 @@ use o_param
   real(kind=WP), allocatable, dimension(:)         :: chl
   real(kind=WP), allocatable, dimension(:,:)       :: sw_3d
 
+!#if defined (__recom)
+!  real(kind=WP), allocatable, dimension(:)         :: GloFeDust, GloNDust
+!  real(kind=WP), allocatable, dimension(:)         :: RiverDIN2D, RiverDON2D, RiverDOC2D, RiverDSi2D, RiverAlk2D, RiverDIC2D
+!  real(kind=WP), allocatable, dimension(:)         :: ErosionTSi2D, ErosionTON2D, ErosionTOC2D
+!#endif
+
 !   real(kind=WP), allocatable, dimension(:)         :: thdgr, thdgrsn
   real(kind=WP), allocatable, dimension(:)         :: flice
   real(kind=WP), allocatable, dimension(:)         :: olat_heat, osen_heat, olwout

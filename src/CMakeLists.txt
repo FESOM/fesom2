@@ -60,7 +60,12 @@ option(BUILD_FESOM_AS_LIBRARY "Build a library instead of an executable" OFF)
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
-if(${USE_ICEPACK})
+
+if(${RECOM_COUPLED})  # RECOM + ICEPACK NOT SUPPORTED
+   file(GLOB sources_Fortran ${src_home}/*.F90 
+                             ${src_home}/int_recom/*.F90 
+                             ${src_home}/int_recom/recom/*.F90)
+elseif(${USE_ICEPACK})
    file(GLOB sources_Fortran ${src_home}/*.F90
                              ${src_home}/icepack_drivers/*.F90
                              ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90)
@@ -69,6 +74,9 @@ elseif(${BUILD_FESOM_AS_LIBRARY})
                              ${src_home}/ifs_interface/*.F90) # ICEPACK + LIBRARY NOT SUPPORTED (YET)
 else()
    file(GLOB sources_Fortran ${src_home}/*.F90)
+#   list(REMOVE_ITEM sources_Fortran ${src_home}/recom_nitrogenss.F90)    # REcoM
+#   list(REMOVE_ITEM sources_Fortran ${src_home}/recom_sinking.F90)       # REcoM
+#   list(REMOVE_ITEM sources_Fortran ${src_home}/recom_modules_diag.F90)  # REcoM
 endif()
 #list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_partition_init.F90)
 file(GLOB sources_C ${src_home}/*.c)
@@ -140,6 +148,12 @@ if(${VERBOSE})
 endif()
 if(${OPENMP_REPRODUCIBLE})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __openmp_reproducible)
+endif()
+if(${RECOM_COUPLED})
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __coccos __3Zoo2Det)
+endif()
+if(${CISO_COUPLED})
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __ciso)
 endif()
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )

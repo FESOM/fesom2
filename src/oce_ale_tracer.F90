@@ -1284,6 +1284,11 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
   USE o_ARRAYS
   USE g_forcing_arrays
   USE g_config
+#if defined (__recom)
+   use recom_config
+   use REcoM_declarations
+   use REcom_GloVar
+#endif
   implicit none
   
   integer,       intent(in)            :: n, id, nzmin 
@@ -1302,6 +1307,40 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
         !     by forming/melting of sea ice
         bc_surface= dt*(virtual_salt(n) & !--> is zeros for zlevel/zstar
                     + relax_salt(n) - real_salt_flux(n)*is_nonlinfs)
+#if defined(__recom)
+    CASE (1001) ! DIN
+!        bc_surface= dt*(AtmNInput(n)  + RiverDIN2D(n) * is_riverinput + ErosionTON2D(n) * is_erosioninput)
+        bc_surface=0.0_WP
+    CASE (1002) ! DIC
+!                bc_surface= dt*(GloCO2flux_seaicemask(n)            &
+!                                + RiverDIC2D(n) * is_riverinput     &
+!                                + ErosionTOC2D(n) * is_erosioninput)
+        bc_surface=0.0_WP
+    CASE (1003) ! Alk
+!                bc_surface= dt*(virtual_alk(n) + relax_alk(n)       &  
+!                                + RiverAlk2D(n) * is_riverinput)
+        bc_surface=0.0_WP
+    CASE (1004:1010)
+        bc_surface=0.0_WP
+    CASE (1011) ! DON
+        bc_surface= dt*RiverDON2D(n) * is_riverinput
+    CASE (1012) ! DOC
+        bc_surface= dt*RiverDOC2D(n) * is_riverinput
+    CASE (1013:1017)
+        bc_surface=0.0_WP
+    CASE (1018) ! DSi
+        bc_surface=dt*(RiverDSi2D(n) * is_riverinput + ErosionTSi2D(n) * is_erosioninput)
+    CASE (1019) ! Fe
+!        bc_surface= dt*AtmFeInput(n)
+        bc_surface=0.0_WP
+    CASE (1020:1021) ! Cal
+        bc_surface=0.0_WP
+    CASE (1022) ! OXY
+!        bc_surface= dt*GloO2flux_seaicemask(n)
+        bc_surface=0.0_WP
+    CASE (1023:1033)
+        bc_surface=0.0_WP  ! OG added bc for recom fields 
+#endif
     CASE (101) ! apply boundary conditions to tracer ID=101
         bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)
     CASE (301)

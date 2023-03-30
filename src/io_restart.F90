@@ -104,9 +104,13 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
          longname='salinity'
          units='psu'
        CASE DEFAULT
-         write(trname,'(A3,i1)') 'tra_', j
-         write(longname,'(A15,i1)') 'passive tracer ', j
+#if defined(__recom)
+!         write(trname,'(A3,i1)') 'tra_', j
+!         write(longname,'(A15,i1)') 'passive tracer ', j
+  	 write(trname,'(A3,i4.4)') 'tra', j		 ! OG i1 -> i4
+         write(longname,'(A15,i4.4)') 'passive tracer ', j
          units='none'
+#endif
      END SELECT
      call oce_files%def_node_var(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
      longname=trim(longname)//', Adams–Bashforth'

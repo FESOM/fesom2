@@ -38,6 +38,11 @@ module fesom_main_storage_module
   use cpl_driver
 #endif
 
+#if defined (__recom)
+  use recom_init_interface
+  use recom_interface
+#endif
+
   implicit none
     
   type :: fesom_main_storage_type
@@ -160,12 +165,18 @@ contains
         
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call tracer_init'//achar(27)//'[0m'
         call tracer_init(f%tracers, f%partit, f%mesh)                ! allocate array of ocean tracers (derived type "t_tracer")
-        
+       
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call arrays_init'//achar(27)//'[0m'
         call arrays_init(f%tracers%num_tracers, f%partit, f%mesh)    ! allocate other arrays (to be refactured same as tracers in the future)
         
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ocean_setup'//achar(27)//'[0m'
         call ocean_setup(f%dynamics, f%tracers, f%partit, f%mesh)
+
+#if defined (__recom)
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call recom_init'//achar(27)//'[0m'
+        call recom_init(f%tracers, f%partit, f%mesh)                 ! adjust values recom tracers (derived type "t_tracer")
+        if (f%mype==0) write(*,*) 'RECOM recom_init... complete'
+#endif 
 
         if (f%mype==0) then
            write(*,*) 'FESOM ocean_setup... complete'
@@ -344,7 +355,8 @@ contains
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call update_atm_forcing(n)'//achar(27)//'[0m'
             f%t0_frc = MPI_Wtime()
             call update_atm_forcing(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
-            f%t1_frc = MPI_Wtime()       
+            f%t1_frc = MPI_Wtime()     
+
             !___compute ice step________________________________________________
             if (f%ice%ice_steps_since_upd>=f%ice%ice_ave_steps-1) then
                 f%ice%ice_update=.true.
@@ -362,6 +374,15 @@ contains
         end if
         call before_oce_step(f%dynamics, f%tracers, f%partit, f%mesh) ! prepare the things if required
         f%t2 = MPI_Wtime()
+
+        !___now recom____________________________________________________
+#if defined (__recom)
+!        if (use_REcoM) then
+            if (f%mype==0 .and. n==1)  print *, achar(27)//'[46'  //'_____________________________________________________________'//achar(27)//'[0m'
+            if (f%mype==0 .and. n==1)  print *, achar(27)//'[46;1m'//'     --> call REcoM                                         '//achar(27)//'[0m'
+            call recom(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+!        end if
+#endif
         
         !___model ocean step____________________________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_timestep_ale'//achar(27)//'[0m'
