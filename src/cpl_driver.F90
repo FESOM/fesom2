@@ -366,6 +366,7 @@ contains
       end if  
     end do
     
+
     ! For every node, loop over neighbours, find mean of node center and neighbour node center.
     coord_e_edge_center=0
     do i = 1, my_number_of_points
@@ -384,6 +385,7 @@ contains
       end if
     end do
 
+
     ! We can have a variable number of corner points.
     ! Luckly oasis can deal with that by just repeating the last one.
     ! Note, we are only allowed to repeat one coordinate and 
@@ -396,20 +398,6 @@ contains
         else
           my_x_corners(i,j) = x_corners(i,j)*rad ! atan2 takes radian and elem corners come in grad
           my_y_corners(i,j) = y_corners(i,j)*rad
-        end if
-        ! To allow for sorting the corners counterclockwise later we calculate the
-        ! arctangent to the center 
-        ! Default case is that center and corner coords have same sign
-        if (my_x_coords(i) <=0 .and. my_x_corners(i,j) <=0 .or. my_x_coords(i) >0 .and. my_x_corners(i,j) >0) then 
-          angle(i,j) = atan2(my_x_corners(i,j) - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
-        ! If they have different sign we are near the dateline and need to bring the corner onto
-        ! the same hemisphere as the center (only for angle calc, the coord for oasis remains as before)
-        else
-          if (my_x_coords(i) <=0) then
-            angle(i,j) = atan2(my_x_corners(i,j) - 2*3.141592653589793_WP - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
-          else
-            angle(i,j) = atan2(my_x_corners(i,j) + 2*3.141592653589793_WP - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
-          end if
         end if
       end do
       ! We repeat the procedure with edge center coordinates, and calculate their angles
@@ -429,19 +417,94 @@ contains
             my_y_corners(i,j+all_max_elem) = coord_e_edge_center(2,i,j)
           end if
         end if
-        ! Default case is that center and corner coords have same sign
-        if (my_x_coords(i) <=0 .and. my_x_corners(i,j+all_max_elem) <=0 .or. my_x_coords(i) >0 .and. my_x_corners(i,j+all_max_elem) >0) then 
-          angle(i,j+all_max_elem) = atan2(my_x_corners(i,j+all_max_elem) - my_x_coords(i), my_y_corners(i,j+all_max_elem) - my_y_coords(i))
-        ! If they have different sign we are near the dateline and need to bring the corner onto
-        ! the same hemisphere as the center (only for angle calc, the coord for oasis remains as before)
-        else
-          if (my_x_coords(i) <=0) then
-            angle(i,j+all_max_elem) = atan2(my_x_corners(i,j+all_max_elem) - 2*3.141592653589793_WP - my_x_coords(i), my_y_corners(i,j+all_max_elem) - my_y_coords(i))
+      end do
+
+
+      ! Obtain center coordinates as node center on open ocean and as mean of corners at coastline
+      do i = 1, my_number_of_points
+        ! As mean of corner coordiantes along coastline
+        if (coastal_nodes(i)==.True.) then
+          ! remove double entries
+          temp_x_coord(:) = pack(coord_e_edge_center(1,i,:), coord_e_edge_center(1,i,:)) 
+          temp_y_coord(:) = pack(coord_e_edge_center(2,i,:), coord_e_edge_center(2,i,:)) 
+          min_x = minval(temp_x_coord)
+          max_x = minval(temp_x_coord)
+          ! if we are at dateline (fesom cell larger than pi)
+          if (max_x-min_x > pi) then
+            pos_x = 0
+            pos_y = 0
+            neg_x = 0
+            neg_x = 0
+            n_pos = 0
+            n_neg = 0
+            do j = 1, size(temp_x_coord)
+              ! build separate corner vectors for the hemispheres
+              if (temp_x_coord(j) > 0) then
+                pos_x(n_pos) = temp_x_coord(j)
+                pos_y(n_pos) = temp_y_coord(j)
+                n_pos = n_pos + 1
+              else
+                neg_x(n_neg) = temp_x_coord(j)
+                neg_y(n_neg) = temp_y_coord(j)
+                n_neg = n_neg + 1
+              end if
+              pos_x = pos_x(1:n_pos)
+              pos_y = pos_y(1:n_pos)
+              neg_x = neg_x(1:n_neg)
+              neg_y = neg_y(1:n_neg)
+              ! calc separate sums for the two hemispheres
+              pos_sum_x = sum(pos_x) * n_pos 
+              neg_sum_x = sum(neg_x) * n_neg
+              pos_sum_y = sum(pos_y) * n_pos 
+              neg_sum_y = sum(neg_y) * n_neg
+              ! if sum of sums is on right side of dateline we shift the negative sum over
+              if (pos_sum > -neg_sum) then
+                this_x_coord = (pos_sum_x + neg_sum_x + 2*pi) / (n_pos + n_neg)
+                this_y_coord = (pos_sum_y + neg_sum_y + 2*pi) / (n_pos + n_neg)
+              ! else we shift the positive sum over to the left side
+              else
+                this_x_coord = (pos_sum_x-2*pi + neg_sum_x) / (n_pos + n_neg)
+                this_y_coord = (pos_sum_y-2*pi + neg_sum_y) / (n_pos + n_neg)
+              end if
+            end do
+          ! max_x-min_x > pi -> we are not at dateline, just a normal mean is enough
           else
-            angle(i,j+all_max_elem) = atan2(my_x_corners(i,j+all_max_elem) + 2*3.141592653589793_WP - my_x_coords(i), my_y_corners(i,j+all_max_elem) - my_y_coords(i))
+            this_x_coord = mean(temp_x_coord)
+            this_y_coord = mean(temp_y_coord)
+          end if
+        ! coastal_nodes(i)==.True. -> Node center on open ocean, we can use node center
+        else
+          this_x_coord = coord_nod2D(1, i)/rad
+          this_y_coord = coord_nod2D(2, i)/rad
+        end if
+        ! unrotate grid
+        call r2g(my_x_coords(i), my_y_coords(i), this_x_coord, this_y_coord)
+      end do
+
+
+
+      ! calculate angle between corners and center
+      do i = 1, my_number_of_points
+        do j = 1, all_max_elem+all_max_edge
+          ! If they have different sign we are near the dateline and need to bring the corner onto
+          ! the same hemisphere as the center (only for angle calc, the coord for oasis remains as before)
+          ! Default: same sign -> normal atan2
+          if (my_x_coords(i) <=0 .and. my_x_corners(i,j) <=0 .or. my_x_coords(i) >0 .and. my_x_corners(i,j) >0) then 
+            angle(i,j) = atan2(my_x_corners(i,j) - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
+          else
+            ! at dateline center is on the right side
+            if (my_x_coords(i) >=pi) then
+              angle(i,j) = atan2(my_x_corners(i,j) - 2*pi - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
+            ! at dateline center is on the left side
+            else if (my_x_coords(i) <=-pi)
+              angle(i,j) = atan2(my_x_corners(i,j) + 2*pi - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
+            ! at prime meridan -> also default
+            else
+              angle(i,j) = atan2(my_x_corners(i,j) - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
+            end if
           end if
         end if
-      end do
+      end do   
 
       
       ! Oasis requires corners sorted counterclockwise, so we sort by angle
@@ -464,6 +527,42 @@ contains
         end do
       end do
     end do   
+
+ 
+    ! after sorting the double entries can be in the middle
+    ! if one is found move rest of vector 1 index forward and fill at back with second to last value
+    do i = 1, my_number_of_points
+      done = 0
+      do j = 1, all_max_elem+all_max_edge
+        ! we only want to work on the first block of duplicates, not on the duplicates we create at
+        ! at the end of the vector. TODO this is quite a hack. refactoring would be good.
+        if (j>done) then
+          exit
+        ! special case first entry: compare with last instead of previous
+        if (j==1) then
+          if (my_x_corners(i,j) == my_x_corners(i,all_max_elem+all_max_edge) then
+            ! move remaining values forward
+            do n = j, all_max_elem+all_max_edge-1
+              my_x_corners(i,n) = my_x_corners(i,n+1)
+              my_y_corners(i,n) = my_y_corners(i,n+1)
+            end do
+            done = j
+            j = j-1
+        ! normal case, compare if entry is the same as previous one
+        else
+          if (my_x_corners(i,j) == my_x_corners(i,j-1) then
+            ! move remaining values forward
+            do n = j, all_max_elem+all_max_edge-1
+              my_x_corners(i,n) = my_x_corners(i,n+1)
+              my_y_corners(i,n) = my_y_corners(i,n+1)
+            end do
+            done = j
+            j = j-1
+          end if
+        end if
+      end do
+    end do
+
 
     ! Oasis takes grad angles
     my_x_coords=my_x_coords/rad
