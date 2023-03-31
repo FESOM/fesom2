@@ -196,6 +196,18 @@ set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 if(${ENABLE_OPENMP} AND NOT ${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray)
    target_compile_options(${PROJECT_NAME} PRIVATE ${OpenMP_Fortran_FLAGS}) # currently we only have OpenMP in the Fortran part
    target_link_libraries(${PROJECT_NAME} OpenMP::OpenMP_Fortran)
+   
+   # there is a problem (at least on levante with ifort) with openmp and I/O multithreading being active at the same time
+   # in this case the simulation stops and never finishes
+   # this has been observed with IFS-Fesom and Fesom standalone
+   # until the problem is identified, we exclude the I/O and multithreading files from openmp compilation, i.e. "-qno-openmp" for ifort
+   if(NOT ${DISABLE_MULTITHREADING})
+      if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
+         set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/io_restart.F90 PROPERTIES COMPILE_OPTIONS "-qno-openmp")
+         set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/async_threads_module.F90 PROPERTIES COMPILE_OPTIONS "-qno-openmp")
+         set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/io_meandata.F90 PROPERTIES COMPILE_OPTIONS "-qno-openmp")
+      endif()
+   endif()
 endif()
 
 
