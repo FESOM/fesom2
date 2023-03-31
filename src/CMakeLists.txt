@@ -35,10 +35,7 @@ if(ALBEDO_INTELMPI_WORKAROUNDS)
    add_compile_options(-DDISABLE_PARALLEL_RESTART_READ)
 endif()
 
-if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
-   message(STATUS "multithreading disabled for Levante") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  albedo )
+if(${FESOM_PLATFORM_STRATEGY} STREQUAL  albedo )
    message(STATUS "multithreading disabled for Albedo") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 else()
