@@ -107,7 +107,7 @@ module recom_config
   logical                :: useErosion            = .false.
   logical                :: NitrogenSS            = .false.    ! This one only activates rivers! And in principle denitrification, but denitrification is commented out. When set to true, external sources and sinks of nitrogen are activated (Riverine, aeolian and denitrification)
   logical                :: useAeolianN           = .false.    ! When set to true, aeolian nitrogen deposition is activated
-  character              :: CO2file               = 'MonthlyAtmCO2_gcb2021.nc'
+  character(50)          :: CO2file               = 'MonthlyAtmCO2_gcb2021'
 ! monthly presribed CO2 of different scenarios 
   integer                :: firstyearoffesomcycle = 1948       ! The first year of the actual physical forcing (e.g. JRA-55) used
   integer                :: lastyearoffesomcycle  = 2009       ! Last year of the actual physical forcing used
