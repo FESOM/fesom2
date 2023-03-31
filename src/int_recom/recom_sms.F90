@@ -475,7 +475,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !------------------------------------------------------------------------------
 ! Calcite dissolution dependent on OmegaC !NEW DISS
 !------------------------------------------------------------------------------
-            Sink_Vel    = Vdet_a* abs(zF(k)) + Vdet
+!            Sink_Vel    = Vdet_a* abs(zF(k)) + Vdet
+            Sink_Vel    = Vcalc* abs(zF(k)) + Vdet
 
             if (OmegaC_diss) then
                 Ca        = (0.02128d0/40.078d0) * Sali_depth(k)/1.80655d0 ! Calcium ion concentration [mol/kg], function from varsolver.f90
