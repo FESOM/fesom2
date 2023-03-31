@@ -1178,7 +1178,7 @@ CONTAINS
           ! daily data (already in m/s)
            i = daynew
            filename = trim(nm_runoff_file)//cyearnew//'0101_redistributed.nc'
-           if (mype==0 .and. my_fesom_group == 0) write(*,*) 'Updating daily runoff from ',filename
+!           if (mype==0 .and. my_fesom_group == 0) write(*,*) 'Updating daily runoff from ',filename
            call read_2ddata_on_grid_NetCDF(filename, 'runoff', i, runoff, mesh)
         end if
      end if
