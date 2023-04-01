@@ -221,10 +221,6 @@ contains
     integer                    :: el(2), enodes(2), edge
 
     integer,allocatable        :: unstr_mask(:,:)
-    real(kind=WP)              :: pos_sum_x      ! pos part of sum of longitude to the right of dateline
-    real(kind=WP)              :: pos_sum_y      ! pos part of sum of latitude to the right of dateline
-    real(kind=WP)              :: neg_sum_x      ! neg part of sum of longitude to the left of dateline
-    real(kind=WP)              :: neg_sum_y      ! neg part of sum of latitude to the left of dateline
     real(kind=WP)              :: max_x          ! max longitude on corners of control volume
     real(kind=WP)              :: min_x          ! min longitude on corners of control volume
     real(kind=WP)              :: temp                  ! temp storage for corner sorting
@@ -471,22 +467,14 @@ contains
               n=n+1
             end if
           end do
-          ! calc separate sums for the two hemispheres
-          pos_sum_x = sum(pos_x) * n_pos 
-          neg_sum_x = sum(neg_x) * n_neg
-          pos_sum_y = sum(pos_y) * n_pos 
-          neg_sum_y = sum(neg_y) * n_neg
-          ! if sum of sums is on right side of dateline we shift the negative sum over
-          if (pos_sum_x > -neg_sum_x) then
-            this_x_coord = (pos_sum_x + neg_sum_x + 2*pi) / (n_pos + n_neg)
-            this_y_coord = (pos_sum_y + neg_sum_y + 2*pi) / (n_pos + n_neg)
+          ! if sum on right side of dateline are further from the dateline we shift the negative sum over to the right
+          if (-sum(pos_x)+pi*n_pos >= sum(neg_x)+pi*n_neg) then
+            this_x_coord = (sum(pos_x) + sum(neg_x) + 2*pi*n_neg) / (n_pos + n_neg)
+            this_y_coord = (sum(pos_y) + sum(neg_y)) / (n_pos + n_neg)
           ! else we shift the positive sum over to the left side
           else
-            this_x_coord = (pos_sum_x-2*pi + neg_sum_x) / (n_pos + n_neg)
-            this_y_coord = (pos_sum_y-2*pi + neg_sum_y) / (n_pos + n_neg)
-            print *, 'coast ocean', i, this_x_coord, sum(pos_x), size(pos_x), sum(neg_x), size(neg_x)
-            print *, 'raw pos values', pos_x
-            print *, 'raw neg values', neg_x
+            this_x_coord = (sum(pos_x) - 2*pi*n_pos + sum(neg_x)) / (n_pos + n_neg)
+            this_y_coord = (sum(pos_y) + sum(neg_y)) / (n_pos + n_neg)
           end if
           deallocate(pos_x,pos_y,neg_x,neg_y)
         ! max_x-min_x > pi -> we are not at dateline, just a normal mean is enough
