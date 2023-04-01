@@ -206,7 +206,7 @@ contains
     logical                    :: new_points
 
     integer                    :: i, j, k        ! local loop indicees
-    integer                    :: l,m,n            ! local loop indicees
+    integer                    :: l,m,n, done    ! local loop indicees
 
     character(len=32)          :: point_name     ! name of the grid points
 
@@ -217,10 +217,16 @@ contains
     integer                    :: my_displacement
     integer                    :: my_max_elem(partit%npes)
     integer                    :: my_max_edge(partit%npes)
-    integer                    :: all_max_elem, all_max_edge
+    integer                    :: all_max_elem, all_max_edge, n_neg, n_pos
     integer                    :: el(2), enodes(2), edge
 
     integer,allocatable        :: unstr_mask(:,:)
+    real(kind=WP)              :: pos_sum_x      ! pos part of sum of longitude to the right of dateline
+    real(kind=WP)              :: pos_sum_y      ! pos part of sum of latitude to the right of dateline
+    real(kind=WP)              :: neg_sum_x      ! neg part of sum of longitude to the left of dateline
+    real(kind=WP)              :: neg_sum_y      ! neg part of sum of latitude to the left of dateline
+    real(kind=WP)              :: max_x          ! max longitude on corners of control volume
+    real(kind=WP)              :: min_x          ! min longitude on corners of control volume
     real(kind=WP)              :: temp                  ! temp storage for corner sorting
     real(kind=WP)              :: this_x_coord          ! longitude coordinates
     real(kind=WP)              :: this_y_coord          ! latitude coordinates
@@ -229,6 +235,12 @@ contains
     !
     ! Corner data structure for a OASIS3-MCT Reglonlatvrt grid
     !
+    real(kind=WP), allocatable :: pos_x(:)       ! longitude to the right of dateline
+    real(kind=WP), allocatable :: pos_y(:)       ! latitude to the right of dateline
+    real(kind=WP), allocatable :: neg_x(:)       ! longitude to the left of dateline
+    real(kind=WP), allocatable :: neg_y(:)       ! latitude to the left of dateline
+    real(kind=WP), allocatable :: temp_x_coord(:)    ! longitude coordinates
+    real(kind=WP), allocatable :: temp_y_coord(:)    ! longitude coordinates
     real(kind=WP), allocatable :: my_x_coords(:)     ! longitude coordinates
     real(kind=WP), allocatable :: my_y_coords(:)     ! latitude  coordinates
     real(kind=WP), allocatable :: angle(:,:)         ! array for holding corner angle for sorting
@@ -330,18 +342,6 @@ contains
     endif
 
 
-      
-    ALLOCATE(my_x_coords(my_number_of_points))
-    ALLOCATE(my_y_coords(my_number_of_points))
-
-    ! Node center coordinates
-    do i = 1, my_number_of_points
-      this_x_coord = coord_nod2D(1, i)
-      this_y_coord = coord_nod2D(2, i)
-      call r2g(my_x_coords(i), my_y_coords(i), this_x_coord, this_y_coord)
-    end do   
-
-
     ALLOCATE(coastal_nodes(number_of_all_points))
     ALLOCATE(angle(my_number_of_points,all_max_elem+all_max_edge))
     ALLOCATE(my_x_corners(my_number_of_points,all_max_elem+all_max_edge))
@@ -418,96 +418,122 @@ contains
           end if
         end if
       end do
+    end do
 
 
-      ! Obtain center coordinates as node center on open ocean and as mean of corners at coastline
-      do i = 1, my_number_of_points
-        ! As mean of corner coordiantes along coastline
-        if (coastal_nodes(i)==.True.) then
-          ! remove double entries
-          temp_x_coord(:) = pack(coord_e_edge_center(1,i,:), coord_e_edge_center(1,i,:)) 
-          temp_y_coord(:) = pack(coord_e_edge_center(2,i,:), coord_e_edge_center(2,i,:)) 
-          min_x = minval(temp_x_coord)
-          max_x = minval(temp_x_coord)
-          ! if we are at dateline (fesom cell larger than pi)
-          if (max_x-min_x > pi) then
-            pos_x = 0
-            pos_y = 0
-            neg_x = 0
-            neg_x = 0
-            n_pos = 0
-            n_neg = 0
-            do j = 1, size(temp_x_coord)
-              ! build separate corner vectors for the hemispheres
-              if (temp_x_coord(j) > 0) then
-                pos_x(n_pos) = temp_x_coord(j)
-                pos_y(n_pos) = temp_y_coord(j)
-                n_pos = n_pos + 1
-              else
-                neg_x(n_neg) = temp_x_coord(j)
-                neg_y(n_neg) = temp_y_coord(j)
-                n_neg = n_neg + 1
-              end if
-              pos_x = pos_x(1:n_pos)
-              pos_y = pos_y(1:n_pos)
-              neg_x = neg_x(1:n_neg)
-              neg_y = neg_y(1:n_neg)
-              ! calc separate sums for the two hemispheres
-              pos_sum_x = sum(pos_x) * n_pos 
-              neg_sum_x = sum(neg_x) * n_neg
-              pos_sum_y = sum(pos_y) * n_pos 
-              neg_sum_y = sum(neg_y) * n_neg
-              ! if sum of sums is on right side of dateline we shift the negative sum over
-              if (pos_sum > -neg_sum) then
-                this_x_coord = (pos_sum_x + neg_sum_x + 2*pi) / (n_pos + n_neg)
-                this_y_coord = (pos_sum_y + neg_sum_y + 2*pi) / (n_pos + n_neg)
-              ! else we shift the positive sum over to the left side
-              else
-                this_x_coord = (pos_sum_x-2*pi + neg_sum_x) / (n_pos + n_neg)
-                this_y_coord = (pos_sum_y-2*pi + neg_sum_y) / (n_pos + n_neg)
-              end if
-            end do
-          ! max_x-min_x > pi -> we are not at dateline, just a normal mean is enough
+    ALLOCATE(my_x_coords(my_number_of_points))
+    ALLOCATE(my_y_coords(my_number_of_points))
+
+    ! Obtain center coordinates as node center on open ocean and as mean of corners at coastline
+    do i = 1, my_number_of_points
+      ! Center coord as mean of corner coordiantes along coastline
+      if (coastal_nodes(i)==.True.) then
+        ! For the mean calculation we don't want all the repeat points that we need for oasis
+        ! So we define some temp_corner coordiantes that only have the corners once
+        allocate(temp_x_coord(nod_in_elem2D_num(i)+nn_num(i)))
+        allocate(temp_y_coord(nod_in_elem2D_num(i)+nn_num(i)))
+        do j = 1, nod_in_elem2D_num(i)
+          temp_x_coord(j) = x_corners(i,j)*rad
+          temp_y_coord(j) = y_corners(i,j)*rad
+        end do
+        do j = 1, nn_num(i)
+          temp_x_coord(j+nod_in_elem2D_num(i)) = coord_e_edge_center(1,i,j)
+          temp_y_coord(j+nod_in_elem2D_num(i)) = coord_e_edge_center(2,i,j)
+        end do
+        min_x = minval(temp_x_coord)
+        max_x = maxval(temp_x_coord)
+        ! if we are at dateline (fesom cell larger than pi)
+        if (max_x-min_x > pi) then
+          n_pos=count(temp_x_coord>=0)
+          n_neg=count(temp_x_coord<0)
+          allocate(pos_x(n_pos))
+          allocate(pos_y(n_pos))
+          allocate(neg_x(n_neg))
+          allocate(neg_y(n_neg))
+          pos_x = 0
+          pos_y = 0
+          neg_x = 0
+          neg_x = 0
+          n=1
+          do j = 1, size(temp_x_coord)
+            ! build separate corner vectors for the hemispheres
+            if (temp_x_coord(j) >= 0) then
+              pos_x(n) = temp_x_coord(j)
+              pos_y(n) = temp_y_coord(j)
+              n=n+1
+            end if
+          end do
+          n=1
+          do j = 1, size(temp_x_coord)
+            if (temp_x_coord(j) < 0) then
+              neg_x(n) = temp_x_coord(j)
+              neg_y(n) = temp_y_coord(j)
+              n=n+1
+            end if
+          end do
+          ! calc separate sums for the two hemispheres
+          pos_sum_x = sum(pos_x) * n_pos 
+          neg_sum_x = sum(neg_x) * n_neg
+          pos_sum_y = sum(pos_y) * n_pos 
+          neg_sum_y = sum(neg_y) * n_neg
+          ! if sum of sums is on right side of dateline we shift the negative sum over
+          if (pos_sum_x > -neg_sum_x) then
+            this_x_coord = (pos_sum_x + neg_sum_x + 2*pi) / (n_pos + n_neg)
+            this_y_coord = (pos_sum_y + neg_sum_y + 2*pi) / (n_pos + n_neg)
+          ! else we shift the positive sum over to the left side
           else
-            this_x_coord = mean(temp_x_coord)
-            this_y_coord = mean(temp_y_coord)
+            this_x_coord = (pos_sum_x-2*pi + neg_sum_x) / (n_pos + n_neg)
+            this_y_coord = (pos_sum_y-2*pi + neg_sum_y) / (n_pos + n_neg)
+            print *, 'coast ocean', i, this_x_coord, sum(pos_x), size(pos_x), sum(neg_x), size(neg_x)
+            print *, 'raw pos values', pos_x
+            print *, 'raw neg values', neg_x
           end if
-        ! coastal_nodes(i)==.True. -> Node center on open ocean, we can use node center
+          deallocate(pos_x,pos_y,neg_x,neg_y)
+        ! max_x-min_x > pi -> we are not at dateline, just a normal mean is enough
         else
-          this_x_coord = coord_nod2D(1, i)/rad
-          this_y_coord = coord_nod2D(2, i)/rad
+          this_x_coord = sum(temp_x_coord)/size(temp_x_coord)
+          this_y_coord = sum(temp_y_coord)/size(temp_y_coord)
         end if
+        my_x_coords(i)=this_x_coord
+        my_y_coords(i)=this_y_coord
+        deallocate(temp_x_coord, temp_y_coord)
+      ! coastal_nodes(i)==.True. -> Node center on open ocean, we can use node center
+      else
+        this_x_coord = coord_nod2D(1, i)
+        this_y_coord = coord_nod2D(2, i)
         ! unrotate grid
         call r2g(my_x_coords(i), my_y_coords(i), this_x_coord, this_y_coord)
-      end do
+      end if
+    end do
 
 
 
-      ! calculate angle between corners and center
-      do i = 1, my_number_of_points
-        do j = 1, all_max_elem+all_max_edge
-          ! If they have different sign we are near the dateline and need to bring the corner onto
-          ! the same hemisphere as the center (only for angle calc, the coord for oasis remains as before)
-          ! Default: same sign -> normal atan2
-          if (my_x_coords(i) <=0 .and. my_x_corners(i,j) <=0 .or. my_x_coords(i) >0 .and. my_x_corners(i,j) >0) then 
-            angle(i,j) = atan2(my_x_corners(i,j) - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
+    ! calculate angle between corners and center
+    do i = 1, my_number_of_points
+      do j = 1, all_max_elem+all_max_edge
+        ! If they have different sign we are near the dateline and need to bring the corner onto
+        ! the same hemisphere as the center (only for angle calc, the coord for oasis remains as before)
+        ! Default: same sign -> normal atan2
+        if (my_x_coords(i) <=0 .and. my_x_corners(i,j) <=0 .or. my_x_coords(i) >0 .and. my_x_corners(i,j) >0) then 
+          angle(i,j) = atan2(my_x_corners(i,j) - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
+        else
+          ! at dateline center is on the right side
+          if (my_x_coords(i) >=pi/2) then 
+            angle(i,j) = atan2(my_x_corners(i,j) + 2*pi - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
+          ! at dateline center is on the left side
+          else if (my_x_coords(i) <=-pi/2) then
+            angle(i,j) = atan2(my_x_corners(i,j) - 2*pi - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
+          ! at prime meridan -> also default
           else
-            ! at dateline center is on the right side
-            if (my_x_coords(i) >=pi) then
-              angle(i,j) = atan2(my_x_corners(i,j) - 2*pi - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
-            ! at dateline center is on the left side
-            else if (my_x_coords(i) <=-pi)
-              angle(i,j) = atan2(my_x_corners(i,j) + 2*pi - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
-            ! at prime meridan -> also default
-            else
-              angle(i,j) = atan2(my_x_corners(i,j) - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
-            end if
+            angle(i,j) = atan2(my_x_corners(i,j) - my_x_coords(i), my_y_corners(i,j) - my_y_coords(i))
           end if
         end if
-      end do   
+      end do
+    end do   
 
-      
-      ! Oasis requires corners sorted counterclockwise, so we sort by angle
+    
+    ! Oasis requires corners sorted counterclockwise, so we sort by angle
+    do i = 1, my_number_of_points
       do l = 1, all_max_elem+all_max_edge-1
         do m = l+1, all_max_elem+all_max_edge
           if (angle(i,l) < angle(i,m)) then
@@ -526,43 +552,45 @@ contains
           end if
         end do
       end do
-    end do   
+    end do
 
- 
     ! after sorting the double entries can be in the middle
     ! if one is found move rest of vector 1 index forward and fill at back with second to last value
     do i = 1, my_number_of_points
       done = 0
+      n = 0
       do j = 1, all_max_elem+all_max_edge
         ! we only want to work on the first block of duplicates, not on the duplicates we create at
         ! at the end of the vector. TODO this is quite a hack. refactoring would be good.
-        if (j>done) then
+        if (n>done) then
           exit
+        end if
         ! special case first entry: compare with last instead of previous
         if (j==1) then
-          if (my_x_corners(i,j) == my_x_corners(i,all_max_elem+all_max_edge) then
+          if (my_x_corners(i,j) == my_x_corners(i,all_max_elem+all_max_edge)) then
             ! move remaining values forward
             do n = j, all_max_elem+all_max_edge-1
               my_x_corners(i,n) = my_x_corners(i,n+1)
               my_y_corners(i,n) = my_y_corners(i,n+1)
             end do
             done = j
-            j = j-1
+            n = n-1
+          end if
         ! normal case, compare if entry is the same as previous one
         else
-          if (my_x_corners(i,j) == my_x_corners(i,j-1) then
+          if (my_x_corners(i,j) == my_x_corners(i,j-1)) then
             ! move remaining values forward
             do n = j, all_max_elem+all_max_edge-1
               my_x_corners(i,n) = my_x_corners(i,n+1)
               my_y_corners(i,n) = my_y_corners(i,n+1)
             end do
             done = j
-            j = j-1
+            n = n-1
           end if
         end if
+        n = n+1
       end do
     end do
-
 
     ! Oasis takes grad angles
     my_x_coords=my_x_coords/rad
