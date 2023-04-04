@@ -159,7 +159,6 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> bio_fluxes'
 !!   We should consider air pressure provided by ECHAM.
      Loc_slp = pa2atm
 #else
-print*, 'CHECK1'
      Loc_slp = press_air(n)
 #endif 
 
@@ -240,7 +239,6 @@ print*, 'CHECK1'
   do tr_num = num_tracers-bgc_num+1, num_tracers !bgc_num+2 
       C(1:nzmax, tr_num-2)= tracers%data(tr_num)%values(1:nzmax, n)
   end do     
-
 
      !!---- Depth of the nodes in the water column 
      zr(1:nzmax) = Z_3d_n(1:nzmax, n)                          

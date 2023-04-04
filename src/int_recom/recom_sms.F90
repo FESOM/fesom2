@@ -2420,7 +2420,7 @@ endif
 
 !-------------------------------------------------------------------------------
 ! Remineralization from the sediments into the bottom layer
-
+if (0) then
   if (use_MEDUSA .and. (sedflx_num .ne. 0)) then
 !   if (mype==0 .and. my_fesom_group == 0) then !OG
 !      write(*,*) ' --> Sedimentary input of nutrients through MEDUSA'
@@ -2471,7 +2471,7 @@ endif
       end if   ! ciso_14
     end if ! ciso
   endif ! use_MEDUSA
-
+end if
   end do ! Main time loop ends
 
 

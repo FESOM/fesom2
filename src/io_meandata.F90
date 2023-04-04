@@ -408,7 +408,7 @@ CASE ('curl_surf ')
     end if
 !___________________________________________________________________________________________________________________________________
 ! output RECOM 2D  
-#if !defined(__recom)
+!#if !defined(__recom)
 
 CASE ('dpCO2s    ')
     if (use_REcoM) then
@@ -561,7 +561,7 @@ CASE ('Chldegc  ')
     call def_stream(nod2D,  myDim_nod2D,   'ChlDegc','Chlorophyll degradation coccolithophores','1/d', Chldegc, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! NEW
     endif
 
-#endif
+!#endif
     
 !___________________________________________________________________________________________________________________________________    
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>   3D streams   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -572,7 +572,7 @@ CASE ('salt      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt',      'salinity',    'psu',    tracers%data(2)%values(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
 
-#if !defined(__recom)
+!#if !defined(__recom)
 
 CASE ('PAR       ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'PAR', 'PAR', 'W/m2',      PAR3D(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -810,7 +810,7 @@ CASE ('otracers  ')
       end if
     end do
 
-#endif
+!#endif
 
 
 

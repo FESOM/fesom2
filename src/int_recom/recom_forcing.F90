@@ -122,15 +122,13 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
     tiny_C_c = tiny_N_c/NCmax_c        ! NCmax_c = 0.15d0
 #endif
 
-#if !defined(__recom)
+!#if !defined(__recom)
 
 
   call Cobeta(partit, mesh)        
   call Depth_calculations(n, Nn,SinkVel,zF,thick,recipthick, partit, mesh)
 
 !! ----- mocsy -------! 
-
-state =0
 
 !! convert from mmol/m3 to mol/m3
   REcoM_DIC  = max(tiny*1e-3, state(one,idic)*1e-3)
@@ -239,37 +237,37 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
 
 !  call REcoM_sms(n, Nn, state, thick, recipthick, SurfSW, sms, Temp ,zF, PAR, mesh)
 
-!  call REcoM_sms(n, Nn, state, thick, recipthick, SurfSW, sms, Temp, Sali_depth &
-!        , CO2_watercolumn                                              & ! MOCSY [mol/m3]
-!        , pH_watercolumn                                               & ! MOCSY on total scale
-!        , pCO2_watercolumn                                             & ! MOCSY [uatm]
-!        , HCO3_watercolumn                                             & ! MOCSY [mol/m3]
-!        , CO3_watercolumn                                              & ! DISS [mol/m3]
-!        , OmegaC_watercolumn                                           & ! DISS calcite saturation state
-!        , kspc_watercolumn                                             & ! DISS stoichiometric solubility product [mol^2/kg^2]
-!        , rhoSW_watercolumn                                            & ! DISS in-situ density of seawater [kg/m3]
-!        , Loc_slp & !, SinkVel
-!        , zF, PAR, Lond, Latd, ice, dynamics, tracers, partit, mesh)
+  call REcoM_sms(n, Nn, state, thick, recipthick, SurfSW, sms, Temp, Sali_depth &
+        , CO2_watercolumn                                              & ! MOCSY [mol/m3]
+        , pH_watercolumn                                               & ! MOCSY on total scale
+        , pCO2_watercolumn                                             & ! MOCSY [uatm]
+        , HCO3_watercolumn                                             & ! MOCSY [mol/m3]
+        , CO3_watercolumn                                              & ! DISS [mol/m3]
+        , OmegaC_watercolumn                                           & ! DISS calcite saturation state
+        , kspc_watercolumn                                             & ! DISS stoichiometric solubility product [mol^2/kg^2]
+        , rhoSW_watercolumn                                            & ! DISS in-situ density of seawater [kg/m3]
+        , Loc_slp & !, SinkVel
+        , zF, PAR, Lond, Latd, ice, dynamics, tracers, partit, mesh)
 
-!  state(1:nn,:)      = max(tiny,state(1:nn,:) + sms(1:nn,:))
-!  state(1:nn,ipchl)  = max(tiny_chl,state(1:nn,ipchl))
-!  state(1:nn,iphyn)  = max(tiny_N,  state(1:nn,iphyn))
-!  state(1:nn,iphyc)  = max(tiny_C,  state(1:nn,iphyc))
-!  state(1:nn,idchl)  = max(tiny_chl,state(1:nn,idchl))
-!  state(1:nn,idian)  = max(tiny_N_d,state(1:nn,idian))
-!  state(1:nn,idiac)  = max(tiny_C_d,state(1:nn,idiac))
-!  state(1:nn,idiasi) = max(tiny_Si, state(1:nn,idiasi))
+  state(1:nn,:)      = max(tiny,state(1:nn,:) + sms(1:nn,:))
+  state(1:nn,ipchl)  = max(tiny_chl,state(1:nn,ipchl))
+  state(1:nn,iphyn)  = max(tiny_N,  state(1:nn,iphyn))
+  state(1:nn,iphyc)  = max(tiny_C,  state(1:nn,iphyc))
+  state(1:nn,idchl)  = max(tiny_chl,state(1:nn,idchl))
+  state(1:nn,idian)  = max(tiny_N_d,state(1:nn,idian))
+  state(1:nn,idiac)  = max(tiny_C_d,state(1:nn,idiac))
+  state(1:nn,idiasi) = max(tiny_Si, state(1:nn,idiasi))
 
-!#if defined (__coccos)
-!  state(1:nn,icchl)  = max(tiny_chl,state(1:nn,icchl))
-!  state(1:nn,icocn)  = max(tiny_N_c,state(1:nn,icocn))
-!  state(1:nn,icocc)  = max(tiny_C_c,state(1:nn,icocc))
-!#endif
+#if defined (__coccos)
+  state(1:nn,icchl)  = max(tiny_chl,state(1:nn,icchl))
+  state(1:nn,icocn)  = max(tiny_N_c,state(1:nn,icocn))
+  state(1:nn,icocc)  = max(tiny_C_c,state(1:nn,icocc))
+#endif
 
-!#if defined (__3Zoo2Det)
-!  state(1:nn,imiczoon)  = max(tiny,state(1:nn,imiczoon))
-!  state(1:nn,imiczooc)  = max(tiny,state(1:nn,imiczooc))
-!#endif
+#if defined (__3Zoo2Det)
+  state(1:nn,imiczoon)  = max(tiny,state(1:nn,imiczoon))
+  state(1:nn,imiczooc)  = max(tiny,state(1:nn,imiczooc))
+#endif
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
 
@@ -333,18 +331,18 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
 !    if (present(lNPPn))then
 !        locNPPn = sum(diags3Dloc(1:nn,idiags) * thick(1:nn))
 !    endif    
-!     locNPPn = sum(vertNPPn(1:nn) * thick(1:nn))
-!     locNPPd = sum(vertNPPd(1:nn) * thick(1:nn))
-!     locGPPn = sum(vertGPPn(1:nn) * thick(1:nn))
-!     locGPPd = sum(vertGPPd(1:nn) * thick(1:nn))
-!     locNNAn = sum(vertNNAn(1:nn) * thick(1:nn))
-!     locNNAd = sum(vertNNAd(1:nn) * thick(1:nn))
-!     locChldegn = sum(vertChldegn(1:nn) * thick(1:nn))
-!     locChldegd = sum(vertChldegd(1:nn) * thick(1:nn))
-!     locNPPc = sum(vertNPPc(1:nn) * thick(1:nn))
-!     locGPPc = sum(vertGPPc(1:nn) * thick(1:nn))
-!     locNNAc = sum(vertNNAc(1:nn) * thick(1:nn))
-!     locChldegc = sum(vertChldegc(1:nn) * thick(1:nn))
+     locNPPn = sum(vertNPPn(1:nn) * thick(1:nn))
+     locNPPd = sum(vertNPPd(1:nn) * thick(1:nn))
+     locGPPn = sum(vertGPPn(1:nn) * thick(1:nn))
+     locGPPd = sum(vertGPPd(1:nn) * thick(1:nn))
+     locNNAn = sum(vertNNAn(1:nn) * thick(1:nn))
+     locNNAd = sum(vertNNAd(1:nn) * thick(1:nn))
+     locChldegn = sum(vertChldegn(1:nn) * thick(1:nn))
+     locChldegd = sum(vertChldegd(1:nn) * thick(1:nn))
+     locNPPc = sum(vertNPPc(1:nn) * thick(1:nn))
+     locGPPc = sum(vertGPPc(1:nn) * thick(1:nn))
+     locNNAc = sum(vertNNAc(1:nn) * thick(1:nn))
+     locChldegc = sum(vertChldegc(1:nn) * thick(1:nn))
 !	do idiags = one,8
 !	  LocDiags2D(idiags) = sum(diags3Dloc(1:nn,idiags) * thick(1:nn))
 !	end do
@@ -355,9 +353,6 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
 !        LocDiags2D(12)       = sum(diags3Dloc(1:nn,24) * thick(1:nn))      ! NEW cocco GNA or chl deg
   end if
 
-
-
-
-#endif
+!#endif
 end subroutine REcoM_Forcing
 
