@@ -442,6 +442,11 @@ subroutine EVPdynamics(ice, partit, mesh)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum, aa, p_ice, elevation_elem, elevation_dx, elevation_dy)
 !$OMP DO
+#if !defined(DISABLE_OPENACC_ATOMICS)
+        !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes, elevation_elem, p_ice) DEFAULT(PRESENT)
+#else
+        !$ACC UPDATE SELF(rhs_a, rhs_m, m_ice, a_ice)
+#endif
         do el = 1,myDim_elem2D
             elnodes = elem2D_nodes(:,el)
             ice_strength(el)=0.0_WP
@@ -489,10 +494,23 @@ subroutine EVPdynamics(ice, partit, mesh)
                 elevation_dy   = sum(gradient_sca(4:6,el)*(elevation_elem+p_ice*use_pice))
 
                 !_______________________________________________________________
-                rhs_a(elnodes) = rhs_a(elnodes)-aa*elevation_dx
-                rhs_m(elnodes) = rhs_m(elnodes)-aa*elevation_dy
+                do k = 1, 3
+#if !defined(DISABLE_OPENACC_ATOMICS)
+                    !$ACC ATOMIC UPDATE
+#endif
+                    rhs_a(elnodes(k)) = rhs_a(elnodes(k))-aa*elevation_dx
+#if !defined(DISABLE_OPENACC_ATOMICS)
+                    !$ACC ATOMIC UPDATE
+#endif
+                    rhs_m(elnodes(k)) = rhs_m(elnodes(k))-aa*elevation_dy
+                end do
             end if
         enddo
+#if !defined(DISABLE_OPENACC_ATOMICS)
+        !$ACC END PARALLEL LOOP
+#else
+        !$ACC UPDATE DEVICE(rhs_a, rhs_m, ice_strength)
+#endif
 !$OMP END DO
 !$OMP END PARALLEL
     else
@@ -534,7 +552,7 @@ subroutine EVPdynamics(ice, partit, mesh)
                 elevation_dx = sum(gradient_sca(1:3,el)*elevation(elnodes))
                 elevation_dy = sum(gradient_sca(4:6,el)*elevation(elnodes))
 
-                do k=1, 3
+                do k = 1, 3
 #if !defined(DISABLE_OPENACC_ATOMICS)
                     !$ACC ATOMIC UPDATE
 #endif
