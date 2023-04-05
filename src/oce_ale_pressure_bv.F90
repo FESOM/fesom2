@@ -2879,8 +2879,10 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, t1, t1_2, t1_3, t1_4, p1, p1_2, p1_3, s1, s35, s35_2, a_over_b)
 !$OMP DO
 
-    !$ACC PARALLEL LOOP GANG
+    !$ACC DATA COPY(myDim_nod2D, ulevels_nod2D, nlevels_nod2D) &
+    !$ACC      COPY(tf1, sf1, sw_alpha, sw_beta, z_3d_n)
 
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
     do n = 1,myDim_nod2d
         nzmin = ulevels_nod2d(n)
         nzmax = nlevels_nod2d(n)
@@ -2928,13 +2930,17 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
         !$ACC END LOOP
     end do
 
- !$ACC END PARALLEL LOOP
+    !$ACC END PARALLEL LOOP
+
 
 !$OMP END DO
 !$OMP END PARALLEL
-call exchange_nod(sw_alpha, partit)
-call exchange_nod(sw_beta, partit)
+call exchange_nod(sw_alpha, partit, luse_g2g = .true.)
+call exchange_nod(sw_beta, partit, luse_g2g = .true.)
 !$OMP BARRIER
+
+    !$ACC END DATA
+
 end subroutine sw_alpha_beta
 !
 !
