@@ -226,6 +226,7 @@ subroutine pressure_bv(tracers, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+
     temp=>tracers%data(1)%values(:,:)
     salt=>tracers%data(2)%values(:,:)
     smallvalue=1.0e-20
@@ -238,11 +239,17 @@ subroutine pressure_bv(tracers, partit, mesh)
         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     end if
 
+    !$ACC DATA COPY(mld1, mld2, mld3, mld1_ind, mld2_ind, mld3_ind) &
+    !$ACC      COPY(density_ref, density_dmoc, density_m_rho0, dbsfc) &
+    !$ACC      COPY(myDim_nod2D, eDim_nod2D, nlevels_nod2D, ulevels_nod2D, hnode) &
+    !$ACC      COPY(temp, salt, zbar_3d_n, z_3d_n, hpressure, bvfreq)
+
     !___________________________________________________________________________
     ! Screen salinity
     a    =0.0_WP
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax)
 !$OMP DO REDUCTION(min: a)
+    !$ACC PARALLEL LOOP GANG VECTOR REDUCTION(min:a) DEFAULT(NONE)
     do node=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(node)
         nzmax = nlevels_nod2D(node)
@@ -250,6 +257,7 @@ subroutine pressure_bv(tracers, partit, mesh)
             a=min(a, salt(nz,node))
         enddo
     enddo
+    !$ACC END PARALLEL LOOP
 !$OMP END DO
 !$OMP END PARALLEL
 
@@ -257,6 +265,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     ! model explodes, no OpenMP parallelization !
     if( a < 0.0_WP ) then
         write (*,*)' --> pressure_bv: s<0 happens!', a
+        !$ACC UPDATE SELF(salt)
         pe_status=1
         do node=1, myDim_nod2D+eDim_nod2D
             nzmin = ulevels_nod2D(node)
@@ -265,6 +274,7 @@ subroutine pressure_bv(tracers, partit, mesh)
                 if (salt(nz, node) < 0) write (*,*) 'the model blows up at n=', mylist_nod2D(node), ' ; ', 'nz=', nz
             end do
         end do
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     endif
 
     !___________________________________________________________________________
@@ -273,10 +283,8 @@ subroutine pressure_bv(tracers, partit, mesh)
 !$OMP                                  rhopot, bulk_0, bulk_pz, bulk_pz2, rho, dbsfc1, db_max, bulk_up, bulk_dn, &
 !$OMP                                  rho_surf, aux_rho, aux_rho1, flag1, flag2, bv1)
 !$OMP DO
-
-    !$ACC PARALLEL LOOP GANG &
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE) &
     !$ACC PRIVATE(rhopot, bulk_0, bulk_pz, bulk_pz2, rho, dbsfc1, bv1)
-
     do node=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(node)
         nzmax = nlevels_nod2D(node)
@@ -522,6 +530,8 @@ subroutine pressure_bv(tracers, partit, mesh)
     end do
 
     !$ACC END PARALLEL LOOP
+
+    !$ACC END DATA
 
 !$OMP END DO
 !$OMP END PARALLEL
