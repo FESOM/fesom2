@@ -209,7 +209,7 @@ contains
     logical                    :: new_points
 
     integer                    :: i, j, k            ! local loop indicees
-    integer                    :: l,m,n, done, nskip ! local loop indicees
+    integer                    :: l,m,n, done        ! local loop indicees
 
     character(len=32)          :: point_name     ! name of the grid points
 
@@ -239,7 +239,6 @@ contains
     real(kind=WP), allocatable :: neg_x(:)       ! longitude to the left of dateline
     real(kind=WP), allocatable :: neg_y(:)       ! latitude to the left of dateline
     real(kind=WP), allocatable :: temp_x_coord(:)    ! longitude coordinates
-    real(kind=WP), allocatable :: temp_x_coord2(:)    ! longitude coordinates
     real(kind=WP), allocatable :: temp_y_coord(:)    ! longitude coordinates
     real(kind=WP), allocatable :: my_x_coords(:)     ! longitude coordinates
     real(kind=WP), allocatable :: my_y_coords(:)     ! latitude  coordinates
@@ -440,7 +439,6 @@ contains
           temp_x_coord(j) = x_corners(i,j)*rad
           temp_y_coord(j) = y_corners(i,j)*rad
         end do
-        nskip=0
         do j = 1, nn_num(i)
           ! We skip coastal edge center points for the new center point calculation
           ! such that 1 element islands have the node center at the right angle
@@ -450,33 +448,38 @@ contains
             if (mype==72) then
               print *, 'edge', i, edge
             end if
-            
+            ! if edge is coastal, add center coords weights on the opposite site of the polygon
             if (edge>0) then
-              nskip=nskip+1
-              continue
+              this_x_coord = coord_nod2D(1, i)
+              this_y_coord = coord_nod2D(2, i)
+              ! unrotate grid
+              call r2g(my_x_coords(i), my_y_coords(i), this_x_coord, this_y_coord)
+
+              if (abs(abs(coord_e_edge_center(1,i,j))-abs(my_x_coords(i))) < pi) then
+                temp_x_coord(j+nod_in_elem2D_num(i))=coord_e_edge_center(1,i,j)-(coord_e_edge_center(1,i,j)-my_x_coords(i))*nn_num(i)
+                temp_y_coord(j+nod_in_elem2D_num(i))=coord_e_edge_center(2,i,j)-(coord_e_edge_center(2,i,j)-my_y_coords(i))*nn_num(i)
+              ! if we are at the data line, this would result in errors, thus we do the conservative 
+              ! and add only the node center, rather than some point on the oder side of the polygon
+              else
+                temp_x_coord(j+nod_in_elem2D_num(i))=my_x_coords(i)
+                temp_y_coord(j+nod_in_elem2D_num(i))=my_y_coords(i)
+              end if
+            ! case for only two elements, here we need the real edge centers to ensure center coord
+            ! is inside polygon
             else
-              temp_x_coord(j+nod_in_elem2D_num(i)-nskip) = coord_e_edge_center(1,i,j)
-              temp_y_coord(j+nod_in_elem2D_num(i)-nskip) = coord_e_edge_center(2,i,j)
+              temp_x_coord(j+nod_in_elem2D_num(i)) = coord_e_edge_center(1,i,j)
+              temp_y_coord(j+nod_in_elem2D_num(i)) = coord_e_edge_center(2,i,j)
             end if
+          ! default case, we just use the corner coords
           else
-            temp_x_coord(j+nod_in_elem2D_num(i)-nskip) = coord_e_edge_center(1,i,j)
-            temp_y_coord(j+nod_in_elem2D_num(i)-nskip) = coord_e_edge_center(2,i,j)
+            temp_x_coord(j+nod_in_elem2D_num(i)) = coord_e_edge_center(1,i,j)
+            temp_y_coord(j+nod_in_elem2D_num(i)) = coord_e_edge_center(2,i,j)
           end if
         end do
         min_x = minval(temp_x_coord)
         max_x = maxval(temp_x_coord)
         ! if we are at dateline (fesom cell larger than pi)
         if (max_x-min_x > pi) then
-
-          ! reduce size temp_x by nskip
-          allocate (temp_x_coord2(size(temp_x_coord)-nskip))
-          do j = 1, nn_num(i)-nskip
-            temp_x_coord2(j)=temp_x_coord(j)
-          end do
-          deallocate (temp_x_coord)
-          allocate (temp_x_coord(size(temp_x_coord2)))
-          temp_x_coord=temp_x_coord2
-          deallocate (temp_x_coord2)
 
           ! set up separate data structures for the two hemispheres
           n_pos=count(temp_x_coord>=0)
@@ -519,8 +522,8 @@ contains
           deallocate(pos_x,pos_y,neg_x,neg_y)
         ! max_x-min_x > pi -> we are not at dateline, just a normal mean is enough
         else
-          this_x_coord = sum(temp_x_coord)/(size(temp_x_coord)-nskip)
-          this_y_coord = sum(temp_y_coord)/(size(temp_y_coord)-nskip)
+          this_x_coord = sum(temp_x_coord)/(size(temp_x_coord))
+          this_y_coord = sum(temp_y_coord)/(size(temp_y_coord))
         end if
         my_x_coords(i)=this_x_coord
         my_y_coords(i)=this_y_coord
