@@ -116,11 +116,15 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
   nlev=ubound(arr,1)
   allocate(work_array(nlev,myDim_nod2D))
 
+  !$ACC DATA COPY(myDim_nod2D, ulevels, nlevels, ulevels_nod2D, nlevels_nod2D) &
+  !$ACC      COPY(elem_area, elem2D_nodes, nod_in_elem2D, nod_in_elem2D_num) &
+  !$ACC      COPY(arr, work_array, vol)
+
 ! Precompute area of patches on all levels (at the bottom, some neighbouring
 ! nodes may vanish in the bathymetry) in the first smoothing step
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, q, el, nz, j, uln, nln, ule, nle)
 !$OMP DO
-   !$ACC PARALLEL LOOP GANG
+   !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
   DO n=1, myDim_nod2D
      uln = ulevels_nod2d(n)
      nln = min(nlev,nlevels_nod2d(n))
@@ -150,7 +154,7 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
 
   ! combined: scale by patch volume + copy back to original field
 !$OMP DO
-   !$ACC PARALLEL LOOP GANG
+   !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
   DO n=1, myDim_nod2D
      uln = ulevels_nod2d(n)
      nln = min(nlev,nlevels_nod2d(n))
@@ -164,14 +168,14 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
 !$OMP END DO
 
 !$OMP MASTER
-  call exchange_nod(arr, partit)
+  call exchange_nod(arr, partit, luse_g2g = .true.)
 !$OMP END MASTER
 
 !$OMP BARRIER
 ! And the remaining smoothing sweeps
   DO q=1,N_smooth-1
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
      DO n=1, myDim_nod2D
         uln = ulevels_nod2d(n)
         nln = min(nlev,nlevels_nod2d(n))
@@ -194,7 +198,7 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
 
 ! combined: scale by patch volume + copy back to original field
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
      DO n=1, myDim_nod2D
         !!PS DO nz=1, min(nlev, nlevels_nod2d(n))
         uln = ulevels_nod2d(n)
@@ -209,11 +213,16 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
 !$OMP END DO
 
 !$OMP MASTER
-     call exchange_nod(arr, partit)
+     call exchange_nod(arr, partit, luse_g2g = .true.)
 !$OMP END MASTER
+
+
 !$OMP BARRIER
   enddo
 !$OMP END PARALLEL
+
+    !$ACC END DATA
+
   deallocate(work_array)
 end subroutine smooth_nod3D
 
