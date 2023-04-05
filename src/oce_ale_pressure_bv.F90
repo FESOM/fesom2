@@ -2426,6 +2426,9 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
     end if
     error = .false.
 
+    !$ACC DATA COPY(myDim_elem2D, elem2D_nodes, ulevels_nod2D, nlevels_nod2D, ulevels, nlevels) &
+    !$ACC      COPY(salt, temp, pgf_x, pgf_y, z_3d_n, zbar_e_bot, helem, gradient_sca)
+
     !___________________________________________________________________________
     ! loop over triangular elemments
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nlz, nln, ni, nlc, nlce, idx, int_dp_dx, drho_dx, drho_dy, dz_dx, dz_dy, aux_sum, dx10, dx20, dx21, &
@@ -2433,7 +2436,7 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
 !$OMP                                  bulk_0, bulk_pz, bulk_pz2, dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, zbar_n, z_n                                )
 !$OMP DO
 
-    !$ACC PARALLEL LOOP GANG &
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE) &
     !$ACC PRIVATE(elnodes, int_dp_dx, rho_at_Zn, zbar_n, z_n) &
     !$ACC REDUCTION(.or.:error)
     do elem = 1, myDim_elem2D
@@ -2633,6 +2636,9 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
         write(*,*) '     This is not wanted, model stops here'
         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
     end if
+
+    !$ACC END DATA
+
 end subroutine pressure_force_4_zxxxx_easypgf
 !
 !
