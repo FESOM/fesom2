@@ -515,11 +515,12 @@ contains
             this_x_coord = (sum(pos_x) - 2*pi*n_pos + sum(neg_x)) / (n_pos + n_neg)
             this_y_coord = (sum(pos_y) + sum(neg_y)) / (n_pos + n_neg)
           end if
+          print *, i, j, this_x_coord, this_y_coord
           deallocate(pos_x,pos_y,neg_x,neg_y)
         ! max_x-min_x > pi -> we are not at dateline, just a normal mean is enough
         else
-          this_x_coord = sum(temp_x_coord)/size(temp_x_coord-nskip)
-          this_y_coord = sum(temp_y_coord)/size(temp_y_coord-nskip)
+          this_x_coord = sum(temp_x_coord)/(size(temp_x_coord)-nskip)
+          this_y_coord = sum(temp_y_coord)/(size(temp_y_coord)-nskip)
         end if
         my_x_coords(i)=this_x_coord
         my_y_coords(i)=this_y_coord
@@ -530,10 +531,10 @@ contains
         this_y_coord = coord_nod2D(2, i)
         ! unrotate grid
         call r2g(my_x_coords(i), my_y_coords(i), this_x_coord, this_y_coord)
+      end if
       if (displs_from_all_pes(mype+1)+i == 126502) then
         print *, 'center'
-        print *, my_x_coords(i), my_y_coords(i)
-      end if
+        print *, my_x_coords(i)/rad, my_y_coords(i)/rad
       end if
     end do
 
@@ -558,8 +559,8 @@ contains
       end if
       if (displs_from_all_pes(mype+1)+i == 126502) then
         print *, 'corners'
-        print *, my_x_corners(i,:) 
-        print *, my_y_corners(i,:)
+        print *, my_x_corners(i,:)/rad
+        print *, my_y_corners(i,:)/rad
       end if
     end do
 
@@ -591,8 +592,8 @@ contains
       end do
       if (displs_from_all_pes(mype+1)+i == 126502) then
         print *, 'Angle'
-        print *, my_x_corners(i,:) 
-        print *, my_y_corners(i,:)
+        print *, my_x_corners(i,:)/rad
+        print *, my_y_corners(i,:)/rad
       end if
     end do   
 
@@ -623,8 +624,8 @@ contains
       end do
       if (displs_from_all_pes(mype+1)+i == 126502) then
         print *, 'corners sorted'
-        print *, my_x_corners(i,:) 
-        print *, my_y_corners(i,:)
+        print *, my_x_corners(i,:)/rad
+        print *, my_y_corners(i,:)/rad
       end if
     end do
 
@@ -654,8 +655,8 @@ contains
       end do
       if (displs_from_all_pes(mype+1)+i == 126502) then
         print *, 'corners padded'
-        print *, my_x_corners(i,:) 
-        print *, my_y_corners(i,:)
+        print *, my_x_corners(i,:)/rad
+        print *, my_y_corners(i,:)/rad
       end if
     end do
 
