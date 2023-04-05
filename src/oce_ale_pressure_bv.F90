@@ -2981,7 +2981,11 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tx, ty, sx, sy, vol, n, nz, elnodes, el, k, nln, uln, nle, ule)
 !$OMP DO
 
-    !$ACC PARALLEL LOOP GANG &
+    !$ACC DATA COPY(myDim_nod2D, ulevels, nlevels, ulevels_nod2D, nlevels_nod2D) &
+    !$ACC      COPY(elem_area, elem2D_nodes, nod_in_elem2D, nod_in_elem2D_num) &
+    !$ACC      COPY(tf1, sf1, sw_alpha, sw_beta, sigma_xy, gradient_sca)
+
+    !$ACC PARALLEL LOOP GANG DEFAULT(NONE) &
     !$ACC PRIVATE(elnodes, tx, ty, sx, sy, vol)
 
     do n=1, myDim_nod2D
@@ -3042,13 +3046,15 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
         end do
         !$ACC END LOOP
     end do
-
     !$ACC END PARALLEL LOOP
 
 !$OMP END DO
 !$OMP END PARALLEL
-  call exchange_nod(sigma_xy, partit)
+  call exchange_nod(sigma_xy, partit, luse_g2g = .true.)
 !$OMP BARRIER
+
+    !$ACC END DATA
+
 end subroutine compute_sigma_xy
 !
 !
