@@ -120,6 +120,7 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
 ! nodes may vanish in the bathymetry) in the first smoothing step
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, q, el, nz, j, uln, nln, ule, nle)
 !$OMP DO
+   !$ACC PARALLEL LOOP GANG
   DO n=1, myDim_nod2D
      uln = ulevels_nod2d(n)
      nln = min(nlev,nlevels_nod2d(n))
@@ -129,35 +130,48 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
         el = nod_in_elem2D(j,n)
         ule = max( uln, ulevels(el) )
         nle = min( nln, min(nlev,nlevels(el)) )
+         !$ACC LOOP VECTOR
         DO nz=ule, nle
            vol(nz,n) = vol(nz,n) + elem_area(el)
            work_array(nz,n) = work_array(nz,n) + elem_area(el) * (arr(nz, elem2D_nodes(1,el)) &
                                                                 + arr(nz, elem2D_nodes(2,el)) &
                                                                 + arr(nz, elem2D_nodes(3,el)))
         END DO
+         !$ACC END LOOP
      ENDDO
+     !$ACC LOOP VECTOR
      DO nz=uln,nln
         vol(nz,n) = 1._WP / (3._WP * vol(nz,n))  ! Here, we need the inverse and scale by 1/3
      END DO
+     !$ACC END LOOP
   END DO
+  !$ACC END PARALLEL LOOP
 !$OMP END DO
+
   ! combined: scale by patch volume + copy back to original field
 !$OMP DO
+   !$ACC PARALLEL LOOP GANG
   DO n=1, myDim_nod2D
      uln = ulevels_nod2d(n)
      nln = min(nlev,nlevels_nod2d(n))
+     !$ACC LOOP VECTOR
      DO nz=uln,nln
         arr(nz, n) = work_array(nz, n) *vol(nz,n)
      END DO
+     !$ACC END LOOP
   END DO
+  !$ACC END PARALLEL LOOP
 !$OMP END DO
+
 !$OMP MASTER
   call exchange_nod(arr, partit)
 !$OMP END MASTER
+
 !$OMP BARRIER
 ! And the remaining smoothing sweeps
   DO q=1,N_smooth-1
 !$OMP DO
+    !$ACC PARALLEL LOOP GANG
      DO n=1, myDim_nod2D
         uln = ulevels_nod2d(n)
         nln = min(nlev,nlevels_nod2d(n))
@@ -166,25 +180,34 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
            el = nod_in_elem2D(j,n)
            ule = max( uln, ulevels(el) )
            nle = min( nln, min(nlev,nlevels(el)) )
+           !$ACC LOOP VECTOR
            DO nz=ule,nle
               work_array(nz,n) = work_array(nz,n) + elem_area(el) * (arr(nz, elem2D_nodes(1,el)) &
                                                                    + arr(nz, elem2D_nodes(2,el)) &
                                                                    + arr(nz, elem2D_nodes(3,el)))
            END DO
+           !$ACC END LOOP
         ENDDO
      ENDDO
+    !$ACC END PARALLEL LOOP
 !$OMP END DO
+
 ! combined: scale by patch volume + copy back to original field
 !$OMP DO
+    !$ACC PARALLEL LOOP GANG
      DO n=1, myDim_nod2D
         !!PS DO nz=1, min(nlev, nlevels_nod2d(n))
         uln = ulevels_nod2d(n)
         nln = min(nlev,nlevels_nod2d(n))
+        !$ACC LOOP VECTOR
         DO nz=uln,nln
            arr(nz, n) = work_array(nz, n) *vol(nz,n)
         END DO
+        !$ACC END LOOP
      END DO
+     !$ACC END PARALLEL LOOP
 !$OMP END DO
+
 !$OMP MASTER
      call exchange_nod(arr, partit)
 !$OMP END MASTER
