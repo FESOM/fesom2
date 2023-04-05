@@ -1,4 +1,4 @@
-!a set of auxuary routines for: 
+!a set of auxuary routines for:
 !1. smoothing FESOM fields using mass matrix
 !2. computing surface integrals of the FESOM fields
 module g_support
@@ -147,10 +147,10 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
      uln = ulevels_nod2d(n)
      nln = min(nlev,nlevels_nod2d(n))
      DO nz=uln,nln
-        arr(nz, n) = work_array(nz, n) *vol(nz,n) 
+        arr(nz, n) = work_array(nz, n) *vol(nz,n)
      END DO
   END DO
-!$OMP END DO  
+!$OMP END DO
 !$OMP MASTER
   call exchange_nod(arr, partit)
 !$OMP END MASTER
@@ -181,7 +181,7 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
         uln = ulevels_nod2d(n)
         nln = min(nlev,nlevels_nod2d(n))
         DO nz=uln,nln
-           arr(nz, n) = work_array(nz, n) *vol(nz,n) 
+           arr(nz, n) = work_array(nz, n) *vol(nz,n)
         END DO
      END DO
 !$OMP END DO
@@ -208,7 +208,7 @@ subroutine smooth_elem2D(arr, N, partit, mesh)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
+#include "associate_mesh_ass.h"
     allocate(work_array(myDim_nod2D+eDim_nod2D))
     DO q=1, N !apply mass matrix N times to smooth the field
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, elem, j, q, elnodes, vol)
@@ -256,10 +256,10 @@ subroutine smooth_elem3D(arr, N, partit, mesh)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
+#include "associate_mesh_ass.h"
 
     allocate(work_array(myDim_nod2D+eDim_nod2D))
-    
+
     my_nl=ubound(arr,1)
     DO q=1, N !apply mass matrix N times to smooth the field
         DO nz=1, my_nl
@@ -325,7 +325,7 @@ subroutine integrate_nod_2D(data, int2D, partit, mesh)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
+#include "associate_mesh_ass.h"
 
 lval=0.0_WP
 #if !defined(__openmp_reproducible)
@@ -335,7 +335,7 @@ lval=0.0_WP
   do row=1, myDim_nod2D
      lval=lval+data(row)*areasvol(ulevels_nod2D(row),row)
   end do
-#if !defined(__openmp_reproducible) 
+#if !defined(__openmp_reproducible)
 !$OMP END DO
 !$OMP END PARALLEL
 #endif
@@ -365,7 +365,7 @@ subroutine integrate_nod_3D(data, int3D, partit, mesh)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
+#include "associate_mesh_ass.h"
 
   lval=0.0_WP
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row, k, lval_row) REDUCTION(+: lval)
@@ -407,11 +407,11 @@ subroutine extrap_nod3D(arr, partit, mesh)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
+#include "associate_mesh_ass.h"
     !___________________________________________________________________________
     allocate(work_array(myDim_nod2D+eDim_nod2D))
     call exchange_nod(arr, partit)
-    
+
     !___________________________________________________________________________
     loc_max=maxval(arr(1,:))
     glob_max=0._WP
@@ -419,70 +419,70 @@ subroutine extrap_nod3D(arr, partit, mesh)
     glob_sum=-1
 
     !___________________________________________________________________________
-    do while (glob_max>0.99_WP*dummy)  
+    do while (glob_max>0.99_WP*dummy)
         !_______________________________________________________________________
         ! extrapolate in horizontal direction
         do nz=1, nl-1
             work_array=arr(nz,:)
             success=.true.
-            
+
             !___________________________________________________________________
-            ! horizontal extrapolation 
+            ! horizontal extrapolation
             do while (success) ! --> do while runs as long as success==.true.
                 success=.false.
-                
+
                 !_______________________________________________________________
-                ! loop over local vertices n 
+                ! loop over local vertices n
                 do n=1, myDim_nod2D+eDim_nod2D
                     ! found node n that has to be extrapolated
                     if ( (work_array(n)>0.99_WP*dummy) .and.  (nlevels_nod2D(n)>nz)) then
                         cnt=0
                         val=0._WP
-                        
+
                         !_______________________________________________________
                         ! loop over adjacent elements
                         do k=1, nod_in_elem2D_num(n)
                             el=nod_in_elem2D(k, n)
-                            
+
                             if (nz>nlevels(el)) cycle
                             enodes=elem2D_nodes(:, el)
                             !___________________________________________________
-                            ! loop over vertices of adjacent element 
+                            ! loop over vertices of adjacent element
                             do j=1, 3
                                 if (enodes(j)==0) cycle
                                 if ((work_array(enodes(j))<0.99_WP*dummy) .and. (nlevels_nod2D(enodes(j))>nz)) then
                                     val=val+work_array(enodes(j))
-                                    cnt=cnt+1              
+                                    cnt=cnt+1
                                 end if
                             end do ! --> do j=1, 3
                         end do ! --> do k=1, nod_in_elem2D_num(n)
-                        
+
                         !_______________________________________________________
-                        ! found valid neighbouring node that can be used for 
-                        ! extrapooolation 
+                        ! found valid neighbouring node that can be used for
+                        ! extrapooolation
                         if (cnt>0) then
                             work_array(n)=val/real(cnt,WP)
                             success=.true. ! --> reason to stay in while loop
                         end if
-                        
+
                     end if ! --> if ( (work_array(n)>0.99_WP*dummy) ....
-                    
+
                 end do ! --> do n=1, myDim_nod2D
-                
+
             end do ! --> do while (success)
             arr(nz,:)=work_array
-            
+
         end do ! --> do nz=1, nl-1
-        
+
         !_______________________________________________________________________
         call exchange_nod(arr, partit)
-        
+
         !_______________________________________________________________________
         loc_max=maxval(arr(1,:))
-        call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)   
-        
-    END DO ! -->  DO WHILE (glob_max>0.99_WP*dummy)  
-    
+        call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+
+    END DO ! -->  DO WHILE (glob_max>0.99_WP*dummy)
+
     !___________________________________________________________________________
     ! extrapolate in vertical direction
     do n=1, myDim_nod2D
@@ -494,15 +494,15 @@ subroutine extrap_nod3D(arr, partit, mesh)
         end do
     end do
     call exchange_nod(arr, partit)
-    
+
     !___________________________________________________________________________
     deallocate(work_array)
-    
+
 end subroutine extrap_nod3D
 !
 !--------------------------------------------------------------------------------------------
 ! returns min/max/sum of a one dimentional array (same as minval) but with the support of OpenMP
-FUNCTION omp_min_max_sum1(arr, pos1, pos2, what, partit, nan) 
+FUNCTION omp_min_max_sum1(arr, pos1, pos2, what, partit, nan)
   USE MOD_PARTIT
   implicit none
   real(kind=WP), intent(in)   :: arr(:)
@@ -562,7 +562,7 @@ END FUNCTION
 !
 !--------------------------------------------------------------------------------------------
 ! returns min/max/sum of a two dimentional array (same as minval) but with the support of OpenMP
-FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan) 
+FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
   implicit none
   real(kind=WP), intent(in)   :: arr(:,:)
   integer,       intent(in)   :: pos11, pos12, pos21, pos22
@@ -571,13 +571,13 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
   real(kind=WP)               :: omp_min_max_sum2
   real(kind=WP)               :: val, vmasked, val_part(pos11:pos12)
   integer                     :: i, j
-  
+
 
   type(t_partit),intent(in), &
                        target :: partit
-  
+
   IF (PRESENT(nan)) vmasked=nan
-  
+
   SELECT CASE (trim(what))
     CASE ('min')
       if (.not. present(nan)) vmasked=huge(vmasked) !just some crazy number
@@ -617,11 +617,11 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
       end do
 !$OMP END PARALLEL DO
 #else
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(j) 
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(j)
       do j=pos21, pos22
          val_part(j) = sum(arr(pos11:pos12,j), mask=(arr(pos11:pos12,j)/=vmasked))
       end do
-!$OMP END PARALLEL DO 
+!$OMP END PARALLEL DO
       val = sum(val_part(pos21:pos22))
 #endif
 
@@ -654,7 +654,7 @@ subroutine integrate_elem_3D(data, int3D, partit, mesh)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
+#include "associate_mesh_ass.h"
 
   lval=0.0_WP
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row, k, lval_row) REDUCTION(+: lval)
@@ -698,7 +698,7 @@ subroutine integrate_elem_2D(data, int2D, partit, mesh)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
+#include "associate_mesh_ass.h"
 
   lval=0.0_WP
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+: lval)
@@ -719,5 +719,3 @@ subroutine integrate_elem_2D(data, int2D, partit, mesh)
        MPI_COMM_FESOM, MPIerr)
 end subroutine integrate_elem_2D
 end module g_support
-
-
