@@ -221,7 +221,7 @@ contains
     integer                    :: my_max_elem(partit%npes)
     integer                    :: my_max_edge(partit%npes)
     integer                    :: all_max_elem, all_max_edge, n_neg, n_pos
-    integer                    :: el(2), enodes(2), edge, my_num_coastal_edges
+    integer                    :: el(2), enodes(2), edge
 
     integer,allocatable        :: unstr_mask(:,:), coastal_edge_list(:,:)
     real(kind=WP)              :: max_x          ! max longitude on corners of control volume
@@ -358,7 +358,7 @@ contains
     ! We need to know for every node if any of it's edges are coastal, because 
     ! in case they are the center point will be a corner of the nodal area
     coastal_nodes=.False.
-    my_num_coastal_edges=0
+    allocate (coastal_edge_list(my_number_of_points*2,my_number_of_points*2))
     do edge=1, myDim_edge2D
       ! local indice of nodes that span up edge
       enodes=edges(:,edge)      
@@ -368,35 +368,16 @@ contains
         ! Inner edge
         continue
       else   
-        my_num_coastal_edges = my_num_coastal_edges + 1
         ! Boundary/coastal edge
         coastal_nodes(enodes(1))=.True.
         coastal_nodes(enodes(2))=.True.
-      end if  
-    end do
-
-    ! Now we know how many costal edges we have
-    ! On the second loop we store them in an array where we can
-    ! Later call them up again based on nodal indies
-    allocate (coastal_edge_list(my_number_of_points*2,my_number_of_points*2))
-    my_num_coastal_edges=0
-    do edge=1, myDim_edge2D
-      ! local indice of nodes that span up edge
-      enodes=edges(:,edge)      
-      ! local index of element that contribute to edge
-      el=edge_tri(:,edge)
-      if(el(2)>0) then
-        ! Inner edge
-        continue
-      else  
-        my_num_coastal_edges = my_num_coastal_edges + 2
         coastal_edge_list(enodes(1),enodes(2))=edge
         coastal_edge_list(enodes(2),enodes(1))=edge
       end if  
     end do
 
 
-    ! For every node, loop over neighbours, find mean of node center and neighbour node center.
+    ! For every node, loop over neighbours, calculate edge center as mean of node center and neighbour node center.
     coord_e_edge_center=0
     do i = 1, my_number_of_points
       ! if we are on coastal node, include node center n=1 as corner
@@ -421,8 +402,7 @@ contains
     do i = 1, my_number_of_points
       ! Center coord as mean of corner coordiantes along coastline
       if (coastal_nodes(i)==.True.) then
-        ! For the mean calculation we don't want all the repeat points that we need for oasis
-        ! So we define some temp_corner coordiantes that only have the corners once
+        ! So we define temp_corner coordiantes 
         allocate(temp_x_coord(nod_in_elem2D_num(i)+nn_num(i)))
         allocate(temp_y_coord(nod_in_elem2D_num(i)+nn_num(i)))
         temp_x_coord=0
@@ -431,6 +411,7 @@ contains
           temp_x_coord(j) = x_corners(i,j)*rad
           temp_y_coord(j) = y_corners(i,j)*rad
         end do
+        ! Loop over edges
         do j = 1, nn_num(i)
           ! We skip coastal edge center points for the new center point calculation
           ! such that 1 element islands have the node center at the right angle
@@ -439,27 +420,27 @@ contains
             edge = coastal_edge_list(i,nn_pos(j,i))
             ! if edge is coastal, add center coords weights on the opposite site of the polygon
             if (edge>0) then
-              this_x_coord = coord_nod2D(1, i)
-              this_y_coord = coord_nod2D(2, i)
-              ! unrotate grid
-              call r2g(my_x_coords(i), my_y_coords(i), this_x_coord, this_y_coord)
-
+              ! Default case where we are not on the dateline
               if (abs(coord_e_edge_center(1,i,j)-my_x_coords(i)) < pi) then
                 temp_x_coord(j+nod_in_elem2D_num(i))=coord_e_edge_center(1,i,j)-(coord_e_edge_center(1,i,j)-my_x_coords(i))*nn_num(i)/2
                 temp_y_coord(j+nod_in_elem2D_num(i))=coord_e_edge_center(2,i,j)-(coord_e_edge_center(2,i,j)-my_y_coords(i))*nn_num(i)/2
-              ! if we are at the data line, this would result in errors, thus we do the conservative 
-              ! and add only the node center, rather than some point on the oder side of the polygon
+              ! if we are at the dateline, this would result in errors, thus we only add the node center, 
+              ! rather than a point on the oder side of the polygon
               else
+                this_x_coord = coord_nod2D(1, i)
+                this_y_coord = coord_nod2D(2, i)
+                ! unrotate grid
+                call r2g(my_x_coords(i), my_y_coords(i), this_x_coord, this_y_coord)
                 temp_x_coord(j+nod_in_elem2D_num(i))=my_x_coords(i)
                 temp_y_coord(j+nod_in_elem2D_num(i))=my_y_coords(i)
               end if
-            ! case for only two elements, here we need the real edge centers to ensure center coord
+            ! case for only two elements, we need the real edge centers to ensure center coord
             ! is inside polygon
             else
               temp_x_coord(j+nod_in_elem2D_num(i)) = coord_e_edge_center(1,i,j)
               temp_y_coord(j+nod_in_elem2D_num(i)) = coord_e_edge_center(2,i,j)
             end if
-          ! default case, we just use the corner coords
+          ! Open ocean case, we just use the corner coords
           else
             temp_x_coord(j+nod_in_elem2D_num(i)) = coord_e_edge_center(1,i,j)
             temp_y_coord(j+nod_in_elem2D_num(i)) = coord_e_edge_center(2,i,j)
@@ -525,19 +506,21 @@ contains
       end if
     end do
 
-
+    ! Add the different corner types to single array in preparation for angle calculation
     do i = 1, my_number_of_points
+      ! First for element center based corners
       do j = 1, nod_in_elem2D_num(i)
         my_x_corners(i,j) = x_corners(i,j)*rad ! atan2 takes radian and elem corners come in grad
         my_y_corners(i,j) = y_corners(i,j)*rad
       end do
-      ! We repeat the procedure with edge center coordinates, and calculate their angles
-      ! No need to worry about the order here, as we will sort the angles in the next step
+      ! Then we repeat for edge center coordinate
+      ! The the coast j=1 is the node center
       if (coastal_nodes(i)==.True.) then
         do j = 1, nn_num(i)
           my_x_corners(i,j+nod_in_elem2D_num(i)) = coord_e_edge_center(1,i,j)
           my_y_corners(i,j+nod_in_elem2D_num(i)) = coord_e_edge_center(2,i,j)
         end do
+      ! On open ocean we dont use the node center as corner, and thus have one less corner
       else
         do j = 1, nn_num(i)-1
           my_x_corners(i,j+nod_in_elem2D_num(i)) = coord_e_edge_center(1,i,j)
