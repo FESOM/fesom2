@@ -364,9 +364,6 @@ contains
       enodes=edges(:,edge)      
       ! local index of element that contribute to edge
       el=edge_tri(:,edge)
-      if (mype==72) then 
-        print *, edge, el, enodes(1), enodes(2)
-      end if
       if(el(2)>0) then
         ! Inner edge
         continue
@@ -392,11 +389,9 @@ contains
         ! Inner edge
         continue
       else  
-        my_num_coastal_edges = my_num_coastal_edges + 1
+        my_num_coastal_edges = my_num_coastal_edges + 2
         coastal_edge_list(enodes(1),enodes(2))=edge
-            if (mype==72) then
-              print *, 'adding edge', enodes(1),enodes(2), edge
-            end if
+        coastal_edge_list(enodes(2),enodes(1))=edge
       end if  
     end do
 
@@ -407,9 +402,6 @@ contains
       ! if we are on coastal node, include node center n=1 as corner
       if (coastal_nodes(i)==.True.) then 
         do n = 1, nn_num(i)
-            if (mype==72) then
-              print *, 'coast', i,n, nn_pos(n,i)
-            end if
           call edge_center(i, nn_pos(n,i), this_x_coord, this_y_coord, mesh)
           call r2g(coord_e_edge_center(1,i,n), coord_e_edge_center(2,i,n), this_x_coord, this_y_coord)
         end do
@@ -445,9 +437,6 @@ contains
           ! We only do so if n elements is > 2, to avoid having only 3 corners
           if ((j>1) .and. (nod_in_elem2D_num(i) > 2)) then
             edge = coastal_edge_list(i,nn_pos(j,i))
-            if (mype==72) then
-              print *, 'edge', i, edge
-            end if
             ! if edge is coastal, add center coords weights on the opposite site of the polygon
             if (edge>0) then
               this_x_coord = coord_nod2D(1, i)
@@ -455,9 +444,9 @@ contains
               ! unrotate grid
               call r2g(my_x_coords(i), my_y_coords(i), this_x_coord, this_y_coord)
 
-              if (abs(abs(coord_e_edge_center(1,i,j))-abs(my_x_coords(i))) < pi) then
-                temp_x_coord(j+nod_in_elem2D_num(i))=coord_e_edge_center(1,i,j)-(coord_e_edge_center(1,i,j)-my_x_coords(i))*nn_num(i)
-                temp_y_coord(j+nod_in_elem2D_num(i))=coord_e_edge_center(2,i,j)-(coord_e_edge_center(2,i,j)-my_y_coords(i))*nn_num(i)
+              if (abs(coord_e_edge_center(1,i,j)-my_x_coords(i)) < pi) then
+                temp_x_coord(j+nod_in_elem2D_num(i))=coord_e_edge_center(1,i,j)-(coord_e_edge_center(1,i,j)-my_x_coords(i))*nn_num(i)/2
+                temp_y_coord(j+nod_in_elem2D_num(i))=coord_e_edge_center(2,i,j)-(coord_e_edge_center(2,i,j)-my_y_coords(i))*nn_num(i)/2
               ! if we are at the data line, this would result in errors, thus we do the conservative 
               ! and add only the node center, rather than some point on the oder side of the polygon
               else
@@ -518,7 +507,6 @@ contains
             this_x_coord = (sum(pos_x) - 2*pi*n_pos + sum(neg_x)) / (n_pos + n_neg)
             this_y_coord = (sum(pos_y) + sum(neg_y)) / (n_pos + n_neg)
           end if
-          print *, i, j, this_x_coord, this_y_coord
           deallocate(pos_x,pos_y,neg_x,neg_y)
         ! max_x-min_x > pi -> we are not at dateline, just a normal mean is enough
         else
@@ -534,10 +522,6 @@ contains
         this_y_coord = coord_nod2D(2, i)
         ! unrotate grid
         call r2g(my_x_coords(i), my_y_coords(i), this_x_coord, this_y_coord)
-      end if
-      if (displs_from_all_pes(mype+1)+i == 126502) then
-        print *, 'center'
-        print *, my_x_coords(i)/rad, my_y_coords(i)/rad
       end if
     end do
 
@@ -559,11 +543,6 @@ contains
           my_x_corners(i,j+nod_in_elem2D_num(i)) = coord_e_edge_center(1,i,j)
           my_y_corners(i,j+nod_in_elem2D_num(i)) = coord_e_edge_center(2,i,j)
         end do
-      end if
-      if (displs_from_all_pes(mype+1)+i == 126502) then
-        print *, 'corners'
-        print *, my_x_corners(i,:)/rad
-        print *, my_y_corners(i,:)/rad
       end if
     end do
 
@@ -593,11 +572,6 @@ contains
           end if
         end if
       end do
-      if (displs_from_all_pes(mype+1)+i == 126502) then
-        print *, 'Angle'
-        print *, my_x_corners(i,:)/rad
-        print *, my_y_corners(i,:)/rad
-      end if
     end do   
 
     ! Oasis requires corners sorted counterclockwise, so we sort by angle
@@ -625,11 +599,6 @@ contains
           end if
         end do
       end do
-      if (displs_from_all_pes(mype+1)+i == 126502) then
-        print *, 'corners sorted'
-        print *, my_x_corners(i,:)/rad
-        print *, my_y_corners(i,:)/rad
-      end if
     end do
 
     ! We can have a variable number of corner points.
@@ -656,11 +625,6 @@ contains
           end if
         end if
       end do
-      if (displs_from_all_pes(mype+1)+i == 126502) then
-        print *, 'corners padded'
-        print *, my_x_corners(i,:)/rad
-        print *, my_y_corners(i,:)/rad
-      end if
     end do
 
     ! Oasis takes grad angles
