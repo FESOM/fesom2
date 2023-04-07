@@ -418,22 +418,14 @@ contains
           ! We only do so if n elements is > 2, to avoid having only 3 corners
           if ((j>1) .and. (nod_in_elem2D_num(i) > 2)) then
             edge = coastal_edge_list(i,nn_pos(j,i))
-            ! if edge is coastal, add center coords weights on the opposite site of the polygon
+            ! if edge is coastal, we leave it out of the mean equation, replaced by the node center
             if (edge>0) then
-              ! Default case where we are not on the dateline
-              if (abs(coord_e_edge_center(1,i,j)-my_x_coords(i)) < pi) then
-                temp_x_coord(j+nod_in_elem2D_num(i))=coord_e_edge_center(1,i,j)-(coord_e_edge_center(1,i,j)-my_x_coords(i))*nn_num(i)/2
-                temp_y_coord(j+nod_in_elem2D_num(i))=coord_e_edge_center(2,i,j)-(coord_e_edge_center(2,i,j)-my_y_coords(i))*nn_num(i)/2
-              ! if we are at the dateline, this would result in errors, thus we only add the node center, 
-              ! rather than a point on the oder side of the polygon
-              else
-                this_x_coord = coord_nod2D(1, i)
-                this_y_coord = coord_nod2D(2, i)
-                ! unrotate grid
-                call r2g(my_x_coords(i), my_y_coords(i), this_x_coord, this_y_coord)
-                temp_x_coord(j+nod_in_elem2D_num(i))=my_x_coords(i)
-                temp_y_coord(j+nod_in_elem2D_num(i))=my_y_coords(i)
-              end if
+              this_x_coord = coord_nod2D(1, i)
+              this_y_coord = coord_nod2D(2, i)
+              ! unrotate grid
+              call r2g(my_x_coords(i), my_y_coords(i), this_x_coord, this_y_coord)
+              temp_x_coord(j+nod_in_elem2D_num(i))=my_x_coords(i)
+              temp_y_coord(j+nod_in_elem2D_num(i))=my_y_coords(i)
             ! case for only two elements, we need the real edge centers to ensure center coord
             ! is inside polygon
             else
