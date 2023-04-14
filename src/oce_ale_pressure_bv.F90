@@ -2870,6 +2870,7 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
   real(kind=WP),  intent(IN)             :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D), SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
   real(kind=WP)                          :: tx(mesh%nl-1), ty(mesh%nl-1), sx(mesh%nl-1), sy(mesh%nl-1), vol(mesh%nl-1), testino(2)
   integer                                :: n, nz, elnodes(3),el, k, nln, uln, nle, ule
+  real(kind=WP)                          :: aux(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -2925,11 +2926,16 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
   END DO
 !$OMP END DO
 !$OMP END PARALLEL
-  CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
-  call exchange_nod(sigma_xy(1,:,:), partit)
-  CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
-  call exchange_nod(sigma_xy(2,:,:), partit)
-  CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+! call exchange_nod(sigma_xy, partit)
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+aux=sigma_xy(1,:,:)
+call exchange_nod(aux, partit)
+sigma_xy(1,:,:)=aux
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+aux=sigma_xy(2,:,:)
+call exchange_nod(aux, partit)
+sigma_xy(2,:,:)=aux
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 !$OMP BARRIER
 end subroutine compute_sigma_xy
 !
