@@ -515,17 +515,31 @@ if (npes>1) then
        s_mpitype_nod3D(:,nl1,n_val), com_nod2D%rPE, com_nod2D%sPE)
 #endif
 
+#ifdef ENABLE_LEVANTE_ENDPOINT_WORKAROUNDS
+
+! test 1: use blocking sends in the second loop
   DO n=1,rn    
-     call MPI_IRECV(nod_array3D, 1, r_mpitype_nod3D(n,nl1,n_val), com_nod2D%rPE(n), &
-          com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr) 
+     call MPI_IRECV(nod_array3D, 1, r_mpitype_nod3D(n,nl1,n_val), com_nod2D%rPE(n), com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr) 
   END DO
  
   DO n=1, sn
-     call MPI_ISEND(nod_array3D, 1, s_mpitype_nod3D(n,nl1,n_val), com_nod2D%sPE(n), &
-          mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
+     call mpi_send(nod_array3D, 1, s_mpitype_nod3D(n,nl1,n_val), com_nod2D%sPE(n), mype, MPI_COMM_FESOM, MPIerr)
+  END DO
+
+  com_nod2D%nreq = rn
+
+
+#else
+  DO n=1,rn    
+     call MPI_IRECV(nod_array3D, 1, r_mpitype_nod3D(n,nl1,n_val), com_nod2D%rPE(n), com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr) 
+  END DO
+ 
+  DO n=1, sn
+     call MPI_ISEND(nod_array3D, 1, s_mpitype_nod3D(n,nl1,n_val), com_nod2D%sPE(n), mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
   END DO
 
   com_nod2D%nreq = rn+sn
+#endif
 
  endif
 

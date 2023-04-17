@@ -42,6 +42,10 @@ else()
    option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
 endif()
 
+if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
+   add_compile_options(-DENABLE_LEVANTE_ENDPOINT_WORKAROUNDS)
+endif()
+
 option(ENABLE_OPENACC "compile with OpenACC support" OFF)
 set(NV_GPU_ARCH "cc80" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
 
