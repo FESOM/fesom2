@@ -43,7 +43,7 @@ else()
 endif()
 
 if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
-   add_compile_options(-DENABLE_LEVANTE_ENDPOINT_WORKAROUNDS)
+   add_compile_options(-DENABLE_LEVANTE_ENDPOINT_WORKAROUNDS_1)
 endif()
 
 option(ENABLE_OPENACC "compile with OpenACC support" OFF)

@@ -102,10 +102,10 @@ contains
 #else
       print '(g0)', 'ENABLE_NVHPC_WORKAROUNDS is OFF'
 #endif  
-#ifdef ENABLE_LEVANTE_ENDPOINT_WORKAROUNDS
-      print '(g0)', 'ENABLE_LEVANTE_ENDPOINT_WORKAROUNDS is ON'
+#ifdef ENABLE_LEVANTE_ENDPOINT_WORKAROUNDS_1
+      print '(g0)', 'ENABLE_LEVANTE_ENDPOINT_WORKAROUNDS_1 is ON'
 #else
-      print '(g0)', 'ENABLE_LEVANTE_ENDPOINT_WORKAROUNDS is OFF'
+      print '(g0)', 'ENABLE_LEVANTE_ENDPOINT_WORKAROUNDS_1 is OFF'
 #endif  
   end subroutine
 

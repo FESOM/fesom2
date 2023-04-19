@@ -515,7 +515,7 @@ if (npes>1) then
        s_mpitype_nod3D(:,nl1,n_val), com_nod2D%rPE, com_nod2D%sPE)
 #endif
 
-#ifdef ENABLE_LEVANTE_ENDPOINT_WORKAROUNDS
+#ifdef ENABLE_LEVANTE_ENDPOINT_WORKAROUNDS_1
 
 ! test 1: use blocking sends in the second loop
   DO n=1,rn    
