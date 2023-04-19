@@ -2949,6 +2949,19 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! calculate equation of state, density, pressure and mixed layer depths
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_bv'//achar(27)//'[0m'
+
+    !$ACC DATA &
+    !$ACC COPY(mesh, hnode, helem, elem_area) &
+    !$ACC COPY(myDim_nod2D, eDim_nod2D, myDim_elem2D, elem2D_nodes) &
+    !$ACC COPY(nlevels_nod2D, ulevels_nod2D, ulevels, nlevels) &
+    !$ACC COPY(nod_in_elem2D, nod_in_elem2D_num) &
+    !$ACC COPY(mld1, mld2, mld3, mld1_ind, mld2_ind, mld3_ind) &
+    !$ACC COPY(zbar_e_bot, gradient_sca, z_3d_n, zbar_3d_n) &
+    !$ACC COPY(density_ref, density_dmoc, density_m_rho0, dbsfc) &
+    !$ACC COPY(hpressure, bvfreq, pgf_x, pgf_y, sw_alpha, sw_beta, sigma_xy) &
+    !$ACC COPY(tracers%data(1)%values, tracers%data(2)%values) &
+    !$ACC COPY(slope_tapered, neutral_slope)
+
     call pressure_bv(tracers, partit, mesh)            !!!!! HeRE change is made. It is linear EoS now.
 
     !___________________________________________________________________________
@@ -2977,6 +2990,8 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! compute both: neutral slope and tapered neutral slope. Can be later combined with compute_sigma_xy
     ! will be primarily used for computing Redi diffusivities. etc?
     call compute_neutral_slope(partit, mesh)
+
+    !$ACC END DATA
 
     !___________________________________________________________________________
     call status_check(partit)
