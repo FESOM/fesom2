@@ -3087,6 +3087,9 @@ subroutine compute_neutral_slope(partit, mesh)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, n, nz, nl1, ul1, el, elnodes, enodes, c, ro_z_inv)
 !$OMP DO
 
+    !$ACC DATA COPY(myDim_nod2D, nlevels_nod2d, ulevels_nod2d, bvfreq, sigma_xy) &
+    !$ACC      COPY(slope_tapered, neutral_slope)
+
 #if !defined(DISABLE_OPENACC_ATOMICS)
     ! WARNING: the hyperbolic tangent is not supported by math_uniform
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(NONE)
@@ -3118,9 +3121,11 @@ subroutine compute_neutral_slope(partit, mesh)
 
 !$OMP END DO
 !$OMP END PARALLEL
-    call exchange_nod(neutral_slope, partit)
-    call exchange_nod(slope_tapered, partit)
+    call exchange_nod(neutral_slope, partit, luse_g2g = .true.)
+    call exchange_nod(slope_tapered, partit, luse_g2g = .true.)
 !$OMP BARRIER
+
+    !$ACC END DATA
 end subroutine compute_neutral_slope
 !
 !
