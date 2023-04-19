@@ -107,6 +107,11 @@ contains
 #else
       print '(g0)', 'ENABLE_LEVANTE_ENDPOINT_WORKAROUNDS_1 is OFF'
 #endif  
+#ifdef ENABLE_LEVANTE_ENDPOINT_WORKAROUNDS_2
+      print '(g0)', 'ENABLE_LEVANTE_ENDPOINT_WORKAROUNDS_2 is ON'
+#else
+      print '(g0)', 'ENABLE_LEVANTE_ENDPOINT_WORKAROUNDS_2 is OFF'
+#endif  
   end subroutine
 
 end module

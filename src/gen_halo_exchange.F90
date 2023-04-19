@@ -486,6 +486,9 @@ type(t_partit), intent(inout), target  :: partit
 real(real64),   intent(inout)       :: nod_array3D(:,:,:)
 integer                             :: n, sn, rn
 integer                             :: nz, nl1, n_val
+integer, parameter :: comm_increment = 500
+integer :: min_rcv_rank = 0
+integer :: max_rcv_rank = 0
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 if (npes>1) then
@@ -527,6 +530,36 @@ if (npes>1) then
   END DO
 
   com_nod2D%nreq = rn
+
+
+#elif ENABLE_LEVANTE_ENDPOINT_WORKAROUNDS_2
+   ! test 2: use non-blocking receive and blocking send, wait for requests after rcv_increment and repeat until we are done with all ranks
+   min_rcv_rank = 0
+   max_rcv_rank = comm_increment-1
+   do while (min_rcv_rank < npes)
+      do n=1,rn
+         if(mype .ge. min_rcv_rank .and. mype .le. max_rcv_rank ) then
+            call mpi_irecv(nod_array3D, 1, r_mpitype_nod3D(n,nl1,n_val), com_nod2D%rPE(n), com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr)
+         else
+            com_nod2D%req(n) = MPI_REQUEST_NULL
+         end if
+      end do
+ 
+      do n=1, sn
+         if(com_nod2D%sPE(n) .ge. min_rcv_rank .and. com_nod2D%sPE(n) .le. max_rcv_rank ) then
+            call mpi_send(nod_array3D, 1, s_mpitype_nod3D(n,nl1,n_val), com_nod2D%sPE(n), mype, MPI_COMM_FESOM, MPIerr)
+         end if
+      end do
+
+      com_nod2D%nreq = rn
+      ! todo: is it sufficient if we use this workaround only for compute_sigma_xy?
+      ! if so, create a separate version with this workaround for compute_sigma_xy and use the first workaround here
+      call mpi_waitall(partit%com_nod2D%nreq, partit%com_nod2D%req, MPI_STATUSES_IGNORE, partit%MPIerr)
+      min_rcv_rank = min_rcv_rank+comm_increment
+      max_rcv_rank = max_rcv_rank+comm_increment
+   end do
+
+   com_nod2D%nreq = 0
 
 
 #else
