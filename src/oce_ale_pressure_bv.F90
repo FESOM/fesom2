@@ -2434,8 +2434,14 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
         !_______________________________________________________________________
         ! calculate mid depth element level --> Z_e
         ! nle...number of mid-depth levels at elem
-        zbar_n          = 0.0_WP
-        Z_n             = 0.0_WP
+        do nlz = 1, mesh%nl
+            zbar_n(nlz) = 0.0_WP
+        end do
+
+        do nlz = 1, mesh%nl - 1
+            Z_n(nlz) = 0.0_WP
+        end do
+
         zbar_n(nle + 1) = zbar_e_bot(elem)
         Z_n(nle)        = zbar_n(nle + 1) + helem(nle, elem) * 0.5_WP
 
@@ -2565,16 +2571,21 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
 
         int_dp_dx = 0.0_WP
         do nlz = ule, nle
+            drho_dx = 0.0_WP
+            drho_dy = 0.0_WP
+            do ni = 1, 3
+                drho_dx = drho_dx + gradient_sca(ni    , elem) * rho_at_Zn(ni, nlz)
+                drho_dy = drho_dy + gradient_sca(ni + 3, elem) * rho_at_Zn(ni, nlz)
+            end do
+
             !_______________________________________________________________________
             ! zonal gradients
-            drho_dx         = sum(gradient_sca(1:3,elem) * rho_at_Zn(:, nlz))
             aux_sum         = drho_dx * helem(nlz,elem) * g/density_0
             pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum * 0.5_WP
             int_dp_dx(1)    = int_dp_dx(1) + aux_sum
 
             !_______________________________________________________________________
             ! meridional gradients
-            drho_dy         = sum(gradient_sca(4:6,elem) * rho_at_Zn(:, nlz))
             aux_sum         = drho_dy * helem(nlz,elem) * g / density_0
             pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum * 0.5_WP
             int_dp_dx(2)    = int_dp_dx(2) + aux_sum
