@@ -1,4 +1,4 @@
-  
+
   integer,          pointer     :: MPI_COMM_FESOM ! FESOM communicator (for ocean only runs if often a copy of MPI_COMM_WORLD)
   type(com_struct), pointer     :: com_nod2D
   type(com_struct), pointer     :: com_elem2D

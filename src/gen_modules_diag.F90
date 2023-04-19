@@ -21,8 +21,9 @@ module diagnostics
             compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, shear, Ri, KvdTdZ, KvdSdZ,   & 
             std_dens_min, std_dens_max, std_dens_N, std_dens,                                        &
             std_dens_UVDZ, std_dens_DIV, std_dens_DIV_fer, std_dens_Z, std_dens_H, std_dens_dVdT, std_dens_flux,       &
-            dens_flux_e, vorticity, zisotherm, compute_diag_dvd_2ndmoment_klingbeil_etal_2014,       &
+            dens_flux_e, vorticity, zisotherm, tempzavg, saltzavg, compute_diag_dvd_2ndmoment_klingbeil_etal_2014,       &
             compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd
+            
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
   ! A=ssh_stiff, x=d_eta, rhs=ssh_rhs; rhs_diag=A*x;
@@ -251,7 +252,7 @@ subroutine diag_turbflux(mode, dynamics, tracers, partit, mesh)
   integer                                  :: n, nz, nzmax, nzmin
   real(kind=WP), dimension(:,:,:), pointer :: UVnode
   real(kind=WP), dimension(:,:),   pointer :: temp, salt
-  real(kind=WP)                            :: val, dz_inv
+  real(kind=WP)                            :: dz_inv
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -274,10 +275,8 @@ salt   => tracers%data(2)%values(:,:)
      nzmax = nlevels_nod2d(n)
      do nz=nzmin+1,nzmax-1
         dz_inv=1.0_WP/(Z_3d_n(nz-1,n)-Z_3d_n(nz,n))
-        val = Kv(nz,n)*(temp(nz-1,n)-temp(nz,n))*dz_inv
-        KvdTdZ(nz,n) = val*dz_inv
-        val = Kv(nz,n)*(salt(nz-1,n)-salt(nz,n))*dz_inv
-        KvdSdZ(nz,n) = val*dz_inv
+        KvdTdZ(nz,n) = -Kv(nz,n)*(temp(nz-1,n)-temp(nz,n))*dz_inv
+        KvdSdZ(nz,n) = -Kv(nz,n)*(salt(nz-1,n)-salt(nz,n))*dz_inv
      end do
   end do
 end subroutine diag_turbflux

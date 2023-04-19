@@ -7,6 +7,9 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 project(FESOM2.0)
+
+set(CMAKE_VERBOSE_MAKEFILE ON)
+
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF) # cmake-internal switch to toggle if library targets are being build as STATIC or SHARED, see https://cmake.org/cmake/help/latest/guide/tutorial/Selecting%20Static%20or%20Shared%20Libraries.html
 set(TOPLEVEL_DIR ${CMAKE_CURRENT_LIST_DIR})
 set(FESOM_COUPLED OFF CACHE BOOL "compile fesom standalone or with oasis support (i.e. coupled)")
