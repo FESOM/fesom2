@@ -249,7 +249,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     a    =0.0_WP
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax)
 !$OMP DO REDUCTION(min: a)
-    !$ACC PARALLEL LOOP GANG VECTOR REDUCTION(min:a) DEFAULT(NONE)
+    !$ACC PARALLEL LOOP GANG VECTOR REDUCTION(min:a) DEFAULT(PRESENT)
     do node=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(node)
         nzmax = nlevels_nod2D(node)
@@ -283,7 +283,7 @@ subroutine pressure_bv(tracers, partit, mesh)
 !$OMP                                  rhopot, bulk_0, bulk_pz, bulk_pz2, rho, dbsfc1, db_max, bulk_up, bulk_dn, &
 !$OMP                                  rho_surf, aux_rho, aux_rho1, flag1, flag2, bv1)
 !$OMP DO
-    !$ACC PARALLEL LOOP GANG DEFAULT(NONE) &
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) &
     !$ACC PRIVATE(rhopot, bulk_0, bulk_pz, bulk_pz2, rho, dbsfc1, bv1)
     do node=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(node)
@@ -2436,7 +2436,7 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
 !$OMP                                  bulk_0, bulk_pz, bulk_pz2, dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, zbar_n, z_n                                )
 !$OMP DO
 
-    !$ACC PARALLEL LOOP GANG DEFAULT(NONE) &
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) &
     !$ACC PRIVATE(elnodes, int_dp_dx, rho_at_Zn, zbar_n, z_n) &
     !$ACC REDUCTION(.or.:error)
     do elem = 1, myDim_elem2D
@@ -2882,7 +2882,7 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
     !$ACC DATA COPY(myDim_nod2D, ulevels_nod2D, nlevels_nod2D) &
     !$ACC      COPY(tf1, sf1, sw_alpha, sw_beta, z_3d_n)
 
-    !$ACC PARALLEL LOOP GANG DEFAULT(NONE)
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
     do n = 1,myDim_nod2d
         nzmin = ulevels_nod2d(n)
         nzmax = nlevels_nod2d(n)
@@ -2985,7 +2985,7 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
     !$ACC      COPY(elem_area, elem2D_nodes, nod_in_elem2D, nod_in_elem2D_num) &
     !$ACC      COPY(tf1, sf1, sw_alpha, sw_beta, sigma_xy, gradient_sca)
 
-    !$ACC PARALLEL LOOP GANG DEFAULT(NONE) &
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) &
     !$ACC PRIVATE(elnodes, tx, ty, sx, sy, vol)
 
     do n=1, myDim_nod2D
@@ -3092,7 +3092,7 @@ subroutine compute_neutral_slope(partit, mesh)
 
 #if !defined(DISABLE_OPENACC_ATOMICS)
     ! WARNING: the hyperbolic tangent is not supported by math_uniform
-    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(NONE)
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #else
     !$ACC UPDATE SELF(myDim_nod2D, nlevels_nod2d, ulevels_nod2d, bvfreq, sigma_xy)
 #endif
