@@ -2400,8 +2400,9 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
     real(kind=WP)                           :: rho_at_Zn(3, mesh%nl), temp_at_Zn(3), salt_at_Zn(3), drho_dz(3), aux_dref
     real(kind=WP)                           :: rhopot(3), bulk_0(3), bulk_pz(3), bulk_pz2(3)
     real(kind=WP)                           :: dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2
-    real(kind=WP)                           :: zbar_n(mesh%nl), z_n(mesh%nl-1)
+    real(kind=WP)                           :: zbar_n(mesh%nl), z_n(mesh%nl - 1)
     real(kind=WP),  dimension(:,:), pointer :: temp, salt
+    logical                                 :: error
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -2413,6 +2414,7 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     end if
+    error = .false.
 
     !___________________________________________________________________________
     ! loop over triangular elemments
@@ -2499,14 +2501,7 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                 if ( idx(ni) < 0 ) then
                     ! would do second order Newtonian boundary extrapolation
                     ! --> this is not wanted !!!
-                    write(*,*) ' --> would do second order bottom boundary density extrapolation'
-                    write(*,*) '     This is not wanted, model stops here'
-                    write(*,*) ' idx = ', idx
-                    write(*,*) ' nlz = ', nlz
-                    write(*,*) ' nle = ', nle
-                    write(*,*) ' ule = ', ule
-                    write(*,*) ' nln = ', nlevels_nod2D(elnodes)-1
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                    error = .true.
                 end if
 
                 layer_offset = 0
@@ -2585,8 +2580,14 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
             int_dp_dx(2)    = int_dp_dx(2) + aux_sum
         end do
     end do ! --> do elem=1, myDim_elem2D
-!$OMP END DO
-!$OMP END PARALLEL
+    !$OMP END DO
+    !$OMP END PARALLEL
+
+    if (error .eqv. .true.) then
+        write(*,*) ' --> Tried doing second order boundary density extrapolation'
+        write(*,*) '     This is not wanted, model stops here'
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+    end if
 end subroutine pressure_force_4_zxxxx_easypgf
 !
 !
