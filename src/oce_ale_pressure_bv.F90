@@ -2422,6 +2422,10 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
 !$OMP                                  f0, df10, df21, t0, dt10, dt21, s0, ds10, ds21, rho_at_Zn, temp_at_Zn, salt_at_Zn, drho_dz, aux_dref, rhopot,                &
 !$OMP                                  bulk_0, bulk_pz, bulk_pz2, dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, zbar_n, z_n                                )
 !$OMP DO
+
+    !$ACC PARALLEL LOOP GANG &
+    !$ACC PRIVATE(elnodes, int_dp_dx, rho_at_Zn, zbar_n, z_n) &
+    !$ACC REDUCTION(.or.:error)
     do elem = 1, myDim_elem2D
         !_______________________________________________________________________
         ! nle...number of mid-depth levels at elem
@@ -2434,21 +2438,28 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
         !_______________________________________________________________________
         ! calculate mid depth element level --> Z_e
         ! nle...number of mid-depth levels at elem
+
+        !$ACC LOOP VECTOR
         do nlz = 1, mesh%nl
             zbar_n(nlz) = 0.0_WP
         end do
+        !$ACC END LOOP
 
+        !$ACC LOOP VECTOR
         do nlz = 1, mesh%nl - 1
             Z_n(nlz) = 0.0_WP
         end do
+        !$ACC END LOOP
 
         zbar_n(nle + 1) = zbar_e_bot(elem)
         Z_n(nle)        = zbar_n(nle + 1) + helem(nle, elem) * 0.5_WP
 
+        !$ACC LOOP SEQ
         do nlz = nle, ule + 1, -1
             zbar_n(nlz)  = zbar_n(nlz + 1) + helem(nlz    , elem)
             Z_n(nlz - 1) = zbar_n(nlz    ) + helem(nlz - 1, elem) * 0.5_WP
         end do
+        !$ACC END LOOP
         zbar_n(ule) = zbar_n(ule + 1) + helem(ule, elem)
 
         !_______________________________________________________________________
@@ -2488,6 +2499,10 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
 
         !_______________________________________________________________________
         ! calculate pressure gradient for all vertical layers
+        !$ACC LOOP VECTOR &
+        !$ACC PRIVATE(idx, dx10, dx21, dx20, t0, dt10, dt21, s0, ds10, ds21) &
+        !$ACC PRIVATE(temp_at_Zn, salt_at_Zn, rhopot, bulk_0, bulk_pz, bulk_pz2) &
+        !$ACC REDUCTION(.or.:error)
         do nlz = ule, nle
             !___________________________________________________________________
             ! account for reference density when using cavities
@@ -2503,6 +2518,7 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                 idx = nlevels_nod2D(elnodes) - 1 - idx
             end if
 
+            !$ACC LOOP SEQ
             do ni = 1, 3
                 if ( idx(ni) < 0 ) then
                     ! would do second order Newtonian boundary extrapolation
@@ -2567,16 +2583,21 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                                      / (rho_at_Zn(ni, nlz) + 0.1_WP * Z_n(nlz) * real(state_equation)) &
                                      - aux_dref
             end do
+            !$ACC END LOOP
         end do
+        !$ACC END LOOP
 
         int_dp_dx = 0.0_WP
+        !$ACC LOOP SEQ
         do nlz = ule, nle
             drho_dx = 0.0_WP
             drho_dy = 0.0_WP
+            !$ACC LOOP SEQ
             do ni = 1, 3
                 drho_dx = drho_dx + gradient_sca(ni    , elem) * rho_at_Zn(ni, nlz)
                 drho_dy = drho_dy + gradient_sca(ni + 3, elem) * rho_at_Zn(ni, nlz)
             end do
+            !$ACC END LOOP
 
             !_______________________________________________________________________
             ! zonal gradients
@@ -2590,7 +2611,10 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
             pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum * 0.5_WP
             int_dp_dx(2)    = int_dp_dx(2) + aux_sum
         end do
+        !$ACC END LOOP
     end do ! --> do elem=1, myDim_elem2D
+    !$ACC END PARALLEL LOOP
+
     !$OMP END DO
     !$OMP END PARALLEL
 
