@@ -239,11 +239,6 @@ subroutine pressure_bv(tracers, partit, mesh)
         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     end if
 
-    !$ACC DATA COPY(mld1, mld2, mld3, mld1_ind, mld2_ind, mld3_ind) &
-    !$ACC      COPY(density_ref, density_dmoc, density_m_rho0, dbsfc) &
-    !$ACC      COPY(myDim_nod2D, eDim_nod2D, nlevels_nod2D, ulevels_nod2D, hnode) &
-    !$ACC      COPY(temp, salt, zbar_3d_n, z_3d_n, hpressure, bvfreq)
-
     !___________________________________________________________________________
     ! Screen salinity
     a    =0.0_WP
@@ -530,8 +525,6 @@ subroutine pressure_bv(tracers, partit, mesh)
     end do
 
     !$ACC END PARALLEL LOOP
-
-    !$ACC END DATA
 
 !$OMP END DO
 !$OMP END PARALLEL
@@ -2426,9 +2419,6 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
     end if
     error = .false.
 
-    !$ACC DATA COPY(myDim_elem2D, elem2D_nodes, ulevels_nod2D, nlevels_nod2D, ulevels, nlevels) &
-    !$ACC      COPY(salt, temp, pgf_x, pgf_y, z_3d_n, zbar_e_bot, helem, gradient_sca)
-
     !___________________________________________________________________________
     ! loop over triangular elemments
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nlz, nln, ni, nlc, nlce, idx, int_dp_dx, drho_dx, drho_dy, dz_dx, dz_dy, aux_sum, dx10, dx20, dx21, &
@@ -2636,9 +2626,6 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
         write(*,*) '     This is not wanted, model stops here'
         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
     end if
-
-    !$ACC END DATA
-
 end subroutine pressure_force_4_zxxxx_easypgf
 !
 !
@@ -2879,9 +2866,6 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, t1, t1_2, t1_3, t1_4, p1, p1_2, p1_3, s1, s35, s35_2, a_over_b)
 !$OMP DO
 
-    !$ACC DATA COPY(myDim_nod2D, ulevels_nod2D, nlevels_nod2D) &
-    !$ACC      COPY(tf1, sf1, sw_alpha, sw_beta, z_3d_n)
-
     !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
     do n = 1,myDim_nod2d
         nzmin = ulevels_nod2d(n)
@@ -2932,15 +2916,11 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
 
     !$ACC END PARALLEL LOOP
 
-
 !$OMP END DO
 !$OMP END PARALLEL
 call exchange_nod(sw_alpha, partit, luse_g2g = .true.)
 call exchange_nod(sw_beta, partit, luse_g2g = .true.)
 !$OMP BARRIER
-
-    !$ACC END DATA
-
 end subroutine sw_alpha_beta
 !
 !
@@ -2980,10 +2960,6 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tx, ty, sx, sy, vol, n, nz, elnodes, el, k, nln, uln, nle, ule)
 !$OMP DO
-
-    !$ACC DATA COPY(myDim_nod2D, ulevels, nlevels, ulevels_nod2D, nlevels_nod2D) &
-    !$ACC      COPY(elem_area, elem2D_nodes, nod_in_elem2D, nod_in_elem2D_num) &
-    !$ACC      COPY(tf1, sf1, sw_alpha, sw_beta, sigma_xy, gradient_sca)
 
     !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) &
     !$ACC PRIVATE(elnodes, tx, ty, sx, sy, vol)
@@ -3052,9 +3028,6 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
 !$OMP END PARALLEL
   call exchange_nod(sigma_xy, partit, luse_g2g = .true.)
 !$OMP BARRIER
-
-    !$ACC END DATA
-
 end subroutine compute_sigma_xy
 !
 !
@@ -3086,9 +3059,6 @@ subroutine compute_neutral_slope(partit, mesh)
     S_d=1.0e-3_WP
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, n, nz, nl1, ul1, el, elnodes, enodes, c, ro_z_inv)
 !$OMP DO
-
-    !$ACC DATA COPY(myDim_nod2D, nlevels_nod2d, ulevels_nod2d, bvfreq, sigma_xy) &
-    !$ACC      COPY(slope_tapered, neutral_slope)
 
 #if !defined(DISABLE_OPENACC_ATOMICS)
     ! WARNING: the hyperbolic tangent is not supported by math_uniform
@@ -3124,8 +3094,6 @@ subroutine compute_neutral_slope(partit, mesh)
     call exchange_nod(neutral_slope, partit, luse_g2g = .true.)
     call exchange_nod(slope_tapered, partit, luse_g2g = .true.)
 !$OMP BARRIER
-
-    !$ACC END DATA
 end subroutine compute_neutral_slope
 !
 !
