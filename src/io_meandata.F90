@@ -789,6 +789,10 @@ function mesh_dimname_from_dimsize(size, partit, mesh) result(name)
         name='nz1'
     elseif (size==std_dens_N) then
         name='ndens'
+    elseif (size==nlev_upper) then
+            name='nz1_upper'
+    elseif (size==nlev_upper+1) then
+            name='nz_upper'
 #if defined (__icepack)
     elseif (size==ncat) then
         name='ncat'
@@ -840,8 +844,12 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
         call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
         if (entry%dimname(1)=='nz') then
             call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer interface'),'depth at layer interface'), __LINE__)
+        elseif (entry%dimname(1)=='nz_upper') then
+                call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer interface fro upper levels'),'depth at layer interface upper levels'), __LINE__)
         elseif (entry%dimname(1)=='nz1') then
             call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer midpoint'),'depth at layer midpoint'), __LINE__)
+        elseif (entry%dimname(1)=='nz1_upper') then
+                call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer midpoint for upper levels'),'depth at layer midpoint upper levels'), __LINE__)
         elseif (entry%dimname(1)=='ncat') then
             call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('sea-ice thickness class'),'sea-ice thickness class'), __LINE__)
         else
@@ -905,8 +913,12 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     call assert_nf( nf_enddef(entry%ncid), __LINE__)
     if (entry%dimname(1)=='nz') then
         call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%zbar)), __LINE__)
+    elseif (entry%dimname(1)=='nz_upper') then
+            call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%zbar(:nlev_upper+1))), __LINE__)
     elseif (entry%dimname(1)=='nz1') then
         call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%Z)), __LINE__)
+    elseif (entry%dimname(1)=='nz1_upper') then
+            call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%Z(:nlev_upper))), __LINE__)
     else
         if (partit%mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
     end if 
