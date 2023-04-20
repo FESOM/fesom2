@@ -389,7 +389,6 @@ contains
     end do
 
     f%last_nstep = f%from_nstep-1+current_nsteps
-    write(*,*) "THIS IS THE LAST TIME STEP! -> ", f%last_nstep
     f%from_nstep = f%from_nstep+current_nsteps
   end subroutine
 
