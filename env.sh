@@ -54,9 +54,13 @@ elif [[ $LOGINHOST =~ ^cc[a-b]+-login[0-9]+\.ecmwf\.int$ ]]; then
 elif [[ $LOGINHOST =~ ^stco-esl[0-9]+$ ]]; then
    STRATEGY="aleph"
 elif [[ $LOGINHOST =~ ^[A-Za-z0-9]+\.ecmwf\.int$ ]]; then
-STRATEGY="wsecmwf"
+   STRATEGY="wsecmwf"
 elif [[ $LOGINHOST =~ \.bullx$ ]]; then
-STRATEGY="atosecmwf"
+   STRATEGY="atosecmwf"
+elif [[ $LOGINHOST =~ uan[0-9][0-9] ]]; then
+   STRATEGY="lumi"
+elif [[ -d $DIR/env/$LOGINHOST ]]; then # check if directory with LOGINHOST exists in env
+STRATEGY=$LOGINHOST
 else
    echo "can not determine environment for host: "$LOGINHOST
    [ $BEING_EXECUTED = true ] && exit 1
