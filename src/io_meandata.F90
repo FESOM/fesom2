@@ -411,7 +411,7 @@ CASE ('salt      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt',      'salinity',    'psu',    tracers%data(2)%values(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('otracers  ')
     do j=3, tracers%num_tracers
-    write (id_string, "(I3.3)") tracers%data(j)%ID
+    write (id_string, "(I4.4)") tracers%data(j)%ID
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'tra_'//id_string, 'pasive tracer ID='//id_string, 'n/a', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end do
 CASE ('slope_x   ')

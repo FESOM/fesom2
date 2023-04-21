@@ -250,6 +250,16 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         end if
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
 !$OMP BARRIER
+        if (tracers%data(tr_num)%ID==1007) then !BC for AGE tracer
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nzmin, nzmax)
+           do node=1,myDim_nod2D+eDim_nod2D
+              nzmax=nlevels_nod2D(node)-1
+              nzmin=ulevels_nod2D(node)
+              tracers%data(tr_num)%values(nzmin,node)        =0.0_WP
+              tracers%data(tr_num)%values(nzmin+1:nzmax,node)=tracers%data(tr_num)%values(nzmin+1:nzmax,node)+dt/(31536000.) !increment is in years
+           end do
+!$OMP END PARALLEL DO
+        end if
     end do
 
     !___________________________________________________________________________
@@ -258,7 +268,6 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     do tr_num=1, ptracers_restore_total
        tracers%data(ptracers_restore(tr_num)%locid)%values(:, ptracers_restore(tr_num)%ind2)=1.0_WP
     end do
-
     !___________________________________________________________________________
     ! subtract the the bolus velocities back from 3D velocities:
     if (Fer_GM) then
@@ -1333,6 +1342,8 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
         else
            bc_surface = dt*water_flux(n)*(sval-1.0)
         end if
+    CASE (1007)
+        bc_surface=0.0_WP
     CASE DEFAULT
       if (partit%mype==0) then
          write (id_string, "(I3)") id

@@ -823,8 +823,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
         CASE (101)       ! initialize tracer ID=101
             tracers%data(i)%values(:,:)=0.0_WP
             if (mype==0) then
-                write (i_string,  "(I3)") i
-                write (id_string, "(I3)") id
+                write (i_string,  "(I4)") i
+                write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
             
@@ -852,8 +852,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             end do
             tracers%data(i)%values(:,ptracers_restore(rcounter3)%ind2)=1.
             if (mype==0) then
-                write (i_string,  "(I3)") i
-                write (id_string, "(I3)") id
+                write (i_string,  "(I4)") i
+                write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
             
@@ -881,8 +881,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             end do
             tracers%data(i)%values(:,ptracers_restore(rcounter3)%ind2)=0.0_WP
             if (mype==0) then
-                write (i_string,  "(I3)") i
-                write (id_string, "(I3)") id
+                write (i_string,  "(I4)") i
+                write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
             
@@ -910,8 +910,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             end do
             tracers%data(i)%values(:,ptracers_restore(rcounter3)%ind2)=0.0_WP
             if (mype==0) then
-                write (i_string,  "(I3)") i
-                write (id_string, "(I3)") id
+                write (i_string,  "(I4)") i
+                write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
             
@@ -919,16 +919,25 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
         CASE (501) ! ice-shelf water due to basal melting
             tracers%data(i)%values(:,:)=0.0_WP
             if (mype==0) then
-                write (i_string,  "(I3)") i
-                write (id_string, "(I3)") id
+                write (i_string,  "(I4)") i
+                write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-            
+        !_______________________________________________________________________
+        CASE (1007)       ! initialize tracer ID=1007            
+            if (mype==0) then
+                write (id_string, "(I4)") id
+                write(*,*) 'tracer '// trim(id_string) // ' was read from climatology (in do_ic3d)?'
+                write(*,*) 'we set negative values to zero!'
+                where (tracers%data(i)%values < 0._WP)
+                      tracers%data(i)%values=0.0_WP
+                end where
+            end if            
         !_______________________________________________________________________
         CASE DEFAULT
             if (mype==0) then
-                write (i_string,  "(I3)") i
-                write (id_string, "(I3)") id
+                write (i_string,  "(I4)") i
+                write (id_string, "(I4)") id
                 if (mype==0) write(*,*) 'invalid ID '//trim(id_string)//' specified for '//trim(i_string)//' th tracer!!!'
                 if (mype==0) write(*,*) 'the model will stop!'
             end if
