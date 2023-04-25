@@ -845,7 +845,7 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
         if (entry%dimname(1)=='nz') then
             call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer interface'),'depth at layer interface'), __LINE__)
         elseif (entry%dimname(1)=='nz_upper') then
-                call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer interface fro upper levels'),'depth at layer interface upper levels'), __LINE__)
+                call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer interface for upper levels'),'depth at layer interface upper levels'), __LINE__)
         elseif (entry%dimname(1)=='nz1') then
             call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer midpoint'),'depth at layer midpoint'), __LINE__)
         elseif (entry%dimname(1)=='nz1_upper') then
