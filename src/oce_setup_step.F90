@@ -101,7 +101,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
     !___________________________________________________________________________
-    integer                               :: n
+    integer                               :: i, n
     
     !___setup virt_salt_flux____________________________________________________
     ! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
@@ -234,7 +234,9 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
 
     if (.not.r_restart) then
        do n=1, tracers%num_tracers
-          tracers%data(n)%valuesAB=tracers%data(n)%values
+          do i=1, tracers%data(n)%AB_order-1
+             tracers%data(n)%valuesold(i,:,:)=tracers%data(n)%values
+          end do
        end do
     end if
     
@@ -336,8 +338,9 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     ! Temperature (index=1), Salinity (index=2), etc.
     allocate(tracers%data(num_tracers))
     do n=1, tracers%num_tracers
-        allocate(tracers%data(n)%values  (nl-1,node_size))
-        allocate(tracers%data(n)%valuesAB(nl-1,node_size))
+        allocate(tracers%data(n)%values   (                             nl-1, node_size))
+        allocate(tracers%data(n)%valuesAB (                             nl-1, node_size))
+        allocate(tracers%data(n)%valuesold(tracers%data(n)%AB_order-1,  nl-1, node_size))
         tracers%data(n)%ID            = nml_tracer_list(n)%id
         tracers%data(n)%tra_adv_hor   = TRIM(nml_tracer_list(n)%adv_hor)
         tracers%data(n)%tra_adv_ver   = TRIM(nml_tracer_list(n)%adv_ver)
@@ -349,7 +352,8 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
         tracers%data(n)%gamma1_tra    = gamma1_tra
         tracers%data(n)%gamma2_tra    = gamma2_tra
         tracers%data(n)%values        = 0.
-        tracers%data(n)%valuesAB      = 0.
+        tracers%data(n)%valuesAB       = 0.
+        tracers%data(n)%valuesold     = 0.
         tracers%data(n)%i_vert_diff   = i_vert_diff
     end do
     allocate(tracers%work%del_ttf(nl-1,node_size))
