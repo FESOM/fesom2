@@ -24,20 +24,6 @@ SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_tracer), intent(inout), target :: tracers
     integer                               :: n,nz 
-    if (tracers%data(n)%AB_order==2) then
-!$OMP PARALLEL DO
-       do n=1, partit%myDim_nod2d+partit%eDim_nod2D
-          tracers%data(tr_num)%valuesold(1, :, n)=tracers%data(tr_num)%values(:, n)
-       end do
-!$OMP END PARALLEL DO
-    elseif (tracers%data(n)%AB_order==3) then
-!$OMP PARALLEL DO
-       do n=1, partit%myDim_nod2d+partit%eDim_nod2D
-          tracers%data(tr_num)%valuesold(2, :, n)=tracers%data(tr_num)%valuesold(1, :, n)
-          tracers%data(tr_num)%valuesold(1, :, n)=tracers%data(tr_num)%values(:, n)
-       end do
-!$OMP END PARALLEL DO
-    end if
 
 !$OMP PARALLEL DO
     do n=1, partit%myDim_nod2D+partit%eDim_nod2D
@@ -54,6 +40,21 @@ SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
        end if
     end do
 !$OMP END PARALLEL DO
+
+    if (tracers%data(n)%AB_order==2) then
+!$OMP PARALLEL DO
+       do n=1, partit%myDim_nod2d+partit%eDim_nod2D
+          tracers%data(tr_num)%valuesold(1, :, n)=tracers%data(tr_num)%values(:, n)
+       end do
+!$OMP END PARALLEL DO
+    elseif (tracers%data(n)%AB_order==3) then
+!$OMP PARALLEL DO
+       do n=1, partit%myDim_nod2d+partit%eDim_nod2D
+          tracers%data(tr_num)%valuesold(2, :, n)=tracers%data(tr_num)%valuesold(1, :, n)
+          tracers%data(tr_num)%valuesold(1, :, n)=tracers%data(tr_num)%values(:, n)
+       end do
+!$OMP END PARALLEL DO
+    end if
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
     call tracer_gradient_elements(tracers%data(tr_num)%valuesAB, partit, mesh)
