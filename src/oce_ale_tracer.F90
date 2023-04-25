@@ -293,6 +293,17 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
     use diff_ver_part_redi_expl_interface
     use diff_ver_part_impl_ale_interface
     use diff_part_bh_interface
+#if defined(__recom)
+use ver_sinking_recom_interface
+use diff_ver_recom_expl_interface
+use ver_sinking_recom_benthos_interface
+use integrate_bottom_interface
+    USE REcoM_GloVar
+    use recom_config !, recom_debug
+    use g_comm_auto
+    use g_support
+    use recom_ciso
+#endif
     implicit none
     integer       , intent(in)   , target :: tr_num
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -310,6 +321,13 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
 #include "associate_mesh_ass.h" 
     del_ttf => tracers%work%del_ttf
     
+#if defined(__recom)
+    dtr_bf         = 0.0_WP
+    str_bf         = 0.0_WP
+    vert_sink      = 0.0_WP
+    nss            = 0.0_WP
+#endif
+
     !___________________________________________________________________________
     ! do horizontal diffusiion
     ! write there also horizontal diffusion rhs to del_ttf which is equal the R_T^n 
@@ -323,6 +341,70 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
     ! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
     ! derivatives and has to be computed explicitly!
     if (Redi) call diff_ver_part_redi_expl(tracers, partit, mesh)     
+
+#if !defined(__recom)
+! 1) Remineralization from the benthos
+!    Nutrient fluxes come from the bottom boundary
+!    Unit [mmol/m2/s]
+
+if (any(recom_remin_tracer_id == tracers%data(tr_num)%ID)) then
+
+! call bottom boundary 
+        call diff_ver_recom_expl(tr_num, tracers, partit, mesh)
+! update tracer fields
+        do n=1, myDim_nod2D 
+            nzmax=nlevels_nod2D(n)-1
+            nzmin=ulevels_nod2D(n)
+!            tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
+!                                                dtr_bf(nzmin:nzmax,n)
+        tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
+                                                dtr_bf(nzmin:nzmax,n) ! define it OG
+
+        end do
+end if
+
+! 2) Sinking in water column
+!YY: recom_sinking_tracer_id in recom_modules extended for 2. zooplankton
+! but not for the combination ciso + 2. zoo!
+if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then 
+
+! sinking
+        call ver_sinking_recom(tr_num, tracers, partit, mesh)  !--- vert_sink ---
+!        call diff_ver_recom_expl(tr_num, tracers, partit, mesh) 
+! sinking into the benthos
+!        call ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)  !--- str_bf ---
+       
+! update tracer fields
+        do n=1, myDim_nod2D 
+            nzmax=nlevels_nod2D(n)-1
+            nzmin=ulevels_nod2D(n)
+!            tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
+!                                                vert_sink(nzmin:nzmax,n)
+!            tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
+!                                                str_bf(nzmin:nzmax,n)
+        tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
+                                                vert_sink(nzmin:nzmax,n)
+        tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
+                                                str_bf(nzmin:nzmax,n)
+        end do                             
+end if
+
+! 3) Nitrogen SS
+!    if (NitrogenSS .and. tracers%data(tr_num)%ID==1008) then ! idetc
+!        call recom_nitogenss(mesh) !--- nss for idetc ---
+!        do n=1, myDim_nod2D
+!            nzmax=nlevels_nod2D(n)-1
+!            nzmin=ulevels_nod2D(n)
+!        tr_arr(nzmin:nzmax,n,3)=tr_arr(nzmin:nzmax,n,3)+ &   ! tracer_id(tr_num)==1001 !idin
+!                                           nss(nzmin:nzmax,n)
+!        tracers%data(3)%values(nzmin:nzmax,n)=tracers%data(3)%values(nzmin:nzmax,n)+ & ! tracer_id(tr_num)==1001 !idin
+!        end do  
+!    end if
+
+!        call exchange_nod(sinkVel1(:,:))
+!        call exchange_nod(sinkVel2(:,:))
+
+#endif
 
     !___________________________________________________________________________
     ! Update tracers --> calculate T* see Danilov et al. (2017)

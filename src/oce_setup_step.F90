@@ -636,11 +636,12 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     ! ================
     ! RECOM forcing arrays
     ! ================
-!#if defined(__recom)
-!    allocate(Alk_surf(node_size))
-!    allocate(relax_alk(node_size))
-!    allocate(virtual_alk(node_size))
-!#endif
+#if defined(__recom)
+    allocate(dtr_bf(nl-1,node_size)) !jh
+    allocate(str_bf(nl-1,node_size)) !OG
+    allocate(vert_sink(nl-1,node_size)) ! OG
+    allocate(nss(nl-1,node_size)) ! OG
+#endif
     ! =================
     ! Visc and Diff coefs
     ! =================
@@ -744,11 +745,12 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
 ! ================
 ! RECOM forcing arrays
 ! ================
-!#if defined(__recom)
-!    Alk_surf=0.0_WP
-!    relax_alk=0.0_WP
-!    virtual_alk=0.0_WP
-!#endif    
+#if defined(__recom)
+    dtr_bf           = 0.0_WP ! jh
+    str_bf           = 0.0_WP ! OG
+    vert_sink        = 0.0_WP ! OG
+    nss              = 0.0_WP ! OG
+#endif    
     
     ! init field for pressure force 
     allocate(density_ref(nl-1,node_size))

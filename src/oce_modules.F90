@@ -199,6 +199,13 @@ real(kind=WP), allocatable    :: ssh_gp(:)
 real(kind=WP), allocatable :: tr_xy(:,:,:)
 real(kind=WP), allocatable :: tr_z(:,:)
 
+#if defined(__recom)
+! REcoM
+real(kind=WP), allocatable    :: dtr_bf(:,:), str_bf(:,:) ! OG, jh -> for fluxes from benthos
+real(kind=WP), allocatable    :: vert_sink(:,:)   ! OG -> vertical sinking
+real(kind=WP), allocatable    :: nss(:,:)   ! OG -> vertical sinking
+#endif
+
 !Viscosity and diff coefs
 real(kind=WP), allocatable,dimension(:,:)   :: Av,Kv
 real(kind=WP), allocatable,dimension(:,:,:) :: Kv_double
