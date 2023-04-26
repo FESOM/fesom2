@@ -400,10 +400,6 @@ contains
     ! EO parameters
     real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
 
-#if defined (__ifsinterface)
-    ! write raw restart at the end of run
-    call write_all_raw_restarts(f%last_nstep, f%MPI_COMM_FESOM, f%mype)
-#endif
     call finalize_output()
     call finalize_restart()
 
