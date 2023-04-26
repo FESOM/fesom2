@@ -14,7 +14,7 @@ MODULE io_RESTART
   use fortran_utils
   
   implicit none
-  public :: restart, finalize_restart, write_all_raw_restarts
+  public :: restart, finalize_restart
   private
 
   integer,       save       :: globalstep=0 ! todo: remove this from module scope as it will mess things up if we use async read/write from the same process

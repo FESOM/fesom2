@@ -42,7 +42,7 @@ module fesom_main_storage_module
     
   type :: fesom_main_storage_type
 
-    integer           :: n, from_nstep, offset, row, i, provided, last_nstep
+    integer           :: n, from_nstep, offset, row, i, provided
     integer           :: which_readr ! read which restart files (0=netcdf, 1=core dump,2=dtype)
     integer, pointer  :: mype, npes, MPIerr, MPI_COMM_FESOM
     real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
@@ -391,7 +391,6 @@ contains
         f%rtime_read_forcing  = f%rtime_read_forcing  + f%t1_frc - f%t0_frc
     end do
 
-    f%last_nstep = f%from_nstep-1+current_nsteps
     f%from_nstep = f%from_nstep+current_nsteps
   end subroutine
 
