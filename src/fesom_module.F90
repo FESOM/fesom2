@@ -209,7 +209,7 @@ contains
         call clock_newyear                        ! check if it is a new year
         if (f%mype==0) f%t6=MPI_Wtime()
         !___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
-        call restart(0, r_restart, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        call restart(0, 0, 0, r_restart, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         if (f%mype==0) f%t7=MPI_Wtime()
         ! store grid information into netcdf file
         if (.not. r_restart) call write_mesh_info(f%partit, f%mesh)
@@ -292,7 +292,7 @@ contains
     use fesom_main_storage_module
     integer, intent(in) :: current_nsteps 
     ! EO parameters
-    integer n
+    integer n, nstart, ntotal
 
     !=====================
     ! Time stepping
@@ -314,7 +314,10 @@ contains
     if (use_global_tides) then
        call foreph_ini(yearnew, month, f%partit)
     end if
-    do n=f%from_nstep, f%from_nstep-1+current_nsteps        
+    nstart=f%from_nstep
+    ntotal=f%from_nstep-1+current_nsteps
+    !do n=f%from_nstep, f%from_nstep-1+current_nsteps
+    do n=nstart, ntotal
         if (use_global_tides) then
            call foreph(f%partit, f%mesh)
         end if
@@ -378,7 +381,7 @@ contains
         call output (n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
 
         f%t5 = MPI_Wtime()
-        call restart(n, .false., f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        call restart(n, nstart, ntotal, .false., f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         f%t6 = MPI_Wtime()
         
         f%rtime_fullice       = f%rtime_fullice       + f%t2 - f%t1
