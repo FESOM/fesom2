@@ -123,7 +123,7 @@ subroutine READ_T_TRACER_DATA(tdata, unit)
     character(len=1024)                  :: iomsg
 
     call read_bin_array(tdata%values,    unit, iostat, iomsg)
-    call write_bin_array(tdata%valuesold,unit, iostat, iomsg)
+    call read_bin_array(tdata%valuesold,unit, iostat, iomsg)
     call read_bin_array(tdata%valuesAB,  unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg) tdata%smooth_bh_tra
     read(unit, iostat=iostat, iomsg=iomsg) tdata%gamma0_tra

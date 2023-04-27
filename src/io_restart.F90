@@ -110,7 +110,10 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
      END SELECT
      call oce_files%def_node_var(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
      longname=trim(longname)//', Adams–Bashforth'
-     call oce_files%def_node_var(trim(trname)//'_AB', trim(longname), trim(units), tracers%data(j)%valuesAB(:,:), mesh, partit)
+     call oce_files%def_node_var(trim(trname)//'_AB', trim(longname), trim(units), tracers%data(j)%valuesAB(:,:),    mesh, partit)
+     call oce_files%def_node_var(trim(trname)//'_M1', trim(longname), trim(units), tracers%data(j)%valuesold(1,:,:), mesh, partit)
+     if (tracers%data(j)%AB_order==3) &
+     call oce_files%def_node_var(trim(trname)//'_M2', trim(longname), trim(units), tracers%data(j)%valuesold(2,:,:), mesh, partit)
   end do
   call oce_files%def_node_var('w', 'vertical velocity', 'm/s', dynamics%w, mesh, partit)
   call oce_files%def_node_var('w_expl', 'vertical velocity', 'm/s', dynamics%w_e, mesh, partit)
