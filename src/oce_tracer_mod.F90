@@ -32,22 +32,22 @@ SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
        tracers%work%del_ttf_advhoriz (:, n) = 0.0_WP
        tracers%work%del_ttf_advvert  (:, n) = 0.0_WP
        ! AB interpolation
-       if (tracers%data(n)%AB_order==2) then
+       if (tracers%data(tr_num)%AB_order==2) then
            tracers%data(tr_num)%valuesAB(:, n)  =-(0.5_WP+epsilon)*tracers%data(tr_num)%valuesold(1, :, n)+(1.5_WP+epsilon)*tracers%data(tr_num)%values(:, n)
-       elseif (tracers%data(n)%AB_order==3) then
+       elseif (tracers%data(tr_num)%AB_order==3) then
            tracers%data(tr_num)%valuesAB(:, n)  =5.0_WP*tracers%data(tr_num)%valuesold(2, :, n)-16.0_WP*tracers%data(tr_num)%valuesold(1, :, n)+23.0_WP*tracers%data(tr_num)%values(:, n)
-           tracers%data(tr_num)%valuesAB(:, n)=tracers%data(tr_num)%valuesAB(:, n)/12.0_WP
+           tracers%data(tr_num)%valuesAB(:, n)  =tracers%data(tr_num)%valuesAB(:, n)/12.0_WP
        end if
     end do
 !$OMP END PARALLEL DO
 
-    if (tracers%data(n)%AB_order==2) then
+    if (tracers%data(tr_num)%AB_order==2) then
 !$OMP PARALLEL DO
        do n=1, partit%myDim_nod2d+partit%eDim_nod2D
           tracers%data(tr_num)%valuesold(1, :, n)=tracers%data(tr_num)%values(:, n)
        end do
 !$OMP END PARALLEL DO
-    elseif (tracers%data(n)%AB_order==3) then
+    elseif (tracers%data(tr_num)%AB_order==3) then
 !$OMP PARALLEL DO
        do n=1, partit%myDim_nod2d+partit%eDim_nod2D
           tracers%data(tr_num)%valuesold(2, :, n)=tracers%data(tr_num)%valuesold(1, :, n)

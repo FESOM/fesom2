@@ -352,7 +352,7 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
         tracers%data(n)%gamma1_tra    = gamma1_tra
         tracers%data(n)%gamma2_tra    = gamma2_tra
         tracers%data(n)%values        = 0.
-        tracers%data(n)%valuesAB       = 0.
+        tracers%data(n)%valuesAB      = 0.
         tracers%data(n)%valuesold     = 0.
         tracers%data(n)%i_vert_diff   = i_vert_diff
     end do
