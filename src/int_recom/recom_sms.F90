@@ -15,8 +15,6 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     use recom_config
     use REcoM_ciso
     use g_clock
-!    use g_PARSUP
-!    use g_rotate_grid
 
     use g_config
     use MOD_MESH
@@ -28,17 +26,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     USE MOD_PARTIT
     USE MOD_PARSUP
 
-
-!    use i_arrays
-!    use i_param
     use g_forcing_arrays
     use g_comm_auto
-!    use i_therm_param
-!    use g_comm
-!    use g_support
-    use mvars                                                                       ! MOCSY
-    use mdepth2press                                                                ! Ballasting
-    use gsw_mod_toolbox, only: gsw_sa_from_sp,gsw_ct_from_pt,gsw_rho                ! Ballasting
+    use mvars
+    use mdepth2press                                   
+    use gsw_mod_toolbox, only: gsw_sa_from_sp,gsw_ct_from_pt,gsw_rho
 
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -83,17 +75,17 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     real(kind=8)                                            :: aux
     integer                                                 :: k,step,ii, idiags,n
 
-    Real(kind=8),                      intent(in)           :: Loc_slp              ! MOCSY [Pa] sea-level pressure
-    Real(kind=8)                                            :: Patm_depth(1)        ! MOCSY
-    Real(kind=8)                                            :: REcoM_T_depth(1)     ! MOCSY temperature for the whole water column for mocsy minimum defined as -2
-    Real(kind=8)                                            :: REcoM_S_depth(1)     ! MOCSY
-    Real(kind=8)                                            :: REcoM_DIC_depth(1)   ! MOCSY
-    Real(kind=8)                                            :: REcoM_Alk_depth(1)   ! MOCSY
-    Real(kind=8)                                            :: REcoM_Si_depth(1)    ! MOCSY
-    Real(kind=8)                                            :: REcoM_Phos_depth(1)  ! MOCSY
-    Real(kind=8),                      intent(in)           :: Latd(1)              ! latitude in degree
-    Real(kind=8),                      intent(in)           :: Lond(1)              ! NEW MOCSY longitude in degree 
-    Real(kind=8)                                            :: mocsy_step_per_day 
+    real(kind=8),                      intent(in)           :: Loc_slp              ! MOCSY [Pa] sea-level pressure
+    real(kind=8)                                            :: Patm_depth(1)        ! MOCSY
+    real(kind=8)                                            :: REcoM_T_depth(1)     ! MOCSY temperature for the whole water column for mocsy minimum defined as -2
+    real(kind=8)                                            :: REcoM_S_depth(1)     ! MOCSY
+    real(kind=8)                                            :: REcoM_DIC_depth(1)   ! MOCSY
+    real(kind=8)                                            :: REcoM_Alk_depth(1)   ! MOCSY
+    real(kind=8)                                            :: REcoM_Si_depth(1)    ! MOCSY
+    real(kind=8)                                            :: REcoM_Phos_depth(1)  ! MOCSY
+    real(kind=8),                      intent(in)           :: Latd(1)              ! latitude in degree
+    real(kind=8),                      intent(in)           :: Lond(1)              ! NEW MOCSY longitude in degree 
+    real(kind=8)                                            :: mocsy_step_per_day 
     real(kind=8)                                            :: & 
         DIN,     & !< Dissolved Inorganic Nitrogen 				[mmol/m3] 
         DIC,     & !< Dissolved Inorganic Carbon				[mmol/m3]
@@ -221,28 +213,30 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             O2     = max(tiny,state(k,ioxy)          + sms(k,ioxy))
             FreeFe = zero
 
-! For Mocsy
             REcoM_T_depth    = max(2.d0, Temp(k))        ! MOCSY minimum set to 2 degC: K1/K2 Lueker valid between 2degC-35degC and 19-43psu
             REcoM_T_depth    = min(REcoM_T_depth, 40.d0) ! MOCSY maximum set to 40 degC: K1/K2 Lueker valid between 2degC-35degC and 19-43psu
-            REcoM_S_depth    = max(21.d0, Sali_depth(k)) ! MOCSY minimum set to 21: K1/K2 Lueker valid between 2degC-35degC and 19-43psu, else causes trouble in regions with S between 19 and 21 and ice conc above 97%                      
-            REcoM_S_depth    = min(REcoM_S_depth, 43.d0) ! MOCSY maximum set to 43: K1/K2 Lueker valid between 2degC-35degC and 19-43psu, else causes trouble   
+            REcoM_S_depth    = max(21.d0, Sali_depth(k)) ! MOCSY minimum set to 21: K1/K2 Lueker valid between 2degC-35degC and 19-43psu, 
+                                                         ! else causes trouble in regions with S between 19 and 21 and ice conc above 97%                      
+            REcoM_S_depth    = min(REcoM_S_depth, 43.d0) ! MOCSY maximum set to 43: K1/K2 Lueker valid between 2degC-35degC and 19-43psu, 
+                                                         ! else causes trouble   
             REcoM_DIC_depth  = max(tiny*1e-3,state(k,idic)*1e-3   + sms(k,idic  )*1e-3)     
             REcoM_Alk_depth  = max(tiny*1e-3,state(k,ialk)*1e-3   + sms(k,ialk  )*1e-3)      
-            REcoM_Si_depth   = max(tiny*1e-3,state(k,isi)*1e-3    + sms(k,isi   )*1e-3)      
+            REcoM_Si_depth   = max(tiny*1e-3,state(k,isi) *1e-3   + sms(k,isi   )*1e-3)      
             REcoM_Phos_depth = max(tiny*1e-3,state(k,idin)*1e-3   + sms(k,idin  )*1e-3) /16 ! convert N to P with Redfield [mol/m3] 
 
             PhyCalc = max(tiny,state(k,iphycal)      + sms(k,iphycal))
             DetCalc = max(tiny,state(k,idetcal)      + sms(k,idetcal))
 
-!-------------------------------------------------------------------------------
+!!------------------------------------------------------------------------------
 !< Quotas
-
-            quota       =  PhyN / PhyC ! include variability of the N: C ratio, cellular chemical composition 
+            ! *** Small phytoplankton
+            quota       =  PhyN / PhyC                     ! include variability of the N: C ratio, cellular chemical composition 
             recipquota  =  real(one) / quota
-            Chl2C       =  PhyChl  / PhyC ! Chl a:phytoplankton carbon ratio, cellular chemical composition [gCHL gC^-1]
-            Chl2N       =  PhyChl  / PhyN ! Chl a:phytoplankton nitrogen ratio, cellular chemical composition [gCHL gN^-1]
+            Chl2C       =  PhyChl  / PhyC                  ! Chl a:phytoplankton carbon ratio, cellular chemical composition [gCHL gC^-1]
+            Chl2N       =  PhyChl  / PhyN                  ! Chl a:phytoplankton nitrogen ratio, cellular chemical composition [gCHL gN^-1]
             CHL2C_plast =  Chl2C * (quota/(quota - NCmin))
-    
+
+            ! *** Diatoms
             quota_dia       =  DiaN / DiaC
             recipQuota_dia  =  real(one)/quota_dia
             Chl2C_dia       =  DiaChl / DiaC
@@ -250,6 +244,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             CHL2C_plast_dia =  Chl2C_dia * (quota_dia/(quota_dia - NCmin_d))
             qSiC            =  DiaSi / DiaC
             qSiN            =  DiaSi / DiaN
+
 #if defined (__coccos) 
             quota_cocco       = CoccoN / CoccoC
             recipQuota_cocco  = real(one)/quota_cocco
@@ -264,6 +259,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             recipQZoo2 = Zoo2C / Zoo2N
             recipQZoo3 = MicZooC / MicZooN
             if (Grazing_detritus) recipDet2 = DetZ2C / DetZ2N
+
 #endif
 
             if (ciso) then
@@ -406,7 +402,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             logfile_outfreq_7  = mocsy_step_per_day*7
             logfile_outfreq_30 = mocsy_step_per_day*30
 
-            if (PARave > 0.01*SurfSR .and. mod(mstep,logfile_outfreq_7)==0) then
+            if (PARave > 0.01*SurfSR) then ! .and. mod(mstep,logfile_outfreq_7)==0) then
                 call vars_sprac(ph_depth, pco2_depth, fco2_depth, co2_depth, hco3_depth, co3_depth, OmegaA_depth, OmegaC_depth, kspc_depth, BetaD_depth,  & ! MOCSY 
                        rhoSW_depth, p_depth, tempis_depth,                                                                                                & ! MOCSY
                        REcoM_T_depth, REcoM_S_depth, REcoM_Alk_depth, REcoM_DIC_depth, REcoM_Si_depth, REcoM_Phos_depth, Patm_depth, zF(k), Latd, Nmocsy, & ! MOCSY
@@ -420,7 +416,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 kspc_watercolumn(k)   = kspc_depth(1)   ! DISS
                 rhoSW_watercolumn(k)  = rhoSW_depth(1)  ! DISS
 
-            elseif (PARave < 0.01*SurfSR .and. mod(mstep,logfile_outfreq_30)==0) then
+            elseif (PARave < 0.01*SurfSR) then ! .and. mod(mstep,logfile_outfreq_30)==0) then
                 call vars_sprac(ph_depth, pco2_depth, fco2_depth, co2_depth, hco3_depth, co3_depth, OmegaA_depth, OmegaC_depth, kspc_depth, BetaD_depth,  & ! MOCSY 
                        rhoSW_depth, p_depth, tempis_depth,                                                                                                & ! MOCSY
                        REcoM_T_depth, REcoM_S_depth, REcoM_Alk_depth, REcoM_DIC_depth, REcoM_Si_depth, REcoM_Phos_depth, Patm_depth, zF(k), Latd, Nmocsy, & ! MOCSY
