@@ -2,8 +2,9 @@ module purge
 module load PrgEnv-cray/8.3.3
 module load craype-x86-milan
 
-vers=14.0.2
+vers=15.0.0
 module swap cce cce/$vers
+module load cray-mpich/8.1.25
 module load cray-fftw/3.3.10.1
 module load cray-hdf5/1.12.1.5
 module load cray-netcdf/4.8.1.5

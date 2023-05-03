@@ -1,0 +1,72 @@
+&forcing_exchange_coeff
+    ce_atm_oce = 0.00175
+    ch_atm_oce = 0.00175
+    cd_atm_oce = 0.001
+    ce_atm_ice = 0.00175
+    ch_atm_ice = 0.00175
+    cd_atm_ice = 0.0012
+    swind = 0.0
+/
+
+&forcing_bulk
+    aomip_drag_coeff = .false.
+    ncar_bulk_formulae = .true.
+    ncar_bulk_z_wind = 10
+    ncar_bulk_z_tair = 10
+    ncar_bulk_z_shum = 10
+/
+
+&land_ice
+    use_landice_water = .false.
+    landice_start_mon = 5
+    landice_end_mon = 10
+/
+
+&nam_sbc
+    nm_xwind_file = '/scratch/project_465000454/models/IFS/inputs/inputs_de_48r1/fesom/v21/forcing//CORE2/u_10.'
+    nm_ywind_file = '/scratch/project_465000454/models/IFS/inputs/inputs_de_48r1/fesom/v21/forcing//CORE2/v_10.'
+    nm_xstre_file = '/work/ollie/clidyn/forcing/JRA55-do-v1.4.0/uas.'
+    nm_ystre_file = '/work/ollie/clidyn/forcing/JRA55-do-v1.4.0/vas.'
+    nm_humi_file = '/scratch/project_465000454/models/IFS/inputs/inputs_de_48r1/fesom/v21/forcing//CORE2/q_10.'
+    nm_qsr_file = '/scratch/project_465000454/models/IFS/inputs/inputs_de_48r1/fesom/v21/forcing//CORE2/ncar_rad.'
+    nm_qlw_file = '/scratch/project_465000454/models/IFS/inputs/inputs_de_48r1/fesom/v21/forcing//CORE2/ncar_rad.'
+    nm_tair_file = '/scratch/project_465000454/models/IFS/inputs/inputs_de_48r1/fesom/v21/forcing//CORE2/t_10.'
+    nm_prec_file = '/scratch/project_465000454/models/IFS/inputs/inputs_de_48r1/fesom/v21/forcing//CORE2/ncar_precip.'
+    nm_snow_file = '/scratch/project_465000454/models/IFS/inputs/inputs_de_48r1/fesom/v21/forcing//CORE2/ncar_precip.'
+    nm_mslp_file = '/scratch/project_465000454/models/IFS/inputs/inputs_de_48r1/fesom/v21/forcing//CORE2/slp.'
+    nm_xwind_var = 'U_10_MOD'
+    nm_ywind_var = 'V_10_MOD'
+    nm_xstre_var = 'uas'
+    nm_ystre_var = 'vas'
+    nm_humi_var = 'Q_10_MOD'
+    nm_qsr_var = 'SWDN_MOD'
+    nm_qlw_var = 'LWDN_MOD'
+    nm_tair_var = 'T_10_MOD'
+    nm_prec_var = 'RAIN'
+    nm_snow_var = 'SNOW'
+    nm_mslp_var = 'SLP'
+    nm_nc_iyear = 1948
+    nm_nc_imm = 1
+    nm_nc_idd = 1
+    nm_nc_freq = 1
+    nm_nc_tmid = 1
+    l_xwind = .true.
+    l_ywind = .true.
+    l_xstre = .false.
+    l_ystre = .false.
+    l_humi = .true.
+    l_qsr = .true.
+    l_qlw = .true.
+    l_tair = .true.
+    l_prec = .true.
+    l_mslp = .false.
+    l_cloud = .false.
+    l_snow = .true.
+    runoff_data_source = 'CORE2'
+    nm_runoff_file = '/scratch/project_465000454/models/IFS/inputs/inputs_de_48r1/fesom/v21/forcing//CORE2/runoff.nc'
+    sss_data_source = 'CORE2'
+    nm_sss_data_file = '/scratch/project_465000454/models/IFS/inputs/inputs_de_48r1/fesom/v21/forcing//CORE2/PHC2_salx.nc'
+    chl_data_source = 'None'
+    nm_chl_data_file = '/work/ollie/clidyn/forcing/Sweeney/Sweeney_2005.nc'
+    chl_const = 0.1
+/
