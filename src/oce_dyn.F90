@@ -56,15 +56,15 @@ end module
 
 module check_validviscopt_interface
     interface
-         subroutine check_viscopt(dynamics, partit, mesh)
-            USE MOD_DYN
-            USE MOD_PARTIT
-            USE MOD_PARSUP
-            USE MOD_MESH
-            type(t_dyn)   , intent(inout), target :: dynamics
-            type(t_partit), intent(inout), target :: partit
-            type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine 
+!PS          subroutine check_viscopt(dynamics, partit, mesh)
+!PS             USE MOD_DYN
+!PS             USE MOD_PARTIT
+!PS             USE MOD_PARSUP
+!PS             USE MOD_MESH
+!PS             type(t_dyn)   , intent(inout), target :: dynamics
+!PS             type(t_partit), intent(inout), target :: partit
+!PS             type(t_mesh)  , intent(in)   , target :: mesh
+!PS         end subroutine 
         
         subroutine check_validviscopt_5(partit, mesh)
             USE MOD_MESH

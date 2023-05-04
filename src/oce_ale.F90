@@ -2919,7 +2919,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     use write_step_info_interface
     use check_blowup_interface
     use fer_solve_interface
-    use check_validviscopt_interface
+!PS     use check_validviscopt_interface
     IMPLICIT NONE
     integer       , intent(in)            :: n
     type(t_dyn)   , intent(inout), target :: dynamics
