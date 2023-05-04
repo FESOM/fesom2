@@ -784,6 +784,7 @@ subroutine check_viscopt(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_MESH
+    USE check_validviscopt_interface
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
