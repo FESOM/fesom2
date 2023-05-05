@@ -820,6 +820,10 @@ subroutine check_validviscopt_5(partit, mesh)
     !___________________________________________________________________________
     loc_R = 0.0_WP
     loc_A = 0.0_WP
+    
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node nz, nzmax, nzmin, c1, rossbyr_1barocl, &
+!$OMP                                  fac_ResR1barocl, loc_R, loc_A)
+!$OMP DO
     do node=1, myDim_nod2D
         !_______________________________________________________________________
         ! Exlude the equator |lat|<30° from checking the ration between resolution
@@ -854,7 +858,8 @@ subroutine check_validviscopt_5(partit, mesh)
         loc_R   = loc_R + fac_ResR1barocl
         loc_A   = loc_A + 1.0_WP
     end do
-    
+!$OMP END DO
+
     !___________________________________________________________________________
     ! compute global mean ratio --> core2 Ratio=4.26 (eddy parameterizted), 
     ! dart Ratio=0.97 (eddy resolving/permitting)
