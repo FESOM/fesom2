@@ -253,7 +253,8 @@ subroutine WRITE_T_DYN(dynamics, unit, iostat, iomsg)
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%use_freeslip
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%use_wsplit
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%wsplit_maxcfl
-
+    write(unit, iostat=iostat, iomsg=iomsg) dynamics%use_ssh_splitexpl_subcycl
+    
     !___________________________________________________________________________
     call dynamics%solverinfo%WRITE_T_SOLVERINFO(unit)
 
@@ -273,6 +274,14 @@ subroutine WRITE_T_DYN(dynamics, unit, iostat, iomsg)
         call write_bin_array(dynamics%fer_w , unit, iostat, iomsg)
         call write_bin_array(dynamics%fer_uv, unit, iostat, iomsg)
     end if
+    if (dynamics%use_ssh_splitexpl_subcycl) then
+        call write_bin_array(dynamics%se_uvh       , unit, iostat, iomsg)
+        call write_bin_array(dynamics%se_uvh_rhs   , unit, iostat, iomsg)
+        call write_bin_array(dynamics%se_uvh_BT4AB , unit, iostat, iomsg)
+        call write_bin_array(dynamics%se_uvBT      , unit, iostat, iomsg)
+        call write_bin_array(dynamics%se_uvBT_theta, unit, iostat, iomsg)
+        call write_bin_array(dynamics%se_uvBT_mean , unit, iostat, iomsg)
+    end if 
 
 
 end subroutine WRITE_T_DYN
@@ -299,6 +308,7 @@ subroutine READ_T_DYN(dynamics, unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%use_freeslip
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%use_wsplit
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%wsplit_maxcfl
+    read(unit, iostat=iostat, iomsg=iomsg) dynamics%use_ssh_splitexpl_subcycl
 
     !___________________________________________________________________________
     call dynamics%solverinfo%READ_T_SOLVERINFO(unit)
@@ -319,6 +329,14 @@ subroutine READ_T_DYN(dynamics, unit, iostat, iomsg)
         call read_bin_array(dynamics%fer_w     , unit, iostat, iomsg)
         call read_bin_array(dynamics%fer_uv    , unit, iostat, iomsg)
     end if
+    if (dynamics%use_ssh_splitexpl_subcycl) then
+        call read_bin_array(dynamics%se_uvh       , unit, iostat, iomsg)
+        call read_bin_array(dynamics%se_uvh_rhs   , unit, iostat, iomsg)
+        call read_bin_array(dynamics%se_uvh_BT4AB , unit, iostat, iomsg)
+        call read_bin_array(dynamics%se_uvBT      , unit, iostat, iomsg)
+        call read_bin_array(dynamics%se_uvBT_theta, unit, iostat, iomsg)
+        call read_bin_array(dynamics%se_uvBT_mean , unit, iostat, iomsg)
+    end if 
 
 end subroutine READ_T_DYN
 
