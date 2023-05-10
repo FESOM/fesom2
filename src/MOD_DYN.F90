@@ -49,7 +49,7 @@ END TYPE T_DYN_WORK
 ! set main structure for dynamicss, contains viscosity options and parameters +
 ! option for momentum advection
 TYPE T_DYN
-!___________________________________________________________________________
+    !___________________________________________________________________________
     ! instant zonal merdional velocity & Adams-Bashfort rhs
     real(kind=WP), allocatable, dimension(:,:,:):: uv, uv_rhs, uv_rhsAB, fer_uv
 
@@ -62,6 +62,19 @@ TYPE T_DYN
     ! sea surface height arrays
     real(kind=WP), allocatable, dimension(:)    :: eta_n, d_eta, ssh_rhs, ssh_rhs_old
 
+    !___arrays for split explicite ssh computation______________________________
+    ! se_uvh...transport velocity, 
+    real(kind=WP), allocatable, dimension(:,:,:):: se_uvh 
+    !se_uv_rhs...vertical integral of transport velocity rhs, se_uvh_BT4AB...
+    ! barotropic transport velocities (vertically integrated), contains actual 
+    ! timestep (1:2) and previous timestep (3:4) for adams-bashfort interpolation
+    real(kind=WP), allocatable, dimension(:,:)  :: se_uvh_rhs, se_uvh_BT4AB 
+    
+    ! se_uvBT...barotropic trnasport velocities from barotropic time stepping
+    ! se_uvBT_theta...velocities for dissipative time stepping of thickness equation
+    ! UBTmean_mean... Mean BT velocity to trim 3D velocity in tracers
+    real(kind=WP), allocatable, dimension(:,:)  :: se_uvBT, se_uvBT_theta, se_uvBT_mean 
+    
     !___________________________________________________________________________
     ! summarizes solver input parameter
     type(t_solverinfo)                          :: solverinfo
@@ -100,7 +113,17 @@ TYPE T_DYN
     logical                                     :: use_wsplit    = .false.
     ! maximum allowed CFL criteria in vertical (0.5 < w_max_cfl < 1.)
     ! in older FESOM it used to be w_exp_max=1.e-3
-    real(kind=WP)                               :: wsplit_maxcfl= 1.0
+    real(kind=WP)                               :: wsplit_maxcfl = 1.0
+    
+    ! switch between ssh computation, by solver or split explicite subcycling
+    ! use_ssh_splitexpl_subcycl = .false. --> solver
+    ! use_ssh_splitexpl_subcycl = .true.  --> split explicite subcycling
+    logical                                     :: use_ssh_splitexpl_subcycl = .false.
+    
+    ! barotropic subcycling time-steps
+    integer                                     :: splitexpl_BTsteps = 40
+    
+    !___________________________________________________________________________
     ! energy diagnostic part: will be computed inside the model ("hard integration"):
     logical                                      :: ldiag_ke       = .true.
     ! different contributions to velocity change. will be computed inside the code.

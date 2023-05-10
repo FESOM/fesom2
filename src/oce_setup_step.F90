@@ -393,7 +393,8 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     real(kind=WP)  :: wsplit_maxcfl
     namelist /dynamics_visc   / opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
                                 use_ivertvisc, visc_easybsreturn
-    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, ldiag_KE
+    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, & 
+                                ldiag_KE, use_ssh_splitexpl_subcycl
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -417,17 +418,18 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
 
     !___________________________________________________________________________
     ! set parameters in derived type
-    dynamics%opt_visc          = opt_visc
-    dynamics%visc_gamma0       = visc_gamma0
-    dynamics%visc_gamma1       = visc_gamma1
-    dynamics%visc_gamma2       = visc_gamma2
-    dynamics%visc_easybsreturn = visc_easybsreturn
-    dynamics%use_ivertvisc     = use_ivertvisc
-    dynamics%momadv_opt        = momadv_opt
-    dynamics%use_freeslip      = use_freeslip
-    dynamics%use_wsplit        = use_wsplit
-    dynamics%wsplit_maxcfl     = wsplit_maxcfl
-    dynamics%ldiag_KE          = ldiag_KE
+    dynamics%opt_visc                   = opt_visc
+    dynamics%visc_gamma0                = visc_gamma0
+    dynamics%visc_gamma1                = visc_gamma1
+    dynamics%visc_gamma2                = visc_gamma2
+    dynamics%visc_easybsreturn          = visc_easybsreturn
+    dynamics%use_ivertvisc              = use_ivertvisc
+    dynamics%momadv_opt                 = momadv_opt
+    dynamics%use_freeslip               = use_freeslip
+    dynamics%use_wsplit                 = use_wsplit
+    dynamics%wsplit_maxcfl              = wsplit_maxcfl
+    dynamics%ldiag_KE                   = ldiag_KE
+    dynamics%use_ssh_splitexpl_subcycl  = use_ssh_splitexpl_subcycl
     !___________________________________________________________________________
     ! define local vertice & elem array size
     elem_size=myDim_elem2D+eDim_elem2D
@@ -469,14 +471,25 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! allocate/initialise ssh arrays in derived type
     allocate(dynamics%eta_n(      node_size))
-    allocate(dynamics%d_eta(      node_size))
-    allocate(dynamics%ssh_rhs(    node_size))
     dynamics%eta_n           = 0.0_WP
-    dynamics%d_eta           = 0.0_WP
-    dynamics%ssh_rhs         = 0.0_WP
+    
     !!PS     allocate(dynamics%ssh_rhs_old(node_size))
     !!PS     dynamics%ssh_rhs_old= 0.0_WP   
-
+    
+    if (dynamics%use_ssh_splitexpl_subcycl) then
+        allocate(dynamics%se_uvh(      2, nl-1, elem_size))
+        allocate(dynamics%se_uvh_rhs(  2,       elem_size))
+        allocate(dynamics%se_uvh_BT4AB(4,       elem_size))
+        dynamics%se_uvh         = 0.0_WP
+        dynamics%se_uvh_rhs     = 0.0_WP
+        dynamics%se_uvh_BT4AB   = 0.0_WP
+    else
+        allocate(dynamics%d_eta(      node_size))
+        allocate(dynamics%ssh_rhs(    node_size))
+        dynamics%d_eta           = 0.0_WP
+        dynamics%ssh_rhs         = 0.0_WP
+    end if 
+    
     !___________________________________________________________________________
     ! inititalise working arrays
     allocate(dynamics%work%uvnode_rhs(2, nl-1, node_size))
