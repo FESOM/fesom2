@@ -44,6 +44,7 @@ module fesom_main_storage_module
 
     integer           :: n, from_nstep, offset, row, i, provided
     integer           :: which_readr ! read which restart files (0=netcdf, 1=core dump,2=dtype)
+    integer           :: total_nsteps
     integer, pointer  :: mype, npes, MPIerr, MPI_COMM_FESOM
     real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
     real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
@@ -141,6 +142,7 @@ contains
         call setup_model(f%partit)  ! Read Namelists, always before clock_init
         call clock_init(f%partit)   ! read the clock file 
         call get_run_steps(fesom_total_nsteps, f%partit)
+        f%total_nsteps=fesom_total_nsteps
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call mesh_setup'//achar(27)//'[0m'
         call mesh_setup(f%partit, f%mesh)
 
@@ -381,7 +383,7 @@ contains
         call output (n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
 
         f%t5 = MPI_Wtime()
-        call restart(n, nstart, ntotal, .false., f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        call restart(n, nstart, f%total_nsteps, .false., f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         f%t6 = MPI_Wtime()
         
         f%rtime_fullice       = f%rtime_fullice       + f%t2 - f%t1
