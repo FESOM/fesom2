@@ -391,6 +391,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     logical        :: use_wsplit   =.false.
     logical        :: ldiag_KE     =.false.
     real(kind=WP)  :: wsplit_maxcfl
+    logical        :: use_ssh_splitexpl_subcycl=.false.
     namelist /dynamics_visc   / opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
                                 use_ivertvisc, visc_easybsreturn
     namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, & 
@@ -486,8 +487,8 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     else
         allocate(dynamics%d_eta(      node_size))
         allocate(dynamics%ssh_rhs(    node_size))
-        dynamics%d_eta           = 0.0_WP
-        dynamics%ssh_rhs         = 0.0_WP
+        dynamics%d_eta          = 0.0_WP
+        dynamics%ssh_rhs        = 0.0_WP
     end if 
     
     !___________________________________________________________________________
