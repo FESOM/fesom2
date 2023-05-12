@@ -20,9 +20,9 @@ subroutine momentum_adv_scalar_4splitexpl(dynamics, partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use MOD_DYN
+    USE MOD_DYN
     USE o_PARAM
-    use g_comm_auto
+    USE g_comm_auto
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -32,7 +32,6 @@ subroutine momentum_adv_scalar_4splitexpl(dynamics, partit, mesh)
     integer                  :: nl1, ul1, nl2, ul2, nl12, ul12
     real(kind=WP)            :: uv12, uv1, uv2, qc, qu, qd, num_ord=0.95_WP
     integer                  :: ednodes(2), edelem(2)
-    real(kind=WP)            :: dx1, dy1, dx2, dy2, uu, vv
     real(kind=WP)            :: wu(mesh%nl), wv(mesh%nl), un1(mesh%nl), un2(mesh%nl)
     
     !___________________________________________________________________________
@@ -117,7 +116,6 @@ subroutine momentum_adv_scalar_4splitexpl(dynamics, partit, mesh)
         
     end do ! --> do node=1, myDim_nod2D
 !$OMP END DO
-
 
 
     !___________________________________________________________________________
@@ -290,7 +288,6 @@ subroutine momentum_adv_scalar_4splitexpl(dynamics, partit, mesh)
 
     end do ! --> do ed=1, myDim_edge2D  
 !$OMP END DO 
-
 
 !PS         !_______________________________________________________________________
 !PS         ! nl12 ... minimum number of layers -1 between element edelem(1) & edelem(2) that 
