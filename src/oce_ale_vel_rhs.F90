@@ -46,6 +46,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     use g_comm_auto
     use g_sbf, only: l_mslp
     use momentum_adv_scalar_interface
+    use momentum_adv_scalar_4splitexpl_interface
     implicit none 
     type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -64,6 +65,8 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     real(kind=WP), dimension(:)    , pointer :: eta_n
     real(kind=WP), dimension(:)    , pointer :: m_ice, m_snow, a_ice
     real(kind=WP)                  , pointer :: rhoice, rhosno, inv_rhowat
+    real(kind=WP), dimension(:,:,:), pointer :: UVh
+    real(kind=WP), dimension(:,:)  , pointer :: UVh_BT4AB
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -77,6 +80,12 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     rhoice    => ice%thermo%rhoice
     rhosno    => ice%thermo%rhosno
     inv_rhowat=> ice%thermo%inv_rhowat
+    
+    ! if split-explicite ssh subcycling is used
+    if (dynamics%use_ssh_splitexpl_subcycl) then
+        UVh       => dynamics%se_uvh
+        UVh_BT4AB => dynamics%se_uvh_BT4AB
+    end if 
     
     !___________________________________________________________________________
     use_pice=0
@@ -136,26 +145,39 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         ! apply pressure gradient force, as well as contributions from gradient of 
         ! the sea surface height as well as ice pressure in case of floating sea ice
         ! to velocity rhs
-
         pre = -(p_eta+p_ice+p_air)
-
         if (use_global_tides) then
            pre=pre-ssh_gp(elnodes)
         end if
 
         Fx  = sum(gradient_sca(1:3,elem)*pre)
         Fy  = sum(gradient_sca(4:6,elem)*pre)
-
         do nz=nzmin,nzmax-1
             ! add pressure gradient terms
             UV_rhs(1,nz,elem)   = UV_rhs(1,nz,elem) + (Fx-pgf_x(nz,elem))*elem_area(elem) 
             UV_rhs(2,nz,elem)   = UV_rhs(2,nz,elem) + (Fy-pgf_y(nz,elem))*elem_area(elem)
-            
-            ! add coriolis force
-            UV_rhsAB(1,nz,elem) = UV(2,nz,elem)*ff! + mm*UV(1,nz,elem)*UV(2,nz,elem)
-            UV_rhsAB(2,nz,elem) =-UV(1,nz,elem)*ff! - mm*UV(1,nz,elem)*UV(2,nz,elem)
         end do
-
+        
+        !____________________________________________________________________________
+        ! when ssh split-explicite subcycling method is setted use transport velocities
+        ! u*h, v*h instead of u,v 
+        if (.not. dynamics%use_ssh_splitexpl_subcycl) then
+            do nz=nzmin,nzmax-1
+                ! add coriolis force
+                UV_rhsAB(1,nz,elem) = UV(2,nz,elem)*ff! + mm*UV(1,nz,elem)*UV(2,nz,elem)
+                UV_rhsAB(2,nz,elem) =-UV(1,nz,elem)*ff! - mm*UV(1,nz,elem)*UV(2,nz,elem)
+            end do
+        else
+            UVh_BT4AB(1:2,elem) = 0.0_WP
+            do nz=nzmin,nzmax-1
+                UV_rhsAB(1, nz ,elem) = UVh(1, nz, elem)*ff! + mm*UV(1,nz,elem)*UVh(1, nz, elem)  
+                UV_rhsAB(2, nz ,elem) =-UVh(2, nz, elem)*ff! - mm*UV(1,nz,elem)*UVh(2, nz, elem)
+                UVh_BT4AB(1,elem) = UVh_BT4AB(1, elem) + UVh(1, nz, elem)  ! Barotropic velocity
+                UVh_BT4AB(2,elem) = UVh_BT4AB(2, elem) + UVh(2, nz, elem)  !
+            end do    
+        end if 
+        
+        !___________________________________________________________________________
         if (dynamics%ldiag_ke) then
            do nz=nzmin,nzmax-1
               dynamics%ke_pre(1,nz,elem)= (Fx-pgf_x(nz,elem))*dt!*elem_area(elem) !not to divide it aterwards (at the end of this subroutine)
@@ -178,7 +200,11 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
        if (mype==0) write(*,*) 'in moment not adapted mom_adv advection typ for ALE, check your namelist'
        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     elseif (dynamics%momadv_opt==2) then
-       call momentum_adv_scalar(dynamics, partit, mesh)
+        if (.not. dynamics%use_ssh_splitexpl_subcycl) then
+            call momentum_adv_scalar(dynamics, partit, mesh)
+        else
+            call momentum_adv_scalar_4splitexpl(dynamics, partit, mesh)
+        end if     
     end if
     !___________________________________________________________________________
     ! Update the rhs   
