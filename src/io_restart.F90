@@ -152,7 +152,7 @@ end subroutine ini_ice_io
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine restart(istep, l_read, which_readr, ice, dynamics, tracers, partit, mesh)
+subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tracers, partit, mesh)
 
 #if defined(__icepack)
   icepack restart not merged here ! produce a compiler error if USE_ICEPACK=ON; todo: merge icepack restart from 68d8b8b
@@ -163,7 +163,7 @@ subroutine restart(istep, l_read, which_readr, ice, dynamics, tracers, partit, m
   ! this is the main restart subroutine
   ! if l_read   is TRUE the restart file will be read
 
-  integer :: istep
+  integer :: istep, nstart, ntotal
   logical :: l_read
   logical :: is_portable_restart_write, is_raw_restart_write, is_bin_restart_write
   type(t_mesh)  , intent(inout), target :: mesh
@@ -313,7 +313,11 @@ subroutine restart(istep, l_read, which_readr, ice, dynamics, tracers, partit, m
   if(is_portable_restart_write .and. (raw_restart_length_unit /= "off")) then
     is_raw_restart_write = .true. ! always write a raw restart together with the portable restart (unless raw restarts are off)
   else
+#if !defined __ifsinterface
     is_raw_restart_write = is_due(trim(raw_restart_length_unit), raw_restart_length, istep)
+#else
+    is_raw_restart_write = is_due(trim(raw_restart_length_unit), raw_restart_length, istep) .OR. (istep==ntotal)
+#endif
   end if
   
   ! --> should write derived type binary restart: True/False
