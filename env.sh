@@ -17,14 +17,25 @@ else
    BEING_EXECUTED=false
 fi
 
-# if an arg is given and doesn't start with - use it as hostname, arguments with - are passed on to cmake
-if [[ ! -z "$1" ]] && [[ ! "$1" = ^- ]]; then
-   LOGINHOST=$1 # arg exists and doesn't start with -
-   shift # pop the argument as we already stored it
-else
+if [ -n "$BASH_VERSION" ]; then
+   # assume bash
+   SOURCE="${BASH_SOURCE[0]}"
+elif [ -n "$ZSH_VERSION" ]; then
+   # assume zsh
+   SOURCE=${(%):-%N}
+fi
+
+DIR="$( cd "$( dirname "${SOURCE}" )" && pwd )"
+
+# if an arg is given and doesn't start with - use it as hostname, arguments stating with - are passed on later to cmake
+if [[ -z "$1" ]] || [[  "$1" =~ ^- ]]; then
    # no argument given
    LOGINHOST="$(hostname -f)"
+else
+   LOGINHOST=$1 # 1st arg exists and doesn't start with -, meaning it is machine specification
+   shift # pop the argument as we already stored it, remaining arguments are passed to cmake
 fi
+
 
 if [[ $LOGINHOST =~ ^m[A-Za-z0-9]+\.hpc\.dkrz\.de$ ]]; then
    STRATEGY="mistral.dkrz.de"
@@ -60,24 +71,20 @@ elif [[ $LOGINHOST =~ ^cc[a-b]+-login[0-9]+\.ecmwf\.int$ ]]; then
 elif [[ $LOGINHOST =~ ^stco-esl[0-9]+$ ]]; then
    STRATEGY="aleph"
 elif [[ $LOGINHOST =~ ^[A-Za-z0-9]+\.ecmwf\.int$ ]]; then
-STRATEGY="wsecmwf"
+   STRATEGY="wsecmwf"
 elif [[ $LOGINHOST =~ \.bullx$ ]]; then
-STRATEGY="atosecmwf"
+   STRATEGY="atosecmwf"
+elif [[ $LOGINHOST =~ uan[0-9][0-9] ]]; then
+   STRATEGY="lumi"
+elif [[ -d $DIR/env/$LOGINHOST ]]; then # check if directory with LOGINHOST exists in env
+STRATEGY=$LOGINHOST
 else
-   echo "can not determine environment for host: "$LOGINHOST
+   echo "can not determine environment for host: "$LOGINHOST 
+   echo "To quickly add a new environment create a directory $DIR/env/$LOGINHOST with a shell file with instructions to find compiler, dependencies and runtime settings."
    [ $BEING_EXECUTED = true ] && exit 1
    return # if we are being sourced, return from this script here
 fi
 
-if [ -n "$BASH_VERSION" ]; then
-   # assume bash
-   SOURCE="${BASH_SOURCE[0]}"
-elif [ -n "$ZSH_VERSION" ]; then
-   # assume zsh
-   SOURCE=${(%):-%N}
-fi
-
-DIR="$( cd "$( dirname "${SOURCE}" )" && pwd )"
 
 if [ $BEING_EXECUTED = true ]; then
    # file is being executed, why is this here?
@@ -93,5 +100,7 @@ else
        echo "Shell file for ${LOGINHOST} doesnt exist: "$SHELLFILE
        exit 1
    fi
+   echo "Sourcing $(realpath $SHELLFILE) for environment" 
    source $SHELLFILE
+   echo "$(realpath ${SHELLFILE})" > $DIR/bin/current_shell_path
 fi

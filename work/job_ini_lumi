@@ -1,0 +1,31 @@
+#!/bin/bash
+#SBATCH --account=project_462000048 # edit your account
+#SBATCH --job-name=ini
+#SBATCH --partition=debug
+#SBATCH --time=00:30:00
+#SBATCH --ntasks=128            # Number of tasks (MPI) tasks to be launched
+#SBATCH -o fesom2_%x_%j.out
+#SBATCH -e fesom2_%x_%j.out
+
+set -x
+
+ulimit -s unlimited
+
+source ../env/lumi/shell
+
+ln -s ../bin/fesom_ini.x         .           # cp -n ../bin/fvom_ini.x
+cp -n ../config/namelist.config  .
+#cp -n ../config/namelist.forcing .
+#cp -n ../config/namelist.oce     .
+#cp -n ../config/namelist.ice     .
+
+
+#___DETERMINE SLURM JOBID+OUTPUTFILE____________________________________________
+jobid=$(echo $SLURM_JOB_ID | cut -d"." -f1)
+fname="fesom2_${SLURM_JOB_NAME}_${jobid}.out"
+
+#___PUT JOB IN QUEUE____________________________________________________________
+date
+srun --mpi=pmi2 --ntasks=1 ./fesom_ini.x >> ${fname}
+date
+
