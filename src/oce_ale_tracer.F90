@@ -485,69 +485,90 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
     if (Redi) isredi=1._WP
     Ty    =0.0_WP
     Ty1   =0.0_WP
-
+    
     ! solve equation diffusion equation implicite part:
     ! -->   h^(n+0.5)* (T^(n+0.5)-Tstar) = dt*( K_33*d/dz*(T^(n+0.5)-Tstar) + K_33*d/dz*Tstar )
     ! -->   Tnew = T^(n+0.5)-Tstar
     ! -->   h^(n+0.5)* (Tnew) = dt*(K_33*d/dz*Tnew) + K_33*dt*d/dz*Tstar
     ! -->   h^(n+0.5)* (Tnew) = dt*(K_33*d/dz*Tnew) + RHS
     ! -->   solve for T_new
-    ! -->   V_1 (Skalar Volume), A_1 (Area of edge),              .
-    !       no Cavity A1==V1, yes Cavity A1 !=V1                 /I\ nvec_up (+1)
-    !                                                             I
-    !    ----------- zbar_1, A_1                             *----I----*
-    ! Z_1 o T_1, V1                                          |\   I  ./|
-    !    ----------- zbar_2, A_2                             | \   ./  |   Gaus Theorem:
-    ! Z_2 o T_2, V2                                          |  \ /    |    --> Flux form
-    !    ----------- zbar_3, A_3                             |   |     |    --> normal vec outwards facing
-    ! Z_3 o T_3, V3                                          *---|-----*
-    !    ----------- zbar_4                                   \  | I ./
-    !        :                                                 \ | I/
-    !                                                           \|/I
-    !                                                            * I
-    !                                                             \I/
-    !                                                              *  nvec_dwn (-1)
+    ! -->   As_1 (Skalar Area), A_1 (Area of edge),               
+    !       no Cavity A_1==As_1, yes Cavity A1 !=As_1             
+    !                                                             
+    !    ----------- zbar_1, A_1                           nvec_up (+1)  
+    ! Z_1 o T_1, As_1                                       ^ 
+    !    ----------- zbar_2, A_2                       _____|_____    Gaus Theorem:
+    ! Z_2 o T_2, As_2                                 /|    |    |\    --> Flux form
+    !    ----------- zbar_3, A_3                     * |    |    | *   --> normal vec outwards facing
+    ! Z_3 o T_3, As_3                                |\___________/|        
+    !    ----------- zbar_4                          | |         | |         
+    !        :                                       | |_________| |          
+    !                                                |/           \|           
+    !                                                *      |      *            
+    !                                                 \_____|_____/
+    !                                                       |
+    !                                                       V nvec_dwn (-1)            
+    !                                                           
     ! --> 1st. solve homogenouse part:
-    ! f(Tnew) = h^(n+0.5)* (Tnew) - dt*(K_33*dTnew/dz) = 0
+    !     f(Tnew) = h^(n+0.5)* (Tnew) - dt*(K_33*dTnew/dz) = 0
     !
     ! --> 2nd. Difference Quotient at Tnew_i in flux form (Gaus Theorem, dont forget normal vectors!!!):
-    ! V_i*Tnew_i *h_i = -dt * [ K_33 * (Tnew_i-1 - Tnew_i)/(Z_i-1 - Z_i) * A_i * nvec_up
-    !                          +K_33 * (Tnew_i - Tnew_i+1)/(Z_i - Z_i+1) * A_i+1 * nvec_dwn ]
-    !     Tnew_i *h_i = -dt * [ K_33 * (Tnew_i-1 - Tnew_i)/(Z_i-1 - Z_i) * A_i  /V_i * nvec_up
-    !                          +K_33 * (Tnew_i - Tnew_i+1)/(Z_i - Z_i+1) * A_i+1/V_i * nvec_dwn ]
+    !        |
+    !        +-> Gauss THeorem: int(V', div(F_vec))dV = intcircle(A', F_vec*n_vec)dA
+    !        |
+    !        +-> du                     = dt*( K_33*d/dz*dTnew )  | *div()_z=d/dz, *int(V',)dV
+    !        |   int(V', d/dz *du)dV    = int(V', d/dz *dt*( K_33*d/dz*dTnew ) )dV
+    !        |   ...                    = intcircle(A', dt*( K_33*d/dz*dTnew )*n_vec)dA   
+    !        |   int(V', d/dz *du)dz*dA = ...
+    !        |   int(A', du)dA          = intcircle(A', dt*( K_33*d/dz*dTnew )*n_vec)dA
+    !        |   
+    !        +-> As_i area of scalar cell = A_i, A_i+1 area of top 
+    !        |   and bottom face of scalar cell 
+    !        V
+    !
+    !    As_i*Tnew_i *h_i = dt * [ K_33 * (Tnew_i-1 - Tnew_i  )/(Z_i-1 - Z_i  ) * A_i   * nvec_up(+1)
+    !                              +K_33 * (Tnew_i   - Tnew_i+1)/(Z_i   - Z_i+1) * A_i+1 * nvec_dwn(-1) ]
+    !    Tnew_i *h_i      = dt * [ K_33 * (Tnew_i-1 - Tnew_i  )/(Z_i-1 - Z_i  ) * A_i  /As_i * nvec_up(+1)
+    !                              +K_33 * (Tnew_i   - Tnew_i+1)/(Z_i   - Z_i+1) * A_i+1/As_i * nvec_dwn(-1) ]
+    !        |
+    !        +-> since we are on scalar cell As_i != A_i != A_i+1 
+    !        +-> take into account normal vector direction
+    !        V
+    !    f(Tnew) = Tnew_i*h_i - dt*K_33 * (Tnew_i-1 - Tnew_i  )/(Z_i-1 - Z_i  ) * A_i  /As_i 
+    !                         + dt*K_33 * (Tnew_i   - Tnew_i+1)/(Z_i   - Z_i+1) * A_i+1/As_i
+    !            = 0
     !
     ! --> 3rd. solve for coefficents a, b, c:
-    ! f(Tnew) = [ a*dTnew_i-1 + b*dTnew_i + c*dTnew_i+1 ]
-    !
-    !     df(Tnew)/dTnew_i-1 = a = -dt*K_33/(Z_i-1 - Z_i) * A_i/V_i * (nvec_up =1)
-    !
-    !     df(Tnew)/dTnew_i+1 = c =  dt * K_33 * 1/(Z_i - Z_i+1) * A_i+1/V_i * (nvec_dwn=-1)
-    !                            = -dt * K_33 * 1/(Z_i - Z_i+1) * A_i+1/V_i
-    !
-    !     df(Tnew)/dTnew_i   = b = h_i + dt*K_33/(Z_i-1 - Z_i) * A_i/V_i   * (nvec_up=+1)
-    !                                  - dt*K_33/(Z_i - Z_i+1) * A_i+1/V_i * (nvec_dwn=-1)
-    !                            = h_i + dt*K_33/(Z_i-1 - Z_i) * A_i/V_i
-    !                                  + dt*K_33/(Z_i - Z_i+1) * A_i+1/V_i
-    !                            = h_i -(a+c)
+    !     f(Tnew) = [ a*dTnew_i-1 + b*dTnew_i + c*dTnew_i+1 ]
+    !        |
+    !        +-> estimate a, b, c by derivation of f(Tnew_i)
+    !        |
+    !        +-> a = df(Tnew)/dTnew_i-1 = -dt*K_33/(Z_i-1 - Z_i) * A_i/As_i
+    !        |
+    !        +-> c = df(Tnew)/dTnew_i+1 = -dt * K_33 * 1/(Z_i - Z_i+1) * A_i+1/As_i
+    !        |
+    !        +-> b = df(Tnew)/dTnew_i   = h_i + dt*K_33/(Z_i-1 - Z_i) * A_i  /As_i
+    !                                          + dt*K_33/(Z_i - Z_i+1) * A_i+1/As_i
+    !                                   = h_i -(a+c)
     !
     ! --> 4th. solve inhomogenous part:
-    ! [ a*dTnew_i-1 + b*dTnew_i + c*dTnew_i+1 ] = RHS/V_i
+    !     [ a*dTnew_i-1 + b*dTnew_i + c*dTnew_i+1 ] = RHS/As_i
     !
-    ! RHS     = K_33*dt*d/dz*Tstar
+    !     RHS     = K_33*dt*d/dz*Tstar
     !
     ! --> write as Difference Quotient in flux form
-    ! RHS/V_i =  K_33 * dt * (Tstar_i-1 - Tstar_i)/(Z_i-1 - Z_i) * A_i/V_i   * (nvec_up=1)
-    !          + K_33 * dt * (Tstar_i - Tstar_i+1)/(Z_i - Z_i+1) * A_i+1/V_i * (nvec_dwn=-1)
+    !     RHS/As_i =  K_33 * dt * (Tstar_i-1 - Tstar_i)/(Z_i-1 - Z_i) * A_i/As_i   * (nvec_up=1)
+    !               + K_33 * dt * (Tstar_i - Tstar_i+1)/(Z_i - Z_i+1) * A_i+1/As_i * (nvec_dwn=-1)
     !
-    !         =  K_33*dt/(Z_i-1 - Z_i) * A_i/V_i   * Tstar_i-1
-    !          - K_33*dt/(Z_i-1 - Z_i) * A_i/V_i   * Tstar_i
-    !          - K_33*dt/(Z_i - Z_i+1) * A_i+1/V_i * Tstar_i
-    !          + K_33*dt/(Z_i - Z_i+1) * A_i+1/V_i * Tstar_i+1
+    !              =  K_33*dt/(Z_i-1 - Z_i) * A_i/As_i   * Tstar_i-1
+    !               - K_33*dt/(Z_i-1 - Z_i) * A_i/As_i   * Tstar_i
+    !               - K_33*dt/(Z_i - Z_i+1) * A_i+1/As_i * Tstar_i
+    !               + K_33*dt/(Z_i - Z_i+1) * A_i+1/As_i * Tstar_i+1
     !
-    !         = -a*Tstar_i-1 + (a+c)*Tstar_i - c * Tstar_i+1
-    !                            |-> b = h_i - (a+c), a+c = h_i-b
+    !              = -a*Tstar_i-1 + (a+c)*Tstar_i - c * Tstar_i+1
+    !              |-> b = h_i - (a+c), a+c = h_i-b
     !
-    !         = -a*Tstar_i-1 - (b-h_i)*Tstar_i - c * Tstar_i+1
+    !              = -a*Tstar_i-1 - (b-h_i)*Tstar_i - c * Tstar_i+1
     !
     ! --> 5th. solve for Tnew_i --> forward sweep algorithm --> see lower
     !  | b_1 c_1 ...            |   |dTnew_1|
@@ -556,12 +577,14 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
     !  |         a_4 b_4 c_4 ...|   |dTnew_4|
     !  |              :         |   |   :   |
     !
-    ! --> a = -dt*K_33 / (Z_i-1 - Z_i) * A_i/V_i
+    ! --> a = -dt*K_33 / (Z_i-1 - Z_i) * A_i/As_i
     !
-    ! --> c = -dt*K_33 / (Z_i - Z_i+1) * A_i+1/V_i
+    ! --> c = -dt*K_33 / (Z_i - Z_i+1) * A_i+1/As_i
     !
-    ! --> b = h^(n+0.5) -[ dt*K_33/(Z_i-1 - Z_i)*A_i/V_i + dt*K_33/(Z_i - Z_i+1) * A_i+1/V_i ] = -(a+c) + h^(n+0.5)
-
+    ! --> b = h^(n+0.5) -[ dt*K_33/(Z_i-1 - Z_i  ) * A_i  /As_i 
+    !                     +dt*K_33/(Z_i   - Z_i+1) * A_i+1/As_i ] 
+    !       = -(a+c) + h^(n+0.5)
+    !
     !___________________________________________________________________________
     ! loop over local nodes
 

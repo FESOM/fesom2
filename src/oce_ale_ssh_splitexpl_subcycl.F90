@@ -497,22 +497,54 @@ end subroutine
 !        V
 !     du * h^(*) = dt*( Av*d/dz*du )|^t_b + dt*( Av*d/dz*u^(n+0.5,*) )|^t_b
 !     du - dt/h^(*)*( Av*d/dz*du ) = dt/h^(*)*( Av*d/dz*u^(n+0.5,*) )   
+! --> solve for du
+!                                                 ^
+!                                                /|\ nvec_up (+1)
+!                                                 |
+!       ----------- zbar_1, A_1              *----|----*
+!   Z_1 o T_1, Ac_1                          |\   |  ./|
+!       ----------- zbar_2, A_2              | \   ./  |   Gaus Theorem:
+!   Z_2 o T_2, Ac_2                          |  \ /    |    --> Flux form
+!       ----------- zbar_3, A_3              |   |     |    --> normal vec outwards facing
+!   Z_3 o T_3, Ac_3                          *---|-----*
+!       ----------- zbar_4                    \  | | ./
+!           :                                  \ | |/
+!                                               \|/|
+!                                                * |
+!                                                  V nvec_dwn (-1)
 !
 ! --> 1st. solve homogenouse part:
 !     f(du) = du - dt/h^(*)*( Av*d/dz*du ) = 0
 !
 ! --> 2nd. compute difference quotient at du_i using Gauss-Theorem --> flux form
-!     V_i * du_i = dt * [ Av_i/h_i * (du_i-1 - du_i)/(Z_i-1 - Z_i) * A_i * nvec_up(+1)  
-!                        +Av_i+1/h_i * (du_i - du_i+1)/(Z_i - Z_i+1) * A_i+1 * nvec_dwn(-1) ] 
-!
-!     f(du_i) = du_i - dt*Av_i/h_i   * (du_i-1 - du_i)/(Z_i-1 - Z_i) * A_i/V_i+1
-!                    + dt*Av_i+1/h_i * (du_i - du_i+1)/(Z_i - Z_i+1) * A_i+1/V_i+1 
+!        |
+!        +-> Gauss THeorem: int(V', div(F_vec))dV = intcircle(A', F_vec*n_vec)dA
+!        |
+!        +-> du                     = dt/h^(*)*( Av*d/dz*du )  | *div()_z=d/dz, *int(V',)dV
+!        |   int(V', d/dz *du)dV    = int(V', d/dz *dt/h^(*)*( Av*d/dz*du ) )dV
+!        |   ...                    = intcircle(A', dt/h^(*)*( Av*d/dz*du )*n_vec)dA   
+!        |   int(V', d/dz *du)dz*dA = ...
+!        |   int(A', du)dA          = intcircle(A', dt/h^(*)*( Av*d/dz*du )*n_vec)dA
+!        |   
+!        +-> Ac_i area of vector cell = are of triangle, A_i, A_i+1 area of top 
+!        |   and bottom face
+!        V
+!         
+!     du_i * Ac_i = dt * [ Av_i  /h_i * (du_i-1 - du_i  )/(Z_i-1 - Z_i  ) * A_i   * nvec_up(+1)  
+!                         +Av_i+1/h_i * (du_i   - du_i+1)/(Z_i   - Z_i+1) * A_i+1 * nvec_dwn(-1) ] 
+!        |
+!        +-> since we are on triangles Ac_i = A_i = A_i+1 --> can kick out A_i/Ac_i
+!        |   and A_i+1/Ac_i
+!        +-> take into account normal vector direction
+!        V
+!     f(du_i) = du_i - dt*Av_i  /h_i * (du_i-1 - du_i  )/(Z_i-1 - Z_i  )
+!                    + dt*Av_i+1/h_i * (du_i   - du_i+1)/(Z_i   - Z_i+1)
 !             = 0
 !
 ! --> 3rd. solve for coefficents a, b, c (homogenous part):
 !     f(du_i) = [ a*du_i-1 + b*du_i + c*du_i+1 ]
 !        |
-!        +-> estimate a, b, c by derivation of d(du_i)
+!        +-> estimate a, b, c by derivation of f(du_i)
 !        |
 !        +-> a = d[f(du_i)]/d[du_i-1] = - dt*Av_i/h_i / (Z_i-1 - Z_i) 
 !        |
@@ -522,18 +554,20 @@ end subroutine
 !                                       1 - a - c
 !
 ! --> 4th. solve inhomogenous part:
-!     [ a*du_i-1 + b*du_i + c*du_i+1 ] = RHS/V_i
+!     [ a*du_i-1 + b*du_i + c*du_i+1 ] = RHS/A_i
 !
-!     RHS/V_i = dt* [ Av_i  /h_i * (u^(n+0.5,*)_i-1 - u^(n+0.5,*)_i)/(Z_i-1 - Z_i) * A_i   * nvec_up(+1) 
-!             |      +Av_i+1/h_i * (u^(n+0.5,*)_i - u^(n+0.5,*)_i+1)/(Z_i - Z_i+1) * A_i+1 * nvec_dwn(-1) ]
-!             |  
+!     RHS/A_i = dt* [ Av_i  /h_i * (u^(n+0.5,*)_i-1 - u^(n+0.5,*)_i  )/(Z_i-1 - Z_i  ) * A_i  /A_i * nvec_up(+1) 
+!             |      +Av_i+1/h_i * (u^(n+0.5,*)_i   - u^(n+0.5,*)_i+1)/(Z_i   - Z_i+1) * A_i+1/A_i * nvec_dwn(-1) ]
+!             |
+!             +-> since we are on triangles A_i = A_i+1 --> can kick out A_i
+!             +-> take into account normal vector direction
 !             V
 !             = -a*u^(n+0.5,*)_i-1 + (a+c)*u^(n+0.5,*)_i - c*u^(n+0.5,*)_i+1
 !
 ! --> 5th. solve for du_i --> forward sweep algorithm --> see lower
 !     | b_1 c_1 ...            |   |du_1|
 !     | a_2 b_2 c_2 ...        |   |du_2|
-!     |     a_3 b_3 c_3 ...    | * |du_3| = RHS/V_i
+!     |     a_3 b_3 c_3 ...    | * |du_3| = RHS/A_i
 !     |         a_4 b_4 c_4 ...|   |du_4|
 !     |              :         |   | :  |
 !
