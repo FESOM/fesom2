@@ -218,7 +218,11 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #else
             ! AWI-CM2 outgoing state vectors
             do n=1,myDim_nod2D+eDim_nod2D
-            exchange(n)=tracers%data(1)%values(1, n)                     ! sea surface temperature [°C]
+#if defined(__yac)
+               exchange(n)=tracers%data(1)%values(1, n)+273.15                     ! sea surface temperature [°K]
+#else
+               exchange(n)=tracers%data(1)%values(1, n)                     ! sea surface temperature [°C]
+#endif
             end do
             elseif (i.eq.2) then
             exchange(:) = m_ice(:)                                  ! ice thickness [m]

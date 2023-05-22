@@ -9,7 +9,6 @@ module cpl_yac_driver
   character(len=*), PARAMETER   :: comp_name = "fesom2"
   integer :: comp_id, grid_id, points_id
   integer :: send_field_id(4), recv_field_id(12)
-  real(kind=WP) :: delta
   real(kind=WP), dimension(:,:),   allocatable   :: a2o_fcorr_stat  !flux correction statistics for the output
   integer, parameter         :: nsend = 4
   integer, parameter         :: nrecv = 12
@@ -37,12 +36,47 @@ contains
 
     CALL yac_finit()
     CALL yac_fdef_calendar(YAC_PROLEPTIC_GREGORIAN)
-    CALL yac_fdef_comp(comp_name, comp_id)
     CALL yac_fread_config_yaml ("coupling.yaml")
+    CALL yac_fdef_comp(comp_name, comp_id)
 
     CALL yac_fget_comp_comm(comp_id, localCommunicator)
 
   end subroutine cpl_yac_init
+
+  subroutine compute_midpoint(geo_a, geo_b, mid)
+    implicit none
+
+    REAL(kind=WP), intent(in) :: geo_a(2), geo_b(2)
+    REAL(kind=WP), intent(out) :: mid(2)
+    REAL(kind=WP) :: cos_lat_a, cos_lat_b, x_mid, y_mid, z_mid
+
+    cos_lat_a = cos(geo_a(2))
+    cos_lat_b = cos(geo_b(2))
+    x_mid = 0.5*(cos_lat_a * cos(geo_a(1)) + cos_lat_b * cos(geo_b(1)))
+    y_mid = 0.5*(cos_lat_a * sin(geo_a(1)) + cos_lat_b * sin(geo_b(1)))
+    z_mid = 0.5*(sin(geo_a(2)) + sin(geo_b(2)))
+
+    mid(1) = atan2(y_mid , x_mid)
+    mid(2) = PI/2 - acos(z_mid/sqrt(x_mid*x_mid + y_mid*y_mid + z_mid*z_mid))
+  end subroutine compute_midpoint
+
+  subroutine compute_center(geo_a, geo_b, geo_c, mid)
+    implicit none
+
+    REAL(kind=WP), intent(in) :: geo_a(2), geo_b(2), geo_c(2)
+    REAL(kind=WP), intent(out) :: mid(2)
+    REAL(kind=WP) :: cos_lat_a, cos_lat_b, cos_lat_c, x_mid, y_mid, z_mid
+
+    cos_lat_a = cos(geo_a(2))
+    cos_lat_b = cos(geo_b(2))
+    cos_lat_c= cos(geo_c(2))
+    x_mid = (cos_lat_a * cos(geo_a(1)) + cos_lat_b * cos(geo_b(1)) + cos_lat_c * cos(geo_c(1))) / 3.
+    y_mid = (cos_lat_a * sin(geo_a(1)) + cos_lat_b * sin(geo_b(1)) + cos_lat_c * sin(geo_c(1)) ) / 3.
+    z_mid = (sin(geo_a(2)) + sin(geo_b(2)) + sin(geo_c(2))) /3.
+
+    mid(1) = atan2(y_mid , x_mid)
+    mid(2) = PI/2 - acos(z_mid/sqrt(x_mid*x_mid + y_mid*y_mid + z_mid*z_mid))
+  end subroutine compute_center
 
   subroutine cpl_yac_define_unstr(partit, mesh)
     use mod_mesh
@@ -56,6 +90,7 @@ contains
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
     real(kind=WP), allocatable :: x_vertices(:), y_vertices(:)
+    real(kind=WP) :: mid(2)
     integer, allocatable :: nbr_vertices_per_cell(:), cell_to_vertex(:)
     integer :: ierr, i, j, k, nbr_vertices, nbr_boundary_nodes, nbr_connections, vtx_idx, c2v_idx
     integer :: curr_elem, curr_edge
@@ -94,18 +129,17 @@ contains
     ! compute vertices
     ! 1 element centers
     DO i=1,myDim_elem2D
-       x_vertices(i) = geo_coord_nod2D(1,elem2D_nodes(1, i))
-       y_vertices(i) = (1./3.)*SUM(geo_coord_nod2D(2,elem2D_nodes(1:3, i)))
-       DO j=2,3
-          delta = geo_coord_nod2D(1,elem2D_nodes(j, i)) - geo_coord_nod2D(1,elem2D_nodes(1, i))
-          x_vertices(i) = x_vertices(i) + (1./3.)*(MODULO(delta + pi, 2*pi) - pi)
-       END DO
+       CALL compute_center(geo_coord_nod2D(1:2,elem2D_nodes(1, i)), &
+            geo_coord_nod2D(1:2,elem2D_nodes(2, i)), &
+            geo_coord_nod2D(1:2,elem2D_nodes(3, i)), mid)
+       x_vertices(i) = mid(1)
+       y_vertices(i) = mid(2)
     END DO
     ! 2 edges midpoints
     DO i=1,myDim_edge2D
-       delta = geo_coord_nod2D(1,edges(2,i)) - geo_coord_nod2D(1,edges(1,i))
-       x_vertices(myDim_elem2D + i) = geo_coord_nod2D(1,edges(1,i)) + 0.5*(MODULO(delta + pi, 2*pi) - pi)
-       y_vertices(myDim_elem2D + i) = 0.5*(geo_coord_nod2D(2,edges(1,i)) + geo_coord_nod2D(2,edges(2,i)))
+       CALL compute_midpoint(geo_coord_nod2D(1:2,edges(1,i)), geo_coord_nod2D(1:2,edges(2,i)), mid)
+       x_vertices(myDim_elem2D + i) = mid(1)
+       y_vertices(myDim_elem2D + i) = mid(2)
     END DO
     ! 3 boundary nodes -> are added on the fly when the cells are computed
 
@@ -138,6 +172,10 @@ contains
        END IF
 
        DO j=1,nod_in_elem2D_num(i)
+          IF (curr_elem == 0) THEN
+             WRITE (0,*) "Error: cells with two or more coast lines are currently not supported by the yac setup code"
+             STOP
+          ENDIF
           ! add the midpoint of curr_edge
           c2v_idx = c2v_idx + 1
           cell_to_vertex(c2v_idx) = myDim_elem2D + curr_edge
@@ -169,8 +207,6 @@ contains
           cell_to_vertex(c2v_idx) = myDim_elem2D + curr_edge
        END IF
     END DO
-
-    WRITE (0,*) "c2v_idx: ", c2v_idx
 
     CALL yac_fdef_grid_nonuniform_r8( &
          "fesom_grid", & ! grid_name
@@ -234,8 +270,9 @@ contains
     type(t_partit), intent(in)     :: partit
     real(kind=WP),  intent(IN)     :: data_array(partit%myDim_nod2D+partit%eDim_nod2D)
     integer :: info, ierr
-    
-    call yac_fput(send_field_id(1), SIZE(data_array), 1, 1, RESHAPE(data_array, [1, 1, SIZE(data_array)]), info, ierr)
+
+    call yac_fput(send_field_id(ind), partit%myDim_nod2D, 1, 1, &
+         RESHAPE(data_array(1:partit%myDim_nod2D), [1, 1, partit%myDim_nod2D]), info, ierr)
     action = info .eq. YAC_ACTION_COUPLING
   end subroutine cpl_yac_send
 
@@ -246,14 +283,14 @@ contains
 
     integer, intent( IN )  :: ind       ! variable Id
     logical, intent( OUT ) :: action    ! 
-    real(kind=WP), intent( OUT ), TARGET    :: data_array(:)
-    type(t_partit), intent(inout), target :: partit
+    type(t_partit), intent(in) :: partit
+    real(kind=WP), intent( OUT ), TARGET    :: data_array(partit%myDim_nod2D+partit%eDim_nod2D)
     integer :: info, ierr
     type(yac_r8_ptr) :: recv_field(1)
 
-    recv_field(1)%p => data_array
+    recv_field(1)%p => data_array(1:partit%myDim_nod2D)
 
-    call yac_fget(send_field_id(1), 1, &
+    call yac_fget(recv_field_id(ind), 1, &
          recv_field, info, ierr)
     action = info .eq. YAC_ACTION_COUPLING
     
