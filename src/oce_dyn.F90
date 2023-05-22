@@ -296,6 +296,7 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
     END DO
 !$OMP END PARALLEL DO
 
+    !___________________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, nz, ed, el, nelem, k, elem, nzmin, nzmax, update_u, update_v)
 !$OMP DO
     DO ed=1, myDim_edge2D+eDim_edge2D
@@ -334,14 +335,16 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
 #endif
     END DO
 !$OMP END DO
+
+    !___________________________________________________________________________
 !$OMP MASTER
     call exchange_elem(U_b, partit)
     call exchange_elem(V_b, partit)
 !$OMP END MASTER
 !$OMP BARRIER
-    ! ===========
-    ! Compute smoothed viscous term: 
-    ! ===========
+    
+    !___________________________________________________________________________
+    ! Compute smoothed viscous term, smoth from elements to nodes
 !$OMP DO
     DO ed=1, myDim_nod2D 
         nzmin = ulevels_nod2D(ed)
@@ -361,19 +364,35 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
         END DO
     END DO
 !$OMP END DO
+
+    !___________________________________________________________________________
 !$OMP MASTER
     call exchange_nod(U_c, V_c, partit)
 !$OMP END MASTER
 !$OMP BARRIER
+
+    !___________________________________________________________________________
+    ! smooth from nodes back to elements, take unsmooth viscos term minus 
+    ! smoothed viscos term multiplied backscatter parameter
 !$OMP DO
     do ed=1, myDim_elem2D
         nelem=elem2D_nodes(:,ed)
         nzmin = ulevels(ed)
         nzmax = nlevels(ed)
-        Do nz=nzmin, nzmax-1
-            UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+U_b(nz,ed) -dynamics%visc_easybsreturn*sum(U_c(nz,nelem))/3.0_WP
-            UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+V_b(nz,ed) -dynamics%visc_easybsreturn*sum(V_c(nz,nelem))/3.0_WP
-        END DO
+        !_______________________________________________________________________
+        if (dynamics%use_ssh_splitexpl_subcycl) then
+            !SD Approximate update for transports. We do not care about accuracy 
+            !SD here. --> of course, helem will be better.
+            Do nz=nzmin, nzmax-1
+                UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+(U_b(nz,ed) -dynamics%visc_easybsreturn*sum(U_c(nz,nelem))/3.0_WP)*(zbar(nz)-zbar(nz+1)) 
+                UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+(V_b(nz,ed) -dynamics%visc_easybsreturn*sum(V_c(nz,nelem))/3.0_WP)*(zbar(nz)-zbar(nz+1)) 
+            END DO
+        else
+            Do nz=nzmin, nzmax-1
+                UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+U_b(nz,ed) -dynamics%visc_easybsreturn*sum(U_c(nz,nelem))/3.0_WP
+                UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+V_b(nz,ed) -dynamics%visc_easybsreturn*sum(V_c(nz,nelem))/3.0_WP
+            END DO
+        end if
     end do
 !$OMP END DO
 !$OMP END PARALLEL
