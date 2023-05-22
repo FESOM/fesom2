@@ -34,6 +34,10 @@ use icedrv_main,          only: set_icepack, init_icepack, alloc_icepack
 use cpl_driver
 #endif
 
+#if defined (__hecubaio)
+use mod_hecuba
+#endif
+
 IMPLICIT NONE
 
 integer :: n, nsteps, offset, row, i, provided

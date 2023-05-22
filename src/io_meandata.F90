@@ -706,6 +706,10 @@ subroutine write_mean(entry, entry_index)
   use mod_mesh
   use g_PARSUP
   use io_gather_module
+#if defined (__hecubaio)
+  use mod_hecuba
+  use iso_c_binding ! todo:use only what is used
+#endif
   implicit none
   type(Meandata), intent(inout) :: entry
   integer, intent(in) :: entry_index
@@ -735,6 +739,11 @@ subroutine write_mean(entry, entry_index)
 #endif
        if(.not. entry%is_elem_based) then
          call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
+         ! hecuba IO
+#if defined (__hecubaio)
+         WRITE (*,*), 
+         call write_array(trim(entry%name)//C_NULL_CHAR, entry%ctime_copy, entry%mype_workaround, entry%ptr3, myDim_nod2D) 
+#endif
        else
          call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
        end if
@@ -839,6 +848,11 @@ subroutine output(istep, mesh)
      call init_io_gather()
 #if defined (__icepack)
      call init_io_icepack(mesh)
+#endif
+
+#if defined (__hecubaio)
+     call fhecuba_start_session()
+     !stop /testing
 #endif
   end if
 

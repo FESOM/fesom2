@@ -17,8 +17,8 @@ COPT = -O3 -march=native -funroll-loops -DLINUX -DUNDER_ -DMPI2 -Iinclude
 CPP_DEFS = -DDISABLE_MULTITHREADING
 
 # NetCDF library and include definitions
-NCFDIR   = /global/AWIsoft/netcdf/4.6.1_gnu
-NC_LIB   = -L$(NCFDIR)/lib -Wl,-rpath,$(NCFDIR)/lib -lnetcdff
+NCFDIR   = /home/suvarchal/Software/netcdf-4.4-for-met
+NC_LIB   = -L$(NCFDIR)/lib64 -Wl,-rpath,$(NCFDIR)/lib64 -lnetcdff
 NC_INC   = -I$(NCFDIR)/include
 
 # Definitions for MPI, if not set by compiler wrappers

@@ -40,6 +40,14 @@ endif()
 #list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_partition_init.F90)
 file(GLOB sources_C ${src_home}/*.c)
 
+if(${USE_HECUBAIO})
+  message("USING HECUBAIO")
+  add_subdirectory(${src_home}/io_hecuba)
+  list(APPEND sources_Fortran ${src_home}/io_hecuba/mod_hecuba.F90)
+  # or optionally use glob * above
+
+endif()
+
 # generate a custom file from fesom_version_info.F90 which includes the current git SHA
 set(FESOM_ORIGINAL_VERSION_FILE ${src_home}/fesom_version_info.F90)
 set(FESOM_GENERATED_VERSION_FILE ${CMAKE_CURRENT_BINARY_DIR}/fesom_version_info-generated.F90)
@@ -86,6 +94,13 @@ endif()
 if(${USE_ICEPACK})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __icepack)
 endif()
+
+if(${USE_HECUBAIO})
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __hecubaio)
+   #target_link_directories(${PROJECT_NAME} PRIVATE "$ENV{HECUBA_ROOT}/lib")
+   target_link_libraries(${PROJECT_NAME} io_hecuba)
+endif()
+
 if(${VERBOSE})
    target_compile_definitions(${PROJECT_NAME} PRIVATE VERBOSE)
 endif()
