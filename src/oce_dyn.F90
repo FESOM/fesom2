@@ -568,7 +568,7 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
        V_c(:, elem) = 0.0_WP
     END DO
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, ed, el, nz, nzmin, nzmax)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, ed, el, nz, nzmin, nzmax, update_u, update_v)
 !$OMP DO
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
