@@ -65,15 +65,15 @@ TYPE T_DYN
     !___arrays for split explicite ssh computation______________________________
     ! se_uvh...transport velocity, 
     real(kind=WP), allocatable, dimension(:,:,:):: se_uvh 
-    !se_uv_rhs...vertical integral of transport velocity rhs, se_uvh_BT4AB...
+    !se_uv_rhs...vertical integral of transport velocity rhs, se_uvhBT_4AB...
     ! barotropic transport velocities (vertically integrated), contains actual 
     ! timestep (1:2) and previous timestep (3:4) for adams-bashfort interpolation
-    real(kind=WP), allocatable, dimension(:,:)  :: se_uvh_rhs, se_uvh_BT4AB 
+    real(kind=WP), allocatable, dimension(:,:)  :: se_uvhBC_rhs, se_uvhBT_4AB 
     
     ! se_uvBT...barotropic trnasport velocities from barotropic time stepping
     ! se_uvBT_theta...velocities for dissipative time stepping of thickness equation
     ! UBTmean_mean... Mean BT velocity to trim 3D velocity in tracers
-    real(kind=WP), allocatable, dimension(:,:)  :: se_uvBT, se_uvBT_theta, se_uvBT_mean 
+    real(kind=WP), allocatable, dimension(:,:)  :: se_uvBT, se_uvBT_theta, se_uvBT_mean, se_uvBT_12 
     
     !___________________________________________________________________________
     ! summarizes solver input parameter
@@ -276,11 +276,12 @@ subroutine WRITE_T_DYN(dynamics, unit, iostat, iomsg)
     end if
     if (dynamics%use_ssh_splitexpl_subcycl) then
         call write_bin_array(dynamics%se_uvh       , unit, iostat, iomsg)
-        call write_bin_array(dynamics%se_uvh_rhs   , unit, iostat, iomsg)
-        call write_bin_array(dynamics%se_uvh_BT4AB , unit, iostat, iomsg)
+        call write_bin_array(dynamics%se_uvhBC_rhs , unit, iostat, iomsg)
+        call write_bin_array(dynamics%se_uvhBT_4AB , unit, iostat, iomsg)
         call write_bin_array(dynamics%se_uvBT      , unit, iostat, iomsg)
         call write_bin_array(dynamics%se_uvBT_theta, unit, iostat, iomsg)
         call write_bin_array(dynamics%se_uvBT_mean , unit, iostat, iomsg)
+        call write_bin_array(dynamics%se_uvBT_12 , unit, iostat, iomsg)
     end if 
 
 
@@ -331,11 +332,12 @@ subroutine READ_T_DYN(dynamics, unit, iostat, iomsg)
     end if
     if (dynamics%use_ssh_splitexpl_subcycl) then
         call read_bin_array(dynamics%se_uvh       , unit, iostat, iomsg)
-        call read_bin_array(dynamics%se_uvh_rhs   , unit, iostat, iomsg)
-        call read_bin_array(dynamics%se_uvh_BT4AB , unit, iostat, iomsg)
+        call read_bin_array(dynamics%se_uvhBC_rhs , unit, iostat, iomsg)
+        call read_bin_array(dynamics%se_uvhBT_4AB , unit, iostat, iomsg)
         call read_bin_array(dynamics%se_uvBT      , unit, iostat, iomsg)
         call read_bin_array(dynamics%se_uvBT_theta, unit, iostat, iomsg)
         call read_bin_array(dynamics%se_uvBT_mean , unit, iostat, iomsg)
+        call read_bin_array(dynamics%se_uvBT_12 , unit, iostat, iomsg)
     end if 
 
 end subroutine READ_T_DYN

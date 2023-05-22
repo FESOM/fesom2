@@ -478,12 +478,20 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     !!PS     dynamics%ssh_rhs_old= 0.0_WP   
     
     if (dynamics%use_ssh_splitexpl_subcycl) then
-        allocate(dynamics%se_uvh(      2, nl-1, elem_size))
-        allocate(dynamics%se_uvh_rhs(  2,       elem_size))
-        allocate(dynamics%se_uvh_BT4AB(4,       elem_size))
+        allocate(dynamics%se_uvh(       2, nl-1, elem_size))
+        allocate(dynamics%se_uvhBC_rhs( 2,       elem_size))
+        allocate(dynamics%se_uvhBT_4AB( 4,       elem_size))
+        allocate(dynamics%se_uvBT(      2,       elem_size))
+        allocate(dynamics%se_uvBT_theta(2,       elem_size))
+        allocate(dynamics%se_uvBT_mean( 2,       elem_size))
+        allocate(dynamics%se_uvBT_12(   2,       elem_size))
         dynamics%se_uvh         = 0.0_WP
-        dynamics%se_uvh_rhs     = 0.0_WP
-        dynamics%se_uvh_BT4AB   = 0.0_WP
+        dynamics%se_uvhBC_rhs   = 0.0_WP
+        dynamics%se_uvhBT_4AB   = 0.0_WP
+        dynamics%se_uvBT        = 0.0_WP
+        dynamics%se_uvBT_theta  = 0.0_WP
+        dynamics%se_uvBT_mean   = 0.0_WP
+        dynamics%se_uvBT_12     = 0.0_WP
     else
         allocate(dynamics%d_eta(      node_size))
         allocate(dynamics%ssh_rhs(    node_size))
