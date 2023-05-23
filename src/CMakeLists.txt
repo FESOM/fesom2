@@ -96,6 +96,8 @@ if(${USE_ICEPACK})
 endif()
 
 if(${USE_HECUBAIO})
+   message("Setting path to Hecuba includes for Marenostrum IV platform")
+   set( HECUBA_ROOT "/apps/HECUBA/2.0" )
    target_compile_definitions(${PROJECT_NAME} PRIVATE __hecubaio)
    #target_link_directories(${PROJECT_NAME} PRIVATE "$ENV{HECUBA_ROOT}/lib")
    target_link_libraries(${PROJECT_NAME} io_hecuba)

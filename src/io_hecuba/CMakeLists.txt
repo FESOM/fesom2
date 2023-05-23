@@ -7,7 +7,10 @@ file(GLOB sources_CXX ${CMAKE_CURRENT_LIST_DIR}/*.cpp)
 
 add_library(${PROJECT_NAME} SHARED ${sources_CXX})
 
-set(HECUBA_ROOT $ENV{HECUBA_ROOT})
+message("Setting path to Hecuba includes for Marenostrum IV platform")
+set( HECUBA_ROOT "/apps/HECUBA/2.0" )
+
+# set(HECUBA_ROOT $ENV{HECUBA_ROOT})
 # TODO: check if HECUBA_ROOT exists if not atleast raise
 
 message("HECUBA ROOT is ${HECUBA_ROOT}")
