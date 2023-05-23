@@ -10,9 +10,10 @@ module cpl_yac_driver
   integer :: comp_id, grid_id, points_id
   integer :: send_field_id(4), recv_field_id(12)
   real(kind=WP), dimension(:,:),   allocatable   :: a2o_fcorr_stat  !flux correction statistics for the output
-  integer, parameter         :: nsend = 4
-  integer, parameter         :: nrecv = 12
-  character(len=32)          :: cpl_send(4), cpl_recv(12)
+  integer, parameter         :: nsend = 2
+  integer, parameter         :: nrecv = 5
+  character(len=32)          :: cpl_send(nsend), cpl_recv(nrecv)
+  integer                    :: cpl_send_collection_size(nsend), cpl_recv_collection_size(nrecv)
   integer                    :: source_root, target_root   !this root/source in MPI_COMM_WORLD
   logical                    :: commRank       ! true for ranks doing YAC communication
 
@@ -107,8 +108,10 @@ contains
     node_is_boundary = .FALSE.
     DO i=1,myDim_edge2D
        IF (myList_edge2D(i) > edge2D_in) THEN
-          node_is_boundary(edges(1,i)) = .TRUE.
-          node_is_boundary(edges(2,i)) = .TRUE.
+          IF (edges(1,i) <= myDim_nod2D) &
+               node_is_boundary(edges(1,i)) = .TRUE.
+          IF (edges(2,i) <= myDim_nod2D) &
+               node_is_boundary(edges(2,i)) = .TRUE.
        END IF
     END DO
     nbr_boundary_nodes = COUNT(node_is_boundary)
@@ -227,31 +230,30 @@ contains
          points_id)
 
     cpl_send( 1)='sst_feom' ! 1. sea surface temperature [°C]      ->
-    cpl_send( 2)='sit_feom' ! 2. sea ice thickness [m]             ->
-    cpl_send( 3)='sie_feom' ! 3. sea ice extent [%-100]            ->
-    cpl_send( 4)='snt_feom' ! 4. snow thickness [m]                ->
+    cpl_send_collection_size(1) = 1
+    cpl_send( 2)='ocean_sea_ice_bundle'
+    cpl_send_collection_size(2) = 3
 
     WRITE (dt_str, '(I4)') int(dt)
-    DO i=1,SIZE(cpl_send)
-       CALL yac_fdef_field(cpl_send(i), comp_id, [points_id], 1, 1, &
+    DO i=1,nsend
+       CALL yac_fdef_field(cpl_send(i), comp_id, [points_id], 1, &
+            cpl_send_collection_size(i), &
             dt_str, YAC_TIME_UNIT_SECOND, send_field_id(i))
     END DO
 
-    cpl_recv(1)  = 'taux_oce'
-    cpl_recv(2)  = 'tauy_oce'
-    cpl_recv(3)  = 'taux_ico'
-    cpl_recv(4)  = 'tauy_ico'    
-    cpl_recv(5)  = 'prec_oce'
-    cpl_recv(6)  = 'snow_oce'    
-    cpl_recv(7)  = 'evap_oce'
-    cpl_recv(8)  = 'subl_oce'
-    cpl_recv(9)  = 'heat_oce'
-    cpl_recv(10) = 'heat_ico'
-    cpl_recv(11) = 'heat_swo'    
-    cpl_recv(12) = 'hydr_oce'
+    cpl_recv(1)  = 'taux'
+    cpl_recv_collection_size(1) = 2
+    cpl_recv(2)  = 'tauy'
+    cpl_recv_collection_size(2) = 2
+    cpl_recv(3)  = 'surface_fresh_water_flux'
+    cpl_recv_collection_size(3) = 3
+    cpl_recv(4) = 'total_heat_flux'
+    cpl_recv_collection_size(4) = 4
+    cpl_recv(5) = 'atmosphere_sea_ice_bundle'
+    cpl_recv_collection_size(5) = 2
 
-    DO i=1,SIZE(cpl_recv)
-       CALL yac_fdef_field(cpl_recv(i), comp_id, [points_id], 1, 1, &
+    DO i=1,nrecv
+       CALL yac_fdef_field(cpl_recv(i), comp_id, [points_id], 1, cpl_recv_collection_size(i), &
             dt_str, YAC_TIME_UNIT_SECOND, recv_field_id(i))
     END DO
 
@@ -260,40 +262,30 @@ contains
   end subroutine cpl_yac_define_unstr
 
 
-  subroutine cpl_yac_send(ind, data_array, action, partit)
-    USE MOD_PARTIT
-    
+  subroutine cpl_yac_send(ind, data_array, action)
     implicit none
 
     integer, intent( IN )          :: ind       ! variable Id
     logical, intent( OUT )         :: action    !
-    type(t_partit), intent(in)     :: partit
-    real(kind=WP),  intent(IN)     :: data_array(partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP),  intent(IN)     :: data_array(:, :)
     integer :: info, ierr
 
-    call yac_fput(send_field_id(ind), partit%myDim_nod2D, 1, 1, &
-         RESHAPE(data_array(1:partit%myDim_nod2D), [1, 1, partit%myDim_nod2D]), info, ierr)
+    call yac_fput(send_field_id(ind), SIZE(data_array, 1), SIZE(data_array, 2), &
+         data_array, info, ierr)
     action = info .eq. YAC_ACTION_COUPLING
   end subroutine cpl_yac_send
 
-  subroutine cpl_yac_recv(ind, data_array, action, partit)
-    USE MOD_PARTIT
-
+  subroutine cpl_yac_recv(ind, data_array, action)
     implicit none
 
     integer, intent( IN )  :: ind       ! variable Id
     logical, intent( OUT ) :: action    ! 
-    type(t_partit), intent(in) :: partit
-    real(kind=WP), intent( OUT ), TARGET    :: data_array(partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent( INOUT )    :: data_array(:,:)
     integer :: info, ierr
-    type(yac_r8_ptr) :: recv_field(1)
 
-    recv_field(1)%p => data_array(1:partit%myDim_nod2D)
-
-    call yac_fget(recv_field_id(ind), 1, &
-         recv_field, info, ierr)
+    call yac_fget(recv_field_id(ind), SIZE(data_array, 1), SIZE(data_array, 2),&
+         data_array, info, ierr)
     action = info .eq. YAC_ACTION_COUPLING
-    
   end subroutine cpl_yac_recv
 
   subroutine cpl_yac_finalize ()
