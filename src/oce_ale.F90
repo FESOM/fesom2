@@ -3194,7 +3194,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     else    
         ! Compute vertical integral of transport velocity rhs omitting the contributions from
         ! the elevation and Coriolis. 
-        call compute_BC_BT_SE_vtransp(dynamics, partit, mesh)
+        call compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
         
         ! Do barotropic step, get eta_{n+1} and BT transport 
         call compute_BT_step_SE_ale(dynamics, partit, mesh)

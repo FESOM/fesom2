@@ -65,10 +65,10 @@ TYPE T_DYN
     !___arrays for split explicite ssh computation______________________________
     ! se_uvh...transport velocity, 
     real(kind=WP), allocatable, dimension(:,:,:):: se_uvh 
-    !se_uv_rhs...vertical integral of transport velocity rhs, se_uvhBT_4AB...
+    !se_uv_rhs...vertical integral of transport velocity rhs, se_uvBT_4AB...
     ! barotropic transport velocities (vertically integrated), contains actual 
     ! timestep (1:2) and previous timestep (3:4) for adams-bashfort interpolation
-    real(kind=WP), allocatable, dimension(:,:)  :: se_uvhBC_rhs, se_uvhBT_4AB 
+    real(kind=WP), allocatable, dimension(:,:)  :: se_uvBT_rhs, se_uvBT_4AB 
     
     ! se_uvBT...barotropic trnasport velocities from barotropic time stepping
     ! se_uvBT_theta...velocities for dissipative time stepping of thickness equation
@@ -276,8 +276,8 @@ subroutine WRITE_T_DYN(dynamics, unit, iostat, iomsg)
     end if
     if (dynamics%use_ssh_splitexpl_subcycl) then
         call write_bin_array(dynamics%se_uvh       , unit, iostat, iomsg)
-        call write_bin_array(dynamics%se_uvhBC_rhs , unit, iostat, iomsg)
-        call write_bin_array(dynamics%se_uvhBT_4AB , unit, iostat, iomsg)
+        call write_bin_array(dynamics%se_uvBT_rhs , unit, iostat, iomsg)
+        call write_bin_array(dynamics%se_uvBT_4AB , unit, iostat, iomsg)
         call write_bin_array(dynamics%se_uvBT      , unit, iostat, iomsg)
         call write_bin_array(dynamics%se_uvBT_theta, unit, iostat, iomsg)
         call write_bin_array(dynamics%se_uvBT_mean , unit, iostat, iomsg)
@@ -332,8 +332,8 @@ subroutine READ_T_DYN(dynamics, unit, iostat, iomsg)
     end if
     if (dynamics%use_ssh_splitexpl_subcycl) then
         call read_bin_array(dynamics%se_uvh       , unit, iostat, iomsg)
-        call read_bin_array(dynamics%se_uvhBC_rhs , unit, iostat, iomsg)
-        call read_bin_array(dynamics%se_uvhBT_4AB , unit, iostat, iomsg)
+        call read_bin_array(dynamics%se_uvBT_rhs , unit, iostat, iomsg)
+        call read_bin_array(dynamics%se_uvBT_4AB , unit, iostat, iomsg)
         call read_bin_array(dynamics%se_uvBT      , unit, iostat, iomsg)
         call read_bin_array(dynamics%se_uvBT_theta, unit, iostat, iomsg)
         call read_bin_array(dynamics%se_uvBT_mean , unit, iostat, iomsg)

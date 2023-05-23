@@ -35,7 +35,7 @@ end module
 !_______________________________________________________________________________
 module compute_ssh_split_explicit_interface
     interface
-        subroutine compute_BC_BT_SE_vtransp(dynamics, partit, mesh)
+        subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
         USE MOD_MESH
         USE MOD_PARTIT
         USE MOD_PARSUP
@@ -739,7 +739,7 @@ end subroutine impl_vert_visc_ale_vtransp
 !SD Compute vertical integral of transport velocity rhs omitting the contributions from
 !SD the elevation and Coriolis. The elevation and Coriolis are accounted for 
 !SD explicitly in BT equations, and should therefore be removed from the vertically integrated rhs.
-subroutine compute_BC_BT_SE_vtransp(dynamics, partit, mesh)
+subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_MESH
@@ -757,15 +757,15 @@ subroutine compute_BC_BT_SE_vtransp(dynamics, partit, mesh)
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV_rhs
     real(kind=WP), dimension(:)    , pointer :: eta_n
-    real(kind=WP), dimension(:,:)  , pointer :: UVhBT_4AB, UVhBC_rhs
+    real(kind=WP), dimension(:,:)  , pointer :: UVBT_4AB, UVBT_rhs
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     eta_n     =>dynamics%eta_n(:)
     UV_rhs    =>dynamics%uv_rhs(:,:,:)
-    UVhBC_rhs =>dynamics%se_uvhBC_rhs(:,:)
-    UVhBT_4AB =>dynamics%se_uvhBT_4AB(:,:)
+    UVBT_rhs  =>dynamics%se_uvBT_rhs(:,:)
+    UVBT_4AB  =>dynamics%se_uvBT_4AB(:,:)
     
     !___________________________________________________________________________
     ab1=(1.5_WP+epsilon)
@@ -791,7 +791,7 @@ subroutine compute_BC_BT_SE_vtransp(dynamics, partit, mesh)
         Fy=g*dt*sum(gradient_sca(5:8,elem)*eta_n(elnodes))
         
         !_______________________________________________________________________
-        ! Sum 3D rhs   
+        ! vertically integrate UV_rhs --> for barotropic equatiobn 
         vert_sum_u=0.0_WP
         vert_sum_v=0.0_WP
         do nz=nzmin, nzmax
@@ -800,31 +800,53 @@ subroutine compute_BC_BT_SE_vtransp(dynamics, partit, mesh)
         end do
         
         !_______________________________________________________________________
-        ! Remove the contribution from the elevation
+        ! Remove the contribution from the elevation will be accounted explicitely 
+        ! for in the barotropic equation
         hh=sum(helem(nzmin:nzmax, elem))
         vert_sum_u=vert_sum_u + Fx*hh
         vert_sum_v=vert_sum_v + Fy*hh
         
         !_______________________________________________________________________
-        ! Remove the contribution from the Coriolis
-        UVhBC_rhs(1, elem)=vert_sum_u - dt*mesh%coriolis(elem)* &
-                                       (ab1*UVhBT_4AB(2,elem)+ab2*UVhBT_4AB(4,elem))         ! for AB-interpolated
-        UVhBC_rhs(2, elem)=vert_sum_v + dt*mesh%coriolis(elem)* &
-                                       (ab1*UVhBT_4AB(1,elem)+ab2*UVhBT_4AB(3,elem))    
+        ! Remove the contribution from the Coriolis  will be accounted explicitely 
+        ! for in the barotropic equation
+        ! UVBT_rhs ... baroclinic forcing term in barotropic equation R_b
+        ! --> d/dt*U_bt + f*e_z x U_bt + g*H* grad(eta) = R_bt
+        UVBT_rhs(1, elem)=vert_sum_u - dt*mesh%coriolis(elem)* &
+                                       (ab1*UVBT_4AB(2,elem)+ab2*UVBT_4AB(4,elem))         ! for AB-interpolated
+        UVBT_rhs(2, elem)=vert_sum_v + dt*mesh%coriolis(elem)* &
+                                       (ab1*UVBT_4AB(1,elem)+ab2*UVBT_4AB(3,elem))    
         
         !_______________________________________________________________________
-        ! save actual of vertical integrated transport velocity UVhBT_4AB(1:2,elem)  
+        ! save actual of vertical integrated transport velocity UVBT_4AB(1:2,elem)  
         ! timestep for next time loop step
-        UVhBT_4AB(3:4,elem)=UVhBT_4AB(1:2,elem)    
+        ! UVBT_4AB ... is U_bt in barotropic equation
+        ! --> d/dt*U_bt + f*e_z x U_bt + g*H*grad_H(eta) = R_bt
+        UVBT_4AB(3:4,elem)=UVBT_4AB(1:2,elem)    
     end do
 !PS !$OMP END DO
 !PS !$OMP END PARALLEL
-end subroutine compute_BC_BT_SE_vtransp
+end subroutine compute_BT_rhs_SE_vtransp
 !
 !
 !_______________________________________________________________________________
-! Barotropic time stepping with Forward-Backward dissipative method
-! (Demange et al. 2019)
+! Barotropic time stepping with Forward-Backward dissipative method 
+! (Demange et al. 2019) is used where eta and U_bt = sum_k(U_k) = sum_k(u_k*h_k) 
+! are estimated from the equations ...
+! --> d/dt*U_bt + f*e_z x U_bt + g*H*grad_H(eta) = R_bt
+! --> d/dt*eta + div_h(U_bt) + FW = 0
+!
+!
+! --> forward-backward dissipative time stepping by Demagne et al. 2019
+! --> equation (6) in T. Banerjee et al.,Split-Explicite external
+!     mode solver in FESOM2, 
+!     
+! Ubt^(n+(m+1)/M) = Ubt^(n+(m)/M) - dt/M*[ 
+!                                  + 0.5*f*e_z x (Ubt^(n+(m+1)/M) + Ubt^(n+(m)/M))
+!                                  - h*H^m*grad_H*eta^((n+m)/M)
+!                                  - Rbt-->UVBT_rhs ] 
+! 
+! eta^(n+(m+1)/M) = eta^(n+(m)/M) - dt/M * div_H * [(1+theta)*Ubt^(n+(m+1)/M) - theta*Ubt^(n+(m)/M)]
+!
 subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -844,13 +866,13 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:)    , pointer :: eta_n
-    real(kind=WP), dimension(:,:)  , pointer :: UVhBC_rhs, UVBT, UVBT_theta, UVBT_mean, UVBT_12
+    real(kind=WP), dimension(:,:)  , pointer :: UVBT_rhs, UVBT, UVBT_theta, UVBT_mean, UVBT_12
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     eta_n     =>dynamics%eta_n(:)
-    UVhBC_rhs =>dynamics%se_uvhBC_rhs(:,:)
+    UVBT_rhs  =>dynamics%se_uvBT_rhs(:,:)
     UVBT      =>dynamics%se_uvBT(:,:)
     UVBT_theta=>dynamics%se_uvBT_theta(:,:)
     UVBT_mean =>dynamics%se_uvBT_mean(:,:)
@@ -877,25 +899,44 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
         ! Advance velocities. I use SI stepping for the Coriolis
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)
-            !PS hh = -zbar(nlevels(elem))+sum(eta_n(elnodes))/3.0_WP 
+            !___________________________________________________________________
+            ! compute term: 
+            ! AAA = - dt/M*[ + 0.5*f*e_z x (Ubt^(n+(m+1)/M) + Ubt^(n+(m)/M))
+            !          - h*H^m*grad_H*eta^((n+m)/M)
+            !          - Rbt-->UVBT_rhs ] 
             hh = -zbar_e_bot(elem)+sum(eta_n(elnodes))/3.0_WP ! Total fluid depth
             f  = mesh%coriolis(elem)
-            rx = dtBT*(-g*hh*sum(gradient_sca(1:3,elem)*eta_n(elnodes)) + f*UVBT(1, elem)) + BT_inv*UVhBC_rhs(1, elem)
-            ry = dtBT*(-g*hh*sum(gradient_sca(4:6,elem)*eta_n(elnodes)) - f*UVBT(2, elem)) + BT_inv*UVhBC_rhs(2, elem)
+            rx = dtBT*(-g*hh*sum(gradient_sca(1:3,elem)*eta_n(elnodes)) + f*UVBT(1, elem)) + BT_inv*UVBT_rhs(1, elem)
+            ry = dtBT*(-g*hh*sum(gradient_sca(4:6,elem)*eta_n(elnodes)) - f*UVBT(2, elem)) + BT_inv*UVBT_rhs(2, elem)
             
             ! Semi-Implicit Coriolis
             a  = dtBT*f*0.5_WP
             d  = 1.0_WP/(1.0_WP+a*a)
             ax = d*(rx+a*ry)
             ay = d*(-a*rx+ry)
-            UVBT(      1, elem) = UVBT(      1, elem) + ax   ! New velocity
-            UVBT(      2, elem) = UVBT(      2, elem) + ay
             
+            !___________________________________________________________________
+            ! compute new velocities Ubt^(n+(m+1)/M) at barotropic time step (n+(m+1)/M) ...
+            ! Ubt^(n+(m+1)/M)   = Ubt^(n+(m)/M) + AAA
+            ! equation (6) in T. Banerjee et al.,Split-Explicite external
+            ! mode solver in FESOM2, 
+            UVBT(      1, elem) = UVBT(1, elem) + ax   
+            UVBT(      2, elem) = UVBT(2, elem) + ay
+            
+            !___________________________________________________________________
             ! velocities for dissipative time stepping of thickness equation
-            UVBT_theta(1, elem) = UVBT_theta(1, elem) + thetaBT*ax   ! New vel*(1+thetaBT)-old vel *thetaBT
-            UVBT_theta(2, elem) = UVBT_theta(2, elem) + thetaBT*ay
+            ! compute: [(1+theta)*Ubt^(n+(m+1)/M) - theta*Ubt^(n+(m)/M)] by ...
+            ! 
+            ! --> AAA = Ubt^(n+(m+1)/M) - Ubt^(n+(m)/M)    | *theta
+            !     AAA * theta = (Ubt^(n+(m+1)/M) - Ubt^(n+(m)/M) )*theta
+            ! --> Ubt^(n+(m+1)/M) + AAA*theta = Ubt^(n+(m+1)/M) + (Ubt^(n+(m+1)/M) - Ubt^(n+(m)/M) )*theta
+            !     (1+theta)*Ubt^(n+(m+1)/M) + theta*Ubt^(n+(m)/M)
+            UVBT_theta(1, elem) = UVBT(1, elem) + thetaBT*ax   ! New vel*(1+thetaBT)-old vel *thetaBT
+            UVBT_theta(2, elem) = UVBT(2, elem) + thetaBT*ay
             
-            ! Mean BT velocity to trim 3D velocity in tracers
+            !___________________________________________________________________
+            ! Mean BT velocity to trim 3D velocity in tracers, equation (10) in 
+            ! T. Banerjee et al.,Split-Explicite external mode solver in FESOM2, 
             UVBT_mean( 1, elem) = UVBT_mean( 1, elem) + UVBT_theta(1, elem)*BT_inv
             UVBT_mean( 2, elem) = UVBT_mean( 2, elem) + UVBT_theta(2, elem)*BT_inv
         end do
@@ -908,12 +949,16 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
         
         !_______________________________________________________________________
         ! Advance thickness
+        ! compute: dt/M * div_H * [(1+theta)*Ubt^(n+(m+1)/M) - theta*Ubt^(n+(m)/M)]
+        ! and advance ssh --> eta^(n+(m+1)/M) = eta^(n+(m)/M) - dt/M * div_H * [...]
         do edge=1, myDim_edge2D
             ednodes = edges(:,edge)
             edelem  = edge_tri(:,edge)
+            
+            !___________________________________________________________________
+            ! compute divergence div_H * [(1+theta)*Ubt^(n+(m+1)/M) - theta*Ubt^(n+(m)/M)]
             deltaX1 = edge_cross_dxdy(1,edge)
             deltaY1 = edge_cross_dxdy(2,edge)
-            
             c1 = UVBT_theta(2, edelem(1))*deltaX1 - UVBT_theta(1, edelem(1))*deltaY1
             c2 = 0.0_WP
             if(edelem(2)>0) then
@@ -921,6 +966,11 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
                 deltaY2=edge_cross_dxdy(4,edge)
                 c2=-(UVBT_theta(2, edelem(2))*deltaX2 - UVBT_theta(1, edelem(2))*deltaY2)
             end if
+            
+            !___________________________________________________________________
+            ! advance ssh --> eta^(n+(m+1)/M) = eta^(n+(m)/M) - dt/M * div_H * [...]
+            ! equation (6) in T. Banerjee et al.,Split-Explicite external
+            ! mode solver in FESOM2, 
             eta_n(ednodes(1))=eta_n(ednodes(1))+(c1+c2)*dtBT/area(1,ednodes(1))
             eta_n(ednodes(2))=eta_n(ednodes(2))-(c1+c2)*dtBT/area(1,ednodes(2))
         end do
@@ -949,7 +999,7 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
-    integer                               :: i,elem, elnodes(4), nz, m
+    integer                               :: i,elem, elnodes(4), nz, m, nzmin, nzmax
     real(kind=WP)                         :: eta(4), ff
     real(kind=WP)                         :: Fx, Fy, ubar, vbar, hh_inv
     !___________________________________________________________________________
@@ -977,20 +1027,35 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
     ! The trimmed Uh,Vh are consistent with new total height defined by eta_n   
     if (mode==1) then              
         do elem=1, myDim_elem2D
-            ubar=0.0_WP
-            vbar=0.0_WP
-            hh_inv=0.0_WP
-            do nz=1, nlevels(elem)-1
-                ! Update transport velocities
+            ubar   = 0.0_WP
+            vbar   = 0.0_WP
+            hh_inv = 0.0_WP
+            
+            nzmin  = ulevels(elem)
+            nzmax  = nlevels(elem)-1
+            do nz=nzmin, nzmax
+                !_______________________________________________________________
+                ! Update transport velocities: U^(n+1/2,**) = U^(n+1/2,*) + U_rhs
                 UVh(1, nz, elem)=UVh(1, nz, elem)+UV_rhs(1, nz, elem)   
                 UVh(2, nz, elem)=UVh(2, nz, elem)+UV_rhs(2, nz, elem)
+                
+                !_______________________________________________________________
+                ! vertically integrate updated transport velocity: sum(k, U_k^(n+1/2,**) )
                 ubar=ubar+UVh(1, nz, elem)
                 vbar=vbar+UVh(2, nz, elem)
                 hh_inv=hh_inv+helem(nz,elem)
             end do
             
+            !___________________________________________________________________
+            ! finalize horizontal transport by making vertically integrated 
+            ! transport equal to the value obtained from the barotropic solution
+            ! 
+            ! --> equation (11) in T. Banerjee et al.,Split-Explicite external
+            !     mode solver in FESOM2, 
+            ! U_k^(n+1/2) =  U^(n+1/2,**) 
+            !              + [<<Ubar>>^(n+1/2) - sum(k, U_k^(n+1/2,**)] * h_k^(n+1/2)/sum(k,h_k^(n+1/2))
             hh_inv=1.0_WP/hh_inv     ! Postpone AB and 2nd order, just use available thickness
-            DO nz=1, nlevels(elem)-1
+            DO nz=nzmin, nzmax
                 UVh(1, nz, elem)= UVh(1, nz, elem)+(UVBT_mean(1, elem)-ubar)*helem(nz,elem)*hh_inv
                 UVh(2, nz, elem)= UVh(2, nz, elem)+(UVBT_mean(2, elem)-vbar)*helem(nz,elem)*hh_inv
                 UV( 1, nz, elem)= UVh(1, nz, elem)/helem(nz,elem)  ! velocities are still needed    
@@ -1004,17 +1069,20 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
     ! Velocity will be used to advance momentum
     else                         
         do elem=1, myDim_elem2D    
-            ubar=0.0_WP
-            vbar=0.0_WP
-            hh_inv=0.0_WP    
-            do nz=1, nlevels(elem)-1
+            ubar   = 0.0_WP
+            vbar   = 0.0_WP
+            hh_inv = 0.0_WP    
+            
+            nzmin  = ulevels(elem)
+            nzmax  = nlevels(elem)-1
+            do nz=nzmin, nzmax
                 ubar=ubar+UVh(1, nz, elem)
                 vbar=vbar+UVh(2, nz, elem)
                 hh_inv=hh_inv+helem(nz,elem)
             end do
             
             hh_inv=1.0_WP/hh_inv    ! Postpone 2nd order, just use available thickness 
-            do nz=1, nlevels(elem)-1
+            do nz=nzmin, nzmax
                 UVh(1, nz, elem)= UVh(1, nz, elem)+(UVBT_12(1, elem)-ubar)*helem(nz,elem)*hh_inv
                 UVh(2, nz, elem)= UVh(2, nz, elem)+(UVBT_12(2, elem)-vbar)*helem(nz,elem)*hh_inv
                 UV( 1, nz, elem)= UVh(1, nz, elem)/helem(nz,elem)  ! velocities are still needed    

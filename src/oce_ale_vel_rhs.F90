@@ -66,7 +66,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     real(kind=WP), dimension(:)    , pointer :: m_ice, m_snow, a_ice
     real(kind=WP)                  , pointer :: rhoice, rhosno, inv_rhowat
     real(kind=WP), dimension(:,:,:), pointer :: UVh
-    real(kind=WP), dimension(:,:)  , pointer :: UVhBT_4AB
+    real(kind=WP), dimension(:,:)  , pointer :: UVBT_4AB
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -83,8 +83,8 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     
     ! if split-explicite ssh subcycling is used
     if (dynamics%use_ssh_splitexpl_subcycl) then
-        UVh       => dynamics%se_uvh
-        UVhBT_4AB => dynamics%se_uvhBT_4AB
+        UVh      => dynamics%se_uvh
+        UVBT_4AB => dynamics%se_uvBT_4AB
     end if 
     
     !___________________________________________________________________________
@@ -172,7 +172,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
                 UV_rhsAB(2, nz, elem) =-UV(1, nz, elem)*ff! - mm*UV(1,nz,elem)*UV(2,nz,elem)
             end do
         else
-            UVhBT_4AB(1:2,elem) = 0.0_WP
+            UVBT_4AB(1:2,elem) = 0.0_WP
             do nz=nzmin,nzmax-1
                 ! add pressure gradient terms
                 UV_rhs(  1, nz, elem) = UV_rhs(1, nz, elem) + (Fx-pgf_x(nz, elem))*elem_area(elem)*helem(nz,elem)
@@ -184,11 +184,11 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
                 UV_rhsAB(2, nz ,elem) =-UVh(2, nz, elem)*ff! - mm*UV(1,nz,elem)*UVh(2, nz, elem)
                 
                 ! compute barotropic velocity for adams-bashfort time stepping
-                ! UVhBT_4AB(1:2, elem)--> actual timestep, 
-                ! UVhBT_4AB(3:4, elem)--> previous timestep (is setted in 
+                ! UVBT_4AB(1:2, elem)--> actual timestep, 
+                ! UVBT_4AB(3:4, elem)--> previous timestep (is setted in 
                 ! call compute_BC_BT_SE_vtransp) 
-                UVhBT_4AB(1, elem)    = UVhBT_4AB(1, elem) + UVh(1, nz, elem)  ! 
-                UVhBT_4AB(2, elem)    = UVhBT_4AB(2, elem) + UVh(2, nz, elem)  !
+                UVBT_4AB(1, elem)    = UVBT_4AB(1, elem) + UVh(1, nz, elem)  ! 
+                UVBT_4AB(2, elem)    = UVBT_4AB(2, elem) + UVh(2, nz, elem)  !
             end do    
         end if 
         
