@@ -131,8 +131,8 @@ TYPE T_ICE
 
     !___________________________________________________________________________
     ! zonal & merdional ice velocity
-    real(kind=WP), allocatable, dimension(:)    :: uice, uice_rhs, uice_old, uice_aux
-    real(kind=WP), allocatable, dimension(:)    :: vice, vice_rhs, vice_old, vice_aux
+    real(kind=WP), allocatable, dimension(:)    :: uice, uice_rhs, uice_old, uice_aux, uice_ib
+    real(kind=WP), allocatable, dimension(:)    :: vice, vice_rhs, vice_old, vice_aux, vice_ib
     
     ! surface stess atm<-->ice, oce<-->ice
     real(kind=WP), allocatable, dimension(:)    :: stress_atmice_x, stress_iceoce_x
@@ -156,6 +156,13 @@ TYPE T_ICE
 #else
     integer                                     :: num_itracers=3
 #endif 
+    
+    !------------------------------
+    ! LA 2023-01-31 add icebergs
+#if defined(__async_icebergs)
+num_itracers=num_itracers+2
+#endif 
+    !------------------------------
 
     ! put ice tracers data arrays
     type(t_ice_data), allocatable, dimension(:) :: data
@@ -769,7 +776,9 @@ subroutine ice_init(ice, partit, mesh)
     ! to here since namelist.ice is now read in ice_init where whichEVP is not available
     ! when  mesh_auxiliary_arrays is called
     !array of 2D boundary conditions is used in ice_maEVP
-    if (ice%whichEVP > 0) then
+    
+    ! LA 2023-05-24 initiate bc_index_nod2D also for whichEVP==0
+    !if (ice%whichEVP > 0) then
         allocate(mesh%bc_index_nod2D(myDim_nod2D+eDim_nod2D))
         mesh%bc_index_nod2D=1._WP
         do n=1, myDim_edge2D
@@ -777,7 +786,7 @@ subroutine ice_init(ice, partit, mesh)
             if (myList_edge2D(n) <= mesh%edge2D_in) cycle
             mesh%bc_index_nod2D(ed)=0._WP
         end do
-    end if
+    !end if
     
 end subroutine ice_init  
 !

@@ -107,7 +107,13 @@ integer, allocatable, dimension(:,:)          :: nn_pos
 ! Arrays added for ALE implementation:
 ! --> layer thinkness at node and depthlayer for t=n and t=n+1
 real(kind=WP), allocatable,dimension(:,:)   :: hnode, hnode_new, zbar_3d_n, Z_3d_n
+!------------------------------
+! LA 2023-01-31 add icebergs
+!#if defined(__async_icebergs)
+real(kind=WP), allocatable,dimension(:,:)   :: Z_3d_n_ib
+!#endif 
 
+!------------------------------
 ! --> layer thinkness at elements, interpolated from hnode
 real(kind=WP), allocatable,dimension(:,:)   :: helem
 
@@ -134,6 +140,7 @@ real(kind=WP), allocatable,dimension(:)     :: zbar_n_srf
 real(kind=WP), allocatable,dimension(:)     :: zbar_e_srf
 
 character(:), allocatable :: representative_checksum
+
 
 contains
 #if defined(__PGI)
@@ -225,6 +232,10 @@ subroutine write_t_mesh(mesh, unit, iostat, iomsg)
     call write_bin_array(mesh%hnode_new,               unit, iostat, iomsg)
     call write_bin_array(mesh%zbar_3d_n,               unit, iostat, iomsg)
     call write_bin_array(mesh%Z_3d_n,                  unit, iostat, iomsg)
+! LA 2023-01-31 add icebergs
+!#if defined(__async_icebergs)
+    call write_bin_array(mesh%Z_3d_n_ib,               unit, iostat, iomsg)
+!#endif 
     call write_bin_array(mesh%helem,                   unit, iostat, iomsg)
     call write_bin_array(mesh%bottom_elem_thickness,   unit, iostat, iomsg)
     call write_bin_array(mesh%bottom_node_thickness,   unit, iostat, iomsg)
@@ -322,6 +333,10 @@ subroutine read_t_mesh(mesh, unit, iostat, iomsg)
     call read_bin_array(mesh%hnode_new,               unit, iostat, iomsg)
     call read_bin_array(mesh%zbar_3d_n,               unit, iostat, iomsg)
     call read_bin_array(mesh%Z_3d_n,                  unit, iostat, iomsg)
+! LA 2023-01-31 add icebergs
+!#if defined(__async_icebergs)
+    call read_bin_array(mesh%Z_3d_n_ib,               unit, iostat, iomsg)
+!#endif 
     call read_bin_array(mesh%helem,                   unit, iostat, iomsg)
     call read_bin_array(mesh%bottom_elem_thickness,   unit, iostat, iomsg)
     call read_bin_array(mesh%bottom_node_thickness,   unit, iostat, iomsg)

@@ -251,7 +251,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     use g_CONFIG
     use o_ARRAYS
     use g_comm_auto
-    use g_forcing_param, only: use_virt_salt
+    use g_forcing_param, only: use_virt_salt,use_landice_water !---fwf-code, add use_landice_water
     use g_forcing_arrays
     use g_support
     use cavity_interfaces
@@ -260,6 +260,9 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
                             init_flux_atm_ocn
 #endif
     use cavity_interfaces
+    !---fwf-code
+    use g_clock 
+    !---fwf-code-end
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(in)   , target :: dynamics
@@ -488,6 +491,26 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
     end if 
     
+!---fwf-code-begin
+    if(use_landice_water) then
+!$OMP PARALLEL DO
+      do n=1, myDim_nod2D+eDim_nod2D
+         water_flux(n)=water_flux(n)-runoff_landice(n)*landice_season(month)
+      end do
+!$OMP END PARALLEL DO
+    end if
+ 
+!    if(lwiso .and. use_landice_water) then
+!!$OMP PARALLEL DO
+!      do n=1, myDim_nod2D+eDim_nod2D
+!         wiso_flux_oce(n,1)=wiso_flux_oce(n,1)+runoff_landice(n)*1000.0*wiso_smow(1)*(1-30.0/1000.0)*landice_season(month)
+!         wiso_flux_oce(n,2)=wiso_flux_oce(n,2)+runoff_landice(n)*1000.0*wiso_smow(2)*(1-240.0/1000.0)*landice_season(month)
+!         wiso_flux_oce(n,3)=wiso_flux_oce(n,3)+runoff_landice(n)*1000.0*landice_season(month)
+!      end do
+!!$OMP END PARALLEL DO
+!    end if
+!---fwf-code-end
+
     !___________________________________________________________________________
     if (use_sw_pene) call cal_shortwave_rad(ice, partit, mesh)
     

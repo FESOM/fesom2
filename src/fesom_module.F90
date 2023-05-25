@@ -30,6 +30,12 @@ module fesom_main_storage_module
   use fesom_version_info_module
   use command_line_options_module
   ! Define icepack module
+
+  ! --------------
+  ! LA icebergs: 2023-05-17 
+  use iceberg_params
+  ! --------------
+
 #if defined (__icepack)
   use icedrv_main,          only: set_icepack, init_icepack, alloc_icepack
 #endif
@@ -44,7 +50,7 @@ module fesom_main_storage_module
 
     integer           :: n, from_nstep, offset, row, i, provided
     integer           :: which_readr ! read which restart files (0=netcdf, 1=core dump,2=dtype)
-    integer, pointer  :: mype, npes, MPIerr, MPI_COMM_FESOM
+    integer, pointer  :: mype, npes, MPIerr, MPI_COMM_FESOM, MPI_COMM_FESOM_IB
     real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
     real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
     real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing 
@@ -124,6 +130,7 @@ contains
         f%mype          =>f%partit%mype
         f%MPIerr        =>f%partit%MPIerr
         f%MPI_COMM_FESOM=>f%partit%MPI_COMM_FESOM
+        f%MPI_COMM_FESOM_IB=>f%partit%MPI_COMM_FESOM_IB
         f%npes          =>f%partit%npes
         if(f%mype==0) then
             write(*,*)
@@ -195,6 +202,13 @@ contains
         call cpl_oasis3mct_define_unstr(f%partit, f%mesh)
         if(f%mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
 #endif
+    
+        ! --------------
+        ! LA icebergs: 2023-05-17 
+        if (use_icebergs) then
+            call allocate_icb(f%partit)
+        endif
+        ! --------------
 
 #if defined (__icepack)
         !=====================
@@ -298,6 +312,15 @@ contains
     ! Time stepping
     !=====================
 
+    ! --------------
+    ! LA icebergs: 2023-05-17 
+    f%MPI_COMM_FESOM_IB = f%MPI_COMM_FESOM
+    if (f%mype==0) then
+!        write (*,*) 'ib_async_mode, initial omp_num_threads ', ib_async_mode, omp_get_num_threads()
+        write (*,*) 'current_nsteps, steps_per_ib_step, icb_outfreq :', current_nsteps, steps_per_ib_step, icb_outfreq
+    end if
+    ! --------------
+
     if (f%mype==0) write(*,*) 'FESOM start iteration before the barrier...'
     call MPI_Barrier(f%MPI_COMM_FESOM, f%MPIERR)
     
@@ -315,6 +338,143 @@ contains
        call foreph_ini(yearnew, month, f%partit)
     end if
     do n=f%from_nstep, f%from_nstep-1+current_nsteps        
+
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        !n_ib         = n
+        u_wind_ib    = u_wind
+        v_wind_ib    = v_wind
+        f%ice%uice_ib     = f%ice%uice
+        f%ice%vice_ib     = f%ice%vice
+        f%ice%data(size(f%ice%data))      = f%ice%data(2)
+        f%ice%data(size(f%ice%data)-1)    = f%ice%data(1)
+
+
+
+! kh 08.03.21 support of different ocean ice and iceberg steps:
+! if steps_per_ib_step is configured greater 1 then UV is modified via call oce_timestep_ale(n) -> call update_vel while
+! the same asynchronous iceberg computation is still active
+        f%dynamics%uv_ib     = f%dynamics%uv
+
+! kh 15.03.21 support of different ocean ice and iceberg steps:
+! if steps_per_ib_step is configured greater 1 then tr_arr is modified via call oce_timestep_ale(n) -> call solve_tracers_ale() while
+! the same asynchronous iceberg computation is still active
+        !tr_arr_ib    = tr_arr
+
+! kh 15.03.21 support of different ocean ice and iceberg steps:
+! if steps_per_ib_step is configured greater 1 then Tsurf and Ssurf might be changed while
+! the same asynchronous iceberg computation is still active
+        Tsurf_ib     = Tsurf
+        Ssurf_ib     = Ssurf
+
+! kh 18.03.21 support of different ocean ice and iceberg steps:
+! if steps_per_ib_step is configured greater 1 then zbar_3d_n and eta_n might be changed while
+! the same asynchronous iceberg computation is still active
+        !zbar_3d_n_ib = zbar_3d_n
+        f%mesh%Z_3d_n_ib     = f%mesh%Z_3d_n
+        f%dynamics%eta_n_ib  = f%dynamics%eta_n
+
+! kh 16.03.21 not modified during overlapping ocean/ice and iceberg computations
+!       coriolis_ib      = coriolis
+!       coriolis_node_ib = coriolis_node
+
+! kh 02.02.21 check iceberg computations mode:
+! ib_async_mode == 0: original sequential behavior for both ice sections (for testing purposes, creating reference results etc.)
+! ib_async_mode == 1: OpenMP code active to overlapped computations in first (ocean ice) and second (icebergs) parallel section
+! ib_async_mode == 2: OpenMP code active, but computations still serialized via spinlock (for testing purposes)
+!        if (ib_async_mode == 0) then ! kh 01.03.21 original sequential behavior for both ice sections
+!
+!! kh 10.03.21 it is not the start of a real parallel section here, but the value of the timer is still of interest
+!            t1_par_sections = MPI_Wtime()
+!
+!            call compute_vel_nodes(mesh)
+!
+!! kh 08.03.21 t1 moved up to here to include the iceberg computation time (like in former FESOM2 paleodyn_icb versions)
+!           t1 = MPI_Wtime()
+!
+!! kh 03.03.21 pseudo overlap ocean ice and iceberg calculation to imitate the behavior of the parallel modes (i.e. ib_async_mode > 0)
+!!           if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
+!            if (use_icebergs .and. mod(n - 1, steps_per_ib_step)==0) then
+!                if (mype==0) write(*,*) '*** step n=',n
+!                t1_icb = MPI_Wtime()
+!                call iceberg_calculation(mesh,n)
+!            end if
+!!
+!            !___model sea-ice step__________________________________________________
+!
+!! kh 08.03.21 t1 moved up to include the iceberg calculation time (like in former FESOM2 paleodyn_icb versions)
+!!           t1 = MPI_Wtime()
+!            if(use_ice) then
+!                call ocean2ice(mesh)
+!                call update_atm_forcing(n, mesh)
+!                
+!                if (ice_steps_since_upd>=ice_ave_steps-1) then
+!                    ice_update=.true.
+!                    ice_steps_since_upd = 0
+!                else
+!                    ice_update=.false.
+!                    ice_steps_since_upd=ice_steps_since_upd+1
+!                endif
+!                
+!                if (ice_update) call ice_timestep(n, mesh)
+!                
+!!LA 20221023 ----------------
+!            if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
+!                t1b_icb = MPI_Wtime()
+!                call icb2fesom(mesh)
+!                t2b_icb = MPI_Wtime()
+!!               t2_icb = MPI_Wtime()
+!                t2_icb = t2_icb + t2b_icb - t1b_icb
+!                bIcbCalcCycleCompleted = .true.
+!                t2_icb = MPI_Wtime()
+!            end if
+!!----------------------------
+!                call oce_fluxes_mom(mesh) ! momentum only
+!                call oce_fluxes(mesh)
+!            end if  
+!                
+!            !###################################
+!            ! LA check wheather this needs to go inside omp
+!            call before_oce_step(mesh)
+!            !###################################
+!
+!            if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
+!!               t1_icb = MPI_Wtime()
+!                !call iceberg_calculation(n)
+!
+!! kh 08.03.21 add time for call icb2fesom to the end of t2_icb (i.e. time is calculated like in former FESOM2 paleodyn_icb  versions, also see above)
+!            end if
+!
+!! kh 10.03.21 it is not the end of a real parallel section here, but the value of the timer is still of interest
+!            t2_par_sections = MPI_Wtime()
+!
+!        !else if (ib_async_mode > 0) then ! kh 02.02.21 asynchronous behavior
+!        end if
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         if (use_global_tides) then
            call foreph(f%partit, f%mesh)
         end if
@@ -332,7 +492,18 @@ contains
         !___compute horizontal velocity on nodes (originaly on elements)________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call compute_vel_nodes'//achar(27)//'[0m'
         call compute_vel_nodes(f%dynamics, f%partit, f%mesh)
-        
+       
+
+        ! --------------
+        ! LA icebergs: 2023-05-17 
+        if (use_icebergs .and. mod(n - 1, steps_per_ib_step)==0) then
+            if (f%mype==0) write(*,*) '*** step n=',n
+            !t1_icb = MPI_Wtime()
+            call iceberg_calculation(f%ice,f%mesh,f%partit,f%dynamics,n)
+        end if
+        ! --------------
+
+
         !___model sea-ice step__________________________________________________
         f%t1 = MPI_Wtime()
         if(use_ice) then
@@ -355,6 +526,22 @@ contains
             endif
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_timestep(n)'//achar(27)//'[0m'
             if (f%ice%ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh)  
+
+            
+            ! --------------
+            ! LA icebergs: 2023-05-17 
+            if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
+                !t1b_icb = MPI_Wtime()
+                call icb2fesom(f%mesh, f%partit, f%ice)
+                !t2b_icb = MPI_Wtime()
+!               !t2_icb = MPI_Wtime()
+                !t2_icb = t2_icb + t2b_icb - t1b_icb
+                !bIcbCalcCycleCompleted = .true.
+                !t2_icb = MPI_Wtime()
+            end if
+            ! --------------
+
+
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
             call oce_fluxes_mom(f%ice, f%dynamics, f%partit, f%mesh) ! momentum only
@@ -396,6 +583,21 @@ contains
     use fesom_main_storage_module
     ! EO parameters
     real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
+
+    ! --------------
+    ! LA icebergs: 2023-05-17 
+    if (use_icebergs) then
+         !t3_icb = MPI_Wtime()
+ 
+         call iceberg_out(f%partit)
+         !!call reset_ib_fluxes        
+         !t4_icb = MPI_Wtime()
+ 
+         !rtime_icb_write = rtime_icb_write + t4_icb - t3_icb
+     end if
+    ! --------------
+
+
 
     call finalize_output()
     call finalize_restart()

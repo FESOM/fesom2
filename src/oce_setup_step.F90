@@ -543,6 +543,10 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     ! Ocean forcing arrays
     ! ================
     allocate(Tclim(nl-1,node_size), Sclim(nl-1, node_size))
+    !---
+    ! LA: add iceberg tracers 2023-02-08
+    allocate(Tclim_ib(nl-1,node_size), Sclim_ib(nl-1, node_size))
+    !---
     allocate(stress_surf(2,myDim_elem2D))    !!! Attention, it is shorter !!! 
     allocate(stress_node_surf(2,node_size))
     allocate(stress_atmoce_x(node_size), stress_atmoce_y(node_size)) 

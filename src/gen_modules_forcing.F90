@@ -39,8 +39,12 @@ real(kind=WP)  :: Swind     =0.0_WP  ! parameterization for coupled current feed
   logical                       :: use_landice_water=.false.
   integer                       :: landice_start_mon=1
   integer                       :: landice_end_mon=12
+!---fwf-code-begin
+  character(MAX_PATH)           :: fwf_path='./mesh/'
+!---fwf-code-end
 
-  namelist /land_ice/ use_landice_water, landice_start_mon, landice_end_mon
+
+  namelist /land_ice/ use_landice_water, landice_start_mon, landice_end_mon, fwf_path
 
 end module g_forcing_param
 ! ====================================================================
@@ -51,6 +55,8 @@ use o_param
 
   ! forcing arrays
   real(kind=WP), allocatable, dimension(:)         :: u_wind, v_wind 
+  real(kind=WP), allocatable, dimension(:)         :: u_wind_ib, v_wind_ib ! kh 19.02.21 additional arrays for asynchronous iceberg computations
+
   real(kind=WP), allocatable, dimension(:)         :: Tair, shum
   real(kind=WP), allocatable, dimension(:,:)       :: u_wind_t, v_wind_t 
   real(kind=WP), allocatable, dimension(:,:)       :: Tair_t, shum_t

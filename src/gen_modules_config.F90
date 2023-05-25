@@ -23,6 +23,7 @@ module g_config
   
   !_____________________________________________________________________________
   ! *** Paths for all in and out ***
+! kh 01.03.21 paths in test environments can easily become longer than 100 characters (the former value) 
   character(MAX_PATH)        :: MeshPath='./mesh/'
   character(MAX_PATH)        :: ClimateDataPath='./hydrography/'
   character(MAX_PATH)        :: TideForcingPath='./tide_forcing/'
@@ -114,6 +115,25 @@ module g_config
   ! *** configuration***
   logical                       :: use_sw_pene=.true.
   logical                       :: use_ice=.false.  
+                                                   ! to be supplied
+  ! *** icebergs ***
+  logical                       :: use_icebergs=.false.
+  logical                       :: use_icesheet_coupling=.false.  
+  integer                       :: ib_num=0
+  integer                       :: steps_per_ib_step=8
+
+! kh 02.02.21
+! ib_async_mode == 0: original sequential behavior for both ice sections (for testing purposes, creating reference results etc.)
+! ib_async_mode == 1: OpenMP code active to overlapped computations in first (ocean ice) and second (icebergs) parallel section
+! ib_async_mode == 2: OpenMP code active but computations still serialized via spinlock (for testing purposes)
+  integer                       :: ib_async_mode=0
+  integer                       :: thread_support_level_required=3 ! 2 = MPI_THREAD_SERIALIZED, 3 = MPI_THREAD_MULTIPLE
+
+  namelist /icebergs/ use_icebergs, use_icesheet_coupling, ib_num, steps_per_ib_step, ib_async_mode, thread_support_level_required
+
+!wiso-code!!!
+  logical                       :: lwiso  =.false.  ! enable isotope?
+!wiso-code!!!
   logical                       :: use_floatice = .false.
   logical                       :: use_cavity = .false. ! switch on/off cavity usage
   logical                       :: use_cavity_partial_cell = .false. ! switch on/off cavity usage
@@ -137,4 +157,3 @@ module g_config
   
   
 end module g_config
-
