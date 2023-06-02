@@ -1991,7 +1991,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     integer       :: el(2), enodes(2), n, nz, ed, nzmin, nzmax, uln1, uln2, nln1, nln2
     real(kind=WP) :: deltaX1, deltaY1, deltaX2, deltaY2, dd, dd1, dddt, cflmax
     ! still to be understood but if you allocate these arrays statically the results will be different:
-    real(kind=WP) :: c1(mesh%nl-1), c2(mesh%nl-1)
+    real(kind=WP) :: e1c1(mesh%nl-1), e1c2(mesh%nl-1), e2c1(mesh%nl-1), e2c2(mesh%nl-1)
     ! --> zlevel with local zstar
     real(kind=WP) :: dhbar_total, dhbar_rest, distrib_dhbar_int
     real(kind=WP), dimension(:), allocatable :: max_dhbar2distr, cumsum_maxdhbar, distrib_dhbar
@@ -2011,14 +2011,20 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     Wvel_e      => dynamics%w_e(:,:)
     Wvel_i      => dynamics%w_i(:,:)
     CFL_z       => dynamics%cfl_z(:,:)
-    ssh_rhs     => dynamics%ssh_rhs(:)
-    ssh_rhs_old => dynamics%ssh_rhs_old(:)
     eta_n       => dynamics%eta_n(:)
-    d_eta       => dynamics%d_eta(:)
     if (Fer_GM) then
         fer_UV  => dynamics%fer_uv(:,:,:)
         fer_Wvel=> dynamics%fer_w(:,:)
-    end if    
+    end if
+    
+    if ( .not. dynamics%use_ssh_splitexpl_subcycl) then
+        d_eta       => dynamics%d_eta(:)
+        ssh_rhs     => dynamics%ssh_rhs(:)
+        ssh_rhs_old => dynamics%ssh_rhs_old(:)
+    else
+    
+    end if 
+    
     !___________________________________________________________________________
     ! Contributions from levels in divergence
 !$OMP PARALLEL DO
@@ -2054,11 +2060,11 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
             ! --> h * u_vec * n_vec
             ! --> e_vec = (dx,dy), n_vec = (-dy,dx);
             ! --> h * u*(-dy) + v*dx
-            c1(nz)=( UV(2,nz,el(1))*deltaX1 - UV(1,nz,el(1))*deltaY1 )*helem(nz,el(1))
+            e1c1(nz)=( UV(2,nz,el(1))*deltaX1 - UV(1,nz,el(1))*deltaY1 )*helem(nz,el(1))
             ! inflow(outflow) "flux" to control volume of node enodes1
             ! is equal to outflow(inflow) "flux" to control volume of node enodes2
             if (Fer_GM) then
-                c2(nz)=(fer_UV(2,nz,el(1))*deltaX1- fer_UV(1,nz,el(1))*deltaY1)*helem(nz,el(1))
+                e1c2(nz)=(fer_UV(2,nz,el(1))*deltaX1- fer_UV(1,nz,el(1))*deltaY1)*helem(nz,el(1))
             end if
         end do
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
@@ -2066,17 +2072,17 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
 #else
 !$OMP ORDERED
 #endif
-        Wvel       (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+c1(nzmin:nzmax)
+        Wvel       (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+e1c1(nzmin:nzmax)
         if (Fer_GM) then
-           fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+c2(nzmin:nzmax)
+           fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+e1c2(nzmin:nzmax)
         end if
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(enodes(1)))
         call omp_set_lock  (partit%plock(enodes(2)))
 #endif
-        Wvel       (nzmin:nzmax, enodes(2))= Wvel    (nzmin:nzmax, enodes(2))-c1(nzmin:nzmax)
+        Wvel       (nzmin:nzmax, enodes(2))= Wvel    (nzmin:nzmax, enodes(2))-e1c1(nzmin:nzmax)
         if (Fer_GM) then
-           fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-c2(nzmin:nzmax)
+           fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-e1c2(nzmin:nzmax)
         end if
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(enodes(2)))
@@ -2086,33 +2092,49 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
         !_______________________________________________________________________
         ! if ed is not a boundary edge --> calc div(u_vec*h) for every layer
         ! for el(2)
+        e2c1 = 0.0_WP
+        e2c2 = 0.0_WP
         if(el(2)>0)then
             deltaX2=edge_cross_dxdy(3,ed)
             deltaY2=edge_cross_dxdy(4,ed)
             nzmin = ulevels(el(2))
             nzmax = nlevels(el(2))-1   
             do nz = nzmax, nzmin, -1
-                c1(nz)=-(UV(2,nz,el(2))*deltaX2 - UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+                e2c1(nz)=-(UV(2,nz,el(2))*deltaX2 - UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
                 if (Fer_GM) then
-                    c2(nz)=-(fer_UV(2,nz,el(2))*deltaX2-fer_UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+                    e2c2(nz)=-(fer_UV(2,nz,el(2))*deltaX2-fer_UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
                 end if
+                
+                !_______________________________________________________________
+                if ( e2c1(nz)/=e2c1(nz) ) then
+                    write(*,*) ' --> subroutine vert_vel_ale --> found Nan in e2c1(nz)'
+                    write(*,*) ' mype =', mype
+                    write(*,*) ' edge =', ed
+                    write(*,*) ' el   =', el
+                    write(*,*) ' nz   =', nz 
+                    write(*,*) ' e2c1(nz)       =', e2c1(nz) 
+                    write(*,*) ' UV(1,nz,el(2)) =', UV(1,nz,el(2))
+                    write(*,*) ' UV(2,nz,el(2)) =', UV(2,nz,el(2))
+                    write(*,*) ' helem(nz,el(2))=', helem(nz,el(2))
+                
+                end if 
             end do
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
             call omp_set_lock  (partit%plock(enodes(1)))
 #else
 !$OMP ORDERED
 #endif
-            Wvel       (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+c1(nzmin:nzmax)
+            Wvel       (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+e2c1(nzmin:nzmax)
             if (Fer_GM) then
-               fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+c2(nzmin:nzmax)
+               fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+e2c2(nzmin:nzmax)
             end if
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
             call omp_unset_lock(partit%plock(enodes(1)))
             call omp_set_lock  (partit%plock(enodes(2)))
 #endif
-            Wvel       (nzmin:nzmax, enodes(2))= Wvel    (nzmin:nzmax, enodes(2))-c1(nzmin:nzmax)
+            Wvel       (nzmin:nzmax, enodes(2))= Wvel    (nzmin:nzmax, enodes(2))-e2c1(nzmin:nzmax)
             if (Fer_GM) then
-               fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-c2(nzmin:nzmax)
+               fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-e2c2(nzmin:nzmax)
             end if
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
             call omp_unset_lock(partit%plock(enodes(2)))
@@ -2120,6 +2142,23 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
 !$OMP END ORDERED
 #endif
         end if
+        
+        !_______________________________________________________________________
+        if ( any(Wvel(nzmin:nzmax, enodes(1))/=Wvel(nzmin:nzmax, enodes(1))) .or.  &
+             any(Wvel(nzmin:nzmax, enodes(2))/=Wvel(nzmin:nzmax, enodes(2)))) then
+            write(*,*) ' --> subroutine vert_vel_ale --> found Nan in Wvel after div_H(...)'
+            write(*,*) ' mype   =', mype
+            write(*,*) ' edge   =', ed
+            write(*,*) ' enodes =', enodes
+            write(*,*) ' Wvel(nzmin:nzmax, enodes(1))=', Wvel(nzmin:nzmax, enodes(1))  
+            write(*,*) ' Wvel(nzmin:nzmax, enodes(2))=', Wvel(nzmin:nzmax, enodes(2)) 
+            write(*,*) ' e1c1', e1c1(nzmin:nzmax)  
+            write(*,*) ' e1c2', e1c2(nzmin:nzmax)  
+            write(*,*) ' e2c1', e2c1(nzmin:nzmax)  
+            write(*,*) ' e2c2', e2c2(nzmin:nzmax)  
+            
+        end if
+        
     end do ! --> do ed=1, myDim_edge2D
 !$OMP END DO
 !$OMP END PARALLEL
@@ -2142,6 +2181,14 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
                 fer_Wvel(nz,n)=fer_Wvel(nz,n)+fer_Wvel(nz+1,n)
             end if
         end do
+        
+        !_______________________________________________________________________
+        if ( any(Wvel(nzmin:nzmax, n)/=Wvel(nzmin:nzmax, n)) ) then
+            write(*,*) ' --> subroutine vert_vel_ale --> found Nan in Wvel after cumulativ summation(...)'
+            write(*,*) ' mype =', mype
+            write(*,*) ' node =', n
+            write(*,*) ' Wvel(nzmin:nzmax, n)=', Wvel(nzmin:nzmax, n) 
+        end if
     end do
 !$OMP END PARALLEL DO
     !___________________________________________________________________________
@@ -2159,6 +2206,14 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
             end if
             
         end do
+        
+        !_______________________________________________________________________
+        if ( any(Wvel(nzmin:nzmax, n)/=Wvel(nzmin:nzmax, n)) ) then
+            write(*,*) ' --> subroutine vert_vel_ale --> found Nan in Wvel after divide with area'
+            write(*,*) ' mype =', mype
+            write(*,*) ' node =', n
+            write(*,*) ' Wvel(nzmin:nzmax, n)=', Wvel(nzmin:nzmax, n) 
+        end if
     end do
 !$OMP END PARALLEL DO
     ! |
@@ -2434,6 +2489,14 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
                 ! continutity
                 Wvel(nzmin,n)=Wvel(nzmin,n)-water_flux(n) 
                 
+                !_______________________________________________________________________
+                if ( any(Wvel(nzmin:nzmax, n)/=Wvel(nzmin:nzmax, n)) ) then
+                    write(*,*) ' --> subroutine vert_vel_ale --> found Nan in Wvel after ssh is distributed'
+                    write(*,*) ' mype =', mype
+                    write(*,*) ' node =', n
+                    write(*,*) ' Wvel(nzmin:nzmax, n)=', Wvel(nzmin:nzmax, n) 
+                end if
+                
             endif ! --> if (nzmin==1) then
             
         end do ! --> do n=1, myDim_nod2D
@@ -2455,10 +2518,12 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
                 write(*,*)
                 write(*,*) 'water_flux     = ', water_flux(n)
                 write(*,*)
-                write(*,*) "ssh_rhs        = ", ssh_rhs(n)
-                write(*,*) "ssh_rhs_old    = ", ssh_rhs_old(n)
                 write(*,*) "eta_n          = ", eta_n(n)
-                write(*,*) "d_eta          = ", d_eta(n)
+                if ( .not. dynamics%use_ssh_splitexpl_subcycl) then
+                    write(*,*) "d_eta          = ", d_eta(n)
+                    write(*,*) "ssh_rhs        = ", ssh_rhs(n)
+                    write(*,*) "ssh_rhs_old    = ", ssh_rhs_old(n)
+                end if 
                 write(*,*)
                 write(*,*) "zbar_3d_n(1,n) = ", zbar_3d_n(1,n)
                 write(*,*) "dd1            = ", dd1
@@ -2487,65 +2552,139 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     call exchange_nod(hnode_new, partit)   ! Or extend cycles above  
     if (Fer_GM) call exchange_nod(fer_Wvel, partit)
 !$OMP BARRIER    
+
+    !___________________________________________________________________________
+    ! compute vertical CFL_z criteria
+    call compute_CFLz(dynamics, partit, mesh)
+    
+    !___________________________________________________________________________
+    ! compute implicite explicite splitting of vetical velocity Wvel according 
+    ! to CFL_z criteria
+    call compute_Wvel_split(dynamics, partit, mesh)
+    
+end subroutine vert_vel_ale
+!
+!
+!_______________________________________________________________________________
+! compute vertical CFL_z criteria and print out warning when critical value over
+! stepped
+subroutine compute_CFLz(dynamics, partit, mesh)
+    use g_config,only: dt, flag_warn_cflz
+    use MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_DYN
+    use o_PARAM
+    use g_comm_auto
+    implicit none
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(inout), target :: mesh
+    !___________________________________________________________________________
+    integer       :: node, nz, nzmin, nzmax
+    real(kind=WP) :: cflmax, c1, c2
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:,:)  , pointer :: Wvel, CFL_z
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    Wvel  => dynamics%w(:,:)
+    CFL_z => dynamics%cfl_z(:,:)
+
     !___________________________________________________________________________
     ! calc vertical CFL criteria for debugging purpose and vertical Wvel splitting
 !$OMP PARALLEL DO
-    do n=1, myDim_nod2D+eDim_nod2D
-       CFL_z(1,n)=0._WP
+    do node=1, myDim_nod2D+eDim_nod2D
+       CFL_z(1,node)=0._WP
     end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax)
-    do n=1, myDim_nod2D+eDim_nod2D
-        nzmin = ulevels_nod2D(n)
-        nzmax = nlevels_nod2D(n)-1
+    !___________________________________________________________________________
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax)
+    do node=1, myDim_nod2D+eDim_nod2D
+        nzmin = ulevels_nod2D(node)
+        nzmax = nlevels_nod2D(node)-1
         do nz=nzmin,nzmax
-            c1(1)=abs(Wvel(nz,n)  *dt/hnode_new(nz,n)) !c1->c1(1) is made for the sake of reproducibility with the master branch (rounding error)
-            c2(1)=abs(Wvel(nz+1,n)*dt/hnode_new(nz,n)) !otherwise just add these terms (c(1) & c(2)) to CFL_z, respectively!
+            c1=abs(Wvel(nz,node)  *dt/hnode_new(nz,node)) !c1->c1(1) is made for the sake of reproducibility with the master branch (rounding error)
+            c2=abs(Wvel(nz+1,node)*dt/hnode_new(nz,node)) !otherwise just add these terms (c(1) & c(2)) to CFL_z, respectively!
             ! strong condition:
             ! total volume change induced by the vertical motion
             ! no matter, upwind or downwind !
-            CFL_z(nz,  n)=CFL_z(nz,n)+c1(1)
-            CFL_z(nz+1,n)=            c2(1)
-        end do
-    end do
+            CFL_z(nz,  node)=CFL_z(nz,node)+c1
+            CFL_z(nz+1,node)=            c2
+        end do ! --> do nz=nzmin,nzmax
+    end do ! --> do node=1, myDim_nod2D+eDim_nod2D
 !$OMP END PARALLEL DO
-cflmax=0.
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n) REDUCTION(max:cflmax)
+
+    !___________________________________________________________________________
+    cflmax=0.
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node) REDUCTION(max:cflmax)
 !$OMP DO
-    do n=1, myDim_nod2D+eDim_nod2D
-       cflmax=max(cflmax, maxval(CFL_z(:, n)))
-    end do
+    do node=1, myDim_nod2D+eDim_nod2D
+       cflmax=max(cflmax, maxval(CFL_z(:, node)))
+    end do ! --> do node=1, myDim_nod2D+eDim_nod2D
 !$OMP END DO
 !$OMP END PARALLEL
 
+    !___________________________________________________________________________
     if (cflmax > 1.0_WP .and. flag_warn_cflz) then
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax)
-        do n=1, myDim_nod2D
-            nzmin = ulevels_nod2D(n)
-            nzmax = nlevels_nod2D(n)-1
-            do nz=nzmin,nzmax
-                if (abs(CFL_z(nz,n)-cflmax) < 1.e-12 .and. CFL_z(nz,n) > 1.75_WP .and. CFL_z(nz,n)<=2.5_WP ) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax)
+        do node=1, myDim_nod2D
+            nzmin = ulevels_nod2D(node)
+            nzmax = nlevels_nod2D(node)-1
+            do nz=nzmin, nzmax
+                if (abs(CFL_z(nz,node)-cflmax) < 1.e-12 .and. CFL_z(nz,node) > 1.75_WP .and. CFL_z(nz,node)<=2.5_WP ) then
                     print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3,I3)', achar(27)//'[33m'//' --> WARNING CFLz>1.75:'//achar(27)//'[0m',&
-                          'CFLz_max=',cflmax,',mstep=',mstep,',glon/glat=',geo_coord_nod2D(1,n)/rad,'/',geo_coord_nod2D(2,n)/rad,&
+                          'CFLz_max=',cflmax,',mstep=',mstep,',glon/glat=',geo_coord_nod2D(1,node)/rad,'/',geo_coord_nod2D(2,node)/rad,&
                           ',nz/nzmin=',nz,nzmin
-                elseif (abs(CFL_z(nz,n)-cflmax) < 1.e-12 .and. CFL_z(nz,n) > 2.5_WP) then          
+                elseif (abs(CFL_z(nz,node)-cflmax) < 1.e-12 .and. CFL_z(nz,node) > 2.5_WP) then          
                     print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3,I3)', achar(27)//'[31m'//' --> WARNING CFLz>2.5:'//achar(27)//'[0m',&
-                          'CFLz_max=',cflmax,',mstep=',mstep,',glon/glat=',geo_coord_nod2D(1,n)/rad,'/',geo_coord_nod2D(2,n)/rad,&
+                          'CFLz_max=',cflmax,',mstep=',mstep,',glon/glat=',geo_coord_nod2D(1,node)/rad,'/',geo_coord_nod2D(2,node)/rad,&
                           ',nz/nzmin=',nz,nzmin
                     !!PS write(*,*) '***********************************************************'
                     !!PS write(*,*) 'max. CFL_z = ', cflmax, ' mype = ', mype
                     !!PS write(*,*) 'mstep      = ', mstep
-                    !!PS write(*,*) 'glon, glat = ', geo_coord_nod2D(:,n)/rad
-                    !!PS write(*,*) '2D node    = ', myList_nod2D(n)
+                    !!PS write(*,*) 'glon, glat = ', geo_coord_nod2D(:,node)/rad
+                    !!PS write(*,*) '2D node    = ', myList_nod2D(node)
                     !!PS write(*,*) 'nz         = ', nz
                     !!PS write(*,*) '***********************************************************'
                 end if
-            end do
-        end do
+            end do ! --> do nz=nzmin,nzmax
+        end do ! --> do node=1, myDim_nod2D
 !$OMP END PARALLEL DO
-    end if
-    
+    end if ! --> if (cflmax > 1.0_WP .and. flag_warn_cflz) then
+end subroutine compute_CFLz
+!
+!
+!_______________________________________________________________________________ 
+subroutine compute_Wvel_split(dynamics, partit, mesh)
+    use MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_DYN
+    use o_PARAM
+    use g_comm_auto
+    implicit none
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(inout), target :: mesh
+    !___________________________________________________________________________
+    integer                               :: node, nz, nzmin, nzmax
+    real(kind=WP)                         :: dd
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, Wvel_i, CFL_z
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    Wvel   => dynamics%w(    :,:)
+    Wvel_e => dynamics%w_e(  :,:)
+    Wvel_i => dynamics%w_i(  :,:)
+    CFL_z  => dynamics%cfl_z(:,:)
+
     !___________________________________________________________________________
     ! Split implicit vertical velocity onto implicit and explicit components using CFL criteria:
     ! wsplit_maxcfl constrains the allowed explicit w according to the CFL at this place
@@ -2553,23 +2692,23 @@ cflmax=0.
     ! wsplit_maxcfl=0 means   w_exp  is zero (everything computed implicitly)
     ! wsplit_maxcfl=inf menas w_impl is zero (everything computed explicitly)
     ! a guess for optimal choice of wsplit_maxcfl would be 0.95
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, dd)
-    do n=1, myDim_nod2D+eDim_nod2D
-        nzmin = ulevels_nod2D(n)
-        nzmax = nlevels_nod2D(n)
-        do nz=nzmin,nzmax
-            Wvel_e(nz,n)=Wvel(nz,n)
-            Wvel_i(nz,n)=0.0_WP
-            if (dynamics%use_wsplit  .and. (CFL_z(nz, n) > dynamics%wsplit_maxcfl)) then
-                dd=max((CFL_z(nz, n)-dynamics%wsplit_maxcfl), 0.0_WP)/max(dynamics%wsplit_maxcfl, 1.e-12)
-                Wvel_e(nz,n)=(1.0_WP/(1.0_WP+dd))*Wvel(nz,n) !explicit part =1. if dd=0.
-                Wvel_i(nz,n)=(dd    /(1.0_WP+dd))*Wvel(nz,n) !implicit part =1. if dd=inf
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, dd)
+    do node=1, myDim_nod2D+eDim_nod2D
+        nzmin = ulevels_nod2D(node)
+        nzmax = nlevels_nod2D(node)
+        do nz=nzmin, nzmax
+            Wvel_e(nz, node)=Wvel(nz, node)
+            Wvel_i(nz, node)=0.0_WP
+            if (dynamics%use_wsplit  .and. (CFL_z(nz, node) > dynamics%wsplit_maxcfl)) then
+                dd=max((CFL_z(nz, node)-dynamics%wsplit_maxcfl), 0.0_WP)/max(dynamics%wsplit_maxcfl, 1.e-12)
+                Wvel_e(nz, node)=(1.0_WP/(1.0_WP+dd))*Wvel(nz, node) !explicit part =1. if dd=0.
+                Wvel_i(nz, node)=(dd    /(1.0_WP+dd))*Wvel(nz, node) !implicit part =1. if dd=inf
             end if
-        end do
-    end do
+        end do ! --> do nz=nzmin,nzmax
+    end do ! --> do node=1, myDim_nod2D+eDim_nod2D
 !$OMP END PARALLEL DO
-end subroutine vert_vel_ale
-
+end subroutine compute_Wvel_split
+!
 !
 !
 !===============================================================================
@@ -2943,10 +3082,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     t0=MPI_Wtime()
-!     water_flux = 0.0_WP
-!     heat_flux  = 0.0_WP
-!     stress_surf= 0.0_WP
-!     stress_node_surf= 0.0_WP
+    water_flux = 0.0_WP
+    heat_flux  = 0.0_WP
+    stress_surf= 0.0_WP
+    stress_node_surf= 0.0_WP
     
     !___________________________________________________________________________
     ! calculate equation of state, density, pressure and mixed layer depths
@@ -3110,7 +3249,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call impl_vert_visc_ale'//achar(27)//'[0m'
     if(dynamics%use_ivertvisc) then
-        if (dynamics%use_ssh_splitexpl_subcycl) then
+        if ( .not. dynamics%use_ssh_splitexpl_subcycl ) then
             call impl_vert_visc_ale(dynamics,partit, mesh)
         else
             call impl_vert_visc_ale_vtransp(dynamics, partit, mesh)
@@ -3233,7 +3372,12 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! The main step of ALE procedure --> this is were the magic happens --> here 
     ! is decided how change in hbar is distributed over the vertical layers
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call vert_vel_ale'//achar(27)//'[0m'
-    call vert_vel_ale(dynamics, partit, mesh)
+    if ( .not. dynamics%use_ssh_splitexpl_subcycl) then
+        call vert_vel_ale(dynamics, partit, mesh)
+    else
+        call compute_thickness_zstar(dynamics, partit, mesh)
+        call compute_vert_vel_transpv(dynamics, partit, mesh)
+    end if    
     t7=MPI_Wtime()   
     
     !___________________________________________________________________________

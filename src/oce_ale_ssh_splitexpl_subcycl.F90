@@ -1,9 +1,9 @@
 !
 !
 !_______________________________________________________________________________
-module momentum_adv_scalar_4splitexpl_interface
+module momentum_adv_scalar_transpv_interface
     interface
-        subroutine momentum_adv_scalar_4splitexpl(dynamics, partit, mesh)
+        subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
         USE MOD_MESH
         USE MOD_PARTIT
         USE MOD_PARSUP
@@ -65,6 +65,16 @@ module compute_ssh_split_explicit_interface
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
         end subroutine
+        
+        subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
+        USE MOD_MESH
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_DYN
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
     end interface
 end module
 
@@ -72,7 +82,7 @@ end module
 !
 !_______________________________________________________________________________
 ! Transports are used instead of velocities, Urhs, Vrhs are also for transports. 
-subroutine momentum_adv_scalar_4splitexpl(dynamics, partit, mesh)
+subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -188,8 +198,8 @@ subroutine momentum_adv_scalar_4splitexpl(dynamics, partit, mesh)
         !_______________________________________________________________________
         ! index off surface layer in case of cavity !=1 and index of mid depth 
         ! bottom layer
-        nl1     = nlevels(edelem(1))-1
         ul1     = ulevels(edelem(1))
+        nl1     = nlevels(edelem(1))-1
         
         !_______________________________________________________________________
         !NR --> Natalja Style
@@ -200,9 +210,9 @@ subroutine momentum_adv_scalar_4splitexpl(dynamics, partit, mesh)
         !_______________________________________________________________________
         ! if edelem(2)==0 than edge is boundary edge
         if(edelem(2)>0) then
-            nl2 = nlevels(edelem(2))-1
             ul2 = ulevels(edelem(2))
-
+            nl2 = nlevels(edelem(2))-1
+            
             !___________________________________________________________________
             !NR --> Natalja Style
             un2          = 0.0_WP
@@ -433,8 +443,8 @@ subroutine momentum_adv_scalar_4splitexpl(dynamics, partit, mesh)
     ! divide total nodal momentum advection by scalar area
 !$OMP DO    
     do node=1,myDim_nod2d
-        nl1 = nlevels_nod2D(node)-1
         ul1 = ulevels_nod2D(node)
+        nl1 = nlevels_nod2D(node)-1
         UVnode_rhs(1, ul1:nl1, node) = UVnode_rhs(1, ul1:nl1, node) * areasvol_inv(ul1:nl1, node)
         UVnode_rhs(2, ul1:nl1, node) = UVnode_rhs(2, ul1:nl1, node) * areasvol_inv(ul1:nl1, node)
     end do ! --> do node=1,myDim_nod2d
@@ -450,8 +460,8 @@ subroutine momentum_adv_scalar_4splitexpl(dynamics, partit, mesh)
     ! convert total nodal advection from vertice --> elements
 !$OMP DO    
     do elem=1, myDim_elem2D
-        nl1 = nlevels(elem)-1
         ul1 = ulevels(elem)
+        nl1 = nlevels(elem)-1
         UV_rhsAB(1:2, ul1:nl1, elem) = UV_rhsAB(1:2, ul1:nl1, elem) + elem_area(elem)* &
                 ( UVnode_rhs(1:2, ul1:nl1, elem2D_nodes(1, elem)) &
                 + UVnode_rhs(1:2, ul1:nl1, elem2D_nodes(2, elem)) & 
@@ -474,7 +484,7 @@ subroutine momentum_adv_scalar_4splitexpl(dynamics, partit, mesh)
 !$OMP END DO
     end if
 !$OMP END PARALLEL
-end subroutine
+end subroutine momentum_adv_scalar_transpv
 
 !
 !
@@ -620,6 +630,21 @@ subroutine impl_vert_visc_ale_vtransp(dynamics, partit, mesh)
         uu(nzmin:nzmax-1)=(UVh(1, nzmin:nzmax-1, elem)+UV_rhs(1, nzmin:nzmax-1, elem))/helem(nzmin:nzmax-1, elem)   !! u*=U*/h
         vv(nzmin:nzmax-1)=(UVh(2, nzmin:nzmax-1, elem)+UV_rhs(2, nzmin:nzmax-1, elem))/helem(nzmin:nzmax-1, elem) 
         
+        !_______________________________________________________________
+        if ( any(uu(nzmin:nzmax-1)/=uu(nzmin:nzmax-1)) .or. &
+             any(vv(nzmin:nzmax-1)/=vv(nzmin:nzmax-1)) ) then
+            write(*,*) ' --> subroutine impl_vert_visc_ale_vtransp --> found Nan in uu=UVh=UV_rhs'
+            write(*,*) ' mype =', mype
+            write(*,*) ' elem =', elem
+            write(*,*) ' uu(nzmin:nzmax-1)=', uu(nzmin:nzmax-1)
+            write(*,*) ' vv(nzmin:nzmax-1)=', vv(nzmin:nzmax-1)
+            write(*,*) ' UV_rhs(1,nz,elem)=', UV_rhs( 1, nz, elem)
+            write(*,*) ' UV_rhs(2,nz,elem)=', UV_rhs( 2, nz, elem)
+            write(*,*) ' UVh( 1, nz, elem)=', UVh( 1, nz, elem)
+            write(*,*) ' UVh( 2, nz, elem)=', UVh( 2, nz, elem)
+            write(*,*) ' helem(nz, elem)  =', helem(nz, elem)
+        end if
+        
         !_______________________________________________________________________
         ! Operator + rhs
         ! Regular part of coefficients:
@@ -729,6 +754,25 @@ subroutine impl_vert_visc_ale_vtransp(dynamics, partit, mesh)
             UV_rhs(1, nz, elem)=UV_rhs(1, nz, elem)+ur(nz)*helem(nz, elem)             !! The rhs is for transport
             UV_rhs(2, nz, elem)=UV_rhs(2, nz, elem)+vr(nz)*helem(nz, elem)
         end do
+        
+        !_______________________________________________________________
+        if ( any(UV_rhs(1, nzmin:nzmax-1, elem)/=UV_rhs(1, nzmin:nzmax-1, elem)) .or. &
+             any(UV_rhs(2, nzmin:nzmax-1, elem)/=UV_rhs(2, nzmin:nzmax-1, elem))) then
+            write(*,*) ' --> subroutine impl_vert_visc_ale_vtransp --> found Nan in UV_rhs=UVh_rhs+uvr*helem'
+            write(*,*) ' mype =', mype
+            write(*,*) ' elem =', elem
+            write(*,*) ' UV_rhs(1,nz,elem)=', UV_rhs( 1, nzmin:nzmax-1, elem)
+            write(*,*) ' UV_rhs(2,nz,elem)=', UV_rhs( 2, nzmin:nzmax-1, elem)
+            write(*,*) ' ur(nzmin:nzmax-1)=', ur(nzmin:nzmax-1)
+            write(*,*) ' vr(nzmin:nzmax-1)=', vr(nzmin:nzmax-1)
+            write(*,*) ' helem(nz, elem)  =', helem(nzmin:nzmax-1, elem)
+            write(*,*) ' a(nzmin:nzmax-1) =', a(nzmin:nzmax-1)
+            write(*,*) ' b(nzmin:nzmax-1) =', b(nzmin:nzmax-1)
+            write(*,*) ' c(nzmin:nzmax-1) =', c(nzmin:nzmax-1)
+            write(*,*) ' Av(nzmin:nzmax-1,elem) =', Av(nzmin:nzmax-1, elem)
+            write(*,*) ' Wvel_i(nzmin:nzmax-1,elem) =',Wvel_i(nzmin:nzmax-1, elnodes)
+        end if
+        
     end do ! --> do elem=1,myDim_elem2D
 !$OMP END DO
 !$OMP END PARALLEL
@@ -751,7 +795,7 @@ subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
     real(kind=WP)       :: vert_sum_u, vert_sum_v, Fx, Fy, ab1, ab2, hh
-    integer             :: elem, nz, nzmin, nzmax, elnodes(4)
+    integer             :: elem, nz, nzmin, nzmax, elnodes(3)
     logical, save       :: sfirst
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -787,8 +831,8 @@ subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
         nzmax  = nlevels(elem)-1
         
         !_______________________________________________________________________
-        Fx=g*dt*sum(gradient_sca(1:4,elem)*eta_n(elnodes))
-        Fy=g*dt*sum(gradient_sca(5:8,elem)*eta_n(elnodes))
+        Fx=g*dt*sum(gradient_sca(1:3,elem)*eta_n(elnodes))
+        Fy=g*dt*sum(gradient_sca(4:6,elem)*eta_n(elnodes))
         
         !_______________________________________________________________________
         ! vertically integrate UV_rhs --> for barotropic equatiobn 
@@ -863,6 +907,7 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     real(kind=WP)                   :: dtBT, BT_inv, hh, f, rx, ry, a, d, c1, c2, ax, ay
     real(kind=WP)                   :: deltaX1, deltaY1, deltaX2, deltaY2, thetaBT
     integer                         :: step, elem, elnodes(3), edge, ednodes(2), edelem(2)
+    integer                         :: nzmin1, nzmax1, nzmin2, nzmax2
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:)    , pointer :: eta_n
@@ -881,7 +926,8 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! Dissipation parameter of FB dissipative method 0.14 is the default value 
     ! from Demange et al.
-    thetaBT= 0.14_WP
+!PS     thetaBT= 0.14_WP
+    thetaBT= 0.5_WP
     
     ! BTsteps should be 30 or 40.
     dtBT   = dt/dynamics%splitexpl_BTsteps                
@@ -904,16 +950,17 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             ! AAA = - dt/M*[ + 0.5*f*e_z x (Ubt^(n+(m+1)/M) + Ubt^(n+(m)/M))
             !          - h*H^m*grad_H*eta^((n+m)/M)
             !          - Rbt-->UVBT_rhs ] 
-            hh = -zbar_e_bot(elem)+sum(eta_n(elnodes))/3.0_WP ! Total fluid depth
+!PS             hh = -zbar_e_bot(elem)+sum(eta_n(elnodes))/3.0_WP ! Total fluid depth
+            hh = -zbar(nlevels(elem))+sum(eta_n(elnodes))/3.0_WP ! Total fluid depth
             f  = mesh%coriolis(elem)
-            rx = dtBT*(-g*hh*sum(gradient_sca(1:3,elem)*eta_n(elnodes)) + f*UVBT(1, elem)) + BT_inv*UVBT_rhs(1, elem)
-            ry = dtBT*(-g*hh*sum(gradient_sca(4:6,elem)*eta_n(elnodes)) - f*UVBT(2, elem)) + BT_inv*UVBT_rhs(2, elem)
+            rx = dtBT*(-g*hh*sum(gradient_sca(1:3,elem)*eta_n(elnodes)) + f*UVBT(2, elem)) + BT_inv*UVBT_rhs(1, elem)
+            ry = dtBT*(-g*hh*sum(gradient_sca(4:6,elem)*eta_n(elnodes)) - f*UVBT(1, elem)) + BT_inv*UVBT_rhs(2, elem)
             
             ! Semi-Implicit Coriolis
             a  = dtBT*f*0.5_WP
             d  = 1.0_WP/(1.0_WP+a*a)
-            ax = d*(rx+a*ry)
-            ay = d*(-a*rx+ry)
+            ax = d*(   rx + a*ry)
+            ay = d*(-a*rx +   ry)
             
             !___________________________________________________________________
             ! compute new velocities Ubt^(n+(m+1)/M) at barotropic time step (n+(m+1)/M) ...
@@ -971,8 +1018,51 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             ! advance ssh --> eta^(n+(m+1)/M) = eta^(n+(m)/M) - dt/M * div_H * [...]
             ! equation (6) in T. Banerjee et al.,Split-Explicite external
             ! mode solver in FESOM2, 
-            eta_n(ednodes(1))=eta_n(ednodes(1))+(c1+c2)*dtBT/area(1,ednodes(1))
-            eta_n(ednodes(2))=eta_n(ednodes(2))-(c1+c2)*dtBT/area(1,ednodes(2))
+            eta_n(ednodes(1))=eta_n(ednodes(1)) + (c1+c2)*dtBT/area(1,ednodes(1))
+            eta_n(ednodes(2))=eta_n(ednodes(2)) - (c1+c2)*dtBT/area(1,ednodes(2))
+            
+            
+!PS             if ( (mype==398) .and. ((abs(eta_n(ednodes(1)))>10) .or. (abs(eta_n(ednodes(1)))>10)) ) then
+            if ((abs(eta_n(ednodes(1)))>100) .or. (abs(eta_n(ednodes(2)))>100)) then
+                write(*,*) '-------------------------------------------------'
+                write(*,*) ' --> subroutine compute_BT_step_SE_ale --> found eta_n>100 in barotrop. subcycling'
+                write(*,*) ' mype           = ', mype
+                write(*,*) ' mstep          = ', mstep
+                write(*,*) ' btstep         = ', step
+                write(*,*) ' edge           = ', edge
+                write(*,*) ' ednodes(1:2)   = ', ednodes
+                write(*,*) ' edelem(1:2)    = ', edelem
+                write(*,*) ' glon,glat      = ', geo_coord_nod2D(:,ednodes)/rad
+                write(*,*)
+                write(*,*) '         eta_n(ednodes) = ', eta_n(ednodes) 
+                write(*,*) '                 c1, c2 = ', c1, c2
+                if(edelem(2)>0) then
+                    write(*,*) ' UVBT_rhs(  1:2,edelem) = ', UVBT_rhs(  1:2, edelem)
+                    write(*,*) ' UVBT(      1:2,edelem) = ', UVBT(      1:2, edelem)
+                    write(*,*) ' UVBT_theta(1:2,edelem) = ', UVBT_theta(1:2, edelem)
+                    write(*,*) ' UVBT_mean( 1:2,edelem) = ', UVBT_mean( 1:2, edelem)
+                    nzmin1 = ulevels(edelem(1))
+                    nzmax1 = nlevels(edelem(1))-1
+                    nzmin2 = ulevels(edelem(2))
+                    nzmax2 = nlevels(edelem(2))-1
+                    write(*,*) ' UVh(1:2,nzmin:nzmax,edelem(1)) = ', dynamics%se_uvh(1:2, nzmin1:nzmax1, edelem(1))
+                    write(*,*) ' UVh(1:2,nzmin:nzmax,edelem(2)) = ', dynamics%se_uvh(1:2, nzmin2:nzmax2, edelem(2))
+                    write(*,*) ' UV_rhs(1:2,nzmin:nzmax,edelem(1)) = ', dynamics%uv_rhs(1:2, nzmin1:nzmax1, edelem(1))
+                    write(*,*) ' UV_rhs(1:2,nzmin:nzmax,edelem(2)) = ', dynamics%uv_rhs(1:2, nzmin2:nzmax2, edelem(2))
+                else
+                    write(*,*) ' UVBT_rhs(  1:2,edelem) = ', UVBT_rhs(  1:2, edelem(1))
+                    write(*,*) ' UVBT(      1:2,edelem) = ', UVBT(      1:2, edelem(1))
+                    write(*,*) ' UVBT_theta(1:2,edelem) = ', UVBT_theta(1:2, edelem(1))
+                    write(*,*) ' UVBT_mean( 1:2,edelem) = ', UVBT_mean( 1:2, edelem(1))
+                    nzmin1 = ulevels(edelem(1))
+                    nzmax1 = nlevels(edelem(1))-1
+                    write(*,*) ' UVh(1:2,nzmin:nzmax,edelem(1)) = ', dynamics%se_uvh(1:2, nzmin1:nzmax1, edelem(1))
+                    write(*,*) ' UV_rhs(1:2,nzmin:nzmax,edelem(1)) = ', dynamics%uv_rhs(1:2, nzmin1:nzmax1, edelem(1))
+                    
+                end if 
+                write(*,*)
+            end if
+            
         end do
         
         !_______________________________________________________________________
@@ -1010,13 +1100,11 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    UV        =>dynamics%uv(:,:,:)
     UVh       =>dynamics%se_uvh(:,:,:)
     UV_rhs    =>dynamics%uv_rhs(:,:,:)
     UVBT_mean =>dynamics%se_uvBT_mean(:,:)
     UVBT_12   =>dynamics%se_uvBT_12(:,:)
-    if (mode==2) then 
-        UV    =>dynamics%uv(:,:,:)
-    end if
     
     !___________________________________________________________________________
     !
@@ -1060,6 +1148,27 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
                 UVh(2, nz, elem)= UVh(2, nz, elem)+(UVBT_mean(2, elem)-vbar)*helem(nz,elem)*hh_inv
                 UV( 1, nz, elem)= UVh(1, nz, elem)/helem(nz,elem)  ! velocities are still needed    
                 UV( 2, nz, elem)= UVh(2, nz, elem)/helem(nz,elem) 
+                
+                !_______________________________________________________________
+                if ( UV( 1, nz, elem)/=UV( 1, nz, elem) .or. &
+                     UV( 2, nz, elem)/=UV( 2, nz, elem)) then
+                    write(*,*) ' --> subroutine update_trim_vel_ale_vtransp(mode=1) --> found Nan in UV after update UV with barotr. term'
+                    write(*,*) ' mype =', mype
+                    write(*,*) ' elem =', elem
+                    write(*,*) ' nz   =', nz
+                    write(*,*) ' UV_rhs(1,nz,elem)=', UV_rhs( 1, nz, elem)
+                    write(*,*) ' UV_rhs(2,nz,elem)=', UV_rhs( 2, nz, elem)
+                    write(*,*) ' UV( 1, nz, elem) =', UV( 1, nz, elem)
+                    write(*,*) ' UV( 2, nz, elem) =', UV( 2, nz, elem)
+                    write(*,*) ' UVh( 1, nz, elem)=', UVh( 1, nz, elem)
+                    write(*,*) ' UVh( 2, nz, elem)=', UVh( 2, nz, elem)
+                    write(*,*) ' helem(nz, elem)  =', helem(nz, elem)
+                    write(*,*) ' UVBT_mean(1,elem)=', UVBT_mean(1,elem)
+                    write(*,*) ' UVBT_mean(2,elem)=', UVBT_mean(2,elem)
+                    write(*,*) ' ubar, vbar       =', ubar, vbar
+                    write(*,*) ' hh_inv           =', hh_inv
+                end if
+                
             end do
         end do
         call exchange_elem(UVh, partit)  ! This exchange can be avoided, but test first.
@@ -1087,12 +1196,280 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
                 UVh(2, nz, elem)= UVh(2, nz, elem)+(UVBT_12(2, elem)-vbar)*helem(nz,elem)*hh_inv
                 UV( 1, nz, elem)= UVh(1, nz, elem)/helem(nz,elem)  ! velocities are still needed    
                 UV( 2, nz, elem)= UVh(2, nz, elem)/helem(nz,elem)  ! to compute momentum advection
+                
+                !_______________________________________________________________
+                if ( UV( 1, nz, elem)/=UV( 1, nz, elem) .or. &
+                     UV( 2, nz, elem)/=UV( 2, nz, elem)) then
+                    write(*,*) ' --> subroutine update_trim_vel_ale_vtransp(mode=2) --> found Nan in UV after update UV with barotr. term'
+                    write(*,*) ' mype =', mype
+                    write(*,*) ' elem =', elem
+                    write(*,*) ' nz   =', nz
+                    write(*,*) ' UV( 1, nz, elem) =', UV( 1, nz, elem)
+                    write(*,*) ' UV( 2, nz, elem) =', UV( 2, nz, elem)
+                    write(*,*) ' UVh( 1, nz, elem)=', UVh( 1, nz, elem)
+                    write(*,*) ' UVh( 2, nz, elem)=', UVh( 2, nz, elem)
+                    write(*,*) ' helem(nz, elem)  =', helem(nz, elem)
+                    write(*,*) ' UVBT_12(1,elem)  =', UVBT_12(1,elem)
+                    write(*,*) ' UVBT_12(2,elem)  =', UVBT_12(2,elem)
+                    write(*,*) ' ubar, vbar       =', ubar, vbar
+                    write(*,*) ' hh_inv           =', hh_inv
+                end if
             end do
         end do
         call exchange_elem(UVh, partit)    ! 
         call exchange_elem(UV , partit)   ! Check if this is needed 
     end if ! --> if (mode==1) then
 end subroutine update_trim_vel_ale_vtransp
-
+!
+!
+!_______________________________________________________________________________
+! Trim U and Uh to be consistent with BT transport
+subroutine compute_thickness_zstar(dynamics, partit, mesh)
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_MESH
+    USE MOD_DYN
+    use g_comm_auto
+    !___________________________________________________________________________
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    integer                               :: node, elem, nz, nzmin, nzmax, elnodes(3) 
+    real(kind=WP)                         :: hh_inv
+    
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer :: eta_n
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    eta_n => dynamics%eta_n(:)
+    
+    !___________________________________________________________________________
+    ! leave bottom layer again untouched
+    do node=1, myDim_nod2D+eDim_nod2D
+        nzmin = ulevels_nod2D(node)
+        nzmax = nlevels_nod2D_min(node)-1
+        hh_inv=-1.0_WP/zbar(nzmax)
+        do nz=nzmin, nzmax-1
+            hnode_new(nz,node)=(zbar(nz)-zbar(nz+1))*(1.0_WP+hh_inv*eta_n(node))
+        end do
+    end do
+    
+    !___________________________________________________________________________
+    ! --> update mean layer thinkness at element
+    do elem=1, myDim_elem2D
+        nzmin = ulevels(elem)
+        nzmax = nlevels(elem)-1
+        elnodes=elem2D_nodes(:,elem)
+        do nz=nzmin, nzmax
+            helem(nz,elem)=sum(hnode_new(nz,elnodes))/3.0_WP
+        end do
+    end do
+    
+end subroutine compute_thickness_zstar
+!
+!
+!_______________________________________________________________________________
+! calculate vertical velocity from eq.3 in S. Danilov et al. : FESOM2: from 
+! finite elements to finite volumes. 
+!
+!   dh_k/dt + grad(u*h)_k + (w^t - w^b) + water_flux_k=1 = 0
+!
+!   w^t = w^b - dh_k/dt - grad(u*h)_k - water_flux=1
+!   --> do cumulativ summation from bottom to top
+subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_MESH
+    USE MOD_DYN
+    use o_ARRAYS, only: water_flux
+    use g_config, only: dt
+    use g_comm_auto
+    !___________________________________________________________________________
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    integer                               :: node, elem, nz, nzmin, nzmax, ednodes(2), edelem(2) 
+    real(kind=WP)                         :: hh_inv 
+    real(kind=WP)                         :: e1c1(mesh%nl-1), e1c2(mesh%nl-1)
+    real(kind=WP)                         :: e2c1(mesh%nl-1), e2c2(mesh%nl-1)
+    
+    
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:,:,:), pointer :: UVh, fer_UV
+    real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, Wvel_i, CFL_z, fer_Wvel
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    UVh         => dynamics%se_uvh(:,:,:)
+    Wvel        => dynamics%w(:,:)
+    Wvel_e      => dynamics%w_e(:,:)
+    Wvel_i      => dynamics%w_i(:,:)
+    CFL_z       => dynamics%cfl_z(:,:)
+    if (Fer_GM) then
+        fer_UV  => dynamics%fer_uv(:,:,:)
+        fer_Wvel=> dynamics%fer_w(:,:)
+    end if
+    
+    !___________________________________________________________________________
+    do node=1, myDim_nod2D+eDim_nod2D
+        Wvel(:, node)=0.0_WP
+    end do ! --> do node=1, myDim_nod2D+eDim_nod2D
+    
+    !___________________________________________________________________________
+    do ed=1, myDim_edge2D
+        ! local indice of nodes that span up edge ed
+        ednodes=edges(:,ed)   
+        
+        ! local index of element that contribute to edge
+        edelem=edge_tri(:,ed)
+        
+        ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid edelem(1) to 
+        ! center of edge --> needed to calc flux perpedicular to edge from elem edelem(1)
+        deltaX1=edge_cross_dxdy(1,ed)
+        deltaY1=edge_cross_dxdy(2,ed)
+        
+        !_______________________________________________________________________
+        ! calc div(u_vec*h) for every layer 
+        ! do it with gauss-law: int( div(u_vec)*dV) = int( u_vec * n_vec * dS )
+        nzmin = ulevels(edelem(1))
+        nzmax = nlevels(edelem(1))-1
+        ! we introduced c1 & c2 as arrays here to avoid deadlocks when in OpenMP mode
+        do nz = nzmax, nzmin, -1
+            ! --> h * u_vec * n_vec
+            ! --> e_vec = (dx,dy), n_vec = (-dy,dx);
+            ! --> h * u*(-dy) + v*dx
+            e1c1(nz)=( UVh(2, nz, edelem(1))*deltaX1 - UVh(1, nz, edelem(1))*deltaY1 )
+            ! inflow(outflow) "flux" to control volume of node enodes1
+            ! is equal to outflow(inflow) "flux" to control volume of node enodes2
+        end do ! --> do nz=nzmax,nzmin,-1
+        Wvel(nzmin:nzmax, ednodes(1))= Wvel(nzmin:nzmax, ednodes(1))+e1c1(nzmin:nzmax)
+        Wvel(nzmin:nzmax, ednodes(2))= Wvel(nzmin:nzmax, ednodes(2))-e1c1(nzmin:nzmax)
+        
+        if (Fer_GM) then
+            do nz = nzmax, nzmin, -1
+                e1c2(nz)=(fer_UV(2, nz, edelem(1))*deltaX1- fer_UV(1, nz, edelem(1))*deltaY1)*helem(nz, edelem(1))
+            end do ! --> do nz=nzmax,nzmin,-1
+            fer_Wvel(nzmin:nzmax, ednodes(1))= fer_Wvel(nzmin:nzmax, ednodes(1))+e1c2(nzmin:nzmax)
+            fer_Wvel(nzmin:nzmax, ednodes(2))= fer_Wvel(nzmin:nzmax, ednodes(2))-e1c2(nzmin:nzmax)
+        end if
+        
+        !_______________________________________________________________________
+        ! if ed is not a boundary edge --> calc div(u_vec*h) for every layer
+        ! for edelem(2)
+        e2c1 = 0.0_WP
+        e2c2 = 0.0_WP
+        if(edelem(2)>0)then
+            deltaX2=edge_cross_dxdy(3,ed)
+            deltaY2=edge_cross_dxdy(4,ed)
+            nzmin = ulevels(edelem(2))
+            nzmax = nlevels(edelem(2))-1   
+            do nz = nzmax, nzmin, -1
+                e2c1(nz)=-(UVh(2, nz, edelem(2))*deltaX2 - UVh(1, nz, edelem(2))*deltaY2)
+            end do ! --> do nz=nzmax,nzmin,-1
+            Wvel(nzmin:nzmax, ednodes(1))= Wvel(nzmin:nzmax, ednodes(1))+e2c1(nzmin:nzmax)
+            Wvel(nzmin:nzmax, ednodes(2))= Wvel(nzmin:nzmax, ednodes(2))-e2c1(nzmin:nzmax)
+            
+            if (Fer_GM) then
+                do nz = nzmax, nzmin, -1
+                    e2c2(nz)=-(fer_UV(2, nz, edelem(2))*deltaX2-fer_UV(1, nz, edelem(2))*deltaY2)*helem(nz, edelem(2))
+                end do ! --> do nz=nzmax,nzmin,-1
+                fer_Wvel(nzmin:nzmax, ednodes(1))= fer_Wvel(nzmin:nzmax, ednodes(1))+e2c2(nzmin:nzmax)
+                fer_Wvel(nzmin:nzmax, ednodes(2))= fer_Wvel(nzmin:nzmax, ednodes(2))-e2c2(nzmin:nzmax)
+            end if 
+        end if
+        
+        !_______________________________________________________________________
+        if ( any(Wvel(nzmin:nzmax, ednodes(1))/=Wvel(nzmin:nzmax, ednodes(1))) .or.  &
+             any(Wvel(nzmin:nzmax, ednodes(2))/=Wvel(nzmin:nzmax, ednodes(2)))) then
+            write(*,*) ' --> subroutine vert_vel_ale --> found Nan in Wvel after div_H(...)'
+            write(*,*) ' mype   =', mype
+            write(*,*) ' edge   =', ed
+            write(*,*) ' enodes =', enodes
+            write(*,*) ' Wvel(nzmin:nzmax, enodes(1))=', Wvel(nzmin:nzmax, ednodes(1))  
+            write(*,*) ' Wvel(nzmin:nzmax, enodes(2))=', Wvel(nzmin:nzmax, ednodes(2)) 
+            write(*,*) ' e1c1', e1c1(nzmin:nzmax)  
+            write(*,*) ' e1c2', e1c2(nzmin:nzmax)  
+            write(*,*) ' e2c1', e2c1(nzmin:nzmax)  
+            write(*,*) ' e2c2', e2c2(nzmin:nzmax)  
+        end if
+    end do ! --> do ed=1, myDim_edge2D
+    
+    !___________________________________________________________________________
+    ! add the contribution from -dh/dt * area
+    do node=1, myDim_nod2D
+        nzmin = ulevels_nod2D(node)
+        nzmax = nlevels_nod2d(node)-1
+        do nz=nzmax,nzmin,-1
+            Wvel(nz, node)=Wvel(nz, node)-(hnode_new(nz, node)-hnode(nz, node))*area(nz, node)/dt 
+        end do ! --> do nz=nzmax,nzmin,-1
+        
+        !_______________________________________________________________________
+        if ( any(Wvel(nzmin:nzmax, node)/=Wvel(nzmin:nzmax, node))) then
+            write(*,*) ' --> subroutine vert_vel_ale --> found Nan in Wvel after +dhnode/dt=W'
+            write(*,*) ' mype   =', mype
+            write(*,*) ' node   =', node
+            write(*,*) ' Wvel(     nzmin:nzmax, node)=', Wvel(nzmin:nzmax, node) 
+            write(*,*) ' hnode_new(nzmin:nzmax, node)=', hnode_new(nzmin:nzmax, node)  
+            write(*,*) ' hnode(    nzmin:nzmax, node)=', hnode(nzmin:nzmax, node)
+        end if
+    end do ! --> do node=1, myDim_nod2D
+    
+    !___________________________________________________________________________
+    ! Sum up to get W*area
+    ! cumulative summation of div(u_vec*h) vertically
+    ! W_k = W_k+1 - div(h_k*u_k)
+    ! W_k ... vertical flux troughdo node=1, myDim_nod2D
+    do node=1, myDim_nod2D
+        nzmin = ulevels_nod2D(node)
+        nzmax = nlevels_nod2d(node)-1
+        do nz=nzmax,nzmin,-1
+            Wvel(nz, node)=Wvel(nz, node)+Wvel(nz+1, node)  
+            if (Fer_GM) then 
+                fer_Wvel(nz, node)=fer_Wvel(nz, node)+fer_Wvel(nz+1, node)
+            end if
+        end do ! --> do nz=nzmax,nzmin,-1
+    end do ! --> do node=1, myDim_nod2D
+    
+    !___________________________________________________________________________
+    ! divide with depth dependent cell area to convert from Vertical flux to 
+    ! physical vertical velocities in units m/s
+    do node=1, myDim_nod2D
+        nzmin = ulevels_nod2D(node)
+        nzmax = nlevels_nod2d(node)-1
+        do nz=nzmin,nzmax
+            Wvel(nz, node)=Wvel(nz, node)/area(nz, node)
+            if (Fer_GM) then 
+                fer_Wvel(nz, node)=fer_Wvel(nz, node)/area(nz, node)
+            end if
+        end do ! --> do nz=nzmax,nzmin,-1
+    end do ! --> do node=1, myDim_nod2D
+    
+    !___________________________________________________________________________
+    ! Add surface fresh water flux as upper boundary condition for 
+    ! continutity
+    do node=1, myDim_nod2D
+        nzmin = ulevels_nod2D(node)
+        if (nzmin==1) Wvel(nzmin, node)=Wvel(nzmin, node)-water_flux(node) 
+    end do ! --> do node=1, myDim_nod2D
+    
+    !___________________________________________________________________________
+    call exchange_nod(Wvel, partit)
+    if (Fer_GM) call exchange_nod(fer_Wvel, partit)
+    
+    !___________________________________________________________________________
+    ! compute vertical CFL_z criteria
+    call compute_CFLz(dynamics, partit, mesh)
+    
+    !___________________________________________________________________________
+    ! compute implicite explicite splitting of vetical velocity Wvel according 
+    ! to CFL_z criteria
+    call compute_Wvel_split(dynamics, partit, mesh)
+    
+end subroutine compute_vert_vel_transpv
 
 

@@ -91,7 +91,7 @@ subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
     Wvel   => dynamics%w(:,:)
     CFL_z  => dynamics%cfl_z(:,:)
     eta_n  => dynamics%eta_n(:)
-    d_eta  => dynamics%d_eta(:)
+    if ( .not. dynamics%use_ssh_splitexpl_subcycl) d_eta => dynamics%d_eta(:)
     m_ice  => ice%data(2)%values(:)
     if (mod(istep,outfreq)==0) then
     
@@ -117,23 +117,26 @@ subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
     do n=1, myDim_nod2D
        loc_eta   = loc_eta   + areasvol(ulevels_nod2D(n), n)*eta_n(n)
        loc_hbar  = loc_hbar  + areasvol(ulevels_nod2D(n), n)*hbar(n)
-       loc_deta  = loc_deta  + areasvol(ulevels_nod2D(n), n)*d_eta(n)
        loc_dhbar = loc_dhbar + areasvol(ulevels_nod2D(n), n)*(hbar(n)-hbar_old(n))
+       if ( .not. dynamics%use_ssh_splitexpl_subcycl) then 
+            loc_deta  = loc_deta  + areasvol(ulevels_nod2D(n), n)*d_eta(n)
+       end if 
        loc_wflux = loc_wflux + areasvol(ulevels_nod2D(n), n)*water_flux(n)
     end do
+    if (dynamics%use_ssh_splitexpl_subcycl)  loc_deta=loc_dhbar
 #if !defined(__openmp_reproducible)
 !$OMP END PARALLEL DO     
 #endif
     !_______________________________________________________________________
     call MPI_AllREDUCE(loc_eta  , int_eta  , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
     call MPI_AllREDUCE(loc_hbar , int_hbar , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(loc_deta , int_deta , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+!PS     call MPI_AllREDUCE(loc_deta , int_deta , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
     call MPI_AllREDUCE(loc_dhbar, int_dhbar, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
     call MPI_AllREDUCE(loc_wflux, int_wflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)     
 
     int_eta  = int_eta  /ocean_areawithcav
     int_hbar = int_hbar /ocean_areawithcav
-    int_deta = int_deta /ocean_areawithcav
+!PS     int_deta = int_deta /ocean_areawithcav
     int_dhbar= int_dhbar/ocean_areawithcav
     int_wflux= int_wflux/ocean_areawithcav      
     !_______________________________________________________________________
@@ -161,7 +164,11 @@ subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
     call MPI_AllREDUCE(loc , min_vvel , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
     loc=omp_min_max_sum1(UVnode(2,2,:), 1, myDim_nod2D, 'min', partit)
     call MPI_AllREDUCE(loc , min_vvel2 , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(d_eta, 1, myDim_nod2D, 'min', partit)
+    if ( .not. dynamics%use_ssh_splitexpl_subcycl) then
+        loc=omp_min_max_sum1(d_eta, 1, myDim_nod2D, 'min', partit)
+    else
+        loc=omp_min_max_sum1(hbar-hbar_old, 1, myDim_nod2D, 'min', partit)
+    end if 
     call MPI_AllREDUCE(loc , min_deta  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
     loc=omp_min_max_sum1(hnode(1,:), 1, myDim_nod2D, 'min', partit)
     call MPI_AllREDUCE(loc , min_hnode , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
@@ -193,7 +200,11 @@ subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
     call MPI_AllREDUCE(loc , max_vvel , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
     loc=omp_min_max_sum1(UVnode(2,2,:), 1, myDim_nod2D, 'max', partit)
     call MPI_AllREDUCE(loc , max_vvel2 , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(d_eta, 1, myDim_nod2D, 'max', partit)
+    if ( .not. dynamics%use_ssh_splitexpl_subcycl) then
+        loc=omp_min_max_sum1(d_eta, 1, myDim_nod2D, 'max', partit)
+    else
+        loc=omp_min_max_sum1(hbar-hbar_old, 1, myDim_nod2D, 'max', partit)
+    end if 
     call MPI_AllREDUCE(loc , max_deta  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
     loc=omp_min_max_sum1(hnode(1, :), 1, myDim_nod2D, 'max', partit)
     call MPI_AllREDUCE(loc , max_hnode , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
@@ -296,6 +307,7 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
     real(kind=WP), dimension(:)    , pointer :: u_ice, v_ice
     real(kind=WP), dimension(:)    , pointer :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:)    , pointer :: a_ice_old, m_ice_old, m_snow_old
+    real(kind=WP), dimension(:), allocatable, target :: dhbar
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -303,10 +315,8 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
     UV          => dynamics%uv(:,:,:)
     Wvel        => dynamics%w(:,:)
     CFL_z       => dynamics%cfl_z(:,:)
-    ssh_rhs     => dynamics%ssh_rhs(:)
-    ssh_rhs_old => dynamics%ssh_rhs_old(:)
+    
     eta_n       => dynamics%eta_n(:)
-    d_eta       => dynamics%d_eta(:)
     u_ice       => ice%uice(:)
     v_ice       => ice%vice(:)
     a_ice       => ice%data(1)%values(:)
@@ -315,6 +325,15 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
     a_ice_old   => ice%data(1)%values_old(:)
     m_ice_old   => ice%data(2)%values_old(:)
     m_snow_old  => ice%data(3)%values_old(:)
+    if ( .not. dynamics%use_ssh_splitexpl_subcycl) then 
+        d_eta       => dynamics%d_eta(:)
+        ssh_rhs     => dynamics%ssh_rhs(:)
+        ssh_rhs_old => dynamics%ssh_rhs_old(:)
+    else
+        allocate(dhbar(myDim_nod2D+eDim_nod2D))
+        dhbar = hbar-hbar_old
+        d_eta => dhbar
+    end if 
     
     !___________________________________________________________________________
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz)
@@ -338,7 +357,9 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
           write(*,*) 'zbar_3d_n   = ',zbar_3d_n(:,n)
           write(*,*) 'Z_3d_n      = ',Z_3d_n(:,n)
           write(*,*)
-          write(*,*) 'ssh_rhs = ',ssh_rhs(n),', ssh_rhs_old = ',ssh_rhs_old(n)
+          if ( .not. dynamics%use_ssh_splitexpl_subcycl) then 
+            write(*,*) 'ssh_rhs = ',ssh_rhs(n),', ssh_rhs_old = ',ssh_rhs_old(n)
+          end if
           write(*,*)
           write(*,*) 'hbar = ',hbar(n),', hbar_old = ',hbar_old(n)
           write(*,*)
@@ -389,8 +410,10 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
           write(*,*) 'd_eta(n)    = ',d_eta(n)
           write(*,*) 'hbar     = ',hbar(n)
           write(*,*) 'hbar_old    = ',hbar_old(n)
-          write(*,*) 'ssh_rhs     = ',ssh_rhs(n)
-          write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(n)
+          if ( .not. dynamics%use_ssh_splitexpl_subcycl) then 
+            write(*,*) 'ssh_rhs     = ',ssh_rhs(n)
+            write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(n)
+          end if
           write(*,*)
           write(*,*) 'CFL_z(:,n)  = ',CFL_z(:,n)
           write(*,*)
@@ -411,6 +434,14 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
           write(*,*) 'hnode(1, n)  = ',hnode(1,n)
           write(*,*) 'hnode(:, n)  = ',hnode(:,n)
           write(*,*)
+          write(*,*) 'eta_n    = ',eta_n(n)
+          write(*,*) 'd_eta(n)    = ',d_eta(n)
+          write(*,*) 'hbar     = ',hbar(n)
+          write(*,*) 'hbar_old    = ',hbar_old(n)
+          if ( .not. dynamics%use_ssh_splitexpl_subcycl) then 
+            write(*,*) 'ssh_rhs     = ',ssh_rhs(n)
+            write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(n)
+          end if
           write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,n)/rad
           write(*,*)
 !$OMP END CRITICAL
@@ -445,8 +476,10 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
              write(*,*) 'd_eta(n)    = ',d_eta(n)
              write(*,*) 'hbar     = ',hbar(n)
              write(*,*) 'hbar_old    = ',hbar_old(n)
-             write(*,*) 'ssh_rhs     = ',ssh_rhs(n)
-             write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(n)
+             if ( .not. dynamics%use_ssh_splitexpl_subcycl) then 
+                write(*,*) 'ssh_rhs     = ',ssh_rhs(n)
+                write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(n)
+             end if
              write(*,*)
              write(*,*) 'm_ice    = ',m_ice(n)
              write(*,*) 'm_ice_old   = ',m_ice_old(n)
@@ -493,8 +526,10 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
              write(*,*) 'd_eta(n)    = ',d_eta(n)
              write(*,*) 'hbar     = ',hbar(n)
              write(*,*) 'hbar_old    = ',hbar_old(n)
-             write(*,*) 'ssh_rhs     = ',ssh_rhs(n)
-             write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(n)
+             if ( .not. dynamics%use_ssh_splitexpl_subcycl) then 
+                write(*,*) 'ssh_rhs     = ',ssh_rhs(n)
+                write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(n)
+             end if 
              write(*,*)
              write(*,*) 'hnode    = ',hnode(:,n)
              write(*,*) 'hnode_new   = ',hnode_new(:,n)

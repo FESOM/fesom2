@@ -46,7 +46,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     use g_comm_auto
     use g_sbf, only: l_mslp
     use momentum_adv_scalar_interface
-    use momentum_adv_scalar_4splitexpl_interface
+    use momentum_adv_scalar_transpv_interface
     implicit none 
     type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -154,8 +154,8 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         if (use_global_tides) then
            pre=pre-ssh_gp(elnodes)
         end if
-        Fx  = sum(gradient_sca(1:3,elem)*pre)
-        Fy  = sum(gradient_sca(4:6,elem)*pre)
+        Fx  = sum(gradient_sca(1:3, elem)*pre)
+        Fy  = sum(gradient_sca(4:6, elem)*pre)
         
         !_______________________________________________________________________
         ! when ssh split-explicite subcycling method is setted use transport velocities
@@ -172,37 +172,40 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
                 UV_rhsAB(2, nz, elem) =-UV(1, nz, elem)*ff! - mm*UV(1,nz,elem)*UV(2,nz,elem)
             end do
         else
-            UVBT_4AB(1:2,elem) = 0.0_WP
             do nz=nzmin,nzmax-1
                 ! add pressure gradient terms
                 UV_rhs(  1, nz, elem) = UV_rhs(1, nz, elem) + (Fx-pgf_x(nz, elem))*elem_area(elem)*helem(nz,elem)
                 UV_rhs(  2, nz, elem) = UV_rhs(2, nz, elem) + (Fy-pgf_y(nz, elem))*elem_area(elem)*helem(nz,elem)
-                
+!PS                 UV_rhs(  1, nz, elem) = UV_rhs(1, nz, elem) + (pgf_x(nz, elem))*elem_area(elem)*helem(nz,elem)
+!PS                 UV_rhs(  2, nz, elem) = UV_rhs(2, nz, elem) + (pgf_y(nz, elem))*elem_area(elem)*helem(nz,elem)
+!PS                 UV_rhs(  1, nz, elem) = UV_rhs(1, nz, elem) + (Fx)*elem_area(elem)*helem(nz,elem)
+!PS                 UV_rhs(  2, nz, elem) = UV_rhs(2, nz, elem) + (Fy)*elem_area(elem)*helem(nz,elem)
+
                 ! add coriolis force, initialise AB2 array of actual timestep 
                 ! with coriolis term
-                UV_rhsAB(1, nz ,elem) = UVh(1, nz, elem)*ff! + mm*UV(1,nz,elem)*UVh(1, nz, elem)  
-                UV_rhsAB(2, nz ,elem) =-UVh(2, nz, elem)*ff! - mm*UV(1,nz,elem)*UVh(2, nz, elem)
+                UV_rhsAB(1, nz ,elem) = UVh(2, nz, elem)*ff! + mm*UV(1,nz,elem)*UVh(2, nz, elem)  
+                UV_rhsAB(2, nz ,elem) =-UVh(1, nz, elem)*ff! - mm*UV(1,nz,elem)*UVh(1, nz, elem)
                 
                 ! compute barotropic velocity for adams-bashfort time stepping
                 ! UVBT_4AB(1:2, elem)--> actual timestep, 
                 ! UVBT_4AB(3:4, elem)--> previous timestep (is setted in 
                 ! call compute_BC_BT_SE_vtransp) 
-                UVBT_4AB(1, elem)    = UVBT_4AB(1, elem) + UVh(1, nz, elem)  ! 
-                UVBT_4AB(2, elem)    = UVBT_4AB(2, elem) + UVh(2, nz, elem)  !
+                UVBT_4AB(1, elem)    = UVh(1, nz, elem)  ! 
+                UVBT_4AB(2, elem)    = UVh(2, nz, elem)  !
             end do    
         end if 
         
         !_______________________________________________________________________
         if (dynamics%ldiag_ke) then
            do nz=nzmin,nzmax-1
-              dynamics%ke_pre(1,nz,elem)= (Fx-pgf_x(nz,elem))*dt!*elem_area(elem) !not to divide it aterwards (at the end of this subroutine)
-              dynamics%ke_pre(2,nz,elem)= (Fy-pgf_y(nz,elem))*dt!*elem_area(elem) !but account for DT here
+              dynamics%ke_pre(   1, nz, elem)= (Fx-pgf_x(nz, elem))*dt!*elem_area(elem) !not to divide it aterwards (at the end of this subroutine)
+              dynamics%ke_pre(   2, nz, elem)= (Fy-pgf_y(nz, elem))*dt!*elem_area(elem) !but account for DT here
 
-              dynamics%ke_cor_AB(1,nz,elem)= UV(2,nz,elem)*ff
-              dynamics%ke_cor_AB(2,nz,elem)=-UV(1,nz,elem)*ff
+              dynamics%ke_cor_AB(1, nz, elem)= UV(2, nz, elem)*ff
+              dynamics%ke_cor_AB(2, nz, elem)=-UV(1, nz, elem)*ff
 
-              dynamics%ke_adv_AB(1,nz,elem)= 0.0_WP
-              dynamics%ke_adv_AB(2,nz,elem)= 0.0_WP
+              dynamics%ke_adv_AB(1, nz, elem)= 0.0_WP
+              dynamics%ke_adv_AB(2, nz, elem)= 0.0_WP
            end do
         end if
 
@@ -219,7 +222,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         if (.not. dynamics%use_ssh_splitexpl_subcycl) then
             call momentum_adv_scalar(dynamics, partit, mesh)
         else
-            call momentum_adv_scalar_4splitexpl(dynamics, partit, mesh)
+            call momentum_adv_scalar_transpv(dynamics, partit, mesh)
         end if     
     end if
     
@@ -232,8 +235,8 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     end if
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
     do elem=1, myDim_elem2D
-        nzmax = nlevels(elem)
         nzmin = ulevels(elem)
+        nzmax = nlevels(elem)
         do nz=nzmin,nzmax-1
             UV_rhs(1,nz,elem)=dt*(UV_rhs(1,nz,elem)+UV_rhsAB(1,nz,elem)*ff)/elem_area(elem)
             UV_rhs(2,nz,elem)=dt*(UV_rhs(2,nz,elem)+UV_rhsAB(2,nz,elem)*ff)/elem_area(elem)
@@ -254,8 +257,8 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     if (dynamics%ldiag_ke) then
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
         do elem=1, myDim_elem2D
-            nzmax = nlevels(elem)
             nzmin = ulevels(elem)
+            nzmax = nlevels(elem)
             do nz=nzmin,nzmax-1
                 dynamics%ke_adv(:,nz,elem)=dt*(dynamics%ke_adv(:,nz,elem)+dynamics%ke_adv_AB(:,nz,elem)*ff)/elem_area(elem)
                 dynamics%ke_cor(:,nz,elem)=dt*(dynamics%ke_cor(:,nz,elem)+dynamics%ke_cor_AB(:,nz,elem)*ff)/elem_area(elem)
