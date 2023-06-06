@@ -822,7 +822,7 @@ subroutine check_validviscopt_5(partit, mesh)
     loc_A = 0.0_WP
     
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmax, nzmin, c1, rossbyr_1barocl, &
-!$OMP                                  fac_ResR1barocl, loc_R, loc_A)
+!$OMP                                  fac_ResR1barocl) REDUCTION(+:loc_R, loc_A)
 !$OMP DO
     do node=1, myDim_nod2D
         !_______________________________________________________________________
