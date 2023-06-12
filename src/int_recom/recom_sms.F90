@@ -1289,7 +1289,14 @@ endif ! REcoM_Third_Zoo
 !Zoo2RespFlux   = 0.0
 !Zoo2LossFlux   = 0.0
     end if
-
+!-------------------------------------------------------------------------------
+!< Mesozooplankton fecal pellets
+    mesfecalloss_n = 0.0
+    mesfecalloss_c = 0.0
+    if (REcoM_Third_Zoo)
+            mesfecalloss_n = fecal_rate_n_mes * grazingFlux
+            mesfecalloss_c = fecal_rate_c_mes * grazingFluxcarbon_mes
+    end if
 !------------------------------------------------------------------------------- 
 ! Third zooplankton (microzooplankton) respiration ! NEW 3Zoo
     MicZooRespFlux = 0.d0
