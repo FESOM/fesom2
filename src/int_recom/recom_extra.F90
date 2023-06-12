@@ -266,9 +266,9 @@ endif
 
     else  
 
-     CO2filename = trim(REcoMDataPath)//'MonthlyAtmCO2_gcb2021.nc'
+!     CO2filename = trim(REcoMDataPath)//'MonthlyAtmCO2_gcb2021.nc'
 !     CO2filename = trim(REcoMDataPath)//'MonthlyAtmCO2_2019.nc'
-!     CO2filename = trim(REcoMDataPath)//CO2file//'.nc'
+     CO2filename = trim(REcoMDataPath)//CO2file
 
      totnumyear                 = lastyearoffesomcycle-firstyearoffesomcycle+1
      firstyearofcurrentCO2cycle = lastyearoffesomcycle-numofCO2cycles*totnumyear+(currentCO2cycle-1)*totnumyear
