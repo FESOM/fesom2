@@ -356,7 +356,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 
                 chl_upper  = (PhyChl + DiaChl)
 #if defined (__coccos) 
-                chl_upper = chl_upper + CoccoChl 
+                chl_upper  = chl_upper + CoccoChl 
 #endif
             else
                 chl_lower  = PhyChl + DiaChl
@@ -1001,6 +1001,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 
             Zoo2fecalloss_n = fecal_rate_n * grazingFlux2
             Zoo2fecalloss_c = fecal_rate_c * grazingFluxcarbonzoo2
+
+!-------------------------------------------------------------------------------
+!< Mesozooplankton fecal pellets
+
+            mesfecalloss_n = fecal_rate_n_mes * grazingFlux
+            mesfecalloss_c = fecal_rate_c_mes * grazingFluxcarbon_mes
 
 !------------------------------------------------------------------------------- 
 ! Third zooplankton, microzooplankton, respiration ! 3Zoo
