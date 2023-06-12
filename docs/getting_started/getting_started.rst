@@ -171,7 +171,7 @@ Let's assume that we run the model with a timestep of 30 minutes (= 1800 seconds
 ::
 
     84600.0 365 1958
-    0.0     1   1958
+    0.0     1   1959
 
 where the first row is the second of the day of the last time step of the model, and the second row gives the time when the simulation is to be continued. The first row indicates that the model ran for 365 days (in 1958) and 84600 seconds, which is ``1 day - 1`` FESOM timestep in seconds. In the next run, FESOM2 will look for restart files for the year 1958 and continue the simulation at the 1st of January in 1959.
 

@@ -126,6 +126,7 @@ subroutine par_init(partit)    ! initializes MPI
   call MPI_Comm_Size(partit%MPI_COMM_FESOM,partit%npes,i)
   call MPI_Comm_Rank(partit%MPI_COMM_FESOM,partit%mype,i)
   if(partit%mype==0) then
+#if !defined(__PGI)
     call MPI_Query_thread(provided_mpi_thread_support_level, i)
     if(provided_mpi_thread_support_level == MPI_THREAD_SINGLE) then
       provided_mpi_thread_support_level_name = "MPI_THREAD_SINGLE"
@@ -140,6 +141,7 @@ subroutine par_init(partit)    ! initializes MPI
     end if
     write(*,*) 'MPI has been initialized, provided MPI thread support level: ', &
          provided_mpi_thread_support_level_name,provided_mpi_thread_support_level
+#endif
     write(*, *) 'Running on                   ', partit%npes, ' PEs'
 #if defined(_OPENMP)
     write(*, *) 'This is MPI/OpenMP run, with ', OMP_GET_MAX_THREADS(), ' threads per PE'
@@ -642,7 +644,7 @@ subroutine init_server(mio_parent_comm, partit)
 
    integer :: cerr
    integer(4), intent(in)                :: mio_parent_comm
-   type(multio_configurationcontext)     :: cc
+   type(multio_configuration)     :: cc
    type(t_partit), intent(in),    target :: partit
    
 #include "associate_part_def.h"
@@ -665,7 +667,7 @@ subroutine init_client(mio, partit, mesh)
 
    type(multio_handle), intent(inout):: mio
    type(multio_metadata)             :: md
-   type(multio_configurationcontext) :: cc
+   type(multio_configuration) :: cc
    integer                           :: cerr
    integer                           :: elem, elnodes(3), aux
    type(t_partit), intent(in),    target :: partit
@@ -692,7 +694,7 @@ subroutine init_client(mio, partit, mesh)
    cerr = md%set_int("globalSize", mesh%nod2D)
    cerr = md%set_bool("toAllServers", .TRUE._1)
    if (cerr /= MULTIO_SUCCESS) ERROR STOP 14
-   cerr = mio%write_domain(md, partit%myList_nod2D(1:partit%myDim_nod2D)-1, partit%myDim_nod2D)
+   cerr = mio%write_domain(md, partit%myList_nod2D(1:partit%myDim_nod2D)-1)
    cerr = md%delete()
 
    !declare grid at elements
@@ -706,7 +708,7 @@ subroutine init_client(mio, partit, mesh)
    cerr = md%set_int("globalSize", mesh%elem2D)
    cerr = md%set_bool("toAllServers", .TRUE._1)
    if (cerr /= MULTIO_SUCCESS) ERROR STOP 14
-   cerr = mio%write_domain(md, partit%myList_elem2D(partit%myInd_elem2D_shrinked)-1, partit%myDim_elem2D_shrinked)
+   cerr = mio%write_domain(md, partit%myList_elem2D(partit%myInd_elem2D_shrinked)-1)
    cerr = md%delete()
 end subroutine init_client
 #endif

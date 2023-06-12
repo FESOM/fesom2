@@ -20,7 +20,11 @@ SUBROUTINE nemogcmcoup_init( mype, icomm, inidate, initime, itini, itend, zstp, 
    USE g_config, only: dt
    USE g_clock, only: timenew, daynew, yearnew, month, day_in_month
    USE nemogcmcoup_steps, ONLY : substeps
-   
+#ifdef __MULTIO
+   USE MIO_INTERFACES
+   use multio_config
+   use multio_api
+#endif
    IMPLICIT NONE
 
    ! Input arguments
@@ -43,6 +47,9 @@ SUBROUTINE nemogcmcoup_init( mype, icomm, inidate, initime, itini, itend, zstp, 
    ! FESOM might perform substeps
    INTEGER :: itend_fesom
    INTEGER :: i
+   character(len=255)                    :: mio_npes_str
+   integer                               :: mycolor   
+   integer                               :: oce_npes_int, mio_npes_int, mio_status
    NAMELIST/namfesomstep/substeps
 
    ! overwritten from value namelist
@@ -50,9 +57,34 @@ SUBROUTINE nemogcmcoup_init( mype, icomm, inidate, initime, itini, itend, zstp, 
    OPEN(9,file='namfesomstep.in')
    READ(9,namfesomstep)
    CLOSE(9)
-
+#if !defined(__MULTIO)
    fesom%partit%MPI_COMM_FESOM=icomm
-
+#else
+   CALL MPI_Comm_Size(icomm, fesom%partit%npes, i)
+   CALL MPI_Comm_Rank(icomm, fesom%partit%mype, i)
+   CALL get_environment_variable('MIO_NPES', mio_npes_str, status=mio_status)
+   if (mio_status/=0) then
+      write(*,*) '$MIO_NPES variable is not set!'
+      call par_ex(icomm, fesom%partit%mype, i)
+      stop
+   end if
+   read(mio_npes_str,*,iostat=mio_status) mio_npes_int
+   oce_npes_int=fesom%partit%npes-mio_npes_int
+   if (fesom%partit%mype==0) write(*,*) 'Size of communicator receieved from IFS is: ', fesom%partit%npes
+   if (fesom%partit%mype==0) write(*,*) 'FESOM will run on                         : ', oce_npes_int, ' processes'
+   if (fesom%partit%mype==0) write(*,*) 'MULTIO Server will run on                 : ', mio_npes_int, ' processes'
+   mycolor=0
+   if (fesom%partit%mype > oce_npes_int-1) mycolor=1
+   CALL MPI_COMM_SPLIT(icomm, mycolor, 0, fesom%partit%MPI_COMM_FESOM, mio_status)
+   IF (multio_initialise() /= MULTIO_SUCCESS) then
+      write(*,*)  'Failed to initialise MULTIO api'
+   END IF
+   IF (mycolor==1) then
+      call init_server(icomm, fesom%partit)
+      call par_ex(icomm, fesom%partit%mype, i)
+      return
+   END IF
+#endif
    itini = 1
    CALL fesom_init(itend_fesom) !also sets mype and npes 
    itend=itend_fesom/substeps
@@ -450,14 +482,14 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    ! Pack ice thickness data and interpolate: 'pghic' on Gaussian grid.
    nfield = nfield + 1
    DO n=1,myDim_nod2D
-      zsendnf(n,nfield)=m_ice(n)/MAX(a_ice(n),0.01) ! ice thickness (mean over ice)
+      zsendnf(n,nfield)=m_ice(n)!/MAX(a_ice(n),0.01) ! ice thickness (mean over ice)
    ENDDO
    
    ! =================================================================== !
    ! Pack snow thickness data and interpolate: 'pghsn' on Gaussian grid.
    nfield = nfield + 1
    DO n=1,myDim_nod2D
-      zsendnf(n,nfield)=m_snow(n)/MAX(a_ice(n),0.01) ! snow thickness (mean over ice)
+      zsendnf(n,nfield)=m_snow(n)!/MAX(a_ice(n),0.01) ! snow thickness (mean over ice)
    ENDDO
 
    ! =================================================================== !
@@ -598,6 +630,7 @@ SUBROUTINE nemogcmcoup_exflds_get( mype, npes, icomm, &
    USE interinfo
    USE fesom_main_storage_module, only: fesom => f
    USE o_ARRAYS, only : MLD1
+   USE diagnostics, only : ldiag_extflds, zisotherm, saltzavg, tempzavg
    IMPLICIT NONE
    
    ! Arguments
@@ -645,9 +678,15 @@ SUBROUTINE nemogcmcoup_exflds_get( mype, npes, icomm, &
    ! =================================================================== !
    ! Pack depth of 20C isotherm
    nfield = nfield + 1
-   DO n=1,myDim_nod2D
-      zsendnf(n,nfield)=-1. ! compute later, set to -1 for the moment
-   ENDDO
+   if (ldiag_extflds) then 
+     DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=zisotherm(n) ! extra diagnostics active
+     ENDDO
+   else
+     DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=-1. ! set to -1 as placeholder
+     ENDDO
+   end if
 
    ! =================================================================== !
    ! Pack sea surface salinity data: 'pgsss' on Gaussian grid.
@@ -659,16 +698,28 @@ SUBROUTINE nemogcmcoup_exflds_get( mype, npes, icomm, &
    ! =================================================================== !
    ! Pack average temp over upper 300m: 'pgtem300' on Gaussian grid.
    nfield = nfield + 1
-   DO n=1,myDim_nod2D
-      zsendnf(n,nfield)=-1. ! compute later, set to -1
-   ENDDO
-   
+   if (ldiag_extflds) then
+     DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=tempzavg(n) ! extra diagnostic active
+     ENDDO
+   else
+     DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=-1. ! set to -1 as placeholder
+     ENDDO
+   end if
+
    ! =================================================================== !
    ! Pack average salinity over upper 300m: 'pgsal300' on Gaussian grid.
    nfield = nfield + 1
-   DO n=1,myDim_nod2D
-      zsendnf(n,nfield)=-1. ! compute later, set to -1
-   ENDDO
+   if (ldiag_extflds) then
+     DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=saltzavg(n) ! extra diagnostic active
+     ENDDO
+   else
+     DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=-1. ! set to -1 as placeholder
+     ENDDO
+   end if
 
    ! =================================================================== !
    ! Interpolate all fields
@@ -775,7 +826,8 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! Local variables
    INTEGER		:: n, jf
    integer, pointer     :: myDim_nod2D, eDim_nod2D
-   REAL(wpIFS), parameter 	:: rhofwt = 1000. ! density of freshwater
+   REAL(wpIFS), parameter 	:: rhofwt = 1000.        ! density of freshwater
+   REAL(wpIFS), parameter  :: lfus = 333.7          ! latent heat of fusion [J/g]
 
    ! Packed send/receive buffers
    INTEGER , PARAMETER :: maxnfield = 11
@@ -787,7 +839,8 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! associate only the necessary things
    real(kind=wpIFS), dimension(:,:), pointer :: coord_nod2D
    real(kind=wpIFS), dimension(:)  , pointer :: stress_atmice_x, stress_atmice_y
-   real(kind=wpIFS), dimension(:)  , pointer :: oce_heat_flux, ice_heat_flux 
+   real(kind=wpIFS), dimension(:)  , pointer :: oce_heat_flux, ice_heat_flux, a_ice
+   real(kind=wpIFS), dimension(:)  , pointer :: enthalpyoffuse
    myDim_nod2D        => fesom%partit%myDim_nod2D
    eDim_nod2D         => fesom%partit%eDim_nod2D
    coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => fesom%mesh%coord_nod2D(:,:)  
@@ -795,7 +848,8 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    stress_atmice_y    => fesom%ice%stress_atmice_y
    oce_heat_flux      => fesom%ice%atmcoupl%oce_flx_h(:)
    ice_heat_flux      => fesom%ice%atmcoupl%ice_flx_h(:)
-   
+   a_ice              => fesom%ice%data(1)%values(:)
+   enthalpyoffuse     => fesom%ice%atmcoupl%enthalpyoffuse(:)
    ! =================================================================== !
    ! Sort out incoming arrays from the IFS and put them on the ocean grid
 
@@ -810,7 +864,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ice_heat_flux=0. 	! Done. This is qns__ice currently. Is this the non-solar heat flux?    !   non solar heat fluxes below  !  (qns)
    oce_heat_flux=0. 	! Done. This is qns__oce currently. Is this the non-solar heat flux?
    !
-   runoff(:)=0.		! not used apparently. What is runoffIN, ocerunoff?
+   !runoff(:)=0.		! not used apparently. What is runoffIN, ocerunoff?
    !evaporation(:)=0.
    !ice_thermo_cpl.F90:  !---- total evaporation (needed in oce_salt_balance.F90)
    !ice_thermo_cpl.F90:  evaporation = evap_no_ifrac*(1.-a_ice) + sublimation*a_ice
@@ -836,9 +890,9 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    zsendnf(:,nfield) = qns__oce(:)
 
    ! =================================================================== !
-   !4. Non-solar radiation over ice to T grid (is this non-solar heat flux?)
+   !4. Total flux over sea ice to T grid
    nfield = nfield + 1
-   zsendnf(:,nfield) = qns__ice(:)
+   zsendnf(:,nfield) = qns__ice(:)+qs___ice(:)
 
    ! =================================================================== !
    !5. D(q)/dT to T grid
@@ -956,7 +1010,9 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    !4. Unpack ice non-solar
    nfield = nfield + 1
    ice_heat_flux(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)
-
+   where (a_ice<=1.e-12)
+         ice_heat_flux=0.0
+   end where
    ! Do the halo exchange
    call exchange_nod(ice_heat_flux,fesom%partit)
 
@@ -976,18 +1032,17 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    nfield = nfield + 1
    evap_no_ifrac(1:myDim_nod2D)=-zrecvnf(1:myDim_nod2D,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
 
-   ! Do the halo exchange
-   call exchange_nod(evap_no_ifrac,fesom%partit)
-
    !7. Unpack sublimation (evaporation over ice), without halo
    nfield = nfield + 1
    sublimation(1:myDim_nod2D)=-zrecvnf(1:myDim_nod2D,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
 
-   ! Do the halo exchange
-   call exchange_nod(sublimation,fesom%partit)
    ! =================================================================== !
-   ! =================================================================== !
+   sublimation(1:myDim_nod2D)  =sublimation(1:myDim_nod2D)*a_ice(1:myDim_nod2D)     ! sublimation   -> sublimation weighted with A
+   evap_no_ifrac(1:myDim_nod2D)=evap_no_ifrac(1:myDim_nod2D)-sublimation(1:myDim_nod2D)            ! evap_no_ifrac -> evap weighted with (1-A)
 
+   ! Do the halo exchange
+   call exchange_nod(evap_no_ifrac,fesom%partit)
+   call exchange_nod(sublimation,  fesom%partit)
 
    ! =================================================================== !
    !8. Unpack liquid precipitation, without halo
@@ -1064,13 +1119,16 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
 
    !if ((do_rotate_oce_wind .AND. do_rotate_ice_wind) .AND. rotated_grid) then
    do n=1, myDim_nod2D+eDim_nod2D
-	call vector_g2r(stress_atmoce_x(n), stress_atmoce_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0) !0-flag for rot. coord.
-	call vector_g2r(stress_atmice_x(n), stress_atmice_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
+	   call vector_g2r(stress_atmoce_x(n), stress_atmoce_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0) !0-flag for rot. coord.
+	   call vector_g2r(stress_atmice_x(n), stress_atmice_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
    end do
    !do_rotate_oce_wind=.false.
    !do_rotate_ice_wind=.false.
    !end if
-
+   ! Enthalpy heat of fusion: take heat from the ocean in order to melt the snow that is falling into the ocean
+   ! prec_snow*rho [kg/m2/s] * lfus [J/kg] = W/m2
+   enthalpyoffuse(1:myDim_nod2D)= - rhofwt * prec_snow(1:myDim_nod2D) * lfus * 1000.
+   call exchange_nod(enthalpyoffuse, fesom%partit)
 END SUBROUTINE nemogcmcoup_lim2_update
 
 

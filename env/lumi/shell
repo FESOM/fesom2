@@ -1,0 +1,59 @@
+# Source me to get the correct configure/build/run environment
+
+# Store tracing and disable (module is *way* too verbose)
+{ tracing_=${-//[^x]/}; set +x; } 2>/dev/null
+
+module_load() {
+  if [ "${2:-""}" == "ECBUILD_CONFIGURE_ONLY" ]; then
+    if [ -n "${ECBUILD_CONFIGURE}" ]; then
+      echo "+ module load $1"
+      module load $1
+    else
+      echo " WARNING: Module $1 not loaded (only during configuration)"
+    fi
+  else
+    echo "+ module load $1"
+    module load $1
+  fi
+}
+module_unload() {
+  echo "+ module unload $1"
+  module unload $1
+}
+
+# Unload to be certain
+module --force purge
+
+# Load modules
+module_load LUMI/23.03
+module_load partition/C
+module_load cpeCray/23.03
+module_load cray-mpich/8.1.25
+module_load cray-fftw/3.3.10.3
+module_load cray-hdf5/1.12.2.3
+module_load cray-netcdf/4.9.0.3
+module_load Eigen/3.4
+module_load libaec/1.0.6-cpeCray-23.03
+module_load Boost/1.81.0-cpeCray-23.03
+module_load ncurses/6.4-cpeCray-23.03
+module_load buildtools/23.03
+#export FFTW_PATH=$( { module load fftw/3.3.4.5; } 2>/dev/null; echo $FFTW_DIR )
+#export NETCDF_ROOT=$( { module load netcdf4-parallel/4.6.2; } 2>/dev/null; echo $NETCDF_DIR )
+#export HDF5_ROOT=$( { module load hdf5-parallel/1.10.4; } 2>/dev/null; echo $HDF5_DIR )
+                             # single precision bit reproducibility
+
+                             
+export lib_multio=/pfs/lustrep3/scratch/project_465000454/$USER/ifs-bundle-DE_CY48R1.0_climateDT/build.SP/lib/
+export inc_multio=/pfs/lustrep3/scratch/project_465000454/$USER/ifs-bundle-DE_CY48R1.0_climateDT/build.SP/multio/module/
+export lib_eccodes=/pfs/lustrep3/scratch/project_465000454/$USER/ifs-bundle-DE_CY48R1.0_climateDT/build.SP/lib/
+
+module list 2>&1
+set -x
+
+export ECBUILD_TOOLCHAIN=./toolchain.cmake
+
+export CRAY_ADD_RPATH=yes
+
+
+# Restore tracing to stored setting
+{ if [[ -n "$tracing_" ]]; then set -x; else set +x; fi } 2>/dev/null
