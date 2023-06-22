@@ -9,7 +9,16 @@ module mod_parsup
   end subroutine
   end interface
 end module mod_parsup
-
+MODULE multio_custom_error_handler_interface
+   INTERFACE
+   SUBROUTINE multio_custom_error_handler(context, err)
+   implicit none
+   integer(8), intent(inout) :: context  ! Use mpi communicator as context
+   integer, intent(in) :: err
+   integer :: mpierr
+   END SUBROUTINE
+   END INTERFACE
+END MODULE multio_custom_error_handler_interface 
 module par_support_interfaces
   interface
   subroutine par_init(partit)
@@ -636,6 +645,7 @@ endif
 end subroutine status_check
 !===================================================================
 #if defined(__MULTIO)
+
 subroutine init_server(mio_parent_comm, partit)
    use multio_config
    use multio_api
@@ -657,17 +667,35 @@ subroutine init_server(mio_parent_comm, partit)
    cerr = cc%delete()
    stop   
 end subroutine init_server
+SUBROUTINE multio_custom_error_handler(context, err)
+   use multio_config
+   use multio_api
+   USE MOD_PARTIT
+   implicit none
+        integer(8), intent(inout) :: context  ! Use mpi communicator as context
+        integer, intent(in) :: err
+        integer :: mpierr
 
+        IF (err /= MULTIO_SUCCESS) THEN
+            write(*,*) 'MULTIO ERROR: ', multio_error_string(err)
+            STOP
+            IF (context /= MPI_UNDEFINED) THEN
+                call MPI_ABORT(int(context), MPI_ERR_OTHER, mpierr)
+                context = MPI_UNDEFINED
+            ENDIF
+        ENDIF
+END SUBROUTINE
 subroutine init_client(mio, partit, mesh)
    use multio_config
    use multio_api
    use MOD_MESH
    USE MOD_PARTIT
+   USE multio_custom_error_handler_interface
    implicit none
 
-   type(multio_handle), intent(inout):: mio
+   type(multio_handle), intent(inout) :: mio
    type(multio_metadata)             :: md
-   type(multio_configuration) :: cc
+   type(multio_configuration)        :: cc
    integer                           :: cerr
    integer                           :: elem, elnodes(3), aux
    type(t_partit), intent(in),    target :: partit
@@ -678,11 +706,15 @@ subroutine init_client(mio, partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-   cerr = cc%new()
-   if (cerr /= MULTIO_SUCCESS) ERROR STOP "Error creating default configuration context"
-   cerr = cc%mpi_client_id("oce")
-   cerr = mio%new(cc)
-   cerr = mio%open_connections()
+!   cerr= multio_set_failure_handler(multio_custom_error_handler, INT(partit%MPI_COMM_FESOM,8))
+!   cerr = cc%new()
+!   if (cerr /= MULTIO_SUCCESS) ERROR STOP "Error creating default configuration context"
+!   cerr = cc%mpi_allow_world_default_comm(.FALSE._1)
+!   cerr = cc%mpi_parent_comm(partit%MPI_PCOM_FESOM) !(partit%MPI_PCOM_FESOM)
+!   cerr = cc%mpi_client_id("oce")
+!   cerr = mio%new(cc)
+!   cerr = mio%open_connections()   
+!#if FALSE
    !declare grid at nodes   
    cerr = md%new()
    cerr = md%set_string("name", "ngrid")
@@ -710,5 +742,6 @@ subroutine init_client(mio, partit, mesh)
    if (cerr /= MULTIO_SUCCESS) ERROR STOP 14
    cerr = mio%write_domain(md, partit%myList_elem2D(partit%myInd_elem2D_shrinked)-1)
    cerr = md%delete()
+!#endif
 end subroutine init_client
 #endif

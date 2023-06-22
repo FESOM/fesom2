@@ -9,7 +9,7 @@ MODULE nemogcmcoup_steps
    INTEGER :: substeps !per IFS timestep
 END MODULE nemogcmcoup_steps
 
-SUBROUTINE nemogcmcoup_init( mype, icomm, inidate, initime, itini, itend, zstp, &
+SUBROUTINE nemogcmcoup_init( mype, icomm, mio, inidate, initime, itini, itend, zstp, &
    & lwaveonly, iatmunit, lwrite )
 
    ! Initialize the FESOM model for single executable coupling 
@@ -30,8 +30,9 @@ SUBROUTINE nemogcmcoup_init( mype, icomm, inidate, initime, itini, itend, zstp, 
    ! Input arguments
 
    ! Message passing information
-   INTEGER, INTENT(IN) :: mype ! was added to ifs/nemo/ininemo.F90 to allow diagnostics based on the first tasks only
-   INTEGER, INTENT(IN) :: icomm
+   INTEGER, INTENT(IN)             :: mype ! was added to ifs/nemo/ininemo.F90 to allow diagnostics based on the first tasks only
+   INTEGER, INTENT(IN)             :: icomm
+   type(multio_handle), intent(inout) :: mio
    ! Initial date (e.g. 20170906), time, initial timestep and final time step
    INTEGER, INTENT(OUT) ::  inidate, initime, itini, itend
    ! Length of the time step
@@ -57,34 +58,37 @@ SUBROUTINE nemogcmcoup_init( mype, icomm, inidate, initime, itini, itend, zstp, 
    OPEN(9,file='namfesomstep.in')
    READ(9,namfesomstep)
    CLOSE(9)
-#if !defined(__MULTIO)
+!#if !defined(__MULTIO)
    fesom%partit%MPI_COMM_FESOM=icomm
-#else
    CALL MPI_Comm_Size(icomm, fesom%partit%npes, i)
    CALL MPI_Comm_Rank(icomm, fesom%partit%mype, i)
-   CALL get_environment_variable('MIO_NPES', mio_npes_str, status=mio_status)
-   if (mio_status/=0) then
-      write(*,*) '$MIO_NPES variable is not set!'
-      call par_ex(icomm, fesom%partit%mype, i)
-      stop
-   end if
-   read(mio_npes_str,*,iostat=mio_status) mio_npes_int
-   oce_npes_int=fesom%partit%npes-mio_npes_int
-   if (fesom%partit%mype==0) write(*,*) 'Size of communicator receieved from IFS is: ', fesom%partit%npes
-   if (fesom%partit%mype==0) write(*,*) 'FESOM will run on                         : ', oce_npes_int, ' processes'
-   if (fesom%partit%mype==0) write(*,*) 'MULTIO Server will run on                 : ', mio_npes_int, ' processes'
-   mycolor=0
-   if (fesom%partit%mype > oce_npes_int-1) mycolor=1
-   CALL MPI_COMM_SPLIT(icomm, mycolor, 0, fesom%partit%MPI_COMM_FESOM, mio_status)
-   IF (multio_initialise() /= MULTIO_SUCCESS) then
-      write(*,*)  'Failed to initialise MULTIO api'
-   END IF
-   IF (mycolor==1) then
-      call init_server(icomm, fesom%partit)
-      call par_ex(icomm, fesom%partit%mype, i)
-      return
-   END IF
-#endif
+   fesom%mio=mio
+!#else
+!   CALL MPI_Comm_Size(icomm, fesom%partit%npes, i)
+!   CALL MPI_Comm_Rank(icomm, fesom%partit%mype, i)
+!   CALL get_environment_variable('MIO_NPES', mio_npes_str, status=mio_status)
+!   if (mio_status/=0) then
+!      write(*,*) '$MIO_NPES variable is not set!'
+!      call par_ex(icomm, fesom%partit%mype, i)
+!      stop
+!   end if
+!   read(mio_npes_str,*,iostat=mio_status) mio_npes_int
+!   oce_npes_int=fesom%partit%npes-mio_npes_int
+!   if (fesom%partit%mype==0) write(*,*) 'Size of communicator receieved from IFS is: ', fesom%partit%npes
+!   if (fesom%partit%mype==0) write(*,*) 'FESOM will run on                         : ', oce_npes_int, ' processes'
+!   if (fesom%partit%mype==0) write(*,*) 'MULTIO Server will run on                 : ', mio_npes_int, ' processes'
+!   mycolor=0
+!   if (fesom%partit%mype > oce_npes_int-1) mycolor=1
+!   CALL MPI_COMM_SPLIT(icomm, mycolor, 0, fesom%partit%MPI_COMM_FESOM, mio_status)
+!   IF (multio_initialise() /= MULTIO_SUCCESS) then
+!      write(*,*)  'Failed to initialise MULTIO api'
+!   END IF
+!   IF (mycolor==1) then
+!      call init_server(icomm, fesom%partit)
+!      call par_ex(icomm, fesom%partit%mype, i)
+!      return
+!   END IF
+!#endif
    itini = 1
    CALL fesom_init(itend_fesom) !also sets mype and npes 
    itend=itend_fesom/substeps
