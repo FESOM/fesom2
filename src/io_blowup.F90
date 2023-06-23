@@ -111,14 +111,16 @@ MODULE io_BLOWUP
             call def_variable(bid, 'ssh_rhs_old', (/nod2D/)			, 'RHS for the elevation', '?', dynamics%ssh_rhs_old);
             
         else
-            call def_variable(bid, 'ubt_rhs'  , (/elem2D/), 'zonal RHS barotr. transp. equation' , '?', dynamics%se_uvBT_rhs(  1,:));
-            call def_variable(bid, 'vbt_rhs'  , (/elem2D/), 'merid. RHS barotr. transp. equation', '?', dynamics%se_uvBT_rhs(  2,:));
-            call def_variable(bid, 'ubt'	  , (/elem2D/), 'zonal barotr. transp.'              , '?', dynamics%se_uvBT(      1,:));
-            call def_variable(bid, 'vbt'	  , (/elem2D/), 'merid. barotr. transp.'             , '?', dynamics%se_uvBT(      2,:));
-            call def_variable(bid, 'ubt_theta', (/elem2D/), 'zonal barotr. theta term.'          , '?', dynamics%se_uvBT_theta(1,:));
-            call def_variable(bid, 'vbt_theta', (/elem2D/), 'merid. barotr. theta term'          , '?', dynamics%se_uvBT_theta(2,:));
-            call def_variable(bid, 'ubt_mean' , (/elem2D/), 'zonal barotr. mean term.'           , '?', dynamics%se_uvBT_mean( 1,:));
-            call def_variable(bid, 'vbt_mean' , (/elem2D/), 'merid. barotr. mean term'           , '?', dynamics%se_uvBT_mean( 2,:));
+            call def_variable(bid, 'ubt_rhs'  , (/elem2D/), 'zonal RHS barotr. transp. equation' , '?'  , dynamics%se_uvBT_rhs(  1,:));
+            call def_variable(bid, 'vbt_rhs'  , (/elem2D/), 'merid. RHS barotr. transp. equation', '?'  , dynamics%se_uvBT_rhs(  2,:));
+            call def_variable(bid, 'ubt'	  , (/elem2D/), 'zonal barotr. transp.'              , '?'  , dynamics%se_uvBT(      1,:));
+            call def_variable(bid, 'vbt'	  , (/elem2D/), 'merid. barotr. transp.'             , '?'  , dynamics%se_uvBT(      2,:));
+            call def_variable(bid, 'ubt_theta', (/elem2D/), 'zonal barotr. theta term.'          , '?'  , dynamics%se_uvBT_theta(1,:));
+            call def_variable(bid, 'vbt_theta', (/elem2D/), 'merid. barotr. theta term'          , '?'  , dynamics%se_uvBT_theta(2,:));
+            call def_variable(bid, 'ubt_mean' , (/elem2D/), 'zonal barotr. mean term.'           , '?'  , dynamics%se_uvBT_mean( 1,:));
+            call def_variable(bid, 'vbt_mean' , (/elem2D/), 'merid. barotr. mean term'           , '?'  , dynamics%se_uvBT_mean( 2,:));
+            call def_variable(bid, 'uh'       , (/nl-1, elem2D/), 'zonal velocity'               , 'm/s', dynamics%se_uvh(1,:,:));
+            call def_variable(bid, 'vh'       , (/nl-1, elem2D/), 'meridional velocity'          , 'm/s', dynamics%se_uvh(2,:,:));
 		end if 
 		
 		!___Define the netCDF variables for 3D fields_______________________________
