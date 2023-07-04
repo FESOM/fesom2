@@ -144,8 +144,8 @@ subroutine solve_tracers_ale(mesh)
                             SinkFlx_tr, Benthos, Benthos_tr, & ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
                             Sinkingvel1, Sinkingvel2, Sinkvel1_tr, Sinkvel2_tr ! OG 16.03.23 
 
-    use REcom_config, only: use_atbox, ciso, &       ! to calculate prognostic 14CO2 and the radioactive decay of 14C
-                            bottflx_num, benthos_num ! kh 28.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+    use REcom_config !OG we need tiny and bgc_num !, only: use_atbox, ciso, &       ! to calculate prognostic 14CO2 and the radioactive decay of 14C
+                     !        bottflx_num, benthos_num ! kh 28.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
 
     use REcoM_ciso, only: ciso_14, ciso_organic_14, c14_tracer_id, lambda_14
 #endif
@@ -424,6 +424,14 @@ subroutine solve_tracers_ale(mesh)
 !!PS             write(*,*)
 !!PS             write(*,*) ' tr_arr(:,node,2) = ',tr_arr(:,node,2)
 !!PS         end if 
+
+!OG
+! BGC tracer fields might become negative
+
+        where (tr_arr(nzmin:nzmax,node,num_tracers-bgc_num+1:num_tracers) < tiny) ! 2.23D-16 )
+            tr_arr(nzmin:nzmax,node,num_tracers-bgc_num+1:num_tracers) = tiny ! 2.23D-16 )
+        end where
+
     end do
 end subroutine solve_tracers_ale
 !
@@ -561,6 +569,22 @@ end if
 !YY: recom_sinking_tracer_id in recom_modules extended for 2. zooplankton
 ! but not for the combination ciso + 2. zoo!
 if (any(recom_sinking_tracer_id == tracer_id(tr_num))) then 
+
+!< activate Ballasting
+!< .OG. 04.11.2022
+
+         if (use_ballasting) then
+!< get seawater viscosity, seawater_visc_3D
+             call get_seawater_viscosity(mesh)
+
+!< get particle density of class 1 and 2 !rho_particle1 and rho_particle2
+             call get_particle_density(mesh)
+
+!< calculate scaling factors
+!< scaling_visc_3D
+!< scaling_density1_3D, scaling_density2_3D
+             call ballast(mesh)
+        end if
 
 ! sinking
         call recom_sinking_new(tr_num,mesh) !--- vert_sink ---

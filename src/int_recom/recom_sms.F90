@@ -369,10 +369,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 
 ! Calculate the carbonate system for the very first time step of the first year of the run
     !if (mocsy_restart==.false. .and. recom_istep==1) then    ! r_restart is defined in gen_modules_clock in fesom_cpl.
+            dpos(1) = -zF(k)
             if (mstep==1) then
                 call vars_sprac(ph_depth, pco2_depth, fco2_depth, co2_depth, hco3_depth, co3_depth, OmegaA_depth, OmegaC_depth, kspc_depth, BetaD_depth,  & ! MOCSY 
                        rhoSW_depth, p_depth, tempis_depth,                                                                                                & ! MOCSY
-                       REcoM_T_depth, REcoM_S_depth, REcoM_Alk_depth, REcoM_DIC_depth, REcoM_Si_depth, REcoM_Phos_depth, Patm_depth, zF(k), Latd, Nmocsy, & ! MOCSY
+                       REcoM_T_depth, REcoM_S_depth, REcoM_Alk_depth, REcoM_DIC_depth, REcoM_Si_depth, REcoM_Phos_depth, Patm_depth, dpos, Latd, Nmocsy,  & ! MOCSY
                        optCON='mol/m3', optT='Tpot   ', optP='m ', optB='u74', optK1K2='l  ', optKf='dg', optGAS='Pinsitu', optS='Sprc')                    ! MOCSY
                 CO2_watercolumn(k)    = co2_depth(1)
                 pH_watercolumn(k)     = ph_depth(1)
@@ -392,7 +393,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             if (PARave > 0.01*SurfSR .and. mod(mstep,logfile_outfreq_7)==0) then
                 call vars_sprac(ph_depth, pco2_depth, fco2_depth, co2_depth, hco3_depth, co3_depth, OmegaA_depth, OmegaC_depth, kspc_depth, BetaD_depth,  & ! MOCSY 
                        rhoSW_depth, p_depth, tempis_depth,                                                                                                & ! MOCSY
-                       REcoM_T_depth, REcoM_S_depth, REcoM_Alk_depth, REcoM_DIC_depth, REcoM_Si_depth, REcoM_Phos_depth, Patm_depth, zF(k), Latd, Nmocsy, & ! MOCSY
+                       REcoM_T_depth, REcoM_S_depth, REcoM_Alk_depth, REcoM_DIC_depth, REcoM_Si_depth, REcoM_Phos_depth, Patm_depth, dpos, Latd, Nmocsy,  & ! MOCSY
                        optCON='mol/m3', optT='Tpot   ', optP='m ', optB='u74', optK1K2='l  ', optKf='dg', optGAS='Pinsitu', optS='Sprc')                    ! MOCSY
                 CO2_watercolumn(k)    = co2_depth(1)
                 pH_watercolumn(k)     = ph_depth(1)
@@ -406,7 +407,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             elseif (PARave < 0.01*SurfSR .and. mod(mstep,logfile_outfreq_30)==0) then
                 call vars_sprac(ph_depth, pco2_depth, fco2_depth, co2_depth, hco3_depth, co3_depth, OmegaA_depth, OmegaC_depth, kspc_depth, BetaD_depth,  & ! MOCSY 
                        rhoSW_depth, p_depth, tempis_depth,                                                                                                & ! MOCSY
-                       REcoM_T_depth, REcoM_S_depth, REcoM_Alk_depth, REcoM_DIC_depth, REcoM_Si_depth, REcoM_Phos_depth, Patm_depth, zF(k), Latd, Nmocsy, & ! MOCSY
+                       REcoM_T_depth, REcoM_S_depth, REcoM_Alk_depth, REcoM_DIC_depth, REcoM_Si_depth, REcoM_Phos_depth, Patm_depth, dpos, Latd, Nmocsy,  & ! MOCSY
                        optCON='mol/m3', optT='Tpot   ', optP='m ', optB='u74', optK1K2='l  ', optKf='dg', optGAS='Pinsitu', optS='Sprc')                    ! MOCSY
                 CO2_watercolumn(k)    = co2_depth(1)
                 pH_watercolumn(k)     = ph_depth(1)
@@ -1148,7 +1149,6 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #endif
         - calcification                               & ! --> Calcification
                                                      ) * dt_b + sms(k,idic)
-
 !  if((Latd(1)<-45.0) .and. ((state(k,idic)+sms(k,idic))>2500)) then
 !     !co2flux(1)=0.0  
 !      print*,'ERROR: strange dic !'

@@ -763,6 +763,7 @@ Module REcoM_locVar
   Real(kind=8) :: rhoSW(1)                     ! rhoSW  = in-situ density of seawater; rhoSW = f(s, t, p)
   Real(kind=8) :: p(1)                         ! pressure [decibars]; p = f(depth, latitude) if computed from depth [m] OR p = depth if [db]
   Real(kind=8) :: tempis(1)                    ! in-situ temperature [degrees C]
+  Real(kind=8) :: dpos(1)                      ! depth converted to positive values, needed in the mocsy routine
   Real(kind=8) :: kw660(1)                     ! gas transfer velocity (piston velocity) for CO2 [m/s] 
   Real(kind=8) :: co2flux_seaicemask(1)        ! air-to-sea flux of CO2 [mmol/m2/s]
   Real(kind=8) :: o2flux_seaicemask(1)         ! air-to-sea flux of CO2 [mmol/m2/s]
