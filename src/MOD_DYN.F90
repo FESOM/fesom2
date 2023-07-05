@@ -53,7 +53,7 @@ TYPE T_DYN
     ! instant zonal merdional velocity & Adams-Bashfort rhs
     real(kind=WP), allocatable, dimension(:,:,:)   :: uv, uv_rhs, fer_uv
     real(kind=WP), allocatable, dimension(:,:,:,:) :: uv_rhsAB
-    integer                                        :: AB_order=3
+    integer                                        :: AB_order=2
     ! horizontal velocities at nodes
     real(kind=WP), allocatable, dimension(:,:,:):: uvnode
 
