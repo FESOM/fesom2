@@ -51,8 +51,9 @@ END TYPE T_DYN_WORK
 TYPE T_DYN
 !___________________________________________________________________________
     ! instant zonal merdional velocity & Adams-Bashfort rhs
-    real(kind=WP), allocatable, dimension(:,:,:):: uv, uv_rhs, uv_rhsAB, fer_uv
-
+    real(kind=WP), allocatable, dimension(:,:,:)   :: uv, uv_rhs, fer_uv
+    real(kind=WP), allocatable, dimension(:,:,:,:) :: uv_rhsAB
+    integer                                        :: AB_order=3
     ! horizontal velocities at nodes
     real(kind=WP), allocatable, dimension(:,:,:):: uvnode
 
@@ -108,12 +109,12 @@ TYPE T_DYN
     real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv, ke_cor, ke_pre, ke_hvis, ke_vvis, ke_du2, ke_umean, ke_u2mean
     real(kind=WP), allocatable, dimension(:,:)   :: ke_wind, ke_drag
     ! same as above but multiplied by velocity. we need both for later computation of turbulent fluxes
-    real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv_xVEL, ke_cor_xVEL, ke_pre_xVEL, ke_hvis_xVEL, ke_vvis_xVEL
-    real(kind=WP), allocatable, dimension(:,:)   :: ke_wind_xVEL, ke_drag_xVEL
-    real(kind=WP), allocatable, dimension(:,:)   :: ke_wrho         !we use pressure to compute (W*dens) as it appeares much easier to compute (P*dW) instead of (dP*w)
-    real(kind=WP), allocatable, dimension(:,:)   :: ke_dW, ke_Pfull !for later computation of turbulent fluxes from the term above
-    real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv_AB, ke_cor_AB
-    real(kind=WP), allocatable, dimension(:,:,:) :: ke_rhs_bak
+    real(kind=WP), allocatable, dimension(:,:,:)   :: ke_adv_xVEL, ke_cor_xVEL, ke_pre_xVEL, ke_hvis_xVEL, ke_vvis_xVEL
+    real(kind=WP), allocatable, dimension(:,:)     :: ke_wind_xVEL, ke_drag_xVEL
+    real(kind=WP), allocatable, dimension(:,:)     :: ke_wrho         !we use pressure to compute (W*dens) as it appeares much easier to compute (P*dW) instead of (dP*w)
+    real(kind=WP), allocatable, dimension(:,:)     :: ke_dW, ke_Pfull !for later computation of turbulent fluxes from the term above
+    real(kind=WP), allocatable, dimension(:,:,:,:) :: ke_adv_AB, ke_cor_AB
+    real(kind=WP), allocatable, dimension(:,:,:)   :: ke_rhs_bak
     ! surface fields to compute APE generation
     real(kind=WP), allocatable, dimension(:)     :: ke_J, ke_D, ke_G, ke_D2, ke_n0, ke_JD, ke_GD, ke_swA, ke_swB
 

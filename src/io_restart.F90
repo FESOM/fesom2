@@ -76,10 +76,14 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
 #endif
   call oce_files%def_elem_var('u', 'zonal velocity',        'm/s', dynamics%uv(1,:,:), mesh, partit)
   call oce_files%def_elem_var('v', 'meridional velocity',   'm/s', dynamics%uv(2,:,:), mesh, partit)
-  call oce_files%def_elem_var('urhs_AB', 'Adams–Bashforth for u', 'm/s', dynamics%uv_rhsAB(1,:,:), mesh, partit)
-  call oce_files%def_elem_var('vrhs_AB', 'Adams–Bashforth for v', 'm/s', dynamics%uv_rhsAB(2,:,:), mesh, partit)
+  call oce_files%def_elem_var('urhs_AB', 'Adams-Bashforth for u (n-1 for AB2 and n-2 for AB3)', 'm/s', dynamics%uv_rhsAB(1,1,:,:), mesh, partit)
+  call oce_files%def_elem_var('vrhs_AB', 'Adams-Bashforth for v (n-1 for AB2 and n-2 for AB3)', 'm/s', dynamics%uv_rhsAB(1,2,:,:), mesh, partit)
+  if (dynamics%AB_order==3) then
+       call oce_files%def_elem_var_optional('urhs_AB3', 'Adams-Bashforth for u (n-1) for AB3', 'm/s', dynamics%uv_rhsAB(2,1,:,:), mesh, partit)
+       call oce_files%def_elem_var_optional('vrhs_AB3', 'Adams-Bashforth for v (n-1) for AB3', 'm/s', dynamics%uv_rhsAB(2,2,:,:), mesh, partit)
+  end if
   
-  !___Save restart variables for TKE and IDEMIX_________________________________
+!___Save restart variables for TKE and IDEMIX_________________________________
 !   if (trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
   if (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
         call oce_files%def_node_var('tke', 'Turbulent Kinetic Energy', 'm2/s2', tke(:,:), mesh, partit)
@@ -109,7 +113,7 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
          units='none'
      END SELECT
      call oce_files%def_node_var(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
-     longname=trim(longname)//', Adams–Bashforth'
+     longname=trim(longname)//', Adams-Bashforth'
      call oce_files%def_node_var(trim(trname)//'_AB', trim(longname), trim(units), tracers%data(j)%valuesAB(:,:),    mesh, partit)
      call oce_files%def_node_var_optional(trim(trname)//'_M1', trim(longname), trim(units), tracers%data(j)%valuesold(1,:,:), mesh, partit)
      if (tracers%data(j)%AB_order==3) &

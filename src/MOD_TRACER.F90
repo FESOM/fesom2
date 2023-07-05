@@ -18,7 +18,7 @@ logical                                       :: i_vert_diff =.false.
 character(20)                                 :: tra_adv_hor, tra_adv_ver, tra_adv_lim ! type of the advection scheme for this tracer
 real(kind=WP)                                 :: tra_adv_ph  = 1.  ! a parameter to be used in horizontal advection (for MUSCL it is the fraction of fourth-order contribution in the solution)
 real(kind=WP)                                 :: tra_adv_pv  = 1.  ! a parameter to be used in horizontal advection (for QR4C  it is the fraction of fourth-order contribution in the solution)
-integer                                       :: AB_order=2
+integer                                       :: AB_order=3
 integer                                       :: ID
 
 contains
