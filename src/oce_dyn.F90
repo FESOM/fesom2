@@ -449,10 +449,10 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
 !$OMP DO
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
-        el=edge_tri(:,ed)
+        el    = edge_tri(:,ed)
         nzmin = maxval(ulevels(el))
         nzmax = minval(nlevels(el))
-        DO  nz=nzmin,nzmax-1
+        DO  nz=nzmin, nzmax-1
             update_u(nz)=(UV(1,nz,el(1))-UV(1,nz,el(2)))
             update_v(nz)=(UV(2,nz,el(1))-UV(2,nz,el(2)))
         END DO
@@ -481,10 +481,10 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
     ! compute viscosity on element
 !$OMP DO
     DO ed=1,myDim_elem2D
-        len=sqrt(elem_area(ed))
+        len   = sqrt(elem_area(ed))
         nzmin = ulevels(ed)
         nzmax = nlevels(ed)
-        Do nz=nzmin,nzmax-1
+        Do nz=nzmin, nzmax-1
             ! vi has the sense of harmonic viscosity coef. because of 
             ! division by area in the end 
             u1=U_c(nz,ed)**2+V_c(nz,ed)**2

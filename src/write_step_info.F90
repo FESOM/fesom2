@@ -340,7 +340,7 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
     do n=1, myDim_nod2d       
        !___________________________________________________________________
        ! check ssh
-       if ( ((eta_n(n) /= eta_n(n)) .or. eta_n(n)<-50.0 .or. eta_n(n)>50.0 .or. (d_eta(n) /= d_eta(n)) ) ) then
+       if ( ((eta_n(n) /= eta_n(n)) .or. eta_n(n)<-10.0 .or. eta_n(n)>10.0 .or. (d_eta(n) /= d_eta(n)) ) ) then
 !$OMP CRITICAL
           found_blowup_loc=1
           write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep

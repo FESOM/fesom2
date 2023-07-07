@@ -122,9 +122,11 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
 
 !$OMP DO    
     do node=1, myDim_nod2D
-        nl1 = nlevels_nod2D(node)
         ul1 = ulevels_nod2D(node)
-        
+        nl1 = nlevels_nod2D(node)
+        wu(1:nl1+1) = 0.0_WP
+        wv(1:nl1+1) = 0.0_WP
+        UVnode_rhs(:,:,node) = 0.0_WP
         !_______________________________________________________________________
         ! surface
         nz=ul1
@@ -144,8 +146,8 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
             qu   = (UVnode(1, nz  , node)-UVnode(1, nz+1, node))/(hnode(nz  , node)+hnode(nz+1, node))
             qd   = (UVnode(1, nz-2, node)-UVnode(1, nz-1, node))/(hnode(nz-2, node)+hnode(nz-1, node))
             
-            uv1  = UVnode(1, nz  , node)+(2*qc+qu)*hnode(nz  , node)/6.0_WP                    ! Gradient reconstruction 2(2qc+qu)(h/2)(1/6)            
-            uv2  = UVnode(1, nz-1, node)-(2*qc+qd)*hnode(nz-1, node)/6.0_WP
+            uv1  =  UVnode(1, nz  , node)+(2*qc+qu)*hnode(nz  , node)/6.0_WP                    ! Gradient reconstruction 2(2qc+qu)(h/2)(1/6)            
+            uv2  =  UVnode(1, nz-1, node)-(2*qc+qd)*hnode(nz-1, node)/6.0_WP
             uv12 = (Wvel_e(nz, node)+abs(Wvel_e(nz, node)))*uv1+ &
                    (Wvel_e(nz, node)-abs(Wvel_e(nz, node)))*uv2
             wu(nz)=0.5_WP*(num_ord*(uv1+uv2)*Wvel_e(nz, node)+(1.0_WP-num_ord)*uv12)*area(nz, node)
@@ -154,8 +156,8 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
             qu   = (UVnode(2, nz  , node)-UVnode(2, nz+1, node))/(hnode(nz  , node)+hnode(nz+1, node))
             qd   = (UVnode(2, nz-2, node)-UVnode(2, nz-1, node))/(hnode(nz-2, node)+hnode(nz-1, node))
             
-            uv1  = UVnode(2, nz  , node)+(2*qc+qu)*hnode(nz  , node)/6.0_WP
-            uv2  = UVnode(2, nz-1, node)-(2*qc+qd)*hnode(nz-1, node)/6.0_WP
+            uv1  =  UVnode(2, nz  , node)+(2*qc+qu)*hnode(nz  , node)/6.0_WP
+            uv2  =  UVnode(2, nz-1, node)-(2*qc+qd)*hnode(nz-1, node)/6.0_WP
             uv12 = (Wvel_e(nz, node)+abs(Wvel_e(nz, node)))*uv1+ &
                    (Wvel_e(nz, node)-abs(Wvel_e(nz, node)))*uv2
             wv(nz)=0.5_WP*(num_ord*(uv1+uv2)*Wvel_e(nz, node)+(1.0_WP-num_ord)*uv12)*area(nz, node)
@@ -175,9 +177,9 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
         
         !_______________________________________________________________________
         ! set to the rhs for transports, not velocities!!! --> No division by h  
-        do nz=1, nl1-1
-            UVnode_rhs(1, nz, node)= -(wu(nz)-wu(nz+1))
-            UVnode_rhs(2, nz, node)= -(wv(nz)-wv(nz+1))
+        do nz=ul1, nl1-1
+            UVnode_rhs(1, nz, node)= UVnode_rhs(1, nz, node) - (wu(nz)-wu(nz+1))
+            UVnode_rhs(2, nz, node)= UVnode_rhs(2, nz, node) - (wv(nz)-wv(nz+1))
         end do
         
     end do ! --> do node=1, myDim_nod2D
@@ -611,6 +613,7 @@ subroutine impl_vert_visc_ale_vtransp(dynamics, partit, mesh)
     UV_rhs =>dynamics%uv_rhs(:,:,:)
     Wvel_i =>dynamics%w_i(:,:)
     UVh    =>dynamics%se_uvh(:,:,:)
+    
     !___________________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(a, b, c, ur, vr, cp, up, vp, elem, & 
 !$OMP                                  nz, nzmin, nzmax, elnodes, &
@@ -622,6 +625,8 @@ subroutine impl_vert_visc_ale_vtransp(dynamics, partit, mesh)
         elnodes= elem2D_nodes(:,elem)
         nzmin  = ulevels(elem)
         nzmax  = nlevels(elem)
+        uu     = 0.0_WP
+        vv     = 0.0_WP
         
         !_______________________________________________________________________
         ! New velocities: compute u_k^(n+1/2, *) = u_k^(n-1/2) + UV_rhs/helem 
@@ -631,19 +636,19 @@ subroutine impl_vert_visc_ale_vtransp(dynamics, partit, mesh)
         vv(nzmin:nzmax-1)=(UVh(2, nzmin:nzmax-1, elem)+UV_rhs(2, nzmin:nzmax-1, elem))/helem(nzmin:nzmax-1, elem) 
         
         !_______________________________________________________________
-        if ( any(uu(nzmin:nzmax-1)/=uu(nzmin:nzmax-1)) .or. &
-             any(vv(nzmin:nzmax-1)/=vv(nzmin:nzmax-1)) ) then
-            write(*,*) ' --> subroutine impl_vert_visc_ale_vtransp --> found Nan in uu=UVh=UV_rhs'
-            write(*,*) ' mype =', mype
-            write(*,*) ' elem =', elem
-            write(*,*) ' uu(nzmin:nzmax-1)=', uu(nzmin:nzmax-1)
-            write(*,*) ' vv(nzmin:nzmax-1)=', vv(nzmin:nzmax-1)
-            write(*,*) ' UV_rhs(1,nz,elem)=', UV_rhs( 1, nz, elem)
-            write(*,*) ' UV_rhs(2,nz,elem)=', UV_rhs( 2, nz, elem)
-            write(*,*) ' UVh( 1, nz, elem)=', UVh( 1, nz, elem)
-            write(*,*) ' UVh( 2, nz, elem)=', UVh( 2, nz, elem)
-            write(*,*) ' helem(nz, elem)  =', helem(nz, elem)
-        end if
+!PS         if ( any(uu(nzmin:nzmax-1)/=uu(nzmin:nzmax-1)) .or. &
+!PS              any(vv(nzmin:nzmax-1)/=vv(nzmin:nzmax-1)) ) then
+!PS             write(*,*) ' --> subroutine impl_vert_visc_ale_vtransp --> found Nan in uu=UVh=UV_rhs'
+!PS             write(*,*) ' mype =', mype
+!PS             write(*,*) ' elem =', elem
+!PS             write(*,*) ' uu(nzmin:nzmax-1)=', uu(nzmin:nzmax-1)
+!PS             write(*,*) ' vv(nzmin:nzmax-1)=', vv(nzmin:nzmax-1)
+!PS             write(*,*) ' UV_rhs(1,nz,elem)=', UV_rhs( 1, nz, elem)
+!PS             write(*,*) ' UV_rhs(2,nz,elem)=', UV_rhs( 2, nz, elem)
+!PS             write(*,*) ' UVh( 1, nz, elem)=', UVh( 1, nz, elem)
+!PS             write(*,*) ' UVh( 2, nz, elem)=', UVh( 2, nz, elem)
+!PS             write(*,*) ' helem(nz, elem)  =', helem(nz, elem)
+!PS         end if
         
         !_______________________________________________________________________
         ! Operator + rhs
@@ -756,22 +761,22 @@ subroutine impl_vert_visc_ale_vtransp(dynamics, partit, mesh)
         end do
         
         !_______________________________________________________________
-        if ( any(UV_rhs(1, nzmin:nzmax-1, elem)/=UV_rhs(1, nzmin:nzmax-1, elem)) .or. &
-             any(UV_rhs(2, nzmin:nzmax-1, elem)/=UV_rhs(2, nzmin:nzmax-1, elem))) then
-            write(*,*) ' --> subroutine impl_vert_visc_ale_vtransp --> found Nan in UV_rhs=UVh_rhs+uvr*helem'
-            write(*,*) ' mype =', mype
-            write(*,*) ' elem =', elem
-            write(*,*) ' UV_rhs(1,nz,elem)=', UV_rhs( 1, nzmin:nzmax-1, elem)
-            write(*,*) ' UV_rhs(2,nz,elem)=', UV_rhs( 2, nzmin:nzmax-1, elem)
-            write(*,*) ' ur(nzmin:nzmax-1)=', ur(nzmin:nzmax-1)
-            write(*,*) ' vr(nzmin:nzmax-1)=', vr(nzmin:nzmax-1)
-            write(*,*) ' helem(nz, elem)  =', helem(nzmin:nzmax-1, elem)
-            write(*,*) ' a(nzmin:nzmax-1) =', a(nzmin:nzmax-1)
-            write(*,*) ' b(nzmin:nzmax-1) =', b(nzmin:nzmax-1)
-            write(*,*) ' c(nzmin:nzmax-1) =', c(nzmin:nzmax-1)
-            write(*,*) ' Av(nzmin:nzmax-1,elem) =', Av(nzmin:nzmax-1, elem)
-            write(*,*) ' Wvel_i(nzmin:nzmax-1,elem) =',Wvel_i(nzmin:nzmax-1, elnodes)
-        end if
+!PS         if ( any(UV_rhs(1, nzmin:nzmax-1, elem)/=UV_rhs(1, nzmin:nzmax-1, elem)) .or. &
+!PS              any(UV_rhs(2, nzmin:nzmax-1, elem)/=UV_rhs(2, nzmin:nzmax-1, elem))) then
+!PS             write(*,*) ' --> subroutine impl_vert_visc_ale_vtransp --> found Nan in UV_rhs=UVh_rhs+uvr*helem'
+!PS             write(*,*) ' mype =', mype
+!PS             write(*,*) ' elem =', elem
+!PS             write(*,*) ' UV_rhs(1,nz,elem)=', UV_rhs( 1, nzmin:nzmax-1, elem)
+!PS             write(*,*) ' UV_rhs(2,nz,elem)=', UV_rhs( 2, nzmin:nzmax-1, elem)
+!PS             write(*,*) ' ur(nzmin:nzmax-1)=', ur(nzmin:nzmax-1)
+!PS             write(*,*) ' vr(nzmin:nzmax-1)=', vr(nzmin:nzmax-1)
+!PS             write(*,*) ' helem(nz, elem)  =', helem(nzmin:nzmax-1, elem)
+!PS             write(*,*) ' a(nzmin:nzmax-1) =', a(nzmin:nzmax-1)
+!PS             write(*,*) ' b(nzmin:nzmax-1) =', b(nzmin:nzmax-1)
+!PS             write(*,*) ' c(nzmin:nzmax-1) =', c(nzmin:nzmax-1)
+!PS             write(*,*) ' Av(nzmin:nzmax-1,elem) =', Av(nzmin:nzmax-1, elem)
+!PS             write(*,*) ' Wvel_i(nzmin:nzmax-1,elem) =',Wvel_i(nzmin:nzmax-1, elnodes)
+!PS         end if
         
     end do ! --> do elem=1,myDim_elem2D
 !$OMP END DO
@@ -831,10 +836,6 @@ subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
         nzmax  = nlevels(elem)-1
         
         !_______________________________________________________________________
-        Fx=g*dt*sum(gradient_sca(1:3,elem)*eta_n(elnodes))
-        Fy=g*dt*sum(gradient_sca(4:6,elem)*eta_n(elnodes))
-        
-        !_______________________________________________________________________
         ! vertically integrate UV_rhs --> for barotropic equatiobn 
         vert_sum_u=0.0_WP
         vert_sum_v=0.0_WP
@@ -846,7 +847,9 @@ subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
         !_______________________________________________________________________
         ! Remove the contribution from the elevation will be accounted explicitely 
         ! for in the barotropic equation
-        hh=sum(helem(nzmin:nzmax, elem))
+        Fx = g*dt*sum(gradient_sca(1:3,elem)*eta_n(elnodes))
+        Fy = g*dt*sum(gradient_sca(4:6,elem)*eta_n(elnodes))
+        hh = sum(helem(nzmin:nzmax, elem))
         vert_sum_u=vert_sum_u + Fx*hh
         vert_sum_v=vert_sum_v + Fy*hh
         
@@ -855,6 +858,8 @@ subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
         ! for in the barotropic equation
         ! UVBT_rhs ... baroclinic forcing term in barotropic equation R_b
         ! --> d/dt*U_bt + f*e_z x U_bt + g*H* grad(eta) = R_bt
+        ! --> from AB2 in oce_ale_vel_rhs.F90 --> ab2=-0.5 (from previouse time
+        !     step) --> ab1=1.5 or 0.0 (first tstep)
         UVBT_rhs(1, elem)=vert_sum_u - dt*mesh%coriolis(elem)* &
                                        (ab1*UVBT_4AB(2,elem)+ab2*UVBT_4AB(4,elem))         ! for AB-interpolated
         UVBT_rhs(2, elem)=vert_sum_v + dt*mesh%coriolis(elem)* &
@@ -867,8 +872,8 @@ subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
         ! --> d/dt*U_bt + f*e_z x U_bt + g*H*grad_H(eta) = R_bt
         UVBT_4AB(3:4,elem)=UVBT_4AB(1:2,elem)    
     end do
-!PS !$OMP END DO
-!PS !$OMP END PARALLEL
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine compute_BT_rhs_SE_vtransp
 !
 !
@@ -927,7 +932,8 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     ! Dissipation parameter of FB dissipative method 0.14 is the default value 
     ! from Demange et al.
 !PS     thetaBT= 0.14_WP
-    thetaBT= 0.5_WP
+!PS     thetaBT= 0.5_WP
+    thetaBT= dynamics%splitexpl_BTtheta
     
     ! BTsteps should be 30 or 40.
     dtBT   = dt/dynamics%splitexpl_BTsteps                
@@ -1023,45 +1029,45 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             
             
 !PS             if ( (mype==398) .and. ((abs(eta_n(ednodes(1)))>10) .or. (abs(eta_n(ednodes(1)))>10)) ) then
-            if ((abs(eta_n(ednodes(1)))>100) .or. (abs(eta_n(ednodes(2)))>100)) then
-                write(*,*) '-------------------------------------------------'
-                write(*,*) ' --> subroutine compute_BT_step_SE_ale --> found eta_n>100 in barotrop. subcycling'
-                write(*,*) ' mype           = ', mype
-                write(*,*) ' mstep          = ', mstep
-                write(*,*) ' btstep         = ', step
-                write(*,*) ' edge           = ', edge
-                write(*,*) ' ednodes(1:2)   = ', ednodes
-                write(*,*) ' edelem(1:2)    = ', edelem
-                write(*,*) ' glon,glat      = ', geo_coord_nod2D(:,ednodes)/rad
-                write(*,*)
-                write(*,*) '         eta_n(ednodes) = ', eta_n(ednodes) 
-                write(*,*) '                 c1, c2 = ', c1, c2
-                if(edelem(2)>0) then
-                    write(*,*) ' UVBT_rhs(  1:2,edelem) = ', UVBT_rhs(  1:2, edelem)
-                    write(*,*) ' UVBT(      1:2,edelem) = ', UVBT(      1:2, edelem)
-                    write(*,*) ' UVBT_theta(1:2,edelem) = ', UVBT_theta(1:2, edelem)
-                    write(*,*) ' UVBT_mean( 1:2,edelem) = ', UVBT_mean( 1:2, edelem)
-                    nzmin1 = ulevels(edelem(1))
-                    nzmax1 = nlevels(edelem(1))-1
-                    nzmin2 = ulevels(edelem(2))
-                    nzmax2 = nlevels(edelem(2))-1
-                    write(*,*) ' UVh(1:2,nzmin:nzmax,edelem(1)) = ', dynamics%se_uvh(1:2, nzmin1:nzmax1, edelem(1))
-                    write(*,*) ' UVh(1:2,nzmin:nzmax,edelem(2)) = ', dynamics%se_uvh(1:2, nzmin2:nzmax2, edelem(2))
-                    write(*,*) ' UV_rhs(1:2,nzmin:nzmax,edelem(1)) = ', dynamics%uv_rhs(1:2, nzmin1:nzmax1, edelem(1))
-                    write(*,*) ' UV_rhs(1:2,nzmin:nzmax,edelem(2)) = ', dynamics%uv_rhs(1:2, nzmin2:nzmax2, edelem(2))
-                else
-                    write(*,*) ' UVBT_rhs(  1:2,edelem) = ', UVBT_rhs(  1:2, edelem(1))
-                    write(*,*) ' UVBT(      1:2,edelem) = ', UVBT(      1:2, edelem(1))
-                    write(*,*) ' UVBT_theta(1:2,edelem) = ', UVBT_theta(1:2, edelem(1))
-                    write(*,*) ' UVBT_mean( 1:2,edelem) = ', UVBT_mean( 1:2, edelem(1))
-                    nzmin1 = ulevels(edelem(1))
-                    nzmax1 = nlevels(edelem(1))-1
-                    write(*,*) ' UVh(1:2,nzmin:nzmax,edelem(1)) = ', dynamics%se_uvh(1:2, nzmin1:nzmax1, edelem(1))
-                    write(*,*) ' UV_rhs(1:2,nzmin:nzmax,edelem(1)) = ', dynamics%uv_rhs(1:2, nzmin1:nzmax1, edelem(1))
-                    
-                end if 
-                write(*,*)
-            end if
+!PS             if ((abs(eta_n(ednodes(1)))>100) .or. (abs(eta_n(ednodes(2)))>100)) then
+!PS                 write(*,*) '-------------------------------------------------'
+!PS                 write(*,*) ' --> subroutine compute_BT_step_SE_ale --> found eta_n>100 in barotrop. subcycling'
+!PS                 write(*,*) ' mype           = ', mype
+!PS                 write(*,*) ' mstep          = ', mstep
+!PS                 write(*,*) ' btstep         = ', step
+!PS                 write(*,*) ' edge           = ', edge
+!PS                 write(*,*) ' ednodes(1:2)   = ', ednodes
+!PS                 write(*,*) ' edelem(1:2)    = ', edelem
+!PS                 write(*,*) ' glon,glat      = ', geo_coord_nod2D(:,ednodes)/rad
+!PS                 write(*,*)
+!PS                 write(*,*) '         eta_n(ednodes) = ', eta_n(ednodes) 
+!PS                 write(*,*) '                 c1, c2 = ', c1, c2
+!PS                 if(edelem(2)>0) then
+!PS                     write(*,*) ' UVBT_rhs(  1:2,edelem) = ', UVBT_rhs(  1:2, edelem)
+!PS                     write(*,*) ' UVBT(      1:2,edelem) = ', UVBT(      1:2, edelem)
+!PS                     write(*,*) ' UVBT_theta(1:2,edelem) = ', UVBT_theta(1:2, edelem)
+!PS                     write(*,*) ' UVBT_mean( 1:2,edelem) = ', UVBT_mean( 1:2, edelem)
+!PS                     nzmin1 = ulevels(edelem(1))
+!PS                     nzmax1 = nlevels(edelem(1))-1
+!PS                     nzmin2 = ulevels(edelem(2))
+!PS                     nzmax2 = nlevels(edelem(2))-1
+!PS                     write(*,*) ' UVh(1:2,nzmin:nzmax,edelem(1)) = ', dynamics%se_uvh(1:2, nzmin1:nzmax1, edelem(1))
+!PS                     write(*,*) ' UVh(1:2,nzmin:nzmax,edelem(2)) = ', dynamics%se_uvh(1:2, nzmin2:nzmax2, edelem(2))
+!PS                     write(*,*) ' UV_rhs(1:2,nzmin:nzmax,edelem(1)) = ', dynamics%uv_rhs(1:2, nzmin1:nzmax1, edelem(1))
+!PS                     write(*,*) ' UV_rhs(1:2,nzmin:nzmax,edelem(2)) = ', dynamics%uv_rhs(1:2, nzmin2:nzmax2, edelem(2))
+!PS                 else
+!PS                     write(*,*) ' UVBT_rhs(  1:2,edelem) = ', UVBT_rhs(  1:2, edelem(1))
+!PS                     write(*,*) ' UVBT(      1:2,edelem) = ', UVBT(      1:2, edelem(1))
+!PS                     write(*,*) ' UVBT_theta(1:2,edelem) = ', UVBT_theta(1:2, edelem(1))
+!PS                     write(*,*) ' UVBT_mean( 1:2,edelem) = ', UVBT_mean( 1:2, edelem(1))
+!PS                     nzmin1 = ulevels(edelem(1))
+!PS                     nzmax1 = nlevels(edelem(1))-1
+!PS                     write(*,*) ' UVh(1:2,nzmin:nzmax,edelem(1)) = ', dynamics%se_uvh(1:2, nzmin1:nzmax1, edelem(1))
+!PS                     write(*,*) ' UV_rhs(1:2,nzmin:nzmax,edelem(1)) = ', dynamics%uv_rhs(1:2, nzmin1:nzmax1, edelem(1))
+!PS                     
+!PS                 end if 
+!PS                 write(*,*)
+!PS             end if
             
         end do
         
@@ -1089,9 +1095,8 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
-    integer                               :: i,elem, elnodes(4), nz, m, nzmin, nzmax
-    real(kind=WP)                         :: eta(4), ff
-    real(kind=WP)                         :: Fx, Fy, ubar, vbar, hh_inv
+    integer                               :: elem, nz, nzmin, nzmax
+    real(kind=WP)                         :: ubar, vbar, hh_inv
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UVh, UV, UV_rhs
@@ -1115,12 +1120,12 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
     ! The trimmed Uh,Vh are consistent with new total height defined by eta_n   
     if (mode==1) then              
         do elem=1, myDim_elem2D
+            nzmin  = ulevels(elem)
+            nzmax  = nlevels(elem)-1
+            
             ubar   = 0.0_WP
             vbar   = 0.0_WP
             hh_inv = 0.0_WP
-            
-            nzmin  = ulevels(elem)
-            nzmax  = nlevels(elem)-1
             do nz=nzmin, nzmax
                 !_______________________________________________________________
                 ! Update transport velocities: U^(n+1/2,**) = U^(n+1/2,*) + U_rhs
@@ -1129,9 +1134,9 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
                 
                 !_______________________________________________________________
                 ! vertically integrate updated transport velocity: sum(k, U_k^(n+1/2,**) )
-                ubar=ubar+UVh(1, nz, elem)
-                vbar=vbar+UVh(2, nz, elem)
-                hh_inv=hh_inv+helem(nz,elem)
+                ubar  = ubar+UVh(1, nz, elem)
+                vbar  = vbar+UVh(2, nz, elem)
+                hh_inv= hh_inv+helem(nz,elem)
             end do
             
             !___________________________________________________________________
@@ -1149,30 +1154,31 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
                 UV( 1, nz, elem)= UVh(1, nz, elem)/helem(nz,elem)  ! velocities are still needed    
                 UV( 2, nz, elem)= UVh(2, nz, elem)/helem(nz,elem) 
                 
-                !_______________________________________________________________
-                if ( UV( 1, nz, elem)/=UV( 1, nz, elem) .or. &
-                     UV( 2, nz, elem)/=UV( 2, nz, elem)) then
-                    write(*,*) ' --> subroutine update_trim_vel_ale_vtransp(mode=1) --> found Nan in UV after update UV with barotr. term'
-                    write(*,*) ' mype =', mype
-                    write(*,*) ' elem =', elem
-                    write(*,*) ' nz   =', nz
-                    write(*,*) ' UV_rhs(1,nz,elem)=', UV_rhs( 1, nz, elem)
-                    write(*,*) ' UV_rhs(2,nz,elem)=', UV_rhs( 2, nz, elem)
-                    write(*,*) ' UV( 1, nz, elem) =', UV( 1, nz, elem)
-                    write(*,*) ' UV( 2, nz, elem) =', UV( 2, nz, elem)
-                    write(*,*) ' UVh( 1, nz, elem)=', UVh( 1, nz, elem)
-                    write(*,*) ' UVh( 2, nz, elem)=', UVh( 2, nz, elem)
-                    write(*,*) ' helem(nz, elem)  =', helem(nz, elem)
-                    write(*,*) ' UVBT_mean(1,elem)=', UVBT_mean(1,elem)
-                    write(*,*) ' UVBT_mean(2,elem)=', UVBT_mean(2,elem)
-                    write(*,*) ' ubar, vbar       =', ubar, vbar
-                    write(*,*) ' hh_inv           =', hh_inv
-                end if
+!PS                 !_______________________________________________________________
+!PS                 if ( UV( 1, nz, elem)/=UV( 1, nz, elem) .or. &
+!PS                      UV( 2, nz, elem)/=UV( 2, nz, elem)) then
+!PS                     write(*,*) ' --> subroutine update_trim_vel_ale_vtransp(mode=1) --> found Nan in UV after update UV with barotr. term'
+!PS                     write(*,*) ' mype =', mype
+!PS                     write(*,*) ' elem =', elem
+!PS                     write(*,*) ' nz   =', nz
+!PS                     write(*,*) ' UV_rhs(1,nz,elem)=', UV_rhs( 1, nz, elem)
+!PS                     write(*,*) ' UV_rhs(2,nz,elem)=', UV_rhs( 2, nz, elem)
+!PS                     write(*,*) ' UV( 1, nz, elem) =', UV( 1, nz, elem)
+!PS                     write(*,*) ' UV( 2, nz, elem) =', UV( 2, nz, elem)
+!PS                     write(*,*) ' UVh( 1, nz, elem)=', UVh( 1, nz, elem)
+!PS                     write(*,*) ' UVh( 2, nz, elem)=', UVh( 2, nz, elem)
+!PS                     write(*,*) ' helem(nz, elem)  =', helem(nz, elem)
+!PS                     write(*,*) ' UVBT_mean(1,elem)=', UVBT_mean(1,elem)
+!PS                     write(*,*) ' UVBT_mean(2,elem)=', UVBT_mean(2,elem)
+!PS                     write(*,*) ' ubar, vbar       =', ubar, vbar
+!PS                     write(*,*) ' hh_inv           =', hh_inv
+!PS                 end if
                 
             end do
         end do
         call exchange_elem(UVh, partit)  ! This exchange can be avoided, but test first.
-        
+        call exchange_elem(UV, partit)
+
     !___________________________________________________________________________
     ! Trim to make velocity consistent with BT velocity at n+1/2
     ! Velocity will be used to advance momentum
@@ -1197,23 +1203,24 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
                 UV( 1, nz, elem)= UVh(1, nz, elem)/helem(nz,elem)  ! velocities are still needed    
                 UV( 2, nz, elem)= UVh(2, nz, elem)/helem(nz,elem)  ! to compute momentum advection
                 
-                !_______________________________________________________________
-                if ( UV( 1, nz, elem)/=UV( 1, nz, elem) .or. &
-                     UV( 2, nz, elem)/=UV( 2, nz, elem)) then
-                    write(*,*) ' --> subroutine update_trim_vel_ale_vtransp(mode=2) --> found Nan in UV after update UV with barotr. term'
-                    write(*,*) ' mype =', mype
-                    write(*,*) ' elem =', elem
-                    write(*,*) ' nz   =', nz
-                    write(*,*) ' UV( 1, nz, elem) =', UV( 1, nz, elem)
-                    write(*,*) ' UV( 2, nz, elem) =', UV( 2, nz, elem)
-                    write(*,*) ' UVh( 1, nz, elem)=', UVh( 1, nz, elem)
-                    write(*,*) ' UVh( 2, nz, elem)=', UVh( 2, nz, elem)
-                    write(*,*) ' helem(nz, elem)  =', helem(nz, elem)
-                    write(*,*) ' UVBT_12(1,elem)  =', UVBT_12(1,elem)
-                    write(*,*) ' UVBT_12(2,elem)  =', UVBT_12(2,elem)
-                    write(*,*) ' ubar, vbar       =', ubar, vbar
-                    write(*,*) ' hh_inv           =', hh_inv
-                end if
+!PS                 !_______________________________________________________________
+!PS                 if ( UV( 1, nz, elem)/=UV( 1, nz, elem) .or. &
+!PS                      UV( 2, nz, elem)/=UV( 2, nz, elem)) then
+!PS                     write(*,*) ' --> subroutine update_trim_vel_ale_vtransp(mode=2) --> found Nan in UV after update UV with barotr. term'
+!PS                     write(*,*) ' mype =', mype
+!PS                     write(*,*) ' elem =', elem
+!PS                     write(*,*) ' nz   =', nz
+!PS                     write(*,*) ' UV( 1, nz, elem) =', UV( 1, nz, elem)
+!PS                     write(*,*) ' UV( 2, nz, elem) =', UV( 2, nz, elem)
+!PS                     write(*,*) ' UVh( 1, nz, elem)=', UVh( 1, nz, elem)
+!PS                     write(*,*) ' UVh( 2, nz, elem)=', UVh( 2, nz, elem)
+!PS                     write(*,*) ' helem(nz, elem)  =', helem(nz, elem)
+!PS                     write(*,*) ' UVBT_12(1,elem)  =', UVBT_12(1,elem)
+!PS                     write(*,*) ' UVBT_12(2,elem)  =', UVBT_12(2,elem)
+!PS                     write(*,*) ' ubar, vbar       =', ubar, vbar
+!PS                     write(*,*) ' hh_inv           =', hh_inv
+!PS                 end if
+
             end do
         end do
         call exchange_elem(UVh, partit)    ! 
@@ -1285,7 +1292,7 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
     USE MOD_MESH
     USE MOD_DYN
     use o_ARRAYS, only: water_flux
-    use g_config, only: dt
+    use g_config, only: dt, which_ale
     use g_comm_auto
     !___________________________________________________________________________
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -1300,7 +1307,7 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UVh, fer_UV
-    real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, Wvel_i, CFL_z, fer_Wvel
+    real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, fer_Wvel
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -1308,8 +1315,6 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
     UVh         => dynamics%se_uvh(:,:,:)
     Wvel        => dynamics%w(:,:)
     Wvel_e      => dynamics%w_e(:,:)
-    Wvel_i      => dynamics%w_i(:,:)
-    CFL_z       => dynamics%cfl_z(:,:)
     if (Fer_GM) then
         fer_UV  => dynamics%fer_uv(:,:,:)
         fer_Wvel=> dynamics%fer_w(:,:)
@@ -1352,7 +1357,7 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
         
         if (Fer_GM) then
             do nz = nzmax, nzmin, -1
-                e1c2(nz)=(fer_UV(2, nz, edelem(1))*deltaX1- fer_UV(1, nz, edelem(1))*deltaY1)*helem(nz, edelem(1))
+                e1c2(nz)=(fer_UV(2, nz, edelem(1))*deltaX1 - fer_UV(1, nz, edelem(1))*deltaY1)*helem(nz, edelem(1))
             end do ! --> do nz=nzmax,nzmin,-1
             fer_Wvel(nzmin:nzmax, ednodes(1))= fer_Wvel(nzmin:nzmax, ednodes(1))+e1c2(nzmin:nzmax)
             fer_Wvel(nzmin:nzmax, ednodes(2))= fer_Wvel(nzmin:nzmax, ednodes(2))-e1c2(nzmin:nzmax)
@@ -1384,19 +1389,19 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
         end if
         
         !_______________________________________________________________________
-        if ( any(Wvel(nzmin:nzmax, ednodes(1))/=Wvel(nzmin:nzmax, ednodes(1))) .or.  &
-             any(Wvel(nzmin:nzmax, ednodes(2))/=Wvel(nzmin:nzmax, ednodes(2)))) then
-            write(*,*) ' --> subroutine vert_vel_ale --> found Nan in Wvel after div_H(...)'
-            write(*,*) ' mype   =', mype
-            write(*,*) ' edge   =', ed
-            write(*,*) ' enodes =', enodes
-            write(*,*) ' Wvel(nzmin:nzmax, enodes(1))=', Wvel(nzmin:nzmax, ednodes(1))  
-            write(*,*) ' Wvel(nzmin:nzmax, enodes(2))=', Wvel(nzmin:nzmax, ednodes(2)) 
-            write(*,*) ' e1c1', e1c1(nzmin:nzmax)  
-            write(*,*) ' e1c2', e1c2(nzmin:nzmax)  
-            write(*,*) ' e2c1', e2c1(nzmin:nzmax)  
-            write(*,*) ' e2c2', e2c2(nzmin:nzmax)  
-        end if
+!PS         if ( any(Wvel(nzmin:nzmax, ednodes(1))/=Wvel(nzmin:nzmax, ednodes(1))) .or.  &
+!PS              any(Wvel(nzmin:nzmax, ednodes(2))/=Wvel(nzmin:nzmax, ednodes(2)))) then
+!PS             write(*,*) ' --> subroutine vert_vel_ale --> found Nan in Wvel after div_H(...)'
+!PS             write(*,*) ' mype   =', mype
+!PS             write(*,*) ' edge   =', ed
+!PS             write(*,*) ' enodes =', enodes
+!PS             write(*,*) ' Wvel(nzmin:nzmax, enodes(1))=', Wvel(nzmin:nzmax, ednodes(1))  
+!PS             write(*,*) ' Wvel(nzmin:nzmax, enodes(2))=', Wvel(nzmin:nzmax, ednodes(2)) 
+!PS             write(*,*) ' e1c1', e1c1(nzmin:nzmax)  
+!PS             write(*,*) ' e1c2', e1c2(nzmin:nzmax)  
+!PS             write(*,*) ' e2c1', e2c1(nzmin:nzmax)  
+!PS             write(*,*) ' e2c2', e2c2(nzmin:nzmax)  
+!PS         end if
     end do ! --> do ed=1, myDim_edge2D
     
     !___________________________________________________________________________
@@ -1409,14 +1414,14 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
         end do ! --> do nz=nzmax,nzmin,-1
         
         !_______________________________________________________________________
-        if ( any(Wvel(nzmin:nzmax, node)/=Wvel(nzmin:nzmax, node))) then
-            write(*,*) ' --> subroutine vert_vel_ale --> found Nan in Wvel after +dhnode/dt=W'
-            write(*,*) ' mype   =', mype
-            write(*,*) ' node   =', node
-            write(*,*) ' Wvel(     nzmin:nzmax, node)=', Wvel(nzmin:nzmax, node) 
-            write(*,*) ' hnode_new(nzmin:nzmax, node)=', hnode_new(nzmin:nzmax, node)  
-            write(*,*) ' hnode(    nzmin:nzmax, node)=', hnode(nzmin:nzmax, node)
-        end if
+!PS         if ( any(Wvel(nzmin:nzmax, node)/=Wvel(nzmin:nzmax, node))) then
+!PS             write(*,*) ' --> subroutine vert_vel_ale --> found Nan in Wvel after +dhnode/dt=W'
+!PS             write(*,*) ' mype   =', mype
+!PS             write(*,*) ' node   =', node
+!PS             write(*,*) ' Wvel(     nzmin:nzmax, node)=', Wvel(nzmin:nzmax, node) 
+!PS             write(*,*) ' hnode_new(nzmin:nzmax, node)=', hnode_new(nzmin:nzmax, node)  
+!PS             write(*,*) ' hnode(    nzmin:nzmax, node)=', hnode(nzmin:nzmax, node)
+!PS         end if
     end do ! --> do node=1, myDim_nod2D
     
     !___________________________________________________________________________
@@ -1452,10 +1457,12 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! Add surface fresh water flux as upper boundary condition for 
     ! continutity
-    do node=1, myDim_nod2D
-        nzmin = ulevels_nod2D(node)
-        if (nzmin==1) Wvel(nzmin, node)=Wvel(nzmin, node)-water_flux(node) 
-    end do ! --> do node=1, myDim_nod2D
+    if (.not. (trim(which_ale)=='linfs' )) then
+        do node=1, myDim_nod2D
+            nzmin = ulevels_nod2D(node)
+            if (nzmin==1) Wvel(nzmin, node)=Wvel(nzmin, node)-water_flux(node) 
+        end do ! --> do node=1, myDim_nod2D
+    end if
     
     !___________________________________________________________________________
     call exchange_nod(Wvel, partit)

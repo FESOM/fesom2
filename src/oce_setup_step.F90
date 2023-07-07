@@ -392,10 +392,14 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     logical        :: ldiag_KE     =.false.
     real(kind=WP)  :: wsplit_maxcfl
     logical        :: use_ssh_splitexpl_subcycl=.false.
+    integer        :: splitexpl_BTsteps
+    real(kind=WP)  :: splitexpl_BTtheta
+    
     namelist /dynamics_visc   / opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
                                 use_ivertvisc, visc_easybsreturn
     namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, & 
-                                ldiag_KE, use_ssh_splitexpl_subcycl
+                                ldiag_KE, use_ssh_splitexpl_subcycl, splitexpl_BTsteps, & 
+                                splitexpl_BTtheta
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -431,6 +435,11 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     dynamics%wsplit_maxcfl              = wsplit_maxcfl
     dynamics%ldiag_KE                   = ldiag_KE
     dynamics%use_ssh_splitexpl_subcycl  = use_ssh_splitexpl_subcycl
+    if (dynamics%use_ssh_splitexpl_subcycl) then
+        dynamics%splitexpl_BTsteps          = splitexpl_BTsteps
+        dynamics%splitexpl_BTtheta          = splitexpl_BTtheta
+    end if 
+    
     !___________________________________________________________________________
     ! define local vertice & elem array size
     elem_size=myDim_elem2D+eDim_elem2D

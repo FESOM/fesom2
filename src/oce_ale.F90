@@ -3375,7 +3375,11 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     if ( .not. dynamics%use_ssh_splitexpl_subcycl) then
         call vert_vel_ale(dynamics, partit, mesh)
     else
-        call compute_thickness_zstar(dynamics, partit, mesh)
+        if (trim(which_ale)=='zstar' ) then
+            call compute_thickness_zstar(dynamics, partit, mesh)
+        else
+            hnode_new = hnode
+        end if 
         call compute_vert_vel_transpv(dynamics, partit, mesh)
     end if    
     t7=MPI_Wtime()   

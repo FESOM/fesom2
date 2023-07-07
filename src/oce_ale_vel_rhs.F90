@@ -123,7 +123,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         !  p_eta=g*eta_n(elnodes)*(1-theta)        !! this place needs update (1-theta)!!!
         p_eta = g*eta_n(elnodes)   
         
-        ff  = mesh%coriolis(elem)*elem_area(elem)
+        ff    = mesh%coriolis(elem)*elem_area(elem)
         !mm=metric_factor(elem)*elem_area(elem)
         
         !_______________________________________________________________________
@@ -172,14 +172,11 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
                 UV_rhsAB(2, nz, elem) =-UV(1, nz, elem)*ff! - mm*UV(1,nz,elem)*UV(2,nz,elem)
             end do
         else
+            UVBT_4AB(1:2, elem) = 0.0_WP
             do nz=nzmin,nzmax-1
                 ! add pressure gradient terms
                 UV_rhs(  1, nz, elem) = UV_rhs(1, nz, elem) + (Fx-pgf_x(nz, elem))*elem_area(elem)*helem(nz,elem)
                 UV_rhs(  2, nz, elem) = UV_rhs(2, nz, elem) + (Fy-pgf_y(nz, elem))*elem_area(elem)*helem(nz,elem)
-!PS                 UV_rhs(  1, nz, elem) = UV_rhs(1, nz, elem) + (pgf_x(nz, elem))*elem_area(elem)*helem(nz,elem)
-!PS                 UV_rhs(  2, nz, elem) = UV_rhs(2, nz, elem) + (pgf_y(nz, elem))*elem_area(elem)*helem(nz,elem)
-!PS                 UV_rhs(  1, nz, elem) = UV_rhs(1, nz, elem) + (Fx)*elem_area(elem)*helem(nz,elem)
-!PS                 UV_rhs(  2, nz, elem) = UV_rhs(2, nz, elem) + (Fy)*elem_area(elem)*helem(nz,elem)
 
                 ! add coriolis force, initialise AB2 array of actual timestep 
                 ! with coriolis term
@@ -190,8 +187,8 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
                 ! UVBT_4AB(1:2, elem)--> actual timestep, 
                 ! UVBT_4AB(3:4, elem)--> previous timestep (is setted in 
                 ! call compute_BC_BT_SE_vtransp) 
-                UVBT_4AB(1, elem)    = UVh(1, nz, elem)  ! 
-                UVBT_4AB(2, elem)    = UVh(2, nz, elem)  !
+                UVBT_4AB(1, elem)     = UVBT_4AB(1, elem) + UVh(1, nz, elem)  ! 
+                UVBT_4AB(2, elem)     = UVBT_4AB(2, elem) + UVh(2, nz, elem)  !
             end do    
         end if 
         
