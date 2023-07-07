@@ -99,7 +99,7 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
     real(kind=WP)            :: uv12, uv1, uv2, qc, qu, qd, num_ord=0.95_WP
     integer                  :: ednodes(2), edelem(2)
     real(kind=WP)            :: wu(mesh%nl), wv(mesh%nl), un1(mesh%nl), un2(mesh%nl)
-    
+!PS     real(kind=WP)            :: un, uu, vv, x1, x2, y1, y2
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB, UVnode_rhs, UVnode, UVh
@@ -340,7 +340,7 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
                 call omp_set_lock(partit%plock(ednodes(2)))
 #endif 
                 ! bulk domain where only edelem(1) exist
-                do nz=ul1 , nl1-1
+                do nz=ul1 , nl1
                     UVnode_rhs(1, nz, ednodes(2)) = UVnode_rhs(1, nz, ednodes(2)) - un1(nz)*UV(1, nz, edelem(1))
                     UVnode_rhs(2, nz, ednodes(2)) = UVnode_rhs(2, nz, ednodes(2)) - un1(nz)*UV(2, nz, edelem(1))
                 end do
@@ -357,6 +357,43 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
     end do ! --> do ed=1, myDim_edge2D  
 !$OMP END DO 
 
+
+
+
+
+
+
+
+
+!PS     !___________________________________________________________________________
+!PS     ! 2nd. compute horizontal advection component: u*du/dx, u*dv/dx & v*du/dy, v*dv/dy
+!PS     ! loop over triangle edges
+!PS !$OMP DO    
+!PS     do ed=1, myDim_edge2D
+!PS         ! local indice of nodes that span up edge ed
+!PS         ednodes = edges(:,ed)   
+!PS         
+!PS         ! local index of element that contribute to edge
+!PS         edelem  = edge_tri(1:2,ed)   
+!PS         
+!PS         !_______________________________________________________________________
+!PS         ! index off surface layer in case of cavity !=1 and index of mid depth 
+!PS         ! bottom layer
+!PS         ul1     = ulevels(edelem(1))
+!PS         nl1     = nlevels(edelem(1))-1
+!PS         x1      = edge_cross_dxdy(1,ed)
+!PS         y1      = edge_cross_dxdy(2,ed)
+!PS         ul2     = 0
+!PS         nl2     = nl
+!PS         
+!PS         !_______________________________________________________________________
+!PS         if (edelem(2) > 0) then
+!PS             ul2     = ulevels(edelem(2))
+!PS             nl2     = nlevels(edelem(2))-1
+!PS             x2      = edge_cross_dxdy(3,ed)
+!PS             y2      = edge_cross_dxdy(4,ed)
+!PS         end if 
+!PS         
 !PS         !_______________________________________________________________________
 !PS         ! nl12 ... minimum number of layers -1 between element edelem(1) & edelem(2) that 
 !PS         ! contribute to edge ed
@@ -371,7 +408,7 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
 !PS         ! (A1) goes only into this loop when the edge has only facing element
 !PS         ! edelem(1) --> so the edge is a boundary edge --> this is for ocean 
 !PS         ! surface in case of cavity
-!PS         do nz=nu1, nu12-1
+!PS         do nz=ul1, ul12-1
 !PS             un= (UVh(2, nz, edelem(1))*x1 - UVh(1, nz, edelem(1))*y1) 
 !PS             uu=un*UV(1, nz, edelem(1)) ! the momentum to be carried depends on velocities
 !PS             vv=un*UV(2, nz, edelem(1))
@@ -379,38 +416,7 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
 !PS             UVnode_rhs(1, nz, ednodes(2))=UVnode_rhs(1, nz, ednodes(2))-uu
 !PS             UVnode_rhs(2, nz, ednodes(1))=UVnode_rhs(2, nz, ednodes(1))+vv
 !PS             UVnode_rhs(2, nz, ednodes(2))=UVnode_rhs(2, nz, ednodes(2))-vv
-!PS         end do ! --> do nz=nu1, nu12-1
-!PS         
-!PS         !_______________________________________________________________________
-!PS         ! (A2) goes only into this loop when the edge has a facing elemenmt
-!PS         ! edelem(2) --> so the edge is a boundary edge --> this is for ocean 
-!PS         ! surface in case of cavity
-!PS         if (nu2 > 0) then 
-!PS             do nz=nu2, nu12-1
-!PS                 un=-(UVh(2, nz, edelem(2))*x2- UVh(1, nz, edelem(2))*y2)
-!PS                 uu=un*UV(1, nz, edelem(2))
-!PS                 vv=un*UV(2, nz, edelem(2))
-!PS                 UVnode_rhs(1, nz, ednodes(1))=UVnode_rhs(1, nz, ednodes(1))+uu
-!PS                 UVnode_rhs(1, nz, ednodes(2))=UVnode_rhs(1, nz, ednodes(2))-uu
-!PS                 UVnode_rhs(2, nz, ednodes(1))=UVnode_rhs(2, nz, ednodes(1))+vv
-!PS                 UVnode_rhs(2, nz, ednodes(2))=UVnode_rhs(2, nz, ednodes(2))-vv
-!PS             end do ! --> do nz=nu2, nu12-1
-!PS         end if 
-!PS         
-!PS         !_______________________________________________________________________
-!PS         ! (B) Both segments
-!PS         ! loop over depth layers from shared upper layer index nu12 to shared 
-!PS         ! lower layer index nl12
-!PS         do nz=nu12, nl12
-!PS             un=  (UVh(2, nz, edelem(1))*x1 - UVh(1, nz, edelem(1))*y1) &
-!PS                 -(UVh(2, nz, edelem(2))*x2 - UVh(1, nz, edelem(2))*y2)
-!PS             uu=un*(UV(1, nz, edelem(1)) + UV(1, nz, edelem(2)))*0.5_WP! the momentum to be carried depends on velocities
-!PS             vv=un*(UV(2, nz, edelem(1)) + UV(2, nz, edelem(2)))*0.5_WP
-!PS             UVnode_rhs(1, nz, ednodes(1))=UVnode_rhs(1, nz, ednodes(1))+uu
-!PS             UVnode_rhs(1, nz, ednodes(2))=UVnode_rhs(1, nz, ednodes(2))-uu
-!PS             UVnode_rhs(2, nz, ednodes(1))=UVnode_rhs(2, nz, ednodes(1))+vv
-!PS             UVnode_rhs(2, nz, ednodes(2))=UVnode_rhs(2, nz, ednodes(2))-vv
-!PS         end do ! --> do nz=nu12, nl12
+!PS         end do ! --> do nz=ul1, ul12-1
 !PS         
 !PS         !_______________________________________________________________________
 !PS         ! (C1) remaining segments from the shared lower lyer index nl12 to bottom 
@@ -425,18 +431,65 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
 !PS             UVnode_rhs(2, nz, ednodes(2))=UVnode_rhs(2, nz, ednodes(2))-vv
 !PS         end do ! --> do nz=nl12+1, nl1
 !PS         
-!PS         !_______________________________________________________________________
-!PS         ! (C2) remaining segments from the shared lower lyer index nl12 to bottom 
-!PS         ! of element edelem(1)
-!PS         do nz=nl12+1, nl2
-!PS             un=-(UVh(2, nz, edelem(2))*x2- UVh(1, nz, edelem(2))*y2)
-!PS             uu=un*UV(1, nz, edelem(2))
-!PS             vv=un*UV(2, nz, edelem(2))
-!PS             UVnode_rhs(1, nz, ednodes(1))=UVnode_rhs(1, nz, ednodes(1))+uu
-!PS             UVnode_rhs(1, nz, ednodes(2))=UVnode_rhs(1, nz, ednodes(2))-uu
-!PS             UVnode_rhs(2, nz, ednodes(1))=UVnode_rhs(2, nz, ednodes(1))+vv
-!PS             UVnode_rhs(2, nz, ednodes(2))=UVnode_rhs(2, nz, ednodes(2))-vv
-!PS         end do ! --> do nz=nl12+1, nl2
+!PS         if (edelem(2) > 0) then 
+!PS             !_______________________________________________________________________
+!PS             ! (A2) goes only into this loop when the edge has a facing elemenmt
+!PS             ! edelem(2) --> so the edge is a boundary edge --> this is for ocean 
+!PS             ! surface in case of cavity
+!PS             do nz=ul2, ul12-1
+!PS                 un=-(UVh(2, nz, edelem(2))*x2- UVh(1, nz, edelem(2))*y2)
+!PS                 uu=un*UV(1, nz, edelem(2))
+!PS                 vv=un*UV(2, nz, edelem(2))
+!PS                 UVnode_rhs(1, nz, ednodes(1))=UVnode_rhs(1, nz, ednodes(1))+uu
+!PS                 UVnode_rhs(1, nz, ednodes(2))=UVnode_rhs(1, nz, ednodes(2))-uu
+!PS                 UVnode_rhs(2, nz, ednodes(1))=UVnode_rhs(2, nz, ednodes(1))+vv
+!PS                 UVnode_rhs(2, nz, ednodes(2))=UVnode_rhs(2, nz, ednodes(2))-vv
+!PS             end do ! --> do nz=ul2, ul12-1
+!PS             
+!PS             !_______________________________________________________________________
+!PS             ! (B) Both segments
+!PS             ! loop over depth layers from shared upper layer index ul12 to shared 
+!PS             ! lower layer index nl12
+!PS             do nz=ul12, nl12
+!PS                 un=  (UVh(2, nz, edelem(1))*x1 - UVh(1, nz, edelem(1))*y1) &
+!PS                     -(UVh(2, nz, edelem(2))*x2 - UVh(1, nz, edelem(2))*y2)
+!PS                 uu=un*(UV(1, nz, edelem(1)) + UV(1, nz, edelem(2)))*0.5_WP! the momentum to be carried depends on velocities
+!PS                 vv=un*(UV(2, nz, edelem(1)) + UV(2, nz, edelem(2)))*0.5_WP
+!PS                 UVnode_rhs(1, nz, ednodes(1))=UVnode_rhs(1, nz, ednodes(1))+uu
+!PS                 UVnode_rhs(1, nz, ednodes(2))=UVnode_rhs(1, nz, ednodes(2))-uu
+!PS                 UVnode_rhs(2, nz, ednodes(1))=UVnode_rhs(2, nz, ednodes(1))+vv
+!PS                 UVnode_rhs(2, nz, ednodes(2))=UVnode_rhs(2, nz, ednodes(2))-vv
+!PS             end do ! --> do nz=ul12, nl12
+!PS         
+!PS             !_______________________________________________________________________
+!PS             ! (C2) remaining segments from the shared lower lyer index nl12 to bottom 
+!PS             ! of element edelem(1)
+!PS             do nz=nl12+1, nl2
+!PS                 un=-(UVh(2, nz, edelem(2))*x2- UVh(1, nz, edelem(2))*y2)
+!PS                 uu=un*UV(1, nz, edelem(2))
+!PS                 vv=un*UV(2, nz, edelem(2))
+!PS                 UVnode_rhs(1, nz, ednodes(1))=UVnode_rhs(1, nz, ednodes(1))+uu
+!PS                 UVnode_rhs(1, nz, ednodes(2))=UVnode_rhs(1, nz, ednodes(2))-uu
+!PS                 UVnode_rhs(2, nz, ednodes(1))=UVnode_rhs(2, nz, ednodes(1))+vv
+!PS                 UVnode_rhs(2, nz, ednodes(2))=UVnode_rhs(2, nz, ednodes(2))-vv
+!PS             end do ! --> do nz=nl12+1, nl2
+!PS         else
+!PS         
+!PS             !_______________________________________________________________________
+!PS             ! (B) Both segments
+!PS             ! loop over depth layers from shared upper layer index ul12 to shared 
+!PS             ! lower layer index nl12
+!PS             do nz=ul12, nl12
+!PS                 un=  (UVh(2, nz, edelem(1))*x1 - UVh(1, nz, edelem(1))*y1)
+!PS                 uu=un*UV(1, nz, edelem(1))! the momentum to be carried depends on velocities
+!PS                 vv=un*UV(2, nz, edelem(1)) 
+!PS                 UVnode_rhs(1, nz, ednodes(1))=UVnode_rhs(1, nz, ednodes(1))+uu
+!PS                 UVnode_rhs(1, nz, ednodes(2))=UVnode_rhs(1, nz, ednodes(2))-uu
+!PS                 UVnode_rhs(2, nz, ednodes(1))=UVnode_rhs(2, nz, ednodes(1))+vv
+!PS                 UVnode_rhs(2, nz, ednodes(2))=UVnode_rhs(2, nz, ednodes(2))-vv
+!PS             end do ! --> do nz=ul12, nl12
+!PS         end if 
+!PS         
 !PS     end do ! --> do ed=1, myDim_edge2D  
 !PS !$OMP END DO
 
@@ -476,8 +529,8 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
     if (dynamics%ldiag_ke) then !we repeat the computation here and there are multiple ways to speed it up
 !$OMP DO
        do elem=1, myDim_elem2D
-          nl1 = nlevels(elem)-1
           ul1 = ulevels(elem)
+          nl1 = nlevels(elem)-1
           dynamics%ke_adv_AB(1:2, ul1:nl1, elem) = dynamics%ke_adv_AB(1:2, ul1:nl1, elem) + elem_area(elem)* &
                 ( UVnode_rhs(1:2, ul1:nl1, elem2D_nodes(1, elem)) &
                 + UVnode_rhs(1:2, ul1:nl1, elem2D_nodes(2, elem)) & 
