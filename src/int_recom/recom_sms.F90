@@ -29,7 +29,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     use i_therm_param
     use g_comm
     use g_support
-    use mvars                                                                       ! MOCSY
+    use mvars                                                                       
     use mdepth2press                                                                ! Ballasting
     use gsw_mod_toolbox, only: gsw_sa_from_sp,gsw_ct_from_pt,gsw_rho                ! Ballasting
 
@@ -47,14 +47,14 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     real(kind=8),dimension(mesh%nl-1)        ,intent(in)    :: Temp                 !< [degrees C] Ocean temperature
     real(kind=8),dimension(mesh%nl-1)        ,intent(in)    :: Sali_depth           !< NEW MOCSY Salinity for the whole water column
 
-    Real(kind=8),dimension(mesh%nl-1),intent(inout)         :: CO2_watercolumn      !< MOCSY [mol/m3]
-    Real(kind=8),dimension(mesh%nl-1),intent(inout)         :: pH_watercolumn       !< MOCSY on total scale
-    Real(kind=8),dimension(mesh%nl-1),intent(inout)         :: pCO2_watercolumn     !< MOCSY [uatm]
-    Real(kind=8),dimension(mesh%nl-1),intent(inout)         :: HCO3_watercolumn     !< MOCSY [mol/m3]
-    Real(kind=8),dimension(mesh%nl-1),intent(inout)         :: CO3_watercolumn      !< DISS [mol/m3]
-    Real(kind=8),dimension(mesh%nl-1),intent(inout)         :: OmegaC_watercolumn   !< DISS calcite saturation state
-    Real(kind=8),dimension(mesh%nl-1),intent(inout)         :: kspc_watercolumn     !< DISS stoichiometric solubility product [mol^2/kg^2]
-    Real(kind=8),dimension(mesh%nl-1),intent(inout)         :: rhoSW_watercolumn    !< DISS in-situ density of seawater [kg/m3]
+    Real(kind=8),dimension(mesh%nl-1),intent(inout)         :: CO2_watercolumn      !< [mol/m3]
+    Real(kind=8),dimension(mesh%nl-1),intent(inout)         :: pH_watercolumn       !< on total scale
+    Real(kind=8),dimension(mesh%nl-1),intent(inout)         :: pCO2_watercolumn     !< [uatm]
+    Real(kind=8),dimension(mesh%nl-1),intent(inout)         :: HCO3_watercolumn     !< [mol/m3]
+    Real(kind=8),dimension(mesh%nl-1),intent(inout)         :: CO3_watercolumn      !< [mol/m3]
+    Real(kind=8),dimension(mesh%nl-1),intent(inout)         :: OmegaC_watercolumn   !< calcite saturation state
+    Real(kind=8),dimension(mesh%nl-1),intent(inout)         :: kspc_watercolumn     !< stoichiometric solubility product [mol^2/kg^2]
+    Real(kind=8),dimension(mesh%nl-1),intent(inout)         :: rhoSW_watercolumn    !< in-situ density of seawater [kg/m3]
 
     real(kind=8),dimension(mesh%nl)          ,intent(in)    :: zF                   !< [m] Depth of fluxes
     real(kind=8),dimension(mesh%nl-1),intent(inout)         :: PAR
@@ -70,16 +70,16 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     real(kind=8)                                            :: aux
     integer                                                 :: k,step,ii, idiags,n
 
-    Real(kind=8),                      intent(in)           :: Loc_slp              ! MOCSY [Pa] sea-level pressure
-    Real(kind=8)                                            :: Patm_depth(1)        ! MOCSY
-    Real(kind=8)                                            :: REcoM_T_depth(1)     ! MOCSY temperature for the whole water column for mocsy minimum defined as -2
-    Real(kind=8)                                            :: REcoM_S_depth(1)     ! MOCSY
-    Real(kind=8)                                            :: REcoM_DIC_depth(1)   ! MOCSY
-    Real(kind=8)                                            :: REcoM_Alk_depth(1)   ! MOCSY
-    Real(kind=8)                                            :: REcoM_Si_depth(1)    ! MOCSY
-    Real(kind=8)                                            :: REcoM_Phos_depth(1)  ! MOCSY
+    Real(kind=8),                      intent(in)           :: Loc_slp              ! [Pa] sea-level pressure
+    Real(kind=8)                                            :: Patm_depth(1)        
+    Real(kind=8)                                            :: REcoM_T_depth(1)     ! temperature for the whole water column for mocsy minimum defined as -2
+    Real(kind=8)                                            :: REcoM_S_depth(1)     
+    Real(kind=8)                                            :: REcoM_DIC_depth(1)   
+    Real(kind=8)                                            :: REcoM_Alk_depth(1)   
+    Real(kind=8)                                            :: REcoM_Si_depth(1)    
+    Real(kind=8)                                            :: REcoM_Phos_depth(1)  
     Real(kind=8),                      intent(in)           :: Latd(1)              ! latitude in degree
-    Real(kind=8),                      intent(in)           :: Lond(1)              ! NEW MOCSY longitude in degree 
+    Real(kind=8),                      intent(in)           :: Lond(1)              ! longitude in degree 
     Real(kind=8)                                            :: mocsy_step_per_day 
     real(kind=8)                                            :: & 
         DIN,     & !< Dissolved Inorganic Nitrogen 				[mmol/m3] 
@@ -205,10 +205,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             FreeFe = zero
 
 ! For Mocsy
-            REcoM_T_depth    = max(2.d0, Temp(k))        ! MOCSY minimum set to 2 degC: K1/K2 Lueker valid between 2degC-35degC and 19-43psu
-            REcoM_T_depth    = min(REcoM_T_depth, 40.d0) ! MOCSY maximum set to 40 degC: K1/K2 Lueker valid between 2degC-35degC and 19-43psu
-            REcoM_S_depth    = max(21.d0, Sali_depth(k)) ! MOCSY minimum set to 21: K1/K2 Lueker valid between 2degC-35degC and 19-43psu, else causes trouble in regions with S between 19 and 21 and ice conc above 97%                      
-            REcoM_S_depth    = min(REcoM_S_depth, 43.d0) ! MOCSY maximum set to 43: K1/K2 Lueker valid between 2degC-35degC and 19-43psu, else causes trouble   
+            REcoM_T_depth    = max(2.d0, Temp(k))        ! minimum set to 2 degC: K1/K2 Lueker valid between 2degC-35degC and 19-43psu
+            REcoM_T_depth    = min(REcoM_T_depth, 40.d0) ! maximum set to 40 degC: K1/K2 Lueker valid between 2degC-35degC and 19-43psu
+            REcoM_S_depth    = max(21.d0, Sali_depth(k)) ! minimum set to 21: K1/K2 Lueker valid between 2degC-35degC and 19-43psu, else causes trouble in regions with S between 19 and 21 and ice conc above 97%
+            REcoM_S_depth    = min(REcoM_S_depth, 43.d0) ! maximum set to 43: K1/K2 Lueker valid between 2degC-35degC and 19-43psu, else causes trouble
             REcoM_DIC_depth  = max(tiny*1e-3,state(k,idic)*1e-3   + sms(k,idic  )*1e-3)     
             REcoM_Alk_depth  = max(tiny*1e-3,state(k,ialk)*1e-3   + sms(k,ialk  )*1e-3)      
             REcoM_Si_depth   = max(tiny*1e-3,state(k,isi)*1e-3    + sms(k,isi   )*1e-3)      
@@ -364,25 +364,25 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             end if
 
 !-------------------------------------------------------------------------------
-! Depth component of Mocsy (see http://ocmip5.ipsl.jussieu.fr/mocsy/pyth.html)      ! NEW MOCSY
+! Depth component of Mocsy (see http://ocmip5.ipsl.jussieu.fr/mocsy/pyth.html)
 !-------------------------------------------------------------------------------
 
 ! Calculate the carbonate system for the very first time step of the first year of the run
     !if (mocsy_restart==.false. .and. recom_istep==1) then    ! r_restart is defined in gen_modules_clock in fesom_cpl.
             dpos(1) = -zF(k)
             if (mstep==1) then
-                call vars_sprac(ph_depth, pco2_depth, fco2_depth, co2_depth, hco3_depth, co3_depth, OmegaA_depth, OmegaC_depth, kspc_depth, BetaD_depth,  & ! MOCSY 
-                       rhoSW_depth, p_depth, tempis_depth,                                                                                                & ! MOCSY
-                       REcoM_T_depth, REcoM_S_depth, REcoM_Alk_depth, REcoM_DIC_depth, REcoM_Si_depth, REcoM_Phos_depth, Patm_depth, dpos, Latd, Nmocsy,  & ! MOCSY
-                       optCON='mol/m3', optT='Tpot   ', optP='m ', optB='u74', optK1K2='l  ', optKf='dg', optGAS='Pinsitu', optS='Sprc')                    ! MOCSY
+                call vars_sprac(ph_depth, pco2_depth, fco2_depth, co2_depth, hco3_depth, co3_depth, OmegaA_depth, OmegaC_depth, kspc_depth, BetaD_depth,  &
+                       rhoSW_depth, p_depth, tempis_depth,                                                                                                &
+                       REcoM_T_depth, REcoM_S_depth, REcoM_Alk_depth, REcoM_DIC_depth, REcoM_Si_depth, REcoM_Phos_depth, Patm_depth, dpos, Latd, Nmocsy,  &
+                       optCON='mol/m3', optT='Tpot   ', optP='m ', optB='u74', optK1K2='l  ', optKf='dg', optGAS='Pinsitu', optS='Sprc')
                 CO2_watercolumn(k)    = co2_depth(1)
                 pH_watercolumn(k)     = ph_depth(1)
                 pCO2_watercolumn(k)   = pco2_depth(1)
                 HCO3_watercolumn(k)   = hco3_depth(1)
-                CO3_watercolumn(k)    = co3_depth(1)    ! DISS
-                OmegaC_watercolumn(k) = OmegaC_depth(1) ! DISS
-                kspc_watercolumn(k)   = kspc_depth(1)   ! DISS
-                rhoSW_watercolumn(k)  = rhoSW_depth(1)  ! DISS
+                CO3_watercolumn(k)    = co3_depth(1)
+                OmegaC_watercolumn(k) = OmegaC_depth(1)
+                kspc_watercolumn(k)   = kspc_depth(1)
+                rhoSW_watercolumn(k)  = rhoSW_depth(1)
             endif 
 
 !! Calculate carbonate system every 7 days for depths < 1%PAR, and every 30 days for the depths below.
@@ -391,32 +391,32 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             logfile_outfreq_30 = mocsy_step_per_day*30
 
             if (PARave > 0.01*SurfSR .and. mod(mstep,logfile_outfreq_7)==0) then
-                call vars_sprac(ph_depth, pco2_depth, fco2_depth, co2_depth, hco3_depth, co3_depth, OmegaA_depth, OmegaC_depth, kspc_depth, BetaD_depth,  & ! MOCSY 
-                       rhoSW_depth, p_depth, tempis_depth,                                                                                                & ! MOCSY
-                       REcoM_T_depth, REcoM_S_depth, REcoM_Alk_depth, REcoM_DIC_depth, REcoM_Si_depth, REcoM_Phos_depth, Patm_depth, dpos, Latd, Nmocsy,  & ! MOCSY
-                       optCON='mol/m3', optT='Tpot   ', optP='m ', optB='u74', optK1K2='l  ', optKf='dg', optGAS='Pinsitu', optS='Sprc')                    ! MOCSY
+                call vars_sprac(ph_depth, pco2_depth, fco2_depth, co2_depth, hco3_depth, co3_depth, OmegaA_depth, OmegaC_depth, kspc_depth, BetaD_depth,  & 
+                       rhoSW_depth, p_depth, tempis_depth,                                                                                                &
+                       REcoM_T_depth, REcoM_S_depth, REcoM_Alk_depth, REcoM_DIC_depth, REcoM_Si_depth, REcoM_Phos_depth, Patm_depth, dpos, Latd, Nmocsy,  &
+                       optCON='mol/m3', optT='Tpot   ', optP='m ', optB='u74', optK1K2='l  ', optKf='dg', optGAS='Pinsitu', optS='Sprc')
                 CO2_watercolumn(k)    = co2_depth(1)
                 pH_watercolumn(k)     = ph_depth(1)
                 pCO2_watercolumn(k)   = pco2_depth(1)
                 HCO3_watercolumn(k)   = hco3_depth(1)
-                CO3_watercolumn(k)    = co3_depth(1)    ! DISS
-                OmegaC_watercolumn(k) = OmegaC_depth(1) ! DISS
-                kspc_watercolumn(k)   = kspc_depth(1)   ! DISS
-                rhoSW_watercolumn(k)  = rhoSW_depth(1)  ! DISS
+                CO3_watercolumn(k)    = co3_depth(1)
+                OmegaC_watercolumn(k) = OmegaC_depth(1)
+                kspc_watercolumn(k)   = kspc_depth(1)
+                rhoSW_watercolumn(k)  = rhoSW_depth(1)
 
             elseif (PARave < 0.01*SurfSR .and. mod(mstep,logfile_outfreq_30)==0) then
-                call vars_sprac(ph_depth, pco2_depth, fco2_depth, co2_depth, hco3_depth, co3_depth, OmegaA_depth, OmegaC_depth, kspc_depth, BetaD_depth,  & ! MOCSY 
-                       rhoSW_depth, p_depth, tempis_depth,                                                                                                & ! MOCSY
-                       REcoM_T_depth, REcoM_S_depth, REcoM_Alk_depth, REcoM_DIC_depth, REcoM_Si_depth, REcoM_Phos_depth, Patm_depth, dpos, Latd, Nmocsy,  & ! MOCSY
-                       optCON='mol/m3', optT='Tpot   ', optP='m ', optB='u74', optK1K2='l  ', optKf='dg', optGAS='Pinsitu', optS='Sprc')                    ! MOCSY
+                call vars_sprac(ph_depth, pco2_depth, fco2_depth, co2_depth, hco3_depth, co3_depth, OmegaA_depth, OmegaC_depth, kspc_depth, BetaD_depth,  &
+                       rhoSW_depth, p_depth, tempis_depth,                                                                                                &
+                       REcoM_T_depth, REcoM_S_depth, REcoM_Alk_depth, REcoM_DIC_depth, REcoM_Si_depth, REcoM_Phos_depth, Patm_depth, dpos, Latd, Nmocsy,  &
+                       optCON='mol/m3', optT='Tpot   ', optP='m ', optB='u74', optK1K2='l  ', optKf='dg', optGAS='Pinsitu', optS='Sprc')
                 CO2_watercolumn(k)    = co2_depth(1)
                 pH_watercolumn(k)     = ph_depth(1)
                 pCO2_watercolumn(k)   = pco2_depth(1)
                 HCO3_watercolumn(k)   = hco3_depth(1)
-                CO3_watercolumn(k)    = co3_depth(1)    ! DISS
-                OmegaC_watercolumn(k) = OmegaC_depth(1) ! DISS
-                kspc_watercolumn(k)   = kspc_depth(1)   ! DISS
-                rhoSW_watercolumn(k)  = rhoSW_depth(1)  ! DISS
+                CO3_watercolumn(k)    = co3_depth(1)
+                OmegaC_watercolumn(k) = OmegaC_depth(1)
+                kspc_watercolumn(k)   = kspc_depth(1)
+                rhoSW_watercolumn(k)  = rhoSW_depth(1)
             endif
 
 !-------------------------------------------------------------------------------
@@ -447,21 +447,28 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #endif
 
 !------------------------------------------------------------------------------
-! Calcite dissolution dependent on OmegaC ! DISS
+! Calcite dissolution
 !------------------------------------------------------------------------------
             Sink_Vel    = Vdet_a* abs(zF(k)) + Vdet
 
-            if (OmegaC_diss) then
+            if (OmegaC_diss) then    ! Calcdiss dependent on carbonate saturation
                 Ca        = (0.02128d0/40.078d0) * Sali_depth(k)/1.80655d0 ! Calcium ion concentration [mol/kg], function from varsolver.f90
                 CO3_sat   = (kspc_watercolumn(k) / Ca) * rhoSW_watercolumn(k) ! Saturated carbonate ion concentration, converted to [mol/m3]
                 calc_diss = calc_diss_omegac * max(zero,(1-(CO3_watercolumn(k)/CO3_sat)))**(calc_diss_exp) ! Dissolution rate scaled by carbonate ratio, after Aumont et al. 2015
-            else
-                calc_diss = calc_diss_rate * Sink_Vel/20.d0 ! Dissolution rate of CaCO3 scaled by the sinking velocity at the current depth
-            endif
 #if defined (__3Zoo2Det)
-            calc_diss2    = calc_diss_rate2 ! Dissolution rate of CaCO3 scaled by the sinking velocity at the current depth seczoo
+                calc_diss2 = calc_diss
 #endif
-            calc_diss_ben = calc_diss_rate * Sink_Vel/20.0 ! DISS added the variable calc_diss_ben to keep the calcite dissolution in the benthos with the old formulation
+            else    ! Calcdiss dependent on depth
+                calc_diss = calc_diss_rate * Sink_Vel/20.d0 ! Dissolution rate of CaCO3 scaled by the sinking velocity at the current depth
+#if defined (__3Zoo2Det)
+                calc_diss2 = calc_diss_rate2* Sink_Vel/20.d0 
+#endif
+            endif
+
+!#if defined (__3Zoo2Det)
+!            calc_diss2    = calc_diss_rate2 ! Dissolution rate of CaCO3 scaled by the sinking velocity at the current depth seczoo
+!#endif
+            calc_diss_ben = calc_diss_rate * Sink_Vel/20.0
 
 !-------------------------------------------------------------------------------
 !> Photosynthesis section, light parameters and rates
@@ -527,7 +534,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             end if
             if (Cphot_dia .lt. tiny) Cphot_dia = zero
 
-!< *** Coccolithophore photosynthesis rate *** (NEW!!!)
+!< *** Coccolithophore photosynthesis rate ***
 !< *******************************************
 #if defined (__coccos) 
             if ( pMax_cocco .lt. tiny .OR. Parave /= Parave .OR. CHL2C_cocco /= CHL2C_cocco) then 
@@ -696,8 +703,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !< *************************
 !< pzPhy: Maximum nanophytoplankton preference
 !< pzDia: Maximum diatom preference
-!< pzDet: Maximum slow-sinking detritus prefence by first zooplankton
-!< pzDetZ2: Maximum fast-sinking detritus preference by first zooplankton
+!< pzCocco: Maximum coccolithophore preference
+!< pzDet: Maximum slow-sinking detritus prefence
+!< pzDetZ2: Maximum fast-sinking detritus preference
+!< pzMicZoo: Maximum microzooplankton preference
 
             if (REcoM_Grazing_Variable_Preference) then   ! CHECK ONUR
                 aux = pzPhy*PhyN + pzDia*DiaN              
@@ -796,7 +805,18 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 ! Second Zooplankton
 !-------------------------------------------------------------------------------
 !< Grazing on small phytoplankton, diatoms, coccolithophore (optional), 
-!< heterotrophs, slow- and fast-sinking detritus
+!< heterotrophs, microzooplankton (optional), slow- and fast-sinking detritus
+
+!< *** Food availability ***
+!< *************************  
+!< pzPhy2: Maximum nanophytoplankton preference 
+!< pzDia2: Maximum diatom preference
+!< pzCocco2: Maximum coccolithophore preference  
+!< pzDet2: Maximum slow-sinking detritus prefence
+!< pzDetZ22: Maximum fast-sinking detritus preference
+!< pzHet: Maximum mesozooplankton preference            
+!< pzMicZoo2: Maximum microzooplankton preference
+
 #if defined (__3Zoo2Det)     
             if (REcoM_Grazing_Variable_Preference) then
                 aux = pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN 
@@ -889,6 +909,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 ! Third Zooplankton (Microzooplankton)
 !-------------------------------------------------------------------------------
 !< Grazing on small phytoplankton, diatoms and coccolithophore (optional)
+
+!< *** Food availability ***
+!< *************************
+!< pzPhy3: Maximum nanophytoplankton preference     
+!< pzDia3: Maximum diatom preference 
+!< pzCocco3: Maximum coccolithophore preference
 
             if (REcoM_Grazing_Variable_Preference) then
                 aux = pzPhy3 * PhyN + pzDia3 * DiaN
@@ -1031,8 +1057,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !-------------------------------------------------------------------------------
 ! Calcification
 !-------------------------------------------------------------------------------
-! Terms required for the formation and dissolution of CaCO3
-! Without this, calcification is performed by a fraction of small phytoplankton
+! Without coccolithophores, calcification is performed by a fraction of small phytoplankton
+
 #if defined (__coccos) 
             if (Temp(k) < 10.6) then                 ! (PICPOC definition after Krumhardt et al. 2017, 2019; Temp(k) because we need degC here)
                 PICPOCtemp = 0.104d0 * Temp(k) - 0.108d0
@@ -1081,7 +1107,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 
             if (ciso) then
                 calcification_13 = calc_prod_ratio * Cphot * PhyC_13 * alpha_calc_13
-                calcification_13 = calcification   * alpha_calc_13  !! CHECK
+                calcification_13 = calcification   * alpha_calc_13
                 calc_loss_agg_13 = aggregationRate * PhyCalc_13
                 calc_loss_gra_13 = grazingFlux_phy * recipQuota_13/(PhyC_13 + tiny) * PhyCalc_13
                 if (ciso_14 .and. ciso_organic_14) then
@@ -1134,7 +1160,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         - Cphot_Cocco                     * CoccoC    & ! --> Coccolithophore photosynthesis
         + phyRespRate_Cocco               * CoccoC    & ! --> Coccolithophore respiration
 #endif
-        + rho_C1 * arrFunc * O2Func       * EOC       & ! --> Remineralization of DOC ! NEW O2remin
+        + rho_C1 * arrFunc * O2Func       * EOC       & ! --> Remineralization of DOC
         + HetRespFlux                                 & ! --> Mesozooplankton respiration
 #if defined (__3Zoo2Det)                     
         + Zoo2RespFlux                                & ! --> Macrozooplankton respiration            
@@ -1178,7 +1204,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #if defined (__coccos)
         + 1.0625 * N_assim_Cocco                 * CoccoC  & 
 #endif
-        - 1.0625 * rho_N * arrFunc * O2Func      * DON     & ! O2remin      
+        - 1.0625 * rho_N * arrFunc * O2Func      * DON     &     
         + 2.d0 * calc_diss                       * DetCalc &
         + 2.d0 * calc_loss_gra  * calc_diss_guts           &
 #if defined (__3Zoo2Det)
@@ -1259,8 +1285,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             - grazingFlux_Cocco3 * grazEff3                &
             + aggregationRate               * CoccoN       & 
 #endif
-            - grazingFlux_Det    * grazEff                 &
-            - grazingFlux_Det2   * grazEff2                &   ! --> okay, grazing of second zoo on first detritus
+            - grazingFlux_Det    * grazEff                 &   ! --> grazing of first zoo (meso) on first detritus
+            - grazingFlux_Det2   * grazEff2                &   ! --> grazing of second zoo on first detritus
             + aggregationRate               * PhyN         &
             + aggregationRate               * DiaN         &
             + miczooLossFlux                               &
@@ -1915,7 +1941,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #endif
         + lossN         * limitFacN       * PhyN    & ! --> Excretion from small pythoplankton
         + lossN_d       * limitFacN_dia   * DiaN    & ! --> Excretion from diatom
-        + reminN * arrFunc * O2Func * DetN          & ! --> Remineralization of detritus   ! NEW O2remin
+        + reminN * arrFunc * O2Func * DetN          & ! --> Remineralization of detritus
         + lossN_z                   * HetN          & ! --> Excretion from zooplankton
 #if defined (__3Zoo2Det)
         + reminN * arrFunc * O2Func * DetZ2N        & ! O2remin
@@ -2434,7 +2460,7 @@ endif
   LocBenthos(3)   = LocBenthos(3)   - decaybenthos(3) * dt_b 
 
 !*** Calc: DIC, Alk ***  ! OG calc_diss_ben is taken from the deepest level 
-  decayBenthos(4) = calc_diss_ben * LocBenthos(4)    ! NEW DISS changed calc_diss to calc_diss_ben to not make the dissolution omega dependent when using the switch OmegaC_diss
+  decayBenthos(4) = calc_diss_ben * LocBenthos(4)
   LocBenthos(4)      = LocBenthos(4)   - decayBenthos(4) * dt_b
 
     if (ciso) then
