@@ -88,6 +88,7 @@ contains
  
   subroutine fesom_init(fesom_total_nsteps)
       use fesom_main_storage_module
+      use iom
       integer, intent(out) :: fesom_total_nsteps
       ! EO parameters
       logical mpi_is_initialized
@@ -240,6 +241,10 @@ contains
            write(*,*) ' > runtime setup other   ',f%rtime_setup_other 
             write(*,*) '============================================' 
         endif
+
+#if defined(__MULTIO)
+          call iom_send_fesom_domains(f%partit, f%mesh)
+#endif
 
     !    f%dump_dir='DUMP/'
     !    INQUIRE(file=trim(f%dump_dir), EXIST=f%L_EXISTS)
