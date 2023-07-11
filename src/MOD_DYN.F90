@@ -67,7 +67,7 @@ TYPE T_DYN
     real(kind=WP), allocatable, dimension(:,:,:):: uvnode
     
     ! instant vertical vel arrays
-    real(kind=WP), allocatable, dimension(:,:)  :: w, w_e, w_i, cfl_z, fer_w
+    real(kind=WP), allocatable, dimension(:,:)  :: w, w_e, w_i, w_old, cfl_z, fer_w
     
     ! sea surface height arrays
     real(kind=WP), allocatable, dimension(:)    :: eta_n, d_eta, ssh_rhs, ssh_rhs_old
@@ -110,8 +110,21 @@ TYPE T_DYN
     logical                                     :: use_wsplit    = .false.
     ! maximum allowed CFL criteria in vertical (0.5 < w_max_cfl < 1.) 
     ! in older FESOM it used to be w_exp_max=1.e-3
-    real(kind=WP)                               :: wsplit_maxcfl= 1.0     
-
+    real(kind=WP)                               :: wsplit_maxcfl= 1.0
+    ! energy diagnostic part: will be computed inside the model ("hard integration"):
+    logical                                      :: ldiag_ke       = .true.
+    ! different contributions to velocity change. will be computed inside the code.
+    real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv, ke_cor, ke_pre, ke_hvis, ke_vvis, ke_du2, ke_umean, ke_u2mean
+    real(kind=WP), allocatable, dimension(:,:)   :: ke_wind, ke_drag
+    ! same as above but multiplied by velocity. we need both for later computation of turbulent fluxes
+    real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv_xVEL, ke_cor_xVEL, ke_pre_xVEL, ke_hvis_xVEL, ke_vvis_xVEL
+    real(kind=WP), allocatable, dimension(:,:)   :: ke_wind_xVEL, ke_drag_xVEL
+    real(kind=WP), allocatable, dimension(:,:)   :: ke_wrho         !we use pressure to compute (W*dens) as it appeares much easier to compute (P*dW) instead of (dP*w)
+    real(kind=WP), allocatable, dimension(:,:)   :: ke_dW, ke_Pfull !for later computation of turbulent fluxes from the term above
+    real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv_AB, ke_cor_AB
+    real(kind=WP), allocatable, dimension(:,:,:) :: ke_rhs_bak
+    ! surface fields to compute APE generation
+    real(kind=WP), allocatable, dimension(:)     :: ke_J, ke_D, ke_G, ke_D2, ke_n0, ke_JD, ke_GD, ke_swA, ke_swB
     !___________________________________________________________________________
     contains
 #if defined(__PGI)
