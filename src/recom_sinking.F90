@@ -40,16 +40,6 @@ subroutine recom_sinking_new(tr_num,mesh)
 
 #include "../associate_mesh.h"
 
-!< calculate scaling factors
-!< scaling_density1_3D, scaling_density2_3D
-!< scaling_visc_3D
-!< .OG. 04.11.2022
-
-!< Activate ballasting
-   if (use_ballasting) then      
-      call ballast(tr_num,mesh)
-   end if
-
 !< Constant sinking velocities (we prescribe them under namelist recom)
 !< This hardcoded part is temporary 
 !< .OG. 07.07.2021
@@ -122,6 +112,11 @@ if (Vsink .gt. 0.1) then ! No sinking if Vsink < 0.1 m/day
 
             if (use_ballasting) then 
 
+    if (tracer_id(tr_num)==1007 .or.    &  !idetn
+        tracer_id(tr_num)==1008 .or.    &  !idetc
+        tracer_id(tr_num)==1017 .or.    &  !idetsi
+        tracer_id(tr_num)==1021 ) then     !idetcal
+
                 Wvel_flux(nz) = w_ref1 * scaling_density1_3D(nz,n) * scaling_visc_3D(nz,n)
 
                 if (depth_scaling1.gt.0.0) Wvel_flux(nz) = Wvel_flux(nz) + (depth_scaling1 * abs(zbar_3d_n(nz,n)))
@@ -130,7 +125,7 @@ if (Vsink .gt. 0.1) then ! No sinking if Vsink < 0.1 m/day
 
                 ! sinking velocity [m d-1] surface --> bottom (negative)
                 Wvel_flux(nz) = -1.0d0 * Wvel_flux(nz)/SecondsPerDay ! now in [m s-1]
-
+end if
             else ! use_ballasting = .false.
                Wvel_flux(nz) = -((Vdet_a * abs(zbar_3d_n(nz,n))/SecondsPerDay) + Vsink/SecondsPerDay)
             endif
@@ -275,14 +270,6 @@ subroutine ballast(tr_num,mesh)
 
 #include  "../associate_mesh.h"
 
-  ! For ballasting, calculate scaling factors here and pass them to FESOM, where sinking velocities are calculated
-     ! -----
-     ! If ballasting is used, sinking velocities are a function of a) particle composition (=density),
-     ! b) sea water viscosity, c) depth (currently for small detritus only), and d) a constant reference sinking speed
-     ! -----
-     call get_seawater_viscosity(mesh) ! seawater_visc_3D
-     call get_particle_density(mesh) ! rho_particle = density of particle class 1 and 2 
-
      !___________________________________________________________________________
      ! loop over local nodes
      do row=1,myDim_nod2D 
@@ -310,24 +297,30 @@ subroutine ballast(tr_num,mesh)
 
            scaling_density1_3D(k,row)=1.0
            scaling_density2_3D(k,row)=1.0
-
-           !do tr_num=1,num_tracers
-
-              if (use_density_scaling) then
-                 if (tracer_id(tr_num)==1008)then
-                    if (tr_arr(k,row,tr_num)>0.001) then ! only apply ballasting above a certain biomass
-                       scaling_density1_3D(k,row) = (rho_particle1(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
+           if (use_density_scaling) then
+!              if (tracer_id(tr_num)==1008)then
+!                 if (tr_arr(k,row,tr_num)>0.001) then ! only apply ballasting above a certain biomass
+                 if (tr_arr(k,row,10)>0.001) then ! idetc only apply ballasting above a certain biomass
+                    scaling_density1_3D(k,row) = (rho_particle1(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
+                 endif 
+              !endif
+              if (REcoM_Second_Zoo) then
+!                 if (tracer_id(tr_num)==1026)then
+!                    if (tr_arr(k,row,tr_num)>0.001) then ! only apply ballasting above a certain biomass
+                    if (tr_arr(k,row,28)>0.001) then ! idetz2c only apply ballasting above a certain biomass
+                       scaling_density2_3D(k,row) = (rho_particle2(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
                     endif 
-                 endif
-                 if (REcoM_Second_Zoo) then
-                    if (tracer_id(tr_num)==1026)then
-                       if (tr_arr(k,row,tr_num)>0.001) then ! only apply ballasting above a certain biomass
-                          scaling_density2_3D(k,row) = (rho_particle2(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
-                       endif 
-                    endif
-                 endif
+!                 endif
               endif
-           !end do
+           endif
+
+!           if (tr_arr(k,row,10)>0.001) then
+!                print*,'scaling_density1_3D(k,row)= ',scaling_density1_3D(k,row)
+!           end if
+
+!           if (tr_arr(k,row,28)>0.001) then
+!                print*,'scaling_density2_3D(k,row)= ',scaling_density2_3D(k,row)
+!           end if
 
             scaling_visc_3D(k,row)=1.0
 
@@ -340,8 +333,6 @@ subroutine ballast(tr_num,mesh)
             endif
 !           print*,'scaling_visc_3D(k,row)= ',scaling_visc_3D(k,row)
         end do
-        rho_particle1(nzmax+1,row) = rho_particle1(nzmax,row)
-        rho_particle2(nzmax+1,row) = rho_particle2(nzmax,row)
         scaling_visc_3D(nzmax+1,row) = scaling_visc_3D(nzmax,row)
      end do
 
@@ -412,6 +403,7 @@ subroutine get_particle_density(mesh)          ! NEW BALL developed by Cara and 
      a3(nzmin:nzmax,row)  = b3(nzmin:nzmax,row)/aux(nzmin:nzmax,row)
      a4(nzmin:nzmax,row)  = b4(nzmin:nzmax,row)/aux(nzmin:nzmax,row)
      rho_particle1(nzmin:nzmax,row) = rho_CaCO3*a4(nzmin:nzmax,row) + rho_opal*a3(nzmin:nzmax,row) + rho_POC*a1(nzmin:nzmax,row) + rho_PON*a2(nzmin:nzmax,row)
+     rho_particle1(nzmax+1,row) = rho_particle1(nzmax,row)
   end do
 
   if (RECoM_Second_Zoo) then
@@ -438,6 +430,7 @@ subroutine get_particle_density(mesh)          ! NEW BALL developed by Cara and 
         a3(nzmin:nzmax,row)  = b3(nzmin:nzmax,row)/aux(nzmin:nzmax,row)
         a4(nzmin:nzmax,row)  = b4(nzmin:nzmax,row)/aux(nzmin:nzmax,row)
         rho_particle2(nzmin:nzmax,row) = rho_CaCO3*a4(nzmin:nzmax,row) + rho_opal*a3(nzmin:nzmax,row) + rho_POC*a1(nzmin:nzmax,row) + rho_PON*a2(nzmin:nzmax,row)
+        rho_particle2(nzmax+1,row) = rho_particle2(nzmax,row)
      end do
   endif
 

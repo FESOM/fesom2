@@ -385,6 +385,23 @@ real :: net
         tracer_id(tr_num) == 1028 ) then      !idetz2calc
 ! endif
 
+
+!< activate Ballasting
+!< .OG. 04.11.2022
+
+         if (use_ballasting) then
+!< get seawater viscosity, seawater_visc_3D
+             call get_seawater_viscosity(mesh)
+
+!< get particle density of class 1 and 2 !rho_particle1 and rho_particle2
+             call get_particle_density(mesh)
+
+!< calculate scaling factors
+!< scaling_visc_3D
+!< scaling_density1_3D, scaling_density2_3D
+             call ballast(tr_num,mesh)
+        end if
+
 ! sinking
         call recom_sinking_new(tr_num,mesh) !--- vert_sink ---
 
