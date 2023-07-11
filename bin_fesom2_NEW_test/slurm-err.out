@@ -1,0 +1,10 @@
++ ulimit -s unlimited
+++ echo 21749018
+++ cut -d. -f1
++ JOBID=21749018
++ date
++ srun --mpi=pmi2 ./fesom.x
++ date
++ Resultpath=//work/ollie/mseifert/fesom2_recom/fesom2_test_Laurent/
++ test -e //work/ollie/mseifert/fesom2_recom/fesom2_test_Laurent//fesom.1962.oce.restart.nc
++ exit

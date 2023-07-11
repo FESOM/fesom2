@@ -1,0 +1,401 @@
+       MPI has been initialized, provided MPI thread support level: MPI_THREAD_MULTIPLE           3
+ Running on          432  PEs
+ 
+ FESOM2 git SHA: d9bc86ee
+ [32m____________________________________________________________[0m
+ [7;32m --> FESOM BUILDS UP MODEL CONFIGURATION                    [0m
+ Namelist files are read in
+ time step size is set to    2700.00000000000      sec
+ 
+ [31m____________________________________________________________[0m
+ [5;7;31m --> THIS IS A RESTART RUN !!!                              [0m
+     > clock restarted at time: 0.00   1 1960
+ 
+       11680  steps to run for fesom job submission
+ rotation matrix for rotated model grids prepared
+           0 rpart is read
+ myLists are read
+ reading /work/ollie/projects/clidyn/FESOM2/meshes/core2/nod2d.out
+ reading /work/ollie/projects/clidyn/FESOM2/meshes/core2/elem2d.out
+ elements are read
+ communication arrays are read
+ =========================
+ 2D mesh was read in   0.390009880065918       seconds
+ 2D mesh info : nod2D=      126858  elem2D=      244659 checksum= 96ef52281f7e327b221950bcd07cc1d8
+ =========================
+ Communication arrays are set
+ test_tri finished in   1.311302185058594E-005  seconds
+ =========================
+ reading /work/ollie/projects/clidyn/FESOM2/meshes/core2/edgenum.out
+ 2D mesh info : edge2D=      371644
+ reading /work/ollie/projects/clidyn/FESOM2/meshes/core2/edges.out
+ reading /work/ollie/projects/clidyn/FESOM2/meshes/core2/edge_tri.out
+ load_edges finished in   0.389130830764771       seconds
+ =========================
+ find_neighbors finished in   1.883983612060547E-003  seconds
+ =========================
+ reading /work/ollie/projects/clidyn/FESOM2/meshes/core2/elvls.out
+ reading /work/ollie/projects/clidyn/FESOM2/meshes/core2/nlvls.out
+ ____________________________________________________________________
+  --> 3D mesh was read in   0.145802021026611       seconds
+  --> Min/max depth on mype :            0   910.000000000000        5400.00000000000     
+ ____________________________________________________________________
+  --> find min/max level e2n in  8.082389831542969E-005  seconds
+ ____________________________________________________________________
+  --> mesh statistics:           0
+           0 maxArea    3675973699.40411         MinArea    773901258.281603     
+           0 maxScArea    6914205164.78001         MinScArea    1268863744.87757     
+           0 Edges:          371644  internal       362333
+      > Total ocean surface area is           :    364354316635734.       m^2
+      > Total ocean surface area wth cavity is:    364354316635734.       m^2
+      > mesh_areas finished in   1.898050308227539E-003  seconds
+ mesh_auxiliary_arrays finished in   7.381439208984375E-004  seconds
+ =========================
+ FESOM mesh_setup... complete
+ ***start level area_test***
+   364354316635734.        364354316635734.     
+   364354316635734.        364354316635734.     
+   364354316635734.        364354316635734.     
+   364354316635734.        364354316635734.     
+   357300317315119.        357300317315119.     
+   354113237650775.        354113237650775.     
+   351817051983039.        351817051983039.     
+   350065333681600.        350065333681600.     
+   348637576114935.        348637576114935.     
+   347389346086852.        347389346086852.     
+   346308199729719.        346308199729719.     
+   345140644361352.        345140644361352.     
+   343747935112280.        343747935112280.     
+   342363896845861.        342363896845861.     
+   340772744666857.        340772744666857.     
+   338775524312136.        338775524312136.     
+   336980984452424.        336980984452424.     
+   335064352342050.        335064352342050.     
+   333090746166042.        333090746166042.     
+   330929778381294.        330929778381294.     
+   328629163831422.        328629163831422.     
+   326592233920372.        326592233920372.     
+   324682485855654.        324682485855654.     
+   322811207664366.        322811207664366.     
+   320902632281560.        320902632281560.     
+   318964714574213.        318964714574213.     
+   316759412805279.        316759412805279.     
+   314415479883026.        314415479883026.     
+   311078606168458.        311078606168458.     
+   307180109446522.        307180109446522.     
+   302361363952099.        302361363952099.     
+   297029016477066.        297029016477066.     
+   290635153372101.        290635153372101.     
+   282779027925473.        282779027925473.     
+   270339151690562.        270339151690562.     
+   253778375323382.        253778375323382.     
+   233908883135421.        233908883135421.     
+   209698317850281.        209698317850281.     
+   182770853080492.        182770853080492.     
+   154768218654313.        154768218654313.     
+   123906855474557.        123906855474557.     
+   94313998475014.2        94313998475014.2     
+   66563213207699.0        66563213207699.0     
+   39329830643744.6        39329830643744.6     
+   18995266378258.7        18995266378258.7     
+   5037468695982.90        5037468695982.90     
+  0.000000000000000E+000  0.000000000000000E+000
+  0.000000000000000E+000  0.000000000000000E+000
+ ***end level area_test***
+ ____________________________________________________________
+  --> initialise ALE arrays + sparse SSH stiff matrix
+ 
+ ____________________________________________________________
+  --> initialise ssh operator using unperturbed ocean depth
+      > in stiff_mat_ale, reading /work/ollie/projects/clidyn/FESOM2/meshes/core2/dist_432/rpart.out
+      took:   2.343988418579102E-002  sec
+ 
+ Arrays are set
+ FCT is initialized
+          30  tracers will be used in FESOM
+ tracer IDs are:            0           1        1001        1002        1003        1004        1005        1006        1007        1008        1009        1010        1011        1012        1013        1014        1015        1016        1017        1018        1019        1020        1021        1022        1023        1024        1025        1026        1027        1028
+ 
+ [36m     --> RECOM ON[0m
+ [36m     --> CISO OFF[0m
+ ____________________________________________________________
+  --> Check namelist.oce for the number of tracers
+ 
+ ____________________________________________________________
+  --> Reading REcoM2 preindustrial DIC for restart
+ 
+ read Iron        climatology from:fe_pisces_opa_eq_init_3D_changed_name.nc
+ read Oxygen      climatology from:woa18_all_o00_01_mmol_fesom2.nc
+ read Silicate    climatology from:woa13_all_i00_01_fesom2.nc
+ read Alkalinity  climatology from:GLODAPv2.2016b.TAlk_fesom2_mmol_fix_z_Fillvalue.nc
+ read DIC         climatology from:GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc
+ read Nitrate     climatology from:woa13_all_n00_01_fesom2.nc
+ read Salt        climatology from:phc3.0_winter.nc
+ read Temperature climatology from:phc3.0_winter.nc
+ Start: Initial conditions  for tracers
+ reading input tracer file for tracer ID=         1019
+ input file: /work/ollie/ogurses/input/corrected_input/fe_pisces_opa_eq_init_3D_changed_name.nc
+ variable  : Fe
+ reading input tracer file for tracer ID=         1022
+ input file: /work/ollie/ogurses/input/corrected_input/woa18_all_o00_01_mmol_fesom2.nc
+ variable  : oxygen_mmol
+ reading input tracer file for tracer ID=         1018
+ input file: /work/ollie/ogurses/input/corrected_input/woa13_all_i00_01_fesom2.nc
+ variable  : i_an
+ reading input tracer file for tracer ID=         1003
+ input file: /work/ollie/ogurses/input/corrected_input/GLODAPv2.2016b.TAlk_fesom2_mmol_fix_z_Fillvalue.nc
+ variable  : TAlk_mmol
+ reading input tracer file for tracer ID=         1002
+ input file: /work/ollie/ogurses/input/corrected_input/GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc
+ variable  : PI_TCO2_mmol
+ reading input tracer file for tracer ID=         1001
+ input file: /work/ollie/ogurses/input/corrected_input/woa13_all_n00_01_fesom2.nc
+ variable  : n_an
+ reading input tracer file for tracer ID=            1
+ input file: /work/ollie/ogurses/input/corrected_input/phc3.0_winter.nc
+ variable  : salt
+ reading input tracer file for tracer ID=            0
+ input file: /work/ollie/ogurses/input/corrected_input/phc3.0_winter.nc
+ variable  : temp
+ converting insitu temperature to potential...
+ DONE:  Initial conditions for tracers
+   |-> gobal max init. temp. =   30.0510326153043     
+   |-> gobal min init. temp. =  -2.06008970141432     
+   |-> gobal max init. salt. =   41.1176835670450     
+   `-> gobal min init. salt. =   5.62836183480000     
+ Sanity check for REcoM variables
+   |-> gobal max init. DIN. =   53.0303514775767     
+   |-> gobal min init. DIN. =  7.812823240199695E-003
+   |-> gobal max init. DIC. =   2467.73270205940     
+   |-> gobal min init. DIC. =   1082.94938277298     
+   |-> gobal max init. Alk. =   2715.00723192219     
+   |-> gobal min init. Alk. =   1102.52251499341     
+   |-> gobal max init. DSi. =   245.254346844946     
+   |-> gobal min init. DSi. =  0.340649448051430     
+   |-> gobal max init. DFe. =  4.239583905802221E-002
+   `-> gobal min init. DFe. = -6.398613047393784E-012
+ initializing    6th tracer with ID=1004
+ initializing    7th tracer with ID=1005
+ initializing    8th tracer with ID=1006
+ initializing    9th tracer with ID=1007
+ initializing   10th tracer with ID=1008
+ initializing   11th tracer with ID=1009
+ initializing   12th tracer with ID=1010
+ initializing   13th tracer with ID=1011
+ initializing   14th tracer with ID=1012
+ initializing   15th tracer with ID=1013
+ initializing   16th tracer with ID=1014
+ initializing   17th tracer with ID=1015
+ initializing   18th tracer with ID=1016
+ initializing   19th tracer with ID=1017
+ initializing   22th tracer with ID=1020
+ initializing   23th tracer with ID=1021
+ initializing   25th tracer with ID=1023
+ initializing   26th tracer with ID=1024
+ initializing   27th tracer with ID=1025
+ initializing   28th tracer with ID=1026
+ initializing   29th tracer with ID=1027
+ initializing   30th tracer with ID=1028
+ ____________________________________________________________
+  --> call init_thickness_ale
+ 
+ ____________________________________________________________
+  --> initialise ALE layerthicknesses, depth levels and middepth levels
+ 
+ Initial state
+ FESOM ocean_setup... complete
+ Benthic layers are set
+ Tracers have been initialized as spinup from WOA/glodap netcdf files
+ RECOM recom_init... complete
+ ****************************************************
+ forcing arrays have been set up
+      file   : namelist_bc.nml open ok
+ Start: Ocean forcing inizialization.
+ Start: Ocean forcing inizialization.
+ Surface boundary conditions parameters:
+       nm_xwind_file = /work/ollie/projects/MarESys/forcing_JRA55-do-v1.4.0_clim61/uas.clim61 ! name of file with X winds
+       nm_xwind_var  = uas ! name of variable in file with wind 
+       nm_ywind_file = /work/ollie/projects/MarESys/forcing_JRA55-do-v1.4.0_clim61/vas.clim61 ! name of file with Y winds
+       nm_ywind_var  = vas ! name of variable in file with wind 
+       nm_humi_file = /work/ollie/projects/MarESys/forcing_JRA55-do-v1.4.0_clim61/huss.clim61 ! name of file with humidity
+       nm_humi_var   = huss ! name of variable in file with humidity  
+       nm_qsr_file = /work/ollie/projects/MarESys/forcing_JRA55-do-v1.4.0_clim61/rsds.clim61 ! name of file with solar heat 
+       nm_qsr_var  = rsds ! name of variable in file with solar heat 
+       nm_qlw_file   = /work/ollie/projects/MarESys/forcing_JRA55-do-v1.4.0_clim61/rlds.clim61 ! name of file with Long wave 
+       nm_qlw_var    = rlds ! name of variable in file with Long wave 
+       nm_tair_file  = /work/ollie/projects/MarESys/forcing_JRA55-do-v1.4.0_clim61/tas.clim61 ! name of file with 2m air temperature 
+       nm_tair_var   = tas ! name of variable in file with 2m air temperature 
+       nm_prec_file  = /work/ollie/projects/MarESys/forcing_JRA55-do-v1.4.0_clim61/prra.clim61 ! name of file with total precipitation 
+       nm_prec_var   = prra ! name of variable in file with total precipitation  
+       nm_snow_file  = /work/ollie/projects/MarESys/forcing_JRA55-do-v1.4.0_clim61/prsn.clim61 ! name of file with snow precipitation 
+       nm_snow_var   = prsn !name of variable in file with air_pressure_at_sea_level 
+       nm_mslp_file  = /work/ollie/projects/MarESys/forcing_JRA55-do-v1.4.0_clim61/psl.clim61 !air_pressure_at_sea_level 
+       nm_mslp_var   = psl !name of variable in file with air_pressure_at_sea_level 
+ total fluxes to read:            9
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): uas !
+ /work/ollie/projects/MarESys/forcing_JRA55-do-v1.4.0_clim61/uas.clim61.nc
+  6.250000000000000E-002   364.906250000000       0.000000000000000E+000
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): vas !
+ /work/ollie/projects/MarESys/forcing_JRA55-do-v1.4.0_clim61/vas.clim61.nc
+  6.250000000000000E-002   364.906250000000       0.000000000000000E+000
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): huss !
+ /work/ollie/projects/MarESys/forcing_JRA55-do-v1.4.0_clim61/huss.clim61.nc
+  6.250000000000000E-002   364.906250000000       0.000000000000000E+000
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): rsds !
+ /work/ollie/projects/MarESys/forcing_JRA55-do-v1.4.0_clim61/rsds.clim61.nc
+  6.250000000000000E-002   364.906250000000       0.000000000000000E+000
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): rlds !
+ /work/ollie/projects/MarESys/forcing_JRA55-do-v1.4.0_clim61/rlds.clim61.nc
+  6.250000000000000E-002   364.906250000000       0.000000000000000E+000
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): tas !
+ /work/ollie/projects/MarESys/forcing_JRA55-do-v1.4.0_clim61/tas.clim61.nc
+  6.250000000000000E-002   364.906250000000       0.000000000000000E+000
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): prra !
+ /work/ollie/projects/MarESys/forcing_JRA55-do-v1.4.0_clim61/prra.clim61.nc
+  6.250000000000000E-002   364.906250000000       0.000000000000000E+000
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): prsn !
+ /work/ollie/projects/MarESys/forcing_JRA55-do-v1.4.0_clim61/prsn.clim61.nc
+  6.250000000000000E-002   364.906250000000       0.000000000000000E+000
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): psl !
+ /work/ollie/projects/MarESys/forcing_JRA55-do-v1.4.0_clim61/psl.clim61.nc
+  6.250000000000000E-002   364.906250000000       0.000000000000000E+000
+ DONE:  Ocean forcing inizialization.
+ Parts of forcing data (only constant in time fields) are read
+ Ice FCT is initialized
+ initialize the sea ice
+ Ice is initialized
+ EVP scheme option=           0
+ associating restart file /work/ollie/mseifert/fesom2_recom/test_output/fesom.1959.oce.restart.nc
+ current restart counter =            1
+      reading restart file:  /work/ollie/mseifert/fesom2_recom/test_output/fesom.1959.oce.restart.nc
+ restart from record            1  of            1
+ reading restart for ssh
+ reading restart for hbar
+ reading restart for ssh_rhs_old
+ reading restart for hnode
+ reading restart for u
+ reading restart for v
+ reading restart for urhs_AB
+ reading restart for vrhs_AB
+ reading restart for temp
+ reading restart for temp_AB
+ reading restart for salt
+ reading restart for salt_AB
+ reading restart for tra0003
+ reading restart for tra0003_AB
+ reading restart for tra0004
+ reading restart for tra0004_AB
+ reading restart for tra0005
+ reading restart for tra0005_AB
+ reading restart for tra0006
+ reading restart for tra0006_AB
+ reading restart for tra0007
+ reading restart for tra0007_AB
+ reading restart for tra0008
+ reading restart for tra0008_AB
+ reading restart for tra0009
+ reading restart for tra0009_AB
+ reading restart for tra0010
+ reading restart for tra0010_AB
+ reading restart for tra0011
+ reading restart for tra0011_AB
+ reading restart for tra0012
+ reading restart for tra0012_AB
+ reading restart for tra0013
+ reading restart for tra0013_AB
+ reading restart for tra0014
+ reading restart for tra0014_AB
+ reading restart for tra0015
+ reading restart for tra0015_AB
+ reading restart for tra0016
+ reading restart for tra0016_AB
+ reading restart for tra0017
+ reading restart for tra0017_AB
+ reading restart for tra0018
+ reading restart for tra0018_AB
+ reading restart for tra0019
+ reading restart for tra0019_AB
+ reading restart for tra0020
+ reading restart for tra0020_AB
+ reading restart for tra0021
+ reading restart for tra0021_AB
+ reading restart for tra0022
+ reading restart for tra0022_AB
+ reading restart for tra0023
+ reading restart for tra0023_AB
+ reading restart for tra0024
+ reading restart for tra0024_AB
+ reading restart for tra0025
+ reading restart for tra0025_AB
+ reading restart for tra0026
+ reading restart for tra0026_AB
+ reading restart for tra0027
+ reading restart for tra0027_AB
+ reading restart for tra0028
+ reading restart for tra0028_AB
+ reading restart for tra0029
+ reading restart for tra0029_AB
+ reading restart for tra0030
+ reading restart for tra0030_AB
+ reading restart for w
+ reading restart for w_expl
+ reading restart for w_impl
+ associating restart file /work/ollie/mseifert/fesom2_recom/test_output/fesom.1959.ice.restart.nc
+ current restart counter =            1
+      reading restart file:  /work/ollie/mseifert/fesom2_recom/test_output/fesom.1959.ice.restart.nc
+ restart from record            1  of            1
+ reading restart for area
+ reading restart for hice
+ reading restart for hsnow
+ reading restart for uice
+ reading restart for vice
+ REcoM_restart=  F
+ ____________________________________________________________
+  --> restart ALE layerthicknesses, depth levels and middepth levels
+ 
+ ==========================================
+ MODEL SETUP took on mype=0 [seconds]      
+ runtime setup total         31.58856    
+  > runtime setup mesh       1.002565    
+  > runtime setup ocean      1.485929    
+  > runtime setup forcing   0.4962561    
+  > runtime setup ice       5.4157972E-02
+  > runtime setup restart    28.54920    
+  > runtime setup other     4.5275688E-04
+ ============================================
+ FESOM start iteration before the barrier...
+ FESOM start iteration after the barrier...
+ 
+ [32m____________________________________________________________[0m
+ [7;32m --> FESOM STARTS TIME LOOP                                 [0m
+ Updating SSS restoring data for month            1
+           1
+ Updating Iron restoring data for month            1  from/work/ollie/ogurses/input/mesh_CORE2_finaltopo_mean/DustClimMonthlyAlbani.nc                                                                                                                                                                                                                                
+ ERROR: co2 flux !
+ pco2surf:                      NaN
+ co2:   9.159089835122780E-003
+ rhoSW:    1028.62248170354     
+ temp:    14.5709601283791     
+ tempis:    14.5709601283791     
+ REcoM_S:    38.3097232223656     
+ REcoM_Alk:    2.76473941031418     
+ REcoM_DIC:    2.33868725700091     
+ REcoM_Si:   3.211065353702601E-005
+ REcoM_Phos:   9.686897908898619E-007
+ kw660:   4.897526672430729E-006
+ LocAtmCO2:    278.000000000000     
+ Patm:   5.618934499089664E+244
+ thick(One):    4.99886612135368     
+ Nmocsy:            1
+ Lond:    10.4569000000000     
+ Latd:    40.0555000000000     
+ ULoc:    2.65034734405205     
+ Loc_ice_conc:   0.000000000000000E+000
