@@ -66,6 +66,11 @@ module compute_ssh_split_explicit_interface
         type(t_mesh)  , intent(inout), target :: mesh
         end subroutine
         
+    end interface
+end module
+
+module compute_vert_vel_transpv_interface
+    interface        
         subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
         USE MOD_MESH
         USE MOD_PARTIT
@@ -1290,6 +1295,7 @@ subroutine compute_thickness_zstar(dynamics, partit, mesh)
     USE MOD_MESH
     USE MOD_DYN
     use g_comm_auto
+    implicit none
     !___________________________________________________________________________
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -1347,12 +1353,13 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
     use o_ARRAYS, only: water_flux
     use g_config, only: dt, which_ale
     use g_comm_auto
-!PS     use compute_Wvel_split_interface
-!PS     use compute_CFLz_interface
+    use compute_Wvel_split_interface
+    use compute_CFLz_interface
+    implicit none
     !___________________________________________________________________________
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
-    type(t_mesh)  , intent(inout)   , target :: mesh
+    type(t_mesh)  , intent(inout), target :: mesh
     integer                               :: node, elem, nz, ed, nzmin, nzmax, ednodes(2), edelem(2) 
     real(kind=WP)                         :: hh_inv, deltaX1, deltaX2, deltaY1, deltaY2 
     real(kind=WP)                         :: e1c1(mesh%nl-1), e1c2(mesh%nl-1)
