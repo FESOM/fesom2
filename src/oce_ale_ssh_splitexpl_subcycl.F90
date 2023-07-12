@@ -69,19 +69,19 @@ module compute_ssh_split_explicit_interface
     end interface
 end module
 
-module compute_vert_vel_transpv_interface
-    interface        
-        subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
-    end interface
-end module
+!PS module compute_vert_vel_transpv_interface
+!PS     interface        
+!PS         subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
+!PS         USE MOD_MESH
+!PS         USE MOD_PARTIT
+!PS         USE MOD_PARSUP
+!PS         USE MOD_DYN
+!PS         type(t_dyn)   , intent(inout), target :: dynamics
+!PS         type(t_partit), intent(inout), target :: partit
+!PS         type(t_mesh)  , intent(inout), target :: mesh
+!PS         end subroutine
+!PS     end interface
+!PS end module
 
 !
 !
@@ -1335,210 +1335,210 @@ subroutine compute_thickness_zstar(dynamics, partit, mesh)
     end do
     
 end subroutine compute_thickness_zstar
-!
-!
-!_______________________________________________________________________________
-! calculate vertical velocity from eq.3 in S. Danilov et al. : FESOM2: from 
-! finite elements to finite volumes. 
-!
-!   dh_k/dt + grad(u*h)_k + (w^t - w^b) + water_flux_k=1 = 0
-!
-!   w^t = w^b - dh_k/dt - grad(u*h)_k - water_flux=1
-!   --> do cumulativ summation from bottom to top
-subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    USE MOD_DYN
-    use o_ARRAYS, only: water_flux
-    use g_config, only: dt, which_ale
-    use g_comm_auto
-    use compute_Wvel_split_interface
-    use compute_CFLz_interface
-    implicit none
-    !___________________________________________________________________________
-    type(t_dyn)   , intent(inout), target :: dynamics
-    type(t_partit), intent(inout), target :: partit
-    type(t_mesh)  , intent(inout), target :: mesh
-    integer                               :: node, elem, nz, ed, nzmin, nzmax, ednodes(2), edelem(2) 
-    real(kind=WP)                         :: hh_inv, deltaX1, deltaX2, deltaY1, deltaY2 
-    real(kind=WP)                         :: e1c1(mesh%nl-1), e1c2(mesh%nl-1)
-    real(kind=WP)                         :: e2c1(mesh%nl-1), e2c2(mesh%nl-1)
-    
-    
-    !___________________________________________________________________________
-    ! pointer on necessary derived types
-    real(kind=WP), dimension(:,:,:), pointer :: UVh, fer_UV
-    real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, fer_Wvel
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
-    UVh         => dynamics%se_uvh(:,:,:)
-    Wvel        => dynamics%w(:,:)
-    Wvel_e      => dynamics%w_e(:,:)
-    if (Fer_GM) then
-        fer_UV  => dynamics%fer_uv(:,:,:)
-        fer_Wvel=> dynamics%fer_w(:,:)
-    end if
-    
-    !___________________________________________________________________________
-    do node=1, myDim_nod2D+eDim_nod2D
-        Wvel(:, node)=0.0_WP
-    end do ! --> do node=1, myDim_nod2D+eDim_nod2D
-    
-    !___________________________________________________________________________
-    do ed=1, myDim_edge2D
-        ! local indice of nodes that span up edge ed
-        ednodes=edges(:,ed)   
-        
-        ! local index of element that contribute to edge
-        edelem=edge_tri(:,ed)
-        
-        ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid edelem(1) to 
-        ! center of edge --> needed to calc flux perpedicular to edge from elem edelem(1)
-        deltaX1=edge_cross_dxdy(1,ed)
-        deltaY1=edge_cross_dxdy(2,ed)
-        
-        !_______________________________________________________________________
-        ! calc div(u_vec*h) for every layer 
-        ! do it with gauss-law: int( div(u_vec)*dV) = int( u_vec * n_vec * dS )
-        nzmin = ulevels(edelem(1))
-        nzmax = nlevels(edelem(1))-1
-        ! we introduced c1 & c2 as arrays here to avoid deadlocks when in OpenMP mode
-        do nz = nzmax, nzmin, -1
-            ! --> h * u_vec * n_vec
-            ! --> e_vec = (dx,dy), n_vec = (-dy,dx);
-            ! --> h * u*(-dy) + v*dx
-            e1c1(nz)=( UVh(2, nz, edelem(1))*deltaX1 - UVh(1, nz, edelem(1))*deltaY1 )
-            ! inflow(outflow) "flux" to control volume of node enodes1
-            ! is equal to outflow(inflow) "flux" to control volume of node enodes2
-        end do ! --> do nz=nzmax,nzmin,-1
-        Wvel(nzmin:nzmax, ednodes(1))= Wvel(nzmin:nzmax, ednodes(1))+e1c1(nzmin:nzmax)
-        Wvel(nzmin:nzmax, ednodes(2))= Wvel(nzmin:nzmax, ednodes(2))-e1c1(nzmin:nzmax)
-        
-        if (Fer_GM) then
-            do nz = nzmax, nzmin, -1
-                e1c2(nz)=(fer_UV(2, nz, edelem(1))*deltaX1 - fer_UV(1, nz, edelem(1))*deltaY1)*helem(nz, edelem(1))
-            end do ! --> do nz=nzmax,nzmin,-1
-            fer_Wvel(nzmin:nzmax, ednodes(1))= fer_Wvel(nzmin:nzmax, ednodes(1))+e1c2(nzmin:nzmax)
-            fer_Wvel(nzmin:nzmax, ednodes(2))= fer_Wvel(nzmin:nzmax, ednodes(2))-e1c2(nzmin:nzmax)
-        end if
-        
-        !_______________________________________________________________________
-        ! if ed is not a boundary edge --> calc div(u_vec*h) for every layer
-        ! for edelem(2)
-        e2c1 = 0.0_WP
-        e2c2 = 0.0_WP
-        if(edelem(2)>0)then
-            deltaX2=edge_cross_dxdy(3,ed)
-            deltaY2=edge_cross_dxdy(4,ed)
-            nzmin = ulevels(edelem(2))
-            nzmax = nlevels(edelem(2))-1   
-            do nz = nzmax, nzmin, -1
-                e2c1(nz)=-(UVh(2, nz, edelem(2))*deltaX2 - UVh(1, nz, edelem(2))*deltaY2)
-            end do ! --> do nz=nzmax,nzmin,-1
-            Wvel(nzmin:nzmax, ednodes(1))= Wvel(nzmin:nzmax, ednodes(1))+e2c1(nzmin:nzmax)
-            Wvel(nzmin:nzmax, ednodes(2))= Wvel(nzmin:nzmax, ednodes(2))-e2c1(nzmin:nzmax)
-            
-            if (Fer_GM) then
-                do nz = nzmax, nzmin, -1
-                    e2c2(nz)=-(fer_UV(2, nz, edelem(2))*deltaX2-fer_UV(1, nz, edelem(2))*deltaY2)*helem(nz, edelem(2))
-                end do ! --> do nz=nzmax,nzmin,-1
-                fer_Wvel(nzmin:nzmax, ednodes(1))= fer_Wvel(nzmin:nzmax, ednodes(1))+e2c2(nzmin:nzmax)
-                fer_Wvel(nzmin:nzmax, ednodes(2))= fer_Wvel(nzmin:nzmax, ednodes(2))-e2c2(nzmin:nzmax)
-            end if 
-        end if
-        
-        !_______________________________________________________________________
-!PS         if ( any(Wvel(nzmin:nzmax, ednodes(1))/=Wvel(nzmin:nzmax, ednodes(1))) .or.  &
-!PS              any(Wvel(nzmin:nzmax, ednodes(2))/=Wvel(nzmin:nzmax, ednodes(2)))) then
-!PS             write(*,*) ' --> subroutine vert_vel_ale --> found Nan in Wvel after div_H(...)'
-!PS             write(*,*) ' mype   =', mype
-!PS             write(*,*) ' edge   =', ed
-!PS             write(*,*) ' enodes =', enodes
-!PS             write(*,*) ' Wvel(nzmin:nzmax, enodes(1))=', Wvel(nzmin:nzmax, ednodes(1))  
-!PS             write(*,*) ' Wvel(nzmin:nzmax, enodes(2))=', Wvel(nzmin:nzmax, ednodes(2)) 
-!PS             write(*,*) ' e1c1', e1c1(nzmin:nzmax)  
-!PS             write(*,*) ' e1c2', e1c2(nzmin:nzmax)  
-!PS             write(*,*) ' e2c1', e2c1(nzmin:nzmax)  
-!PS             write(*,*) ' e2c2', e2c2(nzmin:nzmax)  
+!PS !
+!PS !
+!PS !_______________________________________________________________________________
+!PS ! calculate vertical velocity from eq.3 in S. Danilov et al. : FESOM2: from 
+!PS ! finite elements to finite volumes. 
+!PS !
+!PS !   dh_k/dt + grad(u*h)_k + (w^t - w^b) + water_flux_k=1 = 0
+!PS !
+!PS !   w^t = w^b - dh_k/dt - grad(u*h)_k - water_flux=1
+!PS !   --> do cumulativ summation from bottom to top
+!PS subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
+!PS     USE MOD_PARTIT
+!PS     USE MOD_PARSUP
+!PS     USE MOD_MESH
+!PS     USE MOD_DYN
+!PS     use o_ARRAYS, only: water_flux
+!PS     use g_config, only: dt, which_ale
+!PS     use g_comm_auto
+!PS     use compute_Wvel_split_interface
+!PS     use compute_CFLz_interface
+!PS     implicit none
+!PS     !___________________________________________________________________________
+!PS     type(t_dyn)   , intent(inout), target :: dynamics
+!PS     type(t_partit), intent(inout), target :: partit
+!PS     type(t_mesh)  , intent(inout), target :: mesh
+!PS     integer                               :: node, elem, nz, ed, nzmin, nzmax, ednodes(2), edelem(2) 
+!PS     real(kind=WP)                         :: hh_inv, deltaX1, deltaX2, deltaY1, deltaY2 
+!PS     real(kind=WP)                         :: e1c1(mesh%nl-1), e1c2(mesh%nl-1)
+!PS     real(kind=WP)                         :: e2c1(mesh%nl-1), e2c2(mesh%nl-1)
+!PS     
+!PS     
+!PS     !___________________________________________________________________________
+!PS     ! pointer on necessary derived types
+!PS     real(kind=WP), dimension(:,:,:), pointer :: UVh, fer_UV
+!PS     real(kind=WP), dimension(:,:)  , pointer :: Wvel, Wvel_e, fer_Wvel
+!PS #include "associate_part_def.h"
+!PS #include "associate_mesh_def.h"
+!PS #include "associate_part_ass.h"
+!PS #include "associate_mesh_ass.h"
+!PS     UVh         => dynamics%se_uvh(:,:,:)
+!PS     Wvel        => dynamics%w(:,:)
+!PS     Wvel_e      => dynamics%w_e(:,:)
+!PS     if (Fer_GM) then
+!PS         fer_UV  => dynamics%fer_uv(:,:,:)
+!PS         fer_Wvel=> dynamics%fer_w(:,:)
+!PS     end if
+!PS     
+!PS     !___________________________________________________________________________
+!PS     do node=1, myDim_nod2D+eDim_nod2D
+!PS         Wvel(:, node)=0.0_WP
+!PS     end do ! --> do node=1, myDim_nod2D+eDim_nod2D
+!PS     
+!PS     !___________________________________________________________________________
+!PS     do ed=1, myDim_edge2D
+!PS         ! local indice of nodes that span up edge ed
+!PS         ednodes=edges(:,ed)   
+!PS         
+!PS         ! local index of element that contribute to edge
+!PS         edelem=edge_tri(:,ed)
+!PS         
+!PS         ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid edelem(1) to 
+!PS         ! center of edge --> needed to calc flux perpedicular to edge from elem edelem(1)
+!PS         deltaX1=edge_cross_dxdy(1,ed)
+!PS         deltaY1=edge_cross_dxdy(2,ed)
+!PS         
+!PS         !_______________________________________________________________________
+!PS         ! calc div(u_vec*h) for every layer 
+!PS         ! do it with gauss-law: int( div(u_vec)*dV) = int( u_vec * n_vec * dS )
+!PS         nzmin = ulevels(edelem(1))
+!PS         nzmax = nlevels(edelem(1))-1
+!PS         ! we introduced c1 & c2 as arrays here to avoid deadlocks when in OpenMP mode
+!PS         do nz = nzmax, nzmin, -1
+!PS             ! --> h * u_vec * n_vec
+!PS             ! --> e_vec = (dx,dy), n_vec = (-dy,dx);
+!PS             ! --> h * u*(-dy) + v*dx
+!PS             e1c1(nz)=( UVh(2, nz, edelem(1))*deltaX1 - UVh(1, nz, edelem(1))*deltaY1 )
+!PS             ! inflow(outflow) "flux" to control volume of node enodes1
+!PS             ! is equal to outflow(inflow) "flux" to control volume of node enodes2
+!PS         end do ! --> do nz=nzmax,nzmin,-1
+!PS         Wvel(nzmin:nzmax, ednodes(1))= Wvel(nzmin:nzmax, ednodes(1))+e1c1(nzmin:nzmax)
+!PS         Wvel(nzmin:nzmax, ednodes(2))= Wvel(nzmin:nzmax, ednodes(2))-e1c1(nzmin:nzmax)
+!PS         
+!PS         if (Fer_GM) then
+!PS             do nz = nzmax, nzmin, -1
+!PS                 e1c2(nz)=(fer_UV(2, nz, edelem(1))*deltaX1 - fer_UV(1, nz, edelem(1))*deltaY1)*helem(nz, edelem(1))
+!PS             end do ! --> do nz=nzmax,nzmin,-1
+!PS             fer_Wvel(nzmin:nzmax, ednodes(1))= fer_Wvel(nzmin:nzmax, ednodes(1))+e1c2(nzmin:nzmax)
+!PS             fer_Wvel(nzmin:nzmax, ednodes(2))= fer_Wvel(nzmin:nzmax, ednodes(2))-e1c2(nzmin:nzmax)
 !PS         end if
-    end do ! --> do ed=1, myDim_edge2D
-    
-    !___________________________________________________________________________
-    ! add the contribution from -dh/dt * area
-    do node=1, myDim_nod2D
-        nzmin = ulevels_nod2D(node)
-        nzmax = nlevels_nod2d(node)-1
-        do nz=nzmax,nzmin,-1
-            Wvel(nz, node)=Wvel(nz, node)-(hnode_new(nz, node)-hnode(nz, node))*area(nz, node)/dt 
-        end do ! --> do nz=nzmax,nzmin,-1
-        
-        !_______________________________________________________________________
-!PS         if ( any(Wvel(nzmin:nzmax, node)/=Wvel(nzmin:nzmax, node))) then
-!PS             write(*,*) ' --> subroutine vert_vel_ale --> found Nan in Wvel after +dhnode/dt=W'
-!PS             write(*,*) ' mype   =', mype
-!PS             write(*,*) ' node   =', node
-!PS             write(*,*) ' Wvel(     nzmin:nzmax, node)=', Wvel(nzmin:nzmax, node) 
-!PS             write(*,*) ' hnode_new(nzmin:nzmax, node)=', hnode_new(nzmin:nzmax, node)  
-!PS             write(*,*) ' hnode(    nzmin:nzmax, node)=', hnode(nzmin:nzmax, node)
+!PS         
+!PS         !_______________________________________________________________________
+!PS         ! if ed is not a boundary edge --> calc div(u_vec*h) for every layer
+!PS         ! for edelem(2)
+!PS         e2c1 = 0.0_WP
+!PS         e2c2 = 0.0_WP
+!PS         if(edelem(2)>0)then
+!PS             deltaX2=edge_cross_dxdy(3,ed)
+!PS             deltaY2=edge_cross_dxdy(4,ed)
+!PS             nzmin = ulevels(edelem(2))
+!PS             nzmax = nlevels(edelem(2))-1   
+!PS             do nz = nzmax, nzmin, -1
+!PS                 e2c1(nz)=-(UVh(2, nz, edelem(2))*deltaX2 - UVh(1, nz, edelem(2))*deltaY2)
+!PS             end do ! --> do nz=nzmax,nzmin,-1
+!PS             Wvel(nzmin:nzmax, ednodes(1))= Wvel(nzmin:nzmax, ednodes(1))+e2c1(nzmin:nzmax)
+!PS             Wvel(nzmin:nzmax, ednodes(2))= Wvel(nzmin:nzmax, ednodes(2))-e2c1(nzmin:nzmax)
+!PS             
+!PS             if (Fer_GM) then
+!PS                 do nz = nzmax, nzmin, -1
+!PS                     e2c2(nz)=-(fer_UV(2, nz, edelem(2))*deltaX2-fer_UV(1, nz, edelem(2))*deltaY2)*helem(nz, edelem(2))
+!PS                 end do ! --> do nz=nzmax,nzmin,-1
+!PS                 fer_Wvel(nzmin:nzmax, ednodes(1))= fer_Wvel(nzmin:nzmax, ednodes(1))+e2c2(nzmin:nzmax)
+!PS                 fer_Wvel(nzmin:nzmax, ednodes(2))= fer_Wvel(nzmin:nzmax, ednodes(2))-e2c2(nzmin:nzmax)
+!PS             end if 
 !PS         end if
-    end do ! --> do node=1, myDim_nod2D
-    
-    !___________________________________________________________________________
-    ! Sum up to get W*area
-    ! cumulative summation of div(u_vec*h) vertically
-    ! W_k = W_k+1 - div(h_k*u_k)
-    ! W_k ... vertical flux troughdo node=1, myDim_nod2D
-    do node=1, myDim_nod2D
-        nzmin = ulevels_nod2D(node)
-        nzmax = nlevels_nod2d(node)-1
-        do nz=nzmax,nzmin,-1
-            Wvel(nz, node)=Wvel(nz, node)+Wvel(nz+1, node)  
-            if (Fer_GM) then 
-                fer_Wvel(nz, node)=fer_Wvel(nz, node)+fer_Wvel(nz+1, node)
-            end if
-        end do ! --> do nz=nzmax,nzmin,-1
-    end do ! --> do node=1, myDim_nod2D
-    
-    !___________________________________________________________________________
-    ! divide with depth dependent cell area to convert from Vertical flux to 
-    ! physical vertical velocities in units m/s
-    do node=1, myDim_nod2D
-        nzmin = ulevels_nod2D(node)
-        nzmax = nlevels_nod2d(node)-1
-        do nz=nzmin,nzmax
-            Wvel(nz, node)=Wvel(nz, node)/area(nz, node)
-            if (Fer_GM) then 
-                fer_Wvel(nz, node)=fer_Wvel(nz, node)/area(nz, node)
-            end if
-        end do ! --> do nz=nzmax,nzmin,-1
-    end do ! --> do node=1, myDim_nod2D
-    
-    !___________________________________________________________________________
-    ! Add surface fresh water flux as upper boundary condition for 
-    ! continutity
-    if (.not. (trim(which_ale)=='linfs' )) then
-        do node=1, myDim_nod2D
-            nzmin = ulevels_nod2D(node)
-            if (nzmin==1) Wvel(nzmin, node)=Wvel(nzmin, node)-water_flux(node) 
-        end do ! --> do node=1, myDim_nod2D
-    end if
-    
-    !___________________________________________________________________________
-    call exchange_nod(Wvel, partit)
-    if (Fer_GM) call exchange_nod(fer_Wvel, partit)
-    
-    !___________________________________________________________________________
-    ! compute vertical CFL_z criteria
-    call compute_CFLz(dynamics, partit, mesh)
-    
-    !___________________________________________________________________________
-    ! compute implicite explicite splitting of vetical velocity Wvel according 
-    ! to CFL_z criteria
-    call compute_Wvel_split(dynamics, partit, mesh)
-    
-end subroutine compute_vert_vel_transpv
+!PS         
+!PS         !_______________________________________________________________________
+!PS !PS         if ( any(Wvel(nzmin:nzmax, ednodes(1))/=Wvel(nzmin:nzmax, ednodes(1))) .or.  &
+!PS !PS              any(Wvel(nzmin:nzmax, ednodes(2))/=Wvel(nzmin:nzmax, ednodes(2)))) then
+!PS !PS             write(*,*) ' --> subroutine vert_vel_ale --> found Nan in Wvel after div_H(...)'
+!PS !PS             write(*,*) ' mype   =', mype
+!PS !PS             write(*,*) ' edge   =', ed
+!PS !PS             write(*,*) ' enodes =', enodes
+!PS !PS             write(*,*) ' Wvel(nzmin:nzmax, enodes(1))=', Wvel(nzmin:nzmax, ednodes(1))  
+!PS !PS             write(*,*) ' Wvel(nzmin:nzmax, enodes(2))=', Wvel(nzmin:nzmax, ednodes(2)) 
+!PS !PS             write(*,*) ' e1c1', e1c1(nzmin:nzmax)  
+!PS !PS             write(*,*) ' e1c2', e1c2(nzmin:nzmax)  
+!PS !PS             write(*,*) ' e2c1', e2c1(nzmin:nzmax)  
+!PS !PS             write(*,*) ' e2c2', e2c2(nzmin:nzmax)  
+!PS !PS         end if
+!PS     end do ! --> do ed=1, myDim_edge2D
+!PS     
+!PS     !___________________________________________________________________________
+!PS     ! add the contribution from -dh/dt * area
+!PS     do node=1, myDim_nod2D
+!PS         nzmin = ulevels_nod2D(node)
+!PS         nzmax = nlevels_nod2d(node)-1
+!PS         do nz=nzmax,nzmin,-1
+!PS             Wvel(nz, node)=Wvel(nz, node)-(hnode_new(nz, node)-hnode(nz, node))*area(nz, node)/dt 
+!PS         end do ! --> do nz=nzmax,nzmin,-1
+!PS         
+!PS         !_______________________________________________________________________
+!PS !PS         if ( any(Wvel(nzmin:nzmax, node)/=Wvel(nzmin:nzmax, node))) then
+!PS !PS             write(*,*) ' --> subroutine vert_vel_ale --> found Nan in Wvel after +dhnode/dt=W'
+!PS !PS             write(*,*) ' mype   =', mype
+!PS !PS             write(*,*) ' node   =', node
+!PS !PS             write(*,*) ' Wvel(     nzmin:nzmax, node)=', Wvel(nzmin:nzmax, node) 
+!PS !PS             write(*,*) ' hnode_new(nzmin:nzmax, node)=', hnode_new(nzmin:nzmax, node)  
+!PS !PS             write(*,*) ' hnode(    nzmin:nzmax, node)=', hnode(nzmin:nzmax, node)
+!PS !PS         end if
+!PS     end do ! --> do node=1, myDim_nod2D
+!PS     
+!PS     !___________________________________________________________________________
+!PS     ! Sum up to get W*area
+!PS     ! cumulative summation of div(u_vec*h) vertically
+!PS     ! W_k = W_k+1 - div(h_k*u_k)
+!PS     ! W_k ... vertical flux troughdo node=1, myDim_nod2D
+!PS     do node=1, myDim_nod2D
+!PS         nzmin = ulevels_nod2D(node)
+!PS         nzmax = nlevels_nod2d(node)-1
+!PS         do nz=nzmax,nzmin,-1
+!PS             Wvel(nz, node)=Wvel(nz, node)+Wvel(nz+1, node)  
+!PS             if (Fer_GM) then 
+!PS                 fer_Wvel(nz, node)=fer_Wvel(nz, node)+fer_Wvel(nz+1, node)
+!PS             end if
+!PS         end do ! --> do nz=nzmax,nzmin,-1
+!PS     end do ! --> do node=1, myDim_nod2D
+!PS     
+!PS     !___________________________________________________________________________
+!PS     ! divide with depth dependent cell area to convert from Vertical flux to 
+!PS     ! physical vertical velocities in units m/s
+!PS     do node=1, myDim_nod2D
+!PS         nzmin = ulevels_nod2D(node)
+!PS         nzmax = nlevels_nod2d(node)-1
+!PS         do nz=nzmin,nzmax
+!PS             Wvel(nz, node)=Wvel(nz, node)/area(nz, node)
+!PS             if (Fer_GM) then 
+!PS                 fer_Wvel(nz, node)=fer_Wvel(nz, node)/area(nz, node)
+!PS             end if
+!PS         end do ! --> do nz=nzmax,nzmin,-1
+!PS     end do ! --> do node=1, myDim_nod2D
+!PS     
+!PS     !___________________________________________________________________________
+!PS     ! Add surface fresh water flux as upper boundary condition for 
+!PS     ! continutity
+!PS     if (.not. (trim(which_ale)=='linfs' )) then
+!PS         do node=1, myDim_nod2D
+!PS             nzmin = ulevels_nod2D(node)
+!PS             if (nzmin==1) Wvel(nzmin, node)=Wvel(nzmin, node)-water_flux(node) 
+!PS         end do ! --> do node=1, myDim_nod2D
+!PS     end if
+!PS     
+!PS     !___________________________________________________________________________
+!PS     call exchange_nod(Wvel, partit)
+!PS     if (Fer_GM) call exchange_nod(fer_Wvel, partit)
+!PS     
+!PS     !___________________________________________________________________________
+!PS     ! compute vertical CFL_z criteria
+!PS     call compute_CFLz(dynamics, partit, mesh)
+!PS     
+!PS     !___________________________________________________________________________
+!PS     ! compute implicite explicite splitting of vetical velocity Wvel according 
+!PS     ! to CFL_z criteria
+!PS     call compute_Wvel_split(dynamics, partit, mesh)
+!PS     
+!PS end subroutine compute_vert_vel_transpv
 
 
