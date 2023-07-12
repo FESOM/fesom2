@@ -1351,8 +1351,8 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
-    integer                               :: node, elem, nz, nzmin, nzmax, ednodes(2), edelem(2) 
-    real(kind=WP)                         :: hh_inv 
+    integer                               :: node, elem, nz, ed, nzmin, nzmax, ednodes(2), edelem(2) 
+    real(kind=WP)                         :: hh_inv, deltaX1, deltaX2, deltaY1, deltaY2 
     real(kind=WP)                         :: e1c1(mesh%nl-1), e1c2(mesh%nl-1)
     real(kind=WP)                         :: e2c1(mesh%nl-1), e2c2(mesh%nl-1)
     

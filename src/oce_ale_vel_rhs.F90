@@ -173,7 +173,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
             end do
         else
             UVBT_4AB(1:2, elem) = 0.0_WP
-            do nz=nzmin,nzmax-1
+            do nz=nzmin, nzmax-1
                 ! add pressure gradient terms
                 UV_rhs(  1, nz, elem) = UV_rhs(1, nz, elem) + (Fx-pgf_x(nz, elem))*elem_area(elem)*helem(nz,elem)
                 UV_rhs(  2, nz, elem) = UV_rhs(2, nz, elem) + (Fy-pgf_y(nz, elem))*elem_area(elem)*helem(nz,elem)
