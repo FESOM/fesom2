@@ -1,27 +1,3 @@
-module oce_wsplit_interface
-    interface
-        subroutine compute_CFLz(dynamics, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
-    
-        subroutine compute_Wvel_split(dynamics, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
-    end interface
-end module
-
 module oce_ale_interfaces
     interface
         subroutine init_bottom_elem_thickness(partit, mesh)
@@ -171,7 +147,33 @@ module oce_timestep_ale_interface
     end interface
 end module
 
+module compute_CFLz_interface
+    interface
+        subroutine compute_CFLz(dynamics, partit, mesh)
+        USE MOD_MESH
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_DYN
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(inout), target :: mesh
+        end subroutine
+    end interface
+end module
 
+module compute_Wvel_split_interface
+    interface
+        subroutine compute_Wvel_split(dynamics, partit, mesh)
+        USE MOD_MESH
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_DYN
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(inout), target :: mesh
+        end subroutine
+    end interface
+end module
 
 ! CONTENT:
 ! ------------
@@ -2010,7 +2012,8 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     use g_comm_auto
     use io_RESTART !!PS
     use g_forcing_arrays !!PS
-!PS     use oce_wsplit_interface
+!PS     use compute_Wvel_split_interaface
+!PS     use compute_CFLz_interface
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -3077,7 +3080,8 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     use g_cvmix_kpp
     use g_cvmix_tidal
     use Toy_Channel_Soufflet
-    use oce_wsplit_interface
+    use compute_Wvel_split_interface
+    use compute_CFLz_interface
     use oce_ale_interfaces
     use pressure_bv_interface
     use pressure_force_4_linfs_interface

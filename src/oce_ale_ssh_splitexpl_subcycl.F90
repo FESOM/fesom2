@@ -26,7 +26,7 @@ module impl_vert_visc_ale_vtransp_interface
         USE MOD_DYN
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
+        type(t_mesh)  , intent(inout), target :: mesh
         end subroutine
     end interface
 end module
@@ -42,7 +42,7 @@ module compute_ssh_split_explicit_interface
         USE MOD_DYN
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
+        type(t_mesh)  , intent(inout), target :: mesh
         end subroutine
 
         subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
@@ -52,7 +52,7 @@ module compute_ssh_split_explicit_interface
         USE MOD_DYN
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
+        type(t_mesh)  , intent(inout), target :: mesh
         end subroutine
         
         subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
@@ -63,7 +63,7 @@ module compute_ssh_split_explicit_interface
         integer       , intent(in)            :: mode
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
+        type(t_mesh)  , intent(inout), target :: mesh
         end subroutine
         
         subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
@@ -73,7 +73,7 @@ module compute_ssh_split_explicit_interface
         USE MOD_DYN
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
+        type(t_mesh)  , intent(inout), target :: mesh
         end subroutine
     end interface
 end module
@@ -850,7 +850,7 @@ subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
-    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_mesh)  , intent(inout)   , target :: mesh
     !___________________________________________________________________________
     real(kind=WP)       :: vert_sum_u, vert_sum_v, Fx, Fy, ab1, ab2, hh
     integer             :: elem, nz, nzmin, nzmax, elnodes(3)
@@ -960,7 +960,7 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     !___________________________________________________________________________
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
-    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_mesh)  , intent(inout)   , target :: mesh
     !___________________________________________________________________________
     real(kind=WP)                   :: dtBT, BT_inv, hh, f, rx, ry, a, d, c1, c2, ax, ay
     real(kind=WP)                   :: deltaX1, deltaY1, deltaX2, deltaY2, thetaBT
@@ -1147,7 +1147,7 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
     integer       , intent(in)            :: mode
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
-    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_mesh)  , intent(inout)   , target :: mesh
     integer                               :: elem, nz, nzmin, nzmax
     real(kind=WP)                         :: ubar, vbar, hh_inv
     !___________________________________________________________________________
@@ -1293,7 +1293,7 @@ subroutine compute_thickness_zstar(dynamics, partit, mesh)
     !___________________________________________________________________________
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
-    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_mesh)  , intent(inout)   , target :: mesh
     integer                               :: node, elem, nz, nzmin, nzmax, elnodes(3) 
     real(kind=WP)                         :: hh_inv
     
@@ -1347,11 +1347,12 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
     use o_ARRAYS, only: water_flux
     use g_config, only: dt, which_ale
     use g_comm_auto
-!PS     use oce_wsplit_interface
+!PS     use compute_Wvel_split_interface
+!PS     use compute_CFLz_interface
     !___________________________________________________________________________
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
-    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_mesh)  , intent(inout)   , target :: mesh
     integer                               :: node, elem, nz, ed, nzmin, nzmax, ednodes(2), edelem(2) 
     real(kind=WP)                         :: hh_inv, deltaX1, deltaX2, deltaY1, deltaY2 
     real(kind=WP)                         :: e1c1(mesh%nl-1), e1c2(mesh%nl-1)
