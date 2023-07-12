@@ -1347,6 +1347,7 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
     use o_ARRAYS, only: water_flux
     use g_config, only: dt, which_ale
     use g_comm_auto
+!PS     use oce_wsplit_interface
     !___________________________________________________________________________
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
