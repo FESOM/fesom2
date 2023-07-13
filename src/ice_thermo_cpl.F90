@@ -44,7 +44,7 @@ subroutine thermodynamics(ice, partit, mesh)
   !---- ocean variables (provided by FESOM)
   real(kind=WP)  :: T_oc, S_oc, ustar
   !---- local variables (set in this subroutine)
-  real(kind=WP)  :: rsss
+  real(kind=WP)  :: rsss, qres
   !---- output variables (computed in `ice_growth')
   real(kind=WP)  :: ehf, fw, rsf, dhgrowth, dhsngrowth, dhflice
 
@@ -157,7 +157,7 @@ subroutine thermodynamics(ice, partit, mesh)
      ! energy fluxes ---!
      t                   = ice_temp(inod)
      if(A>Aimin) then
-        call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, t)
+        call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, t, qres)
         ice_temp(inod) = t
      else
         ! Freezing temp of saltwater in K
@@ -166,7 +166,7 @@ subroutine thermodynamics(ice, partit, mesh)
      call ice_albedo(ice%thermo, h, hsn, t, alb)
      ice_alb(inod)       = alb
 #endif
-     call ice_growth
+     call ice_growth(qres)
 
      !__________________________________________________________________________
      ! save old ice variables
@@ -207,7 +207,7 @@ contains
   ! Thermodynamic ice growth model     
   !===================================================================
 
-  subroutine ice_growth
+  subroutine ice_growth(qres)
       
     implicit none
  
@@ -216,7 +216,7 @@ contains
 
     !---- heat fluxes (positive upward, negative downward)
     real(kind=WP)  :: Qatmice, Qatmocn, Qocnice, Qocnatm, Qicecon
-    real(kind=WP)  :: ahf, ohf
+    real(kind=WP)  :: ahf, ohf, qres
 
     !---- atmospheric freshwater fluxes (precipitation minus evaporation)
     real(kind=WP)  :: PmEice, PmEocn
@@ -279,7 +279,7 @@ contains
 
     !---- total atmospheric and oceanic heat fluxes
     !---- average over grid cell [W/m**2]
-    ahf = A*Qatmice + (1._WP-A)*Qatmocn
+    ahf = A*Qatmice + (1._WP-A)*Qatmocn + qres
     ohf = A*Qocnice + (1._WP-A)*Qocnatm
 
 
@@ -495,15 +495,18 @@ contains
 
 
 
- subroutine ice_surftemp(ithermp, h,hsn,a2ihf,t)
+ subroutine ice_surftemp(ithermp, h,hsn,a2ihf,t,qres)
   ! INPUT:
   ! a2ihf - Total atmo heat flux to ice
-  ! A  - Ice fraction
-  ! h  - Ice thickness
+  ! A     - Ice fraction
+  ! h     - Ice thickness
   ! hsn   - Snow thickness
   ! 
   ! INPUT/OUTPUT:
   ! t     - Ice surface temperature
+  !
+  ! OUTPUT:
+  ! qres  - Residual heat flux
 
   implicit none
   type(t_ice_thermo), intent(in), target :: ithermp
@@ -514,6 +517,7 @@ contains
   real(kind=WP)  hsn
   real(kind=WP)  t
   !---- local variables
+  real(kind=WP)  qres
   real(kind=WP)  snicecond
   real(kind=WP)  zsniced
   real(kind=WP)  zicefl
@@ -544,7 +548,10 @@ contains
   zcprosn=rhosno*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
   zcpdte=zcpdt+zcprosn*hsn              ! Combined Energy required to change temperature of snow + 0.05m of upper ice
   t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced) ! New sea ice surf temp [K]
-  t=min(273.15_WP,t)
+  if (t>273.15_WP) then
+    qres=(con/zsniced+zcpdte)*(t-273.15_WP)
+    t=273.15_WP
+  end if
  end subroutine ice_surftemp
 
  subroutine ice_albedo(ithermp, h, hsn, t, alb)
