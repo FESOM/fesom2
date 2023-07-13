@@ -458,17 +458,19 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #if defined (__3Zoo2Det)
                 calc_diss2 = calc_diss
 #endif
+                calc_diss_ben = calc_diss
             else    ! Calcdiss dependent on depth
                 calc_diss = calc_diss_rate * Sink_Vel/20.d0 ! Dissolution rate of CaCO3 scaled by the sinking velocity at the current depth
 #if defined (__3Zoo2Det)
                 calc_diss2 = calc_diss_rate2* Sink_Vel/20.d0 
 #endif
+                calc_diss_ben = calc_diss_rate * Sink_Vel/20.0
             endif
 
 !#if defined (__3Zoo2Det)
 !            calc_diss2    = calc_diss_rate2 ! Dissolution rate of CaCO3 scaled by the sinking velocity at the current depth seczoo
 !#endif
-            calc_diss_ben = calc_diss_rate * Sink_Vel/20.0
+!            calc_diss_ben = calc_diss_rate * Sink_Vel/20.0
 
 !-------------------------------------------------------------------------------
 !> Photosynthesis section, light parameters and rates
@@ -1116,7 +1118,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                     calc_loss_gra_14 = grazingFlux_phy * recipQuota_14/(PhyC_14 + tiny) * PhyCalc_14
                 end if
             end if
-		
+
 !-------------------------------------------------------------------------------
 ! Sources minus sinks (SMS)
 !-------------------------------------------------------------------------------
@@ -1841,14 +1843,14 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
        print*,'dt_b= ', dt_b
        print*,'state(k,icocc): ', state(k,icocc)
        print*,'sms CoccoC: ', CoccoC
+       print*,'sms CoccoN: ', CoccoN
        print*,'sms Cphot cocco: ', Cphot_cocco*CoccoC
        print*,'sms lossC_c: ', lossC_c
        print*,'sms limitFacN_cocco: ', limitFacN_cocco
        print*,'sms phyRespRate_cocco: ', phyRespRate_cocco
        print*,'sms grazingFlux_cocco: ', grazingFlux_cocco
        print*,'sms grazingFlux_cocco2: ', grazingFlux_Cocco2
-       print*,'sms recipQuota_cocco: ', recipQuota_cocco
-
+       print*,'sms grazingFlux_cocco3: ', grazingFlux_Cocco3
        print*,'sms recipQuota_cocco: ', recipQuota_cocco
        call par_ex
        stop
@@ -2035,8 +2037,6 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                                                   ) * dt_b + sms(k,idetcal)
 #endif
 #endif
-
-
 
 !____________________________________________________________
 ! Oxygen
@@ -2343,16 +2343,6 @@ if (Diags) then
 
 
 
-
-
-
-
-
-
-
-
-
-
 !*** zooplankton1 respiration
         vertrespmeso(k) = vertrespmeso(k) + (     &
         + HetRespFlux                             &
@@ -2431,6 +2421,10 @@ if (Diags) then
 #endif
 endif
   end do ! Main vertikal loop ends
+
+!   if (mype==0 .and. my_fesom_group == 0) then !OG
+!      write(*,*) ' --> Main vertikal loop ends'
+!   endif
 
 !-------------------------------------------------------------------------------
 ! Remineralization from the sediments into the bottom layer

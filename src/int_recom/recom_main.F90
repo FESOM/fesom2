@@ -216,35 +216,47 @@ end if ! use_MEDUSA and sedflx_num not 0
 if (Diags) then
 
      !!---- Allocate 3D diagnostics
-     allocate(vertgrazmeso_tot(nl-1), vertgrazmeso_n(nl-1), vertgrazmeso_d(nl-1), vertgrazmeso_c(nl-1))
+     allocate(vertgrazmeso_tot(nl-1), vertgrazmeso_n(nl-1), vertgrazmeso_d(nl-1))
      vertgrazmeso_tot = 0.d0
      vertgrazmeso_n   = 0.d0
      vertgrazmeso_d   = 0.d0
-     vertgrazmeso_c   = 0.d0
 
-     allocate(vertrespmeso(nl-1), vertrespmacro(nl-1), vertrespmicro(nl-1))
+#if defined (__coccos)
+     allocate(vertgrazmeso_c(nl-1))
+     vertgrazmeso_c   = 0.d0
+#endif
+
+     allocate(vertrespmeso(nl-1))
      vertrespmeso  = 0.d0
+
+#if defined (__3Zoo2Det)
+     allocate(vertrespmacro(nl-1), vertrespmicro(nl-1))
      vertrespmacro = 0.d0
      vertrespmicro = 0.d0
+#endif
 
      allocate(vertcalcdiss(nl-1), vertcalcif(nl-1))
      vertcalcdiss = 0.d0
      vertcalcif   = 0.d0
 
-     allocate(vertaggn(nl-1), vertaggd(nl-1), vertaggc(nl-1))
+     allocate(vertaggn(nl-1), vertaggd(nl-1))
      vertaggn = 0.d0
      vertaggd = 0.d0
-     vertaggc = 0.d0
 
-     allocate(vertdocexn(nl-1), vertdocexd(nl-1), vertdocexc(nl-1))
+     allocate(vertdocexn(nl-1), vertdocexd(nl-1))
      vertdocexn = 0.d0
      vertdocexd = 0.d0
-     vertdocexc = 0.d0
 
-     allocate(vertrespn(nl-1), vertrespd(nl-1), vertrespc(nl-1))
+     allocate(vertrespn(nl-1), vertrespd(nl-1))
      vertrespn = 0.d0
      vertrespd = 0.d0
+
+#if defined (__coccos)
+     allocate(vertaggc(nl-1), vertdocexc(nl-1), vertrespc(nl-1))
+     vertaggc = 0.d0
+     vertdocexc = 0.d0
      vertrespc = 0.d0
+#endif
 
      !!---- Allocate 2D diagnostics
      allocate(vertNPPn(nl-1), vertGPPn(nl-1), vertNNAn(nl-1), vertChldegn(nl-1)) 
@@ -259,11 +271,13 @@ if (Diags) then
      vertNNAd = 0.d0
      Chldegd = 0.d0
 
+#if defined (__coccos)
      allocate(vertNPPc(nl-1), vertGPPc(nl-1), vertNNAc(nl-1), vertChldegc(nl-1)) 
      vertNPPc = 0.d0
      vertGPPc = 0.d0
      vertNNAc = 0.d0
      Chldegc = 0.d0
+#endif
 end if
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forcing'//achar(27)//'[0m'
@@ -291,53 +305,74 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forci
 if (Diags) then
      !!---- Updating 2D diagnostics
      NPPn(n) = locNPPn
-     NPPd(n) = locNPPd
      GPPn(n) = locGPPn
-     GPPd(n) = locGPPd
      NNAn(n) = locNNAn
-     NNAd(n) = locNNAd
      Chldegn(n) = locChldegn
+
+     NPPd(n) = locNPPd
+     GPPd(n) = locGPPd
+     NNAd(n) = locNNAd
      Chldegd(n) = locChldegd
+
+#if defined (__coccos)
      NPPc(n) = locNPPc
      GPPc(n) = locGPPc
      NNAc(n) = locNNAc
      Chldegc(n) = locChldegc
+#endif
 
      !!---- Updating 3D diagnostics
      grazmeso_tot(1:nzmax,n) = vertgrazmeso_tot(1:nzmax)
      grazmeso_n(1:nzmax,n)   = vertgrazmeso_n(1:nzmax)
      grazmeso_d(1:nzmax,n)   = vertgrazmeso_d(1:nzmax)
+#if defined (__coccos)
      grazmeso_c(1:nzmax,n)   = vertgrazmeso_c(1:nzmax)
+#endif
+
      respmeso(1:nzmax,n)     = vertrespmeso(1:nzmax)
+#if defined (__3Zoo2Det)
      respmacro(1:nzmax,n)    = vertrespmacro(1:nzmax)
      respmicro(1:nzmax,n)    = vertrespmicro(1:nzmax)
+#endif
      calcdiss(1:nzmax,n)     = vertcalcdiss(1:nzmax)
      calcif(1:nzmax,n)       = vertcalcif(1:nzmax)
+
      aggn(1:nzmax,n)         = vertaggn(1:nzmax)
-     aggd(1:nzmax,n)         = vertaggd(1:nzmax)
-     aggc(1:nzmax,n)         = vertaggc(1:nzmax)
      docexn(1:nzmax,n)       = vertdocexn(1:nzmax)
-     docexd(1:nzmax,n)       = vertdocexd(1:nzmax)
-     docexc(1:nzmax,n)       = vertdocexc(1:nzmax)
      respn(1:nzmax,n)        = vertrespn(1:nzmax)
-     respd(1:nzmax,n)        = vertrespd(1:nzmax)
-     respc(1:nzmax,n)        = vertrespc(1:nzmax)
      NPPn3D(1:nzmax,n)       = vertNPPn(1:nzmax)
+
+     aggd(1:nzmax,n)         = vertaggd(1:nzmax)
+     respd(1:nzmax,n)        = vertrespd(1:nzmax)
+     docexd(1:nzmax,n)       = vertdocexd(1:nzmax)
      NPPd3D(1:nzmax,n)       = vertNPPd(1:nzmax)
+
+#if defined (__coccos)
+     aggc(1:nzmax,n)         = vertaggc(1:nzmax)
+     docexc(1:nzmax,n)       = vertdocexc(1:nzmax)
+     respc(1:nzmax,n)        = vertrespc(1:nzmax)
      NPPc3D(1:nzmax,n)       = vertNPPc(1:nzmax)
+#endif
 
      !!---- Deallocating 2D diagnostics
      deallocate(vertNPPn,vertGPPn,vertNNAn,vertChldegn) 
      deallocate(vertNPPd,vertGPPd,vertNNAd,vertChldegd) 
+#if defined (__coccos)
      deallocate(vertNPPc,vertGPPc,vertNNAc,vertChldegc) 
+#endif
 
      !!---- Deallocating 3D Diagnistics
-     deallocate(vertgrazmeso_tot, vertgrazmeso_n, vertgrazmeso_d, vertgrazmeso_c)
-     deallocate(vertrespmeso, vertrespmacro, vertrespmicro)
+     deallocate(vertgrazmeso_tot, vertgrazmeso_n, vertgrazmeso_d, vertrespmeso)
+#if defined (__3Zoo2Det)
+     deallocate(vertrespmacro, vertrespmicro)
+#endif
      deallocate(vertcalcdiss, vertcalcif)
-     deallocate(vertaggn, vertaggd, vertaggc)
-     deallocate(vertdocexn, vertdocexd, vertdocexc)
-     deallocate(vertrespn, vertrespd, vertrespc)
+     deallocate(vertaggn, vertdocexn, vertrespn)
+     deallocate(vertaggd, vertdocexd, vertrespd)
+#if defined (__coccos)
+    deallocate(vertgrazmeso_c)
+     deallocate(vertaggc, vertdocexc, vertrespc)
+#endif
 endif
 
      GloPCO2surf(n)               = pco2surf(1)
@@ -399,10 +434,12 @@ endif
     call exchange_nod(NNAd)
     call exchange_nod(Chldegn)
     call exchange_nod(Chldegd)
+#if defined (__coccos)
     call exchange_nod(NPPc)
     call exchange_nod(GPPc)
     call exchange_nod(NNAc)
     call exchange_nod(Chldegc)
+#endif
   endif
 
   call exchange_nod(GloPCO2surf)	
@@ -430,14 +467,14 @@ endif
 !  call exchange_nod(DenitBen)	
 
   call exchange_nod(PAR3D)
-  call exchange_nod(CO23D)       ! NEW ms
-  call exchange_nod(pH3D)        ! NEW ms
-  call exchange_nod(pCO23D)      ! NEW ms
-  call exchange_nod(HCO33D)      ! NEW ms
-  call exchange_nod(CO33D)       ! NEW ms
-  call exchange_nod(OmegaC3D)    ! NEW ms
-  call exchange_nod(kspc3D)      ! NEW ms
-  call exchange_nod(rhoSW3D)	 ! NEW ms	
+  call exchange_nod(CO23D)
+  call exchange_nod(pH3D)
+  call exchange_nod(pCO23D)
+  call exchange_nod(HCO33D)
+  call exchange_nod(CO33D)
+  call exchange_nod(OmegaC3D)
+  call exchange_nod(kspc3D)
+  call exchange_nod(rhoSW3D)
 
 end subroutine recom
 ! ======================================================================================

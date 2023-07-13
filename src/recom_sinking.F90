@@ -67,12 +67,13 @@ subroutine recom_sinking_new(tr_num,mesh)
 
             Vsink = VDia
 
+#if defined (__coccos)
     elseif(tracer_id(tr_num)==1029 .or. &  !icocn
         tracer_id(tr_num)==1030 .or.    &  !icocc
         tracer_id(tr_num)==1031 ) then     !icchl
 
             Vsink = VCocco
-
+#endif
     elseif(tracer_id(tr_num)==1020) then   !iphycal
        
 #if defined (__coccos)

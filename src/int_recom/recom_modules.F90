@@ -26,11 +26,24 @@ module recom_config
              ihetc = 10, idon = 11, idoc = 12, idian = 13,       &
              idiac = 14, idchl = 15, idiasi = 16, idetsi = 17,   &
              isi = 18, ife = 19, iphycal = 20, idetcal = 21,     &
-             ioxy= 22, izoo2n = 23, izoo2c =24, idetz2n = 25,    &
-             idetz2c = 26, idetz2si = 27, idetz2calc = 28,       &
-             icocn = 29, icocc = 30, icchl = 31,                 &    ! NEW cocco tracer    
-             imiczoon = 32, imiczooc = 33                             ! NEW 3Zoo
-    
+             ioxy= 22
+
+#if defined (__3Zoo2Det)
+  Integer :: izoo2n = 23, izoo2c =24, idetz2n = 25,              &
+             idetz2c = 26, idetz2si = 27, idetz2calc = 28        
+#endif
+
+#if defined (__coccos) & defined (__3Zoo2Det)
+  Integer :: icocn = 29, icocc = 30, icchl = 31
+#elif defined (__coccos) & !defined (__3Zoo2Det)
+  Integer :: icocn = 23, icocc = 24, icchl = 25 
+#endif
+
+#if defined (__coccos) & defined (__3Zoo2Det)
+  Integer :: imiczoon = 32, imiczooc = 33
+#elif !defined (__coccos) & defined (__3Zoo2Det)    
+  Integer :: imiczoon = 29, imiczooc = 30
+#endif
 
   Integer :: ivphy = 1, ivdia = 2, ivdet = 3, ivdetsc = 4, ivcoc = 5 ! NEW ivcoc
 

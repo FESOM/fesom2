@@ -229,6 +229,8 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
         , Loc_slp & !, SinkVel
         , zF, PAR, Lond, Latd, mesh)
 
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
+
   state(1:nn,:)      = max(tiny,state(1:nn,:) + sms(1:nn,:))
   state(1:nn,ipchl)  = max(tiny_chl,state(1:nn,ipchl))
   state(1:nn,iphyn)  = max(tiny_N,  state(1:nn,iphyn))
@@ -319,18 +321,14 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
      locNNAd = sum(vertNNAd(1:nn) * thick(1:nn))
      locChldegn = sum(vertChldegn(1:nn) * thick(1:nn))
      locChldegd = sum(vertChldegd(1:nn) * thick(1:nn))
+
+#if defined (__coccos)
      locNPPc = sum(vertNPPc(1:nn) * thick(1:nn))
      locGPPc = sum(vertGPPc(1:nn) * thick(1:nn))
      locNNAc = sum(vertNNAc(1:nn) * thick(1:nn))
      locChldegc = sum(vertChldegc(1:nn) * thick(1:nn))
-!	do idiags = one,8
-!	  LocDiags2D(idiags) = sum(diags3Dloc(1:nn,idiags) * thick(1:nn))
-!	end do
+#endif
 
-!        LocDiags2D(9)        = sum(diags3Dloc(1:nn,21) * thick(1:nn))      ! NEW cocco NPP (hard-coded, because cocco NPP etc. are appended to the numbers of 3D fields)
-!        LocDiags2D(10)       = sum(diags3Dloc(1:nn,22) * thick(1:nn))      ! NEW cocco GPP
-!        LocDiags2D(11)       = sum(diags3Dloc(1:nn,23) * thick(1:nn))      ! NEW cocco NNA
-!        LocDiags2D(12)       = sum(diags3Dloc(1:nn,24) * thick(1:nn))      ! NEW cocco GNA or chl deg
   end if
 
 end subroutine REcoM_Forcing

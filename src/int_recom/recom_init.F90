@@ -478,15 +478,24 @@ Sinkvel2_tr(:,:,:)    = 0.0d0 ! OG 16.03.23
     tr_arr(:,:,30) = tiny                   ! tracer 29 = DetZ2Calc 
 #endif
 
-#if defined (__coccos)
-    tr_arr(:,:,31) = tiny_chl/chl2N_max        ! tiny             ! tracer 29 = CoccoN
-    tr_arr(:,:,32) = tiny_chl/chl2N_max/NCmax  ! tiny * Redfield  ! tracer 30 = CoccoC 
-    tr_arr(:,:,33) = tiny_chl                  ! tiny * 1.56d0    ! tracer 31 = CoccoChl
+#if defined (__coccos) & defined (__3Zoo2Det)
+    tr_arr(:,:,31) = tiny_chl/chl2N_max        ! tiny             ! tracer 31 = CoccoN
+    tr_arr(:,:,32) = tiny_chl/chl2N_max/NCmax  ! tiny * Redfield  ! tracer 32 = CoccoC 
+    tr_arr(:,:,33) = tiny_chl                  ! tiny * 1.56d0    ! tracer 33 = CoccoChl
+#elif defined (__coccos) & !defined (__3Zoo2Det)
+   if (mype==0 .and. my_fesom_group == 0)  print *, "case_3p1z1d"
+    tr_arr(:,:,25) = tiny_chl/chl2N_max        ! tracer 25 = CoccoN
+    tr_arr(:,:,26) = tiny_chl/chl2N_max/NCmax  ! tracer 26 = CoccoC 
+    tr_arr(:,:,27) = tiny_chl  
 #endif
 
-#if defined (__3Zoo2Det)
-    tr_arr(:,:,34) = tiny                      ! tracer 32 = Zoo3N
-    tr_arr(:,:,35) = tiny * Redfield           ! tracer 33 = Zoo3C
+#if defined (__coccos) & defined (__3Zoo2Det)
+    tr_arr(:,:,34) = tiny                      ! tracer 34 = Zoo3N
+    tr_arr(:,:,35) = tiny * Redfield           ! tracer 35 = Zoo3C
+#elif !defined (__coccos) & defined (__3Zoo2Det)
+    tr_arr(:,:,31) = tiny                      ! tracer 31 = Zoo3N
+    tr_arr(:,:,32) = tiny * Redfield           ! tracer 32 = Zoo3C
+
 #endif
 
   if (ciso) then
