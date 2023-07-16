@@ -6,7 +6,7 @@ runid='fesom'
 /
 
 &timestep
-step_per_day=720 !96 !96 !72 !72 !45 !72 !96
+step_per_day=72 !96 !96 !72 !72 !45 !72 !96
 run_length=10 !62 !62 !62 !28
 run_length_unit='d' ! y, m, d, s
 /
@@ -20,7 +20,7 @@ yearnew=1958
 &paths
 MeshPath='/albedo/home/pscholz/fesom2/test/meshes/soufflet/'
 ClimateDataPath='/albedo/work/projects/p_fesom/FROM-OLLIE/FESOM2/hydrography/phc3.0/'
-ResultPath='/albedo/work/user/pscholz/results/test_channel_fix_02/chain/'
+ResultPath='../result_tmp/'
 /
 
 &restart_log
@@ -30,7 +30,7 @@ raw_restart_length=1        ! --> do core dump restart
 raw_restart_length_unit='off' ! e.g. y, d, h, s, off
 bin_restart_length=1        ! --> do derived type binary restart 
 bin_restart_length_unit='off' ! e.g. y, d, h, s, off
-logfile_outfreq=1     !in logfile info. output frequency, # steps
+logfile_outfreq=72     !in logfile info. output frequency, # steps
 /
 
 &ale_def
