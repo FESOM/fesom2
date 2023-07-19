@@ -282,6 +282,8 @@ contains
     ahf = A*Qatmice + (1._WP-A)*Qatmocn
     ohf = A*Qocnice + (1._WP-A)*Qocnatm
 
+
+
     !---- convert heat fluxes [W/m**2] into growth per time step dt [m]
     Qicecon = Qicecon*dt/cl
     Qatmice = Qatmice*dt/cl
@@ -293,8 +295,11 @@ contains
     !---- NOTE: evaporation and sublimation represent potential fluxes and
     !---- must be area-weighted (like the heat fluxes); in contrast,
     !---- precipitation (snow and rain) and runoff are effective fluxes
+!already weighted in IFS coupling
+#if !defined (__ifsinterface)
     subli  = A*subli
     evap   = (1._WP-A)*evap
+#endif
     PmEice = A*snow + subli
     PmEocn = evap + rain + (1._WP-A)*snow + runo
 

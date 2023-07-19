@@ -253,9 +253,9 @@ if [ $is_newsimul -eq 1 ] ; then
         # copy restart ocean files/directories from previous spinup cycle 
         prev_rfile=${dname_result}${prev_chain_id}/fesom.${year_e}.oce.restart
         if   [ -d "${prev_rfile}"    ]; then
-            cp -r $prev_rfile $dname_result_link/fesom.${aux_yr}.oce.restart
+            cp -r ${prev_rfile} ${dname_result_link}/fesom.${aux_yr}.oce.restart
         elif [ -f "${prev_rfile}.nc" ]; then
-            cp $prev_rfile $dname_result_link/fesom.${aux_yr}.oce.restart.nc
+            cp ${prev_rfile}.nc ${dname_result_link}/fesom.${aux_yr}.oce.restart.nc
         else
             echo -e "\033[1;31m --> ERROR: could not find ocean restart file \033[0m"
             exit
@@ -264,9 +264,9 @@ if [ $is_newsimul -eq 1 ] ; then
         # copy restart ice files/files/directories from previous spinup cycle 
         prev_rfile=${dname_result}${prev_chain_id}/fesom.${year_e}.ice.restart
         if   [ -d "${prev_rfile}"    ]; then
-            cp -r $prev_rfile $dname_result_link/fesom.${aux_yr}.ice.restart
+            cp -r ${prev_rfile} ${dname_result_link}/fesom.${aux_yr}.ice.restart
         elif [ -f "${prev_rfile}.nc" ]; then
-            cp $prev_rfile $dname_result_link/fesom.${aux_yr}.ice.restart.nc
+            cp ${prev_rfile}.nc ${dname_result_link}/fesom.${aux_yr}.ice.restart.nc
         else
             echo -e "\033[1;31m --> ERROR: could not find ice restart file \033[0m"
             exit

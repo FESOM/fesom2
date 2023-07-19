@@ -58,8 +58,6 @@ namelist.ice:
         evp_rheol_steps: 150
 
 namelist.io:
-    diag_list:
-        ldiag_energy: False
     nml_list:
         io_list:
             "sst       ":

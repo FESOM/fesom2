@@ -5,7 +5,7 @@
 #SBATCH --time=01:00:00
 #SBATCH --qos=12h
 #SBATCH --nodes=48            # Number of tasks (MPI) tasks to be launched
-#SBATCH --tasks-per-node 127  # using all 128CPus we exceed the maxload limit (>130) of many used nodes
+#SBATCH --tasks-per-node 128  # using all 128CPus we exceed the maxload limit (>130) of many used nodes when us parallel I/O
 #SBATCH --cpus-per-task 1
 
 #SBATCH -o fesom2_%x_%j.out

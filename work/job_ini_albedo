@@ -1,37 +1,32 @@
 #!/bin/bash
 #SBATCH --account=clidyn.p_fesom # edit your account
+#SBATCH --job-name=ini
 #SBATCH --partition=mpp
 #SBATCH --time=00:30:00
-#SBATCH --qos=30min     
-#SBATCH --ntasks=1            # Number of tasks (MPI) tasks to be launched
-#SBATCH --cpus-per-task 1
-#SBATCH --hint=nomultithread
+#SBATCH --qos=30min
+#SBATCH --ntasks=128            # Number of tasks (MPI) tasks to be launched
+#SBATCH -o fesom2_%x_%j.out
+#SBATCH -e fesom2_%x_%j.out
 
-#SBATCH --job-name=fesom2.0_INI
-#SBATCH -o slurm-out.out
-#SBATCH -e slurm-err.out
+set -x
 
-#set -x
-#ulimit -s unlimited
+ulimit -s unlimited
 
-export OMP_NUM_THREADS=1
 source ../env/albedo/shell
 
 ln -s ../bin/fesom_ini.x         .           # cp -n ../bin/fvom_ini.x
 cp -n ../config/namelist.config  .
-cp -n ../config/namelist.forcing .
-cp -n ../config/namelist.oce     .
-cp -n ../config/namelist.ice     .
-cp -n ../config/namelist.io      .
-cp -n ../config/namelist.dyn     .
-cp -n ../config/namelist.tra     .
-cp -n ../config/namelist.cvmix   .
+#cp -n ../config/namelist.forcing .
+#cp -n ../config/namelist.oce     .
+#cp -n ../config/namelist.ice     .
 
 
-# determine JOBID
-JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
+#___DETERMINE SLURM JOBID+OUTPUTFILE____________________________________________
+jobid=$(echo $SLURM_JOB_ID | cut -d"." -f1)
+fname="fesom2_${SLURM_JOB_NAME}_${jobid}.out"
 
+#___PUT JOB IN QUEUE____________________________________________________________
 date
-srun --mpi=pmi2 --ntasks=1 ./fesom_ini.x > "fesom2_ini.out"
+srun --mpi=pmi2 --ntasks=1 ./fesom_ini.x >> ${fname}
 date
 

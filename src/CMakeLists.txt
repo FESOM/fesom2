@@ -32,9 +32,19 @@ if(ALEPH_CRAYMPICH_WORKAROUNDS)
 endif()
 if(ALBEDO_INTELMPI_WORKAROUNDS)
    add_compile_options(-DENABLE_ALBEDO_INTELMPI_WORKAROUNDS)
+   add_compile_options(-DDISABLE_PARALLEL_RESTART_READ)
 endif()
 
-option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
+if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
+   message(STATUS "multithreading disabled for Levante") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
+   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  albedo )
+   message(STATUS "multithreading disabled for Albedo") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
+   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
+else()
+   option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
+endif()
+
 option(ENABLE_OPENACC "compile with OpenACC support" OFF)
 set(NV_GPU_ARCH "cc80" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
 

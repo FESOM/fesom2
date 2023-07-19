@@ -19,5 +19,6 @@ use_freeslip = .false. ! Switch on free slip
 use_wsplit   = .false. ! Switch for implicite/explicte splitting of vert. velocity
 wsplit_maxcfl= 1.0     ! maximum allowed CFL criteria in vertical (0.5 < w_max_cfl < 1.) 
                        ! in older FESOM it used to be w_exp_max=1.e-3
+ldiag_KE=.false.       ! activates energy diagnostics
 /
 
