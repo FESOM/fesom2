@@ -279,7 +279,7 @@ contains
 
     !---- total atmospheric and oceanic heat fluxes
     !---- average over grid cell [W/m**2]
-    ahf = A*Qatmice + (1._WP-A)*Qatmocn + qres
+    ahf = A*Qatmice + (1._WP-A)*Qatmocn - qres
     ohf = A*Qocnice + (1._WP-A)*Qocnatm
 
 
