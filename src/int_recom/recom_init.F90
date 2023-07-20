@@ -278,30 +278,14 @@ end if
 !!#endif
     !tr_arr(:,:,24)                        ! tracer 24 = Oxy     ! read from the file
 
-!if (REcoM_Second_Zoo) then
+if (REcoM_Second_Zoo) then
     tr_arr(:,:,25) = tiny                   ! tracer 25 = Zoo2N
     tr_arr(:,:,26) = tiny * Redfield        ! tracer 26 = Zoo2C
-!endif
-
-
-
- if (REcoM_Second_Zoo) then
-!   if (REcoM_Second_Zoo .and. zoo2_initial_field) then
-!     tracer(:,:,27) = tiny            ! tracer 26 = DetZ2N
-!     tracer(:,:,28) = tiny            ! tracer 27 = DetZ2C
-!     tracer(:,:,29) = tiny            ! tracer 28 = DetZ2Si
-!     tracer(:,:,30) = tiny            ! tracer 29 = DetZ2Calc
-!     else
-!     tracer(:,:,25) = tiny            ! tracer 24 = Zoo2N                                      
-!     tracer(:,:,26) = tiny            ! tracer 25 = Zoo2C 
-     tracer(:,:,27) = tiny            ! tracer 26 = DetZ2N                              
-     tracer(:,:,28) = tiny            ! tracer 27 = DetZ2C                                    
-     tracer(:,:,29) = tiny            ! tracer 28 = DetZ2Si                            
-     tracer(:,:,30) = tiny            ! tracer 29 = DetZ2Calc 
-!   endif
-  endif
-
-
+    tr_arr(:,:,27) = tiny                   ! tracer 26 = DetZ2N                              
+    tr_arr(:,:,28) = tiny                   ! tracer 27 = DetZ2C                                    
+    tr_arr(:,:,29) = tiny                   ! tracer 28 = DetZ2Si                            
+    tr_arr(:,:,30) = tiny                   ! tracer 29 = DetZ2Calc 
+endif
 
 if (ciso) then
    tr_arr(:,:,27) = (1. + 0.001 * (2.3 - 0.06 * tr_arr(:,:,3))) * tr_arr(:,:,4) ! DIC_13, GLODAP2 > 500 m 

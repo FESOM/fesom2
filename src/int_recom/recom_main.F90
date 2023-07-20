@@ -165,6 +165,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forci
      end if
 
      GloHplus(n)                  = ph(1) ! hplus
+
      AtmFeInput(n)                = FeDust
      AtmNInput(n)                 = NDust 
 !     DenitBen(n)                  = LocDenit
@@ -278,7 +279,7 @@ subroutine bio_fluxes(mesh)
 
   ! Alkalinity restoring to climatology
 
-if (.not. restore_alkalinity) return  
+  if (.not. restore_alkalinity) return
 
   do n=1, myDim_nod2D+eDim_nod2D
      relax_alk(n)=surf_relax_Alk*(Alk_surf(n)-tr_arr(1,n,2+ialk)) ! 1 temp, 2 salt

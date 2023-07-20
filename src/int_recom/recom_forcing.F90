@@ -63,7 +63,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, PAR,
   Real(kind=8)                          :: REcoM_O2(1)            ! [mmol/m3] Conc of O2 in the surface water, used to calculate O2 flux
 
 ! Subroutine REcoM_sms
-  Real(kind=8),dimension(mesh%nl-1,bgc_num) :: sms, aux                ! matrix that entail changes in tracer concentrations
+  Real(kind=8),dimension(mesh%nl-1,bgc_num) :: sms                ! matrix that entail changes in tracer concentrations
 
 !Diagnostics
   integer                              :: idiags,n,k
