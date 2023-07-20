@@ -114,7 +114,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, PAR,
 
   call pistonvel(ULoc, Loc_ice_conc, Nmocsy, kw660)
   call flxco2(co2flux, co2ex, dpco2surf,                                                    &
-                  ph, pco2surf, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rhoSW, p, tempis,  &
+                  ph, pco2surf, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rhoSW, p, tempis, K0, &
                   REcoM_T, REcoM_S, REcoM_Alk, REcoM_DIC, REcoM_Si, REcoM_Phos, kw660, LocAtmCO2, Patm, thick(One), Nmocsy, Lond,Latd,     &
                   optCON='mol/m3',optT='Tpot   ',optP='m ',optB='u74',optK1K2='l  ',optKf='dg',optGAS='Pinsitu',optS='Sprc')
 
@@ -152,6 +152,8 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, PAR,
    co2flux_seaicemask = co2flux * 1.e3 !  [mmol/m2/s]  * (1.d0 - Loc_ice_conc)
 !   if(mype==0) write(*,*), 'co2flux_seaicemask (mmol/m2/s) =',co2flux_seaicemask
 
+!   if(mype==0) write(*,*), 'ph =',ph
+
 ! then oxygen
    ppo = Loc_slp/Pa2atm !1 !slp divided by 1 atm
    REcoM_O2 = max(tiny*1e-3,state(one,ioxy)*1e-3) ! convert from mmol/m3 to mol/m3 for mocsy
@@ -164,21 +166,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, PAR,
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'//achar(27)//'[0m'
 
-
-!  addtiny(1:nn,1) = state(1:nn,isi)
-!  addtiny(1:nn,2) = state(1:nn,idetsi) 
-!  addtiny(1:nn,3) = state(1:nn,idiasi)
-!  addtiny(1:nn,4) = state(1:nn,idetz2si)
-
   call REcoM_sms(n, Nn, state, thick, recipthick, SurfSW, sms, Temp, SinkVel, zF, PAR, mesh)
-
-!  addtiny(1:nn,1) = (state(1:nn,isi)           - aux(1:nn,isi))
-!  addtiny(1:nn,2) = (state(1:nn,idetsi)        - aux(1:nn,idetsi))
-!  addtiny(1:nn,3) = (state(1:nn,idiasi)        - aux(1:nn,idiasi)) 
-!  addtiny(1:nn,4) = (state(1:nn,idetz2si)      - aux(1:nn,idetz2si))
-
-!  aux=0.0d0
-!  aux(1:nn,:)        = state(1:nn,:) + sms(1:nn,:)
 
   state(1:nn,:)      = max(tiny,state(1:nn,:) + sms(1:nn,:))
   state(1:nn,ipchl)  = max(tiny_chl,state(1:nn,ipchl))
@@ -188,16 +176,6 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
   state(1:nn,idian)  = max(tiny_N_d,state(1:nn,idian))
   state(1:nn,idiac)  = max(tiny_C_d,state(1:nn,idiac))
   state(1:nn,idiasi) = max(tiny_Si, state(1:nn,idiasi))
-
-!  addtiny(1:nn,5) = (state(1:nn,isi)           - aux(1:nn,isi))
-!  addtiny(1:nn,6) = (state(1:nn,idetsi)        - aux(1:nn,idetsi))
-!  addtiny(1:nn,7) = (state(1:nn,idiasi)        - aux(1:nn,idiasi)) 
-!  addtiny(1:nn,8) = (state(1:nn,idetz2si)      - aux(1:nn,idetz2si))
-
-!  addtiny(1:nn,5) = state(1:nn,isi)
-!  addtiny(1:nn,6) = state(1:nn,idetsi) 
-!  addtiny(1:nn,7) = state(1:nn,idiasi)
-!  addtiny(1:nn,8) = state(1:nn,idetz2si)
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
   if (ciso) then

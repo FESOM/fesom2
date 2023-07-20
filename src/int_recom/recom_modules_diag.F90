@@ -179,6 +179,7 @@ subroutine compute_silicate_diag(mode,mesh)
 !end if 
         !BenSi
 !        call integrate_nod(Benthos(:,3), valBenSi, mesh)
+!        call integrate_bottom(Benthos(:,3), valBenSi, mesh)
          call integrate_bottom(valBenSi,mesh)
         if (mype==0 .and. mod(mstep,recom_logfile_outfreq)==0) write(*,*) 'total integral of BenSi at timestep :', mstep, valBenSi
         total_silicate=total_silicate+valBenSi

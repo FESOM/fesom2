@@ -67,7 +67,6 @@ subroutine recom_sinking_new(tr_num,mesh)
             Vsink = VDia
     end if
 
-!if (Vsink .lt. 0.1) return 
 if (Vsink .gt. 0.1) then ! No sinking if Vsink < 0.1 m/day
 
    vd_flux = 0.0d0
@@ -108,8 +107,13 @@ if (1) then ! 3rd Order DST Sceheme with flux limiting. This code comes from old
       k=nod_in_elem2D_num(n)
       ! Screening minimum depth in neigbouring nodes around node n
       nlevels_nod2D_minimum=minval(nlevels(nod_in_elem2D(1:k, n))-1)
+      !nlevels_nod2D_minimum=minval(nlevels(nod_in_elem2D(1:k, n)))
 
       vd_flux(nzmin:nzmax+1)= 0.0_WP
+
+
+      ! loop over shared depth levels
+      !do nz=nlevels_nod2D_minimum-1, nzmin+1,-1
 
       do nz=nzmax, nzmin+1,-1
 
@@ -163,11 +167,16 @@ if (0) then ! simple upwind
          vd_flux(nz)= tv*area(nz,n)
 
       end do
+
 end if ! simple upwind
+
       do nz=nzmin,nzmax
+!      do nz=nzmin,nlevels_nod2D_minimum-1
          vert_sink(nz,n) = vert_sink(nz,n) + (vd_flux(nz)-vd_flux(nz+1))*dt/areasvol(nz,n)/hnode_new(nz,n) !/(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))
       end do
    end do
+
+
 end if ! Vsink .gt. 0.1
 
 end subroutine recom_sinking_new

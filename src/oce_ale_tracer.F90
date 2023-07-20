@@ -117,9 +117,10 @@ end module
 module integrate_bottom_interface
   interface
     subroutine integrate_bottom(tflux, mesh)
+!    subroutine integrate_bottom(influx,tflux, mesh)
       use mod_mesh
-      use g_PARSUP
       type(t_mesh), intent(in) , target :: mesh
+!      real(kind=WP), intent(in)  :: influx(:)
       integer, intent(inout)      :: tflux
     end subroutine
   end interface
@@ -336,7 +337,9 @@ real :: net
 ! Detritus sinking in water column is called here as well
 
 #if defined(__recom)
+if (1) then
 
+!if (mype==0) write(*,*) " Remin, sink"
 ! 1) Remineralization from the benthos
 !    Nutrient fluxes come from the bottom boundary
 !    Unit [mmol/m2/s]
@@ -360,6 +363,7 @@ real :: net
                                                 dtr_bf(nzmin:nzmax,n)
         end do
     end if
+end if ! if (0)
 
 ! 2) Sinking in water column 
     if (tracer_id(tr_num) == 1007 .or.    &   ! idetn
@@ -385,6 +389,8 @@ real :: net
 
 ! sinking
         call recom_sinking_new(tr_num,mesh) !--- vert_sink ---
+!write(*,*) "vertical sinking is on"
+
 
 ! sinking into the benthos
         call ver_sinking_recom_benthos(tr_num,mesh) !--- str_bf ---
@@ -399,7 +405,7 @@ real :: net
                                                 str_bf(nzmin:nzmax,n)
         end do                             
     end if
-
+if (0) then
 ! 3) Nitrogen SS
     if (NitrogenSS .and. tracer_id(tr_num)==1008) then ! idetc
         call recom_nitogenss(mesh) !--- nss for idetc ---
@@ -410,6 +416,9 @@ real :: net
                                            nss(nzmin:nzmax,n)
         end do  
     end if
+
+end if ! if (0)
+
 #endif
     
     !___________________________________________________________________________
@@ -890,6 +899,7 @@ use ver_sinking_recom_benthos_interface
     integer                   :: elem,k, tr_num
     integer                   :: nl1,ul1,nz,n,nzmin, nzmax, net
     real(kind=WP)             :: Vben(mesh%nl),  aux(mesh%nl-1),  flux(mesh%nl), add_benthos_2d(myDim_nod2D)
+    real(kind=WP)             :: aux1(mesh%nl-1), add_benthos_2d_flux(myDim_nod2D)
     integer                   :: nlevels_nod2D_minimum
     real(kind=WP)             :: tv
 #include "associate_mesh.h"
@@ -899,8 +909,10 @@ use ver_sinking_recom_benthos_interface
         ul1=ulevels_nod2D(n)
         
         aux=0._WP
+        aux1=0._WP
         Vben=0._WP
         add_benthos_2d=0._WP
+        add_benthos_2d_flux=0._WP
 
 ! 1) Calculate sinking velociy for vertical sinking case
 ! ******************************************************
@@ -929,7 +941,6 @@ use ver_sinking_recom_benthos_interface
 	    if (allow_var_sinking) Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VDia
       
 ! Constant vertical sinking for the second detritus class
-! *******************************************************
 
 !   if (REcoM_Second_Zoo) then ! No variable sinking
         elseif(tracer_id(tr_num)==1025 .or. &  !idetz2n
@@ -942,6 +953,9 @@ use ver_sinking_recom_benthos_interface
 
         Vben= Vben/SecondsPerDay ! conversion [m/d] --> [m/s] (vertical velocity, note that it is positive here)
 
+
+! *******************************************************
+
         k=nod_in_elem2D_num(n)
         ! Screening minimum depth in neigbouring nodes around node n
         nlevels_nod2D_minimum=minval(nlevels(nod_in_elem2D(1:k, n))-1)
@@ -949,15 +963,25 @@ use ver_sinking_recom_benthos_interface
         do nz=nlevels_nod2D_minimum, nl1
            tv = tr_arr(nz,n,tr_num)*Vben(nz)
            aux(nz)= - tv*(area(nz,n)-area(nz+1,n))
+           aux1(nz)= area(nz,n)-area(nz+1,n)
         end do
+        if (nlevels_nod2D_minimum .lt. nl1) then
         nz=nl1
         tv = tr_arr(nz,n,tr_num)*Vben(nz)
         aux(nz)= - tv*(area(nz+1,n))
-
+        aux1(nz)= area(nz+1,n)
+        end if
         do nz=ul1,nl1
            str_bf(nz,n) = str_bf(nz,n) + (aux(nz))*dt/area(nz,n)/(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))
            !add_benthos_2d(n) = add_benthos_2d(n) - (aux(nz+1))*dt
            add_benthos_2d(n) = add_benthos_2d(n) - (aux(nz))*dt
+           
+           if (aux1(nz) .le. tiny) then ! if the area is very small or zero
+               add_benthos_2d_flux(n)=0.0d0
+           else
+               add_benthos_2d_flux(n) = add_benthos_2d_flux(n) - (aux(nz)/aux1(nz))
+           endif
+
         end do                 
 
             ! N
@@ -966,6 +990,7 @@ use ver_sinking_recom_benthos_interface
                 tracer_id(tr_num)==1013 .or. &  !idian
                 tracer_id(tr_num)==1025 ) then  !idetz2n
                 Benthos(n,1)= Benthos(n,1) +  add_benthos_2d(n) ![mmol]
+                Benthos_flux(n,1)= Benthos_flux(n,1) + add_benthos_2d_flux(n)
             endif
          
             ! C
@@ -981,6 +1006,7 @@ use ver_sinking_recom_benthos_interface
                 tracer_id(tr_num)==1017 .or. &  !idetsi
                 tracer_id(tr_num)==1027 ) then  !idetz2si
                 Benthos(n,3)= Benthos(n,3) + add_benthos_2d(n)
+                Benthos_flux(n,2)= Benthos_flux(n,2) + add_benthos_2d_flux(n)
             endif
 
             ! Cal
@@ -991,12 +1017,22 @@ use ver_sinking_recom_benthos_interface
             endif
 end do
 
+if (mype==0) print*, "Benthos_flux1= ", maxval(Benthos_flux(:,1)), "   , ", minval(Benthos_flux(:,1))
+if (mype==0) print*, "Benthos_flux2= ", maxval(Benthos_flux(:,2)), "   , ", minval(Benthos_flux(:,2))
+
     do n=1, benthos_num
       call exchange_nod(Benthos(:,n))
     end do
+    call exchange_nod(Benthos_flux(:,1))
+    call exchange_nod(Benthos_flux(:,2))
 end subroutine ver_sinking_recom_benthos
 
+
+
+
+
 subroutine integrate_bottom(tflux,mesh)
+!subroutine integrate_bottom(influx,tflux,mesh)
     use o_ARRAYS
     use g_PARSUP
     use MOD_MESH
@@ -1016,17 +1052,25 @@ subroutine integrate_bottom(tflux,mesh)
     integer                            :: nl1,ul1,nz,n
     real(kind=WP)                      :: tf, aux(mesh%nl-1)
     real(kind=WP), intent(inout)       :: tflux
+!    real(kind=WP), intent(in)          :: influx(myDim_nod2D)
     integer                            :: nlevels_nod2D_minimum
 #include "associate_mesh.h"
 
-   tf =0._WP
-   do n=1, myDim_nod2D 
+   tf =0.0_WP
+   do n=1, myDim_nod2D
          tf=tf+Benthos(n,3)
+!         tf=tf+influx(n)
    end do
+
+!if (mype==0) print*, tf 
    tflux=0.0_WP
    call MPI_AllREDUCE(tf, tflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
         MPI_COMM_FESOM, MPIerr)
 end subroutine integrate_bottom
+
+
+
+
 !
 !
 !===============================================================================

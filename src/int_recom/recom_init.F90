@@ -69,6 +69,11 @@ subroutine recom_init(mesh)
     allocate(PAR3D(nl-1,node_size))
     allocate(DenitBen(node_size)) 
     allocate(Benthos(node_size,benthos_num))
+    allocate(Benthos_flux(node_size,2)) ! N and Si
+    allocate(PistonVelocity(node_size))
+    allocate(alphaCO2(node_size))
+
+
     allocate(LocBenthos(benthos_num))
     allocate(decayBenthos(benthos_num)) ! [1/day] Decay rate of detritus in the benthic layer
 
@@ -169,7 +174,10 @@ end if
     dflux = 0.d0
     co2flux_seaicemask = 0.d0
     o2flux_seaicemask = 0.d0
-    dpco2surf= 0.d0
+    dpco2surf = 0.d0
+    PistonVelocity = 0.d0
+    alphaCO2 = 0.d0
+
 
     if (Diags) then
         allocate(diags2D(node_size,8))
@@ -228,6 +236,7 @@ end if
     ! Benthic layer consists of Benthos(1) = N, Benthos(2)=C, Benthos(3)=Si, Benthos(4)=calc
   
     Benthos(:,:) = 0.d0 !tiny
+    Benthos_flux(:,:) = 0.d0
     GloHplus = exp(-8.d0 * log(10.d0)) ! = 10**(-8)
     !___________________________________________________________________________
     if(mype==0) write(*,*) 'Benthic layers are set'
@@ -331,7 +340,7 @@ if (1) then
 
                if     (((geo_coord_nod2D(2,row)>-12.5*rad) .and. (geo_coord_nod2D(2,row)<9.5*rad))&
                   .and.((geo_coord_nod2D(1,row)>-106.0  *rad) .and. (geo_coord_nod2D(1,row)<-72.0*rad))) then
-!                  if (Z_3d_n(k,row)<-2000.0_WP) cycle
+                  if (Z_3d_n(k,row)>-2000.0_WP) cycle
                   tr_arr(k,row,21) = min(0.3,tr_arr(k,row,21))  ! Fe [mol/L] => [umol/m3] Check the units again!
                end if
             end do

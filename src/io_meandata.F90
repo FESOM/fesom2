@@ -108,7 +108,7 @@ subroutine ini_mean_io(mesh)
   integer                   :: i, j
   integer, save             :: nm_io_unit  = 103       ! unit to open namelist file, skip 100-102 for cray
   integer                   :: iost
-  integer,dimension(12)     :: sel_forcvar=0
+  integer,dimension(13)     :: sel_forcvar=0
   character(len=10)         :: id_string
 
   type(t_mesh), intent(in) , target :: mesh
@@ -234,6 +234,9 @@ CASE ('beta      ')
     call def_stream(nod2D, myDim_nod2D, 'beta',     'saline contraction',              'none',   sw_beta (1,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('dens_flux ')
     call def_stream(nod2D, myDim_nod2D , 'dflux',   'density flux',               'kg/(m3*s)',   dens_flux(:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('slp       ')
+    sel_forcvar(13)= 1
+    call def_stream(nod2D, myDim_nod2D, 'slp',   'sea level pressure',                    'Pa',   press_air(:),                 io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('runoff    ')
     sel_forcvar(10)= 1
     call def_stream(nod2D, myDim_nod2D, 'runoff',   'river runoff',                    'none',   runoff(:),                 io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
@@ -302,6 +305,16 @@ CASE ('fer_C     ')
 
 !CO2y,aCO2,rDIN,rDON,rDOC,rDSi,NPPn,NPPd,GPPn,GPPd,NNAn,NNAd,GNAn,GNAd,benCalc,benSi,benC,benN,denb,aN,aFe,Hp,CO2f,dpCO2s,pCO2s
 #if defined(__recom)
+
+CASE ('alphaCO2  ')
+    if (use_REcoM) then
+    call def_stream(nod2D,  myDim_nod2D,   'alphaCO2',    'CO2 solubility',  'mol/kg/atm', alphaCO2(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    end if
+
+CASE ('Kw660     ')
+    if (use_REcoM) then
+    call def_stream(nod2D,  myDim_nod2D,   'Kw660',    'Air-sea piston velocity',  'm/s', PistonVelocity(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    end if
 
 CASE ('dpCO2s    ')
     if (use_REcoM) then

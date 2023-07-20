@@ -164,10 +164,13 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forci
         GloCO2flux_seaicemask_14(n)     = co2flux_seaicemask_14(1)        !  [mmol/m2/s]
      end if
 
-     GloHplus(n)                  = hplus
+     GloHplus(n)                  = ph(1) ! hplus
      AtmFeInput(n)                = FeDust
      AtmNInput(n)                 = NDust 
 !     DenitBen(n)                  = LocDenit
+
+     PistonVelocity(n)         = kw660(1) ! CN: write Piston velocity                                
+     alphaCO2(n)               = K0(1)  ! CN: write CO2 solubility
 
      GlodecayBenthos(n, 1:benthos_num) = decayBenthos(1:benthos_num)/SecondsPerDay ! convert from [mmol/m2/d] to [mmol/m2/s]  
 
@@ -274,6 +277,8 @@ subroutine bio_fluxes(mesh)
 !  end if
 
   ! Alkalinity restoring to climatology
+
+if (.not. restore_alkalinity) return  
 
   do n=1, myDim_nod2D+eDim_nod2D
      relax_alk(n)=surf_relax_Alk*(Alk_surf(n)-tr_arr(1,n,2+ialk)) ! 1 temp, 2 salt

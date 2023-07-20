@@ -467,11 +467,6 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
 !< pzDia: Maximum diatom preference
 !< pzDet: Maximum small detritus prefence by first zooplankton
 !< pzDetZ2: Maximum large detritus preference by first zooplankton
-
-!                varpzPhy    = pzPhy   * PhyN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
-!                varpzDia    = pzDia   * DiaN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
-!                varpzDet    = pzDet   * DetN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
-!                varpzDetZ2  = pzDetZ2 * DetN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
                 aux         = pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N
                 varpzPhy    = pzPhy   * PhyN /aux
                 varpzDia    = pzDia   * DiaN /aux
@@ -547,11 +542,6 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
     if (REcoM_Grazing_Variable_Preference) then
        if (Grazing_detritus) then
           if (Graz_pref_new) then
-!             varpzDia2      = pzDia2   * DiaN   /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)
-!             varpzPhy2      = pzPhy2   * PhyN   /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)
-!             varpzHet       = pzHet    * HetN   /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)  
-!             varpzDet2      = pzDet2   * DetN   /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)
-!             varpzDetZ22    = pzDetZ22 * DetZ2N /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)
              aux            = pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N
              varpzDia2      = pzDia2   * DiaN   /aux
              varpzPhy2      = pzPhy2   * PhyN   /aux
@@ -580,9 +570,6 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
           fDetZ2N2       = varpzDetZ22 * DetZ2N
        else
           if (Graz_pref_new) then
-!             varpzDia2      = pzDia2 * DiaN /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN)
-!             varpzPhy2      = pzPhy2 * PhyN /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN)
-!             varpzHet       = pzHet * HetN /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN)
              aux            = pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN
              varpzDia2      = pzDia2 * DiaN /aux
              varpzPhy2      = pzPhy2 * PhyN /aux
@@ -709,23 +696,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
        feLimitFac  = Fe/(k_Fe_d + Fe)
        qlimitFac   = min(qlimitFac,feLimitFac)
 
-
-!       if (REcoM_Second_Zoo) then 
-!          aggregationrate = agg_PD * DetN + agg_PD * DetZ2N + agg_PP * PhyN + agg_PP * (1 - qlimitFac) * DiaN
-!       else
-!          aggregationrate = agg_PD * DetN                   + agg_PP * PhyN + agg_PP * (1 - qlimitFac) * DiaN
-!       endif
        aggregationrate = agg_PD * DetN + agg_PP * PhyN + agg_PP * (1 - qlimitFac) * DiaN
        if (REcoM_Second_Zoo) aggregationrate = aggregationrate + agg_PD * DetZ2N
 
-
     else
 
-!       if (REcoM_Second_Zoo) then
-!          aggregationrate = agg_PD * DetN + agg_PD * DetZ2N + agg_PP * PhyN + agg_PP * DiaN
-!       else
-!          aggregationrate = agg_PD * DetN                   + agg_PP * PhyN + agg_PP * DiaN
-!       endif
        aggregationrate = agg_PD * DetN + agg_PP * PhyN + agg_PP * DiaN
        if (REcoM_Second_Zoo) aggregationrate = aggregationrate + agg_PD * DetZ2N
 
@@ -743,17 +718,6 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
     calcification = calc_prod_ratio * Cphot * PhyC   ! Z in equations
     calc_loss_agg = aggregationrate * PhyCalc
 
-!    if(REcoM_Second_Zoo)  then
-!       calc_loss_gra  =  grazingFlux_phy   &
-!                       * recipQuota/(PhyC + tiny)    * PhyCalc
-!       calc_loss_gra2 = grazingFlux_phy2   &
-!                       * recipQuota/(PhyC + tiny)    * PhyCalc
-!    else
-!
-!       calc_loss_gra = grazingFlux_phy     &
-!                       * recipQuota/(PhyC + tiny)    * PhyCalc
-!    endif
-
     calc_loss_gra = grazingFlux_phy          &
                   * recipQuota/(PhyC + tiny) &  
                   * PhyCalc
@@ -762,7 +726,6 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
                                          * recipQuota/(PhyC + tiny) &
                                          * PhyCalc
 
- 
     if (ciso) then
         calcification_13 = calc_prod_ratio * Cphot * PhyC_13 * alpha_calc_13
         calcification_14 = calc_prod_ratio * Cphot * PhyC_14 * alpha_calc_14
@@ -942,69 +905,6 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
      	    - grazingFlux_phy * Chl2N                &
                                                    ) * dt_b + sms(k,ipchl)
     endif
-!-------------------------------------------------------------------------------
-! Detritus N
-!   if (REcoM_Second_Zoo) then
-!   if (Grazing_detritus) then
-!    sms(k,idetn)       = (                       &
-!        + grazingFlux_phy                        &
-!        + grazingFlux_dia                        &
-!        - grazingFlux * grazEff                  &
-!        + grazingFlux_phy2                       &
-!        + grazingFlux_dia2                       &
-!        + grazingFlux_het2                       &
-!        - grazingFlux2 * grazEff2                &
-!        + aggregationRate              * PhyN    &
-!        + aggregationRate              * DiaN    &
-!        + hetLossFlux                            &
-!        + Zoo2LossFlux                           &
-!        - reminN * arrFunc             * DetN    &
-!                                               ) * dt_b + sms(k,idetn)
-!   else
-
-!    sms(k,idetn)       = (                       &
-!     	+ grazingFlux_phy                        &
-!     	+ grazingFlux_dia                        &
-!     	- grazingFlux * grazEff                  &
-!     	+ aggregationRate              * PhyN    & 
-!     	+ aggregationRate              * DiaN    &
-!     	+ hetLossFlux                            &
-!     	- reminN * arrFunc             * DetN    &
-!                                               ) * dt_b + sms(k,idetn)
-!   endif   
-!-------------------------------------------------------------------------------
-! Detritus C
-!   if (REcoM_Second_Zoo) then
-!    sms(k,idetc)       = (                             &
-!        + grazingFlux_phy * recipQuota                 &
-!        - grazingFlux_phy * recipQuota * grazEff       &
-!        + grazingFlux_Dia * recipQuota_Dia             &
-!        - grazingFlux_Dia * recipQuota_Dia * grazEff   &
-!        + grazingFlux_phy2 * recipQuota                &
-!        - grazingFlux_phy2 * recipQuota * grazEff2     &
-!        + grazingFlux_Dia2 * recipQuota_Dia            &
-!        - grazingFlux_Dia2 * recipQuota_Dia * grazEff2 &
-!        + grazingFlux_het2 * recipQZoo                 &
-!        - grazingFlux_het2 * recipQZoo * grazEff2      &
-!        + aggregationRate              * phyC          &
-!        + aggregationRate              * DiaC          &
-!        + hetLossFlux * recipQZoo                      &
-!         + Zoo2LossFlux * recipQZoo2                   &
-!        - reminC * arrFunc             * DetC          &
-!                                             )   * dt_b + sms(k,idetc)
-!   else
-
-!    sms(k,idetc)       = (                           &
-!     	+ grazingFlux_phy * recipQuota               &
-!     	- grazingFlux_phy * recipQuota * grazEff     &
-!     	+ grazingFlux_Dia * recipQuota_Dia           &
-!     	- grazingFlux_Dia * recipQuota_Dia * grazEff &
-!     	+ aggregationRate              * phyC        &
-!     	+ aggregationRate              * DiaC        &
-!     	+ hetLossFlux * recipQZoo                    &
-!     	- reminC * arrFunc             * DetC        &
-!                                             )   * dt_b + sms(k,idetc)
-!   endif   
 !-------------------------------------------------------------------------------
 ! Detritus N
    if (Grazing_detritus) then
@@ -1758,7 +1658,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
 
 !-------------------------------------------------------------------------------
 ! Remineralization from the sediments into the bottom layer
-
+if (1) then
 !*** DIN ***
 !< decayRateBenN: Remineralization rate for benthic N [day^-1]
 !< LocBenthos(1): Vertically integrated N concentration in benthos (1 layer) [mmolN/m^2]
@@ -1794,6 +1694,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
      decayBenthos(8) = calc_diss_14    * LocBenthos(8)
      LocBenthos(8)   = LocBenthos(8)   - decayBenthos(8) * dt_b ! / depth of benthos
   end if ! ciso
+
+end if
 
   end do ! Main time loop ends
 

@@ -466,7 +466,8 @@ Module REcoM_GloVar
   implicit none
   save
 	
-  Real(kind=8),allocatable,dimension(:,:) :: Benthos          ! 4 types of benthos-tracers with size [4 n2d]
+  Real(kind=8),allocatable,dimension(:,:) :: Benthos          ! 4 types of benthos-tracers with size [n2d 4]
+  Real(kind=8),allocatable,dimension(:,:) :: Benthos_flux     ! 2 types of benthos-tracers flux with size [n2d 2]
   Real(kind=8),allocatable,dimension(:)   :: GloFeDust        ! [umol/m2/s] Monthly 2D field of iron soluted in surface water from dust
   Real(kind=8),allocatable,dimension(:)   :: GloNDust         ! [mmol/m2/s] 10-year mean 2D fields of nitrogen soluted in surface water from dust
   Real(kind=8),dimension(12)              :: AtmCO2           ! [uatm] Atmospheric CO2 partial pressure. One value for the whole planet for each month
@@ -480,6 +481,8 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:)   :: GloHplus         ! [mol/kg] Concentrations of H-plus ions in the surface ocean
   Real(kind=8),allocatable,dimension(:)   :: GlodPCO2surf       ! [mmol/m2/day] ocean-atmosphere  
   Real(kind=8),allocatable,dimension(:,:) :: GlodecayBenthos  ! [1/day] Decay rate of detritus in the benthic layer saved for oce_ale_tracer.F90
+  Real(kind=8),allocatable,dimension(:)   :: PistonVelocity   ! [m s-1]
+  Real(kind=8),allocatable,dimension(:)   :: alphaCO2         ! [mol L-1 atm-1]
 
   Real(kind=8),allocatable,dimension(:,:)   :: GlowFluxDet    ! 
   Real(kind=8),allocatable,dimension(:,:)   :: GlowFluxPhy    ! 
@@ -535,6 +538,7 @@ Module REcoM_locVar
   Real(kind=8) :: p(1)                         ! pressure [decibars]; p = f(depth, latitude) if computed from depth [m] OR p = depth if [db]
   Real(kind=8) :: tempis(1)                    ! in-situ temperature [degrees C]
   Real(kind=8) :: kw660(1)                     ! gas transfer velocity (piston velocity) for CO2 [m/s] 
+  Real(kind=8) :: K0(1)                        ! CO2 solubility                                            
   Real(kind=8) :: co2flux_seaicemask(1)        ! air-to-sea flux of CO2 [mmol/m2/s]
   Real(kind=8) :: o2flux_seaicemask(1)        ! air-to-sea flux of CO2 [mmol/m2/s]
 !-------------------------------------------------------------------------------
