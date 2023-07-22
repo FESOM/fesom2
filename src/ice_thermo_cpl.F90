@@ -265,7 +265,7 @@ contains
     Qicecon = (Tfrezs-Tfrez0)*con/max(heff,himin)
 
     !---- atmospheric heat fluxes (provided by the atmosphere model)
-    Qatmice = -a2ihf
+    Qatmice = -a2ihf - qres
     Qatmocn = -a2ohf
 
     !---- oceanic heat fluxes
@@ -279,7 +279,7 @@ contains
 
     !---- total atmospheric and oceanic heat fluxes
     !---- average over grid cell [W/m**2]
-    ahf = A*Qatmice + (1._WP-A)*Qatmocn - qres
+    ahf = A*Qatmice + (1._WP-A)*Qatmocn
     ohf = A*Qocnice + (1._WP-A)*Qocnatm
 
 
