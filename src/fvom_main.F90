@@ -380,7 +380,10 @@ character(len=16) comp_name
         write(*,*)
     end if    
 !   call clock_finish  
+#ifdef ENABLE_IOSERVER
     call MPI_Barrier(comm_fesom_with_ioserver, err)
+#endif
+    if (mype==0) print *, 'FESOM calls par_ex'
     call par_ex
 end program main
     
