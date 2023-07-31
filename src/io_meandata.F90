@@ -827,7 +827,6 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     if (partit%mype/=entry%root_rank) return
     ! create an ocean output file
     write(*,*) 'initializing I/O file for ', trim(entry%name)
-    write(*,*) 'filename will be ', trim(entry%filename)
     
     !___________________________________________________________________________
     ! Create file
