@@ -66,6 +66,7 @@ module io_MEANDATA
   logical, save                  :: vec_autorotate=.FALSE.
   logical, save                  :: lnextGEMS=.FALSE.
   integer, save                  :: nlev_upper=1
+  character(len=1), save         :: filesplit_freq='y'
   type io_entry
         CHARACTER(len=15)        :: id        ='unknown   '
         INTEGER                  :: freq      =0
@@ -134,7 +135,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     type(t_tracer), intent(in)   , target :: tracers
     type(t_dyn)   , intent(in)   , target :: dynamics
     type(t_ice)   , intent(in)   , target :: ice
-    namelist /nml_general / io_listsize, vec_autorotate, lnextGEMS, nlev_upper
+    namelist /nml_general / io_listsize, vec_autorotate, lnextGEMS, nlev_upper, filesplit_freq
     namelist /nml_list    / io_list
 
 #include "associate_part_def.h"
@@ -826,6 +827,7 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     if (partit%mype/=entry%root_rank) return
     ! create an ocean output file
     write(*,*) 'initializing I/O file for ', trim(entry%name)
+    write(*,*) 'filename will be ', trim(entry%filename)
     
     !___________________________________________________________________________
     ! Create file
@@ -1200,8 +1202,12 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
             entry%thread_running = .false.
             
             ! define filepath
-            filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
-            
+            if (filesplit_freq=='m') then
+                filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'_'//cmonth//'.nc'
+            else
+                filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
+            endif
+
             !___________________________________________________________________
             ! only root rank task does output
             if(partit%mype == entry%root_rank) then
