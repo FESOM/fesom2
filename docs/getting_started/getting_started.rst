@@ -8,7 +8,7 @@ This chapter describes several ways of getting started with FESOM2. First we sho
 TL;DR version for supported HPC systems
 =======================================
 
-Supported systems are: generic ``ubuntu``, ``ollie`` at AWI, ``mistral`` at DKRZ, ``JURECA`` at JSC, ``HLRN``, ``Hazel Hen``, ``Marinostrum 4`` at BSC. During configuration the system will be recognised and apropriate environment variables and compiler options should be used.
+Supported systems are: generic ``ubuntu``, ``ollie`` at AWI, ``mistral`` at DKRZ, ``JURECA`` at JSC, ``HLRN``, ``Hazel Hen``, ``MareNostrum 4`` at BSC. During configuration the system will be recognised and apropriate environment variables and compiler options should be used.
 ::
 
     git clone https://github.com/FESOM/fesom2.git
@@ -47,7 +47,7 @@ Clone the GitHub repository with a git command:
     git clone https://github.com/FESOM/fesom2.git
 
 
-The repository contains model code and two additional libraries: `Metis` (domain partitioner) and `Parms` (solver), necessary to run FESOM2. To build FESOM2 executable one have to compile Parms library and the code of the model (`src` folder). In order to build executable that is used for model domain partitioning (distribution of the model mesh between CPUs) one have to compile `Metis` library and also some code located in the src directory (see :ref:`partitioning`). Building of the model executable and the partitioner is usually done automatically with the use of CMake. If you going to build the code not on one of the supported platforms (ollie, DKRZ, HLRN, and HAZELHEN, general Ubuntu), you might need to do some (usually small) modifications described in `Adding new platform for compilation`_ section.
+The repository contains model code and two additional libraries: `Metis` (domain partitioner) and `Parms` (solver), necessary to run FESOM2. To build FESOM2 executable one have to compile Parms library and the code of the model (`src` folder). In order to build executable that is used for model domain partitioning (distribution of the model mesh between CPUs) one have to compile `Metis` library and also some code located in the src directory (see :ref:`partitioning`). Building of the model executable and the partitioner is usually done automatically with the use of CMake. If you going to build the code not on one of the supported platforms (ollie, DKRZ, HLRN, HAZELHEN, and BSC, general Ubuntu), you might need to do some (usually small) modifications described in `Adding new platform for compilation`_ section.
 
 Change to the `fesom2` folder and execute:
 
@@ -57,7 +57,7 @@ Change to the `fesom2` folder and execute:
 
 In the best case scenario, your platform will be recognized and the Parms library and model executable will be built and copied to the bin directory. If something went wrong have a look at Troubleshooting_ section.
 
-If you would like to select platform manually (which is nessesary in the case of Ubuntu, for eample), type:
+If you would like to select platform manually (which is necessary in the case of Ubuntu, for example), type:
 
 ::
 
@@ -67,7 +67,7 @@ If you would like to select platform manually (which is nessesary in the case of
 Data and mesh files
 -------------------
 
-The FESOM2 repository contains only very small example meshes and data (in the ``test`` directory, see the note below). However, if you want to run realistic simulations, you ether have to have them on your system, or download an archive with sample data. THere is a chance that your system already have some of the necesseary files, you can check it in the ``setups/paths.yml`` file. If not, the easiest way to start is to download example set from `DKRZ cloud`_  (12 Gb) by executing:
+The FESOM2 repository contains only very small example meshes and data (in the ``test`` directory, see the note below). However, if you want to run realistic simulations, you ether have to have them on your system, or download an archive with sample data. There is a chance that your system already has some of the necesseary files, you can check it in the ``setups/paths.yml`` file. If not, the easiest way to start is to download example set from `DKRZ cloud`_  (12 Gb) by executing:
 
 ::
 
@@ -100,7 +100,7 @@ You have to do several basic things in order to prepare the run. First, create a
 
     mkdir results
 
-you might make a link to some other directory located on the part of the system where you have a lot of storage. In the results directory, you have to create ``fesom.clock`` file (NOTE, if you change ``runid`` in ``namelist.config`` to something like ``runid=mygreatrun``, the file will be named ``mygreatrun.clock``). Inside the file you have to put two identical lines:
+You might make a link to some other directory located on the part of the system where you have a lot of storage. In the results directory, you have to create ``fesom.clock`` file (NOTE, if you change ``runid`` in ``namelist.config`` to something like ``runid=mygreatrun``, the file will be named ``mygreatrun.clock``). Inside the file you have to put two identical lines:
 
 ::
 
