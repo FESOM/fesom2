@@ -175,69 +175,78 @@ subroutine diag_curl_vel3(mode, dynamics, partit, mesh)
 #include "associate_mesh_ass.h" 
     UV => dynamics%uv(:,:,:)
 
-    !=====================
+    !___________________________________________________________________________
     if (firstcall) then  !allocate the stuff at the first call
         allocate(curl_vel3(nl-1, myDim_nod2D+eDim_nod2D))
         firstcall=.false.
         if (mode==0) return
     end if
 
+    !___________________________________________________________________________
     curl_vel3=0.
-
-    DO ed=1,myDim_edge2D
+    do ed=1,myDim_edge2D
         enodes=edges(:,ed)
         el=edge_tri(:,ed)
+        !_______________________________________________________________________
         nl1=nlevels(el(1))-1
         nu1=ulevels(el(1))
         deltaX1=edge_cross_dxdy(1,ed)
         deltaY1=edge_cross_dxdy(2,ed)
-        nl2=0
-        nu2=0
+        
+        !_______________________________________________________________________
         if (el(2)>0) then
             deltaX2=edge_cross_dxdy(3,ed)
             deltaY2=edge_cross_dxdy(4,ed)
             nl2=nlevels(el(2))-1
             nu2=ulevels(el(2))
-        end if   
-        
-        nl12 = min(nl1,nl2)
-        nu12 = min(nu1,nu2)
-        DO nz=nu1,nu12-1
-            c1=deltaX1*UV(1,nz,el(1))+deltaY1*UV(2,nz,el(1))
-            curl_vel3(nz,enodes(1))=curl_vel3(nz,enodes(1))+c1
-            curl_vel3(nz,enodes(2))=curl_vel3(nz,enodes(2))-c1
-        END DO
-        if (nu2>0) then
-            DO nz=nu2,nu12-1
+            nl12 = min(nl1,nl2)
+            nu12 = max(nu1,nu2)
+            !___________________________________________________________________
+            do nz=nu1,nu12-1
+                c1=deltaX1*UV(1,nz,el(1))+deltaY1*UV(2,nz,el(1))
+                curl_vel3(nz,enodes(1))=curl_vel3(nz,enodes(1))+c1
+                curl_vel3(nz,enodes(2))=curl_vel3(nz,enodes(2))-c1
+            end do
+            do nz=nu2,nu12-1
                 c1= -deltaX2*UV(1,nz,el(2))-deltaY2*UV(2,nz,el(2))
                 curl_vel3(nz,enodes(1))=curl_vel3(nz,enodes(1))+c1
                 curl_vel3(nz,enodes(2))=curl_vel3(nz,enodes(2))-c1
-            END DO
+            end do
+            !___________________________________________________________________
+            do nz=nu12,nl12
+                c1=deltaX1*UV(1,nz,el(1))+deltaY1*UV(2,nz,el(1))- &
+                deltaX2*UV(1,nz,el(2))-deltaY2*UV(2,nz,el(2))
+                curl_vel3(nz,enodes(1))=curl_vel3(nz,enodes(1))+c1
+                curl_vel3(nz,enodes(2))=curl_vel3(nz,enodes(2))-c1
+            end do
+            !___________________________________________________________________
+            do nz=nl12+1,nl1
+                c1=deltaX1*UV(1,nz,el(1))+deltaY1*UV(2,nz,el(1))
+                curl_vel3(nz,enodes(1))=curl_vel3(nz,enodes(1))+c1
+                curl_vel3(nz,enodes(2))=curl_vel3(nz,enodes(2))-c1
+            end do
+            do nz=nl12+1,nl2
+                c1= -deltaX2*UV(1,nz,el(2))-deltaY2*UV(2,nz,el(2))
+                curl_vel3(nz,enodes(1))=curl_vel3(nz,enodes(1))+c1
+                curl_vel3(nz,enodes(2))=curl_vel3(nz,enodes(2))-c1
+            end do
+        !_______________________________________________________________________    
+        else
+            do nz=nu1,nl1
+                c1=deltaX1*UV(1,nz,el(1))+deltaY1*UV(2,nz,el(1))
+                curl_vel3(nz,enodes(1))=curl_vel3(nz,enodes(1))+c1
+                curl_vel3(nz,enodes(2))=curl_vel3(nz,enodes(2))-c1
+            end do
         end if
-        DO nz=nu12,nl12
-            c1=deltaX1*UV(1,nz,el(1))+deltaY1*UV(2,nz,el(1))- &
-            deltaX2*UV(1,nz,el(2))-deltaY2*UV(2,nz,el(2))
-            curl_vel3(nz,enodes(1))=curl_vel3(nz,enodes(1))+c1
-            curl_vel3(nz,enodes(2))=curl_vel3(nz,enodes(2))-c1
-        END DO
-        DO nz=nl12+1,nl1
-            c1=deltaX1*UV(1,nz,el(1))+deltaY1*UV(2,nz,el(1))
-            curl_vel3(nz,enodes(1))=curl_vel3(nz,enodes(1))+c1
-            curl_vel3(nz,enodes(2))=curl_vel3(nz,enodes(2))-c1
-        END DO
-        DO nz=nl12+1,nl2
-            c1= -deltaX2*UV(1,nz,el(2))-deltaY2*UV(2,nz,el(2))
-            curl_vel3(nz,enodes(1))=curl_vel3(nz,enodes(1))+c1
-            curl_vel3(nz,enodes(2))=curl_vel3(nz,enodes(2))-c1
-        END DO
-    END DO
-
-    DO n=1, myDim_nod2D
-        !!PS DO nz=1, nlevels_nod2D(n)-1
-        DO nz=ulevels_nod2D(n), nlevels_nod2D(n)-1
+    end do
+    
+    !___________________________________________________________________________
+    do n=1, myDim_nod2D
+        do nz=ulevels_nod2D(n), nlevels_nod2D(n)-1
             curl_vel3(nz,n)=curl_vel3(nz,n)/areasvol(nz,n)
-        END DO
-    END DO
+        end do
+    end do
+    
 end subroutine diag_curl_vel3
 ! ==============================================================
 ! 
