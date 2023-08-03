@@ -3302,8 +3302,6 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     use g_cvmix_kpp
     use g_cvmix_tidal
     use Toy_Channel_Soufflet
-!PS     use compute_Wvel_split_interface
-!PS     use compute_CFLz_interface
     use oce_ale_interfaces
     use compute_vert_vel_transpv_interface
     use compute_ssh_split_explicit_interface

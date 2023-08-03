@@ -115,8 +115,8 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
     do node=1, myDim_nod2D
         ul1 = ulevels_nod2D(node)
         nl1 = nlevels_nod2D(node)
-        wu(1:nl1+1) = 0.0_WP
-        wv(1:nl1+1) = 0.0_WP
+        wu(1:nl1) = 0.0_WP
+        wv(1:nl1) = 0.0_WP
         UVnode_rhs(:,:,node) = 0.0_WP
         !_______________________________________________________________________
         ! surface
