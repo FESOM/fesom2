@@ -211,7 +211,7 @@ contains
        END IF
     END DO
 
-    CALL yac_fdef_grid_nonuniform_r8( &
+    CALL yac_fdef_grid( &
          "fesom_grid", & ! grid_name
          nbr_vertices, &   ! nbr_vertices
          myDim_nod2D, &  ! nbr_cells
@@ -221,6 +221,11 @@ contains
          y_vertices, & ! y_vertices
          cell_to_vertex, &
          grid_id)
+
+    CALL yac_fset_global_index( &
+         partit%myList_nod2D,   &
+         YAC_LOCATION_CELL,     &
+         grid_id )
 
     CALL yac_fdef_points(grid_id, &
          myDim_nod2D, &
@@ -257,7 +262,7 @@ contains
             dt_str, YAC_TIME_UNIT_SECOND, recv_field_id(i))
     END DO
 
-    CALL yac_fsearch(ierr)
+    CALL yac_fenddef(ierr)
 
   end subroutine cpl_yac_define_unstr
 
