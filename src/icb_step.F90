@@ -92,7 +92,8 @@ type(t_dyn)   , intent(inout), target :: dynamics
  do ib=1, ib_num
   lastsubstep = .false.
   if( real(istep) > real(step_per_day)*calving_day(ib) ) then !iceberg calved
-  
+
+!    write(*,*) "LA DEBUG: step1 - istep=",istep,", step_per_day=",step_per_day,", ib=",ib
     !substeps don't work anymore with new communication
     !do times=1, steps_per_FESOM_step
     !if(times == steps_per_FESOM_step) lastsubstep = .true. !do output at last substep

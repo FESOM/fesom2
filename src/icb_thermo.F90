@@ -163,7 +163,7 @@ type(t_partit), intent(inout), target :: partit
     tvl = bvl + lvl_b + lvl_v + lvl_e 	![m^3] per timestep, for freshwater flux convert somehow to [m/s]
     			    		! by distributing over area(iceberg_elem) or over patch
 					! surrounding one node
-    
+!    write(*,*) "LA DEBUG: ib = ",ib,", volume loss = ",tvl,", dt=",dt 
     !write(*,*) '*** tvl=',tvl
     volume_before=height_ib*length_ib*width_ib
 
@@ -216,10 +216,14 @@ type(t_partit), intent(inout), target :: partit
 	    force_last_output = .true.
         end if
     end if
-    fwb_flux_ib(ib) = -bvl*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)
-    fwe_flux_ib(ib) = -lvl_e*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)
-    fwbv_flux_ib(ib) = -lvl_b*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)
-    fwl_flux_ib(ib) = -lvl_v*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)
+    !fwb_flux_ib(ib) = -bvl*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)/step_per_day
+    !fwe_flux_ib(ib) = -lvl_e*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)/step_per_day
+    !fwbv_flux_ib(ib) = -lvl_b*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)/step_per_day
+    !fwl_flux_ib(ib) = -lvl_v*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)/step_per_day
+    fwb_flux_ib(ib) = -bvl*rho_icb/rho_h2o/dt*scaling(ib)/step_per_day
+    fwe_flux_ib(ib) = -lvl_e*rho_icb/rho_h2o/dt*scaling(ib)/step_per_day
+    fwbv_flux_ib(ib) = -lvl_b*rho_icb/rho_h2o/dt*scaling(ib)/step_per_day
+    fwl_flux_ib(ib) = -lvl_v*rho_icb/rho_h2o/dt*scaling(ib)/step_per_day
 
     !stability criterion: icebergs are allowed to roll over
     if(l_weeksmellor) then
@@ -301,6 +305,7 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
   !use i_arrays
   !use MOD_PARTIT
   use iceberg_params
+  use g_config
 
   implicit none
 
@@ -464,8 +469,11 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
      !rt  s_surf_flux(i,j)=gas*(sf-(s(i,j,N,lrhs)+35.0))
 
      !heat_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)*scaling(ib)      ! [W/m2]  ! positive for upward
-     heat_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)*length_ib(ib)*width_ib(ib)*scaling(ib)      ! [W]  ! positive for upward
+     !write(*,*) "LA DEBUG: tin=", tin, "; tf=",tf
+     !write(*,*) "LA DEBUG: gat=",gat
+     heat_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)*length_ib(ib)*width_ib(ib)*scaling(ib)/step_per_day      ! [W]  ! positive for upward
      !fw_flux_ib(ib) =          gas*(sf-sal)/sf   ! [m/s]   !
+     !write(*,*) "LA DEBUG: heat_flux_ib(ib)=",heat_flux_ib(ib)
       M_b 	    =          gas*(sf-sal)/sf   ! [m/s]   ! m freshwater per second
      !fw_flux_ib(ib) = M_b
      !fw = -M_b

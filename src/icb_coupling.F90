@@ -52,6 +52,9 @@ type(t_partit), intent(inout), target :: partit
     if(i_have_element) then 
         ! ##############################################################
         ! LA: spread fluxes over all nodes of element, 25.04.2022
+        ! LA: Das geht nicht auf, wenn die areas der verschiedenen nodes unterscheidlich groß sind:
+        !                       1/3 * flux1 * area1 + 1/3 * flux2 * area2 + 1/3 * flux3 * area3 != flux_tot
+        ! richtig waere:        area1 / area_tot * flux1 + area2 / area_tot * flux2 + area3 / area_tot * flux3 = flux_tot
         num_ib_nods_in_ib_elem=0
 
         do i=1,3
@@ -71,12 +74,13 @@ type(t_partit), intent(inout), target :: partit
             iceberg_node=ib_nods_in_ib_elem(i)
 
             if (iceberg_node>0) then
-                ibfwbv(iceberg_node) = ibfwbv(iceberg_node) - fwbv_flux_ib(ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
-                ibfwb(iceberg_node) = ibfwb(iceberg_node) - fwb_flux_ib(ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
-                ibfwl(iceberg_node) = ibfwl(iceberg_node) - fwl_flux_ib(ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
-                ibfwe(iceberg_node) = ibfwe(iceberg_node) - fwe_flux_ib(ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
-                ibhf(iceberg_node) = ibhf(iceberg_node) - heat_flux_ib(ib) / area(1,iceberg_node) / num_ib_nods_in_ib_elem
-            !else
+                ibfwbv(iceberg_node) = ibfwbv(iceberg_node) - fwbv_flux_ib(ib) / mesh%area(1,iceberg_node) / num_ib_nods_in_ib_elem
+                ibfwb(iceberg_node) = ibfwb(iceberg_node) - fwb_flux_ib(ib) / mesh%area(1,iceberg_node) / num_ib_nods_in_ib_elem
+                ibfwl(iceberg_node) = ibfwl(iceberg_node) - fwl_flux_ib(ib) / mesh%area(1,iceberg_node) / num_ib_nods_in_ib_elem
+                ibfwe(iceberg_node) = ibfwe(iceberg_node) - fwe_flux_ib(ib) / mesh%area(1,iceberg_node) / num_ib_nods_in_ib_elem
+                ibhf(iceberg_node) = ibhf(iceberg_node) - heat_flux_ib(ib) / mesh%area(1,iceberg_node) / num_ib_nods_in_ib_elem
+                write(*,*) "LA DEBUG: ibhf(iceberg_node)=",ibhf(iceberg_node) 
+            !else                                                             
             !    write(*,*) 'iceberg_node only communication node. iceberg_node=',iceberg_node,', mydim_nod2d=',mydim_nod2d
             end if
         end do
@@ -146,6 +150,11 @@ type(t_partit), intent(inout), target :: partit
     net_heat_flux => ice%flx_h(:)
 
     do n=1, myDim_nod2d+eDim_nod2D
+        !if (ibhf(n).ne.0) then
+        !        write(*,*) "LA DEBUG: *** n = ",n
+        !        write(*,*) "LA DEBUG: fresh_wa_flux(n) = ", fresh_wa_flux(n), "(ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n)) = ", (ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n))
+        !        write(*,*) "LA DEBUG: net_heat_flux(n) = ", net_heat_flux(n), "ibhf(n) = ", (ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n))
+        !end if
         fresh_wa_flux(n)   = fresh_wa_flux(n) + (ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n)) * steps_per_ib_step !sign needs to be negative
         net_heat_flux(n)   = net_heat_flux(n) + ibhf(n) * steps_per_ib_step !LA: reversed sign!!! needs to be negative
     end do

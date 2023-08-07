@@ -101,6 +101,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
  ! - T_ave_ib, S_ave_ib		: Mean T & S (integrated) at location of iceberg
  ! - T_keel_ib, S_keel_ib	: T & S below the draft of the iceberg (depth_ib)
  call FEM_3eval(mesh, partit, T_ave_ib,S_ave_ib,lon,lat,T_dz,S_dz,iceberg_elem)
+! write(*,*) "LA DEBUG: T_dz=",T_dz, ", T_ave_ib=",T_ave_ib
  call FEM_3eval(mesh, partit, T_keel_ib,S_keel_ib,lon,lat,T_keel,S_keel,iceberg_elem)
 
 

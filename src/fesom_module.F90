@@ -347,15 +347,18 @@ contains
         
         
         
+if (use_icebergs) then
         
         !n_ib         = n
         u_wind_ib    = u_wind
         v_wind_ib    = v_wind
         f%ice%uice_ib     = f%ice%uice
         f%ice%vice_ib     = f%ice%vice
-        f%ice%data(size(f%ice%data))      = f%ice%data(2)
-        f%ice%data(size(f%ice%data)-1)    = f%ice%data(1)
 
+! LA - this causes the blowup !
+!        f%ice%data(size(f%ice%data))      = f%ice%data(2)
+!        f%ice%data(size(f%ice%data)-1)    = f%ice%data(1)
+!!!!!!!!!!!!!!!!!!
 
 
 ! kh 08.03.21 support of different ocean ice and iceberg steps:
@@ -367,6 +370,8 @@ contains
 ! if steps_per_ib_step is configured greater 1 then tr_arr is modified via call oce_timestep_ale(n) -> call solve_tracers_ale() while
 ! the same asynchronous iceberg computation is still active
         !tr_arr_ib    = tr_arr
+        Tclim_ib     = f%tracers%data(1)%values
+        Sclim_ib     = f%tracers%data(2)%values
 
 ! kh 15.03.21 support of different ocean ice and iceberg steps:
 ! if steps_per_ib_step is configured greater 1 then Tsurf and Ssurf might be changed while
@@ -457,7 +462,7 @@ contains
 !
 !        !else if (ib_async_mode > 0) then ! kh 02.02.21 asynchronous behavior
 !        end if
-        
+end if        
         
         
         
@@ -528,9 +533,11 @@ contains
             if (f%ice%ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh)  
 
             
+            ! LA commented for debugging
             ! --------------
             ! LA icebergs: 2023-05-17 
             if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
+!                write(*,*) "LA DEBUG: n = ",n,", steps_per_ib_step = ",steps_per_ib_step
                 !t1b_icb = MPI_Wtime()
                 call icb2fesom(f%mesh, f%partit, f%ice)
                 !t2b_icb = MPI_Wtime()
@@ -590,11 +597,11 @@ contains
          !t3_icb = MPI_Wtime()
  
          call iceberg_out(f%partit)
-         !!call reset_ib_fluxes        
+         !call reset_ib_fluxes        
          !t4_icb = MPI_Wtime()
  
          !rtime_icb_write = rtime_icb_write + t4_icb - t3_icb
-     end if
+    end if
     ! --------------
 
 
