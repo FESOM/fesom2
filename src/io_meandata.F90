@@ -66,6 +66,7 @@ module io_MEANDATA
 !--------------------------------------------------------------------------------------------
 !
   integer, save                  :: io_listsize=0
+  character(len=1), save         :: filesplit_freq='y'
   integer, save :: keep_nth_level
 
   type io_entry
@@ -114,7 +115,7 @@ subroutine ini_mean_io(mesh)
   character(len=10)         :: id_string
 
   type(t_mesh), intent(in) , target :: mesh
-  namelist /nml_listsize/ io_listsize
+  namelist /nml_listsize/ io_listsize, filesplit_freq
   namelist /nml_list    / io_list
   namelist /nml_output_settings/ keep_nth_level
 
@@ -315,7 +316,11 @@ CASE ('temp'//lvl_limit_name//'  ')
 CASE ('salt      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt',      'salinity',    'psu',    tr_arr(:,:,2),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('salt'//lvl_limit_name//'  ')
-    call def_stream3D_lvl_limit((/lvl_limit, nod2D/), nl-1,  (/lvl_limit, myDim_nod2D/),  'salt'//lvl_limit_name,      'salinity',    'psu',    tr_arr(1:lvl_limit,:,2),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+  call def_stream3D_lvl_limit((/lvl_limit, nod2D/), nl-1,  (/lvl_limit, myDim_nod2D/),  'salt'//lvl_limit_name,      'salinity',    'psu',    tr_arr(1:lvl_limit,:,2),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('sigma0      ')
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'sigma0',      'potential density', 'kg/m^3',      density_m_rho0(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('sigma0'//lvl_limit_name//'  ')
+    call def_stream3D_lvl_limit((/lvl_limit, nod2D/), nl-1,  (/lvl_limit, myDim_nod2D/),  'sigma0'//lvl_limit_name,      'potential density', 'kg/m^3',      density_m_rho0(1:lvl_limit,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('otracers  ')
     do j=3, num_tracers
     write (id_string, "(I3.3)") tracer_id(j)
@@ -1055,7 +1060,13 @@ subroutine output(istep, mesh)
         if(entry%thread_running) call entry%thread%join()
         entry%thread_running = .false.
 
-        filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
+        if (filesplit_freq=='m') then
+
+            filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'_'//cmonth//'.nc'
+        else
+            filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
+        endif
+
         if(mype == entry%root_rank) then
           if(filepath /= trim(entry%filename)) then
             if("" /= trim(entry%filename)) call assert_nf(nf_close(entry%ncid), __LINE__)   
