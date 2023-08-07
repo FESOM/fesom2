@@ -342,6 +342,7 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     do n=1, tracers%num_tracers
         allocate(tracers%data(n)%values   (                             nl-1, node_size))
         allocate(tracers%data(n)%valuesAB (                             nl-1, node_size))
+        tracers%data(n)%AB_order      = AB_order        
         allocate(tracers%data(n)%valuesold(tracers%data(n)%AB_order-1,  nl-1, node_size))
         tracers%data(n)%ID            = nml_tracer_list(n)%id
         tracers%data(n)%tra_adv_hor   = TRIM(nml_tracer_list(n)%adv_hor)
@@ -353,7 +354,6 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
         tracers%data(n)%gamma0_tra    = gamma0_tra
         tracers%data(n)%gamma1_tra    = gamma1_tra
         tracers%data(n)%gamma2_tra    = gamma2_tra
-        tracers%data(n)%AB_order      = AB_order
         tracers%data(n)%values        = 0.
         tracers%data(n)%valuesAB      = 0.
         tracers%data(n)%valuesold     = 0.
