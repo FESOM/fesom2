@@ -728,11 +728,11 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
         do_rotate_oce_wind=.true.
         do_rotate_ice_wind=.true.
      elseif (i.eq.3) then
-        prec_rain(1:myDim_nod2d)    =  exchange(:,1)                   ! tot_prec
+        prec_rain(1:myDim_nod2d)    =  exchange(:,1)/1000                   ! tot_prec ! kg m^(-2) s^(-1) -> m/s
         call exchange_nod(prec_rain, partit)
-        prec_snow(1:myDim_nod2d)    =  exchange(:,2)                    ! snowfall
+        prec_snow(1:myDim_nod2d)    =  exchange(:,2)/1000                    ! snowfall ! kg m^(-2) s^(-1) -> m/s
         call exchange_nod(prec_snow, partit)
-        evap_no_ifrac(1:myDim_nod2d)     =  exchange(:,3)               ! tot_evap
+        evap_no_ifrac(1:myDim_nod2d)     =  -exchange(:,3)/1000               ! tot_evap ! kg m^(-2) s^(-1) -> m/s; change sign
         call exchange_nod(evap_no_ifrac, partit)
      elseif (i.eq.4) then
         oce_heat_flux(1:myDim_nod2d)     =  exchange(:,2) + exchange(:,3) + exchange(:,4)     ! heat_oce
