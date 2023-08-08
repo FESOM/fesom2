@@ -142,11 +142,13 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
 #ifdef __oasis
     call oasis_terminate
 #elif __yac
-    call yac_ffinalize()
+    CALL yac_ffinalize()
+    CALL MPI_Finalize(error)
 #endif
  endif
 #elif defined(__yac)
-  call yac_ffinalize()
+ CALL yac_ffinalize()
+ CALL MPI_Finalize(error)
 #else
   !For ECHAM coupled runs we use the old OASIS nameing scheme (prism / prism_proto)
   if (.not. present(abort)) then
