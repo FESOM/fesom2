@@ -119,11 +119,6 @@ contains
     nbr_vertices = myDim_elem2D + myDim_edge2D + nbr_boundary_nodes
     nbr_connections = 2*SUM(nod_in_elem2D_num(1:myDim_nod2D)) + 2*nbr_boundary_nodes
 
-    WRITE (0,*) "nbr_boundary_nodes: ", nbr_boundary_nodes
-    WRITE (0,*) "nbr_vertices: " , nbr_vertices
-    WRITE (0,*) "nbr_cells: " , myDim_nod2D
-    WRITE (0,*) "nbr_connections: " , nbr_connections
-
     ALLOCATE(x_vertices(nbr_vertices))
     ALLOCATE(y_vertices(nbr_vertices))
     ALLOCATE(nbr_vertices_per_cell(myDim_nod2D))
@@ -239,7 +234,6 @@ contains
     cpl_send( 2)='ocean_sea_ice_bundle'
     cpl_send_collection_size(2) = 3
 
-    WRITE (dt_str, '(I4)') int(dt)
     DO i=1,nsend
        CALL yac_fdef_field(cpl_send(i), comp_id, [points_id], 1, &
             cpl_send_collection_size(i), &

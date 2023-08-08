@@ -718,8 +718,6 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
         call exchange_nod(stress_atmice_x, partit)
         do_rotate_oce_wind=.true.
         do_rotate_ice_wind=.true.
-        WRITE (0,*) "taux_oce:", MINVAL(stress_atmoce_x), " - ", MAXVAL(stress_atmoce_x)
-        WRITE (0,*) "taux_ice:", MINVAL(stress_atmice_x), " - ", MAXVAL(stress_atmice_x)
      elseif (i.eq.2) then
         stress_atmoce_y(1:myDim_nod2d) =  exchange(:,1)                    ! tauy_oce
         call exchange_nod(stress_atmoce_y, partit)
