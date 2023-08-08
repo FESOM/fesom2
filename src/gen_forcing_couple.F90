@@ -640,7 +640,6 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   real(kind=WP)        				   :: flux_global(2), flux_local(2), eff_vol(2)
   real(kind=WP), dimension(:,:), allocatable , save  :: exchange
   real(kind=WP), dimension(:), allocatable , save  :: mask !, weight
-  logical, save                                    :: firstcall=.true.
   logical                                          :: action
   logical                                          :: do_rotate_oce_wind=.false.
   logical                                          :: do_rotate_ice_wind=.false.
@@ -681,12 +680,10 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   stress_atmice_y = 0.
   !_____________________________________________________________________________
   t1=MPI_Wtime()
-  if (firstcall) then
-     allocate(exchange(myDim_nod2D,MAXVAL(cpl_send_collection_size)), &
-          mask(myDim_nod2D+eDim_nod2D))
-     exchange      =0.
-     mask          =0.
-     firstcall=.false.
+  if (.NOT. ALLOCATED(exchange)) then
+     ALLOCATE(exchange(myDim_nod2D, &
+          MAX(MAXVAL(cpl_send_collection_size), MAXVAL(cpl_recv_collection_size))))
+     exchange = 0
   end if
   do i=1,nsend
      exchange  =0.
@@ -704,10 +701,14 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
      if (mype==0) write(*,*) 'SEND: field ', i, ' max val:', maxval(exchange), ' . ACTION? ', action 
   enddo
 #endif
-  mask=1.
   do i=1,nrecv
      exchange =0.0
-     call cpl_yac_recv (i, exchange(:,1:cpl_recv_collection_size(i)), action)
+     CALL cpl_yac_recv (i, exchange(:,1:cpl_recv_collection_size(i)), action)
+#ifdef VERBOSE
+     if (mype==0) then
+        write(*,*) 'FESOM RECV: flux ', i, ', max val: ', maxval(exchange), ' . ACTION? ', action 
+     end if
+#endif
      if (.not. action) cycle
      !Do not apply a correction at first time step!
      if (i.eq.1) then
@@ -742,12 +743,6 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
         ice_heat_flux(1:myDim_nod2d)     =  exchange(:,1) + exchange(:,2) ! heat_ice
         call exchange_nod(ice_heat_flux, partit)
      endif
-
-#ifdef VERBOSE
-     if (mype==0) then
-        write(*,*) 'FESOM RECV: flux ', i, ', max val: ', maxval(exchange)
-     end if
-#endif
   end do
 
   if ((do_rotate_oce_wind .AND. do_rotate_ice_wind) .AND. rotated_grid) then
