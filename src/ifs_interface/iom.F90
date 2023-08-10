@@ -113,13 +113,13 @@ CONTAINS
 
         err = conf_ctx%mpi_return_client_comm(return_comm)
         IF (err /= MULTIO_SUCCESS) THEN
-            WRITE (err_str, "(I)") return_comm
+            WRITE (err_str, "(I10)") return_comm
             CALL ctl_stop('conf_ctx%mpi_return_client_comm(', err_str,') failed: ', multio_error_string(err))
         END IF
 
         err = conf_ctx%mpi_parent_comm(int(mio_parent_comm))
         IF (err /= MULTIO_SUCCESS) THEN
-            WRITE (err_str, "(I)") mio_parent_comm
+            WRITE (err_str, "(I10)") mio_parent_comm
             CALL ctl_stop('conf_ctx%mpi_parent_comm(', err_str,') failed: ', multio_error_string(err))
         END IF
 
@@ -204,7 +204,7 @@ CONTAINS
 
         err = conf_ctx%mpi_parent_comm(int(mio_parent_comm))
         IF (err /= MULTIO_SUCCESS) THEN
-            WRITE (err_str, "(I)") mio_parent_comm
+            WRITE (err_str, "(I10)") mio_parent_comm
             CALL ctl_stop('conf_ctx%mpi_parent_comm(', err_str,') failed: ', multio_error_string(err))
         END IF
 
