@@ -243,6 +243,10 @@ contains
             write(*,*) '============================================' 
         endif
 
+#if defined(__MULTIO)
+          call iom_send_fesom_domains(f%partit, f%mesh)
+#endif
+
     !    f%dump_dir='DUMP/'
     !    INQUIRE(file=trim(f%dump_dir), EXIST=f%L_EXISTS)
     !    if (.not. f%L_EXISTS) call system('mkdir '//trim(f%dump_dir))
