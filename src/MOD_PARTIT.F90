@@ -47,10 +47,10 @@ TYPE T_PARTIT
   integer                             :: eDim_nod2D
   integer, allocatable, dimension(:)  :: myList_nod2D
 
-  integer                             :: myDim_elem2D
+  integer                             :: myDim_elem2D, myDim_elem2D_shrinked
   integer                             :: eDim_elem2D
   integer                             :: eXDim_elem2D
-  integer, allocatable, dimension(:)  :: myList_elem2D
+  integer, allocatable, dimension(:)  :: myList_elem2D, myInd_elem2D_shrinked
 
   integer                             :: myDim_edge2D
   integer                             :: eDim_edge2D
@@ -75,6 +75,7 @@ TYPE T_PARTIT
   integer, allocatable       :: s_mpitype_nod3D(:,:,:), r_mpitype_nod3D(:,:,:)
 
   integer            :: MPIERR
+  
   !!! remPtr_* are constructed during the runtime and shall not be dumped!!!
   integer, allocatable ::  remPtr_nod2D(:),  remList_nod2D(:)
   integer, allocatable ::  remPtr_elem2D(:), remList_elem2D(:)

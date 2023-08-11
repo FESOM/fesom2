@@ -9,6 +9,46 @@ MODULE nemogcmcoup_steps
    INTEGER :: substeps !per IFS timestep
 END MODULE nemogcmcoup_steps
 
+#if defined(__MULTIO)
+SUBROUTINE nemogcmcoup_init_ioserver( icomm, lnemoioserver, irequired, iprovided, lmpi1)
+
+    ! Initialize the NEMO mppio server
+    USE mpp_io
+ 
+    IMPLICIT NONE
+    INTEGER :: icomm
+    LOGICAL :: lnemoioserver
+    INTEGER :: irequired, iprovided
+    LOGICAL :: lmpi1
+ 
+    CALL mpp_io_init(icomm, lnemoioserver,  irequired, iprovided, lmpi1)
+END SUBROUTINE nemogcmcoup_init_ioserver
+ 
+ 
+SUBROUTINE nemogcmcoup_init_ioserver_2( icomm )
+    ! Initialize the NEMO mppio server
+    USE mpp_io
+ 
+    IMPLICIT NONE
+    INTEGER :: icomm
+    
+    CALL mpp_io_init_2( icomm )
+    IF (lioserver) THEN
+        ! IO server finished, clean-up multio objects
+        CALL mpp_stop()
+    ENDIF
+END SUBROUTINE nemogcmcoup_init_ioserver_2
+
+SUBROUTINE nemogcmcoup_end_ioserver
+    ! Function is only called for the IO client.
+    USE mpp_io
+
+    IMPLICIT NONE
+
+    CALL mpp_stop()
+ END SUBROUTINE nemogcmcoup_end_ioserver
+#endif
+
 SUBROUTINE nemogcmcoup_init( mype, icomm, inidate, initime, itini, itend, zstp, &
    & lwaveonly, iatmunit, lwrite )
 
