@@ -89,6 +89,9 @@ contains
  
   subroutine fesom_init(fesom_total_nsteps)
       use fesom_main_storage_module
+#if defined(__MULTIO)
+      use iom
+#endif
       integer, intent(out) :: fesom_total_nsteps
       ! EO parameters
       logical mpi_is_initialized
