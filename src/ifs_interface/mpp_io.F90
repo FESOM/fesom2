@@ -6,6 +6,7 @@
 !-----------------------------------------------------
 
 MODULE mpp_io
+#if defined(__MULTIO)        
     USE iom
     IMPLICIT NONE
     PRIVATE
@@ -177,5 +178,5 @@ MODULE mpp_io
 
         CALL mpi_finalize( ierr )
     END SUBROUTINE mpp_stop
-
+#endif
 END MODULE mpp_io

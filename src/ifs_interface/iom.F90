@@ -6,6 +6,7 @@
 !-----------------------------------------------------
 
 MODULE iom
+#if defined(__MULTIO)        
     USE multio_api
     USE, INTRINSIC :: iso_fortran_env, only: real64
 
@@ -407,5 +408,5 @@ CONTAINS
     END SUBROUTINE ctl_stop
 
     !!======================================================================
- END MODULE iom
- 
+#endif 
+END MODULE iom
