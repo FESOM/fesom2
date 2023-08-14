@@ -2,6 +2,13 @@ cmake_minimum_required(VERSION 3.9)
 
 project(fesom C Fortran)
 
+find_package(MPI REQUIRED)
+if (MPI_FOUND)
+    include_directories(SYSTEM ${MPI_INCLUDE_PATH})
+else (MPI_FOUND)
+	message(SEND_ERROR "MPI library is (almost) necessary for fesom2")
+endif (MPI_FOUND)
+
 if(DEFINED ENV{FESOM_PLATFORM_STRATEGY})
    set(FESOM_PLATFORM_STRATEGY $ENV{FESOM_PLATFORM_STRATEGY} CACHE STRING "switch to platform specific compile settings, this is usually determined via the env.sh script")
 else()
@@ -49,6 +56,18 @@ option(ENABLE_OPENACC "compile with OpenACC support" OFF)
 option(DISABLE_OPENACC_ATOMICS "disable kernels using atomic statement for reproducible results" ON)
 set(GPU_COMPUTE_CAPABILITY "cc80" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
 set(GPU_FLAGS "cuda11.7,${GPU_COMPUTE_CAPABILITY}" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
+
+
+option(ENABLE_MPI "build fesom with MPI" ON) 
+if(${ENABLE_MPI}) 
+   find_package(MPI REQUIRED)
+   if (MPI_FOUND)
+      include_directories(SYSTEM ${MPI_INCLUDE_PATH})
+   else (MPI_FOUND)
+      message(SEND_ERROR "MPI library is (almost) necessary for fesom2")
+   endif (MPI_FOUND)
+endif()  
+#TODO:: later also link C and fortran for this case
 
 option(ENABLE_OPENMP "build FESOM with OpenMP" OFF)
 if(${ENABLE_OPENMP})
