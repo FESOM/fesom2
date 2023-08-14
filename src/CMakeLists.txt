@@ -97,19 +97,24 @@ list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_main.F90)
 #add_subdirectory(../lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
 #include_directories(../lib/metis-5.1.0/include)
 # depends on the parms library
-add_subdirectory(../lib/parms ${PROJECT_BINARY_DIR}/parms)
+if(${PARMS})
+   add_subdirectory(../lib/parms ${PROJECT_BINARY_DIR}/parms)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS __parms)
+   target_link_libraries(${PROJECT_NAME}_C parms) #metis
+endif() 
 
 add_subdirectory(async_threads_cpp)
 
 include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindNETCDF.cmake)
 
+
+### this is silly
 if(${BUILD_FESOM_AS_LIBRARY})
   add_library(${PROJECT_NAME}_C ${sources_C})
 else()
-add_library(${PROJECT_NAME}_C ${sources_C})
+   add_library(${PROJECT_NAME}_C ${sources_C})
 endif()
-target_compile_definitions(${PROJECT_NAME}_C PRIVATE PARMS USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
-target_link_libraries(${PROJECT_NAME}_C parms) #metis
+target_compile_definitions(${PROJECT_NAME}_C PRIVATE USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
 
 
 # create our binary or library (set its name to name of this project)
@@ -120,7 +125,7 @@ if(${BUILD_FESOM_AS_LIBRARY})
 else()
    add_executable(${PROJECT_NAME} ${sources_Fortran} ${src_home}/fesom_main.F90)
 endif()
-target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
+target_compile_definitions(${PROJECT_NAME} PRIVATE  -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
 if(${DISABLE_MULTITHREADING})
    target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_MULTITHREADING)
 endif()

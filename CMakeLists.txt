@@ -16,6 +16,7 @@ set(FESOM_COUPLED OFF CACHE BOOL "compile fesom standalone or with oasis support
 set(OIFS_COUPLED OFF CACHE BOOL "compile fesom coupled to OpenIFS. (Also needs FESOM_COUPLED to work)")
 set(CRAY OFF CACHE BOOL "compile with cray ftn")
 set(USE_ICEPACK OFF CACHE BOOL "compile fesom with the Iceapck modules for sea ice column physics.")
+set(PARMS OFF CACHE BOOL "use parms library as solver, doesn't scale well with omp. use sergey's solver otherwise.")
 set(OPENMP_REPRODUCIBLE OFF CACHE BOOL "serialize OpenMP loops that are critical for reproducible results")
 
 #set(VERBOSE OFF CACHE BOOL "toggle debug output")
