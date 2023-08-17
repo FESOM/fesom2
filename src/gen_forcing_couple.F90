@@ -239,7 +239,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
       do i=1,nrecv
          exchange =0.0
          call cpl_oasis3mct_recv (i, exchange, action, partit)
-	 !if (.not. action) cycle
+         !if (.not. action) cycle
 	 !Do not apply a correction at first time step!
     if (i==1 .and. action .and. istep/=1) call net_rec_from_atm(action, partit)
         if (i.eq.1) then
@@ -332,8 +332,30 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
     	          mask=1.
 	              call force_flux_consv(enthalpyoffuse, mask, i, 0, action, partit, mesh)
              end if
+#else
+! --- icebergs LA
+#if defined (__async_icebergs)
+        elseif (i.eq.13) then
+            if (action) then
+                !if (use_icebergs) then         
+                    u_wind(:)                     = exchange(:)        ! zonal wind
+                    mask=1
+                    call force_flux_consv(u_wind, mask, i, 0, action, partit, mesh)
+                !end if
+            end if
+        elseif (i.eq.14) then
+            if (action) then
+                !if (use_icebergs) then         
+                    v_wind(:)                     = exchange(:)        ! meridional wind
+                    mask=1
+                    call force_flux_consv(v_wind, mask, i, 0, action, partit, mesh)
+                !end if
+            end if
+#endif
+! --- icebergs end LA
 #endif	 
          end if
+
 
 #ifdef VERBOSE
 	  if (mype==0) then

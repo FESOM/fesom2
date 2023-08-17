@@ -154,15 +154,17 @@ TYPE T_ICE
 #if defined (__oifs) || defined (__ifsinterface)
     integer                                     :: num_itracers=4
 #else
-    integer                                     :: num_itracers=3
-#endif 
-    
+!    integer                                     :: num_itracers=3
     !------------------------------
     ! LA 2023-01-31 add icebergs
 #if defined(__async_icebergs)
-num_itracers=num_itracers+2
+    integer                                     :: num_itracers=5
+#else
+    integer                                     :: num_itracers=3
 #endif 
     !------------------------------
+#endif 
+    
 
     ! put ice tracers data arrays
     type(t_ice_data), allocatable, dimension(:) :: data

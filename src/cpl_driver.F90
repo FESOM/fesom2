@@ -13,7 +13,7 @@ module cpl_driver
   ! Modules used
   !
   use mod_oasis                    ! oasis module
-  use g_config, only : dt
+  use g_config, only : dt, use_icebergs
   use o_param,  only : rad
   USE MOD_PARTIT
   implicit none
@@ -27,7 +27,13 @@ module cpl_driver
   integer, parameter         :: nrecv = 13
 #else
   integer, parameter         :: nsend = 4
+! icebergs LA --------------
+#if defined(__async_icebergs)
+  integer, parameter         :: nrecv = 14
+#else
   integer, parameter         :: nrecv = 12
+#endif  
+! icebergs LA --------------
 #endif
   
   integer, dimension(nsend)  :: send_id
@@ -434,6 +440,14 @@ contains
     cpl_recv(10) = 'heat_ico'
     cpl_recv(11) = 'heat_swo'    
     cpl_recv(12) = 'hydr_oce'
+! --- icebergs ---
+!    IF (use_icebergs) THEN
+#if defined (__async_icebergs)
+      cpl_recv(13) = 'u10w_oce'
+      cpl_recv(14) = 'v10w_oce'
+#endif
+!    END IF
+! --- icebergs ---
 #endif
 
     if (mype .eq. 0) then 
