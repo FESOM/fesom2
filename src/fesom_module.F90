@@ -152,7 +152,7 @@ contains
         call mesh_setup(f%partit, f%mesh)
 
         if (f%mype==0) write(*,*) 'FESOM mesh_setup... complete'
-    
+   
         !=====================
         ! Allocate field variables 
         ! and additional arrays needed for 
@@ -200,6 +200,7 @@ contains
         call compute_diagnostics(0, f%dynamics, f%tracers, f%partit, f%mesh) ! allocate arrays for diagnostic
 #if defined (__oasis)
         call cpl_oasis3mct_define_unstr(f%partit, f%mesh)
+
         if(f%mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
 #endif
     
@@ -348,7 +349,6 @@ contains
         
         
 if (use_icebergs) then
-        
         !n_ib         = n
         u_wind_ib    = u_wind
         v_wind_ib    = v_wind
@@ -570,6 +570,12 @@ end if
         !___prepare output______________________________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
         call output (n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+
+        ! LA icebergs: 2023-05-17 
+        if (use_icebergs) then
+                call reset_ib_fluxes
+        end if
+        !--------------------------
 
         f%t5 = MPI_Wtime()
         call restart(n, .false., f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
