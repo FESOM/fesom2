@@ -28,9 +28,9 @@ subroutine setup_model(partit)
   read (fileunit, NML=geometry)
   read (fileunit, NML=calendar)
   read (fileunit, NML=run_config)
-  #if defined (__async_icebergs)
+#if defined (__async_icebergs)
     read (fileunit,NML=icebergs)
-  #endif
+#endif
 !!$  read (fileunit, NML=machine)
   close (fileunit)
   

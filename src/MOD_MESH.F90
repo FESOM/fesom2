@@ -110,7 +110,7 @@ real(kind=WP), allocatable,dimension(:,:)   :: hnode, hnode_new, zbar_3d_n, Z_3d
 !------------------------------
 ! LA 2023-01-31 add icebergs
 !#if defined(__async_icebergs)
-real(kind=WP), allocatable,dimension(:,:)   :: Z_3d_n_ib
+        real(kind=WP), allocatable,dimension(:,:)   :: Z_3d_n_ib
 !#endif 
 
 !------------------------------
