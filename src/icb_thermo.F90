@@ -120,7 +120,7 @@ subroutine iceberg_newdimensions(partit, ib, depth_ib,height_ib,length_ib,width_
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
-  use iceberg_params, only: l_weeksmellor, ascii_out, icb_outfreq, vl_block, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, smallestvol_icb, fwb_flux_ib, fwe_flux_ib, fwbv_flux_ib, fwl_flux_ib, scaling
+  use iceberg_params, only: l_weeksmellor, ascii_out, icb_outfreq, vl_block, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, smallestvol_icb, fwb_flux_ib, fwe_flux_ib, fwbv_flux_ib, fwl_flux_ib, scaling, heat_flux_ib, lheat_flux_ib
   use g_config, only: steps_per_ib_step
 
   implicit none  
@@ -135,6 +135,9 @@ subroutine iceberg_newdimensions(partit, ib, depth_ib,height_ib,length_ib,width_
   logical		:: force_last_output
   real, dimension(4)	:: arr
   integer               :: istep
+  ! LA: include latent heat 2023-04-04
+  real(kind=8),parameter ::  L                  = 334000.                   ! [J/Kg]
+
 type(t_partit), intent(inout), target :: partit
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
@@ -216,14 +219,10 @@ type(t_partit), intent(inout), target :: partit
 	    force_last_output = .true.
         end if
     end if
-    !fwb_flux_ib(ib) = -bvl*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)/step_per_day
-    !fwe_flux_ib(ib) = -lvl_e*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)/step_per_day
-    !fwbv_flux_ib(ib) = -lvl_b*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)/step_per_day
-    !fwl_flux_ib(ib) = -lvl_v*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)/step_per_day
-    fwb_flux_ib(ib) = -bvl*rho_icb/rho_h2o/dt*scaling(ib)/step_per_day
-    fwe_flux_ib(ib) = -lvl_e*rho_icb/rho_h2o/dt*scaling(ib)/step_per_day
-    fwbv_flux_ib(ib) = -lvl_b*rho_icb/rho_h2o/dt*scaling(ib)/step_per_day
-    fwl_flux_ib(ib) = -lvl_v*rho_icb/rho_h2o/dt*scaling(ib)/step_per_day
+    fwb_flux_ib(ib) = -bvl*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)
+    fwe_flux_ib(ib) = -lvl_e*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)
+    fwbv_flux_ib(ib) = -lvl_b*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)
+    fwl_flux_ib(ib) = -lvl_v*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)
 
     !stability criterion: icebergs are allowed to roll over
     if(l_weeksmellor) then
@@ -256,10 +255,18 @@ type(t_partit), intent(inout), target :: partit
 
     !values for communication
     arr= [ bvl_mean(ib), lvlv_mean(ib), lvle_mean(ib), lvlb_mean(ib) ] 
-	
+
     !save in larger array	  
     vl_block((ib-1)*4+1 : ib*4)=arr
 
+    ! -----------------------
+    ! LA: set iceberg heatflux at least to latent heat 2023-04-04
+    ! Latent heat flux at base and sides also changes lines 475/476
+    lheat_flux_ib(ib) = rho_icb*L*tvl*scaling(ib)/dt/REAL(steps_per_ib_step)
+    if( (heat_flux_ib(ib).gt.0.0) .and. (heat_flux_ib(ib).lt.lheat_flux_ib(ib))) then
+        heat_flux_ib(ib)=lheat_flux_ib(ib)
+    end if
+    ! -----------------------
 end subroutine iceberg_newdimensions
 
 
@@ -471,7 +478,7 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
      !heat_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)*scaling(ib)      ! [W/m2]  ! positive for upward
      !write(*,*) "LA DEBUG: tin=", tin, "; tf=",tf
      !write(*,*) "LA DEBUG: gat=",gat
-     heat_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)*length_ib(ib)*width_ib(ib)*scaling(ib)/step_per_day      ! [W]  ! positive for upward
+     heat_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)*length_ib(ib)*width_ib(ib)*scaling(ib)      ! [W]  ! positive for upward
      !fw_flux_ib(ib) =          gas*(sf-sal)/sf   ! [m/s]   !
      !write(*,*) "LA DEBUG: heat_flux_ib(ib)=",heat_flux_ib(ib)
       M_b 	    =          gas*(sf-sal)/sf   ! [m/s]   ! m freshwater per second

@@ -85,7 +85,7 @@ save
   !character(100):: height_icb_file='../icb/icb_height.dat' !iceberg height [m]
   !character(100):: scaling_file='../icb/icb_scaling.dat' !scaling factor
   !===== OUTPUT RELATED SETTINGS  =====
-  integer :: icb_outfreq = 32           ! 180; for FESOM_dt=2min this is 6 hourly output !120; for FESOM_dt=3min this is 6 hourly output
+  integer :: icb_outfreq = 180           ! 180; for FESOM_dt=2min this is 6 hourly output !120; for FESOM_dt=3min this is 6 hourly output
   logical :: l_geo_out = .true.         ! output in unrotated (.true.) or rotated coordinates
   logical :: ascii_out = .false.        ! old ascii output (slow, more detailed); false: faster nc output
   !===== NUMERICS (DONT HAVE TO BE CHANGED) =====
@@ -99,7 +99,7 @@ save
   real,dimension(:), allocatable:: f_u_ib_old, f_v_ib_old
   real,dimension(:), allocatable:: bvl_mean, lvlv_mean, lvle_mean, lvlb_mean !averaged volume losses
   !real,dimension(:), allocatable:: fw_flux_ib, heat_flux_ib
-  real,dimension(:), allocatable:: fwe_flux_ib, fwl_flux_ib, fwb_flux_ib, fwbv_flux_ib, heat_flux_ib
+  real,dimension(:), allocatable:: fwe_flux_ib, fwl_flux_ib, fwb_flux_ib, fwbv_flux_ib, heat_flux_ib, lheat_flux_ib
   
   !===== FRESHWATER AND HEAT ARRAYS ON FESOM GRID =====
   real,dimension(:), allocatable:: ibhf    !icb heat flux into ocean 

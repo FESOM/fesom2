@@ -84,11 +84,13 @@ type(t_partit), intent(inout), target :: partit
   allocate(fwb_flux_ib(ib_num))
   allocate(fwbv_flux_ib(ib_num))
   allocate(heat_flux_ib(ib_num))
+  allocate(lheat_flux_ib(ib_num))
   fwe_flux_ib = 0.0
   fwl_flux_ib = 0.0
   fwb_flux_ib = 0.0
   fwbv_flux_ib = 0.0
   heat_flux_ib = 0.0
+  lheat_flux_ib = 0.0
   allocate(arr_block(15*ib_num))
   allocate(elem_block(ib_num))
   allocate(vl_block(4*ib_num))
