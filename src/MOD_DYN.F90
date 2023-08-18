@@ -121,8 +121,14 @@ TYPE T_DYN
     logical                                     :: use_ssh_splitexpl_subcycl = .false.
     
     ! barotropic subcycling time-steps and dissipation parameter
-    integer                                     :: splitexpl_BTsteps = 40
-    real(kind=WP)                               :: splitexpl_BTtheta = 0.14_WP
+    integer                                     :: splitexpl_BTsteps     = 50
+    real(kind=WP)                               :: splitexpl_BTtheta     = 0.14_WP
+    logical                                     :: splitexpl_bottdrag    = .true.
+    logical                                     :: splitexpl_bdrag_si    = .true.
+    logical                                     :: splitexpl_visc        = .true.
+    real(kind=WP)                               :: splitexpl_visc_gamma0 = 10
+    real(kind=WP)                               :: splitexpl_visc_gamma1 = 2750
+    real(kind=WP)                               :: splitexpl_visc_gamma2 = 0
     
     !___________________________________________________________________________
     ! energy diagnostic part: will be computed inside the model ("hard integration"):

@@ -394,12 +394,15 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     logical        :: use_ssh_splitexpl_subcycl=.false.
     integer        :: splitexpl_BTsteps
     real(kind=WP)  :: splitexpl_BTtheta
+    logical        :: splitexpl_visc, splitexpl_bottdrag, splitexpl_bdrag_si
+    real(kind=WP)  :: splitexpl_visc_gamma0, splitexpl_visc_gamma1, splitexpl_visc_gamma2
     
     namelist /dynamics_visc   / opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
                                 use_ivertvisc, visc_easybsreturn
     namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, & 
                                 ldiag_KE, use_ssh_splitexpl_subcycl, splitexpl_BTsteps, & 
-                                splitexpl_BTtheta
+                                splitexpl_BTtheta, splitexpl_bottdrag, splitexpl_bdrag_si, &
+                                splitexpl_visc, splitexpl_visc_gamma0, splitexpl_visc_gamma1, splitexpl_visc_gamma2
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -436,8 +439,14 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     dynamics%ldiag_KE                   = ldiag_KE
     dynamics%use_ssh_splitexpl_subcycl  = use_ssh_splitexpl_subcycl
     if (dynamics%use_ssh_splitexpl_subcycl) then
-        dynamics%splitexpl_BTsteps          = splitexpl_BTsteps
-        dynamics%splitexpl_BTtheta          = splitexpl_BTtheta
+        dynamics%splitexpl_BTsteps      = splitexpl_BTsteps
+        dynamics%splitexpl_BTtheta      = splitexpl_BTtheta
+        dynamics%splitexpl_bottdrag     = splitexpl_bottdrag
+        dynamics%splitexpl_bdrag_si     = splitexpl_bdrag_si
+        dynamics%splitexpl_visc         = splitexpl_visc
+        dynamics%splitexpl_visc_gamma0  = splitexpl_visc_gamma0
+        dynamics%splitexpl_visc_gamma1  = splitexpl_visc_gamma1
+        dynamics%splitexpl_visc_gamma2  = splitexpl_visc_gamma2
     end if 
     
     !___________________________________________________________________________

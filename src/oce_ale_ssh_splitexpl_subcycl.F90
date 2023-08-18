@@ -805,23 +805,7 @@ subroutine impl_vert_visc_ale_vtransp(dynamics, partit, mesh)
         end do
         
         !_______________________________________________________________
-!PS         if ( any(UV_rhs(1, nzmin:nzmax-1, elem)/=UV_rhs(1, nzmin:nzmax-1, elem)) .or. &
-!PS              any(UV_rhs(2, nzmin:nzmax-1, elem)/=UV_rhs(2, nzmin:nzmax-1, elem))) then
-!PS             write(*,*) ' --> subroutine impl_vert_visc_ale_vtransp --> found Nan in UV_rhs=UVh_rhs+uvr*helem'
-!PS             write(*,*) ' mype =', mype
-!PS             write(*,*) ' elem =', elem
-!PS             write(*,*) ' UV_rhs(1,nz,elem)=', UV_rhs( 1, nzmin:nzmax-1, elem)
-!PS             write(*,*) ' UV_rhs(2,nz,elem)=', UV_rhs( 2, nzmin:nzmax-1, elem)
-!PS             write(*,*) ' ur(nzmin:nzmax-1)=', ur(nzmin:nzmax-1)
-!PS             write(*,*) ' vr(nzmin:nzmax-1)=', vr(nzmin:nzmax-1)
-!PS             write(*,*) ' helem(nz, elem)  =', helem(nzmin:nzmax-1, elem)
-!PS             write(*,*) ' a(nzmin:nzmax-1) =', a(nzmin:nzmax-1)
-!PS             write(*,*) ' b(nzmin:nzmax-1) =', b(nzmin:nzmax-1)
-!PS             write(*,*) ' c(nzmin:nzmax-1) =', c(nzmin:nzmax-1)
-!PS             write(*,*) ' Av(nzmin:nzmax-1,elem) =', Av(nzmin:nzmax-1, elem)
-!PS             write(*,*) ' Wvel_i(nzmin:nzmax-1,elem) =',Wvel_i(nzmin:nzmax-1, elnodes)
-!PS         end if
-        
+     
     end do ! --> do elem=1,myDim_elem2D
 !$OMP END DO
 !$OMP END PARALLEL
@@ -844,8 +828,10 @@ subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
     type(t_mesh)  , intent(inout)   , target :: mesh
     !___________________________________________________________________________
     real(kind=WP)       :: vert_sum_u, vert_sum_v, Fx, Fy, ab1, ab2, hh
-    integer             :: elem, nz, nzmin, nzmax, elnodes(3)
+    integer             :: elem, nz, nzmin, nzmax, elnodes(3), ed, el(2)
     logical, save       :: sfirst
+    real(kind=WP)       :: update_ubt, update_vbt, vi, len
+    
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV_rhs
@@ -898,7 +884,7 @@ subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
         vert_sum_v=vert_sum_v + Fy*hh
         
         !_______________________________________________________________________
-        ! Remove the contribution from the Coriolis  will be accounted explicitely 
+        ! Remove the contribution from the Coriolis will be accounted explicitely 
         ! for in the barotropic equation
         ! UVBT_rhs ... baroclinic forcing term in barotropic equation R_b
         ! --> d/dt*U_bt + f*e_z x U_bt + g*H* grad(eta) = R_bt
@@ -953,14 +939,18 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout)   , target :: mesh
     !___________________________________________________________________________
-    real(kind=WP)                   :: dtBT, BT_inv, hh, f, rx, ry, a, d, c1, c2, ax, ay
+    real(kind=WP)                   :: dtBT, BT_inv, hh, f, rx, ry, a, b, d, c1, c2, ax, ay
     real(kind=WP)                   :: deltaX1, deltaY1, deltaX2, deltaY2, thetaBT
     integer                         :: step, elem, elnodes(3), edge, ednodes(2), edelem(2)
-    integer                         :: nzmin1, nzmax1, nzmin2, nzmax2
+    real(kind=WP)                   :: update_ubt, update_vbt, vi, len, nzmax
+    real(kind=WP), allocatable      :: bottomdrag(:), UVBT_harmvisc(:,:)
+    
+    
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:)    , pointer :: eta_n
     real(kind=WP), dimension(:,:)  , pointer :: UVBT_rhs, UVBT, UVBT_theta, UVBT_mean, UVBT_12
+    real(kind=WP), dimension(:,:,:), pointer :: UV
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -971,26 +961,156 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     UVBT_theta=>dynamics%se_uvBT_theta(:,:)
     UVBT_mean =>dynamics%se_uvBT_mean(:,:)
     UVBT_12   =>dynamics%se_uvBT_12(:,:)
+    if (dynamics%splitexpl_bottdrag) then
+        UV    =>dynamics%uv(:,:,:)
+    end if 
+    
+    allocate(bottomdrag(      myDim_elem2D+eDim_elem2D))
+    allocate(UVBT_harmvisc(2, myDim_elem2D+eDim_elem2D))
+    bottomdrag    = 0.0_WP
+    UVBT_harmvisc = 0.0_WP
     
     !___________________________________________________________________________
     ! Dissipation parameter of FB dissipative method 0.14 is the default value 
     ! from Demange et al.
-!PS     thetaBT= 0.14_WP
-!PS     thetaBT= 0.5_WP
     thetaBT= dynamics%splitexpl_BTtheta
     
     ! BTsteps should be 30 or 40.
     dtBT   = dt/dynamics%splitexpl_BTsteps                
     BT_inv = 1.0_WP/(1.0_WP*dynamics%splitexpl_BTsteps)
     
+    
+    !___SPLIT-EXPLICITE STABILIZATION___________________________________________
+    ! trim R (UVBT_rhs):
+    ! UVBT_rhs --> UVBT_rhs - div_h Ah H^n div_h(Ubt^n/H^n) + Cd*|Ubot|* Ubt^n/H^n 
+    ! The intention here is to approximately remove the term thatwill be
+    ! added later to the barotropic momentum equation (see subroutine 
+    ! compute_BT_step_SE_ale)
+    ! --> use only harmonmic viscosity operator applied to the barotropic
+    !     velocity
+    if (dynamics%splitexpl_visc) then 
+        
+        !_______________________________________________________________________
+        ! remove viscosity
+        do edge=1, myDim_edge2D+eDim_edge2D
+                
+            ! if ed is an outer boundary edge, skip it
+            if(myList_edge2D(edge)>edge2D_in) cycle
+                
+            ! elem indices that participate in edge
+            edelem= edge_tri(:,edge)
+            nzmax = minval(nlevels(edelem))
+            hh    = -zbar(nzmax)
+            len   = sqrt(sum(elem_area(edelem)))
+                
+            update_ubt=(UVBT(1, edelem(1))-UVBT(1, edelem(2)))/hh
+            update_vbt=(UVBT(2, edelem(1))-UVBT(2, edelem(2)))/hh
+            vi=update_ubt*update_ubt + update_vbt*update_vbt
+            vi=-dt*sqrt(max(dynamics%splitexpl_visc_gamma0,           &
+                        max(dynamics%splitexpl_visc_gamma1*sqrt(vi),  &
+                            dynamics%splitexpl_visc_gamma2*vi)        &
+                    )*len)
+            update_ubt=update_ubt*vi
+            update_vbt=update_vbt*vi
+            
+            !___________________________________________________________________
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+            call omp_set_lock(partit%plock(edelem(1)))
+#else
+!$OMP ORDERED
+#endif
+            UVBT_rhs(1, edelem(1))=UVBT_rhs(1, edelem(1))-update_ubt/elem_area(edelem(1))*hh
+            UVBT_rhs(2, edelem(1))=UVBT_rhs(2, edelem(1))-update_vbt/elem_area(edelem(1))*hh
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+            call omp_unset_lock(partit%plock(edelem(1)))
+            call omp_set_lock  (partit%plock(edelem(2)))
+#endif
+            UVBT_rhs(1, edelem(2))=UVBT_rhs(1, edelem(2))+update_ubt/elem_area(edelem(2))*hh
+            UVBT_rhs(2, edelem(2))=UVBT_rhs(2, edelem(2))+update_vbt/elem_area(edelem(2))*hh
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+            call omp_unset_lock(partit%plock(edelem(2)))
+#else
+!$OMP END ORDERED
+#endif
+        end do ! --> do edge=1, myDim_edge2D+eDim_edge2D
+        
+        call exchange_elem_begin(UVBT_rhs, partit)
+        call exchange_elem_end(partit)
+    end if ! --> if (dynamics%splitexpl_visc) then     
+    
+    !___________________________________________________________________________
+    ! remove bottom drag
+    if (dynamics%splitexpl_bottdrag) then
+        do elem=1, myDim_elem2D
+            elnodes= elem2D_nodes(:,elem)
+            nzmax  = nlevels(elem)
+!PS             hh     = -zbar(nzmax)+sum(eta_n(elnodes))/3.0_WP
+            hh     = -zbar(nzmax)
+            bottomdrag(elem) = dt*C_d*sqrt(UV(1, nzmax-1, elem)**2 + UV(2, nzmax-1, elem)**2)
+            UVBT_rhs(1, elem)=UVBT_rhs(1, elem) + bottomdrag(elem)*UVBT(1, elem)/hh
+            UVBT_rhs(2, elem)=UVBT_rhs(2, elem) + bottomdrag(elem)*UVBT(2, elem)/hh
+        end do
+    end if ! --> if (dynamics%splitexpl_bottdrag) then
+    
     !___________________________________________________________________________
     ! eta_n   elevation used in BT stepping, it is just a copy of eta_n
     ! UBT and VBT are transport velocities
     UVBT_mean= 0.0_WP
     do step=1, dynamics%splitexpl_BTsteps
-        !
-        ! Dissipative forward--backward time stepping
-        !
+        !#######################################################################
+        !##########    Dissipative forward--backward time stepping    ##########
+        !#######################################################################
+        
+        !_______________________________________________________________________
+        ! compute harmonic viscosity for stability
+        if (dynamics%splitexpl_visc) then 
+            UVBT_harmvisc = 0.0_WP
+            do edge=1, myDim_edge2D+eDim_edge2D
+                    
+                ! if ed is an outer boundary edge, skip it
+                if(myList_edge2D(edge)>edge2D_in) cycle
+                    
+                ! elem indices that participate in edge
+                edelem = edge_tri(:,edge)
+                nzmax  = minval(nlevels(edelem))
+                hh     = -zbar(nzmax)
+                len    = sqrt(sum(elem_area(edelem)))
+                    
+                update_ubt=(UVBT(1, edelem(1))-UVBT(1, edelem(2)))/hh
+                update_vbt=(UVBT(2, edelem(1))-UVBT(2, edelem(2)))/hh
+                vi=update_ubt*update_ubt + update_vbt*update_vbt
+                vi=dt*sqrt(max(dynamics%splitexpl_visc_gamma0,            &
+                           max(dynamics%splitexpl_visc_gamma1*sqrt(vi),   &
+                               dynamics%splitexpl_visc_gamma2*vi)         &
+                        )*len)
+                update_ubt=update_ubt*vi
+                update_vbt=update_vbt*vi
+                
+                !_______________________________________________________________
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+                call omp_set_lock(partit%plock(edelem(1)))
+#else
+!$OMP ORDERED
+#endif
+                UVBT_harmvisc(1, edelem(1))=UVBT_harmvisc(1, edelem(1))-update_ubt/elem_area(edelem(1))*hh
+                UVBT_harmvisc(2, edelem(1))=UVBT_harmvisc(2, edelem(1))-update_vbt/elem_area(edelem(1))*hh
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+                call omp_unset_lock(partit%plock(edelem(1)))
+                call omp_set_lock  (partit%plock(edelem(2)))
+#endif
+                UVBT_harmvisc(1, edelem(2))=UVBT_harmvisc(1, edelem(2))+update_ubt/elem_area(edelem(2))*hh
+                UVBT_harmvisc(2, edelem(2))=UVBT_harmvisc(2, edelem(2))+update_vbt/elem_area(edelem(2))*hh
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+                call omp_unset_lock(partit%plock(edelem(2)))
+#else
+!$OMP END ORDERED
+#endif
+            end do ! --> do edge=1, myDim_edge2D+eDim_edge2D
+            
+            call exchange_elem_begin(UVBT_harmvisc, partit)
+            call exchange_elem_end(partit)
+        end if ! -> if (dynamics%splitexpl_visc) then 
+        
         !_______________________________________________________________________
         ! Advance velocities. I use SI stepping for the Coriolis
         do elem=1, myDim_elem2D
@@ -1000,17 +1120,58 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             ! AAA = - dt/M*[ + 0.5*f*e_z x (Ubt^(n+(m+1)/M) + Ubt^(n+(m)/M))
             !          - h*H^m*grad_H*eta^((n+m)/M)
             !          - Rbt-->UVBT_rhs ] 
-!PS             hh = -zbar_e_bot(elem)+sum(eta_n(elnodes))/3.0_WP ! Total fluid depth
-            hh = -zbar(nlevels(elem))+sum(eta_n(elnodes))/3.0_WP ! Total fluid depth
+!PS             hh = -zbar(nlevels(elem))+sum(eta_n(elnodes))/3.0_WP ! Total fluid depth
+            hh = -zbar(nlevels(elem)) ! Total fluid depth
             f  = mesh%coriolis(elem)
-            rx = dtBT*(-g*hh*sum(gradient_sca(1:3,elem)*eta_n(elnodes)) + f*UVBT(2, elem)) + BT_inv*UVBT_rhs(1, elem)
-            ry = dtBT*(-g*hh*sum(gradient_sca(4:6,elem)*eta_n(elnodes)) - f*UVBT(1, elem)) + BT_inv*UVBT_rhs(2, elem)
             
+            rx =   dtBT*(-g*hh*sum(gradient_sca(1:3,elem)*eta_n(elnodes)) + f*UVBT(2, elem))  & 
+                 + BT_inv*UVBT_rhs(1, elem)                                                   & 
+                 + BT_inv*(UVBT_harmvisc(1, elem) - bottomdrag(elem)*UVBT(1, elem)/hh) ! <-- stabilization terms
+                 
+            ry =   dtBT*(-g*hh*sum(gradient_sca(4:6,elem)*eta_n(elnodes)) - f*UVBT(1, elem))  &
+                 + BT_inv*UVBT_rhs(2, elem)                                                   &
+                 + BT_inv*(UVBT_harmvisc(2, elem) - bottomdrag(elem)*UVBT(2, elem)/hh) ! <-- stabilization terms
+            
+            ! compute new velocity Ubt^(n+(m+1)/M), Vbt^(n+(m+1)/M) considering 
+            ! in terms of Increments (deltaU) and semi-Implicit Coriolis
+            ! (We do it here based on increments since it saves us some significant
+            ! digits for the accuracy)
+            ! Increments:
+            !   deltaU                      = Ubt^(n+(m+1)/M)-Ubt^(n+m/M)
+            !   Ubt^(n+(m+1)/M)+Ubt^(n+m/M) = Ubt^(n+(m+1)/M)-Ubt^(n+m/M)+2*Ubt^(n+m/M)
+            !                               = deltaU + 2*Ubt^(n+m/M)
+            !
+            ! Ubt^(n+(m+1)/M)-Ubt^(n+m/M) = - dt/M*[ + 0.5*f*e_z x (Ubt^(n+(m+1)/M) + Ubt^(n+m/M))
+            !                               - h*H^m*grad_H*eta^(n+m/M)
+            !                               - Rbt-->UVBT_rhs ] 
+            !
+            ! deltaU - dt/(2*M)*f*deltaV   =  dt/M*f*Vbt^(n+m/M) - h*H^m*gradx_H*eta^(n+m/M) + Rbtx
+            ! deltaV + dt/(2*M)*f*deltaU   = -dt/M*f*Ubt^(n+m/M) - h*H^m*grady_H*eta^(n+m/M) + Rbty
+            !                                \________________________v___________________________/
+            ! --> a = dt/(2*M)*f                                     Rx, Ry 
+            !
+            ! | 1 -a | * | deltaU | = MAT* | deltaU | = | Rx |
+            ! | a  1 |   | deltaV | =      | deltaV | = | Ry |
+            !  
+            ! --> d = 1/(1 + a^2) ; inv(MAT) = d* |  1  a |
+            !                                     | -a  1 |
+            !
+            ! | deltaU | = inv(MAT) * | Rx | 
+            ! | deltaV | =            | Ry |
+            !
+            ! Ubt^(n+(m+1)/M) = Ubt^(n+m/M) + d*(   Rx + a*Ry) 
+            ! Vbt^(n+(m+1)/M) = Vbt^(n+m/M) + d*(-a*Rx +   Ry) 
+            !
             ! Semi-Implicit Coriolis
             a  = dtBT*f*0.5_WP
-            d  = 1.0_WP/(1.0_WP+a*a)
-            ax = d*(   rx + a*ry)
-            ay = d*(-a*rx +   ry)
+            if (dynamics%splitexpl_bdrag_si) then 
+                b  = 1.0_WP+BT_inv*bottomdrag(elem)/hh
+            else
+                b  = 1.0_WP
+            end if 
+            d  = 1.0_WP/(b*b + a*a)
+            ax = d*(  b*rx + a*ry )
+            ay = d*( -a*rx + b*ry )
             
             !___________________________________________________________________
             ! compute new velocities Ubt^(n+(m+1)/M) at barotropic time step (n+(m+1)/M) ...
@@ -1036,6 +1197,7 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             ! T. Banerjee et al.,Split-Explicite external mode solver in FESOM2, 
             UVBT_mean( 1, elem) = UVBT_mean( 1, elem) + UVBT_theta(1, elem)*BT_inv
             UVBT_mean( 2, elem) = UVBT_mean( 2, elem) + UVBT_theta(2, elem)*BT_inv
+            
         end do
         
         !_______________________________________________________________________
@@ -1071,55 +1233,13 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             eta_n(ednodes(1))=eta_n(ednodes(1)) + (c1+c2)*dtBT/area(1,ednodes(1))
             eta_n(ednodes(2))=eta_n(ednodes(2)) - (c1+c2)*dtBT/area(1,ednodes(2))
             
-            
-!PS             if ( (mype==398) .and. ((abs(eta_n(ednodes(1)))>10) .or. (abs(eta_n(ednodes(1)))>10)) ) then
-!PS             if ((abs(eta_n(ednodes(1)))>100) .or. (abs(eta_n(ednodes(2)))>100)) then
-!PS                 write(*,*) '-------------------------------------------------'
-!PS                 write(*,*) ' --> subroutine compute_BT_step_SE_ale --> found eta_n>100 in barotrop. subcycling'
-!PS                 write(*,*) ' mype           = ', mype
-!PS                 write(*,*) ' mstep          = ', mstep
-!PS                 write(*,*) ' btstep         = ', step
-!PS                 write(*,*) ' edge           = ', edge
-!PS                 write(*,*) ' ednodes(1:2)   = ', ednodes
-!PS                 write(*,*) ' edelem(1:2)    = ', edelem
-!PS                 write(*,*) ' glon,glat      = ', geo_coord_nod2D(:,ednodes)/rad
-!PS                 write(*,*)
-!PS                 write(*,*) '         eta_n(ednodes) = ', eta_n(ednodes) 
-!PS                 write(*,*) '                 c1, c2 = ', c1, c2
-!PS                 if(edelem(2)>0) then
-!PS                     write(*,*) ' UVBT_rhs(  1:2,edelem) = ', UVBT_rhs(  1:2, edelem)
-!PS                     write(*,*) ' UVBT(      1:2,edelem) = ', UVBT(      1:2, edelem)
-!PS                     write(*,*) ' UVBT_theta(1:2,edelem) = ', UVBT_theta(1:2, edelem)
-!PS                     write(*,*) ' UVBT_mean( 1:2,edelem) = ', UVBT_mean( 1:2, edelem)
-!PS                     nzmin1 = ulevels(edelem(1))
-!PS                     nzmax1 = nlevels(edelem(1))-1
-!PS                     nzmin2 = ulevels(edelem(2))
-!PS                     nzmax2 = nlevels(edelem(2))-1
-!PS                     write(*,*) ' UVh(1:2,nzmin:nzmax,edelem(1)) = ', dynamics%se_uvh(1:2, nzmin1:nzmax1, edelem(1))
-!PS                     write(*,*) ' UVh(1:2,nzmin:nzmax,edelem(2)) = ', dynamics%se_uvh(1:2, nzmin2:nzmax2, edelem(2))
-!PS                     write(*,*) ' UV_rhs(1:2,nzmin:nzmax,edelem(1)) = ', dynamics%uv_rhs(1:2, nzmin1:nzmax1, edelem(1))
-!PS                     write(*,*) ' UV_rhs(1:2,nzmin:nzmax,edelem(2)) = ', dynamics%uv_rhs(1:2, nzmin2:nzmax2, edelem(2))
-!PS                 else
-!PS                     write(*,*) ' UVBT_rhs(  1:2,edelem) = ', UVBT_rhs(  1:2, edelem(1))
-!PS                     write(*,*) ' UVBT(      1:2,edelem) = ', UVBT(      1:2, edelem(1))
-!PS                     write(*,*) ' UVBT_theta(1:2,edelem) = ', UVBT_theta(1:2, edelem(1))
-!PS                     write(*,*) ' UVBT_mean( 1:2,edelem) = ', UVBT_mean( 1:2, edelem(1))
-!PS                     nzmin1 = ulevels(edelem(1))
-!PS                     nzmax1 = nlevels(edelem(1))-1
-!PS                     write(*,*) ' UVh(1:2,nzmin:nzmax,edelem(1)) = ', dynamics%se_uvh(1:2, nzmin1:nzmax1, edelem(1))
-!PS                     write(*,*) ' UV_rhs(1:2,nzmin:nzmax,edelem(1)) = ', dynamics%uv_rhs(1:2, nzmin1:nzmax1, edelem(1))
-!PS                     
-!PS                 end if 
-!PS                 write(*,*)
-!PS             end if
-            
         end do
         
         !_______________________________________________________________________
         call exchange_nod(eta_n, partit)
         
     end do ! --> do step=1, dynamics%splitexpl_BTsteps
-    
+    deallocate(bottomdrag, UVBT_harmvisc)
     hbar_old = hbar
     hbar     = eta_n 
 end subroutine compute_BT_step_SE_ale
@@ -1198,26 +1318,6 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
                 UV( 1, nz, elem)= UVh(1, nz, elem)/helem(nz,elem)  ! velocities are still needed    
                 UV( 2, nz, elem)= UVh(2, nz, elem)/helem(nz,elem) 
                 
-!PS                 !_______________________________________________________________
-!PS                 if ( UV( 1, nz, elem)/=UV( 1, nz, elem) .or. &
-!PS                      UV( 2, nz, elem)/=UV( 2, nz, elem)) then
-!PS                     write(*,*) ' --> subroutine update_trim_vel_ale_vtransp(mode=1) --> found Nan in UV after update UV with barotr. term'
-!PS                     write(*,*) ' mype =', mype
-!PS                     write(*,*) ' elem =', elem
-!PS                     write(*,*) ' nz   =', nz
-!PS                     write(*,*) ' UV_rhs(1,nz,elem)=', UV_rhs( 1, nz, elem)
-!PS                     write(*,*) ' UV_rhs(2,nz,elem)=', UV_rhs( 2, nz, elem)
-!PS                     write(*,*) ' UV( 1, nz, elem) =', UV( 1, nz, elem)
-!PS                     write(*,*) ' UV( 2, nz, elem) =', UV( 2, nz, elem)
-!PS                     write(*,*) ' UVh( 1, nz, elem)=', UVh( 1, nz, elem)
-!PS                     write(*,*) ' UVh( 2, nz, elem)=', UVh( 2, nz, elem)
-!PS                     write(*,*) ' helem(nz, elem)  =', helem(nz, elem)
-!PS                     write(*,*) ' UVBT_mean(1,elem)=', UVBT_mean(1,elem)
-!PS                     write(*,*) ' UVBT_mean(2,elem)=', UVBT_mean(2,elem)
-!PS                     write(*,*) ' ubar, vbar       =', ubar, vbar
-!PS                     write(*,*) ' hh_inv           =', hh_inv
-!PS                 end if
-                
             end do
         end do
         call exchange_elem(UVh, partit)  ! This exchange can be avoided, but test first.
@@ -1246,25 +1346,6 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
                 UVh(2, nz, elem)= UVh(2, nz, elem)+(UVBT_12(2, elem)-vbar)*helem(nz,elem)*hh_inv
                 UV( 1, nz, elem)= UVh(1, nz, elem)/helem(nz,elem)  ! velocities are still needed    
                 UV( 2, nz, elem)= UVh(2, nz, elem)/helem(nz,elem)  ! to compute momentum advection
-                
-!PS                 !_______________________________________________________________
-!PS                 if ( UV( 1, nz, elem)/=UV( 1, nz, elem) .or. &
-!PS                      UV( 2, nz, elem)/=UV( 2, nz, elem)) then
-!PS                     write(*,*) ' --> subroutine update_trim_vel_ale_vtransp(mode=2) --> found Nan in UV after update UV with barotr. term'
-!PS                     write(*,*) ' mype =', mype
-!PS                     write(*,*) ' elem =', elem
-!PS                     write(*,*) ' nz   =', nz
-!PS                     write(*,*) ' UV( 1, nz, elem) =', UV( 1, nz, elem)
-!PS                     write(*,*) ' UV( 2, nz, elem) =', UV( 2, nz, elem)
-!PS                     write(*,*) ' UVh( 1, nz, elem)=', UVh( 1, nz, elem)
-!PS                     write(*,*) ' UVh( 2, nz, elem)=', UVh( 2, nz, elem)
-!PS                     write(*,*) ' helem(nz, elem)  =', helem(nz, elem)
-!PS                     write(*,*) ' UVBT_12(1,elem)  =', UVBT_12(1,elem)
-!PS                     write(*,*) ' UVBT_12(2,elem)  =', UVBT_12(2,elem)
-!PS                     write(*,*) ' ubar, vbar       =', ubar, vbar
-!PS                     write(*,*) ' hh_inv           =', hh_inv
-!PS                 end if
-
             end do
         end do
         call exchange_elem(UVh, partit)    ! 
