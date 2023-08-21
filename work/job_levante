@@ -9,9 +9,12 @@
 #SBATCH -A ab0995
 
 source /sw/etc/profile.levante
-source ../env/levante.dkrz.de/shell
+#source ../env/levante.dkrz.de/shell
+read -r USED_SHELL < ../bin/current_shell_path
+source $USED_SHELL
+echo "using environment from" $USED_SHELL
 
-ulimit -s 102400
+ulimit -s 204800 # https://docs.dkrz.de/doc/levante/running-jobs/runtime-settings.html
 
 echo Submitted job: $jobid
 squeue -u $USER
