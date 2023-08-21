@@ -141,14 +141,9 @@ TYPE T_ICE
     integer                                     :: num_itracers=5
 #else
     integer                                     :: num_itracers=3
-<<<<<<< HEAD
 #endif 
     !------------------------------
 #endif 
-    
-=======
-#endif
->>>>>>> refactoring
 
     ! put ice tracers data arrays
     type(t_ice_data), allocatable, dimension(:) :: data
@@ -774,15 +769,9 @@ subroutine ice_init(ice, partit, mesh)
             if (myList_edge2D(n) <= mesh%edge2D_in) cycle
             mesh%bc_index_nod2D(ed)=0._WP
         end do
-<<<<<<< HEAD
     !end if
     
 end subroutine ice_init  
-=======
-    end if
-
-end subroutine ice_init
->>>>>>> refactoring
 !
 !
 !

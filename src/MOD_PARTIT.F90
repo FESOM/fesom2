@@ -45,27 +45,6 @@ TYPE T_PARTIT
   type(com_struct) :: com_elem2D
   type(com_struct) :: com_elem2D_full
 
-  integer              :: npes
-  integer              :: mype
-  integer              :: maxPEnum=100
-  integer, allocatable, dimension(:)  :: part
-
-  integer                             :: myDim_nod2D
-  integer                             :: eDim_nod2D
-  integer, allocatable, dimension(:)  :: myList_nod2D
-
-  integer                             :: myDim_elem2D, myDim_elem2D_shrinked
-  integer                             :: eDim_elem2D
-  integer                             :: eXDim_elem2D
-  integer, allocatable, dimension(:)  :: myList_elem2D, myInd_elem2D_shrinked
-
-  integer                             :: myDim_edge2D
-  integer                             :: eDim_edge2D
-  integer, allocatable, dimension(:)  :: myList_edge2D
-  integer :: pe_status = 0 ! if /=0 then something is wrong
-
-  integer              :: MPI_COMM_FESOM ! FESOM communicator (for ocean only runs if often a copy of MPI_COMM_WORLD)
-
   ! MPI Datatypes for interface exchange
   ! Element fields (2D; 2D integer; 3D with nl-1 or nl levels, 1 - 4 values)
   !                 small halo and / or full halo
@@ -82,7 +61,6 @@ TYPE T_PARTIT
   integer, allocatable       :: s_mpitype_nod3D(:,:,:), r_mpitype_nod3D(:,:,:)
 
   integer            :: MPIERR
-<<<<<<< HEAD
   !---------------------------------------------------
   !LA 2023-01-31 add asynchronous icebergs
   ! kh 11.02.21
@@ -91,21 +69,23 @@ TYPE T_PARTIT
   integer            :: npes
   integer            :: mype
   integer            :: maxPEnum=100
-!PS   logical            :: flag_debug=.false.
   integer, allocatable, dimension(:)  :: part
 
-  ! Mesh partition
-  integer                             :: myDim_nod2D, eDim_nod2D
+  integer                             :: myDim_nod2D
+  integer                             :: eDim_nod2D
   integer, allocatable, dimension(:)  :: myList_nod2D
-  integer                             :: myDim_elem2D, eDim_elem2D, eXDim_elem2D
-  integer, allocatable, dimension(:)  :: myList_elem2D
-  integer                             :: myDim_edge2D, eDim_edge2D
+
+  integer                             :: myDim_elem2D, myDim_elem2D_shrinked
+  integer                             :: eDim_elem2D
+  integer                             :: eXDim_elem2D
+  integer, allocatable, dimension(:)  :: myList_elem2D, myInd_elem2D_shrinked
+
+  integer                             :: myDim_edge2D
+  integer                             :: eDim_edge2D
   integer, allocatable, dimension(:)  :: myList_edge2D
 
   integer :: pe_status = 0 ! if /=0 then something is wrong 
-=======
   
->>>>>>> refactoring
   !!! remPtr_* are constructed during the runtime and shall not be dumped!!!
   integer, allocatable ::  remPtr_nod2D(:),  remList_nod2D(:)
   integer, allocatable ::  remPtr_elem2D(:), remList_elem2D(:)

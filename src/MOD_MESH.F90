@@ -156,14 +156,11 @@ real(kind=WP), allocatable,dimension(:)     :: zbar_e_srf
 
 character(:), allocatable :: representative_checksum
 
-<<<<<<< HEAD
-=======
 !
 !
 !___coriolis force______________________________________________________________
 real(kind=WP), allocatable, dimension(:)    :: coriolis
 real(kind=WP), allocatable, dimension(:)    :: coriolis_node
->>>>>>> refactoring
 
 contains
 #if defined(__PGI)

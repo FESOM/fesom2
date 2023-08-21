@@ -358,10 +358,7 @@ if (use_icebergs == 0) then
     v_ice        => ice%vice(:)
     a_ice        => ice%data(1)%values(:)
     m_ice        => ice%data(2)%values(:)
-<<<<<<< HEAD
-=======
     m_snow       => ice%data(3)%values(:)
->>>>>>> refactoring
     !___________________________________________________________________________
     m_ice =0._WP
     a_ice =0._WP
