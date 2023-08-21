@@ -348,15 +348,23 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
 #endif
 
+    !___________________________________________________________________________
+    ! add heat and fresh water flux from cavity 
+    if (use_cavity) then
+        call cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)   
+        call exchange_nod(heat_flux, water_flux, partit)
+!$OMP BARRIER
+    end if 
+    
+    !___________________________________________________________________________
+    ! save total heat flux (heat_flux_in) since heat_flux will be alternated by 
+    ! sw_pene
 !$OMP PARALLEL DO
     do n=1, myDim_nod2d+eDim_nod2d  
        heat_flux_in(n)=heat_flux(n) ! sw_pene will change the heat_flux
     end do
 !$OMP END PARALLEL DO
-    if (use_cavity) call cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)   
-    !___________________________________________________________________________
-    call exchange_nod(heat_flux, water_flux, partit)
-!$OMP BARRIER
+    
     !___________________________________________________________________________
     ! on freshwater inflow/outflow or virtual salinity:
     ! 1. In zlevel & zstar the freshwater flux is applied in the update of the 
@@ -379,37 +387,69 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
             virtual_salt(n)=rsss*water_flux(n) 
         end do
 !$OMP END PARALLEL DO        
-        if (use_cavity) then
-            flux = virtual_salt
-            where (ulevels_nod2d > 1) flux = 0.0_WP
-            call integrate_nod(flux, net, partit, mesh)
-        else   
-            call integrate_nod(virtual_salt, net, partit, mesh)
-        end if
+
+        call integrate_nod(virtual_salt, net, partit, mesh)
+        
+        ! we try not to change the virtual_salt flux values under the cavity from
+        ! the balancing --> but we balance the contribution under the cavity over 
+        ! the rest of the ocean
+        ! ocean_area in case of cavity contains only the open ocean area
+        net = net/ocean_area
 !$OMP PARALLEL DO 
         do n=1, myDim_nod2D+eDim_nod2D
-           virtual_salt(n)=virtual_salt(n)-net/ocean_area
+            if (ulevels_nod2d(n) > 1) cycle ! --> is cavity node 
+            virtual_salt(n)=virtual_salt(n)-net
+        end do
+!$OMP END PARALLEL DO
+
+    !___________________________________________________________________________
+    ! do virtual salt flux under the cavity also when zstar is switched on 
+    ! since under the cavity nothing is allowed to move  --> linfs --> and linfs
+    ! requires virtual salt
+    elseif ( (.not. use_virt_salt) .and. (use_cavity) ) then ! will remain zero otherwise
+        ! Introducing here in zstar a virtual salt flux in the cavity , will mess 
+        ! up our global salinity conservation, we also cant do our usual global 
+        ! virtual salt balancing since this will mess our local virtual_salt 
+        ! flux, since we have no counter salt fluxes anywhere else in the ocean. 
+        ! So what we try is to introduce an artificial very small counter virtual 
+        ! saltflux at every open ocean vertice, to counter balance the virtual 
+        ! salt flux in the cavity and to conserve the global salt budget   
+        rsss=ref_sss
+        
+        ! compute virtual salt flux within the cavity
+!$OMP PARALLEL DO         
+        do n=1, myDim_nod2D+eDim_nod2D
+            virtual_salt(n)=0.0_WP
+            if (ulevels_nod2d(n) == 1) cycle ! --> is open ocean node 
+            if (ref_sss_local) rsss = salt(ulevels_nod2d(n),n)
+            virtual_salt(n)=rsss*water_flux(n) 
+        end do
+!$OMP END PARALLEL DO        
+        
+        ! integrate salt flux in the cavity(outside cavity virtual_salt is 0.0)
+        call integrate_nod(virtual_salt, net, partit, mesh)
+        
+        ! counter balance the integrated cavity salt flux only in the open ocean 
+        ! --> ensure global salt conservation !!!
+        net = net/ocean_area
+!$OMP PARALLEL DO         
+        do n=1, myDim_nod2D+eDim_nod2D
+            if (ulevels_nod2d(n) > 1) cycle ! --> is cavity node 
+            virtual_salt(n)=virtual_salt(n)-net
         end do
 !$OMP END PARALLEL DO
     end if
-
-!$OMP PARALLEL DO
-    do n=1, myDim_nod2D+eDim_nod2D    
-      if (ulevels_nod2d(n) == 1) then
-             dens_flux(n)=sw_alpha(1,n) * heat_flux_in(n) / vcpw + sw_beta(1, n) * (relax_salt(n) + water_flux(n) * salt(1,n))
-      else
-             dens_flux(n)=0.0_WP
-      end if
-    end do
-!$OMP END PARALLEL DO
+    
     !___________________________________________________________________________
     ! balance SSS restoring to climatology
     if (use_cavity) then
+!$OMP PARALLEL DO    
         do n=1, myDim_nod2D+eDim_nod2D
             relax_salt(n) = 0.0_WP
-            if (ulevels_nod2d(n) > 1) cycle
+            if (ulevels_nod2d(n) > 1) cycle ! --> is cavity node --> only do salt relaxation in open ocean
             relax_salt(n)=surf_relax_S*(Ssurf(n)-salt(ulevels_nod2d(n),n))
         end do
+!$OMP END PARALLEL DO
     else
 !$OMP PARALLEL DO
         do n=1, myDim_nod2D+eDim_nod2D
@@ -420,10 +460,13 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     
     ! --> if use_cavity=.true. relax_salt anyway zero where is cavity see above
     call integrate_nod(relax_salt, net, partit, mesh)
+    net = net/ocean_area
 !$OMP PARALLEL DO
-        do n=1, myDim_nod2D+eDim_nod2D
-           relax_salt(n)=relax_salt(n)-net/ocean_area
-        end do
+    do n=1, myDim_nod2D+eDim_nod2D
+        !--> only balance salt_relaxation in open ocean under the cavity it remains zero
+        if (ulevels_nod2d(n) > 1) cycle ! --> is cavity node
+        relax_salt(n)=relax_salt(n)-net
+    end do
 !$OMP END PARALLEL DO
     
     !___________________________________________________________________________
@@ -459,16 +502,22 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
     end if     
     
-    ! Also balance freshwater flux that come from ocean-cavity boundary
+    !___________________________________________________________________________
     if (use_cavity) then
+        ! with zstar we do not balance the freshwater flux under the cavity since its
+        ! not contributing to the ocean volume increase/decrease since under the
+        ! cavity ist linfs 
         if (.not. use_virt_salt) then !zstar, zlevel
-            ! only for full-free surface approach otherwise total ocean volume will drift
-            where (ulevels_nod2d > 1) flux = -water_flux
+            where (ulevels_nod2d > 1) flux = 0.0_WP
+            
+        ! with linfs we balance the freshwater flux globally, thereby ot changeing
+        ! the freshwater flux under the cavity
         else ! linfs 
-            where (ulevels_nod2d > 1) flux =  0.0_WP
+            where (ulevels_nod2d > 1) flux = -water_flux
         end if 
     end if 
     
+    !___________________________________________________________________________
     ! compute total global net freshwater flux into the ocean 
     call integrate_nod(flux, net, partit, mesh)
     
@@ -482,11 +531,18 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         ! due to rigid lid approximation under the cavity we to not add freshwater
         ! under the cavity for the freshwater balancing we do this only for the open
         ! ocean
-        where (ulevels_nod2d == 1) water_flux=water_flux+net/ocean_area
-    else
+        net = net/ocean_area
 !$OMP PARALLEL DO
         do n=1, myDim_nod2D+eDim_nod2D
-           water_flux(n)=water_flux(n)+net/ocean_area
+            if (ulevels_nod2d(n) > 1) cycle
+            water_flux(n)=water_flux(n)+net
+        end do
+!$OMP END PARALLEL DO
+    else
+        net = net/ocean_area
+!$OMP PARALLEL DO
+        do n=1, myDim_nod2D+eDim_nod2D
+           water_flux(n)=water_flux(n)+net
         end do
 !$OMP END PARALLEL DO
     end if 
@@ -510,6 +566,19 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 !!$OMP END PARALLEL DO
 !    end if
 !---fwf-code-end
+
+    !___________________________________________________________________________
+    ! use the balanced water_flux and relax_salt flux (same as in the tracer 
+    ! boundary condition) to compute the dens_flux for MOC diagnostic
+!$OMP PARALLEL DO
+    do n=1, myDim_nod2D+eDim_nod2D    
+        if (ulevels_nod2d(n) == 1) then ! --> is open ocean node 
+            dens_flux(n)=sw_alpha(1,n) * heat_flux_in(n) / vcpw + sw_beta(1, n) * (relax_salt(n) + water_flux(n) * salt(1,n))
+        else
+            dens_flux(n)=0.0_WP
+        end if
+    end do
+!$OMP END PARALLEL DO
 
     !___________________________________________________________________________
     if (use_sw_pene) call cal_shortwave_rad(ice, partit, mesh)

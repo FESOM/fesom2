@@ -842,28 +842,28 @@ end if
  n=com_elem2D_full%sptr(com_elem2D_full%sPEnum+1)-1
  ALLOCATE(com_elem2D_full%slist(n))
  read(fileID,*) com_elem2D_full%slist
-
-!!$ read(fileID,*) com_edge2D%rPEnum
-!!$ ALLOCATE(com_edge2D%rPE(com_edge2D%rPEnum))
-!!$ read(fileID,*) com_edge2D%rPE
-!!$ ALLOCATE(com_edge2D%rptr(com_edge2D%rPEnum+1))
-!!$ read(fileID,*) com_edge2D%rptr
-!!$ ALLOCATE(com_edge2D%rlist(eDim_edge2D))
-!!$ read(fileID,*) com_edge2D%rlist
-!!$	 
-!!$ read(fileID,*) com_edge2D%sPEnum
-!!$ ALLOCATE(com_edge2D%sPE(com_edge2D%sPEnum))
-!!$ read(fileID,*) com_edge2D%sPE
-!!$ ALLOCATE(com_edge2D%sptr(com_edge2D%sPEnum+1))
-!!$ read(fileID,*) com_edge2D%sptr
-!!$ n=com_edge2D%sptr(com_edge2D%sPEnum+1)-1
-!!$ ALLOCATE(com_edge2D%slist(n))
-!!$ read(fileID,*) com_edge2D%slist
  close(fileID)
+
  if (mype==0) write(*,*) 'communication arrays are read'
  deallocate(rbuff, ibuff)
  deallocate(mapping)
- 
+
+! necessary for MULTIO auxuary data:
+! one element might belong to several processes hence we unify the element partition 
+! such that sum(myDim_elem2D_shrinked) over all processors will give elem2D
+ partit%myDim_elem2D_shrinked=0
+ DO n=1, myDim_elem2D
+    if (mesh%elem2D_nodes(1, n) > myDim_nod2D) cycle
+    partit%myDim_elem2D_shrinked=partit%myDim_elem2D_shrinked+1
+ END DO
+ allocate(partit%myInd_elem2D_shrinked(partit%myDim_elem2D_shrinked))
+! fill the respective indicies
+ nn=1
+ DO n=1, myDim_elem2D
+    if (mesh%elem2D_nodes(1, n) > myDim_nod2D) cycle
+    partit%myInd_elem2D_shrinked(nn)=n
+    nn=nn+1
+ END DO
 ! no checksum for now, execute_command_line is failing too often. if you think it is important, please drop me a line and I will try to revive it: jan.hegewald@awi.de
 mesh%representative_checksum = ''
 
@@ -1123,6 +1123,7 @@ subroutine find_levels_cavity(partit, mesh)
     ! Allocate mapping array (chunk_size) --> It will be used for several purposes 
     allocate(mapping(chunk_size))
     allocate(ibuff(chunk_size))
+    allocate(rbuff(chunk_size))
     
     !___________________________________________________________________________
     ! Part I: reading cavity levels at elements...
@@ -1392,7 +1393,7 @@ subroutine find_levels_cavity(partit, mesh)
             write(*,*)
             print *, achar(27)//'[33m'
             write(*,*) '____________________________________________________________________'
-            write(*,*) ' ERROR: could not find file: cavity_depth.out '
+            write(*,*) ' ERROR: could not find file:', file_name
             write(*,*) '        Wrong mesh path ? This file provides the necessary depth'
             write(*,*) '        information of the cavity.'
             write(*,*) '____________________________________________________________________'
@@ -2345,12 +2346,15 @@ type(t_partit), intent(inout), target :: partit
     vol = 0.0_WP
     vol2= 0.0_WP
     do n=1, myDim_nod2D
-        vol2=vol2+mesh%area(mesh%ulevels_nod2D(n), n) ! area also under cavity
+!!PS         vol2=vol2+mesh%area(mesh%ulevels_nod2D(n), n) ! area also under cavity
+!!PS         if (mesh%ulevels_nod2D(n)>1) cycle
+!!PS         vol=vol+mesh%area(1, n) ! area only surface
+        vol2=vol2+mesh%areasvol(mesh%ulevels_nod2D(n), n) ! area also under cavity
         if (mesh%ulevels_nod2D(n)>1) cycle
-        vol=vol+mesh%area(1, n) ! area only surface  
+        vol=vol+mesh%areasvol(1, n) ! area only surface  
     end do
-    mesh%ocean_area=0.0
-    mesh%ocean_areawithcav=0.0
+    mesh%ocean_area=0.0_WP
+    mesh%ocean_areawithcav=0.0_WP
     call MPI_AllREDUCE(vol, mesh%ocean_area, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
         MPI_COMM_FESOM, MPIerr)
     call MPI_AllREDUCE(vol2, mesh%ocean_areawithcav, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
@@ -2366,7 +2370,7 @@ type(t_partit), intent(inout), target :: partit
         write(*,*)  mype, 'Edges:    ', mesh%edge2D, ' internal ', mesh%edge2D_in
         if (mype==0) then
             write(*,*) '     > Total ocean surface area is           : ', mesh%ocean_area, ' m^2'
-            write(*,*) '     > Total ocean surface area wth cavity is: ', mesh%ocean_areawithcav, ' m^2'
+            write(*,*) '     > Total ocean surface area with cavity is: ', mesh%ocean_areawithcav, ' m^2'
         end if
     endif
 

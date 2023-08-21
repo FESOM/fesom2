@@ -1,0 +1,40 @@
+#!/bin/bash
+#SBATCH --job-name=test-fesom
+#SBATCH -p small
+#SBATCH --ntasks-per-node=64
+#SBATCH --ntasks=64
+#SBATCH --time=00:30:00
+#SBATCH -o slurm-out.out
+#SBATCH -e slurm-err.out
+#SBATCH -A project_465000454
+
+source ../env/lumi/shell
+
+ulimit -s 102400
+
+echo Submitted job: $jobid
+squeue -u $USER
+
+# determine JOBID
+JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
+
+ln -s ../bin/fesom.x .           # cp -n ../bin/fesom.x
+cp -n ../config/namelist.config  .
+cp -n ../config/namelist.forcing .
+cp ../config/namelist.oce     .
+cp ../config/namelist.ice     .
+cp ../config/namelist.icepack .
+cp ../config/namelist.tra .
+cp ../config/namelist.io .
+cp ../config/namelist.dyn .
+
+date
+srun -l fesom.x > "fesom2.0.out"
+date
+
+# qstat -f $PBS_JOBID
+#export EXITSTATUS=$?
+#if [ ${EXITSTATUS} -eq 0 ] || [ ${EXITSTATUS} -eq 127 ] ; then
+#sbatch job_mistral
+#fi
+

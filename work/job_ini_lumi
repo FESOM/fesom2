@@ -1,9 +1,8 @@
 #!/bin/bash
-#SBATCH --account=clidyn.p_fesom # edit your account
+#SBATCH --account=project_462000048 # edit your account
 #SBATCH --job-name=ini
-#SBATCH --partition=mpp
+#SBATCH --partition=debug
 #SBATCH --time=00:30:00
-#SBATCH --qos=30min
 #SBATCH --ntasks=128            # Number of tasks (MPI) tasks to be launched
 #SBATCH -o fesom2_%x_%j.out
 #SBATCH -e fesom2_%x_%j.out
@@ -12,7 +11,7 @@ set -x
 
 ulimit -s unlimited
 
-source ../env/albedo/shell
+source ../env/lumi/shell
 
 ln -s ../bin/fesom_ini.x         .           # cp -n ../bin/fvom_ini.x
 cp -n ../config/namelist.config  .

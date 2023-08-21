@@ -58,6 +58,7 @@ subroutine par_init(partit)    ! initializes MPI
  
 
   if(partit%mype==0) then
+#if !defined(__PGI)
     call MPI_Query_thread(provided_mpi_thread_support_level, i)
     if(provided_mpi_thread_support_level == MPI_THREAD_SINGLE) then
       provided_mpi_thread_support_level_name = "MPI_THREAD_SINGLE"
@@ -72,6 +73,7 @@ subroutine par_init(partit)    ! initializes MPI
     end if
     write(*,*) 'MPI has been initialized, provided MPI thread support level: ', &
          provided_mpi_thread_support_level_name,provided_mpi_thread_support_level
+#endif
     write(*, *) 'Running on                   ', partit%npes, ' PEs'
 #if defined(_OPENMP)
     write(*, *) 'This is MPI/OpenMP run, with ', OMP_GET_MAX_THREADS(), ' threads per PE'
