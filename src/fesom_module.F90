@@ -572,8 +572,8 @@ end if
         call output (n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
 
         ! LA icebergs: 2023-05-17 
-        if (use_icebergs) then
-                call reset_ib_fluxes
+        if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
+            call reset_ib_fluxes
         end if
         !--------------------------
 
