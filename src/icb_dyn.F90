@@ -101,7 +101,6 @@ type(t_dyn)   , intent(inout), target :: dynamics
  ! - T_ave_ib, S_ave_ib		: Mean T & S (integrated) at location of iceberg
  ! - T_keel_ib, S_keel_ib	: T & S below the draft of the iceberg (depth_ib)
  call FEM_3eval(mesh, partit, T_ave_ib,S_ave_ib,lon,lat,T_dz,S_dz,iceberg_elem)
-! write(*,*) "LA DEBUG: T_dz=",T_dz, ", T_ave_ib=",T_ave_ib
  call FEM_3eval(mesh, partit, T_keel_ib,S_keel_ib,lon,lat,T_keel,S_keel,iceberg_elem)
 
 
@@ -115,9 +114,6 @@ type(t_dyn)   , intent(inout), target :: dynamics
   
  !ICE THICKNESS (CONCENTRATION) hi_ib, conci_ib
  
- ! LA debug
-! tmp_arr=elem2D_nodes(:,iceberg_elem)
-
  hi_ib3    => ice%data(size(ice%data))%values(:) !ice%m_ice_ib(tmp_arr)
  conci_ib3 => ice%data(size(ice%data)-1)%values(:) !ice%a_ice_ib(tmp_arr) 
  call FEM_3eval(mesh, partit, hi_ib,conci_ib,lon,lat,hi_ib3,conci_ib3,iceberg_elem)
@@ -827,7 +823,6 @@ type(t_partit), intent(inout), target :: partit
     
     else	
       if( k==1 ) then
-          !write(*,*) "LA DEBUG: lev_low = ", lev_low, ", lev_up = ", lev_up, ", depth_ib = ", depth_ib
           cycle
       end if
 

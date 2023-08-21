@@ -394,91 +394,11 @@ if (use_icebergs) then
 ! ib_async_mode == 0: original sequential behavior for both ice sections (for testing purposes, creating reference results etc.)
 ! ib_async_mode == 1: OpenMP code active to overlapped computations in first (ocean ice) and second (icebergs) parallel section
 ! ib_async_mode == 2: OpenMP code active, but computations still serialized via spinlock (for testing purposes)
-!        if (ib_async_mode == 0) then ! kh 01.03.21 original sequential behavior for both ice sections
-!
-!! kh 10.03.21 it is not the start of a real parallel section here, but the value of the timer is still of interest
-!            t1_par_sections = MPI_Wtime()
-!
-!            call compute_vel_nodes(mesh)
-!
-!! kh 08.03.21 t1 moved up to here to include the iceberg computation time (like in former FESOM2 paleodyn_icb versions)
-!           t1 = MPI_Wtime()
-!
-!! kh 03.03.21 pseudo overlap ocean ice and iceberg calculation to imitate the behavior of the parallel modes (i.e. ib_async_mode > 0)
-!!           if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
-!            if (use_icebergs .and. mod(n - 1, steps_per_ib_step)==0) then
-!                if (mype==0) write(*,*) '*** step n=',n
-!                t1_icb = MPI_Wtime()
-!                call iceberg_calculation(mesh,n)
-!            end if
-!!
-!            !___model sea-ice step__________________________________________________
-!
-!! kh 08.03.21 t1 moved up to include the iceberg calculation time (like in former FESOM2 paleodyn_icb versions)
-!!           t1 = MPI_Wtime()
-!            if(use_ice) then
-!                call ocean2ice(mesh)
-!                call update_atm_forcing(n, mesh)
-!                
-!                if (ice_steps_since_upd>=ice_ave_steps-1) then
-!                    ice_update=.true.
-!                    ice_steps_since_upd = 0
-!                else
-!                    ice_update=.false.
-!                    ice_steps_since_upd=ice_steps_since_upd+1
-!                endif
-!                
-!                if (ice_update) call ice_timestep(n, mesh)
-!                
-!!LA 20221023 ----------------
-!            if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
-!                t1b_icb = MPI_Wtime()
-!                call icb2fesom(mesh)
-!                t2b_icb = MPI_Wtime()
-!!               t2_icb = MPI_Wtime()
-!                t2_icb = t2_icb + t2b_icb - t1b_icb
-!                bIcbCalcCycleCompleted = .true.
-!                t2_icb = MPI_Wtime()
-!            end if
-!!----------------------------
-!                call oce_fluxes_mom(mesh) ! momentum only
-!                call oce_fluxes(mesh)
-!            end if  
-!                
-!            !###################################
-!            ! LA check wheather this needs to go inside omp
-!            call before_oce_step(mesh)
-!            !###################################
-!
-!            if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
-!!               t1_icb = MPI_Wtime()
-!                !call iceberg_calculation(n)
-!
-!! kh 08.03.21 add time for call icb2fesom to the end of t2_icb (i.e. time is calculated like in former FESOM2 paleodyn_icb  versions, also see above)
-!            end if
-!
-!! kh 10.03.21 it is not the end of a real parallel section here, but the value of the timer is still of interest
-!            t2_par_sections = MPI_Wtime()
-!
-!        !else if (ib_async_mode > 0) then ! kh 02.02.21 asynchronous behavior
-!        end if
+
+! -----------------------------------------------------------------------------------
+! LA asyncronous coupling not included in this FESOM version, yet!!
+! 
 end if        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         
         if (use_global_tides) then
            call foreph(f%partit, f%mesh)
@@ -537,14 +457,7 @@ end if
             ! --------------
             ! LA icebergs: 2023-05-17 
             if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
-!                write(*,*) "LA DEBUG: n = ",n,", steps_per_ib_step = ",steps_per_ib_step
-                !t1b_icb = MPI_Wtime()
                 call icb2fesom(f%mesh, f%partit, f%ice)
-                !t2b_icb = MPI_Wtime()
-!               !t2_icb = MPI_Wtime()
-                !t2_icb = t2_icb + t2b_icb - t1b_icb
-                !bIcbCalcCycleCompleted = .true.
-                !t2_icb = MPI_Wtime()
             end if
             ! --------------
 
@@ -600,13 +513,7 @@ end if
     ! --------------
     ! LA icebergs: 2023-05-17 
     if (use_icebergs) then
-         !t3_icb = MPI_Wtime()
- 
          call iceberg_out(f%partit)
-         !call reset_ib_fluxes        
-         !t4_icb = MPI_Wtime()
- 
-         !rtime_icb_write = rtime_icb_write + t4_icb - t3_icb
     end if
     ! --------------
 

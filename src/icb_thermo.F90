@@ -166,8 +166,6 @@ type(t_partit), intent(inout), target :: partit
     tvl = bvl + lvl_b + lvl_v + lvl_e 	![m^3] per timestep, for freshwater flux convert somehow to [m/s]
     			    		! by distributing over area(iceberg_elem) or over patch
 					! surrounding one node
-!    write(*,*) "LA DEBUG: ib = ",ib,", volume loss = ",tvl,", dt=",dt 
-    !write(*,*) '*** tvl=',tvl
     volume_before=height_ib*length_ib*width_ib
 
     if((tvl .ge. volume_before) .OR. (volume_before .le. smallestvol_icb)) then
@@ -476,11 +474,8 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
      !rt  s_surf_flux(i,j)=gas*(sf-(s(i,j,N,lrhs)+35.0))
 
      !heat_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)*scaling(ib)      ! [W/m2]  ! positive for upward
-     !write(*,*) "LA DEBUG: tin=", tin, "; tf=",tf
-     !write(*,*) "LA DEBUG: gat=",gat
      heat_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)*length_ib(ib)*width_ib(ib)*scaling(ib)      ! [W]  ! positive for upward
      !fw_flux_ib(ib) =          gas*(sf-sal)/sf   ! [m/s]   !
-     !write(*,*) "LA DEBUG: heat_flux_ib(ib)=",heat_flux_ib(ib)
       M_b 	    =          gas*(sf-sal)/sf   ! [m/s]   ! m freshwater per second
      !fw_flux_ib(ib) = M_b
      !fw = -M_b

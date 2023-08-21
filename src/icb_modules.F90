@@ -73,17 +73,6 @@ save
   character(100):: height_icb_file='icb_height.dat' !iceberg height [m]
   character(100):: scaling_file='icb_scaling.dat' !scaling factor
   
-  !kshell version
-  !character(100):: IcebergRestartPath='../icb/iceberg.restart'
-  !character(100):: IcebergRestartPath_ISM='../icb/iceberg.restart.ISM'
-  !character(100):: num_non_melted_icb_file='../icb/num_non_melted_icb_file'
-  !character(100):: file_icb_netcdf='../icb/buoys_track.nc' !output file of buoys/icebergs
-  !character(100):: buoys_xlon_file='../icb/icb_longitude.dat'     !buoy position in deg
-  !character(100):: buoys_ylat_file='../icb/icb_latitude.dat'     !buoy position in deg
-  !character(100):: length_icb_file='../icb/icb_length.dat' !iceberg length [m]
-  !character(100):: width_icb_file='../icb/icb_length.dat' !iceberg width [m]
-  !character(100):: height_icb_file='../icb/icb_height.dat' !iceberg height [m]
-  !character(100):: scaling_file='../icb/icb_scaling.dat' !scaling factor
   !===== OUTPUT RELATED SETTINGS  =====
   integer :: icb_outfreq = 180           ! 180; for FESOM_dt=2min this is 6 hourly output !120; for FESOM_dt=3min this is 6 hourly output
   logical :: l_geo_out = .true.         ! output in unrotated (.true.) or rotated coordinates
@@ -114,10 +103,8 @@ save
   integer   :: num_non_melted_icb = 0 !1 if iceberg melted, 0 otherwise
   !for communication
   real,dimension(:), allocatable:: arr_block
-  !real,dimension(15*ib_num):: arr_block
   integer,dimension(:), allocatable:: elem_block
   real,dimension(:), allocatable:: vl_block
-  !real,dimension(4*ib_num):: vl_block
 
   !array for output in netcdf
   real,dimension(:,:), allocatable:: buoy_props
@@ -129,16 +116,11 @@ save
  contains
  ! true if all nodes of the element are either "real" model boundary nodes or shelf nodes
  logical function reject_elem(mesh, elem)
-! use o_mesh
  USE MOD_MESH
-! use MOD_PARTIT
  implicit none
  integer, intent(in) :: elem
 type(t_mesh), intent(in) , target :: mesh
-!type(t_partit), intent(inout), target :: partit
-!#include "associate_part_def.h"
 #include "associate_mesh_def.h"
-!#include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
 ! kh 09.08.21 change index_nod2d -> bc_index_nod2d?
@@ -148,17 +130,12 @@ type(t_mesh), intent(in) , target :: mesh
  ! gives number of "coastal" nodes in cavity setup, i.e. number of nodes that are
  ! either "real" model boundary nodes or shelf nodes
  integer function coastal_nodes(mesh, elem)
-! use o_mesh
  USE MOD_MESH
-! use MOD_PARTIT
  implicit none
  integer, intent(in) :: elem
 type(t_mesh), intent(in) , target :: mesh
-!type(t_partit), intent(inout), target :: partit
 #include "associate_part_def.h"
-!#include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-!#include "associate_mesh_ass.h"
 
 ! kh 09.08.21 change index_nod2d -> bc_index_nod2d?
  coastal_nodes = count( (cavity_flag_nod2d(elem2D_nodes(:,elem))==1) .OR. (index_nod2d(elem2D_nodes(:,elem))==1) )
