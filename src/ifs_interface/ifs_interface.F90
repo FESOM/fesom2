@@ -575,50 +575,6 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    nfield = nfield + 1
    pgvcur(:) = zrecvnf(:,nfield)
 
-   ! Pack u(v) surface currents on elements
-   !zsendnfUV(:,1)=fesom%dynamics%UV(1,1,1:myDim_elem2D)
-   !zsendnfUV(:,2)=fesom%dynamics%UV(2,1,1:myDim_elem2D) !UV includes eDim, leave those away here
-   !nfielduv = 2
-   !
-   !do elem=1, myDim_elem2D
-   !
-   !   ! compute element midpoints
-   !   elnodes=elem2D_nodes(:,elem)
-   !   rlon=sum(coord_nod2D(1,elnodes))/3.0_wpIFS
-   !   rlat=sum(coord_nod2D(2,elnodes))/3.0_wpIFS
-   !
-   !   ! Rotate vectors to geographical coordinates (r2g)
-   !   CALL vector_r2g(zsendnfUV(elem,1), zsendnfUV(elem,2), rlon, rlat, 0) ! 0-flag for rot. coord
-   !
-   !end do
-   
-#ifdef FESOM_TODO
-
-   ! We need to sort out the non-unique global index before we
-   ! can couple currents
-
-   ! Interpolate: 'pgucur' and 'pgvcur' on Gaussian grid.
-   IF (lparintmultatm) THEN
-      CALL parinter_fld_mult( nfielduv, mype, npes, icomm, UVtogauss, &
-         &                    myDim_nod2D, zsendnfUV, &
-         &                    nopoints, zrecvnfUV )
-   ELSE
-      DO jf = 1, nfielduv
-         CALL parinter_fld( mype, npes, icomm, UVtogauss, &
-            &               myDim_nod2D, zsendnfUV(:,jf), &
-            &               nopoints, zrecvnfUV(:,jf) )
-      ENDDO
-   ENDIF
-   pgucur(:) = zrecvnfUV(:,1)
-   pgvcur(:) = zrecvnfUV(:,2)
-   
-#else
-
-   !pgucur(:) = 0.0
-   !pgvcur(:) = 0.0
-
-#endif
-
 END SUBROUTINE nemogcmcoup_lim2_get
 
 
