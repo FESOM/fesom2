@@ -77,26 +77,56 @@ if(DEFINED FESOM_ENABLE_IFS_INTERFACE)
 endif()
 message(STATUS "ENABLE_IFS_INTERFACE: ${ENABLE_IFS_INTERFACE}")
 
+set(ENABLE_MULTIO_DEFAULT OFF)
 if(ENABLE_IFS_INTERFACE)
    if(USE_ICEPACK)
       message(FATAL_ERROR "Could not enable IFS interface as it is incompatible with USE_ICEPACK")
    endif()
+   if( NOT DEFINED ENABLE_MULTIO )
+     find_package(multio QUIET)
+     if( multio_FOUND )
+      set(ENABLE_MULTIO_DEFAULT ON)
+     endif()
+   endif()
 endif()
+
+option(ENABLE_MULTIO "Enable MultIO" ${ENABLE_MULTIO_DEFAULT})
+if(DEFINED FESOM_ENABLE_MULTIO)
+  set(ENABLE_MULTIO ${FESOM_ENABLE_MULTIO}) # To distinguish option in a nested cmake project (bundle)
+endif()
+message(STATUS "ENABLE_MULTIO: ${ENABLE_MULTIO}")
+if(ENABLE_MULTIO)
+  find_package(multio)
+  if(multio_FOUND)
+    message(STATUS "Found multio: ${multio_DIR}")
+  else()
+    message(FATAL_ERROR "Could not enable multio as multio could not be found")
+  endif()
+  if(NOT TARGET multio-fapi)
+    message(FATAL_ERROR "Could not enable multio as multio was not compiled with 'multio-fapi' target")
+  endif()
+endif()
+
 
 set(FESOM_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/../.." CACHE FILEPATH "directory where FESOM will be installed to via 'make install'")
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_SOURCE_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
+file(GLOB sources_Fortran ${src_home}/*.F90)
 if(USE_ICEPACK)
-   file(GLOB sources_Fortran ${src_home}/*.F90
-                             ${src_home}/icepack_drivers/*.F90
-                             ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90)
-elseif(ENABLE_IFS_INTERFACE)
-   file(GLOB sources_Fortran ${src_home}/*.F90
-                             ${src_home}/ifs_interface/*.F90) # ICEPACK + LIBRARY NOT SUPPORTED (YET)
-else()
-   file(GLOB sources_Fortran ${src_home}/*.F90)
+   file(GLOB sources_ice_pack ${src_home}/icepack_drivers/*.F90
+                              ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90)
+   list(APPEND sources_Fortran ${sources_ice_pack})
+elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
+   list(APPEND sources_Fortran ${src_home}/ifs_interface/ifs_interface.F90
+                               ${src_home}/ifs_interface/ifs_modules.F90
+                               ${src_home}/ifs_interface/ifs_notused.F90
+                               ${src_home}/ifs_interface/mpp_io.F90)
 endif()
+if(ENABLE_MULTIO)
+   list(APPEND sources_Fortran ${src_home}/ifs_interface/iom.F90)
+endif()
+
 file(GLOB sources_C ${src_home}/*.c)
 
 # generate a custom file from fesom_version_info.F90 which includes the current git SHA
@@ -139,7 +169,7 @@ target_link_libraries(${PROJECT_NAME}_C PRIVATE MPI::MPI_C)
 # fesom library
 add_library(${PROJECT_NAME} ${sources_Fortran})
 add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
-target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243 __MULTIO)
+target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
 
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>)
 target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fesom>)
@@ -148,7 +178,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTO
 target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE parms) #metis
 target_link_libraries(${PROJECT_NAME} PRIVATE async_threads)
-target_link_libraries(${PROJECT_NAME} PRIVATE multio-fapi)
 target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
@@ -157,6 +186,10 @@ if(ENABLE_OPENMP AND NOT ${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray)
    target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_Fortran)
 endif()
 
+if(ENABLE_MULTIO)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __MULTIO)
+   target_link_libraries(${PROJECT_NAME} PRIVATE multio-fapi)
+endif()
 
 if(DISABLE_MULTITHREADING)
    target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_MULTITHREADING)
