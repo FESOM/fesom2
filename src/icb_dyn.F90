@@ -103,7 +103,6 @@ type(t_dyn)   , intent(inout), target :: dynamics
  call FEM_3eval(mesh, partit, T_ave_ib,S_ave_ib,lon,lat,T_dz,S_dz,iceberg_elem)
  call FEM_3eval(mesh, partit, T_keel_ib,S_keel_ib,lon,lat,T_keel,S_keel,iceberg_elem)
 
-
  !ATMOSPHERIC VELOCITY ua_ib, va_ib
  ! kh 11.02.21
  call FEM_eval(mesh, partit, ua_ib,va_ib,lon,lat,u_wind_ib,v_wind_ib,iceberg_elem)      
@@ -147,17 +146,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
 
 ! kh 15.03.21 use Tsurf_ib and Ssurf_ib buffered values here
   call FEM_eval(mesh, partit, sst_ib,sss_ib,lon,lat,Tsurf_ib,Ssurf_ib,iceberg_elem)
-
-  !if(ib==3497) then
-  ! write(*,*) '#####################################################'
-  ! write(*,*) 'SST:',sst_ib,'T_ave:',T_ave_ib,'T_keel:',T_keel_ib
-  ! write(*,*) 'SSS:',sss_ib,'S_ave:',S_ave_ib,'S_keel:',S_keel_ib,'depth:',depth_ib
-  ! write(*,*) 'uo_keel:',uo_skin_ib,'vo_keel:',vo_skin_ib
-  ! write(*,*) 'uo_ave:',uo_ib,'vo_ave:',vo_ib
-  !end if
  
-  !call iceberg_meltrates(M_b, M_v, M_e, M_bv, u_ib,v_ib, uo_ib,vo_ib, ua_ib,va_ib, &
-  !			  sst_ib, length_ib, conci_ib)
   call iceberg_meltrates(	M_b, M_v, M_e, M_bv, &
 				u_ib,v_ib, uo_ib,vo_ib, ua_ib,va_ib, &
 				sst_ib, length_ib, conci_ib, &
@@ -633,17 +622,10 @@ end subroutine compute_areas
 
 
 subroutine iceberg_average_andkeel(mesh, partit, dynamics, uo_dz,vo_dz, uo_keel,vo_keel, T_dz,S_dz, T_keel,S_keel, depth_ib,iceberg_elem, ib)
-  !use o_mesh
   USE MOD_MESH
   use o_param
-  !use i_therm_param
-  !use i_param
-  !use i_arrays
   use MOD_PARTIT
   use MOD_DYN
-
-! kh 17.03.21 specification of structures used
-  !use o_arrays, only: UV_ib, tr_arr_ib, Z_3d_n_ib
   use o_arrays, only: Tclim_ib, Sclim_ib !, UV_ib, Z_3d_n_ib
 
   use g_clock
@@ -696,7 +678,7 @@ type(t_partit), intent(inout), target :: partit
 
    ! LOOP: consider all neighboring pairs (n_up,n_low) of 3D nodes
    ! below n2..
-   innerloop: do k=1, nl+1
+   innerloop: do k=1, nl !+1
 
 
     !##################################################
@@ -771,8 +753,6 @@ type(t_partit), intent(inout), target :: partit
       if( k==1 ) then
         ufkeel1 = UV_ib(1,k,n2)
         ufkeel2 = UV_ib(2,k,n2)
-        !Temkeel = tr_arr_ib(k,n2,1)
-        !Salkeel = tr_arr_ib(k,n2,2)
         Temkeel = Tclim_ib(k,n2)
         Salkeel = Sclim_ib(k,n2)
         uo_dz(m)=ufkeel1*dz 
@@ -796,6 +776,7 @@ type(t_partit), intent(inout), target :: partit
         T_dz(m)=T_dz(m)+ 0.5*(Tclim_ib(k-1,n2)+ Temkeel)*dz
         S_dz(m)=S_dz(m)+ 0.5*(Sclim_ib(k-1,n2)+ Salkeel)*dz
       end if
+
 
       uo_keel(m)=ufkeel1
       vo_keel(m)=ufkeel2

@@ -325,10 +325,9 @@ end subroutine FEM_eval_old
 !      elem	(the LOCAL element the iceberg lies in)
 !=================================================================
 subroutine FEM_3eval(mesh, partit, u_at_ib,v_at_ib,lon,lat,ocean_u,ocean_v,elem)
+  use MOD_MESH
   use MOD_PARTIT !for myDim_nod2D, eDim_nod2D
   use o_param !for rad
-
-use MOD_MESH
 
   implicit none
   real, intent(in)			:: lon, lat 
@@ -355,7 +354,7 @@ type(t_partit), intent(inout), target :: partit
   !values of the 3 local basisfunctions at the 
   !position 'coords'
   coords_tmp = [lon_deg, lat_deg]
-  call locbafu_2D(mesh, partit, phi,elem, coords_tmp)
+  call locbafu_2D(mesh, partit, phi, elem, coords_tmp)
   
   u_at_ib = sum( ocean_u(:) * phi(:))
   v_at_ib = sum( ocean_v(:) * phi(:))
