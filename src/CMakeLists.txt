@@ -104,10 +104,12 @@ set(FESOM_ORIGINAL_VERSION_FILE ${src_home}/fesom_version_info.F90)
 set(FESOM_GENERATED_VERSION_FILE ${CMAKE_CURRENT_BINARY_DIR}/fesom_version_info-generated.F90)
 list(REMOVE_ITEM sources_Fortran ${FESOM_ORIGINAL_VERSION_FILE}) # we want to compile the generated file instead
 list(APPEND sources_Fortran ${FESOM_GENERATED_VERSION_FILE})
-add_custom_command(OUTPUT 5303B6F4_E4F4_45B2_A6E5_8E2B9FB5CDC4 ${FESOM_GENERATED_VERSION_FILE} # the first arg to OUTPUT is a name for a file we never create to make sure this command will run on every re-build (let our file be the second arg, as the first file is inadvertently removed by make)
-                   COMMAND ${CMAKE_COMMAND} -DFESOM_ORIGINAL_VERSION_FILE=${FESOM_ORIGINAL_VERSION_FILE} -DFESOM_GENERATED_VERSION_FILE=${FESOM_GENERATED_VERSION_FILE} -P GitRepositoryInfo.cmake
-                   WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
-                   COMMENT "determining ${PROJECT_NAME} git SHA ...")
+set_source_files_properties(${FESOM_GENERATED_VERSION_FILE} PROPERTIES GENERATED TRUE)
+
+add_custom_target(fesom_version_info-generated.F90 ALL
+                  COMMENT "Determining ${PROJECT_NAME} git SHA ..."
+                  COMMAND ${CMAKE_COMMAND} -DFESOM_ORIGINAL_VERSION_FILE=${FESOM_ORIGINAL_VERSION_FILE} -DFESOM_GENERATED_VERSION_FILE=${FESOM_GENERATED_VERSION_FILE} -P GitRepositoryInfo.cmake
+                  WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR})
 
 #if(FESOM_STANDALONE)
 #   list(REMOVE_ITEM sources_Fortran ${src_home}/cpl_driver.F90)
@@ -136,6 +138,7 @@ target_link_libraries(${PROJECT_NAME}_C PRIVATE MPI::MPI_C)
 
 # fesom library
 add_library(${PROJECT_NAME} ${sources_Fortran})
+add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
 target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243 __MULTIO)
 
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>)
