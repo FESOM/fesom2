@@ -1,49 +1,38 @@
 module landice_water_init_interface
   interface
-    subroutine landice_water_init(mesh, partit)
-      use mod_mesh
+    subroutine landice_water_init(partit, mesh)
       use mod_partit
-      type(t_mesh), intent(in)  , target :: mesh
-      type(t_partit), intent(inout), target :: partit
+      use mod_mesh
+      type(t_partit), intent(in), target :: partit
+      type(t_mesh),   intent(in), target :: mesh
     end subroutine
   end interface
 end module
 
-subroutine landice_water_init(mesh, partit)
+subroutine landice_water_init(partit, mesh)
   ! init land ice melting rate
-  use MOD_MESH
-  !use o_MESH
-  USE g_CONFIG
-  use o_ARRAYS
-  !use i_ARRAYS
-  use g_comm_auto
   use MOD_PARTIT
-  use o_param
-  use g_support
-  use g_config
+  use MOD_MESH
+  use o_PARAM , only: WP
+  use g_comm_auto
   use g_forcing_param
   use g_forcing_arrays
-  use g_clock
 
   implicit none
 
   integer                     :: n, i, j, num_reg, num_nod, num_days
   integer                     :: n_loc, fileID
   integer, allocatable        :: temp_arr2d(:), nodes_in_region(:)
-  real(kind=8)                :: vol, vol_sum, aux
-  real(kind=8), allocatable   :: totalflux(:)
+  real(kind=WP)               :: vol, vol_sum, aux
+  real(kind=WP), allocatable  :: totalflux(:)
   character*300               :: file_name
   character                   :: c_reg_ind
-  !type(t_mesh), intent(in) , target :: mesh
-
-type(t_mesh), intent(in) , target :: mesh
-type(t_partit), intent(inout), target :: partit
-!==================== MODULES & DECLARATIONS ==========================!= 
+  type(t_partit), intent(in), target :: partit
+  type(t_mesh),   intent(in), target :: mesh
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-!#include "associate_mesh.h"
 
   ! read the number of region and the total yearly discharge in each region:
   file_name=trim(fwf_path)//'landice_yearly_mass_loss.out'

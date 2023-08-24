@@ -87,6 +87,14 @@ type(tracer_source3d_type), &
     allocatable, dimension(:)  :: ptracers_restore
 integer                        :: ptracers_restore_total=0
 
+!---wiso-code
+! add water isotope parameters
+real(kind=WP), dimension(3)    :: wiso_smow = (/2005.2e-6_WP, 155.76e-6_WP, 1.0_WP/)  ! water isotope SMOW values
+integer, dimension(3)          :: index_wiso_tracers = (/-1, -1, -1/)  ! water isotope index in all tracers
+!---wiso-code-end
+!---age-code-begin
+integer                        :: index_age_tracer = -1 ! water age tracer index in all tracers
+!---age-code-end
 
 ! Momentum
 !!PS logical                       :: free_slip=.false.
@@ -251,5 +259,12 @@ real(kind=WP),allocatable :: bvfreq(:,:),mixlay_dep(:),bv_ref(:)
 real(kind=WP), target, allocatable    :: fer_c(:), fer_scal(:), fer_K(:,:), fer_gamma(:,:,:)
 
 real(kind=WP),         allocatable    :: ice_rejected_salt(:)
+
+!---wiso-code
+real(kind=WP), allocatable    :: tr_arr_ice(:,:)      !---wiso-code: add sea ice isotope tracers
+real(kind=WP), allocatable    :: wiso_flux_oce(:,:)   !---wiso-code: add isotope fluxes over open water
+real(kind=WP), allocatable    :: wiso_flux_ice(:,:)   !---wiso-code: add isotope fluxes over sea ice
+!---wiso-code-end
+
 END MODULE o_ARRAYS
 !==========================================================

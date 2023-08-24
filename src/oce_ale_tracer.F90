@@ -141,6 +141,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use Toy_Channel_Soufflet
     use diff_tracers_ale_interface
     use oce_adv_tra_driver_interfaces    
+    use g_forcing_param, only: use_age_tracer !---age-code
     implicit none
     type(t_ice)   , intent(in)   , target    :: ice
     type(t_dyn)   , intent(inout), target    :: dynamics
@@ -275,6 +276,19 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
                tracers%data(2)%values(nzmin:nzmax,node) = 3._WP
         end where        
     end do
+
+    !---age-code-begin
+    if (use_age_tracer) then
+      do node=1,myDim_nod2D+eDim_nod2D
+        nzmax=nlevels_nod2D(node)-1
+        nzmin=ulevels_nod2D(node)
+        where (tracers%data(index_age_tracer)%values(nzmin:nzmax,node) < 0._WP )
+               tracers%data(index_age_tracer)%values(nzmin:nzmax,node) = 0._WP
+        end where
+      end do
+    end if
+    !---age-code-end
+
 !$OMP END PARALLEL DO
 end subroutine solve_tracers_ale
 !
@@ -1302,8 +1316,19 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
         !     by forming/melting of sea ice
         bc_surface= dt*(virtual_salt(n) & !--> is zeros for zlevel/zstar
                     + relax_salt(n) - real_salt_flux(n)*is_nonlinfs)
-    CASE (101) ! apply boundary conditions to tracer ID=101
-        bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)
+!---wiso-code
+    CASE (101) ! apply boundary conditions to tracer ID=101 (H218O)
+        bc_surface = dt*wiso_flux_oce(n,1)
+    CASE (102)  ! apply boundary conditions to tracer ID=102 (HDO)
+        bc_surface = dt*wiso_flux_oce(n,2)
+    CASE (103)  ! apply boundary conditions to tracer ID=103 (H216O)
+        bc_surface = dt*wiso_flux_oce(n,3)
+!---wiso-code-end
+!---age-code
+    CASE (100)
+        !bc_surface=-dt*(sval*water_flux(n)*is_nonlinfs)
+        bc_surface=0.0_WP
+!---age-code-end
     CASE (301)
         bc_surface=0.0_WP
     CASE (302)
