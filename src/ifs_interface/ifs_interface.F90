@@ -575,50 +575,6 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    nfield = nfield + 1
    pgvcur(:) = zrecvnf(:,nfield)
 
-   ! Pack u(v) surface currents on elements
-   !zsendnfUV(:,1)=fesom%dynamics%UV(1,1,1:myDim_elem2D)
-   !zsendnfUV(:,2)=fesom%dynamics%UV(2,1,1:myDim_elem2D) !UV includes eDim, leave those away here
-   !nfielduv = 2
-   !
-   !do elem=1, myDim_elem2D
-   !
-   !   ! compute element midpoints
-   !   elnodes=elem2D_nodes(:,elem)
-   !   rlon=sum(coord_nod2D(1,elnodes))/3.0_wpIFS
-   !   rlat=sum(coord_nod2D(2,elnodes))/3.0_wpIFS
-   !
-   !   ! Rotate vectors to geographical coordinates (r2g)
-   !   CALL vector_r2g(zsendnfUV(elem,1), zsendnfUV(elem,2), rlon, rlat, 0) ! 0-flag for rot. coord
-   !
-   !end do
-   
-#ifdef FESOM_TODO
-
-   ! We need to sort out the non-unique global index before we
-   ! can couple currents
-
-   ! Interpolate: 'pgucur' and 'pgvcur' on Gaussian grid.
-   IF (lparintmultatm) THEN
-      CALL parinter_fld_mult( nfielduv, mype, npes, icomm, UVtogauss, &
-         &                    myDim_nod2D, zsendnfUV, &
-         &                    nopoints, zrecvnfUV )
-   ELSE
-      DO jf = 1, nfielduv
-         CALL parinter_fld( mype, npes, icomm, UVtogauss, &
-            &               myDim_nod2D, zsendnfUV(:,jf), &
-            &               nopoints, zrecvnfUV(:,jf) )
-      ENDDO
-   ENDIF
-   pgucur(:) = zrecvnfUV(:,1)
-   pgvcur(:) = zrecvnfUV(:,2)
-   
-#else
-
-   !pgucur(:) = 0.0
-   !pgvcur(:) = 0.0
-
-#endif
-
 END SUBROUTINE nemogcmcoup_lim2_get
 
 
@@ -862,24 +818,20 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! Sort out incoming arrays from the IFS and put them on the ocean grid
 
    ! TODO
-   shortwave(:)=0.	! Done, updated below. What to do with shortwave over ice??
-   !longwave(:)=0.	! Done. Only used in stand-alone mode.
-   prec_rain(:)=0. 	! Done, updated below.
-   prec_snow(:)=0.	! Done, updated below.
-   evap_no_ifrac=0.	! Done, updated below. This is evap over ocean, does this correspond to evap_tot?
-   sublimation=0.	! Done, updated below. 
+   shortwave(:)=0.	
+   !longwave(:)=0.
+   prec_rain(:)=0.
+   prec_snow(:)=0.	
+   evap_no_ifrac=0.	
+   sublimation=0.	
    !
-   ice_heat_flux=0. 	! Done. This is qns__ice currently. Is this the non-solar heat flux?    !   non solar heat fluxes below  !  (qns)
-   oce_heat_flux=0. 	! Done. This is qns__oce currently. Is this the non-solar heat flux?
+   ice_heat_flux=0. 
+   oce_heat_flux=0. 
    !
-   !runoff(:)=0.		! not used apparently. What is runoffIN, ocerunoff?
-   !evaporation(:)=0.
-   !ice_thermo_cpl.F90:  !---- total evaporation (needed in oce_salt_balance.F90)
-   !ice_thermo_cpl.F90:  evaporation = evap_no_ifrac*(1.-a_ice) + sublimation*a_ice
-   stress_atmice_x=0.   ! Done, taux_ice
-   stress_atmice_y=0.   ! Done, tauy_ice
-   stress_atmoce_x=0.   ! Done, taux_oce
-   stress_atmoce_y=0.   ! Done, tauy_oce
+   stress_atmice_x=0. 
+   stress_atmice_y=0. 
+   stress_atmoce_x=0. 
+   stress_atmoce_y=0. 
 
    ! =================================================================== !
    ! Pack all arrays
