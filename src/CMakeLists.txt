@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.9)
 
 project(fesom C Fortran)
 
+find_package(MPI REQUIRED COMPONENTS C CXX Fortran)
+
 if(DEFINED ENV{FESOM_PLATFORM_STRATEGY})
    set(FESOM_PLATFORM_STRATEGY $ENV{FESOM_PLATFORM_STRATEGY} CACHE STRING "switch to platform specific compile settings, this is usually determined via the env.sh script")
 else()
@@ -109,7 +111,7 @@ else()
 add_library(${PROJECT_NAME}_C ${sources_C})
 endif()
 target_compile_definitions(${PROJECT_NAME}_C PRIVATE PARMS USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
-target_link_libraries(${PROJECT_NAME}_C parms) #metis
+target_link_libraries(${PROJECT_NAME}_C PUBLIC parms) #metis
 
 
 # create our binary or library (set its name to name of this project)
@@ -194,13 +196,14 @@ endif()
 target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES} ${OASIS_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
-target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} async_threads_cpp multio-fapi)
+target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
+target_link_libraries(${PROJECT_NAME} PRIVATE async_threads_cpp multio-fapi)
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 if(${ENABLE_OPENMP} AND NOT ${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray)
    target_compile_options(${PROJECT_NAME} PRIVATE ${OpenMP_Fortran_FLAGS}) # currently we only have OpenMP in the Fortran part
-   target_link_libraries(${PROJECT_NAME} OpenMP::OpenMP_Fortran)
+   target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_Fortran)
 endif()
 
 #set(FESOM_INSTALL_PREFIX "${CMAKE_CURRENT_LIST_DIR}/.." CACHE FILEPATH "directory where FESOM will be installed to via 'make install'")
