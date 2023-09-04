@@ -529,8 +529,11 @@ subroutine diag_densMOC(mode, mesh)
 
         if (std_dens(is)>=dmax) is=ie
         if (std_dens(ie)<=dmin) ie=is
-
-        uvdz_el=(UV(:,nz,elem)+fer_uv(:,nz,elem))*helem(nz,elem)
+        if (Fer_GM) then
+            uvdz_el=(UV(:,nz,elem)+fer_uv(:,nz,elem))*helem(nz,elem)
+        else
+            uvdz_el=UV(:,nz,elem)
+        end if
         rhoz_el=(dens(nz)-dens(nz+1))/helem(nz,elem)
         vol_el =helem(nz,elem)*elem_area(elem)
         if (ie-is > 0) then
