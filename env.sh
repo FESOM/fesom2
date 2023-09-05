@@ -36,7 +36,7 @@ else
    shift # pop the argument as we already stored it, remaining arguments are passed to cmake
    
    # check if given machine spec has + in it. if so save the later part as compilerid
-   if [[ $LOGINHOST == *"+"* ]]; then
+   if [[ $MACHINESPEC == *"+"* ]]; then
      LOGINHOST="${MACHINESPEC%%+*}"       # Everything before the '+'
      COMPILERID="${MACHINESPEC#*+}"       # Everything after the '+'
    else
@@ -98,6 +98,7 @@ else
    export FESOM_PLATFORM_STRATEGY=$STRATEGY
    SHELLFILE="${DIR}/env/${STRATEGY}/shell"
    if [[ -n ${COMPILERID} ]]; then
+      echo "Compiler ID for shell is: ${COMPILERID}"
       SHELLFILE="${SHELLFILE}.${COMPILERID}"
    fi
    if [[ ! -e ${SHELLFILE} ]]; then 
