@@ -32,8 +32,17 @@ if [[ -z "$1" ]] || [[  "$1" =~ ^- ]]; then
    # no argument given
    LOGINHOST="$(hostname -f)"
 else
-   LOGINHOST=$1 # 1st arg exists and doesn't start with -, meaning it is machine specification
+   MACHINESPEC=$1 # 1st arg exists and doesn't start with -, meaning it is machine specification
    shift # pop the argument as we already stored it, remaining arguments are passed to cmake
+   
+   # check if given machine spec has + in it. if so save the later part as compilerid
+   if [[ $LOGINHOST == *"+"* ]]; then
+     LOGINHOST="${MACHINESPEC%%+*}"       # Everything before the '+'
+     COMPILERID="${MACHINESPEC#*+}"       # Everything after the '+'
+   else
+     LOGINHOST="$MACHINESPEC"
+     COMPILERID=""
+   fi
 fi
 
 
@@ -58,9 +67,9 @@ elif [[ $LOGINHOST =~ \.hww\.de$ ]] || [[ $LOGINHOST =~ ^nid[0-9]{5}$ ]]; then
    STRATEGY="hazelhen.hww.de"
 elif [[  $LOGINHOST =~ \.jureca$ ]]; then
    STRATEGY="jureca"
-elif [[  $LOGINHOST = ubuntu ]]; then
+elif [[  $LOGINHOST =~ ^ubuntu ]]; then
    STRATEGY="ubuntu"
-elif [[  $LOGINHOST = bsc ]]; then
+elif [[  $LOGINHOST =~ ^bsc ]]; then
    STRATEGY="bsc"
 elif [[  $LOGINHOST =~ ^juwels[0-9][0-9].ib.juwels.fzj.de$ ]]; then
    STRATEGY="juwels"
