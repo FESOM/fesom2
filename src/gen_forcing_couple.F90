@@ -375,7 +375,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
              end if
 #else
          elseif (i.eq.13) then
-             if (action) then
+            if (action) then
                  if (lwiso) then         
                      www3(:)         =  exchange(:)
                  else if (use_icebergs) then    
@@ -452,7 +452,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
                 u_wind(:)                     = exchange(:)        ! meridional wind
              end if
              mask=1
-             if (use_icebergs) then    
+             if (use_icebergs.and.lwiso) then    
                  call force_flux_consv(u_wind, mask, i, 0, action, partit, mesh)
              end if
          elseif (i.eq.20) then
@@ -460,7 +460,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
                 v_wind(:)                     = exchange(:)        ! meridional wind
              end if
              mask=1
-             if (use_icebergs) then    
+             if (use_icebergs.and.lwiso) then    
                  call force_flux_consv(v_wind, mask, i, 0, action, partit, mesh)
              end if
          end if

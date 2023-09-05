@@ -16,6 +16,6 @@ set(USE_ICEPACK OFF CACHE BOOL "compile fesom with the Iceapck modules for sea i
 set(OPENMP_REPRODUCIBLE OFF CACHE BOOL "serialize OpenMP loops that are critical for reproducible results")
 set(ASYNC_ICEBERGS ON CACHE BOOL "compile fesom with or without support for asynchronous iceberg computations")
 
-#set(VERBOSE OFF CACHE BOOL "toggle debug output")
+set(VERBOSE OFF CACHE BOOL "toggle debug output")
 #add_subdirectory(oasis3-mct/lib/psmile)
 add_subdirectory(src)

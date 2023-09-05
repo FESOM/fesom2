@@ -21,11 +21,7 @@ use MOD_PARTIT
  implicit none								!=
 									!=
  integer	:: ib, times, istep
-
-! kh 16.03.21
  integer	:: istep_end_synced
-
-! kh 25.03.21
  integer:: req, status(MPI_STATUS_SIZE)
  logical:: completed
  real(kind=8) 	:: t0, t1, t2, t3, t4, t0_restart, t1_restart   	!=
@@ -53,7 +49,6 @@ type(t_dyn)   , intent(inout), target :: dynamics
  istep_end_synced = istep + steps_per_ib_step - 1
 
  if(firstcall) then
-  !write(*,*) 'ib_num: ', ib_num
   !overwrite icb_modules if restart, initialize netcdf output if no restart:
   
   t0_restart=MPI_Wtime()
@@ -102,8 +97,6 @@ type(t_dyn)   , intent(inout), target :: dynamics
                             u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib), lastsubstep,&
                             f_u_ib_old(ib), f_v_ib_old(ib), l_semiimplicit,   &
                             semiimplicit_coeff, AB_coeff, istep)			
-        !call MPI_Barrier(MPI_COMM_WORLD, MPIERR) !necessary?
-        !end do
     end if 
   end if
  end do
@@ -116,10 +109,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
  !all PEs need the array arr(15) and the iceberg element
  !in step2
  !ALLREDUCE: arr_block, elem_block
-
-!kh 12.02.21 not really needed here
-!call MPI_Barrier(MPI_COMM_FESOM_IB, MPIERR_IB)
-
+ 
  arr_block_red = 0.0
  elem_block_red= 0
  vl_block_red = 0.0
@@ -135,9 +125,6 @@ CALL MPI_TEST(req, completed, status, partit%MPIERR_IB)
 !$omp end critical
  end do
 
-! kh 25.03.21 orig
-! call MPI_AllREDUCE(elem_block, elem_block_red, ib_num, MPI_INTEGER, MPI_SUM, &
-!       MPI_COMM_FESOM_IB, MPIERR_IB)  
 !$omp critical 
  call MPI_IAllREDUCE(elem_block, elem_block_red, ib_num, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)  
 !$omp end critical
@@ -149,10 +136,6 @@ completed = .false.
 !$omp end critical
  end do
 
- !ALLREDUCE: vl_block, containing the volume losses (IBs may switch PE during the output interval)
-! kh 25.03.21 orig
-! call MPI_AllREDUCE(vl_block, vl_block_red, 4*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, &
-!       MPI_COMM_FESOM_IB, MPIERR_IB)
 !$omp critical 
  call MPI_IAllREDUCE(vl_block, vl_block_red, 4*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)
 !$omp end critical
@@ -164,19 +147,6 @@ completed = .false.
 !$omp end critical
  end do
 
-! call MPI_Barrier(MPI_COMM_WORLD,MPIerr)
-! arr_block_red = 0.0
-! elem_block_red= 0
-! vl_block_red = 0.0
-! call MPI_AllREDUCE(arr_block, arr_block_red, 15*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, &
-!       MPI_COMM_WORLD, MPIerr)
-! call MPI_AllREDUCE(elem_block, elem_block_red, ib_num, MPI_INTEGER, MPI_SUM, &
-!       MPI_COMM_WORLD, MPIerr)  
-! !ALLREDUCE: vl_block, containing the volume losses (IBs may switch PE during the output interval)
-! call MPI_AllREDUCE(vl_block, vl_block_red, 4*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, &
-!       MPI_COMM_WORLD, MPIerr)
- 
- !is filled in STEP 2
  buoy_props=0.
 
  t2=MPI_Wtime()   
@@ -202,8 +172,6 @@ completed = .false.
   if( real(istep) > real(step_per_day)*calving_day(ib) ) then !iceberg calved
   
     !substeps don't work anymore with new communication
-    !do times=1, steps_per_FESOM_step
-    !if(times == steps_per_FESOM_step) lastsubstep = .true. !do output at last substep
     lastsubstep = .true. !do output every timestep
    
     if( melted(ib) == .false. ) then
@@ -213,13 +181,9 @@ completed = .false.
                             u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib), lastsubstep,&
                             f_u_ib_old(ib), f_v_ib_old(ib), l_semiimplicit,   &
                             semiimplicit_coeff, AB_coeff, istep)	
-        !call MPI_Barrier(MPI_COMM_WORLD, MPIERR) !necessary?
-        !end do
     end if
   end if
 end do
- 
- !call MPI_Barrier(MPI_COMM_WORLD, MPIERR) !MK: necessary for output !commented 1 JAN 2000
 
  t3=MPI_Wtime() 
 
@@ -230,8 +194,6 @@ end do
  !istep, lon_deg_geo, lat_deg_geo, u_ib_geo, v_ib_geo, volume losses (set to zero)
  !introduce force_last_output(ib)?
 
-! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
-!if (mod(istep,icb_outfreq)==0 .AND. ascii_out==.false.) then
  if (mod(istep_end_synced,icb_outfreq)==0 .AND. ascii_out==.false.) then
 
    if (mype==0 .AND. (real(istep) > real(step_per_day)*calving_day(1) ) ) call write_buoy_props_netcdf(partit)
@@ -246,16 +208,15 @@ end do
 
  t4=MPI_Wtime() 
  
-
-! if (mod(istep,logfile_outfreq)==0 .and. mype==0) then 
-! write(*,*) 'icebergs took', t4-t0 
-! write(*,*) 'iceberg step1 took', t1-t0
-! write(*,*) 'NEW comvalues took', t2-t1
-! write(*,*) 'iceberg step2 took', t3-t2
-! write(*,*) 'vector output took', t4-t3
-! write(*,*) 'reading restart took', t1_restart-t0_restart
-! write(*,*) '*************************************************************'
-! end if
+ if (mod(istep,logfile_outfreq)==0 .and. mype==0) then 
+   write(*,*) 'icebergs took', t4-t0 
+   write(*,*) 'iceberg step1 took', t1-t0
+   write(*,*) 'NEW comvalues took', t2-t1
+   write(*,*) 'iceberg step2 took', t3-t2
+   write(*,*) 'vector output took', t4-t3
+   write(*,*) 'reading restart took', t1_restart-t0_restart
+   write(*,*) '*************************************************************'
+ end if
 end subroutine iceberg_calculation
 
 
@@ -274,11 +235,6 @@ subroutine iceberg_step1(ice, mesh, partit, dynamics, ib, height_ib,length_ib,wi
  !============================= MODULES & DECLARATIONS =========================================!=
  												!=
  use o_param 		!for rad								!=
- 
-! kh 17.03.21 specification of structure used
-! use o_arrays, only: coriolis
-
- !use o_mesh		!for nod2D, (cavities: for cavity_flag_nod2d)				!=
  USE MOD_MESH
  use MOD_PARTIT		!for myDim_elem2D, myList_nod2D						!=
  use MOD_ICE
@@ -308,12 +264,8 @@ subroutine iceberg_step1(ice, mesh, partit, dynamics, ib, height_ib,length_ib,wi
  logical, intent(in)	:: l_semiimplicit
  real,    intent(in)	:: semiimplicit_coeff
  real,    intent(in)	:: AB_coeff
-
-!LA 2023-03-07
-real, dimension(:), pointer     :: coriolis
-
-! kh 16.03.21
-integer :: istep_end_synced
+ real, dimension(:), pointer     :: coriolis
+ integer :: istep_end_synced
  
  integer, dimension(:), save, allocatable :: local_idx_of
  real      			:: depth_ib, volume_ib, mass_ib
@@ -362,9 +314,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
 #include "associate_mesh_ass.h"
  
  mype          =>partit%mype
- !t0=MPI_Wtime()
 
-! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
  istep_end_synced = istep + steps_per_ib_step - 1
 
  depth_ib = -height_ib * rho_icb/rho_h2o
@@ -376,8 +326,6 @@ type(t_dyn)   , intent(inout), target :: dynamics
  if(volume_ib .le. smallestvol_icb) then
   melted(ib) = .true.
 
-! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
-! if (mod(istep,logfile_outfreq)==0 .and. mype==0 .and. lastsubstep) then
   if (mod(istep_end_synced,logfile_outfreq)==0 .and. mype==0 .and. lastsubstep) then
    write(*,*) 'iceberg ', ib,' melted'
   end if
@@ -397,7 +345,6 @@ type(t_dyn)   , intent(inout), target :: dynamics
  if (find_iceberg_elem) then
   lon_rad = lon_deg*rad
   lat_rad = lat_deg*rad
-  !write(*,*) 'IB ',ib,' not rot. coords:', lon_deg, lat_deg !,lon_rad, lat_rad
   call g2r(lon_rad, lat_rad, lon_rad, lat_rad)
   lat_deg=lat_rad/rad !rotated lat in degree
   lon_deg=lon_rad/rad !rotated lon in degree   
@@ -430,15 +377,6 @@ type(t_dyn)   , intent(inout), target :: dynamics
    	stop 'ICEBERG OUTSIDE MODEL DOMAIN OR IN ICE SHELF REGION'
   end if
   
-  if(i_have_element) then 
-   !write(*,*) 'IB ',ib,' in element ',iceberg_elem
-   !write(*,*) 'IB ',ib,' rot. coords:', lon_deg, lat_deg !,lon_rad, lat_rad
-   !do i=1,3
-   ! iceberg_node=elem2D_nodes(i,local_idx_of(iceberg_elem))
-   ! write(*,*) 'node ', i, 's coords lon:', coord_nod2d(1,iceberg_node)/rad,' lat: ', coord_nod2d(2,iceberg_node)/rad
-   !end do
-  end if
-  
   ! initialize the iceberg velocity
   call initialize_velo(mesh, partit, dynamics, i_have_element, ib, u_ib, v_ib, lon_rad, lat_rad, depth_ib, local_idx_of(iceberg_elem))
 
@@ -447,12 +385,6 @@ type(t_dyn)   , intent(inout), target :: dynamics
  
  coriolis => mesh%coriolis(:)
   !for AB method
-  !f_u_ib_old = coriolis_param_elem2D(local_idx_of(iceberg_elem))*u_ib
-  !f_v_ib_old = coriolis_param_elem2D(local_idx_of(iceberg_elem))*v_ib
-
-! kh 18.03.21 use coriolis_ib buffered values here, test only
-! f_u_ib_old = coriolis_ib(local_idx_of(iceberg_elem))*u_ib
-! f_v_ib_old = coriolis_ib(local_idx_of(iceberg_elem))*v_ib
 
 ! kh 06.08.21 observed via -check bounds: forrtl: severe (408): fort: (3): Subscript #1 of the array CORIOLIS has value 0 which is less than the lower bound of 1
   if(local_idx_of(iceberg_elem) > 0) then
@@ -461,30 +393,9 @@ type(t_dyn)   , intent(inout), target :: dynamics
       f_u_ib_old = coriolis(local_idx_of(iceberg_elem))*u_ib
       f_v_ib_old = coriolis(local_idx_of(iceberg_elem))*v_ib
       
-    !else
-    !  write(*,*) 'Error local_idx_of(iceberg_elem) > myDim_elem2D, istep, local_idx_of(iceberg_elem), myDim_elem2D', istep, local_idx_of(iceberg_elem), myDim_elem2D
     endif
-  !else
-  !  write(*,*) 'Error local_idx_of(iceberg_elem) <= 0, istep, local_idx_of(iceberg_elem)', istep, local_idx_of(iceberg_elem)
   endif
  end if
- 
- !file_track='/work/ollie/lackerma/iceberg/iceberg_ICBref_'
- !file_forces_u='/work/ollie/lackerma/iceberg/iceberg_ICBref_forces_u_'
- !file_forces_v='/work/ollie/lackerma/iceberg/iceberg_ICBref_forces_v_'
- !file_meltrates='/work/ollie/lackerma/iceberg/iceberg_ICBref_melt_'
-
- !!convert ib integer to string
- !write(ib_char,'(I10)') ib
- !
- !!left-adjust the string..
- !ib_char = adjustl(ib_char)
- !
- !!.. and trim while concatenating:
- !file_track	=  trim(file_track) // trim(ib_char) // '.dat'
- !file_forces_u	=  trim(file_forces_u) // trim(ib_char) // '.dat'
- !file_forces_v	=  trim(file_forces_v) // trim(ib_char) // '.dat'
- !file_meltrates	=  trim(file_meltrates) // trim(ib_char) // '.dat' 
  
  
  ! ================== START ICEBERG CALCULATION ====================
@@ -515,28 +426,21 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 		   f_v_ib_old, l_semiimplicit, semiimplicit_coeff, &
 		   AB_coeff, file_meltrates, rho_icb)
   call prepare_icb2fesom(mesh,partit,ib,i_have_element,local_idx_of(iceberg_elem),depth_ib)
-  !new_u_ib = 2.0
-  !new_v_ib = 0.0
 
   dudt = (new_u_ib-u_ib)/REAL(steps_per_ib_step) / dt
   dvdt = (new_v_ib-v_ib)/REAL(steps_per_ib_step) / dt
-		   
-  !new_u_ib = 0.
-  !new_v_ib = -0.20
-  !P_ib = 20000.
-  !conci_ib = 0.3
 		   
   !=======================END OF DYNAMICS============================
  
   call depth_bathy(mesh,partit, Zdepth3, local_idx_of(iceberg_elem))
   !interpolate depth to location of iceberg (2 times because FEM_3eval expects a 2 component vector...)
   call FEM_3eval(mesh,partit, Zdepth,Zdepth,lon_rad,lat_rad,Zdepth3,Zdepth3,local_idx_of(iceberg_elem))
-  
   !write(*,*) 'nodal depth in iceberg ', ib,'s element:', Zdepth3
   !write(*,*) 'depth at iceberg ', ib, 's location:', Zdepth
   
   !=================CHECK IF ICEBERG IS GROUNDED...===================
  if((draft_scale(ib)*abs(depth_ib) .gt. Zdepth) .and. l_allowgrounding ) then 
+ !if((draft_scale(ib)*abs(depth_ib) .gt. minval(Zdepth3)) .and. l_allowgrounding ) then 
    !icebergs remains stationary (iceberg can melt above in iceberg_dyn!)
     left_mype = 0.0 
     u_ib = 0.0
@@ -550,7 +454,6 @@ if( local_idx_of(iceberg_elem) > 0 ) then
     !!###########################################
  
 ! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
-!   if (mod(istep,logfile_outfreq)==0) then 
     if (mod(istep_end_synced,logfile_outfreq)==0) then 
         write(*,*) 'iceberg ib ', ib, 'is grounded'
         grounded(ib) = .true.
@@ -642,7 +545,6 @@ end if !... and first node belongs to processor?
  
  end subroutine iceberg_step1
 
-! LA
 subroutine get_total_iceberg_area(mesh, partit,iceberg_elem, area_ib_tot)
  
  use o_param 		!for rad								!=
@@ -686,11 +588,6 @@ subroutine iceberg_step2(mesh, partit,arr, elem_from_block, ib, height_ib,length
  !============================= MODULES & DECLARATIONS =========================================!=
  												!=
  use o_param 		!for rad								!=
-
-! kh 17.03.21 not really used here
-! use o_arrays		!for coriolis_param_elem2D						!=
- 
- !use o_mesh		!for nod2D, (cavities: for cavity_flag_nod2d)				!=
  USE MOD_MESH
  use MOD_PARTIT		!for myDim_elem2D, myList_nod2D						!=
  use g_rotate_grid	!for subroutine g2r, logfile_outfreq					!=
@@ -1024,18 +921,9 @@ end subroutine trajectory
 !****************************************************************************************************************************
 
 subroutine depth_bathy(mesh, partit,Zdepth3, elem)  
-  !use o_mesh
   USE MOD_MESH
   use o_param
-!  use MOD_ICE
-!  use i_therm_param
-!  use i_param
-!  use i_arrays
   use MOD_PARTIT
-  
-! kh 17.03.21 not really used here
-! use o_arrays
-
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
@@ -1048,7 +936,6 @@ subroutine depth_bathy(mesh, partit,Zdepth3, elem)
   
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
-!type(t_ice),    intent(inout), target :: ice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -1067,8 +954,10 @@ type(t_partit), intent(inout), target :: partit
 
    !..compute depth below this node: 
    !Zdepth3(m) = abs(coord_nod3D(3, n_low))
-   Zdepth3(m) = abs(mesh%zbar(k))
-   !if (Zdepth3(m)<0.0) then
+   !Zdepth3(m) = abs(mesh%Z_3d_n_ib(k, n2))
+   Zdepth3(m) = abs(mesh%zbar_n_bot(n2))
+   !Zdepth3(m) = abs(mesh%zbar(k))
+   !if (!Zdepth3(m)<0.0) then
    !    Zdepth3(m) = -Zdepth3(m)
    !end if
  end do

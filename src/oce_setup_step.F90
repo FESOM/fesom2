@@ -868,6 +868,13 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     Sclim=tracers%data(2)%values
     Tsurf=Tclim(1,:)
     Ssurf=Sclim(1,:)
+    
+    if (use_icebergs) then
+      Tclim_ib=tracers%data(1)%values
+      Sclim_ib=tracers%data(2)%values
+      Tsurf_ib=Tclim(1,:)
+      Ssurf_ib=Sclim(1,:)
+    end if
     relax2clim=0.0_WP
 
     ! count the passive tracers which require 3D source (ptracers_restore_total)
