@@ -235,21 +235,21 @@ type(t_partit), intent(inout), target :: partit
     lvle_mean(ib)=lvle_mean(ib)+(lvl_e/real(icb_outfreq)*REAL(steps_per_ib_step)*scaling(ib))
     lvlb_mean(ib)=lvlb_mean(ib)+(lvl_b/real(icb_outfreq)*REAL(steps_per_ib_step)*scaling(ib))
 
-    if( (mod(istep,icb_outfreq)==0 .OR. force_last_output) .AND. ascii_out) then
-      icbID = mype+10
-      open(unit=icbID,file=file_meltrates,position='append')      
-      !old: write(icbID,'(6e15.7)') M_b, M_v, M_e, height_ib, length_ib, tvl*step_per_day*steps_per_FESOM_step
-      tvl=bvl_mean(ib) + lvlv_mean(ib) + lvle_mean(ib) + lvlb_mean(ib)
-      !new output structure with rev. 20:
-      write(icbID,'(7e15.7)') 	bvl_mean(ib)*step_per_day, lvlv_mean(ib)*step_per_day, lvle_mean(ib)*step_per_day, &
-				lvlb_mean(ib)*step_per_day, height_ib, length_ib, tvl*step_per_day
-      close(icbID)
-      ! set back to zero for the next round
-      bvl_mean(ib)=0.0
-      lvlv_mean(ib)=0.0
-      lvle_mean(ib)=0.0      
-      lvlb_mean(ib)=0.0
-    end if
+    !if( (mod(istep,icb_outfreq)==0 .OR. force_last_output) .AND. ascii_out) then
+    !  icbID = mype+10
+    !  open(unit=icbID,file=file_meltrates,position='append')      
+    !  !old: write(icbID,'(6e15.7)') M_b, M_v, M_e, height_ib, length_ib, tvl*step_per_day*steps_per_FESOM_step
+    !  tvl=bvl_mean(ib) + lvlv_mean(ib) + lvle_mean(ib) + lvlb_mean(ib)
+    !  !new output structure with rev. 20:
+    !  write(icbID,'(7e15.7)') 	bvl_mean(ib)*step_per_day, lvlv_mean(ib)*step_per_day, lvle_mean(ib)*step_per_day, &
+	!			lvlb_mean(ib)*step_per_day, height_ib, length_ib, tvl*step_per_day
+    !  close(icbID)
+    !  ! set back to zero for the next round
+    !  bvl_mean(ib)=0.0
+    !  lvlv_mean(ib)=0.0
+    !  lvle_mean(ib)=0.0      
+    !  lvlb_mean(ib)=0.0
+    !end if
 
     !values for communication
     arr= [ bvl_mean(ib), lvlv_mean(ib), lvle_mean(ib), lvlb_mean(ib) ] 

@@ -328,7 +328,7 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
 !---------------------------------------------
 m_snow       => ice%data(3)%values(:)    
 m_snow=0._WP
-if (use_icebergs == 0) then
+if (.not.use_icebergs) then
     u_ice        => ice%uice(:)
     v_ice        => ice%vice(:)
     a_ice        => ice%data(1)%values(:)

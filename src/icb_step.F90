@@ -1,3 +1,35 @@
+module iceberg_step
+ USE MOD_MESH
+ use MOD_PARTIT
+ use MOD_ICE
+ USE MOD_DYN
+ use iceberg_params
+ use iceberg_dynamics
+ use iceberg_element
+
+implicit none
+
+  public    ::  iceberg_calculation
+  public    ::  iceberg_step1
+  public    ::  get_total_iceberg_area
+  public    ::  iceberg_step2
+  public    ::  initialize_velo
+  public    ::  trajectory
+  public    ::  depth_bathy
+  public    ::  parallel2coast
+  public    ::  projection
+  public    ::  iceberg_restart
+  public    ::  iceberg_restart_with_icesheet
+  public    ::  iceberg_out
+  public    ::  init_buoys
+  public    ::  init_icebergs
+  public    ::  init_icebergs_with_icesheet
+  public    ::  determine_save_count
+  public    ::  init_buoy_output
+  public    ::  write_buoy_props_netcdf
+
+contains 
+
 subroutine iceberg_calculation(ice, mesh, partit, dynamics, istep) 
  !======================================================================!
  !									!
@@ -11,12 +43,6 @@ subroutine iceberg_calculation(ice, mesh, partit, dynamics, istep)
  									!=
  use o_param 		!for ?						!=
  use g_config		!for istep, step_per_day, logfile_outfreq	!=
- use iceberg_params	!for ..all others				!=
-
-use MOD_ICE
-use MOD_MESH
-use MOD_PARTIT
- USE MOD_DYN
 !=
  implicit none								!=
 									!=
@@ -52,7 +78,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
   !overwrite icb_modules if restart, initialize netcdf output if no restart:
   
   t0_restart=MPI_Wtime()
-  if (use_icesheet_coupling==.true.) then
+  if (use_icesheet_coupling) then
     call iceberg_restart_with_icesheet(partit)
   else
     call iceberg_restart(partit)
@@ -90,7 +116,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
 
     lastsubstep = .true. !do output every timestep
 
-    if( melted(ib) == .false. ) then
+    if( .not.melted(ib) ) then
         call iceberg_step1(ice, mesh, partit, dynamics, ib, height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),&
                             Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
                             conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
@@ -174,7 +200,7 @@ completed = .false.
     !substeps don't work anymore with new communication
     lastsubstep = .true. !do output every timestep
    
-    if( melted(ib) == .false. ) then
+    if( .not.melted(ib) ) then
         call iceberg_step2(mesh, partit, arr_from_block, elem_from_block, ib, height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),&
                             Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
                             conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
@@ -194,7 +220,7 @@ end do
  !istep, lon_deg_geo, lat_deg_geo, u_ib_geo, v_ib_geo, volume losses (set to zero)
  !introduce force_last_output(ib)?
 
- if (mod(istep_end_synced,icb_outfreq)==0 .AND. ascii_out==.false.) then
+ if (mod(istep_end_synced,icb_outfreq)==0 .AND. .not.ascii_out) then
 
    if (mype==0 .AND. (real(istep) > real(step_per_day)*calving_day(1) ) ) call write_buoy_props_netcdf(partit)
        
@@ -235,18 +261,14 @@ subroutine iceberg_step1(ice, mesh, partit, dynamics, ib, height_ib,length_ib,wi
  !============================= MODULES & DECLARATIONS =========================================!=
  												!=
  use o_param 		!for rad								!=
- USE MOD_MESH
- use MOD_PARTIT		!for myDim_elem2D, myList_nod2D						!=
- use MOD_ICE
- USE MOD_DYN
  use g_rotate_grid	!for subroutine g2r, logfile_outfreq					!=
  use g_config, only: steps_per_ib_step
  !=
-#ifdef use_cavity
- use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, melted, grounded, scaling !, length_ib, width_ib, scaling
-#else
- use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, melted, grounded, scaling !, length_ib, width_ib, scaling
-#endif
+!#ifdef use_cavity
+! use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, melted, grounded, scaling !, length_ib, width_ib, scaling
+!#else
+! use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, melted, grounded, scaling !, length_ib, width_ib, scaling
+!#endif
  												!=
  implicit none											!=
  
@@ -510,7 +532,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
   if((area_ib_tot > elem_area(local_idx_of(iceberg_elem))) .and. &  
                 (iceberg_elem .ne. old_element) .and. &
                 (old_element .ne. 0) .and. &
-                (grounded(ib) .ne. .true.)) then
+                (.not.grounded(ib))) then
       lon_rad = old_lon
       lat_rad = old_lat 
       lon_deg = lon_rad/rad
@@ -551,7 +573,7 @@ subroutine get_total_iceberg_area(mesh, partit,iceberg_elem, area_ib_tot)
  USE MOD_MESH
  use MOD_PARTIT		!for myDim_elem2D, myList_nod2D						!=
  use g_rotate_grid	!for subroutine g2r, logfile_outfreq					!=
- use iceberg_params, only: arr_block, elem_block, length_ib, width_ib, scaling
+ !use iceberg_params, only: arr_block, elem_block, length_ib, width_ib, scaling
  
  implicit none											!=
  
@@ -588,16 +610,14 @@ subroutine iceberg_step2(mesh, partit,arr, elem_from_block, ib, height_ib,length
  !============================= MODULES & DECLARATIONS =========================================!=
  												!=
  use o_param 		!for rad								!=
- USE MOD_MESH
- use MOD_PARTIT		!for myDim_elem2D, myList_nod2D						!=
  use g_rotate_grid	!for subroutine g2r, logfile_outfreq					!=
  use g_config, only: steps_per_ib_step
 !=
-#ifdef use_cavity
- use iceberg_params, only: smallestvol_icb, buoy_props, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, ascii_out, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, elem_block
-#else
- use iceberg_params, only: smallestvol_icb, buoy_props, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, ascii_out, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, elem_block
-#endif
+!#ifdef use_cavity
+! use iceberg_params, only: smallestvol_icb, buoy_props, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, ascii_out, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, elem_block
+!#else
+! use iceberg_params, only: smallestvol_icb, buoy_props, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, ascii_out, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, elem_block
+!#endif
  												!=
  implicit none											!=
  
@@ -772,26 +792,26 @@ type(t_partit), intent(inout), target :: partit
       lat_deg_out = lat_deg
    end if
 
- if(ascii_out) then !use old ASCII output
-  
- file_track='/work/ollie/lackerma/iceberg/iceberg_ICBref_'
- !convert ib integer to string
- write(ib_char,'(I10)') ib
- !left-adjust the string..
- ib_char = adjustl(ib_char)
- !.. and trim while concatenating:
- file_track	=  trim(file_track) // trim(ib_char) // '.dat'
-   
-   open(unit=42,file=file_track,position='append')
-
-! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
-!  write(42,'(I,12e15.7)') 	istep, lon_rad_out, lat_rad_out, lon_deg_out, lat_deg_out, &
-!  				u_ib_out, v_ib_out, frozen_in, P_sill, P_ib, conci_ib, dudt_out, dvdt_out
-   write(42,'(I,12e15.7)') 	istep_end_synced, lon_rad_out, lat_rad_out, lon_deg_out, lat_deg_out, &
-   				u_ib_out, v_ib_out, frozen_in, P_sill, P_ib, conci_ib, dudt_out, dvdt_out
-   close(42)
-
- else !write in array for faster netcdf output
+! if(ascii_out) then !use old ASCII output
+!  
+! file_track='/work/ollie/lackerma/iceberg/iceberg_ICBref_'
+! !convert ib integer to string
+! write(ib_char,'(I10)') ib
+! !left-adjust the string..
+! ib_char = adjustl(ib_char)
+! !.. and trim while concatenating:
+! file_track	=  trim(file_track) // trim(ib_char) // '.dat'
+!   
+!   open(unit=42,file=file_track,position='append')
+!
+!! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
+!!  write(42,'(I,12e15.7)') 	istep, lon_rad_out, lat_rad_out, lon_deg_out, lat_deg_out, &
+!!  				u_ib_out, v_ib_out, frozen_in, P_sill, P_ib, conci_ib, dudt_out, dvdt_out
+!   write(42,'(I,12e15.7)') 	istep_end_synced, lon_rad_out, lat_rad_out, lon_deg_out, lat_deg_out, &
+!   				u_ib_out, v_ib_out, frozen_in, P_sill, P_ib, conci_ib, dudt_out, dvdt_out
+!   close(42)
+!
+! else !write in array for faster netcdf output
 
   buoy_props(ib, 1) = lon_rad_out
   buoy_props(ib, 2) = lat_rad_out
@@ -807,7 +827,7 @@ type(t_partit), intent(inout), target :: partit
   buoy_props(ib,12) = width_ib
   buoy_props(ib,13) = iceberg_elem
 
- end if
+! end if
 
  end if 
  
@@ -829,11 +849,7 @@ end subroutine iceberg_step2
 subroutine initialize_velo(mesh,partit,dynamics, i_have_element, ib, u_ib, v_ib, lon_rad, lat_rad, depth_ib, localelem)			
  
  use g_rotate_grid,  only: vector_g2r
- use iceberg_params, only: l_initial, l_iniuser, ini_u, ini_v
-
-use MOD_MESH
-use MOD_PARTIT
-use MOD_DYN
+! use iceberg_params, only: l_initial, l_iniuser, ini_u, ini_v
 implicit none
  
  logical, intent(in)	:: i_have_element
@@ -871,7 +887,7 @@ type(t_partit), intent(inout), target :: partit
 	else
    		!OCEAN VELOCITY uo_ib, voib is start velocity
    		call iceberg_avvelo(mesh, partit, dynamics, startu,startv,depth_ib,localelem)
-                call FEM_3eval(mesh, partit,u_ib,v_ib,lon_rad,lat_rad,startu,startv,localelem)
+        call FEM_3eval(mesh, partit,u_ib,v_ib,lon_rad,lat_rad,startu,startv,localelem)
 	end if
  end if
  
@@ -921,9 +937,7 @@ end subroutine trajectory
 !****************************************************************************************************************************
 
 subroutine depth_bathy(mesh, partit,Zdepth3, elem)  
-  USE MOD_MESH
   use o_param
-  use MOD_PARTIT
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
@@ -969,12 +983,9 @@ end subroutine depth_bathy
 !****************************************************************************************************************************
 
 subroutine parallel2coast(mesh, partit,u, v, lon,lat, elem)
- !use o_mesh		!for index_nod2D, (cavities: for cavity_flag_nod2d)
- USE MOD_MESH
- use MOD_PARTIT		!for myDim_nod2D
-#ifdef use_cavity
- use iceberg_params, only: coastal_nodes
-#endif
+!#ifdef use_cavity
+! use iceberg_params, only: coastal_nodes
+!#endif
  implicit none
  
  real, intent(inout) 	:: u, v 	!velocity
@@ -1092,9 +1103,6 @@ end subroutine parallel2coast
 
 
 subroutine projection(mesh, partit, velocity, n1, n2)
- !use o_mesh		!for coord_nod2D
- USE MOD_MESH
- use MOD_PARTIT
 implicit none
  
  real, dimension(2), intent(inout) :: velocity
@@ -1128,8 +1136,7 @@ end subroutine projection
 
 
 subroutine iceberg_restart(partit)
- use iceberg_params 
- use MOD_PARTIT		!for mype
+! use iceberg_params 
  use g_config, only : ib_num
 
  implicit none
@@ -1149,7 +1156,7 @@ type(t_partit), intent(inout), target :: partit
   do ib=1, ib_num 
   
    !read all parameters that icb_step needs:			
-   read(icbID,'(18e15.7,I,L,3e15.7,L,I)')						&
+   read(icbID) & !,'(18e15.7,I,L,3e15.7,L,I)')						&
    	height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
 	Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
 	conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
@@ -1192,8 +1199,7 @@ end subroutine iceberg_restart
 
 
 subroutine iceberg_restart_with_icesheet(partit)
- use iceberg_params 
- use MOD_PARTIT		!for mype
+! use iceberg_params 
  use g_config, only : ib_num
 
  implicit none
@@ -1218,7 +1224,7 @@ type(t_partit), intent(inout), target :: partit
   open(unit=icbID_ISM,file=IcebergRestartPath_ISM,status='old')
   do ib=1, num_non_melted_icb 
    !read all parameters that icb_step needs:			
-   read(icbID_ISM,'(18e15.7,I,L,3e15.7,L,I,L)',iostat=st)						&
+   read(icbID_ISM) & !,'(18e15.7,I,L,3e15.7,L,I,L)',iostat=st)						&
    	height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
 	Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
 	conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
@@ -1260,8 +1266,7 @@ end subroutine iceberg_restart_with_icesheet
 
 
 subroutine iceberg_out(partit)
- use iceberg_params
- use MOD_PARTIT		!for mype
+! use iceberg_params
  use g_clock		!for dayold
  implicit none
  integer :: icbID, icbID_ISM, ib, istep
@@ -1290,7 +1295,7 @@ type(t_partit), intent(inout), target :: partit
   do ib=1, ib_num 
   
    !write all parameters that icb_step needs:
-   write(icbID,'(18e15.7,I,L,3e15.7,L,I,L)')						&
+   write(icbID) & !,'(18e15.7,I,L,3e15.7,L,I,L)')						&
    	height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
 	Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
 	conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
@@ -1299,9 +1304,9 @@ type(t_partit), intent(inout), target :: partit
    
    !***************************************************************
    !write new restart file with only non melted icebergs
-   if(melted(ib)==.false.) then
+   if(.not.melted(ib)) then
        !write all parameters that icb_step needs:
-       write(icbID_ISM,'(18e15.7,I,L,3e15.7,L,I,L)')						&
+       write(icbID_ISM) & !,'(18e15.7,I,L,3e15.7,L,I,L)')						&
             height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
             Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
             conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
@@ -1321,16 +1326,12 @@ end subroutine iceberg_out
 ! written by Madlen Kimmritz, 25.07.2015
 !========================================================================
 subroutine init_buoys
- use iceberg_params
+! use iceberg_params
  use g_config
-! use MOD_PARTIT
 
  implicit none
  integer :: i
  integer :: io_error
-!type(t_partit), intent(inout), target :: partit
-!#include "associate_part_def.h"
-!#include "associate_part_ass.h"
 
 !buoys_xlon_file > lon_deg
  open(unit=97, file=buoys_xlon_file,status='old',action='read',iostat=io_error)
@@ -1358,7 +1359,7 @@ end subroutine init_buoys
 ! added length for iceberg case, 07.10.2015
 !========================================================================
 subroutine init_icebergs
- use iceberg_params
+! use iceberg_params
  use g_config
 ! use MOD_PARTIT
 
@@ -1418,7 +1419,7 @@ end subroutine init_icebergs
 !
 
 subroutine init_icebergs_with_icesheet
- use iceberg_params
+! use iceberg_params
  use g_config
 ! use MOD_PARTIT
 
@@ -1481,9 +1482,8 @@ subroutine determine_save_count(partit)
   ! computes save_count_buoys and prev_sec_in_year from records in existing netcdf file
   !-----------------------------------------------------------  
   use g_clock
-  use iceberg_params, only : file_icb_netcdf, save_count_buoys, prev_sec_in_year
+!  use iceberg_params, only : file_icb_netcdf, save_count_buoys, prev_sec_in_year
   !use iceberg_params, only : save_count_buoys, prev_sec_in_year
-  use MOD_PARTIT
   implicit none
 
 #include "netcdf.inc" 
@@ -1539,9 +1539,7 @@ subroutine init_buoy_output(partit)
   !-----------------------------------------------------------  
   use g_clock
   use g_config, only : ib_num
-  use iceberg_params, only : file_icb_netcdf, save_count_buoys !ggf in namelist
-  !use iceberg_params, only : ib_num, save_count_buoys !ggf in namelist
-  use MOD_PARTIT
+!  use iceberg_params, only : file_icb_netcdf, save_count_buoys !ggf in namelist
   implicit none
 
 #include "netcdf.inc" 
@@ -1875,18 +1873,7 @@ subroutine write_buoy_props_netcdf(partit)
 
  use g_config
  use g_clock
- use MOD_PARTIT
- use iceberg_params, only : buoy_props, file_icb_netcdf, save_count_buoys, prev_sec_in_year, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean
- !use iceberg_params, only : ib_num, buoy_props, save_count_buoys, prev_sec_in_year, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean
-  
-! kh 17.03.21 not really used here
-! use o_arrays
-
-!  use o_mesh
-  !use o_passive_tracer_mod
-  !use o_age_tracer_mod
-!  use i_arrays
-! use MOD_ICE
+! use iceberg_params, only : buoy_props, file_icb_netcdf, save_count_buoys, prev_sec_in_year, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean
  use g_forcing_param
 
  implicit none
@@ -2078,3 +2065,4 @@ type(t_partit), intent(inout), target :: partit
 
 
 end subroutine write_buoy_props_netcdf
+end module iceberg_step

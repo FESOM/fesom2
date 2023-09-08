@@ -1,12 +1,26 @@
-subroutine mean_gradient(mesh, partit, dynamics, elem, lon_rad, lat_rad, nablaeta)
- !!use o_mesh
+module iceberg_element
  use MOD_PARTIT
  USE MOD_MESH
  USE MOD_DYN
- ! kh 18.03.21 specification of structure used
-! use o_arrays, only: eta_n_ib
- 
+ use iceberg_params
+! use iceberg_dynamics
+! use iceberg_step
+
  implicit none
+
+ public ::   mean_gradient
+ public ::   nodal_average
+ public ::   FEM_eval
+ public ::   FEM_3eval
+ public ::   iceberg_elem4all
+ public ::   find_new_iceberg_elem
+ public ::   global2local
+ public ::   com_integer
+ public ::   matrix_inverse_2x2
+
+ contains
+
+subroutine mean_gradient(mesh, partit, dynamics, elem, lon_rad, lat_rad, nablaeta)
  
  integer, intent(IN) :: elem
  real, 	  intent(IN) :: lon_rad, lat_rad
@@ -59,12 +73,9 @@ end subroutine mean_gradient
  !***************************************************************************************************************************
 
 subroutine nodal_average(mesh, partit, dynamics, local_idx, gradientx, gradienty, notmynode)  
- !use o_mesh
  use MOD_PARTIT
  USE MOD_MESH
  USE MOD_DYN
-! kh 18.03.21 specification of structure used
-! use o_arrays, only: eta_n_ib
 
  implicit none
  
@@ -137,7 +148,6 @@ end subroutine nodal_average
 subroutine FEM_eval(mesh, partit, u_at_ib,v_at_ib,lon,lat,field_u,field_v,elem)
   use MOD_PARTIT !for myDim_nod2D, eDim_nod2D
   use o_param !for rad
-  !use o_mesh
   USE MOD_MESH
 
   implicit none
@@ -198,18 +208,7 @@ end subroutine FEM_eval
 !      elem	(the LOCAL element the iceberg lies in)
 !=================================================================
 subroutine FEM_eval_old(mesh, partit, u_at_ib,v_at_ib,lon,lat,field_u,field_v,elem)
-  !use o_mesh
-  USE MOD_MESH
   use o_param
-!  use i_therm_param
-!  use i_param
-!  use i_arrays
-  use MOD_PARTIT
-!  use MOD_ICE
-
-! kh 18.03.21 not really used here
-! use o_arrays
- 
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
@@ -327,8 +326,7 @@ end subroutine FEM_eval_old
 subroutine FEM_3eval(mesh, partit, u_at_ib,v_at_ib,lon,lat,ocean_u,ocean_v,elem)
   use MOD_PARTIT !for myDim_nod2D, eDim_nod2D
   use o_param !for rad
-
-use MOD_MESH
+  use MOD_MESH
 
   implicit none
   real, intent(in)			:: lon, lat 
@@ -372,142 +370,15 @@ type(t_partit), intent(inout), target :: partit
   !if (interp > maxval(values, 1)) interp=maxval(values, 1)
 end subroutine FEM_3eval
 
-
- !***************************************************************************************************************************
- !***************************************************************************************************************************
-
-!=================================================================
-! interpolates ocean velocity to ib's location (lon, lat) [radiant]
-! OUT: u_at_ib, v_at_ib (u and v component at location of iceberg)
-! IN : lon, lat (position of iceberg in radiant)
-!      ocean_u, ocean_v (3 nodal values for u and v component where
-!                        ocean_u(m) is value of 
-!                        elem2D_nodes(m,iceberg_elem), m=1,2,3 )
-!      elem	(the LOCAL element the iceberg lies in)
-!=================================================================
-subroutine FEM_3eval_old(mesh, partit, u_at_ib,v_at_ib,lon,lat,ocean_u,ocean_v,elem)
-  !use o_mesh
-  USE MOD_MESH
-  use o_param
-!  use i_therm_param
-!  use i_param
-!  use i_arrays
-  use MOD_PARTIT
-  
-! kh 18.03.21 not really used here
-! use o_arrays
-
-  use g_clock
-  use g_forcing_arrays
-  use g_rotate_grid
-  
-  !use iceberg module
-  !use iceberg_params
-
-  implicit none
-  real, intent(in)			:: lon, lat 
-  real, dimension(3), intent(in)  	:: ocean_u
-  real, dimension(3), intent(in)  	:: ocean_v
-  integer				:: elem
-  real, intent(out) 			:: u_at_ib
-  real, intent(out) 			:: v_at_ib
-  
-  real					:: x, y, x1,x2,x3,y1,y2,y3
-  real					:: T1_u, T1_v, T2_u, T2_v, T3_u, T3_v
-  real, dimension(2,2) 			:: inv_matrix
-  real, dimension(2)			:: alphabeta 
-  real					:: maxlon, minlon, maxlat, minlat
-
-type(t_mesh), intent(in) , target :: mesh
-type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
-  
-  !location of iceberg
-  x = lon
-  y = lat 
-  
-  
-  !coords of the 3 nodes
-  x1 = coord_nod2D(1,elem2D_nodes(1,elem))
-  y1 = coord_nod2D(2,elem2D_nodes(1,elem))
-  x2 = coord_nod2D(1,elem2D_nodes(2,elem))
-  y2 = coord_nod2D(2,elem2D_nodes(2,elem))  
-  x3 = coord_nod2D(1,elem2D_nodes(3,elem))
-  y3 = coord_nod2D(2,elem2D_nodes(3,elem))
-  
-  
-  !check whether iceberg position is in the element
-  maxlon = maxval( (/ x1, x2, x3 /) )
-  minlon = minval( (/ x1, x2, x3 /) )
-  maxlat = maxval( (/ y1, y2, y3 /) )
-  minlat = minval( (/ y1, y2, y3 /) )
-  if( (x > maxlon) .OR. (x < minlon) ) then
-    write(*,*) 'FEM_eval error: iceberg lon ', x, ' outside element!'
-    write(*,*) 'maxlon:', maxlon, ' minlon:', minlon
-    call par_ex
-    stop
-  else if( (y > maxlat) .OR. (y < minlat)) then
-    write(*,*) 'FEM_eval error: iceberg lat', y, ' outside element!'
-    write(*,*) 'maxlat:', maxlat, ' minlat:', minlat
-    call par_ex
-    stop
-  else
-    !everything okay
-  end if 
-  
-  
-  !distances wrt node 1
-  x2 = x2 - x1
-  y2 = y2 - y1 
-  x3 = x3 - x1
-  y3 = y3 - y1
-  x  = x - x1
-  y  = y - y1 
-  
-  !nodal values Ti_u, Ti_v
-  T1_u = ocean_u(1)
-  T1_v = ocean_v(1)
-  T2_u = ocean_u(2)
-  T2_v = ocean_v(2)  
-  T3_u = ocean_u(3)
-  T3_v = ocean_v(3)
-  
-  !differences wrt node 1
-  T2_u = T2_u - T1_u
-  T2_v = T2_v - T1_v  
-  T3_u = T3_u - T1_u
-  T3_v = T3_v - T1_v
-  
-  !determine alpha and beta for u velocity
-  inv_matrix(1,1) = y2
-  inv_matrix(1,2) = -y3
-  inv_matrix(2,1) = -x2
-  inv_matrix(2,2) = x3
-  inv_matrix = (1./(x3*y2 - x2*y3)) * inv_matrix
-  alphabeta = MATMUL(inv_matrix, (/ T3_u, T2_u /))
-  
-  u_at_ib = T1_u + alphabeta(1)*x + alphabeta(2)*y
-  
-  !same for v velocity
-  alphabeta = MATMUL(inv_matrix, (/ T3_v, T2_v /))
-  
-  v_at_ib = T1_v + alphabeta(1)*x + alphabeta(2)*y 
-end subroutine FEM_3eval_old
-
-
  !***************************************************************************************************************************
  !***************************************************************************************************************************
 
 subroutine iceberg_elem4all(mesh, partit, elem, lon_deg, lat_deg) 
- !use o_mesh		!for index_nod2d, elem2D_nodes
  USE MOD_MESH
  use MOD_PARTIT		!for myDim_nod2D, myList_elem2D
-#ifdef use_cavity
- use iceberg_params, only: reject_elem
-#endif
+!#ifdef use_cavity
+! use iceberg_params, only: reject_elem
+!#endif
  
  implicit none
  
@@ -540,18 +411,6 @@ type(t_partit), intent(inout), target :: partit
 #endif 
   end if
   call com_integer(partit, i_have_element,elem) !max 1 PE sends element here; 
- 					!if no PE found elem,it remains 0.
-				
- !call point_in_triangle(elem, (/ lon_deg, lat_deg /)) !all PEs search here
- !i_have_element= (elem .ne. 0) !up to 3 PEs .true.
- !
- !if(i_have_element) then
- ! i_have_element= (elem2D_nodes(1,elem) <= myDim_nod2D) !max 1 PE .true.
- ! elem=myList_elem2D(elem) !global now
- !end if
- !
- !call com_integer(i_have_element,elem) 	!max 1 PE sends element here; 
- !					!if no PE found elem,it remains 0.				
 end subroutine iceberg_elem4all
 
 
@@ -559,17 +418,10 @@ end subroutine iceberg_elem4all
  !***************************************************************************************************************************
 
 subroutine find_new_iceberg_elem(mesh, partit, old_iceberg_elem, pt, left_mype)
-  !use o_mesh !for index_nod2d, elem2D_nodes
-  USE MOD_MESH
   use o_param
-
-! kh 18.03.21 not really used here
-! use o_arrays
-
-  use MOD_PARTIT
-#ifdef use_cavity
-  use iceberg_params, only: reject_elem
-#endif
+!#ifdef use_cavity
+!  use iceberg_params, only: reject_elem
+!#endif
 
   implicit none
   
@@ -907,51 +759,51 @@ type(t_partit), intent(inout), target :: partit
  !***************************************************************************************************************************
  !***************************************************************************************************************************
  
- !==============================================================================
-! routine for visualizing the distribution of the processors involved
+! !==============================================================================
+!! routine for visualizing the distribution of the processors involved
+!!
+!!   Thomas Rackow, 30.07.2010
+!!==============================================================================
+!SUBROUTINE processor_distr(mesh, partit)
+!  !use o_mesh
+!  USE MOD_MESH
+!  use o_param
+!!  use i_therm_param
+!!  use i_param
+!!  use i_arrays
+!  use MOD_PARTIT
 !
-!   Thomas Rackow, 30.07.2010
-!==============================================================================
-SUBROUTINE processor_distr(mesh, partit)
-  !use o_mesh
-  USE MOD_MESH
-  use o_param
-!  use i_therm_param
-!  use i_param
-!  use i_arrays
-  use MOD_PARTIT
-
-! kh 18.03.21 not really used here
-! use o_arrays
-
-  use g_clock
-  use g_forcing_arrays
-  use g_rotate_grid
-
-  IMPLICIT NONE
-  
-  character			:: mype_char*3
-  INTEGER			:: m, row
-
-type(t_mesh), intent(in) , target :: mesh
-type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
-  
-  write(mype_char,*) mype
-  !left-adjust the string..
-  mype_char = adjustl(mype_char)
-
-  DO m=1, myDim_nod2d
-  row=myList_nod2d(m)
-  open(unit=mype+66, file='/work/ab0046/a270046/results/ICB02processor' // trim(mype_char) // '.dat', position='append')
-  !		global local    lon		   lat		PE	
-  write(mype+66,*) row, m, coord_nod2D(1,m), coord_nod2D(2,m), mype
-  close(mype+66)
-  END DO
-END SUBROUTINE processor_distr 
+!! kh 18.03.21 not really used here
+!! use o_arrays
+!
+!  use g_clock
+!  use g_forcing_arrays
+!  use g_rotate_grid
+!
+!  IMPLICIT NONE
+!  
+!  character			:: mype_char*3
+!  INTEGER			:: m, row
+!
+!type(t_mesh), intent(in) , target :: mesh
+!type(t_partit), intent(inout), target :: partit
+!#include "associate_part_def.h"
+!#include "associate_mesh_def.h"
+!#include "associate_part_ass.h"
+!#include "associate_mesh_ass.h"
+!  
+!  write(mype_char,*) mype
+!  !left-adjust the string..
+!  mype_char = adjustl(mype_char)
+!
+!  DO m=1, myDim_nod2d
+!  row=myList_nod2d(m)
+!  open(unit=mype+66, file='/work/ab0046/a270046/results/ICB02processor' // trim(mype_char) // '.dat', position='append')
+!  !		global local    lon		   lat		PE	
+!  write(mype+66,*) row, m, coord_nod2D(1,m), coord_nod2D(2,m), mype
+!  close(mype+66)
+!  END DO
+!END SUBROUTINE processor_distr 
 
 
  !***************************************************************************************************************************
@@ -1024,5 +876,4 @@ subroutine  matrix_inverse_2x2 (A, AINV, DET)
      AINV(2,2) =  A(1,1)/DET
   endif
 end subroutine matrix_inverse_2x2
- !***************************************************************************************************************************
- !***************************************************************************************************************************
+end module iceberg_element

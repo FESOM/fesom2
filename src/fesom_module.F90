@@ -1,6 +1,7 @@
 ! synopsis: save any derived types we initialize
 !           so they can be reused after fesom_init
 module fesom_main_storage_module
+  use iceberg_step
   USE MOD_MESH
   USE MOD_ICE
   USE MOD_TRACER

@@ -1,3 +1,23 @@
+module iceberg_dynamics
+ USE MOD_MESH
+ use MOD_PARTIT
+ use MOD_ICE
+ USE MOD_DYN
+ use iceberg_params
+ use iceberg_element
+ !use iceberg_step
+
+implicit none
+
+ public ::  iceberg_dyn
+ public ::  iceberg_frozen
+ public ::  iceberg_acceleration
+ public ::  compute_areas
+ public ::  iceberg_average_andkeel
+ public ::  iceberg_avvelo
+
+ contains
+
 !==============================================================================
 ! calculates basically the new iceberg velocity; if melting is enabled, the
 ! iceberg dimensions are adjusted as well.
@@ -15,14 +35,7 @@ subroutine iceberg_dyn(mesh, partit, ice, dynamics, ib, new_u_ib, new_v_ib, u_ib
  use g_forcing_arrays 	!for u_wind, v_wind or u_wind_ib, v_wind_ib respectively
  use o_arrays, only: Tsurf_ib, Ssurf_ib
  use o_param		!for dt
- use iceberg_params,only: l_melt, coriolis_scale !are icebergs allowed to melt?
-
- USE MOD_MESH
- use MOD_PARTIT
- use MOD_ICE
- USE MOD_DYN
-
- implicit none
+ !use iceberg_params,only: l_melt, coriolis_scale !are icebergs allowed to melt?
 
  integer, intent(IN) 	:: ib !current iceberg's index
  real,    intent(OUT)	:: new_u_ib, new_v_ib
@@ -203,7 +216,7 @@ end subroutine iceberg_dyn
 
 subroutine iceberg_frozen(festgefroren, P_sill, P_ib, conc_sill, conci_ib, ib)
  
- use iceberg_params, only : l_freeze !use 'capturing mechanism' of sea ice?
+ !use iceberg_params, only : l_freeze !use 'capturing mechanism' of sea ice?
  implicit none
  
  real,	  intent(OUT)	:: festgefroren
@@ -264,15 +277,14 @@ subroutine iceberg_acceleration(mesh, partit, dynamics, ib, au_ib, av_ib, Ao, Aa
 				lon_rad, lat_rad, output, f_u_ib_old, &
 				f_v_ib_old, l_semiimplicit, &
 				semiimplicit_coeff, AB_coeff )
-
+ 
  use o_param 	!for g
  use g_config	!for istep
  use MOD_PARTIT	!for mype
  use g_rotate_grid,  only: vector_r2g, vector_g2r
- use iceberg_params, only: l_wave, l_tides, l_geo_out, surfslop_scale, ascii_out
-
-use MOD_MESH
- USE MOD_DYN
+ !use iceberg_params, only: l_wave, l_tides, l_geo_out, surfslop_scale, ascii_out
+ use MOD_MESH
+ use MOD_DYN
 
  implicit none
  
@@ -485,67 +497,67 @@ icbID = mype+10
   
  end if !use semiimplicit scheme or AB method?
  
- !if(.false.) then
- if(output .AND. ascii_out) then
- 
-   accs_u_out(1) = ocean_drag_u - (0.5 * Co * rho_h2o * Ao * abs_omib * u_ib)/mass_ib
-   accs_u_out(2) = ocean_skin_u - (rho_h2o * Cdo_skin * Ad * abs_omib_skin * u_ib)/mass_ib
-   accs_u_out(3) = air_drag_u
-   accs_u_out(4) = air_skin_u
-   accs_u_out(5) = ice_drag_u
-   accs_u_out(6) = wave_radiation_u
-   accs_u_out(7) = surface_slope_u
-   accs_u_out(8) = fcoriolis*v_ib
-   vels_u_out(1) = uo_ib
-   vels_u_out(2) = uo_skin_ib
-   vels_u_out(3) = ua_ib
-   vels_u_out(4) = ui_ib
-  
-   accs_v_out(1) = ocean_drag_v - (0.5 * Co * rho_h2o * Ao * abs_omib * v_ib)/mass_ib
-   accs_v_out(2) = ocean_skin_v - (rho_h2o * Cdo_skin * Ad * abs_omib_skin * v_ib)/mass_ib
-   accs_v_out(3) = air_drag_v
-   accs_v_out(4) = air_skin_v
-   accs_v_out(5) = ice_drag_v
-   accs_v_out(6) = wave_radiation_v
-   accs_v_out(7) = surface_slope_v
-   accs_v_out(8) = -fcoriolis*u_ib
-   vels_v_out(1) = vo_ib
-   vels_v_out(2) = vo_skin_ib
-   vels_v_out(3) = va_ib
-   vels_v_out(4) = vi_ib
-   
-   if(l_geo_out) then
-    do i=1,8
-     call vector_r2g(accs_u_out(i), accs_v_out(i), lon_rad, lat_rad, 0)
-    end do
-    do i=1,4
-     call vector_r2g(vels_u_out(i), vels_v_out(i), lon_rad, lat_rad, 0)
-    end do   
-   end if
-   
-   open(unit=icbID,file=file1,position='append')
-   write(icbID,'(2I,12e15.7)') mype, istep, 	&
-  		 accs_u_out(1),	accs_u_out(2),	&
-		 accs_u_out(3),	accs_u_out(4),	&
-		 accs_u_out(5),	accs_u_out(6),	&	
-		 accs_u_out(7),	accs_u_out(8), 	&
-		 vels_u_out(1),	vels_u_out(2),	&
-		 vels_u_out(3),	vels_u_out(4)
-		 
-		 
-		 
-   close(icbID)  
- 
-   open(unit=icbID,file=file2,position='append')      
-   write(icbID,'(2I,12e15.7)') mype,istep, 	&
-  		 accs_v_out(1),	accs_v_out(2),	&
-		 accs_v_out(3),	accs_v_out(4),	&
-		 accs_v_out(5),	accs_v_out(6),	&	
-		 accs_v_out(7),	accs_v_out(8),	&		 
-		 vels_v_out(1),	vels_v_out(2),	&
-		 vels_v_out(3),	vels_v_out(4)
-   close(icbID)
- end if !output
+! !if(.false.) then
+! if(output .AND. ascii_out) then
+! 
+!   accs_u_out(1) = ocean_drag_u - (0.5 * Co * rho_h2o * Ao * abs_omib * u_ib)/mass_ib
+!   accs_u_out(2) = ocean_skin_u - (rho_h2o * Cdo_skin * Ad * abs_omib_skin * u_ib)/mass_ib
+!   accs_u_out(3) = air_drag_u
+!   accs_u_out(4) = air_skin_u
+!   accs_u_out(5) = ice_drag_u
+!   accs_u_out(6) = wave_radiation_u
+!   accs_u_out(7) = surface_slope_u
+!   accs_u_out(8) = fcoriolis*v_ib
+!   vels_u_out(1) = uo_ib
+!   vels_u_out(2) = uo_skin_ib
+!   vels_u_out(3) = ua_ib
+!   vels_u_out(4) = ui_ib
+!  
+!   accs_v_out(1) = ocean_drag_v - (0.5 * Co * rho_h2o * Ao * abs_omib * v_ib)/mass_ib
+!   accs_v_out(2) = ocean_skin_v - (rho_h2o * Cdo_skin * Ad * abs_omib_skin * v_ib)/mass_ib
+!   accs_v_out(3) = air_drag_v
+!   accs_v_out(4) = air_skin_v
+!   accs_v_out(5) = ice_drag_v
+!   accs_v_out(6) = wave_radiation_v
+!   accs_v_out(7) = surface_slope_v
+!   accs_v_out(8) = -fcoriolis*u_ib
+!   vels_v_out(1) = vo_ib
+!   vels_v_out(2) = vo_skin_ib
+!   vels_v_out(3) = va_ib
+!   vels_v_out(4) = vi_ib
+!   
+!   if(l_geo_out) then
+!    do i=1,8
+!     call vector_r2g(accs_u_out(i), accs_v_out(i), lon_rad, lat_rad, 0)
+!    end do
+!    do i=1,4
+!     call vector_r2g(vels_u_out(i), vels_v_out(i), lon_rad, lat_rad, 0)
+!    end do   
+!   end if
+!   
+!   !open(unit=icbID,file=file1,position='append')
+!   !write(icbID,'(2I,12e15.7)') mype, istep, 	&
+!   ! 	 accs_u_out(1),	accs_u_out(2),	&
+!   ! 	 accs_u_out(3),	accs_u_out(4),	&
+!   ! 	 accs_u_out(5),	accs_u_out(6),	&	
+!   ! 	 accs_u_out(7),	accs_u_out(8), 	&
+!   ! 	 vels_u_out(1),	vels_u_out(2),	&
+!   ! 	 vels_u_out(3),	vels_u_out(4)
+!   ! 	 
+!   ! 	 
+!   ! 	 
+!   !close(icbID)  
+! 
+!   !open(unit=icbID,file=file2,position='append')      
+!   !write(icbID,'(2I,12e15.7)') mype,istep, 	&
+!   ! 	 accs_v_out(1),	accs_v_out(2),	&
+!   ! 	 accs_v_out(3),	accs_v_out(4),	&
+!   ! 	 accs_v_out(5),	accs_v_out(6),	&	
+!   ! 	 accs_v_out(7),	accs_v_out(8),	&		 
+!   ! 	 vels_v_out(1),	vels_v_out(2),	&
+!   ! 	 vels_v_out(3),	vels_v_out(4)
+!   !close(icbID)
+! end if !output
   
 end subroutine iceberg_acceleration
 
@@ -929,3 +941,4 @@ type(t_partit), intent(inout), target :: partit
   end function interpol1D
   
 end subroutine iceberg_avvelo
+end module iceberg_dynamics
