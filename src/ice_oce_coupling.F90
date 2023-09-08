@@ -515,6 +515,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 #endif
                   +runoff(n)                                  
     end do
+!$OMP END PARALLEL DO
 
     !---wiso-code
     if (lwiso) then
@@ -526,7 +527,6 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     end if
     !---wiso-code-end
 
-!$OMP END PARALLEL DO
     ! --> In case of zlevel and zstar and levitating sea ice, sea ice is just sitting 
     ! on top of the ocean without displacement of water, there the thermodynamic 
     ! growth rates of sea ice have to be taken into account to preserve the fresh water 
