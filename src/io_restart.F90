@@ -82,15 +82,15 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
   !___Save restart variables for TKE and IDEMIX_________________________________
 !   if (trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
   if (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
-        call oce_files%def_node_var('tke', 'Turbulent Kinetic Energy', 'm2/s2', tke(:,:), mesh, partit)
+        call oce_files%def_node_var_optional('tke', 'Turbulent Kinetic Energy', 'm2/s2', tke(:,:), mesh, partit)
   endif
 !   if (trim(mix_scheme)=='cvmix_IDEMIX' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
   if (mix_scheme_nmb==6 .or. mix_scheme_nmb==56) then
-        call oce_files%def_elem_var('iwe', 'Internal Wave Energy'    , 'm2/s2', iwe(:,:), mesh, partit)
+        call oce_files%def_elem_var_optional('iwe', 'Internal Wave Energy'    , 'm2/s2', iwe(:,:), mesh, partit)
   endif 
   if (dynamics%opt_visc==8) then
-        call oce_files%def_elem_var('uke', 'unresolved kinetic energy', 'm2/s2', uke(:,:), mesh, partit)
-        call oce_files%def_elem_var('uke_rhs', 'unresolved kinetic energy rhs', 'm2/s2', uke_rhs(:,:), mesh, partit)
+        call oce_files%def_elem_var_optional('uke', 'unresolved kinetic energy', 'm2/s2', uke(:,:), mesh, partit)
+        call oce_files%def_elem_var_optional('uke_rhs', 'unresolved kinetic energy rhs', 'm2/s2', uke_rhs(:,:), mesh, partit)
   endif
   
   do j=1,tracers%num_tracers

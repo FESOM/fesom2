@@ -89,6 +89,7 @@ TYPE T_DYN
     ! 6=Biharmonic flow aware (viscosity depends on velocity Laplacian)
     ! 7=Biharmonic flow aware (viscosity depends on velocity differences)
     ! 8=Dynamic Backscatter
+    logical                                     :: check_opt_visc= .true.
     integer                                     :: opt_visc      = 5
 
     ! gamma0 [m/s],   backgroung viscosity= gamma0*len, it should be as small

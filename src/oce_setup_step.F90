@@ -261,6 +261,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
         write(*,*) 'maximum allowed CDF on explicit W is set to: ', dynamics%wsplit_maxcfl
         write(*,*) '******************************************************************************'
     end if
+
 end subroutine ocean_setup
 !
 !
@@ -390,6 +391,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     logical        :: use_freeslip =.false.
     logical        :: use_wsplit   =.false.
     logical        :: ldiag_KE     =.false.
+    logical        :: check_opt_visc=.true.
     real(kind=WP)  :: wsplit_maxcfl
     logical        :: use_ssh_splitexpl_subcycl=.false.
     integer        :: splitexpl_BTsteps
@@ -397,7 +399,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     logical        :: splitexpl_visc, splitexpl_bottdrag, splitexpl_bdrag_si
     real(kind=WP)  :: splitexpl_visc_gamma0, splitexpl_visc_gamma1, splitexpl_visc_gamma2
     
-    namelist /dynamics_visc   / opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
+    namelist /dynamics_visc   / opt_visc, check_opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
                                 use_ivertvisc, visc_easybsreturn
     namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, & 
                                 ldiag_KE, use_ssh_splitexpl_subcycl, splitexpl_BTsteps, & 
@@ -427,6 +429,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! set parameters in derived type
     dynamics%opt_visc                   = opt_visc
+    dynamics%check_opt_visc             = check_opt_visc
     dynamics%visc_gamma0                = visc_gamma0
     dynamics%visc_gamma1                = visc_gamma1
     dynamics%visc_gamma2                = visc_gamma2
@@ -448,7 +451,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
         dynamics%splitexpl_visc_gamma1  = splitexpl_visc_gamma1
         dynamics%splitexpl_visc_gamma2  = splitexpl_visc_gamma2
     end if 
-    
+
     !___________________________________________________________________________
     ! define local vertice & elem array size
     elem_size=myDim_elem2D+eDim_elem2D
@@ -791,6 +794,7 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
 !!PS     dum_3d_n = 0.0_WP
 !!PS     dum_2d_e = 0.0_WP
 !!PS     dum_3d_e = 0.0_WP
+
 END SUBROUTINE arrays_init
 !
 !
