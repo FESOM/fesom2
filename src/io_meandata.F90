@@ -758,11 +758,18 @@ END DO ! --> DO i=1, io_listsize
        call def_stream(nod2D , myDim_nod2D ,   'ke_G',           'surface salinity    flux [Gs]','PSU/s',              dynamics%ke_G(:),   io_list(i)%freq, 'm', 8, partit, mesh)
        call def_stream(nod2D , myDim_nod2D ,   'ke_D',           'surface density',              'kg/m^3',             dynamics%ke_D(:),   io_list(i)%freq, 'm', 8, partit, mesh)
        call def_stream(nod2D , myDim_nod2D ,   'ke_D2',          'surface density squared',      'kg^2/m^6',           dynamics%ke_D2(:),  io_list(i)%freq, 'm', 8, partit, mesh)
-       call def_stream(nod2D , myDim_nod2D ,   'ke_n0',          'dRHO/dz',                      'kg/m^4',             dynamics%ke_n0(:),  io_list(i)%freq, 'm', 8, partit, mesh)
        call def_stream(nod2D , myDim_nod2D ,   'ke_JD',          'surface temperature flux [Js] * RHO','°C*kg/s/m^3',  dynamics%ke_JD(:),  io_list(i)%freq, 'm', 8, partit, mesh)
        call def_stream(nod2D , myDim_nod2D ,   'ke_GD',          'surface salinity    flux [Gs] * RHO','PSU*kg/s/m^3', dynamics%ke_GD(:),  io_list(i)%freq, 'm', 8, partit, mesh)
        call def_stream(nod2D , myDim_nod2D ,   'ke_swA',         'Thermal expansion coeff  (alpha)',   '1/°C',         dynamics%ke_swA(:), io_list(i)%freq, 'm', 8, partit, mesh)
        call def_stream(nod2D , myDim_nod2D ,   'ke_swB',         'Taline contraction coeff (beta)',    '1/PSU',        dynamics%ke_swB(:), io_list(i)%freq, 'm', 8, partit, mesh)
+       ! fields required to compute the energy conversions between Pm<->Pe, as well as Pm & Pe
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/) ,   'ke_n0',     'dRHO/dz',         'kg/m^4',   dynamics%ke_n0(:,:),     io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/) ,  'ke_Dx',     'dRHO/dx',         'kg/m^4',   dynamics%ke_Dx(:,:),     io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/) ,  'ke_Dy',     'dRHO/dy',         'kg/m^4',   dynamics%ke_Dy(:,:),     io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/) ,  'ke_DU',     'RHO*U',           'kg*s/m^2', dynamics%ke_DU(:,:),     io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/) ,  'ke_DV',     'RHO*V',           'kg*s/m^2', dynamics%ke_DV(:,:),     io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/) ,  'ke_elemD',  'RHO*    on elem', 'kg/m^3',   dynamics%ke_elemD(:,:),  io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/) ,  'ke_elemD2', 'RHO*^2  on elem', 'kg2/m^6',  dynamics%ke_elemD2(:,:), io_list(i)%freq, 'm', 8, partit, mesh)
     end if
 end subroutine
 !
