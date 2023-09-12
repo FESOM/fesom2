@@ -348,143 +348,6 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
     end do ! --> do ed=1, myDim_edge2D  
 !$OMP END DO 
 
-
-
-
-
-
-
-
-
-!PS     !___________________________________________________________________________
-!PS     ! 2nd. compute horizontal advection component: u*du/dx, u*dv/dx & v*du/dy, v*dv/dy
-!PS     ! loop over triangle edges
-!PS !$OMP DO    
-!PS     do ed=1, myDim_edge2D
-!PS         ! local indice of nodes that span up edge ed
-!PS         ednodes = edges(:,ed)   
-!PS         
-!PS         ! local index of element that contribute to edge
-!PS         edelem  = edge_tri(1:2,ed)   
-!PS         
-!PS         !_______________________________________________________________________
-!PS         ! index off surface layer in case of cavity !=1 and index of mid depth 
-!PS         ! bottom layer
-!PS         ul1     = ulevels(edelem(1))
-!PS         nl1     = nlevels(edelem(1))-1
-!PS         x1      = edge_cross_dxdy(1,ed)
-!PS         y1      = edge_cross_dxdy(2,ed)
-!PS         ul2     = 0
-!PS         nl2     = nl
-!PS         
-!PS         !_______________________________________________________________________
-!PS         if (edelem(2) > 0) then
-!PS             ul2     = ulevels(edelem(2))
-!PS             nl2     = nlevels(edelem(2))-1
-!PS             x2      = edge_cross_dxdy(3,ed)
-!PS             y2      = edge_cross_dxdy(4,ed)
-!PS         end if 
-!PS         
-!PS         !_______________________________________________________________________
-!PS         ! nl12 ... minimum number of layers -1 between element edelem(1) & edelem(2) that 
-!PS         ! contribute to edge ed
-!PS         ! nu12 ... upper index of layers between element edelem(1) & edelem(2) that 
-!PS         ! contribute to edge ed
-!PS         ! be carefull !!! --> if ed is a boundary edge than edelem(1)~=0 and edelem(2)==0
-!PS         !                     that means nl1>0, nl2==0, nl12=min(nl1,nl2)=0 !!!
-!PS         ul12 = max(ul1, ul2)
-!PS         nl12 = min(nl1, nl2)
-!PS         
-!PS         !_______________________________________________________________________
-!PS         ! (A1) goes only into this loop when the edge has only facing element
-!PS         ! edelem(1) --> so the edge is a boundary edge --> this is for ocean 
-!PS         ! surface in case of cavity
-!PS         do nz=ul1, ul12-1
-!PS             un= (UVh(2, nz, edelem(1))*x1 - UVh(1, nz, edelem(1))*y1) 
-!PS             uu=un*UV(1, nz, edelem(1)) ! the momentum to be carried depends on velocities
-!PS             vv=un*UV(2, nz, edelem(1))
-!PS             UVnode_rhs(1, nz, ednodes(1))=UVnode_rhs(1, nz, ednodes(1))+uu
-!PS             UVnode_rhs(1, nz, ednodes(2))=UVnode_rhs(1, nz, ednodes(2))-uu
-!PS             UVnode_rhs(2, nz, ednodes(1))=UVnode_rhs(2, nz, ednodes(1))+vv
-!PS             UVnode_rhs(2, nz, ednodes(2))=UVnode_rhs(2, nz, ednodes(2))-vv
-!PS         end do ! --> do nz=ul1, ul12-1
-!PS         
-!PS         !_______________________________________________________________________
-!PS         ! (C1) remaining segments from the shared lower lyer index nl12 to bottom 
-!PS         ! of element edelem(1)
-!PS         do nz=nl12+1, nl1
-!PS             un= (UVh(2, nz, edelem(1))*x1 - UVh(1, nz, edelem(1))*y1) 
-!PS             uu=un*UV(1, nz, edelem(1)) ! the momentum to be carried depends on velocities
-!PS             vv=un*UV(2, nz, edelem(1))
-!PS             UVnode_rhs(1, nz, ednodes(1))=UVnode_rhs(1, nz, ednodes(1))+uu
-!PS             UVnode_rhs(1, nz, ednodes(2))=UVnode_rhs(1, nz, ednodes(2))-uu
-!PS             UVnode_rhs(2, nz, ednodes(1))=UVnode_rhs(2, nz, ednodes(1))+vv
-!PS             UVnode_rhs(2, nz, ednodes(2))=UVnode_rhs(2, nz, ednodes(2))-vv
-!PS         end do ! --> do nz=nl12+1, nl1
-!PS         
-!PS         if (edelem(2) > 0) then 
-!PS             !_______________________________________________________________________
-!PS             ! (A2) goes only into this loop when the edge has a facing elemenmt
-!PS             ! edelem(2) --> so the edge is a boundary edge --> this is for ocean 
-!PS             ! surface in case of cavity
-!PS             do nz=ul2, ul12-1
-!PS                 un=-(UVh(2, nz, edelem(2))*x2- UVh(1, nz, edelem(2))*y2)
-!PS                 uu=un*UV(1, nz, edelem(2))
-!PS                 vv=un*UV(2, nz, edelem(2))
-!PS                 UVnode_rhs(1, nz, ednodes(1))=UVnode_rhs(1, nz, ednodes(1))+uu
-!PS                 UVnode_rhs(1, nz, ednodes(2))=UVnode_rhs(1, nz, ednodes(2))-uu
-!PS                 UVnode_rhs(2, nz, ednodes(1))=UVnode_rhs(2, nz, ednodes(1))+vv
-!PS                 UVnode_rhs(2, nz, ednodes(2))=UVnode_rhs(2, nz, ednodes(2))-vv
-!PS             end do ! --> do nz=ul2, ul12-1
-!PS             
-!PS             !_______________________________________________________________________
-!PS             ! (B) Both segments
-!PS             ! loop over depth layers from shared upper layer index ul12 to shared 
-!PS             ! lower layer index nl12
-!PS             do nz=ul12, nl12
-!PS                 un=  (UVh(2, nz, edelem(1))*x1 - UVh(1, nz, edelem(1))*y1) &
-!PS                     -(UVh(2, nz, edelem(2))*x2 - UVh(1, nz, edelem(2))*y2)
-!PS                 uu=un*(UV(1, nz, edelem(1)) + UV(1, nz, edelem(2)))*0.5_WP! the momentum to be carried depends on velocities
-!PS                 vv=un*(UV(2, nz, edelem(1)) + UV(2, nz, edelem(2)))*0.5_WP
-!PS                 UVnode_rhs(1, nz, ednodes(1))=UVnode_rhs(1, nz, ednodes(1))+uu
-!PS                 UVnode_rhs(1, nz, ednodes(2))=UVnode_rhs(1, nz, ednodes(2))-uu
-!PS                 UVnode_rhs(2, nz, ednodes(1))=UVnode_rhs(2, nz, ednodes(1))+vv
-!PS                 UVnode_rhs(2, nz, ednodes(2))=UVnode_rhs(2, nz, ednodes(2))-vv
-!PS             end do ! --> do nz=ul12, nl12
-!PS         
-!PS             !_______________________________________________________________________
-!PS             ! (C2) remaining segments from the shared lower lyer index nl12 to bottom 
-!PS             ! of element edelem(1)
-!PS             do nz=nl12+1, nl2
-!PS                 un=-(UVh(2, nz, edelem(2))*x2- UVh(1, nz, edelem(2))*y2)
-!PS                 uu=un*UV(1, nz, edelem(2))
-!PS                 vv=un*UV(2, nz, edelem(2))
-!PS                 UVnode_rhs(1, nz, ednodes(1))=UVnode_rhs(1, nz, ednodes(1))+uu
-!PS                 UVnode_rhs(1, nz, ednodes(2))=UVnode_rhs(1, nz, ednodes(2))-uu
-!PS                 UVnode_rhs(2, nz, ednodes(1))=UVnode_rhs(2, nz, ednodes(1))+vv
-!PS                 UVnode_rhs(2, nz, ednodes(2))=UVnode_rhs(2, nz, ednodes(2))-vv
-!PS             end do ! --> do nz=nl12+1, nl2
-!PS         else
-!PS         
-!PS             !_______________________________________________________________________
-!PS             ! (B) Both segments
-!PS             ! loop over depth layers from shared upper layer index ul12 to shared 
-!PS             ! lower layer index nl12
-!PS             do nz=ul12, nl12
-!PS                 un=  (UVh(2, nz, edelem(1))*x1 - UVh(1, nz, edelem(1))*y1)
-!PS                 uu=un*UV(1, nz, edelem(1))! the momentum to be carried depends on velocities
-!PS                 vv=un*UV(2, nz, edelem(1)) 
-!PS                 UVnode_rhs(1, nz, ednodes(1))=UVnode_rhs(1, nz, ednodes(1))+uu
-!PS                 UVnode_rhs(1, nz, ednodes(2))=UVnode_rhs(1, nz, ednodes(2))-uu
-!PS                 UVnode_rhs(2, nz, ednodes(1))=UVnode_rhs(2, nz, ednodes(1))+vv
-!PS                 UVnode_rhs(2, nz, ednodes(2))=UVnode_rhs(2, nz, ednodes(2))-vv
-!PS             end do ! --> do nz=ul12, nl12
-!PS         end if 
-!PS         
-!PS     end do ! --> do ed=1, myDim_edge2D  
-!PS !$OMP END DO
-
-
     !___________________________________________________________________________
     ! divide total nodal momentum advection by scalar area
 !$OMP DO    
@@ -678,22 +541,7 @@ subroutine impl_vert_visc_ale_vtransp(dynamics, partit, mesh)
         ! therefor divide with helem
         uu(nzmin:nzmax-1)=(UVh(1, nzmin:nzmax-1, elem)+UV_rhs(1, nzmin:nzmax-1, elem))/helem(nzmin:nzmax-1, elem)   !! u*=U*/h
         vv(nzmin:nzmax-1)=(UVh(2, nzmin:nzmax-1, elem)+UV_rhs(2, nzmin:nzmax-1, elem))/helem(nzmin:nzmax-1, elem) 
-        
-        !_______________________________________________________________
-!PS         if ( any(uu(nzmin:nzmax-1)/=uu(nzmin:nzmax-1)) .or. &
-!PS              any(vv(nzmin:nzmax-1)/=vv(nzmin:nzmax-1)) ) then
-!PS             write(*,*) ' --> subroutine impl_vert_visc_ale_vtransp --> found Nan in uu=UVh=UV_rhs'
-!PS             write(*,*) ' mype =', mype
-!PS             write(*,*) ' elem =', elem
-!PS             write(*,*) ' uu(nzmin:nzmax-1)=', uu(nzmin:nzmax-1)
-!PS             write(*,*) ' vv(nzmin:nzmax-1)=', vv(nzmin:nzmax-1)
-!PS             write(*,*) ' UV_rhs(1,nz,elem)=', UV_rhs( 1, nz, elem)
-!PS             write(*,*) ' UV_rhs(2,nz,elem)=', UV_rhs( 2, nz, elem)
-!PS             write(*,*) ' UVh( 1, nz, elem)=', UVh( 1, nz, elem)
-!PS             write(*,*) ' UVh( 2, nz, elem)=', UVh( 2, nz, elem)
-!PS             write(*,*) ' helem(nz, elem)  =', helem(nz, elem)
-!PS         end if
-        
+                
         !_______________________________________________________________________
         ! Operator + rhs
         ! Regular part of coefficients:
@@ -822,6 +670,7 @@ subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
     USE MOD_MESH
     USE MOD_DYN
     USE g_config, only: dt, r_restart
+    USE g_comm_auto
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -901,6 +750,7 @@ subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
         ! UVBT_4AB ... is U_bt in barotropic equation
         ! --> d/dt*U_bt + f*e_z x U_bt + g*H*grad_H(eta) = R_bt
         UVBT_4AB(3:4,elem)=UVBT_4AB(1:2,elem)    
+        
     end do
 !$OMP END DO
 !$OMP END PARALLEL
@@ -931,8 +781,10 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     USE MOD_DYN
-    use g_comm_auto
-    USE g_config, only: dt
+    USE g_comm_auto
+    USE g_config,  only: dt, which_ALE, use_cavity_fw2press
+    USE g_support, only: integrate_nod
+    use o_ARRAYS,  only: water_flux
     IMPLICIT NONE
     !___________________________________________________________________________
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -941,10 +793,9 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     !___________________________________________________________________________
     real(kind=WP)                   :: dtBT, BT_inv, hh, f, rx, ry, a, b, d, c1, c2, ax, ay
     real(kind=WP)                   :: deltaX1, deltaY1, deltaX2, deltaY2, thetaBT
-    integer                         :: step, elem, elnodes(3), edge, ednodes(2), edelem(2)
+    integer                         :: step, elem, edge, node, elnodes(3), ednodes(2), edelem(2)
     real(kind=WP)                   :: update_ubt, update_vbt, vi, len, nzmax
     real(kind=WP), allocatable      :: bottomdrag(:), UVBT_harmvisc(:,:)
-    
     
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -979,7 +830,6 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     dtBT   = dt/dynamics%splitexpl_BTsteps                
     BT_inv = 1.0_WP/(1.0_WP*dynamics%splitexpl_BTsteps)
     
-    
     !___SPLIT-EXPLICITE STABILIZATION___________________________________________
     ! trim R (UVBT_rhs):
     ! UVBT_rhs --> UVBT_rhs - div_h Ah H^n div_h(Ubt^n/H^n) + Cd*|Ubot|* Ubt^n/H^n 
@@ -989,7 +839,6 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     ! --> use only harmonmic viscosity operator applied to the barotropic
     !     velocity
     if (dynamics%splitexpl_visc) then 
-        
         !_______________________________________________________________________
         ! remove viscosity
         do edge=1, myDim_edge2D+eDim_edge2D
@@ -1033,9 +882,6 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
 !$OMP END ORDERED
 #endif
         end do ! --> do edge=1, myDim_edge2D+eDim_edge2D
-        
-        call exchange_elem_begin(UVBT_rhs, partit)
-        call exchange_elem_end(partit)
     end if ! --> if (dynamics%splitexpl_visc) then     
     
     !___________________________________________________________________________
@@ -1072,6 +918,7 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
                     
                 ! elem indices that participate in edge
                 edelem = edge_tri(:,edge)
+                
                 nzmax  = minval(nlevels(edelem))
                 hh     = -zbar(nzmax)
                 len    = sqrt(sum(elem_area(edelem)))
@@ -1079,7 +926,7 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
                 update_ubt=(UVBT(1, edelem(1))-UVBT(1, edelem(2)))/hh
                 update_vbt=(UVBT(2, edelem(1))-UVBT(2, edelem(2)))/hh
                 vi=update_ubt*update_ubt + update_vbt*update_vbt
-                vi=dt*sqrt(max(dynamics%splitexpl_visc_gamma0,            &
+                vi=dt*sqrt(max(dynamics%splitexpl_visc_gamma0,           &
                            max(dynamics%splitexpl_visc_gamma1*sqrt(vi),   &
                                dynamics%splitexpl_visc_gamma2*vi)         &
                         )*len)
@@ -1106,9 +953,6 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
 !$OMP END ORDERED
 #endif
             end do ! --> do edge=1, myDim_edge2D+eDim_edge2D
-            
-            call exchange_elem_begin(UVBT_harmvisc, partit)
-            call exchange_elem_end(partit)
         end if ! -> if (dynamics%splitexpl_visc) then 
         
         !_______________________________________________________________________
@@ -1137,13 +981,13 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             ! (We do it here based on increments since it saves us some significant
             ! digits for the accuracy)
             ! Increments:
-            !   deltaU                      = Ubt^(n+(m+1)/M)-Ubt^(n+m/M)
-            !   Ubt^(n+(m+1)/M)+Ubt^(n+m/M) = Ubt^(n+(m+1)/M)-Ubt^(n+m/M)+2*Ubt^(n+m/M)
-            !                               = deltaU + 2*Ubt^(n+m/M)
+            ! deltaU                       = Ubt^(n+(m+1)/M)-Ubt^(n+m/M)
+            ! Ubt^(n+(m+1)/M)+Ubt^(n+m/M)  = Ubt^(n+(m+1)/M)-Ubt^(n+m/M)+2*Ubt^(n+m/M)
+            !                              = deltaU + 2*Ubt^(n+m/M)
             !
-            ! Ubt^(n+(m+1)/M)-Ubt^(n+m/M) = - dt/M*[ + 0.5*f*e_z x (Ubt^(n+(m+1)/M) + Ubt^(n+m/M))
-            !                               - h*H^m*grad_H*eta^(n+m/M)
-            !                               - Rbt-->UVBT_rhs ] 
+            ! Ubt^(n+(m+1)/M)-Ubt^(n+m/M)  = - dt/M*[ + 0.5*f*e_z x (Ubt^(n+(m+1)/M) + Ubt^(n+m/M))
+            !                                - h*H^m*grad_H*eta^(n+m/M)
+            !                                - Rbt-->UVBT_rhs ] 
             !
             ! deltaU - dt/(2*M)*f*deltaV   =  dt/M*f*Vbt^(n+m/M) - h*H^m*gradx_H*eta^(n+m/M) + Rbtx
             ! deltaV + dt/(2*M)*f*deltaU   = -dt/M*f*Ubt^(n+m/M) - h*H^m*grady_H*eta^(n+m/M) + Rbty
@@ -1178,6 +1022,8 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             ! Ubt^(n+(m+1)/M)   = Ubt^(n+(m)/M) + AAA
             ! equation (6) in T. Banerjee et al.,Split-Explicite external
             ! mode solver in FESOM2, 
+            
+            ! compute barotropic velocity at time step (n+(m+1)/M)
             UVBT(      1, elem) = UVBT(1, elem) + ax   
             UVBT(      2, elem) = UVBT(2, elem) + ay
             
@@ -1199,6 +1045,8 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             UVBT_mean( 2, elem) = UVBT_mean( 2, elem) + UVBT_theta(2, elem)*BT_inv
             
         end do
+        call exchange_elem_begin(UVBT, partit)
+        call exchange_elem_end(partit)
         
         !_______________________________________________________________________
         ! Store mid-step velocity (to trim 3D velocities in momentum)
@@ -1230,18 +1078,28 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             ! advance ssh --> eta^(n+(m+1)/M) = eta^(n+(m)/M) - dt/M * div_H * [...]
             ! equation (6) in T. Banerjee et al.,Split-Explicite external
             ! mode solver in FESOM2, 
-            eta_n(ednodes(1))=eta_n(ednodes(1)) + (c1+c2)*dtBT/area(1,ednodes(1))
-            eta_n(ednodes(2))=eta_n(ednodes(2)) - (c1+c2)*dtBT/area(1,ednodes(2))
+            eta_n(ednodes(1))=eta_n(ednodes(1)) + (c1+c2)*dtBT/areasvol(1,ednodes(1))
+            eta_n(ednodes(2))=eta_n(ednodes(2)) - (c1+c2)*dtBT/areasvol(1,ednodes(2))
             
         end do
+        
+        !_______________________________________________________________________
+        ! Apply freshwater boundary condition 
+        if ( .not. trim(which_ALE)=='linfs') then
+            do node=1,myDim_nod2D
+                eta_n(node)=eta_n(node) - dtBT*water_flux(node)
+            end do
+        end if 
         
         !_______________________________________________________________________
         call exchange_nod(eta_n, partit)
         
     end do ! --> do step=1, dynamics%splitexpl_BTsteps
+    
     deallocate(bottomdrag, UVBT_harmvisc)
     hbar_old = hbar
-    hbar     = eta_n 
+    hbar     = eta_n
+    
 end subroutine compute_BT_step_SE_ale
 !
 !
@@ -1261,6 +1119,7 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
     type(t_mesh)  , intent(inout)   , target :: mesh
     integer                               :: elem, nz, nzmin, nzmax
     real(kind=WP)                         :: ubar, vbar, hh_inv
+    real(kind=WP)                         :: usum(2), udiff(2)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UVh, UV, UV_rhs
@@ -1287,21 +1146,77 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
             nzmin  = ulevels(elem)
             nzmax  = nlevels(elem)-1
             
+            !___________________________________________________________________
             ubar   = 0.0_WP
             vbar   = 0.0_WP
             hh_inv = 0.0_WP
             do nz=nzmin, nzmax
-                !_______________________________________________________________
-                ! Update transport velocities: U^(n+1/2,**) = U^(n+1/2,*) + U_rhs
-                UVh(1, nz, elem)=UVh(1, nz, elem)+UV_rhs(1, nz, elem)   
-                UVh(2, nz, elem)=UVh(2, nz, elem)+UV_rhs(2, nz, elem)
-                
+                !PS !___________________________________________________________
+                !PS ! Update transport velocities: U^(n+1/2,**) = U^(n+1/2,*) + U_rhs
+                !PS UVh(1, nz, elem)=UVh(1, nz, elem)+UV_rhs(1, nz, elem)   
+                !PS UVh(2, nz, elem)=UVh(2, nz, elem)+UV_rhs(2, nz, elem)
+                !PS 
+                !PS !___________________________________________________________
+                !PS ! vertically integrate updated transport velocity: sum(k, U_k^(n+1/2,**) )
+                !PS ubar  = ubar+UVh(1, nz, elem)
+                !PS vbar  = vbar+UVh(2, nz, elem)
+                !PS hh_inv= hh_inv+helem(nz,elem)
                 !_______________________________________________________________
                 ! vertically integrate updated transport velocity: sum(k, U_k^(n+1/2,**) )
-                ubar  = ubar+UVh(1, nz, elem)
-                vbar  = vbar+UVh(2, nz, elem)
+                ! --> the actual update of the transport velocity is done after the 
+                !     if (dynamics%ldiag_ke) block
+                ubar  = ubar+UVh(1, nz, elem) + UV_rhs(1, nz, elem)   
+                vbar  = vbar+UVh(2, nz, elem) + UV_rhs(2, nz, elem)   
                 hh_inv= hh_inv+helem(nz,elem)
             end do
+            hh_inv=1.0_WP/hh_inv
+             
+            !___________________________________________________________________
+            if (dynamics%ldiag_ke) then
+                DO nz=nzmin, nzmax
+                    ! U_(n+1)   - U_n   =  Urhs_n |* (U_(n+1)+U_n)
+                    ! U_(n+1)^2 - U_n^2 =  Urhs_n * (U_(n+1)+U_n) 
+                    !                                  | 
+                    !                                  +-> U_(n+1) = U_n+Urhs_n
+                    ! U_(n+1)^2 - U_n^2 =  Urhs_n * (2*U_n + Urhs) 
+                    !                          |            |
+                    !                          v            v 
+                    !                        udiff         usum 
+                    usum(1)  = 2.0_WP*UVh(1,nz,elem) + UV_rhs(1, nz, elem) + (UVBT_mean(1, elem)-ubar)*helem(nz,elem)*hh_inv
+                    usum(2)  = 2.0_WP*UVh(2,nz,elem) + UV_rhs(2, nz, elem) + (UVBT_mean(2, elem)-vbar)*helem(nz,elem)*hh_inv
+                    ! transform: transport vel --> velocity
+                    usum(1)  = usum(1)/helem(nz,elem)
+                    usum(2)  = usum(2)/helem(nz,elem)
+                    
+                    udiff(1) = UV_rhs(1, nz, elem) + (UVBT_mean(1, elem)-ubar)*helem(nz,elem)*hh_inv
+                    udiff(2) = UV_rhs(2, nz, elem) + (UVBT_mean(2, elem)-vbar)*helem(nz,elem)*hh_inv
+                    ! transform: transport vel --> velocity
+                    udiff(1) = udiff(1)/helem(nz,elem)
+                    udiff(2) = udiff(2)/helem(nz,elem)
+                    
+                    ! (U_(n+1)^2 - U_n^2)/2 = usum*udiff/2
+                    dynamics%ke_du2(      :,nz,elem)  = usum*udiff/2.0_WP
+                    
+                    dynamics%ke_pre_xVEL( :,nz,elem)  = usum*dynamics%ke_pre (:,nz,elem)/2.0_WP
+                    dynamics%ke_adv_xVEL( :,nz,elem)  = usum*dynamics%ke_adv (:,nz,elem)/2.0_WP
+                    dynamics%ke_cor_xVEL( :,nz,elem)  = usum*dynamics%ke_cor (:,nz,elem)/2.0_WP
+                    dynamics%ke_hvis_xVEL(:,nz,elem)  = usum*dynamics%ke_hvis(:,nz,elem)/2.0_WP
+                    dynamics%ke_vvis_xVEL(:,nz,elem)  = usum*dynamics%ke_vvis(:,nz,elem)/2.0_WP
+                    
+                    ! U_(n+0.5)    = U_n + 0.5*Urhs
+                    dynamics%ke_umean(    :,nz,elem)  = usum/2.0_WP
+                    ! U_(n+0.5)^2
+                    dynamics%ke_u2mean(   :,nz,elem)  = (usum*usum)/4.0_WP
+                    
+                    if (nz==nzmin) then
+                        dynamics%ke_wind_xVEL(:,elem) = usum*dynamics%ke_wind(:,elem)/2.0_WP
+                    end if
+                    
+                    if (nz==nzmax) then
+                        dynamics%ke_drag_xVEL(:,elem) = usum*dynamics%ke_drag(:,elem)/2.0_WP
+                    end if
+                END DO
+            end if
             
             !___________________________________________________________________
             ! finalize horizontal transport by making vertically integrated 
@@ -1311,15 +1226,17 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
             !     mode solver in FESOM2, 
             ! U_k^(n+1/2) =  U^(n+1/2,**) 
             !              + [<<Ubar>>^(n+1/2) - sum(k, U_k^(n+1/2,**)] * h_k^(n+1/2)/sum(k,h_k^(n+1/2))
-            hh_inv=1.0_WP/hh_inv     ! Postpone AB and 2nd order, just use available thickness
             DO nz=nzmin, nzmax
-                UVh(1, nz, elem)= UVh(1, nz, elem)+(UVBT_mean(1, elem)-ubar)*helem(nz,elem)*hh_inv
-                UVh(2, nz, elem)= UVh(2, nz, elem)+(UVBT_mean(2, elem)-vbar)*helem(nz,elem)*hh_inv
+                !PS UVh(1, nz, elem)= UVh(1, nz, elem)+(UVBT_mean(1, elem)-ubar)*helem(nz,elem)*hh_inv
+                !PS UVh(2, nz, elem)= UVh(2, nz, elem)+(UVBT_mean(2, elem)-vbar)*helem(nz,elem)*hh_inv
+                UVh(1, nz, elem)= UVh(1, nz, elem) + UV_rhs(1, nz, elem) + (UVBT_mean(1, elem)-ubar)*helem(nz,elem)*hh_inv
+                UVh(2, nz, elem)= UVh(2, nz, elem) + UV_rhs(2, nz, elem) + (UVBT_mean(2, elem)-vbar)*helem(nz,elem)*hh_inv
                 UV( 1, nz, elem)= UVh(1, nz, elem)/helem(nz,elem)  ! velocities are still needed    
                 UV( 2, nz, elem)= UVh(2, nz, elem)/helem(nz,elem) 
-                
             end do
         end do
+        
+        !_______________________________________________________________________
         call exchange_elem(UVh, partit)  ! This exchange can be avoided, but test first.
         call exchange_elem(UV, partit)
 
@@ -1328,18 +1245,20 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
     ! Velocity will be used to advance momentum
     else                         
         do elem=1, myDim_elem2D    
+            nzmin  = ulevels(elem)
+            nzmax  = nlevels(elem)-1
+            
+            !___________________________________________________________________
             ubar   = 0.0_WP
             vbar   = 0.0_WP
             hh_inv = 0.0_WP    
-            
-            nzmin  = ulevels(elem)
-            nzmax  = nlevels(elem)-1
             do nz=nzmin, nzmax
                 ubar=ubar+UVh(1, nz, elem)
                 vbar=vbar+UVh(2, nz, elem)
                 hh_inv=hh_inv+helem(nz,elem)
             end do
             
+            !___________________________________________________________________
             hh_inv=1.0_WP/hh_inv    ! Postpone 2nd order, just use available thickness 
             do nz=nzmin, nzmax
                 UVh(1, nz, elem)= UVh(1, nz, elem)+(UVBT_12(1, elem)-ubar)*helem(nz,elem)*hh_inv
@@ -1348,8 +1267,10 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
                 UV( 2, nz, elem)= UVh(2, nz, elem)/helem(nz,elem)  ! to compute momentum advection
             end do
         end do
+        !___________________________________________________________________
         call exchange_elem(UVh, partit)    ! 
         call exchange_elem(UV , partit)   ! Check if this is needed 
+        
     end if ! --> if (mode==1) then
 end subroutine update_trim_vel_ale_vtransp
 !
@@ -1396,7 +1317,7 @@ subroutine compute_thickness_zstar(dynamics, partit, mesh)
         nzmin = ulevels(elem)
         nzmax = nlevels(elem)-1
         elnodes=elem2D_nodes(:,elem)
-        do nz=nzmin, nzmax
+        do nz=nzmin, nzmax-1
             helem(nz,elem)=sum(hnode_new(nz,elnodes))/3.0_WP
         end do
     end do

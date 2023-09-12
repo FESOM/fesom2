@@ -3337,10 +3337,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     t0=MPI_Wtime()
-    water_flux = 0.0_WP
-    heat_flux  = 0.0_WP
-    stress_surf= 0.0_WP
-    stress_node_surf= 0.0_WP
+!PS     water_flux = 0.0_WP
+!PS     heat_flux  = 0.0_WP
+!PS     stress_surf= 0.0_WP
+!PS     stress_node_surf= 0.0_WP
     
     !___________________________________________________________________________
     ! calculate equation of state, density, pressure and mixed layer depths
@@ -3459,16 +3459,32 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     call compute_vel_rhs(ice, dynamics, partit, mesh)
     
     !___________________________________________________________________________
+    ! Energy diagnostic contribution
     if (dynamics%ldiag_ke) then
+        ! if use solver
+        if (.not. dynamics%use_ssh_splitexpl_subcycl) then
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
-        do elem=1, myDim_elem2D
-            nzmax = nlevels(elem)
-            nzmin = ulevels(elem)
-            do nz=nzmin,nzmax-1
-                dynamics%ke_rhs_bak(:,nz,elem)=dynamics%UV_rhs(:,nz,elem)
+            do elem=1, myDim_elem2D
+                nzmax = nlevels(elem)
+                nzmin = ulevels(elem)
+                do nz=nzmin,nzmax-1
+                    dynamics%ke_rhs_bak(:,nz,elem)=dynamics%UV_rhs(:,nz,elem)
+                end do
             end do
-        end do
 !$OMP END PARALLEL DO
+        
+        ! if use splitexpl subcycl. UV_rhs in units of transport --> therefor *1/helem
+        else
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
+            do elem=1, myDim_elem2D
+                nzmax = nlevels(elem)
+                nzmin = ulevels(elem)
+                do nz=nzmin,nzmax-1
+                    dynamics%ke_rhs_bak(:,nz,elem)=dynamics%UV_rhs(:,nz,elem)/helem(nz,elem) 
+                end do
+            end do
+!$OMP END PARALLEL DO        
+        end if 
     end if
     
     !___________________________________________________________________________
@@ -3479,26 +3495,51 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     call viscosity_filter(dynamics%opt_visc, dynamics, partit, mesh)
     
     !___________________________________________________________________________
+    ! Energy diagnostic contribution
     if (dynamics%ldiag_ke) then
+        ! if use solver
+        if (.not. dynamics%use_ssh_splitexpl_subcycl) then
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
-        do elem=1, myDim_elem2D
-            nzmax = nlevels(elem)
-            nzmin = ulevels(elem)
-            do nz=nzmin,nzmax-1
-                dynamics%ke_hvis(:,nz,elem)=dynamics%UV_rhs(:,nz,elem)-dynamics%ke_rhs_bak(:,nz,elem)
+            do elem=1, myDim_elem2D
+                nzmax = nlevels(elem)
+                nzmin = ulevels(elem)
+                do nz=nzmin,nzmax-1
+                    dynamics%ke_hvis(:,nz,elem)=dynamics%UV_rhs(:,nz,elem) - dynamics%ke_rhs_bak(:,nz,elem)
+                end do
             end do
-        end do
 !$OMP END PARALLEL DO
-    
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
-        do elem=1, myDim_elem2D
-            nzmax = nlevels(elem)
-            nzmin = ulevels(elem)
-            do nz=nzmin,nzmax-1
-                dynamics%ke_rhs_bak(:,nz,elem)=dynamics%UV_rhs(:,nz,elem)
+            do elem=1, myDim_elem2D
+                nzmax = nlevels(elem)
+                nzmin = ulevels(elem)
+                do nz=nzmin,nzmax-1
+                    dynamics%ke_rhs_bak(:,nz,elem)=dynamics%UV_rhs(:,nz,elem)
+                end do
             end do
-        end do
 !$OMP END PARALLEL DO
+
+        ! if use splitexpl subcycl. UV_rhs in units of transport --> therefor *1/helem
+        else
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
+            do elem=1, myDim_elem2D
+                nzmax = nlevels(elem)
+                nzmin = ulevels(elem)
+                do nz=nzmin,nzmax-1
+                    dynamics%ke_hvis(:,nz,elem)=dynamics%UV_rhs(:,nz,elem)/helem(nz,elem) - dynamics%ke_rhs_bak(:,nz,elem)
+                end do
+            end do
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
+            do elem=1, myDim_elem2D
+                nzmax = nlevels(elem)
+                nzmin = ulevels(elem)
+                do nz=nzmin,nzmax-1
+                    dynamics%ke_rhs_bak(:,nz,elem)=dynamics%UV_rhs(:,nz,elem)/helem(nz,elem) 
+                end do
+            end do
+!$OMP END PARALLEL DO        
+        
+        end if 
     end if
     
     !___________________________________________________________________________
@@ -3513,15 +3554,28 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     if (dynamics%ldiag_ke) then
+        ! if use solver
+        if (.not. dynamics%use_ssh_splitexpl_subcycl) then
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
-        do elem=1, myDim_elem2D
-            nzmax = nlevels(elem)
-            nzmin = ulevels(elem)
-            do nz=nzmin,nzmax-1
-                dynamics%ke_vvis(:,nz,elem)=dynamics%UV_rhs(:,nz,elem)-dynamics%ke_rhs_bak(:,nz,elem)
+            do elem=1, myDim_elem2D
+                nzmax = nlevels(elem)
+                nzmin = ulevels(elem)
+                do nz=nzmin,nzmax-1
+                    dynamics%ke_vvis(:,nz,elem)=dynamics%UV_rhs(:,nz,elem) - dynamics%ke_rhs_bak(:,nz,elem)
+                end do
             end do
-        end do
 !$OMP END PARALLEL DO
+
+        ! if use splitexpl subcycl. UV_rhs in units of transport --> therefor *1/helem
+        else
+            do elem=1, myDim_elem2D
+                nzmax = nlevels(elem)
+                nzmin = ulevels(elem)
+                do nz=nzmin,nzmax-1
+                    dynamics%ke_vvis(:,nz,elem)=dynamics%UV_rhs(:,nz,elem)/helem(nz,elem) - dynamics%ke_rhs_bak(:,nz,elem)
+                end do
+            end do
+        end if 
     end if
     t2=MPI_Wtime()
         
@@ -3588,14 +3642,17 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     else    
         ! Compute vertical integral of transport velocity rhs omitting the contributions from
         ! the elevation and Coriolis. 
+        t30=MPI_Wtime()
         call compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
         
         ! Do barotropic step, get eta_{n+1} and BT transport 
         call compute_BT_step_SE_ale(dynamics, partit, mesh)
+        t3=MPI_Wtime()
         
         ! Trim U to be consistent with BT transport
         call update_trim_vel_ale_vtransp(1, dynamics, partit, mesh)   
-        
+        t4=MPI_Wtime()
+        t5=t4
     end if ! --> if (.not. dynamics%use_ssh_splitexpl_subcycl) then
     
     !___________________________________________________________________________
@@ -3672,7 +3729,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     ! write energy diagnostic info (dynamics%ldiag_ke = .true.)
-    if (dynamics%ldiag_ke) then
+    if ( (dynamics%ldiag_ke) .and. (mod(n,logfile_outfreq)==0) ) then
         call write_enegry_info(dynamics, partit, mesh)
     end if
     

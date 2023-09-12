@@ -76,7 +76,9 @@ module diagnostics
   logical                                       :: ldiag_vorticity  =.false.
   logical                                       :: ldiag_extflds    =.false.
   
-  namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_Ri, ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, ldiag_vorticity, ldiag_extflds
+  namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_Ri, & 
+                       ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, &
+                       ldiag_vorticity, ldiag_extflds
   
   contains
 

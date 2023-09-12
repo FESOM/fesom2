@@ -99,32 +99,46 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
         nzmax = nlevels(elem)
 
         if (dynamics%ldiag_ke) then
-           DO nz=nzmin, nzmax-1
-              dynamics%ke_pre(1,nz,elem)  =dynamics%ke_pre(1,nz,elem)   + Fx
-              dynamics%ke_pre(2,nz,elem)  =dynamics%ke_pre(2,nz,elem)   + Fy
-           
-              usum(1)=2.0_WP*UV(1,nz,elem)+(UV_rhs(1,nz,elem) + Fx)
-              usum(2)=2.0_WP*UV(2,nz,elem)+(UV_rhs(2,nz,elem) + Fy)
-
-              udiff(1)=UV_rhs(1,nz,elem) + Fx
-              udiff(2)=UV_rhs(2,nz,elem) + Fy
-              dynamics%ke_du2 (:,nz,elem)  = usum*udiff/2.0_WP
-              dynamics%ke_pre_xVEL (:,nz,elem)  = usum*dynamics%ke_pre (:,nz,elem)/2.0_WP
-              dynamics%ke_adv_xVEL (:,nz,elem)  = usum*dynamics%ke_adv (:,nz,elem)/2.0_WP
-              dynamics%ke_cor_xVEL (:,nz,elem)  = usum*dynamics%ke_cor (:,nz,elem)/2.0_WP
-              dynamics%ke_hvis_xVEL(:,nz,elem)  = usum*dynamics%ke_hvis(:,nz,elem)/2.0_WP
-              dynamics%ke_vvis_xVEL(:,nz,elem)  = usum*dynamics%ke_vvis(:,nz,elem)/2.0_WP
-              dynamics%ke_umean(:,nz,elem)      = usum/2.0_WP
-              dynamics%ke_u2mean(:,nz,elem)     = (usum*usum)/4.0_WP
-              
-              if (nz==nzmin) then
-                 dynamics%ke_wind_xVEL(:,elem)=usum*dynamics%ke_wind(:,elem)/2.0_WP
-              end if
-              
-              if (nz==nzmax-1) then
-                 dynamics%ke_drag_xVEL(:,elem)=usum*dynamics%ke_drag(:,elem)/2.0_WP
-              end if
-        END DO
+            DO nz=nzmin, nzmax-1
+                dynamics%ke_pre(1,nz,elem)  =dynamics%ke_pre(1,nz,elem)   + Fx
+                dynamics%ke_pre(2,nz,elem)  =dynamics%ke_pre(2,nz,elem)   + Fy
+                
+                
+                ! U_(n+1)   - U_n   =  Urhs_n |* (U_(n+1)+U_n)
+                ! U_(n+1)^2 - U_n^2 =  Urhs_n * (U_(n+1)+U_n) 
+                !                                  | 
+                !                                  +-> U_(n+1) = U_n+Urhs_n
+                ! U_(n+1)^2 - U_n^2 =  Urhs_n * (2*U_n + Urhs) 
+                !                          |            |
+                !                          v            v 
+                !                        udiff         usum 
+                usum(1)  = 2.0_WP*UV(1,nz,elem)+(UV_rhs(1,nz,elem) + Fx)
+                usum(2)  = 2.0_WP*UV(2,nz,elem)+(UV_rhs(2,nz,elem) + Fy)
+                udiff(1) = UV_rhs(1,nz,elem) + Fx
+                udiff(2) = UV_rhs(2,nz,elem) + Fy
+                
+                ! (U_(n+1)^2 - U_n^2)/2 = usum*udiff/2
+                dynamics%ke_du2 (:,nz,elem)       = usum*udiff/2.0_WP
+                
+                dynamics%ke_pre_xVEL (:,nz,elem)  = usum*dynamics%ke_pre (:,nz,elem)/2.0_WP
+                dynamics%ke_adv_xVEL (:,nz,elem)  = usum*dynamics%ke_adv (:,nz,elem)/2.0_WP
+                dynamics%ke_cor_xVEL (:,nz,elem)  = usum*dynamics%ke_cor (:,nz,elem)/2.0_WP
+                dynamics%ke_hvis_xVEL(:,nz,elem)  = usum*dynamics%ke_hvis(:,nz,elem)/2.0_WP
+                dynamics%ke_vvis_xVEL(:,nz,elem)  = usum*dynamics%ke_vvis(:,nz,elem)/2.0_WP
+                
+                ! U_(n+0.5)    = U_n + 0.5*Urhs
+                dynamics%ke_umean(    :,nz,elem)  = usum/2.0_WP
+                ! U_(n+0.5)^2
+                dynamics%ke_u2mean(   :,nz,elem)  = (usum*usum)/4.0_WP
+                
+                if (nz==nzmin) then
+                    dynamics%ke_wind_xVEL(:,elem) = usum*dynamics%ke_wind(:,elem)/2.0_WP
+                end if
+                
+                if (nz==nzmax-1) then
+                    dynamics%ke_drag_xVEL(:,elem) = usum*dynamics%ke_drag(:,elem)/2.0_WP
+                end if
+            END DO
         end if
 
         DO nz=nzmin, nzmax-1
