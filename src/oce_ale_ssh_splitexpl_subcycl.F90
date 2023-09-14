@@ -884,7 +884,8 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
 !$OMP END ORDERED
 #endif
         end do ! --> do edge=1, myDim_edge2D+eDim_edge2D
-!$OMP END PARALLEL DO       
+!$OMP END DO       
+!$OMP END PARALLEL 
     end if ! --> if (dynamics%splitexpl_visc) then     
     
     !___________________________________________________________________________
@@ -901,7 +902,8 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             UVBT_rhs(1, elem)=UVBT_rhs(1, elem) + bottomdrag(elem)*UVBT(1, elem)/hh
             UVBT_rhs(2, elem)=UVBT_rhs(2, elem) + bottomdrag(elem)*UVBT(2, elem)/hh
         end do
-!$OMP END PARALLEL DO        
+!$OMP END DO       
+!$OMP END PARALLEL        
     end if ! --> if (dynamics%splitexpl_bottdrag) then
     
     !___________________________________________________________________________
@@ -978,7 +980,8 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
 !$OMP END ORDERED
 #endif
             end do ! --> do edge=1, myDim_edge2D+eDim_edge2D
-!$OMP END PARALLEL DO
+!$OMP END DO       
+!$OMP END PARALLEL 
         end if ! -> if (dynamics%splitexpl_visc) then 
         
         !_______________________________________________________________________
@@ -1082,7 +1085,8 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             UVBT_mean( 2, elem) = UVBT_mean( 2, elem) + UVBT_theta(2, elem)*BT_inv
             
         end do
-!$OMP END PARALLEL DO
+!$OMP END DO       
+!$OMP END PARALLEL 
         
         !_______________________________________________________________________
 !$OMP MASTER
@@ -1141,7 +1145,8 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
 !$OMP END ORDERED
 #endif            
         end do
-!$OMP END PARALLEL DO
+!$OMP END DO       
+!$OMP END PARALLEL 
 
         !_______________________________________________________________________
         ! Apply freshwater boundary condition 
@@ -1236,7 +1241,7 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
                 hh_inv= hh_inv+helem(nz,elem)
             end do ! --> do nz=nzmin, nzmax
             hh_inv=1.0_WP/hh_inv
-
+            
             !___________________________________________________________________
             if (dynamics%ldiag_ke) then
                 do nz=nzmin, nzmax
@@ -1301,7 +1306,8 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
                 UV( 2, nz, elem)= UVh(2, nz, elem)/helem(nz,elem) 
             end do ! --> do nz=nzmin, nzmax
         end do ! --> do elem=1, myDim_elem2D
-!$OMP END PARALLEL DO    
+!$OMP END DO       
+!$OMP END PARALLEL    
         
         !_______________________________________________________________________
 !$OMP MASTER        
@@ -1339,7 +1345,8 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
                 UV( 2, nz, elem)= UVh(2, nz, elem)/helem(nz,elem)  ! to compute momentum advection
             end do
         end do
-!$OMP END PARALLEL DO   
+!$OMP END DO       
+!$OMP END PARALLEL   
 
         !_______________________________________________________________________
 !$OMP MASTER        
@@ -1388,7 +1395,8 @@ subroutine compute_thickness_zstar(dynamics, partit, mesh)
             hnode_new(nz,node)=(zbar(nz)-zbar(nz+1))*(1.0_WP+hh_inv*eta_n(node))
         end do
     end do ! --> do node=1, myDim_nod2D+eDim_nod2D
-!$OMP END PARALLEL DO
+!$OMP END DO       
+!$OMP END PARALLEL 
     
     !___________________________________________________________________________
     ! --> update mean layer thinkness at element
@@ -1402,7 +1410,8 @@ subroutine compute_thickness_zstar(dynamics, partit, mesh)
             helem(nz,elem)=sum(hnode_new(nz,elnodes))/3.0_WP
         end do
     end do
-!$OMP END PARALLEL DO
+!$OMP END DO       
+!$OMP END PARALLEL 
 end subroutine compute_thickness_zstar
 
 
