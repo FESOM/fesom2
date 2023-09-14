@@ -705,10 +705,7 @@ subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
 
     !___________________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax, &
-!$OMP                                  Fx, Fy, hh,                      & 
-!$OMP                                  vert_sum_u, vert_sum_v, hh)
-
-    !___________________________________________________________________________
+!$OMP                                  Fx, Fy, hh, vert_sum_u, vert_sum_v)
 !$OMP DO
     do elem=1,  myDim_elem2D
         elnodes= elem2D_nodes(:,elem)
