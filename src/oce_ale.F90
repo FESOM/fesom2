@@ -2638,9 +2638,7 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
     type(t_mesh)  , intent(inout), target :: mesh
     integer                               :: node, elem, nz, ed, nzmin, nzmax, ednodes(2), edelem(2) 
     real(kind=WP)                         :: hh_inv, deltaX1, deltaX2, deltaY1, deltaY2 
-    real(kind=WP)                         :: e1c1(mesh%nl-1), e1c2(mesh%nl-1)
-    real(kind=WP)                         :: e2c1(mesh%nl-1), e2c2(mesh%nl-1)
-    
+    real(kind=WP)                         :: c1(mesh%nl-1), c2(mesh%nl-1)
     
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -2659,11 +2657,19 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
     end if
     
     !___________________________________________________________________________
+!$OMP PARALLEL DO
     do node=1, myDim_nod2D+eDim_nod2D
         Wvel(:, node)=0.0_WP
+        if (Fer_GM) then
+            fer_Wvel(:, node)=0.0_WP
+        end if
     end do ! --> do node=1, myDim_nod2D+eDim_nod2D
-    
+!$OMP END PARALLEL DO
+
     !___________________________________________________________________________
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, ednodes, edelem, nz, nzmin, nzmax, & 
+!$OMP                                  deltaX1, deltaY1, deltaX2, deltaY2, c1, c2)
+!$OMP DO
     do ed=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         ednodes=edges(:,ed)   
@@ -2686,87 +2692,102 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
             ! --> h * u_vec * n_vec
             ! --> e_vec = (dx,dy), n_vec = (-dy,dx);
             ! --> h * u*(-dy) + v*dx
-            e1c1(nz)=( UVh(2, nz, edelem(1))*deltaX1 - UVh(1, nz, edelem(1))*deltaY1 )
+            c1(nz)=( UVh(2, nz, edelem(1))*deltaX1 - UVh(1, nz, edelem(1))*deltaY1 )
             ! inflow(outflow) "flux" to control volume of node enodes1
             ! is equal to outflow(inflow) "flux" to control volume of node enodes2
         end do ! --> do nz=nzmax,nzmin,-1
-        Wvel(nzmin:nzmax, ednodes(1))= Wvel(nzmin:nzmax, ednodes(1))+e1c1(nzmin:nzmax)
-        Wvel(nzmin:nzmax, ednodes(2))= Wvel(nzmin:nzmax, ednodes(2))-e1c1(nzmin:nzmax)
-        
         if (Fer_GM) then
             do nz = nzmax, nzmin, -1
-                e1c2(nz)=(fer_UV(2, nz, edelem(1))*deltaX1 - fer_UV(1, nz, edelem(1))*deltaY1)*helem(nz, edelem(1))
-            end do ! --> do nz=nzmax,nzmin,-1
-            fer_Wvel(nzmin:nzmax, ednodes(1))= fer_Wvel(nzmin:nzmax, ednodes(1))+e1c2(nzmin:nzmax)
-            fer_Wvel(nzmin:nzmax, ednodes(2))= fer_Wvel(nzmin:nzmax, ednodes(2))-e1c2(nzmin:nzmax)
+                c2(nz)=(fer_UV(2, nz, edelem(1))*deltaX1 - fer_UV(1, nz, edelem(1))*deltaY1)*helem(nz, edelem(1))
+            end do
+        end if 
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+        call omp_set_lock  (partit%plock(ednodes(1)))
+#else
+!$OMP ORDERED
+#endif        
+        Wvel(nzmin:nzmax, ednodes(1))= Wvel(nzmin:nzmax, ednodes(1))+c1(nzmin:nzmax)
+        if (Fer_GM) then
+            fer_Wvel(nzmin:nzmax, ednodes(1))= fer_Wvel(nzmin:nzmax, ednodes(1))+c2(nzmin:nzmax)
         end if
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+        call omp_unset_lock(partit%plock(ednodes(1)))
+        call omp_set_lock  (partit%plock(ednodes(2)))
+#endif        
+        Wvel(nzmin:nzmax, ednodes(2))= Wvel(nzmin:nzmax, ednodes(2))-c1(nzmin:nzmax)
+        if (Fer_GM) then
+            fer_Wvel(nzmin:nzmax, ednodes(2))= fer_Wvel(nzmin:nzmax, ednodes(2))-c2(nzmin:nzmax)
+        end if
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+        call omp_unset_lock(partit%plock(ednodes(2)))
+#else
+!$OMP END ORDERED
+#endif
         
         !_______________________________________________________________________
         ! if ed is not a boundary edge --> calc div(u_vec*h) for every layer
         ! for edelem(2)
-        e2c1 = 0.0_WP
-        e2c2 = 0.0_WP
+        c1 = 0.0_WP
+        c2 = 0.0_WP
         if(edelem(2)>0)then
             deltaX2=edge_cross_dxdy(3,ed)
             deltaY2=edge_cross_dxdy(4,ed)
             nzmin = ulevels(edelem(2))
             nzmax = nlevels(edelem(2))-1   
             do nz = nzmax, nzmin, -1
-                e2c1(nz)=-(UVh(2, nz, edelem(2))*deltaX2 - UVh(1, nz, edelem(2))*deltaY2)
+                c1(nz)=-(UVh(2, nz, edelem(2))*deltaX2 - UVh(1, nz, edelem(2))*deltaY2)
             end do ! --> do nz=nzmax,nzmin,-1
-            Wvel(nzmin:nzmax, ednodes(1))= Wvel(nzmin:nzmax, ednodes(1))+e2c1(nzmin:nzmax)
-            Wvel(nzmin:nzmax, ednodes(2))= Wvel(nzmin:nzmax, ednodes(2))-e2c1(nzmin:nzmax)
-            
             if (Fer_GM) then
                 do nz = nzmax, nzmin, -1
-                    e2c2(nz)=-(fer_UV(2, nz, edelem(2))*deltaX2-fer_UV(1, nz, edelem(2))*deltaY2)*helem(nz, edelem(2))
+                    c2(nz)=-(fer_UV(2, nz, edelem(2))*deltaX2-fer_UV(1, nz, edelem(2))*deltaY2)*helem(nz, edelem(2))
                 end do ! --> do nz=nzmax,nzmin,-1
-                fer_Wvel(nzmin:nzmax, ednodes(1))= fer_Wvel(nzmin:nzmax, ednodes(1))+e2c2(nzmin:nzmax)
-                fer_Wvel(nzmin:nzmax, ednodes(2))= fer_Wvel(nzmin:nzmax, ednodes(2))-e2c2(nzmin:nzmax)
             end if 
-        end if
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+            call omp_set_lock  (partit%plock(ednodes(1)))
+#else
+!$OMP ORDERED
+#endif                
+            Wvel(nzmin:nzmax, ednodes(1))= Wvel(nzmin:nzmax, ednodes(1))+c1(nzmin:nzmax)
+            if (Fer_GM) then
+                fer_Wvel(nzmin:nzmax, ednodes(1))= fer_Wvel(nzmin:nzmax, ednodes(1))+c2(nzmin:nzmax)
+            end if 
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+            call omp_unset_lock(partit%plock(ednodes(1)))
+            call omp_set_lock  (partit%plock(ednodes(2)))
+#endif            
+            Wvel(nzmin:nzmax, ednodes(2))= Wvel(nzmin:nzmax, ednodes(2))-c1(nzmin:nzmax)
+            if (Fer_GM) then
+                fer_Wvel(nzmin:nzmax, ednodes(2))= fer_Wvel(nzmin:nzmax, ednodes(2))-c2(nzmin:nzmax)
+            end if
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+            call omp_unset_lock(partit%plock(ednodes(2)))
+#else
+!$OMP END ORDERED
+#endif            
+        end if !--> if(edelem(2)>0)then
         
-        !_______________________________________________________________________
-!PS         if ( any(Wvel(nzmin:nzmax, ednodes(1))/=Wvel(nzmin:nzmax, ednodes(1))) .or.  &
-!PS              any(Wvel(nzmin:nzmax, ednodes(2))/=Wvel(nzmin:nzmax, ednodes(2)))) then
-!PS             write(*,*) ' --> subroutine vert_vel_ale --> found Nan in Wvel after div_H(...)'
-!PS             write(*,*) ' mype   =', mype
-!PS             write(*,*) ' edge   =', ed
-!PS             write(*,*) ' enodes =', enodes
-!PS             write(*,*) ' Wvel(nzmin:nzmax, enodes(1))=', Wvel(nzmin:nzmax, ednodes(1))  
-!PS             write(*,*) ' Wvel(nzmin:nzmax, enodes(2))=', Wvel(nzmin:nzmax, ednodes(2)) 
-!PS             write(*,*) ' e1c1', e1c1(nzmin:nzmax)  
-!PS             write(*,*) ' e1c2', e1c2(nzmin:nzmax)  
-!PS             write(*,*) ' e2c1', e2c1(nzmin:nzmax)  
-!PS             write(*,*) ' e2c2', e2c2(nzmin:nzmax)  
-!PS         end if
     end do ! --> do ed=1, myDim_edge2D
-    
+!$OMP END DO    
+!$OMP END PARALLEL
+
     !___________________________________________________________________________
     ! add the contribution from -dh/dt * area
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax)   
     do node=1, myDim_nod2D
         nzmin = ulevels_nod2D(node)
         nzmax = nlevels_nod2d(node)-1
         do nz=nzmax,nzmin,-1
             Wvel(nz, node)=Wvel(nz, node)-(hnode_new(nz, node)-hnode(nz, node))*area(nz, node)/dt 
         end do ! --> do nz=nzmax,nzmin,-1
-        
-        !_______________________________________________________________________
-!PS         if ( any(Wvel(nzmin:nzmax, node)/=Wvel(nzmin:nzmax, node))) then
-!PS             write(*,*) ' --> subroutine vert_vel_ale --> found Nan in Wvel after +dhnode/dt=W'
-!PS             write(*,*) ' mype   =', mype
-!PS             write(*,*) ' node   =', node
-!PS             write(*,*) ' Wvel(     nzmin:nzmax, node)=', Wvel(nzmin:nzmax, node) 
-!PS             write(*,*) ' hnode_new(nzmin:nzmax, node)=', hnode_new(nzmin:nzmax, node)  
-!PS             write(*,*) ' hnode(    nzmin:nzmax, node)=', hnode(nzmin:nzmax, node)
-!PS         end if
     end do ! --> do node=1, myDim_nod2D
-    
+!$OMP END PARALLEL DO
+
     !___________________________________________________________________________
     ! Sum up to get W*area
     ! cumulative summation of div(u_vec*h) vertically
     ! W_k = W_k+1 - div(h_k*u_k)
     ! W_k ... vertical flux troughdo node=1, myDim_nod2D
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax)       
     do node=1, myDim_nod2D
         nzmin = ulevels_nod2D(node)
         nzmax = nlevels_nod2d(node)-1
@@ -2777,10 +2798,12 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
             end if
         end do ! --> do nz=nzmax,nzmin,-1
     end do ! --> do node=1, myDim_nod2D
-    
+!$OMP END PARALLEL DO
+
     !___________________________________________________________________________
     ! divide with depth dependent cell area to convert from Vertical flux to 
     ! physical vertical velocities in units m/s
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax)           
     do node=1, myDim_nod2D
         nzmin = ulevels_nod2D(node)
         nzmax = nlevels_nod2d(node)-1
@@ -2791,21 +2814,27 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
             end if
         end do ! --> do nz=nzmax,nzmin,-1
     end do ! --> do node=1, myDim_nod2D
-    
+!$OMP END PARALLEL DO
+
     !___________________________________________________________________________
     ! Add surface fresh water flux as upper boundary condition for 
     ! continutity
     if (.not. (trim(which_ale)=='linfs' )) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nzmin)       
         do node=1, myDim_nod2D
             nzmin = ulevels_nod2D(node)
             if (nzmin==1) Wvel(nzmin, node)=Wvel(nzmin, node)-water_flux(node) 
         end do ! --> do node=1, myDim_nod2D
     end if
-    
+!$OMP END PARALLEL DO
+
     !___________________________________________________________________________
+!$OMP MASTER    
     call exchange_nod(Wvel, partit)
     if (Fer_GM) call exchange_nod(fer_Wvel, partit)
-    
+!$OMP END MASTER    
+!$OMP BARRIER
+
     !___________________________________________________________________________
     ! compute vertical CFL_z criteria
     call compute_CFLz(dynamics, partit, mesh)
