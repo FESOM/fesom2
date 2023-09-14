@@ -884,7 +884,7 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
 !$OMP END ORDERED
 #endif
         end do ! --> do edge=1, myDim_edge2D+eDim_edge2D
-!$OMP END DO        
+!$OMP END PARALLEL DO       
     end if ! --> if (dynamics%splitexpl_visc) then     
     
     !___________________________________________________________________________
