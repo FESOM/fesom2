@@ -224,6 +224,7 @@ contains
         if (r_restart .and. .not. f%which_readr==2) then
             call restart_thickness_ale(f%partit, f%mesh)
         end if
+        if (f%dynamics%ldiag_ke) call init_ref_density_advanced(f%tracers, f%partit, f%mesh)
         if (f%mype==0) then
            f%t8=MPI_Wtime()
     
