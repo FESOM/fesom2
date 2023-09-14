@@ -75,6 +75,11 @@ TYPE T_DYN
     ! UBTmean_mean... Mean BT velocity to trim 3D velocity in tracers
     real(kind=WP), allocatable, dimension(:,:)  :: se_uvBT, se_uvBT_theta, se_uvBT_mean, se_uvBT_12 
     
+    ! array that are needed for viscosity and bottomdrag stabilization of 
+    ! split-expl subcycling method
+    real(kind=WP), allocatable, dimension(:,:)  :: se_uvBT_stab_hvisc 
+    real(kind=WP), allocatable, dimension(:)    :: se_uvBT_stab_bdrag
+    
     !___________________________________________________________________________
     ! summarizes solver input parameter
     type(t_solverinfo)                          :: solverinfo
@@ -290,6 +295,8 @@ subroutine WRITE_T_DYN(dynamics, unit, iostat, iomsg)
         call write_bin_array(dynamics%se_uvBT_theta, unit, iostat, iomsg)
         call write_bin_array(dynamics%se_uvBT_mean , unit, iostat, iomsg)
         call write_bin_array(dynamics%se_uvBT_12 , unit, iostat, iomsg)
+        call write_bin_array(dynamics%se_uvBT_stab_hvisc , unit, iostat, iomsg)
+        call write_bin_array(dynamics%se_uvBT_stab_bdrag , unit, iostat, iomsg)
     end if 
 
 
@@ -346,6 +353,8 @@ subroutine READ_T_DYN(dynamics, unit, iostat, iomsg)
         call read_bin_array(dynamics%se_uvBT_theta, unit, iostat, iomsg)
         call read_bin_array(dynamics%se_uvBT_mean , unit, iostat, iomsg)
         call read_bin_array(dynamics%se_uvBT_12 , unit, iostat, iomsg)
+        call read_bin_array(dynamics%se_uvBT_stab_hvisc , unit, iostat, iomsg)
+        call read_bin_array(dynamics%se_uvBT_stab_bdrag , unit, iostat, iomsg)
     end if 
 
 end subroutine READ_T_DYN

@@ -90,7 +90,7 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
     real(kind=WP)            :: uv12, uv1, uv2, qc, qu, qd, num_ord=0.95_WP
     integer                  :: ednodes(2), edelem(2)
     real(kind=WP)            :: wu(mesh%nl), wv(mesh%nl), un1(mesh%nl), un2(mesh%nl)
-!PS     real(kind=WP)            :: un, uu, vv, x1, x2, y1, y2
+
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB, UVnode_rhs, UVnode, UVh
@@ -109,7 +109,7 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
     ! 1st. compute vertical momentum advection component: w * du/dz, w*dv/dz
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, elem, ed, nz, nl1, ul1, nl2, ul2, nl12, ul12, &
 !$OMP                                  uv1, uv2, uv12, qc, qu, qd, wu, wv, &
-!$OMP                                  ednodes, edelem, dx1, dy1, dx2, dy2, un, uu, vv)
+!$OMP                                  ednodes, edelem, un1, un2)
 
 !$OMP DO    
     do node=1, myDim_nod2D
@@ -522,9 +522,9 @@ subroutine impl_vert_visc_ale_vtransp(dynamics, partit, mesh)
     UVh    =>dynamics%se_uvh(:,:,:)
     
     !___________________________________________________________________________
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(a, b, c, ur, vr, cp, up, vp, elem, & 
-!$OMP                                  nz, nzmin, nzmax, elnodes, &
-!$OMP                                  zinv, m, friction, wu, wv, uu, vv)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(nz, nzmin, nzmax, elem, elnodes, &
+!$OMP                                  a, b, c, m, ur, vr, cp, up, vp,  & 
+!$OMP                                  zinv, friction, wu, wd, uu, vv)
     
     !___________________________________________________________________________
 !$OMP DO
@@ -704,7 +704,8 @@ subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
     ab2=1.0_WP-ab1
 
     !___________________________________________________________________________
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax, Fx, Fy, & 
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax, &
+!$OMP                                  Fx, Fy, hh,                      & 
 !$OMP                                  vert_sum_u, vert_sum_v, hh)
 
     !___________________________________________________________________________
@@ -791,16 +792,15 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout)   , target :: mesh
     !___________________________________________________________________________
-    real(kind=WP)                   :: dtBT, BT_inv, hh, f, rx, ry, a, b, d, c1, c2, ax, ay
+    real(kind=WP)                   :: dtBT, BT_inv, hh, ff, rx, ry, a, b, d, c1, c2, ax, ay
     real(kind=WP)                   :: deltaX1, deltaY1, deltaX2, deltaY2, thetaBT
     integer                         :: step, elem, edge, node, elnodes(3), ednodes(2), edelem(2)
     real(kind=WP)                   :: update_ubt, update_vbt, vi, len, nzmax
-    real(kind=WP), allocatable      :: bottomdrag(:), UVBT_harmvisc(:,:)
     
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP), dimension(:)    , pointer :: eta_n
-    real(kind=WP), dimension(:,:)  , pointer :: UVBT_rhs, UVBT, UVBT_theta, UVBT_mean, UVBT_12
+    real(kind=WP), dimension(:)    , pointer :: eta_n, bottomdrag
+    real(kind=WP), dimension(:,:)  , pointer :: UVBT_rhs, UVBT, UVBT_theta, UVBT_mean, UVBT_12, UVBT_harmvisc
     real(kind=WP), dimension(:,:,:), pointer :: UV
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -813,13 +813,12 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     UVBT_mean =>dynamics%se_uvBT_mean(:,:)
     UVBT_12   =>dynamics%se_uvBT_12(:,:)
     if (dynamics%splitexpl_bottdrag) then
-        UV    =>dynamics%uv(:,:,:)
+        UV           =>dynamics%uv(:,:,:)
+        bottomdrag   =>dynamics%se_uvBT_stab_bdrag(:)
     end if 
-    
-    allocate(bottomdrag(      myDim_elem2D+eDim_elem2D))
-    allocate(UVBT_harmvisc(2, myDim_elem2D+eDim_elem2D))
-    bottomdrag    = 0.0_WP
-    UVBT_harmvisc = 0.0_WP
+    if (dynamics%splitexpl_visc) then 
+        UVBT_harmvisc=>dynamics%se_uvBT_stab_hvisc(:,:)
+    end if 
     
     !___________________________________________________________________________
     ! Dissipation parameter of FB dissipative method 0.14 is the default value 
@@ -841,6 +840,9 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     if (dynamics%splitexpl_visc) then 
         !_______________________________________________________________________
         ! remove viscosity
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, edelem, nzmax, hh, len, &
+!$OMP                                  vi, update_ubt, update_vbt)
+!$OMP DO        
         do edge=1, myDim_edge2D+eDim_edge2D
                 
             ! if ed is an outer boundary edge, skip it
@@ -882,26 +884,37 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
 !$OMP END ORDERED
 #endif
         end do ! --> do edge=1, myDim_edge2D+eDim_edge2D
+!$OMP END DO        
     end if ! --> if (dynamics%splitexpl_visc) then     
     
     !___________________________________________________________________________
     ! remove bottom drag
     if (dynamics%splitexpl_bottdrag) then
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nzmax, hh)
+!$OMP DO    
         do elem=1, myDim_elem2D
             elnodes= elem2D_nodes(:,elem)
             nzmax  = nlevels(elem)
-!PS             hh     = -zbar(nzmax)+sum(eta_n(elnodes))/3.0_WP
+            !PS hh     = -zbar(nzmax)+sum(eta_n(elnodes))/3.0_WP
             hh     = -zbar(nzmax)
             bottomdrag(elem) = dt*C_d*sqrt(UV(1, nzmax-1, elem)**2 + UV(2, nzmax-1, elem)**2)
             UVBT_rhs(1, elem)=UVBT_rhs(1, elem) + bottomdrag(elem)*UVBT(1, elem)/hh
             UVBT_rhs(2, elem)=UVBT_rhs(2, elem) + bottomdrag(elem)*UVBT(2, elem)/hh
         end do
+!$OMP END PARALLEL DO        
     end if ! --> if (dynamics%splitexpl_bottdrag) then
     
     !___________________________________________________________________________
+    ! initialise UVBT_mean with zeros --> OMP style
+!$OMP PARALLEL DO
+    do elem=1, myDim_elem2D+eDim_elem2D
+        UVBT_mean(:, elem) = 0.0_WP
+    end do
+!$OMP END PARALLEL DO    
+   
+    !___________________________________________________________________________
     ! eta_n   elevation used in BT stepping, it is just a copy of eta_n
     ! UBT and VBT are transport velocities
-    UVBT_mean= 0.0_WP
     do step=1, dynamics%splitexpl_BTsteps
         !#######################################################################
         !##########    Dissipative forward--backward time stepping    ##########
@@ -910,7 +923,19 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
         !_______________________________________________________________________
         ! compute harmonic viscosity for stability
         if (dynamics%splitexpl_visc) then 
-            UVBT_harmvisc = 0.0_WP
+            
+            !___________________________________________________________________
+            ! initialise UVBT_harmvisc with zeros --> OMP style
+!$OMP PARALLEL DO
+            do elem=1, myDim_elem2D+eDim_elem2D
+                UVBT_harmvisc(:, elem) = 0.0_WP
+            end do
+!$OMP END PARALLEL DO
+            
+            !___________________________________________________________________
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, edelem, nzmax, hh, len, &
+!$OMP                                  vi, update_ubt, update_vbt)
+!$OMP DO                  
             do edge=1, myDim_edge2D+eDim_edge2D
                     
                 ! if ed is an outer boundary edge, skip it
@@ -953,10 +978,14 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
 !$OMP END ORDERED
 #endif
             end do ! --> do edge=1, myDim_edge2D+eDim_edge2D
+!$OMP END PARALLEL DO
         end if ! -> if (dynamics%splitexpl_visc) then 
         
         !_______________________________________________________________________
         ! Advance velocities. I use SI stepping for the Coriolis
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, hh, ff, rx, ry, a, b,  &
+!$OMP                                  d, ax, ay)
+!$OMP DO           
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)
             !___________________________________________________________________
@@ -964,15 +993,15 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             ! AAA = - dt/M*[ + 0.5*f*e_z x (Ubt^(n+(m+1)/M) + Ubt^(n+(m)/M))
             !          - h*H^m*grad_H*eta^((n+m)/M)
             !          - Rbt-->UVBT_rhs ] 
-!PS             hh = -zbar(nlevels(elem))+sum(eta_n(elnodes))/3.0_WP ! Total fluid depth
+            !PS hh = -zbar(nlevels(elem))+sum(eta_n(elnodes))/3.0_WP ! Total fluid depth
             hh = -zbar(nlevels(elem)) ! Total fluid depth
-            f  = mesh%coriolis(elem)
+            ff  = mesh%coriolis(elem)
             
-            rx =   dtBT*(-g*hh*sum(gradient_sca(1:3,elem)*eta_n(elnodes)) + f*UVBT(2, elem))  & 
+            rx =   dtBT*(-g*hh*sum(gradient_sca(1:3,elem)*eta_n(elnodes)) + ff*UVBT(2, elem))  & 
                  + BT_inv*UVBT_rhs(1, elem)                                                   & 
                  + BT_inv*(UVBT_harmvisc(1, elem) - bottomdrag(elem)*UVBT(1, elem)/hh) ! <-- stabilization terms
                  
-            ry =   dtBT*(-g*hh*sum(gradient_sca(4:6,elem)*eta_n(elnodes)) - f*UVBT(1, elem))  &
+            ry =   dtBT*(-g*hh*sum(gradient_sca(4:6,elem)*eta_n(elnodes)) - ff*UVBT(1, elem))  &
                  + BT_inv*UVBT_rhs(2, elem)                                                   &
                  + BT_inv*(UVBT_harmvisc(2, elem) - bottomdrag(elem)*UVBT(2, elem)/hh) ! <-- stabilization terms
             
@@ -988,26 +1017,35 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             ! Ubt^(n+(m+1)/M)-Ubt^(n+m/M)  = - dt/M*[ + 0.5*f*e_z x (Ubt^(n+(m+1)/M) + Ubt^(n+m/M))
             !                                - h*H^m*grad_H*eta^(n+m/M)
             !                                - Rbt-->UVBT_rhs ] 
+            !                                + dt/M*[grad_h*A_h*H^n*grad_h(Ubt^(n+m/M)/H^n)]
+            !                                - dt/M*[cd*|Ubot|*Ubt^(n+(m+1)/M)/H^n]
             !
-            ! deltaU - dt/(2*M)*f*deltaV   =  dt/M*f*Vbt^(n+m/M) - h*H^m*gradx_H*eta^(n+m/M) + Rbtx
-            ! deltaV + dt/(2*M)*f*deltaU   = -dt/M*f*Ubt^(n+m/M) - h*H^m*grady_H*eta^(n+m/M) + Rbty
+            ! --> a = dt/(2*M)*ff
+            ! --> b = dt/M*cd*|Ubot|/H^n  
+            !
+            ! deltaU + b*deltaU - a*deltaV   =  dt/M*f*Vbt^(n+m/M) - h*H^m*gradx_H*eta^(n+m/M) + Rbtx
+            !                                   + dt/M*[grad_h*A_h*H^n*grad_h(Ubt^(n+m/M)/H^n)]
+            !                                   + dt/M*[cd*|Ubot|*Ubt^(n+m/M)/H^n]
+            ! deltaV + b*deltaV + a*deltaU   = -dt/M*f*Ubt^(n+m/M) - h*H^m*grady_H*eta^(n+m/M) + Rbty
+            !                                   + dt/M*[grad_h*A_h*H^n*grad_h(Vbt^(n+m/M)/H^n)]
+            !                                   + dt/M*[cd*|Ubot|VUbt^(n+m/M)/H^n]
             !                                \________________________v___________________________/
-            ! --> a = dt/(2*M)*f                                     Rx, Ry 
+            !                                                      Rx, Ry 
             !
-            ! | 1 -a | * | deltaU | = MAT* | deltaU | = | Rx |
-            ! | a  1 |   | deltaV | =      | deltaV | = | Ry |
-            !  
-            ! --> d = 1/(1 + a^2) ; inv(MAT) = d* |  1  a |
-            !                                     | -a  1 |
+            ! | 1+b -a  | * | deltaU | = MAT* | deltaU | = | Rx |
+            ! |  a  1+b |   | deltaV | =      | deltaV | = | Ry |
+            ! --> b' = b+1  
+            ! --> d  = 1/(b'^2 + a^2) ; inv(MAT) = d* |  b'  a  |
+            !                                         | -a   b' |
             !
             ! | deltaU | = inv(MAT) * | Rx | 
             ! | deltaV | =            | Ry |
             !
-            ! Ubt^(n+(m+1)/M) = Ubt^(n+m/M) + d*(   Rx + a*Ry) 
-            ! Vbt^(n+(m+1)/M) = Vbt^(n+m/M) + d*(-a*Rx +   Ry) 
+            ! Ubt^(n+(m+1)/M) = Ubt^(n+m/M) + d*( b'*Rx + a *Ry) 
+            ! Vbt^(n+(m+1)/M) = Vbt^(n+m/M) + d*(-a *Rx + b'*Ry) 
             !
             ! Semi-Implicit Coriolis
-            a  = dtBT*f*0.5_WP
+            a  = dtBT*ff*0.5_WP
             if (dynamics%splitexpl_bdrag_si) then 
                 b  = 1.0_WP+BT_inv*bottomdrag(elem)/hh
             else
@@ -1022,7 +1060,6 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             ! Ubt^(n+(m+1)/M)   = Ubt^(n+(m)/M) + AAA
             ! equation (6) in T. Banerjee et al.,Split-Explicite external
             ! mode solver in FESOM2, 
-            
             ! compute barotropic velocity at time step (n+(m+1)/M)
             UVBT(      1, elem) = UVBT(1, elem) + ax   
             UVBT(      2, elem) = UVBT(2, elem) + ay
@@ -1045,9 +1082,15 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             UVBT_mean( 2, elem) = UVBT_mean( 2, elem) + UVBT_theta(2, elem)*BT_inv
             
         end do
+!$OMP END PARALLEL DO
+        
+        !_______________________________________________________________________
+!$OMP MASTER
         call exchange_elem_begin(UVBT, partit)
         call exchange_elem_end(partit)
-        
+!$OMP END MASTER
+!$OMP BARRIER
+
         !_______________________________________________________________________
         ! Store mid-step velocity (to trim 3D velocities in momentum)
         if(step==dynamics%splitexpl_BTsteps/2) then
@@ -1058,6 +1101,9 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
         ! Advance thickness
         ! compute: dt/M * div_H * [(1+theta)*Ubt^(n+(m+1)/M) - theta*Ubt^(n+(m)/M)]
         ! and advance ssh --> eta^(n+(m+1)/M) = eta^(n+(m)/M) - dt/M * div_H * [...]
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, ednodes, edelem, c1, c2, &
+!$OMP                                  deltaX1, deltaX2, deltaY1, deltaY2)
+!$OMP DO
         do edge=1, myDim_edge2D
             ednodes = edges(:,edge)
             edelem  = edge_tri(:,edge)
@@ -1078,28 +1124,46 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             ! advance ssh --> eta^(n+(m+1)/M) = eta^(n+(m)/M) - dt/M * div_H * [...]
             ! equation (6) in T. Banerjee et al.,Split-Explicite external
             ! mode solver in FESOM2, 
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+            call omp_set_lock(partit%plock(ednodes(1)))
+#else
+!$OMP ORDERED
+#endif            
             eta_n(ednodes(1))=eta_n(ednodes(1)) + (c1+c2)*dtBT/areasvol(1,ednodes(1))
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+            call omp_unset_lock(partit%plock(ednodes(1)))
+            call omp_set_lock  (partit%plock(ednodes(2)))
+#endif            
             eta_n(ednodes(2))=eta_n(ednodes(2)) - (c1+c2)*dtBT/areasvol(1,ednodes(2))
-            
+#if defined(_OPENMP) && !defined(__openmp_reproducible) 
+            call omp_unset_lock(partit%plock(ednodes(2)))
+#else
+!$OMP END ORDERED
+#endif            
         end do
-        
+!$OMP END PARALLEL DO
+
         !_______________________________________________________________________
         ! Apply freshwater boundary condition 
         if ( .not. trim(which_ALE)=='linfs') then
+!$OMP PARALLEL DO
             do node=1,myDim_nod2D
                 eta_n(node)=eta_n(node) - dtBT*water_flux(node)
             end do
+!$OMP END PARALLEL DO            
         end if 
         
         !_______________________________________________________________________
+!$OMP MASTER        
         call exchange_nod(eta_n, partit)
-        
+!$OMP END MASTER
+!$OMP BARRIER
+
     end do ! --> do step=1, dynamics%splitexpl_BTsteps
     
-    deallocate(bottomdrag, UVBT_harmvisc)
+    !___________________________________________________________________________
     hbar_old = hbar
     hbar     = eta_n
-    
 end subroutine compute_BT_step_SE_ale
 !
 !
@@ -1141,7 +1205,9 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
     !___________________________________________________________________________
     ! Trim full velocity to ensure that its vertical sum equals to the mean BT velocity
     ! The trimmed Uh,Vh are consistent with new total height defined by eta_n   
-    if (mode==1) then              
+    if (mode==1) then 
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax, ubar, vbar, hh_inv)
+!$OMP DO        
         do elem=1, myDim_elem2D
             nzmin  = ulevels(elem)
             nzmax  = nlevels(elem)-1
@@ -1168,12 +1234,12 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
                 ubar  = ubar+UVh(1, nz, elem) + UV_rhs(1, nz, elem)   
                 vbar  = vbar+UVh(2, nz, elem) + UV_rhs(2, nz, elem)   
                 hh_inv= hh_inv+helem(nz,elem)
-            end do
+            end do ! --> do nz=nzmin, nzmax
             hh_inv=1.0_WP/hh_inv
-             
+
             !___________________________________________________________________
             if (dynamics%ldiag_ke) then
-                DO nz=nzmin, nzmax
+                do nz=nzmin, nzmax
                     ! U_(n+1)   - U_n   =  Urhs_n |* (U_(n+1)+U_n)
                     ! U_(n+1)^2 - U_n^2 =  Urhs_n * (U_(n+1)+U_n) 
                     !                                  | 
@@ -1215,8 +1281,8 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
                     if (nz==nzmax) then
                         dynamics%ke_drag_xVEL(:,elem) = usum*dynamics%ke_drag(:,elem)/2.0_WP
                     end if
-                END DO
-            end if
+                end do ! --> do nz=nzmin, nzmax
+            end if ! --> if (dynamics%ldiag_ke) then
             
             !___________________________________________________________________
             ! finalize horizontal transport by making vertically integrated 
@@ -1226,24 +1292,30 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
             !     mode solver in FESOM2, 
             ! U_k^(n+1/2) =  U^(n+1/2,**) 
             !              + [<<Ubar>>^(n+1/2) - sum(k, U_k^(n+1/2,**)] * h_k^(n+1/2)/sum(k,h_k^(n+1/2))
-            DO nz=nzmin, nzmax
+            do nz=nzmin, nzmax
                 !PS UVh(1, nz, elem)= UVh(1, nz, elem)+(UVBT_mean(1, elem)-ubar)*helem(nz,elem)*hh_inv
                 !PS UVh(2, nz, elem)= UVh(2, nz, elem)+(UVBT_mean(2, elem)-vbar)*helem(nz,elem)*hh_inv
                 UVh(1, nz, elem)= UVh(1, nz, elem) + UV_rhs(1, nz, elem) + (UVBT_mean(1, elem)-ubar)*helem(nz,elem)*hh_inv
                 UVh(2, nz, elem)= UVh(2, nz, elem) + UV_rhs(2, nz, elem) + (UVBT_mean(2, elem)-vbar)*helem(nz,elem)*hh_inv
                 UV( 1, nz, elem)= UVh(1, nz, elem)/helem(nz,elem)  ! velocities are still needed    
                 UV( 2, nz, elem)= UVh(2, nz, elem)/helem(nz,elem) 
-            end do
-        end do
+            end do ! --> do nz=nzmin, nzmax
+        end do ! --> do elem=1, myDim_elem2D
+!$OMP END PARALLEL DO    
         
         !_______________________________________________________________________
+!$OMP MASTER        
         call exchange_elem(UVh, partit)  ! This exchange can be avoided, but test first.
         call exchange_elem(UV, partit)
+!$OMP END MASTER
+!$OMP BARRIER
 
     !___________________________________________________________________________
     ! Trim to make velocity consistent with BT velocity at n+1/2
     ! Velocity will be used to advance momentum
-    else                         
+    else 
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax, ubar, vbar, hh_inv)
+!$OMP DO      
         do elem=1, myDim_elem2D    
             nzmin  = ulevels(elem)
             nzmax  = nlevels(elem)-1
@@ -1267,10 +1339,14 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
                 UV( 2, nz, elem)= UVh(2, nz, elem)/helem(nz,elem)  ! to compute momentum advection
             end do
         end do
-        !___________________________________________________________________
+!$OMP END PARALLEL DO   
+
+        !_______________________________________________________________________
+!$OMP MASTER        
         call exchange_elem(UVh, partit)    ! 
         call exchange_elem(UV , partit)   ! Check if this is needed 
-        
+!$OMP END MASTER
+!$OMP BARRIER
     end if ! --> if (mode==1) then
 end subroutine update_trim_vel_ale_vtransp
 !
@@ -1302,6 +1378,8 @@ subroutine compute_thickness_zstar(dynamics, partit, mesh)
     
     !___________________________________________________________________________
     ! leave bottom layer again untouched
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, hh_inv)
+!$OMP DO    
     do node=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(node)
         nzmax = nlevels_nod2D_min(node)-1
@@ -1309,10 +1387,13 @@ subroutine compute_thickness_zstar(dynamics, partit, mesh)
         do nz=nzmin, nzmax-1
             hnode_new(nz,node)=(zbar(nz)-zbar(nz+1))*(1.0_WP+hh_inv*eta_n(node))
         end do
-    end do
+    end do ! --> do node=1, myDim_nod2D+eDim_nod2D
+!$OMP END PARALLEL DO
     
     !___________________________________________________________________________
     ! --> update mean layer thinkness at element
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax)
+!$OMP DO        
     do elem=1, myDim_elem2D
         nzmin = ulevels(elem)
         nzmax = nlevels(elem)-1
@@ -1321,7 +1402,7 @@ subroutine compute_thickness_zstar(dynamics, partit, mesh)
             helem(nz,elem)=sum(hnode_new(nz,elnodes))/3.0_WP
         end do
     end do
-    
+!$OMP END PARALLEL DO
 end subroutine compute_thickness_zstar
 
 

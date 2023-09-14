@@ -509,6 +509,14 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
         dynamics%se_uvBT_theta  = 0.0_WP
         dynamics%se_uvBT_mean   = 0.0_WP
         dynamics%se_uvBT_12     = 0.0_WP
+        if (dynamics%splitexpl_visc) then 
+            allocate(dynamics%se_uvBT_stab_hvisc(2, elem_size))
+            dynamics%se_uvBT_stab_hvisc = 0.0_WP
+        end if
+        if (dynamics%splitexpl_bottdrag) then 
+            allocate(dynamics%se_uvBT_stab_bdrag(elem_size))
+            dynamics%se_uvBT_stab_bdrag = 0.0_WP
+        end if 
     else
         allocate(dynamics%d_eta(      node_size))
         allocate(dynamics%ssh_rhs(    node_size))
