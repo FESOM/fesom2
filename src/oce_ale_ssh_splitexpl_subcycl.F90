@@ -791,8 +791,8 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     !___________________________________________________________________________
     real(kind=WP)                   :: dtBT, BT_inv, hh, ff, rx, ry, a, b, d, c1, c2, ax, ay
     real(kind=WP)                   :: deltaX1, deltaY1, deltaX2, deltaY2, thetaBT
-    integer                         :: step, elem, edge, node, elnodes(3), ednodes(2), edelem(2)
-    real(kind=WP)                   :: update_ubt, update_vbt, vi, len, nzmax
+    integer                         :: step, elem, edge, node, elnodes(3), ednodes(2), edelem(2), nzmax
+    real(kind=WP)                   :: update_ubt, update_vbt, vi, len
     
     !___________________________________________________________________________
     ! pointer on necessary derived types
