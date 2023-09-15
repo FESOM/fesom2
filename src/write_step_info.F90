@@ -109,7 +109,8 @@ subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
     loc_deta  =0.
     loc_dhbar =0.
     loc_wflux =0.
-    loc    =0.
+    loc       =0.
+    
     !_______________________________________________________________________
 #if !defined(__openmp_reproducible)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n) REDUCTION(+:loc_eta, loc_hbar, loc_deta, loc_dhbar, loc_wflux)
@@ -123,10 +124,13 @@ subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
        end if 
        loc_wflux = loc_wflux + areasvol(ulevels_nod2D(n), n)*water_flux(n)
     end do
-    if (dynamics%use_ssh_splitexpl_subcycl)  loc_deta=loc_dhbar
 #if !defined(__openmp_reproducible)
 !$OMP END PARALLEL DO     
 #endif
+    if (dynamics%use_ssh_splitexpl_subcycl) then
+        loc_deta=loc_dhbar
+    end if
+    
     !_______________________________________________________________________
     call MPI_AllREDUCE(loc_eta  , int_eta  , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
     call MPI_AllREDUCE(loc_hbar , int_hbar , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
