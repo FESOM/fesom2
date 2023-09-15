@@ -2038,7 +2038,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     integer       :: el(2), enodes(2), n, nz, ed, nzmin, nzmax, uln1, uln2, nln1, nln2
     real(kind=WP) :: deltaX1, deltaY1, deltaX2, deltaY2, dd, dd1, dddt, cflmax
     ! still to be understood but if you allocate these arrays statically the results will be different:
-    real(kind=WP) :: e1c1(mesh%nl-1), e1c2(mesh%nl-1), e2c1(mesh%nl-1), e2c2(mesh%nl-1)
+    real(kind=WP) :: c1(mesh%nl-1), c2(mesh%nl-1)
     ! --> zlevel with local zstar
     real(kind=WP) :: dhbar_total, dhbar_rest, distrib_dhbar_int
     real(kind=WP), dimension(:), allocatable :: max_dhbar2distr, cumsum_maxdhbar, distrib_dhbar
@@ -2107,11 +2107,11 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
             ! --> h * u_vec * n_vec
             ! --> e_vec = (dx,dy), n_vec = (-dy,dx);
             ! --> h * u*(-dy) + v*dx
-            e1c1(nz)=( UV(2,nz,el(1))*deltaX1 - UV(1,nz,el(1))*deltaY1 )*helem(nz,el(1))
+            c1(nz)=( UV(2,nz,el(1))*deltaX1 - UV(1,nz,el(1))*deltaY1 )*helem(nz,el(1))
             ! inflow(outflow) "flux" to control volume of node enodes1
             ! is equal to outflow(inflow) "flux" to control volume of node enodes2
             if (Fer_GM) then
-                e1c2(nz)=(fer_UV(2,nz,el(1))*deltaX1- fer_UV(1,nz,el(1))*deltaY1)*helem(nz,el(1))
+                c2(nz)=(fer_UV(2,nz,el(1))*deltaX1- fer_UV(1,nz,el(1))*deltaY1)*helem(nz,el(1))
             end if
         end do
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
@@ -2119,17 +2119,17 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
 #else
 !$OMP ORDERED
 #endif
-        Wvel       (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+e1c1(nzmin:nzmax)
+        Wvel       (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+c1(nzmin:nzmax)
         if (Fer_GM) then
-           fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+e1c2(nzmin:nzmax)
+           fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+c2(nzmin:nzmax)
         end if
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(enodes(1)))
         call omp_set_lock  (partit%plock(enodes(2)))
 #endif
-        Wvel       (nzmin:nzmax, enodes(2))= Wvel    (nzmin:nzmax, enodes(2))-e1c1(nzmin:nzmax)
+        Wvel       (nzmin:nzmax, enodes(2))= Wvel    (nzmin:nzmax, enodes(2))-c1(nzmin:nzmax)
         if (Fer_GM) then
-           fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-e1c2(nzmin:nzmax)
+           fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-c2(nzmin:nzmax)
         end if
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(enodes(2)))
@@ -2139,73 +2139,42 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
         !_______________________________________________________________________
         ! if ed is not a boundary edge --> calc div(u_vec*h) for every layer
         ! for el(2)
-        e2c1 = 0.0_WP
-        e2c2 = 0.0_WP
+        c1 = 0.0_WP
+        c2 = 0.0_WP
         if(el(2)>0)then
             deltaX2=edge_cross_dxdy(3,ed)
             deltaY2=edge_cross_dxdy(4,ed)
             nzmin = ulevels(el(2))
             nzmax = nlevels(el(2))-1   
             do nz = nzmax, nzmin, -1
-                e2c1(nz)=-(UV(2,nz,el(2))*deltaX2 - UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+                c1(nz)=-(UV(2,nz,el(2))*deltaX2 - UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
                 if (Fer_GM) then
-                    e2c2(nz)=-(fer_UV(2,nz,el(2))*deltaX2-fer_UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+                    c2(nz)=-(fer_UV(2,nz,el(2))*deltaX2-fer_UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
                 end if
-                
-                !_______________________________________________________________
-                if ( e2c1(nz)/=e2c1(nz) ) then
-                    write(*,*) ' --> subroutine vert_vel_ale --> found Nan in e2c1(nz)'
-                    write(*,*) ' mype =', mype
-                    write(*,*) ' edge =', ed
-                    write(*,*) ' el   =', el
-                    write(*,*) ' nz   =', nz 
-                    write(*,*) ' e2c1(nz)       =', e2c1(nz) 
-                    write(*,*) ' UV(1,nz,el(2)) =', UV(1,nz,el(2))
-                    write(*,*) ' UV(2,nz,el(2)) =', UV(2,nz,el(2))
-                    write(*,*) ' helem(nz,el(2))=', helem(nz,el(2))
-                
-                end if 
             end do
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
             call omp_set_lock  (partit%plock(enodes(1)))
 #else
 !$OMP ORDERED
 #endif
-            Wvel       (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+e2c1(nzmin:nzmax)
+            Wvel       (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+c1(nzmin:nzmax)
             if (Fer_GM) then
-               fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+e2c2(nzmin:nzmax)
+               fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+c2(nzmin:nzmax)
             end if
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
             call omp_unset_lock(partit%plock(enodes(1)))
             call omp_set_lock  (partit%plock(enodes(2)))
 #endif
-            Wvel       (nzmin:nzmax, enodes(2))= Wvel    (nzmin:nzmax, enodes(2))-e2c1(nzmin:nzmax)
+            Wvel       (nzmin:nzmax, enodes(2))= Wvel    (nzmin:nzmax, enodes(2))-c1(nzmin:nzmax)
             if (Fer_GM) then
-               fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-e2c2(nzmin:nzmax)
+               fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-c2(nzmin:nzmax)
             end if
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
             call omp_unset_lock(partit%plock(enodes(2)))
 #else
 !$OMP END ORDERED
 #endif
-        end if
-        
-        !_______________________________________________________________________
-        if ( any(Wvel(nzmin:nzmax, enodes(1))/=Wvel(nzmin:nzmax, enodes(1))) .or.  &
-             any(Wvel(nzmin:nzmax, enodes(2))/=Wvel(nzmin:nzmax, enodes(2)))) then
-            write(*,*) ' --> subroutine vert_vel_ale --> found Nan in Wvel after div_H(...)'
-            write(*,*) ' mype   =', mype
-            write(*,*) ' edge   =', ed
-            write(*,*) ' enodes =', enodes
-            write(*,*) ' Wvel(nzmin:nzmax, enodes(1))=', Wvel(nzmin:nzmax, enodes(1))  
-            write(*,*) ' Wvel(nzmin:nzmax, enodes(2))=', Wvel(nzmin:nzmax, enodes(2)) 
-            write(*,*) ' e1c1', e1c1(nzmin:nzmax)  
-            write(*,*) ' e1c2', e1c2(nzmin:nzmax)  
-            write(*,*) ' e2c1', e2c1(nzmin:nzmax)  
-            write(*,*) ' e2c2', e2c2(nzmin:nzmax)  
-            
-        end if
-        
+        end if !~-> if(el(2)>0)then       
     end do ! --> do ed=1, myDim_edge2D
 !$OMP END DO
 !$OMP END PARALLEL
