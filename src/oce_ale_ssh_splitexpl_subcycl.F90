@@ -731,6 +731,7 @@ subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
         
         ! total ocean depth H
         !PS hh = sum(helem(nzmin:nzmax, elem))
+        !PS hh = -zbar_e_bot(elem) + sum(eta_n(elnodes))/3.0_WP
         hh = -zbar_e_bot(elem) + sum(eta_n(elnodes))/3.0_WP
         
         vert_sum_u=vert_sum_u + Fx*hh
@@ -843,7 +844,7 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     if (dynamics%se_visc) then 
         !_______________________________________________________________________
         ! remove viscosity
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, edelem, ednodes, nzmax, hh, len, &
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, edelem, ednodes, hh, len, &
 !$OMP                                  vi, update_ubt, update_vbt)
 !$OMP DO        
         do edge=1, myDim_edge2D+eDim_edge2D
@@ -854,11 +855,12 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             ! elem indices that participate in edge
             edelem  = edge_tri(:,edge)
             ednodes = edges(:,edge) 
-            nzmax   = minval(nlevels(edelem))
             
             ! total ocean depth H
+            !PS nzmax = minval(nlevels(edelem))
             !PS hh    = -zbar(nzmax)
-            hh      = -sum(zbar_e_bot(edelem))*0.5_WP + sum(hbar(ednodes))*0.5_WP
+            !PS hh      = minval(-zbar_e_bot(edelem))
+            hh    = -sum(zbar_e_bot(edelem))*0.5_WP + sum(hbar(ednodes))*0.5_WP
             
             len     = sqrt(sum(elem_area(edelem)))
             update_ubt=(UVBT(1, edelem(1))-UVBT(1, edelem(2)))/hh
@@ -907,6 +909,7 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             ! total ocean depth H
             !PS hh     = -zbar(nzmax)+sum(eta_n(elnodes))/3.0_WP
             !PS hh     = -zbar(nzmax)
+            !PS hh     = -zbar_e_bot(elem)
             hh     = -zbar_e_bot(elem) + sum(hbar(elnodes))/3.0_WP
             
             bottomdrag(elem) = dt*C_d*sqrt(UV(1, nzmax-1, elem)**2 + UV(2, nzmax-1, elem)**2)
@@ -946,7 +949,7 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
 !$OMP END PARALLEL DO
             
             !___________________________________________________________________
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, edelem, ednodes, nzmax, hh, len, &
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, edelem, ednodes, hh, len, &
 !$OMP                                  vi, update_ubt, update_vbt)
 !$OMP DO                  
             do edge=1, myDim_edge2D+eDim_edge2D
@@ -957,12 +960,13 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
                 ! elem indices that participate in edge
                 edelem  = edge_tri(:, edge)
                 ednodes = edges(:, edge)
-                nzmax   = minval(nlevels(edelem))
                 
-                 ! total ocean depth H
+                ! total ocean depth H
+                !PS nzmax = minval(nlevels(edelem))
                 !PS hh    = -zbar(nzmax)
+                !PS hh    = minval(-zbar_e_bot(edelem))
                 hh      = -sum(zbar_e_bot(edelem))*0.5_WP + sum(hbar(ednodes))*0.5_WP
-            
+                
                 len     = sqrt(sum(elem_area(edelem)))
                 update_ubt=(UVBT(1, edelem(1))-UVBT(1, edelem(2)))/hh
                 update_vbt=(UVBT(2, edelem(1))-UVBT(2, edelem(2)))/hh
@@ -1013,6 +1017,7 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             ! total ocean depth H
             !PS hh = -zbar(nlevels(elem))+sum(eta_n(elnodes))/3.0_WP ! Total fluid depth
             !PS hh = -zbar(nlevels(elem)) ! Total fluid depth
+            !PS hh = -zbar_e_bot(elem)
             hh = -zbar_e_bot(elem) + sum(hbar(elnodes))/3.0_WP
             
             ff = mesh%coriolis(elem)
