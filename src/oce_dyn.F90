@@ -410,8 +410,10 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
             !SD Approximate update for transports. We do not care about accuracy 
             !SD here. --> of course, helem will be better.
             Do nz=nzmin, nzmax-1
-                UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+(U_b(nz,ed) -dynamics%visc_easybsreturn*sum(U_c(nz,nelem))/3.0_WP)*(zbar(nz)-zbar(nz+1)) 
-                UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+(V_b(nz,ed) -dynamics%visc_easybsreturn*sum(V_c(nz,nelem))/3.0_WP)*(zbar(nz)-zbar(nz+1)) 
+                !PS UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+(U_b(nz,ed) -dynamics%visc_easybsreturn*sum(U_c(nz,nelem))/3.0_WP)*(zbar(nz)-zbar(nz+1)) 
+                !PS UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+(V_b(nz,ed) -dynamics%visc_easybsreturn*sum(V_c(nz,nelem))/3.0_WP)*(zbar(nz)-zbar(nz+1))
+                UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+(U_b(nz,ed) -dynamics%visc_easybsreturn*sum(U_c(nz,nelem))/3.0_WP)*helem(nz, ed)
+!PS                 UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+(V_b(nz,ed) -dynamics%visc_easybsreturn*sum(V_c(nz,nelem))/3.0_WP)*helem(nz, ed)
             END DO
         else
             Do nz=nzmin, nzmax-1
@@ -543,8 +545,10 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
             !SD Approximate update for transports. We do not care about accuracy 
             !SD here. --> of course, helem will be better.
             do  nz=nzmin,nzmax-1
-                update_u(nz)=(U_c(nz,el(1))-U_c(nz,el(2)))*(zbar(nz)-zbar(nz+1)) 
-                update_v(nz)=(V_c(nz,el(1))-V_c(nz,el(2)))*(zbar(nz)-zbar(nz+1)) 
+                !PS update_u(nz)=(U_c(nz,el(1))-U_c(nz,el(2)))*(zbar(nz)-zbar(nz+1)) 
+                !PS update_v(nz)=(V_c(nz,el(1))-V_c(nz,el(2)))*(zbar(nz)-zbar(nz+1)) 
+                update_u(nz)=(U_c(nz,el(1))-U_c(nz,el(2))) * (helem(nz, el(1))+helem(nz, el(2)))*0.5_WP
+                update_v(nz)=(V_c(nz,el(1))-V_c(nz,el(2))) * (helem(nz, el(1))+helem(nz, el(2)))*0.5_WP
             end do
         else
             do  nz=nzmin,nzmax-1
@@ -692,8 +696,10 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
                             dynamics%visc_gamma2*vi)            &
                         )*len)
                 ! vi=-dt*sqrt(max(dynamics%visc_gamma0, dynamics%visc_gamma1*max(sqrt(vi), dynamics%visc_gamma2*vi))*len)
-                update_u(nz)=vi*(U_c(nz,el(1))-U_c(nz,el(2)))*(zbar(nz)-zbar(nz+1)) 
-                update_v(nz)=vi*(V_c(nz,el(1))-V_c(nz,el(2)))*(zbar(nz)-zbar(nz+1)) 
+                !PS update_u(nz)=vi*(U_c(nz,el(1))-U_c(nz,el(2)))*(zbar(nz)-zbar(nz+1)) 
+                !PS update_v(nz)=vi*(V_c(nz,el(1))-V_c(nz,el(2)))*(zbar(nz)-zbar(nz+1)) 
+                update_u(nz)=vi*(U_c(nz,el(1))-U_c(nz,el(2)))*(helem(nz, el(1))+helem(nz, el(2)))*0.5_WP
+                update_v(nz)=vi*(V_c(nz,el(1))-V_c(nz,el(2)))*(helem(nz, el(1))+helem(nz, el(2)))*0.5_WP
             end do
         else
             do nz=nzmin,nzmax-1

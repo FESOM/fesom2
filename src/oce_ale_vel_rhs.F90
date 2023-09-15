@@ -400,7 +400,7 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
             ul2 = ulevels(el2)
             
             un2(ul2:nl2) = - UV(2,ul2:nl2,el2)*edge_cross_dxdy(3,ed) &
-                            + UV(1,ul2:nl2,el2)*edge_cross_dxdy(4,ed)
+                           + UV(1,ul2:nl2,el2)*edge_cross_dxdy(4,ed)
             
             ! fill with zeros to combine the loops
             ! Usually, no or only a very few levels have to be filled. In this case, 
