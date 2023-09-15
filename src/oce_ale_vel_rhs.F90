@@ -82,7 +82,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     inv_rhowat=> ice%thermo%inv_rhowat
     
     ! if split-explicite ssh subcycling is used
-    if (dynamics%use_ssh_splitexpl_subcycl) then
+    if (dynamics%use_ssh_se_subcycl) then
         UVh      => dynamics%se_uvh
         UVBT_4AB => dynamics%se_uvBT_4AB
     end if 
@@ -160,7 +160,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         !_______________________________________________________________________
         ! when ssh split-explicite subcycling method is setted use transport velocities
         ! u*h, v*h instead of u,v 
-        if (.not. dynamics%use_ssh_splitexpl_subcycl) then
+        if (.not. dynamics%use_ssh_se_subcycl) then
             do nz=nzmin, nzmax-1
                 ! add pressure gradient terms
                 UV_rhs(  1, nz, elem) = UV_rhs(1, nz, elem) + (Fx-pgf_x(nz, elem))*elem_area(elem) 
@@ -216,7 +216,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
        if (mype==0) write(*,*) 'in moment not adapted mom_adv advection typ for ALE, check your namelist'
        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     elseif (dynamics%momadv_opt==2) then
-        if (.not. dynamics%use_ssh_splitexpl_subcycl) then
+        if (.not. dynamics%use_ssh_se_subcycl) then
             call momentum_adv_scalar(dynamics, partit, mesh)
         else
             call momentum_adv_scalar_transpv(dynamics, partit, mesh)

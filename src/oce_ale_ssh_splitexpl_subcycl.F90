@@ -809,22 +809,22 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     UVBT_theta=>dynamics%se_uvBT_theta(:,:)
     UVBT_mean =>dynamics%se_uvBT_mean(:,:)
     UVBT_12   =>dynamics%se_uvBT_12(:,:)
-    if (dynamics%splitexpl_bottdrag) then
+    if (dynamics%se_bottdrag) then
         UV           =>dynamics%uv(:,:,:)
         bottomdrag   =>dynamics%se_uvBT_stab_bdrag(:)
     end if 
-    if (dynamics%splitexpl_visc) then 
+    if (dynamics%se_visc) then 
         UVBT_harmvisc=>dynamics%se_uvBT_stab_hvisc(:,:)
     end if 
     
     !___________________________________________________________________________
     ! Dissipation parameter of FB dissipative method 0.14 is the default value 
     ! from Demange et al.
-    thetaBT= dynamics%splitexpl_BTtheta
+    thetaBT= dynamics%se_BTtheta
     
     ! BTsteps should be 30 or 40.
-    dtBT   = dt/dynamics%splitexpl_BTsteps                
-    BT_inv = 1.0_WP/(1.0_WP*dynamics%splitexpl_BTsteps)
+    dtBT   = dt/dynamics%se_BTsteps                
+    BT_inv = 1.0_WP/(1.0_WP*dynamics%se_BTsteps)
     
     !___SPLIT-EXPLICITE STABILIZATION___________________________________________
     ! trim R (UVBT_rhs):
@@ -834,7 +834,7 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     ! compute_BT_step_SE_ale)
     ! --> use only harmonmic viscosity operator applied to the barotropic
     !     velocity
-    if (dynamics%splitexpl_visc) then 
+    if (dynamics%se_visc) then 
         !_______________________________________________________________________
         ! remove viscosity
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, edelem, nzmax, hh, len, &
@@ -854,9 +854,9 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             update_ubt=(UVBT(1, edelem(1))-UVBT(1, edelem(2)))/hh
             update_vbt=(UVBT(2, edelem(1))-UVBT(2, edelem(2)))/hh
             vi=update_ubt*update_ubt + update_vbt*update_vbt
-            vi=-dt*sqrt(max(dynamics%splitexpl_visc_gamma0,           &
-                        max(dynamics%splitexpl_visc_gamma1*sqrt(vi),  &
-                            dynamics%splitexpl_visc_gamma2*vi)        &
+            vi=-dt*sqrt(max(dynamics%se_visc_gamma0,           &
+                        max(dynamics%se_visc_gamma1*sqrt(vi),  &
+                            dynamics%se_visc_gamma2*vi)        &
                     )*len)
             update_ubt=update_ubt*vi
             update_vbt=update_vbt*vi
@@ -883,11 +883,11 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
         end do ! --> do edge=1, myDim_edge2D+eDim_edge2D
 !$OMP END DO       
 !$OMP END PARALLEL 
-    end if ! --> if (dynamics%splitexpl_visc) then     
+    end if ! --> if (dynamics%se_visc) then     
     
     !___________________________________________________________________________
     ! remove bottom drag
-    if (dynamics%splitexpl_bottdrag) then
+    if (dynamics%se_bottdrag) then
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nzmax, hh)
 !$OMP DO    
         do elem=1, myDim_elem2D
@@ -901,7 +901,7 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
         end do
 !$OMP END DO       
 !$OMP END PARALLEL        
-    end if ! --> if (dynamics%splitexpl_bottdrag) then
+    end if ! --> if (dynamics%se_bottdrag) then
     
     !___________________________________________________________________________
     ! initialise UVBT_mean with zeros --> OMP style
@@ -914,14 +914,14 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! eta_n   elevation used in BT stepping, it is just a copy of eta_n
     ! UBT and VBT are transport velocities
-    do step=1, dynamics%splitexpl_BTsteps
+    do step=1, dynamics%se_BTsteps
         !#######################################################################
         !##########    Dissipative forward--backward time stepping    ##########
         !#######################################################################
         
         !_______________________________________________________________________
         ! compute harmonic viscosity for stability
-        if (dynamics%splitexpl_visc) then 
+        if (dynamics%se_visc) then 
             
             !___________________________________________________________________
             ! initialise UVBT_harmvisc with zeros --> OMP style
@@ -950,9 +950,9 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
                 update_ubt=(UVBT(1, edelem(1))-UVBT(1, edelem(2)))/hh
                 update_vbt=(UVBT(2, edelem(1))-UVBT(2, edelem(2)))/hh
                 vi=update_ubt*update_ubt + update_vbt*update_vbt
-                vi=dt*sqrt(max(dynamics%splitexpl_visc_gamma0,           &
-                           max(dynamics%splitexpl_visc_gamma1*sqrt(vi),   &
-                               dynamics%splitexpl_visc_gamma2*vi)         &
+                vi=dt*sqrt(max(dynamics%se_visc_gamma0,           &
+                           max(dynamics%se_visc_gamma1*sqrt(vi),   &
+                               dynamics%se_visc_gamma2*vi)         &
                         )*len)
                 update_ubt=update_ubt*vi
                 update_vbt=update_vbt*vi
@@ -979,7 +979,7 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             end do ! --> do edge=1, myDim_edge2D+eDim_edge2D
 !$OMP END DO       
 !$OMP END PARALLEL 
-        end if ! -> if (dynamics%splitexpl_visc) then 
+        end if ! -> if (dynamics%se_visc) then 
         
         !_______________________________________________________________________
         ! Advance velocities. I use SI stepping for the Coriolis
@@ -1046,7 +1046,7 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             !
             ! Semi-Implicit Coriolis
             a  = dtBT*ff*0.5_WP
-            if (dynamics%splitexpl_bdrag_si) then 
+            if (dynamics%se_bdrag_si) then 
                 b  = 1.0_WP+BT_inv*bottomdrag(elem)/hh
             else
                 b  = 1.0_WP
@@ -1094,7 +1094,7 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
 
         !_______________________________________________________________________
         ! Store mid-step velocity (to trim 3D velocities in momentum)
-        if(step==dynamics%splitexpl_BTsteps/2) then
+        if(step==dynamics%se_BTsteps/2) then
             UVBT_12=UVBT
         end if 
         
@@ -1161,7 +1161,7 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
 !$OMP END MASTER
 !$OMP BARRIER
 
-    end do ! --> do step=1, dynamics%splitexpl_BTsteps
+    end do ! --> do step=1, dynamics%se_BTsteps
     
     !___________________________________________________________________________
     hbar_old = hbar

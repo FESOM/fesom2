@@ -406,7 +406,7 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
         nzmin = ulevels(ed)
         nzmax = nlevels(ed)
         !_______________________________________________________________________
-        if (dynamics%use_ssh_splitexpl_subcycl) then
+        if (dynamics%use_ssh_se_subcycl) then
             !SD Approximate update for transports. We do not care about accuracy 
             !SD here. --> of course, helem will be better.
             Do nz=nzmin, nzmax-1
@@ -539,7 +539,7 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
         nzmin = maxval(ulevels(el))
         nzmax = minval(nlevels(el))
         !_______________________________________________________________________
-        if (dynamics%use_ssh_splitexpl_subcycl) then
+        if (dynamics%use_ssh_se_subcycl) then
             !SD Approximate update for transports. We do not care about accuracy 
             !SD here. --> of course, helem will be better.
             do  nz=nzmin,nzmax-1
@@ -680,7 +680,7 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
         nzmin = maxval(ulevels(el))
         nzmax = minval(nlevels(el))
         !_______________________________________________________________________
-        if (dynamics%use_ssh_splitexpl_subcycl) then
+        if (dynamics%use_ssh_se_subcycl) then
             !SD Approximate update for transports. We do not care about accuracy 
             !SD here. --> of course, helem will be better.
             do nz=nzmin,nzmax-1

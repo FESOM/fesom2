@@ -105,7 +105,7 @@ MODULE io_BLOWUP
 		!___ALE related fields______________________________________________________
 		call def_variable(bid, 'hbar'		, (/nod2D/)			, 'ALE surface elevation hbar_n+0.5', 'm', hbar);
 !!PS 		call def_variable(bid, 'hbar_old'	, (/nod2D/)			, 'ALE surface elevation hbar_n-0.5', 'm', hbar_old);
-        if (.not. dynamics%use_ssh_splitexpl_subcycl) then
+        if (.not. dynamics%use_ssh_se_subcycl) then
             call def_variable(bid, 'd_eta'		, (/nod2D/)			, 'change in ssh from solver', 'm', dynamics%d_eta);
             call def_variable(bid, 'ssh_rhs'	, (/nod2D/)			, 'RHS for the elevation', '?', dynamics%ssh_rhs);
             call def_variable(bid, 'ssh_rhs_old', (/nod2D/)			, 'RHS for the elevation', '?', dynamics%ssh_rhs_old);

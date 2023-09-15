@@ -393,18 +393,18 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     logical        :: ldiag_KE     =.false.
     logical        :: check_opt_visc=.true.
     real(kind=WP)  :: wsplit_maxcfl
-    logical        :: use_ssh_splitexpl_subcycl=.false.
-    integer        :: splitexpl_BTsteps
-    real(kind=WP)  :: splitexpl_BTtheta
-    logical        :: splitexpl_visc, splitexpl_bottdrag, splitexpl_bdrag_si
-    real(kind=WP)  :: splitexpl_visc_gamma0, splitexpl_visc_gamma1, splitexpl_visc_gamma2
+    logical        :: use_ssh_se_subcycl=.false.
+    integer        :: se_BTsteps
+    real(kind=WP)  :: se_BTtheta
+    logical        :: se_visc, se_bottdrag, se_bdrag_si
+    real(kind=WP)  :: se_visc_gamma0, se_visc_gamma1, se_visc_gamma2
     
     namelist /dynamics_visc   / opt_visc, check_opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
                                 use_ivertvisc, visc_easybsreturn
     namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, & 
-                                ldiag_KE, use_ssh_splitexpl_subcycl, splitexpl_BTsteps, & 
-                                splitexpl_BTtheta, splitexpl_bottdrag, splitexpl_bdrag_si, &
-                                splitexpl_visc, splitexpl_visc_gamma0, splitexpl_visc_gamma1, splitexpl_visc_gamma2
+                                ldiag_KE, use_ssh_se_subcycl, se_BTsteps, & 
+                                se_BTtheta, se_bottdrag, se_bdrag_si, &
+                                se_visc, se_visc_gamma0, se_visc_gamma1, se_visc_gamma2
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -440,16 +440,16 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     dynamics%use_wsplit                 = use_wsplit
     dynamics%wsplit_maxcfl              = wsplit_maxcfl
     dynamics%ldiag_KE                   = ldiag_KE
-    dynamics%use_ssh_splitexpl_subcycl  = use_ssh_splitexpl_subcycl
-    if (dynamics%use_ssh_splitexpl_subcycl) then
-        dynamics%splitexpl_BTsteps      = splitexpl_BTsteps
-        dynamics%splitexpl_BTtheta      = splitexpl_BTtheta
-        dynamics%splitexpl_bottdrag     = splitexpl_bottdrag
-        dynamics%splitexpl_bdrag_si     = splitexpl_bdrag_si
-        dynamics%splitexpl_visc         = splitexpl_visc
-        dynamics%splitexpl_visc_gamma0  = splitexpl_visc_gamma0
-        dynamics%splitexpl_visc_gamma1  = splitexpl_visc_gamma1
-        dynamics%splitexpl_visc_gamma2  = splitexpl_visc_gamma2
+    dynamics%use_ssh_se_subcycl  = use_ssh_se_subcycl
+    if (dynamics%use_ssh_se_subcycl) then
+        dynamics%se_BTsteps      = se_BTsteps
+        dynamics%se_BTtheta      = se_BTtheta
+        dynamics%se_bottdrag     = se_bottdrag
+        dynamics%se_bdrag_si     = se_bdrag_si
+        dynamics%se_visc         = se_visc
+        dynamics%se_visc_gamma0  = se_visc_gamma0
+        dynamics%se_visc_gamma1  = se_visc_gamma1
+        dynamics%se_visc_gamma2  = se_visc_gamma2
     end if 
 
     !___________________________________________________________________________
@@ -494,7 +494,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     ! allocate/initialise ssh arrays in derived type
     allocate(dynamics%eta_n(      node_size))
     dynamics%eta_n           = 0.0_WP
-    if (dynamics%use_ssh_splitexpl_subcycl) then
+    if (dynamics%use_ssh_se_subcycl) then
         allocate(dynamics%se_uvh(       2, nl-1, elem_size))
         allocate(dynamics%se_uvBT_rhs(  2,       elem_size))
         allocate(dynamics%se_uvBT_4AB(  4,       elem_size))
@@ -509,11 +509,11 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
         dynamics%se_uvBT_theta  = 0.0_WP
         dynamics%se_uvBT_mean   = 0.0_WP
         dynamics%se_uvBT_12     = 0.0_WP
-        if (dynamics%splitexpl_visc) then 
+        if (dynamics%se_visc) then 
             allocate(dynamics%se_uvBT_stab_hvisc(2, elem_size))
             dynamics%se_uvBT_stab_hvisc = 0.0_WP
         end if
-        if (dynamics%splitexpl_bottdrag) then 
+        if (dynamics%se_bottdrag) then 
             allocate(dynamics%se_uvBT_stab_bdrag(elem_size))
             dynamics%se_uvBT_stab_bdrag = 0.0_WP
         end if 

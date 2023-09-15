@@ -2064,7 +2064,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
         fer_Wvel=> dynamics%fer_w(:,:)
     end if
     
-    if ( .not. dynamics%use_ssh_splitexpl_subcycl) then
+    if ( .not. dynamics%use_ssh_se_subcycl) then
         d_eta       => dynamics%d_eta(:)
         ssh_rhs     => dynamics%ssh_rhs(:)
         ssh_rhs_old => dynamics%ssh_rhs_old(:)
@@ -2535,7 +2535,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
                 write(*,*) 'water_flux     = ', water_flux(n)
                 write(*,*)
                 write(*,*) "eta_n          = ", eta_n(n)
-                if ( .not. dynamics%use_ssh_splitexpl_subcycl) then
+                if ( .not. dynamics%use_ssh_se_subcycl) then
                     write(*,*) "d_eta          = ", d_eta(n)
                     write(*,*) "ssh_rhs        = ", ssh_rhs(n)
                     write(*,*) "ssh_rhs_old    = ", ssh_rhs_old(n)
@@ -3467,7 +3467,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! Energy diagnostic contribution
     if (dynamics%ldiag_ke) then
         ! if use solver
-        if (.not. dynamics%use_ssh_splitexpl_subcycl) then
+        if (.not. dynamics%use_ssh_se_subcycl) then
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
             do elem=1, myDim_elem2D
                 nzmax = nlevels(elem)
@@ -3503,7 +3503,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! Energy diagnostic contribution
     if (dynamics%ldiag_ke) then
         ! if use solver
-        if (.not. dynamics%use_ssh_splitexpl_subcycl) then
+        if (.not. dynamics%use_ssh_se_subcycl) then
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
             do elem=1, myDim_elem2D
                 nzmax = nlevels(elem)
@@ -3550,7 +3550,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call impl_vert_visc_ale'//achar(27)//'[0m'
     if(dynamics%use_ivertvisc) then
-        if ( .not. dynamics%use_ssh_splitexpl_subcycl ) then
+        if ( .not. dynamics%use_ssh_se_subcycl ) then
             call impl_vert_visc_ale(dynamics,partit, mesh)
         else
             call impl_vert_visc_ale_vtransp(dynamics, partit, mesh)
@@ -3560,7 +3560,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     if (dynamics%ldiag_ke) then
         ! if use solver
-        if (.not. dynamics%use_ssh_splitexpl_subcycl) then
+        if (.not. dynamics%use_ssh_se_subcycl) then
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
             do elem=1, myDim_elem2D
                 nzmax = nlevels(elem)
@@ -3592,7 +3592,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! Compute SSH via solver
     ! Update stiffness matrix by dhe=hbar(n+1/2)-hbar(n-1/2) on elements, only
     ! needed for zlevel and zstar
-    if (.not. dynamics%use_ssh_splitexpl_subcycl) then
+    if (.not. dynamics%use_ssh_se_subcycl) then
         if (.not. trim(which_ale)=='linfs') call update_stiff_mat_ale(partit, mesh)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_ssh_rhs_ale'//achar(27)//'[0m'
         ! ssh_rhs=-alpha*\nabla\int(U_n+U_rhs)dz-(1-alpha)*...
@@ -3658,7 +3658,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         call update_trim_vel_ale_vtransp(1, dynamics, partit, mesh)   
         t4=MPI_Wtime()
         t5=t4
-    end if ! --> if (.not. dynamics%use_ssh_splitexpl_subcycl) then
+    end if ! --> if (.not. dynamics%use_ssh_se_subcycl) then
     
     !___________________________________________________________________________
     ! Do horizontal and vertical scaling of GM/Redi  diffusivity 
@@ -3689,7 +3689,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! The main step of ALE procedure --> this is were the magic happens --> here 
     ! is decided how change in hbar is distributed over the vertical layers
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call vert_vel_ale'//achar(27)//'[0m'
-    if ( .not. dynamics%use_ssh_splitexpl_subcycl) then
+    if ( .not. dynamics%use_ssh_se_subcycl) then
         call vert_vel_ale(dynamics, partit, mesh)
     else
         if (trim(which_ale)=='zstar' ) then
@@ -3723,7 +3723,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! Trim to make velocity consistent with BT velocity at n+1/2
     ! Velocity will be used to advance momentum
-    if (dynamics%use_ssh_splitexpl_subcycl) then
+    if (dynamics%use_ssh_se_subcycl) then
         call update_trim_vel_ale_vtransp(2, dynamics, partit, mesh)   
     end if
     

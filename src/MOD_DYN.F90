@@ -122,19 +122,19 @@ TYPE T_DYN
     real(kind=WP)                               :: wsplit_maxcfl = 1.0
     
     ! switch between ssh computation, by solver or split explicite subcycling
-    ! use_ssh_splitexpl_subcycl = .false. --> solver
-    ! use_ssh_splitexpl_subcycl = .true.  --> split explicite subcycling
-    logical                                     :: use_ssh_splitexpl_subcycl = .false.
+    ! use_ssh_se_subcycl = .false. --> solver
+    ! use_ssh_se_subcycl = .true.  --> split explicite subcycling
+    logical                                     :: use_ssh_se_subcycl = .false.
     
     ! barotropic subcycling time-steps and dissipation parameter
-    integer                                     :: splitexpl_BTsteps     = 50
-    real(kind=WP)                               :: splitexpl_BTtheta     = 0.14_WP
-    logical                                     :: splitexpl_bottdrag    = .true.
-    logical                                     :: splitexpl_bdrag_si    = .true.
-    logical                                     :: splitexpl_visc        = .true.
-    real(kind=WP)                               :: splitexpl_visc_gamma0 = 10
-    real(kind=WP)                               :: splitexpl_visc_gamma1 = 2750
-    real(kind=WP)                               :: splitexpl_visc_gamma2 = 0
+    integer                                     :: se_BTsteps     = 50
+    real(kind=WP)                               :: se_BTtheta     = 0.14_WP
+    logical                                     :: se_bottdrag    = .true.
+    logical                                     :: se_bdrag_si    = .true.
+    logical                                     :: se_visc        = .true.
+    real(kind=WP)                               :: se_visc_gamma0 = 10
+    real(kind=WP)                               :: se_visc_gamma1 = 2750
+    real(kind=WP)                               :: se_visc_gamma2 = 0
     
     !___________________________________________________________________________
     ! energy diagnostic part: will be computed inside the model ("hard integration"):
@@ -266,7 +266,7 @@ subroutine WRITE_T_DYN(dynamics, unit, iostat, iomsg)
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%use_freeslip
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%use_wsplit
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%wsplit_maxcfl
-    write(unit, iostat=iostat, iomsg=iomsg) dynamics%use_ssh_splitexpl_subcycl
+    write(unit, iostat=iostat, iomsg=iomsg) dynamics%use_ssh_se_subcycl
     
     !___________________________________________________________________________
     call dynamics%solverinfo%WRITE_T_SOLVERINFO(unit)
@@ -287,7 +287,7 @@ subroutine WRITE_T_DYN(dynamics, unit, iostat, iomsg)
         call write_bin_array(dynamics%fer_w , unit, iostat, iomsg)
         call write_bin_array(dynamics%fer_uv, unit, iostat, iomsg)
     end if
-    if (dynamics%use_ssh_splitexpl_subcycl) then
+    if (dynamics%use_ssh_se_subcycl) then
         call write_bin_array(dynamics%se_uvh       , unit, iostat, iomsg)
         call write_bin_array(dynamics%se_uvBT_rhs , unit, iostat, iomsg)
         call write_bin_array(dynamics%se_uvBT_4AB , unit, iostat, iomsg)
@@ -324,7 +324,7 @@ subroutine READ_T_DYN(dynamics, unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%use_freeslip
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%use_wsplit
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%wsplit_maxcfl
-    read(unit, iostat=iostat, iomsg=iomsg) dynamics%use_ssh_splitexpl_subcycl
+    read(unit, iostat=iostat, iomsg=iomsg) dynamics%use_ssh_se_subcycl
 
     !___________________________________________________________________________
     call dynamics%solverinfo%READ_T_SOLVERINFO(unit)
@@ -345,7 +345,7 @@ subroutine READ_T_DYN(dynamics, unit, iostat, iomsg)
         call read_bin_array(dynamics%fer_w     , unit, iostat, iomsg)
         call read_bin_array(dynamics%fer_uv    , unit, iostat, iomsg)
     end if
-    if (dynamics%use_ssh_splitexpl_subcycl) then
+    if (dynamics%use_ssh_se_subcycl) then
         call read_bin_array(dynamics%se_uvh       , unit, iostat, iomsg)
         call read_bin_array(dynamics%se_uvBT_rhs , unit, iostat, iomsg)
         call read_bin_array(dynamics%se_uvBT_4AB , unit, iostat, iomsg)

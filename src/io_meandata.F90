@@ -621,7 +621,7 @@ CASE ('FORC      ')
 !_______________________________________________________________________________
 ! Split-Explicite subcycling varaibles    
 CASE ('SPLIT-EXPL')
-    if (dynamics%use_ssh_splitexpl_subcycl) then 
+    if (dynamics%use_ssh_se_subcycl) then 
         call def_stream(elem2D, myDim_elem2D , 'ubt'    , 'zonal barotrop. transport' , '?' , dynamics%se_uvBT(1,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(elem2D, myDim_elem2D , 'vbt'    , 'merid. barotrop. transport', '?' , dynamics%se_uvBT(2,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(elem2D, myDim_elem2D , 'ubt_rhs', 'zonal barotrop. transport RHS' , '?' , dynamics%se_uvBT_rhs(1,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
