@@ -2794,8 +2794,9 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
             nzmin = ulevels_nod2D(node)
             if (nzmin==1) Wvel(nzmin, node)=Wvel(nzmin, node)-water_flux(node) 
         end do ! --> do node=1, myDim_nod2D
+!$OMP END PARALLEL DO        
     end if
-!$OMP END PARALLEL DO
+
 
     !___________________________________________________________________________
 !$OMP MASTER    
