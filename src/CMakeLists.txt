@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.9)
 
 project(fesom C Fortran)
 
+find_package(MPI REQUIRED)
+
+#TODO: these machine specific changes must be done using cmake toolchain then here otherwise will make cmake another raps. 
 if(DEFINED ENV{FESOM_PLATFORM_STRATEGY})
    set(FESOM_PLATFORM_STRATEGY $ENV{FESOM_PLATFORM_STRATEGY} CACHE STRING "switch to platform specific compile settings, this is usually determined via the env.sh script")
 else()
@@ -19,6 +22,7 @@ else()
    option(ALBEDO_INTELMPI_WORKAROUNDS "workaround for performance issues on albedo" OFF)
 endif()
 
+#TODO: these machine specific changes must be done using cmake toolchain then here otherwise will make cmake another raps. 
 
 if(ALEPH_CRAYMPICH_WORKAROUNDS)
    # todo: enable these options only for our targets
@@ -35,6 +39,7 @@ if(ALBEDO_INTELMPI_WORKAROUNDS)
    add_compile_options(-DDISABLE_PARALLEL_RESTART_READ)
 endif()
 
+#TODO: this machine specific block can easyly go in  cmake toolchain.
 if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
    message(STATUS "multithreading disabled for Levante") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
@@ -72,9 +77,15 @@ elseif(${BUILD_FESOM_AS_LIBRARY})
 else()
    file(GLOB sources_Fortran ${src_home}/*.F90)
 endif()
+
+if(${USE_MULTIO})
+   list(APPEND sources_Fortran ${src_home}/ifs_interface/iom.F90 ${src_home}/ifs_interface/mpp_io.F90)
+endif()
+
+
 #list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_partition_init.F90)
 file(GLOB sources_C ${src_home}/*.c)
-list(REMOVE_ITEM sources_C ${src_home}/psolve_feom.c) # does the file still exist?
+#list(REMOVE_ITEM sources_C ${src_home}/psolve_feom.c) # this file doesn't exist! please check and remove this
 
 # generate a custom file from fesom_version_info.F90 which includes the current git SHA
 set(FESOM_ORIGINAL_VERSION_FILE ${src_home}/fesom_version_info.F90)
@@ -101,7 +112,10 @@ add_subdirectory(../lib/parms ${PROJECT_BINARY_DIR}/parms)
 
 add_subdirectory(async_threads_cpp)
 
-include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindNETCDF.cmake)
+set(CMAKE_MODULE_PATH ${CURRENT_LIST_DIR}../cmake)
+
+find_package(NETCDF REQUIRED) 
+#include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindNETCDF.cmake)
 
 if(${BUILD_FESOM_AS_LIBRARY})
   add_library(${PROJECT_NAME}_C ${sources_C})
@@ -146,6 +160,7 @@ endif()
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
    if(${BUILD_FESOM_AS_LIBRARY})
+        # TODO: not the best idea to use -xHost will stop from cross compiling tests in CI
         target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -xHost -ip -init=zero -no-wrap-margin -fpe0) # add -fpe0 for RAPS environment
    else()
         target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -ip -init=zero -no-wrap-margin)
@@ -193,6 +208,8 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
    endif()
 endif()
 if(${BUILD_FESOM_AS_LIBRARY})
+
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON) # not sure below are needed anymore
   target_compile_options(${PROJECT_NAME} PRIVATE -fPIC)
   target_compile_options(${PROJECT_NAME}_C PRIVATE -fPIC)
 endif()
@@ -201,7 +218,14 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTO
 target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} async_threads_cpp)
+target_link_libraries(${PROJECT_NAME} async_threads_cpp)	
+
+# MULTIO
+if(${USE_MULTIO})
+    find_package(MULTIO REQUIRED)
+    target_link_libraries(${PROJECT_NAME} ${MULTIO_LIBRARIES})
+    target_include_directories(${PROJECT_NAME} PRIVATE ${MULTIO_INCLUDE_DIRS})
+endif()
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 if(${ENABLE_OPENMP} AND NOT ${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray)
    target_compile_options(${PROJECT_NAME} PRIVATE ${OpenMP_Fortran_FLAGS}) # currently we only have OpenMP in the Fortran part
@@ -213,9 +237,13 @@ set(FESOM_INSTALL_PREFIX "${CMAKE_CURRENT_LIST_DIR}/.." CACHE FILEPATH "director
 if(${BUILD_FESOM_AS_LIBRARY})
    install(TARGETS ${PROJECT_NAME} DESTINATION "${FESOM_INSTALL_PREFIX}/lib")
    install(TARGETS ${PROJECT_NAME}_C DESTINATION "${FESOM_INSTALL_PREFIX}/lib")
+   # below may be needed if we want to use fesom in ec-bundle
+   #install(TARGETS ${PROJECT_NAME} EXPORT ifs_sp-targets DESTINATION "${FESOM_INSTALL_PREFIX}/lib")
+   #install(TARGETS ${PROJECT_NAME}_C EXPORT ifs_sp-targets DESTINATION "${FESOM_INSTALL_PREFIX}/lib")
+
 else()
    set(FESOM_INSTALL_FILEPATH "${FESOM_INSTALL_PREFIX}/bin/fesom.x")
-get_filename_component(FESOM_INSTALL_PATH ${FESOM_INSTALL_FILEPATH} DIRECTORY)
-get_filename_component(FESOM_INSTALL_NAME ${FESOM_INSTALL_FILEPATH} NAME)
-install(PROGRAMS ${PROJECT_BINARY_DIR}/${PROJECT_NAME} DESTINATION ${FESOM_INSTALL_PATH} RENAME ${FESOM_INSTALL_NAME})
+   get_filename_component(FESOM_INSTALL_PATH ${FESOM_INSTALL_FILEPATH} DIRECTORY)
+   get_filename_component(FESOM_INSTALL_NAME ${FESOM_INSTALL_FILEPATH} NAME)
+   install(PROGRAMS ${PROJECT_BINARY_DIR}/${PROJECT_NAME} DESTINATION ${FESOM_INSTALL_PATH} RENAME ${FESOM_INSTALL_NAME})
 endif()
