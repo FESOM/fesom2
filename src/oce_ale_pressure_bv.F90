@@ -74,6 +74,19 @@ module pressure_force_4_linfs_easypgf_interface
     end subroutine
   end interface
 end module
+module pressure_force_4_linfs_easypgf_fc_interface
+  interface
+    subroutine pressure_force_4_linfs_easypgf_fc(tracers, partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      USE MOD_TRACER
+      type(t_tracer), intent(in),     target :: tracers
+      type(t_partit), intent(inout),  target :: partit
+      type(t_mesh),   intent(in),     target :: mesh
+    end subroutine
+  end interface
+end module
 module pressure_force_4_linfs_cubicspline_interface
   interface
     subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
@@ -110,6 +123,19 @@ end module
 module pressure_force_4_zxxxx_easypgf_interface
   interface
     subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      USE MOD_TRACER
+      type(t_mesh),   intent(in) ,    target :: mesh
+      type(t_partit), intent(inout),  target :: partit
+      type(t_tracer), intent(in),     target :: tracers
+    end subroutine
+  end interface
+end module
+module pressure_force_4_zxxxx_easypgf_fc_interface
+  interface
+    subroutine pressure_force_4_zxxxx_easypgf_fc(tracers, partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
       USE MOD_PARSUP
@@ -318,9 +344,9 @@ subroutine pressure_bv(tracers, partit, mesh)
         !!PS do nz=1, nl1
         do nz=nzmin, nzmax-1
             !___________________________________________________________________
-            rho(nz) = bulk_0(nz) + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
+            rho(nz) = bulk_0(nz) + Z_3d_n_fc(nz,node)*(bulk_pz(nz)   + Z_3d_n_fc(nz,node)*bulk_pz2(nz))
             !!PS rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node))-density_0
-            rho(nz) = rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node)*real(state_equation))-density_ref(nz,node)
+            rho(nz) = rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n_fc(nz,node)*real(state_equation))-density_ref(nz,node)
             density_m_rho0(nz,node) = rho(nz)
             
             !___________________________________________________________________
@@ -328,15 +354,15 @@ subroutine pressure_bv(tracers, partit, mesh)
             ! --> bring density of surface point adiabatically to the same 
             !     depth level as the deep point --> than calculate bouyancy 
             !     difference
-            rho_surf=bulk_0(nzmin)   + Z_3d_n(nz,node)*(bulk_pz(nzmin)   + Z_3d_n(nz,node)*bulk_pz2(nzmin))
+            rho_surf=bulk_0(nzmin)   + Z_3d_n_fc(nz,node)*(bulk_pz(nzmin)   + Z_3d_n_fc(nz,node)*bulk_pz2(nzmin))
             !!PS rho_surf=rho_surf*rhopot(nzmin)/(rho_surf+0.1_WP*Z_3d_n(nz,node))-density_0
-            rho_surf=rho_surf*rhopot(nzmin)/(rho_surf+0.1_WP*Z_3d_n(nz,node)*real(state_equation)) !-density_ref(nzmin,node)
+            rho_surf=rho_surf*rhopot(nzmin)/(rho_surf+0.1_WP*Z_3d_n_fc(nz,node)*real(state_equation)) !-density_ref(nzmin,node)
             
             !!PS dbsfc1(nz) = -g * ( rho_surf - rho(nz) ) / (rho(nz)+density_0)      ! this is also required when KPP is ON
             !!PS dbsfc1(nz) = -g * density_0_r * ( rho_surf - rho(nz) )
             dbsfc1(nz) = -g * ( rho_surf - (rho(nz)+density_ref(nz,node)) ) / (rho(nz)+density_ref(nz,node))      ! this is also required when KPP is ON
             
-            db_max = max(dbsfc1(nz)/abs(Z_3d_n(nzmin,node)-Z_3d_n(max(nz, nzmin+1),node)), db_max)
+            db_max = max(dbsfc1(nz)/abs(Z_3d_n_fc(nzmin,node)-Z_3d_n_fc(max(nz, nzmin+1),node)), db_max)
         end do
         
         dbsfc1(nzmax)=dbsfc1(nzmax-1)
@@ -363,8 +389,10 @@ subroutine pressure_bv(tracers, partit, mesh)
                         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
                 end select
                 !_______________________________________________________________
-                rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
-                rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node)*real(state_equation))-density_ref(nz,node)
+!PS                 rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
+!PS                 rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node)*real(state_equation))-density_ref(nz,node)
+                rho(nz)= bulk_0(nz)   + Z_3d_n_fc(nz,node)*(bulk_pz(nz)   + Z_3d_n_fc(nz,node)*bulk_pz2(nz))
+                rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n_fc(nz,node)*real(state_equation))-density_ref(nz,node)
                 density_m_rho0(nz,node) = rho(nz)
             end do
         end if
@@ -382,9 +410,9 @@ subroutine pressure_bv(tracers, partit, mesh)
                 ! --> this as a upper pressure boundary condition incase of a 
                 ! homogenous ocean, with no fluxes and boundary condition creates
                 ! no pressure gradient errors 
-                hpressure(nzmin, node)=0.5_WP*(zbar_3d_n(1,node)-zbar_3d_n(2,node))*rho(1)*g
+                hpressure(nzmin, node)=0.5_WP*(zbar_3d_n_fc(1,node)-zbar_3d_n_fc(2,node))*rho(1)*g
                 do nz=2,nzmin
-                    a=0.5_WP*g*(rho(nz-1)*(zbar_3d_n(nz-1,node)-zbar_3d_n(nz,node))+rho(nz)*(zbar_3d_n(nz,node)-zbar_3d_n(nz+1,node)))
+                    a=0.5_WP*g*(rho(nz-1)*(zbar_3d_n_fc(nz-1,node)-zbar_3d_n_fc(nz,node))+rho(nz)*(zbar_3d_n_fc(nz,node)-zbar_3d_n_fc(nz+1,node)))
                     hpressure(nzmin, node)=hpressure(nzmin, node)+a                
                 end do
                 
@@ -393,7 +421,7 @@ subroutine pressure_bv(tracers, partit, mesh)
                 ! pgf errors 
                 !!PS hpressure(nzmin, node)=-Z_3d_n(nzmin,node)*rho(nzmin)*g
             else
-                hpressure(nzmin, node)=-Z_3d_n(nzmin,node)*rho(nzmin)*g
+                hpressure(nzmin, node)=-Z_3d_n_fc(nzmin,node)*rho(nzmin)*g
             end if 
             
             !___________________________________________________________________
@@ -402,7 +430,7 @@ subroutine pressure_bv(tracers, partit, mesh)
                 ! why 0.5 ... integrate g*rho*dz vertically, integrate half layer 
                 ! thickness of previouse layer and half layer thickness of actual 
                 ! layer to integrate pressure on mid depth level of actual layer
-                a=0.5_WP*g*(rho(nz-1)*hnode(nz-1,node)+rho(nz)*hnode(nz,node))
+                a=0.5_WP*g*(rho(nz-1)*hnode_fc(nz-1,node)+rho(nz)*hnode_fc(nz,node))
                 hpressure(nz, node)=hpressure(nz-1, node)+a
             end do
         end if    
@@ -419,9 +447,9 @@ subroutine pressure_bv(tracers, partit, mesh)
         ! To be CMOR compliant we add MLD3, which is identical to MLD2, except 
         ! for the critical density threshold at 0.03, rather than 0.125 kg/m³
         ! BV frequency:  bvfreq(nl,:), squared value is stored   
-        MLD1(node)=Z_3d_n(nzmin+1,node)
-        MLD2(node)=Z_3d_n(nzmin+1,node)
-        MLD3(node)=Z_3d_n(nzmin+1,node)
+        MLD1(node)=Z_3d_n_fc(nzmin+1,node)
+        MLD2(node)=Z_3d_n_fc(nzmin+1,node)
+        MLD3(node)=Z_3d_n_fc(nzmin+1,node)
         MLD1_ind(node)=nzmin+1
         MLD2_ind(node)=nzmin+1
         MLD3_ind(node)=nzmin+1
@@ -430,12 +458,12 @@ subroutine pressure_bv(tracers, partit, mesh)
         flag2=.true.
         flag3=.true.
         do nz=nzmin+1,nzmax-1
-            zmean   = 0.5_WP*sum(Z_3d_n(nz-1:nz, node))
+            zmean   = 0.5_WP*sum(Z_3d_n_fc(nz-1:nz, node))
             bulk_up = bulk_0(nz-1) + zmean*(bulk_pz(nz-1) + zmean*bulk_pz2(nz-1)) 
             bulk_dn = bulk_0(nz)   + zmean*(bulk_pz(nz)   + zmean*bulk_pz2(nz))
             rho_up  = bulk_up*rhopot(nz-1) / (bulk_up + 0.1_WP*zmean*real(state_equation))  
             rho_dn  = bulk_dn*rhopot(nz)   / (bulk_dn + 0.1_WP*zmean*real(state_equation))
-            dz_inv  = 1.0_WP/(Z_3d_n(nz-1,node)-Z_3d_n(nz,node))  
+            dz_inv  = 1.0_WP/(Z_3d_n_fc(nz-1,node)-Z_3d_n_fc(nz,node))  
             !_______________________________________________________________
             ! squared brunt väisälä frequence N^2 --> N^2>0 stratification is 
             ! stable, vertical elongated parcel is accelaratedtowards 
@@ -450,26 +478,26 @@ subroutine pressure_bv(tracers, partit, mesh)
             ! MLD is the shallowest depth where the local buoyancy gradient matches the maximum buoyancy gradient 
             ! between the surface and any discrete depth within the water column.
             if (bvfreq(nz, node) > db_max .and. flag1) then
-                MLD1(node)    =Z_3d_n(nz, node)
+                MLD1(node)    =Z_3d_n_fc(nz, node)
                 MLD1_ind(node)=nz
                 flag1=.false.
             end if
             
             ! another definition of MLD after Levitus
             if ((rhopot(nz)-rhopot(nzmin) > sigma_theta_crit) .and. flag2) then
-                MLD2(node)=MLD2(node)+(Z_3d_n(nz,node)-MLD2(node))/(rhopot(nz)-rhopot(nz-1)+1.e-20)*(rhopot(1)+sigma_theta_crit-rhopot(nz-1))
+                MLD2(node)=MLD2(node)+(Z_3d_n_fc(nz,node)-MLD2(node))/(rhopot(nz)-rhopot(nz-1)+1.e-20)*(rhopot(1)+sigma_theta_crit-rhopot(nz-1))
                 MLD2_ind(node)=nz
                 flag2=.false.
             elseif (flag2) then
-                MLD2(node)=Z_3d_n(nz,node)
+                MLD2(node)=Z_3d_n_fc(nz,node)
             end if
             ! another definition of MLD after Griffies 2016 (https://doi.org/10.5194/gmd-9-3231-2016)
             if ((rhopot(nz)-rhopot(nzmin) > sigma_theta_crit_cmor) .and. flag3) then
-                MLD3(node)=MLD3(node)+(Z_3d_n(nz,node)-MLD3(node))/(rhopot(nz)-rhopot(nz-1)+1.e-20)*(rhopot(1)+sigma_theta_crit_cmor-rhopot(nz-1))
+                MLD3(node)=MLD3(node)+(Z_3d_n_fc(nz,node)-MLD3(node))/(rhopot(nz)-rhopot(nz-1)+1.e-20)*(rhopot(1)+sigma_theta_crit_cmor-rhopot(nz-1))
                 MLD3_ind(node)=nz
                 flag3=.false.
             elseif (flag3) then
-                MLD3(node)=Z_3d_n(nz,node)
+                MLD3(node)=Z_3d_n_fc(nz,node)
             end if
         end do
         
@@ -547,6 +575,8 @@ subroutine pressure_force_4_linfs(tracers, partit, mesh)
             call pressure_force_4_linfs_cubicspline(partit, mesh)
         elseif (trim(which_pgf)=='easypgf') then
             call pressure_force_4_linfs_easypgf(tracers, partit, mesh)    
+        elseif (trim(which_pgf)=='easypgf_fc') then
+            call pressure_force_4_linfs_easypgf_fc(tracers, partit, mesh)        
         else
             write(*,*) '________________________________________________________'
             write(*,*) ' --> ERROR: the choosen form of pressure gradient       '
@@ -1429,6 +1459,113 @@ end subroutine pressure_force_4_linfs_easypgf
 !
 !
 !===============================================================================
+! Calculate pressure gradient force (PGF) 
+! First coded by P. Scholz for FESOM2.0, 08.02.2019
+subroutine pressure_force_4_linfs_easypgf_fc(tracers, partit, mesh)
+    use o_PARAM
+    use MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use MOD_TRACER
+    use o_ARRAYS
+    use g_config
+    use densityJM_components_interface
+    use density_linear_interface
+    implicit none
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit
+    type(t_tracer), intent(in),     target :: tracers    
+    integer                                :: elem, elnodes(3), nle, ule, nlz, idx(3),ni
+    real(kind=WP)                          :: int_dp_dx(2), drho_dx, aux_sum
+    real(kind=WP)                          :: dx10(3), dx20(3), dx21(3)
+    real(kind=WP)                          :: t0(3), dt10(3), dt21(3)
+    real(kind=WP)                          :: s0(3), ds10(3), ds21(3)
+    real(kind=WP)                          :: rho_at_Zn(3), temp_at_Zn(3), salt_at_Zn(3), drho_dz(3), aux_dref
+    real(kind=WP)                          :: rhopot(3), bulk_0(3), bulk_pz(3), bulk_pz2(3)
+    real(kind=WP)                          :: dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2
+    real(kind=WP)                          :: zbar_n(mesh%nl), z_n(mesh%nl-1)
+    real(kind=WP), dimension(:,:), pointer :: temp, salt
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    temp=>tracers%data(1)%values(:,:)
+    salt=>tracers%data(2)%values(:,:)
+
+    !___________________________________________________________________________
+    ! loop over triangular elemments
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nlz, idx, ni, int_dp_dx, drho_dx, aux_sum, dx10, dx20, dx21, t0, dt10, dt21, s0, ds10, ds21, &
+!$OMP                                  rho_at_Zn, temp_at_Zn, salt_at_Zn, drho_dz, aux_dref, rhopot, bulk_0, bulk_pz, bulk_pz2, dref_rhopot, dref_bulk_0,    &
+!$OMP                                  dref_bulk_pz, dref_bulk_pz2, zbar_n, z_n                                                                              )
+!$OMP DO
+    do elem=1, myDim_elem2D
+        !_______________________________________________________________________
+        ! nle...number of mid-depth levels at elem
+        nle     = nlevels(elem)-1
+        ule     = ulevels(elem)
+        
+        ! node indices of elem 
+        elnodes = elem2D_nodes(:,elem)
+        
+        !_______________________________________________________________________
+        ! calculate mid depth element level --> Z_e
+        ! nle...number of mid-depth levels at elem
+        zbar_n       = 0.0_WP
+        Z_n          = 0.0_WP
+        zbar_n(nle+1)= zbar_e_bot_fc(elem)
+        Z_n(nle)     = zbar_n(nle+1) + helem_fc(nle,elem)*0.5_WP
+        do nlz=nle,ule+1,-1
+            zbar_n(nlz) = zbar_n(nlz+1) + helem_fc(nlz,elem)
+            Z_n(nlz-1)  = zbar_n(nlz)   + helem_fc(nlz-1,elem)*0.5_WP
+        end do
+        zbar_n(ule) = zbar_n(ule+1) + helem_fc(ule,elem)
+        
+        
+        !_______________________________________________________________________
+        ! calculate pressure gradient for surface layer
+        nlz=ule
+        !___________________________________________________________________
+        ! zonal gradients
+        drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+        aux_sum         = drho_dx*helem_fc(nlz,elem)*g/density_0
+        pgf_x(nlz,elem) = aux_sum*0.5_WP
+        int_dp_dx(1)    = aux_sum
+            
+        !___________________________________________________________________
+        ! meridional gradients
+        drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+        aux_sum         = drho_dx*helem_fc(nlz,elem)*g/density_0
+        pgf_y(nlz,elem) = aux_sum*0.5_WP
+        int_dp_dx(2)    = aux_sum
+        
+        !_______________________________________________________________________
+        ! calculate pressure gradient for surface layer +1 until one layer above bottom
+        do nlz=ule+1,nle
+            !___________________________________________________________________
+            ! - g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
+            ! --> in case linfs: dz_dx == 0.0
+            ! zonal gradients
+            drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+            aux_sum         = drho_dx*helem_fc(nlz,elem)*g/density_0
+            pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
+            int_dp_dx(1)    = int_dp_dx(1) + aux_sum
+            
+            ! meridional gradients
+            drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+            aux_sum         = drho_dx*helem_fc(nlz,elem)*g/density_0
+            pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
+            int_dp_dx(2)    = int_dp_dx(2) + aux_sum
+            
+        end do ! --> do nlz=1,nle-1
+        
+    end do ! --> do elem=1, myDim_elem2D
+!$OMP END DO
+!$OMP END PARALLEL
+end subroutine pressure_force_4_linfs_easypgf_fc
+!
+!
+!
+!===============================================================================
 ! Calculate pressure gradient force (PGF) via cubicspline used in FEOSM1.4
 ! First coded by Q. Wang for FESOM1.4, adapted by P. Scholz for FESOM2.0, 08.02.2019
 subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
@@ -1881,8 +2018,8 @@ subroutine pressure_force_4_zxxxx(tracers, partit, mesh)
         call pressure_force_4_zxxxx_cubicspline(partit, mesh)
     elseif (trim(which_pgf)=='easypgf'    ) then
         call pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
-    elseif (trim(which_pgf)=='easypgf_fullbc'    ) then
-        call pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)        
+    elseif (trim(which_pgf)=='easypgf_fc'    ) then
+        call pressure_force_4_zxxxx_easypgf_fc(tracers, partit, mesh)        
     else
         write(*,*) '________________________________________________________'
         write(*,*) ' --> ERROR: the choosen form of pressure gradient       '
@@ -2795,7 +2932,7 @@ end subroutine pressure_force_4_zxxxx_easypgf
 !
 !
 !===============================================================================
-subroutine pressure_force_4_zxxxx_easypgf_fullbc(tracers, partit, mesh)
+subroutine pressure_force_4_zxxxx_easypgf_fc(tracers, partit, mesh)
     use o_PARAM
     use MOD_MESH
     USE MOD_PARTIT
@@ -2846,13 +2983,13 @@ subroutine pressure_force_4_zxxxx_easypgf_fullbc(tracers, partit, mesh)
         ! nle...number of mid-depth levels at elem
         zbar_n       = 0.0_WP
         Z_n          = 0.0_WP
-        zbar_n(nle+1)= zbar_e_bot(elem)
-        Z_n(nle)     = zbar_n(nle+1) + helem(nle,elem)*0.5_WP
+        zbar_n(nle+1)= zbar_e_bot_fc(elem)
+        Z_n(nle)     = zbar_n(nle+1) + helem_fc(nle,elem)*0.5_WP
         do nlz=nle,ule+1,-1
-            zbar_n(nlz) = zbar_n(nlz+1) + helem(nlz,elem)
-            Z_n(nlz-1)  = zbar_n(nlz)   + helem(nlz-1,elem)*0.5_WP
+            zbar_n(nlz) = zbar_n(nlz+1) + helem_fc(nlz,elem)
+            Z_n(nlz-1)  = zbar_n(nlz)   + helem_fc(nlz-1,elem)*0.5_WP
         end do
-        zbar_n(ule)  = zbar_n(ule+1) + helem(ule,elem)
+        zbar_n(ule)  = zbar_n(ule+1) + helem_fc(ule,elem)
         
         !_______________________________________________________________________
         aux_dref     = density_0
@@ -2909,9 +3046,9 @@ subroutine pressure_force_4_zxxxx_easypgf_fullbc(tracers, partit, mesh)
                 ! --> do second order newtonian surface boundary interpolation
                 !___________________________________________________________________
                 ! compute interpolation coefficients
-                dx10(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
-                dx21(ni)   = Z_3d_n(nlz+2,elnodes(ni))-Z_3d_n(nlz+1,elnodes(ni))
-                dx20(ni)   = Z_3d_n(nlz+2,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
+                dx10(ni)   = Z_3d_n_fc(nlz+1,elnodes(ni))-Z_3d_n_fc(nlz  ,elnodes(ni))
+                dx21(ni)   = Z_3d_n_fc(nlz+2,elnodes(ni))-Z_3d_n_fc(nlz+1,elnodes(ni))
+                dx20(ni)   = Z_3d_n_fc(nlz+2,elnodes(ni))-Z_3d_n_fc(nlz  ,elnodes(ni))
                 
                 !!PS f0(ni)     = density_m_rho0(nlz  ,elnodes(ni))
                 !!PS df10(ni)   = density_m_rho0(nlz+1,elnodes(ni))-density_m_rho0(nlz  ,elnodes(ni))
@@ -2927,13 +3064,13 @@ subroutine pressure_force_4_zxxxx_easypgf_fullbc(tracers, partit, mesh)
                 !___________________________________________________________________
                 ! interpoalte vertice temp and salinity to elemental level Z_n
                 temp_at_Zn(ni) = t0(ni) &
-                                + dt10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n(nlz,elnodes(ni))) & 
+                                + dt10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n_fc(nlz,elnodes(ni))) & 
                                 + (dx10(ni)*dt21(ni)-dx21(ni)*dt10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))* &
-                                  (Z_n(nlz)-Z_3d_n(nlz+1,elnodes(ni)))*(Z_n(nlz)-Z_3d_n(nlz,elnodes(ni)))
+                                  (Z_n(nlz)-Z_3d_n_fc(nlz+1,elnodes(ni)))*(Z_n(nlz)-Z_3d_n_fc(nlz,elnodes(ni)))
                 salt_at_Zn(ni) = s0(ni) &
-                                + ds10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n(nlz,elnodes(ni))) & 
+                                + ds10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n_fc(nlz,elnodes(ni))) & 
                                 + (dx10(ni)*ds21(ni)-dx21(ni)*ds10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))* &
-                                  (Z_n(nlz)-Z_3d_n(nlz+1,elnodes(ni)))*(Z_n(nlz)-Z_3d_n(nlz,elnodes(ni)))
+                                  (Z_n(nlz)-Z_3d_n_fc(nlz+1,elnodes(ni)))*(Z_n(nlz)-Z_3d_n_fc(nlz,elnodes(ni)))
                 !___________________________________________________________________
                 ! compute density from state equation 
                 select case(state_equation)
@@ -2958,9 +3095,9 @@ subroutine pressure_force_4_zxxxx_easypgf_fullbc(tracers, partit, mesh)
                 ! --> do normal interpolation
                 !___________________________________________________________________
                 ! compute interpolation coefficients
-                dx10(ni)   = Z_3d_n(nlz  ,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
-                dx21(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
-                dx20(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
+                dx10(ni)   = Z_3d_n_fc(nlz  ,elnodes(ni))-Z_3d_n_fc(nlz-1,elnodes(ni))
+                dx21(ni)   = Z_3d_n_fc(nlz+1,elnodes(ni))-Z_3d_n_fc(nlz  ,elnodes(ni))
+                dx20(ni)   = Z_3d_n_fc(nlz+1,elnodes(ni))-Z_3d_n_fc(nlz-1,elnodes(ni))
                 
                 !!PS f0(ni)     = density_m_rho0(nlz-1,elnodes(ni))
                 !!PS df10(ni)   = density_m_rho0(nlz  ,elnodes(ni))-density_m_rho0(nlz-1,elnodes(ni))
@@ -2976,13 +3113,13 @@ subroutine pressure_force_4_zxxxx_easypgf_fullbc(tracers, partit, mesh)
                 !___________________________________________________________________               
                 ! interpoalte vertice temp and salinity to elemental level Z_n
                 temp_at_Zn(ni) = t0(ni) &
-                                + dt10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni))) & 
+                                + dt10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n_fc(nlz-1,elnodes(ni))) & 
                                 + (dx10(ni)*dt21(ni)-dx21(ni)*dt10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))* &
-                                  (Z_n(nlz)-Z_3d_n(nlz,elnodes(ni)))*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni)))
+                                  (Z_n(nlz)-Z_3d_n_fc(nlz,elnodes(ni)))*(Z_n(nlz)-Z_3d_n_fc(nlz-1,elnodes(ni)))
                 salt_at_Zn(ni) = s0(ni) &
-                                + ds10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni))) & 
+                                + ds10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n_fc(nlz-1,elnodes(ni))) & 
                                 + (dx10(ni)*ds21(ni)-dx21(ni)*ds10(ni))/(dx20(ni)*dx21(ni)*dx10(ni))* &
-                                  (Z_n(nlz)-Z_3d_n(nlz,elnodes(ni)))*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes(ni)))
+                                  (Z_n(nlz)-Z_3d_n_fc(nlz,elnodes(ni)))*(Z_n(nlz)-Z_3d_n_fc(nlz-1,elnodes(ni)))
                 !___________________________________________________________________
                 ! compute density from state equation 
                 select case(state_equation)
@@ -3012,13 +3149,13 @@ subroutine pressure_force_4_zxxxx_easypgf_fullbc(tracers, partit, mesh)
         !_______________________________________________________________________
         ! zonal surface pressure gradients
         drho_dx         = sum(gradient_sca(1:3,elem)*rho_at_Zn)
-        aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+        aux_sum         = drho_dx*helem_fc(nlz,elem)*g/density_0
         pgf_x(nlz,elem) = aux_sum*0.5_WP
         int_dp_dx(1)    = aux_sum
         !_______________________________________________________________________
         ! meridional surface pressure gradients
         drho_dy         = sum(gradient_sca(4:6,elem)*rho_at_Zn)
-        aux_sum         = drho_dy*helem(nlz,elem)*g/density_0
+        aux_sum         = drho_dy*helem_fc(nlz,elem)*g/density_0
         pgf_y(nlz,elem) = aux_sum*0.5_WP
         int_dp_dx(2)    = aux_sum
         
@@ -3036,9 +3173,9 @@ subroutine pressure_force_4_zxxxx_easypgf_fullbc(tracers, partit, mesh)
             
             !___________________________________________________________________
             ! compute interpolation coefficients
-            dx10   = Z_3d_n(nlz  ,elnodes)-Z_3d_n(nlz-1,elnodes)
-            dx21   = Z_3d_n(nlz+1,elnodes)-Z_3d_n(nlz  ,elnodes)
-            dx20   = Z_3d_n(nlz+1,elnodes)-Z_3d_n(nlz-1,elnodes)
+            dx10   = Z_3d_n_fc(nlz  ,elnodes)-Z_3d_n_fc(nlz-1,elnodes)
+            dx21   = Z_3d_n_fc(nlz+1,elnodes)-Z_3d_n_fc(nlz  ,elnodes)
+            dx20   = Z_3d_n_fc(nlz+1,elnodes)-Z_3d_n_fc(nlz-1,elnodes)
             
             !!PS f0     = density_m_rho0(nlz-1,elnodes)
             !!PS df10   = density_m_rho0(nlz  ,elnodes)-density_m_rho0(nlz-1,elnodes)
@@ -3054,15 +3191,15 @@ subroutine pressure_force_4_zxxxx_easypgf_fullbc(tracers, partit, mesh)
             !___________________________________________________________________               
             ! interpoalte vertice temp and salinity to elemental level Z_n
             temp_at_Zn = t0 &
-                            + dt10/dx10*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes)) & 
+                            + dt10/dx10*(Z_n(nlz)-Z_3d_n_fc(nlz-1,elnodes)) & 
                             + (dx10*dt21-dx21*dt10)/(dx20*dx21*dx10)* &
-                                ((/1.0_WP,1.0_WP,1.0_WP/)*Z_n(nlz)-Z_3d_n(nlz,elnodes))*&
-                                ((/1.0_WP,1.0_WP,1.0_WP/)*Z_n(nlz)-Z_3d_n(nlz-1,elnodes))
+                                ((/1.0_WP,1.0_WP,1.0_WP/)*Z_n(nlz)-Z_3d_n_fc(nlz,elnodes))*&
+                                ((/1.0_WP,1.0_WP,1.0_WP/)*Z_n(nlz)-Z_3d_n_fc(nlz-1,elnodes))
             salt_at_Zn = s0 &
-                            + ds10/dx10*(Z_n(nlz)-Z_3d_n(nlz-1,elnodes)) & 
+                            + ds10/dx10*(Z_n(nlz)-Z_3d_n_fc(nlz-1,elnodes)) & 
                             + (dx10*ds21-dx21*ds10)/(dx20*dx21*dx10)* &
-                                ((/1.0_WP,1.0_WP,1.0_WP/)*Z_n(nlz)-Z_3d_n(nlz,elnodes))*&
-                                ((/1.0_WP,1.0_WP,1.0_WP/)*Z_n(nlz)-Z_3d_n(nlz-1,elnodes))
+                                ((/1.0_WP,1.0_WP,1.0_WP/)*Z_n(nlz)-Z_3d_n_fc(nlz,elnodes))*&
+                                ((/1.0_WP,1.0_WP,1.0_WP/)*Z_n(nlz)-Z_3d_n_fc(nlz-1,elnodes))
             !___________________________________________________________________
             ! compute density from state equation 
             select case(state_equation)
@@ -3089,14 +3226,14 @@ subroutine pressure_force_4_zxxxx_easypgf_fullbc(tracers, partit, mesh)
             !___________________________________________________________________
             ! zonal gradients
             drho_dx         = sum(gradient_sca(1:3,elem)*rho_at_Zn)
-            aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+            aux_sum         = drho_dx*helem_fc(nlz,elem)*g/density_0
             pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
             int_dp_dx(1)    = int_dp_dx(1) + aux_sum
             
             !___________________________________________________________________
             ! meridional gradients
             drho_dy         = sum(gradient_sca(4:6,elem)*rho_at_Zn)
-            aux_sum         = drho_dy*helem(nlz,elem)*g/density_0
+            aux_sum         = drho_dy*helem_fc(nlz,elem)*g/density_0
             pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
             int_dp_dx(2)    = int_dp_dx(2) + aux_sum
         end do ! --> do nlz=2,nle-1
@@ -3149,7 +3286,7 @@ subroutine pressure_force_4_zxxxx_easypgf_fullbc(tracers, partit, mesh)
     end do ! --> do elem=1, myDim_elem2D
 !$OMP END DO
 !$OMP END PARALLEL
-end subroutine pressure_force_4_zxxxx_easypgf_fullbc
+end subroutine pressure_force_4_zxxxx_easypgf_fc
 !
 !
 !
@@ -3403,7 +3540,8 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
      t1 = TF1(nz,n)*1.00024_WP
      s1 = SF1(nz,n)
     !!PS      p1 = abs(Z(nz)) 
-     p1 = abs(Z_3d_n(nz,n)) 
+!PS      p1 = abs(Z_3d_n(nz,n))
+     p1 = abs(Z_3d_n_fc(nz,n)) 
      
      t1_2 = t1*t1
      t1_3 = t1_2*t1
@@ -3705,7 +3843,7 @@ subroutine init_ref_density(partit, mesh)
         density_ref(:, node) = 0.0_WP
         nzmin = 1
         nzmax = nlevels_nod2d(node)-1
-        auxz=min(0.0,Z_3d_n(nzmin,node))
+        auxz=min(0.0,Z_3d_n_fc(nzmin,node))
         
         !_______________________________________________________________________
         call densityJM_components(density_ref_T, density_ref_S, bulk_0, bulk_pz, bulk_pz2, rhopot, partit, mesh)
@@ -3714,7 +3852,7 @@ subroutine init_ref_density(partit, mesh)
         
         !_______________________________________________________________________
         do nz=nzmin+1,nzmax
-            auxz=Z_3d_n(nz,node)
+            auxz=Z_3d_n_fc(nz,node)
             rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
             density_ref(nz,node) = rho*rhopot/(rho+0.1_WP*auxz)
         end do

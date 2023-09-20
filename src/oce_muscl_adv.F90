@@ -523,3 +523,225 @@ type(t_tracer_work), intent(inout), target :: twork
 !$OMP END DO
 !$OMP END PARALLEL
 END SUBROUTINE fill_up_dn_grad
+!
+!
+!_______________________________________________________________________________
+SUBROUTINE fill_up_dn_grad_test(twork, partit, mesh)
+! ttx, tty  elemental gradient of tracer 
+USE o_PARAM
+USE MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
+USE MOD_TRACER
+USE o_ARRAYS
+IMPLICIT NONE
+integer                  :: edge, nz, k 
+integer                  :: elem, elem1, ednodes(2), edelems(2), nzmin, nzmax, ednzmin, ednzmax
+real(kind=WP)            :: tvol, tx, ty
+type(t_mesh),        intent(in),    target :: mesh
+type(t_partit),      intent(inout), target :: partit
+type(t_tracer_work), intent(inout), target :: twork
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    !___________________________________________________________________________
+    ! loop over edge segments
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, nz, edelems, elem,  ednzmin, ednzmax, nzmin, nzmax)
+!$OMP DO
+    do edge=1, myDim_edge2D
+        ! local index of element that contribute to edge
+        edelems=edge_tri(:,edge)    
+        ednodes=edges(:,edge)
+        !_______________________________________________________________________
+        ! estimate at which levels edge exists 
+        !                     O
+        !                   ./ \.
+        !                 ./     \.
+        !               ./         \.
+        !             ./      o<-----\.-------------triangle indice edelems(1)
+        !           ./                 \.
+        ! ---------O.--------edge--------O-------------
+        !            \.                 ./
+        !              \.      o<-----./-------------triangle indice edelems(2)
+        !                \.         ./
+        !                  \.     ./
+        !                    \. ./   
+        !                      O
+        ! edge exist at certain depth level only if one of the elements el(1) or 
+        ! el(2) exist at this depth level.
+        
+        ! upper/lower level of elemts that contribute to edge at lest one of these
+        ! triangles has to exist at at a certain depth level, so that this edge 
+        ! can exist at this depth level
+        ednzmin = ulevels(edelems(1))
+        ednzmax = nlevels(edelems(1))-1
+        if (edelems(2)>0) then ! --> if el(2)==0 than edge is boundary edge
+            ednzmin = min(ednzmin, ulevels(edelems(2))  )
+            ednzmax = max(ednzmax, nlevels(edelems(2))-1)
+        end if 
+        
+        !
+        !
+        !_______________________________________________________________________
+        !############################# UPWIND TRIANGLE #########################
+        !case when edge has upwind triangle
+        elem = twork%edge_up_dn_tri(1,edge)
+        if (elem .ne. 0.0_WP) then ! --> edge upwind triangle exist 
+            nzmin = max(ednzmin, ulevels(elem)  )
+            nzmax = min(ednzmax, nlevels(elem)-1)
+            
+            !___________________________________________________________________
+            ! edge exists above the level of the upwind triangle 
+            ! reconstruct tracer gradient from adjacent triangles towards 
+            ! edge node 1
+            do nz=ednzmin, ulevels(elem)-1
+                tvol=0.0_WP
+                tx  =0.0_WP
+                ty  =0.0_WP
+                do k=1, nod_in_elem2D_num(ednodes(1))
+                    elem1=nod_in_elem2D(k,ednodes(1))
+                    if(nlevels(elem1)-1 < nz .or. nz<ulevels(elem1) ) cycle
+                    tvol=tvol+elem_area(elem1)
+                    tx  =tx+tr_xy(1,nz,elem1)*elem_area(elem1)
+                    ty  =ty+tr_xy(2,nz,elem1)*elem_area(elem1)
+                end do
+                ! "reconstructed" tracer gradx, grady for upwind tri
+                twork%edge_up_dn_grad(1,nz,edge)=tx/tvol
+                twork%edge_up_dn_grad(3,nz,edge)=ty/tvol
+            end do
+            
+            !___________________________________________________________________
+            ! edge exist in the depth range of the upwind triangle 
+            do nz=nzmin, nzmax
+                ! tracer gradx, grady for upwind tri
+                twork%edge_up_dn_grad(1,nz,edge)=tr_xy(1,nz,elem)
+                twork%edge_up_dn_grad(3,nz,edge)=tr_xy(2,nz,elem)
+            end do
+            
+            !___________________________________________________________________
+            ! edge exists below the level of the upwind trinagle 
+            ! reconstruct tracer gradient from adjacent triangles towards 
+            ! edge node 1
+            do nz=nlevels(elem), ednzmax
+                tvol=0.0_WP
+                tx  =0.0_WP
+                ty  =0.0_WP
+                do k=1, nod_in_elem2D_num(ednodes(1))
+                    elem1=nod_in_elem2D(k,ednodes(1))
+                    if(nlevels(elem1)-1 < nz .or. nz<ulevels(elem1) ) cycle
+                    tvol=tvol+elem_area(elem1)
+                    tx  =tx+tr_xy(1,nz,elem1)*elem_area(elem1)
+                    ty  =ty+tr_xy(2,nz,elem1)*elem_area(elem1)
+                end do
+                ! "reconstructed" tracer gradx, grady for upwind tri
+                twork%edge_up_dn_grad(1,nz,edge)=tx/tvol
+                twork%edge_up_dn_grad(3,nz,edge)=ty/tvol
+            end do
+            
+        !_______________________________________________________________________
+        ! --> edge upwind triangle does not exist at all 
+        !     reconstruct tracer gradient from adjacent triangles towards 
+        !     edge node 1
+        else  
+            do nz=ednzmin, ednzmax
+                tvol=0.0_WP
+                tx  =0.0_WP
+                ty  =0.0_WP
+                do k=1, nod_in_elem2D_num(ednodes(1))
+                    elem1=nod_in_elem2D(k,ednodes(1))
+                    if(nlevels(elem1)-1 < nz .or. nz<ulevels(elem1) ) cycle
+                    tvol=tvol+elem_area(elem1)
+                    tx  =tx+tr_xy(1,nz,elem1)*elem_area(elem1)
+                    ty  =ty+tr_xy(2,nz,elem1)*elem_area(elem1)
+                end do
+                ! "reconstructed" tracer gradx, grady for upwind tri
+                twork%edge_up_dn_grad(1,nz,edge)=tx/tvol
+                twork%edge_up_dn_grad(3,nz,edge)=ty/tvol
+            end do
+        end if 
+        
+        !
+        !
+        !_______________________________________________________________________
+        !########################### DOWNWIND TRIANGLE #########################
+        ! case when edge has downwind triangle 
+        elem = twork%edge_up_dn_tri(2,edge)
+        if (elem .ne. 0.0_WP) then  ! --> edge downwind triangle exist 
+            nzmin = max(ednzmin, ulevels(elem)  )
+            nzmax = min(ednzmax, nlevels(elem)-1)
+            
+            !___________________________________________________________________
+            ! edge exists above the level of the downwind triangle 
+            ! reconstruct tracer gradient from adjacent triangles towards 
+            ! edge node 1
+            do nz=ednzmin, ulevels(elem)-1
+                tvol=0.0_WP
+                tx  =0.0_WP
+                ty  =0.0_WP
+                do k=1, nod_in_elem2D_num(ednodes(2))
+                    elem1=nod_in_elem2D(k,ednodes(2))
+                    if(nlevels(elem1)-1 < nz .or. nz<ulevels(elem1) ) cycle
+                    tvol=tvol+elem_area(elem1)
+                    tx  =tx+tr_xy(1,nz,elem1)*elem_area(elem1)
+                    ty  =ty+tr_xy(2,nz,elem1)*elem_area(elem1)
+                end do
+                ! "reconstructed" tracer gradx, grady for downwind tri
+                twork%edge_up_dn_grad(2,nz,edge)=tx/tvol
+                twork%edge_up_dn_grad(4,nz,edge)=ty/tvol
+            end do
+            
+            !___________________________________________________________________
+            ! edge exist in the depth range of the downwind triangle 
+            do nz=nzmin, nzmax
+                ! tracer gradx, grady for downwind tri
+                twork%edge_up_dn_grad(2,nz,edge)=tr_xy(1,nz,elem)
+                twork%edge_up_dn_grad(4,nz,edge)=tr_xy(2,nz,elem)
+            end do
+            
+            !___________________________________________________________________
+            ! edge exists below the level of the downwind trinagle 
+            ! reconstruct tracer gradient from adjacent triangles towards 
+            ! edge node 1
+            do nz=nlevels(elem), ednzmax
+                tvol=0.0_WP
+                tx  =0.0_WP
+                ty  =0.0_WP
+                do k=1, nod_in_elem2D_num(ednodes(2))
+                    elem1=nod_in_elem2D(k,ednodes(2))
+                    if(nlevels(elem1)-1 < nz .or. nz<ulevels(elem1) ) cycle
+                    tvol=tvol+elem_area(elem1)
+                    tx  =tx+tr_xy(1,nz,elem1)*elem_area(elem1)
+                    ty  =ty+tr_xy(2,nz,elem1)*elem_area(elem1)
+                end do
+                ! "reconstructed" tracer gradx, grady for downwind tri
+                twork%edge_up_dn_grad(2,nz,edge)=tx/tvol
+                twork%edge_up_dn_grad(4,nz,edge)=ty/tvol
+            end do
+            
+        !_______________________________________________________________________    
+        ! --> edge downwind triangle does not exist at all  
+        !     reconstruct tracer gradient from adjacent triangles towards 
+        !     edge node 2    
+        else  
+            do nz=ednzmin, ednzmax
+                tvol=0.0_WP
+                tx  =0.0_WP
+                ty  =0.0_WP
+                do k=1, nod_in_elem2D_num(ednodes(2))
+                    elem1=nod_in_elem2D(k,ednodes(2))
+                    if(nlevels(elem1)-1 < nz .or. nz<ulevels(elem1) ) cycle
+                    tvol=tvol+elem_area(elem1)
+                    tx  =tx+tr_xy(1,nz,elem1)*elem_area(elem1)
+                    ty  =ty+tr_xy(2,nz,elem1)*elem_area(elem1)
+                end do
+                ! "reconstructed" tracer gradx, grady for downwind tri
+                twork%edge_up_dn_grad(2,nz,edge)=tx/tvol
+                twork%edge_up_dn_grad(4,nz,edge)=ty/tvol
+            end do
+        end if 
+    end do ! --> edge=1, myDim_edge2D
+!$OMP END DO
+!$OMP END PARALLEL
+end subroutine fill_up_dn_grad_test
+

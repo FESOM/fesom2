@@ -680,14 +680,14 @@ end subroutine adv_tra_hor_muscl
            
            !___________________________________________________________________
            ! use downwind triangle to interpolate Tracer to edge center with 
-           ! fancy scheme --> Linear upwind reconstruction
+           ! fancy scheme --> Linear downwind reconstruction
            ! T_n+0.5 = T_n+1 - 1/2*deltax*GRADIENT
            ! --> GRADIENT = 2/3 GRAD_edgecenter + 1/3 GRAD_downwindtri
            ! T_n+0.5 = T_n+1 - 2/6*(T_n+1-T_n) + 1/6*gradT_down
            ! --> edge_up_dn_grad ... contains already elemental tracer gradient 
            !     of up and dn wind triangle
            ! --> Tmean2 ... edge center interpolated Tracer using tracer
-           !     gradient info from upwind triangle
+           !     gradient info from downwind triangle
            Tmean2=ttf(nz, enodes(2))- &
                   (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
                   edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
@@ -699,7 +699,7 @@ end subroutine adv_tra_hor_muscl
             ! --> GRADIENT = 2/3 GRAD_edgecenter + 1/3 GRAD_downwindtri
             ! T_n+0.5 = T_n + 2/6*(T_n+1-T_n) + 1/6*gradT_down
             ! --> Tmean1 ... edge center interpolated Tracer using tracer
-            !     gradient info from downwind triangle
+            !     gradient info from upwind triangle
             Tmean1=ttf(nz, enodes(1))+ &
                    (2.0_WP*(ttf(nz, enodes(2))-ttf(nz,enodes(1)))+ &
                    edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &

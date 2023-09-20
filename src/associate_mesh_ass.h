@@ -67,3 +67,13 @@ zbar_e_bot(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_bot(:)
 zbar_n_srf(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_srf(:)
 zbar_e_srf(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_srf(:)
 
+
+hnode_fc(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)            => mesh%hnode_fc(:,:)
+hnode_new_fc(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)        => mesh%hnode_new_fc(:,:)
+zbar_3d_n_fc(1:mesh%nl, 1:myDim_nod2D+eDim_nod2D)          => mesh%zbar_3d_n_fc(:,:)
+Z_3d_n_fc(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)           => mesh%Z_3d_n_fc(:,:)
+helem_fc(1:mesh%nl-1, 1:myDim_elem2D)                      => mesh%helem_fc(:,:)
+bottom_elem_thickness_fc(1:myDim_elem2D)                   => mesh%bottom_elem_thickness_fc(:)
+bottom_node_thickness_fc(1:myDim_nod2D+eDim_nod2D)         => mesh%bottom_node_thickness_fc(:)
+zbar_n_bot_fc(1:myDim_nod2D+eDim_nod2D)                    => mesh%zbar_n_bot_fc(:)
+zbar_e_bot_fc(1:myDim_elem2D+eDim_elem2D)                  => mesh%zbar_e_bot_fc(:)

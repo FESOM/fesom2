@@ -243,6 +243,7 @@ subroutine init_ale(dynamics, partit, mesh)
     zbar_e_bot(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_bot(:)
     zbar_n_srf(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_srf(:)
     zbar_e_srf(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_srf(:)
+    
     !___initialize______________________________________________________________
     hbar      = 0.0_WP
     hbar_old  = 0.0_WP
@@ -250,6 +251,39 @@ subroutine init_ale(dynamics, partit, mesh)
     hnode     = 0.0_WP
     hnode_new = 0.0_WP
     helem     = 0.0_WP
+    
+    !___________________________________________________________________________
+    !PS for debug partial cell
+    allocate(mesh%hnode_fc(1:nl-1, myDim_nod2D+eDim_nod2D))
+    allocate(mesh%hnode_new_fc(1:nl-1, myDim_nod2D+eDim_nod2D))
+    allocate(mesh%helem_fc(1:nl-1, myDim_elem2D))
+    allocate(mesh%zbar_3d_n_fc(nl,myDim_nod2D+eDim_nod2D))
+    allocate(mesh%Z_3d_n_fc(nl-1,myDim_nod2D+eDim_nod2D)) 
+    allocate(mesh%zbar_n_bot_fc(myDim_nod2D+eDim_nod2D)) 
+    allocate(mesh%zbar_e_bot_fc(myDim_elem2D+eDim_elem2D)) 
+    allocate(mesh%bottom_elem_thickness_fc(myDim_elem2D))
+    allocate(mesh%bottom_node_thickness_fc(myDim_nod2D+eDim_nod2D))
+    
+    hnode_fc(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)               => mesh%hnode_fc(:,:)
+    hnode_new_fc(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)           => mesh%hnode_new_fc(:,:)
+    zbar_3d_n_fc(1:mesh%nl, 1:myDim_nod2D+eDim_nod2D)             => mesh%zbar_3d_n_fc(:,:)
+    Z_3d_n_fc(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)              => mesh%Z_3d_n_fc(:,:)
+    helem_fc(1:mesh%nl-1, 1:myDim_elem2D)                         => mesh%helem_fc(:,:)
+    bottom_elem_thickness_fc(1:myDim_elem2D)                      => mesh%bottom_elem_thickness_fc(:)
+    bottom_node_thickness_fc(1:myDim_nod2D+eDim_nod2D)            => mesh%bottom_node_thickness_fc(:)
+    zbar_n_bot_fc(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_bot_fc(:)
+    zbar_e_bot_fc(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_bot_fc(:)
+    
+    hnode_fc     = 0.0_WP
+    hnode_new_fc = 0.0_WP
+    helem_fc     = 0.0_WP
+    zbar_3d_n_fc = 0.0_WP
+    Z_3d_n_fc    = 0.0_WP
+    zbar_n_bot_fc= 0.0_WP
+    zbar_e_bot_fc= 0.0_WP
+    bottom_elem_thickness_fc = 0.0_WP
+    bottom_node_thickness_fc = 0.0_WP
+    
     !___________________________________________________________________________
     ! calculate thickness of partial bottom layer cells as well as depth depth
     ! of partial cell bootom layer
@@ -300,6 +334,18 @@ subroutine init_ale(dynamics, partit, mesh)
         
         ! in case of partial cells bottom mid depth is different from Z(nzmax-1)
         Z_3d_n(nzmax-1,n) =zbar_3d_n(nzmax-1,n)+(zbar_n_bot(n)-zbar_3d_n(nzmax-1,n))/2;
+        
+        
+        !_______________________________________________________________________
+        !PS debug partiell cells 
+        zbar_3d_n_fc(1:nzmin-1,n)      = zbar(1:nzmin-1);
+        zbar_3d_n_fc(nzmin    ,n)      = zbar_n_srf(n);
+        zbar_3d_n_fc(nzmin+1:nzmax-1,n)= zbar(nzmin+1:nzmax-1);
+        zbar_3d_n_fc(nzmax    ,n)      = zbar_n_bot_fc(n);
+        Z_3d_n_fc(1:nzmin-1   ,n)      = Z(1:nzmin-1);
+        Z_3d_n_fc(nzmin       ,n)      = zbar_3d_n_fc(nzmin,n)+(zbar_3d_n_fc(nzmin+1,n)-zbar_n_srf(n))/2;
+        Z_3d_n_fc(nzmin+1:nzmax-2,n)   = Z(nzmin+1:nzmax-2);
+        Z_3d_n_fc(nzmax-1     ,n)      = zbar_3d_n_fc(nzmax-1,n)+(zbar_n_bot_fc(n)-zbar_3d_n_fc(nzmax-1,n))/2;
         
     end do
 
@@ -433,6 +479,16 @@ subroutine init_bottom_elem_thickness(partit, mesh)
     !___________________________________________________________________________
     call exchange_elem(zbar_e_bot, partit)
     
+    !___________________________________________________________________________
+    !PS debug partiell cells 
+    do elem=1, myDim_elem2D
+        nle=nlevels(elem)
+        bottom_elem_thickness_fc(elem)=zbar(nle-1)-zbar(nle)
+        zbar_e_bot_fc(elem) = zbar(nle)
+    end do
+    call exchange_elem(zbar_e_bot_fc, partit)
+    
+    
 end subroutine init_bottom_elem_thickness
 !
 !
@@ -450,7 +506,7 @@ subroutine init_bottom_node_thickness(partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
     !___________________________________________________________________________
-    integer       :: node, nln, elem, elemi, nelem
+    integer       :: node, nln, elem, elemi, nelem, nle
     real(kind=WP) :: dd 
     real(kind=WP) :: hnbot, tvol 
     !___________________________________________________________________________
@@ -528,9 +584,38 @@ subroutine init_bottom_node_thickness(partit, mesh)
             ! elemental partial bottom depths
             nln   = nlevels_nod2D(node)
             nelem = nod_in_elem2d_num(node)
-            zbar_n_bot(node)           = minval(zbar_e_bot(nod_in_elem2d(1:nelem,node))) 
-            bottom_node_thickness(node)= zbar(nln-1)-zbar_n_bot(node)
-        end do ! --> do node=1, myDim_nod2D+eDim_nod2D
+            
+            
+            ! The bottom topography in FESOM2 is entirly defined on the elements 
+            ! thus also the thickness of the bottom layer on elements is fully 
+            ! defined and valid. BUT therefore the corresponding bottom layer 
+            ! thickness on vertices is less clear 
+            ! 
+            ! --> so far we choose as criteria for the vertices layer thickness 
+            ! that it is equal to the maximum layer thickness of the sorounding 
+            ! element. This has the advantage that no extrapolation when 
+            ! computing the PGF is neccesary. But harbours the risk that the 
+            ! volume of the scalar cluster and the vollume of the sorrounding 
+            ! elements deviates
+            !PS zbar_n_bot(node)           = minval(zbar_e_bot(nod_in_elem2d(1:nelem,node))) 
+            !PS bottom_node_thickness(node)= zbar(nln-1)-zbar_n_bot(node)
+            
+            ! --> here we choose the thickness of the vertice bottom cell so that 
+            ! it agrees with the volulme of the sum of the sorrounding element
+            ! cells
+            ! A_n_bot * h_n_bot = sum( A_e_bot/3 * h_e_boz) 
+            !           h_n_bot = sum( A_e_bot/3 * h_e_boz) / A_n_bot !!!
+            bottom_node_thickness(node) = 0.0_WP
+            do elemi=1,nelem
+                elem = nod_in_elem2d(elemi,node)
+                nle  = nlevels(elem)
+                if (nle>=nln) then
+                    bottom_node_thickness(node) = bottom_node_thickness(node) + bottom_elem_thickness(elem)*elem_area(elem)/3.0_WP
+                end if
+            end do 
+            bottom_node_thickness(node)= bottom_node_thickness(node)/area(nln-1,node)
+            zbar_n_bot(node)           = zbar(nln-1) - bottom_node_thickness(node)
+        end do ! --> do node=1, myDim_nod2D
         
     !___________________________________________________________________________
     ! use full bottom cells
@@ -545,6 +630,17 @@ subroutine init_bottom_node_thickness(partit, mesh)
     !___________________________________________________________________________
     call exchange_nod(zbar_n_bot, partit)
     call exchange_nod(bottom_node_thickness, partit)
+    
+    !___________________________________________________________________________
+    !PS debug partiell cells 
+    do node=1,myDim_nod2D
+        nln = nlevels_nod2D(node)
+        zbar_n_bot_fc(node)           = zbar(nln)
+        bottom_node_thickness_fc(node)= zbar(nln-1)-zbar_n_bot_fc(node)
+    end do
+    call exchange_nod(zbar_n_bot_fc, partit)
+    call exchange_nod(bottom_node_thickness_fc, partit)
+    
     
 end subroutine init_bottom_node_thickness
 !
@@ -755,11 +851,13 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
             do nz=nzmin,nzmax-1
                 !!PS hnode(nz,n)=(zbar(nz)-zbar(nz+1))
                 hnode(nz,n)=(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))
+                hnode_fc(nz,n)=hnode(nz,n)
             end do      
             
             ! set bottom node thickness
             !!PS hnode(nlevels_nod2D(n)-1,n)=bottom_node_thickness(n)
-            hnode(nzmax,n)=bottom_node_thickness(n)
+            hnode(   nzmax,n)=bottom_node_thickness(   n)
+            hnode_fc(nzmax,n)=bottom_node_thickness_fc(n)
             
             !!PS do nz=nlevels_nod2D(n),nl-1
             !!PS --> can skip this, hnode(:,:) is initialised with 0.0_WP
@@ -774,13 +872,16 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
             
             !!PS do nz=1,nlevels(elem)-2
             helem(nzmin,elem)=(zbar_e_srf(elem)-zbar(nzmin+1))
+            helem_fc(nzmin,elem)=helem(nzmin,elem)
             do nz = nzmin+1, nzmax-1
                 helem(nz,elem)=(zbar(nz)-zbar(nz+1))
+                helem_fc(nz,elem)=helem(nz,elem)
             end do
             
             ! set bottom elem thickness
             !!PS helem(nlevels(elem)-1,elem)=bottom_elem_thickness(elem)
-            helem(nzmax,elem)=bottom_elem_thickness(elem)
+            helem(   nzmax,elem)=bottom_elem_thickness(   elem)
+            helem_fc(nzmax,elem)=bottom_elem_thickness_fc(elem)
             
             !!PS do nz=nlevels(elem),nl-1
             !!PS --> can skip this, helem(:,:) is initialised with 0.0_WP
@@ -881,16 +982,18 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
                 ! hbar surface elevation linear over verical column
                 !!PS do nz=1,nlevels_nod2D_min(n)-2
                 do nz=nzmin,nlevels_nod2D_min(n)-2
-                    hnode(nz,n)=(zbar(nz)-zbar(nz+1))*(1.0_WP+hbar(n)/dd)
+                    hnode(   nz,n)=(zbar(nz)-zbar(nz+1))*(1.0_WP+hbar(n)/dd)
+                    hnode_fc(nz,n)=hnode(nz,n)
                 end do
                 
                 ! do not distribute hbar into cells that intersect somehow with 
                 ! bottom layer 
                 !!PS do nz=nlevels_nod2D_min(n)-1, nlevels_nod2D(n)-1
                 do nz=nlevels_nod2D_min(n)-1, nzmax-1
-                    hnode(nz,n)=(zbar(nz)-zbar(nz+1))
+                    hnode(   nz,n)=(zbar(nz)-zbar(nz+1))
+                    hnode_fc(nz,n)=hnode(nz,n)
                 end do
-            else
+            else ! --> in case of cavity
                 ! in case of cavity dont distribute ssh --> cavity-ocean boudnary
                 ! is fixed
                 do nz=nzmin,nzmax-1
@@ -898,7 +1001,8 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
                 end do 
             end if 
             ! set bottom node thickness
-            hnode(nzmax,n)=bottom_node_thickness(n)
+            hnode(   nzmax,n)=bottom_node_thickness(   n)
+            hnode_fc(nzmax,n)=bottom_node_thickness_fc(n)
             
             !!PS --> can skip this, hnode(:,:) is initialised with 0.0_WP
             !!PS ! layer thickness of bottom layer equal 0
@@ -919,6 +1023,7 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
             if (nzmin==1) then 
                 dhe(elem)=sum(hbar(elnodes))/3.0_WP
                 helem(nzmin,elem)=sum(hnode(nzmin,elnodes))/3.0_WP
+                helem_fc(nzmin,elem)=helem(nzmin,elem)
             else
                 dhe = 0.0_WP
                 helem(nzmin,elem)=zbar_e_srf(elem)-zbar(nzmin+1)
@@ -928,11 +1033,13 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
             !!PS do nz=nzmin,nzmax-1
             do nz=nzmin+1,nzmax-1
                 helem(nz,elem)=sum(hnode(nz,elnodes))/3.0_WP
+                helem_fc(nz,elem)=helem(nz,elem)
             end do
             
             ! elemental bottom layer thickness
             !!PS helem(nlevels(elem)-1,elem)=bottom_elem_thickness(elem)
-            helem(nzmax,elem)=bottom_elem_thickness(elem)
+            helem(   nzmax,elem)=bottom_elem_thickness(   elem)
+            helem_fc(nzmax,elem)=bottom_elem_thickness_fc(elem)
             
             !!PS --> can skip this, helem(:,:) is initialised with 0.0_WP 
             !!PS ! fill thickness below bottom layer
@@ -950,8 +1057,8 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
     endif
     
     !___________________________________________________________________________
-    hnode_new=hnode  ! Should be initialized, because only variable part is updated.
-   
+    hnode_new   =hnode  ! Should be initialized, because only variable part is updated.
+    hnode_new_fc=hnode_fc  ! Should be initialized, because only variable part is updated.
     !!PS call check_total_volume(partit, mesh)
     
 end subroutine init_thickness_ale
@@ -1099,6 +1206,10 @@ subroutine update_thickness_ale(partit, mesh)
                 hnode(nz,n)     = hnode_new(nz,n)
                 zbar_3d_n(nz,n) = zbar_3d_n(nz+1,n) + hnode_new(nz,n)
                 Z_3d_n(nz,n)    = zbar_3d_n(nz+1,n) + hnode_new(nz,n)/2.0_WP
+                
+                hnode_fc(nz,n)     = hnode_new_fc(nz,n)
+                zbar_3d_n_fc(nz,n) = zbar_3d_n_fc(nz+1,n) + hnode_new_fc(nz,n)
+                Z_3d_n_fc(nz,n)    = zbar_3d_n_fc(nz+1,n) + hnode_new_fc(nz,n)/2.0_WP
             end do
         end do
 !$OMP END PARALLEL DO
@@ -1117,6 +1228,8 @@ subroutine update_thickness_ale(partit, mesh)
             elnodes=elem2D_nodes(:, elem)
             do nz=nzmin, nzmax-1
                 helem(nz,elem)=sum(hnode(nz,elnodes))/3.0_WP
+                
+                helem_fc(nz,elem)=sum(hnode_fc(nz,elnodes))/3.0_WP
             end do
         end do
 !$OMP END PARALLEL DO
@@ -1175,11 +1288,14 @@ subroutine restart_thickness_ale(partit, mesh)
             ! in case its activated, especially when you make a restart from a non 
             ! partiall cell runs towards a simulation with partial cells
             hnode(nzmax,n) = bottom_node_thickness(n)
+            hnode_fc(nzmax,n) = bottom_node_thickness_fc(n)
             
             !___________________________________________________________________
             do nz=nzmax-1,nzmin,-1
                 zbar_3d_n(nz,n) =zbar_3d_n(nz+1,n) + hnode(nz,n)
                 Z_3d_n(nz,n)    =zbar_3d_n(nz+1,n) + hnode(nz,n)/2.0_WP
+                zbar_3d_n_fc(nz,n) =zbar_3d_n_fc(nz+1,n) + hnode_fc(nz,n)
+                Z_3d_n_fc(nz,n)    =zbar_3d_n_fc(nz+1,n) + hnode_fc(nz,n)/2.0_WP
             end do
         end do
         
@@ -1199,12 +1315,14 @@ subroutine restart_thickness_ale(partit, mesh)
             elnodes=elem2D_nodes(:, elem)
             do nz=nzmin,nzmax-1
                 helem(nz,elem)=sum(hnode(nz,elnodes))/3.0_WP
+                helem_fc(nz,elem)=sum(hnode_fc(nz,elnodes))/3.0_WP
             end do
             
             !___________________________________________________________________
             ! be sure elemental bottom thickness has partial cells in it, when 
             ! its used after restart
             helem(nzmax,elem)=bottom_elem_thickness(elem)
+            helem_fc(nzmax,elem)=bottom_elem_thickness_fc(elem)
             
             !___________________________________________________________________
             ! for the first time steps of a restart or initialisation dhe must 
@@ -1228,18 +1346,23 @@ subroutine restart_thickness_ale(partit, mesh)
             nzmax = nlevels_nod2D(n)-1
             do nz=nzmin,nzmax-1
                 hnode(nz,n)=(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))
+                hnode_fc(nz,n)=(zbar_3d_n_fc(nz,n)-zbar_3d_n_fc(nz+1,n))
             end do      
             hnode(nzmax,n)=bottom_node_thickness(n)
+            hnode_fc(nzmax,n)=bottom_node_thickness_fc(n)
         end do
         
         do elem=1,myDim_elem2D
             nzmin = ulevels(elem)
             nzmax = nlevels(elem)-1
             helem(nzmin,elem)=(zbar_e_srf(elem)-zbar(nzmin+1))
+            helem_fc(nzmin,elem)=(zbar_e_srf(elem)-zbar(nzmin+1))
             do nz = nzmin+1, nzmax-1
                 helem(nz,elem)=(zbar(nz)-zbar(nz+1))
+                helem_fc(nz,elem)=(zbar(nz)-zbar(nz+1))
             end do
             helem(nzmax,elem)=bottom_elem_thickness(elem)
+            helem_fc(nzmax,elem)=bottom_elem_thickness_fc(elem)
         end do    
     endif
 
@@ -1403,7 +1526,10 @@ subroutine init_stiff_mat_ale(partit, mesh)
             
             !!PS fy(1:3) = (zbar_e_bot(el(i)))* & !-> cavity
             !!PS fy(1:3) = (zbar_e_bot(el(i))-zbar(ulevels(el(i))))* &
+!PS             fy(1:3) = (zbar_e_bot_fc(el(i))-zbar_e_srf(el(i)))* &
+!PS             fy(1:3) = (zbar_e_bot_fc(el(i))-zbar_e_srf(el(i)))* &
             fy(1:3) = (zbar_e_bot(el(i))-zbar_e_srf(el(i)))* &
+
                       ( gradient_sca(1:3,el(i)) * edge_cross_dxdy(2*i  ,ed)   &
                        -gradient_sca(4:6,el(i)) * edge_cross_dxdy(2*i-1,ed) )
             
@@ -1731,6 +1857,8 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
         do nz=nzmin, nzmax
             c1=c1+alpha*((UV(2,nz,el(1))+UV_rhs(2,nz,el(1)))*deltaX1- &
                          (UV(1,nz,el(1))+UV_rhs(1,nz,el(1)))*deltaY1)*helem(nz,el(1))
+!PS             c1=c1+alpha*((UV(2,nz,el(1))+UV_rhs(2,nz,el(1)))*deltaX1- &
+!PS                          (UV(1,nz,el(1))+UV_rhs(1,nz,el(1)))*deltaY1)*helem_fc(nz,el(1))
         end do
         
         !_______________________________________________________________________
@@ -1747,6 +1875,8 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
             do nz=nzmin, nzmax
                 c2=c2-alpha*((UV(2,nz,el(2))+UV_rhs(2,nz,el(2)))*deltaX2- &
                              (UV(1,nz,el(2))+UV_rhs(1,nz,el(2)))*deltaY2)*helem(nz,el(2))
+!PS                 c2=c2-alpha*((UV(2,nz,el(2))+UV_rhs(2,nz,el(2)))*deltaX2- &
+!PS                              (UV(1,nz,el(2))+UV_rhs(1,nz,el(2)))*deltaY2)*helem_fc(nz,el(2))
             end do
         end if
         
@@ -1882,6 +2012,7 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
         !!PS do nz=1, nlevels(el(1))-1
         do nz=nzmin, nzmax 
             c1=c1+(UV(2,nz,el(1))*deltaX1-UV(1,nz,el(1))*deltaY1)*helem(nz,el(1))
+!PS             c1=c1+(UV(2,nz,el(1))*deltaX1-UV(1,nz,el(1))*deltaY1)*helem_fc(nz,el(1))
         end do
         !_______________________________________________________________________
         ! if ed is not a boundary edge --> calc depth integral: \nabla\int(U_n)dz 
@@ -1895,6 +2026,7 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
             !!PS do nz=1, nlevels(el(2))-1
             do nz=nzmin, nzmax
                 c2=c2-(UV(2,nz,el(2))*deltaX2-UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+!PS                 c2=c2-(UV(2,nz,el(2))*deltaX2-UV(1,nz,el(2))*deltaY2)*helem_fc(nz,el(2))
             end do
         end if
         !_______________________________________________________________________
@@ -2056,10 +2188,12 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
             ! --> e_vec = (dx,dy), n_vec = (-dy,dx);
             ! --> h * u*(-dy) + v*dx
             c1(nz)=( UV(2,nz,el(1))*deltaX1 - UV(1,nz,el(1))*deltaY1 )*helem(nz,el(1))
+!PS             c1(nz)=( UV(2,nz,el(1))*deltaX1 - UV(1,nz,el(1))*deltaY1 )*helem_fc(nz,el(1))
             ! inflow(outflow) "flux" to control volume of node enodes1
             ! is equal to outflow(inflow) "flux" to control volume of node enodes2
             if (Fer_GM) then
                 c2(nz)=(fer_UV(2,nz,el(1))*deltaX1- fer_UV(1,nz,el(1))*deltaY1)*helem(nz,el(1))
+!PS                 c2(nz)=(fer_UV(2,nz,el(1))*deltaX1- fer_UV(1,nz,el(1))*deltaY1)*helem_fc(nz,el(1))
             end if
         end do
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
@@ -2094,8 +2228,10 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
             nzmax = nlevels(el(2))-1   
             do nz = nzmax, nzmin, -1
                 c1(nz)=-(UV(2,nz,el(2))*deltaX2 - UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+!PS                 c1(nz)=-(UV(2,nz,el(2))*deltaX2 - UV(1,nz,el(2))*deltaY2)*helem_fc(nz,el(2))
                 if (Fer_GM) then
                     c2(nz)=-(fer_UV(2,nz,el(2))*deltaX2-fer_UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+!PS                     c2(nz)=-(fer_UV(2,nz,el(2))*deltaX2-fer_UV(1,nz,el(2))*deltaY2)*helem_fc(nz,el(2))
                 end if
             end do
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
@@ -2428,6 +2564,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
                     Wvel(nz,n)    =Wvel(nz,n) -(zbar_3d_n(nz,n)-dd1)*dddt
                     
                     hnode_new(nz,n)=hnode(nz,n)+(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))*dd
+                    hnode_new_fc(nz,n)=hnode_new(nz,n)
                 end do
                 
                 !___________________________________________________________________
@@ -2485,7 +2622,9 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
 !$OMP END PARALLEL DO
     !___________________________________________________________________________
     call exchange_nod(Wvel, partit)
-    call exchange_nod(hnode_new, partit)   ! Or extend cycles above  
+    call exchange_nod(hnode_new, partit)   ! Or extend cycles above
+    call exchange_nod(hnode_new_fc, partit)   ! Or extend cycles above  
+    
     if (Fer_GM) call exchange_nod(fer_Wvel, partit)
 !$OMP BARRIER    
     !___________________________________________________________________________
@@ -2739,13 +2878,17 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         ! zbar_n(nzmax) is now zbar_e_bot(elem), 
         zbar_n(nzmax)=zbar_e_bot(elem)
         Z_n(nzmax-1)=zbar_n(nzmax) + helem(nzmax-1,elem)/2.0_WP
+!PS         zbar_n(nzmax)=zbar_e_bot_fc(elem)
+!PS         Z_n(nzmax-1)=zbar_n(nzmax) + helem_fc(nzmax-1,elem)/2.0_WP
         !!PS do nz=nzmax-1,2,-1
         do nz=nzmax-1,nzmin+1,-1
             zbar_n(nz) = zbar_n(nz+1) + helem(nz,elem)
             Z_n(nz-1) = zbar_n(nz) + helem(nz-1,elem)/2.0_WP
+!PS             zbar_n(nz) = zbar_n(nz+1) + helem_fc(nz,elem)
+!PS             Z_n(nz-1) = zbar_n(nz) + helem_fc(nz-1,elem)/2.0_WP
         end do
-        !!PS zbar_n(1) = zbar_n(2) + helem(1,elem)
         zbar_n(nzmin) = zbar_n(nzmin+1) + helem(nzmin,elem)
+!PS         zbar_n(nzmin) = zbar_n(nzmin+1) + helem_fc(nzmin,elem)
         
         !___________________________________________________________________________
         ! Operator

@@ -99,9 +99,9 @@ real(kind=WP), allocatable, dimension(:)    :: lump2d_south, lump2d_north
 integer,       allocatable, dimension(:)    :: ind_south, ind_north    
 !#endif
 
-integer                                       :: nn_size
-integer, allocatable, dimension(:)            :: nn_num
-integer, allocatable, dimension(:,:)          :: nn_pos
+integer                                     :: nn_size
+integer, allocatable, dimension(:)          :: nn_num
+integer, allocatable, dimension(:,:)        :: nn_pos
 
 !_______________________________________________________________________________
 ! Arrays added for ALE implementation:
@@ -132,6 +132,11 @@ real(kind=WP), allocatable,dimension(:)     :: zbar_e_bot
 ! new depth of cavity-ocean interface at node and element due to partial cells
 real(kind=WP), allocatable,dimension(:)     :: zbar_n_srf
 real(kind=WP), allocatable,dimension(:)     :: zbar_e_srf
+
+!_______________________________________________________________________________
+real(kind=WP), allocatable,dimension(:,:)   :: hnode_fc, hnode_new_fc, helem_fc, zbar_3d_n_fc, Z_3d_n_fc
+real(kind=WP), allocatable,dimension(:)     :: bottom_elem_thickness_fc, bottom_node_thickness_fc
+real(kind=WP), allocatable,dimension(:)     :: zbar_n_bot_fc, zbar_e_bot_fc
 
 character(:), allocatable :: representative_checksum
 

@@ -50,3 +50,14 @@ real(kind=WP), dimension(:)  , pointer :: zbar_n_bot
 real(kind=WP), dimension(:)  , pointer :: zbar_e_bot
 real(kind=WP), dimension(:)  , pointer :: zbar_n_srf
 real(kind=WP), dimension(:)  , pointer :: zbar_e_srf
+
+
+real(kind=WP), dimension(:,:), pointer :: hnode_fc
+real(kind=WP), dimension(:,:), pointer :: hnode_new_fc
+real(kind=WP), dimension(:,:), pointer :: zbar_3d_n_fc
+real(kind=WP), dimension(:,:), pointer :: Z_3d_n_fc
+real(kind=WP), dimension(:,:), pointer :: helem_fc
+real(kind=WP), dimension(:)  , pointer :: bottom_elem_thickness_fc
+real(kind=WP), dimension(:)  , pointer :: bottom_node_thickness_fc
+real(kind=WP), dimension(:)  , pointer :: zbar_n_bot_fc
+real(kind=WP), dimension(:)  , pointer :: zbar_e_bot_fc

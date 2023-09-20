@@ -416,6 +416,16 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
              found_blowup_loc=1
              write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
              write(*,*) ' --STOP--> found temperture becomes NaN or <-5.0, >60'
+             
+             
+             write(*,*) 'zbar_3d_n   = ',zbar_3d_n(:,n)
+             write(*,*) 'zbar_3d_n_fc= ',zbar_3d_n_fc(:,n)
+             write(*,*) 'Z_3d_n      = ',Z_3d_n(:,n)
+             write(*,*) 'Z_3d_n_fc   = ',Z_3d_n_fc(:,n)
+             write(*,*) 'hnode       = ',hnode(:,n)
+             write(*,*) 'hnode_fc    = ',hnode_fc(:,n)
+             
+             
              write(*,*) 'mype     = ',mype
              write(*,*) 'mstep    = ',istep
              write(*,*) 'node     = ',n

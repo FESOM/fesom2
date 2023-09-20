@@ -2849,8 +2849,4 @@ subroutine check_total_volume(partit, mesh)
         write(*,*) '     > Total ocean volume elem:', vol_e, ' m^3'
         
     end if
-
 end subroutine check_total_volume
-!
-!
-!_______________________________________________________________________________

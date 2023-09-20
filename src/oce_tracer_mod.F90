@@ -48,6 +48,7 @@ SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call fill_up_dn_grad'//achar(27)//'[0m'
     call fill_up_dn_grad(tracers%work, partit, mesh)
+!PS     call fill_up_dn_grad_test(tracers%work, partit, mesh)
     call exchange_nod_end(partit)       ! tr_z halos should have arrived by now.
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'

@@ -198,7 +198,10 @@ subroutine viscosity_filter(option, dynamics, partit, mesh)
     SELECT CASE (option)
         CASE (5)
             if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call visc_filt_bcksct'//achar(27)//'[0m'
-            call visc_filt_bcksct(dynamics, partit, mesh)
+!PS             call visc_filt_bcksct(dynamics, partit, mesh)
+!PS             call visc_filt_bcksct_test(dynamics, partit, mesh)
+!PS             call visc_filt_bcksct_test2(dynamics, partit, mesh)
+            call visc_filt_bcksct_test3(dynamics, partit, mesh)
         CASE (6)
             if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call visc_filt_bilapl'//achar(27)//'[0m'
             call visc_filt_bilapl(dynamics, partit, mesh)
@@ -347,6 +350,583 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine visc_filt_bcksct
+!
+!
+!_______________________________________________________________________________
+SUBROUTINE visc_filt_bcksct_test(dynamics, partit, mesh)
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use MOD_DYN
+    USE o_PARAM
+    USE g_CONFIG
+    USE g_comm_auto
+    IMPLICIT NONE
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    real(kind=8)  :: u1, v1, len, vi
+    integer       :: nz, ed, el(2), elnodes(3),k, elem, nzmin, nzmax, nznobot
+    ! still to be understood but if you allocate these arrays statically the results will be different:
+    real(kind=8)  :: update_u(mesh%nl-1), update_v(mesh%nl-1)
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
+    real(kind=WP), dimension(:,:)  , pointer :: U_c, V_c, U_b, V_b
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    UV     => dynamics%uv(    :,:,:)
+    UV_rhs => dynamics%uv_rhs(:,:,:)
+    U_c    => dynamics%work%u_c(:,:)
+    V_c    => dynamics%work%v_c(:,:)
+    U_b    => dynamics%work%u_b(:,:)
+    V_b    => dynamics%work%v_b(:,:)
+
+    !___________________________________________________________________________
+    ! An analog of harmonic viscosity operator.
+    ! Same as visc_filt_h, but with the backscatter. 
+    ! Here the contribution from squared velocities is added to the viscosity.    
+    ! The contribution from boundary edges is neglected (free slip).
+!$OMP PARALLEL DO
+    do elem=1, myDim_elem2D+eDim_elem2D
+       U_b(:, elem) = 0.0_WP
+       V_b(:, elem) = 0.0_WP
+       U_c(:, elem) = 0.0_WP
+       V_c(:, elem) = 0.0_WP
+    end do
+!$OMP END PARALLEL DO
+
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, nz, ed, el, elnodes, k, elem, nzmin, nzmax, nznobot, update_u, update_v)
+!$OMP DO
+    do ed=1, myDim_edge2D+eDim_edge2D
+
+        ! no contribution from boundary edges 
+        if(myList_edge2D(ed)>edge2D_in) cycle
+        
+        ! local index of element that contribute to edge
+        el=edge_tri(:,ed)
+        
+        ! characteristic length scale 
+        len=sqrt(sum(elem_area(el)))
+        
+        nzmax = minval(nlevels(el))
+        nzmin = maxval(ulevels(el))
+        do  nz=nzmin,nzmax-1
+            ! compute delta_u und delta_v over edge 
+            u1=UV(1,nz,el(1))-UV(1,nz,el(2))
+            v1=UV(2,nz,el(1))-UV(2,nz,el(2))
+            
+            ! compute viscosity over the edge ed: A_hor ~ L * |delta_u^2 = deltav^2|
+            vi=dt*max(dynamics%visc_gamma0,                         &
+                      max(dynamics%visc_gamma1*sqrt(u1*u1+v1*v1),   &
+                      dynamics%visc_gamma2*(u1*u1+v1*v1))           &
+                    )*len
+                    
+            ! compute A_hor * vec_v
+            update_u(nz)=u1*vi
+            update_v(nz)=v1*vi
+        end do 
+        
+        !_______________________________________________________________________
+        ! contribution from edge towards center trinagle
+        !
+        !---O---------------------O---------------------O--------
+        !    \.                 ./ \.                 ./
+        !      \.     o_      ./     \.      o      ./
+        !        \.     \__ ./__       \.         ./
+        !          \.     ./    \_oUb1   \.     ./
+        !            \. ./                 \. ./
+        !           ---O.--------edge--------O---
+        !                \.                 ./
+        !                  \.      oUb2   ./
+        !                    \.         ./
+        !                      \.     ./
+        !                        \. ./   
+        !                          O
+        !                          
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+        call omp_set_lock(partit%plock(el(1)))
+#else
+!$OMP ORDERED
+#endif
+        U_b(nzmin:nzmax-1, el(1))=U_b(nzmin:nzmax-1, el(1))-update_u(nzmin:nzmax-1)/elem_area(el(1))
+        V_b(nzmin:nzmax-1, el(1))=V_b(nzmin:nzmax-1, el(1))-update_v(nzmin:nzmax-1)/elem_area(el(1))
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+        call omp_unset_lock(partit%plock(el(1)))
+        call omp_set_lock  (partit%plock(el(2)))
+#endif
+        U_b(nzmin:nzmax-1, el(2))=U_b(nzmin:nzmax-1, el(2))+update_u(nzmin:nzmax-1)/elem_area(el(2))
+        V_b(nzmin:nzmax-1, el(2))=V_b(nzmin:nzmax-1, el(2))+update_v(nzmin:nzmax-1)/elem_area(el(2))
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+        call omp_unset_lock(partit%plock(el(2)))
+#else
+!$OMP END ORDERED 
+#endif
+    end do
+!$OMP END DO
+!$OMP MASTER
+    call exchange_elem(U_b, partit)
+    call exchange_elem(V_b, partit)
+!$OMP END MASTER
+!$OMP BARRIER
+
+    !___________________________________________________________________________
+    ! first: Compute smoothed viscous term first smooth toward nodes and 
+    ! scalar cluster cell 
+!$OMP DO
+    DO ed=1, myDim_nod2D 
+        nzmin = ulevels_nod2D(ed)
+        nzmax = nlevels_nod2D(ed)
+        DO nz=nzmin, nzmax-1
+            vi=0.0_WP
+            u1=0.0_WP
+            v1=0.0_WP
+            DO k=1, nod_in_elem2D_num(ed)
+                elem=nod_in_elem2D(k,ed)
+                if(nlevels(elem)-1 < nz .or. nz<ulevels(elem) ) cycle
+                vi=vi+elem_area(elem)
+                u1=u1+U_b(nz,elem)*elem_area(elem)
+                v1=v1+V_b(nz,elem)*elem_area(elem)
+            END DO
+            U_c(nz,ed)=u1/vi
+            V_c(nz,ed)=v1/vi
+        END DO
+    END DO
+!$OMP END DO
+!$OMP MASTER
+    call exchange_nod(U_c, V_c, partit)
+!$OMP END MASTER
+!$OMP BARRIER
+
+    !___________________________________________________________________________
+    ! second: smooth from nodes back to elements sum(U_c(nz,nelem))/3.0_WP --> 
+    ! substract large scale dissipation --> remains with grid scale dissipation
+!$OMP DO
+    do elem=1, myDim_elem2D
+        elnodes=elem2D_nodes(:,elem)
+        nzmin = ulevels(elem)
+        nzmax = nlevels(elem)-1
+        
+        ! determine depth level of element where it verically not touches the 
+        ! bottom topography
+        nznobot = nzmax-1 
+        
+        ! determine the depth level of the element where it is horizontally not 
+        ! in touch with the bottom topography via a vertice, face or an edge  
+        nznobot = min(nznobot, minval(nlevels_nod2D_min(elnodes)-1) - 1)
+        
+!PS         do nz=nzmin, nzmax
+!PS             UV_rhs(1,nz,elem)=UV_rhs(1,nz,elem)+U_b(nz,elem) -dynamics%visc_easybsreturn*sum(U_c(nz,nelem))/3.0_WP
+!PS             UV_rhs(2,nz,elem)=UV_rhs(2,nz,elem)+V_b(nz,elem) -dynamics%visc_easybsreturn*sum(V_c(nz,nelem))/3.0_WP
+!PS         end do
+        
+        ! reinject energy only in cells that have no contact to the bottom 
+        do nz=nzmin, nznobot
+            UV_rhs(1,nz,elem)=UV_rhs(1,nz,elem)+U_b(nz,elem) - dynamics%visc_easybsreturn*sum(U_c(nz,elnodes))/3.0_WP
+            UV_rhs(2,nz,elem)=UV_rhs(2,nz,elem)+V_b(nz,elem) - dynamics%visc_easybsreturn*sum(V_c(nz,elnodes))/3.0_WP
+        end do
+        
+        ! do not insert additionasl energy in the bottom cell
+        do nz=nznobot+1,nzmax
+            UV_rhs(1,nz,elem)=UV_rhs(1,nz,elem)+U_b(nz,elem)
+            UV_rhs(2,nz,elem)=UV_rhs(2,nz,elem)+V_b(nz,elem)
+        end do
+    end do
+!$OMP END DO
+!$OMP END PARALLEL
+end subroutine visc_filt_bcksct_test
+!
+!
+!_______________________________________________________________________________
+SUBROUTINE visc_filt_bcksct_test2(dynamics, partit, mesh)
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use MOD_DYN
+    USE o_PARAM
+    USE g_CONFIG
+    USE g_comm_auto
+    IMPLICIT NONE
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    real(kind=8)  :: u1, v1, len, vi
+    integer       :: nz, ed, el(2), elnodes(3),k, elem, nzmin, nzmax, nznobot
+    ! still to be understood but if you allocate these arrays statically the results will be different:
+    real(kind=8)  :: update_u(mesh%nl-1), update_v(mesh%nl-1)
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
+    real(kind=WP), dimension(:,:)  , pointer :: U_c, V_c, U_b, V_b
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    UV     => dynamics%uv(    :,:,:)
+    UV_rhs => dynamics%uv_rhs(:,:,:)
+    U_c    => dynamics%work%u_c(:,:)
+    V_c    => dynamics%work%v_c(:,:)
+    U_b    => dynamics%work%u_b(:,:)
+    V_b    => dynamics%work%v_b(:,:)
+
+    !___________________________________________________________________________
+    ! An analog of harmonic viscosity operator.
+    ! Same as visc_filt_h, but with the backscatter. 
+    ! Here the contribution from squared velocities is added to the viscosity.    
+    ! The contribution from boundary edges is neglected (free slip).
+!$OMP PARALLEL DO
+    do elem=1, myDim_elem2D+eDim_elem2D
+       U_b(:, elem) = 0.0_WP
+       V_b(:, elem) = 0.0_WP
+       U_c(:, elem) = 0.0_WP
+       V_c(:, elem) = 0.0_WP
+    end do
+!$OMP END PARALLEL DO
+
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, nz, ed, el, elnodes, k, elem, nzmin, nzmax, nznobot, update_u, update_v)
+!$OMP DO
+    do ed=1, myDim_edge2D+eDim_edge2D
+
+        ! no contribution from boundary edges 
+        if(myList_edge2D(ed)>edge2D_in) cycle
+        
+        ! local index of element that contribute to edge
+        el=edge_tri(:,ed)
+        
+        ! characteristic length scale 
+        len=sqrt(sum(elem_area(el)))
+        
+        nzmax = minval(nlevels(el))
+        nzmin = maxval(ulevels(el))
+        do  nz=nzmin,nzmax-1
+            ! compute delta_u und delta_v over edge 
+            u1=UV(1,nz,el(1))-UV(1,nz,el(2))
+            v1=UV(2,nz,el(1))-UV(2,nz,el(2))
+            
+            ! compute viscosity over the edge ed: A_hor ~ L * |delta_u^2 = deltav^2|
+            vi=dt*max(dynamics%visc_gamma0,                         &
+                      max(dynamics%visc_gamma1*sqrt(u1*u1+v1*v1),   &
+                      dynamics%visc_gamma2*(u1*u1+v1*v1))           &
+                    )*len
+                    
+            ! compute A_hor * vec_v
+            update_u(nz)=u1*vi
+            update_v(nz)=v1*vi
+        end do 
+        
+        !_______________________________________________________________________
+        ! contribution from edge towards center trinagle
+        !
+        !---O---------------------O---------------------O--------
+        !    \.                 ./ \.                 ./
+        !      \.     o_      ./     \.      o      ./
+        !        \.     \__ ./__       \.         ./
+        !          \.     ./    \_oUb1   \.     ./
+        !            \. ./                 \. ./
+        !           ---O.--------edge--------O---
+        !                \.                 ./
+        !                  \.      oUb2   ./
+        !                    \.         ./
+        !                      \.     ./
+        !                        \. ./   
+        !                          O
+        !                          
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+        call omp_set_lock(partit%plock(el(1)))
+#else
+!$OMP ORDERED
+#endif
+        U_b(nzmin:nzmax-1, el(1))=U_b(nzmin:nzmax-1, el(1))-update_u(nzmin:nzmax-1)/elem_area(el(1))
+        V_b(nzmin:nzmax-1, el(1))=V_b(nzmin:nzmax-1, el(1))-update_v(nzmin:nzmax-1)/elem_area(el(1))
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+        call omp_unset_lock(partit%plock(el(1)))
+        call omp_set_lock  (partit%plock(el(2)))
+#endif
+        U_b(nzmin:nzmax-1, el(2))=U_b(nzmin:nzmax-1, el(2))+update_u(nzmin:nzmax-1)/elem_area(el(2))
+        V_b(nzmin:nzmax-1, el(2))=V_b(nzmin:nzmax-1, el(2))+update_v(nzmin:nzmax-1)/elem_area(el(2))
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+        call omp_unset_lock(partit%plock(el(2)))
+#else
+!$OMP END ORDERED 
+#endif
+    end do
+!$OMP END DO
+!$OMP MASTER
+    call exchange_elem(U_b, partit)
+    call exchange_elem(V_b, partit)
+!$OMP END MASTER
+!$OMP BARRIER
+
+    !___________________________________________________________________________
+    ! first: Compute smoothed viscous term first smooth toward nodes and 
+    ! scalar cluster cell 
+!$OMP DO
+    DO ed=1, myDim_nod2D 
+        nzmin = ulevels_nod2D(ed)
+        nzmax = nlevels_nod2D(ed)
+        DO nz=nzmin, nzmax-1
+            vi=0.0_WP
+            u1=0.0_WP
+            v1=0.0_WP
+            DO k=1, nod_in_elem2D_num(ed)
+                elem=nod_in_elem2D(k,ed)
+                if(nlevels(elem)-1 < nz .or. nz<ulevels(elem) ) cycle
+!PS                 vi=vi+elem_area(elem)
+!PS                 u1=u1+U_b(nz,elem)*elem_area(elem)
+!PS                 v1=v1+V_b(nz,elem)*elem_area(elem)
+                vi=vi +                 elem_area(elem) * helem(nz, elem)
+                u1=u1 + U_b(nz, elem) * elem_area(elem) * helem(nz, elem)
+                v1=v1 + V_b(nz, elem) * elem_area(elem) * helem(nz, elem)
+            END DO
+            U_c(nz,ed)=u1/vi
+            V_c(nz,ed)=v1/vi
+        END DO
+    END DO
+!$OMP END DO
+!$OMP MASTER
+    call exchange_nod(U_c, V_c, partit)
+!$OMP END MASTER
+!$OMP BARRIER
+
+    !___________________________________________________________________________
+    ! second: smooth from nodes back to elements sum(U_c(nz,nelem))/3.0_WP --> 
+    ! substract large scale dissipation --> remains with grid scale dissipation
+!$OMP DO
+    do elem=1, myDim_elem2D
+        elnodes=elem2D_nodes(:,elem)
+        nzmin = ulevels(elem)
+        nzmax = nlevels(elem)-1
+        
+!PS         ! determine depth level of element where it verically not touches the 
+!PS         ! bottom topography
+!PS         nznobot = nzmax-1 
+!PS         
+!PS         ! determine the depth level of the element where it is horizontally not 
+!PS         ! in touch with the bottom topography via a vertice, face or an edge  
+!PS         nznobot = min(nznobot, minval(nlevels_nod2D_min(elnodes)-1) - 1)
+        
+        do nz=nzmin, nzmax
+            vi=0.0_WP
+            u1=0.0_WP
+            v1=0.0_WP
+            do k=1, 3
+                vi=vi +                        area(nz, elnodes(k)) * hnode(nz, elnodes(k))
+                u1=u1 + U_c( nz, elnodes(k)) * area(nz, elnodes(k)) * hnode(nz, elnodes(k))
+                v1=v1 + V_c( nz, elnodes(k)) * area(nz, elnodes(k)) * hnode(nz, elnodes(k))
+            end do
+            u1 = u1/vi
+            v1 = v1/vi
+            UV_rhs(1,nz,elem)=UV_rhs(1,nz,elem)+U_b(nz,elem) - dynamics%visc_easybsreturn*u1/3.0_WP
+            UV_rhs(2,nz,elem)=UV_rhs(2,nz,elem)+V_b(nz,elem) - dynamics%visc_easybsreturn*v1/3.0_WP
+        end do
+        
+!PS         ! reinject energy only in cells that have no contact to the bottom 
+!PS         do nz=nzmin, nznobot
+!PS             UV_rhs(1,nz,elem)=UV_rhs(1,nz,elem)+U_b(nz,elem) - dynamics%visc_easybsreturn*sum(U_c(nz,elnodes))/3.0_WP
+!PS             UV_rhs(2,nz,elem)=UV_rhs(2,nz,elem)+V_b(nz,elem) - dynamics%visc_easybsreturn*sum(V_c(nz,elnodes))/3.0_WP
+!PS         end do
+!PS         
+!PS         ! do not insert additionasl energy in the bottom cell
+!PS         do nz=nznobot+1,nzmax
+!PS             UV_rhs(1,nz,elem)=UV_rhs(1,nz,elem)+U_b(nz,elem)
+!PS             UV_rhs(2,nz,elem)=UV_rhs(2,nz,elem)+V_b(nz,elem)
+!PS         end do
+    end do
+!$OMP END DO
+!$OMP END PARALLEL
+end subroutine visc_filt_bcksct_test2
+!
+!
+!_______________________________________________________________________________
+SUBROUTINE visc_filt_bcksct_test3(dynamics, partit, mesh)
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use MOD_DYN
+    USE o_PARAM
+    USE g_CONFIG
+    USE g_comm_auto
+    IMPLICIT NONE
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    real(kind=8)  :: u1, v1, h1, len, vi
+    integer       :: nz, ed, el(2), elnodes(3),k, elem, nzmin, nzmax, nznobot
+    ! still to be understood but if you allocate these arrays statically the results will be different:
+    real(kind=8)  :: update_u(mesh%nl-1), update_v(mesh%nl-1)
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
+    real(kind=WP), dimension(:,:)  , pointer :: U_c, V_c, U_b, V_b
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    UV     => dynamics%uv(    :,:,:)
+    UV_rhs => dynamics%uv_rhs(:,:,:)
+    U_c    => dynamics%work%u_c(:,:)
+    V_c    => dynamics%work%v_c(:,:)
+    U_b    => dynamics%work%u_b(:,:)
+    V_b    => dynamics%work%v_b(:,:)
+
+    !___________________________________________________________________________
+    ! An analog of harmonic viscosity operator.
+    ! Same as visc_filt_h, but with the backscatter. 
+    ! Here the contribution from squared velocities is added to the viscosity.    
+    ! The contribution from boundary edges is neglected (free slip).
+!$OMP PARALLEL DO
+    do elem=1, myDim_elem2D+eDim_elem2D
+       U_b(:, elem) = 0.0_WP
+       V_b(:, elem) = 0.0_WP
+       U_c(:, elem) = 0.0_WP
+       V_c(:, elem) = 0.0_WP
+    end do
+!$OMP END PARALLEL DO
+
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, h1, len, vi, nz, ed, el, elnodes, k, elem, nzmin, nzmax, nznobot, update_u, update_v)
+!$OMP DO
+    do ed=1, myDim_edge2D+eDim_edge2D
+
+        ! no contribution from boundary edges 
+        if(myList_edge2D(ed)>edge2D_in) cycle
+        
+        ! local index of element that contribute to edge
+        el=edge_tri(:,ed)
+        
+        ! characteristic length scale 
+        len=sqrt(sum(elem_area(el)))
+        
+        nzmax = minval(nlevels(el))
+        nzmin = maxval(ulevels(el))
+        do  nz=nzmin,nzmax-1
+            ! compute delta_u und delta_v over edge 
+            u1=UV(1,nz,el(1))-UV(1,nz,el(2))
+            v1=UV(2,nz,el(1))-UV(2,nz,el(2))
+            h1= (helem(nz, el(1)) + helem(nz, el(2))) * 0.5_WP
+            ! compute viscosity over the edge ed: A_hor ~ L * |delta_u^2 = deltav^2|
+            vi=dt*max(dynamics%visc_gamma0,                         &
+                      max(dynamics%visc_gamma1*sqrt(u1*u1+v1*v1),   &
+                      dynamics%visc_gamma2*(u1*u1+v1*v1))           &
+                    )*len
+                    
+            ! compute A_hor * vec_v
+            update_u(nz)=u1*vi*h1
+            update_v(nz)=v1*vi*h1
+        end do 
+        
+        !_______________________________________________________________________
+        ! contribution from edge towards center trinagle
+        !
+        !---O---------------------O---------------------O--------
+        !    \.                 ./ \.                 ./
+        !      \.     o_      ./     \.      o      ./
+        !        \.     \__ ./__       \.         ./
+        !          \.     ./    \_oUb1   \.     ./
+        !            \. ./                 \. ./
+        !           ---O.--------edge--------O---
+        !                \.                 ./
+        !                  \.      oUb2   ./
+        !                    \.         ./
+        !                      \.     ./
+        !                        \. ./   
+        !                          O
+        !                          
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+        call omp_set_lock(partit%plock(el(1)))
+#else
+!$OMP ORDERED
+#endif
+        U_b(nzmin:nzmax-1, el(1))=U_b(nzmin:nzmax-1, el(1))-update_u(nzmin:nzmax-1)/elem_area(el(1))
+        V_b(nzmin:nzmax-1, el(1))=V_b(nzmin:nzmax-1, el(1))-update_v(nzmin:nzmax-1)/elem_area(el(1))
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+        call omp_unset_lock(partit%plock(el(1)))
+        call omp_set_lock  (partit%plock(el(2)))
+#endif
+        U_b(nzmin:nzmax-1, el(2))=U_b(nzmin:nzmax-1, el(2))+update_u(nzmin:nzmax-1)/elem_area(el(2))
+        V_b(nzmin:nzmax-1, el(2))=V_b(nzmin:nzmax-1, el(2))+update_v(nzmin:nzmax-1)/elem_area(el(2))
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+        call omp_unset_lock(partit%plock(el(2)))
+#else
+!$OMP END ORDERED 
+#endif
+    end do
+!$OMP END DO
+!$OMP MASTER
+    call exchange_elem(U_b, partit)
+    call exchange_elem(V_b, partit)
+!$OMP END MASTER
+!$OMP BARRIER
+
+    !___________________________________________________________________________
+    ! first: Compute smoothed viscous term first smooth toward nodes and 
+    ! scalar cluster cell 
+!$OMP DO
+    DO ed=1, myDim_nod2D 
+        nzmin = ulevels_nod2D(ed)
+        nzmax = nlevels_nod2D(ed)
+        DO nz=nzmin, nzmax-1
+            vi=0.0_WP
+            u1=0.0_WP
+            v1=0.0_WP
+            DO k=1, nod_in_elem2D_num(ed)
+                elem=nod_in_elem2D(k,ed)
+                if(nlevels(elem)-1 < nz .or. nz<ulevels(elem) ) cycle
+                vi=vi+elem_area(elem)
+                u1=u1+U_b(nz,elem)*elem_area(elem)
+                v1=v1+V_b(nz,elem)*elem_area(elem)
+            END DO
+            U_c(nz,ed)=u1/vi
+            V_c(nz,ed)=v1/vi
+        END DO
+    END DO
+!$OMP END DO
+!$OMP MASTER
+    call exchange_nod(U_c, V_c, partit)
+!$OMP END MASTER
+!$OMP BARRIER
+
+    !___________________________________________________________________________
+    ! second: smooth from nodes back to elements sum(U_c(nz,nelem))/3.0_WP --> 
+    ! substract large scale dissipation --> remains with grid scale dissipation
+!$OMP DO
+    do elem=1, myDim_elem2D
+        elnodes=elem2D_nodes(:,elem)
+        nzmin = ulevels(elem)
+        nzmax = nlevels(elem)-1
+        
+!PS         ! determine depth level of element where it verically not touches the 
+!PS         ! bottom topography
+!PS         nznobot = nzmax-1 
+!PS         
+!PS         ! determine the depth level of the element where it is horizontally not 
+!PS         ! in touch with the bottom topography via a vertice, face or an edge  
+!PS         nznobot = min(nznobot, minval(nlevels_nod2D_min(elnodes)-1) - 1)
+        
+        do nz=nzmin, nzmax
+            UV_rhs(1,nz,elem)=UV_rhs(1,nz,elem)+(U_b(nz,elem) - dynamics%visc_easybsreturn*sum(U_c(nz,elnodes))/3.0_WP)/helem(nz,elem)
+            UV_rhs(2,nz,elem)=UV_rhs(2,nz,elem)+(V_b(nz,elem) - dynamics%visc_easybsreturn*sum(V_c(nz,elnodes))/3.0_WP)/helem(nz,elem)
+        end do
+        
+!PS         ! reinject energy only in cells that have no contact to the bottom 
+!PS         do nz=nzmin, nznobot
+!PS             UV_rhs(1,nz,elem)=UV_rhs(1,nz,elem)+U_b(nz,elem) - dynamics%visc_easybsreturn*sum(U_c(nz,elnodes))/3.0_WP
+!PS             UV_rhs(2,nz,elem)=UV_rhs(2,nz,elem)+V_b(nz,elem) - dynamics%visc_easybsreturn*sum(V_c(nz,elnodes))/3.0_WP
+!PS         end do
+!PS         
+!PS         ! do not insert additionasl energy in the bottom cell
+!PS         do nz=nznobot+1,nzmax
+!PS             UV_rhs(1,nz,elem)=UV_rhs(1,nz,elem)+U_b(nz,elem)
+!PS             UV_rhs(2,nz,elem)=UV_rhs(2,nz,elem)+V_b(nz,elem)
+!PS         end do
+    end do
+!$OMP END DO
+!$OMP END PARALLEL
+end subroutine visc_filt_bcksct_test3
 !
 !
 !_______________________________________________________________________________
