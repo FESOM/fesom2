@@ -58,18 +58,10 @@ subroutine par_init(partit)    ! initializes MPI
   !       names and routine names as in src/ifs_interface, that is not elegant.
 #else 
 #ifdef __MULTIO
-  !  fesom standalone with MULTIO 
-  character(len=255)                    :: oce_npes_str, mio_npes_str
-  integer                               :: oce_npes_int, mio_npes_int, oce_status, mio_status
   CALL MPI_Comm_Size(MPI_COMM_WORLD, partit%npes, i)
   CALL MPI_Comm_Rank(MPI_COMM_WORLD, partit%mype, i)
   partit%MPI_COMM_FESOM=MPI_COMM_WORLD 
   partit%MPI_COMM_WORLD=MPI_COMM_WORLD 
-  !TODO: dont need both env variables can do with just one and subtract from npes
-  CALL get_environment_variable('OCE_NPES', oce_npes_str, status=oce_status)
-  CALL get_environment_variable('MIO_NPES', mio_npes_str, status=mio_status)
-  read(oce_npes_str,*,iostat=oce_status) oce_npes_int
-  read(mio_npes_str,*,iostat=mio_status) mio_npes_int
   call mpp_io_init_2(partit%MPI_COMM_FESOM)
 #else 
   partit%MPI_COMM_FESOM=MPI_COMM_WORLD ! use global comm if not coupled (e.g. no __oasis or __ifsinterface or IO server)

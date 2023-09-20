@@ -454,7 +454,7 @@ contains
     call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
 #endif
 
-#ifdef __MULTIO && (ifndef __ifsinterface || ifndef __oasis)
+#if defined(__MULTIO) && !defined(__ifsinterface) && !defined(__oasis)
    call mpp_stop
 #endif
     if(f%fesom_did_mpi_init) call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype) ! finalize MPI before FESOM prints its stats block, otherwise there is sometimes output from other processes from an earlier time in the programm AFTER the starts block (with parastationMPI)
