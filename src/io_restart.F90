@@ -198,6 +198,8 @@ subroutine restart(istep, l_read, mesh)
     is_raw_restart_write = is_due(trim(raw_restart_length_unit), raw_restart_length, istep)
   end if
 
+  is_portable_restart_write=.false.
+
   if(is_portable_restart_write) then
     ! write restart
     if(mype==0) write(*,*)'Do output (netCDF, restart) ...'
