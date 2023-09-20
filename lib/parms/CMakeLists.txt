@@ -14,12 +14,19 @@ if(${BUILD_FESOM_AS_LIBRARY})
 else()
   add_library(${PROJECT_NAME} ${all_sources})
 endif()
+
+if(${BLAS_FOUND})
 target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS USE_MPI REAL=double DBL FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 HAS_BLAS)
+target_link_libraries(${PROJECT_NAME} INTERFACE ${BLAS_C_LIBRARIES} $ENV{UBUNTU_BLAS_LIBRARY})
+else()
+target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS USE_MPI REAL=double DBL FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8)
+target_link_libraries(${PROJECT_NAME} INTERFACE $ENV{UBUNTU_BLAS_LIBRARY})
+endif()
+
 target_include_directories(${PROJECT_NAME}
 	PRIVATE ${src_home}/src/../include ${src_home}/src/include
 	INTERFACE ${src_home}/src/../include
 )
-target_link_libraries(${PROJECT_NAME} INTERFACE ${BLAS_C_LIBRARIES} $ENV{UBUNTU_BLAS_LIBRARY})
 if(${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
 	target_compile_options(${PROJECT_NAME} PRIVATE -no-prec-div -no-prec-sqrt -fast-transcendentals -fp-model precise)
    if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
