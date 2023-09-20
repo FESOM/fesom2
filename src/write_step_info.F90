@@ -417,7 +417,7 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
        end if ! --> if ( .not. trim(which_ALE)=='linfs' .and. ...
           
        
-       do nz=1,nlevels_nod2D(n)-1
+       do nz=ulevels_nod2D(n),nlevels_nod2D(n)-1
           !_______________________________________________________________
           ! check temp
           if ( (tracers%data(1)%values(nz, n) /= tracers%data(1)%values(nz, n)) .or. &
