@@ -45,7 +45,7 @@ module fesom_main_storage_module
     integer           :: n, from_nstep, offset, row, i, provided
     integer           :: which_readr ! read which restart files (0=netcdf, 1=core dump,2=dtype)
     integer           :: total_nsteps
-    integer, pointer  :: mype, npes, MPIerr, MPI_COMM_FESOM
+    integer, pointer  :: mype, npes, MPIerr, MPI_COMM_FESOM, MPI_COMM_WORLD
     real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
     real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
     real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing 
@@ -111,7 +111,7 @@ contains
         !OIFS-FESOM2 coupling: does not require MPI_INIT here as this is done by OASIS
         call MPI_Initialized(mpi_is_initialized, f%i)
         if(.not. mpi_is_initialized) then
-            ! do not initialize MPI here if it has been initialized already, e.g. via IFS when fesom is called as library (__ifsinterface is defined)
+            ! TODO: do not initialize MPI here if it has been initialized already, e.g. via IFS when fesom is called as library (__ifsinterface is defined)
             call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, f%provided, f%i)
             f%fesom_did_mpi_init = .true.
         end if
@@ -128,6 +128,7 @@ contains
         f%mype          =>f%partit%mype
         f%MPIerr        =>f%partit%MPIerr
         f%MPI_COMM_FESOM=>f%partit%MPI_COMM_FESOM
+        f%MPI_COMM_WORLD=>f%partit%MPI_COMM_WORLD
         f%npes          =>f%partit%npes
         if(f%mype==0) then
             write(*,*)
@@ -406,6 +407,10 @@ contains
 
   subroutine fesom_finalize()
     use fesom_main_storage_module
+#if defined(__MULTIO)
+    use iom
+    use mpp_io
+#endif
     ! EO parameters
     real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
 
@@ -447,6 +452,10 @@ contains
 #if defined (__oifs) 
     ! OpenIFS coupled version has to call oasis_terminate through par_ex
     call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
+#endif
+
+#ifdef __MULTIO && (ifndef __ifsinterface || ifndef __oasis)
+   call mpp_stop
 #endif
     if(f%fesom_did_mpi_init) call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype) ! finalize MPI before FESOM prints its stats block, otherwise there is sometimes output from other processes from an earlier time in the programm AFTER the starts block (with parastationMPI)
     if (f%mype==0) then

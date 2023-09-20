@@ -42,17 +42,41 @@ subroutine par_init(partit)    ! initializes MPI
   USE o_PARAM
   USE MOD_PARTIT
   USE MOD_PARSUP
+#ifdef __MULTIO
+  USE iom
+  USE mpp_io
+#endif
+
   implicit none
   type(t_partit), intent(inout), target :: partit
   integer                               :: i
   integer                               :: provided_mpi_thread_support_level
   character(:), allocatable             :: provided_mpi_thread_support_level_name
-
-#if defined __oasis || defined  __ifsinterface
+#ifdef __oasis || defined  __ifsinterface
   ! use comm from coupler or ifs
-#else
-  partit%MPI_COMM_FESOM=MPI_COMM_WORLD ! use global comm if not coupled (e.g. no __oasis or __ifsinterface)
-#endif  
+  ! TODO: multio with __ifsinterface is magically handled by IFS by using same module
+  !       names and routine names as in src/ifs_interface, that is not elegant.
+#else 
+#ifdef __MULTIO
+  !  fesom standalone with MULTIO 
+  character(len=255)                    :: oce_npes_str, mio_npes_str
+  integer                               :: oce_npes_int, mio_npes_int, oce_status, mio_status
+  CALL MPI_Comm_Size(MPI_COMM_WORLD, partit%npes, i)
+  CALL MPI_Comm_Rank(MPI_COMM_WORLD, partit%mype, i)
+  partit%MPI_COMM_FESOM=MPI_COMM_WORLD 
+  partit%MPI_COMM_WORLD=MPI_COMM_WORLD 
+  !TODO: dont need both env variables can do with just one and subtract from npes
+  CALL get_environment_variable('OCE_NPES', oce_npes_str, status=oce_status)
+  CALL get_environment_variable('MIO_NPES', mio_npes_str, status=mio_status)
+  read(oce_npes_str,*,iostat=oce_status) oce_npes_int
+  read(mio_npes_str,*,iostat=mio_status) mio_npes_int
+  call mpp_io_init_2(partit%MPI_COMM_FESOM)
+#else 
+  partit%MPI_COMM_FESOM=MPI_COMM_WORLD ! use global comm if not coupled (e.g. no __oasis or __ifsinterface or IO server)
+#endif 
+
+#endif 
+
   call MPI_Comm_Size(partit%MPI_COMM_FESOM,partit%npes,i)
   call MPI_Comm_Rank(partit%MPI_COMM_FESOM,partit%mype,i)
  
@@ -104,16 +128,22 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
 
 ! For standalone runs we directly call the MPI_barrier and MPI_finalize
 !---------------------------------------------------------------
+!TODO: logic is convoluted here, not defined oasis and model needs to abort doesn't happen using par_ex 
 #ifndef __oasis
   if (present(abort)) then
      if (mype==0) write(*,*) 'Run finished unexpectedly!'
      call MPI_ABORT(COMM, 1 )
   else
+          ! TODO: this is where fesom standalone, ifsinterface etc get to 
+          !1. there no abort actually even when model calls abort, and barrier may hang
+          !2. when using fesom as lib using finalize is bad here as there may 
+          !   be other MPI tasks running in calling library like IFS, better 
+          !   better practice in that case would be to free the communicator.
      call  MPI_Barrier(COMM, error)
      call  MPI_Finalize(error)
   endif
-#else ! standalone
-
+#else !  standalone
+! TODO logic below is also convoluted really not really for standalone
 ! From here on the two coupled options
 !-------------------------------------
 #if defined (__oifs)

@@ -71,7 +71,7 @@ if(${USE_ICEPACK})
    file(GLOB sources_Fortran ${src_home}/*.F90
                              ${src_home}/icepack_drivers/*.F90
                              ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90)
-elseif(${BUILD_FESOM_AS_LIBRARY})
+elseif(${BUILD_FESOM_AS_LIBRARY}) # TODO: assumes multio is always on
    file(GLOB sources_Fortran ${src_home}/*.F90
                              ${src_home}/ifs_interface/*.F90) # ICEPACK + LIBRARY NOT SUPPORTED (YET)
 else()
@@ -135,6 +135,9 @@ else()
    add_executable(${PROJECT_NAME} ${sources_Fortran} ${src_home}/fesom_main.F90)
 endif()
 target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
+if(${USE_MULTIO})
+	target_compile_definitions(${PROJECT_NAME} PRIVATE __MULTIO)
+endif()
 if(${DISABLE_MULTITHREADING})
    target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_MULTITHREADING)
 endif()
