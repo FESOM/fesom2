@@ -278,9 +278,9 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nzmin, nzmax)
     !---age-code-begin
     if (use_age_tracer) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nzmin, nzmax)
       do node=1,myDim_nod2D+eDim_nod2D
         nzmax=nlevels_nod2D(node)-1
         nzmin=ulevels_nod2D(node)
@@ -288,9 +288,9 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
                tracers%data(index_age_tracer)%values(nzmin:nzmax,node) = 0._WP
         end where
       end do
+!$OMP END PARALLEL DO
     end if
     !---age-code-end
-!$OMP END PARALLEL DO
 end subroutine solve_tracers_ale
 !
 !
