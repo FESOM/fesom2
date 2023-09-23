@@ -1156,7 +1156,7 @@ type(t_partit), intent(inout), target :: partit
   do ib=1, ib_num 
   
    !read all parameters that icb_step needs:			
-   read(icbID,'(18e15.7,I,L,3e15.7,L,I)')						&
+   read(icbID,'(18e15.7,I8,L,3e15.7,L,I5,L)')						&
    	height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
 	Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
 	conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
@@ -1224,7 +1224,7 @@ type(t_partit), intent(inout), target :: partit
   open(unit=icbID_ISM,file=IcebergRestartPath_ISM,status='old', form='formatted')
   do ib=1, num_non_melted_icb 
    !read all parameters that icb_step needs:			
-   read(icbID_ISM,'(18e15.7,I,L,3e15.7,L,I,L)',iostat=st)						&
+   read(icbID_ISM,'(18e15.7,I8,L,3e15.7,L,I5,L)',iostat=st)						&
    	height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
 	Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
 	conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
@@ -1295,7 +1295,7 @@ type(t_partit), intent(inout), target :: partit
   do ib=1, ib_num 
   
    !write all parameters that icb_step needs:
-   write(icbID,'(18e15.7,I,L,3e15.7,L,I,L)')						&
+   write(icbID,'(18e15.7,I8,L,3e15.7,L,I5,L)')						&
    	height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
 	Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
 	conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
@@ -1306,7 +1306,7 @@ type(t_partit), intent(inout), target :: partit
    !write new restart file with only non melted icebergs
    if(.not.melted(ib)) then
        !write all parameters that icb_step needs:
-       write(icbID_ISM,'(18e15.7,I,L,3e15.7,L,I,L)')						&
+       write(icbID_ISM,'(18e15.7,I8,L,3e15.7,L,I5,L)')						&
             height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
             Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
             conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
