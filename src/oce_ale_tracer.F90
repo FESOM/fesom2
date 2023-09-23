@@ -291,7 +291,6 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     end if
     !---age-code-end
 !$OMP END PARALLEL DO
-
 end subroutine solve_tracers_ale
 !
 !
