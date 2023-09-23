@@ -39,6 +39,12 @@ end type com_struct
 
 TYPE T_PARTIT
   integer              :: MPI_COMM_FESOM ! FESOM communicator (for ocean only runs if often a copy of MPI_COMM_WORLD)
+  
+  !---------------------------------------------------
+  !LA 2023-01-31 add asynchronous icebergs
+  ! kh 10.02.21 communicator for async iceberg computations based on OpenMP
+  integer              :: MPI_COMM_FESOM_IB
+  !---------------------------------------------------
 
   type(com_struct) :: com_nod2D
   type(com_struct) :: com_elem2D
@@ -61,6 +67,11 @@ TYPE T_PARTIT
 
   ! general MPI part
   integer            :: MPIERR
+  !---------------------------------------------------
+  !LA 2023-01-31 add asynchronous icebergs
+  ! kh 11.02.21
+  integer            :: MPIERR_IB
+  !---------------------------------------------------
   integer            :: npes
   integer            :: mype
   integer            :: maxPEnum=100

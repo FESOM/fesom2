@@ -29,7 +29,6 @@ subroutine landice_water_init(partit, mesh)
   character                   :: c_reg_ind
   type(t_partit), intent(in), target :: partit
   type(t_mesh),   intent(in), target :: mesh
-
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"

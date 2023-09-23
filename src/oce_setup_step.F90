@@ -657,6 +657,10 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     ! Ocean forcing arrays
     ! ================
     allocate(Tclim(nl-1,node_size), Sclim(nl-1, node_size))
+    !---
+    ! LA: add iceberg tracers 2023-02-08
+    allocate(Tclim_ib(nl-1,node_size), Sclim_ib(nl-1, node_size))
+    !---
     allocate(stress_surf(2,myDim_elem2D))    !!! Attention, it is shorter !!! 
     allocate(stress_node_surf(2,node_size))
     allocate(stress_atmoce_x(node_size), stress_atmoce_y(node_size)) 
@@ -864,6 +868,13 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     Sclim=tracers%data(2)%values
     Tsurf=Tclim(1,:)
     Ssurf=Sclim(1,:)
+    
+    if (use_icebergs) then
+      Tclim_ib=tracers%data(1)%values
+      Sclim_ib=tracers%data(2)%values
+      Tsurf_ib=Tclim(1,:)
+      Ssurf_ib=Sclim(1,:)
+    end if
     relax2clim=0.0_WP
 
     ! count the passive tracers which require 3D source (ptracers_restore_total)

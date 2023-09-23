@@ -280,7 +280,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
       do i=1,nrecv
          exchange =0.0
          call cpl_oasis3mct_recv (i, exchange, action, partit)
-	 !if (.not. action) cycle
+         !if (.not. action) cycle
 	 !Do not apply a correction at first time step!
     if (i==1 .and. action .and. istep/=1) call net_rec_from_atm(action, partit)
         if (i.eq.1) then
@@ -373,16 +373,34 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
     	          mask=1.
 	              call force_flux_consv(enthalpyoffuse, mask, i, 0, action, partit, mesh)
              end if
-!---wiso-code
 #else
-         elseif (i.eq.14) then
-             if (action) then
-             ! tot_prec_o18 over water: this variable includes (i) rain over open water and sea ice, (ii) snow and evap over open water,  (iii) river runoff
-             www1(:)         =  exchange(:)
+         elseif (i.eq.13) then
+            if (action) then
+                 if (lwiso) then         
+                     www3(:)         =  exchange(:)
+                 else if (use_icebergs) then    
+                     u_wind(:)                     = exchange(:)        ! zonal wind
+                 end if
              end if
              mask=1.
-             if (lwiso) then
-             call force_flux_consv(www1, mask, i, 0,action, partit, mesh)
+             if (lwiso) then         
+                 call force_flux_consv(www3, mask, i, 0,action, partit, mesh)
+             else if (use_icebergs) then    
+                 call force_flux_consv(u_wind, mask, i, 0, action, partit, mesh)
+             end if
+         elseif (i.eq.14) then
+             if (action) then
+                 if (lwiso) then         
+                     www1(:)         =  exchange(:)
+                 else if (use_icebergs) then    
+                     v_wind(:)                     = exchange(:)        ! meridional wind
+                 end if
+             end if
+             mask=1.
+             if (lwiso) then         
+                 call force_flux_consv(www1, mask, i, 0,action, partit, mesh)
+             else if (use_icebergs) then    
+                 call force_flux_consv(v_wind, mask, i, 0, action, partit, mesh)
              end if
          elseif (i.eq.15) then
              if (action) then
@@ -392,15 +410,6 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
              mask=1.
              if (lwiso) then
              call force_flux_consv(www2, mask, i, 0,action, partit, mesh)
-             end if
-         elseif (i.eq.13) then
-             if (action) then
-             ! tot_prec_o16 over water: this variable includes (i) rain open water and sea ice, (ii) snow and evap over open water,  (iii) river runoff
-             www3(:)         =  exchange(:)
-             end if
-             mask=1.
-             if (lwiso) then
-             call force_flux_consv(www3, mask, i, 0,action, partit, mesh)
              end if
          elseif (i.eq.17) then
              if (action) then
@@ -438,9 +447,24 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
                  call force_flux_consv(iii3,mask,i,1,action, partit, mesh) ! Northern hemisphere
                  call force_flux_consv(iii3,mask,i,2,action, partit, mesh) ! Southern Hemisphere
              end if
-!---wiso-code-end
-# endif
+         elseif (i.eq.19) then
+             if (action) then
+                u_wind(:)                     = exchange(:)        ! meridional wind
+             end if
+             mask=1
+             if (use_icebergs.and.lwiso) then    
+                 call force_flux_consv(u_wind, mask, i, 0, action, partit, mesh)
+             end if
+         elseif (i.eq.20) then
+             if (action) then
+                v_wind(:)                     = exchange(:)        ! meridional wind
+             end if
+             mask=1
+             if (use_icebergs.and.lwiso) then    
+                 call force_flux_consv(v_wind, mask, i, 0, action, partit, mesh)
+             end if
          end if
+# endif
 
 #ifdef VERBOSE
 	  if (mype==0) then

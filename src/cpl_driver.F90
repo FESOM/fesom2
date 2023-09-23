@@ -13,9 +13,7 @@ module cpl_driver
   ! Modules used
   !
   use mod_oasis                    ! oasis module
-  !---wiso-code
-  use g_config, only : dt, lwiso   ! add lwiso switch
-  !---wiso-code-end
+  use g_config, only : dt, use_icebergs, lwiso
   use o_param,  only : rad
   USE MOD_PARTIT
   implicit none
@@ -463,8 +461,7 @@ contains
     cpl_recv(10) = 'heat_ico'
     cpl_recv(11) = 'heat_swo'    
     cpl_recv(12) = 'hydr_oce'
-!---wiso-code
-! add isotope coupling fields
+! --- icebergs ---
     IF (lwiso) THEN
       cpl_recv(13) = 'w1_oce'
       cpl_recv(14) = 'w2_oce'
@@ -472,8 +469,15 @@ contains
       cpl_recv(16) = 'i1_oce'
       cpl_recv(17) = 'i2_oce'
       cpl_recv(18) = 'i3_oce'
+      IF (use_icebergs) THEN
+        cpl_recv(19) = 'u10w_oce'
+        cpl_recv(20) = 'v10w_oce'
+      END IF
+    ELSE IF (use_icebergs) THEN
+      cpl_recv(13) = 'u10w_oce'
+      cpl_recv(14) = 'v10w_oce'
     END IF
-!---wiso-code-end
+! --- icebergs ---
 #endif
 
     if (mype .eq. 0) then 

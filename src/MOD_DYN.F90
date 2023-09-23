@@ -72,6 +72,10 @@ TYPE T_DYN
     ! sea surface height arrays
     real(kind=WP), allocatable, dimension(:)    :: eta_n, d_eta, ssh_rhs, ssh_rhs_old
     
+    ! LA: 2023-05-17 iceberg arrays
+    real(kind=WP), allocatable, dimension(:)    :: eta_n_ib ! kh 18.03.21 additional array for asynchronous iceberg computations
+    real(kind=WP), allocatable, dimension(:,:,:):: uv_ib    ! kh 18.03.21 additional array for asynchronous iceberg computations
+    
     !___________________________________________________________________________
     ! summarizes solver input parameter
     type(t_solverinfo)                          :: solverinfo

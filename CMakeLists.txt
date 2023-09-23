@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.9)
 
 # set default build type cache entry (do so before project(...) is called, which would create this cache entry on its own)
 if(NOT CMAKE_BUILD_TYPE)
-	message(STATUS "setting default build type: Release")
-	set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel.")
+  message(STATUS "setting default build type: Release")
+  set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel.")
 endif()
 
 project(FESOM2.0)
@@ -14,7 +14,8 @@ set(OIFS_COUPLED OFF CACHE BOOL "compile fesom coupled to OpenIFS. (Also needs F
 set(CRAY OFF CACHE BOOL "compile with cray ftn")
 set(USE_ICEPACK OFF CACHE BOOL "compile fesom with the Iceapck modules for sea ice column physics.")
 set(OPENMP_REPRODUCIBLE OFF CACHE BOOL "serialize OpenMP loops that are critical for reproducible results")
+set(ASYNC_ICEBERGS ON CACHE BOOL "compile fesom with or without support for asynchronous iceberg computations")
 
-#set(VERBOSE OFF CACHE BOOL "toggle debug output")
+set(VERBOSE OFF CACHE BOOL "toggle debug output")
 #add_subdirectory(oasis3-mct/lib/psmile)
 add_subdirectory(src)
