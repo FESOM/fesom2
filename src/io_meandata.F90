@@ -4,7 +4,7 @@ module io_MEANDATA
   use, intrinsic :: iso_fortran_env, only: real64, real32
   use io_data_strategy_module
   use async_threads_module
-
+!  use iso_c_binding, only: c_char, C_NULL_CHAR
   implicit none
 #include "netcdf.inc"
   private
@@ -48,6 +48,7 @@ module io_MEANDATA
     real(real32), allocatable, dimension(:,:) :: local_values_r4_copy
     real(kind=WP) :: ctime_copy
     integer :: mype_workaround
+    integer :: iostep=0 ! nth step for IO 
   contains
     final destructor
   end type  
@@ -683,7 +684,6 @@ subroutine assoc_ids(entry)
 
   type(Meandata), intent(inout) :: entry
   integer                       :: j
-
   write(*,*) 'associating mean I/O file ', trim(entry%filename)
 
   do j=1, entry%ndim
@@ -735,8 +735,8 @@ subroutine write_mean(entry, entry_index)
          call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
 ! hecuba IO
 #if defined (__hecubaio)
-         WRITE (*,*), 
-         call write_array(trim(entry%name)//C_NULL_CHAR, entry%ctime_copy, entry%mype_workaround, entry%ptr3, myDim_nod2D) 
+         !WRITE (*,*), "sending  time ", entry%ctime_copy, entry%iostep
+         call write_array("exp24", trim(entry%name)//C_NULL_CHAR, entry%iostep , entry%mype_workaround, entry%ptr3, myDim_nod2D) 
 #endif
        else
          call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
@@ -814,11 +814,12 @@ subroutine output(istep, mesh)
   use icedrv_main,    only: init_io_icepack
 #endif
 #if defined (__hecubaio)
-use mod_hecuba
+  use mod_hecuba
+  use iso_c_binding, only: c_char, C_NULL_CHAR
 #endif
   implicit none
 
-  integer       :: istep
+  integer       :: istep, ierr
   logical, save :: lfirst=.true.
   integer       :: n, k
   logical       :: do_output
@@ -836,8 +837,10 @@ use mod_hecuba
 #endif
      call init_io_gather()
 #if defined (__hecubaio)
-     call fhecuba_start_session()
-     !stop /testing
+     !if(mype==0) then
+       call hecuba_start_session("exp24")
+     !end if
+     call MPI_BARRIER(MPI_COMM_FESOM, ierr)
 #endif
 
   end if
@@ -872,10 +875,10 @@ use mod_hecuba
      endif
 
      if (do_output) then
-
+        
         if(entry%thread_running) call entry%thread%join()
         entry%thread_running = .false.
-
+        entry%iostep = entry%iostep+1 ! added new SUVI to track only io steps
         filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
         if(mype == entry%root_rank) then
           if(filepath /= trim(entry%filename)) then
