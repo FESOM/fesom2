@@ -14,6 +14,7 @@ message("HECUBA ROOT is ${HECUBA_ROOT}")
 target_include_directories(${PROJECT_NAME}
         INTERFACE ${CMAKE_CURRENT_LIST_DIR}
         PUBLIC ${CMAKE_CURRENT_BINARY_DIR}
+	PUBLIC "${HECUBA_ROOT}/include/hecuba"
 	PUBLIC "${HECUBA_ROOT}/include"
 )
 
@@ -24,7 +25,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "-Wl,-rpath,${HECUBA
 #target_link_directories(${PROJECT_NAME} PUBLIC "${HECUBA_ROOT}/lib")
 #target_link_libraries(${PROJECT_NAME} PUBLIC hfetch)
 
-target_link_libraries(${PROJECT_NAME} PUBLIC -L${HECUBA_ROOT}/lib -lhfetch)
+target_link_libraries(${PROJECT_NAME} PRIVATE -L${HECUBA_ROOT}/lib -lhfetch)
 
 #target_link_libraries(${PROJECT_NAME}_C -L${LIBDILL_LIB} -ldill -pthread -lssl -lcrypto)
 
