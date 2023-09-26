@@ -5,10 +5,8 @@
 extern "C" {
 #endif
  
-void start_hecuba_session();
-void load_datamodel();
-void hecuba_put_array_val_C(char *key, void *valueC, long unsigned int *arr_size);
-void hecuba_put_array_val_C2(char *varname, double ctime, int chunk, void *valueC, long unsigned int *arr_size);
+void initHecubaSession(const char * expname);
+void sendMetricsToHecuba(const char * expname, const char * varname, int32_t timestep, int32_t chunk_id, void *data, int32_t metadata);
 
 #ifdef __cplusplus
 }
