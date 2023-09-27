@@ -8,25 +8,19 @@ This chapter describes several ways of getting started with FESOM2. First we sho
 TL;DR version for supported HPC systems
 =======================================
 
-Supported systems are: generic ``ubuntu``, ``ollie`` at AWI, ``mistral`` at DKRZ, ``JURECA`` at JSC, ``HLRN``, ``Hazel Hen``, ``MareNostrum 4`` at BSC. During configuration the system will be recognised and apropriate environment variables and compiler options should be used.
+Supported systems are: generic ``ubuntu``, ``albedo`` at AWI, ``levante`` at DKRZ, ``JURECA`` at JSC, ``HLRN``, ``Hazel Hen``, ``MareNostrum 4`` at BSC. During configuration the system will be recognised and apropriate environment variables and compiler options should be used.
 ::
 
     git clone https://github.com/FESOM/fesom2.git
     cd fesom2
-    bash -l configure.sh
 
-Create file fesom.clock in the output directory with the following content (if you plan to run with COREII foring):
+If one intends to run simulations on ``albedo`` or ``levante``, one first needs to change to the ``refactoring`` branch (note that this part is only needed while the ``refactoring`` is not yet merged into ``master``:
+    
+    git checkout refactoring
 
-::
+After confirming that the right FESOM2 branch is being used, compile the model with:
 
-    0 1  1948
-    0 1  1948
-
-after that one has to adjust the run script for the target sustem and run it:
-::
-
-    cd work
-    sbatch job_ollie
+    bash -l ./configure.sh
 
 Detailed steps of compiling and runing the code
 ===============================================
@@ -50,6 +44,24 @@ Clone the GitHub repository with a git command:
 The repository contains model code and two additional libraries: `Metis` (domain partitioner) and `Parms` (solver), necessary to run FESOM2. To build FESOM2 executable one have to compile Parms library and the code of the model (`src` folder). In order to build executable that is used for model domain partitioning (distribution of the model mesh between CPUs) one have to compile `Metis` library and also some code located in the src directory (see :ref:`partitioning`). Building of the model executable and the partitioner is usually done automatically with the use of CMake. If you going to build the code not on one of the supported platforms (ollie, DKRZ, HLRN, HAZELHEN, and BSC, general Ubuntu), you might need to do some (usually small) modifications described in `Adding new platform for compilation`_ section.
 
 Change to the `fesom2` folder and execute:
+
+::
+
+    cd fesom2
+
+If one intends to run simulations on ``albedo`` or ``levante``, one first needs to change to the ``refactoring`` branch (note that this part is only needed while the ``refactoring`` branch is not yet merged into ``master``.
+
+::
+
+    git checkout refactoring
+
+As a good practice, if one wants to make modifications to the source code or any of the files, it is advisable to create a branch from refactoring:
+
+::
+
+    git checkout -b <my branch> refactoring
+
+After confirming that the right FESOM2 branch is being used, compile the model with:
 
 ::
 
@@ -94,20 +106,34 @@ The ``input`` folder contains files with initial conditions (``phc3.0``) and atm
 Preparing the run
 ------------------
 
-You have to do several basic things in order to prepare the run. First, create a directory where results will be stored. Usually, it is created in the model root directory:
+You have to do several basic things in order to prepare the run. 
+
+First, be aware of the files you need to modify according to your run configurations. Normally, those are:
+
+- ``namelist.config``: inside of the ``config`` folder. In this file you can set several configurations, such as the path to your mesh, climatology and results, as well as run length, units and start year of your run. 
+
+- ``namelist.forcing``: inside of the ``config`` folder. In this file you can set the path to your forcing files.
+
+- ``job_<name-of-hpc>``: inside of the ``work`` folder. In this file you can set other important configurations, such as the time, tasks and tasks per node you allocate to your run.
+
+The exact changes necessary to those file are indicated later in this documentation. Before doing so, create a directory to store your output. Usually, it is created in the model root directory:
 
 ::
 
     mkdir results
 
-You might make a link to some other directory located on the part of the system where you have a lot of storage. In the results directory, you have to create ``fesom.clock`` file (NOTE, if you change ``runid`` in ``namelist.config`` to something like ``runid=mygreatrun``, the file will be named ``mygreatrun.clock``). Inside the file you have to put two identical lines:
+You might make a link to some other directory located on the part of the system where you have a lot of storage. 
+
+In your results directory, create a file named ``fesom.clock`` (NOTE: if you change ``runid`` in ``namelist.config`` to something like ``runid=mygreatrun``, the file will be named ``mygreatrun.clock``).           
+
+Inside the file you have to put two identical lines:
 
 ::
 
     0 1 1958
     0 1 1958
 
-This is initial date of the model run, or the time of the `cold start` of your model. More detailed explanation of the clock file will be given in the `The clock file`_ section.
+This is initial date of the model run, or the time of the `cold start` of your model. In case you want to start your run with a specific forcing from a specific year, substitute 1958 to the desired year. More detailed explanation of the clock file will be given in the `The clock file`_ section. 
 
 The next step is to make some changes in the model configuration. All runtime options can be set in the namelists that are located in the config directory:
 
@@ -115,14 +141,40 @@ The next step is to make some changes in the model configuration. All runtime op
 
     cd ../config/
 
-There are several configuration files, but we are only interested in the ``namelist.config`` for now. The options that you might want to change for your first FESOM2 run are:
+As mentioned before, in this directory, you will normally have to change two files: ``namelist.config`` and ``namelist.forcing``. Both of these files ask for paths to initial conditions. Normally, these paths can be found under ``./setups/paths.yml``. 
 
-- ``run_length`` length of the model run in run_length_unit (see below).
-- ``run_length_unit`` units of the run_length. Can be ``y`` (year), ``m`` (month), ``d`` (days), ``s`` (model steps).
-- ``MeshPath`` - path to the mesh you would like to use (e.g. ``/youdir/FESOM2_one_year_input/mesh/pi/``, slash at the end is important!)
-- ``ClimateDataPath`` - path to the folder with the file with model temperature and salinity initial conditions (e.g. ``/youdir/FESOM2_one_year_input/input/phc3.0/``). The name of the file with initial conditions is defined in `namelist.oce`, but during first runs you probably don't want to change it.
+Changing namelist.config
+========================
 
-More detailed explination of options in the ``namelist.config`` is in the section :ref:`chap_general_configuration`.
+In ``namelist.config``, the options that you might want to change for your first FESOM2 run are:
+
+- ``run_length``: length of the model run in run_length_unit (see below). 
+
+- ``run_length_unit``: units of the run_length. Can be ``y`` (year), ``m`` (month), ``d`` (days), ``s`` (model steps).
+
+.. note:: you will need to adjust the run time to the length of your run. So, if you set ``run_length`` to 10 and ``run_length_unit`` to ``y``, for example, the run time needs to be enough for a 10-year run at once. For 4 nodes, for example, that would take about four hours to run. 
+- ``yearnew``: define the same as the year in your ``fesom.clock``;
+
+- ``MeshPath``: path to the mesh you would like to use (e.g. ``/youdir/FESOM2_one_year_input/mesh/pi/``, slash at the end is important!);
+
+- ``ClimateDataPath``: path to the folder with the file with model temperature and salinity initial conditions (e.g. ``/youdir/FESOM2_one_year_input/input/phc3.0/``). The name of the file with initial conditions is defined in `namelist.oce`, but during first runs you probably don't want to change it;
+
+- ``ResultPath``: path to your results folder. The output of the model will be stored there.
+
+More detailed explanation of options in the ``namelist.config`` is in the section :ref:`chap_general_configuration`.
+
+Changing namelist.forcing
+=========================
+
+In ``namelist.forcing``, the options you need to change for your first FESOM2 run depends on the forcing you decide to use to initialize your experiment. Please note that the year you initialize your experiment with needs to be included in the forcing data files.
+
+In section ``&nam_sbc``, change the path of all the files to the path to the forcing you have chosen. For example, if you want to initialize your experiment with JRA55 forcing on ``levante``, the path to each fiel will be:
+
+::
+
+'/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/<name_of_variable>'
+
+More detailed explanation of options in the ``namelist.forcing`` is in the section :ref:`chap_forcing_configuration`.
 
 Running the model
 -----------------
@@ -130,18 +182,28 @@ Running the model
 Change to the ``work`` directory. You should find several batch scripts that are used to submit model jobs to different HPC machines. The scripts also link ``fesom.x`` executable to the ``work`` directory and copy namelists with configurations from config folder.
 
 .. note::
-   Model executable, namelists and job script have to be located in the same directory (usually ``work``).
+   Model executable, namelists and job script will be located in the same directory (usually ``work``).
 
-If you are working on AWI's ``ollie`` supercomputer, you have to use ``job_ollie``, in other case use the job script for your specific platform, or try to modify one of the existing ones.
+If you are working on AWI's ``albedo`` supercomputer, you have to use ``job_albedo``, in other case use the job script for your specific platform, or try to modify one of the existing ones.
 
-.. note::
-   One thing you might need to adjust in the job files is the number of cores, you would like to run the model on. For example, for SLURM it will be adjusting ``#SBATCH --ntasks=288`` value, and for simple ``mpirun`` command, that we have for ``job_ubuntu`` it will be argument for the ``-n`` option. It is necessary, that your mesh has the corresponding partitioning (``dist_xx`` folder, where ``xx`` is the number of cores).
+In the job file, the changes are done based on the HPC you are using. For ``levante``, you should adapt for example:
 
-On ``ollie`` the submission of your job is done by executing the following command:
+- ``#SBATCH --job-name``: name of your experiment; e.g. myexperiment_001;
+
+- ``#SBATCH --ntasks-per-node``: number of cores per node. This number has to be divisible by the number of tasks. If you choose the ``ntasks``/4, for example, you will run your experiment with 4 nodes;
+
+- ``#SBATCH --ntasks``: number of cores. This number has to be the same of your desired mesh partitioning. It is the ``xx`` number in your ``dist_xx`` mesh folder;
+
+- ``#SBATCH --time``: be generous with your run time, in case you are running a longer simulation and the job is not being resubmmited after each time step;
+
+- ``#SBATCH -A <account>``: define your project account.
+
+
+On ``levante`` the submission of your job is done by executing the following command:
 
 ::
 
-    sbatch job_ollie
+    sbatch job_levante
 
 The job is then submitted. In order to check the status of your job on ollie you can execute:
 
@@ -149,7 +211,22 @@ The job is then submitted. In order to check the status of your job on ollie you
 
     squeue -u yourusername
 
-Results of the model run should appear in the ``results`` directory that you have specified in the ``namelist.config``. After the run is finished the ``fesom.clock`` file (or if you change your runid, ``runid.clock``)  will be updated with information about the time of your run's end, that allows running the next time portion of the model experiment by just resubmitting the job with ``sbatch job_ollie``.
+The output of the model run should appear in the ``results`` directory that you have specified in the ``namelist.config``. After the run is finished the ``fesom.clock`` file (or if you change your runid, ``runid.clock``)  will be updated with information about the time of your run's end, that allows running the next time portion of the model experiment by just resubmitting the job with ``sbatch job_ollie``.
+
+Some files will also be stored on the work folder. Those are
+
+- A file containing information about errors during job preparation and submission, usually containing ``err.out`` in its name;
+
+- A file containing information about the job itself, such as duration, folders, etc, usually contining ``out.out`` in its name;
+
+- A file containing information about the simulation, usually called ``fesom2-0.out``;
+  
+- A binary file ``fesom.x`` specific to that simulation;
+
+- A copy of the namelists used to define the configurations of your run. 
+
+In case your simulation crashes, usually the job error file or ``fesom2-0.out`` contain valuable information to either fix the issue causing the crash or to give the developers an idea of what can be done to help you.
+
 
 Other things you need to know earlier on
 ========================================
