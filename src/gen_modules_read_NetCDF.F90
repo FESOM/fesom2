@@ -205,7 +205,7 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
   integer                       :: i, j,  n, num
   integer                       :: itime, latlen, lonlen
   integer                       :: status, ncid, varid
-  integer                       :: lonid, latid
+  integer                       :: lonid, latid, drain_num
   integer                       :: istart(4), icount(4)
   real(real64)                  :: x, y, miss
   real(real64), allocatable     :: lon(:), lat(:)
@@ -363,7 +363,244 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, 
   call MPI_BCast(ncdata, nod2D, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
   model_2Darray=ncdata(myList_nod2D) 
 end subroutine read_2ddata_on_grid_NetCDF
-  
+
+subroutine read_runoff_mapper(file, vari, R, partit, mesh)
+   ! 1. Read arrival points from the runoff mapper
+   ! 2. Create conservative remapping A*X=runoff:
+   ! A=remapping operator; X=runoff into drainage basins (in Sv); runoff= runoff im [m/s] to be put into the ocean
+!  use, intrinsic :: ISO_FORTRAN_ENV
+   use g_config
+   use o_param
+   USE MOD_MESH
+   USE MOD_PARTIT
+   USE MOD_PARSUP
+   USE g_forcing_arrays,    only: runoff
+   use g_support
+   implicit none
+ 
+#include "netcdf.inc"
+   character(*),   intent(in) :: file
+   character(*),   intent(in) :: vari
+   real(real64),   intent(in) :: R
+   type(t_mesh),   intent(in),    target :: mesh
+   type(t_partit), intent(inout), target :: partit
+   integer                    :: i, j, n, num, cnt, number_arrival_points, offset
+   real(real64)               :: entry, dist, delta_lat, delta_lon
+   integer                    :: itime, latlen, lonlen
+   integer                    :: status, ncid, varid
+   integer                    :: lonid, latid, drain_num
+   integer                    :: istart(2), icount(2)
+   real(real64), allocatable  :: lon(:), lat(:)
+   real(real64)               :: W
+   integer, allocatable       :: ncdata(:,:)
+   real(real64), allocatable  :: lon_sparse(:), lat_sparse(:), dist_min(:), dist_min_glo(:)
+   real(real64), allocatable  :: arrival_area(:)
+   integer, allocatable       :: data_sparse(:), dist_ind(:)
+   logical                    :: check_dummy, do_onvert
+   integer                    :: ierror           ! return error code
+   type(sparse_matrix)        :: RUNOFF_MAPPER
+ 
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+ 
+   if (mype==0) write(*,*) 'building RUNOFF MAPPER with radius of smoothing= ', R*1.e-3, ' km'
+   if (mype==0) then
+      ! open file
+      status=nf_open(trim(file), nf_nowrite, ncid)
+   end if
+ 
+   call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+   if (status.ne.nf_noerr)then
+      print*,'ERROR: CANNOT READ 2D netCDF FILE CORRECTLY !!!!!'
+      print*,'Error in opening netcdf file '//file
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+      stop
+   endif
+ 
+   if (mype==0) then
+      ! lat
+      status=nf_inq_dimid(ncid, 'lat', latid)
+      status=nf_inq_dimlen(ncid, latid, latlen)
+      ! lon
+      status=nf_inq_dimid(ncid, 'lon', lonid)
+      status=nf_inq_dimlen(ncid, lonid, lonlen)
+   end if
+   call MPI_BCast(latlen, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+   call MPI_BCast(lonlen, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+ 
+   ! lat
+   if (mype==0) then
+      allocate(lat(latlen))
+      status=nf_inq_varid(ncid, 'lat', varid)
+      status=nf_get_vara_double(ncid,varid,1,latlen,lat)
+   end if
+
+   ! lon
+   if (mype==0) then
+      allocate(lon(lonlen))
+      status=nf_inq_varid(ncid, 'lon', varid)
+      status=nf_get_vara_double(ncid,varid,1,lonlen,lon)
+   ! make sure range 0. - 360.
+   do n=1,lonlen
+      if (lon(n)<0.0_WP) then
+         lon(n)=lon(n)+360._WP
+      end if
+   end do
+   end if
+
+   if (mype==0) then
+      allocate(ncdata(lonlen,latlen))
+      ncdata = 0.0_WP
+     ! data
+      status=nf_inq_varid(ncid, trim(vari), varid)
+      istart = (/1,1/)
+      icount= (/lonlen,latlen/)
+      status=nf_get_vara_int(ncid,varid,istart,icount,ncdata)
+     ! close file
+     status=nf_close(ncid)
+     number_arrival_points=0
+     do i=1, lonlen
+        do j=1, latlen
+           if (ncdata(i,j)>0) then
+            number_arrival_points=number_arrival_points+1
+           end if
+        end do
+     end do
+   end if
+
+   call MPI_BCast(number_arrival_points, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+   allocate(lon_sparse(number_arrival_points), lat_sparse(number_arrival_points))
+   allocate(dist_min(number_arrival_points), dist_min_glo(number_arrival_points), dist_ind(number_arrival_points))
+   allocate(data_sparse(number_arrival_points))
+
+   if (mype==0) then
+      cnt=1
+      do i=1, lonlen
+         do j=1, latlen
+            if (ncdata(i,j)>0) then
+               lon_sparse(cnt)=lon(i)
+               lat_sparse(cnt)=lat(j)
+               data_sparse(cnt)=ncdata(i,j)
+               cnt=cnt+1
+            end if
+         end do
+      end do
+      deallocate(ncdata, lon, lat)
+   end if
+   call MPI_BCast(lon_sparse,  number_arrival_points, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+   call MPI_BCast(lat_sparse,  number_arrival_points, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+   call MPI_BCast(data_sparse, number_arrival_points, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+   drain_num=maxval(data_sparse)
+   lon_sparse=lon_sparse-360.0_WP
+   lon_sparse=lon_sparse*rad
+   lat_sparse=lat_sparse*rad
+
+   do n=1, number_arrival_points
+      do i=1, myDim_nod2d+eDim_nod2D
+         delta_lon=abs(geo_coord_nod2D(1,i)-lon_sparse(n))
+         if (delta_lon > cyclic_length/2.0_WP) delta_lon=delta_lon-cyclic_length
+         delta_lat=(geo_coord_nod2D(2,i)-lat_sparse(n))
+         entry = sin(delta_lat/2.0)**2 + cos(geo_coord_nod2D(2,i)) * cos(lat_sparse(n)) * sin(delta_lon/2.0)**2
+         dist=2.0 * atan2(sqrt(entry), sqrt(1.0 - entry))*r_earth
+         if (i==1) then
+            dist_min(n)=dist
+            dist_ind(n)=1
+         end if
+         if (dist<dist_min(n)) then 
+             dist_min(n)=dist
+             dist_ind(n)=i
+         end if
+      end do
+   end do
+   
+   call MPI_AllREDUCE(dist_min , dist_min_glo , number_arrival_points, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+
+   lon_sparse=0.0_WP
+   lat_sparse=0.0_WP
+   where ((abs(dist_min-dist_min_glo)<1.e-5) .AND. (dist_ind<=myDim_nod2d))
+         lon_sparse=geo_coord_nod2D(1, dist_ind)
+         lat_sparse=geo_coord_nod2D(2, dist_ind)
+   end where
+   call MPI_AllREDUCE(MPI_IN_PLACE , lon_sparse , number_arrival_points, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , lat_sparse , number_arrival_points, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+
+   RUNOFF_MAPPER%dim=myDim_nod2d+eDim_nod2D
+   ALLOCATE(RUNOFF_MAPPER%rowptr(RUNOFF_MAPPER%dim+1))
+   
+   RUNOFF_MAPPER%rowptr(1) = 1
+   
+   DO n=1, myDim_nod2d+eDim_nod2D
+      cnt=0
+      DO i=1, number_arrival_points
+!       if ((dist_min(i)==dist_min_glo(i)) .AND. (dist_ind(i)==n)) cnt=cnt+1
+         delta_lon=abs(geo_coord_nod2D(1,n)-lon_sparse(i))
+         if (delta_lon > cyclic_length/2.0_WP) delta_lon=delta_lon-cyclic_length
+         delta_lat=(geo_coord_nod2D(2,n)-lat_sparse(i))
+         entry = sin(delta_lat/2.0)**2 + cos(geo_coord_nod2D(2,n)) * cos(lat_sparse(i)) * sin(delta_lon/2.0)**2
+         dist=2.0 * atan2(sqrt(entry), sqrt(1.0 - entry))*r_earth
+         if (dist<=R) cnt=cnt+1
+      END DO
+      RUNOFF_MAPPER%rowptr(n+1)=RUNOFF_MAPPER%rowptr(n)+max(cnt,1)
+   END DO
+   
+ !  write(*,*) 'rowptr check:', mype, RUNOFF_MAPPER%rowptr(RUNOFF_MAPPER%dim+1)
+
+   ALLOCATE(RUNOFF_MAPPER%colind(RUNOFF_MAPPER%rowptr(RUNOFF_MAPPER%dim+1)-1))
+   ALLOCATE(RUNOFF_MAPPER%values(RUNOFF_MAPPER%rowptr(RUNOFF_MAPPER%dim+1)-1))
+   ALLOCATE(arrival_area(drain_num))
+   status=0
+   arrival_area=0.0_WP ! will be used further to normalize the total flux
+   DO n=1, myDim_nod2d+eDim_nod2D
+      offset=RUNOFF_MAPPER%rowptr(n)
+      cnt=0
+      W=areasvol(ulevels_nod2D(n),n)
+      DO i=1, number_arrival_points
+         j=data_sparse(i)
+         delta_lon=abs(geo_coord_nod2D(1,n)-lon_sparse(i))
+         if (delta_lon > cyclic_length/2.0_WP) delta_lon=delta_lon-cyclic_length
+         delta_lat=(geo_coord_nod2D(2,n)-lat_sparse(i))
+         entry = sin(delta_lat/2.0)**2 + cos(geo_coord_nod2D(2,n)) * cos(lat_sparse(i)) * sin(delta_lon/2.0)**2
+         dist=2.0 * atan2(sqrt(entry), sqrt(1.0 - entry))*r_earth
+         entry=(1.0-dist/R)
+         if (entry > 0.) then
+            RUNOFF_MAPPER%values(offset+cnt)=entry
+            RUNOFF_MAPPER%colind(offset+cnt)=j
+            if (n<=myDim_nod2d) then
+               arrival_area(j)=arrival_area(j)+entry*W
+            end if
+            cnt=cnt+1
+         end if
+      END DO
+      if (cnt==0) then
+         RUNOFF_MAPPER%values(offset)=0.0_WP
+         RUNOFF_MAPPER%colind(offset)=1
+      end if
+   END DO
+
+!  write(*,*) 'status', mype, status
+   call MPI_AllREDUCE(MPI_IN_PLACE , arrival_area, drain_num, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+   DO i=1, drain_num
+      if (mype==0) write(*,*) 'arrival_area=', i, arrival_area(i)
+      where (RUNOFF_MAPPER%colind==i)
+            RUNOFF_MAPPER%values=RUNOFF_MAPPER%values/arrival_area(i)
+      end where
+   END DO
+
+   deallocate(lon_sparse, lat_sparse, dist_min, dist_min_glo)
+   deallocate(arrival_area)
+   deallocate(data_sparse, dist_ind)
+
+do n=1, myDim_nod2D+eDim_nod2D
+   i=RUNOFF_MAPPER%rowptr(n)
+   j=RUNOFF_MAPPER%rowptr(n+1)-1
+   runoff(n)=sum(RUNOFF_MAPPER%values(i:j))
+end do
+
+call integrate_nod(runoff, entry, partit, mesh)
+
+if (mype==0) write(*,*) 'RUNOFF MAPPER check (input of 1Sv from each basin results in runoff of):', entry, ' Sv'
+runoff=runoff*1.e-2
+end subroutine read_runoff_mapper
 end module g_read_other_NetCDF
-
-
