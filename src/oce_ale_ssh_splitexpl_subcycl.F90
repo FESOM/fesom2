@@ -1023,12 +1023,20 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             ff = mesh%coriolis(elem)
             
             rx =   dtBT*(-g*hh*sum(gradient_sca(1:3,elem)*eta_n(elnodes)) + ff*UVBT(2, elem))  & 
-                 + BT_inv*UVBT_rhs(1, elem)                                                   & 
-                 + BT_inv*(UVBT_harmvisc(1, elem) - bottomdrag(elem)*UVBT(1, elem)/hh) ! <-- stabilization terms
+                 + BT_inv*UVBT_rhs(1, elem)                                                   !& 
+!PS                  + BT_inv*(UVBT_harmvisc(1, elem) - bottomdrag(elem)*UVBT(1, elem)/hh) ! <-- stabilization terms
                  
             ry =   dtBT*(-g*hh*sum(gradient_sca(4:6,elem)*eta_n(elnodes)) - ff*UVBT(1, elem))  &
-                 + BT_inv*UVBT_rhs(2, elem)                                                   &
-                 + BT_inv*(UVBT_harmvisc(2, elem) - bottomdrag(elem)*UVBT(2, elem)/hh) ! <-- stabilization terms
+                 + BT_inv*UVBT_rhs(2, elem)                                                   !&
+!PS                  + BT_inv*(UVBT_harmvisc(2, elem) - bottomdrag(elem)*UVBT(2, elem)/hh) ! <-- stabilization terms
+            if (dynamics%se_visc) then 
+                rx = rx + BT_inv*UVBT_harmvisc(1, elem) 
+                ry = ry + BT_inv*UVBT_harmvisc(2, elem) 
+            end if 
+            if (dynamics%se_bottdrag) then
+                rx = rx - BT_inv*bottomdrag(elem)*UVBT(1, elem)/hh
+                ry = ry - BT_inv*bottomdrag(elem)*UVBT(2, elem)/hh
+            end if 
             
             ! compute new velocity Ubt^(n+(m+1)/M), Vbt^(n+(m+1)/M) considering 
             ! in terms of Increments (deltaU) and semi-Implicit Coriolis
@@ -1071,7 +1079,7 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             !
             ! Semi-Implicit Coriolis
             a  = dtBT*ff*0.5_WP
-            if (dynamics%se_bdrag_si) then 
+            if ( (dynamics%se_bdrag_si) .and. (dynamics%se_bottdrag) ) then 
                 b  = 1.0_WP+BT_inv*bottomdrag(elem)/hh
             else
                 b  = 1.0_WP
@@ -1433,6 +1441,7 @@ subroutine compute_thickness_zstar(dynamics, partit, mesh)
             helem(nz,elem)=sum(hnode_new(nz,elnodes))/3.0_WP
         end do
     end do
+    call exchange_elem(helem, partit)
 !$OMP END DO       
 !$OMP END PARALLEL 
 end subroutine compute_thickness_zstar
