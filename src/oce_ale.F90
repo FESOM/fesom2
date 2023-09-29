@@ -1168,7 +1168,13 @@ subroutine update_thickness_ale(partit, mesh)
         end do
 !$OMP END PARALLEL DO
     endif
+    
+    !___________________________________________________________________________
+!$OMP MASTER
     call exchange_elem(helem, partit)
+!$OMP END MASTER
+!$OMP BARRIER
+
 end subroutine update_thickness_ale
 !
 !

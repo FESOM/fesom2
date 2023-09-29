@@ -1441,9 +1441,15 @@ subroutine compute_thickness_zstar(dynamics, partit, mesh)
             helem(nz,elem)=sum(hnode_new(nz,elnodes))/3.0_WP
         end do
     end do
-    call exchange_elem(helem, partit)
 !$OMP END DO       
 !$OMP END PARALLEL 
+
+    !___________________________________________________________________________
+!$OMP MASTER
+    call exchange_elem(helem, partit)
+!$OMP END MASTER
+!$OMP BARRIER
+
 end subroutine compute_thickness_zstar
 
 
