@@ -450,6 +450,17 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
         dynamics%se_visc_gamma0  = se_visc_gamma0
         dynamics%se_visc_gamma1  = se_visc_gamma1
         dynamics%se_visc_gamma2  = se_visc_gamma2
+        if (mype==0) then
+            write(*,*) " ___Split-Explicit barotropic subcycling_________", dynamics%se_BTsteps
+            write(*,*) "     se_BTsteps     = ", dynamics%se_BTsteps
+            write(*,*) "     se_BTtheta     = ", dynamics%se_BTtheta
+            write(*,*) "     se_bottdrag    = ", dynamics%se_bottdrag
+            write(*,*) "     se_bdrag_si    = ", dynamics%se_bdrag_si
+            write(*,*) "     se_visc        = ", dynamics%se_visc
+            write(*,*) "     se_visc_gamma0 = ", dynamics%se_visc_gamma0
+            write(*,*) "     se_visc_gamma1 = ", dynamics%se_visc_gamma1
+            write(*,*) "     se_visc_gamma2 = ", dynamics%se_visc_gamma2
+        end if 
     end if 
 
     !___________________________________________________________________________
