@@ -249,7 +249,7 @@ subroutine init_ale(dynamics, partit, mesh)
     allocate(mesh%hbar_old(myDim_nod2D+eDim_nod2D))
     
     ! helem: layer thickness at elements. It is interpolated from hnode.
-    allocate(mesh%helem(1:nl-1, myDim_elem2D))
+    allocate(mesh%helem(1:nl-1, myDim_elem2D+eDim_nod2D))
     
     ! dhe: The increment of total fluid depth on elements. It is used to update the matrix
     ! of the ssh operator.      
@@ -261,7 +261,7 @@ subroutine init_ale(dynamics, partit, mesh)
     allocate(mesh%Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
     
     ! bottom_elem_tickness: changed bottom layer thinkness due to partial cells
-    allocate(mesh%bottom_elem_thickness(myDim_elem2D))
+    allocate(mesh%bottom_elem_thickness(myDim_elem2D+eDim_nod2D))
     allocate(mesh%zbar_e_bot(myDim_elem2D+eDim_elem2D)) 
     allocate(mesh%zbar_e_srf(myDim_elem2D+eDim_elem2D)) 
     
@@ -277,8 +277,8 @@ subroutine init_ale(dynamics, partit, mesh)
     hnode_new(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)           => mesh%hnode_new(:,:)
     zbar_3d_n(1:mesh%nl, 1:myDim_nod2D+eDim_nod2D)             => mesh%zbar_3d_n(:,:)
     Z_3d_n(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)              => mesh%Z_3d_n(:,:)
-    helem(1:mesh%nl-1, 1:myDim_elem2D)                         => mesh%helem(:,:)
-    bottom_elem_thickness(1:myDim_elem2D)                      => mesh%bottom_elem_thickness(:)
+    helem(1:mesh%nl-1, 1:myDim_elem2D+eDim_nod2D)              => mesh%helem(:,:)
+    bottom_elem_thickness(1:myDim_elem2D+eDim_nod2D)           => mesh%bottom_elem_thickness(:)
     bottom_node_thickness(1:myDim_nod2D+eDim_nod2D)            => mesh%bottom_node_thickness(:)
     dhe(1:myDim_elem2D)                                        => mesh%dhe(:)
     hbar(1:myDim_nod2D+eDim_nod2D)                             => mesh%hbar(:)
@@ -476,6 +476,7 @@ subroutine init_bottom_elem_thickness(partit, mesh)
     
     !___________________________________________________________________________
     call exchange_elem(zbar_e_bot, partit)
+    call exchange_elem(bottom_elem_thickness, partit)
     
 end subroutine init_bottom_elem_thickness
 !
@@ -752,6 +753,7 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_DYN
+    use g_comm_auto
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -995,7 +997,7 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
     
     !___________________________________________________________________________
     hnode_new=hnode  ! Should be initialized, because only variable part is updated.
-   
+    call exchange_elem(helem, partit)
     !!PS call check_total_volume(partit, mesh)
     
 end subroutine init_thickness_ale
@@ -1010,6 +1012,7 @@ subroutine update_thickness_ale(partit, mesh)
     USE MOD_PARSUP
     use o_ARRAYS
     use g_config,only: which_ale,lzstar_lev,min_hnode
+    use g_comm_auto
     implicit none
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
@@ -1165,6 +1168,7 @@ subroutine update_thickness_ale(partit, mesh)
         end do
 !$OMP END PARALLEL DO
     endif
+    call exchange_elem(helem, partit)
 end subroutine update_thickness_ale
 !
 !
