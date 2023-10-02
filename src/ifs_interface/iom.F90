@@ -37,23 +37,23 @@ MODULE iom
 
 CONTAINS
 
-    SUBROUTINE multio_custom_error_handler(context, err)
+    SUBROUTINE multio_custom_error_handler(context, err, info)
         USE mpi
 
         IMPLICIT NONE
         INTEGER(8), INTENT(INOUT) :: context  ! Use mpi communicator as context
         INTEGER, INTENT(IN) :: err
+        CLASS(multio_failure_info), INTENT(in) :: info
         INTEGER :: mpierr
- 
+
         IF (err /= MULTIO_SUCCESS) THEN
-            CALL ctl_stop( 'MULTIO ERROR: ', multio_error_string(err))
+            CALL ctl_stop( 'MULTIO ERROR: ', multio_error_string(err, info))
             IF (context /= MPI_UNDEFINED) THEN
                 CALL mpi_abort(int(context), MPI_ERR_OTHER, mpierr)
                 context = MPI_UNDEFINED
             ENDIF
         ENDIF
     END SUBROUTINE
- 
  
     SUBROUTINE iom_initialize(client_id, local_comm, return_comm, global_comm )
         USE mpi
@@ -101,14 +101,15 @@ CONTAINS
             CALL ctl_stop('Creating multio configuration context failed: ', multio_error_string(err))
         END IF
 
+        ! Setting a failure handler that reacts on interface problems or exceptions that are not handled within the interface
+        err = conf_ctx%set_failure_handler(multio_custom_error_handler, mio_parent_comm)
+        if (err /= MULTIO_SUCCESS) then
+            CALL ctl_stop( 'setting multio failure handler failed: ', multio_error_string(err))
+        end if
+
         err = conf_ctx%mpi_allow_world_default_comm(.FALSE._1)
         IF (err /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('conf_ctx%mpi_allow_world_default_comm(.FALSE._1) failed: ', multio_error_string(err))
-        END IF
-
-        err = conf_ctx%mpi_client_id(client_id)
-        IF (err /= MULTIO_SUCCESS) THEN
-            CALL ctl_stop('conf_ctx%mpi_client_id(', TRIM(client_id),') failed: ', multio_error_string(err))
         END IF
 
         err = conf_ctx%mpi_return_client_comm(return_comm)
@@ -131,12 +132,6 @@ CONTAINS
         err = conf_ctx%delete()
         IF (err /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('conf_ctx%delete() failed: ', multio_error_string(err))
-        END IF
-
-        ! Setting a failure handler that reacts on interface problems or exceptions that are not handled within the interface
-        err = multio_set_failure_handler(multio_custom_error_handler, mio_parent_comm)
-        IF (err /= MULTIO_SUCCESS) THEN
-            CALL ctl_stop('setting multio failure handler failed: ', multio_error_string(err))
         END IF
 
         err = mio_handle%open_connections();
@@ -197,6 +192,13 @@ CONTAINS
             CALL ctl_stop('Creating multio server configuration context failed: ', multio_error_string(err))
         END IF
 
+        ! Setting a failure handler that reacts on interface problems or exceptions that are not handled within the interface
+        ! Set handler before invoking blocking start server call
+        err = conf_ctx%set_failure_handler(multio_custom_error_handler, mio_parent_comm)
+        IF (err /= MULTIO_SUCCESS) THEN
+            CALL ctl_stop('setting multio failure handler failed: ', multio_error_string(err))
+        END IF
+
         err = conf_ctx%mpi_allow_world_default_comm(.FALSE._1)
         IF (err /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('conf_ctx%mpi_allow_world_default_comm(.FALSE._1) failed: ', multio_error_string(err))
@@ -206,13 +208,6 @@ CONTAINS
         IF (err /= MULTIO_SUCCESS) THEN
             WRITE (err_str, "(I)") mio_parent_comm
             CALL ctl_stop('conf_ctx%mpi_parent_comm(', err_str,') failed: ', multio_error_string(err))
-        END IF
-
-        ! Setting a failure handler that reacts on interface problems or exceptions that are not handled within the interface
-        ! Set handler before invoking blocking start server call
-        err = multio_set_failure_handler(multio_custom_error_handler, mio_parent_comm)
-        IF (err /= MULTIO_SUCCESS) THEN
-            CALL ctl_stop('setting multio failure handler failed: ', multio_error_string(err))
         END IF
 
         ! Blocking call
@@ -245,7 +240,7 @@ CONTAINS
 #include "../associate_part_ass.h"
 #include "../associate_mesh_ass.h"
 
-        cerr = md%new()
+        cerr = md%new(mio_handle)
         IF (cerr /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('send_fesom_domains: ngrid, md%new() failed: ', multio_error_string(cerr))
         END IF
@@ -287,7 +282,7 @@ CONTAINS
         END IF
 
         !declare grid at elements
-        cerr = md%new()
+        cerr = md%new(mio_handle)
         IF (cerr /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('send_fesom_domains: egrid, md%new() failed: ', multio_error_string(cerr))
         END IF
@@ -335,7 +330,7 @@ CONTAINS
         INTEGER                                 :: cerr
         TYPE(multio_metadata)                   :: md
     
-        cerr = md%new()
+        cerr = md%new(mio_handle)
         IF (cerr /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('send_fesom_data: md%new() failed: ', multio_error_string(cerr))
         END IF
