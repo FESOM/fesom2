@@ -9,18 +9,25 @@ TL;DR version for supported HPC systems
 =======================================
 
 Supported systems are: generic ``ubuntu``, ``albedo`` at AWI, ``levante`` at DKRZ, ``JURECA`` at JSC, ``HLRN``, ``Hazel Hen``, ``MareNostrum 4`` at BSC. During configuration the system will be recognised and apropriate environment variables and compiler options should be used.
-::
 
+::
     git clone https://github.com/FESOM/fesom2.git
     cd fesom2
-
-If one intends to run simulations on ``albedo`` or ``levante``, one first needs to change to the ``refactoring`` branch (note that this part is only needed while the ``refactoring`` is not yet merged into ``master``:
-    
     git checkout refactoring
-
-After confirming that the right FESOM2 branch is being used, compile the model with:
-
     bash -l ./configure.sh
+
+Create file ``fesom.clock`` in the output directory with the following content (if you plan to run with COREII forcing):
+
+::
+    0 1 1958
+    0 1 1958
+
+after that, one has to adjust the run script for the target system and run it:
+
+::
+    cd work
+    sbatch job_albedo
+
 
 Detailed steps of compiling and runing the code
 ===============================================
@@ -37,7 +44,6 @@ Build model executable with Cmake
 Clone the GitHub repository with a git command:
 
 ::
-
     git clone https://github.com/FESOM/fesom2.git
 
 
@@ -46,25 +52,17 @@ The repository contains model code and two additional libraries: `Metis` (domain
 Change to the `fesom2` folder and execute:
 
 ::
-
     cd fesom2
-
-If one intends to run simulations on ``albedo`` or ``levante``, one first needs to change to the ``refactoring`` branch (note that this part is only needed while the ``refactoring`` branch is not yet merged into ``master``.
-
-::
-
     git checkout refactoring
 
 As a good practice, if one wants to make modifications to the source code or any of the files, it is advisable to create a branch from refactoring:
 
 ::
-
     git checkout -b <my branch> refactoring
 
 After confirming that the right FESOM2 branch is being used, compile the model with:
 
 ::
-
     bash -l ./configure.sh
 
 In the best case scenario, your platform will be recognized and the Parms library and model executable will be built and copied to the bin directory. If something went wrong have a look at Troubleshooting_ section.
@@ -152,7 +150,8 @@ In ``namelist.config``, the options that you might want to change for your first
 
 - ``run_length_unit``: units of the run_length. Can be ``y`` (year), ``m`` (month), ``d`` (days), ``s`` (model steps).
 
-.. note:: you will need to adjust the run time to the length of your run. So, if you set ``run_length`` to 10 and ``run_length_unit`` to ``y``, for example, the run time needs to be enough for a 10-year run at once. For 4 nodes, for example, that would take about four hours to run. 
+.. note:: you might need to adjust the run time to the length of your run. In some setups and/or for some machines, if you set ``run_length`` to 10 and ``run_length_unit`` to ``y``, for example, the run time needs to be enough for a 10-year run at once.  
+
 - ``yearnew``: define the same as the year in your ``fesom.clock``;
 
 - ``MeshPath``: path to the mesh you would like to use (e.g. ``/youdir/FESOM2_one_year_input/mesh/pi/``, slash at the end is important!);
