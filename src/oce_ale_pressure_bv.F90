@@ -3176,7 +3176,6 @@ end where
         do nz=nzmin,nzmax
             call densityJM_components(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
             rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
-            density_ref(nzmin, node) = rho*rhopot/(rho+0.1_WP*auxz)
             auxz=Z_3d_n(nz,node)
             rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
             density_ref(nz,node) = rho*rhopot/(rho+0.1_WP*auxz)
