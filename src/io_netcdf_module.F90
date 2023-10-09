@@ -106,7 +106,7 @@ module io_netcdf_module
     use, intrinsic :: ISO_C_BINDING
     class(netcdf_variable_handle), intent(in) :: this
     integer, intent(in) :: timeindex
-    real(8), intent(inout), target :: values(..) ! must be inout or the allocation might be screwed
+    real(8), intent(inout), target :: values(:) ! must be inout or the allocation might be screwed
     ! EO args
     real(8), pointer :: values_ptr(:)
     integer, allocatable, dimension(:) :: starts, sizes
@@ -125,7 +125,7 @@ module io_netcdf_module
     use, intrinsic :: ISO_C_BINDING
     class(netcdf_variable_handle), intent(in) :: this
     integer, intent(in) :: timeindex
-    real(4), intent(inout), target :: values(..) ! must be inout or the allocation might be screwed
+    real(4), intent(inout), target :: values(:) ! must be inout or the allocation might be screwed
     ! EO args
     real(4), pointer :: values_ptr(:)
     integer, allocatable, dimension(:) :: starts, sizes
