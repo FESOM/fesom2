@@ -11,6 +11,7 @@ TL;DR version for supported HPC systems
 Supported systems are: generic ``ubuntu``, ``albedo`` at AWI, ``levante`` at DKRZ, ``JURECA`` at JSC, ``HLRN``, ``Hazel Hen``, ``MareNostrum 4`` at BSC. During configuration the system will be recognised and apropriate environment variables and compiler options should be used.
 
 ::
+
     git clone https://github.com/FESOM/fesom2.git
     cd fesom2
     git checkout refactoring
@@ -19,12 +20,14 @@ Supported systems are: generic ``ubuntu``, ``albedo`` at AWI, ``levante`` at DKR
 Create file ``fesom.clock`` in the output directory with the following content (if you plan to run with COREII forcing):
 
 ::
+
     0 1 1958
     0 1 1958
 
 after that, one has to adjust the run script for the target system and run it:
 
 ::
+
     cd work
     sbatch job_albedo
 
@@ -44,6 +47,7 @@ Build model executable with Cmake
 Clone the GitHub repository with a git command:
 
 ::
+
     git clone https://github.com/FESOM/fesom2.git
 
 
@@ -52,17 +56,20 @@ The repository contains model code and two additional libraries: `Metis` (domain
 Change to the `fesom2` folder and execute:
 
 ::
+
     cd fesom2
     git checkout refactoring
 
 As a good practice, if one wants to make modifications to the source code or any of the files, it is advisable to create a branch from refactoring:
 
 ::
+
     git checkout -b <my branch> refactoring
 
 After confirming that the right FESOM2 branch is being used, compile the model with:
 
 ::
+    
     bash -l ./configure.sh
 
 In the best case scenario, your platform will be recognized and the Parms library and model executable will be built and copied to the bin directory. If something went wrong have a look at Troubleshooting_ section.
