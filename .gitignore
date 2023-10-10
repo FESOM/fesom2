@@ -9,6 +9,7 @@
 src/icepack_drivers/Icepack
 lib/*.a
 lib/*.so
+lib64/*
 /work_*
 Makefile.in
 mesh_part/build

@@ -18,18 +18,43 @@ jobs:
     steps:
     # NK: this changes working directory to fesom2
     - uses: actions/checkout@v2
-    
+
+    - name: Git safe directory
+      run: |
+        git config --global --add safe.directory ${PWD}
+
     - name: Compile model (binary)
       run: |
-        bash -l configure.sh ubuntu
+        ./configure.sh ubuntu
 
-    - name: Compile model (library)
+    - name: Compile model (ifs_interface)
       run: |
-        bash ./test/ifs_interface/configure_lib.sh -l
+        export BUILD_DIR=$PWD/build.ifs_interface
+        ./configure.sh ubuntu -DENABLE_IFS_INTERFACE=ON -DCMAKE_INSTALL_PREFIX=$PWD/install.ifs_interface
 
-    - name: Library exists
+    - name: Test downstream from current install-dir
       run: |
-        bash ./test/ifs_interface/check_exist.sh
+        rm -rf test_downstream/build
+        export fesom_ROOT=${PWD}
+        cmake -S test_downstream -B test_downstream/build -DASSERT_HAVE_IFS_INTERFACE=OFF -DASSERT_FESOM_DIR=${fesom_ROOT}
+        cmake --build test_downstream/build
+        test_downstream/build/main
+
+    - name: Test downstream from ifs_interface build-dir
+      run: |
+        export fesom_ROOT=$PWD/build.ifs_interface
+        rm -rf test_downstream/build
+        cmake -S test_downstream -B test_downstream/build -DASSERT_HAVE_IFS_INTERFACE=ON -DASSERT_FESOM_DIR=${fesom_ROOT}
+        cmake --build test_downstream/build
+        test_downstream/build/main
+
+    - name: Test downstream from ifs_interface install-dir
+      run: |
+        export fesom_ROOT=$PWD/install.ifs_interface
+        rm -rf test_downstream/build
+        cmake -S test_downstream -B test_downstream/build -DASSERT_HAVE_IFS_INTERFACE=ON -DASSERT_FESOM_DIR=${fesom_ROOT}
+        cmake --build test_downstream/build
+        test_downstream/build/main
 
     - name: Create global test run
       run: |
