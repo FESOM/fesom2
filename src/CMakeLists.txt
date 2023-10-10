@@ -58,7 +58,19 @@ endif()
 # option to trigger building a library version of FESOM
 # we do not always build the library along with the executable to avoid having two targets here in the CMakeLists.txt
 # two targets would allow e.g. setting different compiler options or preprocessor definition, which would be error prone.
-option(BUILD_FESOM_AS_LIBRARY "Build a library instead of an executable" OFF)
+set( ENABLE_IFS_INTERFACE_DEFAULT OFF )
+if(DEFINED BUILD_FESOM_AS_LIBRARY AND NOT DEFINED ENABLE_IFS_INTERFACE)
+  message(DEPRECATION "Use ENABLE_IFS_INTERFACE instead of BUILD_FESOM_AS_LIBRARY")
+  set(ENABLE_IFS_INTERFACE_DEFAULT ${BUILD_FESOM_AS_LIBRARY})
+endif()
+option(ENABLE_IFS_INTERFACE   "Enable IFS interface" ${ENABLE_IFS_INTERFACE_DEFAULT})
+message(STATUS "ENABLE_IFS_INTERFACE: ${ENABLE_IFS_INTERFACE}")
+
+if(ENABLE_IFS_INTERFACE)
+   if(USE_ICEPACK)
+      message(FATAL_ERROR "Could not enable IFS interface as it is incompatible with USE_ICEPACK")
+   endif()
+endif()
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
@@ -66,7 +78,7 @@ if(${USE_ICEPACK})
    file(GLOB sources_Fortran ${src_home}/*.F90
                              ${src_home}/icepack_drivers/*.F90
                              ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90)
-elseif(${BUILD_FESOM_AS_LIBRARY})
+elseif(ENABLE_IFS_INTERFACE)
    file(GLOB sources_Fortran ${src_home}/*.F90
                              ${src_home}/ifs_interface/*.F90) # ICEPACK + LIBRARY NOT SUPPORTED (YET)
 else()
@@ -134,7 +146,8 @@ endif()
 if(${USE_ICEPACK})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __icepack)
 endif()
-if(${BUILD_FESOM_AS_LIBRARY})
+
+if(ENABLE_IFS_INTERFACE)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __ifsinterface)
 endif()
 if(${VERBOSE})
