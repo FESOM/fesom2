@@ -19,7 +19,7 @@ void parms_errexit( char *f_str, ... )
 
   sprintf(out2, "Error! %s\n", out1);
 
-  fprintf(stdout, out2);
+  fprintf(stdout, "%s", out2);
   fflush(stdout);
 
   exit( -1 );
