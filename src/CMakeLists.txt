@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.9)
 
-project(fesom C Fortran)
+project(fesom LANGUAGES C CXX Fortran)
 
-find_package(MPI REQUIRED COMPONENTS C CXX Fortran)
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/../cmake ${CMAKE_MODULE_PATH})
+
+include(fesom_setup)
 
 if(DEFINED ENV{FESOM_PLATFORM_STRATEGY})
    set(FESOM_PLATFORM_STRATEGY $ENV{FESOM_PLATFORM_STRATEGY} CACHE STRING "switch to platform specific compile settings, this is usually determined via the env.sh script")
@@ -48,19 +50,40 @@ else()
 endif()
 
 option(ENABLE_OPENACC "compile with OpenACC support" OFF)
+message(STATUS "ENABLE_OPENACC: ${ENABLE_OPENACC}")
+if(ENABLE_OPENACC)
 set(NV_GPU_ARCH "cc80" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
+# TODO: future changes  from @wdeconinck instead of above
+#option(DISABLE_OPENACC_ATOMICS "disable kernels using atomic statement for reproducible results" ON)
+#set(GPU_COMPUTE_CAPABILITY "cc80" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
+#set(GPU_FLAGS "cuda11.7,${GPU_COMPUTE_CAPABILITY}" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
+endif()
 
 option(ENABLE_OPENMP "build FESOM with OpenMP" OFF)
-if(${ENABLE_OPENMP})
-   find_package(OpenMP REQUIRED)
+message(STATUS "ENABLE_OPENMP: ${ENABLE_OPENMP}")
+if(ENABLE_OPENMP)
+   find_package(OpenMP REQUIRED COMPONENTS Fortran)
 endif()
+
+option(USE_ICEPACK "Use ICEPACK" OFF)
+message(STATUS "USE_ICEPACK: ${USE_ICEPACK}")
 
 # option to trigger building a library version of FESOM
 # we do not always build the library along with the executable to avoid having two targets here in the CMakeLists.txt
 # two targets would allow e.g. setting different compiler options or preprocessor definition, which would be error prone.
-option(BUILD_FESOM_AS_LIBRARY "Build a library instead of an executable" OFF)
+set( ENABLE_IFS_INTERFACE_DEFAULT OFF )
+if(DEFINED BUILD_FESOM_AS_LIBRARY AND NOT DEFINED ENABLE_IFS_INTERFACE)
+  message(DEPRECATION "Use ENABLE_IFS_INTERFACE instead of BUILD_FESOM_AS_LIBRARY")
+  set(ENABLE_IFS_INTERFACE_DEFAULT ${BUILD_FESOM_AS_LIBRARY})
+endif()
+option(ENABLE_IFS_INTERFACE   "Enable IFS interface" ${ENABLE_IFS_INTERFACE_DEFAULT})
+message(STATUS "ENABLE_IFS_INTERFACE: ${ENABLE_IFS_INTERFACE}")
 
-set(FESOM_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/../.." CACHE FILEPATH "directory where FESOM will be installed to via 'make install'")
+if(ENABLE_IFS_INTERFACE)
+   if(USE_ICEPACK)
+      message(FATAL_ERROR "Could not enable IFS interface as it is incompatible with USE_ICEPACK")
+   endif()
+endif()
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
@@ -68,7 +91,7 @@ if(${USE_ICEPACK})
    file(GLOB sources_Fortran ${src_home}/*.F90
                              ${src_home}/icepack_drivers/*.F90
                              ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90)
-elseif(${BUILD_FESOM_AS_LIBRARY})
+elseif(ENABLE_IFS_INTERFACE)
    file(GLOB sources_Fortran ${src_home}/*.F90
                              ${src_home}/ifs_interface/*.F90) # ICEPACK + LIBRARY NOT SUPPORTED (YET)
 else()
@@ -76,7 +99,6 @@ else()
 endif()
 #list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_partition_init.F90)
 file(GLOB sources_C ${src_home}/*.c)
-list(REMOVE_ITEM sources_C ${src_home}/psolve_feom.c) # does the file still exist?
 
 # generate a custom file from fesom_version_info.F90 which includes the current git SHA
 set(FESOM_ORIGINAL_VERSION_FILE ${src_home}/fesom_version_info.F90)
@@ -95,6 +117,9 @@ list(REMOVE_ITEM sources_Fortran ${src_home}/fvom_init.F90 ${src_home}/oce_local
 list(REMOVE_ITEM sources_C       ${src_home}/fort_part.c)
 list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_main.F90)
 
+find_package( NETCDF REQUIRED COMPONENTS C Fortran )
+find_package( MPI REQUIRED COMPONENTS C Fortran )
+
 # depends on the metis library
 #add_subdirectory(../lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
 #include_directories(../lib/metis-5.1.0/include)
@@ -103,51 +128,69 @@ add_subdirectory(../lib/parms ${PROJECT_BINARY_DIR}/parms)
 
 add_subdirectory(async_threads_cpp)
 
-include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindNETCDF.cmake)
+# TODO: incase NETCDF NOT FOUND to support LEGACY
+# include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindNETCDF.cmake)
 
-if(${BUILD_FESOM_AS_LIBRARY})
-  add_library(${PROJECT_NAME}_C ${sources_C})
-else()
 add_library(${PROJECT_NAME}_C ${sources_C})
-endif()
+
 target_compile_definitions(${PROJECT_NAME}_C PRIVATE PARMS USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
-target_link_libraries(${PROJECT_NAME}_C PUBLIC parms) #metis
+target_link_libraries(${PROJECT_NAME}_C PRIVATE parms) #metis
+target_link_libraries(${PROJECT_NAME}_C PRIVATE MPI::MPI_C)
 
 
-# create our binary or library (set its name to name of this project)
-# we do not always build the library along with the executable to avoid having two targets here in the CMakeLists.txt
-# two targets would allow e.g. setting different compiler options or preprocessor definition, which would be error prone.
-if(${BUILD_FESOM_AS_LIBRARY})
-   add_library(${PROJECT_NAME} ${sources_Fortran})
-else()
-   add_executable(${PROJECT_NAME} ${sources_Fortran} ${src_home}/fesom_main.F90)
+# fesom library
+add_library(${PROJECT_NAME} ${sources_Fortran})
+add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
+target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
+
+target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>)
+target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fesom>)
+target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES} ${OASIS_Fortran_INCLUDE_DIRECTORIES})
+target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
+target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
+target_link_libraries(${PROJECT_NAME} PRIVATE parms) #metis
+target_link_libraries(${PROJECT_NAME} PRIVATE async_threads)
+target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
+target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
+set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
+if(ENABLE_OPENMP AND NOT ${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray)
+   target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_Fortran)
 endif()
-target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243 __MULTIO)
-if(${DISABLE_MULTITHREADING})
+
+
+if(DISABLE_MULTITHREADING)
    target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_MULTITHREADING)
 endif()
-if(${FESOM_COUPLED})
-   include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindOASIS.cmake)
+
+if(FESOM_COUPLED)
+   find_package(OASIS REQUIRED)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __oasis)
 endif()
-if(${OIFS_COUPLED})
+
+if(OIFS_COUPLED)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __oifs)
 endif()
-if(${USE_ICEPACK})
+
+if(USE_ICEPACK)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __icepack)
 endif()
-if(${BUILD_FESOM_AS_LIBRARY})
+
+if(ENABLE_IFS_INTERFACE)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __ifsinterface)
 endif()
-if(${VERBOSE})
+
+if(VERBOSE)
    target_compile_definitions(${PROJECT_NAME} PRIVATE VERBOSE)
 endif()
-if(${OPENMP_REPRODUCIBLE})
+
+if(OPENMP_REPRODUCIBLE)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __openmp_reproducible)
 endif()
+
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
-   if(${BUILD_FESOM_AS_LIBRARY})
+   if(ENABLE_IFS_INTERFACE)
         target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -ip -init=zero -no-wrap-margin -fpe0 -g -traceback) # add -fpe0 for RAPS environment
    else()
         target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -ip -init=zero -no-wrap-margin -g -traceback)
@@ -170,18 +213,25 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
       target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
    endif()
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
-   if(${ENABLE_OPENMP})
-      target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -homp)
+   target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023)
+   if(ENABLE_OPENMP)
+      target_compile_options(${PROJECT_NAME} PRIVATE -homp)
    else()
-      target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -hnoomp)
+      target_compile_options(${PROJECT_NAME} PRIVATE -hnoomp)
    endif()
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
    target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_NVHPC_WORKAROUNDS)
-   target_compile_options(${PROJECT_NAME} PRIVATE -fast -fastsse -O3 -Mallocatable=95 -Mr8 -pgf90libs)
-   if(${ENABLE_OPENACC})
+   #target_compile_options(${PROJECT_NAME} PRIVATE -fast -fastsse -O3 -Mallocatable=95 -Mr8 -pgf90libs)
+   target_compile_options(${PROJECT_NAME} PRIVATE -Mnofma -Mallocatable=95 -Mr8 -pgf90libs)
+   if(ENABLE_OPENACC)
       # additional compiler settings
       target_compile_options(${PROJECT_NAME} PRIVATE -acc -ta=tesla:${NV_GPU_ARCH} -Minfo=accel)
       set(CMAKE_EXE_LINKER_FLAGS "-acc -ta=tesla:${NV_GPU_ARCH}")
+      # TODO: future changes from @wdocinck 
+      #set(CMAKE_EXE_LINKER_FLAGS "-acc -gpu=${GPU_FLAGS}")
+      #if(DISABLE_OPENACC_ATOMICS)
+      #    target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_OPENACC_ATOMICS)
+      #endif()
    endif()
    if(${ENABLE_OPENMP})
       target_compile_options(${PROJECT_NAME} PRIVATE -Mipa=fast)
