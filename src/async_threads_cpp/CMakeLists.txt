@@ -10,7 +10,7 @@ file(GLOB sources ${CMAKE_CURRENT_LIST_DIR}/*.cpp)
 include(FortranCInterface)
 FortranCInterface_HEADER(ThreadsManagerFCMacros.h MACRO_NAMESPACE "ThreadsManagerFCMacros_" SYMBOLS init_ccall begin_ccall end_ccall)
 
-add_library(${PROJECT_NAME} ${sources} async_threads_module.F90)
+add_library(${PROJECT_NAME} ${sources}) # async_threads_module.F90)
 target_include_directories(${PROJECT_NAME}
   PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>

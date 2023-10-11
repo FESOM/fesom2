@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.9)
 
-project(fesom LANGUAGES C CXX Fortran)
+project(fesom LANGUAGES C CXX Fortran VERSION 2.0)
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/../cmake ${CMAKE_MODULE_PATH})
 
@@ -87,7 +87,7 @@ endif()
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
-if(${USE_ICEPACK})
+if(USE_ICEPACK)
    file(GLOB sources_Fortran ${src_home}/*.F90
                              ${src_home}/icepack_drivers/*.F90
                              ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90)
@@ -102,15 +102,21 @@ file(GLOB sources_C ${src_home}/*.c)
 
 # generate a custom file from fesom_version_info.F90 which includes the current git SHA
 set(FESOM_ORIGINAL_VERSION_FILE ${src_home}/fesom_version_info.F90)
-set(FESOM_GENERATED_VERSION_FILE ${CMAKE_CURRENT_BINARY_DIR}/fesom_version_info-generated.F90)
-list(REMOVE_ITEM sources_Fortran ${FESOM_ORIGINAL_VERSION_FILE}) # we want to compile the generated file instead
-list(APPEND sources_Fortran ${FESOM_GENERATED_VERSION_FILE})
+#set(FESOM_GENERATED_VERSION_FILE ${CMAKE_CURRENT_BINARY_DIR}/fesom_version_info-generated.F90)
+#list(REMOVE_ITEM sources_Fortran ${FESOM_ORIGINAL_VERSION_FILE}) # we want to compile the generated file instead
+#list(APPEND sources_Fortran ${FESOM_GENERATED_VERSION_FILE})
+#set_source_files_properties(${FESOM_GENERATED_VERSION_FILE} PROPERTIES GENERATED TRUE)
+#add_custom_target(fesom_version_info-generated.F90 ALL
+#                  COMMENT "Determining ${PROJECT_NAME} git SHA ..."
+#                  COMMAND ${CMAKE_COMMAND} -DFESOM_ORIGINAL_VERSION_FILE=${FESOM_ORIGINAL_VERSION_FILE} -DFESOM_GENERATED_VERSION_FILE=${FESOM_GENERATED_VERSION_FILE} -P GitRepositoryInfo.cmake
+#                  WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR})
+
 add_custom_command(OUTPUT 5303B6F4_E4F4_45B2_A6E5_8E2B9FB5CDC4 ${FESOM_GENERATED_VERSION_FILE} # the first arg to OUTPUT is a name for a file we never create to make sure this command will run on every re-build (let our file be the second arg, as the first file is inadvertently removed by make)
                    COMMAND ${CMAKE_COMMAND} -DFESOM_ORIGINAL_VERSION_FILE=${FESOM_ORIGINAL_VERSION_FILE} -DFESOM_GENERATED_VERSION_FILE=${FESOM_GENERATED_VERSION_FILE} -P GitRepositoryInfo.cmake
                    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
                    COMMENT "determining ${PROJECT_NAME} git SHA ...")
 
-#if(${FESOM_STANDALONE})
+#if(FESOM_STANDALONE)
 #   list(REMOVE_ITEM sources_Fortran ${src_home}/cpl_driver.F90)
 #endif()
 list(REMOVE_ITEM sources_Fortran ${src_home}/fvom_init.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90)
@@ -132,7 +138,6 @@ add_subdirectory(async_threads_cpp)
 # include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindNETCDF.cmake)
 
 add_library(${PROJECT_NAME}_C ${sources_C})
-
 target_compile_definitions(${PROJECT_NAME}_C PRIVATE PARMS USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
 target_link_libraries(${PROJECT_NAME}_C PRIVATE parms) #metis
 target_link_libraries(${PROJECT_NAME}_C PRIVATE MPI::MPI_C)
@@ -140,7 +145,7 @@ target_link_libraries(${PROJECT_NAME}_C PRIVATE MPI::MPI_C)
 
 # fesom library
 add_library(${PROJECT_NAME} ${sources_Fortran})
-add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
+#add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
 target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
 
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>)
@@ -239,32 +244,21 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
       target_compile_options(${PROJECT_NAME} PRIVATE -Mipa=fast,inline)
    endif()
 endif()
-if(${BUILD_FESOM_AS_LIBRARY})
-  target_compile_options(${PROJECT_NAME} PRIVATE -fPIC)
-  target_compile_options(${PROJECT_NAME}_C PRIVATE -fPIC)
-endif()
-target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES} ${OASIS_Fortran_INCLUDE_DIRECTORIES})
-target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
-target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
 
-target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
-target_link_libraries(${PROJECT_NAME} PRIVATE async_threads_cpp multio-fapi)
+# there are already done around L:156
+#target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES} ${OASIS_Fortran_INCLUDE_DIRECTORIES})
+#target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
+#target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
 
-set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
-if(${ENABLE_OPENMP} AND NOT ${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray)
-   target_compile_options(${PROJECT_NAME} PRIVATE ${OpenMP_Fortran_FLAGS}) # currently we only have OpenMP in the Fortran part
-   target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_Fortran)
-endif()
+#target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
+#target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
+#target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
+#target_link_libraries(${PROJECT_NAME} PRIVATE async_threads_cpp multio-fapi)
 
-#set(FESOM_INSTALL_PREFIX "${CMAKE_CURRENT_LIST_DIR}/.." CACHE FILEPATH "directory where FESOM will be installed to via 'make install'")
-if(${BUILD_FESOM_AS_LIBRARY})
-   install(TARGETS ${PROJECT_NAME} EXPORT ifs_sp-targets DESTINATION "${FESOM_INSTALL_PREFIX}/lib")
-   install(TARGETS ${PROJECT_NAME}_C EXPORT ifs_sp-targets DESTINATION "${FESOM_INSTALL_PREFIX}/lib")
-else()
-   set(FESOM_INSTALL_FILEPATH "${FESOM_INSTALL_PREFIX}/bin/fesom.x")
-   get_filename_component(FESOM_INSTALL_PATH ${FESOM_INSTALL_FILEPATH} DIRECTORY)
-   get_filename_component(FESOM_INSTALL_NAME ${FESOM_INSTALL_FILEPATH} NAME)
-   install(PROGRAMS ${PROJECT_BINARY_DIR}/${PROJECT_NAME} DESTINATION ${FESOM_INSTALL_PATH} RENAME ${FESOM_INSTALL_NAME})
-endif()
+# fesom.x executable
+add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
+target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
+
+
+### Export and installation
+fesom_export(TARGETS ${PROJECT_NAME}_C ${PROJECT_NAME} parms async_threads fesom.x)
