@@ -474,6 +474,7 @@ The best way to run the model locally is to use Docker container. You obviously 
   ::
 
     cd fesom2
+    git checkout refactoring
     bash -l configure.sh ubuntu
 
 - To prepare the run (this will do the test with pi mesh)::
