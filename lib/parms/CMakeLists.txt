@@ -22,7 +22,10 @@ if( NOT LAPACK_LIBRARIES )
     # string( TOLOWER "${_CRAY_PRGENV}" _cray_prgenv  )
     # set( LAPACK_LIBRARIES sci_${_cray_prgenv} )
   else()
-    find_package(LAPACK REQUIRED) # cannot compile without! or BLAS
+    find_package(LAPACK)
+    if(NOT LAPACK_FOUND)
+       find_package(BLAS REQUIRED)     	    
+    endif(i)
   endif()
 endif()
 if( NOT TARGET MPI::MPI_C )
@@ -40,8 +43,11 @@ target_include_directories(${PROJECT_NAME}
   PUBLIC  $<BUILD_INTERFACE:${src_home}/src/../include>
 )
 
-#target_link_libraries(${PROJECT_NAME} PRIVATE ${BLAS_C_LIBRARIES} $ENV{UBUNTU_BLAS_LIBRARY})
+if(BLAS_FOUND)
+	target_link_libraries(${PROJECT_NAME} PRIVATE ${BLAS_C_LIBRARIES} $ENV{UBUNTU_BLAS_LIBRARY})
+else()
 target_link_libraries(${PROJECT_NAME} PRIVATE ${LAPACK_LIBRARIES})
+endif()
 target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_C)
 
 
