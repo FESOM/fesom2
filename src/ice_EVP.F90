@@ -591,8 +591,14 @@ subroutine EVPdynamics(ice, partit, mesh)
 #endif
     do shortstep=1, ice%evp_rheol_steps
         !_______________________________________________________________________
-
+        !TODO: temporary workaround for cray16.0.1.1 bug
+#if defined(_CRAYFTN)
+	!dir$ noinline
+#endif
         call stress_tensor(ice, partit, mesh)
+#if defined(_CRAYFTN)
+	!dir$ noinline
+#endif
         call stress2rhs(ice, partit, mesh)
 
         !_______________________________________________________________________
