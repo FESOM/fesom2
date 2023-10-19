@@ -1,7 +1,7 @@
 fesom-job:
   stage: build
   variables:
-    SCHEDULER_PARAMETERS: "-N 1 -n 56  --mem=16G   -t 00:30:00 -A project_462000376"
+    SCHEDULER_PARAMETERS: "-N 1 -n 56 --mem=32G -p dev-g -t 00:30:00 -A project_462000376"
   tags:
     - lumi
   artifacts:
