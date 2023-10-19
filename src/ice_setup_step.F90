@@ -157,12 +157,15 @@ subroutine ice_timestep(step, ice, partit, mesh)
     !$ACC DEVICE (ice%data(1)%dvalues, ice%data(2)%dvalues, ice%data(3)%dvalues) &
     !$ACC DEVICE (ice%data(1)%values_rhs, ice%data(2)%values_rhs, ice%data(3)%values_rhs) &
     !$ACC DEVICE (ice%data(1)%values_div_rhs, ice%data(2)%values_div_rhs, ice%data(3)%values_div_rhs)
-
     !___________________________________________________________________________
     ! ===== Dynamics
+
     SELECT CASE (ice%whichEVP)
     CASE (0)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'
+#if defined(_CRAYFTN)
+	!dir$ noinline
+#endif
         call EVPdynamics  (ice, partit, mesh)
     CASE (1)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics_m...'//achar(27)//'[0m'
@@ -218,7 +221,6 @@ subroutine ice_timestep(step, ice, partit, mesh)
     !$ACC HOST (ice%data(1)%dvalues, ice%data(2)%dvalues, ice%data(3)%dvalues) &
     !$ACC HOST (ice%data(1)%values_rhs, ice%data(2)%values_rhs, ice%data(3)%values_rhs) &
     !$ACC HOST (ice%data(1)%values_div_rhs, ice%data(2)%values_div_rhs, ice%data(3)%values_div_rhs)
-
 
 #if defined (__oifs) || defined (__ifsinterface)
 !$OMP PARALLEL DO
