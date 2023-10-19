@@ -1,9 +1,10 @@
 name: Run CICD on Lumi (using .gitlab-ci.yml)
 
-on: push
-  branches:
-    - refactoring
-    - lumi_gpu_evatali
+on: 
+  push:
+    branches:
+      - refactoring
+      - lumi_gpu_evatali
 
 jobs:
   gitlabsync:
