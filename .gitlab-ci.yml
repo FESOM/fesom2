@@ -1,13 +1,12 @@
 fesom-job:
   stage: build
   variables:
-    SCHEDULER_PARAMETERS: "-N 1 -n 56  --mem=16G   -t 00:30:00 -A project_462000376"
+    SCHEDULER_PARAMETERS: "-N 1 -n 56 --mem=32G -p dev-g -t 00:30:00 -A project_462000376"
   tags:
     - lumi
-  artifacts:
-    paths:
-      - fesom_build.log
+#  artifacts:
+#    paths:
+#      - fesom_build.log
   script:
     - echo "building fesom branch"
     - bash -l configure.sh lumi
-    - touch fesom_build.log
