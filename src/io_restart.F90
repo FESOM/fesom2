@@ -333,8 +333,9 @@ subroutine read_all_raw_restarts()
     
     ! compare the restart time with our actual time
     if(int(ctime) /= int(rtime)) then
-      print *, "raw restart time ",rtime,"does not match current clock time",ctime
-      stop 1
+      print *, "warning: raw restart time ",rtime,"does not match current clock time",ctime
+      print *, "restarting anyway!"
+      !stop 1
     end if
     globalstep = rstep
     print *,"reading raw restart from "//raw_restart_dirpath
@@ -437,7 +438,7 @@ subroutine read_restart(path, filegroup)
 #endif
         end if
         
-        if(.not. skip_file(i)) call filegroup%files(i)%open_read(filegroup%files(i)%path) ! do we need to bother with read-only access?
+        !if(.not. skip_file(i)) call filegroup%files(i)%open_read(filegroup%files(i)%path) ! do we need to bother with read-only access?
         ! todo: print a reasonable error message if the file does not exist
       end if      
     end if
@@ -470,8 +471,8 @@ subroutine read_restart(path, filegroup)
      if (int(ctime)/=int(rtime)) then
         write(*,*) 'Reading restart: timestamps in restart and in clock files do not match for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
         write(*,*) 'restart/ times are:', ctime, rtime
-        write(*,*) 'the model will stop!'
-        stop 1
+        write(*,*) 'the model wants to stop but i force it to continue!'
+        !stop 1
       end if
     end if
   end do

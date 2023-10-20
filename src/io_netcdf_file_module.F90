@@ -288,6 +288,7 @@ contains
       else
         ! use the dim size which has been set without the file and is thus known anyway to the user
         varshape(i) = this%dims( var%dim_indices(i) )%len
+        write(*,*) "varshape,i:", varshape(i),i
       end if
     end do
   end subroutine
@@ -311,6 +312,7 @@ contains
     call assert(product(sizes) == product(shape(values)), __LINE__)
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
+    write(*,*) this%ncid
     call assert_nc(nf_get_vara_double(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
   end subroutine
 
@@ -331,6 +333,7 @@ contains
     call assert(product(sizes) == product(shape(values)), __LINE__)
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
+    write(*,*) this%ncid
     call assert_nc(nf_get_vara_real(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
   end subroutine
 
