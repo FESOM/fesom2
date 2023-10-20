@@ -143,14 +143,15 @@ subroutine par_ex(abort)       ! finalizes MPI
 #endif
 #if defined (__oifs)
 !OIFS coupling doesnt call prism_terminate_proto and uses MPI_COMM_FESOM
+  use mod_oasis
   implicit none
   integer,optional :: abort
   if (present(abort)) then
 	if (mype==0) write(*,*) 'Run finished unexpectedly!'
 	call MPI_ABORT( MPI_COMM_FESOM, 1 )
   else
-	call  MPI_Barrier(MPI_COMM_FESOM,MPIerr)
-	call  MPI_Finalize(MPIerr)
+    if (mype==0) print *, 'FESOM calls oasis_terminate'
+    call oasis_terminate
   endif
 #endif
 

@@ -12,6 +12,7 @@ module g_clock
   integer                  :: ndpyr                !number of days in yearnew 
   integer                  :: num_day_in_month(0:1,12)
   character(4)             :: cyearold, cyearnew   !year as character string      
+  character(2)             :: cmonth               !month as character string
   data num_day_in_month(0,:) /31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31/
   data num_day_in_month(1,:) /31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31/
 
@@ -55,6 +56,7 @@ contains
        aux2=aux1+num_day_in_month(fleapyear,i)
        if(daynew>aux1 .and. daynew<=aux2) then
           month=i
+          write(cmonth, '(I2.2)') month
           day_in_month=daynew-aux1
           exit
        end if
