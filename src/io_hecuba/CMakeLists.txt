@@ -30,5 +30,5 @@ target_link_libraries(${PROJECT_NAME} PRIVATE -L${HECUBA_ROOT}/lib -lhfetch)
 #target_link_libraries(${PROJECT_NAME}_C -L${LIBDILL_LIB} -ldill -pthread -lssl -lcrypto)
 
 
-#target_compile_options(${PROJECT_NAME} PRIVATE -std=c++11 -fpic -shared)
+target_compile_options(${PROJECT_NAME} PRIVATE -std=c++11 -fpic -shared)
 
