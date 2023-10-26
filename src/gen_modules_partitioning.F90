@@ -93,8 +93,10 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
 #else
   !For ECHAM coupled runs we use the old OASIS nameing scheme (prism / prism_proto)
   use mod_prism 
-#endif ! oifs/echam
-#endif ! oasis
+#endif
+         ! oifs/echam
+#endif
+         ! oasis
 
   implicit none
   integer,           intent(in)   :: COMM
@@ -112,7 +114,8 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
      call  MPI_Barrier(COMM, error)
      call  MPI_Finalize(error)
   endif
-#else ! standalone
+#else 
+      ! standalone
 
 ! From here on the two coupled options
 !-------------------------------------
@@ -136,8 +139,10 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
   
   if (mype==0) print *, 'FESOM calls MPI_Finalize'
   call MPI_Finalize(error)
-#endif ! oifs/echam
-#endif ! oasis
+#endif
+         ! oifs/echam
+#endif
+         ! oasis
 
 ! Regardless of standalone, OpenIFS oder ECHAM coupling, if we reach to this point
 ! we should be fine shutting the whole model down

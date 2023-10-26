@@ -28,7 +28,8 @@ MODULE iom
     !!----------------------------------------------------------------------
 
     TYPE iom_field_request
-        CHARACTER(100)                          :: name = REPEAT(" ", 100)
+        CHARACTER(100)                          :: name     = REPEAT(" ", 100)
+        CHARACTER(100)                          :: category = REPEAT(" ", 100)
         CHARACTER(5)                            :: gridType = REPEAT(" ", 5)
         REAL(real64), DIMENSION(:), POINTER     :: values => NULL()
         INTEGER                                 :: globalSize = 0
@@ -83,17 +84,17 @@ CONTAINS
         BLOCK
             CHARACTER(:), allocatable :: config_file
             INTEGER :: config_file_length
-            
+
             CALL get_environment_variable('MULTIO_FESOM_CONFIG_FILE', length=config_file_length)
             IF (config_file_length == 0) THEN
                 call ctl_stop('The fesom plan file is not correctly set!')
                 err = conf_ctx%new()
             ELSE
                 ALLOCATE(character(len=config_file_length + 1) :: config_file)
-                
+
                 CALL get_environment_variable('MULTIO_FESOM_CONFIG_FILE', config_file)
                 err = conf_ctx%new(config_file)
-                
+
                 DEALLOCATE(config_file)
             ENDIF
         END BLOCK
@@ -135,11 +136,12 @@ CONTAINS
         END IF
 
         ! Setting a failure handler that reacts on interface problems or exceptions that are not handled within the interface
+#if defined  __ifsinterface
         err = multio_set_failure_handler(multio_custom_error_handler, mio_parent_comm)
         IF (err /= MULTIO_SUCCESS) THEN
-            CALL ctl_stop('setting multio failure handler failed: ', multio_error_string(err))
+           CALL ctl_stop('setting multio failure handler failed: ', multio_error_string(err))
         END IF
-
+#endif
         err = mio_handle%open_connections();
         IF (err /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('mio_handle%open_connections failed: ', multio_error_string(err))
@@ -211,11 +213,12 @@ CONTAINS
 
         ! Setting a failure handler that reacts on interface problems or exceptions that are not handled within the interface
         ! Set handler before invoking blocking start server call
+#if defined  __ifsinterface
         err = multio_set_failure_handler(multio_custom_error_handler, mio_parent_comm)
         IF (err /= MULTIO_SUCCESS) THEN
-            CALL ctl_stop('setting multio failure handler failed: ', multio_error_string(err))
+           CALL ctl_stop('setting multio failure handler failed: ', multio_error_string(err))
         END IF
-
+#endif
         ! Blocking call
         err = multio_start_server(conf_ctx)
         IF (err /= MULTIO_SUCCESS) THEN
@@ -246,7 +249,11 @@ CONTAINS
 #include "../associate_part_ass.h"
 #include "../associate_mesh_ass.h"
 
+#if defined  __ifsinterface
         cerr = md%new()
+#else
+        cerr = md%new(mio_handle)
+#endif
         IF (cerr /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('send_fesom_domains: ngrid, md%new() failed: ', multio_error_string(cerr))
         END IF
@@ -288,7 +295,11 @@ CONTAINS
         END IF
 
         !declare grid at elements
+#if defined  __ifsinterface
         cerr = md%new()
+#else
+        cerr = md%new(mio_handle)
+#endif
         IF (cerr /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('send_fesom_domains: egrid, md%new() failed: ', multio_error_string(cerr))
         END IF
@@ -330,18 +341,23 @@ CONTAINS
     END SUBROUTINE iom_send_fesom_domains
 
     SUBROUTINE iom_send_fesom_data(data)
+        USE g_clock
         IMPLICIT NONE
     
         TYPE(iom_field_request), INTENT(INOUT)  :: data
         INTEGER                                 :: cerr
         TYPE(multio_metadata)                   :: md
     
+#if defined  __ifsinterface
         cerr = md%new()
+#else
+        cerr = md%new(mio_handle)
+#endif
         IF (cerr /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('send_fesom_data: md%new() failed: ', multio_error_string(cerr))
         END IF
 
-        cerr = md%set_string("category", "fesom-grid-output")
+        cerr = md%set_string("category", data%category)
         IF (cerr /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('send_fesom_data: md%set_string(category) failed: ', multio_error_string(cerr))
         END IF
@@ -366,9 +382,19 @@ CONTAINS
             CALL ctl_stop('send_fesom_data: md%set_string(name) failed: ', multio_error_string(cerr))
         END IF
 
-        cerr = md%set_string("gridSubType", data%gridType)
+        cerr = md%set_string("gridSubtype", "undefined")
         IF (cerr /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('send_fesom_data: md%set_string(gridSubType) failed: ', multio_error_string(cerr))
+        END IF
+
+        cerr = md%set_string("grid-type", "undefined")
+        IF (cerr /= MULTIO_SUCCESS) THEN
+            CALL ctl_stop('send_fesom_data: md%set_string(grid-type) failed: ', multio_error_string(cerr))
+        END IF
+
+        cerr = md%set_string("operation", "average")
+        IF (cerr /= MULTIO_SUCCESS) THEN
+            CALL ctl_stop('send_fesom_data: md%set_string(operation) failed: ', multio_error_string(cerr))
         END IF
 
         cerr = md%set_string("domain", data%gridType)
@@ -381,6 +407,24 @@ CONTAINS
             CALL ctl_stop('send_fesom_data: md%set_int(step) failed: ', multio_error_string(cerr))
         END IF
 
+        cerr = md%set_int("stepInHours", data%step*24)
+        IF (cerr /= MULTIO_SUCCESS) THEN
+            CALL ctl_stop('send_fesom_data: md%set_int(stepInHours) failed: ', multio_error_string(cerr))
+        END IF
+
+        cerr = md%set_int("timeSpanInHours", 24)
+        IF (cerr /= MULTIO_SUCCESS) THEN
+            CALL ctl_stop('send_fesom_data: md%set_int(timeSpanInHours) failed: ', multio_error_string(cerr))
+        END IF        
+
+        cerr = md%set_int("currentDate", yearnew * 10000 + month * 100 + day_in_month)
+        cerr = md%set_int("currentTime", INT(INT(timenew / 3600) * 10000 + (INT(timenew / 60) - INT(timenew / 3600) * 60) * 100 + (timenew-INT(timenew / 60) * 60)))
+        cerr = md%set_int("startDate", 2020 * 10000 + 01 * 100 + 20)
+        cerr = md%set_int("startTime", 0)
+        IF (cerr /= MULTIO_SUCCESS) THEN
+           CALL ctl_stop('send_fesom_data: md%set_int(date) failed: ', multio_error_string(cerr))
+        END IF
+        
         cerr = mio_handle%write_field(md, data%values)
         IF (cerr /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('send_fesom_data: mio_handle%write_field failed: ', multio_error_string(cerr))
