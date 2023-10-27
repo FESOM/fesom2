@@ -38,7 +38,7 @@ void setExpMetaData(std::string expname, std::string key, std::string value) {
     std::cout<< "+ end here in set metadata"<<std::endl;
    }	
 
-void sendMetricsToHecuba(const char * expname, const char * varname, int32_t timestep_i, int32_t chunk_id, void *data, int32_t metadata) {
+void sendMetricsToHecuba(const char * expname, const char * varname, int32_t timestep_i, int32_t chunk_id, void *data, uint32_t metadata) {
     StorageNumpy metrics_data(data,{metadata,1}); // instantiates a StorageNumpy with the specified info
 
     std::string generatedName = "";
