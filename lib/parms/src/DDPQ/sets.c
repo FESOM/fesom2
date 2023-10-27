@@ -11,7 +11,7 @@
 void parms_errexit( char *f_str, ... )
 {
   va_list argp;
-  char out1[256], out2[256];
+  char out1[256], out2[512];
 
   va_start(argp, f_str);
   vsprintf(out1, f_str, argp);
@@ -19,7 +19,7 @@ void parms_errexit( char *f_str, ... )
 
   sprintf(out2, "Error! %s\n", out1);
 
-  fprintf(stdout, out2);
+  fprintf(stdout, "%s", out2);
   fflush(stdout);
 
   exit( -1 );
