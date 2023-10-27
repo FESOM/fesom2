@@ -504,7 +504,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     ! it takes memory and time. For every element
     ! we need its antidiffusive contribution to
     ! each of its 3 nodes
-
+!$OMP PARALLEL DO
     !$ACC DATA CREATE(icoef, elnodes)
 
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
@@ -513,20 +513,18 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         tmin(n) = 0.0_WP
     end do
     !$ACC END PARALLEL LOOP
-
+!$OMP END PARALLEL  DO
     ! Auxiliary elemental operator (mass matrix- lumped mass matrix)
 
     !$ACC KERNELS
     icoef = 1
     !$ACC END KERNELS
-
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
     do n=1,3   ! three upper nodes
         ! Cycle over rows  row=elnodes(n)
         icoef(n,n)=-2
     end do
     !$ACC END PARALLEL LOOP
-
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, q, elem, elnodes, row, vol, flux, ae)
 !$OMP DO
 
@@ -1117,7 +1115,7 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
     ! Computes the rhs in a Taylor-Galerkin way (with upwind type of
     ! correction for the advection operator)
     ! In this version I tr to split divergent term off, so that FCT works without it.
-
+!$OMP PARALLEL DO
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
     do row=1, myDim_nod2D
                     !! row=myList_nod2D(m)
@@ -1135,6 +1133,7 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 #endif
     end do
     !$ACC END PARALLEL LOOP
+!$OMP END PARALLEL DO
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(diff, entries, um, vm, vol, dx, dy, n, q, row, elem, elnodes, c1, c2, c3, c4, cx1, cx2, cx3, cx4, entries2)
 !$OMP DO
