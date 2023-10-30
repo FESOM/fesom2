@@ -19,6 +19,10 @@ jobs:
     # NK: this changes working directory to fesom2
     - uses: actions/checkout@v2
 
+    - name: Git safe directory
+      run: |
+        git config --global --add safe.directory /__w/fesom2/fesom2
+
     - name: Compile model
       run: |
         bash -l configure.sh ubuntu -DENABLE_OPENMP=ON
