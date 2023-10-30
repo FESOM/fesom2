@@ -109,9 +109,9 @@ CONTAINS
             CALL ctl_stop( 'setting multio failure handler failed: ', multio_error_string(err))
         end if
 
-        err = conf_ctx%mpi_allow_world_default_comm(.FALSE._1)
+        err = conf_ctx%mpi_allow_world_default_comm(.FALSE.)
         IF (err /= MULTIO_SUCCESS) THEN
-            CALL ctl_stop('conf_ctx%mpi_allow_world_default_comm(.FALSE._1) failed: ', multio_error_string(err))
+            CALL ctl_stop('conf_ctx%mpi_allow_world_default_comm(.FALSE.) failed: ', multio_error_string(err))
         END IF
 
         err = conf_ctx%mpi_return_client_comm(return_comm)
@@ -201,9 +201,9 @@ CONTAINS
             CALL ctl_stop('setting multio failure handler failed: ', multio_error_string(err))
         END IF
 
-        err = conf_ctx%mpi_allow_world_default_comm(.FALSE._1)
+        err = conf_ctx%mpi_allow_world_default_comm(.FALSE.)
         IF (err /= MULTIO_SUCCESS) THEN
-            CALL ctl_stop('conf_ctx%mpi_allow_world_default_comm(.FALSE._1) failed: ', multio_error_string(err))
+            CALL ctl_stop('conf_ctx%mpi_allow_world_default_comm(.FALSE.) failed: ', multio_error_string(err))
         END IF
 
         err = conf_ctx%mpi_parent_comm(int(mio_parent_comm))
