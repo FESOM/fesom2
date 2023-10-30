@@ -2,10 +2,13 @@
 
 set -e
 
+SOURCE_DIR="$( cd $( dirname "${BASH_SOURCE[0]}" ) && pwd -P )"
+BUILD_DIR=${BUILD_DIR:-build}
+
 source env.sh # source this from your run script too
-mkdir build || true # make sure not to commit this to svn or git
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Debug ${CMAKE_ARGS} $@
+mkdir -p ${BUILD_DIR} # make sure not to commit this to svn or git
+cd ${BUILD_DIR}
+cmake ${SOURCE_DIR} -DCMAKE_BUILD_TYPE=Debug ${CMAKE_ARGS} $@
     # not required when re-compiling
     # additional cmake arguments can be passed to configure.sh
     # this also includes fesom specific options in CMakeLists, can be used as -DFESOM_COUPLED=ON

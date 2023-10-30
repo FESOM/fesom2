@@ -25,15 +25,12 @@ jobs:
 
     - name: Compile model (binary)
       run: |
-        bash -l configure.sh ubuntu
+        ./configure.sh ubuntu
 
-    - name: Compile model (library)
+    - name: Compile model (ifs_interface)
       run: |
-        bash ./test/ifs_interface/configure_lib.sh -l
-
-    - name: Library exists
-      run: |
-        bash ./test/ifs_interface/check_exist.sh
+        export BUILD_DIR=$PWD/build.ifs_interface
+        ./configure.sh ubuntu -DENABLE_IFS_INTERFACE=ON -DCMAKE_INSTALL_PREFIX=$PWD/install.ifs_interface
 
     - name: Create global test run
       run: |
