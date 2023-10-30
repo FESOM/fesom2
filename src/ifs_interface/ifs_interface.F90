@@ -9,7 +9,6 @@ MODULE nemogcmcoup_steps
    INTEGER :: substeps !per IFS timestep
 END MODULE nemogcmcoup_steps
 
-#if defined(__MULTIO)
 SUBROUTINE nemogcmcoup_init_ioserver( icomm, lnemoioserver, irequired, iprovided, lmpi1)
 
     ! Initialize the NEMO mppio server
@@ -46,8 +45,7 @@ SUBROUTINE nemogcmcoup_end_ioserver
     IMPLICIT NONE
 
     CALL mpp_stop()
- END SUBROUTINE nemogcmcoup_end_ioserver
-#endif
+END SUBROUTINE nemogcmcoup_end_ioserver
 
 SUBROUTINE nemogcmcoup_init( mype, icomm, inidate, initime, itini, itend, zstp, &
    & lwaveonly, iatmunit, lwrite )

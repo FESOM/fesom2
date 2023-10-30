@@ -7,7 +7,8 @@
 
 MODULE mpp_io
 #if defined(__MULTIO)        
-    USE iom
+    USE iom, only : iom_initialize, iom_init_server, iom_finalize
+#endif
     IMPLICIT NONE
     PRIVATE
 
@@ -157,12 +158,14 @@ MODULE mpp_io
         CALL mpi_comm_rank( iicommo, mppcomprank, ierr )
         CALL mpi_comm_size( iicommo, mppcompsize, ierr )
 
+#if defined(__MULTIO)
         IF (.NOT.lioserver) THEN
             CALL iom_initialize( "for_xios_mpi_id", return_comm=iicommm, global_comm = pcommworldmultio )    ! nemo local communicator given by xios
         ELSE
             ! For io-server tasks start an run the right server
             CALL iom_init_server( server_comm = pcommworldmultio )
         ENDIF
+#endif
 
         ! Return to the model with iicomm being compute only tasks
         iicomm = iicommo
@@ -172,11 +175,13 @@ MODULE mpp_io
     SUBROUTINE mpp_stop
         INTEGER :: ierr
         
+#if defined(__MULTIO)
         IF (.NOT.lioserver) THEN
             call iom_finalize()
         ENDIF
+#endif
 
         CALL mpi_finalize( ierr )
     END SUBROUTINE mpp_stop
-#endif
+
 END MODULE mpp_io
