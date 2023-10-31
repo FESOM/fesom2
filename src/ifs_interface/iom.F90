@@ -113,7 +113,6 @@ CONTAINS
         IF (err /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('conf_ctx%mpi_allow_world_default_comm(.FALSE.) failed: ', multio_error_string(err))
         END IF
-
         err = conf_ctx%mpi_return_client_comm(return_comm)
         IF (err /= MULTIO_SUCCESS) THEN
             WRITE (err_str, "(I10)") return_comm
