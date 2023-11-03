@@ -21,7 +21,7 @@ jobs:
 
     - name: Git safe directory
       run: |
-        git config --global --add safe.directory /__w/fesom2/fesom2
+        git config --global --add safe.directory ${PWD}
 
     - name: Compile model
       run: |

@@ -21,7 +21,7 @@ jobs:
 
     - name: Git safe directory
       run: |
-        git config --global --add safe.directory /__w/fesom2/fesom2
+        git config --global --add safe.directory ${PWD}
 
     - name: Compile model (binary)
       run: |
@@ -32,16 +32,16 @@ jobs:
         export BUILD_DIR=$PWD/build.ifs_interface
         ./configure.sh ubuntu -DENABLE_IFS_INTERFACE=ON -DCMAKE_INSTALL_PREFIX=$PWD/install.ifs_interface
 
-    - name: Test downstream from /usr/local install-dir
+    - name: Test downstream from install-dir
       run: |
+        export fesom_ROOT=${PWD}
         rm -rf test_downstream/build
-        cmake -S test_downstream -B test_downstream/build -DASSERT_HAVE_IFS_INTERFACE=OFF -DASSERT_FESOM_DIR=/usr/local
+        cmake -S test_downstream -B test_downstream/build -DASSERT_HAVE_IFS_INTERFACE=OFF -DASSERT_FESOM_DIR=${fesom_ROOT}
         cmake --build test_downstream/build
         test_downstream/build/main
 
     - name: Test downstream from ifs_interface build-dir
       run: |
-        cmake --version
         export fesom_ROOT=$PWD/build.ifs_interface
         rm -rf test_downstream/build
         cmake -S test_downstream -B test_downstream/build -DASSERT_HAVE_IFS_INTERFACE=ON -DASSERT_FESOM_DIR=${fesom_ROOT}
