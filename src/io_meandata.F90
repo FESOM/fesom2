@@ -1725,8 +1725,7 @@ end subroutine
 #if defined(__MULTIO)
 SUBROUTINE send_data_to_multio(entry)
     USE iom
-    USE multio_api
-    
+
     IMPLICIT NONE
 
     TYPE(Meandata), TARGET, INTENT(INOUT)                       :: entry
