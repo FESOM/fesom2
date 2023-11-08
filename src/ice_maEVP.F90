@@ -764,12 +764,12 @@ subroutine EVPdynamics_m(ice, partit, mesh)
                             (sigma11(el)*dx(2)+sigma12(el)*(dy(2) + meancos))                         !metrics
                     v_rhs_ice(elnodes(2)) = v_rhs_ice(elnodes(2)) - elem_area(el)* &
                             (sigma12(el)*dx(2)+sigma22(el)*dy(2) - sigma11(el)*meancos)               !metrics
-                end if
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
                 call omp_unset_lock(partit%plock(elnodes(2)))
 #else
 !$OMP END ORDERED
 #endif
+                end if
 
                 if (elnodes(3) <= myDim_nod2D) then
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
