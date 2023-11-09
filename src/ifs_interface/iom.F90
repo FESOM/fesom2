@@ -30,11 +30,14 @@ MODULE iom
     TYPE iom_field_request
         CHARACTER(100)                          :: name     = REPEAT(" ", 100)
         CHARACTER(100)                          :: category = REPEAT(" ", 100)
-        CHARACTER(5)                            :: gridType = REPEAT(" ", 5)
+        CHARACTER(6)                            :: gridType = REPEAT(" ", 6)
         REAL(real64), DIMENSION(:), POINTER     :: values => NULL()
         INTEGER                                 :: globalSize = 0
+        INTEGER                                 :: sampleInterval=0
         INTEGER                                 :: level = 0
         INTEGER                                 :: step = 0
+        INTEGER                                 :: currentDate,  currentTime
+        INTEGER                                 :: previousDate, previousTime
     END TYPE
 
 CONTAINS
@@ -247,7 +250,7 @@ CONTAINS
             CALL ctl_stop('send_fesom_domains: ngrid, md%new() failed: ', multio_error_string(cerr))
         END IF
 
-        cerr = md%set_string("name", "ngrid")
+        cerr = md%set_string("name", "N grid")
         IF (cerr /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('send_fesom_domains: ngrid, md%set_string(name) failed: ', multio_error_string(cerr))
         END IF
@@ -289,7 +292,7 @@ CONTAINS
             CALL ctl_stop('send_fesom_domains: egrid, md%new() failed: ', multio_error_string(cerr))
         END IF
 
-        cerr = md%set_string("name", "egrid")
+        cerr = md%set_string("name", "C grid")
         IF (cerr /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('send_fesom_domains: egrid, md%set_string(name) failed: ', multio_error_string(cerr))
         END IF
@@ -363,12 +366,12 @@ CONTAINS
             CALL ctl_stop('send_fesom_data: md%set_string(name) failed: ', multio_error_string(cerr))
         END IF
 
-        cerr = md%set_string("gridSubtype", "undefined")
+        cerr = md%set_string("gridSubtype", data%gridType)
         IF (cerr /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('send_fesom_data: md%set_string(gridSubType) failed: ', multio_error_string(cerr))
         END IF
 
-        cerr = md%set_string("grid-type", "undefined")
+        cerr = md%set_string("gridType", "CORE2")
         IF (cerr /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('send_fesom_data: md%set_string(grid-type) failed: ', multio_error_string(cerr))
         END IF
@@ -383,25 +386,13 @@ CONTAINS
             CALL ctl_stop('send_fesom_data: md%set_string(domain) failed: ', multio_error_string(cerr))
         END IF
 
-        cerr = md%set_int("step", data%step)
-        IF (cerr /= MULTIO_SUCCESS) THEN
-            CALL ctl_stop('send_fesom_data: md%set_int(step) failed: ', multio_error_string(cerr))
-        END IF
-
-        cerr = md%set_int("stepInHours", data%step*24)
-        IF (cerr /= MULTIO_SUCCESS) THEN
-            CALL ctl_stop('send_fesom_data: md%set_int(stepInHours) failed: ', multio_error_string(cerr))
-        END IF
-
-        cerr = md%set_int("timeSpanInHours", 24)
-        IF (cerr /= MULTIO_SUCCESS) THEN
-            CALL ctl_stop('send_fesom_data: md%set_int(timeSpanInHours) failed: ', multio_error_string(cerr))
-        END IF
-
-        cerr = md%set_int("currentDate", yearnew * 10000 + month * 100 + day_in_month)
-        cerr = md%set_int("currentTime", INT(INT(timenew / 3600) * 10000 + (INT(timenew / 60) - INT(timenew / 3600) * 60) * 100 + (timenew-INT(timenew / 60) * 60)))
-        cerr = md%set_int("startDate", 2020 * 10000 + 01 * 100 + 20)
-        cerr = md%set_int("startTime", 0)
+        cerr = md%set_int("currentDate",    data%currentDate)
+        cerr = md%set_int("currentTime",    data%currentTime)
+        cerr = md%set_int("previousDate",   data%previousDate)
+        cerr = md%set_int("previousTime",   data%previousTime)
+        cerr = md%set_int("sampleInterval", data%sampleInterval)
+        cerr = md%set_int("sampleIntervalInSeconds", data%sampleInterval)
+        cerr = md%set_string("sampleIntervalUnit", 'S')
         IF (cerr /= MULTIO_SUCCESS) THEN
            CALL ctl_stop('send_fesom_data: md%set_int(date) failed: ', multio_error_string(cerr))
         END IF
