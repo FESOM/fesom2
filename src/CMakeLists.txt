@@ -177,7 +177,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRE
 target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE parms) #metis
-target_link_libraries(${PROJECT_NAME} PRIVATE async_threads)
 target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
@@ -270,4 +269,4 @@ target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
 
 ### Export and installation
 
-fesom_export(TARGETS ${PROJECT_NAME}_C ${PROJECT_NAME} parms async_threads fesom.x)
+fesom_export(TARGETS ${PROJECT_NAME}_C ${PROJECT_NAME} parms async_threads_cpp fesom.x)
