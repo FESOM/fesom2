@@ -12,3 +12,6 @@ lib/*.so
 /work_*
 Makefile.in
 mesh_part/build
+slurm.err
+slurm.out
+fesom2.out
