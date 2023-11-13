@@ -158,7 +158,7 @@ add_subdirectory(../lib/parms ${PROJECT_BINARY_DIR}/parms)
 
 add_subdirectory(async_threads_cpp)
 
-add_library(${PROJECT_NAME}_C ${sources_C})
+add_library(${PROJECT_NAME}_C OBJECT ${sources_C})
 target_compile_definitions(${PROJECT_NAME}_C PRIVATE PARMS USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
 
 target_link_libraries(${PROJECT_NAME}_C PRIVATE parms) #metis
@@ -166,7 +166,7 @@ target_link_libraries(${PROJECT_NAME}_C PRIVATE MPI::MPI_C)
 
 
 # fesom library
-add_library(${PROJECT_NAME} ${sources_Fortran})
+add_library(${PROJECT_NAME} ${sources_Fortran} $<TARGET_OBJECTS:fesom_C> $<TARGET_OBJECTS:async_threads_cpp>)
 add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
 target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
 
@@ -179,7 +179,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE parms) #metis
 target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} PRIVATE async_threads_cpp)
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 if(ENABLE_OPENMP AND NOT ${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray)
    target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_Fortran)
@@ -269,4 +268,4 @@ target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
 
 ### Export and installation
 
-fesom_export(TARGETS ${PROJECT_NAME}_C ${PROJECT_NAME} parms async_threads_cpp fesom.x)
+fesom_export(TARGETS ${PROJECT_NAME} parms fesom.x)
