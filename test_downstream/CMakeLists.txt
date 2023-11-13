@@ -8,6 +8,7 @@ message("fesom found: ${fesom_DIR}")
 message("fesom_VERSION: ${fesom_VERSION}")
 message("fesom_HAVE_OPENMP: ${fesom_HAVE_OPENMP}")
 message("fesom_HAVE_IFS_INTERFACE: ${fesom_HAVE_IFS_INTERFACE}")
+message("fesom_HAVE_MULTIO: ${fesom_HAVE_MULTIO}")
 
 if(NOT TARGET fesom)
   message(FATAL_ERROR "fesom was installed wrongly: fesom target not found")
