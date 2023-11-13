@@ -61,8 +61,8 @@ export UCX_TLS=cma,rc,mm,cuda_ipc,cuda_copy,gdr_copy    # Include cuda and gdr b
 export UCX_MEMTYPE_CACHE=n   
 
 date
-srun -l fesom.x > fesom2.out 2>&1 #> "fesom2.0.out" 2>&1
-#srun -l nsys profile fesom.x > fesom2.out 2>&1 #> "fesom2.0.out" 2>&1
+#srun -l fesom.x > fesom2.out 2>&1 #> "fesom2.0.out" 2>&1
+srun -l nsys profile fesom.x > fesom2.out 2>&1 #> "fesom2.0.out" 2>&1
 date
 
 # qstat -f $PBS_JOBID
