@@ -28,7 +28,8 @@ module io_MEANDATA
     real(real32), allocatable, dimension(:,:) :: local_values_r4
     real(real64), allocatable :: aux_r8(:)
     real(real32), allocatable :: aux_r4(:)
-    integer                                            :: addcounter=0
+    integer                                            :: addcounter =0
+    integer                                            :: lastcounter=0 ! before addcounter is set to 0
     real(kind=WP), pointer                             :: ptr3(:,:) ! todo: use netcdf types, not WP
     character(500)                                     :: filename
     character(100)                                     :: name
@@ -56,9 +57,10 @@ module io_MEANDATA
     ! to be passed to MULTIO (time window for the accumulations)
     integer :: currentDate,  currentTime
     integer :: previousDate, previousTime
+    integer :: startDate, startTime
   contains
     final destructor
-  end type  
+  end type
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -1287,6 +1289,7 @@ ctime=timeold+(dayold-1.)*86400
 !$OMP END PARALLEL DO
             end if ! --> if (entry%accuracy == i_real8) then
             !___________________________________________________________________
+            entry%lastcounter=entry%addcounter
             entry%addcounter   = 0  ! clean_meanarrays
             entry%ctime_copy = ctime
 
@@ -1405,6 +1408,8 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
     entry%previousTime=-1
     entry%currentDate=yearold * 10000 + month * 100 + day_in_month
     entry%currentTime=INT(INT(timeold / 3600) * 10000 + (INT(timeold / 60) - INT(timeold / 3600) * 60) * 100 + (timeold-INT(timeold / 60) * 60))
+    entry%startDate=entry%currentDate
+    entry%startTime=entry%currentTime
     !___________________________________________________________________________
     ! fill up 3d meandata streaming object
     ! 3d specific
@@ -1482,7 +1487,9 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
     entry%previousDate=-1
     entry%previousTime=-1
     entry%currentDate=yearold * 10000 + month * 100 + day_in_month
-    entry%currentTime=INT(INT(timeold / 3600) * 10000 + (INT(timeold / 60) - INT(timeold / 3600) * 60) * 100 + (timeold-INT(timeold / 60) * 60))    
+    entry%currentTime=INT(INT(timeold / 3600) * 10000 + (INT(timeold / 60) - INT(timeold / 3600) * 60) * 100 + (timeold-INT(timeold / 60) * 60))
+    entry%startDate=entry%currentDate
+    entry%startTime=entry%currentTime
     !___________________________________________________________________________
     ! fill up 3d meandata streaming object
     ! 2d specific
@@ -1755,6 +1762,9 @@ SUBROUTINE send_data_to_multio(entry)
     request%previousTime=entry%previousTime
     request%currentDate =entry%currentDate
     request%currentTime =entry%currentTime
+    request%startDate   =entry%startDate
+    request%startTime   =entry%startTime
+    request%lastcounter =entry%lastcounter
     request%sampleInterval=INT(dt)
 
     IF (.NOT. entry%is_elem_based) THEN

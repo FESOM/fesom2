@@ -38,6 +38,8 @@ MODULE iom
         INTEGER                                 :: step = 0
         INTEGER                                 :: currentDate,  currentTime
         INTEGER                                 :: previousDate, previousTime
+        INTEGER                                 :: startDate,    startTime
+        INTEGER                                 :: lastcounter
     END TYPE
 
 CONTAINS
@@ -390,9 +392,15 @@ CONTAINS
         cerr = md%set_int("currentTime",    data%currentTime)
         cerr = md%set_int("previousDate",   data%previousDate)
         cerr = md%set_int("previousTime",   data%previousTime)
+        cerr = md%set_int("startDate",      data%startDate)
+        cerr = md%set_int("startTime",      data%startTime)
         cerr = md%set_int("sampleInterval", data%sampleInterval)
-        cerr = md%set_int("sampleIntervalInSeconds", data%sampleInterval)
+!       cerr = md%set_int("sampleIntervalInSeconds", data%sampleInterval)
         cerr = md%set_string("sampleIntervalUnit", 'S')
+        cerr = md%set_int("sampleIntervalInSeconds", data%sampleInterval)
+        cerr = md%set_int("timeStep",                data%sampleInterval) !we do not distinguish between the timestep & sampling interval legacy code for MULTIO
+        cerr = md%set_int("step-frequency",          data%lastcounter)
+        cerr = md%set_int("step",                    data%step)
         IF (cerr /= MULTIO_SUCCESS) THEN
            CALL ctl_stop('send_fesom_data: md%set_int(date) failed: ', multio_error_string(cerr))
         END IF
