@@ -136,7 +136,7 @@ subroutine ice_TG_rhs(ice, partit, mesh)
         rhs_ms(row)=0._WP
 #if defined (__oifs) || defined (__ifsinterface)
         rhs_temp(row)=0._WP
-#endif /* (__oifs) */
+#endif
     END DO
 !$OMP END DO
     ! Velocities at nodes
@@ -174,7 +174,7 @@ subroutine ice_TG_rhs(ice, partit, mesh)
             rhs_ms(row)=rhs_ms(row)+sum(entries*m_snow(elnodes))
 #if defined (__oifs) || defined (__ifsinterface)
             rhs_temp(row)=rhs_temp(row)+sum(entries*ice_temp(elnodes))
-#endif /* (__oifs) */
+#endif
         END DO
     end do
 !$OMP END DO
@@ -210,7 +210,7 @@ subroutine ice_fct_solve(ice, partit, mesh)
 
 #if defined (__oifs) || defined (__ifsinterface)
   call ice_fem_fct(4, ice, partit, mesh)    ! ice_temp
-#endif /* (__oifs) */
+#endif
 
 end subroutine ice_fct_solve
 !
@@ -297,7 +297,7 @@ subroutine ice_solve_low_order(ice, partit, mesh)
         m_templ(row)=(rhs_temp(row)+gamma*sum(mass_matrix(clo:clo2)* &
                   ice_temp(location(1:cn))))/area(1,row) + &
                   (1.0_WP-gamma)*ice_temp(row)
-#endif /* (__oifs) */
+#endif
     end do
     !$ACC END PARALLEL LOOP
 !$OMP END PARALLEL DO
@@ -305,7 +305,7 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     call exchange_nod(m_icel,a_icel,m_snowl, partit, luse_g2g = .true.)
 #if defined (__oifs) || defined (__ifsinterface)
     call exchange_nod(m_templ, partit, luse_g2g = .true.)
-#endif /* (__oifs) */
+#endif
 
 !$OMP BARRIER
 end subroutine ice_solve_low_order
@@ -372,7 +372,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
         dm_snow(row)=rhs_ms(row)/area(1,row)
 #if defined (__oifs) || defined (__ifsinterface)
         dm_temp(row)=rhs_temp(row)/area(1,row)
-#endif /* (__oifs) */
+#endif
     end do
     !$ACC END PARALLEL LOOP
 
@@ -380,7 +380,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
     call exchange_nod(dm_ice, da_ice, dm_snow, partit, luse_g2g = .true.)
 #if defined (__oifs) || defined (__ifsinterface)
     call exchange_nod(dm_temp, partit, luse_g2g = .true.)
-#endif /* (__oifs) */
+#endif
 !$OMP BARRIER
     !___________________________________________________________________________
     !iterate
@@ -407,7 +407,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
             rhs_new     = rhs_temp(row) - sum(mass_matrix(clo:clo2)*dm_temp(location(1:cn)))
             m_templ(row)= dm_temp(row)+rhs_new/area(1,row)
-#endif /* (__oifs) */
+#endif
         end do
         !$ACC END PARALLEL LOOP
 
@@ -424,7 +424,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
             dm_snow(row)=m_snowl(row)
 #if defined (__oifs) || defined (__ifsinterface)
             dm_temp(row)=m_templ(row)
-#endif /* (__oifs) */
+#endif
         end do
         !$ACC END PARALLEL LOOP
 
@@ -434,7 +434,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
         call exchange_nod(dm_ice, da_ice, dm_snow, partit, luse_g2g = .true.)
 #if defined (__oifs) || defined (__ifsinterface)
         call exchange_nod(dm_temp, partit, luse_g2g = .true.)
-#endif /* (__oifs) */
+#endif
 !$OMP BARRIER
     end do
 end subroutine ice_solve_high_order
@@ -569,7 +569,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
                             dm_temp(elnodes)))*(vol/area(1,elnodes(q)))/12.0_WP
             end do
         end if
-#endif /* (__oifs) */
+#endif
     end do
     !$ACC END PARALLEL LOOP
 !$OMP END DO
@@ -646,7 +646,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         !$ACC END PARALLEL LOOP
 !$OMP END DO
     end if
-#endif /* (__oifs) */
+#endif
 
     !___________________________________________________________________________
     ! Sums of positive/negative fluxes to node row
@@ -946,12 +946,12 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #endif
 !$OMP END DO
     end if
-#endif /* (__oifs) */ || defined (__ifsinterface)
+#endif
 !$OMP END PARALLEL
     call exchange_nod(m_ice, a_ice, m_snow, partit, luse_g2g = .true.)
 #if defined (__oifs) || defined (__ifsinterface)
     call exchange_nod(ice_temp, partit, luse_g2g = .true.)
-#endif /* (__oifs) */
+#endif
 
 !$ACC END DATA
 
@@ -1126,13 +1126,13 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
         rhs_ms(row)=0.0_WP
 #if defined (__oifs) || defined (__ifsinterface)
         rhs_temp(row)=0.0_WP
-#endif /* (__oifs) */
+#endif
         rhs_mdiv(row)=0.0_WP
         rhs_adiv(row)=0.0_WP
         rhs_msdiv(row)=0.0_WP
 #if defined (__oifs) || defined (__ifsinterface)
         rhs_tempdiv(row)=0.0_WP
-#endif /* (__oifs) */
+#endif
     end do
     !$ACC END PARALLEL LOOP
 
@@ -1180,7 +1180,7 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
             cx3=vol*ice%ice_dt*c4*(sum(m_snow(elnodes))+m_snow(elnodes(n))+sum(entries2*m_snow(elnodes)))/12.0_WP
 #if defined (__oifs) || defined (__ifsinterface)
             cx4=vol*ice%ice_dt*c4*(sum(ice_temp(elnodes))+ice_temp(elnodes(n))+sum(entries2*ice_temp(elnodes)))/12.0_WP
-#endif /* (__oifs) */
+#endif
 
             !___________________________________________________________________
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
@@ -1212,7 +1212,7 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
             !$ACC ATOMIC UPDATE
 #endif
             rhs_temp(row)=rhs_temp(row)+tmp_sum+cx4
-#endif /* (__oifs) */
+#endif
 
             !___________________________________________________________________
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -1232,7 +1232,7 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
             !$ACC ATOMIC UPDATE
 #endif
             rhs_tempdiv(row)=rhs_tempdiv(row)-cx4
-#endif /* (__oifs) */
+#endif
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_unset_lock(partit%plock(row))
 #else
@@ -1316,7 +1316,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
         dm_snow(row)=rhs_msdiv(row)/area(1,row)
 #if defined (__oifs) || defined (__ifsinterface)
         dm_temp(row)=rhs_tempdiv(row)/area(1,row)
-#endif /* (__oifs) */
+#endif
     end do
     !$ACC END PARALLEL LOOP
 
@@ -1326,7 +1326,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
     call exchange_nod(dm_snow, partit, luse_g2g = .true.)
 #if defined (__oifs) || defined (__ifsinterface)
     call exchange_nod(dm_temp, partit, luse_g2g = .true.)
-#endif /* (__oifs) */
+#endif
 !$OMP BARRIER
     !___________________________________________________________________________
     !iterate
@@ -1356,7 +1356,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
             rhs_new     = rhs_tempdiv(row) - sum(mass_matrix(clo:clo2)*dm_temp(location(1:cn)))
             m_templ(row)= dm_temp(row)+rhs_new/area(1,row)
-#endif /* (__oifs) */
+#endif
         end do
         !$ACC END PARALLEL LOOP
 
@@ -1372,7 +1372,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
             dm_snow(row) = m_snowl(row)
 #if defined (__oifs) || defined (__ifsinterface)
             dm_temp(row) = m_templ(row)
-#endif /* (__oifs) */
+#endif
         end do
         !$ACC END PARALLEL LOOP
 
@@ -1383,7 +1383,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
         call exchange_nod(dm_snow, partit, luse_g2g = .true.)
 #if defined (__oifs) || defined (__ifsinterface)
         call exchange_nod(dm_temp, partit, luse_g2g = .true.)
-#endif /* (__oifs) */
+#endif
 !$OMP BARRIER
     end do
 
@@ -1396,7 +1396,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
        m_snow(row)  = m_snow(row)+dm_snow(row)
 #if defined (__oifs) || defined (__ifsinterface)
        ice_temp(row)= ice_temp(row)+dm_temp(row)
-#endif /* (__oifs) */
+#endif
     end do
     !$ACC END PARALLEL LOOP
 !$OMP END PARALLEL DO
