@@ -2864,7 +2864,7 @@ subroutine compute_CFLz(dynamics, partit, mesh)
 !$OMP END PARALLEL DO
 
     !___________________________________________________________________________
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, c1, c2)
     do node=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(node)
         nzmax = nlevels_nod2D(node)-1
@@ -2875,7 +2875,7 @@ subroutine compute_CFLz(dynamics, partit, mesh)
             ! total volume change induced by the vertical motion
             ! no matter, upwind or downwind !
             CFL_z(nz,  node)=CFL_z(nz,node)+c1
-            CFL_z(nz+1,node)=            c2
+            CFL_z(nz+1,node)=               c2
         end do ! --> do nz=nzmin,nzmax
     end do ! --> do node=1, myDim_nod2D+eDim_nod2D
 !$OMP END PARALLEL DO
