@@ -2898,13 +2898,13 @@ subroutine compute_CFLz(dynamics, partit, mesh)
             nzmax = nlevels_nod2D(node)-1
             do nz=nzmin, nzmax
                 if (abs(CFL_z(nz,node)-cflmax) < 1.e-12 .and. CFL_z(nz,node) > 1.75_WP .and. CFL_z(nz,node)<=2.5_WP ) then
-                    print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3,I3)', achar(27)//'[33m'//' --> WARNING CFLz>1.75:'//achar(27)//'[0m',&
+                    print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3,I3,I3)', achar(27)//'[33m'//' --> WARNING CFLz>1.75:'//achar(27)//'[0m',&
                           'CFLz_max=',cflmax,',mstep=',mstep,',glon/glat=',geo_coord_nod2D(1,node)/rad,'/',geo_coord_nod2D(2,node)/rad,&
-                          ',nz/nzmin=',nz,nzmin
+                          ',nz/nzmin/nzmax=',nz,nzmin,nzmax
                 elseif (abs(CFL_z(nz,node)-cflmax) < 1.e-12 .and. CFL_z(nz,node) > 2.5_WP) then          
-                    print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3,I3)', achar(27)//'[31m'//' --> WARNING CFLz>2.5:'//achar(27)//'[0m',&
+                    print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3,I3,I3)', achar(27)//'[31m'//' --> WARNING CFLz>2.5:'//achar(27)//'[0m',&
                           'CFLz_max=',cflmax,',mstep=',mstep,',glon/glat=',geo_coord_nod2D(1,node)/rad,'/',geo_coord_nod2D(2,node)/rad,&
-                          ',nz/nzmin=',nz,nzmin
+                          ',nz/nzmin/nzmax=',nz,nzmin,nzmax
                     !!PS write(*,*) '***********************************************************'
                     !!PS write(*,*) 'max. CFL_z = ', cflmax, ' mype = ', mype
                     !!PS write(*,*) 'mstep      = ', mstep
@@ -3665,7 +3665,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         t3=MPI_Wtime()
         
         ! Trim U to be consistent with BT transport
-        call update_trim_vel_ale_vtransp(1, dynamics, partit, mesh)   
+        call update_trim_vel_ale_vtransp(1, dynamics, partit, mesh) 
         t4=MPI_Wtime()
         t5=t4
     end if ! --> if (.not. dynamics%use_ssh_se_subcycl) then
@@ -3730,12 +3730,12 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     call update_thickness_ale(partit, mesh)
     t9=MPI_Wtime() 
     
-    !___________________________________________________________________________
-    ! Trim to make velocity consistent with BT velocity at n+1/2
-    ! Velocity will be used to advance momentum
-    if (dynamics%use_ssh_se_subcycl) then
-        call update_trim_vel_ale_vtransp(2, dynamics, partit, mesh)   
-    end if
+!PS     !___________________________________________________________________________
+!PS     ! Trim to make velocity consistent with BT velocity at n+1/2
+!PS     ! Velocity will be used to advance momentum
+!PS     if (dynamics%use_ssh_se_subcycl) then
+!PS         call update_trim_vel_ale_vtransp(2, dynamics, partit, mesh)   
+!PS     end if
     
     !___________________________________________________________________________
     ! write out global fields for debugging
