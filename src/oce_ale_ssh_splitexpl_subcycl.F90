@@ -1251,7 +1251,7 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
             ubar   = 0.0_WP
             vbar   = 0.0_WP
             hh_inv = 0.0_WP
-            do nz=nzmin, nzmax
+            do nz=nzmin, nzmax-1
                 !PS !___________________________________________________________
                 !PS ! Update transport velocities: U^(n+1/2,**) = U^(n+1/2,*) + U_rhs
                 !PS UVh(1, nz, elem)=UVh(1, nz, elem)+UV_rhs(1, nz, elem)   
@@ -1270,7 +1270,15 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
                 vbar  = vbar+UVh(2, nz, elem) + UV_rhs(2, nz, elem)   
                 hh_inv= hh_inv+helem(nz,elem)
             end do ! --> do nz=nzmin, nzmax
+            ! inverse total heigh over which the trimming part is distributed -->
+            ! here exclude bottom cell
             hh_inv=1.0_WP/hh_inv
+            
+            ! sum transport over entire water column including bottom cell need 
+            ! the trimming with the barotropic transport
+            nz    = nzmax
+            ubar  = ubar+UVh(1, nz, elem) + UV_rhs(1, nz, elem)   
+            vbar  = vbar+UVh(2, nz, elem) + UV_rhs(2, nz, elem)
             
             !___________________________________________________________________
             if (dynamics%ldiag_ke) then
@@ -1283,8 +1291,13 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
                     !                          |            |
                     !                          v            v 
                     !                        udiff         usum 
-                    usum(1)  = 2.0_WP*UVh(1,nz,elem) + UV_rhs(1, nz, elem) + (UVBT_mean(1, elem)-ubar)*helem(nz,elem)*hh_inv
-                    usum(2)  = 2.0_WP*UVh(2,nz,elem) + UV_rhs(2, nz, elem) + (UVBT_mean(2, elem)-vbar)*helem(nz,elem)*hh_inv
+                    if (nz==nzmax) then 
+                        usum(1)  = 2.0_WP*UVh(1,nz,elem) + UV_rhs(1, nz, elem)
+                        usum(2)  = 2.0_WP*UVh(2,nz,elem) + UV_rhs(2, nz, elem)
+                    else
+                        usum(1)  = 2.0_WP*UVh(1,nz,elem) + UV_rhs(1, nz, elem) + (UVBT_mean(1, elem)-ubar)*helem(nz,elem)*hh_inv
+                        usum(2)  = 2.0_WP*UVh(2,nz,elem) + UV_rhs(2, nz, elem) + (UVBT_mean(2, elem)-vbar)*helem(nz,elem)*hh_inv
+                    end if     
                     ! transform: transport vel --> velocity
                     usum(1)  = usum(1)/helem(nz,elem)
                     usum(2)  = usum(2)/helem(nz,elem)
@@ -1327,7 +1340,7 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
             !     mode solver in FESOM2, 
             ! U_k^(n+1/2) =  U^(n+1/2,**) 
             !              + [<<Ubar>>^(n+1/2) - sum(k, U_k^(n+1/2,**)] * h_k^(n+1/2)/sum(k,h_k^(n+1/2))
-            do nz=nzmin, nzmax
+            do nz=nzmin, nzmax-1
                 !PS UVh(1, nz, elem)= UVh(1, nz, elem)+(UVBT_mean(1, elem)-ubar)*helem(nz,elem)*hh_inv
                 !PS UVh(2, nz, elem)= UVh(2, nz, elem)+(UVBT_mean(2, elem)-vbar)*helem(nz,elem)*hh_inv
                 UVh(1, nz, elem)= UVh(1, nz, elem) + UV_rhs(1, nz, elem) + (UVBT_mean(1, elem)-ubar)*helem(nz,elem)*hh_inv
@@ -1335,6 +1348,14 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
                 UV( 1, nz, elem)= UVh(1, nz, elem)/helem(nz,elem)  ! velocities are still needed    
                 UV( 2, nz, elem)= UVh(2, nz, elem)/helem(nz,elem) 
             end do ! --> do nz=nzmin, nzmax
+            
+            ! apply no trimming in the bottom cell
+            nz = nzmax
+            UVh(1, nz, elem)= UVh(1, nz, elem) + UV_rhs(1, nz, elem)
+            UVh(2, nz, elem)= UVh(2, nz, elem) + UV_rhs(2, nz, elem)
+            UV( 1, nz, elem)= UVh(1, nz, elem)/helem(nz,elem)  ! velocities are still needed    
+            UV( 2, nz, elem)= UVh(2, nz, elem)/helem(nz,elem) 
+            
         end do ! --> do elem=1, myDim_elem2D
 !$OMP END DO       
 !$OMP END PARALLEL    
@@ -1349,7 +1370,7 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
     !___________________________________________________________________________
     ! Trim to make velocity consistent with BT velocity at n+1/2
     ! Velocity will be used to advance momentum
-    else 
+    elseif (mode==2) then 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax, ubar, vbar, hh_inv)
 !$OMP DO      
         do elem=1, myDim_elem2D    
@@ -1360,17 +1381,53 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
             ubar   = 0.0_WP
             vbar   = 0.0_WP
             hh_inv = 0.0_WP    
-            do nz=nzmin, nzmax
+            do nz=nzmin, nzmax-1
                 ubar=ubar+UVh(1, nz, elem)
                 vbar=vbar+UVh(2, nz, elem)
                 hh_inv=hh_inv+helem(nz,elem)
             end do
+            nz=nzmax
+            ubar=ubar+UVh(1, nz, elem)
+            vbar=vbar+UVh(2, nz, elem)
             
             !___________________________________________________________________
             hh_inv=1.0_WP/hh_inv    ! Postpone 2nd order, just use available thickness 
-            do nz=nzmin, nzmax
+            do nz=nzmin, nzmax-1
                 UVh(1, nz, elem)= UVh(1, nz, elem)+(UVBT_12(1, elem)-ubar)*helem(nz,elem)*hh_inv
                 UVh(2, nz, elem)= UVh(2, nz, elem)+(UVBT_12(2, elem)-vbar)*helem(nz,elem)*hh_inv
+                UV( 1, nz, elem)= UVh(1, nz, elem)/helem(nz,elem)  ! velocities are still needed    
+                UV( 2, nz, elem)= UVh(2, nz, elem)/helem(nz,elem)  ! to compute momentum advection
+            end do
+            nz=nzmax
+            UVh(1, nz, elem)= UVh(1, nz, elem)
+            UVh(2, nz, elem)= UVh(2, nz, elem)
+            UV( 1, nz, elem)= UVh(1, nz, elem)/helem(nz,elem)  ! velocities are still needed    
+            UV( 2, nz, elem)= UVh(2, nz, elem)/helem(nz,elem)  ! to compute momentum advection
+        end do
+!$OMP END DO       
+!$OMP END PARALLEL   
+
+        !_______________________________________________________________________
+!$OMP MASTER        
+        call exchange_elem(UVh, partit)    ! 
+        call exchange_elem(UV , partit)   ! Check if this is needed 
+!$OMP END MASTER
+!$OMP BARRIER
+    
+    !___________________________________________________________________________
+    ! skip trimming only adnvance velocity
+    ! Velocity will be used to advance momentum
+    elseif (mode==3) then 
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax, ubar, vbar, hh_inv)
+!$OMP DO      
+        do elem=1, myDim_elem2D    
+            nzmin  = ulevels(elem)
+            nzmax  = nlevels(elem)-1
+            
+            !___________________________________________________________________
+            do nz=nzmin, nzmax
+                UVh(1, nz, elem)= UVh(1, nz, elem) + UV_rhs(1, nz, elem)
+                UVh(2, nz, elem)= UVh(2, nz, elem) + UV_rhs(2, nz, elem)
                 UV( 1, nz, elem)= UVh(1, nz, elem)/helem(nz,elem)  ! velocities are still needed    
                 UV( 2, nz, elem)= UVh(2, nz, elem)/helem(nz,elem)  ! to compute momentum advection
             end do
@@ -1384,6 +1441,7 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
         call exchange_elem(UV , partit)   ! Check if this is needed 
 !$OMP END MASTER
 !$OMP BARRIER
+
     end if ! --> if (mode==1) then
 end subroutine update_trim_vel_ale_vtransp
 !
@@ -1429,26 +1487,26 @@ subroutine compute_thickness_zstar(dynamics, partit, mesh)
 !$OMP END DO       
 !$OMP END PARALLEL 
     
-    !___________________________________________________________________________
-    ! --> update mean layer thinkness at element
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax)
-!$OMP DO        
-    do elem=1, myDim_elem2D
-        nzmin = ulevels(elem)
-        nzmax = nlevels(elem)-1
-        elnodes=elem2D_nodes(:,elem)
-        do nz=nzmin, nzmax-1
-            helem(nz,elem)=sum(hnode_new(nz,elnodes))/3.0_WP
-        end do
-    end do
-!$OMP END DO       
-!$OMP END PARALLEL 
-
-    !___________________________________________________________________________
-!$OMP MASTER
-    call exchange_elem(helem, partit)
-!$OMP END MASTER
-!$OMP BARRIER
+!PS     !___________________________________________________________________________
+!PS     ! --> update mean layer thinkness at element
+!PS !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax)
+!PS !$OMP DO        
+!PS     do elem=1, myDim_elem2D
+!PS         nzmin = ulevels(elem)
+!PS         nzmax = nlevels(elem)-1
+!PS         elnodes=elem2D_nodes(:,elem)
+!PS         do nz=nzmin, nzmax-1
+!PS             helem(nz,elem)=sum(hnode_new(nz,elnodes))/3.0_WP
+!PS         end do
+!PS     end do
+!PS !$OMP END DO       
+!PS !$OMP END PARALLEL 
+!PS 
+!PS     !___________________________________________________________________________
+!PS !$OMP MASTER
+!PS     call exchange_elem(helem, partit)
+!PS !$OMP END MASTER
+!PS !$OMP BARRIER
 
 end subroutine compute_thickness_zstar
 
