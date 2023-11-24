@@ -141,6 +141,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use Toy_Channel_Soufflet
     use diff_tracers_ale_interface
     use oce_adv_tra_driver_interfaces
+    USE DIAGNOSTICS, only: ldiag_DVD
     implicit none
     type(t_ice)   , intent(in)   , target    :: ice
     type(t_dyn)   , intent(inout), target    :: dynamics
@@ -193,6 +194,12 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! loop over all tracers
     do tr_num=1, tracers%num_tracers
+    
+        ! DVD diagostic: store tracer (only temp and salt) from previouse time steps
+        if (ldiag_DVD) .and. (tr_num<=2) then 
+            tracers%work%dvd_trstar(:,:, tr_num) = tracers%data(tr_num)%values
+        end if
+        
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
@@ -228,18 +235,22 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
            tracers%work%del_ttf(:, node)=tracers%work%del_ttf(:, node)+tracers%work%del_ttf_advhoriz(:, node)+tracers%work%del_ttf_advvert(:, node)
         end do
 !$OMP END PARALLEL DO
-           !___________________________________________________________________________
-           ! AB is not needed after the advection step. Initialize it with the current tracer before it is modified.
-           ! call init_tracers_AB at the beginning of this loop will compute AB for the next time step then.
+
+        !___________________________________________________________________________
+        ! AB is not needed after the advection step. Initialize it with the current tracer before it is modified.
+        ! call init_tracers_AB at the beginning of this loop will compute AB for the next time step then.
 !$OMP PARALLEL DO
         do node=1, myDim_nod2d+eDim_nod2D
            tracers%data(tr_num)%valuesAB(:, node)=tracers%data(tr_num)%values(:, node) !DS: check that this is the right place!
         end do
 !$OMP END PARALLEL DO
+
+        !___________________________________________________________________________
         ! diffuse tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
         call diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
 
+        !___________________________________________________________________________
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
 !       if ((toy_ocean) .AND. ((tr_num==1) .AND. (TRIM(which_toy)=="soufflet"))) then

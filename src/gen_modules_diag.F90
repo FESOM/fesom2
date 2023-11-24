@@ -21,8 +21,8 @@ module diagnostics
             compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, shear, Ri, KvdTdZ, KvdSdZ,   & 
             std_dens_min, std_dens_max, std_dens_N, std_dens,                                        &
             std_dens_UVDZ, std_dens_DIV, std_dens_DIV_fer, std_dens_Z, std_dens_H, std_dens_dVdT, std_dens_flux,       &
-            dens_flux_e, vorticity, zisotherm, tempzavg, saltzavg, compute_diag_dvd_2ndmoment_klingbeil_etal_2014,       &
-            compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd
+            dens_flux_e, vorticity, zisotherm, tempzavg, saltzavg,       &
+            compute_dvd, dvd_tot, dvd_chi_adv, dvd_chi_adv_h, dvd_chi_adv_v, dvd_chi_diff_h, dvd_chi_diff_v
             
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
@@ -56,6 +56,13 @@ module diagnostics
   real(kind=WP),  save, allocatable, target      :: std_dens_UVDZ(:,:,:), std_dens_flux(:,:,:), std_dens_dVdT(:,:), std_dens_DIV(:,:), std_dens_DIV_fer(:,:), std_dens_Z(:,:), std_dens_H(:,:)
   real(kind=WP),  save, allocatable, target      :: dens_flux_e(:)
 
+  !_____________________________________________________________________________
+  ! DVD diagnostics
+  real(kind=WP),  save, allocatable, target      :: dvd_tot(:,:,:), dvd_chi_adv(:,:,:), dvd_chi_adv_h(:,:,:), &
+                                                    dvd_chi_adv_v(:,:,:), dvd_chi_diff_h(:,:,:), dvd_chi_diff_v(:,:,:)
+  
+  !_____________________________________________________________________________
+  ! Define diagnostic flags + with corresponding namelist
   logical                                       :: ldiag_solver     =.false.
   logical                                       :: lcurt_stress_surf=.false.
   logical                                       :: ldiag_curl_vel3  =.false.
@@ -76,7 +83,9 @@ module diagnostics
   logical                                       :: ldiag_vorticity  =.false.
   logical                                       :: ldiag_extflds    =.false.
   
-  namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_Ri, ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, ldiag_vorticity, ldiag_extflds
+  namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_Ri, & 
+                       ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, &
+                       ldiag_vorticity, ldiag_extflds
   
   contains
 
@@ -838,14 +847,19 @@ subroutine compute_diagnostics(mode, dynamics, tracers, partit, mesh)
   type(t_dyn)   , intent(inout), target :: dynamics
   integer, intent(in)                   :: mode !constructor mode (0=only allocation; any other=do diagnostic)
   real(kind=WP)                         :: val  !1. solver diagnostic
+  ! 1. compute solver diagnostic
   if (ldiag_solver)      call diag_solver(mode, dynamics, partit, mesh)
-  !2. compute curl(stress_surf)
+  
+  ! 2. compute curl(stress_surf)
   if (lcurt_stress_surf) call diag_curl_stress_surf(mode, partit, mesh)
-  !3. compute curl(velocity)
+  
+  ! 3. compute curl(velocity)
   if (ldiag_curl_vel3)   call diag_curl_vel3(mode, dynamics, partit, mesh)
-  !4. compute energy budget
+  
+  ! 4. compute energy budget
   if (ldiag_Ri)          call diag_Ri(mode, dynamics, partit, mesh)
-  !5. print integrated temperature 
+  
+  ! 5. print integrated temperature 
   if (ldiag_salt3d) then
      if (mod(mstep,logfile_outfreq)==0) then
         call integrate_nod(tracers%data(2)%values(:,:), val, partit, mesh)
@@ -854,17 +868,68 @@ subroutine compute_diagnostics(mode, dynamics, tracers, partit, mesh)
         end if
      end if
   end if
-  !6. MOC in density coordinate
+  
+  ! 6. MOC in density coordinate
   if (ldiag_dMOC)        call diag_densMOC(mode, dynamics, tracers, partit, mesh)
-  !7. compute turbulent fluxes
+  
+  ! 7. compute turbulent fluxes
   if (ldiag_turbflux)    call diag_turbflux(mode, dynamics, tracers, partit, mesh)
-  ! compute relative vorticity
+  
+  ! 8. compute relative vorticity
   if (ldiag_vorticity)   call relative_vorticity(mode, dynamics, partit, mesh)
-  ! soe exchanged fields requested by IFS/FESOM in NextGEMS.
+  
+  ! 9. compute some exchanged fields requested by IFS/FESOM in NextGEMS.
   if (ldiag_extflds)     call compute_extflds(mode, dynamics, tracers, partit, mesh)
 
+  ! 10. compute Discrete Variance Decay (DVD) diagnostic of: 
+  ! K. Klingbeil et al., 2014, Quantification of spurious dissipation and mixing – 
+  ! Discrete variance decay in Finite-Volume framework ...
+  ! T. Banerjee, S. Danilov, K. Klingbeil, 2023, Discrete variance decay analysis of 
+  ! spurious mixing
+  if (ldiag_DVD)     call compute_dvd(mode, dynamics, tracers, partit, mesh)
+  
 end subroutine compute_diagnostics
 
+
+!
+!
+!_______________________________________________________________________________
+! compute spurious mixing diagnostic dvd 
+subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
+    IMPLICIT NONE
+    integer,        intent(in)              :: mode
+    logical,        save                    :: firstcall=.true.
+    type(t_dyn)   , intent(in),     target  :: dynamics
+    type(t_tracer), intent(in)   ,  target  :: tracers
+    type(t_partit), intent(inout),  target  :: partit
+    type(t_mesh)  , intent(in)   ,  target  :: mesh
+    integer                                 :: node, edge, nz, nzmin, nzmax
+    
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
+    if (firstcall) then  !allocate the stuff at the first call
+        allocate(dvd_tot(       nl-1, myDim_nod2D+eDim_nod2D, 2))
+        allocate(dvd_chi_adv(   nl-1, myDim_nod2D+eDim_nod2D, 2))
+        allocate(dvd_chi_adv_h( nl-1, myDim_nod2D+eDim_nod2D, 2))
+        allocate(dvd_chi_adv_v( nl-1, myDim_nod2D+eDim_nod2D, 2))
+        allocate(dvd_chi_diff_h(nl-1, myDim_nod2D+eDim_nod2D, 2))
+        allocate(dvd_chi_diff_v(nl-1, myDim_nod2D+eDim_nod2D, 2))
+        dvd_tot        = 0.0_WP
+        dvd_chi_adv    = 0.0_WP
+        dvd_chi_adv_h  = 0.0_WP
+        dvd_chi_adv_v  = 0.0_WP
+        dvd_chi_diff_h = 0.0_WP
+        dvd_chi_diff_v = 0.0_WP
+        if (mode==0) return
+    end if  
+    trflx_h => tracers%work%dvd_trflx_hor(:,:,:)
+    trflx_v => tracers%work%dvd_trflxv_ver(:,:,:)
+    trstar  => tracers%work%dvd_trstar(:,:,:)
+
+    
+end subroutine compute_diagnostics    
 !
 !
 !_______________________________________________________________________________

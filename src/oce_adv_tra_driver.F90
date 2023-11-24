@@ -54,6 +54,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     use oce_adv_tra_ver_interfaces
     use oce_adv_tra_fct_interfaces
     use oce_tra_adv_flux2dtracer_interface
+    USE DIAGNOSTICS, only: ldiag_DVD
     implicit none
     real(kind=WP),  intent(in),    target :: dt
     integer,        intent(in)            :: tr_num
@@ -103,7 +104,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     fct_minus       => tracers%work%fct_minus
     dttf_h          => tracers%work%del_ttf_advhoriz
     dttf_v          => tracers%work%del_ttf_advvert
-
+    
     !___________________________________________________________________________
     ! compute FCT horzontal and vertical low order solution as well as lw order
     ! part of antidiffusive flux
@@ -259,8 +260,8 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         !     oce_ale_tracer.F90 --> subroutine diff_ver_part_impl_ale(tr_num, partit, mesh)
         !     for do_wimpl=.true.
     END SELECT
+    
     !___________________________________________________________________________
-    !
     if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
        !edge_up_dn_grad will be used as an auxuary array here
        call oce_tra_adv_fct(dt, ttf, fct_LO, adv_flux_hor, adv_flux_ver, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, edge_up_dn_grad, partit, mesh)
@@ -269,6 +270,16 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
        call oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, partit, mesh)
     end if
 
+    !___________________________________________________________________________
+    ! DVD diagostic: store horizontal and vertical tracer fluxes through mid 
+    ! edge faces and upper and lower scalar cell prism face. Consider here special
+    ! reconstruction value depending on horiz/vertical advection scheme. Only do 
+    ! this for temperature and salinity
+    if (ldiag_DVD) .and. (tr_num<=2) then 
+        tracer%work%dvd_trflx_hor(:,:,tr_num) = adv_flux_hor
+        tracer%work%dvd_trflx_ver(:,:,tr_num) = adv_flux_ver
+    end if 
+    
 end subroutine do_oce_adv_tra
 !
 !

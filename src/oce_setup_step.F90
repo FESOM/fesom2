@@ -279,7 +279,7 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     type(t_mesh),   intent(in) ,   target               :: mesh
     type(nml_tracer_list_type),    target, allocatable  :: nml_tracer_list(:)
     !___________________________________________________________________________
-    integer        :: elem_size, node_size
+    integer        :: elem_size, node_size, edge_size
     integer, save  :: nm_unit  = 104       ! unit to open namelist file, skip 100-102 for cray
     integer        :: iost
     integer        :: n
@@ -328,8 +328,9 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
 
     !___________________________________________________________________________
     ! define local vertice & elem array size + number of tracers
-    elem_size=myDim_elem2D+eDim_elem2D
-    node_size=myDim_nod2D+eDim_nod2D
+    elem_size=myDim_elem2D + eDim_elem2D
+    node_size=myDim_nod2D  + eDim_nod2D
+    edge_size=myDim_edge2D
     tracers%num_tracers=num_tracers
 
     !___________________________________________________________________________
@@ -359,9 +360,12 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     tracers%work%del_ttf_advhoriz = 0.0_WP
     tracers%work%del_ttf_advvert  = 0.0_WP
     if (ldiag_DVD) then
-        allocate(tracers%work%tr_dvd_horiz(nl-1,node_size,2),tracers%work%tr_dvd_vert(nl-1,node_size,2))
-        tracers%work%tr_dvd_horiz = 0.0_WP
-        tracers%work%tr_dvd_vert  = 0.0_WP
+        allocate(tracers%work%dvd_trflx_hor(nl-1,edge_size)),2)
+        allocate(tracers%work%dvd_trflx_ver(nl  ,node_size),2)
+        allocate(tracers%work%dvd_trstar( nl    ,node_size),2)
+        tracers%work%dvd_trflx_hor = 0.0_WP
+        tracers%work%dvd_trflx_ver = 0.0_WP
+        tracers%work%dvd_trstar    = 0.0_WP
     end if
 END SUBROUTINE tracer_init
 !
