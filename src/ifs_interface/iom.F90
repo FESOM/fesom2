@@ -368,14 +368,19 @@ CONTAINS
             CALL ctl_stop('send_fesom_data: md%set_string(name) failed: ', multio_error_string(cerr))
         END IF
 
-        cerr = md%set_string("gridSubtype", data%gridType)
+        cerr = md%set_string("gridType", "unstructured_grid")
         IF (cerr /= MULTIO_SUCCESS) THEN
-            CALL ctl_stop('send_fesom_data: md%set_string(gridSubType) failed: ', multio_error_string(cerr))
+            CALL ctl_stop('send_fesom_data: md%set_string(gridType) failed: ', multio_error_string(cerr))
         END IF
 
-        cerr = md%set_string("gridType", "CORE2")
+        cerr = md%set_string("unstructuredGridType", "CORE2")
         IF (cerr /= MULTIO_SUCCESS) THEN
-            CALL ctl_stop('send_fesom_data: md%set_string(grid-type) failed: ', multio_error_string(cerr))
+            CALL ctl_stop('send_fesom_data: md%set_string(unstructuredGridType) failed: ', multio_error_string(cerr))
+        END IF
+
+        cerr = md%set_string("unstructuredGridSubtype", data%gridType(1:1))
+        IF (cerr /= MULTIO_SUCCESS) THEN
+            CALL ctl_stop('send_fesom_data: md%set_string(unstructuredGridSubtype) failed: ', multio_error_string(cerr))
         END IF
 
         cerr = md%set_string("operation", "average")
