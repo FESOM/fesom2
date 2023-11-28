@@ -33,9 +33,9 @@ real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:), del_ttf_advvert(:,:
 !                              edge faces for temperature and salintiy. These fluxes
 !                              are already computed in adv_flux_hor, adv_flux_ver 
 !                              but not saved
-! dvd_trstar               ... starts with tracer from previouse time steps becomes later 
-!                              Tstar = 0.5*( T^(n+1) + T^n)
-real(kind=WP), allocatable                    :: dvd_trflx_hor(:,:,:), dvd_trflx_ver, dvd_trstar(:,:,:)
+! dvd_trold                ... tracer from previouse time steps later needed to  
+!                              compute Tstar = 0.5*( T^(n+1) + T^n)
+real(kind=WP), allocatable, dimension(:,:,:)  :: dvd_trflx_hor, dvd_trflx_ver, dvd_trold
 
 !_______________________________________________________________________________
 ! The fct part
@@ -153,9 +153,9 @@ subroutine WRITE_T_TRACER_WORK(twork, unit)
     call write_bin_array(twork%del_ttf,          unit, iostat, iomsg)
     call write_bin_array(twork%del_ttf_advhoriz, unit, iostat, iomsg)
     call write_bin_array(twork%del_ttf_advvert,  unit, iostat, iomsg)
-    call write_bin_array(twork%dvd_trflx_h,      unit, iostat, iomsg)
-    call write_bin_array(twork%dvd_trflx_v,      unit, iostat, iomsg)
-    call write_bin_array(twork%dvd_trstar,       unit, iostat, iomsg)
+    call write_bin_array(twork%dvd_trflx_hor,    unit, iostat, iomsg)
+    call write_bin_array(twork%dvd_trflx_ver,    unit, iostat, iomsg)
+    call write_bin_array(twork%dvd_trold,        unit, iostat, iomsg)
     call write_bin_array(twork%fct_LO,           unit, iostat, iomsg)
     call write_bin_array(twork%adv_flux_hor,     unit, iostat, iomsg)
     call write_bin_array(twork%adv_flux_ver,     unit, iostat, iomsg)
@@ -179,9 +179,9 @@ subroutine READ_T_TRACER_WORK(twork, unit)
     call read_bin_array(twork%del_ttf,          unit, iostat, iomsg)
     call read_bin_array(twork%del_ttf_advhoriz, unit, iostat, iomsg)
     call read_bin_array(twork%del_ttf_advvert,  unit, iostat, iomsg)
-    call read_bin_array(twork%dvd_trflx_h,      unit, iostat, iomsg)
-    call read_bin_array(twork%dvd_trflx_v,      unit, iostat, iomsg)
-    call read_bin_array(twork%dvd_trstar,       unit, iostat, iomsg)
+    call read_bin_array(twork%dvd_trflx_hor,    unit, iostat, iomsg)
+    call read_bin_array(twork%dvd_trflx_ver,    unit, iostat, iomsg)
+    call read_bin_array(twork%dvd_trold,        unit, iostat, iomsg)
     call read_bin_array(twork%fct_LO,           unit, iostat, iomsg)
     call read_bin_array(twork%adv_flux_hor,     unit, iostat, iomsg)
     call read_bin_array(twork%adv_flux_ver,     unit, iostat, iomsg)
