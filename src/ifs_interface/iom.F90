@@ -332,6 +332,7 @@ CONTAINS
 
     SUBROUTINE iom_send_fesom_data(data)
         USE g_clock
+        USE g_config, only: MeshId
         IMPLICIT NONE
 
         TYPE(iom_field_request), INTENT(INOUT)  :: data
@@ -373,7 +374,7 @@ CONTAINS
             CALL ctl_stop('send_fesom_data: md%set_string(gridType) failed: ', multio_error_string(cerr))
         END IF
 
-        cerr = md%set_string("unstructuredGridType", "CORE2")
+        cerr = md%set_string("unstructuredGridType", MeshId)
         IF (cerr /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('send_fesom_data: md%set_string(unstructuredGridType) failed: ', multio_error_string(cerr))
         END IF
