@@ -275,9 +275,9 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     ! edge faces and upper and lower scalar cell prism face. Consider here special
     ! reconstruction value depending on horiz/vertical advection scheme. Only do 
     ! this for temperature and salinity
-    if (ldiag_DVD) .and. (tr_num<=2) then 
-        tracer%work%dvd_trflx_hor(:,:,tr_num) = adv_flux_hor
-        tracer%work%dvd_trflx_ver(:,:,tr_num) = adv_flux_ver
+    if ((ldiag_DVD) .and. (tr_num<=2)) then 
+        tracers%work%dvd_trflx_hor(:,:,tr_num) = adv_flux_hor(:,:)
+        tracers%work%dvd_trflx_ver(:,:,tr_num) = adv_flux_ver(:,:)
     end if 
     
 end subroutine do_oce_adv_tra
