@@ -16,3 +16,4 @@ slurm.err
 slurm.out
 fesom2.out
 /work/*.nsys-rep
+build_*/
