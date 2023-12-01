@@ -229,6 +229,8 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
       target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  albedo)
       target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -O3 -ip -fPIC -qopt-malloc-options=2 -qopt-prefetch=5 -unroll-aggressive) #NEC mpi option
+   elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL atosecmwf )
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE -xHost)
    endif()
