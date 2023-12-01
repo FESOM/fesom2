@@ -17,3 +17,5 @@ slurm.out
 fesom2.out
 /work/*.nsys-rep
 build_*/
+CMakeCache.txt
+CMakeFiles/
