@@ -17,7 +17,7 @@ set -e
 source /sw/etc/profile.levante
 #source ../env/levante.dkrz.de/shell
 #read -r USED_SHELL < ../bin/current_shell_path
-USED_SHELL="/work/ab0995/a270232/base_fesom/env/levante.dkrz.de/shell.nvhpc"
+USED_SHELL="/work/ab0995/a270232/tracer_porting_fesom/env/levante.dkrz.de/shell.nvhpc"
 source $USED_SHELL
 
 #source /work/ab0995/a270232/refactoring/fesom2/env/levante.dkrz.de/shell.nvhpc
@@ -36,7 +36,7 @@ JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
 
 rm -f fesom.x
 #ln -s ../bin/fesom.x .           # cp -n ../bin/fesom.x
-ln -s /work/ab0995/a270232/base_fesom/build_disable_openacc_atomics/src/fesom fesom.x
+ln -s /work/ab0995/a270232/tracer_porting_fesom/build_disable_openacc_atomics/src/fesom fesom.x
 #ln -s ../bin/fesom.x .           # cp -n ../bin/fesom.x
 
 export OMP_NUM_THREADS=4
