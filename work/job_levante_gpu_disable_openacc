@@ -36,7 +36,7 @@ JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
 
 rm -f fesom.x
 #ln -s ../bin/fesom.x .           # cp -n ../bin/fesom.x
-ln -s /work/ab0995/a270232/base_fesom/build_openacc_atomics/src/fesom fesom.x
+ln -s /work/ab0995/a270232/base_fesom/build_disable_openacc_atomics/src/fesom fesom.x
 #ln -s ../bin/fesom.x .           # cp -n ../bin/fesom.x
 
 export OMP_NUM_THREADS=4
@@ -70,4 +70,3 @@ date
 #if [ ${EXITSTATUS} -eq 0 ] || [ ${EXITSTATUS} -eq 127 ] ; then
 #sbatch job_mistral
 #fi
-
