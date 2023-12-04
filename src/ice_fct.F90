@@ -1076,10 +1076,14 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
         !$ACC UPDATE DEVICE(ice_temp)
 #endif
+#ifndef ENABLE_OPENACC
 !$OMP END DO
+#endif
     end if
 #endif /* (__oifs) */ || defined (__ifsinterface)
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL
+#endif
     call exchange_nod(m_ice, a_ice, m_snow, partit, luse_g2g = .true.)
 #if defined (__oifs) || defined (__ifsinterface)
     call exchange_nod(ice_temp, partit, luse_g2g = .true.)
@@ -1087,7 +1091,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 
 !$ACC END DATA
 
+#ifndef ENABLE_OPENACC
 !$OMP BARRIER
+#endif
 end subroutine ice_fem_fct
 !
 !
