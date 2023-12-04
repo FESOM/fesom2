@@ -42,7 +42,7 @@ elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  albedo )
    message(STATUS "multithreading disabled for Albedo") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 else()
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
+   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 endif()
 
 option(ENABLE_OPENACC "compile with OpenACC support" OFF)
