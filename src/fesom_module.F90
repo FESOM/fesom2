@@ -296,6 +296,19 @@ contains
     f%rtime_read_forcing  = 0._WP
 
     f%from_nstep = 1
+    !enter mesh and partit data. 
+    !$ACC ENTER DATA COPYIN (f) 
+    !$ACC ENTER DATA COPYIN (f%mesh, f%mesh%coriolis_node, f%mesh%nn_num, f%mesh%nn_pos) 
+    !$ACC ENTER DATA COPYIN (f%mesh%ssh_stiff, f%mesh%ssh_stiff%rowptr) 
+    !$ACC ENTER DATA COPYIN (f%mesh%gradient_sca, f%mesh%metric_factor, f%mesh%elem_area, f%mesh%area, f%mesh%edge2D_in) 
+    !$ACC ENTER DATA COPYIN (f%mesh%elem2D_nodes, f%mesh%ulevels, f%mesh%ulevels_nod2d, f%mesh%edges, f%mesh%edge_tri) 
+    !$ACC ENTER DATA COPYIN (f%partit, f%partit%eDim_nod2D, f%partit%myDim_edge2D) 
+    !$ACC ENTER DATA COPYIN (f%partit%myDim_elem2D, f%partit%myDim_nod2D, f%partit%myList_edge2D) 
+
+    !$ACC ENTER DATA COPYIN (f%mesh%helem, f%mesh%elem_cos, f%mesh%edge_cross_dxdy, f%mesh%elem2d_nodes, f%mesh%nl) 
+    !$ACC ENTER DATA COPYIN (f%mesh%nlevels_nod2D, f%mesh%nod_in_elem2D, f%mesh%nod_in_elem2D_num) 
+    !$ACC ENTER DATA COPYIN (f%mesh%edge_dxdy, f%mesh%nlevels, f%mesh%hnode, f%mesh%hnode_new, f%mesh%ulevels_nod2D_max) 
+    !$ACC ENTER DATA COPYIN (f%mesh%zbar_3d_n, f%mesh%z_3d_n, f%mesh%areasvol, f%mesh%nlevels_nod2D_min) 
   end subroutine
 
 
@@ -303,7 +316,7 @@ contains
     use fesom_main_storage_module
     integer, intent(in) :: current_nsteps 
     ! EO parameters
-    integer n, nstart, ntotal
+    integer n, nstart, ntotal, tr_num
 
     !=====================
     ! Time stepping
@@ -328,6 +341,32 @@ contains
     nstart=f%from_nstep
     ntotal=f%from_nstep-1+current_nsteps
     !do n=f%from_nstep, f%from_nstep-1+current_nsteps
+    !$ACC ENTER DATA CREATE  (f%ice, f%ice%data, f%ice%work, f%ice%work%fct_massmatrix) 
+    !$ACC ENTER DATA CREATE  (f%ice%delta_min, f%ice%Tevp_inv, f%ice%cd_oce_ice) 
+    !$ACC ENTER DATA CREATE  (f%ice%work%fct_tmax, f%ice%work%fct_tmin) 
+    !$ACC ENTER DATA CREATE  (f%ice%work%fct_fluxes, f%ice%work%fct_plus, f%ice%work%fct_minus) 
+    !$ACC ENTER DATA CREATE  (f%ice%work%eps11, f%ice%work%eps12, f%ice%work%eps22) 
+    !$ACC ENTER DATA CREATE  (f%ice%work%sigma11, f%ice%work%sigma12, f%ice%work%sigma22) 
+    !$ACC ENTER DATA CREATE  (f%ice%work%ice_strength, f%ice%stress_atmice_x, f%ice%stress_atmice_y) 
+    !$ACC ENTER DATA CREATE  (f%ice%thermo%rhosno, f%ice%thermo%rhoice, f%ice%thermo%inv_rhowat) 
+    !$ACC ENTER DATA CREATE  (f%ice%srfoce_ssh, f%ice%pstar, f%ice%c_pressure) 
+    !$ACC ENTER DATA CREATE  (f%ice%work%inv_areamass, f%ice%work%inv_mass, f%ice%uice_rhs, f%ice%vice_rhs) 
+    !$ACC ENTER DATA CREATE  (f%ice%uice, f%ice%vice, f%ice%srfoce_u, f%ice%srfoce_v, f%ice%uice_old, f%ice%vice_old) 
+    !$ACC ENTER DATA CREATE  (f%ice%data(1)%values, f%ice%data(2)%values, f%ice%data(3)%values) 
+    !$ACC ENTER DATA CREATE  (f%ice%data(1)%valuesl, f%ice%data(2)%valuesl, f%ice%data(3)%valuesl) 
+    !$ACC ENTER DATA CREATE  (f%ice%data(1)%dvalues, f%ice%data(2)%dvalues, f%ice%data(3)%dvalues) 
+    !$ACC ENTER DATA CREATE  (f%ice%data(1)%values_rhs, f%ice%data(2)%values_rhs, f%ice%data(3)%values_rhs) 
+    !$ACC ENTER DATA CREATE  (f%ice%data(1)%values_div_rhs, f%ice%data(2)%values_div_rhs, f%ice%data(3)%values_div_rhs)
+
+    !$ACC ENTER DATA CREATE (f%dynamics%w, f%dynamics%w_e, f%dynamics%uv)
+    !$ACC ENTER DATA CREATE (f%tracers%data, f%tracers%work) 
+    do tr_num=1, f%tracers%num_tracers
+    !$ACC ENTER DATA CREATE (f%tracers%data(tr_num)%values, f%tracers%data(tr_num)%valuesAB) 
+    end do
+    !$ACC ENTER DATA CREATE (f%tracers%work%fct_ttf_min, f%tracers%work%fct_ttf_max, f%tracers%work%fct_plus, f%tracers%work%fct_minus) &
+    !$ACC CREATE (f%tracers%work%adv_flux_hor, f%tracers%work%adv_flux_ver, f%tracers%work%fct_LO) &
+    !$ACC CREATE (f%tracers%work%del_ttf_advvert, f%tracers%work%del_ttf_advhoriz, f%tracers%work%edge_up_dn_grad) &
+    !$ACC CREATE (f%tracers%work%del_ttf)
     do n=nstart, ntotal
         if (use_global_tides) then
            call foreph(f%partit, f%mesh)
@@ -403,6 +442,34 @@ contains
     end do
 
     f%from_nstep = f%from_nstep+current_nsteps
+    !$ACC EXIT DATA DELETE (f%ice%delta_min, f%ice%Tevp_inv, f%ice%cd_oce_ice) 
+    !$ACC EXIT DATA DELETE (f%ice%work%fct_tmax, f%ice%work%fct_tmin) 
+    !$ACC EXIT DATA DELETE (f%ice%work%fct_fluxes, f%ice%work%fct_plus, f%ice%work%fct_minus) 
+    !$ACC EXIT DATA DELETE (f%ice%work%eps11, f%ice%work%eps12, f%ice%work%eps22) 
+    !$ACC EXIT DATA DELETE (f%ice%work%sigma11, f%ice%work%sigma12, f%ice%work%sigma22) 
+    !$ACC EXIT DATA DELETE (f%ice%work%ice_strength, f%ice%stress_atmice_x, f%ice%stress_atmice_y) 
+    !$ACC EXIT DATA DELETE (f%ice%thermo%rhosno, f%ice%thermo%rhoice, f%ice%thermo%inv_rhowat) 
+    !$ACC EXIT DATA DELETE (f%ice%srfoce_ssh, f%ice%pstar, f%ice%c_pressure) 
+    !$ACC EXIT DATA DELETE (f%ice%work%inv_areamass, f%ice%work%inv_mass, f%ice%uice_rhs, f%ice%vice_rhs) 
+    !$ACC EXIT DATA DELETE (f%ice%uice, f%ice%vice, f%ice%srfoce_u, f%ice%srfoce_v, f%ice%uice_old, f%ice%vice_old) 
+    !$ACC EXIT DATA DELETE (f%ice%data(1)%values, f%ice%data(2)%values, f%ice%data(3)%values) 
+    !$ACC EXIT DATA DELETE (f%ice%data(1)%valuesl, f%ice%data(2)%valuesl, f%ice%data(3)%valuesl) 
+    !$ACC EXIT DATA DELETE (f%ice%data(1)%dvalues, f%ice%data(2)%dvalues, f%ice%data(3)%dvalues) 
+    !$ACC EXIT DATA DELETE (f%ice%data(1)%values_rhs, f%ice%data(2)%values_rhs, f%ice%data(3)%values_rhs) 
+    !$ACC EXIT DATA DELETE (f%ice%data(1)%values_div_rhs, f%ice%data(2)%values_div_rhs, f%ice%data(3)%values_div_rhs)
+    !$ACC EXIT DATA DELETE (f%ice%data, f%ice%work, f%ice%work%fct_massmatrix) 
+    !$ACC EXIT DATA DELETE (f%ice) 
+    
+    do tr_num=1, f%tracers%num_tracers
+    !$ACC EXIT DATA DELETE (f%tracers%data(tr_num)%values, f%tracers%data(tr_num)%valuesAB) 
+    end do
+    !$ACC EXIT DATA DELETE (f%tracers%work%fct_ttf_min, f%tracers%work%fct_ttf_max, f%tracers%work%fct_plus, f%tracers%work%fct_minus) 
+    !$ACC EXIT DATA DELETE (f%tracers%work%adv_flux_hor, f%tracers%work%adv_flux_ver, f%tracers%work%fct_LO) 
+    !$ACC EXIT DATA DELETE (f%tracers%work%del_ttf_advvert, f%tracers%work%del_ttf_advhoriz, f%tracers%work%edge_up_dn_grad) 
+    !$ACC EXIT DATA DELETE (f%tracers%work%del_ttf)
+    !$ACC EXIT DATA DELETE (f%tracers%data, f%tracers%work) 
+    !$ACC EXIT DATA DELETE (f%dynamics%w, f%dynamics%w_e, f%dynamics%uv)
+
   end subroutine
 
 
@@ -417,6 +484,19 @@ contains
     !___FINISH MODEL RUN________________________________________________________
 
     call MPI_Barrier(f%MPI_COMM_FESOM, f%MPIERR)
+    !delete mesh and partit data.
+    !$ACC EXIT DATA DELETE (f%mesh%coriolis_node, f%mesh%nn_num, f%mesh%nn_pos) 
+    !$ACC EXIT DATA DELETE (f%mesh%ssh_stiff, f%mesh%ssh_stiff%rowptr) 
+    !$ACC EXIT DATA DELETE (f%mesh%gradient_sca, f%mesh%metric_factor, f%mesh%elem_area, f%mesh%area, f%mesh%edge2D_in) 
+    !$ACC EXIT DATA DELETE (f%mesh%elem2D_nodes, f%mesh%ulevels, f%mesh%ulevels_nod2d, f%mesh%edges, f%mesh%edge_tri) 
+    !$ACC EXIT DATA DELETE (f%mesh%helem, f%mesh%elem_cos, f%mesh%edge_cross_dxdy, f%mesh%elem2d_nodes, f%mesh%nl) 
+    !$ACC EXIT DATA DELETE (f%mesh%nlevels_nod2D, f%mesh%nod_in_elem2D, f%mesh%nod_in_elem2D_num) 
+    !$ACC EXIT DATA DELETE (f%mesh%edge_dxdy, f%mesh%nlevels, f%mesh%hnode, f%mesh%hnode_new, f%mesh%ulevels_nod2D_max) 
+    !$ACC EXIT DATA DELETE (f%mesh%zbar_3d_n, f%mesh%z_3d_n, f%mesh%areasvol, f%mesh%nlevels_nod2D_min) 
+    !$ACC EXIT DATA DELETE (f%partit%eDim_nod2D, f%partit%myDim_edge2D) 
+    !$ACC EXIT DATA DELETE (f%partit%myDim_elem2D, f%partit%myDim_nod2D, f%partit%myList_edge2D) 
+    !$ACC EXIT DATA DELETE (f%mesh, f%partit, f)
+    
     if (f%mype==0) then
        f%t1 = MPI_Wtime()
        f%runtime_alltimesteps = real(f%t1-f%t0,real32)
