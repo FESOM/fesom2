@@ -247,7 +247,7 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
       target_compile_options(${PROJECT_NAME} PRIVATE -hnoomp)
    endif()
    if(${ENABLE_OPENACC}) # remove debug later
-	   target_compile_options(${PROJECT_NAME} PRIVATE -hacc –hlist=a -g )
+	   target_compile_options(${PROJECT_NAME} PRIVATE -hacc –hlist=a -g -DENABLE_OPENACC )
       if(${DISABLE_OPENACC_ATOMICS})
           target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_OPENACC_ATOMICS)
       endif()
