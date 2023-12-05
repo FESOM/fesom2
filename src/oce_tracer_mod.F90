@@ -198,6 +198,7 @@ SUBROUTINE relax_to_clim(tr_num, tracers, partit, mesh)
         #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nzmin, nzmax)
 #else
+!$ACC update device(relax2clim, Tclim)
 !$ACC parallel loop
 #endif
         DO n=1, myDim_nod2D
@@ -218,6 +219,7 @@ SUBROUTINE relax_to_clim(tr_num, tracers, partit, mesh)
         #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nzmin, nzmax)
 #else
+!$ACC update device(Sclim)
 !$ACC parallel loop
 #endif
         DO n=1, myDim_nod2D
