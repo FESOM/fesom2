@@ -1,0 +1,57 @@
+&tracer_listsize
+num_tracers=100 !number of tracers to allocate. shallbe large or equal to the number of streams in &nml_list
+/
+
+&tracer_list
+nml_tracer_list =  
+1  , 'MFCT',       'QR4C',       'FCT ',        1.,          1., 
+2  , 'MFCT',       'QR4C',       'FCT ',        1.,          1., 
+!101, 'UPW1',       'UPW1',       'NON ',        0.,          0.
+/
+
+&tracer_init3d                            ! initial conditions for tracers
+n_ic3d   = 2                              ! number of tracers to initialize
+idlist   = 2, 1                           ! their IDs (0 is temperature, 1 is salinity, etc.). The reading order is defined here!
+filelist = 'phc3.0_winter.nc', 'phc3.0_winter.nc' ! list of files in ClimateDataPath to read (one file per tracer), same order as idlist
+varlist  = 'salt', 'temp'                 ! variables to read from specified files
+t_insitu = .true.                         ! if T is insitu it will be converted to potential after reading it
+/
+
+&tracer_init2d                                      ! initial conditions for 2D tracers (sea ice)
+n_ic2d   = 3                                        ! number of tracers to initialize
+idlist   = 1, 2, 3                                  ! their IDs (0 is a_ice, 1 is m_ice, 3 m_snow). The reading order is defined here!
+filelist = 'a_ice.nc', 'm_ice.nc', 'm_snow.nc' ! list of files in ClimateDataPath to read (one file per tracer), same order as idlist
+varlist  = 'a_ice', 'm_ice', 'm_snow'                 ! variables to read from specified files
+ini_ice_from_file=.false.
+/
+
+&tracer_general
+! bharmonic diffusion for tracers. We recommend to use this option in very high resolution runs (Redi is generally off there).
+smooth_bh_tra =.false.     ! use biharmonic diffusion (filter implementation) for tracers
+gamma0_tra    = 0.0005     ! gammaX_tra are analogous to those in the dynamical part
+gamma1_tra    = 0.0125
+gamma2_tra    = 0.
+i_vert_diff   =.true.
+/
+
+&tracer_phys
+use_momix     = .true.     ! switch on/off  !Monin-Obukhov -> TB04 mixing
+momix_lat     = -50.0      ! latitidinal treshhold for TB04, =90 --> global
+momix_kv      = 0.01       ! PP/KPP, mixing coefficient within MO length
+use_instabmix = .true.     ! enhance convection in case of instable stratification
+instabmix_kv  = 0.1
+use_windmix   = .false.    ! enhance mixing trough wind only for PP mixing (for stability)
+windmix_kv    = 1.e-3
+windmix_nl    = 2
+diff_sh_limit=5.0e-3       ! for KPP, max diff due to shear instability
+Kv0_const=.true.
+double_diffusion=.false.   ! for KPP,dd switch
+K_ver=1.0e-5
+K_hor=3000.
+surf_relax_T=0.0
+surf_relax_S=1.929e-06   ! 50m/300days 6.43e-07! m/s 10./(180.*86400.)
+balance_salt_water =.true. ! balance virtual-salt or freshwater flux or not
+clim_relax=0.0	           ! 1/s, geometrical information has to be supplied
+ref_sss_local=.true.
+ref_sss=34.
+/

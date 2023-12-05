@@ -198,6 +198,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
+        !$ACC UPDATE  DEVICE(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB) &
+        !$ACC DEVICE(mesh%nlevels, mesh%ulevels, mesh%nlevels_nod2D, mesh%ulevels_nod2D, mesh%gradient_sca)
         call init_tracers_AB(tr_num, tracers, partit, mesh)
 
         ! advect tracers
@@ -205,9 +207,12 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 
 
 	!here update only those initialized in the init_tracers. (values, valuesAB, edge_up_dn_grad, ...)
-        !$ACC UPDATE  DEVICE(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB) &
-        !$ACC  DEVICE(tracers%work%edge_up_dn_grad) !!&
-        ! it will update del_ttf with contributions from horizontal and vertical advection parts (del_ttf_advhoriz and del_ttf_advvert)
+        !!$ACC UPDATE  DEVICE(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB) &
+        !!$ACC  DEVICE(tracers%work%edge_up_dn_grad) !!&
+        !removing the updates for values and valuesAB, since I updated before init_tracers_AB and will continue
+        !exist in gpu. for del_ttf, del_ttf_advvert and del_ttf_advhoriz, we initialize them directly on gpu
+        ! in the init_tracers_AB.
+        !!! it will update del_ttf with contributions from horizontal and vertical advection parts (del_ttf_advhoriz and del_ttf_advvert)
 	!$ACC wait(1)
         call do_oce_adv_tra(dt, UV, Wvel, Wvel_i, Wvel_e, tr_num, dynamics, tracers, partit, mesh)
 

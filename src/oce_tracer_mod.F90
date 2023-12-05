@@ -25,7 +25,10 @@ SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
     type(t_tracer), intent(inout), target :: tracers
     integer                               :: n,nz 
     
-!$ACC parallel loop collapse(2) default(present) async(1)
+
+#ifdef ENABLE_OPENACC
+!$ACC parallel loop collapse(2)
+#endif
 do n=1, partit%myDim_nod2D+partit%eDim_nod2D
        do nz=1, mesh%nl-1
        ! del_ttf will contain all advection / diffusion contributions for this tracer. Set it to 0 at the beginning!
@@ -34,13 +37,24 @@ do n=1, partit%myDim_nod2D+partit%eDim_nod2D
        tracers%work%del_ttf_advvert  (nz, n) = 0.0_WP
        end do
 end do
+#ifdef ENABLE_OPENACC
 !$ACC end parallel loop
+#endif
+
+#ifdef ENABLE_OPENACC
+!$ACC PARALLEL LOOP
+#else
 !$OMP PARALLEL DO
+#endif
     do n=1, partit%myDim_nod2D+partit%eDim_nod2D
        ! AB interpolation
        tracers%data(tr_num)%valuesAB(:, n)  =-(0.5_WP+epsilon)*tracers%data(tr_num)%valuesAB(:, n)+(1.5_WP+epsilon)*tracers%data(tr_num)%values(:, n)
     end do
+#ifdef ENABLE_OPENACC
+!$ACC END PARALLEL LOOP
+#else
 !$OMP END PARALLEL DO
+#endif
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
     call tracer_gradient_elements(tracers%data(tr_num)%valuesAB, partit, mesh)
@@ -85,7 +99,15 @@ SUBROUTINE tracer_gradient_elements(ttf, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
+
+!we have to remove this update in the final version, when we write these variables
+!directly on gpu. For now, we update from host.
+#ifdef ENABLE_OPENACC
+!$ACC UPDATE DEVICE(tr_xy)
+!$ACC PARALLEL LOOP
+#else
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax)
+#endif
     DO elem=1, myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
         nzmin = ulevels(elem)
@@ -96,7 +118,12 @@ SUBROUTINE tracer_gradient_elements(ttf, partit, mesh)
             tr_xy(2,nz, elem)=sum(gradient_sca(4:6,elem)*ttf(nz,elnodes))
         END DO
     END DO
+#ifdef ENABLE_OPENACC
+!$ACC END PARALLEL LOOP
+#else
 !$OMP END PARALLEL DO
+#endif
+
 END SUBROUTINE tracer_gradient_elements
 !
 !
@@ -121,7 +148,13 @@ SUBROUTINE tracer_gradient_z(ttf, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
+
+#ifdef ENABLE_OPENACC
+!$ACC UPDATE DEVICE(tr_z)
+!$ACC parallel loop
+#else
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, dz)
+#endif
     DO n=1, myDim_nod2D+eDim_nod2D
     !!PS nlev=nlevels_nod2D(n)
     nzmax=nlevels_nod2D(n)
@@ -136,7 +169,12 @@ SUBROUTINE tracer_gradient_z(ttf, partit, mesh)
     tr_z(nzmin, n)=0.0_WP
     tr_z(nzmax, n)=0.0_WP
     END DO
+#ifdef ENABLE_OPENACC
+!$ACC END PARALLEL LOOP
+#else
 !$OMP END PARALLEL DO
+#endif
+
 END SUBROUTINE tracer_gradient_z
 !
 !
@@ -161,10 +199,16 @@ SUBROUTINE relax_to_clim(tr_num, tracers, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
+
     trarr=>tracers%data(tr_num)%values(:,:)
 
     if ((clim_relax>1.0e-8_WP).and.(tracers%data(tr_num)%ID==1)) then
+#ifdef ENABLE_OPENACC
+!$ACC UPDATE DEVICE(relax2clim, Tclim, Sclim)
+!$ACC parallel loop
+#else
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nzmin, nzmax)
+#endif
         DO n=1, myDim_nod2D
             nzmin = ulevels_nod2D(n)    
             nzmax = nlevels_nod2D(n)    
@@ -173,17 +217,31 @@ SUBROUTINE relax_to_clim(tr_num, tracers, partit, mesh)
             trarr(nzmin:nzmax-1,n)=trarr(nzmin:nzmax-1,n)+&
                     relax2clim(n)*dt*(Tclim(nzmin:nzmax-1,n)-trarr(nzmin:nzmax-1,n))
         END DO
+#ifdef ENABLE_OPENACC
+!$ACC end parallel loop
+#else
 !$OMP END PARALLEL DO
+#endif
+
     END if
     if ((clim_relax>1.0e-8_WP).and.(tracers%data(tr_num)%ID==2)) then
+#ifdef ENABLE_OPENACC
+!$ACC parallel loop
+#else
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nzmin, nzmax)
+#endif
         DO n=1, myDim_nod2D
             nzmin = ulevels_nod2D(n)    
             nzmax = nlevels_nod2D(n)  
             trarr(nzmin:nzmax-1,n)=trarr(nzmin:nzmax-1,n)+&
                     relax2clim(n)*dt*(Sclim(nzmin:nzmax-1,n)-trarr(nzmin:nzmax-1,n))
         END DO
+#ifdef ENABLE_OPENACC
+!$ACC end parallel loop
+#else
 !$OMP END PARALLEL DO
+#endif
+
     END IF 
 END SUBROUTINE relax_to_clim
 END MODULE o_tracers
