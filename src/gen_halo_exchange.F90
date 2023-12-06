@@ -641,7 +641,7 @@ type(t_partit), intent(inout), target  :: partit
 real(real64),   intent(inout)          :: nod_array3D(:,:,:)
 logical,        intent(in),optional    :: luse_g2g
 if (partit%npes>1) then
-   call exchange_nod3D_n_begin(nod_array3D, partit)
+   call exchange_nod3D_n_begin(nod_array3D, partit, luse_g2g)
    call exchange_nod_end(partit)
 endif
 
