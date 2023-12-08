@@ -529,16 +529,21 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     ! it takes memory and time. For every element
     ! we need its antidiffusive contribution to
     ! each of its 3 nodes
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
+#else
     !$ACC DATA CREATE(icoef, elnodes)
-
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
+#endif
     do n = 1, myDim_nod2D + eDim_nod2D
         tmax(n) = 0.0_WP
         tmin(n) = 0.0_WP
     end do
-    !$ACC END PARALLEL LOOP
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL  DO
+#else
+    !$ACC END PARALLEL LOOP
+#endif
     ! Auxiliary elemental operator (mass matrix- lumped mass matrix)
 
     !$ACC KERNELS
@@ -681,7 +686,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP DO
 #else
-        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(NONE)
+        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
         do row=1, myDim_nod2D
             if (ulevels_nod2d(row)>1) cycle
@@ -1029,7 +1034,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP DO
 #else
-        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(NONE)
+        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
         do n=1,myDim_nod2D
             if(ulevels_nod2D(n)>1) cycle !LK89140
@@ -1042,7 +1047,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         !$ACC END PARALLEL LOOP
 #endif
 #if !defined(DISABLE_OPENACC_ATOMICS)
-        !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes) DEFAULT(NONE)
+        !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes) DEFAULT(PRESENT)
 #else
         !$ACC UPDATE SELF(ice_temp, icefluxes)
 #endif
@@ -1053,19 +1058,23 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
             elnodes=elem2D_nodes(:,elem)
             do q=1,3
                 n=elnodes(q)
+#ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_set_lock  (partit%plock(n))
 #else
 !$OMP ORDERED
 #endif
+#endif
 #if !defined(DISABLE_OPENACC_ATOMICS)
                 !$ACC ATOMIC UPDATE
 #endif
                 ice_temp(n)=ice_temp(n)+icefluxes(elem,q)
+#ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_unset_lock(partit%plock(n))
 #else
 !$OMP END ORDERED
+#endif
 #endif
             end do
         end do
@@ -1074,10 +1083,14 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
         !$ACC UPDATE DEVICE(ice_temp)
 #endif
+#ifndef ENABLE_OPENACC
 !$OMP END DO
+#endif
     end if
 #endif
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL
+#endif
     call exchange_nod(m_ice, a_ice, m_snow, partit, luse_g2g = .true.)
 #if defined (__oifs) || defined (__ifsinterface)
     call exchange_nod(ice_temp, partit, luse_g2g = .true.)
@@ -1247,8 +1260,11 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
     ! Computes the rhs in a Taylor-Galerkin way (with upwind type of
     ! correction for the advection operator)
     ! In this version I tr to split divergent term off, so that FCT works without it.
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
+#else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
+#endif
     do row=1, myDim_nod2D
                     !! row=myList_nod2D(m)
         rhs_m(row)=0.0_WP
@@ -1264,8 +1280,11 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
         rhs_tempdiv(row)=0.0_WP
 #endif
     end do
-    !$ACC END PARALLEL LOOP
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+    !$ACC END PARALLEL LOOP
+#endif
 
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(diff, entries, um, vm, vol, dx, dy, n, q, row, elem, elnodes, c1, c2, c3, c4, cx1, cx2, cx3, cx4, entries2)
