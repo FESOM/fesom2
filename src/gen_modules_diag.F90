@@ -22,8 +22,9 @@ module diagnostics
             std_dens_min, std_dens_max, std_dens_N, std_dens,                                        &
             std_dens_UVDZ, std_dens_DIV, std_dens_DIV_fer, std_dens_Z, std_dens_H, std_dens_dVdT, std_dens_flux,       &
             dens_flux_e, vorticity, zisotherm, tempzavg, saltzavg,       &
-            compute_dvd, dvd_tot_KK, dvd_tot_SD, dvd_SD_chi_adv, dvd_SD_chi_adv_h, dvd_SD_chi_adv_v, & 
-            dvd_SD_chi_dif_h, dvd_SD_chi_dif_v
+            compute_dvd, dvd_KK_tot, dvd_SD_tot, dvd_SD_chi_adv_h, dvd_SD_chi_adv_v, & 
+            dvd_SD_chi_dif_h, dvd_SD_chi_dif_v, dvd_xdfac, &
+            dvd_KK_chi_adv_h, dvd_KK_chi_adv_v, dvd_KK_chi_dif_h, dvd_KK_chi_dif_v, dvd_KK_chi_dt
             
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
@@ -59,9 +60,11 @@ module diagnostics
 
   !_____________________________________________________________________________
   ! DVD diagnostics
-  real(kind=WP),  save, allocatable, target      :: dvd_tot_KK(:,:,:), dvd_tot_SD(:,:,:), dvd_SD_chi_adv(:,:,:), dvd_SD_chi_adv_h(:,:,:), &
+  real(kind=WP),  save, allocatable, target      :: dvd_KK_tot(:,:,:), dvd_SD_tot(:,:,:), dvd_SD_chi_adv_h(:,:,:), &
                                                     dvd_SD_chi_adv_v(:,:,:), dvd_SD_chi_dif_h(:,:,:), dvd_SD_chi_dif_v(:,:,:)
-  
+  real(kind=WP),  save, allocatable, target      :: dvd_KK_chi_adv_h(:,:,:), dvd_KK_chi_adv_v(:,:,:), dvd_KK_chi_dif_h(:,:,:), dvd_KK_chi_dif_v(:,:,:), dvd_KK_chi_dt(:,:,:)                                                    
+  real(kind=WP),  parameter                      :: dvd_xdfac=0.5_WP  ! Xchi distribution factor, default distribute 
+                                                                      ! equal amount (50:50) of xchi on both side of face
   !_____________________________________________________________________________
   ! Define diagnostic flags + with corresponding namelist
   logical                                       :: ldiag_solver     =.false.
@@ -908,26 +911,38 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
     integer                                   :: nu12, nl12, nl1, nl2, nu1, nu2 
     integer                                   :: ednodes(2), edelem(2), elnodes(3)
     real(kind=8)                              :: c1, c2, deltaX1, deltaY1, deltaX2, deltaY2, vflux, trXflx, Dflx(mesh%nl), trup, trdwn
-    real(kind=WP),  dimension(:,:)  , pointer :: trflx_h, trflx_v, trstar, tr, Wvel, dump
+    real(kind=WP),  dimension(:,:)  , pointer :: trflx_h, trflx_v, trstar, tr, trAB, Wvel, dump
     real(kind=WP),  dimension(:,:,:), pointer :: UV 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
     if (firstcall) then  !allocate the stuff at the first call
-        allocate(dvd_tot_KK(       nl-1, myDim_nod2D+eDim_nod2D, 2))
-        allocate(dvd_tot_SD(       nl-1, myDim_nod2D+eDim_nod2D, 2))
+        allocate(dvd_KK_tot(       nl-1, myDim_nod2D+eDim_nod2D, 2))
+        allocate(dvd_KK_chi_adv_h( nl-1, myDim_nod2D+eDim_nod2D, 2))
+        allocate(dvd_KK_chi_adv_v( nl-1, myDim_nod2D+eDim_nod2D, 2))
+        allocate(dvd_KK_chi_dif_h( nl-1, myDim_nod2D+eDim_nod2D, 2))
+        allocate(dvd_KK_chi_dif_v( nl-1, myDim_nod2D+eDim_nod2D, 2))
+        allocate(dvd_KK_chi_dt(    nl-1, myDim_nod2D+eDim_nod2D, 2))
+        
+        allocate(dvd_SD_tot(       nl-1, myDim_nod2D+eDim_nod2D, 2))
         allocate(dvd_SD_chi_adv_h( nl-1, myDim_nod2D+eDim_nod2D, 2))
         allocate(dvd_SD_chi_adv_v( nl-1, myDim_nod2D+eDim_nod2D, 2))
         allocate(dvd_SD_chi_dif_h( nl-1, myDim_nod2D+eDim_nod2D, 2))
         allocate(dvd_SD_chi_dif_v( nl-1, myDim_nod2D+eDim_nod2D, 2))
+        firstcall=.false.
         if (mode==0) return
     end if  
     !___________________________________________________________________________
     ! initialise each time diagnostic is computed 
-    dvd_tot_KK       = 0.0_WP ! --> DVD diagnostic after Klingbeil et al.
-    dvd_tot_SD       = 0.0_WP ! --> DVD diagnostic after Sergey see Tridib et al.
-    dvd_SD_chi_adv   = 0.0_WP
+    dvd_KK_tot       = 0.0_WP ! --> DVD diagnostic after Klingbeil et al. 2014
+    dvd_KK_chi_adv_h = 0.0_WP
+    dvd_KK_chi_adv_v = 0.0_WP
+    dvd_KK_chi_dif_h = 0.0_WP 
+    dvd_KK_chi_dif_v = 0.0_WP
+    dvd_KK_chi_dt    = 0.0_WP
+    
+    dvd_SD_tot       = 0.0_WP ! --> DVD diagnostic after Banjerjee et al. 2023 (Sergeys way!!!)
     dvd_SD_chi_adv_h = 0.0_WP
     dvd_SD_chi_adv_v = 0.0_WP
     dvd_SD_chi_dif_h = 0.0_WP 
@@ -950,33 +965,40 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
         !=== DVD Knut Klingbeil et al. 2014 ====================================
         ! add time derivativ of 2nd. moment tracer
         ! --> at this point trstar corresponds to tr_old
-        call dvd_add_time_deriv(tr_num, dvd_tot_KK, trstar , tr  , partit, mesh)            
+        call dvd_add_time_deriv(tr_num, dvd_KK_chi_dt, trstar , tr  , partit, mesh)            
         
-        ! from here on compute Tstar = ( T^(n+1) + T^(n) )*0.5
-        trstar  = (trstar + tr)*0.5_WP
-                
         ! compute horizontal 2nd moment tracer flux from advective tracer fluxes at mid 
         ! edge face
-        call dvd_add_advflux_hor( .false., tr_num, dvd_tot_KK, trflx_h, UV, trstar, dump, partit, mesh)
-            
+        call dvd_add_advflux_hor( .false., tr_num, dvd_KK_chi_adv_h, trflx_h, UV, trstar, dump, partit, mesh)
+        
         ! add vertical 2nd moment tracer flux at upper/lower scalar cell prism interface
-        call dvd_add_advflux_ver( .false., tr_num, dvd_tot_KK, trflx_v, Wvel, trstar, partit, mesh)
+        call dvd_add_advflux_ver( .false., tr_num, dvd_KK_chi_adv_v, trflx_v, Wvel, trstar, partit, mesh)
         
         ! add contribution from horizontal diffusion flux (after klingbeil et al. 2014)
-        call dvd_add_difflux_hor( .false., tr_num, dvd_tot_KK, tr, trstar, Ki, slope_tapered, tr_z, tr_xy, dump, partit, mesh)
+        ! --> keep in mind here trstar corresponds to tr_old
+        call dvd_add_difflux_hor( .false., tr_num, dvd_KK_chi_dif_h, trstar, Ki, slope_tapered, tr_z, tr_xy, dump, partit, mesh)
         
         ! add contribution from vertical diffusion flux (after klingbeil et al. 2014)
-        call dvd_add_difflux_vert(.false., tr_num, dvd_tot_KK, tr, trstar, Kv, Ki, slope_tapered, partit, mesh)
+        call dvd_add_difflux_vert(.false., tr_num, dvd_KK_chi_dif_v, tr, trstar, Kv, Ki, slope_tapered, partit, mesh)
         
         ! add contribution from horizontal biharmonic diffusion flux if applied
         if (tracers%data(tr_num)%smooth_bh_tra) then
-            call dvd_add_difflux_bhvisc(.false., tr_num, dvd_tot_KK, tr, trstar,& 
+            call dvd_add_difflux_bhvisc(.false., tr_num, dvd_KK_tot, tr, trstar,& 
             tracers%data(tr_num)%gamma0_tra, tracers%data(tr_num)%gamma1_tra, &
             tracers%data(tr_num)%gamma2_tra, dump, partit, mesh)
         end if 
         
+        ! compute total Xchi 
+        dvd_KK_tot(:,:,tr_num) = dvd_KK_chi_adv_h(:,:,tr_num) + dvd_KK_chi_adv_v(:,:,tr_num) + &
+                                 dvd_KK_chi_dif_h(:,:,tr_num) + dvd_KK_chi_dif_v(:,:,tr_num) + &
+                                 dvd_KK_chi_dt(:,:,tr_num)
+                                 
+        
         !
-        !=== DVD Sergey Danilov after Tridib et al. 2023 =======================
+        !=== DVD Sergey Danilov after T. Banerjee et al. 2023 =======================
+        ! from here on compute Tstar = ( T^(n+1) + T^(n) )*0.5
+        trstar  = (trstar + tr)*0.5_WP
+        
         ! add contribution from horizontal advection
         call dvd_add_advflux_hor( .true., tr_num, dvd_SD_chi_adv_h, trflx_h, UV, trstar, dump, partit, mesh)
         
@@ -984,10 +1006,14 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
         call dvd_add_advflux_ver( .true., tr_num, dvd_SD_chi_adv_v, trflx_v, Wvel, trstar, partit, mesh)
         
         ! add contribution from horizontal diffusion
-        call dvd_add_difflux_hor( .true., tr_num, dvd_SD_chi_dif_h, tr, trstar, Ki, slope_tapered, tr_z, tr_xy, dump, partit, mesh)
+        call dvd_add_difflux_hor( .true., tr_num, dvd_SD_chi_dif_h, trstar, Ki, slope_tapered, tr_z, tr_xy, dump, partit, mesh)
         
         ! add contribution from vertical diffusion
         call dvd_add_difflux_vert(.true., tr_num, dvd_SD_chi_dif_v, tr, trstar, Kv, Ki, slope_tapered, partit, mesh)
+        
+        ! compute total Xchi 
+        dvd_SD_tot(:,:,tr_num) = dvd_SD_chi_adv_h(:,:,tr_num) + dvd_SD_chi_adv_v(:,:,tr_num) + &
+                                 dvd_SD_chi_dif_h(:,:,tr_num) + dvd_SD_chi_dif_v(:,:,tr_num)
         
     end do !--> do tr_num=1,2 
 end subroutine compute_dvd
@@ -1041,10 +1067,10 @@ subroutine dvd_add_advflux_hor(do_SDdvd, tr_num, dvd_tot, trflx_h, UV, trstar, d
     integer       , intent(in)             :: tr_num
     logical       , intent(in)             :: do_SDdvd ! if Sergey DVD==1, if Knut DvD==0
     real(kind=WP) , intent(inout)          :: dvd_tot( mesh%nl-1, partit%myDim_nod2D +partit%eDim_nod2D, 2)
-    real(kind=WP) , intent(in)             :: trflx_h( mesh%nl-1, partit%myDim_nod2D +partit%eDim_nod2D)
-    real(kind=WP) , intent(in)             :: UV(      mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D, 2)
-    real(kind=WP) , intent(in)             :: trstar(  mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-    real(kind=WP) , intent(inout)          :: dump(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP) , intent(in)             :: trflx_h( mesh%nl-1, partit%myDim_edge2D)
+    real(kind=WP) , intent(in)             :: UV(   2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
+    real(kind=WP) , intent(in)             :: trstar(  mesh%nl-1, partit%myDim_nod2D +partit%eDim_nod2D)
+    real(kind=WP) , intent(inout)          :: dump(    mesh%nl-1, partit%myDim_nod2D +partit%eDim_nod2D)
     integer                                :: node, edge, nz, nu12, nl12, nl1, nl2, nu1, nu2 
     integer                                :: ednodes(2), edelem(2), elnodes(3)
     real(kind=WP)                          :: deltaX1, deltaY1, deltaX2, deltaY2, vflx, tr2flx, xchi
@@ -1114,12 +1140,11 @@ subroutine dvd_add_advflux_hor(do_SDdvd, tr_num, dvd_tot, trflx_h, UV, trstar, d
             !  U = u*h
             !  Xchi_(i+0.5) = 2*[U_(i+0.5)* T^tilde_(i+0.5) * ( Tstar_i-Tstar_(i-1) ) -
             !                    U_(i+0.5)*0.5*(Tstar_i+Tstar_(i-1))*(Tstar_i-Tstar_(i-1))]
-            xchi = trflx_h(nz, edge)*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2))) - vflx*0.5_WP*(trstar(nz,ednodes(1))+trstar(nz,ednodes(2)))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
-            ! xchi originally has a factor 2.0_WP*... but since 0.5*Xchi is 
-            ! distributed to one node and the other half goes to the other node. 
-            ! Therefor factor 2.0_WP*... is omitted  
-            dump(nz, ednodes(1)) = dump(nz, ednodes(1)) + merge(-xchi, tr2flx, do_SDdvd)
-            dump(nz, ednodes(2)) = dump(nz, ednodes(2)) - merge( xchi, tr2flx, do_SDdvd)
+            xchi   = 2.0_WP * (trflx_h(nz, edge)*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2))) - &
+                    vflx*0.5_WP*(trstar(nz,ednodes(1))+trstar(nz,ednodes(2)))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2))))
+            
+            dump(nz, ednodes(1)) = dump(nz, ednodes(1)) + merge(-xchi*(       dvd_xdfac), tr2flx, do_SDdvd)
+            dump(nz, ednodes(2)) = dump(nz, ednodes(2)) - merge( xchi*(1.0_WP-dvd_xdfac), tr2flx, do_SDdvd)
         end do !--> do nz=nu1, nu12-1
         
         !_______________________________________________________________________
@@ -1136,7 +1161,7 @@ subroutine dvd_add_advflux_hor(do_SDdvd, tr_num, dvd_tot, trflx_h, UV, trstar, d
                 ! hnode_new contains here in reality hnode_old. So we recompute
                 ! helem from hnode_new ! 
                 elnodes= elem2D_nodes(:, edelem(2))
-                vflx  = (-UV(2, nz, edelem(2))*deltaX2 + UV(1, nz, edelem(2))*deltaY2)*sum(hnode_new(nz, elnodes))/3.0_WP
+                vflx   = (-UV(2, nz, edelem(2))*deltaX2 + UV(1, nz, edelem(2))*deltaY2)*sum(hnode_new(nz, elnodes))/3.0_WP
                 
                 ! knut way to compute total DVD
                 tr2flx = (trflx_h(nz, edge)*trflx_h(nz, edge))/vflx
@@ -1145,13 +1170,11 @@ subroutine dvd_add_advflux_hor(do_SDdvd, tr_num, dvd_tot, trflx_h, UV, trstar, d
                 !  U = u*h
                 !  Xchi_(i+0.5) = 2*[U_(i+0.5)* T^tilde_(i+0.5) * ( Tstar_i-Tstar_(i-1) ) -
                 !                    U_(i+0.5)*0.5*(Tstar_i+Tstar_(i-1))*(Tstar_i-Tstar_(i-1))]
-                xchi = trflx_h(nz, edge)*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2))) - vflx*0.5_WP*(trstar(nz,ednodes(1))+trstar(nz,ednodes(2)))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
-                ! xchi originally has a factor 2.0_WP*... but since 0.5*Xchi is 
-                ! distributed to one node and the other half goes to the other node. 
-                ! Therefor factor 2.0_WP*... is omitted  
-                dump(nz, ednodes(1)) = dump(nz, ednodes(1)) + merge(-xchi, tr2flx, do_SDdvd)
-                dump(nz, ednodes(2)) = dump(nz, ednodes(2)) - merge( xchi, tr2flx, do_SDdvd)
-            
+                xchi   = 2.0_WP * (trflx_h(nz, edge)*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2))) - &
+                         vflx*0.5_WP*(trstar(nz,ednodes(1))+trstar(nz,ednodes(2)))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2))))
+                
+                dump(nz, ednodes(1)) = dump(nz, ednodes(1)) + merge(-xchi*(       dvd_xdfac), tr2flx, do_SDdvd)
+                dump(nz, ednodes(2)) = dump(nz, ednodes(2)) - merge( xchi*(1.0_WP-dvd_xdfac), tr2flx, do_SDdvd)
             end do !--> do nz=nu2, nu12-1
         end if !--> if (nu2 > 0) then
         
@@ -1168,9 +1191,9 @@ subroutine dvd_add_advflux_hor(do_SDdvd, tr_num, dvd_tot, trflx_h, UV, trstar, d
             ! hnode_new contains here in reality hnode_old. So we recompute
             ! helem from hnode_new !
             elnodes= elem2D_nodes(:, edelem(1))
-            vflx  =  ( -UV(2, nz, edelem(1))*deltaX1 + UV(1, nz, edelem(1))*deltaY1 )*sum(hnode_new(nz, elnodes))/3.0_WP
+            vflx   =  ( -UV(2, nz, edelem(1))*deltaX1 + UV(1, nz, edelem(1))*deltaY1 )*sum(hnode_new(nz, elnodes))/3.0_WP
             elnodes= elem2D_nodes(:, edelem(2))
-            vflx  = vflx + (  UV(2, nz, edelem(2))*deltaX2 - UV(1, nz, edelem(2))*deltaY2 )*sum(hnode_new(nz, elnodes))/3.0_WP
+            vflx   = vflx + (  UV(2, nz, edelem(2))*deltaX2 - UV(1, nz, edelem(2))*deltaY2 )*sum(hnode_new(nz, elnodes))/3.0_WP
             
             ! knut way to compute total DVD
             tr2flx = (trflx_h(nz, edge)*trflx_h(nz, edge))/vflx
@@ -1179,13 +1202,11 @@ subroutine dvd_add_advflux_hor(do_SDdvd, tr_num, dvd_tot, trflx_h, UV, trstar, d
             !  U = u*h
             !  Xchi_(i+0.5) = 2*[U_(i+0.5)* T^tilde_(i+0.5) * ( Tstar_i-Tstar_(i-1) ) -
             !                    U_(i+0.5)*0.5*(Tstar_i+Tstar_(i-1))*(Tstar_i-Tstar_(i-1))]
-            xchi = trflx_h(nz, edge)*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2))) - vflx*0.5_WP*(trstar(nz,ednodes(1))+trstar(nz,ednodes(2)))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
-            ! xchi originally has a factor 2.0_WP*... but since 0.5*Xchi is 
-            ! distributed to one node and the other half goes to the other node. 
-            ! Therefor factor 2.0_WP*... is omitted  
-            dump(nz, ednodes(1)) = dump(nz, ednodes(1)) + merge(-xchi, tr2flx, do_SDdvd)
-            dump(nz, ednodes(2)) = dump(nz, ednodes(2)) - merge( xchi, tr2flx, do_SDdvd)
+            xchi   = 2.0_WP * (trflx_h(nz, edge)*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2))) - &
+                     vflx*0.5_WP*(trstar(nz,ednodes(1))+trstar(nz,ednodes(2)))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2))))
             
+            dump(nz, ednodes(1)) = dump(nz, ednodes(1)) + merge(-xchi*(       dvd_xdfac), tr2flx, do_SDdvd)
+            dump(nz, ednodes(2)) = dump(nz, ednodes(2)) - merge( xchi*(1.0_WP-dvd_xdfac), tr2flx, do_SDdvd) 
         end do !--> do nz=nu12, nl12
         
         !_______________________________________________________________________
@@ -1202,7 +1223,7 @@ subroutine dvd_add_advflux_hor(do_SDdvd, tr_num, dvd_tot, trflx_h, UV, trstar, d
             ! hnode_new contains here in reality hnode_old. So we recompute
             ! helem from hnode_new ! 
             elnodes= elem2D_nodes(:, edelem(1))
-            vflx  = (-UV(2, nz, edelem(1))*deltaX1 + UV(1, nz, edelem(1))*deltaY1)*sum(hnode_new(nz, elnodes))/3.0_WP
+            vflx   = (-UV(2, nz, edelem(1))*deltaX1 + UV(1, nz, edelem(1))*deltaY1)*sum(hnode_new(nz, elnodes))/3.0_WP
             
             ! knut way to compute total DVD
             tr2flx = (trflx_h(nz, edge)*trflx_h(nz, edge))/vflx
@@ -1211,13 +1232,11 @@ subroutine dvd_add_advflux_hor(do_SDdvd, tr_num, dvd_tot, trflx_h, UV, trstar, d
             !  U = u*h
             !  Xchi_(i+0.5) = 2*[U_(i+0.5)* T^tilde_(i+0.5) * ( Tstar_i-Tstar_(i-1) ) -
             !                    U_(i+0.5)*0.5*(Tstar_i+Tstar_(i-1))*(Tstar_i-Tstar_(i-1))]
-            xchi = trflx_h(nz, edge)*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2))) - vflx*0.5_WP*(trstar(nz,ednodes(1))+trstar(nz,ednodes(2)))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
-            ! xchi originally has a factor 2.0_WP*... but since 0.5*Xchi is 
-            ! distributed to one node and the other half goes to the other node. 
-            ! Therefor factor 2.0_WP*... is omitted  
-            dump(nz, ednodes(1)) = dump(nz, ednodes(1)) + merge(-xchi, tr2flx, do_SDdvd)
-            dump(nz, ednodes(2)) = dump(nz, ednodes(2)) - merge( xchi, tr2flx, do_SDdvd)
+            xchi   = 2.0_WP * (trflx_h(nz, edge)*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2))) - &
+                     vflx*0.5_WP*(trstar(nz,ednodes(1))+trstar(nz,ednodes(2)))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2))))
             
+            dump(nz, ednodes(1)) = dump(nz, ednodes(1)) + merge(-xchi*(       dvd_xdfac), tr2flx, do_SDdvd)
+            dump(nz, ednodes(2)) = dump(nz, ednodes(2)) - merge( xchi*(1.0_WP-dvd_xdfac), tr2flx, do_SDdvd)
         end do !--> do nz=nl12+1, nl1
         
         !_______________________________________________________________________
@@ -1234,7 +1253,7 @@ subroutine dvd_add_advflux_hor(do_SDdvd, tr_num, dvd_tot, trflx_h, UV, trstar, d
             ! hnode_new contains here in reality hnode_old. So we recompute
             ! helem from hnode_new ! 
             elnodes= elem2D_nodes(:, edelem(2))
-            vflx  = (-UV(2, nz, edelem(2))*deltaX1 + UV(1, nz, edelem(2))*deltaY1)*sum(hnode_new(nz, elnodes))/3.0_WP
+            vflx   = (-UV(2, nz, edelem(2))*deltaX1 + UV(1, nz, edelem(2))*deltaY1)*sum(hnode_new(nz, elnodes))/3.0_WP
             
             ! knut way to compute total DVD
             tr2flx = (trflx_h(nz, edge)*trflx_h(nz, edge))/vflx
@@ -1243,25 +1262,21 @@ subroutine dvd_add_advflux_hor(do_SDdvd, tr_num, dvd_tot, trflx_h, UV, trstar, d
             !  U = u*h
             !  Xchi_(i+0.5) = 2*[U_(i+0.5)* T^tilde_(i+0.5) * ( Tstar_i-Tstar_(i-1) ) -
             !                    U_(i+0.5)*0.5*(Tstar_i+Tstar_(i-1))*(Tstar_i-Tstar_(i-1))]
-            xchi = trflx_h(nz, edge)*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2))) - vflx*0.5_WP*(trstar(nz,ednodes(1))+trstar(nz,ednodes(2)))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
-            ! xchi originally has a factor 2.0_WP*... but since 0.5*Xchi is 
-            ! distributed to one node and the other half goes to the other node. 
-            ! Therefor factor 2.0_WP*... is omitted  
-            dump(nz, ednodes(1)) = dump(nz, ednodes(1)) + merge(-xchi, tr2flx, do_SDdvd)
-            dump(nz, ednodes(2)) = dump(nz, ednodes(2)) - merge( xchi, tr2flx, do_SDdvd)
+            xchi   = 2.0_WP * (trflx_h(nz, edge)*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2))) - &
+                     vflx*0.5_WP*(trstar(nz,ednodes(1))+trstar(nz,ednodes(2)))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2))))
             
+            dump(nz, ednodes(1)) = dump(nz, ednodes(1)) + merge(-xchi*(       dvd_xdfac), tr2flx, do_SDdvd)
+            dump(nz, ednodes(2)) = dump(nz, ednodes(2)) - merge( xchi*(1.0_WP-dvd_xdfac), tr2flx, do_SDdvd)
         end do !--> do nz=nl12+1, nl2
     end do !--> do edge=1, myDim_edge2D
     
     !___________________________________________________________________________
     ! switch from Xchi_tilde --> Xchi
-!PS     if (.not. do_SDdvd) then 
     do node=1, myDim_nod2D+eDim_nod2D
         nu1 = ulevels_nod2D(node)
         nl1 = nlevels_nod2D(node)-1
         dvd_tot(nu1:nl1, node, tr_num) = dvd_tot(nu1:nl1, node, tr_num) + dump(nu1:nl1, node)/(areasvol(nu1:nl1, node)*hnode_new(nu1:nl1, node))
     end do
-!PS     end if 
 end subroutine dvd_add_advflux_hor
 !
 !
@@ -1288,21 +1303,20 @@ subroutine dvd_add_advflux_ver(do_SDdvd, tr_num, dvd_tot, trflx_v, Wvel, trstar,
     if (do_SDdvd) then 
         !_______________________________________________________________________
         !  compute DVD contribution from vertical advection after Sergeys method
-        !   --> see eq. 26 in Tridib et al. 2023 --> U = u*h, T^tilde face reconstructed
+        !   --> see eq. 26 in T. Banerjee et al. 2023 --> U = u*h, T^tilde face reconstructed
         !   value
         !  Xchi_(i+0.5) = 2*[U_(i+0.5)* T^tilde_(i+0.5) * ( Tstar_i-Tstar_(i-1) ) -
         !                    U_(i+0.5)*0.5*(Tstar_i+Tstar_(i-1))*(Tstar_i-Tstar_(i-1))]     
         do node=1,myDim_nod2D
             nu1 = ulevels_nod2D(node) 
             nl1 = nlevels_nod2D(node)
-            
             !___________________________________________________________________
             ! surface (nu1+1 -1) and bulk 
             xchi = 0.0_WP
             do nz=nu1+1,nl1-1
                 ! --> here we are on full depth levels
-                xchi(nz) = trflx_v(nz, node)*(trstar(nz-1, node)-trstar(nz, node)) - &
-                           Wvel(nz, node)*area(nz, node)*0.5_WP*(trstar(nz-1, node)+trstar(nz, node))*(trstar(nz-1, node)-trstar(nz, node))
+                xchi(nz) = 2.0_WP * (trflx_v(nz, node)*(trstar(nz-1, node)-trstar(nz, node)) - &
+                           Wvel(nz, node)*area(nz, node)*0.5_WP*(trstar(nz-1, node)+trstar(nz, node))*(trstar(nz-1, node)-trstar(nz, node)))
                 ! !!! ATTENTION: !!!
                 ! --> here hnode must be the vertice thickness that was used 
                 ! during advection, which was hnode^(n), but hnode^(n) got overwritten
@@ -1313,15 +1327,14 @@ subroutine dvd_add_advflux_ver(do_SDdvd, tr_num, dvd_tot, trflx_v, Wvel, trstar,
                 ! distributed to one node and the other half goes to the other node. 
                 ! Therefor factor 2.0_WP*... is omitted
                 ! --> here we are on mid-depth levels
-                dvd_tot(nz-1, node, tr_num) = dvd_tot(nz-1, node, tr_num) - (xchi(nz-1) + xchi(nz))/(areasvol(nz-1, node)*hnode_new(nz-1, node))
+                dvd_tot(nz-1, node, tr_num) = dvd_tot(nz-1, node, tr_num) - (dvd_xdfac*xchi(nz-1) + (1.0_WP-dvd_xdfac)*xchi(nz))/(areasvol(nz-1, node)*hnode_new(nz-1, node))
                 
                 !--> why divide with dz why switching from Xchi_tilde --> Xchi?
             end do !--> do nz=nu1+1,nl1-1
-            
             !___________________________________________________________________
             ! same for bottom 
             nz=nl1-1
-            dvd_tot(nz, node, tr_num) = dvd_tot(nz, node, tr_num) - (xchi(nz) + xchi(nz+1))/(areasvol(nz, node)*hnode_new(nz, node))
+            dvd_tot(nz, node, tr_num) = dvd_tot(nz, node, tr_num) - (dvd_xdfac*xchi(nz) + (1.0_WP-dvd_xdfac)*xchi(nz+1))/(areasvol(nz, node)*hnode_new(nz, node))
                 
         end do !--> do node=1,myDim_nod2D
     
@@ -1332,7 +1345,6 @@ subroutine dvd_add_advflux_ver(do_SDdvd, tr_num, dvd_tot, trflx_v, Wvel, trstar,
         do node=1,myDim_nod2D
             nu1 = ulevels_nod2D(node) 
             nl1 = nlevels_nod2D(node)
-            
             !___________________________________________________________________
             ! surface
             nz     = nu1
@@ -1353,7 +1365,6 @@ subroutine dvd_add_advflux_ver(do_SDdvd, tr_num, dvd_tot, trflx_v, Wvel, trstar,
             vflx   = Wvel(nz+1, node)*area(nz+1, node)
             tr2flx = (trflx_v(nz+1, node)*trflx_v(nz+1, node))/vflx
             dvd_tot(nz, node, tr_num) = dvd_tot(nz, node, tr_num) - tr2flx/(areasvol(nz, node)*hnode_new(nz, node))
-            
             !_______________________________________________________________________
             ! bulk 
             do nz=nu1+1,nl1-2 ! stop two layers over botrtom since Wvel(nl1)==0 --> 1/Wvel(nl1) --> Inf
@@ -1367,7 +1378,6 @@ subroutine dvd_add_advflux_ver(do_SDdvd, tr_num, dvd_tot, trflx_v, Wvel, trstar,
                 tr2flx = (trflx_v(nz+1, node)*trflx_v(nz+1, node))/vflx
                 dvd_tot(nz, node, tr_num) = dvd_tot(nz, node, tr_num) - tr2flx/(areasvol(nz, node)*hnode_new(nz, node))
             end do !--> do nz=nu1,nl1
-            
             !_______________________________________________________________________
             ! bottom
             nz     = nl-1
@@ -1384,7 +1394,7 @@ end subroutine dvd_add_advflux_ver
 ! add horizontal diffusive flux after Klingbeil et al. 2014, take Redi into account
 ! Xchi^(n+1) =  ...+ (2*Tr^(n+1) * Dflx_hor[Tr^(n+1)] )/ V^(n+1) +...
 ! --> here Tr^(n+1) und Dflx_hor[...] are reconstructed values at the interfase
-subroutine dvd_add_difflux_hor(do_SDdvd, tr_num, dvd_tot, tr, trstar, Ki, slope, tr_z, tr_xy, dump, partit, mesh)
+subroutine dvd_add_difflux_hor(do_SDdvd, tr_num, dvd_tot, tr, Ki, slope, tr_z, tr_xy, dump, partit, mesh)
     implicit none
     type(t_partit), intent(in)   , target  :: partit
     type(t_mesh)  , intent(in)   , target  :: mesh
@@ -1392,7 +1402,6 @@ subroutine dvd_add_difflux_hor(do_SDdvd, tr_num, dvd_tot, tr, trstar, Ki, slope,
     logical       , intent(in)             :: do_SDdvd ! if Sergey DVD==1, if Knut DvD==0
     real(kind=WP) , intent(inout)          :: dvd_tot(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D, 2)
     real(kind=WP) , intent(in)             :: tr(     mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-    real(kind=WP) , intent(in)             :: trstar( mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP) , intent(in)             :: Ki(     mesh%nl  , partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP) , intent(in)             :: slope(3,mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP) , intent(in)             :: tr_z(   mesh%nl  , partit%myDim_nod2D+partit%eDim_nod2D)
@@ -1467,29 +1476,29 @@ subroutine dvd_add_difflux_hor(do_SDdvd, tr_num, dvd_tot, tr, trstar, Ki, slope,
             elnodes= elem2D_nodes(:, edelem(1))
             dZ   = sum(hnode_new(nz, elnodes))/3.0_WP
             ! also Ki is defined at mid depth levels
-            Kh   = sum(Ki(nz, ednodes))/2.0_WP
+            Kh   = sum(Ki(nz, ednodes))*0.5_WP
             ! reminder: tr_z ... vertical tracer gradient sits on full depth levels
             ! with 0.5_WP*(tr_z(nz,ednodes)+tr_z(nz+1,ednodes)) we bring the vertical 
             ! tracer gradient back to mid depth levels
             Trz  = 0.5_WP*(tr_z(nz,ednodes)+tr_z(nz+1,ednodes))
-            SxTz = sum(Trz*slope(1, nz, ednodes))/2.0_WP
-            SyTz = sum(Trz*slope(2, nz, ednodes))/2.0_WP
+            SxTz = sum(Trz*slope(1, nz, ednodes))*0.5_WP
+            SyTz = sum(Trz*slope(2, nz, ednodes))*0.5_WP
             Trx  = tr_xy(1, nz, edelem(1)) + SxTz*isredi
             Try  = tr_xy(2, nz, edelem(1)) + SyTz*isredi
+            ! Dflx is here the horizontal diffusive volume flux 
             Dflx = Kh*(-deltaX1*Try + deltaY1*Trx)*dZ
             !___________________________________________________________________
             ! compute edge centered tracer value --> knut variant
+            ! --> here variable tr corresponds to tr_old = Tr^(n)
             Trc  = tr(nz, ednodes(1)) * hnode_new(nz, ednodes(2)) + tr(nz, ednodes(2)) * hnode_new(nz, ednodes(2))
-            Trc  = Trc/(hnode_new(nz, ednodes(1))+hnode_new(nz, ednodes(2)))*2.0_WP
+            Trc  = 2.0_WP * Trc/(hnode_new(nz, ednodes(1))+hnode_new(nz, ednodes(2)))
             !___________________________________________________________________
             ! compute Tstar diference --> sergey variant
-            xchi = (trstar(nz, ednodes(1))-trstar(nz, ednodes(2)))
-            ! --> xchi originally has a factor 2.0_WP*... but since 0.5*Xchi is 
-            ! distributed to one side and the other half goes to the other side. 
-            ! factor *2.0... can be omitted
+            ! --> here variable tr corresponds to trstar = (Tr^(n+1) + Tr^(n))*0.5
+            xchi = 2.0_WP * (tr(nz, ednodes(1))-tr(nz, ednodes(2)))
             !___________________________________________________________________
-            dump(nz, ednodes(1)) = dump(nz, ednodes(1)) + merge(-xchi, Trc, do_SDdvd)*Dflx
-            dump(nz, ednodes(2)) = dump(nz, ednodes(2)) - merge( xchi, Trc, do_SDdvd)*Dflx
+            dump(nz, ednodes(1)) = dump(nz, ednodes(1)) + merge(-xchi*(       dvd_xdfac), Trc, do_SDdvd)*Dflx
+            dump(nz, ednodes(2)) = dump(nz, ednodes(2)) - merge( xchi*(1.0_WP-dvd_xdfac), Trc, do_SDdvd)*Dflx
         end do !--> do nz=nu1, nu12-1
         
         !_______________________________________________________________________
@@ -1506,29 +1515,29 @@ subroutine dvd_add_difflux_hor(do_SDdvd, tr_num, dvd_tot, tr, trstar, Ki, slope,
                 elnodes= elem2D_nodes(:, edelem(2))
                 dZ   = sum(hnode_new(nz, elnodes))/3.0_WP
                 ! also Ki is defined at mid depth levels
-                Kh   = sum(Ki(nz, ednodes))/2.0_WP
+                Kh   = sum(Ki(nz, ednodes))*0.5_WP
                 ! reminder: tr_z ... vertical tracer gradient sits on full depth levels
                 ! with 0.5_WP*(tr_z(nz,ednodes)+tr_z(nz+1,ednodes)) we bring the vertical 
                 ! tracer gradient back to mid depth levels
                 Trz  = 0.5_WP*(tr_z(nz,ednodes)+tr_z(nz+1,ednodes))
-                SxTz = sum(Trz*slope(1, nz, ednodes))/2.0_WP
-                SyTz = sum(Trz*slope(2, nz, ednodes))/2.0_WP
+                SxTz = sum(Trz*slope(1, nz, ednodes))*0.5_WP
+                SyTz = sum(Trz*slope(2, nz, ednodes))*0.5_WP
                 Trx  = tr_xy(1, nz, edelem(2)) + SxTz*isredi
                 Try  = tr_xy(2, nz, edelem(2)) + SyTz*isredi
+                ! Dflx is here the horizontal diffusive volume flux 
                 Dflx = Kh*(deltaX2*Try - deltaY2*Trx)*dZ
                 !_______________________________________________________________
                 ! compute edge centered tracer value
+                ! --> here variable tr corresponds to tr_old == Tr^(n)
                 Trc  = tr(nz, ednodes(1)) * hnode_new(nz, ednodes(2)) + tr(nz, ednodes(2)) * hnode_new(nz, ednodes(2))
-                Trc  = Trc/(hnode_new(nz, ednodes(1))+hnode_new(nz, ednodes(2)))*2.0_WP
+                Trc  = 2.0_WP * Trc/(hnode_new(nz, ednodes(1))+hnode_new(nz, ednodes(2)))
                 !_______________________________________________________________
                 ! compute Tstar diference --> sergey variant
-                xchi = (trstar(nz, ednodes(1))-trstar(nz, ednodes(2)))
-                ! --> xchi originally has a factor 2.0_WP*... but since 0.5*Xchi is 
-                ! distributed to one side and the other half goes to the other side. 
-                ! factor *2.0... can be omitted
+                ! --> here variable tr corresponds to trstar == (Tr^(n+1) + Tr^(n))*0.5
+                xchi = 2.0_WP * (tr(nz, ednodes(1))-tr(nz, ednodes(2)))
                 !_______________________________________________________________
-                dump(nz, ednodes(1)) = dump(nz, ednodes(1)) + merge(-xchi, Trc, do_SDdvd)*Dflx
-                dump(nz, ednodes(2)) = dump(nz, ednodes(2)) - merge( xchi, Trc, do_SDdvd)*Dflx
+                dump(nz, ednodes(1)) = dump(nz, ednodes(1)) + merge(-xchi*(       dvd_xdfac), Trc, do_SDdvd)*Dflx
+                dump(nz, ednodes(2)) = dump(nz, ednodes(2)) - merge( xchi*(1.0_WP-dvd_xdfac), Trc, do_SDdvd)*Dflx
             end do !--> do nz=nu2, nu12-1
         end if !--> if (nu2 > 0) then
         
@@ -1543,33 +1552,33 @@ subroutine dvd_add_difflux_hor(do_SDdvd, tr_num, dvd_tot, tr, trstar, Ki, slope,
             ! hnode_new contains here in reality hnode_old. So we recompute
             ! helem from hnode_new --> sum(hnode_new(nz, elnodes))/3.0_WP
             elnodes= elem2D_nodes(:, edelem(1))
-            dZ   = sum(hnode_new(nz, elnodes))/3.0_WP/2.0_WP
+            dZ   = sum(hnode_new(nz, elnodes))/3.0_WP
             elnodes= elem2D_nodes(:, edelem(2))
-            dZ   = dZ + sum(hnode_new(nz, elnodes))/3.0_WP/2.0_WP
+            dZ   = (dZ + sum(hnode_new(nz, elnodes))/3.0_WP)*0.5_WP
             ! also Ki is defined at mid depth levels
-            Kh   = sum(Ki(nz, ednodes))/2.0_WP
+            Kh   = sum(Ki(nz, ednodes))*0.5_WP
             ! reminder: tr_z ... vertical tracer gradient sits on full depth levels
             ! with 0.5_WP*(tr_z(nz,ednodes)+tr_z(nz+1,ednodes)) we bring the vertical 
             ! tracer gradient back to mid depth levels
             Trz  = 0.5_WP*(tr_z(nz, ednodes)+tr_z(nz+1, ednodes))
-            SxTz = sum(Trz*slope(1, nz, ednodes))/2.0_WP
-            SyTz = sum(Trz*slope(2, nz, ednodes))/2.0_WP
+            SxTz = sum(Trz*slope(1, nz, ednodes))*0.5_WP
+            SyTz = sum(Trz*slope(2, nz, ednodes))*0.5_WP
             Trx  = 0.5_WP*( tr_xy(1, nz, edelem(1))+tr_xy(1, nz, edelem(2)) ) + SxTz*isredi
             Try  = 0.5_WP*( tr_xy(2, nz, edelem(1))+tr_xy(2, nz, edelem(2)) ) + SyTz*isredi
+            ! Dflx is here the horizontal diffusive volume flux 
             Dflx = Kh*((deltaX2-deltaX1)*Try-(deltaY2-deltaY1)*Trx)*dZ
             !___________________________________________________________________
             ! compute edge centered tracer value
+            ! --> here variable tr corresponds to tr_old == Tr^(n)
             Trc  = tr(nz, ednodes(1)) * hnode_new(nz, ednodes(2)) + tr(nz, ednodes(2)) * hnode_new(nz, ednodes(2))
-            Trc  = Trc/(hnode_new(nz, ednodes(1))+hnode_new(nz, ednodes(2)))*2.0_WP
+            Trc  = 2.0_WP * Trc/(hnode_new(nz, ednodes(1))+hnode_new(nz, ednodes(2)))
             !___________________________________________________________________
             ! compute Tstar diference --> sergey variant
-            xchi = (trstar(nz, ednodes(1))-trstar(nz, ednodes(2)))
-            ! --> xchi originally has a factor 2.0_WP*... but since 0.5*Xchi is 
-            ! distributed to one side and the other half goes to the other side. 
-            ! factor *2.0... can be omitted
+            ! --> here variable tr corresponds to trstar == (Tr^(n+1) + Tr^(n))*0.5
+            xchi = 2.0_WP * (tr(nz, ednodes(1))-tr(nz, ednodes(2)))
             !___________________________________________________________________
-            dump(nz, ednodes(1)) = dump(nz, ednodes(1)) + merge(-xchi, Trc, do_SDdvd)*Dflx
-            dump(nz, ednodes(2)) = dump(nz, ednodes(2)) - merge( xchi, Trc, do_SDdvd)*Dflx
+            dump(nz, ednodes(1)) = dump(nz, ednodes(1)) + merge(-xchi*(       dvd_xdfac), Trc, do_SDdvd)*Dflx
+            dump(nz, ednodes(2)) = dump(nz, ednodes(2)) - merge( xchi*(1.0_WP-dvd_xdfac), Trc, do_SDdvd)*Dflx
         end do !--> do nz=nu12, nl12
         
         !_______________________________________________________________________
@@ -1587,29 +1596,29 @@ subroutine dvd_add_difflux_hor(do_SDdvd, tr_num, dvd_tot, tr, trstar, Ki, slope,
             elnodes= elem2D_nodes(:, edelem(1))
             dZ   = sum(hnode_new(nz, elnodes))/3.0_WP
             ! also Ki is defined at mid depth levels
-            Kh   = sum(Ki(nz, ednodes))/2.0_WP
+            Kh   = sum(Ki(nz, ednodes))*0.5_WP
             ! reminder: tr_z ... vertical tracer gradient sits on full depth levels
             ! with 0.5_WP*(tr_z(nz,ednodes)+tr_z(nz+1,ednodes)) we bring the vertical 
             ! tracer gradient back to mid depth levels
             Trz  = 0.5_WP*(tr_z(nz,ednodes)+tr_z(nz+1,ednodes))
-            SxTz = sum(Trz*slope(1, nz, ednodes))/2.0_WP
-            SyTz = sum(Trz*slope(2, nz, ednodes))/2.0_WP
+            SxTz = sum(Trz*slope(1, nz, ednodes))*0.5_WP
+            SyTz = sum(Trz*slope(2, nz, ednodes))*0.5_WP
             Trx  = tr_xy(1, nz, edelem(1)) + SxTz*isredi
             Try  = tr_xy(2, nz, edelem(1)) + SyTz*isredi
+            ! Dflx is here the horizontal diffusive volume flux 
             Dflx = Kh*(-deltaX1*Try + deltaY1*Trx)*dZ
             !___________________________________________________________________
             ! compute edge centered tracer value
+            ! --> here variable tr corresponds to tr_old == Tr^(n)
             Trc  = tr(nz, ednodes(1)) * hnode_new(nz, ednodes(2)) + tr(nz, ednodes(2)) * hnode_new(nz, ednodes(2))
-            Trc  = Trc/(hnode_new(nz, ednodes(1))+hnode_new(nz, ednodes(2)))*2.0_WP
+            Trc  = 2.0_WP * Trc/(hnode_new(nz, ednodes(1))+hnode_new(nz, ednodes(2)))
             !___________________________________________________________________
             ! compute Tstar diference --> sergey variant
-            xchi = (trstar(nz, ednodes(1))-trstar(nz, ednodes(2)))
-            ! --> xchi originally has a factor 2.0_WP*... but since 0.5*Xchi is 
-            ! distributed to one side and the other half goes to the other side. 
-            ! factor *2.0... can be omitted
+            ! --> here variable tr corresponds to trstar == (Tr^(n+1) + Tr^(n))*0.5
+            xchi = 2.0_WP * (tr(nz, ednodes(1))-tr(nz, ednodes(2)))
             !___________________________________________________________________
-            dump(nz, ednodes(1)) = dump(nz, ednodes(1)) + merge(-xchi, Trc, do_SDdvd)*Dflx
-            dump(nz, ednodes(2)) = dump(nz, ednodes(2)) - merge( xchi, Trc, do_SDdvd)*Dflx
+            dump(nz, ednodes(1)) = dump(nz, ednodes(1)) + merge(-xchi*(       dvd_xdfac), Trc, do_SDdvd)*Dflx
+            dump(nz, ednodes(2)) = dump(nz, ednodes(2)) - merge( xchi*(1.0_WP-dvd_xdfac), Trc, do_SDdvd)*Dflx
         end do !-->do nz=nl12+1, nl1
         
         !_______________________________________________________________________
@@ -1627,43 +1636,42 @@ subroutine dvd_add_difflux_hor(do_SDdvd, tr_num, dvd_tot, tr, trstar, Ki, slope,
             elnodes= elem2D_nodes(:, edelem(2))
             dZ   = sum(hnode_new(nz, elnodes))/3.0_WP
             ! also Ki is defined at mid depth levels
-            Kh   = sum(Ki(nz, ednodes))/2.0_WP
+            Kh   = sum(Ki(nz, ednodes))*0.5_WP
             ! reminder: tr_z ... vertical tracer gradient sits on full depth levels
             ! with 0.5_WP*(tr_z(nz,ednodes)+tr_z(nz+1,ednodes)) we bring the vertical 
             ! tracer gradient back to mid depth levels
             Trz  = 0.5_WP*(tr_z(nz,ednodes)+tr_z(nz+1,ednodes))
-            SxTz = sum(Trz*slope(1, nz, ednodes))/2.0_WP
-            SyTz = sum(Trz*slope(2, nz, ednodes))/2.0_WP
+            SxTz = sum(Trz*slope(1, nz, ednodes))*0.5_WP
+            SyTz = sum(Trz*slope(2, nz, ednodes))*0.5_WP
             Trx  = tr_xy(1, nz, edelem(2)) + SxTz*isredi
             Try  = tr_xy(2, nz, edelem(2)) + SyTz*isredi
+            ! Dflx is here the horizontal diffusive volume flux 
             Dflx = Kh*(deltaX2*Try - deltaY2*Trx)*dZ
             !___________________________________________________________________
             ! compute edge centered tracer value
-            Trc  = tr(nz, ednodes(1)) * hnode_new(nz, ednodes(2)) + tr(nz, ednodes(2)) * hnode_new(nz, ednodes(2))
-            Trc  = Trc/(hnode_new(nz, ednodes(1))+hnode_new(nz, ednodes(2)))*2.0_WP
+            ! --> here variable tr corresponds to tr_old == Tr^(n)
+            Trc  = tr(nz, ednodes(1))*hnode_new(nz, ednodes(2)) + tr(nz, ednodes(2))*hnode_new(nz, ednodes(2))
+            Trc  = 2.0_WP * Trc/(hnode_new(nz, ednodes(1))+hnode_new(nz, ednodes(2)))
             !___________________________________________________________________
             ! compute Tstar diference --> sergey variant
-            xchi = (trstar(nz, ednodes(1))-trstar(nz, ednodes(2)))
-            ! --> xchi originally has a factor 2.0_WP*... but since 0.5*Xchi is 
-            ! distributed to one side and the other half goes to the other side. 
-            ! factor *2.0... can be omitted
+            ! --> here variable tr corresponds to trstar == (Tr^(n+1) + Tr^(n))*0.5
+            xchi = 2.0_WP * (tr(nz, ednodes(1))-tr(nz, ednodes(2)))
             !___________________________________________________________________
-            dump(nz, ednodes(1)) = dump(nz, ednodes(1)) + merge(-xchi, Trc, do_SDdvd)*Dflx
-            dump(nz, ednodes(2)) = dump(nz, ednodes(2)) - merge( xchi, Trc, do_SDdvd)*Dflx
+            dump(nz, ednodes(1)) = dump(nz, ednodes(1)) + merge(-xchi*(       dvd_xdfac), Trc, do_SDdvd)*Dflx
+            dump(nz, ednodes(2)) = dump(nz, ednodes(2)) - merge( xchi*(1.0_WP-dvd_xdfac), Trc, do_SDdvd)*Dflx
             
         end do !--> do nz=nl12+1, nl2
     end do !--> do edge=1, myDim_edge2D
     
     !___________________________________________________________________________
-    ! switch from Xchi_tilde --> Xchi
-!PS     if (.not. do_SDdvd) then 
+    ! switch to volume normalized Xchi
     do node=1, myDim_nod2D+eDim_nod2D
         nu1 = ulevels_nod2D(node)
         nl1 = nlevels_nod2D(node)-1
         dvd_tot(nu1:nl1, node, tr_num) = dvd_tot(nu1:nl1, node, tr_num) + dump(nu1:nl1, node)/(areasvol(nu1:nl1, node)*hnode_new(nu1:nl1, node))
         dvd_tot(nu1:nl1, node, tr_num) = dvd_tot(nu1:nl1, node, tr_num) - dump(nu1:nl1, node)/(areasvol(nu1:nl1, node)*hnode_new(nu1:nl1, node))
     end do
-!PS     end if 
+
 end subroutine dvd_add_difflux_hor
 !
 !
@@ -1720,65 +1728,69 @@ subroutine dvd_add_difflux_vert(do_SDdvd, tr_num, dvd_tot, tr, trstar, Kv, Ki, s
         ! to rescue the varaible hnode^(n) ).
         do nz=nu1+1, nl1-1
             ! take into account isoneutral Redi diffusivity Kd*s^2 --> K_33 = Kv + Kd*s^2
-            dzup     = hnode(nz-1, node)/2.0_WP
-            dzdwn    = hnode(nz  , node)/2.0_WP
+            dzup     = hnode(nz-1, node)*0.5_WP
+            dzdwn    = hnode(nz  , node)*0.5_WP
             Kv_R     = dzup /(dzup + dzdwn) * slope(3, nz-1, node)**2 * Ki(nz-1,node) + &
                        dzdwn/(dzup + dzdwn) * slope(3, nz  , node)**2 * Ki(nz  ,node)
             Kv_R     = Kv_R*isredi
             
             ! fdiff = Kv*dT/dz = Kv (T(nz-1) - T(nz))/ ((hnode(nz-1)+hnode(nz))/2)
-            ! --> Dflx is until here the diffusive flux on full depth levels
-            Dflx(nz) = (Kv(nz, node)+Kv_R) * (tr(nz-1, node)-tr(nz, node)) / (dzup + dzdwn)
+            ! --> Dflx is until here the diffusive volume flux on full depth levels
+            Dflx(nz) = (Kv(nz, node)+Kv_R) * (tr(nz-1, node)-tr(nz, node)) / (dzup + dzdwn) * area(nz,node)
             
             ! extent Dflx after Sergey to compute the diffusive component of DVD 
-            ! see Tridib et al. 2023 eq. 7
+            ! see T. Banerjee et al. 2023 eq. 7
             ! Xchi_(i+0.5) = 2*Kv * (T^(n+1)_(i+1)-T^(n+!)_i)/dz * (Tstar_(i+1)-Tstar_(i)/dz
             ! Dflx(nz) = Dflx * 2*(Tstar_(i+1)-Tstar_(i)/dz
             ! --> if Sergey diagonsitc is used Dflx correspond from here on to 
             !     Xchi at full depth level interface
-            Dflx(nz) = Dflx(nz) * merge(2.0_WP*( trstar(nz, node) - trstar(nz-1, node) )/(dzup+dzdwn)*area(nz,node), 1.0_WP, do_SDdvd)
+            Dflx(nz) = Dflx(nz) * merge(2.0_WP*( trstar(nz, node)-trstar(nz-1, node) )/(dzup+dzdwn), 1.0_WP, do_SDdvd)
             !                       |
-            !                       +-> merge: if do_SDdvd==True use second argument, if
-            !                           do_SDdvd==False use third argument of merge!
+            !                       +-> merge: if do_SDdvd==True use first argument, if
+            !                           do_SDdvd==False use second argument of merge!
         end do !--> do nz=nu1+1, nl1-1
        
         !_______________________________________________________________________
         ! decide between Sergeys and Knuts DVD method
         if (do_SDdvd) then 
             !___________________________________________________________________
-            ! now compute flx of Xchi into control volume, see Tridib et al. 2023
+            ! now compute flx of Xchi into control volume, see T. Banerjee et al. 2023
             ! eq. 9. Each control volume gets one half of the Xchi interface value 
             ! --> keep in mind we are now again on mid depth levels and in this case
             !     Dflx contains the interface value of Xchi
+            ! --> compute volume normlized Xchi contribution
             do nz=nu1, nl1-1
-                dvd_tot(nz, node, tr_num) = dvd_tot(nz, node, tr_num) - 0.5_WP*(Dflx(nz)+Dflx(nz+1))/(areasvol(nz, node)*hnode(nz, node))
+                dvd_tot(nz, node, tr_num) = dvd_tot(nz, node, tr_num) - (dvd_xdfac*Dflx(nz)+ (1.0_WP-dvd_xdfac)+Dflx(nz+1))/(areasvol(nz, node)*hnode(nz, node))
             end do !--> do nz=nu1+1, nl1-1
         else
             !___________________________________________________________________
             ! compute diffusive flux flxdiff(nz), after Klingbeil etal 2014
             ! flxdiff(nz)= ([Kv*dT/dz]_1*T_1*A_1-[Kv*dT/dz]_1*T_1*A_2)/V_1 into the volume 
+            ! surface
             nz     = nu1
             tr_dwn = (tr(nz, node)*hnode(nz, node)+tr(nz+1, node)*hnode(nz+1, node))/(hnode(nz, node)+hnode(nz+1, node))
-            tr_dwn = -Dflx(nz+1)*tr_dwn*area(nz+1, node)
+            tr_dwn = -Dflx(nz+1)*tr_dwn
             dvd_tot(nz, node, tr_num) = dvd_tot(nz, node, tr_num) + 2.0_WP*tr_dwn/(areasvol(nz, node)*hnode(nz, node))
-            
+            !___________________________________________________________________
+            ! bulk
             do nz=nu1+1, nl1-2
                 ! volume (hnode) weighted temperature reconstruction at upper/lower
                 ! scalar cell interface
                 tr_up  = (tr(nz-1, node)*hnode(nz-1, node)+tr(nz  , node)*hnode(nz  , node))/(hnode(nz-1, node)+hnode(nz  , node))
                 tr_dwn = (tr(nz  , node)*hnode(nz  , node)+tr(nz+1, node)*hnode(nz+1, node))/(hnode(nz  , node)+hnode(nz+1, node))
                 ! compute  T^(n+1)_(i+0.5) * Dflx_(i+0.5) through upper and lower face
-                tr_up  =  Dflx(nz  )*tr_up *area(nz  , node)
-                tr_dwn = -Dflx(nz+1)*tr_dwn*area(nz+1, node)
+                tr_up  =  Dflx(nz  )*tr_up 
+                tr_dwn = -Dflx(nz+1)*tr_dwn
                 ! copute dvd contribution normalized with volume 
                 dvd_tot(nz, node, tr_num) = dvd_tot(nz, node, tr_num) + 2.0_WP*(tr_up+tr_dwn)/(areasvol(nz, node)*hnode(nz, node))
-                !                                                              |-> factor 2 comes here from Klingbeil et al.2014
-                !                                                                  (2*Tr^(n+1) * Dflx[Tr^(n+1)] 
+                !                                                         |-> factor 2 comes here from Klingbeil et al.2014
+                !                                                             (2*Tr^(n+1) * Dflx[Tr^(n+1)] 
             end do !--> do nz=nu1+1, nl1-1
-            
+            !___________________________________________________________________
+            ! bottom
             nz    = nl1-1
             tr_up = (tr(nz-1, node)*hnode(nz-1, node)+tr(nz  , node)*hnode(nz  , node))/(hnode(nz-1, node)+hnode(nz  , node))
-            tr_up = Dflx(nz)*tr_up*area(nz, node)
+            tr_up = Dflx(nz)*tr_up
             dvd_tot(nz, node, tr_num) = dvd_tot(nz, node, tr_num) + 2.0_WP*tr_up/(areasvol(nz, node)*hnode(nz, node))
         end if 
     end do !--> do node=1, myDim_nod2D
@@ -1896,7 +1908,7 @@ subroutine dvd_add_difflux_bhvisc(do_SDdvd, tr_num, dvd_tot, tr, trstar, gamma0_
         if (do_SDdvd) then
             do nz=nu1, nl1-1
                 !_______________________________________________________________
-                ! compute Tstar as in Tridib et al. 2023 --> Tstar = (Tr^(n+1) + Tr^n)/2
+                ! compute Tstar as in T. Banerjee et al. 2023 --> Tstar = (Tr^(n+1) + Tr^n)/2
                 ! compute net edge Tracer contribution with Tstar
                 trc(nz) = 2.0_WP*( trstar(nz, ednodes(1)) - trstar(nz, ednodes(2)) )
             end do !-->do nz=nu1, nl1-1
