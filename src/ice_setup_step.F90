@@ -157,6 +157,9 @@ subroutine ice_timestep(step, ice, partit, mesh)
     !$ACC DEVICE (ice%data(1)%dvalues, ice%data(2)%dvalues, ice%data(3)%dvalues) &
     !$ACC DEVICE (ice%data(1)%values_rhs, ice%data(2)%values_rhs, ice%data(3)%values_rhs) &
     !$ACC DEVICE (ice%data(1)%values_div_rhs, ice%data(2)%values_div_rhs, ice%data(3)%values_div_rhs)
+#if defined (__oifs) || defined (__ifsinterface)
+    !$ACC UPDATE DEVICE (ice%data(4)%values, ice%data(4)%valuesl, ice%data(4)%dvalues, ice%data(4)%values_rhs, ice%data(4)%values_div_rhs)
+#endif
     !___________________________________________________________________________
     ! ===== Dynamics
 
@@ -190,11 +193,19 @@ subroutine ice_timestep(step, ice, partit, mesh)
     ! call cut_off
     ! new FCT routines from Sergey Danilov 08.05.2018
 #if defined (__oifs) || defined (__ifsinterface)
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
+#else
+!$ACC parallel loop present(ice_temp, a_ice)
+#endif
     do i=1,myDim_nod2D+eDim_nod2D
         ice_temp(i) = ice_temp(i)*a_ice(i)
     end do
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+!$ACC END parallel loop
+#endif
 #endif /* (__oifs) */
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
     call ice_TG_rhs_div    (ice, partit, mesh)
@@ -221,6 +232,9 @@ subroutine ice_timestep(step, ice, partit, mesh)
     !$ACC HOST (ice%data(1)%dvalues, ice%data(2)%dvalues, ice%data(3)%dvalues) &
     !$ACC HOST (ice%data(1)%values_rhs, ice%data(2)%values_rhs, ice%data(3)%values_rhs) &
     !$ACC HOST (ice%data(1)%values_div_rhs, ice%data(2)%values_div_rhs, ice%data(3)%values_div_rhs)
+#if defined (__oifs) || defined (__ifsinterface)
+    !$ACC UPDATE HOST (ice%data(4)%values, ice%data(4)%valuesl, ice%data(4)%dvalues, ice%data(4)%values_rhs, ice%data(4)%values_div_rhs)
+#endif
 
 #if defined (__oifs) || defined (__ifsinterface)
 !$OMP PARALLEL DO

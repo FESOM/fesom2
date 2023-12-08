@@ -357,6 +357,11 @@ contains
     !$ACC ENTER DATA CREATE  (f%ice%data(1)%dvalues, f%ice%data(2)%dvalues, f%ice%data(3)%dvalues) 
     !$ACC ENTER DATA CREATE  (f%ice%data(1)%values_rhs, f%ice%data(2)%values_rhs, f%ice%data(3)%values_rhs) 
     !$ACC ENTER DATA CREATE  (f%ice%data(1)%values_div_rhs, f%ice%data(2)%values_div_rhs, f%ice%data(3)%values_div_rhs)
+#if defined (__oifs) || defined (__ifsinterface)
+    write(*,*) '************************** DBG: size of data4 is',shape(f%ice%data(4)%values_rhs)
+    write(*,*) '************************** DBG: size of data3 is',shape(f%ice%data(3)%values_rhs)
+    !$ACC ENTER DATA CREATE (f%ice%data(4)%values, f%ice%data(4)%valuesl, f%ice%data(4)%dvalues, f%ice%data(4)%values_rhs, f%ice%data(4)%values_div_rhs)
+#endif
 
     !$ACC ENTER DATA CREATE (f%dynamics%w, f%dynamics%w_e, f%dynamics%uv)
     !$ACC ENTER DATA CREATE (f%tracers%data, f%tracers%work) 
@@ -457,6 +462,9 @@ contains
     !$ACC EXIT DATA DELETE (f%ice%data(1)%dvalues, f%ice%data(2)%dvalues, f%ice%data(3)%dvalues) 
     !$ACC EXIT DATA DELETE (f%ice%data(1)%values_rhs, f%ice%data(2)%values_rhs, f%ice%data(3)%values_rhs) 
     !$ACC EXIT DATA DELETE (f%ice%data(1)%values_div_rhs, f%ice%data(2)%values_div_rhs, f%ice%data(3)%values_div_rhs)
+#if defined (__oifs) || defined (__ifsinterface)
+    !$ACC EXIT DATA DELETE (f%ice%data(4)%values, f%ice%data(4)%valuesl, f%ice%data(4)%dvalues, f%ice%data(4)%values_rhs, f%ice%data(4)%values_div_rhs)
+#endif
     !$ACC EXIT DATA DELETE (f%ice%data, f%ice%work, f%ice%work%fct_massmatrix) 
     !$ACC EXIT DATA DELETE (f%ice) 
     
