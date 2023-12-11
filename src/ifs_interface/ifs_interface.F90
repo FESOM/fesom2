@@ -607,7 +607,7 @@ SUBROUTINE nemogcmcoup_exflds_get( mype, npes, icomm, &
    INTEGER , PARAMETER :: maxnfield = 6
    INTEGER :: nfield = 0
    REAL(wpIFS), DIMENSION(fesom%partit%myDim_nod2D,maxnfield)  :: zsendnf
-   REAL(wpIFS), DIMENSION(nopoints,maxnfield)  :: zrecvnf	
+   REAL(wpIFS), DIMENSION(nopoints,maxnfield)  :: zrecvnf
    real(kind=wpIFS), dimension(:,:), pointer :: coord_nod2D
    integer, pointer :: myDim_nod2D, eDim_nod2D
 
@@ -1086,9 +1086,47 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! Enthalpy heat of fusion: take heat from the ocean in order to melt the snow that is falling into the ocean
    ! prec_snow*rho [kg/m2/s] * lfus [J/kg] = W/m2
    enthalpyoffuse(1:myDim_nod2D)= - rhofwt * prec_snow(1:myDim_nod2D) * lfus * 1000.
-   call exchange_nod(enthalpyoffuse, fesom%partit)
+   call exchange_nod(enthalpyoffuse, fesom%partit)  
 END SUBROUTINE nemogcmcoup_lim2_update
 
+subroutine ocean_update_runoff(NBASIN_RUNOFF, BASIN_RUNOFF)
+   !it will be called inside IFS nemo/couplnemo.F90 -> COUPLNEMO
+   USE par_kind !in ifs_modules.F90
+   USE fesom_main_storage_module, only: fesom => f
+   USE MOD_MESH
+   USE MOD_PARTIT
+   USE MOD_PARSUP
+   USE g_forcing_arrays,    only: runoff
+   USE g_sbf,               only: RUNOFF_MAPPER
+   use g_support
+   implicit none
+   INTEGER,          INTENT(IN)    :: NBASIN_RUNOFF
+   REAL(kind=wpIFS), INTENT(INOUT) :: BASIN_RUNOFF(NBASIN_RUNOFF)
+   integer                         :: n, i, j
+   real(kind=WP)                   :: total_runoff
+   logical, save                   :: lfirst=.true.
+   integer                         :: total_number_of_basins=0 ! will be used to check the consistency after first call
+ 
+   if (lfirst) then
+      total_number_of_basins=maxval(RUNOFF_MAPPER%colind)
+      call MPI_Allreduce(MPI_IN_PLACE, total_number_of_basins, 1, MPI_INTEGER, MPI_MAX, fesom%partit%MPI_COMM_FESOM, fesom%partit%MPIerr)
+      if (total_number_of_basins/=NBASIN_RUNOFF) then
+         if (fesom%partit%mype==0) write(*,*) 'mismatch in number of runoff basins between ocean and atmosphere:', total_number_of_basins, NBASIN_RUNOFF
+         if (fesom%partit%mype==0) write(*,*) 'the model will stop!'
+         call par_ex(fesom%partit%MPI_COMM_FESOM, fesom%partit%mype)
+         stop
+      end if
+      lfirst=.false.
+   end if
+   do n=1, fesom%partit%myDim_nod2D+fesom%partit%eDim_nod2D
+      runoff(n)=0.0_WP
+      i=RUNOFF_MAPPER%rowptr(n)
+      j=RUNOFF_MAPPER%rowptr(n+1)-1
+      runoff(n)=sum(RUNOFF_MAPPER%values(i:j)*REAL(BASIN_RUNOFF(RUNOFF_MAPPER%colind(i:j)), WP))
+   end do
+   call integrate_nod(runoff, total_runoff, fesom%partit, fesom%mesh)
+   if (fesom%partit%mype==0) write(*,*) 'total runoff=', total_runoff*1.e-6
+end subroutine ocean_update_runoff
 
 SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )
 
