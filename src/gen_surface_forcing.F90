@@ -96,8 +96,9 @@ MODULE g_sbf
    character(10),           save   :: chl_data_source   ='None' ! 'Sweeney' Chlorophyll climatology Sweeney et al. 2005
    character(len=MAX_PATH), save   :: nm_chl_data_file  ='/work/ollie/dsidoren/input/forcing/Sweeney_2005.nc'
    real(wp),                save   :: chl_const         = 0.1
-   logical                         :: use_runoff_mapper = .false.
-   character(len=MAX_PATH), save   :: nm_runoff_mapper  ='/p/project/chhb19/streffing1/input/runoff-mapper/runoff_maps_D3.nc'
+   logical                         :: use_runoff_mapper = .false.               !runof mapper to be used in the coupled mode with IFS
+   character(len=MAX_PATH), save   :: runoff_basins_file='runoff_basins.nc'     ! definition file for runoff basins
+   real(wp)                        :: runoff_radius     =500000._WP             !smoothing radius for runoff mapper (in meters)
    type(sparse_matrix)             :: RUNOFF_MAPPER
 
    logical :: runoff_climatology =.false.
@@ -929,7 +930,7 @@ CONTAINS
                         nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, y_perpetual, &
                         l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
                         nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source, &
-                        chl_data_source, nm_chl_data_file, chl_const
+                        chl_data_source, nm_chl_data_file, chl_const, use_runoff_mapper, runoff_basins_file, runoff_radius
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -1103,7 +1104,7 @@ CONTAINS
 
       if (mype==0) write(*,*) "DONE:  Ocean forcing inizialization."
       if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
-      if (use_runoff_mapper) call read_runoff_mapper(nm_runoff_mapper, "arrival_point_id", 500000.0_WP, partit, mesh)
+      if (use_runoff_mapper) call read_runoff_mapper(runoff_basins_file, "arrival_point_id", runoff_radius, partit, mesh)
    END SUBROUTINE sbc_ini
 
    SUBROUTINE sbc_do(partit, mesh)
