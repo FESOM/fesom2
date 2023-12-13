@@ -44,7 +44,7 @@ MODULE g_sbf
    USE g_config, only: dummy, ClimateDataPath, dt
    USE g_clock,  only: timeold, timenew, dayold, daynew, yearold, yearnew, cyearnew
    USE g_forcing_arrays,    only: runoff, chl
-   USE g_read_other_NetCDF, only: read_other_NetCDF, read_2ddata_on_grid_netcdf
+   USE g_read_other_NetCDF, only: read_other_NetCDF, read_2ddata_on_grid_netcdf, read_runoff_mapper
    IMPLICIT NONE
 
    include 'netcdf.inc'
@@ -1100,6 +1100,7 @@ CONTAINS
 
       if (mype==0) write(*,*) "DONE:  Ocean forcing inizialization."
       if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
+!     call read_runoff_mapper("/p/project/chhb19/streffing1/input/runoff-mapper/runoff_maps_D3.nc", "arrival_point_id", 1.0_WP, partit, mesh)
    END SUBROUTINE sbc_ini
 
    SUBROUTINE sbc_do(partit, mesh)
