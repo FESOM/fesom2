@@ -42,7 +42,7 @@ module fesom_main_storage_module
     
   type :: fesom_main_storage_type
 
-    integer           :: n, from_nstep, offset, row, i, provided, last_nstep
+    integer           :: n, from_nstep, offset, row, i, provided
     integer           :: which_readr ! read which restart files (0=netcdf, 1=core dump,2=dtype)
     integer, pointer  :: mype, npes, MPIerr, MPI_COMM_FESOM
     real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
@@ -209,7 +209,7 @@ contains
         call clock_newyear                        ! check if it is a new year
         if (f%mype==0) f%t6=MPI_Wtime()
         !___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
-        call restart(0, r_restart, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        call restart(0, 0, 0, r_restart, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         if (f%mype==0) f%t7=MPI_Wtime()
         ! store grid information into netcdf file
         if (.not. r_restart) call write_mesh_info(f%partit, f%mesh)
@@ -292,7 +292,7 @@ contains
     use fesom_main_storage_module
     integer, intent(in) :: current_nsteps 
     ! EO parameters
-    integer n
+    integer n, nstart, ntotal
 
     !=====================
     ! Time stepping
@@ -314,7 +314,10 @@ contains
     if (use_global_tides) then
        call foreph_ini(yearnew, month, f%partit)
     end if
-    do n=f%from_nstep, f%from_nstep-1+current_nsteps        
+    nstart=f%from_nstep
+    ntotal=f%from_nstep-1+current_nsteps
+    !do n=f%from_nstep, f%from_nstep-1+current_nsteps
+    do n=nstart, ntotal
         if (use_global_tides) then
            call foreph(f%partit, f%mesh)
         end if
@@ -378,7 +381,7 @@ contains
         call output (n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
 
         f%t5 = MPI_Wtime()
-        call restart(n, .false., f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        call restart(n, nstart, ntotal, .false., f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         f%t6 = MPI_Wtime()
         
         f%rtime_fullice       = f%rtime_fullice       + f%t2 - f%t1
@@ -388,8 +391,6 @@ contains
         f%rtime_read_forcing  = f%rtime_read_forcing  + f%t1_frc - f%t0_frc
     end do
 
-    f%last_nstep = f%from_nstep-1+current_nsteps
-    write(*,*) "THIS IS THE LAST TIME STEP! -> ", f%last_nstep
     f%from_nstep = f%from_nstep+current_nsteps
   end subroutine
 
@@ -399,10 +400,6 @@ contains
     ! EO parameters
     real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
 
-#if defined (__ifsinterface)
-    ! write raw restart at the end of run
-    call write_all_raw_restarts(f%last_nstep, f%MPI_COMM_FESOM, f%mype)
-#endif
     call finalize_output()
     call finalize_restart()
 
