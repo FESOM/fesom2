@@ -108,7 +108,7 @@ contains
     f => g%files(g%nfiles)
     
     f%path = ""
-    f%varname = name
+    allocate(f%varname,source=name)
     f%must_exist_on_read = must_exist_on_read
     call f%fesom_file_type%init(mesh_nod2d, mesh_elem2d, mesh_nl, partit)
     ! this is specific for a restart file
