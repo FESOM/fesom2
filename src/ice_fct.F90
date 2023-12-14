@@ -128,8 +128,12 @@ subroutine ice_TG_rhs(ice, partit, mesh)
 #endif
     !___________________________________________________________________________
     ! Taylor-Galerkin (Lax-Wendroff) rhs
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, q, row, elem, elnodes, diff, entries,  um, vm, vol, dx, dy)
 !$OMP DO
+#else
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
+#endif
     DO row=1, myDim_nod2D
         rhs_m(row)=0._WP
         rhs_a(row)=0._WP
@@ -138,9 +142,20 @@ subroutine ice_TG_rhs(ice, partit, mesh)
         rhs_temp(row)=0._WP
 #endif
     END DO
+
+#ifndef ENABLE_OPENACC
 !$OMP END DO
+#else
+    !$ACC END PARALLEL LOOP
+#endif
     ! Velocities at nodes
+
+
+#ifndef ENABLE_OPENACC
 !$OMP DO
+#else
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) private(n, q, row, elem, elnodes, diff, entries,  um, vm, vol, dx, dy)
+#endif
     do elem=1,myDim_elem2D          !assembling rhs over elements
         elnodes=elem2D_nodes(:,elem)
         !_______________________________________________________________________
@@ -158,8 +173,10 @@ subroutine ice_TG_rhs(ice, partit, mesh)
 
         !diffusivity
         diff=ice%ice_diff*sqrt(elem_area(elem)/scale_area)
+        !$ACC LOOP SEQ
         DO n=1,3
             row=elnodes(n)
+	    !$ACC LOOP SEQ
             DO q = 1,3
                 !entries(q)= vol*dt*((dx(n)*um+dy(n)*vm)/3.0_WP - &
                 !            diff*(dx(n)*dx(q)+ dy(n)*dy(q))- &
@@ -169,6 +186,7 @@ subroutine ice_TG_rhs(ice, partit, mesh)
                             diff*(dx(n)*dx(q)+ dy(n)*dy(q))- &
                             0.5_WP*ice%ice_dt*(um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q))/9.0_WP)
             END DO
+	    !$ACC END LOOP
             rhs_m(row)=rhs_m(row)+sum(entries*m_ice(elnodes))
             rhs_a(row)=rhs_a(row)+sum(entries*a_ice(elnodes))
             rhs_ms(row)=rhs_ms(row)+sum(entries*m_snow(elnodes))
@@ -176,9 +194,15 @@ subroutine ice_TG_rhs(ice, partit, mesh)
             rhs_temp(row)=rhs_temp(row)+sum(entries*ice_temp(elnodes))
 #endif
         END DO
+	!$ACC END LOOP
     end do
+
+#ifndef ENABLE_OPENACC
 !$OMP END DO
 !$OMP END PARALLEL
+#else
+    !$ACC END PARALLEL LOOP
+#endif
 end subroutine ice_TG_rhs
 !
 !
@@ -555,6 +579,8 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         icoef(n,n)=-2
     end do
     !$ACC END PARALLEL LOOP
+
+
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, q, elem, elnodes, row, vol, flux, ae)
 !$OMP DO
@@ -809,13 +835,13 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     !$ACC END PARALLEL LOOP
 #endif 
    ! pminus and pplus are to be known to neighbouting PE
+!$ACC wait
 
-
-#ifndef ENABLE_OPENACC
+#if defined(_OPENMP)
 !$OMP MASTER
 #endif
     call exchange_nod(icepminus, icepplus, partit, luse_g2g = .true.)
-#ifndef ENABLE_OPENACC
+#if defined(_OPENMP)
 !$OMP END MASTER
 !$OMP BARRIER
 #endif
