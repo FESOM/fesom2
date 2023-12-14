@@ -91,7 +91,8 @@ module io_MEANDATA
   END INTERFACE
 !
 !--------------------------------------------------------------------------------------------
-!
+  REAL(real64), DIMENSION(:), ALLOCATABLE, TARGET :: multio_temporary_array
+
   contains
 !
 !--------------------------------------------------------------------------------------------
@@ -1744,10 +1745,9 @@ SUBROUTINE send_data_to_multio(entry)
     USE iom
     IMPLICIT NONE
 
-    TYPE(Meandata), TARGET, INTENT(INOUT)                       :: entry
-    TYPE(iom_field_request)                                     :: request
-    REAL(real64), DIMENSION(SIZE(entry%shrinked_indx)), TARGET  :: temp
-    INTEGER                                                     :: numLevels, globalSize, lev, i
+    TYPE(Meandata), TARGET, INTENT(INOUT)           :: entry
+    TYPE(iom_field_request)                         :: request
+    INTEGER                                         :: numLevels, globalSize, lev, i, n
 
     numLevels = entry%glsize(1)
     globalSize = entry%glsize(2)
@@ -1782,14 +1782,41 @@ SUBROUTINE send_data_to_multio(entry)
     ! loop over vertical layers --> do gather 3d variables layerwise in 2d slices
     DO lev=1, numLevels
         request%level = lev
-        IF (.NOT. entry%is_elem_based) THEN
-            request%values => entry%local_values_r8_copy(lev, 1:entry%shrinked_size)
+
+        IF (entry%is_elem_based) THEN
+            n = SIZE(entry%shrinked_indx)
         ELSE
-            DO i = 1, SIZE(entry%shrinked_indx)
-                temp(i) = entry%local_values_r8_copy(lev, entry%shrinked_indx(i))
-            END DO
-            request%values => temp
+            n = entry%shrinked_size
         END IF
+
+        IF (ALLOCATED(multio_temporary_array) .AND. (SIZE(multio_temporary_array) .LT. n)) THEN
+            DEALLOCATE(multio_temporary_array)
+        ENDIF
+
+        IF (.NOT. ALLOCATED(multio_temporary_array)) THEN
+            ALLOCATE(multio_temporary_array(n))
+        ENDIF
+
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i)
+        DO i = 1, n
+            IF (entry%is_elem_based) THEN
+                IF (entry%accuracy == i_real8) THEN
+                    multio_temporary_array(i) = entry%local_values_r8_copy(lev, entry%shrinked_indx(i))
+                ELSE
+                    multio_temporary_array(i) = entry%local_values_r4_copy(lev, entry%shrinked_indx(i))
+                ENDIF
+            ELSE
+                IF (entry%accuracy == i_real8) THEN
+                    multio_temporary_array(i) = entry%local_values_r8_copy(lev, i)
+                ELSE
+                    multio_temporary_array(i) = entry%local_values_r4_copy(lev, i)
+                ENDIF
+            ENDIF
+        ENDDO
+!$OMP END PARALLEL DO
+
+        request%values(1:n) => multio_temporary_array(1:n)
+
         CALL iom_send_fesom_data(request)
     END DO
 END SUBROUTINE
