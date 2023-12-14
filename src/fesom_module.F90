@@ -296,19 +296,9 @@ contains
     f%rtime_read_forcing  = 0._WP
 
     f%from_nstep = 1
-    !enter mesh and partit data. 
-    !$ACC ENTER DATA COPYIN (f) 
-    !$ACC ENTER DATA COPYIN (f%mesh, f%mesh%coriolis_node, f%mesh%nn_num, f%mesh%nn_pos) 
-    !$ACC ENTER DATA COPYIN (f%mesh%ssh_stiff, f%mesh%ssh_stiff%rowptr) 
-    !$ACC ENTER DATA COPYIN (f%mesh%gradient_sca, f%mesh%metric_factor, f%mesh%elem_area, f%mesh%area, f%mesh%edge2D_in) 
-    !$ACC ENTER DATA COPYIN (f%mesh%elem2D_nodes, f%mesh%ulevels, f%mesh%ulevels_nod2d, f%mesh%edges, f%mesh%edge_tri) 
-    !$ACC ENTER DATA COPYIN (f%partit, f%partit%eDim_nod2D, f%partit%myDim_edge2D) 
-    !$ACC ENTER DATA COPYIN (f%partit%myDim_elem2D, f%partit%myDim_nod2D, f%partit%myList_edge2D) 
 
-    !$ACC ENTER DATA COPYIN (f%mesh%helem, f%mesh%elem_cos, f%mesh%edge_cross_dxdy, f%mesh%elem2d_nodes, f%mesh%nl) 
-    !$ACC ENTER DATA COPYIN (f%mesh%nlevels_nod2D, f%mesh%nod_in_elem2D, f%mesh%nod_in_elem2D_num) 
-    !$ACC ENTER DATA COPYIN (f%mesh%edge_dxdy, f%mesh%nlevels, f%mesh%hnode, f%mesh%hnode_new, f%mesh%ulevels_nod2D_max) 
-    !$ACC ENTER DATA COPYIN (f%mesh%zbar_3d_n, f%mesh%z_3d_n, f%mesh%areasvol, f%mesh%nlevels_nod2D_min) 
+
+
   end subroutine
 
 
@@ -324,6 +314,19 @@ contains
 
     if (f%mype==0) write(*,*) 'FESOM start iteration before the barrier...'
     call MPI_Barrier(f%MPI_COMM_FESOM, f%MPIERR)
+    !enter mesh and partit data. 
+    !$ACC ENTER DATA COPYIN (f) 
+    !$ACC ENTER DATA COPYIN (f%mesh, f%mesh%coriolis_node, f%mesh%nn_num, f%mesh%nn_pos) 
+    !$ACC ENTER DATA COPYIN (f%mesh%ssh_stiff, f%mesh%ssh_stiff%rowptr) 
+    !$ACC ENTER DATA COPYIN (f%mesh%gradient_sca, f%mesh%metric_factor, f%mesh%elem_area, f%mesh%area, f%mesh%edge2D_in) 
+    !$ACC ENTER DATA COPYIN (f%mesh%elem2D_nodes, f%mesh%ulevels, f%mesh%ulevels_nod2d, f%mesh%edges, f%mesh%edge_tri) 
+    !$ACC ENTER DATA COPYIN (f%partit, f%partit%eDim_nod2D, f%partit%myDim_edge2D) 
+    !$ACC ENTER DATA COPYIN (f%partit%myDim_elem2D, f%partit%myDim_nod2D, f%partit%myList_edge2D) 
+
+    !$ACC ENTER DATA COPYIN (f%mesh%helem, f%mesh%elem_cos, f%mesh%edge_cross_dxdy, f%mesh%elem2d_nodes, f%mesh%nl) 
+    !$ACC ENTER DATA COPYIN (f%mesh%nlevels_nod2D, f%mesh%nod_in_elem2D, f%mesh%nod_in_elem2D_num) 
+    !$ACC ENTER DATA COPYIN (f%mesh%edge_dxdy, f%mesh%nlevels, f%mesh%hnode, f%mesh%hnode_new, f%mesh%ulevels_nod2D_max) 
+    !$ACC ENTER DATA COPYIN (f%mesh%zbar_3d_n, f%mesh%z_3d_n, f%mesh%areasvol, f%mesh%nlevels_nod2D_min) 
     
     if (f%mype==0) then
        write(*,*) 'FESOM start iteration after the barrier...'
@@ -478,6 +481,18 @@ contains
     !$ACC EXIT DATA DELETE (f%tracers%data, f%tracers%work) 
     !$ACC EXIT DATA DELETE (f%dynamics%w, f%dynamics%w_e, f%dynamics%uv)
 
+    !delete mesh and partit data.
+    !$ACC EXIT DATA DELETE (f%mesh%coriolis_node, f%mesh%nn_num, f%mesh%nn_pos) 
+    !$ACC EXIT DATA DELETE (f%mesh%ssh_stiff, f%mesh%ssh_stiff%rowptr) 
+    !$ACC EXIT DATA DELETE (f%mesh%gradient_sca, f%mesh%metric_factor, f%mesh%elem_area, f%mesh%area, f%mesh%edge2D_in) 
+    !$ACC EXIT DATA DELETE (f%mesh%elem2D_nodes, f%mesh%ulevels, f%mesh%ulevels_nod2d, f%mesh%edges, f%mesh%edge_tri) 
+    !$ACC EXIT DATA DELETE (f%mesh%helem, f%mesh%elem_cos, f%mesh%edge_cross_dxdy, f%mesh%elem2d_nodes, f%mesh%nl) 
+    !$ACC EXIT DATA DELETE (f%mesh%nlevels_nod2D, f%mesh%nod_in_elem2D, f%mesh%nod_in_elem2D_num) 
+    !$ACC EXIT DATA DELETE (f%mesh%edge_dxdy, f%mesh%nlevels, f%mesh%hnode, f%mesh%hnode_new, f%mesh%ulevels_nod2D_max) 
+    !$ACC EXIT DATA DELETE (f%mesh%zbar_3d_n, f%mesh%z_3d_n, f%mesh%areasvol, f%mesh%nlevels_nod2D_min) 
+    !$ACC EXIT DATA DELETE (f%partit%eDim_nod2D, f%partit%myDim_edge2D) 
+    !$ACC EXIT DATA DELETE (f%partit%myDim_elem2D, f%partit%myDim_nod2D, f%partit%myList_edge2D) 
+    !$ACC EXIT DATA DELETE (f%mesh, f%partit, f)
   end subroutine
 
 
@@ -492,18 +507,6 @@ contains
     !___FINISH MODEL RUN________________________________________________________
 
     call MPI_Barrier(f%MPI_COMM_FESOM, f%MPIERR)
-    !delete mesh and partit data.
-    !$ACC EXIT DATA DELETE (f%mesh%coriolis_node, f%mesh%nn_num, f%mesh%nn_pos) 
-    !$ACC EXIT DATA DELETE (f%mesh%ssh_stiff, f%mesh%ssh_stiff%rowptr) 
-    !$ACC EXIT DATA DELETE (f%mesh%gradient_sca, f%mesh%metric_factor, f%mesh%elem_area, f%mesh%area, f%mesh%edge2D_in) 
-    !$ACC EXIT DATA DELETE (f%mesh%elem2D_nodes, f%mesh%ulevels, f%mesh%ulevels_nod2d, f%mesh%edges, f%mesh%edge_tri) 
-    !$ACC EXIT DATA DELETE (f%mesh%helem, f%mesh%elem_cos, f%mesh%edge_cross_dxdy, f%mesh%elem2d_nodes, f%mesh%nl) 
-    !$ACC EXIT DATA DELETE (f%mesh%nlevels_nod2D, f%mesh%nod_in_elem2D, f%mesh%nod_in_elem2D_num) 
-    !$ACC EXIT DATA DELETE (f%mesh%edge_dxdy, f%mesh%nlevels, f%mesh%hnode, f%mesh%hnode_new, f%mesh%ulevels_nod2D_max) 
-    !$ACC EXIT DATA DELETE (f%mesh%zbar_3d_n, f%mesh%z_3d_n, f%mesh%areasvol, f%mesh%nlevels_nod2D_min) 
-    !$ACC EXIT DATA DELETE (f%partit%eDim_nod2D, f%partit%myDim_edge2D) 
-    !$ACC EXIT DATA DELETE (f%partit%myDim_elem2D, f%partit%myDim_nod2D, f%partit%myList_edge2D) 
-    !$ACC EXIT DATA DELETE (f%mesh, f%partit, f)
     
     if (f%mype==0) then
        f%t1 = MPI_Wtime()
