@@ -110,18 +110,31 @@ contains
         integer                               :: edge_left, edge_right
         integer                               :: n, ee, elem, nn, el(2), flag, nn1, nn2
         integer, allocatable, dimension(:)    :: nedges, nelems, nedges1, nelems1, nedges2, nelems2
-        real(kind=WP)              :: this_x_coord, this_y_coord
+        real(kind=WP)                         :: this_x_coord, this_y_coord
+
+        real(kind=WP)                         :: temp_x_coord, temp_y_coord
+        logical                               :: node_of_interest
+
 include "associate_part_def.h"
 include "associate_mesh_def.h"
 include "associate_part_ass.h"
 include "associate_mesh_ass.h"
 
-    if (.not. allocated(array)) then
+    if (.not. allocated(my_x_corners)) then
         ALLOCATE(my_x_corners(myDim_nod2D, 25)) !maxval(nod_in_elem2D_num, 1)*2+2))
+    endif
+    if (.not. allocated(my_y_corners)) then
         ALLOCATE(my_y_corners(myDim_nod2D, 25)) !maxval(nod_in_elem2D_num, 1)*2+2))
     endif
     do n=1, myDim_nod2D
-        ! find the type of node: internal or at boundary
+        node_of_interest=.False.
+        call r2g(temp_x_coord, temp_y_coord, coord_nod2D(1,n), coord_nod2D(2,n))
+        if (temp_x_coord < 27 .AND. temp_x_coord > 26 .AND. temp_y_coord < 40 .AND. temp_y_coord > 38) THEN
+            print *, "found GP1"
+            print *, temp_x_coord, temp_y_coord
+            node_of_interest=.True.
+        end if
+        ! find the type/of node: internal or at boundary
         bEdge_left =0
         belem_left =0
         bEdge_right=0
@@ -497,7 +510,6 @@ include "associate_mesh_ass.h"
       print *, 'FESOM before corner computation'
     endif
     call node_contours(my_x_corners, my_y_corners, partit, mesh)
-    write(*,*) my_x_corners
     if (mype .eq. 0) then
       print *, 'FESOM after corner computation'
     endif
