@@ -59,14 +59,14 @@ end do
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
     call tracer_gradient_elements(tracers%data(tr_num)%valuesAB, partit, mesh)
-    call exchange_elem_begin(tr_xy, partit)
+    call exchange_elem_begin(tr_xy, partit, luse_g2g = .true.)
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_z'//achar(27)//'[0m'
     call tracer_gradient_z(tracers%data(tr_num)%values, partit, mesh)    !WHY NOT AB HERE? DSIDOREN!
     call exchange_elem_end(partit)      ! tr_xy used in fill_up_dn_grad
 !$OMP BARRIER
 
-    call exchange_nod_begin(tr_z, partit) ! not used in fill_up_dn_grad 
+    call exchange_nod_begin(tr_z, partit, luse_g2g = .true.) ! not used in fill_up_dn_grad 
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call fill_up_dn_grad'//achar(27)//'[0m'
     call fill_up_dn_grad(tracers%work, partit, mesh)
@@ -74,7 +74,7 @@ end do
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
     call tracer_gradient_elements(tracers%data(tr_num)%values, partit, mesh) !redefine tr_arr to the current timestep
-    call exchange_elem(tr_xy, partit)
+    call exchange_elem(tr_xy, partit, luse_g2g = .true.)
 
 END SUBROUTINE init_tracers_AB
 !
