@@ -112,9 +112,6 @@ contains
         integer, allocatable, dimension(:)    :: nedges, nelems, nedges1, nelems1, nedges2, nelems2
         real(kind=WP)                         :: this_x_coord, this_y_coord
 
-        real(kind=WP)                         :: temp_x_coord, temp_y_coord
-        logical                               :: node_of_interest
-
 include "associate_part_def.h"
 include "associate_mesh_def.h"
 include "associate_part_ass.h"
@@ -127,17 +124,6 @@ include "associate_mesh_ass.h"
         ALLOCATE(my_y_corners(myDim_nod2D, 25)) !maxval(nod_in_elem2D_num, 1)*2+2))
     endif
     do n=1, myDim_nod2D
-        node_of_interest=.False.
-        call r2g(temp_x_coord, temp_y_coord, coord_nod2D(1,n), coord_nod2D(2,n))
-        temp_x_coord=temp_x_coord/rad
-        temp_y_coord=temp_y_coord/rad
-        !node of interest: (26.37363839491671, 39.03160698980019)
-        !print *, temp_x_coord, temp_y_coord
-        if (temp_x_coord < 26.4 .AND. temp_x_coord > 26.3 .AND. temp_y_coord < 39.1 .AND. temp_y_coord > 39) THEN
-            print *, "found GP1"
-            print *, temp_x_coord, temp_y_coord
-            node_of_interest=.True.
-        end if
         ! find the type/of node: internal or at boundary
         bEdge_left =0
         belem_left =0
@@ -164,13 +150,6 @@ include "associate_mesh_ass.h"
               bEdge_right=bEdge_right+1
               belem_right(bEdge_right)=elem
            end if
-           if (node_of_interest==.True.) then
-              print *, "ee:", ee
-              print *, "edge_left:", edge_left
-              print *, "edge_right:", edge_right
-              print *, "bEdge_left:", bEdge_left
-              print *, "bEdge_right:", bEdge_right
-           end if
         end do
 
     ! now we have three cases
@@ -186,18 +165,11 @@ include "node_contour_inner.h"
              call edge_center(edges(1, nedges(nn)), edges(2, nedges(nn)), my_x_corners(n, (nn-1)*2+1), my_y_corners(n, (nn-1)*2+1), mesh)
              call elem_center(nelems(nn), my_x_corners(n, (nn-1)*2+2), my_y_corners(n, (nn-1)*2+2), mesh)
           end do
-          do nn=nod_in_elem2D_num(n)+1, size(my_x_corners, 2)
-             my_x_corners(n, nn)=my_x_corners(n, nod_in_elem2D_num(n))
-             my_y_corners(n, nn)=my_y_corners(n, nod_in_elem2D_num(n))
+          do nn=nod_in_elem2D_num(n)*2+1, size(my_x_corners, 2)
+             my_x_corners(n, nn)=my_x_corners(n, nod_in_elem2D_num(n)*2)
+             my_y_corners(n, nn)=my_y_corners(n, nod_in_elem2D_num(n)*2)
           end do
           deallocate(nedges, nelems)
-           if (node_of_interest==.True.) then
-              print *, "case1"
-              print *, "n", n
-              print *, "nn", nn
-              print *, "my_x_corners(n, nn):", my_x_corners(n, nn)
-              print *, "my_y_corners(n, nn):", my_y_corners(n, nn)
-           end if
        end if
 
 
@@ -215,22 +187,15 @@ include "node_contour_boundary.h"
           end do
           nn=nod_in_elem2D_num(n)+1
           call edge_center(edges(1, nedges(nn)), edges(2, nedges(nn)), my_x_corners(n, (nn-1)*2+1), my_y_corners(n, (nn-1)*2+1), mesh)
-          nn=nod_in_elem2D_num(n)+2
-          my_x_corners(n, nn)=coord_nod2D(1,n)
-          my_y_corners(n, nn)=coord_nod2D(2,n)
-          do nn=nod_in_elem2D_num(n)+3, size(my_x_corners, 2)
-             my_x_corners(n, nn)=my_x_corners(n, nod_in_elem2D_num(n)+2)
-             my_y_corners(n, nn)=my_y_corners(n, nod_in_elem2D_num(n)+2)
+!         nn=nod_in_elem2D_num(n)+2
+          my_x_corners(n, (nn-1)*2+2)=coord_nod2D(1,n)
+          my_y_corners(n, (nn-1)*2+2)=coord_nod2D(2,n)
+          do nn=nod_in_elem2D_num(n)*2+3, size(my_x_corners, 2)
+             my_x_corners(n, nn)=my_x_corners(n, nod_in_elem2D_num(n)*2+2)
+             my_y_corners(n, nn)=my_y_corners(n, nod_in_elem2D_num(n)*2+2)
           end do
           !!!!!!!
           deallocate(nedges, nelems)
-           if (node_of_interest==.True.) then
-              print *, "case2"
-              print *, "n", n
-              print *, "nn", nn
-              print *, "my_x_corners(n, nn):", my_x_corners(n, nn)
-              print *, "my_y_corners(n, nn):", my_y_corners(n, nn)
-           end if
        end if
 
        if (bEdge_left==2) then  ! strange boundary node
@@ -293,11 +258,6 @@ include "node_contour_boundary.h"
            end do
            !!!!!!!
            deallocate(nedges, nelems, nedges1, nelems1, nedges2, nelems2)
-           if (node_of_interest==.True.) then
-              print *, "case3"
-              print *, "my_x_corners:", my_x_corners
-              print *, "my_y_corners:", my_y_corners
-           end if
        end if
     end do
     do n=1, myDim_nod2D
@@ -305,11 +265,6 @@ include "node_contour_boundary.h"
           this_x_coord=my_x_corners(n, nn)
           this_y_coord=my_y_corners(n, nn)
           call r2g(my_x_corners(n, nn), my_y_corners(n, nn), this_x_coord, this_y_coord)
-           if (node_of_interest==.True.) then
-              print *, "final"
-              print *, "my_x_corners(n, nn)/rad:", my_x_corners(n, nn)/rad
-              print *, "my_y_corners(n, nn)/rad:", my_y_corners(n, nn)/rad
-           end if
        end do
     end do
     my_x_corners=my_x_corners/rad
