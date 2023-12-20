@@ -207,7 +207,7 @@ include "node_contour_boundary.h"
           current_pos=current_pos+pos_increment
           my_x_corners(n, current_pos)=coord_nod2D(1,n)
           my_y_corners(n, current_pos)=coord_nod2D(2,n)
-          current_pos=2*nod_in_elem2D_num(n)+1
+          current_pos=2*nod_in_elem2D_num(n)+2
           do nn=current_pos, size(my_x_corners, 2)
              my_x_corners(n, nn)=my_x_corners(n, current_pos-1)
              my_y_corners(n, nn)=my_y_corners(n, current_pos-1)
