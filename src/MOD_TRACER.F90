@@ -60,9 +60,9 @@ END TYPE T_TRACER_WORK
 ! auxury type for reading namelist.tra
 TYPE NML_TRACER_LIST_TYPE
         INTEGER                 :: ID         =-1
-        CHARACTER(len=4)        :: adv_hor    ='NONE'
-        CHARACTER(len=4)        :: adv_ver    ='NONE'
-        CHARACTER(len=4)        :: adv_lim    ='NONE'
+        CHARACTER(len=20)       :: adv_hor    ='NONE'
+        CHARACTER(len=20)       :: adv_ver    ='NONE'
+        CHARACTER(len=20)       :: adv_lim    ='NONE'
         REAL(kind=WP)           :: adv_ph     =1.
         REAL(kind=WP)           :: adv_pv     =1.
 END TYPE NML_TRACER_LIST_TYPE
