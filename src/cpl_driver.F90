@@ -164,7 +164,7 @@ include "associate_mesh_ass.h"
           !!!!!!! inner_node_contour
 include "node_contour_inner.h"
           if (pos_increment<0) then 
-             current_pos=nod_in_elem2D_num(n)+nod_in_elem2D_num(n)
+             current_pos=2*nod_in_elem2D_num(n)
           else
              current_pos =1
           end if
@@ -174,6 +174,7 @@ include "node_contour_inner.h"
              call elem_center(nelems(nn), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
              current_pos=current_pos+pos_increment
           end do
+          current_pos=2*nod_in_elem2D_num(n)+1
           do nn=current_pos, size(my_x_corners, 2)
              my_x_corners(n, nn)=my_x_corners(n, current_pos-1)
              my_y_corners(n, nn)=my_y_corners(n, current_pos-1)
@@ -190,18 +191,26 @@ include "node_contour_inner.h"
           nelems=0
           !!!!!!!boundary_node_contour
 include "node_contour_boundary.h"
+          if (pos_increment<0) then 
+             current_pos=2*nod_in_elem2D_num(n)+1
+          else
+             current_pos =1
+          end if
           do nn=1, nod_in_elem2D_num(n)
-             call edge_center(edges(1, nedges(nn)), edges(2, nedges(nn)), my_x_corners(n, (nn-1)*2+1), my_y_corners(n, (nn-1)*2+1), mesh)
-             call elem_center(nelems(nn), my_x_corners(n, (nn-1)*2+2), my_y_corners(n, (nn-1)*2+2), mesh)
+             call edge_center(edges(1, nedges(nn)), edges(2, nedges(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+             current_pos=current_pos+pos_increment
+             call elem_center(nelems(nn), my_x_corners(n, current_pos), my_y_corners(n, current_pos, mesh)
+             current_pos=current_pos+pos_increment
           end do
           nn=nod_in_elem2D_num(n)+1
-          call edge_center(edges(1, nedges(nn)), edges(2, nedges(nn)), my_x_corners(n, (nn-1)*2+1), my_y_corners(n, (nn-1)*2+1), mesh)
-!         nn=nod_in_elem2D_num(n)+2
-          my_x_corners(n, (nn-1)*2+2)=coord_nod2D(1,n)
-          my_y_corners(n, (nn-1)*2+2)=coord_nod2D(2,n)
-          do nn=nod_in_elem2D_num(n)*2+3, size(my_x_corners, 2)
-             my_x_corners(n, nn)=my_x_corners(n, nod_in_elem2D_num(n)*2+2)
-             my_y_corners(n, nn)=my_y_corners(n, nod_in_elem2D_num(n)*2+2)
+          call edge_center(edges(1, nedges(nn)), edges(2, nedges(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+          current_pos=current_pos+pos_increment
+          my_x_corners(n, current_pos)=coord_nod2D(1,n)
+          my_y_corners(n, current_pos)=coord_nod2D(2,n)
+          current_pos=2*nod_in_elem2D_num(n)+1
+          do nn=current_pos, size(my_x_corners, 2)
+             my_x_corners(n, nn)=my_x_corners(n, current_pos-1)
+             my_y_corners(n, nn)=my_y_corners(n, current_pos-1)
           end do
           !!!!!!!
           deallocate(nedges, nelems)
