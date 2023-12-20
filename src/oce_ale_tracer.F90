@@ -197,7 +197,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     
         ! DVD diagostic: store tracer (only temp and salt) from previouse time steps
         if ((ldiag_DVD) .and. (tr_num<=2)) then 
-            tracers%work%dvd_trold(:,:, tr_num) = tracers%data(tr_num)%values
+            tracers%work%dvd_trold(:,:, tr_num) = tracers%data(tr_num)%values(:,:)
         end if
         
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
