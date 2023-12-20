@@ -199,7 +199,7 @@ include "node_contour_boundary.h"
           do nn=1, nod_in_elem2D_num(n)
              call edge_center(edges(1, nedges(nn)), edges(2, nedges(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
              current_pos=current_pos+pos_increment
-             call elem_center(nelems(nn), my_x_corners(n, current_pos), my_y_corners(n, current_pos, mesh)
+             call elem_center(nelems(nn), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
              current_pos=current_pos+pos_increment
           end do
           nn=nod_in_elem2D_num(n)+1
