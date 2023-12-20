@@ -192,7 +192,7 @@ include "node_contour_inner.h"
           !!!!!!!boundary_node_contour
 include "node_contour_boundary.h"
           if (pos_increment<0) then 
-             current_pos=2*nod_in_elem2D_num(n)+2 !one more for the node n itself
+             current_pos=2*nod_in_elem2D_num(n)+2 !one more for the node n itself also we have 2 boundary edges
           else
              current_pos =1
           end if
@@ -226,6 +226,11 @@ include "node_contour_boundary.h"
            allocate(nelems1(nod_in_elem2D_num(n)))
            nelems=0
            nelems1=0
+           if (pos_increment<0) then 
+            current_pos=2*nod_in_elem2D_num(n)+4 !two more for the node n itself also we have 4 boundary edges
+           else
+            current_pos =1
+           end if
            !!!!!!!boundary_node_contour
 include "node_contour_boundary.h"
            where (nedges>0)
@@ -236,14 +241,18 @@ include "node_contour_boundary.h"
            end where
            nn1=nn
            do nn=1, nn1
-              call edge_center(edges(1, nedges1(nn)), edges(2, nedges1(nn)), my_x_corners(n, (nn-1)*2+1), my_y_corners(n, (nn-1)*2+1), mesh)
-              call elem_center(nelems1(nn), my_x_corners(n, (nn-1)*2+2), my_y_corners(n, (nn-1)*2+2), mesh)
+              call edge_center(edges(1, nedges1(nn)), edges(2, nedges1(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+              current_pos=current_pos+pos_increment
+              call elem_center(nelems1(nn), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+              current_pos=current_pos+pos_increment
            end do
            nn=nn1+1
-           call edge_center(edges(1, nedges1(nn)), edges(2, nedges1(nn)), my_x_corners(n, (nn-1)*2+1), my_y_corners(n, (nn-1)*2+1), mesh)
+           call edge_center(edges(1, nedges1(nn)), edges(2, nedges1(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+           current_pos=current_pos+pos_increment
            nn=nn1+2
-           my_x_corners(n, nn)=coord_nod2D(1,n)
-           my_y_corners(n, nn)=coord_nod2D(2,n)
+           my_x_corners(n, current_pos)=coord_nod2D(1,n)
+           my_y_corners(n, current_pos)=coord_nod2D(2,n)
+           current_pos=current_pos+pos_increment
            !!!!!!!
            elem=belem_left(2)
            allocate(nedges2(nod_in_elem2D_num(n)+1))
@@ -262,17 +271,20 @@ include "node_contour_boundary.h"
            end where
            nn2=nn
            do nn=nn1+3, nn1+nn2+2
-              call edge_center(edges(1, nedges2(nn)), edges(2, nedges2(nn)), my_x_corners(n, (nn-1)*2+1), my_y_corners(n, (nn-1)*2+1), mesh)
-              call elem_center(nelems2(nn), my_x_corners(n, (nn-1)*2+2), my_y_corners(n, (nn-1)*2+2), mesh)
+              call edge_center(edges(1, nedges2(nn)), edges(2, nedges2(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+              current_pos=current_pos+pos_increment
+              call elem_center(nelems2(nn), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+              current_pos=current_pos+pos_increment
            end do
            nn=nn1+nn2+3
-           call edge_center(edges(1, nedges2(nn)), edges(2, nedges2(nn)), my_x_corners(n, (nn-1)*2+1), my_y_corners(n, (nn-1)*2+1), mesh)
+           call edge_center(edges(1, nedges2(nn)), edges(2, nedges2(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+           current_pos=current_pos+pos_increment
            nn=nn1+nn2+4
            my_x_corners(n, nn)=coord_nod2D(1,n)
            my_y_corners(n, nn)=coord_nod2D(2,n)
-           do nn=nn1+nn2+5, size(my_x_corners, 2)
-              my_x_corners(n, nn)=my_x_corners(n, nn1+nn2+4)
-              my_y_corners(n, nn)=my_y_corners(n, nn1+nn2+4)
+           do nn=current_pos, size(my_x_corners, 2)
+              my_x_corners(n, nn)=my_x_corners(n, current_pos-1)
+              my_y_corners(n, nn)=my_y_corners(n, current_pos-1)
            end do
            !!!!!!!
            deallocate(nedges, nelems, nedges1, nelems1, nedges2, nelems2)
