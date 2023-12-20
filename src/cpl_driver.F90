@@ -192,7 +192,7 @@ include "node_contour_inner.h"
           !!!!!!!boundary_node_contour
 include "node_contour_boundary.h"
           if (pos_increment<0) then 
-             current_pos=2*nod_in_elem2D_num(n)+1
+             current_pos=2*nod_in_elem2D_num(n)+2 !one more for the node n itself
           else
              current_pos =1
           end if
