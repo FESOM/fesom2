@@ -109,6 +109,8 @@ contains
         integer,              dimension(2)    :: belem_left, belem_right
         integer                               :: edge_left, edge_right
         integer                               :: n, ee, elem, nn, el(2), flag, nn1, nn2
+        integer                               :: current_pos
+        integer                               :: pos_increment=-1 ! counter clockwise is negative, otherwise +1!
         integer, allocatable, dimension(:)    :: nedges, nelems, nedges1, nelems1, nedges2, nelems2
         real(kind=WP)                         :: this_x_coord, this_y_coord
 
@@ -161,13 +163,20 @@ include "associate_mesh_ass.h"
           nelems=0
           !!!!!!! inner_node_contour
 include "node_contour_inner.h"
+          if (pos_increment<0) then 
+             current_pos=nod_in_elem2D_num(n)+nod_in_elem2D_num(n)
+          else
+             current_pos =1
+          end if
           do nn=1, nod_in_elem2D_num(n)
-             call edge_center(edges(1, nedges(nn)), edges(2, nedges(nn)), my_x_corners(n, (nn-1)*2+1), my_y_corners(n, (nn-1)*2+1), mesh)
-             call elem_center(nelems(nn), my_x_corners(n, (nn-1)*2+2), my_y_corners(n, (nn-1)*2+2), mesh)
+             call edge_center(edges(1, nedges(nn)), edges(2, nedges(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+             current_pos=current_pos+pos_increment
+             call elem_center(nelems(nn), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+             current_pos=current_pos+pos_increment
           end do
-          do nn=nod_in_elem2D_num(n)*2+1, size(my_x_corners, 2)
-             my_x_corners(n, nn)=my_x_corners(n, nod_in_elem2D_num(n)*2)
-             my_y_corners(n, nn)=my_y_corners(n, nod_in_elem2D_num(n)*2)
+          do nn=current_pos, size(my_x_corners, 2)
+             my_x_corners(n, nn)=my_x_corners(n, current_pos-1)
+             my_y_corners(n, nn)=my_y_corners(n, current_pos-1)
           end do
           deallocate(nedges, nelems)
        end if
