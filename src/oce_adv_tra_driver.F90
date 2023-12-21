@@ -207,6 +207,33 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         !$ACC END PARALLEL LOOP
 !$OMP END PARALLEL DO
 
+        !_______________________________________________________________________
+        ! DVD diagostic: store low order horizontal and vertical tracer fluxes through mid 
+        ! edge faces and upper and lower scalar cell prism face. in case of FCT
+        if ((ldiag_DVD) .and. (tr_num<=2)) then 
+!OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz)
+            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+            do n=1, myDim_edge2D
+                !$ACC LOOP VECTOR
+                do nz=1, mesh%nl - 1
+                    tracers%work%dvd_trflx_hor(nz, n, tr_num) = adv_flux_hor(nz, n)
+                end do
+                !$ACC END LOOP
+            end do
+            !$ACC END PARALLEL LOOP
+            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+            do n=1, myDim_nod2D
+                !$ACC LOOP VECTOR
+                do nz=1, mesh%nl
+                    tracers%work%dvd_trflx_ver(nz, n, tr_num) = adv_flux_ver(nz, n)
+                end do
+                !$ACC END LOOP
+            end do
+            !$ACC END PARALLEL LOOP
+!$OMP END PARALLEL DO
+        end if 
+
+        !_______________________________________________________________________
         if (dynamics%use_wsplit) then !wvel/=wvel_e
             ! update for implicit contribution (w_split option)
             call adv_tra_vert_impl(dt, wi, fct_LO, partit, mesh)
@@ -276,9 +303,53 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     ! reconstruction value depending on horiz/vertical advection scheme. Only do 
     ! this for temperature and salinity
     if ((ldiag_DVD) .and. (tr_num<=2)) then 
-        tracers%work%dvd_trflx_hor(:,:,tr_num) = adv_flux_hor(:,:)
-        tracers%work%dvd_trflx_ver(:,:,tr_num) = adv_flux_ver(:,:)
-    end if 
+        !_______________________________________________________________________
+        if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
+!OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz)
+            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+            do n=1, myDim_edge2D
+                !$ACC LOOP VECTOR
+                do nz=1, mesh%nl-1
+                    tracers%work%dvd_trflx_hor(nz, n, tr_num) = tracers%work%dvd_trflx_hor(nz, n, tr_num) + adv_flux_hor(nz, n)
+                end do
+                !$ACC END LOOP
+            end do
+            !$ACC END PARALLEL LOOP
+            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+            do n=1, myDim_nod2D
+                !$ACC LOOP VECTOR
+                do nz=1, mesh%nl
+                    tracers%work%dvd_trflx_ver(nz, n, tr_num) = tracers%work%dvd_trflx_ver(nz, n, tr_num) + adv_flux_ver(nz, n)
+                end do
+                !$ACC END LOOP
+            end do
+            !$ACC END PARALLEL LOOP
+!$OMP END PARALLEL DO
+
+        !_______________________________________________________________________
+        else
+!OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz)
+            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+            do n=1, myDim_edge2D
+                !$ACC LOOP VECTOR
+                do nz=1, mesh%nl-1
+                    tracers%work%dvd_trflx_hor(nz, n, tr_num) = adv_flux_hor(nz, n)
+                end do
+                !$ACC END LOOP
+            end do
+            !$ACC END PARALLEL LOOP
+            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+            do n=1, myDim_nod2D
+                !$ACC LOOP VECTOR
+                do nz=1, mesh%nl
+                    tracers%work%dvd_trflx_ver(nz, n, tr_num) = adv_flux_ver(nz, n)
+                end do
+                !$ACC END LOOP
+            end do
+            !$ACC END PARALLEL LOOP
+!$OMP END PARALLEL DO
+        end if
+    end if !-->if ((ldiag_DVD) .and. (tr_num<=2)) then 
     
 end subroutine do_oce_adv_tra
 !
