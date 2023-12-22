@@ -705,6 +705,7 @@ subroutine write_mean(entry, entry_index)
   use g_PARSUP
   use io_gather_module
 #if defined (__hecubaio)
+  use g_config
   use mod_hecuba
   use iso_c_binding ! todo:use only what is used
 #endif
@@ -735,8 +736,8 @@ subroutine write_mean(entry, entry_index)
          call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
 ! hecuba IO
 #if defined (__hecubaio)
-         !WRITE (*,*), "sending  time ", entry%ctime_copy, entry%iostep
-         call write_array("exp24", trim(entry%name)//C_NULL_CHAR, entry%iostep , entry%mype_workaround, entry%ptr3, myDim_nod2D) 
+         !WRITE (*,*), "sending to hecuba", entry%ctime_copy, entry%iostep, trim(runid)
+         call write_array(trim(runid), trim(entry%name)//C_NULL_CHAR, entry%iostep , entry%mype_workaround, entry%ptr3, myDim_nod2D) 
 #endif
        else
          call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
