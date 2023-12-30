@@ -815,6 +815,7 @@ subroutine output(istep, mesh)
   use icedrv_main,    only: init_io_icepack
 #endif
 #if defined (__hecubaio)
+  use g_config
   use mod_hecuba
   use iso_c_binding, only: c_char, C_NULL_CHAR
 #endif
@@ -839,7 +840,7 @@ subroutine output(istep, mesh)
      call init_io_gather()
 #if defined (__hecubaio)
      !if(mype==0) then
-       call hecuba_start_session("exp24")
+       call hecuba_start_session(trim(runid))
      !end if
      call MPI_BARRIER(MPI_COMM_FESOM, ierr)
 #endif
