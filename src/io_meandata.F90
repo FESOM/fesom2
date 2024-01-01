@@ -737,7 +737,10 @@ subroutine write_mean(entry, entry_index)
 ! hecuba IO
 #if defined (__hecubaio)
          !WRITE (*,*), "sending to hecuba", entry%ctime_copy, entry%iostep, trim(runid)
-         call write_array(trim(runid), trim(entry%name)//C_NULL_CHAR, entry%iostep , entry%mype_workaround, entry%ptr3, myDim_nod2D) 
+         call write_array(trim(runid), trim(entry%name)//C_NULL_CHAR, entry%iostep, entry%mype_workaround, entry%ptr3, myDim_nod2D) 
+         if (mype==entry%root_rank) then 
+                call write_time(trim(runid), entry%iostep, entry%ctime_copy)
+         end if
 #endif
        else
          call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
@@ -828,6 +831,7 @@ subroutine output(istep, mesh)
   type(Meandata), pointer :: entry
   type(t_mesh), intent(in) , target :: mesh
   character(:), allocatable :: filepath
+  character*10   :: npes_string
   real(real64)                  :: rtime !timestamp of the record
 
   ctime=timeold+(dayold-1.)*86400
@@ -841,7 +845,8 @@ subroutine output(istep, mesh)
 #if defined (__hecubaio)
      call hecuba_start_session(trim(runid))
      if(mype==0) then
-       !call hecuba_set_metadata(trim(runid),"chunks","2")
+       write(npes_string,"(I10)") npes
+       call hecuba_set_metadata(trim(runid),"chunks",trim(npes_string)//c_null_char)
      end if
      call MPI_BARRIER(MPI_COMM_FESOM, ierr)
 #endif

@@ -41,8 +41,23 @@ void setExpMetaData(const char * expname, const char * key, const char * value_s
 void sendMetricsToHecuba(const char * expname, const char * varname, int32_t timestep_i, int32_t chunk_id, void *data, uint32_t metadata) {
     StorageNumpy metrics_data(data,{metadata,1}); // instantiates a StorageNumpy with the specified info
 
+
     std::string generatedName = "";
-    generatedName = generatedName + expname + "/" + varname + "/" +std::to_string(timestep_i) + "/" +std::to_string(chunk_id); //random_generated_name();
+    generatedName += expname;
+    generatedName += "/";
+    generatedName += varname;
+    // Add the timestep_i to generatedName only if it is not -1
+    if (timestep_i != -1) {
+        generatedName += "/";
+        generatedName += std::to_string(timestep_i);
+    }
+
+    // Add the chunk_id to generatedName only if it is not -1
+    if (chunk_id != -1) {
+        generatedName += "/";
+        generatedName += std::to_string(chunk_id);
+    }
+
     metrics_data.make_persistent(generatedName);  // in future releases this make_persistent will be implicit as part
 					// of the assignment to a persistent object (the metricsDict)
     StrKeyClass k = StrKeyClass("/"+generatedName);
