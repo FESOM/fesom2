@@ -30,12 +30,12 @@ void initHecubaSession(const char * expname) {
     metrics.make_persistent(exp_vardict); 	//creates the tables in Cassandra. Generates a python file with the class sp
 } 
 
-void setExpMetaData(std::string expname, std::string key, std::string value) {
-    std::cout<< "+ here in set metadata"<<std::endl;
+void setExpMetaData(const char * expname, const char * key, const char * value_str) {
+    std::cout<< "+ setting metadata"<<std::endl;
     StrKeyClass ky = StrKeyClass(key);
-    StrValueClass kv = StrValueClass(value);
+    StrValueClass kv = StrValueClass(value_str);
     md[ky]=kv;
-    std::cout<< "+ end here in set metadata"<<std::endl;
+    std::cout<< "+ set "<<key<<": "<<value_str<<std::endl;
    }	
 
 void sendMetricsToHecuba(const char * expname, const char * varname, int32_t timestep_i, int32_t chunk_id, void *data, uint32_t metadata) {

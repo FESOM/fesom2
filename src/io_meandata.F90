@@ -839,9 +839,10 @@ subroutine output(istep, mesh)
 #endif
      call init_io_gather()
 #if defined (__hecubaio)
-     !if(mype==0) then
-       call hecuba_start_session(trim(runid))
-     !end if
+     call hecuba_start_session(trim(runid))
+     if(mype==0) then
+       !call hecuba_set_metadata(trim(runid),"chunks","2")
+     end if
      call MPI_BARRIER(MPI_COMM_FESOM, ierr)
 #endif
 

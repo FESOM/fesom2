@@ -1,11 +1,11 @@
 module mod_hecuba
 implicit none
 interface
-        subroutine hecuba_start_session(expname) &
+     subroutine hecuba_start_session(expname) &
                         bind(C, name="initHecubaSession")
               use iso_c_binding, only: c_char 
               character(kind=c_char) :: expname(*)
-        end subroutine hecuba_start_session
+      end subroutine hecuba_start_session
       subroutine write_array(expname, varname, timestep, chunk, cdata, arr_size) &
                     bind(c,name="sendMetricsToHecuba")
               use iso_c_binding, only: c_char, c_int, c_ptr, c_float, c_double 
@@ -17,6 +17,14 @@ interface
               integer(kind=c_int),value :: arr_size
 
       end subroutine write_array
+      subroutine hecuba_set_metadata(expname, key, value_str) &
+                      bind(c,name="setExpMetaData")
+              use iso_c_binding, only: c_char 
+              character(kind=c_char) :: expname(*)
+              character(kind=c_char) :: key(*)
+              character(kind=c_char) :: value_str(*)
+      end subroutine hecuba_set_metadata
+
 end interface
 
 end module
