@@ -846,7 +846,7 @@ subroutine output(istep, mesh)
      call hecuba_start_session(trim(runid))
      if(mype==0) then
        write(npes_string,"(I10)") npes
-       call hecuba_set_metadata(trim(runid),"chunks",trim(npes_string)//c_null_char)
+       call hecuba_set_metadata(trim(runid),"chunks",trim(adjustl(npes_string))//c_null_char)
      end if
      call MPI_BARRIER(MPI_COMM_FESOM, ierr)
 #endif
