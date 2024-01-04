@@ -22,12 +22,14 @@ class MetaDictClass: public StorageDict <StrKeyClass,StrValueClass, MetaDictClas
 // static shared across a session	
 static MetaDictClass md;
 static metricsDict metrics;
+static bool datamodel_loaded = false;
 
 void initHecubaSession(const char * expname) {
     md.make_persistent(expname);
     std::string exp_vardict = "";
     exp_vardict = exp_vardict + expname + "_variables" ;//"aa"+"_variables";
     metrics.make_persistent(exp_vardict); 	//creates the tables in Cassandra. Generates a python file with the class sp
+    datamodel_loaded = true;
 } 
 
 void setExpMetaData(const char * expname, const char * key, const char * value_str) {
@@ -39,6 +41,13 @@ void setExpMetaData(const char * expname, const char * key, const char * value_s
    }	
 
 void sendMetricsToHecuba(const char * expname, const char * varname, int32_t timestep_i, int32_t chunk_id, void *data, uint32_t metadata) {
+    if (not datamodel_loaded) {
+      std::string expid = "";
+      expid += expname;
+      expid +="_variables";
+      metrics.getByAlias(expid);
+      datamodel_loaded = true;
+    }
     StorageNumpy metrics_data(data,{metadata,1}); // instantiates a StorageNumpy with the specified info
 
 
