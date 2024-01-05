@@ -42,13 +42,13 @@ elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  albedo )
    message(STATUS "multithreading disabled for Albedo") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 else()
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
+   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 endif()
 
 option(ENABLE_OPENACC "compile with OpenACC support" OFF)
 option(DISABLE_OPENACC_ATOMICS "disable kernels using atomic statement for reproducible results" ON)
 set(GPU_COMPUTE_CAPABILITY "cc80" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
-set(GPU_FLAGS "cuda11.7,${GPU_COMPUTE_CAPABILITY}" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
+set(GPU_FLAGS "cuda12.2,${GPU_COMPUTE_CAPABILITY}" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
 
 option(ENABLE_OPENMP "build FESOM with OpenMP" OFF)
 if(${ENABLE_OPENMP})
