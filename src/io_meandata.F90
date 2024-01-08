@@ -739,7 +739,7 @@ subroutine write_mean(entry, entry_index)
          !WRITE (*,*), "sending to hecuba", entry%ctime_copy, entry%iostep, trim(runid)
          call write_array(trim(runid)//C_NULL_CHAR, trim(entry%name)//C_NULL_CHAR, entry%iostep, entry%mype_workaround, entry%ptr3, myDim_nod2D) 
          if (mype==entry%root_rank) then 
-                call write_time(trim(runid), entry%iostep, entry%ctime_copy)
+              call write_time(trim(runid)//C_NULL_CHAR, entry%iostep, entry%ctime_copy)
          end if
 #endif
        else
@@ -846,7 +846,7 @@ subroutine output(istep, mesh)
      if(mype==0) then
        call hecuba_start_session(trim(runid)//c_null_char)
        write(npes_string,"(I10)") npes
-       call hecuba_set_metadata(trim(runid),"chunks",trim(adjustl(npes_string))//c_null_char)
+       call hecuba_set_metadata(trim(runid)//c_null_char,"chunks"//c_null_char,trim(adjustl(npes_string))//c_null_char)
      end if
      call MPI_BARRIER(MPI_COMM_FESOM, ierr)
 #endif
