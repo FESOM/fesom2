@@ -25,10 +25,10 @@ MODULE g_ic3d
 
    public  do_ic3d, &                                       ! read and apply 3D initial conditions
            n_ic3d, idlist, filelist, varlist, oce_init3d, & ! to be read from the namelist
-           t_insitu
+           t_insitu, oce_perturb, lperturb, temp_perturb, salt_perturb
    private
-
-! namelists
+   
+   ! namelists
    integer, save  :: nm_ic_unit     = 103       ! unit to open namelist file
 !============== namelistatmdata variables ================
    integer, parameter                           :: ic_max=10
@@ -41,6 +41,26 @@ MODULE g_ic3d
 
    namelist / oce_init3d / n_ic3d, idlist, filelist, varlist, t_insitu
 
+!============= pertubarion to IC variables ================
+   logical                                      :: lperturb = .false.
+   type perturb_entry
+   !INTEGER           :: variable_index ! which variable we perturb 1 for temp and 2 for salt
+                                              ! currently only temp and salinity are allowed (see perturb_list(2) below)
+                                              ! should be easy to extend to other tracers and flexibily based on varlist
+                                              ! todo check index passed should be >0
+   real(WP)                 :: min_val
+   real(WP)                 :: max_val
+                                       !add level to perturb? ! doing same amount of perturb> epsilon to all ocean is a bad idea
+                                       !character(15)            :: method = "uniform" ! or constant
+                                                          ! in case of constant only min_val is used and applied as const perturbation
+                                                          ! not used
+   end type
+   real(WP)                 :: min_val
+   real(WP)                 :: max_val
+   type(perturb_entry),save   :: temp_perturb = perturb_entry(0.0,0.0)
+   type(perturb_entry),save   :: salt_perturb = perturb_entry(0.0,0.0)
+   namelist / oce_perturb / lperturb, temp_perturb, salt_perturb
+!==========================================================
    character(MAX_PATH), save                    :: filename
    character(50),  save                         :: varname
    integer,        save                         :: current_tracer
@@ -580,9 +600,57 @@ CONTAINS
       call MPI_AllREDUCE(locSmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
       if (mype==0) write(*,*) '  `-> gobal min init. salt. =', glo
       
-  
+      ! use here or in oce_setup, probably more elegant
+      if (lperturb) then 
+         call do_perturb(mesh)
+      end if 
    END SUBROUTINE do_ic3d
    
+   SUBROUTINE do_perturb(mesh)
+        IMPLICIT NONE
+        type(t_mesh), intent(in), target :: mesh
+        integer                          :: n,ii
+        real(WP)                         :: rnum
+
+        if (mype==0) write(*,*) 'Perturbing initial conditions: ', lperturb
+        ! inconsistent naming tr_arr(:,:, indx) [temp, salt] and varlist(indx) [salt, temp] so dont be so generic for now, raise issue
+        !do ii=1,size(perturb_list)
+        !   if (mype==0) write(*,*) 'Perturbing variable (all levels): ', trim(varlist(perturb_list(ii)%variable_index)), &
+        !           ' with uniform random perturbation in range: ', perturb_list(ii)%min_val, ' - ', perturb_list(ii)%max_val
+        !end do
+
+        if (mype==0) write(*,*) 'Perturbing temp at all levels with a uniform random perturbation in range: ' &
+                                     , temp_perturb%min_val, ' - ', temp_perturb%max_val
+        if (mype==0) write(*,*) 'Perturbing salt at all levels with a uniform random perturbation in range: ' &
+                                     , salt_perturb%min_val, ' - ', salt_perturb%max_val
+
+        do ii=1, 2
+          do n=1,myDim_nod2d
+            if (ii==1) then
+              min_val = temp_perturb%min_val
+              max_val = temp_perturb%max_val
+            else
+              if (ii==2) then
+               min_val = salt_perturb%min_val
+               max_val = salt_perturb%max_val
+              end if
+            end if
+            call gen_uniform(rnum, min_val, max_val ) ! may be better to get array of rnums
+                                                            !instead of one ? or if taken out of loop will get one random number per pe
+            tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,ii) = &
+                                                tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,ii) + rnum
+          end do
+        end do
+        ! sync halos
+        call exchange_nod(tr_arr(:,:,1))
+        call exchange_nod(tr_arr(:,:,2)) ! may be use all tracers or do a better check which were changed
+
+        if (mype==0) write(*,*) 'Reprinting initial condition diagnostics after perturbation: '
+
+        !call check_initial_conditions(mesh) ! reprint diagnostic information after perturbation
+
+        if (mype==0) write(*,*) 'DONE: Perturbing initial conditions'
+   END SUBROUTINE do_perturb 
    SUBROUTINE err_call(iost,fname)
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE  err_call ***
@@ -653,4 +721,18 @@ CONTAINS
       ind = right
 
    END SUBROUTINE binarysearch
+   SUBROUTINE random_gen(rnum)
+     real(WP), intent(out) :: rnum
+     call random_number(rnum)
+     rnum = rnum
+   END SUBROUTINE random_gen
+
+   SUBROUTINE gen_uniform(rnum, min_val, max_val )
+     real(WP), intent(out) :: rnum
+     real(WP), intent(in)  :: min_val, max_val
+     real(WP)              :: rtemp
+     call random_number(rtemp)                 ! todo seeding to control rnum
+     rnum =(max_val-min_val)*rtemp + min_val ! assuming min_val<max_val
+                                             ! scale [0,1) random number to that of [min_val,max_val)
+   END SUBROUTINE gen_uniform
 END MODULE g_ic3d
