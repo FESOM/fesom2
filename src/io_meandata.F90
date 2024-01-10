@@ -833,7 +833,6 @@ subroutine output(istep, mesh)
   character(:), allocatable :: filepath
   character*10   :: npes_string
   real(real64)                  :: rtime !timestamp of the record
-
   ctime=timeold+(dayold-1.)*86400
   if (lfirst) then
      call ini_mean_io(mesh)
@@ -847,8 +846,10 @@ subroutine output(istep, mesh)
        call hecuba_start_session(trim(runid)//c_null_char)
        write(npes_string,"(I10)") npes
        call hecuba_set_metadata(trim(runid)//c_null_char,"chunks"//c_null_char,trim(adjustl(npes_string))//c_null_char)
+       !call hecuba_set_metadata(trim(runid)//c_null_char,"prune"//c_null_char,"false"//c_null_char)
      end if
      call MPI_BARRIER(MPI_COMM_FESOM, ierr)
+
 #endif
 
   end if

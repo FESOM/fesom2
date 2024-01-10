@@ -20,7 +20,7 @@ using StrValueClass = ValueClass<std::string>;// to store metadata
 class MetaDictClass: public StorageDict <StrKeyClass,StrValueClass, MetaDictClass> { };
 
 // static shared across a session	
-static MetaDictClass md;
+MetaDictClass md;
 static metricsDict metrics;
 static bool datamodel_loaded = false;
 
@@ -32,11 +32,54 @@ void initHecubaSession(const char * expname) {
     datamodel_loaded = true;
 } 
 
+//void getPruneState(const char* expname, char* output) { 
+//   MetaDictClass mdd;
+//   mdd.getByAlias(expname);
+//  StrValueClass v;
+//   std::string prune_str = "prune";
+//   StrKeyClass kyy = StrKeyClass(prune_str);
+//   v = mdd[kyy];
+//   //std::cout<<"valss"<<StrValueClass::get<0>(v)<<std::endl;
+//   //std::cout<< "+ prune state "<<std::string(result0)<<std::endl;
+//  // StrValueClass result = md[ky];
+//  // std::cout<< "+ prune state "<<result<<std::endl;
+//   std::string result = StrValueClass::get<0>(v);
+//   std::strcpy(output,result.c_str());
+//}
+
+//getPruneState returns true or false based on if prune key exists in metadata
+//prune key can be set from python analysis
+//silly to use string, bool is better choice but using it for now
+void getPruneState(const char* expname, char* output) { 
+     MetaDictClass mdd;
+     mdd.getByAlias(expname);
+     StrKeyClass pr;
+     std::string kn;
+     std::string prune_str="prune";	
+     bool prune=false;
+     for(auto it = mdd.begin(); it != mdd.end(); it++) {
+	pr = *it;
+	kn = StrKeyClass::get<0>(pr);
+	if (strcmp("prune",kn.c_str())==0) {
+	   prune=true;
+	   break;
+	}
+     }
+     if (prune) {
+	std::strcpy(output,"true"); 
+     } else {
+	std::strcpy(output,"false"); 
+     }	     
+     std::cout<<"+ Hecuba: Got prune key"<<output<<std::endl;
+}
+
 void setExpMetaData(const char * expname, const char * key, const char * value_str) {
     std::cout<< "+ setting metadata"<<std::endl;
+    MetaDictClass mdd;
+    mdd.getByAlias(expname);
     StrKeyClass ky = StrKeyClass(key);
     StrValueClass kv = StrValueClass(value_str);
-    md[ky]=kv;
+    mdd[ky]=kv;
     std::cout<< "+ set "<<key<<": "<<value_str<<std::endl;
    }	
 
