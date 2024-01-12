@@ -197,7 +197,7 @@ contains
         endif
         
         if (f%mype==0) f%t5=MPI_Wtime()
-        call compute_diagnostics(0, f%dynamics, f%tracers, f%partit, f%mesh) ! allocate arrays for diagnostic
+        call compute_diagnostics(0, f%dynamics, f%tracers, f%ice, f%partit, f%mesh) ! allocate arrays for diagnostic
 #if defined (__oasis)
         call cpl_oasis3mct_define_unstr(f%partit, f%mesh)
         if(f%mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
@@ -430,7 +430,7 @@ write(0,*) 'f%from_nstep before the loop:', f%from_nstep
         f%t3 = MPI_Wtime()
         !___compute energy diagnostics..._______________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call compute_diagnostics(1)'//achar(27)//'[0m'
-        call compute_diagnostics(1, f%dynamics, f%tracers, f%partit, f%mesh)
+        call compute_diagnostics(1, f%dynamics, f%tracers, f%ice, f%partit, f%mesh)
 
         f%t4 = MPI_Wtime()
         !___prepare output______________________________________________________
