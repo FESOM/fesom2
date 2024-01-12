@@ -655,9 +655,11 @@ END DO ! --> DO i=1, io_listsize
     end if
     !___________________________________________________________________________
     ! output Redi parameterisation
+#if !defined(__MULTIO)
     if (Redi) then
         call def_stream((/nl-1  , nod2D /), (/nl-1,   myDim_nod2D /), 'Redi_K',   'Redi diffusion coefficient', 'm2/s', Ki(:,:),    1, 'y', i_real4, partit, mesh)
     end if
+#endif
 
     !___________________________________________________________________________
     ! output Monin-Obukov (TB04) mixing length

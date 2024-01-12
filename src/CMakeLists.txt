@@ -183,7 +183,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
-if(ENABLE_OPENMP AND NOT ${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray)
+if(ENABLE_OPENMP)
    target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_Fortran)
 endif()
 
