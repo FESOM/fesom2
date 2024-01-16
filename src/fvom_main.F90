@@ -36,7 +36,7 @@ use cpl_driver
 
 #if defined (__hecubaio)
 use mod_hecuba
-use iso_c_binding, only:c_char, c_null_char
+use iso_c_binding, only:c_char, c_null_char, c_bool
 #endif
 IMPLICIT NONE
 
@@ -52,8 +52,7 @@ type(t_mesh),             target, save :: mesh
 character(LEN=MPI_MAX_LIBRARY_VERSION_STRING) :: mpi_version_txt
 integer mpi_version_len
 #if defined (__hecubaio)
-  character(kind=c_char,len=8) :: prune_str=""
-  logical                :: prune=.false.
+  logical(kind=c_bool)   :: prune=.false.
 #endif
 
 
@@ -277,10 +276,7 @@ integer mpi_version_len
         
 #if defined (__hecubaio)
         if (mype==0) then
-           call get_prune_state(trim(runid)//c_null_char, prune_str)
-           if (adjustl(trim(prune_str))=="true"//c_null_char) then
-             prune=.true.
-           endif
+           call get_prune_state(trim(runid)//c_null_char, prune)
         endif
         
         call MPI_BCAST(prune, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, MPIERR)
@@ -289,7 +285,7 @@ integer mpi_version_len
 #endif
     end do
 #if defined (__hecubaio)
-    if (mype==0 .and. prune) write(*,*) "Prune got called finishing experiment", runid 
+    if (mype==0 .and. prune) write(*,*) "Prune got called finishing the experiment: ", runid 
 #endif
     call finalize_output()
     

@@ -7,7 +7,7 @@ extern "C" {
  
 void initHecubaSession(const char * expname);
 void sendMetricsToHecuba(const char * expname, const char * varname, int32_t timestep, int32_t chunk_id, void *data, int32_t metadata);
-void getPruneState(const char * expname, char * state);
+void getPruneState(const char * expname, bool* output);
 
 #ifdef __cplusplus
 }

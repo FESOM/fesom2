@@ -38,9 +38,9 @@ module mod_hecuba
       end subroutine hecuba_set_metadata
       
       subroutine get_prune_state(expname, state) bind(C, name="getPruneState")
-            use iso_c_binding, only: c_char 
-            character(kind=c_char), intent(in) :: expname(*)
-            character(kind=c_char), intent(out) :: state(*)
+            use iso_c_binding, only: c_char, c_bool
+            character(kind=c_char),intent(in) :: expname(*)
+            logical(kind=c_bool),intent(out)   :: state
       end subroutine get_prune_state
 
   end interface

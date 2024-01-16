@@ -50,7 +50,7 @@ void initHecubaSession(const char * expname) {
 //getPruneState returns true or false based on if prune key exists in metadata
 //prune key can be set from python analysis
 //silly to use string, bool is better choice but using it for now
-void getPruneState(const char* expname, char* output) { 
+void getPruneState(const char* expname, bool* output) { 
      MetaDictClass mdd;
      mdd.getByAlias(expname);
      StrKeyClass pr;
@@ -65,12 +65,7 @@ void getPruneState(const char* expname, char* output) {
 	   break;
 	}
      }
-     if (prune) {
-	std::strcpy(output,"true"); 
-     } else {
-	std::strcpy(output,"false"); 
-     }	     
-     std::cout<<"+ Hecuba: Got prune key"<<output<<std::endl;
+     *output=prune; 
 }
 
 void setExpMetaData(const char * expname, const char * key, const char * value_str) {
