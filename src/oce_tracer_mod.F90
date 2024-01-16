@@ -24,12 +24,19 @@ SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_tracer), intent(inout), target :: tracers
     integer                               :: n,nz 
+    
+!$ACC parallel loop collapse(2) default(present) async(1)
+do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+       do nz=1, mesh%nl-1
+       ! del_ttf will contain all advection / diffusion contributions for this tracer. Set it to 0 at the beginning!
+       tracers%work%del_ttf          (nz, n) = 0.0_WP
+       tracers%work%del_ttf_advhoriz (nz, n) = 0.0_WP
+       tracers%work%del_ttf_advvert  (nz, n) = 0.0_WP
+       end do
+end do
+!$ACC end parallel loop
 !$OMP PARALLEL DO
     do n=1, partit%myDim_nod2D+partit%eDim_nod2D
-       ! del_ttf will contain all advection / diffusion contributions for this tracer. Set it to 0 at the beginning!
-       tracers%work%del_ttf          (:, n) = 0.0_WP
-       tracers%work%del_ttf_advhoriz (:, n) = 0.0_WP
-       tracers%work%del_ttf_advvert  (:, n) = 0.0_WP
        ! AB interpolation
        tracers%data(tr_num)%valuesAB(:, n)  =-(0.5_WP+epsilon)*tracers%data(tr_num)%valuesAB(:, n)+(1.5_WP+epsilon)*tracers%data(tr_num)%values(:, n)
     end do
