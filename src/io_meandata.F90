@@ -88,7 +88,10 @@ module io_MEANDATA
   subroutine destructor(this)
     type(Meandata), intent(inout) :: this
     ! EO args
+
+#if defined (__netcdfout)
     call assert_nf(nf_close(this%ncid), __LINE__)
+#endif
   end subroutine
 
 
@@ -720,7 +723,9 @@ subroutine write_mean(entry, entry_index)
   ! Serial output implemented so far
   if (mype==entry%root_rank) then
      write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
+#if defined (__netcdfout)
      call assert_nf( nf_put_vara_double(entry%ncid, entry%Tid, entry%rec_count, 1, entry%ctime_copy, 1), __LINE__)
+#endif
   end if
 ! !_______writing 2D and 3D fields________________________________________________
   size1=entry%glsize(1)
@@ -733,7 +738,9 @@ subroutine write_mean(entry, entry_index)
      end if
      do lev=1, size1
        if(.not. entry%is_elem_based) then
+#if defined (__netcdfout)
          call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
+#endif
 ! hecuba IO
 #if defined (__hecubaio)
          !WRITE (*,*), "sending to hecuba", entry%ctime_copy, entry%iostep, trim(runid)
@@ -743,8 +750,11 @@ subroutine write_mean(entry, entry_index)
          end if
 #endif
        else
+#if defined (__netcdfout)
          call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
+#endif
        end if
+#if defined (__netcdfout)
         if (mype==entry%root_rank) then
           if (entry%ndim==1) then
             call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r8, 1), __LINE__)
@@ -752,6 +762,7 @@ subroutine write_mean(entry, entry_index)
             call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r8, 1), __LINE__)
           end if
         end if
+#endif
 
      end do
 
@@ -762,10 +773,15 @@ subroutine write_mean(entry, entry_index)
      end if
      do lev=1, size1
        if(.not. entry%is_elem_based) then
+#if defined (__netcdfout)
          call gather_real4_nod2D (entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm)
+#endif
        else
+#if defined (__netcdfout)
          call gather_real4_elem2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm)
+#endif
        end if
+#if defined (__netcdfout)
         if (mype==entry%root_rank) then
            if (entry%ndim==1) then
              call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r4, 1), __LINE__)
@@ -773,6 +789,7 @@ subroutine write_mean(entry, entry_index)
              call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r4, 1), __LINE__)
            end if
         end if
+#endif
      end do
   end if
 
@@ -890,6 +907,7 @@ subroutine output(istep, mesh)
         entry%iostep = entry%iostep+1 ! added new SUVI to track only io steps
         filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
         if(mype == entry%root_rank) then
+#if defined (__netcdfout)
           if(filepath /= trim(entry%filename)) then
             if("" /= trim(entry%filename)) call assert_nf(nf_close(entry%ncid), __LINE__)   
             entry%filename = filepath
@@ -900,10 +918,13 @@ subroutine output(istep, mesh)
             end if
             call assoc_ids(entry)
           end if
+#endif
 
           !___if the time rtime at the rec_count is larger than ctime we look for the closest record with the timestamp less than ctime
           do k=entry%rec_count, 1, -1
+#if defined (__netcdfout)
              call assert_nf( nf_get_vara_double(entry%ncid, entry%tID, k, 1, rtime, 1), __LINE__)
+#endif
              if (ctime > rtime) then
                 entry%rec_count=k+1
                 exit ! a proper rec_count detected, exit the loop
@@ -947,7 +968,10 @@ use mod_mesh
   mype=entry%mype_workaround ! for the thread callback, copy back the value of our mype as a workaround for errors with the cray envinronment (at least with ftn 2.5.9 and cray-mpich 7.5.3)
 
   call write_mean(entry, entry_index)
+  
+#if defined (__netcdfout)
   if(mype == entry%root_rank) call assert_nf( nf_sync(entry%ncid), __LINE__ ) ! flush the file to disk after each write
+#endif
 end subroutine
 
 
@@ -955,11 +979,13 @@ subroutine finalize_output()
   integer i
   type(Meandata), pointer :: entry
 
+#if defined (__netcdfout)
   do i=1, io_NSTREAMS
     entry=>io_stream(i)
     if(entry%thread_running) call entry%thread%join()
     entry%thread_running = .false.    
   end do
+#endif
 end subroutine
 !
 !--------------------------------------------------------------------------------------------
