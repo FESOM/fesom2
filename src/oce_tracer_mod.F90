@@ -25,7 +25,7 @@ SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
     type(t_tracer), intent(inout), target :: tracers
     integer                               :: n,nz 
     
-!$ACC parallel loop collapse(2) default(present) async(1)
+!$ACC parallel loop collapse(2) default(present) !!!async(1)
 do n=1, partit%myDim_nod2D+partit%eDim_nod2D
        do nz=1, mesh%nl-1
        ! del_ttf will contain all advection / diffusion contributions for this tracer. Set it to 0 at the beginning!

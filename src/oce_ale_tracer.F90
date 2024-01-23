@@ -192,8 +192,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 
     !___________________________________________________________________________
     ! loop over all tracers
-        !$ACC UPDATE DEVICE(dynamics%w, dynamics%w_e, dynamics%uv) async(1) 
-        !$ACC UPDATE DEVICE(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus)
+        !$ACC UPDATE DEVICE(dynamics%w, dynamics%w_e, dynamics%uv) !!! async(1) 
+!!!     !$ACC UPDATE DEVICE(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus)
         !$ACC UPDATE DEVICE (mesh%helem, mesh%hnode, mesh%hnode_new, mesh%zbar_3d_n, mesh%z_3d_n)
     do tr_num=1, tracers%num_tracers
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
@@ -213,8 +213,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         call do_oce_adv_tra(dt, UV, Wvel, Wvel_i, Wvel_e, tr_num, dynamics, tracers, partit, mesh)
 
 
-        !$ACC UPDATE  HOST(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB) &
-        !$ACC  HOST(tracers%work%del_ttf, tracers%work%del_ttf_advhoriz, tracers%work%del_ttf_advvert)
+        !$ACC UPDATE HOST(tracers%work%del_ttf, tracers%work%del_ttf_advhoriz, tracers%work%del_ttf_advvert)
         !___________________________________________________________________________
         ! update array for total tracer flux del_ttf with the fluxes from horizontal
         ! and vertical advection
@@ -246,8 +245,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
 !$OMP BARRIER
     end do
-        !$ACC UPDATE HOST (tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus) &
-        !$ACC HOST  (tracers%work%edge_up_dn_grad)
+!!!        !$ACC UPDATE HOST (tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus) &
+!!!        !$ACC HOST  (tracers%work%edge_up_dn_grad)
 
     !___________________________________________________________________________
     ! 3D restoring for "passive" tracers

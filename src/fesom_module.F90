@@ -306,11 +306,11 @@ contains
     !$ACC ENTER DATA COPYIN (f%partit, f%partit%eDim_nod2D, f%partit%myDim_edge2D) 
     !$ACC ENTER DATA COPYIN (f%partit%myDim_elem2D, f%partit%myDim_nod2D, f%partit%myList_edge2D) 
 
-    !$ACC ENTER DATA COPYIN (f%mesh%helem, f%mesh%elem_cos, f%mesh%edge_cross_dxdy, f%mesh%elem2d_nodes, f%mesh%nl) 
+    !$ACC ENTER DATA COPYIN (f%mesh%elem_cos, f%mesh%edge_cross_dxdy, f%mesh%elem2d_nodes, f%mesh%nl) 
     !$ACC ENTER DATA COPYIN (f%mesh%nlevels_nod2D, f%mesh%nod_in_elem2D, f%mesh%nod_in_elem2D_num) 
-    !$ACC ENTER DATA COPYIN (f%mesh%edge_dxdy, f%mesh%nlevels, f%mesh%hnode, f%mesh%hnode_new, f%mesh%ulevels_nod2D_max) 
-    !$ACC ENTER DATA COPYIN (f%mesh%zbar_3d_n, f%mesh%z_3d_n, f%mesh%areasvol, f%mesh%nlevels_nod2D_min) 
-    
+    !$ACC ENTER DATA COPYIN (f%mesh%edge_dxdy, f%mesh%nlevels, f%mesh%ulevels_nod2D_max) 
+    !$ACC ENTER DATA COPYIN (f%mesh%areasvol, f%mesh%nlevels_nod2D_min) 
+    !$ACC ENTER DATA CREATE (f%mesh%helem, f%mesh%hnode, f%mesh%hnode_new, f%mesh%zbar_3d_n, f%mesh%z_3d_n)
     !do n=f%from_nstep, f%from_nstep-1+current_nsteps
     !$ACC ENTER DATA COPYIN  (f%ice)
     !$ACC ENTER DATA CREATE  (f%ice%data, f%ice%work, f%ice%work%fct_massmatrix) 
@@ -320,7 +320,7 @@ contains
     !$ACC ENTER DATA CREATE  (f%ice%work%eps11, f%ice%work%eps12, f%ice%work%eps22) 
     !$ACC ENTER DATA CREATE  (f%ice%work%sigma11, f%ice%work%sigma12, f%ice%work%sigma22) 
     !$ACC ENTER DATA CREATE  (f%ice%work%ice_strength, f%ice%stress_atmice_x, f%ice%stress_atmice_y) 
-    !$ACC ENTER DATA CREATE  (f%ice%thermo%rhosno, f%ice%thermo%rhoice, f%ice%thermo%inv_rhowat) 
+    !$ACC ENTER DATA COPYIN  (f%ice%thermo%rhosno, f%ice%thermo%rhoice, f%ice%thermo%inv_rhowat) 
     !$ACC ENTER DATA CREATE  (f%ice%srfoce_ssh, f%ice%pstar, f%ice%c_pressure) 
     !$ACC ENTER DATA CREATE  (f%ice%work%inv_areamass, f%ice%work%inv_mass, f%ice%uice_rhs, f%ice%vice_rhs) 
     !$ACC ENTER DATA CREATE  (f%ice%uice, f%ice%vice, f%ice%srfoce_u, f%ice%srfoce_v, f%ice%uice_old, f%ice%vice_old) 
@@ -334,15 +334,16 @@ contains
 #endif
     !$ACC ENTER DATA COPYIN (f%dynamics)
     !$ACC ENTER DATA CREATE (f%dynamics%w, f%dynamics%w_e, f%dynamics%uv)
-    !$ACC ENTER DATA COPYIN (f%tracers)
+    !$ACC ENTER DATA CREATE (f%tracers%work%del_ttf)
     !$ACC ENTER DATA CREATE (f%tracers%data, f%tracers%work) 
     do tr_num=1, f%tracers%num_tracers
-    !$ACC ENTER DATA CREATE (f%tracers%data(tr_num)%values, f%tracers%data(tr_num)%valuesAB) 
+    !$ACC ENTER DATA CREATE (f%tracers%data(tr_num)%values, f%tracers%data(tr_num)%valuesAB)
+    !$ACC ENTER DATA CREATE (f%tracers%data(tr_num)%tra_adv_ph, f%tracers%data(tr_num)%tra_adv_pv)
     end do
     !$ACC ENTER DATA CREATE (f%tracers%work%fct_ttf_min, f%tracers%work%fct_ttf_max, f%tracers%work%fct_plus, f%tracers%work%fct_minus) &
     !$ACC CREATE (f%tracers%work%adv_flux_hor, f%tracers%work%adv_flux_ver, f%tracers%work%fct_LO) &
     !$ACC CREATE (f%tracers%work%del_ttf_advvert, f%tracers%work%del_ttf_advhoriz, f%tracers%work%edge_up_dn_grad) &
-    !$ACC CREATE (f%tracers%work%del_ttf)    
+    !$ACC CREATE (f%tracers%work%del_ttf)
   end subroutine
 
 
@@ -374,7 +375,7 @@ contains
     end if
     nstart=f%from_nstep
     ntotal=f%from_nstep-1+current_nsteps
-write(0,*) 'f%from_nstep before the loop:', f%from_nstep    
+    !write(0,*) 'f%from_nstep before the loop:', f%from_nstep
     do n=nstart, ntotal
         if (use_global_tides) then
            call foreph(f%partit, f%mesh)

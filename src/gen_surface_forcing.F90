@@ -1084,7 +1084,7 @@ CONTAINS
       call nc_sbc_ini(rdate, partit, mesh)
       !==========================================================================
 #endif
-      ! runoff    
+      ! runoff
       if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
          ! runoff in CORE is constant in time
          ! Warning: For a global mesh, conservative scheme is to be updated!!
@@ -1099,7 +1099,7 @@ CONTAINS
          else
             if (mype==0) write(*,*) 'using constant chlorophyll concentration: ', chl_const
             chl=chl_const
-         end if          
+         end if
       end if
 
       if (mype==0) write(*,*) "DONE:  Ocean forcing inizialization."
