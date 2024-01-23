@@ -235,6 +235,7 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
         end do
     end do ! --> do n=1,myDim_nod2D
 !$OMP END DO
+!$OMP BARRIER
 !$OMP END PARALLEL
 end subroutine adv_tra_vert_impl
 !

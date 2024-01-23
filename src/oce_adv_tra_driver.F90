@@ -235,7 +235,10 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 #endif
         if (dynamics%use_wsplit) then !wvel/=wvel_e
             ! update for implicit contribution (w_split option)
+!when adv_tra_vert_impl is ported to ACC the UPDATEs below wont be needed!
+!$ACC UPDATE HOST(fct_LO)
             call adv_tra_vert_impl(dt, wi, fct_LO, partit, mesh)
+!$ACC UPDATE DEVICE(fct_LO)
             ! compute the low order upwind vertical flux (full vertical velocity)
             ! zero the input/output flux before computation
             ! --> compute here low order part of vertical anti diffusive fluxes,
