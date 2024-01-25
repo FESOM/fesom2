@@ -817,14 +817,14 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 
         flux=icepplus(n)
         if (abs(flux)>0) then
-            icepplus(n)=min(1.0_WP,tmax(n)/flux)
+            icepplus(n)=min(1.0_WP,tmax(n)/max(flux,1.e-12))
         else
             icepplus(n)=0._WP
         end if
 
         flux=icepminus(n)
         if (abs(flux)>0) then
-            icepminus(n)=min(1.0_WP,tmin(n)/flux)
+            icepminus(n)=min(1.0_WP,tmin(n)/min(flux,-1.e-12))
         else
             icepminus(n)=0._WP
         end if
