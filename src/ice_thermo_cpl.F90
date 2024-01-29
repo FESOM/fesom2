@@ -193,9 +193,6 @@ subroutine thermodynamics(ice, partit, mesh)
      !---- total evaporation (needed in oce_salt_balance.F90) = evap+subli
      evaporation(inod)    = evap + subli
      ice_sublimation(inod)= subli
-     prec_rain(inod)      = rain
-     prec_snow(inod)      = snow
-     runoff(inod)         = runo
 #if defined (__oasis) || defined (__ifsinterface)
      residualifwflx(inod) = resid
 #endif     
