@@ -482,12 +482,6 @@ contains
 
     !---- convert freshwater mass flux [kg/m**2/s] into sea-water volume flux [m/s]
     fw   = fw/rhowat
-    evap = evap *rhofwt/rhowat
-    rain = rain *rhofwt/rhowat
-    snow = snow *rhofwt/rhowat
-    runo = runo *rhofwt/rhowat
-    subli= subli*rhofwt/rhowat
-    resid= resid*rhofwt/rhowat
     
     return
   end subroutine ice_growth
