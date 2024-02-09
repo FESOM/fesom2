@@ -491,9 +491,9 @@ subroutine pressure_bv(tracers, partit, mesh)
         end if
     end do
 !$OMP END DO
+!$OMP BARRIER
 !$OMP END PARALLEL
 call smooth_nod (bvfreq, 1, partit, mesh)
-!$OMP BARRIER
 end subroutine pressure_bv
 !
 !
@@ -2835,10 +2835,10 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
    end do
  end do
 !$OMP END DO
+!$OMP BARRIER
 !$OMP END PARALLEL
 call exchange_nod(sw_alpha, partit)
 call exchange_nod(sw_beta, partit)
-!$OMP BARRIER
 end subroutine sw_alpha_beta
 !
 !
@@ -2925,6 +2925,7 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
         sigma_xy(2,uln:nln,n) = (-sw_alpha(uln:nln,n)*ty(uln:nln)+sw_beta(uln:nln,n)*sy(uln:nln))/vol(uln:nln)*density_0
   END DO
 !$OMP END DO
+!$OMP BARRIER
 !$OMP END PARALLEL
 ! call exchange_nod(sigma_xy, partit)
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
@@ -2936,7 +2937,6 @@ aux=sigma_xy(2,:,:)
 call exchange_nod(aux, partit)
 sigma_xy(2,:,:)=aux
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
-!$OMP BARRIER
 end subroutine compute_sigma_xy
 !
 !
@@ -2985,10 +2985,10 @@ subroutine compute_neutral_slope(partit, mesh)
         enddo
     enddo
 !$OMP END DO
+!$OMP BARRIER
 !$OMP END PARALLEL
     call exchange_nod(neutral_slope, partit)
     call exchange_nod(slope_tapered, partit)
-!$OMP BARRIER
 end subroutine compute_neutral_slope
 !
 !
