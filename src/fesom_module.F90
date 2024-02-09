@@ -109,12 +109,12 @@ contains
 #endif
 
 !SUVI: disable overflow, underflow for entire model when used  in coupled with ifs
-!      bad practice
-#if defined  __ifsinterface
-    call ieee_set_halting_mode(ieee_overflow, .false.)
-    call ieee_set_halting_mode(ieee_underflow, .false.)
-    call ieee_set_halting_mode(ieee_invalid, .false.)
-#endif
+!      bad practice, use it only in case of Emergency
+!#if defined  __ifsinterface
+!    call ieee_set_halting_mode(ieee_overflow, .false.)
+!    call ieee_set_halting_mode(ieee_underflow, .false.)
+!    call ieee_set_halting_mode(ieee_invalid, .false.)
+!#endif
 
       
       mpi_is_initialized = .false.
