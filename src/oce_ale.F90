@@ -1803,7 +1803,6 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     end if
 !$OMP END PARALLEL
     call exchange_nod(ssh_rhs, partit)
-!$OMP BARRIER
 end subroutine compute_ssh_rhs_ale
 !
 !
@@ -1926,7 +1925,6 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
         end do
 !$OMP END PARALLEL DO
         call exchange_nod(ssh_rhs_old, partit)
-!$OMP BARRIER
     end if 
     !___________________________________________________________________________
     ! update the thickness
@@ -1943,7 +1941,6 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
     end do
 !$OMP END PARALLEL DO
     call exchange_nod(hbar, partit)
-!$OMP BARRIER
     !___________________________________________________________________________
     ! fill the array for updating the stiffness matrix
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes)
@@ -2486,7 +2483,6 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     call exchange_nod(Wvel, partit)
     call exchange_nod(hnode_new, partit)   ! Or extend cycles above  
     if (Fer_GM) call exchange_nod(fer_Wvel, partit)
-!$OMP BARRIER    
     !___________________________________________________________________________
     ! calc vertical CFL criteria for debugging purpose and vertical Wvel splitting
 !$OMP PARALLEL DO

@@ -243,7 +243,6 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
             call relax_to_clim(tr_num, tracers, partit, mesh)
         end if
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
-!$OMP BARRIER
     end do
 !!!        !$ACC UPDATE HOST (tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus) &
 !!!        !$ACC HOST  (tracers%work%edge_up_dn_grad)
@@ -1236,6 +1235,7 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
 #endif
     END DO
 !$OMP END DO
+!$OMP BARRIER
 !$OMP MASTER
     call exchange_nod(temporary_ttf, partit)
 !$OMP END MASTER
@@ -1284,7 +1284,6 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
 !$OMP END DO
 !$OMP END PARALLEL
 call exchange_nod(ttf, partit)
-!$OMP BARRIER
 end subroutine diff_part_bh
 !
 !

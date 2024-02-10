@@ -337,9 +337,6 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     call exchange_nod(m_templ, partit, luse_g2g = .true.)
 #endif
 
-#ifndef ENABLE_OPENACC
-!$OMP BARRIER
-#endif
 end subroutine ice_solve_low_order
 !
 !
@@ -417,9 +414,6 @@ subroutine ice_solve_high_order(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     call exchange_nod(dm_temp, partit, luse_g2g = .true.)
 #endif /* (__oifs) */
-#ifndef ENABLE_OPENACC
-!$OMP BARRIER
-#endif
     !___________________________________________________________________________
     !iterate
 
@@ -482,9 +476,6 @@ subroutine ice_solve_high_order(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
         call exchange_nod(dm_temp, partit, luse_g2g = .true.)
 #endif /* (__oifs) */
-#ifndef ENABLE_OPENACC
-!$OMP BARRIER
-#endif
     end do
 end subroutine ice_solve_high_order
 !
@@ -838,6 +829,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 !$ACC wait
 
 #if defined(_OPENMP)
+!$OMP BARRIER
 !$OMP MASTER
 #endif
     call exchange_nod(icepminus, icepplus, partit, luse_g2g = .true.)
@@ -1124,7 +1116,6 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 
 !$ACC END DATA
 
-!$OMP BARRIER
 end subroutine ice_fem_fct
 !
 !
@@ -1517,9 +1508,6 @@ subroutine ice_update_for_div(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     call exchange_nod(dm_temp, partit, luse_g2g = .true.)
 #endif /* (__oifs) */
-#ifndef ENABLE_OPENACC
-!$OMP BARRIER
-#endif
     !___________________________________________________________________________
     !iterate
     do n=1,num_iter_solve-1
@@ -1586,9 +1574,6 @@ subroutine ice_update_for_div(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
         call exchange_nod(dm_temp, partit, luse_g2g = .true.)
 #endif /* (__oifs) */
-#ifndef ENABLE_OPENACC
-!$OMP BARRIER
-#endif
     end do
 
 #ifndef ENABLE_OPENACC

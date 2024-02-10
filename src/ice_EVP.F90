@@ -819,9 +819,6 @@ subroutine EVPdynamics(ice, partit, mesh)
         !_______________________________________________________________________
         call exchange_nod(U_ice,V_ice,partit, luse_g2g = .true.)
 
-!ifndef ENABLE_OPENACC
-!$OMP BARRIER
-!endif
     END DO !--> do shortstep=1, ice%evp_rheol_steps
 
 end subroutine EVPdynamics
