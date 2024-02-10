@@ -226,6 +226,7 @@ subroutine thermodynamics(ice, partit, mesh)
         ustar_aux(i)=sqrt(ustar*ice%cd_oce_ice)
     end do
 !$OMP END DO
+!$OMP BARRIER
 !$OMP MASTER
     call exchange_nod(ustar_aux, partit)
 !$OMP END MASTER

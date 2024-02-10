@@ -442,6 +442,7 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
     end do !-->do n=1,myDim_nod2d
 !$OMP END DO
     !___________________________________________________________________________
+!$OMP BARRIER
 !$OMP MASTER
     call exchange_nod(UVnode_rhs, partit)
 !$OMP END MASTER

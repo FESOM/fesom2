@@ -158,7 +158,6 @@ subroutine fer_solve_Gamma(partit, mesh)
     END DO   !!! cycle over nodes
 !$OMP END DO
 !$OMP END PARALLEL
-!$OMP BARRIER
     call exchange_nod(fer_gamma, partit)
 END subroutine fer_solve_Gamma
 !
@@ -206,7 +205,6 @@ subroutine fer_gamma2vel(dynamics, partit, mesh)
     END DO
 !$OMP END PARALLEL DO
     call exchange_elem(fer_uv, partit)
-!$OMP BARRIER
 end subroutine fer_gamma2vel
 !
 !
@@ -412,7 +410,6 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
    end do
 !$OMP END DO
 !$OMP END PARALLEL
-!$OMP BARRIER
    if (Fer_GM) call exchange_nod(fer_c, partit)
    if (Fer_GM) call exchange_nod(fer_k, partit)
    if (Redi)   call exchange_nod(Ki, partit)

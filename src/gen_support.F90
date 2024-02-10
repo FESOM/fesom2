@@ -85,11 +85,7 @@ subroutine smooth_nod2D(arr, N, partit, mesh)
        arr(node)=work_array(node)
     ENDDO
 !$OMP END PARALLEL DO
-!$OMP BARRIER
-!$OMP MASTER
     call exchange_nod(arr, partit)
-!$OMP END MASTER
-!$OMP BARRIER
   END DO
   deallocate(work_array)
 end subroutine smooth_nod2D

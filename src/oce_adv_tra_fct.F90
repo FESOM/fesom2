@@ -397,6 +397,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !$ACC END PARALLEL LOOP
 #endif
     ! fct_minus and fct_plus must be known to neighbouring PE
+!$OMP BARRIER
 !$OMP MASTER
     call exchange_nod(fct_plus, fct_minus, partit, luse_g2g = .true.)
 !$OMP END MASTER

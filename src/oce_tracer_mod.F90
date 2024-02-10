@@ -49,7 +49,6 @@ end do
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_z'//achar(27)//'[0m'
     call tracer_gradient_z(tracers%data(tr_num)%values, partit, mesh)    !WHY NOT AB HERE? DSIDOREN!
     call exchange_elem_end(partit)      ! tr_xy used in fill_up_dn_grad
-!$OMP BARRIER
 
     call exchange_nod_begin(tr_z, partit) ! not used in fill_up_dn_grad 
 

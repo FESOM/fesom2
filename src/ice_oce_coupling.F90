@@ -350,7 +350,6 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     if (use_cavity) then
         call cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)   
         call exchange_nod(heat_flux, water_flux, partit)
-!$OMP BARRIER
     end if 
     
     !___________________________________________________________________________

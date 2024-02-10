@@ -145,7 +145,6 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
         END DO
     END DO
 !$OMP END PARALLEL DO
-!$OMP BARRIER
 !!PS Why we do this here eta_n is anyway overwriten through ...
 !!PS do node=1, myDim_nod2D+eDim_nod2D
 !!PS     if (ulevels_nod2D(node)==1) eta_n(node)=alpha*hbar(node)+(1.0_WP-alpha)*hbar_old(node)
@@ -207,7 +206,6 @@ subroutine compute_vel_nodes(dynamics, partit, mesh)
         END DO
     END DO
 !$OMP END PARALLEL DO
-!$OMP BARRIER
     call exchange_nod(UVnode, partit)
 end subroutine compute_vel_nodes
 !
@@ -345,6 +343,7 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
 #endif
     END DO
 !$OMP END DO
+!$OMP BARRIER
 !$OMP MASTER
     call exchange_elem(U_b, partit)
     call exchange_elem(V_b, partit)
@@ -372,6 +371,7 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
         END DO
     END DO
 !$OMP END DO
+!$OMP BARRIER
 !$OMP MASTER
     call exchange_nod(U_c, V_c, partit)
 !$OMP END MASTER
@@ -485,6 +485,7 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
         END DO
     END DO
 !$OMP END DO
+!$OMP BARRIER
 !$OMP MASTER
     call exchange_elem(U_c, partit)
     call exchange_elem(V_c, partit)
@@ -608,6 +609,7 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
 
     END DO
 !$OMP END DO
+!$OMP BARRIER
 !$OMP MASTER
     call exchange_elem(U_c, partit)
     call exchange_elem(V_c, partit)
@@ -859,7 +861,6 @@ subroutine check_validviscopt_5(partit, mesh)
     end do
 !$OMP END DO
 !$OMP END PARALLEL
-!$OMP BARRIER
 
     !___________________________________________________________________________
     ! compute global mean ratio --> core2 Ratio=4.26 (eddy parameterizted), 

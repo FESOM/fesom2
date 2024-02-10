@@ -374,7 +374,6 @@ contains
          call smooth_nod(blmc(:,:,j), 3, partit, mesh)
         end do
      end if
-!$OMP BARRIER
 ! then combine blmc and viscA/diffK
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax)
      DO node=1, myDim_nod2D
@@ -400,7 +399,6 @@ contains
   
      ! OVER ELEMENTS 
      call exchange_nod(viscA, partit) !Warning: don't forget to communicate before averaging on elements!!!
-!$OMP BARRIER
      minmix=3.0e-3_WP
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax)
      DO elem    = 1, myDim_elem2D
@@ -597,7 +595,6 @@ contains
     call exchange_nod(hbl, partit)
     call smooth_nod(hbl, 3, partit, mesh)
   end if
-!$OMP BARRIER
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, dzup, coeff_sw)
   DO node=1, myDim_nod2D
@@ -784,7 +781,6 @@ contains
      IF (smooth_Ri_hor) then
        call smooth_nod(diffK(:,:,1), 3, partit, mesh)
      END IF
-!$OMP BARRIER
     !___________________________________________________________________________
     ! compute viscA and diffK
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, Rigg, ratio, frit, Kv0_b)

@@ -162,7 +162,6 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   END DO
 !$OMP END PARALLEL DO 
   call exchange_nod(rr, partit)
-!$OMP BARRIER
   ! =============
   ! z_0=M^{-1} r_0  (M^{-1} is the precondit. matrix)
   ! pp is the search direction
@@ -233,7 +232,6 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
      ! New z
      ! ===========
   call exchange_nod(rr, partit)     ! Update before matrix-vector multiplications
-!$OMP BARRIER
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
   DO row=1, myDim_nod2D
      zz(row)= sum(pr_values(rptr(row):rptr(row+1)-1)*rr(cind(rptr(row):rptr(row+1)-1)))
@@ -257,7 +255,6 @@ sprod(1:2)=0.0_WP
   
   call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 
-!$OMP BARRIER
      ! ===========
      ! Exit if tolerance is achieved
      ! ===========
@@ -277,7 +274,6 @@ sprod(1:2)=0.0_WP
   END DO
  ! At the end: The result is in X, but it needs a halo exchange.
   call exchange_nod(x, partit)
-!$OMP BARRIER
 end subroutine ssh_solve_cg 
 
 ! ===================================================================

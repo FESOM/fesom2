@@ -856,16 +856,20 @@ subroutine EVPdynamics_m(ice, partit, mesh)
         end do ! --> do ed=1,myDim_edge2D
 !$OMP END DO
         !_______________________________________________________________________
+!$OMP BARRIER
 !$OMP MASTER
         call exchange_nod_begin(u_ice_aux, v_ice_aux, partit)
 !$OMP END MASTER
 !$OMP BARRIER
+! Some thing wierd about why init this during communication 
+! can't it be moved after exchange_end?
 !$OMP DO
         do row=1, myDim_nod2d
            u_rhs_ice(row)=0.0_WP
            v_rhs_ice(row)=0.0_WP
         end do
 !$OMP END DO
+!$OMP BARRIER
 !$OMP MASTER
         call exchange_nod_end(partit)
 !$OMP END MASTER
