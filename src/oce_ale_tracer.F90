@@ -199,6 +199,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
+        !$ACC UPDATE DEVICE(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB)
         call init_tracers_AB(tr_num, tracers, partit, mesh)
 
         ! advect tracers

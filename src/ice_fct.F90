@@ -1124,7 +1124,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 
 !$ACC END DATA
 
+#ifndef ENABLE_OPENACC
 !$OMP BARRIER
+#endif
 end subroutine ice_fem_fct
 !
 !
