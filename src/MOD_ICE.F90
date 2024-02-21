@@ -59,6 +59,7 @@ TYPE T_ICE_THERMO
     !___________________________________________________________________________
     real(kind=WP) :: rhoair=1.3  , inv_rhoair=1./1.3  ! Air density & inverse ,  LY2004 !1.3 AOMIP
     real(kind=WP) :: rhowat=1025., inv_rhowat=1./1025.! Water density & inverse
+    real(kind=WP) :: rhofwt=1000., inv_rhofwt=1./1000.! Freshwter density & inverse
     real(kind=WP) :: rhoice=910. , inv_rhoice=1./910. ! Ice density & inverse, AOMIP
     real(kind=WP) :: rhosno=290. , inv_rhosno=1./290. ! Snow density & inverse, AOMIP
     ! Specific heat of air, ice, snow [J/(kg * K)] 

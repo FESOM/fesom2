@@ -465,7 +465,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         relax_salt(n)=relax_salt(n)-net
     end do
 !$OMP END PARALLEL DO
-    
+
     !___________________________________________________________________________
     ! enforce the total freshwater/salt flux be zero
     ! 1. water flux ! if (.not. use_virt_salt) can be used!
@@ -476,10 +476,14 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
                   -ice_sublimation(n)                 & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
                   +prec_rain(n)                       &
                   +prec_snow(n)*(1.0_WP-a_ice_old(n)) &
-#if defined (__oifs)        
+#if defined (__oasis) || defined (__ifsinterface)
                   +residualifwflx(n)                  & ! balance residual ice flux only in coupled case
 #endif
-                  +runoff(n)                                  
+                  +runoff(n)
+#if defined (__oasis) || defined (__ifsinterface)
+! in the coupled mode the computation of freshwater flux takes into account the ratio between freshwater & salt water
+        flux(n) = flux(n)*ice%thermo%rhofwt/ice%thermo%rhowat
+#endif
     end do
 !$OMP END PARALLEL DO
     ! --> In case of zlevel and zstar and levitating sea ice, sea ice is just sitting 
@@ -513,7 +517,6 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
             where (ulevels_nod2d > 1) flux = -water_flux
         end if 
     end if 
-    
     !___________________________________________________________________________
     ! compute total global net freshwater flux into the ocean 
     call integrate_nod(flux, net, partit, mesh)
