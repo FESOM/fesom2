@@ -148,7 +148,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     type(t_partit), intent(inout), target    :: partit
     type(t_mesh)  , intent(in)   , target    :: mesh
     !___________________________________________________________________________
-    integer                                  :: tr_num, node, elem, nzmax, nzmin
+    integer                                  :: tr_num, node, elem, nzmax, nzmin, nz
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
@@ -207,30 +207,54 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 
 
 	!here update only those initialized in the init_tracers. (values, valuesAB, edge_up_dn_grad, ...)
-        !$ACC UPDATE  DEVICE(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB) &
-        !$ACC  DEVICE(tracers%work%edge_up_dn_grad) !!&
+        !!$ACC UPDATE  DEVICE(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB) &
+        !!$ACC  DEVICE(tracers%work%edge_up_dn_grad) !!&
         ! it will update del_ttf with contributions from horizontal and vertical advection parts (del_ttf_advhoriz and del_ttf_advvert)
-	!$ACC wait(1)
+	!!$ACC wait(1)
+    ! we dont need to update these values on device because we are running init_tracers_AB now 
+    ! on device as well.
         call do_oce_adv_tra(dt, UV, Wvel, Wvel_i, Wvel_e, tr_num, dynamics, tracers, partit, mesh)
 
 
         !$ACC UPDATE HOST(tracers%work%del_ttf, tracers%work%del_ttf_advhoriz, tracers%work%del_ttf_advvert)
+        !We dont have to update these values back to host because we will run the remaining subroutines 
+        ! on the device as well.
         !___________________________________________________________________________
         ! update array for total tracer flux del_ttf with the fluxes from horizontal
         ! and vertical advection
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
+#else
+!!$ACC parallel loop collapse(2)
+#endif
         do node=1, myDim_nod2d
-           tracers%work%del_ttf(:, node)=tracers%work%del_ttf(:, node)+tracers%work%del_ttf_advhoriz(:, node)+tracers%work%del_ttf_advvert(:, node)
+          do nz = 1, mesh%nl-1
+             tracers%work%del_ttf(nz, node)=tracers%work%del_ttf(nz, node)+tracers%work%del_ttf_advhoriz(nz, node)+tracers%work%del_ttf_advvert(nz, node)
+           end do
         end do
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+!!$ACC end parallel loop
+#endif
            !___________________________________________________________________________
            ! AB is not needed after the advection step. Initialize it with the current tracer before it is modified.
            ! call init_tracers_AB at the beginning of this loop will compute AB for the next time step then.
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
+#else
+!!$ACC parallel loop collapse(2)
+#endif
         do node=1, myDim_nod2d+eDim_nod2D
-           tracers%data(tr_num)%valuesAB(:, node)=tracers%data(tr_num)%values(:, node) !DS: check that this is the right place!
+           do nz = 1, mesh%nl-1
+              tracers%data(tr_num)%valuesAB(nz, node)=tracers%data(tr_num)%values(nz, node) !DSnz check that this is the right place!
+           end do
         end do
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+!!$ACC end parallel loop
+#endif
         ! diffuse tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
         call diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
@@ -243,7 +267,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         else
             call relax_to_clim(tr_num, tracers, partit, mesh)
         end if
-        call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
+        call exchange_nod(tracers%data(tr_num)%values(:,:), partit, luse_g2g = .true.)
 !$OMP BARRIER
     end do
 !!!        !$ACC UPDATE HOST (tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus) &
@@ -252,9 +276,13 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! 3D restoring for "passive" tracers
     !!!$OMPTODO: add OpenMP later, not needed right now!
+!!$ACC parallel loop collapse(2)
     do tr_num=1, ptracers_restore_total
-       tracers%data(ptracers_restore(tr_num)%locid)%values(:, ptracers_restore(tr_num)%ind2)=1.0_WP
+       do nz = 1, mesh%nl-1
+         tracers%data(ptracers_restore(tr_num)%locid)%values(:, ptracers_restore(tr_num)%ind2)=1.0_WP
+       end do
     end do
+!!$ACC end parallel loop
 
     !___________________________________________________________________________
     ! subtract the the bolus velocities back from 3D velocities:
@@ -278,7 +306,11 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     ! --> if we do only where (tr_arr(:,:,2) < 3._WP ) we also fill up the bottom
     !     topogrpahy with values which are then writte into the output --> thats why
     !     do node=1,.... and tr_arr(node,1:nzmax,2)
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nzmin, nzmax)
+#else
+!!$ACC parallel loop
+#endif
     do node=1,myDim_nod2D+eDim_nod2D
         nzmax=nlevels_nod2D(node)-1
         nzmin=ulevels_nod2D(node)
@@ -290,7 +322,11 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
                tracers%data(2)%values(nzmin:nzmax,node) = 3._WP
         end where
     end do
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+!!$ACC end parallel loop
+#endif
 end subroutine solve_tracers_ale
 !
 !
@@ -318,12 +354,12 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
     integer                               :: n, nzmax, nzmin
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP), pointer                :: del_ttf(:,:)
+    real(kind=WP), dimension(:,:), pointer :: del_ttf
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    del_ttf => tracers%work%del_ttf
+    del_ttf=>tracers%work%del_ttf(:,:)
 
     !___________________________________________________________________________
     ! do horizontal diffusiion
@@ -342,7 +378,12 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! Update tracers --> calculate T* see Danilov et al. (2017)
     ! T* =  (dt*R_T^n + h^(n-0.5)*T^(n-0.5))/h^(n+0.5)
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nzmin, nzmax)
+#else
+!$ACC update device(hnode)
+!!$ACC parallel loop
+#endif
     do n=1, myDim_nod2D
         nzmax=nlevels_nod2D(n)-1
         nzmin=ulevels_nod2D(n)
@@ -355,7 +396,11 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
         ! tr_arr(1:nzmax,n,tr_num)=(hnode(1:nzmax,n)*tr_arr(1:nzmax,n,tr_num)+ &
         !                           del_ttf(1:nzmax,n))/hnode_new(1:nzmax,n)
     end do
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+!!$ACC end parallel loop
+#endif
     !___________________________________________________________________________
     if (tracers%data(tr_num)%i_vert_diff) then
         ! do vertical diffusion: implicite
