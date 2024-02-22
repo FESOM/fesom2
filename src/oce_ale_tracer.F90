@@ -225,7 +225,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
-!!$ACC parallel loop collapse(2)
+!$ACC parallel loop collapse(2)
 #endif
         do node=1, myDim_nod2d
           do nz = 1, mesh%nl-1
@@ -235,7 +235,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!!$ACC end parallel loop
+!$ACC end parallel loop
 #endif
            !___________________________________________________________________________
            ! AB is not needed after the advection step. Initialize it with the current tracer before it is modified.
@@ -243,7 +243,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
-!!$ACC parallel loop collapse(2)
+!$ACC parallel loop collapse(2)
 #endif
         do node=1, myDim_nod2d+eDim_nod2D
            do nz = 1, mesh%nl-1
@@ -253,7 +253,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!!$ACC end parallel loop
+!$ACC end parallel loop
 #endif
         ! diffuse tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
@@ -276,13 +276,13 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! 3D restoring for "passive" tracers
     !!!$OMPTODO: add OpenMP later, not needed right now!
-!!$ACC parallel loop collapse(2)
+!$ACC parallel loop collapse(2)
     do tr_num=1, ptracers_restore_total
        do nz = 1, mesh%nl-1
          tracers%data(ptracers_restore(tr_num)%locid)%values(:, ptracers_restore(tr_num)%ind2)=1.0_WP
        end do
     end do
-!!$ACC end parallel loop
+!$ACC end parallel loop
 
     !___________________________________________________________________________
     ! subtract the the bolus velocities back from 3D velocities:
@@ -351,7 +351,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
-    integer                               :: n, nzmax, nzmin
+    integer                               :: n, nzmax, nzmin, nz
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:), pointer :: del_ttf
@@ -381,25 +381,30 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nzmin, nzmax)
 #else
-!$ACC update device(hnode)
-!!$ACC parallel loop
+!$ACC update device(hnode, hnode_new)
+!$ACC parallel loop
 #endif
-    do n=1, myDim_nod2D
+    DO n=1, myDim_nod2D
         nzmax=nlevels_nod2D(n)-1
         nzmin=ulevels_nod2D(n)
-        del_ttf(nzmin:nzmax,n)=del_ttf(nzmin:nzmax,n)+tracers%data(tr_num)%values(nzmin:nzmax,n)* &
-                                    (hnode(nzmin:nzmax,n)-hnode_new(nzmin:nzmax,n))
-        tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
-                                    del_ttf(nzmin:nzmax,n)/hnode_new(nzmin:nzmax,n)
+    #ifdef ENABLE_OPENACC
+    !$ACC loop independent 
+    #endif
+        do nz = nzmin, nzmax
+          del_ttf(nz,n)=del_ttf(nz,n)+tracers%data(tr_num)%values(nz,n)* &
+                                      (hnode(nz,n)-hnode_new(nz,n))
+          tracers%data(tr_num)%values(nz,n)=tracers%data(tr_num)%values(nz,n)+ &
+                                    del_ttf(nz,n)/hnode_new(nz,n)
+        end do
         ! WHY NOT ??? --> whats advantage of above --> tested it --> the upper
         ! equation has a 30% smaller nummerical drift
         ! tr_arr(1:nzmax,n,tr_num)=(hnode(1:nzmax,n)*tr_arr(1:nzmax,n,tr_num)+ &
         !                           del_ttf(1:nzmax,n))/hnode_new(1:nzmax,n)
-    end do
+    END DO
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!!$ACC end parallel loop
+!$ACC end parallel loop
 #endif
     !___________________________________________________________________________
     if (tracers%data(tr_num)%i_vert_diff) then

@@ -156,6 +156,10 @@ SUBROUTINE tracer_gradient_z(ttf, partit, mesh)
     nzmax=nlevels_nod2D(n)
     nzmin=ulevels_nod2D(n)
     !!PS DO nz=2,  nlev-1
+    
+    #ifdef ENABLE_OPENACC
+    !$ACC loop independent 
+    #endif
     DO nz=nzmin+1,  nzmax-1
         dz=0.5_WP*(hnode_new(nz-1,n)+hnode_new(nz,n))
         tr_z(nz, n)=(ttf(nz-1,n)-ttf(nz,n))/dz
