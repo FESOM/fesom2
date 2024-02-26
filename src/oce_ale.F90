@@ -2988,8 +2988,9 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     t0=MPI_Wtime()
-!     water_flux = 0.0_WP
-!     heat_flux  = 0.0_WP
+!PS     water_flux = 0.0_WP
+!PS     heat_flux  = 0.0_WP
+!PS     relax_salt = 0.0_WP
 !     stress_surf= 0.0_WP
 !     stress_node_surf= 0.0_WP
     
@@ -3092,8 +3093,8 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tke'//achar(27)//'[0m'
         call calc_cvmix_tke(dynamics, partit, mesh)
         call mo_convect(ice, partit, mesh)
-        
-    end if     
+    
+    end if   
 
     !___EXTENSION OF MIXING SCHEMES_____________________________________________
     ! add CVMIX TIDAL mixing scheme of Simmons et al. 2004 "Tidally driven mixing 

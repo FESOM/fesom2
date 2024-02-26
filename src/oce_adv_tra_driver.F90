@@ -50,11 +50,11 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     USE MOD_PARSUP
     USE MOD_DYN
     use g_comm_auto
+    use diagnostics, only: ldiag_DVD
     use oce_adv_tra_hor_interfaces
     use oce_adv_tra_ver_interfaces
     use oce_adv_tra_fct_interfaces
     use oce_tra_adv_flux2dtracer_interface
-    USE DIAGNOSTICS, only: ldiag_DVD
     implicit none
     real(kind=WP),  intent(in),    target :: dt
     integer,        intent(in)            :: tr_num
@@ -245,7 +245,8 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         end if
         call exchange_nod(fct_LO, partit, luse_g2g = .true.)
 !$OMP BARRIER
-    end if
+    end if !--> if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
+    
     do_zero_flux=.true.
     if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') do_zero_flux=.false.
     !___________________________________________________________________________
@@ -311,19 +312,25 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
                 !$ACC LOOP VECTOR
                 do nz=1, mesh%nl-1
                     tracers%work%dvd_trflx_hor(nz, n, tr_num) = tracers%work%dvd_trflx_hor(nz, n, tr_num) + adv_flux_hor(nz, n)
+                    !                                           |                                           |
+                    !                                           +-> LowO horiz flux                         +-> Antidiff. horiz flux
                 end do
                 !$ACC END LOOP
             end do
             !$ACC END PARALLEL LOOP
+            
             !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
             do n=1, myDim_nod2D
                 !$ACC LOOP VECTOR
                 do nz=1, mesh%nl
                     tracers%work%dvd_trflx_ver(nz, n, tr_num) = tracers%work%dvd_trflx_ver(nz, n, tr_num) + adv_flux_ver(nz, n)
+                    !                                           |                                           |
+                    !                                           +-> LowO vert flux                          +-> Antidiff. vert flux
                 end do
                 !$ACC END LOOP
             end do
             !$ACC END PARALLEL LOOP
+            
 !$OMP END PARALLEL DO
 
         !_______________________________________________________________________
@@ -338,6 +345,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
                 !$ACC END LOOP
             end do
             !$ACC END PARALLEL LOOP
+            
             !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
             do n=1, myDim_nod2D
                 !$ACC LOOP VECTOR
@@ -347,6 +355,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
                 !$ACC END LOOP
             end do
             !$ACC END PARALLEL LOOP
+            
 !$OMP END PARALLEL DO
         end if
     end if !-->if ((ldiag_DVD) .and. (tr_num<=2)) then 
