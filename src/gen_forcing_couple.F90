@@ -57,7 +57,7 @@ module update_atm_forcing_interface
         type(t_tracer), intent(in),    target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in),    target :: mesh
-        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_dyn)   , intent(in),    target :: dynamics
         end subroutine
     end interface
 end module

@@ -54,6 +54,18 @@ module visc_filt_bidiff_interface
   end interface
 end module
 
+module check_validviscopt_interface
+    interface
+        subroutine check_validviscopt_5(partit, mesh)
+            USE MOD_MESH
+            USE MOD_PARTIT
+            USE MOD_PARSUP
+            type(t_partit), intent(inout), target :: partit
+            type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine    
+    end interface
+end module 
+
 ! 
 ! Contains routines needed for computations of dynamics.
 ! includes: update_vel, compute_vel_nodes
@@ -74,6 +86,7 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
     integer       :: n, elem, elnodes(3), nz, nzmin, nzmax
     real(kind=WP) :: eta(3) 
     real(kind=WP) :: Fx, Fy
+    real(kind=WP) :: usum(2), udiff(2)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
@@ -88,7 +101,7 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
     d_eta  => dynamics%d_eta(:)
     
     !___________________________________________________________________________    
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax, eta, Fx, Fy)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax, eta, Fx, Fy, usum, udiff)
     DO elem=1, myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
         eta=-g*theta*dt*d_eta(elnodes)
@@ -96,6 +109,36 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
         Fy=sum(gradient_sca(4:6,elem)*eta)
         nzmin = ulevels(elem)
         nzmax = nlevels(elem)
+
+        if (dynamics%ldiag_ke) then
+           DO nz=nzmin, nzmax-1
+              dynamics%ke_pre(1,nz,elem)  =dynamics%ke_pre(1,nz,elem)   + Fx
+              dynamics%ke_pre(2,nz,elem)  =dynamics%ke_pre(2,nz,elem)   + Fy
+           
+              usum(1)=2.0_WP*UV(1,nz,elem)+(UV_rhs(1,nz,elem) + Fx)
+              usum(2)=2.0_WP*UV(2,nz,elem)+(UV_rhs(2,nz,elem) + Fy)
+
+              udiff(1)=UV_rhs(1,nz,elem) + Fx
+              udiff(2)=UV_rhs(2,nz,elem) + Fy
+              dynamics%ke_du2 (:,nz,elem)  = usum*udiff/2.0_WP
+              dynamics%ke_pre_xVEL (:,nz,elem)  = usum*dynamics%ke_pre (:,nz,elem)/2.0_WP
+              dynamics%ke_adv_xVEL (:,nz,elem)  = usum*dynamics%ke_adv (:,nz,elem)/2.0_WP
+              dynamics%ke_cor_xVEL (:,nz,elem)  = usum*dynamics%ke_cor (:,nz,elem)/2.0_WP
+              dynamics%ke_hvis_xVEL(:,nz,elem)  = usum*dynamics%ke_hvis(:,nz,elem)/2.0_WP
+              dynamics%ke_vvis_xVEL(:,nz,elem)  = usum*dynamics%ke_vvis(:,nz,elem)/2.0_WP
+              dynamics%ke_umean(:,nz,elem)      = usum/2.0_WP
+              dynamics%ke_u2mean(:,nz,elem)     = (usum*usum)/4.0_WP
+              
+              if (nz==nzmin) then
+                 dynamics%ke_wind_xVEL(:,elem)=usum*dynamics%ke_wind(:,elem)/2.0_WP
+              end if
+              
+              if (nz==nzmax-1) then
+                 dynamics%ke_drag_xVEL(:,elem)=usum*dynamics%ke_drag(:,elem)/2.0_WP
+              end if
+        END DO
+        end if
+
         DO nz=nzmin, nzmax-1
             UV(1,nz,elem)= UV(1,nz,elem) + UV_rhs(1,nz,elem) + Fx
             UV(2,nz,elem)= UV(2,nz,elem) + UV_rhs(2,nz,elem) + Fy
@@ -103,11 +146,15 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
     END DO
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO
-    DO n=1, myDim_nod2D+eDim_nod2D
-       eta_n(n)=eta_n(n)+d_eta(n)
-    END DO
-!$OMP END PARALLEL DO
+!!PS Why we do this here eta_n is anyway overwriten through ...
+!!PS do node=1, myDim_nod2D+eDim_nod2D
+!!PS     if (ulevels_nod2D(node)==1) eta_n(node)=alpha*hbar(node)+(1.0_WP-alpha)*hbar_old(node)
+!!PS end do
+!!PS !$OMP PARALLEL DO
+!!PS     DO n=1, myDim_nod2D+eDim_nod2D
+!!PS        eta_n(n)=eta_n(n)+d_eta(n)
+!!PS     END DO
+!!PS !$OMP END PARALLEL DO
     call exchange_elem(UV, partit)
 !$OMP BARRIER
 end subroutine update_vel
@@ -521,7 +568,7 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
        V_c(:, elem) = 0.0_WP
     END DO
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, ed, el, nz, nzmin, nzmax)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, ed, el, nz, nzmin, nzmax, update_u, update_v)
 !$OMP DO
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
@@ -612,3 +659,250 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
 !$OMP END PARALLEL
 end subroutine visc_filt_bidiff
 
+SUBROUTINE compute_ke_wrho(dynamics, partit, mesh)
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use MOD_DYN
+    USE o_PARAM
+    USE g_CONFIG
+    USE g_comm_auto
+    USE o_ARRAYS
+    IMPLICIT NONE
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    real(kind=WP) , pointer               :: inv_rhowat
+    !___________________________________________________________________________
+    integer        :: n, nz, nzmin, nzmax
+    real(kind=WP)  :: wu, wl
+    real(kind=WP)  :: dW, P
+    !___________________________________________________________________________
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+  ! we use pressure to compute this term as it appeares much easier (P*dW) instead of (dP*w)
+  dynamics%ke_wrho=0.0_WP
+  DO n=1, myDim_nod2D
+     nzmin=ulevels_nod2D(n)
+     nzmax=nlevels_nod2D(n)
+     do nz=nzmin, nzmax-1
+        wu=0.5*(dynamics%w(nz,   n)+dynamics%w_old(nz,   n))
+        wl=0.5*(dynamics%w(nz+1, n)+dynamics%w_old(nz+1, n))
+        P =(g*dynamics%eta_n(n)+hpressure(nz, n)/density_0)
+        dW=(wu*area(nz, n)-wl*area(nz+1, n))
+        dW=dW/area(nz, n)/hnode_new(nz,n)
+!       r=(g*dynamics%eta_n(n)+hpressure(nz, n)/density_0)*(wu*area(nz, n)-wl*area(nz+1, n)+0.5_WP*(hnode_new(nz, n)-mesh%hnode_old(nz, n))/dt*area(nz, n) )
+        dynamics%ke_Pfull(nz, n) = P
+        dynamics%ke_dW   (nz, n) = dW
+        dynamics%ke_wrho (nz, n) = P*dW*dt
+     end do
+  END DO
+  call exchange_nod(dynamics%ke_wrho, partit)
+END SUBROUTINE compute_ke_wrho
+! APE generation stuff
+SUBROUTINE compute_apegen(dynamics, tracers, partit, mesh)
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_TRACER
+    USE MOD_PARSUP
+    use MOD_DYN
+    USE o_PARAM
+    USE g_comm_auto
+    USE o_ARRAYS
+    IMPLICIT NONE
+    type(t_dyn)   , intent(inout), target   :: dynamics
+    type(t_tracer), intent(in)   , target   :: tracers
+    type(t_partit), intent(inout), target   :: partit
+    type(t_mesh)  , intent(in)   , target   :: mesh
+    real(kind=WP), dimension(:,:), pointer  :: salt
+    !___________________________________________________________________________
+    integer        :: n, nzmin
+    real(kind=WP)  :: JS, GS, D
+    !___________________________________________________________________________
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+salt   => tracers%data(2)%values(:,:)
+
+  DO n=1, myDim_nod2D
+     nzmin=ulevels_nod2D(n)
+     ! heat and salinity fluxes at node=n
+     JS= heat_flux_in(n) / vcpw
+     GS=(relax_salt(n) + water_flux(n) * salt(nzmin,n))
+     D=density_m_rho0(nzmin,n)
+     dynamics%ke_J   (n)=JS
+     dynamics%ke_G   (n)=GS
+     dynamics%ke_D   (n)=D
+     dynamics%ke_D2  (n)=D**2
+     dynamics%ke_n0  (n)=-bvfreq (nzmin,n)*density_0/g
+     dynamics%ke_JD(n)  =JS*D
+     dynamics%ke_GD(n)  =GS*D
+     dynamics%ke_D (n)  =D
+     dynamics%ke_swA (n)=sw_alpha(nzmin, n)
+     dynamics%ke_swB (n)=sw_beta (nzmin, n)
+  END DO
+  call exchange_nod(dynamics%ke_J, partit)
+  call exchange_nod(dynamics%ke_G, partit)
+  call exchange_nod(dynamics%ke_D, partit)
+
+  call exchange_nod(dynamics%ke_D2, partit)
+  call exchange_nod(dynamics%ke_n0, partit)
+
+  call exchange_nod(dynamics%ke_JD, partit)
+  call exchange_nod(dynamics%ke_GD, partit)
+
+  call exchange_nod(dynamics%ke_swA, partit)
+  call exchange_nod(dynamics%ke_swB, partit)
+END SUBROUTINE compute_apegen
+
+
+!
+!
+!_______________________________________________________________________________
+! check validity of visc_opt=5 selection on basis of ratio betweem resolution and 
+! 1st baroclinic rossby radius. visc_opt=5 ("easy backscatter") in eddy 
+! resolving/partly eddy permitting setups can lead to problems in form of 
+! exedingly strong near boundary currents that can lead e.g to very weak 
+! Drake Passage throughflow (<80Sv). In this case better use visc_opt=7, 
+! which is the flow aware viscosity option 
+subroutine check_viscopt(dynamics, partit, mesh)
+    USE MOD_DYN
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_MESH
+    USE check_validviscopt_interface
+    IMPLICIT NONE
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    
+    if (dynamics%check_opt_visc) then
+        select case (dynamics%opt_visc)
+            case(5) 
+                ! check validity of visc_opt=5 especially in higher resolved setups
+                ! --> there it can lead to problems
+                call check_validviscopt_5(partit, mesh)
+        end select   
+    end if 
+end subroutine check_viscopt
+
+!
+!
+!_______________________________________________________________________________
+! check if viscopt=5 is a valid and recommended option for the used configuration
+subroutine check_validviscopt_5(partit, mesh)
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE o_PARAM , ONLY: rad
+    USE o_ARRAYS, ONLY: bvfreq
+    USE g_CONFIG
+    USE g_comm_auto
+    IMPLICIT NONE
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    integer                               :: node, nz, nzmax, nzmin
+    real(kind=WP)                         :: f_min=1.e-6_WP, z_min=100.0_WP, r_max=200000._WP, r_min=2000.0_WP
+    real(kind=WP)                         :: c_min=0.5_WP, c1
+    real(kind=WP)                         :: excl_EQ=30.0, thresh_ratio=1.5
+    real(kind=WP)                         :: loc_R, loc_A
+    real(kind=WP)                         :: glb_R, glb_A
+    real(kind=WP)                         :: fac_ResR1barocl, rossbyr_1barocl
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    
+    !___________________________________________________________________________
+    loc_R = 0.0_WP
+    loc_A = 0.0_WP
+    
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmax, nzmin, c1, rossbyr_1barocl, &
+!$OMP                                  fac_ResR1barocl) REDUCTION(+:loc_R, loc_A)
+!$OMP DO
+    do node=1, myDim_nod2D
+        !_______________________________________________________________________
+        ! Exlude the equator |lat|<30° from checking the ration between resolution
+        ! and first baroclinic rossby radius  
+        if (abs(mesh%geo_coord_nod2D(2,node)/rad)<excl_EQ) cycle
+        
+        !_______________________________________________________________________
+        !ca. first baroclinic gravity wave speed limited from below by c_min
+        nzmax=mesh%nlevels_nod2D_min(node)
+        nzmin=mesh%ulevels_nod2D_max(node)
+        c1=0.0_WP
+        do nz=nzmin, nzmax-1
+            c1=c1+hnode_new(nz,node)*(                                         &
+                                    sqrt(abs(max(bvfreq(nz  ,node), 0._WP)))+  &
+                                    sqrt(abs(max(bvfreq(nz+1,node), 0._WP)))   &
+                                  )/2._WP ! add abs() for -0 case, cray
+        end do
+        c1=max(c_min, c1/pi)
+        
+        !_______________________________________________________________________
+        ! compute 1st. baroclinic rossby radius
+        rossbyr_1barocl = max( min( c1/max( abs(mesh%coriolis_node(node)), f_min), r_max), r_min)
+        
+        !_______________________________________________________________________
+        ! compute ratio between rossby and resolution, if ratio >=1 setup is not eddy 
+        ! resolving in best case eddy permitting --> GM/Redi will still be neccessary
+        fac_ResR1barocl =min(mesh_resolution(node)/rossbyr_1barocl, 5._WP)
+        
+        !_______________________________________________________________________
+        ! compute local mean ratio but exclude equator |lat|<30°, since Rossby radius 
+        ! at equator becomes very large
+        loc_R   = loc_R + fac_ResR1barocl
+        loc_A   = loc_A + 1.0_WP
+    end do
+!$OMP END DO
+!$OMP END PARALLEL
+!$OMP BARRIER
+
+    !___________________________________________________________________________
+    ! compute global mean ratio --> core2 Ratio=4.26 (eddy parameterizted), 
+    ! dart Ratio=0.97 (eddy resolving/permitting)
+    call MPI_AllREDUCE(loc_R, glb_R, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(loc_A, glb_A, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    glb_R  = glb_R/glb_A
+    
+    !___________________________________________________________________________
+    ! create warning message when ratio<thresh_ratio
+    if (glb_R<thresh_ratio) then 
+        if (mype==0) then 
+        print *, achar(27)//'[33m'
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' --check opt_visc--> Mean Ratio Resol/Rrossby = ',  glb_R 
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' WARNING: You want to use opt_visc=5 (easy backscatter viscosity) in'
+        write(*,*) '          an eddy resolving to eddy permitting (Resol/Rrossby<1.5)  '
+        write(*,*) '          configuration. It revealed to us that this can lead to    '
+        write(*,*) '          problems in form of unrealistically strong near boundary  '
+        write(*,*) '          currents that can ultimatively lead to an e.g very weak   '
+        write(*,*) '          Drake Passage throughflow (<80Sv in spinup up dart        '
+        write(*,*) '          configuration). For these kind of setups we recommend to  '
+        write(*,*) '          use opt_visc=7, which is the flow aware viscosity         '
+        write(*,*) '          parameterisation.                                         '
+        write(*,*) '          The easy backscatter viscosity was designed to energetise '
+        write(*,*) '          coarse resolved configurations!!!                         '
+        write(*,*) '          --> So please change the viscosity option in namelist.dyn '
+        write(*,*) '              to opt_visc=7 .                                       '
+        write(*,*) '          --> If you insist in using opt_visc=5 in your simulation, '
+        write(*,*) '              you can switch off this check in namelist.dyn by      '
+        write(*,*) '              setting check_opt_visc=.false.                        '
+        write(*,*) '                                                                    '
+        write(*,*) '____________________________________________________________________'
+        print *, achar(27)//'[0m'
+        write(*,*)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+        end if
+    else
+        if (mype==0) then 
+        write(*,*) ' --check opt_visc--> Mean Ratio Resol/Rrossby = ',  glb_R 
+        end if
+    end if     
+    
+end subroutine check_validviscopt_5

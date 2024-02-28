@@ -195,7 +195,6 @@ subroutine init_ale(dynamics, partit, mesh)
     ! hnode and hnode_new: layer thicknesses at nodes. 
     allocate(mesh%hnode(1:nl-1, myDim_nod2D+eDim_nod2D))
     allocate(mesh%hnode_new(1:nl-1, myDim_nod2D+eDim_nod2D))
-    
     ! ssh_rhs_old: auxiliary array to store an intermediate part of the rhs computations.
     allocate(dynamics%ssh_rhs_old(myDim_nod2D+eDim_nod2D))
     dynamics%ssh_rhs_old = 0.0_WP
@@ -1215,6 +1214,32 @@ subroutine restart_thickness_ale(partit, mesh)
             dhe(elem)=sum(hbar(elnodes))/3.0_WP
             
         end do
+        
+    !___________________________________________________________________________
+    ! >->->->->->->->->->->->->->->       linfs      <-<-<-<-<-<-<-<-<-<-<-->->-
+    !___________________________________________________________________________
+    ! for the case you make a restart from zstar --> linfs, hnode that comes with
+    ! the restart needs to be overwritten with the standard layer thicknesses. 
+    ! Since zbar_3d_n and Z_3d_n are initialised with standard levels
+    else ! --> which_ale == 'linfs'
+        do n=1,myDim_nod2D+eDim_nod2D
+            nzmin = ulevels_nod2D(n)
+            nzmax = nlevels_nod2D(n)-1
+            do nz=nzmin,nzmax-1
+                hnode(nz,n)=(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))
+            end do      
+            hnode(nzmax,n)=bottom_node_thickness(n)
+        end do
+        
+        do elem=1,myDim_elem2D
+            nzmin = ulevels(elem)
+            nzmax = nlevels(elem)-1
+            helem(nzmin,elem)=(zbar_e_srf(elem)-zbar(nzmin+1))
+            do nz = nzmin+1, nzmax-1
+                helem(nz,elem)=(zbar(nz)-zbar(nz+1))
+            end do
+            helem(nzmax,elem)=bottom_elem_thickness(elem)
+        end do    
     endif
 
 end subroutine restart_thickness_ale
@@ -1646,7 +1671,7 @@ end subroutine update_stiff_mat_ale
 ! ssh_rhs=-alpha*\nabla\int(U_n+U_rhs)dz-(1-alpha)*...
 ! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
 subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
-    use g_config,only: which_ALE,dt
+    use g_config,only: which_ALE, dt, use_cavity_fw2press
     use MOD_MESH
     use o_ARRAYS, only: water_flux
     use o_PARAM
@@ -1702,7 +1727,6 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
         
         nzmin = ulevels(el(1))
         nzmax = nlevels(el(1))-1
-        !!PS do nz=1, nlevels(el(1))-1
         do nz=nzmin, nzmax
             c1=c1+alpha*((UV(2,nz,el(1))+UV_rhs(2,nz,el(1)))*deltaX1- &
                          (UV(1,nz,el(1))+UV_rhs(1,nz,el(1)))*deltaY1)*helem(nz,el(1))
@@ -1719,7 +1743,6 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
             deltaY2=edge_cross_dxdy(4,ed)
             nzmin = ulevels(el(2))
             nzmax = nlevels(el(2))-1
-            !!PS do nz=1, nlevels(el(2))-1
             do nz=nzmin, nzmax
                 c2=c2-alpha*((UV(2,nz,el(2))+UV_rhs(2,nz,el(2)))*deltaX2- &
                              (UV(1,nz,el(2))+UV_rhs(1,nz,el(2)))*deltaY2)*helem(nz,el(2))
@@ -1756,12 +1779,14 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     ! (eta_(n+1)-eta_n)/dt = ssh_rhs - alpha*water_flux*area + (1-alpha)*ssh_rhs_old
     !                      = ssh_rhs
     !                      
-    ! shown in eq (11) rhs of "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
+    ! shown in eq (12) rhs of "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
     if ( .not. trim(which_ALE)=='linfs') then
 !$OMP DO
         do n=1,myDim_nod2D
             nzmin = ulevels_nod2D(n)
-            if (ulevels_nod2D(n)>1) then
+            if (ulevels_nod2D(n)>1 .and. use_cavity_fw2press ) then
+                ! use_cavity_fw2press=.true.: adds freshwater under the cavity thereby 
+                ! increasing the local pressure
                 ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)
             else
                 ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)+(1.0_WP-alpha)*ssh_rhs_old(n)
@@ -1771,7 +1796,7 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     else
 !$OMP DO
         do n=1,myDim_nod2D
-            if (ulevels_nod2D(n)>1) cycle
+            if (ulevels_nod2D(n)>1) cycle ! --> in case of cavity 
             ssh_rhs(n)=ssh_rhs(n)+(1.0_WP-alpha)*ssh_rhs_old(n)
         end do
 !$OMP END DO
@@ -1913,6 +1938,7 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
 
 !$OMP PARALLEL DO
     do n=1,myDim_nod2D
+        if (ulevels_nod2D(n) > 1) cycle ! --> if cavity node hbar == hbar_old
         hbar(n)=hbar_old(n)+ssh_rhs_old(n)*dt/areasvol(ulevels_nod2D(n),n)
     end do
 !$OMP END PARALLEL DO
@@ -2173,7 +2199,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
             
             !_______________________________________________________________________
             ! compute new surface vertical velocity and layer thickness only when 
-            ! there is no cavity 
+            ! there is no cavity --> when there is cavity treat like linfs
             if (nzmin==1) then 
                 !___________________________________________________________________
                 ! total ssh change to distribute
@@ -2338,11 +2364,12 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
                     
                 end if ! --> if (dhbar_total<0 .and. hnode(1,n)+dhbar_total<=... ) then 
                 
+                !___________________________________________________________________
+                ! Add surface fresh water flux as upper boundary condition for continutity
+                !!PS Wvel(1,n) = Wvel(1,n)-water_flux(n)
+                Wvel(nzmin,n) = Wvel(nzmin,n)-water_flux(n)
+            
             end if ! --> if (nzmin==1) then 
-            !___________________________________________________________________
-            ! Add surface fresh water flux as upper boundary condition for continutity
-            !!PS Wvel(1,n) = Wvel(1,n)-water_flux(n)
-            Wvel(nzmin,n) = Wvel(nzmin,n)-water_flux(n)
             
         end do ! --> do n=1, myDim_nod2D
 !$OMP END DO
@@ -2361,7 +2388,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
             
             !_______________________________________________________________________
             ! compute new surface vertical velocity and layer thickness only when 
-            ! there is no cavity 
+            ! there is no cavity --> when there is cavity treat like linfs
             if (nzmin==1) then 
                 
                 !___________________________________________________________________
@@ -2401,14 +2428,13 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
                     
                     hnode_new(nz,n)=hnode(nz,n)+(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))*dd
                 end do
-            
-            endif ! --> if (nzmin==1) then 
-            
-            !___________________________________________________________________
-            ! Add surface fresh water flux as upper boundary condition for 
-            ! continutity
-            !!PS Wvel(1,n)=Wvel(1,n)-water_flux(n)
-            Wvel(nzmin,n)=Wvel(nzmin,n)-water_flux(n) 
+                
+                !___________________________________________________________________
+                ! Add surface fresh water flux as upper boundary condition for 
+                ! continutity
+                Wvel(nzmin,n)=Wvel(nzmin,n)-water_flux(n) 
+                
+            endif ! --> if (nzmin==1) then
             
         end do ! --> do n=1, myDim_nod2D
 !$OMP END PARALLEL DO
@@ -2469,7 +2495,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, c1, c2)
     do n=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(n)
         nzmax = nlevels_nod2D(n)-1
@@ -2610,6 +2636,7 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     if (.not. dynamics%solverinfo%use_parms) then
         if (lfirst) call ssh_solve_preconditioner(dynamics%solverinfo, partit, mesh)
         call ssh_solve_cg(dynamics%d_eta, dynamics%ssh_rhs, dynamics%solverinfo, partit, mesh)
+        call exchange_nod(dynamics%d_eta, partit) !is this required after calling psolve ?
         lfirst=.false.
         return
     end if
@@ -2784,6 +2811,11 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         !!PS vr(1)= vr(1)+zinv*stress_surf(2,elem)/density_0
         ur(nzmin)= ur(nzmin)+zinv*stress_surf(1,elem)/density_0
         vr(nzmin)= vr(nzmin)+zinv*stress_surf(2,elem)/density_0
+
+        if (dynamics%ldiag_ke) then
+           dynamics%ke_wind(1,elem)=stress_surf(1,elem)/density_0*dt
+           dynamics%ke_wind(2,elem)=stress_surf(2,elem)/density_0*dt
+        end if
         
         ! The last row contains bottom friction
         zinv=1.0_WP*dt/(zbar_n(nzmax-1)-zbar_n(nzmax))
@@ -2793,7 +2825,12 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
                         UV(2,nzmax-1,elem)**2)
         ur(nzmax-1)=ur(nzmax-1)+zinv*friction*UV(1,nzmax-1,elem)
         vr(nzmax-1)=vr(nzmax-1)+zinv*friction*UV(2,nzmax-1,elem)
-        
+
+        if (dynamics%ldiag_ke) then
+           dynamics%ke_drag(1,elem)=friction*UV(1,nzmax-1,elem)*dt
+           dynamics%ke_drag(2,elem)=friction*UV(2,nzmax-1,elem)*dt
+        end if
+
         ! Model solves for the difference to the timestep N and therefore we need to 
         ! update the RHS for advective and diffusive contributions at the previous time step
         !!PS do nz=2, nzmax-2
@@ -2892,6 +2929,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
     integer           :: node
+    integer           :: nz, elem, nzmin, nzmax !for KE diagnostic
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer :: eta_n
@@ -2921,7 +2959,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     else  
         call pressure_force_4_zxxxx(tracers, partit, mesh)
     end if
-
+    
+    !___________________________________________________________________________
+    ! check validity of visc_opt=5 selection
+    ! --> need to know buoyancy frequency to do so.
+    ! --> only check on the first timestep 
+    if (n==1) call check_viscopt(dynamics, partit, mesh)
+    
     !___________________________________________________________________________
     ! calculate alpha and beta
     ! it will be used for KPP, Redi, GM etc. Shall we keep it on in general case?
@@ -3023,11 +3067,55 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call viscosity_filter'//achar(27)//'[0m'
+    if (dynamics%ldiag_ke) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
+       do elem=1, myDim_elem2D
+          nzmax = nlevels(elem)
+          nzmin = ulevels(elem)
+          do nz=nzmin,nzmax-1
+             dynamics%ke_rhs_bak(:,nz,elem)=dynamics%UV_rhs(:,nz,elem)
+          end do
+       end do
+!$OMP END PARALLEL DO
+    end if
     call viscosity_filter(dynamics%opt_visc, dynamics, partit, mesh)
+    if (dynamics%ldiag_ke) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
+       do elem=1, myDim_elem2D
+          nzmax = nlevels(elem)
+          nzmin = ulevels(elem)
+          do nz=nzmin,nzmax-1
+             dynamics%ke_hvis(:,nz,elem)=dynamics%UV_rhs(:,nz,elem)-dynamics%ke_rhs_bak(:,nz,elem)
+          end do
+       end do
+!$OMP END PARALLEL DO
+    end if
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call impl_vert_visc_ale'//achar(27)//'[0m'
+    if (dynamics%ldiag_ke) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
+       do elem=1, myDim_elem2D
+          nzmax = nlevels(elem)
+          nzmin = ulevels(elem)
+          do nz=nzmin,nzmax-1
+             dynamics%ke_rhs_bak(:,nz,elem)=dynamics%UV_rhs(:,nz,elem)
+          end do
+       end do
+!$OMP END PARALLEL DO
+    end if
     if(dynamics%use_ivertvisc) call impl_vert_visc_ale(dynamics,partit, mesh)
+    if (dynamics%ldiag_ke) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
+       do elem=1, myDim_elem2D
+          nzmax = nlevels(elem)
+          nzmin = ulevels(elem)
+          do nz=nzmin,nzmax-1
+             dynamics%ke_vvis(:,nz,elem)=dynamics%UV_rhs(:,nz,elem)-dynamics%ke_rhs_bak(:,nz,elem)
+          end do
+       end do
+!$OMP END PARALLEL DO
+    end if
     t2=MPI_Wtime()
         
     !___________________________________________________________________________
@@ -3054,6 +3142,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! estimate new horizontal velocity u^(n+1)
     ! u^(n+1) = u* + [-g * tau * theta * grad(eta^(n+1)-eta^(n)) ]
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_vel'//achar(27)//'[0m'
+    ! ke will be computed inside there if dynamics%ldiag_ke is .TRUE.
     call update_vel(dynamics, partit, mesh)
     
     ! --> eta_(n) --> eta_(n+1) = eta_(n) + deta = eta_(n) + (eta_(n+1) + eta_(n))
@@ -3076,7 +3165,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     !   rigid lid.
 !$OMP PARALLEL DO
     do node=1, myDim_nod2D+eDim_nod2D
-        if (ulevels_nod2D(node)==1) eta_n(node)=alpha*hbar(node)+(1.0_WP-alpha)*hbar_old(node)
+       if (ulevels_nod2D(node)==1) eta_n(node)=alpha*hbar(node)+(1.0_WP-alpha)*hbar_old(node)
     end do
 !$OMP END PARALLEL DO
     ! --> eta_(n)
@@ -3095,14 +3184,26 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         call fer_solve_Gamma(partit, mesh)
         call fer_gamma2vel(dynamics, partit, mesh)
     end if
-    t6=MPI_Wtime()    
+    t6=MPI_Wtime() 
+
     !___________________________________________________________________________
     ! The main step of ALE procedure --> this is were the magic happens --> here 
     ! is decided how change in hbar is distributed over the vertical layers
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call vert_vel_ale'//achar(27)//'[0m'
+    ! keep the old vertical velocity for computation of the mean between the timesteps (is used in compute_ke_wrho)
+    if (dynamics%ldiag_ke) then
+!$OMP PARALLEL DO
+    do node=1, myDim_nod2D+eDim_nod2D
+       dynamics%w_old(:, node)=dynamics%w(:, node)
+    end do
+!$OMP END PARALLEL DO
+    end if
     call vert_vel_ale(dynamics, partit, mesh)
-    t7=MPI_Wtime() 
-
+    t7=MPI_Wtime()   
+    if (dynamics%ldiag_ke) then
+       call compute_ke_wrho(dynamics, partit, mesh)
+       call compute_apegen (dynamics, tracers, partit, mesh)
+    end if
     !___________________________________________________________________________
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
@@ -3118,6 +3219,11 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! write out global fields for debugging
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call write_step_info'//achar(27)//'[0m'
     call write_step_info(n,logfile_outfreq, ice, dynamics, tracers, partit, mesh)
+    !___________________________________________________________________________
+    ! write energy diagnostic info (dynamics%ldiag_ke = .true.)
+    if (dynamics%ldiag_ke) then
+        call write_enegry_info(dynamics, partit, mesh)
+    end if
     
     ! check model for blowup --> ! write_step_info and check_blowup require 
     ! togeather around 2.5% of model runtime
@@ -3153,6 +3259,6 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         write(*,"(A, ES10.3)") '     Oce. TOTAL       :', t10-t0
         write(*,*)
         write(*,*)
-    end if
+    end if    
 end subroutine oce_timestep_ale
 

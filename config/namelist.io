@@ -2,11 +2,13 @@
 ldiag_solver     =.false.
 lcurt_stress_surf=.false.
 ldiag_curl_vel3  =.false.
-ldiag_energy     =.false.
+ldiag_Ri         =.false.
+ldiag_turbflux   =.false.
 ldiag_salt3D     =.false.
 ldiag_dMOC       =.false.
 ldiag_DVD        =.false.
 ldiag_forc       =.false.
+ldiag_extflds    =.false.
 /
 
 &nml_general
@@ -30,6 +32,7 @@ io_list =  'sst       ',1, 'm', 4,
            'm_snow    ',1, 'm', 4,
            'MLD1      ',1, 'm', 4,
            'MLD2      ',1, 'm', 4,
+           'MLD3      ',1, 'm', 4,
            'tx_sur    ',1, 'm', 4,
            'ty_sur    ',1, 'm', 4,
            'temp      ',1, 'y', 4,

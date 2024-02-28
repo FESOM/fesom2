@@ -58,6 +58,7 @@ subroutine par_init(partit)    ! initializes MPI
  
 
   if(partit%mype==0) then
+#if !defined(__PGI)
     call MPI_Query_thread(provided_mpi_thread_support_level, i)
     if(provided_mpi_thread_support_level == MPI_THREAD_SINGLE) then
       provided_mpi_thread_support_level_name = "MPI_THREAD_SINGLE"
@@ -72,6 +73,7 @@ subroutine par_init(partit)    ! initializes MPI
     end if
     write(*,*) 'MPI has been initialized, provided MPI thread support level: ', &
          provided_mpi_thread_support_level_name,provided_mpi_thread_support_level
+#endif
     write(*, *) 'Running on                   ', partit%npes, ' PEs'
 #if defined(_OPENMP)
     write(*, *) 'This is MPI/OpenMP run, with ', OMP_GET_MAX_THREADS(), ' threads per PE'
@@ -91,8 +93,10 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
 #else
   !For ECHAM coupled runs we use the old OASIS nameing scheme (prism / prism_proto)
   use mod_prism 
-#endif ! oifs/echam
-#endif ! oasis
+#endif
+         ! oifs/echam
+#endif
+         ! oasis
 
   implicit none
   integer,           intent(in)   :: COMM
@@ -110,7 +114,8 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
      call  MPI_Barrier(COMM, error)
      call  MPI_Finalize(error)
   endif
-#else ! standalone
+#else 
+      ! standalone
 
 ! From here on the two coupled options
 !-------------------------------------
@@ -134,8 +139,10 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
   
   if (mype==0) print *, 'FESOM calls MPI_Finalize'
   call MPI_Finalize(error)
-#endif ! oifs/echam
-#endif ! oasis
+#endif
+         ! oifs/echam
+#endif
+         ! oasis
 
 ! Regardless of standalone, OpenIFS oder ECHAM coupling, if we reach to this point
 ! we should be fine shutting the whole model down

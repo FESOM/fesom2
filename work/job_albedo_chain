@@ -1,15 +1,24 @@
 #!/bin/bash
 #___SET SLURM OPTIONS___________________________________________________________
-#SBATCH -J chain
-#SBATCH -p mpp
-#SBATCH --ntasks=432
-#SBATCH --time=10:00:00
-#SBATCH --mail-type=END
-#SBATCH --mail-user=Patrick.Scholz@awi.de
-#SBATCH -o fesom2.0_%x_%j.out
-#SBATCH -e fesom2.0_%x_%j.out
+#SBATCH --account=clidyn.p_fesom    # edit your account
+#SBATCH --job-name=chain
+#SBATCH --partition=mpp
 
-## module load intel.compiler intel.mpi netcdf centoslibs
+# disable hyperthreading
+#SBATCH --hint=nomultithread
+#SBATCH --nodes=48                  # Number of tasks (MPI) tasks to be launched
+#SBATCH --tasks-per-node 127        # using all 128CPus we exceed the maxload limit (>130) of many used nodes
+#SBATCH --cpus-per-task 1
+
+#SBATCH --time=12:00:00
+#SBATCH --qos=12h
+
+#SBATCH -o fesom2_%x_%j.out
+#SBATCH -e fesom2_%x_%j.out
+
+##SBATCH --mail-type=END
+##SBATCH --mail-user=Patrick.Scholz@awi.de
+
 
 #___DEFAULT INPUT_______________________________________________________________
 # how many job chains should be applied
@@ -28,7 +37,7 @@ prescribe_rlen=0 # run length in namelist.config --> if 0 value from namelist.co
 fedit=1
 
 #___HELP OUTPUT_________________________________________________________________
-script_name=job_ollie_chain
+script_name=job_albedo_chain
 function usage {
     echo "usage: $script_name [-cn ...] [-cs ...] [-ys ...] [-ye ...] [-wcl ...]"
     echo "  -cn     number of chain cylces (default: 3)"
@@ -69,15 +78,22 @@ jobinfo=$(scontrol show job $SLURM_JOB_ID)
 wcl=$( echo ${jobinfo##*"TimeLimit="} | cut -d " " -f 1 )
 ntasks=$( echo ${jobinfo##*"NumTasks="} | cut -d " " -f 1 )
 
-
-#___SET NAMELIST'S & EXECUTABLE IF NOT ALREADY EXIST____________________________
+#___SET SLURM OPTIONS___________________________________________________________
 set -x
 ulimit -s unlimited
+export OMP_NUM_THREADS=1
+source ../env/albedo/shell
+
+#___SET NAMELIST'S & EXECUTABLE IF NOT ALREADY EXIST____________________________
 ln -s ../bin/fesom.x             .           # cp -n ../bin/fvom_ini.x
 cp -n ../config/namelist.config  .
 cp -n ../config/namelist.forcing .
 cp -n ../config/namelist.oce     .
+cp -n ../config/namelist.dyn     .
+cp -n ../config/namelist.tra     .
 cp -n ../config/namelist.ice     .
+cp -n ../config/namelist.io      .
+cp -n ../config/namelist.icepack .
 
 #___SET CHAIN_ID________________________________________________________________
 if [ -f "file_chain_id" ]; then
@@ -234,36 +250,39 @@ if [ $is_newsimul -eq 1 ] ; then
         prev_chain_id=$(( $chain_id - 1 ))
         
         #_______________________________________________________________________
-        # copy restart ocean files from previous spinup cycle 
-        prev_rfile=${dname_result}${prev_chain_id}/fesom.${year_e}.oce.restart.nc
-        if [ ! -f "$prev_rfile" ]; then
+        # copy restart ocean files/directories from previous spinup cycle 
+        prev_rfile=${dname_result}${prev_chain_id}/fesom.${year_e}.oce.restart
+        if   [ -d "${prev_rfile}"    ]; then
+            cp -r ${prev_rfile} ${dname_result_link}/fesom.${aux_yr}.oce.restart
+        elif [ -f "${prev_rfile}.nc" ]; then
+            cp ${prev_rfile}.nc ${dname_result_link}/fesom.${aux_yr}.oce.restart.nc
+        else
             echo -e "\033[1;31m --> ERROR: could not find ocean restart file \033[0m"
             exit
-        else
-            echo -e "\033[33m --> create ocean warm start files \033[0m"
-            cp $prev_rfile $dname_result_link/fesom.${aux_yr}.oce.restart.nc
         fi
-        # copy restart ice files from previous spinup cycle 
-        prev_rfile=${dname_result}${prev_chain_id}/fesom.${year_e}.ice.restart.nc
-        if [ ! -f "$prev_rfile" ]; then
+        
+        # copy restart ice files/files/directories from previous spinup cycle 
+        prev_rfile=${dname_result}${prev_chain_id}/fesom.${year_e}.ice.restart
+        if   [ -d "${prev_rfile}"    ]; then
+            cp -r ${prev_rfile} ${dname_result_link}/fesom.${aux_yr}.ice.restart
+        elif [ -f "${prev_rfile}.nc" ]; then
+            cp ${prev_rfile}.nc ${dname_result_link}/fesom.${aux_yr}.ice.restart.nc
+        else
             echo -e "\033[1;31m --> ERROR: could not find ice restart file \033[0m"
             exit
-        else
-            echo -e "\033[33m --> create ice warm start files \033[0m"
-            cp $prev_rfile $dname_result_link/fesom.${aux_yr}.ice.restart.nc
         fi
         
         #_______________________________________________________________________
         # adapt year new in namelist.config otherwise fesom is not doing a 
         # restart
-	aux=$(grep "yearnew=" namelist.config | cut -d "=" -f 2 | cut -d " " -f 1 )
+        aux=$(grep "yearnew=" namelist.config | cut -d "=" -f 2 | cut -d " " -f 1 )
         sed -i " s/yearnew=$aux/yearnew=$aux_yr/" namelist.config
         
         #_______________________________________________________________________
         # backup namelist.* & fesom.x in case they dont exist
         if [ ! -f "${dname_result}/namelist.config" ]; then
             cp namelist.config namelist.oce namelist.ice namelist.forcing namelist.io \
-                namelist.cvmix ${dname_result}/.
+               namelist.tra namelist.dyn namelist.cvmix ${dname_result}/.
         fi
         if [ ! -f "${dname_result}/fesom.x" ]; then 
             cp fesom.x ${dname_result}/. 
@@ -276,7 +295,7 @@ fi
 
 #___DETERMINE SLURM JOBID+OUTPUTFILE____________________________________________
 jobid=$(echo $SLURM_JOB_ID | cut -d"." -f1)
-fname="fesom2.0_${SLURM_JOB_NAME}_${jobid}.out"
+fname="fesom2_${SLURM_JOB_NAME}_${jobid}.out"
 
 #___PUT JOB IN QUEUE____________________________________________________________
 date

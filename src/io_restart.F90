@@ -38,6 +38,9 @@ MODULE io_RESTART
 ! ini_ocean_io initializes ocean_file datatype which contains information of all variables need to be written into 
 ! the ocean restart file. This is the only place need to be modified if a new variable is added!
 subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
+#ifdef ENABLE_NVHPC_WORKAROUNDS
+  use nvfortran_subarray_workaround_module
+#endif
   integer, intent(in)       :: year
   integer                   :: j
   character(500)            :: longname
@@ -68,6 +71,9 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
   call oce_files%def_node_var('hnode', 'nodal layer thickness', 'm',   mesh%hnode, mesh, partit)
   
   !___Define the netCDF variables for 3D fields_______________________________
+#ifdef ENABLE_NVHPC_WORKAROUNDS
+  dynamics_workaround => dynamics
+#endif
   call oce_files%def_elem_var('u', 'zonal velocity',        'm/s', dynamics%uv(1,:,:), mesh, partit)
   call oce_files%def_elem_var('v', 'meridional velocity',   'm/s', dynamics%uv(2,:,:), mesh, partit)
   call oce_files%def_elem_var('urhs_AB', 'Adams–Bashforth for u', 'm/s', dynamics%uv_rhsAB(1,:,:), mesh, partit)
@@ -76,15 +82,15 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
   !___Save restart variables for TKE and IDEMIX_________________________________
 !   if (trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
   if (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
-        call oce_files%def_node_var('tke', 'Turbulent Kinetic Energy', 'm2/s2', tke(:,:), mesh, partit)
+        call oce_files%def_node_var_optional('tke', 'Turbulent Kinetic Energy', 'm2/s2', tke(:,:), mesh, partit)
   endif
 !   if (trim(mix_scheme)=='cvmix_IDEMIX' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
   if (mix_scheme_nmb==6 .or. mix_scheme_nmb==56) then
-        call oce_files%def_elem_var('iwe', 'Internal Wave Energy'    , 'm2/s2', iwe(:,:), mesh, partit)
+        call oce_files%def_elem_var_optional('iwe', 'Internal Wave Energy'    , 'm2/s2', iwe(:,:), mesh, partit)
   endif 
   if (dynamics%opt_visc==8) then
-        call oce_files%def_elem_var('uke', 'unresolved kinetic energy', 'm2/s2', uke(:,:), mesh, partit)
-        call oce_files%def_elem_var('uke_rhs', 'unresolved kinetic energy rhs', 'm2/s2', uke_rhs(:,:), mesh, partit)
+        call oce_files%def_elem_var_optional('uke', 'unresolved kinetic energy', 'm2/s2', uke(:,:), mesh, partit)
+        call oce_files%def_elem_var_optional('uke_rhs', 'unresolved kinetic energy rhs', 'm2/s2', uke_rhs(:,:), mesh, partit)
   endif
   
   do j=1,tracers%num_tracers
@@ -146,7 +152,7 @@ end subroutine ini_ice_io
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine restart(istep, l_read, which_readr, ice, dynamics, tracers, partit, mesh)
+subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tracers, partit, mesh)
 
 #if defined(__icepack)
   icepack restart not merged here ! produce a compiler error if USE_ICEPACK=ON; todo: merge icepack restart from 68d8b8b
@@ -157,7 +163,7 @@ subroutine restart(istep, l_read, which_readr, ice, dynamics, tracers, partit, m
   ! this is the main restart subroutine
   ! if l_read   is TRUE the restart file will be read
 
-  integer :: istep
+  integer :: istep, nstart, ntotal
   logical :: l_read
   logical :: is_portable_restart_write, is_raw_restart_write, is_bin_restart_write
   type(t_mesh)  , intent(inout), target :: mesh
@@ -307,7 +313,11 @@ subroutine restart(istep, l_read, which_readr, ice, dynamics, tracers, partit, m
   if(is_portable_restart_write .and. (raw_restart_length_unit /= "off")) then
     is_raw_restart_write = .true. ! always write a raw restart together with the portable restart (unless raw restarts are off)
   else
+#if !defined __ifsinterface
     is_raw_restart_write = is_due(trim(raw_restart_length_unit), raw_restart_length, istep)
+#else
+    is_raw_restart_write = is_due(trim(raw_restart_length_unit), raw_restart_length, istep) .OR. (istep==ntotal)
+#endif
   end if
   
   ! --> should write derived type binary restart: True/False
@@ -730,6 +740,7 @@ end subroutine
 !
 !_______________________________________________________________________________
 subroutine read_restart(path, filegroup, mpicomm, mype)
+  include 'mpif.h'        
   character(len=*), intent(in) :: path
   type(restart_file_group), intent(inout) :: filegroup
   integer, intent(in) :: mpicomm
@@ -744,7 +755,6 @@ subroutine read_restart(path, filegroup, mpicomm, mype)
   integer current_iorank_snd, current_iorank_rcv
   integer max_globalstep
   integer mpierr
-  include 'mpif.h'
   
   allocate(skip_file(filegroup%nfiles))
   skip_file = .false.

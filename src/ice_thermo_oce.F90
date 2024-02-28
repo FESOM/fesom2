@@ -268,8 +268,8 @@ subroutine thermodynamics(ice, partit, mesh)
         S_oc    = S_oc_array(i)
         if(ref_sss_local) rsss = S_oc
         t       = t_skin(i)   
-        ch	     = Ch_atm_oce_arr(i)
-        ce	     = Ce_atm_oce_arr(i)
+        ch	    = Ch_atm_oce_arr(i)
+        ce	    = Ce_atm_oce_arr(i)
         ch_i    = Ch_atm_ice
         ce_i    = Ce_atm_ice
         h_ml    = 2.5_WP                ! 10.0 or 30. used previously
