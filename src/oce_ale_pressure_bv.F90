@@ -211,7 +211,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     type(t_mesh),   intent(in) ,    target  :: mesh
     type(t_partit), intent(inout),  target  :: partit
     type(t_tracer), intent(in),     target  :: tracers
-    real(kind=WP)                           :: zmean, dz_inv, bv,  a, rho_up, rho_dn, t, s
+    real(kind=WP)                           :: zmean, dz_inv, bv,  a, rho_up, rho_dn
     integer                                 :: node, nz, nl1, nzmax, nzmin
     real(kind=WP)                           :: rhopot(mesh%nl), bulk_0(mesh%nl), bulk_pz(mesh%nl), bulk_pz2(mesh%nl), rho(mesh%nl), dbsfc1(mesh%nl), bv1(mesh%nl), db_max
     real(kind=WP)                           :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf, aux_rho, aux_rho1
@@ -220,20 +220,31 @@ subroutine pressure_bv(tracers, partit, mesh)
     logical                                 :: flag1, flag2, flag3, mixing_kpp
     logical                                 :: smooth_bv_vertical=.false. ! smoothing Bv in vertical is sometimes necessary in order to avoid vertival noise in Kv/Av
     real(kind=WP),  dimension(:,:), pointer :: temp, salt
+    character(20)                           :: which_ale_trimmed
+
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+
     temp=>tracers%data(1)%values(:,:)
     salt=>tracers%data(2)%values(:,:)
     smallvalue=1.0e-20
     buoyancy_crit=0.0003_WP
     mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==17)
+    which_ale_trimmed = trim(which_ale)
+
+    if( state_equation > 1 ) then
+        if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end if
+
     !___________________________________________________________________________
     ! Screen salinity
     a    =0.0_WP
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax)
 !$OMP DO REDUCTION(min: a)
+    !$ACC PARALLEL LOOP GANG VECTOR REDUCTION(min:a) DEFAULT(PRESENT)
     do node=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(node)
         nzmax = nlevels_nod2D(node)
@@ -241,6 +252,7 @@ subroutine pressure_bv(tracers, partit, mesh)
             a=min(a, salt(nz,node))
         enddo
     enddo
+    !$ACC END PARALLEL LOOP
 !$OMP END DO
 !$OMP END PARALLEL
 
@@ -248,6 +260,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     ! model explodes, no OpenMP parallelization !
     if( a < 0.0_WP ) then
         write (*,*)' --> pressure_bv: s<0 happens!', a
+        !$ACC UPDATE SELF(salt)
         pe_status=1
         do node=1, myDim_nod2D+eDim_nod2D
             nzmin = ulevels_nod2D(node)
@@ -256,44 +269,49 @@ subroutine pressure_bv(tracers, partit, mesh)
                 if (salt(nz, node) < 0) write (*,*) 'the model blows up at n=', mylist_nod2D(node), ' ; ', 'nz=', nz
             end do
         end do
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     endif
 
     !___________________________________________________________________________
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(zmean, dz_inv, bv,  a, rho_up, rho_dn, t, s, node, nz, nl1, nzmax, nzmin, &
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(zmean, dz_inv, bv,  a, rho_up, rho_dn, node, nz, nl1, nzmax, nzmin, &
 !$OMP                                  rhopot, bulk_0, bulk_pz, bulk_pz2, rho, dbsfc1, db_max, bulk_up, bulk_dn, &
 !$OMP                                  rho_surf, aux_rho, aux_rho1, flag1, flag2, bv1)
 !$OMP DO
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) &
+    !$ACC PRIVATE(rhopot, bulk_0, bulk_pz, bulk_pz2, rho, dbsfc1, bv1)
     do node=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(node)
         nzmax = nlevels_nod2D(node)
 
         !!PS nl1= nlevels_nod2d(node)-1
-        rho      = 0.0_WP
-        bulk_0   = 0.0_WP
-        bulk_pz  = 0.0_WP
-        bulk_pz2 = 0.0_WP
-        rhopot   = 0.0_WP
-        ! also compute the maximum buoyancy gradient between the surface and any depth
-        ! it will be used for computing MLD according to FESOM 1.4 implementation (after Large et al. 1997)
-        db_max   = 0.0_WP
-        dbsfc1   = 0.0_WP
+
+        !$ACC LOOP VECTOR
+        do nz = 1, mesh%nl
+            rho     (nz) = 0.0_WP
+            bulk_0  (nz) = 0.0_WP
+            bulk_pz (nz) = 0.0_WP
+            bulk_pz2(nz) = 0.0_WP
+            rhopot  (nz) = 0.0_WP
+            ! also compute the maximum buoyancy gradient between the surface and any depth
+            ! it will be used for computing MLD according to FESOM 1.4 implementation (after Large et al. 1997)
+            dbsfc1  (nz) = 0.0_WP
+        end do
+        !$ACC END LOOP
+        db_max = 0.0_WP
 
         !_______________________________________________________________________
         ! apply equation of state
+        !$ACC LOOP VECTOR
         do nz=nzmin, nzmax-1
-            t=temp(nz, node)
-            s=salt(nz, node)
             select case(state_equation)
                 case(0)
-                    call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
+                    call density_linear(temp(nz, node), salt(nz, node), bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
                 case(1)
-                    call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
-                case default !unknown
-                    if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                    call densityJM_components(temp(nz, node), salt(nz, node), bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
             end select
         end do
+        !$ACC END LOOP
 
         !NR split the loop here. The Intel compiler could not resolve that there is no dependency
         !NR and did not vectorize the full loop.
@@ -301,16 +319,19 @@ subroutine pressure_bv(tracers, partit, mesh)
         ! calculate density for MOC
         if (ldiag_dMOC) then
             !!PS do nz=1, nl1
+            !$ACC LOOP VECTOR
             do nz=nzmin, nzmax-1
                 rho(nz)              = bulk_0(nz) - 2000._WP*(bulk_pz(nz)   -2000._WP*bulk_pz2(nz))
                 density_dmoc(nz,node)= rho(nz)*rhopot(nz)/(rho(nz)-200._WP)
                         !           density_dmoc(nz,node)   = rhopot(nz)
             end do
+            !$ACC END LOOP
         end if
 
         !_______________________________________________________________________
         ! compute density for PGF
         !!PS do nz=1, nl1
+        !$ACC LOOP VECTOR REDUCTION(max:db_max)
         do nz=nzmin, nzmax-1
             !___________________________________________________________________
             rho(nz) = bulk_0(nz) + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
@@ -333,10 +354,15 @@ subroutine pressure_bv(tracers, partit, mesh)
 
             db_max = max(dbsfc1(nz)/abs(Z_3d_n(nzmin,node)-Z_3d_n(max(nz, nzmin+1),node)), db_max)
         end do
+        !$ACC END LOOP
 
         dbsfc1(nzmax)=dbsfc1(nzmax-1)
         if (mixing_kpp) then ! in case KPP is ON store the buoyancy difference with respect to the surface (m/s2)
-            dbsfc(nzmin:nzmax, node )=dbsfc1(nzmin:nzmax)
+            !$ACC LOOP VECTOR
+            do nz = nzmin, nzmax
+                dbsfc(nz, node) = dbsfc1(nz)
+            end do
+            !$ACC END LOOP
         end if
 
         !_______________________________________________________________________
@@ -345,28 +371,25 @@ subroutine pressure_bv(tracers, partit, mesh)
         ! like at the cavity-ocean interface --> compute water mass density that
         ! is replaced by the cavity
         if (nzmin>1) then
-            t=temp(nzmin, node)
-            s=salt(nzmin, node)
+            !$ACC LOOP VECTOR
             do nz=1, nzmin-1
                 select case(state_equation)
                     case(0)
-                        call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
+                        call density_linear(temp(nz, node), salt(nz, node), bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
                     case(1)
-                        call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
-                    case default !unknown
-                        if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                        call densityJM_components(temp(nz, node), salt(nz, node), bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
                 end select
                 !_______________________________________________________________
                 rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
                 rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node)*real(state_equation))-density_ref(nz,node)
                 density_m_rho0(nz,node) = rho(nz)
             end do
+            !$ACC END LOOP
         end if
 
         !_______________________________________________________________________
         ! calculate pressure
-        if (trim(which_ale)=='linfs' .or. use_cavity .eqv. .true.) then
+        if (which_ale_trimmed == 'linfs' .or. use_cavity .eqv. .true.) then
             !!PS hpressure(1, node)=-Z_3d_n(1,node)*rho(1)*g
             !!PS hpressure(1, node)=0.5_WP*hnode(1,node)*rho(1)*g
             !___________________________________________________________________
@@ -378,10 +401,12 @@ subroutine pressure_bv(tracers, partit, mesh)
                 ! homogenous ocean, with no fluxes and boundary condition creates
                 ! no pressure gradient errors
                 hpressure(nzmin, node)=0.5_WP*(zbar_3d_n(1,node)-zbar_3d_n(2,node))*rho(1)*g
+                !$ACC LOOP VECTOR
                 do nz=2,nzmin
                     a=0.5_WP*g*(rho(nz-1)*(zbar_3d_n(nz-1,node)-zbar_3d_n(nz,node))+rho(nz)*(zbar_3d_n(nz,node)-zbar_3d_n(nz+1,node)))
                     hpressure(nzmin, node)=hpressure(nzmin, node)+a
                 end do
+                !$ACC END LOOP
 
                 !  --> this as a upper pressure boundary condition incase of a
                 ! homogenous ocean, with no fluxes and boundary condition creates
@@ -393,6 +418,7 @@ subroutine pressure_bv(tracers, partit, mesh)
 
             !___________________________________________________________________
             ! compute pressure below surface boundary
+            !$ACC LOOP VECTOR
             do nz=nzmin+1,nzmax-1
                 ! why 0.5 ... integrate g*rho*dz vertically, integrate half layer
                 ! thickness of previouse layer and half layer thickness of actual
@@ -400,6 +426,7 @@ subroutine pressure_bv(tracers, partit, mesh)
                 a=0.5_WP*g*(rho(nz-1)*hnode(nz-1,node)+rho(nz)*hnode(nz,node))
                 hpressure(nz, node)=hpressure(nz-1, node)+a
             end do
+            !$ACC END LOOP
         end if
 
         !___________________________________________________________________
@@ -424,6 +451,7 @@ subroutine pressure_bv(tracers, partit, mesh)
         flag1=.true.
         flag2=.true.
         flag3=.true.
+        !$ACC LOOP SEQ
         do nz=nzmin+1,nzmax-1
             zmean   = 0.5_WP*sum(Z_3d_n(nz-1:nz, node))
             bulk_up = bulk_0(nz-1) + zmean*(bulk_pz(nz-1) + zmean*bulk_pz2(nz-1))
@@ -467,6 +495,7 @@ subroutine pressure_bv(tracers, partit, mesh)
                 MLD3(node)=Z_3d_n(nz,node)
             end if
         end do
+        !$ACC END LOOP
 
         if (flag2) MLD2_ind(node)=nzmax-1
         if (flag3) MLD3_ind(node)=nzmax-1
@@ -480,16 +509,23 @@ subroutine pressure_bv(tracers, partit, mesh)
         !_______________________________________________________________________
         ! BV is defined on full levels except for the first and the last ones.
         if (smooth_bv_vertical) then
+           !$ACC LOOP VECTOR
            do nz=nzmin+1,nzmax-1
               bv1(nz)=        (zbar_3d_n(nz-1,node)-zbar_3d_n(nz,  node))*(bvfreq(nz-1,node)+bvfreq(nz,  node))
               bv1(nz)=bv1(nz)+(zbar_3d_n(nz,  node)-zbar_3d_n(nz+1,node))*(bvfreq(nz,  node)+bvfreq(nz+1,node))
               bv1(nz)=0.5_WP*bv1(nz)/(zbar_3d_n(nz-1,node)-zbar_3d_n(nz+1,  node))
            end do
+           !$ACC END LOOP
+           !$ACC LOOP VECTOR
            do nz=nzmin+1,nzmax-1
               bvfreq(nz,node)=bv1(nz)
            end do
+           !$ACC END LOOP
         end if
     end do
+
+    !$ACC END PARALLEL LOOP
+
 !$OMP END DO
 !$OMP END PARALLEL
 call smooth_nod (bvfreq, 1, partit, mesh)
@@ -2367,20 +2403,32 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
     real(kind=WP)                           :: rho_at_Zn(3, mesh%nl), temp_at_Zn(3), salt_at_Zn(3), drho_dz(3), aux_dref
     real(kind=WP)                           :: rhopot(3), bulk_0(3), bulk_pz(3), bulk_pz2(3)
     real(kind=WP)                           :: dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2
-    real(kind=WP)                           :: zbar_n(mesh%nl), z_n(mesh%nl-1)
+    real(kind=WP)                           :: zbar_n(mesh%nl), z_n(mesh%nl - 1)
     real(kind=WP),  dimension(:,:), pointer :: temp, salt
+    logical                                 :: error
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     temp=>tracers%data(1)%values(:,:)
     salt=>tracers%data(2)%values(:,:)
+
+    if( state_equation > 1 ) then
+        if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end if
+    error = .false.
+
     !___________________________________________________________________________
     ! loop over triangular elemments
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nlz, nln, ni, nlc, nlce, idx, int_dp_dx, drho_dx, drho_dy, dz_dx, dz_dy, aux_sum, dx10, dx20, dx21, &
 !$OMP                                  f0, df10, df21, t0, dt10, dt21, s0, ds10, ds21, rho_at_Zn, temp_at_Zn, salt_at_Zn, drho_dz, aux_dref, rhopot,                &
 !$OMP                                  bulk_0, bulk_pz, bulk_pz2, dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, zbar_n, z_n                                )
 !$OMP DO
+
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) &
+    !$ACC PRIVATE(elnodes, int_dp_dx, rho_at_Zn, zbar_n, z_n) &
+    !$ACC REDUCTION(.or.:error)
     do elem = 1, myDim_elem2D
         !_______________________________________________________________________
         ! nle...number of mid-depth levels at elem
@@ -2393,15 +2441,28 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
         !_______________________________________________________________________
         ! calculate mid depth element level --> Z_e
         ! nle...number of mid-depth levels at elem
-        zbar_n          = 0.0_WP
-        Z_n             = 0.0_WP
+
+        !$ACC LOOP VECTOR
+        do nlz = 1, mesh%nl
+            zbar_n(nlz) = 0.0_WP
+        end do
+        !$ACC END LOOP
+
+        !$ACC LOOP VECTOR
+        do nlz = 1, mesh%nl - 1
+            Z_n(nlz) = 0.0_WP
+        end do
+        !$ACC END LOOP
+
         zbar_n(nle + 1) = zbar_e_bot(elem)
         Z_n(nle)        = zbar_n(nle + 1) + helem(nle, elem) * 0.5_WP
 
+        !$ACC LOOP SEQ
         do nlz = nle, ule + 1, -1
             zbar_n(nlz)  = zbar_n(nlz + 1) + helem(nlz    , elem)
             Z_n(nlz - 1) = zbar_n(nlz    ) + helem(nlz - 1, elem) * 0.5_WP
         end do
+        !$ACC END LOOP
         zbar_n(ule) = zbar_n(ule + 1) + helem(ule, elem)
 
         !_______________________________________________________________________
@@ -2412,9 +2473,6 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                     call density_linear(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot)
                 case(1)
                     call densityJM_components(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot)
-                case default !unknown
-                    if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
             end select
         end if
 
@@ -2444,6 +2502,10 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
 
         !_______________________________________________________________________
         ! calculate pressure gradient for all vertical layers
+        !$ACC LOOP VECTOR &
+        !$ACC PRIVATE(idx, dx10, dx21, dx20, t0, dt10, dt21, s0, ds10, ds21) &
+        !$ACC PRIVATE(temp_at_Zn, salt_at_Zn, rhopot, bulk_0, bulk_pz, bulk_pz2) &
+        !$ACC REDUCTION(.or.:error)
         do nlz = ule, nle
             !___________________________________________________________________
             ! account for reference density when using cavities
@@ -2459,18 +2521,12 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                 idx = nlevels_nod2D(elnodes) - 1 - idx
             end if
 
+            !$ACC LOOP SEQ
             do ni = 1, 3
                 if ( idx(ni) < 0 ) then
                     ! would do second order Newtonian boundary extrapolation
                     ! --> this is not wanted !!!
-                    write(*,*) ' --> would do second order bottom boundary density extrapolation'
-                    write(*,*) '     This is not wanted, model stops here'
-                    write(*,*) ' idx = ', idx
-                    write(*,*) ' nlz = ', nlz
-                    write(*,*) ' nle = ', nle
-                    write(*,*) ' ule = ', ule
-                    write(*,*) ' nln = ', nlevels_nod2D(elnodes)-1
-                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                    error = .true.
                 end if
 
                 layer_offset = 0
@@ -2524,36 +2580,52 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                         call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
                     case(1)
                         call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
-                    case default !unknown
-                        if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
                 end select
                 rho_at_Zn(ni, nlz) = bulk_0(ni) + Z_n(nlz) * (bulk_pz(ni) + Z_n(nlz) * bulk_pz2(ni))
                 rho_at_Zn(ni, nlz) = rho_at_Zn(ni, nlz) * rhopot(ni)                                   &
                                      / (rho_at_Zn(ni, nlz) + 0.1_WP * Z_n(nlz) * real(state_equation)) &
                                      - aux_dref
             end do
+            !$ACC END LOOP
         end do
+        !$ACC END LOOP
 
         int_dp_dx = 0.0_WP
+        !$ACC LOOP SEQ
         do nlz = ule, nle
+            drho_dx = 0.0_WP
+            drho_dy = 0.0_WP
+            !$ACC LOOP SEQ
+            do ni = 1, 3
+                drho_dx = drho_dx + gradient_sca(ni    , elem) * rho_at_Zn(ni, nlz)
+                drho_dy = drho_dy + gradient_sca(ni + 3, elem) * rho_at_Zn(ni, nlz)
+            end do
+            !$ACC END LOOP
+
             !_______________________________________________________________________
             ! zonal gradients
-            drho_dx         = sum(gradient_sca(1:3,elem) * rho_at_Zn(:, nlz))
             aux_sum         = drho_dx * helem(nlz,elem) * g/density_0
             pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum * 0.5_WP
             int_dp_dx(1)    = int_dp_dx(1) + aux_sum
 
             !_______________________________________________________________________
             ! meridional gradients
-            drho_dy         = sum(gradient_sca(4:6,elem) * rho_at_Zn(:, nlz))
             aux_sum         = drho_dy * helem(nlz,elem) * g / density_0
             pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum * 0.5_WP
             int_dp_dx(2)    = int_dp_dx(2) + aux_sum
         end do
+        !$ACC END LOOP
     end do ! --> do elem=1, myDim_elem2D
-!$OMP END DO
-!$OMP END PARALLEL
+    !$ACC END PARALLEL LOOP
+
+    !$OMP END DO
+    !$OMP END PARALLEL
+
+    if (error .eqv. .true.) then
+        write(*,*) ' --> Tried doing second order boundary density extrapolation'
+        write(*,*) '     This is not wanted, model stops here'
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+    end if
 end subroutine pressure_force_4_zxxxx_easypgf
 !
 !
@@ -2599,6 +2671,8 @@ end subroutine densityJM_local
 !
 !===============================================================================
 SUBROUTINE densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot)
+
+!$ACC ROUTINE SEQ
 USE MOD_PARSUP !, only: par_ex,pe_status
 USE o_ARRAYS
 USE o_PARAM
@@ -2662,6 +2736,7 @@ IMPLICIT NONE
                + s*(bs + t*(bst + t*(bst2 + t*(bst3 + t*bst4)))  &
                   + s_sqrt*(bss + t*(bsst + t*bsst2))            &
                        + s* bss2)
+
 end subroutine densityJM_components
 !
 !
@@ -2790,54 +2865,61 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, t1, t1_2, t1_3, t1_4, p1, p1_2, p1_3, s1, s35, s35_2, a_over_b)
 !$OMP DO
-  do n = 1,myDim_nod2d
-     nzmin = ulevels_nod2d(n)
-     nzmax = nlevels_nod2d(n)
-     !!PS do nz=1, nlevels_nod2d(n) -1
-     do nz=nzmin, nzmax-1
 
-     t1 = TF1(nz,n)*1.00024_WP
-     s1 = SF1(nz,n)
-    !!PS      p1 = abs(Z(nz))
-     p1 = abs(Z_3d_n(nz,n))
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT)
+    do n = 1,myDim_nod2d
+        nzmin = ulevels_nod2d(n)
+        nzmax = nlevels_nod2d(n)
+        !!PS do nz=1, nlevels_nod2d(n) -1
 
-     t1_2 = t1*t1
-     t1_3 = t1_2*t1
-     t1_4 = t1_3*t1
-     p1_2 = p1*p1
-     p1_3 = p1_2*p1
-     s35 = s1-35.0_WP
-     s35_2 = s35*s35
+        !$ACC LOOP VECTOR
+        do nz=nzmin, nzmax-1
+            t1 = TF1(nz,n)*1.00024_WP
+            s1 = SF1(nz,n)
+            !!PS      p1 = abs(Z(nz))
+            p1 = abs(Z_3d_n(nz,n))
 
-     ! calculate beta
-     sw_beta(nz,n) = 0.785567e-3_WP - 0.301985e-5_WP*t1 &
-          + 0.555579e-7_WP*t1_2 - 0.415613e-9_WP*t1_3 &
-          + s35*(-0.356603e-6_WP + 0.788212e-8_WP*t1 &
-          + 0.408195e-10_WP*p1 - 0.602281e-15_WP*p1_2) &
-          + s35_2*(0.515032e-8_WP) &
-          + p1*(-0.121555e-7_WP + 0.192867e-9_WP*t1 - 0.213127e-11_WP*t1_2) &
-          + p1_2*(0.176621e-12_WP - 0.175379e-14_WP*t1) &
-          + p1_3*(0.121551e-17_WP)
+            t1_2  = t1*t1
+            t1_3  = t1_2*t1
+            t1_4  = t1_3*t1
+            p1_2  = p1*p1
+            p1_3  = p1_2*p1
+            s35   = s1-35.0_WP
+            s35_2 = s35*s35
 
-     ! calculate the thermal expansion / saline contraction ratio
-     a_over_b = 0.665157e-1_WP + 0.170907e-1_WP*t1 &
-          - 0.203814e-3_WP*t1_2 + 0.298357e-5_WP*t1_3 &
-          - 0.255019e-7_WP*t1_4 &
-          + s35*(0.378110e-2_WP - 0.846960e-4_WP*t1 &
-          - 0.164759e-6_WP*p1 - 0.251520e-11_WP*p1_2) &
-          + s35_2*(-0.678662e-5_WP) &
-          + p1*(0.380374e-4_WP - 0.933746e-6_WP*t1 + 0.791325e-8_WP*t1_2) &
-          + p1_2*t1_2*(0.512857e-12_WP) &
-          - p1_3*(0.302285e-13_WP)
+            ! calculate beta
+            sw_beta(nz,n) = 0.785567e-3_WP - 0.301985e-5_WP*t1 &
+            + 0.555579e-7_WP*t1_2 - 0.415613e-9_WP*t1_3 &
+            + s35*(-0.356603e-6_WP + 0.788212e-8_WP*t1 &
+            + 0.408195e-10_WP*p1 - 0.602281e-15_WP*p1_2) &
+            + s35_2*(0.515032e-8_WP) &
+            + p1*(-0.121555e-7_WP + 0.192867e-9_WP*t1 - 0.213127e-11_WP*t1_2) &
+            + p1_2*(0.176621e-12_WP - 0.175379e-14_WP*t1) &
+            + p1_3*(0.121551e-17_WP)
 
-     ! calculate alpha
-     sw_alpha(nz,n) = a_over_b*sw_beta(nz,n)
-   end do
- end do
+            ! calculate the thermal expansion / saline contraction ratio
+            a_over_b = 0.665157e-1_WP + 0.170907e-1_WP*t1 &
+            - 0.203814e-3_WP*t1_2 + 0.298357e-5_WP*t1_3 &
+            - 0.255019e-7_WP*t1_4 &
+            + s35*(0.378110e-2_WP - 0.846960e-4_WP*t1 &
+            - 0.164759e-6_WP*p1 - 0.251520e-11_WP*p1_2) &
+            + s35_2*(-0.678662e-5_WP) &
+            + p1*(0.380374e-4_WP - 0.933746e-6_WP*t1 + 0.791325e-8_WP*t1_2) &
+            + p1_2*t1_2*(0.512857e-12_WP) &
+            - p1_3*(0.302285e-13_WP)
+
+            ! calculate alpha
+            sw_alpha(nz,n) = a_over_b*sw_beta(nz,n)
+        end do
+        !$ACC END LOOP
+    end do
+
+    !$ACC END PARALLEL LOOP
+
 !$OMP END DO
 !$OMP END PARALLEL
-call exchange_nod(sw_alpha, partit)
-call exchange_nod(sw_beta, partit)
+call exchange_nod(sw_alpha, partit, luse_g2g = .true.)
+call exchange_nod(sw_beta, partit, luse_g2g = .true.)
 !$OMP BARRIER
 end subroutine sw_alpha_beta
 !
@@ -2857,7 +2939,7 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
   ! based on thermal expansion and saline contraction coefficients
   ! computes density gradient sigma_xy
   !-------------------------------------------------------------------
-  use mod_mesh
+  use MOD_MESH
   USE MOD_PARTIT
   USE MOD_PARSUP
   use o_param
@@ -2868,7 +2950,7 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
   type(t_mesh),   intent(in) ,    target :: mesh
   type(t_partit), intent(inout),  target :: partit
   real(kind=WP),  intent(IN)             :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D), SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-  real(kind=WP)                          :: tx(mesh%nl-1), ty(mesh%nl-1), sx(mesh%nl-1), sy(mesh%nl-1), vol(mesh%nl-1), testino(2)
+  real(kind=WP)                          :: tx(mesh%nl - 1), ty(mesh%nl - 1), sx(mesh%nl - 1), sy(mesh%nl - 1), vol(mesh%nl - 1)
   integer                                :: n, nz, elnodes(3),el, k, nln, uln, nle, ule
 
 #include "associate_part_def.h"
@@ -2876,9 +2958,13 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tx, ty, sx, sy, vol, testino, n, nz, elnodes, el, k, nln, uln, nle, ule)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tx, ty, sx, sy, vol, n, nz, elnodes, el, k, nln, uln, nle, ule)
 !$OMP DO
-  DO n=1, myDim_nod2D
+
+    !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) &
+    !$ACC PRIVATE(elnodes, tx, ty, sx, sy, vol)
+
+    do n=1, myDim_nod2D
         nln = nlevels_nod2D(n)-1
         uln = ulevels_nod2D(n)
         !!PS vol(1:nl1) = 0.0_WP
@@ -2886,17 +2972,24 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
         !!PS ty(1:nl1)  = 0.0_WP
         !!PS sx(1:nl1)  = 0.0_WP
         !!PS sy(1:nl1)  = 0.0_WP
-        vol(uln:nln) = 0.0_WP
-        tx(uln:nln)  = 0.0_WP
-        ty(uln:nln)  = 0.0_WP
-        sx(uln:nln)  = 0.0_WP
-        sy(uln:nln)  = 0.0_WP
-        DO k=1, nod_in_elem2D_num(n)
+
+        !$ACC LOOP VECTOR
+        do nz = uln, nln
+            vol(nz) = 0.0_WP
+            tx (nz) = 0.0_WP
+            ty (nz) = 0.0_WP
+            sx (nz) = 0.0_WP
+            sy (nz) = 0.0_WP
+        end do
+        !$ACC END LOOP
+
+        do k=1, nod_in_elem2D_num(n)
            el=nod_in_elem2D(k, n)
            nle = nlevels(el)-1
            ule = ulevels(el)
            !!PS DO nz=1, nlevels(el)-1
-           DO nz=ule, nle
+           !$ACC LOOP VECTOR
+           do nz=ule, nle
               vol(nz) = vol(nz)+elem_area(el)
 
               !NR  writing the sum over elem2D_nodes explicitly helps the compiler to vectorize the nz-loop
@@ -2916,16 +3009,24 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
               sy(nz) = sy(nz)+(gradient_sca(4,el)*SF1(nz,elem2D_nodes(1,el)) &
                              + gradient_sca(5,el)*SF1(nz,elem2D_nodes(2,el)) &
                              + gradient_sca(6,el)*SF1(nz,elem2D_nodes(3,el)))*elem_area(el)
-           END DO
-        enddo
+           end do
+           !$ACC END LOOP
+        end do
+
         !!PS sigma_xy(1,1:nl1,n) = (-sw_alpha(1:nl1,n)*tx(1:nl1)+sw_beta(1:nl1,n)*sx(1:nl1))/vol(1:nl1)*density_0
         !!PS sigma_xy(2,1:nl1,n) = (-sw_alpha(1:nl1,n)*ty(1:nl1)+sw_beta(1:nl1,n)*sy(1:nl1))/vol(1:nl1)*density_0
-        sigma_xy(1,uln:nln,n) = (-sw_alpha(uln:nln,n)*tx(uln:nln)+sw_beta(uln:nln,n)*sx(uln:nln))/vol(uln:nln)*density_0
-        sigma_xy(2,uln:nln,n) = (-sw_alpha(uln:nln,n)*ty(uln:nln)+sw_beta(uln:nln,n)*sy(uln:nln))/vol(uln:nln)*density_0
-  END DO
+        !$ACC LOOP VECTOR
+        do nz = uln, nln
+            sigma_xy(1, nz, n) = (-sw_alpha(nz, n)*tx(nz)+sw_beta(nz, n)*sx(nz))/vol(nz)*density_0
+            sigma_xy(2, nz, n) = (-sw_alpha(nz, n)*ty(nz)+sw_beta(nz, n)*sy(nz))/vol(nz)*density_0
+        end do
+        !$ACC END LOOP
+    end do
+    !$ACC END PARALLEL LOOP
+
 !$OMP END DO
 !$OMP END PARALLEL
-  call exchange_nod(sigma_xy, partit)
+  call exchange_nod(sigma_xy, partit, luse_g2g = .true.)
 !$OMP BARRIER
 end subroutine compute_sigma_xy
 !
@@ -2958,6 +3059,14 @@ subroutine compute_neutral_slope(partit, mesh)
     S_d=1.0e-3_WP
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, n, nz, nl1, ul1, el, elnodes, enodes, c, ro_z_inv)
 !$OMP DO
+
+#if !defined(DISABLE_OPENACC_ATOMICS)
+    ! WARNING: the hyperbolic tangent is not supported by math_uniform
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
+#else
+    !$ACC UPDATE SELF(myDim_nod2D, nlevels_nod2d, ulevels_nod2d, bvfreq, sigma_xy)
+#endif
+
     do n=1, myDim_nod2D
         slope_tapered(: , :, n)=0._WP
         nl1=nlevels_nod2d(n)-1
@@ -2974,10 +3083,16 @@ subroutine compute_neutral_slope(partit, mesh)
             slope_tapered(:,nz,n)=neutral_slope(:,nz,n)*c
         enddo
     enddo
+#if !defined(DISABLE_OPENACC_ATOMICS)
+    !$ACC END PARALLEL LOOP
+#else
+    !$ACC UPDATE DEVICE(slope_tapered, neutral_slope)
+#endif
+
 !$OMP END DO
 !$OMP END PARALLEL
-    call exchange_nod(neutral_slope, partit)
-    call exchange_nod(slope_tapered, partit)
+    call exchange_nod(neutral_slope, partit, luse_g2g = .true.)
+    call exchange_nod(slope_tapered, partit, luse_g2g = .true.)
 !$OMP BARRIER
 end subroutine compute_neutral_slope
 !
@@ -3037,6 +3152,8 @@ end subroutine insitu2pot
 !===============================================================================
 SUBROUTINE density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out)
 !coded by Margarita Smolentseva, 21.05.2020
+
+!$ACC ROUTINE SEQ
 USE MOD_PARSUP !, only: par_ex,pe_status
 USE o_ARRAYS
 USE o_PARAM
@@ -3053,7 +3170,9 @@ IMPLICIT NONE
   bulk_pz  = 0
   bulk_pz2 = 0
 
-  IF((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) THEN
+  ! trim removed for GPU execution
+  ! IF((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) THEN
+  IF(toy_ocean .AND. which_toy == "soufflet") THEN
       rho_out  = density_0 - 0.00025_WP*(t - 10.0_WP)*density_0
   ELSE
       rho_out  = density_0 + 0.8_WP*(s - 34.0_WP) - 0.2*(t - 20.0_WP)

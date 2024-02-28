@@ -15,7 +15,7 @@ module oce_ale_interfaces
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
         end subroutine
-        
+
         subroutine init_surface_elem_depth(partit, mesh)
         use mod_mesh
         USE MOD_PARTIT
@@ -165,7 +165,7 @@ end module
 !
 ! initially written by Sergey Danilov, adapted and expanded by Patrick Scholz and
 ! Dmitry Sidorenko, 14.02.2019
-!    
+!
 !===============================================================================
 ! allocate & initialise arrays for Arbitrary-Langrangian-Eularian (ALE) method
 subroutine init_ale(dynamics, partit, mesh)
@@ -192,40 +192,40 @@ subroutine init_ale(dynamics, partit, mesh)
 #include "associate_mesh_ass.h"
 
     !___allocate________________________________________________________________
-    ! hnode and hnode_new: layer thicknesses at nodes. 
+    ! hnode and hnode_new: layer thicknesses at nodes.
     allocate(mesh%hnode(1:nl-1, myDim_nod2D+eDim_nod2D))
     allocate(mesh%hnode_new(1:nl-1, myDim_nod2D+eDim_nod2D))
     ! ssh_rhs_old: auxiliary array to store an intermediate part of the rhs computations.
     allocate(dynamics%ssh_rhs_old(myDim_nod2D+eDim_nod2D))
     dynamics%ssh_rhs_old = 0.0_WP
-    
+
     ! hbar, hbar_old: correspond to the elevation, but on semi-integer time steps.
     allocate(mesh%hbar(myDim_nod2D+eDim_nod2D))
     allocate(mesh%hbar_old(myDim_nod2D+eDim_nod2D))
-    
+
     ! helem: layer thickness at elements. It is interpolated from hnode.
     allocate(mesh%helem(1:nl-1, myDim_elem2D))
-    
+
     ! dhe: The increment of total fluid depth on elements. It is used to update the matrix
-    ! of the ssh operator.      
+    ! of the ssh operator.
     allocate(mesh%dhe(myDim_elem2D))
-    
+
     allocate(mesh%zbar_3d_n(nl,myDim_nod2D+eDim_nod2D))
-    
-    ! Z_n: mid depth of layers due to ale thinkness variactions at ervery node n 
-    allocate(mesh%Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
-    
+
+    ! Z_n: mid depth of layers due to ale thinkness variactions at ervery node n
+    allocate(mesh%Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D))
+
     ! bottom_elem_tickness: changed bottom layer thinkness due to partial cells
     allocate(mesh%bottom_elem_thickness(myDim_elem2D))
-    allocate(mesh%zbar_e_bot(myDim_elem2D+eDim_elem2D)) 
-    allocate(mesh%zbar_e_srf(myDim_elem2D+eDim_elem2D)) 
-    
-    ! also change bottom thickness at nodes due to partial cell --> bottom 
+    allocate(mesh%zbar_e_bot(myDim_elem2D+eDim_elem2D))
+    allocate(mesh%zbar_e_srf(myDim_elem2D+eDim_elem2D))
+
+    ! also change bottom thickness at nodes due to partial cell --> bottom
     ! thickness at nodes is the volume weighted mean of sorounding elemental
     ! thicknesses
     allocate(mesh%bottom_node_thickness(myDim_nod2D+eDim_nod2D))
-    allocate(mesh%zbar_n_bot(myDim_nod2D+eDim_nod2D)) 
-    allocate(mesh%zbar_n_srf(myDim_nod2D+eDim_nod2D)) 
+    allocate(mesh%zbar_n_bot(myDim_nod2D+eDim_nod2D))
+    allocate(mesh%zbar_n_srf(myDim_nod2D+eDim_nod2D))
 
     ! reassociate after the allocation (no pointer exists before)
     hnode(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)               => mesh%hnode(:,:)
@@ -256,50 +256,50 @@ subroutine init_ale(dynamics, partit, mesh)
     zbar_e_bot = 0.0
     call init_bottom_elem_thickness(partit, mesh)
     call init_bottom_node_thickness(partit, mesh)
-    
+
     ! compute depth of partial cell ocean-cavity interface
     zbar_n_srf = zbar(1)
     zbar_e_srf = zbar(1)
     call init_surface_elem_depth(partit, mesh)
     call init_surface_node_depth(partit, mesh)
-    
+
     !___________________________________________________________________________
     ! initialise 3d field of depth levels and mid-depth levels
     zbar_3d_n  = 0.0_WP
     Z_3d_n     = 0.0_WP
-    do n=1,myDim_nod2D+eDim_nod2D 
+    do n=1,myDim_nod2D+eDim_nod2D
         ! max. number of levels at node n
         nzmin=ulevels_nod2D(n)
         nzmax=nlevels_nod2D(n)
-        
+
         !_______________________________________________________________________
-        ! create dummy zbar full depth levels within cavity --> need to compute 
+        ! create dummy zbar full depth levels within cavity --> need to compute
         ! cavity pressure b oundary condition
         zbar_3d_n(1:nzmin-1,n)=zbar(1:nzmin-1);
-        
+
         !_______________________________________________________________________
         ! in case of partial cells and use_cavity surface depth is different from zbar(nzmin)
         zbar_3d_n(nzmin,n)=zbar_n_srf(n);
-        
+
         zbar_3d_n(nzmin+1:nzmax-1,n)=zbar(nzmin+1:nzmax-1);
-        
+
         ! in case of partial cells bottom depth is different from zbar(nzmax)
         zbar_3d_n(nzmax,n)=zbar_n_bot(n);
-        
+
         !_______________________________________________________________________
-        ! create dummy Z mid depth levels within cavity  --> need to compute 
+        ! create dummy Z mid depth levels within cavity  --> need to compute
         ! cavity pressure b oundary condition
         Z_3d_n(1:nzmin-1,n)=Z(1:nzmin-1);
-        
+
         !_______________________________________________________________________
         ! in case of partial cells bottom mid depth is different from Z(nzmax-1)
         Z_3d_n(nzmin,n) =zbar_3d_n(nzmin,n)+(zbar_3d_n(nzmin+1,n)-zbar_n_srf(n))/2;
-        
+
         Z_3d_n(nzmin+1:nzmax-2,n) =Z(nzmin+1:nzmax-2);
-        
+
         ! in case of partial cells bottom mid depth is different from Z(nzmax-1)
         Z_3d_n(nzmax-1,n) =zbar_3d_n(nzmax-1,n)+(zbar_n_bot(n)-zbar_3d_n(nzmax-1,n))/2;
-        
+
     end do
 
 end subroutine init_ale
@@ -327,27 +327,27 @@ subroutine init_bottom_elem_thickness(partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    
+
     !___________________________________________________________________________
     ! If we use partial cells, the thickness of bottom cell is adjusted.
     ! The adjustment is limited. It cannot be more than + (1/2) of the deeper
-    ! layer, nor -(1/2) of the current layer. 
-    if(use_partial_cell) then 
+    ! layer, nor -(1/2) of the current layer.
+    if(use_partial_cell) then
         !Adjust the thickness of elemental bottom cells
         do elem=1, myDim_elem2D
-            
+
             !___________________________________________________________________
-            if (use_depthonelem) then 
+            if (use_depthonelem) then
                 dd=depth(elem)
             else
-                elnodes=elem2D_nodes(:,elem) 
+                elnodes=elem2D_nodes(:,elem)
                 ! elemental topographic depth
                 dd=sum(depth(elnodes))/3.0_WP
-            end if 
-            
+            end if
+
             ! number of full depth levels at elem
             nle=nlevels(elem)
-            
+
             !___________________________________________________________________
             ! Only apply Partial Cells when the initial full cell bottom
             ! layer thickness is above the treshhold partial_cell_thresh
@@ -355,30 +355,30 @@ subroutine init_bottom_elem_thickness(partit, mesh)
                 zbar_e_bot(elem) = zbar(nle)
                 bottom_elem_thickness(elem)=zbar(nle-1)-zbar_e_bot(elem)
                 cycle
-            end if 
-                
+            end if
+
             !___________________________________________________________________
-            ! if topographic depth dd is deeper than depth of deepest full cell 
+            ! if topographic depth dd is deeper than depth of deepest full cell
             ! depth level zbar(nle)
-            !       : 
-            !       : 
+            !       :
+            !       :
             ! ______________ zbar(nle-1)--------->+---->+
             !                                     |     |
             !                                     |     |
             ! -------------- Z(nle-1)             |--case1--> dd1=
             !                                     |     |
             !                                     |     |
-            ! ______________ zbar(nle)            |     |--case2--> dd1 = 
+            ! ______________ zbar(nle)            |     |--case2--> dd1 =
             ! / / / / / / /                       |     |
             !  / / o dd case1 ------------------->+     |
             ! -------------- Z(nle)(mid-depth)--------->+
             !  / / / / / / /
             ! / /  o dd case2
             !  / / / / / /
-            if(dd<zbar(nle)) then 
+            if(dd<zbar(nle)) then
                 if(nle==nl) then
                     zbar_e_bot(elem) = max(dd,zbar(nle)+(zbar(nle)-Z(nle-1)))
-                    
+
                 else
                     ! case 1 : max(Z(nle),dd) = dd
                     ! case 2 : max(Z(nle),dd) = Z(nle)
@@ -386,39 +386,39 @@ subroutine init_bottom_elem_thickness(partit, mesh)
                 end if
                 bottom_elem_thickness(elem)=zbar(nle-1)-zbar_e_bot(elem)
             !___________________________________________________________________
-            ! if topographic depth dd is shallower than depth of deepest full cell 
+            ! if topographic depth dd is shallower than depth of deepest full cell
             ! depth level zbar(nle)
-            !        : 
-            !        : 
+            !        :
+            !        :
             ! ______________ zbar(nle-1)--------->+---->+
             !                                     |--dd case1--> zbar_n_bot=
             !      o dd case1                     |     |
             ! -------------- Z(nle-1)(mid-depth)->+     |--dd case 2 --> zbar_n_bot=
             !      o dd case2 ------------------------->+
-            ! ______________ zbar(nle) 
-            ! / / / / / / / 
+            ! ______________ zbar(nle)
+            ! / / / / / / /
             !  / / / / / / /
-            ! / / / / / / / 
+            ! / / / / / / /
             else
 !!PS                 !_______________________________________________________________
 !!PS                 ! if a thicker partial bottom layer thickness is more realistic than
-!!PS                 ! always apply it, BUT when a thinner bottom layer thickness is more 
+!!PS                 ! always apply it, BUT when a thinner bottom layer thickness is more
 !!PS                 ! realistic than only apply it when the initial full cell bottom
-!!PS                 ! layer thickness is above the treshhold partial_cell_thresh to 
+!!PS                 ! layer thickness is above the treshhold partial_cell_thresh to
 !!PS                 ! not allow already thin layers to become even thinner
 !!PS                 if (zbar(nle-1)-zbar(nle)<=partial_cell_thresh) then
 !!PS                     zbar_e_bot(elem) = zbar(nle)
 !!PS                     bottom_elem_thickness(elem)=zbar(nle-1)-zbar_e_bot(elem)
 !!PS                     cycle
-!!PS                 end if     
-                
+!!PS                 end if
+
                 ! case 1 : min(Z(nle-1),dd) = Z(nle-1)
                 ! case 2 : min(Z(nle-1),dd) = dd
                 zbar_e_bot(elem) = min(Z(nle-1),dd)
                 bottom_elem_thickness(elem)=zbar(nle-1)-zbar_e_bot(elem)
-            end if  
+            end if
         end do ! --> do elem=1, myDim_elem2D
-        
+
     !___________________________________________________________________________
     ! use full bottom cells
     else
@@ -427,11 +427,11 @@ subroutine init_bottom_elem_thickness(partit, mesh)
             bottom_elem_thickness(elem)=zbar(nle-1)-zbar(nle)
             zbar_e_bot(elem) = zbar(nle)
         end do
-    end if 
-    
+    end if
+
     !___________________________________________________________________________
     call exchange_elem(zbar_e_bot, partit)
-    
+
 end subroutine init_bottom_elem_thickness
 !
 !
@@ -450,87 +450,87 @@ subroutine init_bottom_node_thickness(partit, mesh)
     type(t_mesh)  , intent(inout), target :: mesh
     !___________________________________________________________________________
     integer       :: node, nln, elem, elemi, nelem
-    real(kind=WP) :: dd 
-    real(kind=WP) :: hnbot, tvol 
+    real(kind=WP) :: dd
+    real(kind=WP) :: hnbot, tvol
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    
+
     !___________________________________________________________________________
     ! If we use partial cells, the thickness of bottom cell is adjusted.
     ! The adjustment is limited. It cannot be more than + (1/2) of the deeper
-    ! layer, nor -(1/2) of the current layer. 
-    if(use_partial_cell) then 
+    ! layer, nor -(1/2) of the current layer.
+    if(use_partial_cell) then
         !Adjust the thickness of nodal bottom cells
         do node=1, myDim_nod2D
-            
+
 !!PS             !___________________________________________________________________
-!!PS             ! nodal topographic depth must be as least as deep as deepest bottom depth 
-!!PS             ! of the sorounding elements          
+!!PS             ! nodal topographic depth must be as least as deep as deepest bottom depth
+!!PS             ! of the sorounding elements
 !!PS             dd = depth(node)
-!!PS             
+!!PS
 !!PS             ! number of full depth levels at node
 !!PS             nln  = nlevels_nod2D(node)
-!!PS             
+!!PS
 !!PS             !___________________________________________________________________
-!!PS             ! if topographic depth dd is deeper than depth of deepest full cell 
+!!PS             ! if topographic depth dd is deeper than depth of deepest full cell
 !!PS             ! depth level zbar(nle)
-!!PS             !       : 
-!!PS             !       : 
+!!PS             !       :
+!!PS             !       :
 !!PS             ! ______________ zbar(nle-1)--------->+---->+
 !!PS             !                                     |     |
 !!PS             !                                     |     |
 !!PS             ! -------------- Z(nle-1)             |--case1--> zbar_n_bot=
 !!PS             !                                     |     |
 !!PS             !                                     |     |
-!!PS             ! ______________ zbar(nle)            |     |--case2--> zbar_n_bot = 
+!!PS             ! ______________ zbar(nle)            |     |--case2--> zbar_n_bot =
 !!PS             ! / / / / / / /                       |     |
 !!PS             !  / / o dd case1 ------------------->+     |
 !!PS             ! -------------- Z(nle)(mid-depth)--------->+
 !!PS             !  / / / / / / /
 !!PS             ! / /  o dd case2
 !!PS             !  / / / / / /
-!!PS             if(dd<zbar(nln)) then 
+!!PS             if(dd<zbar(nln)) then
 !!PS                 if(nln==nl) then
 !!PS                     zbar_n_bot(node) = max(dd,zbar(nln)+(zbar(nln)-Z(nln-1)))
-!!PS                     
+!!PS
 !!PS                 else
 !!PS                     ! case 1 : max(Z(nle),dd) = dd
 !!PS                     ! case 2 : max(Z(nle),dd) = Z(nle)
 !!PS                     zbar_n_bot(node) = max(Z(nln),dd)
 !!PS                 end if
 !!PS             !___________________________________________________________________
-!!PS             ! if topographic depth dd is shallower than depth of deepest full cell 
+!!PS             ! if topographic depth dd is shallower than depth of deepest full cell
 !!PS             ! depth level zbar(nle)
-!!PS             !        : 
-!!PS             !        : 
+!!PS             !        :
+!!PS             !        :
 !!PS             ! ______________ zbar(nle-1)--------->+---->+
 !!PS             !                                     |--dd case1--> zbar_n_bot=
 !!PS             !      o dd case1                     |     |
 !!PS             ! -------------- Z(nle-1)(mid-depth)->+     |--dd case 2 --> zbar_n_bot=
 !!PS             !      o dd case2 ------------------------->+
-!!PS             ! ______________ zbar(nle) 
-!!PS             ! / / / / / / / 
+!!PS             ! ______________ zbar(nle)
+!!PS             ! / / / / / / /
 !!PS             !  / / / / / / /
-!!PS             ! / / / / / / / 
+!!PS             ! / / / / / / /
 !!PS             else
 !!PS                 ! case 1 : min(Z(nle-1),dd) = Z(nle-1)
 !!PS                 ! case 2 : min(Z(nle-1),dd) = dd
 !!PS                 zbar_n_bot(node) = min(Z(nln-1),dd)
-!!PS                 
-!!PS             end if        
+!!PS
+!!PS             end if
             !___________________________________________________________________
             ! compute vertice partial bottom depth from the deepest sorounding
             ! elemental partial bottom depths
             nln   = nlevels_nod2D(node)
             nelem = nod_in_elem2d_num(node)
-            zbar_n_bot(node)           = minval(zbar_e_bot(nod_in_elem2d(1:nelem,node))) 
+            zbar_n_bot(node)           = minval(zbar_e_bot(nod_in_elem2d(1:nelem,node)))
             bottom_node_thickness(node)= zbar(nln-1)-zbar_n_bot(node)
         end do ! --> do node=1, myDim_nod2D+eDim_nod2D
-        
+
     !___________________________________________________________________________
     ! use full bottom cells
     else
@@ -539,12 +539,12 @@ subroutine init_bottom_node_thickness(partit, mesh)
             zbar_n_bot(node)           = zbar(nln)
             bottom_node_thickness(node)= zbar(nln-1)-zbar_n_bot(node)
         end do
-    end if ! --> if(use_partial_cell) then 
+    end if ! --> if(use_partial_cell) then
 
     !___________________________________________________________________________
     call exchange_nod(zbar_n_bot, partit)
     call exchange_nod(bottom_node_thickness, partit)
-    
+
 end subroutine init_bottom_node_thickness
 !
 !
@@ -570,46 +570,46 @@ subroutine init_surface_elem_depth(partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    
-    if (use_cavity) then 
-        
+
+    if (use_cavity) then
+
         !_______________________________________________________________________
         ! If we use partial cells and cavity, the thickness of surface cell is adjusted.
         ! The adjustment is limited. It cannot be more than + (1/2) of the deeper
-        ! layer, nor -(1/2) of the current layer. 
+        ! layer, nor -(1/2) of the current layer.
         ! Adjust the thickness of elemental surface cells under the cavity
         do elem=1, myDim_elem2D
             !___________________________________________________________________
-            ule=ulevels(elem)    
+            ule=ulevels(elem)
             if (ule==1) cycle
-            
+
             !___________________________________________________________________
             ! elemental cavity depth
-            if (use_cavity_partial_cell) then 
-            
+            if (use_cavity_partial_cell) then
+
                 !_______________________________________________________________
-                if (use_cavityonelem) then 
+                if (use_cavityonelem) then
                     dd=cavity_depth(elem)
                 else
-                    elnodes=elem2D_nodes(:,elem) 
+                    elnodes=elem2D_nodes(:,elem)
                     ! elemental cavity depth
                     dd=sum(cavity_depth(elnodes))/3.0_WP
-                end if 
-                
+                end if
+
                 !_______________________________________________________________
                 ! Only apply Surface Partial Cells when the initial full cell surface
                 ! layer thickness is above the treshhold cavity_partial_cell_thresh
                 if (zbar(ule)-zbar(ule+1)<=cavity_partial_cell_thresh) then
                     zbar_e_srf(elem) = zbar(ule)
                     cycle
-                end if         
-                
-                if(dd<zbar(ule)) then 
+                end if
+
+                if(dd<zbar(ule)) then
 !!PS                     !_______________________________________________________________
 !!PS                     ! if a thicker partial surface layer thickness is more realistic than
-!!PS                     ! always apply it, BUT when a thinner surface layer thickness is more 
+!!PS                     ! always apply it, BUT when a thinner surface layer thickness is more
 !!PS                     ! realistic than only apply it when the initial full cell surface
-!!PS                     ! layer thickness is above the treshhold cavity_partial_cell_thresh to 
+!!PS                     ! layer thickness is above the treshhold cavity_partial_cell_thresh to
 !!PS                     ! not allow already thin layers to become even thinner
 !!PS                     if (zbar(ule)-zbar(ule+1)<=cavity_partial_cell_thresh) then
 !!PS                         zbar_e_srf(elem) = zbar(ule)
@@ -622,13 +622,13 @@ subroutine init_surface_elem_depth(partit, mesh)
                 end if
             else
                 zbar_e_srf(elem) = zbar(ule)
-            end if 
-                
+            end if
+
         end do ! --> do elem=1, myDim_elem2D
-        
+
         !_______________________________________________________________________
         call exchange_elem(zbar_e_srf, partit)
-    end if 
+    end if
 end subroutine init_surface_elem_depth
 !
 !
@@ -647,60 +647,60 @@ subroutine init_surface_node_depth(partit, mesh)
     type(t_mesh)  , intent(inout), target :: mesh
     !___________________________________________________________________________
     integer       :: node, uln, nelem, elemi
-    real(kind=WP) :: dd 
+    real(kind=WP) :: dd
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    
+
     !___________________________________________________________________________
-    if (use_cavity) then 
+    if (use_cavity) then
         !___________________________________________________________________________
         ! If we use partial cells and cavity, the thickness of surface cell is adjusted.
         ! The adjustment is limited. It cannot be more than + (1/2) of the deeper
-        ! layer, nor -(1/2) of the current layer. 
+        ! layer, nor -(1/2) of the current layer.
         !Adjust the thickness of nodal surface cells
         do node=1, myDim_nod2D
             !___________________________________________________________________
             ! number of full depth levels at node
             uln  = ulevels_nod2D(node)
             if (uln==1) cycle
-            
+
             !___________________________________________________________________
-            ! nodal cavity depth  
-            if (use_cavity_partial_cell) then 
+            ! nodal cavity depth
+            if (use_cavity_partial_cell) then
 !!PS                 dd = cavity_depth(node)
-!!PS                 if(dd<zbar(uln)) then 
+!!PS                 if(dd<zbar(uln)) then
 !!PS                     zbar_n_srf(node) = max(Z(uln),dd)
 !!PS                 else
 !!PS                     zbar_n_srf(node) = min(Z(uln-1),dd)
-!!PS                 end if  
-                
+!!PS                 end if
+
                 nelem =  nod_in_elem2d_num(node)
-                zbar_n_srf(node)=maxval(zbar_e_srf(nod_in_elem2d(1:nelem,node))) 
-                
+                zbar_n_srf(node)=maxval(zbar_e_srf(nod_in_elem2d(1:nelem,node)))
+
             else
                 zbar_n_srf(node) = zbar(uln)
-                
-            end if 
+
+            end if
         end do ! --> do node=1, myDim_nod2D+eDim_nod2D
-        
+
         !_______________________________________________________________________
         call exchange_nod(zbar_n_srf, partit)
-    end if 
+    end if
 end subroutine init_surface_node_depth
 !
 !
 !===============================================================================
-! initialize thickness arrays based on the current hbar 
+! initialize thickness arrays based on the current hbar
 subroutine init_thickness_ale(dynamics, partit, mesh)
-! For z-star case: we stretch scalar thicknesses (nodal) 
+! For z-star case: we stretch scalar thicknesses (nodal)
 ! through nlevels_nod2D_min -2 layers. Layer nlevels_nod2D_min-1
 ! should not be touched if partial cell is implemented (it is).
-! In lower layers scalar prisms are modified by the bottom.  
-! Important: nlevels_nod2D_min has to be allocated and filled. 
+! In lower layers scalar prisms are modified by the bottom.
+! Important: nlevels_nod2D_min has to be allocated and filled.
     use g_config,only: dt, which_ale
     use o_PARAM
     use MOD_MESH
@@ -713,7 +713,7 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
     type(t_mesh)  , intent(inout), target :: mesh
     !___________________________________________________________________________
     integer       :: n, nz, elem, elnodes(3), nzmin, nzmax
-    real(kind=WP) :: dd 
+    real(kind=WP) :: dd
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer :: ssh_rhs_old, eta_n
@@ -723,9 +723,9 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
 #include "associate_mesh_ass.h"
     ssh_rhs_old=>dynamics%ssh_rhs_old(:)
     eta_n      =>dynamics%eta_n(:)
-    
+
     !___________________________________________________________________________
-    
+
     if(mype==0) then
         write(*,*) '____________________________________________________________'
         write(*,*) ' --> initialise ALE layerthicknesses, depth levels and middepth levels'
@@ -737,10 +737,10 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
     do n=1,myDim_nod2D+eDim_nod2D
         ssh_rhs_old(n)=(hbar(n)-hbar_old(n))*areasvol(ulevels_nod2D(n),n)/dt  ! --> TEST_cavity
     end do
-    
+
     ! -->see equation (14) FESOM2:from finite elements to finie volume
-    eta_n=alpha*hbar_old+(1.0_WP-alpha)*hbar   
-    
+    eta_n=alpha*hbar_old+(1.0_WP-alpha)*hbar
+
     if     (trim(which_ale)=='linfs') then
         !_______________________________________________________________________
         ! >->->->->->->->->->->->     linear-free-surface    <-<-<-<-<-<-<-<-<-<
@@ -754,113 +754,113 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
             do nz=nzmin,nzmax-1
                 !!PS hnode(nz,n)=(zbar(nz)-zbar(nz+1))
                 hnode(nz,n)=(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))
-            end do      
-            
+            end do
+
             ! set bottom node thickness
             !!PS hnode(nlevels_nod2D(n)-1,n)=bottom_node_thickness(n)
             hnode(nzmax,n)=bottom_node_thickness(n)
-            
+
             !!PS do nz=nlevels_nod2D(n),nl-1
             !!PS --> can skip this, hnode(:,:) is initialised with 0.0_WP
             !!PS do nz=nzmax+1,nl-1
             !!PS     hnode(nz,n)=0.0_WP
             !!PS end do
         end do
-        
+
         do elem=1,myDim_elem2D
             nzmin = ulevels(elem)
             nzmax = nlevels(elem)-1
-            
+
             !!PS do nz=1,nlevels(elem)-2
             helem(nzmin,elem)=(zbar_e_srf(elem)-zbar(nzmin+1))
             do nz = nzmin+1, nzmax-1
                 helem(nz,elem)=(zbar(nz)-zbar(nz+1))
             end do
-            
+
             ! set bottom elem thickness
             !!PS helem(nlevels(elem)-1,elem)=bottom_elem_thickness(elem)
             helem(nzmax,elem)=bottom_elem_thickness(elem)
-            
+
             !!PS do nz=nlevels(elem),nl-1
             !!PS --> can skip this, helem(:,:) is initialised with 0.0_WP
             !!PS do nz=nzmax+1,nl-1
             !!PS     helem(nz,elem)=0.0_WP
             !!PS end do
         end do
-        
+
     elseif (trim(which_ale)=='zlevel') then
         !_______________________________________________________________________
         ! >->->->->->->->->->->->->->->     z-level    <-<-<-<-<-<-<-<-<-<-<-<-<
         !_______________________________________________________________________
-        ! --> include all ssh variations into the top layer 
+        ! --> include all ssh variations into the top layer
         do n=1,myDim_nod2D+eDim_nod2D
             nzmin = ulevels_nod2D(n)
             nzmax = nlevels_nod2D(n)-1
-            
-            ! put all ssh variation (hbar) into first layer 
+
+            ! put all ssh variation (hbar) into first layer
             !!PS hnode(1,n)=hbar(n)+(zbar(1)-zbar(2))
-            if (nzmin == 1) then 
+            if (nzmin == 1) then
                 ! only allow open ocean to move with ssh
                 !!PS hnode(nzmin,n)=hbar(n)+(zbar(nzmin)-zbar(nzmin+1))
                 hnode(nzmin,n)=hbar(n)+(zbar_3d_n(nzmin,n)-zbar_3d_n(nzmin+1,n))
             else
                 ! in case of cavity no movement with ssh, cavity-ocean boundary is fixed
                 hnode(nzmin,n)=(zbar_3d_n(nzmin,n)-zbar_3d_n(nzmin+1,n))
-            endif 
-            
+            endif
+
             ! leave lower levels untouched
             !!PS do nz=2,nlevels_nod2D(n)-2
             do nz=nzmin+1,nzmax-1
                 !!PS hnode(nz,n)=(zbar(nz)-zbar(nz+1))
                 hnode(nz,n)=(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))
-            end do 
-            
+            end do
+
             ! set bottom node thickness
             !!PS hnode(nlevels_nod2D(n)-1,n)=bottom_node_thickness(n)
             hnode(nzmax,n)=bottom_node_thickness(n)
-            
+
             !!PS --> can skip this, hnode(:,:) is initialised with 0.0_WP
             !!PS ! layer thickness of bottom layer equal 0
             !!PS do nz=nlevels_nod2D(n),nl-1
             !!PS     hnode(nz,n)=0.0_WP
             !!PS end do
         end do
-        
+
         do elem=1,myDim_elem2D
             nzmin = ulevels(elem)
             nzmax = nlevels(elem)-1
-            
-            elnodes=elem2D_nodes(:,elem) 
-            
+
+            elnodes=elem2D_nodes(:,elem)
+
             ! interpolated ssh variation at element elem
             dhe(elem)=sum(hbar(elnodes))/3.0_WP
-            
+
             ! store elemtal ssh varition only in first layer
             !!PS helem(1,elem)=dhe(elem)+(zbar(1)-zbar(2))
-            if (nzmin==1) then 
+            if (nzmin==1) then
                 helem(nzmin,elem)=dhe(elem)+(zbar_e_srf(elem)-zbar(nzmin+1))
             else
                 helem(nzmin,elem)=(zbar_e_srf(elem)-zbar(nzmin+1))
-            end if 
-            
-            ! lower layers leave untouched 
+            end if
+
+            ! lower layers leave untouched
             !!PS do nz=2,nlevels(elem)-2
             do nz=nzmin+1,nzmax-1
                 helem(nz,elem)=(zbar(nz)-zbar(nz+1))
             end do
-            
+
             ! elemental bottom layer thickness
             !!PS helem(nlevels(elem)-1,elem)=bottom_elem_thickness(elem)
             helem(nzmax,elem)=bottom_elem_thickness(elem)
-            
+
             !!PS --> can skip this, helem(:,:) is initialised with 0.0_WP
             !!PS ! fill thickness below bottom layer
             !!PS do nz=nlevels(elem),nl-1
             !!PS     helem(nz,elem)=0.0_WP
             !!PS end do
-            
+
         end do
-        
+
     elseif (trim(which_ale)=='zstar' ) then
         !_______________________________________________________________________
         ! >->->->->->->->->->->->->->->     z-star     <-<-<-<-<-<-<-<-<-<-<-<-<
@@ -869,22 +869,22 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
         do n=1, myDim_nod2D+eDim_nod2D
             nzmin = ulevels_nod2D(n)
             nzmax = nlevels_nod2D(n)-1
-            
-            if (nzmin==1) then 
-                ! depth anomaly until the last minus one level where the scalar 
+
+            if (nzmin==1) then
+                ! depth anomaly until the last minus one level where the scalar
                 ! prism is not intersected with bottom.
                 !!PS dd=zbar(1)-zbar(nlevels_nod2D_min(n)-1)
-                dd=zbar(nzmin)-zbar(nlevels_nod2D_min(n)-1)  
-                
-                ! calc layer thinkness for depth layer nz and node n. distribute 
+                dd=zbar(nzmin)-zbar(nlevels_nod2D_min(n)-1)
+
+                ! calc layer thinkness for depth layer nz and node n. distribute
                 ! hbar surface elevation linear over verical column
                 !!PS do nz=1,nlevels_nod2D_min(n)-2
                 do nz=nzmin,nlevels_nod2D_min(n)-2
                     hnode(nz,n)=(zbar(nz)-zbar(nz+1))*(1.0_WP+hbar(n)/dd)
                 end do
-                
-                ! do not distribute hbar into cells that intersect somehow with 
-                ! bottom layer 
+
+                ! do not distribute hbar into cells that intersect somehow with
+                ! bottom layer
                 !!PS do nz=nlevels_nod2D_min(n)-1, nlevels_nod2D(n)-1
                 do nz=nlevels_nod2D_min(n)-1, nzmax-1
                     hnode(nz,n)=(zbar(nz)-zbar(nz+1))
@@ -894,46 +894,46 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
                 ! is fixed
                 do nz=nzmin,nzmax-1
                     hnode(nz,n)=(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))
-                end do 
-            end if 
+                end do
+            end if
             ! set bottom node thickness
             hnode(nzmax,n)=bottom_node_thickness(n)
-            
+
             !!PS --> can skip this, hnode(:,:) is initialised with 0.0_WP
             !!PS ! layer thickness of bottom layer equal 0
             !!PS do nz=nlevels_nod2D(n),nl-1
             !!PS     hnode(nz,n)=0.0_WP
             !!PS end do
         end do
-        
+
         !_______________________________________________________________________
         ! --> calculate mean layer thinkness at element
         do elem=1, myDim_elem2D
             nzmin = ulevels(elem)
             nzmax = nlevels(elem)-1
-            
+
             elnodes=elem2D_nodes(:, elem)
-            
+
             ! interpolated ssh variation at element elem
-            if (nzmin==1) then 
+            if (nzmin==1) then
                 dhe(elem)=sum(hbar(elnodes))/3.0_WP
                 helem(nzmin,elem)=sum(hnode(nzmin,elnodes))/3.0_WP
             else
                 dhe = 0.0_WP
                 helem(nzmin,elem)=zbar_e_srf(elem)-zbar(nzmin+1)
-            end if 
-            
+            end if
+
             !!PS do nz=1,nlevels(elem)-2
             !!PS do nz=nzmin,nzmax-1
             do nz=nzmin+1,nzmax-1
                 helem(nz,elem)=sum(hnode(nz,elnodes))/3.0_WP
             end do
-            
+
             ! elemental bottom layer thickness
             !!PS helem(nlevels(elem)-1,elem)=bottom_elem_thickness(elem)
             helem(nzmax,elem)=bottom_elem_thickness(elem)
-            
-            !!PS --> can skip this, helem(:,:) is initialised with 0.0_WP 
+
+            !!PS --> can skip this, helem(:,:) is initialised with 0.0_WP
             !!PS ! fill thickness below bottom layer
             !!PS do nz=nlevels(elem),nl-1
             !!PS     helem(nz,elem)=0.0_WP
@@ -945,19 +945,19 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
         write(*,*) '____________________________________________________________'
         write(*,*) 'The vertical ALE discretisation ', which_ale,' is currently not supported!!!'
         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
-        end if 
+        end if
     endif
-    
+
     !___________________________________________________________________________
     hnode_new=hnode  ! Should be initialized, because only variable part is updated.
-   
+
     !!PS call check_total_volume(partit, mesh)
-    
+
 end subroutine init_thickness_ale
 !
 !
 !===============================================================================
-! update thickness arrays based on the current hbar 
+! update thickness arrays based on the current hbar
 subroutine update_thickness_ale(partit, mesh)
     use o_PARAM
     use MOD_MESH
@@ -982,27 +982,27 @@ subroutine update_thickness_ale(partit, mesh)
     ! >->->->->->->->->->->->->->->       z-level      <-<-<-<-<-<-<-<-<-<-<-<-<
     !___________________________________________________________________________
     if     (trim(which_ale)=='zlevel') then
-        
+
         !_______________________________________________________________________
-        ! idx is only needed for local star case to estimate over how much 
+        ! idx is only needed for local star case to estimate over how much
         ! depth layers hnode, depthlevel and mid-depthlevel need to be updated
         allocate(idx(lzstar_lev))
-        
+
         ! if lzstar_lev=4 --> idx = /1,2,3,4/
         idx = (/(nz, nz=1, lzstar_lev, 1)/)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, elem, elnodes)
-!$OMP DO        
+!$OMP DO
         !_______________________________________________________________________
         do elem=1,myDim_elem2D
             elnodes=elem2D_nodes(:, elem)
             nzmin = ulevels(elem)
             nzmax = nlevels(elem)-1
-            
+
             !___________________________________________________________________
-            ! if there is a cavity surface layer thickness is not update, its 
-            ! kept fixed 
+            ! if there is a cavity surface layer thickness is not update, its
+            ! kept fixed
             if (nzmin > 1) cycle
-            
+
             !___________________________________________________________________
             ! actualize elemental layer thinkness in first lzstar_lev layers
             if (any(hnode_new(nzmin+1:nzmin+lzstar_lev-1,elnodes(1)) - hnode(nzmin+1:nzmin+lzstar_lev-1,elnodes(1))/=0.0_WP) .or. &
@@ -1011,7 +1011,7 @@ subroutine update_thickness_ale(partit, mesh)
                 ) then
                 ! --> case local zstar
                 ! try to limitate over how much layers i realy need to distribute
-                ! the change in ssh, so that the next loops run only over the 
+                ! the change in ssh, so that the next loops run only over the
                 ! nesseccary levels and not over all lzstar_lev levels
                 nz    = max(nzmin, maxval(pack(nzmin+idx-1,hnode_new(nzmin+1:nzmin+lzstar_lev-1, elnodes(1)) - hnode(nzmin+1:nzmin+lzstar_lev-1, elnodes(1))/=0.0_WP)))
                 nz    = max(nz   , maxval(pack(nzmin+idx-1,hnode_new(nzmin+1:nzmin+lzstar_lev-1, elnodes(2)) - hnode(nzmin+1:nzmin+lzstar_lev-1, elnodes(2))/=0.0_WP)))
@@ -1019,36 +1019,36 @@ subroutine update_thickness_ale(partit, mesh)
                 nzmax = min(nz   , nzmax-1)
                 do nz=nzmin,nzmax
                     helem(nz,elem)=sum(hnode_new(nz,elnodes))/3.0_WP
-                end do    
+                end do
             !___________________________________________________________________
-            ! only actualize elemental layer thickness in first layer 
+            ! only actualize elemental layer thickness in first layer
             else
                 ! --> case normal zlevel
                 helem(nzmin,elem)=sum(hnode_new(nzmin,elnodes))/3.0_WP
             end if
         end do
-!$OMP END DO 
+!$OMP END DO
         !_______________________________________________________________________
-!$OMP DO 
+!$OMP DO
         do n=1,myDim_nod2D+eDim_nod2D
             nzmin = ulevels_nod2D_max(n)
             nzmax = nlevels_nod2D_min(n)-1
-            
+
             !___________________________________________________________________
-            ! if there is a cavity surface layer thickness is not update, its 
-            ! kept fixed 
+            ! if there is a cavity surface layer thickness is not update, its
+            ! kept fixed
             if (nzmin > 1) cycle
-            
+
             !___________________________________________________________________
             ! actualize layer thinkness in first lzstar_lev layers
             if ( (any(hnode_new(nzmin+1:nzmin+lzstar_lev-1,n)-hnode(nzmin+1:nzmin+lzstar_lev-1,n)/=0.0_WP)) ) then
-                ! --> case local zstar 
+                ! --> case local zstar
                 ! try to limitate over how much layers i realy need to distribute
-                ! the change in ssh, so that the next loops run only over the 
+                ! the change in ssh, so that the next loops run only over the
                 ! nesseccary levels and not over all lzstar_lev levels
                 !!PS nz = max(1,maxval(pack(idx,hnode_new(1:lzstar_lev,n)-hnode(1:lzstar_lev,n)/=0.0_WP)))
                 nz = max(nzmin,maxval(pack(nzmin+idx-1,hnode_new(nzmin:nzmin+lzstar_lev-1,n)-hnode(nzmin:nzmin+lzstar_lev-1,n)/=0.0_WP)))
-                
+
                 ! nlevels_nod2D_min(n)-1 ...would be hnode of partial bottom cell but this
                 ! one is not allowed to change so go until nlevels_nod2D_min(n)-2
                 nzmax = min(nz,nzmax-1)
@@ -1059,9 +1059,9 @@ subroutine update_thickness_ale(partit, mesh)
                     hnode(nz,n)     = hnode_new(nz,n)
                     zbar_3d_n(nz,n) = zbar_3d_n(nz+1,n)+hnode_new(nz,n)
                     Z_3d_n(nz,n)    = zbar_3d_n(nz+1,n)+hnode_new(nz,n)/2.0_WP
-                end do    
+                end do
             !___________________________________________________________________
-            ! only actualize layer thinkness in first layer 
+            ! only actualize layer thinkness in first layer
             else
                 ! --> case normal zlevel
                 hnode(nzmin,n)    = hnode_new(nzmin,n)
@@ -1070,27 +1070,27 @@ subroutine update_thickness_ale(partit, mesh)
             end if
         end do
 !$OMP END DO
-!$OMP END PARALLEL        
+!$OMP END PARALLEL
         !_______________________________________________________________________
         deallocate(idx)
-        
+
     !___________________________________________________________________________
     ! >->->->->->->->->->->->->->->       z-star       <-<-<-<-<-<-<-<-<-<-<-<-<
     !___________________________________________________________________________
     elseif (trim(which_ale)=='zstar' ) then
-        
+
         ! --> update layer thinkness, depth layer  and mid-depth layer at node
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax)
         do n=1, myDim_nod2D+eDim_nod2D
             ! actualize 3d depth levels and mid-depth levels from bottom to top
             nzmin = ulevels_nod2D(n)
             nzmax = nlevels_nod2D_min(n)-2
-            
+
             !___________________________________________________________________
-            ! if there is a cavity layer thickness is not updated, its 
-            ! kept fixed 
+            ! if there is a cavity layer thickness is not updated, its
+            ! kept fixed
             if (nzmin > 1) cycle
-            
+
             !___________________________________________________________________
             ! do not touch zbars_3d_n that are involved in the bottom cell !!!!
             ! --> nlevels_nod2D_min(n),nlevels_nod2D_min(n)-1
@@ -1108,10 +1108,10 @@ subroutine update_thickness_ale(partit, mesh)
             nzmin = ulevels(elem)
             nzmax = nlevels(elem)-1
             !___________________________________________________________________
-            ! if there is a cavity layer thickness is not updated, its 
-            ! kept fixed 
+            ! if there is a cavity layer thickness is not updated, its
+            ! kept fixed
             if (nzmin > 1) cycle
-            
+
             !___________________________________________________________________
             elnodes=elem2D_nodes(:, elem)
             do nz=nzmin, nzmax-1
@@ -1124,7 +1124,7 @@ end subroutine update_thickness_ale
 !
 !
 !===============================================================================
-! update thickness arrays based on the current hbar 
+! update thickness arrays based on the current hbar
 subroutine restart_thickness_ale(partit, mesh)
     use o_PARAM
     use MOD_MESH
@@ -1151,75 +1151,75 @@ subroutine restart_thickness_ale(partit, mesh)
         write(*,*) ' --> restart ALE layerthicknesses, depth levels and middepth levels'
         write(*,*)
     end if
-        
+
     !___________________________________________________________________________
     ! >->->->->->->->->->->->->       z-star/zlevel       <-<-<-<-<-<-<-<-<-<-<-
     !___________________________________________________________________________
     if (trim(which_ale)=='zstar' .or. trim(which_ale)=='zlevel' ) then
         ! restart depthlevels (zbar_3d_n) and mitdpethlevels (Z_3d_n)
-        ! dont forget also at restart zbar_3d_n and Z_3d_n are first initialised 
-        ! and filled up in ale_init there bottom depth zbar_3d_n(nlevels_nod2d) 
-        ! ist set according if there are partial cells or not 
+        ! dont forget also at restart zbar_3d_n and Z_3d_n are first initialised
+        ! and filled up in ale_init there bottom depth zbar_3d_n(nlevels_nod2d)
+        ! ist set according if there are partial cells or not
         do n=1, myDim_nod2D+eDim_nod2D
             nzmin = ulevels_nod2D(n)
             nzmax = nlevels_nod2D(n)-1
-            
+
             !___________________________________________________________________
-            ! if there is a cavity layer thickness is not updated, its 
-            ! kept fixed 
+            ! if there is a cavity layer thickness is not updated, its
+            ! kept fixed
             if (nzmin > 1) cycle
-            
+
             !___________________________________________________________________
             ! be sure that bottom layerthickness uses partial cell layer thickness
-            ! in case its activated, especially when you make a restart from a non 
+            ! in case its activated, especially when you make a restart from a non
             ! partiall cell runs towards a simulation with partial cells
             hnode(nzmax,n) = bottom_node_thickness(n)
-            
+
             !___________________________________________________________________
             do nz=nzmax-1,nzmin,-1
                 zbar_3d_n(nz,n) =zbar_3d_n(nz+1,n) + hnode(nz,n)
                 Z_3d_n(nz,n)    =zbar_3d_n(nz+1,n) + hnode(nz,n)/2.0_WP
             end do
         end do
-        
+
         !_______________________________________________________________________
-        ! restart element layer thinkness (helem) and the increment of total 
+        ! restart element layer thinkness (helem) and the increment of total
         ! fluid depth on elements (dhe)
         do elem=1, myDim_elem2D
             nzmin = ulevels(elem)
             nzmax = nlevels(elem)-1
-            
+
             !___________________________________________________________________
-            ! if there is a cavity layer thickness is not updated, its 
-            ! kept fixed 
+            ! if there is a cavity layer thickness is not updated, its
+            ! kept fixed
             if (nzmin > 1) cycle
-            
+
             !___________________________________________________________________
             elnodes=elem2D_nodes(:, elem)
             do nz=nzmin,nzmax-1
                 helem(nz,elem)=sum(hnode(nz,elnodes))/3.0_WP
             end do
-            
+
             !___________________________________________________________________
-            ! be sure elemental bottom thickness has partial cells in it, when 
+            ! be sure elemental bottom thickness has partial cells in it, when
             ! its used after restart
             helem(nzmax,elem)=bottom_elem_thickness(elem)
-            
+
             !___________________________________________________________________
-            ! for the first time steps of a restart or initialisation dhe must 
+            ! for the first time steps of a restart or initialisation dhe must
             ! be the absolute value of the elemental sea surface height, afterwards
-            ! when the stiffness matrix is update dhe becomes the anomaly between 
+            ! when the stiffness matrix is update dhe becomes the anomaly between
             ! old and new elemental sea surface height (dhe(elem)=sum(hbar(elnodes)
             ! -hbar_old(elnodes))/3.0_WP in subroutine compute_hbar_ale)
             dhe(elem)=sum(hbar(elnodes))/3.0_WP
-            
+
         end do
-        
+
     !___________________________________________________________________________
     ! >->->->->->->->->->->->->->->       linfs      <-<-<-<-<-<-<-<-<-<-<-->->-
     !___________________________________________________________________________
     ! for the case you make a restart from zstar --> linfs, hnode that comes with
-    ! the restart needs to be overwritten with the standard layer thicknesses. 
+    ! the restart needs to be overwritten with the standard layer thicknesses.
     ! Since zbar_3d_n and Z_3d_n are initialised with standard levels
     else ! --> which_ale == 'linfs'
         do n=1,myDim_nod2D+eDim_nod2D
@@ -1227,10 +1227,10 @@ subroutine restart_thickness_ale(partit, mesh)
             nzmax = nlevels_nod2D(n)-1
             do nz=nzmin,nzmax-1
                 hnode(nz,n)=(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))
-            end do      
+            end do
             hnode(nzmax,n)=bottom_node_thickness(n)
         end do
-        
+
         do elem=1,myDim_elem2D
             nzmin = ulevels(elem)
             nzmax = nlevels(elem)-1
@@ -1239,7 +1239,7 @@ subroutine restart_thickness_ale(partit, mesh)
                 helem(nz,elem)=(zbar(nz)-zbar(nz+1))
             end do
             helem(nzmax,elem)=bottom_elem_thickness(elem)
-        end do    
+        end do
     endif
 
 end subroutine restart_thickness_ale
@@ -1247,7 +1247,7 @@ end subroutine restart_thickness_ale
 !
 !===============================================================================
 ! Stiffness matrix for the elevation
-! 
+!
 ! We first use local numbering and assemble the matrix
 ! Having completed this step we substitute global contiguous numbers.
 !
@@ -1257,9 +1257,9 @@ end subroutine restart_thickness_ale
 !           col_pos(nghbr_nod2D(row)%addresses(q)) = q
 !        enddo
 !       ipos=sshstiff%rowptr(row)+col_pos(col)-sshstiff%rowptr(1)
-! 
+!
 ! To achive it we should use global arrays n_num and n_pos.
-! Reserved for future. 
+! Reserved for future.
 subroutine init_stiff_mat_ale(partit, mesh)
     use o_PARAM
     use MOD_MESH
@@ -1293,18 +1293,18 @@ subroutine init_stiff_mat_ale(partit, mesh)
         write(*,*) '____________________________________________________________'
         write(*,*) ' --> initialise ssh operator using unperturbed ocean depth'
     endif
-    
+
     !___________________________________________________________________________
-    ! a) pre allocate stiff_mat: dimenssion,  reduced row vector ... and number 
+    ! a) pre allocate stiff_mat: dimenssion,  reduced row vector ... and number
     ! of neighbors and idices of neighbors
     ssh_stiff%dim=nod2D
     allocate(mesh%ssh_stiff%rowptr(myDim_nod2D+1), mesh%ssh_stiff%rowptr_loc(myDim_nod2D+1))
     ssh_stiff%rowptr(1)=1               ! This has to be updated as
                                         ! contiguous numbering is required
-    
+
     allocate(n_num(myDim_nod2D+eDim_nod2D),n_pos(12,myDim_nod2D))
     n_pos=0
-    
+
     !___________________________________________________________________________
     ! b) Neighbourhood information
     do n=1,myDim_nod2d
@@ -1313,8 +1313,8 @@ subroutine init_stiff_mat_ale(partit, mesh)
         ! position indices of neigbouring nodes, first entry in n_pos-->n_pos(1,n)
         ! is the number of the node itself --> n_pos(1,n)=n
         n_pos(1,n)=n
-    end do   
-    
+    end do
+
     ! determine neighbourhood of nodes via loop over 2d edge array (array adges ...
     ! contains only unique edges)
     do n=1, myDim_edge2D
@@ -1331,33 +1331,33 @@ subroutine init_stiff_mat_ale(partit, mesh)
             n_num(n2)=n_num(n2)+1
         end if
     end do
-    ! n_num...contains the number of neighbors, n_pos...contains their indices 
+    ! n_num...contains the number of neighbors, n_pos...contains their indices
 
     !___________________________________________________________________________
-    ! c) fill up reduced row vector: indice entry where sparse entrys switch to 
-    ! next row, remember ssh_stiff%rowptr(1) is initialised with on and 
+    ! c) fill up reduced row vector: indice entry where sparse entrys switch to
+    ! next row, remember ssh_stiff%rowptr(1) is initialised with on and
     ! ssh_stiff%rowptr is allocated with a length of myDim_nod2D+1
     do n=1,myDim_nod2D
         ssh_stiff%rowptr(n+1) = ssh_stiff%rowptr(n)+n_num(n)
     end do
-    
+
     !___________________________________________________________________________
     ! d) how many nonzero entries sparse matrix has? --> Corresponds to last
     ! entry in ssh_stiff%rowptr with index myDim_nod2D+1 minus 1
     ssh_stiff%nza = ssh_stiff%rowptr(myDim_nod2D+1)-1
-    
-    ! allocate column as colind value array of sparse matrix, have length of nonzero 
-    ! entrie of sparse matrix 
+
+    ! allocate column as colind value array of sparse matrix, have length of nonzero
+    ! entrie of sparse matrix
     allocate(mesh%ssh_stiff%colind(ssh_stiff%nza), mesh%ssh_stiff%colind_loc(ssh_stiff%nza))
     allocate(mesh%ssh_stiff%values(ssh_stiff%nza))
-    ssh_stiff%values=0.0_WP  
-    
+    ssh_stiff%values=0.0_WP
+
     !___________________________________________________________________________
-    ! e) fill up sparse matrix column index 
+    ! e) fill up sparse matrix column index
     do n=1,myDim_nod2D
         ! for every node points n, estimate start (nini) and end (nend) indices of neighbouring nodes
         ! in sparse matrix
-        nini = ssh_stiff%rowptr(n) 
+        nini = ssh_stiff%rowptr(n)
         nend = ssh_stiff%rowptr(n+1)- 1
         ! fill colind with local indices location from n_pos
         ssh_stiff%colind(nini:nend) = n_pos(1:n_num(n),n)
@@ -1368,54 +1368,54 @@ subroutine init_stiff_mat_ale(partit, mesh)
     !!! Thus far everything is in local numbering.    !!!
     !!! We will update it later when the values are   !!!
     !!! filled in                                     !!!
-    
+
     !___________________________________________________________________________
     ! f) fill in  M/dt-alpha*theta*g*dt*\nabla(H\nabla\eta))
     !
-    ! is here reinitialised to become auxilary array to switch from local to 
+    ! is here reinitialised to become auxilary array to switch from local to
     ! global node indices
-    n_num=0 
-    
+    n_num=0
+
     ! 1st do secod term of lhs od equation (18) of "FESOM2 from finite element to finite volumes"
     ! stiffness part
     factor = g*dt*alpha*theta
-    
+
     ! loop over edges
     do ed=1,myDim_edge2D   !! Attention
-        
-        ! el ... which two elements contribute to edge 
+
+        ! el ... which two elements contribute to edge
         el=edge_tri(:,ed)
         ! loop over two triangle elements
         do i=1,2  ! Two elements related to the edge
-                ! It should be just grad on elements 
-            
+                ! It should be just grad on elements
+
             if (el(i)<1) cycle ! if el(i)<1, it means its an outer boundary edge this
                             ! has only one triangle element to which it contribute
-                            
+
             ! which three nodes span up triangle el(i)
-            ! elnodes ... node indices 
+            ! elnodes ... node indices
             elnodes=elem2D_nodes(:,el(i))
-            
+
             ! calc value for stiffness matrix something like H*div --> zbar is maximum depth(m)
             ! at element el(i)
             ! Attention: here corrected with bottom depth of partial cells !!!
-            
+
             !!PS fy(1:3) = (zbar_e_bot(el(i)))* & !-> cavity
             !!PS fy(1:3) = (zbar_e_bot(el(i))-zbar(ulevels(el(i))))* &
             fy(1:3) = (zbar_e_bot(el(i))-zbar_e_srf(el(i)))* &
                       ( gradient_sca(1:3,el(i)) * edge_cross_dxdy(2*i  ,ed)   &
                        -gradient_sca(4:6,el(i)) * edge_cross_dxdy(2*i-1,ed) )
-            
+
             if(i==2) fy=-fy
-            
+
             ! who is node point 1 of edge ed --> connected with row index of sparse matrix
             row=edges(1,ed)
             if (row <= myDim_nod2D) then
-                !n... loop over neighbouring nodes to 1st node point of edge ed 
+                !n... loop over neighbouring nodes to 1st node point of edge ed
                 DO n = SSH_stiff%rowptr(row), SSH_stiff%rowptr(row+1)-1
                     ! SSH_stiff%colind(n) contains still local indices location
                     ! n is in global indexing
-                    ! n_num(SSH_stiff%colind(n)) = n --> with n_num connect local index location 
+                    ! n_num(SSH_stiff%colind(n)) = n --> with n_num connect local index location
                     ! SSH_stiff%colind(n) with global index n
                     n_num(SSH_stiff%colind(n)) = n
                 END DO
@@ -1426,7 +1426,7 @@ subroutine init_stiff_mat_ale(partit, mesh)
                 ! fill sparse martix value array with stiffness info
                 SSH_stiff%values(npos) = SSH_stiff%values(npos) + fy*factor
             endif
-            
+
             ! who is node point 2 of edge ed
             row=edges(2,ed)
             if (row <= myDim_nod2D) then
@@ -1439,27 +1439,27 @@ subroutine init_stiff_mat_ale(partit, mesh)
             endif
         end do
     end do
-    
+
     ! 2nd do first term of lhs od equation (18) of "FESOM2 from finite element to finite volumes"
     ! Mass matrix part
     do row=1, myDim_nod2D
         ! if cavity no time derivative for eta in case of rigid lid approximation at
-        ! thee cavity-ocean interface, which means cavity-ocean interface is not allowed 
+        ! thee cavity-ocean interface, which means cavity-ocean interface is not allowed
         ! to move vertically.
         if (ulevels_nod2D(row)>1) cycle
         offset = ssh_stiff%rowptr(row)
         SSH_stiff%values(offset) = SSH_stiff%values(offset)+ areasvol(ulevels_nod2D(row),row)/dt
     end do
     deallocate(n_pos,n_num)
-    
+
     !___________________________________________________________________________
     ! g) Global contiguous numbers:
-    ! Now we need to exchange between PE to know their 
+    ! Now we need to exchange between PE to know their
     ! numbers of non-zero entries (nza):
-    allocate(pnza(npes), rpnza(npes))    
+    allocate(pnza(npes), rpnza(npes))
     pnza(1:npes)=0
     rpnza=0
-    
+
     ! number of nonzero entries at every CPU
     pnza(mype+1)=ssh_stiff%nza
     call MPI_Barrier(MPI_COMM_FESOM,MPIerr)
@@ -1467,34 +1467,34 @@ subroutine init_stiff_mat_ale(partit, mesh)
     call MPI_AllREDUCE( pnza, rpnza, &
         npes, MPI_INTEGER,MPI_SUM, &
         MPI_COMM_FESOM, MPIerr)
-        
+
     if (mype==0) then
         offset=0
     else
         ! calculate offset for all cpus mype~=0
-        offset=sum(rpnza(1:mype))  ! This is offset for mype 
+        offset=sum(rpnza(1:mype))  ! This is offset for mype
     end if
-    
-    !--> make sparse matrix row pointers from local to global by nonzero entrie 
+
+    !--> make sparse matrix row pointers from local to global by nonzero entrie
     !    offset
     ssh_stiff%rowptr=ssh_stiff%rowptr+offset   ! pointers are global
-    
+
     !___________________________________________________________________________
     ! replace local nza with a global one
     ssh_stiff%nza=sum(rpnza(1:npes))
     deallocate(rpnza, pnza)
-    
+
     !___________________________________________________________________________
     ! colindices are now local to PE. We need to make them local contiguous
-    ! (i) global natural: 
-    do n=1,ssh_stiff%rowptr(myDim_nod2D+1)-ssh_stiff%rowptr(1)  
-        ! myList_nod2D ... contains global node index of every meshpoit that belongs 
+    ! (i) global natural:
+    do n=1,ssh_stiff%rowptr(myDim_nod2D+1)-ssh_stiff%rowptr(1)
+        ! myList_nod2D ... contains global node index of every meshpoit that belongs
         ! to a CPU
         ! ssh_stiff%colind(n) ... contains local node index (1:myDim_nod2d)
         ! myList_nod2D(ssh_stiff%colind(n))  ... converts local index to global index
-        ssh_stiff%colind(n)=myList_nod2D(ssh_stiff%colind(n))    
+        ssh_stiff%colind(n)=myList_nod2D(ssh_stiff%colind(n))
     end do
-    
+
     !___________________________________________________________________________
     allocate(mapping(nod2d))
     ! 0 proc reads the data in chunks and distributes it between other procs
@@ -1506,31 +1506,31 @@ subroutine init_stiff_mat_ale(partit, mesh)
         write(*,*) '     > in stiff_mat_ale, reading ', trim(file_name)
         open(fileID, file=trim(file_name))
         ! n ... how many cpus
-        read(fileID, *) n      
+        read(fileID, *) n
         ! 1st part of rpart.out: mapping(1:npes) = how many 2d node points owns every CPU
         read(fileID, *) mapping(1:npes)
         ! 2nd part of rpart.out: mapping for contigous numbering of how the 2d mesh points are
-        ! locate on the CPUs: e.g node point 1, lies on CPU 2 and is there the 5th node point. 
+        ! locate on the CPUs: e.g node point 1, lies on CPU 2 and is there the 5th node point.
         ! If CPU1 owns in total 5000 node points that is the mapping for the node point 1 =5005
         read(fileID, *) mapping
-        close(fileID) 
+        close(fileID)
     end if
     call MPI_BCast(mapping, nod2D, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-    
+
     !___________________________________________________________________________
-    ! (ii) global PE contiguous: 
-    do n=1,ssh_stiff%rowptr(myDim_nod2D+1)-ssh_stiff%rowptr(1)  
-        ! convert global mesh node point numbering to global numbering of how the single 
+    ! (ii) global PE contiguous:
+    do n=1,ssh_stiff%rowptr(myDim_nod2D+1)-ssh_stiff%rowptr(1)
+        ! convert global mesh node point numbering to global numbering of how the single
         ! node points are contigous located on the CPUs
         ssh_stiff%colind(n)=mapping(ssh_stiff%colind(n))
-    end do    
-    
+    end do
+
     !___________________________________________________________________________
     deallocate(mapping)
     t1=MPI_Wtime()
     if (mype==0) then
         write(*,*) '     took: ',t1-t0, ' sec'
-        write(*,*) 
+        write(*,*)
     endif
 
 end subroutine init_stiff_mat_ale
@@ -1543,11 +1543,11 @@ end subroutine init_stiff_mat_ale
 ! 1/tau*(eta^(n+1)-eta^n) - alpha*theta*g*tau*grad*(int_H^hbar (grad*(eta^(n+1)-eta^n))*dz) = ...
 !
 !   1/tau*(eta^(n+1)-eta^n)                                          |
-!                                                                    |--> this part is done in using the unpertubed bottom depth 
+!                                                                    |--> this part is done in using the unpertubed bottom depth
 !   - alpha*theta*g*tau*grad*(int_H^0(grad*(eta^(n+1)-eta^n))*dz)    |    in the initialisation of the stiff matrix
 !
 !   - alpha*theta*g*tau*grad*(int_0^hbar(grad*(eta^(n+1)-eta^n))*dz) |--> the update from pertubations in the bottom depth
-!                                                                         due to changes in ssh is done here 
+!                                                                         due to changes in ssh is done here
 !   = ssh_rhs                                                             in the update of the stiff matrix
 !
 subroutine update_stiff_mat_ale(partit, mesh)
@@ -1565,7 +1565,7 @@ subroutine update_stiff_mat_ale(partit, mesh)
     integer                             :: n, i, j, k, row, ed, n2
     integer                             :: enodes(2), elnodes(3), el(2)
     integer                             :: elem, npos(3), offset, nini, nend
-    real(kind=WP)                       :: factor 
+    real(kind=WP)                       :: factor
     real(kind=WP)                       :: fx(3), fy(3)
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -1575,7 +1575,7 @@ subroutine update_stiff_mat_ale(partit, mesh)
 #include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
-    ! update secod term of lhs od equation (18) of "FESOM2 from finite element 
+    ! update secod term of lhs od equation (18) of "FESOM2 from finite element
     ! to finite volumes" --> stiff matrix part
     ! loop over lcal edges
     factor=g*dt*alpha*theta
@@ -1583,25 +1583,25 @@ subroutine update_stiff_mat_ale(partit, mesh)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, i, j, k, row, ed, n2, enodes, elnodes, el, elem, npos, offset, nini, nend, fx, fy)
     do ed=1,myDim_edge2D   !! Attention
         ! enodes ... local node indices of nodes that edge ed
-        enodes=edges(:,ed)        
+        enodes=edges(:,ed)
         ! el ... local element indices of the two elments that contribute to edge
         ! el(1) or el(2) < 0 than edge is boundary edge
         el=edge_tri(:,ed)
         !_______________________________________________________________________
-        do j=1,2 
+        do j=1,2
             ! row ... local indice od edge node 1 or 2
             row=enodes(j)
             if(row>myDim_nod2D) cycle    !! Attention
-            
+
             !___________________________________________________________________
             ! sparse indice offset for node with index row
-            offset=SSH_stiff%rowptr(row)-ssh_stiff%rowptr(1)           
+            offset=SSH_stiff%rowptr(row)-ssh_stiff%rowptr(1)
             !___________________________________________________________________
             do i=1, 2  ! Two elements related to the edge
-                        ! It should be just grad on elements 
+                        ! It should be just grad on elements
                 ! elem ... local element index to calc grad on that element
-                elem=el(i)                
-                if(elem<1) cycle                
+                elem=el(i)
+                if(elem<1) cycle
                 ! elnodes ... local node indices of nodes that form element elem
                 elnodes=elem2D_nodes(:,elem)
                 ! we have to put it here for OMP compatibility. The MPI version might become a bit slower :(
@@ -1614,21 +1614,21 @@ subroutine update_stiff_mat_ale(partit, mesh)
                           EXIT
                       end if
                    end do
-                end do                       
+                end do
                 ! here update of second term on lhs of eq. 18 in Danilov etal 2017
-                ! --> in the initialisation of the stiff matrix the integration went 
-                !     over the unperturbed ocean depth using -zbar_e_bot 
-                ! --> here this therm is now updated with the actual change in ssh 
+                ! --> in the initialisation of the stiff matrix the integration went
+                !     over the unperturbed ocean depth using -zbar_e_bot
+                ! --> here this therm is now updated with the actual change in ssh
                 !     interpolated to the element dhe
                 ! calculate: - alpha*theta*g*tau*grad*(int_0^hbar(grad*(eta^(n+1)-eta^n))*dz)
                 fy(1:3) = -dhe(elem)* &
                          ( gradient_sca(1:3,el(i)) * edge_cross_dxdy(2*i  ,ed)   &
                           -gradient_sca(4:6,el(i)) * edge_cross_dxdy(2*i-1,ed) )
-                          
+
                 if(i==2) fy=-fy
                 if(j==2) fy=-fy
-                
-                ! In the computation above, I've used rules from ssh_rhs (where it is 
+
+                ! In the computation above, I've used rules from ssh_rhs (where it is
                 ! on the rhs. So the sign is changed in the expression below.
                 ! npos... sparse matrix indices position of node points elnodes
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
@@ -1641,10 +1641,10 @@ subroutine update_stiff_mat_ale(partit, mesh)
                    call omp_unset_lock(partit%plock(row))
 #else
 !$OMP END ORDERED
-#endif                
+#endif
             end do ! --> do i=1,2
-        end do ! --> do j=1,2 
-    end do ! --> do ed=1,myDim_edge2D 
+        end do ! --> do j=1,2
+    end do ! --> do ed=1,myDim_edge2D
 !$OMP END PARALLEL DO
 !DS this check will work only on 0pe because SSH_stiff%rowptr contains global pointers
 !if (mype==0) then
@@ -1663,11 +1663,11 @@ end subroutine update_stiff_mat_ale
 !
 !
 !===============================================================================
-! compute new ssh_rhs which is first term on rhs of eq.18 in S. Danilov et al.: 
+! compute new ssh_rhs which is first term on rhs of eq.18 in S. Danilov et al.:
 !"FESOM2: from finite elements to finite volumes"
 !
 ! ssh_rhs = alpha * grad[  int_hbot^hbar(n+0.5)( u^n+deltau)dz + W(n+0.5) ]
-! In the semiimplicit method: 
+! In the semiimplicit method:
 ! ssh_rhs=-alpha*\nabla\int(U_n+U_rhs)dz-(1-alpha)*...
 ! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
 subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
@@ -1685,7 +1685,7 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     type(t_dyn)   , intent(inout), target :: dynamics
     !___________________________________________________________________________
     integer       :: ed, el(2), enodes(2), nz, n, nzmin, nzmax
-    real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2 
+    real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2
     real(kind=WP) :: dumc1_1, dumc1_2, dumc2_1, dumc2_2 !!PS
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -1711,33 +1711,33 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, el, enodes, n, nz, nzmin, nzmax, c1, c2, deltaX1, deltaX2, deltaY1, deltaY2, &
 !$OMP                                                                                 dumc1_1, dumc1_2, dumc2_1, dumc2_2)
 !$OMP DO
-    do ed=1, myDim_edge2D      
+    do ed=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,ed)
         ! local index of element that contribute to edge
         el=edge_tri(:,ed)
-        
+
         !_______________________________________________________________________
         ! calc depth integral: alpha*\nabla\int(U_n+U_rhs)dz for el(1)
         c1=0.0_WP
-        ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to 
+        ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to
         ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
-        deltaX1=edge_cross_dxdy(1,ed) 
+        deltaX1=edge_cross_dxdy(1,ed)
         deltaY1=edge_cross_dxdy(2,ed)
-        
+
         nzmin = ulevels(el(1))
         nzmax = nlevels(el(1))-1
         do nz=nzmin, nzmax
             c1=c1+alpha*((UV(2,nz,el(1))+UV_rhs(2,nz,el(1)))*deltaX1- &
                          (UV(1,nz,el(1))+UV_rhs(1,nz,el(1)))*deltaY1)*helem(nz,el(1))
         end do
-        
+
         !_______________________________________________________________________
-        ! if ed is not a boundary edge --> calc depth integral: 
-        ! alpha*\nabla\int(U_n+U_rhs)dz for el(2) 
+        ! if ed is not a boundary edge --> calc depth integral:
+        ! alpha*\nabla\int(U_n+U_rhs)dz for el(2)
         c2=0.0_WP
         if(el(2)>0) then
-            ! edge_cross_dxdy(3:4,ed)... dx,dy distance from element centroid el(2) to 
+            ! edge_cross_dxdy(3:4,ed)... dx,dy distance from element centroid el(2) to
             ! center of edge --> needed to calc flux perpedicular to edge from elem el(2)
             deltaX2=edge_cross_dxdy(3,ed)
             deltaY2=edge_cross_dxdy(4,ed)
@@ -1748,7 +1748,7 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
                              (UV(1,nz,el(2))+UV_rhs(1,nz,el(2)))*deltaY2)*helem(nz,el(2))
             end do
         end if
-        
+
         !_______________________________________________________________________
         ! calc netto "flux"
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
@@ -1775,28 +1775,28 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     ! take into account water flux
     ! at this point: ssh_rhs     = -alpha * nabla*int(u^n + deltau dz)
     !                ssh_rhs_old = - nabla*int(u^n dz) - water_flux*area
-    !                
+    !
     ! (eta_(n+1)-eta_n)/dt = ssh_rhs - alpha*water_flux*area + (1-alpha)*ssh_rhs_old
     !                      = ssh_rhs
-    !                      
+    !
     ! shown in eq (12) rhs of "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
     if ( .not. trim(which_ALE)=='linfs') then
 !$OMP DO
         do n=1,myDim_nod2D
             nzmin = ulevels_nod2D(n)
             if (ulevels_nod2D(n)>1 .and. use_cavity_fw2press ) then
-                ! use_cavity_fw2press=.true.: adds freshwater under the cavity thereby 
+                ! use_cavity_fw2press=.true.: adds freshwater under the cavity thereby
                 ! increasing the local pressure
                 ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)
             else
                 ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)+(1.0_WP-alpha)*ssh_rhs_old(n)
-            end if 
+            end if
         end do
 !$OMP END DO
     else
 !$OMP DO
         do n=1,myDim_nod2D
-            if (ulevels_nod2D(n)>1) cycle ! --> in case of cavity 
+            if (ulevels_nod2D(n)>1) cycle ! --> in case of cavity
             ssh_rhs(n)=ssh_rhs(n)+(1.0_WP-alpha)*ssh_rhs_old(n)
         end do
 !$OMP END DO
@@ -1818,8 +1818,8 @@ end subroutine compute_ssh_rhs_ale
 !
 ! in S. Danilov et al.: "FESOM2: from finite elements to finite volumes"
 !
-! see "FESOM2: from finite elements to finte volumes, S. Danilov..." 
-! hbar(n+1)-hbar(n)=tau*ssh_rhs_old 
+! see "FESOM2: from finite elements to finte volumes, S. Danilov..."
+! hbar(n+1)-hbar(n)=tau*ssh_rhs_old
 ! ssh_rhs_old=-\nabla\int(U_n)dz-water_flux*area (if free surface)
 ! Find new elevation hbar
 subroutine compute_hbar_ale(dynamics, partit, mesh)
@@ -1837,7 +1837,7 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
     type(t_mesh),   intent(inout), target :: mesh
     !___________________________________________________________________________
     integer       :: ed, el(2), enodes(2), elem, elnodes(3), n, nz, nzmin, nzmax
-    real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2 
+    real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV
@@ -1862,28 +1862,28 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, el, enodes, elem, elnodes, n, nz, nzmin, nzmax, &
 !$OMP                                            c1, c2, deltaX1, deltaX2, deltaY1, deltaY2)
 !$OMP DO
-    do ed=1, myDim_edge2D                     
+    do ed=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,ed)
         ! local index of element that contribute to edge
         el=edge_tri(:,ed)
-        
+
         !_______________________________________________________________________
         ! cal depth integal: \nabla\int(U_n)dz for el(1)
         c1=0.0_WP
-        ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to 
+        ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to
         ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
         deltaX1=edge_cross_dxdy(1,ed)
         deltaY1=edge_cross_dxdy(2,ed)
-        
+
         nzmin = ulevels(el(1))
         nzmax = nlevels(el(1))-1
         !!PS do nz=1, nlevels(el(1))-1
-        do nz=nzmin, nzmax 
+        do nz=nzmin, nzmax
             c1=c1+(UV(2,nz,el(1))*deltaX1-UV(1,nz,el(1))*deltaY1)*helem(nz,el(1))
         end do
         !_______________________________________________________________________
-        ! if ed is not a boundary edge --> calc depth integral: \nabla\int(U_n)dz 
+        ! if ed is not a boundary edge --> calc depth integral: \nabla\int(U_n)dz
         ! for el(2)
         c2=0.0_WP
         if(el(2)>0) then
@@ -1927,7 +1927,7 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
 !$OMP END PARALLEL DO
         call exchange_nod(ssh_rhs_old, partit)
 !$OMP BARRIER
-    end if 
+    end if
     !___________________________________________________________________________
     ! update the thickness
 !$OMP PARALLEL DO
@@ -1949,19 +1949,19 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes)
     do elem=1,myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
-        if (ulevels(elem) > 1) then 
+        if (ulevels(elem) > 1) then
             dhe(elem) = 0.0_WP
         else
             dhe(elem) = sum(hbar(elnodes)-hbar_old(elnodes))/3.0_WP
-        endif 
+        endif
     end do
 !$OMP END PARALLEL DO
 end subroutine compute_hbar_ale
 !
 !
 !===============================================================================
-! calculate vertical velocity from eq.3 in S. Danilov et al. : FESOM2: from 
-! finite elements to finite volumes. 
+! calculate vertical velocity from eq.3 in S. Danilov et al. : FESOM2: from
+! finite elements to finite volumes.
 !
 !   dh_k/dt + grad(u*h)_k + (w^t - w^b) + water_flux_k=1 = 0
 !
@@ -2018,7 +2018,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     if (Fer_GM) then
         fer_UV  => dynamics%fer_uv(:,:,:)
         fer_Wvel=> dynamics%fer_w(:,:)
-    end if    
+    end if
     !___________________________________________________________________________
     ! Contributions from levels in divergence
 !$OMP PARALLEL DO
@@ -2034,18 +2034,18 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
 !$OMP DO
     do ed=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
-        enodes=edges(:,ed)   
-        
+        enodes=edges(:,ed)
+
         ! local index of element that contribute to edge
         el=edge_tri(:,ed)
-        
-        ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to 
+
+        ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to
         ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
         deltaX1=edge_cross_dxdy(1,ed)
         deltaY1=edge_cross_dxdy(2,ed)
-        
+
         !_______________________________________________________________________
-        ! calc div(u_vec*h) for every layer 
+        ! calc div(u_vec*h) for every layer
         ! do it with gauss-law: int( div(u_vec)*dV) = int( u_vec * n_vec * dS )
         nzmin = ulevels(el(1))
         nzmax = nlevels(el(1))-1
@@ -2090,7 +2090,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
             deltaX2=edge_cross_dxdy(3,ed)
             deltaY2=edge_cross_dxdy(4,ed)
             nzmin = ulevels(el(2))
-            nzmax = nlevels(el(2))-1   
+            nzmax = nlevels(el(2))-1
             do nz = nzmax, nzmin, -1
                 c1(nz)=-(UV(2,nz,el(2))*deltaX2 - UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
                 if (Fer_GM) then
@@ -2129,35 +2129,35 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! cumulative summation of div(u_vec*h) vertically
     ! W_k = W_k+1 - div(h_k*u_k)
-    ! W_k ... vertical flux trough 
+    ! W_k ... vertical flux trough
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax)
     do n=1, myDim_nod2D
         nzmin = ulevels_nod2D(n)
         nzmax = nlevels_nod2d(n)-1
-        
+
         do nz=nzmax,nzmin,-1
             Wvel(nz,n)=Wvel(nz,n)+Wvel(nz+1,n)
-            if (Fer_GM) then 
+            if (Fer_GM) then
                 fer_Wvel(nz,n)=fer_Wvel(nz,n)+fer_Wvel(nz+1,n)
             end if
         end do
     end do
 !$OMP END PARALLEL DO
     !___________________________________________________________________________
-    ! divide with depth dependent cell area to convert from Vertical flux to 
+    ! divide with depth dependent cell area to convert from Vertical flux to
     ! physical vertical velocities in units m/s
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax)
     do n=1, myDim_nod2D
         nzmin = ulevels_nod2D(n)
         nzmax = nlevels_nod2d(n)-1
-        
+
         do nz=nzmin,nzmax
             Wvel(nz,n)=Wvel(nz,n)/area(nz,n)
-            if (Fer_GM) then 
+            if (Fer_GM) then
                 fer_Wvel(nz,n)=fer_Wvel(nz,n)/area(nz,n)
             end if
-            
+
         end do
     end do
 !$OMP END PARALLEL DO
@@ -2172,18 +2172,18 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     ! |--> (C) ZSTAR:  W_t-W_b = -div(hu) - dh/dt - Wflux_k1
     !                                         |
     !                                         |--> (dh/dt)_k = 1/H*dh/dt
-    
+
     !___________________________________________________________________________
     ! Correct for free surface (zlevel and zstar)
     if(trim(which_ALE)=='zlevel') then
         !_______________________________________________________________________
         ! Update the upper level
         ! water_flux is positive if out of the ocean
-        ! Wvel(1,n) should be 0 up to machine precision only then volume is 
+        ! Wvel(1,n) should be 0 up to machine precision only then volume is
         ! conserved --> at this place should be checked.
-        
+
         !_______________________________________________________________________
-        ! idx is only needed for local star case to estimate over how much 
+        ! idx is only needed for local star case to estimate over how much
         ! depth layers change in ssh needs to be distributed
         !!PS allocate(max_dhbar2distr(nl-1),distrib_dhbar(nl-1),idx(nl-1),cumsum_maxdhbar(nl-1))
         !!PS idx = (/(nz,nz=1,nl-1,1)/)
@@ -2196,69 +2196,69 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
         do n=1, myDim_nod2D
             nzmin = ulevels_nod2D(n)
             nzmax = nlevels_nod2D_min(n)-1
-            
+
             !_______________________________________________________________________
-            ! compute new surface vertical velocity and layer thickness only when 
+            ! compute new surface vertical velocity and layer thickness only when
             ! there is no cavity --> when there is cavity treat like linfs
-            if (nzmin==1) then 
+            if (nzmin==1) then
                 !___________________________________________________________________
                 ! total ssh change to distribute
                 dhbar_total = hbar(n)-hbar_old(n)
-                
+
                 !___________________________________________________________________
-                ! if new surface layerthickness at node n is smaller than the initial 
+                ! if new surface layerthickness at node n is smaller than the initial
                 ! layerthickness*min_hnode than go from zlevel to local zstar approach
                 ! over the first lzstar_lev layers.
-                ! --> otherwise it can happen, especially with floating ice, that 
-                !     layerthickness becomes to small or even negativ and model 
+                ! --> otherwise it can happen, especially with floating ice, that
+                !     layerthickness becomes to small or even negativ and model
                 !     blows up
                 !!PS if (dhbar_total<0.0_WP .and. hnode(1,n)+dhbar_total<=(zbar(1)-zbar(2))*min_hnode ) then
-                if (dhbar_total < 0.0_WP .and. hnode(nzmin,n)+dhbar_total<=(zbar(nzmin)-zbar(nzmin+1))*min_hnode ) then 
-                    ! --> do local zstar case 
+                if (dhbar_total < 0.0_WP .and. hnode(nzmin,n)+dhbar_total<=(zbar(nzmin)-zbar(nzmin+1))*min_hnode ) then
+                    ! --> do local zstar case
                     !_______________________________________________________________
-                    ! max_dhbar2distr ... how much negative ssh change can be maximal 
-                    ! distributed per layer (must be negativ, if positive or ==0 
+                    ! max_dhbar2distr ... how much negative ssh change can be maximal
+                    ! distributed per layer (must be negativ, if positive or ==0
                     ! layer reached already minimum layerthickness)
                     max_dhbar2distr = 0.0_WP
                     !max_dhbar2distr = (zbar(1:lzstar_lev)-zbar(2:lzstar_lev+1))*min_hnode - hnode(1:lzstar_lev,n);
                     max_dhbar2distr = (zbar(nzmin:nzmin+lzstar_lev-1)-zbar(nzmin+1:nzmin+lzstar_lev-1+1))*min_hnode - hnode(nzmin:nzmin+lzstar_lev-1,n);
                     where (max_dhbar2distr>=0.0_WP) max_dhbar2distr=0.0_WP
-                    
+
                     !_______________________________________________________________
-                    ! if vertical CFL criteria at a certain node is at its limit 
-                    ! don't take away further layer thickness --> take it than better 
+                    ! if vertical CFL criteria at a certain node is at its limit
+                    ! don't take away further layer thickness --> take it than better
                     ! from a deeper layer
                     !!PS where (CFL_z(1:lzstar_lev,n)>=0.95_WP) max_dhbar2distr=0.0_WP
                     where (CFL_z(nzmin:nzmin+lzstar_lev-1,n)>=0.95_WP) max_dhbar2distr=0.0_WP
-                    
+
                     !_______________________________________________________________
                     ! try to limitate over how much layers i realy need to distribute
-                    ! the change in ssh, so that the next loops run only over the 
+                    ! the change in ssh, so that the next loops run only over the
                     ! nesseccary levels and not over all lzstar_lev levels
-                    ! --> do this with cumulativ summation of maximum dhbar that can 
+                    ! --> do this with cumulativ summation of maximum dhbar that can
                     !     be distributed per layer. Than search index where this
                     !     cumulativ sum is larger than dhbar_total
                     cumsum_maxdhbar(1)            =  max_dhbar2distr(1)
                     cumsum_maxdhbar(2:lzstar_lev) = (/(max_dhbar2distr(nz)+max_dhbar2distr(nz-1),nz=2,lzstar_lev,1)/)
                     nz = minval(pack(idx,cumsum_maxdhbar<dhbar_total))
                     nz = min(nz,lzstar_lev)
-                    
+
                     !_______________________________________________________________
                     ! calc array for distribution of ssh change over layers
                     distrib_dhbar = 0.0_WP
                     dhbar_rest    = dhbar_total
-                    
-                    ! nlevels_nod2D_min(n)-1 ...would be hnode of partial bottom 
-                    ! cell but this one is not allowed to change so go until 
+
+                    ! nlevels_nod2D_min(n)-1 ...would be hnode of partial bottom
+                    ! cell but this one is not allowed to change so go until
                     ! nlevels_nod2D_min(n)-2
                     !!PS nzmax = min(nz,nlevels_nod2D_min(n)-2)
                     nzmax = min(nz,nzmax-1)
                     do nz=1,nzmax
-                        distrib_dhbar(nz) = max(dhbar_rest,max_dhbar2distr(nz))    
+                        distrib_dhbar(nz) = max(dhbar_rest,max_dhbar2distr(nz))
                         dhbar_rest        = dhbar_rest - distrib_dhbar(nz)
                         dhbar_rest        = min(0.0_WP,dhbar_rest)
                     end do
-                    
+
                     !_______________________________________________________________
                     if ( abs(sum(distrib_dhbar)-dhbar_total)>1.0e-10 ) then
                         write(*,*) " --> problem <-- with conservation of dhbar distribution over depth"
@@ -2274,16 +2274,16 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
                         write(*,*) "                  > max_dhbar2distr=",max_dhbar2distr
                         write(*,*) "                  > hnode_min=",(zbar(1:lzstar_lev)-zbar(2:lzstar_lev+1))*min_hnode
                         write(*,*) "                  > hnode_now=",hnode(1:lzstar_lev,n)
-                        
-                    end if 
-                    
+
+                    end if
+
                     !_______________________________________________________________
                     distrib_dhbar_int = 0.0_WP
                     do nz=nzmax,1,-1
                         !___________________________________________________________
                         ! --> integrate ssh distribution from down to up
                         distrib_dhbar_int = distrib_dhbar_int + distrib_dhbar(nz)
-                        
+
                         !___________________________________________________________
                         ! --> distribute change in ssh over layers in hnode and Wvel
                         !!PS Wvel(nz,n)        = Wvel(nz,n) - distrib_dhbar_int/dt
@@ -2291,44 +2291,44 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
                         Wvel(nzmin+nz-1,n)        = Wvel(nzmin+nz-1,n) - distrib_dhbar_int/dt
                         hnode_new(nzmin+nz-1,n)   = hnode(nzmin+nz-1,n)+ distrib_dhbar(nz)
                     end do
-                    
+
                 !___________________________________________________________________
-                ! in case local zstar was applied must allow the mesh in case of 
+                ! in case local zstar was applied must allow the mesh in case of
                 ! positive ssh change to return to the normal zlevel case, that means
-                ! to first "refill" the subsurface layerthickness and with the rest 
+                ! to first "refill" the subsurface layerthickness and with the rest
                 ! than the surface layerthickness
-                !!PS elseif (dhbar_total>0.0_WP .and. & 
+                !!PS elseif (dhbar_total>0.0_WP .and. &
                 !!PS         any(hnode(2:lzstar_lev,n)/=(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1))) &
                 !!PS         ) then
-                elseif (dhbar_total>0.0_WP .and. & 
+                elseif (dhbar_total>0.0_WP .and. &
                         any(hnode(nzmin+1:nzmin+lzstar_lev-1,n)/=(zbar(nzmin+1:nzmin+lzstar_lev-1)-zbar(nzmin+2:nzmin+lzstar_lev-1+1))) &
                         ) then
                     ! --> do return to zlevel
                     !_______________________________________________________________
-                    ! max_dhbar2distr ... how much positive ssh change must be 
-                    ! distributed in the subsurface layers to be able to return to 
+                    ! max_dhbar2distr ... how much positive ssh change must be
+                    ! distributed in the subsurface layers to be able to return to
                     ! the init layerthickness
                     max_dhbar2distr   = 0.0_WP
                     !!PS max_dhbar2distr   = (zbar(1:lzstar_lev)-zbar(2:lzstar_lev+1)) - hnode(1:lzstar_lev,n);
                     max_dhbar2distr   = (zbar(nzmin:nzmin+lzstar_lev-1)-zbar(nzmin+1:nzmin+lzstar_lev-1+1)) - hnode(nzmin:nzmin+lzstar_lev-1,n);
-                    ! there is no limitation in the surface layer how much positive 
-                    ! ssh change can be put there (1000.0_WP is just an arbitrary 
+                    ! there is no limitation in the surface layer how much positive
+                    ! ssh change can be put there (1000.0_WP is just an arbitrary
                     ! high value that should no be reached by dhbar_total)
                     max_dhbar2distr(1)= 1000.0_WP
-                    
+
                     !_______________________________________________________________
                     ! try to limitate over how much layers i realy need to distribute
-                    ! the change in ssh, so that the next loops run only over the 
+                    ! the change in ssh, so that the next loops run only over the
                     ! nesseccary levels and not over all lzstar_lev levels
                     !!PS nz = maxval(pack(idx,hnode(1:lzstar_lev,n)/=(zbar(1:lzstar_lev)-zbar(2:lzstar_lev+1))))
                     nz = maxval(pack(idx,hnode(nzmin:nzmin+lzstar_lev-1,n)/=(zbar(nzmin:nzmin+lzstar_lev-1)-zbar(nzmin+1:nzmin+lzstar_lev-1+1))))
-                    
-                    ! nlevels_nod2D_min(n)-1 ...would be hnode of partial bottom 
-                    ! cell but this one is not allowed to change so go until 
+
+                    ! nlevels_nod2D_min(n)-1 ...would be hnode of partial bottom
+                    ! cell but this one is not allowed to change so go until
                     ! nlevels_nod2D_min(n)-2
                     !!PS nzmax = min(nz,nlevels_nod2D_min(n)-2)
                     nzmax = min(nz,nzmax-1)
-                    
+
                     !_______________________________________________________________
                     ! calc array for distribution of ssh change over layers
                     dhbar_rest        = dhbar_total
@@ -2337,84 +2337,84 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
                     !!PS do nz=nzmax,1,-1
                     do nz=nzmax,1,-1
                         !___________________________________________________________
-                        distrib_dhbar(nz) = min(dhbar_rest,max_dhbar2distr(nz))    
+                        distrib_dhbar(nz) = min(dhbar_rest,max_dhbar2distr(nz))
                         dhbar_rest        = dhbar_rest - distrib_dhbar(nz)
                         dhbar_rest        = max(0.0_WP,dhbar_rest)
-                        
+
                         !___________________________________________________________
                         ! --> integrate ssh distribution from down to up
                         distrib_dhbar_int = distrib_dhbar_int + distrib_dhbar(nz)
-                        
+
                         !___________________________________________________________
                         ! --> distribute change in ssh over layers in hnode and Wvel
                         Wvel(     nzmin+nz-1,n) = Wvel( nzmin+nz-1,n) - distrib_dhbar_int/dt
                         hnode_new(nzmin+nz-1,n) = hnode(nzmin+nz-1,n) + distrib_dhbar(nz)
-                        
+
                     end do
-                    
+
                 !___________________________________________________________________
                 else
                     ! --> do normal zlevel case
-                    ! only distribute change in ssh for Wvel and hnode_new into the 
+                    ! only distribute change in ssh for Wvel and hnode_new into the
                     ! surface layer
                     !!PS Wvel(1,n)      = Wvel(1,n) -dhbar_total/dt
                     !!PS hnode_new(1,n) = hnode(1,n)+dhbar_total
                     Wvel(nzmin,n)      = Wvel(nzmin,n)  - dhbar_total/dt
                     hnode_new(nzmin,n) = hnode(nzmin,n) + dhbar_total
-                    
-                end if ! --> if (dhbar_total<0 .and. hnode(1,n)+dhbar_total<=... ) then 
-                
+
+                end if ! --> if (dhbar_total<0 .and. hnode(1,n)+dhbar_total<=... ) then
+
                 !___________________________________________________________________
                 ! Add surface fresh water flux as upper boundary condition for continutity
                 !!PS Wvel(1,n) = Wvel(1,n)-water_flux(n)
                 Wvel(nzmin,n) = Wvel(nzmin,n)-water_flux(n)
-            
-            end if ! --> if (nzmin==1) then 
-            
+
+            end if ! --> if (nzmin==1) then
+
         end do ! --> do n=1, myDim_nod2D
 !$OMP END DO
 !$OMP END PARALLEL
         !_______________________________________________________________________
         deallocate(max_dhbar2distr,distrib_dhbar,idx,cumsum_maxdhbar)
-        
+
     !___________________________________________________________________________
     elseif (trim(which_ALE)=='zstar') then
-        ! distribute total change in ssh (hbar(n)-hbar_old(n)) over all layers 
+        ! distribute total change in ssh (hbar(n)-hbar_old(n)) over all layers
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, dd, dd1, dddt)
         do n=1, myDim_nod2D
             nzmin = ulevels_nod2D(n)
             !!PS nzmin = ulevels_nod2D_max(n)
             nzmax = nlevels_nod2D_min(n)-1
-            
+
             !_______________________________________________________________________
-            ! compute new surface vertical velocity and layer thickness only when 
+            ! compute new surface vertical velocity and layer thickness only when
             ! there is no cavity --> when there is cavity treat like linfs
-            if (nzmin==1) then 
-                
+            if (nzmin==1) then
+
                 !___________________________________________________________________
                 ! --> be careful Sergey suggest in his paper to use the unperturbed
-                !     ocean levels NOT the actual one !!! but spoke with Sergey its not 
-                !     so important which to use as long as it is consistent and 
+                !     ocean levels NOT the actual one !!! but spoke with Sergey its not
+                !     so important which to use as long as it is consistent and
                 !     volume is conserved
                 !!PS dd1=zbar_3d_n(nlevels_nod2D_min(n)-1,n)
                 dd1=zbar_3d_n(nzmax,n)
-                
+
                 ! This is the depth the stretching is applied (area(nz,n)=area(1,n))
-                !!ps dd=zbar_3d_n(1,n)-dd1    
-                dd=zbar_3d_n(nzmin,n)-dd1  
-                
+                !!ps dd=zbar_3d_n(1,n)-dd1
+                dd=zbar_3d_n(nzmin,n)-dd1
+
                 ! how much of (hbar(n)-hbar_old(n)) is distributed into each layer
                 ! 1/H*dhbar
                 dd=(hbar(n)-hbar_old(n))/dd
-                
+
                 !___________________________________________________________________
                 ! 1/H*dhbar/dt
                 dddt=dd/dt
-                
+
                 !___________________________________________________________________
                 !!PS do nz=1,nlevels_nod2D_min(n)-2
                 do nz=nzmin, nzmax-1
-                    ! why  *(zbar(nz)-dd1) ??? 
+                    ! why  *(zbar(nz)-dd1) ???
                     ! because here Wvel_k = SUM_k:kmax(div(h_k*v_k))/V_k
                     ! but Wvel_k = Wvel_k+1 - div(h_k*v_k) - h⁰_k/H*dhbar/dt
                     !                |--> Wvel_k+1 = Wvel_k+2 - div(h_k+1*v_k+1) - h⁰_k+1/H*dhbar/dt
@@ -2422,24 +2422,24 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
                     !
                     ! Wvel_k             = SUM_i=k:kmax(div(h_i*v_i)) + 1/H*dhbar/dt*SUM_i=k:kmax(h⁰_k)
                     ! SUM_i=k:kmax(h⁰_k) = (zbar(nz)-dd1)
-                    ! --> this strange term zbar_3d_n(nz,n)-dd1)*dddt --> comes from 
+                    ! --> this strange term zbar_3d_n(nz,n)-dd1)*dddt --> comes from
                     !     the vertical integration bottom to top of Wvel
                     Wvel(nz,n)    =Wvel(nz,n) -(zbar_3d_n(nz,n)-dd1)*dddt
-                    
+
                     hnode_new(nz,n)=hnode(nz,n)+(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))*dd
                 end do
-                
+
                 !___________________________________________________________________
-                ! Add surface fresh water flux as upper boundary condition for 
+                ! Add surface fresh water flux as upper boundary condition for
                 ! continutity
-                Wvel(nzmin,n)=Wvel(nzmin,n)-water_flux(n) 
-                
+                Wvel(nzmin,n)=Wvel(nzmin,n)-water_flux(n)
+
             endif ! --> if (nzmin==1) then
-            
+
         end do ! --> do n=1, myDim_nod2D
 !$OMP END PARALLEL DO
-        ! The implementation here is a bit strange, but this is to avoid 
-        ! unnecessary multiplications and divisions by area. We use the fact 
+        ! The implementation here is a bit strange, but this is to avoid
+        ! unnecessary multiplications and divisions by area. We use the fact
         ! that we apply stretching only over the part of the column
         ! where area(nz,n)=area(1,n)
     endif ! --> if(trim(which_ALE)=='....') then
@@ -2479,14 +2479,14 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
                 write(*,*) "zbar_n_bot(n)  = ", zbar_n_bot(n)
                 write(*,*) "bottom_node_thickness(n) = ", bottom_node_thickness(n)
                 write(*,*)
-            end if 
+            end if
         end do
 !$OMP END PARALLEL DO
     !___________________________________________________________________________
     call exchange_nod(Wvel, partit)
-    call exchange_nod(hnode_new, partit)   ! Or extend cycles above  
+    call exchange_nod(hnode_new, partit)   ! Or extend cycles above
     if (Fer_GM) call exchange_nod(fer_Wvel, partit)
-!$OMP BARRIER    
+!$OMP BARRIER
     !___________________________________________________________________________
     ! calc vertical CFL criteria for debugging purpose and vertical Wvel splitting
 !$OMP PARALLEL DO
@@ -2529,7 +2529,7 @@ cflmax=0.
                     print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3,I3)', achar(27)//'[33m'//' --> WARNING CFLz>1.75:'//achar(27)//'[0m',&
                           'CFLz_max=',cflmax,',mstep=',mstep,',glon/glat=',geo_coord_nod2D(1,n)/rad,'/',geo_coord_nod2D(2,n)/rad,&
                           ',nz/nzmin=',nz,nzmin
-                elseif (abs(CFL_z(nz,n)-cflmax) < 1.e-12 .and. CFL_z(nz,n) > 2.5_WP) then          
+                elseif (abs(CFL_z(nz,n)-cflmax) < 1.e-12 .and. CFL_z(nz,n) > 2.5_WP) then
                     print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3,I3)', achar(27)//'[31m'//' --> WARNING CFLz>2.5:'//achar(27)//'[0m',&
                           'CFLz_max=',cflmax,',mstep=',mstep,',glon/glat=',geo_coord_nod2D(1,n)/rad,'/',geo_coord_nod2D(2,n)/rad,&
                           ',nz/nzmin=',nz,nzmin
@@ -2545,7 +2545,7 @@ cflmax=0.
         end do
 !$OMP END PARALLEL DO
     end if
-    
+
     !___________________________________________________________________________
     ! Split implicit vertical velocity onto implicit and explicit components using CFL criteria:
     ! wsplit_maxcfl constrains the allowed explicit w according to the CFL at this place
@@ -2573,7 +2573,7 @@ end subroutine vert_vel_ale
 !
 !
 !===============================================================================
-! solve  eq.18 in S. Danilov et al. : FESOM2: from finite elements to finite volumes. 
+! solve  eq.18 in S. Danilov et al. : FESOM2: from finite elements to finite volumes.
 ! for (eta^(n+1)-eta^n) = d_eta
 subroutine solve_ssh_ale(dynamics, partit, mesh)
     use o_PARAM
@@ -2596,7 +2596,7 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     logical, save        :: lfirst=.true.
     integer(kind=C_INT)  :: n3, reuse, new_values
     integer              :: n
-    
+
     !___________________________________________________________________________
     ! interface for solver
     interface
@@ -2653,8 +2653,8 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     ! reuse=0: matrix remains static
     ! reuse=1: keeps a copy of the matrix structure to apply scaling of the matrix fast
 
-    ! new_values=0: matrix coefficients unchanged (compared to the last call of psolve) 
-    ! new_values=1: replaces the matrix values (keeps the structure and the preconditioner) 
+    ! new_values=0: matrix coefficients unchanged (compared to the last call of psolve)
+    ! new_values=1: replaces the matrix values (keeps the structure and the preconditioner)
     ! new_values=2: replaces the matrix values and recomputes the preconditioner (keeps the structure)
 
     ! new_values>0 requires reuse=1 in psolver_init!
@@ -2664,13 +2664,13 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     if (lfirst) then
     ! Set SOLCG for CG solver (symmetric, positiv definit matrices only, no precond available!!)
     !     SOLBICGS for BiCGstab solver (arbitrary matrices)
-    !     SOLBICGS_RAS for BiCGstab solver (arbitrary matrices) with integrated RAS - the global 
+    !     SOLBICGS_RAS for BiCGstab solver (arbitrary matrices) with integrated RAS - the global
     !                  preconditioner setting is ignored! It saves a 4 vector copies per iteration
     !                  compared to SOLBICGS + PCRAS.
     !     SOLPBICGS for pipelined BiCGstab solver (arbitrary matrices)
     !               Should scale better than SOLBICGS, but be careful, it is still experimental.
     !     SOLPBICGS_RAS is SOLPBICGS with integrated RAS (global preconditioner setting is ignored!)
-    !                   for even better scalability, well, in the end, it does not matter much.     
+    !                   for even better scalability, well, in the end, it does not matter much.
         call psolver_init(ident, SOLBICGS_RAS, PCRAS, PCILUK, lutype, &
             fillin, droptol, maxiter, restart, soltol, &
             part-1, ssh_stiff%rowptr(:)-ssh_stiff%rowptr(1), &
@@ -2678,7 +2678,7 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     lfirst=.false.
     end if
     !
-    !___________________________________________________________________________    
+    !___________________________________________________________________________
     call psolve(ident, dynamics%ssh_rhs, ssh_stiff%values, dynamics%d_eta, new_values)
 
     !
@@ -2728,14 +2728,14 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         elnodes=elem2D_nodes(:,elem)
         nzmin = ulevels(elem)
         nzmax = nlevels(elem)
-        
+
         !___________________________________________________________________________
-        ! Here can not exchange zbar_n & Z_n with zbar_3d_n & Z_3d_n because 
-        ! they run over elements here 
+        ! Here can not exchange zbar_n & Z_n with zbar_3d_n & Z_3d_n because
+        ! they run over elements here
         zbar_n=0.0_WP
         Z_n   =0.0_WP
-        ! in case of partial cells zbar_n(nzmax) is not any more at zbar(nzmax), 
-        ! zbar_n(nzmax) is now zbar_e_bot(elem), 
+        ! in case of partial cells zbar_n(nzmax) is not any more at zbar(nzmax),
+        ! zbar_n(nzmax) is now zbar_e_bot(elem),
         zbar_n(nzmax)=zbar_e_bot(elem)
         Z_n(nzmax-1)=zbar_n(nzmax) + helem(nzmax-1,elem)/2.0_WP
         !!PS do nz=nzmax-1,2,-1
@@ -2745,7 +2745,7 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         end do
         !!PS zbar_n(1) = zbar_n(2) + helem(1,elem)
         zbar_n(nzmin) = zbar_n(nzmin+1) + helem(nzmin,elem)
-        
+
         !___________________________________________________________________________
         ! Operator
         ! Regular part of coefficients:
@@ -2760,7 +2760,7 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
             wd=sum(Wvel_i(nz+1, elnodes))/3._WP
             a(nz)=a(nz)+min(0._WP, wu)*zinv
             b(nz)=b(nz)+max(0._WP, wu)*zinv
-            
+
             b(nz)=b(nz)-min(0._WP, wd)*zinv
             c(nz)=c(nz)-max(0._WP, wd)*zinv
         end do
@@ -2769,12 +2769,12 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         a(nzmax-1)=-Av(nzmax-1,elem)/(Z_n(nzmax-2)-Z_n(nzmax-1))*zinv
         b(nzmax-1)=-a(nzmax-1)+1.0_WP
         c(nzmax-1)=0.0_WP
-        
+
         ! Update from the vertical advection
         wu=sum(Wvel_i(nzmax-1, elnodes))/3._WP
         a(nzmax-1)=a(nzmax-1)+min(0._WP, wu)*zinv
         b(nzmax-1)=b(nzmax-1)+max(0._WP, wu)*zinv
-        
+
         ! The first row
         !!PS zinv=1.0_WP*dt/(zbar_n(1)-zbar_n(2))
         !!PS c(1)=-Av(2,elem)/(Z_n(1)-Z_n(2))*zinv
@@ -2784,20 +2784,20 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         c(nzmin)=-Av(nzmin+1,elem)/(Z_n(nzmin)-Z_n(nzmin+1))*zinv
         a(nzmin)=0.0_WP
         b(nzmin)=-c(nzmin)+1.0_WP
-        
+
         ! Update from the vertical advection
         !!PS wu=sum(Wvel_i(1, elnodes))/3._WP
         !!PS wd=sum(Wvel_i(2, elnodes))/3._WP
         wu=sum(Wvel_i(nzmin, elnodes))/3._WP
         wd=sum(Wvel_i(nzmin+1, elnodes))/3._WP
-        
+
         !!PS b(1)=b(1)+wu*zinv
         !!PS b(1)=b(1)-min(0._WP, wd)*zinv
         !!PS c(1)=c(1)-max(0._WP, wd)*zinv
         b(nzmin)=b(nzmin)+wu*zinv
         b(nzmin)=b(nzmin)-min(0._WP, wd)*zinv
         c(nzmin)=c(nzmin)-max(0._WP, wd)*zinv
-        
+
         ! ===========================
         ! The rhs:
         ! ===========================
@@ -2805,7 +2805,7 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         !!PS vr(1:nzmax-1)=UV_rhs(2,1:nzmax-1,elem)
         ur(nzmin:nzmax-1)=UV_rhs(1,nzmin:nzmax-1,elem)
         vr(nzmin:nzmax-1)=UV_rhs(2,nzmin:nzmax-1,elem)
-        
+
         ! The first row contains surface forcing
         !!PS ur(1)= ur(1)+zinv*stress_surf(1,elem)/density_0
         !!PS vr(1)= vr(1)+zinv*stress_surf(2,elem)/density_0
@@ -2816,7 +2816,7 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
            dynamics%ke_wind(1,elem)=stress_surf(1,elem)/density_0*dt
            dynamics%ke_wind(2,elem)=stress_surf(2,elem)/density_0*dt
         end if
-        
+
         ! The last row contains bottom friction
         zinv=1.0_WP*dt/(zbar_n(nzmax-1)-zbar_n(nzmax))
         !!PS friction=-C_d*sqrt(UV(1,nlevels(elem)-1,elem)**2+ &
@@ -2831,7 +2831,7 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
            dynamics%ke_drag(2,elem)=friction*UV(2,nzmax-1,elem)*dt
         end if
 
-        ! Model solves for the difference to the timestep N and therefore we need to 
+        ! Model solves for the difference to the timestep N and therefore we need to
         ! update the RHS for advective and diffusive contributions at the previous time step
         !!PS do nz=2, nzmax-2
         do nz=nzmin+1, nzmax-2
@@ -2842,10 +2842,10 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         !!PS vr(1)=vr(1)-(b(1)-1.0_WP)*UV(2,1,elem)-c(1)*UV(2,2,elem)
         ur(nzmin)=ur(nzmin)-(b(nzmin)-1.0_WP)*UV(1,nzmin,elem)-c(nzmin)*UV(1,nzmin+1,elem)
         vr(nzmin)=vr(nzmin)-(b(nzmin)-1.0_WP)*UV(2,nzmin,elem)-c(nzmin)*UV(2,nzmin+1,elem)
-        
+
         ur(nzmax-1)=ur(nzmax-1)-a(nzmax-1)*UV(1,nzmax-2,elem)-(b(nzmax-1)-1.0_WP)*UV(1,nzmax-1,elem)
         vr(nzmax-1)=vr(nzmax-1)-a(nzmax-1)*UV(2,nzmax-2,elem)-(b(nzmax-1)-1.0_WP)*UV(2,nzmax-1,elem)
-        
+
         ! ===========================
         ! The sweep algorithm
         ! ===========================
@@ -2856,7 +2856,7 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         cp(nzmin) = c(nzmin)/b(nzmin)
         up(nzmin) = ur(nzmin)/b(nzmin)
         vp(nzmin) = vr(nzmin)/b(nzmin)
-        
+
         ! solve for vectors c-prime and t, s-prime
         !!PS do nz = 2,nzmax-1
         do nz = nzmin+1,nzmax-1
@@ -2868,14 +2868,14 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         ! initialize x
         ur(nzmax-1) = up(nzmax-1)
         vr(nzmax-1) = vp(nzmax-1)
-        
+
         ! solve for x from the vectors c-prime and d-prime
         !!PS do nz = nzmax-2, 1, -1
         do nz = nzmax-2, nzmin, -1
             ur(nz) = up(nz)-cp(nz)*ur(nz+1)
             vr(nz) = vp(nz)-cp(nz)*vr(nz+1)
         end do
-        
+
         ! ===========================
         ! RHS update
         ! ===========================
@@ -2938,17 +2938,30 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     eta_n => dynamics%eta_n(:)
-    
+
     !___________________________________________________________________________
     t0=MPI_Wtime()
 !     water_flux = 0.0_WP
 !     heat_flux  = 0.0_WP
 !     stress_surf= 0.0_WP
 !     stress_node_surf= 0.0_WP
-    
+
     !___________________________________________________________________________
     ! calculate equation of state, density, pressure and mixed layer depths
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_bv'//achar(27)//'[0m'
+
+    !$ACC DATA &
+    !$ACC COPY(mesh, hnode, helem, elem_area) &
+    !$ACC COPY(myDim_nod2D, eDim_nod2D, myDim_elem2D, elem2D_nodes) &
+    !$ACC COPY(nlevels_nod2D, ulevels_nod2D, ulevels, nlevels) &
+    !$ACC COPY(nod_in_elem2D, nod_in_elem2D_num) &
+    !$ACC COPY(mld1, mld2, mld3, mld1_ind, mld2_ind, mld3_ind) &
+    !$ACC COPY(zbar_e_bot, gradient_sca, z_3d_n, zbar_3d_n) &
+    !$ACC COPY(density_ref, density_dmoc, density_m_rho0, dbsfc) &
+    !$ACC COPY(hpressure, bvfreq, pgf_x, pgf_y, sw_alpha, sw_beta, sigma_xy) &
+    !$ACC COPY(tracers%data(1)%values, tracers%data(2)%values) &
+    !$ACC COPY(slope_tapered, neutral_slope)
+
     call pressure_bv(tracers, partit, mesh)            !!!!! HeRE change is made. It is linear EoS now.
 
     !___________________________________________________________________________
@@ -2956,7 +2969,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_force_4_...'//achar(27)//'[0m'
     if (trim(which_ale)=='linfs') then
         call pressure_force_4_linfs(tracers, partit, mesh)
-    else  
+    else
         call pressure_force_4_zxxxx(tracers, partit, mesh)
     end if
     
@@ -2978,6 +2991,8 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! will be primarily used for computing Redi diffusivities. etc?
     call compute_neutral_slope(partit, mesh)
 
+    !$ACC END DATA
+
     !___________________________________________________________________________
     call status_check(partit)
     !___________________________________________________________________________
@@ -2985,28 +3000,28 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! >>>>>>    calculate vertical mixing coefficients for tracer (Kv)   <<<<<<
     ! >>>>>>    and momentum (Av) using using FESOM implementations      <<<<<<
     ! >>>>>>    for PP and KPP as well as mixing schemes provided by     <<<<<<
-    ! >>>>>>    by the CVMIX library                                     <<<<<< 
+    ! >>>>>>    by the CVMIX library                                     <<<<<<
     ! >>>>>>                                                             <<<<<<
     !___________________________________________________________________________
-    
+
     !___EXTENSION OF MIXING SCHEMES_____________________________________________
-    ! add CVMIX IDEMIX (internal wave energy) parameterisation for 
-    ! vertical mixing (dissipation of energy by internal gravity waves) 
-    ! extension from Olbers and Eden, 2013, "A global Model for the diapycnal 
-    ! diffusivity induced by internal gravity waves" --> use together with 
-    ! cvmix_TKE (mix_scheme='cvmix_TKE+cvmix_IDEMIX') or standalone for debbuging 
-    ! (mix_scheme='cvmix_IDEMIX') --> If idemix is used together with tke it needs 
+    ! add CVMIX IDEMIX (internal wave energy) parameterisation for
+    ! vertical mixing (dissipation of energy by internal gravity waves)
+    ! extension from Olbers and Eden, 2013, "A global Model for the diapycnal
+    ! diffusivity induced by internal gravity waves" --> use together with
+    ! cvmix_TKE (mix_scheme='cvmix_TKE+cvmix_IDEMIX') or standalone for debbuging
+    ! (mix_scheme='cvmix_IDEMIX') --> If idemix is used together with tke it needs
     ! to be called prior to tke
     ! for debugging
     if  (mod(mix_scheme_nmb,10)==6) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_idemix'//achar(27)//'[0m'
         call calc_cvmix_idemix(partit, mesh)
-    end if 
+    end if
 
     !___MAIN MIXING SCHEMES_____________________________________________________
-    ! use FESOM2.0 tuned k-profile parameterization for vertical mixing 
+    ! use FESOM2.0 tuned k-profile parameterization for vertical mixing
     if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
-        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_KPP'//achar(27)//'[0m' 
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_KPP'//achar(27)//'[0m'
         call oce_mixing_KPP(Av, Kv_double, dynamics, tracers, partit, mesh)
 !$OMP PARALLEL DO
         DO node=1, myDim_nod2D+eDim_nod2D
@@ -3015,20 +3030,20 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
 
         call mo_convect(ice, partit, mesh)
-        
-    ! use FESOM2.0 tuned pacanowski & philander parameterization for vertical 
-    ! mixing     
+
+    ! use FESOM2.0 tuned pacanowski & philander parameterization for vertical
+    ! mixing
     else if(mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
-        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_PP'//achar(27)//'[0m' 
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_PP'//achar(27)//'[0m'
         call oce_mixing_PP(dynamics, partit, mesh)
         call mo_convect(ice, partit, mesh)
-        
-    ! use CVMIX KPP (Large at al. 1994) 
+
+    ! use CVMIX KPP (Large at al. 1994)
     else if(mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_kpp'//achar(27)//'[0m'
         call calc_cvmix_kpp(ice, dynamics, tracers, partit, mesh)
         call mo_convect(ice, partit, mesh)
-        
+
     ! use CVMIX PP (Pacanowski and Philander 1981) parameterisation for mixing
     ! based on Richardson number Ri = N^2/(du/dz)^2, using Brunt Väisälä frequency
     ! N^2 and vertical horizontal velocity shear dui/dz
@@ -3036,35 +3051,35 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_pp'//achar(27)//'[0m'
         call calc_cvmix_pp(dynamics, partit, mesh)
         call mo_convect(ice, partit, mesh)
-        
-    ! use CVMIX TKE (turbulent kinetic energy closure) parameterisation for 
-    ! vertical mixing with or without the IDEMIX (dissipation of energy by 
-    ! internal gravity waves) extension from Olbers and Eden, 2013, "A global 
-    ! Model for the diapycnal diffusivity induced by internal gravity waves" 
-    else if(mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then    
+
+    ! use CVMIX TKE (turbulent kinetic energy closure) parameterisation for
+    ! vertical mixing with or without the IDEMIX (dissipation of energy by
+    ! internal gravity waves) extension from Olbers and Eden, 2013, "A global
+    ! Model for the diapycnal diffusivity induced by internal gravity waves"
+    else if(mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tke'//achar(27)//'[0m'
         call calc_cvmix_tke(dynamics, partit, mesh)
         call mo_convect(ice, partit, mesh)
-        
-    end if     
+
+    end if
 
     !___EXTENSION OF MIXING SCHEMES_____________________________________________
-    ! add CVMIX TIDAL mixing scheme of Simmons et al. 2004 "Tidally driven mixing 
-    ! in a numerical model of the ocean general circulation", ocean modelling to 
-    ! the already computed viscosities/diffusivities of KPP, PP, cvmix_KPP or 
+    ! add CVMIX TIDAL mixing scheme of Simmons et al. 2004 "Tidally driven mixing
+    ! in a numerical model of the ocean general circulation", ocean modelling to
+    ! the already computed viscosities/diffusivities of KPP, PP, cvmix_KPP or
     ! cvmix_PP --> use standalone for debugging --> needs to be called after main
     ! mixing schemes
     if ( mod(mix_scheme_nmb,10)==7) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tidal'//achar(27)//'[0m'
         call calc_cvmix_tidal(partit, mesh)
-        
+
     end if
-    t1=MPI_Wtime()    
-    
+    t1=MPI_Wtime()
+
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'
     call compute_vel_rhs(ice, dynamics, partit, mesh)
-    
+
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call viscosity_filter'//achar(27)//'[0m'
     if (dynamics%ldiag_ke) then
@@ -3090,7 +3105,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
        end do
 !$OMP END PARALLEL DO
     end if
-    
+
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call impl_vert_visc_ale'//achar(27)//'[0m'
     if (dynamics%ldiag_ke) then
@@ -3117,7 +3132,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
     end if
     t2=MPI_Wtime()
-        
+
     !___________________________________________________________________________
     ! >->->->->->->->->->->->->     ALE-part starts     <-<-<-<-<-<-<-<-<-<-<-<-
     !___________________________________________________________________________
@@ -3130,24 +3145,24 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     call compute_ssh_rhs_ale(dynamics, partit, mesh)
 
     ! Take updated ssh matrix and solve --> new ssh!
-    t30=MPI_Wtime() 
+    t30=MPI_Wtime()
     call solve_ssh_ale(dynamics, partit, mesh)
-    
+
     if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call relax_zonal_vel'//achar(27)//'[0m'
         call relax_zonal_vel(dynamics, partit, mesh)
-    end if     
-    t3=MPI_Wtime() 
+    end if
+    t3=MPI_Wtime()
 
     ! estimate new horizontal velocity u^(n+1)
     ! u^(n+1) = u* + [-g * tau * theta * grad(eta^(n+1)-eta^(n)) ]
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_vel'//achar(27)//'[0m'
     ! ke will be computed inside there if dynamics%ldiag_ke is .TRUE.
     call update_vel(dynamics, partit, mesh)
-    
+
     ! --> eta_(n) --> eta_(n+1) = eta_(n) + deta = eta_(n) + (eta_(n+1) + eta_(n))
-    t4=MPI_Wtime() 
-    
+    t4=MPI_Wtime()
+
     ! Update to hbar(n+3/2) and compute dhe to be used on the next step
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_hbar_ale'//achar(27)//'[0m'
     call compute_hbar_ale(dynamics, partit, mesh)
@@ -3156,12 +3171,12 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! - Current dynamic elevation alpha*hbar(n+1/2)+(1-alpha)*hbar(n-1/2)
     !   equation (14) Danlov et.al "the finite volume sea ice ocean model FESOM2
     !   ...if we do it here we don't need to write hbar_old into a restart file...
-    ! - where(ulevels_nod2D==1) is used here because of the rigid lid 
-    !   approximation under the cavity 
-    ! - at points in the cavity the time derivative term in ssh matrix will be 
+    ! - where(ulevels_nod2D==1) is used here because of the rigid lid
+    !   approximation under the cavity
+    ! - at points in the cavity the time derivative term in ssh matrix will be
     !   omitted; and (14) will not be applied at cavity points. Additionally,
-    !   since there is no real elevation, but only surface pressure, there is 
-    !   no layer motion under the cavity. In this case the ice sheet acts as a 
+    !   since there is no real elevation, but only surface pressure, there is
+    !   no layer motion under the cavity. In this case the ice sheet acts as a
     !   rigid lid.
 !$OMP PARALLEL DO
     do node=1, myDim_nod2D+eDim_nod2D
@@ -3170,13 +3185,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
     ! --> eta_(n)
     ! call zero_dynamics !DS, zeros several dynamical variables; to be used for testing new implementations!
-    t5=MPI_Wtime() 
+    t5=MPI_Wtime()
     !___________________________________________________________________________
-    ! Do horizontal and vertical scaling of GM/Redi  diffusivity 
+    ! Do horizontal and vertical scaling of GM/Redi  diffusivity
     if (Fer_GM .or. Redi) then
         call init_Redi_GM(partit, mesh)
     end if
-    
+
     ! Implementation of Gent & McWiliams parameterization after R. Ferrari et al., 2010
     ! does not belong directly to ALE formalism
     if (Fer_GM) then
@@ -3184,10 +3199,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         call fer_solve_Gamma(partit, mesh)
         call fer_gamma2vel(dynamics, partit, mesh)
     end if
-    t6=MPI_Wtime() 
+    t6=MPI_Wtime()
 
     !___________________________________________________________________________
-    ! The main step of ALE procedure --> this is were the magic happens --> here 
+    ! The main step of ALE procedure --> this is were the magic happens --> here
     ! is decided how change in hbar is distributed over the vertical layers
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call vert_vel_ale'//achar(27)//'[0m'
     ! keep the old vertical velocity for computation of the mean between the timesteps (is used in compute_ke_wrho)
@@ -3199,7 +3214,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
     end if
     call vert_vel_ale(dynamics, partit, mesh)
-    t7=MPI_Wtime()   
+    t7=MPI_Wtime()
     if (dynamics%ldiag_ke) then
        call compute_ke_wrho(dynamics, partit, mesh)
        call compute_apegen (dynamics, tracers, partit, mesh)
@@ -3208,13 +3223,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
     call solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
-    t8=MPI_Wtime() 
-    
+    t8=MPI_Wtime()
+
     !___________________________________________________________________________
     ! Update hnode=hnode_new, helem
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_thickness_ale'//achar(27)//'[0m'
     call update_thickness_ale(partit, mesh)
-    t9=MPI_Wtime() 
+    t9=MPI_Wtime()
     !___________________________________________________________________________
     ! write out global fields for debugging
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call write_step_info'//achar(27)//'[0m'
@@ -3224,8 +3239,8 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     if (dynamics%ldiag_ke) then
         call write_enegry_info(dynamics, partit, mesh)
     end if
-    
-    ! check model for blowup --> ! write_step_info and check_blowup require 
+
+    ! check model for blowup --> ! write_step_info and check_blowup require
     ! togeather around 2.5% of model runtime
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call check_blowup'//achar(27)//'[0m'
     call check_blowup(n, ice, dynamics, tracers, partit, mesh)
@@ -3241,7 +3256,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     rtime_oce_GMRedi   = rtime_oce_GMRedi + (t6-t5)
     rtime_oce_solvetra = rtime_oce_solvetra + (t8-t7)
     rtime_tot          = rtime_tot + (t10-t0)-(t10-t9)
-    if(mod(n,logfile_outfreq)==0 .and. mype==0) then  
+    if(mod(n,logfile_outfreq)==0 .and. mype==0) then
         write(*,*) '___ALE OCEAN STEP EXECUTION TIMES______________________'
         write(*,"(A, ES10.3)") '     Oce. Mix,Press.. :', t1-t0
         write(*,"(A, ES10.3)") '     Oce. Dynamics    :', t2-t1
@@ -3259,6 +3274,5 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         write(*,"(A, ES10.3)") '     Oce. TOTAL       :', t10-t0
         write(*,*)
         write(*,*)
-    end if    
+    end if
 end subroutine oce_timestep_ale
-
