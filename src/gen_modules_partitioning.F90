@@ -109,7 +109,7 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
 #ifndef __oasis
   if (present(abort)) then
      if (mype==0) write(*,*) 'Run finished unexpectedly!'
-     call MPI_ABORT(COMM, 1 )
+     call MPI_ABORT(MPI_COMM_WORLD, 1 )
   else
      call  MPI_Barrier(COMM, error)
      call  MPI_Finalize(error)
