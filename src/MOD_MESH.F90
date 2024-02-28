@@ -3,7 +3,7 @@ MODULE MOD_MESH
 USE O_PARAM
 USE MOD_WRITE_BINARY_ARRAYS
 USE MOD_READ_BINARY_ARRAYS
-USE,     intrinsic    :: ISO_FORTRAN_ENV
+USE,     intrinsic    :: ISO_FORTRAN_ENV, only : int32
 IMPLICIT NONE
 SAVE
 integer, parameter    :: MAX_ADJACENT=32 ! Max allowed number of adjacent nodes

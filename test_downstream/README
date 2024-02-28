@@ -1,0 +1,9 @@
+This dummy project can be used to test if fesom was installed and can be found correctly in downstream CMake projects
+
+Example use:
+
+  export fesom_ROOT=<path-to-fesom-prefix> # can be install or build dir!!!
+  cmake -S . -B build
+  cmake --build build
+  build/main
+

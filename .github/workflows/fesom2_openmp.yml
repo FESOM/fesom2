@@ -19,15 +19,13 @@ jobs:
     # NK: this changes working directory to fesom2
     - uses: actions/checkout@v2
 
-    - name: switch OpenMP ON
+    - name: Git safe directory
       run: |
-        cd ./src/
-        sed -i 's/with OpenMP\" OFF/with OpenMP\" ON/g' CMakeLists.txt
-        cd ../
+        git config --global --add safe.directory ${PWD}
 
     - name: Compile model
       run: |
-        bash -l configure.sh ubuntu
+        bash -l configure.sh ubuntu -DENABLE_OPENMP=ON
     
     - name: Create global test run with 4 OpenMP threads
       run: |

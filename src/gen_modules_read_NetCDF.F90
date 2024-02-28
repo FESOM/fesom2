@@ -12,7 +12,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
   ! if check_dummy=.true.,  missing value is replaced with a meaningful value nearby
   ! if check_dummy=.false., missing value is replaced with 0.0
 
-  use, intrinsic :: ISO_FORTRAN_ENV
+  use, intrinsic :: ISO_FORTRAN_ENV, only: real64
   use g_config
   use o_param
   USE MOD_MESH
@@ -198,6 +198,7 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
     USE MOD_PARTIT
     USE MOD_PARSUP
     use g_rotate_grid
+    use, intrinsic :: ISO_FORTRAN_ENV, only: real64
     implicit none
 #include "netcdf.inc" 
   type(t_mesh),   intent(in),    target :: mesh
@@ -312,7 +313,7 @@ end subroutine read_surf_hydrography_NetCDF
 !
 subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, mesh)  
 
-  use, intrinsic :: ISO_FORTRAN_ENV
+  use, intrinsic :: ISO_FORTRAN_ENV, only: real64
 
   use g_config
   use o_param

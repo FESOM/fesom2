@@ -29,6 +29,8 @@ module fesom_main_storage_module
   use read_mesh_interface
   use fesom_version_info_module
   use command_line_options_module
+  use, intrinsic :: iso_fortran_env, only : real32
+
   ! Define icepack module
 #if defined (__icepack)
   use icedrv_main,          only: set_icepack, init_icepack, alloc_icepack

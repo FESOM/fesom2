@@ -1,3 +1,4 @@
+#define __FILENAME__ "async_threads_module.F90"
 module async_threads_module
   implicit none  
   public thread_type
@@ -110,7 +111,7 @@ contains
     integer, intent(in) :: line
     ! EO args
     if(.NOT. val) then
-      print *, "error in line ",line, __FILE__
+      print *, "error in line ",line, __FILENAME__
       stop 1
     end if
   end subroutine

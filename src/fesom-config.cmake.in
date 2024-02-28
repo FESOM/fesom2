@@ -1,0 +1,36 @@
+# This file will get included upon `find_package(fesom ... )`
+
+@PACKAGE_INIT@
+
+### insert definitions for IMPORTED targets
+if(NOT @PROJECT_NAME@_BINARY_DIR)
+  find_file(@PROJECT_NAME@_TARGETS_FILE
+    NAMES @PROJECT_NAME@-targets.cmake
+    HINTS ${CMAKE_CURRENT_LIST_DIR} @PACKAGE_TARGETS_DIRS@
+    NO_DEFAULT_PATH)
+  if(@PROJECT_NAME@_TARGETS_FILE)
+    include(${@PROJECT_NAME@_TARGETS_FILE})
+  endif()
+endif()
+
+include(CMakeFindDependencyMacro)
+if( NOT (TARGET MPI::MPI_C AND TARGET MPI::MPI_Fortran) )
+  enable_language(C)
+  enable_language(Fortran)
+  find_dependency(MPI COMPONENTS C Fortran)
+endif()
+if( @ENABLE_OPENMP@ )
+  if( NOT TARGET OpenMP::OpenMP_Fortran )
+    enable_language(Fortran)
+    find_dependency(OpenMP COMPONENTS Fortran)
+  endif()
+  set( fesom_HAVE_OPENMP 1 )
+else()
+  set( fesom_HAVE_OPENMP 0 )
+endif()
+
+if( @ENABLE_IFS_INTERFACE@ )
+  set( fesom_HAVE_IFS_INTERFACE 1 )
+else()
+  set( fesom_HAVE_IFS_INTERFACE 0 )
+endif()

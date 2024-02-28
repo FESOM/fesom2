@@ -21,14 +21,13 @@ jobs:
 
     - name: prepeare FESOM2_icepack
       run: |
-        sed -i 's/USE_ICEPACK OFF/USE_ICEPACK ON/g' CMakeLists.txt
         cd ./src/icepack_drivers/
         ./download_icepack.sh
         cd ../../
     
     - name: Compile model
       run: |
-        bash -l configure.sh ubuntu
+        bash -l configure.sh ubuntu -DUSE_ICEPACK=ON
     
     - name: Create global test run with ICEPACK
       run: |

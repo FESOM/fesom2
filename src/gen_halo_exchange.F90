@@ -16,7 +16,7 @@
 
 module g_comm
 
-  use, intrinsic :: ISO_FORTRAN_ENV
+  use, intrinsic :: ISO_FORTRAN_ENV, only: int16, int32, real32, real64
 
   implicit none
 
