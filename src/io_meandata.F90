@@ -664,9 +664,9 @@ END DO ! --> DO i=1, io_listsize
 
     !___________________________________________________________________________
     ! output Monin-Obukov (TB04) mixing length
-    if (use_momix) then
-        call def_stream(nod2D, myDim_nod2D, 'momix_length',   'Monin-Obukov mixing length', 'm', mixlength(:),    1, 'm', i_real4, partit, mesh)
-    end if
+    !if (use_momix) then
+    !    call def_stream(nod2D, myDim_nod2D, 'momix_length',   'Monin-Obukov mixing length', 'm', mixlength(:),    1, 'm', i_real4, partit, mesh)
+    !end if
   
     !___________________________________________________________________________
     if (ldiag_curl_vel3) then
@@ -1761,21 +1761,22 @@ SUBROUTINE send_data_to_multio(entry)
     END IF
     request%globalSize = globalSize
     request%step = entry%rec_count
-
+    if (numLevels==1) then
+        request%category="ocean-2d"
+    else
+        request%category="ocean-3d"
+    end if
     ! loop over vertical layers --> do gather 3d variables layerwise in 2d slices
     DO lev=1, numLevels
         request%level = lev
-
         IF (.NOT. entry%is_elem_based) THEN
             request%values => entry%local_values_r8_copy(lev, 1:entry%shrinked_size)
         ELSE
             DO i = 1, SIZE(entry%shrinked_indx)
                 temp(i) = entry%local_values_r8_copy(lev, entry%shrinked_indx(i))
             END DO
-            
             request%values => temp
         END IF
-
         CALL iom_send_fesom_data(request)
     END DO
 END SUBROUTINE
