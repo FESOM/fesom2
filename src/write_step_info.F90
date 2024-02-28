@@ -417,7 +417,7 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
        end if ! --> if ( .not. trim(which_ALE)=='linfs' .and. ...
           
        
-       do nz=1,nlevels_nod2D(n)-1
+       do nz=ulevels_nod2D(n),nlevels_nod2D(n)-1
           !_______________________________________________________________
           ! check temp
           if ( (tracers%data(1)%values(nz, n) /= tracers%data(1)%values(nz, n)) .or. &
@@ -469,7 +469,7 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
           !_______________________________________________________________
           ! check salt
           if ( (tracers%data(2)%values(nz, n) /= tracers%data(2)%values(nz, n)) .or.  &
-             tracers%data(2)%values(nz, n) <=3.0_WP .or. tracers%data(2)%values(nz, n)>=45.0_WP ) then
+             tracers%data(2)%values(nz, n) <3.0_WP .or. tracers%data(2)%values(nz, n) >45.0_WP ) then
 !$OMP CRITICAL
              found_blowup_loc=1
              write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep

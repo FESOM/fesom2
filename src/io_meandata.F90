@@ -20,6 +20,8 @@ module io_MEANDATA
     type(t_partit), pointer                            :: p_partit
     integer                                            :: ndim
     integer                                            :: glsize(2)
+    integer                                            :: shrinked_size
+    integer, allocatable, dimension(:)                 :: shrinked_indx
     integer                                            :: accuracy
     real(real64), allocatable, dimension(:,:) :: local_values_r8
     real(real32), allocatable, dimension(:,:) :: local_values_r4
@@ -649,9 +651,9 @@ END DO ! --> DO i=1, io_listsize
 
     !___________________________________________________________________________
     ! output Monin-Obukov (TB04) mixing length
-    if (use_momix) then
-        call def_stream(nod2D, myDim_nod2D, 'momix_length',   'Monin-Obukov mixing length', 'm', mixlength(:),    1, 'm', i_real4, partit, mesh)
-    end if
+    !if (use_momix) then
+    !    call def_stream(nod2D, myDim_nod2D, 'momix_length',   'Monin-Obukov mixing length', 'm', mixlength(:),    1, 'm', i_real4, partit, mesh)
+    !end if
   
     !___________________________________________________________________________
     if (ldiag_curl_vel3) then
@@ -1129,6 +1131,9 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     use MOD_ICE
     use mod_tracer
     use io_gather_module
+#if defined(__MULTIO)
+    use iom
+#endif
 #if defined (__icepack)
     use icedrv_main,    only: init_io_icepack
 #endif
@@ -1144,11 +1149,10 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     type(t_tracer), intent(in)   , target :: tracers
     type(t_dyn)   , intent(in)   , target :: dynamics
     type(t_ice)   , intent(inout), target :: ice
-    
-    character(:), allocatable :: filepath
-    real(real64)                  :: rtime !timestamp of the record
+    character(:), allocatable             :: filepath
+    real(real64)                          :: rtime !timestamp of the record
 
-    ctime=timeold+(dayold-1.)*86400
+ctime=timeold+(dayold-1.)*86400
     
     !___________________________________________________________________________
     if (lfirst) then
@@ -1166,14 +1170,18 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     !PS if (partit%flag_debug .and. partit%mype==0)  print *, achar(27)//'[33m'//' -I/O-> call update_means'//achar(27)//'[0m'  
     call update_means
-    
     !___________________________________________________________________________
     ! loop over defined streams
     do n=1, io_NSTREAMS
         !_______________________________________________________________________
         ! make pointer for entry onto io_stream object
         entry=>io_stream(n)
-        
+!#if defined(__MULTIO)
+!        call mio_write_nod(mio, entry)
+!        lfirst=.false.
+!        return
+!#endif
+
         !_______________________________________________________________________
         !check whether output will be written based on event frequency
         do_output=.false.
@@ -1198,6 +1206,7 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
         ! if its time for output --> do_output==.true.
         if (do_output) then
             if (vec_autorotate) call io_r2g(n, partit, mesh) ! automatically detect if a vector field and rotate if makes sense!
+#if !defined(__MULTIO)
             if(entry%thread_running) call entry%thread%join()
             entry%thread_running = .false.
             
@@ -1250,7 +1259,7 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
                 entry%rec_count=max(entry%rec_count, 1)
                 write(*,*) trim(entry%name)//': current mean I/O counter = ', entry%rec_count
             end if ! --> if(partit%mype == entry%root_rank) then
-            
+#endif
             !___________________________________________________________________
             ! write double precision output
             if (entry%accuracy == i_real8) then
@@ -1275,17 +1284,22 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
                 END DO ! --> DO J=1, size(entry%local_values_r4,dim=2)
 !$OMP END PARALLEL DO
             end if ! --> if (entry%accuracy == i_real8) then
-            
             !___________________________________________________________________
             entry%addcounter   = 0  ! clean_meanarrays
             entry%ctime_copy = ctime
-            
+
+#if defined(__MULTIO)
+!            if (n==1) then
+            entry%rec_count = istep
+            call send_data_to_multio(entry)
+!            end if            
+#else
             !___________________________________________________________________
             ! this is where the magic happens --> here do_output_callback is
             ! triggered as a method of the io_stream object --> call write_mean(...)
             call entry%thread%run()
             entry%thread_running = .true.
-            
+#endif
         endif ! --> if (do_output) then
     end do ! --> do n=1, io_NSTREAMS
     lfirst=.false.
@@ -1563,8 +1577,16 @@ subroutine def_stream_after_dimension_specific(entry, name, description, units, 
     !___________________________________________________________________________
     if(entry%glsize(1)==mesh%nod2D  .or. entry%glsize(2)==mesh%nod2D) then
       entry%is_elem_based = .false.
+      entry%shrinked_size=partit%myDim_nod2D
     else if(entry%glsize(1)==mesh%elem2D .or. entry%glsize(2)==mesh%elem2D) then
       entry%is_elem_based = .true.
+      entry%shrinked_size=partit%myDim_elem2D_shrinked
+      allocate(entry%shrinked_indx(entry%shrinked_size))
+      entry%shrinked_indx=partit%myInd_elem2D_shrinked
+!      write(*,*) partit%mype, partit%myDim_elem2D, partit%myDim_elem2D_shrinked, partit%myDim_elem2D-partit%myDim_elem2D_shrinked
+!      entry_index=0
+!      call MPI_AllREDUCE(partit%myDim_elem2D_shrinked, entry_index, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, err)
+!      write(*,*) 'total elem=', mesh%elem2D, entry_index
     else
       if(partit%mype == 0) print *,"can not determine if ",trim(name)," is node or elem based"
       stop
@@ -1701,4 +1723,48 @@ subroutine io_r2g(n, partit, mesh)
 !$OMP END PARALLEL DO
     END IF
 end subroutine
+
+#if defined(__MULTIO)
+SUBROUTINE send_data_to_multio(entry)
+    USE iom
+    USE multio_api
+    
+    IMPLICIT NONE
+
+    TYPE(Meandata), TARGET, INTENT(INOUT)                       :: entry
+    TYPE(iom_field_request)                                     :: request
+    REAL(real64), DIMENSION(SIZE(entry%shrinked_indx)), TARGET  :: temp
+    INTEGER                                                     :: numLevels, globalSize, lev, i
+
+    numLevels = entry%glsize(1)
+    globalSize = entry%glsize(2)
+
+    request%name = trim(entry%name)
+    IF (.NOT. entry%is_elem_based) THEN
+        request%gridType = "ngrid"
+    ELSE
+        request%gridType = "egrid"
+    END IF
+    request%globalSize = globalSize
+    request%step = entry%rec_count
+    if (numLevels==1) then
+        request%category="ocean-2d"
+    else
+        request%category="ocean-3d"
+    end if
+    ! loop over vertical layers --> do gather 3d variables layerwise in 2d slices
+    DO lev=1, numLevels
+        request%level = lev
+        IF (.NOT. entry%is_elem_based) THEN
+            request%values => entry%local_values_r8_copy(lev, 1:entry%shrinked_size)
+        ELSE
+            DO i = 1, SIZE(entry%shrinked_indx)
+                temp(i) = entry%local_values_r8_copy(lev, entry%shrinked_indx(i))
+            END DO
+            request%values => temp
+        END IF
+        CALL iom_send_fesom_data(request)
+    END DO
+END SUBROUTINE
+#endif
 end module
