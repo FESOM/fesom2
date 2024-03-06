@@ -211,7 +211,7 @@ subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
     end if
     loc=omp_min_max_sum2(Av, 1, nl, 1, myDim_elem2D, 'max', partit) 
     call MPI_AllREDUCE(loc , max_av , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum2(Av, 1, nl, 1, myDim_nod2D, 'max', partit) 
+    loc=omp_min_max_sum2(Kv, 1, nl, 1, myDim_nod2D, 'max', partit) 
     call MPI_AllREDUCE(loc , max_kv , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
     !_______________________________________________________________________
     if (mype==0) then
