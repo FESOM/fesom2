@@ -655,6 +655,8 @@ CASE ('DVD       ')
         end if     
         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_temp_SD_difvi', 'temperature DVD vert. diff. impl.'          , 'K^2/s' , dvd_SD_chi_dif_vi(:,:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         
+!PS         call def_stream((/nl, nod2D/), (/nl, myDim_nod2D/), 'temp_trflx_ver', 'vertical temperature flux.'          , 'Km^2/s' , tracers%work%dvd_trflx_ver(:, :, 1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        
 !PS         !_______________________________________________________________________
 !PS         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_KK_tot' , 'tot. salinity DVD  \n (Klingbeil et al. 2014)'   , 'K^2/s' , dvd_KK_tot(  :,:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 !PS         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_KK_advh', 'salinity DVD horiz. adv.'                    , 'K^2/s' , dvd_KK_chi_adv_h(:,:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
