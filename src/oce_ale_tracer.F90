@@ -475,6 +475,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
     use o_mixing_KPP_mod !for ghats _GO_
     use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
     use bc_surface_interface
+    use diagnostics, only: ldiag_DVD
     implicit none
     integer       , intent(in)   , target :: tr_num
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -486,7 +487,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
     real(kind=WP)            :: cp(mesh%nl), tp(mesh%nl)
     integer                  :: nz, n, nzmax, nzmin
     real(kind=WP)            :: m, zinv, dz
-    real(kind=WP)            :: rsss, Ty, Ty1, c1, zinv1, zinv2, v_adv
+    real(kind=WP)            :: rsss, Ty, Ty1, c1, zinv1, zinv2, v_adv, sfbc
     real(kind=WP)            :: isredi=0._WP
     logical                  :: do_wimpl=.true.
     real(kind=WP)            :: zbar_n(mesh%nl), z_n(mesh%nl-1)
@@ -754,100 +755,100 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
         ! at this point the mixing enhancments from momix, instable
         ! mixing or windmixing which are to much for nonlocal
         ! transports and lead to instability of the model
-!PS         if (use_kpp_nonlclflx) then
-!PS             if (tracers%data(tr_num)%ID==2) then
-!PS                 rsss=ref_sss
-!PS                 if (ref_sss_local) rsss=tracers%data(tr_num)%values(1,n)
-!PS             end if
-!PS 
-!PS             !___________________________________________________________________
-!PS             ! use fesom1.4 KPP
-!PS             if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
-!PS                 if     (tracers%data(tr_num)%ID==1) then ! temperature
-!PS                     ! --> no fluxes to the top out of the surface, no fluxes
-!PS                     !     downwards out of the bottom
-!PS                     !___surface_________________________________________________
-!PS                     nz = nzmin
-!PS                     tr(nz)=tr(nz) &
-!PS                                +(-MIN(ghats(nz+1,n)*blmc(nz+1,n,2), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
-!PS                                 ) * heat_flux(n) / vcpw * dt
-!PS                     !___bulk____________________________________________________
-!PS                     do nz=nzmin+1, nzmax-2
-!PS                         tr(nz)=tr(nz) &
-!PS                                +( MIN(ghats(nz  ,n)*blmc(nz  ,n,2), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
-!PS                                  -MIN(ghats(nz+1,n)*blmc(nz+1,n,2), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
-!PS                                 ) * heat_flux(n) / vcpw * dt
-!PS                     end do
-!PS                     !___bottom__________________________________________________
-!PS                     nz = nzmax-1
-!PS                     tr(nz)=tr(nz) &
-!PS                                +( MIN(ghats(nz  ,n)*blmc(nz  ,n,2), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
-!PS                                 ) * heat_flux(n) / vcpw * dt
-!PS 
-!PS                 elseif (tracers%data(tr_num)%ID==2) then ! salinity
-!PS                     ! --> no fluxes to the top out of the surface, no fluxes
-!PS                     !     downwards out of the bottom
-!PS                     !___surface_________________________________________________
-!PS                     nz = nzmin
-!PS                     tr(nz)=tr(nz) &
-!PS                                -(-MIN(ghats(nz+1,n)*blmc(nz+1,n,3), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
-!PS                                 ) * rsss * water_flux(n) * dt
-!PS                     !___bulk____________________________________________________
-!PS                     do nz=nzmin+1, nzmax-2
-!PS                         tr(nz)=tr(nz) &
-!PS                                -( MIN(ghats(nz  ,n)*blmc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
-!PS                                  -MIN(ghats(nz+1,n)*blmc(nz+1,n,3), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
-!PS                                 ) * rsss * water_flux(n) * dt
-!PS                     end do
-!PS                     !___bottom__________________________________________________
-!PS                     nz = nzmax-1
-!PS                     tr(nz)=tr(nz) &
-!PS                                -( MIN(ghats(nz  ,n)*blmc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
-!PS                                 ) * rsss * water_flux(n) * dt
-!PS                 end if
-!PS             !___________________________________________________________________
-!PS             ! use cvmix KPP
-!PS             elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
-!PS                 if     (tracers%data(tr_num)%ID==1) then ! temperature
-!PS                     !___surface_________________________________________________
-!PS                     nz = nzmin
-!PS                     tr(nz)=tr(nz) &
-!PS                                +(-MIN(kpp_nonlcltranspT(nz+1,n)*kpp_oblmixc(nz+1,n,2), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
-!PS                                 ) * heat_flux(n) / vcpw * dt
-!PS                     !___bulk____________________________________________________
-!PS                     do nz=nzmin+1, nzmax-2
-!PS                         tr(nz)=tr(nz) &
-!PS                                +( MIN(kpp_nonlcltranspT(nz  ,n)*kpp_oblmixc(nz  ,n,2), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
-!PS                                  -MIN(kpp_nonlcltranspT(nz+1,n)*kpp_oblmixc(nz+1,n,2), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
-!PS                                 ) * heat_flux(n) / vcpw * dt
-!PS                     end do
-!PS                     !___bottom__________________________________________________
-!PS                     nz = nzmax-1
-!PS                     tr(nz)=tr(nz) &
-!PS                                +( MIN(kpp_nonlcltranspT(nz  ,n)*kpp_oblmixc(nz  ,n,2), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
-!PS                                 ) * heat_flux(n) / vcpw * dt
-!PS 
-!PS                 elseif (tracers%data(tr_num)%ID==2) then ! salinity
-!PS                     !___surface_________________________________________________
-!PS                     nz = nzmin
-!PS                     tr(nz)=tr(nz) &
-!PS                                -(-MIN(kpp_nonlcltranspS(nz+1,n)*kpp_oblmixc(nz+1,n,3), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
-!PS                                 ) * rsss * water_flux(n) * dt
-!PS                     !___bulk____________________________________________________
-!PS                     do nz=nzmin+1, nzmax-2
-!PS                         tr(nz)=tr(nz) &
-!PS                                -( MIN(kpp_nonlcltranspS(nz  ,n)*kpp_oblmixc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
-!PS                                  -MIN(kpp_nonlcltranspS(nz+1,n)*kpp_oblmixc(nz+1,n,3), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
-!PS                                 ) * rsss * water_flux(n) * dt
-!PS                     end do
-!PS                     !___bottom__________________________________________________
-!PS                     nz = nzmax-1
-!PS                     tr(nz)=tr(nz) &
-!PS                                -( MIN(kpp_nonlcltranspS(nz  ,n)*kpp_oblmixc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
-!PS                                 ) * rsss * water_flux(n) * dt
-!PS                 end if
-!PS             end if
-!PS         end if ! --> if (use_kpp_nonlclflx) then
+        if (use_kpp_nonlclflx) then
+            if (tracers%data(tr_num)%ID==2) then
+                rsss=ref_sss
+                if (ref_sss_local) rsss=tracers%data(tr_num)%values(1,n)
+            end if
+
+            !___________________________________________________________________
+            ! use fesom1.4 KPP
+            if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
+                if     (tracers%data(tr_num)%ID==1) then ! temperature
+                    ! --> no fluxes to the top out of the surface, no fluxes
+                    !     downwards out of the bottom
+                    !___surface_________________________________________________
+                    nz = nzmin
+                    tr(nz)=tr(nz) &
+                               +(-MIN(ghats(nz+1,n)*blmc(nz+1,n,2), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
+                                ) * heat_flux(n) / vcpw * dt
+                    !___bulk____________________________________________________
+                    do nz=nzmin+1, nzmax-2
+                        tr(nz)=tr(nz) &
+                               +( MIN(ghats(nz  ,n)*blmc(nz  ,n,2), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
+                                 -MIN(ghats(nz+1,n)*blmc(nz+1,n,2), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
+                                ) * heat_flux(n) / vcpw * dt
+                    end do
+                    !___bottom__________________________________________________
+                    nz = nzmax-1
+                    tr(nz)=tr(nz) &
+                               +( MIN(ghats(nz  ,n)*blmc(nz  ,n,2), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
+                                ) * heat_flux(n) / vcpw * dt
+
+                elseif (tracers%data(tr_num)%ID==2) then ! salinity
+                    ! --> no fluxes to the top out of the surface, no fluxes
+                    !     downwards out of the bottom
+                    !___surface_________________________________________________
+                    nz = nzmin
+                    tr(nz)=tr(nz) &
+                               -(-MIN(ghats(nz+1,n)*blmc(nz+1,n,3), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
+                                ) * rsss * water_flux(n) * dt
+                    !___bulk____________________________________________________
+                    do nz=nzmin+1, nzmax-2
+                        tr(nz)=tr(nz) &
+                               -( MIN(ghats(nz  ,n)*blmc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
+                                 -MIN(ghats(nz+1,n)*blmc(nz+1,n,3), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
+                                ) * rsss * water_flux(n) * dt
+                    end do
+                    !___bottom__________________________________________________
+                    nz = nzmax-1
+                    tr(nz)=tr(nz) &
+                               -( MIN(ghats(nz  ,n)*blmc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
+                                ) * rsss * water_flux(n) * dt
+                end if
+            !___________________________________________________________________
+            ! use cvmix KPP
+            elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
+                if     (tracers%data(tr_num)%ID==1) then ! temperature
+                    !___surface_________________________________________________
+                    nz = nzmin
+                    tr(nz)=tr(nz) &
+                               +(-MIN(kpp_nonlcltranspT(nz+1,n)*kpp_oblmixc(nz+1,n,2), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
+                                ) * heat_flux(n) / vcpw * dt
+                    !___bulk____________________________________________________
+                    do nz=nzmin+1, nzmax-2
+                        tr(nz)=tr(nz) &
+                               +( MIN(kpp_nonlcltranspT(nz  ,n)*kpp_oblmixc(nz  ,n,2), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
+                                 -MIN(kpp_nonlcltranspT(nz+1,n)*kpp_oblmixc(nz+1,n,2), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
+                                ) * heat_flux(n) / vcpw * dt
+                    end do
+                    !___bottom__________________________________________________
+                    nz = nzmax-1
+                    tr(nz)=tr(nz) &
+                               +( MIN(kpp_nonlcltranspT(nz  ,n)*kpp_oblmixc(nz  ,n,2), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
+                                ) * heat_flux(n) / vcpw * dt
+
+                elseif (tracers%data(tr_num)%ID==2) then ! salinity
+                    !___surface_________________________________________________
+                    nz = nzmin
+                    tr(nz)=tr(nz) &
+                               -(-MIN(kpp_nonlcltranspS(nz+1,n)*kpp_oblmixc(nz+1,n,3), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
+                                ) * rsss * water_flux(n) * dt
+                    !___bulk____________________________________________________
+                    do nz=nzmin+1, nzmax-2
+                        tr(nz)=tr(nz) &
+                               -( MIN(kpp_nonlcltranspS(nz  ,n)*kpp_oblmixc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
+                                 -MIN(kpp_nonlcltranspS(nz+1,n)*kpp_oblmixc(nz+1,n,3), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
+                                ) * rsss * water_flux(n) * dt
+                    end do
+                    !___bottom__________________________________________________
+                    nz = nzmax-1
+                    tr(nz)=tr(nz) &
+                               -( MIN(kpp_nonlcltranspS(nz  ,n)*kpp_oblmixc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
+                                ) * rsss * water_flux(n) * dt
+                end if
+            end if
+        end if ! --> if (use_kpp_nonlclflx) then
 
         !_______________________________________________________________________
         ! case of activated shortwave penetration into the ocean, ad 3d contribution
@@ -985,7 +986,7 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
         nl1=nlevels_nod2D(n)-1
         ul1=ulevels_nod2D(n)
         vd_flux=0._WP
-!PS 
+
 !PS         !_______________________________________________________________________
 !PS         zbar_n(1:mesh%nl  )=0.0_WP
 !PS         z_n   (1:mesh%nl-1)=0.0_WP
@@ -1017,6 +1018,7 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
         enddo
         do nz=ul1,nl1
             del_ttf(nz,n) = del_ttf(nz,n)+(vd_flux(nz) - vd_flux(nz+1))*dt/areasvol(nz,n)
+!PS             del_ttf(nz,n) = del_ttf(nz,n)-(vd_flux(nz) - vd_flux(nz+1))*dt/areasvol(nz,n)
         enddo
     end do
 !$OMP END DO
