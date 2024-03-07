@@ -1510,13 +1510,13 @@ subroutine dvd_add_advflux_ver(do_SDdvd, tr_num, dvd_tot, trflx_v, Wvel, trstar,
                 ! with hnode^(n+1) in call update_thickness(...). But we saved hnode^(n)
                 ! in the variable hnode_new (Although this sounds confusing!!!)                
                 ! --> here we are on mid-depth levels
-                dvd_tot(nz-1, node, tr_num) = dvd_tot(nz-1, node, tr_num) - (dvd_xdfac*xchi(nz-1)+(1.0_WP-dvd_xdfac)*xchi(nz))/(areasvol(nz-1, node)*hnode_new(nz-1, node))
+                dvd_tot(nz-1, node, tr_num) = dvd_tot(nz-1, node, tr_num) + (dvd_xdfac*xchi(nz-1)+(1.0_WP-dvd_xdfac)*xchi(nz))/(areasvol(nz-1, node)*hnode_new(nz-1, node))
                 
             end do !--> do nz=nu1+1,nl1-1
             !___________________________________________________________________
             ! same for bottom 
             nz=nl1-1
-            dvd_tot(nz, node, tr_num) = dvd_tot(nz, node, tr_num) - (dvd_xdfac*xchi(nz)+(1.0_WP-dvd_xdfac)*xchi(nz+1))/(areasvol(nz, node)*hnode_new(nz, node))
+            dvd_tot(nz, node, tr_num) = dvd_tot(nz, node, tr_num) + (dvd_xdfac*xchi(nz)+(1.0_WP-dvd_xdfac)*xchi(nz+1))/(areasvol(nz, node)*hnode_new(nz, node))
                 
         end do !--> do node=1,myDim_nod2D
     
@@ -2436,7 +2436,7 @@ subroutine dvd_add_difflux_vertimpl(do_SDdvd, tr_num, dvd_tot, tr, trstar, Kv, K
                 ! copute dvd contribution normalized with volume 
                 dvd_tot(nz, node, tr_num) = dvd_tot(nz, node, tr_num) + 2.0_WP*(tr_up-tr_dwn)/(areasvol(nz, node)*hnode(nz, node))
                 !                                                     |    |-> factor 2 comes here from Klingbeil et al.2014
-                !                                      this is thes   |         (2*Tr^(n+1) * Dflx[Tr^(n+1)] 
+                !                                      this is the    |         (2*Tr^(n+1) * Dflx[Tr^(n+1)] 
                 !                                   +----plus sign----+
                 !                                   |
                 !                                   v
