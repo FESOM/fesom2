@@ -1017,8 +1017,7 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
             vd_flux(nz)=vd_flux(nz)/(z_n(nz-1)-z_n(nz))*area(nz,n)
         enddo
         do nz=ul1,nl1
-            del_ttf(nz,n) = del_ttf(nz,n)+(vd_flux(nz) - vd_flux(nz+1))*dt/areasvol(nz,n)
-!PS             del_ttf(nz,n) = del_ttf(nz,n)-(vd_flux(nz) - vd_flux(nz+1))*dt/areasvol(nz,n)
+            del_ttf(nz,n) = del_ttf(nz,n) + (vd_flux(nz)-vd_flux(nz+1)) * dt/areasvol(nz,n)
         enddo
     end do
 !$OMP END DO
