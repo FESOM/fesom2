@@ -111,6 +111,10 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   real(kind=WP)            :: i_coef, aux
   real(kind=WP)	           :: dux, dvy,tx,ty,tvol
   real(kind=WP)            :: t1, t2
+  !---wiso-code
+  integer                  :: nt1, nt2
+  real(kind=WP), parameter :: zwisomin = 1.e-6_WP
+  !---wiso-code-end
 #ifdef __oasis
   real(kind=WP)        				   :: flux_global(2), flux_local(2), eff_vol(2)
   real(kind=WP), dimension(:), allocatable , save  :: exchange
@@ -131,13 +135,13 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   ! pointer on necessary derived types
   real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, u_w, v_w
   real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
+  real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
 #if defined (__oasis) || defined (__ifsinterface)
   real(kind=WP), dimension(:), pointer  ::  oce_heat_flux, ice_heat_flux 
   real(kind=WP), dimension(:), pointer  ::  tmp_oce_heat_flux, tmp_ice_heat_flux 
 #endif 
-  real(kind=WP), dimension(:), pointer  :: ice_temp, ice_alb, enthalpyoffuse
-  real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
 #if defined (__oifs) || defined (__ifsinterface)
+  real(kind=WP), dimension(:), pointer  :: ice_temp, ice_alb, enthalpyoffuse
   real(kind=WP),               pointer  :: tmelt
   real(kind=WP), dimension(:,:,:), pointer :: UVnode
 #endif
@@ -155,8 +159,8 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   a_ice            => ice%data(1)%values(:)
   m_ice            => ice%data(2)%values(:)
   m_snow           => ice%data(3)%values(:)
-  ice_temp         => ice%data(4)%values(:)
 #if defined (__oifs) || defined (__ifsinterface)
+  ice_temp         => ice%data(4)%values(:)
   ice_alb          => ice%atmcoupl%ice_alb(:)
   enthalpyoffuse   => ice%atmcoupl%enthalpyoffuse(:)
   tmelt            => ice%thermo%tmelt
@@ -218,6 +222,49 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
             exchange(:) = a_ice(:)                                  ! ice concentation [%]
             elseif (i.eq.4) then
             exchange(:) = m_snow(:)                                 ! snow thickness
+!---wiso-code
+            elseif (i.eq.5) then
+             exchange(:) = 0.0_WP
+             if (lwiso) then
+              nt1 = index_wiso_tracers(1)
+              nt2 = index_wiso_tracers(3)
+              where (tracers%data(nt2)%values(1,:) > zwisomin)
+                exchange(:) = (tracers%data(nt1)%values(1,:)/tracers%data(nt2)%values(1,:)/wiso_smow(1) - 1._WP)*1000._WP ! delta 18O of surface water
+              end where
+             end if
+
+            elseif (i.eq.6) then
+             exchange(:) = 0.0_WP
+             if (lwiso) then
+              nt1 = index_wiso_tracers(2)
+              nt2 = index_wiso_tracers(3)
+              where (tracers%data(nt2)%values(1,:) > zwisomin)
+                exchange(:) = (tracers%data(nt1)%values(1,:)/tracers%data(nt2)%values(1,:)/wiso_smow(2) - 1._WP)*1000._WP ! delta D of surface water
+              end where
+             end if
+
+            elseif (i.eq.7) then
+            exchange(:) = 0.0_WP                          ! delta H216O of surface water is set to zero permill
+
+            elseif (i.eq.8) then
+             exchange(:) = 0.0_WP
+             if (lwiso) then
+              where (tr_arr_ice(:, 3) > zwisomin)
+                exchange(:) = (tr_arr_ice(:, 1)/tr_arr_ice(:, 3)/wiso_smow(1) - 1._WP)*1000._WP ! delta 18O of sea ice
+              end where
+             end if
+
+            elseif (i.eq.9) then
+             exchange(:) = 0.0_WP
+             if (lwiso) then
+              where (tr_arr_ice(:, 3) > zwisomin)
+                exchange(:) = (tr_arr_ice(:, 2)/tr_arr_ice(:, 3)/wiso_smow(2) - 1._WP)*1000._WP ! delta 18O of sea ice
+              end where
+             end if
+
+            elseif (i.eq.10) then
+            exchange(:) = 0.0_WP                          ! delta H216O of sea ice is set to zero permill
+!---wiso-code-end
             else	    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
 #endif
@@ -327,29 +374,97 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 	              call force_flux_consv(enthalpyoffuse, mask, i, 0, action, partit, mesh)
              end if
 #else
-! --- icebergs LA
-#if defined (__async_icebergs)
-        elseif (i.eq.13) then
+         elseif (i.eq.13) then
             if (action) then
-                !if (use_icebergs) then         
-                    u_wind(:)                     = exchange(:)        ! zonal wind
-                    mask=1
-                    call force_flux_consv(u_wind, mask, i, 0, action, partit, mesh)
-                !end if
-            end if
-        elseif (i.eq.14) then
-            if (action) then
-                !if (use_icebergs) then         
-                    v_wind(:)                     = exchange(:)        ! meridional wind
-                    mask=1
-                    call force_flux_consv(v_wind, mask, i, 0, action, partit, mesh)
-                !end if
-            end if
-#endif
-! --- icebergs end LA
-#endif	 
+                 if (lwiso) then         
+                     www3(:)         =  exchange(:)
+                 else if (use_icebergs) then    
+                     u_wind(:)                     = exchange(:)        ! zonal wind
+                 end if
+             end if
+             mask=1.
+             if (lwiso) then         
+                 call force_flux_consv(www3, mask, i, 0,action, partit, mesh)
+             else if (use_icebergs) then    
+                 call force_flux_consv(u_wind, mask, i, 0, action, partit, mesh)
+             end if
+         elseif (i.eq.14) then
+             if (action) then
+                 if (lwiso) then         
+                     www1(:)         =  exchange(:)
+                 else if (use_icebergs) then    
+                     v_wind(:)                     = exchange(:)        ! meridional wind
+                 end if
+             end if
+             mask=1.
+             if (lwiso) then         
+                 call force_flux_consv(www1, mask, i, 0,action, partit, mesh)
+             else if (use_icebergs) then    
+                 call force_flux_consv(v_wind, mask, i, 0, action, partit, mesh)
+             end if
+         elseif (i.eq.15) then
+             if (action) then
+             ! tot_prec_hdo over water: this variable includes (i) rain over open water and sea ice, (ii) snow and evap over open water,  (iii) river runoff
+             www2(:)         =  exchange(:)
+             end if
+             mask=1.
+             if (lwiso) then
+             call force_flux_consv(www2, mask, i, 0,action, partit, mesh)
+             end if
+         elseif (i.eq.17) then
+             if (action) then
+             ! snowfall_o18 over seaice: this variable includes snow and sublimation over sea ice areas
+             iii1(:)         =  exchange(:)
+             tmp_iii1(:)     =  exchange(:)                   ! to reset for flux correction
+             end if
+             mask=a_ice
+             iii1(:)         =  tmp_iii1(:)
+             if (lwiso) then
+                 call force_flux_consv(iii1,mask,i,1,action, partit, mesh) ! Northern hemisphere
+                 call force_flux_consv(iii1,mask,i,2,action, partit, mesh) ! Southern Hemisphere
+             end if
+         elseif (i.eq.18) then
+             if (action) then
+             ! snowfall_hdo over seaice: this variable includes snow and sublimation over sea ice areas
+             iii2(:)         =  exchange(:)
+             tmp_iii2(:)     =  exchange(:)                   ! to reset for flux correction
+             end if
+             mask=a_ice
+             iii2(:)         =  tmp_iii2(:)
+             if (lwiso) then
+                 call force_flux_consv(iii2,mask,i,1,action, partit, mesh) ! Northern hemisphere
+                 call force_flux_consv(iii2,mask,i,2,action, partit, mesh) ! Southern Hemisphere
+             end if
+         elseif (i.eq.16) then
+             if (action) then
+             ! snowfall_o16 over seaice: this variable includes snow and sublimation over sea ice areas
+             iii3(:)         =  exchange(:)
+             tmp_iii3(:)     =  exchange(:)                   ! to reset for flux correction
+             end if
+             mask=a_ice
+             iii3(:)         =  tmp_iii3(:)
+             if (lwiso) then
+                 call force_flux_consv(iii3,mask,i,1,action, partit, mesh) ! Northern hemisphere
+                 call force_flux_consv(iii3,mask,i,2,action, partit, mesh) ! Southern Hemisphere
+             end if
+         elseif (i.eq.19) then
+             if (action) then
+                u_wind(:)                     = exchange(:)        ! meridional wind
+             end if
+             mask=1
+             if (use_icebergs.and.lwiso) then    
+                 call force_flux_consv(u_wind, mask, i, 0, action, partit, mesh)
+             end if
+         elseif (i.eq.20) then
+             if (action) then
+                v_wind(:)                     = exchange(:)        ! meridional wind
+             end if
+             mask=1
+             if (use_icebergs.and.lwiso) then    
+                 call force_flux_consv(v_wind, mask, i, 0, action, partit, mesh)
+             end if
          end if
-
+# endif
 
 #ifdef VERBOSE
 	  if (mype==0) then

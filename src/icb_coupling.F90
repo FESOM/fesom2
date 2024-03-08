@@ -75,7 +75,7 @@ subroutine icb2fesom(mesh, partit, ice)
     use o_param
 
 ! kh 18.03.21 specification of structure used
-    use o_arrays, only: water_flux, heat_flux !, wiso_flux_oce
+    use o_arrays, only: water_flux, heat_flux, wiso_flux_oce
     use MOD_MESH
     use g_config
     use MOD_PARTIT
@@ -102,5 +102,13 @@ type(t_partit), intent(inout), target :: partit
                 fresh_wa_flux(n)   = fresh_wa_flux(n) + (ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n))
         end if
     end do
-
+!---wiso-code-begin
+    if(lwiso) then
+      do n=1, myDim_nod2D+eDim_nod2D
+      wiso_flux_oce(n,1)=wiso_flux_oce(n,1)+(ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n))*1000.0*wiso_smow(1)*(1-30.0/1000.0)
+      wiso_flux_oce(n,2)=wiso_flux_oce(n,2)+(ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n))*1000.0*wiso_smow(2)*(1-240.0/1000.0)
+      wiso_flux_oce(n,3)=wiso_flux_oce(n,3)+(ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n))*1000.0
+      end do
+    end if
+!---wiso-code-end
 end subroutine icb2fesom

@@ -314,7 +314,7 @@ subroutine iceberg_acceleration(mesh, partit, dynamics, ib, au_ib, av_ib, Ao, Aa
  real, dimension(8)	:: accs_u_out, accs_v_out
  real, dimension(4)	:: vels_u_out, vels_v_out
  real 			:: oneminus_AB !, test1, test2
- integer 		:: icbID, i, istep
+ integer 		:: i, istep
  
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
@@ -324,8 +324,6 @@ type(t_dyn)   , intent(inout), target :: dynamics
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-icbID = mype+10
- 
  !estimate wave height at the icebergs location (Bigg et al., 1997),
  !so wave_amplitude = 0.5 * wave_height = 0.5 * const. * abs(atm velo)**2
  vel_atm = sqrt(ua_ib**2 + va_ib**2)

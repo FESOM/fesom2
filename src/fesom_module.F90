@@ -1,6 +1,7 @@
 ! synopsis: save any derived types we initialize
 !           so they can be reused after fesom_init
 module fesom_main_storage_module
+  use iceberg_step
   USE MOD_MESH
   USE MOD_ICE
   USE MOD_TRACER
@@ -29,6 +30,16 @@ module fesom_main_storage_module
   use read_mesh_interface
   use fesom_version_info_module
   use command_line_options_module
+  !---fwf-code, age-code
+  use g_forcing_param, only: use_landice_water, use_age_tracer
+  use landice_water_init_interface
+  use age_tracer_init_interface
+  !---fwf-code-end, age-code-end
+
+  ! Define icepack module
+
+  ! --------------
+  ! LA icebergs: 2023-05-17 
   use iceberg_params
   use iceberg_step
   ! Define icepack module
@@ -160,6 +171,18 @@ contains
         ! and additional arrays needed for 
         ! fancy advection etc.  
         !=====================
+#if defined (__oasis)
+        !---wiso-code
+        IF (lwiso) THEN
+          nsend = nsend + 6       ! add number of water isotope tracers to coupling parameter nsend, nrecv
+          nrecv = nrecv + 6
+        END IF
+        !---wiso-code-end
+        IF (use_icebergs) THEN
+          nrecv = nrecv + 2
+        END IF
+#endif
+
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call check_mesh_consistency'//achar(27)//'[0m'
         call check_mesh_consistency(f%partit, f%mesh)
         if (f%mype==0) f%t2=MPI_Wtime()
@@ -200,6 +223,17 @@ contains
         
         if (f%mype==0) f%t5=MPI_Wtime()
         call compute_diagnostics(0, f%dynamics, f%tracers, f%partit, f%mesh) ! allocate arrays for diagnostic
+
+        !---fwf-code-begin
+        if(f%mype==0)  write(*,*) 'use_landice_water', use_landice_water
+        if(use_landice_water) call landice_water_init(f%partit, f%mesh)
+        !---fwf-code-end
+
+        !---age-code-begin
+        if(f%mype==0)  write(*,*) 'use_age_tracer', use_age_tracer
+        if(use_age_tracer) call age_tracer_init(f%partit, f%mesh)
+        !---age-code-end
+
 #if defined (__oasis)
         call cpl_oasis3mct_define_unstr(f%partit, f%mesh)
 

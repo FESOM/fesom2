@@ -122,9 +122,27 @@ subroutine forcing_array_setup(partit, mesh)
   flux_correction_north=0.0_WP
   flux_correction_south=0.0_WP
   flux_correction_total=0.0_WP  
-  
+#endif 
+
+#if defined (__oasis) || defined (__ifsinterface)
   allocate(residualifwflx(n2))
   residualifwflx = 0.0_WP
+
+  !---wiso-code
+  IF (lwiso) THEN
+    allocate(tmp_iii1(n2), tmp_iii2(n2), tmp_iii3(n2))
+    allocate(www1(n2), www2(n2), www3(n2), iii1(n2), iii2(n2), iii3(n2))
+    tmp_iii1=0.0_WP
+    tmp_iii2=0.0_WP
+    tmp_iii3=0.0_WP
+    www1=0.0_WP
+    www2=0.0_WP
+    www3=0.0_WP
+    iii1=0.0_WP
+    iii2=0.0_WP
+    iii3=0.0_WP
+  END IF
+  !---wiso-code-end
 #endif 
 
 
@@ -164,6 +182,12 @@ subroutine forcing_array_setup(partit, mesh)
     allocate(runoff_landice(n2))
     runoff_landice=0.0_WP
   end if
+  !---age-code-begin
+  if(use_age_tracer) then
+    allocate(age_tracer_loc_index(n2))
+    age_tracer_loc_index=0
+  end if
+  !---age-code-end
  
   ! shortwave penetration
   if(use_sw_pene) then
