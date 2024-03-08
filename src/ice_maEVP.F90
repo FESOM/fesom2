@@ -130,6 +130,7 @@ subroutine stress_tensor_m(ice, partit, mesh)
     vale=1.0_WP/(ice%ellipse**2)
     det2=1.0_WP/(1.0_WP+ice%alpha_evp)
     det1=ice%alpha_evp*det2
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, dx, dy, msum, asum, eps1, eps2, pressure, delta, meancos, usum, vsum, r1, r2, r3, si1, si2)
     do elem=1,myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
         !_______________________________________________________________________
@@ -184,6 +185,7 @@ subroutine stress_tensor_m(ice, partit, mesh)
         rdg_shear_elem(elem) = 0.5_WP*(delta - abs(eps11(elem)+eps22(elem)))
 #endif
     end do
+!$OMP END PARALLEL DO
     ! Equations solved in terms of si1, si2, eps1, eps2 are (43)-(45) of
     ! Boullion et al Ocean Modelling 2013, but in an implicit mode:
     ! si1_{p+1}=det1*si1_p+det2*r1, where det1=alpha/(1+alpha) and det2=1/(1+alpha),
@@ -232,15 +234,18 @@ subroutine ssh2rhs(ice, partit, mesh)
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
 
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row, elem, elnodes, n, dx, dy, vol, meancos, aa, bb, p_ice)
+!$OMP DO
     ! use rhs_m and rhs_a for storing the contribution from elevation:
     do row=1, myDim_nod2d
         rhs_a(row)=0.0_WP
         rhs_m(row)=0.0_WP
     end do
-
+!$OMP END DO
     !_____________________________________________________________________________
     ! use floating sea ice for zlevel and zstar
     if (use_floatice .and.  .not. trim(which_ale)=='linfs') then
+!$OMP DO
         do elem=1,myDim_elem2d
             elnodes=elem2D_nodes(:,elem)
             !_______________________________________________________________________
@@ -263,10 +268,24 @@ subroutine ssh2rhs(ice, partit, mesh)
             bb=g*val3*vol
             aa=bb*sum(dx*(elevation(elnodes)+p_ice))
             bb=bb*sum(dy*(elevation(elnodes)+p_ice))
-            rhs_a(elnodes)=rhs_a(elnodes)-aa
-            rhs_m(elnodes)=rhs_m(elnodes)-bb
+            do n=1,3
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+                call omp_set_lock  (partit%plock(elnodes(n)))
+#else
+!$OMP ORDERED
+#endif
+               rhs_a(elnodes(n))=rhs_a(elnodes(n))-aa
+               rhs_m(elnodes(n))=rhs_m(elnodes(n))-bb
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+               call omp_unset_lock(partit%plock(elnodes(n)))
+#else
+!$OMP END ORDERED
+#endif
+            end do
         end do
+!$OMP END DO
     else
+!$OMP DO
         do elem=1,myDim_elem2d
             elnodes=elem2D_nodes(:,elem)
             !_______________________________________________________________________
@@ -279,10 +298,24 @@ subroutine ssh2rhs(ice, partit, mesh)
             bb=g*val3*vol
             aa=bb*sum(dx*elevation(elnodes))
             bb=bb*sum(dy*elevation(elnodes))
-            rhs_a(elnodes)=rhs_a(elnodes)-aa
-            rhs_m(elnodes)=rhs_m(elnodes)-bb
+            do n=1,3
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+                call omp_set_lock  (partit%plock(elnodes(n)))
+#else
+!$OMP ORDERED
+#endif
+               rhs_a(elnodes(n))=rhs_a(elnodes(n))-aa
+               rhs_m(elnodes(n))=rhs_m(elnodes(n))-bb
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+               call omp_unset_lock(partit%plock(elnodes(n)))
+#else
+!$OMP END ORDERED
+#endif
+            end do
         end do
+!$OMP END DO
     end if
+!$OMP END PARALLEL
 end subroutine ssh2rhs
 !
 !
@@ -330,12 +363,15 @@ subroutine stress2rhs_m(ice, partit, mesh)
 
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
-
+!$OMP PARALLEL DO
     do row=1, myDim_nod2d
         u_rhs_ice(row)=0.0_WP
         v_rhs_ice(row)=0.0_WP
     end do
+!$OMP END PARALLEL DO
 
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, k, row, dx, dy, vol, mf, aa, bb, mass, cluster_area, elevation_elem)
+!$OMP DO
     do elem=1,myDim_elem2d
         elnodes=elem2D_nodes(:,elem)
         !_______________________________________________________________________
@@ -351,15 +387,26 @@ subroutine stress2rhs_m(ice, partit, mesh)
 
         do k=1,3
             row=elnodes(k)
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+            call omp_set_lock  (partit%plock(row))
+#else
+!$OMP ORDERED
+#endif
             u_rhs_ice(row)=u_rhs_ice(row) - vol* &
                 (sigma11(elem)*dx(k)+sigma12(elem)*dy(k))    &
         -vol*sigma12(elem)*val3*mf                         !metrics
             v_rhs_ice(row)=v_rhs_ice(row) - vol* &
                 (sigma12(elem)*dx(k)+sigma22(elem)*dy(k))    &
         +vol*sigma11(elem)*val3*mf                         ! metrics
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+        call omp_unset_lock(partit%plock(row))
+#else
+!$OMP END ORDERED
+#endif
         end do
     end do
-
+!$OMP END DO
+!$OMP DO
     do row=1, myDim_nod2d
         !_______________________________________________________________________
         ! if cavity node skip it
@@ -370,6 +417,8 @@ subroutine stress2rhs_m(ice, partit, mesh)
         u_rhs_ice(row)=(u_rhs_ice(row)*mass + rhs_a(row))/area(1,row)
         v_rhs_ice(row)=(v_rhs_ice(row)*mass + rhs_m(row))/area(1,row)
     end do
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine stress2rhs_m
 !
 !
@@ -485,16 +534,18 @@ subroutine EVPdynamics_m(ice, partit, mesh)
 
     !NR inlined, to have all initialization in one place.
     !  call ssh2rhs
-
     ! use rhs_m and rhs_a for storing the contribution from elevation:
+!$OMP PARALLEL DO
     do row=1, myDim_nod2d
         rhs_a(row)=0.0_WP
         rhs_m(row)=0.0_WP
     end do
-
+!$OMP END PARALLEL DO
     !_____________________________________________________________________________
     ! use floating sea ice for zlevel and zstar
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(el, elnodes, vol, dx, dy, p_ice, n, bb, aa)
     if (use_floatice .and.  .not. trim(which_ale)=='linfs') then
+!$OMP DO
         do el=1,myDim_elem2d
             elnodes=elem2D_nodes(:,el)
 
@@ -518,12 +569,26 @@ subroutine EVPdynamics_m(ice, partit, mesh)
             bb=g*val3*vol
             aa=bb*sum(dx*(elevation(elnodes)+p_ice))
             bb=bb*sum(dy*(elevation(elnodes)+p_ice))
-            rhs_a(elnodes)=rhs_a(elnodes)-aa
-            rhs_m(elnodes)=rhs_m(elnodes)-bb
+            do n=1, 3
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+               call omp_set_lock  (partit%plock(elnodes(n)))
+#else
+!$OMP ORDERED
+#endif
+               rhs_a(elnodes(n))=rhs_a(elnodes(n))-aa
+               rhs_m(elnodes(n))=rhs_m(elnodes(n))-bb
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+               call omp_unset_lock(partit%plock(elnodes(n)))
+#else
+!$OMP END ORDERED
+#endif
+            end do
         end do
+!$OMP END DO
     !_____________________________________________________________________________
     ! use levitating sea ice for linfs, zlevel and zstar
     else
+!$OMP DO
         do el=1,myDim_elem2d
             elnodes=elem2D_nodes(:,el)
             !_______________________________________________________________________
@@ -536,13 +601,27 @@ subroutine EVPdynamics_m(ice, partit, mesh)
             bb=g*val3*vol
             aa=bb*sum(dx*elevation(elnodes))
             bb=bb*sum(dy*elevation(elnodes))
-            rhs_a(elnodes)=rhs_a(elnodes)-aa
-            rhs_m(elnodes)=rhs_m(elnodes)-bb
+            do n=1, 3
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+            call omp_set_lock  (partit%plock(elnodes(n)))
+#else
+!$OMP ORDERED
+#endif
+               rhs_a(elnodes(n))=rhs_a(elnodes(n))-aa
+               rhs_m(elnodes(n))=rhs_m(elnodes(n))-bb
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+            call omp_unset_lock(partit%plock(elnodes(n)))
+#else
+!$OMP END ORDERED
+#endif
+            end do
         end do
+!$OMP END DO
     end if
-
+!$OMP END PARALLEL
     !___________________________________________________________________________
     ! precompute thickness (the inverse is needed) and mass (scaled by area)
+!$OMP PARALLEL DO
     do i=1,myDim_nod2D
         inv_thickness(i) = 0._WP
         mass(i) = 0._WP
@@ -565,9 +644,10 @@ subroutine EVPdynamics_m(ice, partit, mesh)
             ice_nod(i) = .true.
         endif
     enddo
-
+!$OMP END PARALLEL DO
     !___________________________________________________________________________
     ! precompute pressure factor
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum)
     do el=1,myDim_elem2D
         elnodes=elem2D_nodes(:,el)
         pressure_fac(el) = 0._WP
@@ -584,12 +664,13 @@ subroutine EVPdynamics_m(ice, partit, mesh)
             pressure_fac(el) = det2*ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
         endif
     end do
-
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO
     do row=1, myDim_nod2d
         u_rhs_ice(row)=0.0_WP
         v_rhs_ice(row)=0.0_WP
     end do
-
+!$OMP END PARALLEL DO
     !___________________________________________________________________________
     ! Ice EVPdynamics Iteration main loop:
 #if defined (__icepack)
@@ -603,6 +684,8 @@ subroutine EVPdynamics_m(ice, partit, mesh)
         ! New implementation following Boullion et al, Ocean Modelling 2013.
         ! SD, 30.07.2014
         !_______________________________________________________________________
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(el, i, ed, row, elnodes, dx, dy, meancos, eps1, eps2, delta, pressure, umod, drag, rhsu, rhsv, det, n)
+!$OMP DO
         do el=1,myDim_elem2D
             if (ulevels(el)>1) cycle
 
@@ -655,28 +738,59 @@ subroutine EVPdynamics_m(ice, partit, mesh)
                 ! SD, 30.07.2014
                 !-----------------------------------------------------------------
                 if (elnodes(1) <= myDim_nod2D) then
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+                    call omp_set_lock  (partit%plock(elnodes(1)))
+#else
+!$OMP ORDERED
+#endif
                     u_rhs_ice(elnodes(1)) = u_rhs_ice(elnodes(1)) - elem_area(el)* &
                             (sigma11(el)*dx(1)+sigma12(el)*(dy(1) + meancos))                         !metrics
                     v_rhs_ice(elnodes(1)) = v_rhs_ice(elnodes(1)) - elem_area(el)* &
-                            (sigma12(el)*dx(1)+sigma22(el)*dy(1) - sigma11(el)*meancos)               ! metrics
+                            (sigma12(el)*dx(1)+sigma22(el)*dy(1) - sigma11(el)*meancos)               !metrics
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+                    call omp_unset_lock(partit%plock(elnodes(1)))
+#else
+!$OMP END ORDERED
+#endif
                 end if
 
                 if (elnodes(2) <= myDim_nod2D) then
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+                    call omp_set_lock  (partit%plock(elnodes(2)))
+#else
+!$OMP ORDERED
+#endif
                     u_rhs_ice(elnodes(2)) = u_rhs_ice(elnodes(2)) - elem_area(el)* &
                             (sigma11(el)*dx(2)+sigma12(el)*(dy(2) + meancos))                         !metrics
                     v_rhs_ice(elnodes(2)) = v_rhs_ice(elnodes(2)) - elem_area(el)* &
-                            (sigma12(el)*dx(2)+sigma22(el)*dy(2) - sigma11(el)*meancos)               ! metrics
+                            (sigma12(el)*dx(2)+sigma22(el)*dy(2) - sigma11(el)*meancos)               !metrics
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+                call omp_unset_lock(partit%plock(elnodes(2)))
+#else
+!$OMP END ORDERED
+#endif
                 end if
 
                 if (elnodes(3) <= myDim_nod2D) then
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+                    call omp_set_lock  (partit%plock(elnodes(3)))
+#else
+!$OMP ORDERED
+#endif
                     u_rhs_ice(elnodes(3)) = u_rhs_ice(elnodes(3)) - elem_area(el)* &
                             (sigma11(el)*dx(3)+sigma12(el)*(dy(3) + meancos))                         !metrics
                     v_rhs_ice(elnodes(3)) = v_rhs_ice(elnodes(3)) - elem_area(el)* &
-                            (sigma12(el)*dx(3)+sigma22(el)*dy(3) - sigma11(el)*meancos)               ! metrics
+                            (sigma12(el)*dx(3)+sigma22(el)*dy(3) - sigma11(el)*meancos)               !metrics
+#if defined(_OPENMP) && !defined(__openmp_reproducible)
+                   call omp_unset_lock(partit%plock(elnodes(3)))
+#else
+!$OMP END ORDERED
+#endif
                 end if
             end if
         end do ! --> do el=1,myDim_elem2D
-
+!$OMP END DO
+!$OMP DO
         do i=1, myDim_nod2d
             !___________________________________________________________________
             if (ulevels_nod2D(i)>1) cycle
@@ -702,15 +816,24 @@ subroutine EVPdynamics_m(ice, partit, mesh)
                 v_ice_aux(i) = det*((1.0_WP+ice%beta_evp+drag)*rhsv -rdt*mesh%coriolis_node(i)*rhsu)
             end if
         end do ! --> do i=1, myDim_nod2d
-
+!$OMP END DO
         !_______________________________________________________________________
         ! apply sea ice velocity boundary condition
+!$OMP DO
         do ed=1,myDim_edge2D
             !___________________________________________________________________
             ! apply coastal sea ice velocity boundary conditions
-            if(myList_edge2D(ed) > edge2D_in) then
-                u_ice_aux(edges(:,ed))=0.0_WP
-                v_ice_aux(edges(:,ed))=0.0_WP
+            if (myList_edge2D(ed) > edge2D_in) then
+               do n=1, 2
+#if defined(_OPENMP)
+                call omp_set_lock  (partit%plock(edges(n, ed)))
+#endif
+                u_ice_aux(edges(n,ed))=0.0_WP
+                v_ice_aux(edges(n,ed))=0.0_WP
+#if defined(_OPENMP)
+                call omp_unset_lock(partit%plock(edges(n,ed)))
+#endif
+               end do
             end if
 
             !___________________________________________________________________
@@ -718,26 +841,43 @@ subroutine EVPdynamics_m(ice, partit, mesh)
             if (use_cavity) then
                 if ( (ulevels(edge_tri(1,ed))>1) .or. &
                     ( edge_tri(2,ed)>0 .and. ulevels(edge_tri(2,ed))>1) ) then
-                    u_ice_aux(edges(1:2,ed))=0.0_WP
-                    v_ice_aux(edges(1:2,ed))=0.0_WP
+                    do n=1, 2
+#if defined(_OPENMP)
+                       call omp_set_lock  (partit%plock(edges(n, ed)))
+#endif
+                       u_ice_aux(edges(n,ed))=0.0_WP
+                       v_ice_aux(edges(n,ed))=0.0_WP
+#if defined(_OPENMP)
+                       call omp_unset_lock(partit%plock(edges(n,ed)))
+#endif
+                    end do
                 end if
             end if
         end do ! --> do ed=1,myDim_edge2D
-
+!$OMP END DO
         !_______________________________________________________________________
+!$OMP MASTER
         call exchange_nod_begin(u_ice_aux, v_ice_aux, partit)
-
+!$OMP END MASTER
+!$OMP BARRIER
+!$OMP DO
         do row=1, myDim_nod2d
-            u_rhs_ice(row)=0.0_WP
-            v_rhs_ice(row)=0.0_WP
+           u_rhs_ice(row)=0.0_WP
+           v_rhs_ice(row)=0.0_WP
         end do
-
+!$OMP END DO
+!$OMP MASTER
         call exchange_nod_end(partit)
-
+!$OMP END MASTER
+!$OMP BARRIER
+!$OMP END PARALLEL
     end do ! --> do shortstep=1, steps
-    u_ice=u_ice_aux
-    v_ice=v_ice_aux
-
+!$OMP PARALLEL DO
+    do row=1, myDim_nod2d+eDim_nod2D
+       u_ice(row)=u_ice_aux(row)
+       v_ice(row)=v_ice_aux(row)
+    end do
+!$OMP END PARALLEL DO
 end subroutine EVPdynamics_m
 !
 !
