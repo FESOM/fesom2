@@ -2360,7 +2360,7 @@ subroutine dvd_add_difflux_vertimpl(do_SDdvd, tr_num, dvd_tot, tr, trstar, Kv, K
             if     (tr_num==1) then 
                 sbc = -(heat_flux(node)/vcpw + tr(nz, node)*water_flux(node)*is_nonlinfs*0.5_WP)
             elseif (tr_num==2) then 
-                sbc =  (virtual_salt(node) + relax_salt(node) - real_salt_flux(node)*is_nonlinfs*0.5_WP)
+                sbc =  (virtual_salt(node) + relax_salt(node) - (real_salt_flux(node) - tr(nz, node)*water_flux(node)*0.5_WP)*is_nonlinfs)
             end if 
             Dflx(nz) = Dflx(nz) + sbc*area(nz, node)
             
