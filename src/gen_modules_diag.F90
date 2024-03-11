@@ -25,9 +25,9 @@ module diagnostics
             std_dens_UVDZ, std_dens_DIV, std_dens_DIV_fer, std_dens_Z, std_dens_H, std_dens_dVdT, std_dens_flux,       &
             dens_flux_e, vorticity, zisotherm, tempzavg, saltzavg,       &
             compute_dvd, dvd_KK_tot, dvd_SD_tot, dvd_SD_chi_adv_h, dvd_SD_chi_adv_v, & 
-            dvd_SD_chi_dif_h, dvd_SD_chi_dif_hbh, dvd_SD_chi_dif_veR, dvd_SD_chi_dif_ve, dvd_SD_chi_dif_vi, dvd_xdfac, &
-            dvd_KK_chi_adv_h, dvd_KK_chi_adv_v, dvd_KK_chi_dif_h, dvd_KK_chi_dif_veR, dvd_KK_chi_dif_ve, &
-            dvd_KK_chi_dif_vi, dvd_KK_chi_dt, dvd_KK_chi_relax, dvd_KK_chi_dif_hbh!, trstar
+                dvd_SD_chi_dif_h, dvd_SD_chi_dif_hbh, dvd_SD_chi_dif_veR, dvd_SD_chi_dif_ve, &
+                dvd_SD_chi_dif_vi, dvd_xdfac
+            
             
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
@@ -63,11 +63,9 @@ module diagnostics
 
   !_____________________________________________________________________________
   ! DVD diagnostics
-  real(kind=WP),  save, allocatable, target      :: dvd_KK_tot(:,:,:), dvd_SD_tot(:,:,:), dvd_SD_chi_adv_h(:,:,:), dvd_SD_chi_adv_v( :,:,:), &
-                                                    dvd_SD_chi_dif_h( :,:,:), dvd_SD_chi_dif_veR(:,:,:), dvd_SD_chi_dif_ve(:,:,:), dvd_SD_chi_dif_vi( :,:,:), dvd_SD_chi_dif_hbh( :,:,:)
-  real(kind=WP),  save, allocatable, target      :: dvd_KK_chi_adv_h( :,:,:), dvd_KK_chi_adv_v(:,:,:), dvd_KK_chi_dif_h( :,:,:), dvd_KK_chi_dif_veR( :,:,:), dvd_KK_chi_dif_ve( :,:,:), &
-                                                    dvd_KK_chi_dif_vi(:,:,:), dvd_KK_chi_dt(   :,:,:), dvd_KK_chi_relax( :,:,:), dvd_KK_chi_dif_hbh(:,:,:)                                                    
-!PS   real(kind=WP),  save, allocatable, target      :: trstar( :,:)
+  real(kind=WP),  save, allocatable, target      :: dvd_KK_tot(:,:,:), dvd_SD_tot(:,:,:), dvd_SD_chi_adv_h(:,:,:), &
+                                                    dvd_SD_chi_adv_v( :,:,:), dvd_SD_chi_dif_h( :,:,:), dvd_SD_chi_dif_veR(:,:,:), &
+                                                    dvd_SD_chi_dif_ve(:,:,:), dvd_SD_chi_dif_vi(:,:,:), dvd_SD_chi_dif_hbh(:,:,:)
   real(kind=WP),  parameter                      :: dvd_xdfac=0.5_WP  ! Xchi distribution factor, default distribute 
                                                                       ! equal amount (50:50) of xchi on both side of face
   !_____________________________________________________________________________
@@ -921,30 +919,20 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
 #include "associate_mesh_ass.h" 
     if (firstcall) then  !allocate the stuff at the first call
         allocate(dvd_KK_tot(        nl-1, myDim_nod2D+eDim_nod2D, 2))
-        allocate(dvd_KK_chi_adv_h(  nl-1, myDim_nod2D+eDim_nod2D, 2))
-        allocate(dvd_KK_chi_adv_v(  nl-1, myDim_nod2D+eDim_nod2D, 2))
-        allocate(dvd_KK_chi_dif_h(  nl-1, myDim_nod2D+eDim_nod2D, 2))
-        allocate(dvd_KK_chi_dif_vi( nl-1, myDim_nod2D+eDim_nod2D, 2))
-        allocate(dvd_KK_chi_relax(  nl-1, myDim_nod2D+eDim_nod2D, 2))
-        allocate(dvd_KK_chi_dt(     nl-1, myDim_nod2D+eDim_nod2D, 2))
         allocate(dvd_SD_tot(        nl-1, myDim_nod2D+eDim_nod2D, 2))
         allocate(dvd_SD_chi_adv_h(  nl-1, myDim_nod2D+eDim_nod2D, 2))
         allocate(dvd_SD_chi_adv_v(  nl-1, myDim_nod2D+eDim_nod2D, 2))
         allocate(dvd_SD_chi_dif_h(  nl-1, myDim_nod2D+eDim_nod2D, 2))
         allocate(dvd_SD_chi_dif_vi( nl-1, myDim_nod2D+eDim_nod2D, 2))
         if (tracers%data(1)%smooth_bh_tra) then
-            allocate(dvd_KK_chi_dif_hbh(nl-1, myDim_nod2D+eDim_nod2D, 2))
             allocate(dvd_SD_chi_dif_hbh(nl-1, myDim_nod2D+eDim_nod2D, 2))
         end if 
         if (Redi) then
-            allocate(dvd_KK_chi_dif_veR(nl-1, myDim_nod2D+eDim_nod2D, 2))
             allocate(dvd_SD_chi_dif_veR(nl-1, myDim_nod2D+eDim_nod2D, 2))
         end if 
         if (.not. tracers%data(1)%i_vert_diff) then
-            allocate(dvd_KK_chi_dif_ve( nl-1, myDim_nod2D+eDim_nod2D, 2))
             allocate(dvd_SD_chi_dif_ve( nl-1, myDim_nod2D+eDim_nod2D, 2))
         end if 
-!PS         allocate(trstar( nl-1, myDim_nod2D+eDim_nod2D))
         firstcall=.false.
         if (mode==0) return
     end if  
@@ -952,28 +940,18 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! initialise each time diagnostic is computed 
     dvd_KK_tot        = 0.0_WP ! --> DVD diagnostic after Klingbeil et al. 2014
-    dvd_KK_chi_adv_h  = 0.0_WP
-    dvd_KK_chi_adv_v  = 0.0_WP
-    dvd_KK_chi_dif_h  = 0.0_WP 
-    dvd_KK_chi_dif_vi = 0.0_WP ! implicite part
-    dvd_KK_chi_relax  = 0.0_WP
-    dvd_KK_chi_dt     = 0.0_WP
-    
     dvd_SD_tot        = 0.0_WP ! --> DVD diagnostic after Banjerjee et al. 2023 (Sergeys way!!!)
     dvd_SD_chi_adv_h  = 0.0_WP
     dvd_SD_chi_adv_v  = 0.0_WP
     dvd_SD_chi_dif_h  = 0.0_WP 
     dvd_SD_chi_dif_vi = 0.0_WP ! implicite part
     if (tracers%data(1)%smooth_bh_tra) then
-        dvd_KK_chi_dif_hbh= 0.0_WP
         dvd_SD_chi_dif_hbh= 0.0_WP 
     end if 
     if (Redi) then
-        dvd_KK_chi_dif_veR= 0.0_WP ! explicite part (in case of Redi==.true.)
         dvd_SD_chi_dif_veR= 0.0_WP ! explicite part (in case of Redi==.true.)
     end if 
     if (.not. tracers%data(1)%i_vert_diff) then
-        dvd_KK_chi_dif_ve = 0.0_WP 
         dvd_SD_chi_dif_ve = 0.0_WP 
     end if 
     
@@ -1025,57 +1003,44 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
         !=== DVD Knut Klingbeil et al. 2014 ====================================
         ! add time derivativ of 2nd. moment tracer
         ! --> at this point trstar corresponds to tr_old
-        call dvd_add_time_deriv(tr_num, dvd_KK_chi_dt, trstar, tr, partit, mesh)            
+        call dvd_add_time_deriv(tr_num, dvd_KK_tot, trstar, tr, partit, mesh)            
         
         ! compute horizontal 2nd moment tracer flux from advective tracer fluxes at mid 
         ! edge face
-        call dvd_add_advflux_hor( .false., tr_num, dvd_KK_chi_adv_h, trflx_h, UV, trstar, dump, partit, mesh)
+        call dvd_add_advflux_hor( .false., tr_num, dvd_KK_tot, trflx_h, UV, trstar, dump, partit, mesh)
         
         ! add vertical 2nd moment tracer flux at upper/lower scalar cell prism interface
-        call dvd_add_advflux_ver( .false., tr_num, dvd_KK_chi_adv_v, trflx_v, Wvel, trstar, partit, mesh)
+        call dvd_add_advflux_ver( .false., tr_num, dvd_KK_tot, trflx_v, Wvel, trstar, partit, mesh)
         
         ! add contribution from horizontal diffusion flux (after klingbeil et al. 2014)
         ! --> keep in mind here trstar corresponds to tr_old
-        call dvd_add_difflux_hor( .false., tr_num, dvd_KK_chi_dif_h, trstar, Ki, slope_tapered, tr_z, tr_xy, dump, partit, mesh)
+        call dvd_add_difflux_hor( .false., tr_num, dvd_KK_tot, trstar, Ki, slope_tapered, tr_z, tr_xy, dump, partit, mesh)
         
         ! add contribution from vertical diffusion flux (after klingbeil et al. 2014)
         if (.not. tracers%data(tr_num)%i_vert_diff) then
-            call dvd_add_difflux_vertexpl(.false., tr_num, dvd_KK_chi_dif_ve, tr, trstar, Kv, partit, mesh)
+            call dvd_add_difflux_vertexpl(.false., tr_num, dvd_KK_tot, tr, trstar, Kv, partit, mesh)
         end if     
         if (Redi) then
-            call dvd_add_difflux_vertexplredi(.false., tr_num, dvd_KK_chi_dif_veR, trstar, Ki, slope_tapered, tr_xy, partit, mesh)
+            call dvd_add_difflux_vertexplredi(.false., tr_num, dvd_KK_tot, trstar, Ki, slope_tapered, tr_xy, partit, mesh)
         end if     
         
-        call dvd_add_difflux_vertimpl(.false., tr_num, dvd_KK_chi_dif_vi, tr, trstar, Kv, Ki, slope_tapered, partit, mesh)
+        call dvd_add_difflux_vertimpl(.false., tr_num, dvd_KK_tot, tr, trstar, Kv, Ki, slope_tapered, partit, mesh)
         
         ! add contribution from horizontal biharmonic diffusion flux if applied
         if (tracers%data(tr_num)%smooth_bh_tra) then
-            call dvd_add_difflux_bhvisc(.false., tr_num, dvd_KK_chi_dif_hbh, tr, trstar,& 
+            call dvd_add_difflux_bhvisc(.false., tr_num, dvd_KK_tot, tr, trstar,& 
             tracers%data(tr_num)%gamma0_tra, tracers%data(tr_num)%gamma1_tra, &
             tracers%data(tr_num)%gamma2_tra, dump, partit, mesh)
         end if 
         
         ! add contribution from climatological 3d restoring 
         if ((toy_ocean) .AND. ((tr_num==1) .AND. (TRIM(which_toy)=="soufflet"))) then
-            call dvd_add_clim_relax_channel(.false., tr_num, dvd_KK_chi_relax, trstar, partit, mesh)
+            call dvd_add_clim_relax_channel(.false., tr_num, dvd_KK_tot, trstar, partit, mesh)
         elseif (clim_relax>1.0e-8_WP) then 
-            call dvd_add_clim_relax(        .false., tr_num, dvd_KK_chi_relax, trstar, partit, mesh)
+            call dvd_add_clim_relax(        .false., tr_num, dvd_KK_tot, trstar, partit, mesh)
         end if 
         
-        ! compute total Xchi 
-        dvd_KK_tot(:,:,tr_num) = (dvd_KK_chi_adv_h(  :,:,tr_num) + dvd_KK_chi_adv_v(  :,:,tr_num) + &
-                                  dvd_KK_chi_dif_h(  :,:,tr_num) + dvd_KK_chi_dif_vi( :,:,tr_num) + &
-                                  dvd_KK_chi_relax(  :,:,tr_num) + dvd_KK_chi_dt(     :,:,tr_num)) 
-                                    
-        if (.not. tracers%data(tr_num)%i_vert_diff) then
-            dvd_KK_tot(:,:,tr_num) = dvd_KK_tot(:,:,tr_num) + dvd_KK_chi_dif_ve(:,:,tr_num) 
-        end if 
-        if (Redi) then
-            dvd_KK_tot(:,:,tr_num) = dvd_KK_tot(:,:,tr_num) + dvd_KK_chi_dif_veR(:,:,tr_num) 
-        end if
-        if (tracers%data(tr_num)%smooth_bh_tra) then
-            dvd_KK_tot(:,:,tr_num) = dvd_KK_tot(:,:,tr_num) + dvd_KK_chi_dif_hbh(:,:,tr_num) 
-        end if 
+        
         
         !
         !=== DVD Sergey Danilov after T. Banerjee et al. 2023 =======================
@@ -1510,13 +1475,13 @@ subroutine dvd_add_advflux_ver(do_SDdvd, tr_num, dvd_tot, trflx_v, Wvel, trstar,
                 ! with hnode^(n+1) in call update_thickness(...). But we saved hnode^(n)
                 ! in the variable hnode_new (Although this sounds confusing!!!)                
                 ! --> here we are on mid-depth levels
-                dvd_tot(nz-1, node, tr_num) = dvd_tot(nz-1, node, tr_num) + (dvd_xdfac*xchi(nz-1)+(1.0_WP-dvd_xdfac)*xchi(nz))/(areasvol(nz-1, node)*hnode_new(nz-1, node))
+                dvd_tot(nz-1, node, tr_num) = dvd_tot(nz-1, node, tr_num) - (dvd_xdfac*xchi(nz-1)+(1.0_WP-dvd_xdfac)*xchi(nz))/(areasvol(nz-1, node)*hnode_new(nz-1, node))
                 
             end do !--> do nz=nu1+1,nl1-1
             !___________________________________________________________________
             ! same for bottom 
             nz=nl1-1
-            dvd_tot(nz, node, tr_num) = dvd_tot(nz, node, tr_num) + (dvd_xdfac*xchi(nz)+(1.0_WP-dvd_xdfac)*xchi(nz+1))/(areasvol(nz, node)*hnode_new(nz, node))
+            dvd_tot(nz, node, tr_num) = dvd_tot(nz, node, tr_num) - (dvd_xdfac*xchi(nz)+(1.0_WP-dvd_xdfac)*xchi(nz+1))/(areasvol(nz, node)*hnode_new(nz, node))
                 
         end do !--> do node=1,myDim_nod2D
     
