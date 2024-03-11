@@ -36,7 +36,8 @@ SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
 !$OMP END PARALLEL DO
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
-    call tracer_gradient_elements(tracers%data(tr_num)%valuesAB, partit, mesh)
+!PS     call tracer_gradient_elements(tracers%data(tr_num)%valuesAB, partit, mesh)
+    call tracer_gradient_elements(tracers%data(tr_num)%values, partit, mesh)
     call exchange_elem_begin(tr_xy, partit)
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_z'//achar(27)//'[0m'
@@ -121,7 +122,8 @@ SUBROUTINE tracer_gradient_z(ttf, partit, mesh)
     nzmin=ulevels_nod2D(n)
     !!PS DO nz=2,  nlev-1
     DO nz=nzmin+1,  nzmax-1
-        dz=0.5_WP*(hnode_new(nz-1,n)+hnode_new(nz,n))
+!PS         dz=0.5_WP*(hnode_new(nz-1,n)+hnode_new(nz,n))
+        dz=0.5_WP*(hnode(nz-1,n)+hnode(nz,n))
         tr_z(nz, n)=(ttf(nz-1,n)-ttf(nz,n))/dz
     END DO
     !!PS tr_z(1,    n)=0.0_WP
