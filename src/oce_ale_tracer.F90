@@ -970,12 +970,12 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
         zbar_n(1:mesh%nl  )=0.0_WP
         z_n   (1:mesh%nl-1)=0.0_WP
         zbar_n(nl1+1)=zbar_n_bot(n)
-        z_n(nl1)=zbar_n(nl1+1) + hnode_new(nl1,n)/2.0_WP
+        z_n(nl1)=zbar_n(nl1+1) + hnode(nl1,n)/2.0_WP
         do nz=nl1, ul1+1, -1
-            zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
-            z_n(nz-1)  = zbar_n(nz)   + hnode_new(nz-1,n)/2.0_WP
+            zbar_n(nz) = zbar_n(nz+1) + hnode(nz,n)
+            z_n(nz-1)  = zbar_n(nz)   + hnode(nz-1,n)/2.0_WP
         end do
-        zbar_n(ul1) = zbar_n(ul1+1)   + hnode_new(ul1,n)
+        zbar_n(ul1) = zbar_n(ul1+1)   + hnode(ul1,n)
 
         !_______________________________________________________________________
         do nz=ul1+1,nl1
