@@ -121,7 +121,7 @@ SUBROUTINE tracer_gradient_z(ttf, partit, mesh)
     nzmin=ulevels_nod2D(n)
     !!PS DO nz=2,  nlev-1
     DO nz=nzmin+1,  nzmax-1
-        dz=0.5_WP*(hnode_new(nz-1,n)+hnode_new(nz,n))
+        dz=0.5_WP*(hnode(nz-1,n)+hnode(nz,n))
         tr_z(nz, n)=(ttf(nz-1,n)-ttf(nz,n))/dz
     END DO
     !!PS tr_z(1,    n)=0.0_WP
