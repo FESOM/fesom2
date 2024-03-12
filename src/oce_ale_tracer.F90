@@ -274,7 +274,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         end do
 !$OMP END PARALLEL DO
     end if
-
+    
+    ! TODO: do it only when it is coupled to atmosphere 
     !___________________________________________________________________________
     ! to avoid crash with high salinities when coupled to atmosphere
     ! --> if we do only where (tr_arr(:,:,2) < 3._WP ) we also fill up the bottom
