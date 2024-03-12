@@ -37,6 +37,8 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP)  :: a2ohf, a2ihf
   !---- evaporation and sublimation (provided by ECHAM)
   real(kind=WP)  :: evap, subli
+  !---- add residual freshwater flux over ice to freshwater (setted in ice_growth)
+  real(kind=WP)  :: resid
   !---- precipitation and runoff (provided by ECHAM)
   real(kind=WP)  :: rain, snow, runo
   !---- ocean variables (provided by FESOM)
@@ -61,6 +63,7 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP), dimension(:)  , pointer :: u_ice, v_ice
   real(kind=WP), dimension(:)  , pointer :: a_ice, m_ice, m_snow
   real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn
+  real(kind=WP), dimension(:)  , pointer :: a_ice_old, m_ice_old, m_snow_old, thdgr_old 
   real(kind=WP), dimension(:)  , pointer :: S_oc_array, T_oc_array, u_w, v_w
   real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
 #if defined (__oifs) || defined (__ifsinterface)
@@ -81,6 +84,10 @@ subroutine thermodynamics(ice, partit, mesh)
   m_snow        => ice%data(3)%values(:)  
   thdgr         => ice%thermo%thdgr(:)
   thdgrsn       => ice%thermo%thdgrsn(:)
+  a_ice_old     => ice%data(1)%values_old(:)
+  m_ice_old     => ice%data(2)%values_old(:)
+  m_snow_old    => ice%data(3)%values_old(:)
+  thdgr_old     => ice%thermo%thdgr_old
   T_oc_array    => ice%srfoce_temp(:)
   S_oc_array    => ice%srfoce_salt(:)
   u_w           => ice%srfoce_u(:)
@@ -111,15 +118,10 @@ subroutine thermodynamics(ice, partit, mesh)
   !_____________________________________________________________________________  
   rsss = ref_sss
 
-  !---- total evaporation (needed in oce_salt_balance.F90)
-  evaporation = evap_no_ifrac*(1.-a_ice) + sublimation*a_ice
-
   !---- loop over all surface node
-  do inod=1,myDim_nod2d+eDim_nod2d
+  do inod=1,myDim_nod2d+eDim_nod2D
 
-#ifdef use_cavity
      if (ulevels_nod2D(inod) > 1) cycle
-#endif
 
      A       = a_ice(inod)
      h       = m_ice(inod)
@@ -149,14 +151,6 @@ subroutine thermodynamics(ice, partit, mesh)
      end if
 
 #if defined (__oifs) || defined (__ifsinterface)
-     !---- different lead closing parameter for NH and SH
-     if (geo_coord_nod2D(2, inod)>0) then
-        h0min = 0.3
-        h0max = 0.3
-     else
-        h0min = 1.0
-        h0max = 1.0
-     endif
 
      !---- For AWI-CM3 we calculate ice surface temp and albedo in fesom,
      ! then send those to OpenIFS where they are used to calucate the 
@@ -169,23 +163,41 @@ subroutine thermodynamics(ice, partit, mesh)
         ! Freezing temp of saltwater in K
         ice_temp(inod) = -0.0575_WP*S_oc_array(inod) + 1.7105e-3_WP*sqrt(S_oc_array(inod)**3) -2.155e-4_WP*(S_oc_array(inod)**2)+273.15_WP
      endif
-     call ice_albedo(ice%thermo, h, hsn, t, alb, geolat)
+     call ice_albedo(ice%thermo, h, hsn, t, alb)
      ice_alb(inod)       = alb
 #endif
      call ice_growth
 
-     a_ice(inod)         = A
-     m_ice(inod)         = h
-     m_snow(inod)        = hsn
-     net_heat_flux(inod) = ehf
-     fresh_wa_flux(inod) = fw
+     !__________________________________________________________________________
+     ! save old ice variables
+     m_ice_old(inod)      = m_ice(inod) 
+     m_snow_old(inod)     = m_snow(inod)
+     a_ice_old(inod)      = a_ice(inod) 
+     thdgr_old(inod)      = thdgr(inod) 
+     
+     !__________________________________________________________________________
+     ! save new ice variables
+     a_ice(inod)          = A
+     m_ice(inod)          = h
+     m_snow(inod)         = hsn
+     net_heat_flux(inod)  = ehf
+     fresh_wa_flux(inod)  = fw
      if (.not. use_virt_salt) then
         real_salt_flux(inod)= rsf
      end if
-     thdgr(inod)         = dhgrowth
-     thdgrsn(inod)       = dhsngrowth
-     flice(inod)         = dhflice
-
+     thdgr(inod)          = dhgrowth
+     thdgrsn(inod)        = dhsngrowth
+     flice(inod)          = dhflice
+     
+     !---- total evaporation (needed in oce_salt_balance.F90) = evap+subli
+     evaporation(inod)    = evap + subli
+     ice_sublimation(inod)= subli
+     prec_rain(inod)      = rain
+     prec_snow(inod)      = snow
+     runoff(inod)         = runo
+#if defined (__oifs)  
+     residualifwflx(inod) = resid
+#endif     
   enddo
   return
 
@@ -270,6 +282,8 @@ contains
     ahf = A*Qatmice + (1._WP-A)*Qatmocn
     ohf = A*Qocnice + (1._WP-A)*Qocnatm
 
+
+
     !---- convert heat fluxes [W/m**2] into growth per time step dt [m]
     Qicecon = Qicecon*dt/cl
     Qatmice = Qatmice*dt/cl
@@ -281,8 +295,13 @@ contains
     !---- NOTE: evaporation and sublimation represent potential fluxes and
     !---- must be area-weighted (like the heat fluxes); in contrast,
     !---- precipitation (snow and rain) and runoff are effective fluxes
-    PmEice = A*snow + A*subli
-    PmEocn = rain + runo + (1._WP-A)*snow + (1._WP-A)*evap
+!already weighted in IFS coupling
+#if !defined (__ifsinterface)
+    subli  = A*subli
+    evap   = (1._WP-A)*evap
+#endif
+    PmEice = A*snow + subli
+    PmEocn = evap + rain + (1._WP-A)*snow + runo
 
     !---- convert freshwater fluxes [m/s] into growth per time step dt [m]
     PmEice = PmEice*dt
@@ -309,7 +328,8 @@ contains
     else
        PmEice = 0._WP
     endif
-
+    resid  = PmEice/dt
+    
     !---- add residual freshwater flux over ice to freshwater flux over ocean
     PmEocn = PmEocn + PmEice
     PmEice = 0._WP
@@ -424,7 +444,7 @@ contains
 
     !---- total freshwater mass flux into the ocean [kg/m**2/s]
     if (.not. use_virt_salt) then
-       fw = PmEocn*rhofwt - dhgrowth*rhoice - dhsngrowth*rhosno 
+       fw  = PmEocn*rhofwt - dhgrowth*rhoice - dhsngrowth*rhosno
        rsf = -dhgrowth*rhoice*Sice/rhowat
     else
        fw = PmEocn*rhofwt - dhgrowth*rhoice*(rsss-Sice)/rsss - dhsngrowth*rhosno 
@@ -461,7 +481,14 @@ contains
     end if
 
     !---- convert freshwater mass flux [kg/m**2/s] into sea-water volume flux [m/s]
-    fw = fw/rhowat
+    fw   = fw/rhowat
+    evap = evap *rhofwt/rhowat
+    rain = rain *rhofwt/rhowat
+    snow = snow *rhofwt/rhowat
+    runo = runo *rhofwt/rhowat
+    subli= subli*rhofwt/rhowat
+    resid= resid*rhofwt/rhowat
+    
     return
   end subroutine ice_growth
 
@@ -520,12 +547,11 @@ contains
   t=min(273.15_WP,t)
  end subroutine ice_surftemp
 
- subroutine ice_albedo(ithermp, h, hsn, t, alb, geolat)
+ subroutine ice_albedo(ithermp, h, hsn, t, alb)
   ! INPUT:
   ! h      - ice thickness [m]
   ! hsn    - snow thickness [m]
   ! t      - temperature of snow/ice surface [C]
-  ! geolat - lattitude 
   ! 
   ! OUTPUT:
   ! alb    - selected broadband albedo
@@ -536,7 +562,6 @@ contains
   real(kind=WP) :: t    
   real(kind=WP) :: alb
   real(kind=WP) :: geolat
-  real(kind=WP) :: melt_pool_alb_reduction
   real(kind=WP), pointer :: albsn, albi, albsnm, albim
   albsn  => ice%thermo%albsn
   albi   => ice%thermo%albi
@@ -545,23 +570,18 @@ contains
   
   ! set albedo
   ! ice and snow, freezing and melting conditions are distinguished
-  if (geolat.gt.0.) then !SH does not have melt ponds
-      melt_pool_alb_reduction = 0.0_WP
-  else
-      melt_pool_alb_reduction = 0.12_WP
-  endif
   if (h>0.0_WP) then
      if (t<273.15_WP) then         ! freezing condition    
         if (hsn.gt.0.001_WP) then !   snow cover present  
-           alb=albsn            
+           alb=albsn       
         else                    !   no snow cover       
-           alb=albi             
+           alb=albi           
         endif
      else                               ! melting condition     
         if (hsn.gt.0.001_WP) then !   snow cover present  
-           alb=albsnm-melt_pool_alb_reduction           
+           alb=albsnm          
         else                    !   no snow cover       
-           alb=albim-melt_pool_alb_reduction
+           alb=albim
         endif
      endif
    else

@@ -42,22 +42,39 @@ subroutine par_init(partit)    ! initializes MPI
   USE o_PARAM
   USE MOD_PARTIT
   USE MOD_PARSUP
+#ifdef __MULTIO
+  USE iom
+  USE mpp_io
+#endif
+
   implicit none
   type(t_partit), intent(inout), target :: partit
   integer                               :: i
   integer                               :: provided_mpi_thread_support_level
   character(:), allocatable             :: provided_mpi_thread_support_level_name
-
-#if defined __oasis || defined  __ifsinterface
+#ifdef __oasis || defined  __ifsinterface
   ! use comm from coupler or ifs
-#else
-  partit%MPI_COMM_FESOM=MPI_COMM_WORLD ! use global comm if not coupled (e.g. no __oasis or __ifsinterface)
-#endif  
+  ! TODO: multio with __ifsinterface is magically handled by IFS by using same module
+  !       names and routine names as in src/ifs_interface, that is not elegant.
+#else 
+#ifdef __MULTIO
+  CALL MPI_Comm_Size(MPI_COMM_WORLD, partit%npes, i)
+  CALL MPI_Comm_Rank(MPI_COMM_WORLD, partit%mype, i)
+  partit%MPI_COMM_FESOM=MPI_COMM_WORLD 
+  partit%MPI_COMM_WORLD=MPI_COMM_WORLD 
+  call mpp_io_init_2(partit%MPI_COMM_FESOM)
+#else 
+  partit%MPI_COMM_FESOM=MPI_COMM_WORLD ! use global comm if not coupled (e.g. no __oasis or __ifsinterface or IO server)
+#endif 
+
+#endif 
+
   call MPI_Comm_Size(partit%MPI_COMM_FESOM,partit%npes,i)
   call MPI_Comm_Rank(partit%MPI_COMM_FESOM,partit%mype,i)
  
 
   if(partit%mype==0) then
+#if !defined(__PGI)
     call MPI_Query_thread(provided_mpi_thread_support_level, i)
     if(provided_mpi_thread_support_level == MPI_THREAD_SINGLE) then
       provided_mpi_thread_support_level_name = "MPI_THREAD_SINGLE"
@@ -72,6 +89,7 @@ subroutine par_init(partit)    ! initializes MPI
     end if
     write(*,*) 'MPI has been initialized, provided MPI thread support level: ', &
          provided_mpi_thread_support_level_name,provided_mpi_thread_support_level
+#endif
     write(*, *) 'Running on                   ', partit%npes, ' PEs'
 #if defined(_OPENMP)
     write(*, *) 'This is MPI/OpenMP run, with ', OMP_GET_MAX_THREADS(), ' threads per PE'
@@ -80,27 +98,59 @@ subroutine par_init(partit)    ! initializes MPI
 end subroutine par_init
 !=================================================================
 subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
-USE MOD_PARTIT
-#ifndef __oifs
-!For standalone and coupled ECHAM runs
+  use MOD_PARTIT
+
+! In case we are letting oasis orchestrate MPI, we need to shut down through
+! oasis as well, thus we are including it here.
 #if defined (__oasis)
+#if defined (__oifs)
+  !For OpenIFS coupled runs we use the new OASIS nameing scheme (oasis)
+  use mod_oasis
+#else
+  !For ECHAM coupled runs we use the old OASIS nameing scheme (prism / prism_proto)
   use mod_prism 
 #endif
+         ! oifs/echam
+#endif
+         ! oasis
+
   implicit none
   integer,           intent(in)   :: COMM
   integer,           intent(in)   :: mype
   integer, optional, intent(in)   :: abort
   integer                         :: error
 
+! For standalone runs we directly call the MPI_barrier and MPI_finalize
+!---------------------------------------------------------------
+!TODO: logic is convoluted here, not defined oasis and model needs to abort doesn't happen using par_ex 
 #ifndef __oasis
   if (present(abort)) then
      if (mype==0) write(*,*) 'Run finished unexpectedly!'
      call MPI_ABORT(COMM, 1 )
   else
+          ! TODO: this is where fesom standalone, ifsinterface etc get to 
+          !1. there no abort actually even when model calls abort, and barrier may hang
+          !2. when using fesom as lib using finalize is bad here as there may 
+          !   be other MPI tasks running in calling library like IFS, better 
+          !   better practice in that case would be to free the communicator.
      call  MPI_Barrier(COMM, error)
      call  MPI_Finalize(error)
   endif
+
+#else !  standalone
+! TODO logic below is also convoluted really not really for standalone
+! From here on the two coupled options
+!-------------------------------------
+#if defined (__oifs)
+  !For OpenIFS coupled runs we use the new OASIS nameing scheme (oasis)
+  if (present(abort)) then
+    if (mype==0) write(*,*) 'Run finished unexpectedly!'
+    call MPI_ABORT(COMM, 1 )
+  else
+    call oasis_terminate
+  endif
 #else
+  !For ECHAM coupled runs we use the old OASIS nameing scheme (prism / prism_proto)
   if (.not. present(abort)) then
      if (mype==0) print *, 'FESOM calls MPI_Barrier before calling prism_terminate'
      call  MPI_Barrier(MPI_COMM_WORLD, error)
@@ -112,20 +162,13 @@ USE MOD_PARTIT
   if (mype==0) print *, 'FESOM calls MPI_Finalize'
   call MPI_Finalize(error)
 #endif
-  if (mype==0) print *, 'fesom should stop with exit status = 0'
+         ! oifs/echam
 #endif
-#if defined (__oifs)
-!OIFS coupling doesnt call prism_terminate_proto and uses MPI_COMM_FESOM
-  implicit none
-  integer,optional :: abort
-  if (present(abort)) then
-	if (mype==0) write(*,*) 'Run finished unexpectedly!'
-	call MPI_ABORT(COMM, 1 )
-  else
-	call  MPI_Barrier(COMM, error)
-	call  MPI_Finalize(error)
-  endif
-#endif
+         ! oasis
+
+! Regardless of standalone, OpenIFS oder ECHAM coupling, if we reach to this point
+! we should be fine shutting the whole model down
+if (mype==0) print *, 'fesom should stop with exit status = 0'
 
 end subroutine par_ex
 !=======================================================================

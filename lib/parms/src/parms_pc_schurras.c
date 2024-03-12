@@ -10,6 +10,11 @@
 #endif 
 #endif 
 
+/* Forward declarations */
+int parms_OperatorGetU(parms_Operator self, void **mat);
+int parms_MatGetOffDiag(parms_Mat self, void **mat);
+int parms_CommGetOdvlist(parms_Comm self, int **odvlist);
+
 typedef struct schurras_data {
 
   parms_Operator op_out,op_in;

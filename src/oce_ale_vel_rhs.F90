@@ -60,17 +60,19 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     integer                  :: use_pice
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB, UV_rhs
-    real(kind=WP), dimension(:)    , pointer :: eta_n
-    real(kind=WP), dimension(:)    , pointer :: m_ice, m_snow, a_ice
-    real(kind=WP)                  , pointer :: rhoice, rhosno, inv_rhowat
+    real(kind=WP), dimension(:,:,:),   pointer :: UV, UV_rhs
+    real(kind=WP), dimension(:,:,:,:), pointer :: UV_rhsAB
+    real(kind=WP), dimension(:)    ,   pointer :: eta_n
+    real(kind=WP), dimension(:)    ,   pointer :: m_ice, m_snow, a_ice
+    real(kind=WP)                  ,   pointer :: rhoice, rhosno, inv_rhowat
+    real(kind=WP)                              :: ab1, ab2, ab3 !Adams-Bashforth coefficients
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UV        => dynamics%uv(:,:,:)
     UV_rhs    => dynamics%uv_rhs(:,:,:)
-    UV_rhsAB  => dynamics%uv_rhsAB(:,:,:)
+    UV_rhsAB  => dynamics%uv_rhsAB(:,:,:,:)
     eta_n     => dynamics%eta_n(:)
     m_ice     => ice%data(2)%values(:)
     m_snow    => ice%data(3)%values(:)
@@ -83,6 +85,20 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     if (use_floatice .and.  .not. trim(which_ale)=='linfs') use_pice=1
     if ((toy_ocean)  .and. (trim(which_toy)=="soufflet"))   use_pice=0
 
+    IF     (dynamics%AB_order==2)  THEN
+            ab1=-(0.5_WP+epsilon)
+            ab2= (1.5_WP+epsilon)
+            ab3=  0.0_WP
+    ELSEIF (dynamics%AB_order==3) THEN
+            ab1=  5.0_WP/12.0_WP
+            ab2=-16.0_WP/12.0_WP
+            ab3= 23.0_WP/12.0_WP
+    ELSE 
+       write(*,*) 'unsuppported AB scheme for momentum, use 2 or 3'
+       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       stop
+    END IF 
+
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax, elnodes, ff, mm, Fx, Fy, pre, p_ice, p_air, p_eta)
     do elem=1, myDim_elem2D
         nzmax = nlevels(elem)
@@ -90,10 +106,29 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         !___________________________________________________________________________
         ! Take care of the AB part
         !!PS do nz=1,nl-1
+        IF (dynamics%AB_order==2) THEN
         do nz=nzmin,nzmax-1
-            UV_rhs(1,nz,elem)=-(0.5_WP+epsilon)*UV_rhsAB(1,nz,elem)   
-            UV_rhs(2,nz,elem)=-(0.5_WP+epsilon)*UV_rhsAB(2,nz,elem)
+            UV_rhs(1,nz,elem)=ab1*UV_rhsAB(1,1,nz,elem)
+            UV_rhs(2,nz,elem)=ab1*UV_rhsAB(1,2,nz,elem)
         end do
+        if (dynamics%ldiag_ke) then
+           do nz=nzmin,nzmax-1
+              dynamics%ke_adv(:,nz,elem)=ab1*dynamics%ke_adv_AB(1, :,nz,elem)
+              dynamics%ke_cor(:,nz,elem)=ab1*dynamics%ke_cor_AB(1, :,nz,elem)
+           end do
+        end if
+        ELSEIF (dynamics%AB_order==3) THEN
+        do nz=nzmin,nzmax-1
+            UV_rhs(1,nz,elem)=ab1*UV_rhsAB(2,1,nz,elem)+ab2*UV_rhsAB(1,1,nz,elem)
+            UV_rhs(2,nz,elem)=ab1*UV_rhsAB(2,2,nz,elem)+ab2*UV_rhsAB(1,2,nz,elem)
+        end do
+        if (dynamics%ldiag_ke) then
+           do nz=nzmin,nzmax-1
+              dynamics%ke_adv(:,nz,elem)=ab1*dynamics%ke_adv_AB(2,:,nz,elem)+ab2*dynamics%ke_adv_AB(1,:,nz,elem)
+              dynamics%ke_cor(:,nz,elem)=ab1*dynamics%ke_cor_AB(2,:,nz,elem)+ab2*dynamics%ke_cor_AB(1,:,nz,elem)
+           end do
+        end if      
+        END IF
         
         !___________________________________________________________________________
         ! Sea level and pressure contribution   -\nabla(\eta +hpressure/rho_0)
@@ -144,11 +179,40 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
             ! add pressure gradient terms
             UV_rhs(1,nz,elem)   = UV_rhs(1,nz,elem) + (Fx-pgf_x(nz,elem))*elem_area(elem) 
             UV_rhs(2,nz,elem)   = UV_rhs(2,nz,elem) + (Fy-pgf_y(nz,elem))*elem_area(elem)
-            
+
+            IF (dynamics%AB_order==2) THEN
             ! add coriolis force
-            UV_rhsAB(1,nz,elem) = UV(2,nz,elem)*ff! + mm*UV(1,nz,elem)*UV(2,nz,elem)
-            UV_rhsAB(2,nz,elem) =-UV(1,nz,elem)*ff! - mm*UV(1,nz,elem)*UV(2,nz,elem)
+            UV_rhsAB(1,1,nz,elem) = UV(2,nz,elem)*ff! + mm*UV(1,nz,elem)*UV(2,nz,elem)
+            UV_rhsAB(1,2,nz,elem) =-UV(1,nz,elem)*ff! - mm*UV(1,nz,elem)*UV(2,nz,elem)
+            ELSEIF (dynamics%AB_order==3) THEN
+            UV_rhsAB(2,1,nz,elem) = UV_rhsAB(1,1,nz,elem)
+            UV_rhsAB(2,2,nz,elem) = UV_rhsAB(1,2,nz,elem)
+            UV_rhsAB(1,1,nz,elem) = UV(2,nz,elem)*ff
+            UV_rhsAB(1,2,nz,elem) =-UV(1,nz,elem)*ff
+            END IF
         end do
+
+        if (dynamics%ldiag_ke) then
+           do nz=nzmin,nzmax-1
+              dynamics%ke_pre(1,nz,elem)= (Fx-pgf_x(nz,elem))*dt!*elem_area(elem) !not to divide it aterwards (at the end of this subroutine)
+              dynamics%ke_pre(2,nz,elem)= (Fy-pgf_y(nz,elem))*dt!*elem_area(elem) !but account for DT here              
+
+              IF (dynamics%AB_order==3) THEN
+              dynamics%ke_cor_AB(2,1,nz,elem) = dynamics%ke_cor_AB(1,1,nz,elem)
+              dynamics%ke_cor_AB(2,2,nz,elem) = dynamics%ke_cor_AB(1,2,nz,elem)
+
+              dynamics%ke_adv_AB(2,1,nz,elem)= dynamics%ke_adv_AB(1,1,nz,elem)
+              dynamics%ke_adv_AB(2,2,nz,elem)= dynamics%ke_adv_AB(1,2,nz,elem)
+              END IF
+
+              dynamics%ke_cor_AB(1,1,nz,elem)= UV(2,nz,elem)*ff
+              dynamics%ke_cor_AB(1,2,nz,elem)=-UV(1,nz,elem)*ff
+
+              dynamics%ke_adv_AB(1,1,nz,elem)= 0.0_WP
+              dynamics%ke_adv_AB(1,2,nz,elem)= 0.0_WP
+           end do
+        end if
+
     end do
 !$OMP END PARALLEL DO
     
@@ -161,8 +225,13 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
        call momentum_adv_scalar(dynamics, partit, mesh)
     end if
     !___________________________________________________________________________
-    ! Update the rhs   
-    ff=(1.5_WP+epsilon)
+    ! Update the rhs
+    IF (dynamics%AB_order==2) THEN
+        ff=ab2
+    ELSEIF (dynamics%AB_order==3) THEN
+        ff=ab3
+    END IF
+    
     if (lfirst.and.(.not.r_restart)) then
         ff=1.0_WP
         lfirst=.false.
@@ -172,11 +241,24 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         nzmax = nlevels(elem)
         nzmin = ulevels(elem)
         do nz=nzmin,nzmax-1
-            UV_rhs(1,nz,elem)=dt*(UV_rhs(1,nz,elem)+UV_rhsAB(1,nz,elem)*ff)/elem_area(elem)
-            UV_rhs(2,nz,elem)=dt*(UV_rhs(2,nz,elem)+UV_rhsAB(2,nz,elem)*ff)/elem_area(elem)
+            UV_rhs(1,nz,elem)=dt*(UV_rhs(1,nz,elem)+UV_rhsAB(1,1,nz,elem)*ff)/elem_area(elem)
+            UV_rhs(2,nz,elem)=dt*(UV_rhs(2,nz,elem)+UV_rhsAB(1,2,nz,elem)*ff)/elem_area(elem)
         end do
     end do
 !$OMP END PARALLEL DO
+
+    if (dynamics%ldiag_ke) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
+    do elem=1, myDim_elem2D
+        nzmax = nlevels(elem)
+        nzmin = ulevels(elem)
+        do nz=nzmin,nzmax-1
+            dynamics%ke_adv(:,nz,elem)=dt*(dynamics%ke_adv(:,nz,elem)+dynamics%ke_adv_AB(1,:,nz,elem)*ff)/elem_area(elem)
+            dynamics%ke_cor(:,nz,elem)=dt*(dynamics%ke_cor(:,nz,elem)+dynamics%ke_cor_AB(1,:,nz,elem)*ff)/elem_area(elem)
+        end do
+    end do
+!$OMP END PARALLEL DO
+    end if
     
     ! =======================  
     ! U_rhs contains all contributions to velocity from old time steps   
@@ -205,14 +287,15 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
     real(kind=WP)            :: wu(1:mesh%nl), wv(1:mesh%nl)
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB, UVnode_rhs
-    real(kind=WP), dimension(:,:)  , pointer :: Wvel_e
+    real(kind=WP), dimension(:,:,:),   pointer :: UV, UVnode_rhs
+    real(kind=WP), dimension(:,:,:,:), pointer :: UV_rhsAB
+    real(kind=WP), dimension(:,:)    , pointer :: Wvel_e
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UV        =>dynamics%uv(:,:,:)
-    UV_rhsAB  =>dynamics%uv_rhsAB(:,:,:)
+    UV_rhsAB  =>dynamics%uv_rhsAB(:,:,:,:)
     UVnode_rhs=>dynamics%work%uvnode_rhs(:,:,:)
     Wvel_e    =>dynamics%w_e(:,:)
 
@@ -322,12 +405,16 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
             un2(nl2+1:max(nl1,nl2)) = 0._WP
             un1(1:ul1-1)            = 0._WP
             un2(1:ul2-1)            = 0._WP
+
+#if defined(__openmp_reproducible)
+!$OMP ORDERED
+#endif
             
             ! first edge node
             ! Do not calculate on Halo nodes, as the result will not be used. 
             ! The "if" is cheaper than the avoided computiations.
             if (nod(1) <= myDim_nod2d) then
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_set_lock(partit%plock(nod(1)))
 #endif
                 do nz=min(ul1,ul2), max(nl1,nl2)
@@ -335,14 +422,14 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
                     UVnode_rhs(1,nz,nod(1)) = UVnode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1) + un2(nz)*UV(1,nz,el2) 
                     UVnode_rhs(2,nz,nod(1)) = UVnode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1) + un2(nz)*UV(2,nz,el2)
                 end do
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_unset_lock(partit%plock(nod(1)))
 #endif
             endif
             
             ! second edge node
             if (nod(2) <= myDim_nod2d) then
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_set_lock(partit%plock(nod(2)))
 #endif
                 do nz=min(ul1,ul2), max(nl1,nl2)
@@ -350,7 +437,7 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
                     UVnode_rhs(1,nz,nod(2)) = UVnode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1) - un2(nz)*UV(1,nz,el2)
                     UVnode_rhs(2,nz,nod(2)) = UVnode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1) - un2(nz)*UV(2,nz,el2)
                 end do
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_unset_lock(partit%plock(nod(2)))
 #endif
             endif
@@ -358,7 +445,7 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
         else  ! el2 is not a valid element --> ed is a boundary edge, there is only the contribution from el1
             ! first edge node
             if (nod(1) <= myDim_nod2d) then
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_set_lock(partit%plock(nod(1)))
 #endif
                 do nz=ul1, nl1
@@ -366,14 +453,14 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
                     UVnode_rhs(1,nz,nod(1)) = UVnode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1)
                     UVnode_rhs(2,nz,nod(1)) = UVnode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1)
                 end do ! --> do nz=ul1, nl1
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_unset_lock(partit%plock(nod(1)))
 #endif
             endif 
             
             ! second edge node
             if  (nod(2) <= myDim_nod2d) then
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_set_lock(partit%plock(nod(2)))
 #endif
                 do nz=ul1, nl1
@@ -381,11 +468,16 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
                     UVnode_rhs(1,nz,nod(2)) = UVnode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1)
                     UVnode_rhs(2,nz,nod(2)) = UVnode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1)
                 end do ! --> do nz=ul1, nl1
-#if defined(_OPENMP)
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_unset_lock(partit%plock(nod(2)))
 #endif
             endif
         endif ! --> if (el2>0) then
+
+#if defined(__openmp_reproducible)
+!$OMP END ORDERED
+#endif
+
     end do ! --> do ed=1, myDim_edge2D
 !$OMP END DO
 
@@ -410,13 +502,26 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
     do el=1, myDim_elem2D
         nl1 = nlevels(el)-1
         ul1 = ulevels(el)
-        UV_rhsAB(1:2,ul1:nl1,el) = UV_rhsAB(1:2,ul1:nl1,el) &
+        UV_rhsAB(1,1:2,ul1:nl1,el) = UV_rhsAB(1,1:2,ul1:nl1,el) &
                 + elem_area(el)*(UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(1,el)) &
                 + UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(2,el)) & 
                 + UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(3,el))) / 3.0_WP     
     
     end do ! --> do el=1, myDim_elem2D
 !$OMP END DO
+
+    if (dynamics%ldiag_ke) then !we repeat the computation here and there are multiple ways to speed it up
+!$OMP DO
+       do el=1, myDim_elem2D
+          nl1 = nlevels(el)-1
+          ul1 = ulevels(el)
+          dynamics%ke_adv_AB(1,1:2,ul1:nl1,el) = dynamics%ke_adv_AB(1,1:2,ul1:nl1,el) &
+                + elem_area(el)*(UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(1,el)) &
+                + UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(2,el)) & 
+                + UVnode_rhs(1:2,ul1:nl1,elem2D_nodes(3,el))) / 3.0_WP     
+       end do
+!$OMP END DO
+    end if
 !$OMP END PARALLEL
 end subroutine momentum_adv_scalar
 

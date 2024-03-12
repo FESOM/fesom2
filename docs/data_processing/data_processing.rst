@@ -47,6 +47,56 @@ The file that would be read potentially without problems can be created with the
 
 We will try to provide convertion instructions in the form of jupyter notebooks to all files with initial conditions.
 
+Interpolate initial conditions from existing run
+================================================
+
+The easiest way to bring your results from one mesh to another (for example to use low resolution spinup to initialise high resolution run), and continue computations is to use the results of source simulation as initial condition for target simulation. The most common case is to interpolate sea ice conditions, that usually need few years to spinup, and default behavour of FESOM2, that puts 2 meter thick ice everywere temperature is below freesing is not very optimal, espetially for 21st century runs.
+
+Interpolation of sea ice
+------------------------
+
+Preparation of interpolated files is `described in this notebook <https://github.com/FESOM/pyfesom2/blob/master/notebooks/extra_notebooks/initial_conditions_sea_ice_interpolation.ipynb>`_
+
+Resulting files should be located in `ClimateDataPath`, that is set in `namelist.config`.
+
+In the `nemelist.tra` one should edit the `&tracer_init2d` section, that by default looks like this::
+
+    &tracer_init2d                                      
+    n_ic2d   = 3                                        
+    idlist   = 1, 2, 3                                  
+    filelist = 'a_ice2.nc', 'm_ice2.nc', 'm_snow2.nc' 
+    varlist  = 'a_ice', 'm_ice', 'm_snow'
+    ini_ice_from_file=.false.
+    /
+
+You should set `ini_ice_from_file` to `.true.`, and provide list of files with interpolated ice area (`a_ice`), sea ice thickness (`m_ice`) and snow thickness over sea ice (`m_snow`).
+
+Interpolation of TS
+-------------------
+
+Preparation of interpolated files is `described in this notebook <https://github.com/FESOM/pyfesom2/blob/master/notebooks/extra_notebooks/initial_conditions_TS_interpolation.ipynb>`_
+
+Resulting files should be located in `ClimateDataPath`, that is set in `namelist.config`.
+
+In the `nemelist.tra` one should edit the `&tracer_init3d` section, that by default looks like this::
+
+    &tracer_init3d                           
+    n_ic3d   = 2                             
+    idlist   = 2, 1                           
+    filelist = 'phc3.0_winter.nc', 'phc3.0_winter.nc' 
+    varlist  = 'salt', 'temp'                 
+    t_insitu = .true.
+    /
+
+If you interpolate from model data, most probably you have data in potential temperature, so switch `t_insitu` to `.false.`, and provide files with your initial conditions. If you follow the notebook example, and create two separate files for temperature and salinity, your configuration might look like this::
+
+    &tracer_init3d                            
+    n_ic3d   = 2                              
+    idlist   = 2, 1                           
+    filelist = 'phc3.0_winter.nc', 'phc3.0_winter.nc' 
+    varlist  = 'salt', 'temp'                 
+    t_insitu = .true.
+    /
 
 Convert grid to netCDF that CDO understands
 ===========================================

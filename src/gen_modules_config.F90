@@ -87,9 +87,16 @@ module g_config
                                             ! Set to zeros to work with
                                             ! geographical coordinates
   integer                :: thers_zbar_lev=5     ! minimum number of levels to be                                            
-  character(len=5)       :: which_depth_n2e='mean'                                           
-  namelist /geometry/  cartesian, fplane, &
-       cyclic_length, rotated_grid, alphaEuler, betaEuler, gammaEuler, force_rotation, which_depth_n2e
+  character(len=5)       :: which_depth_n2e='mean'    
+  
+  logical                :: use_depthonelem =.false.
+  character(len=10)      :: use_depthfile='aux3d'   ! 'aux3d', 'depth@'        
+  logical                :: use_cavityonelem=.false.
+  
+  namelist /geometry/   cartesian, fplane, &
+                        cyclic_length, rotated_grid, force_rotation, &
+                        alphaEuler, betaEuler, gammaEuler, &
+                        which_depth_n2e, use_depthonelem, use_cavityonelem, use_depthfile
 
   !_____________________________________________________________________________
   ! *** fleap_year ***
@@ -110,13 +117,15 @@ module g_config
   logical                       :: use_floatice = .false.
   logical                       :: use_cavity = .false. ! switch on/off cavity usage
   logical                       :: use_cavity_partial_cell = .false. ! switch on/off cavity usage
+  logical                       :: use_cavity_fw2press = .true. ! switch on/off cavity+zstar input of freshwater leads to increase in pressure
   real(kind=WP)                 :: cavity_partial_cell_thresh=0.0_WP ! same as partial_cell_tresh but for surface
   logical                       :: toy_ocean=.false. ! Ersatz forcing has to be supplied
   character(100)                :: which_toy="soufflet" 
   logical                       :: flag_debug=.false.    ! prints name of actual subroutine he is in 
   logical                       :: flag_warn_cflz=.true. ! switches off cflz warning
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
-                        use_cavity_partial_cell, cavity_partial_cell_thresh, toy_ocean, which_toy, flag_debug, flag_warn_cflz
+                        use_cavity_partial_cell, cavity_partial_cell_thresh, &
+                        use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz
   
   !_____________________________________________________________________________
   ! *** others ***

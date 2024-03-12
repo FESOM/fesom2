@@ -101,7 +101,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
     !___________________________________________________________________________
-    integer                               :: n
+    integer                               :: i, n
     
     !___setup virt_salt_flux____________________________________________________
     ! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
@@ -110,12 +110,13 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     if ( .not. trim(which_ALE)=='linfs') then
         use_virt_salt=.false.
         ! this will force the virtual saltinity flux to be zero
-        ref_sss_local=.false.
-        ref_sss=0._WP
-        is_nonlinfs = 1.0_WP
+        !!PS --> anyway ref_sss or rsss is not used when using zstar 
+        !!PS ref_sss_local=.false.
+        !!PS ref_sss      = 0.0_WP
+        is_nonlinfs  = 1.0_WP
     else
         use_virt_salt=.true.
-        is_nonlinfs = 0.0_WP
+        is_nonlinfs  = 0.0_WP
     end if
    
     !___________________________________________________________________________
@@ -233,7 +234,9 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
 
     if (.not.r_restart) then
        do n=1, tracers%num_tracers
-          tracers%data(n)%valuesAB=tracers%data(n)%values
+          do i=1, tracers%data(n)%AB_order-1
+             tracers%data(n)%valuesold(i,:,:)=tracers%data(n)%values
+          end do
        end do
     end if
     
@@ -260,6 +263,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
         write(*,*) 'maximum allowed CDF on explicit W is set to: ', dynamics%wsplit_maxcfl
         write(*,*) '******************************************************************************'
     end if
+
 end subroutine ocean_setup
 !
 !
@@ -286,9 +290,10 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     integer        :: num_tracers
     logical        :: i_vert_diff, smooth_bh_tra
     real(kind=WP)  :: gamma0_tra, gamma1_tra, gamma2_tra
+    integer        :: AB_order
     namelist /tracer_listsize/ num_tracers
     namelist /tracer_list    / nml_tracer_list
-    namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff
+    namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -335,8 +340,10 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     ! Temperature (index=1), Salinity (index=2), etc.
     allocate(tracers%data(num_tracers))
     do n=1, tracers%num_tracers
-        allocate(tracers%data(n)%values  (nl-1,node_size))
-        allocate(tracers%data(n)%valuesAB(nl-1,node_size))
+        allocate(tracers%data(n)%values   (                             nl-1, node_size))
+        allocate(tracers%data(n)%valuesAB (                             nl-1, node_size))
+        tracers%data(n)%AB_order      = AB_order        
+        allocate(tracers%data(n)%valuesold(tracers%data(n)%AB_order-1,  nl-1, node_size))
         tracers%data(n)%ID            = nml_tracer_list(n)%id
         tracers%data(n)%tra_adv_hor   = TRIM(nml_tracer_list(n)%adv_hor)
         tracers%data(n)%tra_adv_ver   = TRIM(nml_tracer_list(n)%adv_ver)
@@ -349,6 +356,7 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
         tracers%data(n)%gamma2_tra    = gamma2_tra
         tracers%data(n)%values        = 0.
         tracers%data(n)%valuesAB      = 0.
+        tracers%data(n)%valuesold     = 0.
         tracers%data(n)%i_vert_diff   = i_vert_diff
     end do
     allocate(tracers%work%del_ttf(nl-1,node_size))
@@ -384,14 +392,17 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     integer        :: opt_visc
     real(kind=WP)  :: visc_gamma0, visc_gamma1, visc_gamma2
     real(kind=WP)  :: visc_easybsreturn
-    logical        :: use_ivertvisc
+    logical        :: use_ivertvisc=.true.
     integer        :: momadv_opt
-    logical        :: use_freeslip
-    logical        :: use_wsplit
+    logical        :: use_freeslip =.false.
+    logical        :: use_wsplit   =.false.
+    logical        :: ldiag_KE     =.false.
+    integer        :: AB_order     = 2
+    logical        :: check_opt_visc=.true.
     real(kind=WP)  :: wsplit_maxcfl
-    namelist /dynamics_visc   / opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
+    namelist /dynamics_visc   / opt_visc, check_opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
                                 use_ivertvisc, visc_easybsreturn
-    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl 
+    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, ldiag_KE, AB_order
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -416,6 +427,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! set parameters in derived type
     dynamics%opt_visc          = opt_visc
+    dynamics%check_opt_visc    = check_opt_visc
     dynamics%visc_gamma0       = visc_gamma0
     dynamics%visc_gamma1       = visc_gamma1
     dynamics%visc_gamma2       = visc_gamma2
@@ -425,7 +437,8 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     dynamics%use_freeslip      = use_freeslip
     dynamics%use_wsplit        = use_wsplit
     dynamics%wsplit_maxcfl     = wsplit_maxcfl
-
+    dynamics%ldiag_KE          = ldiag_KE
+    dynamics%AB_order          = AB_order
     !___________________________________________________________________________
     ! define local vertice & elem array size
     elem_size=myDim_elem2D+eDim_elem2D
@@ -435,7 +448,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     ! allocate/initialise horizontal velocity arrays in derived type
     allocate(dynamics%uv(        2, nl-1, elem_size))
     allocate(dynamics%uv_rhs(    2, nl-1, elem_size))
-    allocate(dynamics%uv_rhsAB(  2, nl-1, elem_size))
+    allocate(dynamics%uv_rhsAB(  dynamics%AB_order-1, 2, nl-1, elem_size))
     allocate(dynamics%uvnode(    2, nl-1, node_size))
     dynamics%uv              = 0.0_WP
     dynamics%uv_rhs          = 0.0_WP
@@ -449,6 +462,9 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! allocate/initialise vertical velocity arrays in derived type
     allocate(dynamics%w(              nl, node_size))
+    if (dynamics%ldiag_ke) then
+       allocate(dynamics%w_old(       nl, node_size))
+    end if
     allocate(dynamics%w_e(            nl, node_size))
     allocate(dynamics%w_i(            nl, node_size))
     allocate(dynamics%cfl_z(          nl, node_size))
@@ -486,6 +502,69 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
         dynamics%work%u_b = 0.0_WP
         dynamics%work%v_b = 0.0_WP
     end if 
+   
+    if (dynamics%ldiag_ke) then
+       allocate(dynamics%ke_adv    (2, nl-1, elem_size))
+       allocate(dynamics%ke_cor    (2, nl-1, elem_size))
+       allocate(dynamics%ke_pre    (2, nl-1, elem_size))
+       allocate(dynamics%ke_hvis   (2, nl-1, elem_size))
+       allocate(dynamics%ke_vvis   (2, nl-1, elem_size))
+       allocate(dynamics%ke_umean  (2, nl-1, elem_size))
+       allocate(dynamics%ke_u2mean (2, nl-1, elem_size))
+       allocate(dynamics%ke_du2    (2, nl-1, elem_size))
+       allocate(dynamics%ke_adv_AB (dynamics%AB_order-1, 2, nl-1, elem_size))
+       allocate(dynamics%ke_cor_AB (dynamics%AB_order-1, 2, nl-1, elem_size))
+       allocate(dynamics%ke_rhs_bak(2, nl-1, elem_size))
+       allocate(dynamics%ke_wrho   (nl-1, node_size))
+       allocate(dynamics%ke_dW     (nl-1, node_size))
+       allocate(dynamics%ke_Pfull  (nl-1, node_size))
+       allocate(dynamics%ke_wind   (2, elem_size))
+       allocate(dynamics%ke_drag   (2, elem_size))
+
+       allocate(dynamics%ke_pre_xVEL (2, nl-1, elem_size))
+       allocate(dynamics%ke_adv_xVEL (2, nl-1, elem_size))
+       allocate(dynamics%ke_cor_xVEL (2, nl-1, elem_size))
+       allocate(dynamics%ke_hvis_xVEL(2, nl-1, elem_size))
+       allocate(dynamics%ke_vvis_xVEL(2, nl-1, elem_size))
+       allocate(dynamics%ke_wind_xVEL(2, elem_size))
+       allocate(dynamics%ke_drag_xVEL(2, elem_size))
+       allocate(dynamics%ke_J(node_size),  dynamics%ke_D(node_size),   dynamics%ke_G(node_size),  &
+                dynamics%ke_D2(node_size), dynamics%ke_n0(node_size),  dynamics%ke_JD(node_size), &
+                dynamics%ke_GD(node_size), dynamics%ke_swA(node_size), dynamics%ke_swB(node_size))
+
+       dynamics%ke_adv      =0.0_WP
+       dynamics%ke_cor      =0.0_WP
+       dynamics%ke_pre      =0.0_WP
+       dynamics%ke_hvis     =0.0_WP
+       dynamics%ke_vvis     =0.0_WP
+       dynamics%ke_du2      =0.0_WP
+       dynamics%ke_umean    =0.0_WP
+       dynamics%ke_u2mean   =0.0_WP
+       dynamics%ke_adv_AB   =0.0_WP
+       dynamics%ke_cor_AB   =0.0_WP
+       dynamics%ke_rhs_bak  =0.0_WP
+       dynamics%ke_wrho     =0.0_WP
+       dynamics%ke_wind     =0.0_WP
+       dynamics%ke_drag     =0.0_WP
+       dynamics%ke_pre_xVEL =0.0_WP
+       dynamics%ke_adv_xVEL =0.0_WP
+       dynamics%ke_cor_xVEL =0.0_WP
+       dynamics%ke_hvis_xVEL=0.0_WP
+       dynamics%ke_vvis_xVEL=0.0_WP
+       dynamics%ke_wind_xVEL=0.0_WP
+       dynamics%ke_drag_xVEL=0.0_WP
+       dynamics%ke_dW       =0.0_WP
+       dynamics%ke_Pfull    =0.0_WP
+       dynamics%ke_J        =0.0_WP
+       dynamics%ke_D        =0.0_WP
+       dynamics%ke_G        =0.0_WP
+       dynamics%ke_D2       =0.0_WP
+       dynamics%ke_n0       =0.0_WP
+       dynamics%ke_JD       =0.0_WP
+       dynamics%ke_GD       =0.0_WP
+       dynamics%ke_swA      =0.0_WP
+       dynamics%ke_swB      =0.0_WP
+    end if
 END SUBROUTINE dynamics_init
 !
 !
@@ -593,7 +672,8 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     neutral_slope=0.0_WP
     slope_tapered=0.0_WP
 
-    allocate(MLD1(node_size), MLD2(node_size), MLD1_ind(node_size), MLD2_ind(node_size))
+    allocate(MLD1(node_size), MLD2(node_size), MLD3(node_size))
+    allocate(MLD1_ind(node_size), MLD2_ind(node_size), MLD3_ind(node_size))
     if (use_global_tides) then
     allocate(ssh_gp(node_size))
     ssh_gp=0.
@@ -684,6 +764,7 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
 !!PS     dum_3d_n = 0.0_WP
 !!PS     dum_2d_e = 0.0_WP
 !!PS     dum_3d_e = 0.0_WP
+
 END SUBROUTINE arrays_init
 !
 !
@@ -720,8 +801,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     !
     ! read ocean state
     ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
-    if(mype==0) write(*,*) 'read Temperatur climatology from:', trim(filelist(1))
-    if(mype==0) write(*,*) 'read Salt       climatology from:', trim(filelist(2))
+    if(mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(1))
+    if(mype==0) write(*,*) 'read Salinity    climatology from:', trim(filelist(2))
     call do_ic3d(tracers, partit, mesh)
     
     Tclim=tracers%data(1)%values
@@ -750,6 +831,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     DO i=3, tracers%num_tracers
         id=tracers%data(i)%ID
         SELECT CASE (id)
+        !_______________________________________________________________________
         CASE (101)       ! initialize tracer ID=101
             tracers%data(i)%values(:,:)=0.0_WP
             if (mype==0) then
@@ -757,6 +839,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
+            
+        !_______________________________________________________________________            
         CASE (301) !Fram Strait 3d restored passive tracer
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
@@ -784,7 +868,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-
+            
+        !_______________________________________________________________________
         CASE (302) !Bering Strait 3d restored passive tracer
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
@@ -812,7 +897,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-        
+            
+        !_______________________________________________________________________            
         CASE (303) !BSO 3d restored passive tracer
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
@@ -840,6 +926,17 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
+            
+        !_______________________________________________________________________
+        CASE (501) ! ice-shelf water due to basal melting
+            tracers%data(i)%values(:,:)=0.0_WP
+            if (mype==0) then
+                write (i_string,  "(I3)") i
+                write (id_string, "(I3)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
+            
+        !_______________________________________________________________________
         CASE DEFAULT
             if (mype==0) then
                 write (i_string,  "(I3)") i
