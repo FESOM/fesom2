@@ -27,11 +27,11 @@ chain_s=1 # starting chain id
 
 # time frame of model simulation 
 # ___COREv2___
-year_s=1948
-year_e=2009
+# year_s=1948
+# year_e=2009
 # ___JRA55____
-#year_s=1958
-#year_e=2018
+year_s=1958
+year_e=2018
 
 prescribe_rlen=0 # run length in namelist.config --> if 0 value from namelist.config is taken 
 fedit=1
@@ -226,7 +226,7 @@ if [ $is_newsimul -eq 1 ] ; then
         
         #___BACKUP NAMELIST.* FILES INTO RESULT DIRECTORY_______________________
         cp namelist.config namelist.oce namelist.ice namelist.forcing namelist.io \
-           namelist.cvmix ${dname_result}/.
+           namelist.dyn namelist.tra namelist.cvmix ${dname_result}/.
         cp fesom.x ${dname_result}/.
 
     #___BACKUP SRC FILES INTO RESULT DIRECTORY______________________________
