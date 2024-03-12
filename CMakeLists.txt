@@ -14,6 +14,8 @@ set(OIFS_COUPLED OFF CACHE BOOL "compile fesom coupled to OpenIFS. (Also needs F
 set(CRAY OFF CACHE BOOL "compile with cray ftn")
 set(USE_ICEPACK OFF CACHE BOOL "compile fesom with the Iceapck modules for sea ice column physics.")
 set(OPENMP_REPRODUCIBLE OFF CACHE BOOL "serialize OpenMP loops that are critical for reproducible results")
+set(RECOM_COUPLED ON CACHE BOOL "compile fesom including biogeochemistry, REcoM3")
+set(CISO_COUPLED OFF CACHE BOOL "compile ciso coupled to REcoM3. RECOM_COUPLED has to be active")
 
 #set(VERBOSE OFF CACHE BOOL "toggle debug output")
 #add_subdirectory(oasis3-mct/lib/psmile)
