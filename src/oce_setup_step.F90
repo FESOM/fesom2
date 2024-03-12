@@ -789,8 +789,16 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     !
     ! read ocean state
     ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
-    if(mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(1))
-    if(mype==0) write(*,*) 'read Salinity    climatology from:', trim(filelist(2))
+    if(mype==0) write(*,*) 'read Iron        climatology from:', trim(filelist(1))
+    if(mype==0) write(*,*) 'read Oxygen      climatology from:', trim(filelist(2))
+    if(mype==0) write(*,*) 'read Silicate    climatology from:', trim(filelist(3))
+    if(mype==0) write(*,*) 'read Alkalinity  climatology from:', trim(filelist(4))
+    if(mype==0) write(*,*) 'read DIC         climatology from:', trim(filelist(5))
+    if(mype==0) write(*,*) 'read Nitrate     climatology from:', trim(filelist(6))
+    if(mype==0) write(*,*) 'read Salt        climatology from:', trim(filelist(7))
+    if(mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(8))
+    !if(mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(1))
+    !if(mype==0) write(*,*) 'read Salinity    climatology from:', trim(filelist(2))
     call do_ic3d(tracers, partit, mesh)
     
     Tclim=tracers%data(1)%values
@@ -818,7 +826,33 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     rcounter3=0         ! counter for tracers with 3D source
     DO i=3, tracers%num_tracers
         id=tracers%data(i)%ID
+
+        if (any(id == idlist)) cycle ! OG recom tracers id's start from 1001
+
         SELECT CASE (id)
+! Read recom variables (hardcoded IDs) OG
+        !_______________________________________________________________________
+        CASE (1004:1017)
+            tracers%data(i)%values(:,:)=0.0_WP
+            if (mype==0) then
+                write (i_string,  "(I4)") i
+                write (id_string, "(I4)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
+        CASE (1020:1021)
+            tracers%data(i)%values(:,:)=0.0_WP
+            if (mype==0) then
+                write (i_string,  "(I4)") i
+                write (id_string, "(I4)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
+        CASE (1023:1033)
+            tracers%data(i)%values(:,:)=0.0_WP
+            if (mype==0) then
+                write (i_string,  "(I4)") i
+                write (id_string, "(I4)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
         !_______________________________________________________________________
         CASE (101)       ! initialize tracer ID=101
             tracers%data(i)%values(:,:)=0.0_WP

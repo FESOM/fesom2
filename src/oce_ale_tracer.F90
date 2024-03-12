@@ -1316,6 +1316,8 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
         else
            bc_surface = dt*water_flux(n)*(sval-1.0)
         end if
+    CASE (1001:1035)
+        bc_surface=0.0_WP
     CASE DEFAULT
       if (partit%mype==0) then
          write (id_string, "(I3)") id
