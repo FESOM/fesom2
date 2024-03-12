@@ -58,6 +58,7 @@ TYPE T_PARTIT
   integer :: pe_status = 0 ! if /=0 then something is wrong
 
   integer              :: MPI_COMM_FESOM ! FESOM communicator (for ocean only runs if often a copy of MPI_COMM_WORLD)
+  integer              :: MPI_COMM_WORLD ! FESOM communicator (for ocean only runs if often a copy of MPI_COMM_WORLD)
 
   ! MPI Datatypes for interface exchange
   ! Element fields (2D; 2D integer; 3D with nl-1 or nl levels, 1 - 4 values)
