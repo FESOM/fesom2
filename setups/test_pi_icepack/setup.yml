@@ -1,0 +1,90 @@
+mesh: test_global
+forcing: test_global
+clim:
+    type: test_global
+    filelist: ['woa18_netcdf_5deg.nc','woa18_netcdf_5deg.nc']
+    varlist: ['salt', 'temp']
+ntasks: 2
+time: "00:10:00"
+
+namelist.config:
+    timestep:
+        step_per_day: 96
+        run_length: 1
+        run_length_unit: "d"
+    geometry:
+        force_rotation: True
+    restart_log:
+        restart_length: 1
+        restart_length_unit: "d"
+        logfile_outfreq: 10
+
+namelist.oce:
+    oce_dyn:
+        Div_c: 0.5
+        Leith_c: 0.05
+        w_split: True
+
+namelist.ice:
+    ice_dyn:
+        whichEVP: 0
+        evp_rheol_steps: 120
+
+namelist.icepack:
+    nml_list_icepack:
+        io_list_icepack:
+            "aicen     ":
+                freq: 1
+                unit: d
+                prec: 8
+            "vicen     ":
+                freq: 1
+                unit: d
+                prec: 8
+
+namelist.io:
+    diag_list:
+        ldiag_energy: False
+    nml_list:
+        io_list:
+            "sst       ":
+                freq: 1
+                unit: d
+                prec: 8
+            "a_ice     ":
+                freq: 1
+                unit: d
+                prec: 8
+            "temp      ":
+                freq: 1
+                unit: d
+                prec: 8
+            "salt      ":
+                freq: 1
+                unit: d
+                prec: 8
+            "u         ":
+                freq: 1
+                unit: d
+                prec: 8
+            "v         ":
+                freq: 1
+                unit: d
+                prec: 8
+
+fcheck:
+    a_ice: 0.3059942958760058
+    salt: 23.866224273520945
+    temp: 1.7172059436119271
+    sst: 8.725966058658427
+    u: -0.0014448488412238854
+    v: 0.00018596541127645607
+    aicen: 0.061198859175201174
+ 
+
+
+
+
+
+
+

@@ -1,0 +1,19 @@
+mesh: pi
+forcing: JRA55
+clim:
+    type: phc
+    filelist: ['phc3.0_winter.nc','phc3.0_winter.nc']
+    varlist: ['salt', 'temp']
+ntasks: 8
+time: "08:00:00"
+
+namelist.config:
+    timestep:
+        step_per_day: 96
+        run_length: 10
+        run_length_unit: "y"
+    inout:
+        restart_length: 1
+        restart_length_unit: "y"
+
+

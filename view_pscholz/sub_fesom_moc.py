@@ -15,7 +15,8 @@ import xarray
 #| Global MOC, Atlantik MOC, Indo-Pacific MOC, Indo MOC                        |
 #|                                                                             |
 #+_____________________________________________________________________________+
-def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',in_elemidx=[], out_elemidx=False, usemeshdiag=[]):
+def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',\
+              in_elemidx=[], out_elemidx=False, usemeshdiag=[]):
     #do_onelem=False
     #_________________________________________________________________________________________________
     t1=time.time()
@@ -61,7 +62,6 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
             elif which_moc=='imoc':
                 box_moc = [48.0,77.0,9.0,32.0]
                 in_elemidx=calc_basindomain(mesh,box_moc,do_output=do_output)    
-            
             #fig = plt.figure(figsize=[6,3])
             #plt.triplot(mesh.nodes_2d_xg,mesh.nodes_2d_yg,mesh.elem_2d_i[in_elemidx,:],linewidth=0.2)
             #plt.axis('scaled')
@@ -185,7 +185,14 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
     #___________________________________________________________________________
     t2=time.time()
     if do_output==True: print(' --> total time:{:.3f} s'.format(t2-t1))
-        
+    
+    #___________________________________________________________________________
+    if which_moc=='pmoc':
+        # rotate mesh back to starting point
+        if mesh.focus!=0:
+           mesh.focus=0
+           mesh.fesom_grid_rot_r2g(str_mode='focus')
+    
     #___________________________________________________________________________
     # variable number of output fields if you also want to write out the basin limited domain index
     #if out_elemidx==True and which_moc!='gmoc':    
@@ -198,10 +205,21 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
 #+___PLOT MERIDIONAL OVERTRUNING CIRCULATION  _________________________________+
 #|                                                                             |
 #+_____________________________________________________________________________+
-def plot_xmoc(lat,depth,moc,bottom=[],which_moc='gmoc',str_descript='',str_time='',figsize=[],crange=[],cnumb=20):    
+def plot_xmoc(lat, depth, moc, bottom=[], which_moc='gmoc',
+              str_descript='', str_time='', figsize=[], crange=[], cnumb=20,
+              do_clabel=True, do_subplot=[]):    
     
+    #___________________________________________________________________________
     if len(figsize)==0: figsize=[13,6]
-    fig= plt.figure(figsize=figsize)
+    
+    #___________________________________________________________________________
+    # plot is not part of subplot
+    if len(do_subplot)==0:
+        fig = plt.figure(figsize=figsize)
+        ax1 = plt.gca()
+    else:
+        fig = do_subplot[0]
+        ax1 = do_subplot[1]
     
     resolution = 'c'
     fsize = 10
@@ -224,12 +242,13 @@ def plot_xmoc(lat,depth,moc,bottom=[],which_moc='gmoc',str_descript='',str_time=
     #+_________________________________________________________________________+
     #| plot AXES1                                                              |
     #+_________________________________________________________________________+
-    ax1 = plt.gca()    
+    plt.sca(ax1)
     data_plot = moc
     data_plot[data_plot<clevel[ 0]]  = clevel[ 0]+np.finfo(np.float32).eps
     data_plot[data_plot>clevel[-1]] = clevel[-1]-np.finfo(np.float32).eps
     hp1=plt.contourf(lat,depth,data_plot,levels=clevel,extend='both',cmap=cmap0)
-    plt.contour(lat,depth,data_plot,levels=clevel,colors='k',linewidths=[0.5,0.25],antialised=True)
+    CS=plt.contour(lat,depth,data_plot,levels=clevel,colors='k',linewidths=[0.5,0.25],antialised=True)
+    if do_clabel: ax1.clabel(CS,CS.levels[np.where(CS.levels!=cref)],inline=1,inline_spacing=1, fontsize=6,fmt='%1.1f Sv')
     if len(bottom)>0:
         ax1.plot(lat,bottom,color='k')
         ax1.fill_between(lat, bottom, depth[-1],color=cbot,zorder=2)#,alpha=0.95)
@@ -264,10 +283,21 @@ def plot_xmoc(lat,depth,moc,bottom=[],which_moc='gmoc',str_descript='',str_time=
     nstep = ncbar_l/nmax_cbar_l
     nstep = np.int(np.floor(nstep))
     if nstep==0: nstep=1
-    plt.setp(cbar1.ax.get_yticklabels()[:], visible=False)
-    plt.setp(cbar1.ax.get_yticklabels()[idx_cref::nstep], visible=True)
-    plt.setp(cbar1.ax.get_yticklabels()[idx_cref::-nstep], visible=True)
-    plt.show(block=False)    
+    
+    #plt.setp(cbar1.ax.get_yticklabels()[:], visible=False)
+    #plt.setp(cbar1.ax.get_yticklabels()[idx_cref::nstep], visible=True)
+    #plt.setp(cbar1.ax.get_yticklabels()[idx_cref::-nstep], visible=True)
+    #plt.show(block=False)    
+    fig.canvas.draw()
+    tickl = cbar1.ax.get_yticklabels()
+    idx = np.arange(0,len(tickl),1)
+    idxb = np.ones((len(tickl),), dtype=bool)                
+    idxb[idx_cref::nstep]  = False
+    idxb[idx_cref::-nstep] = False
+    idx = idx[idxb==True]
+    for ii in list(idx):
+        tickl[ii]=''
+    cbar1.ax.set_yticklabels(tickl)
     
     fig.canvas.draw()
     return(fig,ax1)
