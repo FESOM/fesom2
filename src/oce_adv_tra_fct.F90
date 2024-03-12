@@ -104,7 +104,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 #include "associate_mesh_ass.h"
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, k, elem, enodes, num, el, nl1, nl2, nu1, nu2, nl12, nu12, edge, &
-!$OMP                          flux, ae,tvert_max, tvert_min)
+!$OMP                          flux, ae)
     ! --------------------------------------------------------------------------
     ! ttf is the tracer field on step n
     ! del_ttf is the increment
