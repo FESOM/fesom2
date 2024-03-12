@@ -33,7 +33,6 @@ type com_struct
 end type com_struct
 
 TYPE T_PARTIT
-  integer              :: MPI_COMM_FESOM ! FESOM communicator (for ocean only runs if often a copy of MPI_COMM_WORLD)
   
   !---------------------------------------------------
   !LA 2023-01-31 add asynchronous icebergs
