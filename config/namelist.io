@@ -13,7 +13,7 @@ ldiag_trflx      =.false.
 /
 
 &nml_general
-io_listsize    =100 !number of streams to allocate. shallbe large or equal to the number of streams in &nml_list
+io_listsize    =120 !number of streams to allocate. shallbe large or equal to the number of streams in &nml_list
 vec_autorotate =.false.
 /
 
@@ -50,4 +50,7 @@ io_list =  'sst       ',1, 'm', 4,
            'bolus_u   ',1, 'y', 4,
            'bolus_v   ',1, 'y', 4,
            'bolus_w   ',1, 'y', 4,
+           'icb       ',1, 'm', 4,
+           'fw        ',1, 'm', 4,
+           'fh        ',1, 'm', 4,
 /

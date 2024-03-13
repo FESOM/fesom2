@@ -28,6 +28,9 @@ subroutine setup_model(partit)
   read (fileunit, NML=geometry)
   read (fileunit, NML=calendar)
   read (fileunit, NML=run_config)
+  read (fileunit,NML=icebergs)
+
+!!$  read (fileunit, NML=machine)
   close (fileunit)
   
   
@@ -61,6 +64,7 @@ subroutine setup_model(partit)
   read (fileunit, NML=forcing_exchange_coeff)
   read (fileunit, NML=forcing_bulk)
   read (fileunit, NML=land_ice)
+  read (fileunit, NML=age_tracer) !---age-code
   close (fileunit)
 
 !   if(use_ice) then

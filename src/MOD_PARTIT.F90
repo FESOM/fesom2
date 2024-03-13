@@ -33,11 +33,22 @@ type com_struct
 end type com_struct
 
 TYPE T_PARTIT
+  
+  !---------------------------------------------------
+  !LA 2023-01-31 add asynchronous icebergs
+  ! kh 10.02.21 communicator for async iceberg computations based on OpenMP
+  integer              :: MPI_COMM_FESOM_IB
+  !---------------------------------------------------
 
   type(com_struct) :: com_nod2D
   type(com_struct) :: com_elem2D
   type(com_struct) :: com_elem2D_full
 
+  !---------------------------------------------------
+  !LA 2023-01-31 add asynchronous icebergs
+  ! kh 11.02.21
+  integer            :: MPIERR_IB
+  !---------------------------------------------------
   integer              :: npes
   integer              :: mype
   integer              :: maxPEnum=100
