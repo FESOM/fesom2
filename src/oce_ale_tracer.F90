@@ -140,7 +140,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use o_tracers
     use Toy_Channel_Soufflet
     use diff_tracers_ale_interface
-    use oce_adv_tra_driver_interfaces
+    use oce_adv_tra_driver_interfaces    
+    use g_forcing_param, only: use_age_tracer !---age-code
     implicit none
     type(t_ice)   , intent(in)   , target    :: ice
     type(t_dyn)   , intent(inout), target    :: dynamics
@@ -148,7 +149,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     type(t_partit), intent(inout), target    :: partit
     type(t_mesh)  , intent(in)   , target    :: mesh
     !___________________________________________________________________________
-    integer                                  :: tr_num, node, elem, nzmax, nzmin
+    integer                                  :: i, tr_num, node, elem, nzmax, nzmin
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
@@ -228,14 +229,6 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
            tracers%work%del_ttf(:, node)=tracers%work%del_ttf(:, node)+tracers%work%del_ttf_advhoriz(:, node)+tracers%work%del_ttf_advvert(:, node)
         end do
 !$OMP END PARALLEL DO
-           !___________________________________________________________________________
-           ! AB is not needed after the advection step. Initialize it with the current tracer before it is modified.
-           ! call init_tracers_AB at the beginning of this loop will compute AB for the next time step then.
-!$OMP PARALLEL DO
-        do node=1, myDim_nod2d+eDim_nod2D
-           tracers%data(tr_num)%valuesAB(:, node)=tracers%data(tr_num)%values(:, node) !DS: check that this is the right place!
-        end do
-!$OMP END PARALLEL DO
         ! diffuse tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
         call diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
@@ -274,7 +267,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         end do
 !$OMP END PARALLEL DO
     end if
-
+    
+    ! TODO: do it only when it is coupled to atmosphere 
     !___________________________________________________________________________
     ! to avoid crash with high salinities when coupled to atmosphere
     ! --> if we do only where (tr_arr(:,:,2) < 3._WP ) we also fill up the bottom
@@ -293,6 +287,20 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         end where
     end do
 !$OMP END PARALLEL DO
+
+    !---age-code-begin
+    if (use_age_tracer) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nzmin, nzmax)
+      do node=1,myDim_nod2D+eDim_nod2D
+        nzmax=nlevels_nod2D(node)-1
+        nzmin=ulevels_nod2D(node)
+        where (tracers%data(index_age_tracer)%values(nzmin:nzmax,node) < 0._WP )
+               tracers%data(index_age_tracer)%values(nzmin:nzmax,node) = 0._WP
+        end where
+      end do
+!$OMP END PARALLEL DO
+    end if
+    !---age-code-end
 end subroutine solve_tracers_ale
 !
 !
@@ -1319,8 +1327,19 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
         !     by forming/melting of sea ice
         bc_surface= dt*(virtual_salt(n) & !--> is zeros for zlevel/zstar
                     + relax_salt(n) - real_salt_flux(n)*is_nonlinfs)
-    CASE (101) ! apply boundary conditions to tracer ID=101
-        bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)
+!---wiso-code
+    CASE (101) ! apply boundary conditions to tracer ID=101 (H218O)
+        bc_surface = dt*wiso_flux_oce(n,1)
+    CASE (102)  ! apply boundary conditions to tracer ID=102 (HDO)
+        bc_surface = dt*wiso_flux_oce(n,2)
+    CASE (103)  ! apply boundary conditions to tracer ID=103 (H216O)
+        bc_surface = dt*wiso_flux_oce(n,3)
+!---wiso-code-end
+!---age-code
+    CASE (100)
+        !bc_surface=-dt*(sval*water_flux(n)*is_nonlinfs)
+        bc_surface=0.0_WP
+!---age-code-end
     CASE (301)
         bc_surface=0.0_WP
     CASE (302)
