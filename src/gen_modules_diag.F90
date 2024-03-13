@@ -19,10 +19,11 @@ module diagnostics
   public :: ldiag_solver, lcurt_stress_surf, ldiag_Ri, ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD,        &
             ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, ldiag_vorticity, ldiag_extflds,    &
             compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, shear, Ri, KvdTdZ, KvdSdZ,   & 
-            std_dens_min, std_dens_max, std_dens_N, std_dens,                                        &
+            std_dens_min, std_dens_max, std_dens_N, std_dens, ldiag_trflx,                           &
             std_dens_UVDZ, std_dens_DIV, std_dens_DIV_fer, std_dens_Z, std_dens_H, std_dens_dVdT, std_dens_flux,       &
             dens_flux_e, vorticity, zisotherm, tempzavg, saltzavg, compute_diag_dvd_2ndmoment_klingbeil_etal_2014,       &
-            compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd, thetao
+            compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd, thetao, tuv, suv
+
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
   ! A=ssh_stiff, x=d_eta, rhs=ssh_rhs; rhs_diag=A*x;
@@ -55,6 +56,7 @@ module diagnostics
   real(kind=WP),  save, allocatable, target      :: std_dens_UVDZ(:,:,:), std_dens_flux(:,:,:), std_dens_dVdT(:,:), std_dens_DIV(:,:), std_dens_DIV_fer(:,:), std_dens_Z(:,:), std_dens_H(:,:)
   real(kind=WP),  save, allocatable, target      :: dens_flux_e(:)
   real(kind=WP),  save, allocatable, target      :: thetao(:) ! sst in K
+  real(kind=WP),  save, allocatable, target      :: tuv(:,:,:), suv(:,:,:)
 
   logical                                       :: ldiag_solver     =.false.
   logical                                       :: lcurt_stress_surf=.false.
@@ -75,8 +77,10 @@ module diagnostics
   
   logical                                       :: ldiag_vorticity  =.false.
   logical                                       :: ldiag_extflds    =.false.
-  
-  namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_Ri, ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, ldiag_vorticity, ldiag_extflds
+  logical                                       :: ldiag_trflx      =.false.
+
+  namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_Ri, ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD, &
+                       ldiag_salt3D, ldiag_forc, ldiag_vorticity, ldiag_extflds, ldiag_trflx
   
   contains
 
@@ -280,6 +284,61 @@ salt   => tracers%data(2)%values(:,:)
      end do
   end do
 end subroutine diag_turbflux
+! ==============================================================
+!
+subroutine diag_trflx(mode, dynamics, tracers, partit, mesh)
+  implicit none
+  type(t_dyn)   , intent(inout), target :: dynamics
+  type(t_tracer), intent(in)   , target :: tracers
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh)  , intent(in)   , target :: mesh
+  integer,        intent(in)            :: mode
+  logical,        save                     :: firstcall=.true.
+  integer                                  :: elem, nz, nzu, nzl, elnodes(3)
+  real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
+  real(kind=WP), dimension(:,:),   pointer :: temp, salt
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+UV     => dynamics%uv(:,:,:)
+temp   => tracers%data(1)%values(:,:)
+salt   => tracers%data(2)%values(:,:)
+fer_UV => dynamics%fer_uv(:,:,:)
+!=====================
+  if (firstcall) then !allocate the stuff at the first call
+      allocate(tuv(2,nl-1,myDim_elem2D+eDim_elem2D))
+      allocate(suv(2,nl-1,myDim_elem2D+eDim_elem2D))
+      tuv = 0.0_WP
+      suv = 0.0_WP
+      firstcall=.false.
+      if (mode==0) return
+  end if
+
+  !___________________________________________________________________________
+  ! compute tracer fluxes
+  do elem=1,myDim_elem2D
+      elnodes = elem2D_nodes(:,elem)
+      nzu     = ulevels(elem)
+      nzl     = nlevels(elem)-1
+      if (Fer_GM) then
+          do nz=nzu, nzl
+              tuv(1,nz,elem) = (UV(1,nz,elem) + fer_UV(1,nz, elem)) * sum(temp(nz,elnodes))/3._WP
+              tuv(2,nz,elem) = (UV(2,nz,elem) + fer_UV(2,nz, elem)) * sum(temp(nz,elnodes))/3._WP
+              suv(1,nz,elem) = (UV(1,nz,elem) + fer_UV(1,nz, elem)) * sum(salt(nz,elnodes))/3._WP
+              suv(2,nz,elem) = (UV(2,nz,elem) + fer_UV(2,nz, elem)) * sum(salt(nz,elnodes))/3._WP
+          end do
+      else
+          do nz=nzu, nzl
+              tuv(1,nz,elem) = UV(1,nz,elem) * sum(temp(nz,elnodes))/3._WP
+              tuv(2,nz,elem) = UV(2,nz,elem) * sum(temp(nz,elnodes))/3._WP
+              suv(1,nz,elem) = UV(1,nz,elem) * sum(salt(nz,elnodes))/3._WP
+              suv(2,nz,elem) = UV(2,nz,elem) * sum(salt(nz,elnodes))/3._WP
+          end do
+      end if
+  end do
+end subroutine diag_trflx
 ! ==============================================================
 ! 
 subroutine diag_Ri(mode, dynamics, partit, mesh)
@@ -880,6 +939,8 @@ subroutine compute_diagnostics(mode, dynamics, tracers, partit, mesh)
   if (ldiag_dMOC)        call diag_densMOC(mode, dynamics, tracers, partit, mesh)
   !7. compute turbulent fluxes
   if (ldiag_turbflux)    call diag_turbflux(mode, dynamics, tracers, partit, mesh)
+  !8. compute tracers fluxes
+  if (ldiag_trflx)       call diag_trflx(mode, dynamics, tracers, partit, mesh)
   ! compute relative vorticity
   if (ldiag_vorticity)   call relative_vorticity(mode, dynamics, partit, mesh)
   ! soe exchanged fields requested by IFS/FESOM in NextGEMS.

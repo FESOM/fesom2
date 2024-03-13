@@ -101,7 +101,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
     !___________________________________________________________________________
-    integer                               :: n
+    integer                               :: i, n
     
     !___setup virt_salt_flux____________________________________________________
     ! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
@@ -234,7 +234,9 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
 
     if (.not.r_restart) then
        do n=1, tracers%num_tracers
-          tracers%data(n)%valuesAB=tracers%data(n)%values
+          do i=1, tracers%data(n)%AB_order-1
+             tracers%data(n)%valuesold(i,:,:)=tracers%data(n)%values
+          end do
        end do
     end if
     
@@ -290,9 +292,10 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     integer        :: num_tracers
     logical        :: i_vert_diff, smooth_bh_tra
     real(kind=WP)  :: gamma0_tra, gamma1_tra, gamma2_tra
+    integer        :: AB_order
     namelist /tracer_listsize/ num_tracers
     namelist /tracer_list    / nml_tracer_list
-    namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff
+    namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -383,8 +386,10 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     ! Temperature (index=1), Salinity (index=2), etc.
     allocate(tracers%data(num_tracers))
     do n=1, tracers%num_tracers
-        allocate(tracers%data(n)%values  (nl-1,node_size))
-        allocate(tracers%data(n)%valuesAB(nl-1,node_size))
+        allocate(tracers%data(n)%values   (                             nl-1, node_size))
+        allocate(tracers%data(n)%valuesAB (                             nl-1, node_size))
+        tracers%data(n)%AB_order      = AB_order        
+        allocate(tracers%data(n)%valuesold(tracers%data(n)%AB_order-1,  nl-1, node_size))
         tracers%data(n)%ID            = nml_tracer_list(n)%id
         tracers%data(n)%tra_adv_hor   = TRIM(nml_tracer_list(n)%adv_hor)
         tracers%data(n)%tra_adv_ver   = TRIM(nml_tracer_list(n)%adv_ver)
@@ -397,6 +402,7 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
         tracers%data(n)%gamma2_tra    = gamma2_tra
         tracers%data(n)%values        = 0.
         tracers%data(n)%valuesAB      = 0.
+        tracers%data(n)%valuesold     = 0.
         tracers%data(n)%i_vert_diff   = i_vert_diff
     end do
     allocate(tracers%work%del_ttf(nl-1,node_size))
@@ -437,11 +443,12 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     logical        :: use_freeslip =.false.
     logical        :: use_wsplit   =.false.
     logical        :: ldiag_KE     =.false.
+    integer        :: AB_order     = 2
     logical        :: check_opt_visc=.true.
     real(kind=WP)  :: wsplit_maxcfl
     namelist /dynamics_visc   / opt_visc, check_opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
                                 use_ivertvisc, visc_easybsreturn
-    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, ldiag_KE
+    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, ldiag_KE, AB_order
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -477,6 +484,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     dynamics%use_wsplit        = use_wsplit
     dynamics%wsplit_maxcfl     = wsplit_maxcfl
     dynamics%ldiag_KE          = ldiag_KE
+    dynamics%AB_order          = AB_order
     !___________________________________________________________________________
     ! define local vertice & elem array size
     elem_size=myDim_elem2D+eDim_elem2D
@@ -486,7 +494,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     ! allocate/initialise horizontal velocity arrays in derived type
     allocate(dynamics%uv(        2, nl-1, elem_size))
     allocate(dynamics%uv_rhs(    2, nl-1, elem_size))
-    allocate(dynamics%uv_rhsAB(  2, nl-1, elem_size))
+    allocate(dynamics%uv_rhsAB(  dynamics%AB_order-1, 2, nl-1, elem_size))
     allocate(dynamics%uvnode(    2, nl-1, node_size))
     dynamics%uv              = 0.0_WP
     dynamics%uv_rhs          = 0.0_WP
@@ -550,8 +558,8 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
        allocate(dynamics%ke_umean  (2, nl-1, elem_size))
        allocate(dynamics%ke_u2mean (2, nl-1, elem_size))
        allocate(dynamics%ke_du2    (2, nl-1, elem_size))
-       allocate(dynamics%ke_adv_AB (2, nl-1, elem_size))
-       allocate(dynamics%ke_cor_AB (2, nl-1, elem_size))
+       allocate(dynamics%ke_adv_AB (dynamics%AB_order-1, 2, nl-1, elem_size))
+       allocate(dynamics%ke_cor_AB (dynamics%AB_order-1, 2, nl-1, elem_size))
        allocate(dynamics%ke_rhs_bak(2, nl-1, elem_size))
        allocate(dynamics%ke_wrho   (nl-1, node_size))
        allocate(dynamics%ke_dW     (nl-1, node_size))

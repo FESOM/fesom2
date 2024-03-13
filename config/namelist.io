@@ -9,6 +9,7 @@ ldiag_dMOC       =.false.
 ldiag_DVD        =.false.
 ldiag_forc       =.false.
 ldiag_extflds    =.false.
+ldiag_trflx      =.false.
 /
 
 &nml_general
@@ -21,6 +22,7 @@ vec_autorotate =.false.
 ! for 'fer_C', 'bolus_u', 'bolus_v', 'bolus_w', 'fer_K' to work Fer_GM must be .true. otherwise no output
 ! 'otracers' - all other tracers if applicable
 ! for 'dMOC' to work ldiag_dMOC must be .true. otherwise no output
+! for 'utemp', 'vtemp', 'usalt', 'vsalt' output, set ldiag_trflx=.true.
 &nml_list
 io_list =  'sst       ',1, 'm', 4,
            'sss       ',1, 'm', 4,
