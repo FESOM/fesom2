@@ -194,7 +194,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     ! loop over all tracers
         !$ACC UPDATE DEVICE(dynamics%w, dynamics%w_e, dynamics%uv) !!! async(1) 
 !!!     !$ACC UPDATE DEVICE(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus)
-        !$ACC UPDATE DEVICE (mesh%helem, mesh%hnode, mesh%hnode_new, mesh%zbar_3d_n, mesh%z_3d_n)
+        !$ACC UPDATE DEVICE (mesh%helem, mesh%hnode, mesh%hnode_new, mesh%zbar_3d_n, mesh%z_3d_n) &
+        !$ACC DEVICE(mesh%ulevels, mesh%nlevels, mesh%ulevels_nod2D, mesh%nlevels_nod2D)
     do tr_num=1, tracers%num_tracers
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
@@ -225,7 +226,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
-!$ACC parallel loop collapse(2)
+!!$ACC parallel loop collapse(2)
 #endif
         do node=1, myDim_nod2d
           do nz = 1, mesh%nl-1
@@ -235,7 +236,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!$ACC end parallel loop
+!!$ACC end parallel loop
 #endif
            !___________________________________________________________________________
            ! AB is not needed after the advection step. Initialize it with the current tracer before it is modified.
@@ -243,7 +244,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
-!$ACC parallel loop collapse(2)
+!!$ACC parallel loop collapse(2)
 #endif
         do node=1, myDim_nod2d+eDim_nod2D
            do nz = 1, mesh%nl-1
@@ -253,7 +254,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!$ACC end parallel loop
+!!$ACC end parallel loop
 #endif
         ! diffuse tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
@@ -267,7 +268,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         else
             call relax_to_clim(tr_num, tracers, partit, mesh)
         end if
-        call exchange_nod(tracers%data(tr_num)%values(:,:), partit, luse_g2g = .true.)
+        call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
 !$OMP BARRIER
     end do
 !!!        !$ACC UPDATE HOST (tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus) &
@@ -276,13 +277,13 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! 3D restoring for "passive" tracers
     !!!$OMPTODO: add OpenMP later, not needed right now!
-!$ACC parallel loop collapse(2)
+!!$ACC parallel loop collapse(2)
     do tr_num=1, ptracers_restore_total
        do nz = 1, mesh%nl-1
          tracers%data(ptracers_restore(tr_num)%locid)%values(:, ptracers_restore(tr_num)%ind2)=1.0_WP
        end do
     end do
-!$ACC end parallel loop
+!!$ACC end parallel loop
 
     !___________________________________________________________________________
     ! subtract the the bolus velocities back from 3D velocities:
@@ -381,14 +382,14 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nzmin, nzmax)
 #else
-!$ACC update device(hnode, hnode_new)
-!$ACC parallel loop
+!!$ACC update device(hnode, hnode_new)
+!!$ACC parallel loop
 #endif
     DO n=1, myDim_nod2D
         nzmax=nlevels_nod2D(n)-1
         nzmin=ulevels_nod2D(n)
     #ifdef ENABLE_OPENACC
-    !$ACC loop independent 
+    !!$ACC loop independent 
     #endif
         do nz = nzmin, nzmax
           del_ttf(nz,n)=del_ttf(nz,n)+tracers%data(tr_num)%values(nz,n)* &
@@ -404,7 +405,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!$ACC end parallel loop
+!!$ACC end parallel loop
 #endif
     !___________________________________________________________________________
     if (tracers%data(tr_num)%i_vert_diff) then

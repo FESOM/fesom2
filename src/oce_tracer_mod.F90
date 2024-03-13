@@ -103,7 +103,6 @@ SUBROUTINE tracer_gradient_elements(ttf, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax)
 #else
-!$ACC update device(gradient_sca)
 !$ACC parallel loop private(elnodes)
 #endif
     DO elem=1, myDim_elem2D
@@ -148,7 +147,6 @@ SUBROUTINE tracer_gradient_z(ttf, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, dz)
 #else
-!$ACC update device(nlevels_nod2D, ulevels_nod2D, hnode_new)
 !$ACC parallel loop
 #endif
     DO n=1, myDim_nod2D+eDim_nod2D
