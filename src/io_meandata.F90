@@ -448,6 +448,9 @@ CASE ('temp      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp',      'temperature', 'C',      tracers%data(1)%values(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('salt      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt',      'salinity',    'psu',    tracers%data(2)%values(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('sigma0      ')
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'sigma0',      'potential density',    'kg/m3',    density_m_rho0(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
 !---wiso-code
 !___________________________________________________________________________________________________________________________________
 ! output water isotopes in ocean water
@@ -464,6 +467,7 @@ CASE ('h2o16     ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'h2o16', 'h2o16 concentration',    'kmol/m**3',    tracers%data(index_wiso_tracers(3))%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 !---wiso-code-end
+
 CASE ('otracers  ')
     do j=3, tracers%num_tracers
     write (id_string, "(I3.3)") tracers%data(j)%ID
