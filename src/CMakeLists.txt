@@ -188,7 +188,7 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
    target_compile_options(${PROJECT_NAME} PRIVATE -Mnofma -Mallocatable=95 -Mr8 -pgf90libs)
    if(${ENABLE_OPENACC})
       # additional compiler settings
-      target_compile_options(${PROJECT_NAME} PRIVATE -acc -gpu=${GPU_FLAGS} -Minfo=accel)
+      target_compile_options(${PROJECT_NAME} PRIVATE -acc -DENABLE_OPENACC -gpu=${GPU_FLAGS} -Minfo=accel)
       set(CMAKE_EXE_LINKER_FLAGS "-acc -gpu=${GPU_FLAGS}")
       if(${DISABLE_OPENACC_ATOMICS})
           target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_OPENACC_ATOMICS)
