@@ -9,10 +9,11 @@ ldiag_dMOC       =.false.
 ldiag_DVD        =.false.
 ldiag_forc       =.false.
 ldiag_extflds    =.false.
+ldiag_trflx      =.false.
 /
 
 &nml_general
-io_listsize    =100 !number of streams to allocate. shallbe large or equal to the number of streams in &nml_list
+io_listsize    =120 !number of streams to allocate. shallbe large or equal to the number of streams in &nml_list
 vec_autorotate =.false.
 /
 
@@ -21,6 +22,7 @@ vec_autorotate =.false.
 ! for 'fer_C', 'bolus_u', 'bolus_v', 'bolus_w', 'fer_K' to work Fer_GM must be .true. otherwise no output
 ! 'otracers' - all other tracers if applicable
 ! for 'dMOC' to work ldiag_dMOC must be .true. otherwise no output
+! for 'utemp', 'vtemp', 'usalt', 'vsalt' output, set ldiag_trflx=.true.
 &nml_list
 io_list =  'sst       ',1, 'm', 4,
            'sss       ',1, 'm', 4,
@@ -48,4 +50,7 @@ io_list =  'sst       ',1, 'm', 4,
            'bolus_u   ',1, 'y', 4,
            'bolus_v   ',1, 'y', 4,
            'bolus_w   ',1, 'y', 4,
+           'icb       ',1, 'm', 4,
+           'fw        ',1, 'm', 4,
+           'fh        ',1, 'm', 4,
 /
