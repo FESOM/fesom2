@@ -1,0 +1,45 @@
+#!/bin/bash
+#SBATCH --job-name=ref
+#SBATCH -p compute
+#SBATCH --ntasks-per-node=128
+#SBATCH --ntasks=512
+#SBATCH --time=08:00:00
+#SBATCH -o slurm-out.out
+#SBATCH -e slurm-err.out
+#SBATCH -A ab0995
+
+source /sw/etc/profile.levante
+#source ../env/levante.dkrz.de/shell
+read -r USED_SHELL < ../bin/current_shell_path
+source $USED_SHELL
+echo "using environment from" $USED_SHELL
+
+ulimit -s 204800 # https://docs.dkrz.de/doc/levante/running-jobs/runtime-settings.html
+
+echo Submitted job: $jobid
+squeue -u $USER
+
+# determine JOBID
+JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
+
+ln -s ../bin/fesom.x .           # cp -n ../bin/fesom.x
+cp -n ../config/namelist.config  .
+cp -n ../config/namelist.forcing .
+cp -n ../config/namelist.oce     .
+cp -n ../config/namelist.ice     .
+cp -n ../config/namelist.icepack .
+cp -n ../config/namelist.tra     .
+cp -n ../config/namelist.io      .
+cp -n ../config/namelist.cvmix   .
+cp -n ../config/namelist.dyn     .
+
+date
+srun -l fesom.x > "fesom2.0.out"
+date
+
+# qstat -f $PBS_JOBID
+#export EXITSTATUS=$?
+#if [ ${EXITSTATUS} -eq 0 ] || [ ${EXITSTATUS} -eq 127 ] ; then
+#sbatch job_mistral
+#fi
+

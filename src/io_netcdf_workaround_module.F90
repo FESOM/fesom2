@@ -6,18 +6,20 @@ module io_netcdf_workaround_module
 contains
 
 
-  integer function next_io_rank(communicator, async_netcdf_allowed) result(result)
-    use g_PARSUP
+  integer function next_io_rank(communicator, async_netcdf_allowed, partit) result(result)
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     use mpi_topology_module
-    integer, intent(in) :: communicator
-    logical, intent(out) :: async_netcdf_allowed
+    integer, intent(in)                :: communicator
+    logical, intent(out)               :: async_netcdf_allowed
+    type(t_partit), intent(in), target :: partit
     ! EO args
     integer rank_use_count
     integer rank
     
     result = next_io_rank_helper(communicator, rank_use_count)
     if(rank_use_count > 1) then
-      if(mype == SEQUENTIAL_IO_RANK) print *,"rejecting additional async NetCDF for process:",result, "use count:", rank_use_count, "falling back to sequential I/O on process ",SEQUENTIAL_IO_RANK
+      if(partit%mype == SEQUENTIAL_IO_RANK) print *,"rejecting additional async NetCDF for process:",result, "use count:", rank_use_count, "falling back to sequential I/O on process ",SEQUENTIAL_IO_RANK
       result = SEQUENTIAL_IO_RANK
       async_netcdf_allowed = .false.
     else

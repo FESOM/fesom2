@@ -1,0 +1,50 @@
+
+name: FESOM2_icepack
+
+# Controls when the action will run. Triggers the workflow on push or pull request. 
+
+on: [push, pull_request]
+
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  icepack_test:
+    # Containers must run in Linux based operating systems
+    runs-on: ubuntu-latest
+    # Docker Hub image that `container-job` executes in
+    container: koldunovn/fesom2_test:refactoring2
+
+    # Service containers to run with `gfortran_ubuntu`
+    steps:
+    # NK: this changes working directory to fesom2
+    - uses: actions/checkout@v2
+
+    - name: prepeare FESOM2_icepack
+      run: |
+        sed -i 's/USE_ICEPACK OFF/USE_ICEPACK ON/g' CMakeLists.txt
+        cd ./src/icepack_drivers/
+        ./download_icepack.sh
+        cd ../../
+    
+    - name: Compile model
+      run: |
+        bash -l configure.sh ubuntu
+    
+    - name: Create global test run with ICEPACK
+      run: |
+        mkrun pi test_pi_icepack -m docker
+    - name: FESOM2 global test run with IEPACK
+      run: |    
+        cd work_pi
+        chmod +x job_docker_new
+        ./job_docker_new
+    - name: Check global results
+      run: |
+        cd work_pi
+        fcheck .
+    - name: Check restarts
+      run: |
+        cd work_pi
+        ./job_docker_new
+    
+

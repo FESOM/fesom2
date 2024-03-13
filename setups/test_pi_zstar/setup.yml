@@ -1,0 +1,78 @@
+mesh: test_global
+forcing: test_global
+clim:
+    type: test_global
+    filelist: ['woa18_netcdf_5deg.nc','woa18_netcdf_5deg.nc']
+    varlist: ['salt', 'temp']
+ntasks: 2
+time: "00:10:00"
+
+namelist.config:
+    timestep:
+        step_per_day: 96
+        run_length: 1
+        run_length_unit: "d"
+    geometry:
+        force_rotation: True
+    restart_log:
+        restart_length: 1
+        restart_length_unit: "d"
+        logfile_outfreq: 10
+    ale_def:
+        which_ALE: "zstar"
+
+namelist.dyn:
+    dynamics_general:
+        use_wsplit: True
+
+namelist.ice:
+    ice_dyn:
+        whichEVP: 1
+        evp_rheol_steps: 120
+
+namelist.io:
+    diag_list:
+        ldiag_energy: False
+    nml_list:
+        io_list:
+            "sst       ":
+                freq: 1
+                unit: d
+                prec: 8
+            "a_ice     ":
+                freq: 1
+                unit: d
+                prec: 8
+            "temp      ":
+                freq: 1
+                unit: d
+                prec: 8
+            "salt      ":
+                freq: 1
+                unit: d
+                prec: 8
+            "u         ":
+                freq: 1
+                unit: d
+                prec: 8
+            "v         ":
+                freq: 1
+                unit: d
+                prec: 8
+
+fcheck:
+    a_ice: 0.26912765975496816
+    salt: 23.944024679315966
+    sst: 8.531528641557886
+    temp: 1.7017687500626169
+    u:  -0.0014072137916283753
+    v: 0.0001418460244606028
+
+ 
+
+
+
+
+
+
+

@@ -10,6 +10,11 @@
 #endif 
 #endif 
 
+/* Forward declarations */
+int parms_OperatorGetU(parms_Operator self, void **mat);
+int parms_MatGetOffDiag(parms_Mat self, void **mat);
+int parms_CommGetOdvlist(parms_Comm self, int **odvlist);
+
 typedef struct schurras_data {
 
   parms_Operator op_out,op_in;
@@ -324,6 +329,9 @@ int parms_PCCreate_Schurras(parms_PC self)
 
 
 
+int parms_OperatorGetU(parms_Operator, void **);
+int parms_MatGetOffDiag(parms_Mat, void **);
+int parms_CommGetOdvlist(parms_Comm, int **);
 static int parms_PC_GetS(parms_PC self, parms_Operator op,parms_Mat *mat)
 {
 

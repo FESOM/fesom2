@@ -3,7 +3,7 @@
 !
 module g_read_other_NetCDF
 contains
-subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, mesh)
+subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_onvert, partit, mesh)
   ! Read 2D data and interpolate to the model grid.
   ! Currently used to read runoff and SSS.
   ! First, missing values are filled in on the raw regular grid;
@@ -16,27 +16,33 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, mesh
   use g_config
   use o_param
   USE MOD_MESH
-  use g_parsup
+  USE MOD_PARTIT
+  USE MOD_PARSUP
   implicit none
 
 #include "netcdf.inc" 
-  type(t_mesh), intent(in)  , target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
   integer                    :: i, j, ii, jj, k, n, num, flag, cnt
   integer                    :: itime, latlen, lonlen
   integer                    :: status, ncid, varid
   integer                    :: lonid, latid
-  integer                    :: istart(3), icount(3)
-  real(real64)               :: x, y, miss, aux
+  integer                    :: istart(3), icount(3), elnodes(3)
+  real(real64)               :: x, y, miss, aux, xmin, elnodes_x(3)
   real(real64), allocatable  :: lon(:), lat(:)
   real(real64), allocatable  :: ncdata(:,:), ncdata_temp(:,:)
   real(real64), allocatable  :: temp_x(:), temp_y(:)
-  real(real64)               :: model_2Darray(myDim_nod2d+eDim_nod2D)   
+  real(real64)               :: model_2Darray(partit%myDim_nod2d+partit%eDim_nod2D)   
   character(*)               :: vari
   character(*)               :: file
-  logical                    :: check_dummy
+  logical                    :: check_dummy, do_onvert
   integer                    :: ierror           ! return error code
 
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
 
   if (mype==0) then
      ! open file
@@ -45,9 +51,9 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, mesh
 
   call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (status.ne.nf_noerr)then
-     print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
-     print*,'Error in opening netcdf file'//file
-     call par_ex
+     print*,'ERROR: CANNOT READ 2D netCDF FILE CORRECTLY !!!!!'
+     print*,'Error in opening netcdf file '//file
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
      stop
   endif
 
@@ -131,26 +137,55 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, mesh
         end if
      end do
   end do
-  !write(*,*) 'post',minval(ncdata), maxval(ncdata)
-  ! model grid coordinates
-  num=myDim_nod2d+eDim_nod2d
-  allocate(temp_x(num), temp_y(num))  
-  do n=1, num
-     temp_x(n)=geo_coord_nod2d(1,n)/rad              
-     temp_y(n)=geo_coord_nod2d(2,n)/rad             
-     ! change lon range to [0 360]
-     if(temp_x(n)<0._WP) temp_x(n)=temp_x(n) + 360.0_WP  
-  end do
-  ! interpolation
-  flag=0
-  call interp_2d_field(lonlen, latlen, lon, lat, ncdata, num, temp_x, temp_y, & 
-       model_2Darray, flag) 
-  deallocate(temp_y, temp_x, ncdata_temp, ncdata, lon, lat)
+    !write(*,*) 'post',minval(ncdata), maxval(ncdata)
+    
+    !___________________________________________________________________________
+    ! create interpolation coordinates
+    ! do data interpolation on vertices
+    if (do_onvert) then
+        num=myDim_nod2d+eDim_nod2d
+        allocate(temp_x(num), temp_y(num))  
+        do n=1, num
+            temp_x(n)=geo_coord_nod2d(1,n)/rad              
+            temp_y(n)=geo_coord_nod2d(2,n)/rad             
+            ! change lon range to [0 360]
+            if(temp_x(n)<0._WP) temp_x(n)=temp_x(n) + 360.0_WP  
+        end do
+        
+    ! do data interpolation on element centroids
+    else
+        num = myDim_elem2D
+        allocate(temp_x(num), temp_y(num))  
+        do n=1, num
+            ! compute points of element centroids in geo frame use them here for interpolation
+            elnodes  = elem2D_nodes(:,n)
+            elnodes_x= geo_coord_nod2D(1, elnodes)
+            xmin     = minval(elnodes_x)
+            do k=1,3
+                if(elnodes_x(k)-xmin>=cyclic_length/2.0_WP) elnodes_x(k)=elnodes_x(k)-cyclic_length
+                if(elnodes_x(k)-xmin<-cyclic_length/2.0_WP) elnodes_x(k)=elnodes_x(k)+cyclic_length
+            end do
+            ! compute in units [deg], in geo frame
+            temp_x(n)=sum(elnodes_x)/3.0_WP/rad
+            temp_y(n)=sum(geo_coord_nod2D(2,elnodes))/3.0_WP/rad
+            
+            ! change lon range to [0 360]
+            if(temp_x(n)<0._WP) temp_x(n)=temp_x(n) + 360.0_WP  
+        end do
+    end if   
+    
+    !___________________________________________________________________________
+    ! do interpolation
+    flag=0
+    call interp_2d_field(lonlen, latlen, lon, lat, ncdata, num, temp_x, temp_y, & 
+                         model_2Darray, flag, partit) 
+    deallocate(temp_y, temp_x, ncdata_temp, ncdata, lon, lat)
+    
 end subroutine read_other_NetCDF
 !
 !------------------------------------------------------------------------------------
 !
-  subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, mesh)
+subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit, mesh)
     ! Read WOA (NetCDF) surface T/S and interpolate to the model grid.
     ! Currently used for surface restoring in case of ocean-alone models
     ! Calling interp_2d_field_v2 to do interpolation, which also treats the dummy value.
@@ -160,28 +195,32 @@ end subroutine read_other_NetCDF
     use g_config
     use o_param
     USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     use g_rotate_grid
-    use g_parsup
     implicit none
-
 #include "netcdf.inc" 
-  type(t_mesh), intent(in)     , target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
   integer                       :: i, j,  n, num
   integer                       :: itime, latlen, lonlen
   integer                       :: status, ncid, varid
-  integer                       :: lonid, latid
+  integer                       :: lonid, latid, drain_num
   integer                       :: istart(4), icount(4)
   real(real64)                  :: x, y, miss
   real(real64), allocatable     :: lon(:), lat(:)
   real(real64), allocatable     :: ncdata(:,:)
   real(real64), allocatable     :: temp_x(:), temp_y(:)
-  real(real64)                  :: model_2Darray(myDim_nod2d+eDim_nod2D)   
+  real(real64)                  :: model_2Darray(partit%myDim_nod2d+partit%eDim_nod2D)   
   character(15)                 :: vari
   character(300)                :: file
   logical                       :: check_dummy
   integer                       :: ierror           ! return error code
 
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
   if (mype==0) then
      ! open file
@@ -191,8 +230,8 @@ end subroutine read_other_NetCDF
   call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (status.ne.nf_noerr)then
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
-     print*,'Error in opening netcdf file'//file
-     call par_ex
+     print*,'Error in opening netcdf file '//file
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
      stop
   endif
 
@@ -265,36 +304,41 @@ end subroutine read_other_NetCDF
   end do
   ! interpolation
   call interp_2d_field_v2(lonlen, latlen, lon, lat, ncdata, miss, &
-       num, temp_x, temp_y, model_2Darray) 
+       num, temp_x, temp_y, model_2Darray, partit) 
   deallocate(temp_y, temp_x, ncdata, lon, lat)
 end subroutine read_surf_hydrography_NetCDF
 !
 !------------------------------------------------------------------------------------
 !
-subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, mesh)  
+subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, mesh)  
 
   use, intrinsic :: ISO_FORTRAN_ENV
 
   use g_config
   use o_param
   USE MOD_MESH
+  USE MOD_PARTIT
+  USE MOD_PARSUP
   use g_rotate_grid
-  use g_parsup
   implicit none
 
 #include "netcdf.inc" 
-  type(t_mesh), intent(in)     , target :: mesh
+  type(t_mesh),   intent(in)   , target :: mesh
+  type(t_partit), intent(inout), target :: partit
   integer                       :: n, i
   integer                       :: itime
   integer                       :: status, ncid, varid
   integer                       :: istart(2), icount(2)
   real(real64)                  :: ncdata(mesh%nod2D)
-  real(real64),   intent(out)	:: model_2Darray(myDim_nod2D+eDim_nod2D)
-  character(*), intent(in) 	:: file
+  real(real64),   intent(out)	:: model_2Darray(partit%myDim_nod2D+partit%eDim_nod2D)
+  character(*),  intent(in) 	:: file
   character(*),  intent(in)     :: vari
   integer                       :: ierror           ! return error code
 
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
   if (mype==0) then
     ! open file
@@ -303,8 +347,8 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, mesh)
   call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (status.ne.nf_noerr)then
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
-     print*,'Error in opening netcdf file'//file
-     call par_ex
+     print*,'Error in opening netcdf file '//file
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
      stop
   endif
 
@@ -319,7 +363,264 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, mesh)
   call MPI_BCast(ncdata, nod2D, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
   model_2Darray=ncdata(myList_nod2D) 
 end subroutine read_2ddata_on_grid_NetCDF
-  
+
+subroutine read_runoff_mapper(file, vari, R, partit, mesh)
+   ! 1. Read arrival points from the runoff mapper
+   ! 2. Create conservative remapping A*X=runoff:
+   ! A=remapping operator; X=runoff into drainage basins (in Sv); runoff= runoff im [m/s] to be put into the ocean
+   use g_config
+   use o_param
+   USE MOD_MESH
+   USE MOD_PARTIT
+   USE MOD_PARSUP
+   USE g_forcing_arrays,    only: runoff
+   use g_support
+   implicit none
+ 
+#include "netcdf.inc"
+   character(*),   intent(in) :: file
+   character(*),   intent(in) :: vari
+   real(kind=WP),   intent(in):: R
+   type(t_mesh),   intent(in),    target :: mesh
+   type(t_partit), intent(inout), target :: partit
+   integer                    :: i, j, n, num, cnt, number_arrival_points, offset
+   real(kind=WP)              :: dist, W
+   integer                    :: itime, latlen, lonlen
+   integer                    :: status, ncid, varid
+   integer                    :: lonid, latid, drain_num
+   integer                    :: istart(2), icount(2)
+   real(kind=WP), allocatable :: lon(:), lat(:)
+   integer, allocatable       :: ncdata(:,:)
+   real(kind=WP), allocatable :: lon_sparse(:), lat_sparse(:), dist_min(:), dist_min_glo(:)
+   real(kind=WP), allocatable :: arrival_area(:)
+   integer, allocatable       :: data_sparse(:), dist_ind(:)
+   integer                    :: ierror           ! return error code
+   type(sparse_matrix)        :: RUNOFF_MAPPER
+ 
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+ 
+   if (mype==0) write(*,*) 'building RUNOFF MAPPER with radius of smoothing= ', R*1.e-3, ' km'
+   if (mype==0) then
+      ! open file
+      status=nf_open(trim(file), nf_nowrite, ncid)
+   end if
+ 
+   call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+   if (status.ne.nf_noerr)then
+      print*,'ERROR: CANNOT READ 2D netCDF FILE CORRECTLY !!!!!'
+      print*,'Error in opening netcdf file '//file
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+      stop
+   endif
+ 
+   if (mype==0) then
+      ! lat
+      status=nf_inq_dimid(ncid, 'lat', latid)
+      status=nf_inq_dimlen(ncid, latid, latlen)
+      ! lon
+      status=nf_inq_dimid(ncid, 'lon', lonid)
+      status=nf_inq_dimlen(ncid, lonid, lonlen)
+   end if
+   call MPI_BCast(latlen, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+   call MPI_BCast(lonlen, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+ 
+   ! lat
+   if (mype==0) then
+      allocate(lat(latlen))
+      status=nf_inq_varid(ncid, 'lat', varid)
+      status=nf_get_vara_double(ncid,varid,1,latlen,lat)
+   end if
+
+   ! lon
+   if (mype==0) then
+      allocate(lon(lonlen))
+      status=nf_inq_varid(ncid, 'lon', varid)
+      status=nf_get_vara_double(ncid,varid,1,lonlen,lon)
+   ! make sure range 0. - 360.
+   do n=1,lonlen
+      if (lon(n)<0.0_WP) then
+         lon(n)=lon(n)+360._WP
+      end if
+   end do
+   end if
+
+   if (mype==0) then
+      allocate(ncdata(lonlen,latlen))
+      ncdata = 0.0_WP
+     ! data
+      status=nf_inq_varid(ncid, trim(vari), varid)
+      istart = (/1,1/)
+      icount= (/lonlen,latlen/)
+      status=nf_get_vara_int(ncid,varid,istart,icount,ncdata)
+     ! close file
+     status=nf_close(ncid)
+     number_arrival_points=0
+     do i=1, lonlen
+        do j=1, latlen
+           if (ncdata(i,j)>0) then
+            number_arrival_points=number_arrival_points+1
+           end if
+        end do
+     end do
+   end if
+
+   call MPI_BCast(number_arrival_points, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+   allocate(lon_sparse(number_arrival_points), lat_sparse(number_arrival_points))
+   allocate(dist_min(number_arrival_points), dist_min_glo(number_arrival_points), dist_ind(number_arrival_points))
+   allocate(data_sparse(number_arrival_points))
+
+   if (mype==0) then
+      cnt=1
+      do i=1, lonlen
+         do j=1, latlen
+            if (ncdata(i,j)>0) then
+               lon_sparse(cnt)=lon(i)
+               lat_sparse(cnt)=lat(j)
+               data_sparse(cnt)=ncdata(i,j)
+               cnt=cnt+1
+            end if
+         end do
+      end do
+      deallocate(ncdata, lon, lat)
+   end if
+   call MPI_BCast(lon_sparse,  number_arrival_points, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+   call MPI_BCast(lat_sparse,  number_arrival_points, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+   call MPI_BCast(data_sparse, number_arrival_points, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+   drain_num=maxval(data_sparse)
+   ALLOCATE(arrival_area(drain_num))
+   arrival_area=0.0_WP ! will be used further to normalize the total flux
+   lon_sparse=lon_sparse-360.0_WP
+   lon_sparse=lon_sparse*rad
+   lat_sparse=lat_sparse*rad
+
+   do n=1, number_arrival_points
+      do i=1, myDim_nod2d
+         dist=distance_on_sphere(lon_sparse(n), lat_sparse(n), geo_coord_nod2D(1,i), geo_coord_nod2D(2,i))
+         if (i==1) then
+            dist_min(n)=dist
+            dist_ind(n)=1
+         end if
+         if (dist<dist_min(n)) then
+             dist_min(n)=dist
+             dist_ind(n)=i
+         end if
+      end do
+   end do
+   do i=1, number_arrival_points
+      dist_min_glo(i)=dist_min(i)
+   end do
+   call MPI_AllREDUCE(MPI_IN_PLACE , dist_min_glo , number_arrival_points, MPI_DOUBLE, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+
+   lon_sparse=0.0_WP
+   lat_sparse=0.0_WP
+   status=0
+   do i=1, number_arrival_points
+      n=dist_ind(i)
+      if ((dist_min(i)==dist_min_glo(i)) .AND. (n<=myDim_nod2d)) then
+           lon_sparse(i)=geo_coord_nod2D(1, n)
+           lat_sparse(i)=geo_coord_nod2D(2, n)
+           status=status+1
+      end if
+   end do
+   call MPI_AllREDUCE(MPI_IN_PLACE , lon_sparse , number_arrival_points, MPI_DOUBLE, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , lat_sparse , number_arrival_points, MPI_DOUBLE, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , status ,     1, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+
+   if (status/=number_arrival_points) then
+      if (mype==0) then
+         write(*,*) 'RUNOFF MAPPER ERROR: total number of arrival points does not sum up among partitions: ', status, number_arrival_points
+         write(*,*) 'two different grid points have same distance to a target point!'
+      end if
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+      STOP
+   end if
+   RUNOFF_MAPPER%dim=myDim_nod2d+eDim_nod2D
+   ALLOCATE(RUNOFF_MAPPER%rowptr(RUNOFF_MAPPER%dim+1))
+   
+   RUNOFF_MAPPER%rowptr(1) = 1
+   
+   DO n=1, myDim_nod2d+eDim_nod2D
+      cnt=0
+      DO i=1, number_arrival_points
+         dist=distance_on_sphere(lon_sparse(i), lat_sparse(i), geo_coord_nod2D(1,n), geo_coord_nod2D(2,n))
+         if (dist < R) cnt=cnt+1
+      END DO
+      RUNOFF_MAPPER%rowptr(n+1)=RUNOFF_MAPPER%rowptr(n)+max(cnt,1)
+   END DO
+   
+   ALLOCATE(RUNOFF_MAPPER%colind(RUNOFF_MAPPER%rowptr(RUNOFF_MAPPER%dim+1)-1))
+   ALLOCATE(RUNOFF_MAPPER%values(RUNOFF_MAPPER%rowptr(RUNOFF_MAPPER%dim+1)-1))
+   DO n=1, myDim_nod2d+eDim_nod2D
+      offset=RUNOFF_MAPPER%rowptr(n)
+      cnt=0
+      W=areasvol(ulevels_nod2D(n),n)
+      DO i=1, number_arrival_points
+         j=data_sparse(i)
+         if ((j<0) .OR. (j>drain_num)) then
+            if (mype==0) then
+               write(*,*) 'RUNOFF MAPPER ERROR: arrival point has an index outside of permitted range', j, drain_num
+               write(*,*) 'two different grid points have same distance to a target point!'
+            end if
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            STOP
+         end if
+         dist=distance_on_sphere(lon_sparse(i), lat_sparse(i), geo_coord_nod2D(1,n), geo_coord_nod2D(2,n))
+         if (dist < R) then
+            RUNOFF_MAPPER%values(offset+cnt)=(1.0-dist/R)
+            RUNOFF_MAPPER%colind(offset+cnt)=j
+            if (n<=myDim_nod2d) then
+               arrival_area(j)=arrival_area(j)+(1.0-dist/R)*W
+            end if
+            cnt=cnt+1
+         end if
+      END DO
+      if (cnt==0) then
+         RUNOFF_MAPPER%values(offset)=0.0_WP
+         RUNOFF_MAPPER%colind(offset)=1
+      end if
+   END DO
+
+   call MPI_AllREDUCE(MPI_IN_PLACE , arrival_area, drain_num, MPI_DOUBLE, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+
+   DO i=1, drain_num
+      where (RUNOFF_MAPPER%colind==i)
+            RUNOFF_MAPPER%values=RUNOFF_MAPPER%values/arrival_area(i)
+      end where
+   END DO
+
+   deallocate(lon_sparse, lat_sparse, dist_min, dist_min_glo)
+   deallocate(arrival_area)
+   deallocate(data_sparse, dist_ind)
+
+do n=1, myDim_nod2D+eDim_nod2D
+   i=RUNOFF_MAPPER%rowptr(n)
+   j=RUNOFF_MAPPER%rowptr(n+1)-1
+   runoff(n)=sum(RUNOFF_MAPPER%values(i:j))
+end do
+
+call integrate_nod(runoff, W, partit, mesh)
+
+if (mype==0) write(*,*) 'RUNOFF MAPPER check (total amount of basins):', drain_num
+if (mype==0) write(*,*) 'RUNOFF MAPPER check (input of 1Sv from each basin results in runoff of):', W, ' Sv'
+runoff=runoff*1.e-2
+end subroutine read_runoff_mapper
+
+real(kind=WP) function distance_on_sphere(lon1, lat1, lon2, lat2)
+!   use, intrinsic :: ISO_FORTRAN_ENV
+    use o_param
+    use g_config
+    implicit none    
+!lons & lats are in radians
+    real(kind=WP), intent(in) :: lon1, lat1, lon2, lat2
+    real(kind=WP)             :: r, delta_lon, delta_lat
+    
+   delta_lon=abs(lon1-lon2)
+   if (delta_lon > cyclic_length/2.0_WP) delta_lon=delta_lon-cyclic_length
+   delta_lat=(lat1-lat2)
+   r = sin(delta_lat/2.0)**2 + cos(lat1) * cos(lat2) * sin(delta_lon/2.0)**2
+   distance_on_sphere=2.0 * atan2(sqrt(r), sqrt(1.0 - r))*r_earth
+end function distance_on_sphere
 end module g_read_other_NetCDF
-
-

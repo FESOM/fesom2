@@ -1,7 +1,7 @@
 ! routines doing 3D, 2D and 1D interpolation
 
 subroutine interp_2d_field_v2(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_reg, missvalue, &
-     num_mod, lon_mod, lat_mod, data_mod)
+     num_mod, lon_mod, lat_mod, data_mod, partit)
   !-------------------------------------------------------------------------------------
   ! A second version of 2D interpolation.
   ! This routine does 2d interpolation from a regular grid to specified nodes
@@ -29,12 +29,14 @@ subroutine interp_2d_field_v2(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_r
   ! Coded by Qiang Wang
   ! Reviewed by ??
   !-------------------------------------------------------------------------------------
-  use g_PARSUP, only: par_ex
+  USE MOD_PARTIT
+  USE MOD_PARSUP
   use o_PARAM, only: WP
   implicit none
   integer             		:: n, i, ii, jj, k, nod_find
   integer			:: ind_lat_h, ind_lat_l, ind_lon_h, ind_lon_l
-  integer, intent(in)         	:: num_lon_reg, num_lat_reg, num_mod
+  integer,        intent(in)   	:: num_lon_reg, num_lat_reg, num_mod
+  type(t_partit), intent(inout) :: partit
   real(kind=WP) 			:: x, y, diff, d, dmin
   real(kind=WP)			:: rt_lat1, rt_lat2, rt_lon1, rt_lon2
   real(kind=WP)                  :: data(2,2)
@@ -47,7 +49,7 @@ subroutine interp_2d_field_v2(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_r
   if(lon_reg(1)<0.0 .or. lon_reg(num_lon_reg)>360.) then
      write(*,*) 'Error in 2D interpolation!'
      write(*,*) 'The regular grid is not in the proper longitude range.'
-     call par_ex(1)
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
      stop
   end if
 
@@ -135,7 +137,7 @@ end subroutine interp_2d_field_v2
 !---------------------------------------------------------------------------
 !
 subroutine interp_2d_field(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_reg, &
-     num_mod, lon_mod, lat_mod, data_mod, phase_flag)
+     num_mod, lon_mod, lat_mod, data_mod, phase_flag, partit)
   !-------------------------------------------------------------------------------------
   ! This routine does 2d interpolation from a regular grid to specified nodes
   ! on the surface grid. The regular grid is assumed to be global.
@@ -162,17 +164,19 @@ subroutine interp_2d_field(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_reg,
   ! Coded by Qiang Wang
   ! Reviewed by ??
   !-------------------------------------------------------------------------------------
-  use g_PARSUP, only: par_ex
+  USE MOD_PARTIT
+  USE MOD_PARSUP
   use o_PARAM, only: WP
   implicit none
   integer             		:: n, i
   integer			:: ind_lat_h, ind_lat_l, ind_lon_h, ind_lon_l
   integer, intent(in)         	:: num_lon_reg, num_lat_reg, num_mod
   integer, intent(in)          	:: phase_flag
+  type(t_partit), intent(inout) :: partit
   real(kind=WP) 			:: x, y, diff
   real(kind=WP)			:: rt_lat1, rt_lat2, rt_lon1, rt_lon2
-  real(kind=WP)                  :: data_ll, data_lh, data_hl, data_hh
-  real(kind=WP)                  :: data_lo, data_up
+  real(kind=WP)                 :: data_ll, data_lh, data_hl, data_hh
+  real(kind=WP)                 :: data_lo, data_up
   real(kind=WP), intent(in)	:: lon_reg(num_lon_reg), lat_reg(num_lat_reg)
   real(kind=WP), intent(in)	:: data_reg(num_lon_reg, num_lat_reg)
   real(kind=WP), intent(in)	:: lon_mod(num_mod), lat_mod(num_mod)
@@ -181,7 +185,7 @@ subroutine interp_2d_field(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_reg,
   if(lon_reg(1)<0.0_WP .or. lon_reg(num_lon_reg)>360._WP) then
      write(*,*) 'Error in 2D interpolation!'
      write(*,*) 'The regular grid is not in the proper longitude range.'
-     call par_ex
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
      stop
   end if
 
@@ -281,7 +285,7 @@ end subroutine interp_2d_field
 !
 subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
      lon_reg, lat_reg, lay_reg, data_reg, &
-     num_mod_z, num_mod, lon_mod, lat_mod, lay_mod, data_mod, mesh)
+     num_mod_z, num_mod, lon_mod, lat_mod, lay_mod, data_mod, partit, mesh)
   !-------------------------------------------------------------------------------------
   ! This routine does 3d interpolation from a regular grid to specified nodes.
   ! The regular grid is assumed to be global.
@@ -311,8 +315,9 @@ subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
   ! Reviewed by ??
   !-------------------------------------------------------------------------------------
   use MOD_MESH
+  USE MOD_PARTIT
+  USE MOD_PARSUP
   use o_param, only: WP
-  use g_parsup
   implicit none
   integer             		:: n, i, flag,nz
   integer			:: ind_lat_h, ind_lat_l, ind_lon_h, ind_lon_l
@@ -330,9 +335,12 @@ subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
   real(kind=WP), intent(in)	:: data_reg(num_lon_reg, num_lat_reg, num_lay_reg)
   real(kind=WP), intent(in)	:: lon_mod(num_mod), lat_mod(num_mod), lay_mod(num_mod)
   real(kind=WP), intent(out)  	:: data_mod(num_mod_z,num_mod)
-  type(t_mesh),  intent(in)    , target :: mesh  
-
-#include "associate_mesh.h"
+  type(t_mesh),   intent(in),    target :: mesh  
+  type(t_partit), intent(inout), target :: partit
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
   do n=1,num_mod
   !!PS do nz=1,nlevels_nod2D(n)-1

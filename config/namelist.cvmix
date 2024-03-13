@@ -13,19 +13,22 @@ tke_min            = 1.0e-6
 ! tke_mxl_choice ... Can only be 1 or 2, choice of calculation of mixing 
 ! length; currently only Blanke, B., P. Delecluse option is implemented
 tke_mxl_choice     = 2     
+tke_dolangmuir     = .false.    
 /
 
-! namelist for IDEMIX
+! namelist for IDEMIX von Pollman et al. (2017)
 &param_idemix
-idemix_tau_v       = 86400.0    ! time scale for vertical symmetrisation (sec)
-idemix_tau_h       = 1296000.0  ! time scale for horizontal symmetrisation
+idemix_tau_v       = 172800.0   ! 2days ! time scale for vertical symmetrisation (sec)
+idemix_tau_h       = 1296000.0  !15days ! time scale for horizontal symmetrisation
 idemix_gamma       = 1.570      ! constant of order one derived from the shape of the spectrum in m space (dimensionless)
-idemix_jstar       = 10.0       ! spectral bandwidth in modes (dimensionless)
-idemix_mu0         = 1.33333333 ! dissipation parameter (dimensionless)
+idemix_jstar       = 5.0        ! spectral bandwidth in modes (dimensionless)
+idemix_mu0         = 0.33333333 ! dissipation parameter (dimensionless)
 idemix_sforcusage  = 0.2
 idemix_n_hor_iwe_prop_iter = 5  ! iterations for contribution from horiz. wave propagation
 idemix_surforc_file = '/work/ollie/clidyn/forcing/IDEMIX/fourier_smooth_2005_cfsr_inert_rgrid.nc'
+idemix_surforc_vname= 'var706'
 idemix_botforc_file = '/work/ollie/clidyn/forcing/IDEMIX/tidal_energy_gx1v6_20090205_rgrid.nc'
+idemix_botforc_vname= 'wave_dissipation'
 /
 
 ! namelist for PP

@@ -338,7 +338,7 @@ int pilu(p4ptr amat, csptr B, csptr C, double *droptol,
      lenl = len > fil0 ? fil0 : len;
      amat->L->nnzrow[ii] = lenl;
      if (lenl < len) 
-       qsplitC(w, jw, len, lenl);
+       qsplitCF(w, jw, len, lenl);
      if (len > 0) {
        amat->L->pj[ii] = (int *) Malloc(lenl*sizeof(int), "pilu:10" ); 
        amat->L->pa[ii] = (FLOAT *) Malloc(lenl*sizeof(FLOAT), "pilu:11" ); 
@@ -363,7 +363,7 @@ int pilu(p4ptr amat, csptr B, csptr C, double *droptol,
      amat->U->nnzrow[ii] = lenu;
      jpos = lenu-1;
      if (jpos < len) 
-       qsplitC(w, jw, len, jpos);
+       qsplitCF(w, jw, len, jpos);
      amat->U->pa[ii] = (FLOAT *) Malloc(lenu*sizeof(FLOAT), "pilu:12" );
      amat->U->pj[ii] = (int *) Malloc(lenu*sizeof(int), "pilu:13" );
      if(ABS_VALUE(t) <= DBL_EPSILON) t = rnorm; //(0.0001+drop1);
@@ -387,7 +387,7 @@ int pilu(p4ptr amat, csptr B, csptr C, double *droptol,
      }
      lenu = len > fil2 ? fil2 : len;
      if (lenu < len)
-       qsplitC(w, jw, len, lenu);
+       qsplitCF(w, jw, len, lenu);
      lflen[ii] = lenu;
      
      if (lenu > 0) {
@@ -586,7 +586,7 @@ int pilu(p4ptr amat, csptr B, csptr C, double *droptol,
      schur->nnzrow[ii] = lenu;
      jpos = lenu;
      if (jpos < len)
-       qsplitC(w, jw, len, jpos);
+       qsplitCF(w, jw, len, jpos);
      schur->pa[ii] = (FLOAT *) Malloc(lenu*sizeof(FLOAT), "pilu:16" );
      schur->pj[ii] = (int *) Malloc(lenu*sizeof(int), "pilu:17" );
 /*---------------------------------------------------------------------

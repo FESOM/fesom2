@@ -1,56 +1,77 @@
 module read_mesh_interface
   interface
-    subroutine read_mesh(mesh)
+    subroutine read_mesh(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(inout)  , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(inout), target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
 module find_levels_interface
   interface
-    subroutine find_levels(mesh)
+    subroutine find_levels(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(inout)  , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(inout), target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
 module find_levels_cavity_interface
   interface
-    subroutine find_levels_cavity(mesh)
+    subroutine find_levels_cavity(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(inout)  , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(inout), target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
 module test_tri_interface
   interface
-    subroutine test_tri(mesh)
+    subroutine test_tri(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(inout)  , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(inout), target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
 module load_edges_interface
   interface
-    subroutine load_edges(mesh)
+    subroutine load_edges(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(inout)  , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(inout), target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
 module find_neighbors_interface
   interface
-    subroutine find_neighbors(mesh)
+    subroutine find_neighbors(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(inout)  , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(inout), target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
 module mesh_areas_interface
   interface
-    subroutine mesh_areas(mesh)
+    subroutine mesh_areas(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(inout)  , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(inout), target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
@@ -58,39 +79,59 @@ module elem_center_interface
   interface
     subroutine elem_center(elem, x, y, mesh)
       use mod_mesh
-      integer      :: elem    
-      real(kind=WP) :: x, y
-      type(t_mesh), intent(inout)  , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      integer       :: elem    
+      real(kind=WP), intent(inout) :: x, y
+      type(t_mesh),  intent(inout), target :: mesh
     end subroutine
   end interface
 end module
 module edge_center_interface
   interface
     subroutine edge_center(n1, n2, x, y, mesh)
-      USE MOD_MESH
+      use mod_mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
       integer                     :: n1, n2
-      real(kind=WP)               :: x, y
-      type(t_mesh), intent(inout), target :: mesh
+      real(kind=WP), intent(inout):: x, y
+      type(t_mesh),  intent(inout), target :: mesh
     end subroutine
   end interface
 end module
 module mesh_auxiliary_arrays_interface
   interface
-    subroutine mesh_auxiliary_arrays(mesh)
+    subroutine mesh_auxiliary_arrays(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(inout)  , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(inout), target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
 module find_levels_min_e2n_interface
   interface
-    subroutine find_levels_min_e2n(mesh)
+    subroutine find_levels_min_e2n(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(inout)  , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(inout), target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
-
+module check_total_volume_interface
+  interface
+    subroutine check_total_volume(partit, mesh)
+      use mod_mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(inout), target :: mesh
+      type(t_partit), intent(inout), target :: partit
+    end subroutine
+  end interface
+end module
 
 ! Driving routine. The distributed mesh information and mesh proper 
 ! are read from files.
@@ -98,9 +139,10 @@ end module
 ! At the beginning of each routine I list arrays it initializes.
 ! Array sizes vary (sometimes we need only myDim, yet sometimes more)! 
 ! S. Danilov, 2012
-SUBROUTINE mesh_setup(mesh)
+SUBROUTINE mesh_setup(partit, mesh)
 USE MOD_MESH
-USE g_parsup
+USE MOD_PARTIT
+USE MOD_PARSUP
 USE g_ROTATE_grid
 use read_mesh_interface
 use find_levels_interface
@@ -111,39 +153,42 @@ use load_edges_interface
 use find_levels_min_e2n_interface
 use find_neighbors_interface
 use mesh_areas_interface
+use par_support_interfaces
 IMPLICIT NONE
-
-      type(t_mesh), intent(inout) :: mesh
+      type(t_mesh),   intent(inout)         :: mesh
+      type(t_partit), intent(inout), target :: partit
 
       call set_mesh_transform_matrix  !(rotated grid)
-      call read_mesh(mesh)
-      call set_par_support(mesh)
-      call find_levels(mesh)
+      call read_mesh(partit, mesh)
+      call init_mpi_types(partit, mesh)
+      call init_gatherLists(partit)
+      if(partit%mype==0) write(*,*) 'Communication arrays are set' 
+      call test_tri(partit, mesh)
+      call load_edges(partit, mesh)
+      call find_neighbors(partit, mesh)
       
-      if (use_cavity) call find_levels_cavity(mesh)
-        
-      call test_tri(mesh)
-      call load_edges(mesh)
-      call find_neighbors(mesh)
-      call find_levels_min_e2n(mesh)
-      call mesh_areas(mesh)
-      call mesh_auxiliary_arrays(mesh)
+      call find_levels(partit, mesh)
+      if (use_cavity) call find_levels_cavity(partit, mesh)
+      
+      call find_levels_min_e2n(partit, mesh)
+      call mesh_areas(partit, mesh)
+      call mesh_auxiliary_arrays(partit, mesh)
            
 END SUBROUTINE mesh_setup
 !======================================================================
 ! Reads distributed mesh
 ! The mesh will be read only by 0 proc and broadcasted to the others.
-SUBROUTINE read_mesh(mesh)
+SUBROUTINE read_mesh(partit, mesh)
 USE o_PARAM
 USE g_CONFIG
 USE MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
 USE o_ARRAYS
-USE g_PARSUP
 USE g_rotate_grid 
 IMPLICIT NONE
-
-type(t_mesh), intent(inout), target :: mesh
-
+type(t_mesh),   intent(inout), target :: mesh
+type(t_partit), intent(inout), target :: partit
  integer        :: n, nn, k, m, fileID
  integer        :: error_status !0/1=no error/error
  integer        :: vert_nodes(1000)
@@ -154,16 +199,20 @@ type(t_mesh), intent(inout), target :: mesh
  character(len=MAX_PATH)  :: file_name
  character(len=MAX_PATH)  :: dist_mesh_dir
  integer        :: flag_wrongaux3d=0
- integer       :: ierror              ! return error code
- integer, allocatable, dimension(:)        :: mapping
- integer, allocatable, dimension(:,:)      :: ibuff
+ integer        :: ierror              ! return error code
+ logical        :: file_exist
+ integer, allocatable, dimension(:)         :: mapping
+ integer, allocatable, dimension(:,:)       :: ibuff
  real(kind=WP), allocatable, dimension(:,:) :: rbuff
- integer, allocatable, dimension(:,:)      :: auxbuff ! will be used for reading aux3d.out 
- integer fileunit, iostat
- character(32) mesh_checksum
+ integer, allocatable, dimension(:,:)       :: auxbuff ! will be used for reading aux3d.out 
+ integer                                    :: fileunit, iostat
+ character(32)                              :: mesh_checksum
 
-!NR Cannot include the pointers before the targets are allocated...
-!NR #include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+mype=>partit%mype
+npes=>partit%npes
+MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
 
   !mesh related files will be read in chunks of chunk_size
   chunk_size=100000
@@ -173,14 +222,12 @@ type(t_mesh), intent(inout), target :: mesh
   !==============================
   allocate(mapping(chunk_size))
   allocate(ibuff(chunk_size,4), rbuff(chunk_size,3))
-
   mapping=0 
   !==============================
   t0=MPI_Wtime()
   write(mype_string,'(i5.5)') mype  
-  write(npes_string,"(I10)") npes
+  write(npes_string,"(I10)")  npes
   dist_mesh_dir=trim(meshpath)//'dist_'//trim(ADJUSTL(npes_string))//'/'
- 
   !=======================
   ! rank partitioning vector
   ! will be read by 0 proc
@@ -189,7 +236,8 @@ type(t_mesh), intent(inout), target :: mesh
      file_name=trim(dist_mesh_dir)//'rpart.out'
      fileID=10
      open(fileID, file=trim(file_name)) 
-     allocate(part(npes+1))
+     allocate(partit%part(npes+1))
+     part=>partit%part
      read(fileID,*) n
      error_status=0
      if (n/=npes) error_status=1 !set the error status for consistency in rpart
@@ -205,16 +253,16 @@ type(t_mesh), intent(inout), target :: mesh
   if (error_status/=0) then
      write(*,*) n
      write(*,*) 'error: NPES does not coincide with that of the mesh'
-     call par_ex(1)
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
      STOP
   end if
   ! broadcasting partitioning vector to the other procs
   if (mype/=0) then
-     allocate(part(npes+1))
+     allocate(partit%part(npes+1))
+     part=>partit%part
   end if
   call MPI_BCast(part, npes+1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (mype==0) write(*,*) mype,'rpart is read'
-
   !===========================
   ! Lists of nodes and elements in global indexing. 
   ! every proc reads its file
@@ -226,23 +274,25 @@ type(t_mesh), intent(inout), target :: mesh
   open(fileID, file=trim(file_name))
   read(fileID,*) n
  
-  read(fileID,*) myDim_nod2D
-  read(fileID,*) eDim_nod2D
-  allocate(myList_nod2D(myDim_nod2D+eDim_nod2D)) 	 
-  read(fileID,*) myList_nod2D
+  read(fileID,*) partit%myDim_nod2D
+  read(fileID,*) partit%eDim_nod2D
+  allocate(partit%myList_nod2D(partit%myDim_nod2D+partit%eDim_nod2D)) 	 
+  read(fileID,*) partit%myList_nod2D
 	 
-  read(fileID,*) myDim_elem2D
-  read(fileID,*) eDim_elem2D
-  read(fileID,*) eXDim_elem2D
-  allocate(myList_elem2D(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
-  read(fileID,*) myList_elem2D
+  read(fileID,*) partit%myDim_elem2D
+  read(fileID,*) partit%eDim_elem2D
+  read(fileID,*) partit%eXDim_elem2D
+  allocate(partit%myList_elem2D(partit%myDim_elem2D+partit%eDim_elem2D+partit%eXDim_elem2D))
+  read(fileID,*) partit%myList_elem2D
 	
-  read(fileID,*) myDim_edge2D
-  read(fileID,*) eDim_edge2D
-  allocate(myList_edge2D(myDim_edge2D+eDim_edge2D))
-  read(fileID,*) myList_edge2D ! m
+  read(fileID,*) partit%myDim_edge2D
+  read(fileID,*) partit%eDim_edge2D
+  allocate(partit%myList_edge2D(partit%myDim_edge2D+partit%eDim_edge2D))
+  read(fileID,*) partit%myList_edge2D ! m
 
   close(fileID)
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
   if (mype==0) write(*,*) 'myLists are read'
 
   !==============================
@@ -264,7 +314,7 @@ type(t_mesh), intent(inout), target :: mesh
   if (error_status/=0) then
      write(*,*) n
      write(*,*) 'error: nod2D/=part(npes+1)-1'
-     call par_ex(1)
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
      STOP
   end if
 
@@ -363,7 +413,7 @@ type(t_mesh), intent(inout), target :: mesh
         write(*,*) '____________________________________________________________________'
         print *, achar(27)//'[0m'
         write(*,*)
-        call par_ex(0)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
     !___________________________________________________________________________
     ! check if rotation needs to be applied to an unrotated mesh
     elseif ((mype==0) .and. (.not. force_rotation) .and. (flag_checkmustrot==1) .and. (.not. toy_ocean)) then
@@ -384,7 +434,7 @@ type(t_mesh), intent(inout), target :: mesh
         write(*,*) '____________________________________________________________________'
         print *, achar(27)//'[0m'
         write(*,*)
-        call par_ex(0)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
     end if
   
   
@@ -467,67 +517,226 @@ type(t_mesh), intent(inout), target :: mesh
  ! read depth data
  !==============================
  ! 0 proc reads header of aux3d.out and broadcasts it between procs
- allocate(mesh%depth(myDim_nod2D+eDim_nod2D))
- if (mype==0) then !open the file for reading on 0 proc
+ !
+ !
+ !______________________________________________________________________________
+ ! read depth from aux3d.out
+ if (trim(use_depthfile)=='aux3d') then
+    ! check if aux3d.out file does exist
+    file_exist=.False.
     file_name=trim(meshpath)//'aux3d.out' 
-    open(fileID, file=file_name)
-    read(fileID,*) mesh%nl  ! the number of levels 
- end if
- call MPI_BCast(mesh%nl, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
- if (mesh%nl < 3) then
-    write(*,*) '!!!Number of levels is less than 3, model will stop!!!'
-    call par_ex
-    stop
- end if
- allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
- if (mype==0) read(fileID,*) mesh%zbar
- call MPI_BCast(mesh%zbar, mesh%nl, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
- if(mesh%zbar(2)>0) mesh%zbar=-mesh%zbar   ! zbar is negative 
- allocate(mesh%Z(mesh%nl-1))
- mesh%Z=mesh%zbar(1:mesh%nl-1)+mesh%zbar(2:mesh%nl)  ! mid-depths of cells
- mesh%Z=0.5_WP*mesh%Z 
+    inquire(file=trim(file_name),exist=file_exist) 
+    !___________________________________________________________________________
+    if (file_exist) then
+        if (mype==0) then !open the file for reading on 0 proc
+            open(fileID, file=file_name)
+            read(fileID,*) mesh%nl  ! the number of levels 
+        end if
+        call MPI_BCast(mesh%nl, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+        if (mesh%nl < 3) then
+            write(*,*) '!!!Number of levels is less than 3, model will stop!!!'
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            stop
+        end if
+        allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
+        if (mype==0) read(fileID,*) mesh%zbar
+        call MPI_BCast(mesh%zbar, mesh%nl, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+        if(mesh%zbar(2)>0) mesh%zbar=-mesh%zbar   ! zbar is negative 
+        allocate(mesh%Z(mesh%nl-1))
+        mesh%Z=mesh%zbar(1:mesh%nl-1)+mesh%zbar(2:mesh%nl)  ! mid-depths of cells
+        mesh%Z=0.5_WP*mesh%Z
+    !___________________________________________________________________________
+    else
+        if (mype==0) then
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: You want to use aux3d.out file to define your depth, but '
+            write(*,*) '        the file seems not to exist'
+            write(*,*) '        --> check in namelist.config, the flag use_depthfile must be'
+            write(*,*) '            use_depthfile= "aux3d" or "depth@" '
+            write(*,*) '        --> model stops here'
+            write(*,*) '____________________________________________________________________'
+        end if
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+    end if
+    
+ !______________________________________________________________________________
+ ! read depth from depth@node.out or depth@elem.out    
+ elseif (trim(use_depthfile)=='depth@') then
+    !___________________________________________________________________________
+    ! load file depth_zlev.out --> contains number of model levels and full depth
+    ! levels
+    file_exist=.False.
+    file_name=trim(meshpath)//'depth_zlev.out' 
+    inquire(file=trim(file_name),exist=file_exist) 
+    if (file_exist) then
+        if (mype==0) then !open the file for reading on 0 proc
+            open(fileID, file=file_name)
+            read(fileID,*) mesh%nl  ! the number of levels 
+        end if
+        call MPI_BCast(mesh%nl, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+        if (mesh%nl < 3) then
+            write(*,*) '!!!Number of levels is less than 3, model will stop!!!'
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            stop
+        end if
+        allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
+        if (mype==0) read(fileID,*) mesh%zbar
+        call MPI_BCast(mesh%zbar, mesh%nl, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+        if(mesh%zbar(2)>0) mesh%zbar=-mesh%zbar   ! zbar is negative 
+        allocate(mesh%Z(mesh%nl-1))
+        mesh%Z=mesh%zbar(1:mesh%nl-1)+mesh%zbar(2:mesh%nl)  ! mid-depths of cells
+        mesh%Z=0.5_WP*mesh%Z
+        if (mype==0) close(fileID)
+    !___________________________________________________________________________
+    else
+        if (mype==0) then
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: You want to use depth@elem.out or depth@node.out file, therefore'
+            write(*,*) '        you also need the file depth_zlev.out which contains the model '
+            write(*,*) '        number of layers and the depth of model levels. This file seems '
+            write(*,*) '        not to exist'
+            write(*,*) '        --> check in namelist.config, the flag use_depthfile must be'
+            write(*,*) '            use_depthfile= "aux3d" or "depth@" and your meshfolder'
+            write(*,*) '        --> model stops here'
+            write(*,*) '____________________________________________________________________'
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+        end if 
+    end if 
+    
+    !___________________________________________________________________________
+    ! load file depth@elem.out or depth@node.out contains topography either at 
+    ! nodes or elements
+    file_exist=.False.
+    if (use_depthonelem) then 
+        file_name=trim(meshpath)//'depth@elem.out' 
+    else
+        file_name=trim(meshpath)//'depth@node.out' 
+    end if 
+    inquire(file=trim(file_name),exist=file_exist) 
+    if (file_exist) then 
+        if (mype==0) open(fileID, file=file_name)
+    else    
+        if (mype==0) then
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: You want to use depth@elem.out or depth@node.out file to '
+            write(*,*) '        define your depth, but the file seems not to exist'
+            write(*,*) '        --> check in namelist.config, the flag use_depthfile must be'
+            write(*,*) '            use_depthfile= "aux3d" or "depth@" and your meshfolder '
+            write(*,*) '        --> model stops here'
+            write(*,*) '____________________________________________________________________'
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+        end if
+    end if     
+ end if 
 
  ! 0 proc reads the data in chunks and distributes it between other procs
- mesh_check=0
- do nchunk=0, (mesh%nod2D-1)/chunk_size
-    mapping(1:chunk_size)=0
-    do n=1, myDim_nod2D+eDim_nod2D
-       ipos=(myList_nod2D(n)-1)/chunk_size
-       if (ipos==nchunk) then
-          iofs=myList_nod2D(n)-nchunk*chunk_size
-          mapping(iofs)=n
-       end if
-    end do
-
-    k=min(chunk_size, mesh%nod2D-nchunk*chunk_size)
-    if (mype==0) then
-       do n=1, k
-          read(fileID,*) rbuff(n,1)
-       end do
-       ! check here if aux3d.out contains depth levels (FESOM2.0) or 3d indices
-       ! (FESOM1.4) like that check if the proper mesh is loaded. 11000.0 is here 
-       ! the maximum depth on earth in marianen trench
-       if ( flag_wrongaux3d==0 .and. any(abs(rbuff(1:k,1))>11000.0_WP) ) flag_wrongaux3d=1
-    end if
-    call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-
-    do n=1, k
-       x=rbuff(n,1)
-       if (x>0) x=-x !deps must be negative!
-       if (x>mesh%zbar(5)) x=mesh%zbar(5) !threshold for depth
-       if (mapping(n)>0) then
-          mesh_check=mesh_check+1
-          mesh%depth(mapping(n))=x
+ !______________________________________________________________________________
+ ! bottom topography is defined on elements 
+ if (use_depthonelem) then
+    !___________________________________________________________________________
+    ! allocate mesh%depth at elements 
+    allocate(mesh%depth(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
+    
+    !___________________________________________________________________________
+    mesh_check=0
+    do nchunk=0, (mesh%elem2D-1)/chunk_size
+        mapping(1:chunk_size)=0
+        do n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
+            ipos=(myList_elem2D(n)-1)/chunk_size
+            if (ipos==nchunk) then
+                iofs=myList_elem2D(n)-nchunk*chunk_size
+                mapping(iofs)=n
+            end if
+        end do
+        
+        k=min(chunk_size, mesh%elem2D-nchunk*chunk_size)
+        if (mype==0) then
+            do n=1, k
+                read(fileID,*) rbuff(n,1)
+            end do
+            ! check here if aux3d.out contains depth levels (FESOM2.0) or 3d indices
+            ! (FESOM1.4) like that check if the proper mesh is loaded. 11000.0 is here 
+            ! the maximum depth on earth in marianen trench
+            if ( flag_wrongaux3d==0 .and. any(abs(rbuff(1:k,1))>11000.0_WP) ) flag_wrongaux3d=1
         end if
-     end do
- end do
-
- if (mype==0) close(fileID)
- if (mesh_check/=myDim_nod2D+eDim_nod2D) then
-    write(*,*) 'ERROR while reading aux3d.out on mype=', mype
-    write(*,*) mesh_check, ' values have been read in according to partitioning'
-    write(*,*) 'it does not equal to myDim_nod2D+eDim_nod2D = ', myDim_nod2D+eDim_nod2D
- end if
+        call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+        
+        do n=1, k
+            x=rbuff(n,1)
+            if (x>0) x=-x !deps must be negative!
+            if (x>mesh%zbar(thers_zbar_lev)) x=mesh%zbar(thers_zbar_lev) !threshold for depth
+            if (mapping(n)>0) then
+                mesh_check=mesh_check+1
+                mesh%depth(mapping(n))=x
+            end if
+        end do ! --> do n=1, k
+    end do ! --> do nchunk=0, (mesh%elem2D-1)/chunk_size
+    
+    !___________________________________________________________________________
+    if (mype==0) close(fileID)
+    
+    !___________________________________________________________________________
+    if (mesh_check/=myDim_elem2D+eDim_elem2D+eXDim_elem2D) then
+        write(*,*) 'ERROR while reading aux3d.out on mype=', mype
+        write(*,*) mesh_check, ' values have been read in according to partitioning'
+        write(*,*) 'it does not equal to myDim_elem2D+eDim_elem2D+eXDim_elem2D = ', myDim_elem2D+eDim_elem2D+eXDim_elem2D
+    end if
+        
+ !______________________________________________________________________________
+ ! bottom topography is defined on nodes 
+ else
+    !___________________________________________________________________________
+    ! allocate mesh%depth at nodes 
+    allocate(mesh%depth(myDim_nod2D+eDim_nod2D))
+ 
+    !___________________________________________________________________________
+    ! fill mesh%depth from file with neighborhood information 
+    mesh_check=0
+    do nchunk=0, (mesh%nod2D-1)/chunk_size
+        mapping(1:chunk_size)=0
+        do n=1, myDim_nod2D+eDim_nod2D
+            ipos=(myList_nod2D(n)-1)/chunk_size
+            if (ipos==nchunk) then
+                iofs=myList_nod2D(n)-nchunk*chunk_size
+                mapping(iofs)=n
+            end if
+        end do
+        
+        k=min(chunk_size, mesh%nod2D-nchunk*chunk_size)
+        if (mype==0) then
+            do n=1, k
+                read(fileID,*) rbuff(n,1)
+            end do
+            ! check here if aux3d.out contains depth levels (FESOM2.0) or 3d indices
+            ! (FESOM1.4) like that check if the proper mesh is loaded. 11000.0 is here 
+            ! the maximum depth on earth in marianen trench
+            if ( flag_wrongaux3d==0 .and. any(abs(rbuff(1:k,1))>11000.0_WP) ) flag_wrongaux3d=1
+        end if
+        call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+        
+        do n=1, k
+            x=rbuff(n,1)
+            if (x>0) x=-x !deps must be negative!
+            if (x>mesh%zbar(thers_zbar_lev)) x=mesh%zbar(thers_zbar_lev) !threshold for depth
+            if (mapping(n)>0) then
+                mesh_check=mesh_check+1
+                mesh%depth(mapping(n))=x
+            end if
+        end do ! --> do n=1, k
+    end do ! --> do nchunk=0, (mesh%nod2D-1)/chunk_size
+    
+    !___________________________________________________________________________
+    if (mype==0) close(fileID)
+    
+    !___________________________________________________________________________
+    if (mesh_check/=myDim_nod2D+eDim_nod2D) then
+        write(*,*) 'ERROR while reading aux3d.out on mype=', mype
+        write(*,*) mesh_check, ' values have been read in according to partitioning'
+        write(*,*) 'it does not equal to myDim_nod2D+eDim_nod2D = ', myDim_nod2D+eDim_nod2D
+    end if
+ end if ! --> if (use_depthonelem) then    
+ 
+ 
 !_______________________________________________________________________________
 ! check if the mesh structure of FESOM2.0 and of FESOM1.4 is loaded
 if ((mype==0) .and. (flag_wrongaux3d==1)) then
@@ -547,7 +756,7 @@ if ((mype==0) .and. (flag_wrongaux3d==1)) then
     write(*,*) '____________________________________________________________________'
     print *, achar(27)//'[0m'
     write(*,*)
-    call par_ex(0)
+    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
 end if 
 
  ! ==============================
@@ -567,7 +776,8 @@ end if
  read(fileID,*) com_nod2D%rPE(1:com_nod2D%rPEnum)
 !!$  ALLOCATE(com_nod2D%rptr(com_nod2D%rPEnum+1))
  read(fileID,*) com_nod2D%rptr(1:com_nod2D%rPEnum+1)
- ALLOCATE(com_nod2D%rlist(eDim_nod2D))
+ ALLOCATE(partit%com_nod2D%rlist(eDim_nod2D))
+
  read(fileID,*) com_nod2D%rlist
 	 
  read(fileID,*) com_nod2D%sPEnum
@@ -632,42 +842,30 @@ end if
  n=com_elem2D_full%sptr(com_elem2D_full%sPEnum+1)-1
  ALLOCATE(com_elem2D_full%slist(n))
  read(fileID,*) com_elem2D_full%slist
-
-!!$ read(fileID,*) com_edge2D%rPEnum
-!!$ ALLOCATE(com_edge2D%rPE(com_edge2D%rPEnum))
-!!$ read(fileID,*) com_edge2D%rPE
-!!$ ALLOCATE(com_edge2D%rptr(com_edge2D%rPEnum+1))
-!!$ read(fileID,*) com_edge2D%rptr
-!!$ ALLOCATE(com_edge2D%rlist(eDim_edge2D))
-!!$ read(fileID,*) com_edge2D%rlist
-!!$	 
-!!$ read(fileID,*) com_edge2D%sPEnum
-!!$ ALLOCATE(com_edge2D%sPE(com_edge2D%sPEnum))
-!!$ read(fileID,*) com_edge2D%sPE
-!!$ ALLOCATE(com_edge2D%sptr(com_edge2D%sPEnum+1))
-!!$ read(fileID,*) com_edge2D%sptr
-!!$ n=com_edge2D%sptr(com_edge2D%sPEnum+1)-1
-!!$ ALLOCATE(com_edge2D%slist(n))
-!!$ read(fileID,*) com_edge2D%slist
  close(fileID)
+
  if (mype==0) write(*,*) 'communication arrays are read'
  deallocate(rbuff, ibuff)
  deallocate(mapping)
- 
-  ! try to calculate checksum and distribute it to every process
-  ! the shell command is probably not very portable and might fail, in which case we just do not have a checksum
-  mesh%representative_checksum = '                                ' ! we use md5 which is 32 chars long, so set default value to the same length
-  if(mype==0) then
-    call execute_command_line("md5sum "//trim(MeshPath)//"nod2d.out | cut -d ' ' -f 1 > "//trim(ResultPath)//"mesh_checksum")
-    ! we can not check if execute_command_line succeeded (e.g. with cmdstat), as the pipe will swallow any error from the initial command
-    ! so we have to thoroughly check if the file exists and if it contains our checksum
-    open(newunit=fileunit, file=trim(ResultPath)//"mesh_checksum", action="READ", iostat=iostat)
-    if(iostat==0) read(fileunit, *, iostat=iostat) mesh_checksum
-    close(fileunit)      
-    if(iostat==0 .and. len_trim(mesh_checksum)==32) mesh%representative_checksum = mesh_checksum
-  end if
-  call MPI_BCAST(mesh%representative_checksum, len(mesh%representative_checksum), MPI_CHAR, 0, MPI_COMM_FESOM, MPIerr)
-  mesh%representative_checksum = trim(mesh%representative_checksum) ! if we did not get a checksum, the string is empty
+
+! necessary for MULTIO auxuary data:
+! one element might belong to several processes hence we unify the element partition 
+! such that sum(myDim_elem2D_shrinked) over all processors will give elem2D
+ partit%myDim_elem2D_shrinked=0
+ DO n=1, myDim_elem2D
+    if (mesh%elem2D_nodes(1, n) > myDim_nod2D) cycle
+    partit%myDim_elem2D_shrinked=partit%myDim_elem2D_shrinked+1
+ END DO
+ allocate(partit%myInd_elem2D_shrinked(partit%myDim_elem2D_shrinked))
+! fill the respective indicies
+ nn=1
+ DO n=1, myDim_elem2D
+    if (mesh%elem2D_nodes(1, n) > myDim_nod2D) cycle
+    partit%myInd_elem2D_shrinked(nn)=n
+    nn=nn+1
+ END DO
+! no checksum for now, execute_command_line is failing too often. if you think it is important, please drop me a line and I will try to revive it: jan.hegewald@awi.de
+mesh%representative_checksum = ''
 
 CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
  t1=MPI_Wtime()
@@ -685,15 +883,17 @@ CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
 ! load fesom2.0 mesh files: nlvls.out and elvls.out that are created during the 
 ! partitioning
 !_______________________________________________________________________________
-subroutine find_levels(mesh)
+subroutine find_levels(partit, mesh)
     use MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_PARAM
-    use g_PARSUP
     use g_config
     !
     implicit none
     !
-    type(t_mesh), intent(inout), target    :: mesh
+    type(t_mesh),   intent(inout), target  :: mesh
+    type(t_partit), intent(inout), target  :: partit
     character(len=MAX_PATH)                :: file_name
     integer                                :: ierror   ! MPI return error code
     integer                                :: k, n, fileID
@@ -701,10 +901,8 @@ subroutine find_levels(mesh)
     integer, allocatable, dimension(:)     :: mapping
     integer, allocatable, dimension(:)     :: ibuff
     real(kind=WP)                          :: t0, t1
-
-!NR Cannot include the pointers before the targets are allocated...
-!NR #include "associate_mesh.h"
-
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
     t0=MPI_Wtime()
     !___________________________________________________________________________
     allocate(mesh%nlevels(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
@@ -887,33 +1085,36 @@ end subroutine find_levels
 ! cavity_elvls.out that are created during the partitioning when namelist.config flag
 ! use_cavity=.True.
 !_______________________________________________________________________________
-subroutine find_levels_cavity(mesh)
+subroutine find_levels_cavity(partit, mesh)
     use MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_PARAM
-    use g_PARSUP
     use g_config
     !
     implicit none
     !
-    type(t_mesh), intent(inout), target :: mesh
+    type(t_mesh),   intent(inout), target :: mesh
+    type(t_partit), intent(inout), target :: partit
     character(MAX_PATH)                 :: file_name
     integer                             :: ierror   ! MPI return error code
     integer                             :: k, n, fileID
     integer                             :: nchunk, chunk_size, ipos, iofs, mesh_check
     integer, allocatable, dimension(:)  :: mapping
     integer, allocatable, dimension(:)  :: ibuff
+    real(kind=WP), allocatable, dimension(:)  :: rbuff
     real(kind=WP)                       :: t0, t1
     logical                             :: file_exist=.False.
-    integer                             :: elem, elnodes(3), ule,  uln(3)
-!NR Cannot include the pointers before the targets are allocated...
-!NR #include "associate_mesh.h"
+    integer                             :: elem, elnodes(3), ule,  uln(3), node, j, nz
+    integer, allocatable, dimension(:) :: numelemtonode
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
     
     t0=MPI_Wtime()
     !___________________________________________________________________________
     ! allocate arrays, reset pointers
 !!PS     allocate(mesh%cavity_flag_e(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
 !!PS     allocate(mesh%cavity_flag_n(myDim_nod2D+eDim_nod2D))
-    allocate(mesh%cavity_depth(myDim_nod2D+eDim_nod2D))
     
     !___________________________________________________________________________
     ! mesh related files will be read in chunks of chunk_size
@@ -922,6 +1123,7 @@ subroutine find_levels_cavity(mesh)
     ! Allocate mapping array (chunk_size) --> It will be used for several purposes 
     allocate(mapping(chunk_size))
     allocate(ibuff(chunk_size))
+    allocate(rbuff(chunk_size))
     
     !___________________________________________________________________________
     ! Part I: reading cavity levels at elements...
@@ -944,7 +1146,7 @@ subroutine find_levels_cavity(mesh)
             write(*,*) '____________________________________________________________________'
             print *, achar(27)//'[0m'
             write(*,*)
-            call par_ex
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
         end if 
     end if
     
@@ -1032,7 +1234,7 @@ subroutine find_levels_cavity(mesh)
             write(*,*) '____________________________________________________________________'
             print *, achar(27)//'[0m'
             write(*,*)
-            call par_ex
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
         end if    
     end if
     
@@ -1095,6 +1297,8 @@ subroutine find_levels_cavity(mesh)
         write(*,*) '____________________________________________________________________'
         print *, achar(27)//'[0m'
     end if
+    
+    deallocate(ibuff)
     
     !___________________________________________________________________________
     ! Part III: computing cavity flag at nodes and elements
@@ -1175,7 +1379,11 @@ subroutine find_levels_cavity(mesh)
     !___________________________________________________________________________
     ! Part IV: reading cavity depth at nodes
     if (mype==0)  then 
-        file_name=trim(meshpath)//'cavity_depth.out'
+        if (use_cavityonelem) then
+            file_name = trim(meshpath)//'cavity_depth@elem.out'
+        else
+            file_name = trim(meshpath)//'cavity_depth@node.out'
+        end if    
         file_exist=.False.
         inquire(file=trim(file_name),exist=file_exist)
         if (file_exist) then
@@ -1185,79 +1393,152 @@ subroutine find_levels_cavity(mesh)
             write(*,*)
             print *, achar(27)//'[33m'
             write(*,*) '____________________________________________________________________'
-            write(*,*) ' ERROR: could not find file: cavity_depth.out '
+            write(*,*) ' ERROR: could not find file:', file_name
             write(*,*) '        Wrong mesh path ? This file provides the necessary depth'
             write(*,*) '        information of the cavity.'
             write(*,*) '____________________________________________________________________'
             print *, achar(27)//'[0m'
             write(*,*)
-            call par_ex
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
         end if 
     end if
     
-    ! 0 proc reads the data in chunks and distributes it between other procs
-    mesh_check=0
-    do nchunk=0, (mesh%nod2D-1)/chunk_size
+    !___________________________________________________________________________
+    ! cavity topography is defined on elements 
+    if (use_cavityonelem) then 
         !_______________________________________________________________________
-        !create the mapping for the current chunk
-        mapping(1:chunk_size)=0
-        do n=1, myDim_nod2D+eDim_nod2D
-            ! myList_nod2D(n) contains global vertice index of the local
-            ! vertice on that CPU
-            ! ipos is integer, (myList_nod2D(n)-1)/chunk_size always rounds 
-            ! off to integer values
-            ! --> ipos is an index to which chunk a global vertice on a local CPU 
-            !     belongs
-            ipos=(myList_nod2D(n)-1)/chunk_size
-            
-            ! if global vertice chunk index (ipos) lies within the actual chunk
-            if (ipos==nchunk) then
-                iofs=myList_nod2D(n)-nchunk*chunk_size
-                ! connect chunk reduced (iofs) global vertice index with local
-                ! vertice index n --> mapping(iofs)=n
-                mapping(iofs)=n
-            end if
-        end do
+        ! allocate mesh%depth at elements 
+        allocate(mesh%cavity_depth(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
         
         !_______________________________________________________________________
-        ! read the chunk piece into the buffer --> done only by one CPU (mype==0)
-        ! k ... is actual chunk size, considers also possible change in chunk size
-        !       at the end i.e nod2d=130000, nchunk_0 = 100000, nchunk_1=30000
-        k=min(chunk_size, mesh%nod2D-nchunk*chunk_size)
-        if (mype==0) then
-            do n=1, k
-                read(fileID,*) ibuff(n)
+        ! fill mesh%cavity_depth from file with neighborhood information 
+        mesh_check=0
+        do nchunk=0, (mesh%elem2D-1)/chunk_size
+            mapping(1:chunk_size)=0
+            do n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
+                ipos=(myList_elem2D(n)-1)/chunk_size
+                if (ipos==nchunk) then
+                    iofs=myList_elem2D(n)-nchunk*chunk_size
+                    mapping(iofs)=n
+                end if
             end do
+            
+            !___________________________________________________________________
+            ! read the chunk piece into the buffer --> done only by one 
+            ! CPU (mype==0)
+            k=min(chunk_size, mesh%elem2D-nchunk*chunk_size)
+            if (mype==0) then
+                do n=1, k
+                    read(fileID,*) rbuff(n)
+                end do
+            end if
+            
+            !___________________________________________________________________
+            ! broadcast chunk buffer to all other CPUs (k...size of buffer)
+            call MPI_BCast(rbuff(1:k), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+            
+            !___________________________________________________________________
+            ! fill the local arrays
+            do n=1, k      
+                if (mapping(n)>0) then
+                    mesh_check=mesh_check+1
+                    mesh%cavity_depth(mapping(n))=rbuff(n)
+                end if
+            end do
+        end do ! --> do nchunk=0, (mesh%elem2D-1)/chunk_size
+        
+        !_______________________________________________________________________
+        if (mype==0) close(fileID)
+        
+        !_______________________________________________________________________
+        if (mesh_check/=myDim_elem2D+eDim_elem2D+eXDim_elem2D) then
+            write(*,*)
+            print *, achar(27)//'[33m'
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: while reading cavity_depth.out on mype=', mype
+            write(*,*) '        ',mesh_check, ' values have been read in according to partitioning'
+            write(*,*) '        it does not equal to myDim_elem2D+eDim_elem2D+eXDim_elem2D = ', myDim_elem2D+eDim_elem2D+eXDim_elem2D
+            write(*,*) '____________________________________________________________________'
+            print *, achar(27)//'[0m'
         end if
         
+    !___________________________________________________________________________
+    ! cavity topography is defined on nodes 
+    else
         !_______________________________________________________________________
-        ! broadcast chunk buffer to all other CPUs (k...size of buffer)
-        call MPI_BCast(ibuff(1:k), k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+        ! allocate mesh%depth at nodes 
+        allocate(mesh%cavity_depth(myDim_nod2D+eDim_nod2D))
         
         !_______________________________________________________________________
-        ! fill the local arrays
-        do n=1, k      
-            if (mapping(n)>0) then
-                mesh_check=mesh_check+1
-                mesh%cavity_depth(mapping(n))=ibuff(n)
+        ! fill mesh%cavity_depth from file with neighborhood information 
+        ! 0 proc reads the data in chunks and distributes it between other procs
+        mesh_check=0
+        do nchunk=0, (mesh%nod2D-1)/chunk_size
+            !___________________________________________________________________
+            !create the mapping for the current chunk
+            mapping(1:chunk_size)=0
+            do n=1, myDim_nod2D+eDim_nod2D
+                ! myList_nod2D(n) contains global vertice index of the local
+                ! vertice on that CPU
+                ! ipos is integer, (myList_nod2D(n)-1)/chunk_size always rounds 
+                ! off to integer values
+                ! --> ipos is an index to which chunk a global vertice on a local CPU 
+                !     belongs
+                ipos=(myList_nod2D(n)-1)/chunk_size
+                
+                ! if global vertice chunk index (ipos) lies within the actual chunk
+                if (ipos==nchunk) then
+                    iofs=myList_nod2D(n)-nchunk*chunk_size
+                    ! connect chunk reduced (iofs) global vertice index with local
+                    ! vertice index n --> mapping(iofs)=n
+                    mapping(iofs)=n
+                end if
+            end do
+            
+            !_______________________________________________________________________
+            ! read the chunk piece into the buffer --> done only by one CPU (mype==0)
+            ! k ... is actual chunk size, considers also possible change in chunk size
+            !       at the end i.e nod2d=130000, nchunk_0 = 100000, nchunk_1=30000
+            k=min(chunk_size, mesh%nod2D-nchunk*chunk_size)
+            if (mype==0) then
+                do n=1, k
+                    read(fileID,*) rbuff(n)
+                end do
             end if
-        end do
-    end do ! --> do nchunk=0, (mesh%nod2D-1)/chunk_size
-    if (mype==0) close(fileID)
-    if (mesh_check/=myDim_nod2D+eDim_nod2D) then
-        write(*,*)
-        print *, achar(27)//'[33m'
-        write(*,*) '____________________________________________________________________'
-        write(*,*) ' ERROR: while reading cavity_depth.out on mype=', mype
-        write(*,*) '        ',mesh_check, ' values have been read in according to partitioning'
-        write(*,*) '        it does not equal to myDim_nod2D+eDim_nod2D = ', myDim_nod2D+eDim_nod2D
-        write(*,*) '____________________________________________________________________'
-        print *, achar(27)//'[0m'
-    end if
+            
+            !___________________________________________________________________
+            ! broadcast chunk buffer to all other CPUs (k...size of buffer)
+            call MPI_BCast(rbuff(1:k), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+            
+            !___________________________________________________________________
+            ! fill the local arrays
+            do n=1, k      
+                if (mapping(n)>0) then
+                    mesh_check=mesh_check+1
+                    mesh%cavity_depth(mapping(n))=rbuff(n)
+                end if
+            end do
+        end do ! --> do nchunk=0, (mesh%nod2D-1)/chunk_size
+        
+        !_______________________________________________________________________
+        if (mype==0) close(fileID)
+        
+        !_______________________________________________________________________
+        if (mesh_check/=myDim_nod2D+eDim_nod2D) then
+            write(*,*)
+            print *, achar(27)//'[33m'
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: while reading cavity_depth.out on mype=', mype
+            write(*,*) '        ',mesh_check, ' values have been read in according to partitioning'
+            write(*,*) '        it does not equal to myDim_nod2D+eDim_nod2D = ', myDim_nod2D+eDim_nod2D
+            write(*,*) '____________________________________________________________________'
+            print *, achar(27)//'[0m'
+        end if
+    end if ! --> if (use_cavityonelem) then 
     
     !___________________________________________________________________________
     ! deallocate mapping and buffer array
-    deallocate(ibuff)
+    deallocate(rbuff)
     deallocate(mapping)
 
     !___________________________________________________________________________
@@ -1283,6 +1564,32 @@ subroutine find_levels_cavity(mesh)
         end if 
     end do 
     
+    
+    !___________________________________________________________________________
+    allocate(numelemtonode(mesh%nl))
+    do node=1, myDim_nod2D+eDim_nod2D
+        numelemtonode=0
+        !_______________________________________________________________________
+        do j=1,mesh%nod_in_elem2D_num(node)
+            elem=mesh%nod_in_elem2D(j,node)
+            do nz=mesh%ulevels(elem),mesh%nlevels(elem)-1
+                numelemtonode(nz) = numelemtonode(nz) + 1
+            end do
+        end do
+        
+        !_______________________________________________________________________
+        ! check how many triangle elements contribute to every vertice in every layer
+        ! every vertice in every layer should be connected to at least two triangle 
+        ! elements !
+        do nz=mesh%ulevels_nod2D(node),mesh%nlevels_nod2D(node)-1
+            if (numelemtonode(nz)== 1) then 
+                write(*,*) 'ERROR A: found vertice with just one triangle:', mype, node, nz
+            end if 
+        end do 
+        
+    end do
+    deallocate(numelemtonode)
+    
 end subroutine find_levels_cavity
 !
 !
@@ -1291,21 +1598,23 @@ end subroutine find_levels_cavity
 ! cavity_elvls.out that are created during the partitioning when namelist.config flag
 ! use_cavity=.True.
 !_______________________________________________________________________________
-subroutine find_levels_min_e2n(mesh)
+subroutine find_levels_min_e2n(partit, mesh)
     use MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_PARAM
-    use g_PARSUP
     use g_config
     use g_comm_auto
     !
     implicit none
     !
-    type(t_mesh), intent(inout), target :: mesh
+    type(t_mesh),   intent(inout), target :: mesh
+    type(t_partit), intent(inout), target :: partit
     integer                             :: node, k
     real(kind=WP)                       :: t0, t1
     
-!NR Cannot include the pointers before the targets are allocated...
-!NR #include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
     
     t0=MPI_Wtime()
     !___________________________________________________________________________
@@ -1317,8 +1626,8 @@ subroutine find_levels_min_e2n(mesh)
         mesh%nlevels_nod2D_min(node)=minval(mesh%nlevels(mesh%nod_in_elem2D(1:k,node)))
         mesh%ulevels_nod2D_max(node)=maxval(mesh%ulevels(mesh%nod_in_elem2D(1:k,node)))
     end do
-    call exchange_nod(mesh%nlevels_nod2D_min)
-    call exchange_nod(mesh%ulevels_nod2D_max)
+    call exchange_nod(mesh%nlevels_nod2D_min, partit)
+    call exchange_nod(mesh%ulevels_nod2D_max, partit)
     
     !___________________________________________________________________________
     t1=MPI_Wtime()
@@ -1332,19 +1641,25 @@ end subroutine find_levels_min_e2n
 !
 !
 !===========================================================================
-SUBROUTINE test_tri(mesh)
+SUBROUTINE test_tri(partit, mesh)
 USE MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
 USE o_PARAM
-USE g_PARSUP
 USE g_CONFIG
 use g_rotate_grid
 IMPLICIT NONE
 ! Check the order of nodes in triangles; correct it if necessary to make
 ! it same sense (clockwise) 
-type(t_mesh), intent(inout), target :: mesh
+type(t_mesh),   intent(inout), target :: mesh
+type(t_partit), intent(inout), target :: partit
 real(kind=WP)               ::  a(2), b(2), c(2),  r
 integer                     ::  n, nx, elnodes(3)
 real(kind=WP)               :: t0, t1
+
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+
 
    t0=MPI_Wtime()
    
@@ -1378,13 +1693,15 @@ real(kind=WP)               :: t0, t1
 
 END SUBROUTINE  test_tri
 !=========================================================================
-SUBROUTINE load_edges(mesh)
+SUBROUTINE load_edges(partit, mesh)
 USE MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
 USE o_PARAM
-USE g_PARSUP
 USE g_CONFIG
 IMPLICIT NONE
-type(t_mesh), intent(inout), target   :: mesh
+type(t_mesh),   intent(inout), target :: mesh
+type(t_partit), intent(inout), target :: partit
 character(MAX_PATH)                   :: file_name
 integer                               :: counter, n, m, nn, k, q, fileID
 integer                               :: elems(2), elem
@@ -1396,8 +1713,8 @@ integer, allocatable, dimension(:)    :: mapping
 integer, allocatable, dimension(:,:)  :: ibuff
 integer                               :: ierror              ! return error code
 
-!NR Cannot include the pointers before the targets are allocated...
-!NR #include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
 t0=MPI_Wtime()
 
@@ -1609,7 +1926,7 @@ endif
 
 END SUBROUTINE load_edges
 !===========================================================================
-SUBROUTINE find_neighbors(mesh)
+SUBROUTINE find_neighbors(partit, mesh)
 ! For each element three its element neighbors are found
 ! For each node the elements containing it are found
 ! Allocated are:
@@ -1620,19 +1937,22 @@ SUBROUTINE find_neighbors(mesh)
 
 USE o_PARAM
 USE MOD_MESH
-USE g_PARSUP
+USE MOD_PARTIT
+USE MOD_PARSUP
 USE g_ROTATE_grid
 use g_comm_auto
+use elem_center_interface
 implicit none
-type(t_mesh), intent(inout), target :: mesh
+type(t_mesh),   intent(inout), target :: mesh
+type(t_partit), intent(inout), target :: partit
 integer                     :: elem, eledges(3), elem1, j, n, node, enum,elems(3),count1,count2,exit_flag,i,nz
 integer, allocatable        :: temp_i(:)
-integer                     :: mymax(npes), rmax(npes)
+integer                     :: mymax(partit%npes), rmax(partit%npes)
 real(kind=WP)               :: gx,gy,rx,ry
 real(kind=WP)               :: t0, t1
 
-!NR Cannot include the pointers before the targets are allocated...
-!NR #include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
 CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
 t0=MPI_Wtime()
@@ -1688,7 +2008,7 @@ CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
     end do
  end do
 
- call exchange_nod(mesh%nod_in_elem2D_num)
+ call exchange_nod(mesh%nod_in_elem2D_num, partit)
  allocate (temp_i(myDim_nod2D+eDim_nod2D))
  temp_i=0
  DO n=1, maxval(rmax)
@@ -1696,7 +2016,7 @@ CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
        do j=1,myDim_nod2D
          if (mesh%nod_in_elem2D(n,j)>0) temp_i(j)=myList_elem2D(mesh%nod_in_elem2D(n,j))
        enddo
-       call exchange_nod(temp_i)
+       call exchange_nod(temp_i, partit)
        mesh%nod_in_elem2D(n,:)=temp_i
  END DO
  deallocate(temp_i)
@@ -1726,7 +2046,7 @@ DO elem=1,myDim_elem2D
    END DO
    if (elem1<2) then
     write(*,*) 'Insufficient number of neighbors ', myList_elem2D(elem)
-    call par_ex(1)
+    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     STOP
    end if
 END DO
@@ -1763,9 +2083,10 @@ USE MOD_MESH
 USE o_PARAM
 USE g_CONFIG 
 implicit none
-integer                     :: n1, n2   ! nodes of the edge
-real(kind=WP)               :: x, y, a(2), b(2)
-type(t_mesh), intent(inout), target :: mesh
+integer                        :: n1, n2   ! nodes of the edge
+real(kind=WP),  intent(inout)  :: x, y
+type(t_mesh),   intent(inout), target :: mesh
+real(kind=WP)                  :: a(2), b(2)
 
 a=mesh%coord_nod2D(:,n1)
 b=mesh%coord_nod2D(:,n2)
@@ -1781,13 +2102,13 @@ USE MOD_MESH
 USE o_PARAM
 USE g_CONFIG  
 implicit none
-integer      :: elem, elnodes(3), k    
-real(kind=WP) :: x, y, ax(3), amin
-
-type(t_mesh), intent(inout), target :: mesh
+real(kind=WP), intent(inout) :: x, y
+type(t_mesh),  intent(inout), target :: mesh
+integer                      :: elem, elnodes(3), k    
+real(kind=WP)                ::  ax(3), amin
 
    elnodes=mesh%elem2D_nodes(:,elem)
-   ax=mesh%coord_nod2D(1, elnodes)
+   ax=mesh%coord_nod2D(1,   elnodes)
    amin=minval(ax)
    DO k=1,3
    if(ax(k)-amin>=cyclic_length/2.0_WP) ax(k)=ax(k)-cyclic_length
@@ -1798,143 +2119,270 @@ type(t_mesh), intent(inout), target :: mesh
 
 end subroutine elem_center
 !==========================================================================
-SUBROUTINE mesh_areas(mesh)
-USE MOD_MESH
-USE o_PARAM
-USE g_PARSUP
-USE g_ROTATE_GRID
-use g_comm_auto
-IMPLICIT NONE
-! Collects auxilliary information on the mesh
-! Allocated and filled in are:
-! elem_area(myDim_elem2D)
-! area(nl, myDim_nod2D)
+SUBROUTINE mesh_areas(partit, mesh)
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE o_PARAM
+    USE o_arrays, only: dum_3d_n
+    USE g_ROTATE_GRID
+    use g_comm_auto
+    IMPLICIT NONE
+    ! Collects auxilliary information on the mesh
+    ! Allocated and filled in are:
+    ! elem_area(myDim_elem2D)
+    ! area(nl, myDim_nod2D)
+
+    integer                                   :: n,j,q, elnodes(3), ed(2), elem, nz,nzmin, nzmax
+    real(kind=WP)                             :: a(2), b(2), ax, ay, lon, lat, vol, vol2
+    real(kind=WP), allocatable,dimension(:)   :: work_array
+    integer, allocatable,dimension(:,:)       :: cavity_contribut
+    real(kind=WP)                             :: t0, t1
+type(t_mesh),   intent(inout), target :: mesh
+type(t_partit), intent(inout), target :: partit
 
 
-integer                                   :: n,j,q, elnodes(3), ed(2), elem, nz
-real(kind=WP)	                          :: a(2), b(2), ax, ay, lon, lat, vol
-real(kind=WP), allocatable,dimension(:)   :: work_array
-real(kind=WP)                             :: t0, t1
-type(t_mesh), intent(inout), target       :: mesh
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
-!NR Cannot include the pointers before the targets are allocated...
-!NR #include "associate_mesh.h"
-
-t0=MPI_Wtime()
-
- allocate(mesh%elem_area(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
- !allocate(elem_area(myDim_elem2D))
- allocate(mesh%area(mesh%nl,myDim_nod2d+eDim_nod2D))   !! Extra size just for simplicity
-                                             !! in some further routines
- allocate(mesh%area_inv(mesh%nl,myDim_nod2d+eDim_nod2D)) 
- allocate(mesh%mesh_resolution(myDim_nod2d+eDim_nod2D))
- ! ============
- ! The areas of triangles:
- ! ============
- DO n=1, myDim_elem2D
- !DO n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
-    elnodes=mesh%elem2D_nodes(:,n)
-    ay=sum(mesh%coord_nod2D(2,elnodes))/3.0_WP
-    ay=cos(ay)
-    if (cartesian) ay=1.0_WP
-    a = mesh%coord_nod2D(:,elnodes(2))-mesh%coord_nod2D(:,elnodes(1))
-    b = mesh%coord_nod2D(:,elnodes(3))-mesh%coord_nod2D(:,elnodes(1))
-    call trim_cyclic(a(1))
-    call trim_cyclic(b(1))
-    a(1)=a(1)*ay
-    b(1)=b(1)*ay
-    mesh%elem_area(n)=0.5_WP*abs(a(1)*b(2)-b(1)*a(2))
- END DO
- call exchange_elem(mesh%elem_area)
- ! =============
- ! Scalar element 
- ! areas at different levels (there can be partly land)
- ! =============
+    t0=MPI_Wtime()
+    
+    ! area of triangles 
+    allocate(mesh%elem_area(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
+    
+    ! area of upper edge and lower edge of scalar cell: size nl x node
+    allocate(mesh%area(mesh%nl,myDim_nod2d+eDim_nod2D))
+    
+    ! "mid" area of scalar cell in case of cavity area \= areasvol, size: nl-1 x node
+    allocate(mesh%areasvol(mesh%nl,myDim_nod2d+eDim_nod2D))
+    
+    ! area inverse
+    allocate(mesh%area_inv(mesh%nl,myDim_nod2d+eDim_nod2D))
+    allocate(mesh%areasvol_inv(mesh%nl,myDim_nod2d+eDim_nod2D))
+    
+    ! resolution at nodes 
+    allocate(mesh%mesh_resolution(myDim_nod2d+eDim_nod2D))
+    
+    !___compute triangle areas__________________________________________________
+    do n=1, myDim_elem2D
+        elnodes=mesh%elem2D_nodes(:,n)
+        ay=sum(mesh%coord_nod2D(2,elnodes))/3.0_WP
+        ay=cos(ay)
+        if (cartesian) ay=1.0_WP
+        a = mesh%coord_nod2D(:,elnodes(2))-mesh%coord_nod2D(:,elnodes(1))
+        b = mesh%coord_nod2D(:,elnodes(3))-mesh%coord_nod2D(:,elnodes(1))
+        call trim_cyclic(a(1))
+        call trim_cyclic(b(1))
+        a(1)=a(1)*ay
+        b(1)=b(1)*ay
+        mesh%elem_area(n)=0.5_WP*abs(a(1)*b(2)-b(1)*a(2))
+    end do
+    call exchange_elem(mesh%elem_area, partit)
+    
+    !___compute areas of upper/lower scalar cell edge___________________________
+    ! areas at different levels (there can be partly land)
+    ! --> only areas through which there is exchange are counted
+    !
+    !-----------------------------~+~~~~~~~+~~~
+    ! ############################ |       |   
+    ! ############################ |       |   layer k-3
+    ! #################### ._______|_______|___area_k-2   
+    ! ##  CAVITY  ######## | / / / |       |   
+    ! #################### |/ /°/ /|       |   layer k-2 --> Transport:  w_k-2*A_k-1
+    ! ############ ._______|_/_/_/_|_______|___area_k-1         -> A_k-1 lower prisma area defines 
+    ! ############ |       |       |       |                    scalar area under the cavity
+    ! ############ |   °   |       |       |   layer k-1
+    !______________|_______|_______|_______|___area_k
+    !      |       | / / / |       |       |   
+    !      |       |/ /°/ /|       |       |   layer k --> Transport: w_k*A_k
+    !______|_______|_/_/_/_|_______|_______|___area_k+1       -> A_k upper prisma face area defines      
+    !      |       |       |       |       |                  scalar area of cell   
+    !      |       |   °   |       |       |   layer k+1
+    !______|_______|_______|_______|_______|___area_k+2
+    ! #############|       |       |       |   
+    ! #############|   °   |       |       |   layer k+2
+    ! #############|_______|_______|_______|___area_k+3
+    ! #####################|       |       |   
+    ! #####################|       |       |   layer k+3
+    ! ##  BOTTOM  #########|_______|_______|___area_k+4
+    ! #############################|       |   
+    ! #############################|       |   :
+    ! #############################|_______|___area_k+5
+    ! #########################################
+    if (use_cavity) then
+        allocate(cavity_contribut(mesh%nl,myDim_nod2d+eDim_nod2D))
+        cavity_contribut = 0
+    end if 
+    
+    mesh%area     = 0.0_WP
+    do n=1, myDim_nod2D+eDim_nod2D
+        do j=1,mesh%nod_in_elem2D_num(n)
+            elem=mesh%nod_in_elem2D(j,n)
+            
+            !___________________________________________________________________
+            ! compute scalar area of prisms at different depth layers. In normal 
+            ! case without cavity the area of the scalar cell corresponds to the
+            ! area of the upper edge of the prism --> if there is cavity its
+            ! different. Directly under the cavity the area of scalar cell 
+            ! corresponds to the area of the lower edge
+            nzmin = mesh%ulevels(elem)
+            nzmax = mesh%nlevels(elem)-1
+            do nz=nzmin,nzmax
+                mesh%area(nz,n)=mesh%area(nz,n)+mesh%elem_area(elem)/3.0_WP
+            end do
+            
+            !___________________________________________________________________
+            ! how many ocean-cavity triangles contribute to an upper edge of a 
+            ! scalar area 
+            if (use_cavity) then
+                do nz=1,nzmin-1
+                    cavity_contribut(nz,n)=cavity_contribut(nz,n)+1
+                end do
+            end if 
+        end do
+    end do
+    
+    !___compute "mid" scalar cell area__________________________________________
+    ! for cavity case: redefine "mid" scalar cell area from upper edge of prism to 
+    ! lower edge of prism if a cavity triangle is present at the upper scalar
+    ! cell edge 
+    mesh%areasvol = 0.0_WP
+    if (use_cavity) then
+        do n = 1, myDim_nod2D+eDim_nod2D
+            nzmin = mesh%ulevels_nod2d(n)
+            nzmax = mesh%nlevels_nod2d(n)-1
+            do nz=nzmin,nzmax
+                if (cavity_contribut(nz,n)>0) then
+                    mesh%areasvol(nz,n) = mesh%area(min(nz+1,nzmax),n)
+                else
+                    mesh%areasvol(nz,n) = mesh%area(nz,n)
+                end if
+            end do 
+        end do
+        deallocate(cavity_contribut)
+    ! for non cavity case: the "mid" area of the scalar cell always corresponds to 
+    ! the area of the upper scalar cell edge    
+    else    
+        do n = 1, myDim_nod2D+eDim_nod2D
+            nzmin = mesh%ulevels_nod2d(n)
+            nzmax = mesh%nlevels_nod2d(n)-1
+            do nz=nzmin,nzmax
+                mesh%areasvol(nz,n) = mesh%area(nz,n)
+            end do 
+        end do
+    end if 
+    
+    ! update to proper dimension
+    ! coordinates are in radians, edge_dxdy are in meters,
+    ! and areas are in m^2
+    mesh%elem_area = mesh%elem_area*r_earth*r_earth
+    mesh%area      = mesh%area     *r_earth*r_earth
+    mesh%areasvol  = mesh%areasvol *r_earth*r_earth
  
- mesh%area=0.0_WP
- DO n=1, myDim_nod2D
-    DO j=1,mesh%nod_in_elem2D_num(n)
-       elem=mesh%nod_in_elem2D(j,n)
-       !!PS DO nz=mesh%ulevels(elem),mesh%nlevels(elem)-1
-       DO nz=1,mesh%nlevels(elem)-1
-        mesh%area(nz,n)=mesh%area(nz,n)+mesh%elem_area(elem)/3.0_WP
-       END DO
-    END DO
- END DO
+    call exchange_nod(mesh%area, partit)
+    call exchange_nod(mesh%areasvol, partit)
+    
+    !___compute inverse area____________________________________________________
+    mesh%area_inv = 0.0_WP
+    do n=1,myDim_nod2d+eDim_nod2D
+        nzmin = mesh%ulevels_nod2d(n)
+        nzmax = mesh%nlevels_nod2d(n)
+        do nz=nzmin,nzmax
+!!PS             mesh%area_inv(nz,n) = 1._WP/mesh%area(nz,n)
+            if (mesh%area(nz,n) > 0._WP) then
+                mesh%area_inv(nz,n) = 1._WP/mesh%area(nz,n)
+            else
+                mesh%area_inv(nz,n) = 0._WP
+            end if
+        end do
+    end do
+    
+    if (use_cavity) then
+        mesh%areasvol_inv = 0.0_WP
+        do n=1,myDim_nod2d+eDim_nod2D
+            nzmin = mesh%ulevels_nod2d(n)
+            nzmax = mesh%nlevels_nod2d(n)-1
+            do nz=nzmin,nzmax
+!!PS                 mesh%areasvol_inv(nz,n) = 1._WP/mesh%areasvol(nz,n)
+                if (mesh%areasvol(nz,n) > 0._WP) then
+                    mesh%areasvol_inv(nz,n) = 1._WP/mesh%areasvol(nz,n)
+                else
+                    mesh%areasvol_inv(nz,n) = 0._WP
+                end if
+            end do
+        end do
+    else
+        mesh%areasvol_inv = mesh%area_inv
+    endif 
  
- ! Only areas through which there is exchange are counted
-
- ! ===========
- ! Update to proper dimension
- ! ===========
- mesh%elem_area=mesh%elem_area*r_earth*r_earth
- mesh%area=mesh%area*r_earth*r_earth
+    !___compute scalar cell resolution__________________________________________
+    allocate(work_array(myDim_nod2D))
+    !!PS mesh%mesh_resolution=sqrt(mesh%area(1, :)/pi)*2._WP
+    do n=1,myDim_nod2d+eDim_nod2D
+        mesh%mesh_resolution(n)=sqrt(mesh%areasvol(mesh%ulevels_nod2d(n),n)/pi)*2._WP
+    end do 
  
- call exchange_nod(mesh%area)
+    ! smooth resolution
+    do q=1, 3 !apply mass matrix N times to smooth the field
+        do n=1, myDim_nod2D
+            vol=0._WP
+            work_array(n)=0._WP
+            do j=1, mesh%nod_in_elem2D_num(n)
+                elem=mesh%nod_in_elem2D(j, n)
+                elnodes=mesh%elem2D_nodes(:,elem)
+                work_array(n)=work_array(n)+sum(mesh%mesh_resolution(elnodes))/3._WP*mesh%elem_area(elem)
+                vol=vol+mesh%elem_area(elem)
+            end do
+            work_array(n)=work_array(n)/vol
+        end do
+        do n=1,myDim_nod2D
+            mesh%mesh_resolution(n)=work_array(n)
+        end do
+        call exchange_nod(mesh%mesh_resolution, partit)
+    end do
+    deallocate(work_array)
 
-do n=1,myDim_nod2d+eDim_nod2D
-   do nz=1,mesh%nl
-      if (mesh%area(nz,n) > 0._WP) then
-         mesh%area_inv(nz,n) = 1._WP/mesh%area(nz,n)
-      else
-         mesh%area_inv(nz,n) = 0._WP
-      end if
-   end do
-end do
- ! coordinates are in radians, edge_dxdy are in meters,
- ! and areas are in m^2
- 
+    !___compute total ocean areas with/without cavity___________________________
+    vol = 0.0_WP
+    vol2= 0.0_WP
+    do n=1, myDim_nod2D
+!!PS         vol2=vol2+mesh%area(mesh%ulevels_nod2D(n), n) ! area also under cavity
+!!PS         if (mesh%ulevels_nod2D(n)>1) cycle
+!!PS         vol=vol+mesh%area(1, n) ! area only surface
+        vol2=vol2+mesh%areasvol(mesh%ulevels_nod2D(n), n) ! area also under cavity
+        if (mesh%ulevels_nod2D(n)>1) cycle
+        vol=vol+mesh%areasvol(1, n) ! area only surface  
+    end do
+    mesh%ocean_area=0.0_WP
+    mesh%ocean_areawithcav=0.0_WP
+    call MPI_AllREDUCE(vol, mesh%ocean_area, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+        MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(vol2, mesh%ocean_areawithcav, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+        MPI_COMM_FESOM, MPIerr)
+    
+    !___write mesh statistics___________________________________________________
+    if (mype==0) then
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' --> mesh statistics:', mype
+        write(*,*)  mype, 'maxArea ',maxval(mesh%elem_area), '   MinArea ', minval(mesh%elem_area)
+        write(*,*)  mype, 'maxScArea ',maxval(mesh%area(1,:)), &
+                    '   MinScArea ', minval(mesh%area(1,:))
+        write(*,*)  mype, 'Edges:    ', mesh%edge2D, ' internal ', mesh%edge2D_in
+        if (mype==0) then
+            write(*,*) '     > Total ocean surface area is           : ', mesh%ocean_area, ' m^2'
+            write(*,*) '     > Total ocean surface area with cavity is: ', mesh%ocean_areawithcav, ' m^2'
+        end if
+    endif
 
- allocate(work_array(myDim_nod2D))
- mesh%mesh_resolution=sqrt(mesh%area(1, :)/pi)*2._WP
- DO q=1, 3 !apply mass matrix N times to smooth the field
-    DO n=1, myDim_nod2D
-       vol=0._WP
-       work_array(n)=0._WP
-       DO j=1, mesh%nod_in_elem2D_num(n)
-          elem=mesh%nod_in_elem2D(j, n)
-          elnodes=mesh%elem2D_nodes(:,elem)
-          work_array(n)=work_array(n)+sum(mesh%mesh_resolution(elnodes))/3._WP*mesh%elem_area(elem)
-          vol=vol+mesh%elem_area(elem)
-       END DO
-       work_array(n)=work_array(n)/vol
-    END DO
-    DO n=1,myDim_nod2D
-       mesh%mesh_resolution(n)=work_array(n)
-    ENDDO
-    call exchange_nod(mesh%mesh_resolution)
- END DO
- deallocate(work_array)
-
- vol=0.0_WP
- do n=1, myDim_nod2D
-    vol=vol+mesh%area(1, n)
- end do
- mesh%ocean_area=0.0
- call MPI_AllREDUCE(vol, mesh%ocean_area, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-       MPI_COMM_FESOM, MPIerr)
-
-if (mype==0) then
- write(*,*)  mype, 'Mesh statistics:'
- write(*,*)  mype, 'maxArea ',maxval(mesh%elem_area), '   MinArea ', minval(mesh%elem_area)
- write(*,*)  mype, 'maxScArea ',maxval(mesh%area(1,:)), &
-            '   MinScArea ', minval(mesh%area(1,:))
- write(*,*)  mype, 'Edges:    ', mesh%edge2D, ' internal ', mesh%edge2D_in
- if (mype==0) then
-    write(*,*) 'Total ocean area is: ', mesh%ocean_area, ' m^2'
- end if
-endif
-
-t1=MPI_Wtime()
-if (mype==0) then
-   write(*,*) 'mesh_areas finished in ', t1-t0, ' seconds'
-   write(*,*) '========================='
-endif
+    t1=MPI_Wtime()
+    if (mype==0) then
+        write(*,*) '     > mesh_areas finished in ', t1-t0, ' seconds'
+    endif
 END SUBROUTINE mesh_areas
 
 !===================================================================
 
-SUBROUTINE mesh_auxiliary_arrays(mesh)
+SUBROUTINE mesh_auxiliary_arrays(partit, mesh)
 ! Collects auxiliary information needed to speed up computations 
 ! of gradients, div. This also makes implementation of cyclicity 
 ! much more straightforward
@@ -1948,9 +2396,9 @@ SUBROUTINE mesh_auxiliary_arrays(mesh)
 ! coriolis(myDim_elem2D)
 
 USE MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
 USE o_PARAM
-USE i_PARAM
-USE g_PARSUP
 USE o_ARRAYS
 USE g_ROTATE_grid
 use g_comm_auto
@@ -1965,10 +2413,11 @@ real(kind=WP)        :: x(3), y(3), cxx, cxy, cyy, d
 real(kind=WP), allocatable :: center_x(:), center_y(:), temp(:) 
 real(kind=WP)              :: t0, t1
 integer                    :: i, nn, ns
-type(t_mesh), intent(inout), target :: mesh
+type(t_mesh),   intent(inout), target :: mesh
+type(t_partit), intent(inout), target :: partit
 
-!NR Cannot include the pointers before the targets are allocated...
-!NR #include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 t0=MPI_Wtime()
 
  allocate(mesh%edge_dxdy(2,myDim_edge2D+eDim_edge2D))
@@ -1977,8 +2426,8 @@ t0=MPI_Wtime()
  allocate(mesh%gradient_vec(6,myDim_elem2D))
  allocate(mesh%metric_factor(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
  allocate(mesh%elem_cos(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
- allocate(coriolis(myDim_elem2D))
- allocate(coriolis_node(myDim_nod2D+eDim_nod2D))
+ allocate(mesh%coriolis(myDim_elem2D))
+ allocate(mesh%coriolis_node(myDim_nod2D+eDim_nod2D))
  allocate(mesh%geo_coord_nod2D(2,myDim_nod2D+eDim_nod2D))
  allocate(center_x(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
  allocate(center_y(myDim_elem2D+eDim_elem2D+eXDim_elem2D)) 
@@ -1989,7 +2438,7 @@ t0=MPI_Wtime()
  ! ============
  DO n=1,myDim_nod2D+eDim_nod2D 
     call r2g(lon, lat, mesh%coord_nod2D(1,n), mesh%coord_nod2D(2,n))
-    coriolis_node(n)=2*omega*sin(lat)	 
+    mesh%coriolis_node(n)=2*omega*sin(lat)	 
  END DO
 
  DO n=1,myDim_nod2D+eDim_nod2D 
@@ -2005,11 +2454,11 @@ t0=MPI_Wtime()
  DO n=1,myDim_elem2D 
     call elem_center(n, ax, ay, mesh)
     call r2g(lon, lat, ax, ay)
-    coriolis(n)=2*omega*sin(lat)	 
+    mesh%coriolis(n)=2*omega*sin(lat)	 
  END DO
   
  if(fplane) then 
-    coriolis=2*omega*0.71_WP
+    mesh%coriolis=2*omega*0.71_WP
  end if
 
  ! ============
@@ -2023,10 +2472,10 @@ t0=MPI_Wtime()
  mesh%metric_factor=tan(ay)/r_earth
  END DO
 
- call exchange_elem(mesh%metric_factor)
- call exchange_elem(mesh%elem_cos)
- call exchange_elem(center_x)
- call exchange_elem(center_y)  
+ call exchange_elem(mesh%metric_factor, partit)
+ call exchange_elem(mesh%elem_cos, partit)
+ call exchange_elem(center_x, partit)
+ call exchange_elem(center_y, partit)  
  if (cartesian) then
     mesh%elem_cos=1.0_WP
     mesh%metric_factor=0.0_WP
@@ -2241,16 +2690,16 @@ DO elem=1,myDim_elem2D
 END DO
 deallocate(center_y, center_x)
 
-    !array of 2D boundary conditions is used in ice_maEVP
-    if (whichEVP > 0) then
-       allocate(mesh%bc_index_nod2D(myDim_nod2D+eDim_nod2D))
-       mesh%bc_index_nod2D=1._WP
-       do n=1, myDim_edge2D
-          ed=mesh%edges(:, n)
-          if (myList_edge2D(n) <= mesh%edge2D_in) cycle
-          mesh%bc_index_nod2D(ed)=0._WP
-       end do
-    end if
+!     !array of 2D boundary conditions is used in ice_maEVP
+!     if (whichEVP > 0) then
+!        allocate(mesh%bc_index_nod2D(myDim_nod2D+eDim_nod2D))
+!        mesh%bc_index_nod2D=1._WP
+!        do n=1, myDim_edge2D
+!           ed=mesh%edges(:, n)
+!           if (myList_edge2D(n) <= mesh%edge2D_in) cycle
+!           mesh%bc_index_nod2D(ed)=0._WP
+!        end do
+!     end if
 
 #if defined (__oasis)
   nn=0
@@ -2261,10 +2710,10 @@ deallocate(center_y, center_x)
   do i=1, myDim_nod2D
      if (mesh%geo_coord_nod2D(2, i) > 0) then
         nn=nn+1
-        mesh%lump2d_north(i)=mesh%area(1, i)
+        mesh%lump2d_north(i)=mesh%areasvol(mesh%ulevels_nod2d(i), i)
      else
         ns=ns+1     
-        mesh%lump2d_south(i)=mesh%area(1, i)
+        mesh%lump2d_south(i)=mesh%area(mesh%ulevels_nod2d(i), i)
      end if	   
   end do   
 
@@ -2290,13 +2739,14 @@ deallocate(center_y, center_x)
     endif
 
 END SUBROUTINE mesh_auxiliary_arrays
-
-!===================================================================
-
-SUBROUTINE check_mesh_consistency(mesh)
+!
+!
+!_______________________________________________________________________________
+SUBROUTINE check_mesh_consistency(partit, mesh)
 USE MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
 USE o_PARAM
-USE g_PARSUP
 USE g_ROTATE_GRID
   use g_comm_auto
 IMPLICIT NONE
@@ -2304,10 +2754,12 @@ IMPLICIT NONE
 ! Allocated and filled in are:
 ! elem_area(myDim_elem2D)
 ! area(nl, myDim_nod2D)
-type(t_mesh), intent(inout), target :: mesh
+type(t_mesh),   intent(inout), target :: mesh
+type(t_partit), intent(inout), target :: partit
 integer                     :: nz, n, elem , elnodes(3)
 real(kind=WP)	            :: vol_n(mesh%nl), vol_e(mesh%nl), aux(mesh%nl)
-
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
    vol_n=0._WP
    vol_e=0._WP
@@ -2315,7 +2767,7 @@ real(kind=WP)	            :: vol_n(mesh%nl), vol_e(mesh%nl), aux(mesh%nl)
    aux=0._WP
    do n=1, myDim_nod2D
       do nz=mesh%ulevels_nod2D(n), mesh%nlevels_nod2D(n)-1
-         aux(nz)=aux(nz)+mesh%area(nz, n)
+         aux(nz)=aux(nz)+mesh%areasvol(nz, n)
       end do
    end do
    call MPI_AllREDUCE(aux, vol_n, mesh%nl, MPI_DOUBLE_PRECISION, MPI_SUM, &
@@ -2325,7 +2777,7 @@ real(kind=WP)	            :: vol_n(mesh%nl), vol_e(mesh%nl), aux(mesh%nl)
    do elem=1, myDim_elem2D
       elnodes=mesh%elem2D_nodes(:, elem)
       if (elnodes(1) > myDim_nod2D) CYCLE
-      do nz=mesh%ulevels(elem), mesh%nlevels(elem)         
+      do nz=mesh%ulevels(elem), mesh%nlevels(elem)-1         
          aux(nz)=aux(nz)+mesh%elem_area(elem)
       end do
    end do
@@ -2340,7 +2792,65 @@ end do
 write(*,*) '***end level area_test***'
 end if
 
-!call par_ex
+!call par_ex(partit%MPI_COMM_FESOM, partit%mype)
 !stop
 END SUBROUTINE check_mesh_consistency
-!==================================================================
+!
+!
+!_______________________________________________________________________________
+subroutine check_total_volume(partit, mesh)
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE o_PARAM
+    use g_comm_auto
+    use o_ARRAYS
+    
+    IMPLICIT NONE
+    type(t_mesh),   intent(inout), target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    integer                               :: nz, n, elem , elnodes(3)
+    real(kind=WP)	                  :: vol_n, vol_e, aux
+    
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+    !___________________________________________________________________________
+    vol_n=0._WP
+    vol_e=0._WP
+    !___________________________________________________________________________
+    ! total ocean volume on nodes
+    aux=0._WP
+    do n=1, myDim_nod2D
+        do nz=ulevels_nod2D(n), nlevels_nod2D(n)-1
+            aux=aux+areasvol(nz, n)*hnode(nz,n)
+        end do
+    end do
+    call MPI_AllREDUCE(aux, vol_n, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    !___________________________________________________________________________
+    ! total ocean volume on elements
+    aux=0._WP
+    do elem=1, myDim_elem2D
+        elnodes=elem2D_nodes(:, elem)
+        if (elnodes(1) > myDim_nod2D) cycle
+        do nz=ulevels(elem), nlevels(elem)-1         
+            aux=aux+elem_area(elem)*helem(nz,elem)
+        end do
+    end do
+    call MPI_AllREDUCE(aux, vol_e, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+
+    !___write mesh statistics___________________________________________________
+    if (mype==0) then
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' --> ocean volume check:', mype
+        write(*,*) '     > Total ocean volume node:', vol_n, ' m^3'
+        write(*,*) '     > Total ocean volume elem:', vol_e, ' m^3'
+        
+    end if
+
+end subroutine check_total_volume
+!
+!
+!_______________________________________________________________________________

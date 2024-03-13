@@ -1,5 +1,5 @@
 !=======================================================================
-subroutine oce_mixing_pp(mesh)
+subroutine oce_mixing_pp(dynamics, partit, mesh)
     !  Compute Richardson number dependent Av and Kv following
     !  Pacanowski and Philander, 1981
     !  Av = Avmax * factor**2 + Av0,
@@ -15,19 +15,28 @@ subroutine oce_mixing_pp(mesh)
     ! SD no if in Kv computations (only minor differences are introduced)
     !    
     !      
-use MOD_MESH
+USE MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
+USE MOD_DYN
 USE o_PARAM
 USE o_ARRAYS
-USE g_PARSUP
 USE g_config
-use i_arrays
 IMPLICIT NONE
 
-type(t_mesh), intent(in) , target :: mesh
-real(kind=WP)            :: dz_inv, bv, shear, a, rho_up, rho_dn, t, s, Kv0_b
-integer                  :: node, nz, nzmax, nzmin, elem, elnodes(3), i
+type(t_mesh),   intent(in),    target :: mesh
+type(t_partit), intent(inout), target :: partit
+type(t_dyn), intent(inout), target :: dynamics
+real(kind=WP)                    :: dz_inv, bv, shear, a, rho_up, rho_dn, t, s, Kv0_b
+integer                          :: node, nz, nzmax, nzmin, elem, elnodes(3), i
+real(kind=WP), dimension(:,:,:), pointer :: UVnode
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+UVnode=>dynamics%uvnode(:,:,:)
 
-#include "associate_mesh.h"
+
     !___________________________________________________________________________
     do node=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2d(node)
@@ -38,8 +47,8 @@ integer                  :: node, nz, nzmax, nzmin, elem, elnodes(3), i
         !!PS do nz=2,nlevels_nod2d(node)-1
         do nz=nzmin+1,nzmax-1
             dz_inv=1.0_WP/(Z_3d_n(nz-1,node)-Z_3d_n(nz,node))
-            shear = (Unode(1,nz-1,node)-Unode(1,nz,node))**2 +&
-                    (Unode(2,nz-1,node)-Unode(2,nz,node))**2 
+            shear = (UVnode(1,nz-1,node)-UVnode(1,nz,node))**2 +&
+                    (UVnode(2,nz-1,node)-UVnode(2,nz,node))**2 
             shear = shear*dz_inv*dz_inv
             Kv(nz,node) = shear/(shear+5._WP*max(bvfreq(nz,node),0.0_WP)+1.0e-14)  ! To avoid NaNs at start
         end do

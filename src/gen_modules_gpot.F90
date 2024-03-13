@@ -23,9 +23,10 @@
 MODULE mo_tidal
       USE o_PARAM
       USE o_ARRAYS, only : ssh_gp
-      USE mod_mesh
+      USE MOD_MESH
+      USE MOD_PARTIT
+      USE MOD_PARSUP
       USE g_config, only : dt
-      USE g_PARSUP
       USE g_clock
       IMPLICIT NONE
       !Earth Tides ( maik thomas, emr  pers. comm )
@@ -36,14 +37,14 @@ MODULE mo_tidal
       CONTAINS
 
 
-      SUBROUTINE foreph_ini(lyear,lmonth)
+      SUBROUTINE foreph_ini(lyear,lmonth, partit)
       ! Initialization of tidal module
       ! Determination of Julian Day of first time step
       ! Projection of mpiom grid on tidal module internal coordinates
 
       IMPLICIT NONE
-
-      INTEGER,INTENT(IN)::lyear,lmonth
+      type(t_partit), intent(in) :: partit
+      INTEGER,INTENT(IN)         :: lyear,lmonth
       INTEGER :: i, j, jcc, moph
 
       mmccdt = 0; jcc = 0; moph = 0
@@ -57,7 +58,7 @@ MODULE mo_tidal
       ! FIXME : replace eph by a some to code that directly calculates julian days and
       ! centuries as needed by siderial time and ephemerides
 
-      if (mype==0) WRITE(*,*)'tidal: phase relative to 2000 :'    &
+      if (partit%mype==0) WRITE(*,*)'tidal: phase relative to 2000 :'    &
       ,'year= ',lyear, 'month= ',lmonth, 'yearoff= ',jcc,' monoff= ',moph ,'mmccdt= ',mmccdt
 
       END SUBROUTINE foreph_ini
@@ -107,18 +108,22 @@ MODULE mo_tidal
 
       END SUBROUTINE eph
 
-      SUBROUTINE foreph(mesh)
+      SUBROUTINE foreph(partit, mesh)
 !     calculates the realtime gravitational potential of sun & moon
 !     output: ssh_gp (with Body Earth Tide effect)
 
       IMPLICIT NONE
-      type(t_mesh), intent(in) , target :: mesh
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
       REAL(WP) :: dres(3,2),crim3,rkomp,erdrad,rekts,dekls
       REAL(WP) :: cris3,rektm,deklm,deklm2,dekls2,sidm,sidmq
       REAL(WP) :: rkosp,codm,codmq,sids,sidsq,cods,codsq,sidm2
       REAL(WP) :: sids2,hamp,hasp
       INTEGER :: i,j
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
       mmccdt = mmccdt + 1
 

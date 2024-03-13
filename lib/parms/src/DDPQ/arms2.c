@@ -227,14 +227,15 @@ static int parms_arms_getssize_vcsr(parms_Operator self)
 }
 
 static struct parms_Operator_ops parms_arms_sol_vptr = {
-  parms_arms_sol_vcsr,
-  parms_arms_lsol_vcsr,
-  parms_arms_invs_vcsr,
-  parms_arms_ascend_vcsr,
-  parms_arms_getssize_vcsr,
-  parms_arms_nnz,
-  arms_free_vcsr,
-  arms_view_vcsr
+  parms_arms_sol_vcsr,        /* apply */
+  parms_arms_lsol_vcsr,       /* lsol */
+  parms_arms_invs_vcsr,       /* invs */
+  NULL,                       /* getu             !!! WARNING,  UNASSIGNED !!! */
+  parms_arms_ascend_vcsr,     /* ascend */
+  parms_arms_getssize_vcsr,   /* getssize */
+  parms_arms_nnz,             /* getnnz */
+  arms_free_vcsr,             /* operator_free */
+  arms_view_vcsr              /* operator_view */
 };
 
 
