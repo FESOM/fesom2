@@ -117,17 +117,12 @@ SUBROUTINE tracer_gradient_z(ttf, partit, mesh)
 #include "associate_mesh_ass.h" 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, dz)
     DO n=1, myDim_nod2D+eDim_nod2D
-    !!PS nlev=nlevels_nod2D(n)
     nzmax=nlevels_nod2D(n)
     nzmin=ulevels_nod2D(n)
-    !!PS DO nz=2,  nlev-1
     DO nz=nzmin+1,  nzmax-1
-!PS         dz=0.5_WP*(hnode_new(nz-1,n)+hnode_new(nz,n))
         dz=0.5_WP*(hnode(nz-1,n)+hnode(nz,n))
         tr_z(nz, n)=(ttf(nz-1,n)-ttf(nz,n))/dz
     END DO
-    !!PS tr_z(1,    n)=0.0_WP
-    !!PS tr_z(nlev, n)=0.0_WP
     tr_z(nzmin, n)=0.0_WP
     tr_z(nzmax, n)=0.0_WP
     END DO
