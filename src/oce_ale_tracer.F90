@@ -140,6 +140,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use o_tracers
     use Toy_Channel_Soufflet
     use diff_tracers_ale_interface
+    use diagnostics, only: ldiag_DVD
     use oce_adv_tra_driver_interfaces
     implicit none
     type(t_ice)   , intent(in)   , target    :: ice
@@ -193,6 +194,12 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! loop over all tracers
     do tr_num=1, tracers%num_tracers
+    
+        ! DVD diagostic: store tracer (only temp and salt) from previouse time steps
+        if ((ldiag_DVD) .and. (tr_num<=2)) then 
+            tracers%work%dvd_trold(:,:, tr_num) = tracers%data(tr_num)%values(:,:)
+        end if
+        
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
@@ -228,22 +235,35 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
            tracers%work%del_ttf(:, node)=tracers%work%del_ttf(:, node)+tracers%work%del_ttf_advhoriz(:, node)+tracers%work%del_ttf_advvert(:, node)
         end do
 !$OMP END PARALLEL DO
-           !___________________________________________________________________________
-           ! AB is not needed after the advection step. Initialize it with the current tracer before it is modified.
-           ! call init_tracers_AB at the beginning of this loop will compute AB for the next time step then.
+
+        !___________________________________________________________________________
+        ! AB is not needed after the advection step. Initialize it with the current tracer before it is modified.
+        ! call init_tracers_AB at the beginning of this loop will compute AB for the next time step then.
+        ! DVD diagostic: store AB tracer before it gets overwritten 
+        if ((ldiag_DVD) .and. (tr_num<=2)) then 
+!$OMP PARALLEL DO
+            do node=1, myDim_nod2d+eDim_nod2D        
+                tracers%work%dvd_trAB(:,node, tr_num) = tracers%data(tr_num)%valuesAB(:, node)
+            end do
+!$OMP END PARALLEL DO     
+        end if 
+        
 !$OMP PARALLEL DO
         do node=1, myDim_nod2d+eDim_nod2D
            tracers%data(tr_num)%valuesAB(:, node)=tracers%data(tr_num)%values(:, node) !DS: check that this is the right place!
         end do
 !$OMP END PARALLEL DO
+
+        !___________________________________________________________________________
         ! diffuse tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
         call diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
 
+        !___________________________________________________________________________
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
-!       if ((toy_ocean) .AND. ((tr_num==1) .AND. (TRIM(which_toy)=="soufflet"))) then
-        if ((toy_ocean) .AND. ((TRIM(which_toy)=="soufflet"))) then
+        if ((toy_ocean) .AND. ((tr_num==1) .AND. (TRIM(which_toy)=="soufflet"))) then
+        !PS f ((toy_ocean) .AND. ((TRIM(which_toy)=="soufflet"))) then
             call relax_zonal_temp(tracers%data(1), partit, mesh)
         else
             call relax_to_clim(tr_num, tracers, partit, mesh)
@@ -455,6 +475,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
     use o_mixing_KPP_mod !for ghats _GO_
     use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
     use bc_surface_interface
+    use diagnostics, only: ldiag_DVD
     implicit none
     integer       , intent(in)   , target :: tr_num
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -466,7 +487,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
     real(kind=WP)            :: cp(mesh%nl), tp(mesh%nl)
     integer                  :: nz, n, nzmax, nzmin
     real(kind=WP)            :: m, zinv, dz
-    real(kind=WP)            :: rsss, Ty, Ty1, c1, zinv1, zinv2, v_adv
+    real(kind=WP)            :: rsss, Ty, Ty1, c1, zinv1, zinv2, v_adv, sfbc
     real(kind=WP)            :: isredi=0._WP
     logical                  :: do_wimpl=.true.
     real(kind=WP)            :: zbar_n(mesh%nl), z_n(mesh%nl-1)
@@ -852,7 +873,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
         !                            v   (+)                        v   (+)
         !
         tr(nzmin)= tr(nzmin)+bc_surface(n, tracers%data(tr_num)%ID, trarr(nzmin,n), nzmin, partit)
-
+        
         !_______________________________________________________________________
         ! The forward sweep algorithm to solve the three-diagonal matrix
         ! problem
@@ -967,16 +988,6 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
         vd_flux=0._WP
 
         !_______________________________________________________________________
-!PS         zbar_n(1:mesh%nl  )=0.0_WP
-!PS         z_n   (1:mesh%nl-1)=0.0_WP
-!PS         zbar_n(nl1+1)=zbar_n_bot(n)
-!PS         z_n(nl1)=zbar_n(nl1+1) + hnode_new(nl1,n)/2.0_WP
-!PS         do nz=nl1, ul1+1, -1
-!PS             zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
-!PS             z_n(nz-1)  = zbar_n(nz)   + hnode_new(nz-1,n)/2.0_WP
-!PS         end do
-!PS         zbar_n(ul1) = zbar_n(ul1+1)   + hnode_new(ul1,n)
-        
         zbar_n(1:mesh%nl  )=0.0_WP
         z_n   (1:mesh%nl-1)=0.0_WP
         zbar_n(nl1+1)=zbar_n_bot(n)
@@ -995,7 +1006,7 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
             vd_flux(nz)=vd_flux(nz)/(z_n(nz-1)-z_n(nz))*area(nz,n)
         enddo
         do nz=ul1,nl1
-            del_ttf(nz,n) = del_ttf(nz,n)+(vd_flux(nz) - vd_flux(nz+1))*dt/areasvol(nz,n)
+            del_ttf(nz,n) = del_ttf(nz,n) + (vd_flux(nz)-vd_flux(nz+1)) * dt/areasvol(nz,n)
         enddo
     end do
 !$OMP END DO
