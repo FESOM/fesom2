@@ -254,10 +254,7 @@ subroutine write_t_mesh(mesh, unit, iostat, iomsg)
     call write_bin_array(mesh%hnode_new,               unit, iostat, iomsg)
     call write_bin_array(mesh%zbar_3d_n,               unit, iostat, iomsg)
     call write_bin_array(mesh%Z_3d_n,                  unit, iostat, iomsg)
-! LA 2023-01-31 add icebergs
-!#if defined(__async_icebergs)
     call write_bin_array(mesh%Z_3d_n_ib,               unit, iostat, iomsg)
-!#endif 
     call write_bin_array(mesh%helem,                   unit, iostat, iomsg)
     call write_bin_array(mesh%bottom_elem_thickness,   unit, iostat, iomsg)
     call write_bin_array(mesh%bottom_node_thickness,   unit, iostat, iomsg)
@@ -354,10 +351,7 @@ subroutine read_t_mesh(mesh, unit, iostat, iomsg)
     call read_bin_array(mesh%hnode_new,               unit, iostat, iomsg)
     call read_bin_array(mesh%zbar_3d_n,               unit, iostat, iomsg)
     call read_bin_array(mesh%Z_3d_n,                  unit, iostat, iomsg)
-! LA 2023-01-31 add icebergs
-!#if defined(__async_icebergs)
     call read_bin_array(mesh%Z_3d_n_ib,               unit, iostat, iomsg)
-!#endif 
     call read_bin_array(mesh%helem,                   unit, iostat, iomsg)
     call read_bin_array(mesh%bottom_elem_thickness,   unit, iostat, iomsg)
     call read_bin_array(mesh%bottom_node_thickness,   unit, iostat, iomsg)
