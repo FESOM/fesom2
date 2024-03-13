@@ -586,8 +586,10 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         do row=1, myDim_nod2D
             if (ulevels_nod2d(row)>1) cycle
             n=nn_num(row)
-            tmax(row)=maxval(m_icel(nn_pos(1:n,row)))
-            tmin(row)=minval(m_icel(nn_pos(1:n,row)))
+            tmax(row)=max(maxval(m_icel(nn_pos(1:n,row))), maxval(m_ice(nn_pos(1:n,row))))
+            tmin(row)=min(minval(m_icel(nn_pos(1:n,row))), minval(m_ice(nn_pos(1:n,row))))
+            ! tmax(row)=maxval(m_icel(nn_pos(1:n,row)))
+            ! tmin(row)=minval(m_icel(nn_pos(1:n,row)))
             ! Admissible increments
             tmax(row)=tmax(row)-m_icel(row)
             tmin(row)=tmin(row)-m_icel(row)
@@ -602,8 +604,10 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         do row=1, myDim_nod2D
             if (ulevels_nod2d(row)>1) cycle
             n=nn_num(row)
-            tmax(row)=maxval(a_icel(nn_pos(1:n,row)))
-            tmin(row)=minval(a_icel(nn_pos(1:n,row)))
+            tmax(row)=max(maxval(a_icel(nn_pos(1:n,row))), maxval(a_ice(nn_pos(1:n,row))))
+            tmin(row)=min(minval(a_icel(nn_pos(1:n,row))), minval(a_ice(nn_pos(1:n,row))))
+            !tmax(row)=maxval(a_icel(nn_pos(1:n,row)))
+            !tmin(row)=minval(a_icel(nn_pos(1:n,row)))
             ! Admissible increments
             tmax(row)=tmax(row)-a_icel(row)
             tmin(row)=tmin(row)-a_icel(row)
@@ -618,8 +622,10 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         do row=1, myDim_nod2D
             if (ulevels_nod2d(row)>1) cycle
             n=nn_num(row)
-            tmax(row)=maxval(m_snowl(nn_pos(1:n,row)))
-            tmin(row)=minval(m_snowl(nn_pos(1:n,row)))
+            tmax(row)=max(maxval(m_snowl(nn_pos(1:n,row))), maxval(m_snow(nn_pos(1:n,row))))
+            tmin(row)=min(minval(m_snowl(nn_pos(1:n,row))), minval(m_snow(nn_pos(1:n,row))))
+            !tmax(row)=maxval(m_snowl(nn_pos(1:n,row)))
+            !tmin(row)=minval(m_snowl(nn_pos(1:n,row)))
             ! Admissible increments
             tmax(row)=tmax(row)-m_snowl(row)
             tmin(row)=tmin(row)-m_snowl(row)
@@ -635,8 +641,8 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         do row=1, myDim_nod2D
             if (ulevels_nod2d(row)>1) cycle
             n=nn_num(row)
-            tmax(row)=maxval(m_templ(nn_pos(1:n,row)))
-            tmin(row)=minval(m_templ(nn_pos(1:n,row)))
+            tmax(row)=max(maxval(m_templ(nn_pos(1:n,row))), maxval(ice_temp(nn_pos(1:n,row))))
+            tmin(row)=min(minval(m_templ(nn_pos(1:n,row))), minval(ice_temp(nn_pos(1:n,row))))
             ! Admissible increments
             tmax(row)=tmax(row)-m_templ(row)
             tmin(row)=tmin(row)-m_templ(row)
