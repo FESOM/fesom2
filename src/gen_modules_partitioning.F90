@@ -95,21 +95,6 @@ subroutine par_init(partit)    ! initializes MPI
     write(*, *) 'This is MPI/OpenMP run, with ', OMP_GET_MAX_THREADS(), ' threads per PE'
 #endif
   end if
-  
-!---------------------------------------------------
-!LA 2023-01-31 add asynchronous icebergs
-#ifndef __async_icebergs
-! kh 04.02.21 OpenMP is used for parallel partitioning
- !$OMP threadprivate(com_nod2D,com_elem2D,com_elem2D_full)
- !$OMP threadprivate(mype)
- !$OMP threadprivate(myDim_nod2D, eDim_nod2D, myList_nod2D)
- !$OMP threadprivate(myDim_elem2D, eDim_elem2D, eXDim_elem2D, myList_elem2D)
- !$OMP threadprivate(myDim_edge2D, eDim_edge2D, myList_edge2D)
-!#else
-! kh 04.02.21 OpenMP is used for asynchronous iceberg computations, i.e. a shared access is required
-#endif  
-!---------------------------------------------------
-
 end subroutine par_init
 !=================================================================
 subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
