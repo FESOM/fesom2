@@ -140,7 +140,6 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use o_tracers
     use Toy_Channel_Soufflet
     use diff_tracers_ale_interface
-    use diagnostics, only: ldiag_DVD
     use oce_adv_tra_driver_interfaces
     implicit none
     type(t_ice)   , intent(in)   , target    :: ice
@@ -195,11 +194,6 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     ! loop over all tracers
     do tr_num=1, tracers%num_tracers
     
-        ! DVD diagostic: store tracer (only temp and salt) from previouse time steps
-        if ((ldiag_DVD) .and. (tr_num<=2)) then 
-            tracers%work%dvd_trold(:,:, tr_num) = tracers%data(tr_num)%values(:,:)
-        end if
-        
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
@@ -238,16 +232,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 
         !___________________________________________________________________________
         ! AB is not needed after the advection step. Initialize it with the current tracer before it is modified.
-        ! call init_tracers_AB at the beginning of this loop will compute AB for the next time step then.
-        ! DVD diagostic: store AB tracer before it gets overwritten 
-        if ((ldiag_DVD) .and. (tr_num<=2)) then 
-!$OMP PARALLEL DO
-            do node=1, myDim_nod2d+eDim_nod2D        
-                tracers%work%dvd_trAB(:,node, tr_num) = tracers%data(tr_num)%valuesAB(:, node)
-            end do
-!$OMP END PARALLEL DO     
-        end if 
-        
+        ! call init_tracers_AB at the beginning of this loop will compute AB for the next time step then.     
 !$OMP PARALLEL DO
         do node=1, myDim_nod2d+eDim_nod2D
            tracers%data(tr_num)%valuesAB(:, node)=tracers%data(tr_num)%values(:, node) !DS: check that this is the right place!
@@ -262,8 +247,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         !___________________________________________________________________________
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
-        if ((toy_ocean) .AND. ((tr_num==1) .AND. (TRIM(which_toy)=="soufflet"))) then
-        !PS f ((toy_ocean) .AND. ((TRIM(which_toy)=="soufflet"))) then
+        ! if ((toy_ocean) .AND. ((tr_num==1) .AND. (TRIM(which_toy)=="soufflet"))) then
+        if ((toy_ocean) .AND. ((TRIM(which_toy)=="soufflet"))) then
             call relax_zonal_temp(tracers%data(1), partit, mesh)
         else
             call relax_to_clim(tr_num, tracers, partit, mesh)
@@ -475,7 +460,6 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
     use o_mixing_KPP_mod !for ghats _GO_
     use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
     use bc_surface_interface
-    use diagnostics, only: ldiag_DVD
     implicit none
     integer       , intent(in)   , target :: tr_num
     type(t_dyn)   , intent(inout), target :: dynamics
