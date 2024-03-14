@@ -101,7 +101,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
     !___________________________________________________________________________
-    integer                               :: n
+    integer                               :: i, n
     
     !___setup virt_salt_flux____________________________________________________
     ! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
@@ -234,7 +234,9 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
 
     if (.not.r_restart) then
        do n=1, tracers%num_tracers
-          tracers%data(n)%valuesAB=tracers%data(n)%values
+          do i=1, tracers%data(n)%AB_order-1
+             tracers%data(n)%valuesold(i,:,:)=tracers%data(n)%values
+          end do
        end do
     end if
     
@@ -273,6 +275,8 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     USE MOD_TRACER
     USE DIAGNOSTICS, only: ldiag_DVD
     USE g_ic3d
+    use g_forcing_param, only: use_age_tracer !---age-code
+    use g_config, only : lwiso   ! add lwiso switch
     IMPLICIT NONE
     type(t_tracer), intent(inout), target               :: tracers
     type(t_partit), intent(inout), target               :: partit
@@ -288,9 +292,10 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     integer        :: num_tracers
     logical        :: i_vert_diff, smooth_bh_tra
     real(kind=WP)  :: gamma0_tra, gamma1_tra, gamma2_tra
+    integer        :: AB_order
     namelist /tracer_listsize/ num_tracers
     namelist /tracer_list    / nml_tracer_list
-    namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff
+    namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -324,6 +329,50 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     end if
     end do
 
+    !---wiso-code
+    !=====================
+    ! set necessary water isotope variables
+    !=====================
+    IF (lwiso) THEN
+      ! always assume 3 water isotope tracers in the order H218O, HD16O, H216O
+      ! tracers simulated in the model
+      nml_tracer_list(num_tracers+1) = nml_tracer_list(1) ! use the same scheme as temperature
+      nml_tracer_list(num_tracers+2) = nml_tracer_list(1)
+      nml_tracer_list(num_tracers+3) = nml_tracer_list(1)
+
+      nml_tracer_list(num_tracers+1)%id = 101
+      nml_tracer_list(num_tracers+2)%id = 102
+      nml_tracer_list(num_tracers+3)%id = 103
+
+      index_wiso_tracers(1) = num_tracers+1
+      index_wiso_tracers(2) = num_tracers+2
+      index_wiso_tracers(3) = num_tracers+3
+
+      num_tracers = num_tracers + 3
+
+      ! tracers initialised from file
+      idlist((n_ic3d+1):(n_ic3d+3)) = (/101, 102, 103/)
+      filelist((n_ic3d+1):(n_ic3d+3)) = (/'wiso.nc', 'wiso.nc', 'wiso.nc'/)
+      varlist((n_ic3d+1):(n_ic3d+3))  = (/'h2o18', 'hDo16', 'h2o16'/)
+
+      n_ic3d = n_ic3d + 3
+
+      if (mype==0) write(*,*) '3 water isotope tracers will be used in FESOM'
+    END IF
+    !---wiso-code-end
+
+    !---age-code-begin
+    if (use_age_tracer) then
+      ! add age tracer in the model
+      nml_tracer_list(num_tracers+1) = nml_tracer_list(1)
+      nml_tracer_list(num_tracers+1)%id = 100
+      index_age_tracer = num_tracers+1
+      num_tracers = num_tracers + 1
+
+      if (mype==0) write(*,*) '1 water age tracer will be used in FESOM'
+    endif
+    !---age-code-end
+
     if (mype==0) write(*,*) 'total number of tracers is: ', num_tracers
 
     !___________________________________________________________________________
@@ -337,8 +386,10 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     ! Temperature (index=1), Salinity (index=2), etc.
     allocate(tracers%data(num_tracers))
     do n=1, tracers%num_tracers
-        allocate(tracers%data(n)%values  (nl-1,node_size))
-        allocate(tracers%data(n)%valuesAB(nl-1,node_size))
+        allocate(tracers%data(n)%values   (                             nl-1, node_size))
+        allocate(tracers%data(n)%valuesAB (                             nl-1, node_size))
+        tracers%data(n)%AB_order      = AB_order        
+        allocate(tracers%data(n)%valuesold(tracers%data(n)%AB_order-1,  nl-1, node_size))
         tracers%data(n)%ID            = nml_tracer_list(n)%id
         tracers%data(n)%tra_adv_hor   = TRIM(nml_tracer_list(n)%adv_hor)
         tracers%data(n)%tra_adv_ver   = TRIM(nml_tracer_list(n)%adv_ver)
@@ -351,6 +402,7 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
         tracers%data(n)%gamma2_tra    = gamma2_tra
         tracers%data(n)%values        = 0.
         tracers%data(n)%valuesAB      = 0.
+        tracers%data(n)%valuesold     = 0.
         tracers%data(n)%i_vert_diff   = i_vert_diff
     end do
     allocate(tracers%work%del_ttf(nl-1,node_size))
@@ -396,11 +448,12 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     logical        :: use_freeslip =.false.
     logical        :: use_wsplit   =.false.
     logical        :: ldiag_KE     =.false.
+    integer        :: AB_order     = 2
     logical        :: check_opt_visc=.true.
     real(kind=WP)  :: wsplit_maxcfl
     namelist /dynamics_visc   / opt_visc, check_opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
                                 use_ivertvisc, visc_easybsreturn
-    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, ldiag_KE
+    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, ldiag_KE, AB_order
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -436,6 +489,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     dynamics%use_wsplit        = use_wsplit
     dynamics%wsplit_maxcfl     = wsplit_maxcfl
     dynamics%ldiag_KE          = ldiag_KE
+    dynamics%AB_order          = AB_order
     !___________________________________________________________________________
     ! define local vertice & elem array size
     elem_size=myDim_elem2D+eDim_elem2D
@@ -445,7 +499,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     ! allocate/initialise horizontal velocity arrays in derived type
     allocate(dynamics%uv(        2, nl-1, elem_size))
     allocate(dynamics%uv_rhs(    2, nl-1, elem_size))
-    allocate(dynamics%uv_rhsAB(  2, nl-1, elem_size))
+    allocate(dynamics%uv_rhsAB(  dynamics%AB_order-1, 2, nl-1, elem_size))
     allocate(dynamics%uvnode(    2, nl-1, node_size))
     dynamics%uv              = 0.0_WP
     dynamics%uv_rhs          = 0.0_WP
@@ -509,8 +563,8 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
        allocate(dynamics%ke_umean  (2, nl-1, elem_size))
        allocate(dynamics%ke_u2mean (2, nl-1, elem_size))
        allocate(dynamics%ke_du2    (2, nl-1, elem_size))
-       allocate(dynamics%ke_adv_AB (2, nl-1, elem_size))
-       allocate(dynamics%ke_cor_AB (2, nl-1, elem_size))
+       allocate(dynamics%ke_adv_AB (dynamics%AB_order-1, 2, nl-1, elem_size))
+       allocate(dynamics%ke_cor_AB (dynamics%AB_order-1, 2, nl-1, elem_size))
        allocate(dynamics%ke_rhs_bak(2, nl-1, elem_size))
        allocate(dynamics%ke_wrho   (nl-1, node_size))
        allocate(dynamics%ke_dW     (nl-1, node_size))
@@ -584,7 +638,7 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     type(t_mesh),   intent(in),    target :: mesh
     !___________________________________________________________________________
     integer                               :: elem_size, node_size
-    integer                               :: n
+    integer                               :: n, nt
     !___________________________________________________________________________
     ! define dynamics namelist parameter
 #include "associate_part_def.h"
@@ -619,6 +673,10 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     ! Ocean forcing arrays
     ! ================
     allocate(Tclim(nl-1,node_size), Sclim(nl-1, node_size))
+    !---
+    ! LA: add iceberg tracers 2023-02-08
+    allocate(Tclim_ib(nl-1,node_size), Sclim_ib(nl-1, node_size))
+    !---
     allocate(stress_surf(2,myDim_elem2D))    !!! Attention, it is shorter !!! 
     allocate(stress_node_surf(2,node_size))
     allocate(stress_atmoce_x(node_size), stress_atmoce_y(node_size)) 
@@ -630,6 +688,7 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
 
     allocate(heat_flux_in(node_size))
     allocate(real_salt_flux(node_size)) !PS
+
     ! =================
     ! Arrays used to organize surface forcing
     ! =================
@@ -762,6 +821,25 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
 !!PS     dum_2d_e = 0.0_WP
 !!PS     dum_3d_e = 0.0_WP
 
+    !---wiso-code
+    if (lwiso) then
+      allocate(tr_arr_ice(node_size,3))  ! add sea ice tracers
+      allocate(wiso_flux_oce(node_size,3))
+      allocate(wiso_flux_ice(node_size,3))
+
+      ! initialize sea ice isotopes with 0. permill
+      ! absolute tracer values are increased by factor 1000. for numerical reasons
+      ! (see also routine oce_fluxes in ice_oce_coupling.F90)
+      do nt = 1,3
+         tr_arr_ice(:,nt)=wiso_smow(nt) * 1000.0_WP
+      end do
+
+      ! initialize atmospheric fluxes over open ocean and sea ice
+      wiso_flux_oce=0.0_WP
+      wiso_flux_ice=0.0_WP
+    end if
+    !---wiso-code-end
+
 END SUBROUTINE arrays_init
 !
 !
@@ -806,6 +884,13 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     Sclim=tracers%data(2)%values
     Tsurf=Tclim(1,:)
     Ssurf=Sclim(1,:)
+    
+    if (use_icebergs) then
+      Tclim_ib=tracers%data(1)%values
+      Sclim_ib=tracers%data(2)%values
+      Tsurf_ib=Tclim(1,:)
+      Ssurf_ib=Sclim(1,:)
+    end if
     relax2clim=0.0_WP
 
     ! count the passive tracers which require 3D source (ptracers_restore_total)
@@ -828,15 +913,41 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     DO i=3, tracers%num_tracers
         id=tracers%data(i)%ID
         SELECT CASE (id)
-        !_______________________________________________________________________
-        CASE (101)       ! initialize tracer ID=101
-            tracers%data(i)%values(:,:)=0.0_WP
-            if (mype==0) then
-                write (i_string,  "(I3)") i
-                write (id_string, "(I3)") id
-                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
-            end if
-            
+        !---age-code-begin
+        ! FESOM tracers with code id 100 are used as water age
+        CASE (100)
+          if (mype==0) then
+             write (i_string,  "(I3)") i
+             write (id_string, "(I3)") id
+             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+             write (*,*) tracers%data(i)%values(1,1)
+          end if
+        !---age-code-end
+        !---wiso-code
+        ! FESOM tracers with code id 101, 102, 103 are used as water isotopes
+        CASE (101)       ! initialize tracer ID=101 H218O
+          if (mype==0) then
+             write (i_string,  "(I3)") i
+             write (id_string, "(I3)") id
+             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+             write (*,*) tracers%data(i)%values(1,1)
+          end if
+        CASE (102)       ! initialize tracer ID=102 HD16O
+          if (mype==0) then
+             write (i_string,  "(I3)") i
+             write (id_string, "(I3)") id
+             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+             write (*,*) tracers%data(i)%values(1,1)
+          end if
+        CASE (103)       ! initialize tracer ID=103 H216O
+          if (mype==0) then
+             write (i_string,  "(I3)") i
+             write (id_string, "(I3)") id
+             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+             write (*,*) tracers%data(i)%values(1,1)
+          end if
+        !---wiso-code-end
+
         !_______________________________________________________________________            
         CASE (301) !Fram Strait 3d restored passive tracer
             tracers%data(i)%values(:,:)=0.0_WP

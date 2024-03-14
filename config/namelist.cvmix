@@ -25,8 +25,10 @@ idemix_jstar       = 5.0        ! spectral bandwidth in modes (dimensionless)
 idemix_mu0         = 0.33333333 ! dissipation parameter (dimensionless)
 idemix_sforcusage  = 0.2
 idemix_n_hor_iwe_prop_iter = 5  ! iterations for contribution from horiz. wave propagation
-idemix_surforc_file = '/albedo/work/projects/p_pool_fesom1/fesom2.0/forcing/idemix/fourier_smooth_2005_cfsr_inert_rgrid.nc'
-idemix_botforc_file = '/albedo/work/projects/p_pool_fesom1/fesom2.0/forcing/idemix/tidal_energy_gx1v6_20090205_rgrid.nc'
+idemix_surforc_file = '/work/ollie/clidyn/forcing/IDEMIX/fourier_smooth_2005_cfsr_inert_rgrid.nc'
+idemix_surforc_vname= 'var706'
+idemix_botforc_file = '/work/ollie/clidyn/forcing/IDEMIX/tidal_energy_gx1v6_20090205_rgrid.nc'
+idemix_botforc_vname= 'wave_dissipation'
 /
 
 ! namelist for PP
