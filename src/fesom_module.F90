@@ -1,6 +1,7 @@
 ! synopsis: save any derived types we initialize
 !           so they can be reused after fesom_init
 module fesom_main_storage_module
+  use iceberg_step
   USE MOD_MESH
   USE MOD_ICE
   USE MOD_TRACER
@@ -29,7 +30,20 @@ module fesom_main_storage_module
   use read_mesh_interface
   use fesom_version_info_module
   use command_line_options_module
+  !---fwf-code, age-code
+  use g_forcing_param, only: use_landice_water, use_age_tracer
+  use landice_water_init_interface
+  use age_tracer_init_interface
+  !---fwf-code-end, age-code-end
+
   ! Define icepack module
+
+  ! --------------
+  ! LA icebergs: 2023-05-17 
+  use iceberg_params
+  use iceberg_step
+  ! Define icepack module
+
 #if defined (__icepack)
   use icedrv_main,          only: set_icepack, init_icepack, alloc_icepack
 #endif
@@ -45,7 +59,7 @@ module fesom_main_storage_module
     integer           :: n, from_nstep, offset, row, i, provided
     integer           :: which_readr ! read which restart files (0=netcdf, 1=core dump,2=dtype)
     integer           :: total_nsteps
-    integer, pointer  :: mype, npes, MPIerr, MPI_COMM_FESOM
+    integer, pointer  :: mype, npes, MPIerr, MPI_COMM_FESOM, MPI_COMM_WORLD, MPI_COMM_FESOM_IB
     real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
     real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
     real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing 
@@ -111,7 +125,7 @@ contains
         !OIFS-FESOM2 coupling: does not require MPI_INIT here as this is done by OASIS
         call MPI_Initialized(mpi_is_initialized, f%i)
         if(.not. mpi_is_initialized) then
-            ! do not initialize MPI here if it has been initialized already, e.g. via IFS when fesom is called as library (__ifsinterface is defined)
+            ! TODO: do not initialize MPI here if it has been initialized already, e.g. via IFS when fesom is called as library (__ifsinterface is defined)
             call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, f%provided, f%i)
             f%fesom_did_mpi_init = .true.
         end if
@@ -128,6 +142,9 @@ contains
         f%mype          =>f%partit%mype
         f%MPIerr        =>f%partit%MPIerr
         f%MPI_COMM_FESOM=>f%partit%MPI_COMM_FESOM
+        f%MPI_COMM_FESOM_IB=>f%partit%MPI_COMM_FESOM_IB
+        f%MPI_COMM_WORLD=>f%partit%MPI_COMM_WORLD
+
         f%npes          =>f%partit%npes
         if(f%mype==0) then
             write(*,*)
@@ -150,12 +167,24 @@ contains
         call mesh_setup(f%partit, f%mesh)
 
         if (f%mype==0) write(*,*) 'FESOM mesh_setup... complete'
-    
+   
         !=====================
         ! Allocate field variables 
         ! and additional arrays needed for 
         ! fancy advection etc.  
         !=====================
+#if defined (__oasis)
+        !---wiso-code
+        IF (lwiso) THEN
+          nsend = nsend + 6       ! add number of water isotope tracers to coupling parameter nsend, nrecv
+          nrecv = nrecv + 6
+        END IF
+        !---wiso-code-end
+        IF (use_icebergs) THEN
+          nrecv = nrecv + 2
+        END IF
+#endif
+
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call check_mesh_consistency'//achar(27)//'[0m'
         call check_mesh_consistency(f%partit, f%mesh)
         if (f%mype==0) f%t2=MPI_Wtime()
@@ -196,10 +225,29 @@ contains
         
         if (f%mype==0) f%t5=MPI_Wtime()
         call compute_diagnostics(0, f%dynamics, f%tracers, f%partit, f%mesh) ! allocate arrays for diagnostic
+
+        !---fwf-code-begin
+        if(f%mype==0)  write(*,*) 'use_landice_water', use_landice_water
+        if(use_landice_water) call landice_water_init(f%partit, f%mesh)
+        !---fwf-code-end
+
+        !---age-code-begin
+        if(f%mype==0)  write(*,*) 'use_age_tracer', use_age_tracer
+        if(use_age_tracer) call age_tracer_init(f%partit, f%mesh)
+        !---age-code-end
+
 #if defined (__oasis)
         call cpl_oasis3mct_define_unstr(f%partit, f%mesh)
+
         if(f%mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
 #endif
+    
+        ! --------------
+        ! LA icebergs: 2023-05-17 
+        if (use_icebergs) then
+            call allocate_icb(f%partit)
+        endif
+        ! --------------
 
 #if defined (__icepack)
         !=====================
@@ -307,6 +355,15 @@ contains
     ! Time stepping
     !=====================
 
+    ! --------------
+    ! LA icebergs: 2023-05-17 
+    f%MPI_COMM_FESOM_IB = f%MPI_COMM_FESOM
+    if (f%mype==0) then
+!        write (*,*) 'ib_async_mode, initial omp_num_threads ', ib_async_mode, omp_get_num_threads()
+        write (*,*) 'current_nsteps, steps_per_ib_step, icb_outfreq :', current_nsteps, steps_per_ib_step, icb_outfreq
+    end if
+    ! --------------
+
     if (f%mype==0) write(*,*) 'FESOM start iteration before the barrier...'
     call MPI_Barrier(f%MPI_COMM_FESOM, f%MPIERR)
     
@@ -323,10 +380,62 @@ contains
     if (use_global_tides) then
        call foreph_ini(yearnew, month, f%partit)
     end if
+    
     nstart=f%from_nstep
     ntotal=f%from_nstep-1+current_nsteps
-    !do n=f%from_nstep, f%from_nstep-1+current_nsteps
     do n=nstart, ntotal
+        if (use_icebergs) then
+                !n_ib         = n
+                u_wind_ib    = u_wind
+                v_wind_ib    = v_wind
+                f%ice%uice_ib     = f%ice%uice
+                f%ice%vice_ib     = f%ice%vice
+        
+        ! LA - this causes the blowup !
+        !        f%ice%data(size(f%ice%data))      = f%ice%data(2)
+        !        f%ice%data(size(f%ice%data)-1)    = f%ice%data(1)
+        !!!!!!!!!!!!!!!!!!
+        
+        
+        ! kh 08.03.21 support of different ocean ice and iceberg steps:
+        ! if steps_per_ib_step is configured greater 1 then UV is modified via call oce_timestep_ale(n) -> call update_vel while
+        ! the same asynchronous iceberg computation is still active
+                f%dynamics%uv_ib     = f%dynamics%uv
+        
+        ! kh 15.03.21 support of different ocean ice and iceberg steps:
+        ! if steps_per_ib_step is configured greater 1 then tr_arr is modified via call oce_timestep_ale(n) -> call solve_tracers_ale() while
+        ! the same asynchronous iceberg computation is still active
+                !tr_arr_ib    = tr_arr
+                Tclim_ib     = f%tracers%data(1)%values
+                Sclim_ib     = f%tracers%data(2)%values
+        
+        ! kh 15.03.21 support of different ocean ice and iceberg steps:
+        ! if steps_per_ib_step is configured greater 1 then Tsurf and Ssurf might be changed while
+        ! the same asynchronous iceberg computation is still active
+                Tsurf_ib     = Tsurf
+                Ssurf_ib     = Ssurf
+        
+        ! kh 18.03.21 support of different ocean ice and iceberg steps:
+        ! if steps_per_ib_step is configured greater 1 then zbar_3d_n and eta_n might be changed while
+        ! the same asynchronous iceberg computation is still active
+                !zbar_3d_n_ib = zbar_3d_n
+                f%mesh%Z_3d_n_ib     = f%mesh%Z_3d_n
+                f%dynamics%eta_n_ib  = f%dynamics%eta_n
+        
+        ! kh 16.03.21 not modified during overlapping ocean/ice and iceberg computations
+        !       coriolis_ib      = coriolis
+        !       coriolis_node_ib = coriolis_node
+        
+        ! kh 02.02.21 check iceberg computations mode:
+        ! ib_async_mode == 0: original sequential behavior for both ice sections (for testing purposes, creating reference results etc.)
+        ! ib_async_mode == 1: OpenMP code active to overlapped computations in first (ocean ice) and second (icebergs) parallel section
+        ! ib_async_mode == 2: OpenMP code active, but computations still serialized via spinlock (for testing purposes)
+        
+        ! -----------------------------------------------------------------------------------
+        ! LA asyncronous coupling not included in this FESOM version, yet!!
+        ! 
+        end if        
+        
         if (use_global_tides) then
            call foreph(f%partit, f%mesh)
         end if
@@ -344,7 +453,18 @@ contains
         !___compute horizontal velocity on nodes (originaly on elements)________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call compute_vel_nodes'//achar(27)//'[0m'
         call compute_vel_nodes(f%dynamics, f%partit, f%mesh)
-        
+       
+
+        ! --------------
+        ! LA icebergs: 2023-05-17 
+        if (use_icebergs .and. mod(n - 1, steps_per_ib_step)==0) then
+            if (f%mype==0) write(*,*) '*** step n=',n
+            !t1_icb = MPI_Wtime()
+            call iceberg_calculation(f%ice,f%mesh,f%partit,f%dynamics,n)
+        end if
+        ! --------------
+
+
         !___model sea-ice step__________________________________________________
         f%t1 = MPI_Wtime()
         if(use_ice) then
@@ -367,6 +487,17 @@ contains
             endif
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_timestep(n)'//achar(27)//'[0m'
             if (f%ice%ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh)  
+
+            
+            ! LA commented for debugging
+            ! --------------
+            ! LA icebergs: 2023-05-17 
+            if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
+                call icb2fesom(f%mesh, f%partit, f%ice)
+            end if
+            ! --------------
+
+
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
             call oce_fluxes_mom(f%ice, f%dynamics, f%partit, f%mesh) ! momentum only
@@ -389,6 +520,12 @@ contains
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
         call output (n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
 
+        ! LA icebergs: 2023-05-17 
+        if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
+            call reset_ib_fluxes
+        end if
+        !--------------------------
+
         f%t5 = MPI_Wtime()
         call restart(n, nstart, f%total_nsteps, .false., f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         f%t6 = MPI_Wtime()
@@ -406,8 +543,21 @@ contains
 
   subroutine fesom_finalize()
     use fesom_main_storage_module
+#if defined(__MULTIO)
+    use iom
+    use mpp_io
+#endif
     ! EO parameters
     real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
+
+    ! --------------
+    ! LA icebergs: 2023-05-17 
+    if (use_icebergs) then
+         call iceberg_out(f%partit)
+    end if
+    ! --------------
+
+
 
     call finalize_output()
     call finalize_restart()
@@ -447,6 +597,10 @@ contains
 #if defined (__oifs) 
     ! OpenIFS coupled version has to call oasis_terminate through par_ex
     call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
+#endif
+
+#if defined(__MULTIO) && !defined(__ifsinterface) && !defined(__oasis)
+   call mpp_stop
 #endif
     if(f%fesom_did_mpi_init) call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype) ! finalize MPI before FESOM prints its stats block, otherwise there is sometimes output from other processes from an earlier time in the programm AFTER the starts block (with parastationMPI)
     if (f%mype==0) then
