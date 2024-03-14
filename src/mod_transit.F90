@@ -247,7 +247,6 @@ MODULE mod_transit
 
     subroutine read_transit_input
 !   Read atmospheric input of isoCO2 and / or other tracers
-      use g_config, only: anthro_transit, paleo_transit, length_transit
       implicit none
 
 !     Internal variables

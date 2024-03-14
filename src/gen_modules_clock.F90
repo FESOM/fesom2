@@ -71,7 +71,7 @@ contains
     USE MOD_PARTIT
     USE MOD_PARSUP
     use g_config
-    use mod_transit, only: ti_transit
+    use mod_transit, only: ti_transit, ti_start_transit
     implicit none
     type(t_partit), intent(in), target    :: partit
     integer                               :: i, daystart, yearstart
