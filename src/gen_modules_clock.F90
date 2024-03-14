@@ -71,6 +71,7 @@ contains
     USE MOD_PARTIT
     USE MOD_PARSUP
     use g_config
+    use mod_transit, only: ti_transit
     implicit none
     type(t_partit), intent(in), target    :: partit
     integer                               :: i, daystart, yearstart
@@ -95,6 +96,9 @@ contains
     else
        r_restart=.true.
     end if
+!   For simulations with transient tracer input data
+    if (use_transit) ti_transit = yearnew - yearstart + ti_start_transit
+
 
     ! year as character string 
     write(cyearold,'(i4)') yearold

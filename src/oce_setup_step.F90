@@ -850,6 +850,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     USE o_ARRAYS
     USE g_config
     USE g_ic3d
+    ! for additional (transient) tracers:
+    use mod_transit, only: id_r14c, id_r39ar, id_f12, id_sf6
     implicit none
     type(t_tracer), intent(inout), target :: tracers
     type(t_partit), intent(inout), target :: partit
@@ -873,6 +875,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
     if(mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(1))
     if(mype==0) write(*,*) 'read Salinity    climatology from:', trim(filelist(2))
+    if(any(idlist == 14) .and. mype==0) write(*,*) 'read radiocarbon climatology from:', trim(filelist(3))
     call do_ic3d(tracers, partit, mesh)
     
     Tclim=tracers%data(1)%values
@@ -942,6 +945,48 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
              write (*,*) tracers%data(i)%values(1,1)
           end if
         !---wiso-code-end
+
+! Transient tracers
+       CASE (14)        ! initialize tracer ID=14, fractionation-corrected 14C/C
+         id_r14c = i
+!        this initialization can be overwritten by calling do_ic3d
+         if (.not. any(idlist == 14)) then
+           tr_arr(:,:,i) = 0.85
+           if (mype==0) then
+              write (i_string,  "(I3)") i
+              write (id_string, "(I3)") id
+              write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+              write (*,*) tracers%data(i)%values(1,1)
+           end if
+         end if
+       CASE (39)        ! initialize tracer ID=39, fractionation-corrected 39Ar/Ar
+         id_r39ar = i
+         tr_arr(:,:,i) = 0.5
+         if (mype==0) then
+            write (i_string,  "(I3)") i
+            write (id_string, "(I3)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            write (*,*) tracers%data(i)%values(1,1)
+         end if
+       CASE (12)        ! initialize tracer ID=12, CFC-12
+         id_f12 = i
+         tr_arr(:,:,i) = 0.
+         if (mype==0) then
+            write (i_string,  "(I3)") i
+            write (id_string, "(I3)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            write (*,*) tracers%data(i)%values(1,1)
+         end if
+       CASE (6)         ! initialize tracer ID=6, SF6
+         id_sf6 = i
+         tr_arr(:,:,i) = 0.
+         if (mype==0) then
+            write (i_string,  "(I3)") i
+            write (id_string, "(I3)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            write (*,*) tracers%data(i)%values(1,1)
+         end if
+! Transient tracers end
 
         !_______________________________________________________________________            
         CASE (301) !Fram Strait 3d restored passive tracer
