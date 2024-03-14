@@ -477,7 +477,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
     real(kind=WP)            :: cp(mesh%nl), tp(mesh%nl)
     integer                  :: nz, n, nzmax, nzmin
     real(kind=WP)            :: m, zinv, dz
-    real(kind=WP)            :: rsss, Ty, Ty1, c1, zinv1, zinv2, v_adv, sfbc
+    real(kind=WP)            :: rsss, Ty, Ty1, c1, zinv1, zinv2, v_adv
     real(kind=WP)            :: isredi=0._WP
     logical                  :: do_wimpl=.true.
     real(kind=WP)            :: zbar_n(mesh%nl), z_n(mesh%nl-1)
