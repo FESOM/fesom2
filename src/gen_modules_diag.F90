@@ -23,10 +23,11 @@ module diagnostics
             compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, shear, Ri, KvdTdZ, KvdSdZ,   & 
             std_dens_min, std_dens_max, std_dens_N, std_dens, ldiag_trflx,                           &
             std_dens_UVDZ, std_dens_DIV, std_dens_DIV_fer, std_dens_Z, std_dens_H, std_dens_dVdT, std_dens_flux,       &
-            dens_flux_e, vorticity, zisotherm, tempzavg, saltzavg, thetao, tuv, suv      &
-            compute_dvd, dvd_KK_tot, dvd_SD_tot, dvd_SD_chi_adv_h, dvd_SD_chi_adv_v, dvd_SD_chi_dif_h, & 
-                dvd_SD_chi_dif_heR, dvd_SD_chi_dif_hbh, dvd_SD_chi_dif_veR, dvd_SD_chi_dif_viR, &
-                dvd_SD_chi_dif_vi, dvd_SD_chi_dif_ve, dvd_xdfac
+            dens_flux_e, vorticity, zisotherm, tempzavg, saltzavg, thetao, tuv, suv,      &
+            compute_dvd, dvd_KK_tot, dvd_SD_tot, dvd_SD_chi_adv_h, dvd_SD_chi_adv_v,      &
+                dvd_SD_chi_dif_h, dvd_SD_chi_dif_heR, dvd_SD_chi_dif_hbh,                 &
+                dvd_SD_chi_dif_veR, dvd_SD_chi_dif_viR, dvd_SD_chi_dif_vi,                &
+                dvd_SD_chi_dif_ve, dvd_xdfac
             
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
