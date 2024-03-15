@@ -37,6 +37,23 @@ SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
        elseif (tracers%data(tr_num)%AB_order==3) then
            tracers%data(tr_num)%valuesAB(:, n)  =5.0_WP*tracers%data(tr_num)%valuesold(2, :, n)-16.0_WP*tracers%data(tr_num)%valuesold(1, :, n)+23.0_WP*tracers%data(tr_num)%values(:, n)
            tracers%data(tr_num)%valuesAB(:, n)  =tracers%data(tr_num)%valuesAB(:, n)/12.0_WP
+       else
+            write(*,*)
+            print *, achar(27)//'[33m'
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: Adams-Bashfort tracer order must be 2 or 3, others are not'
+            write(*,*) '        supported!'
+            write(*,*) '        your tracers%data(tr_num)%AB_order =', tracers%data(tr_num)%AB_order
+            write(*,*) '        '
+            write(*,*) '        --> check your namelist.tra !!!'
+            write(*,*) '            &tracer_general'
+            write(*,*) '                ...'
+            write(*,*) '            AB_order = 2'
+            write(*,*) '            / '
+            write(*,*) '____________________________________________________________________'
+            print *, achar(27)//'[0m'
+            write(*,*)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
        end if
     end do
 !$OMP END PARALLEL DO
