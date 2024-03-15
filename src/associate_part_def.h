@@ -1,5 +1,5 @@
-
-  integer,          pointer     :: MPI_COMM_FESOM ! FESOM communicator (for ocean only runs if often a copy of MPI_COMM_WORLD)
+  integer,          pointer     :: MPI_COMM_FESOM       ! FESOM communicator (for ocean only runs if often a copy of MPI_COMM_WORLD)
+  integer,          pointer     :: MPI_COMM_FESOM_IB    ! FESOM communicator copy for icebergs LA: 2023-05-22
   type(com_struct), pointer     :: com_nod2D
   type(com_struct), pointer     :: com_elem2D
   type(com_struct), pointer     :: com_elem2D_full
@@ -17,6 +17,7 @@
   integer, dimension(:,:,:), pointer :: s_mpitype_nod3D, r_mpitype_nod3D
 
   integer, pointer   :: MPIERR
+  integer, pointer   :: MPIERR_IB       ! copy for icebergs LA: 2023-05-22
   integer, pointer   :: npes
   integer, pointer   :: mype
   integer, pointer   :: maxPEnum

@@ -24,6 +24,7 @@ SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_tracer), intent(inout), target :: tracers
     integer                               :: n,nz 
+
 !$OMP PARALLEL DO
     do n=1, partit%myDim_nod2D+partit%eDim_nod2D
        ! del_ttf will contain all advection / diffusion contributions for this tracer. Set it to 0 at the beginning!
@@ -31,9 +32,29 @@ SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
        tracers%work%del_ttf_advhoriz (:, n) = 0.0_WP
        tracers%work%del_ttf_advvert  (:, n) = 0.0_WP
        ! AB interpolation
-       tracers%data(tr_num)%valuesAB(:, n)  =-(0.5_WP+epsilon)*tracers%data(tr_num)%valuesAB(:, n)+(1.5_WP+epsilon)*tracers%data(tr_num)%values(:, n)
+       if (tracers%data(tr_num)%AB_order==2) then
+           tracers%data(tr_num)%valuesAB(:, n)  =-(0.5_WP+epsilon)*tracers%data(tr_num)%valuesold(1, :, n)+(1.5_WP+epsilon)*tracers%data(tr_num)%values(:, n)
+       elseif (tracers%data(tr_num)%AB_order==3) then
+           tracers%data(tr_num)%valuesAB(:, n)  =5.0_WP*tracers%data(tr_num)%valuesold(2, :, n)-16.0_WP*tracers%data(tr_num)%valuesold(1, :, n)+23.0_WP*tracers%data(tr_num)%values(:, n)
+           tracers%data(tr_num)%valuesAB(:, n)  =tracers%data(tr_num)%valuesAB(:, n)/12.0_WP
+       end if
     end do
 !$OMP END PARALLEL DO
+
+    if (tracers%data(tr_num)%AB_order==2) then
+!$OMP PARALLEL DO
+       do n=1, partit%myDim_nod2d+partit%eDim_nod2D
+          tracers%data(tr_num)%valuesold(1, :, n)=tracers%data(tr_num)%values(:, n)
+       end do
+!$OMP END PARALLEL DO
+    elseif (tracers%data(tr_num)%AB_order==3) then
+!$OMP PARALLEL DO
+       do n=1, partit%myDim_nod2d+partit%eDim_nod2D
+          tracers%data(tr_num)%valuesold(2, :, n)=tracers%data(tr_num)%valuesold(1, :, n)
+          tracers%data(tr_num)%valuesold(1, :, n)=tracers%data(tr_num)%values(:, n)
+       end do
+!$OMP END PARALLEL DO
+    end if
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
 !PS     call tracer_gradient_elements(tracers%data(tr_num)%valuesAB, partit, mesh)
