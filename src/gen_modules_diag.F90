@@ -997,7 +997,7 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
     type(t_partit), intent(inout),  target    :: partit
     type(t_mesh)  , intent(in)   ,  target    :: mesh
     integer                                   :: tr_num, node, elem
-    real(kind=WP),  dimension(:,:)  , pointer :: trflx_h, trflx_v, tr, trstar, trAB, Wvel, dump, fer_Wvel
+    real(kind=WP),  dimension(:,:)  , pointer :: trflx_h, trflx_v, tr, trstar, Wvel, dump, fer_Wvel
     real(kind=WP),  dimension(:,:,:), pointer :: UV, fer_UV
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -1079,15 +1079,14 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
         trflx_h   => tracers%work%dvd_trflx_hor( :,:,tr_num) ! horizontal advectiv tracer flux through mid edge face using AB tracer
         trflx_v   => tracers%work%dvd_trflx_ver( :,:,tr_num) ! vertical advectiv tracer flux 
         trstar    => tracers%work%dvd_trold(     :,:,tr_num) ! tracer^n
-        trAB      => tracers%work%dvd_trAB(      :,:,tr_num) ! tracerAB^n  
         tr        => tracers%data(tr_num)%values(:,:)        ! tracer^(n+1)
         dump      => tracers%work%del_ttf
         
         !_______________________________________________________________________
         ! need to recompute tracer gradients 
-        call tracer_gradient_elements(trAB, partit, mesh)
+        call tracer_gradient_elements(trstar, partit, mesh)
         call exchange_elem(tr_xy, partit)
-        call tracer_gradient_z(tr, partit, mesh)    !WHY NOT AB HERE? DSIDOREN!
+        call tracer_gradient_z(trstar, partit, mesh)    !WHY NOT AB HERE? DSIDOREN!
         call exchange_nod(tr_z, partit)
         
         !=== DVD Knut Klingbeil et al. 2014 ====================================
