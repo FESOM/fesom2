@@ -413,12 +413,8 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     if (ldiag_DVD) then
         allocate(tracers%work%dvd_trflx_hor(nl-1, myDim_edge2D, 2))
         allocate(tracers%work%dvd_trflx_ver(nl  , myDim_nod2D , 2))
-        allocate(tracers%work%dvd_trold(    nl-1, node_size   , 2))
-        allocate(tracers%work%dvd_trAB(     nl-1, node_size   , 2))
         tracers%work%dvd_trflx_hor = 0.0_WP
         tracers%work%dvd_trflx_ver = 0.0_WP
-        tracers%work%dvd_trold     = 0.0_WP
-        tracers%work%dvd_trAB      = 0.0_WP
     end if
 END SUBROUTINE tracer_init
 !
