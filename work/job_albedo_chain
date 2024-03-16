@@ -31,7 +31,7 @@ chain_s=1 # starting chain id
 # year_e=2009
 # ___JRA55____
 year_s=1958
-year_e=2018
+year_e=2019
 
 prescribe_rlen=0 # run length in namelist.config --> if 0 value from namelist.config is taken 
 fedit=1
