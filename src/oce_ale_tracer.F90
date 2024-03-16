@@ -978,17 +978,6 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
         ul1=ulevels_nod2D(n)
         vd_flux=0._WP
 
-!PS         !_______________________________________________________________________
-!PS         zbar_n(1:mesh%nl  )=0.0_WP
-!PS         z_n   (1:mesh%nl-1)=0.0_WP
-!PS         zbar_n(nl1+1)=zbar_n_bot(n)
-!PS         z_n(nl1)=zbar_n(nl1+1) + hnode_new(nl1,n)/2.0_WP
-!PS         do nz=nl1, ul1+1, -1
-!PS             zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
-!PS             z_n(nz-1)  = zbar_n(nz)   + hnode_new(nz-1,n)/2.0_WP
-!PS         end do
-!PS         zbar_n(ul1) = zbar_n(ul1+1)   + hnode_new(ul1,n)
-        
         !_______________________________________________________________________
         zbar_n(1:mesh%nl  )=0.0_WP
         z_n   (1:mesh%nl-1)=0.0_WP
