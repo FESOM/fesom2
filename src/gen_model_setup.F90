@@ -84,7 +84,7 @@ subroutine setup_model(partit)
   if (use_transit) then
 ! Transient tracer input, input file names have to be specified in
 ! namelist.config, nml=run_config
-    if(mype==0) print *, "Transient tracers are ON. Tracer input file: ", ifile_transit
+    if(partit%mype==0) print *, "Transient tracers are ON. Tracer input file: ", ifile_transit
     open (20,file=ifile_transit)
     if (anthro_transit .or. paleo_transit) then
       call read_transit_input
