@@ -46,6 +46,7 @@ MODULE mod_transit
   real(kind=8) :: y_abc, yy_nh
 ! Tracer indices of transient tracers
   integer ::      id_r14c, id_r39ar, id_f12, id_sf6
+  integer, dimension(4) :: index_transit = (/-1, -1, -1, -1/)
 ! Time index (=year) in transient simulations
   integer ::      ti_transit
 

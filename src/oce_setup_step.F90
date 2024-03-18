@@ -373,6 +373,36 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     endif
     !---age-code-end
 
+    ! Transient tracers
+!! UNDER CONSTRUCTION - Actually we do not want to hardwire the number of transient tracers
+    if (use_transit) then
+      ! add transient tracers to the model
+      nml_tracer_list(num_tracers+1) = nml_tracer_list(1)
+      nml_tracer_list(num_tracers+2) = nml_tracer_list(1)
+      nml_tracer_list(num_tracers+3) = nml_tracer_list(1)
+      nml_tracer_list(num_tracers+4) = nml_tracer_list(1)
+      nml_tracer_list(num_tracers+1)%id = 6
+      nml_tracer_list(num_tracers+1)%id = 12
+      nml_tracer_list(num_tracers+1)%id = 14
+      nml_tracer_list(num_tracers+1)%id = 39
+
+      index_transit(1) = num_tracers+1
+      index_transit(2) = num_tracers+2
+      index_transit(3) = num_tracers+3
+      index_transit(4) = num_tracers+4
+
+      num_tracers = num_tracers + 4
+
+      ! tracers initialised from file
+      idlist((n_ic3d+1):(n_ic3d+3)) = (/14/)
+      filelist((n_ic3d+1):(n_ic3d+3)) = (/'R14C.nc'/)
+      varlist((n_ic3d+1):(n_ic3d+3))  = (/'R14C'/)
+
+      if (mype==0) write(*,*) 'XXX Transient tracers will be used in FESOM'
+    endif
+    ! 'use_transit' end
+
+
     if (mype==0) write(*,*) 'total number of tracers is: ', num_tracers
 
     !___________________________________________________________________________
@@ -948,20 +978,18 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 
 ! Transient tracers
        CASE (14)        ! initialize tracer ID=14, fractionation-corrected 14C/C
-         id_r14c = i
 !        this initialization can be overwritten by calling do_ic3d
-         if (.not. any(idlist == 14)) then
-           tr_arr(:,:,i) = 0.85
+!!         if (.not. any(idlist == 14)) then ! CHECK IF THIS LINE IS STILL NECESSARY
+         tracers%data(i)%values(:,:) = 0.85
            if (mype==0) then
               write (i_string,  "(I3)") i
               write (id_string, "(I3)") id
               write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
               write (*,*) tracers%data(i)%values(1,1)
            end if
-         end if
+!!         end if
        CASE (39)        ! initialize tracer ID=39, fractionation-corrected 39Ar/Ar
-         id_r39ar = i
-         tr_arr(:,:,i) = 0.5
+         tracers%data(i)%values(:,:) = 0.85
          if (mype==0) then
             write (i_string,  "(I3)") i
             write (id_string, "(I3)") id
@@ -969,8 +997,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             write (*,*) tracers%data(i)%values(1,1)
          end if
        CASE (12)        ! initialize tracer ID=12, CFC-12
-         id_f12 = i
-         tr_arr(:,:,i) = 0.
+         tracers%data(i)%values(:,:) = 0.
          if (mype==0) then
             write (i_string,  "(I3)") i
             write (id_string, "(I3)") id
@@ -978,8 +1005,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             write (*,*) tracers%data(i)%values(1,1)
          end if
        CASE (6)         ! initialize tracer ID=6, SF6
-         id_sf6 = i
-         tr_arr(:,:,i) = 0.
+         tracers%data(i)%values(:,:) = 0.
          if (mype==0) then
             write (i_string,  "(I3)") i
             write (id_string, "(I3)") id
