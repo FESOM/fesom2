@@ -43,17 +43,19 @@ end module
 
 module diff_ver_part_impl_ale_interface
     interface
-        subroutine diff_ver_part_impl_ale(tr_num, dynamics,  tracer, partit, mesh)
+        subroutine diff_ver_part_impl_ale(tr_num, dynamics,  tracer, ice, partit, mesh)
         use mod_mesh
         USE MOD_PARTIT
         USE MOD_PARSUP
         use mod_tracer
         use MOD_DYN
+        use mod_ice
         integer       , intent(in)   , target :: tr_num
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_tracer), intent(inout), target :: tracer
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
+        type(t_ice)   , intent(in)   , target :: ice
         end subroutine
     end interface
 end module
@@ -91,14 +93,14 @@ end module
 
 module transit_bc_surface_interface
     interface
-        function transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit)
+        function transit_bc_surface(n, id, sst, sss, a_ice, sval, nzmin, partit)
         use mod_mesh
         USE MOD_PARTIT
         USE MOD_PARSUP
         integer , intent(in)                  :: n, id, nzmin
         type(t_partit), intent(inout), target :: partit
         real(kind=WP)                         :: transit_bc_surface
-        real(kind=WP), intent(in)             :: sst, sss, aice, sval
+        real(kind=WP), intent(in)             :: sst, sss, a_ice, sval
         end function
     end interface
 end module
@@ -324,7 +326,7 @@ end subroutine solve_tracers_ale
 !
 !
 !===============================================================================
-subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
+subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     use mod_mesh
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -337,12 +339,14 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
     use diff_ver_part_redi_expl_interface
     use diff_ver_part_impl_ale_interface
     use diff_part_bh_interface
+    use mod_ice
     implicit none
     integer       , intent(in)   , target :: tr_num
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_tracer), intent(inout), target :: tracers
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_ice)   , intent(in)   , target :: ice
     !___________________________________________________________________________
     integer                               :: n, nzmax, nzmin
     !___________________________________________________________________________
@@ -388,7 +392,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     if (tracers%data(tr_num)%i_vert_diff) then
         ! do vertical diffusion: implicite
-        call diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
+        call diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     end if
     !We DO not set del_ttf to zero because it will not be used in this timestep anymore
     !init_tracers_AB will set it to zero for the next timestep
@@ -466,7 +470,7 @@ end subroutine diff_ver_part_expl_ale
 !
 !===============================================================================
 ! vertical diffusivity augmented with Redi contribution [vertical flux of K(3,3)*d_zT]
-subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
+subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     use MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -504,8 +508,9 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:), pointer :: trarr
-    real(kind=WP), dimension(:,:), pointer :: sst, sss, fice  ! auxiliary variables needed for transient tracers
     real(kind=WP), dimension(:,:), pointer :: Wvel_i
+    real(kind=WP), dimension(:,:), pointer :: sst, sss ! auxiliary variables needed for transient tracers
+    real(kind=WP), dimension(:),   pointer :: a_ice
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -515,7 +520,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
 
     sst => tracers%data(1)%values(:,:)
     sss => tracers%data(2)%values(:,:)
-    fice => ice%data(1)%values(:,:)
+    a_ice => ice%data(1)%values(:)
     !___________________________________________________________________________
     if ((trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') .OR. (.not. dynamics%use_wsplit)) do_wimpl=.false.
     if (Redi) isredi=1._WP
@@ -888,7 +893,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
         !
         tr(nzmin)= tr(nzmin)+bc_surface(n, tracers%data(tr_num)%ID, trarr(nzmin,n), nzmin, partit)
         if ((tracers%data(tr_num)%ID .ge. 6) .and.(tracers%data(tr_num)%ID .le. 40)) then
-          tr(nzmin)= tr(nzmin)+transit_bc_surface(n, tracers%data(tr_num)%ID, sst(nzmin,n), sss(nzmin,n), fice(nzmin,n), trarr(nzmin,n), nzmin, partit)
+          tr(nzmin)= tr(nzmin)+transit_bc_surface(n, tracers%data(tr_num)%ID, sst(nzmin,n), sss(nzmin,n), a_ice(n), trarr(nzmin,n), nzmin, partit)
         end if
         !_______________________________________________________________________
         ! The forward sweep algorithm to solve the three-diagonal matrix
@@ -1349,26 +1354,6 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
   character(len=10)                    :: id_string
   real(kind=WP), dimension(:), pointer :: a_ice
 
-!!type(t_ice)   , intent(in)   , target :: ice
-!!  a_ice => ice%data(1)%values(:)
-
-
-  !  --> is_nonlinfs=1.0 for zelvel,zstar ....
-  !  --> is_nonlinfs=0.0 for linfs
-
-!!  if (use_transit) then
-!!#if defined (__oasis)
-!!!   SLP and wind speed in coupled setups. This is a makeshift solution
-!!!   as long as the true values are not provided by the AGCM / OASIS.
-!!    press_a = mean_slp
-!!    wind_2  = speed_2(stress_atmoce_x(n), stress_atmoce_y(n))
-!!#else
-!!    press_a = press_air(n)
-!!    wind_2  = u_wind(n)**2 + v_wind(n)**2
-!!#endif
-!!
-!!  end if
-
   SELECT CASE (id)
     CASE (1)
         bc_surface=-dt*(heat_flux(n)/vcpw + sval*water_flux(n)*is_nonlinfs)
@@ -1377,103 +1362,8 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
         !     by forming/melting of sea ice
         bc_surface= dt*(virtual_salt(n) & !--> is zeros for zlevel/zstar
                     + relax_salt(n) - real_salt_flux(n)*is_nonlinfs)
-
-!!!   Boundary conditions for additional (transient) tracers (14C, 39Ar, CFC-12, and SF6)
-!!    CASE (14) !   Radiocarbon (more precisely, fractionation-corrected 14C/C):
-!!      if (anthro_transit) then
-!!!       Select atmospheric input values corresponding to the latitude
-!!        if (y_abc > 30.)  then
-!!!         Northern Hemisphere
-!!          r14c_a = r14c_nh(ti_transit)
-!!        else if (y_abc <- 30.) then
-!!!         Southern Hemisphere
-!!          r14c_a = r14c_sh(ti_transit)
-!!        else
-!!!         Tropical zone
-!!          r14c_a = r14c_tz(ti_transit)
-!!        end if
-!!        xCO2_a = xCO2_ti(ti_transit)
-!!      else if (paleo_transit) then
-!!        r14c_a = r14c_ti(ti_transit)
-!!        xCO2_a = xCO2_ti(ti_transit)
-!!      else
-!!!      Constant (global-mean) namelist values are taken
-!!      end if
-!!!     Local isotopic 14CO2/CO2 air-sea exchange flux (in m / s),
-!!!     since F14C is normalized to atmospheric (water) values the isotopic flux has to be
-!!!     corrected for precipitation or evaporation fluxes with different isotopic signatures.
-!!      bc_surface = dt * (iso_flux("co2",                                                            &
-!!                                  tracers%data(1)%values(nzmin,n), tracers%data(2)%values(nzmin,n), &
-!!                                  wind_2, a_ice(n), press_a, xco2_a, r14c_a, sval, dic_0)           &
-!!                         - sval * water_flux(n) * is_nonlinfs)
-!!
-!!    CASE (39) ! Argon-39 (fractionationation-corrected 39Ar/Ar)
-!!!     Local isotopic 39Ar/Ar air-sea exchange flux (in m / s),
-!!!     since F39Ar is normalized to atmospheric (water) values the isotopic flux has to be
-!!!     corrected for precipitation or evaporation fluxes with different isotopic signatures.
-!!      bc_surface = dt * (iso_flux("arg",                                                             &
-!!                                  tracers%data(1)%values(nzmin,n), tracers%data(2)%values(nzmin,n),  &
-!!                                  wind_2, a_ice(n), press_a, xarg_a, r39ar_a, sval, arg_0)           &
-!!                         - sval * water_flux(n) * is_nonlinfs)
-!!
-!!    CASE (12) ! CFC-12
-!!      if (anthro_transit) then
-!!!       Select atmospheric input values corresponding to the latitude
-!!!       Annual values are interpolated to monthly values, this is omitted in the last simulation year
-!!        if (y_abc > 10.)  then       ! Northern Hemisphere
-!!!          Northern Hemisphere
-!!           xf12_a = xf12_nh(ti_transit)
-!!           if (ti_transit < length_transit) xf12_a = xf12_a + month * (xf12_nh(ti_transit + 1) - xf12_a) / 12.
-!!        else if (y_abc <- 10.) then
-!!!          Southern Hemisphere
-!!           xf12_a = xf12_sh(ti_transit)
-!!           if (ti_transit < length_transit) xf12_a = xf12_a + month * (xf12_sh(ti_transit + 1) - xf12_a) / 12.
-!!        else
-!!!          Tropical zone, interpolate between NH and SH
-!!           xf12_a = (1 - yy_nh) * xf12_nh(ti_transit) + yy_nh * xf12_sh(ti_transit)
-!!           if (ti_transit < length_transit) xf12_a = xf12_a + month * ((1 - yy_nh) * xf12_nh(ti_transit + 1) + &
-!!                                                                        yy_nh * xf12_sh(ti_transit + 1) - xf12_a) / 12.
-!!        end if
-!!      else
-!!!       Constant (global-mean) namelist values are taken
-!!      end if
-!!
-!!!     Local air-sea exchange gas flux of CFC-12 (in m / s):
-!!      bc_surface = dt * (gas_flux("f12",                                                            &
-!!                                  tracers%data(1)%values(nzmin,n), tracers%data(2)%values(nzmin,n), &
-!!                                  wind_2, a_ice(n), press_a, xf12_a, sval)                          &
-!!                         - tracers%data(i)%values(nzmin,n) * water_flux(n) * is_nonlinfs)
-!!
-!!    CASE (6) ! SF6
-!!      if (anthro_transit) then
-!!!      Select atmospheric input values corresponding to the latitude
-!!!       Annual values are interpolated to monthly values, this is omitted in the last simulation year
-!!        if (y_abc > 10.)  then       ! Northern Hemisphere
-!!!         Northern Hemisphere
-!!          xsf6_a = xsf6_nh(ti_transit)
-!!          if (ti_transit < length_transit) xsf6_a = xsf6_a + month * (xsf6_nh(ti_transit + 1) - xsf6_a) / 12.
-!!        else if (y_abc <- 10.) then
-!!!         Southern Hemisphere
-!!          xsf6_a = xsf6_sh(ti_transit)
-!!          if (ti_transit < length_transit) xsf6_a = xsf6_a + month * (xsf6_sh(ti_transit + 1) - xsf6_a) / 12.
-!!        else
-!!!         Tropical zone, interpolate between NH and SH
-!!          xsf6_a = (1 - yy_nh) * xsf6_nh(ti_transit) + yy_nh * xsf6_sh(ti_transit)
-!!          if (ti_transit < length_transit) xsf6_a = xsf6_a + month * ((1 - yy_nh) * xsf6_nh(ti_transit + 1) + &
-!!                                                                        yy_nh * xsf6_sh(ti_transit + 1) - xsf6_a) / 12.
-!!        end if
-!!      else
-!!!       Constant (global-mean) namelist values are taken
-!!      end if
-!!
-!!!     Local air-sea exchange gas flux of SF6 (in m / s):
-!!      bc_surface = dt * (gas_flux("sf6",                                                            &
-!!                                  tracers%data(1)%values(nzmin,n), tracers%data(2)%values(nzmin,n), &
-!!                                  wind_2, a_ice(n), press_a, xsf6_a, sval)                          &
-!!                         - tracers%data(i)%values(nzmin,n) * water_flux(n) * is_nonlinfs)
-!!
-!!!   Done with boundary conditions for (transient) tracers.
-
+!---Transient tracers (case ##6,12,14,39) need additional input parameters 
+!   and are considered in the separate function transit_bc_surface
 !---wiso-code
     CASE (101) ! apply boundary conditions to tracer ID=101 (H218O)
         bc_surface = dt*wiso_flux_oce(n,1)
@@ -1523,6 +1413,7 @@ FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit)
   USE o_ARRAYS
   USE g_forcing_arrays
   USE g_config
+  use g_clock
   use mod_transit
   implicit none
 
@@ -1531,9 +1422,6 @@ FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit)
   type(t_partit),intent(inout), target :: partit
   REAL(kind=WP)                        :: transit_bc_surface
   character(len=10)                    :: id_string
-  real(kind=WP), dimension(:), pointer :: a_ice
-
-!!  a_ice => ice%data(1)%values(:)
 
 
   !  --> is_nonlinfs=1.0 for zelvel,zstar ....
@@ -1575,14 +1463,14 @@ FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit)
 !     Local isotopic 14CO2/CO2 air-sea exchange flux (in m / s),
 !     since F14C is normalized to atmospheric (water) values the isotopic flux has to be
 !     corrected for precipitation or evaporation fluxes with different isotopic signatures.
-      transit_bc_surface = dt * (iso_flux("co2", sst, sss, wind_2, a_ice(n), press_a, xco2_a, r14c_a, sval, dic_0)   &
+      transit_bc_surface = dt * (iso_flux("co2", sst, sss, wind_2, aice, press_a, xco2_a, r14c_a, sval, dic_0)   &
                                  - sval * water_flux(n) * is_nonlinfs)
 
     CASE (39) ! Argon-39 (fractionationation-corrected 39Ar/Ar)
 !     Local isotopic 39Ar/Ar air-sea exchange flux (in m / s),
 !     since F39Ar is normalized to atmospheric (water) values the isotopic flux has to be
 !     corrected for precipitation or evaporation fluxes with different isotopic signatures.
-      transit_bc_surface = dt * (iso_flux("arg", sst, sss, wind_2, a_ice(n), press_a, xarg_a, r39ar_a, sval, arg_0)  &
+      transit_bc_surface = dt * (iso_flux("arg", sst, sss, wind_2, aice, press_a, xarg_a, r39ar_a, sval, arg_0)  &
                                  - sval * water_flux(n) * is_nonlinfs)
 
     CASE (12) ! CFC-12
@@ -1608,7 +1496,7 @@ FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit)
       end if
 
 !     Local air-sea exchange gas flux of CFC-12 (in m / s):
-      transit_bc_surface = dt * (gas_flux("f12", sst, sss, wind_2, a_ice(n), press_a, xf12_a, sval)  &
+      transit_bc_surface = dt * (gas_flux("f12", sst, sss, wind_2, aice, press_a, xf12_a, sval)  &
                                  - sval * water_flux(n) * is_nonlinfs)
 
     CASE (6) ! SF6
@@ -1634,7 +1522,7 @@ FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit)
       end if
 
 !     Local air-sea exchange gas flux of SF6 (in m / s):
-      transit_bc_surface = dt * (gas_flux("sf6", sst, sss, wind_2, a_ice(n), press_a, xsf6_a, sval)  &
+      transit_bc_surface = dt * (gas_flux("sf6", sst, sss, wind_2, aice, press_a, xsf6_a, sval)  &
                                  - sval * water_flux(n) * is_nonlinfs)
 
 !   Done with boundary conditions for (transient) tracers.
