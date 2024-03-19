@@ -395,9 +395,9 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
       num_tracers = num_tracers + 4
 
       ! tracers initialised from file
-      idlist((n_ic3d+1):(n_ic3d+3)) = (/14/)
-      filelist((n_ic3d+1):(n_ic3d+3)) = (/'R14C.nc'/)
-      varlist((n_ic3d+1):(n_ic3d+3))  = (/'R14C'/)
+      idlist((n_ic3d+1):(n_ic3d+1)) = (/14/)
+      filelist((n_ic3d+1):(n_ic3d+1)) = (/'R14C.nc'/)
+      varlist((n_ic3d+1):(n_ic3d+1))  = (/'R14C'/)
 
       if (mype==0) write(*,*) 'XXX Transient tracers will be used in FESOM'
     endif
