@@ -532,29 +532,39 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
     ! moment only over CPU mype==0
     call MPI_AllREDUCE(found_blowup_loc  , found_blowup  , 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
     if (found_blowup==1) then
-       call write_step_info(istep, 1, ice, dynamics, tracers, partit, mesh)
-       if (mype==0) then
-          call sleep(1)
-          write(*,*)
-          write(*,*) '                MODEL BLOW UP !!!'
-          write(*,*) '                     ____'
-          write(*,*) '               __,-~~/~    `---.'
-          write(*,*) '                _/_,---(      ,    )'
-          write(*,*) '            __ /     <    /   )  \___'
-          write(*,*) '- -- ----===;;;`====------------------===;;;===---- -- -'
-          write(*,*) '               \/  ~"~"~"~"~"~\~"~)~"/'
-          write(*,*) '               (_ (   \  (     >    \)'
-          write(*,*) '                \_( _ <      >_>`'
-          write(*,*) '                ~ `-i` ::>|--"'
-          write(*,*) '                      I;|.|.|'
-          write(*,*) '                     <|i::|i|`'
-          write(*,*) '                    (` ^`"`- ")'
-          write(*,*) '              _____.,-#%&$@%#&#~,._____'
-          write(*,*)
-       end if
-       call blowup(istep, ice, dynamics, tracers, partit, mesh)
-       if (mype==0) write(*,*) ' --> finished writing blow up file'
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        call write_step_info(istep, 1, ice, dynamics, tracers, partit, mesh)
+        if (mype==0) then
+            call sleep(1)
+            write(*,*)
+            write(*,*) '                      ,-*                 ,-*             '
+            write(*,*) '                     (_)  MODEL BLOW UP  (_)              '
+            write(*,*) '                              ____                        '
+            write(*,*) '                       __,-~~/~   `---.                   '
+            write(*,*) '                     _/_,---(      ,   )                  '
+            write(*,*) '                 __ /        <   /   )   \___             '
+            write(*,*) ' - -- ----===;;;`====------------------===;;;===---- -- - '
+            write(*,*) '                    \/  ~"~"~"~"~"~\~"~)~"/               '
+            write(*,*) '                    (_ (   \  (     >    \)               '
+            write(*,*) '                     \_( _ <         >_>`                 '
+            write(*,*) '                        ~ `-i` ::>|--"                    '
+            write(*,*) '                            I;|.|.|                       '
+            write(*,*) '                           <|i::|i|`                      '
+            write(*,*) '                          (` ^`"`- ")                     '
+            write(*,*) ' _______________________.,-#%&$@%#&#~,.__________________ '
+            write(*,*) '                                                          '
+            write(*,*) '            (`- ́)  _ (`- ́).->          <-. (`- ́)          ' 
+            write(*,*) '   <-.      ( OO).-/ ( OO)_      .->      \(OO )_         '
+            write(*,*) '(`- ́)-----.(,------.(_)--\_)(`- ́)----. ,--./  ,-.) .----. '
+            write(*,*) '(OO|(_\--- ́ |  .--- ́/    _ /( OO).-.  `|   `. ́   |\_,-.  |'
+            write(*,*) ' / |  `--. (|  `--. \_..`--.( _) | |  ||  |`. ́|  |   . ́ . ́'
+            write(*,*) ' \_)  .-- ́  |  .-- ́ .-._)   \\|  |)|  ||  |   |  | . ́  /_ '
+            write(*,*) '  `|  |_)   |  `---.\       / `  `- ́   ́|  |   |  ||      |'
+            write(*,*) '   `-- ́     `------ ́ `----- ́   `----- ́ `-- ́   `-- ́`------ ́'
+            write(*,*)
+        end if
+        call blowup(istep, ice, dynamics, tracers, partit, mesh)
+        if (mype==0) write(*,*) ' --> finished writing blow up file'
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
     endif 
 end subroutine
 !===============================================================================
