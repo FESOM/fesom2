@@ -236,6 +236,11 @@ CASE ('m_snow    ')
     call def_stream(nod2D, myDim_nod2D, 'm_snow',   'snow height',                     'm',      ice%data(3)%values(1:myDim_nod2D),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 
+CASE ('t_skin    ')
+    if (use_ice) then
+    call def_stream(nod2D, myDim_nod2D, 't_skin',   'sea ice skin temprature',         '°C',      ice%thermo%t_skin(1:myDim_nod2D),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
 ! Debug ice variables    
 CASE ('strength_ice')
     if (use_ice) then
