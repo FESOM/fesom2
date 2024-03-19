@@ -276,7 +276,8 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     USE DIAGNOSTICS, only: ldiag_DVD
     USE g_ic3d
     use g_forcing_param, only: use_age_tracer !---age-code
-    use g_config, only : lwiso   ! add lwiso switch
+    use g_config, only : lwiso, use_transit   ! add lwiso switch and switch for transient tracers
+    use mod_transit, only : index_transit
     IMPLICIT NONE
     type(t_tracer), intent(inout), target               :: tracers
     type(t_partit), intent(inout), target               :: partit
