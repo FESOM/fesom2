@@ -62,15 +62,17 @@ end module
 
 module diff_tracers_ale_interface
     interface
-        subroutine diff_tracers_ale(tr_num, dynamics, tracer, partit, mesh)
+        subroutine diff_tracers_ale(tr_num, dynamics, tracer, ice, partit, mesh)
         use mod_mesh
         USE MOD_PARTIT
         USE MOD_PARSUP
         use mod_tracer
+        use mod_ice
         use MOD_DYN
         integer       , intent(in),    target :: tr_num
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_tracer), intent(inout), target :: tracer
+        type(t_ice),    intent(in),    target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
         end subroutine
@@ -248,7 +250,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
         ! diffuse tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
-        call diff_tracers_ale(tr_num, dynamics, tracers, partit, mesh)
+        call diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 
 !       Radioactive decay of 14C and 39Ar
         if (tracers%data(tr_num)%ID == 14) tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * exp(-decay14 * dt)
@@ -344,9 +346,9 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     integer       , intent(in)   , target :: tr_num
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_tracer), intent(inout), target :: tracers
+    type(t_ice)   , intent(in)   , target :: ice
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
-    type(t_ice)   , intent(in)   , target :: ice
     !___________________________________________________________________________
     integer                               :: n, nzmax, nzmin
     !___________________________________________________________________________
