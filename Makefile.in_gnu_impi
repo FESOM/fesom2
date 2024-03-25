@@ -5,7 +5,7 @@ MPICC = mpicc
 MPIFC = mpif90 
 LD = $(MPIFC)
 
-# Optimization specs for compiler - used for FESOM an parms.
+# Optimization specs for compiler - used for FESOM.
 # Metis falls back to conservative and non-compiler specific -O2, as
 # it is only used in the less runtime-critical setup phase. 
 OPT  = -O3 -march=native -funroll-loops -ffree-line-length-none
@@ -35,11 +35,8 @@ MPI_INC =
 METIS_DEFS = -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243
 # METISRANDDOMSEED: any integer
 
-# Used to compile the fesom wrapper to parms
-PARMS_DEFS = -DUSE_MPI -DREAL=double -DDBL  -DVOID_POINTER_SIZE_8
-
 #######################################################
-# for pARMS and metis Library, archive and options
+# for metis Library, archive and options
 
 AR     = ar qv
 RANLIB = ranlib

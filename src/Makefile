@@ -12,12 +12,6 @@ METIS_DIR = ../lib/metis-5.1.0
 LIB_METIS = -L$(METIS_DIR)/lib -lmetis
 METIS_INC = -I$(METIS_DIR)/include
 
-# Definition of pARMS include and library
-PARMS_DIR = ../lib/parms
-PARMS_INC = -I$(PARMS_DIR)/include -I$(PARMS_DIR)/src/include
-LIB_PARMS = -L$(PARMS_DIR)/lib -lparms
-CPP_SOL   = -DPARMS
-
 ###### Objects for Mesh Partitioning ################################################
 # modules
 MOD_INI =  fort_part.o  oce_modules.o MOD_MESH.o gen_modules_config.o gen_modules_partitioning.o gen_modules_rotate_grid.o  
@@ -128,7 +122,7 @@ default: run
 run:  $(MODULES) $(OBJECTS)
 	@echo "======= Building FESOM =========="
 	$(LD) $(OPT) -o $(EXE) $(MODULES) $(OBJECTS) \
-	 $(MPI_LIB) $(LIB_LAP) $(LIB_PARMS) $(NC_LIB) 
+	 $(MPI_LIB) $(LIB_LAP) $(NC_LIB) 
 #	cp -pf $(EXE) ../bin/.
 
 run_ini: CPP_DEFS+=-DFVOM_INIT
@@ -141,11 +135,11 @@ run_ini: cleanomod $(MOD_INI) $(OBJ_INI)
 .SUFFIXES: .c .F90 .o 
 
 .c.o :
-	$(MPICC) $(COPT) $(CPP_SOL) $(METIS_DEFS) $(PARMS_DEFS) $(CPP_DEFS) $(METIS_INC) $(PARMS_INC) $(MPI_INC) -c $*.c	
+	$(MPICC) $(COPT) $(CPP_SOL) $(METIS_DEFS) $(CPP_DEFS) $(METIS_INC) $(MPI_INC) -c $*.c	
 
 .F90.o :
 	@echo $@
-	$(MPIFC) $(CPP_DEFS) $(CPP_SOL) $(NC_INC) $(OPT) $(OASIS3_INC) $(PARMS_INC) $(MPI_INC)  -c $*.F90
+	$(MPIFC) $(CPP_DEFS) $(CPP_SOL) $(NC_INC) $(OPT) $(OASIS3_INC) $(MPI_INC)  -c $*.F90
 
 clean :
 	rm -f *.o *.mod *~ *.f90 $(EXE) $(EXE_INI)

@@ -12,7 +12,7 @@ add_subdirectory(${src_home}/../lib/metis-5.1.0             ${PROJECT_BINARY_DIR
 include_directories(${src_home}/../lib/metis-5.1.0/include)
 
 add_library(${PROJECT_NAME}_C ${sources_C})
-target_compile_definitions(${PROJECT_NAME}_C PRIVATE PARMS USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
+target_compile_definitions(${PROJECT_NAME}_C PRIVATE USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
 target_link_libraries(${PROJECT_NAME}_C metis)
 
 add_executable(${PROJECT_NAME} ${sources_Fortran})
