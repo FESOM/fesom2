@@ -35,20 +35,18 @@ list(REMOVE_ITEM sources_C       ${src_home}/fort_part.c)
 # depends on the metis library
 #add_subdirectory(../lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
 #include_directories(../lib/metis-5.1.0/include)
-# depends on the parms library
-add_subdirectory(../lib/parms ${PROJECT_BINARY_DIR}/parms)
 
 add_subdirectory(async_threads_cpp)
 
 include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindNETCDF.cmake)
 
-add_library(${PROJECT_NAME}_C ${sources_C})
-target_compile_definitions(${PROJECT_NAME}_C PRIVATE PARMS USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
-target_link_libraries(${PROJECT_NAME}_C parms) #metis
+#add_library(${PROJECT_NAME}_C ${sources_C})
+#target_compile_definitions(${PROJECT_NAME}_C PRIVATE USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
+#target_link_libraries(${PROJECT_NAME}_C parms) #metis
 
 # create our binary (set its name to name of this project)
 add_executable(${PROJECT_NAME} ${sources_Fortran})
-target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
+target_compile_definitions(${PROJECT_NAME} PRIVATE -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
 if(${DISABLE_MULTITHREADING})
    target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_MULTITHREADING)
 endif()

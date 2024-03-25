@@ -62,11 +62,6 @@ contains
 #else
       print '(g0)', 'OMP_MAX_THREADS is OFF'
 #endif  
-#ifdef PARMS
-      print '(g0)', 'PARMS is ON'
-#else
-      print '(g0)', 'PARMS is OFF'
-#endif  
 #ifdef PETSC
       print '(g0)', 'PETSC is ON'
 #else
