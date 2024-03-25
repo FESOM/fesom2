@@ -736,6 +736,7 @@ subroutine write_mean(entry, entry_index)
      if(mype==entry%root_rank) then
        if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(size2))
      end if
+
      do lev=1, size1
        if(.not. entry%is_elem_based) then
 #if defined (__netcdfout)
@@ -743,15 +744,19 @@ subroutine write_mean(entry, entry_index)
 #endif
 ! hecuba IO
 #if defined (__hecubaio)
-         !WRITE (*,*), "sending to hecuba", entry%ctime_copy, entry%iostep, trim(runid)
-         call write_array(trim(runid)//C_NULL_CHAR, trim(entry%name)//C_NULL_CHAR, entry%iostep, entry%mype_workaround, entry%ptr3, myDim_nod2D) 
-         if (mype==entry%root_rank) then 
-              call write_time(trim(runid)//C_NULL_CHAR, entry%iostep, entry%ctime_copy)
-         end if
+         !call write_array(trim(runid)//C_NULL_CHAR, trim(entry%name)//C_NULL_CHAR, entry%iostep, entry%mype_workaround, entry%ptr3, myDim_nod2D) 
+         call write_array(trim(runid)//C_NULL_CHAR, trim(entry%name)//C_NULL_CHAR, entry%iostep, entry%mype_workaround, entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), myDim_nod2D) 
+         !below may have too many calls to cass so drop for now
+         !if (mype==entry%root_rank) then 
+         !     call write_time(trim(runid)//C_NULL_CHAR, entry%iostep, entry%ctime_copy)
+         !end if
 #endif
        else
 #if defined (__netcdfout)
          call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
+#endif
+#if defined (__hecubaio)
+         call write_array(trim(runid)//C_NULL_CHAR, trim(entry%name)//C_NULL_CHAR, entry%iostep, entry%mype_workaround,entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), myDim_elem2D) 
 #endif
        end if
 #if defined (__netcdfout)
