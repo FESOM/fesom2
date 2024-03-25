@@ -1,0 +1,17 @@
+! The namelist file for transient tracers
+
+&transit_param
+anthro_transit=.false.
+paleo_transit=.false.
+length_transit=1                ! 166 for anthro_transit=.true.
+ti_start_transit=1              ! 1 for D14C, 80 for CFC-12
+ifile_transit='/work/ollie/mbutzin/fesom2/input/trace_gases/Table_CO2_isoC_CFC12_SF6.txt'
+r14c_a  = 1.0000  ! atm. 14C/C ratio, global mean
+r39ar_a = 1.0000	! atm. 39Ar/Ar ratio, global mean
+xarg_a  = 9.34e-3	! atm. Argon concn. (mole fraction), global mean
+xco2_a  = 284.32e-6	! atm. CO2 concn. (mole fraction), global mean
+dic_0   = 2.00          ! mixed layer DIC concn. (mol / m**3), global mean
+arg_0   = 0.01          ! mixed layer Argon concn. (mol / m**3), global mean
+decay14 = 3.8561e-12    ! decay constant of 14C (1 / s), 1 a = 365.0 d
+decay39 = 8.1708e-11    ! decay constant of 39Ar (1 / s), 1 a = 365.0 d
+/
