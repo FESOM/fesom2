@@ -77,7 +77,7 @@ done
 jobinfo=$(scontrol show job $SLURM_JOB_ID)
 wcl=$( echo ${jobinfo##*"TimeLimit="} | cut -d " " -f 1 )
 ntasks=$( echo ${jobinfo##*"NumTasks="} | cut -d " " -f 1 )
-nnodes=$( echo ${jobinfo##*"node="} | cut -d " " -f 1 )
+nnodes=$( echo ${jobinfo##*"NumNodes="} | cut -d " " -f 1 )
 
 #___SET SLURM OPTIONS___________________________________________________________
 set -x
