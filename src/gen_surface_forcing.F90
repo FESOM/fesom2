@@ -1293,6 +1293,8 @@ CONTAINS
      end if
 
 #if defined (__recom)
+!<  read surface atmospheric deposition for Fe, N, CO2
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'//achar(27)//'[0m'
 
 ! ******** Atmospheric CO2 *********
     if (mstep == 1) then ! The year has changed
@@ -1352,6 +1354,7 @@ CONTAINS
 
 ! ******** N deposition *********
     if (useAeolianN) then
+! todo: check below when useAeolianN is .true.
         if (mstep==1) then ! The year has changed
             i=month
 !            if (mstep > 1) i=i+1 
@@ -1376,8 +1379,11 @@ CONTAINS
 
 ! ******** Riverine input (Nutrients) *********
     if (useRivers) then
+!<  read riverine input
     ! *** River inputs are in mmol/m2/s ***
     ! add river nutrients as surface boundary condition (surface_bc function in oce_ale_tracers)
+        if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'   --> River_input'//achar(27)//'[0m'
+
         is_riverinput = 1.0d0
 
         if (update_monthly_flag) then
@@ -1422,8 +1428,11 @@ CONTAINS
 
 ! ******** Erosion (Nutrients) *********
     if (useErosion) then
+!<  read erosion input
     ! *** River inputs are in mmol/m2/s ***
     ! add erosion nutrients as surface boundary condition (surface_bc function in oce_ale_tracers)
+    if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//' --> Erosion_input'//achar(27)//'[0m'
+
     is_erosioninput = 1.0d0
 
         if (update_monthly_flag) then

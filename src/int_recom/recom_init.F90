@@ -42,6 +42,7 @@ subroutine recom_init(tracers, partit, mesh)
 
     real(kind=WP)                           :: locDINmax, locDINmin, locDICmax, locDICmin, locAlkmax, glo
     real(kind=WP)                           :: locAlkmin, locDSimax, locDSimin, locDFemax, locDFemin
+    real(kind=WP)                           :: locO2max, locO2min
 
     type(t_tracer), intent(inout), target   :: tracers
     type(t_partit), intent(inout), target   :: partit
@@ -59,10 +60,28 @@ subroutine recom_init(tracers, partit, mesh)
 
 !! *** Allocate and initialize ***
 
+    !! * Fe and N deposition as surface boundary condition *
     allocate(GloFeDust             ( node_size ))
     allocate(AtmFeInput            ( node_size ))
     allocate(GloNDust              ( node_size ))
     allocate(AtmNInput             ( node_size ))
+
+    !! * River nutrients as surface boundary condition *
+    allocate(RiverDIN2D            ( node_size ))
+    allocate(RiverDON2D            ( node_size ))
+    allocate(RiverDOC2D            ( node_size ))
+    allocate(RiverDSi2D            ( node_size ))
+    allocate(RiverDIC2D            ( node_size ))
+    allocate(RiverAlk2D            ( node_size ))
+    !! * Erosion nutrients as surface boundary condition *
+    allocate(ErosionTON2D          ( node_size ))
+    allocate(ErosionTOC2D          ( node_size ))
+    allocate(ErosionTSi2D          ( node_size ))
+
+    !! * Alkalinity restoring to climatology *
+    allocate(relax_alk             ( node_size ))
+    allocate(virtual_alk           ( node_size ))
+
 
     allocate(cosAI                 ( node_size ))
     allocate(GloPCO2surf           ( node_size ))
@@ -74,40 +93,18 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(Benthos               ( node_size, benthos_num ))
     allocate(Benthos_tr            ( node_size, benthos_num, num_tracers )) ! kh 25.03.22 buffer per tracer index
     allocate(GloHplus              ( node_size ))
-    allocate(DenitBen              ( node_size )) 
-    allocate(RiverDIN2D            ( node_size ))
-    allocate(RiverDON2D            ( node_size ))
-    allocate(RiverDOC2D            ( node_size ))
-    allocate(RiverDSi2D            ( node_size ))
-    allocate(RiverDIC2D            ( node_size ))
-    allocate(RiverAlk2D            ( node_size ))
-    allocate(ErosionTON2D          ( node_size ))
-    allocate(ErosionTOC2D          ( node_size ))
-    allocate(ErosionTSi2D          ( node_size ))
-    allocate(relax_alk             ( node_size ))
-    allocate(virtual_alk           ( node_size ))
+    allocate(DenitBen              ( node_size ))
+
     allocate(LocBenthos            ( benthos_num ))
     allocate(decayBenthos          ( benthos_num ))     ! [1/day] Decay rate of detritus in the benthic layer
-    allocate(wFluxPhy              ( benthos_num ))     ! [mmol/(m2 * day)] Flux of N,C, calc and chl through sinking of phytoplankton
-    allocate(wFluxDia              ( benthos_num ))     ! [mmol/(m2 * day)] Flux of N,C, Si and chl through sinking of diatoms 	
+!    allocate(wFluxPhy              ( benthos_num ))     ! [mmol/(m2 * day)] Flux of N,C, calc and chl through sinking of phytoplankton
+!    allocate(wFluxDia              ( benthos_num ))     ! [mmol/(m2 * day)] Flux of N,C, Si and chl through sinking of diatoms 	
     allocate(PAR3D                 ( nl-1, node_size ))
 
     GloFeDust             = 0.d0
     AtmFeInput            = 0.d0
     GloNDust              = 0.d0
     AtmNInput             = 0.d0
-  
-    cosAI                 = 0.d0
-    GloPCO2surf           = 0.d0
-    GloCO2flux            = 0.d0
-    GloCO2flux_seaicemask = 0.d0 
-    GloO2flux_seaicemask  = 0.d0 
-    GlodPCO2surf          = 0.d0
-    GlodecayBenthos       = 0.d0
-    Benthos               = 0.d0
-    Benthos_tr(:,:,:) = 0.0d0 ! kh 25.03.22
-    GloHplus              = exp(-8.d0 * log(10.d0)) ! = 10**(-8)
-    DenitBen              = 0.d0
 
     RiverDIN2D            = 0.d0
     RiverDON2D            = 0.d0
@@ -115,16 +112,173 @@ subroutine recom_init(tracers, partit, mesh)
     RiverDSi2D            = 0.d0
     RiverDIC2D            = 0.d0
     RiverAlk2D            = 0.d0
+
     ErosionTON2D          = 0.d0
     ErosionTON2D          = 0.d0
     ErosionTSi2D          = 0.d0
+
     relax_alk             = 0.d0
     virtual_alk           = 0.d0
+
+    cosAI                 = 0.d0
+    GloPCO2surf           = 0.d0
+    GloCO2flux            = 0.d0
+    GloCO2flux_seaicemask = 0.d0
+    GloO2flux_seaicemask  = 0.d0
+    GlodPCO2surf          = 0.d0
+    GlodecayBenthos       = 0.d0
+    Benthos               = 0.d0
+    Benthos_tr(:,:,:)     = 0.0d0 ! kh 25.03.22
+    GloHplus              = exp(-8.d0 * log(10.d0)) ! = 10**(-8)
+    DenitBen              = 0.d0
 
     LocBenthos            = 0.d0
     decayBenthos          = 0.d0
     wFluxPhy              = 0.d0
     wFluxDia              = 0.d0
     PAR3D                 = 0.d0
+
+    DO i=num_tracers-bgc_num+1, num_tracers
+        id=tracers%data(i)%ID
+
+        SELECT CASE (id)
+
+! *******************
+! CASE 2phy 1zoo 1det
+! *******************
+! Skip: DIN, DIC, Alk, DSi and O2 are read from files
+! Fe [mol/L] => [umol/m3] Check the units again!
+
+        CASE (1004)
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max       ! PhyN
+
+        CASE (1005)
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax ! PhyC
+
+        CASE (1006)
+            tracers%data(i)%values(:,:) = tiny_chl                 ! PhyChl
+
+        CASE (1007)
+            tracers%data(i)%values(:,:) = tiny                     ! DetN
+
+        CASE (1008)
+            tracers%data(i)%values(:,:) = tiny                     ! DetC
+
+        CASE (1009)
+            tracers%data(i)%values(:,:) = tiny                     ! HetN
+
+        CASE (1010)
+            tracers%data(i)%values(:,:) = tiny * Redfield          ! HetC
+
+        CASE (1011)
+            tracers%data(i)%values(:,:) = tiny                     ! DON
+
+        CASE (1012)
+            tracers%data(i)%values(:,:) = tiny                     ! DOC
+
+        CASE (1013)
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max       ! DiaN
+
+        CASE (1014)
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax ! DiaC
+
+        CASE (1015)
+            tracers%data(i)%values(:,:) = tiny_chl                 ! DiaChl
+
+        CASE (1016)
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max_d/NCmax_d/SiCmax ! DiaSi
+
+        CASE (1017)
+            tracers%data(i)%values(:,:) = tiny                     ! DetSi
+
+        CASE (1019)
+            tracers%data(i)%values(:,:) = tracers%data(i)%values(:,:)* 1.e9 ! Fe [mol/L] => [umol/m3] Check the units again!
+
+        CASE (1020)
+            tracers%data(i)%values(:,:) = tiny * Redfield          ! PhyCalc
+
+        CASE (1021)
+            tracers%data(i)%values(:,:) = tiny                     ! DetCalc
+
+        END SELECT
+    END DO
+!------------------------------------------
+
+
+    !< Mask hydrothermal vent in Eastern Equatorial Pacific GO
+    do row=1, myDim_nod2D+eDim_nod2D
+        !if (ulevels_nod2D(row)>1) cycle 
+        nzmin = ulevels_nod2D(row)
+        nzmax = nlevels_nod2D(row)-1
+        do k=nzmin, nzmax
+            ! do not take regions shallower than 2000 m into account
+            if (((geo_coord_nod2D(2,row) > -12.5*rad) .and. (geo_coord_nod2D(2,row) < 9.5*rad))&
+                .and.((geo_coord_nod2D(1,row)> -106.0*rad) .and. (geo_coord_nod2D(1,row) < -72.0*rad))) then
+                if (abs(Z_3d_n(k,row))<2000.0_WP) cycle
+                tracers%data(21)%values(k,row) = min(0.6, tracers%data(21)%values(k,row))
+            end if
+        end do
+    end do
+
+    !< Mask negative values
+    tracers%data(21)%values(:,:) = max(tiny, tracers%data(21)%values(:,:))
+!------------------------------------------
+
+    if(mype==0) write(*,*),'Tracers have been initialized as spinup from WOA/glodap netcdf files'
+        locDINmax = -66666
+        locDINmin = 66666
+        locDICmax = locDINmax
+        locDICmin = locDINmin
+        locAlkmax = locDINmax
+        locAlkmin = locDINmin
+        locDSimax = locDINmax
+        locDSimin = locDINmin
+        locDFemax = locDINmax
+        locDFemin = locDINmin
+        locO2max  = locDINmax
+        locO2min  = locDINmin
+
+        do n=1, myDim_nod2d
+            locDINmax = max(locDINmax,maxval(tracers%data(3)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
+            locDINmin = min(locDINmin,minval(tracers%data(3)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
+            locDICmax = max(locDICmax,maxval(tracers%data(4)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
+            locDICmin = min(locDICmin,minval(tracers%data(4)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
+            locAlkmax = max(locAlkmax,maxval(tracers%data(5)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
+            locAlkmin = min(locAlkmin,minval(tracers%data(5)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
+            locDSimax = max(locDSimax,maxval(tracers%data(20)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
+            locDSimin = min(locDSimin,minval(tracers%data(20)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
+            locDFemax = max(locDFemax,maxval(tracers%data(21)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
+            locDFemin = min(locDFemin,minval(tracers%data(21)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
+            locO2max  = max(locO2max,maxval(tracers%data(24)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
+            locO2min  = min(locO2min,minval(tracers%data(24)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
+        end do
+
+        if (mype==0) write(*,*) "Sanity check for REcoM variables after recom_init call"
+        call MPI_AllREDUCE(locDINmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal max init. DIN. =', glo
+        call MPI_AllREDUCE(locDINmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal min init. DIN. =', glo
+
+        call MPI_AllREDUCE(locDICmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal max init. DIC. =', glo
+        call MPI_AllREDUCE(locDICmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal min init. DIC. =', glo
+        call MPI_AllREDUCE(locAlkmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal max init. Alk. =', glo
+        call MPI_AllREDUCE(locAlkmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal min init. Alk. =', glo
+        call MPI_AllREDUCE(locDSimax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal max init. DSi. =', glo
+        call MPI_AllREDUCE(locDSimin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal min init. DSi. =', glo
+        call MPI_AllREDUCE(locDFemax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal max init. DFe. =', glo
+        call MPI_AllREDUCE(locDFemin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  `-> gobal min init. DFe. =', glo
+        call MPI_AllREDUCE(locO2max , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal max init. O2. =', glo
+        call MPI_AllREDUCE(locO2min , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  `-> gobal min init. O2. =', glo
+
     end subroutine recom_init
 
