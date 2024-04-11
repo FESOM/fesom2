@@ -20,6 +20,9 @@ module recom_config
 
 !! *** General constants ***
 
+! *******************
+! CASE 2phy 1zoo 1det
+! *******************
   Integer :: idin  =  1, idic   =  2, ialk    =  3,  iphyn  =  4, iphyc = 5, &
              ipchl =  6, idetn  =  7, idetc   =  8,  ihetn  =  9,            &
              ihetc = 10, idon   = 11, idoc    = 12, idian   = 13,            &

@@ -570,6 +570,12 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     use o_mixing_kpp_mod ! KPP
     USE g_forcing_param, only: use_virt_salt
     use diagnostics,     only: ldiag_dMOC, ldiag_DVD
+#if defined(__recom)
+    use recom_glovar
+    use recom_config
+    use recom_ciso
+#endif
+
     IMPLICIT NONE
     integer,        intent(in)            :: num_tracers
     type(t_partit), intent(inout), target :: partit
@@ -628,7 +634,15 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     allocate(Tsurf_t(node_size,2), Ssurf_t(node_size,2))
     allocate(tau_x_t(node_size,2), tau_y_t(node_size,2))  
 
-
+    ! ================
+    ! REcoM forcing arrays
+    ! ================
+#if defined(__recom)
+    allocate(dtr_bf    ( nl-1, node_size ))
+    allocate(str_bf    ( nl-1, node_size ))
+    allocate(vert_sink ( nl-1, node_size ))
+    allocate(Alk_surf  (       node_size ))
+#endif
     ! =================
     ! Visc and Diff coefs
     ! =================
@@ -728,6 +742,16 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     Ssurf_t=0.0_WP
     tau_x_t=0.0_WP
     tau_y_t=0.0_WP
+
+! ================
+! RECOM forcing arrays
+! ================
+#if defined(__recom)
+    dtr_bf              = 0.0_WP
+    str_bf              = 0.0_WP
+    vert_sink           = 0.0_WP
+    Alk_surf            = 0.0_WP
+#endif
     
     ! init field for pressure force 
     allocate(density_ref(nl-1,node_size))
@@ -836,6 +860,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 !    if(mype==0) write(*,*) 'read Salt        climatology from:', trim(filelist(7))
 !    if(mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(8))
 #else
+    ! read ocean state
+    ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
     if(mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(1))
     if(mype==0) write(*,*) 'read Salinity    climatology from:', trim(filelist(2))
 #endif

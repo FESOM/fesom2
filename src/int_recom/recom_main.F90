@@ -64,6 +64,155 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 !! u_wind and v_wind are always at nodes
 ! ======================================================================================
 
+    real(kind=8)               :: SW, Loc_slp
+    integer                    :: tr_num, num_tracers
+    integer                    :: nz, n, nzmin, nzmax
+
+    real(kind=8)               :: Sali
+
+    real(kind=8),  allocatable :: Temp(:), Sali_depth(:), zr(:), PAR(:)
+    real(kind=8),  allocatable :: C(:,:)
+
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"
+
+    allocate(Temp(nl-1), Sali_depth(nl-1), zr(nl-1) , PAR(nl-1))
+    allocate(C(nl-1, bgc_num))
+
+    !< ice concentration [0 to 1]
+
+    a_ice       => ice%data(1)%values(:)
+    num_tracers = tracers%num_tracers
+
+    !< alkalinity restoring to climatology
+    !< virtual flux is possible
+
+    if (restore_alkalinity) call bio_fluxes(tracers, partit, mesh)
+    if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> bio_fluxes'//achar(27)//'[0m'
+
+! ======================================================================================
+!********************************* LOOP STARTS *****************************************
+
+    do n=1, myDim_nod2D  ! needs exchange_nod in the end
+!     if (ulevels_nod2D(n)>1) cycle
+!       nzmin = ulevels_nod2D(n)
+
+        !!---- Number of vertical layers
+        nzmax = nlevels_nod2D(n)-1
+
+        !!---- This is needed for piston velocity
+        Loc_ice_conc = a_ice(n)
+
+        !!---- Mean sea level pressure
+#if defined (__oasis)
+!!      MB: This is an ad-hoc patch for AWIESM-2.1 and needs to be improved:
+!!      We should consider air pressure provided by ECHAM.
+        Loc_slp = pa2atm
+#else
+        Loc_slp = press_air(n)
+#endif
+
+        !!---- Benthic layers
+        LocBenthos(1:benthos_num) = Benthos(n,1:benthos_num)
+
+        !!---- Local conc of [H+]-ions from last time step. Decleared and saved in LocVar.
+        !!---- used as first guess for H+ conc. in subroutine CO2flux (provided by recom_init)
+        Hplus = GloHplus(n)
+
+        !!---- Interpolated wind from atmospheric forcing
+#if defined (__oasis)
+        !! Derive 10m-wind speed from wind stress fields, see module recom_ciso.
+        !! This is an ad-hoc solution as long as 10m-winds are not handled from OASIS.
+        Uloc = wind_10(stress_atmoce_x(n), stress_atmoce_y(n))
+#else
+        ULoc = sqrt(u_wind(n)**2+v_wind(n)**2)
+#endif
+
+        !!---- Atmospheric CO2 in LocVar
+        LocAtmCO2 = AtmCO2(month)
+
+        !!---- Shortwave penetration
+        SW = parFrac * shortwave(n)
+        SW = SW * (1.d0 - a_ice(n))
+
+        !!---- Temperature in water column
+        Temp(1:nzmax) = tracers%data(1)%values(1:nzmax, n)
+
+        !!---- Surface salinity
+        Sali                = tracers%data(2)%values(1, n)
+        Sali_depth(1:nzmax) = tracers%data(2)%values(1:nzmax, n)
+
+        !!---- Biogeochemical tracers
+        do tr_num = num_tracers-bgc_num+1, num_tracers
+            C(1:nzmax, tr_num-2) = tracers%data(tr_num)%values(1:nzmax, n)
+        end do
+
+        !!---- Depth of the nodes in the water column
+        zr(1:nzmax) = Z_3d_n(1:nzmax, n)
+
+        !!---- The PAR in the local water column is initialized
+        PAR(1:nzmax) = 0.d0
+
+        !!---- a_ice(row): Ice concentration in the local node
+        FeDust = GloFeDust(n) * (1.d0 - a_ice(n)) * dust_sol
+        NDust  = GloNDust(n)  * (1.d0 - a_ice(n))
+
+        if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forcing'//achar(27)//'[0m'
+
+! ======================================================================================
+!******************************** RECOM FORCING ****************************************
+        call REcoM_Forcing(zr, n, nzmax, C, SW, Loc_slp , Temp, Sali, Sali_depth &
+                           , PAR, ice, dynamics, tracers, partit, mesh)
+
+        do tr_num = num_tracers-bgc_num+1, num_tracers !bgc_num+2
+            tracers%data(tr_num)%values(1:nzmax, n) = C(1:nzmax, tr_num-2)
+        end do
+
+        !!---- Local variables that have been changed during the time-step are stored so they can be saved
+        Benthos(n,1:benthos_num) = LocBenthos(1:benthos_num)
+        GlodecayBenthos(n, 1:benthos_num) = decayBenthos(1:benthos_num)/SecondsPerDay ! convert from [mmol/m2/d] to [mmol/m2/s]
+        GloHplus(n)              = ph(1) !hplus
+
+        AtmFeInput(n)            = FeDust
+        AtmNInput(n)             = NDust
+
+        GloPCO2surf(n)           = pco2surf(1)
+        GlodPCO2surf(n)          = dpco2surf(1)
+        GloCO2flux(n)            = dflux(1)
+        GloCO2flux_seaicemask(n) = co2flux_seaicemask(1)      !  [mmol/m2/s]
+        GloO2flux_seaicemask(n)  = o2flux_seaicemask(1)       !  [mmol/m2/s]
+
+        if (Diags) then
+
+        end if
+    end do
+
+! ======================================================================================
+!************************** EXCHANGE NODAL INFORMATION *********************************
+
+    do tr_num=num_tracers-bgc_num+1, num_tracers !bgc_num+2
+        call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
+    end do
+
+    call exchange_nod(GloPCO2surf, partit)
+    call exchange_nod(GlodPCO2surf, partit)
+    call exchange_nod(GloCO2flux, partit)
+    call exchange_nod(GloCO2flux_seaicemask, partit)
+
+    call exchange_nod(GloO2flux_seaicemask, partit)
+    do n=1, benthos_num
+        call exchange_nod(Benthos(:,n), partit)
+    end do
+
+    do n=1, benthos_num  !4
+        call exchange_nod(GlodecayBenthos(:,n), partit)
+    end do
+
+    call exchange_nod(GloHplus, partit)
+    call exchange_nod(AtmFeInput, partit)
+    call exchange_nod(AtmNInput, partit)
 
 end subroutine recom
 

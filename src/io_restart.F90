@@ -12,6 +12,11 @@ MODULE io_RESTART
   use MOD_PARTIT
   use MOD_PARSUP
   use fortran_utils
+#if defined(__recom)
+  use recom_glovar
+  use recom_config
+  use recom_ciso
+#endif
   
   implicit none
   public :: restart, finalize_restart
@@ -24,6 +29,10 @@ MODULE io_RESTART
   type(restart_file_group) , save :: ice_files
   character(:), allocatable, save :: oce_path
   character(:), allocatable, save :: ice_path
+#if defined(__recom)
+  type(restart_file_group) , save :: bio_files
+  character(:), allocatable, save :: bio_path
+#endif
 
   character(:), allocatable, save :: raw_restart_dirpath
   character(:), allocatable, save :: raw_restart_infopath
@@ -118,7 +127,7 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
 end subroutine ini_ocean_io
 !
 !--------------------------------------------------------------------------------------------
-! ini_ice_io initializes ice_file datatype which contains information of all variables need to be written into 
+! ini_ice_io initializes ice_file datatype which contains information of all variables need to be written into
 ! the ice restart file. This is the only place need to be modified if a new variable is added!
 subroutine ini_ice_io(year, ice, partit, mesh)
   integer,      intent(in)  :: year
@@ -149,6 +158,42 @@ subroutine ini_ice_io(year, ice, partit, mesh)
 #endif /* (__oifs) */
 
 end subroutine ini_ice_io
+!
+!--------------------------------------------------------------------------------------------
+!
+! ini_bio_io initializes bid datatype which contains information of all variables need to be written into
+! the bio restart file. This is the only place need to be modified if a new variable is added!
+#if defined(__recom)
+subroutine ini_bio_io(year, tracers, partit, mesh)
+    integer,      intent(in)  :: year
+    integer                   :: j
+    character(500)            :: longname
+    character(500)            :: trname, units
+    character(4)              :: cyear
+
+    type(t_mesh), intent(in) , target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_tracer), target :: tracers
+    logical, save :: has_been_called = .false.
+
+    write(cyear,'(i4)') year
+    bio_path = trim(ResultPath)//trim(runid)//'.'//cyear//'.bio.restart.nc'
+
+    if(has_been_called) return
+    has_been_called = .true.
+
+    !===========================================================================
+    !===================== Definition part =====================================
+    !===========================================================================
+    !___Define the netCDF variables for 2D fields_______________________________
+    call bio_files%def_node_var('BenN',    'Benthos Nitrogen', 'mmol/m3',   Benthos(:,1), mesh, partit);
+    call bio_files%def_node_var('BenC',    'Benthos Carbon',   'mmol/m3',   Benthos(:,2), mesh, partit);
+    call bio_files%def_node_var('BenSi',   'Benthos Silicate', 'mmol/m3',   Benthos(:,3), mesh, partit);
+    call bio_files%def_node_var('BenCalc', 'Benthos Calcite',  'mmol/m3',   Benthos(:,4), mesh, partit);
+    call bio_files%def_node_var('HPlus',   'Conc. of H-plus ions in the surface water', 'mol/kg',   GloHplus, mesh, partit);
+
+end subroutine ini_bio_io
+#endif
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -225,9 +270,15 @@ subroutine restart(istep, l_read, which_readr, ice, dynamics, tracers, partit, m
   if (.not. l_read) then
                call ini_ocean_io(yearnew, dynamics, tracers, partit, mesh)
   if (use_ice) call ini_ice_io  (yearnew, ice, partit, mesh)
+#if defined(__recom)
+    if (use_REcoM) call ini_bio_io  (yearnew, tracers, partit, mesh)
+#endif
   else
                call ini_ocean_io(yearold, dynamics, tracers, partit, mesh)
   if (use_ice) call ini_ice_io  (yearold, ice, partit, mesh)
+#if defined(__recom)
+    if (REcoM_restart) call ini_bio_io(yearold, tracers, partit, mesh)
+#endif
   end if
 
   !___READING OF RESTART________________________________________________________
@@ -252,7 +303,7 @@ subroutine restart(istep, l_read, which_readr, ice, dynamics, tracers, partit, m
     if(rawfiles_exist) then
         which_readr = 1
         call read_all_raw_restarts(partit%MPI_COMM_FESOM, partit%mype)
-    
+ 
     !___________________________________________________________________________
     ! read derived type binary file restart
     elseif(binfiles_exist .and. bin_restart_length_unit /= "off") then
@@ -281,7 +332,16 @@ subroutine restart(istep, l_read, which_readr, ice, dynamics, tracers, partit, m
             if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ice'//achar(27)//'[0m'
             call read_restart(ice_path, ice_files, partit%MPI_COMM_FESOM, partit%mype)
         end if 
-        
+
+#if defined(__recom)
+!RECOM restart
+!read here
+            if (REcoM_restart) then
+                    if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: bio'//achar(27)//'[0m'
+                call read_restart(bio_path, bio_files, partit%MPI_COMM_FESOM, partit%mype)
+            end if
+#endif
+
         ! immediately create a raw core dump restart
         if(raw_restart_length_unit /= "off") then
             call write_all_raw_restarts(istep, partit%MPI_COMM_FESOM, partit%mype)
@@ -333,7 +393,17 @@ subroutine restart(istep, l_read, which_readr, ice, dynamics, tracers, partit, m
     if(use_ice) then
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ice'//achar(27)//'[0m'
         call write_restart(ice_path, ice_files, istep)
-    end if     
+    end if
+
+#if defined(__recom)
+!RECOM restart
+!write here
+        if (REcoM_restart .or. use_REcoM) then
+
+                if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: bio'//achar(27)//'[0m'
+            call write_restart(bio_path, bio_files, istep)
+        end if
+#endif
   end if
 
   ! write core dump

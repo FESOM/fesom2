@@ -121,9 +121,9 @@ contains
             f%fesom_did_mpi_init = .true.
         end if
 #endif
-    
 
 #if defined (__oasis)
+
         call cpl_oasis3mct_init(f%partit,f%partit%MPI_COMM_FESOM)
 #endif
         f%t1 = MPI_Wtime()
@@ -134,6 +134,8 @@ contains
         f%MPIerr        =>f%partit%MPIerr
         f%MPI_COMM_FESOM=>f%partit%MPI_COMM_FESOM
         f%npes          =>f%partit%npes
+
+
         if(f%mype==0) then
             write(*,*)
             print *,"FESOM2 git SHA: "//fesom_git_sha()
@@ -154,7 +156,7 @@ contains
         call mesh_setup(f%partit, f%mesh)
 
         if (f%mype==0) write(*,*) 'FESOM mesh_setup... complete'
-    
+
         !=====================
         ! Allocate field variables 
         ! and additional arrays needed for 
@@ -178,9 +180,11 @@ contains
 
         ! recom setup
 #if defined (__recom)
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call recom_init'//achar(27)//'[0m'
         f%t0_recom=MPI_Wtime()
         call recom_init(f%tracers, f%partit, f%mesh) ! adjust values for recom tracers (derived type "t_tracer")
         f%t1_recom=MPI_Wtime()
+        if (f%mype==0) write(*,*) 'RECOM recom_init... complete'
 #endif
 
         if (f%mype==0) then
@@ -209,7 +213,9 @@ contains
 
         call compute_diagnostics(0, f%dynamics, f%tracers, f%partit, f%mesh) ! allocate arrays for diagnostic
 #if defined (__oasis)
+
         call cpl_oasis3mct_define_unstr(f%partit, f%mesh)
+
         if(f%mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
 #endif
 
@@ -390,7 +396,7 @@ contains
         call before_oce_step(f%dynamics, f%tracers, f%partit, f%mesh) ! prepare the things if required
         f%t2 = MPI_Wtime()
 
-        !___now recom___________________________________________________________
+        !___now recom____________________________________________________
 #if defined (__recom)
         if (f%mype==0 .and. n==1)  print *, achar(27)//'[46'  //'_____________________________________________________________'//achar(27)//'[0m'
         if (f%mype==0 .and. n==1)  print *, achar(27)//'[46;1m'//'     --> call REcoM                                         '//achar(27)//'[0m'
