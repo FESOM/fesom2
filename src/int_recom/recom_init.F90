@@ -82,10 +82,10 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(relax_alk             ( node_size ))
     allocate(virtual_alk           ( node_size ))
 
-
     allocate(cosAI                 ( node_size ))
     allocate(GloPCO2surf           ( node_size ))
     allocate(GloCO2flux            ( node_size ))
+    allocate(GloO2flux             ( node_size ))
     allocate(GloCO2flux_seaicemask ( node_size ))
     allocate(GloO2flux_seaicemask  ( node_size ))
     allocate(GlodPCO2surf          ( node_size ))
@@ -137,6 +137,61 @@ subroutine recom_init(tracers, partit, mesh)
     wFluxPhy              = 0.d0
     wFluxDia              = 0.d0
     PAR3D                 = 0.d0
+
+    pco2surf           = 0.d0
+    dflux              = 0.d0
+    oflux              = 0.d0
+    co2flux_seaicemask = 0.d0
+    o2flux_seaicemask  = 0.d0
+    dpco2surf          = 0.d0
+    co2                = 0.d0
+
+    if (Diags) then
+
+!! *** Allocate 2D diagnostics ***
+    allocate(NPPn    ( node_size ))
+    allocate(NPPd    ( node_size ))
+    allocate(GPPn    ( node_size ))
+    allocate(GPPd    ( node_size ))
+    allocate(NNAn    ( node_size ))
+    allocate(NNAd    ( node_size ))
+    allocate(Chldegn ( node_size ))
+    allocate(Chldegd ( node_size ))
+
+    NPPn    = 0.d0
+    NPPd    = 0.d0
+    GPPn    = 0.d0
+    GPPd    = 0.d0
+    NNAn    = 0.d0
+    NNAd    = 0.d0
+    Chldegn = 0.d0
+    Chldegd = 0.d0
+
+!! *** Allocate 3D diagnostics ***
+    allocate(respmeso     ( nl-1, node_size ))
+    allocate(calcdiss     ( nl-1, node_size ))
+    allocate(calcif       ( nl-1, node_size ))
+    allocate(aggn         ( nl-1, node_size ))
+    allocate(aggd         ( nl-1, node_size ))
+    allocate(docexn       ( nl-1, node_size ))
+    allocate(docexd       ( nl-1, node_size ))
+    allocate(respn        ( nl-1, node_size ))
+    allocate(respd        ( nl-1, node_size ))
+    allocate(NPPn3D       ( nl-1, node_size ))
+    allocate(NPPd3D       ( nl-1, node_size ))
+
+    respmeso     = 0.d0
+    calcdiss     = 0.d0
+    calcif       = 0.d0
+    aggn         = 0.d0
+    aggd         = 0.d0
+    docexn       = 0.d0
+    docexd       = 0.d0
+    respn        = 0.d0
+    respd        = 0.d0
+    NPPn3D       = 0.d0
+    NPPd3D       = 0.d0
+    end if
 
     DO i=num_tracers-bgc_num+1, num_tracers
         id=tracers%data(i)%ID

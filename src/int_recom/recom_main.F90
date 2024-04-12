@@ -67,6 +67,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     real(kind=8)               :: SW, Loc_slp
     integer                    :: tr_num, num_tracers
     integer                    :: nz, n, nzmin, nzmax
+    integer                    :: idiags
 
     real(kind=8)               :: Sali
 
@@ -159,6 +160,43 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
         FeDust = GloFeDust(n) * (1.d0 - a_ice(n)) * dust_sol
         NDust  = GloNDust(n)  * (1.d0 - a_ice(n))
 
+        if (Diags) then
+
+        !!---- Allocate 3D diagnostics
+
+            allocate(vertrespmeso(nl-1))
+            vertrespmeso  = 0.d0
+
+            allocate(vertcalcdiss(nl-1), vertcalcif(nl-1))
+            vertcalcdiss = 0.d0
+            vertcalcif   = 0.d0
+
+            allocate(vertaggn(nl-1), vertaggd(nl-1))
+            vertaggn = 0.d0
+            vertaggd = 0.d0
+
+            allocate(vertdocexn(nl-1), vertdocexd(nl-1))
+            vertdocexn = 0.d0
+            vertdocexd = 0.d0
+
+            allocate(vertrespn(nl-1), vertrespd(nl-1))
+            vertrespn = 0.d0
+            vertrespd = 0.d0
+
+            !!---- Allocate 2D diagnostics
+            allocate(vertNPPn(nl-1), vertGPPn(nl-1), vertNNAn(nl-1), vertChldegn(nl-1)) 
+            vertNPPn = 0.d0
+            vertGPPn = 0.d0
+            vertNNAn = 0.d0
+            vertChldegn  = 0.d0
+
+            allocate(vertNPPd(nl-1), vertGPPd(nl-1), vertNNAd(nl-1), vertChldegd(nl-1)) 
+            vertNPPd = 0.d0
+            vertGPPd = 0.d0
+            vertNNAd = 0.d0
+            vertChldegd  = 0.d0
+        end if
+
         if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forcing'//achar(27)//'[0m'
 
 ! ======================================================================================
@@ -175,18 +213,52 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
         GlodecayBenthos(n, 1:benthos_num) = decayBenthos(1:benthos_num)/SecondsPerDay ! convert from [mmol/m2/d] to [mmol/m2/s]
         GloHplus(n)              = ph(1) !hplus
 
+        if (Diags) then
+            !!---- Updating 2D diagnostics
+            NPPn(n) = locNPPn
+            NPPd(n) = locNPPd
+            GPPn(n) = locGPPn
+            GPPd(n) = locGPPd
+            NNAn(n) = locNNAn
+            NNAd(n) = locNNAd
+            Chldegn(n) = locChldegn
+            Chldegd(n) = locChldegd
+
+            !!---- Updating 3D diagnostics
+!            respmeso     (1:nzmax,n) = vertrespmeso     (1:nzmax)
+            calcdiss     (1:nzmax,n) = vertcalcdiss     (1:nzmax)
+            calcif       (1:nzmax,n) = vertcalcif       (1:nzmax)
+            aggn         (1:nzmax,n) = vertaggn         (1:nzmax)
+            aggd         (1:nzmax,n) = vertaggd         (1:nzmax)
+            docexn       (1:nzmax,n) = vertdocexn       (1:nzmax)
+            docexd       (1:nzmax,n) = vertdocexd       (1:nzmax)
+            respn        (1:nzmax,n) = vertrespn        (1:nzmax)
+            respd        (1:nzmax,n) = vertrespd        (1:nzmax)
+            NPPn3D       (1:nzmax,n) = vertNPPn         (1:nzmax)
+            NPPd3D       (1:nzmax,n) = vertNPPd         (1:nzmax)
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
+            !!---- Deallocating 2D diagnostics
+            deallocate(vertNPPn, vertGPPn, vertNNAn, vertChldegn) 
+            deallocate(vertNPPd, vertGPPd, vertNNAd, vertChldegd)
+
+            !!---- Deallocating 3D Diagnistics
+            deallocate(vertrespmeso                                   )
+            deallocate(vertcalcdiss,     vertcalcif                   )
+            deallocate(vertaggn,         vertaggd                     )
+            deallocate(vertdocexn,       vertdocexd                   )
+            deallocate(vertrespn,        vertrespd                    )
+        end if
+
         AtmFeInput(n)            = FeDust
         AtmNInput(n)             = NDust
 
         GloPCO2surf(n)           = pco2surf(1)
         GlodPCO2surf(n)          = dpco2surf(1)
-        GloCO2flux(n)            = dflux(1)
+        GloCO2flux(n)            = dflux(1)                   !  [mmol/m2/d]
         GloCO2flux_seaicemask(n) = co2flux_seaicemask(1)      !  [mmol/m2/s]
         GloO2flux_seaicemask(n)  = o2flux_seaicemask(1)       !  [mmol/m2/s]
+        GloO2flux(n)             = oflux(1)                   !  [mmol/m2/d]
 
-        if (Diags) then
-
-        end if
     end do
 
 ! ======================================================================================
@@ -205,6 +277,19 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     do n=1, benthos_num
         call exchange_nod(Benthos(:,n), partit)
     end do
+
+    if (Diags) then
+        call exchange_nod(NPPn, partit)
+        call exchange_nod(NPPd, partit)
+        call exchange_nod(GPPn, partit)
+        call exchange_nod(GPPd, partit)
+        call exchange_nod(NNAn, partit)
+        call exchange_nod(NNAd, partit)
+        call exchange_nod(Chldegn, partit)
+        call exchange_nod(Chldegd, partit)
+    endif
+
+
 
     do n=1, benthos_num  !4
         call exchange_nod(GlodecayBenthos(:,n), partit)

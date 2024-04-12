@@ -134,7 +134,6 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
     call pistonvel(ULoc, Loc_ice_conc, Nmocsy, kw660)
 
     !! ----- check -------! 
-
     if((REcoM_DIC(1) > 10000.d0)) then               ! NEW: added this entire print statement (if to endif)
         print*, 'NEW ERROR: DIC !'  
         print*, 'pco2surf: ',pco2surf
@@ -205,7 +204,8 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
    REcoM_O2 = max(tiny*1e-3,state(one,ioxy)*1e-3) ! convert from mmol/m3 to mol/m3 for mocsy
 
    call  o2flux(REcoM_T, REcoM_S, kw660, ppo, REcoM_O2, Nmocsy, o2ex)
-     
+
+   oflux     = o2ex * 1.e3 *SecondsPerDay  !* (1.d0 - Loc_ice_conc) [mmol/m2/d]
    o2flux_seaicemask = o2ex * 1.e3 ! back to mmol here [mmol/m2/s] 
 
 ! Source-Minus-Sinks
@@ -229,5 +229,26 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
   state(1:nn,idiasi) = max(tiny_Si, state(1:nn,idiasi))
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
+
+!-------------------------------------------------------------------------------
+! Diagnostics
+  if (Diags) then
+
+!    logical, optional                 :: lNPPn
+
+!    if (present(lNPPn))then
+!        locNPPn = sum(diags3Dloc(1:nn,idiags) * thick(1:nn))
+!    endif
+     locNPPn = sum(vertNPPn(1:nn) * thick(1:nn))
+     locGPPn = sum(vertGPPn(1:nn) * thick(1:nn))
+     locNNAn = sum(vertNNAn(1:nn) * thick(1:nn))
+     locChldegn = sum(vertChldegn(1:nn) * thick(1:nn))
+
+     locNPPd = sum(vertNPPd(1:nn) * thick(1:nn))
+     locGPPd = sum(vertGPPd(1:nn) * thick(1:nn))
+     locNNAd = sum(vertNNAd(1:nn) * thick(1:nn))
+     locChldegd = sum(vertChldegd(1:nn) * thick(1:nn))
+
+  end if
 
 end subroutine REcoM_Forcing

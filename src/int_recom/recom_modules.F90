@@ -649,6 +649,7 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:)   :: AtmNInput        ! [umol/m2/s] Includes ice, but is, other than that identlical to GloNDust
   Real(kind=8),allocatable,dimension(:)   :: GloPCO2surf      ! [uatm] Surface ocean CO2 partial pressure
   Real(kind=8),allocatable,dimension(:)   :: GloCO2flux       ! [mmol/m2/day] Positive downwards
+  Real(kind=8),allocatable,dimension(:)   :: GloO2flux        ! [mmol/m2/day] Positive downwards
   Real(kind=8),allocatable,dimension(:)   :: GloCO2flux_seaicemask       ! [mmol/m2/day] Positive downwards
   Real(kind=8),allocatable,dimension(:)   :: GloO2flux_seaicemask       ! [mmol/m2/day] Positive downwards
   Real(kind=8),allocatable,dimension(:)   :: GloHplus         ! [mol/kg] Concentrations of H-plus ions in the surface ocean
@@ -749,6 +750,7 @@ Module REcoM_locVar
   Real(kind=8) :: Hplus                     ! [mol/kg] Concentrations of H-plus ions in the surface node
   Real(kind=8) :: pCO2surf(1)                  ! [uatm] Partial pressure of CO2 in surface layer at current 2D node	
   Real(kind=8) :: dflux(1)                     ! [mmol/m2/day] Flux of CO2 into the ocean
+  Real(kind=8) :: oflux(1)                     ! [mmol/m2/day] Flux of O2 into the ocean
   Real(kind=8) :: o2ex(1)                     ! [mmol/m2/s] Flux of O2 into the ocean
   Real(kind=8) :: ULoc(1)                      ! Wind strength above current 2D node, change array size if used with mocsy input vector longer than one
   Real(kind=8) :: Loc_ice_conc(1)

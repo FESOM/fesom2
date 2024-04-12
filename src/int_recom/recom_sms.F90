@@ -905,7 +905,93 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 ! Diagnostics: Averaged rates
 	
 	recipbiostep    = 1.d0/real(biostep)
+if (Diags) then
+!*** Net primary production [mmol C /(m3 * day)]
+        vertNPPn(k) = vertNPPn(k)  + (   &
+        + Cphot                   * PhyC  &
+        - PhyRespRate             * PhyC  &
+        ) * recipbiostep
 
+        vertNPPd(k) = vertNPPd(k)  + (   &
+        + Cphot_dia               * DiaC  &
+        - PhyRespRate_dia         * DiaC  &
+        ) * recipbiostep
+
+!*** Gross primary production [mmol C /(m3 * day)]
+        vertGPPn(k) = vertGPPn(k)  + (   &
+        + Cphot                   * PhyC  &
+        ) * recipbiostep
+
+        vertGPPd(k) = vertGPPd(k)  + (   &
+        + Cphot_dia               * DiaC  &
+        ) * recipbiostep
+
+!*** Net N-assimilation [mmol N/(m3 * day)]
+        vertNNAn(k) = vertNNAn(k)  + (   &
+        + N_assim                 * PhyC  &
+        - lossN * limitFacN       * PhyN  &
+        ) * recipbiostep
+
+        vertNNAd(k) = vertNNAd(k)  + (   &
+        + N_assim_dia             * DiaC  &
+        - lossN * limitFacN_dia   * DiaN  &
+        ) * recipbiostep
+
+!*** Changed to chlorophyll degradation (commented out gross N-assimilation below)
+        vertChldegn(k) = vertChldegn(k)  + (   &
+        + KOchl  &
+        ) * recipbiostep
+
+        vertChldegd(k) = vertChldegd(k)  + (   &
+        + KOchl_dia  &
+        ) * recipbiostep
+
+!*** zooplankton1 respiration
+        vertrespmeso(k) = vertrespmeso(k) + (     &
+        + HetRespFlux                             &
+        ) * recipbiostep
+
+!*** calc_diss
+        vertcalcdiss(k) = vertcalcdiss(k) + (     &
+        + calc_diss * DetCalc                     &
+        ) * recipbiostep
+
+!***    aggregation by  small phytoplankton
+        vertaggn(k) = vertaggn(k) + (             &
+        + aggregationrate * PhyC                  &
+        ) * recipbiostep
+
+!***    aggregation by  diatoms
+        vertaggd(k) = vertaggd(k) + (             &
+        + aggregationrate * DiaC                  &
+        ) * recipbiostep
+
+!*** excrection of DOC by phytoplankton
+        vertdocexn(k) = vertdocexn(k) + (         &
+        + lossC * limitFacN              * phyC   &
+        ) * recipbiostep
+
+!*** excrection of DOC by diatoms
+        vertdocexd(k) = vertdocexd(k) + (         &
+        + lossC_d * limitFacN_dia        * DiaC   &
+        ) * recipbiostep
+
+!*** calcification
+        vertcalcif(k) = vertcalcif(k) + (         &
+        + calcification                           &
+        ) * recipbiostep
+
+! phy respiration
+        vertrespn(k) = vertrespn(k) + (           &
+        + PhyRespRate             * PhyC          &
+        ) * recipbiostep
+
+! dia respiration
+        vertrespd(k) = vertrespd(k) + (           &
+        + PhyRespRate_dia         * DiaC          &
+        ) * recipbiostep
+
+endif
   end do ! Main vertikal loop ends
 
 !-------------------------------------------------------------------------------
