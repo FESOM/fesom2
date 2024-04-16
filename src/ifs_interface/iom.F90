@@ -216,7 +216,6 @@ CONTAINS
             WRITE (err_str, "(I10)") mio_parent_comm
             CALL ctl_stop('conf_ctx%mpi_parent_comm(', err_str,') failed: ', multio_error_string(err))
         END IF
-
         ! Blocking call
         err = multio_start_server(conf_ctx)
         IF (err /= MULTIO_SUCCESS) THEN
@@ -338,7 +337,6 @@ CONTAINS
         TYPE(iom_field_request), INTENT(INOUT)  :: data
         INTEGER                                 :: cerr
         TYPE(multio_metadata)                   :: md
-
         cerr = md%new(mio_handle)
         IF (cerr /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('send_fesom_data: md%new() failed: ', multio_error_string(cerr))

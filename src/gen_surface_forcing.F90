@@ -30,7 +30,7 @@ MODULE g_sbf
    !!   we assume that all NetCDF files have identical grid and time variable
    !!
    !! public:
-   !!   sbc_ini  -- inizialization atmpospheric forcing
+   !!   sbc_ini  -- initialization atmpospheric forcing
    !!   sbc_do   -- provide a sbc (surface boundary conditions) each time step
    !!
    USE MOD_MESH
@@ -908,7 +908,7 @@ CONTAINS
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE sbc_ini ***
       !!
-      !! ** Purpose : inizialization of ocean forcing
+      !! ** Purpose : initialization of ocean forcing
       !! ** Method  :
       !! ** Action  :
       !!----------------------------------------------------------------------
@@ -949,13 +949,13 @@ CONTAINS
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
       close( nm_sbc_unit )
       
-      if (mype==0) write(*,*) "Start: Ocean forcing inizialization."
+      if (mype==0) write(*,*) "Start: Ocean forcing initialization."
       rdate = real(julday(yearnew,1,1))
       rdate = rdate+real(daynew-1,WP)+timenew/86400._WP
       idate = int(rdate)
 
       if (mype==0) then
-         write(*,*) "Start: Ocean forcing inizialization."
+         write(*,*) "Start: Ocean forcing initialization."
          write(*,*) "Surface boundary conditions parameters:"
       end if
 
@@ -1102,7 +1102,7 @@ CONTAINS
          end if
       end if
 
-      if (mype==0) write(*,*) "DONE:  Ocean forcing inizialization."
+      if (mype==0) write(*,*) "DONE:  Ocean forcing initialization."
       if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
       if (use_runoff_mapper) call read_runoff_mapper(runoff_basins_file, "arrival_point_id", runoff_radius, partit, mesh)
    END SUBROUTINE sbc_ini

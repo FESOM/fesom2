@@ -114,15 +114,49 @@ MODULE mpp_io
     END SUBROUTINE mpp_io_init
 
     SUBROUTINE mpp_io_init_2( iicomm )
+        INCLUDE "mpif.h"
         
         INTEGER, INTENT(INOUT) :: iicomm
 
         INTEGER :: icode, ierr, icolor, iicommx, iicommm, iicommo
         INTEGER :: ji,inum
         LOGICAL :: lcompp
-        INCLUDE "mpif.h"
+#if defined(__MULTIO) && !defined(__ifsinterface) && !defined(__oasis)
+        ! Construct multio server communicator in FESOM standalone
+        INTEGER :: commsize, myrank
+        character(len=255)        :: oce_npes_str, mio_npes_str
+        integer                   :: oce_npes_int, mio_npes_int, oce_status, mio_status
+       ! fesom standalone with MULTIO
+       ! both below envs are not needed as one can be deduced from other by subtracting 
+       ! from global total pes 
+        CALL get_environment_variable('OCE_NPES', oce_npes_str, status=oce_status)
+        CALL get_environment_variable('MIO_NPES', mio_npes_str, status=mio_status)
+        CALL MPI_Comm_Size(MPI_COMM_WORLD, commsize, ierr)
+        CALL MPI_Comm_Rank(MPI_COMM_WORLD, myrank, ierr)
+        if ((oce_status/=0) .or. (mio_status/=0)) then
+          if (oce_status/=0) then
+             if (myrank==0) write(*,*) '$OCE_NPES variable is not set!'
+          end if
+          if (mio_status/=0) then
+             if (myrank==0) write(*,*) '$MIO_NPES variable is not set!'
+          end if
+             !call par_ex(MPI_COMM_WORLD, myrank, abort=.true.) ! TODO:doesn't work see par_ex        
+             call mpi_abort(mpi_comm_world)
+          stop
+        end if
+        read(oce_npes_str,*,iostat=oce_status) oce_npes_int
+        read(mio_npes_str,*,iostat=mio_status) mio_npes_int
+        if (myrank==0) write(*,*) 'Total number of processes: ', commsize
+        if (myrank==0) write(*,*) 'FESOM runs on           ', oce_npes_int, ' processes'
+        if (myrank==0) write(*,*) 'MULTIO Server runs on  ', mio_npes_int, ' processes'
+        
+        ! note: in case of ifsinterface lmultioserver and lioserver are init in mpp_init
+        if (myrank > oce_npes_int-1) then
+                lmultioserver = .true.
+                lioserver = .true.
+        ENDIF
+#endif
 
-        ! Construct multio server communicator
 
         IF (lmultioserver.OR..NOT.lioserver) THEN
             icolor=12
@@ -160,16 +194,24 @@ MODULE mpp_io
 
 #if defined(__MULTIO)
         IF (.NOT.lioserver) THEN
-            CALL iom_initialize( "for_xios_mpi_id", return_comm=iicommm, global_comm = pcommworldmultio )    ! nemo local communicator given by xios
+            CALL iom_initialize( "feosom client", return_comm=iicommm, global_comm = MPI_COMM_WORLD )    ! nemo local communicator given by xios
+            !iicomm = iicommm
         ELSE
             ! For io-server tasks start an run the right server
-            CALL iom_init_server( server_comm = pcommworldmultio )
+            CALL iom_init_server( server_comm = iicomm )
         ENDIF
 #endif
 
         ! Return to the model with iicomm being compute only tasks
         iicomm = iicommo
-
+#if defined(__MULTIO) && !defined(__ifsinterface) && !defined(__oasis)
+        IF (lioserver) THEN
+            ! TODO: unless we fix partit and segregate compute communicators from IO 
+	    !       communicators it is hard to elegantly close either FESOM or MULTIO
+	    !       currently force stopping multio after all connections from clients are closed   
+            stop "Exiting MIO server"
+        END IF 
+#endif
     END SUBROUTINE mpp_io_init_2
 
     SUBROUTINE mpp_stop
@@ -181,7 +223,9 @@ MODULE mpp_io
         ENDIF
 #endif
 
+#ifdef __ifsinterface 
         CALL mpi_finalize( ierr )
+#endif
     END SUBROUTINE mpp_stop
 
 END MODULE mpp_io

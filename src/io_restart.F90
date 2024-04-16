@@ -76,10 +76,14 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
 #endif
   call oce_files%def_elem_var('u', 'zonal velocity',        'm/s', dynamics%uv(1,:,:), mesh, partit)
   call oce_files%def_elem_var('v', 'meridional velocity',   'm/s', dynamics%uv(2,:,:), mesh, partit)
-  call oce_files%def_elem_var('urhs_AB', 'Adams–Bashforth for u', 'm/s', dynamics%uv_rhsAB(1,:,:), mesh, partit)
-  call oce_files%def_elem_var('vrhs_AB', 'Adams–Bashforth for v', 'm/s', dynamics%uv_rhsAB(2,:,:), mesh, partit)
+  call oce_files%def_elem_var('urhs_AB', 'Adams-Bashforth for u (n-1 for AB2 and n-2 for AB3)', 'm/s', dynamics%uv_rhsAB(1,1,:,:), mesh, partit)
+  call oce_files%def_elem_var('vrhs_AB', 'Adams-Bashforth for v (n-1 for AB2 and n-2 for AB3)', 'm/s', dynamics%uv_rhsAB(1,2,:,:), mesh, partit)
+  if (dynamics%AB_order==3) then
+       call oce_files%def_elem_var_optional('urhs_AB3', 'Adams-Bashforth for u (n-1) for AB3', 'm/s', dynamics%uv_rhsAB(2,1,:,:), mesh, partit)
+       call oce_files%def_elem_var_optional('vrhs_AB3', 'Adams-Bashforth for v (n-1) for AB3', 'm/s', dynamics%uv_rhsAB(2,2,:,:), mesh, partit)
+  end if
   
-  !___Save restart variables for TKE and IDEMIX_________________________________
+!___Save restart variables for TKE and IDEMIX_________________________________
 !   if (trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
   if (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
         call oce_files%def_node_var_optional('tke', 'Turbulent Kinetic Energy', 'm2/s2', tke(:,:), mesh, partit)
@@ -103,14 +107,34 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
          trname='salt'
          longname='salinity'
          units='psu'
+       CASE(6)
+         trname='sf6'
+         longname='sulfur hexafluoride'
+         units='mol / m**3'
+       CASE(12)
+         trname='cfc12'
+         longname='chlorofluorocarbon CFC-12'
+         units='mol / m**3'
+       CASE(14)
+         trname='r14c'
+         longname='14C / C ratio of DIC'
+         units='none'
+       CASE(39)
+         trname='r39ar'
+         longname='39Ar / Ar ratio'
+         units='none'
        CASE DEFAULT
+!        other passive tracers
          write(trname,'(A3,i1)') 'tra_', j
          write(longname,'(A15,i1)') 'passive tracer ', j
          units='none'
      END SELECT
      call oce_files%def_node_var(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
-     longname=trim(longname)//', Adams–Bashforth'
-     call oce_files%def_node_var(trim(trname)//'_AB', trim(longname), trim(units), tracers%data(j)%valuesAB(:,:), mesh, partit)
+     longname=trim(longname)//', Adams-Bashforth'
+     call oce_files%def_node_var(trim(trname)//'_AB', trim(longname), trim(units), tracers%data(j)%valuesAB(:,:),    mesh, partit)
+     call oce_files%def_node_var_optional(trim(trname)//'_M1', trim(longname), trim(units), tracers%data(j)%valuesold(1,:,:), mesh, partit)
+     if (tracers%data(j)%AB_order==3) &
+     call oce_files%def_node_var_optional(trim(trname)//'_M2', trim(longname), trim(units), tracers%data(j)%valuesold(2,:,:), mesh, partit)
   end do
   call oce_files%def_node_var('w', 'vertical velocity', 'm/s', dynamics%w, mesh, partit)
   call oce_files%def_node_var('w_expl', 'vertical velocity', 'm/s', dynamics%w_e, mesh, partit)
@@ -147,6 +171,15 @@ subroutine ini_ice_io(year, ice, partit, mesh)
   call ice_files%def_node_var_optional('ice_albedo', 'ice albedo',    '-',   ice%atmcoupl%ice_alb, mesh, partit)
   call ice_files%def_node_var_optional('ice_temp', 'ice surface temperature',  'K',   ice%data(4)%values, mesh, partit)
 #endif /* (__oifs) */
+#if defined (__oasis)
+  !---wiso-code
+  if (lwiso) then
+    call ice_files%def_node_var_optional('h2o18_ice', 'h2o18 concentration in sea ice', 'kmol/m**3', tr_arr_ice(:,1), mesh, partit)
+    call ice_files%def_node_var_optional('hDo16_ice', 'hDo16 concentration in sea ice', 'kmol/m**3', tr_arr_ice(:,2), mesh, partit)
+    call ice_files%def_node_var_optional('h2o16_ice', 'h2o16 concentration in sea ice', 'kmol/m**3', tr_arr_ice(:,3), mesh, partit)
+  end if
+  !---wiso-code-end
+#endif
 
 end subroutine ini_ice_io
 !
@@ -187,12 +220,12 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   ! initialize directory for core dump restart 
   if(.not. initialized_raw) then
     initialized_raw = .true.
-    raw_restart_dirpath  = trim(ResultPath)//"/fesom_raw_restart/np"//int_to_txt(partit%npes)
-    raw_restart_infopath = trim(ResultPath)//"/fesom_raw_restart/np"//int_to_txt(partit%npes)//".info"
+    raw_restart_dirpath  = trim(ResultPath)//"fesom_raw_restart/np"//int_to_txt(partit%npes)
+    raw_restart_infopath = trim(ResultPath)//"fesom_raw_restart/np"//int_to_txt(partit%npes)//".info"
     if(raw_restart_length_unit /= "off") then
       if(partit%mype == RAW_RESTART_METADATA_RANK) then
         ! execute_command_line with mkdir sometimes fails, use a custom implementation around mkdir from C instead
-        call mkdir(trim(ResultPath)//"/fesom_raw_restart") ! we have no mkdir -p, create the intermediate dirs separately
+        call mkdir(trim(ResultPath)//"fesom_raw_restart") ! we have no mkdir -p, create the intermediate dirs separately
         call mkdir(raw_restart_dirpath)
       end if
       call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr) ! make sure the dir has been created before we continue...
@@ -203,12 +236,12 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   ! initialize directory for derived type binary restart
   if(.not. initialized_bin) then
     initialized_bin = .true.
-    bin_restart_dirpath  = trim(ResultPath)//"/fesom_bin_restart/np"//int_to_txt(partit%npes)
-    bin_restart_infopath = trim(ResultPath)//"/fesom_bin_restart/np"//int_to_txt(partit%npes)//".info"
+    bin_restart_dirpath  = trim(ResultPath)//"fesom_bin_restart/np"//int_to_txt(partit%npes)
+    bin_restart_infopath = trim(ResultPath)//"fesom_bin_restart/np"//int_to_txt(partit%npes)//".info"
     if(bin_restart_length_unit /= "off") then
         if(partit%mype == RAW_RESTART_METADATA_RANK) then
             ! execute_command_line with mkdir sometimes fails, use a custom implementation around mkdir from C instead
-            call mkdir(trim(ResultPath)//"/fesom_bin_restart") ! we have no mkdir -p, create the intermediate dirs separately
+            call mkdir(trim(ResultPath)//"fesom_bin_restart") ! we have no mkdir -p, create the intermediate dirs separately
             call mkdir(bin_restart_dirpath)
         end if
         call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr) ! make sure the dir has been created before we continue...
