@@ -284,8 +284,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     do node=1,myDim_nod2D+eDim_nod2D
         nzmax=nlevels_nod2D(node)-1
         nzmin=ulevels_nod2D(node)
-        where (tracers%data(2)%values(nzmin:nzmax,node) > 45._WP)
-               tracers%data(2)%values(nzmin:nzmax,node)=45._WP
+        where (tracers%data(2)%values(nzmin:nzmax,node) > 50._WP)
+               tracers%data(2)%values(nzmin:nzmax,node)=50._WP
         end where
 
         where (tracers%data(2)%values(nzmin:nzmax,node) < 3._WP )
