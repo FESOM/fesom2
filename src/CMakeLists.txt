@@ -180,20 +180,8 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS -DMETIS_VERSION=5 -DPAR
 
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>)
 target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fesom>)
-target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES} ${OASIS_Fortran_INCLUDE_DIRECTORIES})
-target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
-target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
-target_include_directories(${PROJECT_NAME} PRIVATE ${YAC_Fortran_INCLUDE_DIRECTORIES} ${YAXT_Fortran_INCLUDE_DIRECTORIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE parms) #metis
 target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
-target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C)
-target_link_libraries(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} PRIVATE ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
-
-
-# OASIS-YAK
-target_link_libraries(${PROJECT_NAME} PRIVATE ${YACUTILS_Fortran_LIBRARIES} ${YACCORE_Fortran_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_Fortran_LIBRARIES})
 
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 if(ENABLE_OPENMP)
@@ -293,6 +281,21 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
       target_compile_options(${PROJECT_NAME} PRIVATE -Mipa=fast,inline)
    endif()
 endif()
+
+target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES} ${OASIS_Fortran_INCLUDE_DIRECTORIES})
+target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
+target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
+target_include_directories(${PROJECT_NAME} PRIVATE ${YAC_Fortran_INCLUDE_DIRECTORIES} ${YAXT_Fortran_INCLUDE_DIRECTORIES})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C)
+target_link_libraries(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
+
+
+# OASIS-YAK
+target_link_libraries(${PROJECT_NAME} PRIVATE ${YACUTILS_Fortran_LIBRARIES} ${YACCORE_Fortran_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_Fortran_LIBRARIES})
+
+#set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 
 #target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES} ${OASIS_Fortran_INCLUDE_DIRECTORIES})
 #target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
