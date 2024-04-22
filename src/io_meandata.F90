@@ -82,6 +82,8 @@ module io_MEANDATA
   end type
 
   type(io_entry), save, allocatable, target   :: io_list(:)
+
+  integer                        :: last_flushed_step=0
 !
 !--------------------------------------------------------------------------------------------
 ! generic interface was required to associate variables of unknown rank with the pointers of the same rank
@@ -1163,6 +1165,10 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     type(t_ice)   , intent(inout), target :: ice
     character(:), allocatable             :: filepath
     real(real64)                          :: rtime !timestamp of the record
+#if defined(__MULTIO)
+    logical       :: output_done
+    logical       :: trigger_flush
+#endif
 
 ctime=timeold+(dayold-1.)*86400
     
@@ -1182,6 +1188,11 @@ ctime=timeold+(dayold-1.)*86400
     !___________________________________________________________________________
     !PS if (partit%flag_debug .and. partit%mype==0)  print *, achar(27)//'[33m'//' -I/O-> call update_means'//achar(27)//'[0m'  
     call update_means
+
+#if defined(__MULTIO)
+    output_done = .false.
+#endif
+
     !___________________________________________________________________________
     ! loop over defined streams
     do n=1, io_NSTREAMS
@@ -1213,6 +1224,10 @@ ctime=timeold+(dayold-1.)*86400
             call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
             stop
         endif
+
+#if defined(__MULTIO)
+        output_done = output_done .or. do_output
+#endif
         
         !_______________________________________________________________________
         ! if its time for output --> do_output==.true.
@@ -1316,6 +1331,15 @@ ctime=timeold+(dayold-1.)*86400
         endif ! --> if (do_output) then
     end do ! --> do n=1, io_NSTREAMS
     lfirst=.false.
+
+#if defined(__MULTIO)
+    trigger_flush = output_done .and. (last_flushed_step .ne. istep)
+    if (trigger_flush) then
+        call iom_flush('N grid', istep)
+        last_flushed_step = istep
+    end if
+#endif
+
 end subroutine
 !
 !

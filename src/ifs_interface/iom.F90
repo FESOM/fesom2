@@ -19,6 +19,7 @@ MODULE iom
     PUBLIC iom_initialize, iom_init_server, iom_finalize
     PUBLIC iom_send_fesom_domains
     PUBLIC iom_field_request, iom_send_fesom_data
+    PUBLIC iom_flush
 
     PRIVATE ctl_stop
     !!----------------------------------------------------------------------
@@ -419,6 +420,46 @@ CONTAINS
         cerr = md%delete()
         IF (cerr /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('send_fesom_data: md%delete failed: ', multio_error_string(cerr))
+        END IF
+    END SUBROUTINE
+
+    SUBROUTINE iom_flush(domain, step)
+        IMPLICIT NONE
+
+        CHARACTER(6), INTENT(IN)                :: domain
+        INTEGER, INTENT(IN)                     :: step
+
+        INTEGER                                 :: cerr
+        TYPE(multio_metadata)                   :: md
+
+        cerr = md%new(mio_handle)
+        IF (cerr /= MULTIO_SUCCESS) THEN
+            CALL ctl_stop('iom_flush: md%new() failed: ', multio_error_string(cerr))
+        END IF
+
+        cerr = md%set_bool("toAllServers", .TRUE._1)
+        IF (cerr /= MULTIO_SUCCESS) THEN
+            CALL ctl_stop('iom_flush: md%set_bool(toAllServers) failed: ', multio_error_string(cerr))
+        END IF
+
+        cerr = md%set_string("domain", domain)
+        IF (cerr /= MULTIO_SUCCESS) THEN
+            CALL ctl_stop('iom_flush: md%set_string(domain) failed: ', multio_error_string(cerr))
+        END IF
+
+        cerr = md%set_int("step", step)
+        IF (cerr /= MULTIO_SUCCESS) THEN
+           CALL ctl_stop('iom_flush: md%set_int(step) failed: ', multio_error_string(cerr))
+        END IF
+
+        cerr = mio_handle%flush(md)
+        IF (cerr /= MULTIO_SUCCESS) THEN
+            CALL ctl_stop('iom_flush: mio_handle%multio_flush failed: ', multio_error_string(cerr))
+        END IF
+
+        cerr = md%delete()
+        IF (cerr /= MULTIO_SUCCESS) THEN
+            CALL ctl_stop('iom_flush: md%delete failed: ', multio_error_string(cerr))
         END IF
     END SUBROUTINE
 
