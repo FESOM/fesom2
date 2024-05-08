@@ -62,7 +62,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
     real(kind=8)                              :: Lond(1)              ! longitude in degree
     real(kind=8)                              :: REcoM_T(1)           ! temperature again, for mocsy minimum defined as -2
     real(kind=8)                              :: REcoM_S(1)           ! temperature again, for mocsy minimum defined as 21
-
+! atm pressure, now read in as forcing!!
     !!---- atm pressure
     real(kind=8)                              :: Patm(1)              ! atmospheric pressure [atm]
 
@@ -92,7 +92,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
 
     tiny_Si  = tiny_C_d/SiCmax      ! SiCmax = 0.8d0
 
-    call Cobeta(partit, mesh)        
+    call Cobeta(partit, mesh)      
     call Depth_calculations(n, Nn,SinkVel,zF,thick,recipthick, partit, mesh)
 
     !! ----- mocsy -------! 
@@ -134,6 +134,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
     call pistonvel(ULoc, Loc_ice_conc, Nmocsy, kw660)
 
     !! ----- check -------! 
+
     if((REcoM_DIC(1) > 10000.d0)) then               ! NEW: added this entire print statement (if to endif)
         print*, 'NEW ERROR: DIC !'  
         print*, 'pco2surf: ',pco2surf
@@ -158,35 +159,35 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
         stop
     endif
 
-    call flxco2(co2flux, co2ex, dpco2surf,                                                                                           &
-                ph, pco2surf, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rhoSW, p, tempis,                                         &
+    call flxco2(co2flux, co2ex, dpco2surf,                                                   &
+                ph, pco2surf, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rhoSW, p, tempis, &
                 REcoM_T, REcoM_S, REcoM_Alk, REcoM_DIC, REcoM_Si, REcoM_Phos, kw660, LocAtmCO2, Patm, thick(One), Nmocsy, Lond,Latd, &
                 optCON='mol/m3',optT='Tpot   ',optP='m ',optB='u74',optK1K2='l  ',optKf='dg',optGAS='Pinsitu',optS='Sprc')
 
 ! changed optK1K2='l  ' to 'm10'
-    if((co2flux(1)>1.e10) .or. (co2flux(1)<-1.e10)) then
+  if((co2flux(1)>1.e10) .or. (co2flux(1)<-1.e10)) then
 !     co2flux(1)=0.0  
-        print*, 'ERROR: co2 flux !'
-        print*, 'pco2surf: ',pco2surf
-        print*, 'co2: ',co2
-        print*, 'rhoSW: ', rhoSW
-        print*, 'temp: ',REcoM_T
-        print*, 'tempis: ',tempis
-        print*, 'REcoM_S: ', REcoM_S
-        print*, 'REcoM_Alk: ', REcom_Alk
-        print*, 'REcoM_DIC: ', REcoM_DIC
-        print*, 'REcoM_Si: ', REcoM_Si
-        print*, 'REcoM_Phos: ', REcoM_Phos
-        print*, 'kw660: ',kw660
-        print*, 'LocAtmCO2: ', LocAtmCO2
-        print*, 'Patm: ', Patm
-        print*, 'thick(One): ',thick(One) 
-        print*, 'Nmocsy: ', Nmocsy
-        print*, 'Lond: ', Lond
-        print*, 'Latd: ', Latd   
-        print*, 'ULoc: ', ULoc
-        print*, 'Loc_ice_conc: ', Loc_ice_conc
-        stop
+      print*, 'ERROR: co2 flux !'
+      print*, 'pco2surf: ',pco2surf
+      print*, 'co2: ',co2
+      print*, 'rhoSW: ', rhoSW
+      print*, 'temp: ',REcoM_T
+      print*, 'tempis: ',tempis
+      print*, 'REcoM_S: ', REcoM_S
+      print*, 'REcoM_Alk: ', REcom_Alk
+      print*, 'REcoM_DIC: ', REcoM_DIC
+      print*, 'REcoM_Si: ', REcoM_Si
+      print*, 'REcoM_Phos: ', REcoM_Phos
+      print*, 'kw660: ',kw660
+      print*, 'LocAtmCO2: ', LocAtmCO2
+      print*, 'Patm: ', Patm
+      print*, 'thick(One): ',thick(One) 
+      print*, 'Nmocsy: ', Nmocsy
+      print*, 'Lond: ', Lond
+      print*, 'Latd: ', Latd   
+      print*, 'ULoc: ', ULoc
+      print*, 'Loc_ice_conc: ', Loc_ice_conc
+      stop
     endif
 
 ! use ice-free area and also convert from mol/m2/s to mmol/m2/d
@@ -204,7 +205,6 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
    REcoM_O2 = max(tiny*1e-3,state(one,ioxy)*1e-3) ! convert from mmol/m3 to mol/m3 for mocsy
 
    call  o2flux(REcoM_T, REcoM_S, kw660, ppo, REcoM_O2, Nmocsy, o2ex)
-
    oflux     = o2ex * 1.e3 *SecondsPerDay  !* (1.d0 - Loc_ice_conc) [mmol/m2/d]
    o2flux_seaicemask = o2ex * 1.e3 ! back to mmol here [mmol/m2/s] 
 
@@ -228,6 +228,11 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
   state(1:nn,idiac)  = max(tiny_C_d,state(1:nn,idiac))
   state(1:nn,idiasi) = max(tiny_Si, state(1:nn,idiasi))
 
+#if defined (__3Zoo2Det)
+  state(1:nn,imiczoon)  = max(tiny,state(1:nn,imiczoon))
+  state(1:nn,imiczooc)  = max(tiny,state(1:nn,imiczooc))
+#endif
+
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
 
 !-------------------------------------------------------------------------------
@@ -250,5 +255,4 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
      locChldegd = sum(vertChldegd(1:nn) * thick(1:nn))
 
   end if
-
 end subroutine REcoM_Forcing

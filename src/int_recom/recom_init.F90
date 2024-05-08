@@ -138,13 +138,13 @@ subroutine recom_init(tracers, partit, mesh)
     wFluxDia              = 0.d0
     PAR3D                 = 0.d0
 
-    pco2surf           = 0.d0
-    dflux              = 0.d0
-    oflux              = 0.d0
-    co2flux_seaicemask = 0.d0
-    o2flux_seaicemask  = 0.d0
-    dpco2surf          = 0.d0
-    co2                = 0.d0
+!    pco2surf           = 0.d0
+!    dflux              = 0.d0
+!    oflux              = 0.d0
+!    co2flux_seaicemask = 0.d0
+!    o2flux_seaicemask  = 0.d0
+!    dpco2surf          = 0.d0
+!    co2                = 0.d0
 
     if (Diags) then
 
@@ -169,6 +169,8 @@ subroutine recom_init(tracers, partit, mesh)
 
 !! *** Allocate 3D diagnostics ***
     allocate(respmeso     ( nl-1, node_size ))
+    allocate(respmacro    ( nl-1, node_size ))
+    allocate(respmicro    ( nl-1, node_size ))
     allocate(calcdiss     ( nl-1, node_size ))
     allocate(calcif       ( nl-1, node_size ))
     allocate(aggn         ( nl-1, node_size ))
@@ -181,6 +183,8 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(NPPd3D       ( nl-1, node_size ))
 
     respmeso     = 0.d0
+    respmacro    = 0.d0
+    respmicro    = 0.d0
     calcdiss     = 0.d0
     calcif       = 0.d0
     aggn         = 0.d0
@@ -254,6 +258,32 @@ subroutine recom_init(tracers, partit, mesh)
 
         CASE (1021)
             tracers%data(i)%values(:,:) = tiny                     ! DetCalc
+
+! ***************
+! + 2.zoo + 2.det
+! ***************
+#if defined (__3Zoo2Det)
+        CASE (1023)
+            tracers%data(i)%values(:,:) = tiny                     ! Zoo2N
+        CASE (1024)
+            tracers%data(i)%values(:,:) = tiny * Redfield          ! Zoo2C
+        CASE (1025)
+            tracers%data(i)%values(:,:) = tiny                     ! DetZ2N 
+        CASE (1026)
+            tracers%data(i)%values(:,:) = tiny                     ! DetZ2C
+        CASE (1027)
+            tracers%data(i)%values(:,:) = tiny                     ! DetZ2Si
+        CASE (1028)
+            tracers%data(i)%values(:,:) = tiny                     ! DetZ2Calc
+
+! *******************
+! CASE 2phy 3zoo 2det
+! *******************
+        CASE (1029)
+            tracers%data(i)%values(:,:) = tiny                     ! Zoo3N
+        CASE (1030)
+            tracers%data(i)%values(:,:) = tiny * Redfield          ! Zoo3C
+#endif
 
         END SELECT
     END DO

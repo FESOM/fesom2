@@ -106,6 +106,18 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
           Vben = Vdet_a * abs(zbar_3d_n(:,n)) + Vben
         end if
 
+! Constant vertical sinking for the second detritus class
+! *******************************************************
+
+#if defined(__3Zoo2Det)
+          if(tracers%data(tr_num)%ID==1025 .or. &  !idetz2n
+             tracers%data(tr_num)%ID==1026 .or. &  !idetz2c
+             tracers%data(tr_num)%ID==1027 .or. &  !idetz2si
+             tracers%data(tr_num)%ID==1028 ) then  !idetz2calc
+             Vben = VDet_zoo2
+          endif
+#endif
+
         Vben= Vben/SecondsPerDay ! conversion [m/d] --> [m/s] (vertical velocity, note that it is positive here)
 
         k=nod_in_elem2D_num(n)
@@ -125,26 +137,30 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
         ! Particulate Organic Nitrogen
         if( tracers%data(tr_num)%ID==1004 .or. &  !iphyn
             tracers%data(tr_num)%ID==1007 .or. &  !idetn
-            tracers%data(tr_num)%ID==1013 ) then  !idian
+            tracers%data(tr_num)%ID==1013 .or. & !) then  !idian
+            tracers%data(tr_num)%ID==1025 ) then  !idetz2n
             Benthos(n,1)= Benthos(n,1) +  add_benthos_2d(n) ![mmol]
         endif
 
         ! Particulate Organic Carbon
         if( tracers%data(tr_num)%ID==1005 .or. &  !iphyc
             tracers%data(tr_num)%ID==1008 .or. &  !idetc
-            tracers%data(tr_num)%ID==1014 ) then  !idiac
+            tracers%data(tr_num)%ID==1014 .or. & !) then  !idiac
+            tracers%data(tr_num)%ID==1026 ) then  !idetz2c
             Benthos(n,2)= Benthos(n,2) + add_benthos_2d(n)
         endif
 
         ! Particulate Organic Silicon
         if( tracers%data(tr_num)%ID==1016 .or. &  !idiasi
-            tracers%data(tr_num)%ID==1017 ) then  !idetsi
+            tracers%data(tr_num)%ID==1017 .or. & !) then  !idetsi
+            tracers%data(tr_num)%ID==1027 ) then  !idetz2si
             Benthos(n,3)= Benthos(n,3) + add_benthos_2d(n)
         endif
 
         ! Cal
         if( tracers%data(tr_num)%ID==1020 .or. &  !iphycal
-            tracers%data(tr_num)%ID==1021 ) then  !idetcal
+            tracers%data(tr_num)%ID==1021 .or. & !) then  !idetcal
+            tracers%data(tr_num)%ID==1028 ) then  !idetz2cal
             Benthos(n,4)= Benthos(n,4) + add_benthos_2d(n)
         endif
    end do
@@ -337,6 +353,15 @@ subroutine ver_sinking_recom(tr_num, tracers, partit, mesh)
         tracers%data(tr_num)%ID==1015 ) then     !idchl
 
             Vsink = VDia
+
+#if defined (__3Zoo2Det)
+    elseif(tracers%data(tr_num)%ID==1025 .or. &  !idetz2n
+         tracers%data(tr_num)%ID==1026 .or. &  !idetz2c
+         tracers%data(tr_num)%ID==1027 .or. &  !idetz2si
+         tracers%data(tr_num)%ID==1028 ) then  !idetz2calc 
+            
+            Vsink = VDet_zoo2
+#endif
     end if
 
 if (Vsink .gt. 0.1) then ! No sinking if Vsink < 0.1 m/day
@@ -356,13 +381,22 @@ if (Vsink .gt. 0.1) then ! No sinking if Vsink < 0.1 m/day
       Wvel_flux(nzmin:nzmax+1)= 0.d0  ! Vertical velocity for BCG tracers
 
       do nz=nzmin,nzmax+1
+
+         Wvel_flux(nz) = -Vsink/SecondsPerDay ! allow_var_sinking = .false.
+
          if (allow_var_sinking) then
-
                Wvel_flux(nz) = -((Vdet_a * abs(zbar_3d_n(nz,n))/SecondsPerDay) + Vsink/SecondsPerDay)
-
-         else ! allow_var_sinking = .false.
-            Wvel_flux(nz) = -Vsink/SecondsPerDay
          end if
+
+#if defined (__3Zoo2Det)
+            ! We assume constant sinking for second detritus
+            if(tracers%data(tr_num)%ID ==1025 .or. &  !idetz2n
+               tracers%data(tr_num)%ID ==1026 .or. &  !idetz2c
+               tracers%data(tr_num)%ID ==1027 .or. &  !idetz2si
+               tracers%data(tr_num)%ID ==1028 ) then  !idetz2calc
+                  Wvel_flux(nz) = -VDet_zoo2/SecondsPerDay ! --> VDet_zoo2 ! NEW BALL changed -Vsink to -VDet_zoo2
+            endif ! second detritus tracers
+#endif
       end do
 
       dt_sink = dt

@@ -23,21 +23,33 @@ module recom_config
 ! *******************
 ! CASE 2phy 1zoo 1det
 ! *******************
-  Integer :: idin  =  1, idic   =  2, ialk    =  3,  iphyn  =  4, iphyc = 5, &
-             ipchl =  6, idetn  =  7, idetc   =  8,  ihetn  =  9,            &
+  Integer :: idin  =  1, idic   =  2, ialk    =  3, iphyn   =  4, iphyc = 5, &
+             ipchl =  6, idetn  =  7, idetc   =  8, ihetn   =  9,            &
              ihetc = 10, idon   = 11, idoc    = 12, idian   = 13,            &
              idiac = 14, idchl  = 15, idiasi  = 16, idetsi  = 17,            &
              isi   = 18, ife    = 19, iphycal = 20, idetcal = 21,            &
              ioxy  = 22
+
+! ***************
+! + 2.zoo + 2.det
+! ***************
+#if defined (__3Zoo2Det)
+  Integer :: izoo2n  = 23, izoo2c   = 24, idetz2n    = 25,                   &
+             idetz2c = 26, idetz2si = 27, idetz2calc = 28
+! *******************
+! CASE 2phy 3zoo 2det
+! *******************
+  Integer :: imiczoon = 29, imiczooc = 30
+#endif
 
   Integer :: ivphy = 1, ivdia = 2, ivdet = 3, ivdetsc = 4
 
 !!MB TEST: tracer ids for revised remineralization and sinking in oce_ale_tracer.F90
   integer, dimension(8)  :: recom_remin_tracer_id   = (/1001, 1002, 1003, 1018, 1019, 1022, 1302, 1402/)
 
-  integer, dimension(29) :: recom_sinking_tracer_id = (/1007, 1008, 1017, 1021, 1004, 1005, 1020, 1006, &
+  integer, dimension(26) :: recom_sinking_tracer_id = (/1007, 1008, 1017, 1021, 1004, 1005, 1020, 1006, &  !!!!! for coocos 29
                                                         1013, 1014, 1016, 1015, 1025, 1026, 1027, 1028, &
-                                                        1029, 1030, 1031, &
+!                                                        1029, 1030, 1031, &
                                                         1308, 1321, 1305, 1320, & 
                                                         1314, 1408, 1421, 1405, 1420, 1414/)
 
@@ -46,6 +58,10 @@ module recom_config
   integer, dimension(8)  :: recom_phy_tracer_id     = (/1004, 1005, 1020, 1305, 1320, 1405, 1420, 1006/)
 
   integer, dimension(6)  :: recom_dia_tracer_id     = (/1013, 1014, 1314, 1414, 1016, 1015/)
+
+#if defined (__3Zoo2Det)
+  integer, dimension(4)  :: recom_det2_tracer_id    = (/1025, 1026, 1027, 1028/)
+#endif
 
   Real(kind=8)                 :: zero           = 0.d0
   Integer                      :: one            = 1
@@ -716,8 +732,8 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:)     :: DenitBen         ! Benthic denitrification Field in 2D [n2d 1]
 
 !  for using MEDUSA
-  Real(kind=8),allocatable,dimension(:,:)   :: SinkFlx          ! Diagnostics in 2D [4 n2d] or [6 n2d] with ciso
-  Real(kind=8),allocatable,dimension(:,:,:) :: SinkFlx_tr       ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+  Real(kind=8),allocatable,dimension(:,:)   :: SinkFlx         ! Diagnostics in 2D [4 n2d] or [6 n2d] with ciso
+  Real(kind=8),allocatable,dimension(:,:,:) :: SinkFlx_tr      ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
   Real(kind=8),allocatable,dimension(:,:)   :: Sinkingvel1     ! Diagnostics for vertical sinking
   Real(kind=8),allocatable,dimension(:,:)   :: Sinkingvel2     ! Diagnostics for vertical sinking  
   Real(kind=8),allocatable,dimension(:,:,:) :: Sinkvel1_tr     ! Sinking speed of particle class 1 OG 16.03.23 

@@ -1375,18 +1375,13 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
         bc_surface= dt*(virtual_salt(n) & !--> is zeros for zlevel/zstar
                     + relax_salt(n) - real_salt_flux(n)*is_nonlinfs)
 #if defined(__recom)
-
     CASE (1001) ! DIN
             bc_surface= dt*(AtmNInput(n) + RiverDIN2D(n)   * is_riverinput                &
                                          + ErosionTON2D(n) * is_erosioninput)
-        !bc_surface=0.0_WP
-
     CASE (1002) ! DIC
             bc_surface= dt*(GloCO2flux_seaicemask(n)                &
                                 + RiverDIC2D(n)   * is_riverinput   &
                                 + ErosionTOC2D(n) * is_erosioninput)
-        !bc_surface=0.0_WP
-
     CASE (1003) ! Alk
             bc_surface= dt*(virtual_alk(n) + relax_alk(n)       &
                             + RiverAlk2D(n) * is_riverinput)
@@ -1403,7 +1398,6 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
            bc_surface=dt*(RiverDSi2D(n) * is_riverinput + ErosionTSi2D(n) * is_erosioninput)
     CASE (1019) ! Fe
            bc_surface= dt*AtmFeInput(n)
-        !bc_surface=0.0_WP
     CASE (1020:1021) ! Cal
         bc_surface=0.0_WP
     CASE (1022) ! OXY

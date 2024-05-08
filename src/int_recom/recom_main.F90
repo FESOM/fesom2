@@ -164,8 +164,10 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 
         !!---- Allocate 3D diagnostics
 
-            allocate(vertrespmeso(nl-1))
+            allocate(vertrespmeso(nl-1), vertrespmacro(nl-1), vertrespmicro(nl-1))
             vertrespmeso  = 0.d0
+            vertrespmacro = 0.d0
+            vertrespmicro = 0.d0
 
             allocate(vertcalcdiss(nl-1), vertcalcif(nl-1))
             vertcalcdiss = 0.d0
@@ -225,7 +227,9 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             Chldegd(n) = locChldegd
 
             !!---- Updating 3D diagnostics
-!            respmeso     (1:nzmax,n) = vertrespmeso     (1:nzmax)
+            respmeso     (1:nzmax,n) = vertrespmeso     (1:nzmax)
+            respmacro    (1:nzmax,n) = vertrespmacro    (1:nzmax)
+            respmicro    (1:nzmax,n) = vertrespmicro    (1:nzmax)
             calcdiss     (1:nzmax,n) = vertcalcdiss     (1:nzmax)
             calcif       (1:nzmax,n) = vertcalcif       (1:nzmax)
             aggn         (1:nzmax,n) = vertaggn         (1:nzmax)
@@ -241,9 +245,9 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
             deallocate(vertNPPn, vertGPPn, vertNNAn, vertChldegn) 
             deallocate(vertNPPd, vertGPPd, vertNNAd, vertChldegd)
 
-            !!---- Deallocating 3D Diagnistics
-            deallocate(vertrespmeso                                   )
-            deallocate(vertcalcdiss,     vertcalcif                   )
+            !!---- Deallocating 3D Diagnostics
+            deallocate(vertrespmeso,     vertrespmacro,  vertrespmicro                 )
+            deallocate(vertcalcdiss,     vertcalcif                                    )
             deallocate(vertaggn,         vertaggd                     )
             deallocate(vertdocexn,       vertdocexd                   )
             deallocate(vertrespn,        vertrespd                    )
