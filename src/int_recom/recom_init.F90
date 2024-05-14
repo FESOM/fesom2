@@ -151,21 +151,29 @@ subroutine recom_init(tracers, partit, mesh)
 !! *** Allocate 2D diagnostics ***
     allocate(NPPn    ( node_size ))
     allocate(NPPd    ( node_size ))
+    allocate(NPPc    ( node_size ))
     allocate(GPPn    ( node_size ))
     allocate(GPPd    ( node_size ))
+    allocate(GPPc    ( node_size ))
     allocate(NNAn    ( node_size ))
     allocate(NNAd    ( node_size ))
+    allocate(NNAc    ( node_size ))
     allocate(Chldegn ( node_size ))
     allocate(Chldegd ( node_size ))
+    allocate(Chldegc ( node_size ))
 
     NPPn    = 0.d0
     NPPd    = 0.d0
+    NPPc    = 0.d0
     GPPn    = 0.d0
     GPPd    = 0.d0
+    GPPc    = 0.d0
     NNAn    = 0.d0
     NNAd    = 0.d0
+    NNAc    = 0.d0
     Chldegn = 0.d0
     Chldegd = 0.d0
+    Chldegc = 0.d0
 
 !! *** Allocate 3D diagnostics ***
     allocate(respmeso     ( nl-1, node_size ))
@@ -175,12 +183,16 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(calcif       ( nl-1, node_size ))
     allocate(aggn         ( nl-1, node_size ))
     allocate(aggd         ( nl-1, node_size ))
+    allocate(aggc         ( nl-1, node_size ))
     allocate(docexn       ( nl-1, node_size ))
     allocate(docexd       ( nl-1, node_size ))
+    allocate(docexc       ( nl-1, node_size ))
     allocate(respn        ( nl-1, node_size ))
     allocate(respd        ( nl-1, node_size ))
+    allocate(respc        ( nl-1, node_size ))
     allocate(NPPn3D       ( nl-1, node_size ))
     allocate(NPPd3D       ( nl-1, node_size ))
+    allocate(NPPc3D       ( nl-1, node_size ))
 
     respmeso     = 0.d0
     respmacro    = 0.d0
@@ -189,12 +201,16 @@ subroutine recom_init(tracers, partit, mesh)
     calcif       = 0.d0
     aggn         = 0.d0
     aggd         = 0.d0
+    aggc         = 0.d0
     docexn       = 0.d0
     docexd       = 0.d0
+    docexc       = 0.d0
     respn        = 0.d0
     respd        = 0.d0
+    respc        = 0.d0
     NPPn3D       = 0.d0
     NPPd3D       = 0.d0
+    NPPc3D       = 0.d0
     end if
 
     DO i=num_tracers-bgc_num+1, num_tracers
@@ -259,9 +275,9 @@ subroutine recom_init(tracers, partit, mesh)
         CASE (1021)
             tracers%data(i)%values(:,:) = tiny                     ! DetCalc
 
-! ***************
-! + 2.zoo + 2.det
-! ***************
+! *******************
+! CASE 2phy 2zoo 2det
+! *******************
 #if defined (__3Zoo2Det)
         CASE (1023)
             tracers%data(i)%values(:,:) = tiny                     ! Zoo2N
@@ -275,7 +291,39 @@ subroutine recom_init(tracers, partit, mesh)
             tracers%data(i)%values(:,:) = tiny                     ! DetZ2Si
         CASE (1028)
             tracers%data(i)%values(:,:) = tiny                     ! DetZ2Calc
+#endif
 
+! *******************
+! CASE 3phy 2zoo 2det
+! *******************
+#if defined (__coccos) & defined (__3Zoo2Det)
+        CASE (1029)
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max       ! CoccoN
+        CASE (1030)
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax ! CoccoC
+        CASE (1031)
+            tracers%data(i)%values(:,:) = tiny_chl                 ! CoccoChl
+! *******************
+! CASE 3phy 1zoo 1det
+! *******************
+#elif defined (__coccos) & !defined (__3Zoo2Det)
+        CASE (1023)
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max       ! CoccoN
+        CASE (1024)
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax ! CoccoC
+        CASE (1025)
+            tracers%data(i)%values(:,:) = tiny_chl                 ! CoccoChl
+#endif
+
+! *******************
+! CASE 3phy 3zoo 2det
+! *******************
+#if defined (__coccos) & defined (__3Zoo2Det)
+        CASE (1032)
+            tracers%data(i)%values(:,:) = tiny                     ! Zoo3N
+        CASE (1033)
+            tracers%data(i)%values(:,:) = tiny * Redfield          ! Zoo3C
+#elif !defined (__coccos) & defined (__3Zoo2Det)
 ! *******************
 ! CASE 2phy 3zoo 2det
 ! *******************

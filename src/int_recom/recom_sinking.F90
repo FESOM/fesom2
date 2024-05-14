@@ -342,7 +342,7 @@ subroutine ver_sinking_recom(tr_num, tracers, partit, mesh)
 
     elseif(tracers%data(tr_num)%ID ==1004 .or. &  !iphyn
         tracers%data(tr_num)%ID ==1005 .or.    &  !iphyc
-        tracers%data(tr_num)%ID==1020 .or.    &  !iphycal
+        !tracers%data(tr_num)%ID==1020 .or.    &  !iphycal
         tracers%data(tr_num)%ID==1006 ) then     !ipchl
 
             Vsink = VPhy
@@ -354,6 +354,22 @@ subroutine ver_sinking_recom(tr_num, tracers, partit, mesh)
 
             Vsink = VDia
 
+#if defined (__coccos)
+    elseif(tracers%data(tr_num)%ID == 1029 .or. &  !icocn             ! NEW
+        tracers%data(tr_num)%ID == 1030 .or.    &  !icocc             ! NEW
+        tracers%data(tr_num)%ID == 1031 ) then     !icchl             ! NEW
+
+            Vsink = VCocco
+#endif
+
+    elseif(tracers%data(tr_num)%ID == 1020) then   !iphycal
+       
+#if defined (__coccos)
+            Vsink = VCocco
+#else
+            Vsink = VPhy
+#endif
+            
 #if defined (__3Zoo2Det)
     elseif(tracers%data(tr_num)%ID==1025 .or. &  !idetz2n
          tracers%data(tr_num)%ID==1026 .or. &  !idetz2c

@@ -173,17 +173,20 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             vertcalcdiss = 0.d0
             vertcalcif   = 0.d0
 
-            allocate(vertaggn(nl-1), vertaggd(nl-1))
+            allocate(vertaggn(nl-1), vertaggd(nl-1), vertaggc(nl-1))
             vertaggn = 0.d0
             vertaggd = 0.d0
+            vertaggc = 0.d0
 
-            allocate(vertdocexn(nl-1), vertdocexd(nl-1))
+            allocate(vertdocexn(nl-1), vertdocexd(nl-1), vertdocexc(nl-1))
             vertdocexn = 0.d0
             vertdocexd = 0.d0
+            vertdocexc = 0.d0
 
-            allocate(vertrespn(nl-1), vertrespd(nl-1))
+            allocate(vertrespn(nl-1), vertrespd(nl-1), vertrespc(nl-1))
             vertrespn = 0.d0
             vertrespd = 0.d0
+            vertrespc = 0.d0
 
             !!---- Allocate 2D diagnostics
             allocate(vertNPPn(nl-1), vertGPPn(nl-1), vertNNAn(nl-1), vertChldegn(nl-1)) 
@@ -197,6 +200,12 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             vertGPPd = 0.d0
             vertNNAd = 0.d0
             vertChldegd  = 0.d0
+
+            allocate(vertNPPc(nl-1), vertGPPc(nl-1), vertNNAc(nl-1), vertChldegc(nl-1)) 
+            vertNPPc = 0.d0
+            vertGPPc = 0.d0
+            vertNNAc = 0.d0
+            vertChldegc  = 0.d0
         end if
 
         if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forcing'//achar(27)//'[0m'
@@ -219,12 +228,16 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             !!---- Updating 2D diagnostics
             NPPn(n) = locNPPn
             NPPd(n) = locNPPd
+            NPPc(n) = locNPPc
             GPPn(n) = locGPPn
             GPPd(n) = locGPPd
+            GPPc(n) = locGPPc
             NNAn(n) = locNNAn
             NNAd(n) = locNNAd
+            NNAc(n) = locNNAc
             Chldegn(n) = locChldegn
             Chldegd(n) = locChldegd
+            Chldegc(n) = locChldegc
 
             !!---- Updating 3D diagnostics
             respmeso     (1:nzmax,n) = vertrespmeso     (1:nzmax)
@@ -234,24 +247,28 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             calcif       (1:nzmax,n) = vertcalcif       (1:nzmax)
             aggn         (1:nzmax,n) = vertaggn         (1:nzmax)
             aggd         (1:nzmax,n) = vertaggd         (1:nzmax)
+            aggc         (1:nzmax,n) = vertaggc         (1:nzmax)
             docexn       (1:nzmax,n) = vertdocexn       (1:nzmax)
             docexd       (1:nzmax,n) = vertdocexd       (1:nzmax)
+            docexc       (1:nzmax,n) = vertdocexc       (1:nzmax)
             respn        (1:nzmax,n) = vertrespn        (1:nzmax)
             respd        (1:nzmax,n) = vertrespd        (1:nzmax)
+            respc        (1:nzmax,n) = vertrespc        (1:nzmax)
             NPPn3D       (1:nzmax,n) = vertNPPn         (1:nzmax)
             NPPd3D       (1:nzmax,n) = vertNPPd         (1:nzmax)
+            NPPc3D       (1:nzmax,n) = vertNPPc         (1:nzmax)
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
             !!---- Deallocating 2D diagnostics
             deallocate(vertNPPn, vertGPPn, vertNNAn, vertChldegn) 
             deallocate(vertNPPd, vertGPPd, vertNNAd, vertChldegd)
+            deallocate(vertNPPc, vertGPPc, vertNNAc, vertChldegc) 
 
             !!---- Deallocating 3D Diagnostics
             deallocate(vertrespmeso,     vertrespmacro,  vertrespmicro                 )
             deallocate(vertcalcdiss,     vertcalcif                                    )
-            deallocate(vertaggn,         vertaggd                     )
-            deallocate(vertdocexn,       vertdocexd                   )
-            deallocate(vertrespn,        vertrespd                    )
-        end if
+            deallocate(vertaggn,         vertaggd,       vertaggc                      )
+            deallocate(vertdocexn,       vertdocexd,     vertdocexc                    )
+            deallocate(vertrespn,        vertrespd,      vertrespc                     )
 
         AtmFeInput(n)            = FeDust
         AtmNInput(n)             = NDust
@@ -262,7 +279,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
         GloCO2flux_seaicemask(n) = co2flux_seaicemask(1)      !  [mmol/m2/s]
         GloO2flux_seaicemask(n)  = o2flux_seaicemask(1)       !  [mmol/m2/s]
         GloO2flux(n)             = oflux(1)                   !  [mmol/m2/d]
-
+        end if 
     end do
 
 ! ======================================================================================
@@ -291,9 +308,11 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
         call exchange_nod(NNAd, partit)
         call exchange_nod(Chldegn, partit)
         call exchange_nod(Chldegd, partit)
+        call exchange_nod(NPPc, partit)
+        call exchange_nod(GPPc, partit)
+        call exchange_nod(NNAc, partit)
+        call exchange_nod(Chldegc, partit)
     endif
-
-
 
     do n=1, benthos_num  !4
         call exchange_nod(GlodecayBenthos(:,n), partit)

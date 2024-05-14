@@ -92,6 +92,11 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
 
     tiny_Si  = tiny_C_d/SiCmax      ! SiCmax = 0.8d0
 
+#if defined (__coccos)
+    tiny_N_c = tiny_chl/chl2N_max_c ! 0.00001/ 3.5d0 
+    tiny_C_c = tiny_N_c/NCmax_c     ! NCmax_c = 0.15d0
+#endif
+
     call Cobeta(partit, mesh)      
     call Depth_calculations(n, Nn,SinkVel,zF,thick,recipthick, partit, mesh)
 
@@ -228,6 +233,12 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
   state(1:nn,idiac)  = max(tiny_C_d,state(1:nn,idiac))
   state(1:nn,idiasi) = max(tiny_Si, state(1:nn,idiasi))
 
+#if defined (__coccos)
+  state(1:nn,icchl)  = max(tiny_chl,state(1:nn,icchl))
+  state(1:nn,icocn)  = max(tiny_N_c,state(1:nn,icocn))
+  state(1:nn,icocc)  = max(tiny_C_c,state(1:nn,icocc))
+#endif
+
 #if defined (__3Zoo2Det)
   state(1:nn,imiczoon)  = max(tiny,state(1:nn,imiczoon))
   state(1:nn,imiczooc)  = max(tiny,state(1:nn,imiczooc))
@@ -253,6 +264,11 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
      locGPPd = sum(vertGPPd(1:nn) * thick(1:nn))
      locNNAd = sum(vertNNAd(1:nn) * thick(1:nn))
      locChldegd = sum(vertChldegd(1:nn) * thick(1:nn))
+
+     locNPPc = sum(vertNPPc(1:nn) * thick(1:nn))
+     locGPPc = sum(vertGPPc(1:nn) * thick(1:nn))
+     locNNAc = sum(vertNNAc(1:nn) * thick(1:nn))
+     locChldegc = sum(vertChldegc(1:nn) * thick(1:nn))
 
   end if
 end subroutine REcoM_Forcing

@@ -431,7 +431,7 @@ subroutine restart(istep, l_read, which_readr, ice, dynamics, tracers, partit, m
         call clock_finish
     end if
   end if
-  
+
 end subroutine restart
 !
 !
@@ -501,6 +501,9 @@ subroutine write_all_raw_restarts(istep, mpicomm, mype)
   open(newunit = fileunit, file = raw_restart_dirpath//'/'//mpirank_to_txt(mpicomm)//'.dump', form = 'unformatted')
   call write_raw_restart_group(oce_files, fileunit)
   if(use_ice) call write_raw_restart_group(ice_files, fileunit)
+#if defined(__recom)
+  call write_raw_restart_group(bio_files, fileunit)
+#endif
   close(fileunit)
 
   if(mype == RAW_RESTART_METADATA_RANK) then
@@ -513,6 +516,9 @@ subroutine write_all_raw_restarts(istep, mpicomm, mype)
     write(fileunit, '(2(g0))') "! year: ",yearnew
     write(fileunit, '(3(g0))') "! oce: ", oce_files%nfiles, " variables"
     if(use_ice) write(fileunit, '(3(g0))') "! ice: ", ice_files%nfiles, " variables"
+#if defined(__recom)
+    write(fileunit, '(3(g0))') "! bio: ", bio_files%nfiles, " variables"
+#endif
     close(fileunit)
   end if
 end subroutine
@@ -757,6 +763,9 @@ subroutine read_all_raw_restarts(mpicomm, mype)
   if(status == 0) then
     call read_raw_restart_group(oce_files, fileunit)
     if(use_ice) call read_raw_restart_group(ice_files, fileunit)
+#if defined(__recom)
+    call read_raw_restart_group(bio_files, fileunit)
+#endif
     close(fileunit)
   else
     print *,"can not open ",raw_restart_dirpath//'/'//mpirank_to_txt(mpicomm)//'.dump'
@@ -801,6 +810,14 @@ subroutine finalize_restart()
       end if
     end do
   end if
+#if defined(__recom)
+  do i=1, bio_files%nfiles
+    call bio_files%files(i)%join()
+    if(bio_files%files(i)%is_iorank()) then
+      if(bio_files%files(i)%is_attached()) call bio_files%files(i)%close_file()
+    end if
+  end do
+#endif
 end subroutine
 !
 !

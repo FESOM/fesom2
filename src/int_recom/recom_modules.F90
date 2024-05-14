@@ -30,19 +30,39 @@ module recom_config
              isi   = 18, ife    = 19, iphycal = 20, idetcal = 21,            &
              ioxy  = 22
 
-! ***************
-! + 2.zoo + 2.det
-! ***************
+! *******************
+! CASE 2phy 2zoo 2det
+! *******************
 #if defined (__3Zoo2Det)
   Integer :: izoo2n  = 23, izoo2c   = 24, idetz2n    = 25,                   &
              idetz2c = 26, idetz2si = 27, idetz2calc = 28
+#endif
+
+#if defined (__coccos) & defined (__3Zoo2Det)
+! *******************
+! CASE 3phy 2zoo 2det
+! *******************
+  Integer :: icocn = 29, icocc = 30, icchl = 31
+#elif defined (__coccos) & !defined (__3Zoo2Det)
+! *******************
+! CASE 3phy 1zoo 1det
+! *******************
+  Integer :: icocn = 23, icocc = 24, icchl = 25 
+#endif
+
+#if defined (__coccos) & defined (__3Zoo2Det)
+! *******************
+! CASE 3phy 3zoo 2det
+! *******************
+  Integer :: imiczoon = 32, imiczooc = 33
+#elif !defined (__coccos) & defined (__3Zoo2Det) 
 ! *******************
 ! CASE 2phy 3zoo 2det
 ! *******************
   Integer :: imiczoon = 29, imiczooc = 30
 #endif
 
-  Integer :: ivphy = 1, ivdia = 2, ivdet = 3, ivdetsc = 4
+  Integer :: ivphy = 1, ivdia = 2, ivdet = 3, ivdetsc = 4, ivcoc = 5 
 
 !!MB TEST: tracer ids for revised remineralization and sinking in oce_ale_tracer.F90
   integer, dimension(8)  :: recom_remin_tracer_id   = (/1001, 1002, 1003, 1018, 1019, 1022, 1302, 1402/)
@@ -58,6 +78,13 @@ module recom_config
   integer, dimension(8)  :: recom_phy_tracer_id     = (/1004, 1005, 1020, 1305, 1320, 1405, 1420, 1006/)
 
   integer, dimension(6)  :: recom_dia_tracer_id     = (/1013, 1014, 1314, 1414, 1016, 1015/)
+
+
+#if defined (__coccos) & defined (__3Zoo2Det)
+  integer, dimension(3)  :: recom_cocco_tracer_id   = (/1029, 1030, 1031/)
+#elif defined (__coccos) & !defined (__3Zoo2Det)
+  integer, dimension(3)  :: recom_cocco_tracer_id   = (/1023, 1024, 1025/)
+#endif
 
 #if defined (__3Zoo2Det)
   integer, dimension(4)  :: recom_det2_tracer_id    = (/1025, 1026, 1027, 1028/)

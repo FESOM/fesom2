@@ -54,6 +54,7 @@ subroutine Depth_calculations(n,Nn,wF,zF,thick,recipthick, partit, mesh)
   wF(2:Nn,ivdia)   = VDia
   wF(2:Nn,ivdet)   = VDet
   wF(2:Nn,ivdetsc) = VDet_zoo2
+  wF(2:Nn,ivcoc)   = VCocco
 
   wF(1,:)          = 0.d0
   wF(Nn+1,:)       = 0.d0

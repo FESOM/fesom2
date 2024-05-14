@@ -509,6 +509,29 @@ CASE ('Chldegd  ')
     call def_stream(nod2D,  myDim_nod2D,   'ChlDegd','Chlorophyll degradation diatoms','1/d', Chldegd, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 
+CASE ('NPPc     ')
+    if (use_REcoM) then
+!    call def_stream(nod2D,  myDim_nod2D,   'NPPc','Mean NPP coccolithophores','mmolC/(m2*d)', diags2D(:,9), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)     ! NEW
+    call def_stream(nod2D,  myDim_nod2D,   'NPPc','Mean NPP coccolithophores','mmolC/(m2*d)', NPPc, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)     ! NEW
+    end if
+
+CASE ('GPPc     ')
+    if (use_REcoM) then
+!    call def_stream(nod2D,  myDim_nod2D,   'GPPc','Mean GPP coccolithophores','mmolC/(m2*d)', diags2D(:,10), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)    ! NEW
+    call def_stream(nod2D,  myDim_nod2D,   'GPPc','Mean GPP coccolithophores','mmolC/(m2*d)', GPPc, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)    ! NEW
+    end if
+
+CASE ('NNAc     ')
+    if (use_REcoM) then
+!    call def_stream(nod2D,  myDim_nod2D,   'NNAc','Net N-assimilation coccolithophores','mmolN/(m2*d)', diags2D(:,11), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)   ! NEW
+    call def_stream(nod2D,  myDim_nod2D,   'NNAc','Net N-assimilation coccolithophores','mmolN/(m2*d)', NNAc, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)   !NEW
+    endif
+
+CASE ('Chldegc  ')
+    if (use_REcoM) then
+!    call def_stream(nod2D,  myDim_nod2D,   'GNAc','Gross N-assimilation coccolithophores','mmolN/(m2*d)', diags2D(:,12), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh) ! NEW
+    call def_stream(nod2D,  myDim_nod2D,   'ChlDegc','Chlorophyll degradation coccolithophores','1/d', Chldegc, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! NEW
+    endif
 #endif
     
 !___________________________________________________________________________________________________________________________________    
@@ -533,12 +556,12 @@ CASE ('respmeso       ')
 
 CASE ('respmacro      ')
    if (use_REcoM) then ! .and. three_zoo_two_det) then
-   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'respmacro','Respiration rate of macrozooplankton', 'mmolC/(m2*d)', respmacro(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'respmacro','Respiration rate of macrozooplankton', 'mmolC/m2/d', respmacro(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
 CASE ('respmicro      ')
    if (use_REcoM) then ! .and. three_zoo_two_det) then
-   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'respmicro','Respiration rate of microzooplankton', 'mmolC/(m2*d)', respmicro(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'respmicro','Respiration rate of microzooplankton', 'mmolC/m2/d', respmicro(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
 CASE ('calcdiss       ')
@@ -561,6 +584,11 @@ CASE ('aggd           ')
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'aggd','Aggregation of diatoms', 'mmolC/m2/d', aggd(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
+CASE ('aggc           ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'aggc','Aggregation of coccolithophores', 'mmolC/m2/d', aggc(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
 CASE ('docexn         ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'docexn','DOC excretion by small phytoplankton', 'mmolC/m2/d', docexn(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -569,6 +597,11 @@ CASE ('docexn         ')
 CASE ('docexd         ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'docexd','DOC excretion by diatoms', 'mmolC/m2/d', docexd(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('docexc         ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'docexc','DOC excretion by coccolithophores', 'mmolC/m2/d', docexc(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
 CASE ('respn          ')
@@ -581,6 +614,11 @@ CASE ('respd          ')
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'respd','Respiration by diatoms', 'mmolC/m2/d', respd(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
+CASE ('respc          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'respc','Respiration by coccolithophores', 'mmolC/(m2*d)', respc(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
 CASE ('NPPn3D         ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPn3D','Net primary production of small phytoplankton', 'mmolC/m2/d', NPPn3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -591,7 +629,12 @@ CASE ('NPPd3D         ')
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPd3D','Net primary production of diatoms', 'mmolC/m2/d', NPPd3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
+CASE ('NPPc3D         ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPc3D','Net primary production of coccolithophores', 'mmolC/m2/d', NPPc3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
 #endif
+
 !CASE ('otracers  ')
 !    do j=3, tracers%num_tracers
 !    write (id_string, "(I3.3)") tracers%data(j)%ID
@@ -742,29 +785,27 @@ CASE ('otracers  ')
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'idetz2calc', 'idetz2calc', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
 
-!      else if (tracers%data(j)%ID==1029) then
-!         if (use_REcoM) then
-!         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'CoccoN', 'CoccoN', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-!         endif
-
-!      else if (tracers%data(j)%ID==1030) then
-!         if (use_REcoM) then
-!         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'CoccoC', 'CoccoC', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-!         endif
-
-!      else if (tracers%data(j)%ID==1031) then
-!         if (use_REcoM) then
-!         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'CoccoChl', 'CoccoChl', '[mg/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-!         endif
-
-!      else if (tracers%data(j)%ID==1032) then
       else if (tracers%data(j)%ID==1029) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'CoccoN', 'CoccoN', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         endif
+
+      else if (tracers%data(j)%ID==1030) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'CoccoC', 'CoccoC', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         endif
+
+      else if (tracers%data(j)%ID==1031) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'CoccoChl', 'CoccoChl', '[mg/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         endif
+
+      else if (tracers%data(j)%ID==1032) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Zoo3N', 'Zoo3N', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
 
-      else if (tracers%data(j)%ID==1030) then
-!      else if (tracers%data(j)%ID==1033) then
+      else if (tracers%data(j)%ID==1033) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Zoo3C', 'Zoo3C', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
