@@ -81,7 +81,7 @@ set(GPU_FLAGS "cuda12.2,${GPU_COMPUTE_CAPABILITY}" CACHE STRING "GPU arch for nv
 
 option(ENABLE_OPENMP "build FESOM with OpenMP" OFF)
 message(STATUS "ENABLE_OPENMP: ${ENABLE_OPENMP}")
-if(ENABLE_OPENMP)
+if(${ENABLE_OPENMP})
    find_package(OpenMP REQUIRED COMPONENTS Fortran)
 endif()
 
@@ -203,7 +203,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fes
 target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
-if(ENABLE_OPENMP)
+if(${ENABLE_OPENMP})
    target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_Fortran)
 endif()
 
@@ -412,8 +412,8 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
    endif()
    if(${ENABLE_OPENMP})
       target_compile_options(${PROJECT_NAME} PRIVATE -Mipa=fast)
-   # else()
-   #    target_compile_options(${PROJECT_NAME} PRIVATE -Mipa=fast,inline)
+   else()
+      target_compile_options(${PROJECT_NAME} PRIVATE -Mipa=fast,inline)
    endif()
 endif()
 
