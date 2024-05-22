@@ -22,17 +22,7 @@ subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
 				uo_keel_ib, vo_keel_ib, T_keel_ib, S_keel_ib, depth_ib, &
 				T_ave_ib, S_ave_ib, ib)
   
-!  use o_mesh
   use o_param
-!  use i_therm_param
-!  use i_param
-!  use MOD_ICE
-!  use i_arrays
-!  use MOD_PARTIT
-
-! kh 18.03.21 not really used here
-! use o_arrays
-
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
@@ -52,14 +42,6 @@ subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
   
   real			:: absamino, damping, sea_state, v_ibmino
   real			:: tf, T_d 				!freezing temp. and 'thermal driving'
-!type(t_partit), intent(inout), target :: partit
-!#include "associate_part_def.h"
-!#include "associate_part_ass.h"
-  
-  !bottom melt (basal turbulent melting rate)
-  !M_b = 0.58 * sqrt( (u_ib - uo_ib)**2 + (v_ib - vo_ib)**2 )**0.8 &
-  !     	* (sst_ib + 4.0) / length_ib**0.2
-  !M_b = M_b/86400. !conversion of m/day to m/s	
 
   !3-eq. formulation for bottom melting [m/s]    
   v_ibmino  = sqrt( (u_ib - uo_keel_ib)**2 + (v_ib - vo_keel_ib)**2 )
@@ -76,12 +58,9 @@ subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
   !write(*,*) 'thermal driving:',T_d,'; Tf:',tf,'T_ave:',T_ave_ib
 
   !lateral melt (buoyant convection)
-  !M_v = 0.00762 * sst_ib + 0.00129 * sst_ib**2
-  !M_v = M_v/86400.
   !M_v is a function of the 'thermal driving', NOT just sst! Cf. Neshyba and Josberger (1979)
   M_v = 0.00762 * T_d + 0.00129 * T_d**2
   M_v = M_v/86400.
-  !fwl_flux_ib = M_v
 
   !wave erosion
   absamino = sqrt( (ua_ib - uo_ib)**2 + (va_ib - vo_ib)**2 )
@@ -106,17 +85,8 @@ end subroutine iceberg_meltrates
 subroutine iceberg_newdimensions(partit, ib, depth_ib,height_ib,length_ib,width_ib,M_b,M_v,M_e,M_bv, &
 				 rho_h2o, rho_icb, file_meltrates)
   
-!  use o_mesh
   use o_param !for step_per_day
-!  use i_therm_param
-!  use i_param
-!  use MOD_ICE
-!  use i_arrays
   use MOD_PARTIT	!for mype
-
-! kh 18.03.21 not really used here
-! use o_arrays         
-
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
@@ -185,8 +155,6 @@ type(t_partit), intent(inout), target :: partit
     	volume_after=volume_before-tvl
     
     	!calculating the new iceberg dimensions
-    	!depth_ib = (abs(depth_ib)-dh_b)*(-1.)
-    	!height_ib= abs(depth_ib) * rho_h2o/rho_icb
 	height_ib=  height_ib - dh_b
 	depth_ib = -height_ib * rho_icb/rho_h2o
     
@@ -196,8 +164,6 @@ type(t_partit), intent(inout), target :: partit
     
     	!distribute dh_e equally between length and width
     	!as in code of michael schodlok, but not dh_v? 
-    	!length_ib= length_ib - dh_v -dh_e/2.
-    	!width_ib = width_ib  - dh_v -dh_e/2.
     
     	volume_after=height_ib*length_ib*width_ib
 
@@ -303,12 +269,7 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
   ! adjusted for use in FESOM by Ralph Timmermann, 16.02.2011
   ! adopted and modified for iceberg basal melting by Thomas Rackow, 11.06.2014
   !----------------------------------------------------------------
-
-  !use o_mesh
-  !use o_param
-  !use o_arrays
-  !use i_arrays
-  !use MOD_PARTIT
+  
   use iceberg_params
   use g_config
 
@@ -352,21 +313,6 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
 
   real(kind=8),parameter ::  L    = 334000.                   ! [J/Kg]
 
-  ! hemw = helium content of the glacial meltwater
-  ! oomw = isotopic fractionation due to melting
-  ! oofw = isotopic fractionation due to freezing
-  !      hemw=  4.02*14.
-  !      oomw= -30.
-  !      oofw= -2.5
-
-  !n3=myDim_nod3d+eDim_nod3d
-
-  !do n=1,myDim_nod2D+eDim_nod2D      
-     !if(mesh%cavity_flag_n(n)==0) cycle   
-     !nk=nod3d_below_nod2d(1,n)
-     !temp = tracer(nk,1)	
-     !sal  = tracer(nk,2)
-     !zice = coord_nod3d(3,nk)  !(<0)
      temp = T_ib
      sal = S_ib
      zice = depth_ib !(<0)
@@ -378,15 +324,7 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
      ! Calculate or prescribe the turbulent heat and salt transfer coeff. GAT and GAS
      ! velocity-dependent approach of Jenkins (1991)
 
-     !rt      vt1  = 0.25*sqrt((u(i,j,N,lrhs)+u(i+1,j,N,lrhs))**2
-     !rt     &                +(v(i,j,N,lrhs)+v(i,j+1,N,lrhs))**2)
-     ! if(vt1.eq.0.) vt1=0.001
-     !rt      re   = Hz_r(i,j,N)*ds/un        !Reynolds number
-
-     !vt1  = sqrt(uf(nk)*uf(nk)+uf(nk+n3)*uf(nk+n3))   ! relative velocity ice-ocean
-     vt1 = v_rel ! relative velocity iceberg-ocean (at depth 'depth_ib')
-
-!rt RG44030     vt1  = max(vt1,0.001)
+     vt1  = v_rel ! relative velocity iceberg-ocean (at depth 'depth_ib')
      vt1  = max(vt1,0.005)       ! RG44030
 
      re   = 10./un                   !vt1*re (=velocity times length scale over kinematic viscosity) is the Reynolds number

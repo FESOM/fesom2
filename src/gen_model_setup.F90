@@ -6,10 +6,11 @@ subroutine setup_model(partit)
 !   use i_therm_param
   use g_forcing_param
   use g_config
-  use diagnostics, only: ldiag_solver,lcurt_stress_surf,lcurt_stress_surf, ldiag_Ri, ldiag_TurbFlux, &
+  use diagnostics, only: ldiag_solver,lcurt_stress_surf,lcurt_stress_surf, ldiag_Ri, ldiag_TurbFlux, ldiag_trflx, &
                          ldiag_dMOC, ldiag_DVD, diag_list
   use g_clock,     only: timenew, daynew, yearnew
-  use g_ic3d 
+  use g_ic3d
+  use mod_transit
   implicit none
   type(t_partit), intent(inout), target :: partit
   character(len=MAX_PATH)               :: nmlfile
@@ -28,9 +29,8 @@ subroutine setup_model(partit)
   read (fileunit, NML=geometry)
   read (fileunit, NML=calendar)
   read (fileunit, NML=run_config)
-#if defined (__async_icebergs)
-    read (fileunit,NML=icebergs)
-#endif
+  read (fileunit,NML=icebergs)
+
 !!$  read (fileunit, NML=machine)
   close (fileunit)
   
@@ -80,6 +80,21 @@ subroutine setup_model(partit)
   open (newunit=fileunit, file=nmlfile)
   read (fileunit, NML=diag_list)
   close (fileunit)
+
+  if (use_transit) then
+! Transient tracer input, input file names have to be specified in
+! namelist.config, nml=run_config
+    if(partit%mype==0) print *, "Transient tracers are ON. Tracer input file: ", ifile_transit
+    open (20,file=ifile_transit)
+    if (anthro_transit .or. paleo_transit) then
+      call read_transit_input
+    else
+!     Spinup / equilibrium runs with constant tracer input,
+!     read parameter values from namelist.oce
+      read (20,nml=transit_param)
+    end if
+    close (20)
+  end if
 
   if(partit%mype==0) write(*,*) 'Namelist files are read in'
   

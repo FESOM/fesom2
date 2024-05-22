@@ -27,7 +27,7 @@ contains
     ! EO parameters
     integer w, val_width
     character(:), allocatable :: widthtxt
-    
+
     if(val == 0) then
       val_width = 1
     else
@@ -39,8 +39,8 @@ contains
     allocate(character(w) :: txt)
     write(txt,'(i0.'//widthtxt//')') val
   end function
-  
-  
+
+
   function mpirank_to_txt(mpicomm) result(txt)
     integer, intent(in) :: mpicomm
     character(:), allocatable :: txt
@@ -49,13 +49,13 @@ contains
     integer npes
     integer mpierr
     include 'mpif.h'
-  
+
     call MPI_Comm_Rank(mpicomm, mype, mpierr)
     call MPI_Comm_Size(mpicomm, npes, mpierr)
     txt = int_to_txt_pad(mype,int(log10(real(npes)))+1) ! pad to the width of the number of processes
   end function
-  
-  
+
+
   ! using EXECUTE_COMMAND_LINE to call mkdir sometimes fail (EXECUTE_COMMAND_LINE is forked as an new process, which may be the problem)
   ! try to use the C mkdir as an alternative
   subroutine mkdir(path)
@@ -73,7 +73,7 @@ contains
         integer(c_int), value :: mode
       end function
     end interface
-      
+
     pathcopy = path ! we need to pass an array of c_char to the C funcktion (this is not a correct type conversion, but Fortran characters seem to be of the same kind as c_char)
     ! result is 0 if the dir has been created from this call, otherwise -1
     ! the mode will not exactly be what we pass here, as it is subtracted by the umask bits (and possibly more)

@@ -211,7 +211,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
               end do
             else    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
-#else
+#else   ! oifs
             ! AWI-CM2 outgoing state vectors
             do n=1,myDim_nod2D+eDim_nod2D
             exchange(n)=tracers%data(1)%values(1, n)                     ! sea surface temperature [°C]
@@ -267,14 +267,14 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 !---wiso-code-end
             else	    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
-#endif
+#endif  ! oifs
          endif
          call cpl_oasis3mct_send(i, exchange, action, partit)
-      enddo
+      end do
 #ifdef VERBOSE
       do i=1, nsend 
         if (mype==0) write(*,*) 'SEND: field ', i, ' max val:', maxval(exchange), ' . ACTION? ', action 
-      enddo
+      end do
 #endif
       mask=1.
       do i=1,nrecv
@@ -373,7 +373,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
     	          mask=1.
 	              call force_flux_consv(enthalpyoffuse, mask, i, 0, action, partit, mesh)
              end if
-#else
+#else ! oifs
          elseif (i.eq.13) then
             if (action) then
                  if (lwiso) then         
@@ -463,8 +463,8 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
              if (use_icebergs.and.lwiso) then    
                  call force_flux_consv(v_wind, mask, i, 0, action, partit, mesh)
              end if
+#endif !   oifs
          end if
-# endif
 
 #ifdef VERBOSE
 	  if (mype==0) then

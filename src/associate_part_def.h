@@ -1,4 +1,3 @@
-  
   integer,          pointer     :: MPI_COMM_FESOM       ! FESOM communicator (for ocean only runs if often a copy of MPI_COMM_WORLD)
   integer,          pointer     :: MPI_COMM_FESOM_IB    ! FESOM communicator copy for icebergs LA: 2023-05-22
   type(com_struct), pointer     :: com_nod2D

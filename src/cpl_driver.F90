@@ -99,6 +99,217 @@ module cpl_driver
 
 contains
 
+    subroutine node_contours(my_x_corners, my_y_corners, partit, mesh)
+        USE MOD_MESH
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE o_PARAM
+        use g_comm_auto
+        use o_ARRAYS
+        use g_rotate_grid
+
+        IMPLICIT NONE
+        type(t_mesh),   intent(in), target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        real(kind=WP), allocatable, intent(inout) :: my_x_corners(:,:)     ! longitude node corners
+        real(kind=WP), allocatable, intent(inout) :: my_y_corners(:,:)     ! latitude node corners    
+        integer                               :: bEdge_left, bEdge_right
+        integer,              dimension(2)    :: belem_left, belem_right
+        integer                               :: edge_left, edge_right
+        integer                               :: n, ee, elem, nn, el(2), flag, nn1, nn2
+        integer                               :: current_pos
+        integer                               :: pos_increment=-1 ! counter clockwise is negative, otherwise +1!
+        integer, allocatable, dimension(:)    :: nedges, nelems, nedges1, nelems1, nedges2, nelems2
+        real(kind=WP)                         :: this_x_coord, this_y_coord
+
+include "associate_part_def.h"
+include "associate_mesh_def.h"
+include "associate_part_ass.h"
+include "associate_mesh_ass.h"
+
+    if (.not. allocated(my_x_corners)) then
+        ALLOCATE(my_x_corners(myDim_nod2D, 25)) !maxval(nod_in_elem2D_num, 1)*2+2))
+    endif
+    if (.not. allocated(my_y_corners)) then
+        ALLOCATE(my_y_corners(myDim_nod2D, 25)) !maxval(nod_in_elem2D_num, 1)*2+2))
+    endif
+    do n=1, myDim_nod2D
+        ! find the type/of node: internal or at boundary
+        bEdge_left =0
+        belem_left =0
+        bEdge_right=0
+        belem_right=0
+
+        do ee=1, nod_in_elem2D_num(n)
+           elem=nod_in_elem2D(ee,n)
+           if (elem2D_nodes(1,elem)==n) then
+              edge_left=elem_edges(3,elem)
+              edge_right=elem_edges(2,elem)
+           elseif (elem2D_nodes(2,elem)==n) then
+              edge_left=elem_edges(1,elem)
+              edge_right=elem_edges(3,elem)
+           else
+              edge_left=elem_edges(2,elem)
+              edge_right=elem_edges(1,elem)
+           end if
+           if (myList_edge2D(edge_left)>edge2D_in) then
+              bEdge_left=bEdge_left+1
+              belem_left(bEdge_left)=elem
+           end if
+           if (myList_edge2D(edge_right)>edge2D_in) then
+              bEdge_right=bEdge_right+1
+              belem_right(bEdge_right)=elem
+           end if
+        end do
+
+    ! now we have three cases
+       if (bEdge_left==0) then      ! inner contour
+          elem=nod_in_elem2D(1, n)  ! we can start from any
+          allocate(nedges(nod_in_elem2D_num(n)))
+          nedges=0
+          allocate(nelems(nod_in_elem2D_num(n)))
+          nelems=0
+          !!!!!!! inner_node_contour
+include "node_contour_inner.h"
+          if (pos_increment<0) then 
+             current_pos=2*nod_in_elem2D_num(n)
+          else
+             current_pos =1
+          end if
+          do nn=1, nod_in_elem2D_num(n)
+             call edge_center(edges(1, nedges(nn)), edges(2, nedges(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+             current_pos=current_pos+pos_increment
+             call elem_center(nelems(nn), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+             current_pos=current_pos+pos_increment
+          end do
+          current_pos=2*nod_in_elem2D_num(n)+1
+          do nn=current_pos, size(my_x_corners, 2)
+             my_x_corners(n, nn)=my_x_corners(n, current_pos-1)
+             my_y_corners(n, nn)=my_y_corners(n, current_pos-1)
+          end do
+          deallocate(nedges, nelems)
+       end if
+
+
+       if (bEdge_left==1) then ! standard boundary node
+          elem=belem_left(1)
+          allocate(nedges(nod_in_elem2D_num(n)+1))
+          nedges=0
+          allocate(nelems(nod_in_elem2D_num(n)))
+          nelems=0
+          !!!!!!!boundary_node_contour
+include "node_contour_boundary.h"
+          if (pos_increment<0) then 
+             current_pos=2*nod_in_elem2D_num(n)+2 !one more for the node n itself also we have 2 boundary edges
+          else
+             current_pos =1
+          end if
+          do nn=1, nod_in_elem2D_num(n)
+             call edge_center(edges(1, nedges(nn)), edges(2, nedges(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+             current_pos=current_pos+pos_increment
+             call elem_center(nelems(nn), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+             current_pos=current_pos+pos_increment
+          end do
+          nn=nod_in_elem2D_num(n)+1
+          call edge_center(edges(1, nedges(nn)), edges(2, nedges(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+          current_pos=current_pos+pos_increment
+          my_x_corners(n, current_pos)=coord_nod2D(1,n)
+          my_y_corners(n, current_pos)=coord_nod2D(2,n)
+          current_pos=2*nod_in_elem2D_num(n)+3
+          do nn=current_pos, size(my_x_corners, 2)
+             my_x_corners(n, nn)=my_x_corners(n, current_pos-1)
+             my_y_corners(n, nn)=my_y_corners(n, current_pos-1)
+          end do
+          !!!!!!!
+          deallocate(nedges, nelems)
+       end if
+
+       if (bEdge_left==2) then  ! strange boundary node
+           elem=belem_left(1)
+           allocate(nedges (nod_in_elem2D_num(n)+1))
+           allocate(nedges1(nod_in_elem2D_num(n)+1))
+           nedges =0
+           nedges1=0
+           allocate(nelems (nod_in_elem2D_num(n)))
+           allocate(nelems1(nod_in_elem2D_num(n)))
+           nelems=0
+           nelems1=0
+           if (pos_increment<0) then 
+            current_pos=2*nod_in_elem2D_num(n)+4 !two more for the node n itself also we have 4 boundary edges
+           else
+            current_pos =1
+           end if
+           !!!!!!!boundary_node_contour
+include "node_contour_boundary.h"
+           where (nedges>0)
+                 nedges1=nedges
+           end where
+           where (nelems>0)
+                 nelems1=nelems
+           end where
+           nn1=nn
+           do nn=1, nn1
+              call edge_center(edges(1, nedges1(nn)), edges(2, nedges1(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+              current_pos=current_pos+pos_increment
+              call elem_center(nelems1(nn), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+              current_pos=current_pos+pos_increment
+           end do
+           nn=nn1+1
+           call edge_center(edges(1, nedges1(nn)), edges(2, nedges1(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+           current_pos=current_pos+pos_increment
+           nn=nn1+2
+           my_x_corners(n, current_pos)=coord_nod2D(1,n)
+           my_y_corners(n, current_pos)=coord_nod2D(2,n)
+           current_pos=current_pos+pos_increment
+           !!!!!!!
+           elem=belem_left(2)
+           allocate(nedges2(nod_in_elem2D_num(n)+1))
+           nedges =0
+           nedges2=0
+           allocate(nelems2(nod_in_elem2D_num(n)))
+           nelems =0
+           nelems2=0
+           !!!!!!!boundary_node_contour
+include "node_contour_boundary.h"
+           where (nedges>0)
+                nedges2=nedges
+           end where
+           where (nelems>0)
+                 nelems2=nelems
+           end where
+           nn2=nn
+           do nn=nn1+3, nn1+nn2+2
+              call edge_center(edges(1, nedges2(nn)), edges(2, nedges2(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+              current_pos=current_pos+pos_increment
+              call elem_center(nelems2(nn), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+              current_pos=current_pos+pos_increment
+           end do
+           nn=nn1+nn2+3
+           call edge_center(edges(1, nedges2(nn)), edges(2, nedges2(nn)), my_x_corners(n, current_pos), my_y_corners(n, current_pos), mesh)
+           current_pos=current_pos+pos_increment
+           nn=nn1+nn2+4
+           my_x_corners(n, nn)=coord_nod2D(1,n)
+           my_y_corners(n, nn)=coord_nod2D(2,n)
+           current_pos=2*nod_in_elem2D_num(n)+5
+           do nn=current_pos, size(my_x_corners, 2)
+              my_x_corners(n, nn)=my_x_corners(n, current_pos-1)
+              my_y_corners(n, nn)=my_y_corners(n, current_pos-1)
+           end do
+           !!!!!!!
+           deallocate(nedges, nelems, nedges1, nelems1, nedges2, nelems2)
+       end if
+    end do
+    do n=1, myDim_nod2D
+       do nn=1, size(my_x_corners, 2)
+          this_x_coord=my_x_corners(n, nn)
+          this_y_coord=my_y_corners(n, nn)
+          call r2g(my_x_corners(n, nn), my_y_corners(n, nn), this_x_coord, this_y_coord)
+       end do
+    end do
+    my_x_corners=my_x_corners/rad
+    my_y_corners=my_y_corners/rad
+    end subroutine node_contours
+
   subroutine cpl_oasis3mct_init(partit, localCommunicator )
     USE MOD_PARTIT
     implicit none   
@@ -237,10 +448,15 @@ contains
     real(kind=WP), allocatable :: all_y_coords(:, :)     ! latitude  coordinates
     real(kind=WP), allocatable :: all_area(:,:)    
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+    real(kind=WP), allocatable :: my_x_corners(:,:)     ! local longitude node corners
+    real(kind=WP), allocatable :: my_y_corners(:,:)     ! local latitude node corners
+    real(kind=WP), allocatable :: all_x_corners(:,:,:)     ! global longitude node corners
+    real(kind=WP), allocatable :: all_y_corners(:,:,:)     ! global latitude node corners
+
+include "associate_part_def.h"
+include "associate_mesh_def.h"
+include "associate_part_ass.h"
+include "associate_mesh_ass.h"
 
 
 #ifdef VERBOSE
@@ -316,6 +532,8 @@ contains
       
     ALLOCATE(my_x_coords(my_number_of_points))
     ALLOCATE(my_y_coords(my_number_of_points))
+    ALLOCATE(my_x_corners(myDim_nod2D, 25))
+    ALLOCATE(my_y_corners(myDim_nod2D, 25))
 
     do i = 1, my_number_of_points
       this_x_coord = coord_nod2D(1, i)
@@ -326,15 +544,29 @@ contains
     my_x_coords=my_x_coords/rad
     my_y_coords=my_y_coords/rad
 
+    if (mype .eq. 0) then
+      print *, 'FESOM before corner computation'
+    endif
+    call node_contours(my_x_corners, my_y_corners, partit, mesh)
+    if (mype .eq. 0) then
+      print *, 'FESOM after corner computation'
+    endif
+
     if (mype .eq. localroot) then
       ALLOCATE(all_x_coords(number_of_all_points, 1))
       ALLOCATE(all_y_coords(number_of_all_points, 1))
       ALLOCATE(all_area(number_of_all_points, 1))
+      ALLOCATE(all_x_corners(number_of_all_points, 1, 25))
+      ALLOCATE(all_y_corners(number_of_all_points, 1, 25))
     else 
       ALLOCATE(all_x_coords(1, 1))
       ALLOCATE(all_y_coords(1, 1))
       ALLOCATE(all_area(1, 1))
+      ALLOCATE(all_x_corners(1, 1, 1))
+      ALLOCATE(all_y_corners(1, 1, 1))
     endif
+
+
 
     displs_from_all_pes(1) = 0
     do i = 2, npes
@@ -359,9 +591,12 @@ contains
     CALL MPI_GATHERV(area(1,:), my_number_of_points, MPI_DOUBLE_PRECISION, all_area,  &
                     counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
 
-    if (mype .eq. 0) then 
-      print *, 'FESOM after 3rd GatherV'
-    endif
+    do j = 1, 25
+      CALL MPI_GATHERV(my_x_corners(:,j), myDim_nod2D, MPI_DOUBLE_PRECISION, all_x_corners(:,:,j),  &
+                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+      CALL MPI_GATHERV(my_y_corners(:,j), myDim_nod2D, MPI_DOUBLE_PRECISION, all_y_corners(:,:,j),  &
+                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+    end do
 
     CALL MPI_Barrier(MPI_COMM_FESOM, ierror)
     if (mype .eq. 0) then 
@@ -369,12 +604,15 @@ contains
     endif
 
     if (mype .eq. localroot) then
-      print *, 'FESOM before start_grids_writing'
+      print *, 'FESOM before grid writing to oasis grid files'
        CALL oasis_start_grids_writing(il_flag)
        IF (il_flag .NE. 0) THEN
 
-          print *, 'FESOM before write grid'
+          print *, 'FESOM before write grid centers'
           CALL oasis_write_grid (grid_name, number_of_all_points, 1, all_x_coords(:,:), all_y_coords(:,:))
+
+          print *, 'FESOM before write corner'
+          CALL oasis_write_corner (grid_name, number_of_all_points, 1, 25, all_x_corners(:,:,:), all_y_corners(:,:,:))
 
           ALLOCATE(unstr_mask(number_of_all_points, 1))
           unstr_mask=0

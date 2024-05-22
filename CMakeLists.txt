@@ -7,6 +7,9 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 project(FESOM2.0)
+
+set(CMAKE_VERBOSE_MAKEFILE ON)
+
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF) # cmake-internal switch to toggle if library targets are being build as STATIC or SHARED, see https://cmake.org/cmake/help/latest/guide/tutorial/Selecting%20Static%20or%20Shared%20Libraries.html
 set(TOPLEVEL_DIR ${CMAKE_CURRENT_LIST_DIR})
 set(FESOM_COUPLED ON CACHE BOOL "compile fesom standalone or with oasis support (i.e. coupled)")
@@ -14,8 +17,9 @@ set(OIFS_COUPLED OFF CACHE BOOL "compile fesom coupled to OpenIFS. (Also needs F
 set(CRAY OFF CACHE BOOL "compile with cray ftn")
 set(USE_ICEPACK OFF CACHE BOOL "compile fesom with the Iceapck modules for sea ice column physics.")
 set(OPENMP_REPRODUCIBLE OFF CACHE BOOL "serialize OpenMP loops that are critical for reproducible results")
+set(USE_MULTIO OFF CACHE BOOL "Use MULTIO for IO, either grib or binary for now. This also means path to MULTIO installation has to provided using env MULTIO_INSTALL_PATH='..' and multio configuration yamls must be present to run the model with MULTIO")
+set(OASIS_WITH_YAC OFF CACHE BOOL "Useing a version of OASIS compiled with YAC instead of SCRIP for interpolation?")
 set(ASYNC_ICEBERGS ON CACHE BOOL "compile fesom with or without support for asynchronous iceberg computations")
-
 set(VERBOSE OFF CACHE BOOL "toggle debug output")
 #add_subdirectory(oasis3-mct/lib/psmile)
 add_subdirectory(src)
