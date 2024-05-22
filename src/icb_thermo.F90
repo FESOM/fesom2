@@ -362,7 +362,7 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
   !n3=myDim_nod3d+eDim_nod3d
 
   !do n=1,myDim_nod2D+eDim_nod2D      
-     !if(cavity_flag_nod2d(n)==0) cycle   
+     !if(mesh%cavity_flag_n(n)==0) cycle   
      !nk=nod3d_below_nod2d(1,n)
      !temp = tracer(nk,1)	
      !sal  = tracer(nk,2)
@@ -532,7 +532,7 @@ end subroutine potit_ib
 
 ! if the underlying FESOM is run without cavities, the following routines might be 
 ! missing, so put them here:
-#ifndef use_cavity
+!if (.not. use_cavity) then
 !
 !-------------------------------------------------------------------------------------
 !
@@ -634,7 +634,7 @@ end subroutine potit_ib
 !
 !----------------------------------------------------------------------------------------
 !
-#endif
+!endif
 
 
 ! LA from oce_dens_press for iceberg coupling
