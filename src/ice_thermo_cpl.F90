@@ -99,6 +99,7 @@ subroutine thermodynamics(ice, partit, mesh)
   ice_temp      => ice%data(4)%values(:)
   ice_alb       => ice%atmcoupl%ice_alb(:)
   enthalpyoffuse=> ice%atmcoupl%enthalpyoffuse(:)
+  lqres         => ice%thermo%lqres
   if (lqres) ice_heat_qres => ice%atmcoupl%flx_qres(:)
 #endif 
 #if defined (__oasis) || defined (__ifsinterface)
@@ -116,8 +117,6 @@ subroutine thermodynamics(ice, partit, mesh)
   consn         => ice%thermo%consn
   con           => ice%thermo%con
   rhoice        => ice%thermo%rhoice
-  lqres         => ice%thermo%lqres
-
   !_____________________________________________________________________________  
   rsss = ref_sss
 
