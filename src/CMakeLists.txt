@@ -41,6 +41,12 @@ endif()
 if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
    message(STATUS "multithreading disabled for Levante") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  leo-dcgp )
+   message(STATUS "multithreading disabled for Leonardo") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
+   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  mn5-gpp )
+   message(STATUS "multithreading disabled for MN5 GPP") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
+   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  albedo )
    message(STATUS "multithreading disabled for Albedo") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
@@ -226,6 +232,10 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
    target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -ip -init=zero -no-wrap-margin -fpe0) # add -fpe0 for RAPS environment
    if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
       target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
+   elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
+   elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  albedo)
       target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -O3 -ip -fPIC -qopt-malloc-options=2 -qopt-prefetch=5 -unroll-aggressive) #NEC mpi option
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL atosecmwf )
