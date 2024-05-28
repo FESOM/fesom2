@@ -65,6 +65,7 @@ CONTAINS
 
     SUBROUTINE iom_initialize(client_id, local_comm, return_comm, global_comm )
         USE mpi
+        USE mpp_io, ONLY: lnomultio
 
         IMPLICIT NONE
         CHARACTER(LEN=*), INTENT(IN)      :: client_id
@@ -74,6 +75,8 @@ CONTAINS
         TYPE(multio_configuration)        :: conf_ctx
         INTEGER :: err
         CHARACTER(len=16)                 :: err_str
+
+        IF (lnomultio.EQ..TRUE._1) RETURN
 
         mio_parent_comm = mpi_comm_world
 
@@ -149,8 +152,12 @@ CONTAINS
     END SUBROUTINE iom_initialize
 
     SUBROUTINE iom_finalize()
+        USE mpp_io, ONLY: lnomultio
+
         IMPLICIT NONE
         INTEGER :: err
+
+        IF (lnomultio.EQ..TRUE._1) RETURN
 
         err = mio_handle%close_connections();
         IF (err /= MULTIO_SUCCESS) THEN
@@ -164,11 +171,15 @@ CONTAINS
     END SUBROUTINE iom_finalize
 
     SUBROUTINE iom_init_server(server_comm)
-       IMPLICIT NONE
-       INTEGER, INTENT(IN) :: server_comm
-       type(multio_configuration)        :: conf_ctx
-       INTEGER                           :: err
-       CHARACTER(len=16)                 :: err_str
+        USE mpp_io, ONLY: lnomultio
+
+        IMPLICIT NONE
+        INTEGER, INTENT(IN) :: server_comm
+        type(multio_configuration)        :: conf_ctx
+        INTEGER                           :: err
+        CHARACTER(len=16)                 :: err_str
+
+        IF (lnomultio.EQ..TRUE._1) RETURN
 
         mio_parent_comm = server_comm
 
@@ -231,6 +242,7 @@ CONTAINS
     END SUBROUTINE iom_init_server
 
     SUBROUTINE iom_send_fesom_domains(partit, mesh)
+        USE mpp_io, ONLY: lnomultio
         USE MOD_MESH
         USE MOD_PARTIT
 
@@ -247,6 +259,8 @@ CONTAINS
 #include "../associate_mesh_def.h"
 #include "../associate_part_ass.h"
 #include "../associate_mesh_ass.h"
+
+        IF (lnomultio.EQ..TRUE._1) RETURN
 
         cerr = md%new(mio_handle)
         IF (cerr /= MULTIO_SUCCESS) THEN
@@ -332,6 +346,7 @@ CONTAINS
     END SUBROUTINE iom_send_fesom_domains
 
     SUBROUTINE iom_send_fesom_data(data)
+        USE mpp_io, ONLY: lnomultio
         USE g_clock
         USE g_config, only: MeshId
         IMPLICIT NONE
@@ -339,6 +354,8 @@ CONTAINS
         TYPE(iom_field_request), INTENT(INOUT)  :: data
         INTEGER                                 :: cerr
         TYPE(multio_metadata)                   :: md
+
+        IF (lnomultio.EQ..TRUE._1) RETURN
 
         cerr = md%new(mio_handle)
         IF (cerr /= MULTIO_SUCCESS) THEN
@@ -424,6 +441,8 @@ CONTAINS
     END SUBROUTINE
 
     SUBROUTINE iom_flush(domain, step)
+        USE mpp_io, ONLY: lnomultio
+
         IMPLICIT NONE
 
         CHARACTER(6), INTENT(IN)                :: domain
@@ -431,6 +450,8 @@ CONTAINS
 
         INTEGER                                 :: cerr
         TYPE(multio_metadata)                   :: md
+
+        IF (lnomultio.EQ..TRUE._1) RETURN
 
         cerr = md%new(mio_handle)
         IF (cerr /= MULTIO_SUCCESS) THEN
