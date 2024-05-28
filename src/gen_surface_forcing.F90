@@ -216,7 +216,6 @@ CONTAINS
       !open file
       if (partit%mype==0) then
          iost = nf_open(trim(flf%file_name),NF_NOWRITE,ncid)
-         write(*,*) 'before: flf%file_name=', trim(flf%file_name)
       end if
 
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
@@ -375,7 +374,6 @@ CONTAINS
         aux_calendar = aux_calendar(1:aux_len)
         if (iost .ne. NF_NOERR) then
             flf%calendar='none'
-            aux_len = 4
             write(*,*) ' --> could not find/read calendar attribute in the time axis'
             write(*,*) '     of the forcing file (Is this right?). I assume there is'
             write(*,*) '     none and proceed in CORE2 style without leap years!'
