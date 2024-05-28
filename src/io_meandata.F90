@@ -82,8 +82,6 @@ module io_MEANDATA
   end type
 
   type(io_entry), save, allocatable, target   :: io_list(:)
-
-  integer                        :: last_flushed_step=0
 !
 !--------------------------------------------------------------------------------------------
 ! generic interface was required to associate variables of unknown rank with the pointers of the same rank
@@ -1333,10 +1331,8 @@ ctime=timeold+(dayold-1.)*86400
     lfirst=.false.
 
 #if defined(__MULTIO)
-    trigger_flush = output_done .and. (last_flushed_step .ne. istep)
-    if (trigger_flush) then
+    if (output_done) then
         call iom_flush('N grid', istep)
-        last_flushed_step = istep
     end if
 #endif
 
