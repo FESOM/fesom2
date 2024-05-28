@@ -19,6 +19,7 @@ MODULE iom
     PUBLIC iom_initialize, iom_init_server, iom_finalize
     PUBLIC iom_send_fesom_domains
     PUBLIC iom_field_request, iom_send_fesom_data
+    PUBLIC iom_flush
 
     PRIVATE ctl_stop
     !!----------------------------------------------------------------------
@@ -64,6 +65,7 @@ CONTAINS
 
     SUBROUTINE iom_initialize(client_id, local_comm, return_comm, global_comm )
         USE mpi
+        USE mpp_io, ONLY: lnomultio
 
         IMPLICIT NONE
         CHARACTER(LEN=*), INTENT(IN)      :: client_id
@@ -73,6 +75,8 @@ CONTAINS
         TYPE(multio_configuration)        :: conf_ctx
         INTEGER :: err
         CHARACTER(len=16)                 :: err_str
+
+        IF (lnomultio.EQ..TRUE._1) RETURN
 
         mio_parent_comm = mpi_comm_world
 
@@ -148,8 +152,12 @@ CONTAINS
     END SUBROUTINE iom_initialize
 
     SUBROUTINE iom_finalize()
+        USE mpp_io, ONLY: lnomultio
+
         IMPLICIT NONE
         INTEGER :: err
+
+        IF (lnomultio.EQ..TRUE._1) RETURN
 
         err = mio_handle%close_connections();
         IF (err /= MULTIO_SUCCESS) THEN
@@ -163,11 +171,15 @@ CONTAINS
     END SUBROUTINE iom_finalize
 
     SUBROUTINE iom_init_server(server_comm)
-       IMPLICIT NONE
-       INTEGER, INTENT(IN) :: server_comm
-       type(multio_configuration)        :: conf_ctx
-       INTEGER                           :: err
-       CHARACTER(len=16)                 :: err_str
+        USE mpp_io, ONLY: lnomultio
+
+        IMPLICIT NONE
+        INTEGER, INTENT(IN) :: server_comm
+        type(multio_configuration)        :: conf_ctx
+        INTEGER                           :: err
+        CHARACTER(len=16)                 :: err_str
+
+        IF (lnomultio.EQ..TRUE._1) RETURN
 
         mio_parent_comm = server_comm
 
@@ -230,6 +242,7 @@ CONTAINS
     END SUBROUTINE iom_init_server
 
     SUBROUTINE iom_send_fesom_domains(partit, mesh)
+        USE mpp_io, ONLY: lnomultio
         USE MOD_MESH
         USE MOD_PARTIT
 
@@ -246,6 +259,8 @@ CONTAINS
 #include "../associate_mesh_def.h"
 #include "../associate_part_ass.h"
 #include "../associate_mesh_ass.h"
+
+        IF (lnomultio.EQ..TRUE._1) RETURN
 
         cerr = md%new(mio_handle)
         IF (cerr /= MULTIO_SUCCESS) THEN
@@ -331,6 +346,7 @@ CONTAINS
     END SUBROUTINE iom_send_fesom_domains
 
     SUBROUTINE iom_send_fesom_data(data)
+        USE mpp_io, ONLY: lnomultio
         USE g_clock
         USE g_config, only: MeshId
         IMPLICIT NONE
@@ -338,6 +354,8 @@ CONTAINS
         TYPE(iom_field_request), INTENT(INOUT)  :: data
         INTEGER                                 :: cerr
         TYPE(multio_metadata)                   :: md
+
+        IF (lnomultio.EQ..TRUE._1) RETURN
 
         cerr = md%new(mio_handle)
         IF (cerr /= MULTIO_SUCCESS) THEN
@@ -419,6 +437,50 @@ CONTAINS
         cerr = md%delete()
         IF (cerr /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('send_fesom_data: md%delete failed: ', multio_error_string(cerr))
+        END IF
+    END SUBROUTINE
+
+    SUBROUTINE iom_flush(domain, step)
+        USE mpp_io, ONLY: lnomultio
+
+        IMPLICIT NONE
+
+        CHARACTER(6), INTENT(IN)                :: domain
+        INTEGER, INTENT(IN)                     :: step
+
+        INTEGER                                 :: cerr
+        TYPE(multio_metadata)                   :: md
+
+        IF (lnomultio.EQ..TRUE._1) RETURN
+
+        cerr = md%new(mio_handle)
+        IF (cerr /= MULTIO_SUCCESS) THEN
+            CALL ctl_stop('iom_flush: md%new() failed: ', multio_error_string(cerr))
+        END IF
+
+        cerr = md%set_bool("toAllServers", .TRUE._1)
+        IF (cerr /= MULTIO_SUCCESS) THEN
+            CALL ctl_stop('iom_flush: md%set_bool(toAllServers) failed: ', multio_error_string(cerr))
+        END IF
+
+        cerr = md%set_string("domain", domain)
+        IF (cerr /= MULTIO_SUCCESS) THEN
+            CALL ctl_stop('iom_flush: md%set_string(domain) failed: ', multio_error_string(cerr))
+        END IF
+
+        cerr = md%set_int("step", step)
+        IF (cerr /= MULTIO_SUCCESS) THEN
+           CALL ctl_stop('iom_flush: md%set_int(step) failed: ', multio_error_string(cerr))
+        END IF
+
+        cerr = mio_handle%flush(md)
+        IF (cerr /= MULTIO_SUCCESS) THEN
+            CALL ctl_stop('iom_flush: mio_handle%multio_flush failed: ', multio_error_string(cerr))
+        END IF
+
+        cerr = md%delete()
+        IF (cerr /= MULTIO_SUCCESS) THEN
+            CALL ctl_stop('iom_flush: md%delete failed: ', multio_error_string(cerr))
         END IF
     END SUBROUTINE
 
