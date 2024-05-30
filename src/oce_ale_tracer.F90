@@ -148,7 +148,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     type(t_partit), intent(inout), target    :: partit
     type(t_mesh)  , intent(in)   , target    :: mesh
     !___________________________________________________________________________
-    integer                                  :: tr_num, node, elem, nzmax, nzmin
+    integer                                  :: tr_num, node, elem, nzmax, nzmin, ierr
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
@@ -196,10 +196,39 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 !!!     !$ACC UPDATE DEVICE(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus)
         !$ACC UPDATE DEVICE (mesh%helem, mesh%hnode, mesh%hnode_new, mesh%zbar_3d_n, mesh%z_3d_n)
     do tr_num=1, tracers%num_tracers
+    
+        if (tr_num == 1) then
+          open(unit=10, file='pre_init_tracers_output.txt', status='replace', action='write', iostat=ierr)
+          write(10, *) "tr_num : ", tr_num
+
+          if (ierr /= 0) then
+            print *, 'Error opening file!'
+            stop
+          end if
+
+          write(10, *) "Printing in oce_ale_tracer file, before init_tracers"
+          write(10, *) "my tracer values:", tracers%data(1)%values(1:10,:)
+          close(unit=10)
+        end if
+        
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
         call init_tracers_AB(tr_num, tracers, partit, mesh)
+        
+        if (tr_num == 1) then
+          open(unit=20, file='post_init_tracers_output.txt', status='replace', action='write', iostat=ierr)
+          write(20, *) "tr_num : ", tr_num
+  
+          if (ierr /= 0) then
+            print *, 'Error opening file!'
+            stop
+          end if
+
+          write(20, *) "Printing in oce_ale_tracer file, after init_tracers"
+          write(20, *) "my tracer values:", tracers%data(tr_num)%values(1:10,:)
+          close(unit=20)
+        end if
 
         ! advect tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
@@ -210,8 +239,53 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         !$ACC  DEVICE(tracers%work%edge_up_dn_grad) !!&
         ! it will update del_ttf with contributions from horizontal and vertical advection parts (del_ttf_advhoriz and del_ttf_advvert)
 	!$ACC wait(1)
-        call do_oce_adv_tra(dt, UV, Wvel, Wvel_i, Wvel_e, tr_num, dynamics, tracers, partit, mesh)
 
+        
+        ! if (tr_num == 1) then
+        !   !$ACC UPDATE HOST(tracers%work%fct_LO)
+        !   open(unit=10, file='pre_do_oce_adv_tra_fct_LO_output.txt', status='replace', action='write', iostat=ierr)
+        !   write(10, *) "tr_num : ", tr_num
+        !
+        !   if (ierr /= 0) then
+        !     print *, 'Error opening file!'
+        !     stop
+        !   end if
+        !
+        !   write(10, *) "Printing in oce_adv_tra_driver before adv_tra_ver_upw1 function"
+        !   write(10, *) "fct_LO values :", tracers%work%fct_LO
+        !   close(unit=10)
+        ! end if
+        call do_oce_adv_tra(dt, UV, Wvel, Wvel_i, Wvel_e, tr_num, dynamics, tracers, partit, mesh)
+        
+        ! if (tr_num == 1) then
+        !   !$ACC UPDATE HOST(tracers%work%fct_LO)
+        !   open(unit=20, file='post_do_oce_adv_tra_fct_LO_output.txt', status='replace', action='write', iostat=ierr)
+        !   write(20, *) "tr_num : ", tr_num
+        !
+        !   if (ierr /= 0) then
+        !     print *, 'Error opening file!'
+        !     stop
+        !   end if
+        !
+        !   write(20, *) "Printing in oce_adv_tra_driver after adv_tra_ver_upw1 function"
+        !   write(20, *) "fct_LO values :", tracers%work%fct_LO
+        !   close(unit=20)
+        ! end if
+
+        if (tr_num == 1) then
+            !$ACC UPDATE HOST(tracers%data(tr_num)%values)
+          open(unit=20, file='post_do_oce_adv_tra_output.txt', status='replace', action='write', iostat=ierr)
+          write(20, *) "tr_num : ", tr_num
+  
+          if (ierr /= 0) then
+            print *, 'Error opening file!'
+            stop
+          end if
+
+          write(20, *) "Printing in oce_ale_tracer file, after do_oce_adv_tra"
+          write(20, *) "my tracer values:", tracers%data(tr_num)%values(1:10,:)
+          close(unit=20)
+        end if
 
         !$ACC UPDATE HOST(tracers%work%del_ttf, tracers%work%del_ttf_advhoriz, tracers%work%del_ttf_advvert)
         !___________________________________________________________________________

@@ -83,6 +83,8 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     real(kind=WP) :: Tmean, Tmean1, Tmean2, num_ord
     real(kind=WP) :: opth, optv
     logical       :: do_zero_flux
+    
+    integer      :: ierr
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -111,7 +113,35 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         ! compute the low order upwind horizontal flux
         ! o_init_zero=.true.  : zero the horizontal flux before computation
         ! o_init_zero=.false. : input flux will be substracted
+        if (tr_num == 1) then
+          !$ACC UPDATE HOST(fct_LO)
+          open(unit=10, file='pre_adv_tra_hor_upw1_output.txt', status='replace', action='write', iostat=ierr)
+          write(10, *) "tr_num : ", tr_num
+
+          if (ierr /= 0) then
+            print *, 'Error opening file!'
+            stop
+          end if
+
+          write(10, *) "Printing in oce_adv_tra_driver before adv_tra_ver_upw1 function"
+          write(10, *) "fct_LO values :", fct_LO
+          close(unit=10)
+        end if
         call adv_tra_hor_upw1(vel, ttf, partit, mesh, adv_flux_hor, o_init_zero=.true.)
+        if (tr_num == 1) then
+          !$ACC UPDATE HOST(fct_LO)
+          open(unit=20, file='post_adv_tra_hor_upw1_output.txt', status='replace', action='write', iostat=ierr)
+          write(20, *) "tr_num : ", tr_num
+
+          if (ierr /= 0) then
+            print *, 'Error opening file!'
+            stop
+          end if
+
+          write(20, *) "Printing in oce_adv_tra_driver after adv_tra_ver_upw1 function"
+          write(20, *) "fct_LO values :", fct_LO
+          close(unit=20)
+        end if
         ! update the LO solution for horizontal contribution
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
@@ -208,10 +238,40 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 #endif
 #endif
 
+
+        if (tr_num == 1) then
+          open(unit=10, file='pre_adv_tra_ver_upw1_output.txt', status='replace', action='write', iostat=ierr)
+          write(10, *) "tr_num : ", tr_num
+
+          !$ACC UPDATE HOST(fct_LO)
+          if (ierr /= 0) then
+            print *, 'Error opening file!'
+            stop
+          end if
+
+          write(10, *) "Printing in oce_adv_tra_driver before adv_tra_ver_upw1 function"
+          write(10, *) "fct_LO values :", fct_LO
+          close(unit=10)
+        end if
+
         ! compute the low order upwind vertical flux (explicit part only)
         ! zero the input/output flux before computation
         call adv_tra_ver_upw1(we, ttf, partit, mesh, adv_flux_ver, o_init_zero=.true.)
         ! update the LO solution for vertical contribution
+        if (tr_num == 1) then
+          open(unit=20, file='post_adv_tra_ver_upw1_output.txt', status='replace', action='write', iostat=ierr)
+          write(20, *) "tr_num : ", tr_num
+
+          !$ACC UPDATE HOST(fct_LO)
+          if (ierr /= 0) then
+            print *, 'Error opening file!'
+            stop
+          end if
+
+          write(20, *) "Printing in oce_adv_tra_driver after adv_tra_ver_upw1 function"
+          write(20, *) "fct_LO values :", fct_LO
+          close(unit=20)
+        end if
 
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nu1, nl1, nz)
@@ -290,6 +350,19 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         !     for do_wimpl=.true.
     END SELECT
     !___________________________________________________________________________
+        ! if (tr_num == 1) then
+        !   open(unit=10, file='pre_oce_tra_adv_flux2dtracer_output.txt', status='replace', action='write', iostat=ierr)
+        !   write(10, *) "tr_num : ", tr_num
+        !   !$ACC UPDATE HOST(ttf)
+        !   if (ierr /= 0) then
+        !     print *, 'Error opening file!'
+        !     stop
+        !   end if
+        !
+        !   write(10, *) "Printing in oce_adv_tra_driver before oce_tra_adv_flux2dtracer function"
+        !   write(10, *) "ttf values :", ttf(1:10, :)
+        !   close(unit=10)
+        ! end if
     !
     if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
        !edge_up_dn_grad will be used as an auxuary array here
@@ -298,6 +371,20 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     else
        call oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, partit, mesh)
     end if
+        ! if (tr_num == 1) then
+        !   open(unit=20, file='post_oce_tra_adv_flux2dtracer_output.txt', status='replace', action='write', iostat=ierr)
+        !   write(20, *) "tr_num : ", tr_num
+        !   !$ACC UPDATE HOST(ttf)
+        !
+        !   if (ierr /= 0) then
+        !     print *, 'Error opening file!'
+        !     stop
+        !   end if
+        !
+        !   write(20, *) "Printing in oce_adv_tra_driver after oce_tra_adv_flux2dtracer function"
+        !   write(20, *) "ttf values :", ttf(1:10, :)
+        !   close(unit=20)
+        ! end if
 
 end subroutine do_oce_adv_tra
 !

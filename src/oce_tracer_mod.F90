@@ -39,6 +39,7 @@ end do
 #ifdef ENABLE_OPENACC
 !$ACC end parallel loop
 #endif
+
 !$OMP PARALLEL DO
     do n=1, partit%myDim_nod2D+partit%eDim_nod2D
        ! AB interpolation
