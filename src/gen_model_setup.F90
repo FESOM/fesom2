@@ -6,15 +6,15 @@ subroutine setup_model(partit)
 !   use i_therm_param
   use g_forcing_param
   use g_config
-  use diagnostics, only: ldiag_solver,lcurt_stress_surf,lcurt_stress_surf, ldiag_Ri, ldiag_TurbFlux, &
+  use diagnostics, only: ldiag_solver,lcurt_stress_surf,lcurt_stress_surf, ldiag_Ri, ldiag_TurbFlux, ldiag_trflx, &
                          ldiag_dMOC, ldiag_DVD, diag_list
   use g_clock,     only: timenew, daynew, yearnew
   use g_ic3d
-
 #ifdef __recom
   use recom_config
   use recom_ciso
 #endif
+  use mod_transit
 
   implicit none
   type(t_partit), intent(inout), target :: partit
@@ -34,6 +34,9 @@ subroutine setup_model(partit)
   read (fileunit, NML=geometry)
   read (fileunit, NML=calendar)
   read (fileunit, NML=run_config)
+  read (fileunit,NML=icebergs)
+
+!!$  read (fileunit, NML=machine)
   close (fileunit)
   
   
@@ -67,6 +70,7 @@ subroutine setup_model(partit)
   read (fileunit, NML=forcing_exchange_coeff)
   read (fileunit, NML=forcing_bulk)
   read (fileunit, NML=land_ice)
+  read (fileunit, NML=age_tracer) !---age-code
   close (fileunit)
 
 !   if(use_ice) then
@@ -119,6 +123,21 @@ subroutine setup_model(partit)
   read (fileunit, NML=paciso)
   close (fileunit)
 #endif
+
+  if (use_transit) then
+! Transient tracer input, input file names have to be specified in
+! namelist.config, nml=run_config
+    if(partit%mype==0) print *, "Transient tracers are ON. Tracer input file: ", ifile_transit
+    open (20,file=ifile_transit)
+    if (anthro_transit .or. paleo_transit) then
+      call read_transit_input
+    else
+!     Spinup / equilibrium runs with constant tracer input,
+!     read parameter values from namelist.oce
+      read (20,nml=transit_param)
+    end if
+    close (20)
+  end if
 
   if(partit%mype==0) write(*,*) 'Namelist files are read in'
   

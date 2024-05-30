@@ -158,8 +158,8 @@ subroutine fer_solve_Gamma(partit, mesh)
     END DO   !!! cycle over nodes
 !$OMP END DO
 !$OMP END PARALLEL
-    call exchange_nod(fer_gamma, partit)
 !$OMP BARRIER
+    call exchange_nod(fer_gamma, partit)
 END subroutine fer_solve_Gamma
 !
 !
@@ -223,8 +223,8 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
     IMPLICIT NONE
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
-    integer                  :: n, nz, nzmax, nzmin
-    real(kind=WP)            :: reso, c1, rosb, scaling, rr_ratio, aux_zz(mesh%nl)
+    integer                  :: n, k, nz, nzmax, nzmin
+    real(kind=WP)            :: reso, c1, rosb, scaling, rr_ratio, aux, aux_zz(mesh%nl)
     real(kind=WP)            :: x0=1.5_WP, sigma=.15_WP ! Fermi function parameters to cut off GM where Rossby radius is resolved
     real(kind=WP)            :: c_min=0.5_WP, f_min=1.e-6_WP, r_max=200000._WP
     real(kind=WP)            :: zscaling(mesh%nl)
@@ -237,11 +237,18 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
 
     ! fill arrays for 3D Redi and GM coefficients: F1(xy)*F2(z)
     !******************************* F1(x,y) ***********************************
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmax, nzmin, reso, c1, rosb, scaling, rr_ratio, aux_zz, zscaling, bvref)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, nz, nzmax, nzmin, reso, c1, rosb, scaling, rr_ratio, aux, aux_zz, zscaling, bvref)
 !$OMP DO
     do n=1, myDim_nod2D
-        nzmax=minval(nlevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
-        nzmin=maxval(ulevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
+       !nzmax=minval(nlevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
+       !nzmin=maxval(ulevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
+       !Intel vectorisation did something strange in the above lines hence we had to code it more explicitely
+        nzmax=mesh%nl
+        nzmin=1
+        do k=1, nod_in_elem2D_num(n)
+           nzmax=min(nzmax, nlevels(nod_in_elem2D(k, n)))
+           nzmin=max(nzmin, ulevels(nod_in_elem2D(k, n)))
+        end do
         reso=mesh_resolution(n)
         if (Fer_GM) then
             c1=0._wp
@@ -282,7 +289,10 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
 !!PS                 scaling=scaling*max((reso/10000.0_WP-3.0_WP), 0._WP) !no GM below 30km resolution
 !!PS             end if
             if (reso/1000.0_WP < K_GM_rampmax) then
-                scaling=scaling*max((reso/1000.0_WP-K_GM_rampmin)/(K_GM_rampmax-K_GM_rampmin), 0._WP) !no GM below 30km resolution
+                !scaling=scaling*max((reso/1000.0_WP-K_GM_rampmin)/(K_GM_rampmax-K_GM_rampmin), 0._WP) !no GM below 30km resolution
+                !even if the condition is not met, compiling with Intel caused division by 0 here when optimization was used
+                !hence we limit the denominator by 1.e-12
+                scaling=scaling*max((reso/1000.0_WP-K_GM_rampmin)/max(K_GM_rampmax-K_GM_rampmin, 1.e-12), 0._WP) !no GM below 30km resolution
             end if
             
             !___________________________________________________________________
@@ -402,9 +412,9 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
    end do
 !$OMP END DO
 !$OMP END PARALLEL
+!$OMP BARRIER
    if (Fer_GM) call exchange_nod(fer_c, partit)
    if (Fer_GM) call exchange_nod(fer_k, partit)
    if (Redi)   call exchange_nod(Ki, partit)
-!$OMP BARRIER
 end subroutine init_Redi_GM
 !====================================================================

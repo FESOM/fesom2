@@ -54,6 +54,18 @@ module visc_filt_bidiff_interface
   end interface
 end module
 
+module check_validviscopt_interface
+    interface
+        subroutine check_validviscopt_5(partit, mesh)
+            USE MOD_MESH
+            USE MOD_PARTIT
+            USE MOD_PARSUP
+            type(t_partit), intent(inout), target :: partit
+            type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine    
+    end interface
+end module 
+
 ! 
 ! Contains routines needed for computations of dynamics.
 ! includes: update_vel, compute_vel_nodes
@@ -556,7 +568,7 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
        V_c(:, elem) = 0.0_WP
     END DO
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, ed, el, nz, nzmin, nzmax)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, ed, el, nz, nzmin, nzmax, update_u, update_v)
 !$OMP DO
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
@@ -746,3 +758,151 @@ salt   => tracers%data(2)%values(:,:)
   call exchange_nod(dynamics%ke_swA, partit)
   call exchange_nod(dynamics%ke_swB, partit)
 END SUBROUTINE compute_apegen
+
+
+!
+!
+!_______________________________________________________________________________
+! check validity of visc_opt=5 selection on basis of ratio betweem resolution and 
+! 1st baroclinic rossby radius. visc_opt=5 ("easy backscatter") in eddy 
+! resolving/partly eddy permitting setups can lead to problems in form of 
+! exedingly strong near boundary currents that can lead e.g to very weak 
+! Drake Passage throughflow (<80Sv). In this case better use visc_opt=7, 
+! which is the flow aware viscosity option 
+subroutine check_viscopt(dynamics, partit, mesh)
+    USE MOD_DYN
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_MESH
+    USE check_validviscopt_interface
+    IMPLICIT NONE
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    
+    if (dynamics%check_opt_visc) then
+        select case (dynamics%opt_visc)
+            case(5) 
+                ! check validity of visc_opt=5 especially in higher resolved setups
+                ! --> there it can lead to problems
+                call check_validviscopt_5(partit, mesh)
+        end select   
+    end if 
+end subroutine check_viscopt
+
+!
+!
+!_______________________________________________________________________________
+! check if viscopt=5 is a valid and recommended option for the used configuration
+subroutine check_validviscopt_5(partit, mesh)
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE o_PARAM , ONLY: rad
+    USE o_ARRAYS, ONLY: bvfreq
+    USE g_CONFIG
+    USE g_comm_auto
+    IMPLICIT NONE
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    integer                               :: node, nz, nzmax, nzmin
+    real(kind=WP)                         :: f_min=1.e-6_WP, z_min=100.0_WP, r_max=200000._WP, r_min=2000.0_WP
+    real(kind=WP)                         :: c_min=0.5_WP, c1
+    real(kind=WP)                         :: excl_EQ=30.0, thresh_ratio=1.5
+    real(kind=WP)                         :: loc_R, loc_A
+    real(kind=WP)                         :: glb_R, glb_A
+    real(kind=WP)                         :: fac_ResR1barocl, rossbyr_1barocl
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    
+    !___________________________________________________________________________
+    loc_R = 0.0_WP
+    loc_A = 0.0_WP
+    
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmax, nzmin, c1, rossbyr_1barocl, &
+!$OMP                                  fac_ResR1barocl) REDUCTION(+:loc_R, loc_A)
+!$OMP DO
+    do node=1, myDim_nod2D
+        !_______________________________________________________________________
+        ! Exlude the equator |lat|<30° from checking the ration between resolution
+        ! and first baroclinic rossby radius  
+        if (abs(mesh%geo_coord_nod2D(2,node)/rad)<excl_EQ) cycle
+        
+        !_______________________________________________________________________
+        !ca. first baroclinic gravity wave speed limited from below by c_min
+        nzmax=mesh%nlevels_nod2D_min(node)
+        nzmin=mesh%ulevels_nod2D_max(node)
+        c1=0.0_WP
+        do nz=nzmin, nzmax-1
+            c1=c1+hnode_new(nz,node)*(                                         &
+                                    sqrt(abs(max(bvfreq(nz  ,node), 0._WP)))+  &
+                                    sqrt(abs(max(bvfreq(nz+1,node), 0._WP)))   &
+                                  )/2._WP ! add abs() for -0 case, cray
+        end do
+        c1=max(c_min, c1/pi)
+        
+        !_______________________________________________________________________
+        ! compute 1st. baroclinic rossby radius
+        rossbyr_1barocl = max( min( c1/max( abs(mesh%coriolis_node(node)), f_min), r_max), r_min)
+        
+        !_______________________________________________________________________
+        ! compute ratio between rossby and resolution, if ratio >=1 setup is not eddy 
+        ! resolving in best case eddy permitting --> GM/Redi will still be neccessary
+        fac_ResR1barocl =min(mesh_resolution(node)/rossbyr_1barocl, 5._WP)
+        
+        !_______________________________________________________________________
+        ! compute local mean ratio but exclude equator |lat|<30°, since Rossby radius 
+        ! at equator becomes very large
+        loc_R   = loc_R + fac_ResR1barocl
+        loc_A   = loc_A + 1.0_WP
+    end do
+!$OMP END DO
+!$OMP END PARALLEL
+!$OMP BARRIER
+
+    !___________________________________________________________________________
+    ! compute global mean ratio --> core2 Ratio=4.26 (eddy parameterizted), 
+    ! dart Ratio=0.97 (eddy resolving/permitting)
+    call MPI_AllREDUCE(loc_R, glb_R, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(loc_A, glb_A, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    glb_R  = glb_R/glb_A
+    
+    !___________________________________________________________________________
+    ! create warning message when ratio<thresh_ratio
+    if (glb_R<thresh_ratio) then 
+        if (mype==0) then 
+        print *, achar(27)//'[33m'
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' --check opt_visc--> Mean Ratio Resol/Rrossby = ',  glb_R 
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' WARNING: You want to use opt_visc=5 (easy backscatter viscosity) in'
+        write(*,*) '          an eddy resolving to eddy permitting (Resol/Rrossby<1.5)  '
+        write(*,*) '          configuration. It revealed to us that this can lead to    '
+        write(*,*) '          problems in form of unrealistically strong near boundary  '
+        write(*,*) '          currents that can ultimatively lead to an e.g very weak   '
+        write(*,*) '          Drake Passage throughflow (<80Sv in spinup up dart        '
+        write(*,*) '          configuration). For these kind of setups we recommend to  '
+        write(*,*) '          use opt_visc=7, which is the flow aware viscosity         '
+        write(*,*) '          parameterisation.                                         '
+        write(*,*) '          The easy backscatter viscosity was designed to energetise '
+        write(*,*) '          coarse resolved configurations!!!                         '
+        write(*,*) '          --> So please change the viscosity option in namelist.dyn '
+        write(*,*) '              to opt_visc=7 .                                       '
+        write(*,*) '          --> If you insist in using opt_visc=5 in your simulation, '
+        write(*,*) '              you can switch off this check in namelist.dyn by      '
+        write(*,*) '              setting check_opt_visc=.false.                        '
+        write(*,*) '                                                                    '
+        write(*,*) '____________________________________________________________________'
+        print *, achar(27)//'[0m'
+        write(*,*)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+        end if
+    else
+        if (mype==0) then 
+        write(*,*) ' --check opt_visc--> Mean Ratio Resol/Rrossby = ',  glb_R 
+        end if
+    end if     
+    
+end subroutine check_validviscopt_5
