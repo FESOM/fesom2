@@ -30,10 +30,10 @@ module recom_config
              isi   = 18, ife    = 19, iphycal = 20, idetcal = 21,            &
              ioxy  = 22
 
+#if defined (__3Zoo2Det)
 ! *******************
 ! CASE 2phy 2zoo 2det
 ! *******************
-#if defined (__3Zoo2Det)
   Integer :: izoo2n  = 23, izoo2c   = 24, idetz2n    = 25,                   &
              idetz2c = 26, idetz2si = 27, idetz2calc = 28
 #endif
@@ -43,6 +43,7 @@ module recom_config
 ! CASE 3phy 2zoo 2det
 ! *******************
   Integer :: icocn = 29, icocc = 30, icchl = 31
+
 #elif defined (__coccos) & !defined (__3Zoo2Det)
 ! *******************
 ! CASE 3phy 1zoo 1det
@@ -55,6 +56,7 @@ module recom_config
 ! CASE 3phy 3zoo 2det
 ! *******************
   Integer :: imiczoon = 32, imiczooc = 33
+
 #elif !defined (__coccos) & defined (__3Zoo2Det) 
 ! *******************
 ! CASE 2phy 3zoo 2det
@@ -62,26 +64,28 @@ module recom_config
   Integer :: imiczoon = 29, imiczooc = 30
 #endif
 
-  Integer :: ivphy = 1, ivdia = 2, ivdet = 3, ivdetsc = 4, ivcoc = 5 
+!=============================================================================
 
-!!MB TEST: tracer ids for revised remineralization and sinking in oce_ale_tracer.F90
+  Integer :: ivphy = 1, ivdia = 2, ivdet = 3, ivdetsc = 4, ivcoc = 5
+ 
+!=============================================================================
+
   integer, dimension(8)  :: recom_remin_tracer_id   = (/1001, 1002, 1003, 1018, 1019, 1022, 1302, 1402/)
 
-  integer, dimension(26) :: recom_sinking_tracer_id = (/1007, 1008, 1017, 1021, 1004, 1005, 1020, 1006, &  !!!!! for coocos 29
+! OG
+! Todo:  Make recom_sinking_tracer_id case sensitive
+  integer, dimension(29) :: recom_sinking_tracer_id = (/1007, 1008, 1017, 1021, 1004, 1005, 1020, 1006, &
                                                         1013, 1014, 1016, 1015, 1025, 1026, 1027, 1028, &
-!                                                        1029, 1030, 1031, &
+                                                        1029, 1030, 1031, &
                                                         1308, 1321, 1305, 1320, & 
                                                         1314, 1408, 1421, 1405, 1420, 1414/)
-
   integer, dimension(8)  :: recom_det_tracer_id     = (/1007, 1008, 1017, 1021, 1308, 1321, 1408, 1421/)
-
   integer, dimension(8)  :: recom_phy_tracer_id     = (/1004, 1005, 1020, 1305, 1320, 1405, 1420, 1006/)
-
   integer, dimension(6)  :: recom_dia_tracer_id     = (/1013, 1014, 1314, 1414, 1016, 1015/)
-
 
 #if defined (__coccos) & defined (__3Zoo2Det)
   integer, dimension(3)  :: recom_cocco_tracer_id   = (/1029, 1030, 1031/)
+
 #elif defined (__coccos) & !defined (__3Zoo2Det)
   integer, dimension(3)  :: recom_cocco_tracer_id   = (/1023, 1024, 1025/)
 #endif
@@ -89,6 +93,8 @@ module recom_config
 #if defined (__3Zoo2Det)
   integer, dimension(4)  :: recom_det2_tracer_id    = (/1025, 1026, 1027, 1028/)
 #endif
+
+!=============================================================================
 
   Real(kind=8)                 :: zero           = 0.d0
   Integer                      :: one            = 1
@@ -796,7 +802,6 @@ Module REcoM_locVar
   Real(kind=8) :: oflux(1)                     ! [mmol/m2/day] Flux of O2 into the ocean
   Real(kind=8) :: o2ex(1)                     ! [mmol/m2/s] Flux of O2 into the ocean
   Real(kind=8) :: ULoc(1)                      ! Wind strength above current 2D node, change array size if used with mocsy input vector longer than one
-  Real(kind=8) :: Loc_ice_conc(1)
   Real(kind=8) :: dpCO2surf(1)              ! [uatm] difference of oceanic pCO2 minus atmospheric pCO2
 
 ! mocsy output -----------------------------------------------------------------------------------------------------------------------------
@@ -815,7 +820,9 @@ Module REcoM_locVar
   Real(kind=8) :: rhoSW(1)                     ! rhoSW  = in-situ density of seawater; rhoSW = f(s, t, p)
   Real(kind=8) :: p(1)                         ! pressure [decibars]; p = f(depth, latitude) if computed from depth [m] OR p = depth if [db]
   Real(kind=8) :: tempis(1)                    ! in-situ temperature [degrees C]
+  Real(kind=8) :: dpos(1)                      ! depth converted to positive values, needed in the mocsy routine
   Real(kind=8) :: kw660(1)                     ! gas transfer velocity (piston velocity) for CO2 [m/s] 
+  Real(kind=8) :: K0(1)                        ! CO2 solubility
   Real(kind=8) :: co2flux_seaicemask(1)        ! air-to-sea flux of CO2 [mmol/m2/s]
   Real(kind=8) :: o2flux_seaicemask(1)         ! air-to-sea flux of CO2 [mmol/m2/s]
 
@@ -843,7 +850,7 @@ Module REcoM_locVar
   Real(kind=8) :: k1, k2, kw, kb, ff           ! Common block: Equilibrium_constants
   Real(kind=8) :: FeDust                       ! [umol/m2/s]
   Real(kind=8) :: NDust                        ! [mmol/m2/s]
-!  Real(kind=8) :: Loc_ice_conc(1)              ! Used to calculate flux of DIC in REcoM 0 -> 1
+  Real(kind=8) :: Loc_ice_conc(1)              ! Used to calculate flux of DIC in REcoM 0 -> 1
   Real(kind=8) :: LocAtmCO2(1)                 ! [uatm]
   Real(kind=8) :: LocDiags2D(12)               ! (changed it from 8 to 12)
 !  Real(kind=8) :: LocDenit                    ! BALL

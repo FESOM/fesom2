@@ -121,7 +121,8 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
         Vben= Vben/SecondsPerDay ! conversion [m/d] --> [m/s] (vertical velocity, note that it is positive here)
 
         k=nod_in_elem2D_num(n)
-        ! Screening minimum depth in neigbouring nodes around node n
+
+        !! * Screening minimum depth in neigbouring nodes around node n*
         nlevels_nod2D_minimum=minval(nlevels(nod_in_elem2D(1:k, n))-1)
 
         do nz=nlevels_nod2D_minimum, nl1
@@ -134,32 +135,32 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
            add_benthos_2d(n) = add_benthos_2d(n) - (aux(nz))*dt    !!!!!!!!CHECK Maybe /area(nz,n) -> [mmol/m2]
         end do
 
-        ! Particulate Organic Nitrogen
+        !! * Particulate Organic Nitrogen *
         if( tracers%data(tr_num)%ID==1004 .or. &  !iphyn
             tracers%data(tr_num)%ID==1007 .or. &  !idetn
-            tracers%data(tr_num)%ID==1013 .or. & !) then  !idian
+            tracers%data(tr_num)%ID==1013 .or. &  !idian
             tracers%data(tr_num)%ID==1025 ) then  !idetz2n
             Benthos(n,1)= Benthos(n,1) +  add_benthos_2d(n) ![mmol]
         endif
 
-        ! Particulate Organic Carbon
+        !! * Particulate Organic Carbon *
         if( tracers%data(tr_num)%ID==1005 .or. &  !iphyc
             tracers%data(tr_num)%ID==1008 .or. &  !idetc
-            tracers%data(tr_num)%ID==1014 .or. & !) then  !idiac
+            tracers%data(tr_num)%ID==1014 .or. &  !idiac
             tracers%data(tr_num)%ID==1026 ) then  !idetz2c
             Benthos(n,2)= Benthos(n,2) + add_benthos_2d(n)
         endif
 
-        ! Particulate Organic Silicon
+        !! *Particulate Organic Silicon *
         if( tracers%data(tr_num)%ID==1016 .or. &  !idiasi
-            tracers%data(tr_num)%ID==1017 .or. & !) then  !idetsi
+            tracers%data(tr_num)%ID==1017 .or. &  !idetsi
             tracers%data(tr_num)%ID==1027 ) then  !idetz2si
             Benthos(n,3)= Benthos(n,3) + add_benthos_2d(n)
         endif
 
-        ! Cal
+        !! * Cal *
         if( tracers%data(tr_num)%ID==1020 .or. &  !iphycal
-            tracers%data(tr_num)%ID==1021 .or. & !) then  !idetcal
+            tracers%data(tr_num)%ID==1021 .or. &  !idetcal
             tracers%data(tr_num)%ID==1028 ) then  !idetz2cal
             Benthos(n,4)= Benthos(n,4) + add_benthos_2d(n)
         endif
@@ -191,23 +192,23 @@ subroutine diff_ver_recom_expl(tr_num, tracers, partit, mesh)
     use g_clock
     use o_PARAM
     use g_config
-    use o_param           ! num_tracers
+    use o_param 
     use o_arrays
-    use g_forcing_arrays  ! press_air
+    use g_forcing_arrays
     use g_comm_auto
 
     IMPLICIT NONE
 
-    integer       , intent(in)   , target :: tr_num
-    type(t_tracer), intent(inout), target :: tracers
-    type(t_partit), intent(inout), target :: partit
-    type(t_mesh)  , intent(in)   , target :: mesh
+    integer       , intent(in)   , target  :: tr_num
+    type(t_tracer), intent(inout), target  :: tracers
+    type(t_partit), intent(inout), target  :: partit
+    type(t_mesh)  , intent(in)   , target  :: mesh
 
-    integer                  :: elem,k
-    integer                  :: n2,nl1,nl2,nz,n,id,ul1
-    real(kind=WP)            :: vd_flux(mesh%nl)
-    integer                  :: nlevels_nod2D_minimum
-    real(kind=WP)            :: bottom_flux(partit%myDim_nod2D+partit%eDim_nod2D)
+    integer                                :: elem,k
+    integer                                :: n2,nl1,nl2,nz,n,id,ul1
+    real(kind=WP)                          :: vd_flux(mesh%nl)
+    integer                                :: nlevels_nod2D_minimum
+    real(kind=WP)                          :: bottom_flux(partit%myDim_nod2D+partit%eDim_nod2D)
 
     real(kind=WP), dimension(:,:), pointer :: trarr
 
@@ -219,32 +220,32 @@ subroutine diff_ver_recom_expl(tr_num, tracers, partit, mesh)
     trarr=>tracers%data(tr_num)%values(:,:)
 
 
-bottom_flux = 0._WP
-id = tracers%data(tr_num)%ID
+    bottom_flux = 0._WP
+    id = tracers%data(tr_num)%ID
 
-  SELECT CASE (id)
-    CASE (1001)
-      bottom_flux = GlodecayBenthos(:,1) !*** DIN [mmolN/m^2/s] ***
-    CASE (1002)
-      bottom_flux = GlodecayBenthos(:,2) + GlodecayBenthos(:,4) !*** DIC + calcification ***
-    CASE (1003)
-      bottom_flux = GlodecayBenthos(:,4) * 2.0_WP - 1.0625_WP * GlodecayBenthos(:,1) !*** Alk ***
-    CASE (1018)
-      bottom_flux = GlodecayBenthos(:,3) !*** Si ***
-    CASE (1019)
-      bottom_flux = GlodecayBenthos(:,1) * Fe2N_benthos !*** DFe ***
-    CASE (1022)
-      bottom_flux = -GlodecayBenthos(:,2) * redO2C !*** O2 ***
-    CASE DEFAULT
-      if (partit%mype==0) then
-         write(*,*) 'check specified in boundary conditions'
-         write(*,*) 'the model will stop!'
-      end if
-      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-      stop
-  END SELECT
+    SELECT CASE (id)
+       CASE (1001)
+          bottom_flux = GlodecayBenthos(:,1) !*** DIN [mmolN/m^2/s] ***
+       CASE (1002)
+          bottom_flux = GlodecayBenthos(:,2) + GlodecayBenthos(:,4) !*** DIC + calcification ***
+       CASE (1003)
+          bottom_flux = GlodecayBenthos(:,4) * 2.0_WP - 1.0625_WP * GlodecayBenthos(:,1) !*** Alk ***
+       CASE (1018)
+          bottom_flux = GlodecayBenthos(:,3) !*** Si ***
+       CASE (1019)
+          bottom_flux = GlodecayBenthos(:,1) * Fe2N_benthos !*** DFe ***
+       CASE (1022)
+          bottom_flux = -GlodecayBenthos(:,2) * redO2C !*** O2 ***
+       CASE DEFAULT
+          if (partit%mype==0) then
+             write(*,*) 'check specified in boundary conditions'
+             write(*,*) 'the model will stop!'
+          end if
+          call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+          stop
+    END SELECT
 
-   do n=1, myDim_nod2D
+    do n=1, myDim_nod2D
 
         nl1=nlevels_nod2D(n)-1
         ul1=ulevels_nod2D(n)
@@ -290,9 +291,9 @@ subroutine ver_sinking_recom(tr_num, tracers, partit, mesh)
     use g_clock
     use o_PARAM
     use g_config
-    use o_param           ! num_tracers
+    use o_param
     use o_arrays
-    use g_forcing_arrays  ! press_air
+    use g_forcing_arrays
     use g_comm_auto
     implicit none
 
@@ -308,8 +309,8 @@ subroutine ver_sinking_recom(tr_num, tracers, partit, mesh)
     real(kind=8)                           :: Rjp,Rj,Rjm
 
     real(kind=8)                           :: cfl, d0, d1, thetaP, thetaM, psiP, psiM
-    real(kind=8)                           :: onesixth	= 	1.d0/6.d0
-    real(kind=8)                           :: dt_sink, c1, c2     ! BALL added dt_sink
+    real(kind=8)                           :: onesixth	= 1.d0/6.d0
+    real(kind=8)                           :: dt_sink, c1, c2
     real(kind=8)                           :: Vsink, tv
     real(kind=8),dimension(mesh%nl)        :: Wvel_flux
 
@@ -342,7 +343,6 @@ subroutine ver_sinking_recom(tr_num, tracers, partit, mesh)
 
     elseif(tracers%data(tr_num)%ID ==1004 .or. &  !iphyn
         tracers%data(tr_num)%ID ==1005 .or.    &  !iphyc
-        !tracers%data(tr_num)%ID==1020 .or.    &  !iphycal
         tracers%data(tr_num)%ID==1006 ) then     !ipchl
 
             Vsink = VPhy
@@ -355,9 +355,9 @@ subroutine ver_sinking_recom(tr_num, tracers, partit, mesh)
             Vsink = VDia
 
 #if defined (__coccos)
-    elseif(tracers%data(tr_num)%ID == 1029 .or. &  !icocn             ! NEW
-        tracers%data(tr_num)%ID == 1030 .or.    &  !icocc             ! NEW
-        tracers%data(tr_num)%ID == 1031 ) then     !icchl             ! NEW
+    elseif(tracers%data(tr_num)%ID == 1029 .or. &  !icocn
+        tracers%data(tr_num)%ID == 1030 .or.    &  !icocc
+        tracers%data(tr_num)%ID == 1031 ) then     !icchl
 
             Vsink = VCocco
 #endif
@@ -372,23 +372,24 @@ subroutine ver_sinking_recom(tr_num, tracers, partit, mesh)
             
 #if defined (__3Zoo2Det)
     elseif(tracers%data(tr_num)%ID==1025 .or. &  !idetz2n
-         tracers%data(tr_num)%ID==1026 .or. &  !idetz2c
-         tracers%data(tr_num)%ID==1027 .or. &  !idetz2si
-         tracers%data(tr_num)%ID==1028 ) then  !idetz2calc 
+           tracers%data(tr_num)%ID==1026 .or. &  !idetz2c
+           tracers%data(tr_num)%ID==1027 .or. &  !idetz2si
+           tracers%data(tr_num)%ID==1028 ) then  !idetz2calc 
             
             Vsink = VDet_zoo2
 #endif
     end if
 
-if (Vsink .gt. 0.1) then ! No sinking if Vsink < 0.1 m/day
+!! ---- No sinking if Vsink < 0.1 m/day
+if (Vsink .gt. 0.1) then 
 
    do n = 1,myDim_nod2D
       if (ulevels_nod2D(n)>1) cycle
       nzmin = ulevels_nod2D(n)
       nzmax = nlevels_nod2D(n)-1
 
-      ! distance between tracer points, surface and bottom dz_trr is half
-      ! the layer thickness
+      !! distance between tracer points, surface and bottom dz_trr is half
+      !! the layer thickness
       dz_trr                = 0.0d0
       dz_trr(nzmin+1:nzmax) = abs(Z_3d_n(nzmin:nzmax-1,n)-Z_3d_n(nzmin+1:nzmax,n))
       dz_trr(nzmin)         = hnode(nzmin,n)/2.0d0
@@ -401,17 +402,41 @@ if (Vsink .gt. 0.1) then ! No sinking if Vsink < 0.1 m/day
          Wvel_flux(nz) = -Vsink/SecondsPerDay ! allow_var_sinking = .false.
 
          if (allow_var_sinking) then
-               Wvel_flux(nz) = -((Vdet_a * abs(zbar_3d_n(nz,n))/SecondsPerDay) + Vsink/SecondsPerDay)
+            Wvel_flux(nz) = -((Vdet_a * abs(zbar_3d_n(nz,n))/SecondsPerDay) + Vsink/SecondsPerDay)
+            if (use_ballasting) then
+                Wvel_flux(nz) = w_ref1 * scaling_density1_3D(nz,n) * scaling_visc_3D(nz,n)
+
+                if (depth_scaling1.gt.0.0) Wvel_flux(nz) = Wvel_flux(nz) + (depth_scaling1 * abs(zbar_3d_n(nz,n)))
+
+                if (abs(Wvel_flux(nz)) .gt. max_sinking_velocity) Wvel_flux(nz) = max_sinking_velocity
+
+                !! * sinking velocity [m d-1] surface --> bottom (negative)* 
+                Wvel_flux(nz) = -1.0d0 * Wvel_flux(nz)/SecondsPerDay ! now in [m s-1]
+            endif
          end if
 
 #if defined (__3Zoo2Det)
-            ! We assume constant sinking for second detritus
-            if(tracers%data(tr_num)%ID ==1025 .or. &  !idetz2n
-               tracers%data(tr_num)%ID ==1026 .or. &  !idetz2c
-               tracers%data(tr_num)%ID ==1027 .or. &  !idetz2si
-               tracers%data(tr_num)%ID ==1028 ) then  !idetz2calc
-                  Wvel_flux(nz) = -VDet_zoo2/SecondsPerDay ! --> VDet_zoo2 ! NEW BALL changed -Vsink to -VDet_zoo2
-            endif ! second detritus tracers
+
+         !! ---- We assume *constant* sinking for second detritus
+         if(tracers%data(tr_num)%ID ==1025 .or. &  !idetz2n
+            tracers%data(tr_num)%ID ==1026 .or. &  !idetz2c
+            tracers%data(tr_num)%ID ==1027 .or. &  !idetz2si
+            tracers%data(tr_num)%ID ==1028 ) then  !idetz2calc
+               Wvel_flux(nz) = -VDet_zoo2/SecondsPerDay
+
+               if (use_ballasting) then
+
+                  Wvel_flux(nz) = w_ref2*scaling_density2_3D(nz,n)*scaling_visc_3D(nz,n)
+
+                  if (depth_scaling2.gt.0.0) Wvel_flux(nz) = Wvel_flux(nz) + (depth_scaling2 * abs(zbar_3d_n(nz,n)))
+
+                  if (abs(Wvel_flux(nz)) .gt. max_sinking_velocity) Wvel_flux(nz) = max_sinking_velocity
+
+                  !! * sinking velocity [m d-1] surface --> bottom (negative) *
+                  Wvel_flux(nz) = -1.0d0 * Wvel_flux(nz)/SecondsPerDay ! now in [m s-1]
+               end if
+
+         endif
 #endif
       end do
 
@@ -486,4 +511,281 @@ end if ! simple upwind
 end if ! Vsink .gt. 0.1
 
 end subroutine ver_sinking_recom
+!-------------------------------------------------------------------------------
+! Subroutine calculate ballasting
+!-------------------------------------------------------------------------------
+subroutine ballast(tr_num, tracers, partit, mesh)
 
+    use MOD_MESH
+    use MOD_PARTIT
+    use MOD_PARSUP
+    use MOD_TRACER
+
+    use recom_config
+    use recom_glovar
+
+    USE o_PARAM
+    USE o_ARRAYS
+    USE g_CONFIG
+    use g_forcing_arrays
+    use g_comm_auto
+    use g_clock
+    use g_rotate_grid
+    use mvars
+    use mdepth2press
+    use gsw_mod_toolbox, only: gsw_sa_from_sp,gsw_ct_from_pt,gsw_rho
+
+    implicit none
+    integer       , intent(in)   , target :: tr_num
+    type(t_tracer), intent(inout), target :: tracers
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    integer                               :: row, k, nzmin, nzmax
+    real(kind=8)                          :: depth_pos(1)
+    real(kind=8)                          :: pres(1)
+    real(kind=8)                          :: sa(1)
+    real(kind=8)                          :: ct(1)
+    real(kind=8)                          :: rho_seawater(1)
+    real(kind=8)                          :: Lon_degree(1)
+    real(kind=8)                          :: Lat_degree(1)
+
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"
+
+  ! For ballasting, calculate scaling factors here and pass them to FESOM, where sinking velocities are calculated
+     ! -----
+     ! If ballasting is used, sinking velocities are a function of a) particle composition (=density),
+     ! b) sea water viscosity, c) depth (currently for small detritus only), and d) a constant reference sinking speed
+     ! -----
+
+     !___________________________________________________________________________
+     ! loop over local nodes
+     do row=1,myDim_nod2D
+         ! max. number of levels at node n
+        nzmin = ulevels_nod2D(row)
+        nzmax = nlevels_nod2D(row)
+         !! lon
+        Lon_degree(1)=geo_coord_nod2D(1,row)/rad !! convert from rad to degree
+         !! lat
+        Lat_degree(1)=geo_coord_nod2D(2,row)/rad !! convert from rad to degree
+
+        ! get scaling vectors -> these need to be passed to FESOM to get sinking velocities
+        ! get local seawater density
+        do k=nzmin, nzmax
+
+           !! level depth
+           depth_pos(1) = abs(Z_3d_n(k,row))  ! take depth of tracers instead of levels abs(zbar_3d_n(k,row))
+
+           call depth2press(depth_pos(1), Lat_degree(1), pres, 1)  ! pres is output of function,1=number of records
+           sa           = gsw_sa_from_sp(tracers%data(2)%values(k,row), pres, Lon_degree(1), Lat_degree(1))
+           ct           = gsw_ct_from_pt(sa,tracers%data(1)%values(k,row))
+           rho_seawater = gsw_rho(sa, ct, pres)
+
+           ! (i.e. no density scaling)
+           scaling_density1_3D(k,row)=1.0
+           scaling_density2_3D(k,row)=1.0
+
+              if (use_density_scaling) then
+                 if (tracers%data(tr_num)%ID ==1008)then !idetc
+                    if (tracers%data(tr_num)%values(k,row)>0.001) then ! only apply ballasting above a certain biomass (OG Todo: remove) 
+                       scaling_density1_3D(k,row) = (rho_particle1(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
+                    endif
+                 endif
+#if defined (__3Zoo2Det)
+
+                    if (tracers%data(tr_num)%ID ==1026)then ! idetz2c
+                       if (tracers%data(tr_num)%values(k,row)>0.001) then ! only apply ballasting above a certain biomass (OG Todo: remove) 
+                          scaling_density2_3D(k,row) = (rho_particle2(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
+                       endif
+                    endif
+#endif
+              endif
+
+            scaling_visc_3D(k,row)=1.0
+
+            if (use_viscosity_scaling) then
+                if (seawater_visc_3D(k,row)==0) then
+                    scaling_visc_3D(k,row)=1.0
+                else
+                    scaling_visc_3D(k,row)= visc_ref_water/seawater_visc_3D(k,row)
+                endif
+            endif
+
+        end do
+        rho_particle1(nzmax+1,row) = rho_particle1(nzmax,row)
+        rho_particle2(nzmax+1,row) = rho_particle2(nzmax,row)
+        scaling_visc_3D(nzmax+1,row) = scaling_visc_3D(nzmax,row)
+     end do
+    ! in the unlikely (if possible at all...) case that rho_particle(k)-rho_seawater(1)<0, prevent the scaling factor from being negative
+
+    if (any(scaling_density1_3D(:,:) <= tiny)) scaling_density1_3D(:,:) = 1.0_WP      ! tiny = 2.23D-16
+#if defined (__3Zoo2Det)
+    if (any(scaling_density2_3D(:,:) <= tiny)) scaling_density2_3D(:,:) = 1.0_WP      ! tiny = 2.23D-16
+#endif
+end subroutine ballast
+!-------------------------------------------------------------------------------
+! Subroutine calculate density of particle
+! depending on composition (detC, detOpal, detCaCO3) based on Cram et al. (2018)
+!-------------------------------------------------------------------------------
+subroutine get_particle_density(tracers, partit, mesh)
+
+    use MOD_MESH
+    use MOD_PARTIT
+    use MOD_PARSUP
+    use MOD_TRACER
+
+    use recom_config
+    use recom_glovar
+    USE o_PARAM
+    USE o_ARRAYS
+    USE g_CONFIG
+    use g_forcing_arrays
+    use g_comm_auto
+    use g_clock
+    use g_rotate_grid
+
+    implicit none
+    type(t_tracer), intent(inout), target :: tracers
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+
+    integer                               :: row, k, nzmin, nzmax, tr_num, num_tracers
+
+    real(kind=8)                          :: a1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D) ! [n.d.] fraction of carbon in detritus class
+    real(kind=8)                          :: a2(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D) ! [n.d.] fraction of nitrogen in detritus class
+    real(kind=8)                          :: a3(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D) ! [n.d.] fraction of Opal in detritus class
+    real(kind=8)                          :: a4(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D) ! [n.d.] fraction of CaCO3 in detritus class
+    real(kind=8)                          :: b1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=8)                          :: b2(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=8)                          :: b3(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=8)                          :: b4(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=8)                          :: aux(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"
+
+    num_tracers=tracers%num_tracers
+
+    rho_particle1 = 0.0
+    b1 = 0.0
+    b2 = 0.0
+    b3 = 0.0
+    b4 = 0.0
+    aux = 0.0
+
+    do tr_num=1,num_tracers
+        if (tracers%data(tr_num)%ID==1008)  b1 = max(tiny,tracers%data(tr_num)%values(:,:)) !idetc      ! [mmol m-3] detritus carbon
+        if (tracers%data(tr_num)%ID==1007)  b2 = max(tiny,tracers%data(tr_num)%values(:,:)) !idetn      ! [mmol m-3] detritus nitrogen
+        if (tracers%data(tr_num)%ID==1017)  b3 = max(tiny,tracers%data(tr_num)%values(:,:)) !idetsi     ! [mmol m-3] detritus Si
+        if (tracers%data(tr_num)%ID==1021)  b4 = max(tiny,tracers%data(tr_num)%values(:,:)) !idetcal    ! [mmol m-3] detritus CaCO3
+    end do
+
+    do row=1,myDim_nod2d
+        nzmin = ulevels_nod2D(row)
+        nzmax = nlevels_nod2D(row)
+        aux(nzmin:nzmax,row) = b1(nzmin:nzmax,row)+b2(nzmin:nzmax,row)+b3(nzmin:nzmax,row)+b4(nzmin:nzmax,row)
+        a1(nzmin:nzmax,row)  = b1(nzmin:nzmax,row)/aux(nzmin:nzmax,row)
+        a2(nzmin:nzmax,row)  = b2(nzmin:nzmax,row)/aux(nzmin:nzmax,row)
+        a3(nzmin:nzmax,row)  = b3(nzmin:nzmax,row)/aux(nzmin:nzmax,row)
+        a4(nzmin:nzmax,row)  = b4(nzmin:nzmax,row)/aux(nzmin:nzmax,row)
+        rho_particle1(nzmin:nzmax,row) = rho_CaCO3*a4(nzmin:nzmax,row) + rho_opal*a3(nzmin:nzmax,row) + rho_POC*a1(nzmin:nzmax,row) + rho_PON*a2(nzmin:nzmax,row)
+    end do
+
+#if defined (__3Zoo2Det)
+    rho_particle2 = 0.0
+    b1 = 0.0
+    b2 = 0.0
+    b3 = 0.0
+    b4 = 0.0
+    aux = 0.0
+    do tr_num=1,num_tracers
+        if (tracers%data(tr_num)%ID==1026)  b1 = max(tiny,tracers%data(tr_num)%values(:,:)) !idetz2c
+        if (tracers%data(tr_num)%ID==1025)  b2 = max(tiny,tracers%data(tr_num)%values(:,:)) !idetz2n
+        if (tracers%data(tr_num)%ID==1027)  b3 = max(tiny,tracers%data(tr_num)%values(:,:)) !idetz2si
+        if (tracers%data(tr_num)%ID==1028)  b4 = max(tiny,tracers%data(tr_num)%values(:,:)) !idetz2calc
+    end do
+
+    do row=1,myDim_nod2d+eDim_nod2D   ! myDim is sufficient
+        !if (ulevels_nod2D(row)>1) cycle
+        nzmin = ulevels_nod2D(row)
+        nzmax = nlevels_nod2D(row)
+        aux(nzmin:nzmax,row) = b1(nzmin:nzmax,row)+b2(nzmin:nzmax,row)+b3(nzmin:nzmax,row)+b4(nzmin:nzmax,row)
+        a1(nzmin:nzmax,row)  = b1(nzmin:nzmax,row)/aux(nzmin:nzmax,row)
+        a2(nzmin:nzmax,row)  = b2(nzmin:nzmax,row)/aux(nzmin:nzmax,row)
+        a3(nzmin:nzmax,row)  = b3(nzmin:nzmax,row)/aux(nzmin:nzmax,row)
+        a4(nzmin:nzmax,row)  = b4(nzmin:nzmax,row)/aux(nzmin:nzmax,row)
+        rho_particle2(nzmin:nzmax,row) = rho_CaCO3*a4(nzmin:nzmax,row) + rho_opal*a3(nzmin:nzmax,row) + rho_POC*a1(nzmin:nzmax,row) + rho_PON*a2(nzmin:nzmax,row)
+    end do
+#endif
+
+end subroutine get_particle_density
+!-------------------------------------------------------------------------------
+! Subroutine to approximate seawater viscosity with current temperature
+! based on Cram et al. (2018)
+!-------------------------------------------------------------------------------
+
+! neglecting salinity effects, which are much smaller than those of temperature
+! https://bitbucket.org/ohnoplus/ballasted-sinking/src/master/tools/waterviscosity.m
+
+subroutine get_seawater_viscosity(tr_num, tracers, partit, mesh)
+
+    use MOD_MESH
+    use MOD_PARTIT
+    use MOD_PARSUP
+    use MOD_TRACER
+
+    use recom_config
+    use recom_glovar
+    USE o_PARAM
+    USE o_ARRAYS
+    USE g_CONFIG
+    use g_forcing_arrays
+    use g_comm_auto
+    use g_clock
+    use g_rotate_grid
+
+    implicit none
+
+!!  temp [degrees C] Ocean temperature
+!!  salt [g/kg or n.d.] Ocean salinity
+!!  seawater_visc_3D [kg m-1 s-1] Ocean viscosity
+
+    real(kind=8),dimension(1)             :: A, B, mu_w
+    integer                               :: row, k, nzmin, nzmax
+
+    integer       , intent(in)   , target :: tr_num
+    type(t_tracer), intent(inout), target :: tracers
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"
+
+    seawater_visc_3D(:,:) = 0.0
+    do row=1,myDim_nod2d
+     !if (ulevels_nod2D(row)>1) cycle
+! OG Do we need any limitation here?
+! i.e., if (seawater_visc_3D(row)<=0.0_WP) cycle
+        nzmin = ulevels_nod2D(row)
+        nzmax = nlevels_nod2D(row)
+
+        do k=nzmin, nzmax
+     ! Eq from Sharaway 2010
+     ! validity:
+     !  0<temp<180 degC
+     !  0<salt<0.15 kg/kg
+     ! Note: because salinity is expected to be in kg/kg, use conversion factor 0.001 below!
+            A(1) = 1.541 + 1.998*0.01*tracers%data(1)%values(k,row) - 9.52*1e-5*tracers%data(1)%values(k,row)*tracers%data(1)%values(k,row)
+            B(1) = 7.974 - 7.561*0.01*tracers%data(1)%values(k,row) + 4.724*1e-4*tracers%data(1)%values(k,row)*tracers%data(1)%values(k,row)
+            mu_w(1) = 4.2844*1.0e-5 + (1.0/(0.157*(tracers%data(1)%values(k,row)+64.993)*(tracers%data(1)%values(k,row)+64.993)-91.296))
+            seawater_visc_3D(k,row) = mu_w(1) * (1.0 + A(1)*tracers%data(2)%values(k,row)*0.001 + B(1)*tracers%data(2)%values(k,row)*0.001*tracers%data(2)%values(k,row)*0.001)
+        enddo
+    end do
+
+end subroutine get_seawater_viscosity

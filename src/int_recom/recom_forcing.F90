@@ -2,6 +2,14 @@
 ! REcoM_Forcing
 !===============================================================================
 subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sali_depth &
+            , CO2_watercolumn                                          &
+            , pH_watercolumn                                           &
+            , pCO2_watercolumn                                         &
+            , HCO3_watercolumn                                         &
+            , CO3_watercolumn                                          &
+            , OmegaC_watercolumn                                       &
+            , kspc_watercolumn                                         &
+            , rhoSW_watercolumn                                        &
             , PAR, ice, dynamics, tracers, partit, mesh)
 
     use recom_declarations
@@ -41,7 +49,17 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
     real(kind=8)                              :: SurfSW        ! [W/m2] ShortWave radiation at surface
     real(kind=8)                              :: Loc_slp       ! [Pa] sea-level pressure
     real(kind=8),dimension(mesh%nl-1)         :: Temp          ! [degrees C] Ocean temperature
-    real(kind=8),dimension(mesh%nl-1)         :: Sali_depth    ! NEW MOCSY Salinity for the whole water column
+    real(kind=8),dimension(mesh%nl-1)         :: Sali_depth    ! Salinity for the whole water column
+
+    !!---- Watercolumn carbonate chemistry
+    real(kind=8),dimension(mesh%nl-1)         :: CO2_watercolumn
+    real(kind=8),dimension(mesh%nl-1)         :: pH_watercolumn
+    real(kind=8),dimension(mesh%nl-1)         :: pCO2_watercolumn
+    real(kind=8),dimension(mesh%nl-1)         :: HCO3_watercolumn
+    real(kind=8),dimension(mesh%nl-1)         :: CO3_watercolumn
+    real(kind=8),dimension(mesh%nl-1)         :: OmegaC_watercolumn
+    real(kind=8),dimension(mesh%nl-1)         :: kspc_watercolumn
+    real(kind=8),dimension(mesh%nl-1)         :: rhoSW_watercolumn
 
     real(kind=8),dimension(mesh%nl-1)         :: PAR
 
@@ -100,7 +118,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
     call Cobeta(partit, mesh)      
     call Depth_calculations(n, Nn,SinkVel,zF,thick,recipthick, partit, mesh)
 
-    !! ----- mocsy -------! 
+    !! *** Mocsy ***
 
     !!---- convert from mmol/m3 to mol/m3
     REcoM_DIC  = max(tiny*1e-3, state(one,idic)*1e-3)
@@ -138,7 +156,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
 
     call pistonvel(ULoc, Loc_ice_conc, Nmocsy, kw660)
 
-    !! ----- check -------! 
+    !! *** check ***
 
     if((REcoM_DIC(1) > 10000.d0)) then               ! NEW: added this entire print statement (if to endif)
         print*, 'NEW ERROR: DIC !'  
@@ -220,7 +238,15 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
 !  call REcoM_sms(n, Nn, state, thick, recipthick, SurfSW, sms, Temp ,zF, PAR, mesh)
 
   call REcoM_sms(n, Nn, state, thick, recipthick, SurfSW, sms, Temp, Sali_depth &
-        , Loc_slp & !, SinkVel
+        , CO2_watercolumn                                              & ! MOCSY [mol/m3]
+        , pH_watercolumn                                               & ! MOCSY on total scale
+        , pCO2_watercolumn                                             & ! MOCSY [uatm]
+        , HCO3_watercolumn                                             & ! MOCSY [mol/m3]
+        , CO3_watercolumn                                              & ! DISS [mol/m3]
+        , OmegaC_watercolumn                                           & ! DISS calcite saturation state
+        , kspc_watercolumn                                             & ! DISS stoichiometric solubility product [mol^2/kg^2]
+        , rhoSW_watercolumn                                            & ! DISS in-situ density of seawater [kg/m3]
+        , Loc_slp                                                      &
         , zF, PAR, Lond, Latd, ice, dynamics, tracers, partit, mesh)
 
   state(1:nn,:)      = max(tiny,state(1:nn,:) + sms(1:nn,:))

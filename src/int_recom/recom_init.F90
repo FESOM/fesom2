@@ -30,9 +30,6 @@ subroutine recom_init(tracers, partit, mesh)
     use REcoM_locVar
     use recom_config
     use REcoM_ciso
-    ! fesom modules
-!    use o_ARRAYS
-!    use o_MESH
     implicit none
 #include "netcdf.inc"
     !___________________________________________________________________________
@@ -73,6 +70,7 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(RiverDSi2D            ( node_size ))
     allocate(RiverDIC2D            ( node_size ))
     allocate(RiverAlk2D            ( node_size ))
+
     !! * Erosion nutrients as surface boundary condition *
     allocate(ErosionTON2D          ( node_size ))
     allocate(ErosionTOC2D          ( node_size ))
@@ -97,8 +95,6 @@ subroutine recom_init(tracers, partit, mesh)
 
     allocate(LocBenthos            ( benthos_num ))
     allocate(decayBenthos          ( benthos_num ))     ! [1/day] Decay rate of detritus in the benthic layer
-!    allocate(wFluxPhy              ( benthos_num ))     ! [mmol/(m2 * day)] Flux of N,C, calc and chl through sinking of phytoplankton
-!    allocate(wFluxDia              ( benthos_num ))     ! [mmol/(m2 * day)] Flux of N,C, Si and chl through sinking of diatoms 	
     allocate(PAR3D                 ( nl-1, node_size ))
 
     GloFeDust             = 0.d0
@@ -212,6 +208,43 @@ subroutine recom_init(tracers, partit, mesh)
     NPPd3D       = 0.d0
     NPPc3D       = 0.d0
     end if
+
+!! *** Allocate 3D mocsy ***
+    allocate(CO23D        ( nl-1, node_size ))
+    allocate(pH3D         ( nl-1, node_size ))
+    allocate(pCO23D       ( nl-1, node_size ))
+    allocate(HCO33D       ( nl-1, node_size ))
+    allocate(CO33D        ( nl-1, node_size ))
+    allocate(OmegaC3D     ( nl-1, node_size ))
+    allocate(kspc3D       ( nl-1, node_size ))
+    allocate(rhoSW3D      ( nl-1, node_size ))
+  
+    CO23D(:,:)          = 0.d0
+    pH3D(:,:)           = 0.d0
+    pCO23D(:,:)         = 0.d0
+    HCO33D(:,:)         = 0.d0
+    CO33D(:,:)          = 0.d0
+    OmegaC3D(:,:)       = 0.d0
+    kspc3D(:,:)         = 0.d0
+    rhoSW3D(:,:)        = 0.d0
+
+!! *** Allocate ballasting ***
+    allocate(rho_particle1       ( nl-1, node_size ))
+    allocate(rho_particle2       ( nl-1, node_size ))
+    allocate(scaling_density1_3D ( nl,   node_size ))
+    allocate(scaling_density2_3D ( nl,   node_size ))
+    allocate(scaling_visc_3D     ( nl,   node_size ))
+    allocate(seawater_visc_3D    ( nl-1, node_size ))
+    rho_particle1       = 0.d0
+    rho_particle2       = 0.d0
+    scaling_density1_3D = 0.d0
+    scaling_density2_3D = 0.d0
+    scaling_visc_3D     = 0.d0
+    seawater_visc_3D    = 0.d0
+
+    allocate(Sinkingvel1(nl,node_size), Sinkingvel2(nl,node_size))
+    Sinkingvel1(:,:)      = 0.d0
+    Sinkingvel2(:,:)      = 0.d0
 
     DO i=num_tracers-bgc_num+1, num_tracers
         id=tracers%data(i)%ID
@@ -337,7 +370,6 @@ subroutine recom_init(tracers, partit, mesh)
     END DO
 !------------------------------------------
 
-
     !< Mask hydrothermal vent in Eastern Equatorial Pacific GO
     do row=1, myDim_nod2D+eDim_nod2D
         !if (ulevels_nod2D(row)>1) cycle 
@@ -348,7 +380,7 @@ subroutine recom_init(tracers, partit, mesh)
             if (((geo_coord_nod2D(2,row) > -12.5*rad) .and. (geo_coord_nod2D(2,row) < 9.5*rad))&
                 .and.((geo_coord_nod2D(1,row)> -106.0*rad) .and. (geo_coord_nod2D(1,row) < -72.0*rad))) then
                 if (abs(Z_3d_n(k,row))<2000.0_WP) cycle
-                tracers%data(21)%values(k,row) = min(0.6, tracers%data(21)%values(k,row))
+                tracers%data(21)%values(k,row) = min(0.3, tracers%data(21)%values(k,row)) ! OG todo: try 0.6 
             end if
         end do
     end do

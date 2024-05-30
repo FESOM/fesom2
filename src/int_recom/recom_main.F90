@@ -74,6 +74,18 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     real(kind=8),  allocatable :: Temp(:), Sali_depth(:), zr(:), PAR(:)
     real(kind=8),  allocatable :: C(:,:)
 
+    !! * Mocsy *
+    real(kind=8),  allocatable :: CO2_watercolumn(:)
+    real(kind=8),  allocatable :: pH_watercolumn(:)
+    real(kind=8),  allocatable :: pCO2_watercolumn(:)
+    real(kind=8),  allocatable :: HCO3_watercolumn(:)
+
+    !! * Diss *
+    real(kind=8),  allocatable :: CO3_watercolumn(:)
+    real(kind=8),  allocatable :: OmegaC_watercolumn(:)
+    real(kind=8),  allocatable :: kspc_watercolumn(:)
+    real(kind=8),  allocatable :: rhoSW_watercolumn(:)
+
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
 #include "../associate_part_ass.h"
@@ -81,6 +93,8 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 
     allocate(Temp(nl-1), Sali_depth(nl-1), zr(nl-1) , PAR(nl-1))
     allocate(C(nl-1, bgc_num))
+    allocate(CO2_watercolumn(nl-1), pH_watercolumn(nl-1), pCO2_watercolumn(nl-1) , HCO3_watercolumn(nl-1))
+    allocate(CO3_watercolumn(nl-1), OmegaC_watercolumn(nl-1), kspc_watercolumn(nl-1) , rhoSW_watercolumn(nl-1))
 
     !< ice concentration [0 to 1]
 
@@ -145,6 +159,20 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
         Sali                = tracers%data(2)%values(1, n)
         Sali_depth(1:nzmax) = tracers%data(2)%values(1:nzmax, n)
 
+
+        !!---- CO2 in the watercolumn
+
+        !! * Mocsy *
+        CO2_watercolumn(1:nzmax)    = CO23D(1:nzmax, n)
+        pH_watercolumn(1:nzmax)     = pH3D(1:nzmax, n)
+        pCO2_watercolumn(1:nzmax)   = pCO23D(1:nzmax, n)
+        HCO3_watercolumn(1:nzmax)   = HCO33D(1:nzmax, n)
+        !! * Diss *
+        CO3_watercolumn(1:nzmax)    = CO33D(1:nzmax, n)
+        OmegaC_watercolumn(1:nzmax) = OmegaC3D(1:nzmax, n)
+        kspc_watercolumn(1:nzmax)   = kspc3D(1:nzmax, n)
+        rhoSW_watercolumn(1:nzmax)  = rhoSW3D(1:nzmax, n)
+
         !!---- Biogeochemical tracers
         do tr_num = num_tracers-bgc_num+1, num_tracers
             C(1:nzmax, tr_num-2) = tracers%data(tr_num)%values(1:nzmax, n)
@@ -162,8 +190,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 
         if (Diags) then
 
-        !!---- Allocate 3D diagnostics
-
+        !! * Allocate 3D diagnostics *
             allocate(vertrespmeso(nl-1), vertrespmacro(nl-1), vertrespmicro(nl-1))
             vertrespmeso  = 0.d0
             vertrespmacro = 0.d0
@@ -188,7 +215,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             vertrespd = 0.d0
             vertrespc = 0.d0
 
-            !!---- Allocate 2D diagnostics
+            !! * Allocate 2D diagnostics *
             allocate(vertNPPn(nl-1), vertGPPn(nl-1), vertNNAn(nl-1), vertChldegn(nl-1)) 
             vertNPPn = 0.d0
             vertGPPn = 0.d0
@@ -213,6 +240,14 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 ! ======================================================================================
 !******************************** RECOM FORCING ****************************************
         call REcoM_Forcing(zr, n, nzmax, C, SW, Loc_slp , Temp, Sali, Sali_depth &
+           , CO2_watercolumn                                     & ! NEW MOCSY CO2 for the whole watercolumn
+           , pH_watercolumn                                      & ! NEW MOCSY pH for the whole watercolumn
+           , pCO2_watercolumn                                    & ! NEW MOCSY pCO2 for the whole watercolumn
+           , HCO3_watercolumn                                    & ! NEW MOCSY HCO3 for the whole watercolumn
+           , CO3_watercolumn                                     & ! NEW DISS CO3 for the whole watercolumn
+           , OmegaC_watercolumn                                  & ! NEW DISS OmegaC for the whole watercolumn
+           , kspc_watercolumn                                    & ! NEW DISS stoichiometric solubility product for calcite [mol^2/kg^2]
+           , rhoSW_watercolumn                                   & ! NEW DISS in-situ density of seawater [mol/m^3]
                            , PAR, ice, dynamics, tracers, partit, mesh)
 
         do tr_num = num_tracers-bgc_num+1, num_tracers !bgc_num+2
@@ -222,10 +257,10 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
         !!---- Local variables that have been changed during the time-step are stored so they can be saved
         Benthos(n,1:benthos_num) = LocBenthos(1:benthos_num)
         GlodecayBenthos(n, 1:benthos_num) = decayBenthos(1:benthos_num)/SecondsPerDay ! convert from [mmol/m2/d] to [mmol/m2/s]
-        GloHplus(n)              = ph(1) !hplus
 
         if (Diags) then
-            !!---- Updating 2D diagnostics
+
+            !! * Update 2D diagnostics *
             NPPn(n) = locNPPn
             NPPd(n) = locNPPd
             NPPc(n) = locNPPc
@@ -239,7 +274,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             Chldegd(n) = locChldegd
             Chldegc(n) = locChldegc
 
-            !!---- Updating 3D diagnostics
+            !! * Update 3D diagnostics *
             respmeso     (1:nzmax,n) = vertrespmeso     (1:nzmax)
             respmacro    (1:nzmax,n) = vertrespmacro    (1:nzmax)
             respmicro    (1:nzmax,n) = vertrespmicro    (1:nzmax)
@@ -258,20 +293,24 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             NPPd3D       (1:nzmax,n) = vertNPPd         (1:nzmax)
             NPPc3D       (1:nzmax,n) = vertNPPc         (1:nzmax)
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
-            !!---- Deallocating 2D diagnostics
+
+            !! * Deallocating 2D diagnostics *
             deallocate(vertNPPn, vertGPPn, vertNNAn, vertChldegn) 
             deallocate(vertNPPd, vertGPPd, vertNNAd, vertChldegd)
             deallocate(vertNPPc, vertGPPc, vertNNAc, vertChldegc) 
 
-            !!---- Deallocating 3D Diagnostics
+            !! * Deallocating 3D Diagnostics *
             deallocate(vertrespmeso,     vertrespmacro,  vertrespmicro                 )
             deallocate(vertcalcdiss,     vertcalcif                                    )
             deallocate(vertaggn,         vertaggd,       vertaggc                      )
             deallocate(vertdocexn,       vertdocexd,     vertdocexc                    )
             deallocate(vertrespn,        vertrespd,      vertrespc                     )
 
+        end if 
+
         AtmFeInput(n)            = FeDust
         AtmNInput(n)             = NDust
+        GloHplus(n)              = ph(1)
 
         GloPCO2surf(n)           = pco2surf(1)
         GlodPCO2surf(n)          = dpco2surf(1)
@@ -279,13 +318,26 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
         GloCO2flux_seaicemask(n) = co2flux_seaicemask(1)      !  [mmol/m2/s]
         GloO2flux_seaicemask(n)  = o2flux_seaicemask(1)       !  [mmol/m2/s]
         GloO2flux(n)             = oflux(1)                   !  [mmol/m2/d]
-        end if 
+
+        PAR3D(1:nzmax,n)         = PAR(1:nzmax)
+
+        !! * Mocsy *
+        CO23D(1:nzmax,n)         = CO2_watercolumn(1:nzmax)
+        pH3D(1:nzmax,n)          = pH_watercolumn(1:nzmax)
+        pCO23D(1:nzmax,n)        = pCO2_watercolumn(1:nzmax)
+        HCO33D(1:nzmax,n)        = HCO3_watercolumn(1:nzmax)
+
+        !! * Diss *
+        CO33D(1:nzmax,n)         = CO3_watercolumn(1:nzmax)
+        OmegaC3D(1:nzmax,n)      = OmegaC_watercolumn(1:nzmax)
+        kspc3D(1:nzmax,n)        = kspc_watercolumn(1:nzmax)
+        rhoSW3D(1:nzmax,n)       = rhoSW_watercolumn(1:nzmax)
     end do
 
 ! ======================================================================================
 !************************** EXCHANGE NODAL INFORMATION *********************************
 
-    do tr_num=num_tracers-bgc_num+1, num_tracers !bgc_num+2
+    do tr_num=num_tracers-bgc_num+1, num_tracers
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
     end do
 
@@ -314,7 +366,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
         call exchange_nod(Chldegc, partit)
     endif
 
-    do n=1, benthos_num  !4
+    do n=1, benthos_num
         call exchange_nod(GlodecayBenthos(:,n), partit)
     end do
 
@@ -322,6 +374,16 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
     call exchange_nod(AtmFeInput, partit)
     call exchange_nod(AtmNInput, partit)
 
+    call exchange_nod(PAR3D, partit)
+
+    call exchange_nod(CO23D, partit)
+    call exchange_nod(pH3D, partit)
+    call exchange_nod(pCO23D, partit)
+    call exchange_nod(HCO33D, partit)
+    call exchange_nod(CO33D, partit)
+    call exchange_nod(OmegaC3D, partit)
+    call exchange_nod(kspc3D, partit)
+    call exchange_nod(rhoSW3D, partit)
 end subroutine recom
 
 ! ======================================================================================
@@ -388,20 +450,11 @@ subroutine bio_fluxes(tracers, partit, mesh)
 
     !___________________________________________________________________________
     ! Balance alkalinity restoring to climatology
-!    if (.not. restore_alkalinity) return
     do n=1, myDim_nod2D+eDim_nod2D
-!     relax_alk(n)=surf_relax_Alk*(Alk_surf(n)-tr_arr(1,n,2+ialk)) ! 1 temp, 2 salt
 !        relax_alk(n)=surf_relax_Alk * (Alk_surf(n) - tracers%data(2+ialk)%values(1, n)) 
 !        relax_alk(n)=surf_relax_Alk * (Alk_surf(n) - alkalinity(ulevels_nod2d(n),n)
         relax_alk(n)=surf_relax_Alk * (Alk_surf(n) - alkalinity(1, n))
     end do
-
-!  if (mype==0) then
-!      write(*,*) 'Alk_surf  = ', Alk_surf
-!      write(*,*) 'tr_arr    = ', tracers%data(2+ialk)%values(1, :)
-!      write(*,*) 'relax_alk = ', relax_alk
-!  endif
-
 
   ! 2. virtual alkalinity flux
 !  if (use_virt_alk) then ! is already zero otherwise
@@ -411,20 +464,8 @@ subroutine bio_fluxes(tracers, partit, mesh)
 
 
   ! 3. restoring to Alkalinity climatology
-!  call integrate_nod(relax_alk, net, mesh)
     call integrate_nod(relax_alk, net, partit, mesh)
-!  if (mype==0) then
-!      write(*,*) 'ocean_area     = ', ocean_area
-!      write(*,*) 'net            = ', net
-!      write(*,*) 'net/ocean_area = ', net/ocean_area
-!  endif
 
     relax_alk=relax_alk-net/ocean_area  ! at ocean surface layer
-
-
-!  if (mype==0) then
-!     write(*,*) '____________________________________________________________'
-!     write(*,*) ' --> relax_alk,  = ', relax_alk
-!  endif
 
 end subroutine bio_fluxes

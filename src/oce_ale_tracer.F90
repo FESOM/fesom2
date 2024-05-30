@@ -370,6 +370,22 @@ end if
 ! but not for the combination ciso + 2. zoo!
 if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
 
+!< activate Ballasting
+!< .OG. 04.11.2022
+
+         if (use_ballasting) then
+!< get seawater viscosity, seawater_visc_3D
+              call get_seawater_viscosity(tr_num, tracers, partit, mesh) ! seawater_visc_3D
+
+!< get particle density of class 1 and 2 !rho_particle1 and rho_particle2
+              call get_particle_density(tracers, partit, mesh) ! rho_particle = density of particle class 1 and 2
+
+!< calculate scaling factors
+!< scaling_visc_3D
+!< scaling_density1_3D, scaling_density2_3D
+              call ballast(tr_num, tracers, partit, mesh)
+        end if
+
 ! sinking
         call ver_sinking_recom(tr_num, tracers, partit, mesh)  !--- vert_sink ---
 ! update tracer fields
