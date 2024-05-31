@@ -667,8 +667,7 @@ type(t_partit), intent(inout), target :: partit
     ! write(*,*) 'INFO, k:',k,'z_up:',coord_nod3D(3, n_up),'z_lo:',coord_nod3D(3, n_low),'depth:',depth_ib,'cavity:',(mesh%cavity_flag_n(elem2D_nodes(m,iceberg_elem))==1)
     !end if
 
-!if ((use_cavity) .AND. ( mesh%cavity_flag_n(elem2D_nodes(m,iceberg_elem))==1 .AND. abs(depth_ib)<abs(lev_up) )) then
-if ((use_cavity) .AND. (mesh%cavity_depth(elem2D_nodes(m,iceberg_elem))/=0.0)==1 .AND. abs(depth_ib)<abs(lev_up) ) then
+if (use_cavity .AND. mesh%cavity_depth(elem2D_nodes(m,iceberg_elem)) /= 0.0 .AND. abs(depth_ib) < abs(lev_up)) then
     ! LA: Never go here for k=1, because abs(depth_ib)>=0.0 for all icebergs
       
       uo_dz(m)=UV_ib(1,k-1,n2)*abs(depth_ib)
