@@ -664,12 +664,10 @@ type(t_partit), intent(inout), target :: partit
     !end if
     
     !if( (abs(coord_nod3D(3, n_low))>abs(depth_ib)) .AND. (abs(coord_nod3D(3, n_up))>abs(depth_ib)) ) then
-    ! write(*,*) 'INFO, k:',k,'z_up:',coord_nod3D(3, n_up),'z_lo:',coord_nod3D(3, n_low),'depth:',depth_ib,'cavity:',(cavity_flag_nod2d(elem2D_nodes(m,iceberg_elem))==1)
+    ! write(*,*) 'INFO, k:',k,'z_up:',coord_nod3D(3, n_up),'z_lo:',coord_nod3D(3, n_low),'depth:',depth_ib,'cavity:',(mesh%cavity_flag_n(elem2D_nodes(m,iceberg_elem))==1)
     !end if
 
-#ifdef use_cavity
-    ! if cavity node ..
-    if( cavity_flag_nod2d(elem2D_nodes(m,iceberg_elem))==1 .AND. abs(depth_ib)<abs(lev_up) ) then
+if (use_cavity .AND. mesh%cavity_depth(elem2D_nodes(m,iceberg_elem)) /= 0.0 .AND. abs(depth_ib) < abs(lev_up)) then
     ! LA: Never go here for k=1, because abs(depth_ib)>=0.0 for all icebergs
       
       uo_dz(m)=UV_ib(1,k-1,n2)*abs(depth_ib)
@@ -689,10 +687,8 @@ type(t_partit), intent(inout), target :: partit
     
     !****************************************************************
     ! LA 23.11.21 case if depth_ib<lev_up
-    else if( abs(lev_low)>=abs(depth_ib) ) then !.AND. (abs(lev_up)<=abs(depth_ib)) ) then
-#else
+else !# comp cav flag
     if( abs(lev_low)>=abs(depth_ib) ) then !.AND. (abs(lev_up)<=abs(depth_ib)) ) then
-#endif
       if( abs(lev_up)<abs(depth_ib) ) then
         dz = abs ( lev_up - depth_ib )
       else
@@ -795,7 +791,7 @@ type(t_partit), intent(inout), target :: partit
         S_keel(m)=Sclim_ib(k,n2)
       end if
     end if
-
+end if !cavity
    end do innerloop
 
    ! divide by depth over which was integrated
