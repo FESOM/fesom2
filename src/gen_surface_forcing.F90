@@ -747,7 +747,7 @@ CONTAINS
         ! if include_fleapyear==.False. and forcing file of year contains a fleap
         ! year, try to step over the 29.Feb so it is not used for temporal 
         ! interpolation
-        if ((include_fleapyear==.False.) .and.  &
+        if ((include_fleapyear .eqv. .False.) .and.  &
             ((trim(sbc_flfi(fld_idx)%calendar).eq.'julian'             ) .or. &
              (trim(sbc_flfi(fld_idx)%calendar).eq.'gregorian'          ) .or. &
              (trim(sbc_flfi(fld_idx)%calendar).eq.'proleptic_gregorian') .or. &
@@ -1242,7 +1242,7 @@ CONTAINS
         !_______________________________________________________________________
         ! special case if include_fleapyear==False but the calendar of the forcing 
         ! is julian or gregorian, so has the potential to contain a fleapyear value 
-        if ((include_fleapyear==.False.) .and.  &
+        if ((include_fleapyear .eqv. .False.) .and.  &
             ((trim(sbc_flfi(fld_idx)%calendar).eq.'julian'             ) .or. &
              (trim(sbc_flfi(fld_idx)%calendar).eq.'gregorian'          ) .or. &
              (trim(sbc_flfi(fld_idx)%calendar).eq.'proleptic_gregorian') .or. &
