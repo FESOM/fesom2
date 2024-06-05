@@ -453,7 +453,69 @@ CASE ('Chldegc  ')
 !    call def_stream(nod2D,  myDim_nod2D,   'GNAc','Gross N-assimilation coccolithophores','mmolN/(m2*d)', diags2D(:,12), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh) ! NEW
     call def_stream(nod2D,  myDim_nod2D,   'ChlDegc','Chlorophyll degradation coccolithophores','1/d', Chldegc, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh) ! NEW
     endif
+
+
+CASE ('grazmeso_tot')
+   call def_stream(nod2D,  myDim_nod2D,   'grazmeso_tot','Total grazing flux of mesozooplankton, dependent on grazing efficiency','mmolC/(m2*d)', grazmeso_tot, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
+CASE ('grazmeso_n')
+   call def_stream(nod2D,  myDim_nod2D,   'grazmeso_n','Grazing flux of mesozooplankton on small phytoplankton without grazing efficiency (i.e., = loss small phytoplankton)','mmolC/(m2*d)', grazmeso_n, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
+CASE ('grazmeso_d')
+   call def_stream(nod2D,  myDim_nod2D,   'grazmeso_d','Grazing flux of mesozooplankton on diatoms without grazing efficiency (i.e., = loss diatoms)','mmolC/(m2*d)', grazmeso_d, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
+CASE ('grazmeso_c')
+   call def_stream(nod2D,  myDim_nod2D,   'grazmeso_c','Grazing flux of mesozooplankton on coccolithophores without grazing efficiency (i.e., = loss coccolithophores)','mmolC/(m2*d)', grazmeso_c, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
+CASE ('grazmeso_det')
+   call def_stream(nod2D,  myDim_nod2D,   'grazmeso_det','Grazing flux of mesozooplankton on first detritus group without grazing efficiency (i.e., = loss first detritus group)','mmolC/(m2*d)', grazmeso_det, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
+CASE ('grazmeso_mic')
+   call def_stream(nod2D,  myDim_nod2D,   'grazmeso_mic','Grazing flux of mesozooplankton on microzooplankton without grazing efficiency (i.e., = loss microzooplankton)','mmolC/(m2*d)', grazmeso_mic, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
+CASE ('grazmeso_det2')
+   call def_stream(nod2D,  myDim_nod2D,   'grazmeso_det2','Grazing flux of mesozooplankton on first detritus group without grazing efficiency (i.e., = loss second detritus group)','mmolC/(m2*d)', grazmeso_det2, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
+
+CASE ('grazmacro_tot')
+   call def_stream(nod2D,  myDim_nod2D,   'grazmacro_tot','Total grazing flux of macrozooplankton, dependent on grazing efficiency','mmolC/(m2*d)', grazmacro_tot, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
+CASE ('grazmacro_n')
+   call def_stream(nod2D,  myDim_nod2D,   'grazmacro_n','Grazing flux of macrozooplankton on small phytoplankton without grazing efficiency (i.e., = loss small phytoplankton)','mmolC/(m2*d)', grazmacro_n, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
+CASE ('grazmacro_d')
+   call def_stream(nod2D,  myDim_nod2D,   'grazmacro_d','Grazing flux of macrozooplankton on diatoms without grazing efficiency (i.e., = loss diatoms)','mmolC/(m2*d)', grazmacro_d, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
+CASE ('grazmacro_c')
+   call def_stream(nod2D,  myDim_nod2D,   'grazmacro_c','Grazing flux of macrozooplankton on coccolithophores without grazing efficiency (i.e., = loss coccolithophores)','mmolC/(m2*d)', grazmacro_c, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
+CASE ('grazmacro_mes')
+   call def_stream(nod2D,  myDim_nod2D,   'grazmacro_mes','Grazing flux of mesozooplankton on macrozooplankton without grazing efficiency (i.e., = loss mesozooplankton)','mmolC/(m2*d)', grazmacro_mes, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
+CASE ('grazmacro_det')
+   call def_stream(nod2D,  myDim_nod2D,   'grazmacro_det','Grazing flux of macrozooplankton on first detritus group without grazing efficiency (i.e., = loss first detritus group)','mmolC/(m2*d)', grazmacro_det, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
+CASE ('grazmacro_mic')
+   call def_stream(nod2D,  myDim_nod2D,   'grazmacro_mic','Grazing flux of macrozooplankton on microzooplankton without grazing efficiency (i.e., = loss microzooplankton)','mmolC/(m2*d)', grazmacro_mic, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
+CASE ('grazmacro_det2')
+   call def_stream(nod2D,  myDim_nod2D,   'grazmacro_det2','Grazing flux of macrozooplankton on first detritus group without grazing efficiency (i.e., = loss second detritus group)','mmolC/(m2*d)', grazmacro_det2, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
+
+CASE ('grazmicro_tot')
+   call def_stream(nod2D,  myDim_nod2D,   'grazmicro_tot','Total grazing flux of microzooplankton, dependent on grazing efficiency','mmolC/(m2*d)', grazmicro_tot, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
+CASE ('grazmicro_n')
+   call def_stream(nod2D,  myDim_nod2D,   'grazmicro_n','Grazing flux of microzooplankton on small phytoplankton without grazing efficiency (i.e., = loss small phytoplankton)','mmolC/(m2*d)', grazmicro_n, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
+CASE ('grazmicro_d')
+   call def_stream(nod2D,  myDim_nod2D,   'grazmicro_d','Grazing flux of microzooplankton on diatoms without grazing efficiency (i.e., = loss diatoms)','mmolC/(m2*d)', grazmicro_d, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
+CASE ('grazmicro_c')
+   call def_stream(nod2D,  myDim_nod2D,   'grazmicro_c','Grazing flux of microzooplankton on coccolithophores without grazing efficiency (i.e., = loss coccolithophores)','mmolC/(m2*d)', grazmicro_c, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
 #endif
+   
 !___________________________________________________________________________________________________________________________________    
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>   3D streams   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 !___________________________________________________________________________________________________________________________________
@@ -513,22 +575,22 @@ CASE ('scaling_visc   ')
 
 
 
-CASE ('grazmeso_tot   ')
-   if (use_REcoM) then
-   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmeso_tot','Total grazing flux of mesozooplankton', 'mmolC/(m2*d)', grazmeso_tot(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-   endif
-CASE ('grazmeso_n     ')
-   if (use_REcoM) then
-   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmeso_n','Grazing of mesozooplankton on small phytoplankton', 'mmolC/(m2*d)', grazmeso_n(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-   endif
-CASE ('grazmeso_d     ')
-   if (use_REcoM) then
-   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmeso_d','Grazing of mesozooplankton on diatoms', 'mmolC/(m2*d)', grazmeso_d(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-   endif
-CASE ('grazmeso_c     ')
-   if (use_REcoM) then
-   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmeso_c','Grazing of mesozooplankton on coccolithophores', 'mmolC/(m2*d)', grazmeso_c(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-   endif
+!CASE ('grazmeso_tot   ')
+!   if (use_REcoM) then
+!   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmeso_tot','Total grazing flux of mesozooplankton', 'mmolC/(m2*d)', grazmeso_tot(:,:),    !      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+!   endif
+!CASE ('grazmeso_n     ')
+!   if (use_REcoM) then
+!   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmeso_n','Grazing of mesozooplankton on small phytoplankton', 'mmolC/(m2*d)', grazmeso_n(:!,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+!   endif
+!CASE ('grazmeso_d     ')
+!   if (use_REcoM) then
+!   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmeso_d','Grazing of mesozooplankton on diatoms', 'mmolC/(m2*d)', grazmeso_d(:,:),        !  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+!   endif
+!CASE ('grazmeso_c     ')
+!   if (use_REcoM) then
+!   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'grazmeso_c','Grazing of mesozooplankton on coccolithophores', 'mmolC/(m2*d)', grazmeso_c(:,:)!,          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+!   endif
 CASE ('respmeso       ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'respmeso','Respiration rate of mesozooplankton', 'mmolC/(m2*d)', respmeso(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
