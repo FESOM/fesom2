@@ -25,7 +25,10 @@ SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
     type(t_tracer), intent(inout), target :: tracers
     integer                               :: n,nz 
 
+#ifndef ENABLE_OPENACC
+#else
 !$ACC parallel loop collapse(2) default(present) !!!async(1)
+#endif
 do n=1, partit%myDim_nod2D+partit%eDim_nod2D
        do nz=1, mesh%nl-1
        ! del_ttf will contain all advection / diffusion contributions for this tracer. Set it to 0 at the beginning!
@@ -34,44 +37,80 @@ do n=1, partit%myDim_nod2D+partit%eDim_nod2D
        tracers%work%del_ttf_advvert  (nz, n) = 0.0_WP
        end do
 end do
+#ifndef ENABLE_OPENACC
+#else
 !$ACC end parallel loop
+#endif
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
+#else
+!$ACC parallel loop collapse(2)
+#endif
     do n=1, partit%myDim_nod2D+partit%eDim_nod2D
        ! AB interpolation
-       if (tracers%data(tr_num)%AB_order==2) then
-           tracers%data(tr_num)%valuesAB(:, n)  =-(0.5_WP+epsilon)*tracers%data(tr_num)%valuesold(1, :, n)+(1.5_WP+epsilon)*tracers%data(tr_num)%values(:, n)
-       elseif (tracers%data(tr_num)%AB_order==3) then
-           tracers%data(tr_num)%valuesAB(:, n)  =5.0_WP*tracers%data(tr_num)%valuesold(2, :, n)-16.0_WP*tracers%data(tr_num)%valuesold(1, :, n)+23.0_WP*tracers%data(tr_num)%values(:, n)
-           tracers%data(tr_num)%valuesAB(:, n)  =tracers%data(tr_num)%valuesAB(:, n)/12.0_WP
-       end if
+       do nz = 1, mesh%nl-1
+          if (tracers%data(tr_num)%AB_order==2) then
+             tracers%data(tr_num)%valuesAB(nz, n)  =-(0.5_WP+epsilon)*tracers%data(tr_num)%valuesold(1, nz, n)+(1.5_WP+epsilon)*tracers%data(tr_num)%values(nz, n)
+          elseif (tracers%data(tr_num)%AB_order==3) then
+             tracers%data(tr_num)%valuesAB(nz, n)  =5.0_WP*tracers%data(tr_num)%valuesold(2, nz, n)-16.0_WP*tracers%data(tr_num)%valuesold(1, nz, n)+23.0_WP*tracers%data(tr_num)%values(nz, n)
+             tracers%data(tr_num)%valuesAB(nz, n)  =tracers%data(tr_num)%valuesAB(nz, n)/12.0_WP
+          end if
+       end do
     end do
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+!$ACC end parallel loop
+#endif
 
     if (tracers%data(tr_num)%AB_order==2) then
+        
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
+#else
+!$ACC parallel loop collapse(2)
+#endif
        do n=1, partit%myDim_nod2d+partit%eDim_nod2D
-          tracers%data(tr_num)%valuesold(1, :, n)=tracers%data(tr_num)%values(:, n)
+         do nz = 1, mesh%nl-1
+           tracers%data(tr_num)%valuesold(1, nz, n)=tracers%data(tr_num)%values(nz, n)
+         end do
        end do
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+!$ACC end parallel loop
+#endif
+
     elseif (tracers%data(tr_num)%AB_order==3) then
+        
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
+#else
+!$ACC parallel loop collapse(2)
+#endif
        do n=1, partit%myDim_nod2d+partit%eDim_nod2D
-          tracers%data(tr_num)%valuesold(2, :, n)=tracers%data(tr_num)%valuesold(1, :, n)
-          tracers%data(tr_num)%valuesold(1, :, n)=tracers%data(tr_num)%values(:, n)
+          do nz = 1, mesh%nl-1
+            tracers%data(tr_num)%valuesold(2, nz, n)=tracers%data(tr_num)%valuesold(1, nz, n)
+            tracers%data(tr_num)%valuesold(1, nz, n)=tracers%data(tr_num)%values(nz, n)
+          end do
        end do
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+!$ACC end parallel loop
+#endif
     end if
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
     call tracer_gradient_elements(tracers%data(tr_num)%valuesAB, partit, mesh)
-    call exchange_elem_begin(tr_xy, partit)
+    call exchange_elem_begin(tr_xy, partit, luse_g2g = .true.)
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_z'//achar(27)//'[0m'
     call tracer_gradient_z(tracers%data(tr_num)%values, partit, mesh)    !WHY NOT AB HERE? DSIDOREN!
     call exchange_elem_end(partit)      ! tr_xy used in fill_up_dn_grad
 !$OMP BARRIER
 
-    call exchange_nod_begin(tr_z, partit) ! not used in fill_up_dn_grad 
+    call exchange_nod_begin(tr_z, partit, luse_g2g = .true.) ! not used in fill_up_dn_grad 
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call fill_up_dn_grad'//achar(27)//'[0m'
     call fill_up_dn_grad(tracers%work, partit, mesh)
@@ -79,7 +118,7 @@ end do
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
     call tracer_gradient_elements(tracers%data(tr_num)%values, partit, mesh) !redefine tr_arr to the current timestep
-    call exchange_elem(tr_xy, partit)
+    call exchange_elem(tr_xy, partit, luse_g2g = .true.)
 
 END SUBROUTINE init_tracers_AB
 !
@@ -105,7 +144,12 @@ SUBROUTINE tracer_gradient_elements(ttf, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax)
+#else
+!$ACC UPDATE DEVICE(gradient_sca)
+!$ACC parallel loop private(elnodes)
+#endif
     DO elem=1, myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
         nzmin = ulevels(elem)
@@ -116,7 +160,11 @@ SUBROUTINE tracer_gradient_elements(ttf, partit, mesh)
             tr_xy(2,nz, elem)=sum(gradient_sca(4:6,elem)*ttf(nz,elnodes))
         END DO
     END DO
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+!$ACC end parallel loop
+#endif
 END SUBROUTINE tracer_gradient_elements
 !
 !
@@ -141,7 +189,12 @@ SUBROUTINE tracer_gradient_z(ttf, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, dz)
+#else
+!$ACC UDPATE DEVICE(hnode_new)
+!$ACC parallel loop
+#endif
     DO n=1, myDim_nod2D+eDim_nod2D
     !!PS nlev=nlevels_nod2D(n)
     nzmax=nlevels_nod2D(n)
@@ -156,7 +209,11 @@ SUBROUTINE tracer_gradient_z(ttf, partit, mesh)
     tr_z(nzmin, n)=0.0_WP
     tr_z(nzmax, n)=0.0_WP
     END DO
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+!$ACC end parallel loop
+#endif
 END SUBROUTINE tracer_gradient_z
 !
 !
@@ -184,7 +241,12 @@ SUBROUTINE relax_to_clim(tr_num, tracers, partit, mesh)
     trarr=>tracers%data(tr_num)%values(:,:)
 
     if ((clim_relax>1.0e-8_WP).and.(tracers%data(tr_num)%ID==1)) then
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nzmin, nzmax)
+#else
+!$ACC UPDATE DEVICE(relax2clim, Tclim)
+!$ACC parallel loop
+#endif
         DO n=1, myDim_nod2D
             nzmin = ulevels_nod2D(n)    
             nzmax = nlevels_nod2D(n)    
@@ -193,17 +255,30 @@ SUBROUTINE relax_to_clim(tr_num, tracers, partit, mesh)
             trarr(nzmin:nzmax-1,n)=trarr(nzmin:nzmax-1,n)+&
                     relax2clim(n)*dt*(Tclim(nzmin:nzmax-1,n)-trarr(nzmin:nzmax-1,n))
         END DO
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+!$ACC end parallel loop
+#endif
     END if
     if ((clim_relax>1.0e-8_WP).and.(tracers%data(tr_num)%ID==2)) then
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nzmin, nzmax)
+#else
+!$ACC UPDATE DEVICE(relax2clim, Sclim)
+!$ACC parallel loop
+#endif
         DO n=1, myDim_nod2D
             nzmin = ulevels_nod2D(n)    
             nzmax = nlevels_nod2D(n)  
             trarr(nzmin:nzmax-1,n)=trarr(nzmin:nzmax-1,n)+&
                     relax2clim(n)*dt*(Sclim(nzmin:nzmax-1,n)-trarr(nzmin:nzmax-1,n))
         END DO
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+!$ACC end parallel loop
+#endif
     END IF 
 END SUBROUTINE relax_to_clim
 END MODULE o_tracers
