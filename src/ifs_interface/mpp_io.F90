@@ -7,7 +7,7 @@
 
 MODULE mpp_io
 #if defined(__MULTIO)        
-    USE iom, only : iom_initialize, iom_init_server, iom_finalize
+    USE iom, only : iom_enable_multio, iom_initialize, iom_init_server, iom_finalize
 #endif
     IMPLICIT NONE
     PRIVATE
@@ -20,7 +20,6 @@ MODULE mpp_io
     INTEGER :: ntask_multio  = 0
     INTEGER :: ntask_xios    = 0
     LOGICAL, PUBLIC :: lioserver, lmultioserver, lmultiproc
-    LOGICAL, PUBLIC :: lnomultio = .TRUE._1
     INTEGER :: ntask_notio
     INTEGER, SAVE :: mppallrank, mppallsize, mppiorank, mppiosize
     INTEGER, SAVE :: mppmultiorank, mppmultiosize
@@ -80,7 +79,7 @@ MODULE mpp_io
         CLOSE(10)
 
         IF (ntask_multio /= 0) THEN
-            lnomultio = .FALSE._1
+            CALL iom_enable_multio()
         ENDIF
 
         IF ( ntask_xios + ntask_multio == 0 ) THEN

@@ -126,13 +126,14 @@ if(USE_ICEPACK)
                               ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90)
    list(APPEND sources_Fortran ${sources_ice_pack})
 elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
+   if(ENABLE_MULTIO)
+      list(APPEND sources_Fortran ${src_home}/ifs_interface/iom.F90)
+   endif()
+
    list(APPEND sources_Fortran ${src_home}/ifs_interface/ifs_interface.F90
                                ${src_home}/ifs_interface/ifs_modules.F90
                                ${src_home}/ifs_interface/ifs_notused.F90
                                ${src_home}/ifs_interface/mpp_io.F90)
-endif()
-if(ENABLE_MULTIO)
-   list(APPEND sources_Fortran ${src_home}/ifs_interface/iom.F90)
 endif()
 
 file(GLOB sources_C ${src_home}/*.c)
