@@ -78,9 +78,11 @@ MODULE mpp_io
         WRITE(*,namio)
         CLOSE(10)
 
+#if defined(__MULTIO)
         IF (ntask_multio /= 0) THEN
             CALL iom_enable_multio()
         ENDIF
+#endif
 
         IF ( ntask_xios + ntask_multio == 0 ) THEN
             iicomm = mpi_comm_world
