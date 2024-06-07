@@ -41,20 +41,17 @@ end do
 #else
 !$ACC end parallel loop
 #endif
+
+       ! AB interpolation
+    if (tracers%data(tr_num)%AB_order==2) then
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
 !$ACC parallel loop collapse(2)
 #endif
     do n=1, partit%myDim_nod2D+partit%eDim_nod2D
-       ! AB interpolation
        do nz = 1, mesh%nl-1
-          if (tracers%data(tr_num)%AB_order==2) then
              tracers%data(tr_num)%valuesAB(nz, n)  =-(0.5_WP+epsilon)*tracers%data(tr_num)%valuesold(1, nz, n)+(1.5_WP+epsilon)*tracers%data(tr_num)%values(nz, n)
-          elseif (tracers%data(tr_num)%AB_order==3) then
-             tracers%data(tr_num)%valuesAB(nz, n)  =5.0_WP*tracers%data(tr_num)%valuesold(2, nz, n)-16.0_WP*tracers%data(tr_num)%valuesold(1, nz, n)+23.0_WP*tracers%data(tr_num)%values(nz, n)
-             tracers%data(tr_num)%valuesAB(nz, n)  =tracers%data(tr_num)%valuesAB(nz, n)/12.0_WP
-          end if
        end do
     end do
 #ifndef ENABLE_OPENACC
@@ -63,8 +60,27 @@ end do
 !$ACC end parallel loop
 #endif
 
-    if (tracers%data(tr_num)%AB_order==2) then
+       ! AB interpolation contd
+    elseif (tracers%data(tr_num)%AB_order==3) then
+#ifndef ENABLE_OPENACC
+!$OMP PARALLEL DO
+#else
+!$ACC parallel loop collapse(2)
+#endif
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
+       do nz = 1, mesh%nl-1
+          tracers%data(tr_num)%valuesAB(nz, n)  =5.0_WP*tracers%data(tr_num)%valuesold(2, nz, n)-16.0_WP*tracers%data(tr_num)%valuesold(1, nz, n)+23.0_WP*tracers%data(tr_num)%values(nz, n)
+          tracers%data(tr_num)%valuesAB(nz, n)  =tracers%data(tr_num)%valuesAB(nz, n)/12.0_WP
+       end do
+    end do
+end if
+#ifndef ENABLE_OPENACC
+!$OMP END PARALLEL DO
+#else
+!$ACC end parallel loop
+#endif
         
+    if (tracers%data(tr_num)%AB_order==2) then
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
@@ -82,7 +98,6 @@ end do
 #endif
 
     elseif (tracers%data(tr_num)%AB_order==3) then
-        
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
