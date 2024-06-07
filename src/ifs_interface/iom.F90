@@ -16,10 +16,13 @@ MODULE iom
     TYPE(multio_handle) :: mio_handle
     INTEGER(8), PRIVATE :: mio_parent_comm
 
+    PUBLIC iom_enable_multio
     PUBLIC iom_initialize, iom_init_server, iom_finalize
     PUBLIC iom_send_fesom_domains
     PUBLIC iom_field_request, iom_send_fesom_data
     PUBLIC iom_flush
+
+    LOGICAL :: lnomultio = .TRUE._1
 
     PRIVATE ctl_stop
     !!----------------------------------------------------------------------
@@ -45,6 +48,11 @@ MODULE iom
 
 CONTAINS
 
+    SUBROUTINE iom_enable_multio()
+        IMPLICIT NONE
+        lnomultio = .FALSE._1
+    END SUBROUTINE
+
     SUBROUTINE multio_custom_error_handler(context, err, info)
         USE mpi
 
@@ -65,7 +73,6 @@ CONTAINS
 
     SUBROUTINE iom_initialize(client_id, local_comm, return_comm, global_comm )
         USE mpi
-        USE mpp_io, ONLY: lnomultio
 
         IMPLICIT NONE
         CHARACTER(LEN=*), INTENT(IN)      :: client_id
@@ -152,8 +159,6 @@ CONTAINS
     END SUBROUTINE iom_initialize
 
     SUBROUTINE iom_finalize()
-        USE mpp_io, ONLY: lnomultio
-
         IMPLICIT NONE
         INTEGER :: err
 
@@ -171,8 +176,6 @@ CONTAINS
     END SUBROUTINE iom_finalize
 
     SUBROUTINE iom_init_server(server_comm)
-        USE mpp_io, ONLY: lnomultio
-
         IMPLICIT NONE
         INTEGER, INTENT(IN) :: server_comm
         type(multio_configuration)        :: conf_ctx
@@ -242,7 +245,6 @@ CONTAINS
     END SUBROUTINE iom_init_server
 
     SUBROUTINE iom_send_fesom_domains(partit, mesh)
-        USE mpp_io, ONLY: lnomultio
         USE MOD_MESH
         USE MOD_PARTIT
 
@@ -346,7 +348,6 @@ CONTAINS
     END SUBROUTINE iom_send_fesom_domains
 
     SUBROUTINE iom_send_fesom_data(data)
-        USE mpp_io, ONLY: lnomultio
         USE g_clock
         USE g_config, only: MeshId
         IMPLICIT NONE
@@ -441,8 +442,6 @@ CONTAINS
     END SUBROUTINE
 
     SUBROUTINE iom_flush(domain, step)
-        USE mpp_io, ONLY: lnomultio
-
         IMPLICIT NONE
 
         CHARACTER(6), INTENT(IN)                :: domain
