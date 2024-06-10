@@ -67,7 +67,12 @@ option(BUILD_FESOM_AS_LIBRARY "Build a library instead of an executable" OFF)
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
-if(${USE_ICEPACK})
+
+if(${RECOM_COUPLED})  # RECOM + ICEPACK NOT SUPPORTED
+   file(GLOB sources_Fortran ${src_home}/*.F90
+                             ${src_home}/int_recom/*.F90
+                             ${src_home}/int_recom/recom/*.F90)
+elseif(${USE_ICEPACK})
    file(GLOB sources_Fortran ${src_home}/*.F90
                              ${src_home}/icepack_drivers/*.F90
                              ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90)
@@ -170,6 +175,12 @@ endif()
 if(${OPENMP_REPRODUCIBLE})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __openmp_reproducible)
 endif()
+if(${RECOM_COUPLED})
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __3Zoo2Det __coccos)# __usetp)
+endif()
+if(${CISO_COUPLED})
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __ciso)
+endif()
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
    if(${BUILD_FESOM_AS_LIBRARY})
@@ -181,7 +192,7 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
    if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
       target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  albedo)
-      target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -O3 -ip -fPIC -qopt-malloc-options=2 -qopt-prefetch=5 -unroll-aggressive) #NEC mpi option
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -O3 -ip -fPIC -qopt-malloc-options=2 -qopt-prefetch=5 -unroll-aggressive) # -g -traceback -check) #NEC mpi option
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE -xHost)
    endif()
@@ -191,7 +202,12 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 #    target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
-   target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
+   if(${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu )
+      message(STATUS "Allowing type mismatches on Ubuntu for CI Testing" )  # NOTE(PG): Would be nicer to grab the CI=True from the env variable
+      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none -fallow-argument-mismatch)
+   else()
+      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
+   endif()
    if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
       target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
    endif()
