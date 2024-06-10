@@ -470,7 +470,7 @@ end subroutine potit_ib
 
 ! if the underlying FESOM is run without cavities, the following routines might be 
 ! missing, so put them here:
-#ifndef use_cavity
+!if (.not. use_cavity) then
 !
 !-------------------------------------------------------------------------------------
 !
@@ -572,7 +572,7 @@ end subroutine potit_ib
 !
 !----------------------------------------------------------------------------------------
 !
-#endif
+!endif
 
 
 ! LA from oce_dens_press for iceberg coupling
