@@ -2622,43 +2622,19 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     USE MOD_DYN
     use g_comm_auto
     use g_config, only: which_ale
-    use iso_c_binding, only: C_INT, C_DOUBLE
     use ssh_solve_preconditioner_interface
     use ssh_solve_cg_interface
     implicit none
-#include "fparms.h"
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
     !___________________________________________________________________________
     logical, save        :: lfirst=.true.
-    integer(kind=C_INT)  :: n3, reuse, new_values
     integer              :: n
     
-    !___________________________________________________________________________
-    ! interface for solver
-    interface
-        subroutine psolver_init(ident, SOL, PCGLOB, PCLOC, lutype, &
-                                fillin, droptol, maxiter, restart, soltol, &
-                                part, rowptr, colind, values, reuse, MPI_COMM) bind(C)
-            use iso_c_binding, only: C_INT, C_DOUBLE
-            integer(kind=C_INT) :: ident, SOL, PCGLOB, PCLOC, lutype, &
-                                    fillin,  maxiter, restart, &
-                                    part(*), rowptr(*), colind(*), reuse, MPI_COMM
-            real(kind=C_DOUBLE) :: droptol,  soltol, values(*)
-        end subroutine psolver_init
-    end interface
-    interface
-        subroutine psolve(ident, ssh_rhs, values, d_eta, newvalues) bind(C)
-            use iso_c_binding, only: C_INT, C_DOUBLE
-            integer(kind=C_INT) :: ident, newvalues
-            real(kind=C_DOUBLE) :: values(*), ssh_rhs(*), d_eta(*)
-        end subroutine psolve
-    end interface
-    !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=C_DOUBLE), pointer  :: droptol, soltol
-    integer(kind=C_INT), pointer  :: maxiter, restart, lutype, fillin, ident
+    real(kind=WP), pointer  :: droptol, soltol
+    integer, pointer  :: maxiter, restart, lutype, fillin, ident
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -2671,57 +2647,10 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     droptol => dynamics%solverinfo%droptol
     soltol  => dynamics%solverinfo%soltol
 
-    if (.not. dynamics%solverinfo%use_parms) then
-        if (lfirst) call ssh_solve_preconditioner(dynamics%solverinfo, partit, mesh)
-        call ssh_solve_cg(dynamics%d_eta, dynamics%ssh_rhs, dynamics%solverinfo, partit, mesh)
-        call exchange_nod(dynamics%d_eta, partit) !is this required after calling psolve ?
-        lfirst=.false.
-        return
-    end if
-
-    !___________________________________________________________________________
-    if  (trim(which_ale)=='linfs') then
-        reuse=0
-        new_values=0
-    else
-        reuse=1     ! For varying coefficients, set reuse=1
-        new_values=1 !PS 1 ! and new_values=1, as soon as the coefficients have changed
-    end if
-
-    ! reuse=0: matrix remains static
-    ! reuse=1: keeps a copy of the matrix structure to apply scaling of the matrix fast
-
-    ! new_values=0: matrix coefficients unchanged (compared to the last call of psolve) 
-    ! new_values=1: replaces the matrix values (keeps the structure and the preconditioner) 
-    ! new_values=2: replaces the matrix values and recomputes the preconditioner (keeps the structure)
-
-    ! new_values>0 requires reuse=1 in psolver_init!
-
-    !
-    !___________________________________________________________________________
-    if (lfirst) then
-    ! Set SOLCG for CG solver (symmetric, positiv definit matrices only, no precond available!!)
-    !     SOLBICGS for BiCGstab solver (arbitrary matrices)
-    !     SOLBICGS_RAS for BiCGstab solver (arbitrary matrices) with integrated RAS - the global 
-    !                  preconditioner setting is ignored! It saves a 4 vector copies per iteration
-    !                  compared to SOLBICGS + PCRAS.
-    !     SOLPBICGS for pipelined BiCGstab solver (arbitrary matrices)
-    !               Should scale better than SOLBICGS, but be careful, it is still experimental.
-    !     SOLPBICGS_RAS is SOLPBICGS with integrated RAS (global preconditioner setting is ignored!)
-    !                   for even better scalability, well, in the end, it does not matter much.     
-        call psolver_init(ident, SOLBICGS_RAS, PCRAS, PCILUK, lutype, &
-            fillin, droptol, maxiter, restart, soltol, &
-            part-1, ssh_stiff%rowptr(:)-ssh_stiff%rowptr(1), &
-            ssh_stiff%colind-1, ssh_stiff%values, reuse, MPI_COMM_FESOM)
-    lfirst=.false.
-    end if
-    !
-    !___________________________________________________________________________    
-    call psolve(ident, dynamics%ssh_rhs, ssh_stiff%values, dynamics%d_eta, new_values)
-
-    !
-    !___________________________________________________________________________
+    if (lfirst) call ssh_solve_preconditioner(dynamics%solverinfo, partit, mesh)
+    call ssh_solve_cg(dynamics%d_eta, dynamics%ssh_rhs, dynamics%solverinfo, partit, mesh)
     call exchange_nod(dynamics%d_eta, partit) !is this required after calling psolve ?
+    lfirst=.false.
 
 end subroutine solve_ssh_ale
 !
