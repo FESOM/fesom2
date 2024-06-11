@@ -304,7 +304,7 @@ contains
     class(netcdf_file_type), intent(in) :: this
     integer, intent(in) :: varindex
     integer, dimension(:) :: starts, sizes
-    real(8), intent(inout), target :: values(..) ! must be inout or the allocation might be screwed
+    real(8), intent(inout), target :: values(:) ! must be inout or the allocation might be screwed
     ! EO parameters
     include "netcdf.inc"
     real(8), pointer :: values_ptr(:)
@@ -324,7 +324,7 @@ contains
     class(netcdf_file_type), intent(in) :: this
     integer, intent(in) :: varindex
     integer, dimension(:) :: starts, sizes
-    real(4), intent(inout), target :: values(..) ! must be inout or the allocation might be screwed
+    real(4), intent(inout), target :: values(:) ! must be inout or the allocation might be screwed
     ! EO parameters
     include "netcdf.inc"
     real(4), pointer :: values_ptr(:)
@@ -344,7 +344,7 @@ contains
     class(netcdf_file_type), intent(in) :: this
     integer, intent(in) :: varindex
     integer, dimension(:) :: starts, sizes
-    integer, intent(inout), target :: values(..) ! must be inout or the allocation might be screwed
+    integer, intent(inout), target :: values(:) ! must be inout or the allocation might be screwed
     ! EO parameters
     include "netcdf.inc"
     integer, pointer :: values_ptr(:)
@@ -474,7 +474,7 @@ contains
     class(netcdf_file_type), intent(in) :: this
     integer, intent(in) :: varindex
     integer, dimension(:) :: starts, sizes
-    real(8), intent(in), target :: values(..) ! must be inout or the allocation might be screwed
+    real(8), intent(in), target :: values(:) ! must be inout or the allocation might be screwed
     ! EO parameters
     include "netcdf.inc"
     real(8), pointer :: values_ptr(:)
@@ -493,7 +493,7 @@ contains
     class(netcdf_file_type), intent(in) :: this
     integer, intent(in) :: varindex
     integer, dimension(:) :: starts, sizes
-    real(4), intent(in), target :: values(..) ! must be inout or the allocation might be screwed
+    real(4), intent(in), target :: values(:) ! must be inout or the allocation might be screwed
     ! EO parameters
     include "netcdf.inc"
     real(4), pointer :: values_ptr(:)
@@ -512,7 +512,7 @@ contains
     class(netcdf_file_type), intent(in) :: this
     integer, intent(in) :: varindex
     integer, dimension(:) :: starts, sizes
-    integer, intent(in), target :: values(..) ! must be inout or the allocation might be screwed
+    integer, intent(in), target :: values(:) ! must be inout or the allocation might be screwed
     ! EO parameters
     include "netcdf.inc"
     integer, pointer :: values_ptr(:)

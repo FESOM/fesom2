@@ -1,0 +1,45 @@
+#!/bin/bash --login
+#SBATCH -p dev-g
+#SBATCH -J fesom
+#SBATCH -o fesom.out
+#SBATCH -e fesom.err
+#SBATCH -N 2
+#SBATCH --gpus-per-node=8
+#SBATCH --ntasks-per-node=8
+#SBATCH --cpus-per-task=7
+#SBATCH --hint=nomultithread
+#SBATCH --exclusive
+#SBATCH --account=project_465000454
+#SBATCH --time=00:10:00
+#SBATCH --mem=0
+
+source ../env/lumi/shell
+
+ulimit -s 102400
+
+echo Submitted job: $jobid
+squeue -u $USER
+
+# determine JOBID
+JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
+
+ln -s ../bin/fesom.x .           # cp -n ../bin/fesom.x
+cp -n ../config/namelist.config  .
+cp -n ../config/namelist.forcing .
+cp ../config/namelist.oce     .
+cp ../config/namelist.ice     .
+cp ../config/namelist.icepack .
+cp ../config/namelist.tra .
+cp ../config/namelist.io .
+cp ../config/namelist.dyn .
+
+date
+srun -l fesom.x
+date
+
+# qstat -f $PBS_JOBID
+#export EXITSTATUS=$?
+#if [ ${EXITSTATUS} -eq 0 ] || [ ${EXITSTATUS} -eq 127 ] ; then
+#sbatch job_mistral
+#fi
+

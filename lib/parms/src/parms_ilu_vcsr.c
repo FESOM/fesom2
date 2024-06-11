@@ -1683,14 +1683,15 @@ int parms_ilu_update(parms_Mat self, parms_FactParam param, void *mat,
       if(ABS_VALUE(t1) < DBL_EPSILON) continue;
 
       if( ii+start < schur_start ){	
-	for(jj = 1; jj < nnz; jj++) {
-	  iw = jw[rowjj[jj]];
-	  if(iw != -1) 
-	    if(iw < ii+start)	      	      
-	      rowm[iw] -= t1*rowmm[jj];	  	   
-	    else
-	      data->U->pa[ii+start][iw-ii-start] -= t1*rowmm[jj];	  
-	}
+        for(jj = 1; jj < nnz; jj++) {
+          iw = jw[rowjj[jj]];
+          if(iw != -1) {
+            if(iw < ii+start)
+              rowm[iw] -= t1*rowmm[jj];
+            else
+              data->U->pa[ii+start][iw-ii-start] -= t1*rowmm[jj];
+          }
+        }
       }
       else {	
 	for(jj = 1; jj < nnz; jj++){	  	 
