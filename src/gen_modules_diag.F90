@@ -6,6 +6,7 @@ module diagnostics
   USE MOD_PARSUP
   use MOD_TRACER
   use MOD_DYN
+  use MOD_ICE
   use g_clock
   use g_comm_auto
   use o_ARRAYS
@@ -16,29 +17,27 @@ module diagnostics
   implicit none
 
   private
-  public :: ldiag_solver, lcurt_stress_surf, ldiag_energy, ldiag_dMOC, ldiag_DVD,       &
-            ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, ldiag_vorticity,      &
-            compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, wrhof, rhof,    &
-            u_x_u, u_x_v, v_x_v, v_x_w, u_x_w, dudx, dudy, dvdx, dvdy, dudz, dvdz,      & 
-            utau_surf, utau_bott, av_dudz_sq, av_dudz, av_dvdz, stress_bott, u_surf,    &
-            v_surf, u_bott, v_bott, std_dens_min, std_dens_max, std_dens_N, std_dens,   &
-            std_dens_UVDZ, std_dens_DIV, std_dens_Z, std_dens_dVdT, std_dens_flux,      &
-            dens_flux_e, vorticity, compute_diag_dvd_2ndmoment_klingbeil_etal_2014,                &
-            compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd
+  public :: ldiag_solver, lcurt_stress_surf, ldiag_Ri, ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD,        &
+            ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, ldiag_vorticity, ldiag_extflds, ldiag_ice,   &
+            compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, shear, Ri, KvdTdZ, KvdSdZ,   & 
+            std_dens_min, std_dens_max, std_dens_N, std_dens, ldiag_trflx,                           &
+            std_dens_UVDZ, std_dens_DIV, std_dens_DIV_fer, std_dens_Z, std_dens_H, std_dens_dVdT, std_dens_flux,       &
+            dens_flux_e, vorticity, zisotherm, tempzavg, saltzavg, compute_diag_dvd_2ndmoment_klingbeil_etal_2014,       &
+            compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd, vol_ice, vol_snow, compute_ice_diag, thetao, tuv, suv
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
   ! A=ssh_stiff, x=d_eta, rhs=ssh_rhs; rhs_diag=A*x;
   real(kind=WP),  save, allocatable, target      :: rhs_diag(:)
   real(kind=WP),  save, allocatable, target      :: curl_stress_surf(:)
   real(kind=WP),  save, allocatable, target      :: curl_vel3(:,:)
-  real(kind=WP),  save, allocatable, target      :: wrhof(:,:), rhof(:,:)
-  real(kind=WP),  save, allocatable, target      :: u_x_u(:,:), u_x_v(:,:), v_x_v(:,:), v_x_w(:,:), u_x_w(:,:)
-  real(kind=WP),  save, allocatable, target      :: dudx(:,:), dudy(:,:), dvdx(:,:), dvdy(:,:), dudz(:,:), dvdz(:,:), av_dudz(:,:), av_dvdz(:,:), av_dudz_sq(:,:)
-  real(kind=WP),  save, allocatable, target      :: utau_surf(:), utau_bott(:)
+
+  real(kind=WP),  save, allocatable, target      :: shear(:,:), Ri(:,:), KvdTdZ(:,:), KvdSdZ(:,:)
   real(kind=WP),  save, allocatable, target      :: stress_bott(:,:), u_bott(:), v_bott(:), u_surf(:), v_surf(:)
   real(kind=WP),  save, allocatable, target      :: vorticity(:,:)
-
-! defining a set of standard density bins which will be used for computing densMOC
+  real(kind=WP),  save, allocatable, target      :: zisotherm(:)              !target temperature is specified as whichtemp in compute_extflds
+  real(kind=WP),  save, allocatable, target      :: tempzavg(:), saltzavg(:)  !target depth for averaging is specified as whichdepth in compute_extflds
+  real(kind=WP),  save, allocatable, target      :: vol_ice(:),  vol_snow(:)
+  ! defining a set of standard density bins which will be used for computing densMOC
 ! integer,        parameter                      :: std_dens_N  = 100
 ! real(kind=WP),  save, target                   :: std_dens(std_dens_N)
   integer,        parameter                      :: std_dens_N  =89
@@ -55,13 +54,17 @@ module diagnostics
                                                             37.11979, 37.13630, 37.15257, 37.16861, 37.18441, 37.50000, 37.75000, 40.00000/)
   real(kind=WP),  save, target                   :: std_dd(std_dens_N-1)
   real(kind=WP),  save, target                   :: std_dens_min=1030., std_dens_max=1040.
-  real(kind=WP),  save, allocatable, target      :: std_dens_UVDZ(:,:,:), std_dens_flux(:,:,:), std_dens_dVdT(:,:), std_dens_DIV(:,:), std_dens_Z(:,:)
+  real(kind=WP),  save, allocatable, target      :: std_dens_UVDZ(:,:,:), std_dens_flux(:,:,:), std_dens_dVdT(:,:), std_dens_DIV(:,:), std_dens_DIV_fer(:,:), std_dens_Z(:,:), std_dens_H(:,:)
   real(kind=WP),  save, allocatable, target      :: dens_flux_e(:)
+  real(kind=WP),  save, allocatable, target      :: thetao(:) ! sst in K
+  real(kind=WP),  save, allocatable, target      :: tuv(:,:,:), suv(:,:,:)
 
   logical                                       :: ldiag_solver     =.false.
   logical                                       :: lcurt_stress_surf=.false.
   logical                                       :: ldiag_curl_vel3  =.false.
-  logical                                       :: ldiag_energy     =.false.
+  logical                                       :: ldiag_Ri         =.false.
+  logical                                       :: ldiag_TurbFlux   =.false.
+  logical                                       :: ldiag_KE         =.false.
   logical                                       :: ldiag_salt3D     =.false.
   ! this option activates writing the horizintal velocity transports within the density bins (U_rho_x_DZ and V_rho_x_DZ)
   ! an additional field (RHO_Z) will be computed which allows for diagnosing the numerical diapycnal mixing after A. Megann 2018
@@ -74,9 +77,12 @@ module diagnostics
   logical                                       :: ldiag_forc       =.false.
   
   logical                                       :: ldiag_vorticity  =.false.
-  
-  namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_energy, &
-                       ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, ldiag_vorticity
+  logical                                       :: ldiag_extflds    =.false.
+  logical                                       :: ldiag_ice        =.false.
+  logical                                       :: ldiag_trflx      =.false.
+
+  namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_Ri, ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD, &
+                       ldiag_salt3D, ldiag_forc, ldiag_vorticity, ldiag_extflds, ldiag_trflx
   
   contains
 
@@ -240,186 +246,140 @@ subroutine diag_curl_vel3(mode, dynamics, partit, mesh)
     END DO
 end subroutine diag_curl_vel3
 ! ==============================================================
-!energy budget
-subroutine diag_energy(mode, dynamics, partit, mesh)
+! 
+subroutine diag_turbflux(mode, dynamics, tracers, partit, mesh)
+  implicit none
+  type(t_dyn)   , intent(inout), target :: dynamics
+  type(t_tracer), intent(in)   , target :: tracers
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh)  , intent(in)   , target :: mesh
+  integer,        intent(in)            :: mode
+  logical,        save                     :: firstcall=.true.
+  integer                                  :: n, nz, nzmax, nzmin
+  real(kind=WP), dimension(:,:,:), pointer :: UVnode
+  real(kind=WP), dimension(:,:),   pointer :: temp, salt
+  real(kind=WP)                            :: dz_inv
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+UVnode=>dynamics%uvnode(:,:,:)
+temp   => tracers%data(1)%values(:,:)
+salt   => tracers%data(2)%values(:,:)
+!=====================
+  if (firstcall) then  !allocate the stuff at the first call
+     allocate(KvdTdZ(nl, myDim_nod2D+eDim_nod2D), KvdSdZ(nl, myDim_nod2D+eDim_nod2D))
+     KvdTdZ =0.0_WP
+     KvdSdZ =0.0_WP
+     firstcall=.false.
+     if (mode==0) return
+  end if  
+
+  do n=1, myDim_nod2D+eDim_nod2D
+     nzmin = ulevels_nod2d(n)
+     nzmax = nlevels_nod2d(n)
+     do nz=nzmin+1,nzmax-1
+        dz_inv=1.0_WP/(Z_3d_n(nz-1,n)-Z_3d_n(nz,n))
+        KvdTdZ(nz,n) = -Kv(nz,n)*(temp(nz-1,n)-temp(nz,n))*dz_inv
+        KvdSdZ(nz,n) = -Kv(nz,n)*(salt(nz-1,n)-salt(nz,n))*dz_inv
+     end do
+  end do
+end subroutine diag_turbflux
+! ==============================================================
+!
+subroutine diag_trflx(mode, dynamics, tracers, partit, mesh)
+  implicit none
+  type(t_dyn)   , intent(inout), target :: dynamics
+  type(t_tracer), intent(in)   , target :: tracers
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh)  , intent(in)   , target :: mesh
+  integer,        intent(in)            :: mode
+  logical,        save                     :: firstcall=.true.
+  integer                                  :: elem, nz, nzu, nzl, elnodes(3)
+  real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
+  real(kind=WP), dimension(:,:),   pointer :: temp, salt
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+UV     => dynamics%uv(:,:,:)
+temp   => tracers%data(1)%values(:,:)
+salt   => tracers%data(2)%values(:,:)
+fer_UV => dynamics%fer_uv(:,:,:)
+!=====================
+  if (firstcall) then !allocate the stuff at the first call
+      allocate(tuv(2,nl-1,myDim_elem2D+eDim_elem2D))
+      allocate(suv(2,nl-1,myDim_elem2D+eDim_elem2D))
+      tuv = 0.0_WP
+      suv = 0.0_WP
+      firstcall=.false.
+      if (mode==0) return
+  end if
+
+  !___________________________________________________________________________
+  ! compute tracer fluxes
+  do elem=1,myDim_elem2D
+      elnodes = elem2D_nodes(:,elem)
+      nzu     = ulevels(elem)
+      nzl     = nlevels(elem)-1
+      if (Fer_GM) then
+          do nz=nzu, nzl
+              tuv(1,nz,elem) = (UV(1,nz,elem) + fer_UV(1,nz, elem)) * sum(temp(nz,elnodes))/3._WP
+              tuv(2,nz,elem) = (UV(2,nz,elem) + fer_UV(2,nz, elem)) * sum(temp(nz,elnodes))/3._WP
+              suv(1,nz,elem) = (UV(1,nz,elem) + fer_UV(1,nz, elem)) * sum(salt(nz,elnodes))/3._WP
+              suv(2,nz,elem) = (UV(2,nz,elem) + fer_UV(2,nz, elem)) * sum(salt(nz,elnodes))/3._WP
+          end do
+      else
+          do nz=nzu, nzl
+              tuv(1,nz,elem) = UV(1,nz,elem) * sum(temp(nz,elnodes))/3._WP
+              tuv(2,nz,elem) = UV(2,nz,elem) * sum(temp(nz,elnodes))/3._WP
+              suv(1,nz,elem) = UV(1,nz,elem) * sum(salt(nz,elnodes))/3._WP
+              suv(2,nz,elem) = UV(2,nz,elem) * sum(salt(nz,elnodes))/3._WP
+          end do
+      end if
+  end do
+end subroutine diag_trflx
+! ==============================================================
+! 
+subroutine diag_Ri(mode, dynamics, partit, mesh)
   implicit none
   type(t_dyn)   , intent(inout), target :: dynamics
   type(t_partit), intent(inout), target :: partit
   type(t_mesh)  , intent(in)   , target :: mesh
   integer,        intent(in)            :: mode
-  logical,        save       :: firstcall=.true.
-  integer                    :: n, nz, k, i, elem, nzmax, nzmin, elnodes(3)
-  integer                    :: iup, ilo
-  real(kind=WP)              :: ux, vx, uy, vy, tvol, rval(2)
-  real(kind=WP)              :: geo_grad_x(3), geo_grad_y(3), geo_u(3), geo_v(3)
-  real(kind=WP), dimension(:,:,:), pointer :: UV, UVnode
-  real(kind=WP), dimension(:,:),   pointer :: Wvel
-  real(kind=WP)              :: zbar_n(mesh%nl), Z_n(mesh%nl-1)
+  logical,        save                     :: firstcall=.true.
+  integer                                  :: n, nz, nzmax, nzmin
+  real(kind=WP), dimension(:,:,:), pointer :: UVnode
+  real(kind=WP)                            :: val, dz_inv
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
-  UV    => dynamics%uv(:,:,:)
-  UVnode=> dynamics%uvnode(:,:,:)
-  Wvel  => dynamics%w(:,:)
-
+#include "associate_mesh_ass.h"
+UVnode=>dynamics%uvnode(:,:,:)
 !=====================
   if (firstcall) then  !allocate the stuff at the first call
-     allocate(wrhof(nl, myDim_nod2D), rhof(nl, myDim_nod2D))
-     allocate(u_x_u(nl-1, myDim_nod2D), u_x_v(nl-1, myDim_nod2D), v_x_v(nl-1, myDim_nod2D), v_x_w(nl-1, myDim_elem2D), u_x_w(nl-1, myDim_elem2D))
-     allocate(dudx(nl-1, myDim_nod2D), dudy(nl-1, myDim_nod2D), dvdx(nl-1, myDim_nod2D), dvdy(nl-1, myDim_nod2D), dudz(nl, myDim_elem2D), dvdz(nl, myDim_elem2D))
-     allocate(utau_surf(myDim_elem2D), utau_bott(myDim_elem2D), av_dudz_sq(nl, myDim_elem2D), av_dudz(nl, myDim_elem2D), av_dvdz(nl, myDim_elem2D))
-     allocate(u_surf(myDim_elem2D), v_surf(myDim_elem2D), u_bott(myDim_elem2D), v_bott(myDim_elem2D), stress_bott(2, myDim_elem2D))
-     rhof  =0.
-     wrhof=0.
-     u_x_u=0.
-     u_x_v=0.
-     v_x_v=0.
-     u_x_w=0.
-     v_x_w=0.
-     dudx=0.
-     dudy=0.
-     dvdx=0.
-     dvdy=0.
-     dudz=0.
-     dvdz=0.
-     av_dudz_sq=0.
-     av_dudz=0.
-     av_dvdz=0.
-
-     u_surf=0.
-     v_surf=0.
-
-     u_bott=0.
-     v_bott=0.
-
-     stress_bott=0.
-
-     utau_surf=0.
-     utau_bott=0.
-
+     allocate(shear(nl, myDim_nod2D+eDim_nod2D), Ri(nl, myDim_nod2D+eDim_nod2D))
+     shear=0.0_WP
+     Ri   =0.0_WP
      firstcall=.false.
      if (mode==0) return
-  end if
-  
-  u_x_u=UVnode(1,1:nl-1,1:myDim_nod2D)*UVnode(1,1:nl-1,1:myDim_nod2D)
-  u_x_v=UVnode(1,1:nl-1,1:myDim_nod2D)*UVnode(2,1:nl-1,1:myDim_nod2D)
-  v_x_v=UVnode(2,1:nl-1,1:myDim_nod2D)*UVnode(2,1:nl-1,1:myDim_nod2D)
-  ! this loop might be very expensive
-  DO n=1, myDim_elem2D
-     nzmax = nlevels(n)
-     nzmin = ulevels(n)
-     zbar_n=0.0_WP
-     Z_n   =0.0_WP
-     ! in case of partial cells zbar_n(nzmax) is not any more at zbar(nzmax), 
-     ! zbar_n(nzmax) is now zbar_e_bot(n), 
-     zbar_n(nzmax)=zbar_e_bot(n)
-     Z_n(nzmax-1)=zbar_n(nzmax) + helem(nzmax-1,n)/2.0_WP
-     !!PS do nz=nzmax-1,2,-1
-     do nz=nzmax-1,nzmin+1,-1
-        zbar_n(nz) = zbar_n(nz+1) + helem(nz,n)
-        Z_n(nz-1) = zbar_n(nz) + helem(nz-1,n)/2.0_WP
+  end if  
+
+  do n=1, myDim_nod2D+eDim_nod2D
+     nzmin = ulevels_nod2d(n)
+     nzmax = nlevels_nod2d(n)
+     do nz=nzmin+1,nzmax-1
+        dz_inv=1.0_WP/(Z_3d_n(nz-1,n)-Z_3d_n(nz,n))
+        val =   (UVnode(1,nz-1,n)-UVnode(1,nz,n))**2 +&
+                (UVnode(2,nz-1,n)-UVnode(2,nz,n))**2
+        shear(nz,n) = val*dz_inv*dz_inv
+        Ri(nz,n)    = bvfreq(nz,n)/max(shear(nz,n), 1.e-12)
      end do
-     !!PS zbar_n(1) = zbar_n(2) + helem(1,n)
-     zbar_n(nzmin) = zbar_n(nzmin+1) + helem(nzmin,n)
-
-     !compute du/dz & dv/dz
-     !!PS dudz(2:nzmax-1, n)=(UV(1, 1:nzmax-2, n)-UV(1, 2:nzmax-1, n))/(Z_n(1:nzmax-2)-Z_n(2:nzmax-1)) !central differences in vertical
-     !!PS dvdz(2:nzmax-1, n)=(UV(2, 1:nzmax-2, n)-UV(2, 2:nzmax-1, n))/(Z_n(1:nzmax-2)-Z_n(2:nzmax-1))
-     dudz(nzmin+1:nzmax-1, n)=(UV(1, nzmin:nzmax-2, n)-UV(1, nzmin+1:nzmax-1, n))/(Z_n(nzmin:nzmax-2)-Z_n(nzmin+1:nzmax-1)) !central differences in vertical
-     dvdz(nzmin+1:nzmax-1, n)=(UV(2, nzmin:nzmax-2, n)-UV(2, nzmin+1:nzmax-1, n))/(Z_n(nzmin:nzmax-2)-Z_n(nzmin+1:nzmax-1))
-
-     rval=-C_d*sqrt(UV(1, nzmax-1,n)**2+ UV(2, nzmax-1, n)**2)*UV(:,nzmax-1,n)
-     
-     !!PS dudz(1, n)  =0.!stress_surf(1,n)/density_0/Av(2, n)
-     !!PS dvdz(1, n)  =0.!stress_surf(2,n)/density_0/Av(2, n)
-     dudz(nzmin, n) = 0.!stress_surf(1,n)/density_0/Av(2, n)
-     dvdz(nzmin, n) = 0.!stress_surf(2,n)/density_0/Av(2, n)
-     dudz(nzmax, n) = 0.!rval(1)/Av(nzmax-1, n)
-     dvdz(nzmax, n) = 0.!rval(2)/Av(nzmax-1, n)
-
-     !compute int(Av * (du/dz)^2)
-     !!PS av_dudz_sq(1:nzmax, n)=(dudz(1:nzmax, n)**2+dvdz(1:nzmax, n)**2)*Av(1:nzmax, n)
-     !!PS av_dudz   (1:nzmax, n)= dudz(1:nzmax, n)*Av(1:nzmax, n)
-     !!PS av_dvdz   (1:nzmax, n)= dvdz(1:nzmax, n)*Av(1:nzmax, n)
-     av_dudz_sq(nzmin:nzmax, n)=(dudz(nzmin:nzmax, n)**2+dvdz(nzmin:nzmax, n)**2)*Av(nzmin:nzmax, n)
-     av_dudz   (nzmin:nzmax, n)= dudz(nzmin:nzmax, n)*Av(nzmin:nzmax, n)
-     av_dvdz   (nzmin:nzmax, n)= dvdz(nzmin:nzmax, n)*Av(nzmin:nzmax, n)
-
-     !!PS utau_surf(n)=sum(stress_surf(:,n)/density_0*UV(:,1,n))
-     utau_surf(n)=sum(stress_surf(:,n)/density_0*UV(:,nzmin,n))
-     utau_bott(n)=sum(rval*UV(:,nzmax-1,n))    !a scalar product tau_bottom times u 
-
-     stress_bott(:,n)=rval
-
-     !!PS u_surf(n)=UV(1,1,n)
-     !!PS v_surf(n)=UV(2,1,n)
-     u_surf(n)=UV(1,nzmin,n)
-     v_surf(n)=UV(2,nzmin,n)
-
-     u_bott(n)=UV(1,nzmax-1,n)
-     v_bott(n)=UV(2,nzmax-1,n)
-     
-     elnodes=elem2D_nodes(:,n)
-     !!PS DO nz=1, nzmax-1
-     DO nz=nzmin, nzmax-1
-        !!PS iup=max(nz-1, 1)
-        iup=max(nz-1, nzmin)
-        ilo=min(nz, nzmax-1)
-        u_x_w(nz,n)=sum(Wvel(nz, elnodes))/3.*(UV(1, iup, n)*helem(iup ,n)+UV(1, ilo, n)*helem(ilo,n))/(helem(iup ,n)+helem(ilo ,n))
-        v_x_w(nz,n)=sum(Wvel(nz, elnodes))/3.*(UV(2, iup, n)*helem(iup ,n)+UV(2, ilo, n)*helem(ilo,n))/(helem(iup ,n)+helem(ilo ,n))
-     END DO
-  END DO ! --> DO n=1, myDim_elem2D
-  
-  ! this loop might be very expensive
-  DO n=1, myDim_nod2D
-     nzmax=nlevels_nod2D(n)
-     nzmin=ulevels_nod2D(n)
-     ! compute Z_n which is the mid depth of prisms (ALE supports changing layer thicknesses)
-     zbar_n=0.0_WP
-     Z_n   =0.0_WP
-     zbar_n(nzmax) =zbar_n_bot(n)
-     rhof(nzmax,n) =density_m_rho0(nzmax-1, n)
-     !!PS rhof(1,n)     =density_m_rho0(1, n)
-     rhof(nzmin,n)     =density_m_rho0(nzmin, n)
-
-     Z_n(nzmax-1) =zbar_n(nzmax)  + hnode_new(nzmax-1,n)/2.0_WP
-     !!PS do nz=nzmax-1,2,-1
-     do nz=nzmax-1,nzmin+1,-1
-        zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
-        Z_n(nz-1)  = zbar_n(nz)   + hnode_new(nz-1,n)/2.0_WP
-        rhof(nz,n) = (hnode_new(nz,n)*density_m_rho0(nz, n)+hnode_new(nz-1,n)*density_m_rho0(nz-1, n))/(hnode_new(nz,n)+hnode_new(nz-1,n))
-     end do
-     !!PS zbar_n(1)         = zbar_n(2) + hnode_new(1,n)
-     !!PS wrhof(1:nzmax, n) = rhof(1:nzmax, n)*Wvel(1:nzmax, n)
-     zbar_n(nzmin)         = zbar_n(nzmin+1) + hnode_new(nzmin,n)
-     wrhof(nzmin:nzmax, n) = rhof(nzmin:nzmax, n)*Wvel(nzmin:nzmax, n)
-
-     !!PS DO nz=1, nzmax-1
-     DO nz=nzmin, nzmax-1
-        tvol=0.0_WP
-        ux  =0.0_WP
-        uy  =0.0_WP
-        vx  =0.0_WP
-        vy  =0.0_WP
-        DO k=1, nod_in_elem2D_num(n)
-           elem=nod_in_elem2D(k,n)
-           if (nlevels(elem)-1 < nz) cycle
-           elnodes=elem2D_nodes(:, elem)
-           tvol=tvol+elem_area(elem)
-           ux=ux+sum(gradient_sca(1:3,elem)*UVnode(1,nz,elnodes))*elem_area(elem)         !accumulate tensor of velocity derivatives
-           vx=vx+sum(gradient_sca(1:3,elem)*UVnode(2,nz,elnodes))*elem_area(elem)
-           uy=uy+sum(gradient_sca(4:6,elem)*UVnode(1,nz,elnodes))*elem_area(elem)
-           vy=vy+sum(gradient_sca(4:6,elem)*UVnode(2,nz,elnodes))*elem_area(elem)
-        END DO
-        dudx(nz,n)=ux/tvol!/area(nz, n)/3.
-        dvdx(nz,n)=vx/tvol
-        dudy(nz,n)=uy/tvol
-        dvdy(nz,n)=vy/tvol
-     END DO
-  END DO
-end subroutine diag_energy
+  end do
+end subroutine diag_Ri
 ! ==============================================================
 subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
   implicit none
@@ -453,10 +413,12 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
      allocate(std_dens_w   (  std_dens_N, myDim_elem2D))
      allocate(std_dens_dVdT(  std_dens_N, myDim_elem2D))
      allocate(std_dens_DIV (  std_dens_N, myDim_nod2D+eDim_nod2D))
+     if (Fer_GM) allocate(std_dens_DIV_fer(  std_dens_N, myDim_nod2D+eDim_nod2D))
      allocate(std_dens_VOL1(  std_dens_N, myDim_elem2D))
      allocate(std_dens_VOL2(  std_dens_N, myDim_elem2D))
      allocate(std_dens_flux(3,std_dens_N, myDim_elem2D))
      allocate(std_dens_Z   (  std_dens_N, myDim_elem2D))
+     allocate(std_dens_H   (  std_dens_N, myDim_elem2D))
      allocate(dens_flux_e(elem2D))
      allocate(aux  (nl-1))
      allocate(dens (nl))
@@ -474,10 +436,12 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
      std_dens_UVDZ=0. !will be U & V transports within the density class
      std_dens_dVdT=0. !rate of change of a bin volume (for estimating the 'model drift')
      std_dens_DIV =0. !meridional divergence within a density bin (for reconstruction of the diapycnal velocity) !TOP PRIORITY
+     if (Fer_GM) std_dens_DIV_fer =0. !meridional divergence of bolus velocity within a density bin (for reconstruction of the diapycnal velocity) !TOP PRIORITY
      std_dens_VOL1=0. !temporal arrays for computing std_dens_dVdT
      std_dens_VOL2=0.
      std_dens_flux=0. !bouyancy flux for computation of surface bouyancy transformations
      std_dens_Z   =0. !will be the vertical position of the density class (for convertion between dAMOC <-> zMOC)
+     std_dens_H   =0. !will be the vertical layerthickness of the density class (for convertion between dAMOC <-> zMOC)
      depth        =0.
      el_depth     =0.
      firstcall_s=.false.
@@ -490,7 +454,10 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
   dens_flux_e    =0.
   std_dens_VOL2=0.
   std_dens_DIV =0.
+  if (Fer_GM) std_dens_DIV_fer =0. !meridional divergence of bolus velocity within a density bin (for reconstruction of the diapycnal velocity) !TOP PRIORITY
   std_dens_Z   =0.
+  std_dens_H   =0.
+  
   ! proceed with fields at elements...
   do elem=1, myDim_elem2D
      elnodes=elem2D_nodes(:,elem)     
@@ -554,8 +521,11 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
 
         if (std_dens(is)>=dmax) is=ie
         if (std_dens(ie)<=dmin) ie=is
-
-        uvdz_el=(UV(:,nz,elem)+fer_uv(:,nz,elem))*helem(nz,elem)
+        if (Fer_GM) then
+           uvdz_el=(UV(:,nz,elem)+fer_uv(:,nz,elem))*helem(nz,elem)
+        else
+           uvdz_el=UV(:,nz,elem)*helem(nz,elem)
+        end if
         rhoz_el=(dens(nz)-dens(nz+1))/helem(nz,elem)
         vol_el =helem(nz,elem)*elem_area(elem)
         if (ie-is > 0) then
@@ -565,22 +535,22 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
            std_dens_VOL2(   is, elem)=std_dens_VOL2(   is, elem)+weight*vol_el
            locz=el_depth(nz+1)+weight*helem(nz,elem)
            std_dens_Z   (   is, elem)=std_dens_Z   (   is, elem)+locz*weight
-           std_dens_w(      is, elem)   =std_dens_w(   is, elem)+weight
+           std_dens_w(      is, elem)=std_dens_w   (   is, elem)+weight
            do snz=is+1, ie-1
               weight=(sum(std_dd(snz-1:snz))/2.)/ddiff
               std_dens_UVDZ(:, snz, elem)=std_dens_UVDZ(:, snz, elem)+weight*uvdz_el
               std_dens_VOL2(   snz, elem)=std_dens_VOL2(   snz, elem)+weight*vol_el
               locz=locz+weight*helem(nz,elem)
-              std_dens_Z   (   snz, elem) =std_dens_Z    (  snz, elem)+locz*weight
-              std_dens_w   (   snz, elem) =std_dens_w    (  snz, elem)+weight
+              std_dens_Z   (   snz, elem)=std_dens_Z   (   snz, elem)+locz*weight
+              std_dens_w   (   snz, elem)=std_dens_w   (   snz, elem)+weight
            end do
            weight=(dmax-std_dens(ie))+std_dd(ie-1)/2.
            weight=max(weight, 0.)/ddiff
            std_dens_UVDZ(:, ie, elem)=std_dens_UVDZ(:, ie, elem)+weight*uvdz_el
            std_dens_VOL2(   ie, elem)=std_dens_VOL2(   ie, elem)+weight*vol_el
            locz=locz+weight*helem(nz,elem)
-           std_dens_Z   (   ie, elem) =std_dens_Z   (  ie, elem)+locz*weight
-           std_dens_w   (   ie, elem) =std_dens_w   (  ie, elem)+weight
+           std_dens_Z   (   ie, elem)=std_dens_Z   (   ie, elem)+locz*weight
+           std_dens_w   (   ie, elem)=std_dens_w   (   ie, elem)+weight
         else
            std_dens_UVDZ(:, is, elem)=std_dens_UVDZ(:, is, elem)+uvdz_el
            std_dens_VOL2(   is, elem)=std_dens_VOL2(   is, elem)+vol_el
@@ -590,92 +560,154 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
      end do
   end do
 
-  ! proceed with fields at nodes (cycle over edges to compute the divergence)...
-  do edge=1, myDim_edge2D
-     if (myList_edge2D(edge) > edge2D_in) cycle
-     enodes=edges(:,edge)
-     eelems=edge_tri(:,edge)
-     nzmax =nlevels(eelems(1))
-     nzmin =ulevels(eelems(1))
-     if (eelems(2)>0) nzmax=max(nzmax, nlevels(eelems(2)))
-     !!PS do nz=1, nzmax-1
-     do nz=nzmin, nzmax-1
-        aux(nz)=sum(density_dmoc(nz, enodes))/2.-1000.
-     end do
-
-     do e=1,2
-        elem=eelems(e)
-        if (elem<=0) CYCLE
-        deltaX=edge_cross_dxdy(1+(e-1)*2,edge) 
-        deltaY=edge_cross_dxdy(2+(e-1)*2,edge)
-        nzmax =nlevels(elem)
-        nzmin =ulevels(elem)
-
-        do nz=nzmax-1,nzmin+1,-1
-           dens(nz)   = (aux(nz)     * helem(nz-1,elem)+&
-                         aux(nz-1)   * helem(nz,  elem))/sum(helem(nz-1:nz,elem))
+    !___________________________________________________________________________
+    ! proceed with fields at nodes (cycle over edges to compute the divergence)...
+    do edge=1, myDim_edge2D
+        if (myList_edge2D(edge) > edge2D_in) cycle
+        enodes=edges(:,edge)
+        eelems=edge_tri(:,edge)
+        nzmax =nlevels(eelems(1))
+        nzmin =ulevels(eelems(1))
+        if (eelems(2)>0) nzmax=max(nzmax, nlevels(eelems(2)))
+        do nz=nzmin, nzmax-1
+            aux(nz)=sum(density_dmoc(nz, enodes))/2.-1000.
         end do
-        dens(nzmax)=dens(nzmax-1)+(dens(nzmax-1)-dens(nzmax-2))*helem(nzmax-1,elem)/helem(nzmax-2,elem)
-        dens(nzmin)    =dens(nzmin+1)      +(dens(nzmin+1)-dens(nzmin+2))            *helem(nzmin, elem)     /helem(nzmin+1,elem)       
-        is=minloc(abs(std_dens-dens(nzmin)),1)
-
-        do nz=nzmax-1,nzmin,-1
-           div=(UV(2,nz,elem)*deltaX-UV(1,nz,elem)*deltaY)*helem(nz,elem)
-           if (e==2) div=-div
-           dmin =minval(dens(nz:nz+1))
-           dmax =maxval(dens(nz:nz+1))
-           ddiff=abs(dens(nz)-dens(nz+1))
-   
-          ! do vertical  binning onto prescribed density classes
-           is=std_dens_N
-           do jj = 1, std_dens_N
-              if (std_dens(jj) > dmin) then
-                 is = jj
-                 exit
-              endif
-           end do
-
-           ie=1
-           do jj = std_dens_N,1,-1
-              if (std_dens(jj) < dmax) then
-                 ie = jj
-                 exit
-              endif
-           end do
-
-           if (std_dens(is)>=dmax) is=ie
-           if (std_dens(ie)<=dmin) ie=is
-
-           if (ie-is > 0) then
-           weight=(std_dens(is)-dmin)+std_dd(is)/2.
-           weight=max(weight, 0.)/ddiff
-           std_dens_DIV(is, enodes(1))=std_dens_DIV(is, enodes(1))+weight*div
-           std_dens_DIV(is, enodes(2))=std_dens_DIV(is, enodes(2))-weight*div
-           do snz=is+1, ie-1
-              weight=(sum(std_dd(snz-1:snz))/2.)/ddiff
-              std_dens_DIV(snz, enodes(1))=std_dens_DIV(snz, enodes(1))+weight*div
-              std_dens_DIV(snz, enodes(2))=std_dens_DIV(snz, enodes(2))-weight*div
-           end do
-           weight=(dmax-std_dens(ie))+std_dd(ie-1)/2.
-           weight=max(weight, 0.)/ddiff
-           std_dens_DIV(ie, enodes(1))=std_dens_DIV(ie, enodes(1))+weight*div
-           std_dens_DIV(ie, enodes(2))=std_dens_DIV(ie, enodes(2))-weight*div
-        else
-           std_dens_DIV(is, enodes(1))=std_dens_DIV(is, enodes(1))+div
-           std_dens_DIV(is, enodes(2))=std_dens_DIV(is, enodes(2))-div
-        end if
-      end do
-    end do
-  end do
-
+        
+        !_______________________________________________________________________
+        do e=1,2
+            elem=eelems(e)
+            if (elem<=0) CYCLE
+            deltaX=edge_cross_dxdy(1+(e-1)*2,edge) 
+            deltaY=edge_cross_dxdy(2+(e-1)*2,edge)
+            nzmax =nlevels(elem)
+            nzmin =ulevels(elem)
+            
+            !___________________________________________________________________
+            do nz=nzmax-1,nzmin+1,-1
+                dens(nz)   = (aux(nz)     * helem(nz-1,elem)+&
+                            aux(nz-1)   * helem(nz,  elem))/sum(helem(nz-1:nz,elem))
+            end do
+            dens(nzmax)=dens(nzmax-1)+(dens(nzmax-1)-dens(nzmax-2))*helem(nzmax-1,elem)/helem(nzmax-2,elem)
+            dens(nzmin)    =dens(nzmin+1)      +(dens(nzmin+1)-dens(nzmin+2))            *helem(nzmin, elem)     /helem(nzmin+1,elem)       
+            is=minloc(abs(std_dens-dens(nzmin)),1)
+            
+            !___________________________________________________________________
+            do nz=nzmax-1,nzmin,-1
+                div=(UV(2,nz,elem)*deltaX-UV(1,nz,elem)*deltaY)*helem(nz,elem)
+                if (e==2) div=-div
+                dmin =minval(dens(nz:nz+1))
+                dmax =maxval(dens(nz:nz+1))
+                ddiff=abs(dens(nz)-dens(nz+1))
+                
+                ! do vertical  binning onto prescribed density classes
+                is=std_dens_N
+                do jj = 1, std_dens_N
+                    if (std_dens(jj) > dmin) then
+                        is = jj
+                        exit
+                    endif
+                end do
+                ie=1
+                do jj = std_dens_N,1,-1
+                    if (std_dens(jj) < dmax) then
+                        ie = jj
+                        exit
+                    endif
+                end do
+                
+                if (std_dens(is)>=dmax) is=ie
+                if (std_dens(ie)<=dmin) ie=is
+                if (ie-is > 0) then
+                    weight=(std_dens(is)-dmin)+std_dd(is)/2.
+                    weight=max(weight, 0.)/ddiff
+                    std_dens_DIV(is, enodes(1))=std_dens_DIV(is, enodes(1))+weight*div
+                    std_dens_DIV(is, enodes(2))=std_dens_DIV(is, enodes(2))-weight*div
+                    do snz=is+1, ie-1
+                        weight=(sum(std_dd(snz-1:snz))/2.)/ddiff
+                        std_dens_DIV(snz, enodes(1))=std_dens_DIV(snz, enodes(1))+weight*div
+                        std_dens_DIV(snz, enodes(2))=std_dens_DIV(snz, enodes(2))-weight*div
+                    end do
+                    weight=(dmax-std_dens(ie))+std_dd(ie-1)/2.
+                    weight=max(weight, 0.)/ddiff
+                    std_dens_DIV(ie, enodes(1))=std_dens_DIV(ie, enodes(1))+weight*div
+                    std_dens_DIV(ie, enodes(2))=std_dens_DIV(ie, enodes(2))-weight*div
+                else
+                    std_dens_DIV(is, enodes(1))=std_dens_DIV(is, enodes(1))+div
+                    std_dens_DIV(is, enodes(2))=std_dens_DIV(is, enodes(2))-div
+                end if ! --> if (ie-is > 0) then
+            end do ! --> do nz=nzmax-1,nzmin,-1
+            
+            !___________________________________________________________________
+            ! compute density class divergence from GM Bolus velocity
+            if (Fer_GM) then
+                do nz=nzmax-1,nzmin,-1
+                    div=(fer_uv(2,nz,elem)*deltaX-fer_uv(1,nz,elem)*deltaY)*helem(nz,elem)
+                    if (e==2) div=-div
+                    dmin =minval(dens(nz:nz+1))
+                    dmax =maxval(dens(nz:nz+1))
+                    ddiff=abs(dens(nz)-dens(nz+1))
+                    
+                    ! do vertical  binning onto prescribed density classes
+                    is=std_dens_N
+                    do jj = 1, std_dens_N
+                        if (std_dens(jj) > dmin) then
+                            is = jj
+                            exit
+                        endif
+                    end do
+                    ie=1
+                    do jj = std_dens_N,1,-1
+                        if (std_dens(jj) < dmax) then
+                            ie = jj
+                            exit
+                        endif
+                    end do
+                    
+                    if (std_dens(is)>=dmax) is=ie
+                    if (std_dens(ie)<=dmin) ie=is
+                    if (ie-is > 0) then
+                        weight=(std_dens(is)-dmin)+std_dd(is)/2.
+                        weight=max(weight, 0.)/ddiff
+                        std_dens_DIV_fer(is, enodes(1))=std_dens_DIV_fer(is, enodes(1))+weight*div
+                        std_dens_DIV_fer(is, enodes(2))=std_dens_DIV_fer(is, enodes(2))-weight*div
+                        do snz=is+1, ie-1
+                            weight=(sum(std_dd(snz-1:snz))/2.)/ddiff
+                            std_dens_DIV_fer(snz, enodes(1))=std_dens_DIV_fer(snz, enodes(1))+weight*div
+                            std_dens_DIV_fer(snz, enodes(2))=std_dens_DIV_fer(snz, enodes(2))-weight*div
+                        end do
+                        weight=(dmax-std_dens(ie))+std_dd(ie-1)/2.
+                        weight=max(weight, 0.)/ddiff
+                        std_dens_DIV_fer(ie, enodes(1))=std_dens_DIV_fer(ie, enodes(1))+weight*div
+                        std_dens_DIV_fer(ie, enodes(2))=std_dens_DIV_fer(ie, enodes(2))-weight*div
+                    else
+                        std_dens_DIV_fer(is, enodes(1))=std_dens_DIV_fer(is, enodes(1))+div
+                        std_dens_DIV_fer(is, enodes(2))=std_dens_DIV_fer(is, enodes(2))-div
+                    end if ! --> if (ie-is > 0) then
+                end do ! --> do nz=nzmax-1,nzmin,-1
+            end if ! --> if (Fer_GM) then
+        end do ! --> do e=1,2
+    end do ! --> do edge=1, myDim_edge2D
+  
+  !_____________________________________________________________________________
   where (std_dens_w > 0.)
-        std_dens_Z   =std_dens_Z   /std_dens_w
+        std_dens_Z   =std_dens_Z / std_dens_w
   end where
-
+  
+  !_____________________________________________________________________________
+  ! compute density class volume change over time 
   if (.not. firstcall_e) then
      std_dens_dVdT=(std_dens_VOL2-std_dens_VOL1)/dt
   end if
   std_dens_VOL1=std_dens_VOL2
+  
+  !_____________________________________________________________________________
+  ! compute mean thickness of density class, try to extract better vertical position
+  ! when do projection into zcoord. 
+  std_dens_H = std_dens_VOL2
+  do jj = 1, std_dens_N
+        std_dens_H(jj,1:myDim_elem2D) = std_dens_H(jj,1:myDim_elem2D)/elem_area(1:myDim_elem2D)
+  end do
+  
   firstcall_e=.false.
 end subroutine diag_densMOC
 !
@@ -780,15 +812,141 @@ subroutine relative_vorticity(mode, dynamics, partit, mesh)
     
 ! Now it the relative vorticity known on neighbors too
 end subroutine relative_vorticity
+!
+!
+!_______________________________________________________________________________
+subroutine compute_extflds(mode, dynamics, tracers, partit, mesh)
+    IMPLICIT NONE
+    integer,        intent(in)              :: mode
+    logical,        save                    :: firstcall=.true.
+    type(t_dyn)   , intent(in),     target  :: dynamics
+    type(t_tracer), intent(in)   ,  target  :: tracers
+    type(t_partit), intent(inout),  target  :: partit
+    type(t_mesh)  , intent(in)   ,  target  :: mesh
+    real(kind=WP),  dimension(:,:), pointer :: temp, salt
+    real(kind=WP)                           :: zn, zint, tup, tlo
+    integer                                 :: n, nz, nzmin, nzmax
+    real(kind=WP)                           :: whichtemp=  20.0_WP ! which isotherm to compute (set 20 per default)
+    real(kind=WP)                           :: whichdepth=300.0_WP ! for which tepth to average for tempzavg & saltzavg
 
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
+    if (firstcall) then  !allocate the stuff at the first call
+        allocate(zisotherm(myDim_nod2D+eDim_nod2D))
+        allocate(tempzavg(myDim_nod2D+eDim_nod2D), saltzavg(myDim_nod2D+eDim_nod2D))
+        zisotherm=0.0_WP
+        tempzavg =0.0_WP
+        saltzavg =0.0_WP
+        firstcall=.false.
+        if (mode==0) return
+    end if  
+    temp   => tracers%data(1)%values(:,:)
+    salt   => tracers%data(2)%values(:,:)    
 
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, zn, tup, tlo)
+    DO n=1, myDim_nod2D
+       saltzavg(n) =0.0_WP
+       nzmax=nlevels_nod2D(n)
+       nzmin=ulevels_nod2D(n)
+       zn  =0.0_WP
+       do nz=nzmin+1, nzmax-1
+          tup=temp(nz-1, n)
+          if (tup < whichtemp) exit
+          tlo=temp(nz,   n)                 
+          if ((tup-whichtemp)*(tlo-whichtemp)<0) then
+             zn=zn+0.5_WP*(hnode(nz-1, n)+(whichtemp-tup)*sum(hnode(nz-1:nz, n))/(tlo-tup))
+             exit
+          end if
+          zn=zn+hnode(nz-1, n) 
+       end do
+       zisotherm(n)=zn
+    END DO
+!$OMP END PARALLEL DO 
+
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, zint)
+    DO n=1, myDim_nod2D
+       tempzavg(n) =0.0_WP
+       saltzavg(n) =0.0_WP
+       nzmax=nlevels_nod2D(n)
+       nzmin=ulevels_nod2D(n)
+       zint=0.0_WP
+       do nz=nzmin, nzmax-1
+          zint=zint+hnode(nz, n) 
+          tempzavg(n)=tempzavg(n)+temp(nz,   n)*hnode(nz, n)
+          saltzavg(n)=saltzavg(n)+salt(nz,   n)*hnode(nz, n)
+          if (zint>=whichdepth) exit
+       end do
+       tempzavg(n)=tempzavg(n)/zint
+       saltzavg(n)=saltzavg(n)/zint
+    END DO
+!$OMP END PARALLEL DO 
+
+  call exchange_nod(zisotherm, partit)
+  call exchange_nod(tempzavg, partit)
+  call exchange_nod(saltzavg, partit)
+end subroutine compute_extflds
+!_______________________________________________________________________________
+subroutine compute_ice_diag(mode, ice, partit, mesh)
+    IMPLICIT NONE
+    integer,        intent(in)              :: mode
+    logical,        save                    :: firstcall=.true.
+    type(t_ice)   , intent(in),     target  :: ice
+    type(t_partit), intent(inout),  target  :: partit
+    type(t_mesh)  , intent(in)   ,  target  :: mesh
+    integer                                 :: n
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    if (firstcall) then  !allocate the stuff at the first call
+        allocate(vol_ice(myDim_nod2D+eDim_nod2D), vol_snow(myDim_nod2D+eDim_nod2D))
+        vol_ice =0.0_WP
+        vol_snow=0.0_WP
+        firstcall=.false.
+        if (mode==0) return
+    end if
+!$OMP PARALLEL DO
+DO n=1, myDim_nod2D
+   vol_ice(n) =ice%data(1)%values(n)*ice%data(2)%values(n)
+   vol_snow(n)=ice%data(1)%values(n)*ice%data(3)%values(n)
+END DO
+!$OMP END PARALLEL DO
+
+end subroutine compute_ice_diag
+
+! SST in K
+subroutine compute_thetao(mode, tracers, partit, mesh)
+  implicit none
+  integer,        intent(in)            :: mode
+  type(t_tracer), intent(in) ,  target  :: tracers
+  type(t_mesh)  , intent(in) ,  target  :: mesh
+  type(t_partit), intent(in), target :: partit
+  logical, save                         :: firstcall=.true.
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+  if (firstcall) then !allocate the stuff at the first call
+     allocate(thetao(mydim_nod2D))
+     firstcall=.false.
+     if (mode==0) return
+  end if
+
+  !skipping loop 
+  thetao(:) = tracers%data(1)%values(1,1:myDim_nod2D)+273.15_WP 
+end subroutine compute_thetao
 
 ! ==============================================================
-subroutine compute_diagnostics(mode, dynamics, tracers, partit, mesh)
+subroutine compute_diagnostics(mode, dynamics, tracers, ice, partit, mesh)
   implicit none
   type(t_mesh)  , intent(in)   , target :: mesh
   type(t_partit), intent(inout), target :: partit
   type(t_tracer), intent(inout), target :: tracers
+  type(t_ice),    intent(inout), target :: ice
   type(t_dyn)   , intent(inout), target :: dynamics
   integer, intent(in)                   :: mode !constructor mode (0=only allocation; any other=do diagnostic)
   real(kind=WP)                         :: val  !1. solver diagnostic
@@ -798,7 +956,7 @@ subroutine compute_diagnostics(mode, dynamics, tracers, partit, mesh)
   !3. compute curl(velocity)
   if (ldiag_curl_vel3)   call diag_curl_vel3(mode, dynamics, partit, mesh)
   !4. compute energy budget
-  if (ldiag_energy)      call diag_energy(mode, dynamics, partit, mesh)
+  if (ldiag_Ri)          call diag_Ri(mode, dynamics, partit, mesh)
   !5. print integrated temperature 
   if (ldiag_salt3d) then
      if (mod(mstep,logfile_outfreq)==0) then
@@ -810,10 +968,17 @@ subroutine compute_diagnostics(mode, dynamics, tracers, partit, mesh)
   end if
   !6. MOC in density coordinate
   if (ldiag_dMOC)        call diag_densMOC(mode, dynamics, tracers, partit, mesh)
-  
+  !7. compute turbulent fluxes
+  if (ldiag_turbflux)    call diag_turbflux(mode, dynamics, tracers, partit, mesh)
+  !8. compute tracers fluxes
+  if (ldiag_trflx)       call diag_trflx(mode, dynamics, tracers, partit, mesh)
   ! compute relative vorticity
   if (ldiag_vorticity)   call relative_vorticity(mode, dynamics, partit, mesh)
-
+  ! soe exchanged fields requested by IFS/FESOM in NextGEMS.
+  if (ldiag_extflds)     call compute_extflds(mode, dynamics, tracers, partit, mesh)
+  !fields required for for destinE
+  if (ldiag_ice)         call compute_ice_diag(mode, ice, partit, mesh)
+  call compute_thetao(mode, tracers, partit, mesh) 
 end subroutine compute_diagnostics
 
 !

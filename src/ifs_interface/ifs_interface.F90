@@ -9,6 +9,44 @@ MODULE nemogcmcoup_steps
    INTEGER :: substeps !per IFS timestep
 END MODULE nemogcmcoup_steps
 
+SUBROUTINE nemogcmcoup_init_ioserver( icomm, lnemoioserver, irequired, iprovided, lmpi1)
+
+    ! Initialize the NEMO mppio server
+    USE mpp_io
+ 
+    IMPLICIT NONE
+    INTEGER :: icomm
+    LOGICAL :: lnemoioserver
+    INTEGER :: irequired, iprovided
+    LOGICAL :: lmpi1
+ 
+    CALL mpp_io_init(icomm, lnemoioserver,  irequired, iprovided, lmpi1)
+END SUBROUTINE nemogcmcoup_init_ioserver
+ 
+ 
+SUBROUTINE nemogcmcoup_init_ioserver_2( icomm )
+    ! Initialize the NEMO mppio server
+    USE mpp_io
+ 
+    IMPLICIT NONE
+    INTEGER :: icomm
+    
+    CALL mpp_io_init_2( icomm )
+    IF (lioserver) THEN
+        ! IO server finished, clean-up multio objects
+        CALL mpp_stop()
+    ENDIF
+END SUBROUTINE nemogcmcoup_init_ioserver_2
+
+SUBROUTINE nemogcmcoup_end_ioserver
+    ! Function is only called for the IO client.
+    USE mpp_io
+
+    IMPLICIT NONE
+
+    CALL mpp_stop()
+END SUBROUTINE nemogcmcoup_end_ioserver
+
 SUBROUTINE nemogcmcoup_init( mype, icomm, inidate, initime, itini, itend, zstp, &
    & lwaveonly, iatmunit, lwrite )
 
@@ -20,7 +58,7 @@ SUBROUTINE nemogcmcoup_init( mype, icomm, inidate, initime, itini, itend, zstp, 
    USE g_config, only: dt
    USE g_clock, only: timenew, daynew, yearnew, month, day_in_month
    USE nemogcmcoup_steps, ONLY : substeps
-
+   
    IMPLICIT NONE
 
    ! Input arguments
@@ -61,6 +99,7 @@ SUBROUTINE nemogcmcoup_init( mype, icomm, inidate, initime, itini, itend, zstp, 
    WRITE(0,*)'! FESOM is initialized from within IFS.'
    WRITE(0,*)'! get MPI_COMM_FESOM. ================='
    WRITE(0,*)'! main_initialize done. ==============='
+   WRITE(0,*)'Thomas/Kristian parinter_mult version'
    endif
 
    ! Set more information for the caller
@@ -132,7 +171,9 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
       &                 lwritedist, &
       &                 lcommout, &
       &                 commoutprefix,&
-      &                 lparbcast
+      &                 lparbcast, &
+      &                 lparinterp2p, &
+      &                 lparintmultatm
 
    ! Global number of gaussian gridpoints
    INTEGER :: nglopoints
@@ -176,6 +217,7 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    cdpathdist        = './'
    lreaddist         = .FALSE.
    lwritedist        = .FALSE.
+   lparintmultatm    = .TRUE.
 
    OPEN(9,file='namfesomcoup.in')
    READ(9,namfesomcoup)
@@ -379,13 +421,19 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    INTEGER, INTENT(IN) :: nopoints
 
    ! Local variables
-   REAL(wpIFS), DIMENSION(fesom%partit%myDim_nod2D)  :: zsend
-   REAL(wpIFS), DIMENSION(fesom%partit%myDim_elem2D) :: zsendU, zsendV
+   INTEGER , PARAMETER :: maxnfield = 8
+   INTEGER , PARAMETER :: maxnfielduv = 2
+   INTEGER :: nfield = 0
+   INTEGER :: nfielduv = 0
+   REAL(wpIFS), DIMENSION(fesom%partit%myDim_nod2D,maxnfield)  :: zsendnf
+   REAL(wpIFS), DIMENSION(fesom%partit%myDim_elem2D,maxnfielduv) :: zsendnfUV
+   REAL(wpIFS), DIMENSION(nopoints,maxnfield)  :: zrecvnf
+   REAL(wpIFS), DIMENSION(nopoints,maxnfielduv) :: zrecvnfUV
    INTEGER			     :: elnodes(3)
    REAL(wpIFS)			     :: rlon, rlat	
 
    ! Loop variables
-   INTEGER :: n, elem, ierr
+   INTEGER :: n, elem, ierr, jf
 
    !#include "associate_mesh.h"
    ! associate what is needed only
@@ -405,154 +453,355 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    ice_alb      => fesom%ice%atmcoupl%ice_alb(:)
    tmelt        => fesom%ice%thermo%tmelt ! scalar const.
 
+
+   nfield = 0
    ! =================================================================== !
    ! Pack SST data and convert to K. 'pgsst' is on Gauss grid.
-   do n=1,myDim_nod2D
-      zsend(n)=fesom%tracers%data(1)%values(1, n) +tmelt ! sea surface temperature [K], 
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=fesom%tracers%DATA(1)%values(1, n) +tmelt ! sea surface temperature [K], 
 							 ! (1=surface, n=node, data(1/2)=T/S)
-   enddo
-
-   ! Interpolate SST
-   CALL parinter_fld( mype, npes, icomm, Ttogauss, &
-      &               myDim_nod2D, zsend, &
-      &               nopoints, pgsst )
-
-
+   ENDDO
+!$OMP END PARALLEL DO
    ! =================================================================== !
-   ! Pack ice fraction data [0..1] and interpolate: 'pgifr' on Gauss.
-   ! zsend(:)=a_ice(:)
-   CALL parinter_fld( mype, npes, icomm, Ttogauss, &
-      &               myDim_nod2D, a_ice, &
-      &               nopoints, pgifr )
-
-
+   ! Pack ice fraction data [0..1]
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=a_ice(n)
+   ENDDO
+!$OMP END PARALLEL DO
    ! =================================================================== !
    ! Pack ice temperature data (already in K)
-   zsend(:)=ice_temp
-
-   ! Interpolate ice surface temperature: 'pgist' on Gaussian grid. 
-   CALL parinter_fld( mype, npes, icomm, Ttogauss, &
-      &               myDim_nod2D, zsend, &
-      &               nopoints, pgist )
-
-
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=ice_temp(n)
+   ENDDO
+!$OMP END PARALLEL DO
    ! =================================================================== !
    ! Pack ice albedo data and interpolate: 'pgalb' on Gaussian grid.
-   zsend(:)=ice_alb
-   
-   ! Interpolate ice albedo
-   CALL parinter_fld( mype, npes, icomm, Ttogauss, &
-      &               myDim_nod2D, zsend, &
-      &               nopoints, pgalb )
-
-
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=ice_alb(n)
+   ENDDO
+!$OMP END PARALLEL DO
    ! =================================================================== !
    ! Pack ice thickness data and interpolate: 'pghic' on Gaussian grid.
-   zsend(:)=m_ice(:)/max(a_ice(:),0.01) ! ice thickness (mean over ice)
-
-   ! Interpolation of average ice thickness
-   CALL parinter_fld( mype, npes, icomm, Ttogauss, &
-      &               myDim_nod2D, zsend, &
-      &               nopoints, pghic ) 
-
-
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=m_ice(n)!/MAX(a_ice(n),0.01) ! ice thickness (mean over ice)
+   ENDDO
+!$OMP END PARALLEL DO
    ! =================================================================== !
    ! Pack snow thickness data and interpolate: 'pghsn' on Gaussian grid.
-   zsend(:)=m_snow(:)/max(a_ice(:),0.01) ! snow thickness (mean over ice)
-
-   ! Interpolation of snow thickness
-   CALL parinter_fld( mype, npes, icomm, Ttogauss, &
-      &               myDim_nod2D, zsend, &
-      &               nopoints, pghsn )
-
-
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=m_snow(n)!/MAX(a_ice(n),0.01) ! snow thickness (mean over ice)
+   ENDDO
+!$OMP END PARALLEL DO
    ! =================================================================== !
-   ! Surface currents need to be rotated to geographical grid
-
-   ! Pack u(v) surface currents
-   zsendU(:)=fesom%dynamics%UV(1,1,1:myDim_elem2D)
-   zsendV(:)=fesom%dynamics%UV(2,1,1:myDim_elem2D) !UV includes eDim, leave those away here
-
-   do elem=1, myDim_elem2D
-
-      ! compute element midpoints
-      elnodes=elem2D_nodes(:,elem)
-      rlon=sum(coord_nod2D(1,elnodes))/3.0_wpIFS
-      rlat=sum(coord_nod2D(2,elnodes))/3.0_wpIFS
-
-      ! Rotate vectors to geographical coordinates (r2g)
-      call vector_r2g(zsendU(elem), zsendV(elem), rlon, rlat, 0) ! 0-flag for rot. coord
-
-   end do
-
-#ifdef FESOM_TODO
-
-   ! We need to sort out the non-unique global index before we
-   ! can couple currents
-
-   ! Interpolate: 'pgucur' and 'pgvcur' on Gaussian grid.
-   CALL parinter_fld( mype, npes, icomm, UVtogauss, &
-      &               myDim_elem2D, zsendU, &
-      &               nopoints, pgucur )
-
-   CALL parinter_fld( mype, npes, icomm, UVtogauss, &
-      &               myDim_elem2D, zsendV, &
-      &               nopoints, pgvcur )
-
-#else
-
-   pgucur(:) = 0.0
-   pgvcur(:) = 0.0
-
-#endif
-
-#ifndef FESOM_TODO
-
-   if(mype==0) then
-   WRITE(0,*)'Everything implemented except ice level temperatures (licelvls).'
-   endif
-
-#else
-
-   ! Ice level temperatures
-
-   IF (licelvls) THEN
-
-#if defined key_lim2
-
-      DO jl = 1, 3
-         
-         ! Pack ice temperatures data at level jl(already in K)
-         
-         jk = 0 
-         DO jj = nldj, nlej
-            DO ji = nldi, nlei
-               jk = jk + 1
-               zsend(jk) = tbif (ji,jj,jl)
-            ENDDO
-         ENDDO
-         
-         ! Interpolate ice temperature  at level jl
-         
+   ! Pack U surface currents; need to be rotated to geographical grid
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=fesom%dynamics%uvnode(1,1,n) ! (u/v,level,nod2D)
+   ENDDO
+!$OMP END PARALLEL DO
+   ! =================================================================== !
+   ! Pack V surface currents; need to be rotated to geographical grid
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=fesom%dynamics%uvnode(2,1,n) ! (u/v,level,nod2D)
+   ENDDO
+!$OMP END PARALLEL DO
+   ! Rotate vectors (U,V) to geographical coordinates (r2g)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, rlon, rlat)
+!$OMP DO
+   DO n=1,myDim_nod2D
+      rlon=coord_nod2D(1,n)
+      rlat=coord_nod2D(2,n)
+      CALL vector_r2g(zsendnf(n,nfield-1), zsendnf(n,nfield), rlon, rlat, 0) ! 0-flag for rot. coord
+   ENDDO
+!$OMP END DO
+!$OMP BARRIER
+!$OMP END PARALLEL
+   ! =================================================================== !
+   ! Interpolate all fields
+   IF (lparintmultatm) THEN
+      CALL parinter_fld_mult( nfield, mype, npes, icomm, Ttogauss, &
+         &                    myDim_nod2D, zsendnf, &
+         &                    nopoints, zrecvnf )
+   ELSE
+      DO jf = 1, nfield
          CALL parinter_fld( mype, npes, icomm, Ttogauss, &
-            &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zsend, &
-            &               nopoints, pgistl(:,jl) )
-         
+            &               myDim_nod2D, zsendnf(:,jf), &
+            &               nopoints, zrecvnf(:,jf) )
       ENDDO
-
-#else
-      WRITE(0,*)'licelvls needs to be sorted for LIM3'
-      CALL abort
-#endif     
-
    ENDIF
 
-   IF(nn_timing == 1) CALL timing_stop('nemogcmcoup_lim2_get')
-   IF(lhook) CALL dr_hook('nemogcmcoup_lim2_get',1,zhook_handle)
-
-#endif
-
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nfield)
+   nfield = 0
+   ! =================================================================== !
+   ! Unpack 'pgsst' on Gauss.
+   ! zsend(:)=a_ice(:)
+   nfield = nfield + 1
+!$OMP DO
+   do n=1, nopoints
+      pgsst(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END DO
+   !
+   ! =================================================================== !
+   ! Unpack 'pgifr' on Gauss.
+   ! zsend(:)=a_ice(:)
+   nfield = nfield + 1
+!$OMP DO
+   do n=1, nopoints
+      pgifr(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END DO
+   !
+   ! =================================================================== !
+   ! Unpack ice temperature data (already in K)
+   nfield = nfield + 1
+!$OMP DO
+   do n=1, nopoints
+      pgist(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END DO
+   ! =================================================================== !
+   ! Unpack ice albedo data pgalb on Gaussian grid.
+   nfield = nfield + 1
+!$OMP DO
+   do n=1, nopoints
+      pgalb(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END DO
+   ! =================================================================== !
+   ! Unpack ice thickness data pghic on Gaussian grid.
+   nfield = nfield + 1
+!$OMP DO
+   do n=1, nopoints
+      pghic(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END DO
+   ! =================================================================== !
+   ! Unpack snow thickness data pghsn on Gaussian grid.
+   nfield = nfield + 1
+!$OMP DO
+   do n=1, nopoints
+      pghsn(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END DO
+   ! =================================================================== !
+   ! Unpack surface currents data pgucur/pgvcur on Gaussian grid.
+   nfield = nfield + 1
+!$OMP DO
+   do n=1, nopoints
+      pgucur(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END DO
+   nfield = nfield + 1
+!$OMP DO
+   do n=1, nopoints
+      pgvcur(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END DO
+!$OMP END PARALLEL
 END SUBROUTINE nemogcmcoup_lim2_get
+
+
+SUBROUTINE nemogcmcoup_exflds_get( mype, npes, icomm, &
+   &                               nopoints, pgssh, pgmld, pg20d, pgsss, &
+   &                               pgtem300, pgsal300 )
+
+   ! Interpolate SSH, MLD, 20C isotherm, sea surface salinity, average T&S over upper 300m
+   ! from the FESOM grid to IFS's Gaussian grid. 
+   
+   ! This routine can be called at any point in time since it does
+   ! the necessary message passing in parinter_fld. 
+
+   USE par_kind
+   USE scripremap
+   USE parinter
+   USE interinfo
+   USE fesom_main_storage_module, only: fesom => f
+   USE o_ARRAYS, only : MLD1
+   USE diagnostics, only : ldiag_extflds, zisotherm, saltzavg, tempzavg
+   IMPLICIT NONE
+   
+   ! Arguments
+   REAL(wpIFS), DIMENSION(nopoints) :: pgssh, pgmld, pg20d, pgsss, &
+      & pgtem300, pgsal300
+   ! Message passing information
+   INTEGER, INTENT(IN) :: mype, npes, icomm
+   ! Number Gaussian grid points
+   INTEGER, INTENT(IN) :: nopoints
+
+   ! Local variables
+   INTEGER , PARAMETER :: maxnfield = 6
+   INTEGER :: nfield = 0
+   REAL(wpIFS), DIMENSION(fesom%partit%myDim_nod2D,maxnfield)  :: zsendnf
+   REAL(wpIFS), DIMENSION(nopoints,maxnfield)  :: zrecvnf
+   real(kind=wpIFS), dimension(:,:), pointer :: coord_nod2D
+   integer, pointer :: myDim_nod2D, eDim_nod2D
+
+   ! Loop variables
+   INTEGER :: n, elem, ierr, jf
+
+   !#include "associate_mesh.h"
+   ! associate what is needed only
+   myDim_nod2D  => fesom%partit%myDim_nod2D
+   eDim_nod2D   => fesom%partit%eDim_nod2D
+   coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => fesom%mesh%coord_nod2D   
+
+   nfield = 0
+   ! =================================================================== !
+   ! Pack SSH data 'pgssh' is on Gauss grid.
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=fesom%dynamics%eta_n(n)  ! in meters
+   ENDDO
+!$OMP END PARALLEL DO
+   ! =================================================================== !
+   ! Pack MLD data
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=-MLD1(n) ! depth at which the density over depth differs 
+        			 ! by 0.125 sigma units from the surface density (Griffies et al., 2009)
+   ENDDO
+!$OMP END PARALLEL DO
+   ! =================================================================== !
+   ! Pack depth of 20C isotherm
+   nfield = nfield + 1
+   if (ldiag_extflds) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+      DO n=1,myDim_nod2D
+         zsendnf(n,nfield)=zisotherm(n) ! extra diagnostics active
+      ENDDO
+!$OMP END PARALLEL DO
+   else
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+      DO n=1,myDim_nod2D
+         zsendnf(n,nfield)=-1. ! set to -1 as placeholder
+      ENDDO
+!$OMP END PARALLEL DO
+   end if
+
+   ! =================================================================== !
+   ! Pack sea surface salinity data: 'pgsss' on Gaussian grid.
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   DO n=1,myDim_nod2D
+      zsendnf(n,nfield)=fesom%tracers%data(2)%values(1,n) ! in psu
+   ENDDO
+!$OMP END PARALLEL DO
+   ! =================================================================== !
+   ! Pack average temp over upper 300m: 'pgtem300' on Gaussian grid.
+   nfield = nfield + 1
+   if (ldiag_extflds) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+      DO n=1,myDim_nod2D
+         zsendnf(n,nfield)=tempzavg(n) ! extra diagnostic active
+      ENDDO
+!$OMP END PARALLEL DO
+   else
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+      DO n=1,myDim_nod2D
+         zsendnf(n,nfield)=-1. ! set to -1 as placeholder
+      ENDDO
+!$OMP END PARALLEL DO
+   end if
+
+   ! =================================================================== !
+   ! Pack average salinity over upper 300m: 'pgsal300' on Gaussian grid.
+   nfield = nfield + 1
+   if (ldiag_extflds) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+      DO n=1,myDim_nod2D
+         zsendnf(n,nfield)=saltzavg(n) ! extra diagnostic active
+      ENDDO
+!$OMP END PARALLEL DO
+   else
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+      DO n=1,myDim_nod2D
+         zsendnf(n,nfield)=-1. ! set to -1 as placeholder
+      ENDDO
+!$OMP END PARALLEL DO
+   end if
+   ! =================================================================== !
+   ! Interpolate all fields
+   IF (lparintmultatm) THEN
+      CALL parinter_fld_mult( nfield, mype, npes, icomm, Ttogauss, &
+         &                    myDim_nod2D, zsendnf, &
+         &                    nopoints, zrecvnf )
+   ELSE
+      DO jf = 1, nfield
+         CALL parinter_fld( mype, npes, icomm, Ttogauss, &
+            &               myDim_nod2D, zsendnf(:,jf), &
+            &               nopoints, zrecvnf(:,jf) )
+      ENDDO
+   ENDIF
+   nfield = 0
+   ! =================================================================== !
+   ! Unpack 'pgssh' on Gauss.
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, nopoints
+      pgssh(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END PARALLEL DO
+   !
+   ! =================================================================== !
+   ! Unpack 'pgmld' on Gauss.
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, nopoints
+      pgmld(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END PARALLEL DO
+   !
+   ! =================================================================== !
+   ! Unpack depth of 20C isotherm data
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, nopoints
+      pg20d(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END PARALLEL DO
+   ! =================================================================== !
+   ! Unpack sea surface salinity pgsss on Gaussian grid.
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, nopoints
+      pgsss(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END PARALLEL DO
+   ! =================================================================== !
+   ! Unpack average temp over upper 300m pgtem300 on Gaussian grid.
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, nopoints
+      pgtem300(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END PARALLEL DO
+   ! =================================================================== !
+   ! Unpack average salinity over upper 300m on Gaussian grid.
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, nopoints
+      pgsal300(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END PARALLEL DO
+END SUBROUTINE nemogcmcoup_exflds_get
 
 
 SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
@@ -609,21 +858,23 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    !type(t_mesh), target :: mesh
 
    ! Local variables
-   INTEGER		:: n
+   INTEGER		:: n, jf
    integer, pointer     :: myDim_nod2D, eDim_nod2D
-   REAL(wpIFS), parameter 	:: rhofwt = 1000. ! density of freshwater
+   REAL(wpIFS), parameter 	:: rhofwt = 1000.        ! density of freshwater
+   REAL(wpIFS), parameter  :: lfus = 333.7          ! latent heat of fusion [J/g]
 
-
-   ! Packed receive buffer
-   REAL(wpIFS), DIMENSION(fesom%partit%myDim_nod2D) :: zrecv
-   REAL(wpIFS), DIMENSION(fesom%partit%myDim_elem2D):: zrecvU, zrecvV
-
+   ! Packed send/receive buffers
+   INTEGER , PARAMETER :: maxnfield = 11
+   INTEGER :: nfield = 0
+   REAL(wpIFS), DIMENSION(npoints,maxnfield) :: zsendnf
+   REAL(wpIFS), DIMENSION(fesom%partit%myDim_nod2D,maxnfield) :: zrecvnf
 
    !#include "associate_mesh.h"
    ! associate only the necessary things
    real(kind=wpIFS), dimension(:,:), pointer :: coord_nod2D
    real(kind=wpIFS), dimension(:)  , pointer :: stress_atmice_x, stress_atmice_y
-   real(kind=wpIFS), dimension(:)  , pointer :: oce_heat_flux, ice_heat_flux 
+   real(kind=wpIFS), dimension(:)  , pointer :: oce_heat_flux, ice_heat_flux, a_ice
+   real(kind=wpIFS), dimension(:)  , pointer :: enthalpyoffuse
    myDim_nod2D        => fesom%partit%myDim_nod2D
    eDim_nod2D         => fesom%partit%eDim_nod2D
    coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => fesom%mesh%coord_nod2D(:,:)  
@@ -631,136 +882,97 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    stress_atmice_y    => fesom%ice%stress_atmice_y
    oce_heat_flux      => fesom%ice%atmcoupl%oce_flx_h(:)
    ice_heat_flux      => fesom%ice%atmcoupl%ice_flx_h(:)
-   
+   a_ice              => fesom%ice%data(1)%values(:)
+   enthalpyoffuse     => fesom%ice%atmcoupl%enthalpyoffuse(:)
    ! =================================================================== !
    ! Sort out incoming arrays from the IFS and put them on the ocean grid
-
    ! TODO
-   shortwave(:)=0.	! Done, updated below. What to do with shortwave over ice??
-   !longwave(:)=0.	! Done. Only used in stand-alone mode.
-   prec_rain(:)=0. 	! Done, updated below.
-   prec_snow(:)=0.	! Done, updated below.
-   evap_no_ifrac=0.	! Done, updated below. This is evap over ocean, does this correspond to evap_tot?
-   sublimation=0.	! Done, updated below. 
-   !
-   ice_heat_flux=0. 	! Done. This is qns__ice currently. Is this the non-solar heat flux?    !   non solar heat fluxes below  !  (qns)
-   oce_heat_flux=0. 	! Done. This is qns__oce currently. Is this the non-solar heat flux?
-   !
-   runoff(:)=0.		! not used apparently. What is runoffIN, ocerunoff?
-   !evaporation(:)=0.
-   !ice_thermo_cpl.F90:  !---- total evaporation (needed in oce_salt_balance.F90)
-   !ice_thermo_cpl.F90:  evaporation = evap_no_ifrac*(1.-a_ice) + sublimation*a_ice
-   stress_atmice_x=0.   ! Done, taux_ice
-   stress_atmice_y=0.   ! Done, tauy_ice
-   stress_atmoce_x=0.   ! Done, taux_oce
-   stress_atmoce_y=0.   ! Done, tauy_oce
-
-
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   DO n=1,myDim_nod2D+eDim_nod2D
+      shortwave(n)      =0.
+      prec_rain(n)      =0.
+      prec_snow(n)      =0.
+      evap_no_ifrac(n)  =0.
+      sublimation(n)    =0.
+      ice_heat_flux(n)  =0.
+      oce_heat_flux(n)  =0.
+      stress_atmice_x(n)=0.
+      stress_atmice_y(n)=0.
+      stress_atmoce_x(n)=0.
+      stress_atmoce_y(n)=0.
+   END DO
+!$OMP END PARALLEL DO
    ! =================================================================== !
-   !1. Interpolate ocean solar radiation to T grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, qs___oce,  &
-      &               myDim_nod2D, zrecv )
-   
-   ! Unpack ocean solar radiation, without halo
-   shortwave(1:myDim_nod2D)=zrecv(1:myDim_nod2D)
-
-   ! Do the halo exchange
-   call exchange_nod(shortwave,fesom%partit)
-
-
+   ! Pack all arrays
+   nfield = 0
+   !1. Ocean solar radiation to T grid
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, npoints
+      zsendnf(n,nfield) = qs___oce(n)
+   end do
+!$OMP END PARALLEL DO
    ! =================================================================== !
-   !2. Interpolate ice solar radiation to T grid
+   !2. Ice solar radiation to T grid
    ! DO NOTHING
 
-
    ! =================================================================== !
-   !3. Interpolate ocean non-solar radiation to T grid (is this non-solar heat flux?)
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, qns__oce,  &
-      &               myDim_nod2D, zrecv )
-   
-   ! Unpack ocean non-solar, without halo
-   oce_heat_flux(1:myDim_nod2D)=zrecv(1:myDim_nod2D)
-
-   ! Do the halo exchange
-   call exchange_nod(oce_heat_flux,fesom%partit)
-
-
+   !3. Ocean non-solar radiation to T grid (is this non-solar heat flux?)
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, npoints
+      zsendnf(n,nfield) = qns__oce(n)
+   end do
+!$OMP END PARALLEL DO
    ! =================================================================== !
-   !4. Interpolate non-solar radiation over ice to T grid (is this non-solar heat flux?)
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, qns__ice,  &
-      &               myDim_nod2D, zrecv )
-   
-   ! Unpack ice non-solar
-   ice_heat_flux(1:myDim_nod2D)=zrecv(1:myDim_nod2D)
-
-   ! Do the halo exchange
-   call exchange_nod(ice_heat_flux,fesom%partit)
-
-
+   !4. Total flux over sea ice to T grid
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, npoints
+      zsendnf(n,nfield) = qns__ice(n)+qs___ice(n)
+   end do
+!$OMP END PARALLEL DO
    ! =================================================================== !
    !5. D(q)/dT to T grid
    ! DO NOTHING
 
 
    ! =================================================================== !
-   !6. Interpolate total evaporation to T grid
+   !6. Total evaporation to T grid
    ! =================================================================== !
    !ice_thermo_cpl.F90:  total evaporation (needed in oce_salt_balance.F90)
    !ice_thermo_cpl.F90:  evaporation = evap_no_ifrac*(1.-a_ice) + sublimation*a_ice
    ! =================================================================== !
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, evap_tot,  &
-      &               myDim_nod2D, zrecv )
-   
-   ! Unpack total evaporation, without halo
-   evap_no_ifrac(1:myDim_nod2D)=-zrecv(1:myDim_nod2D)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
-
-   ! Do the halo exchange
-   call exchange_nod(evap_no_ifrac,fesom%partit)
-
-   !7. Interpolate sublimation (evaporation over ice) to T grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, evap_ice,  &
-      &               myDim_nod2D, zrecv )
-   
-   ! Unpack sublimation (evaporation over ice), without halo
-   sublimation(1:myDim_nod2D)=-zrecv(1:myDim_nod2D)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
-
-   ! Do the halo exchange
-   call exchange_nod(sublimation,fesom%partit)
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, npoints
+      zsendnf(n,nfield) = evap_tot(n)
+   end do
+!$OMP END PARALLEL DO
    ! =================================================================== !
-   ! =================================================================== !
-
-
+   !7. Sublimation (evaporation over ice) to T grid
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, npoints
+      zsendnf(n,nfield) = evap_ice(n)
+   end do
+!$OMP END PARALLEL DO
    ! =================================================================== !
    !8. Interpolate liquid precipitation to T grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, prcp_liq,  &
-      &               myDim_nod2D, zrecv )
-   
-   ! Unpack liquid precipitation, without halo
-   prec_rain(1:myDim_nod2D)=zrecv(1:myDim_nod2D)/rhofwt	! kg m^(-2) s^(-1) -> m/s
-   
-   ! Do the halo exchange
-   call exchange_nod(prec_rain,fesom%partit)
-
-
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, npoints
+      zsendnf(n,nfield) = prcp_liq(n)
+   end do
+!$OMP END PARALLEL DO
    ! =================================================================== !
    !9. Interpolate solid precipitation to T grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, prcp_sol,  &
-      &               myDim_nod2D, zrecv )
-   
-   ! Unpack solid precipitation, without halo
-   prec_snow(1:myDim_nod2D)=zrecv(1:myDim_nod2D)/rhofwt	! kg m^(-2) s^(-1) -> m/s
-
-   ! Do the halo exchange
-   call exchange_nod(prec_snow,fesom%partit)
-
-
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, npoints
+      zsendnf(n,nfield) = prcp_sol(n)
+   end do
+!$OMP END PARALLEL DO
    ! =================================================================== !
    !10. Interpolate runoff to T grid
    !
@@ -788,687 +1000,294 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
 
    ! =================================================================== !
    ! STRESSES
-
    ! OVER OCEAN:
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, taux_oce,  &
-      &               myDim_nod2D, zrecv )
-   
-   ! Unpack x stress atm->oce, without halo; then do halo exchange
-   stress_atmoce_x(1:myDim_nod2D)=zrecv(1:myDim_nod2D)
-   call exchange_nod(stress_atmoce_x,fesom%partit)
-
-   !
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, tauy_oce,  &
-      &               myDim_nod2D, zrecv )
-   
-   ! Unpack y stress atm->oce, without halo; then do halo exchange
-   stress_atmoce_y(1:myDim_nod2D)=zrecv(1:myDim_nod2D)
-   call exchange_nod(stress_atmoce_y,fesom%partit)
-
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, npoints
+      zsendnf(n,nfield) = taux_oce(n)
+   end do
+!$OMP END PARALLEL DO
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, npoints
+      zsendnf(n,nfield) = tauy_oce(n)
+   end do
+!$OMP END PARALLEL DO
    ! =================================================================== !
    ! OVER ICE:
+   nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, npoints
+      zsendnf(n,nfield) = taux_ice(n)
+   end do
+!$OMP END PARALLEL DO
+   nfield = nfield + 1
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n)
+!$OMP DO
+   do n=1, npoints
+      zsendnf(n,nfield) = tauy_ice(n)
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP END PARALLEL
+   ! =================================================================== !
+   ! Interpolate arrays
+   IF (lparintmultatm) THEN
+      CALL parinter_fld_mult( nfield, mype, npes, icomm, gausstoT, npoints, &
+         &                    zsendnf, myDim_nod2D, &
+         &                    zrecvnf )
+   ELSE
+      DO jf = 1, nfield
+         CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, &
+            &               zsendnf(:,jf), myDim_nod2D, &
+            &               zrecvnf(:,jf) )
+      ENDDO
+   ENDIF
+   ! =================================================================== !
+   ! Unpack all arrays
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nfield)
+   nfield = 0
+   ! =================================================================== !
+   !1. Unpack ocean solar radiation, without halo
+   nfield = nfield + 1
+!$OMP DO
+   do n=1, myDim_nod2D
+      shortwave(n)=zrecvnf(n,nfield)
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
+   call exchange_nod(shortwave,fesom%partit)
+!$OMP END MASTER
+   ! =================================================================== !
+   !2. Interpolate ice solar radiation to T grid
+   ! DO NOTHING
 
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, taux_ice,  &
-      &               myDim_nod2D, zrecv )
-   
-   ! Unpack x stress atm->ice, without halo; then do halo exchange
-   stress_atmice_x(1:myDim_nod2D)=zrecv(1:myDim_nod2D)
-   call exchange_nod(stress_atmice_x,fesom%partit)
+   ! =================================================================== !
+   !3. Unpack ocean non-solar, without halo
+   nfield = nfield + 1
+!$OMP DO
+   do n=1, myDim_nod2D
+      oce_heat_flux(n)=zrecvnf(n,nfield)
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
+   call exchange_nod(oce_heat_flux,fesom%partit)
+!$OMP END MASTER
+   ! =================================================================== !
+   !4. Unpack ice non-solar
+   nfield = nfield + 1
+!$OMP DO
+   do n=1, myDim_nod2D
+      ice_heat_flux(n)=zrecvnf(n, nfield)
+      if (a_ice(n) <= 1.e-12) then
+         ice_heat_flux(n)=0.0
+      end if
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
+   call exchange_nod(ice_heat_flux,fesom%partit)
+!$OMP END MASTER
+   ! =================================================================== !
+   !5. D(q)/dT to T grid
+   ! DO NOTHING
 
+   ! =================================================================== !
+   !6. Unpack total evaporation to T grid
+   ! =================================================================== !
+   !ice_thermo_cpl.F90:  total evaporation (needed in oce_salt_balance.F90)
+   !ice_thermo_cpl.F90:  evaporation = evap_no_ifrac*(1.-a_ice) + sublimation*a_ice
+   ! =================================================================== !
+   ! Unpack total evaporation, without halo
+   nfield = nfield + 1
+!$OMP DO
+   do n=1, myDim_nod2D
+      evap_no_ifrac(n)=-zrecvnf(n,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
+   end do
+!$OMP END DO
+   !7. Unpack sublimation (evaporation over ice), without halo
+   nfield = nfield + 1
+!$OMP DO
+   do n=1, myDim_nod2D
+      sublimation(n)=-zrecvnf(n,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
+   end do
+!$OMP END DO
+!$OMP DO
+   do n=1, myDim_nod2D
+      sublimation(n)  =sublimation(n)*a_ice(n)           ! sublimation   -> sublimation weighted with A
+      evap_no_ifrac(n)=evap_no_ifrac(n)-sublimation(n)   ! evap_no_ifrac -> evap weighted with (1-A)
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
+   call exchange_nod(evap_no_ifrac,fesom%partit)
+   call exchange_nod(sublimation,  fesom%partit)
+!$OMP END MASTER
+   ! =================================================================== !
+   !8. Unpack liquid precipitation, without halo
+   nfield = nfield + 1
+!$OMP DO
+   do n=1, myDim_nod2D
+      prec_rain(n)=zrecvnf(n,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
+   call exchange_nod(prec_rain,fesom%partit)
+!$OMP END MASTER
+   ! =================================================================== !
+   !9. Unpack solid precipitation, without halo
+   nfield = nfield + 1
+!$OMP DO
+   do n=1, myDim_nod2D
+      prec_snow(n)=zrecvnf(n,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
+   call exchange_nod(prec_snow,fesom%partit)
+!$OMP END MASTER
+   ! =================================================================== !
+   !10. Interpolate runoff to T grid
    !
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, tauy_ice,  &
-      &               myDim_nod2D, zrecv )
-   
+   !CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, runoff,  &
+   !   &               myDim_nod2D, zrecv )
+   !
+   ! Unpack runoff, without halo
+   !runoff(1:myDim_nod2D)=zrecv(1:myDim_nod2D) !conversion??
+   !
+   ! Do the halo exchange
+   !call exchange_nod(runoff,fesom%partit)
+   !
+   !11. Interpolate ocean runoff to T grid
+   !
+   !CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, ocerunoff,  &
+   !   &               myDim_nod2D, zrecv )
+   !
+   ! Unpack ocean runoff
+   ! ??
+
+   !12. Interpolate total cloud fractions to T grid (tcc)
+   !
+   !13. Interpolate low cloud fractions to T grid (lcc)
+   ! =================================================================== !
+   ! STRESSES
+   ! OVER OCEAN:
+   nfield = nfield + 1
+   ! Unpack x stress atm->oce, without halo; then do halo exchange
+!$OMP DO
+   do n=1, myDim_nod2D
+      stress_atmoce_x(n)=zrecvnf(n,nfield)
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
+   call exchange_nod(stress_atmoce_x,fesom%partit)
+!$OMP END MASTER
+   !
+   ! Unpack y stress atm->oce, without halo; then do halo exchange
+   nfield = nfield + 1
+!$OMP DO
+   do n=1, myDim_nod2D
+      stress_atmoce_y(n)=zrecvnf(n,nfield)
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
+   call exchange_nod(stress_atmoce_y,fesom%partit)
+!$OMP END MASTER
+   ! =================================================================== !
+   ! OVER ICE:
+   ! Unpack x stress atm->ice, without halo; then do halo exchange
+   nfield = nfield + 1
+!$OMP DO
+   do n=1, myDim_nod2D
+      stress_atmice_x(n)=zrecvnf(n,nfield)
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
+   call exchange_nod(stress_atmice_x,fesom%partit)
+!$OMP END MASTER
+   !
    ! Unpack y stress atm->ice, without halo; then do halo exchange
-   stress_atmice_y(1:myDim_nod2D)=zrecv(1:myDim_nod2D)
+   nfield = nfield + 1
+!$OMP DO
+   do n=1, myDim_nod2D
+      stress_atmice_y(n)=zrecvnf(n,nfield)
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
    call exchange_nod(stress_atmice_y,fesom%partit)
-
-
+!$OMP END MASTER
    ! =================================================================== !
    ! ROTATE VECTORS FROM GEOGRAPHIC TO FESOMS ROTATED GRID
 
    !if ((do_rotate_oce_wind .AND. do_rotate_ice_wind) .AND. rotated_grid) then
+!$OMP DO
    do n=1, myDim_nod2D+eDim_nod2D
-	call vector_g2r(stress_atmoce_x(n), stress_atmoce_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0) !0-flag for rot. coord.
-	call vector_g2r(stress_atmice_x(n), stress_atmice_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
+	   call vector_g2r(stress_atmoce_x(n), stress_atmoce_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0) !0-flag for rot. coord.
+	   call vector_g2r(stress_atmice_x(n), stress_atmice_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
    end do
+!$OMP END DO
    !do_rotate_oce_wind=.false.
    !do_rotate_ice_wind=.false.
    !end if
-
-
-#ifdef FESOM_TODO
-
-   ! Packed receive buffer
-   REAL(wpIFS), DIMENSION((nlei-nldi+1)*(nlej-nldj+1)) :: zrecv
-   ! Unpacked fields on ORCA grids
-   REAL(wpIFS), DIMENSION(jpi,jpj) :: zqs___oce, zqs___ice, zqns__oce, zqns__ice
-   REAL(wpIFS), DIMENSION(jpi,jpj) :: zdqdt_ice, zevap_tot, zevap_ice, zprcp_liq, zprcp_sol
-   REAL(wpIFS), DIMENSION(jpi,jpj) :: zrunoff, zocerunoff
-   REAL(wpIFS), DIMENSION(jpi,jpj) :: ztmp, zicefr
-   ! Arrays for rotation
-   REAL(wpIFS), DIMENSION(jpi,jpj) :: zuu,zvu,zuv,zvv,zutau,zvtau 
-   ! Lead fraction for both LIM2/LIM3
-   REAL(wpIFS), DIMENSION(jpi,jpj) :: zfrld
-   ! Mask for masking for I grid
-   REAL(wpIFS) :: zmsksum
-   ! For summing up LIM3 contributions to ice temperature
-   REAL(wpIFS) :: zval,zweig
-
-   ! Loop variables
-   INTEGER :: ji,jj,jk,jl
-   ! netCDF debugging output variables
-   CHARACTER(len=128) :: cdoutfile
-   INTEGER :: inum
-   REAL(wpIFS) :: zhook_handle ! Dr Hook handle
-
-   IF(lhook) CALL dr_hook('nemogcmcoup_lim2_update',0,zhook_handle)
-   IF(nn_timing == 1) CALL timing_start('nemogcmcoup_lim2_update')
-   
-   ! Allocate the storage data
-
-   IF (.NOT.lallociceflx) THEN
-      ALLOCATE( &
-         & zsqns_tot(jpi,jpj),   &
-         & zsqns_ice(jpi,jpj),   &
-         & zsqsr_tot(jpi,jpj),   &
-         & zsqsr_ice(jpi,jpj),   &
-         & zsemp_tot(jpi,jpj),   &
-         & zsemp_ice(jpi,jpj),   &
-	 & zsevap_ice(jpi,jpj),  &
-         & zsdqdns_ice(jpi,jpj), &
-         & zssprecip(jpi,jpj),   &
-	 & zstprecip(jpi,jpj),   &
-         & zstcc(jpi,jpj),       &
-         & zslcc(jpi,jpj),       &
-         & zsatmist(jpi,jpj),    &
-         & zsqns_ice_add(jpi,jpj)&
-         & )
-      lallociceflx = .TRUE.
-   ENDIF
-   IF (.NOT.lallocstress) THEN
-      ALLOCATE( &
-         & zsutau(jpi,jpj),     &
-         & zsvtau(jpi,jpj),     &
-         & zsutau_ice(jpi,jpj), &
-         & zsvtau_ice(jpi,jpj)  &
-         & )
-      lallocstress = .TRUE.
-   ENDIF
-
-   ! Sort out incoming arrays from the IFS and put them on the ocean grid
-   
-   !1. Interpolate ocean solar radiation to T grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, qs___oce,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-   
-   ! Unpack ocean solar radiation
-
-   zqs___oce(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zqs___oce(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
-
-   !2. Interpolate ice solar radiation to T grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, qs___ice,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-   
-   ! Unpack ice solar radiation
-
-   zqs___ice(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zqs___ice(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
-   
-   !3. Interpolate ocean non-solar radiation to T grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, qns__oce,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-   
-   ! Unpack ocean non-solar radiation
-
-   zqns__oce(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zqns__oce(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
-
-   !4. Interpolate ice non-solar radiation to T grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, qns__ice,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-   
-   ! Unpack ice non-solar radiation
-
-   zqns__ice(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zqns__ice(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
-   
-   !5. Interpolate  D(q)/dT to T grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, dqdt_ice,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-   
-   ! Unpack D(q)/D(T) 
-
-   zdqdt_ice(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zdqdt_ice(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
-
-   !6. Interpolate total evaporation to T grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, evap_tot,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-   
-   ! Unpack total evaporation
-
-   zevap_tot(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zevap_tot(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
-   
-   !7. Interpolate evaporation over ice to T grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, evap_ice,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-   
-   ! Unpack evaporation over ice
-
-   zevap_ice(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zevap_ice(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
- 
-   !8. Interpolate liquid precipitation to T grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, prcp_liq,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-   
-   ! Unpack liquid precipitation
-
-   zprcp_liq(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zprcp_liq(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
-   
-   !9. Interpolate solid precipitation to T grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, prcp_sol,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-   
-   ! Unpack precipitation over ice
-
-   zprcp_sol(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zprcp_sol(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
-   
-   !10. Interpolate runoff to T grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, runoff,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-   
-   ! Unpack runoff
-
-   zrunoff(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zrunoff(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
-
-   !11. Interpolate ocean runoff to T grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, ocerunoff,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-   
-   ! Unpack ocean runoff
-
-   zocerunoff(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zocerunoff(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
-
-   !12. Interpolate total cloud fractions to T grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, tcc,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-   
-   ! Unpack ocean runoff
-
-   zstcc(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zstcc(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
-
-   !13. Interpolate low cloud fractions to T grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, lcc,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-   
-   ! Unpack ocean runoff
-
-   zslcc(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zslcc(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
-
-   ! get sea ice fraction and lead fraction
-
-#if defined key_lim2
-   zfrld(:,:) = frld(:,:)
-   zicefr(:,:) = 1 - zfrld(:,:)
-#else
-   zicefr(:,:) = 0.0_wpIFS
-   DO jl = 1, jpl
-      zicefr(:,:) = zicefr(:,:) + a_i(:,:,jl)
-   ENDDO
-   zfrld(:,:) = 1 - zicefr(:,:)
-#endif
-    
-   zsemp_tot(:,:) = zevap_tot(:,:) - zprcp_liq(:,:) - zprcp_sol(:,:)
-   zstprecip(:,:) = zprcp_liq(:,:) + zprcp_sol(:,:)
-   ! More consistent with NEMO, but does changes the results, so
-   ! we don't do it for now.
-   ! zsemp_tot(:,:) = zevap_tot(:,:) - zstprecip(:,:)
-   zsemp_ice(:,:) = zevap_ice(:,:) - zprcp_sol(:,:)
-   zssprecip(:,:) = - zsemp_ice(:,:)
-   zsemp_tot(:,:) = zsemp_tot(:,:) - zrunoff(:,:)
-   zsemp_tot(:,:) = zsemp_tot(:,:) - zocerunoff(:,:)
-   zsevap_ice(:,:) = zevap_ice(:,:)
-
-   !   non solar heat fluxes   !  (qns)
-   IF (loceicemix) THEN
-      zsqns_tot(:,:) =  zqns__oce(:,:)
-   ELSE
-      zsqns_tot(:,:) =  zfrld(:,:) * zqns__oce(:,:) + zicefr(:,:) * zqns__ice(:,:)
-   ENDIF
-   zsqns_ice(:,:) =  zqns__ice(:,:)
-   ztmp(:,:) = zfrld(:,:) * zprcp_sol(:,:) * lfus  ! add the latent heat of solid precip. melting
-
-   zsqns_tot(:,:) = zsqns_tot(:,:) - ztmp(:,:)    ! over free ocean 
-   !      solar heat fluxes    !   (qsr)
-  
-   IF (loceicemix) THEN
-      zsqsr_tot(:,:) =  zqs___oce(:,:)
-   ELSE
-      zsqsr_tot(:,:) =  zfrld(:,:) * zqs___oce(:,:) + zicefr(:,:) * zqs___ice(:,:)
-   ENDIF
-   zsqsr_ice(:,:) =  zqs___ice(:,:)
-   
-   IF( ln_dm2dc ) THEN   ! modify qsr to include the diurnal cycle
-      zsqsr_tot(:,:) = sbc_dcy( zsqsr_tot(:,:) )
-      zsqsr_ice(:,:) = sbc_dcy( zsqsr_ice(:,:) )
-   ENDIF
-  
-   zsdqdns_ice(:,:) = zdqdt_ice(:,:)
-
-   ! Apply lateral boundary condition
-   
-   CALL lbc_lnk(zsqns_tot, 'T', 1.0)
-   CALL lbc_lnk(zsqns_ice, 'T', 1.0)
-   CALL lbc_lnk(zsqsr_tot, 'T', 1.0)
-   CALL lbc_lnk(zsqsr_ice, 'T', 1.0)
-   CALL lbc_lnk(zsemp_tot, 'T', 1.0)
-   CALL lbc_lnk(zsemp_ice, 'T', 1.0)
-   CALL lbc_lnk(zsdqdns_ice, 'T', 1.0)
-   CALL lbc_lnk(zssprecip, 'T', 1.0)
-   CALL lbc_lnk(zstprecip, 'T', 1.0)
-   CALL lbc_lnk(zstcc, 'T', 1.0)
-   CALL lbc_lnk(zslcc, 'T', 1.0)
-
-   ! Interpolate  atmospheric ice temperature to T grid
-      
-   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, tice_atm,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-   
-   ! Unpack atmospheric ice temperature
-      
-   zsatmist(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zsatmist(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
-   CALL lbc_lnk(zsatmist, 'T', 1.0)
-   
-   zsqns_ice_add(:,:) = 0.0_wpIFS
-
-   ! Use the dqns_ice filter
-
-   IF (lqnsicefilt) THEN
-
-      ! Add filtr to qns_ice
-      
-#if defined key_lim2 
-      ztmp(:,:) = tn_ice(:,:,1)
-#else
-      DO jj = nldj, nlej
-         DO ji = nldi, nlei
-            zval=0.0
-            zweig=0.0
-            DO jl = 1, jpl
-               zval = zval + tn_ice(ji,jj,jl) * a_i(ji,jj,jl)
-               zweig = zweig + a_i(ji,jj,jl)
-            ENDDO
-            IF ( zweig > 0.0 ) THEN
-               ztmp(ji,jj) = zval /zweig
-            ELSE
-               ztmp(ji,jj) = rt0
-            ENDIF
-         ENDDO
-      ENDDO
-      CALL lbc_lnk(ztmp, 'T', 1.0)
-#endif
-
-      WHERE ( zicefr(:,:) > .001_wpIFS )
-         zsqns_ice_add(:,:) = zsdqdns_ice(:,:) * ( ztmp(:,:) - zsatmist(:,:) )
-      END WHERE
-
-      zsqns_ice(:,:) = zsqns_ice(:,:) + zsqns_ice_add(:,:)
-      
-   ENDIF
-
-   ! Interpolate u-stress to U grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoU, npoints,taux_oce,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-
-   ! Unpack u stress on U grid
-
-   zuu(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zuu(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
-
-   ! Interpolate v-stress to U grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoU, npoints, tauy_oce,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-   
-   ! Unpack v stress on U grid
-
-   zvu(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zvu(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
-
-   ! Interpolate u-stress to V grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoV, npoints,taux_oce,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-
-   ! Unpack u stress on V grid
-
-   zuv(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zuv(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
-
-   ! Interpolate v-stress to V grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoV, npoints, tauy_oce,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-
-   ! Unpack v stress on V grid
-
-   zvv(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zvv(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
-   
-   ! Rotate stresses from en to ij and put u,v stresses on U,V grids
-   
-   CALL repcmo( zuu, zvu, zuv, zvv, zsutau, zsvtau )
-
-   ! Apply lateral boundary condition on u,v stresses on the U,V grids
-
-   CALL lbc_lnk( zsutau, 'U', -1.0 )
-   CALL lbc_lnk( zsvtau, 'V', -1.0 )
-
-   ! Interpolate ice u-stress to U grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoU, npoints,taux_ice,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-
-   ! Unpack ice u stress on U grid
-
-   zuu(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zuu(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
-
-   ! Interpolate ice v-stress to U grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoU, npoints, tauy_ice,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-   
-   ! Unpack ice v stress on U grid
-
-   zvu(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zvu(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
-
-   ! Interpolate ice u-stress to V grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoV, npoints,taux_ice,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-
-   ! Unpack ice u stress on V grid
-
-   zuv(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zuv(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
-
-   ! Interpolate ice v-stress to V grid
-
-   CALL parinter_fld( mype, npes, icomm, gausstoV, npoints, tauy_ice,  &
-      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zrecv )
-
-   ! Unpack ice v stress on V grid
-
-   zvv(:,:) = 0.0
-   DO jj = nldj, nlej
-      DO ji = nldi, nlei
-         jk = ( jj - nldj ) * ( nlei - nldi + 1 ) + ( ji - nldi + 1 )
-         zvv(ji,jj) = zrecv(jk)
-      ENDDO
-   ENDDO
-   
-   ! Rotate stresses from en to ij and put u,v stresses on U,V grids
-
-   CALL repcmo( zuu, zvu, zuv, zvv, zutau, zvtau )
-
-   ! Apply lateral boundary condition on u,v stresses on the U,V grids
-
-   CALL lbc_lnk( zutau, 'U', -1.0 )
-   CALL lbc_lnk( zvtau, 'V', -1.0 )
-
-#if defined key_lim2_vp
-
-   ! Convert to I grid for LIM2 for key_lim_vp
-   DO jj = 2, jpjm1                                   ! (U,V) ==> I
-      DO ji = 2, jpim1   ! NO vector opt.
-         zmsksum = umask(ji-1,jj,1) + umask(ji-1,jj-1,1) 
-         zsutau_ice(ji,jj) = ( umask(ji-1,jj,1) * zutau(ji-1,jj) + &
-            &                  umask(ji-1,jj-1,1) * zutau(ji-1,jj-1) )
-         IF ( zmsksum > 0.0 ) THEN
-            zsutau_ice(ji,jj) = zsutau_ice(ji,jj) / zmsksum
-         ENDIF
-         zmsksum = vmask(ji,jj-1,1) + vmask(ji-1,jj-1,1) 
-         zsvtau_ice(ji,jj) = ( vmask(ji,jj-1,1) * zvtau(ji,jj-1) + &
-            &                  vmask(ji-1,jj-1,1) * zvtau(ji-1,jj-1) )
-         IF ( zmsksum > 0.0 ) THEN
-            zsvtau_ice(ji,jj) = zsvtau_ice(ji,jj) / zmsksum
-         ENDIF
-      END DO
-   END DO
-
-#else
-   
-   zsutau_ice(:,:) = zutau(:,:)
-   zsvtau_ice(:,:) = zvtau(:,:)
-
-#endif
-
-   CALL lbc_lnk( zsutau_ice, 'I', -1.0 )
-   CALL lbc_lnk( zsvtau_ice, 'I', -1.0 )
-   
-   ! Optionally write files write the data on the ORCA grid via IOM.
-
-   IF (ldebug) THEN      
-      WRITE(cdoutfile,'(A,I8.8)') 'zsutau_',kt
-      CALL iom_open( TRIM(cdoutfile), inum, ldwrt = .TRUE., kiolib = jprstlib)
-      CALL iom_rstput( kt, kt, inum, 'zsutau' , zsutau )
-      CALL iom_close( inum )
-      WRITE(cdoutfile,'(A,I8.8)') 'zsvtau_',kt
-      CALL iom_open( TRIM(cdoutfile), inum, ldwrt = .TRUE., kiolib = jprstlib)
-      CALL iom_rstput( kt, kt, inum, 'zsvtau' , zsvtau )
-      CALL iom_close( inum )
-      WRITE(cdoutfile,'(A,I8.8)') 'zsutau_ice_',kt
-      CALL iom_open( TRIM(cdoutfile), inum, ldwrt = .TRUE., kiolib = jprstlib)
-      CALL iom_rstput( kt, kt, inum, 'zsutau_ice' , zsutau_ice )
-      CALL iom_close( inum )
-      WRITE(cdoutfile,'(A,I8.8)') 'zsvtau_ice_',kt
-      CALL iom_open( TRIM(cdoutfile), inum, ldwrt = .TRUE., kiolib = jprstlib)
-      CALL iom_rstput( kt, kt, inum, 'zsvtau_ice' , zsvtau_ice )
-      CALL iom_close( inum )
-      WRITE(cdoutfile,'(A,I8.8)') 'zsqns_tot_',kt
-      CALL iom_open( TRIM(cdoutfile), inum, ldwrt = .TRUE., kiolib = jprstlib)
-      CALL iom_rstput( kt, kt, inum, 'zsqns_tot' , zsqns_tot )
-      CALL iom_close( inum )
-      WRITE(cdoutfile,'(A,I8.8)') 'zsqns_ice_',kt
-      CALL iom_open( TRIM(cdoutfile), inum, ldwrt = .TRUE., kiolib = jprstlib)
-      CALL iom_rstput( kt, kt, inum, 'zsqns_ice' , zsqns_ice )
-      CALL iom_close( inum )
-      WRITE(cdoutfile,'(A,I8.8)') 'zsqsr_tot_',kt
-      CALL iom_open( TRIM(cdoutfile), inum, ldwrt = .TRUE., kiolib = jprstlib)
-      CALL iom_rstput( kt, kt, inum, 'zsqsr_tot' , zsqsr_tot )
-      CALL iom_close( inum )
-      WRITE(cdoutfile,'(A,I8.8)') 'zsqsr_ice_',kt
-      CALL iom_open( TRIM(cdoutfile), inum, ldwrt = .TRUE., kiolib = jprstlib)
-      CALL iom_rstput( kt, kt, inum, 'zsqsr_ice' , zsqsr_ice )
-      CALL iom_close( inum )
-      WRITE(cdoutfile,'(A,I8.8)') 'zsemp_tot_',kt
-      CALL iom_open( TRIM(cdoutfile), inum, ldwrt = .TRUE., kiolib = jprstlib)
-      CALL iom_rstput( kt, kt, inum, 'zsemp_tot' , zsemp_tot )
-      CALL iom_close( inum )
-      WRITE(cdoutfile,'(A,I8.8)') 'zsemp_ice_',kt
-      CALL iom_open( TRIM(cdoutfile), inum, ldwrt = .TRUE., kiolib = jprstlib)
-      CALL iom_rstput( kt, kt, inum, 'zsemp_ice' , zsemp_ice )
-      CALL iom_close( inum )
-      WRITE(cdoutfile,'(A,I8.8)') 'zsdqdns_ice_',kt
-      CALL iom_open( TRIM(cdoutfile), inum, ldwrt = .TRUE., kiolib = jprstlib)
-      CALL iom_rstput( kt, kt, inum, 'zsdqdns_ice' , zsdqdns_ice )
-      CALL iom_close( inum )
-      WRITE(cdoutfile,'(A,I8.8)') 'zssprecip_',kt
-      CALL iom_open( TRIM(cdoutfile), inum, ldwrt = .TRUE., kiolib = jprstlib)
-      CALL iom_rstput( kt, kt, inum, 'zssprecip' , zssprecip )
-      CALL iom_close( inum )
-      WRITE(cdoutfile,'(A,I8.8)') 'zstprecip_',kt
-      CALL iom_open( TRIM(cdoutfile), inum, ldwrt = .TRUE., kiolib = jprstlib)
-      CALL iom_rstput( kt, kt, inum, 'zstprecip' , zstprecip )
-      CALL iom_close( inum )
-      WRITE(cdoutfile,'(A,I8.8)') 'zsevap_ice_',kt
-      CALL iom_open( TRIM(cdoutfile), inum, ldwrt = .TRUE., kiolib = jprstlib)
-      CALL iom_rstput( kt, kt, inum, 'zsevap_ice' , zsevap_ice )
-      CALL iom_close( inum )
-      WRITE(cdoutfile,'(A,I8.8)') 'zstcc_',kt
-      CALL iom_open( TRIM(cdoutfile), inum, ldwrt = .TRUE., kiolib = jprstlib)
-      CALL iom_rstput( kt, kt, inum, 'zstcc' , zstcc )
-      CALL iom_close( inum )
-      WRITE(cdoutfile,'(A,I8.8)') 'zslcc_',kt
-      CALL iom_open( TRIM(cdoutfile), inum, ldwrt = .TRUE., kiolib = jprstlib)
-      CALL iom_rstput( kt, kt, inum, 'zslcc' , zslcc )
-      CALL iom_close( inum )
-      WRITE(cdoutfile,'(A,I8.8)') 'zsatmist_',kt
-      CALL iom_open( TRIM(cdoutfile), inum, ldwrt = .TRUE., kiolib = jprstlib)
-      CALL iom_rstput( kt, kt, inum, 'zsatmist' , zsatmist )
-      CALL iom_close( inum )
-      WRITE(cdoutfile,'(A,I8.8)') 'zsqns_ice_add_',kt
-      CALL iom_open( TRIM(cdoutfile), inum, ldwrt = .TRUE., kiolib = jprstlib)
-      CALL iom_rstput( kt, kt, inum, 'zsqns_ice_add' , zsqns_ice_add )
-      CALL iom_close( inum )
-   ENDIF
-
-   IF(nn_timing == 1) CALL timing_stop('nemogcmcoup_lim2_update')
-   IF(lhook) CALL dr_hook('nemogcmcoup_lim2_update',1,zhook_handle)
-
-#else
-
-   !FESOM part
-   !WRITE(0,*)'nemogcmcoup_lim2_update partially implemented. Proceeding...'
-   !CALL par_ex
-
-#endif
-
+   ! Enthalpy heat of fusion: take heat from the ocean in order to melt the snow that is falling into the ocean
+   ! prec_snow*rho [kg/m2/s] * lfus [J/kg] = W/m2
+!$OMP DO
+   do n=1, myDim_nod2D
+      enthalpyoffuse(n)= - rhofwt * prec_snow(n) * lfus * 1000.
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
+   call exchange_nod(enthalpyoffuse, fesom%partit)
+!$OMP END MASTER
+!$OMP END PARALLEL
 END SUBROUTINE nemogcmcoup_lim2_update
 
+subroutine ocean_update_runoff(NBASIN_RUNOFF, BASIN_RUNOFF)
+   !it will be called inside IFS nemo/couplnemo.F90 -> COUPLNEMO
+   USE par_kind !in ifs_modules.F90
+   USE fesom_main_storage_module, only: fesom => f
+   USE MOD_MESH
+   USE MOD_PARTIT
+   USE MOD_PARSUP
+   USE g_forcing_arrays,    only: runoff
+   USE g_sbf,               only: RUNOFF_MAPPER
+   use g_support
+   implicit none
+   INTEGER,          INTENT(IN)    :: NBASIN_RUNOFF
+   REAL(kind=wpIFS), INTENT(INOUT) :: BASIN_RUNOFF(NBASIN_RUNOFF)
+   integer                         :: n, i, j
+   real(kind=WP)                   :: total_runoff
+   logical, save                   :: lfirst=.true.
+   integer                         :: total_number_of_basins=0 ! will be used to check the consistency after first call
+ 
+   if (lfirst) then
+      total_number_of_basins=maxval(RUNOFF_MAPPER%colind)
+      call MPI_Allreduce(MPI_IN_PLACE, total_number_of_basins, 1, MPI_INTEGER, MPI_MAX, fesom%partit%MPI_COMM_FESOM, fesom%partit%MPIerr)
+      if (total_number_of_basins/=NBASIN_RUNOFF) then
+         if (fesom%partit%mype==0) write(*,*) 'mismatch in number of runoff basins between ocean and atmosphere:', total_number_of_basins, NBASIN_RUNOFF
+         if (fesom%partit%mype==0) write(*,*) 'the model will stop!'
+         call par_ex(fesom%partit%MPI_COMM_FESOM, fesom%partit%mype)
+         stop
+      end if
+      lfirst=.false.
+   end if
+   do n=1, fesom%partit%myDim_nod2D+fesom%partit%eDim_nod2D
+      runoff(n)=0.0_WP
+      i=RUNOFF_MAPPER%rowptr(n)
+      j=RUNOFF_MAPPER%rowptr(n+1)-1
+      runoff(n)=sum(RUNOFF_MAPPER%values(i:j)*REAL(BASIN_RUNOFF(RUNOFF_MAPPER%colind(i:j)), WP))
+   end do
+   call integrate_nod(runoff, total_runoff, fesom%partit, fesom%mesh)
+   if (fesom%partit%mype==0) write(*,*) 'total runoff=', total_runoff*1.e-6
+end subroutine ocean_update_runoff
 
 SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )
 
@@ -1499,17 +1318,6 @@ SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )
    if(fesom%mype==0) then
    WRITE(0,*)'! FESOM date at end of timestep is ', icdate ,' ======'
    endif
-
-#ifdef FESOM_TODO
-   iye = ndastp / 10000
-   imo = ndastp / 100 - iye * 100
-   ida = MOD( ndastp, 100 )
-   CALL greg2jul( 0, 0, 0, ida, imo, iye, zjul )
-   zjul = zjul + ( nsec_day + 0.5_wpIFS * rdttra(1) ) / 86400.0_wpIFS
-   CALL jul2greg( iss, imm, ihh, ida, imo, iye, zjul )
-   icdate = iye * 10000 + imo * 100 + ida
-   ictime = ihh * 10000 + imm * 100 + iss
-#endif
 
 END SUBROUTINE nemogcmcoup_step
 

@@ -72,7 +72,7 @@ subroutine thermodynamics(ice, partit, mesh)
 #if defined (__oasis) || defined (__ifsinterface)
   real(kind=WP), dimension(:)  , pointer ::  oce_heat_flux, ice_heat_flux 
 #endif 
-  real(kind=WP)                , pointer :: rhoice, rhosno, rhowat, Sice, cl, cc, cpice, consn, con 
+  real(kind=WP)                , pointer :: rhoice, rhosno, rhowat, rhofwt, Sice, cl, cc, cpice, consn, con 
   myDim_nod2d=>partit%myDim_nod2D
   eDim_nod2D =>partit%eDim_nod2D
   ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D
@@ -106,6 +106,7 @@ subroutine thermodynamics(ice, partit, mesh)
   rhoice        => ice%thermo%rhoice  
   rhosno        => ice%thermo%rhosno
   rhowat        => ice%thermo%rhowat
+  rhofwt        => ice%thermo%rhofwt
   Sice          => ice%thermo%Sice
   cl            => ice%thermo%cl
   cc            => ice%thermo%cc
@@ -192,10 +193,7 @@ subroutine thermodynamics(ice, partit, mesh)
      !---- total evaporation (needed in oce_salt_balance.F90) = evap+subli
      evaporation(inod)    = evap + subli
      ice_sublimation(inod)= subli
-     prec_rain(inod)      = rain
-     prec_snow(inod)      = snow
-     runoff(inod)         = runo
-#if defined (__oifs)  
+#if defined (__oasis) || defined (__ifsinterface)
      residualifwflx(inod) = resid
 #endif     
   enddo
@@ -244,9 +242,6 @@ contains
     !---- significantly greater than the time step dt
     real(kind=WP), parameter :: gamma_t = 10./86400.
 
-    !---- density of freshwater [kg/m**3].
-    real(kind=WP), parameter :: rhofwt = 1000.
-
     !---- freezing temperature of freshwater [deg C]
     real(kind=WP), parameter :: Tfrez0 = 0.
 
@@ -282,6 +277,8 @@ contains
     ahf = A*Qatmice + (1._WP-A)*Qatmocn
     ohf = A*Qocnice + (1._WP-A)*Qocnatm
 
+
+
     !---- convert heat fluxes [W/m**2] into growth per time step dt [m]
     Qicecon = Qicecon*dt/cl
     Qatmice = Qatmice*dt/cl
@@ -293,8 +290,11 @@ contains
     !---- NOTE: evaporation and sublimation represent potential fluxes and
     !---- must be area-weighted (like the heat fluxes); in contrast,
     !---- precipitation (snow and rain) and runoff are effective fluxes
+!already weighted in IFS coupling
+#if !defined (__ifsinterface)
     subli  = A*subli
     evap   = (1._WP-A)*evap
+#endif
     PmEice = A*snow + subli
     PmEocn = evap + rain + (1._WP-A)*snow + runo
 
@@ -477,13 +477,13 @@ contains
 
     !---- convert freshwater mass flux [kg/m**2/s] into sea-water volume flux [m/s]
     fw   = fw/rhowat
-    evap = evap *rhofwt/rhowat
-    rain = rain *rhofwt/rhowat
-    snow = snow *rhofwt/rhowat
-    runo = runo *rhofwt/rhowat
-    subli= subli*rhofwt/rhowat
-    resid= resid*rhofwt/rhowat
-    
+    ! keep in mind that for computation of FW all imposed fluxes were accounted with the ratio rhofwt/rhowat:
+    !evap = evap *rhofwt/rhowat
+    !rain = rain *rhofwt/rhowat
+    !snow = snow *rhofwt/rhowat
+    !runo = runo *rhofwt/rhowat
+    !subli= subli*rhofwt/rhowat
+    !resid= resid*rhofwt/rhowat
     return
   end subroutine ice_growth
 

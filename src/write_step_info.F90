@@ -8,12 +8,22 @@ module write_step_info_interface
       use MOD_TRACER
       use MOD_DYN
       use MOD_ICE
-      integer              :: istep,outfreq
+      integer                               :: istep,outfreq
       type(t_mesh),   intent(in)   , target :: mesh
       type(t_partit), intent(inout), target :: partit
       type(t_tracer), intent(in)   , target :: tracers
       type(t_dyn)   , intent(in)   , target :: dynamics
       type(t_ice)   , intent(in)   , target :: ice
+    end subroutine
+    subroutine write_enegry_info(dynamics, partit, mesh)
+      use MOD_MESH
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      use MOD_DYN
+      use g_support
+      type(t_mesh),   intent(in)   , target :: mesh
+      type(t_partit), intent(inout), target :: partit
+      type(t_dyn)   , intent(in)   , target :: dynamics
     end subroutine
   end interface
 end module
@@ -258,7 +268,7 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_MESH
-    use g_config, only: logfile_outfreq, which_ALE
+    use g_config, only: logfile_outfreq, which_ALE, toy_ocean, use_ice
     use o_PARAM
     use o_ARRAYS, only: water_flux, stress_surf, &
                     heat_flux, Kv, Av
@@ -276,7 +286,7 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
     integer                       :: n, nz, istep, found_blowup_loc=0, found_blowup=0
-    integer                      :: el, elidx
+    integer                       :: el, elidx
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV
@@ -334,14 +344,18 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
           write(*,*)
           write(*,*) 'wflux = ',water_flux(n)
           write(*,*)
-          write(*,*) 'u_wind = ',u_wind(n),', v_wind = ',v_wind(n)
-          write(*,*)
-          do nz=1,nod_in_elem2D_num(n)
-                write(*,*) 'stress_surf(1:2,',nz,') = ',stress_surf(:,nod_in_elem2D(nz,n))
-          end do
+          if (.not. toy_ocean) then
+            write(*,*) 'u_wind = ',u_wind(n),', v_wind = ',v_wind(n)
+            write(*,*)
+            do nz=1,nod_in_elem2D_num(n)
+                    write(*,*) 'stress_surf(1:2,',nz,') = ',stress_surf(:,nod_in_elem2D(nz,n))
+            end do
+          end if
+          if (use_ice) then
           write(*,*)
           write(*,*) 'm_ice = ',m_ice(n),', m_ice_old = ',m_ice_old(n)
           write(*,*) 'a_ice = ',a_ice(n),', a_ice_old = ',a_ice_old(n)
+          end if 
           write(*,*)
           write(*,*) 'Wvel(:, n)  = ',Wvel(ulevels_nod2D(n):nlevels_nod2D(n),n)
           write(*,*)
@@ -407,7 +421,7 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
        end if ! --> if ( .not. trim(which_ALE)=='linfs' .and. ...
           
        
-       do nz=1,nlevels_nod2D(n)-1
+       do nz=ulevels_nod2D(n),nlevels_nod2D(n)-1
           !_______________________________________________________________
           ! check temp
           if ( (tracers%data(1)%values(nz, n) /= tracers%data(1)%values(nz, n)) .or. &
@@ -438,11 +452,13 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
              write(*,*) 'ssh_rhs     = ',ssh_rhs(n)
              write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(n)
              write(*,*)
-             write(*,*) 'm_ice    = ',m_ice(n)
-             write(*,*) 'm_ice_old   = ',m_ice_old(n)
-             write(*,*) 'm_snow      = ',m_snow(n)
-             write(*,*) 'm_snow_old  = ',m_snow_old(n)
-             write(*,*)
+             if (use_ice) then
+                write(*,*) 'm_ice    = ',m_ice(n)
+                write(*,*) 'm_ice_old   = ',m_ice_old(n)
+                write(*,*) 'm_snow      = ',m_snow(n)
+                write(*,*) 'm_snow_old  = ',m_snow_old(n)
+                write(*,*)
+             end if 
              write(*,*) 'hnode    = ',hnode(:,n)
              write(*,*) 'hnode_new   = ',hnode_new(:,n)
              write(*,*)
@@ -459,11 +475,11 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
           !_______________________________________________________________
           ! check salt
           if ( (tracers%data(2)%values(nz, n) /= tracers%data(2)%values(nz, n)) .or.  &
-             tracers%data(2)%values(nz, n) < 0 .or. tracers%data(2)%values(nz, n)>50 ) then
+             tracers%data(2)%values(nz, n) <3.0_WP .or. tracers%data(2)%values(nz, n) >45.0_WP ) then
 !$OMP CRITICAL
              found_blowup_loc=1
              write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
-             write(*,*) ' --STOP--> found salinity becomes NaN or <0, >50'
+             write(*,*) ' --STOP--> found salinity becomes NaN or <=3.0, >=45.0'
              write(*,*) 'mype     = ',mype
              write(*,*) 'mstep    = ',istep
              write(*,*) 'node     = ',n
@@ -542,3 +558,56 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
     endif 
 end subroutine
 !===============================================================================
+subroutine write_enegry_info(dynamics, partit, mesh)
+   use MOD_MESH
+   USE MOD_PARTIT
+   USE MOD_PARSUP
+   use MOD_DYN
+   use g_support
+   IMPLICIT NONE
+   type(t_mesh),   intent(in)   , target :: mesh
+   type(t_partit), intent(inout), target :: partit
+   type(t_dyn)   , intent(in)   , target :: dynamics
+   real(kind=WP)                         :: budget(2)
+   integer, pointer                      :: mype
+
+   mype            => partit%mype
+
+   if (mype==0) write(*,*) '*******KE budget analysis...*******'
+   if (mype==0) write(*,*) '     U     |     V     |     TOTAL'
+   call integrate_elem(dynamics%ke_du2(1,:,:),  budget(1), partit, mesh)
+   call integrate_elem(dynamics%ke_du2(2,:,:),  budget(2), partit, mesh)
+   if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. du2=', budget(1),' | ',  budget(2), ' | ', sum(budget)
+
+   call integrate_elem(dynamics%ke_pre_xVEL(1,:,:),  budget(1), partit, mesh)
+   call integrate_elem(dynamics%ke_pre_xVEL(2,:,:),  budget(2), partit, mesh)
+   if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. pre=', budget(1), ' | ', budget(2), ' | ', sum(budget)
+
+   call integrate_nod(dynamics%ke_wrho,  budget(1), partit, mesh)
+   if (mype==0) write(*,"(A, ES14.7)") 'w * rho=', budget(1)
+
+   call integrate_elem(dynamics%ke_adv_xVEL(1,:,:),  budget(1), partit, mesh)
+   call integrate_elem(dynamics%ke_adv_xVEL(2,:,:),  budget(2), partit, mesh)
+   if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. adv=', budget(1), ' | ', budget(2), ' | ', sum(budget)
+
+   call integrate_elem(dynamics%ke_hvis_xVEL(1,:,:), budget(1), partit, mesh)
+   call integrate_elem(dynamics%ke_hvis_xVEL(2,:,:), budget(2), partit, mesh)
+   if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke.  ah=', budget(1), ' | ', budget(2), ' | ', sum(budget)
+
+   call integrate_elem(dynamics%ke_vvis_xVEL(1,:,:), budget(1), partit, mesh)
+   call integrate_elem(dynamics%ke_vvis_xVEL(2,:,:), budget(2), partit, mesh)
+   if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke.  av=', budget(1), ' | ', budget(2), ' | ', sum(budget)
+
+   call integrate_elem(dynamics%ke_cor_xVEL(1,:,:),  budget(1), partit, mesh)
+   call integrate_elem(dynamics%ke_cor_xVEL(2,:,:),  budget(2), partit, mesh)
+   if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. cor=', budget(1), ' | ', budget(2), ' | ', sum(budget)
+
+   call integrate_elem(dynamics%ke_wind_xVEL(1,:),  budget(1), partit, mesh)
+   call integrate_elem(dynamics%ke_wind_xVEL(2,:),  budget(2), partit, mesh)
+   if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. wind=', budget(1), ' | ', budget(2), ' | ', sum(budget)
+
+   call integrate_elem(dynamics%ke_drag_xVEL(1,:),  budget(1), partit, mesh)
+   call integrate_elem(dynamics%ke_drag_xVEL(2,:),  budget(2), partit, mesh)
+   if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. drag=', budget(1), ' | ', budget(2), ' | ', sum(budget)
+   if (mype==0) write(*,*) '***********************************'   
+end subroutine

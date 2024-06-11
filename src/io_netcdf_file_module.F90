@@ -5,7 +5,11 @@ module io_netcdf_file_module
   private
 
   type dim_type
+#if !defined(_CRAYFTN)
     character(:), allocatable :: name
+#else
+    character(1000)           :: name
+#endif
     integer len
     integer ncid
   end type
@@ -15,7 +19,11 @@ module io_netcdf_file_module
   end type
 
   type var_type ! todo: use variable type from io_netcdf_module here
+#if !defined(_CRAYFTN)
     character(:), allocatable :: name
+#else
+    character(1000)           :: name
+#endif
     integer, allocatable :: dim_indices(:)
     integer datatype
     type(att_type_wrapper) :: atts(15) ! use a fixed size array to store our netcdf variable attributes as nvfortran seems to loose allocation of derived types which contain allocatable types when copying the array
@@ -296,7 +304,7 @@ contains
     class(netcdf_file_type), intent(in) :: this
     integer, intent(in) :: varindex
     integer, dimension(:) :: starts, sizes
-    real(8), intent(inout), target :: values(..) ! must be inout or the allocation might be screwed
+    real(8), intent(inout), target :: values(:) ! must be inout or the allocation might be screwed
     ! EO parameters
     include "netcdf.inc"
     real(8), pointer :: values_ptr(:)
@@ -316,7 +324,7 @@ contains
     class(netcdf_file_type), intent(in) :: this
     integer, intent(in) :: varindex
     integer, dimension(:) :: starts, sizes
-    real(4), intent(inout), target :: values(..) ! must be inout or the allocation might be screwed
+    real(4), intent(inout), target :: values(:) ! must be inout or the allocation might be screwed
     ! EO parameters
     include "netcdf.inc"
     real(4), pointer :: values_ptr(:)
@@ -336,7 +344,7 @@ contains
     class(netcdf_file_type), intent(in) :: this
     integer, intent(in) :: varindex
     integer, dimension(:) :: starts, sizes
-    integer, intent(inout), target :: values(..) ! must be inout or the allocation might be screwed
+    integer, intent(inout), target :: values(:) ! must be inout or the allocation might be screwed
     ! EO parameters
     include "netcdf.inc"
     integer, pointer :: values_ptr(:)
@@ -466,7 +474,7 @@ contains
     class(netcdf_file_type), intent(in) :: this
     integer, intent(in) :: varindex
     integer, dimension(:) :: starts, sizes
-    real(8), intent(in), target :: values(..) ! must be inout or the allocation might be screwed
+    real(8), intent(in), target :: values(:) ! must be inout or the allocation might be screwed
     ! EO parameters
     include "netcdf.inc"
     real(8), pointer :: values_ptr(:)
@@ -485,7 +493,7 @@ contains
     class(netcdf_file_type), intent(in) :: this
     integer, intent(in) :: varindex
     integer, dimension(:) :: starts, sizes
-    real(4), intent(in), target :: values(..) ! must be inout or the allocation might be screwed
+    real(4), intent(in), target :: values(:) ! must be inout or the allocation might be screwed
     ! EO parameters
     include "netcdf.inc"
     real(4), pointer :: values_ptr(:)
@@ -504,7 +512,7 @@ contains
     class(netcdf_file_type), intent(in) :: this
     integer, intent(in) :: varindex
     integer, dimension(:) :: starts, sizes
-    integer, intent(in), target :: values(..) ! must be inout or the allocation might be screwed
+    integer, intent(in), target :: values(:) ! must be inout or the allocation might be screwed
     ! EO parameters
     include "netcdf.inc"
     integer, pointer :: values_ptr(:)

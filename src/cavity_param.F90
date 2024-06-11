@@ -51,7 +51,7 @@ module cavity_interfaces
         USE MOD_PARTIT
         USE MOD_PARSUP
         USE MOD_MESH
-        type(t_dyn),    intent(inout), target :: dynamics
+        type(t_dyn),    intent(in), target    :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in),    target :: mesh
         end subroutine
@@ -130,10 +130,10 @@ subroutine compute_nrst_pnt2cavline(partit, mesh)
     call MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
     
     ! mpi reduce from local to global 
-    call MPI_AllREDUCE(lcl_cavl_idx, cavl_idx, nod2d, MPI_INTEGER         , MPI_SUM, MPI_COMM_WORLD, MPIerr)
-    call MPI_AllREDUCE(lcl_cavl_lon, cavl_lon, nod2d, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, MPIerr)
-    call MPI_AllREDUCE(lcl_cavl_lat, cavl_lat, nod2d, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, MPIerr)
-    call MPI_AllREDUCE(lcl_cavl_dep, cavl_dep, nod2d, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, MPIerr)
+    call MPI_AllREDUCE(lcl_cavl_idx, cavl_idx, nod2d, MPI_INTEGER         , MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(lcl_cavl_lon, cavl_lon, nod2d, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(lcl_cavl_lat, cavl_lat, nod2d, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(lcl_cavl_dep, cavl_dep, nod2d, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
   
     !___________________________________________________________________________
     ! deallocate local arrays
@@ -452,7 +452,7 @@ subroutine cavity_momentum_fluxes(dynamics, partit, mesh)
     implicit none
     
     !___________________________________________________________________________
-    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_dyn)   , intent(in),    target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     integer        :: elem, elnodes(3), nzmin, node

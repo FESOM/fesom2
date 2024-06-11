@@ -2,7 +2,17 @@ cmake_minimum_required(VERSION 3.4)
 
 project(fesom Fortran)
 
-option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
+if(DEFINED ENV{FESOM_PLATFORM_STRATEGY})
+   set(FESOM_PLATFORM_STRATEGY $ENV{FESOM_PLATFORM_STRATEGY} CACHE STRING "switch to platform specific compile settings, this is usually determined via the env.sh script")
+else()
+   set(FESOM_PLATFORM_STRATEGY "notset" CACHE STRING "switch to platform specific compile settings, this is usually determined via the env.sh script")
+endif()
+
+option(ENABLE_OPENACC "compile with OpenACC support" ON)
+option(DISABLE_OPENACC_ATOMICS "disable kernels using atomic statement for reproducible results" ON)
+option(ENABLE_NVTX "enable use of nvtx tools" ON)
+
+option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
@@ -66,11 +76,20 @@ if(${VERBOSE})
    target_compile_definitions(${PROJECT_NAME} PRIVATE VERBOSE)
 endif()
 
+set(CMAKE_VERBOSE_MAKEFILE ON)
 
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
 #       target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -xHost -ip -init=zero -no-wrap-margin)
-        target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -xHost -ip -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
+        target_compile_options(${PROJECT_NAME} PRIVATE
+                               $<$<CONFIG:DEBUG>:-r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -xHost -ip -g -traceback -check all,noarg_temp_created,bounds,uninit>
+                               $<$<CONFIG:RELEASE>:-r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -ip -g -traceback>
+                              )
+   if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
+   else()
+      target_compile_options(${PROJECT_NAME} PRIVATE -xHost)
+   endif()
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
         target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -march=native -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
         if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
@@ -78,6 +97,26 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
         endif()
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
        target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -hnoomp)
+elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL PGI OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC)
+   if(${ENABLE_OPENACC})
+       target_compile_options(${PROJECT_NAME} PRIVATE
+                              $<$<CONFIG:DEBUG>:-Mallocatable=95 -Mr8 -pgf90libs -Mnofma -Minfo=accel -acc=verystrict -gpu=math_uniform,cuda11.7,cc80>
+                              $<$<CONFIG:RELEASE>:-Mallocatable=95 -Mr8 -pgf90libs -Minfo=all -acc=verystrict -gpu=cc80>
+                             )
+       set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-acc=verystrict -Mnofma -gpu=math_uniform,cuda11.7,cc80")
+       set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-acc=verystrict -gpu=cc80")
+       if(${DISABLE_OPENACC_ATOMICS})
+          target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_OPENACC_ATOMICS)
+       endif()
+   else()
+       target_compile_options(${PROJECT_NAME} PRIVATE
+                              $<$<CONFIG:DEBUG>:-Mallocatable=95 -Mr8 -pgf90libs -Mnofma>
+                              $<$<CONFIG:RELEASE>:-Mallocatable=95 -Mr8 -pgf90libs>
+                             )
+   endif()
+   if(${ENABLE_NVTX})
+       target_link_libraries(${PROJECT_NAME} nvhpcwrapnvtx)
+   endif()
 endif()
 
 
