@@ -28,8 +28,9 @@ module g_config
   character(MAX_PATH)        :: ClimateDataPath='./hydrography/'
   character(MAX_PATH)        :: TideForcingPath='./tide_forcing/'
   character(MAX_PATH)        :: ResultPath='./result/'
+  character(20)              :: MeshId='NONE'
   namelist /paths/  MeshPath, ClimateDataPath, &
-       TideForcingPath, ResultPath
+       TideForcingPath, ResultPath, MeshId
        
   !_____________________________________________________________________________
   ! *** restart_log ***
@@ -145,9 +146,11 @@ module g_config
   character(100)                :: which_toy="soufflet" 
   logical                       :: flag_debug=.false.    ! prints name of actual subroutine he is in 
   logical                       :: flag_warn_cflz=.true. ! switches off cflz warning
+  logical                       :: use_transit=.false.    ! switches off transient tracers
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
-                        use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso !---wiso-code: add lwiso
+                        use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
+                        use_transit
   
   !_____________________________________________________________________________
   ! *** others ***

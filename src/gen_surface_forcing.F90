@@ -44,7 +44,7 @@ MODULE g_sbf
    USE g_config, only: dummy, ClimateDataPath, dt
    USE g_clock,  only: timeold, timenew, dayold, daynew, yearold, yearnew, cyearnew
    USE g_forcing_arrays,    only: runoff, chl
-   USE g_read_other_NetCDF, only: read_other_NetCDF, read_2ddata_on_grid_netcdf, read_runoff_mapper
+   USE g_read_other_NetCDF, only: read_other_NetCDF, read_2ddata_on_grid_netcdf
    IMPLICIT NONE
 
    include 'netcdf.inc'
@@ -52,6 +52,7 @@ MODULE g_sbf
    public  sbc_ini  ! routine called before 1st time step (open files, read namelist,...)
    public  sbc_do   ! routine called each time step to provide a sbc fileds (wind,...)
    public  sbc_end  ! routine called after last time step
+   public  RUNOFF_MAPPER
    public  julday   ! get julian day from date
    public  atmdata
    public  i_totfl, i_xwind, i_ywind, i_xstre, i_ystre, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow
@@ -95,7 +96,10 @@ MODULE g_sbf
    character(10),           save   :: chl_data_source   ='None' ! 'Sweeney' Chlorophyll climatology Sweeney et al. 2005
    character(len=MAX_PATH), save   :: nm_chl_data_file  ='/work/ollie/dsidoren/input/forcing/Sweeney_2005.nc'
    real(wp),                save   :: chl_const         = 0.1
-
+   logical                         :: use_runoff_mapper = .false.               !runof mapper to be used in the coupled mode with IFS
+   character(len=MAX_PATH), save   :: runoff_basins_file='runoff_basins.nc'     ! definition file for runoff basins
+   real(wp)                        :: runoff_radius     =500000._WP             !smoothing radius for runoff mapper (in meters)
+   type(sparse_matrix)             :: RUNOFF_MAPPER
 
    logical :: runoff_climatology =.false.
 
@@ -926,7 +930,7 @@ CONTAINS
                         nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, y_perpetual, &
                         l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
                         nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source, &
-                        chl_data_source, nm_chl_data_file, chl_const
+                        chl_data_source, nm_chl_data_file, chl_const, use_runoff_mapper, runoff_basins_file, runoff_radius
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -1080,7 +1084,7 @@ CONTAINS
       call nc_sbc_ini(rdate, partit, mesh)
       !==========================================================================
 #endif
-      ! runoff    
+      ! runoff
       if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
          ! runoff in CORE is constant in time
          ! Warning: For a global mesh, conservative scheme is to be updated!!
@@ -1095,12 +1099,12 @@ CONTAINS
          else
             if (mype==0) write(*,*) 'using constant chlorophyll concentration: ', chl_const
             chl=chl_const
-         end if          
+         end if
       end if
 
       if (mype==0) write(*,*) "DONE:  Ocean forcing initialization."
       if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
-!     call read_runoff_mapper("/p/project/chhb19/streffing1/input/runoff-mapper/runoff_maps_D3.nc", "arrival_point_id", 1.0_WP, partit, mesh)
+      if (use_runoff_mapper) call read_runoff_mapper(runoff_basins_file, "arrival_point_id", runoff_radius, partit, mesh)
    END SUBROUTINE sbc_ini
 
    SUBROUTINE sbc_do(partit, mesh)
@@ -2223,8 +2227,265 @@ CONTAINS
         return
     end function lowercase 
 
-!-----------------------------------------------------------------------
-! Copyright by the GOTM-team under the GNU Public License - www.gnu.org
-!-----------------------------------------------------------------------
+subroutine read_runoff_mapper(file, vari, R, partit, mesh)
+   ! 1. Read arrival points from the runoff mapper
+   ! 2. Create conservative remapping A*X=runoff:
+   ! A=remapping operator; X=runoff into drainage basins (in Sv); runoff= runoff im [m/s] to be put into the ocean
+   use g_config
+   use o_param
+   USE MOD_MESH
+   USE MOD_PARTIT
+   USE MOD_PARSUP
+   USE g_forcing_arrays,    only: runoff
+   use g_support
+   implicit none
+ 
+#include "netcdf.inc"
+   character(*),   intent(in) :: file
+   character(*),   intent(in) :: vari
+   real(kind=WP),   intent(in):: R
+   type(t_mesh),   intent(in),    target :: mesh
+   type(t_partit), intent(inout), target :: partit
+   integer                    :: i, j, n, num, cnt, number_arrival_points, offset
+   real(kind=WP)              :: dist, W
+   integer                    :: itime, latlen, lonlen
+   integer                    :: status, ncid, varid
+   integer                    :: lonid, latid, drain_num
+   integer                    :: istart(2), icount(2)
+   real(kind=WP), allocatable :: lon(:), lat(:)
+   integer, allocatable       :: ncdata(:,:)
+   real(kind=WP), allocatable :: lon_sparse(:), lat_sparse(:), dist_min(:), dist_min_glo(:)
+   real(kind=WP), allocatable :: arrival_area(:)
+   integer, allocatable       :: data_sparse(:), dist_ind(:)
+   integer                    :: ierror           ! return error code
+!  type(sparse_matrix)        :: RUNOFF_MAPPER
+ 
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+ 
+   if (mype==0) write(*,*) 'building RUNOFF MAPPER with radius of smoothing= ', R*1.e-3, ' km'
+   if (mype==0) then
+      ! open file
+      status=nf_open(trim(file), nf_nowrite, ncid)
+   end if
+ 
+   call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+   if (status.ne.nf_noerr)then
+      print*,'ERROR: CANNOT READ 2D netCDF FILE CORRECTLY !!!!!'
+      print*,'Error in opening netcdf file '//file
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+      stop
+   endif
+ 
+   if (mype==0) then
+      ! lat
+      status=nf_inq_dimid(ncid, 'lat', latid)
+      status=nf_inq_dimlen(ncid, latid, latlen)
+      ! lon
+      status=nf_inq_dimid(ncid, 'lon', lonid)
+      status=nf_inq_dimlen(ncid, lonid, lonlen)
+   end if
+   call MPI_BCast(latlen, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+   call MPI_BCast(lonlen, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+ 
+   ! lat
+   if (mype==0) then
+      allocate(lat(latlen))
+      status=nf_inq_varid(ncid, 'lat', varid)
+      status=nf_get_vara_double(ncid,varid,1,latlen,lat)
+   end if
 
+   ! lon
+   if (mype==0) then
+      allocate(lon(lonlen))
+      status=nf_inq_varid(ncid, 'lon', varid)
+      status=nf_get_vara_double(ncid,varid,1,lonlen,lon)
+   ! make sure range 0. - 360.
+   do n=1,lonlen
+      if (lon(n)<0.0_WP) then
+         lon(n)=lon(n)+360._WP
+      end if
+   end do
+   end if
+
+   if (mype==0) then
+      allocate(ncdata(lonlen,latlen))
+      ncdata = 0.0_WP
+     ! data
+      status=nf_inq_varid(ncid, trim(vari), varid)
+      istart = (/1,1/)
+      icount= (/lonlen,latlen/)
+      status=nf_get_vara_int(ncid,varid,istart,icount,ncdata)
+     ! close file
+     status=nf_close(ncid)
+     number_arrival_points=0
+     do i=1, lonlen
+        do j=1, latlen
+           if (ncdata(i,j)>0) then
+            number_arrival_points=number_arrival_points+1
+           end if
+        end do
+     end do
+   end if
+
+   call MPI_BCast(number_arrival_points, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+   allocate(lon_sparse(number_arrival_points), lat_sparse(number_arrival_points))
+   allocate(dist_min(number_arrival_points), dist_min_glo(number_arrival_points), dist_ind(number_arrival_points))
+   allocate(data_sparse(number_arrival_points))
+
+   if (mype==0) then
+      cnt=1
+      do i=1, lonlen
+         do j=1, latlen
+            if (ncdata(i,j)>0) then
+               lon_sparse(cnt)=lon(i)
+               lat_sparse(cnt)=lat(j)
+               data_sparse(cnt)=ncdata(i,j)
+               cnt=cnt+1
+            end if
+         end do
+      end do
+      deallocate(ncdata, lon, lat)
+   end if
+   call MPI_BCast(lon_sparse,  number_arrival_points, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+   call MPI_BCast(lat_sparse,  number_arrival_points, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+   call MPI_BCast(data_sparse, number_arrival_points, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+   drain_num=maxval(data_sparse)
+   ALLOCATE(arrival_area(drain_num))
+   arrival_area=0.0_WP ! will be used further to normalize the total flux
+   lon_sparse=lon_sparse-360.0_WP
+   lon_sparse=lon_sparse*rad
+   lat_sparse=lat_sparse*rad
+
+   do n=1, number_arrival_points
+      do i=1, myDim_nod2d
+         dist=distance_on_sphere(lon_sparse(n), lat_sparse(n), geo_coord_nod2D(1,i), geo_coord_nod2D(2,i))
+         if (i==1) then
+            dist_min(n)=dist
+            dist_ind(n)=1
+         end if
+         if (dist<dist_min(n)) then
+             dist_min(n)=dist
+             dist_ind(n)=i
+         end if
+      end do
+   end do
+   do i=1, number_arrival_points
+      dist_min_glo(i)=dist_min(i)
+   end do
+   call MPI_AllREDUCE(MPI_IN_PLACE , dist_min_glo , number_arrival_points, MPI_DOUBLE, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+
+   lon_sparse=0.0_WP
+   lat_sparse=0.0_WP
+   status=0
+   do i=1, number_arrival_points
+      n=dist_ind(i)
+      if ((dist_min(i)==dist_min_glo(i)) .AND. (n<=myDim_nod2d)) then
+           lon_sparse(i)=geo_coord_nod2D(1, n)
+           lat_sparse(i)=geo_coord_nod2D(2, n)
+           status=status+1
+      end if
+   end do
+   call MPI_AllREDUCE(MPI_IN_PLACE , lon_sparse , number_arrival_points, MPI_DOUBLE, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , lat_sparse , number_arrival_points, MPI_DOUBLE, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , status ,     1, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+
+   if (status/=number_arrival_points) then
+      if (mype==0) then
+         write(*,*) 'RUNOFF MAPPER ERROR: total number of arrival points does not sum up among partitions: ', status, number_arrival_points
+         write(*,*) 'two different grid points have same distance to a target point!'
+      end if
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+      STOP
+   end if
+   RUNOFF_MAPPER%dim=myDim_nod2d+eDim_nod2D
+   ALLOCATE(RUNOFF_MAPPER%rowptr(RUNOFF_MAPPER%dim+1))
+   
+   RUNOFF_MAPPER%rowptr(1) = 1
+   
+   DO n=1, myDim_nod2d+eDim_nod2D
+      cnt=0
+      DO i=1, number_arrival_points
+         dist=distance_on_sphere(lon_sparse(i), lat_sparse(i), geo_coord_nod2D(1,n), geo_coord_nod2D(2,n))
+         if (dist < R) cnt=cnt+1
+      END DO
+      RUNOFF_MAPPER%rowptr(n+1)=RUNOFF_MAPPER%rowptr(n)+max(cnt,1)
+   END DO
+   
+   ALLOCATE(RUNOFF_MAPPER%colind(RUNOFF_MAPPER%rowptr(RUNOFF_MAPPER%dim+1)-1))
+   ALLOCATE(RUNOFF_MAPPER%values(RUNOFF_MAPPER%rowptr(RUNOFF_MAPPER%dim+1)-1))
+   DO n=1, myDim_nod2d+eDim_nod2D
+      offset=RUNOFF_MAPPER%rowptr(n)
+      cnt=0
+      W=areasvol(ulevels_nod2D(n),n)
+      DO i=1, number_arrival_points
+         j=data_sparse(i)
+         if ((j<0) .OR. (j>drain_num)) then
+            if (mype==0) then
+               write(*,*) 'RUNOFF MAPPER ERROR: arrival point has an index outside of permitted range', j, drain_num
+               write(*,*) 'two different grid points have same distance to a target point!'
+            end if
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            STOP
+         end if
+         dist=distance_on_sphere(lon_sparse(i), lat_sparse(i), geo_coord_nod2D(1,n), geo_coord_nod2D(2,n))
+         if (dist < R) then
+            RUNOFF_MAPPER%values(offset+cnt)=(1.0-dist/R)
+            RUNOFF_MAPPER%colind(offset+cnt)=j
+            if (n<=myDim_nod2d) then
+               arrival_area(j)=arrival_area(j)+(1.0-dist/R)*W
+            end if
+            cnt=cnt+1
+         end if
+      END DO
+      if (cnt==0) then
+         RUNOFF_MAPPER%values(offset)=0.0_WP
+         RUNOFF_MAPPER%colind(offset)=1
+      end if
+   END DO
+
+   call MPI_AllREDUCE(MPI_IN_PLACE , arrival_area, drain_num, MPI_DOUBLE, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+
+   DO i=1, drain_num
+      where (RUNOFF_MAPPER%colind==i)
+            RUNOFF_MAPPER%values=RUNOFF_MAPPER%values/arrival_area(i)
+      end where
+   END DO
+
+   deallocate(lon_sparse, lat_sparse, dist_min, dist_min_glo)
+   deallocate(arrival_area)
+   deallocate(data_sparse, dist_ind)
+
+do n=1, myDim_nod2D+eDim_nod2D
+   i=RUNOFF_MAPPER%rowptr(n)
+   j=RUNOFF_MAPPER%rowptr(n+1)-1
+   runoff(n)=sum(RUNOFF_MAPPER%values(i:j))
+end do
+
+call integrate_nod(runoff, W, partit, mesh)
+
+if (mype==0) write(*,*) 'RUNOFF MAPPER check (total amount of basins):', drain_num
+if (mype==0) write(*,*) 'RUNOFF MAPPER check (input of 1Sv from each basin results in runoff of):', W, ' Sv'
+
+!allocate(BASIN_RUNOFF(drain_num))
+!BASIN_RUNOFF=0.0_WP
+end subroutine read_runoff_mapper
+
+real(kind=WP) function distance_on_sphere(lon1, lat1, lon2, lat2)
+!   use, intrinsic :: ISO_FORTRAN_ENV
+    use o_param
+    use g_config
+    implicit none    
+!lons & lats are in radians
+    real(kind=WP), intent(in) :: lon1, lat1, lon2, lat2
+    real(kind=WP)             :: r, delta_lon, delta_lat
+    
+   delta_lon=abs(lon1-lon2)
+   if (delta_lon > cyclic_length/2.0_WP) delta_lon=delta_lon-cyclic_length
+   delta_lat=(lat1-lat2)
+   r = sin(delta_lat/2.0)**2 + cos(lat1) * cos(lat2) * sin(delta_lon/2.0)**2
+   distance_on_sphere=2.0 * atan2(sqrt(r), sqrt(1.0 - r))*r_earth
+end function distance_on_sphere
 END MODULE g_sbf

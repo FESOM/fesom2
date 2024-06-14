@@ -324,7 +324,7 @@ subroutine iceberg_step1(ice, mesh, partit, dynamics, ib, height_ib,length_ib,wi
  											!=
  real, dimension(2)             :: coords_tmp
 ! integer, pointer  :: mype
-
+ logical                        :: reject_tmp !LA for debugging
 type(t_ice),  intent(inout), target :: ice
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
@@ -375,21 +375,25 @@ type(t_dyn)   , intent(inout), target :: dynamics
   coords_tmp = [lon_deg, lat_deg]
   call point_in_triangle(mesh, partit, iceberg_elem, coords_tmp)
   !call point_in_triangle(mesh, iceberg_elem, (/lon_deg, lat_deg/))
-  i_have_element= (iceberg_elem .ne. 0) !up to 3 PEs possible
+  i_have_element= (iceberg_elem .ne. 0) !up to 3 PEs .true.
   
   if(i_have_element) then
    i_have_element= mesh%elem2D_nodes(1,iceberg_elem) <= partit%myDim_nod2D !1 PE still .true.
-#ifdef use_cavity
-   if(reject_elem(mesh, partit, iceberg_elem)) then
-    iceberg_elem=0 !reject element
-    i_have_element=.false.
-   else 
-    iceberg_elem=partit%myList_elem2D(iceberg_elem) !global now
-   end if
-#else
-   
-   iceberg_elem=partit%myList_elem2D(iceberg_elem) !global now
-#endif 
+   if (use_cavity) then
+      reject_tmp = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0.0) )
+      !if(reject_elem(mesh, partit, iceberg_elem)) then
+      if(reject_tmp) then
+!       write(*,*) " * set IB elem ",iceberg_elem,"to zero for IB=",ib
+!       write(*,*) " cavity: ",all((mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0))
+!       write(*,*) " boundary: ", all(mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==1)
+       iceberg_elem=0 !reject element
+       i_have_element=.false.
+      else 
+       iceberg_elem=partit%myList_elem2D(iceberg_elem) !global now
+      end if
+   else
+      iceberg_elem=partit%myList_elem2D(iceberg_elem) !global now
+   endif 
   end if
   call com_integer(partit, i_have_element,iceberg_elem)
  
@@ -983,9 +987,7 @@ end subroutine depth_bathy
 !****************************************************************************************************************************
 
 subroutine parallel2coast(mesh, partit,u, v, lon,lat, elem)
-!#ifdef use_cavity
-! use iceberg_params, only: coastal_nodes
-!#endif
+ use iceberg_params, only: coastal_nodes
  implicit none
  
  real, intent(inout) 	:: u, v 	!velocity
@@ -1004,12 +1006,12 @@ type(t_partit), intent(inout), target :: partit
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-#ifdef use_cavity
-  SELECT CASE ( coastal_nodes(mesh, elem) ) !num of "coastal" points
-#else
+!if (use_cavity) then
+!  SELECT CASE ( coastal_nodes(mesh, partit, elem) ) !num of "coastal" points
+!else
   SELECT CASE ( sum( mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem)) ) ) !num of coastal points
   !SELECT CASE ( sum( bc_index_nod2D(elem2D_nodes(:,elem)) ) ) !num of coastal points
-#endif
+!endif
    CASE (0) !...coastal points: do nothing
     return
     
@@ -1020,14 +1022,18 @@ type(t_partit), intent(inout), target :: partit
     do m = 1, 3
       node = mesh%elem2D_nodes(m,elem)
       !write(*,*) 'index ', m, ':', index_nod2D(node)
-#ifdef use_cavity
-      if( mesh%bc_index_nod2D(node)==1 .OR. cavity_flag_nod2d(node)==1 ) then
-#else
-      if( mesh%bc_index_nod2D(node)==1 ) then
-#endif
-       n(i) = node
-       exit
-      end if 
+      if (use_cavity) then
+            !if( mesh%bc_index_nod2D(node)==1 .OR. mesh%cavity_flag_n(node)==1 ) then
+            if( mesh%bc_index_nod2D(node)==0.0 .OR.  (mesh%cavity_depth(node)/=0.0) ) then
+             n(i) = node
+             exit
+            end if 
+      else
+            if( mesh%bc_index_nod2D(node)==0.0 ) then
+             n(i) = node
+             exit
+            end if 
+      endif
     end do 
     
    !write(*,*) 'one coastal node ', n(1)
@@ -1039,7 +1045,7 @@ type(t_partit), intent(inout), target :: partit
    ! do m = 1, nghbr_nod2D(n(1))%nmb
    !   node = nghbr_nod2D(n(1))%addresses(m) 
 !#ifdef use_cavity
-   !   if ( (node /= n(1)) .and. ( (bc_index_nod2D(node)==1) .OR. (cavity_flag_nod2d(node)==1) ) ) then   
+   !   if ( (node /= n(1)) .and. ( (bc_index_nod2D(node)==1) .OR. (mesh%cavity_flag_n(node)==1) ) ) then   
 !#else
    !   if ( (node /= n(1)) .and. (bc_index_nod2D(node)==1)) then
 !#endif
@@ -1075,14 +1081,18 @@ type(t_partit), intent(inout), target :: partit
     velocity = [ u, v ]
     do m = 1, 3
       node = mesh%elem2D_nodes(m,elem) 
-#ifdef use_cavity
-      if( (mesh%bc_index_nod2D(node)==1) .OR. (cavity_flag_nod2d(node)==1)) then
-#else
-      if( mesh%bc_index_nod2D(node)==1 ) then
-#endif
+if (use_cavity) then
+      !if( (mesh%bc_index_nod2D(node)==1) .OR. (mesh%cavity_flag_n(node)==1)) then
+      if( (mesh%bc_index_nod2D(node)==0.0) .OR. (mesh%cavity_depth(node)/=0.0) ) then
        n(i) = node
        i = i+1
       end if
+else
+      if( mesh%bc_index_nod2D(node)==0.0 ) then
+       n(i) = node
+       i = i+1
+      end if
+endif
     end do   
     call projection(mesh,partit,  velocity, n(1), n(2))
     
@@ -1644,7 +1654,7 @@ type(t_partit), intent(inout), target :: partit
   longname='time' ! use NetCDF Climate and Forecast (CF) Metadata Convention
   status = nf_PUT_ATT_TEXT(ncid, time_varid, 'long_name', len_trim(longname), trim(longname)) 
   if (status .ne. nf_noerr) call handle_err(status)
-  write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)'), 'seconds since ', year_start, '-', month_start, '-', day_start, ' 00:00:00'
+  write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)') 'seconds since ', year_start, '-', month_start, '-', day_start, ' 00:00:00'
   status = nf_PUT_ATT_TEXT(ncid, time_varid, 'units', len_trim(att_text), trim(att_text))
   if (status .ne. nf_noerr) call handle_err(status)
   if (include_fleapyear) then

@@ -103,6 +103,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, k, elem, enodes, num, el, nl1, nl2, nu1, nu2, nl12, nu12, edge, &
 !$OMP                          flux, ae)
     ! --------------------------------------------------------------------------
@@ -112,11 +113,14 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     ! --------------------------------------------------------------------------
     !___________________________________________________________________________
     ! a1. max, min between old solution and updated low-order solution per node
-
+#else
     !$ACC DATA CREATE(tvert_max, tvert_min)
-
+#endif
+#ifndef ENABLE_OPENACC
 !$OMP DO
+#else
     !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
     do n=1,myDim_nod2D + edim_nod2d
         nu1 = ulevels_nod2D(n)
         nl1 = nlevels_nod2D(n)
@@ -127,14 +131,20 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
         end do
         !$ACC END LOOP
     end do
-    !$ACC END PARALLEL LOOP
+#ifndef ENABLE_OPENACC
 !$OMP END DO
+#else
+    !$ACC END PARALLEL LOOP
+#endif
     !___________________________________________________________________________
     ! a2. Admissible increments on elements
     !     (only layers below the first and above the last layer)
     !     look for max, min bounds for each element --> AUX here auxilary array
+#ifndef ENABLE_OPENACC
 !$OMP DO
+#else
     !$ACC PARALLEL LOOP GANG PRIVATE(enodes) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
     do elem=1, myDim_elem2D
         enodes=elem2D_nodes(:,elem)
         nu1 = ulevels(elem)
@@ -154,16 +164,22 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
             !$ACC END LOOP
         endif
     end do ! --> do elem=1, myDim_elem2D
-    !$ACC END PARALLEL LOOP
+#ifndef ENABLE_OPENACC
 !$OMP END DO
+#else
+    !$ACC END PARALLEL LOOP
+#endif
     !___________________________________________________________________________
     ! a3. Bounds on clusters and admissible increments
     ! Vertical1: In this version we look at the bounds on the clusters
     !            above and below, which leaves wide bounds because typically
     !            vertical gradients are larger.
         !Horizontal
+#ifndef ENABLE_OPENACC
 !$OMP DO
+#else
     !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
     do n=1, myDim_nod2D
        nu1 = ulevels_nod2D(n)
        nl1 = nlevels_nod2D(n)
@@ -185,11 +201,17 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
        end do
        !$ACC END LOOP
     end do
-    !$ACC END PARALLEL LOOP
+#ifndef ENABLE_OPENACC
 !$OMP END DO
+#else
+    !$ACC END PARALLEL LOOP
+#endif
 
+#ifndef ENABLE_OPENACC
 !$OMP DO
+#else
     !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
     do n=1, myDim_nod2D
        nu1 = ulevels_nod2D(n)
        nl1 = nlevels_nod2D(n)
@@ -212,16 +234,22 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
        fct_ttf_max(nz,n)=tvert_max(nz, n)-LO(nz,n)
        fct_ttf_min(nz,n)=tvert_min(nz, n)-LO(nz,n)
     end do
-   !$ACC END PARALLEL LOOP
+#ifndef ENABLE_OPENACC
 !$OMP END DO
+#else
+   !$ACC END PARALLEL LOOP
+#endif
     !___________________________________________________________________________
     ! b1. Split positive and negative antidiffusive contributions
     ! --> sum all positive (fct_plus), negative (fct_minus) antidiffusive
     !     horizontal element and vertical node contribution to node n and layer nz
     !     see. R. Löhner et al. "finite element flux corrected transport (FEM-FCT)
     !     for the euler and navier stoke equation
+#ifndef ENABLE_OPENACC
 !$OMP DO
+#else
     !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
     do n=1, myDim_nod2D
         nu1 = ulevels_nod2D(n)
         nl1 = nlevels_nod2D(n)
@@ -232,12 +260,17 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
         end do
        !$ACC END LOOP
     end do
-    !$ACC END PARALLEL LOOP
+#ifndef ENABLE_OPENACC
 !$OMP END DO
-
+#else
+    !$ACC END PARALLEL LOOP
+#endif
     !Vertical
+#ifndef ENABLE_OPENACC
 !$OMP DO
+#else
     !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
     do n=1, myDim_nod2D
        nu1 = ulevels_nod2D(n)
        nl1 = nlevels_nod2D(n)
@@ -248,16 +281,22 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
        end do
        !$ACC END LOOP
     end do
-    !$ACC END PARALLEL LOOP
+#ifndef ENABLE_OPENACC
 !$OMP END DO
+#else
+    !$ACC END PARALLEL LOOP
+#endif
 
+#ifndef ENABLE_OPENACC
 !$OMP DO
+#else
     !Horizontal
 #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #else
     !$ACC UPDATE SELF(fct_plus, fct_minus, adf_h)
 #endif
+#endif 
     do edge=1, myDim_edge2D
        enodes(1:2)=edges(:,edge)
        el=edge_tri(:,edge)
@@ -273,13 +312,16 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
        nl12 = max(nl1,nl2)
        nu12 = nu1
        if (nu2>0) nu12 = min(nu1,nu2)
+#ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_set_lock(partit%plock(enodes(1)))
 #else
 !$OMP ORDERED
 #endif
+#else
 #if !defined(DISABLE_OPENACC_ATOMICS)
        !$ACC LOOP VECTOR
+#endif
 #endif
        do nz=nu12, nl12
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -290,14 +332,18 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
           !$ACC ATOMIC UPDATE
 #endif
           fct_minus(nz,enodes(1))=fct_minus(nz,enodes(1)) + min(0.0_WP, adf_h(nz,edge))
+
+#ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
        end do
        call omp_unset_lock(partit%plock(enodes(1)))
        call omp_set_lock  (partit%plock(enodes(2)))
        do nz=nu12, nl12
 #endif
+#else
 #if !defined(DISABLE_OPENACC_ATOMICS)
           !$ACC ATOMIC UPDATE
+#endif
 #endif
           fct_plus (nz,enodes(2))=fct_plus (nz,enodes(2)) + max(0.0_WP,-adf_h(nz,edge))
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -308,23 +354,31 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 #if !defined(DISABLE_OPENACC_ATOMICS)
        !$ACC END LOOP
 #endif
+
+#ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
        call omp_unset_lock(partit%plock(enodes(2)))
 #else
 !$OMP END ORDERED
 #endif
+#endif
     end do
+#ifndef ENABLE_OPENACC
+!$OMP END DO
+#else
 #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC END PARALLEL LOOP
 #else
     !$ACC UPDATE DEVICE(fct_plus, fct_minus)
 #endif
-!$OMP END DO
-
+#endif
     !___________________________________________________________________________
     ! b2. Limiting factors
+#ifndef ENABLE_OPENACC
 !$OMP DO
+#else
     !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
     do n=1,myDim_nod2D
         nu1=ulevels_nod2D(n)
         nl1=nlevels_nod2D(n)
@@ -337,9 +391,11 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
         end do
         !$ACC END LOOP
     end do
-    !$ACC END PARALLEL LOOP
+#ifndef ENABLE_OPENACC
 !$OMP END DO
-
+#else
+    !$ACC END PARALLEL LOOP
+#endif
     ! fct_minus and fct_plus must be known to neighbouring PE
 !$OMP MASTER
     call exchange_nod(fct_plus, fct_minus, partit, luse_g2g = .true.)
@@ -349,8 +405,11 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !___________________________________________________________________________
     ! b3. Limiting
     !Vertical
+#ifndef ENABLE_OPENACC
 !$OMP DO
+#else
     !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
     do n=1, myDim_nod2D
         nu1=ulevels_nod2D(n)
         nl1=nlevels_nod2D(n)
@@ -383,13 +442,17 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
         !$ACC END LOOP
     ! the bottom flux is always zero
     end do
-    !$ACC END PARALLEL LOOP
+#ifndef ENABLE_OPENACC
 !$OMP END DO
-
+#else
+    !$ACC END PARALLEL LOOP
+#endif
     !Horizontal
+#ifndef ENABLE_OPENACC
 !$OMP DO
-
+#else
     !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
     do edge=1, myDim_edge2D
         enodes(1:2)=edges(:,edge)
         el=edge_tri(:,edge)
@@ -423,9 +486,15 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
         end do
         !$ACC END LOOP
     end do
-    !$ACC END PARALLEL LOOP
+#ifndef ENABLE_OPENACC
 !$OMP END DO
+#else
+    !$ACC END PARALLEL LOOP
+#endif
 
-!$ACC END DATA
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL
+#else
+!$ACC END DATA
+#endif
 end subroutine oce_tra_adv_fct

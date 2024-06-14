@@ -89,24 +89,33 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
        l_init_zero=o_init_zero
     end if
     if (l_init_zero) then
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
+#else
        !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
        do edge=1, myDim_edge2D
           do nz=1, mesh%nl-1
              flux(nz,edge)=0.0_WP
           end do
        end do
-       !$ACC END PARALLEL LOOP
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+       !$ACC END PARALLEL LOOP
+#endif
     end if
 
     ! The result is the low-order solution horizontal fluxes
     ! They are put into flux
     !___________________________________________________________________________
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, &
 !$OMP                       a, vflux, el, enodes, nz, nu12, nl12, nl1, nl2, nu1, nu2)
 !$OMP DO
+#else
     !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
     do edge=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,edge)
@@ -239,9 +248,12 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
         end do
         !$ACC END LOOP
     end do
-    !$ACC END PARALLEL LOOP
+#ifndef ENABLE_OPENACC
 !$OMP END DO
 !$OMP END PARALLEL
+#else
+    !$ACC END PARALLEL LOOP
+#endif
 end subroutine adv_tra_hor_upw1
 !
 !
@@ -563,22 +575,31 @@ end subroutine adv_tra_hor_muscl
        l_init_zero=o_init_zero
     end if
     if (l_init_zero) then
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
+#else
        !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
        do edge=1, myDim_edge2D
           flux(:,edge)=0.0_WP
        end do
-       !$ACC END PARALLEL LOOP
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+       !$ACC END PARALLEL LOOP
+#endif
     end if
 
     ! The result is the low-order solution horizontal fluxes
     ! They are put into flux
     !___________________________________________________________________________
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, Tmean1, Tmean2, cHO, &
 !$OMP                                     a, vflux, el, enodes, nz, nu12, nl12, nl1, nl2, nu1, nu2)
 !$OMP DO
+#else
     !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
     do edge=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,edge)
@@ -804,7 +825,10 @@ end subroutine adv_tra_hor_muscl
         end do
         !$ACC END LOOP
     end do
-    !$ACC END PARALLEL LOOP
+#ifndef ENABLE_OPENACC
 !$OMP END DO
 !$OMP END PARALLEL
+#else
+    !$ACC END PARALLEL LOOP
+#endif 
 end subroutine adv_tra_hor_mfct

@@ -94,7 +94,7 @@ use o_param
 #if defined (__oasis) || defined (__ifsinterface)
   real(kind=WP), allocatable, dimension(:)         :: residualifwflx
 #endif
-  
+
   real(kind=WP), allocatable, dimension(:)         :: runoff_landice
   real(kind=WP)                                    :: landice_season(12)
 

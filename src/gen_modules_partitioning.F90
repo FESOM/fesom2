@@ -52,26 +52,13 @@ subroutine par_init(partit)    ! initializes MPI
   integer                               :: i
   integer                               :: provided_mpi_thread_support_level
   character(:), allocatable             :: provided_mpi_thread_support_level_name
-#ifdef __oasis || defined  __ifsinterface
+#if defined __oasis || defined  __ifsinterface
   ! use comm from coupler or ifs
-  ! TODO: multio with __ifsinterface is magically handled by IFS by using same module
-  !       names and routine names as in src/ifs_interface, that is not elegant.
-#else 
-#ifdef __MULTIO
-  CALL MPI_Comm_Size(MPI_COMM_WORLD, partit%npes, i)
-  CALL MPI_Comm_Rank(MPI_COMM_WORLD, partit%mype, i)
-  partit%MPI_COMM_FESOM=MPI_COMM_WORLD 
-  partit%MPI_COMM_WORLD=MPI_COMM_WORLD 
-  call mpp_io_init_2(partit%MPI_COMM_FESOM)
-#else 
-  partit%MPI_COMM_FESOM=MPI_COMM_WORLD ! use global comm if not coupled (e.g. no __oasis or __ifsinterface or IO server)
-#endif 
-
-#endif 
-
+#else
+  partit%MPI_COMM_FESOM=MPI_COMM_WORLD ! use global comm if not coupled (e.g. no __oasis or __ifsinterface)
+#endif
   call MPI_Comm_Size(partit%MPI_COMM_FESOM,partit%npes,i)
-  call MPI_Comm_Rank(partit%MPI_COMM_FESOM,partit%mype,i)
- 
+  call MPI_Comm_Rank(partit%MPI_COMM_FESOM,partit%mype,i) 
 
   if(partit%mype==0) then
 #if !defined(__PGI)
@@ -126,7 +113,7 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
 #ifndef __oasis
   if (present(abort)) then
      if (mype==0) write(*,*) 'Run finished unexpectedly!'
-     call MPI_ABORT(COMM, 1 )
+     call MPI_ABORT(MPI_COMM_WORLD, 1 )
   else
           ! TODO: this is where fesom standalone, ifsinterface etc get to 
           !1. there no abort actually even when model calls abort, and barrier may hang
