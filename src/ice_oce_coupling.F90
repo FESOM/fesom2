@@ -499,7 +499,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         relax_salt(n)=relax_salt(n)-net
     end do
 !$OMP END PARALLEL DO
-    
+
     !___________________________________________________________________________
     ! enforce the total freshwater/salt flux be zero
     ! 1. water flux ! if (.not. use_virt_salt) can be used!
@@ -562,7 +562,6 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
             where (ulevels_nod2d > 1) flux = -water_flux
         end if 
     end if 
-    
     !___________________________________________________________________________
     ! compute total global net freshwater flux into the ocean 
     call integrate_nod(flux, net, partit, mesh)

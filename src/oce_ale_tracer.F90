@@ -212,6 +212,9 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 
     !___________________________________________________________________________
     ! loop over all tracers
+        !$ACC UPDATE DEVICE(dynamics%w, dynamics%w_e, dynamics%uv) !!! async(1) 
+!!!     !$ACC UPDATE DEVICE(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus)
+        !$ACC UPDATE DEVICE (mesh%helem, mesh%hnode, mesh%hnode_new, mesh%zbar_3d_n, mesh%z_3d_n)
     do tr_num=1, tracers%num_tracers
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
@@ -221,25 +224,16 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         ! advect tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
 
-        !$ACC DATA COPY(mesh, partit, dynamics, tracers) &
-        !$ACC      COPY(mesh%helem, mesh%elem_cos, mesh%edge_cross_dxdy, mesh%elem2d_nodes, mesh%nl) &
-        !$ACC      COPY(mesh%nlevels_nod2D, mesh%ulevels_nod2D, mesh%nod_in_elem2D, mesh%nod_in_elem2D_num) &
-        !$ACC      COPY(mesh%ulevels, mesh%edge_tri, mesh%edge_dxdy, mesh%edges, mesh%nlevels, mesh%hnode, mesh%hnode_new) &
-        !$ACC      COPY(mesh%zbar_3d_n, mesh%z_3d_n, mesh%area, mesh%areasvol) &
-        !$ACC      COPY(partit%mydim_elem2d, partit%myDim_nod2D, partit%edim_nod2d, partit%myDim_edge2D) &
-        !$ACC      COPY(dynamics%w, dynamics%w_e, dynamics%uv) &
-        !$ACC      COPY(tracers%data, tracers%work) &
-        !$ACC      COPY(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB) &
-        !$ACC      COPY(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus) &
-        !$ACC      COPY(tracers%work%adv_flux_hor, tracers%work%adv_flux_ver, tracers%work%fct_LO) &
-        !$ACC      COPY(tracers%work%del_ttf_advvert, tracers%work%del_ttf_advhoriz, tracers%work%edge_up_dn_grad) &
-        !$ACC      COPY(tracers%work%del_ttf)
 
+	!here update only those initialized in the init_tracers. (values, valuesAB, edge_up_dn_grad, ...)
+        !$ACC UPDATE  DEVICE(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB) &
+        !$ACC  DEVICE(tracers%work%edge_up_dn_grad) !!&
         ! it will update del_ttf with contributions from horizontal and vertical advection parts (del_ttf_advhoriz and del_ttf_advvert)
+	!$ACC wait(1)
         call do_oce_adv_tra(dt, UV, Wvel, Wvel_i, Wvel_e, tr_num, dynamics, tracers, partit, mesh)
 
-        !$ACC END DATA
 
+        !$ACC UPDATE HOST(tracers%work%del_ttf, tracers%work%del_ttf_advhoriz, tracers%work%del_ttf_advvert)
         !___________________________________________________________________________
         ! update array for total tracer flux del_ttf with the fluxes from horizontal
         ! and vertical advection
@@ -267,6 +261,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
 !$OMP BARRIER
     end do
+!!!        !$ACC UPDATE HOST (tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus) &
+!!!        !$ACC HOST  (tracers%work%edge_up_dn_grad)
 
     !___________________________________________________________________________
     ! 3D restoring for "passive" tracers
