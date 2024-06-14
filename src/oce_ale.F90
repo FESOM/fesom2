@@ -220,10 +220,18 @@ subroutine init_ale(dynamics, partit, mesh)
     USE MOD_PARSUP
     USE MOD_DYN
     USE o_ARRAYS
-    USE g_config, only: which_ale, use_cavity, use_partial_cell
+!    USE g_config, only: which_ale, use_cavity, use_partial_cell
+
+! kh 18.03.21
+    USE g_config, only: which_ale, use_cavity, use_partial_cell, ib_async_mode
+
     USE g_forcing_param, only: use_virt_salt
     use oce_ale_interfaces
     Implicit NONE
+     
+! kh 18.03.21
+    integer             :: i, j
+
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(inout), target :: mesh
@@ -258,7 +266,38 @@ subroutine init_ale(dynamics, partit, mesh)
     allocate(mesh%zbar_3d_n(nl,myDim_nod2D+eDim_nod2D))
     
     ! Z_n: mid depth of layers due to ale thinkness variactions at ervery node n 
-    allocate(mesh%Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
+!    allocate(mesh%Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
+! kh 18.03.21
+    if (ib_async_mode == 0) then
+        allocate(mesh%Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
+        allocate(mesh%Z_3d_n_ib(nl-1,myDim_nod2D+eDim_nod2D)) 
+        Z_3d_n(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)              => mesh%Z_3d_n(:,:)
+        Z_3d_n_ib(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)           => mesh%Z_3d_n_ib(:,:)
+        !allocate(Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D))
+        !allocate(Z_3d_n_ib(nl-1,myDim_nod2D+eDim_nod2D))
+    else
+! kh 18.03.21 support "first touch" idea
+!$omp parallel sections num_threads(2)
+!$omp section
+        allocate(mesh%Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
+        Z_3d_n(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)              => mesh%Z_3d_n(:,:)
+        !allocate(Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D))
+        do i = 1, myDim_nod2D+eDim_nod2D
+            do j = 1, nl-1
+                Z_3d_n(j, i) = 0._WP
+            end do
+        end do
+!$omp section
+        allocate(mesh%Z_3d_n_ib(nl-1,myDim_nod2D+eDim_nod2D)) 
+        Z_3d_n_ib(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)           => mesh%Z_3d_n_ib(:,:)
+        !allocate(Z_3d_n_ib(nl-1,myDim_nod2D+eDim_nod2D))
+        do i = 1, myDim_nod2D+eDim_nod2D
+            do j = 1, nl-1
+                Z_3d_n_ib(j, i) = 0._WP
+            end do
+        end do
+!$omp end parallel sections
+    end if
     
     ! bottom_elem_tickness: changed bottom layer thinkness due to partial cells
     allocate(mesh%bottom_elem_thickness(myDim_elem2D+eDim_nod2D))
@@ -1993,7 +2032,6 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
 
 !$OMP PARALLEL DO
     do n=1,myDim_nod2D
-        if (ulevels_nod2D(n) > 1) cycle ! --> if cavity node hbar == hbar_old
         hbar(n)=hbar_old(n)+ssh_rhs_old(n)*dt/areasvol(ulevels_nod2D(n),n)
     end do
 !$OMP END PARALLEL DO
@@ -3645,7 +3683,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         !   rigid lid.
 !$OMP PARALLEL DO
         do node=1, myDim_nod2D+eDim_nod2D
-            if (ulevels_nod2D(node)==1) eta_n(node)=alpha*hbar(node)+(1.0_WP-alpha)*hbar_old(node)
+            eta_n(node)=alpha*hbar(node)+(1.0_WP-alpha)*hbar_old(node)
         end do
 !$OMP END PARALLEL DO
         ! --> eta_(n)

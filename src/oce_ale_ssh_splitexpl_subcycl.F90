@@ -92,14 +92,15 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
 
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhsAB, UVnode_rhs, UVnode, UVh
-    real(kind=WP), dimension(:,:)  , pointer :: Wvel_e
+    real(kind=WP), dimension(:,:,:,:), pointer :: UV_rhsAB
+    real(kind=WP), dimension(:,:,:)  , pointer :: UV, UVnode_rhs, UVnode, UVh
+    real(kind=WP), dimension(:,:)    , pointer :: Wvel_e
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UV        =>dynamics%uv(:,:,:)
-    UV_rhsAB  =>dynamics%uv_rhsAB(:,:,:)
+    UV_rhsAB  =>dynamics%uv_rhsAB(:,:,:,:)
     UVnode_rhs=>dynamics%work%uvnode_rhs(:,:,:)
     UVnode    =>dynamics%uvnode(:,:,:)
     Wvel_e    =>dynamics%w_e(:,:)
@@ -369,7 +370,7 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
     do elem=1, myDim_elem2D
         ul1 = ulevels(elem)
         nl1 = nlevels(elem)-1
-        UV_rhsAB(1:2, ul1:nl1, elem) = UV_rhsAB(1:2, ul1:nl1, elem) + elem_area(elem)* &
+        UV_rhsAB(1, 1:2, ul1:nl1, elem) = UV_rhsAB(1, 1:2, ul1:nl1, elem) + elem_area(elem)* &
                 ( UVnode_rhs(1:2, ul1:nl1, elem2D_nodes(1, elem)) &
                 + UVnode_rhs(1:2, ul1:nl1, elem2D_nodes(2, elem)) & 
                 + UVnode_rhs(1:2, ul1:nl1, elem2D_nodes(3, elem))) / 3.0_WP     
@@ -383,11 +384,11 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
         do elem=1, myDim_elem2D
             ul1 = ulevels(elem)
             nl1 = nlevels(elem)-1
-            dynamics%ke_adv_AB(1, ul1:nl1, elem) = dynamics%ke_adv_AB(1, ul1:nl1, elem) + elem_area(elem)* &
+            dynamics%ke_adv_AB(1, 1, ul1:nl1, elem) = dynamics%ke_adv_AB(1, 1, ul1:nl1, elem) + elem_area(elem)* &
                     ( UVnode_rhs(1, ul1:nl1, elem2D_nodes(1, elem)) &
                     + UVnode_rhs(1, ul1:nl1, elem2D_nodes(2, elem)) & 
                     + UVnode_rhs(1, ul1:nl1, elem2D_nodes(3, elem))) / 3.0_WP / helem(ul1:nl1, elem) 
-            dynamics%ke_adv_AB(2, ul1:nl1, elem) = dynamics%ke_adv_AB(2, ul1:nl1, elem) + elem_area(elem)* &
+            dynamics%ke_adv_AB(1, 2, ul1:nl1, elem) = dynamics%ke_adv_AB(1, 2, ul1:nl1, elem) + elem_area(elem)* &
                     ( UVnode_rhs(2, ul1:nl1, elem2D_nodes(1, elem)) &
                     + UVnode_rhs(2, ul1:nl1, elem2D_nodes(2, elem)) & 
                     + UVnode_rhs(2, ul1:nl1, elem2D_nodes(3, elem))) / 3.0_WP / helem(ul1:nl1, elem)            

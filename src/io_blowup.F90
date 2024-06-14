@@ -130,8 +130,8 @@ MODULE io_BLOWUP
 		call def_variable(bid, 'v'			, (/nl-1, elem2D/)	, 'meridional velocity', 'm/s', dynamics%uv(2,:,:));
 		call def_variable(bid, 'u_rhs'			, (/nl-1, elem2D/)	, 'zonal velocity', 'm/s', dynamics%uv_rhs(1,:,:));
 		call def_variable(bid, 'v_rhs'			, (/nl-1, elem2D/)	, 'meridional velocity', 'm/s', dynamics%uv_rhs(2,:,:));
-		call def_variable(bid, 'urhs_AB'	, (/nl-1, elem2D/)	, 'Adams–Bashforth for u', 'm/s', dynamics%uv_rhsAB(1,:,:));
-		call def_variable(bid, 'vrhs_AB'	, (/nl-1, elem2D/)	, 'Adams–Bashforth for v', 'm/s', dynamics%uv_rhsAB(2,:,:));
+		call def_variable(bid, 'urhs_AB'	, (/nl-1, elem2D/)	, 'Adams-Bashforth for u', 'm/s', dynamics%uv_rhsAB(1,1,:,:));
+		call def_variable(bid, 'vrhs_AB'	, (/nl-1, elem2D/)	, 'Adams-Bashforth for v', 'm/s', dynamics%uv_rhsAB(1,2,:,:));
 		call def_variable(bid, 'zbar_n_bot' , (/nod2D/)			, 'node bottom depth', 'm', zbar_n_bot);
 		call def_variable(bid, 'zbar_e_bot' , (/elem2d/)		, 'elem bottom depth', 'm', zbar_e_bot);
 		call def_variable(bid, 'bottom_node_thickness' , (/nod2D/)			, 'node bottom thickness', 'm', bottom_node_thickness);

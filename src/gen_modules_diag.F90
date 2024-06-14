@@ -6,6 +6,7 @@ module diagnostics
   USE MOD_PARSUP
   use MOD_TRACER
   use MOD_DYN
+  use MOD_ICE
   use g_clock
   use g_comm_auto
   use o_ARRAYS
@@ -17,13 +18,12 @@ module diagnostics
 
   private
   public :: ldiag_solver, lcurt_stress_surf, ldiag_Ri, ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD,        &
-            ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, ldiag_vorticity, ldiag_extflds,    &
+            ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, ldiag_vorticity, ldiag_extflds, ldiag_ice,   &
             compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, shear, Ri, KvdTdZ, KvdSdZ,   & 
-            std_dens_min, std_dens_max, std_dens_N, std_dens,                                        &
+            std_dens_min, std_dens_max, std_dens_N, std_dens, ldiag_trflx,                           &
             std_dens_UVDZ, std_dens_DIV, std_dens_DIV_fer, std_dens_Z, std_dens_H, std_dens_dVdT, std_dens_flux,       &
             dens_flux_e, vorticity, zisotherm, tempzavg, saltzavg, compute_diag_dvd_2ndmoment_klingbeil_etal_2014,       &
-            compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd
-            
+            compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd, vol_ice, vol_snow, compute_ice_diag, thetao, tuv, suv
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
   ! A=ssh_stiff, x=d_eta, rhs=ssh_rhs; rhs_diag=A*x;
@@ -34,9 +34,10 @@ module diagnostics
   real(kind=WP),  save, allocatable, target      :: shear(:,:), Ri(:,:), KvdTdZ(:,:), KvdSdZ(:,:)
   real(kind=WP),  save, allocatable, target      :: stress_bott(:,:), u_bott(:), v_bott(:), u_surf(:), v_surf(:)
   real(kind=WP),  save, allocatable, target      :: vorticity(:,:)
-  real(kind=WP),  save, allocatable, target      :: zisotherm(:)             !target temperature is specified as whichtemp in compute_extflds
+  real(kind=WP),  save, allocatable, target      :: zisotherm(:)              !target temperature is specified as whichtemp in compute_extflds
   real(kind=WP),  save, allocatable, target      :: tempzavg(:), saltzavg(:)  !target depth for averaging is specified as whichdepth in compute_extflds
-! defining a set of standard density bins which will be used for computing densMOC
+  real(kind=WP),  save, allocatable, target      :: vol_ice(:),  vol_snow(:)
+  ! defining a set of standard density bins which will be used for computing densMOC
 ! integer,        parameter                      :: std_dens_N  = 100
 ! real(kind=WP),  save, target                   :: std_dens(std_dens_N)
   integer,        parameter                      :: std_dens_N  =89
@@ -55,6 +56,8 @@ module diagnostics
   real(kind=WP),  save, target                   :: std_dens_min=1030., std_dens_max=1040.
   real(kind=WP),  save, allocatable, target      :: std_dens_UVDZ(:,:,:), std_dens_flux(:,:,:), std_dens_dVdT(:,:), std_dens_DIV(:,:), std_dens_DIV_fer(:,:), std_dens_Z(:,:), std_dens_H(:,:)
   real(kind=WP),  save, allocatable, target      :: dens_flux_e(:)
+  real(kind=WP),  save, allocatable, target      :: thetao(:) ! sst in K
+  real(kind=WP),  save, allocatable, target      :: tuv(:,:,:), suv(:,:,:)
 
   logical                                       :: ldiag_solver     =.false.
   logical                                       :: lcurt_stress_surf=.false.
@@ -75,10 +78,12 @@ module diagnostics
   
   logical                                       :: ldiag_vorticity  =.false.
   logical                                       :: ldiag_extflds    =.false.
+  logical                                       :: ldiag_ice        =.false.
+  logical                                       :: ldiag_trflx      =.false.
   
   namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_Ri, & 
                        ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, &
-                       ldiag_vorticity, ldiag_extflds
+                       ldiag_vorticity, ldiag_extflds, ldiag_trflx, ldiag_ice
   
   contains
 
@@ -291,6 +296,61 @@ salt   => tracers%data(2)%values(:,:)
      end do
   end do
 end subroutine diag_turbflux
+! ==============================================================
+!
+subroutine diag_trflx(mode, dynamics, tracers, partit, mesh)
+  implicit none
+  type(t_dyn)   , intent(inout), target :: dynamics
+  type(t_tracer), intent(in)   , target :: tracers
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh)  , intent(in)   , target :: mesh
+  integer,        intent(in)            :: mode
+  logical,        save                     :: firstcall=.true.
+  integer                                  :: elem, nz, nzu, nzl, elnodes(3)
+  real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
+  real(kind=WP), dimension(:,:),   pointer :: temp, salt
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+UV     => dynamics%uv(:,:,:)
+temp   => tracers%data(1)%values(:,:)
+salt   => tracers%data(2)%values(:,:)
+fer_UV => dynamics%fer_uv(:,:,:)
+!=====================
+  if (firstcall) then !allocate the stuff at the first call
+      allocate(tuv(2,nl-1,myDim_elem2D+eDim_elem2D))
+      allocate(suv(2,nl-1,myDim_elem2D+eDim_elem2D))
+      tuv = 0.0_WP
+      suv = 0.0_WP
+      firstcall=.false.
+      if (mode==0) return
+  end if
+
+  !___________________________________________________________________________
+  ! compute tracer fluxes
+  do elem=1,myDim_elem2D
+      elnodes = elem2D_nodes(:,elem)
+      nzu     = ulevels(elem)
+      nzl     = nlevels(elem)-1
+      if (Fer_GM) then
+          do nz=nzu, nzl
+              tuv(1,nz,elem) = (UV(1,nz,elem) + fer_UV(1,nz, elem)) * sum(temp(nz,elnodes))/3._WP
+              tuv(2,nz,elem) = (UV(2,nz,elem) + fer_UV(2,nz, elem)) * sum(temp(nz,elnodes))/3._WP
+              suv(1,nz,elem) = (UV(1,nz,elem) + fer_UV(1,nz, elem)) * sum(salt(nz,elnodes))/3._WP
+              suv(2,nz,elem) = (UV(2,nz,elem) + fer_UV(2,nz, elem)) * sum(salt(nz,elnodes))/3._WP
+          end do
+      else
+          do nz=nzu, nzl
+              tuv(1,nz,elem) = UV(1,nz,elem) * sum(temp(nz,elnodes))/3._WP
+              tuv(2,nz,elem) = UV(2,nz,elem) * sum(temp(nz,elnodes))/3._WP
+              suv(1,nz,elem) = UV(1,nz,elem) * sum(salt(nz,elnodes))/3._WP
+              suv(2,nz,elem) = UV(2,nz,elem) * sum(salt(nz,elnodes))/3._WP
+          end do
+      end if
+  end do
+end subroutine diag_trflx
 ! ==============================================================
 ! 
 subroutine diag_Ri(mode, dynamics, partit, mesh)
@@ -837,15 +897,66 @@ subroutine compute_extflds(mode, dynamics, tracers, partit, mesh)
   call exchange_nod(tempzavg, partit)
   call exchange_nod(saltzavg, partit)
 end subroutine compute_extflds
+!_______________________________________________________________________________
+subroutine compute_ice_diag(mode, ice, partit, mesh)
+    IMPLICIT NONE
+    integer,        intent(in)              :: mode
+    logical,        save                    :: firstcall=.true.
+    type(t_ice)   , intent(in),     target  :: ice
+    type(t_partit), intent(inout),  target  :: partit
+    type(t_mesh)  , intent(in)   ,  target  :: mesh
+    integer                                 :: n
 
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    if (firstcall) then  !allocate the stuff at the first call
+        allocate(vol_ice(myDim_nod2D+eDim_nod2D), vol_snow(myDim_nod2D+eDim_nod2D))
+        vol_ice =0.0_WP
+        vol_snow=0.0_WP
+        firstcall=.false.
+        if (mode==0) return
+    end if
+!$OMP PARALLEL DO
+DO n=1, myDim_nod2D
+   vol_ice(n) =ice%data(1)%values(n)*ice%data(2)%values(n)
+   vol_snow(n)=ice%data(1)%values(n)*ice%data(3)%values(n)
+END DO
+!$OMP END PARALLEL DO
 
+end subroutine compute_ice_diag
+
+! SST in K
+subroutine compute_thetao(mode, tracers, partit, mesh)
+  implicit none
+  integer,        intent(in)            :: mode
+  type(t_tracer), intent(in) ,  target  :: tracers
+  type(t_mesh)  , intent(in) ,  target  :: mesh
+  type(t_partit), intent(in), target :: partit
+  logical, save                         :: firstcall=.true.
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+  if (firstcall) then !allocate the stuff at the first call
+     allocate(thetao(mydim_nod2D))
+     firstcall=.false.
+     if (mode==0) return
+  end if
+
+  !skipping loop 
+  thetao(:) = tracers%data(1)%values(1,1:myDim_nod2D)+273.15_WP 
+end subroutine compute_thetao
 
 ! ==============================================================
-subroutine compute_diagnostics(mode, dynamics, tracers, partit, mesh)
+subroutine compute_diagnostics(mode, dynamics, tracers, ice, partit, mesh)
   implicit none
   type(t_mesh)  , intent(in)   , target :: mesh
   type(t_partit), intent(inout), target :: partit
   type(t_tracer), intent(inout), target :: tracers
+  type(t_ice),    intent(inout), target :: ice
   type(t_dyn)   , intent(inout), target :: dynamics
   integer, intent(in)                   :: mode !constructor mode (0=only allocation; any other=do diagnostic)
   real(kind=WP)                         :: val  !1. solver diagnostic
@@ -869,11 +980,15 @@ subroutine compute_diagnostics(mode, dynamics, tracers, partit, mesh)
   if (ldiag_dMOC)        call diag_densMOC(mode, dynamics, tracers, partit, mesh)
   !7. compute turbulent fluxes
   if (ldiag_turbflux)    call diag_turbflux(mode, dynamics, tracers, partit, mesh)
+  !8. compute tracers fluxes
+  if (ldiag_trflx)       call diag_trflx(mode, dynamics, tracers, partit, mesh)
   ! compute relative vorticity
   if (ldiag_vorticity)   call relative_vorticity(mode, dynamics, partit, mesh)
   ! soe exchanged fields requested by IFS/FESOM in NextGEMS.
   if (ldiag_extflds)     call compute_extflds(mode, dynamics, tracers, partit, mesh)
-
+  !fields required for for destinE
+  if (ldiag_ice)         call compute_ice_diag(mode, ice, partit, mesh)
+  call compute_thetao(mode, tracers, partit, mesh) 
 end subroutine compute_diagnostics
 
 !

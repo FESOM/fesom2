@@ -1,12 +1,17 @@
-#!/bin/bash
-#SBATCH --job-name=test-fesom
-#SBATCH -p small
-#SBATCH --ntasks-per-node=64
-#SBATCH --ntasks=64
-#SBATCH --time=00:30:00
-#SBATCH -o slurm-out.out
-#SBATCH -e slurm-err.out
-#SBATCH -A project_465000454
+#!/bin/bash --login
+#SBATCH -p dev-g
+#SBATCH -J fesom
+#SBATCH -o fesom.out
+#SBATCH -e fesom.err
+#SBATCH -N 2
+#SBATCH --gpus-per-node=8
+#SBATCH --ntasks-per-node=8
+#SBATCH --cpus-per-task=7
+#SBATCH --hint=nomultithread
+#SBATCH --exclusive
+#SBATCH --account=project_465000454
+#SBATCH --time=00:10:00
+#SBATCH --mem=0
 
 source ../env/lumi/shell
 
@@ -29,7 +34,7 @@ cp ../config/namelist.io .
 cp ../config/namelist.dyn .
 
 date
-srun -l fesom.x > "fesom2.0.out"
+srun -l fesom.x
 date
 
 # qstat -f $PBS_JOBID
