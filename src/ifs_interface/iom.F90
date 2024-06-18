@@ -22,7 +22,7 @@ MODULE iom
     PUBLIC iom_field_request, iom_send_fesom_data
     PUBLIC iom_flush
 
-    LOGICAL :: lnomultio = .TRUE._1
+    LOGICAL :: lnomultio = .TRUE.
 
     PRIVATE ctl_stop
     !!----------------------------------------------------------------------
@@ -50,7 +50,7 @@ CONTAINS
 
     SUBROUTINE iom_enable_multio()
         IMPLICIT NONE
-        lnomultio = .FALSE._1
+        lnomultio = .FALSE.
     END SUBROUTINE
 
     SUBROUTINE multio_custom_error_handler(context, err, info)
@@ -83,7 +83,7 @@ CONTAINS
         INTEGER :: err
         CHARACTER(len=16)                 :: err_str
 
-        IF (lnomultio.EQ..TRUE._1) RETURN
+        IF (lnomultio) RETURN
 
         mio_parent_comm = mpi_comm_world
 
@@ -162,7 +162,7 @@ CONTAINS
         IMPLICIT NONE
         INTEGER :: err
 
-        IF (lnomultio.EQ..TRUE._1) RETURN
+        IF (lnomultio) RETURN
 
         err = mio_handle%close_connections();
         IF (err /= MULTIO_SUCCESS) THEN
@@ -182,7 +182,7 @@ CONTAINS
         INTEGER                           :: err
         CHARACTER(len=16)                 :: err_str
 
-        IF (lnomultio.EQ..TRUE._1) RETURN
+        IF (lnomultio) RETURN
 
         mio_parent_comm = server_comm
 
@@ -262,7 +262,7 @@ CONTAINS
 #include "../associate_part_ass.h"
 #include "../associate_mesh_ass.h"
 
-        IF (lnomultio.EQ..TRUE._1) RETURN
+        IF (lnomultio) RETURN
 
         cerr = md%new(mio_handle)
         IF (cerr /= MULTIO_SUCCESS) THEN
@@ -356,7 +356,7 @@ CONTAINS
         INTEGER                                 :: cerr
         TYPE(multio_metadata)                   :: md
 
-        IF (lnomultio.EQ..TRUE._1) RETURN
+        IF (lnomultio) RETURN
 
         cerr = md%new(mio_handle)
         IF (cerr /= MULTIO_SUCCESS) THEN
@@ -450,7 +450,7 @@ CONTAINS
         INTEGER                                 :: cerr
         TYPE(multio_metadata)                   :: md
 
-        IF (lnomultio.EQ..TRUE._1) RETURN
+        IF (lnomultio) RETURN
 
         cerr = md%new(mio_handle)
         IF (cerr /= MULTIO_SUCCESS) THEN
