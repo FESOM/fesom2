@@ -58,7 +58,7 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
     use recom_glovar
     use recom_config
     use recom_ciso
-    use ver_sinking_recom_benthos_interface
+    ! use ver_sinking_recom_benthos_interface
 
     use g_support
     use g_clock
@@ -187,7 +187,7 @@ subroutine diff_ver_recom_expl(tr_num, tracers, partit, mesh)
     use recom_glovar
     use recom_config
     use recom_ciso
-    use diff_ver_recom_expl_interface
+    ! use diff_ver_recom_expl_interface
 
     use g_clock
     use o_PARAM
@@ -286,7 +286,7 @@ subroutine ver_sinking_recom(tr_num, tracers, partit, mesh)
     use REcoM_GloVar
     use recom_config
     use REcoM_ciso
-    use ver_sinking_recom_interface
+    ! use ver_sinking_recom_interface
 
     use g_clock
     use o_PARAM
@@ -443,7 +443,8 @@ if (Vsink .gt. 0.1) then
       dt_sink = dt
       vd_flux = 0.0d0
 
-if (1) then ! 3rd Order DST Sceheme with flux limiting. This code comes from old recom
+!FIXME: Having IF True and IF False is bad practice. Either throw away the old code, or make a namelist switch...
+if (.TRUE.) then ! 3rd Order DST Sceheme with flux limiting. This code comes from old recom
 
       k=nod_in_elem2D_num(n)
       ! Screening minimum depth in neigbouring nodes around node n
@@ -481,7 +482,7 @@ if (1) then ! 3rd Order DST Sceheme with flux limiting. This code comes from old
       end do
 end if ! 3rd Order DST Sceheme with flux limiting
 
-if (0) then ! simple upwind
+if (.FALSE.) then ! simple upwind
 
       ! Surface flux
       vd_flux(nzmin)= 0.0_WP

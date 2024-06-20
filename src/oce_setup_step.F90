@@ -1076,21 +1076,21 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
         !---age-code-end
         !---wiso-code
         ! FESOM tracers with code id 101, 102, 103 are used as water isotopes
-        CASE (101)       ! initialize tracer ID=101 H218O
+        CASE (102)       ! initialize tracer ID=101 H218O
           if (mype==0) then
              write (i_string,  "(I3)") i
              write (id_string, "(I3)") id
              write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
              write (*,*) tracers%data(i)%values(1,1)
           end if
-        CASE (102)       ! initialize tracer ID=102 HD16O
+        CASE (103)       ! initialize tracer ID=102 HD16O
           if (mype==0) then
              write (i_string,  "(I3)") i
              write (id_string, "(I3)") id
              write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
              write (*,*) tracers%data(i)%values(1,1)
           end if
-        CASE (103)       ! initialize tracer ID=103 H216O
+        CASE (104)       ! initialize tracer ID=103 H216O
           if (mype==0) then
              write (i_string,  "(I3)") i
              write (id_string, "(I3)") id

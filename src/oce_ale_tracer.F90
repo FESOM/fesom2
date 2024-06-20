@@ -1487,11 +1487,11 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
 !---Transient tracers (case ##6,12,14,39) need additional input parameters 
 !   and are considered in the separate function transit_bc_surface
 !---wiso-code
-    CASE (101) ! apply boundary conditions to tracer ID=101 (H218O)
+    CASE (102) ! apply boundary conditions to tracer ID=101 (H218O)
         bc_surface = dt*wiso_flux_oce(n,1)
-    CASE (102)  ! apply boundary conditions to tracer ID=102 (HDO)
+    CASE (103)  ! apply boundary conditions to tracer ID=102 (HDO)
         bc_surface = dt*wiso_flux_oce(n,2)
-    CASE (103)  ! apply boundary conditions to tracer ID=103 (H216O)
+    CASE (104)  ! apply boundary conditions to tracer ID=103 (H216O)
         bc_surface = dt*wiso_flux_oce(n,3)
 !---wiso-code-end
 !---age-code

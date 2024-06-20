@@ -5,18 +5,45 @@
 module recom_interface
     interface
         subroutine recom(ice, dynamics, tracers, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        use MOD_DYN
-        use MOD_ICE
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_tracer), intent(inout), target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
+            use mod_mesh
+            USE MOD_PARTIT
+            USE MOD_PARSUP
+            use mod_tracer
+            use MOD_DYN
+            use MOD_ICE
+            type(t_dyn)   , intent(inout), target :: dynamics
+            type(t_ice)   , intent(inout), target :: ice
+            type(t_tracer), intent(inout), target :: tracers
+            type(t_partit), intent(inout), target :: partit
+            type(t_mesh)  , intent(inout), target :: mesh
         end subroutine
+    end interface
+end module
+
+module bio_fluxes_interface
+    interface
+        subroutine bio_fluxes(tracers, partit, mesh)
+            use recom_declarations
+            use recom_locvar
+            use recom_glovar
+            use recom_config
+
+            use mod_mesh
+            USE MOD_PARTIT
+            USE MOD_PARSUP
+            use mod_tracer
+
+            use g_config
+            use o_arrays
+            use g_comm_auto
+            use g_forcing_arrays
+            use g_support
+
+            type(t_tracer), intent(inout), target :: tracers
+            type(t_partit), intent(inout), target :: partit
+            type(t_mesh), intent(inout), target :: mesh
+
+      end subroutine
     end interface
 end module
 
@@ -32,6 +59,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     USE MOD_PARSUP
 
     use recom_declarations
+    use bio_fluxes_interface
     use recom_locvar
     use recom_glovar
     use recom_config
