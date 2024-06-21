@@ -2925,6 +2925,7 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
   END DO
 !$OMP END DO
 !$OMP END PARALLEL
+  CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
   call exchange_nod(sigma_xy, partit)
 !$OMP BARRIER
 end subroutine compute_sigma_xy

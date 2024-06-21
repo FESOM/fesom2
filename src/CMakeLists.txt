@@ -42,6 +42,7 @@ if(ALBEDO_INTELMPI_WORKAROUNDS)
    add_compile_options(-DDISABLE_PARALLEL_RESTART_READ)
 endif()
 
+
 #TODO: this machine specific block can easyly go in  cmake toolchain.
 if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
    message(STATUS "multithreading disabled for Levante") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
@@ -286,28 +287,33 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRE
 target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${YAC_Fortran_INCLUDE_DIRECTORIES} ${YAXT_Fortran_INCLUDE_DIRECTORIES})
+
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C)
 target_link_libraries(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
-
-
 # OASIS-YAK
 target_link_libraries(${PROJECT_NAME} PRIVATE ${YACUTILS_Fortran_LIBRARIES} ${YACCORE_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_Fortran_LIBRARIES})
 
+set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
+if(${ENABLE_OPENMP} AND NOT ${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray)
+   target_compile_options(${PROJECT_NAME} PRIVATE ${OpenMP_Fortran_FLAGS}) # currently we only have OpenMP in the Fortran part
+   target_link_libraries(${PROJECT_NAME} OpenMP::OpenMP_Fortran)
+   
+   # there is a problem (at least on levante with ifort) with openmp and I/O multithreading being active at the same time
+   # in this case the simulation stops and never finishes
+   # this has been observed with IFS-Fesom and Fesom standalone
+   # until the problem is identified, we exclude the I/O and multithreading files from openmp compilation, i.e. "-qno-openmp" for ifort
+   if(NOT ${DISABLE_MULTITHREADING})
+      if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
+         set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/io_restart.F90 PROPERTIES COMPILE_OPTIONS "-qno-openmp")
+         set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/async_threads_module.F90 PROPERTIES COMPILE_OPTIONS "-qno-openmp")
+         set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/io_meandata.F90 PROPERTIES COMPILE_OPTIONS "-qno-openmp")
+      endif()
+   endif()
+endif()
+
 #set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
-
-#target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES} ${OASIS_Fortran_INCLUDE_DIRECTORIES})
-#target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
-#target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
-#target_include_directories(${PROJECT_NAME} PRIVATE ${YAC_Fortran_INCLUDE_DIRECTORIES} ${YAXT_Fortran_INCLUDE_DIRECTORIES})
-##target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
-#target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
-
-## OASIS-YAK
-#target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${YACUTILS_Fortran_LIBRARIES} ${YACCORE_Fortran_LIBRARIES})
-#target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${YAXT_Fortran_LIBRARIES} ${YAXTC_Fortran_LIBRARIES})
-
    
 # fesom.x executable
 add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
