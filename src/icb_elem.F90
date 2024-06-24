@@ -376,15 +376,14 @@ end subroutine FEM_3eval
 subroutine iceberg_elem4all(mesh, partit, elem, lon_deg, lat_deg) 
  USE MOD_MESH
  use MOD_PARTIT		!for myDim_nod2D, myList_elem2D
-!#ifdef use_cavity
 ! use iceberg_params, only: reject_elem
-!#endif
  
  implicit none
  
  integer, intent(INOUT) :: elem
  real, intent(IN) :: lon_deg, lat_deg
  logical :: i_have_element
+ logical                        :: reject_tmp !LA for debugging
 
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
@@ -398,17 +397,19 @@ type(t_partit), intent(inout), target :: partit
   
   if(i_have_element) then
    i_have_element= elem2D_nodes(1,elem) <= myDim_nod2D !1 PE still .true.
-#ifdef use_cavity
-   if( reject_elem(mesh, elem) ) then
-    elem=0 !reject element
-    i_have_element=.false.
-    !write(*,*) 'elem4all: iceberg found in shelf region: elem = 0'
-   else 
-    elem=myList_elem2D(elem) !global now
-   end if 
-#else
+   if (use_cavity) then 
+      reject_tmp = all( (mesh%cavity_depth(elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(elem2D_nodes(:,elem))==0.0) )
+      if(reject_tmp) then
+      !if( reject_elem(mesh, partit, elem) ) then
+       elem=0 !reject element
+       i_have_element=.false.
+       !write(*,*) 'elem4all: iceberg found in shelf region: elem = 0'
+      else 
+       elem=myList_elem2D(elem) !global now
+      end if 
+   else
    elem=myList_elem2D(elem) !global now
-#endif 
+endif 
   end if
   call com_integer(partit, i_have_element,elem) !max 1 PE sends element here; 
 end subroutine iceberg_elem4all
@@ -419,9 +420,7 @@ end subroutine iceberg_elem4all
 
 subroutine find_new_iceberg_elem(mesh, partit, old_iceberg_elem, pt, left_mype)
   use o_param
-!#ifdef use_cavity
 !  use iceberg_params, only: reject_elem
-!#endif
 
   implicit none
   
@@ -431,6 +430,7 @@ subroutine find_new_iceberg_elem(mesh, partit, old_iceberg_elem, pt, left_mype)
   
   INTEGER :: m, n2, idx_elem_containing_n2, elem_containing_n2, ibelem_tmp
   REAL, DIMENSION(3) :: werte2D
+ logical                        :: reject_tmp !LA for debugging
 
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
@@ -461,13 +461,15 @@ do m=1, 3
   if (ALL(werte2D <= 1.+ 1.0e-07) .AND. ALL(werte2D >= 0.0- 1.0e-07) ) then
    old_iceberg_elem=elem_containing_n2
    
-#ifdef use_cavity
-   if( reject_elem(mesh, old_iceberg_elem) ) then
-      left_mype=1.0
-      !write(*,*) 'iceberg found in shelf region: left_mype = 1'
-      old_iceberg_elem=ibelem_tmp
-   end if
-#endif
+   if (use_cavity) then 
+      !if( reject_elem(mesh, partit, old_iceberg_elem) ) then
+      reject_tmp = all( (mesh%cavity_depth(elem2D_nodes(:,ibelem_tmp))/=0.0) .OR. (mesh%bc_index_nod2D(elem2D_nodes(:,ibelem_tmp))==0.0) )
+      if(reject_tmp) then
+         left_mype=1.0
+         !write(*,*) 'iceberg found in shelf region: left_mype = 1'
+         old_iceberg_elem=ibelem_tmp
+      end if
+   endif
 
    RETURN 
   end if
