@@ -632,7 +632,7 @@ end if
             write (id_string, "(I4)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
          end if
-   CASE (1023:1035)
+   CASE (1023:1038) ! NEW Phaeo: changed from 1035 to 1038 (although I don't know why it was 1035 initially, should have been 1032??)
          tr_arr(:,:,i)=0.0_WP
         if (mype==0 .and. my_fesom_group == 0) then !OG
             write (i_string,  "(I4)") i

@@ -20,7 +20,7 @@ subroutine recom(mesh)
   use g_rotate_grid
   use g_config
   use mod_MESH
-  use i_arrays 		! a_ice, m_ice 
+  use i_arrays          ! a_ice, m_ice 
   use o_param           ! num_tracers
   use i_param
   use o_arrays
@@ -224,6 +224,8 @@ if (Diags) then
 #if defined (__coccos)
      allocate(vertgrazmeso_c(nl-1))
      vertgrazmeso_c   = 0.d0
+     allocate(vertgrazmeso_p(nl-1))   ! Phaeocystis
+     vertgrazmeso_p   = 0.d0
 #endif
 
      allocate(vertrespmeso(nl-1))
@@ -256,6 +258,10 @@ if (Diags) then
      vertaggc = 0.d0
      vertdocexc = 0.d0
      vertrespc = 0.d0
+     allocate(vertaggp(nl-1), vertdocexp(nl-1), vertrespp(nl-1)) ! Phaeocystis
+     vertaggp = 0.d0
+     vertdocexp = 0.d0
+     vertrespp = 0.d0
 #endif
 
      !!---- Allocate 2D diagnostics
@@ -277,6 +283,11 @@ if (Diags) then
      vertGPPc = 0.d0
      vertNNAc = 0.d0
      Chldegc = 0.d0
+     allocate(vertNPPp(nl-1), vertGPPp(nl-1), vertNNAp(nl-1), vertChldegp(nl-1)) ! Phaeocystis
+     vertNPPp = 0.d0
+     vertGPPp = 0.d0
+     vertNNAp = 0.d0
+     Chldegp = 0.d0
 #endif
 end if
 
@@ -319,6 +330,10 @@ if (Diags) then
      GPPc(n) = locGPPc
      NNAc(n) = locNNAc
      Chldegc(n) = locChldegc
+     NPPp(n) = locNPPp     ! Phaeocystis
+     GPPp(n) = locGPPp
+     NNAp(n) = locNNAp
+     Chldegp(n) = locChldegp
 #endif
 
      !!---- Updating 3D diagnostics
@@ -327,6 +342,7 @@ if (Diags) then
      grazmeso_d(1:nzmax,n)   = vertgrazmeso_d(1:nzmax)
 #if defined (__coccos)
      grazmeso_c(1:nzmax,n)   = vertgrazmeso_c(1:nzmax)
+     grazmeso_p(1:nzmax,n)   = vertgrazmeso_p(1:nzmax)   ! Phaeocystis
 #endif
 
      respmeso(1:nzmax,n)     = vertrespmeso(1:nzmax)
@@ -352,6 +368,10 @@ if (Diags) then
      docexc(1:nzmax,n)       = vertdocexc(1:nzmax)
      respc(1:nzmax,n)        = vertrespc(1:nzmax)
      NPPc3D(1:nzmax,n)       = vertNPPc(1:nzmax)
+     aggp(1:nzmax,n)         = vertaggp(1:nzmax)   ! Phaeocystis
+     docexp(1:nzmax,n)       = vertdocexp(1:nzmax)
+     respp(1:nzmax,n)        = vertrespp(1:nzmax)
+     NPPp3D(1:nzmax,n)       = vertNPPp(1:nzmax)
 #endif
 
      !!---- Deallocating 2D diagnostics
@@ -359,6 +379,7 @@ if (Diags) then
      deallocate(vertNPPd,vertGPPd,vertNNAd,vertChldegd) 
 #if defined (__coccos)
      deallocate(vertNPPc,vertGPPc,vertNNAc,vertChldegc) 
+     deallocate(vertNPPp,vertGPPp,vertNNAp,vertChldegp)   ! Phaeocystis
 #endif
 
      !!---- Deallocating 3D Diagnistics
@@ -370,8 +391,10 @@ if (Diags) then
      deallocate(vertaggn, vertdocexn, vertrespn)
      deallocate(vertaggd, vertdocexd, vertrespd)
 #if defined (__coccos)
-    deallocate(vertgrazmeso_c)
+     deallocate(vertgrazmeso_c)
      deallocate(vertaggc, vertdocexc, vertrespc)
+     deallocate(vertgrazmeso_p)                   ! Phaeocystis
+     deallocate(vertaggp, vertdocexp, vertrespp)
 #endif
 endif
 
@@ -439,11 +462,15 @@ endif
     call exchange_nod(GPPc)
     call exchange_nod(NNAc)
     call exchange_nod(Chldegc)
+    call exchange_nod(NPPp)    ! Phaeocystis
+    call exchange_nod(GPPp)
+    call exchange_nod(NNAp)
+    call exchange_nod(Chldegp)
 #endif
   endif
 
-  call exchange_nod(GloPCO2surf)	
-  call exchange_nod(GloCO2flux)	
+  call exchange_nod(GloPCO2surf)
+  call exchange_nod(GloCO2flux)
   call exchange_nod(GloCO2flux_seaicemask)
   if (ciso) then
     call exchange_nod(GloPCO2surf_13)
@@ -460,10 +487,10 @@ endif
     call exchange_nod(GlodecayBenthos(:,n))
   end do
  
-  call exchange_nod(GloO2flux_seaicemask)	
-  call exchange_nod(GloHplus)	
-  call exchange_nod(AtmFeInput)	
-  call exchange_nod(AtmNInput)	
+  call exchange_nod(GloO2flux_seaicemask)
+  call exchange_nod(GloHplus)
+  call exchange_nod(AtmFeInput)
+  call exchange_nod(AtmNInput)
 !  call exchange_nod(DenitBen)	
 
   call exchange_nod(PAR3D)

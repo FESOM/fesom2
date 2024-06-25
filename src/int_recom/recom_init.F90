@@ -195,6 +195,14 @@ subroutine recom_init(mesh)
   NNAc = 0.d0
   allocate(Chldegc(node_size))
   Chldegc = 0.d0
+  allocate(NPPp(node_size))
+  NPPp = 0.d0
+  allocate(GPPp(node_size))
+  GPPp = 0.d0
+  allocate(NNAp(node_size))
+  NNAp = 0.d0
+  allocate(Chldegp(node_size))
+  Chldegp = 0.d0
 !--- Allocate 3D diagnostics
   allocate(grazmeso_tot(nl-1,node_size))
   grazmeso_tot(:,:) = 0.d0
@@ -204,6 +212,8 @@ subroutine recom_init(mesh)
   grazmeso_d(:,:) = 0.d0
   allocate(grazmeso_c(nl-1,node_size))
   grazmeso_c(:,:) = 0.d0
+  allocate(grazmeso_p(nl-1,node_size))
+  grazmeso_p(:,:) = 0.d0
   allocate(respmeso(nl-1,node_size))
   respmeso(:,:) = 0.d0
   allocate(respmacro(nl-1,node_size))
@@ -220,24 +230,32 @@ subroutine recom_init(mesh)
   aggd(:,:) = 0.d0
   allocate(aggc(nl-1,node_size))
   aggc(:,:) = 0.d0
+  allocate(aggp(nl-1,node_size))
+  aggp(:,:) = 0.d0
   allocate(docexn(nl-1,node_size))
   docexn(:,:) = 0.d0
   allocate(docexd(nl-1,node_size))
   docexd(:,:) = 0.d0
   allocate(docexc(nl-1,node_size))
   docexc(:,:) = 0.d0
+  allocate(docexp(nl-1,node_size))
+  docexp(:,:) = 0.d0
   allocate(respn(nl-1,node_size))
   respn(:,:) = 0.d0
   allocate(respd(nl-1,node_size))
   respd(:,:) = 0.d0
   allocate(respc(nl-1,node_size))
   respc(:,:) = 0.d0
+  allocate(respp(nl-1,node_size))
+  respp(:,:) = 0.d0
   allocate(NPPn3D(nl-1,node_size))
   NPPn3D(:,:) = 0.d0
   allocate(NPPd3D(nl-1,node_size))
   NPPd3D(:,:) = 0.d0
   allocate(NPPc3D(nl-1,node_size))
   NPPc3D(:,:) = 0.d0
+  allocate(NPPp3D(nl-1,node_size))
+  NPPp3D(:,:) = 0.d0
 
     end if  
 
@@ -482,16 +500,25 @@ Sinkvel2_tr(:,:,:)    = 0.0d0 ! OG 16.03.23
     tr_arr(:,:,31) = tiny_chl/chl2N_max        ! tiny             ! tracer 31 = CoccoN
     tr_arr(:,:,32) = tiny_chl/chl2N_max/NCmax  ! tiny * Redfield  ! tracer 32 = CoccoC 
     tr_arr(:,:,33) = tiny_chl                  ! tiny * 1.56d0    ! tracer 33 = CoccoChl
+    ! Phaeocystis
+    tr_arr(:,:,34) = tiny_chl/chl2N_max        ! tiny             ! tracer 34 = PhaeoN
+    tr_arr(:,:,35) = tiny_chl/chl2N_max/NCmax  ! tiny * Redfield  ! tracer 35 = PhaeoC
+    tr_arr(:,:,36) = tiny_chl                  ! tiny * 1.56d0    ! tracer 36 = PhaeoChl
+
 #elif defined (__coccos) & !defined (__3Zoo2Det)
    if (mype==0 .and. my_fesom_group == 0)  print *, "case_3p1z1d"
     tr_arr(:,:,25) = tiny_chl/chl2N_max        ! tracer 25 = CoccoN
     tr_arr(:,:,26) = tiny_chl/chl2N_max/NCmax  ! tracer 26 = CoccoC 
-    tr_arr(:,:,27) = tiny_chl  
+    tr_arr(:,:,27) = tiny_chl
+    ! Phaeocystis
+    tr_arr(:,:,28) = tiny_chl/chl2N_max        ! tracer 25 = PhaeoN
+    tr_arr(:,:,29) = tiny_chl/chl2N_max/NCmax  ! tracer 26 = PhaeoC
+    tr_arr(:,:,30) = tiny_chl                  ! tracer 27 = PhaeoChl  
 #endif
 
 #if defined (__coccos) & defined (__3Zoo2Det)
-    tr_arr(:,:,34) = tiny                      ! tracer 34 = Zoo3N
-    tr_arr(:,:,35) = tiny * Redfield           ! tracer 35 = Zoo3C
+    tr_arr(:,:,37) = tiny                      ! tracer 34 = Zoo3N
+    tr_arr(:,:,38) = tiny * Redfield           ! tracer 35 = Zoo3C
 #elif !defined (__coccos) & defined (__3Zoo2Det)
     tr_arr(:,:,31) = tiny                      ! tracer 31 = Zoo3N
     tr_arr(:,:,32) = tiny * Redfield           ! tracer 32 = Zoo3C

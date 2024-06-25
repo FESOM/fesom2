@@ -1120,6 +1120,7 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
           if (any(recom_det_tracer_id == tracer_id(tr_num))) Vben = Vdet
           if (any(recom_phy_tracer_id == tracer_id(tr_num))) Vben = VPhy
           if (any(recom_dia_tracer_id == tracer_id(tr_num))) Vben = VDia
+          if (any(recom_phaeo_tracer_id == tracer_id(tr_num))) Vben = VPhaeo   ! NEW Phaeo: added this line
           Vben = Vdet_a * abs(zbar_3d_n(:,n)) + Vben
         end if
 
@@ -1854,7 +1855,7 @@ use REcoM_ciso
         bc_surface=0.0_WP  ! OG added bc for recom fields 
     CASE (1022) ! OXY
         bc_surface= dt*GloO2flux_seaicemask(n)
-    CASE (1023:1032)
+    CASE (1023:1035) ! NEW Phaeo: changed from 1032 to 1035
         bc_surface=0.0_WP  ! OG added bc for recom fields 
     CASE (1302) ! Before (1033) ! DIC_13
          if (ciso) then
@@ -1882,7 +1883,7 @@ use REcoM_ciso
          end if
     CASE (1405:1421)
          bc_surface=0.0_WP ! organic 14C
-    CASE (1033:1299)
+    CASE (1036:1299) ! NEW Phaeo: changed from 1033 to 1036
         bc_surface=0.0_WP  ! OG added bc for recom fields - adapted to ciso by MB 
 #endif 
     CASE (101) ! apply boundary conditions to tracer ID=101
