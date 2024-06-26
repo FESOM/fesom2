@@ -431,10 +431,10 @@ include "node_contour_boundary.h"
 
     integer                    :: my_number_of_points
     integer                    :: number_of_all_points
-    integer                    :: counts_from_all_pes(partit%npes)
-    integer                    :: displs_from_all_pes(partit%npes)
     integer                    :: my_displacement
 
+    integer,allocatable        :: counts_from_all_pes(:)
+    integer,allocatable        :: displs_from_all_pes(:)
     integer,allocatable        :: unstr_mask(:,:)
     real(kind=WP)              :: this_x_coord          ! longitude coordinates
     real(kind=WP)              :: this_y_coord          ! latitude coordinates
@@ -477,6 +477,9 @@ include "associate_mesh_ass.h"
     ALLOCATE(send_id(nsend))
     ALLOCATE(recv_id(nrecv))
 !---wiso-code-end
+    
+    ALLOCATE(displs_from_all_pes(partit%npes))
+    ALLOCATE(counts_from_all_pes(partit%npes))
 
     send_id = 0
     recv_id = 0
@@ -565,7 +568,7 @@ include "associate_mesh_ass.h"
       ALLOCATE(all_x_corners(1, 1, 1))
       ALLOCATE(all_y_corners(1, 1, 1))
     endif
-
+   
 
 
     displs_from_all_pes(1) = 0
@@ -631,7 +634,7 @@ include "associate_mesh_ass.h"
      
 
 
-    DEALLOCATE(all_x_coords, all_y_coords, my_x_coords, my_y_coords) 
+    DEALLOCATE(all_x_coords, all_y_coords, my_x_coords, my_y_coords, displs_from_all_pes, counts_from_all_pes)
 !------------------------------------------------------------------
 ! 3rd Declare the transient variables
 !------------------------------------------------------------------
