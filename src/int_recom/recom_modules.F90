@@ -160,14 +160,25 @@ module recom_config
   Real(kind=8)                 :: cZoo2N         = 0.2d0
 
   namelist /painitialization_N/ cPhyN, cHetN, cZoo2N
+
 !!------------------------------------------------------------------------------
-!! *** Arrhenius function ***
+!! *** Temperature and Arrhenius functions ***
   Real(kind=8)                 :: recom_Tref     = 288.15d0       ! [K]
   Real(kind=8)                 :: C2K            = 273.15d0       !     Conversion from degrees C to K
   Real(kind=8)                 :: Ae             = 4500.d0        ! [K] Slope of the linear part of the Arrhenius function
+
+! NEW MODIFIED parameters
+  Real(kind=8)                 :: ord_d          = -0.2216d0 ! parameters for diatom temperature function
+  Real(kind=8)                 :: expon_d        = 0.0406d0 ! diatom exponent
+  Real(kind=8)                 :: ord_phy        = -1.2154d0 ! small phyto ordonnée
+  Real(kind=8)                 :: expon_phy      = 0.0599d0 ! small phyto exponent
+  Real(kind=8)                 :: ord_cocco      = -0.2310d0 ! coccolith ordonnée
+  Real(kind=8)                 :: expon_cocco    = 0.0327d0 ! small phyto ordonnée
+
   Real(kind=8)                 :: reminSi        = 0.02d0
   Real(kind=8)                 :: k_o2_remin     = 15.d0          ! NEW O2remin mmol m-3; Table 1 in Cram 2018 cites DeVries & Weber 2017 for a range of 0-30 mmol m-3
-  namelist /paArrhenius/ recom_Tref, C2K, Ae, reminSi, k_o2_remin   
+  namelist /paArrhenius/ recom_Tref, C2K, Ae, ord_d, expon_d, ord_phy, expon_phy, ord_cocco, expon_cocco, reminSi, k_o2_remin
+
 !!------------------------------------------------------------------------------
 !! *** For limiter function ***
   Real(kind=8)                 :: NMinSlope      = 50.d0 
@@ -180,10 +191,7 @@ module recom_config
   Real(kind=8)                 :: k_Fe_d         = 0.12d0
   Real(kind=8)                 :: k_Fe_c         = 0.04           ! NEW
   Real(kind=8)                 :: k_si           = 4.d0
-  Real(kind=8)                 :: P_cm           = 3.0d0          ! [1/day]   the rate of C-specific photosynthesis
-  Real(kind=8)                 :: P_cm_d         = 3.5d0
-  Real(kind=8)                 :: P_cm_c         = 3.3d0          ! NEW
-  namelist /palimiter_function/ NMinSlope, SiMinSlope, NCmin, NCmin_d, NCmin_c, SiCmin, k_Fe, k_Fe_d, k_Fe_c, k_si, P_cm, P_cm_d, P_cm_c   
+ namelist /palimiter_function/ NMinSlope, SiMinSlope, NCmin, NCmin_d, NCmin_c, SiCmin, k_Fe, k_Fe_d, k_Fe_c, k_si
 !!------------------------------------------------------------------------------
 !! *** For light calculations ***
   Real(kind=8)                 :: k_w            = 0.04d0         ! [1/m]              Light attenuation coefficient
@@ -458,7 +466,9 @@ Module REcoM_declarations
   Real(kind=8)  :: rTref                  ! [1/K] Reciproque value of reference temp for Arrhenius function
   Real(kind=8)  :: rTloc                  ! [1/K] Reciproque of local ocean temp
   Real(kind=8)  :: arrFunc                ! []    Temp dependence of rates
-  Real(kind=8)  :: CoccoTFunc             ! []    Temp dependence of coccolithophores
+  Real(kind=8)  :: Temp_diatoms             ! []    Temp dependence of diatoms
+  Real(kind=8)  :: Temp_phyto             ! []    Temp dependence of small phyto
+  Real(kind=8)  :: Temp_cocco             ! []    Temp dependence of coccolithophores
   Real(kind=8)  :: arrFuncZoo2            ! []    Temperature function for krill
   Real(kind=8)  :: q10_mic                ! 3Zoo
   Real(kind=8)  :: q10_mic_res            ! 3Zoo
@@ -522,6 +532,15 @@ Module REcoM_declarations
   Real(kind=8)  :: phyRespRate, phyRespRate_dia, phyRespRate_cocco    ! [1/day] Phytoplankton respiration rate
   Real(kind=8)  :: KOchl, KOchl_dia, KOchl_cocco                      ! coefficient for damage to the photosynthetic apparatus 
 !!------------------------------------------------------------------------------
+!! *** Vertical only Decomposition of phytoplankton growth components ***
+  Real(kind=8),allocatable,dimension(:)  :: VTTemp_diatoms, VTTemp_phyto, VTTemp_cocco            ! Vertical 1D  temperature effect on phytoplankton photosynthesis
+  Real(kind=8),allocatable,dimension(:)  :: VTPhyCO2, VTDiaCO2, VTCoccoCO2                        ! CO2 effect
+  Real(kind=8),allocatable,dimension(:)  :: VTqlimitFac_phyto, VTqlimitFac_diatoms, VTqlimitFac_cocco  ! nutrient effect
+  Real(kind=8),allocatable,dimension(:)  :: VTCphotLigLim_phyto, VTCphotLigLim_diatoms, VTCphotLigLim_cocco ! light limitation
+  Real(kind=8),allocatable,dimension(:)  :: VTCphot_phyto, VTCphot_diatoms, VTCphot_cocco
+  Real(kind=8),allocatable,dimension(:)  :: VTSi_assimDia  
+
+!!------------------------------------------------------------------------------  
 !! *** Iron chemistry ***
   Real(kind=8),external :: iron_chemistry 
 !!------------------------------------------------------------------------------
@@ -605,7 +624,12 @@ Module REcoM_declarations
   Real(kind=8),allocatable,dimension(:) :: vertNPPn, vertGPPn, vertNNAn, vertChldegn
   Real(kind=8),allocatable,dimension(:) :: vertNPPd, vertGPPd, vertNNAd, vertChldegd
   Real(kind=8),allocatable,dimension(:) :: vertNPPc, vertGPPc, vertNNAc, vertChldegc
-  Real(kind=8),allocatable,dimension(:) :: vertgrazmeso_tot, vertgrazmeso_n, vertgrazmeso_d, vertgrazmeso_c
+  Real(kind=8)  :: locgrazmeso_tot, locgrazmeso_n, locgrazmeso_d, locgrazmeso_c, locgrazmeso_det, locgrazmeso_mic, locgrazmeso_det2
+  Real(kind=8)  :: locgrazmacro_tot, locgrazmacro_n, locgrazmacro_d, locgrazmacro_c, locgrazmacro_mes, locgrazmacro_det, locgrazmacro_mic, locgrazmacro_det2
+  Real(kind=8)  :: locgrazmicro_tot, locgrazmicro_n, locgrazmicro_d, locgrazmicro_c
+  Real(kind=8),allocatable,dimension(:) :: vertgrazmeso_tot, vertgrazmeso_n, vertgrazmeso_d, vertgrazmeso_c, vertgrazmeso_det, vertgrazmeso_mic, vertgrazmeso_det2
+  Real(kind=8),allocatable,dimension(:) :: vertgrazmacro_tot, vertgrazmacro_n, vertgrazmacro_d, vertgrazmacro_c, vertgrazmacro_mes, vertgrazmacro_det, vertgrazmacro_mic, vertgrazmacro_det2
+  Real(kind=8),allocatable,dimension(:) :: vertgrazmicro_tot, vertgrazmicro_n, vertgrazmicro_d, vertgrazmicro_c
   Real(kind=8),allocatable,dimension(:) :: vertrespmeso, vertrespmacro, vertrespmicro
   Real(kind=8),allocatable,dimension(:) :: vertcalcdiss, vertcalcif
   Real(kind=8),allocatable,dimension(:) :: vertaggn, vertaggd, vertaggc
@@ -698,10 +722,25 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:)     :: GPPc
   Real(kind=8),allocatable,dimension(:)     :: NNAc
   Real(kind=8),allocatable,dimension(:)     :: Chldegc
-  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_tot
-  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_n
-  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_d
-  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_c
+  Real(kind=8),allocatable,dimension(:)     :: grazmeso_tot
+  Real(kind=8),allocatable,dimension(:)     :: grazmeso_n
+  Real(kind=8),allocatable,dimension(:)     :: grazmeso_d
+  Real(kind=8),allocatable,dimension(:)     :: grazmeso_c
+  Real(kind=8),allocatable,dimension(:)     :: grazmeso_det
+  Real(kind=8),allocatable,dimension(:)     :: grazmeso_mic
+  Real(kind=8),allocatable,dimension(:)     :: grazmeso_det2
+  Real(kind=8),allocatable,dimension(:)     :: grazmacro_tot
+  Real(kind=8),allocatable,dimension(:)     :: grazmacro_n
+  Real(kind=8),allocatable,dimension(:)     :: grazmacro_d
+  Real(kind=8),allocatable,dimension(:)     :: grazmacro_c
+  Real(kind=8),allocatable,dimension(:)     :: grazmacro_mes
+  Real(kind=8),allocatable,dimension(:)     :: grazmacro_det
+  Real(kind=8),allocatable,dimension(:)     :: grazmacro_mic
+  Real(kind=8),allocatable,dimension(:)     :: grazmacro_det2
+  Real(kind=8),allocatable,dimension(:)     :: grazmicro_tot
+  Real(kind=8),allocatable,dimension(:)     :: grazmicro_n
+  Real(kind=8),allocatable,dimension(:)     :: grazmicro_d
+  Real(kind=8),allocatable,dimension(:)     :: grazmicro_c
   Real(kind=8),allocatable,dimension(:,:)   :: respmeso
   Real(kind=8),allocatable,dimension(:,:)   :: respmacro
   Real(kind=8),allocatable,dimension(:,:)   :: respmicro
@@ -719,6 +758,22 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:,:)   :: NPPn3D
   Real(kind=8),allocatable,dimension(:,:)   :: NPPd3D
   Real(kind=8),allocatable,dimension(:,:)   :: NPPc3D
+  Real(kind=8),allocatable,dimension(:,:)   :: TTemp_diatoms ! my new variables to track
+  Real(kind=8),allocatable,dimension(:,:)   :: TTemp_phyto ! new Temperature effect 
+  Real(kind=8),allocatable,dimension(:,:)   :: TTemp_cocco ! new
+  Real(kind=8),allocatable,dimension(:,:)   :: TPhyCO2 ! new CO2 effect
+  Real(kind=8),allocatable,dimension(:,:)   :: TDiaCO2 ! new
+  Real(kind=8),allocatable,dimension(:,:)   :: TCoccoCO2 ! new
+  Real(kind=8),allocatable,dimension(:,:)   :: TqlimitFac_phyto ! new nutrient limitation
+  Real(kind=8),allocatable,dimension(:,:)   :: TqlimitFac_diatoms
+  Real(kind=8),allocatable,dimension(:,:)   :: TqlimitFac_cocco
+  Real(kind=8),allocatable,dimension(:,:)   :: TCphotLigLim_phyto ! new light limitation
+  Real(kind=8),allocatable,dimension(:,:)   :: TCphot_phyto       ! new 
+  Real(kind=8),allocatable,dimension(:,:)   :: TCphotLigLim_diatoms ! new light limitation
+  Real(kind=8),allocatable,dimension(:,:)   :: TCphot_diatoms
+  Real(kind=8),allocatable,dimension(:,:)   :: TCphotLigLim_cocco ! new light limitation
+  Real(kind=8),allocatable,dimension(:,:)   :: TCphot_cocco ! new
+  Real(kind=8),allocatable,dimension(:,:)   :: TSi_assimDia ! tracking the assimilation of Si by Diatoms
 
   Real(kind=8),allocatable,dimension(:)     :: DenitBen         ! Benthic denitrification Field in 2D [n2d 1]
 
@@ -739,6 +794,7 @@ Module REcoM_GloVar
   Real(kind=8), allocatable,dimension(:)    :: Alk_surf         ! Surface alkalinity field used for restoring
   Real(kind=8), allocatable,dimension(:)    :: relax_alk
   Real(kind=8), allocatable,dimension(:)    :: virtual_alk
+
   real(kind=8), allocatable,dimension(:,:)  :: PAR3D            ! Light in the water column [nl-1 n2d]
   real(kind=8), allocatable,dimension(:)    :: RiverineLonOrig, RiverineLatOrig, RiverineDINOrig, RiverineDONOrig, RiverineDOCOrig, RiverineDSiOrig ! Variables to save original values for riverine nutrients
   real(kind=8), allocatable,dimension(:)    :: RiverDIN2D, RiverDON2D, RiverDOC2D, RiverDSi2D, RiverAlk2D, RiverDIC2D, RiverFe

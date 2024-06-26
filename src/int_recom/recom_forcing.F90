@@ -329,6 +329,49 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
      locChldegc = sum(vertChldegc(1:nn) * thick(1:nn))
 #endif
 
+
+
+     if (Grazing_detritus) then    ! only for the case if grazing detritus is used, as probably only needed for tuning which uses detritus grazing
+        ! Mesozooplankton
+        locgrazmeso_tot = sum(vertgrazmeso_tot(1:nn) * thick(1:nn))
+        locgrazmeso_n   = sum(vertgrazmeso_n(1:nn) * thick(1:nn))
+        locgrazmeso_d 	= sum(vertgrazmeso_d(1:nn) * thick(1:nn))
+#if defined (__coccos)
+        locgrazmeso_c   = sum(vertgrazmeso_c(1:nn) * thick(1:nn))
+#endif
+        locgrazmeso_det = sum(vertgrazmeso_det(1:nn) * thick(1:nn))
+#if defined (__3Zoo2Det)
+        locgrazmeso_mic = sum(vertgrazmeso_mic(1:nn) * thick(1:nn))
+        locgrazmeso_det2= sum(vertgrazmeso_det2(1:nn) * thick(1:nn))
+#endif
+
+#if defined (__3Zoo2Det)
+        ! Macrozooplankton
+        locgrazmacro_tot = sum(vertgrazmacro_tot(1:nn) * thick(1:nn))
+        locgrazmacro_n   = sum(vertgrazmacro_n(1:nn) * thick(1:nn))
+        locgrazmacro_d	 = sum(vertgrazmacro_d(1:nn) * thick(1:nn))
+#if defined (__coccos)
+        locgrazmacro_c   = sum(vertgrazmacro_c(1:nn) * thick(1:nn))
+#endif
+        locgrazmacro_mes = sum(vertgrazmacro_mes(1:nn) * thick(1:nn))
+        locgrazmacro_det = sum(vertgrazmacro_det(1:nn) * thick(1:nn))
+        locgrazmacro_mic = sum(vertgrazmacro_mic(1:nn) * thick(1:nn))
+        locgrazmacro_det2= sum(vertgrazmacro_det2(1:nn) * thick(1:nn))
+
+        ! Microzooplankton
+        locgrazmicro_tot = sum(vertgrazmicro_tot(1:nn) * thick(1:nn))
+        locgrazmicro_n   = sum(vertgrazmicro_n(1:nn) * thick(1:nn))
+        locgrazmicro_d   = sum(vertgrazmicro_d(1:nn) * thick(1:nn))
+#if defined (__coccos)
+        locgrazmicro_c   = sum(vertgrazmicro_c(1:nn) * thick(1:nn))
+#endif
+        
+#endif        
+     endif
+
+
+     
+
   end if
 
 end subroutine REcoM_Forcing

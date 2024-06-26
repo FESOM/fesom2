@@ -215,16 +215,16 @@ end if ! use_MEDUSA and sedflx_num not 0
 
 if (Diags) then
 
-     !!---- Allocate 3D diagnostics
-     allocate(vertgrazmeso_tot(nl-1), vertgrazmeso_n(nl-1), vertgrazmeso_d(nl-1))
-     vertgrazmeso_tot = 0.d0
-     vertgrazmeso_n   = 0.d0
-     vertgrazmeso_d   = 0.d0
+     !!---- Allocate 3D diagnostics    ! Comment Miriam (2/2024): changed grazing from a 3D to a 2D diagnostic while completing all grazing fluxes
+!     allocate(vertgrazmeso_tot(nl-1), vertgrazmeso_n(nl-1), vertgrazmeso_d(nl-1))
+!     vertgrazmeso_tot = 0.d0
+!     vertgrazmeso_n   = 0.d0
+!     vertgrazmeso_d   = 0.d0
 
-#if defined (__coccos)
-     allocate(vertgrazmeso_c(nl-1))
-     vertgrazmeso_c   = 0.d0
-#endif
+!#if defined (__coccos)
+!     allocate(vertgrazmeso_c(nl-1))
+!     vertgrazmeso_c   = 0.d0
+!#endif
 
      allocate(vertrespmeso(nl-1))
      vertrespmeso  = 0.d0
@@ -250,6 +250,35 @@ if (Diags) then
      allocate(vertrespn(nl-1), vertrespd(nl-1))
      vertrespn = 0.d0
      vertrespd = 0.d0
+
+     allocate(VTTemp_diatoms(nl-1), VTTemp_phyto(nl-1), VTTemp_cocco(nl-1))
+     VTTemp_diatoms = 0.d0
+     VTTemp_phyto = 0.d0
+     VTTemp_cocco = 0.d0
+
+     allocate(VTPhyCO2(nl-1), VTDiaCO2(nl-1), VTCoccoCO2(nl-1))
+     VTPhyCO2 = 0.d0
+     VTDiaCO2 = 0.d0
+     VTCoccoCO2 = 0.d0
+
+     allocate(VTqlimitFac_phyto(nl-1), VTqlimitFac_diatoms(nl-1), VTqlimitFac_cocco(nl-1))
+     VTqlimitFac_phyto = 0.d0
+     VTqlimitFac_diatoms = 0.d0
+     VTqlimitFac_cocco  = 0.d0
+
+     allocate(VTCphotLigLim_phyto(nl-1), VTCphotLigLim_diatoms(nl-1), VTCphotLigLim_cocco(nl-1))
+     VTCphotLigLim_phyto = 0.d0
+     VTCphotLigLim_diatoms = 0.d0
+     VTCphotLigLim_cocco  = 0.d0
+
+     allocate(VTCphot_phyto(nl-1), VTCphot_diatoms(nl-1), VTCphot_cocco(nl-1))
+     VTCphot_phyto = 0.d0
+     VTCphot_diatoms = 0.d0
+     VTCphot_cocco  = 0.d0
+
+     allocate(VTSi_assimDia(nl-1))
+     VTSi_assimDia = 0.d0
+
 
 #if defined (__coccos)
      allocate(vertaggc(nl-1), vertdocexc(nl-1), vertrespc(nl-1))
@@ -278,6 +307,45 @@ if (Diags) then
      vertNNAc = 0.d0
      Chldegc = 0.d0
 #endif
+
+     if (Grazing_detritus) then
+        allocate(vertgrazmeso_tot(nl-1), vertgrazmeso_n(nl-1), vertgrazmeso_d(nl-1))
+        vertgrazmeso_tot = 0.d0
+        vertgrazmeso_n   = 0.d0
+        vertgrazmeso_d   = 0.d0
+#if defined (__coccos)
+        allocate(vertgrazmeso_c(nl-1))
+        vertgrazmeso_c   = 0.d0
+#endif
+        allocate(vertgrazmeso_det(nl-1))
+        vertgrazmeso_det = 0.d0
+#if defined (__3Zoo2Det)
+        allocate(vertgrazmeso_mic(nl-1), vertgrazmeso_det2(nl-1))
+        vertgrazmeso_mic  = 0.d0
+        vertgrazmeso_det2 = 0.d0
+        allocate(vertgrazmacro_tot(nl-1), vertgrazmacro_n(nl-1), vertgrazmacro_d(nl-1))
+        vertgrazmacro_tot = 0.d0
+        vertgrazmacro_n   = 0.d0
+        vertgrazmacro_d   = 0.d0
+#if defined (__coccos)
+        allocate(vertgrazmacro_c(nl-1))
+        vertgrazmacro_c   = 0.d0
+#endif
+        allocate(vertgrazmacro_mes(nl-1), vertgrazmacro_det(nl-1), vertgrazmacro_mic(nl-1), vertgrazmacro_det2(nl-1))
+        vertgrazmacro_mes = 0.d0
+        vertgrazmacro_det = 0.d0
+        vertgrazmacro_mic = 0.d0
+        vertgrazmacro_det2= 0.d0
+        allocate(vertgrazmicro_tot(nl-1), vertgrazmicro_n(nl-1), vertgrazmicro_d(nl-1))
+        vertgrazmicro_tot = 0.d0
+        vertgrazmicro_n   = 0.d0
+        vertgrazmicro_d   = 0.d0
+#if defined (__coccos)
+        allocate(vertgrazmicro_c(nl-1))
+        vertgrazmicro_c   = 0.d0
+#endif
+#endif
+     endif !Grazing_detritus
 end if
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forcing'//achar(27)//'[0m'
@@ -321,13 +389,51 @@ if (Diags) then
      Chldegc(n) = locChldegc
 #endif
 
-     !!---- Updating 3D diagnostics
-     grazmeso_tot(1:nzmax,n) = vertgrazmeso_tot(1:nzmax)
-     grazmeso_n(1:nzmax,n)   = vertgrazmeso_n(1:nzmax)
-     grazmeso_d(1:nzmax,n)   = vertgrazmeso_d(1:nzmax)
+     if (Grazing_detritus) then
+     ! Mesozooplankton
+     grazmeso_tot(n) = locgrazmeso_tot
+     grazmeso_n(n)   = locgrazmeso_n
+     grazmeso_d(n)   = locgrazmeso_d
 #if defined (__coccos)
-     grazmeso_c(1:nzmax,n)   = vertgrazmeso_c(1:nzmax)
+     grazmeso_c(n)   = locgrazmeso_c
 #endif
+     grazmeso_det(n) = locgrazmeso_det
+#if defined (__3Zoo2Det)
+     grazmeso_mic(n) = locgrazmeso_mic
+     grazmeso_det2(n)= locgrazmeso_det2
+#endif
+
+#if defined (__3Zoo2Det)
+     ! Macrozooplankton
+     grazmacro_tot(n) = locgrazmacro_tot
+     grazmacro_n(n)   = locgrazmacro_n
+     grazmacro_d(n)   = locgrazmacro_d
+#if defined (__coccos)
+     grazmacro_c(n)   = locgrazmacro_c
+#endif
+     grazmacro_mes(n) = locgrazmacro_mes
+     grazmacro_det(n) = locgrazmacro_det
+     grazmacro_mic(n) = locgrazmacro_mic
+     grazmacro_det2(n)= locgrazmacro_det2
+
+     ! Microzooplankton
+     grazmicro_tot(n) = locgrazmicro_tot
+     grazmicro_n(n)   = locgrazmicro_n
+     grazmicro_d(n)   = locgrazmicro_d
+#if defined (__coccos)
+     grazmicro_c(n)   = locgrazmicro_c
+#endif
+     
+#endif
+     endif
+     
+     !!---- Updating 3D diagnostics
+!     grazmeso_tot(1:nzmax,n) = vertgrazmeso_tot(1:nzmax)
+!     grazmeso_n(1:nzmax,n)   = vertgrazmeso_n(1:nzmax)
+!     grazmeso_d(1:nzmax,n)   = vertgrazmeso_d(1:nzmax)
+!#if defined (__coccos)
+!     grazmeso_c(1:nzmax,n)   = vertgrazmeso_c(1:nzmax)
+!#endif
 
      respmeso(1:nzmax,n)     = vertrespmeso(1:nzmax)
 #if defined (__3Zoo2Det)
@@ -341,6 +447,28 @@ if (Diags) then
      docexn(1:nzmax,n)       = vertdocexn(1:nzmax)
      respn(1:nzmax,n)        = vertrespn(1:nzmax)
      NPPn3D(1:nzmax,n)       = vertNPPn(1:nzmax)
+ 
+     TTemp_diatoms(1:nzmax,n)  = VTTemp_diatoms(1:nzmax) !! NEW from here tracking vars
+     TTemp_phyto(1:nzmax,n)    = VTTemp_phyto(1:nzmax)
+     TTemp_cocco(1:nzmax,n)    = VTTemp_cocco(1:nzmax)
+
+     TPhyCO2(1:nzmax,n)        = VTPhyCO2(1:nzmax)
+     TDiaCO2(1:nzmax,n)        = VTDiaCO2(1:nzmax)
+     TCoccoCO2(1:nzmax,n)      = VTCoccoCO2(1:nzmax)
+
+     TqlimitFac_phyto(1:nzmax,n)   = VTqlimitFac_phyto(1:nzmax)
+     TqlimitFac_diatoms(1:nzmax,n) = VTqlimitFac_diatoms(1:nzmax)
+     TqlimitFac_cocco(1:nzmax,n)   = VTqlimitFac_cocco(1:nzmax)
+
+     TCphotLigLim_phyto(1:nzmax,n)   = VTCphotLigLim_phyto(1:nzmax)
+     TCphotLigLim_diatoms(1:nzmax,n) = VTCphotLigLim_diatoms(1:nzmax)
+     TCphotLigLim_cocco(1:nzmax,n)   = VTCphotLigLim_cocco(1:nzmax)
+
+     TCphot_phyto(1:nzmax,n)   = VTCphot_phyto(1:nzmax)
+     TCphot_diatoms(1:nzmax,n) = VTCphot_diatoms(1:nzmax)
+     TCphot_cocco(1:nzmax,n)  = VTCphot_cocco(1:nzmax)
+
+     TSi_assimDia(1:nzmax,n)   = VTSi_assimDia(1:nzmax)
 
      aggd(1:nzmax,n)         = vertaggd(1:nzmax)
      respd(1:nzmax,n)        = vertrespd(1:nzmax)
@@ -361,16 +489,48 @@ if (Diags) then
      deallocate(vertNPPc,vertGPPc,vertNNAc,vertChldegc) 
 #endif
 
+     if (Grazing_detritus) then
+        deallocate(vertgrazmeso_tot, vertgrazmeso_n,  vertgrazmeso_d)
+#if defined (__coccos)
+        deallocate(vertgrazmeso_c)
+#endif
+        deallocate(vertgrazmeso_det)
+#if defined (__3Zoo2Det)
+        deallocate(vertgrazmeso_mic, vertgrazmeso_det2)
+        deallocate(vertgrazmacro_tot, vertgrazmacro_n, vertgrazmacro_d)
+#if defined (__coccos)
+        deallocate(vertgrazmacro_c)
+#endif
+        deallocate(vertgrazmacro_mes, vertgrazmacro_det, vertgrazmacro_mic, vertgrazmacro_det2)
+        deallocate(vertgrazmicro_tot, vertgrazmicro_n, vertgrazmicro_d)
+#if defined (__coccos)
+        deallocate(vertgrazmicro_c)
+#endif        
+#endif
+     endif ! Grazing_detritus
+        
+
      !!---- Deallocating 3D Diagnistics
-     deallocate(vertgrazmeso_tot, vertgrazmeso_n, vertgrazmeso_d, vertrespmeso)
+     !     deallocate(vertgrazmeso_tot, vertgrazmeso_n, vertgrazmeso_d, vertrespmeso)
+     deallocate(vertrespmeso)
 #if defined (__3Zoo2Det)
      deallocate(vertrespmacro, vertrespmicro)
 #endif
      deallocate(vertcalcdiss, vertcalcif)
      deallocate(vertaggn, vertdocexn, vertrespn)
      deallocate(vertaggd, vertdocexd, vertrespd)
+
+     deallocate(VTTemp_diatoms, VTTemp_phyto, VTTemp_cocco) ! NEW 
+     deallocate(VTPhyCO2, VTDiaCO2, VTCoccoCO2)
+     deallocate(VTqlimitFac_phyto, VTqlimitFac_diatoms, VTqlimitFac_cocco)
+     deallocate(VTCphotLigLim_phyto, VTCphotLigLim_diatoms, VTCphotLigLim_cocco)
+     deallocate(VTCphot_phyto, VTCphot_diatoms, VTCphot_cocco)
+     deallocate(VTSi_assimDia)
+
+
+
 #if defined (__coccos)
-    deallocate(vertgrazmeso_c)
+!    deallocate(vertgrazmeso_c)
      deallocate(vertaggc, vertdocexc, vertrespc)
 #endif
 endif
@@ -439,6 +599,33 @@ endif
     call exchange_nod(GPPc)
     call exchange_nod(NNAc)
     call exchange_nod(Chldegc)
+#endif
+    call exchange_nod(grazmeso_tot)
+    call exchange_nod(grazmeso_n)
+    call exchange_nod(grazmeso_d)
+#if defined (__coccos)
+    call exchange_nod(grazmeso_c)
+#endif
+    call exchange_nod(grazmeso_det)
+#if defined (__3Zoo2Det)
+    call exchange_nod(grazmeso_mic)
+    call exchange_nod(grazmeso_det2)
+    call exchange_nod(grazmacro_tot)
+    call exchange_nod(grazmacro_n)
+    call exchange_nod(grazmacro_d)
+#if defined (__coccos)
+    call exchange_nod(grazmacro_c)
+#endif
+    call exchange_nod(grazmacro_mes)
+    call exchange_nod(grazmacro_det)
+    call exchange_nod(grazmacro_mic)
+    call exchange_nod(grazmacro_det2)
+    call exchange_nod(grazmicro_tot)
+    call exchange_nod(grazmicro_n)
+    call exchange_nod(grazmicro_d)
+#if defined (__coccos)
+    call exchange_nod(grazmicro_c)
+#endif
 #endif
   endif
 

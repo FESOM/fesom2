@@ -34,14 +34,14 @@ use_viscosity_scaling = .true.
 OmegaC_diss           = .true.    ! Use OmegaC from Mocsy to compute calcite dissolution (after Aumont et al. 2015 and Gehlen et al. 2007) -> set calc_diss_guts to zero if this is false!!!!
 CO2lim                = .true.    ! CO2 dependence of growth and calcification
 Diags                 = .true.
-constant_CO2          = .true.
+constant_CO2          = .false.
 UseFeDust             = .true.      ! Turns dust input of iron off when set to.false.
 UseDustClim           = .true.
 UseDustClimAlbani     = .true.     ! Use Albani dustclim field (If it is false Mahowald will be used)
 use_photodamage       = .true.      ! use Alvarez et al (2018) for chlorophyll degradation
 HetRespFlux_plus      = .true.      !MB More stable computation of zooplankton respiration fluxes adding a small number to HetN
 REcoMDataPath         = '/albedo/work/projects/MarESys/ogurses/input/mesh_CORE2_finaltopo_mean/' !'/work/ollie/projects/MarESys/forcing/CORE2mesh/'
-restore_alkalinity    = .true.
+restore_alkalinity    = .false.
 useRivers             = .false.
 useRivFe              = .false.      ! When set to true, riverine Fe source is activated
 useErosion            = .false.
@@ -79,14 +79,14 @@ cZoo2N                = 0.2d0
 recom_Tref            = 288.15d0    ! [K]
 C2K                   = 273.15d0    ! Conversion from degrees C to K
 Ae                    = 4500.d0     ! [K] Slope of the linear part of the Arrhenius function
-ord_d                 = -0.2216d0 ! diatom ordonnée
-expon_d               = 0.0406d0 ! diatom exponent
-ord_phy               = -1.2154d0 ! small phyto ordonnée
-expon_phy             = 0.0599d0 ! small phyto exponent
-ord_cocco             = -0.2310d0 ! coccolitho ordonnée
-expon_cocco           = 0.0327d0 ! coccolitho exponent
+ord_d                 = -0.2216d0   ! diatom ordonnée
+expon_d               = 0.0406d0    ! diatom exponent
+ord_phy               = -1.2154d0   ! small phyto ordonnée
+expon_phy             = 0.0599d0    ! small phyto exponent
+ord_cocco             = -0.2310d0   ! coccolitho ordonnée
+expon_cocco           = 0.0327d0    ! coccolitho exponent
 reminSi               = 0.02d0
-k_o2_remin            = 15.d0       ! NEW O2remin mmol m-3; Table 1 in Cram 2018 cites DeVries & Weber 2017 for a range of 0-30 mmol m-3
+k_o2_remin            = 15.d0       ! O2remin mmol m-3; Table 1 in Cram 2018 cites DeVries & Weber 2017 for a range of 0-30 mmol m-3
 /
 
 &palimiter_function
@@ -100,9 +100,6 @@ k_Fe                  = 0.04d0
 k_Fe_d                = 0.12d0
 k_Fe_c		      = 0.09d0    
 k_si                  = 4.d0
-P_cm                  = 3.0d0       ! [1/day]            Rate of C-specific photosynthesis 
-P_cm_d                = 3.5d0
-P_cm_c		      = 2.8d0	  
 /
 
 &palight_calculations
@@ -112,7 +109,7 @@ a_chl                 = 0.03d0      ! [1/m * 1/(mg Chl)] Chlorophyll specific at
 
 &paphotosynthesis
 alfa                  = 0.14d0	    ! [(mmol C*m2)/(mg Chl*W*day)] 
-alfa_d                = 0.19d0      ! An initial slope of the P-I curve
+alfa_d                = 0.19d0      ! An initial slope of the P-I curve alfa_d                = 0.19d0      ! An initial slope of the P-I curve
 alfa_c		      = 0.10d0     
 parFrac               = 0.43d0
 /

@@ -293,9 +293,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 end if   ! ciso_14
             end if     ! ciso
 
+
 !-------------------------------------------------------------------------------
 !> Temperature dependence of rates
-!------------------------------------------------------------------------------- 
+!-------------------------------------------------------------------------------
 !< Schourup 2013 Eq. A54
 !< Temperature dependence of metabolic rate, fT, dimensionless
 !< Ae: Slope of the linear region of the Arrhenius plot
@@ -306,8 +307,19 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 
             rTloc   = real(one)/(Temp(k) + C2K)
             arrFunc = exp(-Ae * ( rTloc - rTref))
-#if defined (__coccos) 
-            CoccoTFunc = max(0.1419d0 * Temp(k)**0.8151d0,tiny) ! Function from Fielding 2013; is based on observational GR, but range fits best to ours
+
+!< New phytoplankton temperature functions
+
+            Temp_diatoms = exp(ord_d + expon_d * Temp(k)) ! NEW MODIFIED  2 parameters in new function ordonnee and exponent
+            VTTemp_diatoms(k) = Temp_diatoms ! track the output here 
+            Temp_phyto = exp(ord_phy + expon_phy * Temp(k)) ! NEW MODIFIED
+            VTTemp_phyto(k) = Temp_phyto
+
+
+#if defined (__coccos)
+            Temp_cocco = exp(ord_cocco + expon_cocco * Temp(k)) ! NEW MODIFIED  ! CoccoTFunc = max(0.1419d0 * Temp(k)**0.8151d0,tiny) ! Function from Fielding 2013; is based on observational GR, but range fits best to ours
+            VTTemp_cocco(k) = Temp_cocco
+
 #endif
 
 #if defined (__3Zoo2Det)
@@ -318,10 +330,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             q10_mic_res  = 1.0897**(Temp(k)) ! 3Zoo
 #endif
 
-!< Silicate temperature dependence 
+!< Silicate temperature dependence
 !            reminSiT = min(1.32e16 * exp(-11200.d0 * rTloc),reminSi) !! arrFunc control, reminSi=0.02d0 ! Kamatani (1982)
 !            reminSiT = reminSi
-            reminSiT = max(0.023d0 * 2.6d0**((Temp(k)-10.)/10.),reminSi)
+             reminSiT = max(0.023d0 * 2.6d0**((Temp(k)-10.)/10.),reminSi)
+
 
 !-------------------------------------------------------------------------------
 !> O2 dependence of rates
@@ -431,12 +444,14 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 - exp(-c_co2_phy * CO2_watercolumn(k) * Cunits) - d_co2_phy * 10.**(-pH_watercolumn(k))
             PhyCO2 = min(PhyCO2,3.d0)      ! April 2022: limitation to 3
             PhyCO2 = max(0.d0,PhyCO2)      ! July 2022: limitation to zero
+            VTPhyCO2(k) = PhyCO2
 
 ! Diatoms
             DiaCO2 = a_co2_dia * HCO3_watercolumn(k) * Cunits / (b_co2_dia + HCO3_watercolumn(k) * Cunits) &
                 - exp(-c_co2_dia * CO2_watercolumn(k) * Cunits) - d_co2_dia * 10.**(-pH_watercolumn(k))
             DiaCO2 = min(DiaCO2,3.d0)      ! April 2022: limitation to 3
             DiaCO2 = max(0.d0,DiaCO2)      ! July 2022: limitation to zero
+            VTDiaCO2(k) = DiaCO2
 
 #if defined (__coccos) 
 ! Coccolithophores
@@ -444,6 +459,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 - exp(-c_co2_cocco * CO2_watercolumn(k) * Cunits) - d_co2_cocco * 10.**(-pH_watercolumn(k))
             CoccoCO2 = min(CoccoCO2,3.d0)  ! April 2022: limitation to 3
             CoccoCO2 = max(0.d0,CoccoCO2)  ! July 2022: limitation to zero
+            VTCoccoCO2(k) = CoccoCO2
 #endif
 
 !------------------------------------------------------------------------------
@@ -496,8 +512,9 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             qlimitFac    = recom_limiter(NMinSlope, NCmin, quota) ! Eqn A55
             feLimitFac   = Fe/(k_Fe + Fe)                         ! Use Michaelis–Menten kinetics
             qlimitFac    = min(qlimitFac, feLimitFac)             ! Liebig law of the minimum
-            pMax         = P_cm * qlimitFac * arrFunc             ! Maximum value of C-specific rate of photosynthesis
-    
+            VTqlimitFac_phyto(k) = qlimitFac                      ! tracking qlimitFac 
+            pMax         = qlimitFac * Temp_phyto                ! Maximum value of C-specific rate of photosynthesis
+
 !< *** Diatoms ***
 !< ***************
             qlimitFac    = recom_limiter(NMinSlope, NCmin_d, quota_dia)
@@ -505,7 +522,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             qlimitFac    = min(qLimitFac, qlimitFacTmp)
             feLimitFac   = Fe/(k_Fe_d + Fe)
             qlimitFac    = min(qlimitFac, feLimitFac)
-            pMax_dia     = P_cm_d * qlimitFac * arrFunc
+            VTqlimitFac_diatoms(k) = qlimitFac
+            pMax_dia     = qlimitFac * Temp_diatoms
 
 !< *** Coccolithophores ***
 !< ************************
@@ -513,7 +531,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             qlimitFac  = recom_limiter(NMinSlope, NCmin_c, quota_cocco) 
             feLimitFac = Fe/(k_Fe_c + Fe)                               
             qlimitFac  = min(qlimitFac, feLimitFac)                     
-            pMax_cocco = P_cm_c * qlimitFac * CoccoTFunc                ! Here the T dependency is changed
+            VTqlimitFac_cocco(k) = qlimitFac
+            pMax_cocco = qlimitFac * Temp_cocco                ! Here the T dependency is changed
 #endif
 !-------------------------------------------------------------------------------
 !< *** Small phytoplankton photosynthesis rate ***
@@ -522,9 +541,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 Cphot = zero
             else
                 Cphot = pMax*(real(one) - exp(-alfa * Chl2C * PARave / pMax))
+                VTCphotLigLim_phyto(k) = Cphot/pMax ! track the light limitation 
                 if (CO2lim) Cphot = Cphot * PhyCO2 ! Added the CO2 dependence
             end if
             if (Cphot .lt. tiny) Cphot = zero
+            VTCphot_phyto(k) = Cphot ! tracking Cphot with all processes included
 
 !< *** Diatom photosynthesis rate ***
 !< **********************************
@@ -532,9 +553,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 Cphot_dia = zero
             else
                 Cphot_dia = pMax_dia * (real(one) - exp(-alfa_d * Chl2C_dia * PARave / pMax_dia))
+                VTCphotLigLim_diatoms(k) = Cphot/pMax ! track light limitation
                 if (CO2lim) Cphot_dia = Cphot_dia  * DiaCO2 ! Added the CO2 dependence
             end if
             if (Cphot_dia .lt. tiny) Cphot_dia = zero
+            VTCphot_diatoms(k) = Cphot_dia ! tracking complete Cphot
 
 !< *** Coccolithophore photosynthesis rate ***
 !< *******************************************
@@ -543,9 +566,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 Cphot_cocco = zero
             else 
                 Cphot_cocco = pMax_cocco * (real(one) - exp( -alfa_c * Chl2C_cocco * PARave / pMax_cocco))  
+                VTCphotLigLim_cocco(k) = Cphot/pMax ! track the light limitation
                 if (CO2lim) Cphot_cocco = Cphot_cocco * CoccoCO2 ! Added the CO2 dependence 
             end if 
             if (Cphot_cocco .lt. tiny) Cphot_cocco = zero
+            VTCphot_cocco(k) = Cphot_cocco
 #endif
 !------------------------------------------------------------------------------- 
 !< chlorophyll degradation
@@ -563,16 +588,20 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 if (pMax .lt. tiny .OR. PARave /= PARave .OR. CHL2C_plast /= CHL2C_plast) then
                     KOchl = deg_Chl*0.1d0
                 else
-                    KOchl = deg_Chl*(real(one) - exp(-alfa * CHL2C_plast * PARave / pMax))
+                   !KOchl = deg_Chl*(real(one) - exp(-alfa * CHL2C_plast * PARave / pMax))
+                    KOchl = deg_Chl * CHL2C_plast * PARave
                     KOchl = max((deg_Chl*0.1d0), KOchl)
+                    KOchl = min(KOChl, 0.3d0)
                 end if
 !< *** Diatoms Chla loss ***                                                                                                                                
 !< *************************
                 if (pMax_dia .lt. tiny .OR. PARave /= PARave .OR. CHL2C_plast_dia /= CHL2C_plast_dia) then
                     KOchl_dia = deg_Chl_d*0.1d0
                 else
-                    KOchl_dia = deg_Chl_d * (real(one) - exp(-alfa_d * CHL2C_plast_dia * PARave / pMax_dia ))
+                   !KOchl_dia = deg_Chl_d * (real(one) - exp(-alfa_d * CHL2C_plast_dia * PARave / pMax_dia ))
+                    KOchl_dia = deg_Chl_d * CHL2C_plast_dia * PARave
                     KOchl_dia = max((deg_Chl_d*0.1d0), KOchl_dia)
+                    KOchl_dia = min(KOChl_dia, 0.3d0)
                 end if
 !< *** Coccolithophores chla loss ***
 !< **********************************
@@ -580,8 +609,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 if (pMax_cocco .lt. tiny .OR. PARave /= Parave .OR. CHL2C_plast_cocco /= CHL2C_plast_cocco) then 
                     KOchl_cocco = deg_Chl_c*0.1d0 
                 else 
-                    KOchl_cocco = deg_Chl_c * (real(one) - exp( -alfa_c * CHL2C_plast_cocco * PARave / pMax_cocco ))
+                   !KOchl_cocco = deg_Chl_c * (real(one) - exp( -alfa_c * CHL2C_plast_cocco * PARave / pMax_cocco ))
+                    KOchl_cocco = deg_Chl_c * CHL2C_plast_cocco * PARave
                     KOchl_cocco = max((deg_Chl_c*0.1d0), KOchl_cocco)
+                    KOchl_cocco = min(KOChl_cocco, 0.3d0)
                 end if
 #endif
                 if (KOchl /= KOchl) then
@@ -650,8 +681,9 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 
             limitFacSi     = recom_limiter(SiMaxSlope, qSiC, SiCmax)  &
                               * limitFacN_dia
-            Si_assim       = V_cm_fact_d * P_cm_d * arrFunc * SiCUptakeRatio &
+            Si_assim       = V_cm_fact_d * Temp_diatoms * SiCUptakeRatio &
                               * limitFacSi * Si/(Si + k_si)
+            VTSi_assimDia(k) = Si_assim
 
 !-------------------------------------------------------------------------------
 !< *** Iron chemistry ***
@@ -2303,46 +2335,159 @@ if (Diags) then
         ) * recipbiostep
 #endif
 
-! diagnostics, combined from Onur and Cara
+!--------------------------------------------------------------------------------------------------------------------------------------
+
+! GRAZING FLUXES
+! Only for the case with detritus grazing, not without detritus grazing, because this output is probably anyway not needed as a default.
+! diagnostics, combined from Onur and Cara, modified by Miriam
+
+    if (Grazing_detritus) then
+
+! **** First zooplankton / Mesozooplankton ****
+! -----------------------------------------
 !*** Total grazing of first zooplankton (with graz_eff, i.e. what reaches ZOO)
-        vertgrazmeso_tot(k) = vertgrazmeso_tot(k) + ( &                       
-        + grazingFlux_phy * recipQuota * grazEff     &
-        + grazingFlux_Dia * recipQuota_Dia * grazEff &
+        vertgrazmeso_tot(k) = vertgrazmeso_tot(k) + (    &                       
+        + grazingFlux_phy * recipQuota * grazEff         &
+        + grazingFlux_Dia * recipQuota_Dia * grazEff     &
+        + grazingFlux_Det * recipDet * grazEff           &
 #if defined (__coccos)
         + grazingFlux_Cocco * recipQuota_Cocco * grazEff &
 #endif
-!#if defined (__3Zoo2Det)
-!        + grazingFlux_Det * recipDet * grazEff           &                ! NEW  --> ? Ask Onur
-!        + GrazingFlux_DetZ2 * recipDet2 * grazEff        &                ! NEW  --> ? Ask Onur
-!#endif
+#if defined (__3Zoo2Det)
+        + GrazingFlux_DetZ2 * recipDet2 * grazEff        &
+        + grazingFlux_miczoo * recipQZoo3 * grazEff      &
+#endif
         ) * recipbiostep                                 
 
-!*** Grazing on small Phytoplankton by First Zooplankton (without grazeff, i.e. loss term for PHY)
+!*** Grazing on small phytoplankton by first zooplankton (without grazeff, i.e. loss term for PHY)
         vertgrazmeso_n(k) = vertgrazmeso_n(k) + ( &  
-        + grazingFlux_phy * recipQuota           &
+        + grazingFlux_phy * recipQuota            &
         ) * recipbiostep                                 
 
-!*** Grazing on diatoms by First Zooplankton (without grazeff, i.e. loss term for DIA)
+!*** Grazing on diatoms by first zooplankton (without grazeff, i.e. loss term for DIA)
         vertgrazmeso_d(k) = vertgrazmeso_d(k) + ( &                                               
-        + grazingFlux_dia * recipQuota_dia       & 
+        + grazingFlux_dia * recipQuota_dia        & 
         ) * recipbiostep  
 
 #if defined (__coccos)
-!*** Grazing on cocclithophores by First Zooplankton (without grazeff, i.e. loss term for COCCO)
+!*** Grazing on cocclithophores by first zooplankton (without grazeff, i.e. loss term for COCCO)
         vertgrazmeso_c(k) = vertgrazmeso_c(k) + ( &
-        + grazingFlux_Cocco * recipQuota_cocco   &
+        + grazingFlux_Cocco * recipQuota_cocco    &
         ) * recipbiostep
 #endif
 
+!*** Grazing on first detritus by first zooplankton (without grazeff, i.e. loss term for DET)
+        vertgrazmeso_det(k) = vertgrazmeso_det(k) + ( &
+        + grazingFlux_Det * recipDet                  &
+        ) * recipbiostep
 
+#if defined (__3Zoo2Det)
+!*** Grazing on microzooplankton by first zooplankton (without grazeff, i.e. loss term for MICZOO)
+        vertgrazmeso_mic(k) = vertgrazmeso_mic(k) + ( &
+        + grazingFlux_miczoo * recipQZoo3             &
+        ) * recipbiostep
+
+!*** Grazing on second detritus by first zooplankton (without grazeff, i.e. loss term for DET2)
+        vertgrazmeso_det2(k) = vertgrazmeso_det2(k) + ( &
+        + GrazingFlux_DetZ2 * recipDet2                 &
+        ) * recipbiostep
+#endif
+
+        
+
+! **** Second zooplankton / Macrozooplankton / Krill ****  
+! -----------------------------------------
+#if defined (__3Zoo2Det)
+        
 !*** Total grazing of second zooplankton (with graz_eff, i.e. what reaches ZOO)
-!        vertgrazmacro_tot(k) = vertgrazmacro_tot(k) + ( &
-!         + grazingFlux_phy * recipQuota * grazEff     &
+        vertgrazmacro_tot(k) = vertgrazmacro_tot(k) + (    &
+        + grazingFlux_phy2 * recipQuota * grazEff2         &
+        + grazingFlux_Dia2   * recipQuota_Dia   * grazEff2 &
+#if defined (__coccos)
+        + grazingFlux_Cocco2 * recipQuota_Cocco * grazEff2 &
+#endif
+        + grazingFlux_het2   * recipQZoo        * grazEff2 &
+        + grazingFlux_miczoo2* recipQZoo3       * grazEff2 &
+        + grazingFlux_Det2   * recipDet         * grazEff2 &
+        + grazingFlux_DetZ22 * recipDet2        * grazEff2 &
+        ) * recipbiostep
 
-! -> Continue here once grazing makes more sense
+!*** Grazing on small phytoplankton by second zooplankton (without grazeff, i.e. loss term for PHY)
+        vertgrazmacro_n(k) = vertgrazmacro_n(k) + ( &
+        + grazingFlux_phy2 * recipQuota             &
+        ) * recipbiostep
+
+!*** Grazing on diatoms by second zooplankton (without grazeff, i.e. loss term for DIA) 
+        vertgrazmacro_d(k) = vertgrazmacro_d(k) + ( &
+        + grazingFlux_Dia2 * recipQuota_Dia         &
+        ) * recipbiostep
+        
+#if defined (__coccos)
+!*** Grazing on cocclithophores by second zooplankton (without grazeff, i.e. loss term for COCCO)
+        vertgrazmacro_c(k) = vertgrazmacro_c(k) + ( &
+        + grazingFlux_Cocco2 * recipQuota_cocco     &
+        ) * recipbiostep
+#endif
+
+!*** Grazing on mesozooplankton by second zooplankton (without grazeff, i.e. loss term for HET)
+        vertgrazmacro_mes(k) = vertgrazmacro_mes(k) + ( &
+        + grazingFlux_het2   * recipQZoo                &
+        ) * recipbiostep
+        
+!*** Grazing on first detritus by second zooplankton (without grazeff, i.e. loss term for DET)
+        vertgrazmacro_det(k) = vertgrazmacro_det(k) + ( &
+        + grazingFlux_Det2 * recipDet                   &
+        ) * recipbiostep
+
+!*** Grazing on microzooplankton by second zooplankton (without grazeff, i.e. loss term for MICZOO)
+        vertgrazmacro_mic(k) = vertgrazmacro_mic(k) + ( &
+        + grazingFlux_miczoo2 * recipQZoo3              &
+        ) * recipbiostep
+
+!*** Grazing on second detritus by second zooplankton (without grazeff, i.e. loss term for DET2)
+        vertgrazmacro_det2(k) = vertgrazmacro_det2(k) + ( &
+        + GrazingFlux_DetZ22 * recipDet2                  &
+        ) * recipbiostep
+
+#endif
 
 
+! **** Third zooplankton / Microzooplankton ****
+! -----------------------------------------                                                                                                                  
+#if defined (__3Zoo2Det)
+        
+!*** Total grazing of third zooplankton (with graz_eff, i.e. what reaches ZOO) 
+        vertgrazmicro_tot(k) = vertgrazmicro_tot(k) + (     &
+        + grazingFlux_phy3    * recipQuota       * grazEff3 &
+        + grazingFlux_Dia3    * recipQuota_Dia   * grazEff3 &
+#if defined (__coccos)
+        + grazingFlux_Cocco3  * recipQuota_Cocco * grazEff3 &
+#endif
+        ) * recipbiostep
 
+!*** Grazing on small phytoplankton by third zooplankton (without grazeff, i.e. loss term for PHY)
+        vertgrazmicro_n(k) = vertgrazmicro_n(k) + ( &
+        + grazingFlux_phy3 * recipQuota             &
+        ) * recipbiostep
+
+!*** Grazing on diatoms by third zooplankton (without grazeff, i.e. loss term for DIA)
+        vertgrazmicro_d(k) = vertgrazmicro_d(k) + ( &
+        + grazingFlux_Dia3 * recipQuota_Dia         &
+        ) * recipbiostep
+
+#if defined (__coccos)
+!*** Grazing on cocclithophores by third zooplankton (without grazeff, i.e. loss term for COCCO)
+        vertgrazmicro_c(k) = vertgrazmicro_c(k) + ( &
+        + grazingFlux_Cocco3 * recipQuota_cocco     &
+        ) * recipbiostep
+#endif
+
+#endif
+
+     end if ! grazing_detritus
+
+!-----------------------------------------------------------------------------------------------------------------
+     
 !*** zooplankton1 respiration
         vertrespmeso(k) = vertrespmeso(k) + (     &
         + HetRespFlux                             &

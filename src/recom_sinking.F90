@@ -320,14 +320,14 @@ subroutine ballast(mesh)
            scaling_density2_3D(k,row)=1.0
 
               if (use_density_scaling) then
-                    if (tr_arr(k,row,10)>0.001) then ! idetc only apply ballasting above a certain biomass
+                    !if (tr_arr(k,row,10)>0.001) then ! idetc only apply ballasting above a certain biomass
                        scaling_density1_3D(k,row) = (rho_particle1(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
-                    endif 
+                    !endif 
 
 #if defined (__3Zoo2Det)
-                    if (tr_arr(k,row,28)>0.001) then ! idetz2c only apply ballasting above a certain biomass
+                    !if (tr_arr(k,row,28)>0.001) then ! idetz2c only apply ballasting above a certain biomass
                        scaling_density2_3D(k,row) = (rho_particle2(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
-                    endif 
+                    !endif 
 #endif
               endif
 

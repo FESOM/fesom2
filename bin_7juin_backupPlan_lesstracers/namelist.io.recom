@@ -1,0 +1,118 @@
+&diag_list
+ldiag_solver     =.false.
+lcurt_stress_surf=.false.
+ldiag_curl_vel3  =.false.
+ldiag_energy     =.false.
+ldiag_salt3D     =.false.
+ldiag_dMOC       =.true.
+ldiag_DVD        =.false.
+ldiag_forc       =.false.
+/
+
+&nml_listsize
+io_listsize=150 !number of streams to allocate. shallbe large or equal to the number of streams in &nml_list
+/
+
+ for sea ice related variables use_ice should be true, otherewise there will be no output
+! for 'curl_surf' to work lcurt_stress_surf must be .true. otherwise no output
+! for 'fer_C', 'bolus_u', 'bolus_v', 'bolus_w', 'fer_K' to work Fer_GM must be .true. otherwise no output
+! 'otracers' - all other tracers if applicable
+! for 'dMOC' to work ldiag_dMOC must be .true. otherwise no output
+&nml_list
+io_list =  'sst       ',1, 'm', 4,
+           'sss       ',1, 'm', 4,
+    	   'ssh       ',1, 'm', 4,
+           'vve_5     ',1, 'm', 4,
+           'uice      ',1, 'm', 4,
+           'vice      ',1, 'm', 4,
+           'a_ice     ',1, 'm', 4,
+           'm_ice     ',1, 'm', 4,
+           'thdgr     ',1, 'm', 4,
+           'thdgrsn   ',1, 'm', 4,
+           'm_snow    ',1, 'm', 4,
+           'MLD1      ',1, 'm', 4,
+           'MLD2      ',1, 'm', 4,
+           'fh        ',1, 'm', 4,
+           'fw        ',1, 'm', 4,
+           'alpha     ',1, 'm', 4,
+           'beta      ',1, 'm', 4,
+           'runoff    ',1, 'm', 4,
+           'evap      ',1, 'm', 4,
+           'prec      ',1, 'm', 4,
+           'tx_sur    ',1, 'm', 4,
+           'ty_sur    ',1, 'm', 4,
+           'curl_surf ',1, 'm', 4,
+           'fer_C     ',1, 'm', 4,
+           'temp      ',1, 'm', 4,
+           'salt      ',1, 'm', 8,
+           'otracers  ',1, 'm', 4,
+           'N2        ',1, 'y', 4,
+           'Kv        ',1, 'y', 4,
+           'u         ',1, 'y', 4,
+           'v         ',1, 'y', 4,
+           'w         ',1, 'y', 4,
+           'Av        ',1, 'y', 4,
+           'bolus_u   ',1, 'y', 4,
+           'bolus_v   ',1, 'y', 4,
+           'bolus_w   ',1, 'y', 4,
+           'dMOC      ',1, 'y', 4,
+           'dpCO2s    ',1, 'm', 4,
+           'pCO2s     ',1, 'm', 4,
+           'CO2f      ',1, 'm', 4,
+           'Hp        ',1, 'm', 4,
+           'GPPd      ',1, 'm', 4,
+           'GPPn      ',1, 'm', 4,
+           'GPPc      ',1, 'm', 4,
+           'PAR       ',1, 'm', 4,
+           'CO2       ',1, 'm', 4,
+           'pH        ',1, 'm', 4,
+           'pCO2      ',1, 'm', 4,
+           'OmegaC    ',1, 'm', 4,
+           'wsink_det1',1, 'm', 8,
+           'wsink_det2',1, 'm', 8,
+           'rho_det1',1, 'm', 8,
+           'rho_det2',1, 'm', 8,
+           'scaling_rho_1',1, 'm', 8,
+           'scaling_rho_2',1, 'm', 8,
+           'scaling_visc',1, 'm', 8,
+           'calcdiss',1, 'm', 4,
+           'calcif',1, 'm', 4,
+           'grazmeso_tot',1, 'm', 4,
+           'grazmeso_n',1, 'm', 4,
+           'grazmeso_d',1, 'm', 4,
+           'grazmeso_c',1, 'm', 4,
+           'grazmeso_det',1, 'm', 4,
+           'grazmeso_mic',1, 'm', 4,
+           'grazmeso_det2',1, 'm', 4,
+           'grazmacro_tot',1, 'm', 4,
+           'grazmacro_n',1, 'm', 4,
+           'grazmacro_d',1, 'm', 4,
+           'grazmacro_c',1, 'm', 4,
+           'grazmacro_mes',1, 'm', 4,
+           'grazmacro_det',1, 'm', 4,
+           'grazmacro_mic',1, 'm', 4,
+           'grazmacro_det2',1, 'm', 4,
+           'grazmicro_tot',1, 'm', 4,
+           'grazmicro_n',1, 'm', 4,
+           'grazmicro_d',1, 'm', 4,
+           'grazmicro_c',1, 'm', 4,
+	   'NPPn3D',1, 'm', 4,
+	   'NPPd3D',1, 'm', 4,
+	   'NPPc3D',1, 'm', 4,
+           'TTemp_diatoms',1, 'm', 4,                                                                      
+           'TTemp_phyto',1, 'm', 4,                                                                       
+           'TTemp_cocco',1, 'm', 4,                                                                        
+           'TPhyCO2',1, 'm', 4,                                                                   
+           'TDiaCO2',1, 'm', 4,                                                                   
+           'TCoccoCO2',1, 'm', 4,                                                                   
+           'TqLF_phyto',1, 'm', 4,                                                                   
+           'TqLF_diatoms',1, 'm', 4,                                                                 
+           'TqLF_cocco',1, 'm', 4,                                                                   
+           'TCphotLL_phyto',1, 'm', 4,                                   
+           'TCphotLL_diatoms',1, 'm', 4,
+           'TCphotLL_cocco',1, 'm', 4,                                                          
+           'TCphot_phyto',1, 'm', 4,
+           'TCphot_diatoms',1, 'm', 4,                                                                  
+           'TCphot_cocco',1, 'm', 4,                                                                 
+           'TSi_assimDia',1, 'm', 4,
+/
