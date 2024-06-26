@@ -215,11 +215,11 @@ end if ! use_MEDUSA and sedflx_num not 0
 
 if (Diags) then
 
-     !!---- Allocate 3D diagnostics
-     allocate(vertgrazmeso_tot(nl-1), vertgrazmeso_n(nl-1), vertgrazmeso_d(nl-1))
-     vertgrazmeso_tot = 0.d0
-     vertgrazmeso_n   = 0.d0
-     vertgrazmeso_d   = 0.d0
+     !!---- Allocate 3D diagnostics    ! Comment Miriam (2/2024): changed grazing from a 3D to a 2D diagnostic while completing all grazing fluxes
+!     allocate(vertgrazmeso_tot(nl-1), vertgrazmeso_n(nl-1), vertgrazmeso_d(nl-1))
+!     vertgrazmeso_tot = 0.d0
+!     vertgrazmeso_n   = 0.d0
+!     vertgrazmeso_d   = 0.d0
 
 #if defined (__coccos)
      allocate(vertgrazmeso_c(nl-1))
@@ -227,6 +227,14 @@ if (Diags) then
      allocate(vertgrazmeso_p(nl-1))   ! Phaeocystis
      vertgrazmeso_p   = 0.d0
 #endif
+=======
+!#if defined (__coccos)
+!     allocate(vertgrazmeso_c(nl-1))
+!     vertgrazmeso_c   = 0.d0
+!     allocate(vertgrazmeso_p(nl-1))   ! Phaeocystis
+!f     vertgrazmeso_p   = 0.d0
+!#endif
+
 
      allocate(vertrespmeso(nl-1))
      vertrespmeso  = 0.d0
@@ -289,6 +297,51 @@ if (Diags) then
      vertNNAp = 0.d0
      Chldegp = 0.d0
 #endif
+
+     if (Grazing_detritus) then
+        allocate(vertgrazmeso_tot(nl-1), vertgrazmeso_n(nl-1), vertgrazmeso_d(nl-1))
+        vertgrazmeso_tot = 0.d0
+        vertgrazmeso_n   = 0.d0
+        vertgrazmeso_d   = 0.d0
+#if defined (__coccos)
+        allocate(vertgrazmeso_c(nl-1))
+        vertgrazmeso_c   = 0.d0
+        allocate(vertgrazmeso_p(nl-1))
+        vertgrazmeso_p   = 0.d0
+#endif
+        allocate(vertgrazmeso_det(nl-1))
+        vertgrazmeso_det = 0.d0
+#if defined (__3Zoo2Det)
+        allocate(vertgrazmeso_mic(nl-1), vertgrazmeso_det2(nl-1))
+        vertgrazmeso_mic  = 0.d0
+        vertgrazmeso_det2 = 0.d0
+        allocate(vertgrazmacro_tot(nl-1), vertgrazmacro_n(nl-1), vertgrazmacro_d(nl-1))
+        vertgrazmacro_tot = 0.d0
+        vertgrazmacro_n   = 0.d0
+        vertgrazmacro_d   = 0.d0
+#if defined (__coccos)
+        allocate(vertgrazmacro_c(nl-1))
+        vertgrazmacro_c   = 0.d0
+        allocate(vertgrazmacro_p(nl-1))
+        vertgrazmacro_p   = 0.d0
+#endif
+        allocate(vertgrazmacro_mes(nl-1), vertgrazmacro_det(nl-1), vertgrazmacro_mic(nl-1), vertgrazmacro_det2(nl-1))
+        vertgrazmacro_mes = 0.d0
+        vertgrazmacro_det = 0.d0
+        vertgrazmacro_mic = 0.d0
+        vertgrazmacro_det2= 0.d0
+        allocate(vertgrazmicro_tot(nl-1), vertgrazmicro_n(nl-1), vertgrazmicro_d(nl-1))
+        vertgrazmicro_tot = 0.d0
+        vertgrazmicro_n   = 0.d0
+        vertgrazmicro_d   = 0.d0
+#if defined (__coccos)
+        allocate(vertgrazmicro_c(nl-1))
+        vertgrazmicro_c   = 0.d0
+        allocate(vertgrazmicro_p(nl-1))
+        vertgrazmicro_p   = 0.d0
+#endif
+#endif
+     endif !Grazing_detritus
 end if
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forcing'//achar(27)//'[0m'
@@ -336,14 +389,58 @@ if (Diags) then
      Chldegp(n) = locChldegp
 #endif
 
-     !!---- Updating 3D diagnostics
-     grazmeso_tot(1:nzmax,n) = vertgrazmeso_tot(1:nzmax)
-     grazmeso_n(1:nzmax,n)   = vertgrazmeso_n(1:nzmax)
-     grazmeso_d(1:nzmax,n)   = vertgrazmeso_d(1:nzmax)
+     if (Grazing_detritus) then
+     ! Mesozooplankton
+     grazmeso_tot(n) = locgrazmeso_tot
+     grazmeso_n(n)   = locgrazmeso_n
+     grazmeso_d(n)   = locgrazmeso_d
+#if defined (__coccos)
+     grazmeso_c(n)   = locgrazmeso_c
+     grazmeso_p(n)   = locgrazmeso_p
+#endif
+     grazmeso_det(n) = locgrazmeso_det
+#if defined (__3Zoo2Det)
+     grazmeso_mic(n) = locgrazmeso_mic
+     grazmeso_det2(n)= locgrazmeso_det2
+#endif
+
+#if defined (__3Zoo2Det)
+     ! Macrozooplankton
+     grazmacro_tot(n) = locgrazmacro_tot
+     grazmacro_n(n)   = locgrazmacro_n
+     grazmacro_d(n)   = locgrazmacro_d
+#if defined (__coccos)
+     grazmacro_c(n)   = locgrazmacro_c
+     grazmacro_p(n)   = locgrazmacro_p
+#endif
+     grazmacro_mes(n) = locgrazmacro_mes
+     grazmacro_det(n) = locgrazmacro_det
+     grazmacro_mic(n) = locgrazmacro_mic
+     grazmacro_det2(n)= locgrazmacro_det2
+
+     ! Microzooplankton
+     grazmicro_tot(n) = locgrazmicro_tot
+     grazmicro_n(n)   = locgrazmicro_n
+     grazmicro_d(n)   = locgrazmicro_d
 #if defined (__coccos)
      grazmeso_c(1:nzmax,n)   = vertgrazmeso_c(1:nzmax)
      grazmeso_p(1:nzmax,n)   = vertgrazmeso_p(1:nzmax)   ! Phaeocystis
+=======
+     grazmicro_c(n)   = locgrazmicro_c
+     grazmicro_p(n)   = locgrazmicro_p
 #endif
+     
+#endif
+     endif
+     
+     !!---- Updating 3D diagnostics
+!     grazmeso_tot(1:nzmax,n) = vertgrazmeso_tot(1:nzmax)
+!     grazmeso_n(1:nzmax,n)   = vertgrazmeso_n(1:nzmax)
+!     grazmeso_d(1:nzmax,n)   = vertgrazmeso_d(1:nzmax)
+!#if defined (__coccos)
+!     grazmeso_c(1:nzmax,n)   = vertgrazmeso_c(1:nzmax)
+      grazmeso_p(1:nzmax,n)   = vertgrazmeso_p(1:nzmax)
+!#endif
 
      respmeso(1:nzmax,n)     = vertrespmeso(1:nzmax)
 #if defined (__3Zoo2Det)
@@ -382,8 +479,33 @@ if (Diags) then
      deallocate(vertNPPp,vertGPPp,vertNNAp,vertChldegp)   ! Phaeocystis
 #endif
 
+     if (Grazing_detritus) then
+        deallocate(vertgrazmeso_tot, vertgrazmeso_n,  vertgrazmeso_d)
+#if defined (__coccos)
+        deallocate(vertgrazmeso_c)
+        deallocate(vertgrazmeso_p)
+#endif
+        deallocate(vertgrazmeso_det)
+#if defined (__3Zoo2Det)
+        deallocate(vertgrazmeso_mic, vertgrazmeso_det2)
+        deallocate(vertgrazmacro_tot, vertgrazmacro_n, vertgrazmacro_d)
+#if defined (__coccos)
+        deallocate(vertgrazmacro_c)
+        deallocate(vertgrazmacro_p)
+#endif
+        deallocate(vertgrazmacro_mes, vertgrazmacro_det, vertgrazmacro_mic, vertgrazmacro_det2)
+        deallocate(vertgrazmicro_tot, vertgrazmicro_n, vertgrazmicro_d)
+#if defined (__coccos)
+        deallocate(vertgrazmicro_c)
+        deallocate(vertgrazmicro_p)
+#endif        
+#endif
+     endif ! Grazing_detritus
+        
+
      !!---- Deallocating 3D Diagnistics
-     deallocate(vertgrazmeso_tot, vertgrazmeso_n, vertgrazmeso_d, vertrespmeso)
+     !     deallocate(vertgrazmeso_tot, vertgrazmeso_n, vertgrazmeso_d, vertrespmeso)
+     deallocate(vertrespmeso)
 #if defined (__3Zoo2Det)
      deallocate(vertrespmacro, vertrespmicro)
 #endif
@@ -466,6 +588,36 @@ endif
     call exchange_nod(GPPp)
     call exchange_nod(NNAp)
     call exchange_nod(Chldegp)
+#endif
+    call exchange_nod(grazmeso_tot)
+    call exchange_nod(grazmeso_n)
+    call exchange_nod(grazmeso_d)
+#if defined (__coccos)
+    call exchange_nod(grazmeso_c)
+    call exchange_nod(grazmeso_p)
+#endif
+    call exchange_nod(grazmeso_det)
+#if defined (__3Zoo2Det)
+    call exchange_nod(grazmeso_mic)
+    call exchange_nod(grazmeso_det2)
+    call exchange_nod(grazmacro_tot)
+    call exchange_nod(grazmacro_n)
+    call exchange_nod(grazmacro_d)
+#if defined (__coccos)
+    call exchange_nod(grazmacro_c)
+    call exchange_nod(grazmacro_p)
+#endif
+    call exchange_nod(grazmacro_mes)
+    call exchange_nod(grazmacro_det)
+    call exchange_nod(grazmacro_mic)
+    call exchange_nod(grazmacro_det2)
+    call exchange_nod(grazmicro_tot)
+    call exchange_nod(grazmicro_n)
+    call exchange_nod(grazmicro_d)
+#if defined (__coccos)
+    call exchange_nod(grazmicro_c)
+    call exchange_nod(grazmicro_p)
+#endif
 #endif
   endif
 
