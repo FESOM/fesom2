@@ -1,4 +1,4 @@
-subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
+broutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         , CO2_watercolumn                                                    & 
         , pH_watercolumn                                                     &
         , pCO2_watercolumn                                                   &
@@ -317,7 +317,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 
 
 #if defined (__coccos)
-            Temp_cocco = exp(ord_cocco + expon_cocco * Temp(k)) ! NEW MODIFIED  ! CoccoTFunc = max(0.1419d0 * Temp(k)**0.8151d0,tiny) ! Function from Fielding 2013; is based on observational GR, but range fits best to ours
+            Temp_cocco = exp(ord_cocco + expon_cocco * Temp(k)) -  exp(ord_cocco) ! NEW MODIFIED  ! CoccoTFunc = max(0.1419d0 * Temp(k)**0.8151d0,tiny) ! Function from Fielding 2013; is based on observational GR, but range fits best to ours
             VTTemp_cocco(k) = Temp_cocco
 
 #endif
