@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --job-name=test_3zoo_ballast_phaeo
+#SBATCH --job-name=test_3zoo_ballast_phaeo_özgür
 #SBATCH --account=nwg_hauck.maresys
 #SBATCH --partition=mpp
 #SBATCH -N 9
 #SBATCH --cpus-per-task=1
-#SBATCH --time=08:00:00
+#SBATCH --time=00:30:00
 #SBATCH --qos=12h
 #SBATCH --tasks-per-node 96  # using all 128CPus we exceed the maxload limit (>130) of many used nodes when us parallel I/O
 
@@ -47,8 +47,8 @@ date
 #sbatch job_albedo
 #fi
 
-Resultpath='/albedo/work/user/simuel001/PHAEO_UNTUNED/'
-test -e $Resultpath/fesom.1978.oce.restart.nc && exit
+Resultpath='/albedo/work/user/simuel001/PHAEO_TEST/'
+test -e $Resultpath/fesom.1959.oce.restart.nc && exit
 
 IsInFile=$( tail -1 fesom2.0.out | grep -c should)
 if (( IsInFile > 0 )); then

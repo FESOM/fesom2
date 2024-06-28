@@ -644,15 +644,12 @@ Module REcoM_declarations
   Real(kind=8),allocatable,dimension(:) :: vertNPPd, vertGPPd, vertNNAd, vertChldegd
   Real(kind=8),allocatable,dimension(:) :: vertNPPc, vertGPPc, vertNNAc, vertChldegc
   Real(kind=8),allocatable,dimension(:) :: vertNPPp, vertGPPp, vertNNAp, vertChldegp     ! Phaeocystis
-  Real(kind=8),allocatable,dimension(:) :: vertgrazmeso_tot, vertgrazmeso_n, vertgrazmeso_d, vertgrazmeso_c, vertgrazmeso_p
-=======
   Real(kind=8)  :: locgrazmeso_tot, locgrazmeso_n, locgrazmeso_d, locgrazmeso_c, locgrazmeso_p, locgrazmeso_det, locgrazmeso_mic, locgrazmeso_det2
   Real(kind=8)  :: locgrazmacro_tot, locgrazmacro_n, locgrazmacro_d, locgrazmacro_c, locgrazmacro_p, locgrazmacro_mes, locgrazmacro_det, locgrazmacro_mic, locgrazmacro_det2
   Real(kind=8)  :: locgrazmicro_tot, locgrazmicro_n, locgrazmicro_d, locgrazmicro_c, locgrazmicro_p
   Real(kind=8),allocatable,dimension(:) :: vertgrazmeso_tot, vertgrazmeso_n, vertgrazmeso_d, vertgrazmeso_c, vertgrazmeso_p, vertgrazmeso_det, vertgrazmeso_mic, vertgrazmeso_det2
   Real(kind=8),allocatable,dimension(:) :: vertgrazmacro_tot, vertgrazmacro_n, vertgrazmacro_d, vertgrazmacro_c, vertgrazmacro_p, vertgrazmacro_mes, vertgrazmacro_det, vertgrazmacro_mic, vertgrazmacro_det2
   Real(kind=8),allocatable,dimension(:) :: vertgrazmicro_tot, vertgrazmicro_n, vertgrazmicro_d, vertgrazmicro_c, vertgrazmicro_p
->>>>>>> origin/fesom2_3zoo_ballast
   Real(kind=8),allocatable,dimension(:) :: vertrespmeso, vertrespmacro, vertrespmicro
   Real(kind=8),allocatable,dimension(:) :: vertcalcdiss, vertcalcif
   Real(kind=8),allocatable,dimension(:) :: vertaggn, vertaggd, vertaggc, vertaggp
@@ -752,12 +749,6 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:)     :: GPPp
   Real(kind=8),allocatable,dimension(:)     :: NNAp
   Real(kind=8),allocatable,dimension(:)     :: Chldegp
-  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_tot
-  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_n
-  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_d
-  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_c
-  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_p      ! Phaeocystis
-=======
   Real(kind=8),allocatable,dimension(:)     :: grazmeso_tot
   Real(kind=8),allocatable,dimension(:)     :: grazmeso_n
   Real(kind=8),allocatable,dimension(:)     :: grazmeso_d
@@ -780,7 +771,6 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:)     :: grazmicro_d
   Real(kind=8),allocatable,dimension(:)     :: grazmicro_c
   Real(kind=8),allocatable,dimension(:)     :: grazmicro_p     ! Phaeocystis
->>>>>>> origin/fesom2_3zoo_ballast
   Real(kind=8),allocatable,dimension(:,:)   :: respmeso
   Real(kind=8),allocatable,dimension(:,:)   :: respmacro
   Real(kind=8),allocatable,dimension(:,:)   :: respmicro

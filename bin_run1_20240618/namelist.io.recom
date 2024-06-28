@@ -10,7 +10,7 @@ ldiag_forc       =.false.
 /
 
 &nml_listsize
-io_listsize=100 !number of streams to allocate. shallbe large or equal to the number of streams in &nml_list
+io_listsize=110 !number of streams to allocate. shallbe large or equal to the number of streams in &nml_list
 /
 
  for sea ice related variables use_ice should be true, otherewise there will be no output

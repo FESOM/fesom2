@@ -221,18 +221,17 @@ if (Diags) then
 !     vertgrazmeso_n   = 0.d0
 !     vertgrazmeso_d   = 0.d0
 
-#if defined (__coccos)
-     allocate(vertgrazmeso_c(nl-1))
-     vertgrazmeso_c   = 0.d0
-     allocate(vertgrazmeso_p(nl-1))   ! Phaeocystis
-     vertgrazmeso_p   = 0.d0
-#endif
-=======
 !#if defined (__coccos)
 !     allocate(vertgrazmeso_c(nl-1))
 !     vertgrazmeso_c   = 0.d0
 !     allocate(vertgrazmeso_p(nl-1))   ! Phaeocystis
-!f     vertgrazmeso_p   = 0.d0
+!     vertgrazmeso_p   = 0.d0
+!#endif
+!#if defined (__coccos)
+!     allocate(vertgrazmeso_c(nl-1))
+!     vertgrazmeso_c   = 0.d0
+!     allocate(vertgrazmeso_p(nl-1))   ! Phaeocystis
+!     vertgrazmeso_p   = 0.d0
 !#endif
 
 
@@ -423,9 +422,6 @@ if (Diags) then
      grazmicro_n(n)   = locgrazmicro_n
      grazmicro_d(n)   = locgrazmicro_d
 #if defined (__coccos)
-     grazmeso_c(1:nzmax,n)   = vertgrazmeso_c(1:nzmax)
-     grazmeso_p(1:nzmax,n)   = vertgrazmeso_p(1:nzmax)   ! Phaeocystis
-=======
      grazmicro_c(n)   = locgrazmicro_c
      grazmicro_p(n)   = locgrazmicro_p
 #endif
@@ -439,7 +435,7 @@ if (Diags) then
 !     grazmeso_d(1:nzmax,n)   = vertgrazmeso_d(1:nzmax)
 !#if defined (__coccos)
 !     grazmeso_c(1:nzmax,n)   = vertgrazmeso_c(1:nzmax)
-      grazmeso_p(1:nzmax,n)   = vertgrazmeso_p(1:nzmax)
+!     grazmeso_p(1:nzmax,n)   = vertgrazmeso_p(1:nzmax)
 !#endif
 
      respmeso(1:nzmax,n)     = vertrespmeso(1:nzmax)
@@ -513,9 +509,9 @@ if (Diags) then
      deallocate(vertaggn, vertdocexn, vertrespn)
      deallocate(vertaggd, vertdocexd, vertrespd)
 #if defined (__coccos)
-     deallocate(vertgrazmeso_c)
+     ! deallocate(vertgrazmeso_c)
      deallocate(vertaggc, vertdocexc, vertrespc)
-     deallocate(vertgrazmeso_p)                   ! Phaeocystis
+     ! deallocate(vertgrazmeso_p)                   ! Phaeocystis
      deallocate(vertaggp, vertdocexp, vertrespp)
 #endif
 endif

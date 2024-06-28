@@ -203,18 +203,6 @@ subroutine recom_init(mesh)
   NNAp = 0.d0
   allocate(Chldegp(node_size))
   Chldegp = 0.d0
-!--- Allocate 3D diagnostics
-  allocate(grazmeso_tot(nl-1,node_size))
-  grazmeso_tot(:,:) = 0.d0
-  allocate(grazmeso_n(nl-1,node_size))
-  grazmeso_n(:,:) = 0.d0
-  allocate(grazmeso_d(nl-1,node_size))
-  grazmeso_d(:,:) = 0.d0
-  allocate(grazmeso_c(nl-1,node_size))
-  grazmeso_c(:,:) = 0.d0
-  allocate(grazmeso_p(nl-1,node_size))
-  grazmeso_p(:,:) = 0.d0
-=======
   allocate(grazmeso_tot(node_size))
   grazmeso_tot = 0.d0
   allocate(grazmeso_n(node_size))
@@ -223,6 +211,8 @@ subroutine recom_init(mesh)
   grazmeso_d   = 0.d0
   allocate(grazmeso_c(node_size))
   grazmeso_c   = 0.d0
+  allocate(grazmeso_p(node_size))
+  grazmeso_p   = 0.d0
   allocate(grazmeso_det(node_size))
   grazmeso_det = 0.d0
   allocate(grazmeso_mic(node_size))
@@ -237,6 +227,8 @@ subroutine recom_init(mesh)
   grazmacro_d = 0.d0
   allocate(grazmacro_c(node_size))
   grazmacro_c = 0.d0
+  allocate(grazmacro_p(node_size))
+  grazmacro_p = 0.d0
   allocate(grazmacro_mes(node_size))
   grazmacro_mes = 0.d0
   allocate(grazmacro_det(node_size))
@@ -253,6 +245,8 @@ subroutine recom_init(mesh)
   grazmicro_d = 0.d0
   allocate(grazmicro_c(node_size))
   grazmicro_c = 0.d0
+  allocate(grazmicro_p(node_size))
+  grazmicro_p = 0.d0
 !--- Allocate 3D diagnostics
 !  allocate(grazmeso_tot(nl-1,node_size))  ! Comment Miriam (02/2024): changed grazing output from 3D to 2D diagnostics
 !  grazmeso_tot(:,:) = 0.d0
@@ -262,7 +256,6 @@ subroutine recom_init(mesh)
 !  grazmeso_d(:,:) = 0.d0
 !  allocate(grazmeso_c(nl-1,node_size))
 !  grazmeso_c(:,:) = 0.d0
->>>>>>> origin/fesom2_3zoo_ballast
   allocate(respmeso(nl-1,node_size))
   respmeso(:,:) = 0.d0
   allocate(respmacro(nl-1,node_size))

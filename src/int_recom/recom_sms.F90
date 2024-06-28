@@ -625,8 +625,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 if (pMax_phaeo .lt. tiny .OR. PARave /= PARave .OR. CHL2C_plast_phaeo /= CHL2C_plast_phaeo) then
                     KOchl_phaeo = deg_Chl_p*0.1d0
                 else
-                    KOchl_phaeo = deg_Chl_p*(real(one) - exp(-alfa_p * CHL2C_plast_phaeo * PARave / pMax_phaeo))
+                   !KOchl_phaeo = deg_Chl_p*(real(one) - exp(-alfa_p * CHL2C_plast_phaeo * PARave / pMax_phaeo))
+                    KOchl_phaeo = deg_Chl_p * CHL2C_plast_phaeo * PARave
                     KOchl_phaeo = max((deg_Chl_p*0.1d0), KOchl_phaeo)
+                    KOchl_phaeo = min(KOChl_phaeo, 0.3d0)
                 end if
 #endif
                 if (KOchl /= KOchl) then
