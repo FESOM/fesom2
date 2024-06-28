@@ -39,8 +39,8 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
 
   Real(kind=8)                              :: Latr          
   Integer                                   :: Nn            ! Total number of nodes
-  Real(kind=8),dimension(mesh%nl-1)	    :: zNodes	     ! Depth of nodes   zr(1:nzmax) = Z_3d_n(1:nzmax,n)
-  Real(kind=8),dimension(mesh%nl-1,bgc_num) :: state         	
+  Real(kind=8),dimension(mesh%nl-1)         :: zNodes        ! Depth of nodes   zr(1:nzmax) = Z_3d_n(1:nzmax,n)
+  Real(kind=8),dimension(mesh%nl-1,bgc_num) :: state        
   Real(kind=8)                              :: SurfSW        ! [W/m2] ShortWave radiation at surface
   Real(kind=8)                              :: Loc_slp       ! [Pa] se-level pressure
 
@@ -61,7 +61,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
 ! Subroutine Depth
 
   Real(kind=8),dimension(mesh%nl)           :: zF                   ! [m] Depth of fluxes
-  Real(kind=8),dimension(mesh%nl,5)         :: SinkVel              ! [m/day]
+  Real(kind=8),dimension(mesh%nl,6)         :: SinkVel              ! [m/day]
   Real(kind=8),dimension(mesh%nl-1)         :: thick                ! [m] Vertical distance between two nodes = Thickness 
   Real(kind=8),dimension(mesh%nl-1)         :: recipthick           ! [1/m] reciprocal of thick
 
@@ -103,6 +103,8 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
 #if defined (__coccos)
     tiny_N_c = tiny_chl/chl2N_max_c    ! 0.00001/ 3.5d0    NEW
     tiny_C_c = tiny_N_c/NCmax_c        ! NCmax_c = 0.15d0  NEW
+    tiny_N_p = tiny_chl/chl2N_max_p    ! 0.00001/ 3.5d0    Phaeocystis
+    tiny_C_p = tiny_N_p/NCmax_p        ! NCmax_c = 0.15d0  Phaeocystis
 #endif
 
   call Cobeta(mesh)        
@@ -244,6 +246,9 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
   state(1:nn,icchl)  = max(tiny_chl,state(1:nn,icchl))
   state(1:nn,icocn)  = max(tiny_N_c,state(1:nn,icocn))
   state(1:nn,icocc)  = max(tiny_C_c,state(1:nn,icocc))
+  state(1:nn,iphachl)= max(tiny_chl,state(1:nn,iphachl)) ! Phaeocystis
+  state(1:nn,iphan)  = max(tiny_N_p,state(1:nn,iphan))
+  state(1:nn,iphac)  = max(tiny_C_p,state(1:nn,iphac))
 #endif
 
 #if defined (__3Zoo2Det)
@@ -327,6 +332,10 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
      locGPPc = sum(vertGPPc(1:nn) * thick(1:nn))
      locNNAc = sum(vertNNAc(1:nn) * thick(1:nn))
      locChldegc = sum(vertChldegc(1:nn) * thick(1:nn))
+     locNPPp = sum(vertNPPp(1:nn) * thick(1:nn))        ! Phaeocystis
+     locGPPp = sum(vertGPPp(1:nn) * thick(1:nn))
+     locNNAp = sum(vertNNAp(1:nn) * thick(1:nn))
+     locChldegp = sum(vertChldegp(1:nn) * thick(1:nn))
 #endif
 
 

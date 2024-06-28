@@ -20,14 +20,14 @@ subroutine Depth_calculations(n,Nn,wF,zF,thick,recipthick,mesh)
   implicit none
 ! Input
   type(t_mesh), intent(in) , target                :: mesh
-  Integer,                     intent(in)          :: Nn	     ! Total number of nodes
+  Integer,                     intent(in)          :: Nn             ! Total number of nodes
 ! Output
   real(kind=8),dimension(mesh%nl),intent(out)      :: zF             ! [m] Depth of vertical fluxes
 
   real(kind=8),dimension(mesh%nl-1),intent(out)    :: thick          ! [m] Distance between two nodes = thickness
   real(kind=8),dimension(mesh%nl-1),intent(out)    :: recipthick     ! [1/m] reciprocal of thickness
 
-  real(kind=8),dimension(mesh%nl,5),intent(out)    :: wF             ! [m/day] Velocities of fluxes at the border of the control volumes
+  real(kind=8),dimension(mesh%nl,6),intent(out)    :: wF             ! [m/day] Velocities of fluxes at the border of the control volumes
   Integer                                          :: k, n           ! Index for depth      
 #include "../associate_mesh.h"
 ! ======================================================================================
@@ -52,6 +52,7 @@ subroutine Depth_calculations(n,Nn,wF,zF,thick,recipthick,mesh)
   wF(2:Nn,ivdet)   = VDet
   wF(2:Nn,ivdetsc) = VDet_zoo2
   wF(2:Nn,ivcoc)   = VCocco            ! NEW
+  wF(2:Nn,ivpha)   = VPhaeo            ! Phaeocystis
 
   wF(1,:)          = 0.d0
   wF(Nn+1,:)       = 0.d0
@@ -95,7 +96,7 @@ subroutine Cobeta(mesh)
   use mod_MESH
   use g_comm_auto
   Implicit none
-  	
+  
 ! Declarations
   Real(kind=8)                     :: yearfrac              ! The fraction of the year that has passed [0 1]
   Real(kind=8)                     :: yDay                  ! yearfrac in radians [0 2*pi]
@@ -104,7 +105,7 @@ subroutine Cobeta(mesh)
   integer                          :: n
 
 ! Constants
-  Real(kind=8)		           :: nWater        = 1.33
+  Real(kind=8)                     :: nWater        = 1.33
   type(t_mesh), intent(in), target :: mesh  
 #include  "../associate_mesh.h"
 !
@@ -113,17 +114,17 @@ subroutine Cobeta(mesh)
   yearfrac    = mod(real(daynew),real(ndpyr))/real(ndpyr)
   yDay        = 2 * pi * yearfrac
   declination = 0.006918                   &
-         	- 0.399912 * cos(    yDay) &
-     	        + 0.070257 * sin(    yDay) &
-          	- 0.006758 * cos(2 * yDay) &
-        	+ 0.000907 * sin(2 * yDay) &
-        	- 0.002697 * cos(3 * yDay) &
-        	+ 0.001480 * sin(3 * yDay) 
+                - 0.399912 * cos(    yDay) &
+                + 0.070257 * sin(    yDay) &
+                - 0.006758 * cos(2 * yDay) &
+                + 0.000907 * sin(2 * yDay) &
+                - 0.002697 * cos(3 * yDay) &
+                + 0.001480 * sin(3 * yDay) 
 
   do n=1, myDim_nod2D!+eDim_nod2D 
 
         cosAngleNoon   =   sin(geo_coord_nod2D(2,n)) * sin(declination) &
-     		         + cos(geo_coord_nod2D(2,n)) * cos(declination)
+                         + cos(geo_coord_nod2D(2,n)) * cos(declination)
         cosAI(n)       = sqrt(1-(1-cosAngleNoon**2)/nWater**2)
 
   end do
@@ -148,7 +149,7 @@ subroutine Atm_input(mesh)
 #include "netcdf.inc"
 
   real(kind=8), allocatable :: ncdata(:)
-  integer	                :: status, ncid, varid
+  integer                   :: status, ncid, varid
   character(300)            :: Ironname, CO2filename, DustNfilename
   character(15)             :: Ironvari, CO2vari, Nvari
   integer, dimension(2)     :: istart, icount
@@ -277,7 +278,7 @@ endif
         stop
      call par_ex
      endif    
-	
+
 !	! data
      allocate(ncdata(12))
      status=nf_inq_varid(ncid, CO2vari, varid)
@@ -730,7 +731,7 @@ subroutine River_input(mesh)
 #include "netcdf.inc"
 
   real(kind=8), allocatable :: ncdata(:)
-  integer	            :: status, ncid, varid
+  integer                   :: status, ncid, varid
   character(300)            :: Riverfilename
   integer, dimension(2)     :: istart, icount
   integer                   :: CO2start, CO2count
@@ -865,7 +866,7 @@ subroutine Erosion_input(mesh)
 #include "netcdf.inc"
 
   real(kind=8), allocatable :: ncdata(:)
-  integer	            :: status, ncid, varid
+  integer                   :: status, ncid, varid
   character(300)            :: Erosionfilename
   integer, dimension(2)     :: istart, icount
   integer                   :: CO2start, CO2count
@@ -901,7 +902,7 @@ subroutine Erosion_input(mesh)
 !           write(*,*) mype, 'ErosionTON2D', maxval(ErosionTON2D(:)), minval(ErosionTON2D(:))
 
            ! No silicates in erosion, we convert from nitrogen with redfieldian ratio     
-	   ErosionTSi2D=ErosionTON2D * 16/15
+           ErosionTSi2D=ErosionTON2D * 16/15
 !           write(*,*) mype, 'ErosionTSi2D', maxval(ErosionTSi2D(:)), minval(ErosionTSi2D(:))        
      else
 
@@ -923,7 +924,7 @@ subroutine Erosion_input(mesh)
 !           write(*,*) mype, 'ErosionTON2D', maxval(ErosionTON2D(:)), minval(ErosionTON2D(:))        
 
             ! No silicates in erosion, we convert from nitrogen with redfieldian ratio     
-	    ErosionTSi2D=ErosionTON2D * 16/15 
+            ErosionTSi2D=ErosionTON2D * 16/15 
 !           write(*,*) mype, 'ErosionTSi2D', maxval(ErosionTSi2D(:)), minval(ErosionTSi2D(:))        
         end if
      end if
