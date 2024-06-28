@@ -299,6 +299,54 @@ subroutine recom_init(mesh)
   allocate(NPPp3D(nl-1,node_size))
   NPPp3D(:,:) = 0.d0
 
+  allocate(TTemp_diatoms(nl-1,node_size)) !! new variables from here!
+  TTemp_diatoms(:,:) = 0.d0
+  allocate(TTemp_phyto(nl-1,node_size))
+  TTemp_phyto(:,:) = 0.d0
+  allocate(TTemp_cocco(nl-1,node_size))
+  TTemp_cocco(:,:) = 0.d0
+  allocate(TTemp_phaeo(nl-1,node_size))
+  TTemp_phaeo(:,:) = 0.d0
+
+  allocate(TPhyCO2(nl-1,node_size))
+  TPhyCO2(:,:) = 0.d0
+  allocate(TDiaCO2(nl-1,node_size))
+  TDiaCO2(:,:) = 0.d0
+  allocate(TCoccoCO2(nl-1,node_size))
+  TCoccoCO2(:,:) = 0.d0
+  allocate(TPhaeoCO2(nl-1,node_size))
+  TPhaeoCO2(:,:) = 0.d0
+
+  allocate(TqlimitFac_phyto(nl-1,node_size))
+  TqlimitFac_phyto(:,:) = 0.d0
+  allocate(TqlimitFac_diatoms(nl-1,node_size))
+  TqlimitFac_diatoms(:,:) = 0.d0
+  allocate(TqlimitFac_cocco(nl-1,node_size))
+  TqlimitFac_cocco(:,:) = 0.d0
+  allocate(TqlimitFac_phaeo(nl-1,node_size))
+  TqlimitFac_phaeo(:,:) = 0.d0
+
+  allocate(TCphotLigLim_diatoms(nl-1,node_size))
+  TqlimitFac_diatoms(:,:) = 0.d0
+  allocate(TCphotLigLim_phyto(nl-1,node_size))
+  TCphotLigLim_phyto(:,:) = 0.d0
+  allocate(TCphotLigLim_cocco(nl-1,node_size))
+  TCphotLigLim_cocco(:,:) = 0.d0
+  allocate(TCphotLigLim_phaeo(nl-1,node_size))
+  TCphotLigLim_phaeo(:,:) = 0.d0
+
+  allocate(TCphot_diatoms(nl-1,node_size))
+  TCphot_diatoms(:,:) = 0.d0
+  allocate(TCphot_phyto(nl-1,node_size))
+  TCphot_phyto(:,:) = 0.d0
+  allocate(TCphot_cocco(nl-1,node_size))
+  TCphot_cocco(:,:) = 0.d0
+  allocate(TCphot_phaeo(nl-1,node_size))
+  TCphot_phaeo(:,:) = 0.d0
+
+  allocate(TSi_assimDia(nl-1,node_size))
+  TSi_assimDia(:,:) = 0.d0
+
     end if  
 
     allocate(CO23D(nl-1,node_size))                   !NEW MOCSY

@@ -166,14 +166,27 @@ module recom_config
   Real(kind=8)                 :: cZoo2N         = 0.2d0
 
   namelist /painitialization_N/ cPhyN, cHetN, cZoo2N
+
 !!------------------------------------------------------------------------------
-!! *** Arrhenius function ***
+!! *** Temperature and Arrhenius functions ***
   Real(kind=8)                 :: recom_Tref     = 288.15d0       ! [K]
   Real(kind=8)                 :: C2K            = 273.15d0       !     Conversion from degrees C to K
   Real(kind=8)                 :: Ae             = 4500.d0        ! [K] Slope of the linear part of the Arrhenius function
+
+! NEW MODIFIED parameters
+  Real(kind=8)                 :: ord_d          = -0.2216d0 ! parameters for diatom temperature function
+  Real(kind=8)                 :: expon_d        = 0.0406d0 ! diatom exponent
+  Real(kind=8)                 :: ord_phy        = -1.2154d0 ! small phyto ordonnée
+  Real(kind=8)                 :: expon_phy      = 0.0599d0 ! small phyto exponent
+  Real(kind=8)                 :: ord_cocco      = -0.2310d0 ! coccolith ordonnée
+  Real(kind=8)                 :: expon_cocco    = 0.0327d0 ! small phyto ordonnée
+  Real(kind=8)                 :: ord_phaeo      = -0.2310d0 ! phaeocystis ordonnée
+  Real(kind=8)                 :: expon_phaeo    = 0.0327d0 ! phaeocystis ordonnée
+
   Real(kind=8)                 :: reminSi        = 0.02d0
   Real(kind=8)                 :: k_o2_remin     = 15.d0          ! NEW O2remin mmol m-3; Table 1 in Cram 2018 cites DeVries & Weber 2017 for a range of 0-30 mmol m-3
-  namelist /paArrhenius/ recom_Tref, C2K, Ae, reminSi, k_o2_remin   
+  namelist /paArrhenius/ recom_Tref, C2K, Ae, ord_d, expon_d, ord_phy, expon_phy, ord_cocco, expon_cocco, ord_phaeo, expon_phaeo, reminSi, k_o2_remin
+
 !!------------------------------------------------------------------------------
 !! *** For limiter function ***
   Real(kind=8)                 :: NMinSlope      = 50.d0 
@@ -193,6 +206,9 @@ module recom_config
   Real(kind=8)                 :: P_cm_c         = 3.3d0          ! NEW
   Real(kind=8)                 :: P_cm_p         = 3.4d0          ! NEW for Phaeocystis ( to be tuned)
   namelist /palimiter_function/ NMinSlope, SiMinSlope, NCmin, NCmin_d, NCmin_c, NCmin_p, SiCmin, k_Fe, k_Fe_d, k_Fe_c, k_Fe_p, k_si, P_cm, P_cm_d, P_cm_c, P_cm_p   
+
+  namelist /palimiter_function/ NMinSlope, SiMinSlope, NCmin, NCmin_d, NCmin_c, NCmin_p, SiCmin, k_Fe, k_Fe_d, k_Fe_c, k_Fe_p, k_si
+
 !!------------------------------------------------------------------------------
 !! *** For light calculations ***
   Real(kind=8)                 :: k_w            = 0.04d0         ! [1/m]              Light attenuation coefficient
@@ -555,6 +571,15 @@ Module REcoM_declarations
   Real(kind=8)  :: phyRespRate, phyRespRate_dia, phyRespRate_cocco, phyRespRate_phaeo ! [1/day] Phytoplankton respiration rate
   Real(kind=8)  :: KOchl, KOchl_dia, KOchl_cocco, KOchl_phaeo          ! coefficient for damage to the photosynthetic apparatus 
 !!------------------------------------------------------------------------------
+!! *** Vertical only Decomposition of phytoplankton growth components ***
+  Real(kind=8),allocatable,dimension(:)  :: VTTemp_diatoms, VTTemp_phyto, VTTemp_cocco, VTTemp_phaeo            ! Vertical 1D  temperature effect on phytoplankton photosynthesis
+  Real(kind=8),allocatable,dimension(:)  :: VTPhyCO2, VTDiaCO2, VTCoccoCO2, VTPhaeoCO2                        ! CO2 effect
+  Real(kind=8),allocatable,dimension(:)  :: VTqlimitFac_phyto, VTqlimitFac_diatoms, VTqlimitFac_cocco, VTqlimitFac_phaeo  ! nutrient effect
+  Real(kind=8),allocatable,dimension(:)  :: VTCphotLigLim_phyto, VTCphotLigLim_diatoms, VTCphotLigLim_cocco, VTCphotLigLim_phaeo ! light limitation
+  Real(kind=8),allocatable,dimension(:)  :: VTCphot_phyto, VTCphot_diatoms, VTCphot_cocco, VTCphot_phaeo
+  Real(kind=8),allocatable,dimension(:)  :: VTSi_assimDia  
+
+!!------------------------------------------------------------------------------  
 !! *** Iron chemistry ***
   Real(kind=8),external :: iron_chemistry 
 !!------------------------------------------------------------------------------
@@ -792,6 +817,30 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:,:)   :: NPPd3D
   Real(kind=8),allocatable,dimension(:,:)   :: NPPc3D 
   Real(kind=8),allocatable,dimension(:,:)   :: NPPp3D           ! Phaeocystis
+=======
+  Real(kind=8),allocatable,dimension(:,:)   :: NPPc3D
+  Real(kind=8),allocatable,dimension(:,:)   :: TTemp_diatoms ! my new variables to track
+  Real(kind=8),allocatable,dimension(:,:)   :: TTemp_phyto ! new Temperature effect 
+  Real(kind=8),allocatable,dimension(:,:)   :: TTemp_cocco ! new
+  Real(kind=8),allocatable,dimension(:,:)   :: TTemp_phaeo ! new
+  Real(kind=8),allocatable,dimension(:,:)   :: TPhyCO2 ! new CO2 effect
+  Real(kind=8),allocatable,dimension(:,:)   :: TDiaCO2 ! new
+  Real(kind=8),allocatable,dimension(:,:)   :: TCoccoCO2 ! new
+  Real(kind=8),allocatable,dimension(:,:)   :: TPhaeoCO2 ! new
+  Real(kind=8),allocatable,dimension(:,:)   :: TqlimitFac_phyto ! new nutrient limitation
+  Real(kind=8),allocatable,dimension(:,:)   :: TqlimitFac_diatoms
+  Real(kind=8),allocatable,dimension(:,:)   :: TqlimitFac_cocco
+  Real(kind=8),allocatable,dimension(:,:)   :: TqlimitFac_phaeo
+  Real(kind=8),allocatable,dimension(:,:)   :: TCphotLigLim_phyto ! new light limitation
+  Real(kind=8),allocatable,dimension(:,:)   :: TCphot_phyto       ! new 
+  Real(kind=8),allocatable,dimension(:,:)   :: TCphotLigLim_diatoms ! new light limitation
+  Real(kind=8),allocatable,dimension(:,:)   :: TCphot_diatoms
+  Real(kind=8),allocatable,dimension(:,:)   :: TCphotLigLim_cocco ! new light limitation
+  Real(kind=8),allocatable,dimension(:,:)   :: TCphot_cocco ! new
+  Real(kind=8),allocatable,dimension(:,:)   :: TCphotLigLim_phaeo ! new light limitation
+  Real(kind=8),allocatable,dimension(:,:)   :: TCphot_phaeo ! new
+  Real(kind=8),allocatable,dimension(:,:)   :: TSi_assimDia ! tracking the assimilation of Si by Diatoms
+>>>>>>> fesom2_temp
 
   Real(kind=8),allocatable,dimension(:)     :: DenitBen         ! Benthic denitrification Field in 2D [n2d 1]
 

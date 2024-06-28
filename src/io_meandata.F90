@@ -711,11 +711,107 @@ CASE ('NPPc3D         ')
 CASE ('NPPp3D         ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPp3D','Net primary production of phaeocystis', 'mmolC/(m2*d)', NPPp3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh) ! Phaeocystis
+
+!====================
+CASE ('TTemp_diatoms          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TTemp_diatoms','Temperature dependence of diatoms PS', 'per day',TTemp_diatoms(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
    endif
 
+CASE ('TTemp_cocco          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TTemp_cocco','Temperature dependence of coccolithophores PS', 'per day',TTemp_cocco(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
+CASE ('TTemp_phaeo          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TTemp_phaeo','Temperature dependence of phaeocystis PS', 'per day',TTemp_phaeo(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
+CASE ('TTemp_phyto          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TTemp_phyto','Temperature dependence of small phytoplankton PS', 'per day',TTemp_phyto(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
+CASE ('TPhyCO2          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TPhyCO2','Effect of CO2 of phyto growth/PS', 'per day',TPhyCO2(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
+CASE ('TDiaCO2          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TDiaCO2','Effect of CO2 of phyto growth/PS', 'per day',TDiaCO2(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
 
+CASE ('TCoccoCO2          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCoccoCO2','Effect of CO2 of phyto growth/PS', 'per day',TCoccoCO2(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
+CASE ('TPhaeoCO2          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TPhaeoCO2','Effect of CO2 of phyto growth/PS', 'per day',TPhaeoCO2(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
+CASE ('TqLF_phyto          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TqLF_phyto','Nutrient limitation effect of phyto PS', 'per day',TqlimitFac_phyto(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
 
+CASE ('TqLF_diatoms          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TqLF_diatoms','Nutrient limitation effect of diatoms PS', 'per day',TqlimitFac_diatoms(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
 
+CASE ('TqLF_cocco          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TqLF_cocco','Nutrient limitation effect of diatoms PS', 'per day',TqlimitFac_diatoms(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
+CASE ('TqLF_phaeo          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TqLF_phaeo','Nutrient limitation effect of diatoms PS', 'per day',TqlimitFac_diatoms(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
+
+CASE ('TCphotLL_dia          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphotLL_dia','Light limitation on phyto PS', 'per day',TCphotLigLim_diatoms(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
+
+CASE ('TCphotLL_phyto          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphotLL_phyto','Light limitation on phyto PS', 'per day',TCphotLigLim_phyto(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
+
+CASE ('TCphotLL_cocco          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphotLL_cocco','Light limitation on phyto PS', 'per day',TCphotLigLim_cocco(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif   
+
+CASE ('TCphotLL_phaeo          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphotLL_phaeo','Light limitation on phyto PS', 'per day',TCphotLigLim_phaeo(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
+
+CASE ('TCphot_diatoms          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphot_diatoms','Light limitation on phyto PS', 'per day',TCphot_diatoms(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif   
+
+CASE ('TCphot_phyto          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphot_phyto','Light limitation on phyto PS', 'per day',TCphot_phyto(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
+
+CASE ('TCphot_cocco          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphot_cocco','Light limitation on phyto PS', 'per day',TCphot_cocco(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
+
+CASE ('TCphot_phaeo          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphot_phaeo','Light limitation on phyto PS', 'per day',TCphot_phaeo(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
+
+CASE ('TSi_assimDia          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TSi_assimDia','Silicate assimilation', 'per day',TSi_assimDia(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
+   
+   
 CASE ('otracers  ')
     do j=3, num_tracers
     write (id_string, "(I4.4)") tracer_id(j)

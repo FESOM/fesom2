@@ -321,6 +321,22 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             arrFunc = exp(-Ae * ( rTloc - rTref))
 #if defined (__coccos) 
             CoccoTFunc = max(0.1419d0 * Temp(k)**0.8151d0,tiny) ! Function from Fielding 2013; is based on observational GR, but range fits best to ours
+            PhaeoTFunc = max(0.1419d0 * Temp(k)**0.8151d0,tiny) ! to be tuned
+
+!< New phytoplankton temperature functions
+
+            Temp_diatoms = exp(ord_d + expon_d * Temp(k)) ! NEW MODIFIED  2 parameters in new function ordonnee and exponent
+            VTTemp_diatoms(k) = Temp_diatoms ! track the output here 
+            Temp_phyto = exp(ord_phy + expon_phy * Temp(k)) ! NEW MODIFIED
+            VTTemp_phyto(k) = Temp_phyto
+
+
+#if defined (__coccos)
+            Temp_cocco = exp(ord_cocco + expon_cocco * Temp(k)) -  exp(ord_cocco) ! NEW MODIFIED  ! CoccoTFunc = max(0.1419d0 * Temp(k)**0.8151d0,tiny) ! Function from Fielding 2013; is based on observational GR, but range fits best to ours
+            VTTemp_cocco(k) = Temp_cocco
+            Temp_phaeo = exp(ord_phaeo + expon_phaeo * Temp(k)) -  exp(ord_phaeo) ! NEW MODIFIED  ! CoccoTFunc = max(0.1419d0 * Temp(k)**0.8151d0,tiny) ! Function from Fielding 2013; is based on observational GR, but range fits best to ours
+            VTTemp_phaeo(k) = Temp_phaeo
+
 
 #endif
 
@@ -335,7 +351,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !< Silicate temperature dependence 
 !            reminSiT = min(1.32e16 * exp(-11200.d0 * rTloc),reminSi) !! arrFunc control, reminSi=0.02d0 ! Kamatani (1982)
 !            reminSiT = reminSi
-            reminSiT = max(0.023d0 * 2.6d0**((Temp(k)-10.)/10.),reminSi)
+             reminSiT = max(0.023d0 * 2.6d0**((Temp(k)-10.)/10.),reminSi)
+
 
 !-------------------------------------------------------------------------------
 !> O2 dependence of rates
@@ -445,12 +462,14 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 - exp(-c_co2_phy * CO2_watercolumn(k) * Cunits) - d_co2_phy * 10.**(-pH_watercolumn(k))
             PhyCO2 = min(PhyCO2,3.d0)      ! April 2022: limitation to 3
             PhyCO2 = max(0.d0,PhyCO2)      ! July 2022: limitation to zero
+            VTPhyCO2(k) = PhyCO2
 
 ! Diatoms
             DiaCO2 = a_co2_dia * HCO3_watercolumn(k) * Cunits / (b_co2_dia + HCO3_watercolumn(k) * Cunits) &
                 - exp(-c_co2_dia * CO2_watercolumn(k) * Cunits) - d_co2_dia * 10.**(-pH_watercolumn(k))
             DiaCO2 = min(DiaCO2,3.d0)      ! April 2022: limitation to 3
             DiaCO2 = max(0.d0,DiaCO2)      ! July 2022: limitation to zero
+            VTDiaCO2(k) = DiaCO2
 
 #if defined (__coccos) 
 ! Coccolithophores
@@ -463,6 +482,9 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 - exp(-c_co2_phaeo * CO2_watercolumn(k) * Cunits) - d_co2_phaeo * 10.**(-pH_watercolumn(k))
             PhaeoCO2 = min(PHaeoCO2,3.d0)      ! April 2022: limitation to 3
             PhaeoCO2 = max(0.d0,PhaeoCO2)      ! July 2022: limitation to zero
+
+            VTCoccoCO2(k) = CoccoCO2
+            VTPhaeoCO2(k) = PhaeoCO2
 #endif
 
 !------------------------------------------------------------------------------
@@ -515,8 +537,9 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             qlimitFac    = recom_limiter(NMinSlope, NCmin, quota) ! Eqn A55
             feLimitFac   = Fe/(k_Fe + Fe)                         ! Use Michaelis–Menten kinetics
             qlimitFac    = min(qlimitFac, feLimitFac)             ! Liebig law of the minimum
-            pMax         = P_cm * qlimitFac * arrFunc             ! Maximum value of C-specific rate of photosynthesis
-    
+            VTqlimitFac_phyto(k) = qlimitFac                      ! tracking qlimitFac 
+            pMax         = qlimitFac * Temp_phyto                ! Maximum value of C-specific rate of photosynthesis
+
 !< *** Diatoms ***
 !< ***************
             qlimitFac    = recom_limiter(NMinSlope, NCmin_d, quota_dia)
@@ -524,7 +547,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             qlimitFac    = min(qLimitFac, qlimitFacTmp)
             feLimitFac   = Fe/(k_Fe_d + Fe)
             qlimitFac    = min(qlimitFac, feLimitFac)
-            pMax_dia     = P_cm_d * qlimitFac * arrFunc
+            VTqlimitFac_diatoms(k) = qlimitFac
+            pMax_dia     = qlimitFac * Temp_diatoms
 
 !< *** Coccolithophores ***
 !< ************************
@@ -532,11 +556,18 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             qlimitFac  = recom_limiter(NMinSlope, NCmin_c, quota_cocco) 
             feLimitFac = Fe/(k_Fe_c + Fe)                               
             qlimitFac  = min(qlimitFac, feLimitFac)                     
-            pMax_cocco = P_cm_c * qlimitFac * CoccoTFunc                ! Here the T dependency is changed
+            VTqlimitFac_cocco(k) = qlimitFac
+            pMax_cocco = qlimitFac * Temp_cocco                ! Here the T dependency is changed           
+
             qlimitFac  = recom_limiter(NMinSlope, NCmin_p, quota_phaeo) ! Phaeocystis
             feLimitFac = Fe/(k_Fe_p + Fe)
             qlimitFac  = min(qlimitFac, feLimitFac)
-            pMax_phaeo = P_cm_p * qlimitFac * arrFunc
+            VTqlimitFac_phaeo(k) = qlimitFac
+            pMax_phaeo = qlimitFac * Temp_phaeo                ! Here the T dependency is changed
+
+
+
+
 #endif
 !-------------------------------------------------------------------------------
 !< *** Small phytoplankton photosynthesis rate ***
@@ -545,9 +576,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 Cphot = zero
             else
                 Cphot = pMax*(real(one) - exp(-alfa * Chl2C * PARave / pMax))
+                VTCphotLigLim_phyto(k) = Cphot/pMax ! track the light limitation 
                 if (CO2lim) Cphot = Cphot * PhyCO2 ! Added the CO2 dependence
             end if
             if (Cphot .lt. tiny) Cphot = zero
+            VTCphot_phyto(k) = Cphot ! tracking Cphot with all processes included
 
 !< *** Diatom photosynthesis rate ***
 !< **********************************
@@ -555,9 +588,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 Cphot_dia = zero
             else
                 Cphot_dia = pMax_dia * (real(one) - exp(-alfa_d * Chl2C_dia * PARave / pMax_dia))
+                VTCphotLigLim_diatoms(k) = Cphot/pMax ! track light limitation
                 if (CO2lim) Cphot_dia = Cphot_dia  * DiaCO2 ! Added the CO2 dependence
             end if
             if (Cphot_dia .lt. tiny) Cphot_dia = zero
+            VTCphot_diatoms(k) = Cphot_dia ! tracking complete Cphot
 
 !< *** Coccolithophore photosynthesis rate ***
 !< *******************************************
@@ -566,17 +601,24 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 Cphot_cocco = zero
             else 
                 Cphot_cocco = pMax_cocco * (real(one) - exp( -alfa_c * Chl2C_cocco * PARave / pMax_cocco))  
+                VTCphotLigLim_cocco(k) = Cphot/pMax ! track the light limitation
                 if (CO2lim) Cphot_cocco = Cphot_cocco * CoccoCO2 ! Added the CO2 dependence 
             end if 
             if (Cphot_cocco .lt. tiny) Cphot_cocco = zero
+            VTCphot_cocco(k) = Cphot_cocco
+
             ! Phaeocystis
             if ( pMax_phaeo .lt. tiny .OR. Parave /= Parave .OR. CHL2C_phaeo /= CHL2C_phaeo) then
                 Cphot_phaeo = zero
             else
                 Cphot_phaeo = pMax_phaeo * (real(one) - exp( -alfa_p * Chl2C_phaeo * PARave / pMax_phaeo))
+                VTCphotLigLim_phaeo(k) = Cphot/pMax ! track the light limitation
                 if (CO2lim) Cphot_phaeo = Cphot_phaeo * PhaeoCO2 ! Added the CO2 dependence 
             end if
             if (Cphot_phaeo .lt. tiny) Cphot_phaeo = zero
+            VTCphot_phaeo(k) = Cphot_phaeo
+            
+
 #endif
 !------------------------------------------------------------------------------- 
 !< chlorophyll degradation
@@ -710,8 +752,9 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 
             limitFacSi     = recom_limiter(SiMaxSlope, qSiC, SiCmax)  &
                               * limitFacN_dia
-            Si_assim       = V_cm_fact_d * P_cm_d * arrFunc * SiCUptakeRatio &
+            Si_assim       = V_cm_fact_d * Temp_diatoms * SiCUptakeRatio &
                               * limitFacSi * Si/(Si + k_si)
+            VTSi_assimDia(k) = Si_assim
 
 !-------------------------------------------------------------------------------
 !< *** Iron chemistry ***

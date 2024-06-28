@@ -260,6 +260,40 @@ if (Diags) then
      vertrespn = 0.d0
      vertrespd = 0.d0
 
+     allocate(VTTemp_diatoms(nl-1), VTTemp_phyto(nl-1), VTTemp_cocco(nl-1), VTTemp_phaeo(nl-1))
+     VTTemp_diatoms = 0.d0
+     VTTemp_phyto = 0.d0
+     VTTemp_cocco = 0.d0
+     VTTemp_phaeo = 0.d0
+
+     allocate(VTPhyCO2(nl-1), VTDiaCO2(nl-1), VTCoccoCO2(nl-1), VTPhaeoCO2(nl-1))
+     VTPhyCO2 = 0.d0
+     VTDiaCO2 = 0.d0
+     VTCoccoCO2 = 0.d0
+     VTPhaeoCO2 = 0.d0
+
+     allocate(VTqlimitFac_phyto(nl-1), VTqlimitFac_diatoms(nl-1), VTqlimitFac_cocco(nl-1), VTqlimitFac_phaeo(nl-1))
+     VTqlimitFac_phyto = 0.d0
+     VTqlimitFac_diatoms = 0.d0
+     VTqlimitFac_cocco  = 0.d0
+     VTqlimitFac_phaeo  = 0.d0
+
+     allocate(VTCphotLigLim_phyto(nl-1), VTCphotLigLim_diatoms(nl-1), VTCphotLigLim_cocco(nl-1), VTCphotLigLim_phaeo(nl-1))
+     VTCphotLigLim_phyto = 0.d0
+     VTCphotLigLim_diatoms = 0.d0
+     VTCphotLigLim_cocco  = 0.d0
+     VTCphotLigLim_phaeo  = 0.d0
+
+     allocate(VTCphot_phyto(nl-1), VTCphot_diatoms(nl-1), VTCphot_cocco(nl-1), VTCphot_phaeo(nl-1))
+     VTCphot_phyto = 0.d0
+     VTCphot_diatoms = 0.d0
+     VTCphot_cocco  = 0.d0
+     VTCphot_phaeo  = 0.d0
+
+     allocate(VTSi_assimDia(nl-1))
+     VTSi_assimDia = 0.d0
+
+
 #if defined (__coccos)
      allocate(vertaggc(nl-1), vertdocexc(nl-1), vertrespc(nl-1))
      vertaggc = 0.d0
@@ -450,6 +484,33 @@ if (Diags) then
      docexn(1:nzmax,n)       = vertdocexn(1:nzmax)
      respn(1:nzmax,n)        = vertrespn(1:nzmax)
      NPPn3D(1:nzmax,n)       = vertNPPn(1:nzmax)
+ 
+     TTemp_diatoms(1:nzmax,n)  = VTTemp_diatoms(1:nzmax) !! NEW from here tracking vars
+     TTemp_phyto(1:nzmax,n)    = VTTemp_phyto(1:nzmax)
+     TTemp_cocco(1:nzmax,n)    = VTTemp_cocco(1:nzmax)
+     TTemp_phaeo(1:nzmax,n)    = VTTemp_phaeo(1:nzmax)
+
+     TPhyCO2(1:nzmax,n)        = VTPhyCO2(1:nzmax)
+     TDiaCO2(1:nzmax,n)        = VTDiaCO2(1:nzmax)
+     TCoccoCO2(1:nzmax,n)      = VTCoccoCO2(1:nzmax)
+     TPhaeoCO2(1:nzmax,n)      = VTPhaeoCO2(1:nzmax)
+
+     TqlimitFac_phyto(1:nzmax,n)   = VTqlimitFac_phyto(1:nzmax)
+     TqlimitFac_diatoms(1:nzmax,n) = VTqlimitFac_diatoms(1:nzmax)
+     TqlimitFac_cocco(1:nzmax,n)   = VTqlimitFac_cocco(1:nzmax)
+     TqlimitFac_phaeo(1:nzmax,n)   = VTqlimitFac_phaeo(1:nzmax)
+
+     TCphotLigLim_phyto(1:nzmax,n)   = VTCphotLigLim_phyto(1:nzmax)
+     TCphotLigLim_diatoms(1:nzmax,n) = VTCphotLigLim_diatoms(1:nzmax)
+     TCphotLigLim_cocco(1:nzmax,n)   = VTCphotLigLim_cocco(1:nzmax)
+     TCphotLigLim_phaeo(1:nzmax,n)   = VTCphotLigLim_phaeo(1:nzmax)
+
+     TCphot_phyto(1:nzmax,n)   = VTCphot_phyto(1:nzmax)
+     TCphot_diatoms(1:nzmax,n) = VTCphot_diatoms(1:nzmax)
+     TCphot_cocco(1:nzmax,n)  = VTCphot_cocco(1:nzmax)
+     TCphot_phaeo(1:nzmax,n)  = VTCphot_phaeo(1:nzmax)
+
+     TSi_assimDia(1:nzmax,n)   = VTSi_assimDia(1:nzmax)
 
      aggd(1:nzmax,n)         = vertaggd(1:nzmax)
      respd(1:nzmax,n)        = vertrespd(1:nzmax)
@@ -508,6 +569,16 @@ if (Diags) then
      deallocate(vertcalcdiss, vertcalcif)
      deallocate(vertaggn, vertdocexn, vertrespn)
      deallocate(vertaggd, vertdocexd, vertrespd)
+
+     deallocate(VTTemp_diatoms, VTTemp_phyto, VTTemp_cocco, VTTemp_phaeo) ! NEW 
+     deallocate(VTPhyCO2, VTDiaCO2, VTCoccoCO2, VTPhaeoCO2)
+     deallocate(VTqlimitFac_phyto, VTqlimitFac_diatoms, VTqlimitFac_cocco, VTqlimitFac_phaeo)
+     deallocate(VTCphotLigLim_phyto, VTCphotLigLim_diatoms, VTCphotLigLim_cocco, VTCphotLigLim_phaeo)
+     deallocate(VTCphot_phyto, VTCphot_diatoms, VTCphot_cocco, VTCphot_phaeo)
+     deallocate(VTSi_assimDia)
+
+
+
 #if defined (__coccos)
      ! deallocate(vertgrazmeso_c)
      deallocate(vertaggc, vertdocexc, vertrespc)
