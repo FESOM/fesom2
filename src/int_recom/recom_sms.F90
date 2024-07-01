@@ -45,6 +45,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 
     real(kind=8),dimension(mesh%nl-1,bgc_num),intent(inout) :: sms                  !< Source-Minus-Sinks term
     real(kind=8),dimension(mesh%nl-1)        ,intent(in)    :: Temp                 !< [degrees C] Ocean temperature
+    !real(kind=8)                                            :: tau_phaeo            ! Temperature interval for phaeocystis optimal growth of 3.6
     real(kind=8),dimension(mesh%nl-1)        ,intent(in)    :: Sali_depth           !< NEW MOCSY Salinity for the whole water column
 
     Real(kind=8),dimension(mesh%nl-1),intent(inout)         :: CO2_watercolumn      !< [mol/m3]
@@ -319,9 +320,6 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 
             rTloc   = real(one)/(Temp(k) + C2K)
             arrFunc = exp(-Ae * ( rTloc - rTref))
-#if defined (__coccos) 
-            CoccoTFunc = max(0.1419d0 * Temp(k)**0.8151d0,tiny) ! Function from Fielding 2013; is based on observational GR, but range fits best to ours
-            PhaeoTFunc = max(0.1419d0 * Temp(k)**0.8151d0,tiny) ! to be tuned
 
 !< New phytoplankton temperature functions
 
@@ -334,7 +332,14 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #if defined (__coccos)
             Temp_cocco = exp(ord_cocco + expon_cocco * Temp(k)) -  exp(ord_cocco) ! NEW MODIFIED  ! CoccoTFunc = max(0.1419d0 * Temp(k)**0.8151d0,tiny) ! Function from Fielding 2013; is based on observational GR, but range fits best to ours
             VTTemp_cocco(k) = Temp_cocco
-            Temp_phaeo = exp(ord_phaeo + expon_phaeo * Temp(k)) -  exp(ord_phaeo) ! NEW MODIFIED  ! CoccoTFunc = max(0.1419d0 * Temp(k)**0.8151d0,tiny) ! Function from Fielding 2013; is based on observational GR, but range fits best to ours
+
+            if (Temp(k) < 3.6) then 
+                tau_phaeo = 17.51
+            else
+                tau_phaeo = 1.17
+            endif 
+            Temp_phaeo = 1.56 * exp(-(Temp(k) - 3.6) / tau_phaeo)**2
+            !Temp_phaeo = exp(ord_phaeo + expon_phaeo * Temp(k)) -  exp(ord_phaeo) ! NEW MODIFIED  ! CoccoTFunc = max(0.1419d0 * Temp(k)**0.8151d0,tiny) ! Function from Fielding 2013; is based on observational GR, but range fits best to ours
             VTTemp_phaeo(k) = Temp_phaeo
 
 
@@ -581,7 +586,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             end if
             if (Cphot .lt. tiny) Cphot = zero
             VTCphot_phyto(k) = Cphot ! tracking Cphot with all processes included
-
+           
 !< *** Diatom photosynthesis rate ***
 !< **********************************
             if ( pMax_dia .lt. tiny .OR. PARave /= PARave .OR. CHL2C_dia /= CHL2C_dia) then
@@ -593,7 +598,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             end if
             if (Cphot_dia .lt. tiny) Cphot_dia = zero
             VTCphot_diatoms(k) = Cphot_dia ! tracking complete Cphot
-
+            
 !< *** Coccolithophore photosynthesis rate ***
 !< *******************************************
 #if defined (__coccos) 
@@ -606,7 +611,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             end if 
             if (Cphot_cocco .lt. tiny) Cphot_cocco = zero
             VTCphot_cocco(k) = Cphot_cocco
-
+           
             ! Phaeocystis
             if ( pMax_phaeo .lt. tiny .OR. Parave /= Parave .OR. CHL2C_phaeo /= CHL2C_phaeo) then
                 Cphot_phaeo = zero
@@ -617,7 +622,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             end if
             if (Cphot_phaeo .lt. tiny) Cphot_phaeo = zero
             VTCphot_phaeo(k) = Cphot_phaeo
-            
+           
 
 #endif
 !------------------------------------------------------------------------------- 

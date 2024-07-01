@@ -711,8 +711,8 @@ CASE ('NPPc3D         ')
 CASE ('NPPp3D         ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPp3D','Net primary production of phaeocystis', 'mmolC/(m2*d)', NPPp3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh) ! Phaeocystis
+   endif
 
-!====================
 CASE ('TTemp_diatoms          ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TTemp_diatoms','Temperature dependence of diatoms PS', 'per day',TTemp_diatoms(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)

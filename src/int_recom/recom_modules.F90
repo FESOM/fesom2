@@ -505,7 +505,11 @@ Module REcoM_declarations
   Real(kind=8)  :: rTref                  ! [1/K] Reciproque value of reference temp for Arrhenius function
   Real(kind=8)  :: rTloc                  ! [1/K] Reciproque of local ocean temp
   Real(kind=8)  :: arrFunc                ! []    Temp dependence of rates (also for Phaeocystis)
-  Real(kind=8)  :: CoccoTFunc             ! []    Temp dependence of coccolithophores
+  Real(kind=8)  :: Temp_diatoms           ! []    Temp dependence of diatoms
+  Real(kind=8)  :: Temp_phyto             ! []    Temp dependence of small phyto
+  Real(kind=8)  :: Temp_cocco             ! []    Temp dependence of coccolithophores
+  Real(kind=8)  :: Temp_phaeo             ! []    Temp dependence of phaeocystis
+  Real(kind=8)  :: tau_phaeo              ! [°C]  Temperature interval for phaeocystis optimum growth 3.6
   Real(kind=8)  :: arrFuncZoo2            ! []    Temperature function for krill
   Real(kind=8)  :: q10_mic                ! 3Zoo
   Real(kind=8)  :: q10_mic_res            ! 3Zoo
@@ -817,8 +821,6 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:,:)   :: NPPd3D
   Real(kind=8),allocatable,dimension(:,:)   :: NPPc3D 
   Real(kind=8),allocatable,dimension(:,:)   :: NPPp3D           ! Phaeocystis
-=======
-  Real(kind=8),allocatable,dimension(:,:)   :: NPPc3D
   Real(kind=8),allocatable,dimension(:,:)   :: TTemp_diatoms ! my new variables to track
   Real(kind=8),allocatable,dimension(:,:)   :: TTemp_phyto ! new Temperature effect 
   Real(kind=8),allocatable,dimension(:,:)   :: TTemp_cocco ! new
@@ -840,7 +842,6 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:,:)   :: TCphotLigLim_phaeo ! new light limitation
   Real(kind=8),allocatable,dimension(:,:)   :: TCphot_phaeo ! new
   Real(kind=8),allocatable,dimension(:,:)   :: TSi_assimDia ! tracking the assimilation of Si by Diatoms
->>>>>>> fesom2_temp
 
   Real(kind=8),allocatable,dimension(:)     :: DenitBen         ! Benthic denitrification Field in 2D [n2d 1]
 
