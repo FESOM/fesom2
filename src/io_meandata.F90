@@ -759,11 +759,11 @@ CASE ('TqLF_diatoms          ')
 
 CASE ('TqLF_cocco          ')
    if (use_REcoM) then
-   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TqLF_cocco','Nutrient limitation effect of diatoms PS', 'per day',TqlimitFac_diatoms(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TqLF_cocco','Nutrient limitation effect of diatoms PS', 'per day',TqlimitFac_cocco(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
    endif
 CASE ('TqLF_phaeo          ')
    if (use_REcoM) then
-   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TqLF_phaeo','Nutrient limitation effect of diatoms PS', 'per day',TqlimitFac_diatoms(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TqLF_phaeo','Nutrient limitation effect of diatoms PS', 'per day', TqlimitFac_phaeo(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
    endif
 
 CASE ('TCphotLL_dia          ')
