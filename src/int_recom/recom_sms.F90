@@ -331,6 +331,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 
 #if defined (__coccos)
             Temp_cocco = exp(ord_cocco + expon_cocco * Temp(k)) -  exp(ord_cocco) ! NEW MODIFIED  ! CoccoTFunc = max(0.1419d0 * Temp(k)**0.8151d0,tiny) ! Function from Fielding 2013; is based on observational GR, but range fits best to ours
+            Temp_cocco = max(Temp_cocco, tiny) 
             VTTemp_cocco(k) = Temp_cocco
 
             if (Temp(k) < 3.6) then 
