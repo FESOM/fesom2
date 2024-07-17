@@ -53,6 +53,10 @@ subroutine stress_tensor(ice, partit, mesh)
 #if defined (__icepack)
     use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
 #endif
+#ifdef ENABLE_OPENACC
+    use openacc_lib     !! Juha: add for cray_acc_set_debug_global_level
+#endif
+
     implicit none
     type(t_partit), intent(inout), target :: partit
     type(t_ice)   , intent(inout), target :: ice
@@ -89,6 +93,7 @@ subroutine stress_tensor(ice, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, r1, r2, r3, si1, si2, zeta, delta, delta_inv, d1, d2)
 #else
+    CALL cray_acc_set_debug_global_level(3) !! Juha: debugging ACC
 !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
     do el=1,myDim_elem2D
@@ -166,6 +171,7 @@ subroutine stress_tensor(ice, partit, mesh)
 !$OMP END PARALLEL DO
 #else
 !$ACC END PARALLEL LOOP
+    call cray_acc_set_debug_global_level(0) !! Juha: debugging ACC
 #endif
 end subroutine stress_tensor
 !
@@ -334,6 +340,9 @@ subroutine EVPdynamics(ice, partit, mesh)
     use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
     use icedrv_main,   only: icepack_to_fesom
 #endif
+#ifdef ENABLE_ROCTX
+    USE mo_roctx
+#endif
     IMPLICIT NONE
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -367,10 +376,15 @@ subroutine EVPdynamics(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: a_ice_old, m_ice_old, m_snow_old
 #endif
     real(kind=WP)              , pointer  :: inv_rhowat, rhosno, rhoice
+
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+
+#ifdef ENABLE_ROCTX
+    CALL roctxStartRange("EVPdynamics/pointers 1")
+#endif   
     u_ice           => ice%uice(:)
     v_ice           => ice%vice(:)
     a_ice           => ice%data(1)%values(:)
@@ -399,6 +413,9 @@ subroutine EVPdynamics(ice, partit, mesh)
     inv_areamass    => ice%work%inv_areamass(:)
     inv_mass        => ice%work%inv_mass(:)
     ice_strength    => ice%work%ice_strength(:)
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+#endif
 
     !___________________________________________________________________________
     ! If Icepack is used, always update the tracers
@@ -419,6 +436,9 @@ subroutine EVPdynamics(ice, partit, mesh)
 
     !___________________________________________________________________________
     ! Precompute values that are never changed during the iteration
+#ifdef ENABLE_ROCTX
+    CALL roctxStartRange("EVPdynamics/kernel 1")
+#endif  
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
@@ -468,6 +488,9 @@ subroutine EVPdynamics(ice, partit, mesh)
 !$OMP END PARALLEL DO
 #else
     !$ACC END PARALLEL LOOP
+#endif
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
 #endif
     !___________________________________________________________________________
     use_pice=0
@@ -636,30 +659,41 @@ subroutine EVPdynamics(ice, partit, mesh)
 #else
     !$ACC END PARALLEL LOOP
 #endif
+#ifdef ENABLE_ROCTX
+    CALL roctxStartRange("EVPdynamics/before shortstep")
+#endif
     !___________________________________________________________________________
     ! End of Precomputing --> And the ice stepping starts
 #if defined (__icepack)
     rdg_conv_elem(:)  = 0.0_WP
     rdg_shear_elem(:) = 0.0_WP
 #endif
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+#endif  
     do shortstep=1, ice%evp_rheol_steps
         !_______________________________________________________________________
         !TODO: temporary workaround for cray16.0.1.1 bug
 #if defined(_CRAYFTN)
 	!dir$ noinline
 #endif
+#ifdef ENABLE_ROCTX
+        CALL roctxStartRange("EVPdynamics/stress")
+#endif
         call stress_tensor(ice, partit, mesh)
 #if defined(_CRAYFTN)
 	!dir$ noinline
 #endif
         call stress2rhs(ice, partit, mesh)
-
+#ifdef ENABLE_ROCTX
+        CALL roctxRangePop()
+#endif 
         !_______________________________________________________________________
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, ed, umod, drag, rhsu, rhsv, r_a, r_b, det)
 !$OMP DO
 #else
-        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
+        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)    
 #endif
         do n=1,myDim_nod2D+eDim_nod2D
            U_ice_old(n) = U_ice(n) !PS

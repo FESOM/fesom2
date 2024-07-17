@@ -17,6 +17,10 @@
 module g_comm
 
   use, intrinsic :: ISO_FORTRAN_ENV, only: int16, int32, real32, real64
+#ifdef ENABLE_ROCTX
+  USE mo_roctx
+#endif
+
 
   implicit none
 
@@ -66,8 +70,25 @@ logical,        intent(in),optional   :: luse_g2g
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 if (npes > 1) then
+
+#ifdef ENABLE_ROCTX
+    CALL roctxStartRange("exchange_nod2d_i begin")
+#endif
+
     call exchange_nod2D_i_begin(nod_array2D, partit, luse_g2g)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+
+    CALL roctxStartRange("exchange_nod2d_i wait")
+#endif
+
     call exchange_nod_end(partit)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+#endif
+
 endif
 END SUBROUTINE exchange_nod2D_i
 
@@ -152,8 +173,25 @@ logical,        intent(in),optional   :: luse_g2g
 #include "associate_part_ass.h"
 
  if (npes > 1) then
+
+#ifdef ENABLE_ROCTX
+    CALL roctxStartRange("exchange_nod2d begin")
+#endif
+
     call exchange_nod2D_begin(nod_array2D, partit, luse_g2g)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+
+    CALL roctxStartRange("exchange_nod2d wait")
+#endif
+
     call exchange_nod_end(partit)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+#endif
+
  end if
 
 END SUBROUTINE exchange_nod2D
@@ -234,8 +272,25 @@ logical,        intent(in),optional   :: luse_g2g
 #include "associate_part_ass.h"
 
  if (npes > 1) then
+
+#ifdef ENABLE_ROCTX
+    CALL roctxStartRange("exchange_nod2d_2fields begin")
+#endif
+
     call exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D, partit, luse_g2g)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+
+    CALL roctxStartRange("exchange_nod2d_2fields wait")
+#endif
+
     call exchange_nod_end(partit)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+#endif
+
  end if
 
 END SUBROUTINE exchange_nod2D_2fields
@@ -331,8 +386,25 @@ logical,        intent(in),optional   :: luse_g2g
 
 
  if (npes > 1) then
+
+#ifdef ENABLE_ROCTX
+    CALL roctxStartRange("exchange_nod2d_3fields begin")
+#endif
+
     call exchange_nod2D_3fields_begin(nod1_array2D, nod2_array2D, nod3_array2D, partit, luse_g2g)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+    
+    CALL roctxStartRange("exchange_nod2d_3fields wait")
+#endif
+
     call exchange_nod_end(partit)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+#endif
+
  end if
 
 END SUBROUTINE exchange_nod2D_3fields
@@ -439,8 +511,25 @@ real(real64),   intent(inout)         :: nod_array3D(:,:)
 logical,        intent(in),optional   :: luse_g2g
 
 if (partit%npes > 1) then
+
+#ifdef ENABLE_ROCTX
+    CALL roctxStartRange("exchange_nod3d begin")
+#endif
+
    call exchange_nod3D_begin(nod_array3D, partit, luse_g2g)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+
+    CALL roctxStartRange("exchange_nod3d wait")
+#endif
+
    call exchange_nod_end(partit)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+#endif
+
 endif
 
 END SUBROUTINE exchange_nod3D
@@ -532,8 +621,25 @@ logical,        intent(in),optional   :: luse_g2g
 #include "associate_part_ass.h"
 
 if (npes > 1) then
+
+#ifdef ENABLE_ROCTX
+    CALL roctxStartRange("exchange_nod3d_2fields begin")
+#endif
+
    call exchange_nod3D_2fields_begin(nod1_array3D,nod2_array3D, partit, luse_g2g)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+
+    CALL roctxStartRange("exchange_nod3d_2fields wait")
+#endif
+
    call exchange_nod_end(partit)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+#endif
+
 endif
 END SUBROUTINE exchange_nod3D_2fields
 
@@ -641,8 +747,26 @@ type(t_partit), intent(inout), target  :: partit
 real(real64),   intent(inout)          :: nod_array3D(:,:,:)
 logical,        intent(in),optional    :: luse_g2g
 if (partit%npes>1) then
+
+#ifdef ENABLE_ROCTX
+    CALL roctxStartRange("exchange_nod3d_n begin")
+#endif
+
    call exchange_nod3D_n_begin(nod_array3D, partit, luse_g2g)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+    
+    CALL roctxStartRange("exchange_nod3d_n wait")
+#endif
+
    call exchange_nod_end(partit)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+#endif
+
+
 endif
 
 END SUBROUTINE exchange_nod3D_n
@@ -777,8 +901,23 @@ logical,        intent(in),optional    :: luse_g2g
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
+#ifdef ENABLE_ROCTX
+    CALL roctxStartRange("exchange_elem3d begin")
+#endif
+
 call exchange_elem3D_begin(elem_array3D, partit, luse_g2g)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+
+    CALL roctxStartRange("exchange_elem3d wait")
+#endif
+
 call exchange_elem_end(partit)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+#endif
 
 END SUBROUTINE exchange_elem3D
 !===========================================
@@ -997,8 +1136,25 @@ logical,        intent(in),optional    :: luse_g2g
 #include "associate_part_ass.h"
 
  if (npes> 1) then
+
+#ifdef ENABLE_ROCTX
+    CALL roctxStartRange("exchange_elem3d_n begin")
+#endif
+
     call exchange_elem3D_n_begin(elem_array3D, partit, luse_g2g)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+
+    CALL roctxStartRange("exchange_elem3d_n wait")
+#endif
+
     call exchange_elem_end(partit)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+#endif
+
  endif
 END SUBROUTINE exchange_elem3D_n
 !=============================================================================
@@ -1135,8 +1291,25 @@ logical,        intent(in),optional    :: luse_g2g
 #include "associate_part_ass.h"
 
  if (npes> 1) then
+
+#ifdef ENABLE_ROCTX
+    CALL roctxStartRange("exchange_elem2d begin")
+#endif
+
     call exchange_elem2D_begin(elem_array2D, partit, luse_g2g)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+
+    CALL roctxStartRange("exchange_elem2d wait")
+#endif
+
     call exchange_elem_end(partit)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+#endif
+
  end if
 
 END SUBROUTINE exchange_elem2D
@@ -1256,8 +1429,25 @@ logical,        intent(in),optional    :: luse_g2g
 #include "associate_part_ass.h"
 
  if (npes> 1) then
+
+#ifdef ENABLE_ROCTX
+    CALL roctxStartRange("exchange_elem2d_i begin")
+#endif
+
     call exchange_elem2D_i_begin(elem_array2D, partit, luse_g2g)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+
+    CALL roctxStartRange("exchange_elem2d_i wait")
+#endif
+
     call exchange_elem_end(partit)
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+#endif
+
 end if
 
 END SUBROUTINE exchange_elem2D_i

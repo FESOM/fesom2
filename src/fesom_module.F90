@@ -361,6 +361,11 @@ contains
 
   subroutine fesom_runloop(current_nsteps)
     use fesom_main_storage_module
+#ifdef ENABLE_ROCTX
+    USE iso_c_binding, only : c_char
+    USE mo_roctx
+    character(kind=c_char,len=10) :: rtxmsg = "ice step"
+#endif
 !   use openacc_lib
     integer, intent(in) :: current_nsteps 
     ! EO parameters
@@ -427,7 +432,14 @@ contains
                 f%ice%ice_steps_since_upd=f%ice%ice_steps_since_upd+1
             endif
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_timestep(n)'//achar(27)//'[0m'
+#ifdef ENABLE_ROCTX
+            CALL roctxStartRange("fesom_module/ice step")
+#endif
             if (f%ice%ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh)  
+#ifdef ENABLE_ROCTX
+            CALL roctxRangePop()
+#endif
+
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
             call oce_fluxes_mom(f%ice, f%dynamics, f%partit, f%mesh) ! momentum only
@@ -436,10 +448,15 @@ contains
         call before_oce_step(f%dynamics, f%tracers, f%partit, f%mesh) ! prepare the things if required
         f%t2 = MPI_Wtime()
         
+#ifdef ENABLE_ROCTX
+        CALL roctxStartRange("Oce step")
+#endif        
         !___model ocean step____________________________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_timestep_ale'//achar(27)//'[0m'
         call oce_timestep_ale(n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
-
+#ifdef ENABLE_ROCTX
+        CALL roctxRangePop()
+#endif
         f%t3 = MPI_Wtime()
         !___compute energy diagnostics..._______________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call compute_diagnostics(1)'//achar(27)//'[0m'

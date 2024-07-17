@@ -108,6 +108,11 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #if defined (__icepack)
     use icedrv_main,   only: step_icepack
 #endif
+
+#ifdef ENABLE_ROCTX
+    USE mo_roctx
+#endif 
+
     implicit none
     integer       , intent(in)            :: step
     type(t_ice)   , intent(inout), target :: ice
@@ -141,6 +146,9 @@ subroutine ice_timestep(step, ice, partit, mesh)
     call step_icepack(ice, mesh, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts
 #else
 
+#ifdef ENABLE_ROCTX
+    CALL roctxStartRange("ice_timestep/acc update device")
+#endif
     !$ACC UPDATE DEVICE (ice%work%fct_massmatrix) &
     !$ACC DEVICE (ice%delta_min, ice%Tevp_inv, ice%cd_oce_ice) &
     !$ACC DEVICE (ice%work%fct_tmax, ice%work%fct_tmin) &
@@ -160,8 +168,15 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     !$ACC UPDATE DEVICE (ice%data(4)%values, ice%data(4)%valuesl, ice%data(4)%dvalues, ice%data(4)%values_rhs, ice%data(4)%values_div_rhs)
 #endif
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+#endif    
     !___________________________________________________________________________
     ! ===== Dynamics
+
+#ifdef ENABLE_ROCTX
+    CALL roctxStartRange("ice_timestep/EVPdynamics")
+#endif
 
     SELECT CASE (ice%whichEVP)
     CASE (0)
@@ -181,6 +196,10 @@ subroutine ice_timestep(step, ice, partit, mesh)
         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
         stop
     END SELECT
+
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+#endif    
 
     if (use_cavity) call cavity_ice_clean_vel(ice, partit, mesh)
     t1=MPI_Wtime()
@@ -207,6 +226,11 @@ subroutine ice_timestep(step, ice, partit, mesh)
 !$ACC END parallel loop
 #endif
 #endif /* (__oifs) */
+
+
+#ifdef ENABLE_ROCTX
+    CALL roctxStartRange("ice_timestep/advectionpart")
+#endif
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
     call ice_TG_rhs_div    (ice, partit, mesh)
 
@@ -215,7 +239,13 @@ subroutine ice_timestep(step, ice, partit, mesh)
 
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_update_for_div...'//achar(27)//'[0m'
     call ice_update_for_div(ice, partit, mesh)
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+#endif  
 
+#ifdef ENABLE_ROCTX
+    CALL roctxStartRange("ice_timestep/acc update host")
+#endif
     !$ACC UPDATE HOST (ice%work%fct_massmatrix) &
     !$ACC HOST (ice%delta_min, ice%Tevp_inv, ice%cd_oce_ice) &
     !$ACC HOST (ice%work%fct_tmax, ice%work%fct_tmin) &
@@ -235,6 +265,9 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     !$ACC UPDATE HOST (ice%data(4)%values, ice%data(4)%valuesl, ice%data(4)%dvalues, ice%data(4)%values_rhs, ice%data(4)%values_div_rhs)
 #endif
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+#endif
 
 #if defined (__oifs) || defined (__ifsinterface)
 !$OMP PARALLEL DO
@@ -252,8 +285,15 @@ subroutine ice_timestep(step, ice, partit, mesh)
 
     !___________________________________________________________________________
     ! ===== Thermodynamic part
+#ifdef ENABLE_ROCTX
+    CALL roctxStartRange("ice_timestep/thermopart")
+#endif
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
     call thermodynamics(ice, partit, mesh)
+#ifdef ENABLE_ROCTX
+    CALL roctxRangePop()
+#endif 
+
 #endif /* (__icepack) */
 
     !___________________________________________________________________________

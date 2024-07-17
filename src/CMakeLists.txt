@@ -51,6 +51,10 @@ else()
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 endif()
 
+# Will put this to work only with Cray compiler and OpenACC=ON for now.
+option(ENABLE_ROCTX "Compile with roctx marker calls" OFF)
+message(STATUS "ENABLE_ROCTX: ${ENABLE_ROCTX}")
+
 option(ENABLE_OPENACC "compile with OpenACC support" OFF)
 message(STATUS "ENABLE_OPENACC: ${ENABLE_OPENACC}")
 
@@ -247,15 +251,21 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
 	#target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O3)
    target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O2 -hnoacc -M878)  #-hnoacc is a workaround for cray automatically activate -hacc, -M878 is to suppress ftn-878 warning
    if(ENABLE_OPENMP)
-      target_compile_options(${PROJECT_NAME} PRIVATE -homp)
+      target_compile_options(${PROJECT_NAME} PRIVATE -homp )
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE -hnoomp)
    endif()
    if(${ENABLE_OPENACC}) # remove debug later
-	   target_compile_options(${PROJECT_NAME} PRIVATE -hacc –hlist=a -g -DENABLE_OPENACC )
+	   target_compile_options(${PROJECT_NAME} PRIVATE -hacc –hlist=a -g )
+  	   target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_OPENACC)
       if(${DISABLE_OPENACC_ATOMICS})
           target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_OPENACC_ATOMICS)
       endif()
+
+      if(${ENABLE_ROCTX})
+	  target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_ROCTX )
+      endif()
+
    endif()
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
    target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_NVHPC_WORKAROUNDS)
@@ -275,7 +285,14 @@ endif()
 
 # fesom.x executable
 add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
+if(${ENABLE_ROCTX})
+    target_link_libraries(${PROJECT_NAME}.x PUBLIC roctx64 roctracer64)
+endif()
+if(${ENABLE_OPENMP})
+target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME} -homp)
+else()
 target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
+endif()
 
 
 ### Export and installation
