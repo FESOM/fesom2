@@ -39,6 +39,7 @@ integer,        intent(in)         :: sn, rn, r_mpitype(:), s_mpitype(:), rPE(:)
 integer                            :: n, sdebug, rdebug, status(MPI_STATUS_SIZE), request
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
+
 DO n=1,rn
    CALL MPI_TYPE_SIZE(r_mpitype(n), rdebug, MPIerr)
    CALL MPI_ISEND(rdebug, 1, MPI_INTEGER, rPE(n), 10, MPI_COMM_FESOM, request, MPIerr)
@@ -67,9 +68,7 @@ IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 integer,        intent(inout)         :: nod_array2D(:)
 logical,        intent(in),optional   :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
-if (npes > 1) then
+if (partit%npes > 1) then
 
 #ifdef ENABLE_ROCTX
     CALL roctxStartRange("exchange_nod2d_i begin")
@@ -125,7 +124,6 @@ end if
 #endif
      if (lg2g) then
 
-
      !$ACC HOST_DATA USE_DEVICE(nod_array2D)
          DO n=1,rn
 
@@ -169,16 +167,14 @@ IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(real64),   intent(inout)         :: nod_array2D(:)
 logical,        intent(in),optional   :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
- if (npes > 1) then
+ if (partit%npes > 1) then
 
 #ifdef ENABLE_ROCTX
     CALL roctxStartRange("exchange_nod2d begin")
 #endif
 
-    call exchange_nod2D_begin(nod_array2D, partit, luse_g2g)
+    call exchange_nod2D_begin(nod_array2D(1), partit, luse_g2g)
 
 #ifdef ENABLE_ROCTX
     CALL roctxRangePop()
@@ -193,7 +189,6 @@ logical,        intent(in),optional   :: luse_g2g
 #endif
 
  end if
-
 END SUBROUTINE exchange_nod2D
 
 ! ========================================================================
@@ -204,7 +199,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod_array2D(:)
+real(real64),   intent(inout)         :: nod_array2D!(:)
 integer                               :: n, sn, rn
 logical,        intent(in),optional   :: luse_g2g
 logical                               :: lg2g
@@ -229,6 +224,7 @@ end if
 #endif
 
      if(lg2g) then
+
          !$ACC HOST_DATA USE_DEVICE(nod_array2D)
 
          DO n=1,rn
@@ -255,7 +251,6 @@ end if
      com_nod2D%nreq = rn+sn
 
   end if
-
 END SUBROUTINE exchange_nod2D_begin
 !===============================================
 ! General version of the communication routine for 2D nodal fields
@@ -268,16 +263,14 @@ type(t_partit), intent(inout), target :: partit
 real(real64),   intent(inout)         :: nod1_array2D(:)
 real(real64),   intent(inout)         :: nod2_array2D(:)
 logical,        intent(in),optional   :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
- if (npes > 1) then
+ if (partit%npes > 1) then
 
 #ifdef ENABLE_ROCTX
     CALL roctxStartRange("exchange_nod2d_2fields begin")
 #endif
 
-    call exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D, partit, luse_g2g)
+    call exchange_nod2D_2fields_begin(nod1_array2D(1), nod2_array2D(1), partit, luse_g2g)
 
 #ifdef ENABLE_ROCTX
     CALL roctxRangePop()
@@ -292,7 +285,6 @@ logical,        intent(in),optional   :: luse_g2g
 #endif
 
  end if
-
 END SUBROUTINE exchange_nod2D_2fields
 
 ! ========================================================================
@@ -303,8 +295,8 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod1_array2D(:)
-real(real64),   intent(inout)         :: nod2_array2D(:)
+real(real64),   intent(inout)         :: nod1_array2D!(:)
+real(real64),   intent(inout)         :: nod2_array2D!(:)
 integer                               :: n, sn, rn
 logical,        intent(in),optional   :: luse_g2g
 logical                               :: lg2g
@@ -328,6 +320,7 @@ if (npes > 1) then
           com_nod2D%rPE, com_nod2D%sPE)
 #endif
   if (lg2g) then 
+
     !$ACC HOST_DATA USE_DEVICE(nod1_array2D, nod2_array2D) 
   
     DO n=1,rn
@@ -346,6 +339,7 @@ if (npes > 1) then
     END DO
   
     !$ACC END HOST_DATA
+
   else  
     DO n=1,rn
        call MPI_IRECV(nod1_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
@@ -366,8 +360,8 @@ if (npes > 1) then
 
 
 end if
-
 END SUBROUTINE exchange_nod2D_2fields_begin
+
 
 !===============================================
 subroutine exchange_nod2D_3fields(nod1_array2D, nod2_array2D, nod3_array2D, partit, luse_g2g)
@@ -381,17 +375,14 @@ real(real64),   intent(inout)         :: nod1_array2D(:)
 real(real64),   intent(inout)         :: nod2_array2D(:)
 real(real64),   intent(inout)         :: nod3_array2D(:)
 logical,        intent(in),optional   :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-
- if (npes > 1) then
+ if (partit%npes > 1) then
 
 #ifdef ENABLE_ROCTX
     CALL roctxStartRange("exchange_nod2d_3fields begin")
 #endif
 
-    call exchange_nod2D_3fields_begin(nod1_array2D, nod2_array2D, nod3_array2D, partit, luse_g2g)
+    call exchange_nod2D_3fields_begin(nod1_array2D(1), nod2_array2D(1), nod3_array2D(1), partit, luse_g2g)
 
 #ifdef ENABLE_ROCTX
     CALL roctxRangePop()
@@ -406,7 +397,6 @@ logical,        intent(in),optional   :: luse_g2g
 #endif
 
  end if
-
 END SUBROUTINE exchange_nod2D_3fields
 
 ! ========================================================================
@@ -417,9 +407,9 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod1_array2D(:)
-real(real64),   intent(inout)         :: nod2_array2D(:)
-real(real64),   intent(inout)         :: nod3_array2D(:)
+real(real64),   intent(inout)         :: nod1_array2D!(:)
+real(real64),   intent(inout)         :: nod2_array2D!(:)
+real(real64),   intent(inout)         :: nod3_array2D!(:)
 integer                               :: n, sn, rn
 logical,        intent(in),optional   :: luse_g2g
 logical                               :: lg2g
@@ -469,6 +459,7 @@ end if
     END DO
   
    !$ACC END HOST_DATA
+
   else
     DO n=1,rn
        call MPI_IRECV(nod1_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
@@ -495,7 +486,6 @@ end if
   com_nod2D%nreq = 3*(rn+sn)
 
 end if
-
 END SUBROUTINE exchange_nod2D_3fields_begin
 
 ! ========================================================================
@@ -617,10 +607,8 @@ type(t_partit), intent(inout), target :: partit
 real(real64),   intent(inout)         :: nod1_array3D(:,:)
 real(real64),   intent(inout)         :: nod2_array3D(:,:)
 logical,        intent(in),optional   :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes > 1) then
+if (partit%npes > 1) then
 
 #ifdef ENABLE_ROCTX
     CALL roctxStartRange("exchange_nod3d_2fields begin")
@@ -689,6 +677,7 @@ end if
        endif
        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     endif
+
 
 #ifdef DEBUG
     call check_mpi_comm(rn, sn, r_mpitype_nod3D(:,nl1,1), s_mpitype_nod3D(:,nl1,1), &
@@ -850,8 +839,6 @@ if (npes>1) then
   com_nod2D%nreq = rn+sn
 
  endif
-
-
 END SUBROUTINE exchange_nod3D_n_begin
 
 !=======================================
@@ -898,8 +885,6 @@ IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(real64),   intent(inout)          :: elem_array3D(:,:)
 logical,        intent(in),optional    :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
 #ifdef ENABLE_ROCTX
     CALL roctxStartRange("exchange_elem3d begin")
@@ -918,7 +903,6 @@ call exchange_elem_end(partit)
 #ifdef ENABLE_ROCTX
     CALL roctxRangePop()
 #endif
-
 END SUBROUTINE exchange_elem3D
 !===========================================
 ! General version of the communication routine for 3D elemental fields
@@ -1037,7 +1021,8 @@ if (npes> 1) then
 
       if (nl1==ubound(r_mpitype_elem3D_full, 2) .or. nl1==ubound(r_mpitype_elem3D_full, 2)-1) then
          ! Check MPI point-to-point communication for consistency
-#ifdef DEBUG
+
+#ifdef DEBUG 
          call check_mpi_comm(rn, sn, r_mpitype_elem3D_full(:,nl1,1), &
               s_mpitype_elem3D_full(:,nl1,1), com_elem2D_full%rPE, com_elem2D_full%sPE)
 #endif
@@ -1118,7 +1103,6 @@ if (npes> 1) then
    endif
 
 endif
-
 END SUBROUTINE exchange_elem3D_begin
 
 !=============================================================================
@@ -1132,10 +1116,8 @@ IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(real64),   intent(inout)       :: elem_array3D(:,:,:)
 logical,        intent(in),optional    :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
- if (npes> 1) then
+ if (partit%npes> 1) then
 
 #ifdef ENABLE_ROCTX
     CALL roctxStartRange("exchange_elem3d_n begin")
@@ -1273,7 +1255,6 @@ end if
 
   end if
 
-
 endif
 END SUBROUTINE exchange_elem3D_n_begin
 !========================================================================
@@ -1287,10 +1268,8 @@ IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(real64),   intent(inout)       :: elem_array2D(:)
 logical,        intent(in),optional    :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
- if (npes> 1) then
+ if (partit%npes> 1) then
 
 #ifdef ENABLE_ROCTX
     CALL roctxStartRange("exchange_elem2d begin")
@@ -1311,7 +1290,6 @@ logical,        intent(in),optional    :: luse_g2g
 #endif
 
  end if
-
 END SUBROUTINE exchange_elem2D
 !========================================================================
 ! General version of the communication routine for 3D elemental fields
@@ -1412,7 +1390,6 @@ if (npes> 1) then
   end if
 
 end if
-
 END SUBROUTINE exchange_elem2D_begin
 ! ========================================================================
 !Exchange with ALL(!) the neighbours
@@ -1425,10 +1402,8 @@ type(t_partit), intent(inout), target  :: partit
 integer,        intent(inout)       :: elem_array2D(:)
 integer                             :: n, sn, rn
 logical,        intent(in),optional    :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
- if (npes> 1) then
+ if (partit%npes> 1) then
 
 #ifdef ENABLE_ROCTX
     CALL roctxStartRange("exchange_elem2d_i begin")
@@ -1449,7 +1424,6 @@ logical,        intent(in),optional    :: luse_g2g
 #endif
 
 end if
-
 END SUBROUTINE exchange_elem2D_i
 !=============================================================================
 !Exchange with ALL(!) the neighbours
@@ -1513,7 +1487,6 @@ end if
     com_elem2D_full%nreq = rn+sn
 
 end if
-
 END SUBROUTINE exchange_elem2D_i_begin
 ! ========================================================================
 ! Broadcast routines
@@ -2351,7 +2324,6 @@ ELSE
 
 ENDIF
 end if
-
 end subroutine gather_elem2D
 
 !================================================
@@ -2410,7 +2382,6 @@ ELSE
 
 ENDIF
 end if
-
 end subroutine gather_real4_elem2D
 
 !================================================
@@ -2468,7 +2439,6 @@ ELSE
 
 ENDIF
 end if
-
 end subroutine gather_int2_elem2D
 
 
@@ -2534,7 +2504,6 @@ ELSE
 ENDIF
 
 end if
-
 end subroutine gather_real8to4_nod3D
 !==============================================
 ! Make nodal information available to master PE
@@ -2726,7 +2695,6 @@ integer                       :: start, e2D
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
-
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
   ! Consider MPI-datatypes to recv directly into arr2D_global!
   IF ( mype == 0 ) THEN
@@ -2884,6 +2852,7 @@ ELSE
                    MPI_COMM_FESOM, MPIerr )
 ENDIF
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+
 end subroutine gather_edg2D_i
 !==============================================
 

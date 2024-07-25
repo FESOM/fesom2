@@ -113,6 +113,9 @@ subroutine ice_timestep(step, ice, partit, mesh)
     USE mo_roctx
 #endif 
 
+#ifdef ENABLE_OPENACC
+    use openacc_lib ! Juha: add for cray_acc_set_debug_global_level
+#endif
     implicit none
     integer       , intent(in)            :: step
     type(t_ice)   , intent(inout), target :: ice
@@ -126,26 +129,42 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #endif
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
+    ! Juha: switch for associate blocks
+    !real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
+!#if defined (__oifs) || defined (__ifsinterface)
+    !real(kind=WP), dimension(:), pointer  :: ice_temp, a_ice
+!#endif
+!#include "associate_part_def.h"
+!#include "associate_mesh_def.h"
+!#include "associate_part_ass.h"
+!#include "associate_mesh_ass.h"
+#include "associate_part_ass_test.h"
+#include "associate_mesh_ass_test.h"
+
+    !u_ice    => ice%uice(:)
+    !v_ice    => ice%vice(:)
+!#if defined (__oifs) || defined (__ifsinterface)
+    !a_ice    => ice%data(1)%values(:)
+    !ice_temp => ice%data(4)%values(:)
+!#endif
+
+    associate( &
 #if defined (__oifs) || defined (__ifsinterface)
-    real(kind=WP), dimension(:), pointer  :: ice_temp, a_ice
+    a_ice    => ice%data(1)%values(:), &
+    ice_temp => ice%data(4)%values(:), &
 #endif
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
-    u_ice    => ice%uice(:)
-    v_ice    => ice%vice(:)
-#if defined (__oifs) || defined (__ifsinterface)
-    a_ice    => ice%data(1)%values(:)
-    ice_temp => ice%data(4)%values(:)
-#endif
+    u_ice    => ice%uice(:), &
+    v_ice    => ice%vice(:) &
+    )
+
     !___________________________________________________________________________
     t0=MPI_Wtime()
 #if defined (__icepack)
     call step_icepack(ice, mesh, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts
 #else
 
+    ! Juha added
+    !call cray_acc_set_debug_global_level(3)
 #ifdef ENABLE_ROCTX
     CALL roctxStartRange("ice_timestep/acc update device")
 #endif
@@ -171,6 +190,10 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #ifdef ENABLE_ROCTX
     CALL roctxRangePop()
 #endif    
+
+    ! Juha added
+    !call cray_acc_set_debug_global_level(0)
+
     !___________________________________________________________________________
     ! ===== Dynamics
 
@@ -326,6 +349,12 @@ subroutine ice_timestep(step, ice, partit, mesh)
         write(*,"(A, ES10.3)") '	Ice TOTAL       :', t3-t0
         write(*,*)
      endif
+
+    ! Juha: for associate blocks
+    end associate
+    end associate
+    end associate
+
 end subroutine ice_timestep
 !
 !

@@ -266,32 +266,58 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     real(kind=WP) :: gamma
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
-    real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, rhs_ms
-    real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
-    real(kind=WP), dimension(:), pointer  :: mass_matrix
+
+    ! Juha: switch for associate blocks to prevent copying dope vectors
+
+    !real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
+    !real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, rhs_ms
+    !real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
+    !real(kind=WP), dimension(:), pointer  :: mass_matrix
+!#if defined (__oifs) || defined (__ifsinterface)
+!    real(kind=WP), dimension(:), pointer  :: ice_temp, rhs_temp, m_templ
+!#endif
+!#include "associate_part_def.h"
+!#include "associate_mesh_def.h"
+!#include "associate_part_ass.h"
+!#include "associate_mesh_ass.h"
+#include "associate_part_ass_test.h"
+#include "associate_mesh_ass_test.h"
+
+    !a_ice        => ice%data(1)%values(:)
+    !m_ice        => ice%data(2)%values(:)
+    !m_snow       => ice%data(3)%values(:)
+    !rhs_a        => ice%data(1)%values_rhs(:)
+    !rhs_m        => ice%data(2)%values_rhs(:)
+    !rhs_ms       => ice%data(3)%values_rhs(:)
+    !a_icel       => ice%data(1)%valuesl(:)
+    !m_icel       => ice%data(2)%valuesl(:)
+    !m_snowl      => ice%data(3)%valuesl(:)
+    !mass_matrix  => ice%work%fct_massmatrix(:)
+!#if defined (__oifs) || defined (__ifsinterface)
+    !ice_temp     => ice%data(4)%values(:)
+    !rhs_temp     => ice%data(4)%values_rhs(:)
+    !m_templ      => ice%data(4)%valuesl(:)
+!#endif
+
+    associate( &
 #if defined (__oifs) || defined (__ifsinterface)
-    real(kind=WP), dimension(:), pointer  :: ice_temp, rhs_temp, m_templ
+    ice_temp     => ice%data(4)%values(:), &
+    rhs_temp     => ice%data(4)%values_rhs(:), &
+    m_templ      => ice%data(4)%valuesl(:), &
 #endif
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
-    a_ice        => ice%data(1)%values(:)
-    m_ice        => ice%data(2)%values(:)
-    m_snow       => ice%data(3)%values(:)
-    rhs_a        => ice%data(1)%values_rhs(:)
-    rhs_m        => ice%data(2)%values_rhs(:)
-    rhs_ms       => ice%data(3)%values_rhs(:)
-    a_icel       => ice%data(1)%valuesl(:)
-    m_icel       => ice%data(2)%valuesl(:)
-    m_snowl      => ice%data(3)%valuesl(:)
-    mass_matrix  => ice%work%fct_massmatrix(:)
-#if defined (__oifs) || defined (__ifsinterface)
-    ice_temp     => ice%data(4)%values(:)
-    rhs_temp     => ice%data(4)%values_rhs(:)
-    m_templ      => ice%data(4)%valuesl(:)
-#endif
+    a_ice        => ice%data(1)%values(:), &
+    m_ice        => ice%data(2)%values(:), &
+    m_snow       => ice%data(3)%values(:), &
+    rhs_a        => ice%data(1)%values_rhs(:), &
+    rhs_m        => ice%data(2)%values_rhs(:), &
+    rhs_ms       => ice%data(3)%values_rhs(:), &
+    a_icel       => ice%data(1)%valuesl(:), &
+    m_icel       => ice%data(2)%valuesl(:), &
+    m_snowl      => ice%data(3)%valuesl(:), &
+    mass_matrix  => ice%work%fct_massmatrix(:) &
+    )
+
+
     !___________________________________________________________________________
     gamma=ice%ice_gamma_fct         ! Added diffusivity parameter
                                 ! Adjust it to ensure posivity of solution
@@ -340,6 +366,12 @@ subroutine ice_solve_low_order(ice, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP BARRIER
 #endif
+
+    ! Juha: switch to associates
+    end associate
+    end associate
+    end associate
+
 end subroutine ice_solve_low_order
 !
 !
@@ -362,32 +394,56 @@ subroutine ice_solve_high_order(ice, partit, mesh)
     integer                               :: num_iter_solve=3
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, rhs_ms
-    real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
-    real(kind=WP), dimension(:), pointer  :: da_ice, dm_ice, dm_snow
-    real(kind=WP), dimension(:), pointer  :: mass_matrix
+
+    ! Juha:: switch to associate blocks to avoid copying dope vectors
+    !real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, rhs_ms
+    !real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
+    !real(kind=WP), dimension(:), pointer  :: da_ice, dm_ice, dm_snow
+    !real(kind=WP), dimension(:), pointer  :: mass_matrix
+!#if defined (__oifs) || defined (__ifsinterface)
+    !real(kind=WP), dimension(:), pointer  :: rhs_temp, m_templ, dm_temp
+!#endif
+!#include "associate_part_def.h"
+!#include "associate_mesh_def.h"
+!#include "associate_part_ass.h"
+!#include "associate_mesh_ass.h"
+#include "associate_part_ass_test.h"
+#include "associate_mesh_ass_test.h"
+
+    !rhs_a        => ice%data(1)%values_rhs(:)
+    !rhs_m        => ice%data(2)%values_rhs(:)
+    !rhs_ms       => ice%data(3)%values_rhs(:)
+    !a_icel       => ice%data(1)%valuesl(:)
+    !m_icel       => ice%data(2)%valuesl(:)
+    !m_snowl      => ice%data(3)%valuesl(:)
+    !da_ice       => ice%data(1)%dvalues(:)
+    !dm_ice       => ice%data(2)%dvalues(:)
+    !dm_snow      => ice%data(3)%dvalues(:)
+    !mass_matrix  => ice%work%fct_massmatrix(:)
+!#if defined (__oifs) || defined (__ifsinterface)
+    !rhs_temp     => ice%data(4)%values_rhs(:)
+    !m_templ      => ice%data(4)%valuesl(:)
+    !dm_temp      => ice%data(4)%dvalues(:)
+!#endif
+
+    associate( &
 #if defined (__oifs) || defined (__ifsinterface)
-    real(kind=WP), dimension(:), pointer  :: rhs_temp, m_templ, dm_temp
+    rhs_temp     => ice%data(4)%values_rhs(:), &
+    m_templ      => ice%data(4)%valuesl(:), &
+    dm_temp      => ice%data(4)%dvalues(:), &
 #endif
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
-    rhs_a        => ice%data(1)%values_rhs(:)
-    rhs_m        => ice%data(2)%values_rhs(:)
-    rhs_ms       => ice%data(3)%values_rhs(:)
-    a_icel       => ice%data(1)%valuesl(:)
-    m_icel       => ice%data(2)%valuesl(:)
-    m_snowl      => ice%data(3)%valuesl(:)
-    da_ice       => ice%data(1)%dvalues(:)
-    dm_ice       => ice%data(2)%dvalues(:)
-    dm_snow      => ice%data(3)%dvalues(:)
-    mass_matrix  => ice%work%fct_massmatrix(:)
-#if defined (__oifs) || defined (__ifsinterface)
-    rhs_temp     => ice%data(4)%values_rhs(:)
-    m_templ      => ice%data(4)%valuesl(:)
-    dm_temp      => ice%data(4)%dvalues(:)
-#endif
+    rhs_a        => ice%data(1)%values_rhs(:), &
+    rhs_m        => ice%data(2)%values_rhs(:), &
+    rhs_ms       => ice%data(3)%values_rhs(:), &
+    a_icel       => ice%data(1)%valuesl(:), &
+    m_icel       => ice%data(2)%valuesl(:), &
+    m_snowl      => ice%data(3)%valuesl(:), &
+    da_ice       => ice%data(1)%dvalues(:), &
+    dm_ice       => ice%data(2)%dvalues(:), &
+    dm_snow      => ice%data(3)%dvalues(:), &
+    mass_matrix  => ice%work%fct_massmatrix(:)  &
+    )
+
     !___________________________________________________________________________
     ! Does Taylor-Galerkin solution
     !
@@ -486,6 +542,11 @@ subroutine ice_solve_high_order(ice, partit, mesh)
 !$OMP BARRIER
 #endif
     end do
+
+    end associate
+    end associate
+    end associate
+
 end subroutine ice_solve_high_order
 !
 !
@@ -512,37 +573,66 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     real(kind=WP) :: vol, flux, ae, gamma
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP), dimension(:)  , pointer  :: a_ice, m_ice, m_snow
-    real(kind=WP), dimension(:)  , pointer  :: a_icel, m_icel, m_snowl
-    real(kind=WP), dimension(:)  , pointer  :: da_ice, dm_ice, dm_snow
-    real(kind=WP), dimension(:)  , pointer  :: icepplus, icepminus, tmax, tmin
-    real(kind=WP), dimension(:,:), pointer  :: icefluxes
+
+    !! Juha: switch to associates to avoid copying dope vector
+    !real(kind=WP), dimension(:)  , pointer  :: a_ice, m_ice, m_snow
+    !real(kind=WP), dimension(:)  , pointer  :: a_icel, m_icel, m_snowl
+    !real(kind=WP), dimension(:)  , pointer  :: da_ice, dm_ice, dm_snow
+    !real(kind=WP), dimension(:)  , pointer  :: icepplus, icepminus, tmax, tmin
+    !real(kind=WP), dimension(:,:), pointer  :: icefluxes
+!#if defined (__oifs) || defined (__ifsinterface)
+!    real(kind=WP), dimension(:)  , pointer  :: ice_temp, m_templ, dm_temp
+!#endif
+!#include "associate_part_def.h"
+!#include "associate_mesh_def.h"
+!#include "associate_part_ass.h"
+!#include "associate_mesh_ass.h"
+#include "associate_part_ass_test.h"
+#include "associate_mesh_ass_test.h"
+
+    !a_ice     => ice%data(1)%values(:)
+    !m_ice     => ice%data(2)%values(:)
+    !m_snow    => ice%data(3)%values(:)
+    !a_icel    => ice%data(1)%valuesl(:)
+    !m_icel    => ice%data(2)%valuesl(:)
+    !m_snowl   => ice%data(3)%valuesl(:)
+    !da_ice    => ice%data(1)%dvalues(:)
+    !dm_ice    => ice%data(2)%dvalues(:)
+    !dm_snow   => ice%data(3)%dvalues(:)
+    !icefluxes => ice%work%fct_fluxes(:,:)
+    !icepplus  => ice%work%fct_plus(:)
+    !icepminus => ice%work%fct_minus(:)
+    !tmax      => ice%work%fct_tmax(:)
+    !tmin      => ice%work%fct_tmin(:)
+!#if defined (__oifs) || defined (__ifsinterface)
+    !ice_temp  => ice%data(4)%values(:)
+    !m_templ   => ice%data(4)%valuesl(:)
+    !dm_temp   => ice%data(4)%dvalues(:)
+!#endif
+
+    associate( &
 #if defined (__oifs) || defined (__ifsinterface)
-    real(kind=WP), dimension(:)  , pointer  :: ice_temp, m_templ, dm_temp
+    ice_temp  => ice%data(4)%values(:), &
+    m_templ   => ice%data(4)%valuesl(:), &
+    dm_temp   => ice%data(4)%dvalues(:), &
 #endif
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
-    a_ice     => ice%data(1)%values(:)
-    m_ice     => ice%data(2)%values(:)
-    m_snow    => ice%data(3)%values(:)
-    a_icel    => ice%data(1)%valuesl(:)
-    m_icel    => ice%data(2)%valuesl(:)
-    m_snowl   => ice%data(3)%valuesl(:)
-    da_ice    => ice%data(1)%dvalues(:)
-    dm_ice    => ice%data(2)%dvalues(:)
-    dm_snow   => ice%data(3)%dvalues(:)
-    icefluxes => ice%work%fct_fluxes(:,:)
-    icepplus  => ice%work%fct_plus(:)
-    icepminus => ice%work%fct_minus(:)
-    tmax      => ice%work%fct_tmax(:)
-    tmin      => ice%work%fct_tmin(:)
-#if defined (__oifs) || defined (__ifsinterface)
-    ice_temp  => ice%data(4)%values(:)
-    m_templ   => ice%data(4)%valuesl(:)
-    dm_temp   => ice%data(4)%dvalues(:)
-#endif
+    a_ice     => ice%data(1)%values(:), &
+    m_ice     => ice%data(2)%values(:), &
+    m_snow    => ice%data(3)%values(:), &
+    a_icel    => ice%data(1)%valuesl(:), &
+    m_icel    => ice%data(2)%valuesl(:), &
+    m_snowl   => ice%data(3)%valuesl(:), &
+    da_ice    => ice%data(1)%dvalues(:), &
+    dm_ice    => ice%data(2)%dvalues(:), &
+    dm_snow   => ice%data(3)%dvalues(:), &
+    icefluxes => ice%work%fct_fluxes(:,:), &
+    icepplus  => ice%work%fct_plus(:), &
+    icepminus => ice%work%fct_minus(:), &
+    tmax      => ice%work%fct_tmax(:), &
+    tmin      => ice%work%fct_tmin(:) &
+    )
+
+
     !___________________________________________________________________________
     ! It should coinside with gamma in ts_solve_low_order
     gamma=ice%ice_gamma_fct
@@ -1125,6 +1215,12 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 !$ACC END DATA
 
 !$OMP BARRIER
+
+    !Juha: for associate blocks
+    end associate
+    end associate
+    end associate
+
 end subroutine ice_fem_fct
 !
 !
@@ -1255,33 +1351,60 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
     real(kind=WP)            :: c1, c2, c3, c4, cx1, cx2, cx3, cx4, entries2(3)
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
-    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
+    !real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
+    !real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, rhs_ms
-    real(kind=WP), dimension(:), pointer  :: rhs_adiv, rhs_mdiv, rhs_msdiv
+    !real(kind=WP), dimension(:), pointer  :: rhs_adiv, rhs_mdiv, rhs_msdiv
 #if defined (__oifs) || defined (__ifsinterface)
-    real(kind=WP), dimension(:), pointer  :: ice_temp, rhs_temp, rhs_tempdiv
+    !real(kind=WP), dimension(:), pointer  :: ice_temp, rhs_temp, rhs_tempdiv
 #endif
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
-    u_ice       => ice%uice(:)
-    v_ice       => ice%vice(:)
-    a_ice       => ice%data(1)%values(:)
-    m_ice       => ice%data(2)%values(:)
-    m_snow      => ice%data(3)%values(:)
-    rhs_a       => ice%data(1)%values_rhs(:)
+!#include "associate_part_def.h"
+!#include "associate_mesh_def.h"
+!#include "associate_part_ass.h"
+!#include "associate_mesh_ass.h"
+!! Juha: to avoid copying dope vectors
+#include "associate_part_ass_test.h"
+#include "associate_mesh_ass_test.h"
+
+    !! Juha: switch to associates to avoid copying dope vectors
+    !u_ice       => ice%uice(:)
+    !v_ice       => ice%vice(:)
+    !a_ice       => ice%data(1)%values(:)
+    !m_ice       => ice%data(2)%values(:)
+    !m_snow      => ice%data(3)%values(:)
+    rhs_a       => ice%data(1)%values_rhs(:)  !! Juha: leavign these here because acc atomic updates don't allow allocatable vars
     rhs_m       => ice%data(2)%values_rhs(:)
     rhs_ms      => ice%data(3)%values_rhs(:)
-    rhs_adiv    => ice%data(1)%values_div_rhs(:)
-    rhs_mdiv    => ice%data(2)%values_div_rhs(:)
-    rhs_msdiv   => ice%data(3)%values_div_rhs(:)
+    !rhs_adiv    => ice%data(1)%values_div_rhs(:)
+    !rhs_mdiv    => ice%data(2)%values_div_rhs(:)
+    !rhs_msdiv   => ice%data(3)%values_div_rhs(:)
+!#if defined (__oifs) || defined (__ifsinterface)
+    !ice_temp    => ice%data(4)%values(:)
+    !rhs_temp    => ice%data(4)%values_rhs(:)
+    !rhs_tempdiv => ice%data(4)%values_div_rhs(:)
+!#endif
+    
+    associate(  &
 #if defined (__oifs) || defined (__ifsinterface)
-    ice_temp    => ice%data(4)%values(:)
-    rhs_temp    => ice%data(4)%values_rhs(:)
-    rhs_tempdiv => ice%data(4)%values_div_rhs(:)
+    ice_temp    => ice%data(4)%values(:), &
+    rhs_temp    => ice%data(4)%values_rhs(:), &
+    rhs_tempdiv => ice%data(4)%values_div_rhs(:), & 
 #endif
+    u_ice       => ice%uice(:), &
+    v_ice       => ice%vice(:), &
+    a_ice       => ice%data(1)%values(:), &
+    m_ice       => ice%data(2)%values(:), &
+    m_snow      => ice%data(3)%values(:), &
+    !rhs_a       => ice%data(1)%values_rhs(:), &
+    !rhs_m       => ice%data(2)%values_rhs(:), &
+    !rhs_ms      => ice%data(3)%values_rhs(:), &
+    rhs_adiv    => ice%data(1)%values_div_rhs(:), &
+    rhs_mdiv    => ice%data(2)%values_div_rhs(:), &
+    rhs_msdiv   => ice%data(3)%values_div_rhs(:) & 
+    )
+    
+
+
     !___________________________________________________________________________
     ! Computes the rhs in a Taylor-Galerkin way (with upwind type of
     ! correction for the advection operator)
@@ -1433,6 +1556,12 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
     !$ACC UPDATE DEVICE(rhs_a, rhs_m, rhs_ms, rhs_adiv, rhs_mdiv, rhs_msdiv)
 #endif
 #endif
+
+    !! Juha: for the associates, there are nested ones from the include files
+    end associate
+    end associate
+    end associate
+
 end subroutine ice_TG_rhs_div
 !
 !
@@ -1455,37 +1584,65 @@ subroutine ice_update_for_div(ice, partit, mesh)
     integer                                 :: num_iter_solve=3
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
-    real(kind=WP), dimension(:), pointer  :: rhs_adiv, rhs_mdiv, rhs_msdiv
-    real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
-    real(kind=WP), dimension(:), pointer  :: da_ice, dm_ice, dm_snow
-    real(kind=WP), dimension(:), pointer  :: mass_matrix
+    ! Juha: switch to associate blocks
+    !real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
+    !real(kind=WP), dimension(:), pointer  :: rhs_adiv, rhs_mdiv, rhs_msdiv
+    !real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
+    !real(kind=WP), dimension(:), pointer  :: da_ice, dm_ice, dm_snow
+    !real(kind=WP), dimension(:), pointer  :: mass_matrix
+!#if defined (__oifs) || defined (__ifsinterface)
+!    real(kind=WP), dimension(:), pointer  :: ice_temp, m_templ, dm_temp, rhs_tempdiv
+!#endif
+!#include "associate_part_def.h"
+!#include "associate_mesh_def.h"
+!#include "associate_part_ass.h"
+!#include "associate_mesh_ass.h"
+#include "associate_part_ass_test.h"
+#include "associate_mesh_ass_test.h"
+
+    !a_ice        => ice%data(1)%values(:)
+    !m_ice        => ice%data(2)%values(:)
+    !m_snow       => ice%data(3)%values(:)
+    !rhs_adiv     => ice%data(1)%values_div_rhs(:)
+    !rhs_mdiv     => ice%data(2)%values_div_rhs(:)
+    !rhs_msdiv    => ice%data(3)%values_div_rhs(:)
+    !a_icel       => ice%data(1)%valuesl(:)
+    !m_icel       => ice%data(2)%valuesl(:)
+    !m_snowl      => ice%data(3)%valuesl(:)
+    !da_ice       => ice%data(1)%dvalues(:)
+    !dm_ice       => ice%data(2)%dvalues(:)
+    !dm_snow      => ice%data(3)%dvalues(:)
+    !mass_matrix  => ice%work%fct_massmatrix(:)
+!#if defined (__oifs) || defined (__ifsinterface)
+    !ice_temp     => ice%data(4)%values(:)
+    !m_templ      => ice%data(4)%valuesl(:)
+    !dm_temp      => ice%data(4)%dvalues(:)
+    !rhs_tempdiv  => ice%data(4)%values_div_rhs(:)
+!#endif
+
+    associate( &
 #if defined (__oifs) || defined (__ifsinterface)
-    real(kind=WP), dimension(:), pointer  :: ice_temp, m_templ, dm_temp, rhs_tempdiv
+    ice_temp     => ice%data(4)%values(:), &
+    m_templ      => ice%data(4)%valuesl(:), &
+    dm_temp      => ice%data(4)%dvalues(:), &
+    rhs_tempdiv  => ice%data(4)%values_div_rhs(:), &
 #endif
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
-    a_ice        => ice%data(1)%values(:)
-    m_ice        => ice%data(2)%values(:)
-    m_snow       => ice%data(3)%values(:)
-    rhs_adiv     => ice%data(1)%values_div_rhs(:)
-    rhs_mdiv     => ice%data(2)%values_div_rhs(:)
-    rhs_msdiv    => ice%data(3)%values_div_rhs(:)
-    a_icel       => ice%data(1)%valuesl(:)
-    m_icel       => ice%data(2)%valuesl(:)
-    m_snowl      => ice%data(3)%valuesl(:)
-    da_ice       => ice%data(1)%dvalues(:)
-    dm_ice       => ice%data(2)%dvalues(:)
-    dm_snow      => ice%data(3)%dvalues(:)
-    mass_matrix  => ice%work%fct_massmatrix(:)
-#if defined (__oifs) || defined (__ifsinterface)
-    ice_temp     => ice%data(4)%values(:)
-    m_templ      => ice%data(4)%valuesl(:)
-    dm_temp      => ice%data(4)%dvalues(:)
-    rhs_tempdiv  => ice%data(4)%values_div_rhs(:)
-#endif
+    a_ice        => ice%data(1)%values(:), &
+    m_ice        => ice%data(2)%values(:), &
+    m_snow       => ice%data(3)%values(:), &
+    rhs_adiv     => ice%data(1)%values_div_rhs(:), &
+    rhs_mdiv     => ice%data(2)%values_div_rhs(:), &
+    rhs_msdiv    => ice%data(3)%values_div_rhs(:), &
+    a_icel       => ice%data(1)%valuesl(:), &
+    m_icel       => ice%data(2)%valuesl(:), &
+    m_snowl      => ice%data(3)%valuesl(:), &
+    da_ice       => ice%data(1)%dvalues(:), &
+    dm_ice       => ice%data(2)%dvalues(:), &
+    dm_snow      => ice%data(3)%dvalues(:), &
+    mass_matrix  => ice%work%fct_massmatrix(:) &
+    )
+
+
     !___________________________________________________________________________
     ! Does Taylor-Galerkin solution
     ! the first approximation
@@ -1609,5 +1766,11 @@ subroutine ice_update_for_div(ice, partit, mesh)
 #else
     !$ACC END PARALLEL LOOP
 #endif
+
+    ! Juha: Switch for associates
+    end associate
+    end associate
+    end associate
+
 end subroutine ice_update_for_div
 ! =============================================================
