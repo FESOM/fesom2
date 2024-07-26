@@ -43,6 +43,10 @@ end do
        elseif (tracers%data(tr_num)%AB_order==3) then
            tracers%data(tr_num)%valuesAB(:, n)  =5.0_WP*tracers%data(tr_num)%valuesold(2, :, n)-16.0_WP*tracers%data(tr_num)%valuesold(1, :, n)+23.0_WP*tracers%data(tr_num)%values(:, n)
            tracers%data(tr_num)%valuesAB(:, n)  =tracers%data(tr_num)%valuesAB(:, n)/12.0_WP
+       else
+           write(*,*) 'unknown AB order for tracer ', tr_num, ' = ', tracers%data(tr_num)%AB_order
+           call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+           STOP
        end if
     end do
 !$OMP END PARALLEL DO
