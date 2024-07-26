@@ -484,7 +484,6 @@ contains
     !runo = runo *rhofwt/rhowat
     !subli= subli*rhofwt/rhowat
     !resid= resid*rhofwt/rhowat
-    
     return
   end subroutine ice_growth
 

@@ -145,8 +145,6 @@ subroutine forcing_array_setup(partit, mesh)
   !---wiso-code-end
 #endif 
 
-
-
 ! Temp storage for averaging
 !!PS   allocate(aver_temp(n2))
 

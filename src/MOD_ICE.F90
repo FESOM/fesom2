@@ -1,6 +1,6 @@
 MODULE MOD_ICE
 USE o_PARAM, only: WP
-USE, intrinsic :: ISO_FORTRAN_ENV
+USE, intrinsic :: ISO_FORTRAN_ENV, only : int32
 USE MOD_WRITE_BINARY_ARRAYS
 USE MOD_READ_BINARY_ARRAYS
 IMPLICIT NONE
@@ -762,7 +762,6 @@ subroutine ice_init(ice, partit, mesh)
     !array of 2D boundary conditions is used in ice_maEVP
     
     ! LA 2023-05-24 initiate bc_index_nod2D also for whichEVP==0
-    !if (ice%whichEVP > 0) then
         allocate(mesh%bc_index_nod2D(myDim_nod2D+eDim_nod2D))
         mesh%bc_index_nod2D=1._WP
         do n=1, myDim_edge2D
@@ -770,7 +769,6 @@ subroutine ice_init(ice, partit, mesh)
             if (myList_edge2D(n) <= mesh%edge2D_in) cycle
             mesh%bc_index_nod2D(ed)=0._WP
         end do
-    !end if
     
 end subroutine ice_init  
 !

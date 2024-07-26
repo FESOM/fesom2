@@ -1,4 +1,7 @@
 module iceberg_params
+use MOD_PARTIT
+USE MOD_MESH
+use g_config, only: use_cavity, use_cavityonelem
 implicit none
 save
   !integer,parameter :: ib_num               ! realistic dataset comprising 6912 icebergs
@@ -110,36 +113,56 @@ save
   real,dimension(:,:), allocatable:: buoy_props
   integer:: save_count_buoys
   real:: prev_sec_in_year
+
 !****************************************************************************************************************************
 !****************************************************************************************************************************
-#ifdef use_cavity
  contains
  ! true if all nodes of the element are either "real" model boundary nodes or shelf nodes
- logical function reject_elem(mesh, elem)
- USE MOD_MESH
- implicit none
- integer, intent(in) :: elem
-type(t_mesh), intent(in) , target :: mesh
-#include "associate_mesh_def.h"
-#include "associate_mesh_ass.h"
+ logical function reject_elem(mesh, partit, elem)
 
+integer, intent(in) :: elem
+type(t_mesh), intent(in) , target :: mesh
+type(t_partit), intent(inout), target :: partit
+#include "associate_mesh_def.h"
+#include "associate_part_def.h"
+#include "associate_mesh_ass.h"
+#include "associate_part_ass.h"
+
+write(*,*) "LA DEBUG 3"
+if (use_cavity) then
 ! kh 09.08.21 change index_nod2d -> bc_index_nod2d?
- reject_elem = all( (cavity_flag_nod2d(elem2D_nodes(:,elem))==1) .OR. (index_nod2d(elem2D_nodes(:,elem))==1) )
+ if (.not. use_cavityonelem) then
+   write(*,*) "LA DEBUG: cavity_depth = ", mesh%cavity_depth
+   write(*,*) "LA DEBUG: cavity_flag = ", mesh%cavity_depth(mesh%elem2D_nodes(:,elem))
+   reject_elem = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
+ !else
+ end if
+else
+ reject_elem = all( (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
+endif
  end function reject_elem
  
  ! gives number of "coastal" nodes in cavity setup, i.e. number of nodes that are
  ! either "real" model boundary nodes or shelf nodes
- integer function coastal_nodes(mesh, elem)
- USE MOD_MESH
- implicit none
- integer, intent(in) :: elem
+ integer function coastal_nodes(mesh, partit, elem)
+
+integer, intent(in) :: elem
 type(t_mesh), intent(in) , target :: mesh
+type(t_partit), intent(inout), target :: partit
+#include "associate_mesh_def.h"
 #include "associate_part_def.h"
+#include "associate_mesh_ass.h"
 #include "associate_part_ass.h"
 
+if (use_cavity) then
 ! kh 09.08.21 change index_nod2d -> bc_index_nod2d?
- coastal_nodes = count( (cavity_flag_nod2d(elem2D_nodes(:,elem))==1) .OR. (index_nod2d(elem2D_nodes(:,elem))==1) )
+ if (.not. use_cavityonelem) then
+   coastal_nodes = count( (mesh%cavity_depth(mesh%elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
+ !else
+ end if
+else 
+ coastal_nodes = count( (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
+endif
  end function coastal_nodes
-#endif
 
 end module iceberg_params

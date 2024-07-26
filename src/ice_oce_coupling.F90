@@ -499,7 +499,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         relax_salt(n)=relax_salt(n)-net
     end do
 !$OMP END PARALLEL DO
-    
+
     !___________________________________________________________________________
     ! enforce the total freshwater/salt flux be zero
     ! 1. water flux ! if (.not. use_virt_salt) can be used!
@@ -562,7 +562,6 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
             where (ulevels_nod2d > 1) flux = -water_flux
         end if 
     end if 
-    
     !___________________________________________________________________________
     ! compute total global net freshwater flux into the ocean 
     call integrate_nod(flux, net, partit, mesh)
@@ -602,15 +601,15 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
     end if
  
-!    if(lwiso .and. use_landice_water) then
-!!$OMP PARALLEL DO
-!      do n=1, myDim_nod2D+eDim_nod2D
-!         wiso_flux_oce(n,1)=wiso_flux_oce(n,1)+runoff_landice(n)*1000.0*wiso_smow(1)*(1-30.0/1000.0)*landice_season(month)
-!         wiso_flux_oce(n,2)=wiso_flux_oce(n,2)+runoff_landice(n)*1000.0*wiso_smow(2)*(1-240.0/1000.0)*landice_season(month)
-!         wiso_flux_oce(n,3)=wiso_flux_oce(n,3)+runoff_landice(n)*1000.0*landice_season(month)
-!      end do
-!!$OMP END PARALLEL DO
-!    end if
+    if(lwiso .and. use_landice_water) then
+!$OMP PARALLEL DO
+      do n=1, myDim_nod2D+eDim_nod2D
+         wiso_flux_oce(n,1)=wiso_flux_oce(n,1)+runoff_landice(n)*1000.0*wiso_smow(1)*(1-30.0/1000.0)*landice_season(month)
+         wiso_flux_oce(n,2)=wiso_flux_oce(n,2)+runoff_landice(n)*1000.0*wiso_smow(2)*(1-240.0/1000.0)*landice_season(month)
+         wiso_flux_oce(n,3)=wiso_flux_oce(n,3)+runoff_landice(n)*1000.0*landice_season(month)
+      end do
+!$OMP END PARALLEL DO
+    end if
 !---fwf-code-end
 
     !___________________________________________________________________________
@@ -757,22 +756,6 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     end if  ! lwiso end
 
     !---wiso-code-end
-
-    !---fwf-code-begin
-    if(use_landice_water) then
-      do n=1, myDim_nod2D+eDim_nod2D
-         water_flux(n)=water_flux(n)-runoff_landice(n)*landice_season(month)
-      end do
-    end if
-
-    if(lwiso .and. use_landice_water) then
-      do n=1, myDim_nod2D+eDim_nod2D
-      wiso_flux_oce(n,1)=wiso_flux_oce(n,1)+runoff_landice(n)*1000.0*wiso_smow(1)*(1-30.0/1000.0)*landice_season(month)
-      wiso_flux_oce(n,2)=wiso_flux_oce(n,2)+runoff_landice(n)*1000.0*wiso_smow(2)*(1-240.0/1000.0)*landice_season(month)
-      wiso_flux_oce(n,3)=wiso_flux_oce(n,3)+runoff_landice(n)*1000.0*landice_season(month)
-      end do
-    end if
-    !---fwf-code-end
 
     !---age-code-begin
     if (use_age_tracer) then

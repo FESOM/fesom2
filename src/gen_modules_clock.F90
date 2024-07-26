@@ -71,6 +71,7 @@ contains
     USE MOD_PARTIT
     USE MOD_PARSUP
     use g_config
+    use mod_transit, only: ti_transit, ti_start_transit
     implicit none
     type(t_partit), intent(in), target    :: partit
     integer                               :: i, daystart, yearstart
@@ -95,6 +96,9 @@ contains
     else
        r_restart=.true.
     end if
+!   For simulations with transient tracer input data
+    if (use_transit) ti_transit = yearnew - yearstart + ti_start_transit
+
 
     ! year as character string 
     write(cyearold,'(i4)') yearold
@@ -192,11 +196,18 @@ contains
     flag=0
 
     if(.not.include_fleapyear) return
+    call is_fleapyr(year, flag)
+  end subroutine check_fleapyr
 
+  subroutine is_fleapyr(year, flag)
+    implicit none
+    integer, intent(in) :: year      
+    integer, intent(out):: flag
+    flag=0
     if ((mod(year,4)==0.and.mod(year,100)/=0) .or. mod(year,400)==0) then
        flag=1
     endif
-  end subroutine check_fleapyr
+  end subroutine is_fleapyr
   !
   !----------------------------------------------------------------------------
   !
