@@ -216,6 +216,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 !!!     !$ACC UPDATE DEVICE(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus)
         !$ACC UPDATE DEVICE (mesh%helem, mesh%hnode, mesh%hnode_new, mesh%zbar_3d_n, mesh%z_3d_n)
     do tr_num=1, tracers%num_tracers
+    
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
@@ -242,6 +243,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
            tracers%work%del_ttf(:, node)=tracers%work%del_ttf(:, node)+tracers%work%del_ttf_advhoriz(:, node)+tracers%work%del_ttf_advvert(:, node)
         end do
 !$OMP END PARALLEL DO
+
+        !___________________________________________________________________________
         ! diffuse tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
         call diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
@@ -250,9 +253,10 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         if (tracers%data(tr_num)%ID == 14) tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * exp(-decay14 * dt)
         if (tracers%data(tr_num)%ID == 39) tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * exp(-decay39 * dt)
 
+        !___________________________________________________________________________
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
-!       if ((toy_ocean) .AND. ((tr_num==1) .AND. (TRIM(which_toy)=="soufflet"))) then
+        ! if ((toy_ocean) .AND. ((tr_num==1) .AND. (TRIM(which_toy)=="soufflet"))) then
         if ((toy_ocean) .AND. ((TRIM(which_toy)=="soufflet"))) then
             call relax_zonal_temp(tracers%data(1), partit, mesh)
         else
@@ -890,9 +894,11 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         !                            v   (+)                        v   (+)
         !
         tr(nzmin)= tr(nzmin)+bc_surface(n, tracers%data(tr_num)%ID, trarr(nzmin,n), nzmin, partit)
+
         if ((tracers%data(tr_num)%ID .ge. 6) .and.(tracers%data(tr_num)%ID .le. 40)) then
           tr(nzmin)= tr(nzmin)+transit_bc_surface(n, tracers%data(tr_num)%ID, sst(nzmin,n), sss(nzmin,n), a_ice(n), trarr(nzmin,n), nzmin, partit)
         end if
+        
         !_______________________________________________________________________
         ! The forward sweep algorithm to solve the three-diagonal matrix
         ! problem
@@ -1010,12 +1016,12 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
         zbar_n(1:mesh%nl  )=0.0_WP
         z_n   (1:mesh%nl-1)=0.0_WP
         zbar_n(nl1+1)=zbar_n_bot(n)
-        z_n(nl1)=zbar_n(nl1+1) + hnode_new(nl1,n)/2.0_WP
+        z_n(nl1)=zbar_n(nl1+1) + hnode(nl1,n)/2.0_WP
         do nz=nl1, ul1+1, -1
-            zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
-            z_n(nz-1)  = zbar_n(nz)   + hnode_new(nz-1,n)/2.0_WP
+            zbar_n(nz) = zbar_n(nz+1) + hnode(nz,n)
+            z_n(nz-1)  = zbar_n(nz)   + hnode(nz-1,n)/2.0_WP
         end do
-        zbar_n(ul1) = zbar_n(ul1+1)   + hnode_new(ul1,n)
+        zbar_n(ul1) = zbar_n(ul1+1)   + hnode(ul1,n)
 
         !_______________________________________________________________________
         do nz=ul1+1,nl1
@@ -1025,7 +1031,7 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
             vd_flux(nz)=vd_flux(nz)/(z_n(nz-1)-z_n(nz))*area(nz,n)
         enddo
         do nz=ul1,nl1
-            del_ttf(nz,n) = del_ttf(nz,n)+(vd_flux(nz) - vd_flux(nz+1))*dt/areasvol(nz,n)
+            del_ttf(nz,n) = del_ttf(nz,n) + (vd_flux(nz)-vd_flux(nz+1)) * dt/areasvol(nz,n)
         enddo
     end do
 !$OMP END DO
