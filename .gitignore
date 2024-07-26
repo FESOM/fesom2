@@ -1,5 +1,7 @@
 /build
 /build.lib
+/work
+/lib64
 *.o
 *.mod
 *.x
