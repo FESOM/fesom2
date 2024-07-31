@@ -327,7 +327,7 @@ subroutine recom_init(mesh)
   TqlimitFac_phaeo(:,:) = 0.d0
 
   allocate(TCphotLigLim_diatoms(nl-1,node_size))
-  TqlimitFac_diatoms(:,:) = 0.d0
+  TCphotLigLim_diatoms(:,:) = 0.d0
   allocate(TCphotLigLim_phyto(nl-1,node_size))
   TCphotLigLim_phyto(:,:) = 0.d0
   allocate(TCphotLigLim_cocco(nl-1,node_size))

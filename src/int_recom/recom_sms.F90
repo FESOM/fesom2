@@ -334,15 +334,23 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             Temp_cocco = max(Temp_cocco, tiny) 
             VTTemp_cocco(k) = Temp_cocco
 
-            if (Temp(k) < 3.6) then 
-                tau_phaeo = 17.51
-            else
-                tau_phaeo = 1.17
-            endif 
-            Temp_phaeo = 1.56 * exp(-(Temp(k) - 3.6) / tau_phaeo)**2
-            !Temp_phaeo = exp(ord_phaeo + expon_phaeo * Temp(k)) -  exp(ord_phaeo) ! NEW MODIFIED  ! CoccoTFunc = max(0.1419d0 * Temp(k)**0.8151d0,tiny) ! Function from Fielding 2013; is based on observational GR, but range fits best to ours
+            ! Phaeocystis: 
+            ! Blanchard function (Grimaud et al., 2017):
+            ! rate = uopt * ((Tmax-temperature)/(Tmax-Topt))^b * exp(-b*(Topt-temperature)/(Tmax-Topt))
+            ! with fitted values: uopt = 0.7328, Tmax = 16, Topt = 7.5272, b = 0.7829
+
+            Temp_phaeo = 0.7328 * ((16-Temp(k))/(16-7.5272)) ** 0.7829 * exp(-0.7829 * (7.5272-Temp(k))/(16-7.5272))
+            Temp_phaeo = max(Temp_phaeo, tiny)
+            
             VTTemp_phaeo(k) = Temp_phaeo
 
+            ! if (Temp(k) < 3.6) then
+            !     tau_phaeo = 17.51
+            ! else
+            !     tau_phaeo = 1.17
+            ! endif
+            !Temp_phaeo = 1.56 * exp(-(Temp(k) - 3.6) / tau_phaeo)**2
+            !Temp_phaeo = exp(ord_phaeo + expon_phaeo * Temp(k)) -  exp(ord_phaeo) ! NEW MODIFIED  ! CoccoTFunc = max(0.1419d0 * Temp(k)**0.8151d0,tiny) ! Function from Fielding 2013; is based on observational GR, but range fits best to ours
 
 #endif
 
