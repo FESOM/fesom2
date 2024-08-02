@@ -173,6 +173,12 @@ module recom_config
   Real(kind=8)                 :: C2K            = 273.15d0       !     Conversion from degrees C to K
   Real(kind=8)                 :: Ae             = 4500.d0        ! [K] Slope of the linear part of the Arrhenius function
 
+!! *** Temperature variables for Blanchard function ***
+  Real(kind=8)                 :: Tmax_phaeo     = 16d0           ! [°C] For Blanchard temp fxn: maximum temperature 
+  Real(kind=8)                 :: Topt_phaeo     = 7.5272d0       ! [°C] For Blanchard temp fxn: optimum temperature
+  Real(kind=8)                 :: uopt_phaeo     = 0.7328d0       ! [1/day] For Blanchard function: optimum growth date 
+  Real(kind=8)                 :: beta_phaeo     = 0.7829d0       ! [unitless] For Blanchard function  
+  
 ! NEW MODIFIED parameters
   Real(kind=8)                 :: ord_d          = -0.2216d0 ! parameters for diatom temperature function
   Real(kind=8)                 :: expon_d        = 0.0406d0 ! diatom exponent
@@ -185,7 +191,7 @@ module recom_config
 
   Real(kind=8)                 :: reminSi        = 0.02d0
   Real(kind=8)                 :: k_o2_remin     = 15.d0          ! NEW O2remin mmol m-3; Table 1 in Cram 2018 cites DeVries & Weber 2017 for a range of 0-30 mmol m-3
-  namelist /paArrhenius/ recom_Tref, C2K, Ae, ord_d, expon_d, ord_phy, expon_phy, ord_cocco, expon_cocco, ord_phaeo, expon_phaeo, reminSi, k_o2_remin
+  namelist /paArrhenius/ recom_Tref, C2K, Ae, Tmax_phaeo, Topt_phaeo, uopt_phaeo, beta_phaeo, ord_d, expon_d, ord_phy, expon_phy, ord_cocco, expon_cocco, ord_phaeo, expon_phaeo, reminSi, k_o2_remin
 
 !!------------------------------------------------------------------------------
 !! *** For limiter function ***

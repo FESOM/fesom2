@@ -336,10 +336,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 
             ! Phaeocystis: 
             ! Blanchard function (Grimaud et al., 2017):
-            ! rate = uopt * ((Tmax-temperature)/(Tmax-Topt))^b * exp(-b*(Topt-temperature)/(Tmax-Topt))
-            ! with fitted values: uopt = 0.7328, Tmax = 16, Topt = 7.5272, b = 0.7829
-
-            Temp_phaeo = 0.7328 * ((16-Temp(k))/(16-7.5272)) ** 0.7829 * exp(-0.7829 * (7.5272-Temp(k))/(16-7.5272))
+            Temp_phaeo = uopt_phaeo * ((Tmax_phaeo-Temp(k))/(Tmax_phaeo-Topt_phaeo))**beta_phaeo * exp(-beta_phaeo * (Topt_phaeo-Temp(k))/(Tmax_phaeo-Topt_phaeo))
             Temp_phaeo = max(Temp_phaeo, tiny)
             
             VTTemp_phaeo(k) = Temp_phaeo

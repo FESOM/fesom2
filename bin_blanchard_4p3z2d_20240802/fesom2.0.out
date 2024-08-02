@@ -1,0 +1,1205 @@
+ MPI has been initialized, provided MPI thread support level: MPI_THREAD_MULTIPLE           3
+ Running on          864  PEs
+ npes_fesom_world, num_fesom_groups         864           1
+ processes_per_group         864
+ 
+ FESOM2 git SHA: 6c124cb0
+ [32m____________________________________________________________[0m
+ [7;32m --> FESOM BUILDS UP MODEL CONFIGURATION                    [0m
+ Namelist files are read in
+ time step size is set to    2700.00000000000      sec
+ 
+ [32m____________________________________________________________[0m
+ [7;32m --> THIS IS A INITIALISATION RUN !!!                       [0m
+     > clock initialized at time: 0.00   1 1958
+ 
+       11680  steps to run for fesom job submission
+ rotation matrix for rotated model grids prepared
+           0 rpart is read
+ myLists are read
+ reading /albedo/work/projects/p_recompdaf/frbunsen/FESOM2/meshes/core2/nod2d.out
+ reading /albedo/work/projects/p_recompdaf/frbunsen/FESOM2/meshes/core2/elem2d.out
+ elements are read
+ communication arrays are read
+ =========================
+ 2D mesh was read in   0.701024453592254       seconds
+ 2D mesh info : nod2D=      126858  elem2D=      244659 checksum= 96ef52281f7e327b221950bcd07cc1d8
+ =========================
+ Communication arrays are set
+ test_tri finished in   1.749006332829595E-005  seconds
+ =========================
+ reading /albedo/work/projects/p_recompdaf/frbunsen/FESOM2/meshes/core2/edgenum.out
+ 2D mesh info : edge2D=      371644
+ reading /albedo/work/projects/p_recompdaf/frbunsen/FESOM2/meshes/core2/edges.out
+ reading /albedo/work/projects/p_recompdaf/frbunsen/FESOM2/meshes/core2/edge_tri.out
+ load_edges finished in   0.484850736407680       seconds
+ =========================
+ find_neighbors finished in   4.716294555692002E-003  seconds
+ =========================
+ reading /albedo/work/projects/p_recompdaf/frbunsen/FESOM2/meshes/core2/elvls.out
+ reading /albedo/work/projects/p_recompdaf/frbunsen/FESOM2/meshes/core2/nlvls.out
+ ____________________________________________________________________
+  --> 3D mesh was read in   0.194602950607077       seconds
+  --> Min/max depth on mype :            0   1180.00000000000        5400.00000000000     
+ ____________________________________________________________________
+  --> find min/max level e2n in  2.494507643859833E-004  seconds
+ ____________________________________________________________________
+  --> mesh statistics:           0
+           0 maxArea    9293855608.15890         MinArea    2517260066.06088     
+           0 maxScArea    17113834049.5471         MinScArea    4643380667.43227     
+           0 Edges:          371644  internal       362333
+      > Total ocean surface area is           :    364354316635734.       m^2
+      > Total ocean surface area wth cavity is:    364354316635734.       m^2
+      > mesh_areas finished in   3.243780010961927E-003  seconds
+ mesh_auxiliary_arrays finished in   8.813327149255201E-004  seconds
+ =========================
+ FESOM mesh_setup... complete
+ ***start level area_test***
+   364354316635734.        364354316635734.     
+   364354316635734.        364354316635734.     
+   364354316635734.        364354316635734.     
+   364354316635734.        364354316635734.     
+   357300317315119.        357300317315119.     
+   354113237650775.        354113237650775.     
+   351817051983039.        351817051983039.     
+   350065333681600.        350065333681600.     
+   348637576114935.        348637576114935.     
+   347389346086852.        347389346086852.     
+   346308199729719.        346308199729719.     
+   345140644361352.        345140644361352.     
+   343747935112280.        343747935112280.     
+   342363896845861.        342363896845861.     
+   340772744666857.        340772744666857.     
+   338775524312136.        338775524312136.     
+   336980984452424.        336980984452424.     
+   335064352342050.        335064352342050.     
+   333090746166042.        333090746166042.     
+   330929778381294.        330929778381294.     
+   328629163831422.        328629163831422.     
+   326592233920372.        326592233920372.     
+   324682485855654.        324682485855654.     
+   322811207664366.        322811207664366.     
+   320902632281560.        320902632281560.     
+   318964714574213.        318964714574213.     
+   316759412805279.        316759412805279.     
+   314415479883026.        314415479883026.     
+   311078606168458.        311078606168458.     
+   307180109446522.        307180109446522.     
+   302361363952099.        302361363952099.     
+   297029016477066.        297029016477066.     
+   290635153372101.        290635153372101.     
+   282779027925473.        282779027925473.     
+   270339151690562.        270339151690562.     
+   253778375323382.        253778375323382.     
+   233908883135421.        233908883135421.     
+   209698317850281.        209698317850281.     
+   182770853080492.        182770853080492.     
+   154768218654313.        154768218654313.     
+   123906855474557.        123906855474557.     
+   94313998475014.3        94313998475014.2     
+   66563213207699.0        66563213207699.0     
+   39329830643744.6        39329830643744.6     
+   18995266378258.7        18995266378258.7     
+   5037468695982.90        5037468695982.90     
+  0.000000000000000E+000  0.000000000000000E+000
+  0.000000000000000E+000  0.000000000000000E+000
+ ***end level area_test***
+ ____________________________________________________________
+  --> initialise ALE arrays + sparse SSH stiff matrix
+ 
+ ____________________________________________________________
+  --> initialise ssh operator using unperturbed ocean depth
+      > in stiff_mat_ale, reading /albedo/work/projects/p_recompdaf/frbunsen/FESOM2/meshes/core2/dist_864/rpart.out
+      took:   2.076808409765363E-002  sec
+ 
+ Arrays are set
+ FCT is initialized
+          38  tracers will be used in FESOM
+ tracer IDs are:            0           1        1001        1002        1003        1004        1005        1006        1007        1008        1009        1010        1011        1012        1013        1014        1015        1016        1017        1018        1019        1020        1021        1022        1023        1024        1025        1026        1027        1028        1029        1030        1031        1032        1033        1034        1035        1036
+ 
+ [36m     --> RECOM ON[0m
+ [36m     --> CISO OFF[0m
+ ____________________________________________________________
+  --> Check namelist.oce for the number of tracers
+ 
+ ____________________________________________________________
+  --> Reading REcoM2 preindustrial DIC for restart
+ 
+ read Iron        climatology from:fe_pisces_opa_eq_init_3D_changed_name.nc
+ read Oxygen      climatology from:woa18_all_o00_01_mmol_fesom2.nc
+ read Silicate    climatology from:woa13_all_i00_01_fesom2.nc
+ read Alkalinity  climatology from:GLODAPv2.2016b.TAlk_fesom2_mmol_fix_z_Fillvalue.nc
+ read DIC         climatology from:GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc
+ read Nitrate     climatology from:woa13_all_n00_01_fesom2.nc
+ read Salt        climatology from:phc3.0_winter.nc
+ read Temperature climatology from:phc3.0_winter.nc
+ Start: Initial conditions  for tracers
+ reading input tracer file for tracer ID=         1019
+ input file: /albedo/work/projects/MarESys/ogurses/input/corrected_input/fe_pisces_opa_eq_init_3D_changed_name.nc
+ variable  : Fe
+ reading input tracer file for tracer ID=         1022
+ input file: /albedo/work/projects/MarESys/ogurses/input/corrected_input/woa18_all_o00_01_mmol_fesom2.nc
+ variable  : oxygen_mmol
+ reading input tracer file for tracer ID=         1018
+ input file: /albedo/work/projects/MarESys/ogurses/input/corrected_input/woa13_all_i00_01_fesom2.nc
+ variable  : i_an
+ reading input tracer file for tracer ID=         1003
+ input file: /albedo/work/projects/MarESys/ogurses/input/corrected_input/GLODAPv2.2016b.TAlk_fesom2_mmol_fix_z_Fillvalue.nc
+ variable  : TAlk_mmol
+ reading input tracer file for tracer ID=         1002
+ input file: /albedo/work/projects/MarESys/ogurses/input/corrected_input/GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc
+ variable  : PI_TCO2_mmol
+ reading input tracer file for tracer ID=         1001
+ input file: /albedo/work/projects/MarESys/ogurses/input/corrected_input/woa13_all_n00_01_fesom2.nc
+ variable  : n_an
+ reading input tracer file for tracer ID=            1
+ input file: /albedo/work/projects/MarESys/ogurses/input/corrected_input/phc3.0_winter.nc
+ variable  : salt
+ reading input tracer file for tracer ID=            0
+ input file: /albedo/work/projects/MarESys/ogurses/input/corrected_input/phc3.0_winter.nc
+ variable  : temp
+ converting insitu temperature to potential...
+ DONE:  Initial conditions for tracers
+   |-> gobal max init. temp. =   30.0510326153043     
+   |-> gobal min init. temp. =  -2.06008970141432     
+   |-> gobal max init. salt. =   41.1176835670450     
+   `-> gobal min init. salt. =   5.62836183480000     
+ Sanity check for REcoM variables
+   |-> gobal max init. DIN. =   53.0303514775767     
+   |-> gobal min init. DIN. =  7.812823240199695E-003
+   |-> gobal max init. DIC. =   2467.73270205940     
+   |-> gobal min init. DIC. =   1082.94938277298     
+   |-> gobal max init. Alk. =   2715.00723192219     
+   |-> gobal min init. Alk. =   1102.52251499341     
+   |-> gobal max init. DSi. =   245.254346844946     
+   |-> gobal min init. DSi. =  0.340649448051430     
+   |-> gobal max init. DFe. =  4.239583905802221E-002
+   `-> gobal min init. DFe. = -6.398613047393471E-012
+ [46;1m--> Set surface field for alkalinity restoring[0m
+ Alkalinity restoring = true. Field read in.
+ initializing    6th tracer with ID=1004
+ initializing    7th tracer with ID=1005
+ initializing    8th tracer with ID=1006
+ initializing    9th tracer with ID=1007
+ initializing   10th tracer with ID=1008
+ initializing   11th tracer with ID=1009
+ initializing   12th tracer with ID=1010
+ initializing   13th tracer with ID=1011
+ initializing   14th tracer with ID=1012
+ initializing   15th tracer with ID=1013
+ initializing   16th tracer with ID=1014
+ initializing   17th tracer with ID=1015
+ initializing   18th tracer with ID=1016
+ initializing   19th tracer with ID=1017
+ initializing   22th tracer with ID=1020
+ initializing   23th tracer with ID=1021
+ initializing   25th tracer with ID=1023
+ initializing   26th tracer with ID=1024
+ initializing   27th tracer with ID=1025
+ initializing   28th tracer with ID=1026
+ initializing   29th tracer with ID=1027
+ initializing   30th tracer with ID=1028
+ initializing   31th tracer with ID=1029
+ initializing   32th tracer with ID=1030
+ initializing   33th tracer with ID=1031
+ initializing   34th tracer with ID=1032
+ initializing   35th tracer with ID=1033
+ initializing   36th tracer with ID=1034
+ initializing   37th tracer with ID=1035
+ initializing   38th tracer with ID=1036
+ ____________________________________________________________
+  --> call init_thickness_ale
+ 
+ ____________________________________________________________
+  --> initialise ALE layerthicknesses, depth levels and middepth levels
+ 
+ Initial state
+ Benthic layers are set
+ Tracers have been initialized as spinup from WOA/glodap netcdf files
+ RECOM recom_init... complete
+ FESOM ocean_setup... complete
+ ****************************************************
+ forcing arrays have been set up
+      file   : namelist_bc.nml open ok
+ Start: Ocean forcing inizialization.
+ Start: Ocean forcing inizialization.
+ Surface boundary conditions parameters:
+       nm_xwind_file = /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/uas.clim61 ! name of file with X winds
+       nm_xwind_var  = uas ! name of variable in file with wind 
+       nm_ywind_file = /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/vas.clim61 ! name of file with Y winds
+       nm_ywind_var  = vas ! name of variable in file with wind 
+       nm_humi_file = /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/huss.clim61 ! name of file with humidity
+       nm_humi_var   = huss ! name of variable in file with humidity  
+       nm_qsr_file = /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/rsds.clim61 ! name of file with solar heat 
+       nm_qsr_var  = rsds ! name of variable in file with solar heat 
+       nm_qlw_file   = /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/rlds.clim61 ! name of file with Long wave 
+       nm_qlw_var    = rlds ! name of variable in file with Long wave 
+       nm_tair_file  = /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/tas.clim61 ! name of file with 2m air temperature 
+       nm_tair_var   = tas ! name of variable in file with 2m air temperature 
+       nm_prec_file  = /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/prra.clim61 ! name of file with total precipitation 
+       nm_prec_var   = prra ! name of variable in file with total precipitation  
+       nm_snow_file  = /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/prsn.clim61 ! name of file with snow precipitation 
+       nm_snow_var   = prsn !name of variable in file with air_pressure_at_sea_level 
+       nm_mslp_file  = /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/psl.clim61 !air_pressure_at_sea_level 
+       nm_mslp_var   = psl !name of variable in file with air_pressure_at_sea_level 
+ total fluxes to read:            9
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): uas !
+ /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/uas.clim61.nc
+  6.250000000000000E-002   364.906250000000       0.000000000000000E+000
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): vas !
+ /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/vas.clim61.nc
+  6.250000000000000E-002   364.906250000000       0.000000000000000E+000
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): huss !
+ /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/huss.clim61.nc
+  6.250000000000000E-002   364.906250000000       0.000000000000000E+000
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): rsds !
+ /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/rsds.clim61.nc
+  6.250000000000000E-002   364.906250000000       0.000000000000000E+000
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): rlds !
+ /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/rlds.clim61.nc
+  6.250000000000000E-002   364.906250000000       0.000000000000000E+000
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): tas !
+ /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/tas.clim61.nc
+  6.250000000000000E-002   364.906250000000       0.000000000000000E+000
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): prra !
+ /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/prra.clim61.nc
+  6.250000000000000E-002   364.906250000000       0.000000000000000E+000
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): prsn !
+ /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/prsn.clim61.nc
+  6.250000000000000E-002   364.906250000000       0.000000000000000E+000
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): psl !
+ /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/psl.clim61.nc
+  6.250000000000000E-002   364.906250000000       0.000000000000000E+000
+ DONE:  Ocean forcing inizialization.
+ Parts of forcing data (only constant in time fields) are read
+ Ice FCT is initialized
+ initialize the sea ice
+ Ice is initialized
+ EVP scheme option=           0
+ ==========================================
+ MODEL SETUP took on mype=0 [seconds]      
+ runtime setup total         6.308914    
+  > runtime setup mesh       1.477062    
+  > runtime setup ocean      2.920592    
+  > runtime setup forcing    1.635012    
+  > runtime setup ice       1.3072039E-04
+  > runtime setup restart   8.8493270E-04
+  > runtime setup other     0.2752320    
+ ============================================
+ FESOM start iteration before the barrier...
+ FESOM start iteration after the barrier...
+ 
+ [32m____________________________________________________________[0m
+ [7;32m --> FESOM STARTS TIME LOOP                                 [0m
+ Updating SSS restoring data for month            1
+           1
+ Updating Iron restoring data for month            1  from/albedo/work/projects/MarESys/ogurses/input/mesh_CORE2_finaltopo_mean/DustClimMonthlyAlbani.nc                                                                                                                                                                                                              
+ In atm_input: AtmCO2    =    278.000000000000     
+ [46;1m     --> call RECOM         [0m
+ [46;1m --> call compute_recom_diagnostics(1)[0m
+ Using namelist.io.recom
+      file   : namelist.io.recom open ok
+ io_listsize will be changed from          150  to          123 !
+ adding I/O stream 2D for sst
+ adding I/O stream 2D for sss
+ adding I/O stream 2D for ssh
+ adding I/O stream 2D for vve_5
+ adding I/O stream 2D for uice
+ adding I/O stream 2D for vice
+ adding I/O stream 2D for a_ice
+ adding I/O stream 2D for m_ice
+ adding I/O stream 2D for thdgr
+ adding I/O stream 2D for thdgrsn
+ adding I/O stream 2D for m_snow
+ adding I/O stream 2D for MLD1
+ adding I/O stream 2D for MLD2
+ adding I/O stream 2D for fh
+ adding I/O stream 2D for fw
+ adding I/O stream 2D for alpha
+ adding I/O stream 2D for beta
+ adding I/O stream 2D for runoff
+ adding I/O stream 2D for evap
+ adding I/O stream 2D for prec
+ adding I/O stream 2D for tx_sur
+ adding I/O stream 2D for ty_sur
+ adding I/O stream 2D for fer_C
+ adding I/O stream 3D for temp
+ adding I/O stream 3D for salt
+ adding I/O stream 3D for DIN
+ adding I/O stream 3D for DIC
+ adding I/O stream 3D for Alk
+ adding I/O stream 3D for PhyN
+ adding I/O stream 3D for PhyC
+ adding I/O stream 3D for PhyChl
+ adding I/O stream 3D for DetN
+ adding I/O stream 3D for DetC
+ adding I/O stream 3D for HetN
+ adding I/O stream 3D for HetC
+ adding I/O stream 3D for DON
+ adding I/O stream 3D for DOC
+ adding I/O stream 3D for DiaN
+ adding I/O stream 3D for DiaC
+ adding I/O stream 3D for DiaChl
+ adding I/O stream 3D for DiaSi
+ adding I/O stream 3D for DetSi
+ adding I/O stream 3D for DSi
+ adding I/O stream 3D for DFe
+ adding I/O stream 3D for PhyCalc
+ adding I/O stream 3D for DetCalc
+ adding I/O stream 3D for O2
+ adding I/O stream 3D for Zoo2N
+ adding I/O stream 3D for Zoo2C
+ adding I/O stream 3D for idetz2n
+ adding I/O stream 3D for idetz2c
+ adding I/O stream 3D for idetz2si
+ adding I/O stream 3D for idetz2calc
+ adding I/O stream 3D for CoccoN
+ adding I/O stream 3D for CoccoC
+ adding I/O stream 3D for CoccoChl
+ adding I/O stream 3D for PhaeoN
+ adding I/O stream 3D for PhaeoC
+ adding I/O stream 3D for PhaeoChl
+ adding I/O stream 3D for Zoo3N
+ adding I/O stream 3D for Zoo3C
+ adding I/O stream 3D for N2
+ adding I/O stream 3D for Kv
+ adding I/O stream 3D for u
+ adding I/O stream 3D for v
+ adding I/O stream 3D for w
+ adding I/O stream 3D for Av
+ adding I/O stream 3D for bolus_u
+ adding I/O stream 3D for bolus_v
+ adding I/O stream 3D for bolus_w
+ adding I/O stream 2D for dpCO2s
+ adding I/O stream 2D for pCO2s
+ adding I/O stream 2D for CO2f
+ adding I/O stream 2D for Hp
+ adding I/O stream 2D for aFe
+ adding I/O stream 2D for aN
+ adding I/O stream 2D for denb
+ adding I/O stream 2D for benN
+ adding I/O stream 2D for benC
+ adding I/O stream 2D for benSi
+ adding I/O stream 2D for benCalc
+ adding I/O stream 2D for ChlDegd
+ adding I/O stream 2D for ChlDegn
+ adding I/O stream 2D for NNAd
+ adding I/O stream 2D for NNAn
+ adding I/O stream 2D for GPPd
+ adding I/O stream 2D for GPPn
+ adding I/O stream 2D for NPPd
+ adding I/O stream 2D for NPPn
+ adding I/O stream 2D for NPPc
+ adding I/O stream 2D for GPPc
+ adding I/O stream 2D for NNAc
+ adding I/O stream 2D for ChlDegc
+ adding I/O stream 3D for PAR
+ adding I/O stream 3D for CO2
+ adding I/O stream 3D for pH
+ adding I/O stream 3D for pCO2
+ adding I/O stream 3D for HCO3
+ adding I/O stream 3D for CO3
+ adding I/O stream 3D for OmegaC
+ adding I/O stream 3D for kspc
+ adding I/O stream 3D for rhoSW
+ adding I/O stream 3D for wsink_det1
+ adding I/O stream 3D for wsink_det2
+ adding I/O stream 3D for rho_det1
+ adding I/O stream 3D for rho_det2
+ adding I/O stream 3D for scaling_rho_1
+ adding I/O stream 3D for scaling_rho_2
+ adding I/O stream 3D for scaling_visc
+ adding I/O stream 2D for grazmeso_tot
+ adding I/O stream 2D for grazmeso_n
+ adding I/O stream 2D for grazmeso_d
+ adding I/O stream 2D for grazmeso_c
+ adding I/O stream 3D for respmeso
+ adding I/O stream 3D for respmacro
+ adding I/O stream 3D for respmicro
+ adding I/O stream 3D for calcdiss
+ adding I/O stream 3D for calcif
+ adding I/O stream 3D for aggn
+ adding I/O stream 3D for aggd
+ adding I/O stream 3D for aggc
+ adding I/O stream 3D for docexn
+ adding I/O stream 3D for docexd
+ adding I/O stream 3D for docexc
+ adding I/O stream 3D for respn
+ adding I/O stream 3D for respd
+ adding I/O stream 3D for respc
+ adding I/O stream 2D for NPPp
+ adding I/O stream 2D for GPPp
+ adding I/O stream 2D for NNAp
+ adding I/O stream 2D for ChlDegp
+ adding I/O stream 2D for grazmeso_p
+ adding I/O stream 3D for aggp
+ adding I/O stream 3D for respp
+ adding I/O stream 3D for docexp
+ adding I/O stream 3D for TTemp_diatoms
+ adding I/O stream 3D for TTemp_phyto
+ adding I/O stream 3D for TTemp_cocco
+ adding I/O stream 3D for TTemp_phaeo
+ adding I/O stream 3D for TPhyCO2
+ adding I/O stream 3D for TDiaCO2
+ adding I/O stream 3D for TCoccoCO2
+ adding I/O stream 3D for TPhaeoCO2
+ adding I/O stream 3D for TqLF_phyto
+ adding I/O stream 3D for TqLF_diatoms
+ adding I/O stream 3D for TqLF_cocco
+ adding I/O stream 3D for TqLF_phaeo
+ adding I/O stream 3D for TCphotLL_phyto
+ adding I/O stream 3D for TCphotLL_dia
+ adding I/O stream 3D for TCphotLL_cocco
+ adding I/O stream 3D for TCphotLL_phaeo
+ adding I/O stream 3D for TCphot_phyto
+ adding I/O stream 3D for TCphot_diatoms
+ adding I/O stream 3D for TCphot_cocco
+ adding I/O stream 3D for TCphot_phaeo
+ adding I/O stream 3D for TSi_assimDia
+ adding I/O stream 3D for Redi_K
+ adding I/O stream 2D for momix_length
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.75,mstep=    38,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.79,mstep=    39,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.83,mstep=    40,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.88,mstep=    41,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.92,mstep=    42,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.95,mstep=    43,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.97,mstep=    44,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.99,mstep=    45,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.98,mstep=    46,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.97,mstep=    47,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.94,mstep=    48,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.90,mstep=    49,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.86,mstep=    50,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.82,mstep=    51,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.78,mstep=    52,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.78,mstep=   175,glon/glat= 163.06/ 57.71,nz/nzmin=  7  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.87,mstep=   176,glon/glat= 163.06/ 57.71,nz/nzmin=  7  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.95,mstep=   177,glon/glat= 163.06/ 57.71,nz/nzmin=  7  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.02,mstep=   178,glon/glat= 163.06/ 57.71,nz/nzmin=  7  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.10,mstep=   179,glon/glat= 163.06/ 57.71,nz/nzmin=  7  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.16,mstep=   180,glon/glat= 163.06/ 57.71,nz/nzmin=  7  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.20,mstep=   181,glon/glat= 163.06/ 57.71,nz/nzmin=  7  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.23,mstep=   182,glon/glat= 163.06/ 57.71,nz/nzmin=  7  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.23,mstep=   183,glon/glat= 163.06/ 57.71,nz/nzmin=  7  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.21,mstep=   184,glon/glat= 163.06/ 57.71,nz/nzmin=  7  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.15,mstep=   185,glon/glat= 163.06/ 57.71,nz/nzmin=  7  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.12,mstep=   186,glon/glat= 163.06/ 57.71,nz/nzmin=  7  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.06,mstep=   187,glon/glat= 163.06/ 57.71,nz/nzmin=  7  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.99,mstep=   188,glon/glat= 163.06/ 57.71,nz/nzmin=  7  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.93,mstep=   189,glon/glat= 163.06/ 57.71,nz/nzmin=  7  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.86,mstep=   190,glon/glat= 163.06/ 57.71,nz/nzmin=  7  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.79,mstep=   191,glon/glat= 163.06/ 57.71,nz/nzmin=  7  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.88,mstep=   587,glon/glat=-163.03/ 54.15,nz/nzmin= 13  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.04,mstep=   588,glon/glat=-163.03/ 54.15,nz/nzmin= 13  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.15,mstep=   589,glon/glat=-163.03/ 54.15,nz/nzmin= 13  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.21,mstep=   590,glon/glat=-163.03/ 54.15,nz/nzmin= 13  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.24,mstep=   591,glon/glat=-163.03/ 54.15,nz/nzmin= 13  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.23,mstep=   592,glon/glat=-163.03/ 54.15,nz/nzmin= 13  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.20,mstep=   593,glon/glat=-163.03/ 54.15,nz/nzmin= 13  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.13,mstep=   594,glon/glat=-163.03/ 54.15,nz/nzmin= 13  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.05,mstep=   595,glon/glat=-163.03/ 54.15,nz/nzmin= 13  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.94,mstep=   596,glon/glat=-163.03/ 54.15,nz/nzmin= 13  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.83,mstep=   597,glon/glat=-163.03/ 54.15,nz/nzmin= 13  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.78,mstep=   723,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.82,mstep=   724,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.85,mstep=   725,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.88,mstep=   726,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.91,mstep=   727,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.93,mstep=   728,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.96,mstep=   729,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.98,mstep=   730,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.01,mstep=   731,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.02,mstep=   732,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.04,mstep=   733,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.05,mstep=   734,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.05,mstep=   735,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.04,mstep=   736,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.03,mstep=   737,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.02,mstep=   738,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=2.00,mstep=   739,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.99,mstep=   740,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.97,mstep=   741,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.95,mstep=   742,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.92,mstep=   743,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.90,mstep=   744,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.87,mstep=   745,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.85,mstep=   746,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.83,mstep=   747,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.80,mstep=   748,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.78,mstep=   749,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.76,mstep=   750,glon/glat= -40.03/ 64.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.77,mstep=   945,glon/glat=-144.97/ 58.84,nz/nzmin= 11  1
+ FESOM =======================================================
+ FESOM step:         960  day:          30  year:        1958
+ 
+ ___ICE STEP EXECUTION TIMES____________________________
+	Ice Dyn.        : 3.336E-03
+	Ice Advect.     : 4.940E-04
+	Ice Thermodyn.  : 4.217E-05
+    _______________________________
+	Ice TOTAL       : 3.872E-03
+ 
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.78,mstep=   960,glon/glat=-144.97/ 58.84,nz/nzmin= 11  1
+ ___CHECK GLOBAL OCEAN VARIABLES --> mstep=         960
+ 	___global estimat of eta & hbar____________________
+ 	 int(eta), int(hbar)      =  2.144204046252760E-017  2.144204046252760E-017
+ 	  --> error(eta-hbar)     =  0.000000000000000E+000
+ 	 min(eta) , max(eta)      =  -1.76603207839789       0.917290166973538     
+ 	 max(hbar), max(hbar)     =  -1.76603207839789       0.917290166973538     
+ 
+ 	 int(deta), int(dhbar)    = -9.927193909658287E-013 -3.245621359074002E-019
+ 	  --> error(deta-dhbar)   = -9.927190664036928E-013
+ 	  --> error(deta-wflux)   = -9.927193909626337E-013
+ 	  --> error(dhbar-wflux)  = -3.245589407943876E-019
+ 
+ 	 -int(wflux)*dt           =  8.626805133942443E-021
+ 	 int(deta )-int(wflux)*dt = -9.927193995926338E-013
+ 	 int(dhbar)-int(wflux)*dt = -3.331889410413426E-019
+ 
+ 	___global min/max/mean  --> mstep=         960 ____________
+ 	       eta= -1.766E+00 |  9.173E-01 | N.A.
+ 	      deta= -4.620E-02 |  3.623E-02 | N.A.
+ 	      hbar= -1.766E+00 |  9.173E-01 | N.A.
+ 	     wflux= -5.765E-06 |  1.982E-06 | -3.195E-24
+ 	     hflux= -3.027E+02 |  2.108E+03 |  0.000E+00
+ 	      temp= -2.005E+00 |  3.032E+01 |  0.000E+00
+ 	      salt=  5.215E+00 |  4.108E+01 |  0.000E+00
+ 	 wvel(1,:)= -6.783E-18 |  1.052E-17 | N.A.
+ 	 wvel(2,:)= -1.866E-04 |  1.512E-04 | N.A.
+ 	 uvel(1,:)= -1.067E+00 |  9.891E-01 | N.A.
+ 	 uvel(2,:)= -1.023E+00 |  9.895E-01 | N.A.
+ 	 vvel(1,:)= -1.235E+00 |  1.114E+00 | N.A.
+ 	 vvel(2,:)= -1.234E+00 |  1.130E+00 | N.A.
+ 	hnode(1,:)=  4.580E+00 |  5.216E+00 | N.A.
+ 	hnode(2,:)=  4.580E+00 |  5.216E+00 | N.A.
+ 	     cfl_z=  N.A.      |  1.783E+00 | N.A.
+ 	     pgf_x=  N.A.      |  6.019E-05 | N.A.
+ 	     pgf_y=  N.A.      |  6.295E-05 | N.A.
+ 	        Av=  N.A.      |  2.052E+00 | N.A.
+ 	        Kv=  N.A.      |  5.203E+00 | N.A.
+ 	     m_ice=  N.A.      |  3.373E+00 | N.A.
+ 
+ ___ALE OCEAN STEP EXECUTION TIMES______________________
+     Oce. Mix,Press.. : 3.850E-03
+     Oce. Dynamics    : 1.713E-03
+     Oce. Update Vel. : 1.069E-04
+     Oce. Fer-GM.     : 6.442E-04
+     _______________________________
+     ALE-Solve SSH    : 6.043E-03
+     ALE-Calc. hbar   : 1.146E-04
+     ALE-Update+W     : 4.778E-04
+     ALE-Solve Tracer : 2.085E-01
+     ALE-Update hnode : 1.012E-04
+     _______________________________
+     check for blowup : 1.024E-02
+     _______________________________
+     Oce. TOTAL       : 2.318E-01
+ 
+ 
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.79,mstep=   975,glon/glat=-144.97/ 58.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.75,mstep=   979,glon/glat=-144.97/ 58.84,nz/nzmin= 11  1
+[33m --> WARNING CFLz>1.75:[0mCFLz_max=1.79,mstep=   990,glon/glat=-144.97/ 58.84,nz/nzmin= 11  1
+ Updating SSS restoring data for month            2
+ Updating Iron restoring data for month            2  from/albedo/work/projects/MarESys/ogurses/input/mesh_CORE2_finaltopo_mean/DustClimMonthlyAlbani.nc                                                                                                                                                                                                              
+ initializing I/O file for vice
+ initializing I/O file for fw
+ initializing I/O file for m_ice
+ initializing I/O file for sss
+ initializing I/O file for ssh
+ initializing I/O file for m_snow
+ initializing I/O file for beta
+ initializing I/O file for uice
+ initializing I/O file for prec
+ initializing I/O file for MLD1
+ initializing I/O file for tx_sur
+ initializing I/O file for thdgr
+ initializing I/O file for sst
+ initializing I/O file for vve_5
+ initializing I/O file for runoff
+ initializing I/O file for a_ice
+ initializing I/O file for thdgrsn
+ initializing I/O file for MLD2
+ initializing I/O file for evap
+ initializing I/O file for ty_sur
+ initializing I/O file for DOC
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/ssh.fesom.1958.nc
+ ssh: current mean I/O counter =            1
+ writing mean record for ssh; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/beta.fesom.1958.nc
+ beta: current mean I/O counter =            1
+ writing mean record for beta; rec. count =            1
+ initializing I/O file for dpCO2s
+ initializing I/O file for fer_C
+ initializing I/O file for alpha
+ initializing I/O file for PhaeoChl
+ initializing I/O file for fh
+ initializing I/O file for DON
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/m_ice.fesom.1958.nc
+ m_ice: current mean I/O counter =            1
+ writing mean record for m_ice; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/fer_C.fesom.1958.nc
+ fer_C: current mean I/O counter =            1
+ writing mean record for fer_C; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/runoff.fesom.1958.nc
+ runoff: current mean I/O counter =            1
+ writing mean record for runoff; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/thdgr.fesom.1958.nc
+ thdgr: current mean I/O counter =            1
+ writing mean record for thdgr; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/vve_5.fesom.1958.nc
+ vve_5: current mean I/O counter =            1
+ writing mean record for vve_5; rec. count =            1
+ initializing I/O file for DiaChl
+ initializing I/O file for Zoo2C
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/fw.fesom.1958.nc
+ fw: current mean I/O counter =            1
+ writing mean record for fw; rec. count =            1
+ initializing I/O file for NPPn
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/vice.fesom.1958.nc
+ vice: current mean I/O counter =            1
+ writing mean record for vice; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/tx_sur.fesom.1958.nc
+ tx_sur: current mean I/O counter =            1
+ writing mean record for tx_sur; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/ty_sur.fesom.1958.nc
+ ty_sur: current mean I/O counter =            1
+ writing mean record for ty_sur; rec. count =            1
+ initializing I/O file for HetC
+ initializing I/O file for scaling_rho_1
+ initializing I/O file for respn
+ initializing I/O file for TPhaeoCO2
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/MLD2.fesom.1958.nc
+ MLD2: current mean I/O counter =            1
+ writing mean record for MLD2; rec. count =            1
+ initializing I/O file for DiaC
+ initializing I/O file for NNAd
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/a_ice.fesom.1958.nc
+ a_ice: current mean I/O counter =            1
+ writing mean record for a_ice; rec. count =            1
+ initializing I/O file for HetN
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/dpCO2s.fesom.1958.nc
+ dpCO2s: current mean I/O counter =            1
+ writing mean record for dpCO2s; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/sst.fesom.1958.nc
+ sst: current mean I/O counter =            1
+ writing mean record for sst; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/alpha.fesom.1958.nc
+ alpha: current mean I/O counter =            1
+ writing mean record for alpha; rec. count =            1
+ initializing I/O file for Alk
+ initializing I/O file for CoccoChl
+ initializing I/O file for DetCalc
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/evap.fesom.1958.nc
+ evap: current mean I/O counter =            1
+ writing mean record for evap; rec. count =            1
+ initializing I/O file for TCphot_cocco
+ initializing I/O file for CoccoC
+ initializing I/O file for Zoo3N
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/NPPn.fesom.1958.nc
+ NPPn: current mean I/O counter =            1
+ writing mean record for NPPn; rec. count =            1
+ initializing I/O file for TTemp_phyto
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/sss.fesom.1958.nc
+ sss: current mean I/O counter =            1
+ writing mean record for sss; rec. count =            1
+ initializing I/O file for pH
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/DiaChl.fesom.1958.nc
+ DiaChl: current mean I/O counter =            1
+ writing mean record for DiaChl; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/Zoo2C.fesom.1958.nc
+ Zoo2C: current mean I/O counter =            1
+ writing mean record for Zoo2C; rec. count =            1
+ initializing I/O file for TTemp_phaeo
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/thdgrsn.fesom.1958.nc
+ thdgrsn: current mean I/O counter =            1
+ writing mean record for thdgrsn; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/DOC.fesom.1958.nc
+ DOC: current mean I/O counter =            1
+ writing mean record for DOC; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/prec.fesom.1958.nc
+ prec: current mean I/O counter =            1
+ writing mean record for prec; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/CoccoChl.fesom.1958.nc
+ CoccoChl: current mean I/O counter =            1
+ writing mean record for CoccoChl; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/m_snow.fesom.1958.nc
+ m_snow: current mean I/O counter =            1
+ writing mean record for m_snow; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/Zoo3N.fesom.1958.nc
+ Zoo3N: current mean I/O counter =            1
+ writing mean record for Zoo3N; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/MLD1.fesom.1958.nc
+ MLD1: current mean I/O counter =            1
+ writing mean record for MLD1; rec. count =            1
+ initializing I/O file for PhyC
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/DiaC.fesom.1958.nc
+ DiaC: current mean I/O counter =            1
+ writing mean record for DiaC; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/NNAd.fesom.1958.nc
+ NNAd: current mean I/O counter =            1
+ writing mean record for NNAd; rec. count =            1
+ initializing I/O file for DIC
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/DON.fesom.1958.nc
+ DON: current mean I/O counter =            1
+ writing mean record for DON; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/uice.fesom.1958.nc
+ uice: current mean I/O counter =            1
+ writing mean record for uice; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/fh.fesom.1958.nc
+ fh: current mean I/O counter =            1
+ writing mean record for fh; rec. count =            1
+ initializing I/O file for DiaSi
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/DiaSi.fesom.1958.nc
+ DiaSi: current mean I/O counter =            1
+ writing mean record for DiaSi; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/PhaeoChl.fesom.1958.nc
+ PhaeoChl: current mean I/O counter =            1
+ writing mean record for PhaeoChl; rec. count =            1
+ initializing I/O file for GPPd
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/HetN.fesom.1958.nc
+ HetN: current mean I/O counter =            1
+ writing mean record for HetN; rec. count =            1
+ initializing I/O file for DetC
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/pH.fesom.1958.nc
+ pH: current mean I/O counter =            1
+ writing mean record for pH; rec. count =            1
+ initializing I/O file for wsink_det2
+ initializing I/O file for temp
+ initializing I/O file for DIN
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/HetC.fesom.1958.nc
+ HetC: current mean I/O counter =            1
+ writing mean record for HetC; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/scaling_rho_1.fesom.1958.nc
+ scaling_rho_1: current mean I/O counter =            1
+ writing mean record for scaling_rho_1; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/respn.fesom.1958.nc
+ respn: current mean I/O counter =            1
+ writing mean record for respn; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/TPhaeoCO2.fesom.1958.nc
+ TPhaeoCO2: current mean I/O counter =            1
+ writing mean record for TPhaeoCO2; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/GPPd.fesom.1958.nc
+ GPPd: current mean I/O counter =            1
+ writing mean record for GPPd; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/Alk.fesom.1958.nc
+ Alk: current mean I/O counter =            1
+ writing mean record for Alk; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/DetCalc.fesom.1958.nc
+ DetCalc: current mean I/O counter =            1
+ writing mean record for DetCalc; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/CoccoC.fesom.1958.nc
+ CoccoC: current mean I/O counter =            1
+ writing mean record for CoccoC; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/TCphot_cocco.fesom.1958.nc
+ TCphot_cocco: current mean I/O counter =            1
+ writing mean record for TCphot_cocco; rec. count =            1
+ initializing I/O file for docexn
+ initializing I/O file for DetN
+ initializing I/O file for PhyChl
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/PhyChl.fesom.1958.nc
+ PhyChl: current mean I/O counter =            1
+ writing mean record for PhyChl; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/TTemp_phaeo.fesom.1958.nc
+ TTemp_phaeo: current mean I/O counter =            1
+ writing mean record for TTemp_phaeo; rec. count =            1
+ initializing I/O file for PhyN
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/PhyN.fesom.1958.nc
+ PhyN: current mean I/O counter =            1
+ writing mean record for PhyN; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/TTemp_phyto.fesom.1958.nc
+ TTemp_phyto: current mean I/O counter =            1
+ writing mean record for TTemp_phyto; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/wsink_det2.fesom.1958.nc
+ wsink_det2: current mean I/O counter =            1
+ writing mean record for wsink_det2; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/DIC.fesom.1958.nc
+ DIC: current mean I/O counter =            1
+ writing mean record for DIC; rec. count =            1
+ initializing I/O file for salt
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/docexn.fesom.1958.nc
+ docexn: current mean I/O counter =            1
+ writing mean record for docexn; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/temp.fesom.1958.nc
+ temp: current mean I/O counter =            1
+ writing mean record for temp; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/DetC.fesom.1958.nc
+ DetC: current mean I/O counter =            1
+ writing mean record for DetC; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/DetN.fesom.1958.nc
+ DetN: current mean I/O counter =            1
+ writing mean record for DetN; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/DIN.fesom.1958.nc
+ DIN: current mean I/O counter =            1
+ writing mean record for DIN; rec. count =            1
+ initializing I/O file for NNAc
+ initializing I/O file for Hp
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/PhyC.fesom.1958.nc
+ PhyC: current mean I/O counter =            1
+ writing mean record for PhyC; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/salt.fesom.1958.nc
+ salt: current mean I/O counter =            1
+ writing mean record for salt; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/Hp.fesom.1958.nc
+ Hp: current mean I/O counter =            1
+ writing mean record for Hp; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/NNAc.fesom.1958.nc
+ NNAc: current mean I/O counter =            1
+ writing mean record for NNAc; rec. count =            1
+ initializing I/O file for kspc
+ initializing I/O file for CO2f
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/kspc.fesom.1958.nc
+ kspc: current mean I/O counter =            1
+ writing mean record for kspc; rec. count =            1
+ initializing I/O file for NPPp
+ initializing I/O file for TCphot_phaeo
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/CO2f.fesom.1958.nc
+ CO2f: current mean I/O counter =            1
+ writing mean record for CO2f; rec. count =            1
+ initializing I/O file for ChlDegd
+ initializing I/O file for scaling_visc
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/NPPp.fesom.1958.nc
+ NPPp: current mean I/O counter =            1
+ writing mean record for NPPp; rec. count =            1
+ initializing I/O file for TqLF_cocco
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/TqLF_cocco.fesom.1958.nc
+ TqLF_cocco: current mean I/O counter =            1
+ writing mean record for TqLF_cocco; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/TCphot_phaeo.fesom.1958.nc
+ TCphot_phaeo: current mean I/O counter =            1
+ writing mean record for TCphot_phaeo; rec. count =            1
+ initializing I/O file for idetz2n
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/ChlDegd.fesom.1958.nc
+ ChlDegd: current mean I/O counter =            1
+ writing mean record for ChlDegd; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/scaling_visc.fesom.1958.nc
+ scaling_visc: current mean I/O counter =            1
+ writing mean record for scaling_visc; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/idetz2n.fesom.1958.nc
+ idetz2n: current mean I/O counter =            1
+ writing mean record for idetz2n; rec. count =            1
+ initializing I/O file for GPPc
+ initializing I/O file for OmegaC
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/GPPc.fesom.1958.nc
+ GPPc: current mean I/O counter =            1
+ writing mean record for GPPc; rec. count =            1
+ initializing I/O file for grazmeso_c
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/grazmeso_c.fesom.1958.nc
+ grazmeso_c: current mean I/O counter =            1
+ writing mean record for grazmeso_c; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/OmegaC.fesom.1958.nc
+ OmegaC: current mean I/O counter =            1
+ writing mean record for OmegaC; rec. count =            1
+ initializing I/O file for momix_length
+ initializing I/O file for Zoo3C
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/momix_length.fesom.1958.nc
+ momix_length: current mean I/O counter =            1
+ writing mean record for momix_length; rec. count =            1
+ initializing I/O file for DetSi
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/Zoo3C.fesom.1958.nc
+ Zoo3C: current mean I/O counter =            1
+ writing mean record for Zoo3C; rec. count =            1
+ initializing I/O file for TPhyCO2
+ initializing I/O file for grazmeso_tot
+ initializing I/O file for TCphotLL_dia
+ initializing I/O file for idetz2si
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/DetSi.fesom.1958.nc
+ DetSi: current mean I/O counter =            1
+ writing mean record for DetSi; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/TPhyCO2.fesom.1958.nc
+ TPhyCO2: current mean I/O counter =            1
+ writing mean record for TPhyCO2; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/TCphotLL_dia.fesom.1958.nc
+ TCphotLL_dia: current mean I/O counter =            1
+ writing mean record for TCphotLL_dia; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/idetz2si.fesom.1958.nc
+ idetz2si: current mean I/O counter =            1
+ writing mean record for idetz2si; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/grazmeso_tot.fesom.1958.nc
+ grazmeso_tot: current mean I/O counter =            1
+ writing mean record for grazmeso_tot; rec. count =            1
+ initializing I/O file for PhaeoC
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/PhaeoC.fesom.1958.nc
+ PhaeoC: current mean I/O counter =            1
+ writing mean record for PhaeoC; rec. count =            1
+ initializing I/O file for grazmeso_p
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/grazmeso_p.fesom.1958.nc
+ grazmeso_p: current mean I/O counter =            1
+ writing mean record for grazmeso_p; rec. count =            1
+ initializing I/O file for respc
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/respc.fesom.1958.nc
+ respc: current mean I/O counter =            1
+ writing mean record for respc; rec. count =            1
+ initializing I/O file for CoccoN
+ initializing I/O file for CO3
+ initializing I/O file for scaling_rho_2
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/CoccoN.fesom.1958.nc
+ CoccoN: current mean I/O counter =            1
+ writing mean record for CoccoN; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/CO3.fesom.1958.nc
+ CO3: current mean I/O counter =            1
+ writing mean record for CO3; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/scaling_rho_2.fesom.1958.nc
+ scaling_rho_2: current mean I/O counter =            1
+ writing mean record for scaling_rho_2; rec. count =            1
+ initializing I/O file for PhyCalc
+ initializing I/O file for TCphot_diatoms
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/PhyCalc.fesom.1958.nc
+ PhyCalc: current mean I/O counter =            1
+ writing mean record for PhyCalc; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/TCphot_diatoms.fesom.1958.nc
+ TCphot_diatoms: current mean I/O counter =            1
+ writing mean record for TCphot_diatoms; rec. count =            1
+ initializing I/O file for denb
+ initializing I/O file for CO2
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/denb.fesom.1958.nc
+ denb: current mean I/O counter =            1
+ writing mean record for denb; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/CO2.fesom.1958.nc
+ CO2: current mean I/O counter =            1
+ writing mean record for CO2; rec. count =            1
+ initializing I/O file for DFe
+ initializing I/O file for calcif
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/DFe.fesom.1958.nc
+ DFe: current mean I/O counter =            1
+ writing mean record for DFe; rec. count =            1
+ initializing I/O file for benSi
+ initializing I/O file for respp
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/calcif.fesom.1958.nc
+ calcif: current mean I/O counter =            1
+ writing mean record for calcif; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/benSi.fesom.1958.nc
+ benSi: current mean I/O counter =            1
+ writing mean record for benSi; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/respp.fesom.1958.nc
+ respp: current mean I/O counter =            1
+ writing mean record for respp; rec. count =            1
+ initializing I/O file for DiaN
+ initializing I/O file for PhaeoN
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/DiaN.fesom.1958.nc
+ DiaN: current mean I/O counter =            1
+ writing mean record for DiaN; rec. count =            1
+ initializing I/O file for DSi
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/PhaeoN.fesom.1958.nc
+ PhaeoN: current mean I/O counter =            1
+ writing mean record for PhaeoN; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/DSi.fesom.1958.nc
+ DSi: current mean I/O counter =            1
+ writing mean record for DSi; rec. count =            1
+ initializing I/O file for Zoo2N
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/Zoo2N.fesom.1958.nc
+ Zoo2N: current mean I/O counter =            1
+ writing mean record for Zoo2N; rec. count =            1
+ initializing I/O file for NPPd
+ initializing I/O file for pCO2
+ initializing I/O file for TTemp_diatoms
+ initializing I/O file for NNAn
+ initializing I/O file for aN
+ initializing I/O file for grazmeso_d
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/TTemp_diatoms.fesom.1958.nc
+ TTemp_diatoms: current mean I/O counter =            1
+ writing mean record for TTemp_diatoms; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/NPPd.fesom.1958.nc
+ NPPd: current mean I/O counter =            1
+ writing mean record for NPPd; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/pCO2.fesom.1958.nc
+ pCO2: current mean I/O counter =            1
+ writing mean record for pCO2; rec. count =            1
+ initializing I/O file for PAR
+ initializing I/O file for benN
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/aN.fesom.1958.nc
+ aN: current mean I/O counter =            1
+ writing mean record for aN; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/NNAn.fesom.1958.nc
+ NNAn: current mean I/O counter =            1
+ writing mean record for NNAn; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/PAR.fesom.1958.nc
+ PAR: current mean I/O counter =            1
+ writing mean record for PAR; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/grazmeso_d.fesom.1958.nc
+ grazmeso_d: current mean I/O counter =            1
+ writing mean record for grazmeso_d; rec. count =            1
+ initializing I/O file for aggc
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/aggc.fesom.1958.nc
+ aggc: current mean I/O counter =            1
+ writing mean record for aggc; rec. count =            1
+ initializing I/O file for NNAp
+ initializing I/O file for TCphotLL_phyto
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/NNAp.fesom.1958.nc
+ NNAp: current mean I/O counter =            1
+ writing mean record for NNAp; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/benN.fesom.1958.nc
+ benN: current mean I/O counter =            1
+ writing mean record for benN; rec. count =            1
+ initializing I/O file for idetz2c
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/TCphotLL_phyto.fesom.1958.nc
+ TCphotLL_phyto: current mean I/O counter =            1
+ writing mean record for TCphotLL_phyto; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/idetz2c.fesom.1958.nc
+ idetz2c: current mean I/O counter =            1
+ writing mean record for idetz2c; rec. count =            1
+ initializing I/O file for TCphotLL_cocco
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/TCphotLL_cocco.fesom.1958.nc
+ TCphotLL_cocco: current mean I/O counter =            1
+ writing mean record for TCphotLL_cocco; rec. count =            1
+ initializing I/O file for ChlDegp
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/ChlDegp.fesom.1958.nc
+ ChlDegp: current mean I/O counter =            1
+ writing mean record for ChlDegp; rec. count =            1
+ initializing I/O file for pCO2s
+ initializing I/O file for NPPc
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/pCO2s.fesom.1958.nc
+ pCO2s: current mean I/O counter =            1
+ writing mean record for pCO2s; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/NPPc.fesom.1958.nc
+ NPPc: current mean I/O counter =            1
+ writing mean record for NPPc; rec. count =            1
+ initializing I/O file for respd
+ initializing I/O file for benCalc
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/benCalc.fesom.1958.nc
+ benCalc: current mean I/O counter =            1
+ writing mean record for benCalc; rec. count =            1
+ initializing I/O file for calcdiss
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/respd.fesom.1958.nc
+ respd: current mean I/O counter =            1
+ writing mean record for respd; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/calcdiss.fesom.1958.nc
+ calcdiss: current mean I/O counter =            1
+ writing mean record for calcdiss; rec. count =            1
+ initializing I/O file for TqLF_diatoms
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/TqLF_diatoms.fesom.1958.nc
+ TqLF_diatoms: current mean I/O counter =            1
+ writing mean record for TqLF_diatoms; rec. count =            1
+ initializing I/O file for idetz2calc
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/idetz2calc.fesom.1958.nc
+ idetz2calc: current mean I/O counter =            1
+ writing mean record for idetz2calc; rec. count =            1
+ initializing I/O file for respmicro
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/respmicro.fesom.1958.nc
+ respmicro: current mean I/O counter =            1
+ writing mean record for respmicro; rec. count =            1
+ initializing I/O file for ChlDegc
+ initializing I/O file for rhoSW
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/ChlDegc.fesom.1958.nc
+ ChlDegc: current mean I/O counter =            1
+ writing mean record for ChlDegc; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/rhoSW.fesom.1958.nc
+ rhoSW: current mean I/O counter =            1
+ writing mean record for rhoSW; rec. count =            1
+ initializing I/O file for wsink_det1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/wsink_det1.fesom.1958.nc
+ wsink_det1: current mean I/O counter =            1
+ writing mean record for wsink_det1; rec. count =            1
+ initializing I/O file for aFe
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/aFe.fesom.1958.nc
+ aFe: current mean I/O counter =            1
+ writing mean record for aFe; rec. count =            1
+ initializing I/O file for O2
+ initializing I/O file for aggn
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/O2.fesom.1958.nc
+ O2: current mean I/O counter =            1
+ writing mean record for O2; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/aggn.fesom.1958.nc
+ aggn: current mean I/O counter =            1
+ writing mean record for aggn; rec. count =            1
+ initializing I/O file for GPPn
+ initializing I/O file for rho_det2
+ initializing I/O file for respmeso
+ initializing I/O file for benC
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/rho_det2.fesom.1958.nc
+ rho_det2: current mean I/O counter =            1
+ writing mean record for rho_det2; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/GPPn.fesom.1958.nc
+ GPPn: current mean I/O counter =            1
+ writing mean record for GPPn; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/respmeso.fesom.1958.nc
+ respmeso: current mean I/O counter =            1
+ writing mean record for respmeso; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/benC.fesom.1958.nc
+ benC: current mean I/O counter =            1
+ writing mean record for benC; rec. count =            1
+ initializing I/O file for rho_det1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/rho_det1.fesom.1958.nc
+ rho_det1: current mean I/O counter =            1
+ writing mean record for rho_det1; rec. count =            1
+ initializing I/O file for TCoccoCO2
+ initializing I/O file for aggp
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/aggp.fesom.1958.nc
+ aggp: current mean I/O counter =            1
+ writing mean record for aggp; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/TCoccoCO2.fesom.1958.nc
+ TCoccoCO2: current mean I/O counter =            1
+ writing mean record for TCoccoCO2; rec. count =            1
+ initializing I/O file for docexp
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/docexp.fesom.1958.nc
+ docexp: current mean I/O counter =            1
+ writing mean record for docexp; rec. count =            1
+ initializing I/O file for grazmeso_n
+ initializing I/O file for aggd
+ initializing I/O file for GPPp
+ initializing I/O file for HCO3
+ initializing I/O file for TqLF_phaeo
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/grazmeso_n.fesom.1958.nc
+ grazmeso_n: current mean I/O counter =            1
+ writing mean record for grazmeso_n; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/HCO3.fesom.1958.nc
+ HCO3: current mean I/O counter =            1
+ writing mean record for HCO3; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/aggd.fesom.1958.nc
+ aggd: current mean I/O counter =            1
+ writing mean record for aggd; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/GPPp.fesom.1958.nc
+ GPPp: current mean I/O counter =            1
+ writing mean record for GPPp; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/TqLF_phaeo.fesom.1958.nc
+ TqLF_phaeo: current mean I/O counter =            1
+ writing mean record for TqLF_phaeo; rec. count =            1
+ initializing I/O file for TCphot_phyto
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/TCphot_phyto.fesom.1958.nc
+ TCphot_phyto: current mean I/O counter =            1
+ writing mean record for TCphot_phyto; rec. count =            1
+ initializing I/O file for ChlDegn
+ initializing I/O file for docexd
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/ChlDegn.fesom.1958.nc
+ ChlDegn: current mean I/O counter =            1
+ writing mean record for ChlDegn; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/docexd.fesom.1958.nc
+ docexd: current mean I/O counter =            1
+ writing mean record for docexd; rec. count =            1
+ initializing I/O file for respmacro
+ initializing I/O file for docexc
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/respmacro.fesom.1958.nc
+ respmacro: current mean I/O counter =            1
+ writing mean record for respmacro; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/docexc.fesom.1958.nc
+ docexc: current mean I/O counter =            1
+ writing mean record for docexc; rec. count =            1
+ initializing I/O file for TqLF_phyto
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/TqLF_phyto.fesom.1958.nc
+ TqLF_phyto: current mean I/O counter =            1
+ writing mean record for TqLF_phyto; rec. count =            1
+ initializing I/O file for TSi_assimDia
+ initializing I/O file for TTemp_cocco
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/TSi_assimDia.fesom.1958.nc
+ TSi_assimDia: current mean I/O counter =            1
+ writing mean record for TSi_assimDia; rec. count =            1
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/TTemp_cocco.fesom.1958.nc
+ TTemp_cocco: current mean I/O counter =            1
+ writing mean record for TTemp_cocco; rec. count =            1
+ initializing I/O file for TDiaCO2
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/TDiaCO2.fesom.1958.nc
+ TDiaCO2: current mean I/O counter =            1
+ writing mean record for TDiaCO2; rec. count =            1
+ initializing I/O file for TCphotLL_phaeo
+ associating mean I/O file /albedo/scratch/user/simuel001/blanchard_4p3z2d_20240802/TCphotLL_phaeo.fesom.1958.nc
+ TCphotLL_phaeo: current mean I/O counter =            1
+ writing mean record for TCphotLL_phaeo; rec. count =            1
