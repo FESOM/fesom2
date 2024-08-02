@@ -652,7 +652,7 @@ END DO ! --> DO i=1, io_listsize
     end if
   
     !___________________________________________________________________________
-    if (ldiag_curl_vel3) then
+    if (ldiag_vorticity) then
         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'curl_u',     'relative vorticity',          '1/s',   vorticity,                   1, 'm', i_real4, partit, mesh)
     end if
 
