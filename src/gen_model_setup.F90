@@ -128,7 +128,7 @@ subroutine get_run_steps(nsteps, partit)
   ! clock should have been inialized before calling this routine
 
   if(run_length_unit=='s') then
-     nsteps=run_length
+     nsteps=run_length/dt
   elseif(run_length_unit=='d') then
      nsteps=step_per_day*run_length
   elseif(run_length_unit=='m') then
