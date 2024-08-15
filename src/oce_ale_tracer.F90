@@ -148,6 +148,9 @@ end module
 subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use g_config
     use o_PARAM, only: SPP, Fer_GM
+    !tr_xy and tr_z are needed cause, we are writing them on the GPU in init_tracers_AB subroutine
+    !and updating them so HOST can have access to them
+    use o_arrays, only: tr_xy, tr_z
     use mod_mesh
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -219,15 +222,20 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
+        !$ACC UPDATE  DEVICE(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB)
         call init_tracers_AB(tr_num, tracers, partit, mesh)
+        !$ACC UPDATE HOST(tr_xy, tr_z)
+        
 
         ! advect tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
 
 
 	!here update only those initialized in the init_tracers. (values, valuesAB, edge_up_dn_grad, ...)
-        !$ACC UPDATE  DEVICE(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB) &
-        !$ACC  DEVICE(tracers%work%edge_up_dn_grad) !!&
+    !!!! UPDATE from hpc_tracer !!!!
+    !we dont have to update because we are updating before init_tracers_AB
+        !!$ACC UPDATE  DEVICE(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB) &
+        !$ACC  UPDATE DEVICE(tracers%work%edge_up_dn_grad) !!&
         ! it will update del_ttf with contributions from horizontal and vertical advection parts (del_ttf_advhoriz and del_ttf_advvert)
 	!$ACC wait(1)
         call do_oce_adv_tra(dt, UV, Wvel, Wvel_i, Wvel_e, tr_num, dynamics, tracers, partit, mesh)

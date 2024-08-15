@@ -382,6 +382,9 @@ contains
     !$ACC CREATE (f%tracers%work%adv_flux_hor, f%tracers%work%adv_flux_ver, f%tracers%work%fct_LO) &
     !$ACC CREATE (f%tracers%work%del_ttf_advvert, f%tracers%work%del_ttf_advhoriz, f%tracers%work%edge_up_dn_grad) &
     !$ACC CREATE (f%tracers%work%del_ttf)
+    
+    !! Creating variables in GPU memory for init_tracers_AB module
+    !$ACC ENTER DATA CREATE(tr_xy, tr_z, relax2clim, Sclim, Tclim)
   end subroutine
 
 
@@ -631,6 +634,9 @@ contains
     !$ACC EXIT DATA DELETE (f%tracers%data, f%tracers%work)
     !$ACC EXIT DATA DELETE (f%dynamics%w, f%dynamics%w_e, f%dynamics%uv)
     !$ACC EXIT DATA DELETE (f%dynamics, f%tracers)
+
+    !!$ Deleting init_tracers_AB values
+    !$ACC EXIT DATA DELETE (tr_xy, tr_z, relax2clim, Sclim, Tclim)
 
     !delete mesh and partit data.
     !$ACC EXIT DATA DELETE (f%mesh%coriolis_node, f%mesh%nn_num, f%mesh%nn_pos) 
