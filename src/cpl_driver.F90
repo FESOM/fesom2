@@ -477,6 +477,9 @@ include "associate_mesh_ass.h"
     ALLOCATE(send_id(nsend))
     ALLOCATE(recv_id(nrecv))
 !---wiso-code-end
+    
+    ALLOCATE(displs_from_all_pes(partit%npes))
+    ALLOCATE(counts_from_all_pes(partit%npes))
 
     send_id = 0
     recv_id = 0
@@ -565,8 +568,6 @@ include "associate_mesh_ass.h"
       ALLOCATE(all_x_corners(1, 1, 1))
       ALLOCATE(all_y_corners(1, 1, 1))
     endif
-    ALLOCATE(displs_from_all_pes(partit%npes))
-    ALLOCATE(counts_from_all_pes(partit%npes))
    
 
 
