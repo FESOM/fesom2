@@ -95,12 +95,13 @@ end module
 
 module transit_bc_surface_interface
     interface
-        function transit_bc_surface(n, id, sst, sss, a_ice, sval, nzmin, partit)
+        function transit_bc_surface(n, id, sst, sss, a_ice, sval, nzmin, partit, mesh)
         use mod_mesh
         USE MOD_PARTIT
         USE MOD_PARSUP
         integer , intent(in)                  :: n, id, nzmin
         type(t_partit), intent(inout), target :: partit
+        type(t_mesh), intent(in), target      :: mesh
         real(kind=WP)                         :: transit_bc_surface
         real(kind=WP), intent(in)             :: sst, sss, a_ice, sval
         end function
@@ -896,7 +897,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         tr(nzmin)= tr(nzmin)+bc_surface(n, tracers%data(tr_num)%ID, trarr(nzmin,n), nzmin, partit)
 
         if ((tracers%data(tr_num)%ID .ge. 6) .and.(tracers%data(tr_num)%ID .le. 40)) then
-          tr(nzmin)= tr(nzmin)+transit_bc_surface(n, tracers%data(tr_num)%ID, sst(nzmin,n), sss(nzmin,n), a_ice(n), trarr(nzmin,n), nzmin, partit)
+          tr(nzmin)= tr(nzmin)+transit_bc_surface(n, tracers%data(tr_num)%ID, sst(nzmin,n), sss(nzmin,n), a_ice(n), trarr(nzmin,n), nzmin, partit, mesh)
         end if
         
         !_______________________________________________________________________
@@ -1410,7 +1411,7 @@ END FUNCTION
 ! This function returns a boundary conditions for a specified transient tracer ID and surface node.
 ! Different to function bc_surface, SST, SSS, and sea ice concentrations are always needed as
 ! auxiliary variable
-FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit)
+FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit, mesh)
   use MOD_MESH
   USE MOD_PARTIT
   USE MOD_PARSUP
@@ -1424,6 +1425,7 @@ FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit)
   integer,       intent(in)            :: n, id, nzmin
   real(kind=WP), intent(in)            :: sst, sss, aice, sval
   type(t_partit),intent(inout), target :: partit
+  type(t_mesh),  intent(in), target    :: mesh
   REAL(kind=WP)                        :: transit_bc_surface
   character(len=10)                    :: id_string
 
@@ -1432,14 +1434,19 @@ FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit)
   !  --> is_nonlinfs=0.0 for linfs
 
 #if defined (__oasis)
-!   SLP and wind speed in coupled setups. This is a makeshift solution
-!   as long as the true values are not provided by the AGCM / OASIS.
-    press_a = mean_slp
-    wind_2  = speed_2(stress_atmoce_x(n), stress_atmoce_y(n))
+! SLP and wind speed in coupled setups. This is a makeshift solution
+! as long as the true values are not provided by the AGCM / OASIS.
+  press_a = mean_slp
+  wind_2  = speed_2(stress_atmoce_x(n), stress_atmoce_y(n))
 #else
-    press_a = press_air(n)
-    wind_2  = u_wind(n)**2 + v_wind(n)**2
+  press_a = press_air(n)
+  wind_2  = u_wind(n)**2 + v_wind(n)**2
 #endif
+
+! The atmospheric input of bomb 14C, CFC-12, and SF6 depends on latitude. To that effect specify
+  y_abc = mesh%geo_coord_nod2D(2,n) / rad  ! latitude of atmospheric tracer input
+  yy_nh = (10. - y_abc) * 0.05             ! interpolation weight for tropical tracer values
+
 
   SELECT CASE (id)
 
