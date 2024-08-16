@@ -1,5 +1,6 @@
 export FC=mpifort CC=mpicc CXX=mpicxx
-export BLAS_LIBRARIES=/usr/lib/x86_64-linux-gnu/blas/
-export UBUNTU_BLAS_LIBRARY="libblas.a"
-
+if [[ -f "/usr/lib/x86_64-linux-gnu/liblapack.so.3" ]]; then
+  export LAPACK_LIBRARIES=/usr/lib/x86_64-linux-gnu/liblapack.so.3
+  export CMAKE_ARGS=-DLAPACK_LIBRARIES=${LAPACK_LIBRARIES}
+fi
 
