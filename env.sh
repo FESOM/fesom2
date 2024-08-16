@@ -32,8 +32,17 @@ if [[ -z "$1" ]] || [[  "$1" =~ ^- ]]; then
    # no argument given
    LOGINHOST="$(hostname -f)"
 else
-   LOGINHOST=$1 # 1st arg exists and doesn't start with -, meaning it is machine specification
+   MACHINESPEC=$1 # 1st arg exists and doesn't start with -, meaning it is machine specification
    shift # pop the argument as we already stored it, remaining arguments are passed to cmake
+   
+   # check if given machine spec has + in it. if so save the later part as compilerid
+   if [[ $MACHINESPEC == *"+"* ]]; then
+     LOGINHOST="${MACHINESPEC%%+*}"       # Everything before the '+'
+     COMPILERID="${MACHINESPEC#*+}"       # Everything after the '+'
+   else
+     LOGINHOST="$MACHINESPEC"
+     COMPILERID=""
+   fi
 fi
 
 
@@ -45,11 +54,6 @@ elif [[ $LOGINHOST =~ ^m[A-Za-z0-9]+\.hpc\.dkrz\.de$ ]]; then
    STRATEGY="mistral.dkrz.de"
 elif [[ $LOGINHOST =~ ^levante ]] || [[ $LOGINHOST =~ ^l[:alnum:]+\.lvt\.dkrz\.de$ ]]; then 
    STRATEGY="levante.dkrz.de"
-   # following regex only matches if input is 2 word like levante.nvhpc, this enables using different shells for a machine directly
-   compid_regex="^([[:alnum:]]+)\.([[:alnum:]]+)$"
-   if [[ $LOGINHOST =~ $compid_regex ]]; then
-     COMPILERID="${BASH_REMATCH[2]}"
-   fi
 elif [[ $LOGINHOST =~ ^ollie[0-9]$ ]] || [[ $LOGINHOST =~ ^prod-[0-9]{4}$ ]]; then
    STRATEGY="ollie"
 elif [[ $LOGINHOST =~ ^albedo[0-9]$ ]] || [[ $LOGINHOST =~ ^prod-[0-9]{4}$ ]]; then
@@ -62,9 +66,9 @@ elif [[ $LOGINHOST =~ \.hww\.de$ ]] || [[ $LOGINHOST =~ ^nid[0-9]{5}$ ]]; then
    STRATEGY="hazelhen.hww.de"
 elif [[  $LOGINHOST =~ \.jureca$ ]]; then
    STRATEGY="jureca"
-elif [[  $LOGINHOST = ubuntu ]]; then
+elif [[  $LOGINHOST =~ ^ubuntu ]]; then
    STRATEGY="ubuntu"
-elif [[  $LOGINHOST = bsc ]]; then
+elif [[  $LOGINHOST =~ ^bsc ]]; then
    STRATEGY="bsc"
 elif [[  $LOGINHOST =~ ^juwels[0-9][0-9].ib.juwels.fzj.de$ ]]; then
    STRATEGY="juwels"
@@ -98,6 +102,7 @@ else
    export FESOM_PLATFORM_STRATEGY=$STRATEGY
    SHELLFILE="${DIR}/env/${STRATEGY}/shell"
    if [[ -n ${COMPILERID} ]]; then
+      echo "Compiler ID for shell is: ${COMPILERID}"
       SHELLFILE="${SHELLFILE}.${COMPILERID}"
    fi
    if [[ ! -e ${SHELLFILE} ]]; then 

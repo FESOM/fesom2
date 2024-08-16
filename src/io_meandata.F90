@@ -54,6 +54,9 @@ module io_MEANDATA
     real(real32), allocatable, dimension(:,:) :: local_values_r4_copy
     real(kind=WP) :: ctime_copy
     integer :: mype_workaround
+    character(500) :: long_description="" 
+    character(100) :: defined_on=""
+    character(100) :: mesh="fesom_mesh"
     ! to be passed to MULTIO (time window for the accumulations)
     integer :: currentDate,  currentTime
     integer :: previousDate, previousTime
@@ -74,6 +77,8 @@ module io_MEANDATA
   logical, save                  :: vec_autorotate=.FALSE.
   logical, save                  :: lnextGEMS=.FALSE.
   integer, save                  :: nlev_upper=1
+  character(len=1), save         :: filesplit_freq='y'
+  integer, save                  :: compression_level=0
   type io_entry
         CHARACTER(len=15)        :: id        ='unknown   '
         INTEGER                  :: freq      =0
@@ -118,6 +123,10 @@ end subroutine
 !_______________________________________________________________________________
 ! define 2d/3d meandata stream parameter
 subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
+    !------------------------------------------
+    ! LA 2023-01-31 add iceberg params
+    use iceberg_params
+    !------------------------------------------
     use MOD_MESH
     use MOD_TRACER
     USE MOD_PARTIT
@@ -130,7 +139,9 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     use g_cvmix_tidal
     use diagnostics
     use g_config,        only: use_cavity
-    use g_forcing_param, only: use_virt_salt
+    use g_forcing_param, only: use_virt_salt, use_landice_water, use_age_tracer !---fwf-code, age-code
+    use g_config, only : lwiso !---wiso-code
+    use mod_transit, only : index_transit 
     implicit none
     integer                   :: i, j
     integer, save             :: nm_io_unit  = 103       ! unit to open namelist file, skip 100-102 for cray
@@ -143,7 +154,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     type(t_tracer), intent(in)   , target :: tracers
     type(t_dyn)   , intent(in)   , target :: dynamics
     type(t_ice)   , intent(in)   , target :: ice
-    namelist /nml_general / io_listsize, vec_autorotate, lnextGEMS, nlev_upper
+    namelist /nml_general / io_listsize, vec_autorotate, lnextGEMS, nlev_upper, filesplit_freq, compression_level
     namelist /nml_list    / io_list
 
 #include "associate_part_def.h"
@@ -180,9 +191,9 @@ DO i=1, io_listsize
 SELECT CASE (trim(io_list(i)%id))
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!2D streams!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 CASE ('sst       ')
-    call def_stream(nod2D, myDim_nod2D, 'sst',      'sea surface temperature',        'C',      tracers%data(1)%values(1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'sst',      'sea surface temperature',        'C', tracers%data(1)%values(1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea surface temperature")
 CASE ('sss       ')
-    call def_stream(nod2D, myDim_nod2D, 'sss',      'sea surface salinity',           'psu',    tracers%data(2)%values(1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'sss',      'sea surface salinity',           'psu', tracers%data(2)%values(1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea surface salinity")
 CASE ('ssh       ')
     call def_stream(nod2D, myDim_nod2D, 'ssh',      'sea surface elevation',          'm',      dynamics%eta_n,                          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('vve_5     ')
@@ -321,6 +332,37 @@ CASE ('MLD3      ')
     call def_stream(nod2D, myDim_nod2D, 'MLD3',     'Mixed Layer Depth',               'm',      MLD3(1:myDim_nod2D),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     
 !_______________________________________________________________________________
+!---wiso-code
+! output water isotopes in sea ice
+CASE ('h2o18_ice ')
+    if (lwiso) then
+    call def_stream(nod2D,  myDim_nod2D,  'h2o18_ice',      'h2o18 concentration in sea ice',    'kmol/m**3',    tr_arr_ice(:,1),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+CASE ('hDo16_ice ')
+    if (lwiso) then
+    call def_stream(nod2D,  myDim_nod2D,  'hDo16_ice',      'hDo16 concentration in sea ice',    'kmol/m**3',    tr_arr_ice(:,2),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+CASE ('h2o16_ice ')
+    if (lwiso) then
+    call def_stream(nod2D,  myDim_nod2D,  'h2o16_ice',      'h2o16 concentration in sea ice',    'kmol/m**3',    tr_arr_ice(:,3),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+!---wiso-code-end
+
+!---fwf-code-begin
+CASE ('landice   ')
+    if (use_landice_water) then
+    call def_stream(nod2D,  myDim_nod2D,  'landice',      'freshwater flux',    'm/s',    runoff_landice,    io_list(i)%freq,    io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+!---fwf-code-end
+
+!---age-code-begin
+CASE ('age       ')
+    if (use_age_tracer) then
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'age',      'water age tracer',    'year',    tracers%data(index_age_tracer)%values(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+!---age-code-end
+
+!_______________________________________________________________________________
 ! output surface forcing
 CASE ('fh        ')
     call def_stream(nod2D, myDim_nod2D, 'fh',       'heat flux',                       'W',      heat_flux_in(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -346,7 +388,7 @@ CASE ('dens_flux ')
     call def_stream(nod2D, myDim_nod2D, 'dflux',    'density flux',               'kg/(m3*s)',   dens_flux(:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('runoff    ')
     sel_forcvar(10)= 1
-    call def_stream(nod2D, myDim_nod2D, 'runoff',   'river runoff',                    'none',   runoff(:),                 io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'runoff',   'river runoff',                    'm/s',   runoff(:),                 io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('evap      ')
     sel_forcvar(7) = 1
     call def_stream(nod2D, myDim_nod2D, 'evap',     'evaporation',                     'm/s',    evaporation(:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -402,13 +444,14 @@ CASE ('kpp_sbuoyflx')
     end if
 CASE ('tx_sur    ')
     sel_forcvar(11) = 1
-    call def_stream(elem2D, myDim_elem2D,  'tx_sur',    'zonal wind str. to ocean',       'm/s2',   stress_surf(1, :),         io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(elem2D, myDim_elem2D,  'tx_sur',    'zonal wind str. to ocean',       'N/m2',   stress_surf(1, :),         io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('ty_sur    ')
     sel_forcvar(12) = 1
-    call def_stream(elem2D, myDim_elem2D,  'ty_sur',    'meridional wind str. to ocean',  'm/s2',   stress_surf(2, :),         io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(elem2D, myDim_elem2D,  'ty_sur',    'meridional wind str. to ocean',  'N/m2',   stress_surf(2, :),         io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('curl_surf ')
     if (lcurt_stress_surf) then
-    call def_stream(nod2D, myDim_nod2D,    'curl_surf', 'vorticity of the surface stress','none',   curl_stress_surf(:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D,    'curl_surf', 'vorticity of the surface stress', 'none',   curl_stress_surf(:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    
     end if
     
 !___________________________________________________________________________________________________________________________________    
@@ -418,11 +461,36 @@ CASE ('temp      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp',      'temperature', 'C',      tracers%data(1)%values(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('salt      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt',      'salinity',    'psu',    tracers%data(2)%values(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-CASE ('otracers  ')
-    do j=3, tracers%num_tracers
-    write (id_string, "(I3.3)") tracers%data(j)%ID
-    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'tra_'//id_string, 'pasive tracer ID='//id_string, 'n/a', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-    end do
+CASE ('sigma0      ')
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'sigma0',      'potential density',    'kg/m3',    density_m_rho0(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+!---wiso-code
+!___________________________________________________________________________________________________________________________________
+! output water isotopes in ocean water
+CASE ('h2o18     ')
+    if (lwiso) then
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'h2o18', 'h2o18 concentration',    'kmol/m**3',    tracers%data(index_wiso_tracers(1))%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('hDo16     ')
+    if (lwiso) then
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'hDo16', 'hDo16 concentration',    'kmol/m**3',    tracers%data(index_wiso_tracers(2))%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('h2o16     ')
+    if (lwiso) then
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'h2o16', 'h2o16 concentration',    'kmol/m**3',    tracers%data(index_wiso_tracers(3))%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+!---wiso-code-end
+
+! Transient tracers
+CASE('SF6        ')
+    if (use_transit)  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'sf6', 'sulfur hexafluoride', 'mol / m**3', tracers%data(index_transit(1))%values(:,:),  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE('CFC-12     ')
+    if (use_transit)  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'cfc12', 'chlorofluorocarbon CFC-12', 'mol / m**3', tracers%data(index_transit(2))%values(:,:),  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE('R14C       ')
+    if (use_transit)  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'r14c', '14C / C ratio of DIC', 'none', tracers%data(index_transit(3))%values(:,:),  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE('R39Ar       ')
+    if (use_transit)  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'r39ar', '39Ar / Ar ratio', 'none', tracers%data(index_transit(4))%values(:,:),  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+! Transient tracers end
 CASE ('slope_x   ')
     call def_stream((/nl-1,  nod2D/), (/nl-1, myDim_nod2D/),  'slope_x',   'neutral slope X',    'none', slope_tapered(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('slope_y   ')
@@ -545,6 +613,18 @@ CASE ('qso       ')
 CASE ('enthalpy  ')
   call def_stream(nod2D, myDim_nod2D, 'enth',  'enthalpy of fusion',     'W/m^2',  ice%atmcoupl%enthalpyoffuse(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 #endif
+
+!------------------------------------------
+! LA 2023-01-31 adding iceberg outputs
+CASE ('icb       ')
+  if (use_icebergs) then
+    call def_stream(nod2D, myDim_nod2D, 'ibfwb',   'basal iceberg melting',            'm/s',    ibfwb(:),         1, 'm', i_real4, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'ibfwbv',  'basal iceberg melting',            'm/s',    ibfwbv(:),        1, 'm', i_real4, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'ibfwl',   'lateral iceberg melting',          'm/s',    ibfwl(:),         1, 'm', i_real4, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'ibfwe',   'iceberg erosion',                  'm/s',    ibfwe(:),         1, 'm', i_real4, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'ibhf',    'heat flux from iceberg melting',   'W/m2',   ibhf(:),          1, 'm', i_real4, partit, mesh)
+  end if
+!------------------------------------------
 !_______________________________________________________________________________
 ! TKE mixing diagnostic 
 CASE ('TKE       ')
@@ -606,8 +686,8 @@ CASE ('FORC      ')
         if (sel_forcvar( 8)==0) call def_stream(nod2D , myDim_nod2D , 'swr'   , 'short wave radiation'           , 'W/m^2', shortwave(:)     , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         if (sel_forcvar( 9)==0) call def_stream(nod2D , myDim_nod2D , 'lwr'   , 'long wave radiation'            , 'W/m^2', longwave(:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         if (sel_forcvar(10)==0) call def_stream(nod2D , myDim_nod2D , 'runoff', 'river runoff'                   , 'none' , runoff(:)        , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-        if (sel_forcvar(11)==0) call def_stream(elem2D, myDim_elem2D, 'tx_sur', 'zonal wind str. to ocean'       , 'm/s^2', stress_surf(1, :), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-        if (sel_forcvar(12)==0) call def_stream(elem2D, myDim_elem2D, 'ty_sur', 'meridional wind str. to ocean'  , 'm/s^2', stress_surf(2, :), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        if (sel_forcvar(11)==0) call def_stream(elem2D, myDim_elem2D, 'tx_sur', 'zonal wind str. to ocean'       , 'N/m^2', stress_surf(1, :), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        if (sel_forcvar(12)==0) call def_stream(elem2D, myDim_elem2D, 'ty_sur', 'meridional wind str. to ocean'  , 'N/m^2', stress_surf(2, :), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         
         call def_stream(nod2D , myDim_nod2D , 'cd',    'wind drag coef. '             , '',     cd_atm_oce_arr(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(nod2D , myDim_nod2D , 'ch',    'transfer coeff. sensible heat', '',     ch_atm_oce_arr(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -654,6 +734,14 @@ END DO ! --> DO i=1, io_listsize
         call def_stream((/nl,  nod2D/), (/nl, myDim_nod2D/), 'KvdSdz',   'KvdSdz',           'PSU m/s',   KvdSdz(:,:), 1, 'm', i_real8, partit, mesh)
     end if
     !___________________________________________________________________________
+    ! Tracers flux diagnostics
+    if (ldiag_trflx) then
+        call def_stream((/nl-1,  elem2D/), (/nl-1, myDim_elem2D/), 'utemp',   'u*temp',           'm/s*°C',     tuv(1,:,:), 1, 'm', i_real8, partit, mesh)
+        call def_stream((/nl-1,  elem2D/), (/nl-1, myDim_elem2D/), 'vtemp',   'v*temp',           'm/s*°C',     tuv(2,:,:), 1, 'm', i_real8, partit, mesh)
+        call def_stream((/nl-1,  elem2D/), (/nl-1, myDim_elem2D/), 'usalt',   'u*salt',           'm/s*psu',   suv(1,:,:), 1, 'm', i_real8, partit, mesh)
+        call def_stream((/nl-1,  elem2D/), (/nl-1, myDim_elem2D/), 'vsalt',   'v*salt',           'm/s*psu',   suv(2,:,:), 1, 'm', i_real8, partit, mesh)
+    end if
+    !___________________________________________________________________________
     ! output Redi parameterisation
 #if !defined(__MULTIO)
     if (Redi) then
@@ -687,29 +775,11 @@ END DO ! --> DO i=1, io_listsize
         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_temp_v', 'vert. dvd of temperature' , '°C/s' , tracers%work%tr_dvd_vert(:,:,1) , 1, 'm', i_real4, partit, mesh)
         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_h', 'horiz. dvd of salinity'   , 'psu/s', tracers%work%tr_dvd_horiz(:,:,2), 1, 'm', i_real4, partit, mesh)
         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_v', 'vert. dvd of salinity'    , 'psu/s', tracers%work%tr_dvd_vert(:,:,2) , 1, 'm', i_real4, partit, mesh)
+
     end if     
-    !___________________________________________________________________________
-    if (ldiag_forc) then
-        if (sel_forcvar( 1)==0) call def_stream(nod2D , myDim_nod2D , 'uwind' , '10m zonal surface wind velocity', 'm/s'  , u_wind(:)        , 1, 'm', i_real4, partit, mesh)
-        if (sel_forcvar( 2)==0) call def_stream(nod2D , myDim_nod2D , 'vwind' , '10m merid surface wind velocity', 'm/s'  , v_wind(:)        , 1, 'm', i_real4, partit, mesh)
-        if (sel_forcvar( 3)==0) call def_stream(nod2D , myDim_nod2D , 'tair'  , 'surface air temperature'        , '°C'   , Tair(:)          , 1, 'm', i_real4, partit, mesh)
-        if (sel_forcvar( 4)==0) call def_stream(nod2D , myDim_nod2D , 'shum'  , 'specific humidity'              , ''     , shum(:)          , 1, 'm', i_real4, partit, mesh)
-        if (sel_forcvar( 5)==0) call def_stream(nod2D , myDim_nod2D , 'prec'  , 'precicipation rain'             , 'm/s'  , prec_rain(:)     , 1, 'm', i_real4, partit, mesh)
-        if (sel_forcvar( 6)==0) call def_stream(nod2D , myDim_nod2D , 'snow'  , 'precicipation snow'             , 'm/s'  , prec_snow(:)     , 1, 'm', i_real4, partit, mesh)
-        if (sel_forcvar( 7)==0) call def_stream(nod2D , myDim_nod2D , 'evap'  , 'evaporation'                    , 'm/s'  , evaporation(:)   , 1, 'm', i_real4, partit, mesh)
-        if (sel_forcvar( 8)==0) call def_stream(nod2D , myDim_nod2D , 'swr'   , 'short wave radiation'           , 'W/m^2', shortwave(:)     , 1, 'm', i_real4, partit, mesh)
-        if (sel_forcvar( 9)==0) call def_stream(nod2D , myDim_nod2D , 'lwr'   , 'long wave radiation'            , 'W/m^2', longwave(:)      , 1, 'm', i_real4, partit, mesh)
-        if (sel_forcvar(10)==0) call def_stream(nod2D , myDim_nod2D , 'runoff', 'river runoff'                   , 'none' , runoff(:)        , 1, 'm', i_real4, partit, mesh)
-        if (sel_forcvar(11)==0) call def_stream(elem2D, myDim_elem2D, 'tx_sur', 'zonal wind str. to ocean'       , 'm/s^2', stress_surf(1, :), 1, 'm', i_real4, partit, mesh)
-        if (sel_forcvar(12)==0) call def_stream(elem2D, myDim_elem2D, 'ty_sur', 'meridional wind str. to ocean'  , 'm/s^2', stress_surf(2, :), 1, 'm', i_real4, partit, mesh)
-        call def_stream(nod2D , myDim_nod2D , 'cd',    'wind drag coef. '             , '',     cd_atm_oce_arr(:), 1, 'm', i_real4, partit, mesh)
-        call def_stream(nod2D , myDim_nod2D , 'ch',    'transfer coeff. sensible heat', '',     ch_atm_oce_arr(:), 1, 'm', i_real4, partit, mesh)
-        call def_stream(nod2D , myDim_nod2D , 'ce',    'transfer coeff. evaporation ' , '',     ce_atm_oce_arr(:), 1, 'm', i_real4, partit, mesh)
-#if defined (__oasis)
-        call def_stream(nod2D,  myDim_nod2D,  'subli', 'sublimation',                   'm/s',  sublimation(:),   1, 'm',  i_real4, partit, mesh)
-#endif
-    end if
+
     
+    !___________________________________________________________________________
     if (dynamics%ldiag_ke) then
        call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_adv_u_xVEL', 'work of advection   [u]',        'm2/s2', dynamics%ke_adv_xVEL(1,:,:),  io_list(i)%freq, 'm', 8, partit, mesh)
        call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_adv_v_xVEL', 'work of advection   [v]',        'm2/s2', dynamics%ke_adv_xVEL(2,:,:),  io_list(i)%freq, 'm', 8, partit, mesh)
@@ -888,23 +958,29 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     
     call assert_nf( nf_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), entry%ndim+1, (/entry%dimid(entry%ndim:1:-1), entry%recID/), entry%varID), __LINE__)
 
+    call assert_nf( nf_def_var_deflate(entry%ncid, entry%varID, 0, 1, compression_level), __LINE__)
     call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'description', len_trim(entry%description), entry%description), __LINE__)
     call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'long_name', len_trim(entry%description), entry%description), __LINE__)
     call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'units',       len_trim(entry%units),       entry%units), __LINE__)
-  
-    !___Global attributes_______________________________________________________  
+    call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'location',       len_trim(entry%defined_on),       entry%defined_on), __LINE__)
+    call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'mesh',       len_trim(entry%mesh),       entry%mesh), __LINE__)
+
+
+  !___Global attributes________  
+    call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'Conventions', len_trim('UGRID-1.0'),'UGRID-1.0'), __LINE__)
     call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'model', len_trim('FESOM2'),'FESOM2'), __LINE__)
     call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'website', len_trim('fesom.de'), trim('fesom.de')), __LINE__)
-    
+
     call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'git_SHA', len_trim(fesom_git_sha()), fesom_git_sha()), __LINE__)
     call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'MeshPath', len_trim(MeshPath), trim(MeshPath)), __LINE__)
     call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'mesh_representative_checksum', len(mesh%representative_checksum), mesh%representative_checksum), __LINE__)
     call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'ClimateDataPath', len_trim(ClimateDataPath), trim(ClimateDataPath)), __LINE__)
     call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'which_ALE', len_trim(which_ALE), trim(which_ALE)), __LINE__)
     call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'mix_scheme', len_trim(mix_scheme), trim(mix_scheme)), __LINE__)
-! call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_hor', len_trim(tra_adv_hor), trim(tra_adv_hor)), __LINE__)
-! call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_ver', len_trim(tra_adv_ver), trim(tra_adv_ver)), __LINE__)
-! call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_lim', len_trim(tra_adv_lim), trim(tra_adv_lim)), __LINE__)
+
+  ! call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_hor', len_trim(tra_adv_hor), trim(tra_adv_hor)), __LINE__)
+  ! call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_ver', len_trim(tra_adv_ver), trim(tra_adv_ver)), __LINE__)
+  ! call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_lim', len_trim(tra_adv_lim), trim(tra_adv_lim)), __LINE__)
  
     call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell', NF_INT, 1,  use_partial_cell), __LINE__)
     call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'force_rotation', NF_INT, 1,  force_rotation), __LINE__)
@@ -1175,9 +1251,10 @@ ctime=timeold+(dayold-1.)*86400
         ! define output streams-->dimension, variable, long_name, units, array, freq, unit, precision
         !PS if (partit%flag_debug .and. partit%mype==0)  print *, achar(27)//'[32m'//' -I/O-> call ini_mean_io'//achar(27)//'[0m'
         call ini_mean_io(ice, dynamics, tracers, partit, mesh)
-        
+
         !PS if (partit%flag_debug .and. partit%mype==0)  print *, achar(27)//'[33m'//' -I/O-> call init_io_gather'//achar(27)//'[0m'
         call init_io_gather(partit)
+
 #if defined (__icepack)
         call init_io_icepack(mesh) !icapack has its copy of p_partit => partit
 #endif
@@ -1236,8 +1313,12 @@ ctime=timeold+(dayold-1.)*86400
             entry%thread_running = .false.
             
             ! define filepath
-            filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
-            
+            if (filesplit_freq=='m') then
+                filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'_'//cmonth//'.nc'
+            else
+                filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
+            endif
+
             !___________________________________________________________________
             ! only root rank task does output
             if(partit%mype == entry%root_rank) then
@@ -1391,25 +1472,28 @@ subroutine finalize_output()
 end subroutine
 !
 !
+
 !_______________________________________________________________________________
 ! build 3d meandata streaming object
-subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh, flip_array)
-    use mod_mesh
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    implicit none
-    type(t_partit),        intent(inout), target :: partit
-    integer,               intent(in)    :: glsize(2), lcsize(2)
-    character(len=*),      intent(in)    :: name, description, units
-    real(kind=WP), target, intent(in)    :: data(:,:)
-    integer,               intent(in)    :: freq
-    character,             intent(in)    :: freq_unit
-    integer,               intent(in)    :: accuracy
-    type(Meandata),        allocatable   :: tmparr(:)
-    type(Meandata),        pointer       :: entry
-    type(t_mesh), intent(in), target     :: mesh
-    logical, optional, intent(in)        :: flip_array
-    integer i
+subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh, flip_array, long_description)
+  use mod_mesh
+  USE MOD_PARTIT
+  USE MOD_PARSUP
+  implicit none
+  type(t_partit),        intent(inout), target :: partit
+  integer,               intent(in)    :: glsize(2), lcsize(2)
+  character(len=*),      intent(in)    :: name, description, units
+  real(kind=WP), target, intent(in)    :: data(:,:)
+  integer,               intent(in)    :: freq
+  character,             intent(in)    :: freq_unit
+  integer,               intent(in)    :: accuracy
+  type(Meandata),        allocatable   :: tmparr(:)
+  type(Meandata),        pointer       :: entry
+  type(t_mesh), intent(in), target     :: mesh
+  logical, optional, intent(in)        :: flip_array
+  character(len=*), optional, intent(in) :: long_description
+  integer i
+
  
     !___________________________________________________________________________
 #if !defined(__PGI)  
@@ -1466,30 +1550,31 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
 
     entry%dimname(1)=mesh_dimname_from_dimsize(glsize(1), partit, mesh)     !2D! mesh_dimname_from_dimsize(glsize, mesh)
     entry%dimname(2)=mesh_dimname_from_dimsize(glsize(2), partit, mesh)     !2D! entry%dimname(2)='unknown'
-    
     ! non dimension specific
-    call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh)
+    call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh, long_description)
+
 end subroutine
 !
 !
 !_______________________________________________________________________________
 ! build 2d meandata streaming object
-subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh)
-    use mod_mesh
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    implicit none
-    integer,               intent(in)    :: glsize, lcsize
-    character(len=*),      intent(in)    :: name, description, units
-    real(kind=WP), target, intent(in)    :: data(:)
-    integer,               intent(in)    :: freq
-    character,             intent(in)    :: freq_unit
-    integer,               intent(in)    :: accuracy
-    type(Meandata),        allocatable   :: tmparr(:)
-    type(Meandata),        pointer       :: entry
-    type(t_mesh),          intent(in)    :: mesh
-    type(t_partit),        intent(inout) :: partit
-    integer i
+subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh, long_description)
+  use mod_mesh
+  USE MOD_PARTIT
+  USE MOD_PARSUP
+  implicit none
+  integer,               intent(in)    :: glsize, lcsize
+  character(len=*),      intent(in)    :: name, description, units
+  real(kind=WP), target, intent(in)    :: data(:)
+  integer,               intent(in)    :: freq
+  character,             intent(in)    :: freq_unit
+  integer,               intent(in)    :: accuracy
+  type(Meandata),        allocatable   :: tmparr(:)
+  type(Meandata),        pointer       :: entry
+  type(t_mesh),          intent(in)    :: mesh
+  type(t_partit),        intent(inout) :: partit
+  character(len=*), optional, intent(in) :: long_description
+  integer i
 
     !___________________________________________________________________________
 #if !defined(__PGI)   
@@ -1531,14 +1616,14 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
         entry%local_values_r4 = 0._real32
     end if
 
+    ! non dimension specific
     entry%ndim=1
     entry%glsize=(/1, glsize/)
-
     entry%dimname(1)=mesh_dimname_from_dimsize(glsize, partit, mesh)
     entry%dimname(2)='unknown'
 
     ! non dimension specific
-    call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh)
+    call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh, long_description)
 end subroutine
 !
 !
@@ -1573,7 +1658,7 @@ end subroutine
 !_______________________________________________________________________________
 ! further fill up 2d/3d meandata streaming object --> link output callback routine
 ! as stream object method
-subroutine def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh)
+subroutine def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh, long_description)
     use mod_mesh
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -1585,6 +1670,7 @@ subroutine def_stream_after_dimension_specific(entry, name, description, units, 
     integer,               intent(in)    :: accuracy
     type(t_mesh), intent(in), target     :: mesh
     type(t_partit), intent(inout), target :: partit
+    character(len=*), intent(in) :: long_description
     ! EO args
     logical async_netcdf_allowed
     integer provided_mpi_thread_support_level
@@ -1609,6 +1695,8 @@ subroutine def_stream_after_dimension_specific(entry, name, description, units, 
     !___________________________________________________________________________
     entry%name = name
     entry%description = description
+    entry%long_description = long_description
+    entry%mesh = "fesom_mesh";
     entry%units = units
     entry%filename = ""
 
@@ -1620,9 +1708,11 @@ subroutine def_stream_after_dimension_specific(entry, name, description, units, 
     !___________________________________________________________________________
     if(entry%glsize(1)==mesh%nod2D  .or. entry%glsize(2)==mesh%nod2D) then
       entry%is_elem_based = .false.
+      entry%defined_on = "node"
       entry%shrinked_size=partit%myDim_nod2D
     else if(entry%glsize(1)==mesh%elem2D .or. entry%glsize(2)==mesh%elem2D) then
       entry%is_elem_based = .true.
+      entry%defined_on = "face"
       entry%shrinked_size=partit%myDim_elem2D_shrinked
       allocate(entry%shrinked_indx(entry%shrinked_size))
       entry%shrinked_indx=partit%myInd_elem2D_shrinked
@@ -1719,6 +1809,8 @@ subroutine io_r2g(n, partit, mesh)
     IF ((trim(entry_x%name)=='atmice_x') .AND. ((trim(entry_y%name)=='atmice_y'))) do_rotation=.TRUE.
     IF ((trim(entry_x%name)=='atmoce_x') .AND. ((trim(entry_y%name)=='atmoce_y'))) do_rotation=.TRUE.    
     IF ((trim(entry_x%name)=='iceoce_x') .AND. ((trim(entry_y%name)=='iceoce_y'))) do_rotation=.TRUE.    
+    IF ((trim(entry_x%name)=='utemp'   ) .AND. ((trim(entry_y%name)=='vtemp'   ))) do_rotation=.TRUE.
+    IF ((trim(entry_x%name)=='usalt'   ) .AND. ((trim(entry_y%name)=='vsalt'   ))) do_rotation=.TRUE.
 
     IF (.NOT. (do_rotation)) RETURN
    

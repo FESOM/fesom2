@@ -231,7 +231,6 @@ CONTAINS
             WRITE (err_str, "(I10)") mio_parent_comm
             CALL ctl_stop('conf_ctx%mpi_parent_comm(', err_str,') failed: ', multio_error_string(err))
         END IF
-
         ! Blocking call
         err = multio_start_server(conf_ctx)
         IF (err /= MULTIO_SUCCESS) THEN

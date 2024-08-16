@@ -175,10 +175,18 @@ subroutine init_ale(dynamics, partit, mesh)
     USE MOD_PARSUP
     USE MOD_DYN
     USE o_ARRAYS
-    USE g_config, only: which_ale, use_cavity, use_partial_cell
+!    USE g_config, only: which_ale, use_cavity, use_partial_cell
+
+! kh 18.03.21
+    USE g_config, only: which_ale, use_cavity, use_partial_cell, ib_async_mode
+
     USE g_forcing_param, only: use_virt_salt
     use oce_ale_interfaces
     Implicit NONE
+     
+! kh 18.03.21
+    integer             :: i, j
+
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(inout), target :: mesh
@@ -213,7 +221,38 @@ subroutine init_ale(dynamics, partit, mesh)
     allocate(mesh%zbar_3d_n(nl,myDim_nod2D+eDim_nod2D))
     
     ! Z_n: mid depth of layers due to ale thinkness variactions at ervery node n 
-    allocate(mesh%Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
+!    allocate(mesh%Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
+! kh 18.03.21
+    if (ib_async_mode == 0) then
+        allocate(mesh%Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
+        allocate(mesh%Z_3d_n_ib(nl-1,myDim_nod2D+eDim_nod2D)) 
+        Z_3d_n(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)              => mesh%Z_3d_n(:,:)
+        Z_3d_n_ib(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)           => mesh%Z_3d_n_ib(:,:)
+        !allocate(Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D))
+        !allocate(Z_3d_n_ib(nl-1,myDim_nod2D+eDim_nod2D))
+    else
+! kh 18.03.21 support "first touch" idea
+!$omp parallel sections num_threads(2)
+!$omp section
+        allocate(mesh%Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
+        Z_3d_n(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)              => mesh%Z_3d_n(:,:)
+        !allocate(Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D))
+        do i = 1, myDim_nod2D+eDim_nod2D
+            do j = 1, nl-1
+                Z_3d_n(j, i) = 0._WP
+            end do
+        end do
+!$omp section
+        allocate(mesh%Z_3d_n_ib(nl-1,myDim_nod2D+eDim_nod2D)) 
+        Z_3d_n_ib(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)           => mesh%Z_3d_n_ib(:,:)
+        !allocate(Z_3d_n_ib(nl-1,myDim_nod2D+eDim_nod2D))
+        do i = 1, myDim_nod2D+eDim_nod2D
+            do j = 1, nl-1
+                Z_3d_n_ib(j, i) = 0._WP
+            end do
+        end do
+!$omp end parallel sections
+    end if
     
     ! bottom_elem_tickness: changed bottom layer thinkness due to partial cells
     allocate(mesh%bottom_elem_thickness(myDim_elem2D))
@@ -231,7 +270,7 @@ subroutine init_ale(dynamics, partit, mesh)
     hnode(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)               => mesh%hnode(:,:)
     hnode_new(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)           => mesh%hnode_new(:,:)
     zbar_3d_n(1:mesh%nl, 1:myDim_nod2D+eDim_nod2D)             => mesh%zbar_3d_n(:,:)
-    Z_3d_n(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)              => mesh%Z_3d_n(:,:)
+    !Z_3d_n(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)              => mesh%Z_3d_n(:,:)
     helem(1:mesh%nl-1, 1:myDim_elem2D)                         => mesh%helem(:,:)
     bottom_elem_thickness(1:myDim_elem2D)                      => mesh%bottom_elem_thickness(:)
     bottom_node_thickness(1:myDim_nod2D+eDim_nod2D)            => mesh%bottom_node_thickness(:)
@@ -1938,7 +1977,6 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
 
 !$OMP PARALLEL DO
     do n=1,myDim_nod2D
-        if (ulevels_nod2D(n) > 1) cycle ! --> if cavity node hbar == hbar_old
         hbar(n)=hbar_old(n)+ssh_rhs_old(n)*dt/areasvol(ulevels_nod2D(n),n)
     end do
 !$OMP END PARALLEL DO
@@ -2584,43 +2622,19 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     USE MOD_DYN
     use g_comm_auto
     use g_config, only: which_ale
-    use iso_c_binding, only: C_INT, C_DOUBLE
     use ssh_solve_preconditioner_interface
     use ssh_solve_cg_interface
     implicit none
-#include "fparms.h"
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
     !___________________________________________________________________________
     logical, save        :: lfirst=.true.
-    integer(kind=C_INT)  :: n3, reuse, new_values
     integer              :: n
     
-    !___________________________________________________________________________
-    ! interface for solver
-    interface
-        subroutine psolver_init(ident, SOL, PCGLOB, PCLOC, lutype, &
-                                fillin, droptol, maxiter, restart, soltol, &
-                                part, rowptr, colind, values, reuse, MPI_COMM) bind(C)
-            use iso_c_binding, only: C_INT, C_DOUBLE
-            integer(kind=C_INT) :: ident, SOL, PCGLOB, PCLOC, lutype, &
-                                    fillin,  maxiter, restart, &
-                                    part(*), rowptr(*), colind(*), reuse, MPI_COMM
-            real(kind=C_DOUBLE) :: droptol,  soltol, values(*)
-        end subroutine psolver_init
-    end interface
-    interface
-        subroutine psolve(ident, ssh_rhs, values, d_eta, newvalues) bind(C)
-            use iso_c_binding, only: C_INT, C_DOUBLE
-            integer(kind=C_INT) :: ident, newvalues
-            real(kind=C_DOUBLE) :: values(*), ssh_rhs(*), d_eta(*)
-        end subroutine psolve
-    end interface
-    !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=C_DOUBLE), pointer  :: droptol, soltol
-    integer(kind=C_INT), pointer  :: maxiter, restart, lutype, fillin, ident
+    real(kind=WP), pointer  :: droptol, soltol
+    integer, pointer  :: maxiter, restart, lutype, fillin, ident
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -2633,57 +2647,10 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     droptol => dynamics%solverinfo%droptol
     soltol  => dynamics%solverinfo%soltol
 
-    if (.not. dynamics%solverinfo%use_parms) then
-        if (lfirst) call ssh_solve_preconditioner(dynamics%solverinfo, partit, mesh)
-        call ssh_solve_cg(dynamics%d_eta, dynamics%ssh_rhs, dynamics%solverinfo, partit, mesh)
-        call exchange_nod(dynamics%d_eta, partit) !is this required after calling psolve ?
-        lfirst=.false.
-        return
-    end if
-
-    !___________________________________________________________________________
-    if  (trim(which_ale)=='linfs') then
-        reuse=0
-        new_values=0
-    else
-        reuse=1     ! For varying coefficients, set reuse=1
-        new_values=1 !PS 1 ! and new_values=1, as soon as the coefficients have changed
-    end if
-
-    ! reuse=0: matrix remains static
-    ! reuse=1: keeps a copy of the matrix structure to apply scaling of the matrix fast
-
-    ! new_values=0: matrix coefficients unchanged (compared to the last call of psolve) 
-    ! new_values=1: replaces the matrix values (keeps the structure and the preconditioner) 
-    ! new_values=2: replaces the matrix values and recomputes the preconditioner (keeps the structure)
-
-    ! new_values>0 requires reuse=1 in psolver_init!
-
-    !
-    !___________________________________________________________________________
-    if (lfirst) then
-    ! Set SOLCG for CG solver (symmetric, positiv definit matrices only, no precond available!!)
-    !     SOLBICGS for BiCGstab solver (arbitrary matrices)
-    !     SOLBICGS_RAS for BiCGstab solver (arbitrary matrices) with integrated RAS - the global 
-    !                  preconditioner setting is ignored! It saves a 4 vector copies per iteration
-    !                  compared to SOLBICGS + PCRAS.
-    !     SOLPBICGS for pipelined BiCGstab solver (arbitrary matrices)
-    !               Should scale better than SOLBICGS, but be careful, it is still experimental.
-    !     SOLPBICGS_RAS is SOLPBICGS with integrated RAS (global preconditioner setting is ignored!)
-    !                   for even better scalability, well, in the end, it does not matter much.     
-        call psolver_init(ident, SOLBICGS_RAS, PCRAS, PCILUK, lutype, &
-            fillin, droptol, maxiter, restart, soltol, &
-            part-1, ssh_stiff%rowptr(:)-ssh_stiff%rowptr(1), &
-            ssh_stiff%colind-1, ssh_stiff%values, reuse, MPI_COMM_FESOM)
-    lfirst=.false.
-    end if
-    !
-    !___________________________________________________________________________    
-    call psolve(ident, dynamics%ssh_rhs, ssh_stiff%values, dynamics%d_eta, new_values)
-
-    !
-    !___________________________________________________________________________
+    if (lfirst) call ssh_solve_preconditioner(dynamics%solverinfo, partit, mesh)
+    call ssh_solve_cg(dynamics%d_eta, dynamics%ssh_rhs, dynamics%solverinfo, partit, mesh)
     call exchange_nod(dynamics%d_eta, partit) !is this required after calling psolve ?
+    lfirst=.false.
 
 end subroutine solve_ssh_ale
 !
@@ -3165,7 +3132,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     !   rigid lid.
 !$OMP PARALLEL DO
     do node=1, myDim_nod2D+eDim_nod2D
-       if (ulevels_nod2D(node)==1) eta_n(node)=alpha*hbar(node)+(1.0_WP-alpha)*hbar_old(node)
+       eta_n(node)=alpha*hbar(node)+(1.0_WP-alpha)*hbar_old(node)
     end do
 !$OMP END PARALLEL DO
     ! --> eta_(n)

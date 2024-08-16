@@ -17,14 +17,7 @@ TYPE T_SOLVERINFO
     integer       :: fillin  = 3
     integer       :: lutype  = 2
     real(kind=WP) :: droptol = 1.e-8
-!!! PARMS Solver
-!    real(kind=WP) :: soltol  = 1e-10  ! default for PARMS
-!    logical       :: use_parms = .TRUE.
-!!!
-!! Sergey's Solver
-   real(kind=WP)  :: soltol  = 1e-5  ! default for PARMS
-   logical        :: use_parms = .FALSE.
-!!
+    real(kind=WP)  :: soltol  = 1e-5
     real(kind=WP), allocatable   :: rr(:), zz(:), pp(:), App(:)
     contains
     procedure WRITE_T_SOLVERINFO
@@ -51,8 +44,9 @@ END TYPE T_DYN_WORK
 TYPE T_DYN
 !___________________________________________________________________________
     ! instant zonal merdional velocity & Adams-Bashfort rhs
-    real(kind=WP), allocatable, dimension(:,:,:):: uv, uv_rhs, uv_rhsAB, fer_uv
-
+    real(kind=WP), allocatable, dimension(:,:,:)   :: uv, uv_rhs, fer_uv
+    real(kind=WP), allocatable, dimension(:,:,:,:) :: uv_rhsAB
+    integer                                        :: AB_order=2
     ! horizontal velocities at nodes
     real(kind=WP), allocatable, dimension(:,:,:):: uvnode
 
@@ -61,7 +55,11 @@ TYPE T_DYN
 
     ! sea surface height arrays
     real(kind=WP), allocatable, dimension(:)    :: eta_n, d_eta, ssh_rhs, ssh_rhs_old
-
+    
+    ! LA: 2023-05-17 iceberg arrays
+    real(kind=WP), allocatable, dimension(:)    :: eta_n_ib ! kh 18.03.21 additional array for asynchronous iceberg computations
+    real(kind=WP), allocatable, dimension(:,:,:):: uv_ib    ! kh 18.03.21 additional array for asynchronous iceberg computations
+    
     !___________________________________________________________________________
     ! summarizes solver input parameter
     type(t_solverinfo)                          :: solverinfo
@@ -108,12 +106,12 @@ TYPE T_DYN
     real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv, ke_cor, ke_pre, ke_hvis, ke_vvis, ke_du2, ke_umean, ke_u2mean
     real(kind=WP), allocatable, dimension(:,:)   :: ke_wind, ke_drag
     ! same as above but multiplied by velocity. we need both for later computation of turbulent fluxes
-    real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv_xVEL, ke_cor_xVEL, ke_pre_xVEL, ke_hvis_xVEL, ke_vvis_xVEL
-    real(kind=WP), allocatable, dimension(:,:)   :: ke_wind_xVEL, ke_drag_xVEL
-    real(kind=WP), allocatable, dimension(:,:)   :: ke_wrho         !we use pressure to compute (W*dens) as it appeares much easier to compute (P*dW) instead of (dP*w)
-    real(kind=WP), allocatable, dimension(:,:)   :: ke_dW, ke_Pfull !for later computation of turbulent fluxes from the term above
-    real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv_AB, ke_cor_AB
-    real(kind=WP), allocatable, dimension(:,:,:) :: ke_rhs_bak
+    real(kind=WP), allocatable, dimension(:,:,:)   :: ke_adv_xVEL, ke_cor_xVEL, ke_pre_xVEL, ke_hvis_xVEL, ke_vvis_xVEL
+    real(kind=WP), allocatable, dimension(:,:)     :: ke_wind_xVEL, ke_drag_xVEL
+    real(kind=WP), allocatable, dimension(:,:)     :: ke_wrho         !we use pressure to compute (W*dens) as it appeares much easier to compute (P*dW) instead of (dP*w)
+    real(kind=WP), allocatable, dimension(:,:)     :: ke_dW, ke_Pfull !for later computation of turbulent fluxes from the term above
+    real(kind=WP), allocatable, dimension(:,:,:,:) :: ke_adv_AB, ke_cor_AB
+    real(kind=WP), allocatable, dimension(:,:,:)   :: ke_rhs_bak
     ! surface fields to compute APE generation
     real(kind=WP), allocatable, dimension(:)     :: ke_J, ke_D, ke_G, ke_D2, ke_n0, ke_JD, ke_GD, ke_swA, ke_swB
 

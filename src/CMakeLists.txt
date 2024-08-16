@@ -5,6 +5,9 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/../cmake ${CMAKE_MODULE_PATH})
 
 include(fesom_setup)
 
+find_package(MPI REQUIRED)
+
+#TODO: these machine specific changes must be done using cmake toolchain then here otherwise will make cmake another raps. 
 if(DEFINED ENV{FESOM_PLATFORM_STRATEGY})
    set(FESOM_PLATFORM_STRATEGY $ENV{FESOM_PLATFORM_STRATEGY} CACHE STRING "switch to platform specific compile settings, this is usually determined via the env.sh script")
 else()
@@ -22,6 +25,7 @@ else()
    option(ALBEDO_INTELMPI_WORKAROUNDS "workaround for performance issues on albedo" OFF)
 endif()
 
+#TODO: these machine specific changes must be done using cmake toolchain then here otherwise will make cmake another raps. 
 
 if(ALEPH_CRAYMPICH_WORKAROUNDS)
    # todo: enable these options only for our targets
@@ -38,6 +42,7 @@ if(ALBEDO_INTELMPI_WORKAROUNDS)
    add_compile_options(-DDISABLE_PARALLEL_RESTART_READ)
 endif()
 
+#TODO: this machine specific block can easyly go in  cmake toolchain.
 if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
    message(STATUS "multithreading disabled for Levante") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
@@ -136,8 +141,6 @@ elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
                                ${src_home}/ifs_interface/mpp_io.F90)
 endif()
 
-file(GLOB sources_C ${src_home}/*.c)
-
 # generate a custom file from fesom_version_info.F90 which includes the current git SHA
 set(FESOM_ORIGINAL_VERSION_FILE ${src_home}/fesom_version_info.F90)
 set(FESOM_GENERATED_VERSION_FILE ${CMAKE_CURRENT_BINARY_DIR}/fesom_version_info-generated.F90)
@@ -154,7 +157,6 @@ add_custom_target(fesom_version_info-generated.F90 ALL
 #   list(REMOVE_ITEM sources_Fortran ${src_home}/cpl_driver.F90)
 #endif()
 list(REMOVE_ITEM sources_Fortran ${src_home}/fvom_init.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90)
-list(REMOVE_ITEM sources_C       ${src_home}/fort_part.c)
 list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_main.F90)
 
 find_package( NETCDF REQUIRED COMPONENTS C Fortran )
@@ -163,32 +165,19 @@ find_package( MPI REQUIRED COMPONENTS C Fortran )
 # depends on the metis library
 #add_subdirectory(../lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
 #include_directories(../lib/metis-5.1.0/include)
-# depends on the parms library
-add_subdirectory(../lib/parms ${PROJECT_BINARY_DIR}/parms)
 
 add_subdirectory(async_threads_cpp)
 
-add_library(${PROJECT_NAME}_C OBJECT ${sources_C})
-target_compile_definitions(${PROJECT_NAME}_C PRIVATE PARMS USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
-
-target_link_libraries(${PROJECT_NAME}_C PRIVATE parms) #metis
-target_link_libraries(${PROJECT_NAME}_C PRIVATE MPI::MPI_C)
-
 
 # fesom library
-add_library(${PROJECT_NAME} ${sources_Fortran} $<TARGET_OBJECTS:fesom_C> $<TARGET_OBJECTS:async_threads_cpp>)
+add_library(${PROJECT_NAME} ${sources_Fortran} $<TARGET_OBJECTS:async_threads_cpp>)
 add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
-target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
+target_compile_definitions(${PROJECT_NAME} PRIVATE -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
 
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>)
 target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fesom>)
-target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES} ${OASIS_Fortran_INCLUDE_DIRECTORIES})
-target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
-target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
-target_link_libraries(${PROJECT_NAME} PRIVATE parms) #metis
 target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
-target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} PRIVATE ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
+
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 if(ENABLE_OPENMP)
    target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_Fortran)
@@ -203,12 +192,21 @@ if(DISABLE_MULTITHREADING)
    target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_MULTITHREADING)
 endif()
 
-if(FESOM_COUPLED)
-   find_package(OASIS REQUIRED)
+if(${FESOM_COUPLED})
+   message(STATUS "FESOM is coupled")
+   if(${OASIS_WITH_YAC})
+      message(STATUS "Looking for OASIS with YAC lib")
+      include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindOASISYAC.cmake)
+   else()
+      message(STATUS "Looking for OASIS")
+      include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindOASIS.cmake)
+   endif()
    target_compile_definitions(${PROJECT_NAME} PRIVATE __oasis)
 endif()
-
-if(OIFS_COUPLED)
+if(${ASYNC_ICEBERGS})
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __async_icebergs)
+endif()
+if(${OIFS_COUPLED})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __oifs)
 endif()
 
@@ -283,7 +281,32 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
    endif()
 endif()
 
+target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES} ${OASIS_Fortran_INCLUDE_DIRECTORIES})
+target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
+target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
+target_include_directories(${PROJECT_NAME} PRIVATE ${YAC_Fortran_INCLUDE_DIRECTORIES} ${YAXT_Fortran_INCLUDE_DIRECTORIES})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
 
+
+# OASIS-YAK
+target_link_libraries(${PROJECT_NAME} PRIVATE ${YACUTILS_Fortran_LIBRARIES} ${YACCORE_Fortran_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_Fortran_LIBRARIES})
+
+#set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
+
+#target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES} ${OASIS_Fortran_INCLUDE_DIRECTORIES})
+#target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
+#target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
+#target_include_directories(${PROJECT_NAME} PRIVATE ${YAC_Fortran_INCLUDE_DIRECTORIES} ${YAXT_Fortran_INCLUDE_DIRECTORIES})
+##target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
+#target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
+
+## OASIS-YAK
+#target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${YACUTILS_Fortran_LIBRARIES} ${YACCORE_Fortran_LIBRARIES})
+#target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${YAXT_Fortran_LIBRARIES} ${YAXTC_Fortran_LIBRARIES})
+
+   
 # fesom.x executable
 add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
 target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
@@ -291,4 +314,4 @@ target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
 
 ### Export and installation
 
-fesom_export(TARGETS ${PROJECT_NAME} parms fesom.x)
+fesom_export(TARGETS ${PROJECT_NAME} fesom.x)

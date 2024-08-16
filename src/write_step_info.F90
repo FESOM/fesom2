@@ -268,7 +268,7 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_MESH
-    use g_config, only: logfile_outfreq, which_ALE
+    use g_config, only: logfile_outfreq, which_ALE, toy_ocean, use_ice
     use o_PARAM
     use o_ARRAYS, only: water_flux, stress_surf, &
                     heat_flux, Kv, Av
@@ -344,14 +344,18 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
           write(*,*)
           write(*,*) 'wflux = ',water_flux(n)
           write(*,*)
-          write(*,*) 'u_wind = ',u_wind(n),', v_wind = ',v_wind(n)
-          write(*,*)
-          do nz=1,nod_in_elem2D_num(n)
-                write(*,*) 'stress_surf(1:2,',nz,') = ',stress_surf(:,nod_in_elem2D(nz,n))
-          end do
+          if (.not. toy_ocean) then
+            write(*,*) 'u_wind = ',u_wind(n),', v_wind = ',v_wind(n)
+            write(*,*)
+            do nz=1,nod_in_elem2D_num(n)
+                    write(*,*) 'stress_surf(1:2,',nz,') = ',stress_surf(:,nod_in_elem2D(nz,n))
+            end do
+          end if
+          if (use_ice) then
           write(*,*)
           write(*,*) 'm_ice = ',m_ice(n),', m_ice_old = ',m_ice_old(n)
           write(*,*) 'a_ice = ',a_ice(n),', a_ice_old = ',a_ice_old(n)
+          end if 
           write(*,*)
           write(*,*) 'Wvel(:, n)  = ',Wvel(ulevels_nod2D(n):nlevels_nod2D(n),n)
           write(*,*)
@@ -448,11 +452,13 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
              write(*,*) 'ssh_rhs     = ',ssh_rhs(n)
              write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(n)
              write(*,*)
-             write(*,*) 'm_ice    = ',m_ice(n)
-             write(*,*) 'm_ice_old   = ',m_ice_old(n)
-             write(*,*) 'm_snow      = ',m_snow(n)
-             write(*,*) 'm_snow_old  = ',m_snow_old(n)
-             write(*,*)
+             if (use_ice) then
+                write(*,*) 'm_ice    = ',m_ice(n)
+                write(*,*) 'm_ice_old   = ',m_ice_old(n)
+                write(*,*) 'm_snow      = ',m_snow(n)
+                write(*,*) 'm_snow_old  = ',m_snow_old(n)
+                write(*,*)
+             end if 
              write(*,*) 'hnode    = ',hnode(:,n)
              write(*,*) 'hnode_new   = ',hnode_new(:,n)
              write(*,*)
