@@ -86,7 +86,7 @@ subroutine setup_model(partit)
   read (fileunit, NML=diag_list)
   close (fileunit)
 
-#if defined(__recom)
+#if defined (__recom)
   nmlfile ='namelist.recom'    ! name of recom namelist file
   open (newunit=fileunit, file=nmlfile)
   read (fileunit, NML=pavariables)
