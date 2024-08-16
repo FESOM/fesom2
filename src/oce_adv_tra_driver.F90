@@ -235,6 +235,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         !$ACC END PARALLEL LOOP
 #endif
 
+
         !_______________________________________________________________________
         ! DVD diagostic: store low order horizontal and vertical tracer fluxes through mid 
         ! edge faces and upper and lower scalar cell prism face. in case of FCT
@@ -242,7 +243,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz)
 #else
-        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
             do n=1, myDim_edge2D
                 !$ACC LOOP VECTOR
@@ -266,6 +267,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         !$ACC END PARALLEL LOOP
 #endif
         end if 
+
 
         !_______________________________________________________________________
 
