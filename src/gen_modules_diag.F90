@@ -3116,7 +3116,7 @@ subroutine dvd_add_difflux_bhvisc(do_SDdvd, tr_num, dvd_tot, tr, trstar, gamma0_
             dvd_tot(nu1:nl1-1, ednodes(2), tr_num) = dvd_tot(nu1:nl1-1, ednodes(2), tr_num) - &
                                     trc(nu1:nl1-1)*dtr(nu1:nl1-1)/(areasvol(nu1:nl1-1,ednodes(2))) 
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(en(2)))
+            call omp_unset_lock(partit%plock(ednodes(2)))
 #else
 !$OMP END ORDERED
 #endif
