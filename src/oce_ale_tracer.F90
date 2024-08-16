@@ -95,12 +95,13 @@ end module
 
 module transit_bc_surface_interface
     interface
-        function transit_bc_surface(n, id, sst, sss, a_ice, sval, nzmin, partit)
+        function transit_bc_surface(n, id, sst, sss, a_ice, sval, nzmin, partit, mesh)
         use mod_mesh
         USE MOD_PARTIT
         USE MOD_PARSUP
         integer , intent(in)                  :: n, id, nzmin
         type(t_partit), intent(inout), target :: partit
+        type(t_mesh), intent(in), target      :: mesh
         real(kind=WP)                         :: transit_bc_surface
         real(kind=WP), intent(in)             :: sst, sss, a_ice, sval
         end function
@@ -216,6 +217,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 !!!     !$ACC UPDATE DEVICE(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus)
         !$ACC UPDATE DEVICE (mesh%helem, mesh%hnode, mesh%hnode_new, mesh%zbar_3d_n, mesh%z_3d_n)
     do tr_num=1, tracers%num_tracers
+    
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
@@ -242,6 +244,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
            tracers%work%del_ttf(:, node)=tracers%work%del_ttf(:, node)+tracers%work%del_ttf_advhoriz(:, node)+tracers%work%del_ttf_advvert(:, node)
         end do
 !$OMP END PARALLEL DO
+
+        !___________________________________________________________________________
         ! diffuse tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
         call diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
@@ -250,9 +254,10 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         if (tracers%data(tr_num)%ID == 14) tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * exp(-decay14 * dt)
         if (tracers%data(tr_num)%ID == 39) tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * exp(-decay39 * dt)
 
+        !___________________________________________________________________________
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
-!       if ((toy_ocean) .AND. ((tr_num==1) .AND. (TRIM(which_toy)=="soufflet"))) then
+        ! if ((toy_ocean) .AND. ((tr_num==1) .AND. (TRIM(which_toy)=="soufflet"))) then
         if ((toy_ocean) .AND. ((TRIM(which_toy)=="soufflet"))) then
             call relax_zonal_temp(tracers%data(1), partit, mesh)
         else
@@ -913,9 +918,11 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         !                            v   (+)                        v   (+)
         !
         tr(nzmin)= tr(nzmin)+bc_surface(n, tracers%data(tr_num)%ID, trarr(nzmin,n), nzmin, partit)
+
         if ((tracers%data(tr_num)%ID .ge. 6) .and.(tracers%data(tr_num)%ID .le. 40)) then
-          tr(nzmin)= tr(nzmin)+transit_bc_surface(n, tracers%data(tr_num)%ID, sst(nzmin,n), sss(nzmin,n), a_ice(n), trarr(nzmin,n), nzmin, partit)
+          tr(nzmin)= tr(nzmin)+transit_bc_surface(n, tracers%data(tr_num)%ID, sst(nzmin,n), sss(nzmin,n), a_ice(n), trarr(nzmin,n), nzmin, partit, mesh)
         end if
+        
         !_______________________________________________________________________
         ! The forward sweep algorithm to solve the three-diagonal matrix
         ! problem
@@ -1033,12 +1040,12 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
         zbar_n(1:mesh%nl  )=0.0_WP
         z_n   (1:mesh%nl-1)=0.0_WP
         zbar_n(nl1+1)=zbar_n_bot(n)
-        z_n(nl1)=zbar_n(nl1+1) + hnode_new(nl1,n)/2.0_WP
+        z_n(nl1)=zbar_n(nl1+1) + hnode(nl1,n)/2.0_WP
         do nz=nl1, ul1+1, -1
-            zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
-            z_n(nz-1)  = zbar_n(nz)   + hnode_new(nz-1,n)/2.0_WP
+            zbar_n(nz) = zbar_n(nz+1) + hnode(nz,n)
+            z_n(nz-1)  = zbar_n(nz)   + hnode(nz-1,n)/2.0_WP
         end do
-        zbar_n(ul1) = zbar_n(ul1+1)   + hnode_new(ul1,n)
+        zbar_n(ul1) = zbar_n(ul1+1)   + hnode(ul1,n)
 
         !_______________________________________________________________________
         do nz=ul1+1,nl1
@@ -1048,7 +1055,7 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
             vd_flux(nz)=vd_flux(nz)/(z_n(nz-1)-z_n(nz))*area(nz,n)
         enddo
         do nz=ul1,nl1
-            del_ttf(nz,n) = del_ttf(nz,n)+(vd_flux(nz) - vd_flux(nz+1))*dt/areasvol(nz,n)
+            del_ttf(nz,n) = del_ttf(nz,n) + (vd_flux(nz)-vd_flux(nz+1)) * dt/areasvol(nz,n)
         enddo
     end do
 !$OMP END DO
@@ -1427,7 +1434,7 @@ END FUNCTION
 ! This function returns a boundary conditions for a specified transient tracer ID and surface node.
 ! Different to function bc_surface, SST, SSS, and sea ice concentrations are always needed as
 ! auxiliary variable
-FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit)
+FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit, mesh)
   use MOD_MESH
   USE MOD_PARTIT
   USE MOD_PARSUP
@@ -1441,6 +1448,7 @@ FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit)
   integer,       intent(in)            :: n, id, nzmin
   real(kind=WP), intent(in)            :: sst, sss, aice, sval
   type(t_partit),intent(inout), target :: partit
+  type(t_mesh),  intent(in), target    :: mesh
   REAL(kind=WP)                        :: transit_bc_surface
   character(len=10)                    :: id_string
 
@@ -1449,14 +1457,19 @@ FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit)
   !  --> is_nonlinfs=0.0 for linfs
 
 #if defined (__oasis)
-!   SLP and wind speed in coupled setups. This is a makeshift solution
-!   as long as the true values are not provided by the AGCM / OASIS.
-    press_a = mean_slp
-    wind_2  = speed_2(stress_atmoce_x(n), stress_atmoce_y(n))
+! SLP and wind speed in coupled setups. This is a makeshift solution
+! as long as the true values are not provided by the AGCM / OASIS.
+  press_a = mean_slp
+  wind_2  = speed_2(stress_atmoce_x(n), stress_atmoce_y(n))
 #else
-    press_a = press_air(n)
-    wind_2  = u_wind(n)**2 + v_wind(n)**2
+  press_a = press_air(n)
+  wind_2  = u_wind(n)**2 + v_wind(n)**2
 #endif
+
+! The atmospheric input of bomb 14C, CFC-12, and SF6 depends on latitude. To that effect specify
+  y_abc = mesh%geo_coord_nod2D(2,n) / rad  ! latitude of atmospheric tracer input
+  yy_nh = (10. - y_abc) * 0.05             ! interpolation weight for tropical tracer values
+
 
   SELECT CASE (id)
 

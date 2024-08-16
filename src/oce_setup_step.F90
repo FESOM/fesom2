@@ -293,7 +293,7 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     integer        :: num_tracers
     logical        :: i_vert_diff, smooth_bh_tra
     real(kind=WP)  :: gamma0_tra, gamma1_tra, gamma2_tra
-    integer        :: AB_order
+    integer        :: AB_order = 2
     namelist /tracer_listsize/ num_tracers
     namelist /tracer_list    / nml_tracer_list
     namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order

@@ -17,14 +17,7 @@ TYPE T_SOLVERINFO
     integer       :: fillin  = 3
     integer       :: lutype  = 2
     real(kind=WP) :: droptol = 1.e-8
-!!! PARMS Solver
-    real(kind=WP) :: soltol  = 1e-10  ! default for PARMS
-    logical       :: use_parms = .TRUE.
-!!!
-!!! Sergey's Solver
-!   real(kind=WP)  :: soltol  = 1e-5  ! default for PARMS
-!   logical        :: use_parms = .FALSE.
-!!!
+    real(kind=WP)  :: soltol  = 1e-5
     real(kind=WP), allocatable   :: rr(:), zz(:), pp(:), App(:)
     contains
     procedure WRITE_T_SOLVERINFO
