@@ -44,9 +44,22 @@ end do
            tracers%data(tr_num)%valuesAB(:, n)  =5.0_WP*tracers%data(tr_num)%valuesold(2, :, n)-16.0_WP*tracers%data(tr_num)%valuesold(1, :, n)+23.0_WP*tracers%data(tr_num)%values(:, n)
            tracers%data(tr_num)%valuesAB(:, n)  =tracers%data(tr_num)%valuesAB(:, n)/12.0_WP
        else
-           write(*,*) 'unknown AB order for tracer ', tr_num, ' = ', tracers%data(tr_num)%AB_order
-           call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-           STOP
+            write(*,*)
+            print *, achar(27)//'[33m'
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: Adams-Bashfort tracer order must be 2 or 3, others are not'
+            write(*,*) '        supported!'
+            write(*,*) '        your tracers%data(tr_num)%AB_order =', tracers%data(tr_num)%AB_order
+            write(*,*) '        '
+            write(*,*) '        --> check your namelist.tra !!!'
+            write(*,*) '            &tracer_general'
+            write(*,*) '                ...'
+            write(*,*) '            AB_order = 2'
+            write(*,*) '            / '
+            write(*,*) '____________________________________________________________________'
+            print *, achar(27)//'[0m'
+            write(*,*)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
        end if
     end do
 !$OMP END PARALLEL DO
@@ -148,14 +161,14 @@ SUBROUTINE tracer_gradient_z(ttf, partit, mesh)
 #include "associate_mesh_ass.h" 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, dz)
     DO n=1, myDim_nod2D+eDim_nod2D
-    nzmax=nlevels_nod2D(n)
-    nzmin=ulevels_nod2D(n)
-    DO nz=nzmin+1,  nzmax-1
-        dz=0.5_WP*(hnode(nz-1,n)+hnode(nz,n))
-        tr_z(nz, n)=(ttf(nz-1,n)-ttf(nz,n))/dz
-    END DO
-    tr_z(nzmin, n)=0.0_WP
-    tr_z(nzmax, n)=0.0_WP
+        nzmax=nlevels_nod2D(n)
+        nzmin=ulevels_nod2D(n)
+        DO nz=nzmin+1,  nzmax-1
+            dz=0.5_WP*(hnode(nz-1,n)+hnode(nz,n))
+            tr_z(nz, n)=(ttf(nz-1,n)-ttf(nz,n))/dz
+        END DO
+        tr_z(nzmin, n)=0.0_WP
+        tr_z(nzmax, n)=0.0_WP
     END DO
 !$OMP END PARALLEL DO
 END SUBROUTINE tracer_gradient_z
