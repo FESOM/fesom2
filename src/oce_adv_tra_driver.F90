@@ -350,8 +350,9 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     if ((ldiag_DVD) .and. (tr_num<=2)) then 
         !_______________________________________________________________________
         if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz)
             !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+!$OMP DO
             do n=1, myDim_edge2D
                 !$ACC LOOP VECTOR
                 do nz=1, mesh%nl-1
@@ -361,9 +362,11 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
                 end do
                 !$ACC END LOOP
             end do
+!$OMP END DO
             !$ACC END PARALLEL LOOP
             
             !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+!$OMP DO
             do n=1, myDim_nod2D
                 !$ACC LOOP VECTOR
                 do nz=1, mesh%nl
@@ -373,14 +376,16 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
                 end do
                 !$ACC END LOOP
             end do
+!$OMP END DO
             !$ACC END PARALLEL LOOP
             
-!$OMP END PARALLEL DO
+!$OMP END PARALLEL
 
         !_______________________________________________________________________
         else
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz)
             !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+!$OMP DO
             do n=1, myDim_edge2D
                 !$ACC LOOP VECTOR
                 do nz=1, mesh%nl-1
@@ -388,9 +393,11 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
                 end do
                 !$ACC END LOOP
             end do
+!$OMP END DO
             !$ACC END PARALLEL LOOP
             
             !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+!$OMP DO
             do n=1, myDim_nod2D
                 !$ACC LOOP VECTOR
                 do nz=1, mesh%nl
@@ -398,9 +405,10 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
                 end do
                 !$ACC END LOOP
             end do
+!$OMP END DO
             !$ACC END PARALLEL LOOP
             
-!$OMP END PARALLEL DO
+!$OMP END PARALLEL
         end if
     end if !-->if ((ldiag_DVD) .and. (tr_num<=2)) then 
     
