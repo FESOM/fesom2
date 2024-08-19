@@ -159,7 +159,7 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
         END DO
     END DO
 !$OMP END PARALLEL DO
-
+!$OMP BARRIER
 !!PS Why we do this here eta_n is anyway overwriten through ...
 !!PS do node=1, myDim_nod2D+eDim_nod2D
 !!PS     if (ulevels_nod2D(node)==1) eta_n(node)=alpha*hbar(node)+(1.0_WP-alpha)*hbar_old(node)
@@ -170,7 +170,6 @@ SUBROUTINE update_vel(dynamics, partit, mesh)
 !!PS     END DO
 !!PS !$OMP END PARALLEL DO
     call exchange_elem(UV, partit)
-!$OMP BARRIER
 end subroutine update_vel
 !
 !
@@ -222,8 +221,8 @@ subroutine compute_vel_nodes(dynamics, partit, mesh)
         END DO
     END DO
 !$OMP END PARALLEL DO
-    call exchange_nod(UVnode, partit)
 !$OMP BARRIER
+    call exchange_nod(UVnode, partit)
 end subroutine compute_vel_nodes
 !
 !
