@@ -89,6 +89,9 @@ end module
 !           this way FESOM can e.g. be used as a library with an external time loop driver
 !           used with IFS-FESOM
 module fesom_module
+#if defined  __ifsinterface
+  use, intrinsic :: ieee_exceptions
+#endif
   implicit none
   public fesom_init, fesom_runloop, fesom_finalize
   private
@@ -110,6 +113,15 @@ contains
         stop
       end if
 #endif
+
+!SUVI: disable overflow, underflow for entire model when used  in coupled with ifs
+!      bad practice, use it only in case of Emergency
+!#if defined  __ifsinterface
+!    call ieee_set_halting_mode(ieee_overflow, .false.)
+!    call ieee_set_halting_mode(ieee_underflow, .false.)
+!    call ieee_set_halting_mode(ieee_invalid, .false.)
+!#endif
+
       
       mpi_is_initialized = .false.
       f%fesom_did_mpi_init = .false.
