@@ -346,7 +346,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     if ((ldiag_DVD) .and. (tr_num<=2)) then 
         !_______________________________________________________________________
         if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
-!OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz)
             !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
             do n=1, myDim_edge2D
                 !$ACC LOOP VECTOR
@@ -375,7 +375,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 
         !_______________________________________________________________________
         else
-!OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz)
             !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
             do n=1, myDim_edge2D
                 !$ACC LOOP VECTOR
