@@ -3,7 +3,7 @@
 !
 module g_read_other_NetCDF
 contains
-subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, mesh)
+subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_onvert, partit, mesh)
   ! Read 2D data and interpolate to the model grid.
   ! Currently used to read runoff and SSS.
   ! First, missing values are filled in on the raw regular grid;
@@ -12,31 +12,37 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, mesh
   ! if check_dummy=.true.,  missing value is replaced with a meaningful value nearby
   ! if check_dummy=.false., missing value is replaced with 0.0
 
-  use, intrinsic :: ISO_FORTRAN_ENV
+  use, intrinsic :: ISO_FORTRAN_ENV, only: real64
   use g_config
   use o_param
   USE MOD_MESH
-  use g_parsup
+  USE MOD_PARTIT
+  USE MOD_PARSUP
   implicit none
 
 #include "netcdf.inc" 
-  type(t_mesh), intent(in)  , target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
   integer                    :: i, j, ii, jj, k, n, num, flag, cnt
   integer                    :: itime, latlen, lonlen
   integer                    :: status, ncid, varid
   integer                    :: lonid, latid
-  integer                    :: istart(3), icount(3)
-  real(real64)               :: x, y, miss, aux
+  integer                    :: istart(3), icount(3), elnodes(3)
+  real(real64)               :: x, y, miss, aux, xmin, elnodes_x(3)
   real(real64), allocatable  :: lon(:), lat(:)
   real(real64), allocatable  :: ncdata(:,:), ncdata_temp(:,:)
   real(real64), allocatable  :: temp_x(:), temp_y(:)
-  real(real64)               :: model_2Darray(myDim_nod2d+eDim_nod2D)   
+  real(real64)               :: model_2Darray(partit%myDim_nod2d+partit%eDim_nod2D)   
   character(*)               :: vari
   character(*)               :: file
-  logical                    :: check_dummy
+  logical                    :: check_dummy, do_onvert
   integer                    :: ierror           ! return error code
 
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
 
   if (mype==0) then
      ! open file
@@ -45,9 +51,9 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, mesh
 
   call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (status.ne.nf_noerr)then
-     print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
-     print*,'Error in opening netcdf file'//file
-     call par_ex
+     print*,'ERROR: CANNOT READ 2D netCDF FILE CORRECTLY !!!!!'
+     print*,'Error in opening netcdf file '//file
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
      stop
   endif
 
@@ -131,26 +137,55 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, mesh
         end if
      end do
   end do
-  !write(*,*) 'post',minval(ncdata), maxval(ncdata)
-  ! model grid coordinates
-  num=myDim_nod2d+eDim_nod2d
-  allocate(temp_x(num), temp_y(num))  
-  do n=1, num
-     temp_x(n)=geo_coord_nod2d(1,n)/rad              
-     temp_y(n)=geo_coord_nod2d(2,n)/rad             
-     ! change lon range to [0 360]
-     if(temp_x(n)<0._WP) temp_x(n)=temp_x(n) + 360.0_WP  
-  end do
-  ! interpolation
-  flag=0
-  call interp_2d_field(lonlen, latlen, lon, lat, ncdata, num, temp_x, temp_y, & 
-       model_2Darray, flag) 
-  deallocate(temp_y, temp_x, ncdata_temp, ncdata, lon, lat)
+    !write(*,*) 'post',minval(ncdata), maxval(ncdata)
+    
+    !___________________________________________________________________________
+    ! create interpolation coordinates
+    ! do data interpolation on vertices
+    if (do_onvert) then
+        num=myDim_nod2d+eDim_nod2d
+        allocate(temp_x(num), temp_y(num))  
+        do n=1, num
+            temp_x(n)=geo_coord_nod2d(1,n)/rad              
+            temp_y(n)=geo_coord_nod2d(2,n)/rad             
+            ! change lon range to [0 360]
+            if(temp_x(n)<0._WP) temp_x(n)=temp_x(n) + 360.0_WP  
+        end do
+        
+    ! do data interpolation on element centroids
+    else
+        num = myDim_elem2D
+        allocate(temp_x(num), temp_y(num))  
+        do n=1, num
+            ! compute points of element centroids in geo frame use them here for interpolation
+            elnodes  = elem2D_nodes(:,n)
+            elnodes_x= geo_coord_nod2D(1, elnodes)
+            xmin     = minval(elnodes_x)
+            do k=1,3
+                if(elnodes_x(k)-xmin>=cyclic_length/2.0_WP) elnodes_x(k)=elnodes_x(k)-cyclic_length
+                if(elnodes_x(k)-xmin<-cyclic_length/2.0_WP) elnodes_x(k)=elnodes_x(k)+cyclic_length
+            end do
+            ! compute in units [deg], in geo frame
+            temp_x(n)=sum(elnodes_x)/3.0_WP/rad
+            temp_y(n)=sum(geo_coord_nod2D(2,elnodes))/3.0_WP/rad
+            
+            ! change lon range to [0 360]
+            if(temp_x(n)<0._WP) temp_x(n)=temp_x(n) + 360.0_WP  
+        end do
+    end if   
+    
+    !___________________________________________________________________________
+    ! do interpolation
+    flag=0
+    call interp_2d_field(lonlen, latlen, lon, lat, ncdata, num, temp_x, temp_y, & 
+                         model_2Darray, flag, partit) 
+    deallocate(temp_y, temp_x, ncdata_temp, ncdata, lon, lat)
+    
 end subroutine read_other_NetCDF
 !
 !------------------------------------------------------------------------------------
 !
-  subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, mesh)
+subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit, mesh)
     ! Read WOA (NetCDF) surface T/S and interpolate to the model grid.
     ! Currently used for surface restoring in case of ocean-alone models
     ! Calling interp_2d_field_v2 to do interpolation, which also treats the dummy value.
@@ -160,28 +195,33 @@ end subroutine read_other_NetCDF
     use g_config
     use o_param
     USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     use g_rotate_grid
-    use g_parsup
+    use, intrinsic :: ISO_FORTRAN_ENV, only: real64
     implicit none
-
 #include "netcdf.inc" 
-  type(t_mesh), intent(in)     , target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
   integer                       :: i, j,  n, num
   integer                       :: itime, latlen, lonlen
   integer                       :: status, ncid, varid
-  integer                       :: lonid, latid
+  integer                       :: lonid, latid, drain_num
   integer                       :: istart(4), icount(4)
   real(real64)                  :: x, y, miss
   real(real64), allocatable     :: lon(:), lat(:)
   real(real64), allocatable     :: ncdata(:,:)
   real(real64), allocatable     :: temp_x(:), temp_y(:)
-  real(real64)                  :: model_2Darray(myDim_nod2d+eDim_nod2D)   
+  real(real64)                  :: model_2Darray(partit%myDim_nod2d+partit%eDim_nod2D)   
   character(15)                 :: vari
   character(300)                :: file
   logical                       :: check_dummy
   integer                       :: ierror           ! return error code
 
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
   if (mype==0) then
      ! open file
@@ -191,8 +231,8 @@ end subroutine read_other_NetCDF
   call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (status.ne.nf_noerr)then
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
-     print*,'Error in opening netcdf file'//file
-     call par_ex
+     print*,'Error in opening netcdf file '//file
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
      stop
   endif
 
@@ -265,36 +305,41 @@ end subroutine read_other_NetCDF
   end do
   ! interpolation
   call interp_2d_field_v2(lonlen, latlen, lon, lat, ncdata, miss, &
-       num, temp_x, temp_y, model_2Darray) 
+       num, temp_x, temp_y, model_2Darray, partit) 
   deallocate(temp_y, temp_x, ncdata, lon, lat)
 end subroutine read_surf_hydrography_NetCDF
 !
 !------------------------------------------------------------------------------------
 !
-subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, mesh)  
+subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, mesh)  
 
-  use, intrinsic :: ISO_FORTRAN_ENV
+  use, intrinsic :: ISO_FORTRAN_ENV, only: real64
 
   use g_config
   use o_param
   USE MOD_MESH
+  USE MOD_PARTIT
+  USE MOD_PARSUP
   use g_rotate_grid
-  use g_parsup
   implicit none
 
 #include "netcdf.inc" 
-  type(t_mesh), intent(in)     , target :: mesh
+  type(t_mesh),   intent(in)   , target :: mesh
+  type(t_partit), intent(inout), target :: partit
   integer                       :: n, i
   integer                       :: itime
   integer                       :: status, ncid, varid
   integer                       :: istart(2), icount(2)
   real(real64)                  :: ncdata(mesh%nod2D)
-  real(real64),   intent(out)	:: model_2Darray(myDim_nod2D+eDim_nod2D)
-  character(*), intent(in) 	:: file
+  real(real64),   intent(out)	:: model_2Darray(partit%myDim_nod2D+partit%eDim_nod2D)
+  character(*),  intent(in) 	:: file
   character(*),  intent(in)     :: vari
   integer                       :: ierror           ! return error code
 
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
   if (mype==0) then
     ! open file
@@ -303,8 +348,8 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, mesh)
   call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (status.ne.nf_noerr)then
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
-     print*,'Error in opening netcdf file'//file
-     call par_ex
+     print*,'Error in opening netcdf file '//file
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
      stop
   endif
 
@@ -319,7 +364,4 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, mesh)
   call MPI_BCast(ncdata, nod2D, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
   model_2Darray=ncdata(myList_nod2D) 
 end subroutine read_2ddata_on_grid_NetCDF
-  
 end module g_read_other_NetCDF
-
-

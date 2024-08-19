@@ -1,0 +1,38 @@
+#!/bin/bash
+#SBATCH --job-name=ref
+#SBATCH -p compute
+#SBATCH --ntasks-per-node=1
+#SBATCH --ntasks=1
+#SBATCH --time=01:00:00
+#SBATCH -o slurm-out.out
+#SBATCH -e slurm-err.out
+#SBATCH -A ab0995
+
+source /sw/etc/profile.levante
+source ../env/levante.dkrz.de/shell
+
+ulimit -s 102400
+
+echo Submitted job: $jobid
+squeue -u $USER
+
+# determine JOBID
+JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
+
+ln -s ../bin/fesom_ini.x .           # cp -n ../bin/fesom.x
+cp -n ../config/namelist.config  .
+cp -n ../config/namelist.forcing .
+cp -n ../config/namelist.oce     .
+cp -n ../config/namelist.ice     .
+cp -n ../config/namelist.icepack .
+
+date
+srun -l fesom_ini.x > "fesom_ini.out"
+date
+
+# qstat -f $PBS_JOBID
+#export EXITSTATUS=$?
+#if [ ${EXITSTATUS} -eq 0 ] || [ ${EXITSTATUS} -eq 127 ] ; then
+#sbatch job_mistral
+#fi
+

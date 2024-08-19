@@ -1,31 +1,50 @@
-subroutine cal_shortwave_rad(mesh)
+subroutine cal_shortwave_rad(ice, partit, mesh)
   ! This routine is inherited from FESOM 1.4 and adopted appropreately. It calculates 
   ! shortwave penetration into the ocean assuming the constant chlorophyll concentration.
   ! No penetration under the ice is applied. A decent way for ice region is to be discussed.
   ! This routine should be called after ice2oce coupling done if ice model is used.
   ! Ref.: Morel and Antoine 1994, Sweeney et al. 2005
-  USE MOD_MESH
-  USE o_PARAM
-  USE o_ARRAYS
-  USE g_PARSUP
-  USE g_CONFIG
-  use g_forcing_arrays
-  use g_comm_auto
-  use i_param
-  use i_arrays
-  use i_therm_param
-  IMPLICIT NONE
+    USE MOD_ICE
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_MESH
+    USE o_PARAM
+    USE o_ARRAYS
+    USE g_CONFIG
+    use g_forcing_arrays
+    use g_comm_auto
+    IMPLICIT NONE
+    type(t_ice)   , intent(inout), target :: ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    !___________________________________________________________________________
+    integer      :: m, n2, n3, k, nzmax, nzmin
+    real(kind=WP):: swsurf, aux
+    real(kind=WP):: c, c2, c3, c4, c5
+    real(kind=WP):: v1, v2, sc1, sc2
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: a_ice
+    real(kind=WP)              , pointer  :: albw
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    a_ice => ice%data(1)%values(:)
+    albw  => ice%thermo%albw
+    
+    !___________________________________________________________________________
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(m, n2, n3, k, nzmax, nzmin, swsurf, aux, c, c2, c3, c4, c5, v1, v2, sc1, sc2)
+!$OMP DO
+  do n2=1, myDim_nod2D+eDim_nod2D 
+     do k=1, nl
+        sw_3d(k, n2)=0.0_WP
+     end do
+  end do
+!$OMP END DO
 
-  integer      :: m, n2, n3, k, nzmax, nzmin
-  real(kind=WP):: swsurf, aux
-  real(kind=WP):: c, c2, c3, c4, c5
-  real(kind=WP):: v1, v2, sc1, sc2
-  type(t_mesh), intent(in) , target :: mesh
-
-#include "associate_mesh.h"
-
-  sw_3d=0.0_WP
   !_____________________________________________________________________________
+!$OMP DO
   do n2=1, myDim_nod2D+eDim_nod2D   
      
      !__________________________________________________________________________
@@ -58,15 +77,12 @@ subroutine cal_shortwave_rad(mesh)
      v1=0.321_WP+v1
      sc1=1.54_WP-0.197_WP*c+0.166_WP*c2-0.252_WP*c3-0.055_WP*c4+0.042_WP*c5
      sc2=7.925_WP-6.644_WP*c+3.662_WP*c2-1.815_WP*c3-0.218_WP*c4+0.502_WP*c5
-
      ! convert from heat flux [W/m2] to temperature flux [K m/s]
      swsurf=swsurf/vcpw
      ! vis. sw. rad. in the colume
      nzmax=(nlevels_nod2D(n2))
      nzmin=(ulevels_nod2D(n2))
-     !!PS sw_3d(1, n2)=swsurf
      sw_3d(nzmin, n2)=swsurf
-     !!PS do k=2, nzmax
      do k=nzmin+1, nzmax
         aux=(v1*exp(zbar_3d_n(k,n2)/sc1)+v2*exp(zbar_3d_n(k,n2)/sc2))
         sw_3d(k, n2)=swsurf*aux
@@ -90,6 +106,6 @@ subroutine cal_shortwave_rad(mesh)
 !end if
 
   end do
-!call par_ex
-!stop
+!$OMP END DO
+!$OMP END PARALLEL
 end subroutine cal_shortwave_rad

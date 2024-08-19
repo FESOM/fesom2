@@ -1,43 +1,40 @@
 ! ==============================================================
-subroutine setup_model
-  implicit none
-  call read_namelist    ! should be before clock_init
-end subroutine setup_model
-! ==============================================================
-subroutine read_namelist
-  ! Reads namelist files and overwrites default parameters.
-  !
-  ! Coded by Lars Nerger
-  ! Modified by Qiang Wang, SD
-  !--------------------------------------------------------------
+subroutine setup_model(partit)
+  USE MOD_PARTIT
+  USE MOD_PARSUP
   use o_param
-  use i_param
-  use i_therm_param
+!   use i_therm_param
   use g_forcing_param
-  use g_parsup
   use g_config
-  use diagnostics, only: ldiag_solver,lcurt_stress_surf,lcurt_stress_surf, ldiag_energy, &
+  use diagnostics, only: ldiag_solver,lcurt_stress_surf,lcurt_stress_surf, ldiag_Ri, ldiag_TurbFlux, ldiag_trflx, &
                          ldiag_dMOC, ldiag_DVD, diag_list
-  use g_clock, only: timenew, daynew, yearnew
-  use g_ic3d 
+  use g_clock,     only: timenew, daynew, yearnew
+  use g_ic3d
+  use mod_transit
   implicit none
+  type(t_partit), intent(inout), target :: partit
+  character(len=MAX_PATH)               :: nmlfile
+  integer fileunit
 
-  character(len=MAX_PATH)   :: nmlfile
   namelist /clockinit/ timenew, daynew, yearnew
 
   nmlfile ='namelist.config'    ! name of general configuration namelist file
-  open (20,file=nmlfile)
-  read (20,NML=modelname)
-  read (20,NML=timestep)
-  read (20,NML=clockinit) 
-  read (20,NML=paths)
-  read (20,NML=restart_log)
-  read (20,NML=ale_def)
-  read (20,NML=geometry)
-  read (20,NML=calendar)
-  read (20,NML=run_config)
-!!$  read (20,NML=machine)
-  close (20)
+  open (newunit=fileunit, file=nmlfile)
+  read (fileunit, NML=modelname)
+  read (fileunit, NML=timestep)
+  read (fileunit, NML=clockinit) 
+  read (fileunit, NML=paths)
+  read (fileunit, NML=restart_log)
+  read (fileunit, NML=ale_def)
+  read (fileunit, NML=geometry)
+  read (fileunit, NML=calendar)
+  read (fileunit, NML=run_config)
+  read (fileunit,NML=icebergs)
+
+!!$  read (fileunit, NML=machine)
+  close (fileunit)
+  
+  
   ! ==========
   ! compute dt
   ! ========== 
@@ -54,37 +51,56 @@ subroutine read_namelist
 ! =================================
  
   nmlfile ='namelist.oce'    ! name of ocean namelist file
-  open (20,file=nmlfile)
-  read (20,NML=oce_dyn)
-  read (20,NML=oce_tra)
-  read (20,NML=oce_init3d)
-  close (20)
+  open (newunit=fileunit, file=nmlfile)
+  read (fileunit, NML=oce_dyn)
+  close (fileunit)
+
+  nmlfile ='namelist.tra'    ! name of ocean namelist file
+  open (newunit=fileunit, file=nmlfile)
+  read (fileunit, NML=tracer_phys)
+  close (fileunit)
 
   nmlfile ='namelist.forcing'    ! name of forcing namelist file
-  open (20,file=nmlfile)
-  read (20,NML=forcing_exchange_coeff)
-  read (20,NML=forcing_bulk)
-  read (20,NML=land_ice)
-  close (20)
+  open (newunit=fileunit, file=nmlfile)
+  read (fileunit, NML=forcing_exchange_coeff)
+  read (fileunit, NML=forcing_bulk)
+  read (fileunit, NML=land_ice)
+  read (fileunit, NML=age_tracer) !---age-code
+  close (fileunit)
 
-  if(use_ice) then
-  nmlfile ='namelist.ice'    ! name of ice namelist file
-  open (20,file=nmlfile)
-  read (20,NML=ice_dyn)
-  read (20,NML=ice_therm)
-  close (20)
-  endif
+!   if(use_ice) then
+!   nmlfile ='namelist.ice'    ! name of ice namelist file
+!   open (newunit=fileunit, file=nmlfile)
+! !   read (fileunit, NML=ice_dyn)
+!   read (fileunit, NML=ice_therm)
+!   close (fileunit)
+!   endif
   
   nmlfile ='namelist.io'    ! name of forcing namelist file
-  open (20,file=nmlfile)
-  read (20,NML=diag_list)
-  close (20)
+  open (newunit=fileunit, file=nmlfile)
+  read (fileunit, NML=diag_list)
+  close (fileunit)
 
-  if(mype==0) write(*,*) 'Namelist files are read in'
+  if (use_transit) then
+! Transient tracer input, input file names have to be specified in
+! namelist.config, nml=run_config
+    if(partit%mype==0) print *, "Transient tracers are ON. Tracer input file: ", ifile_transit
+    open (20,file=ifile_transit)
+    if (anthro_transit .or. paleo_transit) then
+      call read_transit_input
+    else
+!     Spinup / equilibrium runs with constant tracer input,
+!     read parameter values from namelist.oce
+      read (20,nml=transit_param)
+    end if
+    close (20)
+  end if
+
+  if(partit%mype==0) write(*,*) 'Namelist files are read in'
   
   !_____________________________________________________________________________
   ! Check for namelist parameter consistency
-  if(mype==0) then
+  if(partit%mype==0) then
     
     ! check for valid step per day number
     if (mod(86400,step_per_day)==0) then
@@ -108,25 +124,26 @@ subroutine read_namelist
         write(*,*) '____________________________________________________________________'
         print *, achar(27)//'[0m'
         write(*,*)
-        call par_ex(0)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
     endif
     
 
   endif
-
 ! if ((output_length_unit=='s').or.(int(real(step_per_day)/24.0)<=1)) use_means=.false.
-end subroutine read_namelist
+end subroutine setup_model
 ! =================================================================
-subroutine get_run_steps(nsteps)
+subroutine get_run_steps(nsteps, partit)
   ! Coded by Qiang Wang
   ! Reviewed by ??
-  !--------------------------------------------------------------
-  
+  !--------------------------------------------------------------  
   use g_clock
-  use g_parsup
+  USE MOD_PARTIT
+  USE MOD_PARSUP
   implicit none
 
-  integer      :: i, temp_year, temp_mon, temp_fleapyear, nsteps
+  type(t_partit), intent(inout) :: partit
+  integer,        intent(inout) :: nsteps 
+  integer                       :: i, temp_year, temp_mon, temp_fleapyear
 
   ! clock should have been inialized before calling this routine
 
@@ -158,11 +175,11 @@ subroutine get_run_steps(nsteps)
   else
      write(*,*) 'Run length unit ', run_length_unit, ' is not defined.'
      write(*,*) 'Please check and update the code.'
-     call par_ex(1)
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
      stop
   end if
 
-  if(mype==0) write(*,*) nsteps, ' steps to run for ', runid, ' job submission'
+  if(partit%mype==0) write(*,*) nsteps, ' steps to run for ', runid, ' job submission'
 end subroutine get_run_steps
 
     

@@ -44,7 +44,7 @@
 #if METIS_VERSION == 5 /* ---------------- METIS 5 part ------------------------ */
 #include "metis.h"
 
-void partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part)
+void do_partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part)
 {
   int i, j, wgt_type;
   idx_t opt[METIS_NOPTIONS];
@@ -278,7 +278,7 @@ void partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part
             wgt_loc[vertex_loc]=wgt[j];
         }
 
-      partit(&n_loc, ptr_loc, adj_loc, wgt_loc, np, part_loc);
+      do_partit(&n_loc, ptr_loc, adj_loc, wgt_loc, np, part_loc);
 
       /* Convert the partitioned graph back to the current level indexing */
       for (j=0; j<*n; j++)
@@ -302,7 +302,7 @@ void partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part
 
 #elif METIS_VERSION == 4 /* ---------------- METIS 4 part ------------------------ */
 
-void partit(int *n, int *ptr, int *adj, int *wgt, int *np, int *part)
+void do_partit(int *n, int *ptr, int *adj, int *wgt, int *np, int *part)
 {
   int opt[5];
   int numfl=1; /* 0: C-numbering ; 1: F-numbering*/

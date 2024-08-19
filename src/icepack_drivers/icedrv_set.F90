@@ -18,22 +18,21 @@
       use icepack_intfc,    only: icepack_query_tracer_indices
       use icepack_intfc,    only: icepack_warnings_flush
       use icepack_intfc,    only: icepack_warnings_aborted
-      use icedrv_system,    only: icedrv_system_abort 
+      use icedrv_system,    only: icedrv_system_abort, icedrv_system_init
       
       contains 
 
-      module subroutine set_icepack()
-
-          use g_parsup,            only: myDim_nod2D,  eDim_nod2D,  &
-                                         myDim_elem2D, eDim_elem2D, &
-                                         mpi_comm_fesom
-          use i_param,             only: whichEVP
-          use i_param,             only: cd_oce_ice, Pstar, c_pressure  
-          use i_therm_param,       only: albw
+      module subroutine set_icepack(ice, partit)
+          use MOD_ICE
+!           use i_param,             only: whichEVP
+!           use i_param,             only: cd_oce_ice, Pstar, c_pressure  
+!           use i_therm_param,       only: albw
 
           implicit none
 
           ! local variables
+          type(t_partit), intent(inout), target :: partit
+          type(t_ice), intent(inout), target :: ice
 
           character(len=char_len)     :: nml_filename, diag_filename
           character(len=*), parameter :: subname = '(set_icepack)'
@@ -256,12 +255,13 @@
           !-----------------------------------------------------------------
           ! Derived quantities used by the icepack model
           !-----------------------------------------------------------------
-          
-          nx         = myDim_nod2D  + eDim_nod2D
-          nx_elem    = myDim_elem2D + eDim_elem2D
-          nx_nh      = myDim_nod2D
-          nx_elem_nh = myDim_elem2D
-
+          call icedrv_system_init(partit)
+          p_partit => partit
+          nx         = p_partit%myDim_nod2D  + p_partit%eDim_nod2D
+          nx_elem    = p_partit%myDim_elem2D + p_partit%eDim_elem2D
+          nx_nh      = p_partit%myDim_nod2D
+          nx_elem_nh = p_partit%myDim_elem2D
+          mype       = p_partit%mype
           ncat      = nicecat    ! number of categories
           nfsd      = nfsdcat    ! number of floe size categories
           nilyr     = nicelyr    ! number of ice layers per category
@@ -433,13 +433,13 @@
           if (mype == 0) write(nu_diag,*) '-----------------------------------'
           if (mype == 0) write(nu_diag,*) ' '
 
-          if (whichEVP == 1 .or. whichEVP == 2) then
+          if (ice%whichEVP == 1 .or. ice%whichEVP == 2) then
              if (mype == 0) write (nu_diag,*) 'WARNING: whichEVP = 1 or 2'
              if (mype == 0) write (nu_diag,*) 'Adaptive or Modified EVP formulations'
              if (mype == 0) write (nu_diag,*) 'are not allowed when using Icepack (yet).'
              if (mype == 0) write (nu_diag,*) 'Standard EVP will be used instead'
              if (mype == 0) write (nu_diag,*) '         whichEVP = 0'
-             whichEVP = 0
+             ice%whichEVP = 0
           endif
     
           if (ncat == 1 .and. kitd == 1) then
@@ -818,10 +818,10 @@
           ! Make the namelists.ice and namelist.icepack consistent (icepack wins
           ! over fesom)
 
-          cd_oce_ice = dragio
-          albw       = albocn
-          Pstar      = P_star
-          c_pressure = C_star
+          ice%cd_oce_ice = dragio
+          ice%thermo%albw= albocn
+          ice%Pstar      = P_star
+          ice%c_pressure = C_star
 
     
           call icepack_init_parameters(ustar_min_in=ustar_min, Cf_in=Cf, &
@@ -870,7 +870,7 @@
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
 
-          call mpi_barrier(mpi_comm_fesom,mpi_error)
+          call mpi_barrier(p_partit%mpi_comm_fesom, mpi_error)
 
       end subroutine set_icepack
 

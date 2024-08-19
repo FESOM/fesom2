@@ -1,14 +1,20 @@
 MODULE Toy_Channel_Soufflet
-  use mod_mesh
+  USE MOD_MESH
+  USE MOD_PARTIT
+  USE MOD_PARSUP
+  USE MOD_TRACER
+  USE MOD_DYN
   USE o_ARRAYS
   USE o_PARAM
-  USE g_PARSUP
   USE g_config
+  use g_comm_auto
 
   implicit none
   SAVE 
   private
-  public :: relax_zonal_vel, relax_zonal_temp, compute_zonal_mean_ini, compute_zonal_mean, initial_state_soufflet, energy_out_soufflet, soufflet_forc_update
+  public :: relax_zonal_vel, relax_zonal_temp, compute_zonal_mean_ini, compute_zonal_mean, &
+            initial_state_soufflet, energy_out_soufflet, soufflet_forc_update, &
+            tau_inv, lat0, dy, ztem
 
   real(kind=WP), allocatable  :: zvel(:,:), Uclim(:,:)
   real(kind=WP), allocatable  :: ztem(:,:)
@@ -41,13 +47,22 @@ MODULE Toy_Channel_Soufflet
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine relax_zonal_vel(mesh)
+subroutine relax_zonal_vel(dynamics, partit, mesh)
   implicit none
   integer        :: elem,  nz, nn, nn1
   real(kind=WP)  :: a, yy, uzon 
-  type(t_mesh), intent(in)     , target :: mesh
-#include  "associate_mesh.h"
-
+  
+  type(t_dyn)   , intent(inout), target :: dynamics
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh)  , intent(in)   , target :: mesh
+  real(kind=WP), dimension(:,:,:), pointer :: UV_rhs
+  
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
+  UV_rhs=>dynamics%uv_rhs(:,:,:)
+  
   DO elem=1, myDim_elem2D
      ! ========
      ! Interpolation
@@ -70,16 +85,22 @@ subroutine relax_zonal_vel(mesh)
         UV_rhs(1,nz,elem) = UV_rhs(1,nz,elem)+dt*tau_inv*(Uclim(nz,elem)-Uzon)
      END DO
   END DO
+  call exchange_elem(UV_rhs, partit)   
 end subroutine relax_zonal_vel
 !==========================================================================
-subroutine relax_zonal_temp(mesh)
+subroutine relax_zonal_temp(tdata, partit, mesh)
   implicit none
-  integer                           :: n, nz, nn, nn1
-  real(kind=WP)                     :: yy, a, Tzon
-  type(t_mesh), intent(in) , target :: mesh
-#include  "associate_mesh.h"
+  integer                                    :: n, nz, nn, nn1
+  real(kind=WP)                              :: yy, a, Tzon
+  type(t_mesh),        intent(in),    target :: mesh
+  type(t_partit),      intent(inout), target :: partit
+  type(t_tracer_data), intent(inout), target :: tdata
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
 
-  do n=1, myDim_nod2D
+  do n=1, myDim_nod2D+eDim_nod2D
      yy=coord_nod2D(2,n)-lat0
      a=0 
     if (yy<dy/2) then  ! southward from the center of the first bin
@@ -94,18 +115,22 @@ subroutine relax_zonal_temp(mesh)
     end if
     do nz=1, nlevels_nod2D(n)-1
        Tzon=(1.0-a)*ztem(nz,nn)+a*ztem(nz,nn1)
-       tr_arr(nz,n,1)=  tr_arr(nz,n,1)+dt*tau_inv*(Tclim(nz,n)-Tzon)
+       tdata%values(nz,n)=  tdata%values(nz,n)+dt*tau_inv*(Tclim(nz,n)-Tzon)
     end do
   end do
 end subroutine relax_zonal_temp
 !==========================================================================
-subroutine compute_zonal_mean_ini(mesh)
+subroutine compute_zonal_mean_ini(partit, mesh)
   implicit none 
   real(kind=8)                      :: ymean, Ly
   integer                           :: elem, nz, m, elnodes(3)
-  real(kind=8), allocatable         :: zvel1D(:), znum1D(:)
-  type(t_mesh), intent(in) , target :: mesh
-#include  "associate_mesh.h"
+  real(kind=8),   allocatable       :: zvel1D(:), znum1D(:)
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
 
 Ly=ysize/r_earth       ! The meridional lenght in radians
 dy=Ly/real(nybins)
@@ -154,20 +179,27 @@ ztem=0.0
  ! no division by 0 is occurring 
 end subroutine compute_zonal_mean_ini
 !==========================================================================
-subroutine compute_zonal_mean(mesh)
+subroutine compute_zonal_mean(dynamics, tracers, partit, mesh)
   implicit none 
-  integer       :: elem, nz, m, elnodes(3)
-  real(kind=8), allocatable  :: zvel1D(:), znum1D(:)
-  type(t_mesh), intent(in) , target :: mesh
-#include  "associate_mesh.h"
-
+  integer                            :: elem, nz, m, elnodes(3)
+  real(kind=8), allocatable          :: zvel1D(:), znum1D(:)
+  type(t_mesh)  , intent(in)   , target :: mesh
+  type(t_partit), intent(inout), target :: partit
+  type(t_tracer), intent(inout), target :: tracers
+  type(t_dyn)   , intent(inout), target :: dynamics
+  real(kind=WP), dimension(:,:,:), pointer :: UV
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
+  UV => dynamics%uv(:,:,:)
 
  ztem=0.
  zvel=0.
  DO elem=1,myDim_elem2D
     if(elem2D_nodes(1,elem)>myDim_nod2D) cycle
     Do nz=1,nlevels(elem)-1
-    ztem(nz,bpos(elem))=ztem(nz,bpos(elem))+sum(tr_arr(nz,elem2D_nodes(:,elem),1))/3.0_8
+    ztem(nz,bpos(elem))=ztem(nz,bpos(elem))+sum(tracers%data(1)%values(nz,elem2D_nodes(:,elem)))/3.0_8
     zvel(nz,bpos(elem))=zvel(nz,bpos(elem))+UV(1,nz,elem)
     END DO
  END DO
@@ -214,26 +246,35 @@ subroutine compute_zonal_mean(mesh)
 
 end subroutine compute_zonal_mean
 ! ====================================================================================
-subroutine initial_state_soufflet(mesh)
+subroutine initial_state_soufflet(dynamics, tracers, partit, mesh)
  ! Profiles Soufflet 2016 (OM)
   implicit none
-  type(t_mesh), intent(in) , target  :: mesh
+  type(t_mesh)  , intent(inout), target :: mesh
+  type(t_partit), intent(inout), target :: partit
+  type(t_tracer), intent(inout), target :: tracers
+  type(t_dyn)   , intent(inout), target :: dynamics
+
   integer                            :: n, nz, elnodes(3)
   real(kind=8)                       :: dst, yn, Fy, Lx
 ! real(kind=8)                       :: Ljet,rhomax,Sb, drho_No, drho_So
 ! real(kind=8)                       :: z_No, z_So,dz_No,dz_So, drhosurf_No, drhosurf_So, zsurf 
   real(kind=8)                       :: d_No(mesh%nl-1), d_So(mesh%nl-1), rho_No(mesh%nl-1), rho_So(mesh%nl-1)
-#include  "associate_mesh.h"
+  real(kind=WP), dimension(:,:,:), pointer :: UV
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
+  UV => dynamics%uv(:,:,:)
 
   dy=ysize/nybins/r_earth
 
   ! Default values
-  stress_surf   = 0.0
-  heat_flux     = 0.0_8
-  tr_arr(:,:,2) = 35.0_8
-  Ssurf         = tr_arr(1,:,1)
-  water_flux    = 0.0_8
-  relax2clim    = 0.0_8
+  stress_surf            = 0.0_WP
+  heat_flux              = 0.0_WP
+  tracers%data(2)%values = 35.0_WP
+  Ssurf                  = tracers%data(2)%values(1,:)
+  water_flux             = 0.0_WP
+  relax2clim             = 0.0_WP
 
 ! Have to set density_0=1028._WP in oce_modules.F90
 ! ========
@@ -276,21 +317,21 @@ do n=1, myDim_nod2D+eDim_nod2D
         end if
      end if
      do nz=1, nlevels_nod2D(n)-1
-        tr_arr(nz, n,1)=rho_So(nz)+(rho_No(nz)-rho_So(nz))*(1.0-Fy)
+        tracers%data(1)%values(nz,n)=rho_So(nz)+(rho_No(nz)-rho_So(nz))*(1.0-Fy)
      end do
   end do
  
   ! ========
   ! Make consistent
   ! ========
-  Tsurf=tr_arr(1,:,1)
-  Tclim=tr_arr(:,:,1)
+  Tsurf=tracers%data(1)%values(1,:)
+  Tclim=tracers%data(1)%values(:,:)
   ! ========
   ! add small perturbation:
   do n=1, myDim_nod2D+eDim_nod2D
      dst=(coord_nod2D(2, n)-lat0)*r_earth
      do nz=1, nlevels_nod2D(n)-1
-        tr_arr(nz,n,1)=tr_arr(nz,n,1)-0.1*sin(2*pi*dst/ysize)*exp(2*Z(nz)/zsize) &
+        tracers%data(1)%values(nz,n)=tracers%data(1)%values(nz,n)-0.1*sin(2*pi*dst/ysize)*exp(2*Z(nz)/zsize) &
 	       *(sin(8*pi*coord_nod2D(1,n)*r_earth/xsize)+ &
 	       0.5*sin(3*pi*coord_nod2D(1,n)*r_earth/xsize))
      end do
@@ -298,41 +339,54 @@ do n=1, myDim_nod2D+eDim_nod2D
   ! =======
   ! Compute geostrophically balanced flow
   ! =======
-  write(*,*) mype, 'T', maxval(tr_arr(:,:,1)), minval(tr_arr(:,:,1))
+  write(*,*) mype, 'T', maxval(tracers%data(1)%values), minval(tracers%data(1)%values)
   ! Redefine Coriolis (to agree with the Soufflet paper) 
   DO n=1,myDim_elem2D
   elnodes=elem2D_nodes(:,n)
   dst=(sum(coord_nod2D(2, elnodes))/3.0-lat0)*r_earth-ysize/2
-  coriolis(n)=1.0e-4+dst*1.6e-11	 
+  mesh%coriolis(n)=1.0e-4+dst*1.6e-11	 
   END DO
-  write(*,*) mype, 'COR', maxval(coriolis*10000.0), minval(coriolis*10000.0) 
+  write(*,*) mype, 'COR', maxval(mesh%coriolis*10000.0), minval(mesh%coriolis*10000.0) 
   DO n=1,myDim_elem2D 
-  elnodes=elem2D_nodes(:,n)
-  ! Thermal wind \partial_z UV(1,:,:)=(g/rho_0/f)\partial_y rho 
-  DO nz=1,nlevels(n)-1
-     d_No(nz)=(-(0.00025_WP*density_0)*g/density_0/coriolis(n))*sum(gradient_sca(4:6,n)*Tclim(nz, elnodes))
-  !  d_N is used here as a placeholder
-  ! -(sw_alpha*density_0) here is from the equation of state d\rho=-(sw_alpha*density_0) dT 
+    elnodes=elem2D_nodes(:,n)
+    ! Thermal wind \partial_z UV(1,:,:)=(g/rho_0/f)\partial_y rho 
+    DO nz=1,nlevels(n)-1
+        d_No(nz)=(-(0.00025_WP*density_0)*g/density_0/mesh%coriolis(n))*sum(gradient_sca(4:6,n)*Tclim(nz, elnodes))
+    !  d_N is used here as a placeholder
+    ! -(sw_alpha*density_0) here is from the equation of state d\rho=-(sw_alpha*density_0) dT 
+    END DO
+    ! Vertical integration
+    nz=nlevels(n)-1
+    UV(1,nz,n)=d_No(nz)*(Z(nz)-zbar(nz+1)) 
+    DO nz=nlevels(n)-2,1,-1
+        UV(1,nz,n)=UV(1,nz+1,n)+d_No(nz+1)*(zbar(nz+1)-Z(nz+1))+d_No(nz)*(Z(nz)-zbar(nz+1)) 
+    END DO 
   END DO
-  ! Vertical integration
-  nz=nlevels(n)-1
-  UV(1,nz,n)=d_No(nz)*(Z(nz)-zbar(nz+1)) 
-  DO nz=nlevels(n)-2,1,-1
-  UV(1,nz,n)=UV(1,nz+1,n)+d_No(nz+1)*(zbar(nz+1)-Z(nz+1))+d_No(nz)*(Z(nz)-zbar(nz+1)) 
-  END DO 
-  END DO
-  allocate(Uclim(nl-1,myDim_elem2D))
-  Uclim=UV(1,:,:)
+  call exchange_elem(UV, partit)
+  
+  allocate(Uclim(nl-1,myDim_elem2D+eDim_elem2D))
+  Uclim=UV(1,:,:)    
   write(*,*) mype, 'Vel', maxval(UV(1,:,:)), minval(UV(1,:,:))
  END subroutine initial_state_soufflet
 ! ===============================================================================
-subroutine energy_out_soufflet(mesh)
+subroutine energy_out_soufflet(dynamics, partit, mesh)
   implicit none 
   real(kind=8)                      :: tke(2), aux(2), ww, wwaux 
   integer                           :: elem, nz, m, elnodes(3), nybins
-  real(kind=8), allocatable         :: zvel1D(:), znum1D(:)
-  type(t_mesh), intent(in) , target :: mesh
-#include  "associate_mesh.h"
+  real(kind=8),   allocatable       :: zvel1D(:), znum1D(:)
+  type(t_dyn)   , intent(inout), target :: dynamics
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh)  , intent(in)   , target :: mesh
+  
+real(kind=WP), dimension(:,:,:), pointer :: UV
+real(kind=WP), dimension(:,:), pointer :: Wvel
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
+UV => dynamics%uv(:,:,:)
+Wvel => dynamics%w(:,:)
+
 
  nybins=100
  zvel=0.

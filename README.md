@@ -27,3 +27,5 @@ References
 * **[Version coupled with ECHAM6 atmosphere]** Sidorenko, D., Goessling, H. F., Koldunov, N. V., Scholz, P., Danilov, S., Barbi, D., et al ( 2019). Evaluation of FESOM2.0 coupled to ECHAM6.3: Pre‐industrial and HighResMIP simulations. Journal of Advances in Modeling Earth Systems, 11. https://doi.org/10.1029/2019MS001696
 
 * **[Version with ICEPACK sea ice thermodynamics]** Zampieri, Lorenzo, Frank Kauker, Jörg Fröhle, Hiroshi Sumata, Elizabeth C. Hunke, and Helge Goessling. Impact of Sea-Ice Model Complexity on the Performance of an Unstructured-Mesh Sea-ice/ocean Model Under Different Atmospheric Forcings. Washington: American Geophysical Union, 2020. https://dx.doi.org/10.1002/essoar.10505308.1.
+
+* **[Version coupled with OpenIFS atmosphere]** Streffing, J., Sidorenko, D., Semmler, T., Zampieri, L., Scholz, P., Andrés-Martínez, M., et al ( 2022). AWI-CM3 coupled climate model: description and evaluation experiments for a prototype post-CMIP6 model. Geoscientific Model Development, 15. https://doi.org/10.5194/gmd-15-6399-2022

@@ -12,6 +12,7 @@ module g_clock
   integer                  :: ndpyr                !number of days in yearnew 
   integer                  :: num_day_in_month(0:1,12)
   character(4)             :: cyearold, cyearnew   !year as character string      
+  character(2)             :: cmonth               !month as character string      
   data num_day_in_month(0,:) /31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31/
   data num_day_in_month(1,:) /31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31/
 
@@ -55,6 +56,7 @@ contains
        aux2=aux1+num_day_in_month(fleapyear,i)
        if(daynew>aux1 .and. daynew<=aux2) then
           month=i
+          write(cmonth, '(I2.2)') month
           day_in_month=daynew-aux1
           exit
        end if
@@ -65,12 +67,15 @@ contains
   !
   !--------------------------------------------------------------------------------
   !
-  subroutine clock_init
-    use g_parsup
+  subroutine clock_init(partit)
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     use g_config
+    use mod_transit, only: ti_transit, ti_start_transit
     implicit none
-    integer          :: i, daystart, yearstart
-    real(kind=WP)    :: aux1, aux2, timestart
+    type(t_partit), intent(in), target    :: partit
+    integer                               :: i, daystart, yearstart
+    real(kind=WP)                         :: aux1, aux2, timestart
  
     ! the model initialized at
     timestart=timenew
@@ -91,6 +96,9 @@ contains
     else
        r_restart=.true.
     end if
+!   For simulations with transient tracer input data
+    if (use_transit) ti_transit = yearnew - yearstart + ti_start_transit
+
 
     ! year as character string 
     write(cyearold,'(i4)') yearold
@@ -123,18 +131,18 @@ contains
        aux1=aux2
     end do
 
-    if(mype==0) then
+    if(partit%mype==0) then
         if(r_restart) then
             write(*,*)
             print *, achar(27)//'[31m'    //'____________________________________________________________'//achar(27)//'[0m'
             print *, achar(27)//'[5;7;31m'//' --> THIS IS A RESTART RUN !!!                              '//achar(27)//'[0m'
-            write(*,"(A, F5.2, I4, I5)") '     > clock restarted at time:', timenew, daynew, yearnew
+            write(*,"(A, F8.2, I4, I5)") '     > clock restarted at time:', timenew, daynew, yearnew
             write(*,*)
         else
             write(*,*)
             print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
             print *, achar(27)//'[7;32m'//' --> THIS IS A INITIALISATION RUN !!!                       '//achar(27)//'[0m'
-            write(*,"(A, F5.2, I4, I5)")'     > clock initialized at time:', timenew, daynew, yearnew
+            write(*,"(A, F8.2, I4, I5)")'     > clock initialized at time:', timenew, daynew, yearnew
             write(*,*)
         end if
     end if
@@ -188,11 +196,18 @@ contains
     flag=0
 
     if(.not.include_fleapyear) return
+    call is_fleapyr(year, flag)
+  end subroutine check_fleapyr
 
+  subroutine is_fleapyr(year, flag)
+    implicit none
+    integer, intent(in) :: year      
+    integer, intent(out):: flag
+    flag=0
     if ((mod(year,4)==0.and.mod(year,100)/=0) .or. mod(year,400)==0) then
        flag=1
     endif
-  end subroutine check_fleapyr
+  end subroutine is_fleapyr
   !
   !----------------------------------------------------------------------------
   !

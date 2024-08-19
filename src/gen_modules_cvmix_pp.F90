@@ -25,10 +25,11 @@ module g_cvmix_pp
     use g_config
     use o_param           
     use MOD_MESH
-    use g_parsup
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_DYN
     use o_arrays
     use g_comm_auto 
-    use i_arrays
     implicit none
    
     !___________________________________________________________________________
@@ -64,14 +65,18 @@ module g_cvmix_pp
     !===========================================================================
     ! allocate and initialize CVMIX PP variables --> call initialisation 
     ! routine from cvmix library
-    subroutine init_cvmix_pp(mesh)
-        use MOD_MESH
+    subroutine init_cvmix_pp(partit, mesh)
         implicit none
-        type(t_mesh), intent(in), target :: mesh        
-        character(len=MAX_PATH)       :: nmlfile
-        logical                  :: nmlfile_exist=.False.
-        integer                  :: node_size
-#include "associate_mesh.h"
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        character(len=MAX_PATH)          :: nmlfile
+        logical                          :: nmlfile_exist=.False.
+        integer                          :: node_size
+        integer fileunit
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -97,9 +102,9 @@ module g_cvmix_pp
         ! check if cvmix namelist file exists if not use default values 
         inquire(file=trim(nmlfile),exist=nmlfile_exist) 
         if (nmlfile_exist) then
-            open(20,file=trim(nmlfile))
-                read(20,nml=param_pp)
-            close(20)
+            open(newunit=fileunit,file=trim(nmlfile))
+                read(fileunit,nml=param_pp)
+            close(fileunit)
         else
             write(*,*) '     could not find namelist.cvmix, will use default values !'
         end if
@@ -157,13 +162,21 @@ module g_cvmix_pp
     !
     !===========================================================================
     ! calculate PP vertrical mixing coefficients from CVMIX library
-    subroutine calc_cvmix_pp(mesh)
+    subroutine calc_cvmix_pp(dynamics, partit, mesh)
         use MOD_MESH
+        
         implicit none
-        type(t_mesh), intent(in), target :: mesh                
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        type(t_dyn), intent(inout), target :: dynamics
         integer       :: node, elem, nz, nln, nun, elnodes(3), windnl=2, node_size
         real(kind=WP) :: vshear2, dz2, Kvb
-#include "associate_mesh.h"
+        real(kind=WP), dimension(:,:,:), pointer :: UVnode
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
+        UVnode=>dynamics%uvnode(:,:,:)
         node_size = myDim_nod2D
         !_______________________________________________________________________
         do node = 1,node_size
@@ -177,8 +190,8 @@ module g_cvmix_pp
             !!PS do nz=2,nln
             do nz=nun+1,nln
                 dz2     = (Z_3d_n( nz-1,node)-Z_3d_n( nz,node))**2
-                vshear2 = (Unode(1,nz-1,node)-Unode(1,nz,node))**2 +&
-                          (Unode(2,nz-1,node)-Unode(2,nz,node))**2 
+                vshear2 = (UVnode(1,nz-1,node)-UVnode(1,nz,node))**2 +&
+                          (UVnode(2,nz-1,node)-UVnode(2,nz,node))**2 
                 vshear2 = vshear2/dz2
                 ! WIKIPEDIA: The Richardson number is always 
                 ! considered positive. A negative value of N² (i.e. complex N) 
@@ -247,13 +260,13 @@ module g_cvmix_pp
 
         !_______________________________________________________________________
         ! write out diffusivities to FESOM2.0 --> diffusivities remain on nodes
-        call exchange_nod(pp_Kv)
+        call exchange_nod(pp_Kv, partit)
         Kv = pp_Kv
            
         !_______________________________________________________________________
         ! write out viscosities to FESOM2.0 --> viscosities for FESOM2.0 are 
         ! defined on elements --> interpolate therefor from nodes to elements
-        call exchange_nod(pp_Av)
+        call exchange_nod(pp_Av, partit)
         Av = 0.0_WP
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)

@@ -22,11 +22,14 @@ module g_cvmix_kpp
     ! module calls from FESOM
     use g_config
     use o_param           
-    use mod_mesh
-    use g_parsup
+    USE MOD_ICE
+    USE MOD_DYN
+    USE mod_tracer
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_MESH
     use o_arrays
     use g_comm_auto 
-    use i_arrays
     use g_forcing_arrays
     use g_support
     use o_mixing_KPP_mod
@@ -218,13 +221,18 @@ module g_cvmix_kpp
     !===========================================================================
     ! allocate and initialize CVMIX KPP variables --> call initialisation 
     ! routine from cvmix library
-    subroutine init_cvmix_kpp(mesh)
+    subroutine init_cvmix_kpp(partit, mesh)
         implicit none
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
         character(len=MAX_PATH) :: nmlfile
         logical            :: nmlfile_exist=.False.
         integer            :: node_size
-        type(t_mesh), intent(in) , target :: mesh
-#include "associate_mesh.h"
+        integer fileunit
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -272,9 +280,9 @@ module g_cvmix_kpp
         ! check if cvmix namelist file exists if not use default values 
         inquire(file=trim(nmlfile),exist=nmlfile_exist) 
         if (nmlfile_exist) then
-            open(20,file=trim(nmlfile))
-                read(20,nml=param_kpp)
-            close(20)
+            open(newunit=fileunit,file=trim(nmlfile))
+                read(fileunit,nml=param_kpp)
+            close(fileunit)
         else
             write(*,*) '     could not find namelist.cvmix, will use default values !'
         end if
@@ -341,8 +349,13 @@ module g_cvmix_kpp
     !
     !===========================================================================
     ! calculate PP vertrical mixing coefficients from CVMIX library
-    subroutine calc_cvmix_kpp(mesh)
-        type(t_mesh), intent(in)  , target :: mesh
+    subroutine calc_cvmix_kpp(ice, dynamics, tracers, partit, mesh)
+        type(t_ice)   , intent(in),    target :: ice
+        type(t_dyn)   , intent(in),    target :: dynamics
+        type(t_tracer), intent(in),    target :: tracers
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        !_______________________________________________________________________
         integer       :: node, elem, nz, nln, nun,  elnodes(3), aux_nz
         real(kind=WP) :: vshear2, dz2, aux, aux_wm(mesh%nl), aux_ws(mesh%nl)
         real(kind=WP) :: aux_coeff, sigma, stable
@@ -352,7 +365,20 @@ module g_cvmix_kpp
         real(kind=WP) :: sldepth, sfc_temp, sfc_salt, sfc_u, sfc_v, htot, delh, rho_sfc, rho_nz
         real(kind=WP) :: rhopot, bulk_0, bulk_pz, bulk_pz2
         real(kind=WP) :: sfc_rhopot, sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2
-#include "associate_mesh.h"
+        !_______________________________________________________________________
+        ! pointer on necessary derived types
+        real(kind=WP), dimension(:), pointer  :: a_ice
+        real(kind=WP), dimension(:,:), pointer :: temp, salt
+        real(kind=WP), dimension(:,:,:), pointer :: UVnode
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+        temp=>tracers%data(1)%values(:,:)
+        salt=>tracers%data(2)%values(:,:)
+        UVnode=>dynamics%uvnode(:,:,:)
+        a_ice        => ice%data(1)%values(:)
+        
         !_______________________________________________________________________
         kpp_Av = 0.0_WP
         kpp_Kv = 0.0_WP
@@ -388,15 +414,15 @@ module g_cvmix_kpp
                     !___________________________________________________________
                     ! calculate squared velocity shear referenced to the surface
                     ! --> cvmix wants to have it with  respect to the midlevel rather than full levels
-                    !!PS kpp_dvsurf2(nz) = ((Unode(1,nz-1,node)+Unode(1,nz,node))*0.5 - Unode( 1,1,node) )**2 + &
-                    !!PS                   ((Unode(2,nz-1,node)+Unode(2,nz,node))*0.5 - Unode( 2,1,node) )**2
-                    kpp_dvsurf2(nz) = ((Unode(1,nz-1,node)+Unode(1,nz,node))*0.5 - Unode( 1,nun,node) )**2 + &
-                                      ((Unode(2,nz-1,node)+Unode(2,nz,node))*0.5 - Unode( 2,nun,node) )**2
+                    !!PS kpp_dvsurf2(nz) = ((UVnode(1,nz-1,node)+UVnode(1,nz,node))*0.5 - UVnode( 1,1,node) )**2 + &
+                    !!PS                   ((UVnode(2,nz-1,node)+UVnode(2,nz,node))*0.5 - UVnode( 2,1,node) )**2
+                    kpp_dvsurf2(nz) = ((UVnode(1,nz-1,node)+UVnode(1,nz,node))*0.5 - UVnode( 1,nun,node) )**2 + &
+                                      ((UVnode(2,nz-1,node)+UVnode(2,nz,node))*0.5 - UVnode( 2,nun,node) )**2
                     !___________________________________________________________
                     ! calculate shear Richardson number Ri = N^2/(du/dz)^2
                     dz2     = (Z_3d_n( nz-1,node)-Z_3d_n( nz,node))**2
-                    vshear2 = (Unode(1,nz-1,node)-Unode(1,nz,node))**2 + &
-                              (Unode(2,nz-1,node)-Unode(2,nz,node))**2 
+                    vshear2 = (UVnode(1,nz-1,node)-UVnode(1,nz,node))**2 + &
+                              (UVnode(2,nz-1,node)-UVnode(2,nz,node))**2 
                     vshear2 = vshear2/dz2
                     kpp_shearRi(nz) = max(bvfreq(nz,node),0.0_WP)/(vshear2+kpp_epsln)
                     
@@ -404,9 +430,9 @@ module g_cvmix_kpp
                     ! buoyancy difference with respect to the surface --> computed in
                     ! oce_ale_pressure_bf.F90 --> subroutine pressure_bv 
                     ! --> dbsfc(nz,node)
-                    !!PS call densityJM_components(tr_arr(1,node,1), tr_arr(1,node,2), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot, mesh)
-                    call densityJM_components(tr_arr(nun,node,1), tr_arr(nun,node,2), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot, mesh)
-                    call densityJM_components(tr_arr(nz,node,1), tr_arr(nz,node,2), bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)                    
+                    !!PS call densityJM_components(temp(1,node), salt(1,node), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot, mesh)
+                    call densityJM_components(temp(nun,node), salt(nun,node), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot, mesh)
+                    call densityJM_components(temp(nz, node), salt(nz, node), bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)                    
                     rho_nz  = bulk_0   + Z_3d_n(nz,node)*(bulk_pz   + Z_3d_n(nz,node)*bulk_pz2)
                     rho_nz  = rho_nz*rhopot/(rho_nz+0.1_WP*Z_3d_n(nz,node))-density_0
                     rho_sfc = sfc_bulk_0   + Z_3d_n(nz,node)*(sfc_bulk_pz   + Z_3d_n(nz,node)*sfc_bulk_pz2)
@@ -441,10 +467,10 @@ module g_cvmix_kpp
                     do nztmp = nun, nzsfc
                         delh     = min( max(0.0_WP,sldepth-htot), hnode(nztmp,node) )
                         htot     = htot+delh
-                        sfc_temp = sfc_temp + tr_arr(nztmp,node,1)*delh
-                        sfc_salt = sfc_salt + tr_arr(nztmp,node,2)*delh
-                        sfc_u    = sfc_u    + Unode(1,nztmp,node) *delh
-                        sfc_v    = sfc_v    + Unode(2,nztmp,node) *delh
+                        sfc_temp = sfc_temp + temp(nztmp,node)*delh
+                        sfc_salt = sfc_salt + salt(nztmp,node)*delh
+                        sfc_u    = sfc_u    + UVnode(1,nztmp,node) *delh
+                        sfc_v    = sfc_v    + UVnode(2,nztmp,node) *delh
                     end do
                     sfc_temp = sfc_temp/htot
                     sfc_salt = sfc_salt/htot
@@ -454,8 +480,8 @@ module g_cvmix_kpp
                     !___________________________________________________________
                     ! calculate vertical shear between present layer and surface
                     ! averaged sfc_u and sfc_v
-                    kpp_dvsurf2(nz) = (Unode(1,nz,node)-sfc_u)**2 + &
-                                      (Unode(2,nz,node)-sfc_v)**2
+                    kpp_dvsurf2(nz) = (UVnode(1,nz,node)-sfc_u)**2 + &
+                                      (UVnode(2,nz,node)-sfc_v)**2
                     
                     !___________________________________________________________
                     ! calculate buoyancy difference between the surface averaged 
@@ -464,7 +490,7 @@ module g_cvmix_kpp
                     !     depth level as the deep point --> than calculate bouyancy 
                     !     difference
                     call densityJM_components(sfc_temp, sfc_salt, sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot, mesh)
-                    call densityJM_components(tr_arr(nz,node,1), tr_arr(nz,node,2), bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)                    
+                    call densityJM_components(temp(nz,node), salt(nz,node), bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)                    
                     rho_nz  = bulk_0   + Z_3d_n(nz,node)*(bulk_pz   + Z_3d_n(nz,node)*bulk_pz2)
                     rho_nz  = rho_nz*rhopot/(rho_nz+0.1_WP*Z_3d_n(nz,node))-density_0
                     rho_sfc = sfc_bulk_0   + Z_3d_n(nz,node)*(sfc_bulk_pz   + Z_3d_n(nz,node)*sfc_bulk_pz2)
@@ -478,8 +504,8 @@ module g_cvmix_kpp
                     ! calculate shear Richardson number Ri = N^2/(du/dz)^2 for 
                     ! mixing parameterisation below ocean boundary layer 
                     dz2     = (Z_3d_n( nz-1,node)-Z_3d_n( nz,node))**2
-                    vshear2 = (Unode(1,nz-1,node)-Unode(1,nz,node))**2 + &
-                              (Unode(2,nz-1,node)-Unode(2,nz,node))**2 
+                    vshear2 = (UVnode(1,nz-1,node)-UVnode(1,nz,node))**2 + &
+                              (UVnode(2,nz-1,node)-UVnode(2,nz,node))**2 
                     vshear2 = vshear2/dz2
                     kpp_shearRi(nz) = max(bvfreq(nz,node),0.0_WP)/(vshear2+kpp_epsln)
                 end do ! --> do nz=1, nln
@@ -491,10 +517,10 @@ module g_cvmix_kpp
             !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> call surface buyflux[0m'
             !!PS kpp_sbuoyflx(node) = -g * &
             !!PS                         (sw_alpha(1,node)*heat_flux( node) / vcpw + &   !heat_flux & water_flux: positive up
-            !!PS                          sw_beta( 1,node)*water_flux(node)*tr_arr(1,node,2))
+            !!PS                          sw_beta( 1,node)*water_flux(node)*salt(1,node,2))
             kpp_sbuoyflx(node) = -g * &
                                     (sw_alpha(nun,node)*heat_flux( node) / vcpw + &   !heat_flux & water_flux: positive up
-                                     sw_beta( nun,node)*water_flux(node)*tr_arr(nun,node,2))
+                                     sw_beta( nun,node)*water_flux(node)*salt(nun,node))
             
             
             ! calculate friction velocity (ustar) at surface (m/s)
@@ -546,7 +572,7 @@ module g_cvmix_kpp
             else
                 write(*,*) " --> Error: this kpp_internalmix scheme is not supported"
                 write(*,*) "     for the mixing below the OBL, either KPP or PP !"
-                call par_ex
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype)
             end if 
             
             !___________________________________________________________________
@@ -705,7 +731,7 @@ module g_cvmix_kpp
                 zt_cntr    = Z_3d_n(    nun:nln  ,node), & ! (in) Height of cell centers (m) dim=(ke)
                 surf_fric  = aux_ustar,                & ! (in) Turbulent friction velocity at surface (m/s) dim=1
                 surf_buoy  = aux_surfbuoyflx_nl(1),    & ! (in) Buoyancy flux at surface (m2/s3) dim=1
-                Coriolis   = coriolis_node(node),      & ! (in) Coriolis parameter (1/s) dim=1
+                Coriolis   = mesh%coriolis_node(node), & ! (in) Coriolis parameter (1/s) dim=1
                 OBL_depth  = kpp_obldepth(node),       & ! (out) OBL depth (m) dim=1
                 kOBL_depth = kpp_nzobldepth(node)      & ! (out) level (+fraction) of OBL extent dim=1
                 )    
@@ -751,7 +777,7 @@ module g_cvmix_kpp
             ! --> interpolate contribution that comes from shortwave penetration
             ! to the depth of the obldepth
             aux_surfbuoyflx_nl(1) = kpp_sbuoyflx(node)
-            if (use_sw_pene .and. kpp_use_fesomkpp .eqv. .true.) then
+            if (use_sw_pene .and. kpp_use_fesomkpp) then
                 aux_nz = int(kpp_nzobldepth(node))
                 ! take only penetrated shortwave radiation heatflux into account 
                 ! that reached until the obldepth --> do linear interpolation 
@@ -766,7 +792,7 @@ module g_cvmix_kpp
             ! MOM6 provides different option how buoyancy flux is influenced by 
             ! short wave penetration flux
             ! --> mxl comes closest to what FESOM1.4 was doing 
-            elseif (use_sw_pene .and. kpp_use_fesomkpp .eqv. .false.) then
+            elseif (use_sw_pene .and. (.not. kpp_use_fesomkpp)) then
                 if     (trim(kpp_sw_method) == 'all')  then
                     aux_surfbuoyflx_nl(1) = aux_surfbuoyflx_nl(1)+aux_coeff*sw_3d(1,node) 
                 elseif (trim(kpp_sw_method) == 'mxl')  then
@@ -890,14 +916,14 @@ module g_cvmix_kpp
         ! original kpp parameterisation of FESOM1.4 & FESOM2.0
         !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> calc smooth kpp_oblmixc'//achar(27)//'[0m'    
         if (kpp_use_smoothblmc .and. kpp_use_fesomkpp) then
-            call exchange_nod(kpp_oblmixc(:,:,1))
-            call exchange_nod(kpp_oblmixc(:,:,2))
-            call exchange_nod(kpp_oblmixc(:,:,3))
+            call exchange_nod(kpp_oblmixc(:,:,1), partit)
+            call exchange_nod(kpp_oblmixc(:,:,2), partit)
+            call exchange_nod(kpp_oblmixc(:,:,3), partit)
             do nz=1, 3
                 !_______________________________________________________________
                 ! all loops go over myDim_nod2D so no halo information --> for 
                 ! smoothing haloinfo is required --> therefor exchange_nod
-                call smooth_nod(kpp_oblmixc(:,:,nz), kpp_smoothblmc_nmb, mesh)
+                call smooth_nod(kpp_oblmixc(:,:,nz), kpp_smoothblmc_nmb, partit, mesh)
             end do
         end if 
         
@@ -930,13 +956,13 @@ module g_cvmix_kpp
         
         !_______________________________________________________________________
         ! write out diffusivities to FESOM2.0 --> diffusivities remain on nodes
-        call exchange_nod(kpp_Kv)
+        call exchange_nod(kpp_Kv, partit)
         Kv = kpp_Kv
         
         !_______________________________________________________________________
         ! write out viscosities to FESOM2.0 --> viscosities for FESOM2.0 are 
         ! defined on elements --> interpolate therefor from nodes to elements
-        call exchange_nod(kpp_Av)
+        call exchange_nod(kpp_Av, partit)
         Av = 0.0_WP
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)

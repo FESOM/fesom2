@@ -19,20 +19,26 @@ LIB_PARMS = -L$(PARMS_DIR)/lib -lparms
 CPP_SOL   = -DPARMS
 
 ###### Objects for Mesh Partitioning ################################################
-# modules
-MOD_INI =  fort_part.o  oce_modules.o MOD_MESH.o gen_modules_config.o gen_modules_partitioning.o gen_modules_rotate_grid.o  
-
-OBJ_INI =  fvom_init.o \
-           oce_local.o \
-           gen_comm.o
+OBJ_INI = fort_part.o  oce_modules.o MOD_READ_BINARY_ARRAYS.o MOD_WRITE_BINARY_ARRAYS.o MOD_MESH.o MOD_PARTIT.o \
+          gen_modules_partitioning.o gen_modules_config.o \
+          gen_modules_rotate_grid.o oce_local.o gen_comm.o fvom_init.o
 
 # objects
 
-MODULES = oce_modules.o \
+OBJECTS = fortran_utils.o \
+          oce_modules.o \
+          info_module.o \
+          command_line_options.o \
+          MOD_READ_BINARY_ARRAYS.o  \
+          MOD_WRITE_BINARY_ARRAYS.o \
           MOD_MESH.o \
+          MOD_PARTIT.o \
+          MOD_DYN.o \
+          gen_modules_partitioning.o \
+          MOD_ICE.o \
+          MOD_TRACER.o \
           ice_modules.o \
           gen_modules_config.o \
-          gen_modules_partitioning.o \
           gen_modules_clock.o \
           gen_modules_rotate_grid.o \
           gen_modules_read_NetCDF.o \
@@ -71,45 +77,51 @@ MODULES = oce_modules.o \
           io_netcdf_workaround_module.o \
           io_data_strategy.o \
           fesom_version_info.o \
+          io_netcdf_attribute_module.o \
+          io_netcdf_file_module.o \
+          io_scatter.o \
           io_meandata.o \
+          io_restart_derivedtype.o \
+          io_fesom_file.o \
+          io_restart_file_group.o \
           io_restart.o \
           io_blowup.o \
           io_mesh_info.o \
+	  oce_ale_pressure_bv.o \
           gen_ic3d.o \
           gen_surface_forcing.o \
           gen_modules_gpot.o \
-          toy_channel_soufflet.o
-
-OBJECTS=  fvom_main.o 		\
-          gen_comm.o 		\
+          toy_channel_soufflet.o \
+          gen_modules_backscatter.o \
+          solver.o \
+          oce_ale_vel_rhs.o 	\
+          write_step_info.o     \
+	  oce_fer_gm.o 		\
+          oce_ale_tracer.o 	\
+          oce_ale.o 		\
           oce_setup_step.o 	\
+          gen_comm.o 		\
           oce_mesh.o 		\
           oce_dyn.o 		\
-          oce_ale_vel_rhs.o 	\
-          oce_vel_rhs_vinv.o 	\
-	  oce_ale_pressure_bv.o \
-	  oce_fer_gm.o 		\
           oce_muscl_adv.o 	\
-          oce_ice_init_state.o 	\
           oce_shortwave_pene.o 	\
-          oce_ale.o 		\
-          oce_ale_tracer.o 	\
           cavity_param.o        \
           ice_EVP.o             \
           ice_maEVP.o 		\
-          ice_setup_step.o 	\
           ice_fct.o 		\
-          ice_oce_coupling.o 	\
           ice_thermo_oce.o      \
+          ice_setup_step.o 	\
+          ice_oce_coupling.o 	\
           gen_model_setup.o 	\
           gen_forcing_init.o 	\
           gen_bulk_formulae.o 	\
           gen_forcing_couple.o 	\
           gen_interpolation.o 	\
           gen_events.o 		\
-          write_step_info.o     \
           oce_mo_conv.o         \
-          oce_spp.o  
+          oce_spp.o            \
+          fesom_module.o \
+          fesom_main.o 
 
 
 # oce_pressure_bv.o \
@@ -125,14 +137,14 @@ default: run
 
 run:  $(MODULES) $(OBJECTS)
 	@echo "======= Building FESOM =========="
-	$(LD) $(OPT) -o $(EXE) $(MODULES) $(OBJECTS) \
-	 $(MPI_LIB) $(LIB_LAP) $(LIB_PARMS) $(NC_LIB) 
+	$(LD) $(OPT) -o $(EXE) $(OBJECTS) \
+	 $(MPI_LIB) $(LIB_LAP) $(NC_LIB) $(LIB_PARMS) 
 #	cp -pf $(EXE) ../bin/.
 
 run_ini: CPP_DEFS+=-DFVOM_INIT
-run_ini: cleanomod $(MOD_INI) $(OBJ_INI)
+run_ini: cleanomod $(OBJ_INI)
 	@echo "======= Building FESOM partioning program =========="
-	$(LD)  $(OPT) -o $(EXE_INI)  $(MOD_INI) $(OBJ_INI) \
+	$(LD)  $(OPT) -o $(EXE_INI)  $(OBJ_INI) \
 	$(MPI_LIB) $(LIB_METIS) $(NC_LIB)
 	cp -pf $(EXE_INI) ../bin/.
 

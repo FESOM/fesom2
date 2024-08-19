@@ -1,31 +1,65 @@
 
 name: FESOM2 main test
 
-# Controls when the action will run. Triggers the workflow on push or pull request.
+# Controls when the action will run. Triggers the workflow on push or pull request. 
 
 on: [push, pull_request]
 
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  gfortran_ubuntu:
+  general_test:
     # Containers must run in Linux based operating systems
     runs-on: ubuntu-latest
     # Docker Hub image that `container-job` executes in
-    container: koldunovn/fesom2_test:fesom2.1
+    container: koldunovn/fesom2_test:refactoring2
 
     # Service containers to run with `gfortran_ubuntu`
     steps:
     # NK: this changes working directory to fesom2
     - uses: actions/checkout@v2
-    
-    - name: Compile model
+
+    - name: Git safe directory
       run: |
-        bash -l configure.sh ubuntu
-    
+        git config --global --add safe.directory ${PWD}
+
+    - name: Compile model (binary)
+      run: |
+        ./configure.sh ubuntu
+
+    - name: Compile model (ifs_interface)
+      run: |
+        export BUILD_DIR=$PWD/build.ifs_interface
+        ./configure.sh ubuntu -DENABLE_IFS_INTERFACE=ON -DCMAKE_INSTALL_PREFIX=$PWD/install.ifs_interface
+
+    - name: Test downstream from install-dir
+      run: |
+        export fesom_ROOT=${PWD}
+        rm -rf test_downstream/build
+        cmake -S test_downstream -B test_downstream/build -DASSERT_HAVE_IFS_INTERFACE=OFF -DASSERT_FESOM_DIR=${fesom_ROOT}
+        cmake --build test_downstream/build
+        test_downstream/build/main
+
+    - name: Test downstream from ifs_interface build-dir
+      run: |
+        export fesom_ROOT=$PWD/build.ifs_interface
+        rm -rf test_downstream/build
+        cmake -S test_downstream -B test_downstream/build -DASSERT_HAVE_IFS_INTERFACE=ON -DASSERT_FESOM_DIR=${fesom_ROOT}
+        cmake --build test_downstream/build
+        test_downstream/build/main
+
+    - name: Test downstream from ifs_interface install-dir
+      run: |
+        export fesom_ROOT=$PWD/install.ifs_interface
+        rm -rf test_downstream/build
+        cmake -S test_downstream -B test_downstream/build -DASSERT_HAVE_IFS_INTERFACE=ON -DASSERT_FESOM_DIR=${fesom_ROOT}
+        cmake --build test_downstream/build
+        test_downstream/build/main
+
     - name: Create global test run
       run: |
         mkrun pi test_pi -m docker
+
     - name: FESOM2 global test run
       run: |    
         cd work_pi
@@ -35,15 +69,28 @@ jobs:
       run: |
         cd work_pi
         fcheck .
-    
+    - name: Check UGRID Compliance
+      run: |
+        pip install ugrid-checks xarray
+        # Needed to combine the mesh diag and output
+        python3 -c "import xarray as xr; ds1 = xr.open_dataset('./test/output_pi/sst.fesom.1948.nc'); ds2 = xr.open_dataset('./test/output_pi/fesom.mesh.diag.nc'); xr.merge([ds1, ds2]).to_netcdf('./test/output_pi/merged_ugrid_check.nc')"
+        ugrid-checker ./test/output_pi/merged_ugrid_check.nc
+
+    - name: Check restarts
+      run: |
+        cd work_pi
+        ./job_docker_new
+
     - name: Create channel test run
       run: |
         mkrun souf test_souf -m docker
+
     - name: FESOM2 channel test run
       run: |    
         cd work_souf
         chmod +x job_docker_new
         ./job_docker_new
+
     - name: Check channel  results
       run: |
         cd work_souf
@@ -53,6 +100,7 @@ jobs:
       run: |
         cd mesh_part
         bash -l configure.sh ubuntu
+
     - name: Run partitioner
       run: |
         cd work_pi

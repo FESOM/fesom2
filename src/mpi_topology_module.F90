@@ -25,7 +25,9 @@ module mpi_topology_module
 
   type :: mpi_topology_type
   contains
-    procedure, nopass :: next_host_head_rank, set_hostname_strategy, reset_state
+    procedure, nopass :: next_host_head_rank
+    procedure, nopass :: set_hostname_strategy
+    procedure, nopass :: reset_state
   end type
   type(mpi_topology_type) mpi_topology
 

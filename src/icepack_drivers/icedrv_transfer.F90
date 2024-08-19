@@ -10,7 +10,7 @@
 
       contains
 
-      module subroutine fesom_to_icepack(mesh)
+      module subroutine fesom_to_icepack(ice, mesh)
 
           use g_forcing_arrays, only: Tair, shum, u_wind,   v_wind,       & ! Atmospheric forcing fields
                                       shortwave,  longwave, prec_rain,    &
@@ -18,11 +18,12 @@
           use g_forcing_param,  only: ncar_bulk_z_wind, ncar_bulk_z_tair, &
                                       ncar_bulk_z_shum
           use g_sbf,            only: l_mslp                     
-          use i_arrays,         only: S_oc_array,      T_oc_array,        & ! Ocean and sea ice fields
-                                      u_w,             v_w,               &
-                                      u_ice,           v_ice,             &
-                                      stress_atmice_x, stress_atmice_y
-          use i_param,          only: cd_oce_ice                            ! Sea ice parameters
+!           use i_arrays,         only: S_oc_array,      T_oc_array,        & ! Ocean and sea ice fields
+!                                       u_w,             v_w,               &
+!                                       stress_atmice_x, stress_atmice_y
+! !                                       u_ice,           v_ice,             &
+                                    
+!           use i_param,          only: cd_oce_ice                            ! Sea ice parameters
           use icepack_intfc,    only: icepack_warnings_flush, icepack_warnings_aborted
           use icepack_intfc,    only: icepack_query_parameters
           use icepack_intfc,    only: icepack_sea_freezing_temperature
@@ -31,8 +32,8 @@
           use g_config,         only: dt
           use o_param,          only: mstep
           use mod_mesh
-          use o_mesh
-          use g_parsup
+          use mod_tracer
+          use mod_ice
           use g_clock
  
           implicit none
@@ -61,9 +62,18 @@
              cprho
 
           type(t_mesh), target, intent(in) :: mesh
-
-#include "../associate_mesh.h"
-
+          type(t_ice), target, intent(inout) :: ice
+          real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, S_oc_array, T_oc_array, & 
+                                                   u_w, v_w, stress_atmice_x, stress_atmice_y
+#include "associate_mesh.h"
+          u_ice      => ice%uice(:)
+          v_ice      => ice%vice(:)
+          S_oc_array => ice%srfoce_salt(:)
+          T_oc_array => ice%srfoce_temp(:)
+          u_w        => ice%srfoce_u(:)
+          v_w        => ice%srfoce_v(:)
+          stress_atmice_x => ice%stress_atmice_x(:)
+          stress_atmice_y => ice%stress_atmice_y(:)
           ! Ice 
     
           uvel(:)  = u_ice(:)
@@ -121,7 +131,7 @@
     
           do i = 1, nx
               ! ocean - ice stress
-              aux = sqrt((uvel(i)-uocn(i))**2+(vvel(i)-vocn(i))**2)*rhowat*cd_oce_ice
+              aux = sqrt((uvel(i)-uocn(i))**2+(vvel(i)-vocn(i))**2)*rhowat*ice%cd_oce_ice
               strocnxT(i) = aux*(uvel(i) - uocn(i))
               strocnyT(i) = aux*(vvel(i) - vocn(i))
               ! freezing - melting potential
@@ -145,7 +155,7 @@
               rdg_shear(i) = ty / tvol
            enddo
 
-           call exchange_nod(rdg_conv, rdg_shear)
+           call exchange_nod(rdg_conv, rdg_shear, p_partit)
 
           ! Clock variables
     

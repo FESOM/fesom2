@@ -1,0 +1,122 @@
+module io_netcdf_module_tests
+  use io_netcdf_module
+  use funit; implicit none
+  
+contains  
+
+
+  @test
+  subroutine test_can_read_2d_variable_real8()
+    type(netcdf_variable_handle) handle
+    real(8), allocatable :: values(:)
+    
+    call handle%initialize("fixtures/io_netcdf/columnwise_2d_sss.nc", "sss")
+
+    allocate(values(5))
+
+    call handle%read_values(1, values)
+    ! check level 1 values
+    @assertEqual(1.001, values(1), tolerance=1.e-6)  
+    @assertEqual(1.002, values(2), tolerance=1.e-6)  
+    @assertEqual(1.003, values(3), tolerance=1.e-6)  
+    @assertEqual(1.004, values(4), tolerance=1.e-6)  
+    @assertEqual(1.005, values(5), tolerance=1.e-6)  
+    
+    call handle%finalize()
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_2d_variable_real4()
+    type(netcdf_variable_handle) handle
+    real(4), allocatable :: values(:)
+    
+    call handle%initialize("fixtures/io_netcdf/columnwise_2d_sss.nc", "sss")
+
+    allocate(values(5))
+
+    call handle%read_values(1, values)
+    ! check level 1 values
+    @assertEqual(1.001, values(1), tolerance=1.e-6)  
+    @assertEqual(1.002, values(2), tolerance=1.e-6)  
+    @assertEqual(1.003, values(3), tolerance=1.e-6)  
+    @assertEqual(1.004, values(4), tolerance=1.e-6)  
+    @assertEqual(1.005, values(5), tolerance=1.e-6)  
+    
+    call handle%finalize()
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_3d_variable_real4()
+    type(netcdf_variable_handle) handle
+    real(4), allocatable :: values(:,:)
+    
+    call handle%initialize("fixtures/io_netcdf/columnwise_3d_salt.nc", "salt")
+
+    allocate(values(3,5))
+
+    call handle%read_values(1, values)
+    ! check level 1 values
+    @assertEqual(1.001, values(1,1), tolerance=1.e-6)  
+    @assertEqual(1.002, values(1,2), tolerance=1.e-6)  
+    @assertEqual(1.003, values(1,3), tolerance=1.e-6)  
+    @assertEqual(1.004, values(1,4), tolerance=1.e-6)  
+    @assertEqual(1.005, values(1,5), tolerance=1.e-6)  
+
+    ! check level 2 values
+    @assertEqual(2.001, values(2,1), tolerance=1.e-6)  
+    @assertEqual(2.002, values(2,2), tolerance=1.e-6)  
+    @assertEqual(2.003, values(2,3), tolerance=1.e-6)  
+    @assertEqual(2.004, values(2,4), tolerance=1.e-6)  
+    @assertEqual(2.005, values(2,5), tolerance=1.e-6)  
+    
+    call handle%finalize()
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_number_of_timesteps()
+    type(netcdf_variable_handle) handle
+
+    call handle%initialize("fixtures/io_netcdf/columnwise_3d_salt.nc", "salt")
+    @assertEqual(2,handle%number_of_timesteps())
+    
+    call handle%finalize()
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_number_of_dimensions()
+    type(netcdf_variable_handle) handle
+
+    call handle%initialize("fixtures/io_netcdf/columnwise_3d_salt.nc", "salt")
+    @assertEqual(3,handle%number_of_dims())
+    
+    call handle%finalize()
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_dimension_size_at_index()
+    type(netcdf_variable_handle) handle
+
+    call handle%initialize("fixtures/io_netcdf/columnwise_3d_salt.nc", "salt")
+    @assertEqual(3,handle%dimsize_at(1))
+    @assertEqual(5,handle%dimsize_at(2))
+    @assertEqual(2,handle%dimsize_at(3))
+    
+    call handle%finalize()
+  end subroutine
+
+
+  @test
+  subroutine test_can_initialize_netcdf_variable_for_existing_file()
+    type(netcdf_variable_handle) handle
+
+    call handle%initialize("fixtures/io_netcdf/columnwise_3d_salt.nc", "salt")
+    call handle%finalize()
+  end subroutine
+
+
+end module

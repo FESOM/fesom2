@@ -1,3 +1,35 @@
+module fer_solve_interface
+    interface
+        subroutine fer_solve_Gamma(partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        type(t_mesh)  , intent(in)   , target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        end subroutine
+        
+        subroutine fer_gamma2vel(dynamics, partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_DYN
+        type(t_mesh)  , intent(in)   , target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        type(t_dyn)   , intent(inout), target :: dynamics
+        end subroutine
+
+        subroutine init_Redi_GM(partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        type(t_mesh)  , intent(in)   , target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        end subroutine
+    end interface
+end module
+
+
+
 !---------------------------------------------------------------------------
 !Implementation of Gent & McWiliams parameterization after R. Ferrari et al., 2010
 !Contains:
@@ -5,23 +37,32 @@
 !  fer_gamma2vel
 !  fer_compute_C_K ! this subroutine shall be a subject of future tuning (with respect to fer_k)
 !===========================================================================
-subroutine fer_solve_Gamma(mesh)
+subroutine fer_solve_Gamma(partit, mesh)
     USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_PARAM
-    USE o_ARRAYS, ONLY: sigma_xy, fer_gamma, bvfreq, fer_c, fer_K, zbar_n, Z_n, hnode_new, zbar_n_bot
-    USE g_PARSUP
+    USE o_ARRAYS, ONLY: sigma_xy, fer_gamma, bvfreq, fer_c, fer_K
     USE g_CONFIG
     use g_comm_auto
     IMPLICIT NONE
-    type(t_mesh), intent(in)               , target :: mesh	
+    type(t_partit), intent(inout), target  :: partit
+    type(t_mesh),   intent(in),    target  :: mesh	
     integer                                :: nz, n, nzmax, nzmin
     real(kind=WP)                          :: zinv1,zinv2, zinv, m, r
     real(kind=WP)                          :: a(mesh%nl), b(mesh%nl), c(mesh%nl)
     real(kind=WP)                          :: cp(mesh%nl), tp(2,mesh%nl)
+    real(kind=WP)                          :: zbar_n(mesh%nl), z_n(mesh%nl-1)
+
     real(kind=WP), dimension(:,:), pointer :: tr
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmax, nzmin, zinv1,zinv2, zinv, m, r, a, b, c, cp, tp, tr, zbar_n, Z_n)
+!$OMP DO
     DO n=1,myDim_nod2D
         tr=>fer_gamma(:,:,n)
 !       !_____________________________________________________________________
@@ -115,18 +156,22 @@ subroutine fer_solve_Gamma(mesh)
             tr(:,nz) = tp(:,nz)-cp(nz)*tr(:,nz+1)
         end do
     END DO   !!! cycle over nodes
-    
-    call exchange_nod(fer_gamma)
+!$OMP END DO
+!$OMP END PARALLEL
+!$OMP BARRIER
+    call exchange_nod(fer_gamma, partit)
 END subroutine fer_solve_Gamma
 !
 !
 !
 !====================================================================
-subroutine fer_gamma2vel(mesh)
+subroutine fer_gamma2vel(dynamics, partit, mesh)
     USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_DYN
     USE o_PARAM
-    USE o_ARRAYS, ONLY: fer_gamma, fer_uv, helem
-    USE g_PARSUP
+    USE o_ARRAYS, ONLY: fer_gamma
     USE g_CONFIG
     use g_comm_auto
     IMPLICIT NONE
@@ -134,10 +179,19 @@ subroutine fer_gamma2vel(mesh)
     integer                                :: nz, nzmax, el, elnod(3), nzmin
     real(kind=WP)                          :: zinv
     real(kind=WP)                          :: onethird=1._WP/3._WP
-    type(t_mesh), intent(in)               , target :: mesh
+    type(t_dyn)   , intent(inout), target  :: dynamics
+    type(t_partit), intent(inout), target  :: partit
+    type(t_mesh)  , intent(in),    target  :: mesh
+    real(kind=WP), dimension(:,:,:), pointer :: fer_UV
+    real(kind=WP), dimension(:,:)  , pointer :: fer_Wvel
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    fer_UV    =>dynamics%fer_uv(:,:,:)
+    fer_Wvel  =>dynamics%fer_w(:,:)
 
-#include  "associate_mesh.h"
-
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnod, nz, nzmin, nzmax, zinv)
     DO el=1, myDim_elem2D
         elnod=elem2D_nodes(:,el)
         ! max. number of levels at element el
@@ -150,35 +204,51 @@ subroutine fer_gamma2vel(mesh)
             fer_uv(2,nz,el)=sum(fer_gamma(2,nz,elnod)-fer_gamma(2,nz+1,elnod))*zinv
         END DO
     END DO
-    call exchange_elem(fer_uv)
+!$OMP END PARALLEL DO
+    call exchange_elem(fer_uv, partit)
+!$OMP BARRIER
 end subroutine fer_gamma2vel
 !
 !
 !
 !===============================================================================
-subroutine init_Redi_GM(mesh) !fer_compute_C_K_Redi
+subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
     USE MOD_MESH
     USE o_PARAM
-    USE o_ARRAYS, ONLY: fer_c, fer_k, fer_scal, Ki, bvfreq, MLD1_ind, neutral_slope, coriolis_node, hnode_new, Z_3d_n
-    USE g_PARSUP
+    USE o_ARRAYS, ONLY: fer_c, fer_k, fer_scal, Ki, bvfreq, MLD1_ind, neutral_slope
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     USE g_CONFIG
     use g_comm_auto
     IMPLICIT NONE
-    type(t_mesh), intent(in) , target :: mesh
-    integer                  :: n, nz, nzmax, nzmin
-    real(kind=WP)            :: reso, c1, rosb, scaling, rr_ratio, aux_zz(mesh%nl)
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    integer                  :: n, k, nz, nzmax, nzmin
+    real(kind=WP)            :: reso, c1, rosb, scaling, rr_ratio, aux, aux_zz(mesh%nl)
     real(kind=WP)            :: x0=1.5_WP, sigma=.15_WP ! Fermi function parameters to cut off GM where Rossby radius is resolved
     real(kind=WP)            :: c_min=0.5_WP, f_min=1.e-6_WP, r_max=200000._WP
     real(kind=WP)            :: zscaling(mesh%nl)
     real(kind=WP)            :: bvref
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     ! fill arrays for 3D Redi and GM coefficients: F1(xy)*F2(z)
     !******************************* F1(x,y) ***********************************
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, nz, nzmax, nzmin, reso, c1, rosb, scaling, rr_ratio, aux, aux_zz, zscaling, bvref)
+!$OMP DO
     do n=1, myDim_nod2D
-        nzmax=minval(nlevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
-        nzmin=maxval(ulevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
+       !nzmax=minval(nlevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
+       !nzmin=maxval(ulevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
+       !Intel vectorisation did something strange in the above lines hence we had to code it more explicitely
+        nzmax=mesh%nl
+        nzmin=1
+        do k=1, nod_in_elem2D_num(n)
+           nzmax=min(nzmax, nlevels(nod_in_elem2D(k, n)))
+           nzmin=max(nzmin, ulevels(nod_in_elem2D(k, n)))
+        end do
         reso=mesh_resolution(n)
         if (Fer_GM) then
             c1=0._wp
@@ -194,7 +264,7 @@ subroutine init_Redi_GM(mesh) !fer_compute_C_K_Redi
             !___________________________________________________________________
             ! Cutoff K_GM depending on (Resolution/Rossby radius) ratio
             if (scaling_Rossby) then
-                rosb=min(c1/max(abs(coriolis_node(n)), f_min), r_max)
+                rosb=min(c1/max(abs(mesh%coriolis_node(n)), f_min), r_max)
                 rr_ratio=min(reso/rosb, 5._WP)
                 scaling=1._WP/(1._WP+exp(-(rr_ratio-x0)/sigma))
             end if
@@ -219,7 +289,10 @@ subroutine init_Redi_GM(mesh) !fer_compute_C_K_Redi
 !!PS                 scaling=scaling*max((reso/10000.0_WP-3.0_WP), 0._WP) !no GM below 30km resolution
 !!PS             end if
             if (reso/1000.0_WP < K_GM_rampmax) then
-                scaling=scaling*max((reso/1000.0_WP-K_GM_rampmin)/(K_GM_rampmax-K_GM_rampmin), 0._WP) !no GM below 30km resolution
+                !scaling=scaling*max((reso/1000.0_WP-K_GM_rampmin)/(K_GM_rampmax-K_GM_rampmin), 0._WP) !no GM below 30km resolution
+                !even if the condition is not met, compiling with Intel caused division by 0 here when optimization was used
+                !hence we limit the denominator by 1.e-12
+                scaling=scaling*max((reso/1000.0_WP-K_GM_rampmin)/max(K_GM_rampmax-K_GM_rampmin, 1.e-12), 0._WP) !no GM below 30km resolution
             end if
             
             !___________________________________________________________________
@@ -243,18 +316,22 @@ subroutine init_Redi_GM(mesh) !fer_compute_C_K_Redi
             Ki(nzmin,n)=K_hor*(reso/100000.0_WP)**2
         end if
     end do
- 
+!$OMP END DO
+
     !Like in FESOM 1.4 we make Redi equal GM
     if (Redi .and. Fer_GM) then
-        !!PS Ki(1,:)=fer_k(1,:)
-        Ki(nzmin,:)=fer_k(nzmin,:)
+!$OMP DO
+        do n=1, myDim_nod2D
+           Ki(nzmin, n)=fer_k(nzmin, n)
+        end do
+!$OMP END DO
     end if
    
 !******************************* F2(z) (e.g. Ferreira et al., 2005) *********************************
 !Ferreira, D., Marshall, J. and Heimbach, P.: Estimating Eddy Stresses by Fitting Dynamics to Observations Using a
 !Residual-Mean Ocean Circulation Model and Its Adjoint, Journal of Physical Oceanography, 35(10), 1891–
 !1910, doi:10.1175/jpo2785.1, 2005.
-
+!$OMP DO
     do n=1,myDim_nod2D
         nzmax=nlevels_nod2D(n)
         nzmin=ulevels_nod2D(n)
@@ -311,7 +388,7 @@ subroutine init_Redi_GM(mesh) !fer_compute_C_K_Redi
             ! the surface template for the scaling 
             !!PS do nz=2, nzmax
             do nz=nzmin+1, nzmax
-                fer_k(nz,n)=fer_k(1,n)*zscaling(nz)
+                fer_k(nz,n)=fer_k(nzmin,n)*zscaling(nz)
             end do 
             ! after vertical Ferreira scaling is done also scale surface template
             !!PS fer_k(1,n)=fer_k(1,n)*zscaling(1)
@@ -333,9 +410,11 @@ subroutine init_Redi_GM(mesh) !fer_compute_C_K_Redi
             Ki(nzmin,n)=Ki(nzmin,n)*0.5_WP*(zscaling(nzmin)+zscaling(nzmin+1))
         end if
    end do
-
-   if (Fer_GM) call exchange_nod(fer_c)
-   if (Fer_GM) call exchange_nod(fer_k)
-   if (Redi)   call exchange_nod(Ki)
+!$OMP END DO
+!$OMP END PARALLEL
+!$OMP BARRIER
+   if (Fer_GM) call exchange_nod(fer_c, partit)
+   if (Fer_GM) call exchange_nod(fer_k, partit)
+   if (Redi)   call exchange_nod(Ki, partit)
 end subroutine init_Redi_GM
 !====================================================================
