@@ -2973,7 +2973,10 @@ subroutine compute_neutral_slope(partit, mesh)
         nl1=nlevels_nod2d(n)-1
         ul1=ulevels_nod2d(n)
         do nz = ul1+1, nl1
-            ro_z_inv=2._WP*g/density_0/max(bvfreq(nz,n)+bvfreq(nz+1,n), eps**2) !without minus, because neutral slope S=-(nabla\rho)/(d\rho/dz)
+            !without minus, because neutral slope S=-(nabla\rho)/(d\rho/dz)
+            ! --> the minus sign is hidden within the definition of buoyancy
+            ! --> N2 = -g*drho/dz
+            ro_z_inv=2._WP*g/density_0/max(bvfreq(nz,n)+bvfreq(nz+1,n), eps**2) 
             neutral_slope(1,nz,n)=sigma_xy(1,nz,n)*ro_z_inv
             neutral_slope(2,nz,n)=sigma_xy(2,nz,n)*ro_z_inv
             neutral_slope(3,nz,n)=sqrt(neutral_slope(1,nz,n)**2+neutral_slope(2,nz,n)**2)

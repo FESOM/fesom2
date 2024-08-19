@@ -1051,13 +1051,16 @@ subroutine update_thickness_ale(partit, mesh)
     USE MOD_PARSUP
     use o_ARRAYS
     use g_config,only: which_ale,lzstar_lev,min_hnode
+    use diagnostics, only: ldiag_DVD 
     use g_comm_auto
+
     implicit none
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
     !___________________________________________________________________________
     integer :: n, nz, elem, elnodes(3),nzmax, nzmin
     integer      , dimension(:), allocatable :: idx
+    real(kind=WP)                            :: rescue_hnode_old(mesh%nl-1)
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -1143,17 +1146,46 @@ subroutine update_thickness_ale(partit, mesh)
                 ! this ones are set up during initialisation and are not touched afterwards
                 ! --> nlevels_nod2D_min(n),nlevels_nod2D_min(n)-1
                 do nz=nzmax,nzmin,-1
+                    ! --> case normal zlevel
+                    ! at this point hnode = hode^(n) becomes hnode^(n+1) but i need the 
+                    ! hnode^(n) value for the DVD analysis in call diagnostic() therefore 
+                    ! i need to rescue this value before it gets dumped 
+                    rescue_hnode_old(nz) = hnode(nz,n) 
+                
                     hnode(nz,n)     = hnode_new(nz,n)
                     zbar_3d_n(nz,n) = zbar_3d_n(nz+1,n)+hnode_new(nz,n)
                     Z_3d_n(nz,n)    = zbar_3d_n(nz+1,n)+hnode_new(nz,n)/2.0_WP
                 end do    
+                
+                ! save hnode^(n) now in the variable hnode_new --> be carefull this 
+                ! might be confusing here for later ! --> it will only happen when 
+                ! the DVD diagnostic is active !
+                if (ldiag_DVD) then 
+                    do nz=nzmax,nzmin,-1
+                        hnode_new(nz,n) = rescue_hnode_old(nz)
+                    end do
+                end if 
+                    
             !___________________________________________________________________
             ! only actualize layer thinkness in first layer 
             else
                 ! --> case normal zlevel
+                ! at this point hnode = hode^(n) becomes hnode^(n+1) but i need the 
+                ! hnode^(n) value for the DVD analysis in call diagnostic() therefore 
+                ! i need to rescue this value before it gets dumped 
+                rescue_hnode_old(nzmin) = hnode(nzmin,n) 
+                
                 hnode(nzmin,n)    = hnode_new(nzmin,n)
                 zbar_3d_n(nzmin,n)= zbar_3d_n(nzmin+1,n)+hnode_new(nzmin,n)
                 Z_3d_n(nzmin,n)   = zbar_3d_n(nzmin+1,n)+hnode_new(nzmin,n)/2.0_WP
+                
+                ! save hnode^(n) now in the variable hnode_new --> be carefull this 
+                ! might be confusing here for later ! --> it will only happen when 
+                ! the DVD diagnostic is active !
+                if (ldiag_DVD) then 
+                    hnode_new(nzmin,n) = rescue_hnode_old(nzmin)
+                end if 
+               
             end if
         end do
 !$OMP END DO
@@ -1182,10 +1214,26 @@ subroutine update_thickness_ale(partit, mesh)
             ! do not touch zbars_3d_n that are involved in the bottom cell !!!!
             ! --> nlevels_nod2D_min(n),nlevels_nod2D_min(n)-1
             do nz=nzmax, nzmin,-1
+                ! at this point hnode = hode^(n) becomes hnode^(n+1) but i need the 
+                ! hnode^(n) value for the DVD analysis in call diagnostic() therefore 
+                ! i need to rescue this value before it gets dumped 
+                rescue_hnode_old(nz) = hnode(nz,n) 
+                
                 hnode(nz,n)     = hnode_new(nz,n)
                 zbar_3d_n(nz,n) = zbar_3d_n(nz+1,n) + hnode_new(nz,n)
                 Z_3d_n(nz,n)    = zbar_3d_n(nz+1,n) + hnode_new(nz,n)/2.0_WP
             end do
+            
+            !___________________________________________________________________
+            ! save hnode^(n) now in the variable hnode_new --> be carefull this 
+            ! might be confusing here for later ! --> it will only happen when 
+            ! the DVD diagnostic is active !
+            if (ldiag_DVD) then 
+                do nz=nzmax, nzmin,-1
+                    hnode_new(nz,n) = rescue_hnode_old(nz)
+                end do
+            end if 
+            
         end do
 !$OMP END PARALLEL DO
         !_______________________________________________________________________
@@ -3417,8 +3465,8 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tke'//achar(27)//'[0m'
         call calc_cvmix_tke(dynamics, partit, mesh)
         call mo_convect(ice, partit, mesh)
-        
-    end if     
+    
+    end if   
 
     !___EXTENSION OF MIXING SCHEMES_____________________________________________
     ! add CVMIX TIDAL mixing scheme of Simmons et al. 2004 "Tidally driven mixing 

@@ -159,7 +159,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use o_tracers
     use Toy_Channel_Soufflet
     use diff_tracers_ale_interface
-    use oce_adv_tra_driver_interfaces    
+    use diagnostics, only: ldiag_DVD
+    use oce_adv_tra_driver_interfaces
     use g_forcing_param, only: use_age_tracer !---age-code
     use mod_transit, only: decay14, decay39
     implicit none
@@ -1427,6 +1428,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
       stop
   END SELECT
   RETURN
+
 END FUNCTION
 
 
@@ -1563,3 +1565,4 @@ FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit, mesh)
   END SELECT
   RETURN
 END FUNCTION
+
