@@ -296,6 +296,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
     call thermodynamics(ice, partit, mesh)
 #endif /* (__icepack) */
 
+
     !___________________________________________________________________________
 !$OMP PARALLEL DO
     do i=1,myDim_nod2D+eDim_nod2D
