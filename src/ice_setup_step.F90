@@ -248,13 +248,13 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #endif
 #endif /* (__oifs) */
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
-    call ice_TG_rhs_div    (ice, partit, mesh)
+    call ice_TG_rhs    (ice, partit, mesh)
 
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_solve...'//achar(27)//'[0m'
     call ice_fct_solve     (ice, partit, mesh)
 
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_update_for_div...'//achar(27)//'[0m'
-    call ice_update_for_div(ice, partit, mesh)
+!   call ice_update_for_div(ice, partit, mesh)
 
     !$ACC UPDATE HOST (ice%work%fct_massmatrix) &
     !$ACC HOST (ice%delta_min, ice%Tevp_inv, ice%cd_oce_ice) &
