@@ -1803,10 +1803,11 @@ CONTAINS
       INTEGER :: dims1(1), dims2(2)
       INTEGER :: idda, idsa, idrm, idns, idsaa, idnr, idnrp, idnsp
 
-      WRITE(cdfile,'(A,2(I8.8,A),2(I4.4,A),A)') &
-         & TRIM(cdpath)//'/'//TRIM(cdprefix)//'_', &
-         & nsrcglopoints,'_',ndstglopoints,'_',mype,'_',nproc,'.nc'
+      WRITE(cdfile, '(A,I0,A,2(I8.8,A),2(I4.4,A),A)') &
+         & TRIM(cdpath) // '/dist_', nproc, '/'// TRIM(cdprefix)//'_', &
+         & nsrcglopoints, '_', ndstglopoints, '_', mype, '_', nproc, '.nc'
 
+      call execute_command_line('mkdir -p ' // cdpath)
       CALL nchdlerr(nf90_create(TRIM(cdfile),nf90_clobber,ncid), &
          &          __LINE__, __MYFILE__ )
 
@@ -1957,14 +1958,17 @@ CONTAINS
       CHARACTER(len=1024) :: cdfile
       INTEGER :: ncid, dimid, varid, num_wgts
 
-      WRITE(cdfile,'(A,2(I8.8,A),2(I4.4,A),A)') &
-         & TRIM(cdpath)//'/'//TRIM(cdprefix)//'_', &
-         & nsrcglopoints,'_',ndstglopoints,'_',mype,'_',nproc,'.nc'
+      WRITE(cdfile, '(A,I0,A,2(I8.8,A),2(I4.4,A),A)') &
+         & TRIM(cdpath) // '/dist_', nproc, '/'// TRIM(cdprefix)//'_', &
+         & nsrcglopoints, '_', ndstglopoints, '_', mype, '_', nproc, '.nc'
 
 
       lexists=nf90_open(TRIM(cdfile),nf90_nowrite,ncid)==nf90_noerr
 
       IF (lexists) THEN
+        IF (mype==0) THEN
+          WRITE(*,*) "FESOM ifs-interface: precomputed weight file exists, reading it in."
+        ENDIF
 
          ! If num_links is not present we assume it to be zero.
          

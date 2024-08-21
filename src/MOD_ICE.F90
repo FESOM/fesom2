@@ -1,6 +1,6 @@
 MODULE MOD_ICE
 USE o_PARAM, only: WP
-USE, intrinsic :: ISO_FORTRAN_ENV
+USE, intrinsic :: ISO_FORTRAN_ENV, only : int32
 USE MOD_WRITE_BINARY_ARRAYS
 USE MOD_READ_BINARY_ARRAYS
 IMPLICIT NONE
@@ -93,7 +93,7 @@ TYPE T_ICE_ATMCOUPL
     real(kind=WP), allocatable, dimension(:)    :: oce_flx_h, ice_flx_h, tmpoce_flx_h, tmpice_flx_h
 #if defined (__oifs) || defined (__ifsinterface)
     !___________________________________________________________________________
-    real(kind=WP), allocatable, dimension(:)    :: ice_alb, enthalpyoffuse
+    real(kind=WP), allocatable, dimension(:)    :: ice_alb, enthalpyoffuse, flx_qres, flx_qcon
     ! !!! DONT FORGET ice_temp rhs_tempdiv rhs_temp is advected for oifs !!! --> becomes additional ice
     ! tracer in ice%data(4)%values
 #endif /* (__oifs)  */
@@ -664,7 +664,7 @@ subroutine ice_init(ice, partit, mesh)
     allocate(ice%flx_h( node_size))
     ice%flx_fw           = 0.0_WP
     ice%flx_h            = 0.0_WP
-
+    
     !___________________________________________________________________________
     ! initialse data array of ice derived type containing "ice tracer" that have
     ! to be advected: a_ice (index=1), m_ice (index=2), m_snow (index=3),
@@ -752,6 +752,10 @@ subroutine ice_init(ice, partit, mesh)
     allocate(ice%atmcoupl%enthalpyoffuse(node_size))
     ice%atmcoupl%ice_alb       = 0.6_WP
     ice%atmcoupl%enthalpyoffuse= 0.0_WP
+    allocate(ice%atmcoupl%flx_qres(node_size))
+    allocate(ice%atmcoupl%flx_qcon(node_size))
+    ice%atmcoupl%flx_qres      = 0.0_WP    
+    ice%atmcoupl%flx_qcon      = 0.0_WP
 #endif /* (__oifs) */
 #endif /* (__oasis) */
 

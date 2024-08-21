@@ -181,34 +181,34 @@ subroutine ice_timestep(step, ice, partit, mesh)
     call step_icepack(ice, mesh, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts
 #else
 
-    !$ACC DATA COPY(mesh, mesh%coriolis_node, mesh%nn_num, mesh%nn_pos) &
-    !$ACC      COPY(mesh%ssh_stiff, mesh%ssh_stiff%rowptr) &
-    !$ACC      COPY(mesh%gradient_sca, mesh%metric_factor, mesh%elem_area, mesh%area, mesh%edge2D_in) &
-    !$ACC      COPY(mesh%elem2D_nodes, mesh%ulevels, mesh%ulevels_nod2d, mesh%edges, mesh%edge_tri) &
-    !$ACC      COPY(partit, partit%eDim_nod2D, partit%myDim_edge2D) &
-    !$ACC      COPY(partit%myDim_elem2D, partit%myDim_nod2D, partit%myList_edge2D) &
-    !$ACC      COPY(ice, ice%data, ice%work, ice%work%fct_massmatrix) &
-    !$ACC      COPY(ice%delta_min, ice%Tevp_inv, ice%cd_oce_ice) &
-    !$ACC      COPY(ice%work%fct_tmax, ice%work%fct_tmin) &
-    !$ACC      COPY(ice%work%fct_fluxes, ice%work%fct_plus, ice%work%fct_minus) &
-    !$ACC      COPY(ice%work%eps11, ice%work%eps12, ice%work%eps22) &
-    !$ACC      COPY(ice%work%sigma11, ice%work%sigma12, ice%work%sigma22) &
-    !$ACC      COPY(ice%work%ice_strength, ice%stress_atmice_x, ice%stress_atmice_y) &
-    !$ACC      COPY(ice%thermo%rhosno, ice%thermo%rhoice, ice%thermo%inv_rhowat) &
-    !$ACC      COPY(ice%srfoce_ssh, ice%pstar, ice%c_pressure) &
-    !$ACC      COPY(ice%work%inv_areamass, ice%work%inv_mass, ice%uice_rhs, ice%vice_rhs) &
-    !$ACC      COPY(ice%uice, ice%vice, ice%srfoce_u, ice%srfoce_v, ice%uice_old, ice%vice_old) &
-    !$ACC      COPY(ice%data(1)%values, ice%data(2)%values, ice%data(3)%values) &
-    !$ACC      COPY(ice%data(1)%valuesl, ice%data(2)%valuesl, ice%data(3)%valuesl) &
-    !$ACC      COPY(ice%data(1)%dvalues, ice%data(2)%dvalues, ice%data(3)%dvalues) &
-    !$ACC      COPY(ice%data(1)%values_rhs, ice%data(2)%values_rhs, ice%data(3)%values_rhs) &
-    !$ACC      COPY(ice%data(1)%values_div_rhs, ice%data(2)%values_div_rhs, ice%data(3)%values_div_rhs)
-
+    !$ACC UPDATE DEVICE (ice%work%fct_massmatrix) &
+    !$ACC DEVICE (ice%delta_min, ice%Tevp_inv, ice%cd_oce_ice) &
+    !$ACC DEVICE (ice%work%fct_tmax, ice%work%fct_tmin) &
+    !$ACC DEVICE (ice%work%fct_fluxes, ice%work%fct_plus, ice%work%fct_minus) &
+    !$ACC DEVICE (ice%work%eps11, ice%work%eps12, ice%work%eps22) &
+    !$ACC DEVICE (ice%work%sigma11, ice%work%sigma12, ice%work%sigma22) &
+    !$ACC DEVICE (ice%work%ice_strength, ice%stress_atmice_x, ice%stress_atmice_y) &
+    !$ACC DEVICE (ice%thermo%rhosno, ice%thermo%rhoice, ice%thermo%inv_rhowat) &
+    !$ACC DEVICE (ice%srfoce_ssh, ice%pstar, ice%c_pressure) &
+    !$ACC DEVICE (ice%work%inv_areamass, ice%work%inv_mass, ice%uice_rhs, ice%vice_rhs) &
+    !$ACC DEVICE (ice%uice, ice%vice, ice%srfoce_u, ice%srfoce_v, ice%uice_old, ice%vice_old) &
+    !$ACC DEVICE (ice%data(1)%values, ice%data(2)%values, ice%data(3)%values) &
+    !$ACC DEVICE (ice%data(1)%valuesl, ice%data(2)%valuesl, ice%data(3)%valuesl) &
+    !$ACC DEVICE (ice%data(1)%dvalues, ice%data(2)%dvalues, ice%data(3)%dvalues) &
+    !$ACC DEVICE (ice%data(1)%values_rhs, ice%data(2)%values_rhs, ice%data(3)%values_rhs) &
+    !$ACC DEVICE (ice%data(1)%values_div_rhs, ice%data(2)%values_div_rhs, ice%data(3)%values_div_rhs)
+#if defined (__oifs) || defined (__ifsinterface)
+    !$ACC UPDATE DEVICE (ice%data(4)%values, ice%data(4)%valuesl, ice%data(4)%dvalues, ice%data(4)%values_rhs, ice%data(4)%values_div_rhs)
+#endif
     !___________________________________________________________________________
     ! ===== Dynamics
+
     SELECT CASE (ice%whichEVP)
     CASE (0)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'
+#if defined(_CRAYFTN)
+	!dir$ noinline
+#endif
         call EVPdynamics  (ice, partit, mesh)
     CASE (1)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics_m...'//achar(27)//'[0m'
@@ -233,22 +233,48 @@ subroutine ice_timestep(step, ice, partit, mesh)
     ! call cut_off
     ! new FCT routines from Sergey Danilov 08.05.2018
 #if defined (__oifs) || defined (__ifsinterface)
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
+#else
+!$ACC parallel loop present(ice_temp, a_ice)
+#endif
     do i=1,myDim_nod2D+eDim_nod2D
         ice_temp(i) = ice_temp(i)*a_ice(i)
     end do
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+!$ACC END parallel loop
+#endif
 #endif /* (__oifs) */
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
-    call ice_TG_rhs_div    (ice, partit, mesh)
+    call ice_TG_rhs    (ice, partit, mesh)
 
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_solve...'//achar(27)//'[0m'
     call ice_fct_solve     (ice, partit, mesh)
 
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_update_for_div...'//achar(27)//'[0m'
-    call ice_update_for_div(ice, partit, mesh)
+!   call ice_update_for_div(ice, partit, mesh)
 
-    !$ACC END DATA
+    !$ACC UPDATE HOST (ice%work%fct_massmatrix) &
+    !$ACC HOST (ice%delta_min, ice%Tevp_inv, ice%cd_oce_ice) &
+    !$ACC HOST (ice%work%fct_tmax, ice%work%fct_tmin) &
+    !$ACC HOST (ice%work%fct_fluxes, ice%work%fct_plus, ice%work%fct_minus) &
+    !$ACC HOST (ice%work%eps11, ice%work%eps12, ice%work%eps22) &
+    !$ACC HOST (ice%work%sigma11, ice%work%sigma12, ice%work%sigma22) &
+    !$ACC HOST (ice%work%ice_strength, ice%stress_atmice_x, ice%stress_atmice_y) &
+    !$ACC HOST (ice%thermo%rhosno, ice%thermo%rhoice, ice%thermo%inv_rhowat) &
+    !$ACC HOST (ice%srfoce_ssh, ice%pstar, ice%c_pressure) &
+    !$ACC HOST (ice%work%inv_areamass, ice%work%inv_mass, ice%uice_rhs, ice%vice_rhs) &
+    !$ACC HOST (ice%uice, ice%vice, ice%srfoce_u, ice%srfoce_v, ice%uice_old, ice%vice_old) &
+    !$ACC HOST (ice%data(1)%values, ice%data(2)%values, ice%data(3)%values) &
+    !$ACC HOST (ice%data(1)%valuesl, ice%data(2)%valuesl, ice%data(3)%valuesl) &
+    !$ACC HOST (ice%data(1)%dvalues, ice%data(2)%dvalues, ice%data(3)%dvalues) &
+    !$ACC HOST (ice%data(1)%values_rhs, ice%data(2)%values_rhs, ice%data(3)%values_rhs) &
+    !$ACC HOST (ice%data(1)%values_div_rhs, ice%data(2)%values_div_rhs, ice%data(3)%values_div_rhs)
+#if defined (__oifs) || defined (__ifsinterface)
+    !$ACC UPDATE HOST (ice%data(4)%values, ice%data(4)%valuesl, ice%data(4)%dvalues, ice%data(4)%values_rhs, ice%data(4)%values_div_rhs)
+#endif
 
 #if defined (__oifs) || defined (__ifsinterface)
 !$OMP PARALLEL DO
@@ -269,6 +295,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
     call thermodynamics(ice, partit, mesh)
 #endif /* (__icepack) */
+
 
     !___________________________________________________________________________
 !$OMP PARALLEL DO

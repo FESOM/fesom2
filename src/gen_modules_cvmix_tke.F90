@@ -318,10 +318,17 @@ module g_cvmix_tke
             ! calcualte for TKE surface momentum forcing --> norm of nodal 
             ! surface wind stress --> tke_forc2d_normstress --> interpolate from elements
             ! to nodes
-            tke_forc2d_normstress(node) =   sqrt( &
-                                                stress_node_surf(1,node)**2 + &
-                                                stress_node_surf(2,node)**2 &
-                                                )/density_0
+
+!!PS             tvol = 0.0_WP
+!!PS             do nelem=1,nod_in_elem2D_num(node)
+!!PS                 elem = nod_in_elem2D(nelem,node)
+!!PS                 tvol = tvol + elem_area(elem)
+!!PS                 tke_forc2d_normstress(node) = tke_forc2d_normstress(node) &
+!!PS                                          + sqrt(stress_surf(1,elem)**2 + stress_surf(2,elem)**2)*elem_area(elem)/density_0
+!!PS             end do !--> do nelem=1,nod_in_elem2D_num(node)
+!!PS             tke_forc2d_normstress(node) = tke_forc2d_normstress(node)/tvol
+            tke_forc2d_normstress(node) = sqrt( stress_node_surf(1,node)**2 + stress_node_surf(2,node)**2)/density_0
+
             
             !___________________________________________________________________
             ! calculate for TKE 3D vertical velocity shear

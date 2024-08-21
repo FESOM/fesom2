@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION 3.16)
 
 # set default build type cache entry (do so before project(...) is called, which would create this cache entry on its own)
 if(NOT CMAKE_BUILD_TYPE)
@@ -8,9 +8,7 @@ endif()
 
 project(FESOM2.0)
 
-set(CMAKE_VERBOSE_MAKEFILE ON)
-
-option(BUILD_SHARED_LIBS "Build using shared libraries" OFF) # cmake-internal switch to toggle if library targets are being build as STATIC or SHARED, see https://cmake.org/cmake/help/latest/guide/tutorial/Selecting%20Static%20or%20Shared%20Libraries.html
+set(BUILD_SHARED_LIBS ON CACHE BOOL "Default to using shared libs")
 set(TOPLEVEL_DIR ${CMAKE_CURRENT_LIST_DIR})
 set(FESOM_COUPLED OFF CACHE BOOL "compile fesom standalone or with oasis support (i.e. coupled)")
 set(OIFS_COUPLED OFF CACHE BOOL "compile fesom coupled to OpenIFS. (Also needs FESOM_COUPLED to work)")
@@ -25,3 +23,15 @@ set(ASYNC_ICEBERGS ON CACHE BOOL "compile fesom with or without support for asyn
 set(VERBOSE OFF CACHE BOOL "toggle debug output")
 #add_subdirectory(oasis3-mct/lib/psmile)
 add_subdirectory(src)
+
+foreach( _file fesom-config.cmake fesom-config-version.cmake fesom-targets.cmake )
+  execute_process( COMMAND ${CMAKE_COMMAND} -E create_symlink ${PROJECT_BINARY_DIR}/src/${_file} ${PROJECT_BINARY_DIR}/${_file}  )
+endforeach()
+
+# Define ${PROJECT_NAME}_DIR in PARENT_SCOPE so that a `find_package( <this-project> )` in a bundle
+# will easily find the project without requiring a `HINT <this-project>_BINARY_DIR` argument
+if( NOT CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR )
+    # Guard needed because PARENT_SCOPE cannot be used in top-level CMake project
+
+    set( fesom_DIR ${fesom_DIR} PARENT_SCOPE )
+endif()

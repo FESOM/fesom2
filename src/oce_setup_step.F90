@@ -293,7 +293,7 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     integer        :: num_tracers
     logical        :: i_vert_diff, smooth_bh_tra
     real(kind=WP)  :: gamma0_tra, gamma1_tra, gamma2_tra
-    integer        :: AB_order
+    integer        :: AB_order = 2
     namelist /tracer_listsize/ num_tracers
     namelist /tracer_list    / nml_tracer_list
     namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order
@@ -408,8 +408,8 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
 
     !___________________________________________________________________________
     ! define local vertice & elem array size + number of tracers
-    elem_size=myDim_elem2D+eDim_elem2D
-    node_size=myDim_nod2D+eDim_nod2D
+    elem_size=myDim_elem2D + eDim_elem2D
+    node_size=myDim_nod2D  + eDim_nod2D
     tracers%num_tracers=num_tracers
 
     !___________________________________________________________________________
@@ -442,9 +442,10 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     tracers%work%del_ttf_advhoriz = 0.0_WP
     tracers%work%del_ttf_advvert  = 0.0_WP
     if (ldiag_DVD) then
-        allocate(tracers%work%tr_dvd_horiz(nl-1,node_size,2),tracers%work%tr_dvd_vert(nl-1,node_size,2))
-        tracers%work%tr_dvd_horiz = 0.0_WP
-        tracers%work%tr_dvd_vert  = 0.0_WP
+        allocate(tracers%work%dvd_trflx_hor(nl-1, myDim_edge2D, 2))
+        allocate(tracers%work%dvd_trflx_ver(nl  , myDim_nod2D , 2))
+        tracers%work%dvd_trflx_hor = 0.0_WP
+        tracers%work%dvd_trflx_ver = 0.0_WP
     end if
 END SUBROUTINE tracer_init
 !
@@ -477,9 +478,21 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     integer        :: AB_order     = 2
     logical        :: check_opt_visc=.true.
     real(kind=WP)  :: wsplit_maxcfl
+    logical        :: use_ssh_se_subcycl=.false.
+    integer        :: se_BTsteps
+    real(kind=WP)  :: se_BTtheta
+    logical        :: se_visc, se_bottdrag, se_bdrag_si
+    real(kind=WP)  :: se_visc_gamma0, se_visc_gamma1, se_visc_gamma2
+    
     namelist /dynamics_visc   / opt_visc, check_opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
                                 use_ivertvisc, visc_easybsreturn
-    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, ldiag_KE, AB_order
+
+    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, & 
+                                ldiag_KE, AB_order,                                  &
+                                use_ssh_se_subcycl, se_BTsteps, se_BTtheta,          &
+                                se_bottdrag, se_bdrag_si, se_visc, se_visc_gamma0,   &
+                                se_visc_gamma1, se_visc_gamma2
+
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -503,19 +516,42 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
 
     !___________________________________________________________________________
     ! set parameters in derived type
-    dynamics%opt_visc          = opt_visc
-    dynamics%check_opt_visc    = check_opt_visc
-    dynamics%visc_gamma0       = visc_gamma0
-    dynamics%visc_gamma1       = visc_gamma1
-    dynamics%visc_gamma2       = visc_gamma2
-    dynamics%visc_easybsreturn = visc_easybsreturn
-    dynamics%use_ivertvisc     = use_ivertvisc
-    dynamics%momadv_opt        = momadv_opt
-    dynamics%use_freeslip      = use_freeslip
-    dynamics%use_wsplit        = use_wsplit
-    dynamics%wsplit_maxcfl     = wsplit_maxcfl
-    dynamics%ldiag_KE          = ldiag_KE
-    dynamics%AB_order          = AB_order
+    dynamics%opt_visc            = opt_visc
+    dynamics%check_opt_visc      = check_opt_visc
+    dynamics%visc_gamma0         = visc_gamma0
+    dynamics%visc_gamma1         = visc_gamma1
+    dynamics%visc_gamma2         = visc_gamma2
+    dynamics%visc_easybsreturn   = visc_easybsreturn
+    dynamics%use_ivertvisc       = use_ivertvisc
+    dynamics%momadv_opt          = momadv_opt
+    dynamics%use_freeslip        = use_freeslip
+    dynamics%use_wsplit          = use_wsplit
+    dynamics%wsplit_maxcfl       = wsplit_maxcfl
+    dynamics%ldiag_KE            = ldiag_KE
+    dynamics%AB_order            = AB_order
+    dynamics%use_ssh_se_subcycl  = use_ssh_se_subcycl
+    if (dynamics%use_ssh_se_subcycl) then
+        dynamics%se_BTsteps      = se_BTsteps
+        dynamics%se_BTtheta      = se_BTtheta
+        dynamics%se_bottdrag     = se_bottdrag
+        dynamics%se_bdrag_si     = se_bdrag_si
+        dynamics%se_visc         = se_visc
+        dynamics%se_visc_gamma0  = se_visc_gamma0
+        dynamics%se_visc_gamma1  = se_visc_gamma1
+        dynamics%se_visc_gamma2  = se_visc_gamma2
+        if (mype==0) then
+            write(*,*) " ___Split-Explicit barotropic subcycling_________", dynamics%se_BTsteps
+            write(*,*) "     se_BTsteps     = ", dynamics%se_BTsteps
+            write(*,*) "     se_BTtheta     = ", dynamics%se_BTtheta
+            write(*,*) "     se_bottdrag    = ", dynamics%se_bottdrag
+            write(*,*) "     se_bdrag_si    = ", dynamics%se_bdrag_si
+            write(*,*) "     se_visc        = ", dynamics%se_visc
+            write(*,*) "     se_visc_gamma0 = ", dynamics%se_visc_gamma0
+            write(*,*) "     se_visc_gamma1 = ", dynamics%se_visc_gamma1
+            write(*,*) "     se_visc_gamma2 = ", dynamics%se_visc_gamma2
+        end if 
+    end if 
+
     !___________________________________________________________________________
     ! define local vertice & elem array size
     elem_size=myDim_elem2D+eDim_elem2D
@@ -557,14 +593,39 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! allocate/initialise ssh arrays in derived type
     allocate(dynamics%eta_n(      node_size))
-    allocate(dynamics%d_eta(      node_size))
-    allocate(dynamics%ssh_rhs(    node_size))
     dynamics%eta_n           = 0.0_WP
-    dynamics%d_eta           = 0.0_WP
-    dynamics%ssh_rhs         = 0.0_WP
-    !!PS     allocate(dynamics%ssh_rhs_old(node_size))
-    !!PS     dynamics%ssh_rhs_old= 0.0_WP   
-
+    if (dynamics%use_ssh_se_subcycl) then
+        allocate(dynamics%se_uvh(       2, nl-1, elem_size))
+        allocate(dynamics%se_uvBT_rhs(  2,       elem_size))
+        allocate(dynamics%se_uvBT_4AB(  4,       elem_size))
+        allocate(dynamics%se_uvBT(      2,       elem_size))
+        allocate(dynamics%se_uvBT_theta(2,       elem_size))
+        allocate(dynamics%se_uvBT_mean( 2,       elem_size))
+        allocate(dynamics%se_uvBT_12(   2,       elem_size))
+        dynamics%se_uvh         = 0.0_WP
+        dynamics%se_uvBT_rhs    = 0.0_WP
+        dynamics%se_uvBT_4AB    = 0.0_WP
+        dynamics%se_uvBT        = 0.0_WP
+        dynamics%se_uvBT_theta  = 0.0_WP
+        dynamics%se_uvBT_mean   = 0.0_WP
+        dynamics%se_uvBT_12     = 0.0_WP
+        if (dynamics%se_visc) then 
+            allocate(dynamics%se_uvBT_stab_hvisc(2, elem_size))
+            dynamics%se_uvBT_stab_hvisc = 0.0_WP
+        end if
+        if (dynamics%se_bottdrag) then 
+            allocate(dynamics%se_uvBT_stab_bdrag(elem_size))
+            dynamics%se_uvBT_stab_bdrag = 0.0_WP
+        end if 
+    else
+        allocate(dynamics%d_eta(      node_size))
+        allocate(dynamics%ssh_rhs(    node_size))
+        dynamics%d_eta          = 0.0_WP
+        dynamics%ssh_rhs        = 0.0_WP
+        !!PS     allocate(dynamics%ssh_rhs_old(node_size))
+        !!PS     dynamics%ssh_rhs_old= 0.0_WP   
+    end if 
+    
     !___________________________________________________________________________
     ! inititalise working arrays
     allocate(dynamics%work%uvnode_rhs(2, nl-1, node_size))

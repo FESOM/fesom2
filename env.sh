@@ -46,7 +46,11 @@ else
 fi
 
 
-if [[ $LOGINHOST =~ ^m[A-Za-z0-9]+\.hpc\.dkrz\.de$ ]]; then
+if [[ "$LOGINHOST" == "local" ]]; then
+   echo "Using local environment $BEING_EXECUTED"
+   [ $BEING_EXECUTED = true ] && exit
+   return 0 # if we are being sourced, return from this script here
+elif [[ $LOGINHOST =~ ^m[A-Za-z0-9]+\.hpc\.dkrz\.de$ ]]; then
    STRATEGY="mistral.dkrz.de"
 elif [[ $LOGINHOST =~ ^levante ]] || [[ $LOGINHOST =~ ^l[:alnum:]+\.lvt\.dkrz\.de$ ]]; then 
    STRATEGY="levante.dkrz.de"
