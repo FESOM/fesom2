@@ -46,10 +46,14 @@ subroutine mo_convect(ice, partit, mesh)
             
             !___________________________________________________________________
             ! calcualte monin obukhov length
+!!PS             call mo_length(water_flux(node),heat_flux(node), &         
+!!PS                     stress_atmoce_x(node),stress_atmoce_y(node), &    
+!!PS                     u_ice(node),v_ice(node),a_ice(node), &                             
+!!PS                     dt, mixlength(node))
             call mo_length(water_flux(node),heat_flux(node), &         
-                    stress_atmoce_x(node),stress_atmoce_y(node), &    
+                    stress_node_surf(1,node),stress_node_surf(2,node), &    
                     u_ice(node),v_ice(node),a_ice(node), &                             
-                    dt, mixlength(node))
+                    dt, mixlength(node))        
             
             !___________________________________________________________________
             ! increase vertical diffusion within monin obukov length to namelist

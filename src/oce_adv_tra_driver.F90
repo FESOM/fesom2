@@ -50,6 +50,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     USE MOD_PARSUP
     USE MOD_DYN
     use g_comm_auto
+    use diagnostics, only: ldiag_DVD
     use oce_adv_tra_hor_interfaces
     use oce_adv_tra_ver_interfaces
     use oce_adv_tra_fct_interfaces
@@ -103,7 +104,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     fct_minus       => tracers%work%fct_minus
     dttf_h          => tracers%work%del_ttf_advhoriz
     dttf_v          => tracers%work%del_ttf_advvert
-
+    
     !___________________________________________________________________________
     ! compute FCT horzontal and vertical low order solution as well as lw order
     ! part of antidiffusive flux
@@ -233,6 +234,47 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 #else
         !$ACC END PARALLEL LOOP
 #endif
+
+
+        !_______________________________________________________________________
+        ! DVD diagostic: store low order horizontal and vertical tracer fluxes through mid 
+        ! edge faces and upper and lower scalar cell prism face. in case of FCT
+        if ((ldiag_DVD) .and. (tr_num<=2)) then 
+#ifndef ENABLE_OPENACC
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz)
+#else
+            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
+!$OMP DO
+            do n=1, myDim_edge2D
+                !$ACC LOOP VECTOR
+                do nz=1, mesh%nl - 1
+                    tracers%work%dvd_trflx_hor(nz, n, tr_num) = adv_flux_hor(nz, n)
+                end do
+                !$ACC END LOOP
+            end do
+!$OMP END DO
+            !$ACC END PARALLEL LOOP
+            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+!$OMP DO
+            do n=1, myDim_nod2D
+                !$ACC LOOP VECTOR
+                do nz=1, mesh%nl
+                    tracers%work%dvd_trflx_ver(nz, n, tr_num) = adv_flux_ver(nz, n)
+                end do
+                !$ACC END LOOP
+            end do
+!$OMP END DO
+#ifndef ENABLE_OPENACC
+!$OMP END PARALLEL
+#else
+        !$ACC END PARALLEL LOOP
+#endif
+        end if 
+
+
+        !_______________________________________________________________________
+
         if (dynamics%use_wsplit) then !wvel/=wvel_e
             ! update for implicit contribution (w_split option)
 !when adv_tra_vert_impl is ported to ACC the UPDATEs below wont be needed!
@@ -247,7 +289,8 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         end if
         call exchange_nod(fct_LO, partit, luse_g2g = .true.)
 !$OMP BARRIER
-    end if
+    end if !--> if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
+    
     do_zero_flux=.true.
     if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') do_zero_flux=.false.
     !___________________________________________________________________________
@@ -289,8 +332,8 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         !     oce_ale_tracer.F90 --> subroutine diff_ver_part_impl_ale(tr_num, partit, mesh)
         !     for do_wimpl=.true.
     END SELECT
+    
     !___________________________________________________________________________
-    !
     if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
        !edge_up_dn_grad will be used as an auxuary array here
        call oce_tra_adv_fct(dt, ttf, fct_LO, adv_flux_hor, adv_flux_ver, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, edge_up_dn_grad, partit, mesh)
@@ -299,6 +342,76 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
        call oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, partit, mesh)
     end if
 
+    !___________________________________________________________________________
+    ! DVD diagostic: store horizontal and vertical tracer fluxes through mid 
+    ! edge faces and upper and lower scalar cell prism face. Consider here special
+    ! reconstruction value depending on horiz/vertical advection scheme. Only do 
+    ! this for temperature and salinity
+    if ((ldiag_DVD) .and. (tr_num<=2)) then 
+        !_______________________________________________________________________
+        if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz)
+            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+!$OMP DO
+            do n=1, myDim_edge2D
+                !$ACC LOOP VECTOR
+                do nz=1, mesh%nl-1
+                    tracers%work%dvd_trflx_hor(nz, n, tr_num) = tracers%work%dvd_trflx_hor(nz, n, tr_num) + adv_flux_hor(nz, n)
+                    !                                           |                                           |
+                    !                                           +-> LowO horiz flux                         +-> Antidiff. horiz flux
+                end do
+                !$ACC END LOOP
+            end do
+!$OMP END DO
+            !$ACC END PARALLEL LOOP
+            
+            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+!$OMP DO
+            do n=1, myDim_nod2D
+                !$ACC LOOP VECTOR
+                do nz=1, mesh%nl
+                    tracers%work%dvd_trflx_ver(nz, n, tr_num) = tracers%work%dvd_trflx_ver(nz, n, tr_num) + adv_flux_ver(nz, n)
+                    !                                           |                                           |
+                    !                                           +-> LowO vert flux                          +-> Antidiff. vert flux
+                end do
+                !$ACC END LOOP
+            end do
+!$OMP END DO
+            !$ACC END PARALLEL LOOP
+            
+!$OMP END PARALLEL
+
+        !_______________________________________________________________________
+        else
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz)
+            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+!$OMP DO
+            do n=1, myDim_edge2D
+                !$ACC LOOP VECTOR
+                do nz=1, mesh%nl-1
+                    tracers%work%dvd_trflx_hor(nz, n, tr_num) = adv_flux_hor(nz, n)
+                end do
+                !$ACC END LOOP
+            end do
+!$OMP END DO
+            !$ACC END PARALLEL LOOP
+            
+            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+!$OMP DO
+            do n=1, myDim_nod2D
+                !$ACC LOOP VECTOR
+                do nz=1, mesh%nl
+                    tracers%work%dvd_trflx_ver(nz, n, tr_num) = adv_flux_ver(nz, n)
+                end do
+                !$ACC END LOOP
+            end do
+!$OMP END DO
+            !$ACC END PARALLEL LOOP
+            
+!$OMP END PARALLEL
+        end if
+    end if !-->if ((ldiag_DVD) .and. (tr_num<=2)) then 
+    
 end subroutine do_oce_adv_tra
 !
 !

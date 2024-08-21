@@ -14,7 +14,6 @@ Supported systems are: generic ``ubuntu``, ``albedo`` at AWI, ``levante`` at DKR
 
     git clone https://github.com/FESOM/fesom2.git
     cd fesom2
-    git checkout refactoring
     bash -l ./configure.sh
 
 Create file ``fesom.clock`` in the output directory with the following content (if you plan to run with COREII forcing):

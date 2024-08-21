@@ -95,12 +95,13 @@ end module
 
 module transit_bc_surface_interface
     interface
-        function transit_bc_surface(n, id, sst, sss, a_ice, sval, nzmin, partit)
+        function transit_bc_surface(n, id, sst, sss, a_ice, sval, nzmin, partit, mesh)
         use mod_mesh
         USE MOD_PARTIT
         USE MOD_PARSUP
         integer , intent(in)                  :: n, id, nzmin
         type(t_partit), intent(inout), target :: partit
+        type(t_mesh), intent(in), target      :: mesh
         real(kind=WP)                         :: transit_bc_surface
         real(kind=WP), intent(in)             :: sst, sss, a_ice, sval
         end function
@@ -158,7 +159,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use o_tracers
     use Toy_Channel_Soufflet
     use diff_tracers_ale_interface
-    use oce_adv_tra_driver_interfaces    
+    use diagnostics, only: ldiag_DVD
+    use oce_adv_tra_driver_interfaces
     use g_forcing_param, only: use_age_tracer !---age-code
     use mod_transit, only: decay14, decay39
     implicit none
@@ -528,69 +530,90 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     if (Redi) isredi=1._WP
     Ty    =0.0_WP
     Ty1   =0.0_WP
-
+    
     ! solve equation diffusion equation implicite part:
     ! -->   h^(n+0.5)* (T^(n+0.5)-Tstar) = dt*( K_33*d/dz*(T^(n+0.5)-Tstar) + K_33*d/dz*Tstar )
     ! -->   Tnew = T^(n+0.5)-Tstar
     ! -->   h^(n+0.5)* (Tnew) = dt*(K_33*d/dz*Tnew) + K_33*dt*d/dz*Tstar
     ! -->   h^(n+0.5)* (Tnew) = dt*(K_33*d/dz*Tnew) + RHS
     ! -->   solve for T_new
-    ! -->   V_1 (Skalar Volume), A_1 (Area of edge),              .
-    !       no Cavity A1==V1, yes Cavity A1 !=V1                 /I\ nvec_up (+1)
-    !                                                             I
-    !    ----------- zbar_1, A_1                             *----I----*
-    ! Z_1 o T_1, V1                                          |\   I  ./|
-    !    ----------- zbar_2, A_2                             | \   ./  |   Gaus Theorem:
-    ! Z_2 o T_2, V2                                          |  \ /    |    --> Flux form
-    !    ----------- zbar_3, A_3                             |   |     |    --> normal vec outwards facing
-    ! Z_3 o T_3, V3                                          *---|-----*
-    !    ----------- zbar_4                                   \  | I ./
-    !        :                                                 \ | I/
-    !                                                           \|/I
-    !                                                            * I
-    !                                                             \I/
-    !                                                              *  nvec_dwn (-1)
+    ! -->   As_1 (Skalar Area), A_1 (Area of edge),               
+    !       no Cavity A_1==As_1, yes Cavity A1 !=As_1             
+    !                                                             
+    !    ----------- zbar_1, A_1                           nvec_up (+1)  
+    ! Z_1 o T_1, As_1                                       ^ 
+    !    ----------- zbar_2, A_2                       _____|_____    Gaus Theorem:
+    ! Z_2 o T_2, As_2                                 /|    |    |\    --> Flux form
+    !    ----------- zbar_3, A_3                     * |    |    | *   --> normal vec outwards facing
+    ! Z_3 o T_3, As_3                                |\___________/|        
+    !    ----------- zbar_4                          | |         | |         
+    !        :                                       | |_________| |          
+    !                                                |/           \|           
+    !                                                *      |      *            
+    !                                                 \_____|_____/
+    !                                                       |
+    !                                                       V nvec_dwn (-1)            
+    !                                                           
     ! --> 1st. solve homogenouse part:
-    ! f(Tnew) = h^(n+0.5)* (Tnew) - dt*(K_33*dTnew/dz) = 0
+    !     f(Tnew) = h^(n+0.5)* (Tnew) - dt*(K_33*dTnew/dz) = 0
     !
     ! --> 2nd. Difference Quotient at Tnew_i in flux form (Gaus Theorem, dont forget normal vectors!!!):
-    ! V_i*Tnew_i *h_i = -dt * [ K_33 * (Tnew_i-1 - Tnew_i)/(Z_i-1 - Z_i) * A_i * nvec_up
-    !                          +K_33 * (Tnew_i - Tnew_i+1)/(Z_i - Z_i+1) * A_i+1 * nvec_dwn ]
-    !     Tnew_i *h_i = -dt * [ K_33 * (Tnew_i-1 - Tnew_i)/(Z_i-1 - Z_i) * A_i  /V_i * nvec_up
-    !                          +K_33 * (Tnew_i - Tnew_i+1)/(Z_i - Z_i+1) * A_i+1/V_i * nvec_dwn ]
+    !        |
+    !        +-> Gauss THeorem: int(V', div(F_vec))dV = intcircle(A', F_vec*n_vec)dA
+    !        |
+    !        +-> du                     = dt*( K_33*d/dz*dTnew )  | *div()_z=d/dz, *int(V',)dV
+    !        |   int(V', d/dz *du)dV    = int(V', d/dz *dt*( K_33*d/dz*dTnew ) )dV
+    !        |   ...                    = intcircle(A', dt*( K_33*d/dz*dTnew )*n_vec)dA   
+    !        |   int(V', d/dz *du)dz*dA = ...
+    !        |   int(A', du)dA          = intcircle(A', dt*( K_33*d/dz*dTnew )*n_vec)dA
+    !        |   
+    !        +-> As_i area of scalar cell = A_i, A_i+1 area of top 
+    !        |   and bottom face of scalar cell 
+    !        V
+    !
+    !    As_i*Tnew_i *h_i = dt * [ K_33 * (Tnew_i-1 - Tnew_i  )/(Z_i-1 - Z_i  ) * A_i   * nvec_up(+1)
+    !                              +K_33 * (Tnew_i   - Tnew_i+1)/(Z_i   - Z_i+1) * A_i+1 * nvec_dwn(-1) ]
+    !    Tnew_i *h_i      = dt * [ K_33 * (Tnew_i-1 - Tnew_i  )/(Z_i-1 - Z_i  ) * A_i  /As_i * nvec_up(+1)
+    !                              +K_33 * (Tnew_i   - Tnew_i+1)/(Z_i   - Z_i+1) * A_i+1/As_i * nvec_dwn(-1) ]
+    !        |
+    !        +-> since we are on scalar cell As_i != A_i != A_i+1 
+    !        +-> take into account normal vector direction
+    !        V
+    !    f(Tnew) = Tnew_i*h_i - dt*K_33 * (Tnew_i-1 - Tnew_i  )/(Z_i-1 - Z_i  ) * A_i  /As_i 
+    !                         + dt*K_33 * (Tnew_i   - Tnew_i+1)/(Z_i   - Z_i+1) * A_i+1/As_i
+    !            = 0
     !
     ! --> 3rd. solve for coefficents a, b, c:
-    ! f(Tnew) = [ a*dTnew_i-1 + b*dTnew_i + c*dTnew_i+1 ]
-    !
-    !     df(Tnew)/dTnew_i-1 = a = -dt*K_33/(Z_i-1 - Z_i) * A_i/V_i * (nvec_up =1)
-    !
-    !     df(Tnew)/dTnew_i+1 = c =  dt * K_33 * 1/(Z_i - Z_i+1) * A_i+1/V_i * (nvec_dwn=-1)
-    !                            = -dt * K_33 * 1/(Z_i - Z_i+1) * A_i+1/V_i
-    !
-    !     df(Tnew)/dTnew_i   = b = h_i + dt*K_33/(Z_i-1 - Z_i) * A_i/V_i   * (nvec_up=+1)
-    !                                  - dt*K_33/(Z_i - Z_i+1) * A_i+1/V_i * (nvec_dwn=-1)
-    !                            = h_i + dt*K_33/(Z_i-1 - Z_i) * A_i/V_i
-    !                                  + dt*K_33/(Z_i - Z_i+1) * A_i+1/V_i
-    !                            = h_i -(a+c)
+    !     f(Tnew) = [ a*dTnew_i-1 + b*dTnew_i + c*dTnew_i+1 ]
+    !        |
+    !        +-> estimate a, b, c by derivation of f(Tnew_i)
+    !        |
+    !        +-> a = df(Tnew)/dTnew_i-1 = -dt*K_33/(Z_i-1 - Z_i) * A_i/As_i
+    !        |
+    !        +-> c = df(Tnew)/dTnew_i+1 = -dt * K_33 * 1/(Z_i - Z_i+1) * A_i+1/As_i
+    !        |
+    !        +-> b = df(Tnew)/dTnew_i   = h_i + dt*K_33/(Z_i-1 - Z_i) * A_i  /As_i
+    !                                          + dt*K_33/(Z_i - Z_i+1) * A_i+1/As_i
+    !                                   = h_i -(a+c)
     !
     ! --> 4th. solve inhomogenous part:
-    ! [ a*dTnew_i-1 + b*dTnew_i + c*dTnew_i+1 ] = RHS/V_i
+    !     [ a*dTnew_i-1 + b*dTnew_i + c*dTnew_i+1 ] = RHS/As_i
     !
-    ! RHS     = K_33*dt*d/dz*Tstar
+    !     RHS     = K_33*dt*d/dz*Tstar
     !
     ! --> write as Difference Quotient in flux form
-    ! RHS/V_i =  K_33 * dt * (Tstar_i-1 - Tstar_i)/(Z_i-1 - Z_i) * A_i/V_i   * (nvec_up=1)
-    !          + K_33 * dt * (Tstar_i - Tstar_i+1)/(Z_i - Z_i+1) * A_i+1/V_i * (nvec_dwn=-1)
+    !     RHS/As_i =  K_33 * dt * (Tstar_i-1 - Tstar_i)/(Z_i-1 - Z_i) * A_i/As_i   * (nvec_up=1)
+    !               + K_33 * dt * (Tstar_i - Tstar_i+1)/(Z_i - Z_i+1) * A_i+1/As_i * (nvec_dwn=-1)
     !
-    !         =  K_33*dt/(Z_i-1 - Z_i) * A_i/V_i   * Tstar_i-1
-    !          - K_33*dt/(Z_i-1 - Z_i) * A_i/V_i   * Tstar_i
-    !          - K_33*dt/(Z_i - Z_i+1) * A_i+1/V_i * Tstar_i
-    !          + K_33*dt/(Z_i - Z_i+1) * A_i+1/V_i * Tstar_i+1
+    !              =  K_33*dt/(Z_i-1 - Z_i) * A_i/As_i   * Tstar_i-1
+    !               - K_33*dt/(Z_i-1 - Z_i) * A_i/As_i   * Tstar_i
+    !               - K_33*dt/(Z_i - Z_i+1) * A_i+1/As_i * Tstar_i
+    !               + K_33*dt/(Z_i - Z_i+1) * A_i+1/As_i * Tstar_i+1
     !
-    !         = -a*Tstar_i-1 + (a+c)*Tstar_i - c * Tstar_i+1
-    !                            |-> b = h_i - (a+c), a+c = h_i-b
+    !              = -a*Tstar_i-1 + (a+c)*Tstar_i - c * Tstar_i+1
+    !              |-> b = h_i - (a+c), a+c = h_i-b
     !
-    !         = -a*Tstar_i-1 - (b-h_i)*Tstar_i - c * Tstar_i+1
+    !              = -a*Tstar_i-1 - (b-h_i)*Tstar_i - c * Tstar_i+1
     !
     ! --> 5th. solve for Tnew_i --> forward sweep algorithm --> see lower
     !  | b_1 c_1 ...            |   |dTnew_1|
@@ -599,12 +622,14 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     !  |         a_4 b_4 c_4 ...|   |dTnew_4|
     !  |              :         |   |   :   |
     !
-    ! --> a = -dt*K_33 / (Z_i-1 - Z_i) * A_i/V_i
+    ! --> a = -dt*K_33 / (Z_i-1 - Z_i) * A_i/As_i
     !
-    ! --> c = -dt*K_33 / (Z_i - Z_i+1) * A_i+1/V_i
+    ! --> c = -dt*K_33 / (Z_i - Z_i+1) * A_i+1/As_i
     !
-    ! --> b = h^(n+0.5) -[ dt*K_33/(Z_i-1 - Z_i)*A_i/V_i + dt*K_33/(Z_i - Z_i+1) * A_i+1/V_i ] = -(a+c) + h^(n+0.5)
-
+    ! --> b = h^(n+0.5) -[ dt*K_33/(Z_i-1 - Z_i  ) * A_i  /As_i 
+    !                     +dt*K_33/(Z_i   - Z_i+1) * A_i+1/As_i ] 
+    !       = -(a+c) + h^(n+0.5)
+    !
     !___________________________________________________________________________
     ! loop over local nodes
 
@@ -896,7 +921,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         tr(nzmin)= tr(nzmin)+bc_surface(n, tracers%data(tr_num)%ID, trarr(nzmin,n), nzmin, partit)
 
         if ((tracers%data(tr_num)%ID .ge. 6) .and.(tracers%data(tr_num)%ID .le. 40)) then
-          tr(nzmin)= tr(nzmin)+transit_bc_surface(n, tracers%data(tr_num)%ID, sst(nzmin,n), sss(nzmin,n), a_ice(n), trarr(nzmin,n), nzmin, partit)
+          tr(nzmin)= tr(nzmin)+transit_bc_surface(n, tracers%data(tr_num)%ID, sst(nzmin,n), sss(nzmin,n), a_ice(n), trarr(nzmin,n), nzmin, partit, mesh)
         end if
         
         !_______________________________________________________________________
@@ -1403,6 +1428,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
       stop
   END SELECT
   RETURN
+
 END FUNCTION
 
 
@@ -1410,7 +1436,7 @@ END FUNCTION
 ! This function returns a boundary conditions for a specified transient tracer ID and surface node.
 ! Different to function bc_surface, SST, SSS, and sea ice concentrations are always needed as
 ! auxiliary variable
-FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit)
+FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit, mesh)
   use MOD_MESH
   USE MOD_PARTIT
   USE MOD_PARSUP
@@ -1424,6 +1450,7 @@ FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit)
   integer,       intent(in)            :: n, id, nzmin
   real(kind=WP), intent(in)            :: sst, sss, aice, sval
   type(t_partit),intent(inout), target :: partit
+  type(t_mesh),  intent(in), target    :: mesh
   REAL(kind=WP)                        :: transit_bc_surface
   character(len=10)                    :: id_string
 
@@ -1432,14 +1459,19 @@ FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit)
   !  --> is_nonlinfs=0.0 for linfs
 
 #if defined (__oasis)
-!   SLP and wind speed in coupled setups. This is a makeshift solution
-!   as long as the true values are not provided by the AGCM / OASIS.
-    press_a = mean_slp
-    wind_2  = speed_2(stress_atmoce_x(n), stress_atmoce_y(n))
+! SLP and wind speed in coupled setups. This is a makeshift solution
+! as long as the true values are not provided by the AGCM / OASIS.
+  press_a = mean_slp
+  wind_2  = speed_2(stress_atmoce_x(n), stress_atmoce_y(n))
 #else
-    press_a = press_air(n)
-    wind_2  = u_wind(n)**2 + v_wind(n)**2
+  press_a = press_air(n)
+  wind_2  = u_wind(n)**2 + v_wind(n)**2
 #endif
+
+! The atmospheric input of bomb 14C, CFC-12, and SF6 depends on latitude. To that effect specify
+  y_abc = mesh%geo_coord_nod2D(2,n) / rad  ! latitude of atmospheric tracer input
+  yy_nh = (10. - y_abc) * 0.05             ! interpolation weight for tropical tracer values
+
 
   SELECT CASE (id)
 
@@ -1533,3 +1565,4 @@ FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit)
   END SELECT
   RETURN
 END FUNCTION
+
