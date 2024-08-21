@@ -48,7 +48,7 @@ MODULE g_sbf
    use recom_config
    use recom_declarations
 #endif
-   USE g_read_other_NetCDF, only: read_other_NetCDF, read_2ddata_on_grid_netcdf, read_runoff_mapper
+   USE g_read_other_NetCDF, only: read_other_NetCDF, read_2ddata_on_grid_netcdf
 
    IMPLICIT NONE
 
