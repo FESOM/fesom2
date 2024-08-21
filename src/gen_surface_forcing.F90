@@ -117,9 +117,6 @@ MODULE g_sbf
 
 #endif
 
-   character(10),           save   :: chl_data_source   ='None' ! 'Sweeney' Chlorophyll climatology Sweeney et al. 2005
-   character(len=MAX_PATH), save   :: nm_chl_data_file  ='/work/ollie/dsidoren/input/forcing/Sweeney_2005.nc'
-   real(wp),                save   :: chl_const         = 0.1
    logical                         :: use_runoff_mapper = .false.               !runof mapper to be used in the coupled mode with IFS
    character(len=MAX_PATH), save   :: runoff_basins_file='runoff_basins.nc'     ! definition file for runoff basins
    real(wp)                        :: runoff_radius     =500000._WP             !smoothing radius for runoff mapper (in meters)
