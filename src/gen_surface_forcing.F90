@@ -44,7 +44,12 @@ MODULE g_sbf
    USE g_config, only: dummy, ClimateDataPath, dt
    USE g_clock,  only: timeold, timenew, dayold, daynew, yearold, yearnew, cyearnew
    USE g_forcing_arrays,    only: runoff, chl
+#if defined (__recom)
+   use recom_config
+   use recom_declarations
+#endif
    USE g_read_other_NetCDF, only: read_other_NetCDF, read_2ddata_on_grid_netcdf
+
    IMPLICIT NONE
 
    include 'netcdf.inc'
@@ -87,15 +92,31 @@ MODULE g_sbf
    logical :: l_cloud = .false.
    logical :: l_snow  = .false.
 
-   character(10),           save   :: runoff_data_source='CORE2'
-   character(len=MAX_PATH), save   :: nm_runoff_file    ='runoff.nc'
+   character(10),           save   :: runoff_data_source   ='CORE2'
+   character(len=MAX_PATH), save   :: nm_runoff_file       ='runoff.nc'
 
-   character(10),           save   :: sss_data_source   ='CORE2'
-   character(len=MAX_PATH), save   :: nm_sss_data_file  ='PHC2_salx.nc'
+   character(10),           save   :: sss_data_source      ='CORE2'
+   character(len=MAX_PATH), save   :: nm_sss_data_file     ='PHC2_salx.nc'
 
-   character(10),           save   :: chl_data_source   ='None' ! 'Sweeney' Chlorophyll climatology Sweeney et al. 2005
-   character(len=MAX_PATH), save   :: nm_chl_data_file  ='/work/ollie/dsidoren/input/forcing/Sweeney_2005.nc'
-   real(wp),                save   :: chl_const         = 0.1
+   character(10),           save   :: chl_data_source      ='None' ! 'Sweeney' Chlorophyll climatology Sweeney et al. 2005
+   character(len=MAX_PATH), save   :: nm_chl_data_file     ='/work/ollie/dsidoren/input/forcing/Sweeney_2005.nc'
+   real(wp),                save   :: chl_const            = 0.1
+
+#if defined (__recom)
+   character(10),           save   :: fe_data_source       ='Albani'
+   character(len=MAX_PATH), save   :: nm_fe_data_file      ='DustClimMonthlyAlbani.nc'
+
+   character(len=MAX_PATH), save   :: nm_aen_data_file     ='AeolianNitrogenDep.nc '
+
+   character(len=MAX_PATH), save   :: nm_river_data_file   ='River.nc'
+   character(len=MAX_PATH), save   :: nm_erosion_data_file ='Erosion.nc'
+
+   character(len=MAX_PATH), save   :: nm_co2_data_file     ='MonthlyAtmCO2_gcb2021.nc'
+
+   character(len=MAX_PATH), save   :: nm_sed_data_file     ='medusa_flux2fesom.nc'
+
+#endif
+
    logical                         :: use_runoff_mapper = .false.               !runof mapper to be used in the coupled mode with IFS
    character(len=MAX_PATH), save   :: runoff_basins_file='runoff_basins.nc'     ! definition file for runoff basins
    real(wp)                        :: runoff_radius     =500000._WP             !smoothing radius for runoff mapper (in meters)
@@ -1018,6 +1039,10 @@ CONTAINS
                         nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source, &
                         chl_data_source, nm_chl_data_file, chl_const, use_runoff_mapper, runoff_basins_file, runoff_radius
 
+#if defined(__recom)
+      namelist /nam_rsbc/ fe_data_source, nm_fe_data_file, nm_aen_data_file, nm_river_data_file, nm_erosion_data_file, nm_co2_data_file
+#endif
+
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -1189,7 +1214,23 @@ CONTAINS
 
       if (mype==0) write(*,*) "DONE:  Ocean forcing initialization."
       if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
+
+#if defined(__recom)
+        ! OPEN and read namelist for SBC REcoM
+        open( unit=nm_sbc_unit+1, file='namelist.recom', form='formatted', access='sequential', status='old', iostat=iost )
+        if (iost == 0) then
+            if (mype==0) WRITE(*,*) '     file   : ', 'namelist.recom for sbc',' open ok'
+        else
+            if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.recom for sbc',' ; iostat=',iost
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            stop
+        endif
+        READ( nm_sbc_unit+1, nml=nam_rsbc, iostat=iost )
+        close( nm_sbc_unit+1 )
+#endif
+
       if (use_runoff_mapper) call read_runoff_mapper(runoff_basins_file, "arrival_point_id", runoff_radius, partit, mesh)
+
    END SUBROUTINE sbc_ini
 
    SUBROUTINE sbc_do(partit, mesh)
@@ -1201,6 +1242,10 @@ CONTAINS
       !! ** Action  :
       !!----------------------------------------------------------------------
       use g_clock
+#if defined (__recom)
+      use recom_config
+      use recom_glovar
+#endif
       IMPLICIT NONE
 
       real(wp)     :: rdate ! date
@@ -1210,6 +1255,14 @@ CONTAINS
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
       real(wp),  pointer   :: nc_time(:)
       character(len=MAX_PATH)               :: filename
+#if defined (__recom)
+      character(15)             :: CO2vari, Nvari
+      integer                   :: firstyearofcurrentCO2cycle, totnumyear, currentCO2year
+      character(4)              :: currentCO2year_char
+      real(kind=8), allocatable :: ncdata(:)
+      integer                   :: CO2start, CO2count
+      integer	                :: status, ncid, varid
+#endif
       type(t_partit), intent(inout), target :: partit
       type(t_mesh),   intent(in),    target :: mesh
       
@@ -1308,7 +1361,7 @@ CONTAINS
                i=month
                if (mstep > 1) i=i+1 
                if (i > 12) i=1
-               if (mype==0) write(*,*) 'Updating SSS restoring data for month ', i 
+               if (mype==0) write(*,*) 'Updating SSS restoring data for month     ', i 
                call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true., .true., partit, mesh) 
             end if
          end if
@@ -1348,7 +1401,7 @@ CONTAINS
            i=month
            if (mstep > 1) i=i+1 
            if (i > 12) i=1
-           if (mype==0) write(*,*) 'Updating monthly runoff for month ', i 
+           if (mype==0) write(*,*) 'Updating monthly runoff for month             ', i 
            filename=trim(nm_runoff_file)//cyearnew//'.nc' 
            call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
 
@@ -1360,9 +1413,174 @@ CONTAINS
 
      end if
 
+#if defined (__recom)
+!<  read surface atmospheric deposition for Fe, N, CO2
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'//achar(27)//'[0m'
+
+! ******** Atmospheric CO2 *********
+    if (mstep == 1) then ! The year has changed
+
+        if (constant_CO2) then
+            AtmCO2(:) = CO2_for_spinup
+            if (mype==0) write(*,*) 'Constant_CO2 = ', CO2_for_spinup 
+            if (mype==0) write(*,*),'Atm CO2=', AtmCO2               
+        else
+            filename=trim(nm_co2_data_file)
+            if (mype==0) write(*,*) 'Updating CO2 climatology for month       ', i,' from ', trim(filename)
+
+            totnumyear                 = lastyearoffesomcycle-firstyearoffesomcycle+1
+            firstyearofcurrentCO2cycle = lastyearoffesomcycle-numofCO2cycles*totnumyear+(currentCO2cycle-1)*totnumyear
+    
+            currentCO2year = firstyearofcurrentCO2cycle + (yearnew-firstyearoffesomcycle)+1
+            if(mype==0) write(*,*),currentCO2year, firstyearofcurrentCO2cycle, yearnew, firstyearoffesomcycle
+            write(currentCO2year_char,'(i4)') currentCO2year
+            CO2vari     = 'AtmCO2_'//currentCO2year_char
+
+            ! open file
+            status=nf_open(filename, nf_nowrite, ncid)
+            if (status.ne.nf_noerr)then
+                print*,'ERROR: CANNOT READ CO2 FILE CORRECTLY !!!!!'
+                print*,'Error in opening netcdf file '//filename
+                call par_ex(MPI_COMM_FESOM, mype)
+                stop
+            endif
+	
+            ! data
+            allocate(ncdata(12))
+            status=nf_inq_varid(ncid, CO2vari, varid)
+            CO2start = 1
+            CO2count = 12
+            status=nf_get_vara_double(ncid,varid,CO2start,CO2count,ncdata)
+            AtmCO2(:)=ncdata(:)
+            deallocate(ncdata)
+            if (mype==0) write(*,*),'Current carbon year=',currentCO2year
+            if (mype==0) write(*,*),'Atm CO2=', AtmCO2
+            status=nf_close(ncid)
+        end if
+    end if
+
+! ******** Fe deposition *********
+    if (fe_data_source=='Albani') then
+        if (update_monthly_flag) then
+            i=month
+            if (mstep > 1) i=i+1 
+            if (i > 12) i=1
+            filename=trim(nm_fe_data_file)
+            if (mype==0) write(*,*) 'Updating iron climatology for month       ', i,' from ', trim(filename)
+            call read_2ddata_on_grid_NetCDF(filename,'DustClim', i, GloFeDust, partit, mesh)
+        end if
+    else
+        if (mype==0) write(*,*) 'Albani is switched off --> Check namelist.recom'     
+    end if
+
+! ******** N deposition *********
+    if (useAeolianN) then
+! todo: check below when useAeolianN is .true.
+        if (mstep==1) then ! The year has changed
+            i=month
+!            if (mstep > 1) i=i+1 
+!            if (i > 12) i=1
+!            if (mype==0) write(*,*) 'Updating iron climatology for month ', i 
+            filename=trim(nm_aen_data_file)
+            if (mype==0) write(*,*) 'Updating nitrogen climatology for month   ', i,' from ', trim(filename)
+            if (yearnew .gt. 2009) then
+                Nvari = 'NDep2009'
+            else if (yearnew .lt. 1850) then
+                Nvari = 'NDep1850'
+            else
+                Nvari = 'NDep'//cyearnew
+            endif
+
+            call read_2ddata_on_grid_NetCDF(filename, Nvari, i, GloNDust, partit, mesh)
+        end if
+    else
+        GloNDust = 0.0_WP
+        if (mstep==1 .and. mype==0) write(*,*) 'useAeolianN is switched off'       
+    end if
+
+! ******** Riverine input (Nutrients) *********
+    if (useRivers) then
+!<  read riverine input
+    ! *** River inputs are in mmol/m2/s ***
+    ! add river nutrients as surface boundary condition (surface_bc function in oce_ale_tracers)
+        if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'   --> River_input'//achar(27)//'[0m'
+
+        is_riverinput = 1.0d0
+
+        if (update_monthly_flag) then
+            i=month
+            if (mstep > 1) i=i+1 
+            if (i > 12) i=1
+            filename=trim(nm_river_data_file)
+            if (mype==0) write(*,*) 'Updating riverine restoring data for month', i,' from ', trim(filename)
+            call read_2ddata_on_grid_NetCDF(filename,'Alkalinity', i, RiverAlk2D, partit, mesh)
+            ! write(*,*) mype, 'RiverAlk2D', maxval(RiverAlk2D(:)), minval(RiverAlk2D(:))        
+            ! molar convertion of [CaCo3] * 2  -> [total Alkalinity]   
+            RiverAlk2D = RiverAlk2D * 2
+  
+            call read_2ddata_on_grid_NetCDF(filename, 'DIC', i, RiverDIC2D, partit, mesh) 
+            ! write(*,*) mype, 'RiverDIC2D', maxval(RiverDIC2D(:)), minval(RiverDIC2D(:))     
+
+            call read_2ddata_on_grid_NetCDF(filename, 'DIN', i, RiverDIN2D, partit, mesh) 
+            ! write(*,*) mype, 'RiverDIN2D', maxval(RiverDIN2D(:)), minval(RiverDIN2D(:))     
+
+            call read_2ddata_on_grid_NetCDF(filename, 'DOC', i, RiverDOC2D, partit, mesh) 
+            ! write(*,*) mype, 'RiverDOC2D', maxval(RiverDOC2D(:)), minval(RiverDOC2D(:))     
+
+            call read_2ddata_on_grid_NetCDF(filename, 'DON', i, RiverDON2D, partit, mesh) 
+            ! write(*,*) mype, 'RiverDON2D', maxval(RiverDON2D(:)), minval(RiverDON2D(:))     
+
+            RiverDSi2D = RiverDIN2D * (16/15)
+        end if
+    else
+        is_riverinput = 0.0d0
+        if (mype==0 .and. mstep==1) write(*,*) 'No riverine input' 
+    end if
+
+! ******** Riverine input of iron *********
+    if (useRivFe) then
+    ! River runoff (m/s) is multiplied with Fe concentration * muemolFe/m3 -> muemolFe/m2/s
+    ! add river nutrients as surface boundary condition (surface_bc function in
+    ! oce_ale_tracers)
+        RiverFe = runoff * RiverFeConc
+    else
+        RiverFe = 0.0d0
+    end if
+
+! ******** Erosion (Nutrients) *********
+    if (useErosion) then
+!<  read erosion input
+    ! *** River inputs are in mmol/m2/s ***
+    ! add erosion nutrients as surface boundary condition (surface_bc function in oce_ale_tracers)
+    if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//' --> Erosion_input'//achar(27)//'[0m'
+
+    is_erosioninput = 1.0d0
+
+        if (update_monthly_flag) then
+            i=month
+            if (mstep > 1) i=i+1 
+            if (i > 12) i=1
+            filename=trim(nm_erosion_data_file)
+            if (mype==0) write(*,*) 'Updating erosion restoring data for month ', i,' from ', trim(filename)
+            call read_2ddata_on_grid_NetCDF(filename,'POC', i, ErosionTOC2D, partit, mesh)
+            ! write(*,*) mype, 'ErosionTOC2D', maxval(ErosionTOC2D(:)), minval(ErosionTOC2D(:))    
+    
+            call read_2ddata_on_grid_NetCDF(filename,'PON', i, ErosionTON2D, partit, mesh)
+            ! write(*,*) mype, 'ErosionTON2D', maxval(ErosionTON2D(:)), minval(ErosionTON2D(:))        
+
+            ! No silicates in erosion, we convert from nitrogen with redfieldian ratio     
+	    ErosionTSi2D=ErosionTON2D * 16/15
+        end if
+    else
+        is_erosioninput = 0.0d0
+        if (mype==0 .and. mstep==1) write(*,*) 'No erosion input' 
+    end if
+#endif
+
       if (partit%mype==0) then 
         write(*,*) 'sbc_do --> mstep:',mstep, ' rdate=', rdate
       end if 
+
       ! interpolate in time
       call data_timeinterp(rdate, partit)
    END SUBROUTINE sbc_do

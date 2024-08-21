@@ -90,6 +90,7 @@ if(DEFINED FESOM_ENABLE_IFS_INTERFACE)
 endif()
 message(STATUS "ENABLE_IFS_INTERFACE: ${ENABLE_IFS_INTERFACE}")
 
+
 set(ENABLE_MULTIO_DEFAULT OFF)
 if(ENABLE_IFS_INTERFACE)
    if(USE_ICEPACK)
@@ -140,6 +141,12 @@ elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
                                ${src_home}/ifs_interface/ifs_notused.F90
                                ${src_home}/ifs_interface/mpp_io.F90)
 endif()
+
+if(${RECOM_COUPLED})  # ADD RECOM FILES
+   file(GLOB sources_Fortran ${src_home}/*.F90
+                             ${src_home}/int_recom/*.F90
+                             ${src_home}/int_recom/recom/*.F90)
+endif()                             
 
 # generate a custom file from fesom_version_info.F90 which includes the current git SHA
 set(FESOM_ORIGINAL_VERSION_FILE ${src_home}/fesom_version_info.F90)
@@ -226,6 +233,14 @@ if(OPENMP_REPRODUCIBLE)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __openmp_reproducible)
 endif()
 
+if(${RECOM_COUPLED})
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __3Zoo2Det __coccos)# __usetp)
+endif()
+
+if(${CISO_COUPLED})
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __ciso)
+endif()
+
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
    target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -ip -init=zero -no-wrap-margin -fpe0) # add -fpe0 for RAPS environment
@@ -236,7 +251,7 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
       target_compile_options(${PROJECT_NAME} PRIVATE -O3 -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  albedo)
-      target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -O3 -ip -fPIC -qopt-malloc-options=2 -qopt-prefetch=5 -unroll-aggressive) #NEC mpi option
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -O3 -ip -fPIC -qopt-malloc-options=2 -qopt-prefetch=5 -unroll-aggressive) # -g -traceback -check) #NEC mpi option
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL atosecmwf )
       target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
    else()
@@ -248,7 +263,12 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 #    target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
-   target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
+   if(${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu )
+      message(STATUS "Allowing type mismatches on Ubuntu for CI Testing" )  # NOTE(PG): Would be nicer to grab the CI=True from the env variable
+      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch)
+   else()
+      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none)
+   endif()
    if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
       target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
    endif()

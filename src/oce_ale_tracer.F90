@@ -159,8 +159,12 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use o_tracers
     use Toy_Channel_Soufflet
     use diff_tracers_ale_interface
-    use diagnostics, only: ldiag_DVD
     use oce_adv_tra_driver_interfaces
+#if defined(__recom)
+    use recom_glovar
+    use recom_config
+#endif
+    use diagnostics, only: ldiag_DVD
     use g_forcing_param, only: use_age_tracer !---age-code
     use mod_transit, only: decay14, decay39
     implicit none
@@ -343,6 +347,15 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     use diff_ver_part_redi_expl_interface
     use diff_ver_part_impl_ale_interface
     use diff_part_bh_interface
+#if defined(__recom)
+    use ver_sinking_recom_interface
+    use diff_ver_recom_expl_interface
+    use ver_sinking_recom_benthos_interface
+    use recom_glovar
+    use recom_config
+    use g_comm_auto
+    use g_support
+#endif
     use mod_ice
     implicit none
     integer       , intent(in)   , target :: tr_num
@@ -361,7 +374,11 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     del_ttf => tracers%work%del_ttf
-
+#if defined(__recom)
+    dtr_bf         = 0.0_WP
+    str_bf         = 0.0_WP
+    vert_sink      = 0.0_WP
+#endif
     !___________________________________________________________________________
     ! do horizontal diffusiion
     ! write there also horizontal diffusion rhs to del_ttf which is equal the R_T^n
@@ -376,6 +393,71 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     ! derivatives and has to be computed explicitly!
     if (Redi) call diff_ver_part_redi_expl(tracers, partit, mesh)
 
+!        if (recom_debug .and. mype==0)  print *, tracers%data(tr_num)%ID
+
+#if defined(__recom)
+! 1) Remineralization from the benthos
+!    Nutrient fluxes come from the bottom boundary
+!    Unit [mmol/m2/s]
+
+if (any(recom_remin_tracer_id == tracers%data(tr_num)%ID)) then
+
+! call bottom boundary
+        call diff_ver_recom_expl(tr_num, tracers, partit, mesh)
+! update tracer fields
+        do n=1, myDim_nod2D
+            nzmax=nlevels_nod2D(n)-1
+            nzmin=ulevels_nod2D(n)
+!            tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
+!                                                dtr_bf(nzmin:nzmax,n)
+        tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
+                                                dtr_bf(nzmin:nzmax,n)
+        end do
+end if
+
+! 2) Sinking in water column
+!YY: recom_sinking_tracer_id in recom_modules extended for 2. zooplankton
+! but not for the combination ciso + 2. zoo!
+if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
+
+!< activate Ballasting
+!< .OG. 04.11.2022
+
+         if (use_ballasting) then
+!< get seawater viscosity, seawater_visc_3D
+              call get_seawater_viscosity(tr_num, tracers, partit, mesh) ! seawater_visc_3D
+
+!< get particle density of class 1 and 2 !rho_particle1 and rho_particle2
+              call get_particle_density(tracers, partit, mesh) ! rho_particle = density of particle class 1 and 2
+
+!< calculate scaling factors
+!< scaling_visc_3D
+!< scaling_density1_3D, scaling_density2_3D
+              call ballast(tr_num, tracers, partit, mesh)
+        end if
+
+! sinking
+        call ver_sinking_recom(tr_num, tracers, partit, mesh)  !--- vert_sink ---
+! update tracer fields
+! sinking into the benthos
+        call ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)  !--- str_bf ---
+
+! update tracer fields
+
+        do n=1, myDim_nod2D
+            nzmax=nlevels_nod2D(n)-1
+            nzmin=ulevels_nod2D(n)
+!            tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
+!                                                vert_sink(nzmin:nzmax,n)
+!            tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
+!                                                str_bf(nzmin:nzmax,n)
+        tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
+                                                vert_sink(nzmin:nzmax,n)
+        tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
+                                                str_bf(nzmin:nzmax,n)
+        end do
+endif
+#endif
     !___________________________________________________________________________
     ! Update tracers --> calculate T* see Danilov et al. (2017)
     ! T* =  (dt*R_T^n + h^(n-0.5)*T^(n-0.5))/h^(n+0.5)
@@ -1373,6 +1455,10 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
   USE o_ARRAYS
   USE g_forcing_arrays
   USE g_config
+#if defined (__recom)
+   use recoM_declarations
+   use recom_glovar
+#endif
   use mod_transit
   implicit none
 
@@ -1391,14 +1477,48 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
         !     by forming/melting of sea ice
         bc_surface= dt*(virtual_salt(n) & !--> is zeros for zlevel/zstar
                     + relax_salt(n) - real_salt_flux(n)*is_nonlinfs)
+#if defined(__recom)
+    CASE (1001) ! DIN
+            bc_surface= dt*(AtmNInput(n) + RiverDIN2D(n)   * is_riverinput                &
+                                         + ErosionTON2D(n) * is_erosioninput)
+    CASE (1002) ! DIC
+            bc_surface= dt*(GloCO2flux_seaicemask(n)                &
+                                + RiverDIC2D(n)   * is_riverinput   &
+                                + ErosionTOC2D(n) * is_erosioninput)
+    CASE (1003) ! Alk
+            bc_surface= dt*(virtual_alk(n) + relax_alk(n)       &
+                            + RiverAlk2D(n) * is_riverinput)
+        !bc_surface=0.0_WP
+    CASE (1004:1010)
+        bc_surface=0.0_WP
+    CASE (1011) ! DON
+        bc_surface= dt*RiverDON2D(n) * is_riverinput
+    CASE (1012) ! DOC
+        bc_surface= dt*RiverDOC2D(n) * is_riverinput
+    CASE (1013:1017)
+        bc_surface=0.0_WP
+    CASE (1018) ! DSi
+           bc_surface=dt*(RiverDSi2D(n) * is_riverinput + ErosionTSi2D(n) * is_erosioninput)
+    CASE (1019) ! Fe
+           bc_surface= dt*AtmFeInput(n)
+    CASE (1020:1021) ! Cal
+        bc_surface=0.0_WP
+    CASE (1022) ! OXY
+        bc_surface= dt*GloO2flux_seaicemask(n)
+!        bc_surface=0.0_WP
+    CASE (1023:1035)
+        bc_surface=0.0_WP  ! OG added bc for recom fields
+#endif
+    CASE (101) ! apply boundary conditions to tracer ID=101
+        bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)
 !---Transient tracers (case ##6,12,14,39) need additional input parameters 
 !   and are considered in the separate function transit_bc_surface
 !---wiso-code
-    CASE (101) ! apply boundary conditions to tracer ID=101 (H218O)
+    CASE (102) ! apply boundary conditions to tracer ID=101 (H218O)
         bc_surface = dt*wiso_flux_oce(n,1)
-    CASE (102)  ! apply boundary conditions to tracer ID=102 (HDO)
+    CASE (103)  ! apply boundary conditions to tracer ID=102 (HDO)
         bc_surface = dt*wiso_flux_oce(n,2)
-    CASE (103)  ! apply boundary conditions to tracer ID=103 (H216O)
+    CASE (104)  ! apply boundary conditions to tracer ID=103 (H216O)
         bc_surface = dt*wiso_flux_oce(n,3)
 !---wiso-code-end
 !---age-code
@@ -1564,5 +1684,6 @@ FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit, mesh)
 !   Done with boundary conditions for (transient) tracers.
   END SELECT
   RETURN
+
 END FUNCTION
 

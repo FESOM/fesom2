@@ -10,7 +10,12 @@ subroutine setup_model(partit)
                          ldiag_dMOC, ldiag_DVD, diag_list
   use g_clock,     only: timenew, daynew, yearnew
   use g_ic3d
+#ifdef __recom
+  use recom_config
+  use recom_ciso
+#endif
   use mod_transit
+
   implicit none
   type(t_partit), intent(inout), target :: partit
   character(len=MAX_PATH)               :: nmlfile
@@ -80,6 +85,44 @@ subroutine setup_model(partit)
   open (newunit=fileunit, file=nmlfile)
   read (fileunit, NML=diag_list)
   close (fileunit)
+
+#if defined (__recom)
+  nmlfile ='namelist.recom'    ! name of recom namelist file
+  open (newunit=fileunit, file=nmlfile)
+  read (fileunit, NML=pavariables)
+  read (fileunit, NML=pasinking)
+  read (fileunit, NML=painitialization_N)
+  read (fileunit, NML=paArrhenius)
+  read (fileunit, NML=palimiter_function)
+  read (fileunit, NML=palight_calculations)
+  read (fileunit, NML=paphotosynthesis)
+  read (fileunit, NML=paassimilation)
+  read (fileunit, NML=pairon_chem)
+  read (fileunit, NML=pazooplankton)
+  read (fileunit, NML=pasecondzooplankton)
+  read (fileunit, NML=pathirdzooplankton)
+  read (fileunit, NML=pagrazingdetritus)
+  read (fileunit, NML=paaggregation)
+  read (fileunit, NML=padin_rho_N)
+  read (fileunit, NML=padic_rho_C1)
+  read (fileunit, NML=paphytoplankton_N)
+  read (fileunit, NML=paphytoplankton_C)
+  read (fileunit, NML=paphytoplankton_ChlA)
+  read (fileunit, NML=padetritus_N)
+  read (fileunit, NML=padetritus_C)
+  read (fileunit, NML=paheterotrophs)
+  read (fileunit, NML=paseczooloss)
+  read (fileunit, NML=pathirdzooloss)
+  read (fileunit, NML=paco2lim)
+  read (fileunit, NML=pairon)
+  read (fileunit, NML=pacalc)
+  read (fileunit, NML=pabenthos_decay_rate)
+  read (fileunit, NML=paco2_flux_param)
+  read (fileunit, NML=paalkalinity_restoring)
+  read (fileunit, NML=paballasting)
+  read (fileunit, NML=paciso)
+  close (fileunit)
+#endif
 
   if (use_transit) then
 ! Transient tracer input, input file names have to be specified in

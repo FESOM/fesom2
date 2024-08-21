@@ -12,7 +12,7 @@ jobs:
     # Containers must run in Linux based operating systems
     runs-on: ubuntu-latest
     # Docker Hub image that `container-job` executes in
-    container: koldunovn/fesom2_test:refactoring2
+    container: ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master
 
     # Service containers to run with `gfortran_ubuntu`
     steps:
