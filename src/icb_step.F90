@@ -752,16 +752,16 @@ type(t_partit), intent(inout), target :: partit
            v_ib    = 0.
    else
      if (mype==0) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
-     call get_total_iceberg_area(mesh, partit, iceberg_elem, area_ib_tot)
-     if(area_ib_tot > elem_area(local_idx_of(iceberg_elem))) then
-         lon_rad = old_lon
-         lat_rad = old_lat 
-         lon_deg = lon_rad/rad
-         lat_deg = lat_rad/rad
-         iceberg_elem = old_element
-         u_ib    = 0.
-         v_ib    = 0.  
-     end if
+     !call get_total_iceberg_area(mesh, partit, iceberg_elem, area_ib_tot)
+     !if(area_ib_tot > elem_area(local_idx_of(iceberg_elem))) then
+     !    lon_rad = old_lon
+     !    lat_rad = old_lat 
+     !    lon_deg = lon_rad/rad
+     !    lat_deg = lat_rad/rad
+     !    iceberg_elem = old_element
+     !    u_ib    = 0.
+     !    v_ib    = 0.  
+     !end if
    end if
  end if
  

@@ -45,7 +45,7 @@ type(t_partit), intent(inout), target :: partit
         do i=1,3
             iceberg_node=elem2d_nodes(i,localelement)
 
-            if (iceberg_node<=mydim_nod2d) then
+            if (iceberg_node>0) then
                 ib_nods_in_ib_elem(i)   = iceberg_node
                 num_ib_nods_in_ib_elem  = num_ib_nods_in_ib_elem + 1
                 tot_area_nods_in_ib_elem= tot_area_nods_in_ib_elem + mesh%area(1,iceberg_node)
