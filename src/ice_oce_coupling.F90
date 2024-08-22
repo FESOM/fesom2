@@ -259,6 +259,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     use icedrv_main,   only: icepack_to_fesom,    &
                             init_flux_atm_ocn
 #endif
+    use iceberg_params
     use cavity_interfaces
     !---fwf-code
     use g_clock
@@ -563,6 +564,12 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         end if 
     end if 
     
+    !___________________________________________________________________________
+    if (use_icebergs) then
+        call icb2fesom(mesh, partit, ice)
+        flux = flux + ibfwb + ibfwe + ibfwl + ibfwbv
+    end if
+
     !___________________________________________________________________________
     ! compute total global net freshwater flux into the ocean 
     call integrate_nod(flux, net, partit, mesh)

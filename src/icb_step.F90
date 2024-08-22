@@ -447,7 +447,6 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 		   dt*REAL(steps_per_ib_step), l_output, f_u_ib_old, &
 		   f_v_ib_old, l_semiimplicit, semiimplicit_coeff, &
 		   AB_coeff, file_meltrates, rho_icb)
-  call prepare_icb2fesom(mesh,partit,ib,i_have_element,local_idx_of(iceberg_elem),depth_ib)
 
   dudt = (new_u_ib-u_ib)/REAL(steps_per_ib_step) / dt
   dvdt = (new_v_ib-v_ib)/REAL(steps_per_ib_step) / dt
@@ -522,8 +521,9 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 
   !-----------------------------
   ! LA 2022-11-30
+  area_ib_tot = 0.
   do idx = 1, size(elem_block)
-      if (elem_block(idx) == iceberg_elem) then
+      if ((elem_block(idx) == iceberg_elem) .and. (local_idx_of(iceberg_elem) .ne. 0)) then
           area_ib_tot = area_ib_tot + length_ib * width_ib * scaling(idx)
       end if
   end do
@@ -553,6 +553,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
   	  
  end if !processor has element?
 end if !... and first node belongs to processor?
+  call prepare_icb2fesom(mesh,partit,ib,i_have_element,local_idx_of(iceberg_elem),depth_ib)
 
  !t1=MPI_Wtime()
  !if (mod(istep,logfile_outfreq)==0 .and. i_have_element .and. lastsubstep) write(*,*) 'dynamics  took', t1-t0
