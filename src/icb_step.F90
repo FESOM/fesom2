@@ -551,9 +551,9 @@ if( local_idx_of(iceberg_elem) > 0 ) then
   arr_block((ib-1)*15+1 : ib*15)=arr
   elem_block(ib)=iceberg_elem
   	  
+  call prepare_icb2fesom(mesh,partit,ib,i_have_element,local_idx_of(iceberg_elem),depth_ib)
  end if !processor has element?
 end if !... and first node belongs to processor?
-  call prepare_icb2fesom(mesh,partit,ib,i_have_element,local_idx_of(iceberg_elem),depth_ib)
 
  !t1=MPI_Wtime()
  !if (mod(istep,logfile_outfreq)==0 .and. i_have_element .and. lastsubstep) write(*,*) 'dynamics  took', t1-t0
