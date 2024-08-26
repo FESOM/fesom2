@@ -524,7 +524,8 @@ module g_cvmix_kpp
             
             
             ! calculate friction velocity (ustar) at surface (m/s)
-            aux_ustar = sqrt( sqrt( stress_atmoce_x(node)**2 + stress_atmoce_y(node)**2 )*density_0_r ) ! @ the surface (eqn. 2)
+!!PS             aux_ustar = sqrt( sqrt( stress_atmoce_x(node)**2 + stress_atmoce_y(node)**2 )*density_0_r ) ! @ the surface (eqn. 2)
+            aux_ustar = sqrt( sqrt( stress_node_surf(1,node)**2 + stress_node_surf(2,node)**2 )*density_0_r ) ! @ the surface (eqn. 2)
             
             ! reduce friction velocity under ice --> approach take from the mpiom
             ! interface --> haven't been tested before with FESOM

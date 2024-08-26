@@ -7,7 +7,7 @@
 
 MODULE mpp_io
 #if defined(__MULTIO)        
-    USE iom, only : iom_initialize, iom_init_server, iom_finalize
+    USE iom, only : iom_enable_multio, iom_initialize, iom_init_server, iom_finalize
 #endif
     IMPLICIT NONE
     PRIVATE
@@ -19,7 +19,7 @@ MODULE mpp_io
 
     INTEGER :: ntask_multio  = 0
     INTEGER :: ntask_xios    = 0
-    LOGICAL, PUBLIC  :: lioserver, lmultioserver, lmultiproc
+    LOGICAL, PUBLIC :: lioserver, lmultioserver, lmultiproc
     INTEGER :: ntask_notio
     INTEGER, SAVE :: mppallrank, mppallsize, mppiorank, mppiosize
     INTEGER, SAVE :: mppmultiorank, mppmultiosize
@@ -77,6 +77,12 @@ MODULE mpp_io
         READ(10,namio)
         WRITE(*,namio)
         CLOSE(10)
+
+#if defined(__MULTIO)
+        IF (ntask_multio /= 0) THEN
+            CALL iom_enable_multio()
+        ENDIF
+#endif
 
         IF ( ntask_xios + ntask_multio == 0 ) THEN
             iicomm = mpi_comm_world

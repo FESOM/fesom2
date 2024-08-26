@@ -46,6 +46,12 @@ module fesom_main_storage_module
   use cpl_driver
 #endif
 
+! define recom module
+#if defined (__recom)
+  use recom_init_interface
+  use recom_interface
+#endif
+
   implicit none
     
   type :: fesom_main_storage_type
@@ -59,7 +65,10 @@ module fesom_main_storage_module
     real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing 
     real(kind=real32) :: rtime_setup_ice,  rtime_setup_other, rtime_setup_restart
     real(kind=real32) :: runtime_alltimesteps
-
+#if defined (__recom)
+    real(kind=WP)     :: t0_recom, t1_recom
+    real(kind=real32) :: rtime_setup_recom, rtime_compute_recom
+#endif
 
     type(t_mesh)   mesh
     type(t_tracer) tracers
@@ -89,6 +98,9 @@ end module
 !           this way FESOM can e.g. be used as a library with an external time loop driver
 !           used with IFS-FESOM
 module fesom_module
+#if defined  __ifsinterface
+  use, intrinsic :: ieee_exceptions
+#endif
   implicit none
   public fesom_init, fesom_runloop, fesom_finalize
   private
@@ -110,6 +122,15 @@ contains
         stop
       end if
 #endif
+
+!SUVI: disable overflow, underflow for entire model when used  in coupled with ifs
+!      bad practice, use it only in case of Emergency
+!#if defined  __ifsinterface
+!    call ieee_set_halting_mode(ieee_overflow, .false.)
+!    call ieee_set_halting_mode(ieee_underflow, .false.)
+!    call ieee_set_halting_mode(ieee_invalid, .false.)
+!#endif
+
       
       mpi_is_initialized = .false.
       f%fesom_did_mpi_init = .false.
@@ -124,9 +145,9 @@ contains
             f%fesom_did_mpi_init = .true.
         end if
 #endif
-    
 
 #if defined (__oasis)
+
         call cpl_oasis3mct_init(f%partit,f%partit%MPI_COMM_FESOM)
 #endif
         f%t1 = MPI_Wtime()
@@ -140,6 +161,8 @@ contains
         f%MPI_COMM_WORLD=>f%partit%MPI_COMM_WORLD
 
         f%npes          =>f%partit%npes
+
+
         if(f%mype==0) then
             write(*,*)
             print *,"FESOM2 git SHA: "//fesom_git_sha()
@@ -161,7 +184,7 @@ contains
         call mesh_setup(f%partit, f%mesh)
 
         if (f%mype==0) write(*,*) 'FESOM mesh_setup... complete'
-   
+
         !=====================
         ! Allocate field variables 
         ! and additional arrays needed for 
@@ -188,12 +211,21 @@ contains
         
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call tracer_init'//achar(27)//'[0m'
         call tracer_init(f%tracers, f%partit, f%mesh)                ! allocate array of ocean tracers (derived type "t_tracer")
-        
+
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call arrays_init'//achar(27)//'[0m'
         call arrays_init(f%tracers%num_tracers, f%partit, f%mesh)    ! allocate other arrays (to be refactured same as tracers in the future)
         
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ocean_setup'//achar(27)//'[0m'
         call ocean_setup(f%dynamics, f%tracers, f%partit, f%mesh)
+
+        ! recom setup
+#if defined (__recom)
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call recom_init'//achar(27)//'[0m'
+        f%t0_recom=MPI_Wtime()
+        call recom_init(f%tracers, f%partit, f%mesh) ! adjust values for recom tracers (derived type "t_tracer")
+        f%t1_recom=MPI_Wtime()
+        if (f%mype==0) write(*,*) 'RECOM recom_init... complete'
+#endif
 
         if (f%mype==0) then
            write(*,*) 'FESOM ocean_setup... complete'
@@ -218,7 +250,9 @@ contains
         endif
         
         if (f%mype==0) f%t5=MPI_Wtime()
+
         call compute_diagnostics(0, f%dynamics, f%tracers, f%ice, f%partit, f%mesh) ! allocate arrays for diagnostic
+        
         !---fwf-code-begin
         if(f%mype==0)  write(*,*) 'use_landice_water', use_landice_water
         if(use_landice_water) call landice_water_init(f%partit, f%mesh)
@@ -229,6 +263,7 @@ contains
         if(use_age_tracer) call age_tracer_init(f%partit, f%mesh)
         !---age-code-end
 #if defined (__oasis)
+
         call cpl_oasis3mct_define_unstr(f%partit, f%mesh)
 
         if(f%mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
@@ -274,6 +309,10 @@ contains
            f%rtime_setup_restart = real( f%t7 - f%t6              ,real32)
            f%rtime_setup_other   = real((f%t8 - f%t7) + (f%t6 - f%t5) ,real32)
 
+#if defined (__recom)
+           f%rtime_setup_recom   = real( f%t1_recom - f%t0_recom  ,real32)
+#endif
+
            write(*,*) '=========================================='
            write(*,*) 'MODEL SETUP took on mype=0 [seconds]      '
            write(*,*) 'runtime setup total      ',real(f%t8-f%t1,real32)      
@@ -282,7 +321,10 @@ contains
            write(*,*) ' > runtime setup forcing ',f%rtime_setup_forcing
            write(*,*) ' > runtime setup ice     ',f%rtime_setup_ice    
            write(*,*) ' > runtime setup restart ',f%rtime_setup_restart
-           write(*,*) ' > runtime setup other   ',f%rtime_setup_other 
+           write(*,*) ' > runtime setup other   ',f%rtime_setup_other
+#if defined (__recom)
+           write(*,*) ' > runtime setup recom   ',f%rtime_setup_recom
+#endif
             write(*,*) '============================================' 
         endif
 
@@ -332,6 +374,9 @@ contains
     f%rtime_write_means   = 0._WP
     f%rtime_compute_diag  = 0._WP
     f%rtime_read_forcing  = 0._WP
+#if defined (__recom)
+    f%rtime_compute_recom = 0._WP
+#endif
 
     f%from_nstep = 1
 
@@ -513,7 +558,7 @@ contains
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call update_atm_forcing(n)'//achar(27)//'[0m'
             f%t0_frc = MPI_Wtime()
             call update_atm_forcing(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
-            f%t1_frc = MPI_Wtime()       
+            f%t1_frc = MPI_Wtime()
             !___compute ice step________________________________________________
             if (f%ice%ice_steps_since_upd>=f%ice%ice_ave_steps-1) then
                 f%ice%ice_update=.true.
@@ -542,6 +587,15 @@ contains
         end if
         call before_oce_step(f%dynamics, f%tracers, f%partit, f%mesh) ! prepare the things if required
         f%t2 = MPI_Wtime()
+
+        !___now recom____________________________________________________
+#if defined (__recom)
+        if (f%mype==0 .and. n==1)  print *, achar(27)//'[46'  //'_____________________________________________________________'//achar(27)//'[0m'
+        if (f%mype==0 .and. n==1)  print *, achar(27)//'[46;1m'//'     --> call REcoM                                         '//achar(27)//'[0m'
+        f%t0_recom = MPI_Wtime()
+        call recom(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        f%t1_recom = MPI_Wtime()
+#endif
         
         !___model ocean step____________________________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_timestep_ale'//achar(27)//'[0m'
@@ -572,6 +626,9 @@ contains
         f%rtime_write_means   = f%rtime_write_means   + f%t5 - f%t4
         f%rtime_write_restart = f%rtime_write_restart + f%t6 - f%t5
         f%rtime_read_forcing  = f%rtime_read_forcing  + f%t1_frc - f%t0_frc
+#if defined (__recom)
+        f%rtime_compute_recom = f%rtime_compute_recom + f%t1_recom - f%t0_recom
+#endif
     end do
 !call cray_acc_set_debug_global_level(3)    
     f%from_nstep = f%from_nstep+current_nsteps
@@ -663,10 +720,20 @@ contains
     mean_rtime(11) = f%rtime_compute_diag
     mean_rtime(12) = f%rtime_write_means
     mean_rtime(13) = f%rtime_write_restart
-    mean_rtime(14) = f%rtime_read_forcing   
-    
+    mean_rtime(14) = f%rtime_read_forcing
+#if defined (__recom)
+    mean_rtime(15) = f%rtime_compute_recom
+#endif
     max_rtime(1:14) = mean_rtime(1:14)
     min_rtime(1:14) = mean_rtime(1:14)
+#if defined (__recom)
+    max_rtime(15) = mean_rtime(15)
+    min_rtime(15) = mean_rtime(15)
+    call MPI_AllREDUCE(MPI_IN_PLACE, mean_rtime(15), 1, MPI_REAL, MPI_SUM, f%MPI_COMM_FESOM, f%MPIerr)
+    mean_rtime(15) = mean_rtime(15) / real(f%npes,real32)
+    call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime(15),  1, MPI_REAL, MPI_MAX, f%MPI_COMM_FESOM, f%MPIerr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime(15),  1, MPI_REAL, MPI_MIN, f%MPI_COMM_FESOM, f%MPIerr)
+#endif
 
     call MPI_AllREDUCE(MPI_IN_PLACE, mean_rtime, 14, MPI_REAL, MPI_SUM, f%MPI_COMM_FESOM, f%MPIerr)
     mean_rtime(1:14) = mean_rtime(1:14) / real(f%npes,real32)
@@ -701,6 +768,9 @@ contains
         print 42, '  runtime restart:            ',    mean_rtime(13),    min_rtime(13),     max_rtime(13)
         print 42, '  runtime forcing:            ',    mean_rtime(14),    min_rtime(14),     max_rtime(14)
         print 42, '  runtime total (ice+oce):    ',    mean_rtime(9),     min_rtime(9),      max_rtime(9)
+#if defined (__recom)
+        print 42, '  runtime recom:              ',    mean_rtime(15),    min_rtime(15),     max_rtime(15)
+#endif
 
         43 format (a33,i15)        !Format Ncores
         44 format (a33,i15)        !Format OMP threads
