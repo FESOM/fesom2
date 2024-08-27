@@ -683,9 +683,9 @@ CONTAINS
       end do
          ! interpolate in time
          
-      if (partit%mype==0) then 
-        write(*,*) 'sbc_do --> mstep:',mstep, ' rdate=', rdate
-      end if 
+      !!PS if (partit%mype==0) then 
+      !!PS  write(*,*) 'sbc_do --> mstep:',mstep, ' rdate=', rdate
+      !!PS end if 
       call data_timeinterp(rdate, partit)
    END SUBROUTINE nc_sbc_ini
 
@@ -1577,9 +1577,9 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
     end if
 #endif
 
-      if (partit%mype==0) then 
-        write(*,*) 'sbc_do --> mstep:',mstep, ' rdate=', rdate
-      end if 
+      !!PS if (partit%mype==0) then 
+      !!PS   write(*,*) 'sbc_do --> mstep:',mstep, ' rdate=', rdate
+      !!PS end if 
 
       ! interpolate in time
       call data_timeinterp(rdate, partit)
