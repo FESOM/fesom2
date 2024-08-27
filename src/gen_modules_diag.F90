@@ -27,7 +27,7 @@ module diagnostics
             dens_flux_e, vorticity, zisotherm, tempzavg, saltzavg, vol_ice, vol_snow, compute_ice_diag, thetao,   &
             tuv, suv, compute_dvd, dvd_KK_tot, dvd_SD_tot, dvd_SD_chi_adv_h, dvd_SD_chi_adv_v, dvd_SD_chi_dif_he, &
             dvd_SD_chi_dif_heR, dvd_SD_chi_dif_hbh, dvd_SD_chi_dif_veR, dvd_SD_chi_dif_viR, dvd_SD_chi_dif_vi,    &
-            dvd_SD_chi_dif_ve, dvd_xdfac
+            dvd_SD_chi_dif_ve, dvd_SD_chi_dif_sbc, dvd_xdfac
 
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
@@ -69,7 +69,7 @@ module diagnostics
   real(kind=WP),  save, allocatable, target      :: dvd_KK_tot(:,:,:), dvd_SD_tot(:,:,:), dvd_SD_chi_adv_h(:,:,:), &
                                                     dvd_SD_chi_adv_v( :,:,:), dvd_SD_chi_dif_heR(:,:,:), dvd_SD_chi_dif_veR(:,:,:), &
                                                     dvd_SD_chi_dif_viR(:,:,:), dvd_SD_chi_dif_vi(:,:,:), dvd_SD_chi_dif_hbh(:,:,:), &
-                                                    dvd_SD_chi_dif_ve(:,:,:), dvd_SD_chi_dif_he(:,:,:), trstar(:,:)
+                                                    dvd_SD_chi_dif_ve(:,:,:), dvd_SD_chi_dif_he(:,:,:), dvd_SD_chi_dif_sbc(:,:,:), trstar(:,:)
   real(kind=WP),  parameter                      :: dvd_xdfac=0.5_WP  ! Xchi distribution factor, default distribute 
                                                                       ! equal amount (50:50) of xchi on both side of face
   !_____________________________________________________________________________
@@ -1047,13 +1047,14 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
     if (firstcall) then  !allocate the stuff at the first call
-        allocate(trstar( nl-1, myDim_nod2D+eDim_nod2D))
-        allocate(dvd_KK_tot(       nl-1, myDim_nod2D+eDim_nod2D, 2))
-        allocate(dvd_SD_tot(       nl-1, myDim_nod2D+eDim_nod2D, 2))
-        allocate(dvd_SD_chi_adv_h( nl-1, myDim_nod2D+eDim_nod2D, 2))
-        allocate(dvd_SD_chi_adv_v( nl-1, myDim_nod2D+eDim_nod2D, 2))
-        allocate(dvd_SD_chi_dif_he(nl-1, myDim_nod2D+eDim_nod2D, 2))
-        allocate(dvd_SD_chi_dif_vi(nl-1, myDim_nod2D+eDim_nod2D, 2))
+        allocate(trstar(                nl-1, myDim_nod2D+eDim_nod2D))
+        allocate(dvd_KK_tot(            nl-1, myDim_nod2D+eDim_nod2D, 2))
+        allocate(dvd_SD_tot(            nl-1, myDim_nod2D+eDim_nod2D, 2))
+        allocate(dvd_SD_chi_adv_h(      nl-1, myDim_nod2D+eDim_nod2D, 2))
+        allocate(dvd_SD_chi_adv_v(      nl-1, myDim_nod2D+eDim_nod2D, 2))
+        allocate(dvd_SD_chi_dif_he(     nl-1, myDim_nod2D+eDim_nod2D, 2))
+        allocate(dvd_SD_chi_dif_vi(     nl-1, myDim_nod2D+eDim_nod2D, 2))
+        allocate(dvd_SD_chi_dif_sbc(    nl-1, myDim_nod2D+eDim_nod2D, 2))
         if (tracers%data(1)%smooth_bh_tra) then
             allocate(dvd_SD_chi_dif_hbh(nl-1, myDim_nod2D+eDim_nod2D, 2))
         end if 
@@ -1078,6 +1079,7 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
     dvd_SD_chi_adv_v  = 0.0_WP
     dvd_SD_chi_dif_he = 0.0_WP 
     dvd_SD_chi_dif_vi = 0.0_WP ! implicite part
+    dvd_SD_chi_dif_sbc= 0.0_WP ! implicite part
     if (tracers%data(1)%smooth_bh_tra) then
         dvd_SD_chi_dif_hbh= 0.0_WP 
     end if 
@@ -1162,6 +1164,8 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
         
         call dvd_add_difflux_vertimpl(.false., tr_num, dvd_KK_tot, tr, trold, Kv, partit, mesh)
         
+        call dvd_add_difflux_sbc(.false., tr_num, dvd_KK_tot, tr, trold, partit, mesh)
+        
         ! add contribution from horizontal biharmonic diffusion flux if applied
         if (tracers%data(tr_num)%smooth_bh_tra) then
             call dvd_add_difflux_bhvisc(.false., tr_num, dvd_KK_tot, tr, trold,& 
@@ -1203,6 +1207,8 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
         
         call dvd_add_difflux_vertimpl(.true., tr_num, dvd_SD_chi_dif_vi, tr, trstar, Kv, partit, mesh)
         
+        call dvd_add_difflux_sbc(.true., tr_num, dvd_SD_chi_dif_sbc, tr, trstar, partit, mesh)
+        
         ! add contribution from horizontal biharmonic diffusion flux if applied
         if (tracers%data(tr_num)%smooth_bh_tra) then
             call dvd_add_difflux_bhvisc(.true., tr_num, dvd_SD_chi_dif_hbh, tr, trstar,& 
@@ -1211,8 +1217,10 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
         end if 
         
         ! compute total Xchi 
-        dvd_SD_tot(:,:,tr_num) = dvd_SD_chi_adv_h( :,:,tr_num) + dvd_SD_chi_adv_v(  :,:,tr_num) + &
-                                 dvd_SD_chi_dif_vi(:,:,tr_num) + dvd_SD_chi_dif_he(:,:,tr_num)
+        dvd_SD_tot(:,:,tr_num) = dvd_SD_chi_adv_h(  :,:,tr_num) + dvd_SD_chi_adv_v( :,:,tr_num) + &
+                                 dvd_SD_chi_dif_vi( :,:,tr_num) + dvd_SD_chi_dif_he(:,:,tr_num) + &
+                                 dvd_SD_chi_dif_sbc(:,:,tr_num)
+                                 
         if (.not. tracers%data(tr_num)%i_vert_diff) then 
             dvd_SD_tot(:,:,tr_num) = dvd_SD_tot(:,:,tr_num) + dvd_SD_chi_dif_ve(:,:,tr_num)
         end if 
@@ -2793,14 +2801,11 @@ subroutine dvd_add_difflux_vertimpl(do_SDdvd, tr_num, dvd_tot, tr, trstar, Kv, p
         real(kind=WP) , intent(in)             :: Kv(     mesh%nl  , partit%myDim_nod2D+partit%eDim_nod2D)
         integer                                :: node, nz, nu1, nl1
         real(kind=WP)                          :: tr_up, tr_dwn, Dflx(mesh%nl), dzup, dzdwn, dz, Kv_R
-        real(kind=WP)                          :: isredi=0.0_WP, sbc, rsss
+        real(kind=WP)                          :: sbc, rsss
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"    
-    
-    ! add contribution of redi diffusivity when activated
-    if (Redi) isredi=1.0_WP
     
     ! add contribution of implicite vertical diffusion (after Klingbeil et al.2014)
     do node=1, myDim_nod2D
@@ -2872,83 +2877,7 @@ subroutine dvd_add_difflux_vertimpl(do_SDdvd, tr_num, dvd_tot, tr, trstar, Kv, p
                 dvd_tot(nz, node, tr_num) = dvd_tot(nz, node, tr_num) + (dvd_xdfac*Dflx(nz)+(1.0_WP-dvd_xdfac)*Dflx(nz+1))/(areasvol(nz, node)*hnode(nz, node))
             end do !--> do nz=nu1+1, nl1-1
         else
-            !___________________________________________________________________
-            ! apply surface boundary condition --> have to do this here from hand -->
-            ! i was somehow not able to bind in the function module for the surface 
-            ! boundary condition
-            ! d/dt(h*T) + div_h*(u*h*T) + h*d/dz(w*T) - div_3(h*Kv*div_3*T) = -(Q_hf + W*T_w)_k=1
-            !     |
-            ! need eq. for 2nd. moment    
-            ! tracer thickness variance
-            !     |
-            !     V
-            ! d/dt(h*T^2) = T*d/dt(h*T) + h*T*d/dt(T)+
-            !                                      |
-            !     +-------eq. for d/dt(T)----------+
-            !     |
-            ! d/dt(T) + div_h*(u*T) + d/dz(w*T) - div_3(Kv*div_3*T) = -(Q_hf + W*(T_w-T_k))_k=1 / h_k
-            !
-            ! d/dt(h*T^2) + div*(u*h*T^2) + h*d/dz(w*T^2) - ... = (-2*T_k*Q_hf - W*T_w*T_k - W*T_k*(T_w-T_k) )_k=1
-            !                                                   = 2*(-T_k*Q_hf - 0.5*W*T_w*T_k - 0.5*W*T_k*(T_w-T_k) )_k=1
-            ! --> temp: T_w=T_k --> 2*(-T_k*Q_hf - 0.5*W*T_w*T_k)
-            ! --> salt: T_w=0   --> 2*(-T_k*Q_hf + 0.5*W*T_w*T_k)
-            nz = nu1
-            if     (tr_num==1) then 
-                sbc = -(heat_flux(node)/vcpw + tr(nz, node)*water_flux(node)*is_nonlinfs*0.5_WP)
-            elseif (tr_num==2) then 
-                sbc =  (virtual_salt(node) + relax_salt(node) - (real_salt_flux(node) - tr(nz, node)*water_flux(node)*0.5_WP)*is_nonlinfs)
-            end if 
-            Dflx(nz) = Dflx(nz) + sbc*area(nz, node)
-            
-            !___________________________________________________________________
-            ! apply shortwave penetration fluxes
-            if (use_sw_pene .and. tr_num==1) then
-                nz=nu1
-                Dflx(nz) = Dflx(nz) + sw_3d(nz, node)*area(nz,node)
-                do nz=nu1+1, nl1-1
-                    Dflx(nz) = Dflx(nz) + sw_3d(nz, node)*area(nz,node) 
-                end do
-            end if
-            
-            !___________________________________________________________________
-            ! Add KPP nonlocal fluxes to the rhs (only T and S currently)
-            ! use here blmc or kpp_oblmixc instead of Kv, since Kv already contains
-            ! at this point the mixing enhancments from momix, instable
-            ! mixing or windmixing which are to much for nonlocal
-            ! transports and lead to instability of the model
-            if (use_kpp_nonlclflx) then
-                if (tr_num==2) then
-                    rsss=ref_sss
-                    if (ref_sss_local) rsss=tr(1,node)
-                end if
 
-                !_______________________________________________________________
-                ! use fesom1.4 KPP
-                if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
-                    if     (tr_num==1) then ! temperature
-                        do nz=nu1+1, nl1-1
-                            Dflx(nz) = Dflx(nz) + MIN(ghats(nz, node)*blmc(nz, node, 2), 1.0_WP)*heat_flux(node)/vcpw*area(nz, node) 
-                        end do
-                    elseif (tr_num==2) then ! salinity
-                        do nz=nu1+1, nl1-1
-                            Dflx(nz) = Dflx(nz) + MIN(ghats(nz, node)*blmc(nz, node, 3), 1.0_WP)*rsss*water_flux(node)*area(nz, node) 
-                        end do
-                    end if
-                !_______________________________________________________________
-                ! use cvmix KPP
-                elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
-                    if     (tr_num==1) then ! temperature
-                        do nz=nu1+1, nl1-1
-                            Dflx(nz) = Dflx(nz) + MIN(kpp_nonlcltranspT(nz, node)*kpp_oblmixc(nz, node, 2), 1.0_WP)*heat_flux(node)/vcpw*area(nz, node) 
-                        end do
-                    elseif (tr_num==2) then ! salinity
-                        do nz=nu1+1, nl1-1
-                            Dflx(nz) = Dflx(nz) + MIN(kpp_nonlcltranspT(nz, node)*kpp_oblmixc(nz, node, 3), 1.0_WP)*rsss*water_flux(node)*area(nz, node) 
-                        end do
-                    end if    
-                end if
-            end if ! --> if (use_kpp_nonlclflx) then
-            
             !___________________________________________________________________
             ! compute diffusive flux flxdiff(nz), after Klingbeil etal 2014
             ! flxdiff(nz)= ([Kv*dT/dz]_1*T_1*A_1-[Kv*dT/dz]_1*T_1*A_2)/V_1 into the volume 
@@ -2993,6 +2922,173 @@ subroutine dvd_add_difflux_vertimpl(do_SDdvd, tr_num, dvd_tot, tr, trstar, Kv, p
         end if 
     end do !--> do node=1, myDim_nod2D
 end subroutine dvd_add_difflux_vertimpl
+!
+!
+!_______________________________________________________________________________
+! add implicite vertical diffusive flux for surface boundary condition after 
+! Klingbeil et al. 2014, see between eq. 18 
+! ans eq. 20 --> or eq. 24
+! Xchi^(n+1) =  ...+ (2*Tr^(n+1) * Dflx[Tr^(n+1)] )/ V^(n+1) +...
+! --> here Tr^(n+1) und Dflx[...] are reconstructed values at the interfase
+subroutine dvd_add_difflux_sbc(do_SDdvd, tr_num, dvd_tot, tr, trstar, partit, mesh)
+    use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
+    implicit none
+        type(t_partit), intent(inout), target  :: partit
+        type(t_mesh)  , intent(in)   , target  :: mesh
+        integer       , intent(in)             :: tr_num
+        logical       , intent(in)             :: do_SDdvd ! if Sergey DVD==1, if Knut DvD==0
+        real(kind=WP) , intent(inout)          :: dvd_tot(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D, 2)
+        real(kind=WP) , intent(in)             :: tr(     mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+        real(kind=WP) , intent(in)             :: trstar( mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+        integer                                :: node, nz, nu1, nl1
+        real(kind=WP)                          :: tr_up, tr_dwn, Dflx(mesh%nl), dzup, dzdwn, dz, Kv_R
+        real(kind=WP)                          :: sbc, rsss
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"    
+    
+    ! add contribution of implicite vertical diffusion (after Klingbeil et al.2014)
+    do node=1, myDim_nod2D
+        nu1  = ulevels_nod2D(node) 
+        nl1  = nlevels_nod2D(node)
+        Dflx = 0.0_WP
+        
+        !_______________________________________________________________________
+        ! apply apply surface boundarie condition
+        nz = nu1
+        if     (tr_num==1) then 
+            sbc = -(heat_flux(node)/vcpw + tr(nz, node)*water_flux(node)*is_nonlinfs*0.5_WP)
+        elseif (tr_num==2) then 
+                sbc =  (virtual_salt(node) + relax_salt(node) - (real_salt_flux(node) - tr(nz, node)*water_flux(node)*0.5_WP)*is_nonlinfs)
+        end if 
+        Dflx(nz) = Dflx(nz) + sbc*area(nz, node)
+            
+        !_______________________________________________________________________
+        ! apply shortwave penetration fluxes
+        if (use_sw_pene .and. tr_num==1) then
+            nz=nu1
+            Dflx(nz) = Dflx(nz) + sw_3d(nz, node)*area(nz,node)
+            do nz=nu1+1, nl1-1
+                Dflx(nz) = Dflx(nz) + sw_3d(nz, node)*area(nz,node) 
+            end do
+        end if
+            
+        !_______________________________________________________________________
+        ! Add KPP nonlocal fluxes to the rhs (only T and S currently)
+        ! use here blmc or kpp_oblmixc instead of Kv, since Kv already contains
+        ! at this point the mixing enhancments from momix, instable
+        ! mixing or windmixing which are to much for nonlocal
+        ! transports and lead to instability of the model
+        if (use_kpp_nonlclflx) then
+            if (tr_num==2) then
+                rsss=ref_sss
+                if (ref_sss_local) rsss=tr(1,node)
+            end if
+            !___________________________________________________________________
+            ! use fesom1.4 KPP
+            if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
+                if     (tr_num==1) then ! temperature
+                    do nz=nu1+1, nl1-1
+                        Dflx(nz) = Dflx(nz) + MIN(ghats(nz, node)*blmc(nz, node, 2), 1.0_WP)*heat_flux(node)/vcpw*area(nz, node) 
+                    end do
+                elseif (tr_num==2) then ! salinity
+                    do nz=nu1+1, nl1-1
+                        Dflx(nz) = Dflx(nz) + MIN(ghats(nz, node)*blmc(nz, node, 3), 1.0_WP)*rsss*water_flux(node)*area(nz, node) 
+                    end do
+                end if
+            !___________________________________________________________________
+            ! use cvmix KPP
+            elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
+                if     (tr_num==1) then ! temperature
+                    do nz=nu1+1, nl1-1
+                        Dflx(nz) = Dflx(nz) + MIN(kpp_nonlcltranspT(nz, node)*kpp_oblmixc(nz, node, 2), 1.0_WP)*heat_flux(node)/vcpw*area(nz, node) 
+                    end do
+                elseif (tr_num==2) then ! salinity
+                    do nz=nu1+1, nl1-1
+                        Dflx(nz) = Dflx(nz) + MIN(kpp_nonlcltranspT(nz, node)*kpp_oblmixc(nz, node, 3), 1.0_WP)*rsss*water_flux(node)*area(nz, node) 
+                    end do
+                end if    
+            end if
+        end if ! --> if (use_kpp_nonlclflx) then
+        
+        !_______________________________________________________________________
+        if (do_SDdvd) then 
+            ! --> if Sergey diagonsitc is used Dflx correspond from here on to 
+            !     Xchi at full depth level interface
+            nz = 1 
+            Dflx(nz) = Dflx(nz) * -2.0_WP*( trstar(nz, node) )
+            do nz=nu1+1, nl1-1
+                Dflx(nz) = Dflx(nz) * -2.0_WP*( trstar(nz, node)-trstar(nz-1, node) )
+            end do ! --> do nz=nu1+1, nl1-1
+        end if 
+        
+        !_______________________________________________________________________
+        ! decide between Sergeys and Knuts DVD method
+        if (do_SDdvd) then 
+            !___________________________________________________________________
+            ! In Sergeys DVD diagnostic we do not take into account the surface 
+            ! and interior fluxes of surface boundary condition and short wave 
+            ! penetration, since akthough they are source terms for variance, 
+            ! they not contribute to the decay variance !!!
+            ! If they arte considered than only in a separate term but not added
+            ! to the variance decay term of diffusivity. However in Knuts DVD |
+            ! diagnostic this is different. Here the source term have to be explicitly 
+            ! taken into account since they already contributed to (T^(n+1))^2-(T^(n))^2
+            
+            ! now compute flx of Xchi into control volume, see T. Banerjee et al. 2023
+            ! eq. 9. Each control volume gets one half of the Xchi interface value 
+            ! --> keep in mind we are now again on mid depth levels and in this case
+            !     Dflx contains the interface value of Xchi
+            ! --> compute volume normlized Xchi contribution
+            do nz=nu1, nl1-1
+                dvd_tot(nz, node, tr_num) = dvd_tot(nz, node, tr_num) + (dvd_xdfac*Dflx(nz)+(1.0_WP-dvd_xdfac)*Dflx(nz+1))/(areasvol(nz, node)*hnode(nz, node))
+            end do !--> do nz=nu1+1, nl1-1
+        else
+            !___________________________________________________________________
+            ! compute diffusive flux flxdiff(nz), after Klingbeil etal 2014
+            ! flxdiff(nz)= ([Kv*dT/dz]_1*T_1*A_1-[Kv*dT/dz]_1*T_1*A_2)/V_1 into the volume 
+            ! surface
+            nz     = nu1
+            tr_up  = Dflx(nz  )*tr(nz, node)
+            tr_dwn = (tr(nz, node)*hnode(nz, node)+tr(nz+1, node)*hnode(nz+1, node))/(hnode(nz, node)+hnode(nz+1, node))
+            tr_dwn = Dflx(nz+1)*tr_dwn
+            dvd_tot(nz, node, tr_num) = dvd_tot(nz, node, tr_num) + 2.0_WP*(tr_up-tr_dwn)/(areasvol(nz, node)*hnode(nz, node))
+            
+            !___________________________________________________________________
+            ! bulk
+            do nz=nu1+1, nl1-2
+                ! volume (hnode) weighted temperature reconstruction at upper/lower
+                ! scalar cell interface
+                tr_up  = (tr(nz-1, node)*hnode(nz-1, node)+tr(nz  , node)*hnode(nz  , node))/(hnode(nz-1, node)+hnode(nz  , node))
+                tr_dwn = (tr(nz  , node)*hnode(nz  , node)+tr(nz+1, node)*hnode(nz+1, node))/(hnode(nz  , node)+hnode(nz+1, node))
+                ! compute  T^(n+1)_(i+0.5) * Dflx_(i+0.5) through upper and lower face
+                tr_up  =  Dflx(nz  )*tr_up 
+                tr_dwn =  Dflx(nz+1)*tr_dwn
+                ! copute dvd contribution normalized with volume 
+                dvd_tot(nz, node, tr_num) = dvd_tot(nz, node, tr_num) + 2.0_WP*(tr_up-tr_dwn)/(areasvol(nz, node)*hnode(nz, node))
+                !                                                     |    |-> factor 2 comes here from Klingbeil et al.2014
+                !                                      this is the    |         (2*Tr^(n+1) * Dflx[Tr^(n+1)] 
+                !                                   +----plus sign----+
+                !                                   |
+                !                                   v
+                !  Xchi = -d/dt(Tr^2) - div(v*Tr^2) + div(Kv*nabla*Tr^2)
+                !   |
+                !   v
+                !  Kv*(nabla*Tr)^2
+            end do !--> do nz=nu1+1, nl1-1
+            
+            !___________________________________________________________________
+            ! bottom
+            nz     = nl1-1
+            tr_up  = (tr(nz-1, node)*hnode(nz-1, node)+tr(nz  , node)*hnode(nz  , node))/(hnode(nz-1, node)+hnode(nz  , node))
+            tr_dwn = tr(nz, node)
+            tr_up  = Dflx(nz  )*tr_up
+            tr_dwn = 0.0_WP
+            dvd_tot(nz, node, tr_num) = dvd_tot(nz, node, tr_num) + 2.0_WP*(tr_up-tr_dwn)/(areasvol(nz, node)*hnode(nz, node))
+        end if 
+    end do !--> do node=1, myDim_nod2D
+end subroutine dvd_add_difflux_sbc
 !
 !
 !_______________________________________________________________________________
