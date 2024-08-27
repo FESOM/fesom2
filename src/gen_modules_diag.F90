@@ -19,15 +19,19 @@ module diagnostics
   implicit none
 
   private
-  public :: ldiag_solver, lcurt_stress_surf, ldiag_Ri, ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD,        &
-            ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, ldiag_vorticity, ldiag_extflds, ldiag_ice,   &
-            compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, shear, Ri, KvdTdZ, KvdSdZ,   & 
-            std_dens_min, std_dens_max, std_dens_N, std_dens, ldiag_trflx,                           &
-            std_dens_UVDZ, std_dens_DIV, std_dens_DIV_fer, std_dens_Z, std_dens_H, std_dens_dVdT, std_dens_flux,       &
+  public :: ldiag_solver, lcurt_stress_surf, ldiag_Ri, ldiag_TurbFlux, ldiag_dMOC,                                &
+            ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, ldiag_vorticity, ldiag_extflds, ldiag_ice,      &
+            compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, shear, Ri, KvdTdZ, KvdSdZ,                & 
+            std_dens_min, std_dens_max, std_dens_N, std_dens, ldiag_trflx,                                        &
+            std_dens_UVDZ, std_dens_DIV, std_dens_DIV_fer, std_dens_Z, std_dens_H, std_dens_dVdT, std_dens_flux,  &
             dens_flux_e, vorticity, zisotherm, tempzavg, saltzavg, vol_ice, vol_snow, compute_ice_diag, thetao,   &
-            tuv, suv, compute_dvd, dvd_KK_tot, dvd_SD_tot, dvd_SD_chi_adv_h, dvd_SD_chi_adv_v, dvd_SD_chi_dif_he, &
+            tuv, suv,                                                                                             &
+            ldiag_DVD, compute_dvd, dvd_KK_tot, dvd_SD_tot, dvd_SD_chi_adv_h, dvd_SD_chi_adv_v, dvd_SD_chi_dif_he,&
             dvd_SD_chi_dif_heR, dvd_SD_chi_dif_hbh, dvd_SD_chi_dif_veR, dvd_SD_chi_dif_viR, dvd_SD_chi_dif_vi,    &
-            dvd_SD_chi_dif_ve, dvd_SD_chi_dif_sbc, dvd_xdfac
+            dvd_SD_chi_dif_ve, dvd_SD_chi_dif_sbc, dvd_xdfac,                                                     &
+            ldiag_uvw_sqr, uv2, wvel2,                                                                            &
+            ldiag_trgrd_xyz, trgrd_x, trgrd_y, trgrd_z
+             
 
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
@@ -63,7 +67,9 @@ module diagnostics
   real(kind=WP),  save, allocatable, target      :: dens_flux_e(:)
   real(kind=WP),  save, allocatable, target      :: thetao(:) ! sst in K
   real(kind=WP),  save, allocatable, target      :: tuv(:,:,:), suv(:,:,:)
-
+  real(kind=WP),  save, allocatable, target      :: uv2(:,:,:), wvel2(:,:)
+  real(kind=WP),  save, allocatable, target      :: trgrd_x(:,:,:), trgrd_y(:,:,:), trgrd_z(:,:,:)
+  
   !_____________________________________________________________________________
   ! DVD diagnostics
   real(kind=WP),  save, allocatable, target      :: dvd_KK_tot(:,:,:), dvd_SD_tot(:,:,:), dvd_SD_chi_adv_h(:,:,:), &
@@ -95,10 +101,12 @@ module diagnostics
   logical                                       :: ldiag_extflds    =.false.
   logical                                       :: ldiag_ice        =.false.
   logical                                       :: ldiag_trflx      =.false.
+  logical                                       :: ldiag_uvw_sqr    =.false.
+  logical                                       :: ldiag_trgrd_xyz  =.false.
   
   namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_Ri, & 
                        ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, &
-                       ldiag_vorticity, ldiag_extflds, ldiag_trflx, ldiag_ice
+                       ldiag_vorticity, ldiag_extflds, ldiag_trflx, ldiag_ice, ldiag_uvw_sqr, ldiag_trgrd_xyz
   
   contains
 
@@ -964,8 +972,153 @@ subroutine compute_thetao(mode, tracers, partit, mesh)
   !skipping loop 
   thetao(:) = tracers%data(1)%values(1,1:myDim_nod2D)+273.15_WP 
 end subroutine compute_thetao
+!
+!
+!
+!_______________________________________________________________________________
+subroutine diag_uvw_sqr(mode, dynamics, partit, mesh)
+    implicit none
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    integer,        intent(in)            :: mode
+    logical,        save                     :: firstcall=.true.
+    integer                                  :: elem, node, nz, nzu, nzl, elnodes(3)
+    real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
+    real(kind=WP), dimension(:,:),   pointer :: Wvel, fer_Wvel
 
-! ==============================================================
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    !___________________________________________________________________________
+    UV     => dynamics%uv(:,:,:)
+    Wvel   => dynamics%w(:,:)
+    if (Fer_GM) then
+        fer_UV     => dynamics%fer_uv(:,:,:)
+        fer_Wvel   => dynamics%fer_w(:,:)
+    end if
+    
+    !___________________________________________________________________________
+    if (firstcall) then !allocate the stuff at the first call
+        allocate(uv2(2,nl-1,myDim_elem2D))
+        allocate(wvel2(nl-1,myDim_nod2D))
+        uv2 = 0.0_WP
+        wvel2 = 0.0_WP
+        firstcall=.false.
+        if (mode==0) return
+    end if
+
+    !___________________________________________________________________________
+    ! compute squared horizontal velocities
+    do elem=1,myDim_elem2D
+        nzu     = ulevels(elem)
+        nzl     = nlevels(elem)-1
+        if (Fer_GM) then
+            do nz=nzu, nzl
+                uv2(1,nz,elem) = (UV(1,nz,elem) + fer_UV(1,nz, elem))
+                uv2(2,nz,elem) = (UV(2,nz,elem) + fer_UV(2,nz, elem))
+                uv2(1,nz,elem) = uv2(1,nz,elem) * uv2(1,nz,elem)
+                uv2(2,nz,elem) = uv2(2,nz,elem) * uv2(2,nz,elem)
+            end do
+        else
+            do nz=nzu, nzl
+                uv2(1,nz,elem) = UV(1,nz,elem)*UV(1,nz,elem)
+                uv2(2,nz,elem) = UV(2,nz,elem)*UV(2,nz,elem)
+            end do
+        end if
+    end do
+    
+    !___________________________________________________________________________
+    ! compute squared vertical velocities
+    do node=1,myDim_nod2D
+        nzu     = ulevels_nod2D(node)
+        nzl     = nlevels_nod2D(node)-1
+        if (Fer_GM) then
+            do nz=nzu, nzl
+                wvel2(nz,node) = (Wvel(nz,node) + fer_Wvel(nz, node))
+                wvel2(nz,node) = wvel2(nz,node) * wvel2(nz,node)
+            end do
+        else
+            do nz=nzu, nzl
+                wvel2(nz,node) = Wvel(nz,node)*Wvel(nz,node)
+            end do
+        end if
+    end do
+end subroutine diag_uvw_sqr
+
+!
+!
+!
+!_______________________________________________________________________________
+subroutine diag_trgrd_xyz(mode, tracers, partit, mesh)
+    implicit none
+    type(t_tracer), intent(in)   , target  :: tracers
+    type(t_partit), intent(inout), target  :: partit
+    type(t_mesh)  , intent(in)   , target  :: mesh
+    integer,        intent(in)             :: mode
+    logical,        save                   :: firstcall=.true.
+    integer                                :: elem, node, nz, nzu, nzl, elnodes(3)
+    real(kind=WP), dimension(:,:), pointer :: temp, salt
+    
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    !___________________________________________________________________________
+    temp   => tracers%data(1)%values(:,:)
+    salt   => tracers%data(2)%values(:,:)    
+    
+    !___________________________________________________________________________
+    if (firstcall) then !allocate the stuff at the first call
+        allocate(trgrd_x(2, nl-1, myDim_elem2D))
+        allocate(trgrd_y(2, nl-1, myDim_elem2D))
+        allocate(trgrd_z(2, nl-1, myDim_nod2D))
+        trgrd_x = 0.0_WP
+        trgrd_y = 0.0_WP
+        trgrd_z = 0.0_WP
+        firstcall=.false.
+        if (mode==0) return
+    end if
+
+    !___________________________________________________________________________
+    ! compute vertical tracer gradient
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzu, nzl)
+    do node=1, myDim_nod2D
+        nzl=nlevels_nod2D(node)
+        nzu=ulevels_nod2D(node)
+        trgrd_z(1, nzu, node)=0.0_WP
+        trgrd_z(2, nzu, node)=0.0_WP
+        do nz=nzu+1, nzl-1
+            trgrd_z(1, nz, node)=(temp(nz-1, node)-temp(nz, node))/(hnode(nz-1, node)+hnode(nz, node))/0.5_WP
+            trgrd_z(2, nz, node)=(salt(nz-1, node)-salt(nz, node))/(hnode(nz-1, node)+hnode(nz, node))/0.5_WP
+        end do
+        trgrd_z(1, nzl, node)=0.0_WP
+        trgrd_z(2, nzl, node)=0.0_WP
+    end do
+!$OMP END PARALLEL DO
+    
+    !___________________________________________________________________________
+    ! compute horizontal tracer gradient
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzu, nzl)    
+    do elem=1,myDim_elem2D
+        nzu     = ulevels(elem)
+        nzl     = nlevels(elem)
+        elnodes = elem2D_nodes(:,elem)
+        do nz=nzu, nzl-1
+            trgrd_x(1, nz, elem)=sum(gradient_sca(1:3, elem)*temp(nz, elnodes))
+            trgrd_y(1, nz, elem)=sum(gradient_sca(4:6, elem)*temp(nz, elnodes))
+            trgrd_x(2, nz, elem)=sum(gradient_sca(1:3, elem)*salt(nz, elnodes))
+            trgrd_y(2, nz, elem)=sum(gradient_sca(4:6, elem)*salt(nz, elnodes))
+        end do
+    end do
+!$OMP END PARALLEL DO    
+end subroutine diag_trgrd_xyz
+
+!
+!
+!
+!_______________________________________________________________________________
 subroutine compute_diagnostics(mode, dynamics, tracers, ice, partit, mesh)
   implicit none
   type(t_mesh)  , intent(in)   , target :: mesh
@@ -1017,9 +1170,15 @@ subroutine compute_diagnostics(mode, dynamics, tracers, ice, partit, mesh)
   ! Discrete variance decay in Finite-Volume framework ...
   ! T. Banerjee, S. Danilov, K. Klingbeil, 2023, Discrete variance decay analysis of 
   ! spurious mixing
-  if (ldiag_DVD)     call compute_dvd(mode, dynamics, tracers, partit, mesh)
+  if (ldiag_DVD)         call compute_dvd(mode, dynamics, tracers, partit, mesh)
  
-  !fields required for for destinE
+  ! 12. compute squared velocities for varaince computation .
+  if (ldiag_uvw_sqr)     call diag_uvw_sqr(mode, dynamics, partit, mesh)
+  
+  ! 13. compute online tracer gradients
+  if (ldiag_trgrd_xyz)   call diag_trgrd_xyz(mode, tracers, partit, mesh)
+  
+  ! 14. compute fields required for for destinE
   if (ldiag_ice)         call compute_ice_diag(mode, ice, partit, mesh)
   
   call compute_thetao(mode, tracers, partit, mesh) 
