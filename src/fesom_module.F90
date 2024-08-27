@@ -483,13 +483,13 @@ end if
             if (f%ice%ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh)  
 
             
-            !! LA commented for debugging
-            !! --------------
-            !! LA icebergs: 2023-05-17 
-            !if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
-            !    call icb2fesom(f%mesh, f%partit, f%ice)
-            !end if
-            !! --------------
+            ! LA commented for debugging
+            ! --------------
+            ! LA icebergs: 2023-05-17 
+            if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
+                call icb2fesom(f%mesh, f%partit, f%ice)
+            end if
+            ! --------------
 
 
             !___compute fluxes to the ocean: heat, freshwater, momentum_________

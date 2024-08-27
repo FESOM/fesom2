@@ -565,18 +565,18 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     end if 
     
     !___________________________________________________________________________
-    if (use_icebergs) then
-        call integrate_nod(runoff, net, partit, mesh)
-        if (mype==0) write(*,*) "LA DEBUG: runoff: ",net
-        call integrate_nod(flux, net, partit, mesh)
-        if (mype==0) write(*,*) "LA DEBUG: flux pre icb: ",net
-        call icb2fesom(mesh, partit, ice)
-        !if (.not.turn_off_fw) then
-        !    flux = flux + (ibfwb + ibfwe + ibfwl + ibfwbv) !* steps_per_ib_step
-        !end if
-        call integrate_nod(ibfwb + ibfwe + ibfwl + ibfwbv, net, partit, mesh)
-        if (mype==0) write(*,*) "LA DEBUG: flux icb: ",net
-    end if
+    !if (use_icebergs) then
+    !    call integrate_nod(runoff, net, partit, mesh)
+    !    if (mype==0) write(*,*) "LA DEBUG: runoff: ",net
+    !    call integrate_nod(flux, net, partit, mesh)
+    !    if (mype==0) write(*,*) "LA DEBUG: flux pre icb: ",net
+    !    call icb2fesom(mesh, partit, ice)
+    !    !if (.not.turn_off_fw) then
+    !    !    flux = flux + (ibfwb + ibfwe + ibfwl + ibfwbv) !* steps_per_ib_step
+    !    !end if
+    !    call integrate_nod(ibfwb + ibfwe + ibfwl + ibfwbv, net, partit, mesh)
+    !    if (mype==0) write(*,*) "LA DEBUG: flux icb: ",net
+    !end if
 
     !___________________________________________________________________________
     ! compute total global net freshwater flux into the ocean 
