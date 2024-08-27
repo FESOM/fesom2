@@ -45,7 +45,7 @@ type(t_partit), intent(inout), target :: partit
         do i=1,3
             iceberg_node=elem2d_nodes(i,localelement)
 
-            if (iceberg_node>0) then
+            if (iceberg_node<=mydim_nod2d) then
                 ib_nods_in_ib_elem(i)   = iceberg_node
                 num_ib_nods_in_ib_elem  = num_ib_nods_in_ib_elem + 1
                 tot_area_nods_in_ib_elem= tot_area_nods_in_ib_elem + mesh%area(1,iceberg_node)
@@ -57,7 +57,7 @@ type(t_partit), intent(inout), target :: partit
         do i=1, 3
             iceberg_node=ib_nods_in_ib_elem(i)
 
-            if (iceberg_node<=mydim_nod2d) then
+            if (iceberg_node>0) then
                 ibfwbv(iceberg_node) = ibfwbv(iceberg_node) - fwbv_flux_ib(ib) / tot_area_nods_in_ib_elem
                 ibfwb(iceberg_node) = ibfwb(iceberg_node) - fwb_flux_ib(ib) / tot_area_nods_in_ib_elem
                 ibfwl(iceberg_node) = ibfwl(iceberg_node) - fwl_flux_ib(ib) / tot_area_nods_in_ib_elem
@@ -96,10 +96,10 @@ type(t_partit), intent(inout), target :: partit
 
     do n=1, myDim_nod2d+eDim_nod2D
         if (.not.turn_off_hf) then
-                net_heat_flux(n)   = net_heat_flux(n) + ibhf(n)
+                net_heat_flux(n)   = net_heat_flux(n) + ibhf(n) !* steps_per_ib_step
         end if
         if (.not.turn_off_fw) then
-                fresh_wa_flux(n)   = fresh_wa_flux(n) + (ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n)) 
+                fresh_wa_flux(n)   = fresh_wa_flux(n) + (ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n)) !* steps_per_ib_step
         end if
     end do
 !---wiso-code-begin
