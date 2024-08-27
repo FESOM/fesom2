@@ -3013,7 +3013,9 @@ subroutine dvd_add_difflux_sbc(do_SDdvd, tr_num, dvd_tot, tr, trstar, partit, me
         end if ! --> if (use_kpp_nonlclflx) then
         
         !_______________________________________________________________________
+        ! decide between Sergeys and Knuts DVD method
         if (do_SDdvd) then 
+            
             ! --> if Sergey diagonsitc is used Dflx correspond from here on to 
             !     Xchi at full depth level interface
             nz = 1 
@@ -3021,11 +3023,7 @@ subroutine dvd_add_difflux_sbc(do_SDdvd, tr_num, dvd_tot, tr, trstar, partit, me
             do nz=nu1+1, nl1-1
                 Dflx(nz) = Dflx(nz) * -2.0_WP*( trstar(nz, node)-trstar(nz-1, node) )
             end do ! --> do nz=nu1+1, nl1-1
-        end if 
-        
-        !_______________________________________________________________________
-        ! decide between Sergeys and Knuts DVD method
-        if (do_SDdvd) then 
+            
             !___________________________________________________________________
             ! In Sergeys DVD diagnostic we do not take into account the surface 
             ! and interior fluxes of surface boundary condition and short wave 
