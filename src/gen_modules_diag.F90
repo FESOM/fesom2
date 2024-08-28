@@ -1083,7 +1083,7 @@ subroutine diag_trgrd_xyz(mode, tracers, partit, mesh)
 
     !___________________________________________________________________________
     ! compute vertical tracer gradient
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzu, nzl)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzu, nzl)
     do node=1, myDim_nod2D
         nzl=nlevels_nod2D(node)
         nzu=ulevels_nod2D(node)
