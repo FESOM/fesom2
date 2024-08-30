@@ -1309,12 +1309,15 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
         
         ! add contribution from horizontal diffusion flux (after klingbeil et al. 2014)
         ! --> keep in mind here trstar corresponds to tr_old
-        call dvd_add_difflux_horexpl( .false., tr_num, dvd_KK_tot, trold, Ki, tr_xy, dump, partit, mesh)
+        if (Redi == .False. .and. K_hor /= 0.0_WP) then
+            call dvd_add_difflux_horexpl( .false., tr_num, dvd_KK_tot, trold, Ki, tr_xy, dump, partit, mesh)
+        end if 
         
         ! add contribution from vertical diffusion flux (after klingbeil et al. 2014)
         if (.not. tracers%data(tr_num)%i_vert_diff) then
             call dvd_add_difflux_vertexpl(.false., tr_num, dvd_KK_tot, tr, trold, Kv, partit, mesh)
-        end if     
+        end if 
+        
         if (Redi) then
             call dvd_add_difflux_horexplredi( .false., tr_num, dvd_KK_tot, trold, Ki, slope_tapered, tr_z, dump, partit, mesh)
             call dvd_add_difflux_vertexplredi(.false., tr_num, dvd_KK_tot, trold, Ki, slope_tapered, tr_xy, partit, mesh)
@@ -1352,12 +1355,15 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
         call dvd_add_advflux_ver( .true., tr_num, dvd_SD_chi_adv_v, trflx_v, Wvel, trstar,  partit, mesh)
         
         ! add contribution from horizontal diffusion
-        call dvd_add_difflux_horexpl( .true., tr_num, dvd_SD_chi_dif_he, trstar, Ki, tr_xy, dump, partit, mesh)
+        if (Redi == .False. .and. K_hor /= 0.0_WP) then
+            call dvd_add_difflux_horexpl( .true., tr_num, dvd_SD_chi_dif_he, trstar, Ki, tr_xy, dump, partit, mesh)
+        end if 
         
         ! add contribution from vertical diffusion
         if (.not. tracers%data(tr_num)%i_vert_diff) then 
             call dvd_add_difflux_vertexpl(.true., tr_num, dvd_SD_chi_dif_ve, tr, trstar, Kv, partit, mesh)
-        end if     
+        end if    
+        
         if (Redi) then
             call dvd_add_difflux_horexplredi( .true., tr_num, dvd_SD_chi_dif_heR, trstar, Ki, slope_tapered, tr_z, dump, partit, mesh)
             call dvd_add_difflux_vertexplredi(.true., tr_num, dvd_SD_chi_dif_veR, trstar, Ki, slope_tapered, tr_xy, partit, mesh)
@@ -1387,7 +1393,7 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
             dvd_SD_tot(:,:,tr_num) = dvd_SD_tot(:,:,tr_num) + dvd_SD_chi_dif_heR(:,:,tr_num) &
                                                             + dvd_SD_chi_dif_veR(:,:,tr_num) &
                                                             + dvd_SD_chi_dif_viR(:,:,tr_num)
-            
+                                                            
         end if 
         if (tracers%data(tr_num)%smooth_bh_tra) then
             dvd_SD_tot(:,:,tr_num) = dvd_SD_tot(:,:,tr_num) + dvd_SD_chi_dif_hbh(:,:,tr_num)
@@ -1882,7 +1888,6 @@ subroutine dvd_add_difflux_horexpl(do_SDdvd, tr_num, dvd_tot, tr, Ki, tr_xy, dum
     integer                                :: ednodes(2), edelem(2), elnodes(3)
     real(kind=WP)                          :: deltaX1, deltaY1, deltaX2, deltaY2, dZ
     real(kind=WP)                          :: Kh, Trx, Try, Trz(2), SxTz, SyTz, Dflx, Trc, xchi
-    real(kind=WP)                          :: isredi=0.0_WP
     
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -1894,9 +1899,6 @@ subroutine dvd_add_difflux_horexpl(do_SDdvd, tr_num, dvd_tot, tr, Ki, tr_xy, dum
     do node=1, myDim_nod2D+eDim_nod2D
         dump(:, node)=0.0_WP
     end do
-    
-    ! add contribution of redi diffusivity when activated
-    if (Redi) isredi=1.0_WP
     
     ! compute horizontal 2nd moment tracer flux from advective tracer fluxes at mid 
     ! edge face (tr^2) and add it to dvd_tot
@@ -1958,7 +1960,7 @@ subroutine dvd_add_difflux_horexpl(do_SDdvd, tr_num, dvd_tot, tr, Ki, tr_xy, dum
             ! compute edge centered tracer value --> knut variant
             ! --> here variable tr corresponds to tr_old = Tr^(n)
             Trc  = tr(nz, ednodes(1)) * hnode_new(nz, ednodes(1)) + tr(nz, ednodes(2)) * hnode_new(nz, ednodes(2))
-            Trc  = -2.0_WP * Trc/(hnode_new(nz, ednodes(1))+hnode_new(nz, ednodes(2)))
+            Trc  = 2.0_WP * Trc/(hnode_new(nz, ednodes(1))+hnode_new(nz, ednodes(2)))
             !___________________________________________________________________
             ! compute Tstar dfiference --> sergey variant
             ! --> here variable tr corresponds to trstar = (Tr^(n+1) + Tr^(n))*0.5
@@ -2173,7 +2175,6 @@ subroutine dvd_add_difflux_horexplredi(do_SDdvd, tr_num, dvd_tot, tr, Ki, slope,
     integer                                :: ednodes(2), edelem(2), elnodes(3)
     real(kind=WP)                          :: deltaX1, deltaY1, deltaX2, deltaY2, dZ
     real(kind=WP)                          :: Kh, Trx, Try, Trz(2), SxTz, SyTz, Dflx, Trc, xchi
-    real(kind=WP)                          :: isredi=0.0_WP
     
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -2185,9 +2186,6 @@ subroutine dvd_add_difflux_horexplredi(do_SDdvd, tr_num, dvd_tot, tr, Ki, slope,
     do node=1, myDim_nod2D+eDim_nod2D
         dump(:, node)=0.0_WP
     end do
-    
-    ! add contribution of redi diffusivity when activated
-    if (Redi) isredi=1.0_WP
     
     ! compute horizontal 2nd moment tracer flux from advective tracer fluxes at mid 
     ! edge face (tr^2) and add it to dvd_tot
@@ -2241,18 +2239,21 @@ subroutine dvd_add_difflux_horexplredi(do_SDdvd, tr_num, dvd_tot, tr, Ki, slope,
             ! reminder: tr_z ... vertical tracer gradient sits on full depth levels
             ! with 0.5_WP*(tr_z(nz,ednodes)+tr_z(nz+1,ednodes)) we bring the vertical 
             ! tracer gradient back to mid depth levels
+            Trx  = tr_xy(1, nz, edelem(1)) 
+            Try  = tr_xy(2, nz, edelem(1))
             Trz  = 0.5_WP*(tr_z(nz,ednodes)+tr_z(nz+1,ednodes))
             SxTz = sum(Trz*slope(1, nz, ednodes))*0.5_WP
             SyTz = sum(Trz*slope(2, nz, ednodes))*0.5_WP
-            Trx  = SxTz*isredi
-            Try  = SyTz*isredi
+            Trx  = Trx + SxTz
+            Try  = Try + SyTz
+            
             ! Dflx is here the horizontal diffusive volume flux 
             Dflx = Kh*(-deltaX1*Try + deltaY1*Trx)*dZ
             !___________________________________________________________________
             ! compute edge centered tracer value --> knut variant
             ! --> here variable tr corresponds to tr_old = Tr^(n)
             Trc  = tr(nz, ednodes(1)) * hnode_new(nz, ednodes(1)) + tr(nz, ednodes(2)) * hnode_new(nz, ednodes(2))
-            Trc  = -2.0_WP * Trc/(hnode_new(nz, ednodes(1))+hnode_new(nz, ednodes(2)))
+            Trc  = 2.0_WP * Trc/(hnode_new(nz, ednodes(1))+hnode_new(nz, ednodes(2)))
             !___________________________________________________________________
             ! compute Tstar dfiference --> sergey variant
             ! --> here variable tr corresponds to trstar = (Tr^(n+1) + Tr^(n))*0.5
@@ -2281,11 +2282,14 @@ subroutine dvd_add_difflux_horexplredi(do_SDdvd, tr_num, dvd_tot, tr, Ki, slope,
                 ! reminder: tr_z ... vertical tracer gradient sits on full depth levels
                 ! with 0.5_WP*(tr_z(nz,ednodes)+tr_z(nz+1,ednodes)) we bring the vertical 
                 ! tracer gradient back to mid depth levels
+                Trx  = tr_xy(1, nz, edelem(2))
+                Try  = tr_xy(2, nz, edelem(2))
                 Trz  = 0.5_WP*(tr_z(nz,ednodes)+tr_z(nz+1,ednodes))
                 SxTz = sum(Trz*slope(1, nz, ednodes))*0.5_WP
                 SyTz = sum(Trz*slope(2, nz, ednodes))*0.5_WP
-                Trx  = SxTz*isredi
-                Try  = SyTz*isredi
+                Trx  = Trx + SxTz
+                Try  = Try + SyTz
+            
                 ! Dflx is here the horizontal diffusive volume flux 
                 Dflx = Kh*(deltaX2*Try - deltaY2*Trx)*dZ
                 !_______________________________________________________________
@@ -2323,11 +2327,14 @@ subroutine dvd_add_difflux_horexplredi(do_SDdvd, tr_num, dvd_tot, tr, Ki, slope,
             ! reminder: tr_z ... vertical tracer gradient sits on full depth levels
             ! with 0.5_WP*(tr_z(nz,ednodes)+tr_z(nz+1,ednodes)) we bring the vertical 
             ! tracer gradient back to mid depth levels
+            Trx  = 0.5_WP*( tr_xy(1, nz, edelem(1))+tr_xy(1, nz, edelem(2)) )
+            Try  = 0.5_WP*( tr_xy(2, nz, edelem(1))+tr_xy(2, nz, edelem(2)) )
             Trz  = 0.5_WP*(tr_z(nz, ednodes)+tr_z(nz+1, ednodes))
             SxTz = sum(Trz*slope(1, nz, ednodes))*0.5_WP
             SyTz = sum(Trz*slope(2, nz, ednodes))*0.5_WP
-            Trx  = SxTz*isredi
-            Try  = SyTz*isredi
+            Trx  = Trx + SxTz
+            Try  = Try + SyTz
+            
             ! Dflx is here the horizontal diffusive volume flux 
             Dflx = Kh*((deltaX2-deltaX1)*Try-(deltaY2-deltaY1)*Trx)*dZ
             !___________________________________________________________________
@@ -2363,11 +2370,14 @@ subroutine dvd_add_difflux_horexplredi(do_SDdvd, tr_num, dvd_tot, tr, Ki, slope,
             ! reminder: tr_z ... vertical tracer gradient sits on full depth levels
             ! with 0.5_WP*(tr_z(nz,ednodes)+tr_z(nz+1,ednodes)) we bring the vertical 
             ! tracer gradient back to mid depth levels
+            Trx  = tr_xy(1, nz, edelem(1))
+            Try  = tr_xy(2, nz, edelem(1))
             Trz  = 0.5_WP*(tr_z(nz,ednodes)+tr_z(nz+1,ednodes))
             SxTz = sum(Trz*slope(1, nz, ednodes))*0.5_WP
             SyTz = sum(Trz*slope(2, nz, ednodes))*0.5_WP
-            Trx  = SxTz*isredi
-            Try  = SyTz*isredi
+            Trx  = Trx + SxTz
+            Try  = Try + SyTz
+            
             ! Dflx is here the horizontal diffusive volume flux 
             Dflx = Kh*(-deltaX1*Try + deltaY1*Trx)*dZ
             !___________________________________________________________________
@@ -2403,11 +2413,14 @@ subroutine dvd_add_difflux_horexplredi(do_SDdvd, tr_num, dvd_tot, tr, Ki, slope,
             ! reminder: tr_z ... vertical tracer gradient sits on full depth levels
             ! with 0.5_WP*(tr_z(nz,ednodes)+tr_z(nz+1,ednodes)) we bring the vertical 
             ! tracer gradient back to mid depth levels
+            Trx  = tr_xy(1, nz, edelem(2))
+            Try  = tr_xy(2, nz, edelem(2))
             Trz  = 0.5_WP*(tr_z(nz,ednodes)+tr_z(nz+1,ednodes))
             SxTz = sum(Trz*slope(1, nz, ednodes))*0.5_WP
             SyTz = sum(Trz*slope(2, nz, ednodes))*0.5_WP
-            Trx  = SxTz*isredi
-            Try  = SyTz*isredi
+            Trx  = Trx + SxTz
+            Try  = Try + SyTz
+            
             ! Dflx is here the horizontal diffusive volume flux 
             Dflx = Kh*(deltaX2*Try - deltaY2*Trx)*dZ
             !___________________________________________________________________
@@ -2814,14 +2827,11 @@ subroutine dvd_add_difflux_vertimplredi(do_SDdvd, tr_num, dvd_tot, tr, trstar, K
         real(kind=WP) , intent(in)             :: slope(3,mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
         integer                                :: node, nz, nu1, nl1
         real(kind=WP)                          :: tr_up, tr_dwn, Dflx(mesh%nl), dzup, dzdwn, dz, Kv_R
-        real(kind=WP)                          :: isredi=0.0_WP, sbc, rsss
+        real(kind=WP)                          :: sbc, rsss
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"    
-    
-    ! add contribution of redi diffusivity when activated
-    if (Redi) isredi=1.0_WP
     
     ! add contribution of implicite vertical diffusion (after Klingbeil et al.2014)
     do node=1, myDim_nod2D
@@ -2855,7 +2865,6 @@ subroutine dvd_add_difflux_vertimplredi(do_SDdvd, tr_num, dvd_tot, tr, trstar, K
             dzdwn    = hnode(nz  , node)*0.5_WP
             Kv_R     = dzup /(dzup + dzdwn) * slope(3, nz-1, node)**2 * Ki(nz-1,node) + &
                        dzdwn/(dzup + dzdwn) * slope(3, nz  , node)**2 * Ki(nz  ,node)
-            Kv_R     = Kv_R*isredi
             
             ! fdiff = Kv*dT/dz = Kv (T(nz-1) - T(nz))/ ((hnode(nz-1)+hnode(nz))/2)
             ! --> Dflx is until here the diffusive volume flux on full depth levels
@@ -3178,7 +3187,8 @@ subroutine dvd_add_difflux_sbc(do_SDdvd, tr_num, dvd_tot, tr, trstar, partit, me
             ! --> if Sergey diagonsitc is used Dflx correspond from here on to 
             !     Xchi at full depth level interface
             nz = 1 
-            Dflx(nz) = Dflx(nz) * -2.0_WP*( trstar(nz, node) )
+!PS             Dflx(nz) = Dflx(nz) * -2.0_WP*( trstar(nz, node) )
+            Dflx(nz) = Dflx(nz) * -2.0_WP*( trstar(nz+1, node)-trstar(nz, node) )
             do nz=nu1+1, nl1-1
                 Dflx(nz) = Dflx(nz) * -2.0_WP*( trstar(nz, node)-trstar(nz-1, node) )
             end do ! --> do nz=nu1+1, nl1-1
