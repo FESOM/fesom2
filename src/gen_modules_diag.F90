@@ -1309,7 +1309,7 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
         
         ! add contribution from horizontal diffusion flux (after klingbeil et al. 2014)
         ! --> keep in mind here trstar corresponds to tr_old
-        if (Redi == .False. .and. K_hor /= 0.0_WP) then
+        if (Redi .eqv. .False. .and. K_hor /= 0.0_WP) then
             call dvd_add_difflux_horexpl( .false., tr_num, dvd_KK_tot, trold, Ki, tr_xy, dump, partit, mesh)
         end if 
         
@@ -1355,7 +1355,7 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
         call dvd_add_advflux_ver( .true., tr_num, dvd_SD_chi_adv_v, trflx_v, Wvel, trstar,  partit, mesh)
         
         ! add contribution from horizontal diffusion
-        if (Redi == .False. .and. K_hor /= 0.0_WP) then
+        if (Redi .eqv. .False. .and. K_hor /= 0.0_WP) then
             call dvd_add_difflux_horexpl( .true., tr_num, dvd_SD_chi_dif_he, trstar, Ki, tr_xy, dump, partit, mesh)
         end if 
         
