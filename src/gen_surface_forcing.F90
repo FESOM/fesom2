@@ -686,6 +686,7 @@ CONTAINS
       !!PS if (partit%mype==0) then 
       !!PS  write(*,*) 'sbc_do --> mstep:',mstep, ' rdate=', rdate
       !!PS end if 
+
       call data_timeinterp(rdate, partit)
    END SUBROUTINE nc_sbc_ini
 

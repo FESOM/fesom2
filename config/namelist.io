@@ -10,6 +10,9 @@ ldiag_DVD        =.false.
 ldiag_forc       =.false.
 ldiag_extflds    =.false.
 ldiag_trflx      =.false.
+ldiag_uvw_sqr    =.false.
+ldiag_trgrd_xyz  =.false.
+
 /
 
 &nml_general

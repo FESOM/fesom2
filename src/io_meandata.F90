@@ -1141,8 +1141,11 @@ CASE ('DVD       ')
         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_temp_SD_tot' ,  'tot. temperature DVD \n (Banerjee et al. 2023)' , 'K^2/s' , dvd_SD_tot(        :,:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_temp_SD_advh',  'temperature DVD horiz. adv.'                    , 'K^2/s' , dvd_SD_chi_adv_h(  :,:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_temp_SD_advv',  'temperature DVD vert. adv. '                    , 'K^2/s' , dvd_SD_chi_adv_v(  :,:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-        call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_temp_SD_difh',  'temperature DVD horiz. diff. expl.'             , 'K^2/s' , dvd_SD_chi_dif_he( :,:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        if (Redi .eqv. .False. .and. K_hor /= 0.0_WP) then
+            call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_temp_SD_difh',  'temperature DVD horiz. diff. expl.'             , 'K^2/s' , dvd_SD_chi_dif_he( :,:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        end if
         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_temp_SD_difvi', 'temperature DVD vert. diff. impl.'              , 'K^2/s' , dvd_SD_chi_dif_vi( :,:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_temp_SD_difsbc', 'temperature DVD sbc.'                          , 'K^2/s' , dvd_SD_chi_dif_sbc(:,:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         if (.not. tracers%data(1)%i_vert_diff) then
             call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_temp_SD_difve', 'temperature DVD vert. diff. expl.'          , 'K^2/s' , dvd_SD_chi_dif_ve( :,:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         end if
@@ -1151,6 +1154,7 @@ CASE ('DVD       ')
         end if 
         if (Redi) then 
             call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_temp_SD_difheR', 'temperature DVD horiz. redi diff. expl.'   , 'K^2/s' , dvd_SD_chi_dif_heR(:,:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            
             call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_temp_SD_difveR', 'temperature DVD vert. redi diff. expl.'    , 'K^2/s' , dvd_SD_chi_dif_veR(:,:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
             call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_temp_SD_difviR', 'temperature DVD vert. redi diff. impl.'    , 'K^2/s' , dvd_SD_chi_dif_viR(:,:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         end if     
@@ -1160,8 +1164,11 @@ CASE ('DVD       ')
         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_SD_tot' ,  'tot. salinity DVD \n (Banerjee et al. 2023)'    , 'K^2/s' , dvd_SD_tot(        :,:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_SD_advh',  'salinity DVD horiz. adv.'                       , 'K^2/s' , dvd_SD_chi_adv_h(  :,:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_SD_advv',  'salinity DVD vert. adv. '                       , 'K^2/s' , dvd_SD_chi_adv_v(  :,:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-        call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_SD_difh',  'salinity DVD horiz. diff. expl.'                , 'K^2/s' , dvd_SD_chi_dif_he( :,:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        if (Redi .eqv. .False. .and. K_hor /= 0.0_WP) then
+            call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_SD_difh',  'salinity DVD horiz. diff. expl.'                , 'K^2/s' , dvd_SD_chi_dif_he( :,:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        end if 
         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_SD_difvi', 'salinity DVD vert. diff. impl.'                 , 'K^2/s' , dvd_SD_chi_dif_vi( :,:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_SD_difsbc','salinity DVD sbc.'                              , 'K^2/s' , dvd_SD_chi_dif_sbc(:,:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         if (.not. tracers%data(1)%i_vert_diff) then
             call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_SD_difve', 'salinity DVD vert. diff. expl.'             , 'K^2/s' , dvd_SD_chi_dif_ve( :,:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         end if
@@ -1170,6 +1177,7 @@ CASE ('DVD       ')
         end if 
         if (Redi) then 
             call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_SD_difheR', 'salinity DVD horiz. redi diff. expl.'      , 'K^2/s' , dvd_SD_chi_dif_heR(:,:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            
             call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_SD_difveR', 'salinity DVD vert. redi diff. expl.'       , 'K^2/s' , dvd_SD_chi_dif_veR(:,:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
             call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_SD_difviR', 'salinity DVD vert. redi diff. impl.'       , 'K^2/s' , dvd_SD_chi_dif_viR(:,:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         end if     
@@ -1200,6 +1208,29 @@ CASE ('SPLIT-EXPL')
         end if 
     end if
 
+!_______________________________________________________________________________
+! compute squared velocities of u, v, w
+CASE ('UVW_SQR   ')
+    if (ldiag_uvw_sqr) then
+        !___temperature DVD_____________________________________________________
+        call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u2' , 'squared zonal velocity'     , 'm^2/s^2' , uv2(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v2' , 'squared meridional velocity', 'm^2/s^2' , uv2(2,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl-1, nod2D/) , (/nl-1, myDim_nod2D/) , 'w2' , 'squared vertical velocity'  , 'm^2/s^2' , wvel2(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if !--> if (ldiag_DVD) then    
+    
+!_______________________________________________________________________________
+! compute horizontal and vertical tracer gradients
+CASE ('TRGRD_XYZ ')
+    if (ldiag_trgrd_xyz) then
+        call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/),  'temp_grdx',   'zonal temperature gradient',        'K/m', trgrd_x(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/),  'temp_grdy',   'meridional temperature gradient',   'K/m', trgrd_y(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl-1,  nod2D/), (/nl-1, myDim_nod2D /),  'temp_grdz',   'vertical temperature gradient',     'K/m', trgrd_z(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        
+        call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/),  'salt_grdx',   'zonal salinity gradient',         'psu/m', trgrd_x(2,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/),  'salt_grdy',   'meridional salinity gradient',    'psu/m', trgrd_y(2,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl-1,  nod2D/), (/nl-1, myDim_nod2D /),  'salt_grdz',   'vertical salinity gradient',      'psu/m', trgrd_z(2,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if !--> if (ldiag_DVD) then    
+    
 !_______________________________________________________________________________
 CASE DEFAULT
     if (mype==0) write(*,*) 'stream ', io_list(i)%id, ' is not defined !'
