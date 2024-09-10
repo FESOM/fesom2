@@ -472,7 +472,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,zF,PAR, mesh)
                 varpzPhy    = pzPhy   * PhyN /aux
                 varpzDia    = pzDia   * DiaN /aux
                 varpzDet    = pzDet   * DetN /aux
-                varpzDetZ2  = pzDetZ2 * DetN /aux
+                varpzDetZ2  = pzDetZ2 * DetZ2 /aux
             else
                 DiaNsq      = DiaN**2
                 PhyNsq      = PhyN**2
@@ -915,7 +915,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,zF,PAR, mesh)
         + grazingFlux_dia                        &
         - grazingFlux_dia * grazEff              &
         - grazingFlux_Det * grazEff              & !!!Sloppy feeding is  thought because of grazing flux multiplied with grazeff 
-        - grazingFlux_Det2 * grazEff             &
+        - grazingFlux_Det2 * grazEff2            &
         + aggregationRate              * PhyN    &
         + aggregationRate              * DiaN    &
         + hetLossFlux                            &
@@ -941,7 +941,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,zF,PAR, mesh)
         + grazingFlux_Dia * recipQuota_Dia             &
         - grazingFlux_Dia * recipQuota_Dia * grazEff   &
         - grazingFlux_Det * recipDet * grazEff         &
-        - grazingFlux_Det2 * recipDet2 * grazEff       &     
+        - grazingFlux_Det2 * recipDet * grazEff2       &     
         + aggregationRate              * phyC          &
         + aggregationRate              * DiaC          &
         + hetLossFlux * recipQZoo                      &
@@ -1055,7 +1055,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,zF,PAR, mesh)
          - grazingFlux_dia2 * grazEff2            & 
          + grazingFlux_het2                       &
          - grazingFlux_het2 * grazEff2            &
-         - grazingFlux_DetZ2 * grazEff2           &
+         - grazingFlux_DetZ2 * grazEff            &
          - grazingFlux_DetZ22 * grazEff2          &   
          + Zoo2LossFlux                           &
          + Zoo2fecalloss_n                          &
@@ -1083,7 +1083,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,zF,PAR, mesh)
         - grazingFlux_Dia2 * recipQuota_Dia * grazEff2 &
         + grazingFlux_het2 * recipQZoo                 &
         - grazingFlux_het2 * recipQZoo * grazEff2      &
-        - grazingFlux_DetZ2 * recipDet * grazEff2      &
+        - grazingFlux_DetZ2 * recipDet2 * grazEff      &
         - grazingFlux_DetZ22 * recipDet2 * grazEff2    &
         + Zoo2LossFlux * recipQZoo2                    &
         + Zoo2fecalloss_c                   & 
@@ -1332,7 +1332,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,zF,PAR, mesh)
                 + lossN_d*limitFacN_dia   * DiaN     & ! --> Excretion from diatom
                 + reminN * arrFunc        * DetN     & ! --> Remineralization of detritus
                 + reminN * arrFunc        * DetZ2N   &
-                + lossN_z                 * HetN     & ! --> Excretion from zooplanton
+                + lossN_z                 * HetN     & ! --> Excretion from zooplankton
                 + lossN_z2                * Zoo2N    &         
                                                )     &
                 - kScavFe                 * DetC   * FreeFe   & 
@@ -1344,11 +1344,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,zF,PAR, mesh)
                 -  Cphot_dia              * DiaC     & ! Diatom photosynthesis                / -> net growth
                 +  phyRespRate            * PhyC     & ! Small pyhtoplankton respiration --- /
                 +  phyRespRate_dia        * DiaC     & ! Diatom respiration
-                +  lossC*limitFacN        * phyC     & ! Exrcetion from small pythoplankton
-                +  lossC_d*limitFacN_dia  * diaC     & ! Excretion from diatom
+                +  lossC*limitFacN        * phyC     & ! Exrcetion from small phytoplankton
+                +  lossC_d*limitFacN_dia  * diaC     & ! Excretion from diatoms
                 +  reminC * arrFunc       * detC     & ! Remineralization of detritus
                 +  reminC * arrFunc       * DetZ2C   &
-                +  lossC_z                * hetC     & ! Excretion from zooplanton
+                +  lossC_z                * hetC     & ! Excretion from zooplankton
                 +  hetRespFlux                       & ! Zooplankton respiration
                 +  lossC_z2               * Zoo2C    &
                 +  zoo2RespFlux                      &
