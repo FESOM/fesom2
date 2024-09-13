@@ -1,4 +1,7 @@
 module iceberg_params
+use, intrinsic :: iso_fortran_env, only: real64
+USE o_PARAM, only: WP 
+
 implicit none
 save
   !integer,parameter :: ib_num               ! realistic dataset comprising 6912 icebergs
@@ -92,6 +95,7 @@ save
   
   !===== FRESHWATER AND HEAT ARRAYS ON FESOM GRID =====
   real,dimension(:), allocatable:: ibhf    !icb heat flux into ocean 
+  real(kind=WP),dimension(:,:), allocatable:: ibhf_n    !icb heat flux into ocean 
   real,dimension(:), allocatable:: ibfwb   !freshwater flux into ocean from basal melting
   real,dimension(:), allocatable:: ibfwbv   !freshwater flux into ocean from basal melting
   real,dimension(:), allocatable:: ibfwl   !freshwater flux into ocean from lateral melting
@@ -104,6 +108,8 @@ save
   !for communication
   real,dimension(:), allocatable:: arr_block
   integer,dimension(:), allocatable:: elem_block
+  integer,dimension(:), allocatable:: pe_block
+  real(real64), dimension(:), allocatable:: elem_area_glob
   real,dimension(:), allocatable:: vl_block
 
   !array for output in netcdf

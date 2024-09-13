@@ -1,20 +1,29 @@
-subroutine allocate_icb(partit)
+subroutine allocate_icb(partit, mesh)
   use iceberg_params
   use g_config
+  use g_comm
+  use g_comm_auto
+  use o_param
   use MOD_PARTIT
+  use MOD_MESH
 
   integer       :: n2
 type(t_partit), intent(inout), target :: partit
+type(t_mesh), intent(in), target :: mesh
 #include "associate_part_def.h"
+#include "associate_mesh_def.h"
 #include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
   n2=myDim_nod2D+eDim_nod2D
 
   allocate(ibhf(n2), ibfwb(n2), ibfwl(n2), ibfwe(n2), ibfwbv(n2))
-  ibhf=0
-  ibfwb=0
-  ibfwl=0
-  ibfwe=0
-  ibfwbv=0
+  ibhf      = 0.0
+  ibfwb     = 0.0
+  ibfwl     = 0.0
+  ibfwe     = 0.0
+  ibfwbv    = 0.0
+  allocate(ibhf_n(mesh%nl, n2))
+  ibhf_n    = 0.0_WP
 
   allocate(calving_day(ib_num))
   calving_day = 1   !28.0: September 29 for restart in 1 SEP 97 ! 271.0: September 29 for year 1997
@@ -93,6 +102,13 @@ type(t_partit), intent(inout), target :: partit
   lheat_flux_ib = 0.0
   allocate(arr_block(15*ib_num))
   allocate(elem_block(ib_num))
+  allocate(pe_block(ib_num))
+  
+  allocate(elem_area_glob(elem2D))
+  elem_area_glob=0.0
+  call gather_elem(elem_area(1:myDim_elem2D), elem_area_glob, partit)
+  call MPI_Bcast(elem_area_glob, elem2D, MPI_DOUBLE, 0, MPI_COMM_FESOM, MPIERR)
+
   allocate(vl_block(4*ib_num))
   allocate(buoy_props(ib_num,13))
   buoy_props = 0.0

@@ -237,7 +237,7 @@ contains
         ! --------------
         ! LA icebergs: 2023-05-17 
         if (use_icebergs) then
-            call allocate_icb(f%partit)
+            call allocate_icb(f%partit, f%mesh)
         endif
         ! --------------
 

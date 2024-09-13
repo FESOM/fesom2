@@ -16,7 +16,7 @@
 !				use 3D information for T,S and velocities
 !				instead of SSTs; M_v depends on 'thermal driving')
 !==============================================================================
-subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
+subroutine iceberg_meltrates(partit, M_b, M_v, M_e, M_bv, &
 				u_ib,v_ib, uo_ib,vo_ib, ua_ib,va_ib, &
 				sst_ib, length_ib, conci_ib, &
 				uo_keel_ib, vo_keel_ib, T_keel_ib, S_keel_ib, depth_ib, &
@@ -28,7 +28,7 @@ subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
 !  use i_param
 !  use MOD_ICE
 !  use i_arrays
-!  use MOD_PARTIT
+  use MOD_PARTIT
 
 ! kh 18.03.21 not really used here
 ! use o_arrays
@@ -52,9 +52,9 @@ subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
   
   real			:: absamino, damping, sea_state, v_ibmino
   real			:: tf, T_d 				!freezing temp. and 'thermal driving'
-!type(t_partit), intent(inout), target :: partit
-!#include "associate_part_def.h"
-!#include "associate_part_ass.h"
+type(t_partit), intent(inout), target :: partit
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
   
   !bottom melt (basal turbulent melting rate)
   !M_b = 0.58 * sqrt( (u_ib - uo_ib)**2 + (v_ib - vo_ib)**2 )**0.8 &
@@ -63,17 +63,16 @@ subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
 
   !3-eq. formulation for bottom melting [m/s]    
   v_ibmino  = sqrt( (u_ib - uo_keel_ib)**2 + (v_ib - vo_keel_ib)**2 )
-  call iceberg_heat_water_fluxes_3eq(ib, M_b, T_keel_ib,S_keel_ib,v_ibmino, depth_ib, tf)
+  call iceberg_heat_water_fluxes_3eq(partit, ib, M_b, T_keel_ib,S_keel_ib,v_ibmino, depth_ib, tf)
 
   !3-eq. formulation for lateral 'basal' melting [m/s]
   v_ibmino  = sqrt( (u_ib - uo_ib)**2 + (v_ib - vo_ib)**2 ) ! depth-average rel. velocity
-  call iceberg_heat_water_fluxes_3eq(ib, M_bv, T_ave_ib,S_ave_ib,v_ibmino, depth_ib/2.0, tf)
+  call iceberg_heat_water_fluxes_3eq(partit, ib, M_bv, T_ave_ib,S_ave_ib,v_ibmino, depth_ib/2.0, tf)
   
   !'thermal driving', defined as the elevation of ambient water 
   !temperature above freezing point' (Neshyba and Josberger, 1979).
   T_d = T_ave_ib - tf
   if(T_d < 0.) T_d = 0.
-  !write(*,*) 'thermal driving:',T_d,'; Tf:',tf,'T_ave:',T_ave_ib
 
   !lateral melt (buoyant convection)
   !M_v = 0.00762 * sst_ib + 0.00129 * sst_ib**2
@@ -297,7 +296,7 @@ end subroutine weeksmellor
  !***************************************************************************************************************************
  !***************************************************************************************************************************
 
-subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_freeze)
+subroutine iceberg_heat_water_fluxes_3eq(partit, ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_freeze)
   ! The three-equation model of ice-shelf ocean interaction (Hellmer et al., 1997)
   ! Code derived from BRIOS subroutine iceshelf (which goes back to H.Hellmer's 2D ice shelf model code)
   ! adjusted for use in FESOM by Ralph Timmermann, 16.02.2011
@@ -308,7 +307,7 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
   !use o_param
   !use o_arrays
   !use i_arrays
-  !use MOD_PARTIT
+  use MOD_PARTIT
   use iceberg_params
   use g_config
 
@@ -351,6 +350,10 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
   real(kind=8),parameter ::  cpi =  152.5+7.122*(atk+tob)     !Paterson:"The Physics of Glaciers"
 
   real(kind=8),parameter ::  L    = 334000.                   ! [J/Kg]
+type(t_partit), intent(inout), target :: partit
+!==================== MODULES & DECLARATIONS ==========================!= 
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
   ! hemw = helium content of the glacial meltwater
   ! oomw = isotopic fractionation due to melting
@@ -466,7 +469,7 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
      endif
 
      t_freeze = tf ! output of freezing temperature
-
+!     if(mype==141) write(*,*) "LA DEBUG: ib ", ib, ", tf=", tf, ", tin=", tin, ", T_ib,=", T_ib
      ! Calculate the melting/freezing rate [m/s]
      ! seta = ep5*(1.0-sal/sf)     !rt thinks this is not needed; TR: Why different to M_b? LIQUID vs. ICE
 
