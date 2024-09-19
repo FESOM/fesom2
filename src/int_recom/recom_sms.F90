@@ -1284,25 +1284,25 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     if (Grazing_detritus) then
 #if defined (__3Zoo2Det)
         sms(k,idetn)       = (                             &
-            + grazingFlux_phy3                             &
-            - grazingFlux_phy3   * grazEff3                &
-            + grazingFlux_dia3                             &
-            - grazingFlux_dia3   * grazEff3                &
+            + grazingFlux_phy3                             & ! --> grazing on small phytoplankton by third zooplankton
+            - grazingFlux_phy3   * grazEff3                & ! --> fraction of grazingFlux_phy3 into microzooplankton pool
+            + grazingFlux_dia3                             & ! --> grazing on diatoms by third zooplankton
+            - grazingFlux_dia3   * grazEff3                & ! --> fraction of grazingFlux_dia3 into microzooplankton pool
 #if defined (__coccos)
-            + grazingFlux_Cocco3                           &
-            - grazingFlux_Cocco3 * grazEff3                &
+            + grazingFlux_Cocco3                           & ! --> grazing on coccolithophores by third zooplankton
+            - grazingFlux_Cocco3 * grazEff3                & ! --> fraction of grazingFlux_Cocco3 into microzooplankton pool
             + aggregationRate               * CoccoN       & 
 #endif
-            - grazingFlux_Det    * grazEff                 &   ! --> grazing of first zoo (meso) on first detritus
-            - grazingFlux_Det2   * grazEff2                &   ! --> grazing of second zoo on first detritus
+            - grazingFlux_Det    * grazEff                 & ! --> grazing of first zoo (meso) on first detritus class
+            - grazingFlux_Det2   * grazEff2                & ! --> grazing of second zoo (macro) on first detritus class
             + aggregationRate               * PhyN         &
             + aggregationRate               * DiaN         &
-            + miczooLossFlux                               &
-            - reminN * arrFunc * O2Func     * DetN         & ! O2remin
+            + miczooLossFlux                               & !  --> microzooplankton, mortality
+            - reminN * arrFunc * O2Func     * DetN         & !  --> O2remin
                                                           ) * dt_b + sms(k,idetn)
 #else
         sms(k,idetn)       = (                             &
-	    + grazingFlux_phy                              &
+	    + grazingFlux_phy                              & ! Technically it is mesooooooooooooooooo
             - grazingFlux_phy   * grazEff                  &
             + grazingFlux_dia                              &
             - grazingFlux_dia   * grazEff                  &
@@ -1312,7 +1312,6 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             + aggregationRate               * CoccoN       &
 #endif
             - grazingFlux_Det   * grazEff                  & ! Sloppy feeding is thought because of grazing flux multiplied with grazeff 
-            - grazingFlux_Det2  * grazEff2                 &
             + aggregationRate               * PhyN         &
             + aggregationRate               * DiaN         &
             + hetLossFlux                                  &
@@ -1366,7 +1365,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             + aggregationRate                       * CoccoC   &
 #endif
             - grazingFlux_Det  * recipDet  * grazEff           &
-            - grazingFlux_Det2 * recipDet2 * grazEff2          &
+            - grazingFlux_Det2 * recipDet  * grazEff2          & ! corrected recipDet2 -> recipDet
             + aggregationRate                         * PhyC   &
             + aggregationRate                         * DiaC   &
             + miczooLossFlux   * recipQZoo3                    &
@@ -1384,7 +1383,6 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             + aggregationRate                      * CoccoC    &
 #endif
             - grazingFlux_Det  * recipDet  * grazEff           &
-            - grazingFlux_Det2 * recipDet2 * grazEff           &
             + aggregationRate              * phyC              &
             + aggregationRate              * DiaC              &
             + hetLossFlux      * recipQZoo                     &

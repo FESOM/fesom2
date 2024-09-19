@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=test_3zoo_ballast
-#SBATCH --account=nwg_hauck.maresys
+#SBATCH --account=nwg_maresys.maresys
 #SBATCH --partition=mpp
 #SBATCH -N 9
 #SBATCH --cpus-per-task=1
@@ -10,8 +10,6 @@
 
 #SBATCH -o slurm-out.out
 #SBATCH -e slurm-err.out
-#SBATCH --mail-user=ozgur.gurses@awi.de
-#SBATCH --mail-type=END
 
 # disable hyperthreading
 #SBATCH --hint=nomultithread
@@ -47,7 +45,7 @@ date
 #sbatch job_albedo
 #fi
 
-Resultpath='/albedo/scratch/user/ogurses/test_14.06.2023/'
+Resultpath='/albedo/scratch/user/xxx/'
 test -e $Resultpath/fesom.1970.oce.restart.nc && exit
 
 IsInFile=$( tail -1 fesom2.0.out | grep -c should)
