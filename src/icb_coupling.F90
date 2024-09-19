@@ -24,14 +24,18 @@ subroutine prepare_icb2fesom(mesh, partit, ib,i_have_element,localelement,depth_
     use MOD_PARTIT
     use iceberg_params
 
+    implicit none
+
     logical                 :: i_have_element
-!    real                    :: depth_ib
+    real, intent(in)        :: depth_ib
+    real                    :: lev_low, lev_up
     integer                 :: localelement
     integer                 :: iceberg_node  
     integer, dimension(3)   :: ib_nods_in_ib_elem
     integer                 :: num_ib_nods_in_ib_elem
+    real                    :: dz
     real, dimension(:), allocatable      :: tot_area_nods_in_ib_elem
-    integer                 :: i, ib
+    integer                 :: i, j, k, ib
     integer, dimension(3)   :: idx_d
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
@@ -40,6 +44,7 @@ type(t_partit), intent(inout), target :: partit
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
+    write(*,*) "LA DEBUG: ib ",ib,", i_have_element=",i_have_element,", localelement=",localelement
     if(i_have_element) then 
         !iceberg_node=elem2D_nodes(1,localelement)
 
@@ -48,15 +53,16 @@ type(t_partit), intent(inout), target :: partit
         !    ibfwb(iceberg_node)     = ibfwb(iceberg_node)   - fwb_flux_ib(ib)   /   mesh%area(1,iceberg_node)
         !    ibfwl(iceberg_node)     = ibfwl(iceberg_node)   - fwl_flux_ib(ib)   /   mesh%area(1,iceberg_node)
         !    ibfwe(iceberg_node)     = ibfwe(iceberg_node)   - fwe_flux_ib(ib)   /   mesh%area(1,iceberg_node)
-        !    ibhf(iceberg_node)      = ibhf(iceberg_node)    - heat_flux_ib(ib)  /   mesh%area(1,iceberg_node)
+        !    ibhf(iceberg_node)      = ibhf(iceberg_node)    - hfb_flux_ib(ib)  /   mesh%area(1,iceberg_node)
         !else
         !    write(*,*) 'iceberg_node only communication node'
         !end if
 
+        dz = 0.0
         allocate(tot_area_nods_in_ib_elem(mesh%nl))
 
         num_ib_nods_in_ib_elem=0
-        tot_area_nods_in_ib_elem=0
+        tot_area_nods_in_ib_elem=0.0
         idx_d = 0
 
         do i=1,3
@@ -85,17 +91,15 @@ type(t_partit), intent(inout), target :: partit
                 end if
             end do
                 
-!            if (mype==167) write(*,*) "LA DEBUG: depth_ib=",abs(depth_ib),", idx_d=",idx_d,", lev_up=",lev_up,", lev_low=",lev_low
             if (iceberg_node<=mydim_nod2d) then
-                ib_nods_in_ib_elem(i)   = iceberg_node
-                num_ib_nods_in_ib_elem  = num_ib_nods_in_ib_elem + 1
+                ib_nods_in_ib_elem(i)           = iceberg_node
+                num_ib_nods_in_ib_elem          = num_ib_nods_in_ib_elem + 1
                 tot_area_nods_in_ib_elem        = tot_area_nods_in_ib_elem + mesh%area(:,iceberg_node)
             else
-                ib_nods_in_ib_elem(i)   = 0
+                ib_nods_in_ib_elem(i)           = 0
             end if
         end do
        
-        !write(*,*) "LA DEBUG: tot_area_nods_in_ib_elem = ",tot_area_nods_in_ib_elem, ", ibhf_n = ",ibhf_n(k,ib_nods_in_ib_elem(1))
         do i=1, 3
             iceberg_node=ib_nods_in_ib_elem(i)
 
@@ -104,11 +108,29 @@ type(t_partit), intent(inout), target :: partit
                 ibfwb(iceberg_node) = ibfwb(iceberg_node) - fwb_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
                 ibfwl(iceberg_node) = ibfwl(iceberg_node) - fwl_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
                 ibfwe(iceberg_node) = ibfwe(iceberg_node) - fwe_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
-                !ibhf(iceberg_node) = ibhf(iceberg_node) - heat_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
-                ibhf_n(idx_d(i),iceberg_node) = ibhf_n(idx_d(i),iceberg_node) - heat_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i))
+                !ibhf(iceberg_node) = ibhf(iceberg_node) - hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
+                
+                do j=1,idx_d(i)
+                    lev_up  = mesh%zbar_3d_n(j, iceberg_node)
+                    if( j==nlevels_nod2D(iceberg_node) ) then
+                        lev_low = mesh%zbar_n_bot(iceberg_node)
+                    else
+                        lev_low = mesh%zbar_3d_n(j+1, iceberg_node)
+                    end if
+                    dz = abs( lev_low - lev_up )
+                    if( (abs(lev_low)>=abs(depth_ib)) .and. (abs(lev_up)<abs(depth_ib)) ) then 
+                        dz = abs( lev_up - depth_ib )
+                    end if              
+                    
+                    if( depth_ib==0.0 ) then
+                        ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) - hfbv_flux_ib(ib) / tot_area_nods_in_ib_elem(j)
+                    else
+                        ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) - hfbv_flux_ib(ib) * (dz / depth_ib) / tot_area_nods_in_ib_elem(j)
+                    end if
+                end do
+                ibhf_n(idx_d(i),iceberg_node) = ibhf_n(idx_d(i),iceberg_node) - hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i))
             end if
         end do
-        !write(*,*) "LA DEBUG: ibhf_n = ",ibhf_n(k,ib_nods_in_ib_elem(1))
     end if
 end subroutine prepare_icb2fesom
 

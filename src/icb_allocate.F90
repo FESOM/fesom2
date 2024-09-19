@@ -15,6 +15,7 @@ type(t_mesh), intent(in), target :: mesh
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
   n2=myDim_nod2D+eDim_nod2D
+  icb_outfreq = step_per_day / steps_per_ib_step
 
   allocate(ibhf(n2), ibfwb(n2), ibfwl(n2), ibfwe(n2), ibfwbv(n2))
   ibhf      = 0.0
@@ -92,14 +93,16 @@ type(t_mesh), intent(in), target :: mesh
   allocate(fwl_flux_ib(ib_num))
   allocate(fwb_flux_ib(ib_num))
   allocate(fwbv_flux_ib(ib_num))
-  allocate(heat_flux_ib(ib_num))
-  allocate(lheat_flux_ib(ib_num))
+  allocate(hfb_flux_ib(ib_num))
+  allocate(hfbv_flux_ib(ib_num))
+  allocate(lhfb_flux_ib(ib_num))
   fwe_flux_ib = 0.0
   fwl_flux_ib = 0.0
   fwb_flux_ib = 0.0
   fwbv_flux_ib = 0.0
-  heat_flux_ib = 0.0
-  lheat_flux_ib = 0.0
+  hfb_flux_ib = 0.0
+  hfbv_flux_ib = 0.0
+  lhfb_flux_ib = 0.0
   allocate(arr_block(15*ib_num))
   allocate(elem_block(ib_num))
   allocate(pe_block(ib_num))
