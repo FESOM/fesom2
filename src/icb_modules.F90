@@ -2,6 +2,9 @@ module iceberg_params
 use MOD_PARTIT
 USE MOD_MESH
 use g_config, only: use_cavity, use_cavityonelem
+use, intrinsic :: iso_fortran_env, only: real64
+USE o_PARAM, only: WP
+
 implicit none
 save
   !integer,parameter :: ib_num               ! realistic dataset comprising 6912 icebergs
@@ -77,7 +80,7 @@ save
   character(100):: scaling_file='icb_scaling.dat' !scaling factor
   
   !===== OUTPUT RELATED SETTINGS  =====
-  integer :: icb_outfreq = 180           ! 180; for FESOM_dt=2min this is 6 hourly output !120; for FESOM_dt=3min this is 6 hourly output
+  integer :: icb_outfreq           ! 180; for FESOM_dt=2min this is 6 hourly output !120; for FESOM_dt=3min this is 6 hourly output
   logical :: l_geo_out = .true.         ! output in unrotated (.true.) or rotated coordinates
   logical :: ascii_out = .false.        ! old ascii output (slow, more detailed); false: faster nc output
   !===== NUMERICS (DONT HAVE TO BE CHANGED) =====
@@ -90,11 +93,13 @@ save
   logical,dimension(:), allocatable:: find_iceberg_elem
   real,dimension(:), allocatable:: f_u_ib_old, f_v_ib_old
   real,dimension(:), allocatable:: bvl_mean, lvlv_mean, lvle_mean, lvlb_mean !averaged volume losses
-  !real,dimension(:), allocatable:: fw_flux_ib, heat_flux_ib
-  real,dimension(:), allocatable:: fwe_flux_ib, fwl_flux_ib, fwb_flux_ib, fwbv_flux_ib, heat_flux_ib, lheat_flux_ib
+  !real,dimension(:), allocatable:: fw_flux_ib, hfb_flux_ib
+  real,dimension(:), allocatable:: fwe_flux_ib, fwl_flux_ib, fwb_flux_ib, fwbv_flux_ib
+  real,dimension(:), allocatable:: hfe_flux_ib, hfl_flux_ib, hfb_flux_ib, hfbv_flux_ib, lhfb_flux_ib
   
   !===== FRESHWATER AND HEAT ARRAYS ON FESOM GRID =====
   real,dimension(:), allocatable:: ibhf    !icb heat flux into ocean 
+  real(kind=WP),dimension(:,:), allocatable:: ibhf_n    !icb heat flux into ocean
   real,dimension(:), allocatable:: ibfwb   !freshwater flux into ocean from basal melting
   real,dimension(:), allocatable:: ibfwbv   !freshwater flux into ocean from basal melting
   real,dimension(:), allocatable:: ibfwl   !freshwater flux into ocean from lateral melting
@@ -107,6 +112,8 @@ save
   !for communication
   real,dimension(:), allocatable:: arr_block
   integer,dimension(:), allocatable:: elem_block
+  integer,dimension(:), allocatable:: pe_block
+  real(real64), dimension(:), allocatable:: elem_area_glob
   real,dimension(:), allocatable:: vl_block
 
   !array for output in netcdf
@@ -119,8 +126,8 @@ save
  contains
  ! true if all nodes of the element are either "real" model boundary nodes or shelf nodes
  logical function reject_elem(mesh, partit, elem)
-
-integer, intent(in) :: elem
+ implicit none
+ integer, intent(in) :: elem
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
 #include "associate_mesh_def.h"
@@ -128,12 +135,9 @@ type(t_partit), intent(inout), target :: partit
 #include "associate_mesh_ass.h"
 #include "associate_part_ass.h"
 
-write(*,*) "LA DEBUG 3"
 if (use_cavity) then
 ! kh 09.08.21 change index_nod2d -> bc_index_nod2d?
  if (.not. use_cavityonelem) then
-   write(*,*) "LA DEBUG: cavity_depth = ", mesh%cavity_depth
-   write(*,*) "LA DEBUG: cavity_flag = ", mesh%cavity_depth(mesh%elem2D_nodes(:,elem))
    reject_elem = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
  !else
  end if
@@ -145,8 +149,8 @@ endif
  ! gives number of "coastal" nodes in cavity setup, i.e. number of nodes that are
  ! either "real" model boundary nodes or shelf nodes
  integer function coastal_nodes(mesh, partit, elem)
-
-integer, intent(in) :: elem
+ implicit none
+ integer, intent(in) :: elem
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
 #include "associate_mesh_def.h"

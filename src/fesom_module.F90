@@ -272,7 +272,7 @@ contains
         ! --------------
         ! LA icebergs: 2023-05-17 
         if (use_icebergs) then
-            call allocate_icb(f%partit)
+            call allocate_icb(f%partit, f%mesh)
         endif
         ! --------------
 
@@ -569,16 +569,6 @@ contains
             endif
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_timestep(n)'//achar(27)//'[0m'
             if (f%ice%ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh)  
-
-            
-            ! LA commented for debugging
-            ! --------------
-            ! LA icebergs: 2023-05-17 
-            if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
-                call icb2fesom(f%mesh, f%partit, f%ice)
-            end if
-            ! --------------
-
 
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
