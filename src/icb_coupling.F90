@@ -44,20 +44,7 @@ type(t_partit), intent(inout), target :: partit
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-    write(*,*) "LA DEBUG: ib ",ib,", i_have_element=",i_have_element,", localelement=",localelement
     if(i_have_element) then 
-        !iceberg_node=elem2D_nodes(1,localelement)
-
-        !if (iceberg_node<=mydim_nod2d) then
-        !    ibfwbv(iceberg_node)    = ibfwbv(iceberg_node)  - fwbv_flux_ib(ib)  /   mesh%area(1,iceberg_node)
-        !    ibfwb(iceberg_node)     = ibfwb(iceberg_node)   - fwb_flux_ib(ib)   /   mesh%area(1,iceberg_node)
-        !    ibfwl(iceberg_node)     = ibfwl(iceberg_node)   - fwl_flux_ib(ib)   /   mesh%area(1,iceberg_node)
-        !    ibfwe(iceberg_node)     = ibfwe(iceberg_node)   - fwe_flux_ib(ib)   /   mesh%area(1,iceberg_node)
-        !    ibhf(iceberg_node)      = ibhf(iceberg_node)    - hfb_flux_ib(ib)  /   mesh%area(1,iceberg_node)
-        !else
-        !    write(*,*) 'iceberg_node only communication node'
-        !end if
-
         dz = 0.0
         allocate(tot_area_nods_in_ib_elem(mesh%nl))
 

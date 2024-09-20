@@ -454,7 +454,6 @@ do m=1, 3
       !write(*,*) 'iceberg found in shelf region: left_mype = 1'
       old_iceberg_elem=ibelem_tmp
    end if
-   write(*,*) "LA DEBUG: elem found ",old_iceberg_elem
    RETURN 
   end if
  end do

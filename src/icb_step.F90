@@ -362,7 +362,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
 #include "associate_mesh_ass.h"
 
 
-write(*,*) "LA DEBUG: 1"
+!write(*,*) "LA DEBUG: 1"
  mype          =>partit%mype
 
  istep_end_synced = istep + steps_per_ib_step - 1
@@ -373,7 +373,7 @@ write(*,*) "LA DEBUG: 1"
  lon_rad = lon_deg*rad
  lat_rad = lat_deg*rad
  
-write(*,*) "LA DEBUG: 2"
+!write(*,*) "LA DEBUG: 2"
  if(volume_ib .le. smallestvol_icb) then
   melted(ib) = .true.
 
@@ -383,7 +383,7 @@ write(*,*) "LA DEBUG: 2"
 
   return
  end if 
-write(*,*) "LA DEBUG: 3"
+!write(*,*) "LA DEBUG: 3"
  
  if (firstcall) then
   if(mype==0) write(*,*) 'Preparing local_idx_of array...'
@@ -393,7 +393,7 @@ write(*,*) "LA DEBUG: 3"
   firstcall=.false.
   if(mype==0) write(*,*) 'Preparing local_idx_of done.' 
  end if 
-write(*,*) "LA DEBUG: 4"
+!write(*,*) "LA DEBUG: 4"
  
  if (find_iceberg_elem) then
   lon_rad = lon_deg*rad
@@ -407,23 +407,23 @@ write(*,*) "LA DEBUG: 4"
   call point_in_triangle(mesh, partit, iceberg_elem, coords_tmp)
   !call point_in_triangle(mesh, iceberg_elem, (/lon_deg, lat_deg/))
   i_have_element= (iceberg_elem .ne. 0) !up to 3 PEs possible
-write(*,*) "LA DEBUG: 4a"
+!write(*,*) "LA DEBUG: 4a"
   
   if(i_have_element) then
-write(*,*) "LA DEBUG: 4a1"
+!write(*,*) "LA DEBUG: 4a1"
    i_have_element= mesh%elem2D_nodes(1,iceberg_elem) <= partit%myDim_nod2D !1 PE still .true.
-write(*,*) "LA DEBUG: 4a2"
+!write(*,*) "LA DEBUG: 4a2"
    if( (use_cavity) .and. (reject_elem(mesh, partit, iceberg_elem))) then
     iceberg_elem=0 !reject element
     i_have_element=.false.
    else 
     iceberg_elem=partit%myList_elem2D(iceberg_elem) !global now
    end if
-write(*,*) "LA DEBUG: 4a3"
+!write(*,*) "LA DEBUG: 4a3"
   end if
-write(*,*) "LA DEBUG: 4b"
+!write(*,*) "LA DEBUG: 4b"
   call com_integer(partit, i_have_element,iceberg_elem)
-write(*,*) "LA DEBUG: 4c"
+!write(*,*) "LA DEBUG: 4c"
  
   if(iceberg_elem .EQ. 0) then
         write(*,*) 'IB ',ib,' rot. coords:', lon_deg, lat_deg !,lon_rad, lat_rad
@@ -432,9 +432,9 @@ write(*,*) "LA DEBUG: 4c"
   end if
   
   ! initialize the iceberg velocity
-write(*,*) "LA DEBUG: 4d"
+!write(*,*) "LA DEBUG: 4d"
   call initialize_velo(mesh, partit, dynamics, i_have_element, ib, u_ib, v_ib, lon_rad, lat_rad, depth_ib, local_idx_of(iceberg_elem))
-write(*,*) "LA DEBUG: 4e"
+!write(*,*) "LA DEBUG: 4e"
 
   !iceberg elem of ib is found
   find_iceberg_elem = .false.
@@ -451,10 +451,10 @@ write(*,*) "LA DEBUG: 4e"
       
     endif
   endif
-write(*,*) "LA DEBUG: 4f"
+!write(*,*) "LA DEBUG: 4f"
  end if
  
-write(*,*) "LA DEBUG: 5"
+!write(*,*) "LA DEBUG: 5"
  
  ! ================== START ICEBERG CALCULATION ====================
  
@@ -467,6 +467,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 write(*,*) "LA DEBUG: 5a"
 
   if( elem2D_nodes(1,local_idx_of(iceberg_elem)) <= partit%myDim_nod2D ) then
+write(*,*) "LA DEBUG: 5b"
 
   i_have_element=.true. 
 
@@ -520,6 +521,7 @@ write(*,*) "LA DEBUG: 5a"
 
  
  t0=MPI_Wtime()
+write(*,*) "LA DEBUG: before_trajectory"
   call trajectory( lon_rad,lat_rad, u_ib,v_ib, new_u_ib,new_v_ib, &
 		   lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
   	   
@@ -585,6 +587,7 @@ write(*,*) "LA DEBUG: end_loop_saturation"
         u_ib    = 0.
         v_ib    = 0.  
     end if
+write(*,*) "LA DEBUG: after_cell_saturation"
   end if
   !###########################################
  
@@ -598,7 +601,9 @@ write(*,*) "LA DEBUG: end_loop_saturation"
   pe_block(ib)=mype
 
   volume_ib=height_ib_single*length_ib_single*width_ib_single
+write(*,*) "LA DEBUG: before_prepare"
   call prepare_icb2fesom(mesh,partit,ib,i_have_element,local_idx_of(iceberg_elem),depth_ib)
+write(*,*) "LA DEBUG: after_prepare"
  end if !processor has element?
 end if !... and first node belongs to processor?
 
