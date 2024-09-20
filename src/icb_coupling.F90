@@ -110,12 +110,18 @@ type(t_partit), intent(inout), target :: partit
                     end if              
                     
                     if( depth_ib==0.0 ) then
-                        ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) - hfbv_flux_ib(ib) / tot_area_nods_in_ib_elem(j)
+                        ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) & 
+                                                    - ((hfbv_flux_ib(ib)+hfl_flux_ib(ib)) &
+                                                    + hfe_flux_ib(ib)) / tot_area_nods_in_ib_elem(j)
                     else
-                        ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) - hfbv_flux_ib(ib) * (dz / depth_ib) / tot_area_nods_in_ib_elem(j)
+                        ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) & 
+                                                    - ((hfbv_flux_ib(ib)+hfl_flux_ib(ib)) * (dz / abs(depth_ib)) & 
+                                                    + hfe_flux_ib(ib) * (dz / abs(height_ib(ib)))) &
+                                                    / tot_area_nods_in_ib_elem(j)
                     end if
                 end do
                 ibhf_n(idx_d(i),iceberg_node) = ibhf_n(idx_d(i),iceberg_node) - hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i))
+                ibhf_n(1,iceberg_node) = ibhf_n(1,iceberg_node) - hfe_flux_ib(ib) * ((abs(height_ib(ib))-abs(depth_ib))/abs(height_ib(ib))) / tot_area_nods_in_ib_elem(1)
             end if
         end do
     end if

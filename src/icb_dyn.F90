@@ -139,8 +139,8 @@ type(t_dyn)   , intent(inout), target :: dynamics
   call iceberg_meltrates(partit, M_b, M_v, M_e, M_bv, &
 				u_ib,v_ib, uo_ib,vo_ib, ua_ib,va_ib, &
 				sst_ib, length_ib, conci_ib, &
-				uo_skin_ib, vo_skin_ib, T_keel_ib, S_keel_ib, depth_ib, &
-				T_ave_ib, S_ave_ib, ib)
+				uo_skin_ib, vo_skin_ib, T_keel_ib, S_keel_ib, depth_ib, height_ib, &
+				T_ave_ib, S_ave_ib, ib, rho_icb)
 
   call iceberg_newdimensions(partit, ib, depth_ib,height_ib,length_ib,width_ib,M_b,M_v,M_e,M_bv, &
 			     rho_h2o, rho_icb, file3)

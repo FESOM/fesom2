@@ -20,7 +20,7 @@ subroutine iceberg_meltrates(partit, M_b, M_v, M_e, M_bv, &
 				u_ib,v_ib, uo_ib,vo_ib, ua_ib,va_ib, &
 				sst_ib, length_ib, conci_ib, &
 				uo_keel_ib, vo_keel_ib, T_keel_ib, S_keel_ib, depth_ib, &
-				T_ave_ib, S_ave_ib, ib)
+				T_ave_ib, S_ave_ib, ib, rho_icb)
   
   use o_param
   use MOD_PARTIT
@@ -28,18 +28,20 @@ subroutine iceberg_meltrates(partit, M_b, M_v, M_e, M_bv, &
   use g_forcing_arrays
   use g_rotate_grid
 
-  use iceberg_params, only: fwe_flux_ib, fwl_flux_ib, fwb_flux_ib, fwbv_flux_ib, hfb_flux_ib, hfbv_flux_ib, scaling
-  
+  use iceberg_params, only: fwe_flux_ib, fwl_flux_ib, fwb_flux_ib, fwbv_flux_ib, hfb_flux_ib, hfbv_flux_ib, hfe_flux_ib, hfl_flux_ib, height_ib, scaling
   implicit none
+  
+  ! LA: include latent heat 2023-04-04
+  real(kind=8),parameter ::  L                  = 334000.                   ! [J/Kg]
   
   real, intent(IN)	:: u_ib,v_ib, uo_ib,vo_ib, ua_ib,va_ib	!iceberg velo, (int.) ocean & atm velo
   real, intent(IN)	:: uo_keel_ib, vo_keel_ib		!ocean velo at iceberg's draft
-  real, intent(IN)	:: sst_ib, length_ib, conci_ib 		!SST, length and sea ice conc.
-  real, intent(IN)	:: T_keel_ib, S_keel_ib, depth_ib	!T & S at depth 'depth_ib'
+  real, intent(IN)	:: sst_ib, length_ib, conci_ib, rho_icb 		!SST, length and sea ice conc.
+  real, intent(IN)	:: T_keel_ib, S_keel_ib, depth_ib !T & S at depth 'depth_ib'
   real, intent(IN)	:: T_ave_ib, S_ave_ib			!T & S averaged, i.e. at 'depth_ib/2'
   integer, intent(IN)	:: ib					!iceberg ID
   real, intent(OUT)	:: M_b, M_v, M_e, M_bv			!melt rates [m (ice) per s]	
-  real 	            :: H_b, H_bv			!melt rates [m (ice) per s]	
+  real 	            :: H_b, H_v, H_e, H_bv			!melt rates [m (ice) per s]	
   	
   
   real			:: absamino, damping, sea_state, v_ibmino
@@ -74,6 +76,8 @@ type(t_partit), intent(inout), target :: partit
   !M_v is a function of the 'thermal driving', NOT just sst! Cf. Neshyba and Josberger (1979)
   M_v = 0.00762 * T_d + 0.00129 * T_d**2
   M_v = M_v/86400.
+  H_v = M_v * rho_icb * L
+  hfl_flux_ib = H_v * (2*length_ib*abs(depth_ib)  + 2*length_ib*abs(depth_ib) ) * scaling(ib)
   !fwl_flux_ib = M_v
 
   !wave erosion
@@ -82,6 +86,8 @@ type(t_partit), intent(inout), target :: partit
   damping = 0.5 * (1.0 + cos(conci_ib**3 * Pi))
   M_e = 1./6. * sea_state * (sst_ib + 2.0) * damping
   M_e = M_e/86400.
+  H_e = M_e * rho_icb * L
+  hfe_flux_ib = H_e * (length_ib*abs(height_ib)  + length_ib*abs(height_ib) ) * scaling(ib)
   !fwe_flux_ib = M_e  
 end subroutine iceberg_meltrates
 
@@ -104,7 +110,7 @@ subroutine iceberg_newdimensions(partit, ib, depth_ib,height_ib,length_ib,width_
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
-  use iceberg_params, only: l_weeksmellor, ascii_out, icb_outfreq, vl_block, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, smallestvol_icb, fwb_flux_ib, fwe_flux_ib, fwbv_flux_ib, fwl_flux_ib, scaling, hfb_flux_ib, hfbv_flux_ib, lhfb_flux_ib
+  use iceberg_params, only: l_weeksmellor, ascii_out, icb_outfreq, vl_block, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, smallestvol_icb, fwb_flux_ib, fwe_flux_ib, fwbv_flux_ib, fwl_flux_ib, scaling, hfb_flux_ib, hfbv_flux_ib, hfe_flux_ib, hfl_flux_ib, lhfb_flux_ib
   use g_config, only: steps_per_ib_step
 
   implicit none  
@@ -112,6 +118,7 @@ subroutine iceberg_newdimensions(partit, ib, depth_ib,height_ib,length_ib,width_
   integer, intent(IN)	:: ib
   real, intent(INOUT)	:: depth_ib, height_ib, length_ib, width_ib
   real, intent(IN)	:: M_b, M_v, M_e, M_bv, rho_h2o, rho_icb
+  real              :: hf_tot_tmp
   character, intent(IN)	:: file_meltrates*80
   
   real			:: dh_b, dh_v, dh_e, dh_bv, bvl, lvl_b, lvl_v, lvl_e, tvl, volume_before, volume_after
@@ -154,7 +161,7 @@ type(t_partit), intent(inout), target :: partit
 
     if((tvl .ge. volume_before) .OR. (volume_before .le. smallestvol_icb)) then
     	volume_after=0.0    	
-	depth_ib = 0.0
+	    depth_ib = 0.0
     	height_ib= 0.0
     	length_ib= 0.0
     	width_ib = 0.0
@@ -243,9 +250,14 @@ type(t_partit), intent(inout), target :: partit
     ! Lateral heat flux set to latent heat and basal heat flux set to zero
     if( lmin_latent_hf ) then
         lhfb_flux_ib(ib) = rho_icb*L*tvl*scaling(ib)/dt/REAL(steps_per_ib_step)
-        if( (hfb_flux_ib(ib)+hfbv_flux_ib(ib) >= 0.0) .and. (hfb_flux_ib(ib)+hfbv_flux_ib(ib) < lhfb_flux_ib(ib))) then
-            hfbv_flux_ib(ib)=-lhfb_flux_ib(ib)
-            hfb_flux_ib(ib)=0.0
+
+        hf_tot_tmp = hfb_flux_ib(ib)+hfbv_flux_ib(ib)+hfl_flux_ib(ib)+hfe_flux_ib(ib)
+
+        if( (hf_tot_tmp >= 0.0) .and. (hf_tot_tmp < lhfb_flux_ib(ib))) then
+            hfe_flux_ib(ib)=-lhfb_flux_ib(ib) * abs(hfe_flux_ib(ib)/hf_tot_tmp)
+            hfl_flux_ib(ib)=-lhfb_flux_ib(ib) * abs(hfl_flux_ib(ib)/hf_tot_tmp)
+            hfb_flux_ib(ib)=-lhfb_flux_ib(ib) * abs(hfb_flux_ib(ib)/hf_tot_tmp)
+            hfbv_flux_ib(ib)=-lhfb_flux_ib(ib) * abs(hfbv_flux_ib(ib)/hf_tot_tmp)
         end if
     end if
     ! -----------------------

@@ -521,7 +521,7 @@ write(*,*) "LA DEBUG: 5b"
 
  
  t0=MPI_Wtime()
-write(*,*) "LA DEBUG: before_trajectory"
+!write(*,*) "LA DEBUG: before_trajectory"
   call trajectory( lon_rad,lat_rad, u_ib,v_ib, new_u_ib,new_v_ib, &
 		   lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
   	   
@@ -557,9 +557,9 @@ write(*,*) "LA DEBUG: before_trajectory"
 
   !-----------------------------
   ! LA 2022-11-30
-write(*,*) "LA DEBUG: before_saturation"
+!write(*,*) "LA DEBUG: before_saturation"
   if(lcell_saturation) then
-write(*,*) "LA DEBUG: start_saturation"
+!write(*,*) "LA DEBUG: start_saturation"
     area_ib_tot = length_ib_single*width_ib_single*scaling(ib)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(idx, area_ib_tot)
 !$OMP DO
@@ -568,7 +568,7 @@ write(*,*) "LA DEBUG: start_saturation"
             area_ib_tot = area_ib_tot + length_ib(idx) * width_ib(idx) * scaling(idx)
         end if
     end do
-write(*,*) "LA DEBUG: end_loop_saturation"
+!write(*,*) "LA DEBUG: end_loop_saturation"
 !$OMP END DO
 !$OMP END PARALLEL
   !-----------------------------
@@ -587,7 +587,7 @@ write(*,*) "LA DEBUG: end_loop_saturation"
         u_ib    = 0.
         v_ib    = 0.  
     end if
-write(*,*) "LA DEBUG: after_cell_saturation"
+!write(*,*) "LA DEBUG: after_cell_saturation"
   end if
   !###########################################
  
@@ -601,9 +601,9 @@ write(*,*) "LA DEBUG: after_cell_saturation"
   pe_block(ib)=mype
 
   volume_ib=height_ib_single*length_ib_single*width_ib_single
-write(*,*) "LA DEBUG: before_prepare"
+!write(*,*) "LA DEBUG: before_prepare"
   call prepare_icb2fesom(mesh,partit,ib,i_have_element,local_idx_of(iceberg_elem),depth_ib)
-write(*,*) "LA DEBUG: after_prepare"
+!write(*,*) "LA DEBUG: after_prepare"
  end if !processor has element?
 end if !... and first node belongs to processor?
 
