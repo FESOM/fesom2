@@ -20,7 +20,7 @@ MODULE io_RESTART
 #endif
   
   implicit none
-  public :: restart, finalize_restart
+  public :: write_initial_conditions, read_initial_conditions, finalize_restart
   private
 
   integer,       save       :: globalstep=0 ! todo: remove this from module scope as it will mess things up if we use async read/write from the same process
@@ -47,23 +47,18 @@ MODULE io_RESTART
 !--------------------------------------------------------------------------------------------
 ! ini_ocean_io initializes ocean_file datatype which contains information of all variables need to be written into 
 ! the ocean restart file. This is the only place need to be modified if a new variable is added!
-subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
+subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
 #ifdef ENABLE_NVHPC_WORKAROUNDS
   use nvfortran_subarray_workaround_module
 #endif
-  integer, intent(in)       :: year
   integer                   :: j
   character(500)            :: longname
   character(500)            :: trname, units
-  character(4)              :: cyear
   type(t_mesh), target :: mesh
   type(t_partit), intent(inout), target :: partit
   type(t_tracer), target :: tracers
   type(t_dyn), target :: dynamics
   logical, save :: has_been_called = .false.
-
-  write(cyear,'(i4)') year
-  oce_path = trim(ResultPath)//trim(runid)//'.'//cyear//'.oce.restart.nc'
 
   if(has_been_called) return
   has_been_called = .true.
@@ -153,16 +148,11 @@ end subroutine ini_ocean_io
 !--------------------------------------------------------------------------------------------
 ! ini_ice_io initializes ice_file datatype which contains information of all variables need to be written into
 ! the ice restart file. This is the only place need to be modified if a new variable is added!
-subroutine ini_ice_io(year, ice, partit, mesh)
-  integer,      intent(in)  :: year
-  character(4)              :: cyear
+subroutine ini_ice_io(ice, partit, mesh)
   type(t_mesh), intent(in) , target :: mesh
   type(t_partit), intent(inout), target :: partit
   type(t_ice), target :: ice
   logical, save :: has_been_called = .false.
-
-  write(cyear,'(i4)') year
-  ice_path = trim(ResultPath)//trim(runid)//'.'//cyear//'.ice.restart.nc'
 
   if(has_been_called) return
   has_been_called = .true.
@@ -198,20 +188,16 @@ end subroutine ini_ice_io
 ! ini_bio_io initializes bid datatype which contains information of all variables need to be written into
 ! the bio restart file. This is the only place need to be modified if a new variable is added!
 #if defined(__recom)
-subroutine ini_bio_io(year, tracers, partit, mesh)
-    integer,      intent(in)  :: year
+subroutine ini_bio_io(tracers, partit, mesh)
     integer                   :: j
     character(500)            :: longname
     character(500)            :: trname, units
-    character(4)              :: cyear
 
     type(t_mesh), intent(in) , target :: mesh
     type(t_partit), intent(inout), target :: partit
     type(t_tracer), target :: tracers
     logical, save :: has_been_called = .false.
 
-    write(cyear,'(i4)') year
-    bio_path = trim(ResultPath)//trim(runid)//'.'//cyear//'.bio.restart.nc'
 
     if(has_been_called) return
     has_been_called = .true.
@@ -231,19 +217,125 @@ end subroutine ini_bio_io
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tracers, partit, mesh)
 
+!! This is the main restart subroutine
+!! We check the different restart options (raw, binary, netcdf) in that order and try loading the first one
+subroutine read_initial_conditions(istep, nstart, ntotal, which_readr, ice, dynamics, tracers, partit, mesh)
 #if defined(__icepack)
   icepack restart not merged here ! produce a compiler error if USE_ICEPACK=ON; todo: merge icepack restart from 68d8b8b
 #endif
 
   use fortran_utils
   implicit none
-  ! this is the main restart subroutine
-  ! if l_read   is TRUE the restart file will be read
 
   integer :: istep, nstart, ntotal
-  logical :: l_read
+  logical :: is_portable_restart_write, is_raw_restart_write, is_bin_restart_write
+  type(t_mesh)  , intent(inout), target :: mesh
+  type(t_partit), intent(inout), target :: partit
+  type(t_tracer), intent(inout), target :: tracers
+  type(t_dyn)   , intent(inout), target :: dynamics
+  type(t_ice)   , intent(inout), target :: ice
+  !which_readr = ...
+  ! 0 ... read netcdf restart
+  ! 1 ... read dump file restart (binary)
+  ! 2 ... read derived type restart (binary) 
+  integer, intent(out):: which_readr
+
+  logical rawfiles_exist, binfiles_exist
+  integer mpierr
+  integer             :: cstep
+  character(4)              :: cyear    !! used in string for oce_path
+
+
+  ! compute current time based on what is written in fesom.clock file
+  ctime=timeold+(dayold-1.)*86400
+
+  raw_restart_dirpath  = trim(RestartPath)//"fesom_raw_restart/np"//int_to_txt(partit%npes)
+  raw_restart_infopath = trim(RestartPath)//"fesom_raw_restart/np"//int_to_txt(partit%npes)//".info"
+  bin_restart_dirpath  = trim(RestartPath)//"fesom_bin_restart/np"//int_to_txt(partit%npes)
+  bin_restart_infopath = trim(RestartPath)//"fesom_bin_restart/np"//int_to_txt(partit%npes)//".info"
+
+  write(cyear,'(i4)') yearold
+  oce_path = trim(RestartPath)//trim(runid)//'.'//cyear//'.oce.restart.nc'
+  ice_path = trim(RestartPath)//trim(runid)//'.'//cyear//'.ice.restart.nc'
+#if defined(__recom)
+  bio_path = trim(RestartPath)//trim(runid)//'.'//cyear//'.bio.restart.nc'
+#endif
+
+  call ini_ocean_io(dynamics, tracers, partit, mesh)
+  if (use_ice) call ini_ice_io  (ice, partit, mesh)
+#if defined(__recom)
+  if (use_REcoM) call ini_bio_io  (tracers, partit, mesh)
+#endif
+
+  ! determine if we can load raw restart dump files --> check if *.info file for 
+  ! raw restarts exist --> if info file exist also the rest must exist --> so 
+  ! core dump restart is readable
+  if(partit%mype == RAW_RESTART_METADATA_RANK) then
+    inquire(file=raw_restart_infopath, exist=rawfiles_exist)
+  end if
+  call MPI_Bcast(rawfiles_exist, 1, MPI_LOGICAL, RAW_RESTART_METADATA_RANK, partit%MPI_COMM_FESOM, mpierr)
+  
+  ! check if folder for derived type binary restarts exist
+  if(partit%mype == RAW_RESTART_METADATA_RANK) then
+    inquire(file=bin_restart_infopath, exist=binfiles_exist)
+  end if
+  call MPI_Bcast(binfiles_exist, 1, MPI_LOGICAL, RAW_RESTART_METADATA_RANK, partit%MPI_COMM_FESOM, mpierr)
+  
+  !___________________________________________________________________________
+  ! read core dump file restart
+  if(rawfiles_exist) then
+      which_readr = 1
+      call read_all_raw_restarts(partit%MPI_COMM_FESOM, partit%mype)
+ 
+  !___________________________________________________________________________
+  ! read derived type binary file restart
+  elseif(binfiles_exist .and. bin_restart_length_unit /= "off") then
+      which_readr = 2
+      if (use_ice) then 
+          call read_all_bin_restarts(bin_restart_dirpath, &
+                                     partit   = partit,   &
+                                     mesh     = mesh,     &
+                                     ice      = ice,      &
+                                     dynamics = dynamics, &
+                                     tracers  = tracers   )
+      else
+          call read_all_bin_restarts(bin_restart_dirpath, &
+                                     partit   = partit,   &
+                                     mesh     = mesh,     &                    
+                                     dynamics = dynamics, &
+                                     tracers  = tracers   )
+      end if     
+  !___________________________________________________________________________
+  ! read netcdf file restart
+  else
+      which_readr = 0
+      if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ocean'//achar(27)//'[0m'
+      call read_restart(oce_path, oce_files, partit%MPI_COMM_FESOM, partit%mype)
+      if (use_ice) then
+          if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ice'//achar(27)//'[0m'
+          call read_restart(ice_path, ice_files, partit%MPI_COMM_FESOM, partit%mype)
+      end if 
+
+#if defined(__recom)
+!ROM restart
+!rd here
+          if (REcoM_restart) then
+                  if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: bio'//achar(27)//'[0m'
+              call read_restart(bio_path, bio_files, partit%MPI_COMM_FESOM, partit%mype)
+          end if
+#endif
+
+  end if
+
+end subroutine read_initial_conditions
+
+!! this is the main restart writing routine, now named write_initial_conditions
+subroutine write_initial_conditions(istep, nstart, ntotal, ice, dynamics, tracers, partit, mesh)
+  use fortran_utils
+  implicit none
+
+  integer :: istep, nstart, ntotal
   logical :: is_portable_restart_write, is_raw_restart_write, is_bin_restart_write
   type(t_mesh)  , intent(inout), target :: mesh
   type(t_partit), intent(inout), target :: partit
@@ -254,14 +346,23 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   logical, save :: initialized_raw = .false.
   logical, save :: initialized_bin = .false.
   integer mpierr
-  
-  !which_readr = ...
-  ! 0 ... read netcdf restart
-  ! 1 ... read dump file restart (binary)
-  ! 2 ... read derived type restart (binary) 
-  integer, intent(out):: which_readr
-  
+  character(4)              :: cyear    !! used in string for oce_path
   integer             :: cstep
+
+  ! now for writing we need to change the paths for the restart files
+  write(cyear,'(i4)') yearnew
+  oce_path = trim(ResultPath)//trim(runid)//'.'//cyear//'.oce.restart.nc'
+  ice_path = trim(ResultPath)//trim(runid)//'.'//cyear//'.ice.restart.nc'
+#if defined(__recom)
+  bio_path = trim(ResultPath)//trim(runid)//'.'//cyear//'.bio.restart.nc'
+#endif
+
+  call ini_ocean_io(dynamics, tracers, partit, mesh)
+  if (use_ice) call ini_ice_io  (ice, partit, mesh)
+#if defined(__recom)
+  if (use_REcoM) call ini_bio_io  (tracers, partit, mesh)
+#endif
+
   !_____________________________________________________________________________
   ! initialize directory for core dump restart 
   if(.not. initialized_raw) then
@@ -298,105 +399,7 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   ! compute current time based on what is written in fesom.clock file
   ctime=timeold+(dayold-1.)*86400
   
-  !_____________________________________________________________________________
-  ! initialise files for netcdf restart if l_read==TRUE --> the restart file 
-  ! will be read
-  if (.not. l_read) then
-               call ini_ocean_io(yearnew, dynamics, tracers, partit, mesh)
-  if (use_ice) call ini_ice_io  (yearnew, ice, partit, mesh)
-#if defined(__recom)
-    if (use_REcoM) call ini_bio_io  (yearnew, tracers, partit, mesh)
-#endif
-  else
-               call ini_ocean_io(yearold, dynamics, tracers, partit, mesh)
-  if (use_ice) call ini_ice_io  (yearold, ice, partit, mesh)
-#if defined(__recom)
-    if (REcoM_restart) call ini_bio_io(yearold, tracers, partit, mesh)
-#endif
-  end if
 
-  !___READING OF RESTART________________________________________________________
-  ! should restart files be readed --> see r_restart in gen_modules_clock.F90
-  if (l_read) then
-    ! determine if we can load raw restart dump files --> check if *.info file for 
-    ! raw restarts exist --> if info file exist also the rest must exist --> so 
-    ! core dump restart is readable
-    if(partit%mype == RAW_RESTART_METADATA_RANK) then
-      inquire(file=raw_restart_infopath, exist=rawfiles_exist)
-    end if
-    call MPI_Bcast(rawfiles_exist, 1, MPI_LOGICAL, RAW_RESTART_METADATA_RANK, partit%MPI_COMM_FESOM, mpierr)
-    
-    ! check if folder for derived type binary restarts exist
-    if(partit%mype == RAW_RESTART_METADATA_RANK) then
-      inquire(file=bin_restart_infopath, exist=binfiles_exist)
-    end if
-    call MPI_Bcast(binfiles_exist, 1, MPI_LOGICAL, RAW_RESTART_METADATA_RANK, partit%MPI_COMM_FESOM, mpierr)
-    
-    !___________________________________________________________________________
-    ! read core dump file restart
-    if(rawfiles_exist) then
-        which_readr = 1
-        call read_all_raw_restarts(partit%MPI_COMM_FESOM, partit%mype)
- 
-    !___________________________________________________________________________
-    ! read derived type binary file restart
-    elseif(binfiles_exist .and. bin_restart_length_unit /= "off") then
-        which_readr = 2
-        if (use_ice) then 
-            call read_all_bin_restarts(bin_restart_dirpath, &
-                                       partit   = partit,   &
-                                       mesh     = mesh,     &
-                                       ice      = ice,      &
-                                       dynamics = dynamics, &
-                                       tracers  = tracers   )
-        else
-            call read_all_bin_restarts(bin_restart_dirpath, &
-                                       partit   = partit,   &
-                                       mesh     = mesh,     &                    
-                                       dynamics = dynamics, &
-                                       tracers  = tracers   )
-        end if     
-    !___________________________________________________________________________
-    ! read netcdf file restart
-    else
-        which_readr = 0
-        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ocean'//achar(27)//'[0m'
-        call read_restart(oce_path, oce_files, partit%MPI_COMM_FESOM, partit%mype)
-        if (use_ice) then
-            if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ice'//achar(27)//'[0m'
-            call read_restart(ice_path, ice_files, partit%MPI_COMM_FESOM, partit%mype)
-        end if 
-
-#if defined(__recom)
-!RECOM restart
-!read here
-            if (REcoM_restart) then
-                    if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: bio'//achar(27)//'[0m'
-                call read_restart(bio_path, bio_files, partit%MPI_COMM_FESOM, partit%mype)
-            end if
-#endif
-
-        ! immediately create a raw core dump restart
-        if(raw_restart_length_unit /= "off") then
-            call write_all_raw_restarts(istep, partit%MPI_COMM_FESOM, partit%mype)
-        end if
-        
-        ! immediately create a derived type binary restart
-        if(bin_restart_length_unit /= "off") then
-            ! current (total) model step --> cstep = globalstep+istep
-            call write_all_bin_restarts((/globalstep+istep, int(ctime), yearnew/),      &
-                                        bin_restart_dirpath,                 &
-                                        bin_restart_infopath,                &
-                                        partit,                              &
-                                        mesh,                                &                                        
-                                        ice,                                 &
-                                        dynamics,                            &
-                                        tracers                              )
-        end if
-    end if
-  end if
-
-  if (istep==0) return
     
   !___WRITING OF RESTART________________________________________________________  
   ! check whether restart will be written
@@ -470,7 +473,7 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
     end if
   end if
 
-end subroutine restart
+end subroutine write_initial_conditions
 !
 !
 !_______________________________________________________________________________
@@ -877,6 +880,8 @@ subroutine read_restart(path, filegroup, mpicomm, mype)
   
   allocate(skip_file(filegroup%nfiles))
   skip_file = .false.
+
+  write(*,*) path
   
   do i=1, filegroup%nfiles
     current_iorank_snd = 0

@@ -34,11 +34,13 @@ subroutine setup_model(partit)
   read (fileunit, NML=geometry)
   read (fileunit, NML=calendar)
   read (fileunit, NML=run_config)
-  read (fileunit,NML=icebergs)
 
 !!$  read (fileunit, NML=machine)
   close (fileunit)
-  
+
+  ! by default use ResultPath for RestartPath
+  if (RestartPath == 'same-as-result') RestartPath = ResultPath
+
   
   ! ==========
   ! compute dt
