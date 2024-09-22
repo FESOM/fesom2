@@ -38,8 +38,9 @@ subroutine setup_model(partit)
 !!$  read (fileunit, NML=machine)
   close (fileunit)
 
-  ! by default use ResultPath for RestartPath
-  if (RestartPath == 'same-as-result') RestartPath = ResultPath
+  ! by default use ResultPath for RestartInPath and RestartOutPath
+  if (RestartInPath == 'same-as-result') RestartInPath = ResultPath
+  if (RestartOutPath == 'same-as-result') RestartOutPath = ResultPath
 
   
   ! ==========

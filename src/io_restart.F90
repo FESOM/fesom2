@@ -250,16 +250,16 @@ subroutine read_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyna
   ! compute current time based on what is written in fesom.clock file
   ctime=timeold+(dayold-1.)*86400
 
-  raw_restart_dirpath  = trim(RestartPath)//"fesom_raw_restart/np"//int_to_txt(partit%npes)
-  raw_restart_infopath = trim(RestartPath)//"fesom_raw_restart/np"//int_to_txt(partit%npes)//".info"
-  bin_restart_dirpath  = trim(RestartPath)//"fesom_bin_restart/np"//int_to_txt(partit%npes)
-  bin_restart_infopath = trim(RestartPath)//"fesom_bin_restart/np"//int_to_txt(partit%npes)//".info"
+  raw_restart_dirpath  = trim(RestartInPath)//"fesom_raw_restart/np"//int_to_txt(partit%npes)
+  raw_restart_infopath = trim(RestartInPath)//"fesom_raw_restart/np"//int_to_txt(partit%npes)//".info"
+  bin_restart_dirpath  = trim(RestartInPath)//"fesom_bin_restart/np"//int_to_txt(partit%npes)
+  bin_restart_infopath = trim(RestartInPath)//"fesom_bin_restart/np"//int_to_txt(partit%npes)//".info"
 
   write(cyear,'(i4)') yearold
-  oce_path = trim(RestartPath)//trim(runid)//'.'//cyear//'.oce.restart.nc'
-  ice_path = trim(RestartPath)//trim(runid)//'.'//cyear//'.ice.restart.nc'
+  oce_path = trim(RestartInPath)//trim(runid)//'.'//cyear//'.oce.restart.nc'
+  ice_path = trim(RestartInPath)//trim(runid)//'.'//cyear//'.ice.restart.nc'
 #if defined(__recom)
-  bio_path = trim(RestartPath)//trim(runid)//'.'//cyear//'.bio.restart.nc'
+  bio_path = trim(RestartInPath)//trim(runid)//'.'//cyear//'.bio.restart.nc'
 #endif
 
   call ini_ocean_io(dynamics, tracers, partit, mesh)
@@ -351,10 +351,10 @@ subroutine write_initial_conditions(istep, nstart, ntotal, ice, dynamics, tracer
 
   ! now for writing we need to change the paths for the restart files
   write(cyear,'(i4)') yearnew
-  oce_path = trim(ResultPath)//trim(runid)//'.'//cyear//'.oce.restart.nc'
-  ice_path = trim(ResultPath)//trim(runid)//'.'//cyear//'.ice.restart.nc'
+  oce_path = trim(RestartOutPath)//trim(runid)//'.'//cyear//'.oce.restart.nc'
+  ice_path = trim(RestartOutPath)//trim(runid)//'.'//cyear//'.ice.restart.nc'
 #if defined(__recom)
-  bio_path = trim(ResultPath)//trim(runid)//'.'//cyear//'.bio.restart.nc'
+  bio_path = trim(RestartOutPath)//trim(runid)//'.'//cyear//'.bio.restart.nc'
 #endif
 
   call ini_ocean_io(dynamics, tracers, partit, mesh)
@@ -367,12 +367,12 @@ subroutine write_initial_conditions(istep, nstart, ntotal, ice, dynamics, tracer
   ! initialize directory for core dump restart 
   if(.not. initialized_raw) then
     initialized_raw = .true.
-    raw_restart_dirpath  = trim(ResultPath)//"fesom_raw_restart/np"//int_to_txt(partit%npes)
-    raw_restart_infopath = trim(ResultPath)//"fesom_raw_restart/np"//int_to_txt(partit%npes)//".info"
+    raw_restart_dirpath  = trim(RestartOutPath)//"fesom_raw_restart/np"//int_to_txt(partit%npes)
+    raw_restart_infopath = trim(RestartOutPath)//"fesom_raw_restart/np"//int_to_txt(partit%npes)//".info"
     if(raw_restart_length_unit /= "off") then
       if(partit%mype == RAW_RESTART_METADATA_RANK) then
         ! execute_command_line with mkdir sometimes fails, use a custom implementation around mkdir from C instead
-        call mkdir(trim(ResultPath)//"fesom_raw_restart") ! we have no mkdir -p, create the intermediate dirs separately
+        call mkdir(trim(RestartOutPath)//"fesom_raw_restart") ! we have no mkdir -p, create the intermediate dirs separately
         call mkdir(raw_restart_dirpath)
       end if
       call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr) ! make sure the dir has been created before we continue...
@@ -383,12 +383,12 @@ subroutine write_initial_conditions(istep, nstart, ntotal, ice, dynamics, tracer
   ! initialize directory for derived type binary restart
   if(.not. initialized_bin) then
     initialized_bin = .true.
-    bin_restart_dirpath  = trim(ResultPath)//"fesom_bin_restart/np"//int_to_txt(partit%npes)
-    bin_restart_infopath = trim(ResultPath)//"fesom_bin_restart/np"//int_to_txt(partit%npes)//".info"
+    bin_restart_dirpath  = trim(RestartOutPath)//"fesom_bin_restart/np"//int_to_txt(partit%npes)
+    bin_restart_infopath = trim(RestartOutPath)//"fesom_bin_restart/np"//int_to_txt(partit%npes)//".info"
     if(bin_restart_length_unit /= "off") then
         if(partit%mype == RAW_RESTART_METADATA_RANK) then
             ! execute_command_line with mkdir sometimes fails, use a custom implementation around mkdir from C instead
-            call mkdir(trim(ResultPath)//"fesom_bin_restart") ! we have no mkdir -p, create the intermediate dirs separately
+            call mkdir(trim(RestartOutPath)//"fesom_bin_restart") ! we have no mkdir -p, create the intermediate dirs separately
             call mkdir(bin_restart_dirpath)
         end if
         call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr) ! make sure the dir has been created before we continue...
@@ -800,6 +800,7 @@ subroutine read_all_raw_restarts(mpicomm, mype)
   call MPI_Bcast(globalstep, 1, MPI_INTEGER, RAW_RESTART_METADATA_RANK, mpicomm, mpierr)
 
   open(newunit = fileunit, status = 'old', iostat = status, file = raw_restart_dirpath//'/'//mpirank_to_txt(mpicomm)//'.dump', form = 'unformatted')
+
   if(status == 0) then
     call read_raw_restart_group(oce_files, fileunit)
     if(use_ice) call read_raw_restart_group(ice_files, fileunit)

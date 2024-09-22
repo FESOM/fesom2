@@ -83,7 +83,7 @@ contains
     yearstart=yearnew
 
     ! init clock for this run
-    open(99,file=trim(RestartPath)//trim(runid)//'.clock',status='old')
+    open(99,file=trim(RestartInPath)//trim(runid)//'.clock',status='old')
     read(99,*) timeold, dayold, yearold
     read(99,*) timenew, daynew, yearnew
     close(99)
@@ -167,7 +167,7 @@ contains
        dum_yearnew=yearold+1
     endif
 
-    open(99,file=trim(ResultPath)//trim(runid)//'.clock',status='unknown')
+    open(99,file=trim(RestartOutPath)//trim(runid)//'.clock',status='unknown')
     write(99,*) timeold, dayold, yearold
     write(99,*) dum_timenew, dum_daynew, dum_yearnew
     close(99)
