@@ -843,6 +843,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
             do nz=nzmin, nzmax-1
                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
                 !!PS tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n) * ( area(nz+1,n)/areasvol(nz,n)) ) * zinv
+                !write(*,*) "LA DEBUG: n=",n,", nz=",nz,", ibhf_n(nz, n)=",ibhf_n(nz, n)
                 tr(nz)=tr(nz)+(ibhf_n(nz, n)-ibhf_n(nz+1, n) * area(nz+1,n)/areasvol(nz,n)) * zinv / vcpw
             end do
         end if

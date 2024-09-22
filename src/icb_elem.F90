@@ -175,6 +175,7 @@ type(t_partit), intent(inout), target :: partit
   
   !values of the 3 local basisfunctions at the 
   !position 'coords'
+  write(*,*) "LA DEBUG: 1 - elem=",elem,", coords_tmp=",coords_tmp,", phi=",phi
   call locbafu_2D(mesh, partit, phi,elem,coords_tmp)
 
   values_u = field_u(elem2D_nodes(:,elem))
@@ -353,6 +354,7 @@ type(t_partit), intent(inout), target :: partit
   !values of the 3 local basisfunctions at the 
   !position 'coords'
   coords_tmp = [lon_deg, lat_deg]
+  write(*,*) "LA DEBUG: 2 - elem=",elem,", coords_tmp=",coords_tmp,", phi=",phi
   call locbafu_2D(mesh, partit, phi,elem, coords_tmp)
   
   u_at_ib = sum( ocean_u(:) * phi(:))
@@ -444,6 +446,7 @@ do m=1, 3
   !elem_containing_n2 = nod_in_elem2D(n2)%addresses(idx_elem_containing_n2)
   elem_containing_n2 = nod_in_elem2D(idx_elem_containing_n2,n2) 
     
+  write(*,*) "LA DEBUG: 3 - elem=",elem_containing_n2,", coords_tmp=",pt,", phi=",werte2D
   call locbafu_2D(mesh, partit, werte2D, elem_containing_n2, pt)
    
   if (ALL(werte2D <= 1.+ 1.0e-07) .AND. ALL(werte2D >= 0.0- 1.0e-07) ) then
@@ -497,6 +500,7 @@ type(t_partit), intent(inout), target :: partit
   !DO l=1,elem2D
   DO l=1,partit%myDim_elem2D
  
+  write(*,*) "LA DEBUG: 4 - elem=",l,", coords_tmp=",pt,", phi=",werte2D
      call locbafu_2D(mesh, partit, werte2D, l, pt)
      
      if (ALL(werte2D <= 1.+ 1.0e-07) .AND. ALL(werte2D >= 0.0- 1.0e-07) ) then

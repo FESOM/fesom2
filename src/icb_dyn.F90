@@ -35,7 +35,7 @@ subroutine iceberg_dyn(mesh, partit, ice, dynamics, ib, new_u_ib, new_v_ib, u_ib
  use g_forcing_arrays 	!for u_wind, v_wind or u_wind_ib, v_wind_ib respectively
  use o_arrays, only: Tsurf_ib, Ssurf_ib
  use o_param		!for dt
- !use iceberg_params,only: l_melt, coriolis_scale !are icebergs allowed to melt?
+ use iceberg_params, only: T_ave !l_melt, coriolis_scale !are icebergs allowed to melt?
 
  integer, intent(IN) 	:: ib !current iceberg's index
  real,    intent(OUT)	:: new_u_ib, new_v_ib
@@ -99,7 +99,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
  ! - T_keel_ib, S_keel_ib	: T & S below the draft of the iceberg (depth_ib)
  call FEM_3eval(mesh, partit, T_ave_ib,S_ave_ib,lon,lat,T_dz,S_dz,iceberg_elem)
  call FEM_3eval(mesh, partit, T_keel_ib,S_keel_ib,lon,lat,T_keel,S_keel,iceberg_elem)
-
+ T_ave(ib) = T_ave_ib
 
  !ATMOSPHERIC VELOCITY ua_ib, va_ib
  call FEM_eval(mesh, partit, ua_ib,va_ib,lon,lat,u_wind_ib,v_wind_ib,iceberg_elem)      

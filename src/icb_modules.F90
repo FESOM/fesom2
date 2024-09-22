@@ -88,6 +88,7 @@ save
   real :: semiimplicit_coeff = 1.0      !1. fully implicit, 0.5 no damping
   real :: AB_coeff = 1.53               !1.5 original AB (amplifying), 1.6 stabilized
   !===== NOTHING MUST BE CHANGED BELOW THIS LINE =====
+  real,dimension(:), allocatable:: T_ave
   real,dimension(:), allocatable:: u_ib, v_ib
   integer,dimension(:), allocatable:: iceberg_elem
   logical,dimension(:), allocatable:: find_iceberg_elem

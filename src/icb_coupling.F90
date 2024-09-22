@@ -14,7 +14,7 @@ subroutine reset_ib_fluxes()
 end subroutine
 
 
-subroutine prepare_icb2fesom(mesh, partit, ib,i_have_element,localelement,depth_ib)
+subroutine prepare_icb2fesom(mesh, partit, ib,i_have_element,localelement,depth_ib,height_ib_single)
     !transmits the relevant fields from the iceberg to the ocean model
     !Lars Ackermann, 17.03.2020
 
@@ -27,7 +27,7 @@ subroutine prepare_icb2fesom(mesh, partit, ib,i_have_element,localelement,depth_
     implicit none
 
     logical                 :: i_have_element
-    real, intent(in)        :: depth_ib
+    real, intent(in)        :: depth_ib, height_ib_single
     real                    :: lev_low, lev_up
     integer                 :: localelement
     integer                 :: iceberg_node  
@@ -106,9 +106,10 @@ type(t_partit), intent(inout), target :: partit
                     end if
                     dz = abs( lev_low - lev_up )
                     if( (abs(lev_low)>=abs(depth_ib)) .and. (abs(lev_up)<abs(depth_ib)) ) then 
-                        dz = abs( lev_up - depth_ib )
+                        dz = abs( lev_up - abs(depth_ib) )
                     end if              
-                    
+                   
+!                    write(*,*) "LA DEBUG: hfbv_flux_ib(ib)=",hfbv_flux_ib(ib),", hfb_flux_ib(ib)=",hfb_flux_ib(ib),", hfl_flux_ib(ib)=",hfl_flux_ib(ib),", hfe_flux_ib(ib)=",hfe_flux_ib(ib)
                     if( depth_ib==0.0 ) then
                         ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) & 
                                                     - ((hfbv_flux_ib(ib)+hfl_flux_ib(ib)) &
@@ -116,12 +117,15 @@ type(t_partit), intent(inout), target :: partit
                     else
                         ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) & 
                                                     - ((hfbv_flux_ib(ib)+hfl_flux_ib(ib)) * (dz / abs(depth_ib)) & 
-                                                    + hfe_flux_ib(ib) * (dz / abs(height_ib(ib)))) &
+                                                    + hfe_flux_ib(ib) * (dz / abs(height_ib_single))) &
                                                     / tot_area_nods_in_ib_elem(j)
                     end if
+!                    write(*,*) "LA DEBUG: ibhf_n(j,iceberg_node)=",ibhf_n(j,iceberg_node),", height_ib_single=",height_ib_single
                 end do
                 ibhf_n(idx_d(i),iceberg_node) = ibhf_n(idx_d(i),iceberg_node) - hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i))
-                ibhf_n(1,iceberg_node) = ibhf_n(1,iceberg_node) - hfe_flux_ib(ib) * ((abs(height_ib(ib))-abs(depth_ib))/abs(height_ib(ib))) / tot_area_nods_in_ib_elem(1)
+                if( height_ib_single .ne. 0.0 ) then
+                    ibhf_n(1,iceberg_node) = ibhf_n(1,iceberg_node) - hfe_flux_ib(ib) * ((abs(height_ib_single)-abs(depth_ib))/abs(height_ib_single)) / tot_area_nods_in_ib_elem(1)
+                end if
             end if
         end do
     end if

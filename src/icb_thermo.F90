@@ -19,7 +19,7 @@
 subroutine iceberg_meltrates(partit, M_b, M_v, M_e, M_bv, &
 				u_ib,v_ib, uo_ib,vo_ib, ua_ib,va_ib, &
 				sst_ib, length_ib, conci_ib, &
-				uo_keel_ib, vo_keel_ib, T_keel_ib, S_keel_ib, depth_ib, &
+				uo_keel_ib, vo_keel_ib, T_keel_ib, S_keel_ib, depth_ib, height_ib, &
 				T_ave_ib, S_ave_ib, ib, rho_icb)
   
   use o_param
@@ -28,7 +28,7 @@ subroutine iceberg_meltrates(partit, M_b, M_v, M_e, M_bv, &
   use g_forcing_arrays
   use g_rotate_grid
 
-  use iceberg_params, only: fwe_flux_ib, fwl_flux_ib, fwb_flux_ib, fwbv_flux_ib, hfb_flux_ib, hfbv_flux_ib, hfe_flux_ib, hfl_flux_ib, height_ib, scaling
+  use iceberg_params, only: fwe_flux_ib, fwl_flux_ib, fwb_flux_ib, fwbv_flux_ib, hfb_flux_ib, hfbv_flux_ib, hfe_flux_ib, hfl_flux_ib, scaling
   implicit none
   
   ! LA: include latent heat 2023-04-04
@@ -37,7 +37,7 @@ subroutine iceberg_meltrates(partit, M_b, M_v, M_e, M_bv, &
   real, intent(IN)	:: u_ib,v_ib, uo_ib,vo_ib, ua_ib,va_ib	!iceberg velo, (int.) ocean & atm velo
   real, intent(IN)	:: uo_keel_ib, vo_keel_ib		!ocean velo at iceberg's draft
   real, intent(IN)	:: sst_ib, length_ib, conci_ib, rho_icb 		!SST, length and sea ice conc.
-  real, intent(IN)	:: T_keel_ib, S_keel_ib, depth_ib !T & S at depth 'depth_ib'
+  real, intent(IN)	:: T_keel_ib, S_keel_ib, depth_ib, height_ib !T & S at depth 'depth_ib'
   real, intent(IN)	:: T_ave_ib, S_ave_ib			!T & S averaged, i.e. at 'depth_ib/2'
   integer, intent(IN)	:: ib					!iceberg ID
   real, intent(OUT)	:: M_b, M_v, M_e, M_bv			!melt rates [m (ice) per s]	
@@ -59,11 +59,13 @@ type(t_partit), intent(inout), target :: partit
   v_ibmino  = sqrt( (u_ib - uo_keel_ib)**2 + (v_ib - vo_keel_ib)**2 )
   call iceberg_heat_water_fluxes_3eq(partit, ib, M_b, H_b, T_keel_ib,S_keel_ib,v_ibmino, depth_ib, tf)
   hfb_flux_ib = H_b * length_ib*length_ib*scaling(ib)
+!  write(*,*) "LA DEBUG: 1"
 
   !3-eq. formulation for lateral 'basal' melting [m/s]
   v_ibmino  = sqrt( (u_ib - uo_ib)**2 + (v_ib - vo_ib)**2 ) ! depth-average rel. velocity
   call iceberg_heat_water_fluxes_3eq(partit, ib, M_bv, H_bv, T_ave_ib,S_ave_ib,v_ibmino, depth_ib/2.0, tf)
   hfbv_flux_ib = H_bv * (2*length_ib*abs(depth_ib)  + 2*length_ib*abs(depth_ib) ) * scaling(ib)
+!  write(*,*) "LA DEBUG: 2"
   
   !'thermal driving', defined as the elevation of ambient water 
   !temperature above freezing point' (Neshyba and Josberger, 1979).
@@ -77,7 +79,10 @@ type(t_partit), intent(inout), target :: partit
   M_v = 0.00762 * T_d + 0.00129 * T_d**2
   M_v = M_v/86400.
   H_v = M_v * rho_icb * L
+!  write(*,*) "!LA DEBUG: H_v=",H_v
   hfl_flux_ib = H_v * (2*length_ib*abs(depth_ib)  + 2*length_ib*abs(depth_ib) ) * scaling(ib)
+!  write(*,*) "LA DEBUG: hfl_flux_ib=",hfl_flux_ib
+!  write(*,*) "LA DEBUG: 3"
   !fwl_flux_ib = M_v
 
   !wave erosion
@@ -87,7 +92,11 @@ type(t_partit), intent(inout), target :: partit
   M_e = 1./6. * sea_state * (sst_ib + 2.0) * damping
   M_e = M_e/86400.
   H_e = M_e * rho_icb * L
+!  write(*,*) "LA DEBUG: H_e=",H_e
+!  write(*,*) "LA DEBUG: height=",height_ib
   hfe_flux_ib = H_e * (length_ib*abs(height_ib)  + length_ib*abs(height_ib) ) * scaling(ib)
+!  write(*,*) "LA DEBUG: hfe_flux_ib=",hfe_flux_ib
+!  write(*,*) "LA DEBUG: 4"
   !fwe_flux_ib = M_e  
 end subroutine iceberg_meltrates
 
@@ -253,7 +262,7 @@ type(t_partit), intent(inout), target :: partit
 
         hf_tot_tmp = hfb_flux_ib(ib)+hfbv_flux_ib(ib)+hfl_flux_ib(ib)+hfe_flux_ib(ib)
 
-        if( (hf_tot_tmp >= 0.0) .and. (hf_tot_tmp < lhfb_flux_ib(ib))) then
+        if( (hf_tot_tmp >= 0.0) .and. (abs(hf_tot_tmp) < abs(lhfb_flux_ib(ib)))) then
             hfe_flux_ib(ib)=-lhfb_flux_ib(ib) * abs(hfe_flux_ib(ib)/hf_tot_tmp)
             hfl_flux_ib(ib)=-lhfb_flux_ib(ib) * abs(hfl_flux_ib(ib)/hf_tot_tmp)
             hfb_flux_ib(ib)=-lhfb_flux_ib(ib) * abs(hfb_flux_ib(ib)/hf_tot_tmp)

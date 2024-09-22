@@ -464,10 +464,10 @@ type(t_dyn)   , intent(inout), target :: dynamics
  !if the first node belongs to this processor.. (just one processor enters here!)
  !if( local_idx_of(iceberg_elem) > 0 .and. elem2D_nodes(1,local_idx_of(iceberg_elem)) <= myDim_nod2D ) then
 if( local_idx_of(iceberg_elem) > 0 ) then 
-write(*,*) "LA DEBUG: 5a"
+!write(*,*) "LA DEBUG: 5a"
 
   if( elem2D_nodes(1,local_idx_of(iceberg_elem)) <= partit%myDim_nod2D ) then
-write(*,*) "LA DEBUG: 5b"
+!write(*,*) "LA DEBUG: 5b"
 
   i_have_element=.true. 
 
@@ -573,7 +573,7 @@ write(*,*) "LA DEBUG: 5b"
 !$OMP END PARALLEL
   !-----------------------------
 
-    if ((area_ib_tot > elem_area_glob(iceberg_elem)) .and. (old_element.ne.0)) then 
+    if ((area_ib_tot > elem_area_glob(iceberg_elem)) .and. (old_element.ne.0) .and. (left_mype == 0)) then 
         write(*,*) " *******************************************************"
         write(*,*) " * set iceberg ", ib, " back to elem ", old_element, " from elem ", iceberg_elem
         write(*,*) " * area_ib_tot = ", area_ib_tot, "; elem_area = ", elem_area(local_idx_of(iceberg_elem))
@@ -602,7 +602,7 @@ write(*,*) "LA DEBUG: 5b"
 
   volume_ib=height_ib_single*length_ib_single*width_ib_single
 !write(*,*) "LA DEBUG: before_prepare"
-  call prepare_icb2fesom(mesh,partit,ib,i_have_element,local_idx_of(iceberg_elem),depth_ib)
+  call prepare_icb2fesom(mesh,partit,ib,i_have_element,local_idx_of(iceberg_elem),depth_ib,height_ib_single)
 !write(*,*) "LA DEBUG: after_prepare"
  end if !processor has element?
 end if !... and first node belongs to processor?
