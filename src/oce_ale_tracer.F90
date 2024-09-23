@@ -930,7 +930,8 @@ use ver_sinking_recom_benthos_interface
                tracer_id(tr_num)==1006 ) then  !ipchl
 
             Vben = VPhy
-	    if (allow_var_sinking) Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VPhy
+! Error, phytoplankton and detritus sinking is constant, does not increase
+!	    if (allow_var_sinking) Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VPhy
 
         elseif(tracer_id(tr_num)==1013 .or. &  !idian
                tracer_id(tr_num)==1014 .or. &  !idiac
@@ -938,7 +939,8 @@ use ver_sinking_recom_benthos_interface
                tracer_id(tr_num)==1015 ) then  !idchl
 
             Vben = VDia
-	    if (allow_var_sinking) Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VDia
+! Error, see above
+!	    if (allow_var_sinking) Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VDia
       
 ! Constant vertical sinking for the second detritus class
 
