@@ -112,11 +112,11 @@ type(t_partit), intent(inout), target :: partit
 !                    write(*,*) "LA DEBUG: hfbv_flux_ib(ib)=",hfbv_flux_ib(ib),", hfb_flux_ib(ib)=",hfb_flux_ib(ib),", hfl_flux_ib(ib)=",hfl_flux_ib(ib),", hfe_flux_ib(ib)=",hfe_flux_ib(ib)
                     if( depth_ib==0.0 ) then
                         ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) & 
-                                                    - ((hfbv_flux_ib(ib)+hfl_flux_ib(ib)) &
+                                                    - ((hfbv_flux_ib(ib,j)+hfl_flux_ib(ib,j)) &
                                                     + hfe_flux_ib(ib)) / tot_area_nods_in_ib_elem(j)
                     else
                         ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) & 
-                                                    - ((hfbv_flux_ib(ib)+hfl_flux_ib(ib)) * (dz / abs(depth_ib)) & 
+                                                    - ((hfbv_flux_ib(ib,j)+hfl_flux_ib(ib,j)) * (dz / abs(depth_ib)) & 
                                                     + hfe_flux_ib(ib) * (dz / abs(height_ib_single))) &
                                                     / tot_area_nods_in_ib_elem(j)
                     end if
@@ -128,6 +128,9 @@ type(t_partit), intent(inout), target :: partit
                 end if
             end if
         end do
+    end if
+    if (mype==171) then
+        write(*,*) "LA DEBUG: ib ",ib,", hfe_flux_ib=",hfe_flux_ib, ", hfb_flux_ib=",hfb_flux_ib, ", hfl_flux_ib=", hfl_flux_ib,",hfbv_flux_ib=", hfbv_flux_ib
     end if
 end subroutine prepare_icb2fesom
 

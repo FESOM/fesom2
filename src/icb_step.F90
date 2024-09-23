@@ -573,7 +573,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 !$OMP END PARALLEL
   !-----------------------------
 
-    if ((area_ib_tot > elem_area_glob(iceberg_elem)) .and. (old_element.ne.0) .and. (left_mype == 0)) then 
+    if ((area_ib_tot > elem_area_glob(iceberg_elem)) .and. (old_element.ne.0)) then ! .and. (left_mype == 0)) then 
         write(*,*) " *******************************************************"
         write(*,*) " * set iceberg ", ib, " back to elem ", old_element, " from elem ", iceberg_elem
         write(*,*) " * area_ib_tot = ", area_ib_tot, "; elem_area = ", elem_area(local_idx_of(iceberg_elem))

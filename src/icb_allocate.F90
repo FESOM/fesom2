@@ -96,9 +96,9 @@ type(t_mesh), intent(in), target :: mesh
   allocate(fwb_flux_ib(ib_num))
   allocate(fwbv_flux_ib(ib_num))
   allocate(hfe_flux_ib(ib_num))
-  allocate(hfl_flux_ib(ib_num))
+  allocate(hfl_flux_ib(ib_num,mesh%nl))
   allocate(hfb_flux_ib(ib_num))
-  allocate(hfbv_flux_ib(ib_num))
+  allocate(hfbv_flux_ib(ib_num,mesh%nl))
   allocate(lhfb_flux_ib(ib_num))
   fwe_flux_ib = 0.0
   fwl_flux_ib = 0.0
