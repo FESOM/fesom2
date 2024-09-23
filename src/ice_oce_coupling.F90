@@ -130,11 +130,16 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
         if (ulevels(elem)>1) cycle
         
         !_______________________________________________________________________
+        ! total surface stress (iceoce+atmoce) on elements 
         elnodes=elem2D_nodes(:,elem)
-        stress_surf(1,elem)=sum(stress_iceoce_x(elnodes)*a_ice(elnodes) + &
-                                stress_atmoce_x(elnodes)*(1.0_WP-a_ice(elnodes)))/3.0_WP
-        stress_surf(2,elem)=sum(stress_iceoce_y(elnodes)*a_ice(elnodes) + &
-                                stress_atmoce_y(elnodes)*(1.0_WP-a_ice(elnodes)))/3.0_WP
+        
+        !!PS stress_surf(1,elem)=sum(stress_iceoce_x(elnodes)*a_ice(elnodes) + &
+        !!PS                         stress_atmoce_x(elnodes)*(1.0_WP-a_ice(elnodes)))/3.0_WP
+        !!PS stress_surf(2,elem)=sum(stress_iceoce_y(elnodes)*a_ice(elnodes) + &
+        !!PS                         stress_atmoce_y(elnodes)*(1.0_WP-a_ice(elnodes)))/3.0_WP
+        stress_surf(1,elem)=sum(stress_node_surf(1,elnodes))/3.0_WP
+        stress_surf(2,elem)=sum(stress_node_surf(2,elnodes))/3.0_WP
+
     END DO
 !$OMP END DO
 !$OMP END PARALLEL

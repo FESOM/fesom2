@@ -46,6 +46,12 @@ endif()
 if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
    message(STATUS "multithreading disabled for Levante") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  leo-dcgp )
+   message(STATUS "multithreading disabled for Leonardo") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
+   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  mn5-gpp )
+   message(STATUS "multithreading disabled for MN5 GPP") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
+   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  albedo )
    message(STATUS "multithreading disabled for Albedo") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
@@ -83,6 +89,7 @@ if(DEFINED FESOM_ENABLE_IFS_INTERFACE)
   set(ENABLE_IFS_INTERFACE ${FESOM_ENABLE_IFS_INTERFACE}) # To distinguish option in a nested cmake project (bundle)
 endif()
 message(STATUS "ENABLE_IFS_INTERFACE: ${ENABLE_IFS_INTERFACE}")
+
 
 set(ENABLE_MULTIO_DEFAULT OFF)
 if(ENABLE_IFS_INTERFACE)
@@ -125,16 +132,21 @@ if(USE_ICEPACK)
                               ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90)
    list(APPEND sources_Fortran ${sources_ice_pack})
 elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
+   if(ENABLE_MULTIO)
+      list(APPEND sources_Fortran ${src_home}/ifs_interface/iom.F90)
+   endif()
+
    list(APPEND sources_Fortran ${src_home}/ifs_interface/ifs_interface.F90
                                ${src_home}/ifs_interface/ifs_modules.F90
                                ${src_home}/ifs_interface/ifs_notused.F90
                                ${src_home}/ifs_interface/mpp_io.F90)
 endif()
-if(ENABLE_MULTIO)
-   list(APPEND sources_Fortran ${src_home}/ifs_interface/iom.F90)
-endif()
 
-file(GLOB sources_C ${src_home}/*.c)
+if(${RECOM_COUPLED})  # ADD RECOM FILES
+   file(GLOB sources_Fortran ${src_home}/*.F90
+                             ${src_home}/int_recom/*.F90
+                             ${src_home}/int_recom/recom/*.F90)
+endif()                             
 
 # generate a custom file from fesom_version_info.F90 which includes the current git SHA
 set(FESOM_ORIGINAL_VERSION_FILE ${src_home}/fesom_version_info.F90)
@@ -152,7 +164,6 @@ add_custom_target(fesom_version_info-generated.F90 ALL
 #   list(REMOVE_ITEM sources_Fortran ${src_home}/cpl_driver.F90)
 #endif()
 list(REMOVE_ITEM sources_Fortran ${src_home}/fvom_init.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90)
-list(REMOVE_ITEM sources_C       ${src_home}/fort_part.c)
 list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_main.F90)
 
 find_package( NETCDF REQUIRED COMPONENTS C Fortran )
@@ -161,26 +172,17 @@ find_package( MPI REQUIRED COMPONENTS C Fortran )
 # depends on the metis library
 #add_subdirectory(../lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
 #include_directories(../lib/metis-5.1.0/include)
-# depends on the parms library
-add_subdirectory(../lib/parms ${PROJECT_BINARY_DIR}/parms)
 
 add_subdirectory(async_threads_cpp)
 
-add_library(${PROJECT_NAME}_C OBJECT ${sources_C})
-target_compile_definitions(${PROJECT_NAME}_C PRIVATE PARMS USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
-
-target_link_libraries(${PROJECT_NAME}_C PRIVATE parms) #metis
-target_link_libraries(${PROJECT_NAME}_C PRIVATE MPI::MPI_C)
-
 
 # fesom library
-add_library(${PROJECT_NAME} ${sources_Fortran} $<TARGET_OBJECTS:${PROJECT_NAME}_C> $<TARGET_OBJECTS:async_threads_cpp>)
+add_library(${PROJECT_NAME} ${sources_Fortran} $<TARGET_OBJECTS:async_threads_cpp>)
 add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
-target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
+target_compile_definitions(${PROJECT_NAME} PRIVATE -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
 
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>)
 target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fesom>)
-target_link_libraries(${PROJECT_NAME} PRIVATE parms) #metis
 target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
@@ -231,13 +233,25 @@ if(OPENMP_REPRODUCIBLE)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __openmp_reproducible)
 endif()
 
+if(${RECOM_COUPLED})
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __3Zoo2Det __coccos)# __usetp)
+endif()
+
+if(${CISO_COUPLED})
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __ciso)
+endif()
+
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
    target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -ip -init=zero -no-wrap-margin -fpe0) # add -fpe0 for RAPS environment
    if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
       target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
+   elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
+   elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  albedo)
-      target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -O3 -ip -fPIC -qopt-malloc-options=2 -qopt-prefetch=5 -unroll-aggressive) #NEC mpi option
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -O3 -ip -fPIC -qopt-malloc-options=2 -qopt-prefetch=5 -unroll-aggressive) # -g -traceback -check) #NEC mpi option
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL atosecmwf )
       target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
    else()
@@ -249,7 +263,12 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 #    target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
-   target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
+   if(${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu )
+      message(STATUS "Allowing type mismatches on Ubuntu for CI Testing" )  # NOTE(PG): Would be nicer to grab the CI=True from the env variable
+      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch)
+   else()
+      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none)
+   endif()
    if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
       target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
    endif()
@@ -286,7 +305,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRE
 target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${YAC_Fortran_INCLUDE_DIRECTORIES} ${YAXT_Fortran_INCLUDE_DIRECTORIES})
-target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C)
 target_link_libraries(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
 
@@ -316,4 +334,4 @@ target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
 
 ### Export and installation
 
-fesom_export(TARGETS ${PROJECT_NAME} parms fesom.x)
+fesom_export(TARGETS ${PROJECT_NAME} fesom.x)

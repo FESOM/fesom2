@@ -12,6 +12,11 @@ MODULE io_RESTART
   use MOD_PARTIT
   use MOD_PARSUP
   use fortran_utils
+#if defined(__recom)
+  use recom_glovar
+  use recom_config
+  use recom_ciso
+#endif
   
   implicit none
   public :: restart, finalize_restart
@@ -24,6 +29,10 @@ MODULE io_RESTART
   type(restart_file_group) , save :: ice_files
   character(:), allocatable, save :: oce_path
   character(:), allocatable, save :: ice_path
+#if defined(__recom)
+  type(restart_file_group) , save :: bio_files
+  character(:), allocatable, save :: bio_path
+#endif
 
   character(:), allocatable, save :: raw_restart_dirpath
   character(:), allocatable, save :: raw_restart_infopath
@@ -124,9 +133,8 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
          longname='39Ar / Ar ratio'
          units='none'
        CASE DEFAULT
-!        other passive tracers
-         write(trname,'(A3,i1)') 'tra_', j
-         write(longname,'(A15,i1)') 'passive tracer ', j
+         write(trname,'(A3,i4.4)') 'tra_', j
+         write(longname,'(A15,i4.4)') 'passive tracer ', j
          units='none'
      END SELECT
      call oce_files%def_node_var(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
@@ -142,7 +150,7 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
 end subroutine ini_ocean_io
 !
 !--------------------------------------------------------------------------------------------
-! ini_ice_io initializes ice_file datatype which contains information of all variables need to be written into 
+! ini_ice_io initializes ice_file datatype which contains information of all variables need to be written into
 ! the ice restart file. This is the only place need to be modified if a new variable is added!
 subroutine ini_ice_io(year, ice, partit, mesh)
   integer,      intent(in)  :: year
@@ -182,6 +190,43 @@ subroutine ini_ice_io(year, ice, partit, mesh)
 #endif
 
 end subroutine ini_ice_io
+!
+!--------------------------------------------------------------------------------------------
+!
+
+! ini_bio_io initializes bid datatype which contains information of all variables need to be written into
+! the bio restart file. This is the only place need to be modified if a new variable is added!
+#if defined(__recom)
+subroutine ini_bio_io(year, tracers, partit, mesh)
+    integer,      intent(in)  :: year
+    integer                   :: j
+    character(500)            :: longname
+    character(500)            :: trname, units
+    character(4)              :: cyear
+
+    type(t_mesh), intent(in) , target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_tracer), target :: tracers
+    logical, save :: has_been_called = .false.
+
+    write(cyear,'(i4)') year
+    bio_path = trim(ResultPath)//trim(runid)//'.'//cyear//'.bio.restart.nc'
+
+    if(has_been_called) return
+    has_been_called = .true.
+
+    !===========================================================================
+    !===================== Definition part =====================================
+    !===========================================================================
+    !___Define the netCDF variables for 2D fields_______________________________
+    call bio_files%def_node_var('BenN',    'Benthos Nitrogen', 'mmol/m3',   Benthos(:,1), mesh, partit);
+    call bio_files%def_node_var('BenC',    'Benthos Carbon',   'mmol/m3',   Benthos(:,2), mesh, partit);
+    call bio_files%def_node_var('BenSi',   'Benthos Silicate', 'mmol/m3',   Benthos(:,3), mesh, partit);
+    call bio_files%def_node_var('BenCalc', 'Benthos Calcite',  'mmol/m3',   Benthos(:,4), mesh, partit);
+    call bio_files%def_node_var('HPlus',   'Conc. of H-plus ions in the surface water', 'mol/kg',   GloHplus, mesh, partit);
+
+end subroutine ini_bio_io
+#endif
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -258,9 +303,15 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   if (.not. l_read) then
                call ini_ocean_io(yearnew, dynamics, tracers, partit, mesh)
   if (use_ice) call ini_ice_io  (yearnew, ice, partit, mesh)
+#if defined(__recom)
+    if (use_REcoM) call ini_bio_io  (yearnew, tracers, partit, mesh)
+#endif
   else
                call ini_ocean_io(yearold, dynamics, tracers, partit, mesh)
   if (use_ice) call ini_ice_io  (yearold, ice, partit, mesh)
+#if defined(__recom)
+    if (REcoM_restart) call ini_bio_io(yearold, tracers, partit, mesh)
+#endif
   end if
 
   !___READING OF RESTART________________________________________________________
@@ -285,7 +336,7 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
     if(rawfiles_exist) then
         which_readr = 1
         call read_all_raw_restarts(partit%MPI_COMM_FESOM, partit%mype)
-    
+ 
     !___________________________________________________________________________
     ! read derived type binary file restart
     elseif(binfiles_exist .and. bin_restart_length_unit /= "off") then
@@ -314,7 +365,16 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
             if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ice'//achar(27)//'[0m'
             call read_restart(ice_path, ice_files, partit%MPI_COMM_FESOM, partit%mype)
         end if 
-        
+
+#if defined(__recom)
+!RECOM restart
+!read here
+            if (REcoM_restart) then
+                    if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: bio'//achar(27)//'[0m'
+                call read_restart(bio_path, bio_files, partit%MPI_COMM_FESOM, partit%mype)
+            end if
+#endif
+
         ! immediately create a raw core dump restart
         if(raw_restart_length_unit /= "off") then
             call write_all_raw_restarts(istep, partit%MPI_COMM_FESOM, partit%mype)
@@ -370,7 +430,17 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
     if(use_ice) then
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ice'//achar(27)//'[0m'
         call write_restart(ice_path, ice_files, istep)
-    end if     
+    end if
+
+#if defined(__recom)
+!RECOM restart
+!write here
+        if (REcoM_restart .or. use_REcoM) then
+
+                if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: bio'//achar(27)//'[0m'
+            call write_restart(bio_path, bio_files, istep)
+        end if
+#endif
   end if
 
   ! write core dump
@@ -398,7 +468,7 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
         call clock_finish
     end if
   end if
-  
+
 end subroutine restart
 !
 !
@@ -468,6 +538,9 @@ subroutine write_all_raw_restarts(istep, mpicomm, mype)
   open(newunit = fileunit, file = raw_restart_dirpath//'/'//mpirank_to_txt(mpicomm)//'.dump', form = 'unformatted')
   call write_raw_restart_group(oce_files, fileunit)
   if(use_ice) call write_raw_restart_group(ice_files, fileunit)
+#if defined(__recom)
+  call write_raw_restart_group(bio_files, fileunit)
+#endif
   close(fileunit)
 
   if(mype == RAW_RESTART_METADATA_RANK) then
@@ -480,6 +553,9 @@ subroutine write_all_raw_restarts(istep, mpicomm, mype)
     write(fileunit, '(2(g0))') "! year: ",yearnew
     write(fileunit, '(3(g0))') "! oce: ", oce_files%nfiles, " variables"
     if(use_ice) write(fileunit, '(3(g0))') "! ice: ", ice_files%nfiles, " variables"
+#if defined(__recom)
+    write(fileunit, '(3(g0))') "! bio: ", bio_files%nfiles, " variables"
+#endif
     close(fileunit)
   end if
 end subroutine
@@ -724,6 +800,9 @@ subroutine read_all_raw_restarts(mpicomm, mype)
   if(status == 0) then
     call read_raw_restart_group(oce_files, fileunit)
     if(use_ice) call read_raw_restart_group(ice_files, fileunit)
+#if defined(__recom)
+    call read_raw_restart_group(bio_files, fileunit)
+#endif
     close(fileunit)
   else
     print *,"can not open ",raw_restart_dirpath//'/'//mpirank_to_txt(mpicomm)//'.dump'
@@ -768,6 +847,14 @@ subroutine finalize_restart()
       end if
     end do
   end if
+#if defined(__recom)
+  do i=1, bio_files%nfiles
+    call bio_files%files(i)%join()
+    if(bio_files%files(i)%is_iorank()) then
+      if(bio_files%files(i)%is_attached()) call bio_files%files(i)%close_file()
+    end if
+  end do
+#endif
 end subroutine
 !
 !

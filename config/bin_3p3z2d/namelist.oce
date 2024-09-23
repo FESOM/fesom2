@@ -1,0 +1,26 @@
+! The namelist file for the finite-volume ocean model
+
+&oce_dyn
+C_d=0.0025             ! Bottom drag, nondimensional
+A_ver= 1.e-4	       ! Vertical viscosity, m^2/s
+scale_area=5.8e9       ! Visc. and diffus. are for an element with scale_area
+SPP=.false.                 ! Salt Plume Parameterization
+Fer_GM=.true.               ! to swith on/off GM after Ferrari et al. 2010
+K_GM_max     = 2000.0       ! max. GM thickness diffusivity (m2/s)
+K_GM_min     = 2.0          ! max. GM thickness diffusivity (m2/s)
+K_GM_bvref   = 2            ! def of bvref in ferreira scaling 0=srf,1=bot mld,2=mean over mld,3=weighted mean over mld
+K_GM_rampmax = -1.0         ! Resol >K_GM_rampmax[km] GM on
+K_GM_rampmin = -1.0         ! Resol <K_GM_rampmin[km] GM off, in between linear scaled down
+K_GM_resscalorder = 1
+
+scaling_Ferreira   =.false.  ! GM vertical scaling after Ferreira et al.(2005) (as also implemented by Qiang in FESOM 1.4)
+scaling_Rossby     =.false. ! GM is smoothly switched off according to Rossby radius (from 1. in coarse areas to 0. where resolution reaches 2 points/Rossby radius)
+scaling_resolution =.true.  ! GM is spatially scaled with resolution; A value of K_GM corresponds then to a resolution of 100km
+scaling_FESOM14    =.false.  ! special treatment of GM in the NH (as also implemented by Qiang in FESOM 1.4; it is zero within the boundary layer)
+
+Redi  =.true.
+visc_sh_limit=5.0e-3       ! for KPP, max visc due to shear instability
+mix_scheme='KPP'           ! vertical mixing scheme: KPP, PP 
+Ricr   = 0.3               ! critical bulk Richardson Number
+concv  = 1.6               ! constant for pure convection (eqn. 23) (Large 1.5-1.6; MOM default 1.8)
+/
