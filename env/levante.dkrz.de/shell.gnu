@@ -18,8 +18,7 @@ export FC=mpif90 CC=mpicc CXX=mpicxx
 # following is only needed for libblas which is needed by params lib and often provided by lapack
 #module load intel-oneapi-mkl/2022.0.1-gcc-11.2.0
 # so use the LD_LIBRARY_PATH or other paths like prefix paths etc for cmake
-export LD_LIBRARY_PATH=/sw/spack-levante/intel-oneapi-mkl-2022.0.1-ttdktf/mkl/2022.0.1/lib/intel64:$LD_LIBRARY_PATH
-spack load intel-oneapi-mkl@2022.0.1%gcc@11.2.0
+#export LD_LIBRARY_PATH=/sw/spack-levante/intel-oneapi-mkl-2022.0.1-ttdktf/mkl/2022.0.1/lib/intel64:$LD_LIBRARY_PATH spack load intel-oneapi-mkl@2022.0.1%gcc@11.2.0
 
 #other alternative blas
 #spack load netlib-lapack@3.9.1%gcc@11.2.0
