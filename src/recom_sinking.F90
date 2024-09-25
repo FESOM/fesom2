@@ -92,7 +92,7 @@ subroutine recom_sinking_new(tr_num,mesh)
 #endif
     end if
 
-!! No sinking if background sinking velocity is less than 0.1 m/day
+!! Very low or no sinking if background sinking velocity is less than 0.1 m/day
 if (Vsink .gt. 0.1) then
 
    do n = 1,myDim_nod2D

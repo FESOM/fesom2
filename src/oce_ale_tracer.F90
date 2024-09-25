@@ -1116,10 +1116,11 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
 
 ! 1) Calculate sinking velociy for vertical sinking case
 ! ******************************************************
-        if (allow_var_sinking) then
-          if (any(recom_det_tracer_id == tracer_id(tr_num))) Vben = Vdet
-          if (any(recom_phy_tracer_id == tracer_id(tr_num))) Vben = VPhy
-          if (any(recom_dia_tracer_id == tracer_id(tr_num))) Vben = VDia
+
+        if (any(recom_det_tracer_id == tracer_id(tr_num))) Vben = Vdet
+        if (any(recom_phy_tracer_id == tracer_id(tr_num))) Vben = VPhy
+        if (any(recom_dia_tracer_id == tracer_id(tr_num))) Vben = VDia
+        if (allow_var_sinking .and. any(recom_det_tracer_id == tracer_id(tr_num))) then
           Vben = Vdet_a * abs(zbar_3d_n(:,n)) + Vben
         end if
 
