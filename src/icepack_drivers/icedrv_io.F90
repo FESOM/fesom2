@@ -278,7 +278,7 @@
     module subroutine init_restart_icepack(year, mesh)
         
         use mod_mesh
-        use g_config,     only: runid, ResultPath
+        use g_config,     only: runid, RestartOutPath
         use io_restart,   only: ip_id, def_variable_2d, def_dim
     
         implicit none
@@ -341,7 +341,7 @@
         write(cyear,'(i4)') year
         ! Create an icepack restart file
         ! Only serial output implemented so far
-        ip_id%filename=trim(ResultPath)//trim(runid)//'.'//cyear//'.icepack.restart.nc'
+        ip_id%filename=trim(RestartOutPath)//trim(runid)//'.'//cyear//'.icepack.restart.nc'
         if (ip_id%is_in_use) return
         ip_id%is_in_use=.true.
       

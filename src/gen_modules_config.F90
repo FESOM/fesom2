@@ -28,9 +28,11 @@ module g_config
   character(MAX_PATH)        :: ClimateDataPath='./hydrography/'
   character(MAX_PATH)        :: TideForcingPath='./tide_forcing/'
   character(MAX_PATH)        :: ResultPath='./result/'
+  character(MAX_PATH)        :: RestartInPath='same-as-result'
+  character(MAX_PATH)        :: RestartOutPath='same-as-result'
   character(20)              :: MeshId='NONE'
   namelist /paths/  MeshPath, ClimateDataPath, &
-       TideForcingPath, ResultPath, MeshId
+       TideForcingPath, ResultPath, RestartInPath, RestartOutPath, MeshId
        
   !_____________________________________________________________________________
   ! *** restart_log ***
