@@ -20,7 +20,7 @@ subroutine iceberg_meltrates(partit, mesh, M_b, M_v, M_e, M_bv, &
 				u_ib,v_ib, arr_uo_ib,arr_vo_ib, ua_ib,va_ib, &
 				sst_ib, length_ib, conci_ib, &
 				uo_keel_ib, vo_keel_ib, T_keel_ib, S_keel_ib, depth_ib, height_ib, &
-				arr_T_ave_ib, arr_S_ave_ib, ib, rho_icb,uo_ib,vo_ib, ib_n_lvls, iceberg_elem)
+				arr_T_ave_ib, arr_S_ave_ib, ib, rho_icb,uo_ib,vo_ib, ib_n_lvls, elem, n_lvls)
   
   use o_param
   use MOD_PARTIT
@@ -36,17 +36,18 @@ subroutine iceberg_meltrates(partit, mesh, M_b, M_v, M_e, M_bv, &
   real(kind=8),parameter ::  L                  = 334000.                   ! [J/Kg]
   
   real, intent(IN)	:: u_ib,v_ib, uo_ib,vo_ib,ua_ib,va_ib	!iceberg velo, (int.) ocean & atm velo
-  real, intent(IN), dimension(:)	:: arr_uo_ib, arr_vo_ib	!iceberg velo, (int.) ocean & atm velo
   real, intent(IN)	:: uo_keel_ib, vo_keel_ib		!ocean velo at iceberg's draft
   real, intent(IN)	:: sst_ib, length_ib, conci_ib, rho_icb 		!SST, length and sea ice conc.
   real, intent(IN)	:: T_keel_ib, S_keel_ib, depth_ib, height_ib !T & S at depth 'depth_ib'
-  real, intent(IN), dimension(:)	:: arr_T_ave_ib, arr_S_ave_ib			!T & S averaged, i.e. at 'depth_ib/2'
-  integer, intent(IN)	:: ib, ib_n_lvls					!iceberg ID
+  integer, intent(IN)	:: ib, n_lvls, ib_n_lvls					!iceberg ID
+  real, intent(IN), dimension(n_lvls)	:: arr_T_ave_ib, arr_S_ave_ib			!T & S averaged, i.e. at 'depth_ib/2'
+  real, intent(IN), dimension(n_lvls)	:: arr_uo_ib, arr_vo_ib	!iceberg velo, (int.) ocean & atm velo
   real, intent(OUT)	:: M_b, M_v, M_e, M_bv			!melt rates [m (ice) per s]	
   real 	            :: H_b, H_v, H_e, H_bv			!melt rates [m (ice) per s]	
-  real              :: M_bv_dz, M_v_dz	
+  real              :: M_bv_dz, M_v_dz, dz_acc
  
-  integer           :: n, n2, iceberg_elem
+  integer           :: n, n2
+  integer, intent(IN)   :: elem
   real              :: lev_up, lev_low, dz
   real			:: absamino, damping, sea_state, v_ibmino
   real			:: tf, T_d 				!freezing temp. and 'thermal driving'
@@ -68,15 +69,15 @@ type(t_partit), intent(inout), target :: partit
   
   call iceberg_heat_water_fluxes_3eq(partit, ib, M_b, H_b, T_keel_ib,S_keel_ib,v_ibmino, depth_ib, tf)
   hfb_flux_ib(ib) = H_b * length_ib*length_ib*scaling(ib)
-!  write(*,*) "LA DEBUG: 1"
 
   M_bv_dz = 0.0
   M_v_dz = 0.0
+  dz_acc = 0.0
 
+  n2=elem2D_nodes(1,elem)
   do n=1,ib_n_lvls
   !3-eq. formulation for lateral 'basal' melting [m/s]
     lev_up  = mesh%zbar_3d_n(n, n2)
-    n2 = elem2d_nodes(1, iceberg_elem)
     if( n==nlevels_nod2D(n2) ) then
         lev_low = mesh%zbar_n_bot(n2)
     else
@@ -84,17 +85,19 @@ type(t_partit), intent(inout), target :: partit
     end if
     
     if( abs(lev_low)>=abs(depth_ib) ) then !.AND. (abs(lev_up)<=abs(depth_ib)) ) then
-      dz = abs ( lev_up - depth_ib )
+        dz = abs(lev_up - depth_ib)
+    elseif(lev_low == lev_up) then
+        exit
     else
-        dz = abs( lev_low - lev_up )
+        dz = abs(lev_low - lev_up)
     end if
+    dz_acc = dz_acc + dz
     
     v_ibmino  = sqrt( (u_ib - arr_uo_ib(n))**2 + (v_ib - arr_vo_ib(n))**2 ) ! depth-average rel. velocity
-    call iceberg_heat_water_fluxes_3eq(partit, ib, M_bv, H_bv, arr_T_ave_ib(n), arr_S_ave_ib(n),v_ibmino, dz/2.0, tf)
+    call iceberg_heat_water_fluxes_3eq(partit, ib, M_bv, H_bv, arr_T_ave_ib(n), arr_S_ave_ib(n),v_ibmino, dz_acc+dz/2.0, tf)
     M_bv_dz = M_bv_dz + M_bv*dz
     
     hfbv_flux_ib(ib,n) = H_bv * (2*length_ib*dz  + 2*length_ib*dz ) * scaling(ib)
-!  write(*,*) "LA DEBUG: 2"
   
     !'thermal driving', defined as the elevation of ambient water 
     !temperature above freezing point' (Neshyba and Josberger, 1979).
@@ -109,10 +112,7 @@ type(t_partit), intent(inout), target :: partit
     M_v = M_v/86400.
     H_v = M_v * rho_icb * L
     M_v_dz = M_v_dz + M_v*dz
-  !  write(*,*) "!LA DEBUG: H_v=",H_v
     hfl_flux_ib(ib,n) = H_v * (2*length_ib*dz  + 2*length_ib*dz ) * scaling(ib)
-  !  write(*,*) "LA DEBUG: hfl_flux_ib=",hfl_flux_ib
-  !  write(*,*) "LA DEBUG: 3"
     !fwl_flux_ib = M_v
   end do
   M_bv  = M_bv_dz / abs(depth_ib)
@@ -125,11 +125,7 @@ type(t_partit), intent(inout), target :: partit
   M_e = 1./6. * sea_state * (sst_ib + 2.0) * damping
   M_e = M_e/86400.
   H_e = M_e * rho_icb * L
-!  write(*,*) "LA DEBUG: H_e=",H_e
-!  write(*,*) "LA DEBUG: height=",height_ib
   hfe_flux_ib(ib) = H_e * (length_ib*abs(height_ib)  + length_ib*abs(height_ib) ) * scaling(ib)
-!  write(*,*) "LA DEBUG: hfe_flux_ib=",hfe_flux_ib
-!  write(*,*) "LA DEBUG: 4"
   !fwe_flux_ib = M_e  
 end subroutine iceberg_meltrates
 
@@ -497,7 +493,7 @@ type(t_partit), intent(inout), target :: partit
      M_b = - (rhow / rhoi) * M_b 		 ! [m (ice) per second], positive for melting? NOW positive for melting
 
      !LA avoid basal freezing for grounded icebergs
-     if(M_b.lt.0.) then
+     if(grounded(ib) .and. (M_b.lt.0.)) then
          M_b = 0.0
      endif
 
