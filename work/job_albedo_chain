@@ -97,25 +97,6 @@ cp -n ../config/namelist.ice     .
 cp -n ../config/namelist.io      .
 cp -n ../config/namelist.icepack .
 
-#___SET CHAIN_ID________________________________________________________________
-if [ -f "file_chain_id" ]; then
-    chain_id=$(<file_chain_id)
-else 
-    chain_id=${chain_s}
-    echo $chain_id > file_chain_id
-fi
-
-#___PRINT INPUT INFO____________________________________________________________
-echo -e "\033[1;7;33m_____JOB CHAIN INFO_____________________________________\033[0m"
-echo -e "\033[1;33m --> actual chain cycle: $chain_id \033[0m"
-echo -e "\033[1;33m --> max. number of chain cycles: $chain_n \033[0m"
-echo -e "\033[1;33m --> simulated time range: [ $year_s $year_e] \033[0m"
-echo -e "\033[1;33m --> slurm: wall-clock-time = $wcl \033[0m"
-echo -e "\033[1;33m --> slurm: ntasks = $ntasks \033[0m"
-echo -e "\033[1;33m --> slurm: nnodes = $nnodes \033[0m"
-if [ $prescribe_rlen -ne 0 ]; then
-    echo -e "\033[1;33m -->change run_length = $prescribe_rlen \033[0m"
-fi
 
 #___CREATE SAVE DIR INFRASTRUCTURE______________________________________________
 # extract resultpath from namelist.config
@@ -147,6 +128,25 @@ fi
 
 # identify real path in case a link is used
 dname_result="$(realpath "$dname_result")/"
+
+#___SET CHAIN_ID________________________________________________________________
+if [ -f "${dname_result}/file_chain_id" ]; then
+    chain_id=$(<${dname_result}/file_chain_id)
+else 
+    chain_id=${chain_s}
+    echo $chain_id > ${dname_result}/file_chain_id
+fi
+#___PRINT INPUT INFO____________________________________________________________
+echo -e "\033[1;7;33m_____JOB CHAIN INFO_____________________________________\033[0m"
+echo -e "\033[1;33m --> actual chain cycle: $chain_id \033[0m"
+echo -e "\033[1;33m --> max. number of chain cycles: $chain_n \033[0m"
+echo -e "\033[1;33m --> simulated time range: [ $year_s $year_e] \033[0m"
+echo -e "\033[1;33m --> slurm: wall-clock-time = $wcl \033[0m"
+echo -e "\033[1;33m --> slurm: ntasks = $ntasks \033[0m"
+echo -e "\033[1;33m --> slurm: nnodes = $nnodes \033[0m"
+if [ $prescribe_rlen -ne 0 ]; then
+    echo -e "\033[1;33m -->change run_length = $prescribe_rlen \033[0m"
+fi
 
 # if directory for chain_id doesn't exist --> create it 
 if [ ! -d "${dname_result}/${chain_id}" ]; then 
@@ -234,8 +234,7 @@ if [ $is_newsimul -eq 1 ] ; then
         
         #___BACKUP NAMELIST.* FILES INTO RESULT DIRECTORY_______________________
 
-        cp namelist.config namelist.oce namelist.ice namelist.forcing namelist.io \
-           namelist.dyn namelist.tra namelist.cvmix ${dname_result}/.
+        cp namelist.* ${dname_result}/.
         cp fesom.x ${dname_result}/.
 
     #___BACKUP SRC FILES INTO RESULT DIRECTORY__________________________________
@@ -335,6 +334,6 @@ fi
 # check if complete cycle is finished only than increase chain_id
 if [ $aux_yr_clock -gt $year_e ] && [ ${chain_id} -lt ${chain_n} ] ; then
     chain_id=$(( $chain_id + 1 ))
-    echo $chain_id > file_chain_id
+    echo $chain_id > ${dname_result}/file_chain_id
 fi
 

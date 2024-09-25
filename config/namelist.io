@@ -10,12 +10,15 @@ ldiag_DVD        =.false.
 ldiag_forc       =.false.
 ldiag_extflds    =.false.
 ldiag_trflx      =.false.
+ldiag_uvw_sqr    =.false.
+ldiag_trgrd_xyz  =.false.
+
 /
 
 &nml_general
 io_listsize    =120 !number of streams to allocate. shallbe large or equal to the number of streams in &nml_list
 vec_autorotate =.false.
-compression_level = 0
+compression_level = 1
 /
 
 ! for sea ice related variables use_ice should be true, otherewise there will be no output
