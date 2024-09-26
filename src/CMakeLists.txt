@@ -132,6 +132,9 @@ endif()
 if(ENABLE_MULTIO)
    list(APPEND sources_Fortran ${src_home}/ifs_interface/iom.F90)
 endif()
+if(${ENABLE_ROCTX})
+    list(APPEND sources_Fortran ${src_home}/roctx_interface/mo_roctx.F90)
+endif()
 
 file(GLOB sources_C ${src_home}/*.c)
 
@@ -288,10 +291,12 @@ add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
 if(${ENABLE_ROCTX})
     target_link_libraries(${PROJECT_NAME}.x PUBLIC roctx64 roctracer64)
 endif()
-if(${ENABLE_OPENMP})
-target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME} -homp)
+if(${ENABLE_OPENMP})  # Needed to add to compile on LUMI
+    if(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray)
+        target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME} -homp)
+    endif()
 else()
-target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
+    target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
 endif()
 
 
