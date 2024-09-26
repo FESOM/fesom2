@@ -237,6 +237,7 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
 !$OMP END DO
 !$OMP BARRIER
 !$OMP END PARALLEL
+
 end subroutine adv_tra_vert_impl
 !
 !
@@ -258,10 +259,10 @@ subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
     real(kind=WP), intent(inout)      :: flux(mesh%nl,  partit%myDim_nod2D)
     logical, optional                 :: o_init_zero
     logical                           :: l_init_zero
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+
+! Juha: use associate blocks intead of pointers to work around gpu memcopy issues with Cray
+#include "associate_part_ass_combined.h" ! Must be first because declares some variables
+#include "associate_mesh_ass_combined.h"
 
     l_init_zero=.true.
     if (present(o_init_zero)) then
@@ -325,6 +326,11 @@ subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
 #else
     !$ACC END PARALLEL LOOP
 #endif
+
+    ! Juha: close associate blocks
+    end associate
+    end associate
+
 end subroutine adv_tra_ver_upw1
 !
 !
@@ -349,10 +355,9 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
     real(kind=WP)                :: Tmean, Tmean1, Tmean2
     real(kind=WP)                :: qc, qu, qd
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+! Juha: use associate blocks intead of pointers to work around gpu memcopy issues with Cray 
+#include "associate_part_ass_combined.h" ! This must be first because declares some vars
+#include "associate_mesh_ass_combined.h"
 
     l_init_zero=.true.
     if (present(o_init_zero)) then
@@ -431,6 +436,11 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
 #else
     !$ACC END PARALLEL LOOP
 #endif
+
+    ! Juha: close associate blocks
+    end associate
+    end associate
+
 end subroutine adv_tra_ver_qr4c
 !
 !
@@ -494,7 +504,7 @@ subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
 
         ! tracer at surface level
         tv(nzmin)=ttf(nzmin,n)
-        ! tracer at surface+1 level
+        !tracer at surface+1 level
 !       tv(2)=-ttf(1,n)*min(sign(1.0, W(2,n)), 0._WP)+ttf(2,n)*max(sign(1.0, W(2,n)), 0._WP)
 !       tv(3)=-ttf(2,n)*min(sign(1.0, W(3,n)), 0._WP)+ttf(3,n)*max(sign(1.0, W(3,n)), 0._WP)
         tv(nzmin+1)=0.5*(ttf(nzmin,  n)+ttf(nzmin+1,n))

@@ -79,10 +79,9 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
     integer                           :: el(2), enodes(2), nz, edge
     integer                           :: nu12, nl12, nl1, nl2, nu1, nu2
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+! Juha: Use associate blocks instead of pointers to workaround gpu memcopy issues on Cray
+#include "associate_part_ass_combined.h" 
+#include "associate_mesh_ass_combined.h"
 
     l_init_zero=.true.
     if (present(o_init_zero)) then
@@ -254,6 +253,11 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
 #else
     !$ACC END PARALLEL LOOP
 #endif
+
+    ! Juha: close the associate blocks
+    end associate
+    end associate
+
 end subroutine adv_tra_hor_upw1
 !
 !
@@ -282,10 +286,9 @@ subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_g
     integer                           :: el(2), enodes(2), nz, edge
     integer                           :: nu12, nl12, nl1, nl2, nu1, nu2
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+! Juha: Use associate blocks instead of pointers to workaround gpu memcopy issues on Cray
+#include "associate_part_ass_combined.h" 
+#include "associate_mesh_ass_combined.h"
 
     l_init_zero=.true.
     if (present(o_init_zero)) then
@@ -539,6 +542,11 @@ subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_g
     end do
 !$OMP END DO
 !$OMP END PARALLEL
+
+    ! Juha: close associate blocks
+    end associate
+    end associate
+
 end subroutine adv_tra_hor_muscl
 !
 !
@@ -565,10 +573,9 @@ end subroutine adv_tra_hor_muscl
     integer                           :: el(2), enodes(2), nz, edge
     integer                           :: nu12, nl12, nl1, nl2, nu1, nu2
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+! Juha: Use associate blocks instead of pointers to workaround gpu memcopy issues on Cray
+#include "associate_part_ass_combined.h" 
+#include "associate_mesh_ass_combined.h"
 
     l_init_zero=.true.
     if (present(o_init_zero)) then
@@ -831,4 +838,9 @@ end subroutine adv_tra_hor_muscl
 #else
     !$ACC END PARALLEL LOOP
 #endif 
+
+    ! Juha: close associate blocks
+    end associate
+    end associate
+
 end subroutine adv_tra_hor_mfct

@@ -103,29 +103,24 @@ subroutine ice_TG_rhs(ice, partit, mesh)
     real(kind=WP)   :: diff, entries(3),  um, vm, vol, dx(3), dy(3)
     integer         :: n, q, row, elem, elnodes(3)
     !___________________________________________________________________________
-    ! pointer on necessary derived types
-    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
-    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
-    real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, rhs_ms
+
+!! Juha: Use associate blocks instead of pointers to work around gpu memcopy issues with Cray
+#include "associate_part_ass_combined.h"
+#include "associate_mesh_ass_combined.h"
+
+    associate (    &
 #if defined (__oifs) || defined (__ifsinterface)
-    real(kind=WP), dimension(:), pointer  :: ice_temp, rhs_temp
+        ice_temp => ice%data(4)%values(:), &
+        rhs_temp => ice%data(4)%values_rhs(:), &
 #endif
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
-    u_ice    => ice%uice(:)
-    v_ice    => ice%vice(:)
-    a_ice    => ice%data(1)%values(:)
-    m_ice    => ice%data(2)%values(:)
-    m_snow   => ice%data(3)%values(:)
-    rhs_a    => ice%data(1)%values_rhs(:)
-    rhs_m    => ice%data(2)%values_rhs(:)
-    rhs_ms   => ice%data(3)%values_rhs(:)
-#if defined (__oifs) || defined (__ifsinterface)
-    ice_temp => ice%data(4)%values(:)
-    rhs_temp => ice%data(4)%values_rhs(:)
-#endif
+        u_ice    => ice%uice(:), &
+        v_ice    => ice%vice(:), &
+        a_ice    => ice%data(1)%values(:), &
+        m_ice    => ice%data(2)%values(:), &
+        m_snow   => ice%data(3)%values(:), &
+        rhs_a    => ice%data(1)%values_rhs(:), &
+        rhs_m    => ice%data(2)%values_rhs(:), &
+        rhs_ms   => ice%data(3)%values_rhs(:) )
     !___________________________________________________________________________
     ! Taylor-Galerkin (Lax-Wendroff) rhs
 #ifndef ENABLE_OPENACC
@@ -203,6 +198,12 @@ subroutine ice_TG_rhs(ice, partit, mesh)
 #else
     !$ACC END PARALLEL LOOP
 #endif
+
+    ! Juha: close associate blocks
+    end associate
+    end associate
+    end associate
+
 end subroutine ice_TG_rhs
 !
 !
@@ -265,39 +266,10 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     integer       :: row, clo, clo2, cn, location(100)
     real(kind=WP) :: gamma
     !___________________________________________________________________________
-    ! pointer on necessary derived types
 
-    ! Juha: switch for associate blocks to prevent copying dope vectors
-
-    !real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
-    !real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, rhs_ms
-    !real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
-    !real(kind=WP), dimension(:), pointer  :: mass_matrix
-!#if defined (__oifs) || defined (__ifsinterface)
-!    real(kind=WP), dimension(:), pointer  :: ice_temp, rhs_temp, m_templ
-!#endif
-!#include "associate_part_def.h"
-!#include "associate_mesh_def.h"
-!#include "associate_part_ass.h"
-!#include "associate_mesh_ass.h"
-#include "associate_part_ass_test.h"
-#include "associate_mesh_ass_test.h"
-
-    !a_ice        => ice%data(1)%values(:)
-    !m_ice        => ice%data(2)%values(:)
-    !m_snow       => ice%data(3)%values(:)
-    !rhs_a        => ice%data(1)%values_rhs(:)
-    !rhs_m        => ice%data(2)%values_rhs(:)
-    !rhs_ms       => ice%data(3)%values_rhs(:)
-    !a_icel       => ice%data(1)%valuesl(:)
-    !m_icel       => ice%data(2)%valuesl(:)
-    !m_snowl      => ice%data(3)%valuesl(:)
-    !mass_matrix  => ice%work%fct_massmatrix(:)
-!#if defined (__oifs) || defined (__ifsinterface)
-    !ice_temp     => ice%data(4)%values(:)
-    !rhs_temp     => ice%data(4)%values_rhs(:)
-    !m_templ      => ice%data(4)%valuesl(:)
-!#endif
+    ! Juha: Use associate blocks instead of pointers to work around gpu memcopy issues with Cray
+#include "associate_part_ass_combined.h"
+#include "associate_mesh_ass_combined.h"
 
     associate( &
 #if defined (__oifs) || defined (__ifsinterface)
@@ -367,7 +339,7 @@ subroutine ice_solve_low_order(ice, partit, mesh)
 !$OMP BARRIER
 #endif
 
-    ! Juha: switch to associates
+    ! Juha: close associate blocks
     end associate
     end associate
     end associate
@@ -393,38 +365,10 @@ subroutine ice_solve_high_order(ice, partit, mesh)
     real(kind=WP)                         :: rhs_new
     integer                               :: num_iter_solve=3
     !___________________________________________________________________________
-    ! pointer on necessary derived types
 
-    ! Juha:: switch to associate blocks to avoid copying dope vectors
-    !real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, rhs_ms
-    !real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
-    !real(kind=WP), dimension(:), pointer  :: da_ice, dm_ice, dm_snow
-    !real(kind=WP), dimension(:), pointer  :: mass_matrix
-!#if defined (__oifs) || defined (__ifsinterface)
-    !real(kind=WP), dimension(:), pointer  :: rhs_temp, m_templ, dm_temp
-!#endif
-!#include "associate_part_def.h"
-!#include "associate_mesh_def.h"
-!#include "associate_part_ass.h"
-!#include "associate_mesh_ass.h"
-#include "associate_part_ass_test.h"
-#include "associate_mesh_ass_test.h"
-
-    !rhs_a        => ice%data(1)%values_rhs(:)
-    !rhs_m        => ice%data(2)%values_rhs(:)
-    !rhs_ms       => ice%data(3)%values_rhs(:)
-    !a_icel       => ice%data(1)%valuesl(:)
-    !m_icel       => ice%data(2)%valuesl(:)
-    !m_snowl      => ice%data(3)%valuesl(:)
-    !da_ice       => ice%data(1)%dvalues(:)
-    !dm_ice       => ice%data(2)%dvalues(:)
-    !dm_snow      => ice%data(3)%dvalues(:)
-    !mass_matrix  => ice%work%fct_massmatrix(:)
-!#if defined (__oifs) || defined (__ifsinterface)
-    !rhs_temp     => ice%data(4)%values_rhs(:)
-    !m_templ      => ice%data(4)%valuesl(:)
-    !dm_temp      => ice%data(4)%dvalues(:)
-!#endif
+    ! Juha: Use associate blocks instead of pointers to work around gpu memcopy issues with Cray
+#include "associate_part_ass_combined.h"
+#include "associate_mesh_ass_combined.h"
 
     associate( &
 #if defined (__oifs) || defined (__ifsinterface)
@@ -543,6 +487,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
 #endif
     end do
 
+    ! Juha: close associate blocks
     end associate
     end associate
     end associate
@@ -572,43 +517,10 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     integer       :: icoef(3,3), n, q, elem, elnodes(3), row
     real(kind=WP) :: vol, flux, ae, gamma
     !___________________________________________________________________________
-    ! pointer on necessary derived types
 
-    !! Juha: switch to associates to avoid copying dope vector
-    !real(kind=WP), dimension(:)  , pointer  :: a_ice, m_ice, m_snow
-    !real(kind=WP), dimension(:)  , pointer  :: a_icel, m_icel, m_snowl
-    !real(kind=WP), dimension(:)  , pointer  :: da_ice, dm_ice, dm_snow
-    !real(kind=WP), dimension(:)  , pointer  :: icepplus, icepminus, tmax, tmin
-    !real(kind=WP), dimension(:,:), pointer  :: icefluxes
-!#if defined (__oifs) || defined (__ifsinterface)
-!    real(kind=WP), dimension(:)  , pointer  :: ice_temp, m_templ, dm_temp
-!#endif
-!#include "associate_part_def.h"
-!#include "associate_mesh_def.h"
-!#include "associate_part_ass.h"
-!#include "associate_mesh_ass.h"
-#include "associate_part_ass_test.h"
-#include "associate_mesh_ass_test.h"
-
-    !a_ice     => ice%data(1)%values(:)
-    !m_ice     => ice%data(2)%values(:)
-    !m_snow    => ice%data(3)%values(:)
-    !a_icel    => ice%data(1)%valuesl(:)
-    !m_icel    => ice%data(2)%valuesl(:)
-    !m_snowl   => ice%data(3)%valuesl(:)
-    !da_ice    => ice%data(1)%dvalues(:)
-    !dm_ice    => ice%data(2)%dvalues(:)
-    !dm_snow   => ice%data(3)%dvalues(:)
-    !icefluxes => ice%work%fct_fluxes(:,:)
-    !icepplus  => ice%work%fct_plus(:)
-    !icepminus => ice%work%fct_minus(:)
-    !tmax      => ice%work%fct_tmax(:)
-    !tmin      => ice%work%fct_tmin(:)
-!#if defined (__oifs) || defined (__ifsinterface)
-    !ice_temp  => ice%data(4)%values(:)
-    !m_templ   => ice%data(4)%valuesl(:)
-    !dm_temp   => ice%data(4)%dvalues(:)
-!#endif
+    !! Juha: Use associate blocks instead of pointers to work around gpu memcopy issues with Cray
+#include "associate_part_ass_combined.h"
+#include "associate_mesh_ass_combined.h"
 
     associate( &
 #if defined (__oifs) || defined (__ifsinterface)
@@ -1350,39 +1262,14 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
     integer                  :: n, q, row, elem, elnodes(3)
     real(kind=WP)            :: c1, c2, c3, c4, cx1, cx2, cx3, cx4, entries2(3)
     !___________________________________________________________________________
-    ! pointer on necessary derived types
-    !real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
-    !real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:), pointer  :: rhs_a, rhs_m, rhs_ms
-    !real(kind=WP), dimension(:), pointer  :: rhs_adiv, rhs_mdiv, rhs_msdiv
-#if defined (__oifs) || defined (__ifsinterface)
-    !real(kind=WP), dimension(:), pointer  :: ice_temp, rhs_temp, rhs_tempdiv
-#endif
-!#include "associate_part_def.h"
-!#include "associate_mesh_def.h"
-!#include "associate_part_ass.h"
-!#include "associate_mesh_ass.h"
-!! Juha: to avoid copying dope vectors
-#include "associate_part_ass_test.h"
-#include "associate_mesh_ass_test.h"
+!! Juha: Use associate blocks instead of pointers to work around gpu memcopy issues with Cray
+#include "associate_part_ass_combined.h"
+#include "associate_mesh_ass_combined.h"
 
-    !! Juha: switch to associates to avoid copying dope vectors
-    !u_ice       => ice%uice(:)
-    !v_ice       => ice%vice(:)
-    !a_ice       => ice%data(1)%values(:)
-    !m_ice       => ice%data(2)%values(:)
-    !m_snow      => ice%data(3)%values(:)
-    rhs_a       => ice%data(1)%values_rhs(:)  !! Juha: leavign these here because acc atomic updates don't allow allocatable vars
+    rhs_a       => ice%data(1)%values_rhs(:)  !! Juha: leavign these here because for some reason acc atomic updates wouldnt work, look into later
     rhs_m       => ice%data(2)%values_rhs(:)
     rhs_ms      => ice%data(3)%values_rhs(:)
-    !rhs_adiv    => ice%data(1)%values_div_rhs(:)
-    !rhs_mdiv    => ice%data(2)%values_div_rhs(:)
-    !rhs_msdiv   => ice%data(3)%values_div_rhs(:)
-!#if defined (__oifs) || defined (__ifsinterface)
-    !ice_temp    => ice%data(4)%values(:)
-    !rhs_temp    => ice%data(4)%values_rhs(:)
-    !rhs_tempdiv => ice%data(4)%values_div_rhs(:)
-!#endif
     
     associate(  &
 #if defined (__oifs) || defined (__ifsinterface)
@@ -1557,7 +1444,7 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 #endif
 #endif
 
-    !! Juha: for the associates, there are nested ones from the include files
+    !! Juha: close associate blocks
     end associate
     end associate
     end associate
@@ -1583,42 +1470,10 @@ subroutine ice_update_for_div(ice, partit, mesh)
     real(kind=WP)                           :: rhs_new
     integer                                 :: num_iter_solve=3
     !___________________________________________________________________________
-    ! pointer on necessary derived types
-    ! Juha: switch to associate blocks
-    !real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
-    !real(kind=WP), dimension(:), pointer  :: rhs_adiv, rhs_mdiv, rhs_msdiv
-    !real(kind=WP), dimension(:), pointer  :: a_icel, m_icel, m_snowl
-    !real(kind=WP), dimension(:), pointer  :: da_ice, dm_ice, dm_snow
-    !real(kind=WP), dimension(:), pointer  :: mass_matrix
-!#if defined (__oifs) || defined (__ifsinterface)
-!    real(kind=WP), dimension(:), pointer  :: ice_temp, m_templ, dm_temp, rhs_tempdiv
-!#endif
-!#include "associate_part_def.h"
-!#include "associate_mesh_def.h"
-!#include "associate_part_ass.h"
-!#include "associate_mesh_ass.h"
-#include "associate_part_ass_test.h"
-#include "associate_mesh_ass_test.h"
 
-    !a_ice        => ice%data(1)%values(:)
-    !m_ice        => ice%data(2)%values(:)
-    !m_snow       => ice%data(3)%values(:)
-    !rhs_adiv     => ice%data(1)%values_div_rhs(:)
-    !rhs_mdiv     => ice%data(2)%values_div_rhs(:)
-    !rhs_msdiv    => ice%data(3)%values_div_rhs(:)
-    !a_icel       => ice%data(1)%valuesl(:)
-    !m_icel       => ice%data(2)%valuesl(:)
-    !m_snowl      => ice%data(3)%valuesl(:)
-    !da_ice       => ice%data(1)%dvalues(:)
-    !dm_ice       => ice%data(2)%dvalues(:)
-    !dm_snow      => ice%data(3)%dvalues(:)
-    !mass_matrix  => ice%work%fct_massmatrix(:)
-!#if defined (__oifs) || defined (__ifsinterface)
-    !ice_temp     => ice%data(4)%values(:)
-    !m_templ      => ice%data(4)%valuesl(:)
-    !dm_temp      => ice%data(4)%dvalues(:)
-    !rhs_tempdiv  => ice%data(4)%values_div_rhs(:)
-!#endif
+! Juha : Use associate blocks instead of pointers to work around gpu memcopy issues with Cray
+#include "associate_part_ass_combined.h"
+#include "associate_mesh_ass_combined.h"
 
     associate( &
 #if defined (__oifs) || defined (__ifsinterface)
@@ -1767,7 +1622,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
     !$ACC END PARALLEL LOOP
 #endif
 
-    ! Juha: Switch for associates
+    ! Juha: close associate blocks
     end associate
     end associate
     end associate

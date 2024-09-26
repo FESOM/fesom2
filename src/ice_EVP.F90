@@ -53,9 +53,6 @@ subroutine stress_tensor(ice, partit, mesh)
 #if defined (__icepack)
     use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
 #endif
-#ifdef ENABLE_OPENACC
-    use openacc_lib     !! Juha: add for cray_acc_set_debug_global_level
-#endif
 
     implicit none
     type(t_partit), intent(inout), target :: partit
@@ -66,32 +63,11 @@ subroutine stress_tensor(ice, partit, mesh)
     real(kind=WP)   :: det1, det2, dte, vale, r1, r2, r3, si1, si2
     real(kind=WP)   :: zeta, delta, delta_inv, d1, d2
     !___________________________________________________________________________
-    ! pointer on necessary derived types
-    !! Juha: try to use ASSOCIATE instead of pointers!
-    !real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
-    !real(kind=WP), dimension(:), pointer  :: eps11, eps12, eps22
-    !real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
-    !real(kind=WP), dimension(:), pointer  :: ice_strength
 
-! Juha: test converting some of these to associate as well
-!#include "associate_part_def.h"
-!#include "associate_mesh_def.h"
-!#include "associate_part_ass.h"
-!#include "associate_mesh_ass.h"
-#include "associate_part_ass_test.h" ! This must be first because declares some vars... Also has 2 nested associates...
-#include "associate_mesh_ass_test.h"
+! Juha: Use associate blocks instead of pointers to work around gpu memcopy issues on Cray
+#include "associate_part_ass_combined.h"
+#include "associate_mesh_ass_combined.h"
 
-
-    !! Juha: try to use ASSOCIATE
-    !u_ice       => ice%uice(:)
-    !v_ice       => ice%vice(:)
-    !eps11       => ice%work%eps11(:)
-    !eps12       => ice%work%eps12(:)
-    !eps22       => ice%work%eps22(:)
-    !sigma11     => ice%work%sigma11(:)
-    !sigma12     => ice%work%sigma12(:)
-    !sigma22     => ice%work%sigma22(:)
-    !ice_strength=> ice%work%ice_strength(:)
     ASSOCIATE(  u_ice       => ice%uice(:), &
                 v_ice       => ice%vice(:), &
                 eps11       => ice%work%eps11(:), &
@@ -110,7 +86,6 @@ subroutine stress_tensor(ice, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, r1, r2, r3, si1, si2, zeta, delta, delta_inv, d1, d2)
 #else
-    !!CALL cray_acc_set_debug_global_level(3) !! Juha: debugging ACC
 !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
     do el=1,myDim_elem2D
@@ -188,14 +163,10 @@ subroutine stress_tensor(ice, partit, mesh)
 !$OMP END PARALLEL DO
 #else
 !$ACC END PARALLEL LOOP
-    !!call cray_acc_set_debug_global_level(0) !! Juha: debugging ACC
 #endif
 
-    !! Juha: try to use ASSOCIATE
-    END ASSOCIATE
-
-    ! Juha: needed for the include file test: the includes in effect 
-    ! make nested associates that need to be closed here
+    !! Juha: close associate blocks
+    end associate
     end associate
     end associate
 
@@ -220,29 +191,11 @@ subroutine stress2rhs(ice, partit, mesh)
     INTEGER                   :: n, el,  k
     REAL(kind=WP)             :: val3
     !___________________________________________________________________________
-    ! pointer on necessary derived types
-    !! Juha: try switching pointers to associate
-    !real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
-    !real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice, rhs_a, rhs_m
-    !real(kind=WP), dimension(:), pointer  :: inv_areamass, ice_strength
 
-!! Juha: switch from pointers to associate
-!#include "associate_part_def.h"
-!#include "associate_mesh_def.h"
-!#include "associate_part_ass.h"
-!#include "associate_mesh_ass.h"
-#include "associate_part_ass_test.h"
-#include "associate_mesh_ass_test.h"
+!! Juha: Use associate blocks instead of pointers to work around gpu memcopy issues on Cray
+#include "associate_part_ass_combined.h"
+#include "associate_mesh_ass_combined.h"
 
-    !sigma11      => ice%work%sigma11(:) !! Juha: switch to ASSOCIATE
-    !sigma12      => ice%work%sigma12(:)
-    !sigma22      => ice%work%sigma22(:)
-    !u_rhs_ice    => ice%uice_rhs(:)
-    !v_rhs_ice    => ice%vice_rhs(:)
-    !rhs_a        => ice%data(1)%values_rhs(:)
-    !rhs_m        => ice%data(2)%values_rhs(:)
-    !inv_areamass => ice%work%inv_areamass(:)
-    !ice_strength => ice%work%ice_strength(:)
     associate(  &
     sigma11      => ice%work%sigma11(:), &
     sigma12      => ice%work%sigma12(:), &
@@ -365,10 +318,8 @@ subroutine stress2rhs(ice, partit, mesh)
     !$ACC END PARALLEL LOOP
 #endif
 
-    !! Juha: switch pointers to associate
+    !! Juha: close associate blocks
     end associate    
-
-    ! Juha: as a brute force test, the include files define nested associate blocks...
     end associate
     end associate
 
@@ -393,10 +344,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     use icedrv_main,   only: icepack_to_fesom
 #endif
 #ifdef ENABLE_ROCTX
-    USE mo_roctx
-#endif
-#ifdef ENABLE_OPENACC
-    use openacc_lib     !! Juha: add for cray_acc_set_debug_global_level
+    USE mo_roctx  ! for rocprof instrumentation
 #endif
 
     IMPLICIT NONE
@@ -420,62 +368,10 @@ subroutine EVPdynamics(ice, partit, mesh)
     real(kind=WP)   :: zeta, delta_inv, d1, d2
     INTEGER         :: elem
     !_______________________________________________________________________________
-    ! pointer on necessary derived types
-    !! Juha: switch pointers to associate
-    !real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
-    !real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
-    !real(kind=WP), dimension(:), pointer  :: u_ice_old, v_ice_old
-    !real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice, rhs_a, rhs_m
-    !real(kind=WP), dimension(:), pointer  :: u_w, v_w, elevation
-    !real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
-    !real(kind=WP), dimension(:), pointer  :: inv_areamass, inv_mass, ice_strength
-!#if defined (__icepack)
-    !real(kind=WP), dimension(:), pointer  :: a_ice_old, m_ice_old, m_snow_old
-!#endif
-    !real(kind=WP)              , pointer  :: inv_rhowat, rhosno, rhoice
 
-!! Juha: switch from pointers to associate
-!#include "associate_part_def.h"
-!#include "associate_mesh_def.h"
-!#include "associate_part_ass.h"
-!#include "associate_mesh_ass.h"
-#include "associate_part_ass_test.h"
-#include "associate_mesh_ass_test.h"
-
-!#ifdef ENABLE_ROCTX
-!    CALL roctxStartRange("EVPdynamics/pointers 1")
-!#endif   
-    !u_ice           => ice%uice(:)
-    !v_ice           => ice%vice(:)
-    !a_ice           => ice%data(1)%values(:)
-    !m_ice           => ice%data(2)%values(:)
-    !m_snow          => ice%data(3)%values(:)
-    !u_ice_old       => ice%uice_old(:)
-    !v_ice_old       => ice%vice_old(:)
-    !u_rhs_ice       => ice%uice_rhs(:)
-    !v_rhs_ice       => ice%vice_rhs(:)
-    !rhs_a           => ice%data(1)%values_rhs(:)
-    !rhs_m           => ice%data(2)%values_rhs(:)
-    !u_w             => ice%srfoce_u(:)
-    !v_w             => ice%srfoce_v(:)
-    !elevation       => ice%srfoce_ssh(:)
-    !stress_atmice_x => ice%stress_atmice_x(:)
-    !stress_atmice_y => ice%stress_atmice_y(:)
-!#if defined (__icepack)
-    !a_ice_old       => ice%data(1)%values_old(:)
-    !m_ice_old       => ice%data(2)%values_old(:)
-    !m_snow_old      => ice%data(3)%values_old(:)
-!#endif
-    !rhosno          => ice%thermo%rhosno
-    !rhoice          => ice%thermo%rhoice
-    !inv_rhowat      => ice%thermo%inv_rhowat
-
-    !inv_areamass    => ice%work%inv_areamass(:)
-    !inv_mass        => ice%work%inv_mass(:)
-    !ice_strength    => ice%work%ice_strength(:)
-!#ifdef ENABLE_ROCTX
-!    CALL roctxRangePop()
-!#endif
+!! Juha : Use associate blocks instead of pointers to work around gpu memcopy issues on Cray
+#include "associate_part_ass_combined.h"
+#include "associate_mesh_ass_combined.h"
 
     associate(  &
     u_ice           => ice%uice(:), &
@@ -944,23 +840,16 @@ subroutine EVPdynamics(ice, partit, mesh)
 #endif
 
 !write(*,*) partit%mype, shortstep, 'CP4'
-        !CALL cray_acc_set_debug_global_level(3) !! Juha: debugging ACC
         !_______________________________________________________________________
         call exchange_nod(U_ice,V_ice,partit, luse_g2g = .true.) 
-        !Juha changed
-        !call exchange_nod2D_2fields_explicit_shape(myDim_nod2D+eDim_nod2D,U_ice,V_ice,partit, luse_g2g = .true.)
-        !call exchange_nod2D_2fields_explicit_shape(U_ice(1),V_ice(1), partit, luse_g2g = .true.)
-        !CALL cray_acc_set_debug_global_level(0) !! Juha: debugging ACC
 
 !ifndef ENABLE_OPENACC
 !$OMP BARRIER
 !endif
     END DO !--> do shortstep=1, ice%evp_rheol_steps
 
-    !! Juha: switch pointers to associate
+    !! Juha: close associate blocks
     end associate  
-
-    !! Juha: as a brute force attempt, the include files define nested associate blocks...
     end associate
     end associate
 

@@ -54,6 +54,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     use oce_adv_tra_ver_interfaces
     use oce_adv_tra_fct_interfaces
     use oce_tra_adv_flux2dtracer_interface
+
     implicit none
     real(kind=WP),  intent(in),    target :: dt
     integer,        intent(in)            :: tr_num
@@ -67,13 +68,6 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     real(kind=WP),  intent(in), target    :: WE(mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
 
     real(kind=WP),  pointer, dimension (:,:)   :: pwvel
-    real(kind=WP),  pointer, dimension (:,:)   :: ttf, ttfAB, fct_LO
-    real(kind=WP),  pointer, dimension (:,:)   :: adv_flux_hor, adv_flux_ver, dttf_h, dttf_v
-    real(kind=WP),  pointer, dimension (:,:)   :: fct_ttf_min, fct_ttf_max
-    real(kind=WP),  pointer, dimension (:,:)   :: fct_plus, fct_minus
-
-    integer,        pointer, dimension (:)     :: nboundary_lay
-    real(kind=WP),  pointer, dimension (:,:,:) :: edge_up_dn_grad
 
     integer       :: el(2), enodes(2), nz, n, e
     integer       :: nl12, nu12, nl1, nl2, nu1, nu2
@@ -84,25 +78,28 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     real(kind=WP) :: opth, optv
     logical       :: do_zero_flux
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
-    ttf             => tracers%data(tr_num)%values
-    ttfAB           => tracers%data(tr_num)%valuesAB
+! Juha: Use associate blocks instead of pointers to work around gpu memcopy issues with Cray
+#include "associate_part_ass_combined.h" ! This must be first because declares some vars... Also has 2 nested associates...
+#include "associate_mesh_ass_combined.h"
+
     opth            =  tracers%data(tr_num)%tra_adv_ph
     optv            =  tracers%data(tr_num)%tra_adv_pv
-    fct_LO          => tracers%work%fct_LO
-    adv_flux_ver    => tracers%work%adv_flux_ver
-    adv_flux_hor    => tracers%work%adv_flux_hor
-    edge_up_dn_grad => tracers%work%edge_up_dn_grad
-    nboundary_lay   => tracers%work%nboundary_lay
-    fct_ttf_min     => tracers%work%fct_ttf_min
-    fct_ttf_max     => tracers%work%fct_ttf_max
-    fct_plus        => tracers%work%fct_plus
-    fct_minus       => tracers%work%fct_minus
-    dttf_h          => tracers%work%del_ttf_advhoriz
-    dttf_v          => tracers%work%del_ttf_advvert
+
+    associate( ttf             => tracers%data(tr_num)%values, &
+               ttfAB           => tracers%data(tr_num)%valuesAB, &
+               fct_LO          => tracers%work%fct_LO, &
+               adv_flux_ver    => tracers%work%adv_flux_ver, &
+               adv_flux_hor    => tracers%work%adv_flux_hor, &
+               edge_up_dn_grad => tracers%work%edge_up_dn_grad, &
+               nboundary_lay   => tracers%work%nboundary_lay, &
+               fct_ttf_min     => tracers%work%fct_ttf_min, &
+               fct_ttf_max     => tracers%work%fct_ttf_max, &
+               fct_plus        => tracers%work%fct_plus, &
+               fct_minus       => tracers%work%fct_minus, &
+               dttf_h          => tracers%work%del_ttf_advhoriz, &
+               dttf_v          => tracers%work%del_ttf_advvert )
+
+
 
     !___________________________________________________________________________
     ! compute FCT horzontal and vertical low order solution as well as lw order
@@ -113,6 +110,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         ! o_init_zero=.false. : input flux will be substracted
         call adv_tra_hor_upw1(vel, ttf, partit, mesh, adv_flux_hor, o_init_zero=.true.)
         ! update the LO solution for horizontal contribution
+
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
@@ -299,6 +297,13 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
        call oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, partit, mesh)
     end if
 
+    !! Juha: close associate blocks
+    end associate
+    end associate
+    end associate
+
+
+
 end subroutine do_oce_adv_tra
 !
 !
@@ -321,10 +326,11 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
     real(kind=WP), optional           :: lo (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP), optional           :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     integer                           :: n, nz, k, elem, enodes(3), num, el(2), nu12, nl12, nu1, nu2, nl1, nl2, edge
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+
+! Juha: Use associate blocks instead of pointers to work around gpu memcopy issues with Cray
+#include "associate_part_ass_combined.h" ! This must be first because declares some vars... Also has 2 nested associates...
+#include "associate_mesh_ass_combined.h"
+
     !___________________________________________________________________________
     ! c. Update the solution
     ! Vertical
@@ -454,5 +460,9 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
     !$ACC UPDATE DEVICE(dttf_h)
 #endif
 #endif
+
+    ! Juha: close associate blocks
+    end associate
+    end associate
 
 end subroutine oce_tra_adv_flux2dtracer

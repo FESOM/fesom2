@@ -110,12 +110,9 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #endif
 
 #ifdef ENABLE_ROCTX
-    USE mo_roctx
+    USE mo_roctx  ! For rocprof instrumentation
 #endif 
 
-#ifdef ENABLE_OPENACC
-    use openacc_lib ! Juha: add for cray_acc_set_debug_global_level
-#endif
     implicit none
     integer       , intent(in)            :: step
     type(t_ice)   , intent(inout), target :: ice
@@ -129,24 +126,9 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #endif
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    ! Juha: switch for associate blocks
-    !real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
-!#if defined (__oifs) || defined (__ifsinterface)
-    !real(kind=WP), dimension(:), pointer  :: ice_temp, a_ice
-!#endif
-!#include "associate_part_def.h"
-!#include "associate_mesh_def.h"
-!#include "associate_part_ass.h"
-!#include "associate_mesh_ass.h"
-#include "associate_part_ass_test.h"
-#include "associate_mesh_ass_test.h"
-
-    !u_ice    => ice%uice(:)
-    !v_ice    => ice%vice(:)
-!#if defined (__oifs) || defined (__ifsinterface)
-    !a_ice    => ice%data(1)%values(:)
-    !ice_temp => ice%data(4)%values(:)
-!#endif
+    ! Juha: Use associate blocks instead to work around gpu memcopy issues with Cray
+#include "associate_part_ass_combined.h"
+#include "associate_mesh_ass_combined.h"
 
     associate( &
 #if defined (__oifs) || defined (__ifsinterface)
@@ -163,8 +145,6 @@ subroutine ice_timestep(step, ice, partit, mesh)
     call step_icepack(ice, mesh, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts
 #else
 
-    ! Juha added
-    !call cray_acc_set_debug_global_level(3)
 #ifdef ENABLE_ROCTX
     CALL roctxStartRange("ice_timestep/acc update device")
 #endif
@@ -190,9 +170,6 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #ifdef ENABLE_ROCTX
     CALL roctxRangePop()
 #endif    
-
-    ! Juha added
-    !call cray_acc_set_debug_global_level(0)
 
     !___________________________________________________________________________
     ! ===== Dynamics
@@ -350,7 +327,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
         write(*,*)
      endif
 
-    ! Juha: for associate blocks
+    ! Juha: close associate blocks
     end associate
     end associate
     end associate

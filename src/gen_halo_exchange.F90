@@ -174,7 +174,7 @@ logical,        intent(in),optional   :: luse_g2g
     CALL roctxStartRange("exchange_nod2d begin")
 #endif
 
-    call exchange_nod2D_begin(nod_array2D(1), partit, luse_g2g)
+    call exchange_nod2D_begin(nod_array2D, partit, luse_g2g)
 
 #ifdef ENABLE_ROCTX
     CALL roctxRangePop()
@@ -199,7 +199,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod_array2D!(:)
+real(real64),   intent(inout)         :: nod_array2D(:)
 integer                               :: n, sn, rn
 logical,        intent(in),optional   :: luse_g2g
 logical                               :: lg2g
@@ -270,7 +270,7 @@ logical,        intent(in),optional   :: luse_g2g
     CALL roctxStartRange("exchange_nod2d_2fields begin")
 #endif
 
-    call exchange_nod2D_2fields_begin(nod1_array2D(1), nod2_array2D(1), partit, luse_g2g)
+    call exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D, partit, luse_g2g)
 
 #ifdef ENABLE_ROCTX
     CALL roctxRangePop()
@@ -295,8 +295,8 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod1_array2D!(:)
-real(real64),   intent(inout)         :: nod2_array2D!(:)
+real(real64),   intent(inout)         :: nod1_array2D(:)
+real(real64),   intent(inout)         :: nod2_array2D(:)
 integer                               :: n, sn, rn
 logical,        intent(in),optional   :: luse_g2g
 logical                               :: lg2g
@@ -382,7 +382,7 @@ logical,        intent(in),optional   :: luse_g2g
     CALL roctxStartRange("exchange_nod2d_3fields begin")
 #endif
 
-    call exchange_nod2D_3fields_begin(nod1_array2D(1), nod2_array2D(1), nod3_array2D(1), partit, luse_g2g)
+    call exchange_nod2D_3fields_begin(nod1_array2D, nod2_array2D, nod3_array2D, partit, luse_g2g)
 
 #ifdef ENABLE_ROCTX
     CALL roctxRangePop()
@@ -407,9 +407,9 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod1_array2D!(:)
-real(real64),   intent(inout)         :: nod2_array2D!(:)
-real(real64),   intent(inout)         :: nod3_array2D!(:)
+real(real64),   intent(inout)         :: nod1_array2D(:)
+real(real64),   intent(inout)         :: nod2_array2D(:)
+real(real64),   intent(inout)         :: nod3_array2D(:)
 integer                               :: n, sn, rn
 logical,        intent(in),optional   :: luse_g2g
 logical                               :: lg2g

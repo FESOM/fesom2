@@ -857,7 +857,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
 !$OMP END DO
         !_______________________________________________________________________
 !$OMP MASTER
-        call exchange_nod_begin(u_ice_aux(1), v_ice_aux(1), partit) !!! Juha: interface changed to avoid copying dope vector
+        call exchange_nod_begin(u_ice_aux, v_ice_aux, partit) 
 !$OMP END MASTER
 !$OMP BARRIER
 !$OMP DO

@@ -98,10 +98,10 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     real(kind=WP)                     :: flux, ae, tvert_max(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D), tvert_min(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP)                     :: flux_eps=1e-16
     real(kind=WP)                     :: bignumber=1e3
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+
+! Juha: Use associate blocks instead of pointers to work around gpu memcopy issues on Cray
+#include "associate_part_ass_combined.h" 
+#include "associate_mesh_ass_combined.h"
 
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, k, elem, enodes, num, el, nl1, nl2, nu1, nu2, nl12, nu12, edge, &
@@ -497,4 +497,9 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 #else
 !$ACC END DATA
 #endif
+
+    ! Juha: close associate blocks
+    end associate
+    end associate
+
 end subroutine oce_tra_adv_fct
