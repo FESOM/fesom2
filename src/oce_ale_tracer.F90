@@ -1120,6 +1120,13 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
         if (any(recom_det_tracer_id == tracer_id(tr_num))) Vben = Vdet
         if (any(recom_phy_tracer_id == tracer_id(tr_num))) Vben = VPhy
         if (any(recom_dia_tracer_id == tracer_id(tr_num))) Vben = VDia
+        if (any(recom_cocco_tracer_id == tracer_id(tr_num))) Vben = VCocco   ! check conditions (#if defined (__coccos)) and add the necessary tracers numbers below OG:
+! Adjust iphycalc
+
+#if defined (__coccos)
+        if(tracer_id(tr_num)==1020) Vben = VCocco   !iphycal in case of coccos 
+#endif
+
         if (allow_var_sinking .and. any(recom_det_tracer_id == tracer_id(tr_num))) then
           Vben = Vdet_a * abs(zbar_3d_n(:,n)) + Vben
         end if
@@ -1128,12 +1135,12 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
 ! *******************************************************
 
 #if defined(__3Zoo2Det)
-          if(tracer_id(tr_num)==1025 .or. &  !idetz2n
-             tracer_id(tr_num)==1026 .or. &  !idetz2c
-             tracer_id(tr_num)==1027 .or. &  !idetz2si
-             tracer_id(tr_num)==1028 ) then  !idetz2calc
-             Vben = VDet_zoo2
-          endif
+        if(tracer_id(tr_num)==1025 .or. &  !idetz2n
+           tracer_id(tr_num)==1026 .or. &  !idetz2c
+           tracer_id(tr_num)==1027 .or. &  !idetz2si
+           tracer_id(tr_num)==1028 ) then  !idetz2calc
+           Vben = VDet_zoo2
+        endif
 #endif
 
         Vben= Vben/SecondsPerDay ! conversion [m/d] --> [m/s] (vertical velocity, note that it is positive here)
@@ -1156,6 +1163,11 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
         ! Particulate Organic Nitrogen
         if( tracer_id(tr_num)==1004 .or. &  !iphyn
             tracer_id(tr_num)==1007 .or. &  !idetn
+#if defined (__coccos) & defined (__3Zoo2Det)
+            tracer_id(tr_num)==1029 .or. &  !icocn
+#elif defined (__coccos) & !defined (__3Zoo2Det)
+            tracer_id(tr_num)==1023 .or. &  !icocn
+#endif
             tracer_id(tr_num)==1013 ) then  !idian
 !            tracer_id(tr_num)==1013 .or. &  !idian
 !            tracer_id(tr_num)==1025 ) then  !idetz2n
@@ -1177,6 +1189,11 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
         ! Particulate Organic Carbon
         if( tracer_id(tr_num)==1005 .or. &  !iphyc
             tracer_id(tr_num)==1008 .or. &  !idetc
+#if defined (__coccos) & defined (__3Zoo2Det)
+            tracer_id(tr_num)==1030 .or. &  !icocc
+#elif defined (__coccos) & !defined (__3Zoo2Det)
+            tracer_id(tr_num)==1024 .or. &  !icocc
+#endif
             tracer_id(tr_num)==1014 ) then
 !            tracer_id(tr_num)==1014 .or. &  !idiac
 !            tracer_id(tr_num)==1026 ) then  !idetz2c
@@ -1211,8 +1228,7 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
 
         endif
 
-        ! Cal
-        if( tracer_id(tr_num)==1020 .or. &  !iphycal
+        if( tracer_id(tr_num)==1020 .or. &  !iphycal  ! computed using Vcocco in case of coccos, otherwise Vphy
             tracer_id(tr_num)==1021 ) then   !idetcal
 !            tracer_id(tr_num)==1021 .or. &  !idetcal
 !            tracer_id(tr_num)==1028 ) then  !idetz2cal

@@ -30,13 +30,16 @@ module recom_config
 
 #if defined (__3Zoo2Det)
   Integer :: izoo2n = 23, izoo2c =24, idetz2n = 25,              &
-             idetz2c = 26, idetz2si = 27, idetz2calc = 28        
+             idetz2c = 26, idetz2si = 27, idetz2calc = 28
+  integer, dimension(4)  :: recom_det2_tracer_id    = (/1025, 1026, 1027, 1028/)
 #endif
 
 #if defined (__coccos) & defined (__3Zoo2Det)
   Integer :: icocn = 29, icocc = 30, icchl = 31
+  integer, dimension(3)  :: recom_cocco_tracer_id   = (/1029, 1030, 1031/)
 #elif defined (__coccos) & !defined (__3Zoo2Det)
-  Integer :: icocn = 23, icocc = 24, icchl = 25 
+  Integer :: icocn = 23, icocc = 24, icchl = 25
+  integer, dimension(3)  :: recom_cocco_tracer_id   = (/1023, 1024, 1025/)
 #endif
 
 #if defined (__coccos) & defined (__3Zoo2Det)
@@ -49,16 +52,20 @@ module recom_config
 
 !!MB TEST: tracer ids for revised remineralization and sinking in oce_ale_tracer.F90
   integer, dimension(8)  :: recom_remin_tracer_id   = (/1001, 1002, 1003, 1018, 1019, 1022, 1302, 1402/)
+
+
+
   integer, dimension(29) :: recom_sinking_tracer_id = (/1007, 1008, 1017, 1021, 1004, 1005, 1020, 1006, &
                                                         1013, 1014, 1016, 1015, 1025, 1026, 1027, 1028, &
                                                         1029, 1030, 1031, &  ! OG Cocco
                                                         1308, 1321, 1305, 1320, & 
                                                         1314, 1408, 1421, 1405, 1420, 1414/)
+
   integer, dimension(8)  :: recom_det_tracer_id     = (/1007, 1008, 1017, 1021, 1308, 1321, 1408, 1421/)
   integer, dimension(8)  :: recom_phy_tracer_id     = (/1004, 1005, 1020, 1305, 1320, 1405, 1420, 1006/)
   integer, dimension(6)  :: recom_dia_tracer_id     = (/1013, 1014, 1314, 1414, 1016, 1015/)
-  integer, dimension(3)  :: recom_cocco_tracer_id   = (/1029, 1030, 1031/)
-  integer, dimension(4)  :: recom_det2_tracer_id    = (/1025, 1026, 1027, 1028/)
+!  integer, dimension(3)  :: recom_cocco_tracer_id   = (/1029, 1030, 1031/)
+!  integer, dimension(4)  :: recom_det2_tracer_id    = (/1025, 1026, 1027, 1028/)
 
   Real(kind=8)                 :: zero           = 0.d0
   Integer                      :: one            = 1
