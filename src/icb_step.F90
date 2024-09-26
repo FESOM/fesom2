@@ -422,8 +422,11 @@ type(t_dyn)   , intent(inout), target :: dynamics
   end if
   
   ! initialize the iceberg velocity
-  call initialize_velo(mesh, partit, dynamics, i_have_element, ib, u_ib, v_ib, lon_rad, lat_rad, depth_ib, local_idx_of(iceberg_elem))
-
+  if(local_idx_of(iceberg_elem) <= partit%myDim_elem2D ) then
+    call initialize_velo(mesh, partit, dynamics, i_have_element, ib, u_ib, v_ib, lon_rad, lat_rad, depth_ib, local_idx_of(iceberg_elem))
+  else
+    write(*,*) " * skip initialize_velo"
+  end if
   !iceberg elem of ib is found
   find_iceberg_elem = .false.
  
@@ -540,7 +543,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
   !-----------------------------
   ! LA 2022-11-30
   if(lcell_saturation) then
-    area_ib_tot = length_ib_single*width_ib_single*scaling(ib)
+    area_ib_tot = 0.0 !length_ib_single*width_ib_single*scaling(ib)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(idx, area_ib_tot)
 !$OMP DO
     do idx = 1, size(elem_block)
@@ -759,7 +762,7 @@ type(t_partit), intent(inout), target :: partit
    else if(lcell_saturation) then
      if (mype==0) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
      elem_area_tmp = elem_area_glob(iceberg_elem)
-     area_ib_tot = length_ib_single * width_ib_single * scaling(ib)
+     area_ib_tot = 0.0 !length_ib_single * width_ib_single * scaling(ib)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(idx, area_ib_tot)
 !$OMP DO
      do idx = 1, size(elem_block_red)

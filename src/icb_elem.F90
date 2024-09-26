@@ -481,7 +481,7 @@ SUBROUTINE point_in_triangle(mesh, partit, el2D, pt)
   
   REAL, DIMENSION(2), INTENT(IN) :: pt
   INTEGER, INTENT(OUT) :: el2D
-  
+
   INTEGER :: i, k, l
   REAL, DIMENSION(3) :: werte2D
   REAL               :: xdiff, ydiff
@@ -576,7 +576,7 @@ type(t_partit), intent(inout), target :: partit
   DO i=1, 2
      TRANS(:,i) = local_cart_coords(:,i+1)-local_cart_coords(:,1)     
   END DO  
-  call matrix_inverse_2x2(TRANS, TRANS_inv, DET)  
+  call matrix_inverse_2x2(TRANS, TRANS_inv, DET, elem, coords)  
 
   vec=x_cart-local_cart_coords(:,1)  
   stdel_coords = MATMUL(TRANS_inv, vec)
@@ -835,13 +835,16 @@ type(t_partit), intent(inout), target :: partit
 !END SUBROUTINE tides_distr
 
 !LA from oce_mesh_setup ofr iceberg coupling
-subroutine  matrix_inverse_2x2 (A, AINV, DET)
+subroutine  matrix_inverse_2x2 (A, AINV, DET, elem, coords)
   !
   ! Coded by Sergey Danilov
   ! Reviewed by Qiang Wang
   !-------------------------------------------------------------
   
   implicit none
+ 
+  integer                                   :: elem
+  REAL, DIMENSION(2), INTENT(IN) :: coords
   
   real(kind=8), dimension(2,2), intent(IN)  :: A
   real(kind=8), dimension(2,2), intent(OUT) :: AINV
@@ -853,6 +856,7 @@ subroutine  matrix_inverse_2x2 (A, AINV, DET)
      do j=1,2
         write(*,*) (A(i,j),i=1,2)
      end do
+     write(*,*) " * elem: ", elem, ", coords: ", coords
      stop 'SINGULAR 2X2 MATRIX'
   else
      AINV(1,1) =  A(2,2)/DET

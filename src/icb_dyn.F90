@@ -112,6 +112,10 @@ arr_S_ave_ib = 0.0
  ! - (uo_skin_ib, vo_skin_ib)	: velocity below the draft of the iceberg
  ! call iceberg_avvelo_ufkeel(uo_dz,vo_dz, uo_keel,vo_keel, depth_ib,iceberg_elem) 
  call iceberg_average_andkeel(mesh, partit, dynamics, uo_dz,vo_dz, uo_keel,vo_keel, T_dz,S_dz, T_keel,S_keel, depth_ib,iceberg_elem, ib)
+
+ !OCEANIC VELOCITY uo_ib, vo_ib
+ call FEM_3eval(mesh, partit, uo_ib,vo_ib,lon,lat,uo_dz,vo_dz,iceberg_elem)
+
  call iceberg_levelwise_andkeel(mesh, partit, dynamics, arr_uo_dz,arr_vo_dz, uo_keel,vo_keel, arr_T_dz,arr_S_dz, T_keel,S_keel, depth_ib,iceberg_elem, ib, ib_n_lvls)
  do n=1, ib_n_lvls
     call FEM_3eval(mesh, partit, arr_uo_ib(n),arr_vo_ib(n),lon,lat,arr_uo_dz(:,n),arr_vo_dz(:,n),iceberg_elem)
