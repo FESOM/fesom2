@@ -265,6 +265,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
                             init_flux_atm_ocn
 #endif
     use iceberg_params
+    use iceberg_ocean_coupling
     use cavity_interfaces
     !---fwf-code
     use g_clock

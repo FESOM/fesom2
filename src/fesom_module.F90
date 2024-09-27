@@ -36,6 +36,7 @@ module fesom_main_storage_module
   use age_tracer_init_interface
   use iceberg_params
   use iceberg_step
+  use iceberg_ocean_coupling
   ! Define icepack module
 
 #if defined (__icepack)

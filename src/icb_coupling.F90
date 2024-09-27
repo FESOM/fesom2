@@ -1,3 +1,17 @@
+module iceberg_ocean_coupling
+ USE MOD_MESH
+ use MOD_PARTIT
+ use MOD_ICE
+ USE MOD_DYN
+ use iceberg_params
+
+ public :: reset_ib_fluxes
+ public :: prepare_icb2fesom
+ public :: icb2fesom
+
+ contains
+
+
 subroutine reset_ib_fluxes()
     use o_param
 
@@ -190,3 +204,4 @@ type(t_partit), intent(inout), target :: partit
     end if
 !---wiso-code-end
 end subroutine icb2fesom
+end module

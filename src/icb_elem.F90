@@ -3,6 +3,8 @@ module iceberg_element
  USE MOD_MESH
  USE MOD_DYN
  use iceberg_params
+ use iceberg_thermodynamics
+ use iceberg_ocean_coupling
 ! use iceberg_dynamics
 ! use iceberg_step
 

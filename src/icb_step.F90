@@ -6,6 +6,8 @@ module iceberg_step
  use iceberg_params
  use iceberg_dynamics
  use iceberg_element
+ use iceberg_thermodynamics
+ use iceberg_ocean_coupling
 
 implicit none
 

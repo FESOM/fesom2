@@ -1,3 +1,23 @@
+module iceberg_thermodynamics
+ USE MOD_MESH
+ use MOD_PARTIT
+ use MOD_ICE
+ USE MOD_DYN
+ use iceberg_params
+ !use iceberg_element
+ !use iceberg_step
+ use iceberg_ocean_coupling
+
+ implicit none
+
+ public ::  iceberg_meltrates
+ public ::  iceberg_newdimensions
+ public ::  iceberg_heat_water_fluxes_3eq
+ public ::  potit_ib
+ public ::  fcn_density
+
+ contains 
+
 !!=============================================================================
 ! calculates the empirical melt rates of the iceberg as in 
 ! Martin: 'Parameterizing the fresh-water flux from land ice to ocean
@@ -596,3 +616,4 @@ subroutine fcn_density(t,s,z,rho)
       + 4.8314e-4*s**2)
  rho = rhopot / (1.0 + 0.1*z/bulk)
 end subroutine fcn_density
+end module
