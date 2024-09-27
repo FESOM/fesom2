@@ -385,6 +385,10 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
 #endif
 
+    if (use_icebergs) then
+        call icb2fesom(mesh, partit, ice)
+    end if
+
     !___________________________________________________________________________
     ! add heat and fresh water flux from cavity 
     if (use_cavity) then
@@ -555,6 +559,16 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     end if     
     
     !___________________________________________________________________________
+    if (use_icebergs) then
+        if (lbalance_fw .and. (.not. turn_off_fw)) then
+            flux = flux + (ibfwb + ibfwe + ibfwl + ibfwbv) !* steps_per_ib_step
+        end if
+        
+        call integrate_nod(ibfwb + ibfwe + ibfwl + ibfwbv, net, partit, mesh)
+        if (mype==0) write(*,*) " * total iceberg fw flux: ", net
+    end if
+    
+    !___________________________________________________________________________
     if (use_cavity) then
         ! with zstar we do not balance the freshwater flux under the cavity since its
         ! not contributing to the ocean volume increase/decrease since under the
@@ -568,17 +582,6 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
             where (ulevels_nod2d > 1) flux = -water_flux
         end if 
     end if 
-    
-    !___________________________________________________________________________
-    if (use_icebergs .and. lbalance_fw) then
-        call icb2fesom(mesh, partit, ice)
-        if (.not.turn_off_fw) then
-            flux = flux + (ibfwb + ibfwe + ibfwl + ibfwbv) !* steps_per_ib_step
-        end if
-        
-        call integrate_nod(ibfwb + ibfwe + ibfwl + ibfwbv, net, partit, mesh)
-        if (mype==0) write(*,*) " * total iceberg fw flux: ", net
-    end if
 
     !___________________________________________________________________________
     ! compute total global net freshwater flux into the ocean 

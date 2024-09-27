@@ -298,7 +298,7 @@ use iceberg_params, only: length_ib, width_ib, scaling, elem_block, elem_area_gl
  												!=
  implicit none											!=
  
- 
+ logical                :: reject_tmp 
  integer, intent(in)	:: ib, istep
  real,    intent(inout)	:: height_ib_single,length_ib_single,width_ib_single
  real,    intent(inout)	:: lon_deg,lat_deg
@@ -361,7 +361,6 @@ type(t_dyn)   , intent(inout), target :: dynamics
 #include "associate_mesh_ass.h"
 
 
-!write(*,*) "LA DEBUG: 1"
  mype          =>partit%mype
 
  istep_end_synced = istep + steps_per_ib_step - 1
@@ -372,7 +371,6 @@ type(t_dyn)   , intent(inout), target :: dynamics
  lon_rad = lon_deg*rad
  lat_rad = lat_deg*rad
  
-!write(*,*) "LA DEBUG: 2"
  if(volume_ib .le. smallestvol_icb) then
   melted(ib) = .true.
 
@@ -382,7 +380,6 @@ type(t_dyn)   , intent(inout), target :: dynamics
 
   return
  end if 
-!write(*,*) "LA DEBUG: 3"
  
  if (firstcall) then
   if(mype==0) write(*,*) 'Preparing local_idx_of array...'
@@ -392,7 +389,6 @@ type(t_dyn)   , intent(inout), target :: dynamics
   firstcall=.false.
   if(mype==0) write(*,*) 'Preparing local_idx_of done.' 
  end if 
-!write(*,*) "LA DEBUG: 4"
  
  if (find_iceberg_elem) then
   lon_rad = lon_deg*rad
@@ -409,12 +405,23 @@ type(t_dyn)   , intent(inout), target :: dynamics
   
   if(i_have_element) then
    i_have_element= mesh%elem2D_nodes(1,iceberg_elem) <= partit%myDim_nod2D !1 PE still .true.
-   if( (use_cavity) .and. (reject_elem(mesh, partit, iceberg_elem))) then
-    iceberg_elem=0 !reject element
-    i_have_element=.false.
-   else 
-    iceberg_elem=partit%myList_elem2D(iceberg_elem) !global now
-   end if
+   
+   
+   
+   if (use_cavity) then
+      reject_tmp = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0.0) )
+      if(reject_tmp) then
+!       write(*,*) " * set IB elem ",iceberg_elem,"to zero for IB=",ib
+!       write(*,*) " cavity: ",all((mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0))
+!       write(*,*) " boundary: ", all(mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==1)
+       iceberg_elem=0 !reject element
+       i_have_element=.false.
+      else 
+       iceberg_elem=partit%myList_elem2D(iceberg_elem) !global now
+      end if
+   else
+      iceberg_elem=partit%myList_elem2D(iceberg_elem) !global now
+   endif   
   end if
   call com_integer(partit, i_have_element,iceberg_elem)
  
@@ -425,10 +432,11 @@ type(t_dyn)   , intent(inout), target :: dynamics
   end if
   
   ! initialize the iceberg velocity
-!write(*,*) "LA DEBUG: 4d"
-  call initialize_velo(mesh, partit, dynamics, i_have_element, ib, u_ib, v_ib, lon_rad, lat_rad, depth_ib, local_idx_of(iceberg_elem))
-!write(*,*) "LA DEBUG: 4e"
-
+  if(local_idx_of(iceberg_elem) <= partit%myDim_elem2D ) then
+    call initialize_velo(mesh, partit, dynamics, i_have_element, ib, u_ib, v_ib, lon_rad, lat_rad, depth_ib, local_idx_of(iceberg_elem))
+  else
+    write(*,*) " * skip initialize_velo"
+  end if
   !iceberg elem of ib is found
   find_iceberg_elem = .false.
  
@@ -444,10 +452,8 @@ type(t_dyn)   , intent(inout), target :: dynamics
       
     endif
   endif
-!write(*,*) "LA DEBUG: 4f"
  end if
  
-!write(*,*) "LA DEBUG: 5"
  
  ! ================== START ICEBERG CALCULATION ====================
  
@@ -457,10 +463,8 @@ type(t_dyn)   , intent(inout), target :: dynamics
  !if the first node belongs to this processor.. (just one processor enters here!)
  !if( local_idx_of(iceberg_elem) > 0 .and. elem2D_nodes(1,local_idx_of(iceberg_elem)) <= myDim_nod2D ) then
 if( local_idx_of(iceberg_elem) > 0 ) then 
-write(*,*) "LA DEBUG: 5a"
 
   if( elem2D_nodes(1,local_idx_of(iceberg_elem)) <= partit%myDim_nod2D ) then
-write(*,*) "LA DEBUG: 5b"
 
   i_have_element=.true. 
 
@@ -505,8 +509,7 @@ write(*,*) "LA DEBUG: 5b"
 ! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
     grounded(ib) = .true.
     !if (mod(istep_end_synced,logfile_outfreq)==0) then
-! if(ib==148) write(*,*) "LA DEBUG: 3 - elem ", iceberg_elem
-    write(*,*) 'iceberg ib ', ib, 'is grounded'
+    if (lverbose_icb) write(*,*) 'iceberg ib ', ib, 'is grounded'
     !end if
  	
  else 
@@ -514,7 +517,6 @@ write(*,*) "LA DEBUG: 5b"
 
  
  t0=MPI_Wtime()
-!write(*,*) "LA DEBUG: before_trajectory"
   call trajectory( lon_rad,lat_rad, u_ib,v_ib, new_u_ib,new_v_ib, &
 		   lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
   	   
@@ -550,10 +552,16 @@ write(*,*) "LA DEBUG: 5b"
 
   !-----------------------------
   ! LA 2022-11-30
-!write(*,*) "LA DEBUG: before_saturation"
-  if(lcell_saturation) then
-!write(*,*) "LA DEBUG: start_saturation"
-    area_ib_tot = length_ib_single*width_ib_single*scaling(ib)
+  if(cell_saturation > 0) then
+    if( lverbose_icb) then
+     write(*,*) " * checking for cell saturation - ib: ", ib, ", old_elem: ", old_element, ", new_elem: ", iceberg_elem
+    end if
+    select case(cell_saturation) !num of coastal points
+     case(1) 
+      area_ib_tot = 0.0
+     case(2) 
+      area_ib_tot = length_ib_single*width_ib_single*scaling(ib)
+    end select
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(idx, area_ib_tot)
 !$OMP DO
     do idx = 1, size(elem_block)
@@ -561,15 +569,17 @@ write(*,*) "LA DEBUG: 5b"
             area_ib_tot = area_ib_tot + length_ib(idx) * width_ib(idx) * scaling(idx)
         end if
     end do
-!write(*,*) "LA DEBUG: end_loop_saturation"
 !$OMP END DO
 !$OMP END PARALLEL
   !-----------------------------
 
-    if ((area_ib_tot > elem_area_glob(iceberg_elem)) .and. (old_element.ne.0) .and. (left_mype == 0)) then 
-        write(*,*) " *******************************************************"
-        write(*,*) " * set iceberg ", ib, " back to elem ", old_element, " from elem ", iceberg_elem
-        write(*,*) " * area_ib_tot = ", area_ib_tot, "; elem_area = ", elem_area(local_idx_of(iceberg_elem))
+    if ((area_ib_tot > elem_area_glob(iceberg_elem)) .and. (old_element.ne.0) .and. (iceberg_elem.ne.old_element)) then ! .and. (left_mype == 0)) then 
+        if( lverbose_icb) then
+            write(*,*) " *******************************************************"
+            write(*,*) " * set iceberg ", ib, " back to elem ", old_element, " from elem ", iceberg_elem
+            write(*,*) " * area_ib_tot = ", area_ib_tot, "; elem_area = ", elem_area(local_idx_of(iceberg_elem))
+        
+        end if
         i_have_element = .true.
         left_mype = 0.0
         lon_rad = old_lon
@@ -580,7 +590,6 @@ write(*,*) "LA DEBUG: 5b"
         u_ib    = 0.
         v_ib    = 0.
     end if
-!write(*,*) "LA DEBUG: after_cell_saturation"
   end if
   !###########################################
  
@@ -594,9 +603,7 @@ write(*,*) "LA DEBUG: 5b"
   pe_block(ib)=mype
 
   volume_ib=height_ib_single*length_ib_single*width_ib_single
-!write(*,*) "LA DEBUG: before_prepare"
-  call prepare_icb2fesom(mesh,partit,ib,i_have_element,local_idx_of(iceberg_elem),depth_ib)
-!write(*,*) "LA DEBUG: after_prepare"
+  call prepare_icb2fesom(mesh,partit,ib,i_have_element,local_idx_of(iceberg_elem),depth_ib,height_ib_single)
  end if !processor has element?
 end if !... and first node belongs to processor?
 
@@ -770,10 +777,15 @@ type(t_partit), intent(inout), target :: partit
            iceberg_elem = old_element
            u_ib    = 0.
            v_ib    = 0.
-   else if(lcell_saturation) then
+   else if(cell_saturation > 0) then
      if (mype==0) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
      elem_area_tmp = elem_area_glob(iceberg_elem)
-     area_ib_tot = length_ib_single * width_ib_single * scaling(ib)
+     select case(cell_saturation) !num of coastal points
+      case(1) 
+       area_ib_tot = 0.0
+      case(2) 
+       area_ib_tot = length_ib_single*width_ib_single*scaling(ib)
+     end select
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(idx, area_ib_tot)
 !$OMP DO
      do idx = 1, size(elem_block_red)
@@ -784,8 +796,8 @@ type(t_partit), intent(inout), target :: partit
      end do
 !$OMP END DO
 !$OMP END PARALLEL
-     if((area_ib_tot > elem_area_tmp) .and. (elem_area_tmp > 0.0)) then
-         if(mype==pe_block_red(ib)) then
+     if((area_ib_tot > elem_area_tmp) .and. (elem_area_tmp > 0.0) .and. (iceberg_elem.ne.old_element)) then
+         if(mype==pe_block_red(ib) .and. lverbose_icb) then
             write(*,*) " *******************************************************"
             write(*,*) " * iceberg changed PE and saturation"
             write(*,*) " * set iceberg ", ib, " back to elem ", old_element, " from elem ", iceberg_elem
@@ -800,7 +812,7 @@ type(t_partit), intent(inout), target :: partit
          u_ib    = 0.
          v_ib    = 0.
      end if
-   else if(lcell_saturation) then
+   else 
      if (mype==0) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
    end if
  end if
@@ -1035,11 +1047,12 @@ type(t_partit), intent(inout), target :: partit
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
+  
   if( use_cavity ) then
-    fld_tmp = coastal_nodes(mesh, partit, elem)
+    !fld_tmp = coastal_nodes(mesh, partit, elem)
+    fld_tmp =  count( (mesh%cavity_depth(mesh%elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
   else
-    fld_tmp = sum( mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem)) )
+    fld_tmp =  count( (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
   end if
   
   SELECT CASE ( fld_tmp ) !num of coastal points

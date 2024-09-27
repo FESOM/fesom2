@@ -123,8 +123,9 @@ module g_config
   logical                       :: turn_off_fw=.false.
   logical                       :: use_icesheet_coupling=.false.  
   logical                       :: lbalance_fw=.true.
-  logical                       :: lcell_saturation=.true.
+  integer                       :: cell_saturation=2 ! 0=no cell saturation, 1=one additional iceberg allowed, 2=no daddtional iceberg allowed
   logical                       :: lmin_latent_hf=.true.
+  logical                       :: lverbose_icb=.false.  
   integer                       :: ib_num=0
   integer                       :: steps_per_ib_step=8
 
@@ -135,7 +136,8 @@ module g_config
   integer                       :: ib_async_mode=0
   integer                       :: thread_support_level_required=3 ! 2 = MPI_THREAD_SERIALIZED, 3 = MPI_THREAD_MULTIPLE
 
-  namelist /icebergs/ use_icebergs, turn_off_hf, turn_off_fw, use_icesheet_coupling, lbalance_fw, lcell_saturation, lmin_latent_hf, ib_num, steps_per_ib_step, ib_async_mode, thread_support_level_required
+  namelist /icebergs/   use_icebergs, turn_off_hf, turn_off_fw, use_icesheet_coupling, lbalance_fw, cell_saturation, lmin_latent_hf, &
+                        ib_num, steps_per_ib_step, ib_async_mode, thread_support_level_required, lverbose_icb
 
 !wiso-code!!!
   logical                       :: lwiso  =.false.  ! enable isotope?

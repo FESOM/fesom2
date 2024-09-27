@@ -95,7 +95,8 @@ save
   real,dimension(:), allocatable:: bvl_mean, lvlv_mean, lvle_mean, lvlb_mean !averaged volume losses
   !real,dimension(:), allocatable:: fw_flux_ib, hfb_flux_ib
   real,dimension(:), allocatable:: fwe_flux_ib, fwl_flux_ib, fwb_flux_ib, fwbv_flux_ib
-  real,dimension(:), allocatable:: hfe_flux_ib, hfl_flux_ib, hfb_flux_ib, hfbv_flux_ib, lhfb_flux_ib
+  real,dimension(:), allocatable:: hfe_flux_ib, hfb_flux_ib, lhfb_flux_ib
+  real,dimension(:,:), allocatable:: hfl_flux_ib, hfbv_flux_ib
   
   !===== FRESHWATER AND HEAT ARRAYS ON FESOM GRID =====
   real,dimension(:), allocatable:: ibhf    !icb heat flux into ocean 
@@ -129,7 +130,7 @@ save
  implicit none
  integer, intent(in) :: elem
 type(t_mesh), intent(in) , target :: mesh
-type(t_partit), intent(inout), target :: partit
+type(t_partit), intent(in), target :: partit
 #include "associate_mesh_def.h"
 #include "associate_part_def.h"
 #include "associate_mesh_ass.h"

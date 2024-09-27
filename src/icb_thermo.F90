@@ -16,14 +16,15 @@
 !				use 3D information for T,S and velocities
 !				instead of SSTs; M_v depends on 'thermal driving')
 !==============================================================================
-subroutine iceberg_meltrates(partit, M_b, M_v, M_e, M_bv, &
-				u_ib,v_ib, uo_ib,vo_ib, ua_ib,va_ib, &
+subroutine iceberg_meltrates(partit, mesh, M_b, M_v, M_e, M_bv, &
+				u_ib,v_ib, arr_uo_ib,arr_vo_ib, ua_ib,va_ib, &
 				sst_ib, length_ib, conci_ib, &
 				uo_keel_ib, vo_keel_ib, T_keel_ib, S_keel_ib, depth_ib, height_ib, &
-				T_ave_ib, S_ave_ib, ib, rho_icb)
+				arr_T_ave_ib, arr_S_ave_ib, ib, rho_icb,uo_ib,vo_ib, ib_n_lvls, elem, n_lvls)
   
   use o_param
   use MOD_PARTIT
+  use MOD_MESH
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
@@ -34,43 +35,84 @@ subroutine iceberg_meltrates(partit, M_b, M_v, M_e, M_bv, &
   ! LA: include latent heat 2023-04-04
   real(kind=8),parameter ::  L                  = 334000.                   ! [J/Kg]
   
-  real, intent(IN)	:: u_ib,v_ib, uo_ib,vo_ib, ua_ib,va_ib	!iceberg velo, (int.) ocean & atm velo
+  real, intent(IN)	:: u_ib,v_ib, uo_ib,vo_ib,ua_ib,va_ib	!iceberg velo, (int.) ocean & atm velo
   real, intent(IN)	:: uo_keel_ib, vo_keel_ib		!ocean velo at iceberg's draft
   real, intent(IN)	:: sst_ib, length_ib, conci_ib, rho_icb 		!SST, length and sea ice conc.
   real, intent(IN)	:: T_keel_ib, S_keel_ib, depth_ib, height_ib !T & S at depth 'depth_ib'
-  real, intent(IN)	:: T_ave_ib, S_ave_ib			!T & S averaged, i.e. at 'depth_ib/2'
-  integer, intent(IN)	:: ib					!iceberg ID
+  integer, intent(IN)	:: ib, n_lvls, ib_n_lvls					!iceberg ID
+  real, intent(IN), dimension(n_lvls)	:: arr_T_ave_ib, arr_S_ave_ib			!T & S averaged, i.e. at 'depth_ib/2'
+  real, intent(IN), dimension(n_lvls)	:: arr_uo_ib, arr_vo_ib	!iceberg velo, (int.) ocean & atm velo
   real, intent(OUT)	:: M_b, M_v, M_e, M_bv			!melt rates [m (ice) per s]	
   real 	            :: H_b, H_v, H_e, H_bv			!melt rates [m (ice) per s]	
+  real              :: M_bv_dz, M_v_dz, dz_acc
   	
-  
+  integer           :: n, n2
+  integer, intent(IN)   :: elem
+  real              :: lev_up, lev_low, dz
   real			:: absamino, damping, sea_state, v_ibmino
   real			:: tf, T_d 				!freezing temp. and 'thermal driving'
+type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
+!==================== MODULES & DECLARATIONS ==========================!= 
 #include "associate_part_def.h"
+#include "associate_mesh_def.h"
 #include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+  
 
   !3-eq. formulation for bottom melting [m/s]    
   v_ibmino  = sqrt( (u_ib - uo_keel_ib)**2 + (v_ib - vo_keel_ib)**2 )
   call iceberg_heat_water_fluxes_3eq(partit, ib, M_b, H_b, T_keel_ib,S_keel_ib,v_ibmino, depth_ib, tf)
-  hfb_flux_ib = H_b * length_ib*length_ib*scaling(ib)
+  hfb_flux_ib(ib) = H_b * length_ib*length_ib*scaling(ib)
 
+  M_bv_dz = 0.0
+  M_v_dz = 0.0
+  dz_acc = 0.0
+
+
+  n2=elem2D_nodes(1,elem)
+  do n=1,ib_n_lvls
   !3-eq. formulation for lateral 'basal' melting [m/s]
-  v_ibmino  = sqrt( (u_ib - uo_ib)**2 + (v_ib - vo_ib)**2 ) ! depth-average rel. velocity
-  call iceberg_heat_water_fluxes_3eq(partit, ib, M_bv, H_bv, T_ave_ib,S_ave_ib,v_ibmino, depth_ib/2.0, tf)
-  hfbv_flux_ib = H_bv * (2*length_ib*abs(depth_ib)  + 2*length_ib*abs(depth_ib) ) * scaling(ib)
+    lev_up  = mesh%zbar_3d_n(n, n2)
+    if( n==nlevels_nod2D(n2) ) then
+        lev_low = mesh%zbar_n_bot(n2)
+    else
+        lev_low = mesh%zbar_3d_n(n+1, n2)
+    end if
+    
+    if( abs(lev_low)>=abs(depth_ib) ) then !.AND. (abs(lev_up)<=abs(depth_ib)) ) then
+        dz = abs(lev_up - depth_ib)
+    elseif(lev_low == lev_up) then
+        exit
+    else
+        dz = abs(lev_low - lev_up)
+    end if
+    dz_acc = dz_acc + dz
+    
+    v_ibmino  = sqrt( (u_ib - arr_uo_ib(n))**2 + (v_ib - arr_vo_ib(n))**2 ) ! depth-average rel. velocity
+    call iceberg_heat_water_fluxes_3eq(partit, ib, M_bv, H_bv, arr_T_ave_ib(n), arr_S_ave_ib(n),v_ibmino, dz_acc+dz/2.0, tf)
+    M_bv_dz = M_bv_dz + M_bv*dz
+    
+    hfbv_flux_ib(ib,n) = H_bv * (2*length_ib*dz  + 2*length_ib*dz ) * scaling(ib)
   
-  !'thermal driving', defined as the elevation of ambient water 
-  !temperature above freezing point' (Neshyba and Josberger, 1979).
-  T_d = T_ave_ib - tf
-  if(T_d < 0.) T_d = 0.
-
-  !lateral melt (buoyant convection)
-  !M_v is a function of the 'thermal driving', NOT just sst! Cf. Neshyba and Josberger (1979)
-  M_v = 0.00762 * T_d + 0.00129 * T_d**2
-  M_v = M_v/86400.
-  H_v = M_v * rho_icb * L
-  hfl_flux_ib = H_v * (2*length_ib*abs(depth_ib)  + 2*length_ib*abs(depth_ib) ) * scaling(ib)
+    !'thermal driving', defined as the elevation of ambient water 
+    !temperature above freezing point' (Neshyba and Josberger, 1979).
+    T_d = arr_T_ave_ib(n) - tf
+    if(T_d < 0.) T_d = 0.
+  
+    !lateral melt (buoyant convection)
+    !M_v = 0.00762 * sst_ib + 0.00129 * sst_ib**2
+    !M_v = M_v/86400.
+    !M_v is a function of the 'thermal driving', NOT just sst! Cf. Neshyba and Josberger (1979)
+    M_v = 0.00762 * T_d + 0.00129 * T_d**2
+    M_v = M_v/86400.
+    H_v = M_v * rho_icb * L
+    M_v_dz = M_v_dz + M_v*dz
+    hfl_flux_ib(ib,n) = H_v * (2*length_ib*dz  + 2*length_ib*dz ) * scaling(ib)
+    !fwl_flux_ib = M_v
+  end do
+  M_bv  = M_bv_dz / abs(depth_ib)
+  M_v   = M_v_dz / abs(depth_ib)
 
   !wave erosion
   absamino = sqrt( (ua_ib - uo_ib)**2 + (va_ib - vo_ib)**2 )
@@ -79,7 +121,7 @@ type(t_partit), intent(inout), target :: partit
   M_e = 1./6. * sea_state * (sst_ib + 2.0) * damping
   M_e = M_e/86400.
   H_e = M_e * rho_icb * L
-  hfe_flux_ib = H_e * (length_ib*abs(height_ib)  + length_ib*abs(height_ib) ) * scaling(ib)
+  hfe_flux_ib(ib) = H_e * (length_ib*abs(height_ib)  + length_ib*abs(height_ib) ) * scaling(ib)
   !fwe_flux_ib = M_e  
 end subroutine iceberg_meltrates
 
@@ -236,23 +278,23 @@ type(t_partit), intent(inout), target :: partit
     !save in larger array	  
     vl_block((ib-1)*4+1 : ib*4)=arr
 
-    ! -----------------------
-    ! LA: set iceberg heatflux at least to latent heat 2023-04-04
-    ! Latent heat flux at base and sides also changes lines 475/476
-    ! Lateral heat flux set to latent heat and basal heat flux set to zero
-    if( lmin_latent_hf ) then
-        lhfb_flux_ib(ib) = rho_icb*L*tvl*scaling(ib)/dt/REAL(steps_per_ib_step)
+    !! -----------------------
+    !! LA: set iceberg heatflux at least to latent heat 2023-04-04
+    !! Latent heat flux at base and sides also changes lines 475/476
+    !! Lateral heat flux set to latent heat and basal heat flux set to zero
+    !if( lmin_latent_hf ) then
+    !    lhfb_flux_ib(ib) = rho_icb*L*tvl*scaling(ib)/dt/REAL(steps_per_ib_step)
 
-        hf_tot_tmp = hfb_flux_ib(ib)+hfbv_flux_ib(ib)+hfl_flux_ib(ib)+hfe_flux_ib(ib)
+    !    hf_tot_tmp = hfb_flux_ib(ib)+hfbv_flux_ib(ib)+hfl_flux_ib(ib)+hfe_flux_ib(ib)
 
-        if( (hf_tot_tmp >= 0.0) .and. (hf_tot_tmp < lhfb_flux_ib(ib))) then
-            hfe_flux_ib(ib)=-lhfb_flux_ib(ib) * abs(hfe_flux_ib(ib)/hf_tot_tmp)
-            hfl_flux_ib(ib)=-lhfb_flux_ib(ib) * abs(hfl_flux_ib(ib)/hf_tot_tmp)
-            hfb_flux_ib(ib)=-lhfb_flux_ib(ib) * abs(hfb_flux_ib(ib)/hf_tot_tmp)
-            hfbv_flux_ib(ib)=-lhfb_flux_ib(ib) * abs(hfbv_flux_ib(ib)/hf_tot_tmp)
-        end if
-    end if
-    ! -----------------------
+    !    if( (hf_tot_tmp >= 0.0) .and. (abs(hf_tot_tmp) < abs(lhfb_flux_ib(ib)))) then
+    !        hfe_flux_ib(ib)=-lhfb_flux_ib(ib) * abs(hfe_flux_ib(ib)/hf_tot_tmp)
+    !        hfl_flux_ib(ib)=-lhfb_flux_ib(ib) * abs(hfl_flux_ib(ib)/hf_tot_tmp)
+    !        hfb_flux_ib(ib)=-lhfb_flux_ib(ib) * abs(hfb_flux_ib(ib)/hf_tot_tmp)
+    !        hfbv_flux_ib(ib)=-lhfb_flux_ib(ib) * abs(hfbv_flux_ib(ib)/hf_tot_tmp)
+    !    end if
+    !end if
+    !! -----------------------
 end subroutine iceberg_newdimensions
 
 
@@ -447,7 +489,7 @@ type(t_partit), intent(inout), target :: partit
      M_b = - (rhow / rhoi) * M_b 		 ! [m (ice) per second], positive for melting? NOW positive for melting
 
      !LA avoid basal freezing for grounded icebergs
-     if(M_b.lt.0.) then
+     if(grounded(ib) .and. (M_b.lt.0.)) then
          M_b = 0.0
      endif
 

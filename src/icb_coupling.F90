@@ -14,7 +14,7 @@ subroutine reset_ib_fluxes()
 end subroutine
 
 
-subroutine prepare_icb2fesom(mesh, partit, ib,i_have_element,localelement,depth_ib)
+subroutine prepare_icb2fesom(mesh, partit, ib,i_have_element,localelement,depth_ib,height_ib_single)
     !transmits the relevant fields from the iceberg to the ocean model
     !Lars Ackermann, 17.03.2020
 
@@ -27,7 +27,7 @@ subroutine prepare_icb2fesom(mesh, partit, ib,i_have_element,localelement,depth_
     implicit none
 
     logical                 :: i_have_element
-    real, intent(in)        :: depth_ib
+    real, intent(in)        :: depth_ib, height_ib_single
     real                    :: lev_low, lev_up
     integer                 :: localelement
     integer                 :: iceberg_node  
@@ -44,7 +44,7 @@ type(t_partit), intent(inout), target :: partit
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-    if(i_have_element) then 
+    if(i_have_element) then
         dz = 0.0
         allocate(tot_area_nods_in_ib_elem(mesh%nl))
 
@@ -89,6 +89,7 @@ type(t_partit), intent(inout), target :: partit
 
         do i=1, 3
             iceberg_node=ib_nods_in_ib_elem(i)
+            if (use_cavity .and. ulevels_nod2d(iceberg_node) > 1) cycle
 
             if (iceberg_node>0) then
                 ibfwbv(iceberg_node) = ibfwbv(iceberg_node) - fwbv_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
@@ -105,23 +106,34 @@ type(t_partit), intent(inout), target :: partit
                         lev_low = mesh%zbar_3d_n(j+1, iceberg_node)
                     end if
                     dz = abs( lev_low - lev_up )
-                    if( (abs(lev_low)>=abs(depth_ib)) .and. (abs(lev_up)<abs(depth_ib)) ) then
-                        dz = abs( lev_up - depth_ib )
-                    end if
-
+                    if( (abs(lev_low)>=abs(depth_ib)) .and. (abs(lev_up)<abs(depth_ib)) ) then 
+                        dz = abs( lev_up - abs(depth_ib) )
+                    end if              
+                   
                     if( depth_ib==0.0 ) then
-                        ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) &
-                                                    - ((hfbv_flux_ib(ib)+hfl_flux_ib(ib)) &
-                                                    + hfe_flux_ib(ib)) / tot_area_nods_in_ib_elem(j)
+                        ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) & 
+                                                    - (hfbv_flux_ib(ib,j)+hfl_flux_ib(ib,j)) &
+                                                    / tot_area_nods_in_ib_elem(j)
                     else
-                        ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) &
-                                                    - ((hfbv_flux_ib(ib)+hfl_flux_ib(ib)) * (dz / abs(depth_ib)) &
-                                                    + hfe_flux_ib(ib) * (dz / abs(height_ib(ib)))) &
+                        ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) & 
+                                                    - ((hfbv_flux_ib(ib,j)+hfl_flux_ib(ib,j)) * (dz / abs(depth_ib)) & 
+                                                    + hfe_flux_ib(ib) * (dz / abs(height_ib_single))) &
                                                     / tot_area_nods_in_ib_elem(j)
                     end if
                 end do
-                ibhf_n(idx_d(i),iceberg_node) = ibhf_n(idx_d(i),iceberg_node) - hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i))
-                ibhf_n(1,iceberg_node) = ibhf_n(1,iceberg_node) - hfe_flux_ib(ib) * ((abs(height_ib(ib))-abs(depth_ib))/abs(height_ib(ib))) / tot_area_nods_in_ib_elem(1)
+                
+                if( idx_d(i) > 1 ) then
+                    ibhf_n(idx_d(i),iceberg_node) = ibhf_n(idx_d(i),iceberg_node) - 0.5 * hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i))
+                    ibhf_n(idx_d(i)-1,iceberg_node) = ibhf_n(idx_d(i)-1,iceberg_node) - 0.5 * hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i)-1)
+                else
+                    ibhf_n(idx_d(i),iceberg_node) = ibhf_n(idx_d(i),iceberg_node) - hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i))
+                end if
+                
+                if( height_ib_single .ne. 0.0 ) then
+                    ibhf_n(1,iceberg_node) = ibhf_n(1,iceberg_node) - hfe_flux_ib(ib) & 
+                            * ((abs(height_ib_single)-abs(depth_ib))/abs(height_ib_single)) & 
+                            / tot_area_nods_in_ib_elem(1)
+                end if
             end if
         end do
     end if
@@ -150,11 +162,24 @@ type(t_partit), intent(inout), target :: partit
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
+  if (use_cavity) then
+!$OMP PARALLEL DO
+    do n=1, myDim_nod2d+eDim_nod2D
+        if (ulevels_nod2d(n) > 1) cycle
+        if (.not.turn_off_fw) then
+                water_flux(n)  = water_flux(n) - (ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n)) !* steps_per_ib_step
+        end if
+    end do
+!$OMP END PARALLEL DO
+  else
+!$OMP PARALLEL DO
     do n=1, myDim_nod2d+eDim_nod2D
         if (.not.turn_off_fw) then
                 water_flux(n)  = water_flux(n) - (ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n)) !* steps_per_ib_step
         end if
     end do
+!$OMP END PARALLEL DO
+  end if
 !---wiso-code-begin
     if(lwiso) then
       do n=1, myDim_nod2D+eDim_nod2D

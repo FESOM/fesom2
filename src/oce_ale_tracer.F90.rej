@@ -1,9 +1,0 @@
-diff a/src/oce_ale_tracer.F90 b/src/oce_ale_tracer.F90	(rejected hunks)
-@@ -452,6 +452,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
-     use o_mixing_KPP_mod !for ghats _GO_   
-     use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
-     use bc_surface_interface
-+    use iceberg_params
-     implicit none
-     integer       , intent(in)   , target :: tr_num
-     type(t_dyn)   , intent(inout), target :: dynamics
