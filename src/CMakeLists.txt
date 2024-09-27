@@ -291,10 +291,9 @@ add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
 if(${ENABLE_ROCTX})
     target_link_libraries(${PROJECT_NAME}.x PUBLIC roctx64 roctracer64)
 endif()
-if(${ENABLE_OPENMP})  # Needed to add to compile on LUMI
-    if(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray)
-        target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME} -homp)
-    endif()
+if(${ENABLE_OPENMP} AND ${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray) 
+    ## Apparently explicit -homp is required for OpenMP also at this stage with Cray compilers for some reason...
+    target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME} -homp)
 else()
     target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
 endif()
