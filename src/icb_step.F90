@@ -542,8 +542,17 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 
   !-----------------------------
   ! LA 2022-11-30
-  if(lcell_saturation) then
-    area_ib_tot = 0.0 !length_ib_single*width_ib_single*scaling(ib)
+  if((cell_saturation>0) .and. (iceberg_elem.ne.old_element)) then
+    if( lverbose_icb) then
+     write(*,*) " * checking for cell saturation"
+     write(*,*) " * ib: ", ib, ", old_elem: ", old_element, ", new_elem: ", iceberg_elem
+    end if
+    select case(cell_saturation) !num of coastal points
+     case(1) 
+      area_ib_tot = 0.0
+     case(2) 
+      area_ib_tot = length_ib_single*width_ib_single*scaling(ib)
+    end select
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(idx, area_ib_tot)
 !$OMP DO
     do idx = 1, size(elem_block)
@@ -555,12 +564,11 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 !$OMP END PARALLEL
   !-----------------------------
 
-    if ((area_ib_tot > elem_area_glob(iceberg_elem)) .and. (old_element.ne.0) .and. (iceberg_elem.ne.old_element)) then ! .and. (left_mype == 0)) then 
+    if ((area_ib_tot > elem_area_glob(iceberg_elem)) .and. (old_element.ne.0)) then ! .and. (left_mype == 0)) then 
         if( lverbose_icb) then
             write(*,*) " *******************************************************"
             write(*,*) " * set iceberg ", ib, " back to elem ", old_element, " from elem ", iceberg_elem
             write(*,*) " * area_ib_tot = ", area_ib_tot, "; elem_area = ", elem_area(local_idx_of(iceberg_elem))
-        
         end if
         i_have_element = .true.
         left_mype = 0.0
@@ -759,10 +767,15 @@ type(t_partit), intent(inout), target :: partit
            iceberg_elem = old_element
            u_ib    = 0.
            v_ib    = 0.
-   else if(lcell_saturation) then
+   else if((cell_saturation>0) .and. (iceberg_elem.ne.old_element)) then
      if (mype==0) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
      elem_area_tmp = elem_area_glob(iceberg_elem)
-     area_ib_tot = 0.0 !length_ib_single * width_ib_single * scaling(ib)
+     select case(cell_saturation) !num of coastal points
+      case(1) 
+       area_ib_tot = 0.0
+      case(2) 
+       area_ib_tot = length_ib_single*width_ib_single*scaling(ib)
+     end select
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(idx, area_ib_tot)
 !$OMP DO
      do idx = 1, size(elem_block_red)
@@ -773,7 +786,7 @@ type(t_partit), intent(inout), target :: partit
      end do
 !$OMP END DO
 !$OMP END PARALLEL
-     if((area_ib_tot > elem_area_tmp) .and. (elem_area_tmp > 0.0) .and. (iceberg_elem.ne.old_element)) then
+     if((area_ib_tot > elem_area_tmp) .and. (elem_area_tmp > 0.0)) then
          if(mype==pe_block_red(ib) .and. lverbose_icb) then
             write(*,*) " *******************************************************"
             write(*,*) " * iceberg changed PE and saturation"
@@ -789,7 +802,7 @@ type(t_partit), intent(inout), target :: partit
          u_ib    = 0.
          v_ib    = 0.
      end if
-   else if(lcell_saturation) then
+   else 
      if (mype==0) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
    end if
  end if
