@@ -18,12 +18,6 @@
           use g_forcing_param,  only: ncar_bulk_z_wind, ncar_bulk_z_tair, &
                                       ncar_bulk_z_shum
           use g_sbf,            only: l_mslp                     
-!           use i_arrays,         only: S_oc_array,      T_oc_array,        & ! Ocean and sea ice fields
-!                                       u_w,             v_w,               &
-!                                       stress_atmice_x, stress_atmice_y
-! !                                       u_ice,           v_ice,             &
-                                    
-!           use i_param,          only: cd_oce_ice                            ! Sea ice parameters
           use icepack_intfc,    only: icepack_warnings_flush, icepack_warnings_aborted
           use icepack_intfc,    only: icepack_query_parameters
           use icepack_intfc,    only: icepack_sea_freezing_temperature
@@ -66,6 +60,7 @@
           real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, S_oc_array, T_oc_array, & 
                                                    u_w, v_w, stress_atmice_x, stress_atmice_y
 #include "associate_mesh.h"
+          
           u_ice      => ice%uice(:)
           v_ice      => ice%vice(:)
           S_oc_array => ice%srfoce_salt(:)
@@ -74,13 +69,14 @@
           v_w        => ice%srfoce_v(:)
           stress_atmice_x => ice%stress_atmice_x(:)
           stress_atmice_y => ice%stress_atmice_y(:)
+
           ! Ice 
     
           uvel(:)  = u_ice(:)
           vvel(:)  = v_ice(:)
     
           ! Atmosphere 
-    
+
           T_air(:)  = Tair(:) + 273.15_dbl_kind
           Qa(:)     = shum(:)
           uatm(:)   = u_wind(:)

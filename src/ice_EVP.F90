@@ -428,11 +428,11 @@ subroutine EVPdynamics(ice, partit, mesh)
                 
                 !_______________________________________________________________
                 ! Hunke and Dukowicz c*h*p*
-#if defined (__icepack)
+! #if defined (__icepack) # frank.kauker@awi.de
                 ice_strength(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
-#else
-                ice_strength(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
-#endif
+! #else
+!                ice_strength(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
+! #endif # frank.kauker@awi.de
                 ice_strength(el) = 0.5_WP*ice_strength(el)
                 
                 !_______________________________________________________________
@@ -481,11 +481,11 @@ subroutine EVPdynamics(ice, partit, mesh)
                 asum = sum(a_ice(elnodes))/3.0_WP
                 
                 ! ===== Hunke and Dukowicz c*h*p*
-#if defined (__icepack)
+! #if defined (__icepack) # frank.kauker@awi.de
                 ice_strength(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
-#else
-                ice_strength(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
-#endif
+! #else
+!                ice_strength(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
+! #endif # frank.kauker@awi.de
                 ice_strength(el) = 0.5_WP*ice_strength(el)
                 
                 ! use rhs_m and rhs_a for storing the contribution from elevation:

@@ -12,7 +12,7 @@ set(TOPLEVEL_DIR ${CMAKE_CURRENT_LIST_DIR})
 set(FESOM_COUPLED OFF CACHE BOOL "compile fesom standalone or with oasis support (i.e. coupled)")
 set(OIFS_COUPLED OFF CACHE BOOL "compile fesom coupled to OpenIFS. (Also needs FESOM_COUPLED to work)")
 set(CRAY OFF CACHE BOOL "compile with cray ftn")
-set(USE_ICEPACK OFF CACHE BOOL "compile fesom with the Iceapck modules for sea ice column physics.")
+set(USE_ICEPACK ON CACHE BOOL "compile fesom with the Icepack modules for sea ice column physics.")
 set(OPENMP_REPRODUCIBLE OFF CACHE BOOL "serialize OpenMP loops that are critical for reproducible results")
 
 #set(VERBOSE OFF CACHE BOOL "toggle debug output")

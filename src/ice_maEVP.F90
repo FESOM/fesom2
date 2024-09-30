@@ -159,7 +159,7 @@ subroutine stress_tensor_m(ice, partit, mesh)
         eps2=eps11(elem)-eps22(elem)   
         
         ! ====== moduli:
-        delta=eps1**2+vale*(eps2**2+4.0_WP*eps12(elem)**2)
+        delta=eps1**2 + vale * ( eps2**2 + 4.0_WP*eps12(elem)**2 )
         delta=sqrt(delta)
         
 #if defined (__icepack)

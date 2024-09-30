@@ -1045,17 +1045,25 @@ end subroutine
 !
 !
 !_______________________________________________________________________________
-subroutine update_means
+subroutine update_means(mype)
     implicit none
     type(Meandata), pointer :: entry
     integer                 :: n
     integer                 :: I, J
-
+    integer                 :: mype
+    
     DO n=1, io_NSTREAMS
         entry=>io_stream(n)
+        ! frank.kauker@awi.de
+        ! if (mype==0) write(*,*) "++++++++++++++++++++++++++++++"
+        ! if (mype==0) write(*,*) "io_stream: n = ", n, entry%name, i_real4, i_real8
+        ! if (mype==0) write(*,*) "entry%accuracy = ", entry%accuracy
+        ! if (mype==0) write(*,*) "entry%flip = ", entry%flip
+
         
         !_____________ compute in 8 byte accuracy ______________________________
         IF (entry%accuracy == i_real8) then
+            ! write(*,*) "size(entry%local_values_r8) = ", size(entry%local_values_8)
             IF (entry%flip) then
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
                 DO J=1, size(entry%local_values_r8,dim=2)
@@ -1076,7 +1084,8 @@ subroutine update_means
             
         !_____________ compute in 4 byte accuracy ______________________________
         ELSE IF (entry%accuracy == i_real4) then
-            IF (entry%flip) then
+           ! write(*,*) "size(entry%local_values_r4) = ", size(entry%local_values_4)
+           IF (entry%flip) then
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
                 DO J=1, size(entry%local_values_r4,dim=2)
                     DO I=1, size(entry%local_values_r4,dim=1)
@@ -1148,7 +1157,7 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     !PS if (partit%flag_debug .and. partit%mype==0)  print *, achar(27)//'[33m'//' -I/O-> call update_means'//achar(27)//'[0m'  
-    call update_means
+    call update_means(partit%mype)
     
     !___________________________________________________________________________
     ! loop over defined streams

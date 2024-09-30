@@ -155,7 +155,7 @@ end subroutine ini_ice_io
 subroutine restart(istep, l_read, which_readr, ice, dynamics, tracers, partit, mesh)
 
 #if defined(__icepack)
-  icepack restart not merged here ! produce a compiler error if USE_ICEPACK=ON; todo: merge icepack restart from 68d8b8b
+  use icedrv_main,   only: init_restart_icepack
 #endif
 
   use fortran_utils
@@ -225,9 +225,14 @@ subroutine restart(istep, l_read, which_readr, ice, dynamics, tracers, partit, m
   if (.not. l_read) then
                call ini_ocean_io(yearnew, dynamics, tracers, partit, mesh)
   if (use_ice) call ini_ice_io  (yearnew, ice, partit, mesh)
-  else
+#if defined(__icepack)
+  if (use_ice) call init_restart_icepack(yearnew, mesh)
+#endif  else
                call ini_ocean_io(yearold, dynamics, tracers, partit, mesh)
   if (use_ice) call ini_ice_io  (yearold, ice, partit, mesh)
+#if defined(__icepack)
+  if (use_ice) call init_restart_icepack(yearold, mesh)
+#endif
   end if
 
   !___READING OF RESTART________________________________________________________

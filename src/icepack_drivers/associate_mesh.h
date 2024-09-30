@@ -7,8 +7,6 @@ real(kind=WP)   , pointer :: ocean_areawithcav
 integer         , pointer :: nl
 integer         , pointer :: nn_size
 
-
-
 real(kind=WP), dimension(:,:), pointer :: coord_nod2D, geo_coord_nod2D
 integer, dimension(:,:)      , pointer :: elem2D_nodes
 integer, dimension(:,:)      , pointer :: edges       
@@ -62,7 +60,7 @@ ocean_areawithcav  => mesh%ocean_areawithcav
 nl                 => mesh%nl  
 nn_size            => mesh%nn_size
 
-
+! needed to specify dimensions
 myDim_nod2D  => p_partit%myDim_nod2D
 eDim_nod2D   => p_partit%eDim_nod2D
 myDim_elem2D => p_partit%myDim_elem2D
@@ -70,7 +68,6 @@ eDim_elem2D  => p_partit%eDim_elem2D
 eXDim_elem2D => p_partit%eXDim_elem2D
 myDim_edge2D => p_partit%myDim_edge2D
 eDim_edge2D  => p_partit%eDim_edge2D
-
 
 coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)                  => mesh%coord_nod2D        
 geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)              => mesh%geo_coord_nod2D    
@@ -84,9 +81,9 @@ edge_cross_dxdy(1:4,1:myDim_edge2D+eDim_edge2D)            => mesh%edge_cross_dx
 elem_cos(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)          => mesh%elem_cos           
 metric_factor(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)     => mesh%metric_factor      
 elem_neighbors(1:3,1:myDim_elem2D)                         => mesh%elem_neighbors     
-nod_in_elem2D      => mesh%nod_in_elem2D   ! (maxval(rmax),myDim_nod2D+eDim_nod2D)    
-x_corners          => mesh%x_corners   ! (myDim_nod2D, maxval(rmax)) 
-y_corners          => mesh%y_corners   ! (myDim_nod2D, maxval(rmax))       
+nod_in_elem2D                                              => mesh%nod_in_elem2D   ! (maxval(rmax),myDim_nod2D+eDim_nod2D)    
+x_corners                                                  => mesh%x_corners   ! (myDim_nod2D, maxval(rmax)) 
+y_corners                                                  => mesh%y_corners   ! (myDim_nod2D, maxval(rmax))       
 nod_in_elem2D_num(1:myDim_nod2D+eDim_nod2D)                => mesh%nod_in_elem2D_num  
 depth(1:myDim_nod2D+eDim_nod2D)                            => mesh%depth              
 gradient_vec(1:6,1:myDim_elem2D)                           => mesh%gradient_vec       
@@ -94,7 +91,7 @@ gradient_sca(1:6,1:myDim_elem2D)                           => mesh%gradient_sca
 bc_index_nod2D(1:myDim_nod2D+eDim_nod2D)                   => mesh%bc_index_nod2D     
 zbar(1:mesh%nl)                                            => mesh%zbar               
 Z(1:mesh%nl-1)                                             => mesh%Z
-elem_depth         => mesh%elem_depth      ! never used, not even allocated
+elem_depth                                                 => mesh%elem_depth      ! never used, not even allocated
 nlevels(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)           => mesh%nlevels            
 nlevels_nod2D(1:myDim_nod2D+eDim_nod2D)                    => mesh%nlevels_nod2D
 nlevels_nod2D_min(1:myDim_nod2D+eDim_nod2D)                => mesh%nlevels_nod2D_min
@@ -130,5 +127,3 @@ zbar_n_bot(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_bot
 zbar_e_bot(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_bot
 zbar_n_srf(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_srf
 zbar_e_srf(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_srf
-
-

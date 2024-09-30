@@ -63,7 +63,7 @@
           namelist /nml_listsize      / io_listsize
           namelist /nml_list_icepack  / io_list_icepack        
 
-#include "associate_mesh.h"
+#include "associate_mesh.h" ! includes pointers to partit # frank.kauker@awi.de
 
           ! Get the tracers information from icepack
           call icepack_query_tracer_indices(nt_Tsfc_out=nt_Tsfc, nt_sice_out=nt_sice, &
@@ -89,28 +89,18 @@
                tr_bgc_hum_out=tr_bgc_hum)
         
           ! OPEN and read namelist for icepack I/O
-          open( unit=nm_io_unit, file='namelist.io', form='formatted', access='sequential', status='old', iostat=iost )
-          if (iost == 0) then
-          if (mype==0) write(*,*) '     file   : ', 'namelist.io',' open ok'
-             else
-          if (mype==0) write(*,*) 'ERROR: --> bad opening file   : ','namelist.io',' ;    iostat=',iost
-             call par_ex(p_partit%MPI_COMM_FESOM, p_partit%mype)
-             stop
-          end if
           open( unit=nm_icepack_unit, file='namelist.icepack', form='formatted', access='sequential', status='old', iostat=iost )
           if (iost == 0) then
-          if (mype==0) write(*,*) '     file   : ', 'namelist.icepack',' open ok' 
-             else
-          if (mype==0) write(*,*) 'ERROR: --> bad opening file   : ','namelist.icepack',' ;    iostat=',iost
+             if (mype==0) write(*,*) '     file   : ', 'namelist.icepack',' open ok' 
+          else
+             if (mype==0) write(*,*) 'ERROR: --> bad opening file   : ','namelist.icepack',' ;    iostat=',iost
              call par_ex(p_partit%MPI_COMM_FESOM, p_partit%mype)
              stop
           end if
-
-          read(nm_io_unit, nml=nml_listsize, iostat=iost )
+          read(nm_icepack_unit, nml=nml_listsize, iostat=iost )
           allocate(io_list_icepack(io_listsize))
           read(nm_icepack_unit, nml=nml_list_icepack, iostat=iost )
           close(nm_icepack_unit)
-        
         
           do i=1, io_listsize
              if (trim(io_list_icepack(i)%id)=='unknown   ') then
@@ -119,7 +109,6 @@
                 exit
              end if
           end do
-        
           do i=1, io_listsize
              select case (trim(io_list_icepack(i)%id))
              case ('aice0     ')
@@ -145,7 +134,7 @@
              case ('Tsfc      ')
                  call def_stream2D(nod2D,  nx_nh,  'Tsfc', 'sea ice surf. temperature',  'degC', trcr(:,nt_Tsfc), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, p_partit, mesh)
              case ('Tsfcn     ')
-                 call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/),  'Tsfcn',  'sea ice surf. temperature', 'degC', trcrn(:,nt_Tsfc,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, p_partit, mesh)
+                 call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/),  'Tsfcn',  'sea ice surf. temperature', 'degC', trcrn(:,nt_Tsfc,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, p_partit, mesh, .true.)
              case ('strength  ')
                  call def_stream2D(nod2D,              nx_nh,          'strength', 'sea ice strength',       'N', strength(:),   io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, p_partit, mesh) 
              ! If the following tracers are not defined they will not be outputed
@@ -279,7 +268,7 @@
         
         use mod_mesh
         use g_config,     only: runid, ResultPath
-        use io_restart,   only: ip_id, def_variable_2d, def_dim
+        ! frank.kauker@awi.de use io_restart,   only: ip_id, def_variable_2d, def_dim
     
         implicit none
     
@@ -341,9 +330,9 @@
         write(cyear,'(i4)') year
         ! Create an icepack restart file
         ! Only serial output implemented so far
-        ip_id%filename=trim(ResultPath)//trim(runid)//'.'//cyear//'.icepack.restart.nc'
-        if (ip_id%is_in_use) return
-        ip_id%is_in_use=.true.
+        ! frank.kauker@awi.de ip_id%filename=trim(ResultPath)//trim(runid)//'.'//cyear//'.icepack.restart.nc'
+        ! frank.kauker@awi.de if (ip_id%is_in_use) return
+        ! frank.kauker@awi.de ip_id%is_in_use=.true.
       
         ! Define the dimensions of the netCDF file
         !
@@ -353,8 +342,8 @@
         ! reconstructed after the restart. Multidimensional variables would solve
         ! this.
       
-        call def_dim(ip_id, 'node',  nod2D)    ! Number of nodes
-        call def_dim(ip_id, 'ncat',  ncat)     ! Number of thickness classes
+        ! frank.kauker@awi.de call def_dim(ip_id, 'node',  nod2D)    ! Number of nodes
+        ! frank.kauker@awi.de call def_dim(ip_id, 'ncat',  ncat)     ! Number of thickness classes
       
         ! Define the netCDF variables for surface
         ! and vertically constant fields
@@ -363,73 +352,79 @@
         ! 3D restart fields (ncat)
         !-----------------------------------------------------------------
       
-        call def_variable_2d(ip_id, 'aicen',  (/nod2D, ncat/), 'sea ice concentration',       'none', aicen(:,:));
-        call def_variable_2d(ip_id, 'vicen',  (/nod2D, ncat/), 'volum per unit area of ice',  'm',    vicen(:,:));
-        call def_variable_2d(ip_id, 'vsnon',  (/nod2D, ncat/), 'volum per unit area of snow', 'm',    vsnon(:,:));
-        call def_variable_2d(ip_id, 'Tsfc',   (/nod2D, ncat/), 'sea ice surf. temperature',   'degC', trcrn(:,nt_Tsfc,:));
+        ! frank.kauker@awi.de
+        ! call def_variable_2d(ip_id, 'aicen',  (/nod2D, ncat/), 'sea ice concentration',       'none', aicen(:,:));
+        ! call def_variable_2d(ip_id, 'vicen',  (/nod2D, ncat/), 'volum per unit area of ice',  'm',    vicen(:,:));
+        ! call def_variable_2d(ip_id, 'vsnon',  (/nod2D, ncat/), 'volum per unit area of snow', 'm',    vsnon(:,:));
+        ! call def_variable_2d(ip_id, 'Tsfc',   (/nod2D, ncat/), 'sea ice surf. temperature',   'degC', trcrn(:,nt_Tsfc,:));
       
-        if (tr_iage) then
-            call def_variable_2d(ip_id, 'iage',  (/nod2D, ncat/), 'sea ice age', 's', trcrn(:,nt_iage,:));
-        end if
+        ! if (tr_iage) then
+        !     call def_variable_2d(ip_id, 'iage',  (/nod2D, ncat/), 'sea ice age', 's', trcrn(:,nt_iage,:));
+        ! end if
       
-        if (tr_FY) then
-            call def_variable_2d(ip_id, 'FY',  (/nod2D, ncat/), 'first year ice', 'none', trcrn(:,nt_FY,:));
-        end if
+        ! if (tr_FY) then
+        !     call def_variable_2d(ip_id, 'FY',  (/nod2D, ncat/), 'first year ice', 'none', trcrn(:,nt_FY,:));
+        ! end if
       
-        if (tr_lvl) then
-            call def_variable_2d(ip_id, 'alvl',  (/nod2D, ncat/), 'ridged sea ice area',   'none', trcrn(:,nt_alvl,:));
-            call def_variable_2d(ip_id, 'vlvl',  (/nod2D, ncat/), 'ridged sea ice volume', 'm',    trcrn(:,nt_vlvl,:));
-        end if
+        ! if (tr_lvl) then
+        !     call def_variable_2d(ip_id, 'alvl',  (/nod2D, ncat/), 'ridged sea ice area',   'none', trcrn(:,nt_alvl,:));
+        !     call def_variable_2d(ip_id, 'vlvl',  (/nod2D, ncat/), 'ridged sea ice volume', 'm',    trcrn(:,nt_vlvl,:));
+        ! end if
       
-        if (tr_pond_cesm) then
-            call def_variable_2d(ip_id, 'apnd',  (/nod2D, ncat/), 'melt pond area fraction', 'none', trcrn(:,nt_apnd,:));
-            call def_variable_2d(ip_id, 'hpnd',  (/nod2D, ncat/), 'melt pond depth',         'm',    trcrn(:,nt_hpnd,:));
-        end if
+        ! if (tr_pond_cesm) then
+        !     call def_variable_2d(ip_id, 'apnd',  (/nod2D, ncat/), 'melt pond area fraction', 'none', trcrn(:,nt_apnd,:));
+        !     call def_variable_2d(ip_id, 'hpnd',  (/nod2D, ncat/), 'melt pond depth',         'm',    trcrn(:,nt_hpnd,:));
+        ! end if
       
-        if (tr_pond_topo) then
-            call def_variable_2d(ip_id, 'apnd',  (/nod2D, ncat/), 'melt pond area fraction',  'none', trcrn(:,nt_apnd,:));
-            call def_variable_2d(ip_id, 'hpnd',  (/nod2D, ncat/), 'melt pond depth',          'm',    trcrn(:,nt_hpnd,:));
-            call def_variable_2d(ip_id, 'ipnd',  (/nod2D, ncat/), 'melt pond refrozen lid thickness', 'm',    trcrn(:,nt_ipnd,:));
-        end if
+        ! if (tr_pond_topo) then
+        !     call def_variable_2d(ip_id, 'apnd',  (/nod2D, ncat/), 'melt pond area fraction',  'none', trcrn(:,nt_apnd,:));
+        !     call def_variable_2d(ip_id, 'hpnd',  (/nod2D, ncat/), 'melt pond depth',          'm',    trcrn(:,nt_hpnd,:));
+        !     call def_variable_2d(ip_id, 'ipnd',  (/nod2D, ncat/), 'melt pond refrozen lid thickness', 'm',    trcrn(:,nt_ipnd,:));
+        ! end if
       
-        if (tr_pond_lvl) then
-            call def_variable_2d(ip_id, 'apnd',    (/nod2D, ncat/), 'melt pond area fraction', 'none', trcrn(:,nt_apnd,:));
-            call def_variable_2d(ip_id, 'hpnd',    (/nod2D, ncat/), 'melt pond depth',         'm',    trcrn(:,nt_hpnd,:));
-            call def_variable_2d(ip_id, 'ipnd',    (/nod2D, ncat/), 'melt pond refrozen lid thickness', 'm',    trcrn(:,nt_ipnd,:));
-            call def_variable_2d(ip_id, 'ffracn',  (/nod2D, ncat/), 'fraction of fsurfn over pond used to melt ipond',   'none', ffracn);
-            call def_variable_2d(ip_id, 'dhsn',    (/nod2D, ncat/), 'depth difference for snow on sea ice and pond ice', 'm',    dhsn);
-        end if
+        ! if (tr_pond_lvl) then
+        !     call def_variable_2d(ip_id, 'apnd',    (/nod2D, ncat/), 'melt pond area fraction', 'none', trcrn(:,nt_apnd,:));
+        !     call def_variable_2d(ip_id, 'hpnd',    (/nod2D, ncat/), 'melt pond depth',         'm',    trcrn(:,nt_hpnd,:));
+        !     call def_variable_2d(ip_id, 'ipnd',    (/nod2D, ncat/), 'melt pond refrozen lid thickness', 'm',    trcrn(:,nt_ipnd,:));
+        !     call def_variable_2d(ip_id, 'ffracn',  (/nod2D, ncat/), 'fraction of fsurfn over pond used to melt ipond',   'none', ffracn);
+        !     call def_variable_2d(ip_id, 'dhsn',    (/nod2D, ncat/), 'depth difference for snow on sea ice and pond ice', 'm',    dhsn);
+        ! end if
       
-        if (tr_brine) then
-            call def_variable_2d(ip_id, 'fbri',       (/nod2D, ncat/), 'volume fraction of ice with dynamic salt', 'none',    trcrn(:,nt_fbri,:));
-            call def_variable_2d(ip_id, 'first_ice',  (/nod2D, ncat/), 'distinguishes ice that disappears',        'logical', first_ice_real(:,:));
-        end if
+        ! if (tr_brine) then
+        !     call def_variable_2d(ip_id, 'fbri',       (/nod2D, ncat/), 'volume fraction of ice with dynamic salt', 'none',    trcrn(:,nt_fbri,:));
+        !     call def_variable_2d(ip_id, 'first_ice',  (/nod2D, ncat/), 'distinguishes ice that disappears',        'logical', first_ice_real(:,:));
+        ! end if
+        ! frank.kauker@awi.de
       
         !-----------------------------------------------------------------
         ! 4D restart fields, written as layers of 3D
         !-----------------------------------------------------------------
       
         ! Ice
-      
-        do k = 1,nilyr
-           write(trname,'(A6,i1)') 'sicen_', k
-           write(longname,'(A21,i1)') 'sea ice salinity lyr:', k
-           units='psu'
-           call def_variable_2d(ip_id, trim(trname), (/nod2D, ncat/), trim(longname), trim(units), trcrn(:,nt_sice+k-1,:));
-           write(trname,'(A6,i1)') 'qicen_', k
-           write(longname,'(A21,i1)') 'sea ice enthalpy lyr:', k
-           units='J/m3'
-           call def_variable_2d(ip_id, trim(trname), (/nod2D, ncat/), trim(longname), trim(units), trcrn(:,nt_qice+k-1,:));
-        end do
+
+        ! frank.kauker@awi.de
+        ! do k = 1,nilyr
+        !    write(trname,'(A6,i1)') 'sicen_', k
+        !    write(longname,'(A21,i1)') 'sea ice salinity lyr:', k
+        !    units='psu'
+        !    call def_variable_2d(ip_id, trim(trname), (/nod2D, ncat/), trim(longname), trim(units), trcrn(:,nt_sice+k-1,:));
+        !    write(trname,'(A6,i1)') 'qicen_', k
+        !    write(longname,'(A21,i1)') 'sea ice enthalpy lyr:', k
+        !    units='J/m3'
+        !    call def_variable_2d(ip_id, trim(trname), (/nod2D, ncat/), trim(longname), trim(units), trcrn(:,nt_qice+k-1,:));
+        ! end do
+        ! frank.kauker@awi.de
       
         ! Snow
-      
-        do k = 1,nslyr
-           write(trname,'(A6,i1)') 'qsnon_', k
-           write(longname,'(A18,i1)') 'snow enthalpy lyr:', k
-           units='J/m3'
-           call def_variable_2d(ip_id, trim(trname), (/nod2D, ncat/), trim(longname), trim(units), trcrn(:,nt_qsno+k-1,:));
-        end do
+
+        ! frank.kauker@awi.de
+        ! do k = 1,nslyr
+        !    write(trname,'(A6,i1)') 'qsnon_', k
+        !    write(longname,'(A18,i1)') 'snow enthalpy lyr:', k
+        !    units='J/m3'
+        !    call def_variable_2d(ip_id, trim(trname), (/nod2D, ncat/), trim(longname), trim(units), trcrn(:,nt_qsno+k-1,:));
+        ! end do
+        ! frank.kauker@awi.de
       
         !
         ! All the other 4D tracers (linked to aerosols and biogeochemistry) are at the

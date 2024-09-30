@@ -322,18 +322,35 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
                            vsno_out=m_snow,                &
                            fhocn_tot_out=net_heat_flux,    &
                            fresh_tot_out=fresh_wa_flux,    &
+                           dhs_dt_out=thdgrsn,             &
+                           dhi_dt_out=thdgr,               &
                            fsalt_out=real_salt_flux,       &
-                           dhi_dt_out=thdgrsn,             &
-                           dhs_dt_out=thdgr,               &
                            evap_ocn_out=evaporation        )
 
-    heat_flux(:)   = - net_heat_flux(:)
-    water_flux(:)  = - (fresh_wa_flux(:)/1000.0_WP) - runoff(:)
+    ! write(*,*) "************************"
+    ! write(*,*) "min/max a_ice = ", minval(a_ice), maxval(a_ice)
+    ! write(*,*) "min/max net_heat_flux = ", minval(net_heat_flux), maxval(net_heat_flux)
+    ! write(*,*) "min/max fresh_wa_flux = ", minval(fresh_wa_flux), maxval(fresh_wa_flux)
+    ! write(*,*) "min/max real_salt_flux = ", minval(real_salt_flux), maxval(real_salt_flux)
+    ! write(*,*) "min/max evaporation = ", minval(evaporation), maxval(evaporation)
+    ! write(*,*) "-------------------------"
+    ! frank.kauker@awi.de
 
-    ! Evaporation
-    evaporation(:) = - evaporation(:) / 1000.0_WP
-    ice_sublimation(:) = 0.0_WP
+!$OMP PARALLEL DO
+    do n=1, myDim_nod2d+eDim_nod2d  
+       heat_flux(n)   = - net_heat_flux(n)
+       water_flux(n)  = - (fresh_wa_flux(n)/1000.0_WP) - runoff(n)
+       ! Evaporation
+       evaporation(n) = - evaporation(n) / 1000.0_WP
+       ice_sublimation(n) = 0.0_WP
+    end do
+!$OMP END PARALLEL DO
 
+    ! write(*,*) "min/max heat_flux = ", minval(heat_flux), maxval(heat_flux)
+    ! write(*,*) "min/max water_flux = ", minval(water_flux), maxval(water_flux)
+    ! write(*,*) "min/max evaporation = ", minval(evaporation), maxval(evaporation)
+    ! write(*,*) "************************"
+    
     call init_flux_atm_ocn()
 
 #else

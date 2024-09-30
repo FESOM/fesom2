@@ -8,7 +8,7 @@
 
       submodule (icedrv_main) icedrv_set
 
-      use icepack_intfc,    only: icepack_init_parameters
+      use icepack_intfc,    only: icepack_init_parameters 
       use icepack_intfc,    only: icepack_init_tracer_flags
       use icepack_intfc,    only: icepack_init_tracer_sizes
       use icepack_intfc,    only: icepack_init_tracer_indices
@@ -227,21 +227,31 @@
           ndtd      = 1           ! dynamic time steps per thermodynamic time step
 
           !-----------------------------------------------------------------
+          ! Derived quantities used by the icepack model
+          !-----------------------------------------------------------------                                                                                  
+          call icedrv_system_init(partit)
+          p_partit => partit
+          nx         = p_partit%myDim_nod2D  + p_partit%eDim_nod2D
+          nx_elem    = p_partit%myDim_elem2D + p_partit%eDim_elem2D
+          nx_nh      = p_partit%myDim_nod2D
+          nx_elem_nh = p_partit%myDim_elem2D
+          mype       = p_partit%mype
+
+          !-----------------------------------------------------------------
           ! Read namelist env_nml
           !-----------------------------------------------------------------
 
-          open (nu_nml, file=nml_filename, status='old',iostat=nml_error)
+          open (nu_nml, file=nml_filename, status='old', iostat=nml_error)
           if (nml_error /= 0) then
              nml_error = -1
           else
              nml_error =  1
           end if
 
-          do while (nml_error > 0) 
-              if (mype == 0) print*,'Reading namelist file   ',nml_filename
-
+          do while (nml_error > 0)
+              if (mype == 0) print*,'Reading namelist file ',nml_filename
               if (mype == 0) print*,'Reading env_nml'
-              read(nu_nml, nml=env_nml,iostat=nml_error)
+              read(nu_nml, nml=env_nml ,iostat=nml_error)
               if (nml_error /= 0) exit
           end do
 
@@ -252,16 +262,6 @@
              close(nu_nml)
           end if
 
-          !-----------------------------------------------------------------
-          ! Derived quantities used by the icepack model
-          !-----------------------------------------------------------------
-          call icedrv_system_init(partit)
-          p_partit => partit
-          nx         = p_partit%myDim_nod2D  + p_partit%eDim_nod2D
-          nx_elem    = p_partit%myDim_elem2D + p_partit%eDim_elem2D
-          nx_nh      = p_partit%myDim_nod2D
-          nx_elem_nh = p_partit%myDim_elem2D
-          mype       = p_partit%mype
           ncat      = nicecat    ! number of categories
           nfsd      = nfsdcat    ! number of floe size categories
           nilyr     = nicelyr    ! number of ice layers per category

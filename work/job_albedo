@@ -1,18 +1,21 @@
 #!/bin/bash
-#SBATCH --account=clidyn.p_fesom # edit your account
-#SBATCH --job-name=run
+#___SET SLURM OPTIONS___________________________________________________________
+#SBATCH --account=meereis.meereis    # edit your account
+#SBATCH --job-name=head
 #SBATCH --partition=mpp
-#SBATCH --time=01:00:00
-#SBATCH --qos=12h
-#SBATCH --nodes=48            # Number of tasks (MPI) tasks to be launched
-#SBATCH --tasks-per-node 128  # using all 128CPus we exceed the maxload limit (>130) of many used nodes when us parallel I/O
+# disable hyperthreading
+#SBATCH --hint=nomultithread
+#SBATCH --nodes=4                   # Number of tasks (MPI) tasks to be launched
+#SBATCH --tasks-per-node 127        # using all 128CPus we exceed the maxload limit (>130) of many used nodes
 #SBATCH --cpus-per-task 1
+#SBATCH --time=12:00:00
+#SBATCH --qos=12h
 
 #SBATCH -o fesom2_%x_%j.out
 #SBATCH -e fesom2_%x_%j.out
 
-# disable hyperthreading
-#SBATCH --hint=nomultithread
+##SBATCH --mail-type=END
+##SBATCH --mail-user=Frank.Kauker@awi.de  
 
 module purge 
 source ../env/albedo/shell
@@ -39,10 +42,13 @@ fname="fesom2_${SLURM_JOB_NAME}_${jobid}.out"
 #___PUT JOB IN QUEUE____________________________________________________________
 date
 srun --mpi=pmi2 ./fesom.x >> ${fname}
+err_srun=$?
+echo -e "\033[33m --> err_srun=${err_srun} \033[0m"
 date
 
-#qstat -f $PBS_JOBID
-#export EXITSTATUS=$?
-#if [ ${EXITSTATUS} -eq 0 ] || [ ${EXITSTATUS} -eq 127 ] ; then
-#sbatch job_ollie
-#fi
+#___SETUP JOBCHAIN______________________________________________________________
+if [ ${err_srun} -eq 0 ]; then
+    sbatch --dependency=aftercorr:$SLURM_JOB_ID job_albedo
+fi
+
+
