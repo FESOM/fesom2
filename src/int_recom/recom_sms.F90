@@ -1312,7 +1312,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             + aggregationRate               * CoccoN       &
 #endif
             - grazingFlux_Det   * grazEff                  & ! Sloppy feeding is thought because of grazing flux multiplied with grazeff 
-            - grazingFlux_Det2  * grazEff2                 &
+!            - grazingFlux_Det2  * grazEff2                 & ! Removed : case without second zoo .OG. 01.10.2024
             + aggregationRate               * PhyN         &
             + aggregationRate               * DiaN         &
             + hetLossFlux                                  &
@@ -1366,7 +1366,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             + aggregationRate                       * CoccoC   &
 #endif
             - grazingFlux_Det  * recipDet  * grazEff           &
-            - grazingFlux_Det2 * recipDet2 * grazEff2          &
+            - grazingFlux_Det2 * recipDet  * grazEff2          &  ! corrected recipDet2 -> recipDet .OG. 01.10.2024
             + aggregationRate                         * PhyC   &
             + aggregationRate                         * DiaC   &
             + miczooLossFlux   * recipQZoo3                    &
@@ -1384,7 +1384,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             + aggregationRate                      * CoccoC    &
 #endif
             - grazingFlux_Det  * recipDet  * grazEff           &
-            - grazingFlux_Det2 * recipDet2 * grazEff           &
+!            - grazingFlux_Det2 * recipDet2 * grazEff           & ! Removed : case without second zoo .OG. 01.10.2024
             + aggregationRate              * phyC              &
             + aggregationRate              * DiaC              &
             + hetLossFlux      * recipQZoo                     &
