@@ -25,7 +25,7 @@ compression_level = 0
 ! for 'dMOC' to work ldiag_dMOC must be .true. otherwise no output
 ! for 'utemp', 'vtemp', 'usalt', 'vsalt' output, set ldiag_trflx=.true.
 &nml_list
-io_list =  'sst       ',1, 'm', 4,
+io_list =  'sst       ',1, 'd', 4,
            'sss       ',1, 'm', 4,
     	   'ssh       ',1, 'm', 4,
            'uice      ',1, 'd', 4,
