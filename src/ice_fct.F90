@@ -149,6 +149,7 @@ subroutine ice_TG_rhs(ice, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP DO
 #else
+
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) private(n, q, row, elem, elnodes, diff, entries,  um, vm, vol, dx, dy)
 #endif
     do elem=1,myDim_elem2D          !assembling rhs over elements
@@ -171,7 +172,7 @@ subroutine ice_TG_rhs(ice, partit, mesh)
         !$ACC LOOP SEQ
         DO n=1,3
             row=elnodes(n)
-	    !$ACC LOOP SEQ
+        !$ACC LOOP SEQ
             DO q = 1,3
                 !entries(q)= vol*dt*((dx(n)*um+dy(n)*vm)/3.0_WP - &
                 !            diff*(dx(n)*dx(q)+ dy(n)*dy(q))- &
@@ -181,7 +182,7 @@ subroutine ice_TG_rhs(ice, partit, mesh)
                             diff*(dx(n)*dx(q)+ dy(n)*dy(q))- &
                             0.5_WP*ice%ice_dt*(um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q))/9.0_WP)
             END DO
-	    !$ACC END LOOP
+        !$ACC END LOOP
             rhs_m(row)=rhs_m(row)+sum(entries*m_ice(elnodes))
             rhs_a(row)=rhs_a(row)+sum(entries*a_ice(elnodes))
             rhs_ms(row)=rhs_ms(row)+sum(entries*m_snow(elnodes))
@@ -189,7 +190,7 @@ subroutine ice_TG_rhs(ice, partit, mesh)
             rhs_temp(row)=rhs_temp(row)+sum(entries*ice_temp(elnodes))
 #endif
         END DO
-	!$ACC END LOOP
+    !$ACC END LOOP
     end do
 
 #ifndef ENABLE_OPENACC
@@ -575,6 +576,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     !$ACC KERNELS
     icoef = 1
     !$ACC END KERNELS
+
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
     do n=1,3   ! three upper nodes
         ! Cycle over rows  row=elnodes(n)
@@ -836,8 +838,8 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
     !$ACC END PARALLEL LOOP
 #endif 
-   ! pminus and pplus are to be known to neighbouting PE
-!$ACC wait
+    ! pminus and pplus are to be known to neighbouting PE
+    !$ACC WAIT
 
 #if defined(_OPENMP)
 !$OMP MASTER
@@ -954,6 +956,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 !$OMP DO
 #else
         !$ACC END PARALLEL LOOP
+
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes) DEFAULT(PRESENT)
 #else
@@ -1013,6 +1016,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 !$OMP DO
 #else
         !$ACC END PARALLEL LOOP
+
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes) DEFAULT(PRESENT)
 #else
@@ -1125,6 +1129,8 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #endif
 
 !$ACC END DATA
+!! lisaa wait
+
 
 !$OMP BARRIER
 
@@ -1523,6 +1529,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
 #else
     !$ACC END PARALLEL LOOP
 #endif
+    !$ACC WAIT
     call exchange_nod(dm_ice, partit, luse_g2g = .true.)
     call exchange_nod(da_ice, partit, luse_g2g = .true.)
     call exchange_nod(dm_snow, partit, luse_g2g = .true.)
@@ -1592,6 +1599,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
 #else
         !$ACC END PARALLEL LOOP
 #endif
+        !$ACC WAIT
         call exchange_nod(dm_ice, partit, luse_g2g = .true.)
         call exchange_nod(da_ice, partit, luse_g2g = .true.)
         call exchange_nod(dm_snow, partit, luse_g2g = .true.)
