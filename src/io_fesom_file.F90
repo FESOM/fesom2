@@ -43,9 +43,9 @@ module io_fesom_file_module
     procedure, public :: async_read_and_scatter_variables, async_gather_and_write_variables, join, init, is_iorank, rec_count, time_varindex, time_dimindex
     procedure, public :: read_variables_raw, write_variables_raw
     procedure, public :: close_file ! inherited procedures we overwrite
-    generic, public :: specify_node_var => specify_node_var_2d, specify_node_var_3d
+    generic, public :: specify_node_var => specify_node_var_2d, specify_node_var_3d, specify_node_var_2dicepack
     generic, public :: specify_elem_var => specify_elem_var_2d, specify_elem_var_3d
-    procedure, private :: specify_node_var_2d, specify_node_var_3d
+    procedure, private :: specify_node_var_2d, specify_node_var_3d, specify_node_var_2dicepack
     procedure, private :: specify_elem_var_2d, specify_elem_var_3d
     procedure, private :: read_and_scatter_variables, gather_and_write_variables
   end type
@@ -54,6 +54,7 @@ module io_fesom_file_module
   integer, save :: m_nod2d
   integer, save :: m_elem2d
   integer, save :: m_nl
+  integer, save :: m_nitc  
   
 
   type fesom_file_type_ptr
@@ -103,7 +104,7 @@ contains
   end function
   
   
-  subroutine init(this, mesh_nod2d, mesh_elem2d, mesh_nl, partit) ! todo: would like to call it initialize but Fortran is rather cluncky with overwriting base type procedures
+  subroutine init(this, mesh_nod2d, mesh_elem2d, mesh_nl, partit, mesh_nitc) ! todo: would like to call it initialize but Fortran is rather cluncky with overwriting base type procedures
     use io_netcdf_workaround_module
     use io_gather_module
     use MOD_PARTIT
@@ -111,6 +112,7 @@ contains
     integer mesh_nod2d
     integer mesh_elem2d
     integer mesh_nl
+    integer, optional :: mesh_nitc
     type(t_partit), target :: partit
     ! EO parameters
     type(fesom_file_type_ptr), allocatable :: tmparr(:)
@@ -121,9 +123,16 @@ contains
     call init_io_gather(partit)
 
     ! get hold of our mesh data for later use (assume the mesh instance will not change)
-    m_nod2d = mesh_nod2d
+    m_nod2d  = mesh_nod2d
     m_elem2d = mesh_elem2d
-    m_nl = mesh_nl
+    m_nl     = mesh_nl
+    !PS mesh_nitc ... icepack number of ice thickness classes,
+    if (present(mesh_nitc)) then 
+        m_nitc   = mesh_nitc
+    else    
+        m_nitc   = 0
+    end if 
+    
     call this%netcdf_file_type%initialize()
 
     allocate(this%used_mesh_dims(0))
@@ -446,6 +455,22 @@ use nvfortran_subarray_workaround_module
     external_local_data_ptr(1:1,1:size(local_data)) => local_data(:)
     call specify_variable(this, name, [level_diminfo%idx, this%time_dimidx], level_diminfo%len, external_local_data_ptr, .false., longname, units)    
   end subroutine
+  
+  subroutine specify_node_var_2dicepack(this, name, longname, units, local_data, nitc)
+    use, intrinsic :: ISO_C_BINDING
+    class(fesom_file_type), intent(inout) :: this
+    character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: units, longname
+    real(kind=8), target, intent(inout) :: local_data(:,:)
+    integer, intent(in) :: nitc! todo: be able to set precision
+    ! EO parameters
+    type(dim_info) level_diminfo, nitc_diminfo
+    
+    level_diminfo = obtain_diminfo(this, m_nod2d)    
+    nitc_diminfo = obtain_diminfo(this, size(local_data, dim=2))
+
+    call specify_variable(this, name, [level_diminfo%idx, nitc_diminfo%idx, this%time_dimidx], level_diminfo%len, local_data, .false., longname, units)    
+  end subroutine
 
 
   subroutine specify_node_var_3d(this, name, longname, units, local_data)
@@ -520,7 +545,9 @@ use nvfortran_subarray_workaround_module
     else if(len == m_nl-1) then
       info = dim_info( idx=this%add_dim('nz_1', len), len=len)
     else if(len == m_nl) then
-      info = dim_info( idx=this%add_dim('nz', len), len=len)
+      info = dim_info( idx=this%add_dim('nz'  , len), len=len)
+    else if(len == m_nitc) then
+      info = dim_info( idx=this%add_dim('nitc', len), len=len)  
     else
       print *, "error in line ",__LINE__, __FILE__," can not find dimension with size",len
       stop 1

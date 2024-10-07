@@ -1742,7 +1742,7 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     use iom
 #endif
 #if defined (__icepack)
-    use icedrv_main,    only: init_io_icepack
+    use icedrv_main,    only: ini_mean_icepack_io
 #endif
     implicit none
     integer       :: istep
@@ -1775,7 +1775,7 @@ ctime=timeold+(dayold-1.)*86400
         call init_io_gather(partit)
 
 #if defined (__icepack)
-        call init_io_icepack(mesh) !icapack has its copy of p_partit => partit
+        call ini_mean_icepack_io(mesh) !icapack has its copy of p_partit => partit
 #endif
     end if ! --> if (lfirst) then
     

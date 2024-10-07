@@ -13,6 +13,9 @@ MODULE io_RESTART
   use MOD_PARSUP
   use fortran_utils
   use mpi
+#if defined(__icepack)
+  use icedrv_main
+#endif 
 #if defined(__recom)
   use recom_glovar
   use recom_config
@@ -27,9 +30,17 @@ MODULE io_RESTART
   real(kind=WP)             :: ctime !current time in seconds from the beginning of the year
 
   type(restart_file_group) , save :: oce_files
-  type(restart_file_group) , save :: ice_files
   character(:), allocatable, save :: oce_path
+  
+  type(restart_file_group) , save :: ice_files
   character(:), allocatable, save :: ice_path
+  
+#if defined(__icepack)
+  type(restart_file_group) , save, public :: icepack_files
+  character(:), allocatable, save, public :: icepack_path
+  
+#endif  
+
 #if defined(__recom)
   type(restart_file_group) , save :: bio_files
   character(:), allocatable, save :: bio_path
@@ -233,9 +244,9 @@ end subroutine ini_bio_io
 !
 subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tracers, partit, mesh)
 
-#if defined(__icepack)
-  icepack restart not merged here ! produce a compiler error if USE_ICEPACK=ON; todo: merge icepack restart from 68d8b8b
-#endif
+! #if defined(__icepack)
+!   icepack restart not merged here ! produce a compiler error if USE_ICEPACK=ON; todo: merge icepack restart from 68d8b8b
+! #endif
 
   use fortran_utils
   implicit none
@@ -302,18 +313,29 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   ! initialise files for netcdf restart if l_read==TRUE --> the restart file 
   ! will be read
   if (.not. l_read) then
-               call ini_ocean_io(yearnew, dynamics, tracers, partit, mesh)
-  if (use_ice) call ini_ice_io  (yearnew, ice, partit, mesh)
+    call ini_ocean_io(yearnew, dynamics, tracers, partit, mesh)
+    if (use_ice) then
+        call ini_ice_io(yearnew, ice, partit, mesh)
+#if defined(__icepack)    
+        call ini_icepack_io(yearnew, partit, mesh)
+#endif        
+    end if     
 #if defined(__recom)
     if (use_REcoM) call ini_bio_io  (yearnew, tracers, partit, mesh)
 #endif
+
   else
-               call ini_ocean_io(yearold, dynamics, tracers, partit, mesh)
-  if (use_ice) call ini_ice_io  (yearold, ice, partit, mesh)
+    call ini_ocean_io(yearold, dynamics, tracers, partit, mesh)
+    if (use_ice) then
+        call ini_ice_io  (yearold, ice, partit, mesh)
+#if defined(__icepack)    
+        call ini_icepack_io(yearnew, partit, mesh)
+#endif        
+    end if     
 #if defined(__recom)
     if (REcoM_restart) call ini_bio_io(yearold, tracers, partit, mesh)
 #endif
-  end if
+  end if ! --> if (.not. l_read) then
 
   !___READING OF RESTART________________________________________________________
   ! should restart files be readed --> see r_restart in gen_modules_clock.F90
@@ -431,13 +453,16 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
     if(use_ice) then
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ice'//achar(27)//'[0m'
         call write_restart(ice_path, ice_files, istep)
+#if defined(__icepack)        
+        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: icepack'//achar(27)//'[0m'
+        call write_restart(icepack_path, icepack_files, istep)
+#endif 
     end if
 
 #if defined(__recom)
 !RECOM restart
 !write here
         if (REcoM_restart .or. use_REcoM) then
-
                 if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: bio'//achar(27)//'[0m'
             call write_restart(bio_path, bio_files, istep)
         end if

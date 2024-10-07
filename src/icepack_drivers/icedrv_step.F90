@@ -772,12 +772,15 @@ submodule (icedrv_main) icedrv_step
 ! Allows heat storage in ocean for uncoupled runs.
 !
 
-      subroutine ocean_mixed_layer (dt)
+      subroutine ocean_mixed_layer (ice, dt)
 
           use icepack_intfc, only: icepack_ocn_mixed_layer, icepack_atm_boundary
-    
+          use mod_ice
+          
           implicit none
 
+          type(t_ice), target, intent(inout) :: ice
+          
           real (kind=dbl_kind), intent(in) :: &
              dt      ! time step
     
@@ -852,7 +855,8 @@ submodule (icedrv_main) icedrv_step
           !-----------------------------------------------------------------
     
           do i = 1, nx
-             call ocn_mixed_layer_icepack( alvdr_ocn=alvdr_ocn(i),  swvdr=swvdr(i),         & 
+             call ocn_mixed_layer_icepack( ice,                                             &
+                                           alvdr_ocn=alvdr_ocn(i),  swvdr=swvdr(i),         & 
                                            alidr_ocn=alidr_ocn(i),  swidr=swidr(i),         &
                                            alvdf_ocn=alvdf_ocn(i),  swvdf=swvdf(i),         &
                                            alidf_ocn=alidf_ocn(i),  swidf=swidf(i),         &
@@ -878,7 +882,7 @@ submodule (icedrv_main) icedrv_step
 
 !=======================================================================
 
-      subroutine ocn_mixed_layer_icepack(                       &
+      subroutine ocn_mixed_layer_icepack(ice,                   &
                                          alvdr_ocn, swvdr,      &
                                          alidr_ocn, swidr,      &
                                          alvdf_ocn, swvdf,      &
@@ -896,11 +900,11 @@ submodule (icedrv_main) icedrv_step
                                          frzmlt,    fsalt,      &
                                          sss)
 
-          use i_therm_param,    only: emiss_wat
           use g_forcing_param,  only: use_virt_salt
-
+          use mod_ice
+          
           implicit none
-
+          
           real (kind=dbl_kind), intent(in) :: &
              alvdr_ocn , & ! visible, direct   (fraction)
              alidr_ocn , & ! near-ir, direct   (fraction)
@@ -951,6 +955,10 @@ submodule (icedrv_main) icedrv_step
              ice_ref_salinity
 
           character(len=*),parameter :: subname='(icepack_ocn_mixed_layer)'
+          
+          type(t_ice), target, intent(inout) :: ice  
+          real(kind=WP), pointer  :: emiss_wat
+          emiss_wat => ice%thermo%emiss_wat
 
           call icepack_query_parameters( Tffresh_out=Tffresh, Lfresh_out=Lfresh, &
                                          stefan_boltzmann_out=stefan_boltzmann,  &
@@ -992,11 +1000,14 @@ submodule (icedrv_main) icedrv_step
 
 !=======================================================================
 
-      subroutine coupling_prep(dt)
-
+      subroutine coupling_prep(ice, dt)
+            
+          use mod_ice  
           ! local variables
 
           implicit none
+          
+          type(t_ice), target, intent(inout) :: ice
     
           real (kind=dbl_kind), intent(in) :: &
              dt      ! time step
@@ -1029,7 +1040,7 @@ submodule (icedrv_main) icedrv_step
                 frzmlt_init  (i) = frzmlt(i)
              enddo
     
-             call ocean_mixed_layer (dt) ! ocean surface fluxes and sst
+             call ocean_mixed_layer (ice, dt) ! ocean surface fluxes and sst
     
           !-----------------------------------------------------------------
           ! Aggregate albedos
@@ -1207,7 +1218,7 @@ submodule (icedrv_main) icedrv_step
           !-----------------------------------------------------------------
 
           dhi_dt(:) = ( vice(:) - dhi_dt(:) ) / dt
-          dhs_dt(:) = ( vsno(:) - dhi_dt(:) ) / dt
+          dhs_dt(:) = ( vsno(:) - dhs_dt(:) ) / dt
          
           ! clean up, update tendency diagnostics
     
@@ -1294,7 +1305,7 @@ submodule (icedrv_main) icedrv_step
           ! get ready for coupling and the next time step
           !-----------------------------------------------------------------
     
-          call coupling_prep (dt)
+          call coupling_prep (ice, dt)
 
           !-----------------------------------------------------------------
           ! icepack timing

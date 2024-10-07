@@ -25,7 +25,7 @@
                     ! Subroutines
                     set_icepack, alloc_icepack, init_icepack, step_icepack, &
                     icepack_to_fesom, icepack_to_fesom_single_point,        &
-                    init_flux_atm_ocn, init_io_icepack, init_restart_icepack
+                    init_flux_atm_ocn, ini_icepack_io , ini_mean_icepack_io
     
           !=======================================================================
 !--------- Everything else is private
@@ -883,19 +883,22 @@
               end subroutine step_icepack
 
               ! Initialize output
-              module subroutine init_io_icepack(mesh)
+              module subroutine ini_mean_icepack_io(mesh)
                   use mod_mesh
                   implicit none
                   type(t_mesh), intent(in), target :: mesh
-              end subroutine init_io_icepack
+              end subroutine ini_mean_icepack_io
 
               ! Initialize restart
-              module subroutine init_restart_icepack(year, mesh)
+              module subroutine ini_icepack_io(year, partit, mesh)
                   use mod_mesh
+                  use mod_partit
+                  use mod_parsup
                   implicit none
-                  type(t_mesh), intent(in), target     :: mesh
-                  integer(kind=int_kind),  intent(in) :: year
-              end subroutine init_restart_icepack
+                  type(t_mesh),           intent(in)   , target :: mesh
+                  type(t_partit),         intent(inout), target :: partit
+                  integer(kind=int_kind), intent(in)            :: year
+              end subroutine ini_icepack_io
 
               ! Cut off Icepack
               module subroutine cut_off_icepack

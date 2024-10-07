@@ -18,7 +18,11 @@
  
       contains
 
-      module subroutine init_io_icepack(mesh)
+    !
+    !
+    !_________________________________________________________________________
+    ! define mean IO output of icepack 
+    module subroutine ini_mean_icepack_io(mesh)
 
           use mod_mesh
           use io_meandata,      only: def_stream3D, def_stream2D 
@@ -269,32 +273,33 @@
              end select
           end do
 
-      end subroutine init_io_icepack
+    end subroutine ini_mean_icepack_io
 
     !
-    !--------------------------------------------------------------------------------------------
     !
-    
-    module subroutine init_restart_icepack(year, mesh)
+    !___________________________________________________________________________
+    ! define mean IO output of icepack 
+    module subroutine ini_icepack_io(year, partit, mesh)
         
         use mod_mesh
+        use mod_partit
+        use mod_parsup
         use g_config,     only: runid, ResultPath
-        use io_restart,   only: ip_id, def_variable_2d, def_dim
+        use io_restart,   only: icepack_files, icepack_path
     
         implicit none
     
-        type(t_mesh), target, intent(in) :: mesh
-    
-        integer, intent(in)       :: year
-        integer (kind=int_kind)   :: ncid
+        type(t_mesh)  , intent(in)   , target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        integer       , intent(in)            :: year
+        logical       , save                  :: has_been_called = .false.
+        
         integer (kind=int_kind)   :: i, j, k, iblk, &     ! counting indices
                                      nt_Tsfc, nt_sice, nt_qice, nt_qsno,    &
                                      nt_apnd, nt_hpnd, nt_ipnd, nt_alvl,    &
                                      nt_vlvl, nt_iage, nt_FY,   nt_aero,    &
                                      ktherm,  nt_fbri
-        integer (kind=int_kind)   :: varid
         character(500)            :: longname
-        character(500)            :: filename
         character(500)            :: trname, units
         character(4)              :: cyear
     
@@ -341,68 +346,57 @@
         write(cyear,'(i4)') year
         ! Create an icepack restart file
         ! Only serial output implemented so far
-        ip_id%filename=trim(ResultPath)//trim(runid)//'.'//cyear//'.icepack.restart.nc'
-        if (ip_id%is_in_use) return
-        ip_id%is_in_use=.true.
-      
-        ! Define the dimensions of the netCDF file
-        !
-        ! Note that at the moment FESOM2 supports only 3D output and restart (very
-        ! suboptimal). The different ice layers are thus splitted in different arrays
-        ! and
-        ! reconstructed after the restart. Multidimensional variables would solve
-        ! this.
-      
-        call def_dim(ip_id, 'node',  nod2D)    ! Number of nodes
-        call def_dim(ip_id, 'ncat',  ncat)     ! Number of thickness classes
-      
+        icepack_path=trim(ResultPath)//trim(runid)//'.'//cyear//'.icepack.restart.nc'
+        
+        if(has_been_called) return
+        has_been_called = .true.
+        
         ! Define the netCDF variables for surface
         ! and vertically constant fields
       
         !-----------------------------------------------------------------
         ! 3D restart fields (ncat)
         !-----------------------------------------------------------------
-      
-        call def_variable_2d(ip_id, 'aicen',  (/nod2D, ncat/), 'sea ice concentration',       'none', aicen(:,:));
-        call def_variable_2d(ip_id, 'vicen',  (/nod2D, ncat/), 'volum per unit area of ice',  'm',    vicen(:,:));
-        call def_variable_2d(ip_id, 'vsnon',  (/nod2D, ncat/), 'volum per unit area of snow', 'm',    vsnon(:,:));
-        call def_variable_2d(ip_id, 'Tsfc',   (/nod2D, ncat/), 'sea ice surf. temperature',   'degC', trcrn(:,nt_Tsfc,:));
+        call icepack_files%def_node_var('aicen'     , 'sea ice concentration'                       , 'none', aicen(:,:)        , ncat, mesh, partit)
+        call icepack_files%def_node_var('vicen'     , 'volum per unit area of ice'                  , 'm'   , vicen(:,:)        , ncat, mesh, partit)
+        call icepack_files%def_node_var('vsnon'     , 'volum per unit area of snow'                 , 'm'   , vsnon(:,:)        , ncat, mesh, partit)
+        call icepack_files%def_node_var('Tsfc'      ,  'sea ice surf. temperature'                  , 'degC', trcrn(:,nt_Tsfc,:), ncat, mesh, partit)
       
         if (tr_iage) then
-            call def_variable_2d(ip_id, 'iage',  (/nod2D, ncat/), 'sea ice age', 's', trcrn(:,nt_iage,:));
+            call icepack_files%def_node_var('iage'  , 'sea ice age'                                 , 's'   , trcrn(:,nt_iage,:), ncat, mesh, partit)
         end if
       
         if (tr_FY) then
-            call def_variable_2d(ip_id, 'FY',  (/nod2D, ncat/), 'first year ice', 'none', trcrn(:,nt_FY,:));
+            call icepack_files%def_node_var('FY'    , 'first year ice'                              , 'none', trcrn(:,nt_FY,:)  , ncat, mesh, partit)
         end if
       
         if (tr_lvl) then
-            call def_variable_2d(ip_id, 'alvl',  (/nod2D, ncat/), 'ridged sea ice area',   'none', trcrn(:,nt_alvl,:));
-            call def_variable_2d(ip_id, 'vlvl',  (/nod2D, ncat/), 'ridged sea ice volume', 'm',    trcrn(:,nt_vlvl,:));
+            call icepack_files%def_node_var('alvl'  , 'ridged sea ice area'                         , 'none', trcrn(:,nt_alvl,:), ncat, mesh, partit)
+            call icepack_files%def_node_var('vlvl'  , 'ridged sea ice volume'                       , 'm'   , trcrn(:,nt_vlvl,:), ncat, mesh, partit)
         end if
       
         if (tr_pond_cesm) then
-            call def_variable_2d(ip_id, 'apnd',  (/nod2D, ncat/), 'melt pond area fraction', 'none', trcrn(:,nt_apnd,:));
-            call def_variable_2d(ip_id, 'hpnd',  (/nod2D, ncat/), 'melt pond depth',         'm',    trcrn(:,nt_hpnd,:));
+            call icepack_files%def_node_var('apnd'  , 'melt pond area fraction'                     , 'none', trcrn(:,nt_apnd,:), ncat, mesh, partit)
+            call icepack_files%def_node_var('hpnd'  , 'melt pond depth'                             , 'm'   , trcrn(:,nt_hpnd,:), ncat, mesh, partit)
         end if
       
         if (tr_pond_topo) then
-            call def_variable_2d(ip_id, 'apnd',  (/nod2D, ncat/), 'melt pond area fraction',  'none', trcrn(:,nt_apnd,:));
-            call def_variable_2d(ip_id, 'hpnd',  (/nod2D, ncat/), 'melt pond depth',          'm',    trcrn(:,nt_hpnd,:));
-            call def_variable_2d(ip_id, 'ipnd',  (/nod2D, ncat/), 'melt pond refrozen lid thickness', 'm',    trcrn(:,nt_ipnd,:));
+            call icepack_files%def_node_var('apnd'  , 'melt pond area fraction'                     , 'none', trcrn(:,nt_apnd,:), ncat, mesh, partit)
+            call icepack_files%def_node_var('hpnd'  , 'melt pond depth'                             , 'm'   , trcrn(:,nt_hpnd,:), ncat, mesh, partit)
+            call icepack_files%def_node_var('ipnd'  , 'melt pond refrozen lid thickness'            , 'm'   , trcrn(:,nt_ipnd,:), ncat, mesh, partit)
         end if
       
         if (tr_pond_lvl) then
-            call def_variable_2d(ip_id, 'apnd',    (/nod2D, ncat/), 'melt pond area fraction', 'none', trcrn(:,nt_apnd,:));
-            call def_variable_2d(ip_id, 'hpnd',    (/nod2D, ncat/), 'melt pond depth',         'm',    trcrn(:,nt_hpnd,:));
-            call def_variable_2d(ip_id, 'ipnd',    (/nod2D, ncat/), 'melt pond refrozen lid thickness', 'm',    trcrn(:,nt_ipnd,:));
-            call def_variable_2d(ip_id, 'ffracn',  (/nod2D, ncat/), 'fraction of fsurfn over pond used to melt ipond',   'none', ffracn);
-            call def_variable_2d(ip_id, 'dhsn',    (/nod2D, ncat/), 'depth difference for snow on sea ice and pond ice', 'm',    dhsn);
+            call icepack_files%def_node_var('apnd'  , 'melt pond area fraction'                     , 'none', trcrn(:,nt_apnd,:), ncat, mesh, partit)
+            call icepack_files%def_node_var('hpnd'  , 'melt pond depth'                             , 'm'   , trcrn(:,nt_hpnd,:), ncat, mesh, partit)
+            call icepack_files%def_node_var('ipnd'  , 'melt pond refrozen lid thickness'            , 'm'   , trcrn(:,nt_ipnd,:), ncat, mesh, partit)
+            call icepack_files%def_node_var('ffracn', 'fraction of fsurfn over pond used to melt ipond'     , 'none', ffracn, mesh, partit);
+            call icepack_files%def_node_var('dhsn'  ,  'depth difference for snow on sea ice and pond ice'  ,  'm'  , dhsn  , mesh, partit);
         end if
       
         if (tr_brine) then
-            call def_variable_2d(ip_id, 'fbri',       (/nod2D, ncat/), 'volume fraction of ice with dynamic salt', 'none',    trcrn(:,nt_fbri,:));
-            call def_variable_2d(ip_id, 'first_ice',  (/nod2D, ncat/), 'distinguishes ice that disappears',        'logical', first_ice_real(:,:));
+            call icepack_files%def_node_var('fbri'  ,     'volume fraction of ice with dynamic salt', 'none', trcrn(:,nt_fbri,:), ncat, mesh, partit)
+            call icepack_files%def_node_var('first_ice', 'distinguishes ice that disappears'        , 'logical', first_ice_real(:,:), ncat, mesh, partit)
         end if
       
         !-----------------------------------------------------------------
@@ -415,11 +409,11 @@
            write(trname,'(A6,i1)') 'sicen_', k
            write(longname,'(A21,i1)') 'sea ice salinity lyr:', k
            units='psu'
-           call def_variable_2d(ip_id, trim(trname), (/nod2D, ncat/), trim(longname), trim(units), trcrn(:,nt_sice+k-1,:));
+           call icepack_files%def_node_var(trim(trname), trim(longname), trim(units), trcrn(:,nt_sice+k-1,:), ncat, mesh, partit)
            write(trname,'(A6,i1)') 'qicen_', k
            write(longname,'(A21,i1)') 'sea ice enthalpy lyr:', k
            units='J/m3'
-           call def_variable_2d(ip_id, trim(trname), (/nod2D, ncat/), trim(longname), trim(units), trcrn(:,nt_qice+k-1,:));
+           call icepack_files%def_node_var(trim(trname), trim(longname), trim(units), trcrn(:,nt_qice+k-1,:), ncat, mesh, partit)
         end do
       
         ! Snow
@@ -428,7 +422,7 @@
            write(trname,'(A6,i1)') 'qsnon_', k
            write(longname,'(A18,i1)') 'snow enthalpy lyr:', k
            units='J/m3'
-           call def_variable_2d(ip_id, trim(trname), (/nod2D, ncat/), trim(longname), trim(units), trcrn(:,nt_qsno+k-1,:));
+           call icepack_files%def_node_var(trim(trname), trim(longname), trim(units), trcrn(:,nt_qsno+k-1,:), ncat, mesh, partit)
         end do
       
         !
@@ -438,6 +432,6 @@
         ! enough to use these options. Lorenzo Zampieri - 16/10/2019.
         !
       
-    end subroutine init_restart_icepack
+    end subroutine ini_icepack_io
 
-    end submodule icedrv_io
+end submodule icedrv_io
