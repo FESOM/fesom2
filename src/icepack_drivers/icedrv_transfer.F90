@@ -188,7 +188,8 @@
                                           fhocn_tot_out, fresh_tot_out,    &
                                           strocnxT_out,  strocnyT_out,     &
                                           dhs_dt_out,    dhi_dt_out,       &
-                                          fsalt_out,     evap_ocn_out      )
+                                          fsalt_out,     evap_ocn_out,     &
+                                          evap_out)
 
           implicit none
 
@@ -206,7 +207,8 @@
              fsalt_out,     &
              dhs_dt_out,    &
              dhi_dt_out,    &
-             evap_ocn_out
+             evap_ocn_out,  &
+             evap_out
 
           character(len=*),parameter :: subname='(icepack_to_fesom)'   
 
@@ -222,6 +224,7 @@
           if (present(dhs_dt_out)            ) dhs_dt_out       = dhs_dt
           if (present(fsalt_out)             ) fsalt_out        = fsalt
           if (present(evap_ocn_out)          ) evap_ocn_out     = evap_ocn
+          if (present(evap_ocn_out)          ) evap_out         = evap
 
       end subroutine icepack_to_fesom
 

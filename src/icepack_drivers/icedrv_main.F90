@@ -820,7 +820,8 @@
                                           fhocn_tot_out, fresh_tot_out,    &
                                           strocnxT_out,  strocnyT_out,     &
                                           dhs_dt_out,    dhi_dt_out,       &
-                                          fsalt_out,     evap_ocn_out      )
+                                          fsalt_out,     evap_ocn_out,     &
+                                          evap_out                         )
                   use mod_mesh
                   implicit none        
                   integer (kind=int_kind), intent(in) :: &
@@ -836,7 +837,8 @@
                      fsalt_out,     &
                      dhs_dt_out,    &
                      dhi_dt_out,    &
-                     evap_ocn_out
+                     evap_ocn_out,  &
+                     evap_out
               end subroutine icepack_to_fesom
 
               ! Copy variables from icepack to fesom (single node or element)

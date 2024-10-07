@@ -362,16 +362,22 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
                            fhocn_tot_out=net_heat_flux,    &
                            fresh_tot_out=fresh_wa_flux,    &
                            fsalt_out=real_salt_flux,       &
-                           dhi_dt_out=thdgrsn,             &
-                           dhs_dt_out=thdgr,               &
-                           evap_ocn_out=evaporation        )
+                           dhs_dt_out=thdgrsn,             &
+                           dhi_dt_out=thdgr,               &
+                           evap_ocn_out=evaporation,       &
+                           evap_out=ice_sublimation        )
 
-    heat_flux(:)   = - net_heat_flux(:)
-    water_flux(:)  = - (fresh_wa_flux(:)/1000.0_WP) - runoff(:)
+    ! Heat flux 
+    heat_flux       = - net_heat_flux
 
-    ! Evaporation
-    evaporation(:) = - evaporation(:) / 1000.0_WP
-    ice_sublimation(:) = 0.0_WP
+    ! Freshwater flux (convert units from icepack to fesom)
+    water_flux      = - (fresh_wa_flux * inv_rhowat) - runoff(:)
+
+    ! Evaporation (convert units from icepack to fesom)
+    evaporation     = - evaporation * (1.0_WP - a_ice) * inv_rhowat
+
+    ! Ice-Sublimation is not added to evap in icepack 
+    ice_sublimation = 0.0_WP
 
     call init_flux_atm_ocn()
 
@@ -509,12 +515,21 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     ! enforce the total freshwater/salt flux be zero
     ! 1. water flux ! if (.not. use_virt_salt) can be used!
     ! we conserve only the fluxes from the database plus evaporation.
+    ! ICEPACK: adds rain, snow and evap is based on the newly formed ice 
+    !          concentration (a_ice). In our standard ice model rain, snow and evap is
+    !          added based on the ice concentration of the previous time step (a_ice_old)  
+    !          So for the proper balancing of snow the proper aice has to be choosen 
 !$OMP PARALLEL DO
     do n=1, myDim_nod2D+eDim_nod2D
         flux(n) = evaporation(n)                      &
                   -ice_sublimation(n)                 & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
                   +prec_rain(n)                       &
+#if defined (__icepack)
+                  +prec_snow(n)*(1.0_WP-a_ice(n))     &
+#else
                   +prec_snow(n)*(1.0_WP-a_ice_old(n)) &
+#endif
+
 #if defined (__oasis) || defined (__ifsinterface)
                   +residualifwflx(n)                  & ! balance residual ice flux only in coupled case
 #endif
