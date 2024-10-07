@@ -798,7 +798,7 @@ type(t_partit), intent(inout), target :: partit
      end do
 !$OMP END DO
 !$OMP END PARALLEL
-     if((area_ib_tot > elem_area_tmp) .and. (elem_area_tmp > 0.0)) then
+     if((area_ib_tot > elem_area_tmp) .and. (elem_area_tmp > 0.0) .and. (old_element.ne.0)) then
          if(mype==pe_block_red(ib) .and. lverbose_icb) then
             write(*,*) " *******************************************************"
             write(*,*) " * iceberg changed PE and saturation"
