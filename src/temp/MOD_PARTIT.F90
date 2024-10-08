@@ -5,9 +5,9 @@ USE O_PARAM
 USE, intrinsic :: ISO_FORTRAN_ENV
 USE MOD_WRITE_BINARY_ARRAYS
 USE MOD_READ_BINARY_ARRAYS
-USE mpi
 IMPLICIT NONE
 SAVE
+include 'mpif.h'
 integer, parameter   :: MAX_LAENDERECK=16
 integer, parameter   :: MAX_NEIGHBOR_PARTITIONS=32
 
