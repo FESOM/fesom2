@@ -16,6 +16,7 @@ module cpl_driver
   use g_config, only : dt, use_icebergs, lwiso
   use o_param,  only : rad
   USE MOD_PARTIT
+  use mpi
   implicit none
   save   
   !
