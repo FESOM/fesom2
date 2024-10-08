@@ -9,6 +9,44 @@ MODULE nemogcmcoup_steps
    INTEGER :: substeps !per IFS timestep
 END MODULE nemogcmcoup_steps
 
+SUBROUTINE nemogcmcoup_init_ioserver( icomm, lnemoioserver, irequired, iprovided, lmpi1)
+
+    ! Initialize the NEMO mppio server
+    USE mpp_io
+ 
+    IMPLICIT NONE
+    INTEGER :: icomm
+    LOGICAL :: lnemoioserver
+    INTEGER :: irequired, iprovided
+    LOGICAL :: lmpi1
+ 
+    CALL mpp_io_init(icomm, lnemoioserver,  irequired, iprovided, lmpi1)
+END SUBROUTINE nemogcmcoup_init_ioserver
+ 
+ 
+SUBROUTINE nemogcmcoup_init_ioserver_2( icomm )
+    ! Initialize the NEMO mppio server
+    USE mpp_io
+ 
+    IMPLICIT NONE
+    INTEGER :: icomm
+    
+    CALL mpp_io_init_2( icomm )
+    IF (lioserver) THEN
+        ! IO server finished, clean-up multio objects
+        CALL mpp_stop()
+    ENDIF
+END SUBROUTINE nemogcmcoup_init_ioserver_2
+
+SUBROUTINE nemogcmcoup_end_ioserver
+    ! Function is only called for the IO client.
+    USE mpp_io
+
+    IMPLICIT NONE
+
+    CALL mpp_stop()
+END SUBROUTINE nemogcmcoup_end_ioserver
+
 SUBROUTINE nemogcmcoup_init( mype, icomm, inidate, initime, itini, itend, zstp, &
    & lwaveonly, iatmunit, lwrite )
 
@@ -420,67 +458,79 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    ! =================================================================== !
    ! Pack SST data and convert to K. 'pgsst' is on Gauss grid.
    nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
    DO n=1,myDim_nod2D
       zsendnf(n,nfield)=fesom%tracers%DATA(1)%values(1, n) +tmelt ! sea surface temperature [K], 
 							 ! (1=surface, n=node, data(1/2)=T/S)
    ENDDO
-
+!$OMP END PARALLEL DO
    ! =================================================================== !
    ! Pack ice fraction data [0..1]
    nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
    DO n=1,myDim_nod2D
       zsendnf(n,nfield)=a_ice(n)
    ENDDO
-   
+!$OMP END PARALLEL DO
    ! =================================================================== !
    ! Pack ice temperature data (already in K)
    nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
    DO n=1,myDim_nod2D
       zsendnf(n,nfield)=ice_temp(n)
    ENDDO
-
+!$OMP END PARALLEL DO
    ! =================================================================== !
    ! Pack ice albedo data and interpolate: 'pgalb' on Gaussian grid.
    nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
    DO n=1,myDim_nod2D
       zsendnf(n,nfield)=ice_alb(n)
    ENDDO
-
+!$OMP END PARALLEL DO
    ! =================================================================== !
    ! Pack ice thickness data and interpolate: 'pghic' on Gaussian grid.
    nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
    DO n=1,myDim_nod2D
       zsendnf(n,nfield)=m_ice(n)!/MAX(a_ice(n),0.01) ! ice thickness (mean over ice)
    ENDDO
-   
+!$OMP END PARALLEL DO
    ! =================================================================== !
    ! Pack snow thickness data and interpolate: 'pghsn' on Gaussian grid.
    nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
    DO n=1,myDim_nod2D
       zsendnf(n,nfield)=m_snow(n)!/MAX(a_ice(n),0.01) ! snow thickness (mean over ice)
    ENDDO
-
+!$OMP END PARALLEL DO
    ! =================================================================== !
    ! Pack U surface currents; need to be rotated to geographical grid
    nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
    DO n=1,myDim_nod2D
       zsendnf(n,nfield)=fesom%dynamics%uvnode(1,1,n) ! (u/v,level,nod2D)
    ENDDO
-
+!$OMP END PARALLEL DO
    ! =================================================================== !
    ! Pack V surface currents; need to be rotated to geographical grid
    nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
    DO n=1,myDim_nod2D
       zsendnf(n,nfield)=fesom%dynamics%uvnode(2,1,n) ! (u/v,level,nod2D)
    ENDDO
-
+!$OMP END PARALLEL DO
    ! Rotate vectors (U,V) to geographical coordinates (r2g)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, rlon, rlat)
+!$OMP DO
    DO n=1,myDim_nod2D
       rlon=coord_nod2D(1,n)
       rlat=coord_nod2D(2,n)
       CALL vector_r2g(zsendnf(n,nfield-1), zsendnf(n,nfield), rlon, rlat, 0) ! 0-flag for rot. coord
    ENDDO
-
+!$OMP END DO
+!$OMP BARRIER
+!$OMP END PARALLEL
    ! =================================================================== !
    ! Interpolate all fields
    IF (lparintmultatm) THEN
@@ -495,90 +545,75 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
       ENDDO
    ENDIF
 
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nfield)
    nfield = 0
    ! =================================================================== !
    ! Unpack 'pgsst' on Gauss.
    ! zsend(:)=a_ice(:)
    nfield = nfield + 1
-   pgsst(:) = zrecvnf(:,nfield)
+!$OMP DO
+   do n=1, nopoints
+      pgsst(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END DO
    !
    ! =================================================================== !
    ! Unpack 'pgifr' on Gauss.
    ! zsend(:)=a_ice(:)
    nfield = nfield + 1
-   pgifr(:) = zrecvnf(:,nfield)
+!$OMP DO
+   do n=1, nopoints
+      pgifr(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END DO
    !
    ! =================================================================== !
    ! Unpack ice temperature data (already in K)
    nfield = nfield + 1
-   pgist(:) = zrecvnf(:,nfield)
-
+!$OMP DO
+   do n=1, nopoints
+      pgist(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END DO
    ! =================================================================== !
    ! Unpack ice albedo data pgalb on Gaussian grid.
    nfield = nfield + 1
-   pgalb(:) = zrecvnf(:,nfield)
-
+!$OMP DO
+   do n=1, nopoints
+      pgalb(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END DO
    ! =================================================================== !
    ! Unpack ice thickness data pghic on Gaussian grid.
    nfield = nfield + 1
-   pghic(:) = zrecvnf(:,nfield)
-
+!$OMP DO
+   do n=1, nopoints
+      pghic(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END DO
    ! =================================================================== !
    ! Unpack snow thickness data pghsn on Gaussian grid.
    nfield = nfield + 1
-   pghsn(:) = zrecvnf(:,nfield)
-
+!$OMP DO
+   do n=1, nopoints
+      pghsn(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END DO
    ! =================================================================== !
    ! Unpack surface currents data pgucur/pgvcur on Gaussian grid.
    nfield = nfield + 1
-   pgucur(:) = zrecvnf(:,nfield)
+!$OMP DO
+   do n=1, nopoints
+      pgucur(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END DO
    nfield = nfield + 1
-   pgvcur(:) = zrecvnf(:,nfield)
-
-   ! Pack u(v) surface currents on elements
-   !zsendnfUV(:,1)=fesom%dynamics%UV(1,1,1:myDim_elem2D)
-   !zsendnfUV(:,2)=fesom%dynamics%UV(2,1,1:myDim_elem2D) !UV includes eDim, leave those away here
-   !nfielduv = 2
-   !
-   !do elem=1, myDim_elem2D
-   !
-   !   ! compute element midpoints
-   !   elnodes=elem2D_nodes(:,elem)
-   !   rlon=sum(coord_nod2D(1,elnodes))/3.0_wpIFS
-   !   rlat=sum(coord_nod2D(2,elnodes))/3.0_wpIFS
-   !
-   !   ! Rotate vectors to geographical coordinates (r2g)
-   !   CALL vector_r2g(zsendnfUV(elem,1), zsendnfUV(elem,2), rlon, rlat, 0) ! 0-flag for rot. coord
-   !
-   !end do
-   
-#ifdef FESOM_TODO
-
-   ! We need to sort out the non-unique global index before we
-   ! can couple currents
-
-   ! Interpolate: 'pgucur' and 'pgvcur' on Gaussian grid.
-   IF (lparintmultatm) THEN
-      CALL parinter_fld_mult( nfielduv, mype, npes, icomm, UVtogauss, &
-         &                    myDim_nod2D, zsendnfUV, &
-         &                    nopoints, zrecvnfUV )
-   ELSE
-      DO jf = 1, nfielduv
-         CALL parinter_fld( mype, npes, icomm, UVtogauss, &
-            &               myDim_nod2D, zsendnfUV(:,jf), &
-            &               nopoints, zrecvnfUV(:,jf) )
-      ENDDO
-   ENDIF
-   pgucur(:) = zrecvnfUV(:,1)
-   pgvcur(:) = zrecvnfUV(:,2)
-   
-#else
-
-   !pgucur(:) = 0.0
-   !pgvcur(:) = 0.0
-
-#endif
-
+!$OMP DO
+   do n=1, nopoints
+      pgvcur(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END DO
+!$OMP END PARALLEL
 END SUBROUTINE nemogcmcoup_lim2_get
 
 
@@ -613,7 +648,7 @@ SUBROUTINE nemogcmcoup_exflds_get( mype, npes, icomm, &
    INTEGER , PARAMETER :: maxnfield = 6
    INTEGER :: nfield = 0
    REAL(wpIFS), DIMENSION(fesom%partit%myDim_nod2D,maxnfield)  :: zsendnf
-   REAL(wpIFS), DIMENSION(nopoints,maxnfield)  :: zrecvnf	
+   REAL(wpIFS), DIMENSION(nopoints,maxnfield)  :: zrecvnf
    real(kind=wpIFS), dimension(:,:), pointer :: coord_nod2D
    integer, pointer :: myDim_nod2D, eDim_nod2D
 
@@ -625,70 +660,83 @@ SUBROUTINE nemogcmcoup_exflds_get( mype, npes, icomm, &
    myDim_nod2D  => fesom%partit%myDim_nod2D
    eDim_nod2D   => fesom%partit%eDim_nod2D
    coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => fesom%mesh%coord_nod2D   
-   
 
    nfield = 0
    ! =================================================================== !
    ! Pack SSH data 'pgssh' is on Gauss grid.
    nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
    DO n=1,myDim_nod2D
       zsendnf(n,nfield)=fesom%dynamics%eta_n(n)  ! in meters
    ENDDO
-
+!$OMP END PARALLEL DO
    ! =================================================================== !
    ! Pack MLD data
    nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
    DO n=1,myDim_nod2D
       zsendnf(n,nfield)=-MLD1(n) ! depth at which the density over depth differs 
         			 ! by 0.125 sigma units from the surface density (Griffies et al., 2009)
    ENDDO
-   
+!$OMP END PARALLEL DO
    ! =================================================================== !
    ! Pack depth of 20C isotherm
    nfield = nfield + 1
-   if (ldiag_extflds) then 
-     DO n=1,myDim_nod2D
-      zsendnf(n,nfield)=zisotherm(n) ! extra diagnostics active
-     ENDDO
+   if (ldiag_extflds) then
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+      DO n=1,myDim_nod2D
+         zsendnf(n,nfield)=zisotherm(n) ! extra diagnostics active
+      ENDDO
+!$OMP END PARALLEL DO
    else
-     DO n=1,myDim_nod2D
-      zsendnf(n,nfield)=-1. ! set to -1 as placeholder
-     ENDDO
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+      DO n=1,myDim_nod2D
+         zsendnf(n,nfield)=-1. ! set to -1 as placeholder
+      ENDDO
+!$OMP END PARALLEL DO
    end if
 
    ! =================================================================== !
    ! Pack sea surface salinity data: 'pgsss' on Gaussian grid.
    nfield = nfield + 1
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
    DO n=1,myDim_nod2D
       zsendnf(n,nfield)=fesom%tracers%data(2)%values(1,n) ! in psu
    ENDDO
-
+!$OMP END PARALLEL DO
    ! =================================================================== !
    ! Pack average temp over upper 300m: 'pgtem300' on Gaussian grid.
    nfield = nfield + 1
    if (ldiag_extflds) then
-     DO n=1,myDim_nod2D
-      zsendnf(n,nfield)=tempzavg(n) ! extra diagnostic active
-     ENDDO
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+      DO n=1,myDim_nod2D
+         zsendnf(n,nfield)=tempzavg(n) ! extra diagnostic active
+      ENDDO
+!$OMP END PARALLEL DO
    else
-     DO n=1,myDim_nod2D
-      zsendnf(n,nfield)=-1. ! set to -1 as placeholder
-     ENDDO
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+      DO n=1,myDim_nod2D
+         zsendnf(n,nfield)=-1. ! set to -1 as placeholder
+      ENDDO
+!$OMP END PARALLEL DO
    end if
 
    ! =================================================================== !
    ! Pack average salinity over upper 300m: 'pgsal300' on Gaussian grid.
    nfield = nfield + 1
    if (ldiag_extflds) then
-     DO n=1,myDim_nod2D
-      zsendnf(n,nfield)=saltzavg(n) ! extra diagnostic active
-     ENDDO
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+      DO n=1,myDim_nod2D
+         zsendnf(n,nfield)=saltzavg(n) ! extra diagnostic active
+      ENDDO
+!$OMP END PARALLEL DO
    else
-     DO n=1,myDim_nod2D
-      zsendnf(n,nfield)=-1. ! set to -1 as placeholder
-     ENDDO
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+      DO n=1,myDim_nod2D
+         zsendnf(n,nfield)=-1. ! set to -1 as placeholder
+      ENDDO
+!$OMP END PARALLEL DO
    end if
-
    ! =================================================================== !
    ! Interpolate all fields
    IF (lparintmultatm) THEN
@@ -702,39 +750,57 @@ SUBROUTINE nemogcmcoup_exflds_get( mype, npes, icomm, &
             &               nopoints, zrecvnf(:,jf) )
       ENDDO
    ENDIF
-
    nfield = 0
    ! =================================================================== !
    ! Unpack 'pgssh' on Gauss.
    nfield = nfield + 1
-   pgssh(:) = zrecvnf(:,nfield)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, nopoints
+      pgssh(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END PARALLEL DO
    !
    ! =================================================================== !
    ! Unpack 'pgmld' on Gauss.
    nfield = nfield + 1
-   pgmld(:) = zrecvnf(:,nfield)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, nopoints
+      pgmld(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END PARALLEL DO
    !
    ! =================================================================== !
    ! Unpack depth of 20C isotherm data
    nfield = nfield + 1
-   pg20d(:) = zrecvnf(:,nfield)
-
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, nopoints
+      pg20d(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END PARALLEL DO
    ! =================================================================== !
    ! Unpack sea surface salinity pgsss on Gaussian grid.
    nfield = nfield + 1
-   pgsss(:) = zrecvnf(:,nfield)
-
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, nopoints
+      pgsss(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END PARALLEL DO
    ! =================================================================== !
    ! Unpack average temp over upper 300m pgtem300 on Gaussian grid.
    nfield = nfield + 1
-   pgtem300(:) = zrecvnf(:,nfield)
-
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, nopoints
+      pgtem300(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END PARALLEL DO
    ! =================================================================== !
    ! Unpack average salinity over upper 300m on Gaussian grid.
    nfield = nfield + 1
-   pgsal300(:) = zrecvnf(:,nfield)
-
-
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, nopoints
+      pgsal300(n) = zrecvnf(n,nfield)
+   end do
+!$OMP END PARALLEL DO
 END SUBROUTINE nemogcmcoup_exflds_get
 
 
@@ -820,34 +886,32 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    enthalpyoffuse     => fesom%ice%atmcoupl%enthalpyoffuse(:)
    ! =================================================================== !
    ! Sort out incoming arrays from the IFS and put them on the ocean grid
-
    ! TODO
-   shortwave(:)=0.	! Done, updated below. What to do with shortwave over ice??
-   !longwave(:)=0.	! Done. Only used in stand-alone mode.
-   prec_rain(:)=0. 	! Done, updated below.
-   prec_snow(:)=0.	! Done, updated below.
-   evap_no_ifrac=0.	! Done, updated below. This is evap over ocean, does this correspond to evap_tot?
-   sublimation=0.	! Done, updated below. 
-   !
-   ice_heat_flux=0. 	! Done. This is qns__ice currently. Is this the non-solar heat flux?    !   non solar heat fluxes below  !  (qns)
-   oce_heat_flux=0. 	! Done. This is qns__oce currently. Is this the non-solar heat flux?
-   !
-   !runoff(:)=0.		! not used apparently. What is runoffIN, ocerunoff?
-   !evaporation(:)=0.
-   !ice_thermo_cpl.F90:  !---- total evaporation (needed in oce_salt_balance.F90)
-   !ice_thermo_cpl.F90:  evaporation = evap_no_ifrac*(1.-a_ice) + sublimation*a_ice
-   stress_atmice_x=0.   ! Done, taux_ice
-   stress_atmice_y=0.   ! Done, tauy_ice
-   stress_atmoce_x=0.   ! Done, taux_oce
-   stress_atmoce_y=0.   ! Done, tauy_oce
-
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   DO n=1,myDim_nod2D+eDim_nod2D
+      shortwave(n)      =0.
+      prec_rain(n)      =0.
+      prec_snow(n)      =0.
+      evap_no_ifrac(n)  =0.
+      sublimation(n)    =0.
+      ice_heat_flux(n)  =0.
+      oce_heat_flux(n)  =0.
+      stress_atmice_x(n)=0.
+      stress_atmice_y(n)=0.
+      stress_atmoce_x(n)=0.
+      stress_atmoce_y(n)=0.
+   END DO
+!$OMP END PARALLEL DO
    ! =================================================================== !
    ! Pack all arrays
    nfield = 0
    !1. Ocean solar radiation to T grid
    nfield = nfield + 1
-   zsendnf(:,nfield) = qs___oce(:)
-
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, npoints
+      zsendnf(n,nfield) = qs___oce(n)
+   end do
+!$OMP END PARALLEL DO
    ! =================================================================== !
    !2. Ice solar radiation to T grid
    ! DO NOTHING
@@ -855,13 +919,19 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! =================================================================== !
    !3. Ocean non-solar radiation to T grid (is this non-solar heat flux?)
    nfield = nfield + 1
-   zsendnf(:,nfield) = qns__oce(:)
-
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, npoints
+      zsendnf(n,nfield) = qns__oce(n)
+   end do
+!$OMP END PARALLEL DO
    ! =================================================================== !
    !4. Total flux over sea ice to T grid
    nfield = nfield + 1
-   zsendnf(:,nfield) = qns__ice(:)+qs___ice(:)
-
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, npoints
+      zsendnf(n,nfield) = qns__ice(n)+qs___ice(n)
+   end do
+!$OMP END PARALLEL DO
    ! =================================================================== !
    !5. D(q)/dT to T grid
    ! DO NOTHING
@@ -874,23 +944,35 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    !ice_thermo_cpl.F90:  evaporation = evap_no_ifrac*(1.-a_ice) + sublimation*a_ice
    ! =================================================================== !
    nfield = nfield + 1
-   zsendnf(:,nfield) = evap_tot(:)
-
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, npoints
+      zsendnf(n,nfield) = evap_tot(n)
+   end do
+!$OMP END PARALLEL DO
    ! =================================================================== !
    !7. Sublimation (evaporation over ice) to T grid
    nfield = nfield + 1
-   zsendnf(:,nfield) = evap_ice(:)
-
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, npoints
+      zsendnf(n,nfield) = evap_ice(n)
+   end do
+!$OMP END PARALLEL DO
    ! =================================================================== !
    !8. Interpolate liquid precipitation to T grid
    nfield = nfield + 1
-   zsendnf(:,nfield) = prcp_liq(:)
-
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, npoints
+      zsendnf(n,nfield) = prcp_liq(n)
+   end do
+!$OMP END PARALLEL DO
    ! =================================================================== !
    !9. Interpolate solid precipitation to T grid
    nfield = nfield + 1
-   zsendnf(:,nfield) = prcp_sol(:)
-   
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, npoints
+      zsendnf(n,nfield) = prcp_sol(n)
+   end do
+!$OMP END PARALLEL DO
    ! =================================================================== !
    !10. Interpolate runoff to T grid
    !
@@ -918,22 +1000,36 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
 
    ! =================================================================== !
    ! STRESSES
-
    ! OVER OCEAN:
    nfield = nfield + 1
-   zsendnf(:,nfield) = taux_oce(:)
-
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, npoints
+      zsendnf(n,nfield) = taux_oce(n)
+   end do
+!$OMP END PARALLEL DO
    nfield = nfield + 1
-   zsendnf(:,nfield) = tauy_oce(:)
-
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, npoints
+      zsendnf(n,nfield) = tauy_oce(n)
+   end do
+!$OMP END PARALLEL DO
    ! =================================================================== !
    ! OVER ICE:
    nfield = nfield + 1
-   zsendnf(:,nfield) = taux_ice(:)
-
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+   do n=1, npoints
+      zsendnf(n,nfield) = taux_ice(n)
+   end do
+!$OMP END PARALLEL DO
    nfield = nfield + 1
-   zsendnf(:,nfield) = tauy_ice(:)
-   
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n)
+!$OMP DO
+   do n=1, npoints
+      zsendnf(n,nfield) = tauy_ice(n)
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP END PARALLEL
    ! =================================================================== !
    ! Interpolate arrays
    IF (lparintmultatm) THEN
@@ -947,48 +1043,56 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
             &               zrecvnf(:,jf) )
       ENDDO
    ENDIF
-   
    ! =================================================================== !
    ! Unpack all arrays
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nfield)
    nfield = 0
    ! =================================================================== !
    !1. Unpack ocean solar radiation, without halo
    nfield = nfield + 1
-   shortwave(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)
-
-   ! Do the halo exchange
+!$OMP DO
+   do n=1, myDim_nod2D
+      shortwave(n)=zrecvnf(n,nfield)
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
    call exchange_nod(shortwave,fesom%partit)
-
-
+!$OMP END MASTER
    ! =================================================================== !
    !2. Interpolate ice solar radiation to T grid
    ! DO NOTHING
 
-
    ! =================================================================== !
    !3. Unpack ocean non-solar, without halo
    nfield = nfield + 1
-   oce_heat_flux(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)
-
-   ! Do the halo exchange
+!$OMP DO
+   do n=1, myDim_nod2D
+      oce_heat_flux(n)=zrecvnf(n,nfield)
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
    call exchange_nod(oce_heat_flux,fesom%partit)
-
-
+!$OMP END MASTER
    ! =================================================================== !
    !4. Unpack ice non-solar
    nfield = nfield + 1
-   ice_heat_flux(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)
-   where (a_ice<=1.e-12)
-         ice_heat_flux=0.0
-   end where
-   ! Do the halo exchange
+!$OMP DO
+   do n=1, myDim_nod2D
+      ice_heat_flux(n)=zrecvnf(n, nfield)
+      if (a_ice(n) <= 1.e-12) then
+         ice_heat_flux(n)=0.0
+      end if
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
    call exchange_nod(ice_heat_flux,fesom%partit)
-
-
+!$OMP END MASTER
    ! =================================================================== !
    !5. D(q)/dT to T grid
    ! DO NOTHING
-
 
    ! =================================================================== !
    !6. Unpack total evaporation to T grid
@@ -998,38 +1102,53 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! =================================================================== !
    ! Unpack total evaporation, without halo
    nfield = nfield + 1
-   evap_no_ifrac(1:myDim_nod2D)=-zrecvnf(1:myDim_nod2D,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
-
+!$OMP DO
+   do n=1, myDim_nod2D
+      evap_no_ifrac(n)=-zrecvnf(n,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
+   end do
+!$OMP END DO
    !7. Unpack sublimation (evaporation over ice), without halo
    nfield = nfield + 1
-   sublimation(1:myDim_nod2D)=-zrecvnf(1:myDim_nod2D,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
-
-   ! =================================================================== !
-   sublimation(1:myDim_nod2D)  =sublimation(1:myDim_nod2D)*a_ice(1:myDim_nod2D)     ! sublimation   -> sublimation weighted with A
-   evap_no_ifrac(1:myDim_nod2D)=evap_no_ifrac(1:myDim_nod2D)-sublimation(1:myDim_nod2D)            ! evap_no_ifrac -> evap weighted with (1-A)
-
-   ! Do the halo exchange
+!$OMP DO
+   do n=1, myDim_nod2D
+      sublimation(n)=-zrecvnf(n,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
+   end do
+!$OMP END DO
+!$OMP DO
+   do n=1, myDim_nod2D
+      sublimation(n)  =sublimation(n)*a_ice(n)           ! sublimation   -> sublimation weighted with A
+      evap_no_ifrac(n)=evap_no_ifrac(n)-sublimation(n)   ! evap_no_ifrac -> evap weighted with (1-A)
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
    call exchange_nod(evap_no_ifrac,fesom%partit)
    call exchange_nod(sublimation,  fesom%partit)
-
+!$OMP END MASTER
    ! =================================================================== !
    !8. Unpack liquid precipitation, without halo
    nfield = nfield + 1
-   prec_rain(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s
-   
-   ! Do the halo exchange
+!$OMP DO
+   do n=1, myDim_nod2D
+      prec_rain(n)=zrecvnf(n,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
    call exchange_nod(prec_rain,fesom%partit)
-
-
+!$OMP END MASTER
    ! =================================================================== !
    !9. Unpack solid precipitation, without halo
    nfield = nfield + 1
-   prec_snow(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s
-
-   ! Do the halo exchange
+!$OMP DO
+   do n=1, myDim_nod2D
+      prec_snow(n)=zrecvnf(n,nfield)/rhofwt	! kg m^(-2) s^(-1) -> m/s
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
    call exchange_nod(prec_snow,fesom%partit)
-
-
+!$OMP END MASTER
    ! =================================================================== !
    !10. Interpolate runoff to T grid
    !
@@ -1053,52 +1172,122 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    !12. Interpolate total cloud fractions to T grid (tcc)
    !
    !13. Interpolate low cloud fractions to T grid (lcc)
-
-
    ! =================================================================== !
    ! STRESSES
-
    ! OVER OCEAN:
    nfield = nfield + 1
    ! Unpack x stress atm->oce, without halo; then do halo exchange
-   stress_atmoce_x(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)
+!$OMP DO
+   do n=1, myDim_nod2D
+      stress_atmoce_x(n)=zrecvnf(n,nfield)
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
    call exchange_nod(stress_atmoce_x,fesom%partit)
+!$OMP END MASTER
    !
    ! Unpack y stress atm->oce, without halo; then do halo exchange
    nfield = nfield + 1
-   stress_atmoce_y(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)
+!$OMP DO
+   do n=1, myDim_nod2D
+      stress_atmoce_y(n)=zrecvnf(n,nfield)
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
    call exchange_nod(stress_atmoce_y,fesom%partit)
-
+!$OMP END MASTER
    ! =================================================================== !
    ! OVER ICE:
    ! Unpack x stress atm->ice, without halo; then do halo exchange
    nfield = nfield + 1
-   stress_atmice_x(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)
+!$OMP DO
+   do n=1, myDim_nod2D
+      stress_atmice_x(n)=zrecvnf(n,nfield)
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
    call exchange_nod(stress_atmice_x,fesom%partit)
+!$OMP END MASTER
    !
    ! Unpack y stress atm->ice, without halo; then do halo exchange
    nfield = nfield + 1
-   stress_atmice_y(1:myDim_nod2D)=zrecvnf(1:myDim_nod2D,nfield)
+!$OMP DO
+   do n=1, myDim_nod2D
+      stress_atmice_y(n)=zrecvnf(n,nfield)
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
    call exchange_nod(stress_atmice_y,fesom%partit)
-
-
+!$OMP END MASTER
    ! =================================================================== !
    ! ROTATE VECTORS FROM GEOGRAPHIC TO FESOMS ROTATED GRID
 
    !if ((do_rotate_oce_wind .AND. do_rotate_ice_wind) .AND. rotated_grid) then
+!$OMP DO
    do n=1, myDim_nod2D+eDim_nod2D
 	   call vector_g2r(stress_atmoce_x(n), stress_atmoce_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0) !0-flag for rot. coord.
 	   call vector_g2r(stress_atmice_x(n), stress_atmice_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
    end do
+!$OMP END DO
    !do_rotate_oce_wind=.false.
    !do_rotate_ice_wind=.false.
    !end if
    ! Enthalpy heat of fusion: take heat from the ocean in order to melt the snow that is falling into the ocean
    ! prec_snow*rho [kg/m2/s] * lfus [J/kg] = W/m2
-   enthalpyoffuse(1:myDim_nod2D)= - rhofwt * prec_snow(1:myDim_nod2D) * lfus * 1000.
+!$OMP DO
+   do n=1, myDim_nod2D
+      enthalpyoffuse(n)= - rhofwt * prec_snow(n) * lfus * 1000.
+   end do
+!$OMP END DO
+!$OMP BARRIER
+!$OMP MASTER
    call exchange_nod(enthalpyoffuse, fesom%partit)
+!$OMP END MASTER
+!$OMP END PARALLEL
 END SUBROUTINE nemogcmcoup_lim2_update
 
+subroutine ocean_update_runoff(NBASIN_RUNOFF, BASIN_RUNOFF)
+   !it will be called inside IFS nemo/couplnemo.F90 -> COUPLNEMO
+   USE par_kind !in ifs_modules.F90
+   USE fesom_main_storage_module, only: fesom => f
+   USE MOD_MESH
+   USE MOD_PARTIT
+   USE MOD_PARSUP
+   USE g_forcing_arrays,    only: runoff
+   USE g_sbf,               only: RUNOFF_MAPPER
+   use g_support
+   implicit none
+   INTEGER,          INTENT(IN)    :: NBASIN_RUNOFF
+   REAL(kind=wpIFS), INTENT(INOUT) :: BASIN_RUNOFF(NBASIN_RUNOFF)
+   integer                         :: n, i, j
+   real(kind=WP)                   :: total_runoff
+   logical, save                   :: lfirst=.true.
+   integer                         :: total_number_of_basins=0 ! will be used to check the consistency after first call
+ 
+   if (lfirst) then
+      total_number_of_basins=maxval(RUNOFF_MAPPER%colind)
+      call MPI_Allreduce(MPI_IN_PLACE, total_number_of_basins, 1, MPI_INTEGER, MPI_MAX, fesom%partit%MPI_COMM_FESOM, fesom%partit%MPIerr)
+      if (total_number_of_basins/=NBASIN_RUNOFF) then
+         if (fesom%partit%mype==0) write(*,*) 'mismatch in number of runoff basins between ocean and atmosphere:', total_number_of_basins, NBASIN_RUNOFF
+         if (fesom%partit%mype==0) write(*,*) 'the model will stop!'
+         call par_ex(fesom%partit%MPI_COMM_FESOM, fesom%partit%mype)
+         stop
+      end if
+      lfirst=.false.
+   end if
+   do n=1, fesom%partit%myDim_nod2D+fesom%partit%eDim_nod2D
+      runoff(n)=0.0_WP
+      i=RUNOFF_MAPPER%rowptr(n)
+      j=RUNOFF_MAPPER%rowptr(n+1)-1
+      runoff(n)=sum(RUNOFF_MAPPER%values(i:j)*REAL(BASIN_RUNOFF(RUNOFF_MAPPER%colind(i:j)), WP))
+   end do
+   call integrate_nod(runoff, total_runoff, fesom%partit, fesom%mesh)
+   if (fesom%partit%mype==0) write(*,*) 'total runoff=', total_runoff*1.e-6
+end subroutine ocean_update_runoff
 
 SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )
 

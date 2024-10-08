@@ -842,28 +842,28 @@ end if
  n=com_elem2D_full%sptr(com_elem2D_full%sPEnum+1)-1
  ALLOCATE(com_elem2D_full%slist(n))
  read(fileID,*) com_elem2D_full%slist
-
-!!$ read(fileID,*) com_edge2D%rPEnum
-!!$ ALLOCATE(com_edge2D%rPE(com_edge2D%rPEnum))
-!!$ read(fileID,*) com_edge2D%rPE
-!!$ ALLOCATE(com_edge2D%rptr(com_edge2D%rPEnum+1))
-!!$ read(fileID,*) com_edge2D%rptr
-!!$ ALLOCATE(com_edge2D%rlist(eDim_edge2D))
-!!$ read(fileID,*) com_edge2D%rlist
-!!$	 
-!!$ read(fileID,*) com_edge2D%sPEnum
-!!$ ALLOCATE(com_edge2D%sPE(com_edge2D%sPEnum))
-!!$ read(fileID,*) com_edge2D%sPE
-!!$ ALLOCATE(com_edge2D%sptr(com_edge2D%sPEnum+1))
-!!$ read(fileID,*) com_edge2D%sptr
-!!$ n=com_edge2D%sptr(com_edge2D%sPEnum+1)-1
-!!$ ALLOCATE(com_edge2D%slist(n))
-!!$ read(fileID,*) com_edge2D%slist
  close(fileID)
+
  if (mype==0) write(*,*) 'communication arrays are read'
  deallocate(rbuff, ibuff)
  deallocate(mapping)
- 
+
+! necessary for MULTIO auxuary data:
+! one element might belong to several processes hence we unify the element partition 
+! such that sum(myDim_elem2D_shrinked) over all processors will give elem2D
+ partit%myDim_elem2D_shrinked=0
+ DO n=1, myDim_elem2D
+    if (mesh%elem2D_nodes(1, n) > myDim_nod2D) cycle
+    partit%myDim_elem2D_shrinked=partit%myDim_elem2D_shrinked+1
+ END DO
+ allocate(partit%myInd_elem2D_shrinked(partit%myDim_elem2D_shrinked))
+! fill the respective indicies
+ nn=1
+ DO n=1, myDim_elem2D
+    if (mesh%elem2D_nodes(1, n) > myDim_nod2D) cycle
+    partit%myInd_elem2D_shrinked(nn)=n
+    nn=nn+1
+ END DO
 ! no checksum for now, execute_command_line is failing too often. if you think it is important, please drop me a line and I will try to revive it: jan.hegewald@awi.de
 mesh%representative_checksum = ''
 

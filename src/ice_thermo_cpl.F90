@@ -34,7 +34,7 @@ subroutine thermodynamics(ice, partit, mesh)
   !---- prognostic variables (updated in `ice_growth')
   real(kind=WP)  :: A, h, hsn, alb, t
   !---- atmospheric heat fluxes (provided by ECHAM)
-  real(kind=WP)  :: a2ohf, a2ihf
+  real(kind=WP)  :: a2ohf, a2ihf, qres, qcon
   !---- evaporation and sublimation (provided by ECHAM)
   real(kind=WP)  :: evap, subli
   !---- add residual freshwater flux over ice to freshwater (setted in ice_growth)
@@ -67,12 +67,12 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP), dimension(:)  , pointer :: S_oc_array, T_oc_array, u_w, v_w
   real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
 #if defined (__oifs) || defined (__ifsinterface)
-  real(kind=WP), dimension(:)  , pointer :: ice_temp, ice_alb, enthalpyoffuse
+  real(kind=WP), dimension(:) , pointer  :: ice_temp, ice_alb, enthalpyoffuse, ice_heat_qres, ice_heat_qcon
 #endif
 #if defined (__oasis) || defined (__ifsinterface)
   real(kind=WP), dimension(:)  , pointer ::  oce_heat_flux, ice_heat_flux 
 #endif 
-  real(kind=WP)                , pointer :: rhoice, rhosno, rhowat, Sice, cl, cc, cpice, consn, con 
+  real(kind=WP)                , pointer :: rhoice, rhosno, rhowat, rhofwt, Sice, cl, cc, cpice, consn, con 
   myDim_nod2d=>partit%myDim_nod2D
   eDim_nod2D =>partit%eDim_nod2D
   ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D
@@ -98,6 +98,8 @@ subroutine thermodynamics(ice, partit, mesh)
   ice_temp      => ice%data(4)%values(:)
   ice_alb       => ice%atmcoupl%ice_alb(:)
   enthalpyoffuse=> ice%atmcoupl%enthalpyoffuse(:)
+  ice_heat_qres => ice%atmcoupl%flx_qres(:)
+  ice_heat_qcon => ice%atmcoupl%flx_qcon(:)
 #endif 
 #if defined (__oasis) || defined (__ifsinterface)
   oce_heat_flux => ice%atmcoupl%oce_flx_h(:)
@@ -106,6 +108,7 @@ subroutine thermodynamics(ice, partit, mesh)
   rhoice        => ice%thermo%rhoice  
   rhosno        => ice%thermo%rhosno
   rhowat        => ice%thermo%rhowat
+  rhofwt        => ice%thermo%rhofwt
   Sice          => ice%thermo%Sice
   cl            => ice%thermo%cl
   cc            => ice%thermo%cc
@@ -113,8 +116,6 @@ subroutine thermodynamics(ice, partit, mesh)
   consn         => ice%thermo%consn
   con           => ice%thermo%con
   rhoice        => ice%thermo%rhoice
-
-
   !_____________________________________________________________________________  
   rsss = ref_sss
 
@@ -156,15 +157,19 @@ subroutine thermodynamics(ice, partit, mesh)
      ! then send those to OpenIFS where they are used to calucate the 
      ! energy fluxes ---!
      t                   = ice_temp(inod)
+     qres     = 0.0_WP
+     qcon     = 0.0_WP
      if(A>Aimin) then
         call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, t)
-        ice_temp(inod) = t
+        ice_temp(inod)  = t
      else
         ! Freezing temp of saltwater in K
-        ice_temp(inod) = -0.0575_WP*S_oc_array(inod) + 1.7105e-3_WP*sqrt(S_oc_array(inod)**3) -2.155e-4_WP*(S_oc_array(inod)**2)+273.15_WP
+        ice_temp(inod) = -0.0575_WP*S_oc_array(inod) + 1.7105e-3_WP*sqrt(S_oc_array(inod)**3) -2.155e-4_WP*(S_oc_array(inod)**2)+273.15_WP        
      endif
      call ice_albedo(ice%thermo, h, hsn, t, alb)
      ice_alb(inod)       = alb
+     ice_heat_qres(inod) = qres
+     ice_heat_qcon(inod) = qcon
 #endif
      call ice_growth
 
@@ -192,10 +197,7 @@ subroutine thermodynamics(ice, partit, mesh)
      !---- total evaporation (needed in oce_salt_balance.F90) = evap+subli
      evaporation(inod)    = evap + subli
      ice_sublimation(inod)= subli
-     prec_rain(inod)      = rain
-     prec_snow(inod)      = snow
-     runoff(inod)         = runo
-#if defined (__oifs)  
+#if defined (__oasis) || defined (__ifsinterface)
      residualifwflx(inod) = resid
 #endif     
   enddo
@@ -244,9 +246,6 @@ contains
     !---- significantly greater than the time step dt
     real(kind=WP), parameter :: gamma_t = 10./86400.
 
-    !---- density of freshwater [kg/m**3].
-    real(kind=WP), parameter :: rhofwt = 1000.
-
     !---- freezing temperature of freshwater [deg C]
     real(kind=WP), parameter :: Tfrez0 = 0.
 
@@ -265,7 +264,12 @@ contains
     Qicecon = (Tfrezs-Tfrez0)*con/max(heff,himin)
 
     !---- atmospheric heat fluxes (provided by the atmosphere model)
+
+#if defined (__oifs) || defined (__ifsinterface)
+    Qatmice = -qres-qcon
+#else
     Qatmice = -a2ihf
+#endif
     Qatmocn = -a2ohf
 
     !---- oceanic heat fluxes
@@ -482,18 +486,15 @@ contains
 
     !---- convert freshwater mass flux [kg/m**2/s] into sea-water volume flux [m/s]
     fw   = fw/rhowat
-    evap = evap *rhofwt/rhowat
-    rain = rain *rhofwt/rhowat
-    snow = snow *rhofwt/rhowat
-    runo = runo *rhofwt/rhowat
-    subli= subli*rhofwt/rhowat
-    resid= resid*rhofwt/rhowat
-    
+    ! keep in mind that for computation of FW all imposed fluxes were accounted with the ratio rhofwt/rhowat:
+    !evap = evap *rhofwt/rhowat
+    !rain = rain *rhofwt/rhowat
+    !snow = snow *rhofwt/rhowat
+    !runo = runo *rhofwt/rhowat
+    !subli= subli*rhofwt/rhowat
+    !resid= resid*rhofwt/rhowat
     return
   end subroutine ice_growth
-
-
-
 
  subroutine ice_surftemp(ithermp, h,hsn,a2ihf,t)
   ! INPUT:
@@ -542,9 +543,14 @@ contains
   hcapice=rhoice*cpice*dice             ! heat capacity of upper 0.05 cm sea ice layer [J/(m²K)]
   zcpdt=hcapice/dt                      ! Energy required to change temperature of top ice "layer" [J/(sm²K)]
   zcprosn=rhosno*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
-  zcpdte=zcpdt+zcprosn*hsn              ! Combined Energy required to change temperature of snow + 0.05m of upper ice
+  zcpdte=zcpdt !+zcprosn*hsn            ! Combined Energy required to change temperature of snow + 0.05m of upper ice
   t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced) ! New sea ice surf temp [K]
-  t=min(273.15_WP,t)
+  if (t>273.15_WP) then
+     qres=(con/zsniced+zcpdte)*(t-273.15_WP)
+     t=273.15_WP
+  endif
+  qcon=con*(t-TFrezs)/max(zsniced, himin)
+! t=min(273.15_WP,t)
  end subroutine ice_surftemp
 
  subroutine ice_albedo(ithermp, h, hsn, t, alb)

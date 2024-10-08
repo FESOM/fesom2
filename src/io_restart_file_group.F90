@@ -17,7 +17,8 @@ module restart_file_group_module
 
   type restart_file_group
     private
-    type(restart_file_type), public :: files(20)
+    type(restart_file_type), public :: files(112)
+
     integer, public :: nfiles = 0 ! todo: allow dynamically allocated size without messing with shallow copied pointers
   contains
     generic, public :: def_node_var => def_node_var_2d, def_node_var_3d

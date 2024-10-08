@@ -6,6 +6,15 @@
 FESOM2 documentation
 ====================
 
+The Finite volumE Sea Ice-Ocean Model (FESOM2).
+
+Multi-resolution ocean general circulation model that solves
+the equations of motion describing the ocean and sea ice using
+finite-volume methods on unstructured computational grids. The
+model is developed and supported by researchers at the Alfred
+Wegener Institute, Helmholtz Centre for Polar and Marine
+Research (AWI), in Bremerhaven, Germany.
+
 Authors
    -------
 
@@ -33,6 +42,7 @@ Authors
    subcycling_instead_solver
    isoneutral_diffusion_triangular_prisms
    zreferences
+   code_documentation/io_mesh_info
    
 
 Proposed structure:

@@ -85,6 +85,7 @@ subroutine smooth_nod2D(arr, N, partit, mesh)
        arr(node)=work_array(node)
     ENDDO
 !$OMP END PARALLEL DO
+!$OMP BARRIER
 !$OMP MASTER
     call exchange_nod(arr, partit)
 !$OMP END MASTER
@@ -151,6 +152,7 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
      END DO
   END DO
 !$OMP END DO  
+!$OMP BARRIER
 !$OMP MASTER
   call exchange_nod(arr, partit)
 !$OMP END MASTER
@@ -185,6 +187,7 @@ subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
         END DO
      END DO
 !$OMP END DO
+!$OMP BARRIER
 !$OMP MASTER
      call exchange_nod(arr, partit)
 !$OMP END MASTER
@@ -224,6 +227,7 @@ subroutine smooth_elem2D(arr, N, partit, mesh)
             work_array(node)=work_array(node)/vol
         END DO
 !$OMP END DO
+!$OMP BARRIER
 !$OMP MASTER
         call exchange_nod(work_array, partit)
 !$OMP END MASTER
@@ -234,6 +238,7 @@ subroutine smooth_elem2D(arr, N, partit, mesh)
             arr(elem)=sum(work_array(elnodes))/3.0_WP  ! Here, we need the inverse and scale by 1/3
         ENDDO
 !$OMP END DO
+!$OMP BARRIER
 !$OMP MASTER
         call exchange_elem(arr, partit)
 !$OMP END MASTER
@@ -286,6 +291,7 @@ subroutine smooth_elem3D(arr, N, partit, mesh)
                 work_array(node)=work_array(node)/vol
             END DO
 !$OMP END DO
+!$OMP BARRIER
 !$OMP MASTER
             call exchange_nod(work_array, partit)
 !$OMP END MASTER

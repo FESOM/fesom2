@@ -100,20 +100,20 @@ DO n=1, myDim_nod2D+eDim_nod2D
    if (a_ice(n) > 1.0_WP)   a_ice(n)=1.0_WP
     ! upper cutoff: a_ice
    if (a_ice(n) < .1e-8_WP) then
-       a_ice(n)=0.0_WP
-#if defined (__oifs) || defined (__ifsinterface)
+        a_ice(n)   =0.0_WP
         m_ice(n)   =0.0_WP
         m_snow(n)  =0.0_WP
+#if defined (__oifs) || defined (__ifsinterface)
         ice_temp(n)=273.15_WP
 #endif /* (__oifs) */
    end if
     !___________________________________________________________________________
     ! lower cutoff: m_ice
    if (m_ice(n) < .1e-8_WP) then
-        m_ice(n)=0.0_WP 
-#if defined (__oifs) || defined (__ifsinterface)
+        m_ice(n)   =0.0_WP 
         m_snow(n)  =0.0_WP
         a_ice(n)   =0.0_WP
+#if defined (__oifs) || defined (__ifsinterface)
         ice_temp(n)=273.15_WP
 #endif /* (__oifs) */
    end if

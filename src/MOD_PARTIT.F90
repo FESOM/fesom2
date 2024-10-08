@@ -2,15 +2,15 @@
 ! Variables to organize parallel work
 module MOD_PARTIT
 USE O_PARAM
-USE, intrinsic :: ISO_FORTRAN_ENV
+USE, intrinsic :: ISO_FORTRAN_ENV, only : int32
 USE MOD_WRITE_BINARY_ARRAYS
 USE MOD_READ_BINARY_ARRAYS
+USE mpi
 #if defined(_OPENMP)
     USE OMP_LIB
 #endif
 IMPLICIT NONE
 SAVE
-include 'mpif.h'
 integer, parameter   :: MAX_LAENDERECK=16
 integer, parameter   :: MAX_NEIGHBOR_PARTITIONS=32
 
@@ -33,11 +33,22 @@ type com_struct
 end type com_struct
 
 TYPE T_PARTIT
+  
+  !---------------------------------------------------
+  !LA 2023-01-31 add asynchronous icebergs
+  ! kh 10.02.21 communicator for async iceberg computations based on OpenMP
+  integer              :: MPI_COMM_FESOM_IB
+  !---------------------------------------------------
 
   type(com_struct) :: com_nod2D
   type(com_struct) :: com_elem2D
   type(com_struct) :: com_elem2D_full
 
+  !---------------------------------------------------
+  !LA 2023-01-31 add asynchronous icebergs
+  ! kh 11.02.21
+  integer            :: MPIERR_IB
+  !---------------------------------------------------
   integer              :: npes
   integer              :: mype
   integer              :: maxPEnum=100
@@ -47,10 +58,10 @@ TYPE T_PARTIT
   integer                             :: eDim_nod2D
   integer, allocatable, dimension(:)  :: myList_nod2D
 
-  integer                             :: myDim_elem2D
+  integer                             :: myDim_elem2D, myDim_elem2D_shrinked
   integer                             :: eDim_elem2D
   integer                             :: eXDim_elem2D
-  integer, allocatable, dimension(:)  :: myList_elem2D
+  integer, allocatable, dimension(:)  :: myList_elem2D, myInd_elem2D_shrinked
 
   integer                             :: myDim_edge2D
   integer                             :: eDim_edge2D
@@ -58,6 +69,7 @@ TYPE T_PARTIT
   integer :: pe_status = 0 ! if /=0 then something is wrong
 
   integer              :: MPI_COMM_FESOM ! FESOM communicator (for ocean only runs if often a copy of MPI_COMM_WORLD)
+  integer              :: MPI_COMM_WORLD ! FESOM communicator (for ocean only runs if often a copy of MPI_COMM_WORLD)
 
   ! MPI Datatypes for interface exchange
   ! Element fields (2D; 2D integer; 3D with nl-1 or nl levels, 1 - 4 values)
@@ -75,6 +87,7 @@ TYPE T_PARTIT
   integer, allocatable       :: s_mpitype_nod3D(:,:,:), r_mpitype_nod3D(:,:,:)
 
   integer            :: MPIERR
+  
   !!! remPtr_* are constructed during the runtime and shall not be dumped!!!
   integer, allocatable ::  remPtr_nod2D(:),  remList_nod2D(:)
   integer, allocatable ::  remPtr_elem2D(:), remList_elem2D(:)

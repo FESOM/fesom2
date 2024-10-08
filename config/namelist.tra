@@ -32,6 +32,7 @@ gamma0_tra    = 0.0005     ! gammaX_tra are analogous to those in the dynamical 
 gamma1_tra    = 0.0125
 gamma2_tra    = 0.
 i_vert_diff   =.true.
+AB_order      = 2
 /
 
 &tracer_phys

@@ -89,6 +89,14 @@ type(tracer_source3d_type), &
     allocatable, dimension(:)  :: ptracers_restore
 integer                        :: ptracers_restore_total=0
 
+!---wiso-code
+! add water isotope parameters
+real(kind=WP), dimension(3)    :: wiso_smow = (/2005.2e-6_WP, 155.76e-6_WP, 1.0_WP/)  ! water isotope SMOW values
+integer, dimension(3)          :: index_wiso_tracers = (/-1, -1, -1/)  ! water isotope index in all tracers
+!---wiso-code-end
+!---age-code-begin
+integer                        :: index_age_tracer = -1 ! water age tracer index in all tracers
+!---age-code-end
 
 ! Momentum
 !!PS logical                       :: free_slip=.false.
@@ -176,6 +184,7 @@ IMPLICIT NONE
 ! Arrays are described in subroutine array_setup
 real(kind=WP), allocatable         :: uke(:,:), v_back(:,:), uke_back(:,:), uke_dis(:,:), uke_dif(:,:)
 real(kind=WP), allocatable         :: uke_rhs(:,:), uke_rhs_old(:,:)
+!real(kind=WP), allocatable         :: UV_ib(:,:,:) ! kh 08.03.21 additional array for asynchronous iceberg computations
 real(kind=WP), allocatable         :: UV_dis_tend(:,:,:), UV_back_tend(:,:,:), UV_total_tend(:,:,:), UV_dis_tend_node(:,:,:)
 real(kind=WP), allocatable         :: UV_dis_posdef_b2(:,:), UV_dis_posdef(:,:), UV_back_posdef(:,:)
 real(kind=WP), allocatable         :: hpressure(:,:)
@@ -183,11 +192,18 @@ real(kind=WP), allocatable         :: stress_surf(:,:)
 real(kind=WP), allocatable         :: stress_node_surf(:,:)
 REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_x(:)
 REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_y(:)
-real(kind=WP), allocatable         :: heat_flux(:), Tsurf(:)
-real(kind=WP), allocatable         :: heat_flux_in(:) !to keep the unmodified (by SW penetration etc.) heat flux
+real(kind=WP), allocatable         :: heat_flux(:), Tsurf(:) 
+real(kind=WP), allocatable         :: heat_flux_in(:) !to keep the unmodified (by SW penetration etc.) heat flux 
+real(kind=WP), allocatable         :: Tsurf_ib(:) ! kh 15.03.21 additional array for asynchronous iceberg computations
 real(kind=WP), allocatable    :: water_flux(:), Ssurf(:)
+real(kind=WP), allocatable    :: Ssurf_ib(:) ! kh 15.03.21 additional array for asynchronous iceberg computations
 real(kind=WP), allocatable    :: virtual_salt(:), relax_salt(:)
 real(kind=WP), allocatable    :: Tclim(:,:), Sclim(:,:)
+
+!--------------
+! LA: add iceberg tracer arrays 2023-02-08
+!--------------
+real(kind=WP), allocatable    :: Tclim_ib(:,:), Sclim_ib(:,:)
 !!PS real(kind=WP), allocatable    :: Visc(:,:)
 real(kind=WP), allocatable    :: Tsurf_t(:,:), Ssurf_t(:,:)
 real(kind=WP), allocatable    :: tau_x_t(:,:), tau_y_t(:,:)
@@ -200,6 +216,11 @@ real(kind=WP), allocatable    :: ssh_gp(:)
 !Tracer gradients&RHS
 real(kind=WP), allocatable :: tr_xy(:,:,:)
 real(kind=WP), allocatable :: tr_z(:,:)
+
+#if defined(__recom)
+real(kind=WP), allocatable    :: dtr_bf(:,:), str_bf(:,:)
+real(kind=WP), allocatable    :: vert_sink(:,:)
+#endif
 
 !Viscosity and diff coefs
 real(kind=WP), allocatable,dimension(:,:)   :: Av,Kv
@@ -245,5 +266,12 @@ real(kind=WP),allocatable :: bvfreq(:,:),mixlay_dep(:),bv_ref(:)
 real(kind=WP), target, allocatable    :: fer_c(:), fer_scal(:), fer_K(:,:), fer_gamma(:,:,:)
 
 real(kind=WP),         allocatable    :: ice_rejected_salt(:)
+
+!---wiso-code
+real(kind=WP), allocatable    :: tr_arr_ice(:,:)      !---wiso-code: add sea ice isotope tracers
+real(kind=WP), allocatable    :: wiso_flux_oce(:,:)   !---wiso-code: add isotope fluxes over open water
+real(kind=WP), allocatable    :: wiso_flux_ice(:,:)   !---wiso-code: add isotope fluxes over sea ice
+!---wiso-code-end
+
 END MODULE o_ARRAYS
 !==========================================================

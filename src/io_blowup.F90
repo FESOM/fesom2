@@ -102,12 +102,27 @@ MODULE io_BLOWUP
 		!___Define the netCDF variables for 2D fields_______________________________
 		!___SSH_____________________________________________________________________
 		call def_variable(bid, 'eta_n'		, (/nod2D/)			, 'sea surface elevation', 'm', dynamics%eta_n);
-		call def_variable(bid, 'd_eta'		, (/nod2D/)			, 'change in ssh from solver', 'm', dynamics%d_eta);
 		!___ALE related fields______________________________________________________
 		call def_variable(bid, 'hbar'		, (/nod2D/)			, 'ALE surface elevation hbar_n+0.5', 'm', hbar);
 !!PS 		call def_variable(bid, 'hbar_old'	, (/nod2D/)			, 'ALE surface elevation hbar_n-0.5', 'm', hbar_old);
-		call def_variable(bid, 'ssh_rhs'	, (/nod2D/)			, 'RHS for the elevation', '?', dynamics%ssh_rhs);
-		call def_variable(bid, 'ssh_rhs_old', (/nod2D/)			, 'RHS for the elevation', '?', dynamics%ssh_rhs_old);
+        if (.not. dynamics%use_ssh_se_subcycl) then
+            call def_variable(bid, 'd_eta'		, (/nod2D/)			, 'change in ssh from solver', 'm', dynamics%d_eta);
+            call def_variable(bid, 'ssh_rhs'	, (/nod2D/)			, 'RHS for the elevation', '?', dynamics%ssh_rhs);
+            call def_variable(bid, 'ssh_rhs_old', (/nod2D/)			, 'RHS for the elevation', '?', dynamics%ssh_rhs_old);
+            
+        else
+            call def_variable(bid, 'ubt_rhs'  , (/elem2D/), 'zonal RHS barotr. transp. equation' , '?'  , dynamics%se_uvBT_rhs(  1,:));
+            call def_variable(bid, 'vbt_rhs'  , (/elem2D/), 'merid. RHS barotr. transp. equation', '?'  , dynamics%se_uvBT_rhs(  2,:));
+            call def_variable(bid, 'ubt'	  , (/elem2D/), 'zonal barotr. transp.'              , '?'  , dynamics%se_uvBT(      1,:));
+            call def_variable(bid, 'vbt'	  , (/elem2D/), 'merid. barotr. transp.'             , '?'  , dynamics%se_uvBT(      2,:));
+            call def_variable(bid, 'ubt_theta', (/elem2D/), 'zonal barotr. theta term.'          , '?'  , dynamics%se_uvBT_theta(1,:));
+            call def_variable(bid, 'vbt_theta', (/elem2D/), 'merid. barotr. theta term'          , '?'  , dynamics%se_uvBT_theta(2,:));
+            call def_variable(bid, 'ubt_mean' , (/elem2D/), 'zonal barotr. mean term.'           , '?'  , dynamics%se_uvBT_mean( 1,:));
+            call def_variable(bid, 'vbt_mean' , (/elem2D/), 'merid. barotr. mean term'           , '?'  , dynamics%se_uvBT_mean( 2,:));
+            call def_variable(bid, 'uh'       , (/nl-1, elem2D/), 'zonal velocity'               , 'm/s', dynamics%se_uvh(1,:,:));
+            call def_variable(bid, 'vh'       , (/nl-1, elem2D/), 'meridional velocity'          , 'm/s', dynamics%se_uvh(2,:,:));
+		end if 
+		
 		!___Define the netCDF variables for 3D fields_______________________________
 		call def_variable(bid, 'hnode'		, (/nl-1,  nod2D/)	, 'ALE stuff', '?', hnode);
 		call def_variable(bid, 'helem'		, (/nl-1, elem2D/)	, 'Element layer thickness', 'm/s', helem(:,:));
@@ -115,8 +130,8 @@ MODULE io_BLOWUP
 		call def_variable(bid, 'v'			, (/nl-1, elem2D/)	, 'meridional velocity', 'm/s', dynamics%uv(2,:,:));
 		call def_variable(bid, 'u_rhs'			, (/nl-1, elem2D/)	, 'zonal velocity', 'm/s', dynamics%uv_rhs(1,:,:));
 		call def_variable(bid, 'v_rhs'			, (/nl-1, elem2D/)	, 'meridional velocity', 'm/s', dynamics%uv_rhs(2,:,:));
-		call def_variable(bid, 'urhs_AB'	, (/nl-1, elem2D/)	, 'Adams–Bashforth for u', 'm/s', dynamics%uv_rhsAB(1,:,:));
-		call def_variable(bid, 'vrhs_AB'	, (/nl-1, elem2D/)	, 'Adams–Bashforth for v', 'm/s', dynamics%uv_rhsAB(2,:,:));
+		call def_variable(bid, 'urhs_AB'	, (/nl-1, elem2D/)	, 'Adams-Bashforth for u', 'm/s', dynamics%uv_rhsAB(1,1,:,:));
+		call def_variable(bid, 'vrhs_AB'	, (/nl-1, elem2D/)	, 'Adams-Bashforth for v', 'm/s', dynamics%uv_rhsAB(1,2,:,:));
 		call def_variable(bid, 'zbar_n_bot' , (/nod2D/)			, 'node bottom depth', 'm', zbar_n_bot);
 		call def_variable(bid, 'zbar_e_bot' , (/elem2d/)		, 'elem bottom depth', 'm', zbar_e_bot);
 		call def_variable(bid, 'bottom_node_thickness' , (/nod2D/)			, 'node bottom thickness', 'm', bottom_node_thickness);

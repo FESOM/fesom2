@@ -235,6 +235,7 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
         end do
     end do ! --> do n=1,myDim_nod2D
 !$OMP END DO
+!$OMP BARRIER
 !$OMP END PARALLEL
 end subroutine adv_tra_vert_impl
 !
@@ -267,20 +268,28 @@ subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
        l_init_zero=o_init_zero
     end if
     if (l_init_zero) then
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
+#else
         !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
         do n=1, myDim_nod2D
           do nz=1,mesh%nl
             flux(nz, n)=0.0_WP
           end do
         end do
-        !$ACC END PARALLEL LOOP
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+        !$ACC END PARALLEL LOOP
+#endif
     end if
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tvert, n, nz, nzmax, nzmin)
 !$OMP DO
-
+#else
     !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
     do n=1, myDim_nod2D
        !_______________________________________________________________________
        nzmax=nlevels_nod2D(n)
@@ -310,9 +319,12 @@ subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
        end do
        !$ACC END LOOP
     end do
-    !$ACC END PARALLEL LOOP
+#ifndef ENABLE_OPENACC
 !$OMP END DO
 !$OMP END PARALLEL
+#else
+    !$ACC END PARALLEL LOOP
+#endif
 end subroutine adv_tra_ver_upw1
 !
 !
@@ -347,19 +359,28 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
        l_init_zero=o_init_zero
     end if
     if (l_init_zero) then
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
+#else
        !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
        do n=1, myDim_nod2D
           do nz=1, mesh%nl
              flux(nz, n)=0.0_WP
           end do
        end do
-       !$ACC END PARALLEL LOOP
+#ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
+#else
+       !$ACC END PARALLEL LOOP
+#endif
     end if
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tvert,n, nz, nzmax, nzmin, Tmean, Tmean1, Tmean2, qc, qu,qd)
 !$OMP DO
+#else
     !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
     do n=1, myDim_nod2D
        !_______________________________________________________________________
        nzmax=nlevels_nod2D(n)
@@ -404,9 +425,12 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
        end do
        !$ACC END LOOP
     end do
-    !$ACC END PARALLEL LOOP
+#ifndef ENABLE_OPENACC
 !$OMP END DO
 !$OMP END PARALLEL
+#else
+    !$ACC END PARALLEL LOOP
+#endif
 end subroutine adv_tra_ver_qr4c
 !
 !

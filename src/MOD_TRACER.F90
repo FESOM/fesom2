@@ -1,21 +1,25 @@
 !==========================================================
 MODULE MOD_TRACER
 USE O_PARAM
-USE, intrinsic :: ISO_FORTRAN_ENV
+USE, intrinsic :: ISO_FORTRAN_ENV, only : int32
 USE MOD_WRITE_BINARY_ARRAYS
 USE MOD_READ_BINARY_ARRAYS
 IMPLICIT NONE
 SAVE
 
 TYPE T_TRACER_DATA
-real(kind=WP), allocatable, dimension(:,:)  :: values, valuesAB  ! instant values & Adams-Bashfort interpolation
-logical                                     :: smooth_bh_tra=.false.
-real(kind=WP)                               :: gamma0_tra, gamma1_tra, gamma2_tra
-logical                                     :: i_vert_diff =.false.
-character(20)                               :: tra_adv_hor, tra_adv_ver, tra_adv_lim ! type of the advection scheme for this tracer
-real(kind=WP)                               :: tra_adv_ph  = 1.  ! a parameter to be used in horizontal advection (for MUSCL it is the fraction of fourth-order contribution in the solution)
-real(kind=WP)                               :: tra_adv_pv  = 1.  ! a parameter to be used in horizontal advection (for QR4C  it is the fraction of fourth-order contribution in the solution)
-integer                                     :: ID
+real(kind=WP), allocatable, dimension(:,:)    :: values    ! instant values
+real(kind=WP), allocatable, dimension(:,:)    :: valuesAB  ! Adams-Bashfort interpolation
+real(kind=WP), allocatable, dimension(:,:,:)  :: valuesold ! previous timesteps
+
+logical                                       :: smooth_bh_tra=.false.
+real(kind=WP)                                 :: gamma0_tra, gamma1_tra, gamma2_tra
+logical                                       :: i_vert_diff =.false.
+character(20)                                 :: tra_adv_hor, tra_adv_ver, tra_adv_lim ! type of the advection scheme for this tracer
+real(kind=WP)                                 :: tra_adv_ph  = 1.  ! a parameter to be used in horizontal advection (for MUSCL it is the fraction of fourth-order contribution in the solution)
+real(kind=WP)                                 :: tra_adv_pv  = 1.  ! a parameter to be used in horizontal advection (for QR4C  it is the fraction of fourth-order contribution in the solution)
+integer                                       :: AB_order=2
+integer                                       :: ID
 
 contains
 procedure WRITE_T_TRACER_DATA
@@ -29,7 +33,15 @@ real(kind=WP), allocatable         :: del_ttf(:,:)
 real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:), del_ttf_advvert(:,:)
 !_______________________________________________________________________________
 ! in case ldiag_DVD=.true. --> calculate discrete variance decay (DVD)
-real(kind=WP), allocatable                    :: tr_dvd_horiz(:,:,:), tr_dvd_vert(:,:,:)
+! dvd_trflx_h, dvd_trflx_v ... reconstructed horizontal tracer fluxes at mid 
+!                              edge faces for temperature and salintiy. These fluxes
+!                              are already computed in adv_flux_hor, adv_flux_ver 
+!                              but not saved
+! dvd_trold                ... tracer from previouse time steps later needed to  
+!                              compute Tstar = 0.5*( T^(n+1) + T^n)
+real(kind=WP), allocatable, dimension(:,:,:)  :: dvd_trflx_hor, dvd_trflx_ver
+
+!_______________________________________________________________________________
 ! The fct part
 real(kind=WP),allocatable,dimension(:,:)      :: fct_LO          ! Low-order solution
 real(kind=WP),allocatable,dimension(:,:)      :: adv_flux_hor    ! Antidif. horiz. contrib. from edges / backup for iterafive fct scheme
@@ -37,6 +49,8 @@ real(kind=WP),allocatable,dimension(:,:)      :: adv_flux_ver    ! Antidif. vert
 
 real(kind=WP),allocatable,dimension(:,:)      :: fct_ttf_max,fct_ttf_min
 real(kind=WP),allocatable,dimension(:,:)      :: fct_plus,fct_minus
+
+!_______________________________________________________________________________
 ! MUSCL type reconstruction
 integer,allocatable,dimension(:)              :: nboundary_lay
 integer,allocatable,dimension(:,:)            :: edge_up_dn_tri
@@ -50,9 +64,9 @@ END TYPE T_TRACER_WORK
 ! auxury type for reading namelist.tra
 TYPE NML_TRACER_LIST_TYPE
         INTEGER                 :: ID         =-1
-        CHARACTER(len=4)        :: adv_hor    ='NONE'
-        CHARACTER(len=4)        :: adv_ver    ='NONE'
-        CHARACTER(len=4)        :: adv_lim    ='NONE'
+        CHARACTER(len=20)       :: adv_hor    ='NONE'
+        CHARACTER(len=20)       :: adv_ver    ='NONE'
+        CHARACTER(len=20)       :: adv_lim    ='NONE'
         REAL(kind=WP)           :: adv_ph     =1.
         REAL(kind=WP)           :: adv_pv     =1.
 END TYPE NML_TRACER_LIST_TYPE
@@ -95,6 +109,7 @@ subroutine WRITE_T_TRACER_DATA(tdata, unit)
     character(len=1024)                  :: iomsg
 
     call write_bin_array(tdata%values,   unit, iostat, iomsg)
+    call write_bin_array(tdata%valuesold,unit, iostat, iomsg)
     call write_bin_array(tdata%valuesAB, unit, iostat, iomsg)
     write(unit, iostat=iostat, iomsg=iomsg) tdata%smooth_bh_tra
     write(unit, iostat=iostat, iomsg=iomsg) tdata%gamma0_tra
@@ -117,8 +132,9 @@ subroutine READ_T_TRACER_DATA(tdata, unit)
     integer                              :: iostat
     character(len=1024)                  :: iomsg
 
-    call read_bin_array(tdata%values,   unit, iostat, iomsg)
-    call read_bin_array(tdata%valuesAB, unit, iostat, iomsg)
+    call read_bin_array(tdata%values,    unit, iostat, iomsg)
+    call read_bin_array(tdata%valuesold,unit, iostat, iomsg)
+    call read_bin_array(tdata%valuesAB,  unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg) tdata%smooth_bh_tra
     read(unit, iostat=iostat, iomsg=iomsg) tdata%gamma0_tra
     read(unit, iostat=iostat, iomsg=iomsg) tdata%gamma1_tra
@@ -143,8 +159,8 @@ subroutine WRITE_T_TRACER_WORK(twork, unit)
     call write_bin_array(twork%del_ttf,          unit, iostat, iomsg)
     call write_bin_array(twork%del_ttf_advhoriz, unit, iostat, iomsg)
     call write_bin_array(twork%del_ttf_advvert,  unit, iostat, iomsg)
-    call write_bin_array(twork%tr_dvd_horiz,     unit, iostat, iomsg)
-    call write_bin_array(twork%tr_dvd_vert,      unit, iostat, iomsg)
+    call write_bin_array(twork%dvd_trflx_hor,    unit, iostat, iomsg)
+    call write_bin_array(twork%dvd_trflx_ver,    unit, iostat, iomsg)
     call write_bin_array(twork%fct_LO,           unit, iostat, iomsg)
     call write_bin_array(twork%adv_flux_hor,     unit, iostat, iomsg)
     call write_bin_array(twork%adv_flux_ver,     unit, iostat, iomsg)
@@ -168,8 +184,8 @@ subroutine READ_T_TRACER_WORK(twork, unit)
     call read_bin_array(twork%del_ttf,          unit, iostat, iomsg)
     call read_bin_array(twork%del_ttf_advhoriz, unit, iostat, iomsg)
     call read_bin_array(twork%del_ttf_advvert,  unit, iostat, iomsg)
-    call read_bin_array(twork%tr_dvd_horiz,     unit, iostat, iomsg)
-    call read_bin_array(twork%tr_dvd_vert,      unit, iostat, iomsg)
+    call read_bin_array(twork%dvd_trflx_hor,    unit, iostat, iomsg)
+    call read_bin_array(twork%dvd_trflx_ver,    unit, iostat, iomsg)
     call read_bin_array(twork%fct_LO,           unit, iostat, iomsg)
     call read_bin_array(twork%adv_flux_hor,     unit, iostat, iomsg)
     call read_bin_array(twork%adv_flux_ver,     unit, iostat, iomsg)

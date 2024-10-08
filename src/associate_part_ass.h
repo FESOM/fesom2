@@ -1,4 +1,5 @@
 MPI_COMM_FESOM  => partit%MPI_COMM_FESOM
+MPI_COMM_FESOM_IB       => partit%MPI_COMM_FESOM_IB
 com_nod2D       => partit%com_nod2D
 com_elem2D      => partit%com_elem2D
 com_elem2D_full => partit%com_elem2D_full
@@ -12,6 +13,7 @@ eDim_edge2D     => partit%eDim_edge2D
 pe_status       => partit%pe_status
 elem_full_flag  => partit%elem_full_flag
 MPIERR          => partit%MPIERR
+MPIERR_IB               => partit%MPIERR_IB
 npes            => partit%npes
 mype            => partit%mype
 maxPEnum        => partit%maxPEnum

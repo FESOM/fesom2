@@ -38,6 +38,7 @@ real(kind=WP), dimension(:,:), pointer :: hnode
 real(kind=WP), dimension(:,:), pointer :: hnode_new
 real(kind=WP), dimension(:,:), pointer :: zbar_3d_n
 real(kind=WP), dimension(:,:), pointer :: Z_3d_n
+real(kind=WP), dimension(:,:), pointer :: Z_3d_n_ib
 real(kind=WP), dimension(:,:), pointer :: helem
 real(kind=WP), dimension(:)  , pointer :: bottom_elem_thickness
 real(kind=WP), dimension(:)  , pointer :: bottom_node_thickness

@@ -3,33 +3,6 @@
 !
 ! -Original code by Kristian Mogensen, ECMWF.
 
-SUBROUTINE nemogcmcoup_init_ioserver( icomm, lnemoioserver )
-
-   ! Initialize the NEMO mppio server
-
-   IMPLICIT NONE
-   INTEGER :: icomm
-   LOGICAL :: lnemoioserver
-
-   WRITE(*,*)'No mpp_ioserver'
-   CALL abort
-   
-END SUBROUTINE nemogcmcoup_init_ioserver
-
-
-SUBROUTINE nemogcmcoup_init_ioserver_2( icomm )
-
-   ! Initialize the NEMO mppio server
-
-   IMPLICIT NONE
-   INTEGER :: icomm
-
-   WRITE(*,*)'No mpp_ioserver'
-   CALL abort
-   
-END SUBROUTINE nemogcmcoup_init_ioserver_2
-
-
 SUBROUTINE nemogcmcoup_mlflds_get( mype, npes, icomm, &
    &                               nlev, nopoints, pgt3d, pgs3d, pgu3d, pgv3d )
 
@@ -202,7 +175,7 @@ SUBROUTINE nemogcmcoup_update_add( mype, npes, icomm, &
    ! Local variables
 
    if(fesom%mype==0) then
-   WRITE(0,*)'nemogcmcoup_update_add should not be called when coupling to fesom. Commented ABORT. Proceeding...'
+   WRITE(0,*)'In nemogcmcoup_update_add FESOM dummy routine. Proceeding...'
    !CALL abort
    endif   
 
@@ -331,17 +304,3 @@ SUBROUTINE nemogcmcoup_wam_update_stress( mype, npes, icomm, npoints, &
    CALL abort
 
 END SUBROUTINE nemogcmcoup_wam_update_stress
-
-SUBROUTINE nemogcmcoup_end_ioserver
-
-   ! Close io servers
-
-   IMPLICIT NONE
-   INTEGER :: icomm
-   LOGICAL :: lnemoioserver
-
-   WRITE(*,*)'No mpp_ioserver'
-   CALL abort
-
-END SUBROUTINE nemogcmcoup_end_ioserver
-
