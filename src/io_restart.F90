@@ -12,7 +12,6 @@ MODULE io_RESTART
   use MOD_PARTIT
   use MOD_PARSUP
   use fortran_utils
-  use mpi
 #if defined(__recom)
   use recom_glovar
   use recom_config
@@ -772,6 +771,7 @@ subroutine read_all_raw_restarts(mpicomm, mype)
   integer fileunit
   integer status
   integer mpierr
+  include 'mpif.h'
 
   if(mype == RAW_RESTART_METADATA_RANK) then
     ! read metadata info for the raw restart
@@ -860,6 +860,7 @@ end subroutine
 !
 !_______________________________________________________________________________
 subroutine read_restart(path, filegroup, mpicomm, mype)
+  include 'mpif.h'        
   character(len=*), intent(in) :: path
   type(restart_file_group), intent(inout) :: filegroup
   integer, intent(in) :: mpicomm
@@ -1003,6 +1004,7 @@ end subroutine
 !     integer mype
 !     integer npes
 !     integer mpierr
+!     include 'mpif.h'
 !   
 !     call MPI_Comm_Rank(mpicomm, mype, mpierr)
 !     call MPI_Comm_Size(mpicomm, npes, mpierr)

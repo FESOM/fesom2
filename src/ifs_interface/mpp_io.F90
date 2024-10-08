@@ -6,7 +6,6 @@
 !-----------------------------------------------------
 
 MODULE mpp_io
-    USE mpi
 #if defined(__MULTIO)        
     USE iom, only : iom_enable_multio, iom_initialize, iom_init_server, iom_finalize
 #endif
@@ -31,6 +30,7 @@ MODULE mpp_io
     
     SUBROUTINE mpp_io_init( iicomm,  lio, irequired, iprovided, lmpi1 ) 
 
+        INCLUDE "mpif.h"
         INTEGER, INTENT(INOUT) :: iicomm
         LOGICAL, INTENT(INOUT) :: lio
         INTEGER, INTENT(INOUT) :: irequired, iprovided
@@ -126,6 +126,7 @@ MODULE mpp_io
         INTEGER :: icode, ierr, icolor, iicommx, iicommm, iicommo
         INTEGER :: ji,inum
         LOGICAL :: lcompp
+        INCLUDE "mpif.h"
 
         ! Construct multio server communicator
 

@@ -113,7 +113,7 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
 #ifndef __oasis
   if (present(abort)) then
      if (mype==0) write(*,*) 'Run finished unexpectedly!'
-     call MPI_ABORT(MPI_COMM_WORLD, 1, error)
+     call MPI_ABORT(MPI_COMM_WORLD, 1 )
   else
           ! TODO: this is where fesom standalone, ifsinterface etc get to 
           !1. there no abort actually even when model calls abort, and barrier may hang
@@ -580,3 +580,4 @@ if (res /= 0 ) then
     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
 endif
 end subroutine status_check
+
