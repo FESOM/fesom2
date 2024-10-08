@@ -155,6 +155,8 @@ MODULE g_sbf
       character(len = MAX_PATH)                 :: file_name ! file name
       character(len = 34)                  :: var_name  ! variable name in the NetCDF file
       character(len = 34)                  :: calendar  ! variable name in the NetCDF file
+      integer                              :: year_orig ! year according to original time axis
+      integer                              :: year      ! year according to filename year!=year_orig in case of linked forcing
       integer                              :: nc_Nlon
       integer                              :: nc_Nlat
       integer                              :: nc_Ntime
@@ -199,6 +201,7 @@ CONTAINS
       integer                      :: ierror              ! return error code
       character(len=20)            :: aux_calendar
       integer                      :: aux_len
+      integer                      :: yyyy,mm,dd
 
       !open file
       if (mype==0) then
@@ -359,7 +362,7 @@ CONTAINS
          iost = nf_inq_attlen(ncid, id_time,'calendar',aux_len)
          iost = nf_get_att(ncid, id_time,'calendar',aux_calendar)
          aux_calendar = aux_calendar(1:aux_len)
-         
+
          if (iost .ne. NF_NOERR) then
             flf%calendar='none'
             write(*,*) ' --> could not find/read calendar attribute in the time axis'
@@ -429,9 +432,46 @@ CONTAINS
             call par_ex(0)
          end if 
       end if
-      
-    ! transform time axis accorcing to calendar and include_fleapyear=.true./.false. flag  
-      flf%nc_time = flf%nc_time / nm_nc_freq + julday(nm_nc_iyear,nm_nc_imm,nm_nc_idd)
+
+      call MPI_Bcast(flf%calendar, len(flf%calendar), MPI_CHARACTER,0, MPI_COMM_FESOM, ierror)
+
+!     transform time axis accorcing to calendar and include_fleapyear=.true./.false. flag
+!     flf%nc_time = flf%nc_time / nm_nc_freq + julday(nm_nc_iyear,nm_nc_imm,nm_nc_idd)
+
+      ! transfer time-axis of the forcing files in units of days
+      flf%nc_time = flf%nc_time / nm_nc_freq
+
+      ! add the original reference period (1900-01-01(JRA55) to 0000-01-01)  of the
+      ! forcing file in units of days --> new reference period 0001-01-01
+      flf%nc_time = flf%nc_time + julday(nm_nc_iyear,nm_nc_imm,nm_nc_idd,trim(flf%calendar))
+
+      ! Solve special problem here: Ozgurs wants to repeat only part of the JRA55
+      ! forcing periodically (e.g repeat the period 1958-1967) through re-linking
+      ! of the original forcing files.
+      !
+      ! 1st problem: This will mess up the leap year cycle of the entire forcing, so
+      !              the model has to run best without leapyear although the calendar
+      !              system of the forcing remains gregorian (so with leapyear)
+      !              This can be solved by makeing the treatment of the time-axes
+      !              depending on the calendar of the forcing files, not alone from
+      !              the include_fleapyear flag
+      !
+      ! 2nd problem: In the case of a periodically repeated forcing period through
+      !              re-linking of the original files it happens that e.g. the year
+      !              1968 is linked to the file 1958 in that case time axis of the
+      !              1968 forcing file remains that of the original 1958 file. So
+      !              axis needs to be resetted properly
+      call calendar_date(int(flf%nc_time(1)), yyyy, mm, dd, trim(flf%calendar))
+
+      ! remove the reference period of the original file
+      flf%year_orig = yyyy
+      flf%nc_time   = flf%nc_time - julday(yyyy   , 1, 1, trim(flf%calendar))
+
+      ! reset the reference period to the proper year it should represent
+      flf%year      = yearnew
+      flf%nc_time   = flf%nc_time + julday(yearnew, 1, 1, trim(flf%calendar))
+
+
       if (nm_nc_tmid/=1) then
          if (flf%nc_Ntime > 1) then
             do i = 1, flf%nc_Ntime-1
@@ -511,14 +551,16 @@ CONTAINS
       if (l_cloud) sbc_flfi(i_cloud)%var_name=ADJUSTL(trim(nm_cloud_var))
    END SUBROUTINE nc_sbc_ini_fillnames
 
-   SUBROUTINE nc_sbc_ini(rdate, mesh)
+!   SUBROUTINE nc_sbc_ini(rdate, mesh)
+   SUBROUTINE nc_sbc_ini(mesh)
       !!---------------------------------------------------------------------
       !! ** Purpose : initialization of ocean forcing from NETCDF file
       !!----------------------------------------------------------------------
 
       IMPLICIT NONE
-      real(wp),intent(in) :: rdate ! initialization date
-      integer             :: idate
+!      real(wp),intent(in) :: rdate ! initialization date
+!      integer             :: idate
+      real(wp)         :: rdate
       integer             :: yyyy,mm,dd
 
       integer                  :: i
@@ -542,13 +584,19 @@ CONTAINS
 
 
       ! get ini year; Fill names of sbc_flfi
-      idate=int(rdate)
-      call calendar_date(idate,yyyy,mm,dd)
-      call nc_sbc_ini_fillnames(yyyy)
+!      idate=int(rdate)
+!      call calendar_date(idate,yyyy,mm,dd)
+      !call nc_sbc_ini_fillnames(yyyy)
+      call nc_sbc_ini_fillnames(yearnew)
       ! we assume that all NetCDF files have identical grid and time variable
       do fld_idx = 1, i_totfl
          call nc_readTimeGrid(sbc_flfi(fld_idx))
       end do
+
+! compute the model rdate at initial moment
+      rdate = real(julday(yearnew, 1, 1, sbc_flfi(1)%calendar))
+      rdate = rdate+real(daynew-1,WP)+timenew/86400._WP
+
       if (lfirst) then
       do fld_idx = 1, i_totfl
          flf=>sbc_flfi(fld_idx)
@@ -599,6 +647,7 @@ CONTAINS
    SUBROUTINE getcoeffld(fld_idx, rdate, mesh)
       use forcing_provider_async_module
       use io_netcdf_workaround_module
+      use g_clock
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE getcoeffld ***
       !!
@@ -626,10 +675,11 @@ CONTAINS
 !     real(wp), allocatable, dimension(:,:)  :: sbcdata1,sbcdata2
       real(wp)             :: data1,data2
       real(wp)             :: delta_t   ! time(t_indx) - time(t_indx+1)
+      real(wp)             :: rdatep1   ! time(t_indx) - time(t_indx+1)
 
       integer              :: elnodes(4) !4 nodes from one element
       integer              :: numnodes   ! nu,ber of nodes in elem (3 for triangle, 4 for ... )
-      integer              :: yyyy,mm,dd
+      integer              :: yyyy, mm, dd, flag_flpyr=0
       integer              :: ierror              ! return error code
       integer,   pointer   :: nc_Ntime, nc_Nlon, nc_Nlat, t_indx, t_indx_p1
       character(len=MAX_PATH), pointer   :: file_name
@@ -669,8 +719,52 @@ CONTAINS
       now_date = rdate
       call binarysearch(nc_Ntime,nc_time,now_date,t_indx)
       if ( (t_indx < nc_Ntime) .and. (t_indx > 0) ) then
+
          t_indx_p1 = t_indx + 1
          delta_t   = nc_time(t_indx_p1) - nc_time(t_indx)
+
+        !_______________________________________________________________________
+        ! if include_fleapyear==.False. and forcing file of year contains a fleap
+        ! year, try to step over the 29.Feb so it is not used for temporal
+        ! interpolation
+
+        if ((include_fleapyear .eqv. .False.) .and.  &
+            ((trim(sbc_flfi(fld_idx)%calendar).eq.'julian'             ) .or. &
+             (trim(sbc_flfi(fld_idx)%calendar).eq.'gregorian'          ) .or. &
+             (trim(sbc_flfi(fld_idx)%calendar).eq.'proleptic_gregorian') .or. &
+             (trim(sbc_flfi(fld_idx)%calendar).eq.'standard'           ))) then
+
+            ! Need to know what is the original year of the forcing file. In case of
+            ! ozgures problem where forcing files get re-linked it can happen that
+            ! non-leapyears are represented by a leapyear file thus the indexing
+            ! and counting needs to be adapted
+            ! --> sbc_flfi(fld_idx)%year_orig ... year according to original time axis
+            ! --> sbc_flfi(fld_idx)%year      ... year according to filename
+            call is_fleapyr(sbc_flfi(fld_idx)%year_orig, flag_flpyr)
+
+
+            ! here skip the 29.Feb in the counting
+            ! go from 28.Feb directly to 1.Mar for the case the forcing file contains
+            ! a leapyear.
+            if (flag_flpyr==1) then
+                ! skip the 29. Feb if the model finds one in the forcing data
+                call calendar_date(int(nc_time(t_indx_p1)), yyyy, mm, dd, sbc_flfi(fld_idx)%calendar )
+                if (mm==2 .and. dd==29) then
+                    ! --> go directly to the first time slice what represents the
+                    !     1. March
+                    rdatep1 = real(julday(yearnew,1,1, sbc_flfi(fld_idx)%calendar ),WP)
+                    rdatep1 = rdatep1+real(60,WP) + delta_t*0.5_WP
+                    call binarysearch(nc_Ntime, nc_time, rdatep1, t_indx_p1)
+                    delta_t   = nc_time(t_indx_p1) - nc_time(t_indx)
+                    if (mype==0 .and. fld_idx==1) then
+                        call calendar_date(int(nc_time(t_indx_p1)), yyyy, mm, dd, sbc_flfi(fld_idx)%calendar )
+                        write(*,*) ' --> jump over 29. Feb, now : yy, mm, dd  = ', yyyy, mm, dd
+                    end if
+                end if
+            end if
+        end if
+
+
       elseif (t_indx > 0) then ! NO extrapolation to future
          t_indx    = nc_Ntime
          t_indx_p1 = t_indx
@@ -885,8 +979,8 @@ CONTAINS
       !!----------------------------------------------------------------------
       IMPLICIT NONE
 
-      integer            :: idate ! initialization date
-      real(wp)           :: rdate ! initialization date
+!      integer            :: idate ! initialization date
+!      real(wp)           :: rdate ! initialization date
       integer            :: iost  ! I/O status
       integer            :: sbc_alloc                   !: allocation status
 
@@ -912,10 +1006,10 @@ CONTAINS
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
       close( nm_sbc_unit )
       
-      if (mype==0) write(*,*) "Start: Ocean forcing inizialization."
-      rdate = real(julday(yearnew,1,1))
-      rdate = rdate+real(daynew-1,WP)+timenew/86400._WP
-      idate = int(rdate)
+!      if (mype==0) write(*,*) "Start: Ocean forcing inizialization."
+!      rdate = real(julday(yearnew,1,1))
+!      rdate = rdate+real(daynew-1,WP)+timenew/86400._WP
+!      idate = int(rdate)
 
       if (mype==0) then
          write(*,*) "Start: Ocean forcing inizialization."
@@ -1024,7 +1118,9 @@ CONTAINS
       emp          = 0.0_WP
       qsr          = 0.0_WP
       ALLOCATE(sbc_flfi(i_totfl))
-      call nc_sbc_ini(rdate, mesh)
+!      call nc_sbc_ini(rdate, mesh)
+      call nc_sbc_ini(mesh)
+
       !==========================================================================
       ! runoff    
       if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
@@ -1037,6 +1133,8 @@ CONTAINS
       if (mype==0) write(*,*) "DONE:  Ocean forcing inizialization."
       if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
    END SUBROUTINE sbc_ini
+
+
 
    SUBROUTINE sbc_do(mesh)
       !!---------------------------------------------------------------------
@@ -1052,7 +1150,7 @@ CONTAINS
       real(wp)     :: rdate ! date
       integer      :: fld_idx, i
       logical      :: do_rotation, force_newcoeff, update_monthly_flag
-      integer      :: yyyy, dd, mm
+      integer      :: yyyy, dd, mm, flag_flpyr=0
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
       real(wp),  pointer   :: nc_time(:)
       character(len=MAX_PATH)   :: filename
@@ -1062,23 +1160,58 @@ CONTAINS
 
       force_newcoeff=.false.
       if (yearnew/=yearold) then
-         rdate = real(julday(yearnew,1,1),WP)
-         call calendar_date(int(rdate),yyyy,dd,mm)
+!         rdate = real(julday(yearnew,1,1),WP)
+!         call calendar_date(int(rdate),yyyy,dd,mm)
          ! use next set of forcing files
-         call nc_sbc_ini_fillnames(yyyy)
+!         call nc_sbc_ini_fillnames(yyyy)
+         call nc_sbc_ini_fillnames(yearnew)
+
          ! we assume that all NetCDF files have identical grid and time variable
          do fld_idx = 1, i_totfl
             call nc_readTimeGrid(sbc_flfi(fld_idx))            
          end do
          force_newcoeff=.true.
       end if
-      
 
-      rdate = real(julday(yearnew,1,1),WP)
-      rdate = rdate+real(daynew-1,WP)+timenew/86400._WP-dt/86400._WP/2._WP
+
+!      rdate = real(julday(yearnew,1,1),WP)
+!      rdate = rdate+real(daynew-1,WP)+timenew/86400._WP-dt/86400._WP/2._WP
       do_rotation=.false.
 
       do fld_idx = 1, i_totfl
+         ! compute model rdate based on the calendar option of the forcing file
+         ! so match up
+         rdate = real(julday(yearnew,1,1,sbc_flfi(1)%calendar),WP)
+         rdate = rdate+real(daynew-1,WP)+timenew/86400._WP-dt/86400._WP/2._WP
+
+        !_______________________________________________________________________
+        ! special case if include_fleapyear==False but the calendar of the forcing
+        ! is julian or gregorian, so has the potential to contain a fleapyear value
+        if ((include_fleapyear .eqv. .False.) .and.  &
+            ((trim(sbc_flfi(fld_idx)%calendar).eq.'julian'             ) .or. &
+             (trim(sbc_flfi(fld_idx)%calendar).eq.'gregorian'          ) .or. &
+             (trim(sbc_flfi(fld_idx)%calendar).eq.'proleptic_gregorian') .or. &
+             (trim(sbc_flfi(fld_idx)%calendar).eq.'standard'           ))) then
+
+            ! Need to know what is the original year of the forcing file. In case of
+            ! ozgures problem where forcing files get re-linked it can happen that
+            ! non-leapyears are represented by a leapyear file thus the indexing
+            ! and counting needs to be adapted
+            ! --> sbc_flfi(fld_idx)%year_orig ... year according to original time axis
+            ! --> sbc_flfi(fld_idx)%year      ... year according to filename
+            call is_fleapyr(sbc_flfi(fld_idx)%year_orig, flag_flpyr)
+
+            ! here skip the 29.Feb (28 Feb is the 59 day in year) in the counting
+            ! go from 28.Feb directly to 1.Mar for the case the forcing file contains
+            ! a leapyear.
+            if (flag_flpyr==1 .and. daynew>59) then
+                rdate = real(julday(yearnew,1,1, sbc_flfi(fld_idx)%calendar ),WP)
+                rdate = rdate+real(daynew-1+1,WP)+timenew/86400._WP-dt/86400._WP/2._WP
+            end if
+        end if
+
+        !_______________________________________________________________________
+
          nc_time  =>sbc_flfi(fld_idx)%nc_time
          t_indx_p1=>sbc_flfi(fld_idx)%t_indx_p1
          t_indx   =>sbc_flfi(fld_idx)%t_indx
@@ -1088,6 +1221,7 @@ CONTAINS
             call getcoeffld(fld_idx, rdate, mesh)
             if (fld_idx==i_xwind) do_rotation=.true.
          endif
+
       end do
 
       if (do_rotation) then
@@ -1177,11 +1311,13 @@ CONTAINS
 
    END SUBROUTINE err_call
 
-   FUNCTION julday(yyyy,mm,dd)
+!   FUNCTION julday(yyyy,mm,dd)
+   FUNCTION julday(yyyy,mm,dd,calendar)
 
    IMPLICIT NONE
       integer, INTENT(IN) :: mm, dd, yyyy
       integer             :: julday
+      character(len=*)    :: calendar
       ! In this routine julday returns the Julian Day Number that begins at noon of the calendar     
       !    date specified by month mm, day dd , and year yyyy, all integer variables. Positive year
       !    signifies A.D.; negative, B.C. Remember that the year after 1 B.C. was 1 A.D. (from Num. Rec.)
@@ -1192,7 +1328,11 @@ CONTAINS
          julday=0
          return
       end if
-      if (include_fleapyear) then
+!      if (include_fleapyear) then
+         if ((trim(calendar).eq.'julian')    .or. &
+                 (trim(calendar).eq.'gregorian') .or. &
+                 (trim(calendar).eq.'proleptic_gregorian') .or. &
+                 (trim(calendar).eq.'standard')) then
          jy = yyyy
          if (jy == 0) STOP 'julday: there is no year zero'
          if (jy < 0) jy=jy+1
@@ -1214,20 +1354,26 @@ CONTAINS
    END FUNCTION julday
 
 
-   SUBROUTINE calendar_date(julian,yyyy,mm,dd)
+   !SUBROUTINE calendar_date(julian,yyyy,mm,dd)
+   SUBROUTINE calendar_date(julian,yyyy,mm,dd, calendar)
 
 !  Converts a Julian day to a calendar date (year, month and day). Numerical Recipes
    IMPLICIT NONE
 !
       integer,intent(in)  :: julian
       integer,intent(out) :: yyyy,mm,dd
+      character(len=*)    :: calendar
 
       integer, parameter :: IGREG=2299161
       integer            :: ja,jb,jc,jd,je
       real(wp)           :: x
       !
       !-----------------------------------------------------------------------
-      if (include_fleapyear) then
+!      if (include_fleapyear) then
+         if ((trim(calendar).eq.'julian')    .or. &
+                 (trim(calendar).eq.'gregorian') .or. &
+                 (trim(calendar).eq.'proleptic_gregorian') .or. &
+                 (trim(calendar).eq.'standard')) then
          if (julian >= IGREG ) then
             x = ((julian-1867216)-0.25_WP)/36524.25_WP
             ja = julian+1+int(x)-int(0.25*x)

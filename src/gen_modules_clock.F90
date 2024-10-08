@@ -182,17 +182,25 @@ contains
   !
   subroutine check_fleapyr(year, flag)
     implicit none
-    integer, intent(in) :: year      
+    integer, intent(in) :: year
     integer, intent(out):: flag
 
     flag=0
 
     if(.not.include_fleapyear) return
+    call is_fleapyr(year, flag)
 
+  end subroutine check_fleapyr
+
+  subroutine is_fleapyr(year, flag)
+    implicit none
+    integer, intent(in) :: year
+    integer, intent(out):: flag
+    flag=0
     if ((mod(year,4)==0.and.mod(year,100)/=0) .or. mod(year,400)==0) then
        flag=1
     endif
-  end subroutine check_fleapyr
+  end subroutine is_fleapyr
   !
   !----------------------------------------------------------------------------
   !

@@ -1228,6 +1228,7 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
 
         endif
 
+        ! Cal
         if( tracer_id(tr_num)==1020 .or. &  !iphycal  ! computed using Vcocco in case of coccos, otherwise Vphy
             tracer_id(tr_num)==1021 ) then   !idetcal
 !            tracer_id(tr_num)==1021 .or. &  !idetcal
