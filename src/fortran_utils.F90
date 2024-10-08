@@ -1,6 +1,5 @@
  ! synopsis: basic Fortran utilities, no MPI, dependencies only to INTRINSIC modules
 module fortran_utils
-  use mpi
   implicit none
 
 contains
@@ -49,6 +48,7 @@ contains
     integer mype
     integer npes
     integer mpierr
+    include 'mpif.h'
 
     call MPI_Comm_Rank(mpicomm, mype, mpierr)
     call MPI_Comm_Size(mpicomm, npes, mpierr)

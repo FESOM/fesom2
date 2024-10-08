@@ -5,12 +5,12 @@ USE O_PARAM
 USE, intrinsic :: ISO_FORTRAN_ENV, only : int32
 USE MOD_WRITE_BINARY_ARRAYS
 USE MOD_READ_BINARY_ARRAYS
-USE mpi
 #if defined(_OPENMP)
     USE OMP_LIB
 #endif
 IMPLICIT NONE
 SAVE
+include 'mpif.h'
 integer, parameter   :: MAX_LAENDERECK=16
 integer, parameter   :: MAX_NEIGHBOR_PARTITIONS=32
 
