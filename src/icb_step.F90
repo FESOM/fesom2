@@ -464,7 +464,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
  i_have_element=.false.
  !if the first node belongs to this processor.. (just one processor enters here!)
  !if( local_idx_of(iceberg_elem) > 0 .and. elem2D_nodes(1,local_idx_of(iceberg_elem)) <= myDim_nod2D ) then
-if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDim_elem2D) ) then
+if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDim_elem2D+partit%eDim_elem2D) ) then 
   if( elem2D_nodes(1,local_idx_of(iceberg_elem)) <= partit%myDim_nod2D ) then
 
   i_have_element=.true. 
