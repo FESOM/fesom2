@@ -21,14 +21,14 @@ module restart_file_group_module
 
     integer, public :: nfiles = 0 ! todo: allow dynamically allocated size without messing with shallow copied pointers
   contains
-    generic, public :: def_node_var => def_node_var_2d, def_node_var_3d, def_node_var_2dicepack
+    generic, public :: def_node_var => def_node_var_2d, def_node_var_2dicepack, def_node_var_3d
     generic, public :: def_elem_var => def_elem_var_2d, def_elem_var_3d
-    procedure, private :: def_node_var_2d, def_node_var_3d, def_node_var_2dicepack
+    procedure, private :: def_node_var_2d, def_node_var_2dicepack, def_node_var_3d
     procedure, private :: def_elem_var_2d, def_elem_var_3d
     ! def_*_optional procedures create a restart variable which does not have to exist when reading the restart file
-    generic, public :: def_node_var_optional => def_node_var_2d_optional, def_node_var_3d_optional, def_node_var_2dicepack_optional
+    generic, public :: def_node_var_optional => def_node_var_2d_optional, def_node_var_2dicepack_optional, def_node_var_3d_optional
     generic, public :: def_elem_var_optional => def_elem_var_2d_optional, def_elem_var_3d_optional
-    procedure, private :: def_node_var_2d_optional, def_node_var_3d_optional, def_node_var_2dicepack_optional
+    procedure, private :: def_node_var_2d_optional, def_node_var_2dicepack_optional, def_node_var_3d_optional
     procedure, private :: def_elem_var_2d_optional, def_elem_var_3d_optional
   end type
   
@@ -44,7 +44,7 @@ contains
     type(t_mesh), intent(in) :: mesh
     type(t_partit), intent(in) :: partit
     ! EO parameters
-
+!PS     write(*,*) "--> def_node_var_2d:", __LINE__, __FILE__
     call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
     call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
   end subroutine
@@ -62,9 +62,9 @@ contains
     type(t_mesh)    , intent(in)        :: mesh
     type(t_partit)  , intent(in)        :: partit
     ! EO parameters
-
+!PS     write(*,*) "--> def_node_var_2dicepack:", __LINE__, __FILE__
     call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl, partit, nitc)
-    call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
+    call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data, nitc)
   end subroutine
 
   subroutine def_node_var_3d(this, name, longname, units, local_data, mesh, partit)
@@ -76,7 +76,7 @@ contains
     type(t_mesh), intent(in) :: mesh
     type(t_partit), intent(in) :: partit
     ! EO parameters
-
+!PS     write(*,*) "--> def_node_var_3d:", __LINE__, __FILE__
     call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
     call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
   end subroutine
@@ -91,7 +91,7 @@ contains
     type(t_mesh), intent(in) :: mesh
     type(t_partit), intent(in) :: partit
     ! EO parameters
-
+!PS     write(*,*) "--> def_elem_var_2d:", __LINE__, __FILE__
     call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
     call this%files(this%nfiles)%specify_elem_var(name, longname, units, local_data)
   end subroutine
@@ -106,7 +106,7 @@ contains
     type(t_mesh), intent(in) :: mesh
     type(t_partit), intent(in) :: partit
     ! EO parameters
-
+!PS     write(*,*) "--> def_elem_var_3d:", __LINE__, __FILE__
     call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
     call this%files(this%nfiles)%specify_elem_var(name, longname, units, local_data)
   end subroutine
@@ -172,7 +172,7 @@ contains
     ! EO parameters
 
     call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl, partit, nitc)
-    call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
+    call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data, nitc)
   end subroutine
 
   subroutine def_node_var_3d_optional(this, name, longname, units, local_data, mesh, partit)

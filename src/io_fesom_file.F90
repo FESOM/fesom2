@@ -43,9 +43,9 @@ module io_fesom_file_module
     procedure, public :: async_read_and_scatter_variables, async_gather_and_write_variables, join, init, is_iorank, rec_count, time_varindex, time_dimindex
     procedure, public :: read_variables_raw, write_variables_raw
     procedure, public :: close_file ! inherited procedures we overwrite
-    generic, public :: specify_node_var => specify_node_var_2d, specify_node_var_3d, specify_node_var_2dicepack
+    generic, public :: specify_node_var => specify_node_var_2d, specify_node_var_2dicepack, specify_node_var_3d 
     generic, public :: specify_elem_var => specify_elem_var_2d, specify_elem_var_3d
-    procedure, private :: specify_node_var_2d, specify_node_var_3d, specify_node_var_2dicepack
+    procedure, private :: specify_node_var_2d, specify_node_var_2dicepack, specify_node_var_3d
     procedure, private :: specify_elem_var_2d, specify_elem_var_3d
     procedure, private :: read_and_scatter_variables, gather_and_write_variables
   end type
@@ -450,6 +450,7 @@ use nvfortran_subarray_workaround_module
     real(8), pointer :: external_local_data_ptr(:,:)
     type(dim_info) level_diminfo
 
+!PS     write(*,*) "--> specify_node_var_2d:", __LINE__, __FILE__
     level_diminfo = obtain_diminfo(this, m_nod2d)
    
     external_local_data_ptr(1:1,1:size(local_data)) => local_data(:)
@@ -466,6 +467,7 @@ use nvfortran_subarray_workaround_module
     ! EO parameters
     type(dim_info) level_diminfo, nitc_diminfo
     
+!PS     write(*,*) "--> specify_node_var_2dicepack:", __LINE__, __FILE__
     level_diminfo = obtain_diminfo(this, m_nod2d)    
     nitc_diminfo = obtain_diminfo(this, size(local_data, dim=2))
 
@@ -481,7 +483,8 @@ use nvfortran_subarray_workaround_module
     real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
     ! EO parameters
     type(dim_info) level_diminfo, depth_diminfo
-
+    
+!PS     write(*,*) "--> specify_node_var_3d:", __LINE__, __FILE__
     level_diminfo = obtain_diminfo(this, m_nod2d)    
     depth_diminfo = obtain_diminfo(this, size(local_data, dim=1))
 
@@ -499,6 +502,7 @@ use nvfortran_subarray_workaround_module
     real(8), pointer :: external_local_data_ptr(:,:)
     type(dim_info) level_diminfo
 
+!PS     write(*,*) "--> specify_elem_var_2d:", __LINE__, __FILE__
     level_diminfo = obtain_diminfo(this, m_elem2d)
 
     external_local_data_ptr(1:1,1:size(local_data)) => local_data(:)
@@ -515,6 +519,7 @@ use nvfortran_subarray_workaround_module
     ! EO parameters
     type(dim_info) level_diminfo, depth_diminfo
 
+!PS     write(*,*) "--> specify_elem_var_3d:", __LINE__, __FILE__
     level_diminfo = obtain_diminfo(this, m_elem2d)
     depth_diminfo = obtain_diminfo(this, size(local_data, dim=1))
     
@@ -537,16 +542,18 @@ use nvfortran_subarray_workaround_module
       end if
     end do
     
+!PS     write(*,*) 'm_n2d=',m_nod2d,', m_e2d=',m_elem2d,', m_nl=', m_nl,', nitc', m_nitc, ', LEN=', len
+    
     ! the dim has not been added yet, see if it is one of our allowed mesh related dims
-    if(len == m_nod2d) then
+    if     (len == m_nod2d)  then
       info = dim_info( idx=this%add_dim('node', len), len=len)
     else if(len == m_elem2d) then
       info = dim_info( idx=this%add_dim('elem', len), len=len)
-    else if(len == m_nl-1) then
+    else if(len == m_nl-1  ) then
       info = dim_info( idx=this%add_dim('nz_1', len), len=len)
-    else if(len == m_nl) then
+    else if(len == m_nl    ) then
       info = dim_info( idx=this%add_dim('nz'  , len), len=len)
-    else if(len == m_nitc) then
+    else if(len == m_nitc  ) then
       info = dim_info( idx=this%add_dim('nitc', len), len=len)  
     else
       print *, "error in line ",__LINE__, __FILE__," can not find dimension with size",len
