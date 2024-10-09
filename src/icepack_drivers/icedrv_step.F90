@@ -313,7 +313,10 @@ submodule (icedrv_main) icedrv_step
     
           logical (kind=log_kind) :: &
              tr_fsd  ! floe size distribution tracers
-    
+             
+          logical (kind=log_kind) :: &
+             update_ocn_f  ! floe size distribution tracers   
+          
           character(len=*), parameter :: subname='(step_therm2)'
     
           !-----------------------------------------------------------------
@@ -322,6 +325,7 @@ submodule (icedrv_main) icedrv_step
     
           call icepack_query_tracer_sizes(ntrcr_out=ntrcr, nbtrcr_out=nbtrcr)
           call icepack_query_tracer_flags(tr_fsd_out=tr_fsd)
+          call icepack_query_parameters(update_ocn_f_out=update_ocn_f)
           call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
@@ -939,7 +943,6 @@ submodule (icedrv_main) icedrv_step
              frzmlt    , & ! freezing/melting potential (W/m^2)
              fhocn_tot , & ! net total heat flux to ocean (W/m^2)
              fresh_tot     ! fresh total water flux to ocean (kg/m^2/s)
-             
 
           real (kind=dbl_kind), parameter :: &
              frzmlt_max = c1000   ! max magnitude of frzmlt (W/m^2)
@@ -1190,8 +1193,8 @@ submodule (icedrv_main) icedrv_step
           ! tendencies needed by fesom
           !-----------------------------------------------------------------
 
-          dhi_dt(:) = vice(:)
-          dhs_dt(:) = vsno(:)
+          dhi_t_dt(:) = vice(:)
+          dhs_t_dt(:) = vsno(:)
 
           !-----------------------------------------------------------------
           ! initialize diagnostics
@@ -1214,17 +1217,18 @@ submodule (icedrv_main) icedrv_step
           call step_therm2     (dt) ! ice thickness distribution thermo
     
           !-----------------------------------------------------------------
+          ! clean up, update tendency diagnostics
+          !-----------------------------------------------------------------
+          offset = dt
+          call update_state (dt, daidtt, dvidtt, dagedtt, offset)
+          
+          !-----------------------------------------------------------------
           ! tendencies needed by fesom
           !-----------------------------------------------------------------
 
-          dhi_dt(:) = ( vice(:) - dhi_dt(:) ) / dt
-          dhs_dt(:) = ( vsno(:) - dhs_dt(:) ) / dt
+          dhi_t_dt(:) = ( vice(:) - dhi_t_dt(:) ) / dt
+          dhs_t_dt(:) = ( vsno(:) - dhs_t_dt(:) ) / dt
          
-          ! clean up, update tendency diagnostics
-    
-          offset = dt
-          call update_state (dt, daidtt, dvidtt, dagedtt, offset)
-    
           !-----------------------------------------------------------------
           ! dynamics, transport, ridging
           !-----------------------------------------------------------------
@@ -1282,19 +1286,39 @@ submodule (icedrv_main) icedrv_step
 
              t3 = MPI_Wtime()
              time_advec = t3 - t2
-
+             
+             !-----------------------------------------------------------------
+             ! initialize tendencies needed by fesom
+             !-----------------------------------------------------------------
+             dhi_r_dt(:) = vice(:)
+             dhs_r_dt(:) = vsno(:)
+             
              !-----------------------------------------------------------------
              ! ridging
              !-----------------------------------------------------------------
-
              call step_dyn_ridge (dt_dyn, ndtd)
      
              ! clean up, update tendency diagnostics
              offset = c0
              call update_state (dt_dyn, daidtd, dvidtd, dagedtd, offset)
-    
+             
+             !-----------------------------------------------------------------
+             ! tendencies needed by fesom
+             !-----------------------------------------------------------------
+             ! --> ridging adds fresh water need to know for compensation of thermodynamic
+             !     growth rate of ice and snow in fesom
+             dhi_r_dt(:) = ( vice(:) - dhi_r_dt(:) ) / dt
+             dhs_r_dt(:) = ( vsno(:) - dhs_r_dt(:) ) / dt
+             
           enddo
-    
+          
+          !-----------------------------------------------------------------
+          ! total tendencies of thermodynamic and ridging needed by fesom
+          !-----------------------------------------------------------------
+          ! --> needed for total compenstion of fresh of thgr and thgrsn
+          dhi_dt(:) = dhi_r_dt(:) + dhi_t_dt(:) 
+          dhs_dt(:) = dhs_r_dt(:) + dhs_t_dt(:)
+          
           !-----------------------------------------------------------------
           ! albedo, shortwave radiation
           !-----------------------------------------------------------------

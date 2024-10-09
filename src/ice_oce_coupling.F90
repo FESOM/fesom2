@@ -376,8 +376,8 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     ! Evaporation (convert units from icepack to fesom)
     evaporation     = - evaporation * (1.0_WP - a_ice) * inv_rhowat
 
-    ! Ice-Sublimation is not added to evap in icepack 
-    ice_sublimation = 0.0_WP
+!PS     ! Ice-Sublimation is not added to evap in icepack 
+!PS     ice_sublimation = 0.0_WP
 
     call init_flux_atm_ocn()
 
@@ -519,14 +519,25 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     !          concentration (a_ice). In our standard ice model rain, snow and evap is
     !          added based on the ice concentration of the previous time step (a_ice_old)  
     !          So for the proper balancing of snow the proper aice has to be choosen 
+    !          -icepack_therm_itd.F90 --> subroutine icepack_step_therm2(...)
+    !           fresh  = fresh + frain*aice
+    !          -icedrv_step.F90: subroutine ocn_mixed_layer_icepack(...
+    !           fresh_tot = fresh + (-evap_ocn + frain + fsnow)*(c1-aice)
+    !          At the end all rain is added to the ocean, only snow needs to be
+    !          scaled with (1-aice )
+    !          -Ice-Sublimation is not added to evap in icepack, therefor we dont need
+    !           to compensate for it the ice2atmos subplimation does not contribute 
+    !           to the freshwater flux into the ocean
+                   
 !$OMP PARALLEL DO
     do n=1, myDim_nod2D+eDim_nod2D
         flux(n) = evaporation(n)                      &
-                  -ice_sublimation(n)                 & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
                   +prec_rain(n)                       &
+                  
 #if defined (__icepack)
                   +prec_snow(n)*(1.0_WP-a_ice(n))     &
 #else
+                  -ice_sublimation(n)                 & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
                   +prec_snow(n)*(1.0_WP-a_ice_old(n)) &
 #endif
 

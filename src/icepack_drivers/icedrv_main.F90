@@ -153,6 +153,10 @@
              opening(:),  & ! rate of opening due to divergence/shear (1/s)   
              dhi_dt(:),   & ! ice volume tendency due to thermodynamics (m/s)
              dhs_dt(:),   & ! snow volume tendency due to thermodynamics (m/s) 
+             dhi_t_dt(:),   & ! ice volume tendency due to thermodynamics (m/s)
+             dhs_t_dt(:),   & ! snow volume tendency due to thermodynamics (m/s)
+             dhi_r_dt(:),   & ! ice volume tendency due to ridging (m/s)
+             dhs_r_dt(:),   & ! snow volume tendency due to ridging (m/s)
              ! ridging diagnostics in categories
              dardg1ndt(:,:), & ! rate of area loss by ridging ice (1/s)
              dardg2ndt(:,:), & ! rate of area gain by new ridges (1/s)
