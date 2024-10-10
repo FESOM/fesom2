@@ -57,14 +57,14 @@ Z_3d_n(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)              => mesh%Z_3d_n(:,:)
 #if defined(__async_icebergs)
 Z_3d_n_ib(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)           => mesh%Z_3d_n_ib(:,:)
 #endif
-helem(1:mesh%nl-1, 1:myDim_elem2D)                         => mesh%helem(:,:)
-bottom_elem_thickness(1:myDim_elem2D)                      => mesh%bottom_elem_thickness(:)
+helem(1:mesh%nl-1, 1:myDim_elem2D+eDim_elem2D)             => mesh%helem(:,:)
+bottom_elem_thickness(1:myDim_elem2D+eDim_elem2D)          => mesh%bottom_elem_thickness(:)
 bottom_node_thickness(1:myDim_nod2D+eDim_nod2D)            => mesh%bottom_node_thickness(:)
 dhe(1:myDim_elem2D)                                        => mesh%dhe(:)
 hbar(1:myDim_nod2D+eDim_nod2D)                             => mesh%hbar(:)
 hbar_old(1:myDim_nod2D+eDim_nod2D)                         => mesh%hbar_old(:)
-!zbar_n(1:mesh%nl)                                          => mesh%zbar_n
-!Z_n(1:mesh%nl-1)                                           => mesh%Z_n
+!zbar_n(1:mesh%nl)                                         => mesh%zbar_n
+!Z_n(1:mesh%nl-1)                                          => mesh%Z_n
 zbar_n_bot(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_bot(:)
 zbar_e_bot(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_bot(:)
 zbar_n_srf(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_srf(:)

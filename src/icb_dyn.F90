@@ -25,7 +25,7 @@ implicit none
 !   Thomas Rackow, 29.06.2010
 !==============================================================================
 subroutine iceberg_dyn(mesh, partit, ice, dynamics, ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
-                       height_ib, length_ib, width_ib, iceberg_elem, &
+               height_ib, length_ib, width_ib, iceberg_elem, &
 		       mass_ib, Ci, Ca, Co, Cda_skin, Cdo_skin, &
 		       rho_ice, rho_air, rho_h2o, P_sill, conc_sill, frozen_in, &
 		       file1, file2, P_ib, conci_ib, dt_ib, lastsubstep, &
@@ -35,8 +35,8 @@ subroutine iceberg_dyn(mesh, partit, ice, dynamics, ib, new_u_ib, new_v_ib, u_ib
  use g_forcing_arrays 	!for u_wind, v_wind or u_wind_ib, v_wind_ib respectively
  use o_arrays, only: Tsurf_ib, Ssurf_ib
  use o_param		!for dt
- !use iceberg_params,only: l_melt, coriolis_scale !are icebergs allowed to melt?
 
+ integer                :: ib_n_lvls, m
  integer, intent(IN) 	:: ib !current iceberg's index
  real,    intent(OUT)	:: new_u_ib, new_v_ib
  real,    intent(IN)    :: u_ib, v_ib
@@ -61,21 +61,21 @@ subroutine iceberg_dyn(mesh, partit, ice, dynamics, ib, new_u_ib, new_v_ib, u_ib
 
 !LA 2023-03-07
  real, dimension(:), pointer    :: hi_ib3, conci_ib3, coriolis
- real, dimension(3) 	:: uo_dz, vo_dz, uo_keel, vo_keel, T_dz,S_dz, T_keel,S_keel !hi_ib3, conci_ib3, 
+ real, dimension(3) 	:: uo_keel, vo_keel, T_keel,S_keel, uo_dz, vo_dz, T_dz,S_dz!hi_ib3, conci_ib3, 
+ real, dimension(:,:), allocatable 	:: arr_uo_dz, arr_vo_dz, arr_T_dz,arr_S_dz !hi_ib3, conci_ib3, 
  real 			:: uo_ib, vo_ib, ua_ib, va_ib, ui_ib, vi_ib, hi_ib, uo_skin_ib, vo_skin_ib
+ real, dimension(:), allocatable :: arr_uo_ib, arr_vo_ib, arr_T_ave_ib, arr_S_ave_ib
  real 			:: Ao, Aa, Ai, Ad, fcoriolis
  real 			:: au_ib, av_ib
  real, dimension(2,2) 	:: SI_matrix
  real, dimension(2)	:: SI_velo
  real 			:: u_ib_tmp, v_ib_tmp, normold, normnew, abs_omib, abs_omib_skin, ocean_drag
- integer 		:: iter_ib
+ integer 		:: iter_ib, n, n2
  real          		:: M_b, M_v, M_e, M_bv, sst_ib, sss_ib ! meltrates (basal, lateral, erosion, lateral 'basal'), temp. & salinity
  real			:: T_ave_ib, S_ave_ib, T_keel_ib, S_keel_ib
  character,  intent(IN)	:: file3*80
  real, intent(IN)	:: rho_icb
  
-! integer, dimension(3)  :: tmp_arr
-
 type(t_ice)   , intent(inout), target :: ice
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
@@ -85,19 +85,44 @@ type(t_dyn)   , intent(inout), target :: dynamics
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
   
+n2=elem2D_nodes(1,iceberg_elem)
+allocate(arr_uo_dz(3,nlevels_nod2D(n2)))
+allocate(arr_vo_dz(3,nlevels_nod2D(n2)))
+allocate(arr_T_dz(3,nlevels_nod2D(n2)))
+allocate(arr_S_dz(3,nlevels_nod2D(n2)))
+arr_uo_dz = 0.0
+arr_vo_dz = 0.0
+arr_T_dz = 0.0
+arr_S_dz = 0.0
+
+allocate(arr_uo_ib(nlevels_nod2D(n2)))
+allocate(arr_vo_ib(nlevels_nod2D(n2)))
+allocate(arr_T_ave_ib(nlevels_nod2D(n2)))
+allocate(arr_S_ave_ib(nlevels_nod2D(n2)))
+arr_uo_ib = 0.0
+arr_vo_ib = 0.0
+arr_T_ave_ib = 0.0
+arr_S_ave_ib = 0.0
+
  !OCEAN VELOCITIES: 
  ! - (uo_ib, vo_ib)		: integrated mean velocity at location of iceberg
  ! - (uo_skin_ib, vo_skin_ib)	: velocity below the draft of the iceberg
  ! call iceberg_avvelo_ufkeel(uo_dz,vo_dz, uo_keel,vo_keel, depth_ib,iceberg_elem) 
  call iceberg_average_andkeel(mesh, partit, dynamics, uo_dz,vo_dz, uo_keel,vo_keel, T_dz,S_dz, T_keel,S_keel, depth_ib,iceberg_elem, ib)
- call FEM_3eval(mesh, partit, uo_ib,vo_ib,lon,lat,uo_dz,vo_dz,iceberg_elem)
- call FEM_3eval(mesh, partit, uo_skin_ib,vo_skin_ib,lon,lat,uo_keel,vo_keel,iceberg_elem)
  
+ !OCEANIC VELOCITY uo_ib, vo_ib
+ call FEM_3eval(mesh, partit, uo_ib,vo_ib,lon,lat,uo_dz,vo_dz,iceberg_elem)
+
+ call iceberg_levelwise_andkeel(mesh, partit, dynamics, arr_uo_dz,arr_vo_dz, uo_keel,vo_keel, arr_T_dz,arr_S_dz, T_keel,S_keel, depth_ib,iceberg_elem, ib, ib_n_lvls)
+ do n=1, ib_n_lvls
+    call FEM_3eval(mesh, partit, arr_uo_ib(n),arr_vo_ib(n),lon,lat,arr_uo_dz(:,n),arr_vo_dz(:,n),iceberg_elem)
+    call FEM_3eval(mesh, partit, arr_T_ave_ib(n),arr_S_ave_ib(n),lon,lat,arr_T_dz(:,n),arr_S_dz(:,n),iceberg_elem)
+ end do 
+ call FEM_3eval(mesh, partit, uo_skin_ib,vo_skin_ib,lon,lat,uo_keel,vo_keel,iceberg_elem)
 
  !TEMPERATURE AND SALINITY:
  ! - T_ave_ib, S_ave_ib		: Mean T & S (integrated) at location of iceberg
  ! - T_keel_ib, S_keel_ib	: T & S below the draft of the iceberg (depth_ib)
- call FEM_3eval(mesh, partit, T_ave_ib,S_ave_ib,lon,lat,T_dz,S_dz,iceberg_elem)
  call FEM_3eval(mesh, partit, T_keel_ib,S_keel_ib,lon,lat,T_keel,S_keel,iceberg_elem)
 
 
@@ -133,13 +158,13 @@ type(t_dyn)   , intent(inout), target :: dynamics
 
  !========================THERMODYNAMICS============================
  if(l_melt) then
-
   call FEM_eval(mesh, partit, sst_ib,sss_ib,lon,lat,Tsurf_ib,Ssurf_ib,iceberg_elem)
-  call iceberg_meltrates(	M_b, M_v, M_e, M_bv, &
-				u_ib,v_ib, uo_ib,vo_ib, ua_ib,va_ib, &
+ 
+  call iceberg_meltrates(partit, mesh, M_b, M_v, M_e, M_bv, &
+				u_ib,v_ib, arr_uo_ib,arr_vo_ib, ua_ib,va_ib, &
 				sst_ib, length_ib, conci_ib, &
-				uo_skin_ib, vo_skin_ib, T_keel_ib, S_keel_ib, depth_ib, &
-				T_ave_ib, S_ave_ib, ib)
+				uo_skin_ib, vo_skin_ib, T_keel_ib, S_keel_ib, depth_ib, height_ib, &
+				arr_T_ave_ib, arr_S_ave_ib, ib, rho_icb, uo_ib, vo_ib, ib_n_lvls, iceberg_elem, nlevels_nod2D(n2))
 
   call iceberg_newdimensions(partit, ib, depth_ib,height_ib,length_ib,width_ib,M_b,M_v,M_e,M_bv, &
 			     rho_h2o, rho_icb, file3)
@@ -579,6 +604,260 @@ subroutine compute_areas(Ao, Aa, Ai, Ad, depth_ib, &
   
 end subroutine compute_areas
 
+!***************************************************************************************************************************
+!***************************************************************************************************************************
+
+
+subroutine iceberg_levelwise_andkeel(mesh, partit, dynamics, uo_dz,vo_dz, uo_keel,vo_keel, T_dz,S_dz, T_keel,S_keel, depth_ib,iceberg_elem, ib, ib_n_lvls)
+  USE MOD_MESH
+  use o_param
+  use MOD_PARTIT
+  use MOD_DYN
+
+  use o_arrays, only: Tclim_ib, Sclim_ib !, UV_ib, Z_3d_n_ib
+
+  use g_clock
+  use g_forcing_arrays
+  use g_rotate_grid
+  
+  implicit none
+
+  REAL, DIMENSION(:,:), allocatable, INTENT(OUT) :: uo_dz
+  REAL, DIMENSION(:,:), allocatable, INTENT(OUT) :: vo_dz
+  REAL, DIMENSION(3), INTENT(OUT) :: uo_keel
+  REAL, DIMENSION(3), INTENT(OUT) :: vo_keel
+  REAL, DIMENSION(:,:), allocatable, INTENT(OUT) :: T_dz
+  REAL, DIMENSION(:,:), allocatable, INTENT(OUT) :: S_dz
+  REAL, DIMENSION(3), INTENT(OUT) :: T_keel
+  REAL, DIMENSION(3), INTENT(OUT) :: S_keel
+  REAl,               INTENT(IN)  :: depth_ib
+  INTEGER                         :: ib_n_lvls_old
+  INTEGER,            INTENT(IN)  :: iceberg_elem, ib
+  INTEGER,            INTENT(OUT) :: ib_n_lvls
+  INTEGER, dimension(3)           :: arr_ib_n_lvls
+  REAL, dimension(:,:,:), pointer :: UV_ib
+
+  real           :: lev_up, lev_low
+  integer        :: m, k, n2, n_up, n_low, cavity_count, max_node_level_count
+  ! depth over which is integrated (layer and sum)
+  real           :: dz, ufkeel1, ufkeel2, Temkeel, Salkeel, ldepth_up, ldepth_low, dz_depth
+
+type(t_mesh), intent(in) , target :: mesh
+type(t_dyn), intent(in) , target :: dynamics
+type(t_partit), intent(inout), target :: partit
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+  UV_IB     => dynamics%uv_ib(:,:,:)
+  cavity_count=0
+
+  do m=1,3
+    if(m==1) then
+        max_node_level_count = nlevels_nod2D(elem2D_nodes(m,iceberg_elem))
+    else
+        max_node_level_count = max(max_node_level_count, nlevels_nod2D(elem2D_nodes(m,iceberg_elem)))
+    end if
+  end do
+
+  allocate(uo_dz(3,max_node_level_count))
+  allocate(vo_dz(3,max_node_level_count))
+  allocate(T_dz(3,max_node_level_count))
+  allocate(S_dz(3,max_node_level_count))
+
+  ib_n_lvls_old = 0
+  ib_n_lvls = 0
+  arr_ib_n_lvls = 0
+
+  uo_dz     =   0.0
+  vo_dz     =   0.0
+  uo_keel   =   0.0
+  vo_keel   =   0.0
+  T_dz      =   0.0
+  S_dz      =   0.0
+  T_keel    =   0.0
+  S_keel    =   0.0
+  
+  !LOOP: over all nodes of the iceberg element
+  nodeloop: do m=1, 3
+   !for each 2D node of the iceberg element..
+   n2=elem2D_nodes(m,iceberg_elem)
+
+   ! LOOP: consider all neighboring pairs (n_up,n_low) of 3D nodes
+   ! below n2..
+   !innerloop: do k=1, nl+1
+   innerloop: do k=1, nlevels_nod2D(n2)
+    lev_up  = mesh%zbar_3d_n(k, n2)
+    !lev_up  = mesh%Z_3d_n(k, n2)
+    ldepth_up = mesh%Z_3d_n(k, n2)
+
+    if( k==nlevels_nod2D(n2) ) then
+        lev_low = mesh%zbar_n_bot(n2)
+        ldepth_low = mesh%zbar_n_bot(n2)
+    else
+        lev_low = mesh%zbar_3d_n(k+1, n2)
+        ldepth_low = mesh%Z_3d_n(k+1, n2)
+        !lev_low = mesh%Z_3d_n(k+1, n2)
+    end if
+
+    
+    !if( k==1 ) then
+    !    lev_up = 0.0
+    !else
+    !    lev_up  = mesh%Z_3d_n_ib(k-1, n2)
+    !    !lev_up  = mesh%Z_3d_n_ib(k-1, n2)
+    !end if
+
+    !if( k==nlevels_nod2D(n2) ) then
+    !    lev_low = mesh%zbar_n_bot(n2)
+    !else
+    !    lev_low = mesh%Z_3d_n_ib(k, n2)
+    !end if
+    dz = abs( lev_low - lev_up )
+    dz_depth = abs( ldepth_low - ldepth_up )
+    
+    !if( abs(lev_up)>=abs(depth_ib) ) then
+    !    ! ...icb bottom above lev_up --> no further integration
+    !end if
+    
+    !if( (abs(coord_nod3D(3, n_low))>abs(depth_ib)) .AND. (abs(coord_nod3D(3, n_up))>abs(depth_ib)) ) then
+    ! write(*,*) 'INFO, k:',k,'z_up:',coord_nod3D(3, n_up),'z_lo:',coord_nod3D(3, n_low),'depth:',depth_ib,'cavity:',(cavity_flag_nod2d(elem2D_nodes(m,iceberg_elem))==1)
+    !end if
+
+    ! if cavity node ..
+if (use_cavity .AND. mesh%cavity_depth(elem2D_nodes(m,iceberg_elem)) /= 0.0 .AND. abs(depth_ib) < abs(lev_up)) then
+    ! LA: Never go here for k=1, because abs(depth_ib)>=0.0 for all icebergs
+      
+      uo_dz(m,k)=UV_ib(1,k-1,n2)*abs(depth_ib)
+      vo_dz(m,k)=UV_ib(2,k-1,n2)*abs(depth_ib)
+      uo_keel(m)=UV_ib(1,k-1,n2)
+      vo_keel(m)=UV_ib(2,k-1,n2)
+
+      T_dz(m,k)=Tclim_ib(k-1,n2)*abs(depth_ib)
+      S_dz(m,k)=Sclim_ib(k-1,n2)*abs(depth_ib)
+      T_keel(m)=Tclim_ib(k-1,n2)
+      S_keel(m)=Sclim_ib(k-1,n2) ! check those choices with RT: OK
+
+      exit innerloop
+
+    ! if the lowest z coord is below the iceberg draft, exit
+    !else if( abs(coord_nod3D(3, n_low))>=abs(depth_ib) .AND. abs(coord_nod3D(3, n_up))<=abs(depth_ib) ) then
+    
+    !****************************************************************
+    ! LA 23.11.21 case if depth_ib<lev_up
+else !# comp cav flag
+    if( abs(lev_low)>=abs(depth_ib) ) then !.AND. (abs(lev_up)<=abs(depth_ib)) ) then
+      if( abs(lev_up)<abs(depth_ib) ) then
+        dz = abs ( lev_up - depth_ib )
+      else
+        ! LA: Never go here, when starting with k=1
+        dz = abs(depth_ib)
+      end if
+    !****************************************************************
+      if( k==1 ) then
+
+        ufkeel1 = UV_ib(1,k,n2)
+        ufkeel2 = UV_ib(2,k,n2)
+        Temkeel = Tclim_ib(k,n2)
+        Salkeel = Sclim_ib(k,n2)
+      else if( k.eq.nlevels_nod2D(n2) ) then
+        ufkeel1 = UV_ib(1,k-1,n2)
+        ufkeel2 = UV_ib(2,k-1,n2)
+        Temkeel = Tclim_ib(k-1,n2)
+        Salkeel = Sclim_ib(k-1,n2)
+      else
+        ufkeel1 = interpol1D(abs(lev_up),UV_ib(1,k-1,n2),abs(lev_low),UV_ib(1,k,n2),abs(depth_ib))
+        ufkeel2 = interpol1D(abs(lev_up),UV_ib(2,k-1,n2),abs(lev_low),UV_ib(2,k,n2),abs(depth_ib))
+        Temkeel = interpol1D(abs(lev_up),Tclim_ib(k-1,n2),abs(lev_low),Tclim_ib(k,n2),abs(depth_ib))
+        Salkeel = interpol1D(abs(lev_up),Sclim_ib(k-1,n2),abs(lev_low),Sclim_ib(k,n2),abs(depth_ib))
+      end if
+      
+      uo_dz(m,k)=ufkeel1 
+      vo_dz(m,k)=ufkeel2
+      T_dz(m,k)=Temkeel
+      S_dz(m,k)=Salkeel
+
+      uo_keel(m)=ufkeel1
+      vo_keel(m)=ufkeel2
+      T_keel(m)=Temkeel
+      S_keel(m)=Salkeel
+
+      arr_ib_n_lvls(m) = k
+      exit innerloop
+    
+    !****************************************************************
+    ! LA 23.11.21 case if lev_low==0
+    else if(lev_low==lev_up) then
+      arr_ib_n_lvls(m) = k
+      exit innerloop
+    !****************************************************************
+    
+    else
+      if( k==1 ) then
+
+        uo_dz(m,k)=UV_ib(1,k,n2)
+        vo_dz(m,k)=UV_ib(2,k,n2)
+        T_dz(m,k)=Tclim_ib(k,n2)
+        S_dz(m,k)=Sclim_ib(k,n2)
+      elseif (k.eq.nlevels_nod2D(n2)) then  ! LA 2023-08-31
+
+        ! .. and sum up the layer-integrated velocities ..
+  ! kh 08.03.21 use UV_ib buffered values here      
+        uo_dz(m,k)=UV_ib(1,k-1,n2)
+        vo_dz(m,k)=UV_ib(2,k-1,n2)
+        T_dz(m,k)=Tclim_ib(k-1,n2)
+        S_dz(m,k)=Sclim_ib(k-1,n2)
+      else  
+
+        uo_dz(m,k)=0.5*(UV_ib(1,k-1,n2)+UV_ib(1,k,n2))
+        vo_dz(m,k)=0.5*(UV_ib(2,k-1,n2)+UV_ib(2,k,n2))
+        T_dz(m,k)=0.5*(Tclim_ib(k-1,n2)+ Tclim_ib(k,n2))
+        S_dz(m,k)=0.5*(Sclim_ib(k-1,n2)+ Sclim_ib(k,n2))
+      end if
+      
+      if (k.eq.nlevels_nod2D(n2)) then  ! LA 2023-08-31
+
+        uo_keel(m)=UV_ib(1,k-1,n2)
+        vo_keel(m)=UV_ib(2,k-1,n2)
+
+        T_keel(m)=Tclim_ib(k-1,n2)
+        S_keel(m)=Sclim_ib(k-1,n2)
+      else  
+        uo_keel(m)=UV_ib(1,k,n2)
+        vo_keel(m)=UV_ib(2,k,n2)
+
+        T_keel(m)=Tclim_ib(k,n2)
+        S_keel(m)=Sclim_ib(k,n2)
+      end if
+    end if
+end if !cavity
+
+   end do innerloop
+ end do nodeloop !loop over all nodes of iceberg element
+ 
+ do m=1,3
+    if (arr_ib_n_lvls(m)==0) then
+        cycle
+    else
+        ib_n_lvls_old = ib_n_lvls
+        ib_n_lvls = arr_ib_n_lvls(m)
+        if ((ib_n_lvls_old.ne.0) .and. ib_n_lvls_old<ib_n_lvls) ib_n_lvls=ib_n_lvls_old
+    end if
+ end do
+
+ contains
+ 
+  real function interpol1D(x0,f0,x1,f1,x)
+   implicit none
+   real, intent(IN) :: x0,f0,x1,f1,x
+   real :: frac
+   
+   frac = (f1 - f0)/(x1 - x0)
+   interpol1D = f0 + frac * (x - x0)
+  	
+  end function interpol1D
+end subroutine iceberg_levelwise_andkeel
 
 !***************************************************************************************************************************
 !***************************************************************************************************************************
@@ -644,19 +923,26 @@ type(t_partit), intent(inout), target :: partit
    ! below n2..
    !innerloop: do k=1, nl+1
    innerloop: do k=1, nlevels_nod2D(n2)
-
-    if( k==1 ) then
-        lev_up = 0.0
-    else
-        lev_up  = mesh%Z_3d_n_ib(k-1, n2)
-        !lev_up  = mesh%Z_3d_n_ib(k-1, n2)
-    end if
+    lev_up  = mesh%zbar_3d_n(k, n2)
 
     if( k==nlevels_nod2D(n2) ) then
         lev_low = mesh%zbar_n_bot(n2)
     else
-        lev_low = mesh%Z_3d_n_ib(k, n2)
+        lev_low = mesh%zbar_3d_n(k+1, n2)
     end if
+
+    !if( k==1 ) then
+    !    lev_up = 0.0
+    !else
+    !    lev_up  = mesh%Z_3d_n_ib(k-1, n2)
+    !    !lev_up  = mesh%Z_3d_n_ib(k-1, n2)
+    !end if
+
+    !if( k==nlevels_nod2D(n2) ) then
+    !    lev_low = mesh%zbar_n_bot(n2)
+    !else
+    !    lev_low = mesh%Z_3d_n_ib(k, n2)
+    !end if
     dz = abs( lev_low - lev_up )
     
     !if( abs(lev_up)>=abs(depth_ib) ) then

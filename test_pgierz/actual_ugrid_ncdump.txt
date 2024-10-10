@@ -1,0 +1,23 @@
+netcdf fesom.mesh.diag {
+  dimensions:
+    nfesom_mesh_node = 3140 ;
+    nfesom_mesh_edge = 8986 ;
+    nfesom_mesh_face = 5839 ;
+    nz = 48 ;
+    nz1 = 47 ;
+    n2 = 2 ;
+    n3 = 3 ;
+    n4 = 4 ;
+    N = 8 ;
+    info = 1 ;
+	int fesom_mesh ;
+		fesom_mesh:cf_role = "mesh_topology" ;
+		fesom_mesh:long_name = "Topology data of 2D unstructured mesh" ;
+		fesom_mesh:topology_dimension = 2 ;
+		fesom_mesh:node_coordinates = "lon lat" ;
+		fesom_mesh:face_node_connectivity = "fesom_mesh_face_nodes" ;
+		fesom_mesh:face_dimension = "nfesom_mesh_face" ;
+		fesom_mesh:edge_node_connectivity = "fesom_mesh_edge_nodes" ;
+		fesom_mesh:edge_dimension = "n_fesom_mesh_edg" ;
+		fesom_mesh:edge_face_connectivity = "edge_tri" ;
+}
