@@ -997,7 +997,26 @@ submodule (icedrv_main) icedrv_step
              fresh = fresh - lfs_corr * ice_ref_salinity / sss
           endif
 
-          fresh_tot = fresh + (-evap_ocn + frain + fsnow)*(c1-aice)
+          !PS fresh_tot = fresh + (-evap_ocn + frain + fsnow)*(c1-aice)
+          fresh_tot = fresh + frain + (-evap_ocn + fsnow)*(c1-aice)
+          !            |         |         |        |--> depending on ice concentration eiter snow adds to the                  
+          !            |         |         |             freshwater in the ocean or accumulates on the ice as snoe layer
+          !            |         |         |
+          !            |         |         |--> evaporation ocean-->atmosphere
+          !            |         |
+          !            |         |--> add here the total rain, at the end all the rain
+          !            |              drains through the ice, therefor comment the line
+          !            |              in ice_pack_therm_itd.F90, subroutine icepack_step_therm2()
+          !            |              Line: 1999
+          !            |              !!! If i dont do this here im not able to balance
+          !            |              the ocean volume under zstar to maschine precision !!!
+          !            | 
+          !            |--> at that point fresh contains the freshwater flux contributions
+          !                 from the thermodynamic growth rates of ice and snow but also 
+          !                 the contributions from the sublimation of ice-->atmos (see.
+          !                 icepack_therm_vertical.F90-->subroutine thermo_vertical(...)
+          !                 Line: 453 --> freshn = freshn + evapn - (rhoi*dhi + rhos*dhs) / dt
+          !                 evapn == evaporative water flux (kg/m^2/s)  from sublimation
 
       end subroutine ocn_mixed_layer_icepack
 

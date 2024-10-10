@@ -376,8 +376,10 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     ! Evaporation (convert units from icepack to fesom)
     evaporation     = - evaporation * (1.0_WP - a_ice) * inv_rhowat
 
-!PS     ! Ice-Sublimation is not added to evap in icepack 
-!PS     ice_sublimation = 0.0_WP
+    ! Ice-Sublimation is added to to the freshwater in icepack --> see 
+    ! icepack_therm_vertical.90 --> subroutine thermo_vertical(...): Line: 453
+    ! freshn = freshn + evapn - (rhoi*dhi + rhos*dhs) / dt , evapn==sublimation
+    ice_sublimation = - ice_sublimation * inv_rhowat
 
     call init_flux_atm_ocn()
 
@@ -531,13 +533,12 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
                    
 !$OMP PARALLEL DO
     do n=1, myDim_nod2D+eDim_nod2D
-        flux(n) = evaporation(n)                      &
-                  +prec_rain(n)                       &
-                  
+        flux(n) = evaporation(n)                     &
+                  -ice_sublimation(n)                 & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
+                  +prec_rain(n)                       &                  
 #if defined (__icepack)
                   +prec_snow(n)*(1.0_WP-a_ice(n))     &
 #else
-                  -ice_sublimation(n)                 & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
                   +prec_snow(n)*(1.0_WP-a_ice_old(n)) &
 #endif
 
@@ -623,6 +624,8 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
     end if 
     
+    
+    !___________________________________________________________________________
 !---fwf-code-begin
     if(use_landice_water) then
 !$OMP PARALLEL DO
@@ -631,7 +634,8 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
       end do
 !$OMP END PARALLEL DO
     end if
- 
+    
+    !___________________________________________________________________________
     if(lwiso .and. use_landice_water) then
 !$OMP PARALLEL DO
       do n=1, myDim_nod2D+eDim_nod2D
