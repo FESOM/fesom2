@@ -367,19 +367,23 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
                            evap_ocn_out=evaporation,       &
                            evap_out=ice_sublimation        )
 
-    ! Heat flux 
-    heat_flux       = - net_heat_flux
+!$OMP PARALLEL DO
+    do n=1, myDim_nod2d+eDim_nod2d  
+        ! Heat flux 
+        heat_flux(n)       = - net_heat_flux(n)
 
-    ! Freshwater flux (convert units from icepack to fesom)
-    water_flux      = - (fresh_wa_flux * inv_rhowat) - runoff(:)
+        ! Freshwater flux (convert units from icepack to fesom)
+        water_flux(n)      = - (fresh_wa_flux(n) * inv_rhowat) - runoff(n)
 
-    ! Evaporation (convert units from icepack to fesom)
-    evaporation     = - evaporation * (1.0_WP - a_ice) * inv_rhowat
+        ! Evaporation (convert units from icepack to fesom)
+        evaporation(n)     = - evaporation(n) * (1.0_WP - a_ice(n)) * inv_rhowat
 
-    ! Ice-Sublimation is added to to the freshwater in icepack --> see 
-    ! icepack_therm_vertical.90 --> subroutine thermo_vertical(...): Line: 453
-    ! freshn = freshn + evapn - (rhoi*dhi + rhos*dhs) / dt , evapn==sublimation
-    ice_sublimation = - ice_sublimation * inv_rhowat
+        ! Ice-Sublimation is added to to the freshwater in icepack --> see 
+        ! icepack_therm_vertical.90 --> subroutine thermo_vertical(...): Line: 453
+        ! freshn = freshn + evapn - (rhoi*dhi + rhos*dhs) / dt , evapn==sublimation
+        ice_sublimation(n) = - ice_sublimation(n) * inv_rhowat
+    end do
+!$OMP END PARALLEL DO
 
     call init_flux_atm_ocn()
 

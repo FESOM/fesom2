@@ -18,12 +18,6 @@
           use g_forcing_param,  only: ncar_bulk_z_wind, ncar_bulk_z_tair, &
                                       ncar_bulk_z_shum
           use g_sbf,            only: l_mslp                     
-!           use i_arrays,         only: S_oc_array,      T_oc_array,        & ! Ocean and sea ice fields
-!                                       u_w,             v_w,               &
-!                                       stress_atmice_x, stress_atmice_y
-! !                                       u_ice,           v_ice,             &
-                                    
-!           use i_param,          only: cd_oce_ice                            ! Sea ice parameters
           use icepack_intfc,    only: icepack_warnings_flush, icepack_warnings_aborted
           use icepack_intfc,    only: icepack_query_parameters
           use icepack_intfc,    only: icepack_sea_freezing_temperature
