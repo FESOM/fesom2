@@ -1120,7 +1120,7 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
         if (any(recom_det_tracer_id == tracer_id(tr_num))) Vben = Vdet
         if (any(recom_phy_tracer_id == tracer_id(tr_num))) Vben = VPhy
         if (any(recom_dia_tracer_id == tracer_id(tr_num))) Vben = VDia
-        if (any(recom_cocco_tracer_id == tracer_id(tr_num))) Vben = VCocco   ! check conditions (#if defined (__coccos)) and add the necessary tracers numbers below OG:
+!       if (any(recom_cocco_tracer_id == tracer_id(tr_num))) Vben = VCocco   ! check conditions (#if defined (__coccos)) and add the necessary tracers numbers below OG:
 ! Adjust iphycalc
 
 #if defined (__coccos)
