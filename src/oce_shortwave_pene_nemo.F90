@@ -7,13 +7,14 @@ subroutine cal_shortwave_rad_nemo(mesh)
   USE MOD_MESH
   USE o_PARAM
   USE o_ARRAYS
-  USE g_PARSUP
+  USE MOD_PARSUP
+  USE MOD_PARTIT
   USE g_CONFIG
   !use g_forcing_arrays, only: chl, sw_3d
   use g_comm_auto
   use i_param
   use i_arrays
-  use i_therm_param
+ ! use i_therm_param
   use Toy_Channel_Nemo, only: qsr_c, t_star
   IMPLICIT NONE
 
@@ -23,8 +24,10 @@ subroutine cal_shortwave_rad_nemo(mesh)
   real(kind=WP):: v1, v2, sc1, sc2
   type(t_mesh), intent(in) , target :: mesh
 
-#include "associate_mesh.h"
-
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
   sw_3d=0.0_WP
   
 

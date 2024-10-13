@@ -870,7 +870,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 
         !_______________________________________________________________________
         ! case of activated shortwave penetration into the ocean, ad 3d contribution
-        if (use_sw_pene .and. tracers%data(tr_num)%ID==1) then
+        if (use_sw_pene .and. (tracers%data(tr_num)%ID==1) .and. (.not. toy_ocean)) then
 
             do nz=nzmin, nzmax-1
                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
@@ -878,10 +878,10 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
                 tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n) * area(nz+1,n)/areasvol(nz,n)) * zinv
             end do
 
-        elseif (use_sw_pene .and. tr_num==1 .and. toy_ocean) then
+        elseif (use_sw_pene .and. (tracers%data(tr_num)%ID==1) .and. toy_ocean) then
 
          call cal_shortwave_rad_nemo(mesh)
-            do nz=1, nzmax-1
+            do nz=nzmin, nzmax-1
                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
                 tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n)*area(nz+1,n)/area(nz,n))*zinv
             end do

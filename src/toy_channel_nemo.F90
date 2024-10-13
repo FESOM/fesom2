@@ -2,9 +2,10 @@ MODULE Toy_Channel_Nemo
   use mod_mesh
   USE o_ARRAYS
   USE o_PARAM
-  USE g_PARSUP
+  USE MOD_PARSUP
+  USE MOD_PARTIT
   USE g_config
-  USE i_therm_param, only: albw
+  !USE i_therm_param, only: albw
 
   implicit none
   SAVE 
