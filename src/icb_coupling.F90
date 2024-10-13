@@ -121,7 +121,7 @@ type(t_partit), intent(inout), target :: partit
                     end if
                     dz = abs( lev_low - lev_up )
                     if( (abs(lev_low)>=abs(depth_ib)) .and. (abs(lev_up)<abs(depth_ib)) ) then 
-                        dz = abs( lev_up - abs(depth_ib) )
+                        dz = abs(abs(lev_up) - abs(depth_ib))
                     end if              
                    
                     if( depth_ib==0.0 ) then
