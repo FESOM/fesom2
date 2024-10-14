@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=test_3zoo_ballast
-#SBATCH --account=nwg_hauck.maresys
+#SBATCH --account=nwg_maresys.maresys
 #SBATCH --partition=mpp
 #SBATCH -N 9
 #SBATCH --cpus-per-task=1
