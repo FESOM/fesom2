@@ -15,7 +15,7 @@ set(OIFS_COUPLED OFF CACHE BOOL "compile fesom coupled to OpenIFS. (Also needs F
 set(CRAY OFF CACHE BOOL "compile with cray ftn")
 set(USE_ICEPACK OFF CACHE BOOL "compile fesom with the Iceapck modules for sea ice column physics.")
 set(OPENMP_REPRODUCIBLE OFF CACHE BOOL "serialize OpenMP loops that are critical for reproducible results")
-set(RECOM_COUPLED OFF CACHE BOOL "compile fesom including biogeochemistry, REcoM3")
+set(RECOM_COUPLED ON CACHE BOOL "compile fesom including biogeochemistry, REcoM3")
 set(CISO_COUPLED OFF CACHE BOOL "compile ciso coupled to REcoM3. RECOM_COUPLED has to be active")
 set(USE_MULTIO OFF CACHE BOOL "Use MULTIO for IO, either grib or binary for now. This also means path to MULTIO installation has to provided using env MULTIO_INSTALL_PATH='..' and multio configuration yamls must be present to run the model with MULTIO")
 set(OASIS_WITH_YAC OFF CACHE BOOL "Useing a version of OASIS compiled with YAC instead of SCRIP for interpolation?")

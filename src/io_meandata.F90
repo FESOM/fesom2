@@ -707,6 +707,29 @@ CASE ('otracers  ')
       else if (tracers%data(j)%ID==1002) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC', 'Dissolved Inorganic C', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+            if (tracers%data(j)%ltra_diag) then ! OG - tra_diag
+               ! horizontal advection
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_hor_adv', 'Horizontal advection part of dissolved Inorganic C', '[mmol/m3]', tracers%work%tra_advhoriz(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! vertical advection
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_ver_adv', 'Vertical advection part of dissolved Inorganic C', '[mmol/m3]', tracers%work%tra_advvert(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! horizontal diffusion
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_hor_redi', 'Horizontal diffusion of dissolved Inorganic C (includes Redi diffusivity if Redi=.true.)', '[mmol/m3]', tracers%work%tra_diff_part_hor_redi(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               if (.not. tracers%data(j)%i_vert_diff) then
+               ! vertical diffusion (Explicit)
+                   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_ver_expl', 'Vertical diffusion of dissolved Inorganic C (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+               end if
+
+               ! projection of horizontal Redi diffussivity onto vertical
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_ver_redi_expl', 'Projection of horizontal Redi diffussivity onto vertical for dissolved Inorganic C (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_redi_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! vertical diffusion (Implicit)
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_ver_impl', 'Vertical diffusion of dissolved Inorganic C (Implicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_impl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            end if
+
          endif
 
       else if (tracers%data(j)%ID==1003) then

@@ -175,6 +175,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     type(t_mesh)  , intent(in)   , target    :: mesh
     !___________________________________________________________________________
     integer                                  :: i, tr_num, node, elem, nzmax, nzmin
+    real(kind=WP)                            :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_elem2D) ! local variable ! OG - tra_diag
+    integer                                  :: nz, n, nu1, nl1 ! OG - tra_diag
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
@@ -216,6 +218,14 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
     end if
 
+    ! Set advective and diffusive components of total tracer fluxes to zero
+    ! Before tr_num loop
+!#if defined (__recom)           ! not necessarily should belong to recom case
+!    tracers%work%tra_advhoriz = 0.0 ! O:G - tra_diag
+!    tracers%work%tra_advvert  = 0.0
+    ttf_rhs_bak = 0.0
+!#endif
+    
     !___________________________________________________________________________
     ! loop over all tracers
         !$ACC UPDATE DEVICE(dynamics%w, dynamics%w_e, dynamics%uv) !!! async(1) 
@@ -250,6 +260,33 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         end do
 !$OMP END PARALLEL DO
 
+! O:G
+! Save horizontal and vertical advective fluxes.
+! We have the values on the nodes
+! We do not know how much each edge contributes
+! to the nodes it connects
+! Notes from Patrick: del_ttf includes
+! Low-order solution. But, del_ttf_advhoriz and
+! del_ttf_advvert contain antidiffusive fluxes 
+! from the FCT scheme
+
+!if (.FALSE.) then
+! O:G - tra_diag
+!#if defined (__recom)
+!        if (tracers%data(tr_num)%ltra_diag) then
+!           do n=1, myDim_nod2D+eDim_nod2D
+!              nu1 = ulevels_nod2D(n)
+!              nl1 = nlevels_nod2D(n)
+!              do nz = nu1, nl1-1
+                 ! Horizontal advection part
+!                 tracers%work%tra_advhoriz(nz,n,tr_num) = tracers%work%del_ttf_advhoriz(nz,n)
+                 ! Vertical advection part
+!                 tracers%work%tra_advvert (nz,n,tr_num) = tracers%work%del_ttf_advvert(nz,n)
+!              end do
+!           end do
+!        end if
+!#endif
+!endif 
         !___________________________________________________________________________
         ! diffuse tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
@@ -366,6 +403,8 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
     integer                               :: n, nzmax, nzmin
+    real(kind=WP)                         :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D) ! OG - tra_diag
+    integer                               :: nz, nu1, nl1 ! OG - tra_diag
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), pointer                :: del_ttf(:,:)
@@ -379,19 +418,90 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     str_bf         = 0.0_WP
     vert_sink      = 0.0_WP
 #endif
+
+    ttf_rhs_bak = 0.0 ! OG - tra_diag
+
+    if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+          do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ttf_rhs_bak(nz,n) = del_ttf(nz,n)
+          end do
+       end do
+    end if
     !___________________________________________________________________________
-    ! do horizontal diffusiion
+    ! do horizontal diffusion
     ! write there also horizontal diffusion rhs to del_ttf which is equal the R_T^n
     ! in danilovs srcipt
     ! includes Redi diffusivity if Redi=.true.
     call diff_part_hor_redi(tracers, partit, mesh)  ! seems to be ~9% faster than diff_part_hor
 
+    if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+       do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ! horizontal diffusion (w/out Redi)           
+             tracers%work%tra_diff_part_hor_redi(nz,n,tr_num) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) / hnode_new(nz,n) ! Unit [Conc]
+             !if (mype==0)  print *, tracers%work%tra_diff_part_hor_redi(nz,n,tr_num)
+          end do
+       end do
+    end if
+
+    if ((.not. tracers%data(tr_num)%i_vert_diff) .and. tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+       do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ttf_rhs_bak(nz,n) = del_ttf(nz,n)
+          end do
+       end do
+    end if
     !___________________________________________________________________________
     ! do vertical diffusion: explicit
     if (.not. tracers%data(tr_num)%i_vert_diff) call diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
+
+    ! OG i_vert_diff = TRUE so, we dont call explicit scheme
+    ! If we use this, check surface forcing for recom variables (They are not updated)
+    if ((.not. tracers%data(tr_num)%i_vert_diff) .and. tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag 
+       do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ! vertical diffusion: explicit
+             tracers%work%tra_diff_part_ver_expl(nz,n,tr_num) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) / hnode_new(nz,n) ! Unit [Conc]
+             !if (mype==0)  print *,  tra_diff_part_ver_expl(:,:,tr_num)
+          end do
+       end do
+    end if
+
     ! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
     ! derivatives and has to be computed explicitly!
+
+    if (tracers%data(tr_num)%ltra_diag .and. Redi) then ! OG - tra_diag
+       do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ttf_rhs_bak(nz,n) = del_ttf(nz,n)
+          end do
+       end do
+    end if
+
     if (Redi) call diff_ver_part_redi_expl(tracers, partit, mesh)
+
+    if (tracers%data(tr_num)%ltra_diag .and. Redi) then ! OG - tra_diag
+       do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ! Redi diffussivity onto vertical: explicit
+             tracers%work%tra_diff_part_ver_redi_expl(nz,n,tr_num) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) / hnode_new(nz,n) ! Unit [Conc]
+             !if (mype==0)  print *,  tra_diff_part_ver_redi_expl(:,:,tr_num)
+          end do
+       end do
+    end if
 
 !        if (recom_debug .and. mype==0)  print *, tracers%data(tr_num)%ID
 
@@ -478,7 +588,32 @@ endif
     !___________________________________________________________________________
     if (tracers%data(tr_num)%i_vert_diff) then
         ! do vertical diffusion: implicite
+
+        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+           do n=1, myDim_nod2D+eDim_nod2D
+              nu1 = ulevels_nod2D(n)
+              nl1 = nlevels_nod2D(n)
+              do nz = nu1, nl1-1
+                 ttf_rhs_bak(nz,n) = tracers%data(tr_num)%values(nz,n)
+              end do
+           end do
+        end if
+
+        ! (w/out Redi)
         call diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
+
+        ! vertical diffusion: implicit
+        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+           do n=1, myDim_nod2D+eDim_nod2D
+              nu1 = ulevels_nod2D(n)
+              nl1 = nlevels_nod2D(n)
+              do nz = nu1, nl1-1
+                 tracers%work%tra_diff_part_ver_impl(nz,n,tr_num) = tracers%data(tr_num)%values(nz,n) - ttf_rhs_bak(nz,n)
+                 !if (mype==0)  print *,  tra_diff_part_ver_impl(:,:,tr_num)
+              end do
+           end do
+        end if
+
     end if
     !We DO not set del_ttf to zero because it will not be used in this timestep anymore
     !init_tracers_AB will set it to zero for the next timestep

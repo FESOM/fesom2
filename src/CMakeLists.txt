@@ -73,6 +73,9 @@ if(ENABLE_OPENMP)
    find_package(OpenMP REQUIRED COMPONENTS Fortran)
 endif()
 
+option(RECOM_COUPLED "Use RECOM" OFF)
+message(STATUS "RECOM_COUPLED: ${RECOM_COUPLED}")
+
 option(USE_ICEPACK "Use ICEPACK" OFF)
 message(STATUS "USE_ICEPACK: ${USE_ICEPACK}")
 
