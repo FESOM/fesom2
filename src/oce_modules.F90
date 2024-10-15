@@ -184,6 +184,7 @@ REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_y(:)
 real(kind=WP), allocatable         :: heat_flux(:), Tsurf(:) 
 real(kind=WP), allocatable         :: heat_flux_in(:) !to keep the unmodified (by SW penetration etc.) heat flux 
 real(kind=WP), allocatable    :: water_flux(:), Ssurf(:)
+real(kind=WP), allocatable    :: hosing_flux(:)
 real(kind=WP), allocatable    :: virtual_salt(:), relax_salt(:)
 real(kind=WP), allocatable    :: Tclim(:,:), Sclim(:,:)
 !!PS real(kind=WP), allocatable    :: Visc(:,:)

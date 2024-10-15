@@ -49,7 +49,7 @@ module fesom_main_storage_module
     real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
     real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing 
     real(kind=real32) :: rtime_setup_ice,  rtime_setup_other, rtime_setup_restart
-    real(kind=real32) :: runtime_alltimesteps
+    real(kind=real32) :: total_nsteps, runtime_alltimesteps
 
 
     type(t_mesh)   mesh
@@ -141,6 +141,7 @@ contains
         call setup_model(f%partit)  ! Read Namelists, always before clock_init
         call clock_init(f%partit)   ! read the clock file 
         call get_run_steps(fesom_total_nsteps, f%partit)
+        f%total_nsteps=fesom_total_nsteps
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call mesh_setup'//achar(27)//'[0m'
         call mesh_setup(f%partit, f%mesh)
 
@@ -290,7 +291,8 @@ contains
 
   subroutine fesom_runloop(current_nsteps)
     use fesom_main_storage_module
-    integer, intent(in) :: current_nsteps 
+    integer, intent(in) :: current_nsteps
+    real(kind=WP)                            :: hSv
     ! EO parameters
     integer n
 
@@ -359,6 +361,9 @@ contains
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
             call oce_fluxes_mom(f%ice, f%dynamics, f%partit, f%mesh) ! momentum only
             call oce_fluxes(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+            !___freshwater hosing routine_______________________________________
+            hSv = 10
+            call fw_depth_anomaly(f%tracers%data(2)%values, hSv, f%partit, f%mesh)
         end if
         call before_oce_step(f%dynamics, f%tracers, f%partit, f%mesh) ! prepare the things if required
         f%t2 = MPI_Wtime()

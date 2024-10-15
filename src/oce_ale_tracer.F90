@@ -1310,6 +1310,8 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
         bc_surface=0.0_WP
     CASE (303)
         bc_surface=0.0_WP
+    CASE (304)
+        bc_surface= dt*(hosing_flux(n))
     CASE (501) ! ice-shelf water due to basal melting
         if (nzmin==1) then
            bc_surface = 0.0_WP

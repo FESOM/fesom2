@@ -43,6 +43,21 @@ module oce_fluxes_interface
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
         end subroutine
+
+        subroutine fw_surf_anomaly(hSv, partit, mesh)
+        use o_PARAM
+        use o_ARRAYS
+        USE MOD_PARTIT
+        use MOD_MESH
+        use MOD_PARSUP
+        USE g_CONFIG
+        use g_comm_auto
+        use g_support
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),  intent(in) , target :: mesh
+        real(kind=WP), intent(in)          :: hSv
+        end subroutine
+
     end interface
 end module
 
@@ -268,7 +283,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
     integer                    :: n, elem, elnodes(3),n1
-    real(kind=WP)              :: rsss, net
+    real(kind=WP)              :: rsss, net, hSv
     real(kind=WP), allocatable :: flux(:)
     !___________________________________________________________________________
     real(kind=WP), dimension(:,:), pointer :: temp, salt
@@ -344,6 +359,10 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     end do
 !$OMP END PARALLEL DO
 #endif
+    
+    !___freshwater hosing routine_______________________________________________
+    hSv=10
+    call fw_surf_anomaly(hSv, partit, mesh)
 
     !___________________________________________________________________________
     ! add heat and fresh water flux from cavity 
@@ -568,6 +587,114 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     deallocate(flux)
     
 end subroutine oce_fluxes
+!
+!
+!_______________________________________________________________________________
+subroutine fw_surf_anomaly(hSv, partit, mesh) !coordinates in the format [-180 180 -90 90]
+
+    use o_PARAM
+    use o_ARRAYS
+    USE MOD_PARTIT
+    use MOD_MESH
+    use MOD_PARSUP
+    USE g_CONFIG
+    use g_comm_auto
+    use g_support
+    implicit none
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+    real(kind=WP),  intent(in)            :: hSv
+    real(kind=WP)                         :: x, y, net
+    integer                               :: n, ed(2)
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+     hosing_flux=0._WP
+
+     do n=1, myDim_edge2D
+        ed=mesh%edges(:, n)
+        if (myList_edge2D(n) <= mesh%edge2D_in) cycle
+                y = sum(geo_coord_nod2D(2,ed))/2._WP/rad
+        if (y<-60._WP) hosing_flux(ed)=1._WP
+     end do
+
+     call smooth_nod (hosing_flux, 5, partit, mesh)
+     do n=1,myDim_nod2d+eDim_nod2D
+        if (hosing_flux(n)>0.0_WP) hosing_flux(n)=1.0_WP
+     end do
+
+     call integrate_nod(hosing_flux, net, partit, mesh)
+
+     if (abs(net)>1.e-6) then
+        hosing_flux=hosing_flux/net*hSv*1.e6 ! hSv*1.e6 in m/s
+     end if
+     water_flux=water_flux-hosing_flux
+!write(*,*) mype, 'hSv=', hSv, 'net=', net, 'hf=', minval(hosing_flux, 1), maxval(hosing_flux, 1)
+
+end subroutine fw_surf_anomaly
+!
+!
+!_______________________________________________________________________________
+subroutine fw_depth_anomaly(ttf, hSv, partit, mesh)
+    use o_PARAM
+    use o_ARRAYS
+    USE MOD_PARTIT
+    use MOD_MESH
+    use MOD_PARSUP
+    use g_comm_auto
+    use g_support
+    use o_tracers
+    use g_config,         only: dt
+    implicit none
+
+    integer                               :: n, ed(2), row, k, nzmin, nzmax
+    real(kind=WP)                         :: x, y, net, spar(100)
+    real(kind=WP),  intent(in)            :: hSv
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    real(kind=WP),  intent (inout)        :: ttf(mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D)
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    hosing_flux=0._WP
+
+    do n=1, myDim_edge2D
+       ed=mesh%edges(:, n)
+       if (myList_edge2D(n) <= mesh%edge2D_in) cycle
+          y = sum(geo_coord_nod2D(2,ed))/2._WP/rad
+       if (y<-60._WP) hosing_flux(ed)=1._WP
+    end do
+
+    call smooth_nod (hosing_flux, 5, partit, mesh)
+    do row=1,myDim_nod2d+eDim_nod2D
+       if (hosing_flux(row)>0.0_WP) hosing_flux(row)=1.0_WP
+    end do
+
+    call integrate_nod(hosing_flux, net, partit, mesh)
+
+    if (abs(net)>1.e-6) then
+       hosing_flux=hosing_flux/net*hSv*1.e6 ! hSv*1.e6 in m/s
+    end if
+
+    !water_flux=water_flux-hosing_flux
+
+    do row=1,myDim_nod2d+eDim_nod2D   ! myDim is sufficient
+     hosing_flux(row)=hosing_flux(row)*area(1,row)
+     if (ulevels_nod2D(row)>1) cycle
+        nzmin = ulevels_nod2D(row)
+        nzmax = min(21, nlevels_nod2D(row)-1)
+        do k=nzmin, nzmax
+           spar(k)=areasvol(k,row)*hnode(k,row) ! *any profile function(z)
+        end do
+        spar(nzmin:nzmax)=spar(nzmin:nzmax)/sum(spar(nzmin:nzmax))
+        do k=nzmin+1,nzmax
+           ttf(k,row)=ttf(k,row)-hosing_flux(row)*spar(k)/areasvol(k,row)/hnode(k,row)*dt
+        end do
+    end do
+
+end subroutine fw_depth_anomaly
 !
 !
 !_______________________________________________________________________________
