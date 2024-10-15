@@ -245,6 +245,8 @@ contains
 #endif
        if (var%is_icepackvar2) then 
             ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
+            ! PS Again icepack variable demension is [nod2, ncat] thats why we need 
+            ! PS to switch here the index where we sort in the 2d slices
             var%external_local_data_ptr(:,lvl) = laux ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
        else
             ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
