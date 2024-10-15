@@ -38,7 +38,6 @@ MODULE io_RESTART
 #if defined(__icepack)
   type(restart_file_group) , save, public :: icepack_files
   character(:), allocatable, save, public :: icepack_path
-  
 #endif  
 
 #if defined(__recom)
@@ -244,11 +243,8 @@ end subroutine ini_bio_io
 !
 subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tracers, partit, mesh)
 
-! #if defined(__icepack)
-!   icepack restart not merged here ! produce a compiler error if USE_ICEPACK=ON; todo: merge icepack restart from 68d8b8b
-! #endif
-
   use fortran_utils
+
   implicit none
   ! this is the main restart subroutine
   ! if l_read   is TRUE the restart file will be read
@@ -273,6 +269,7 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   integer, intent(out):: which_readr
   
   integer             :: cstep
+  
   !_____________________________________________________________________________
   ! initialize directory for core dump restart 
   if(.not. initialized_raw) then
@@ -316,7 +313,7 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
     call ini_ocean_io(yearnew, dynamics, tracers, partit, mesh)
     if (use_ice) then
         call ini_ice_io(yearnew, ice, partit, mesh)
-#if defined(__icepack)    
+#if defined(__icepack)
         call ini_icepack_io(yearnew, partit, mesh)
 #endif        
     end if     
@@ -329,7 +326,7 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
     if (use_ice) then
         call ini_ice_io  (yearold, ice, partit, mesh)
 #if defined(__icepack)    
-        call ini_icepack_io(yearnew, partit, mesh)
+        call ini_icepack_io(yearold, partit, mesh)
 #endif        
     end if     
 #if defined(__recom)
@@ -387,6 +384,10 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
         if (use_ice) then
             if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ice'//achar(27)//'[0m'
             call read_restart(ice_path, ice_files, partit%MPI_COMM_FESOM, partit%mype)
+#if defined(__icepack)   
+            if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: icepack'//achar(27)//'[0m'
+            call read_restart(icepack_path, icepack_files, partit%MPI_COMM_FESOM, partit%mype)            
+#endif
         end if 
 
 #if defined(__recom)

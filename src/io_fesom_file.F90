@@ -15,6 +15,7 @@ module io_fesom_file_module
     real(kind=8), allocatable :: global_level_data(:)
     integer :: global_level_data_size = 0
     logical is_elem_based
+    logical :: is_icepackvar2=.false.
     character(:), allocatable :: varname ! todo: maybe use a getter in netcdf_file_type to get the name
   end type
   
@@ -54,7 +55,7 @@ module io_fesom_file_module
   integer, save :: m_nod2d
   integer, save :: m_elem2d
   integer, save :: m_nl
-  integer, save :: m_nitc  
+  integer, save :: m_ncat  
   
 
   type fesom_file_type_ptr
@@ -104,7 +105,7 @@ contains
   end function
   
   
-  subroutine init(this, mesh_nod2d, mesh_elem2d, mesh_nl, partit, mesh_nitc) ! todo: would like to call it initialize but Fortran is rather cluncky with overwriting base type procedures
+  subroutine init(this, mesh_nod2d, mesh_elem2d, mesh_nl, partit, mesh_ncat) ! todo: would like to call it initialize but Fortran is rather cluncky with overwriting base type procedures
     use io_netcdf_workaround_module
     use io_gather_module
     use MOD_PARTIT
@@ -112,7 +113,7 @@ contains
     integer mesh_nod2d
     integer mesh_elem2d
     integer mesh_nl
-    integer, optional :: mesh_nitc
+    integer, optional :: mesh_ncat
     type(t_partit), target :: partit
     ! EO parameters
     type(fesom_file_type_ptr), allocatable :: tmparr(:)
@@ -126,11 +127,11 @@ contains
     m_nod2d  = mesh_nod2d
     m_elem2d = mesh_elem2d
     m_nl     = mesh_nl
-    !PS mesh_nitc ... icepack number of ice thickness classes,
-    if (present(mesh_nitc)) then 
-        m_nitc   = mesh_nitc
+    !PS mesh_ncat ... icepack number of ice thickness classes,
+    if (present(mesh_ncat)) then 
+        m_ncat   = mesh_ncat
     else    
-        m_nitc   = 0
+        m_ncat   = 0
     end if 
     
     call this%netcdf_file_type%initialize()
@@ -191,9 +192,18 @@ contains
     do i=1, this%nvar_infos
       var => this%var_infos(i)
     
-      nlvl = size(var%external_local_data_ptr,dim=1)
+    
+      if (var%is_icepackvar2) then 
+        !PS for icepack external_local_data_ptr has still dimension [nod2, ncat]
+        !PS but usual fesom output would have [nlev, nod2] so we need to change here
+        !PS dim= parameter to get the proper dimension 
+        nlvl = size(var%external_local_data_ptr,dim=2)
+        allocate(laux( size(var%external_local_data_ptr,dim=1) )) ! i.e. myDim_elem2D+eDim_elem2D or myDim_nod2D+eDim_nod2D
+      else
+        nlvl = size(var%external_local_data_ptr,dim=1)
+        allocate(laux( size(var%external_local_data_ptr,dim=2) )) ! i.e. myDim_elem2D+eDim_elem2D or myDim_nod2D+eDim_nod2D
+      end if 
       is_2d = (nlvl == 1)
-      allocate(laux( size(var%external_local_data_ptr,dim=2) )) ! i.e. myDim_elem2D+eDim_elem2D or myDim_nod2D+eDim_nod2D
 
       if(this%is_iorank()) then
         ! todo: choose how many levels we read at once
@@ -233,8 +243,13 @@ contains
     dynamics_workaround%uv_rhsAB(2,lvl,:) = laux
   else
 #endif
-        ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
-       var%external_local_data_ptr(lvl,:) = laux ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
+       if (var%is_icepackvar2) then 
+            ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
+            var%external_local_data_ptr(:,lvl) = laux ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
+       else
+            ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
+            var%external_local_data_ptr(lvl,:) = laux ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
+       end if 
 #ifdef ENABLE_NVHPC_WORKAROUNDS
   end if
 #endif
@@ -410,7 +425,11 @@ use nvfortran_subarray_workaround_module
         var%local_data_copy = dynamics_workaround%uv_rhsAB(2,:,:)
       else
 #endif
-      var%local_data_copy = var%external_local_data_ptr
+        if (var%is_icepackvar2) then 
+            var%local_data_copy = transpose(var%external_local_data_ptr)
+        else
+            var%local_data_copy = var%external_local_data_ptr
+        end if   
 #ifdef ENABLE_NVHPC_WORKAROUNDS
       end if
 #endif
@@ -457,21 +476,22 @@ use nvfortran_subarray_workaround_module
     call specify_variable(this, name, [level_diminfo%idx, this%time_dimidx], level_diminfo%len, external_local_data_ptr, .false., longname, units)    
   end subroutine
   
-  subroutine specify_node_var_2dicepack(this, name, longname, units, local_data, nitc)
+  subroutine specify_node_var_2dicepack(this, name, longname, units, local_data, ncat)
     use, intrinsic :: ISO_C_BINDING
     class(fesom_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
     real(kind=8), target, intent(inout) :: local_data(:,:)
-    integer, intent(in) :: nitc! todo: be able to set precision
+    integer, intent(in) :: ncat! todo: be able to set precision
     ! EO parameters
-    type(dim_info) level_diminfo, nitc_diminfo
+    type(dim_info) level_diminfo, ncat_diminfo
     
-!PS     write(*,*) "--> specify_node_var_2dicepack:", __LINE__, __FILE__
+!PS     write(*,*) "--> specify_node_var_2dicepack:", __LINE__, __FILE__, size(local_data)
     level_diminfo = obtain_diminfo(this, m_nod2d)    
-    nitc_diminfo = obtain_diminfo(this, size(local_data, dim=2))
+    ncat_diminfo = obtain_diminfo(this, size(local_data, dim=2))
 
-    call specify_variable(this, name, [level_diminfo%idx, nitc_diminfo%idx, this%time_dimidx], level_diminfo%len, local_data, .false., longname, units)    
+    call specify_variable(this, name, [level_diminfo%idx, ncat_diminfo%idx, this%time_dimidx], level_diminfo%len, local_data, .false., longname, units, ncat)
+    
   end subroutine
 
 
@@ -542,8 +562,6 @@ use nvfortran_subarray_workaround_module
       end if
     end do
     
-!PS     write(*,*) 'm_n2d=',m_nod2d,', m_e2d=',m_elem2d,', m_nl=', m_nl,', nitc', m_nitc, ', LEN=', len
-    
     ! the dim has not been added yet, see if it is one of our allowed mesh related dims
     if     (len == m_nod2d)  then
       info = dim_info( idx=this%add_dim('node', len), len=len)
@@ -553,8 +571,8 @@ use nvfortran_subarray_workaround_module
       info = dim_info( idx=this%add_dim('nz_1', len), len=len)
     else if(len == m_nl    ) then
       info = dim_info( idx=this%add_dim('nz'  , len), len=len)
-    else if(len == m_nitc  ) then
-      info = dim_info( idx=this%add_dim('nitc', len), len=len)  
+    else if(len == m_ncat  ) then
+      info = dim_info( idx=this%add_dim('ncat', len), len=len)  
     else
       print *, "error in line ",__LINE__, __FILE__," can not find dimension with size",len
       stop 1
@@ -570,14 +588,16 @@ use nvfortran_subarray_workaround_module
   end function
 
 
-  subroutine specify_variable(this, name, dim_indices, global_level_data_size, local_data, is_elem_based, longname, units)
-    type(fesom_file_type), intent(inout) :: this
-    character(len=*), intent(in) :: name
-    integer, intent(in) :: dim_indices(:)
-    integer global_level_data_size
-    real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision?
-    logical, intent(in) :: is_elem_based
-    character(len=*), intent(in) :: units, longname
+  subroutine specify_variable(this, name, dim_indices, global_level_data_size, local_data, is_elem_based, longname, units, ncat)
+    type(fesom_file_type), intent(inout)            :: this
+    character(len=*)     , intent(in)               :: name
+    integer              , intent(in)               :: dim_indices(:)
+    integer              , intent(in)               :: global_level_data_size
+    real(kind=8)         , intent(inout), target    :: local_data(:,:) ! todo: be able to set precision?
+    logical              , intent(in)               :: is_elem_based
+    character(len=*)     , intent(in)               :: units, longname
+    integer              , intent(in)   , optional  :: ncat
+    
     ! EO parameters
     integer var_index
 
@@ -592,6 +612,8 @@ use nvfortran_subarray_workaround_module
     this%var_infos(this%nvar_infos)%global_level_data_size = global_level_data_size
     this%var_infos(this%nvar_infos)%is_elem_based = is_elem_based
     this%var_infos(this%nvar_infos)%varname = name
+    if (present(ncat)) this%var_infos(this%nvar_infos)%is_icepackvar2=.true.
+    
   end subroutine
   
   

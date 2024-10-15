@@ -51,20 +51,20 @@ contains
 
   !PS add a seprate case for icepack since here i need to write a 2d vertice file
   !PS over the dimension of number of ice thickness classes. Additional input 
-  !PS parameter nitc
-  subroutine def_node_var_2dicepack(this, name, longname, units, local_data, nitc, mesh, partit)
+  !PS parameter ncat
+  subroutine def_node_var_2dicepack(this, name, longname, units, local_data, ncat, mesh, partit)
     use mod_mesh
     class(restart_file_group), target, intent(inout) :: this
     character(len=*), intent(in)        :: name
     character(len=*), intent(in)        :: units, longname
     real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
-    integer                             :: nitc
+    integer                             :: ncat
     type(t_mesh)    , intent(in)        :: mesh
     type(t_partit)  , intent(in)        :: partit
     ! EO parameters
 !PS     write(*,*) "--> def_node_var_2dicepack:", __LINE__, __FILE__
-    call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl, partit, nitc)
-    call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data, nitc)
+    call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl, partit, ncat)
+    call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data, ncat)
   end subroutine
 
   subroutine def_node_var_3d(this, name, longname, units, local_data, mesh, partit)
@@ -112,16 +112,16 @@ contains
   end subroutine
 
 
-  subroutine add_file(g, name, must_exist_on_read, mesh_nod2d, mesh_elem2d, mesh_nl, partit, mesh_nitc)
+  subroutine add_file(g, name, must_exist_on_read, mesh_nod2d, mesh_elem2d, mesh_nl, partit, mesh_ncat)
     class(restart_file_group), target, intent(inout) :: g
     character(len=*), intent(in) :: name
     logical must_exist_on_read
     integer mesh_nod2d, mesh_elem2d, mesh_nl
     type(t_partit), intent(in) :: partit
-    !PS mesh_nitc ... icepack number of ice thickness classes, do it here as optional 
+    !PS mesh_ncat ... icepack number of ice thickness classes, do it here as optional 
     !PS parameter, i assume is the less intrusive option. Therefore it must be 
     !PS at the end of the argumnent input list
-    integer, optional :: mesh_nitc 
+    integer, optional :: mesh_ncat 
     ! EO parameters
     type(restart_file_type), pointer :: f
 
@@ -133,8 +133,12 @@ contains
     allocate(f%varname,source=name)
     f%must_exist_on_read = must_exist_on_read
     
-    if (present(mesh_nitc)) then
-        call f%fesom_file_type%init(mesh_nod2d, mesh_elem2d, mesh_nl, partit, mesh_nitc)
+    if (present(mesh_ncat)) then
+        call f%fesom_file_type%init(mesh_nod2d, mesh_elem2d, mesh_nl, partit, mesh_ncat)
+        ! make sure we can identify a 2d icepackvariable, problem here is, We have a new 
+        ! dimension ncat number of ice thickness categories and icepack 2d vars have 
+        ! dimensions (nod2, ncat) but fesom IO expects (ncat, nod2) --> means we
+        ! need to sneek in a matrix transpose somehow!!!
     else
         call f%fesom_file_type%init(mesh_nod2d, mesh_elem2d, mesh_nl, partit)
     end if
@@ -159,20 +163,20 @@ contains
 
   !PS add a seprate case for icepack since here i need to write a 2d vertice file
   !PS over the dimension of number of ice thickness classes. Additional input 
-  !PS parameter nitc
-  subroutine def_node_var_2dicepack_optional(this, name, longname, units, local_data, nitc, mesh, partit)
+  !PS parameter ncat
+  subroutine def_node_var_2dicepack_optional(this, name, longname, units, local_data, ncat, mesh, partit)
     use mod_mesh
     class(restart_file_group), target, intent(inout) :: this
     character(len=*), intent(in)        :: name
     character(len=*), intent(in)        :: units, longname
     real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
-    integer                             :: nitc
+    integer                             :: ncat
     type(t_mesh)    , intent(in)        :: mesh
     type(t_partit)  , intent(in)        :: partit
     ! EO parameters
 
-    call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl, partit, nitc)
-    call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data, nitc)
+    call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl, partit, ncat)
+    call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data, ncat)
   end subroutine
 
   subroutine def_node_var_3d_optional(this, name, longname, units, local_data, mesh, partit)

@@ -905,7 +905,7 @@
                   type(t_partit),         intent(inout), target :: partit
                   integer(kind=int_kind), intent(in)            :: year
               end subroutine ini_icepack_io
-
+              
               ! Cut off Icepack
               module subroutine cut_off_icepack
                   use icepack_intfc,         only: icepack_compute_tracers
