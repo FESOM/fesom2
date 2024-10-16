@@ -15,7 +15,7 @@ module io_MEANDATA
   implicit none
 #include "netcdf.inc"
   private
-  public :: def_stream2D, def_stream3D, output, finalize_output
+  public :: def_stream, def_stream2D, def_stream3D, output, finalize_output
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -1426,7 +1426,12 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     type(t_ice)   , intent(in) :: ice
     
     type(Meandata), intent(inout) :: entry
-    character(len=*), parameter :: global_attributes_prefix = "FESOM_"
+    character(len=*), parameter :: global_attributes_prefix = "FESOM_"    
+#if defined(__icepack)
+    integer, allocatable :: ncat_arr(:)
+    integer              :: ii
+#endif
+
     ! Serial output implemented so far
     if (partit%mype/=entry%root_rank) return
     ! create an ocean output file
@@ -1443,15 +1448,21 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
         
     else if (entry%ndim==2) then
         call assert_nf( nf_def_dim(entry%ncid,  entry%dimname(1), entry%glsize(1), entry%dimID(1)), __LINE__)
-        call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
         if (entry%dimname(1)=='nz') then
+            call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
             call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer interface'),'depth at layer interface'), __LINE__)
+            
         elseif (entry%dimname(1)=='nz1') then
+            call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
             call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer midpoint'),'depth at layer midpoint'), __LINE__)
+            
         elseif (entry%dimname(1)=='ncat') then
+            call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_INT   ,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
             call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('sea-ice thickness class'),'sea-ice thickness class'), __LINE__)
+            
         else
             if (partit%mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
+            
         end if 
         call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'units', len_trim('m'),'m'), __LINE__)
         call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'positive', len_trim('down'),'down'), __LINE__)
@@ -1519,6 +1530,15 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
         call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%zbar)), __LINE__)
     elseif (entry%dimname(1)=='nz1') then
         call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%Z)), __LINE__)
+#if defined(__icepack)    
+    elseif (entry%dimname(1)=='ncat') then
+        allocate(ncat_arr(entry%glsize(1)))
+        do ii= 1, entry%glsize(1)
+            ncat_arr(ii)=ii
+        end do        
+        call assert_nf( nf_put_var_int(entry%ncid, entry%dimvarID(1), ncat_arr), __LINE__)    
+        deallocate(ncat_arr)
+#endif         
     else
         if (partit%mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
     end if 
