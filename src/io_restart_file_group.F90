@@ -21,14 +21,14 @@ module restart_file_group_module
 
     integer, public :: nfiles = 0 ! todo: allow dynamically allocated size without messing with shallow copied pointers
   contains
-    generic, public :: def_node_var => def_node_var_2d, def_node_var_2dicepack, def_node_var_3d
+    generic, public :: def_node_var => def_node_var_2d, def_node_var_3d
     generic, public :: def_elem_var => def_elem_var_2d, def_elem_var_3d
-    procedure, private :: def_node_var_2d, def_node_var_2dicepack, def_node_var_3d
+    procedure, private :: def_node_var_2d, def_node_var_3d
     procedure, private :: def_elem_var_2d, def_elem_var_3d
     ! def_*_optional procedures create a restart variable which does not have to exist when reading the restart file
-    generic, public :: def_node_var_optional => def_node_var_2d_optional, def_node_var_2dicepack_optional, def_node_var_3d_optional
+    generic, public :: def_node_var_optional => def_node_var_2d_optional, def_node_var_3d_optional
     generic, public :: def_elem_var_optional => def_elem_var_2d_optional, def_elem_var_3d_optional
-    procedure, private :: def_node_var_2d_optional, def_node_var_2dicepack_optional, def_node_var_3d_optional
+    procedure, private :: def_node_var_2d_optional, def_node_var_3d_optional
     procedure, private :: def_elem_var_2d_optional, def_elem_var_3d_optional
   end type
   
@@ -49,36 +49,27 @@ contains
     call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
   end subroutine
 
-  !PS add a seprate case for icepack since here i need to write a 2d vertice file
-  !PS over the dimension of number of ice thickness classes. Additional input 
-  !PS parameter ncat
-  subroutine def_node_var_2dicepack(this, name, longname, units, local_data, ncat, mesh, partit)
+  subroutine def_node_var_3d(this, name, longname, units, local_data, mesh, partit, ncat)
     use mod_mesh
-    class(restart_file_group), target, intent(inout) :: this
-    character(len=*), intent(in)        :: name
-    character(len=*), intent(in)        :: units, longname
-    real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
-    integer                             :: ncat
-    type(t_mesh)    , intent(in)        :: mesh
-    type(t_partit)  , intent(in)        :: partit
-    ! EO parameters
-!PS     write(*,*) "--> def_node_var_2dicepack:", __LINE__, __FILE__
-    call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl, partit, ncat)
-    call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data, ncat)
-  end subroutine
-
-  subroutine def_node_var_3d(this, name, longname, units, local_data, mesh, partit)
-    use mod_mesh
-    class(restart_file_group), intent(inout) :: this
-    character(len=*), intent(in) :: name
-    character(len=*), intent(in) :: units, longname
-    real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
-    type(t_mesh), intent(in) :: mesh
-    type(t_partit), intent(in) :: partit
+    class(restart_file_group), intent(inout)           :: this
+    character(len=*)         , intent(in)              :: name
+    character(len=*)         , intent(in)              :: units, longname
+    real(kind=8)             , intent(inout), target   :: local_data(:,:) ! todo: be able to set precision
+    type(t_mesh)             , intent(in)              :: mesh
+    type(t_partit)           , intent(in)              :: partit
+    integer                  , intent(in)   , optional :: ncat
     ! EO parameters
 !PS     write(*,*) "--> def_node_var_3d:", __LINE__, __FILE__
-    call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
-    call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
+    if (present(ncat)) then
+        !PS add a seprate case for icepack since here i need to write a 2d vertice file
+        !PS over the dimension of number of ice thickness classes. Additional input 
+        !PS parameter ncat
+        call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl, partit, ncat)
+        call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data, ncat)
+    else
+        call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
+        call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
+    end if 
   end subroutine
 
 
@@ -161,36 +152,27 @@ contains
     call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
   end subroutine
 
-  !PS add a seprate case for icepack since here i need to write a 2d vertice file
-  !PS over the dimension of number of ice thickness classes. Additional input 
-  !PS parameter ncat
-  subroutine def_node_var_2dicepack_optional(this, name, longname, units, local_data, ncat, mesh, partit)
+  subroutine def_node_var_3d_optional(this, name, longname, units, local_data, mesh, partit, ncat)
     use mod_mesh
-    class(restart_file_group), target, intent(inout) :: this
-    character(len=*), intent(in)        :: name
-    character(len=*), intent(in)        :: units, longname
-    real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
-    integer                             :: ncat
-    type(t_mesh)    , intent(in)        :: mesh
-    type(t_partit)  , intent(in)        :: partit
+    class(restart_file_group), intent(inout)            :: this
+    character(len=*)         , intent(in)               :: name
+    character(len=*)         , intent(in)               :: units, longname
+    real(kind=8)             , intent(inout), target    :: local_data(:,:) ! todo: be able to set precision
+    type(t_mesh)             , intent(in)               :: mesh
+    type(t_partit)           , intent(in)               :: partit
+    integer                  , intent(in)   , optional  :: ncat
     ! EO parameters
-
-    call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl, partit, ncat)
-    call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data, ncat)
-  end subroutine
-
-  subroutine def_node_var_3d_optional(this, name, longname, units, local_data, mesh, partit)
-    use mod_mesh
-    class(restart_file_group), intent(inout) :: this
-    character(len=*), intent(in) :: name
-    character(len=*), intent(in) :: units, longname
-    real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
-    type(t_mesh), intent(in) :: mesh
-    type(t_partit), intent(in) :: partit
-    ! EO parameters
-
-    call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
-    call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
+    if (present(ncat)) then 
+        !PS add a seprate case for icepack since here i need to write a 2d vertice file
+        !PS over the dimension of number of ice thickness classes. Additional input 
+        !PS parameter ncat
+        call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl, partit, ncat)
+        call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data, ncat)
+    else
+        call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
+        call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
+    end if 
+    
   end subroutine
 
 
