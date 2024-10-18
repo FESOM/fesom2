@@ -16,6 +16,7 @@ module cpl_driver
   use g_config, only : dt, use_icebergs, lwiso
   use o_param,  only : rad
   USE MOD_PARTIT
+  use mpi
   implicit none
   save   
   !
@@ -56,7 +57,7 @@ module cpl_driver
   integer                    :: localRank      ! local MPI rank
   integer                    :: localSize      ! local MPI size
   integer                    :: localComm      ! local MPI size
-  logical                    :: commRank       ! true for ranks doing OASIS communication
+  integer                    :: commRank
   integer                    :: comp_id        ! id returned by oasis_init_comp
 
   logical, save              :: oasis_was_initialized
@@ -773,11 +774,11 @@ include "associate_mesh_ass.h"
 !------------------------------------------------------------------
 
    call oasis_enddef(ierror)
-   if (commRank) print *, 'fesom oasis_enddef: COMPLETED'
+   if (ierror .eq. oasis_ok) print *, 'fesom oasis_enddef: COMPLETED'
 #ifndef __oifs
-   if (commRank) print *, 'FESOM: calling exchange_roots'
+   if (ierror .eq. oasis_ok) print *, 'FESOM: calling exchange_roots'
    call exchange_roots(source_root, target_root, 1, partit%MPI_COMM_FESOM, MPI_COMM_WORLD)
-   if (commRank) print *, 'FESOM source/target roots: ', source_root, target_root
+   if (ierror .eq. oasis_ok) print *, 'FESOM source/target roots: ', source_root, target_root
 #endif
 
    ! WAS VOM FOLGENDEN BRAUCHE ICH NOCH ??? 
