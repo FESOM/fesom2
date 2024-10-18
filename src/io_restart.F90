@@ -471,7 +471,7 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
         call write_restart(icepack_path, icepack_files, istep)
 #else
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ice'//achar(27)//'[0m'
-        call write_restart(ic e_path, ice_files, istep)
+        call write_restart(ice_path, ice_files, istep)
 #endif 
     end if
 
