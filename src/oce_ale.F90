@@ -1926,10 +1926,12 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
 !$OMP DO
         do n=1,myDim_nod2D
             nzmin = ulevels_nod2D(n)
-            if (ulevels_nod2D(n)>1 .and. use_cavity_fw2press ) then
+            if (ulevels_nod2D(n)>1) then
                 ! use_cavity_fw2press=.true.: adds freshwater under the cavity thereby 
                 ! increasing the local pressure
-                ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)
+                if (use_cavity_fw2press) then
+                    ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)
+                end if
             else
                 ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)+(1.0_WP-alpha)*ssh_rhs_old(n)
             end if 
