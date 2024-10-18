@@ -312,9 +312,10 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   if (.not. l_read) then
     call ini_ocean_io(yearnew, dynamics, tracers, partit, mesh)
     if (use_ice) then
-        call ini_ice_io(yearnew, ice, partit, mesh)
 #if defined(__icepack)
         call ini_icepack_io(yearnew, partit, mesh)
+#else        
+        call ini_ice_io(yearnew, ice, partit, mesh)        
 #endif        
     end if     
 #if defined(__recom)
@@ -324,9 +325,10 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   else
     call ini_ocean_io(yearold, dynamics, tracers, partit, mesh)
     if (use_ice) then
-        call ini_ice_io  (yearold, ice, partit, mesh)
 #if defined(__icepack)    
         call ini_icepack_io(yearold, partit, mesh)
+#else
+        call ini_ice_io  (yearold, ice, partit, mesh)
 #endif        
     end if     
 #if defined(__recom)
@@ -379,26 +381,33 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
     ! read netcdf file restart
     else
         which_readr = 0
+        !_______________________________________________________________________
+        ! read OCEAN restart
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ocean'//achar(27)//'[0m'
         call read_restart(oce_path, oce_files, partit%MPI_COMM_FESOM, partit%mype)
+        
+        !_______________________________________________________________________
+        ! read ICE/ICEPACK restart
         if (use_ice) then
-            if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ice'//achar(27)//'[0m'
-            call read_restart(ice_path, ice_files, partit%MPI_COMM_FESOM, partit%mype)
 #if defined(__icepack)   
             if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: icepack'//achar(27)//'[0m'
-            call read_restart(icepack_path, icepack_files, partit%MPI_COMM_FESOM, partit%mype)            
+            call read_restart(icepack_path, icepack_files, partit%MPI_COMM_FESOM, partit%mype)
+#else            
+            if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ice'//achar(27)//'[0m'
+            call read_restart(ice_path, ice_files, partit%MPI_COMM_FESOM, partit%mype)            
 #endif
         end if 
 
 #if defined(__recom)
-!RECOM restart
-!read here
-            if (REcoM_restart) then
-                    if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: bio'//achar(27)//'[0m'
-                call read_restart(bio_path, bio_files, partit%MPI_COMM_FESOM, partit%mype)
-            end if
+        !_______________________________________________________________________
+        ! read RECOM restarts
+        if (REcoM_restart) then
+            if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: bio'//achar(27)//'[0m'
+            call read_restart(bio_path, bio_files, partit%MPI_COMM_FESOM, partit%mype)
+        end if
 #endif
 
+        !_______________________________________________________________________
         ! immediately create a raw core dump restart
         if(raw_restart_length_unit /= "off") then
             call write_all_raw_restarts(istep, partit%MPI_COMM_FESOM, partit%mype)
@@ -448,25 +457,31 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   ! finally write restart for netcdf, core dump and derived type binary
   ! write netcdf restart
   if(is_portable_restart_write) then
+    !___________________________________________________________________________
+    ! write OCEAN restart
 !     if(partit%mype==0) write(*,*)'Do output (netCDF, restart) ...'
     if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ocean'//achar(27)//'[0m'
     call write_restart(oce_path, oce_files, istep)
+    
+    !___________________________________________________________________________
+    ! write ICE/ICEPACK restart
     if(use_ice) then
-        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ice'//achar(27)//'[0m'
-        call write_restart(ice_path, ice_files, istep)
 #if defined(__icepack)        
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: icepack'//achar(27)//'[0m'
         call write_restart(icepack_path, icepack_files, istep)
+#else
+        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ice'//achar(27)//'[0m'
+        call write_restart(ic e_path, ice_files, istep)
 #endif 
     end if
 
 #if defined(__recom)
-!RECOM restart
-!write here
-        if (REcoM_restart .or. use_REcoM) then
-                if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: bio'//achar(27)//'[0m'
-            call write_restart(bio_path, bio_files, istep)
-        end if
+    !___________________________________________________________________________
+    ! write RECOM restart
+    if (REcoM_restart .or. use_REcoM) then
+        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: bio'//achar(27)//'[0m'
+        call write_restart(bio_path, bio_files, istep)
+    end if
 #endif
   end if
 

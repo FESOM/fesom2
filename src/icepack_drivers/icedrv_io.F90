@@ -329,8 +329,6 @@
 #include "associate_mesh.h"
     
         ! Get the tracers information from icepack
-        call icepack_query_tracer_indices(nt_Tsfc_out=nt_Tsfc, nt_sice_out=nt_sice, &
-             nt_qice_out=nt_qice, nt_qsno_out=nt_qsno)
         call icepack_query_tracer_indices(                                          &
              nt_apnd_out=nt_apnd, nt_hpnd_out=nt_hpnd, nt_ipnd_out=nt_ipnd,         &
              nt_alvl_out=nt_alvl, nt_vlvl_out=nt_vlvl, nt_Tsfc_out=nt_Tsfc,         &
@@ -369,10 +367,16 @@
         !-----------------------------------------------------------------
         ! 3D restart fields (ncat)
         !-----------------------------------------------------------------
-        call icepack_files%def_node_var('aicen'     , 'sea ice concentration'                       , 'none', aicen(:,:)        , mesh, partit, ncat)
-        call icepack_files%def_node_var('vicen'     , 'volum per unit area of ice'                  , 'm'   , vicen(:,:)        , mesh, partit, ncat)
-        call icepack_files%def_node_var('vsnon'     , 'volum per unit area of snow'                 , 'm'   , vsnon(:,:)        , mesh, partit, ncat)
+        call icepack_files%def_node_var('aice'     , 'sea ice concentration'                        , 'none', aice(:)           , mesh, partit)
+        call icepack_files%def_node_var('vice'     , 'volum per unit area of ice'                   , 'm'   , vice(:)           , mesh, partit)
+        call icepack_files%def_node_var('vsno'     , 'volum per unit area of snow'                  , 'm'   , vsno(:)           , mesh, partit)
+        
+        call icepack_files%def_node_var('aicen'     , 'sea ice concentration per class'             , 'none', aicen(:,:)        , mesh, partit, ncat)
+        call icepack_files%def_node_var('vicen'     , 'volum per unit area of ice per class'        , 'm'   , vicen(:,:)        , mesh, partit, ncat)
+        call icepack_files%def_node_var('vsnon'     , 'volum per unit area of snow per class'       , 'm'   , vsnon(:,:)        , mesh, partit, ncat)
         call icepack_files%def_node_var('Tsfc'      , 'sea ice surf. temperature'                   , 'degC', trcrn(:,nt_Tsfc,:), mesh, partit, ncat)
+        call icepack_files%def_node_var('uvel'      , 'zonal component of ice velocity'             , 'm/s' , uvel(:)           , mesh, partit)
+        call icepack_files%def_node_var('vvel'      , 'meridional component of ice velocity'        , 'm/s' , vvel(:)           , mesh, partit)
       
         if (tr_iage) then
             call icepack_files%def_node_var('iage'  , 'sea ice age'                                 , 's'   , trcrn(:,nt_iage,:), mesh, partit, ncat)
