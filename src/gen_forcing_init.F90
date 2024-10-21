@@ -164,10 +164,10 @@ subroutine forcing_array_setup(partit, mesh)
      allocate(cloudiness(n2))
      cloudiness=0.0_WP
   end if
-  if (l_mslp) then
+!  if (l_mslp) then
      allocate(press_air(n2))
      press_air=0.0_WP
-  end if
+!  end if
  
   allocate(u_wind_t(2,n2),v_wind_t(2,n2))
   allocate(Tair_t(2,n2), shum_t(2,n2))

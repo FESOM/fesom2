@@ -96,10 +96,10 @@ type(t_partit), intent(inout), target :: partit
 
     do n=1, myDim_nod2d+eDim_nod2D
         if (.not.turn_off_hf) then
-                net_heat_flux(n)   = net_heat_flux(n) + ibhf(n) 
+                net_heat_flux(n)   = net_heat_flux(n) + ibhf(n) * steps_per_ib_step 
         end if
         if (.not.turn_off_fw) then
-                fresh_wa_flux(n)   = fresh_wa_flux(n) + (ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n))
+                fresh_wa_flux(n)   = fresh_wa_flux(n) + (ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n)) * steps_per_ib_step
         end if
     end do
 !---wiso-code-begin

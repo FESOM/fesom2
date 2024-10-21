@@ -29,12 +29,3 @@ References
 * **[Version with ICEPACK sea ice thermodynamics]** Zampieri, Lorenzo, Frank Kauker, Jörg Fröhle, Hiroshi Sumata, Elizabeth C. Hunke, and Helge Goessling. Impact of Sea-Ice Model Complexity on the Performance of an Unstructured-Mesh Sea-ice/ocean Model Under Different Atmospheric Forcings. Washington: American Geophysical Union, 2020. https://dx.doi.org/10.1002/essoar.10505308.1.
 
 * **[Version coupled with OpenIFS atmosphere]** Streffing, J., Sidorenko, D., Semmler, T., Zampieri, L., Scholz, P., Andrés-Martínez, M., et al ( 2022). AWI-CM3 coupled climate model: description and evaluation experiments for a prototype post-CMIP6 model. Geoscientific Model Development, 15. https://doi.org/10.5194/gmd-15-6399-2022
-
-Documentation for FESOM2
-************************
-
-Here lives FESOM2 documentation
-
-Rendered version: https://fesom2.readthedocs.io/en/latest/
-
-

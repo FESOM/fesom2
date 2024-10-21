@@ -1,0 +1,23 @@
+netcdf exampleMesh2 {
+  dimensions:
+    nfesom_mesh_node = 4 ; // nNodes
+    nfesom_mesh_edge = 5 ; // nEdges
+    nfesom_mesh_face = 2 ; // nFaces
+    Two = 2 ;
+    Three = 3 ;
+
+  integer fesom_mesh ;
+    fesom_mesh:cf_role = "mesh_topology" ;
+    fesom_mesh:long_name = "Topology data of 2D unstructured mesh" ;
+    fesom_mesh:topology_dimension = 2 ;
+    fesom_mesh:node_coordinates = "fesom_mesh_node_x fesom_mesh_node_y" ;
+    fesom_mesh:face_node_connectivity = "fesom_mesh_face_nodes" ;
+    fesom_mesh:face_dimension = "nfesom_mesh_face" ;
+    fesom_mesh:edge_node_connectivity = "fesom_mesh_edge_nodes" ; // attribute required if variables will be defined on edges
+    fesom_mesh:edge_dimension = "nfesom_mesh_edge" ;
+    fesom_mesh:edge_coordinates = "fesom_mesh_edge_x fesom_mesh_edge_y" ; // optional attribute (requires edge_node_connectivity)
+    fesom_mesh:face_coordinates = "fesom_mesh_face_x fesom_mesh_face_y" ; // optional attribute
+    fesom_mesh:face_edge_connectivity = "fesom_mesh_face_edges" ; // optional attribute (requires edge_node_connectivity)
+    fesom_mesh:face_face_connectivity = "fesom_mesh_face_links" ; // optional attribute
+    fesom_mesh:edge_face_connectivity = "fesom_mesh_edge_face_links" ; // optional attribute (requires edge_node_connectivity)
+}
