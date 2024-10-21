@@ -18,7 +18,7 @@ end module
 
 module oce_fluxes_interface
     interface
-        subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
+        subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh, total_nsteps, nstep)
         USE MOD_ICE
         USE MOD_DYN
         USE MOD_TRACER
@@ -30,6 +30,8 @@ module oce_fluxes_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
+        integer       , intent(in)            :: total_nsteps
+        integer       , intent(in)            :: nstep
         end subroutine
         
         subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
@@ -54,8 +56,8 @@ module oce_fluxes_interface
         use g_comm_auto
         use g_support
         type(t_partit), intent(inout), target :: partit
-        type(t_mesh),  intent(in) , target :: mesh
-        real(kind=WP), intent(in)          :: hSv
+        type(t_mesh)  , intent(in)   , target :: mesh
+        real(kind=WP) , intent(in)            :: hSv
         end subroutine
 
     end interface
@@ -256,7 +258,7 @@ end subroutine ocean2ice
 !
 !
 !_______________________________________________________________________________
-subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
+subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh, total_nsteps, nstep)
     USE MOD_ICE
     USE MOD_DYN
     USE MOD_TRACER
@@ -275,15 +277,18 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
                             init_flux_atm_ocn
 #endif
     use cavity_interfaces
+    use g_clock
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(in)   , target :: dynamics
     type(t_tracer), intent(inout), target :: tracers
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
+    integer       , intent(in)            :: total_nsteps
+    integer       , intent(in)            :: nstep
     !___________________________________________________________________________
     integer                    :: n, elem, elnodes(3),n1
-    real(kind=WP)              :: rsss, net, hSv
+    real(kind=WP)              :: rsss, net, hSv, fw0
     real(kind=WP), allocatable :: flux(:)
     !___________________________________________________________________________
     real(kind=WP), dimension(:,:), pointer :: temp, salt
@@ -361,7 +366,19 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 #endif
     
     !___freshwater hosing routine_______________________________________________
-    hSv=10
+    !
+    !1992-2020 hosing experiment increasing 1.1*10^-3 Sv/yr
+    if (yearnew<1992) then
+        fw0 = 0.0
+        hSv = 0.0 
+    else
+        fw0 = 0.0011*(yearnew-1992)
+        hSv = fw0 + (0.0011/total_nsteps)*nstep
+    endif
+    !
+    !constant flux
+    !hSv=0.1
+    !
     call fw_surf_anomaly(hSv, partit, mesh)
 
     !___________________________________________________________________________
@@ -612,6 +629,13 @@ subroutine fw_surf_anomaly(hSv, partit, mesh) !coordinates in the format [-180 1
 #include "associate_mesh_ass.h"
      hosing_flux=0._WP
 
+     !all nodes south of 60S 
+     !do n=1, myDim_nod2D+eDim_nod2D
+     !   y = geo_coord_nod2D(2,n)/rad
+     !   if (y<-60._WP) hosing_flux(n)=1._WP
+     !end do
+
+     !only coastal nodes south of 60S
      do n=1, myDim_edge2D
         ed=mesh%edges(:, n)
         if (myList_edge2D(n) <= mesh%edge2D_in) cycle
@@ -619,10 +643,10 @@ subroutine fw_surf_anomaly(hSv, partit, mesh) !coordinates in the format [-180 1
         if (y<-60._WP) hosing_flux(ed)=1._WP
      end do
 
-     call smooth_nod (hosing_flux, 5, partit, mesh)
-     do n=1,myDim_nod2d+eDim_nod2D
-        if (hosing_flux(n)>0.0_WP) hosing_flux(n)=1.0_WP
-     end do
+     !call smooth_nod (hosing_flux, 5, partit, mesh)
+     !do n=1,myDim_nod2d+eDim_nod2D
+     !   if (hosing_flux(n)>0.0_WP) hosing_flux(n)=1.0_WP
+     !end do
 
      call integrate_nod(hosing_flux, net, partit, mesh)
 
@@ -677,8 +701,6 @@ subroutine fw_depth_anomaly(ttf, hSv, partit, mesh)
     if (abs(net)>1.e-6) then
        hosing_flux=hosing_flux/net*hSv*1.e6 ! hSv*1.e6 in m/s
     end if
-
-    !water_flux=water_flux-hosing_flux
 
     do row=1,myDim_nod2d+eDim_nod2D   ! myDim is sufficient
      hosing_flux(row)=hosing_flux(row)*area(1,row)

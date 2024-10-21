@@ -49,7 +49,8 @@ module fesom_main_storage_module
     real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
     real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing 
     real(kind=real32) :: rtime_setup_ice,  rtime_setup_other, rtime_setup_restart
-    real(kind=real32) :: total_nsteps, runtime_alltimesteps
+    real(kind=real32) :: runtime_alltimesteps
+    integer           :: total_nsteps
 
 
     type(t_mesh)   mesh
@@ -292,7 +293,8 @@ contains
   subroutine fesom_runloop(current_nsteps)
     use fesom_main_storage_module
     integer, intent(in) :: current_nsteps
-    real(kind=WP)                            :: hSv
+    real(kind=WP)                            :: hSv, fw0
+    integer                                  ::nstep
     ! EO parameters
     integer n
 
@@ -360,10 +362,29 @@ contains
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
             call oce_fluxes_mom(f%ice, f%dynamics, f%partit, f%mesh) ! momentum only
-            call oce_fluxes(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+            nstep = n
+            call oce_fluxes(f%ice, f%dynamics, f%tracers, f%partit, f%mesh, f%total_nsteps, nstep)
             !___freshwater hosing routine_______________________________________
-            hSv = 10
-            call fw_depth_anomaly(f%tracers%data(2)%values, hSv, f%partit, f%mesh)
+            !
+            !1992-2020 hosing experiment increasing 1.1*10^-3 Sv/yr
+            !if (yearnew<1992) then
+            !    fw0 = 0.0
+            !    hSv = 0.0
+            !else
+            !    fw0 = 0.0011*(yearnew-1992)
+            !    hSv = fw0 + (0.0011/f%total_nsteps)*nstep
+            !endif
+            !
+            !1992-2020 hosing experiment 0.1 constant Sv
+            !if (yearnew<1992) then
+            !    hSv = 0.0
+            !else
+            !    hSv = 0.1
+            !endif
+            !
+            !constant flux
+            !hSv = 10
+            !call fw_depth_anomaly(f%tracers%data(2)%values, hSv, f%partit, f%mesh)
         end if
         call before_oce_step(f%dynamics, f%tracers, f%partit, f%mesh) ! prepare the things if required
         f%t2 = MPI_Wtime()
