@@ -15,7 +15,7 @@ module io_MEANDATA
   implicit none
 #include "netcdf.inc"
   private
-  public :: def_stream2D, def_stream3D, output, finalize_output
+  public :: def_stream, def_stream2D, def_stream3D, output, finalize_output
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -400,7 +400,7 @@ CASE ('dens_flux ')
     call def_stream(nod2D, myDim_nod2D, 'dflux',    'density flux',               'kg/(m3*s)',   dens_flux(:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('runoff    ')
     sel_forcvar(10)= 1
-    call def_stream(nod2D, myDim_nod2D, 'runoff',   'river runoff',                    'm/s',   runoff(:),                 io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'runoff',   'river runoff',                    'm/s',    runoff(:),                 io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('evap      ')
     sel_forcvar(7) = 1
     call def_stream(nod2D, myDim_nod2D, 'evap',     'evaporation',                     'm/s',    evaporation(:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -1049,7 +1049,7 @@ CASE ('icb       ')
     call def_stream(nod2D, myDim_nod2D, 'ibfwbv',  'basal iceberg melting',            'm/s',    ibfwbv(:),        1, 'm', i_real4, partit, mesh)
     call def_stream(nod2D, myDim_nod2D, 'ibfwl',   'lateral iceberg melting',          'm/s',    ibfwl(:),         1, 'm', i_real4, partit, mesh)
     call def_stream(nod2D, myDim_nod2D, 'ibfwe',   'iceberg erosion',                  'm/s',    ibfwe(:),         1, 'm', i_real4, partit, mesh)
-    call def_stream(nod2D, myDim_nod2D, 'ibhf',    'heat flux from iceberg melting',   'W/m2',   ibhf(:),          1, 'm', i_real4, partit, mesh)
+    call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'ibhf',    'heat flux from iceberg melting',   'W/m2',    ibhf_n(:,:),      1, 'm', i_real4, partit, mesh)
   end if
 !------------------------------------------
 !_______________________________________________________________________________
@@ -1426,7 +1426,12 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     type(t_ice)   , intent(in) :: ice
     
     type(Meandata), intent(inout) :: entry
-    character(len=*), parameter :: global_attributes_prefix = "FESOM_"
+    character(len=*), parameter :: global_attributes_prefix = "FESOM_"    
+#if defined(__icepack)
+    integer, allocatable :: ncat_arr(:)
+    integer              :: ii
+#endif
+
     ! Serial output implemented so far
     if (partit%mype/=entry%root_rank) return
     ! create an ocean output file
@@ -1443,15 +1448,21 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
         
     else if (entry%ndim==2) then
         call assert_nf( nf_def_dim(entry%ncid,  entry%dimname(1), entry%glsize(1), entry%dimID(1)), __LINE__)
-        call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
         if (entry%dimname(1)=='nz') then
+            call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
             call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer interface'),'depth at layer interface'), __LINE__)
+            
         elseif (entry%dimname(1)=='nz1') then
+            call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
             call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer midpoint'),'depth at layer midpoint'), __LINE__)
+            
         elseif (entry%dimname(1)=='ncat') then
+            call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_INT   ,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
             call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('sea-ice thickness class'),'sea-ice thickness class'), __LINE__)
+            
         else
             if (partit%mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
+            
         end if 
         call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'units', len_trim('m'),'m'), __LINE__)
         call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'positive', len_trim('down'),'down'), __LINE__)
@@ -1519,6 +1530,15 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
         call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%zbar)), __LINE__)
     elseif (entry%dimname(1)=='nz1') then
         call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%Z)), __LINE__)
+#if defined(__icepack)    
+    elseif (entry%dimname(1)=='ncat') then
+        allocate(ncat_arr(entry%glsize(1)))
+        do ii= 1, entry%glsize(1)
+            ncat_arr(ii)=ii
+        end do        
+        call assert_nf( nf_put_var_int(entry%ncid, entry%dimvarID(1), ncat_arr), __LINE__)    
+        deallocate(ncat_arr)
+#endif         
     else
         if (partit%mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
     end if 
@@ -1742,7 +1762,7 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     use iom
 #endif
 #if defined (__icepack)
-    use icedrv_main,    only: init_io_icepack
+    use icedrv_main,    only: ini_mean_icepack_io
 #endif
     implicit none
     integer       :: istep
@@ -1770,13 +1790,14 @@ ctime=timeold+(dayold-1.)*86400
         ! define output streams-->dimension, variable, long_name, units, array, freq, unit, precision
         !PS if (partit%flag_debug .and. partit%mype==0)  print *, achar(27)//'[32m'//' -I/O-> call ini_mean_io'//achar(27)//'[0m'
         call ini_mean_io(ice, dynamics, tracers, partit, mesh)
+        
+#if defined (__icepack)
+        call ini_mean_icepack_io(mesh) !icapack has its copy of p_partit => partit
+#endif
 
         !PS if (partit%flag_debug .and. partit%mype==0)  print *, achar(27)//'[33m'//' -I/O-> call init_io_gather'//achar(27)//'[0m'
         call init_io_gather(partit)
 
-#if defined (__icepack)
-        call init_io_icepack(mesh) !icapack has its copy of p_partit => partit
-#endif
     end if ! --> if (lfirst) then
     
     !___________________________________________________________________________
