@@ -228,7 +228,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
               call compute_zonal_mean(dynamics, tracers, partit, mesh)
            end if
          CASE("nemo")
-             call initial_state_nemo(mesh)
+             call initial_state_nemo(dynamics, tracers, partit, mesh)
        END SELECT
     else
        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call oce_initial_state'//achar(27)//'[0m' 
@@ -684,6 +684,8 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     ! ================     
     !allocate(stress_diag(2, elem_size))!delete me
     !!PS allocate(Visc(nl-1, elem_size))
+    allocate(t_star(node_size))
+    allocate(qsr_c(node_size))
     ! ================
     ! elevation and its rhs
     ! ================

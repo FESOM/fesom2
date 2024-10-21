@@ -199,6 +199,7 @@ real(kind=WP), allocatable    :: water_flux(:), Ssurf(:)
 real(kind=WP), allocatable    :: Ssurf_ib(:) ! kh 15.03.21 additional array for asynchronous iceberg computations
 real(kind=WP), allocatable    :: virtual_salt(:), relax_salt(:)
 real(kind=WP), allocatable    :: Tclim(:,:), Sclim(:,:)
+real(kind=WP), allocatable    :: t_star(:), qsr_c(:)
 
 !--------------
 ! LA: add iceberg tracer arrays 2023-02-08

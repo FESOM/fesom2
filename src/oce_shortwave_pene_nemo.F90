@@ -1,35 +1,44 @@
-subroutine cal_shortwave_rad_nemo(mesh)
+subroutine cal_shortwave_rad_nemo(ice, tracers, partit, mesh)
   ! This routine is inherited from FESOM 1.4 and adopted appropreately. It calculates 
   ! shortwave penetration into the ocean assuming the constant chlorophyll concentration.
   ! No penetration under the ice is applied. A decent way for ice region is to be discussed.
   ! This routine should be called after ice2oce coupling done if ice model is used.
   ! Ref.: Morel and Antoine 1994, Sweeney et al. 2005
   USE MOD_MESH
+  USE MOD_ICE
   USE o_PARAM
   USE o_ARRAYS
   USE MOD_PARSUP
   USE MOD_PARTIT
+  USE MOD_TRACER
   USE g_CONFIG
-  !use g_forcing_arrays, only: chl, sw_3d
+  use g_forcing_arrays!, only: chl, sw_3d
   use g_comm_auto
-  use i_param
-  use i_arrays
+ !  use i_param
+ !  use i_arrays
  ! use i_therm_param
-  use Toy_Channel_Nemo, only: qsr_c, t_star
+ ! use Toy_Channel_Nemo!, only: qsr_c, t_star
   IMPLICIT NONE
+  type(t_ice) ,intent(in), target :: ice
+  type(t_tracer), intent(inout), target :: tracers
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh), intent(in) , target :: mesh
 
-  integer      :: m, n2, n3, k, nzmax
+
+  integer      :: m, n2, n3, k, nzmax, nzmin
   real(kind=WP):: swsurf, aux, zTstar, ztrp
   real(kind=WP):: c, c2, c3, c4, c5
   real(kind=WP):: v1, v2, sc1, sc2
-  type(t_mesh), intent(in) , target :: mesh
+  real(kind=WP), pointer :: albw
+
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+
   sw_3d=0.0_WP
-  
+  albw => ice%thermo%albw  
 
   
   do n2=1, myDim_nod2D+eDim_nod2D     
@@ -41,7 +50,7 @@ subroutine cal_shortwave_rad_nemo(mesh)
      !lat = coord_nod2D(2,n2)
      
      !t_star (n2) = zTstar * cos(pi*((lat / rad - 5.0 ) / 107.0))
-     heat_flux(n2) = ztrp * (tr_arr(1,n2,1) - t_star(n2)) 
+     heat_flux(n2) = ztrp * (tracers%data(1)%values(1,n2) - t_star(n2)) 
      
      
      
@@ -87,10 +96,11 @@ subroutine cal_shortwave_rad_nemo(mesh)
      ! convert from heat flux [W/m2] to temperature flux [K m/s]
      swsurf=swsurf/vcpw
      ! vis. sw. rad. in the colume
-     nzmax=(nlevels(n2))
-     sw_3d(1, n2)=swsurf
-     do k=2, nzmax
-        aux=(v1*exp(zbar_3d_n(k,n2)/sc1)+v2*exp(zbar_3d_n(k,n2)/sc2))
+     nzmax=(mesh%nlevels(n2))
+     nzmin=(mesh%ulevels(n2))
+     sw_3d(nzmin, n2)=swsurf
+     do k=nzmin+1, nzmax
+        aux=(v1*exp(mesh%zbar_3d_n(k,n2)/sc1)+v2*exp(mesh%zbar_3d_n(k,n2)/sc2))
         sw_3d(k, n2)=swsurf*aux
         if (aux < 1.e-5_WP .OR. k==nzmax) then 
            sw_3d(k, n2)=0.0_WP

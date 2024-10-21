@@ -12,7 +12,7 @@ cp ../config/namelist.forcing .
 cp ../config/namelist.oce     .
 cp ../config/namelist.ice     .
 cp ../config/namelist.io      .
-
+cp ../config/namelist.dyn     .
 date
 time mpirun --allow-run-as-root --mca btl_vader_single_copy_mechanism none -n 4  fesom.x
 date

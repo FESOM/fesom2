@@ -4,6 +4,8 @@ MODULE Toy_Channel_Nemo
   USE o_PARAM
   USE MOD_PARSUP
   USE MOD_PARTIT
+  USE MOD_TRACER
+  USE MOD_DYN
   USE g_config
   !USE i_therm_param, only: albw
 
@@ -22,10 +24,14 @@ MODULE Toy_Channel_Nemo
 !
 !--------------------------------------------------------------------------------------------
 
-subroutine initial_state_nemo(mesh)
+subroutine initial_state_nemo(dynamics, tracers, partit, mesh)
  ! Profiles NEMO 2010 
   implicit none
-  type(t_mesh), intent(in) , target  :: mesh
+  type(t_mesh), intent(inout) , target :: mesh
+  type(t_partit), intent(inout), target :: partit
+  type(t_tracer), intent(inout), target :: tracers
+  type(t_dyn), intent(inout), target :: dynamics 
+
   integer                            :: elem, n, nz, elnodes(3),m,k,nzmax
   real(kind=8)                       :: dst!, yn, Fy, Lx
   real(kind=WP)                      :: lon, lat
@@ -56,11 +62,11 @@ subroutine initial_state_nemo(mesh)
  t_star        = 0.0_8
  qsr_c       = 0.0_8
  relax2clim    = 0.0_8
- tr_arr(:,:,2) = 35.0_8
+ tracers%data(2)%values(:,:) = 35.0_8 !tr_arr(:,:,2) = 35.0_8
  !tr_arr(:,:,1) = 20.0_8
  
- Tsurf         = tr_arr(1,:,1)
- Ssurf         = tr_arr(1,:,2)
+ Tsurf         = tracers%data(1)%values(1,:) !tr_arr(1,:,1)
+ Ssurf         = tracers%data(2)%values(1,:) !tr_arr(1,:,2)
  water_flux    = 0.0_8
  !clim_relax   = 0.0_8
  
@@ -94,7 +100,7 @@ subroutine initial_state_nemo(mesh)
 !  elevation
 ! ========  
   if (elevation==1) then 
-      eta_n=0.01*(coord_nod2D(2,:)-30.0*rad)/(15.0*rad)
+      dynamics%eta_n=0.01*(coord_nod2D(2,:)-30.0*rad)/(15.0*rad)
   end if
   
 ! ========
@@ -112,7 +118,7 @@ subroutine initial_state_nemo(mesh)
              
              !tr_arr(nz,n,1) = (1+Z(nz)/4000)*(coord_nod2D(2,n)/rad)
              !tr_arr(nz,n,1)=tr_arr(nz,n,1)-0.95_WP*20*tanh(abs(Z(nz))/300)-abs(Z(nz))/2400.0_WP
-             tr_arr(nz,n,1) = 7.5 * ( 1.-TANH((ABS(Z(nz))-80.)/30.) )   &
+             tracers%data(1)%values(nz,n) = 7.5 * ( 1.-TANH((ABS(Z(nz))-80.)/30.) )   &
                 &               + 10. * ( 5000. - ABS(Z(nz)) ) /5000.   
              !tr_arr(nz,n,1)=25.0 + .05*tanh((Z(nz) - 300.0)/5.0) - Z(nz)*0.008_WP
          
@@ -122,7 +128,7 @@ subroutine initial_state_nemo(mesh)
   !write(*,*) mype, 'Temperature', maxval(tr_arr(:,:,1)), minval(tr_arr(:,:,1))
   
   
-  Tsurf=tr_arr(1,:,1)
+  Tsurf=tracers%data(1)%values(1,:) !tr_arr(1,:,1)
 
 
   if (sprofile==1) then  
@@ -130,7 +136,7 @@ subroutine initial_state_nemo(mesh)
 
        DO nz=1, nlevels_nod2D(n)-1
              
-           tr_arr(nz,n,2) = 36. - ABS(Z(nz)) /4000.
+           tracers%data(2)%values(nz,n) = 36. - ABS(Z(nz)) /4000.
 
          
        END DO
@@ -150,11 +156,11 @@ subroutine initial_state_nemo(mesh)
       DO n=1, myDim_nod2D+eDim_nod2D 
           lat = coord_nod2D(2,n)
           !the function varies from 27C at 50N to 7C at 15N, again the analogy with spring
-          t_star (n) = zTstar * cos(pi*((lat / rad - 5.0 ) / 107.0))
+          t_star(n) = zTstar * cos(pi*((lat / rad - 5.0 ) / 107.0))
           !solar radiation component
           qsr_c(n) = 230 * COS( pi * ((lat / rad) / 162.0 ))
          
-          heat_flux(n) = ztrp * (tr_arr(1,n,1) - t_star(n)) !+ qsr_c(n)
+          heat_flux(n) = ztrp * (tracers%data(1)%values(1,n) - t_star(n)) !+ qsr_c(n)
           
           !write(*,*) mype, 't_star', t_star
           
@@ -218,15 +224,15 @@ subroutine initial_state_nemo(mesh)
       elnodes=elem2D_nodes(:,n)
       !dst - change in latitude
       dst=(sum(coord_nod2D(2, elnodes))/3.0-lat0*rad)*r_earth-ysize/2
-      coriolis(n)=1.0e-4+dst*1.8e-11	 
+      mesh%coriolis(n)=1.0e-4+dst*1.8e-11	 
   END DO
-  write(*,*) mype, 'COR', maxval(coriolis*10000.0), minval(coriolis*10000.0) 
+  write(*,*) mype, 'COR', maxval(mesh%coriolis*10000.0), minval(mesh%coriolis*10000.0) 
   
   DO n=1,myDim_nod2D+eDim_nod2D
       dst=(coord_nod2D(2, n)-lat0*rad)*r_earth-ysize/2
-      coriolis_node(n)=1.0e-4+dst*1.8e-11	 
+      mesh%coriolis_node(n)=1.0e-4+dst*1.8e-11	 
   END DO
-  write(*,*) mype, 'COR_n', maxval(coriolis_node*10000.0), minval(coriolis_node*10000.0) 
+  write(*,*) mype, 'COR_n', maxval(mesh%coriolis_node*10000.0), minval(mesh%coriolis_node*10000.0) 
 
  
  
@@ -244,7 +250,7 @@ if (tpert==1) then
      if (dst>1.5*rad) cycle
      do nz=1, nlevels_nod2D(n)-1 
         !if(abs(Z(nz)+500)<300) then
-        tr_arr(nz,n,1)=tr_arr(nz,n,1)+1.0*cos(pi*dst/2.0/1.5/rad)       !exp(-(dst/(1.5*rad))**2)
+        tracers%data(1)%values(nz,n)=tracers%data(1)%values(nz,n)+1.0*cos(pi*dst/2.0/1.5/rad)       !exp(-(dst/(1.5*rad))**2)
 	!end if
      end do
   end do 

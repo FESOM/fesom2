@@ -84,6 +84,8 @@ elif [[ $LOGINHOST =~ \.bullx$ ]]; then
    STRATEGY="atosecmwf"
 elif [[ $LOGINHOST =~ uan[0-9][0-9] ]]; then
    STRATEGY="lumi"
+elif [[ $LOGINHOST =~ nesh-login[1-3] ]]; then
+   STRATEGY="nesh"
 elif [[ -d $DIR/env/$LOGINHOST ]]; then # check if directory with LOGINHOST exists in env
 STRATEGY=$LOGINHOST
 else

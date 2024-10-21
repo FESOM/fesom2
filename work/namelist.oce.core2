@@ -1,0 +1,49 @@
+! The namelist file for the finite-volume ocean model
+
+&oce_dyn
+C_d=0.0025             ! Bottom drag, nondimensional
+A_ver= 1.e-4	       ! Vertical viscosity, m^2/s
+laplacian=.false.      ! Use Laplacian viscosity 
+A_hor=0.               ! 500.      ! Background horizontal viscosity
+A_hor_max=0.           ! 8000.     ! Maximum viscosity allowed (to limit Smag and Leith contributions when they are too large
+Div_c=.2  	       ! 0.35   ! Modified Leith viscosity, nondimensional, 0.3 -- 1.0
+Leith_c=.01	       ! The strength of the Leith viscosity
+tau_c= 0.              ! 1.5 !0.2 !1.5	       ! Controls the strength of filters (1.5 and 0.2 for dt=1min and 15min, respectively)
+Smag_c=0.              ! 0.2 Smagorinsky viscosity, nondimensional, 0.1 --0.2
+biharmonic=.false.     ! Use biharmonic viscosity
+Abh0=0.                ! 1.e12 ! Biharmonic viscosity, m^4/s
+scale_area=5.8e9       ! Visc. and diffus. are for an element with scale_area
+mom_adv=2              ! 1=vector CV, p1 vel, 2=sca. CV, 3=vector inv.
+free_slip=.false.      ! Switch on free slip
+i_vert_visc=.true.    
+w_split=.true.
+w_exp_max=5.e-4
+Fer_GM=.true.               ! to swith on/off GM after Ferrari et al. 2010
+K_GM=1500.                  ! GM thickness diffusivity (m2/s)
+scaling_Ferreira   =.false. ! GM vertical scaling after Ferreira et al.(2005) (as also implemented by Qiang in FESOM 1.4)
+scaling_Rossby     =.false. ! GM is smoothly switched off according to Rossby radius (from 1. in coarse areas to 0. where resolution reaches 2 points/Rossby radius)
+scaling_resolution =.true.  ! GM is spatially scaled with resolution; A value of K_GM corresponds then to a resolution of 100km
+scaling_FESOM14    =.true.  ! special treatment of GM in the NH (as also implemented by Qiang in FESOM 1.4; it is zero within the boundary layer)
+
+Redi  =.true.
+visc_sh_limit=5.0e-3       ! for KPP, max visc due to shear instability
+mix_scheme='KPP'           ! vertical mixing scheme: KPP, PP 
+Ricr   = 0.3               ! critical bulk Richardson Number
+concv  = 1.6               ! constant for pure convection (eqn. 23) (Large 1.5-1.6; MOM default 1.8)
+/
+
+&oce_tra 
+diff_sh_limit=0.05 !5.0e-3            ! for KPP, max diff due to shear instability
+Kv0_const=.false.
+double_diffusion=.false.               ! for KPP,dd switch
+K_ver=1.0e-5
+K_hor=150.
+surf_relax_T=0.0
+surf_relax_S=1.929e-06       ! 50m/300days 6.43e-07! m/s 10./(180.*86400.)
+balance_salt_water =.true.   ! balance virtual-salt or freshwater flux or not
+clim_relax=0.0	                    ! 1/s, geometrical information has to be supplied
+ref_sss_local=.true.
+ref_sss=34.
+i_vert_diff=.true.  ! true
+tracer_adv=2        ! 1=MUSCL, 2=MUSCL+FCT
+/
