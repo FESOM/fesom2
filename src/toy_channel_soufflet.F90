@@ -12,7 +12,9 @@ MODULE Toy_Channel_Soufflet
   implicit none
   SAVE 
   private
-  public :: relax_zonal_vel, relax_zonal_temp, compute_zonal_mean_ini, compute_zonal_mean, initial_state_soufflet, energy_out_soufflet, soufflet_forc_update
+  public :: relax_zonal_vel, relax_zonal_temp, compute_zonal_mean_ini, compute_zonal_mean, &
+            initial_state_soufflet, energy_out_soufflet, soufflet_forc_update, &
+            tau_inv, lat0, dy, ztem
 
   real(kind=WP), allocatable  :: zvel(:,:), Uclim(:,:)
   real(kind=WP), allocatable  :: ztem(:,:)

@@ -1,0 +1,24 @@
+&dynamics_visc
+visc_gamma0  = 0.003 ! [m/s],   backgroung viscosity= gamma0*len, it should be as small a s possible (keep it < 0.01 m/s).
+visc_gamma1  = 0.1   ! [nodim], for computation of the flow aware viscosity
+visc_gamma2  = 0.285 ! [s/m],   is only used in easy backscatter option
+visc_easybsreturn= 1.5
+
+opt_visc     = 5          
+! 5=Kinematic (easy) Backscatter
+! 6=Biharmonic flow aware (viscosity depends on velocity Laplacian)
+! 7=Biharmonic flow aware (viscosity depends on velocity differences)
+! 8=Dynamic Backscatter
+
+use_ivertvisc= .true.  
+/
+
+&dynamics_general
+momadv_opt   = 2       ! option for momentum advection in moment only =2
+use_freeslip = .false. ! Switch on free slip
+use_wsplit   = .false. ! Switch for implicite/explicte splitting of vert. velocity
+wsplit_maxcfl= 1.0     ! maximum allowed CFL criteria in vertical (0.5 < w_max_cfl < 1.) 
+                       ! in older FESOM it used to be w_exp_max=1.e-3
+ldiag_KE=.false.       ! activates energy diagnostics
+/
+

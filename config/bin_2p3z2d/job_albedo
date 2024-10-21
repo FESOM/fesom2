@@ -1,0 +1,66 @@
+#!/bin/bash
+#SBATCH --account=nwg_hauck.maresys # edit your account
+#SBATCH --job-name=recom
+#SBATCH --partition=mpp
+#SBATCH --time=01:30:00
+####SBATCH --constraint="[rack1|rack3]"
+#SBATCH --qos=12h
+#SBATCH --nodes=9            # Number of tasks (MPI) tasks to be launched
+#SBATCH --tasks-per-node 96 #8 #4  # using all 128CPus we exceed the maxload limit (>130) of many used nodes when us parallel I/O
+#SBATCH --cpus-per-task 1
+
+#SBATCH -o fesom2o.out
+#SBATCH -e fesom2e.out
+
+# disable hyperthreading
+#SBATCH --hint=nomultithread
+
+module purge 
+source ../env/albedo/shell
+export OMP_NUM_THREADS=1
+ulimit -s unlimited
+
+# determine JOBID
+JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
+
+ln -s ../bin/fesom.x .           # cp -n ../bin/fesom.x
+cp -n ../config/namelist.config  .
+cp -n ../config/namelist.forcing .
+cp -n ../config/namelist.oce     .
+cp -n ../config/namelist.dyn     .
+cp -n ../config/namelist.tra     .
+cp -n ../config/namelist.ice     .
+cp -n ../config/namelist.io      .
+cp -n ../config/namelist.icepack .
+
+#___DETERMINE SLURM JOBID+OUTPUTFILE____________________________________________
+jobid=$(echo $SLURM_JOB_ID | cut -d"." -f1)
+fname="fesom2_${SLURM_JOB_NAME}_${jobid}.out"
+
+#___PUT JOB IN QUEUE____________________________________________________________
+date
+####srun --mpi=pmi2 ./fesom.x >> ${fname}
+srun --mpi=pmi2 ./fesom.x > fesom2.0.out
+date
+
+#qstat -f $PBS_JOBID
+#export EXITSTATUS=$?
+#if [ ${EXITSTATUS} -eq 0 ] || [ ${EXITSTATUS} -eq 127 ] ; then
+#sbatch job_ollie
+#fi
+
+#Resultpath='/albedo/scratch/user/ogurses/ocean_only/'
+Resultpath='/albedo/scratch/user/ogurses/fesom2.5_recom_st1_vsink_vben_diags_3Zoo2Det_v3/'
+test -d $Resultpath/fesom.2019.oce.restart && exit
+
+IsInFile=$( tail -3 fesom2.0.out | grep -c timesteps)
+if (( IsInFile > 0 )); then
+# submit next #job                                                                                                     \
+ echo "submitting next job"
+ cp fesom2.0.out fesom.out.done
+ sbatch job_albedo
+else
+ echo "something is wrong, last line of fesom.out reads"
+ echo $( tail -1 fesom2.0.out)
+ echo "abnormal termination of job script"
+fi

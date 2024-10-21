@@ -338,15 +338,19 @@ contains
 !       ustar = sqrt( sqrt( stress_atmoce_x^2 + stress_atmoce_y^2 ) / rho ) (m/s)
 !       bo =  -g * ( Talpha*heat_flux/vcpw + Sbeta * salinity*water_flux ) (m^2/s^3)
 !      *******************************************************************
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nzmin)
-     DO node=1, myDim_nod2D
-        nzmin = ulevels_nod2D(node)
-        ustar(node) = sqrt( sqrt( stress_atmoce_x(node)**2 + stress_atmoce_y(node)**2 )*density_0_r ) ! @ the surface (eqn. 2)   
-        ! Surface buoyancy forcing (eqns. A2c & A2d & A3b & A3d)
-        Bo(node)  = -g * ( sw_alpha(nzmin,node) * heat_flux(node)  / vcpw             &   !heat_flux & water_flux: positive up
-                         + sw_beta (nzmin,node) * water_flux(node) * tracers%data(2)%values(nzmin,node)) 
-     END DO
-!$OMP END PARALLEL DO
+
+  DO node=1, myDim_nod2D !+eDim_nod2D
+     nzmin = ulevels_nod2D(node)
+!!PS      ustar(node) = sqrt( sqrt( stress_atmoce_x(node)**2 + stress_atmoce_y(node)**2 )*density_0_r ) ! @ the surface (eqn. 2)
+     ustar(node) = sqrt( sqrt( stress_node_surf(1,node)**2 + stress_node_surf(2,node)**2 )*density_0_r ) ! @ the surface (eqn. 2)
+    
+! Surface buoyancy forcing (eqns. A2c & A2d & A3b & A3d)
+     !!PS Bo(node)  = -g * ( sw_alpha(1,node) * heat_flux(node)  / vcpw             &   !heat_flux & water_flux: positive up
+     !!PS                  + sw_beta (1,node) * water_flux(node) * tr_arr(1,node,2))
+     Bo(node)  = -g * ( sw_alpha(nzmin,node) * heat_flux(node)  / vcpw             &   !heat_flux & water_flux: positive up
+                      + sw_beta (nzmin,node) * water_flux(node) * tracers%data(2)%values(nzmin,node)) 
+  END DO
+      
 ! compute interior mixing coefficients everywhere, due to constant 
 ! internal wave activity, static instability, and local shear 
 ! instability.

@@ -12,7 +12,7 @@ jobs:
     # Containers must run in Linux based operating systems
     runs-on: ubuntu-latest
     # Docker Hub image that `container-job` executes in
-    container: koldunovn/fesom2_test:refactoring2
+    container: ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master
 
     # Service containers to run with `gfortran_ubuntu`
     steps:
@@ -69,6 +69,12 @@ jobs:
       run: |
         cd work_pi
         fcheck .
+    - name: Check UGRID Compliance
+      run: |
+        pip install ugrid-checks xarray
+        # Needed to combine the mesh diag and output
+        python3 -c "import xarray as xr; ds1 = xr.open_dataset('./test/output_pi/sst.fesom.1948.nc'); ds2 = xr.open_dataset('./test/output_pi/fesom.mesh.diag.nc'); xr.merge([ds1, ds2]).to_netcdf('./test/output_pi/merged_ugrid_check.nc')"
+        ugrid-checker ./test/output_pi/merged_ugrid_check.nc
 
     - name: Check restarts
       run: |
