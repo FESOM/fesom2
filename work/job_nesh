@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=souff_20_001_06_25_5
+#SBATCH --job-name=nemo_dg_test
 #SBATCH --partition=base
 #SBATCH --time=02:45:00
 #SBATCH --nodes=1
-#SBATCH --tasks-per-node=12
+#SBATCH --tasks-per-node=20
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=12G
+#SBATCH --mem=60G
 
 #SBATCH --output %x_%j.out
 #SBATCH --error %x_%j.err
@@ -14,10 +14,10 @@
 #SBATCH --hint=nomultithread
 
 module purge 
-source ../../env/nesh/shell
+source ../env/nesh/shell
 export OMP_NUM_THREADS=1
 
-ln -sf ../../bin/fesom.x .
+ln -sf ../bin/fesom.x .
 
 #___DETERMINE SLURM JOBID+OUTPUTFILE____________________________________________
 jobid=$(echo $SLURM_JOB_ID | cut -d"." -f1)
