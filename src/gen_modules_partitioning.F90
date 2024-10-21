@@ -132,7 +132,7 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
   !For OpenIFS coupled runs we use the new OASIS nameing scheme (oasis)
   if (present(abort)) then
     if (mype==0) write(*,*) 'Run finished unexpectedly!'
-    call MPI_ABORT(COMM, 1 )
+    call MPI_ABORT(MPI_COMM_WORLD, 1, error)
   else
     call oasis_terminate
   endif
