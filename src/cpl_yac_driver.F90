@@ -3,6 +3,8 @@ module cpl_yac_driver
 
   use mo_yac_finterface
   USE o_PARAM
+  USE g_clock
+
   implicit none
   save
 
@@ -97,11 +99,19 @@ contains
     integer :: curr_elem, curr_edge
     logical, allocatable :: node_is_boundary(:)
     character(len=4)           :: dt_str
+    character(LEN=24) :: startdatetime
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+
+    WRITE(startdatetime, '(I4.4,"-",I2.2,"-",I2.2,"T",I2.2,":",I2.2,":",I2.2,".",I3.3, "Z")') &
+         yearnew, month, day_in_month, &
+         INT(timenew)/3600, MODULO(INT(timenew), 3600)/60, MODULO(INT(timenew), 60), &
+         INT(MODULO(timenew, 1.0_WP)*1000)
+
+    CALL yac_fdef_datetime(startdatetime)
 
     ! find boundary nodes
     ALLOCATE(node_is_boundary(myDim_nod2D))
