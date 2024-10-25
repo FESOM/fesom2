@@ -7,7 +7,7 @@ set(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:${yac_DIR}/lib/pkgconfig:${yac_D
 find_package(PkgConfig QUIET)
 PKG_CHECK_MODULES(PC_yac yac)
 
-find_path(YAC_Fortran_INCLUDE_DIRECTORIES mo_yac_finterface.mod HINTS ${PC_yac_INCLUDE_DIRS} ${yac_DIR}/src)
+find_path(YAC_Fortran_INCLUDE_DIRECTORIES mo_yac_finterface.mod HINTS ${PC_yac_INCLUDE_DIRS} ${yac_DIR}/src/mci)
 
 find_library(YAC_LIBRARY yac HINTS ${PC_yac_LINK_LIBRARIES} ${yac_DIR}/src)
 #find_library(YAC_CLAPACK_LIBRARY yac_clapack HINTS ${PC_yac_LINK_LIBRARIES} ${yac_DIR}/clapack)
