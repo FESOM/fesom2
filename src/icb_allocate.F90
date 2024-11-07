@@ -26,6 +26,10 @@ type(t_mesh), intent(in), target :: mesh
   allocate(ibhf_n(mesh%nl, n2))
   ibhf_n    = 0.0_WP
 
+  allocate(wave_erosion_potential(elem2D), linit_wave_erosion_pot(elem2D))
+  wave_erosion_potential = 0.0
+  linit_wave_erosion_pot = .true.
+
   allocate(calving_day(ib_num))
   calving_day = 1   !28.0: September 29 for restart in 1 SEP 97 ! 271.0: September 29 for year 1997
   allocate(height_ib(ib_num))
