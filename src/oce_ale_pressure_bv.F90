@@ -3133,7 +3133,7 @@ subroutine init_ref_density_advanced(tracers, partit, mesh)
     type(t_tracer), intent(in),     target  :: tracers
     integer                                 :: node, nz, nzmin, nzmax
     real(kind=WP)                           :: rhopot, bulk_0, bulk_pz, bulk_pz2, rho
-    real(kind=8)                            :: T, S, auxz
+    real(kind=8)                            :: T, S, auxz, x, y
     real(kind=WP),  dimension(:,:), pointer :: temp, salt
     real(kind=8)                            :: ref_temp1D(mesh%nl-1), ref_salt1D(mesh%nl-1), vol1D(mesh%nl-1)
 #include "associate_part_def.h"
@@ -3148,6 +3148,10 @@ ref_temp1D=0.0_WP
 ref_salt1D=0.0_WP
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax) REDUCTION(+:vol1D)
 do node=1,myDim_nod2d
+    x=geo_coord_nod2D(1,node)/rad
+    y=geo_coord_nod2D(1,node)/rad
+    if ((x>=-6.) .AND. (x<=42) .AND. (y>=30.15) .AND. (y<=42)) CYCLE !exclude Mediterranean Sea
+    if ((x>= 2.) .AND. (x<=42) .AND. (y>=41)    .AND. (y<=48)) CYCLE !exclude Black Sea
     nzmin = 1
     nzmax = nlevels_nod2d(node)-1
     do nz=nzmin,nzmax
@@ -3175,7 +3179,6 @@ end where
         auxz=min(0.0,Z_3d_n(nzmin,node))
         do nz=nzmin,nzmax
             call densityJM_components(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
-            rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
             auxz=Z_3d_n(nz,node)
             rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
             density_ref(nz,node) = rho*rhopot/(rho+0.1_WP*auxz)
@@ -3183,4 +3186,13 @@ end where
     end do
 !$OMP END PARALLEL DO
 if(mype==0) write(*,*) ' --> compute reference density'
+if(mype==0) then
+do nz=1,68
+ call densityJM_components(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
+ auxz=Z(nz)
+ rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
+ rho = rho*rhopot/(rho+0.1_WP*auxz)
+ write(*,*) "mytest:", ref_temp1D(nz), ref_salt1D(nz), auxz, rho
+end do
+end if
 end subroutine init_ref_density_advanced
