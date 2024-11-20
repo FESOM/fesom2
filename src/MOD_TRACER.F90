@@ -50,6 +50,7 @@ real(kind=WP), allocatable                    :: tra_diff_part_hor_redi(:,:,:)
 real(kind=WP), allocatable                    :: tra_diff_part_ver_expl(:,:,:)
 real(kind=WP), allocatable                    :: tra_diff_part_ver_redi_expl(:,:,:)
 real(kind=WP), allocatable                    :: tra_diff_part_ver_impl(:,:,:)
+real(kind=WP), allocatable                    :: tra_recom_sms(:,:,:)
 
 ! The fct part
 real(kind=WP),allocatable,dimension(:,:)      :: fct_LO          ! Low-order solution

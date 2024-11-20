@@ -94,7 +94,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 
     real(kind=8)               :: SW, Loc_slp
     integer                    :: tr_num, num_tracers
-    integer                    :: nz, n, nzmin, nzmax
+    integer                    :: nz, n, nzmin, nzmax, nu1, nl1
     integer                    :: idiags
 
     real(kind=8)               :: Sali
@@ -113,6 +113,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     real(kind=8),  allocatable :: OmegaC_watercolumn(:)
     real(kind=8),  allocatable :: kspc_watercolumn(:)
     real(kind=8),  allocatable :: rhoSW_watercolumn(:)
+    real(kind=WP)              :: ttf_rhs_bak (mesh%nl-1, tracers%num_tracers) ! local variable ! OG - tra_diag
 
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
@@ -206,6 +207,14 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             C(1:nzmax, tr_num-2) = tracers%data(tr_num)%values(1:nzmax, n)
         end do
 
+        ttf_rhs_bak = 0.0 ! OG - tra_diag
+
+        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+           do tr_num=1, num_tracers
+              ttf_rhs_bak(1:nzmax,tr_num) = tracers%data(tr_num)%values(1:nzmax, n)
+           end do
+        end if
+
         !!---- Depth of the nodes in the water column
         zr(1:nzmax) = Z_3d_n(1:nzmax, n)
 
@@ -281,6 +290,14 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
         do tr_num = num_tracers-bgc_num+1, num_tracers !bgc_num+2
             tracers%data(tr_num)%values(1:nzmax, n) = C(1:nzmax, tr_num-2)
         end do
+
+        ! recom_sms
+        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+           do tr_num=1, num_tracers
+             tracers%work%tra_recom_sms(1:nzmax,n,tr_num) = tracers%data(tr_num)%values(1:nzmax, n) - ttf_rhs_bak(1:nzmax,tr_num)
+             !if (mype==0)  print *,  tra_recom_sms(:,:,tr_num)
+           end do
+        end if
 
         !!---- Local variables that have been changed during the time-step are stored so they can be saved
         Benthos(n,1:benthos_num) = LocBenthos(1:benthos_num)
@@ -412,6 +429,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
     call exchange_nod(OmegaC3D, partit)
     call exchange_nod(kspc3D, partit)
     call exchange_nod(rhoSW3D, partit)
+
 end subroutine recom
 
 ! ======================================================================================

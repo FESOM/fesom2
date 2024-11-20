@@ -454,10 +454,13 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
         tracers%work%tra_advvert  = 0.0_WP
         allocate(tracers%work%tra_diff_part_hor_redi(nl-1,node_size,num_tracers),tracers%work%tra_diff_part_ver_expl(nl-1,node_size,num_tracers))
         allocate(tracers%work%tra_diff_part_ver_redi_expl(nl-1,node_size,num_tracers),tracers%work%tra_diff_part_ver_impl(nl-1,node_size,num_tracers))
+        allocate(tracers%work%tra_recom_sms(nl-1,node_size,num_tracers))
         tracers%work%tra_diff_part_hor_redi = 0.0_WP
         tracers%work%tra_diff_part_ver_expl = 0.0_WP
         tracers%work%tra_diff_part_ver_redi_expl = 0.0_WP
         tracers%work%tra_diff_part_ver_impl = 0.0_WP
+        tracers%work%tra_recom_sms = 0.0_WP
+
     end if
 END SUBROUTINE tracer_init
 !
