@@ -19,6 +19,8 @@ subroutine reset_ib_fluxes()
     use g_config
     use iceberg_params
 
+    wave_erosion_potential  = 0.0
+    linit_wave_erosion_pot  = .true.
     ibfwbv  = 0.0
     ibfwb   = 0.0
     ibfwl   = 0.0
@@ -124,14 +126,14 @@ type(t_partit), intent(inout), target :: partit
                         dz = abs(abs(lev_up) - abs(depth_ib))
                     end if              
                    
-                    if( depth_ib==0.0 ) then
+                    if( abs(depth_ib) > 0.0 ) then
+                    !    ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) & 
+                    !                                - (hfbv_flux_ib(ib,j)+hfl_flux_ib(ib,j)) &
+                    !                                / tot_area_nods_in_ib_elem(j)
+                    !else
                         ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) & 
-                                                    - (hfbv_flux_ib(ib,j)+hfl_flux_ib(ib,j)) &
-                                                    / tot_area_nods_in_ib_elem(j)
-                    else
-                        ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) & 
-                                                    - ((hfbv_flux_ib(ib,j)+hfl_flux_ib(ib,j)) * (dz / abs(depth_ib)) & 
-                                                    + hfe_flux_ib(ib) * (dz / abs(height_ib_single))) &
+                                                    - ((hfbv_flux_ib(ib,j)+hfl_flux_ib(ib,j)) * (dz / abs(depth_ib))) & 
+                                                    !+ hfe_flux_ib(ib) * (dz / abs(height_ib_single))) &
                                                     / tot_area_nods_in_ib_elem(j)
                     end if
                 end do
@@ -145,7 +147,8 @@ type(t_partit), intent(inout), target :: partit
                 
                 if( height_ib_single .ne. 0.0 ) then
                     ibhf_n(1,iceberg_node) = ibhf_n(1,iceberg_node) - hfe_flux_ib(ib) & 
-                            * ((abs(height_ib_single)-abs(depth_ib))/abs(height_ib_single)) & 
+                            !* abs(height_ib_single) & 
+                            !* ((abs(height_ib_single)-abs(depth_ib))/abs(height_ib_single)) & 
                             / tot_area_nods_in_ib_elem(1)
                 end if
             end if
