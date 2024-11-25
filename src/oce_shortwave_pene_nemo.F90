@@ -12,12 +12,9 @@ subroutine cal_shortwave_rad_nemo(ice, tracers, partit, mesh)
   USE MOD_PARTIT
   USE MOD_TRACER
   USE g_CONFIG
-  use g_forcing_arrays!, only: chl, sw_3d
+  use g_forcing_arrays
   use g_comm_auto
- !  use i_param
- !  use i_arrays
- ! use i_therm_param
- ! use Toy_Channel_Nemo!, only: qsr_c, t_star
+  use Toy_Channel_Nemo
   IMPLICIT NONE
   type(t_ice) ,intent(in), target :: ice
   type(t_tracer), intent(inout), target :: tracers

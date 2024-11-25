@@ -7,7 +7,6 @@ MODULE Toy_Channel_Nemo
   USE MOD_TRACER
   USE MOD_DYN
   USE g_config
-  !USE i_therm_param, only: albw
 
   implicit none
   SAVE 
