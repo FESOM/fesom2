@@ -15,5 +15,5 @@ find_library(YAC_LIBRARY yac HINTS ${PC_yac_LINK_LIBRARIES} ${yac_DIR}/src)
 
 #list(REMOVE_ITEM PC_yac_LINK_LIBRARIES yac yac_clapack yac_mtime)
 
-#message(FATAL_ERROR ${PC_yac_LDFLAGS})
+#message(FATAL_ERROR "${PC_yac_LDFLAGS}")
 set(YAC_Fortran_LIBRARIES "-L${yac_DIR}/src" ${PC_yac_LDFLAGS})
