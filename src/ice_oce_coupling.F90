@@ -46,15 +46,17 @@ module oce_fluxes_interface
         type(t_mesh)  , intent(in)   , target :: mesh
         end subroutine
 
-        subroutine fw_surf_anomaly(hSv, partit, mesh)
+        subroutine fw_surf_anomaly(hSv, tracers, partit, mesh)
         use o_PARAM
         use o_ARRAYS
+        USE MOD_TRACER
         USE MOD_PARTIT
         use MOD_MESH
         use MOD_PARSUP
         USE g_CONFIG
         use g_comm_auto
         use g_support
+        type(t_tracer), intent(in),    target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
         real(kind=WP) , intent(in)            :: hSv
@@ -379,7 +381,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh, total_nsteps, nstep)
     !constant flux
     !hSv=0.1
     !
-    call fw_surf_anomaly(hSv, partit, mesh)
+    call fw_surf_anomaly(hSv, tracers, partit, mesh)
 
     !___________________________________________________________________________
     ! add heat and fresh water flux from cavity 
@@ -607,10 +609,11 @@ end subroutine oce_fluxes
 !
 !
 !_______________________________________________________________________________
-subroutine fw_surf_anomaly(hSv, partit, mesh) !coordinates in the format [-180 180 -90 90]
+subroutine fw_surf_anomaly(hSv, tracers, partit, mesh) 
 
     use o_PARAM
     use o_ARRAYS
+    USE MOD_TRACER
     USE MOD_PARTIT
     use MOD_MESH
     use MOD_PARSUP
@@ -618,16 +621,21 @@ subroutine fw_surf_anomaly(hSv, partit, mesh) !coordinates in the format [-180 1
     use g_comm_auto
     use g_support
     implicit none
-    type(t_partit), intent(inout), target :: partit
-    type(t_mesh),   intent(in),    target :: mesh
-    real(kind=WP),  intent(in)            :: hSv
-    real(kind=WP)                         :: x, y, net
-    integer                               :: n, ed(2)
+    type(t_partit), intent(inout), target  :: partit
+    type(t_mesh),   intent(in),    target  :: mesh
+    type(t_tracer), intent(in),    target  :: tracers
+    real(kind=WP),  intent(in)             :: hSv
+    real(kind=WP)                          :: x, y, net
+    integer                                :: n, ed(2)
+    real(kind=WP), dimension(:,:), pointer :: temp
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-     hosing_flux=0._WP
+      temp          => tracers%data(1)%values(:,:)
+
+      hosing_flux=0._WP
+      hosing_heat_flux=0._WP
 
      !all nodes south of 60S 
      !do n=1, myDim_nod2D+eDim_nod2D
@@ -639,11 +647,11 @@ subroutine fw_surf_anomaly(hSv, partit, mesh) !coordinates in the format [-180 1
      do n=1, myDim_edge2D
         ed=mesh%edges(:, n)
         if (myList_edge2D(n) <= mesh%edge2D_in) cycle
-                y = sum(geo_coord_nod2D(2,ed))/2._WP/rad
+        y = sum(geo_coord_nod2D(2,ed))/2._WP/rad
         if (y<-60._WP) hosing_flux(ed)=1._WP
      end do
 
-     !call smooth_nod (hosing_flux, 5, partit, mesh)
+     !call smooth_nod (hosing_flux, 8, partit, mesh)
      !do n=1,myDim_nod2d+eDim_nod2D
      !   if (hosing_flux(n)>0.0_WP) hosing_flux(n)=1.0_WP
      !end do
@@ -654,13 +662,18 @@ subroutine fw_surf_anomaly(hSv, partit, mesh) !coordinates in the format [-180 1
         hosing_flux=hosing_flux/net*hSv*1.e6 ! hSv*1.e6 in m/s
      end if
      water_flux=water_flux-hosing_flux
+
+     hosing_heat_flux=(temp(1,:)+1.8)*hosing_flux*vcpw !(tf - temp(1,:)) with tf=-1.8 
+     !write(*,*) mype, 'heat_flux=', heat_flux, 'temp=', temp(1,:)
+     heat_flux=heat_flux+hosing_heat_flux
+     !write(*,*) mype, 'hosing_heat_flux=', hosing_heat_flux, 'heat_flux=', heat_flux
 !write(*,*) mype, 'hSv=', hSv, 'net=', net, 'hf=', minval(hosing_flux, 1), maxval(hosing_flux, 1)
 
 end subroutine fw_surf_anomaly
 !
 !
 !_______________________________________________________________________________
-subroutine fw_depth_anomaly(ttf, hSv, partit, mesh)
+subroutine fw_depth_anomaly(tts, ttt, hSv, partit, mesh)
     use o_PARAM
     use o_ARRAYS
     USE MOD_PARTIT
@@ -672,49 +685,144 @@ subroutine fw_depth_anomaly(ttf, hSv, partit, mesh)
     use g_config,         only: dt
     implicit none
 
-    integer                               :: n, ed(2), row, k, nzmin, nzmax
+    integer                               :: n, ed(2), row, k, nz, nzmin, nzmax, elem1, elem2
     real(kind=WP)                         :: x, y, net, spar(100)
     real(kind=WP),  intent(in)            :: hSv
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
-    real(kind=WP),  intent (inout)        :: ttf(mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP),  intent (inout)        :: tts(mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP),  intent (inout)        :: ttt(mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), save, allocatable      :: mask(:), mask3D(:,:)
+    logical, save                         :: lfirst=.true.
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-    hosing_flux=0._WP
+    hosing_flux3D=0._WP
+    if (lfirst) then
+       allocate(mask(myDim_nod2D+eDim_nod2D), mask3D(mesh%nl-1, myDim_nod2D+eDim_nod2D))
+       mask =0._WP
+       mask3D=0._WP
+       spar=0._WP
+       do n=1, myDim_edge2D
+          ed=mesh%edges(:, n)
+          if (myList_edge2D(n) <= mesh%edge2D_in) cycle
+             y = sum(geo_coord_nod2D(2,ed))/2._WP/rad
+          if (y<-60._WP) mask(ed)=1._WP
+       end do
+       
+       call smooth_nod (mask, 5, partit, mesh)
 
-    do n=1, myDim_edge2D
-       ed=mesh%edges(:, n)
-       if (myList_edge2D(n) <= mesh%edge2D_in) cycle
-          y = sum(geo_coord_nod2D(2,ed))/2._WP/rad
-       if (y<-60._WP) hosing_flux(ed)=1._WP
-    end do
+       where (mask>1.e-12)
+             mask=1.0_WP
+       end where
 
-    call smooth_nod (hosing_flux, 5, partit, mesh)
-    do row=1,myDim_nod2d+eDim_nod2D
-       if (hosing_flux(row)>0.0_WP) hosing_flux(row)=1.0_WP
-    end do
+       do n=1, myDim_edge2D
+          ed = mesh%edges(:, n)
+          if (any(mask(ed)<1.e-12)) cycle
+          elem1 = mesh%edge_tri(1, n)
+          elem2 = mesh%edge_tri(2, n)
+          if (elem2<=0) then
+             nzmin=1
+             nzmax=mesh%nlevels(elem1)-1
+          else
+             nzmin = min(mesh%nlevels(elem1), mesh%nlevels(elem2))-1 !!remove -1 depending on what is desired
+             nzmax = max(mesh%nlevels(elem1), mesh%nlevels(elem2))-1
+          end if
+          if (nzmax<nzmin) nzmax=nzmin
+          nzmin=max(16, nzmin) !circa 200m
+          nzmax=min(19, nzmax) !circa 400m
+          mask3D(nzmin:nzmax, ed)=1._WP
+       end do
+       
+!      mask=0.0_WP
+       do row=1,myDim_nod2d+eDim_nod2D
+          if (sum(mask3D(:, row))<1.e-12) mask(row)=0._WP
+       end do
+       
+       call integrate_nod(mask, net, partit, mesh)
 
-    call integrate_nod(hosing_flux, net, partit, mesh)
-
-    if (abs(net)>1.e-6) then
-       hosing_flux=hosing_flux/net*hSv*1.e6 ! hSv*1.e6 in m/s
+       if (abs(net)>1.e-6) then
+          mask=mask/net*1.e6 ! hSv will be applied later as it changes in time
+       end if
+       
+       do row=1,myDim_nod2d+eDim_nod2D 
+          spar(:mesh%nl)=0._WP
+          do k=ulevels_nod2D(row), nlevels_nod2D(row)-1
+             spar(k)=areasvol(k,row)*hnode(k,row)*mask3D(k, row) ! *any profile function(z) or 1.!                           
+          end do
+          !spar(:15)=0._WP
+          !spar(16:19)=1._WP
+          !spar(20:)=0._WP
+          spar(:nlevels_nod2D(row)-1)=spar(:nlevels_nod2D(row)-1)/max(sum(spar(:nlevels_nod2D(row)-1)), 1.e-12)
+          do k=ulevels_nod2D(row), nlevels_nod2D(row)-1
+             spar(k)=spar(k)/areasvol(k,row)/hnode(k,row)*mask(row)*area(1,row)*dt
+          end do
+          !if ((mask(row)>1.e-12) .AND. (nlevels_nod2D(row)-1<=15)) then
+          !    write(*,*) 'ALARM: (mask(row)>1.e-12) .AND. (nlevels_nod2D(row)-1<15)', nlevels_nod2D(row)
+          !end if
+          mask3D(:nlevels_nod2D(row)-1,row)=spar(:nlevels_nod2D(row)-1)
+       end do
+       lfirst=.false.
+    !call integrate_nod(mask3D, net, partit, mesh)
+    !write(*,*) 'integrated mask3D=', net
+    !call integrate_nod(mask, net, partit, mesh)
+    !write(*,*) 'integrated mask2D=', net
     end if
+    tts=tts-mask3D*hSv*tts     
+    ttt=ttt-mask3D*hSv*(ttt+1.8)
+    call integrate_nod(tts, net, partit, mesh)
+    write(*,*) 'integrated salinity=', net
+    call integrate_nod(ttt, net, partit, mesh)
+    write(*,*) 'integrated temperature=', net
 
-    do row=1,myDim_nod2d+eDim_nod2D   ! myDim is sufficient
-     hosing_flux(row)=hosing_flux(row)*area(1,row)
-     if (ulevels_nod2D(row)>1) cycle
-        nzmin = ulevels_nod2D(row)
-        nzmax = min(21, nlevels_nod2D(row)-1)
-        do k=nzmin, nzmax
-           spar(k)=areasvol(k,row)*hnode(k,row) ! *any profile function(z)
-        end do
-        spar(nzmin:nzmax)=spar(nzmin:nzmax)/sum(spar(nzmin:nzmax))
-        do k=nzmin+1,nzmax
-           ttf(k,row)=ttf(k,row)-hosing_flux(row)*spar(k)/areasvol(k,row)/hnode(k,row)*dt
-        end do
-    end do
+    hosing_flux3D=hosing_flux3D+mask3D*hSv
+
+!    do row=1,myDim_nod2d+eDim_nod2D
+!       do k=1, mesh%nl-1
+!          if (mask3(k, row)<1.e-12) CYCLE
+!          ttf(k,row)=ttf(k,row)-mask3(k,row)*hSv*ttf(1, row)
+!       end do
+!    end do
+
+!___ original routine___
+!    hosing_flux=0._WP
+!
+!    do n=1, myDim_edge2D
+!       ed=mesh%edges(:, n)
+!       if (myList_edge2D(n) <= mesh%edge2D_in) cycle
+!          y = sum(geo_coord_nod2D(2,ed))/2._WP/rad
+!       if (y<-60._WP) hosing_flux(ed)=1._WP
+!    end do
+!
+!    call smooth_nod (hosing_flux, 5, partit, mesh)
+!    do row=1,myDim_nod2d+eDim_nod2D
+!      if (hosing_flux(row)>0.0_WP) hosing_flux(row)=1.0_WP
+!    end do
+!
+!    call integrate_nod(hosing_flux, net, partit, mesh)
+!
+!    if (abs(net)>1.e-6) then
+!       hosing_flux=hosing_flux/net*hSv*1.e6 ! hSv*1.e6 in m/s
+!    end if
+!
+!    do row=1, myDim_nod2d+eDim_nod2D
+!        hosing_flux(row)=hosing_flux(row)*ttf(1, row)
+!    end do
+!
+!    do row=1,myDim_nod2d+eDim_nod2D   ! myDim is sufficient
+!     hosing_flux(row)=hosing_flux(row)*area(1,row)
+!     if (ulevels_nod2D(row)>1) cycle
+!        nzmin = ulevels_nod2D(row)
+!        nzmax = min(21, nlevels_nod2D(row)-1)
+!        do k=nzmin, nzmax
+!          spar(k)=areasvol(k,row)*hnode(k,row) ! *any profile function(z)
+!        end do
+!        spar(nzmin:nzmax)=spar(nzmin:nzmax)/sum(spar(nzmin:nzmax))
+!        do k=nzmin+1,nzmax
+!           ttf(k,row)=ttf(k,row)-hosing_flux(row)*ttf(1, row)*spar(k)/areasvol(k,row)/hnode(k,row)*dt
+!        end do
+!    end do
 
 end subroutine fw_depth_anomaly
 !

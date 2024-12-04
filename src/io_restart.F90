@@ -108,9 +108,9 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
          write(longname,'(A15,i1)') 'passive tracer ', j
          units='none'
      END SELECT
-     call oce_files%def_node_var(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
+     call oce_files%def_node_var_optional(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
      longname=trim(longname)//', Adams–Bashforth'
-     call oce_files%def_node_var(trim(trname)//'_AB', trim(longname), trim(units), tracers%data(j)%valuesAB(:,:), mesh, partit)
+     call oce_files%def_node_var_optional(trim(trname)//'_AB', trim(longname), trim(units), tracers%data(j)%valuesAB(:,:), mesh, partit)
   end do
   call oce_files%def_node_var('w', 'vertical velocity', 'm/s', dynamics%w, mesh, partit)
   call oce_files%def_node_var('w_expl', 'vertical velocity', 'm/s', dynamics%w_e, mesh, partit)

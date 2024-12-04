@@ -618,6 +618,8 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     allocate(heat_flux(node_size), Tsurf(node_size))
     allocate(water_flux(node_size), Ssurf(node_size))
     allocate(hosing_flux(node_size))
+    allocate(hosing_heat_flux(node_size))
+    allocate(hosing_flux3D(nl-1,node_size))
     allocate(relax_salt(node_size))
     allocate(virtual_salt(node_size))
 
@@ -703,6 +705,8 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
 
     water_flux=0.0_WP
     hosing_flux=0.0_WP
+    hosing_heat_flux=0.0_WP
+    hosing_flux3D=0.0_WP
     relax_salt=0.0_WP
     virtual_salt=0.0_WP
 

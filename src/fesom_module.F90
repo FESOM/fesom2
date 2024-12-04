@@ -375,16 +375,10 @@ contains
             !    hSv = fw0 + (0.0011/f%total_nsteps)*nstep
             !endif
             !
-            !1992-2020 hosing experiment 0.1 constant Sv
-            !if (yearnew<1992) then
-            !    hSv = 0.0
-            !else
-            !    hSv = 0.1
-            !endif
-            !
             !constant flux
             !hSv = 10
-            !call fw_depth_anomaly(f%tracers%data(2)%values, hSv, f%partit, f%mesh)
+            !
+            !call fw_depth_anomaly(f%tracers%data(2)%values, f%tracers%data(1)%values,  hSv, f%partit, f%mesh)
         end if
         call before_oce_step(f%dynamics, f%tracers, f%partit, f%mesh) ! prepare the things if required
         f%t2 = MPI_Wtime()

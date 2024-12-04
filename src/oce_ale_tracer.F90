@@ -833,8 +833,15 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, partit, mesh)
         !  (BUT CHECK!)              |    |                         |    |
         !                            v   (+)                        v   (+) 
         !                            
-        tr(nzmin)= tr(nzmin)+bc_surface(n, tracers%data(tr_num)%ID, trarr(nzmin,n), nzmin, partit)  
         
+        if (tracers%data(tr_num)%ID==304) then
+            do nz=nzmin,nzmax
+                tr(nz)= tr(nz)+bc_surface(n, tracers%data(tr_num)%ID, trarr(nz,n), nz, partit)
+            end do
+        else 
+            tr(nzmin)= tr(nzmin)+bc_surface(n, tracers%data(tr_num)%ID, trarr(nzmin,n), nzmin, partit)
+        end if
+        !tr(nzmin)= tr(nzmin)+bc_surface(n, tracers%data(tr_num)%ID, trarr(nzmin,n), nzmin, partit)   
         !_______________________________________________________________________
         ! The forward sweep algorithm to solve the three-diagonal matrix 
         ! problem
@@ -1311,7 +1318,8 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
     CASE (303)
         bc_surface=0.0_WP
     CASE (304)
-        bc_surface= dt*(hosing_flux(n))
+        bc_surface= dt*(hosing_flux3D(nzmin,n))
+        !bc_surface= dt*(hosing_flux(n))
     CASE (501) ! ice-shelf water due to basal melting
         if (nzmin==1) then
            bc_surface = 0.0_WP
