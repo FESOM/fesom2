@@ -692,7 +692,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
      elseif (i.eq.2) then
         exchange(:,1) = m_ice(1:myDim_nod2d)              ! ice thickness [m]
         exchange(:,2) = m_snow(1:myDim_nod2d)             ! snow thickness
-        exchange(:,3) = a_ice(1:myDim_nod2d)/100.              ! ice concentation [%]
+        exchange(:,3) = a_ice(1:myDim_nod2d)              ! ice concentation [%]
      endif
      call cpl_yac_send(i, exchange(:,1:cpl_send_collection_size(i)), action)
   enddo
