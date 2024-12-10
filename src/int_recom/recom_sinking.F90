@@ -141,6 +141,18 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
             tracers%data(tr_num)%ID==1013 .or. &  !idian
             tracers%data(tr_num)%ID==1025 ) then  !idetz2n
             Benthos(n,1)= Benthos(n,1) +  add_benthos_2d(n) ![mmol]
+
+            if (use_MEDUSA) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+               SinkFlx_tr(n,1,tr_num) = SinkFlx_tr(n,1,tr_num) + add_benthos_2d(n) / area(1,n)/dt ![mmol/m2]
+        ! now SinkFlx hat the unit mmol/time step 
+        ! but mmol/m2/time is needed for MEDUSA: thus /area
+            endif
+            if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then  
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+               Benthos_tr(n,1,tr_num)= Benthos_tr(n,1,tr_num) +  add_benthos_2d(n) ![mmol]
+            endif
+
         endif
 
         !! * Particulate Organic Carbon *
@@ -149,6 +161,16 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
             tracers%data(tr_num)%ID==1014 .or. &  !idiac
             tracers%data(tr_num)%ID==1026 ) then  !idetz2c
             Benthos(n,2)= Benthos(n,2) + add_benthos_2d(n)
+
+            if (use_MEDUSA) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+               SinkFlx_tr(n,2,tr_num) = SinkFlx_tr(n,2,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+            endif
+            if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+               Benthos_tr(n,2,tr_num)= Benthos_tr(n,2,tr_num) + add_benthos_2d(n)
+            endif
+
         endif
 
         !! *Particulate Organic Silicon *
@@ -156,6 +178,16 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
             tracers%data(tr_num)%ID==1017 .or. &  !idetsi
             tracers%data(tr_num)%ID==1027 ) then  !idetz2si
             Benthos(n,3)= Benthos(n,3) + add_benthos_2d(n)
+
+            if (use_MEDUSA) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+               SinkFlx_tr(n,3,tr_num) = SinkFlx_tr(n,3,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+            endif
+            if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+               Benthos_tr(n,3,tr_num)= Benthos_tr(n,3,tr_num) + add_benthos_2d(n)
+            endif
+
         endif
 
         !! * Cal *
@@ -163,9 +195,96 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
             tracers%data(tr_num)%ID==1021 .or. &  !idetcal
             tracers%data(tr_num)%ID==1028 ) then  !idetz2cal
             Benthos(n,4)= Benthos(n,4) + add_benthos_2d(n)
+
+            if (use_MEDUSA) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+               SinkFlx_tr(n,4,tr_num) = SinkFlx_tr(n,4,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+            endif
+            if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+               Benthos_tr(n,4,tr_num)= Benthos_tr(n,4,tr_num) + add_benthos_2d(n)
+            endif
+
         endif
+
+        ! flux of 13C into the sediment
+        if (ciso) then             
+            if( tracers%data(tr_num)%ID==1305 .or. & !iphyc_13
+                tracers%data(tr_num)%ID==1308 .or. & !idetc_13
+                tracers%data(tr_num)%ID==1314 ) then !idiac_14
+
+                if (use_MEDUSA) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                   SinkFlx_tr(n,5,tr_num) = SinkFlx_tr(n,5,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+                endif
+                if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                   Benthos_tr(n,5,tr_num)= Benthos_tr(n,5,tr_num) + add_benthos_2d(n)
+                endif
+
+            endif
+
+           if( tracers%data(tr_num)%ID==1320 .or. &  !iphycal
+               tracers%data(tr_num)%ID==1321 ) then  !idetcal
+
+               if (use_MEDUSA) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                  SinkFlx_tr(n,6,tr_num) = SinkFlx_tr(n,6,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+               endif
+               if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                  Benthos_tr(n,6,tr_num)= Benthos_tr(n,6,tr_num) + add_benthos_2d(n)
+               endif
+
+           endif
+
+        endif
+        
+        ! flux of 14C into the sediment
+        if (ciso .and. ciso_organic_14) then             
+           if( tracers%data(tr_num)%ID==1405 .or. & !iphyc_13
+               tracers%data(tr_num)%ID==1408 .or. & !idetc_13
+               tracers%data(tr_num)%ID==1414 ) then !idiac_14
+
+               if (use_MEDUSA) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                  SinkFlx_tr(n,7,tr_num) = SinkFlx_tr(n,7,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+               endif
+               if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                  Benthos_tr(n,7,tr_num)= Benthos_tr(n,7,tr_num) + add_benthos_2d(n)
+               endif
+
+           endif
+
+           if( tracers%data(tr_num)%ID==1420 .or. &  !iphycal
+               tracers%data(tr_num)%ID==1421 ) then  !idetcal
+               if (use_MEDUSA) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                  SinkFlx_tr(n,8,tr_num) = SinkFlx_tr(n,8,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+               endif
+               if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                  Benthos_tr(n,8,tr_num)= Benthos_tr(n,8,tr_num) + add_benthos_2d(n)
+               endif
+           endif
+
+        endif
+
    end do
+
+   if(use_MEDUSA) then
+        do n=1, bottflx_num
+!           SinkFlx(:,n) = Sinkflx(:,n)/dt
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+           call exchange_nod(SinkFlx_tr(:,n,tr_num), partit)
+        end do
+   end if ! use_MEDUSA
+
    do n=1, benthos_num
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+      call exchange_nod(Benthos_tr(:,n,tr_num), partit)
+
       call exchange_nod(Benthos(:,n), partit)
    end do
 
@@ -223,6 +342,43 @@ subroutine diff_ver_recom_expl(tr_num, tracers, partit, mesh)
     bottom_flux = 0._WP
     id = tracers%data(tr_num)%ID
 
+#if defined(__recom)
+if (use_MEDUSA .and. (sedflx_num .ne. 0)) then
+   !CV update: the calculation later has been changed by Ozgur in such
+   !a way  that now the  variable bottom_flux is in  (mol/time) units,
+   !rather than  a flux in  (mol/time/area). I therefore  multiply the
+   !Medusa fluxes by the area to get the same unit.
+
+   SELECT CASE (id)
+    CASE (1001)
+      bottom_flux = GloSed(:,1) * area(1,:) ! DIN
+    CASE (1002)
+      bottom_flux = GloSed(:,2) * area(1,:) ! DIC
+    CASE (1003)
+      bottom_flux = GloSed(:,3) * area(1,:) ! Alk
+    CASE (1018)
+      bottom_flux = GloSed(:,4) * area(1,:) ! Si
+    CASE (1019)
+      bottom_flux = GloSed(:,1) * Fe2N_benthos * area(1,:)
+    CASE (1022)
+      bottom_flux = GloSed(:,5) * area(1,:) ! Oxy
+    CASE (1302)
+      if (ciso) then
+        bottom_flux = GloSed(:,6) * area(1,:) ! DIC_13 and Calc: DIC_13
+      end if
+    CASE (1402)
+      if (ciso) then
+        bottom_flux = GloSed(:,7) * area(1,:) ! DIC_14 and Calc: DIC_14
+      end if
+    CASE DEFAULT
+      if (partit%mype==0) then
+        write(*,*) 'check specified in boundary conditions'
+        write(*,*) 'the model will stop!'
+      end if
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+      stop
+  END SELECT
+else
     SELECT CASE (id)
        CASE (1001)
           bottom_flux = GlodecayBenthos(:,1) !*** DIN [mmolN/m^2/s] ***
@@ -244,6 +400,8 @@ subroutine diff_ver_recom_expl(tr_num, tracers, partit, mesh)
           call par_ex(partit%MPI_COMM_FESOM, partit%mype)
           stop
     END SELECT
+endif ! (use_MEDUSA .and. (sedflux_num .gt. 0))  
+#endif
 
     do n=1, myDim_nod2D
 

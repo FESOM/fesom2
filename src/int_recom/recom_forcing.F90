@@ -272,6 +272,54 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
 
+  if (ciso) then
+!   Calculate carbon-isotopic fractionation, radioactive decay is calculated in oce_ale_tracer.F90
+
+!   Fractionation due to air-sea exchange and chemical speciation of CO2
+    call recom_ciso_airsea(recom_t(1), co3(1), recom_dic(1)) ! -> alpha_aq, alpha_dic. CO3 is taken from mocsy
+
+!   Isotopic ratios of dissolved CO2, also needed to calculate biogenic fractionation
+    r_dic_13     = max(tiny*1e-3,state(1,idic_13)*1e-3) / recom_dic(1)
+    r_co2s_13    = alpha_aq_13 / alpha_dic_13 * r_dic_13
+!   Calculate air-sea fluxes of 13|14CO2 in mmol / m**2 / s
+    kwco2  = kw660(1) * (660/scco2(REcoM_T(1)))**0.5  ! Piston velocity (via mocsy)
+    co2sat = co2flux(1) / (kwco2 + tiny) + co2(1)     ! Saturation concentration of CO2 (via mocsy)
+!   co2flux_13   = kwco2 * alpha_k_13 * (alpha_aq_13 * r_atm_13 * co2sat - r_co2s_13 * co2(1))
+!   co2flux_13   = alpha_k_13 * alpha_aq_13 * kwco2 * (r_atm_13 * co2sat - r_dic_13 * co2(1) / alpha_dic_13)
+!   Fractionation factors were determined for freshwater, include a correction for enhanced fractionation in seawater
+    co2flux_13   = (alpha_k_13 * alpha_aq_13 - 0.0002) * kwco2 * (r_atm_13 * co2sat - r_dic_13 * co2(1) / alpha_dic_13)
+    co2flux_seaicemask_13 = co2flux_13 * 1.e3
+
+!   Biogenic fractionation due to photosynthesis of plankton
+!   phyc_13|14 and diac_13|14 are only used in REcoM_sms to calculate DIC_13|14, DOC_13|14 and DetC_13|14
+
+    call recom_ciso_photo(co2(1)) ! -> alpha_p
+    r_phyc_13 = r_co2s_13 / alpha_p_13
+    r_diac_13 = r_co2s_13 / alpha_p_dia_13
+    state(1:nn,iphyc_13)   = max((tiny_C   * r_phyc_13), (state(1:nn,iphyc) * r_phyc_13))
+    state(1:nn,idiac_13)   = max((tiny_C_d * r_diac_13), (state(1:nn,idiac) * r_diac_13))
+
+!   The same for radiocarbon, fractionation factors have been already derived above
+    if (ciso_14) then
+!   Air-sea exchange
+      r_dic_14   = max(tiny*1e-3,state(1,idic_14)*1e-3) / recom_dic(1)
+      r_co2s_14  = alpha_aq_14 / alpha_dic_14 * r_dic_14
+!     co2flux_14 = kwco2 * alpha_k_14 * (alpha_aq_14 * r_atm_14 * co2sat - r_co2s_14 * co2(1))
+!     Fractionation factors were determined for freshwater, include a correction for enhanced fractionation seawater
+      co2flux_14 = (alpha_k_14 * alpha_aq_14 - 0.0004) * kwco2 * (r_atm_14 * co2sat - r_dic_14 * co2(1) / alpha_dic_14)
+      co2flux_seaicemask_14 = co2flux_14 * 1.e3
+!   Biogenic fractionation
+      if (ciso_organic_14) then
+        r_phyc_14 = r_co2s_14 / alpha_p_14
+        r_diac_14 = r_co2s_14 / alpha_p_dia_14
+        state(1:nn,iphyc_14) = max((tiny_C   * r_phyc_14), (state(1:nn,iphyc) * r_phyc_14))
+        state(1:nn,idiac_14) = max((tiny_C_d * r_diac_14), (state(1:nn,idiac) * r_diac_14))
+      end if
+    end if
+!   Radiocarbon
+  end if
+! ciso
+
 !-------------------------------------------------------------------------------
 ! Diagnostics
   if (Diags) then
@@ -291,10 +339,12 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
      locNNAd = sum(vertNNAd(1:nn) * thick(1:nn))
      locChldegd = sum(vertChldegd(1:nn) * thick(1:nn))
 
+#if defined (__coccos)
      locNPPc = sum(vertNPPc(1:nn) * thick(1:nn))
      locGPPc = sum(vertGPPc(1:nn) * thick(1:nn))
      locNNAc = sum(vertNNAc(1:nn) * thick(1:nn))
      locChldegc = sum(vertChldegc(1:nn) * thick(1:nn))
+#endif
 
   end if
 end subroutine REcoM_Forcing

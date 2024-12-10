@@ -246,6 +246,18 @@ subroutine recom_init(tracers, partit, mesh)
     Sinkingvel1(:,:)      = 0.d0
     Sinkingvel2(:,:)      = 0.d0
 
+    if (use_MEDUSA) then
+        allocate(GloSed(node_size,sedflx_num))
+        allocate(SinkFlx(node_size,bottflx_num))
+        allocate(SinkFlx_tr(node_size,bottflx_num,num_tracers)) ! kh 25.03.22 buffer sums per tracer index
+
+        SinkFlx(:,:)      = 0.d0
+        SinkFlx_tr(:,:,:) = 0.0d0 ! kh 25.03.22
+        GloSed(:,:)       = 0.d0
+        allocate(lb_flux(node_size,9))
+        lb_flux(:,:)      = 0.d0
+    end if
+
     DO i=num_tracers-bgc_num+1, num_tracers
         id=tracers%data(i)%ID
 
@@ -332,20 +344,26 @@ subroutine recom_init(tracers, partit, mesh)
 #if defined (__coccos) & defined (__3Zoo2Det)
         CASE (1029)
             tracers%data(i)%values(:,:) = tiny_chl/chl2N_max       ! CoccoN
+
         CASE (1030)
             tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax ! CoccoC
+
         CASE (1031)
             tracers%data(i)%values(:,:) = tiny_chl                 ! CoccoChl
+
 ! *******************
 ! CASE 3phy 1zoo 1det
 ! *******************
 #elif defined (__coccos) & !defined (__3Zoo2Det)
         CASE (1023)
             tracers%data(i)%values(:,:) = tiny_chl/chl2N_max       ! CoccoN
+
         CASE (1024)
             tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax ! CoccoC
+
         CASE (1025)
             tracers%data(i)%values(:,:) = tiny_chl                 ! CoccoChl
+
 #endif
 
 ! *******************
@@ -354,16 +372,20 @@ subroutine recom_init(tracers, partit, mesh)
 #if defined (__coccos) & defined (__3Zoo2Det)
         CASE (1032)
             tracers%data(i)%values(:,:) = tiny                     ! Zoo3N
+
         CASE (1033)
             tracers%data(i)%values(:,:) = tiny * Redfield          ! Zoo3C
+
 #elif !defined (__coccos) & defined (__3Zoo2Det)
 ! *******************
 ! CASE 2phy 3zoo 2det
 ! *******************
         CASE (1029)
             tracers%data(i)%values(:,:) = tiny                     ! Zoo3N
+
         CASE (1030)
             tracers%data(i)%values(:,:) = tiny * Redfield          ! Zoo3C
+
 #endif
 
         END SELECT

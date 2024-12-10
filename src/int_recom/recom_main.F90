@@ -98,6 +98,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     integer                    :: idiags
 
     real(kind=8)               :: Sali
+    logical                    :: do_update = .false. 
 
     real(kind=8),  allocatable :: Temp(:), Sali_depth(:), zr(:), PAR(:)
     real(kind=8),  allocatable :: C(:,:)
@@ -136,6 +137,17 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     if (restore_alkalinity) call bio_fluxes(tracers, partit, mesh)
     if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> bio_fluxes'//achar(27)//'[0m'
 
+  if (use_atbox) then    ! MERGE
+! Prognostic atmospheric isoCO2
+    call recom_atbox(partit,mesh)
+!   optional I/O of isoCO2 and inferred cosmogenic 14C production; this may cost some CPU time
+    if (ciso .and. ciso_14) then
+      call annual_event(do_update)
+      if (do_update .and. mype==0) write (*, fmt = '(a50,2x,i6,4(2x,f6.2))') &
+                                         'Year, xCO2 (ppm), cosmic 14C flux (at / cm² / s):', &
+                                          yearold, x_co2atm(1), x_co2atm_13(1), x_co2atm_14(1), cosmic_14(1) * production_rate_to_flux_14
+    end if
+  end if
 ! ======================================================================================
 !********************************* LOOP STARTS *****************************************
 
@@ -176,6 +188,31 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 
         !!---- Atmospheric CO2 in LocVar
         LocAtmCO2 = AtmCO2(month)
+
+! Update of prognostic atmospheric CO2 values
+     if (use_atbox) then
+       LocAtmCO2                   = x_co2atm(1)
+       if (ciso) then
+         LocAtmCO2_13              = x_co2atm_13(1)
+         if (ciso_14) LocAtmCO2_14 = x_co2atm_14(1)
+       end if
+     else
+! Consider prescribed atmospheric CO2 values
+       if (ciso) then
+         LocAtmCO2_13              = AtmCO2_13(month)
+         if (ciso_14) then
+!          Latitude of nodal point n 
+           lat_val = geo_coord_nod2D(2,n) / rad
+!          Zonally binned NH / SH / TZ 14CO2 input values
+           LocAtmCO2_14 = AtmCO2_14(lat_zone(lat_val), month)
+         end if
+       end if
+     end if  ! use_atbox
+
+     if (ciso) then
+       r_atm_13                    = LocAtmCO2_13(1) / LocAtmCO2(1)
+       if (ciso_14) r_atm_14       = LocAtmCO2_14(1) / LocAtmCO2(1)
+     end if
 
         !!---- Shortwave penetration
         SW = parFrac * shortwave(n)
@@ -228,29 +265,36 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
         if (Diags) then
 
         !! * Allocate 3D diagnostics *
-            allocate(vertrespmeso(nl-1), vertrespmacro(nl-1), vertrespmicro(nl-1))
+            allocate(vertrespmeso(nl-1))
             vertrespmeso  = 0.d0
+
+#if defined (__3Zoo2Det)
+            allocate(vertrespmacro(nl-1), vertrespmicro(nl-1))
             vertrespmacro = 0.d0
             vertrespmicro = 0.d0
-
+#endif
             allocate(vertcalcdiss(nl-1), vertcalcif(nl-1))
             vertcalcdiss = 0.d0
             vertcalcif   = 0.d0
 
-            allocate(vertaggn(nl-1), vertaggd(nl-1), vertaggc(nl-1))
+            allocate(vertaggn(nl-1), vertaggd(nl-1))
             vertaggn = 0.d0
             vertaggd = 0.d0
-            vertaggc = 0.d0
 
-            allocate(vertdocexn(nl-1), vertdocexd(nl-1), vertdocexc(nl-1))
+            allocate(vertdocexn(nl-1), vertdocexd(nl-1))
             vertdocexn = 0.d0
             vertdocexd = 0.d0
-            vertdocexc = 0.d0
 
-            allocate(vertrespn(nl-1), vertrespd(nl-1), vertrespc(nl-1))
+            allocate(vertrespn(nl-1), vertrespd(nl-1))
             vertrespn = 0.d0
             vertrespd = 0.d0
+
+#if defined (__coccos)
+            allocate(vertaggc(nl-1), vertdocexc(nl-1), vertrespc(nl-1))
+            vertaggc = 0.d0
+            vertdocexc = 0.d0
             vertrespc = 0.d0
+#endif
 
             !! * Allocate 2D diagnostics *
             allocate(vertNPPn(nl-1), vertGPPn(nl-1), vertNNAn(nl-1), vertChldegn(nl-1)) 
@@ -265,11 +309,13 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             vertNNAd = 0.d0
             vertChldegd  = 0.d0
 
+#if defined (__coccos)
             allocate(vertNPPc(nl-1), vertGPPc(nl-1), vertNNAc(nl-1), vertChldegc(nl-1)) 
             vertNPPc = 0.d0
             vertGPPc = 0.d0
             vertNNAc = 0.d0
             vertChldegc  = 0.d0
+#endif
         end if
 
         if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forcing'//achar(27)//'[0m'
@@ -321,22 +367,30 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 
             !! * Update 3D diagnostics *
             respmeso     (1:nzmax,n) = vertrespmeso     (1:nzmax)
+#if defined (__3Zoo2Det)
             respmacro    (1:nzmax,n) = vertrespmacro    (1:nzmax)
             respmicro    (1:nzmax,n) = vertrespmicro    (1:nzmax)
+#endif
             calcdiss     (1:nzmax,n) = vertcalcdiss     (1:nzmax)
             calcif       (1:nzmax,n) = vertcalcif       (1:nzmax)
+
             aggn         (1:nzmax,n) = vertaggn         (1:nzmax)
-            aggd         (1:nzmax,n) = vertaggd         (1:nzmax)
-            aggc         (1:nzmax,n) = vertaggc         (1:nzmax)
             docexn       (1:nzmax,n) = vertdocexn       (1:nzmax)
-            docexd       (1:nzmax,n) = vertdocexd       (1:nzmax)
-            docexc       (1:nzmax,n) = vertdocexc       (1:nzmax)
             respn        (1:nzmax,n) = vertrespn        (1:nzmax)
-            respd        (1:nzmax,n) = vertrespd        (1:nzmax)
-            respc        (1:nzmax,n) = vertrespc        (1:nzmax)
             NPPn3D       (1:nzmax,n) = vertNPPn         (1:nzmax)
+
+            aggd         (1:nzmax,n) = vertaggd         (1:nzmax)
+            docexd       (1:nzmax,n) = vertdocexd       (1:nzmax)
+            respd        (1:nzmax,n) = vertrespd        (1:nzmax)
             NPPd3D       (1:nzmax,n) = vertNPPd         (1:nzmax)
+
+#if defined (__coccos)
+            aggc         (1:nzmax,n) = vertaggc         (1:nzmax)
+            docexc       (1:nzmax,n) = vertdocexc       (1:nzmax)
+            respc        (1:nzmax,n) = vertrespc        (1:nzmax)
             NPPc3D       (1:nzmax,n) = vertNPPc         (1:nzmax)
+#endif
+
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
 
             !! * Deallocating 2D diagnostics *
@@ -345,11 +399,17 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
             deallocate(vertNPPc, vertGPPc, vertNNAc, vertChldegc) 
 
             !! * Deallocating 3D Diagnostics *
-            deallocate(vertrespmeso,     vertrespmacro,  vertrespmicro                 )
-            deallocate(vertcalcdiss,     vertcalcif                                    )
-            deallocate(vertaggn,         vertaggd,       vertaggc                      )
-            deallocate(vertdocexn,       vertdocexd,     vertdocexc                    )
-            deallocate(vertrespn,        vertrespd,      vertrespc                     )
+            deallocate(vertrespmeso)
+#if defined (__3Zoo2Det)
+            deallocate(vertrespmacro, vertrespmicro)
+#endif
+            deallocate(vertcalcdiss, vertcalcif)
+            deallocate(vertaggn, vertdocexn, vertrespn)
+            deallocate(vertaggd, vertdocexd, vertrespd)
+#if defined (__coccos)
+!           deallocate(vertgrazmeso_c)
+            deallocate(vertaggc, vertdocexc, vertrespc)
+#endif
 
         end if 
 
@@ -362,6 +422,12 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
         GloCO2flux(n)            = dflux(1)                   !  [mmol/m2/d]
         GloCO2flux_seaicemask(n) = co2flux_seaicemask(1)      !  [mmol/m2/s]
         GloO2flux_seaicemask(n)  = o2flux_seaicemask(1)       !  [mmol/m2/s]
+    if (ciso) then
+        GloCO2flux_seaicemask_13(n)     = co2flux_seaicemask_13(1)        !  [mmol/m2/s]
+        if (ciso_14) then
+            GloCO2flux_seaicemask_14(n) = co2flux_seaicemask_14(1)        !  [mmol/m2/s]
+        end if
+     end if
         GloO2flux(n)             = oflux(1)                   !  [mmol/m2/d]
 
         PAR3D(1:nzmax,n)         = PAR(1:nzmax)
@@ -392,6 +458,16 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
     call exchange_nod(GloCO2flux_seaicemask, partit)
 
     call exchange_nod(GloO2flux_seaicemask, partit)
+    if (ciso) then
+        call exchange_nod(GloPCO2surf_13, partit)
+        call exchange_nod(GloCO2flux_13, partit)
+        call exchange_nod(GloCO2flux_seaicemask_13, partit)
+        if (ciso_14) then
+            call exchange_nod(GloPCO2surf_14, partit)
+            call exchange_nod(GloCO2flux_14, partit)
+            call exchange_nod(GloCO2flux_seaicemask_14, partit)
+        end if 
+    end if
     do n=1, benthos_num
         call exchange_nod(Benthos(:,n), partit)
     end do
@@ -405,10 +481,12 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
         call exchange_nod(NNAd, partit)
         call exchange_nod(Chldegn, partit)
         call exchange_nod(Chldegd, partit)
+#if defined (__coccos)
         call exchange_nod(NPPc, partit)
         call exchange_nod(GPPc, partit)
         call exchange_nod(NNAc, partit)
         call exchange_nod(Chldegc, partit)
+#endif
     endif
 
     do n=1, benthos_num
