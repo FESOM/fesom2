@@ -1,4 +1,4 @@
-/module io_MEANDATA
+module io_MEANDATA
   USE MOD_PARTIT
   USE MOD_PARSUP
 #if defined(__recom)
