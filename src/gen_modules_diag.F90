@@ -3197,9 +3197,9 @@ subroutine dvd_add_difflux_sbc(do_SDdvd, tr_num, dvd_tot, tr, trstar, partit, me
             !     Xchi at full depth level interface
             nz = 1 
 !PS             Dflx(nz) = Dflx(nz) * -2.0_WP*( trstar(nz, node) )
-            Dflx(nz) = Dflx(nz) * -2.0_WP*( trstar(nz+1, node)-trstar(nz, node) )
+            Dflx(nz) = Dflx(nz) * (-2.0_WP) * ( trstar(nz+1, node)-trstar(nz, node) )
             do nz=nu1+1, nl1-1
-                Dflx(nz) = Dflx(nz) * -2.0_WP*( trstar(nz, node)-trstar(nz-1, node) )
+                Dflx(nz) = Dflx(nz) * (-2.0_WP) * ( trstar(nz, node)-trstar(nz-1, node) )
             end do ! --> do nz=nu1+1, nl1-1
             
             !___________________________________________________________________
