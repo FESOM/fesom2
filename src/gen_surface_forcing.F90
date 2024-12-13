@@ -1554,13 +1554,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
         icount = (/1,1/)
         ncdata = 0.d0
 
-!        total_runoff = sum(runoff*area(1,:))*86400
-!       Does 'area' only contain values on one node? sum of area not equal total
-!       ocean surface area!
         total_runoff = 8.76d5*86400
-!        if (mype==0) write(*,*) mype, 'total runoff (m3/day):', total_runoff
-!        if (mype==0) write(*,*) mype, 'runoff:', maxval(runoff),minval(runoff)
-!        if (mype==0) write(*,*) mype, 'surface area',maxval(area(1,:)),minval(area(1,:))
 
         status=nf_open(sedfilename, nf_nowrite, ncid)
         if(status.ne.nf_noerr) call handle_err(status)
@@ -1631,19 +1625,6 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
         do n_lb = 1,9
            lb_flux(:,n_lb) = -runoff*ncdata(n_lb)/total_runoff*lb_tscale
         end do
-
-!        if (mype==0) write(*,*) mype, 'sum of surface area (m2)',
-!        sum(area(1,:))
-!        if (mype==0) write(*,*) mype, 'total ocean area (m2)', ocean_area        
-!        if (mype==0) write(*,*) mype, 'DSi concentration in rivers',ncdata(4)/total_runoff
-!        if (mype==0) write(*,*) mype, 'DIC concentration in rivers',ncdata(2)/total_runoff
-!        if (mype==0) write(*,*) mype, 'Alk concentration in rivers',ncdata(3)/total_runoff
-!        if (mype==0) write(*,*) mype, 'DIN concentration in rivers',ncdata(1)/total_runoff
-!        if (mype==0) write(*,*) mype, 'DIN surface input:',minval(lb_flux(:,1)),maxval(lb_flux(:,1))
-!        if (mype==0) write(*,*) mype, 'DIC surface input:',minval(lb_flux(:,2)),maxval(lb_flux(:,2))
-!        if (mype==0) write(*,*) mype, 'Alk surface input:',minval(lb_flux(:,3)),maxval(lb_flux(:,3))
-!        if (mype==0) write(*,*) mype, 'DSi surface input:',minval(lb_flux(:,4)),maxval(lb_flux(:,4))
-!        if (mype==0) write(*,*) mype, 'DIC(calcite) surface input:',minval(lb_flux(:,5)),maxval(lb_flux(:,5))
 
       end if ! add_loopback
 

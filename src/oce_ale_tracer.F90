@@ -232,6 +232,11 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 !!!     !$ACC UPDATE DEVICE(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus)
         !$ACC UPDATE DEVICE (mesh%helem, mesh%hnode, mesh%hnode_new, mesh%zbar_3d_n, mesh%z_3d_n)
     do tr_num=1, tracers%num_tracers
+
+!YY: sinkflx needs to be reset at each time step
+        if(use_MEDUSA) then
+            SinkFlx = 0.0d0
+        endif
     
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
@@ -292,9 +297,19 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
         call diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 
-!       Radioactive decay of 14C and 39Ar
+        !___________________________________________________________________________
+        ! Radioactive decay of 14C and 39Ar
         if (tracers%data(tr_num)%ID == 14) tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * exp(-decay14 * dt)
         if (tracers%data(tr_num)%ID == 39) tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * exp(-decay39 * dt)
+
+!YY: C14 seems to be calculated both in fesom and recom
+!YY: decay differently calculated???
+#if defined(__recom)
+        ! radioactive decay of 14C
+        if (ciso_14 .and. any(c14_tracer_id == tracers%data(tr_num)%ID)) then
+          tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * (1 - lambda_14 * dt)
+        end if    ! ciso & ciso_14
+#endif
 
         !___________________________________________________________________________
         ! relax to salt and temp climatology
@@ -1614,16 +1629,35 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
                     + relax_salt(n) - real_salt_flux(n)*is_nonlinfs)
 #if defined(__recom)
     CASE (1001) ! DIN
+        if (use_MEDUSA .and. add_loopback) then  ! OG: add is_MEDUSA_loopback flag is_MEDUSA_loopback flag * lb_flux(n,1)
+            bc_surface= dt*(AtmNInput(n) + RiverDIN2D(n)   * is_riverinput                &
+                                         + ErosionTON2D(n) * is_erosioninput + lb_flux(n,1))
+        else
             bc_surface= dt*(AtmNInput(n) + RiverDIN2D(n)   * is_riverinput                &
                                          + ErosionTON2D(n) * is_erosioninput)
+        end if
+
     CASE (1002) ! DIC
+        if (use_MEDUSA .and. add_loopback) then
+            bc_surface= dt*(GloCO2flux_seaicemask(n)                &
+                                + RiverDIC2D(n)   * is_riverinput   &
+                                + ErosionTOC2D(n) * is_erosioninput &
+                                + lb_flux(n,2) + lb_flux(n,5))
+        else
             bc_surface= dt*(GloCO2flux_seaicemask(n)                &
                                 + RiverDIC2D(n)   * is_riverinput   &
                                 + ErosionTOC2D(n) * is_erosioninput)
+       end if
+
     CASE (1003) ! Alk
+        if (use_MEDUSA .and. add_loopback) then
+            bc_surface= dt*(virtual_alk(n) + relax_alk(n)       &
+                            + RiverAlk2D(n) * is_riverinput     &
+                            + lb_flux(n,3) + lb_flux(n,5)*2) !CaCO3:Alk burial=1:2
+        else
             bc_surface= dt*(virtual_alk(n) + relax_alk(n)       &
                             + RiverAlk2D(n) * is_riverinput)
-        !bc_surface=0.0_WP
+        end if
     CASE (1004:1010)
         bc_surface=0.0_WP
     CASE (1011) ! DON
@@ -1633,16 +1667,53 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
     CASE (1013:1017)
         bc_surface=0.0_WP
     CASE (1018) ! DSi
-           bc_surface=dt*(RiverDSi2D(n) * is_riverinput + ErosionTSi2D(n) * is_erosioninput)
+        if (use_MEDUSA .and. add_loopback) then
+           bc_surface=dt*(RiverDSi2D(n)   * is_riverinput        &
+                        + ErosionTSi2D(n) * is_erosioninput      &
+                        + lb_flux(n,4))
+        else
+            bc_surface=dt*(RiverDSi2D(n) * is_riverinput + ErosionTSi2D(n) * is_erosioninput)
+        end if
+
     CASE (1019) ! Fe
+        if (useRivFe) then
+            bc_surface= dt*(AtmFeInput(n) + RiverFe(n))
+        else
            bc_surface= dt*AtmFeInput(n)
+        end if
     CASE (1020:1021) ! Cal
         bc_surface=0.0_WP
     CASE (1022) ! OXY
         bc_surface= dt*GloO2flux_seaicemask(n)
 !        bc_surface=0.0_WP
-    CASE (1023:1035)
+    CASE (1023:1033)
         bc_surface=0.0_WP  ! OG added bc for recom fields
+    CASE (1302) ! Before (1033) ! DIC_13
+         if (ciso) then
+            if (use_MEDUSA .and. add_loopback) then
+               bc_surface= dt*(GloCO2flux_seaicemask_13(n) &
+                           + lb_flux(n,6) + lb_flux(n,7))
+            else
+               bc_surface= dt*(GloCO2flux_seaicemask_13(n))
+            end if
+         else
+            bc_surface=0.0_WP
+         end if
+    CASE (1305:1321)
+         bc_surface=0.0_WP ! organic 13C
+    CASE (1402) ! Before (1034) ! DIC_14
+         if (ciso .and. ciso_14) then
+             if (use_MEDUSA .and. add_loopback .and. ciso_organic_14) then
+                 bc_surface= dt*(GloCO2flux_seaicemask_14(n) &
+                             + lb_flux(n,8) + lb_flux(n,9))
+             else
+                 bc_surface= dt*GloCO2flux_seaicemask_14(n)
+             end if
+         else
+             bc_surface=0.0_WP
+         end if
+    CASE (1405:1421)
+         bc_surface=0.0_WP ! organic 14C
 #endif
     CASE (101) ! apply boundary conditions to tracer ID=101
         bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)

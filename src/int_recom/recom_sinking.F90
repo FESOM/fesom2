@@ -392,6 +392,14 @@ else
           bottom_flux = GlodecayBenthos(:,1) * Fe2N_benthos !*** DFe ***
        CASE (1022)
           bottom_flux = -GlodecayBenthos(:,2) * redO2C !*** O2 ***
+       CASE (1302)
+         if (ciso) then
+           bottom_flux = GlodecayBenthos(:,5) + GlodecayBenthos(:,6) !*** DIC_13 and Calc: DIC_13 ***
+         end if
+       CASE (1402)
+         if (ciso) then
+           bottom_flux = GlodecayBenthos(:,7) + GlodecayBenthos(:,8) !*** DIC_14 and Calc: DIC_14 ***
+         end if
        CASE DEFAULT
           if (partit%mype==0) then
              write(*,*) 'check specified in boundary conditions'
