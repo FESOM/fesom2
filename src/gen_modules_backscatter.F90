@@ -75,7 +75,7 @@ module g_backscatter
     subroutine visc_filt_dbcksc(dynamics, partit, mesh)
         IMPLICIT NONE
         
-        real(kind=WP)  :: u1, v1, le(2), len, crosslen, vi, uke1 
+        real(kind=WP)  :: u1, v1, le(2), len, len2, crosslen, vi, uke1 
         integer       :: nz, ed, el(2)
         real(kind=WP)  , allocatable  :: uke_d(:,:)
         !!PS real(kind=WP)  , allocatable  :: UV_back(:,:,:), UV_dis(:,:,:)
@@ -113,9 +113,16 @@ module g_backscatter
         DO ed=1, myDim_edge2D+eDim_edge2D
             if(myList_edge2D(ed)>edge2D_in) cycle
             el=edge_tri(:,ed)
+            !New viscosity lines
+            len=sqrt(sum(elem_area(el)))
             DO  nz=1,minval(nlevels(el))-1
                 u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
                 v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+                ! New viscosity lines
+                vi=u1*u1+v1*v1
+                vi=sqrt(max(dynamics%visc_gamma0, max(dynamics%visc_gamma1*sqrt(vi), dynamics%visc_gamma2*vi))*len)
+                u1=u1*vi
+                v1=v1*vi
                 
                 U_c(nz,el(1))=U_c(nz,el(1))-u1
                 U_c(nz,el(2))=U_c(nz,el(2))+u1
@@ -124,20 +131,21 @@ module g_backscatter
             END DO 
         END DO
         
-        Do ed=1,myDim_elem2D
-            len=sqrt(elem_area(ed))                     
-            len=dt*len/30.0_WP
-            Do nz=1,nlevels(ed)-1
-                ! vi has the sense of harmonic viscosity coefficient because of 
-                ! the division by area in the end 
-                ! ====
-                ! Case 1 -- an analog to the third-order upwind (vi=|u|l/12)
-                ! ====
-                vi=max(0.2_WP,sqrt(UV(1,nz,ed)**2+UV(2,nz,ed)**2))*len 
-                U_c(nz,ed)=-U_c(nz,ed)*vi                             
-                V_c(nz,ed)=-V_c(nz,ed)*vi
-            END DO
-        end do
+        ! old viscosity
+       ! Do ed=1,myDim_elem2D
+       !     len=sqrt(elem_area(ed))                     
+       !     len=dt*len/30.0_WP
+       !     Do nz=1,nlevels(ed)-1
+       !         ! vi has the sense of harmonic viscosity coefficient because of 
+       !         ! the division by area in the end 
+       !         ! ====
+       !         ! Case 1 -- an analog to the third-order upwind (vi=|u|l/12)
+       !         ! ====
+       !         vi=max(0.2_WP,sqrt(UV(1,nz,ed)**2+UV(2,nz,ed)**2))*len 
+       !         U_c(nz,ed)=-U_c(nz,ed)*vi                             
+       !         V_c(nz,ed)=-V_c(nz,ed)*vi
+       !     END DO
+       ! end do
         call exchange_elem(U_c, partit)
         call exchange_elem(V_c, partit) 
         
@@ -146,7 +154,10 @@ module g_backscatter
             el=edge_tri(:,ed)
             le=edge_dxdy(:,ed)
             le(1)=le(1)*sum(elem_cos(el))*0.25_WP
+            !Check this weighting here!!!
             len=sqrt(le(1)**2+le(2)**2)*r_earth
+            !Weighting new viscosity 
+            len2=sqrt(sum(elem_area(el)))
             le(1)=edge_cross_dxdy(1,ed)-edge_cross_dxdy(3,ed)
             le(2)=edge_cross_dxdy(2,ed)-edge_cross_dxdy(4,ed)
             crosslen=sqrt(le(1)**2+le(2)**2) 
@@ -175,8 +186,16 @@ module g_backscatter
                 uke_d(nz,el(2))=uke_d(nz,el(2))+uke1/elem_area(el(2))
                 
                 !Biharmonic contribution
-                u1=(U_c(nz,el(1))-U_c(nz,el(2)))
-                v1=(V_c(nz,el(1))-V_c(nz,el(2)))
+                !u1=(U_c(nz,el(1))-U_c(nz,el(2)))
+                !v1=(V_c(nz,el(1))-V_c(nz,el(2)))
+                
+                !New viscosity param part
+                u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
+                v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+                vi=u1*u1+v1*v1
+                vi=-dt*sqrt(max(dynamics%visc_gamma0, max(dynamics%visc_gamma1*sqrt(vi), dynamics%visc_gamma2*vi))*len2)
+                u1=vi*(U_c(nz,el(1))-U_c(nz,el(2)))
+                v1=vi*(V_c(nz,el(1))-V_c(nz,el(2)))
                 
                 UV_dis(1,nz,el(1))=UV_dis(1,nz,el(1))-u1/elem_area(el(1))
                 UV_dis(1,nz,el(2))=UV_dis(1,nz,el(2))+u1/elem_area(el(2))
@@ -358,30 +377,8 @@ module g_backscatter
             
             DO nz=1, nlevels(ed)-1  
                 elnodes=elem2D_nodes(:,ed)
-                
-                !Taking out that one place where it is always weird (Pacific Southern Ocean)
-                !Should not really be used later on, once we fix the issue with the 1/4 degree grid
-                if(.not. (TRIM(which_toy)=="soufflet") .AND. .not. (TRIM(which_toy)=="dbgyre") ) then
-                call elem_center(ed, ex, ey)
-                !a1=-104.*rad
-                !a2=-49.*rad
-                call g2r(-104.*rad, -49.*rad, a1, a2)
-                dist_reg(1)=ex-a1
-                dist_reg(2)=ey-a2
-                call trim_cyclic(dist_reg(1))
-                dist_reg(1)=dist_reg(1)*elem_cos(ed)
-                dist_reg=dist_reg*r_earth
-                len_reg=sqrt(dist_reg(1)**2+dist_reg(2)**2)
-                
-                !if(mype==0) write(*,*) 'len_reg ', len_reg , ' and dist_reg' , dist_reg, ' and ex, ey', ex, ey, ' and a ', a1, a2
                 rosb_array(nz,ed)=rosb_array(nz,ed)/max(abs(sum(mesh%coriolis_node(elnodes(:)))), f_min)
-                !uke_dif(nz, ed)=scaling*(1-exp(-len_reg/300000))*1._8/(1._8+rosb_array(nz,ed)/rosb_dis)!UV_dif(1,ed)
-                uke_dis(nz,ed)=scaling*(1-exp(-len_reg/300000))*1._WP/(1._WP+rosb_array(nz,ed)/rosb_dis)*uke_dis(nz,ed)
-                else
-                rosb_array(nz,ed)=rosb_array(nz,ed)/max(abs(sum(mesh%coriolis_node(elnodes(:)))), f_min)
-                !uke_dif(nz, ed)=scaling*1._8/(1._8+rosb_array(nz,ed)/rosb_dis)!UV_dif(1,ed)
                 uke_dis(nz,ed)=scaling*1._WP/(1._WP+rosb_array(nz,ed)/rosb_dis)*uke_dis(nz,ed)
-                end if
             END DO
         END DO
         

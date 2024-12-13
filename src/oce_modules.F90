@@ -182,8 +182,8 @@ MODULE o_ARRAYS
 USE o_PARAM
 IMPLICIT NONE
 ! Arrays are described in subroutine array_setup
-real(kind=WP), allocatable         :: uke(:,:), v_back(:,:), uke_back(:,:), uke_dis(:,:), uke_dif(:,:)
-real(kind=WP), allocatable         :: uke_rhs(:,:), uke_rhs_old(:,:)
+!real(kind=WP), allocatable         :: uke(:,:), v_back(:,:), uke_back(:,:), uke_dis(:,:), uke_dif(:,:)
+!real(kind=WP), allocatable         :: uke_rhs(:,:), uke_rhs_old(:,:)
 !real(kind=WP), allocatable         :: UV_ib(:,:,:) ! kh 08.03.21 additional array for asynchronous iceberg computations
 real(kind=WP), allocatable         :: UV_dis_tend(:,:,:), UV_back_tend(:,:,:), UV_total_tend(:,:,:), UV_dis_tend_node(:,:,:)
 real(kind=WP), allocatable         :: UV_dis_posdef_b2(:,:), UV_dis_posdef(:,:), UV_back_posdef(:,:)
