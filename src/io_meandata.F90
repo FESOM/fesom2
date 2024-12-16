@@ -145,6 +145,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     use diagnostics
     use g_config,        only: use_cavity
     use g_forcing_param, only: use_virt_salt
+    use g_backscatter
 #if defined(__recom)
   use recom_glovar
   use recom_config
