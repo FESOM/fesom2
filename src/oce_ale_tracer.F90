@@ -557,7 +557,6 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     use o_mixing_KPP_mod !for ghats _GO_
     use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
     use bc_surface_interface
-    use transit_bc_surface_interface
     use mod_ice
     use iceberg_params
     implicit none
