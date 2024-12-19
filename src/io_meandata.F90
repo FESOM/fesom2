@@ -80,7 +80,7 @@ module io_MEANDATA
 !
   integer, save                  :: io_listsize   =0
   logical, save                  :: vec_autorotate=.FALSE.
-  logical, save                  :: lnextGEMS=.FALSE.
+  logical, save                  :: lnextGEMS     =.FALSE.
   integer, save                  :: nlev_upper=1
   character(len=1), save         :: filesplit_freq='y'
   integer, save                  :: compression_level=0
