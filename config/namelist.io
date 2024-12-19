@@ -56,4 +56,5 @@ io_list =  'sst       ',1, 'm', 4,
            'bolus_w   ',1, 'y', 4,
            'fw        ',1, 'm', 4,
            'fh        ',1, 'm', 4,
+           'otracers  ',1, 'y', 4,
 /
