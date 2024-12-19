@@ -24,14 +24,6 @@ real(kind=WP)                 :: C_d= 0.0025_WP ! Bottom drag coefficient
 real(kind=WP)	              :: kappa=0.4      !von Karman's constant
 real(kind=WP)                 :: mix_coeff_PP=0.01_WP   ! mixing coef for PP scheme
 real(kind=WP)                 :: A_ver=0.001_WP ! Vertical harm. visc.
-logical                       :: uke_scaling=.true.
-real(kind=WP)                 :: uke_scaling_factor=1._WP
-real(kind=WP)		          :: rosb_dis=1._WP
-integer                       :: smooth_back=2
-integer                       :: smooth_dis=2
-integer                       :: smooth_back_tend=4
-real(kind=WP)		          :: K_back=600._WP
-real(kind=WP)                 :: c_back=0.1_8
 real(kind=WP)                 :: K_hor=10._WP
 real(kind=WP)                 :: K_ver=0.00001_WP
 real(kind=WP)                 :: scale_area=2.0e8
@@ -165,9 +157,7 @@ character(20)                  :: which_pgf='shchepetkin'
                     scale_area, SPP,&
                     Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, &
                     scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, &
-                    Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, alpha, theta, use_density_ref, &
-                    K_back, c_back, uke_scaling, uke_scaling_factor, smooth_back, smooth_dis, &
-                    smooth_back_tend, rosb_dis
+                    Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, alpha, theta, use_density_ref
 
  NAMELIST /tracer_phys/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, &
             balance_salt_water, clim_relax, ref_sss_local, ref_sss, &

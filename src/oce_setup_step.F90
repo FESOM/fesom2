@@ -492,6 +492,14 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     real(kind=WP)  :: visc_gamma0, visc_gamma1, visc_gamma2
     real(kind=WP)  :: visc_easybsreturn
     logical        :: use_ivertvisc=.true.
+    logical        :: uke_scaling=.true.
+    real(kind=WP)  :: uke_scaling_factor=1._WP
+    real(kind=WP)  :: rosb_dis=1._WP
+    integer        :: smooth_back=2
+    integer        :: smooth_dis=2
+    integer        :: smooth_back_tend=4
+    real(kind=WP)  :: K_back=600._WP
+    real(kind=WP)  :: c_back=0.1_8
     integer        :: momadv_opt
     logical        :: use_freeslip =.false.
     logical        :: use_wsplit   =.false.
@@ -506,7 +514,9 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     real(kind=WP)  :: se_visc_gamma0, se_visc_gamma1, se_visc_gamma2
     
     namelist /dynamics_visc   / opt_visc, check_opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
-                                use_ivertvisc, visc_easybsreturn
+                                use_ivertvisc, visc_easybsreturn, &
+                                uke_scaling, uke_scaling_factor, rosb_dis, smooth_back,           &
+                                smooth_dis, smooth_back_tend, K_back, c_back
 
     namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, & 
                                 ldiag_KE, AB_order,                                  &
@@ -543,6 +553,14 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     dynamics%visc_gamma1         = visc_gamma1
     dynamics%visc_gamma2         = visc_gamma2
     dynamics%visc_easybsreturn   = visc_easybsreturn
+    dynamics%uke_scaling         = uke_scaling
+    dynamics%uke_scaling_factor  = uke_scaling_factor
+    dynamics%rosb_dis            = rosb_dis
+    dynamics%smooth_back         = smooth_back
+    dynamics%smooth_dis          = smooth_dis
+    dynamics%smooth_back_tend    = smooth_back_tend
+    dynamics%K_back              = K_back
+    dynamics%c_back              = c_back
     dynamics%use_ivertvisc       = use_ivertvisc
     dynamics%momadv_opt          = momadv_opt
     dynamics%use_freeslip        = use_freeslip

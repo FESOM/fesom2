@@ -173,7 +173,7 @@ module g_backscatter
                 v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))*vi
                 
                 !UKE diffusion
-                vi=dt*len*(K_back*sqrt(elem_area(el(1))/scale_area)+K_back*sqrt(elem_area(el(2))/scale_area))/crosslen
+                vi=dt*len*(dynamics%K_back*sqrt(elem_area(el(1))/scale_area)+dynamics%K_back*sqrt(elem_area(el(2))/scale_area))/crosslen
                 uke1=(uke(nz,el(1))-uke(nz,el(2)))*vi
                 
                 UV_back(1,nz,el(1))=UV_back(1,nz,el(1))-u1/elem_area(el(1))
@@ -209,11 +209,11 @@ module g_backscatter
         DO  nz=1, nl-1
             uuu=0.0_WP
             uuu=UV_back(1,nz,:)
-            call smooth_elem(uuu,smooth_back_tend, partit, mesh)
+            call smooth_elem(uuu,dynamics%smooth_back_tend, partit, mesh)
             UV_back(1,nz,:)=uuu
             uuu=0.0_WP
             uuu=UV_back(2,nz,:)
-            call smooth_elem(uuu,smooth_back_tend, partit, mesh)
+            call smooth_elem(uuu,dynamics%smooth_back_tend, partit, mesh)
             UV_back(2,nz,:)=uuu 
         END DO
         
@@ -239,8 +239,9 @@ module g_backscatter
     !
     !
     !_______________________________________________________________________________
-    subroutine backscatter_coef(partit, mesh)
+    subroutine backscatter_coef(dynamics, partit, mesh)
         IMPLICIT NONE
+        type(t_dyn)   , intent(inout), target :: dynamics
         type(t_mesh),   intent(in),    target :: mesh
         type(t_partit), intent(inout), target :: partit
         integer                               :: elem, nz
@@ -257,7 +258,7 @@ module g_backscatter
             DO  nz=1,nlevels(elem)-1
                 !v_back(1,ed)=c_back*sqrt(2.0_WP*elem_area(ed))*sqrt(max(2.0_WP*uke(1,ed),0.0_WP))*(3600.0_WP*24.0_WP/tau_c)*4.0_WP/sqrt(2.0_WP*elem_area(ed))**2 !*sqrt(max(2.0_WP*uke(1,ed),0.0_WP))
                 !v_back(nz,elem)=-c_back*sqrt(4._8/sqrt(3.0_8)*elem_area(elem))*sqrt(max(2.0_8*uke(nz,elem),0.0_8)) !Is the scaling correct
-                v_back(nz,elem)=min(-c_back*sqrt(elem_area(elem))*sqrt(max(2.0_8*uke(nz,elem),0.0_8)),0.2*elem_area(elem)/dt) !Is the scaling correct
+                v_back(nz,elem)=min(-dynamics%c_back*sqrt(elem_area(elem))*sqrt(max(2.0_8*uke(nz,elem),0.0_8)),0.2*elem_area(elem)/dt) !Is the scaling correct
                 !Scaling by sqrt(2*elem_area) or sqrt(elem_area)?
             END DO
         END DO
@@ -307,7 +308,7 @@ module g_backscatter
         DO  nz=1,nl-1
             uuu=0.0_8
             uuu=uke_back(nz,:)
-            call smooth_elem(uuu,smooth_back, partit, mesh) !3) ?
+            call smooth_elem(uuu,dynamics%smooth_back, partit, mesh) !3) ?
             uke_back(nz,:)=uuu
         END DO
         
@@ -356,7 +357,7 @@ module g_backscatter
         
         DO ed=1, myDim_elem2D
             scaling=1._WP
-            IF(uke_scaling) then
+            IF(dynamics%uke_scaling) then
                 reso=sqrt(elem_area(ed)*4._wp/sqrt(3._wp))
                 rosb=0._wp
                 elnodes=elem2D_nodes(:, ed)   
@@ -372,13 +373,13 @@ module g_backscatter
                     rosb=rosb+min(c1/max(abs(mesh%coriolis_node(elnodes(kk))), f_min), r_max)
                 END DO
                 rosb=rosb/3._WP
-                scaling=1._WP/(1._WP+(uke_scaling_factor*reso/rosb))!(4._wp*reso/rosb))
+                scaling=1._WP/(1._WP+(dynamics%uke_scaling*reso/rosb))!(4._wp*reso/rosb))
             END IF
             
             DO nz=1, nlevels(ed)-1  
                 elnodes=elem2D_nodes(:,ed)
                 rosb_array(nz,ed)=rosb_array(nz,ed)/max(abs(sum(mesh%coriolis_node(elnodes(:)))), f_min)
-                uke_dis(nz,ed)=scaling*1._WP/(1._WP+rosb_array(nz,ed)/rosb_dis)*uke_dis(nz,ed)
+                uke_dis(nz,ed)=scaling*1._WP/(1._WP+rosb_array(nz,ed)/dynamics%rosb_dis)*uke_dis(nz,ed)
             END DO
         END DO
         
@@ -389,7 +390,7 @@ module g_backscatter
         call exchange_elem(uke_dis, partit)
         DO nz=1, nl-1  
             uuu=uke_dis(nz,:)
-            call smooth_elem(uuu,smooth_dis, partit, mesh)
+            call smooth_elem(uuu,dynamics%smooth_dis, partit, mesh)
             uke_dis(nz,:)=uuu
         END DO
         DO ed=1, myDim_elem2D
