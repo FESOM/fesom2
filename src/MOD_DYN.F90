@@ -107,6 +107,16 @@ TYPE T_DYN
     ! (easy backscatter)
     real(kind=WP)                               :: visc_easybsreturn = 1.5
 
+    ! coefficients and options for opt_visc=8 (dynamic backscatter)
+    logical                                     :: uke_scaling        = .true.
+    real(kind=WP)                               :: uke_scaling_factor = 1._WP
+    real(kind=WP)                               :: rosb_dis           = 1._WP
+    integer                                     :: smooth_back        = 2
+    integer                                     :: smooth_dis         = 2
+    integer                                     :: smooth_back_tend   = 4
+    real(kind=WP)                               :: K_back             = 600._WP
+    real(kind=WP)                               :: c_back             = 0.1_8
+
     logical                                     :: use_ivertvisc = .true.
     integer                                     :: momadv_opt    = 2
 
