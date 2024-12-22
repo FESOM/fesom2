@@ -31,16 +31,35 @@ subroutine setup_model(partit)
     endif
     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
   endif
-  read (fileunit, NML=modelname)
-  read (fileunit, NML=timestep)
-  read (fileunit, NML=clockinit) 
-  read (fileunit, NML=paths)
-  read (fileunit, NML=restart_log)
-  read (fileunit, NML=ale_def)
-  read (fileunit, NML=geometry)
-  read (fileunit, NML=calendar)
-  read (fileunit, NML=run_config)
-  read (fileunit,NML=icebergs)
+  read (fileunit, NML=modelname, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'modelname', nmlfile, partit)
+  
+  read (fileunit, NML=timestep, iostat=istat)  
+  if (istat /= 0) call check_namelist_read(fileunit, 'timestep', nmlfile, partit)
+
+  read (fileunit, NML=clockinit, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'clockinit', nmlfile, partit)
+
+  read (fileunit, NML=paths, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'paths', nmlfile, partit)
+
+  read (fileunit, NML=restart_log, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'restart_log', nmlfile, partit)
+
+  read (fileunit, NML=ale_def, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'ale_def', nmlfile, partit)
+
+  read (fileunit, NML=geometry, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'geometry', nmlfile, partit)
+
+  read (fileunit, NML=calendar, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'calendar', nmlfile, partit)
+
+  read (fileunit, NML=run_config, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'run_config', nmlfile, partit)
+
+  read (fileunit, NML=icebergs, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'icebergs', nmlfile, partit)
 
 !!$  read (fileunit, NML=machine)
   close (fileunit)
@@ -69,7 +88,8 @@ subroutine setup_model(partit)
     endif
     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
   endif
-  read (fileunit, NML=oce_dyn)
+  read (fileunit, NML=oce_dyn, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'oce_dyn', nmlfile, partit)
   close (fileunit)
 
   nmlfile ='namelist.tra'    ! name of ocean namelist file
@@ -80,7 +100,8 @@ subroutine setup_model(partit)
     endif
     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
   endif
-  read (fileunit, NML=tracer_phys)
+  read (fileunit, NML=tracer_phys, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'tracer_phys', nmlfile, partit)
   close (fileunit)
 
   nmlfile ='namelist.forcing'    ! name of forcing namelist file
@@ -91,11 +112,17 @@ subroutine setup_model(partit)
     endif
     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
   endif
-  read (fileunit, NML=forcing_exchange_coeff)
-  read (fileunit, NML=forcing_bulk)
-  read (fileunit, NML=land_ice)
-  read (fileunit, NML=age_tracer) !---age-code
-  close (fileunit)
+  read (fileunit, NML=forcing_exchange_coeff, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'forcing_exchange_coeff', nmlfile, partit)
+
+  read (fileunit, NML=forcing_bulk, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'forcing_bulk', nmlfile, partit)
+
+  read (fileunit, NML=land_ice, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'land_ice', nmlfile, partit)
+
+  read (fileunit, NML=age_tracer, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'age_tracer', nmlfile, partit)
 
 !   if(use_ice) then
 !   nmlfile ='namelist.ice'    ! name of ice namelist file
@@ -113,7 +140,8 @@ subroutine setup_model(partit)
     endif
     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
   endif
-  read (fileunit, NML=diag_list)
+  read (fileunit, NML=diag_list, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'diag_list', nmlfile, partit)
   close (fileunit)
 
 #if defined (__recom)
@@ -125,38 +153,102 @@ subroutine setup_model(partit)
     endif
     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
   endif
-  read (fileunit, NML=pavariables)
-  read (fileunit, NML=pasinking)
-  read (fileunit, NML=painitialization_N)
-  read (fileunit, NML=paArrhenius)
-  read (fileunit, NML=palimiter_function)
-  read (fileunit, NML=palight_calculations)
-  read (fileunit, NML=paphotosynthesis)
-  read (fileunit, NML=paassimilation)
-  read (fileunit, NML=pairon_chem)
-  read (fileunit, NML=pazooplankton)
-  read (fileunit, NML=pasecondzooplankton)
-  read (fileunit, NML=pathirdzooplankton)
-  read (fileunit, NML=pagrazingdetritus)
-  read (fileunit, NML=paaggregation)
-  read (fileunit, NML=padin_rho_N)
-  read (fileunit, NML=padic_rho_C1)
-  read (fileunit, NML=paphytoplankton_N)
-  read (fileunit, NML=paphytoplankton_C)
-  read (fileunit, NML=paphytoplankton_ChlA)
-  read (fileunit, NML=padetritus_N)
-  read (fileunit, NML=padetritus_C)
-  read (fileunit, NML=paheterotrophs)
-  read (fileunit, NML=paseczooloss)
-  read (fileunit, NML=pathirdzooloss)
-  read (fileunit, NML=paco2lim)
-  read (fileunit, NML=pairon)
-  read (fileunit, NML=pacalc)
-  read (fileunit, NML=pabenthos_decay_rate)
-  read (fileunit, NML=paco2_flux_param)
-  read (fileunit, NML=paalkalinity_restoring)
-  read (fileunit, NML=paballasting)
-  read (fileunit, NML=paciso)
+  read (fileunit, NML=pavariables, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'pavariables', nmlfile, partit)
+
+  read (fileunit, NML=pasinking, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'pasinking', nmlfile, partit)
+
+  read (fileunit, NML=painitialization_N, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'painitialization_N', nmlfile, partit)
+
+  read (fileunit, NML=paArrhenius, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'paArrhenius', nmlfile, partit)
+
+  read (fileunit, NML=palimiter_function, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'palimiter_function', nmlfile, partit)
+
+  read (fileunit, NML=palight_calculations, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'palight_calculations', nmlfile, partit)
+
+  read (fileunit, NML=paphotosynthesis, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'paphotosynthesis', nmlfile, partit)
+
+  read (fileunit, NML=paassimilation, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'paassimilation', nmlfile, partit)
+
+  read (fileunit, NML=pairon_chem, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'pairon_chem', nmlfile, partit)
+
+  read (fileunit, NML=pazooplankton, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'pazooplankton', nmlfile, partit)
+
+  read (fileunit, NML=pasecondzooplankton, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'pasecondzooplankton', nmlfile, partit)
+
+  read (fileunit, NML=pathirdzooplankton, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'pathirdzooplankton', nmlfile, partit)
+
+  read (fileunit, NML=pagrazingdetritus, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'pagrazingdetritus', nmlfile, partit)
+
+  read (fileunit, NML=paaggregation, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'paaggregation', nmlfile, partit)
+
+  read (fileunit, NML=padin_rho_N, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'padin_rho_N', nmlfile, partit)
+
+  read (fileunit, NML=padic_rho_C1, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'padic_rho_C1', nmlfile, partit)
+
+  read (fileunit, NML=paphytoplankton_N, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'paphytoplankton_N', nmlfile, partit)
+
+  read (fileunit, NML=paphytoplankton_C, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'paphytoplankton_C', nmlfile, partit)
+
+  read (fileunit, NML=paphytoplankton_ChlA, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'paphytoplankton_ChlA', nmlfile, partit)
+
+  read (fileunit, NML=padetritus_N, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'padetritus_N', nmlfile, partit)
+
+  read (fileunit, NML=padetritus_C, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'padetritus_C', nmlfile, partit)
+
+  read (fileunit, NML=paheterotrophs, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'paheterotrophs', nmlfile, partit)
+
+  read (fileunit, NML=paseczooloss, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'paseczooloss', nmlfile, partit)
+
+  read (fileunit, NML=pathirdzooloss, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'pathirdzooloss', nmlfile, partit)
+
+  read (fileunit, NML=paco2lim, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'paco2lim', nmlfile, partit)
+
+  read (fileunit, NML=pairon, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'pairon', nmlfile, partit)
+
+  read (fileunit, NML=pacalc, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'pacalc', nmlfile, partit)
+
+  read (fileunit, NML=pabenthos_decay_rate, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'pabenthos_decay_rate', nmlfile, partit)
+
+  read (fileunit, NML=paco2_flux_param, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'paco2_flux_param', nmlfile, partit)
+
+  read (fileunit, NML=paalkalinity_restoring, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'paalkalinity_restoring', nmlfile, partit)
+
+  read (fileunit, NML=paballasting, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'paballasting', nmlfile, partit)
+
+  read (fileunit, NML=paciso, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'paciso', nmlfile, partit)
+
   close (fileunit)
 #endif
 
@@ -263,3 +355,22 @@ end subroutine get_run_steps
 
     
 ! ==============================================================
+
+subroutine check_namelist_read(fileunit, nml_name, nmlfile, partit)
+    use MOD_PARTIT
+    use, intrinsic :: iso_fortran_env, only: error_unit
+    implicit none
+    integer,          intent(in) :: fileunit
+    character(len=*), intent(in) :: nml_name
+    character(len=*), intent(in) :: nmlfile
+    type(t_partit),   intent(in) :: partit
+    character(len=256) :: line
+
+    backspace(fileunit)
+    read(fileunit, fmt='(A)') line
+    if(partit%mype==0) then
+        write(error_unit,'(A)') 'ERROR: Could not read namelist '//trim(nml_name)//' from '//trim(nmlfile)
+        write(error_unit,'(A)') 'Invalid line in namelist: '//trim(line)
+    endif
+    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+end subroutine
