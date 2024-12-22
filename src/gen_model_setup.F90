@@ -358,6 +358,7 @@ end subroutine get_run_steps
 
 subroutine check_namelist_read(fileunit, nml_name, nmlfile, partit)
     use MOD_PARTIT
+    use MOD_PARSUP
     use, intrinsic :: iso_fortran_env, only: error_unit
     implicit none
     integer,          intent(in) :: fileunit
