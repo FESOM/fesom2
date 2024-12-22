@@ -19,12 +19,18 @@ subroutine setup_model(partit)
   implicit none
   type(t_partit), intent(inout), target :: partit
   character(len=MAX_PATH)               :: nmlfile
-  integer fileunit
+  integer                               :: fileunit, istat
 
   namelist /clockinit/ timenew, daynew, yearnew
 
   nmlfile ='namelist.config'    ! name of general configuration namelist file
-  open (newunit=fileunit, file=nmlfile)
+  open (newunit=fileunit, file=nmlfile, status='OLD', iostat=istat)
+  if (istat /= 0) then
+    if(partit%mype==0) then
+      write(*,*) 'ERROR: Could not open namelist file ', trim(nmlfile)
+    endif
+    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+  endif
   read (fileunit, NML=modelname)
   read (fileunit, NML=timestep)
   read (fileunit, NML=clockinit) 
@@ -56,17 +62,35 @@ subroutine setup_model(partit)
 ! =================================
  
   nmlfile ='namelist.oce'    ! name of ocean namelist file
-  open (newunit=fileunit, file=nmlfile)
+  open (newunit=fileunit, file=nmlfile, status='OLD', iostat=istat)
+  if (istat /= 0) then
+    if(partit%mype==0) then
+      write(*,*) 'ERROR: Could not open namelist file ', trim(nmlfile)
+    endif
+    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+  endif
   read (fileunit, NML=oce_dyn)
   close (fileunit)
 
   nmlfile ='namelist.tra'    ! name of ocean namelist file
-  open (newunit=fileunit, file=nmlfile)
+  open (newunit=fileunit, file=nmlfile, status='OLD', iostat=istat)
+  if (istat /= 0) then
+    if(partit%mype==0) then
+      write(*,*) 'ERROR: Could not open namelist file ', trim(nmlfile)
+    endif
+    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+  endif
   read (fileunit, NML=tracer_phys)
   close (fileunit)
 
   nmlfile ='namelist.forcing'    ! name of forcing namelist file
-  open (newunit=fileunit, file=nmlfile)
+  open (newunit=fileunit, file=nmlfile, status='OLD', iostat=istat)
+  if (istat /= 0) then
+    if(partit%mype==0) then
+      write(*,*) 'ERROR: Could not open namelist file ', trim(nmlfile)
+    endif
+    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+  endif
   read (fileunit, NML=forcing_exchange_coeff)
   read (fileunit, NML=forcing_bulk)
   read (fileunit, NML=land_ice)
@@ -82,13 +106,25 @@ subroutine setup_model(partit)
 !   endif
   
   nmlfile ='namelist.io'    ! name of forcing namelist file
-  open (newunit=fileunit, file=nmlfile)
+  open (newunit=fileunit, file=nmlfile, status='OLD', iostat=istat)
+  if (istat /= 0) then
+    if(partit%mype==0) then
+      write(*,*) 'ERROR: Could not open namelist file ', trim(nmlfile)
+    endif
+    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+  endif
   read (fileunit, NML=diag_list)
   close (fileunit)
 
 #if defined (__recom)
   nmlfile ='namelist.recom'    ! name of recom namelist file
-  open (newunit=fileunit, file=nmlfile)
+  open (newunit=fileunit, file=nmlfile, iostat=istat)
+  if (istat /= 0) then
+    if(partit%mype==0) then
+      write(*,*) 'ERROR: Could not open namelist file ', trim(nmlfile)
+    endif
+    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+  endif
   read (fileunit, NML=pavariables)
   read (fileunit, NML=pasinking)
   read (fileunit, NML=painitialization_N)
