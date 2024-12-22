@@ -244,7 +244,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
        write (unit=error_unit, fmt='(3A)') &
          '### error: can not open file ', file_name, &
          ', error: ' // trim(errmsg)
-       call MPI_Abort(MPI_COMM_FESOM, 1, ierror)
+ !call MPI_Abort(MPI_COMM_FESOM, 1, ierror) # dont call abort here yet called bellow
      end if
      allocate(partit%part(npes+1))
      part=>partit%part
@@ -264,7 +264,6 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
      write(*,*) n
      write(*,*) 'error: NPES does not coincide with that of the mesh'
      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
-     call MPI_Abort(MPI_COMM_FESOM, 1, ierror)
   end if
   ! broadcasting partitioning vector to the other procs
   if (mype/=0) then
@@ -423,7 +422,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
         write(*,*) '____________________________________________________________________'
         print *, achar(27)//'[0m'
         write(*,*)
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     !___________________________________________________________________________
     ! check if rotation needs to be applied to an unrotated mesh
     elseif ((mype==0) .and. (.not. force_rotation) .and. (flag_checkmustrot==1) .and. (.not. toy_ocean)) then
@@ -444,7 +443,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
         write(*,*) '____________________________________________________________________'
         print *, achar(27)//'[0m'
         write(*,*)
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     end if
   
   
@@ -545,7 +544,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
         call MPI_BCast(mesh%nl, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
         if (mesh%nl < 3) then
             write(*,*) '!!!Number of levels is less than 3, model will stop!!!'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
             stop
         end if
         allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
@@ -566,7 +565,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
             write(*,*) '        --> model stops here'
             write(*,*) '____________________________________________________________________'
         end if
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     end if
     
  !______________________________________________________________________________
@@ -586,7 +585,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
         call MPI_BCast(mesh%nl, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
         if (mesh%nl < 3) then
             write(*,*) '!!!Number of levels is less than 3, model will stop!!!'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
             stop
         end if
         allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
@@ -609,7 +608,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
             write(*,*) '            use_depthfile= "aux3d" or "depth@" and your meshfolder'
             write(*,*) '        --> model stops here'
             write(*,*) '____________________________________________________________________'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
         end if 
     end if 
     
@@ -634,7 +633,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
             write(*,*) '            use_depthfile= "aux3d" or "depth@" and your meshfolder '
             write(*,*) '        --> model stops here'
             write(*,*) '____________________________________________________________________'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
         end if
     end if     
  end if 
@@ -766,7 +765,7 @@ if ((mype==0) .and. (flag_wrongaux3d==1)) then
     write(*,*) '____________________________________________________________________'
     print *, achar(27)//'[0m'
     write(*,*)
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
 end if 
 
  ! ==============================
@@ -1156,7 +1155,7 @@ subroutine find_levels_cavity(partit, mesh)
             write(*,*) '____________________________________________________________________'
             print *, achar(27)//'[0m'
             write(*,*)
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
         end if 
     end if
     
@@ -1244,7 +1243,7 @@ subroutine find_levels_cavity(partit, mesh)
             write(*,*) '____________________________________________________________________'
             print *, achar(27)//'[0m'
             write(*,*)
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
         end if    
     end if
     
@@ -1409,7 +1408,7 @@ subroutine find_levels_cavity(partit, mesh)
             write(*,*) '____________________________________________________________________'
             print *, achar(27)//'[0m'
             write(*,*)
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
         end if 
     end if
     
