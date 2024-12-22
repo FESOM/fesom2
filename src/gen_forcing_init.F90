@@ -11,9 +11,9 @@ module forcing_array_setup_interfaces
 end module
 
 
-module forcing_array_setup_nemo_interfaces
+module forcing_array_setup_dbgyre_interfaces
   interface
-    subroutine forcing_array_setup_nemo(partit, mesh)
+    subroutine forcing_array_setup_dbgyre(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
@@ -34,7 +34,7 @@ use mod_mesh
 USE MOD_PARTIT
 USE MOD_PARSUP
 use forcing_array_setup_interfaces
-use forcing_array_setup_nemo_interfaces
+use forcing_array_setup_dbgyre_interfaces
 implicit none
 type(t_mesh),   intent(in),    target :: mesh
 type(t_partit), intent(inout), target :: partit
@@ -46,13 +46,13 @@ type(t_partit), intent(inout), target :: partit
      call sbc_ini(partit, mesh)         ! initialize forcing fields
 #endif
   endif 
-  if ((toy_ocean) .AND. TRIM(which_toy)=="nemo" .AND. (use_sw_pene)) then
-     call forcing_array_setup_nemo(partit, mesh)
+  if ((toy_ocean) .AND. TRIM(which_toy)=="dbgyre" .AND. (use_sw_pene)) then
+     call forcing_array_setup_dbgyre(partit, mesh)
   endif
 end subroutine forcing_setup
 
 ! ==========================================================
-subroutine forcing_array_setup_nemo(partit, mesh)
+subroutine forcing_array_setup_dbgyre(partit, mesh)
   use g_forcing_arrays
   use mod_mesh
   USE MOD_PARTIT
@@ -72,7 +72,7 @@ subroutine forcing_array_setup_nemo(partit, mesh)
   allocate(sw_3d(nl,n2))
   chl=0.1_WP
 
-end subroutine forcing_array_setup_nemo
+end subroutine forcing_array_setup_dbgyre
 
 ! ==========================================================
 subroutine forcing_array_setup(partit, mesh)

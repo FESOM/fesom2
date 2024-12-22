@@ -37,14 +37,14 @@ use_partial_cell=.false.
 /
 
 &geometry
-cartesian=.true.
+cartesian=.false.
 fplane=.false.
 cyclic_length=90       ![degree]
 rotated_grid=.false.     !option only valid for coupled model case now
 force_rotation=.false.
-alphaEuler=50.          ![degree] Euler angles, convention:
-betaEuler=15.           ![degree] first around z, then around new x,
-gammaEuler=-90.         ![degree] then around new z.
+alphaEuler=0          ![degree] Euler angles, convention:
+betaEuler=0           ![degree] first around z, then around new x,
+gammaEuler=0         ![degree] then around new z.
 /
 
 &calendar
@@ -60,7 +60,7 @@ use_sw_pene=.true.
 flag_debug=.false.
 flag_warn_cflz=.false.
 toy_ocean=.true.
-which_toy="nemo"
+which_toy="dbgyre"
 flag_debug=.false.
 /
 

@@ -1,4 +1,4 @@
-subroutine cal_shortwave_rad_nemo(ice, tracers, partit, mesh)
+subroutine cal_shortwave_rad_dbgyre(ice, tracers, partit, mesh)
   ! This routine is inherited from FESOM 1.4 and adopted appropreately. It calculates 
   ! shortwave penetration into the ocean assuming the constant chlorophyll concentration.
   ! No penetration under the ice is applied. A decent way for ice region is to be discussed.
@@ -14,7 +14,7 @@ subroutine cal_shortwave_rad_nemo(ice, tracers, partit, mesh)
   USE g_CONFIG
   use g_forcing_arrays
   use g_comm_auto
-  use Toy_Channel_Nemo
+  use Toy_Channel_Dbgyre
   IMPLICIT NONE
   type(t_ice) ,intent(in), target :: ice
   type(t_tracer), intent(inout), target :: tracers
@@ -121,4 +121,4 @@ subroutine cal_shortwave_rad_nemo(ice, tracers, partit, mesh)
   end do
 !call par_ex
 !stop
-end subroutine cal_shortwave_rad_nemo
+end subroutine cal_shortwave_rad_dbgyre

@@ -1,4 +1,4 @@
-MODULE Toy_Channel_Nemo
+MODULE Toy_Channel_Dbgyre
   use mod_mesh
   USE o_ARRAYS
   USE o_PARAM
@@ -11,7 +11,7 @@ MODULE Toy_Channel_Nemo
   implicit none
   SAVE 
   private
-  public :: initial_state_nemo
+  public :: initial_state_dbgyre
   real(kind=WP)     ::   ysize       =3180000.0            ! the meridional lenght of the channel [m]
   real(kind=WP)     ::   xsize       =2120000.0   ! the zonal lenght of the channel [m] !4.5*pi*r_earth=90018410.49779853
   real(kind=WP)     ::   zsize       =4000.0      ! m  The depth
@@ -23,7 +23,7 @@ MODULE Toy_Channel_Nemo
 !
 !--------------------------------------------------------------------------------------------
 
-subroutine initial_state_nemo(dynamics, tracers, partit, mesh)
+subroutine initial_state_dbgyre(dynamics, tracers, partit, mesh)
  ! Profiles NEMO 2010 
   implicit none
   type(t_mesh), intent(inout) , target :: mesh
@@ -257,5 +257,5 @@ end if
 !write(*,*) mype, 'dst', dst
 !write(*,*) mype, 'rad', rad
 
-end subroutine initial_state_nemo
-END MODULE Toy_Channel_Nemo
+end subroutine initial_state_dbgyre
+END MODULE Toy_Channel_Dbgyre
