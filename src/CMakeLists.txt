@@ -335,3 +335,19 @@ target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
 ### Export and installation
 
 fesom_export(TARGETS ${PROJECT_NAME} fesom.x)
+
+# Add test program for ifs_interface
+if(ENABLE_IFS_INTERFACE)
+   add_executable(test_ifs_interface 
+       ifs_interface/test_ifs_interface.F90
+   )
+   target_link_libraries(test_ifs_interface 
+       ${PROJECT_NAME}
+       ${NETCDF_LIBS}
+       ${HDF5_LIBS}
+       ${LAPACK_LIBRARIES}
+       ${MPI_Fortran_LIBRARIES}
+   )
+   # Make sure IFS interface is enabled when building test
+   target_compile_definitions(test_ifs_interface PRIVATE __ifsinterface)
+endif()
