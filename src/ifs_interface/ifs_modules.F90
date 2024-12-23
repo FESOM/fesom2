@@ -11,7 +11,7 @@ MODULE par_kind
        dp = SELECTED_REAL_KIND(12,307),  &  !: double precision (real 8)
        wpIFS = SELECTED_REAL_KIND(12,307),  &  !: double precision (real 8)
        ik = SELECTED_INT_KIND(6)  , &          !: integer precision 
-   jptime = SELECTED_INT_KIND(18)  ! used for time, can handle numbers up to 10^18
+     JPTIME = SELECTED_INT_KIND(18)  ! used for time, can handle numbers up to 10^18
 END MODULE par_kind
 
 MODULE nctools

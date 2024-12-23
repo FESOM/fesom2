@@ -83,6 +83,7 @@ SUBROUTINE nemogcmcoup_init( mype, icomm, inidate, initime, itini, itend, zstp, 
    INTEGER :: itend_fesom
    INTEGER :: i
    INTEGER :: istat, ierr
+   character(len=256) :: line 
    NAMELIST/namfesomstep/substeps
 
    ! overwritten from value namelist
@@ -93,7 +94,7 @@ SUBROUTINE nemogcmcoup_init( mype, icomm, inidate, initime, itini, itend, zstp, 
       call MPI_ABORT(icomm, 1, ierr)
    endif
    READ(9,namfesomstep,iostat=istat)
-   if (istat /= 0):
+   if (istat /= 0) then
       backspace(9)
       read(9, fmt='(A)') line
       if(mype==0) write(*,*) 'Invalid line in namelist: '//trim(line)
@@ -236,14 +237,14 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
 
    OPEN(9,file='namfesomcoup.in', status='OLD', iostat=istat)
    if (istat /= 0) then
-      if(mype==0) write(*,*) 'ERROR: Could not open namelist file namfesomcoup.in'
+      if(fesom%mype==0) write(*,*) 'ERROR: Could not open namelist file namfesomcoup.in'
       call MPI_ABORT(icomm, 1, ierr)
    endif
    READ(9,namfesomcoup,iostat=istat)
-   if (istat /= 0):
+   if (istat /= 0) then
       backspace(9)
       read(9, fmt='(A)') line
-      if(mype==0) write(*,*) 'Invalid line in namelist: '//trim(line)
+      if(fesom%mype==0) write(*,*) 'Invalid line in namelist: '//trim(line)
       call MPI_ABORT(icomm, 1, ierr)
    endif
 
@@ -1316,7 +1317,7 @@ subroutine ocean_update_runoff(NBASIN_RUNOFF, BASIN_RUNOFF)
 end subroutine ocean_update_runoff
 
 SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )
-
+   USE par_kind
    USE g_clock, only: yearnew, month, day_in_month
    USE fesom_main_storage_module, only: fesom => f ! mype
    USE fesom_module, ONLY : fesom_runloop
