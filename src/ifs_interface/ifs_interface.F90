@@ -58,6 +58,7 @@ SUBROUTINE nemogcmcoup_init( mype, icomm, inidate, initime, itini, itend, zstp, 
    USE g_config, only: dt
    USE g_clock, only: timenew, daynew, yearnew, month, day_in_month
    USE nemogcmcoup_steps, ONLY : substeps
+   USE mpi
    
    IMPLICIT NONE
 
@@ -81,12 +82,23 @@ SUBROUTINE nemogcmcoup_init( mype, icomm, inidate, initime, itini, itend, zstp, 
    ! FESOM might perform substeps
    INTEGER :: itend_fesom
    INTEGER :: i
+   INTEGER :: istat, ierr
    NAMELIST/namfesomstep/substeps
 
    ! overwritten from value namelist
    substeps=2
-   OPEN(9,file='namfesomstep.in')
-   READ(9,namfesomstep)
+   OPEN(9,file='namfesomstep.in', status='OLD', iostat=istat)
+   if (istat /= 0) then
+      if(mype==0) write(*,*) 'ERROR: Could not open namelist file namfesomstep.in'
+      call MPI_ABORT(icomm, 1, ierr)
+   endif
+   READ(9,namfesomstep,iostat=istat)
+   if (istat /= 0):
+      backspace(9)
+      read(9, fmt='(A)') line
+      if(mype==0) write(*,*) 'Invalid line in namelist: '//trim(line)
+      call MPI_ABORT(icomm, 1, ierr)
+   endif
    CLOSE(9)
 
    fesom%partit%MPI_COMM_FESOM=icomm
@@ -133,6 +145,7 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    USE parinter
    USE scripremap
    USE interinfo
+   USE mpi
    IMPLICIT NONE
 
    ! Input arguments
@@ -185,7 +198,9 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
       & remap_gauss_to_UV, remap_UV_to_gauss
    ! Misc variables
    INTEGER :: i,j,k,ierr
+   INTEGER :: istat
    LOGICAL :: lexists
+   character(len=256) :: line 
 
    ! associate the mesh, only what is needed here
    ! #include "associate_mesh.h"
@@ -219,8 +234,19 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    lwritedist        = .FALSE.
    lparintmultatm    = .TRUE.
 
-   OPEN(9,file='namfesomcoup.in')
-   READ(9,namfesomcoup)
+   OPEN(9,file='namfesomcoup.in', status='OLD', iostat=istat)
+   if (istat /= 0) then
+      if(mype==0) write(*,*) 'ERROR: Could not open namelist file namfesomcoup.in'
+      call MPI_ABORT(icomm, 1, ierr)
+   endif
+   READ(9,namfesomcoup,iostat=istat)
+   if (istat /= 0):
+      backspace(9)
+      read(9, fmt='(A)') line
+      if(mype==0) write(*,*) 'Invalid line in namelist: '//trim(line)
+      call MPI_ABORT(icomm, 1, ierr)
+   endif
+
    CLOSE(9)
 
    ! Global number of Gaussian gridpoints
@@ -847,7 +873,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
       & runoffIN, ocerunoff, tcc, lcc, tice_atm
 
    ! Current time step
-   INTEGER, INTENT(in) :: kt
+   INTEGER(KIND=JPTIME), INTENT(in) :: kt
    ! Write debugging fields in netCDF
    LOGICAL, INTENT(IN) :: ldebug
    ! QS/QNS mixed switch
@@ -1300,7 +1326,7 @@ SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )
    ! Arguments
 
    ! Time step
-   INTEGER, INTENT(IN) :: istp
+   INTEGER(KIND=JPTIME), INTENT(IN) :: istp
 
    ! Data and time from NEMO
    INTEGER, INTENT(OUT) :: icdate, ictime
@@ -1337,3 +1363,4 @@ SUBROUTINE nemogcmcoup_final
    CALL fesom_finalize
 
 END SUBROUTINE nemogcmcoup_final
+
