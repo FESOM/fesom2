@@ -3240,10 +3240,8 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         !!PS friction=-C_d*sqrt(UV(1,nlevels(elem)-1,elem)**2+ &
         !!PS             UV(2,nlevels(elem)-1,elem)**2)
         
-        if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) then
-           friction=-0.005
-        elseif ((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) then
-           friction=-0.001
+        if ((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) then
+           friction=-C_d
         else
            friction=-C_d*sqrt(UV(1,nzmax-1,elem)**2+ &
                            UV(2,nzmax-1,elem)**2)

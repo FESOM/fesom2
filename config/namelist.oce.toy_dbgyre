@@ -2,7 +2,7 @@
 
 &oce_dyn
 state_equation=0       ! 1 - full equation of state, 0 - linear equation of state
-C_d=0.001             ! Bottom drag, nondimensional
+C_d=0.001             ! Bottom drag, nondimensional, use C_d=0.001 for double gyre setup based on Bagaeva et al.(2024)
 A_ver= 1.e-4	       ! Vertical viscosity, m^2/s
 scale_area=5.8e9       ! Visc. and diffus. are for an element with scale_area
 SPP=.false.                 ! Salt Plume Parameterization
