@@ -2,8 +2,6 @@ module g_clock
   !combining RT and Lars version
   !
   use g_config
-  use iso_fortran_env, only: error_unit
-  use mpi
   implicit none
   save
   real(kind=WP)            :: timeold, timenew     !time in a day, unit: sec
@@ -71,15 +69,13 @@ contains
   !
   subroutine clock_init(partit)
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use g_config
     use mod_transit, only: ti_transit, ti_start_transit
     implicit none
     type(t_partit), intent(in), target    :: partit
     integer                               :: i, daystart, yearstart
     real(kind=WP)                         :: aux1, aux2, timestart
-    integer                               :: ierr
-    integer                               :: file_unit
-    character(512)                        :: errmsg
  
     ! the model initialized at
     timestart=timenew
@@ -87,17 +83,10 @@ contains
     yearstart=yearnew
 
     ! init clock for this run
-    open(newunit=file_unit, file=trim(ResultPath)//trim(runid)//'.clock', action='read', &
-        status='old', iostat=ierr, iomsg=errmsg)
-    if (ierr /= 0) then
-      write (unit=error_unit, fmt='(3A)') &
-        '### error: can not open file ', trim(ResultPath)//trim(runid)//'.clock', &
-        ', error: ' // trim(errmsg)
-      call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
-    end if
-    read(unit=file_unit, fmt=*) timeold, dayold, yearold
-    read(unit=file_unit, fmt=*) timenew, daynew, yearnew
-    close(unit=file_unit)
+    open(99,file=trim(ResultPath)//trim(runid)//'.clock',status='old')
+    read(99,*) timeold, dayold, yearold
+    read(99,*) timenew, daynew, yearnew
+    close(99)
     if(daynew==0) daynew=1
     
     ! check if this is a restart or not
@@ -168,9 +157,6 @@ contains
     real(kind=WP)            :: dum_timenew     !time in a day, unit: sec
     integer                  :: dum_daynew       !day in a year
     integer                  :: dum_yearnew     !year before and after time step
-    integer                               :: ierr
-    integer                               :: file_unit
-    character(512)                        :: errmsg
     
     dum_timenew = timenew
     dum_daynew  = daynew
@@ -181,17 +167,10 @@ contains
        dum_yearnew=yearold+1
     endif
 
-    open(newunit=file_unit, file=trim(ResultPath)//trim(runid)//'.clock', action='write', &
-        status='unknown', iostat=ierr, iomsg=errmsg)
-    if (ierr /= 0) then
-      write (unit=error_unit, fmt='(3A)') &
-        '### error: can not open file ', trim(ResultPath)//trim(runid)//'.clock', &
-        ', error: ' // trim(errmsg)
-      call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
-    end if
-    write(unit=file_unit, fmt=*) timeold, dayold, yearold
-    write(unit=file_unit, fmt=*) dum_timenew, dum_daynew, dum_yearnew
-    close(unit=file_unit)
+    open(99,file=trim(ResultPath)//trim(runid)//'.clock',status='unknown')
+    write(99,*) timeold, dayold, yearold
+    write(99,*) dum_timenew, dum_daynew, dum_yearnew
+    close(99)
   end subroutine clock_finish
   !
   !----------------------------------------------------------------------------

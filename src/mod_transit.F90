@@ -16,6 +16,7 @@ MODULE mod_transit
                   r39ar_a = 1.0, &       ! 39Ar / 40 Ar (homogeneous)
                   xarg_a  = 9.34e-3, &   ! Argon (homogeneous)
                   xCO2_a  = 284.32e-6, & ! CO2 (CMIP6 & OMIP-BGC: 284.32e-6 for 1700-1850, PMIP4: 190.00e-6 for 21 ka BP)
+                  xf11_a  = 0.0, &       ! CFC-11 (latitude dependent)
                   xf12_a  = 0.0, &       ! CFC-12 (latitude dependent)
                   xsf6_a  = 0.0          ! SF6 (latitude dependent)
 
@@ -23,20 +24,27 @@ MODULE mod_transit
   real(kind=8), allocatable, dimension(:) :: r14c_nh, r14c_tz, r14c_sh, & ! 14CO2 / 12CO2, latitude-dependent (e.g., bomb 14C)
                                              r14c_ti, &                   ! 14CO2 / 12CO2, homogenous (e.g., IntCal)
                                              xCO2_ti, &                   ! CO2
+                                             xf11_nh, xf11_sh, &          ! CFC-11, latitude-dependent
                                              xf12_nh, xf12_sh, &          ! CFC-12, latitude-dependent
                                              xsf6_nh, xsf6_sh             ! SF6, latitude-dependent
   integer, allocatable, dimension(:)      :: year_ce                      ! current year in anthropenic runs (control output)
   integer                                 :: length_transit = 1, &        ! length (years) of transient tracer input
                                              ti_start_transit = 1         ! index of the first tracer input year in ifile_transit
-  logical                                 :: anthro_transit = .false., &  
+  logical                                 :: l_r14c = .false., &          ! switch on / off specific tracerss
+                                             l_r39ar = .false. , &
+                                             l_f11 = .false., &
+                                             l_f12 = .false., &
+                                             l_sf6 = .false., &
+                                             anthro_transit = .false., &
                                              paleo_transit = .false.      ! specify tracer input scenario
-  character(300)                          :: ifile_transit ='Table_CO2_isoC_CFC12_SF6.txt'! tracer input file; not neccessary for steady state simulations
+  character(300)                          :: ifile_transit ='Table_CO2_isoC_CFCs_SF6.txt'! tracer input file; not neccessary for steady state simulations
 
 
 ! Parameters which can be changed via namelist.oce (-> transit_param)
 ! Global-mean concentrations of DIC and Argon in the mixed layer (mol / m**3)
   real(kind=8) :: dic_0 = 2.00, &        ! GLODAPv2, 0-50 m: TCO2 ~ 2050 umol / kg
                   arg_0 = 0.01           ! Hamme et al. 2019, doi:10.1146/annurev-marine-121916-063604
+
 ! Radioactive decay constants (1 / s; default values assume that 1 year = 365.00 days)
   real(kind=8) :: decay14 = 3.8561e-12 , & ! 14C; t1/2 = 5700 a following OMIP-BGC
                   decay39 = 8.1708e-11     ! 39Ar; t1/2 = 269 a
@@ -45,16 +53,20 @@ MODULE mod_transit
 ! Latitude of atmospheric boundary conditions and latitudinal interpolation weight
   real(kind=8) :: y_abc, yy_nh
 ! Tracer indices of transient tracers
-  integer ::      id_r14c, id_r39ar, id_f12, id_sf6
-  integer, dimension(4) :: index_transit = (/-1, -1, -1, -1/)
+  integer ::      id_r14c, id_r39ar, id_f11, id_f12, id_sf6, index_transit_r14c, index_transit_r39ar, index_transit_f11, index_transit_f12, index_transit_sf6
 ! Time index (=year) in transient simulations
   integer ::      ti_transit
 
 ! Namelist to modify default parameter settings
   namelist / transit_param / &
-                             anthro_transit, &             ! anthoropogenic transient tracers
+                             l_r14c, &                     ! switch on R14C
+                             l_r39ar, &                    ! switch on R39Ar
+                             l_f11, &                      ! switch on CFC-11
+                             l_f12, &                      ! switch on CFC-12
+                             l_sf6, &                      ! switch on SF6
+                             anthro_transit, &             ! anthropogenic transient tracers
                              paleo_transit, &              ! paleo transient tracers
-                             length_transit, &             ! 166 for anthro_transit=.true.
+                             length_transit, &             ! 166 if (anthro_transit=.true.)
                              ti_start_transit, &           ! 1 for D14C, 80 for CFC-12
                              ifile_transit, &              ! forcing file
                              r14c_a, &                     ! atm. 14C/C ratio, global mean
@@ -135,6 +147,11 @@ MODULE mod_transit
         a1 = -160.7333;  a2 = 215.4152;   a3 = 89.8920;   a4 = -1.47759;  pow = 2
         b1 =  0.029941;  b2 = -0.027455;  b3 = 0.0053407; c1 = 0.
         con2con = 1000.  ! convert to mol / (m**3 * atm)
+      case ("f11")
+!       CFC-11 in mol / (L * atm) (Warner & Weiss 1985, doi:10.1016/0198-0149(85)90099-8, Table 5)
+        a1 = -229.9261;  a2 = 319.6552;   a3 = 119.4471;   a4 = -1.39165; pow = 2
+        b1 = -0.142382;  b2 = 0.091459;   b3 = -0.0157274; c1 = 0.
+        con2con = 1000. ! convert to mol / (m**3 * atm)
       case ("f12")
 !       CFC-12 in mol / (L * atm) (Warner & Weiss 1985, doi:10.1016/0198-0149(85)90099-8, Table 5)
         a1 = -218.0971;  a2 = 298.9702;   a3 = 113.8049;   a4 = -1.39165; pow = 2
@@ -175,6 +192,8 @@ MODULE mod_transit
       select case (which_gas)
       case ("co2") ! CO2
         as = 2116.8; bs = -136.25; cs = 4.7353; ds = -0.092307; es = 0.0007555
+      case ("f11") ! CFC-11
+        as = 3579.2; bs = -222.63; cs = 7.5749; ds = -0.145950; es = 0.0011870
       case ("f12") ! CFC-12
         as = 3828.1; bs = -249.86; cs = 8.7603; ds = -0.171600; es = 0.0014080
       case ("sf6") ! SF6
@@ -246,11 +265,12 @@ MODULE mod_transit
     end function speed_2
 
 
-    subroutine read_transit_input
+    subroutine read_transit_input(ifileunit)
 !   Read atmospheric input of isoCO2 and / or other tracers
       implicit none
 
 !     Internal variables
+      integer, intent(in) :: ifileunit
       integer :: jj
       real(kind=8), allocatable, dimension(:) :: d14c_nh, d14c_tz, d14c_sh, d14c_ti, d13c_dummy
 
@@ -263,6 +283,8 @@ MODULE mod_transit
         allocate(r14c_tz(length_transit))
         allocate(r14c_sh(length_transit))
         allocate(xCO2_ti(length_transit))
+        allocate(xf11_nh(length_transit))
+        allocate(xf11_sh(length_transit))
         allocate(xf12_nh(length_transit))
         allocate(xf12_sh(length_transit))
         allocate(xsf6_nh(length_transit))
@@ -272,14 +294,15 @@ MODULE mod_transit
 
 !       Skip header lines
         do jj = 1,15
-          read (20, fmt=*)
+          read (ifileunit, fmt=*)
         end do
 !       Read input values
         do jj = 1, length_transit
-          read (20, fmt=*) year_ce(jj), &
+          read (ifileunit, fmt=*) year_ce(jj), &
                            xCO2_ti(jj), &
                            d14c_nh(jj), d14c_tz(jj), d14c_sh(jj), &
                            d13c_dummy(jj), &
+                           xf11_nh(jj), xf11_sh(jj), &
                            xf12_nh(jj), xf12_sh(jj), &
                            xsf6_nh(jj), xsf6_sh(jj)
         end do
@@ -290,6 +313,8 @@ MODULE mod_transit
         r14c_sh = 1. + 0.001 * d14c_sh
 !       Convert volume mixing ratios
         xCO2_ti = xCO2_ti * 1.e-6
+        xf11_nh = xf11_nh * 1.e-12
+        xf11_sh = xf11_sh * 1.e-12
         xf12_nh = xf12_nh * 1.e-12
         xf12_sh = xf12_sh * 1.e-12
         xsf6_nh = xsf6_nh * 1.e-12
