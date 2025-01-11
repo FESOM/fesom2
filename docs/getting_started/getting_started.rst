@@ -460,12 +460,16 @@ The best way to run the model locally is to use Docker container. You obviously 
 
 - Get the image::
     
-    docker pull koldunovn/fesom2_test:refactoring2
+    docker pull ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master
+    # if you use Mac Silicon (M1 M2 etc) use:
+    docker pull --platform linux/amd64 ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master
 
 - Go to the folder with your version of fesom2 folder (NOT inside fesom2 folder, one up, the one you run ``git clone https://github.com/FESOM/fesom2.git`` in).
 - Run::
 
     docker run -it -v "$(pwd)"/fesom2:/fesom/fesom2 koldunovn/fesom2_test:refactoring2 /bin/bash
+    # if you use Mac Silicon (M1 M2 etc) use:
+    docker run --platform linux/amd64 -it -v "$(pwd)"/fesom2:/fesom/fesom2 ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master /bin/bash
 
 - This should get you inside the container. You now can edit the files in your fesom2 folder (on host system), but run compule and run the model inside the container.
 - When inside the container, to compile do:
