@@ -467,7 +467,7 @@ The best way to run the model locally is to use Docker container. You obviously 
 - Go to the folder with your version of fesom2 folder (NOT inside fesom2 folder, one up, the one you run ``git clone https://github.com/FESOM/fesom2.git`` in).
 - Run::
 
-    docker run -it -v "$(pwd)"/fesom2:/fesom/fesom2 koldunovn/fesom2_test:refactoring2 /bin/bash
+    docker run -it -v "$(pwd)"/fesom2:/fesom/fesom2 ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master /bin/bash
     # if you use Mac Silicon (M1 M2 etc) use:
     docker run --platform linux/amd64 -it -v "$(pwd)"/fesom2:/fesom/fesom2 ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master /bin/bash
 
