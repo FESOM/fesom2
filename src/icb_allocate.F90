@@ -1,3 +1,20 @@
+module allocate_icb_interface
+  interface
+     subroutine allocate_icb(partit, mesh)
+        use iceberg_params
+        use g_config
+        use g_comm
+        use g_comm_auto
+        use o_param
+        use MOD_PARTIT
+        use MOD_MESH
+        implicit none
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in)   , target :: mesh
+     end subroutine allocate_icb
+  end interface
+end module allocate_icb_interface
+
 subroutine allocate_icb(partit, mesh)
   use iceberg_params
   use g_config
