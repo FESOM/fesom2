@@ -142,6 +142,34 @@ module solve_tracers_ale_interface
         end subroutine
     end interface
 end module
+
+module brine_rejection_local_interfaces
+    implicit none
+    interface
+       subroutine cal_rejected_salt(ice, partit, mesh)
+          use mod_ice
+          use mod_partit
+          use mod_mesh
+          use mod_parsup
+          use o_tracers
+          implicit none
+          type(t_ice)   , intent(in), target :: ice
+          type(t_partit), intent(in), target :: partit
+          type(t_mesh)  , intent(in), target :: mesh
+       end subroutine cal_rejected_salt
+ 
+       subroutine app_rejected_salt(ttf, partit, mesh)
+          use mod_mesh
+          use mod_partit
+          use mod_parsup
+          use o_tracers
+          implicit none
+          type(t_mesh)   , intent(in), target :: mesh
+          type(t_partit) , intent(in), target :: partit
+          real(kind=WP), intent(inout) :: ttf(:, :)
+       end subroutine app_rejected_salt
+    end interface
+ end module brine_rejection_local_interfaces
 !
 !
 !===============================================================================
@@ -160,6 +188,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use Toy_Channel_Soufflet
     use diff_tracers_ale_interface
     use oce_adv_tra_driver_interfaces
+    use brine_rejection_local_interfaces
 #if defined(__recom)
     use recom_glovar
     use recom_config

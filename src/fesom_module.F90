@@ -37,6 +37,19 @@ module fesom_main_storage_module
   use iceberg_params
   use iceberg_step
   use iceberg_ocean_coupling
+  use par_support_interfaces
+  use dynamics_init_interface
+  use ice_timestep_interface
+  use setup_model_interface
+  use get_run_steps_interface
+  use mesh_setup_interface
+  use check_mesh_consistency_interface
+  use arrays_init_interface
+  use forcing_setup_interface
+  use ice_init_toyocean_dummy_interface
+  use allocate_icb_interface
+  use restart_thickness_ale_interface
+  use compute_vel_nodes_interface
   ! Define icepack module
 
 #if defined (__icepack)

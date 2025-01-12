@@ -43,8 +43,26 @@ module oce_fluxes_interface
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
         end subroutine
+
+        subroutine cal_shortwave_rad(ice, partit, mesh)
+            USE MOD_ICE
+            USE MOD_PARTIT
+            USE MOD_PARSUP
+            USE MOD_MESH
+            USE o_PARAM
+            USE o_ARRAYS
+            USE g_CONFIG
+            USE g_forcing_arrays
+            USE g_comm_auto
+            IMPLICIT NONE
+            type(t_ice)   , intent(inout), target :: ice
+            type(t_partit), intent(inout), target :: partit
+            type(t_mesh)  , intent(in)   , target :: mesh
+         end subroutine cal_shortwave_rad
+   
     end interface
 end module
+
 
 !
 !
@@ -260,6 +278,9 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     use g_forcing_arrays
     use g_support
     use cavity_interfaces
+    USE o_PARAM
+    USE oce_fluxes_interface
+    
 #if defined (__icepack)
     use icedrv_main,   only: icepack_to_fesom,    &
                             init_flux_atm_ocn

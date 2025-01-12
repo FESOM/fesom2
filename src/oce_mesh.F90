@@ -133,6 +133,47 @@ module check_total_volume_interface
   end interface
 end module
 
+module mesh_setup_interface
+    interface
+       subroutine mesh_setup(partit, mesh)
+          USE MOD_MESH
+          USE MOD_PARTIT
+          USE MOD_PARSUP
+          USE g_ROTATE_grid
+          use read_mesh_interface
+          use find_levels_interface
+          use find_levels_cavity_interface
+          use mesh_auxiliary_arrays_interface
+          use test_tri_interface
+          use load_edges_interface
+          use find_levels_min_e2n_interface
+          use find_neighbors_interface
+          use mesh_areas_interface
+          use par_support_interfaces
+          implicit none
+          type(t_partit), intent(inout), target :: partit
+          type(t_mesh),   intent(inout)        :: mesh
+       end subroutine mesh_setup
+    end interface
+ end module mesh_setup_interface
+
+ module check_mesh_consistency_interface
+    interface
+       subroutine check_mesh_consistency(partit, mesh)
+          USE MOD_MESH
+          USE MOD_PARTIT
+          USE MOD_PARSUP
+          USE o_PARAM
+          USE g_ROTATE_GRID
+          use g_comm_auto
+          implicit none
+          type(t_partit), intent(inout), target :: partit
+          type(t_mesh),   intent(inout), target :: mesh
+       end subroutine check_mesh_consistency
+    end interface
+ end module check_mesh_consistency_interface
+ 
+
 ! Driving routine. The distributed mesh information and mesh proper 
 ! are read from files.
 ! Auxiliary arrays with mesh information are assembled.

@@ -71,6 +71,85 @@ module before_oce_step_interface
         end subroutine
     end interface
 end module
+
+module init_stiff_mat_ale_interface
+    interface
+       subroutine init_stiff_mat_ale(partit, mesh)
+          USE o_PARAM
+          USE MOD_MESH
+          USE MOD_PARTIT
+          USE MOD_PARSUP
+          use g_CONFIG
+          IMPLICIT NONE
+          type(t_partit), intent(inout), target :: partit
+          type(t_mesh),   intent(inout), target :: mesh
+       end subroutine init_stiff_mat_ale
+    end interface
+ end module init_stiff_mat_ale_interface
+
+ module compute_nrst_pnt2cavline_interface
+    interface
+       subroutine compute_nrst_pnt2cavline(partit, mesh)
+          USE MOD_MESH
+          USE MOD_PARTIT
+          USE MOD_PARSUP
+          use o_PARAM, only: WP
+          IMPLICIT NONE
+          type(t_partit), intent(inout), target :: partit
+          type(t_mesh),   intent(inout), target :: mesh
+       end subroutine compute_nrst_pnt2cavline
+    end interface
+ end module compute_nrst_pnt2cavline_interface
+
+ module muscl_adv_init_interface
+    interface
+       subroutine muscl_adv_init(twork, partit, mesh)
+          USE MOD_MESH
+          USE MOD_PARTIT
+          USE MOD_PARSUP
+          use MOD_TRACER
+          use o_ARRAYS
+          use o_PARAM
+          use g_comm_auto
+          use g_config
+          ! The subroutine also uses "find_up_downwind_triangles_interface",
+          ! but that is not needed here in the interface unless it provides
+          ! types or parameters used in the dummy arguments.
+          IMPLICIT NONE
+          type(t_tracer_work), intent(inout), target :: twork
+          type(t_partit)     , intent(inout), target :: partit
+          type(t_mesh)       , intent(inout), target :: mesh
+       end subroutine muscl_adv_init
+    end interface
+ end module muscl_adv_init_interface
+
+ module arrays_init_interface
+    interface
+       subroutine arrays_init(num_tracers, partit, mesh)
+          USE MOD_MESH
+          USE MOD_PARTIT
+          USE MOD_PARSUP
+          USE o_ARRAYS
+          USE o_PARAM
+          use g_comm_auto
+          use g_config
+          use g_forcing_arrays
+          use o_mixing_kpp_mod
+          use g_forcing_param, only: use_virt_salt
+          use diagnostics, only: ldiag_dMOC, ldiag_DVD
+
+#if defined(__recom)
+          use recom_glovar
+          use recom_config
+          use recom_ciso
+#endif
+          implicit none
+          integer,        intent(in)            :: num_tracers
+          type(t_partit), intent(inout), target :: partit
+          type(t_mesh),   intent(in)   , target :: mesh
+       end subroutine arrays_init
+    end interface
+ end module arrays_init_interface
 !
 !
 !_______________________________________________________________________________
@@ -95,6 +174,11 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     use oce_adv_tra_fct_interfaces
     use init_ale_interface
     use init_thickness_ale_interface
+    use init_ref_density_interface
+    use init_stiff_mat_ale_interface
+    use compute_nrst_pnt2cavline_interface
+    use muscl_adv_init_interface
+
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_tracer), intent(inout), target :: tracers

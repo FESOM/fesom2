@@ -70,6 +70,20 @@ module ice_fct_interfaces
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in),    target :: mesh
         end subroutine
+        
+        subroutine ice_fct_solve(ice, partit, mesh)
+            use mod_ice
+            use mod_partit
+            use mod_parsup
+            use mod_mesh
+            implicit none
+            type(t_ice)   , intent(inout), target :: ice
+            type(t_partit), intent(inout), target :: partit
+            ! If you do *not* modify mesh, use intent(in).
+            ! If you really do modify mesh, use intent(inout).
+            type(t_mesh)  , intent(in)   , target :: mesh
+         end subroutine ice_fct_solve
+
     end interface
 end module
 !

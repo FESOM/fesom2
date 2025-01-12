@@ -23,9 +23,9 @@ module ice_setup_interface
         USE MOD_PARSUP
         USE MOD_MESH
         type(t_ice)   , intent(inout), target :: ice
-        type(t_tracer), intent(in)   , target :: tracers
+        type(t_tracer), intent(inout)   , target :: tracers
         type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
+        type(t_mesh)  , intent(inout)   , target :: mesh
         end subroutine
     end interface
 end module
@@ -58,10 +58,11 @@ subroutine ice_setup(ice, tracers, partit, mesh)
     use g_CONFIG
     use ice_initial_state_interface
     use ice_fct_interfaces
+    use ice_init_interface
     implicit none
     type(t_ice)   , intent(inout), target :: ice
-    type(t_tracer), intent(in)   , target :: tracers
-    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_tracer), intent(inout)   , target :: tracers
+    type(t_mesh)  , intent(inout)   , target :: mesh
     type(t_partit), intent(inout), target :: partit
 
     !___________________________________________________________________________

@@ -189,6 +189,225 @@ module oce_timestep_ale_interface
         end subroutine
     end interface
 end module
+module check_viscopt_interface
+    interface
+       subroutine check_viscopt(dynamics, partit, mesh)
+          USE MOD_DYN
+          USE MOD_PARTIT
+          USE MOD_PARSUP
+          USE MOD_MESH
+          ! (Also uses check_validviscopt_interface in the subroutine itself,
+          !  but that is typically not required here in the interface.)
+          implicit none
+          type(t_dyn)   , intent(inout), target :: dynamics
+          type(t_partit), intent(inout), target :: partit
+          type(t_mesh)  , intent(in)   , target :: mesh
+       end subroutine check_viscopt
+    end interface
+ end module check_viscopt_interface
+
+ module sw_alpha_beta_interface
+    interface
+       subroutine sw_alpha_beta(TF1, SF1, partit, mesh)
+          USE MOD_MESH
+          USE MOD_PARTIT
+          USE MOD_PARSUP
+          USE o_arrays      ! if needed for WP, etc.
+          USE o_param       ! if needed for WP
+          implicit none
+          ! Arrays TF1, SF1 are declared in the subroutine as 
+          !   real(kind=WP) :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+          !   real(kind=WP) :: SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+          ! but for simplicity in an interface, we often use assumed-shape:
+          real(kind=WP), intent(in) :: TF1(:,:), SF1(:,:)
+          type(t_partit), intent(inout), target :: partit
+          type(t_mesh)  , intent(in)   , target :: mesh
+       end subroutine sw_alpha_beta
+    end interface
+ end module sw_alpha_beta_interface
+
+ module compute_sigma_xy_interface
+    interface
+       subroutine compute_sigma_xy(TF1, SF1, partit, mesh)
+          USE MOD_MESH
+          USE MOD_PARTIT
+          USE MOD_PARSUP
+          USE o_arrays
+          USE o_param
+          implicit none
+          real(kind=WP), intent(in) :: TF1(:,:), SF1(:,:)
+          type(t_partit), intent(inout), target :: partit
+          type(t_mesh)  , intent(in)   , target :: mesh
+       end subroutine compute_sigma_xy
+    end interface
+ end module compute_sigma_xy_interface
+
+ module compute_neutral_slope_interface
+    interface
+       subroutine compute_neutral_slope(partit, mesh)
+          USE MOD_PARTIT
+          USE MOD_PARSUP
+          USE MOD_MESH
+          USE o_param
+          USE o_arrays
+          implicit none
+          type(t_partit), intent(inout), target :: partit
+          type(t_mesh)  , intent(in)   , target :: mesh
+       end subroutine compute_neutral_slope
+    end interface
+ end module compute_neutral_slope_interface
+ 
+ module status_check_interface
+    interface
+       subroutine status_check(partit)
+          USE MOD_PARTIT
+          USE MOD_PARSUP
+          implicit none
+          type(t_partit), intent(inout), target :: partit
+       end subroutine status_check
+    end interface
+ end module status_check_interface
+
+ module mo_convect_interface
+    interface
+       subroutine mo_convect(ice, partit, mesh)
+          USE MOD_ICE
+          USE MOD_PARTIT
+          USE MOD_PARSUP
+          USE MOD_MESH
+          USE o_arrays
+          USE o_param
+          implicit none
+          type(t_ice),    intent(in),    target :: ice
+          type(t_partit), intent(inout), target :: partit
+          type(t_mesh),   intent(in),    target :: mesh
+       end subroutine mo_convect
+    end interface
+ end module mo_convect_interface
+
+ module oce_mixing_pp_interface
+    interface
+       subroutine oce_mixing_pp(dynamics, partit, mesh)
+          USE MOD_MESH
+          USE MOD_PARTIT
+          USE MOD_PARSUP
+          USE MOD_DYN
+          USE o_param
+          USE o_arrays
+          implicit none
+          type(t_dyn)   , intent(inout), target :: dynamics
+          type(t_partit), intent(inout), target :: partit
+          type(t_mesh)  , intent(in)   , target :: mesh
+       end subroutine oce_mixing_pp
+    end interface
+ end module oce_mixing_pp_interface
+
+ module viscosity_filter_interface
+    interface
+       subroutine viscosity_filter(option, dynamics, partit, mesh)
+          USE o_PARAM
+          USE MOD_MESH
+          USE MOD_PARTIT
+          USE MOD_PARSUP
+          USE MOD_DYN
+          implicit none
+          integer, intent(in)                 :: option
+          type(t_dyn)   , intent(inout), target :: dynamics
+          type(t_partit), intent(inout), target :: partit
+          type(t_mesh)  , intent(inout), target :: mesh
+       end subroutine viscosity_filter
+    end interface
+ end module viscosity_filter_interface
+
+ module update_vel_interface
+    interface
+       subroutine update_vel(dynamics, partit, mesh)
+          USE MOD_MESH
+          USE MOD_PARTIT
+          USE MOD_PARSUP
+          USE MOD_DYN
+          USE o_PARAM
+          USE g_CONFIG
+          USE g_comm_auto
+          IMPLICIT NONE
+          type(t_dyn)   , intent(inout), target :: dynamics
+          type(t_partit), intent(inout), target :: partit
+          type(t_mesh)  , intent(in)   , target :: mesh
+       end subroutine update_vel
+    end interface
+ end module update_vel_interface
+ 
+ module compute_thickness_zstar_interface
+    interface
+       subroutine compute_thickness_zstar(dynamics, partit, mesh)
+          USE MOD_PARTIT
+          USE MOD_PARSUP
+          USE MOD_MESH
+          USE MOD_DYN
+          USE g_comm_auto
+          IMPLICIT NONE
+          type(t_dyn)   , intent(inout), target :: dynamics
+          type(t_partit), intent(inout), target :: partit
+          ! Note the actual subroutine has "intent(inout)" for mesh:
+          type(t_mesh)  , intent(inout), target :: mesh
+       end subroutine compute_thickness_zstar
+    end interface
+ end module compute_thickness_zstar_interface
+
+ module compute_ke_wrho_interface
+    interface
+       subroutine compute_ke_wrho(dynamics, partit, mesh)
+          USE MOD_MESH
+          USE MOD_PARTIT
+          USE MOD_PARSUP
+          USE MOD_DYN
+          USE o_PARAM
+          USE g_CONFIG
+          USE g_comm_auto
+          USE o_ARRAYS
+          IMPLICIT NONE
+          type(t_dyn)   , intent(inout), target :: dynamics
+          type(t_partit), intent(inout), target :: partit
+          type(t_mesh)  , intent(in)   , target :: mesh
+       end subroutine compute_ke_wrho
+    end interface
+ end module compute_ke_wrho_interface
+
+ module compute_apegen_interface
+    interface
+       subroutine compute_apegen(dynamics, tracers, partit, mesh)
+          USE MOD_MESH
+          USE MOD_PARTIT
+          USE MOD_TRACER
+          USE MOD_PARSUP
+          USE MOD_DYN
+          USE o_PARAM
+          USE g_comm_auto
+          USE o_ARRAYS
+          IMPLICIT NONE
+          type(t_dyn)   , intent(inout), target :: dynamics
+          type(t_tracer), intent(in)   , target :: tracers
+          type(t_partit), intent(inout), target :: partit
+          type(t_mesh)  , intent(in)   , target :: mesh
+       end subroutine compute_apegen
+    end interface
+ end module compute_apegen_interface
+
+ module restart_thickness_ale_interface
+    interface
+       subroutine restart_thickness_ale(partit, mesh)
+          use o_PARAM
+          use MOD_MESH
+          USE MOD_PARTIT
+          USE MOD_PARSUP
+          use o_ARRAYS
+          use g_config,only: which_ale,lzstar_lev,min_hnode
+          implicit none
+          type(t_partit), intent(inout), target :: partit
+          type(t_mesh)  , intent(inout), target :: mesh
+       end subroutine restart_thickness_ale
+    end interface
+ end module restart_thickness_ale_interface
 
 
 ! CONTENT:
@@ -3340,6 +3559,19 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     use check_blowup_interface
     use fer_solve_interface
     use impl_vert_visc_ale_vtransp_interface
+    use check_viscopt_interface
+    use sw_alpha_beta_interface
+    use compute_sigma_xy_interface
+    use compute_neutral_slope_interface
+    use status_check_interface
+    use mo_convect_interface
+    use oce_mixing_pp_interface
+    use viscosity_filter_interface
+    use update_vel_interface
+    use compute_thickness_zstar_interface
+    use compute_ke_wrho_interface
+    use compute_apegen_interface
+
     
     IMPLICIT NONE
     integer       , intent(in)            :: n
