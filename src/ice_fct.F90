@@ -71,7 +71,7 @@ module ice_fct_interfaces
         type(t_mesh),   intent(in),    target :: mesh
         end subroutine
         
-        subroutine ice_fct_solve(ice, partit, mesh)
+        subroutine ice_fct_solve_interface(ice, partit, mesh)
             use mod_ice
             use mod_partit
             use mod_parsup
