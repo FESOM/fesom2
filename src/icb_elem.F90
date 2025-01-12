@@ -2,6 +2,7 @@ module iceberg_element
  use MOD_PARTIT
  USE MOD_MESH
  USE MOD_DYN
+ USE MOD_PARSUP
  use iceberg_params
  use iceberg_thermodynamics
  use iceberg_ocean_coupling
@@ -262,12 +263,12 @@ type(t_partit), intent(inout), target :: partit
   if( (x > maxlon) .OR. (x < minlon) ) then
     write(*,*) 'FEM_eval error: iceberg lon ', x, ' outside element!'
     write(*,*) 'maxlon:', maxlon, ' minlon:', minlon
-    call par_ex
+    call par_ex (partit%MPI_COMM_FESOM, partit%mype)
     stop
   else if( (y > maxlat) .OR. (y < minlat)) then
     write(*,*) 'FEM_eval error: iceberg lat', y, ' outside element!'
     write(*,*) 'maxlat:', maxlat, ' minlat:', minlat
-    call par_ex
+    call par_ex (partit%MPI_COMM_FESOM, partit%mype)
     stop
   else
     !everything okay
