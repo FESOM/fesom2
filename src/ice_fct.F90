@@ -82,7 +82,7 @@ module ice_fct_interfaces
             ! If you do *not* modify mesh, use intent(in).
             ! If you really do modify mesh, use intent(inout).
             type(t_mesh)  , intent(in)   , target :: mesh
-         end subroutine ice_fct_solve
+         end subroutine ice_fct_solve_interface
 
     end interface
 end module

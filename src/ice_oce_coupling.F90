@@ -30,7 +30,7 @@ module oce_fluxes_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine oce_fluxes
         
         subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
         USE MOD_ICE
@@ -42,7 +42,7 @@ module oce_fluxes_interface
         type(t_dyn)   , intent(in)   , target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine oce_fluxes_mom
 
         subroutine cal_shortwave_rad(ice, partit, mesh)
             USE MOD_ICE
@@ -279,7 +279,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     use g_support
     use cavity_interfaces
     USE o_PARAM
-    USE oce_fluxes_interface
+    ! USE oce_fluxes_interface
     
 #if defined (__icepack)
     use icedrv_main,   only: icepack_to_fesom,    &
