@@ -57,13 +57,12 @@ Change to the `fesom2` folder and execute:
 ::
 
     cd fesom2
-    git checkout refactoring
 
-As a good practice, if one wants to make modifications to the source code or any of the files, it is advisable to create a branch from refactoring:
+As a good practice, if one wants to make modifications to the source code or any of the files, it is advisable to create a branch from main:
 
 ::
 
-    git checkout -b <my branch> refactoring
+    git checkout -b <my branch> main
 
 After confirming that the right FESOM2 branch is being used, compile the model with:
 
@@ -477,7 +476,6 @@ The best way to run the model locally is to use Docker container. You obviously 
   ::
 
     cd fesom2
-    git checkout refactoring
     bash -l configure.sh ubuntu
 
 - To prepare the run (this will do the test with pi mesh)::
