@@ -1463,7 +1463,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
 
   REAL(kind=WP)                        :: bc_surface
   character(len=10)                    :: id_string
-!  real(kind=WP), dimension(:), pointer :: a_ice  !! MB: where is this needed?
+  real(kind=WP), dimension(:), pointer :: a_ice  !! MB: where is this needed?
 
   if (use_transit) then
 #if defined (__oasis)
