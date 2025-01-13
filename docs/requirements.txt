@@ -2,3 +2,4 @@ sphinx>=5.0
 sphinxcontrib-bibtex>=2.5
 sphinxcontrib-applehelp
 sphinx_rtd_theme
+sphinxfortran
