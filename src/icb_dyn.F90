@@ -1,6 +1,7 @@
 module iceberg_dynamics
  USE MOD_MESH
  use MOD_PARTIT
+ USE MOD_PARSUP
  use MOD_ICE
  USE MOD_DYN
  use iceberg_params
@@ -1167,7 +1168,7 @@ type(t_partit), intent(inout), target :: partit
 	
     if(dz < 1) then
       !write(*,*) 'z coord of up node', n_up, ':', coord_nod3D(3, n_up), 'z coord of low node', n_low, ':', coord_nod3D(3, n_low)
-      call par_ex
+      call par_ex (partit%MPI_COMM_FESOM, partit%mype)
       stop
     end if
 	
