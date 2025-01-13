@@ -33,7 +33,6 @@ release = "0.2"
 extensions = [
     "sphinx.ext.mathjax",
     "sphinxcontrib.bibtex",
-    "sphinxfortran.fortran_domain",
 ]
 bibtex_bibfiles = ["mybib_fesom2.bib"]
 
