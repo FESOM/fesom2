@@ -125,18 +125,24 @@ subroutine setup_model(partit)
 #endif
 
   if (use_transit) then
-! Transient tracer input, input file names have to be specified in
-! namelist.config, nml=run_config
-    if(partit%mype==0) print *, "Transient tracers are ON. Tracer input file: ", ifile_transit
-    open (20,file=ifile_transit)
-    if (anthro_transit .or. paleo_transit) then
-      call read_transit_input
+    if(partit%mype==0) print *, "Transient tracers are ON."
+    nmlfile = 'namelist.transit'  ! name of transient tracers namelist file
+    open (newunit=fileunit, file=nmlfile)
+    read (fileunit, nml=transit_param)
+    close (fileunit)
+    if (anthro_transit) then
+!     transient values of historical CO2, bomb radiocarbon, CFC-12, and SF6
+      if(partit%mype==0) print *, "Reading transient input values from file: ", ifile_transit
+      open (newunit=fileunit, file=ifile_transit)
+      call read_transit_input(fileunit)
+      close (fileunit)
+    elseif (paleo_transit) then
+!     transient values of atmospheric CO2 and radiocarbon reconstructions
+!     under construction / not yet realized
     else
-!     Spinup / equilibrium runs with constant tracer input,
-!     read parameter values from namelist.oce
-      read (20,nml=transit_param)
+!     Spinup / equilibrium runs with constant tracer input specified in namelist.transit
+      if(partit%mype==0) print *, "Reading constant input values from file: ", nmlfile
     end if
-    close (20)
   end if
 
   if(partit%mype==0) write(*,*) 'Namelist files are read in'

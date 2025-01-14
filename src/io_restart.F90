@@ -62,7 +62,7 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
   use nvfortran_subarray_workaround_module
 #endif
   integer, intent(in)       :: year
-  integer                   :: j
+  integer                   :: j, id
   character(500)            :: longname
   character(500)            :: trname, units
   character(4)              :: cyear
@@ -118,7 +118,8 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
   endif
   
   do j=1,tracers%num_tracers
-     SELECT CASE (j) 
+     id=tracers%data(j)%ID  !MB: Avoid hard-wired tracer assignments like SELECT CASE(j)
+     SELECT CASE (id) 
        CASE(1)
          trname='temp'
          longname='potential temperature'
@@ -130,6 +131,10 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
        CASE(6)
          trname='sf6'
          longname='sulfur hexafluoride'
+         units='mol / m**3'
+       CASE(11)
+         trname='cfc11'
+         longname='chlorofluorocarbon CFC-11'
          units='mol / m**3'
        CASE(12)
          trname='cfc12'
