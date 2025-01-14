@@ -244,7 +244,6 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
        write (unit=error_unit, fmt='(3A)') &
          '### error: can not open file ', file_name, &
          ', error: ' // trim(errmsg)
- !call MPI_Abort(MPI_COMM_FESOM, 1, ierror) # dont call abort here yet called bellow
      end if
      allocate(partit%part(npes+1))
      part=>partit%part
