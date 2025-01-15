@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.4)
 
 project(fesom_ini C Fortran)
+find_package(MPI REQUIRED)
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}/../src)
