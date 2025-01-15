@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.4)
 project(fesom_ini C Fortran)
 find_package(MPI REQUIRED)
 
+
+
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}/../src)
 set(sources_Fortran ${src_home}/MOD_MESH.F90 ${src_home}/oce_modules.F90 ${src_home}/gen_modules_config.F90 ${src_home}/gen_modules_partitioning.F90 ${src_home}/gen_modules_rotate_grid.F90 ${src_home}/fvom_init.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90 ${src_home}/MOD_READ_BINARY_ARRAYS.F90 ${src_home}/MOD_WRITE_BINARY_ARRAYS.F90 ${src_home}/MOD_PARTIT.F90)
@@ -27,5 +29,5 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
       target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
    endif()
 endif()
-target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C)
+target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C MPI::MPI_Fortran)
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
