@@ -562,11 +562,20 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     allocate(dynamics%uv(        2, nl-1, elem_size))
     allocate(dynamics%uv_rhs(    2, nl-1, elem_size))
     allocate(dynamics%uv_rhsAB(  dynamics%AB_order-1, 2, nl-1, elem_size))
+    if (dynamics%momadv_opt==1) then
+       allocate(dynamics%vel_grad_ux(nl-1, elem_size), dynamics%vel_grad_uy(nl-1, elem_size))
+       allocate(dynamics%vel_grad_vx(nl-1, elem_size), dynamics%vel_grad_vy(nl-1, elem_size))
+       dynamics%vel_grad_ux     = 0.0_WP
+       dynamics%vel_grad_uy     = 0.0_WP
+       dynamics%vel_grad_vx     = 0.0_WP
+       dynamics%vel_grad_vy     = 0.0_WP
+    end if
     allocate(dynamics%uvnode(    2, nl-1, node_size))
     dynamics%uv              = 0.0_WP
     dynamics%uv_rhs          = 0.0_WP
     dynamics%uv_rhsAB        = 0.0_WP
     dynamics%uvnode          = 0.0_WP
+    
     if (Fer_GM) then
         allocate(dynamics%fer_uv(2, nl-1, elem_size))
         dynamics%fer_uv      = 0.0_WP

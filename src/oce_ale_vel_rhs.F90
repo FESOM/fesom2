@@ -28,7 +28,37 @@ module momentum_adv_scalar_interface
         end subroutine
     end interface
 end module
-
+module momentum_adv_lin_upwind_interface
+    interface
+        subroutine momentum_adv_lin_upwind(dynamics, partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_DYN
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+        subroutine m_vert_adv_c_nodiv(dynamics, partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_DYN
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+        subroutine vel_gradients(dynamics, partit, mesh)
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_DYN
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine
+    end interface
+end module
 !
 !
 !_______________________________________________________________________________
@@ -47,6 +77,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     use g_sbf, only: l_mslp
     use momentum_adv_scalar_interface
     use momentum_adv_scalar_transpv_interface
+    use momentum_adv_lin_upwind_interface
     implicit none 
     type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -75,7 +106,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
 #include "associate_mesh_ass.h"
     UV        => dynamics%uv(:,:,:)
     UV_rhs    => dynamics%uv_rhs(:,:,:)
-    UV_rhsAB  => dynamics%uv_rhsAB(:,:,:,:)
+    UV_rhsAB  => dynamics%UV_rhsAB(:,:,:,:)
     eta_n     => dynamics%eta_n(:)
     m_ice     => ice%data(2)%values(:)
     m_snow    => ice%data(3)%values(:)
@@ -266,14 +297,36 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     ! advection --> add momentum advection to actual timerstep adams-bashfort 
     ! array UV_rhsAB
     if (dynamics%momadv_opt==1) then
-       if (mype==0) write(*,*) 'in moment not adapted mom_adv advection typ for ALE, check your namelist'
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       !still a lot of restrictions to me removed
+       if (dynamics%use_ssh_se_subcycl) then
+          if (mype==0) write(*,*) 'upwind reconstruction momentum advection momadv_opt==1 cannot yet be combined with the subsycling timestepping'
+          call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       end if
+       if (use_cavity) then
+          if (mype==0) write(*,*) 'upwind reconstruction momentum advection momadv_opt==1 cannot yet be combined with use_cavity=.TRUE.'
+          call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       end if
+       if (dynamics%ldiag_ke) then
+          if (mype==0) write(*,*) 'upwind reconstruction momentum advection momadv_opt==1 is not supported by energy diagnostic yet!'
+          call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+       end if
+       if (dynamics%use_wsplit) then
+          if (mype==0) write(*,*) 'upwind reconstruction momentum advection momadv_opt==1 cannot yet be combined with wsplit=.TRUE.'
+          call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)          
+       end if
+       !upwind reconstruction momentum advection
+       call vel_gradients(dynamics, partit, mesh)
+       call momentum_adv_lin_upwind(dynamics, partit, mesh)
+       call m_vert_adv_c_nodiv(dynamics, partit, mesh)
     elseif (dynamics%momadv_opt==2) then
         if (.not. dynamics%use_ssh_se_subcycl) then
-            call momentum_adv_scalar(dynamics, partit, mesh)
+           call momentum_adv_scalar(dynamics, partit, mesh)      
         else
-            call momentum_adv_scalar_transpv(dynamics, partit, mesh)
-        end if     
+           call momentum_adv_scalar_transpv(dynamics, partit, mesh)
+        end if
+    else
+        if (mype==0) write(*,*) 'Unknown option for momentum advection'
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     end if
     
     !___________________________________________________________________________
@@ -358,7 +411,7 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UV        =>dynamics%uv(:,:,:)
-    UV_rhsAB  =>dynamics%uv_rhsAB(:,:,:,:)
+    UV_rhsAB  =>dynamics%UV_rhsAB(:,:,:,:)
     UVnode_rhs=>dynamics%work%uvnode_rhs(:,:,:)
     Wvel_e    =>dynamics%w_e(:,:)
 
@@ -587,7 +640,290 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
     end if
 !$OMP END PARALLEL
 end subroutine momentum_adv_scalar
-
-
 ! ===================================================================
+SUBROUTINE momentum_adv_lin_upwind(dynamics, partit, mesh)
+! 
+! Linear reconstruction upwind horizontal momentum advection.
+! The scheme is due to Kobayashi et al, J. Comput. Phys., 1999.
+  USE MOD_MESH
+  USE MOD_PARTIT
+  USE MOD_PARSUP
+  use MOD_DYN
+  USE o_PARAM
+  use g_comm_auto
+  IMPLICIT NONE
+  type(t_dyn)   , intent(inout), target :: dynamics
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh)  , intent(in)   , target :: mesh
+
+  integer          :: ed, nodes(2), el(2), nz, nl1, nl2
+  real(kind=WP)    :: x1, y1, x2, y2, u1, u2, v1, v2
+  real(kind=WP)    :: un, xe, ye, uu, vv, num_ord
+  !___________________________________________________________________________
+  ! pointer on necessary derived types
+  real(kind=WP), dimension(:,:,:),   pointer :: UV
+  real(kind=WP), dimension(:,:,:,:), pointer :: UV_rhsAB
+  real(kind=WP), dimension(:,:)    , pointer :: Wvel
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+
+UV        =>dynamics%uv(:,:,:)
+UV_rhsAB  =>dynamics%UV_rhsAB(:,:,:,:)
+Wvel      =>dynamics%w_e(:,:)
+
+num_ord=0.75
+
+! ======================
+! Horizontal momentum advection   -\int div(uu)dS=-\sum u(un)l
+! (assembly over edges)        
+! ======================
+
+ DO ed=1, myDim_edge2D+eDim_edge2D  
+   if(myList_edge2D(ed)>edge2D_in) cycle   ! Only inner edges
+   
+   nodes=edges(:,ed)
+   el=edge_tri(:,ed)
+   nl1=nlevels(el(1))-1
+   nl2=nlevels(el(2))-1
+   
+   x1=-edge_cross_dxdy(1,ed)
+   y1=-edge_cross_dxdy(2,ed)
+   x2=-edge_cross_dxdy(3,ed)
+   y2=-edge_cross_dxdy(4,ed)
+   xe=edge_dxdy(1,ed)
+   ye=edge_dxdy(2,ed)
+   
+   DO nz=1, min(nl1,nl2)   ! Only faces that do not belong to
+                           ! vertical walls can contribute to
+			   ! the momentum advection 
+   !====== 
+   ! The piece below gives second order spatial accuracy for
+   ! the momentum fluxes. 
+   !======
+   
+   u1=UV(1,nz,el(1))+ dynamics%vel_grad_ux(nz,el(1))*x1+dynamics%vel_grad_uy(nz,el(1))*y1
+   v1=UV(2,nz,el(1))+ dynamics%vel_grad_vx(nz,el(1))*x1+dynamics%vel_grad_vy(nz,el(1))*y1
+   u2=UV(1,nz,el(2))+ dynamics%vel_grad_ux(nz,el(2))*x2+dynamics%vel_grad_uy(nz,el(2))*y2
+   v2=UV(2,nz,el(2))+ dynamics%vel_grad_vx(nz,el(2))*x2+dynamics%vel_grad_vy(nz,el(2))*y2
+   
+   !======
+   ! Normal velocity at edge ed directed to el(2)
+   ! (outer to el(1)) multiplied with the length of the edge
+   !======
+   un=0.5_WP*r_earth*((u1+u2)*ye-(v1*elem_cos(el(1))+v2*elem_cos(el(2)))*xe)
+   !======
+   ! If it is positive, take velocity in the left element (el(1)),
+   ! and use the velocity at el(2) otherwise.
+   !======  
+   uu=u1*(un+abs(un))+u2*(un-abs(un))
+   vv=v1*(un+abs(un))+v2*(un-abs(un))
+   uu=0.5*(uu*(1.0_WP-num_ord)+un*num_ord*(u1+u2))
+   vv=0.5*(vv*(1.0_WP-num_ord)+un*num_ord*(v1+v2))
+   
+   UV_rhsAB(1,1,nz,el(1))=UV_rhsAB(1,1,nz,el(1))-(uu-un*UV(1,nz,el(1)))
+   UV_rhsAB(1,2,nz,el(1))=UV_rhsAB(1,2,nz,el(1))-(vv-un*UV(2,nz,el(1)))
+   UV_rhsAB(1,1,nz,el(2))=UV_rhsAB(1,1,nz,el(2))+(uu-un*UV(1,nz,el(2)))
+   UV_rhsAB(1,2,nz,el(2))=UV_rhsAB(1,2,nz,el(2))+(vv-un*UV(2,nz,el(2)))
+ 
+   END DO
+ END DO
+END SUBROUTINE momentum_adv_lin_upwind
+! ==========================================================================
+SUBROUTINE m_vert_adv_c_nodiv(dynamics, partit, mesh)
+! 
+! Vertical momentum advection
+! 
+  USE MOD_MESH
+  USE MOD_PARTIT
+  USE MOD_PARSUP
+  use MOD_DYN
+  USE o_PARAM
+  use g_comm_auto
+  IMPLICIT NONE
+  type(t_dyn)   , intent(inout), target :: dynamics
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh)  , intent(in)   , target :: mesh
+  integer          :: elem, elnodes(3), nz, nl1 
+  real(kind=WP)    :: ff, w, uvertAB(2, mesh%nl)
+  !___________________________________________________________________________
+  ! pointer on necessary derived types
+  real(kind=WP), dimension(:,:,:),   pointer :: UV
+  real(kind=WP), dimension(:,:,:,:), pointer :: UV_rhsAB
+  real(kind=WP), dimension(:,:)    , pointer :: Wvel
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+UV        =>dynamics%uv(:,:,:)
+UV_rhsAB  =>dynamics%UV_rhsAB(:,:,:,:)
+Wvel      =>dynamics%w_e(:,:)
+
+! =======================
+! Vertical momentum advection 
+! and vertical viscosity
+! =======================
+ uvertAB=0.0_WP
+ DO elem=1, myDim_elem2D
+  elnodes=elem2D_nodes(:,elem)         
+  nl1= nlevels(elem)-1	  
+  ff=elem_area(elem)
+  ! ===========
+  ! Fluxes in the column
+  ! ===========
+  !w=sum(w_cv(:,elem)*Wvel(1,elnodes))*ff
+  uvertAB(1,1)= 0.0_8 !-w*UV(1,1,elem) 
+  uvertAB(2,1)= 0.0_8 !-w*UV(2,1,elem) 
+  ! ===========
+  ! no flux at the bottom
+  ! ===========
+  uvertAB(:,nl1+1)=0.	    
+  ! ===========
+  ! centered differences on levels 2 and nl1
+  ! ===========
+  DO nz=2, nl1
+   w=1.0_WP/6.0_WP*sum(Wvel(nz,elnodes))*ff !0.5*W
+   uvertAB(1,nz)= -w*(UV(1,nz-1,elem)-UV(1,nz,elem))      !/(Z(nz-1)-Z(nz)) 
+   uvertAB(2,nz)= -w*(UV(2,nz-1,elem)-UV(2,nz,elem))      !/(Z(nz-1)-Z(nz)) 
+  END DO
+  DO nz=1,nl1
+    UV_rhsAB(1,1,nz,elem)=UV_rhsAB(1,1,nz,elem)+(uvertAB(1,nz)+uvertAB(1,nz+1))/helem(nz,elem)!(zbar(nz)-zbar(nz+1)) 
+    UV_rhsAB(1,2,nz,elem)=UV_rhsAB(1,2,nz,elem)+(uvertAB(2,nz)+uvertAB(2,nz+1))/helem(nz,elem)!(zbar(nz)-zbar(nz+1))
+  END DO
+END DO
+
+END SUBROUTINE m_vert_adv_c_nodiv
+!===========================================================================
+SUBROUTINE vel_gradients(dynamics, partit, mesh)
+! Compute derivatives of velocity by least square interpolation.
+! The interpolation coefficients are already saved
+! For the no-slip case, it is assumed that velocity at 
+! the boundary edge == 0. For the free-slip case, there are only 2
+! neighbours
+  USE MOD_MESH
+  USE MOD_PARTIT
+  USE MOD_PARSUP
+  use MOD_DYN
+  USE o_PARAM
+  use g_comm_auto
+  IMPLICIT NONE
+  type(t_dyn)   , intent(inout), target :: dynamics
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh)  , intent(in)   , target :: mesh
+
+  real(kind=WP)    ::  u, v
+  real(kind=WP)    :: zc(2), un, grad_aux(4,mesh%nl)
+  real(kind=WP)    :: u_aux(mesh%nl), v_aux(mesh%nl)
+  integer          :: elem, el, j, nz
+  !___________________________________________________________________________
+  ! pointer on necessary derived types
+  real(kind=WP), dimension(:,:,:),   pointer :: UV
+  real(kind=WP), dimension(:,:)    , pointer :: Wvel
+  logical                                    :: free_slip=.false.
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+UV        =>dynamics%uv(:,:,:)
+Wvel      =>dynamics%w_e(:,:)
+
+   DO elem=1, myDim_elem2D 
+      grad_aux=0.0_WP
+      DO j=1,3
+	  el=elem_neighbors(j,elem)
+      
+	  if (el>0) then
+	     ! ======================
+	     ! fill in virtual values in the velocity array
+	     ! ======================
+	     if(nlevels(el)<nlevels(elem)) then
+	         DO nz=1, nlevels(el)-1
+		 u_aux(nz)=UV(1,nz,el)
+		 v_aux(nz)=UV(2,nz,el)
+		 END DO
+	       if(free_slip) then
+		 zc=edge_dxdy(:,elem_edges(j,elem))
+		 zc(1)=zc(1)*elem_cos(elem)
+	    	 DO nz=nlevels(el),nlevels(elem)-1
+		        un=-2*(UV(1,nz,elem)*zc(2)-UV(2,nz,elem)*zc(1))/sum(zc*zc)
+                        u_aux(nz)=UV(1,nz,elem)+un*zc(2)
+                        v_aux(nz)=UV(2,nz,elem)-un*zc(1)
+		 END DO
+                else     ! noslip
+		 DO nz=nlevels(el),nlevels(elem)-1
+		        u_aux(nz)=-UV(1,nz,elem)
+			v_aux(nz)=-UV(2,nz,elem)     
+		 END DO
+		end if 
+	     else
+	         DO nz=1, nlevels(elem)-1
+		 u_aux(nz)=UV(1,nz,el)
+		 v_aux(nz)=UV(2,nz,el)
+		 END DO
+	     end if  
+		! ======================
+		! Filling in velocity gradients:
+		! ======================
+	     DO nz=1, nlevels(elem)-1
+		u=u_aux(nz)-UV(1,nz,elem)
+                v=v_aux(nz)-UV(2,nz,elem)
+         	grad_aux(1,nz)=grad_aux(1,nz)+gradient_vec(j,elem)*u
+		grad_aux(2,nz)=grad_aux(2,nz)+gradient_vec(j+3,elem)*u
+		grad_aux(3,nz)=grad_aux(3,nz)+gradient_vec(j,elem)*v
+		grad_aux(4,nz)=grad_aux(4,nz)+gradient_vec(j+3,elem)*v
+	     END DO
+	  else
+	  
+	  ! ===============
+	  ! Boundary element
+	  ! ===============
+	  !    (Here we do not have place for virtual velocities
+	  !     in the velocity array so we use auxiliary array)
+	  ! ======================
+	     if(free_slip) then
+	       zc=edge_dxdy(:,elem_edges(j,elem))
+	       zc(1)=zc(1)*elem_cos(elem)
+	       DO nz=1,nlevels(elem)-1
+		  un=-2*(UV(1,nz,elem)*zc(2)-UV(2,nz,elem)*zc(1))/sum(zc*zc)
+                  u_aux(nz)=UV(1,nz,elem)+un*zc(2)
+                  v_aux(nz)=UV(2,nz,elem)-un*zc(1)
+	       END DO
+             else     ! noslip
+	       DO nz=1,nlevels(elem)-1
+		  u_aux(nz)=-UV(1,nz,elem)
+		  v_aux(nz)=-UV(2,nz,elem)     
+	       END DO
+	     end if 
+		 ! ======================
+		 ! Filling in velocity gradients:
+		 ! ======================
+	     DO nz=1, nlevels(elem)-1
+		u=u_aux(nz)-UV(1,nz,elem)
+                v=v_aux(nz)-UV(2,nz,elem)
+         	grad_aux(1,nz)=grad_aux(1,nz)+gradient_vec(j,elem)*u
+		grad_aux(2,nz)=grad_aux(2,nz)+gradient_vec(j+3,elem)*u
+		grad_aux(3,nz)=grad_aux(3,nz)+gradient_vec(j,elem)*v
+		grad_aux(4,nz)=grad_aux(4,nz)+gradient_vec(j+3,elem)*v
+	     END DO
+	   end if
+	  end do   ! cycle over neighbor elements
+ 	 dynamics%vel_grad_ux(1:nlevels(elem)-1,elem)=grad_aux(1,1:nlevels(elem)-1)
+	 dynamics%vel_grad_uy(1:nlevels(elem)-1,elem)=grad_aux(2,1:nlevels(elem)-1)
+	 dynamics%vel_grad_vx(1:nlevels(elem)-1,elem)=grad_aux(3,1:nlevels(elem)-1)
+	 dynamics%vel_grad_vy(1:nlevels(elem)-1,elem)=grad_aux(4,1:nlevels(elem)-1)
+  END DO	  
+ call exchange_elem(dynamics%vel_grad_ux, partit)
+ call exchange_elem(dynamics%vel_grad_uy, partit)
+ call exchange_elem(dynamics%vel_grad_vx, partit)
+ call exchange_elem(dynamics%vel_grad_vy, partit)
+
+END SUBROUTINE vel_gradients
+!===========================================================================
 
