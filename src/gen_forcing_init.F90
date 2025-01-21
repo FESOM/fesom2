@@ -10,6 +10,22 @@ module forcing_array_setup_interfaces
   end interface
 end module
 
+module forcing_setup_interface
+  interface
+     subroutine forcing_setup(partit, mesh)
+        use g_CONFIG
+        use g_sbf, only: sbc_ini
+        use mod_mesh
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use forcing_array_setup_interfaces
+        implicit none
+        type(t_mesh),   intent(in)    :: mesh
+        type(t_partit), intent(inout), target :: partit
+     end subroutine forcing_setup
+  end interface
+end module forcing_setup_interface
+
 ! Adapted from FESOM code by Q. Wang. 
 ! Added the driving routine forcing_setup.
 ! S.D 05.04.12

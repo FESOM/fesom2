@@ -788,6 +788,23 @@ end subroutine ice_init
 !
 !_______________________________________________________________________________
 ! initialise derived type for sea ice
+
+module ice_init_toyocean_dummy_interface
+    interface
+       subroutine ice_init_toyocean_dummy(ice, partit, mesh)
+          USE MOD_ICE
+          USE MOD_PARTIT
+          USE MOD_PARSUP
+          USE MOD_MESH
+          USE o_param, only: WP
+          implicit none
+          type(t_ice)   , intent(inout), target :: ice
+          type(t_partit), intent(inout), target :: partit
+          type(t_mesh)  , intent(in)   , target :: mesh
+       end subroutine ice_init_toyocean_dummy
+    end interface
+ end module ice_init_toyocean_dummy_interface
+
 subroutine ice_init_toyocean_dummy(ice, partit, mesh)
     USE MOD_ICE
     USE MOD_PARTIT

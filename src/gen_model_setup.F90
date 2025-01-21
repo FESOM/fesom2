@@ -1,3 +1,41 @@
+module setup_model_interface
+  interface
+     subroutine setup_model(partit)
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use o_param
+        use g_forcing_param
+        use g_config
+        use diagnostics, only: ldiag_solver, lcurt_stress_surf, ldiag_Ri, &
+                               ldiag_TurbFlux, ldiag_trflx, ldiag_dMOC, &
+                               ldiag_DVD, diag_list
+        use g_clock,     only: timenew, daynew, yearnew
+        use g_ic3d
+#ifdef __recom
+        use recom_config
+        use recom_ciso
+#endif
+        use mod_transit
+        implicit none
+        type(t_partit), intent(inout), target :: partit
+     end subroutine setup_model
+  end interface
+end module setup_model_interface
+
+module get_run_steps_interface
+  interface
+     subroutine get_run_steps(nsteps, partit)
+        use g_clock
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        implicit none
+        integer,        intent(inout) :: nsteps
+        type(t_partit), intent(inout) :: partit
+     end subroutine get_run_steps
+  end interface
+end module get_run_steps_interface
+
+
 ! ==============================================================
 subroutine setup_model(partit)
   USE MOD_PARTIT

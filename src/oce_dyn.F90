@@ -66,6 +66,23 @@ module check_validviscopt_interface
     end interface
 end module 
 
+module compute_vel_nodes_interface
+    interface
+       subroutine compute_vel_nodes(dynamics, partit, mesh)
+          USE MOD_MESH
+          USE MOD_PARTIT
+          USE MOD_PARSUP
+          USE MOD_DYN
+          USE o_PARAM
+          use g_comm_auto
+          implicit none
+          type(t_dyn)   , intent(inout), target :: dynamics
+          type(t_partit), intent(inout), target :: partit
+          type(t_mesh)  , intent(in)   , target :: mesh
+       end subroutine compute_vel_nodes
+    end interface
+ end module compute_vel_nodes_interface
+ 
 ! 
 ! Contains routines needed for computations of dynamics.
 ! includes: update_vel, compute_vel_nodes
@@ -241,7 +258,7 @@ subroutine viscosity_filter(option, dynamics, partit, mesh)
     integer                               :: option
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
-    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_mesh)  , intent(inout)   , target :: mesh
     
     ! Driving routine 
     ! Background viscosity is selected in terms of Vl, where V is 

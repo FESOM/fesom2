@@ -34,7 +34,7 @@ module g_backscatter
     subroutine init_backscatter(partit, mesh)
         implicit none 
         integer                               :: elem_size
-        type(t_mesh),   intent(in),    target :: mesh
+        type(t_mesh),   intent(inout),    target :: mesh
         type(t_partit), intent(inout), target :: partit
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -82,7 +82,7 @@ module g_backscatter
         real(kind=WP)  , allocatable  :: uuu(:)
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
+        type(t_mesh)  , intent(inout)   , target :: mesh
         real(kind=WP) , dimension(:,:,:), pointer :: UV, UV_rhs
         real(kind=WP) , dimension(:,:)  , pointer :: U_c, V_c
 #include "associate_part_def.h"
@@ -248,6 +248,7 @@ module g_backscatter
     !
     !_______________________________________________________________________________
     subroutine uke_update(dynamics, partit, mesh)
+        use elem_center_interface
         IMPLICIT NONE
 
         !I had to change uke(:) to uke(:,:) to make output and restart work!!
@@ -255,7 +256,7 @@ module g_backscatter
         !integer, intent(in)        :: t_levels
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
+        type(t_mesh)  , intent(inout), target :: mesh
 
         real(kind=WP)     :: hall, h1_eta, hnz, vol
         integer           :: elnodes(3), nz, ed, edi, node, j, elem, q
@@ -362,7 +363,7 @@ module g_backscatter
                 !Taking out that one place where it is always weird (Pacific Southern Ocean)
                 !Should not really be used later on, once we fix the issue with the 1/4 degree grid
                 if(.not. (TRIM(which_toy)=="soufflet")) then
-                call elem_center(ed, ex, ey)
+                call elem_center(ed, ex, ey, mesh)
                 !a1=-104.*rad
                 !a2=-49.*rad
                 call g2r(-104.*rad, -49.*rad, a1, a2)
