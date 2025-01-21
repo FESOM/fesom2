@@ -1,6 +1,7 @@
 module iceberg_dynamics
  USE MOD_MESH
  use MOD_PARTIT
+ USE MOD_PARSUP
  use MOD_ICE
  USE MOD_DYN
  use iceberg_params
@@ -159,7 +160,7 @@ arr_S_ave_ib = 0.0
  !========================THERMODYNAMICS============================
  if(l_melt) then
   call FEM_eval(mesh, partit, sst_ib,sss_ib,lon,lat,Tsurf_ib,Ssurf_ib,iceberg_elem)
- 
+
   call iceberg_meltrates(partit, mesh, M_b, M_v, M_e, M_bv, &
 				u_ib,v_ib, arr_uo_ib,arr_vo_ib, ua_ib,va_ib, &
 				sst_ib, length_ib, conci_ib, &
@@ -1167,7 +1168,7 @@ type(t_partit), intent(inout), target :: partit
 	
     if(dz < 1) then
       !write(*,*) 'z coord of up node', n_up, ':', coord_nod3D(3, n_up), 'z coord of low node', n_low, ':', coord_nod3D(3, n_low)
-      call par_ex
+      call par_ex (partit%MPI_COMM_FESOM, partit%mype)
       stop
     end if
 	

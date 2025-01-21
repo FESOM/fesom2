@@ -97,7 +97,9 @@ save
   real,dimension(:), allocatable:: fwe_flux_ib, fwl_flux_ib, fwb_flux_ib, fwbv_flux_ib
   real,dimension(:), allocatable:: hfe_flux_ib, hfb_flux_ib, lhfb_flux_ib
   real,dimension(:,:), allocatable:: hfl_flux_ib, hfbv_flux_ib
-  
+  real,dimension(:), allocatable:: wave_erosion_potential
+  logical,dimension(:), allocatable:: linit_wave_erosion_pot
+
   !===== FRESHWATER AND HEAT ARRAYS ON FESOM GRID =====
   real,dimension(:), allocatable:: ibhf    !icb heat flux into ocean 
   real(kind=WP),dimension(:,:), allocatable:: ibhf_n    !icb heat flux into ocean
