@@ -64,7 +64,7 @@ end subroutine write1d_char
 
 subroutine write1d_int_static(arr, unit, iostat, iomsg)
     IMPLICIT NONE
-    integer,       intent(in)               :: arr(:) 
+    integer,       intent(in)               :: arr(:)
     integer,       intent(in)               :: unit
     integer,       intent(out)              :: iostat
     character(*),  intent(inout)            :: iomsg
@@ -157,4 +157,3 @@ subroutine write3d_int(arr, unit, iostat, iomsg)
 end subroutine write3d_int
 end module MOD_WRITE_BINARY_ARRAYS
 !==========================================================
-

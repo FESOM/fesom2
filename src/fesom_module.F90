@@ -58,6 +58,7 @@ module fesom_main_storage_module
     integer           :: n, from_nstep, offset, row, i, provided
     integer           :: which_readr ! read which restart files (0=netcdf, 1=core dump,2=dtype)
     integer, pointer  :: mype, npes, MPIerr, MPI_COMM_FESOM, MPI_COMM_FESOM_IB
+    integer           :: total_nsteps
     real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
     real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
     real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing 
@@ -155,6 +156,7 @@ contains
         call setup_model(f%partit)  ! Read Namelists, always before clock_init
         call clock_init(f%partit)   ! read the clock file 
         call get_run_steps(fesom_total_nsteps, f%partit)
+        f%total_nsteps=fesom_total_nsteps
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call mesh_setup'//achar(27)//'[0m'
         call mesh_setup(f%partit, f%mesh)
 
@@ -254,7 +256,7 @@ contains
         call clock_newyear                        ! check if it is a new year
         if (f%mype==0) f%t6=MPI_Wtime()
         !___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
-        call restart(0, r_restart, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        call restart(0, 0, 0, r_restart, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         if (f%mype==0) f%t7=MPI_Wtime()
         ! store grid information into netcdf file
         if (.not. r_restart) call write_mesh_info(f%partit, f%mesh)
@@ -337,7 +339,7 @@ contains
     use fesom_main_storage_module
     integer, intent(in) :: current_nsteps 
     ! EO parameters
-    integer n
+    integer n, nstart, ntotal
 
     !=====================
     ! Time stepping
@@ -368,68 +370,10 @@ contains
     if (use_global_tides) then
        call foreph_ini(yearnew, month, f%partit)
     end if
-    do n=f%from_nstep, f%from_nstep-1+current_nsteps        
-
-        
-        
-        
-        
-        
-        
-        
-        
-if (use_icebergs) then
-        !n_ib         = n
-        u_wind_ib    = u_wind
-        v_wind_ib    = v_wind
-        f%ice%uice_ib     = f%ice%uice
-        f%ice%vice_ib     = f%ice%vice
-
-! LA - this causes the blowup !
-!        f%ice%data(size(f%ice%data))      = f%ice%data(2)
-!        f%ice%data(size(f%ice%data)-1)    = f%ice%data(1)
-!!!!!!!!!!!!!!!!!!
-
-
-! kh 08.03.21 support of different ocean ice and iceberg steps:
-! if steps_per_ib_step is configured greater 1 then UV is modified via call oce_timestep_ale(n) -> call update_vel while
-! the same asynchronous iceberg computation is still active
-        f%dynamics%uv_ib     = f%dynamics%uv
-
-! kh 15.03.21 support of different ocean ice and iceberg steps:
-! if steps_per_ib_step is configured greater 1 then tr_arr is modified via call oce_timestep_ale(n) -> call solve_tracers_ale() while
-! the same asynchronous iceberg computation is still active
-        !tr_arr_ib    = tr_arr
-        Tclim_ib     = f%tracers%data(1)%values
-        Sclim_ib     = f%tracers%data(2)%values
-
-! kh 15.03.21 support of different ocean ice and iceberg steps:
-! if steps_per_ib_step is configured greater 1 then Tsurf and Ssurf might be changed while
-! the same asynchronous iceberg computation is still active
-        Tsurf_ib     = Tsurf
-        Ssurf_ib     = Ssurf
-
-! kh 18.03.21 support of different ocean ice and iceberg steps:
-! if steps_per_ib_step is configured greater 1 then zbar_3d_n and eta_n might be changed while
-! the same asynchronous iceberg computation is still active
-        !zbar_3d_n_ib = zbar_3d_n
-        f%mesh%Z_3d_n_ib     = f%mesh%Z_3d_n
-        f%dynamics%eta_n_ib  = f%dynamics%eta_n
-
-! kh 16.03.21 not modified during overlapping ocean/ice and iceberg computations
-!       coriolis_ib      = coriolis
-!       coriolis_node_ib = coriolis_node
-
-! kh 02.02.21 check iceberg computations mode:
-! ib_async_mode == 0: original sequential behavior for both ice sections (for testing purposes, creating reference results etc.)
-! ib_async_mode == 1: OpenMP code active to overlapped computations in first (ocean ice) and second (icebergs) parallel section
-! ib_async_mode == 2: OpenMP code active, but computations still serialized via spinlock (for testing purposes)
-
-! -----------------------------------------------------------------------------------
-! LA asyncronous coupling not included in this FESOM version, yet!!
-! 
-end if        
-        
+    nstart=f%from_nstep
+    ntotal=f%from_nstep-1+current_nsteps
+    !do n=f%from_nstep, f%from_nstep-1+current_nsteps
+    do n=nstart, ntotal
         if (use_global_tides) then
            call foreph(f%partit, f%mesh)
         end if
@@ -521,7 +465,7 @@ end if
         !--------------------------
 
         f%t5 = MPI_Wtime()
-        call restart(n, .false., f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        call restart(n, nstart, f%total_nsteps, .false., f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         f%t6 = MPI_Wtime()
         
         f%rtime_fullice       = f%rtime_fullice       + f%t2 - f%t1

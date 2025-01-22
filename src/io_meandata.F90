@@ -551,6 +551,7 @@ CASE ('dMOC      ')
        call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'std_frwt_flux',  'FW bouyancy flux      ', 'kg*m/s' ,std_dens_flux(3,:,:),   1, 'y', i_real4, partit, mesh)
        call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'std_dens_dVdT',  'dV/dT',                  'm3/s'   ,std_dens_dVdT(:,:),     1, 'y', i_real4, partit, mesh)
        call def_stream((/std_dens_N, nod2D /),  (/std_dens_N,  myDim_nod2D/), 'std_dens_DIV',   'm3/s',                   'm3/s'   ,std_dens_DIV(:,:),      1, 'y', i_real4, partit, mesh)
+       if (Fer_GM) call def_stream((/std_dens_N, nod2D /),  (/std_dens_N,  myDim_nod2D/), 'std_dens_DIVbolus',   'm3/s',                   'm3/s'   ,std_dens_DIV_fer(:,:),  1, 'y', i_real4, partit, mesh)
        call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'std_dens_Z',     'm',                      'm'      ,std_dens_Z(:,:),        1, 'y', i_real4, partit, mesh)
        call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'std_dens_H'    , 'density thickness'     , 'm'     , std_dens_H(:,:),        1, 'y', i_real4, partit, mesh)
        call def_stream((/nl-1,       nod2D /),  (/nl-1,       myDim_nod2D /), 'density_dMOC',   'density'               , 'm',      density_dmoc(:,:),      1, 'y', i_real4, partit, mesh)
@@ -1038,6 +1039,8 @@ subroutine write_mean(entry, entry_index)
         ! allocate global 2d array in which local data are gathered
         if(entry%p_partit%mype==entry%root_rank) then
             if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(size2))
+        else
+            if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(1))
         end if
         
         !_______________________________________________________________________
@@ -1078,6 +1081,8 @@ subroutine write_mean(entry, entry_index)
         ! allocate global 2d array in which local data are gathered
         if(entry%p_partit%mype==entry%root_rank) then
             if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(size2))
+        else
+            if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(1))
         end if
         
         !_______________________________________________________________________

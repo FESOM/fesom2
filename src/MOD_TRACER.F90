@@ -18,13 +18,8 @@ real(kind=WP)                               :: tra_adv_pv  = 1.  ! a parameter t
 integer                                     :: ID
 
 contains
-#if defined(__PGI)
-private
-#endif        
 procedure WRITE_T_TRACER_DATA
 procedure READ_T_TRACER_DATA
-generic :: write(unformatted) => WRITE_T_TRACER_DATA
-generic :: read(unformatted)  => READ_T_TRACER_DATA
 END TYPE T_TRACER_DATA
 
 
@@ -48,13 +43,8 @@ integer,allocatable,dimension(:,:)            :: edge_up_dn_tri
 real(kind=WP),allocatable,dimension(:,:,:)    :: edge_up_dn_grad
 
 contains
-#if defined(__PGI)
-private
-#endif        
 procedure WRITE_T_TRACER_WORK
 procedure READ_T_TRACER_WORK
-generic :: write(unformatted) => WRITE_T_TRACER_WORK
-generic :: read(unformatted)  => READ_T_TRACER_WORK
 END TYPE T_TRACER_WORK
 
 ! auxury type for reading namelist.tra
@@ -84,10 +74,12 @@ type(t_tracer_work)                         :: work
 
 contains
 #if defined(__PGI)
-private
-#endif        
+procedure, private WRITE_T_TRACER
+procedure, private READ_T_TRACER
+#else
 procedure WRITE_T_TRACER
 procedure READ_T_TRACER
+#endif
 generic :: write(unformatted) => WRITE_T_TRACER
 generic :: read(unformatted)  => READ_T_TRACER
 END TYPE T_TRACER
@@ -95,12 +87,12 @@ END TYPE T_TRACER
 contains
 
 ! Unformatted writing for T_TRACER_DATA
-subroutine WRITE_T_TRACER_DATA(tdata, unit, iostat, iomsg)
+subroutine WRITE_T_TRACER_DATA(tdata, unit)
     IMPLICIT NONE
     class(T_TRACER_DATA), intent(in)     :: tdata
     integer,              intent(in)     :: unit
-    integer,              intent(out)    :: iostat
-    character(*),         intent(inout)  :: iomsg
+    integer                              :: iostat
+    character(len=1024)                  :: iomsg
 
     call write_bin_array(tdata%values,   unit, iostat, iomsg)
     call write_bin_array(tdata%valuesAB, unit, iostat, iomsg)
@@ -118,12 +110,12 @@ subroutine WRITE_T_TRACER_DATA(tdata, unit, iostat, iomsg)
 end subroutine WRITE_T_TRACER_DATA
 
 ! Unformatted reading for T_TRACER_DATA
-subroutine READ_T_TRACER_DATA(tdata, unit, iostat, iomsg)
+subroutine READ_T_TRACER_DATA(tdata, unit)
     IMPLICIT NONE
     class(T_TRACER_DATA), intent(inout)  :: tdata
     integer,              intent(in)     :: unit
-    integer,              intent(out)    :: iostat
-    character(*),         intent(inout)  :: iomsg
+    integer                              :: iostat
+    character(len=1024)                  :: iomsg
 
     call read_bin_array(tdata%values,   unit, iostat, iomsg)
     call read_bin_array(tdata%valuesAB, unit, iostat, iomsg)
@@ -141,12 +133,12 @@ subroutine READ_T_TRACER_DATA(tdata, unit, iostat, iomsg)
 end subroutine READ_T_TRACER_DATA
 
 ! Unformatted writing for T_TRACER_WORK
-subroutine WRITE_T_TRACER_WORK(twork, unit, iostat, iomsg)
+subroutine WRITE_T_TRACER_WORK(twork, unit)
     IMPLICIT NONE
     class(T_TRACER_WORK), intent(in)     :: twork
     integer,              intent(in)     :: unit
-    integer,              intent(out)    :: iostat
-    character(*),         intent(inout)  :: iomsg
+    integer                              :: iostat
+    character(len=1024)                  :: iomsg
 
     call write_bin_array(twork%del_ttf,          unit, iostat, iomsg)
     call write_bin_array(twork%del_ttf_advhoriz, unit, iostat, iomsg)
@@ -166,12 +158,12 @@ subroutine WRITE_T_TRACER_WORK(twork, unit, iostat, iomsg)
 end subroutine WRITE_T_TRACER_WORK
 
 ! Unformatted reading for T_TRACER_WORK
-subroutine READ_T_TRACER_WORK(twork, unit, iostat, iomsg)
+subroutine READ_T_TRACER_WORK(twork, unit)
     IMPLICIT NONE
     class(T_TRACER_WORK), intent(inout)  :: twork
     integer,              intent(in)     :: unit
-    integer,              intent(out)    :: iostat
-    character(*),         intent(inout)  :: iomsg
+    integer                              :: iostat
+    character(len=1024)                  :: iomsg
 
     call read_bin_array(twork%del_ttf,          unit, iostat, iomsg)
     call read_bin_array(twork%del_ttf_advhoriz, unit, iostat, iomsg)
@@ -201,9 +193,9 @@ subroutine WRITE_T_TRACER(tracer, unit, iostat, iomsg)
 
     write(unit, iostat=iostat, iomsg=iomsg) tracer%num_tracers
     do i=1, tracer%num_tracers
-       write(unit, iostat=iostat, iomsg=iomsg) tracer%data(i)
+        call tracer%data(i)%WRITE_T_TRACER_DATA(unit)
     end do
-    write(unit, iostat=iostat, iomsg=iomsg)    tracer%work
+    call tracer%work%WRITE_T_TRACER_WORK(unit)
 !   write(unit, iostat=iostat, iomsg=iomsg)    tracer%smooth_bh_tra
 !   write(unit, iostat=iostat, iomsg=iomsg)    tracer%gamma0_tra
 !   write(unit, iostat=iostat, iomsg=iomsg)    tracer%gamma1_tra
@@ -224,10 +216,10 @@ subroutine READ_T_TRACER(tracer, unit, iostat, iomsg)
 !   write(*,*) 'number of tracers to read: ', tracer%num_tracers
     if (.not. allocated(tracer%data)) allocate(tracer%data(tracer%num_tracers))
     do i=1, tracer%num_tracers
-       read(unit, iostat=iostat, iomsg=iomsg) tracer%data(i)
+       call tracer%data(i)%READ_T_TRACER_DATA(unit)
 !      write(*,*) 'tracer info:', tracer%data(i)%ID, TRIM(tracer%data(i)%tra_adv_hor), TRIM(tracer%data(i)%tra_adv_ver), TRIM(tracer%data(i)%tra_adv_lim)
     end do
-    read(unit, iostat=iostat, iomsg=iomsg)    tracer%work
+    call tracer%work%READ_T_TRACER_WORK(unit)
 !   read(unit, iostat=iostat, iomsg=iomsg)    tracer%smooth_bh_tra
 !   read(unit, iostat=iostat, iomsg=iomsg)    tracer%gamma0_tra
 !   read(unit, iostat=iostat, iomsg=iomsg)    tracer%gamma1_tra
@@ -236,4 +228,3 @@ subroutine READ_T_TRACER(tracer, unit, iostat, iomsg)
 end subroutine READ_T_TRACER
 end module MOD_TRACER
 !==========================================================
-

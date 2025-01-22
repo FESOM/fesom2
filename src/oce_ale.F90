@@ -2998,7 +2998,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     else  
         call pressure_force_4_zxxxx(tracers, partit, mesh)
     end if
-
+    
+    !___________________________________________________________________________
+    ! check validity of visc_opt=5 selection
+    ! --> need to know buoyancy frequency to do so.
+    ! --> only check on the first timestep 
+    if (n==1) call check_viscopt(dynamics, partit, mesh)
+    
     !___________________________________________________________________________
     ! calculate alpha and beta
     ! it will be used for KPP, Redi, GM etc. Shall we keep it on in general case?

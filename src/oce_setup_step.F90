@@ -261,6 +261,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
         write(*,*) 'maximum allowed CDF on explicit W is set to: ', dynamics%wsplit_maxcfl
         write(*,*) '******************************************************************************'
     end if
+
 end subroutine ocean_setup
 !
 !
@@ -436,8 +437,9 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     logical        :: use_freeslip =.false.
     logical        :: use_wsplit   =.false.
     logical        :: ldiag_KE     =.false.
+    logical        :: check_opt_visc=.true.
     real(kind=WP)  :: wsplit_maxcfl
-    namelist /dynamics_visc   / opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
+    namelist /dynamics_visc   / opt_visc, check_opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
                                 use_ivertvisc, visc_easybsreturn
     namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, ldiag_KE
     !___________________________________________________________________________
@@ -464,6 +466,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! set parameters in derived type
     dynamics%opt_visc          = opt_visc
+    dynamics%check_opt_visc    = check_opt_visc
     dynamics%visc_gamma0       = visc_gamma0
     dynamics%visc_gamma1       = visc_gamma1
     dynamics%visc_gamma2       = visc_gamma2

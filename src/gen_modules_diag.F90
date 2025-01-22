@@ -20,7 +20,7 @@ module diagnostics
             ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, ldiag_vorticity, ldiag_extflds,    &
             compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, shear, Ri, KvdTdZ, KvdSdZ,   & 
             std_dens_min, std_dens_max, std_dens_N, std_dens,                                        &
-            std_dens_UVDZ, std_dens_DIV, std_dens_Z, std_dens_H, std_dens_dVdT, std_dens_flux,       &
+            std_dens_UVDZ, std_dens_DIV, std_dens_DIV_fer, std_dens_Z, std_dens_H, std_dens_dVdT, std_dens_flux,       &
             dens_flux_e, vorticity, zisotherm, tempzavg, saltzavg, compute_diag_dvd_2ndmoment_klingbeil_etal_2014,       &
             compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd, thetao
   ! Arrays used for diagnostics, some shall be accessible to the I/O
@@ -52,7 +52,7 @@ module diagnostics
                                                             37.11979, 37.13630, 37.15257, 37.16861, 37.18441, 37.50000, 37.75000, 40.00000/)
   real(kind=WP),  save, target                   :: std_dd(std_dens_N-1)
   real(kind=WP),  save, target                   :: std_dens_min=1030., std_dens_max=1040.
-  real(kind=WP),  save, allocatable, target      :: std_dens_UVDZ(:,:,:), std_dens_flux(:,:,:), std_dens_dVdT(:,:), std_dens_DIV(:,:), std_dens_Z(:,:), std_dens_H(:,:)
+  real(kind=WP),  save, allocatable, target      :: std_dens_UVDZ(:,:,:), std_dens_flux(:,:,:), std_dens_dVdT(:,:), std_dens_DIV(:,:), std_dens_DIV_fer(:,:), std_dens_Z(:,:), std_dens_H(:,:)
   real(kind=WP),  save, allocatable, target      :: dens_flux_e(:)
   real(kind=WP),  save, allocatable, target      :: thetao(:) ! sst in K
 
@@ -352,6 +352,7 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
      allocate(std_dens_w   (  std_dens_N, myDim_elem2D))
      allocate(std_dens_dVdT(  std_dens_N, myDim_elem2D))
      allocate(std_dens_DIV (  std_dens_N, myDim_nod2D+eDim_nod2D))
+     if (Fer_GM) allocate(std_dens_DIV_fer(  std_dens_N, myDim_nod2D+eDim_nod2D))
      allocate(std_dens_VOL1(  std_dens_N, myDim_elem2D))
      allocate(std_dens_VOL2(  std_dens_N, myDim_elem2D))
      allocate(std_dens_flux(3,std_dens_N, myDim_elem2D))
@@ -374,6 +375,7 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
      std_dens_UVDZ=0. !will be U & V transports within the density class
      std_dens_dVdT=0. !rate of change of a bin volume (for estimating the 'model drift')
      std_dens_DIV =0. !meridional divergence within a density bin (for reconstruction of the diapycnal velocity) !TOP PRIORITY
+     if (Fer_GM) std_dens_DIV_fer =0. !meridional divergence of bolus velocity within a density bin (for reconstruction of the diapycnal velocity) !TOP PRIORITY
      std_dens_VOL1=0. !temporal arrays for computing std_dens_dVdT
      std_dens_VOL2=0.
      std_dens_flux=0. !bouyancy flux for computation of surface bouyancy transformations
@@ -391,8 +393,10 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
   dens_flux_e    =0.
   std_dens_VOL2=0.
   std_dens_DIV =0.
+  if (Fer_GM) std_dens_DIV_fer =0. !meridional divergence of bolus velocity within a density bin (for reconstruction of the diapycnal velocity) !TOP PRIORITY
   std_dens_Z   =0.
   std_dens_H   =0.
+  
   ! proceed with fields at elements...
   do elem=1, myDim_elem2D
      elnodes=elem2D_nodes(:,elem)     
@@ -495,83 +499,133 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
      end do
   end do
 
-  ! proceed with fields at nodes (cycle over edges to compute the divergence)...
-  do edge=1, myDim_edge2D
-     if (myList_edge2D(edge) > edge2D_in) cycle
-     enodes=edges(:,edge)
-     eelems=edge_tri(:,edge)
-     nzmax =nlevels(eelems(1))
-     nzmin =ulevels(eelems(1))
-     if (eelems(2)>0) nzmax=max(nzmax, nlevels(eelems(2)))
-     !!PS do nz=1, nzmax-1
-     do nz=nzmin, nzmax-1
-        aux(nz)=sum(density_dmoc(nz, enodes))/2.-1000.
-     end do
-
-     do e=1,2
-        elem=eelems(e)
-        if (elem<=0) CYCLE
-        deltaX=edge_cross_dxdy(1+(e-1)*2,edge) 
-        deltaY=edge_cross_dxdy(2+(e-1)*2,edge)
-        nzmax =nlevels(elem)
-        nzmin =ulevels(elem)
-
-        do nz=nzmax-1,nzmin+1,-1
-           dens(nz)   = (aux(nz)     * helem(nz-1,elem)+&
-                         aux(nz-1)   * helem(nz,  elem))/sum(helem(nz-1:nz,elem))
+    !___________________________________________________________________________
+    ! proceed with fields at nodes (cycle over edges to compute the divergence)...
+    do edge=1, myDim_edge2D
+        if (myList_edge2D(edge) > edge2D_in) cycle
+        enodes=edges(:,edge)
+        eelems=edge_tri(:,edge)
+        nzmax =nlevels(eelems(1))
+        nzmin =ulevels(eelems(1))
+        if (eelems(2)>0) nzmax=max(nzmax, nlevels(eelems(2)))
+        do nz=nzmin, nzmax-1
+            aux(nz)=sum(density_dmoc(nz, enodes))/2.-1000.
         end do
-        dens(nzmax)=dens(nzmax-1)+(dens(nzmax-1)-dens(nzmax-2))*helem(nzmax-1,elem)/helem(nzmax-2,elem)
-        dens(nzmin)    =dens(nzmin+1)      +(dens(nzmin+1)-dens(nzmin+2))            *helem(nzmin, elem)     /helem(nzmin+1,elem)       
-        is=minloc(abs(std_dens-dens(nzmin)),1)
-
-        do nz=nzmax-1,nzmin,-1
-           div=(UV(2,nz,elem)*deltaX-UV(1,nz,elem)*deltaY)*helem(nz,elem)
-           if (e==2) div=-div
-           dmin =minval(dens(nz:nz+1))
-           dmax =maxval(dens(nz:nz+1))
-           ddiff=abs(dens(nz)-dens(nz+1))
-   
-          ! do vertical  binning onto prescribed density classes
-           is=std_dens_N
-           do jj = 1, std_dens_N
-              if (std_dens(jj) > dmin) then
-                 is = jj
-                 exit
-              endif
-           end do
-
-           ie=1
-           do jj = std_dens_N,1,-1
-              if (std_dens(jj) < dmax) then
-                 ie = jj
-                 exit
-              endif
-           end do
-
-           if (std_dens(is)>=dmax) is=ie
-           if (std_dens(ie)<=dmin) ie=is
-
-           if (ie-is > 0) then
-           weight=(std_dens(is)-dmin)+std_dd(is)/2.
-           weight=max(weight, 0.)/ddiff
-           std_dens_DIV(is, enodes(1))=std_dens_DIV(is, enodes(1))+weight*div
-           std_dens_DIV(is, enodes(2))=std_dens_DIV(is, enodes(2))-weight*div
-           do snz=is+1, ie-1
-              weight=(sum(std_dd(snz-1:snz))/2.)/ddiff
-              std_dens_DIV(snz, enodes(1))=std_dens_DIV(snz, enodes(1))+weight*div
-              std_dens_DIV(snz, enodes(2))=std_dens_DIV(snz, enodes(2))-weight*div
-           end do
-           weight=(dmax-std_dens(ie))+std_dd(ie-1)/2.
-           weight=max(weight, 0.)/ddiff
-           std_dens_DIV(ie, enodes(1))=std_dens_DIV(ie, enodes(1))+weight*div
-           std_dens_DIV(ie, enodes(2))=std_dens_DIV(ie, enodes(2))-weight*div
-        else
-           std_dens_DIV(is, enodes(1))=std_dens_DIV(is, enodes(1))+div
-           std_dens_DIV(is, enodes(2))=std_dens_DIV(is, enodes(2))-div
-        end if
-      end do
-    end do
-  end do
+        
+        !_______________________________________________________________________
+        do e=1,2
+            elem=eelems(e)
+            if (elem<=0) CYCLE
+            deltaX=edge_cross_dxdy(1+(e-1)*2,edge) 
+            deltaY=edge_cross_dxdy(2+(e-1)*2,edge)
+            nzmax =nlevels(elem)
+            nzmin =ulevels(elem)
+            
+            !___________________________________________________________________
+            do nz=nzmax-1,nzmin+1,-1
+                dens(nz)   = (aux(nz)     * helem(nz-1,elem)+&
+                            aux(nz-1)   * helem(nz,  elem))/sum(helem(nz-1:nz,elem))
+            end do
+            dens(nzmax)=dens(nzmax-1)+(dens(nzmax-1)-dens(nzmax-2))*helem(nzmax-1,elem)/helem(nzmax-2,elem)
+            dens(nzmin)    =dens(nzmin+1)      +(dens(nzmin+1)-dens(nzmin+2))            *helem(nzmin, elem)     /helem(nzmin+1,elem)       
+            is=minloc(abs(std_dens-dens(nzmin)),1)
+            
+            !___________________________________________________________________
+            do nz=nzmax-1,nzmin,-1
+                div=(UV(2,nz,elem)*deltaX-UV(1,nz,elem)*deltaY)*helem(nz,elem)
+                if (e==2) div=-div
+                dmin =minval(dens(nz:nz+1))
+                dmax =maxval(dens(nz:nz+1))
+                ddiff=abs(dens(nz)-dens(nz+1))
+                
+                ! do vertical  binning onto prescribed density classes
+                is=std_dens_N
+                do jj = 1, std_dens_N
+                    if (std_dens(jj) > dmin) then
+                        is = jj
+                        exit
+                    endif
+                end do
+                ie=1
+                do jj = std_dens_N,1,-1
+                    if (std_dens(jj) < dmax) then
+                        ie = jj
+                        exit
+                    endif
+                end do
+                
+                if (std_dens(is)>=dmax) is=ie
+                if (std_dens(ie)<=dmin) ie=is
+                if (ie-is > 0) then
+                    weight=(std_dens(is)-dmin)+std_dd(is)/2.
+                    weight=max(weight, 0.)/ddiff
+                    std_dens_DIV(is, enodes(1))=std_dens_DIV(is, enodes(1))+weight*div
+                    std_dens_DIV(is, enodes(2))=std_dens_DIV(is, enodes(2))-weight*div
+                    do snz=is+1, ie-1
+                        weight=(sum(std_dd(snz-1:snz))/2.)/ddiff
+                        std_dens_DIV(snz, enodes(1))=std_dens_DIV(snz, enodes(1))+weight*div
+                        std_dens_DIV(snz, enodes(2))=std_dens_DIV(snz, enodes(2))-weight*div
+                    end do
+                    weight=(dmax-std_dens(ie))+std_dd(ie-1)/2.
+                    weight=max(weight, 0.)/ddiff
+                    std_dens_DIV(ie, enodes(1))=std_dens_DIV(ie, enodes(1))+weight*div
+                    std_dens_DIV(ie, enodes(2))=std_dens_DIV(ie, enodes(2))-weight*div
+                else
+                    std_dens_DIV(is, enodes(1))=std_dens_DIV(is, enodes(1))+div
+                    std_dens_DIV(is, enodes(2))=std_dens_DIV(is, enodes(2))-div
+                end if ! --> if (ie-is > 0) then
+            end do ! --> do nz=nzmax-1,nzmin,-1
+            
+            !___________________________________________________________________
+            ! compute density class divergence from GM Bolus velocity
+            if (Fer_GM) then
+                do nz=nzmax-1,nzmin,-1
+                    div=(fer_uv(2,nz,elem)*deltaX-fer_uv(1,nz,elem)*deltaY)*helem(nz,elem)
+                    if (e==2) div=-div
+                    dmin =minval(dens(nz:nz+1))
+                    dmax =maxval(dens(nz:nz+1))
+                    ddiff=abs(dens(nz)-dens(nz+1))
+                    
+                    ! do vertical  binning onto prescribed density classes
+                    is=std_dens_N
+                    do jj = 1, std_dens_N
+                        if (std_dens(jj) > dmin) then
+                            is = jj
+                            exit
+                        endif
+                    end do
+                    ie=1
+                    do jj = std_dens_N,1,-1
+                        if (std_dens(jj) < dmax) then
+                            ie = jj
+                            exit
+                        endif
+                    end do
+                    
+                    if (std_dens(is)>=dmax) is=ie
+                    if (std_dens(ie)<=dmin) ie=is
+                    if (ie-is > 0) then
+                        weight=(std_dens(is)-dmin)+std_dd(is)/2.
+                        weight=max(weight, 0.)/ddiff
+                        std_dens_DIV_fer(is, enodes(1))=std_dens_DIV_fer(is, enodes(1))+weight*div
+                        std_dens_DIV_fer(is, enodes(2))=std_dens_DIV_fer(is, enodes(2))-weight*div
+                        do snz=is+1, ie-1
+                            weight=(sum(std_dd(snz-1:snz))/2.)/ddiff
+                            std_dens_DIV_fer(snz, enodes(1))=std_dens_DIV_fer(snz, enodes(1))+weight*div
+                            std_dens_DIV_fer(snz, enodes(2))=std_dens_DIV_fer(snz, enodes(2))-weight*div
+                        end do
+                        weight=(dmax-std_dens(ie))+std_dd(ie-1)/2.
+                        weight=max(weight, 0.)/ddiff
+                        std_dens_DIV_fer(ie, enodes(1))=std_dens_DIV_fer(ie, enodes(1))+weight*div
+                        std_dens_DIV_fer(ie, enodes(2))=std_dens_DIV_fer(ie, enodes(2))-weight*div
+                    else
+                        std_dens_DIV_fer(is, enodes(1))=std_dens_DIV_fer(is, enodes(1))+div
+                        std_dens_DIV_fer(is, enodes(2))=std_dens_DIV_fer(is, enodes(2))-div
+                    end if ! --> if (ie-is > 0) then
+                end do ! --> do nz=nzmax-1,nzmin,-1
+            end if ! --> if (Fer_GM) then
+        end do ! --> do e=1,2
+    end do ! --> do edge=1, myDim_edge2D
   
   !_____________________________________________________________________________
   where (std_dens_w > 0.)

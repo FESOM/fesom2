@@ -7,27 +7,22 @@ IMPLICIT NONE
 SAVE
 
 !
-! 
+!
 !_______________________________________________________________________________
-! set data array derived type for ice-tracers (area, mice, msnow) more tracer 
+! set data array derived type for ice-tracers (area, mice, msnow) more tracer
 ! are theretical possible
 TYPE T_ICE_DATA
     !___________________________________________________________________________
-    real(kind=WP), allocatable, dimension(:)    :: values, values_old, values_rhs, & 
+    real(kind=WP), allocatable, dimension(:)    :: values, values_old, values_rhs, &
                                                    values_div_rhs, dvalues, valuesl
     integer                                     :: ID
     !___________________________________________________________________________
     contains
-#if defined(__PGI)
-    private
-#endif            
         procedure WRITE_T_ICE_DATA
         procedure READ_T_ICE_DATA
-        generic :: write(unformatted) => WRITE_T_ICE_DATA
-        generic :: read(unformatted)  => READ_T_ICE_DATA
 END TYPE T_ICE_DATA
 !
-! 
+!
 !_______________________________________________________________________________
 ! set work array derived type for ice
 TYPE T_ICE_WORK
@@ -41,16 +36,11 @@ TYPE T_ICE_WORK
     real(kind=WP), allocatable, dimension(:)    :: ice_strength, inv_areamass, inv_mass
     !___________________________________________________________________________
     contains
-#if defined(__PGI)
-    private
-#endif            
         procedure WRITE_T_ICE_WORK
         procedure READ_T_ICE_WORK
-        generic :: write(unformatted) => WRITE_T_ICE_WORK
-        generic :: read(unformatted)  => READ_T_ICE_WORK
 END TYPE T_ICE_WORK
 !
-! 
+!
 !_______________________________________________________________________________
 ! set work array derived type for ice
 TYPE T_ICE_THERMO
@@ -62,26 +52,26 @@ TYPE T_ICE_THERMO
     real(kind=WP) :: rhofwt=1000., inv_rhofwt=1./1000.! Freshwter density & inverse
     real(kind=WP) :: rhoice=910. , inv_rhoice=1./910. ! Ice density & inverse, AOMIP
     real(kind=WP) :: rhosno=290. , inv_rhosno=1./290. ! Snow density & inverse, AOMIP
-    ! Specific heat of air, ice, snow [J/(kg * K)] 
-    real(kind=WP) :: cpair=1005., cpice=2106., cpsno=2090. 
+    ! Specific heat of air, ice, snow [J/(kg * K)]
+    real(kind=WP) :: cpair=1005., cpice=2106., cpsno=2090.
 !     real(kind=WP) :: cc=rhowat*4190.0  ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
 !     real(kind=WP) :: cl=rhoice*3.34e5  ! Volumetr. latent heat of ice fusion [J/m**3](cl=rhoice*Lf)
 ! --> cl and cc are setted in subroutine ice_init(...)
     real(kind=WP) :: cc=1025.*4190.0  ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
-    real(kind=WP) :: cl=910.*3.34e5  ! Volumetr. latent heat of ice fusion [J/m**3](cl=rhoice*Lf) 
+    real(kind=WP) :: cl=910.*3.34e5  ! Volumetr. latent heat of ice fusion [J/m**3](cl=rhoice*Lf)
     real(kind=WP) :: clhw=2.501e6      ! Specific latent heat [J/kg]: water	-> water vapor
     real(kind=WP) :: clhi=2.835e6      !                              sea ice-> water vapor
-    real(kind=WP) :: tmelt=273.15      ! 0 deg C expressed in K 
+    real(kind=WP) :: tmelt=273.15      ! 0 deg C expressed in K
     real(kind=WP) :: boltzmann=5.67E-8 ! S. Boltzmann const.*longw. emissivity
     integer       :: iclasses=7        ! Number of ice thickness gradations for ice growth calcs.
     real(kind=WP) :: hmin= 0.01        ! Cut-off ice thickness     !!
     real(kind=WP) :: Armin=0.01        ! Minimum ice concentration !!
-    
+
     ! --- namelist parameter /ice_therm/
     real(kind=WP) :: con= 2.1656, consn = 0.31 ! Thermal conductivities: ice & snow; W/m/K
     real(kind=WP) :: Sice = 4.0        ! Ice salinity 3.2--5.0 ppt.
     real(kind=WP) :: h0=1.0	           ! Lead closing parameter [m] ! 0.5
-    real(kind=WP) :: emiss_ice=0.97    ! Emissivity of Snow/Ice, 
+    real(kind=WP) :: emiss_ice=0.97    ! Emissivity of Snow/Ice,
     real(kind=WP) :: emiss_wat=0.97    ! Emissivity of open water
     real(kind=WP) :: albsn = 0.81      ! Albedo: frozen snow
     real(kind=WP) :: albsnm= 0.77      !         melting snow
@@ -89,16 +79,11 @@ TYPE T_ICE_THERMO
     real(kind=WP) :: albim = 0.68      !         melting ice
     real(kind=WP) :: albw  = 0.066     !         open water, LY2004
     contains
-#if defined(__PGI)
-    private
-#endif            
         procedure WRITE_T_ICE_THERMO
         procedure READ_T_ICE_THERMO
-        generic :: write(unformatted) => WRITE_T_ICE_THERMO
-        generic :: read(unformatted)  => READ_T_ICE_THERMO
 END TYPE T_ICE_THERMO
 !
-! 
+!
 !_______________________________________________________________________________
 ! set work array derived type for ice
 #if defined (__oasis) || defined (__ifsinterface)
@@ -109,23 +94,18 @@ TYPE T_ICE_ATMCOUPL
 #if defined (__oifs) || defined (__ifsinterface)
     !___________________________________________________________________________
     real(kind=WP), allocatable, dimension(:)    :: ice_alb, enthalpyoffuse
-    ! !!! DONT FORGET ice_temp rhs_tempdiv rhs_temp is advected for oifs !!! --> becomes additional ice 
+    ! !!! DONT FORGET ice_temp rhs_tempdiv rhs_temp is advected for oifs !!! --> becomes additional ice
     ! tracer in ice%data(4)%values
 #endif /* (__oifs)  */
     !___________________________________________________________________________
     contains
-#if defined(__PGI)
-    private
-#endif            
         procedure WRITE_T_ICE_ATMCOUPL
         procedure READ_T_ICE_ATMCOUPL
-        generic :: write(unformatted) => WRITE_T_ICE_ATMCOUPL
-        generic :: read(unformatted)  => READ_T_ICE_ATMCOUPL
 END TYPE T_ICE_ATMCOUPL
 #endif /* (__oasis) */
 
 !
-! 
+!
 !_______________________________________________________________________________
 ! set main ice derived type contains parameters, data array, work array, u_ice, vice
 TYPE T_ICE
@@ -138,18 +118,18 @@ TYPE T_ICE
     ! surface stess atm<-->ice, oce<-->ice
     real(kind=WP), allocatable, dimension(:)    :: stress_atmice_x, stress_iceoce_x
     real(kind=WP), allocatable, dimension(:)    :: stress_atmice_y, stress_iceoce_y
-    
+
     ! oce temp, salt, ssh, and uv at surface
     real(kind=WP), allocatable, dimension(:)    :: srfoce_temp, srfoce_salt, srfoce_ssh
 !     real(kind=WP), allocatable, dimension(:,:)  :: srfoce_uv
     real(kind=WP), allocatable, dimension(:)    :: srfoce_u, srfoce_v
-    
+
     ! freshwater & heatflux
     real(kind=WP), allocatable, dimension(:)    :: flx_fw, flx_h
-    
+
     ! maEVP variables
     real(kind=WP), allocatable, dimension(:)    :: alpha_evp_array, beta_evp_array
-    
+
     !___________________________________________________________________________
     ! total number of ice tracers (default=3, 1=area, 2=mice, 3=msnow, (4=ice_temp)
 #if defined (__oifs) || defined (__ifsinterface)
@@ -169,19 +149,19 @@ TYPE T_ICE
 
     ! put ice tracers data arrays
     type(t_ice_data), allocatable, dimension(:) :: data
-    
+
     !___________________________________________________________________________
     ! put ice working arrays
     type(t_ice_work)                            :: work
-    
+
     ! put thermodynamics arrays
     type(t_ice_thermo)                          :: thermo
-    
+
 #if defined (__oasis) || defined (__ifsinterface)
     !___________________________________________________________________________
     ! put ice arrays for coupled model
     type(t_ice_atmcoupl)                        :: atmcoupl
-#endif /* (__oasis) */ 
+#endif /* (__oasis) */
 
     !___________________________________________________________________________
     ! set ice model parameters:
@@ -201,37 +181,39 @@ TYPE T_ICE
     real(kind=WP)             :: c_aevp=0.15               ! 0.1--0.2, but should be adjusted experimentally
     ! --- Ice forcing averaging ---
     integer                   :: ice_ave_steps=1           !ice step=ice_ave_steps*oce_step
-    real(kind=WP)             :: cd_oce_ice = 5.5e-3       ! drag coef. oce - ice      
+    real(kind=WP)             :: cd_oce_ice = 5.5e-3       ! drag coef. oce - ice
     logical                   :: ice_free_slip=.false.
     integer                   :: whichEVP=0                ! 0=standart; 1=mEVP; 2=aEVP
-    
+
     real(kind=WP)             :: ice_dt                    ! ice step=ice_ave_steps*oce_step
-    real(kind=WP)             :: Tevp_inv   
-    
+    real(kind=WP)             :: Tevp_inv
+
     integer                   :: ice_steps_since_upd=0
     logical                   :: ice_update = .true.
     !___________________________________________________________________________
     contains
 #if defined(__PGI)
-    private
-#endif            
+        procedure, private WRITE_T_ICE
+        procedure, private READ_T_ICE
+#else
         procedure WRITE_T_ICE
         procedure READ_T_ICE
+#endif
         generic :: write(unformatted) => WRITE_T_ICE
         generic :: read(unformatted)  => READ_T_ICE
 END TYPE T_ICE
 
-contains 
+contains
 !
 !
 !_______________________________________________________________________________
 ! Unformatted writing for T_ICE_DATA
-subroutine WRITE_T_ICE_DATA(tdata, unit, iostat, iomsg)
+subroutine WRITE_T_ICE_DATA(tdata, unit)
     IMPLICIT NONE
     class(T_ICE_DATA),      intent(in)     :: tdata
     integer,                intent(in)     :: unit
-    integer,                intent(out)    :: iostat
-    character(*),           intent(inout)  :: iomsg
+    integer                                :: iostat
+    character(len=1024)                    :: iomsg
     call write_bin_array(tdata%values,         unit, iostat, iomsg)
     call write_bin_array(tdata%values_old,     unit, iostat, iomsg)
     call write_bin_array(tdata%values_rhs,     unit, iostat, iomsg)
@@ -239,15 +221,15 @@ subroutine WRITE_T_ICE_DATA(tdata, unit, iostat, iomsg)
     call write_bin_array(tdata%dvalues,        unit, iostat, iomsg)
     call write_bin_array(tdata%valuesl,        unit, iostat, iomsg)
     write(unit, iostat=iostat, iomsg=iomsg) tdata%ID
-end subroutine WRITE_T_ICE_DATA  
+end subroutine WRITE_T_ICE_DATA
 
 ! Unformatted reading for T_ICE_DATA
-subroutine READ_T_ICE_DATA(tdata, unit, iostat, iomsg)
+subroutine READ_T_ICE_DATA(tdata, unit)
     IMPLICIT NONE
     class(T_ICE_DATA),      intent(inout)  :: tdata
     integer,                intent(in)     :: unit
-    integer,                intent(out)    :: iostat
-    character(*),           intent(inout)  :: iomsg
+    integer                                :: iostat
+    character(len=1024)                    :: iomsg
     call read_bin_array(tdata%values,         unit, iostat, iomsg)
     call read_bin_array(tdata%values_old,     unit, iostat, iomsg)
     call read_bin_array(tdata%values_rhs,     unit, iostat, iomsg)
@@ -255,17 +237,17 @@ subroutine READ_T_ICE_DATA(tdata, unit, iostat, iomsg)
     call read_bin_array(tdata%dvalues,        unit, iostat, iomsg)
     call read_bin_array(tdata%valuesl,        unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg) tdata%ID
-end subroutine READ_T_ICE_DATA                                   
+end subroutine READ_T_ICE_DATA
 !
 !
 !_______________________________________________________________________________
 ! Unformatted writing for T_ICE_WORK
-subroutine WRITE_T_ICE_WORK(twork, unit, iostat, iomsg)
+subroutine WRITE_T_ICE_WORK(twork, unit)
     IMPLICIT NONE
     class(T_ICE_WORK),      intent(in)     :: twork
     integer,                intent(in)     :: unit
-    integer,                intent(out)    :: iostat
-    character(*),           intent(inout)  :: iomsg
+    integer                                :: iostat
+    character(len=1024)                    :: iomsg
     call write_bin_array(twork%fct_tmax,     unit, iostat, iomsg)
     call write_bin_array(twork%fct_tmin,     unit, iostat, iomsg)
     call write_bin_array(twork%fct_plus,     unit, iostat, iomsg)
@@ -281,15 +263,15 @@ subroutine WRITE_T_ICE_WORK(twork, unit, iostat, iomsg)
     call write_bin_array(twork%ice_strength, unit, iostat, iomsg)
     call write_bin_array(twork%inv_areamass, unit, iostat, iomsg)
     call write_bin_array(twork%inv_mass,     unit, iostat, iomsg)
-end subroutine WRITE_T_ICE_WORK    
+end subroutine WRITE_T_ICE_WORK
 
 ! Unformatted reading for T_ICE_WORK
-subroutine READ_T_ICE_WORK(twork, unit, iostat, iomsg)
+subroutine READ_T_ICE_WORK(twork, unit)
     IMPLICIT NONE
     class(T_ICE_WORK),      intent(inout)  :: twork
     integer,                intent(in)     :: unit
-    integer,                intent(out)    :: iostat
-    character(*),           intent(inout)  :: iomsg
+    integer                                :: iostat
+    character(len=1024)                    :: iomsg
     call read_bin_array(twork%fct_tmax,     unit, iostat, iomsg)
     call read_bin_array(twork%fct_tmin,     unit, iostat, iomsg)
     call read_bin_array(twork%fct_plus,     unit, iostat, iomsg)
@@ -310,26 +292,26 @@ end subroutine READ_T_ICE_WORK
 !
 !_______________________________________________________________________________
 ! Unformatted writing for T_ICE_WORK
-subroutine WRITE_T_ICE_THERMO(ttherm, unit, iostat, iomsg)
+subroutine WRITE_T_ICE_THERMO(ttherm, unit)
     IMPLICIT NONE
     class(T_ICE_THERMO),    intent(in)     :: ttherm
     integer,                intent(in)     :: unit
-    integer,                intent(out)    :: iostat
-    character(*),           intent(inout)  :: iomsg
+    integer                                :: iostat
+    character(len=1024)                    :: iomsg
     call write_bin_array(ttherm%t_skin,       unit, iostat, iomsg)
     call write_bin_array(ttherm%thdgr,        unit, iostat, iomsg)
     call write_bin_array(ttherm%thdgrsn,      unit, iostat, iomsg)
     call write_bin_array(ttherm%thdgr_old,    unit, iostat, iomsg)
     call write_bin_array(ttherm%ustar,        unit, iostat, iomsg)
-end subroutine WRITE_T_ICE_THERMO    
+end subroutine WRITE_T_ICE_THERMO
 
 ! Unformatted reading for T_ICE_WORK
-subroutine READ_T_ICE_THERMO(ttherm, unit, iostat, iomsg)
+subroutine READ_T_ICE_THERMO(ttherm, unit)
     IMPLICIT NONE
     class(T_ICE_THERMO),    intent(inout)  :: ttherm
     integer,                intent(in)     :: unit
-    integer,                intent(out)    :: iostat
-    character(*),           intent(inout)  :: iomsg
+    integer                                :: iostat
+    character(len=1024)                    :: iomsg
     call read_bin_array(ttherm%t_skin,       unit, iostat, iomsg)
     call read_bin_array(ttherm%thdgr,        unit, iostat, iomsg)
     call read_bin_array(ttherm%thdgrsn,      unit, iostat, iomsg)
@@ -340,42 +322,42 @@ end subroutine READ_T_ICE_THERMO
 !
 !_______________________________________________________________________________
 ! Unformatted writing for T_ICE_ATMCOUPL
-#if defined (__oasis) || defined (__ifsinterface)    
-subroutine WRITE_T_ICE_ATMCOUPL(tcoupl, unit, iostat, iomsg)
+#if defined (__oasis) || defined (__ifsinterface)
+subroutine WRITE_T_ICE_ATMCOUPL(tcoupl, unit)
     IMPLICIT NONE
     class(T_ICE_ATMCOUPL),  intent(in)     :: tcoupl
     integer,                intent(in)     :: unit
-    integer,                intent(out)    :: iostat
-    character(*),           intent(inout)  :: iomsg
+    integer                                :: iostat
+    character(len=1024)                    :: iomsg
     call write_bin_array(tcoupl%oce_flx_h,      unit, iostat, iomsg)
     call write_bin_array(tcoupl%ice_flx_h,      unit, iostat, iomsg)
     call write_bin_array(tcoupl%tmpoce_flx_h,   unit, iostat, iomsg)
     call write_bin_array(tcoupl%tmpice_flx_h,   unit, iostat, iomsg)
-#if defined (__oifs) || defined (__ifsinterface)  
+#if defined (__oifs) || defined (__ifsinterface)
     call write_bin_array(tcoupl%ice_alb,        unit, iostat, iomsg)
     call write_bin_array(tcoupl%enthalpyoffuse, unit, iostat, iomsg)
 #endif /* (__oifs) */
-end subroutine WRITE_T_ICE_ATMCOUPL  
-#endif /* (__oasis) */    
+end subroutine WRITE_T_ICE_ATMCOUPL
+#endif /* (__oasis) */
 
 ! Unformatted reading for T_ICE_ATMCOUPL
 #if defined (__oasis) || defined (__ifsinterface)
-subroutine READ_T_ICE_ATMCOUPL(tcoupl, unit, iostat, iomsg)
+subroutine READ_T_ICE_ATMCOUPL(tcoupl, unit)
     IMPLICIT NONE
     class(T_ICE_ATMCOUPL),  intent(inout)  :: tcoupl
     integer,                intent(in)     :: unit
-    integer,                intent(out)    :: iostat
-    character(*),           intent(inout)  :: iomsg
+    integer                                :: iostat
+    character(len=1024)                    :: iomsg
     call read_bin_array(tcoupl%oce_flx_h, unit, iostat, iomsg)
     call read_bin_array(tcoupl%ice_flx_h, unit, iostat, iomsg)
     call read_bin_array(tcoupl%tmpoce_flx_h, unit, iostat, iomsg)
     call read_bin_array(tcoupl%tmpice_flx_h, unit, iostat, iomsg)
-#if defined (__oifs) || defined (__ifsinterface)  
+#if defined (__oifs) || defined (__ifsinterface)
     call read_bin_array(tcoupl%ice_alb, unit, iostat, iomsg)
     call read_bin_array(tcoupl%enthalpyoffuse, unit, iostat, iomsg)
 #endif /* (__oifs) */
 end subroutine READ_T_ICE_ATMCOUPL
-#endif /* (__oasis) */   
+#endif /* (__oasis) */
 !
 !
 !_______________________________________________________________________________
@@ -390,14 +372,14 @@ subroutine WRITE_T_ICE(ice, unit, iostat, iomsg)
     !___________________________________________________________________________
     write(unit, iostat=iostat, iomsg=iomsg) ice%num_itracers
     do i=1, ice%num_itracers
-       write(unit, iostat=iostat, iomsg=iomsg) ice%data(i)
+       call ice%data(i)%WRITE_T_ICE_DATA(unit)
     end do
     !___________________________________________________________________________
-    write(unit, iostat=iostat, iomsg=iomsg) ice%thermo
-    write(unit, iostat=iostat, iomsg=iomsg) ice%work
+    call ice%thermo%WRITE_T_ICE_THERMO(unit)
+    call ice%work%WRITE_T_ICE_WORK(unit)
 #if defined (__oasis) || defined (__ifsinterface)
-    write(unit, iostat=iostat, iomsg=iomsg) ice%atmcoupl
-#endif /* (__oasis) */       
+    call ice%atmcoupl%WRITE_T_ICE_ATMCOUPL(unit)
+#endif /* (__oasis) */
 
     !___________________________________________________________________________
     write(unit, iostat=iostat, iomsg=iomsg) ice%pstar
@@ -422,7 +404,7 @@ subroutine WRITE_T_ICE(ice, unit, iostat, iomsg)
     write(unit, iostat=iostat, iomsg=iomsg) ice%Tevp_inv
     write(unit, iostat=iostat, iomsg=iomsg) ice%ice_steps_since_upd
     write(unit, iostat=iostat, iomsg=iomsg) ice%ice_update
-    
+
     !___________________________________________________________________________
     call write_bin_array(ice%uice           , unit, iostat, iomsg)
     call write_bin_array(ice%uice_rhs       , unit, iostat, iomsg)
@@ -446,8 +428,8 @@ subroutine WRITE_T_ICE(ice, unit, iostat, iomsg)
     if (ice%whichEVP > 0) then
         call write_bin_array(ice%alpha_evp_array        , unit, iostat, iomsg)
         call write_bin_array(ice%beta_evp_array         , unit, iostat, iomsg)
-    end if     
-    
+    end if
+
 end subroutine WRITE_T_ICE
 
 ! Unformatted reading for T_ICE
@@ -458,19 +440,19 @@ subroutine READ_T_ICE(ice, unit, iostat, iomsg)
     integer,                intent(out)    :: iostat
     character(*),           intent(inout)  :: iomsg
     integer                                :: i
-    
+
     !___________________________________________________________________________
     read(unit, iostat=iostat, iomsg=iomsg) ice%num_itracers
     if (.not. allocated(ice%data)) allocate(ice%data(ice%num_itracers))
     do i=1, ice%num_itracers
-       read(unit, iostat=iostat, iomsg=iomsg) ice%data(i)
+       call ice%data(i)%READ_T_ICE_DATA(unit)
     end do
     !___________________________________________________________________________
-    read(unit, iostat=iostat, iomsg=iomsg) ice%thermo
-    read(unit, iostat=iostat, iomsg=iomsg) ice%work
+    call ice%thermo%READ_T_ICE_THERMO(unit)
+    call ice%work%READ_T_ICE_WORK(unit)
 #if defined (__oasis) || defined (__ifsinterface)
-    read(unit, iostat=iostat, iomsg=iomsg) ice%atmcoupl
-#endif /* (__oasis) */       
+    call ice%atmcoupl%READ_T_ICE_ATMCOUPL(unit)
+#endif /* (__oasis) */
 
     !___________________________________________________________________________
     read(unit, iostat=iostat, iomsg=iomsg) ice%pstar
@@ -495,7 +477,7 @@ subroutine READ_T_ICE(ice, unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg) ice%Tevp_inv
     read(unit, iostat=iostat, iomsg=iomsg) ice%ice_steps_since_upd
     read(unit, iostat=iostat, iomsg=iomsg) ice%ice_update
-    
+
     !___________________________________________________________________________
     call read_bin_array(ice%uice            , unit, iostat, iomsg)
     call read_bin_array(ice%uice_rhs        , unit, iostat, iomsg)
@@ -519,14 +501,14 @@ subroutine READ_T_ICE(ice, unit, iostat, iomsg)
     if (ice%whichEVP > 0) then
         call read_bin_array(ice%alpha_evp_array     , unit, iostat, iomsg)
         call read_bin_array(ice%beta_evp_array      , unit, iostat, iomsg)
-    end if     
-    
+    end if
+
 end subroutine READ_T_ICE
 END MODULE MOD_ICE
 !
 !
 !_______________________________________________________________________________
-! interface to initialise derived type for sea ice 
+! interface to initialise derived type for sea ice
 module ice_init_interface
     interface
         subroutine ice_init(ice, partit, mesh)
@@ -543,7 +525,7 @@ end module
 !
 !
 !_______________________________________________________________________________
-! initialise derived type for sea ice 
+! initialise derived type for sea ice
 subroutine ice_init(ice, partit, mesh)
     USE MOD_ICE
     USE MOD_PARTIT
@@ -566,9 +548,9 @@ subroutine ice_init(ice, partit, mesh)
     namelist /ice_dyn/ whichEVP, Pstar, ellipse, c_pressure, delta_min, evp_rheol_steps, &
                        Cd_oce_ice, ice_gamma_fct, ice_diff, theta_io, ice_ave_steps, &
                        alpha_evp, beta_evp, c_aevp
-                       
+
     real(kind=WP)  :: Sice, h0, emiss_ice, emiss_wat, albsn, albsnm, albi, &
-                      albim, albw, con, consn                   
+                      albim, albw, con, consn
     namelist /ice_therm/ Sice, h0, emiss_ice, emiss_wat, albsn, albsnm, albi, &
                          albim, albw, con, consn
     !___________________________________________________________________________
@@ -576,7 +558,7 @@ subroutine ice_init(ice, partit, mesh)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h"   
+#include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
     ! open and read namelist.ice for I/O
@@ -591,10 +573,10 @@ subroutine ice_init(ice, partit, mesh)
     read(nm_unit, nml=ice_dyn  , iostat=iost)
     read(nm_unit, nml=ice_therm, iostat=iost)
     close(nm_unit)
-    
+
     !___________________________________________________________________________
-    ! set parameters in ice derived type from namelist.ice --> namelist /ice_dyn/ 
-    ice%whichEVP        = whichEVP 
+    ! set parameters in ice derived type from namelist.ice --> namelist /ice_dyn/
+    ice%whichEVP        = whichEVP
     ice%pstar           = Pstar
     ice%ellipse         = ellipse
     ice%c_pressure      = c_pressure
@@ -605,34 +587,34 @@ subroutine ice_init(ice, partit, mesh)
     ice%ice_diff        = ice_diff
     ice%theta_io        = theta_io
     ice%ice_ave_steps   = ice_ave_steps
-    ice%alpha_evp       = alpha_evp       
+    ice%alpha_evp       = alpha_evp
     ice%beta_evp        = beta_evp
     ice%c_aevp          = c_aevp
-    
-    ! set parameters in ice derived type from namelist.ice --> namelist /ice_therm/ 
+
+    ! set parameters in ice derived type from namelist.ice --> namelist /ice_therm/
     ice%thermo%con      = con
     ice%thermo%consn    = consn
     ice%thermo%Sice     = Sice
     ice%thermo%h0       = h0
-    ice%thermo%emiss_ice= emiss_ice    
+    ice%thermo%emiss_ice= emiss_ice
     ice%thermo%emiss_wat= emiss_wat
-    ice%thermo%albsn    = albsn 
+    ice%thermo%albsn    = albsn
     ice%thermo%albsnm   = albsnm
-    ice%thermo%albi     = albi    
+    ice%thermo%albi     = albi
     ice%thermo%albim    = albim
     ice%thermo%albw     = albw
-    
+
     ice%thermo%cc=ice%thermo%rhowat*4190.0  ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
     ice%thermo%cl=ice%thermo%rhoice*3.34e5  ! Volumetr. latent heat of ice fusion [J/m**3](cl=rhoice*Lf)
-    
+
     !___________________________________________________________________________
     ! define local vertice & elem array size
     elem_size=myDim_elem2D+eDim_elem2D
     node_size=myDim_nod2D +eDim_nod2D
-    
+
     !___________________________________________________________________________
     ! allocate/initialise arrays in ice derived type
-    ! initialise velocity and stress related arrays in ice derived type 
+    ! initialise velocity and stress related arrays in ice derived type
     allocate(ice%uice(                 node_size))
     allocate(ice%uice_rhs(             node_size))
     allocate(ice%uice_old(             node_size))
@@ -665,9 +647,9 @@ subroutine ice_init(ice, partit, mesh)
         ice%alpha_evp_array = ice%alpha_evp
         ice%beta_evp_array  = ice%alpha_evp
     end if
-    
+
     !___________________________________________________________________________
-    ! initialise surface ocean arrays in ice derived type 
+    ! initialise surface ocean arrays in ice derived type
     allocate(ice%srfoce_u(             node_size))
     allocate(ice%srfoce_v(             node_size))
     allocate(ice%srfoce_temp(          node_size))
@@ -678,15 +660,15 @@ subroutine ice_init(ice, partit, mesh)
     ice%srfoce_temp      = 0.0_WP
     ice%srfoce_salt      = 0.0_WP
     ice%srfoce_ssh       = 0.0_WP
-    
+
     allocate(ice%flx_fw(node_size))
     allocate(ice%flx_h( node_size))
     ice%flx_fw           = 0.0_WP
     ice%flx_h            = 0.0_WP
-    
+
     !___________________________________________________________________________
     ! initialse data array of ice derived type containing "ice tracer" that have
-    ! to be advected: a_ice (index=1), m_ice (index=2), m_snow (index=3), 
+    ! to be advected: a_ice (index=1), m_ice (index=2), m_snow (index=3),
     ! ice_temp (index=4, only when coupled)
     allocate(ice%data(ice%num_itracers))
     do n = 1, ice%num_itracers
@@ -705,9 +687,9 @@ subroutine ice_init(ice, partit, mesh)
         ice%data(n)%valuesl        = 0.0_WP
         if (n==4) ice%data(n)%values = 265.15_WP
     end do
-    
+
     !___________________________________________________________________________
-    ! initialse work array of ice derived type 
+    ! initialse work array of ice derived type
     allocate(ice%work%fct_tmax(        node_size))
     allocate(ice%work%fct_tmin(        node_size))
     allocate(ice%work%fct_plus(        node_size))
@@ -718,10 +700,10 @@ subroutine ice_init(ice, partit, mesh)
     ice%work%fct_plus    = 0.0_WP
     ice%work%fct_minus   = 0.0_WP
     ice%work%fct_fluxes  = 0.0_WP
-    
+
     allocate(ice%work%fct_massmatrix(sum(nn_num(1:myDim_nod2D))))
     ice%work%fct_massmatrix = 0.0_WP
-    
+
     allocate(ice%work%sigma11(         elem_size))
     allocate(ice%work%sigma12(         elem_size))
     allocate(ice%work%sigma22(         elem_size))
@@ -734,16 +716,16 @@ subroutine ice_init(ice, partit, mesh)
     ice%work%eps11       = 0.0_WP
     ice%work%eps12       = 0.0_WP
     ice%work%eps22       = 0.0_WP
-    
+
     allocate(ice%work%ice_strength(    elem_size))
     allocate(ice%work%inv_areamass(    node_size))
     allocate(ice%work%inv_mass(        node_size))
     ice%work%ice_strength= 0.0_WP
     ice%work%inv_areamass= 0.0_WP
     ice%work%inv_mass    = 0.0_WP
-    
+
     !___________________________________________________________________________
-    ! initialse thermo array of ice derived type 
+    ! initialse thermo array of ice derived type
     allocate(ice%thermo%ustar(         node_size))
     allocate(ice%thermo%t_skin(        node_size))
     allocate(ice%thermo%thdgr(         node_size))
@@ -754,10 +736,10 @@ subroutine ice_init(ice, partit, mesh)
     ice%thermo%thdgr     = 0.0_WP
     ice%thermo%thdgrsn   = 0.0_WP
     ice%thermo%thdgr_old = 0.0_WP
-    
+
     !___________________________________________________________________________
-    ! initialse coupling array of ice derived type 
-#if defined (__oasis) || defined (__ifsinterface)    
+    ! initialse coupling array of ice derived type
+#if defined (__oasis) || defined (__ifsinterface)
     allocate(ice%atmcoupl%oce_flx_h(     node_size))
     allocate(ice%atmcoupl%ice_flx_h(     node_size))
     allocate(ice%atmcoupl%tmpoce_flx_h(  node_size))
@@ -766,13 +748,13 @@ subroutine ice_init(ice, partit, mesh)
     ice%atmcoupl%ice_flx_h     = 0.0_WP
     ice%atmcoupl%tmpoce_flx_h  = 0.0_WP
     ice%atmcoupl%tmpice_flx_h  = 0.0_WP
-#if defined (__oifs) || defined (__ifsinterface)  
+#if defined (__oifs) || defined (__ifsinterface)
     allocate(ice%atmcoupl%ice_alb(       node_size))
     allocate(ice%atmcoupl%enthalpyoffuse(node_size))
     ice%atmcoupl%ice_alb       = 0.6_WP
     ice%atmcoupl%enthalpyoffuse= 0.0_WP
 #endif /* (__oifs) */
-#endif /* (__oasis) */       
+#endif /* (__oasis) */
 
     !___________________________________________________________________________
     ! --> took from oce_mesh.F90 --> subroutine mesh_auxiliary_arrays(partit, mesh)
@@ -798,7 +780,7 @@ end subroutine ice_init
 !
 !
 !_______________________________________________________________________________
-! initialise derived type for sea ice 
+! initialise derived type for sea ice
 subroutine ice_init_toyocean_dummy(ice, partit, mesh)
     USE MOD_ICE
     USE MOD_PARTIT
@@ -816,15 +798,15 @@ subroutine ice_init_toyocean_dummy(ice, partit, mesh)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h"   
+#include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
     ! define local vertice & elem array size
     node_size=myDim_nod2D+eDim_nod2D
-    
+
     !___________________________________________________________________________
     ! allocate/initialise arrays in ice derived type
-    ! initialise velocity and stress related arrays in ice derived type 
+    ! initialise velocity and stress related arrays in ice derived type
     allocate(ice%uice(                  node_size))
     allocate(ice%vice(                  node_size))
     ice%uice               = 0.0_WP
@@ -835,4 +817,4 @@ subroutine ice_init_toyocean_dummy(ice, partit, mesh)
         ice%data(n)%ID      = n
         ice%data(n)%values  = 0.0_WP
     end do
-end subroutine ice_init_toyocean_dummy    
+end subroutine ice_init_toyocean_dummy

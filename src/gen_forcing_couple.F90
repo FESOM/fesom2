@@ -176,7 +176,6 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   
   !_____________________________________________________________________________
   t1=MPI_Wtime()
-#if defined (__oasis)
      if (firstcall) then
         allocate(exchange(myDim_nod2D+eDim_nod2D), mask(myDim_nod2D+eDim_nod2D))
         allocate(a2o_fcorr_stat(nrecv,6))
@@ -188,7 +187,6 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
      do i=1,nsend
          exchange  =0.
          if (i.eq.1) then
-#if defined (__oifs)
             ! AWI-CM3 outgoing state vectors
               do n=1,myDim_nod2D+eDim_nod2D
               exchange(n)=tracers%data(1)%values(1, n)+tmelt	           ! sea surface temperature [K]
@@ -211,71 +209,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
               end do
             else    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
-#else
-            ! AWI-CM2 outgoing state vectors
-            do n=1,myDim_nod2D+eDim_nod2D
-            exchange(n)=tracers%data(1)%values(1, n)                     ! sea surface temperature [°C]
-            end do
-            elseif (i.eq.2) then
-            exchange(:) = m_ice(:)                                  ! ice thickness [m]
-            elseif (i.eq.3) then
-            exchange(:) = a_ice(:)                                  ! ice concentation [%]
-            elseif (i.eq.4) then
-            exchange(:) = m_snow(:)                                 ! snow thickness
-!---wiso-code
-            elseif (i.eq.5) then
-             exchange(:) = 0.0_WP
-             if (lwiso) then
-              nt1 = index_wiso_tracers(1)
-              nt2 = index_wiso_tracers(3)
-              where (tracers%data(nt2)%values(1,:) > zwisomin)
-                exchange(:) = (tracers%data(nt1)%values(1,:)/tracers%data(nt2)%values(1,:)/wiso_smow(1) - 1._WP)*1000._WP ! delta 18O of surface water
-              end where
-             end if
-
-            elseif (i.eq.6) then
-             exchange(:) = 0.0_WP
-             if (lwiso) then
-              nt1 = index_wiso_tracers(2)
-              nt2 = index_wiso_tracers(3)
-              where (tracers%data(nt2)%values(1,:) > zwisomin)
-                exchange(:) = (tracers%data(nt1)%values(1,:)/tracers%data(nt2)%values(1,:)/wiso_smow(2) - 1._WP)*1000._WP ! delta D of surface water
-              end where
-             end if
-
-            elseif (i.eq.7) then
-            exchange(:) = 0.0_WP                          ! delta H216O of surface water is set to zero permill
-
-            elseif (i.eq.8) then
-             exchange(:) = 0.0_WP
-             if (lwiso) then
-              where (tr_arr_ice(:, 3) > zwisomin)
-                exchange(:) = (tr_arr_ice(:, 1)/tr_arr_ice(:, 3)/wiso_smow(1) - 1._WP)*1000._WP ! delta 18O of sea ice
-              end where
-             end if
-
-            elseif (i.eq.9) then
-             exchange(:) = 0.0_WP
-             if (lwiso) then
-              where (tr_arr_ice(:, 3) > zwisomin)
-                exchange(:) = (tr_arr_ice(:, 2)/tr_arr_ice(:, 3)/wiso_smow(2) - 1._WP)*1000._WP ! delta 18O of sea ice
-              end where
-             end if
-
-            elseif (i.eq.10) then
-            exchange(:) = 0.0_WP                          ! delta H216O of sea ice is set to zero permill
-!---wiso-code-end
-            else	    
-            print *, 'not installed yet or error in cpl_oasis3mct_send', mype
-#endif
          endif
          call cpl_oasis3mct_send(i, exchange, action, partit)
       enddo
-#ifdef VERBOSE
-      do i=1, nsend 
-        if (mype==0) write(*,*) 'SEND: field ', i, ' max val:', maxval(exchange), ' . ACTION? ', action 
-      enddo
-#endif
       mask=1.
       do i=1,nrecv
          exchange =0.0
@@ -365,7 +301,6 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
                 mask=1.
                 call force_flux_consv(runoff, mask, i, 0,action, partit, mesh)
             end if
-#if defined (__oifs)
 
          elseif (i.eq.13) then
              if (action) then
@@ -373,104 +308,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
     	          mask=1.
 	              call force_flux_consv(enthalpyoffuse, mask, i, 0, action, partit, mesh)
              end if
-#else
-         elseif (i.eq.13) then
-            if (action) then
-                 if (lwiso) then         
-                     www3(:)         =  exchange(:)
-                 else if (use_icebergs) then    
-                     u_wind(:)                     = exchange(:)        ! zonal wind
-                 end if
-             end if
-             mask=1.
-             if (lwiso) then         
-                 call force_flux_consv(www3, mask, i, 0,action, partit, mesh)
-             else if (use_icebergs) then    
-                 call force_flux_consv(u_wind, mask, i, 0, action, partit, mesh)
-             end if
-         elseif (i.eq.14) then
-             if (action) then
-                 if (lwiso) then         
-                     www1(:)         =  exchange(:)
-                 else if (use_icebergs) then    
-                     v_wind(:)                     = exchange(:)        ! meridional wind
-                 end if
-             end if
-             mask=1.
-             if (lwiso) then         
-                 call force_flux_consv(www1, mask, i, 0,action, partit, mesh)
-             else if (use_icebergs) then    
-                 call force_flux_consv(v_wind, mask, i, 0, action, partit, mesh)
-             end if
-         elseif (i.eq.15) then
-             if (action) then
-             ! tot_prec_hdo over water: this variable includes (i) rain over open water and sea ice, (ii) snow and evap over open water,  (iii) river runoff
-             www2(:)         =  exchange(:)
-             end if
-             mask=1.
-             if (lwiso) then
-             call force_flux_consv(www2, mask, i, 0,action, partit, mesh)
-             end if
-         elseif (i.eq.17) then
-             if (action) then
-             ! snowfall_o18 over seaice: this variable includes snow and sublimation over sea ice areas
-             iii1(:)         =  exchange(:)
-             tmp_iii1(:)     =  exchange(:)                   ! to reset for flux correction
-             end if
-             mask=a_ice
-             iii1(:)         =  tmp_iii1(:)
-             if (lwiso) then
-                 call force_flux_consv(iii1,mask,i,1,action, partit, mesh) ! Northern hemisphere
-                 call force_flux_consv(iii1,mask,i,2,action, partit, mesh) ! Southern Hemisphere
-             end if
-         elseif (i.eq.18) then
-             if (action) then
-             ! snowfall_hdo over seaice: this variable includes snow and sublimation over sea ice areas
-             iii2(:)         =  exchange(:)
-             tmp_iii2(:)     =  exchange(:)                   ! to reset for flux correction
-             end if
-             mask=a_ice
-             iii2(:)         =  tmp_iii2(:)
-             if (lwiso) then
-                 call force_flux_consv(iii2,mask,i,1,action, partit, mesh) ! Northern hemisphere
-                 call force_flux_consv(iii2,mask,i,2,action, partit, mesh) ! Southern Hemisphere
-             end if
-         elseif (i.eq.16) then
-             if (action) then
-             ! snowfall_o16 over seaice: this variable includes snow and sublimation over sea ice areas
-             iii3(:)         =  exchange(:)
-             tmp_iii3(:)     =  exchange(:)                   ! to reset for flux correction
-             end if
-             mask=a_ice
-             iii3(:)         =  tmp_iii3(:)
-             if (lwiso) then
-                 call force_flux_consv(iii3,mask,i,1,action, partit, mesh) ! Northern hemisphere
-                 call force_flux_consv(iii3,mask,i,2,action, partit, mesh) ! Southern Hemisphere
-             end if
-         elseif (i.eq.19) then
-             if (action) then
-                u_wind(:)                     = exchange(:)        ! meridional wind
-             end if
-             mask=1
-             if (use_icebergs.and.lwiso) then    
-                 call force_flux_consv(u_wind, mask, i, 0, action, partit, mesh)
-             end if
-         elseif (i.eq.20) then
-             if (action) then
-                v_wind(:)                     = exchange(:)        ! meridional wind
-             end if
-             mask=1
-             if (use_icebergs.and.lwiso) then    
-                 call force_flux_consv(v_wind, mask, i, 0, action, partit, mesh)
-             end if
-         end if
-# endif
-
-#ifdef VERBOSE
-	  if (mype==0) then
-		write(*,*) 'FESOM RECV: flux ', i, ', max val: ', maxval(exchange)
-	  end if
-#endif
+         endif
       end do
 
     if ((do_rotate_oce_wind .AND. do_rotate_ice_wind) .AND. rotated_grid) then
@@ -481,106 +319,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
         do_rotate_oce_wind=.false.
         do_rotate_ice_wind=.false.
     end if
-#else
-#ifndef __ifsinterface
-  call sbc_do(partit, mesh)
-!$OMP PARALLEL DO
-  DO n=1, myDim_nod2D+eDim_nod2D
-     u_wind(n)    = atmdata(i_xwind,n)
-     v_wind(n)    = atmdata(i_ywind,n)
-     if (l_xstre) then
-        stress_atmoce_x(n)=atmdata(i_xstre, n)
-     end if
-     if (l_ystre) then
-        stress_atmoce_y(n)=atmdata(i_ystre, n)
-     end if
-     shum(n)      = atmdata(i_humi ,n)
-     longwave(n)  = atmdata(i_qlw  ,n)
-     shortwave(n) = atmdata(i_qsr  ,n)
-     Tair(n)      = atmdata(i_tair ,n)-273.15_WP
-     prec_rain(n) = atmdata(i_prec ,n)/1000._WP
-     prec_snow(n) = atmdata(i_snow ,n)/1000._WP
-     if (l_mslp) then
-        press_air(n) = atmdata(i_mslp ,n) ! unit should be Pa
-     end if
-  END DO
-!$OMP END PARALLEL DO
-
-  if (use_cavity) then 
-!$OMP PARALLEL DO
-    do i=1,myDim_nod2d+eDim_nod2d
-        if (ulevels_nod2d(i)>1) then
-            u_wind(i)   = 0.0_WP
-            v_wind(i)   = 0.0_WP
-            shum(i)     = 0.0_WP
-            longwave(i) = 0.0_WP
-            Tair(i)     = 0.0_WP
-            prec_rain(i)= 0.0_WP
-            prec_snow(i)= 0.0_WP
-            if (l_mslp) then
-               press_air(i)= 0.0_WP 
-            end if
-            runoff(i)   = 0.0_WP
-        end if
-    end do
-!$OMP END PARALLEL DO
-  endif 
-  ! second, compute exchange coefficients
-  ! 1) drag coefficient 
-  if(AOMIP_drag_coeff) then
-     call cal_wind_drag_coeff(partit)
-  end if
-  ! 2) drag coeff. and heat exchange coeff. over ocean in case using ncar formulae
-  if(ncar_bulk_formulae) then
-!     cd_atm_oce_arr=0.0_WP
-!     ch_atm_oce_arr=0.0_WP
-!     ce_atm_oce_arr=0.0_WP
-     call ncar_ocean_fluxes_mode(ice, partit, mesh)
-  elseif(AOMIP_drag_coeff) then
-     cd_atm_oce_arr=cd_atm_ice_arr
-  end if
-  ! third, compute wind stress
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i, dux, dvy, aux)
-
-  do i=1,myDim_nod2d+eDim_nod2d   
-     !__________________________________________________________________________
-     if (ulevels_nod2d(i)>1) then
-        stress_atmoce_x(i)=0.0_WP
-        stress_atmoce_y(i)=0.0_WP
-        stress_atmice_x(i)=0.0_WP
-        stress_atmice_y(i)=0.0_WP
-        cycle
-     end if 
-     
-     !__________________________________________________________________________
-     dux=u_wind(i)-(1.0_WP-Swind)*u_w(i) 
-     dvy=v_wind(i)-(1.0_WP-Swind)*v_w(i)
-     aux=sqrt(dux**2+dvy**2)*rhoair
-     if ( .not. l_xstre) then
-        stress_atmoce_x(i) = Cd_atm_oce_arr(i)*aux*dux
-     end if
-     if ( .not. l_ystre) then
-        stress_atmoce_y(i) = Cd_atm_oce_arr(i)*aux*dvy
-     end if
-     !__________________________________________________________________________
-     dux=u_wind(i)-u_ice(i) 
-     dvy=v_wind(i)-v_ice(i)
-     aux=sqrt(dux**2+dvy**2)*rhoair
-     stress_atmice_x(i) = Cd_atm_ice_arr(i)*aux*dux
-     stress_atmice_y(i) = Cd_atm_ice_arr(i)*aux*dvy
-  end do
-!$OMP END PARALLEL DO
-  ! heat and fresh water fluxes are treated in i_therm and ice2ocean
-#endif /* skip all in case of __ifsinterface */
-#endif /* (__oasis) */
 
   t2=MPI_Wtime()
 
-#ifdef VERBOSE
-  if (mod(istep,logfile_outfreq)==0 .and. mype==0) then
-     write(*,*) 'update forcing data took', t2-t1
-  end if
-#endif
 
 end subroutine update_atm_forcing
 !

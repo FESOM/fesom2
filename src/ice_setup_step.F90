@@ -58,35 +58,35 @@ subroutine ice_setup(ice, tracers, partit, mesh)
     use g_CONFIG
     use ice_initial_state_interface
     use ice_fct_interfaces
-    implicit none 
+    implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_tracer), intent(in)   , target :: tracers
     type(t_mesh)  , intent(in)   , target :: mesh
     type(t_partit), intent(inout), target :: partit
-    
+
     !___________________________________________________________________________
-    ! initialise ice derived type 
+    ! initialise ice derived type
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call ice_init'//achar(27)//'[0m'
     call ice_init(ice, partit, mesh)
-    
+
     !___________________________________________________________________________
     ! DO not change
     ice%ice_dt   = real(ice%ice_ave_steps,WP)*dt
     ! ice_dt=dt
-    ice%Tevp_inv = 3.0_WP/ice%ice_dt 
+    ice%Tevp_inv = 3.0_WP/ice%ice_dt
     ! This is combination it always enters
-    ice%Clim_evp = ice%Clim_evp*(ice%evp_rheol_steps/ice%ice_dt)**2/ice%Tevp_inv  
-    
+    ice%Clim_evp = ice%Clim_evp*(ice%evp_rheol_steps/ice%ice_dt)**2/ice%Tevp_inv
+
     !___________________________________________________________________________
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_init'//achar(27)//'[0m'
     call ice_mass_matrix_fill(ice, partit, mesh)
-    
+
     !___________________________________________________________________________
-    ! Initialization routine, user input is required 
+    ! Initialization routine, user input is required
     !call ice_init_fields_test
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call ice_initial_state'//achar(27)//'[0m'
     call ice_initial_state(ice, tracers, partit, mesh)   ! Use it unless running test example
-    
+
     if(partit%mype==0) write(*,*) 'Ice is initialized'
 end subroutine ice_setup
 !
@@ -106,9 +106,9 @@ subroutine ice_timestep(step, ice, partit, mesh)
     use ice_thermodynamics_interfaces
     use cavity_interfaces
 #if defined (__icepack)
-    use icedrv_main,   only: step_icepack 
+    use icedrv_main,   only: step_icepack
 #endif
-    implicit none 
+    implicit none
     integer       , intent(in)            :: step
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -174,34 +174,57 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     a_ice    => ice%data(1)%values(:)
     ice_temp => ice%data(4)%values(:)
-#endif     
+#endif
     !___________________________________________________________________________
     t0=MPI_Wtime()
 #if defined (__icepack)
-    call step_icepack(ice, mesh, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts    
-#else     
-    
+    call step_icepack(ice, mesh, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts
+#else
+
+    !$ACC DATA COPY(mesh, mesh%coriolis_node, mesh%nn_num, mesh%nn_pos) &
+    !$ACC      COPY(mesh%ssh_stiff, mesh%ssh_stiff%rowptr) &
+    !$ACC      COPY(mesh%gradient_sca, mesh%metric_factor, mesh%elem_area, mesh%area, mesh%edge2D_in) &
+    !$ACC      COPY(mesh%elem2D_nodes, mesh%ulevels, mesh%ulevels_nod2d, mesh%edges, mesh%edge_tri) &
+    !$ACC      COPY(partit, partit%eDim_nod2D, partit%myDim_edge2D) &
+    !$ACC      COPY(partit%myDim_elem2D, partit%myDim_nod2D, partit%myList_edge2D) &
+    !$ACC      COPY(ice, ice%data, ice%work, ice%work%fct_massmatrix) &
+    !$ACC      COPY(ice%delta_min, ice%Tevp_inv, ice%cd_oce_ice) &
+    !$ACC      COPY(ice%work%fct_tmax, ice%work%fct_tmin) &
+    !$ACC      COPY(ice%work%fct_fluxes, ice%work%fct_plus, ice%work%fct_minus) &
+    !$ACC      COPY(ice%work%eps11, ice%work%eps12, ice%work%eps22) &
+    !$ACC      COPY(ice%work%sigma11, ice%work%sigma12, ice%work%sigma22) &
+    !$ACC      COPY(ice%work%ice_strength, ice%stress_atmice_x, ice%stress_atmice_y) &
+    !$ACC      COPY(ice%thermo%rhosno, ice%thermo%rhoice, ice%thermo%inv_rhowat) &
+    !$ACC      COPY(ice%srfoce_ssh, ice%pstar, ice%c_pressure) &
+    !$ACC      COPY(ice%work%inv_areamass, ice%work%inv_mass, ice%uice_rhs, ice%vice_rhs) &
+    !$ACC      COPY(ice%uice, ice%vice, ice%srfoce_u, ice%srfoce_v, ice%uice_old, ice%vice_old) &
+    !$ACC      COPY(ice%data(1)%values, ice%data(2)%values, ice%data(3)%values) &
+    !$ACC      COPY(ice%data(1)%valuesl, ice%data(2)%valuesl, ice%data(3)%valuesl) &
+    !$ACC      COPY(ice%data(1)%dvalues, ice%data(2)%dvalues, ice%data(3)%dvalues) &
+    !$ACC      COPY(ice%data(1)%values_rhs, ice%data(2)%values_rhs, ice%data(3)%values_rhs) &
+    !$ACC      COPY(ice%data(1)%values_div_rhs, ice%data(2)%values_div_rhs, ice%data(3)%values_div_rhs)
+
     !___________________________________________________________________________
     ! ===== Dynamics
     SELECT CASE (ice%whichEVP)
     CASE (0)
-        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'  
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'
         call EVPdynamics  (ice, partit, mesh)
     CASE (1)
-        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics_m...'//achar(27)//'[0m'  
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics_m...'//achar(27)//'[0m'
         call EVPdynamics_m(ice, partit, mesh)
     CASE (2)
-        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics_a...'//achar(27)//'[0m'  
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics_a...'//achar(27)//'[0m'
         call EVPdynamics_a(ice, partit, mesh)
     CASE DEFAULT
         if (mype==0) write(*,*) 'a non existing EVP scheme specified!'
         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
         stop
     END SELECT
-    
+
     if (use_cavity) call cavity_ice_clean_vel(ice, partit, mesh)
-    t1=MPI_Wtime()   
-    
+    t1=MPI_Wtime()
+
     !___________________________________________________________________________
     ! ===== Advection part
     ! old FCT routines
@@ -217,14 +240,16 @@ subroutine ice_timestep(step, ice, partit, mesh)
 !$OMP END PARALLEL DO
 #endif /* (__oifs) */
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
-    call ice_TG_rhs_div    (ice, partit, mesh)  
-    
-    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_solve...'//achar(27)//'[0m' 
+    call ice_TG_rhs_div    (ice, partit, mesh)
+
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_solve...'//achar(27)//'[0m'
     call ice_fct_solve     (ice, partit, mesh)
-    
+
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_update_for_div...'//achar(27)//'[0m'
     call ice_update_for_div(ice, partit, mesh)
-    
+
+    !$ACC END DATA
+
 #if defined (__oifs) || defined (__ifsinterface)
 !$OMP PARALLEL DO
     do i=1,myDim_nod2D+eDim_nod2D
@@ -235,10 +260,10 @@ subroutine ice_timestep(step, ice, partit, mesh)
 
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call cut_off...'//achar(27)//'[0m'
     call cut_off(ice, partit, mesh)
-    
+
     if (use_cavity) call cavity_ice_clean_ma(ice, partit, mesh)
     t2=MPI_Wtime()
-    
+
     !___________________________________________________________________________
     ! ===== Thermodynamic part
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
@@ -254,13 +279,13 @@ subroutine ice_timestep(step, ice, partit, mesh)
             write(*,*) " U_ice(n) = ", U_ice(i)
             write(*,*) " V_ice(n) = ", V_ice(i)
             write(*,*)
-        end if 
+        end if
     end do
 !$OMP END PARALLEL DO
     t3=MPI_Wtime()
     rtime_ice = rtime_ice + (t3-t0)
     rtime_tot = rtime_tot + (t3-t0)
-    if(mod(step,logfile_outfreq)==0 .and. mype==0) then 
+    if(mod(step,logfile_outfreq)==0 .and. mype==0) then
         write(*,*) '___ICE STEP EXECUTION TIMES____________________________'
 #if defined (__icepack)
         write(*,"(A, ES10.3)") '	Ice Dyn.        :', time_evp
@@ -286,8 +311,8 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_MESH
-    use o_PARAM   
-    use o_arrays        
+    use o_PARAM
+    use o_arrays
     use g_CONFIG
     USE g_read_other_NetCDF, only: read_other_NetCDF
     implicit none
@@ -301,7 +326,7 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
     real(kind=WP), external               :: TFrez  ! Sea water freeze temperature.
 !============== namelistatmdata variables ================
    integer, save                                :: nm_ic_unit     = 107 ! unit to open namelist file
-   integer                                      :: iost                 !I/O status 
+   integer                                      :: iost                 !I/O status
    integer, parameter                           :: ic_max=10
    logical                                      :: ic_cyclic=.true.
    integer,             save                    :: n_ic2d
@@ -333,6 +358,7 @@ if (.not.use_icebergs) then
     v_ice        => ice%vice(:)
     a_ice        => ice%data(1)%values(:)
     m_ice        => ice%data(2)%values(:)
+    m_snow       => ice%data(3)%values(:)
     !___________________________________________________________________________
     m_ice =0._WP
     a_ice =0._WP
@@ -417,22 +443,22 @@ end if
     if (.not. ini_ice_from_file) then
     if(mype==0) write(*,*) 'initialize the sea ice: cold start'
     !___________________________________________________________________________
-    do i=1,myDim_nod2D+eDim_nod2D        
+    do i=1,myDim_nod2D+eDim_nod2D
         !_______________________________________________________________________
         if (ulevels_nod2d(i)>1) then
             !!PS m_ice(i)  = 1.0e15_WP
             !!PS m_snow(i) = 0.1e15_WP
             cycle ! --> if cavity, no sea ice, no initial state
-        endif    
-        
+        endif
+
         !_______________________________________________________________________
         if (tracers%data(1)%values(1,i)< 0.0_WP) then
             if (geo_coord_nod2D(2,i)>0._WP) then
                 m_ice(i) = 1.0_WP
-                m_snow(i)= 0.1_WP 
+                m_snow(i)= 0.1_WP
             else
                 m_ice(i) = 2.0_WP
-                m_snow(i)= 0.5_WP 
+                m_snow(i)= 0.5_WP
             end if
             a_ice(i) = 0.9_WP
             u_ice(i) = 0.0_WP
@@ -441,7 +467,7 @@ end if
     enddo
     else
     if (mype==0) write(*,*) 'initialize the sea ice: from file'
-       DO i=1, n_ic2d 
+       DO i=1, n_ic2d
           DO current_tracer=1, ice%num_itracers
              IF (ice%data(current_tracer)%ID==idlist(i)) then
                 IF (mype==0) then

@@ -2,7 +2,7 @@
 ! Modules of cell-vertex ocean model
 ! S. Danilov, 2012 (sergey.danilov@awi.de)
 ! SI units are used
-  
+
 !==========================================================
 MODULE o_PARAM
 integer, parameter            :: WP=8        ! Working precision
@@ -11,7 +11,7 @@ integer		                  :: mstep
 real(kind=WP), parameter      :: pi=3.14159265358979
 real(kind=WP), parameter      :: rad=pi/180.0_WP
 real(kind=WP), parameter      :: density_0=1030.0_WP
-real(kind=WP), parameter      :: density_0_r=1.0_WP/density_0 ! [m^3/kg]         
+real(kind=WP), parameter      :: density_0_r=1.0_WP/density_0 ! [m^3/kg]
 real(kind=WP), parameter      :: g=9.81_WP
 real(kind=WP), parameter      :: r_earth=6367500.0_WP
 real(kind=WP), parameter      :: omega=2*pi/(3600.0_WP*24.0_WP)
@@ -47,18 +47,18 @@ logical                       :: Fer_GM =.false.  !flag for Ferrari et al. (2010
 real(kind=WP)                 :: K_GM_max = 3000.
 real(kind=WP)                 :: K_GM_min = 2.0
 integer                       :: K_GM_bvref = 2 ! 0...surface, 1...bottom mixlay, 2...mean over mixlay
-real(kind=WP)                 :: K_GM_resscalorder = 2.0 
+real(kind=WP)                 :: K_GM_resscalorder = 2.0
 real(kind=WP)                 :: K_GM_rampmax = 40.0 ! Resol >K_GM_rampmax[km] GM full
 real(kind=WP)                 :: K_GM_rampmin = 30.0 ! Resol <K_GM_rampmin[km] GM off
 logical                       :: scaling_Ferreira   =.true.
-logical                       :: scaling_Rossby     =.false. 
+logical                       :: scaling_Rossby     =.false.
 logical                       :: scaling_resolution =.true.
 logical                       :: scaling_FESOM14    =.false.
 logical                       :: Redi               =.false.  !flag for Redi scheme
 
 real(kind=WP)                 :: visc_sh_limit=5.0e-3      !for KPP, max visc due to shear instability
 real(kind=WP)                 :: diff_sh_limit=5.0e-3      !for KPP, max diff due to shear instability
-logical                       :: Kv0_const=.true.		    !use Kv0 varying with depth and latitude 
+logical                       :: Kv0_const=.true.		    !use Kv0 varying with depth and latitude
 logical                       :: double_diffusion=.false.  !for KPP,dd switch
                                  ! KPP parametrization
 character(25)                 :: mix_scheme     ='KPP'	   !'KPP','PP'
@@ -68,14 +68,16 @@ real(KIND=WP)                 :: concv  = 1.6_WP  ! constant for pure convection
 
 logical                       :: hbl_diag =.false.        ! writen boundary layer depth
 logical                       :: use_global_tides=.false. ! tidal potential will be computed and used in the SSH gradient computation
-! Time stepping                               
+! Time stepping
 ! real(kind=WP)                 :: alpha=1.0_WP, theta=1.0_WP ! implicitness for
 real(kind=WP)                 :: alpha=1.0_WP, theta=1.0_WP ! implicitness for
                                                  ! elevation and divergence
-real(kind=WP)                 :: epsilon=0.1_WP  ! AB2 offset 
+real(kind=WP)                 :: epsilon=0.1_WP  ! AB2 offset
 ! Tracers
 
 logical                       :: SPP=.false.
+
+integer                       :: acc_vl = 64
 
 TYPE tracer_source3d_type
     integer                             :: locID
@@ -98,16 +100,16 @@ integer                        :: index_age_tracer = -1 ! water age tracer index
 
 ! Momentum
 !!PS logical                       :: free_slip=.false.
-!!PS                                 ! false=no slip 
+!!PS                                 ! false=no slip
 !!PS integer                       :: mom_adv=2
                                 ! 1 vector control volumes, p1 velocities
-				! 2 scalar control volumes  
-				! 3 vector invariant 
+				! 2 scalar control volumes
+				! 3 vector invariant
 
-logical                       :: open_b=.false.   ! Reserved    
+logical                       :: open_b=.false.   ! Reserved
 
 !_______________________________________________________________________________
-!--> mixing enhancement than can be applied via subroutine mo_convect(mesh) 
+!--> mixing enhancement than can be applied via subroutine mo_convect(mesh)
 !    additionally to every mixing scheme i.e. KPP, PP, cvmix_KPP, cvmix_PP, cvmix_TKE
 
 ! Switch for Monin-Obukov TB04 mixing --> can be additionally applied for all mixing schemes
@@ -117,7 +119,7 @@ real(kind=WP)                 :: momix_lat     = -50.0_WP ! latitudinal treshhol
 real(kind=WP)                 :: momix_kv      = 0.01   ! for PP/KPP, mixing coefficient within MO length
 
 ! Switch for enhanced vertical mixing in case of instable stratification --> enhanced
-! convection 
+! convection
 logical                       :: use_instabmix = .true.
 real(kind=WP)                 :: instabmix_kv  = 0.1
 
@@ -139,7 +141,7 @@ logical                       :: use_kpp_nonlclflx = .false.
 !_______________________________________________________________________________
 ! *** active tracer cutoff
 logical          :: limit_salinity=.true.         !set an allowed range for salinity
-real(kind=WP)    :: salinity_min=5.0              !minimal salinity 
+real(kind=WP)    :: salinity_min=5.0              !minimal salinity
 real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s to s_min
 
   namelist /tracer_cutoff/ limit_salinity, salinity_min, coeff_limit_salinity
@@ -148,21 +150,21 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
  real(kind=WP)                        :: time_sum=0.0 ! for runtime estimate
 
 !___________________________________________
-! Pressure Gradient Force  calculation (pgf) 
-! calculation of pgf either: 
+! Pressure Gradient Force  calculation (pgf)
+! calculation of pgf either:
 ! only linfs:
 ! > 'nemo'         ... like NEMO (interpolate to elemental depth, inter-/extrapolation)
 ! linfs, zlevel, zstar:
 ! > 'shchepetkin'  ... based on density jacobian
 ! > 'cubicspline'  ... like in FESOM1.4
 ! > 'easypgf'      ... interpolate pressure on elemental depth
-character(20)                  :: which_pgf='shchepetkin' 
+character(20)                  :: which_pgf='shchepetkin'
 
 
  NAMELIST /oce_dyn/ state_equation, C_d, A_ver, &
                     scale_area, SPP,&
-                    Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, & 
-                    scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, & 
+                    Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, &
+                    scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, &
                     Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, alpha, theta, use_density_ref, &
                     K_back, c_back, uke_scaling, uke_scaling_factor, smooth_back, smooth_dis, &
                     smooth_back_tend, rosb_dis
@@ -173,14 +175,14 @@ character(20)                  :: which_pgf='shchepetkin'
             use_instabmix, instabmix_kv, &
             use_windmix, windmix_kv, windmix_nl, &
             use_kpp_nonlclflx
-            
-END MODULE o_PARAM  
+
+END MODULE o_PARAM
 !==========================================================
 MODULE o_ARRAYS
 USE o_PARAM
 IMPLICIT NONE
-! Arrays are described in subroutine array_setup  
-real(kind=WP), allocatable         :: uke(:,:), v_back(:,:), uke_back(:,:), uke_dis(:,:), uke_dif(:,:) 
+! Arrays are described in subroutine array_setup
+real(kind=WP), allocatable         :: uke(:,:), v_back(:,:), uke_back(:,:), uke_dis(:,:), uke_dif(:,:)
 real(kind=WP), allocatable         :: uke_rhs(:,:), uke_rhs_old(:,:)
 !real(kind=WP), allocatable         :: UV_ib(:,:,:) ! kh 08.03.21 additional array for asynchronous iceberg computations
 real(kind=WP), allocatable         :: UV_dis_tend(:,:,:), UV_back_tend(:,:,:), UV_total_tend(:,:,:), UV_dis_tend_node(:,:,:)
@@ -204,14 +206,14 @@ real(kind=WP), allocatable    :: Tclim(:,:), Sclim(:,:)
 real(kind=WP), allocatable    :: Tclim_ib(:,:), Sclim_ib(:,:)
 !!PS real(kind=WP), allocatable    :: Visc(:,:)
 real(kind=WP), allocatable    :: Tsurf_t(:,:), Ssurf_t(:,:)
-real(kind=WP), allocatable    :: tau_x_t(:,:), tau_y_t(:,:) 
-real(kind=WP), allocatable    :: heat_flux_t(:,:), heat_rel_t(:,:), heat_rel(:) 
+real(kind=WP), allocatable    :: tau_x_t(:,:), tau_y_t(:,:)
+real(kind=WP), allocatable    :: heat_flux_t(:,:), heat_rel_t(:,:), heat_rel(:)
 !!PS real(kind=WP), allocatable    :: coriolis(:), coriolis_node(:)
 real(kind=WP), allocatable    :: relax2clim(:)
 real(kind=WP), allocatable    :: MLD1(:), MLD2(:), MLD3(:)
 integer,       allocatable    :: MLD1_ind(:), MLD2_ind(:), MLD3_ind(:)
 real(kind=WP), allocatable    :: ssh_gp(:)
-!Tracer gradients&RHS      
+!Tracer gradients&RHS
 real(kind=WP), allocatable :: tr_xy(:,:,:)
 real(kind=WP), allocatable :: tr_z(:,:)
 
