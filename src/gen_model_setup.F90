@@ -123,6 +123,7 @@ subroutine setup_model(partit)
 
   read (fileunit, NML=age_tracer, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'age_tracer', nmlfile, partit)
+  close (fileunit)
 
 !   if(use_ice) then
 !   nmlfile ='namelist.ice'    ! name of ice namelist file
