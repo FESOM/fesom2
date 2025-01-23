@@ -3175,11 +3175,20 @@ subroutine dvd_add_difflux_sbc(do_SDdvd, tr_num, dvd_tot, tr, trstar, partit, me
         
         !_______________________________________________________________________
         ! apply apply surface boundarie condition
+        ! SBC_dvd = -2*T_k*Qflx - 2*T_k*T_w * W * kron_1k + T_k^2 * W *kron_1k
+        !         = -2*T_k*Qflx + ((T_k - T_w)^2 - T_w^2) *W * kron_1k
+        !
+        ! temp: T_w=T_k, ((T_k - T_w)^2 - T_w^2) = -T_k^2
+        !       -->SBC_dvd = -2*T_k (Qflx + 0.5*T_k*W)        
+        !       
+        ! salt: T_w=0  , ((T_k - T_w)^2 - T_w^2) =  T_k^2
+        !       -->SBC_dvd = -2*T_k (Qflx - 0.5*T_k*W)        
+        !
         nz = nu1
         if     (tr_num==1) then 
             sbc = -(heat_flux(node)/vcpw + tr(nz, node)*water_flux(node)*is_nonlinfs*0.5_WP)
         elseif (tr_num==2) then 
-                sbc =  (virtual_salt(node) + relax_salt(node) - (real_salt_flux(node) - tr(nz, node)*water_flux(node)*0.5_WP)*is_nonlinfs)
+            sbc =  (virtual_salt(node) + relax_salt(node) - (real_salt_flux(node) - tr(nz, node)*water_flux(node)*0.5_WP)*is_nonlinfs)
         end if 
         Dflx(nz) = Dflx(nz) + sbc*area(nz, node)
             
