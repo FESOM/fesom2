@@ -80,7 +80,7 @@ module io_MEANDATA
 !
   integer, save                  :: io_listsize   =0
   logical, save                  :: vec_autorotate=.FALSE.
-  logical, save                  :: lnextGEMS=.FALSE.
+  logical, save                  :: lnextGEMS     =.FALSE.
   integer, save                  :: nlev_upper=1
   character(len=1), save         :: filesplit_freq='y'
   integer, save                  :: compression_level=0
@@ -361,7 +361,21 @@ CASE ('MLD2      ')
     call def_stream(nod2D, myDim_nod2D, 'MLD2',     'Mixed Layer Depth',               'm',      MLD2(1:myDim_nod2D),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('MLD3      ')
     call def_stream(nod2D, myDim_nod2D, 'MLD3',     'Mixed Layer Depth',               'm',      MLD3(1:myDim_nod2D),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-    
+
+!_______________________________________________________________________________
+! output heat content (for destine)
+CASE ('hc300m')
+    if (ldiag_destinE) then
+        call def_stream(nod2D, myDim_nod2D, 'heatcontent300m', 'Vertically integrated heat content upper 300m',   'J m**-2', heatcontent(1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if 
+CASE ('hc700m')
+    if (ldiag_destinE) then
+        call def_stream(nod2D, myDim_nod2D, 'heatcontent700m', 'Vertically integrated heat content upper 700m',   'J m**-2', heatcontent(2,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if 
+CASE ('hc')
+    if (ldiag_destinE) then
+        call def_stream(nod2D, myDim_nod2D, 'heatcontent',     'Vertically integrated heat content total column', 'J m**-2', heatcontent(3,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if 
 !_______________________________________________________________________________
 !---wiso-code
 ! output water isotopes in sea ice
