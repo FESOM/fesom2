@@ -1128,7 +1128,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     call exchange_nod(ice_temp, partit, luse_g2g = .true.)
 #endif
 
+#ifdef ENABLE_OPENACC
 !$ACC END DATA
+#endif
 
 !$OMP BARRIER
 end subroutine ice_fem_fct
