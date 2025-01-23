@@ -9,6 +9,7 @@ ldiag_dMOC       =.false.
 ldiag_DVD        =.false.
 ldiag_forc       =.false.
 ldiag_extflds    =.false.
+ldiag_destinE    =.false. ! enables computation of heatcontent. (hc300m, hc700m, hc) in io_list
 ldiag_trflx      =.false.
 ldiag_uvw_sqr    =.false.
 ldiag_trgrd_xyz  =.false.
