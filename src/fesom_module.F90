@@ -194,7 +194,7 @@ contains
           write (*,*)
           write (*,*) "*** Transient tracers: Initial atmospheric input values >>>"
           write (*,*) "Year CE, xCO2, D14C_NH, D14C_TZ, D14C_SH, xCFC-11_NH, xCFC-11_SH, xCFC-12_NH, xCFC-12_SH, xSF6_NH, xSF6_SH"
-          write (*, fmt="(2x,i4,10(2x,f6.2))"), &
+          write (*, fmt="(2x,i4,10(2x,f6.2))") &
                   year_ce(ti_transit), xCO2_ti(ti_transit) * 1.e6, &
                   (r14c_nh(ti_transit) - 1.) * 1000., (r14c_tz(ti_transit) - 1.) * 1000., (r14c_sh(ti_transit) - 1.) * 1000., &
                   xf11_nh(ti_transit) * 1.e12, xf11_sh(ti_transit) * 1.e12, &
@@ -654,7 +654,7 @@ contains
             write (*,*)
             write (*,*) "*** Transient tracers: Updated atmospheric input values >>>"
             write (*,*) "Year CE, xCO2, D14C_NH, D14C_TZ, D14C_SH, xCFC-11_NH, xCFC-11_SH, xCFC-12_NH, xCFC-12_SH, xSF6_NH, xSF6_SH"
-            write (*, fmt="(2x,i4,10(2x,f6.2))"), &
+            write (*, fmt="(2x,i4,10(2x,f6.2))") &
                         year_ce(ti_transit), xCO2_ti(ti_transit) * 1.e6, &
                         (r14c_nh(ti_transit) - 1.) * 1000., (r14c_tz(ti_transit) - 1.) * 1000., (r14c_sh(ti_transit) - 1.) * 1000., &
                         xf11_nh(ti_transit) * 1.e12, xf11_sh(ti_transit) * 1.e12, &
