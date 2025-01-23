@@ -3114,7 +3114,7 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_DYN
-    USE g_CONFIG,only: dt
+    USE g_CONFIG !,only: dt
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -3239,8 +3239,14 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         zinv=1.0_WP*dt/(zbar_n(nzmax-1)-zbar_n(nzmax))
         !!PS friction=-C_d*sqrt(UV(1,nlevels(elem)-1,elem)**2+ &
         !!PS             UV(2,nlevels(elem)-1,elem)**2)
-        friction=-C_d*sqrt(UV(1,nzmax-1,elem)**2+ &
-                        UV(2,nzmax-1,elem)**2)
+        
+        if ((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) then
+           friction=-C_d
+        else
+           friction=-C_d*sqrt(UV(1,nzmax-1,elem)**2+ &
+                           UV(2,nzmax-1,elem)**2)
+        end if
+
         ur(nzmax-1)=ur(nzmax-1)+zinv*friction*UV(1,nzmax-1,elem)
         vr(nzmax-1)=vr(nzmax-1)+zinv*friction*UV(2,nzmax-1,elem)
 

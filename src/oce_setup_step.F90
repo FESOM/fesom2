@@ -91,6 +91,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     use g_cvmix_tidal
     use g_backscatter
     use Toy_Channel_Soufflet
+    use Toy_Channel_Dbgyre
     use oce_initial_state_interface
     use oce_adv_tra_fct_interfaces
     use init_ale_interface
@@ -226,6 +227,8 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
               call compute_zonal_mean_ini(partit, mesh)  
               call compute_zonal_mean(dynamics, tracers, partit, mesh)
            end if
+         CASE("dbgyre")
+             call initial_state_dbgyre(dynamics, tracers, partit, mesh)
        END SELECT
     else
        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call oce_initial_state'//achar(27)//'[0m' 
@@ -766,6 +769,8 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     ! ================     
     !allocate(stress_diag(2, elem_size))!delete me
     !!PS allocate(Visc(nl-1, elem_size))
+    allocate(t_star(node_size))
+    allocate(qsr_c(node_size))
     ! ================
     ! elevation and its rhs
     ! ================
