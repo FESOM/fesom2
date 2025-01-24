@@ -272,7 +272,7 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   logical, save :: initialized_bin = .false.
 !  integer mpierr
 
-#if defined(__recom) || defined ( __usetp)
+#if defined ( __usetp)
 ! kh 31.03.22
     integer :: tr_arr_slice_count_fix_1
     integer :: group_i
@@ -291,7 +291,7 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   
   integer             :: cstep
 
-#if defined(__recom) || defined ( __usetp)
+#if defined ( __usetp)
 ! kh 31.03.22 nl is required
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
