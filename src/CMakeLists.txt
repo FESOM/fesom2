@@ -237,7 +237,7 @@ if(OPENMP_REPRODUCIBLE)
 endif()
 
 if(${RECOM_COUPLED})
-   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __3Zoo2Det __coccos)# __usetp)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __usetp) #__3Zoo2Det __coccos)
 endif()
 
 if(${CISO_COUPLED})

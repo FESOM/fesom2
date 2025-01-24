@@ -151,7 +151,13 @@ module g_config
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
                         use_transit
-  
+ 
+#if defined(__recom) & defined(__usetp)
+! kh 11.11.21 number of groups for multi FESOM group loop parallelization
+  integer                       :: num_fesom_groups=1
+  namelist /run_config_tp/ num_fesom_groups  
+#endif
+ 
   !_____________________________________________________________________________
   ! *** others ***
   real(kind=WP)                 :: dt

@@ -163,6 +163,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 #if defined(__recom)
     use recom_glovar
     use recom_config
+    use recom_ciso
+    use o_arrays
 #endif
     use diagnostics, only: ldiag_DVD
     use g_forcing_param, only: use_age_tracer !---age-code
@@ -173,6 +175,38 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     type(t_tracer), intent(inout), target    :: tracers
     type(t_partit), intent(inout), target    :: partit
     type(t_mesh)  , intent(in)   , target    :: mesh
+
+#if defined(__recom) || defined ( __usetp)
+! kh 11.11.21 multi FESOM group loop parallelization
+    integer             :: num_tracers
+    integer             :: tr_num_start_memo
+
+! kh 15.11.21
+    integer             :: group_i
+    integer             :: tr_num_start
+
+! kh 19.11.21
+    logical             :: has_one_added_tracer
+    logical             :: has_one_added_tracer_local_dummy
+    logical             :: tr_num_end_local_dummy
+    logical             :: tr_num_in_group_local_dummy
+    integer             :: tr_num_end
+    logical             :: tr_num_in_group_dummy
+    integer             :: tr_arr_slice_count_fix_1
+
+! kh 28.03.22
+    integer             :: Sinkflx_tr_slice_count_fix_1
+    integer             :: Benthos_tr_slice_count_fix_1
+
+    integer             :: tr_num_start_local
+    integer             :: tr_num_to_send
+
+! kh 22.11.21
+    logical             :: completed
+
+    logical             :: bBreak
+#endif
+
     !___________________________________________________________________________
     integer                                  :: i, tr_num, node, elem, nzmax, nzmin
     real(kind=WP)                            :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_elem2D) ! local variable ! OG - tra_diag
@@ -195,6 +229,10 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         fer_Wvel   => dynamics%fer_w(:,:)
     end if
     del_ttf => tracers%work%del_ttf
+
+#if defined(__recom) || defined ( __usetp)
+    num_tracers=tracers%num_tracers
+#endif
 
     !___________________________________________________________________________
     if (SPP) call cal_rejected_salt(ice, partit, mesh)
@@ -231,13 +269,42 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         !$ACC UPDATE DEVICE(dynamics%w, dynamics%w_e, dynamics%uv) !!! async(1) 
 !!!     !$ACC UPDATE DEVICE(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus)
         !$ACC UPDATE DEVICE (mesh%helem, mesh%hnode, mesh%hnode_new, mesh%zbar_3d_n, mesh%z_3d_n)
-    do tr_num=1, tracers%num_tracers
 
-!YY: sinkflx needs to be reset at each time step
-        if(use_MEDUSA) then
+#if defined(__usetp)
+! kh 11.11.21 multi FESOM group loop parallelization
+    call calc_slice(num_tracers, num_fesom_groups, partit%my_fesom_group, tr_num_start, tr_num_end, tr_num_in_group_dummy, has_one_added_tracer)
+
+! kh 19.11.21
+    tr_arr_slice_count_fix_1 = 1 * (nl - 1) * (myDim_nod2D + eDim_nod2D)
+
+! kh 28.03.22
+    Sinkflx_tr_slice_count_fix_1 = 1 * (myDim_nod2D + eDim_nod2D) * bottflx_num
+    Benthos_tr_slice_count_fix_1 = 1 * (myDim_nod2D + eDim_nod2D) * benthos_num
+
+    tr_num_start_memo = tr_num_start
+
+! kh 22.11.21
+    request_count = 0
+#endif
+
+#if defined(__usetp)
+    do tr_num = tr_num_start, tr_num_end
+#else
+    do tr_num=1, tracers%num_tracers
+#endif
+
+#if defined(__recom)
+    if(use_MEDUSA) then
             SinkFlx = 0.0d0
-        endif
-    
+#if defined(__usetp)
+            SinkFlx_tr(:, :, tr_num) = 0.0d0
+#endif
+    endif
+#if defined(__usetp)
+    Benthos_tr(:, :, tr_num) = 0.0d0
+#endif
+#endif !__recom
+
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
@@ -322,9 +389,92 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         end if
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
 !$OMP BARRIER
-    end do
+!    end do
 !!!        !$ACC UPDATE HOST (tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus) &
 !!!        !$ACC HOST  (tracers%work%edge_up_dn_grad)
+
+#if defined(__usetp)
+! kh 19.11.21 broadcast tracer results to fesom groups
+        if(num_fesom_groups > 1) then
+
+            do group_i = 0, num_fesom_groups - 1
+                call calc_slice(num_tracers, num_fesom_groups, group_i, tr_num_start_local, tr_num_end_local_dummy, tr_num_in_group_local_dummy, has_one_added_tracer_local_dummy)
+
+                tr_num_to_send = tr_num_start_local + (tr_num - tr_num_start_memo)
+
+                if((tr_num == tr_num_end) .and. has_one_added_tracer) then
+                    ! skip: if last tracer in group was added to compensate for fragementation it is skipped here and handled after the loop
+                else
+                    request_count = request_count + 1
+
+! kh 22.11.21 non-blocking communication overlapped with computation in loop
+                    call MPI_IBcast(tracers%data(tr_num_to_send)%values(:, :), tr_arr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                                group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, tr_arr_requests(request_count),     MPIerr)
+
+                    if(use_MEDUSA) then
+                        call MPI_IBcast(Sinkflx_tr (:, :, tr_num_to_send), Sinkflx_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                                    group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, SinkFlx_tr_requests(request_count), MPIerr)
+                    endif
+                        call MPI_IBcast(Benthos_tr (:, :, tr_num_to_send), Benthos_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                                    group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, Benthos_tr_requests(request_count), MPIerr)
+                end if
+            end do
+        end if ! (num_fesom_groups > 1) then
+#endif
+    end do ! tr_num = tr_num_start, tr_num_end
+    
+#if defined(__usetp)
+! kh 19.11.21 if tracer in group was added to compensate for fragmentation its broadcast of the last index is handled here
+    if(num_fesom_groups > 1) then
+        do group_i = 0, num_fesom_groups - 1
+            call calc_slice(num_tracers, num_fesom_groups, group_i, tr_num_start, tr_num_end, tr_num_in_group_dummy, has_one_added_tracer)
+
+            if(has_one_added_tracer) then
+
+                request_count = request_count + 1
+
+                call MPI_IBcast(tracers%data(tr_num_end)%values(:, :), tr_arr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, tr_arr_requests(request_count),     MPIerr)
+                if(use_MEDUSA) then
+                    call MPI_IBcast(Sinkflx_tr (:, :, tr_num_end), Sinkflx_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                    group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, SinkFlx_tr_requests(request_count), MPIerr)
+                endif
+                    call MPI_IBcast(Benthos_tr (:, :, tr_num_end), Benthos_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                    group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, Benthos_tr_requests(request_count), MPIerr)
+            end if
+        end do
+    end if !(num_fesom_groups > 1) then
+
+    if(num_fesom_groups > 1) then
+        completed = .false.
+        do while (.not. completed)
+            call MPI_TESTALL(request_count, tr_arr_requests(:),     completed, MPI_STATUSES_IGNORE, MPIerr)
+        end do
+
+        if(use_MEDUSA) then
+            completed = .false.
+            do while (.not. completed)
+                call MPI_TESTALL(request_count, SinkFlx_tr_requests(:), completed, MPI_STATUSES_IGNORE, MPIerr)
+            end do
+        endif ! (use_MEDUSA) then
+
+            completed = .false.
+            do while (.not. completed)
+                call MPI_TESTALL(request_count, Benthos_tr_requests(:), completed, MPI_STATUSES_IGNORE, MPIerr)
+            end do
+    end if ! (num_fesom_groups > 1) then
+#endif
+
+#if defined(__recom)
+! kh 25.03.22 SinkFlx and Benthos values are buffered per tracer index in the loop above and now summed up to
+! avoid non bit identical results regarding global sums when running the tracer loop in parallel
+        do tr_num = 1, num_tracers
+            if(use_MEDUSA) then
+                SinkFlx = SinkFlx + SinkFlx_tr(:, :, tr_num)
+            endif
+            Benthos = Benthos + Benthos_tr(:, :, tr_num)
+        end do
+#endif
 
     !___________________________________________________________________________
     ! 3D restoring for "passive" tracers
@@ -1608,6 +1758,8 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
 #if defined (__recom)
    use recoM_declarations
    use recom_glovar
+   use recom_config
+   use recom_ciso   
 #endif
   use mod_transit
   implicit none
@@ -1893,3 +2045,38 @@ FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit, mesh)
 
 END FUNCTION
 
+!===============================================================================
+! kh 11.11.21 divide the range specified by indexcount into fesom_group_count equal slices and calculate
+! the start_index and end_index for the given fesom_group_id.
+! if necessary to compensate for fragmentation, the end index of the first n slices
+! might be one higher than for the remaining slices. this is indicated by end_index_is_one_higher
+subroutine calc_slice(index_count, fesom_group_count, fesom_group_id, start_index, end_index, index_count_in_group, end_index_is_one_higher)
+!   use g_config
+
+    implicit none
+    integer, intent(in)      :: index_count
+    integer, intent(in)      :: fesom_group_count
+    integer, intent(in)      :: fesom_group_id
+    integer, intent(out)     :: start_index
+    integer, intent(out)     :: end_index
+    integer, intent(out)     :: index_count_in_group
+    logical, intent(out)     :: end_index_is_one_higher
+
+    integer                  :: group_id_limit_to_adjust_end_index
+
+    index_count_in_group               = index_count / fesom_group_count
+    group_id_limit_to_adjust_end_index = mod(index_count, fesom_group_count)
+    start_index                        = (fesom_group_id * index_count_in_group) + 1
+
+! kh 11.11.21 adjust loop start and number of loop iterations by 1 if necessary
+    if(fesom_group_id < group_id_limit_to_adjust_end_index) then
+      start_index = start_index + fesom_group_id
+      index_count_in_group = index_count_in_group + 1
+      end_index_is_one_higher = .true.
+    else
+      start_index = start_index + group_id_limit_to_adjust_end_index
+      end_index_is_one_higher = .false.
+    end if
+
+    end_index  = start_index + index_count_in_group - 1
+end subroutine calc_slice

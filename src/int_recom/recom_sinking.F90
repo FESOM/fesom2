@@ -148,6 +148,7 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
         ! now SinkFlx hat the unit mmol/time step 
         ! but mmol/m2/time is needed for MEDUSA: thus /area
             endif
+            !YY: check if benthos_tr should be needed for usetp
             if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then  
 ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
                Benthos_tr(n,1,tr_num)= Benthos_tr(n,1,tr_num) +  add_benthos_2d(n) ![mmol]

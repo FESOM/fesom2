@@ -811,6 +811,12 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     allocate(str_bf    ( nl-1, node_size ))
     allocate(vert_sink ( nl-1, node_size ))
     allocate(Alk_surf  (       node_size ))
+#if defined (__usetp)
+! kh 22.11.21
+    allocate(tr_arr_requests(num_tracers), tr_arr_old_requests(num_tracers))
+    allocate(SinkFlx_tr_requests(num_tracers))
+    allocate(Benthos_tr_requests(num_tracers))
+#endif
 #endif
     ! =================
     ! Visc and Diff coefs
@@ -920,6 +926,13 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     str_bf              = 0.0_WP
     vert_sink           = 0.0_WP
     Alk_surf            = 0.0_WP
+#if defined (__usetp)
+! kh 23.03.22
+    tr_arr_requests     = 0
+    tr_arr_old_requests = 0
+    SinkFlx_tr_requests = 0
+    Benthos_tr_requests = 0
+#endif  
 #endif
     
     ! init field for pressure force 
@@ -1015,6 +1028,9 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     end if
 
     if (mype==0) then
+#if defined (__usetp)
+        if (my_fesom_group==0) then
+#endif
             write(*,*)
             print *, achar(27)//'[36m'//'*************************'//achar(27)//'[0m'
             print *, achar(27)//'[36m'//' --> RECOM ON'//achar(27)//'[0m'
@@ -1039,6 +1055,9 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             write(*,*) 'read Nitrate     climatology from:', trim(filelist(6))
             write(*,*) 'read Salt        climatology from:', trim(filelist(7))
             write(*,*) 'read Temperature climatology from:', trim(filelist(8))
+#if defined ( __usetp)
+        end if ! (my_fesom_group==0) then
+#endif
     end if
     ! read ocean state
     ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
@@ -1055,9 +1074,10 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
     if(mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(1))
     if(mype==0) write(*,*) 'read Salinity    climatology from:', trim(filelist(2))
-
 #endif
+
     if(any(idlist == 14) .and. mype==0) write(*,*) 'read radiocarbon climatology from:', trim(filelist(3))
+
     call do_ic3d(tracers, partit, mesh)
     
     Tclim=tracers%data(1)%values
@@ -1075,9 +1095,17 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 
 #if defined(__recom)
     if (restore_alkalinity) then
+
+#if defined ( __usetp)
+        if (my_fesom_group==0) then
+#endif
         if (mype==0) write(*,*)
         if (mype==0) print *, achar(27)//'[46;1m'//' --> Set surface field for alkalinity restoring'//achar(27)//'[0m'
-        if (mype==0) write(*,*)
+        if (mype==0) write(*,*),'Alkalinity restoring = true. Field is read.'
+#if defined ( __usetp)
+        endif !(my_fesom_group==0) then
+#endif
+
         Alk_surf = tracers%data(5)%values(1,:) ! alkalinity is the 5th tracer
     endif
 
@@ -1112,26 +1140,101 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
         !_______________________________________________________________________
         CASE (1004:1017)
             tracers%data(i)%values(:,:)=0.0_WP
+#if defined ( __usetp)
+    if (my_fesom_group==0) then
+#endif
             if (mype==0) then
                 write (i_string,  "(I4)") i
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
+#if defined ( __usetp)
+    endif !(my_fesom_group==0) then
+#endif
         CASE (1020:1021)
             tracers%data(i)%values(:,:)=0.0_WP
+#if defined ( __usetp)
+    if (my_fesom_group==0) then
+#endif
             if (mype==0) then
                 write (i_string,  "(I4)") i
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
+#if defined ( __usetp)
+    endif !(my_fesom_group==0) then
+#endif
         CASE (1023:1033)
             tracers%data(i)%values(:,:)=0.0_WP
+#if defined ( __usetp)
+    if (my_fesom_group==0) then
+#endif
             if (mype==0) then
                 write (i_string,  "(I4)") i
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-        !_______________________________________________________________________
+#if defined ( __usetp)
+    endif !(my_fesom_group==0) then
+#endif
+!_______________________________________________________________________
+! Carbon isotopes
+! Carbon-13
+       CASE (1302)
+            tracers%data(i)%values(:,:)=0.0_WP
+#if defined ( __usetp)
+    if (my_fesom_group==0) then
+#endif
+            if (mype==0) then
+                write (i_string,  "(I4)") i
+                write (id_string, "(I4)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
+#if defined ( __usetp)
+    endif !(my_fesom_group==0) then
+#endif
+       CASE (1305:1321)
+            tracers%data(i)%values(:,:)=0.0_WP
+#if defined ( __usetp)
+    if (my_fesom_group==0) then
+#endif
+            if (mype==0) then
+                write (i_string,  "(I4)") i
+                write (id_string, "(I4)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
+#if defined ( __usetp)
+    endif !(my_fesom_group==0) then
+#endif
+! Radiocarbon
+       CASE (1402)
+            tracers%data(i)%values(:,:)=0.0_WP
+#if defined ( __usetp)
+    if (my_fesom_group==0) then
+#endif
+            if (mype==0) then
+                write (i_string,  "(I4)") i
+                write (id_string, "(I4)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
+#if defined ( __usetp)
+    endif !(my_fesom_group==0) then
+#endif
+       CASE (1405:1421)
+            tracers%data(i)%values(:,:)=0.0_WP
+#if defined ( __usetp)
+    if (my_fesom_group==0) then
+#endif
+            if (mype==0) then
+                write (i_string,  "(I4)") i
+                write (id_string, "(I4)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
+#if defined ( __usetp)
+    endif !(my_fesom_group==0) then
+#endif
+! End of carbon isotopes section
+!_______________________________________________________________________
         CASE (101)       ! initialize tracer ID=101
             tracers%data(i)%values(:,:)=0.0_WP
             if (mype==0) then

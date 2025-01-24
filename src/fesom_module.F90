@@ -60,6 +60,9 @@ module fesom_main_storage_module
     integer           :: which_readr ! read which restart files (0=netcdf, 1=core dump,2=dtype)
     integer           :: total_nsteps
     integer, pointer  :: mype, npes, MPIerr, MPI_COMM_FESOM, MPI_COMM_WORLD, MPI_COMM_FESOM_IB
+#if defined(__usetp)
+    integer, pointer  :: my_fesom_group, MPI_COMM_FESOM_WORLD, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS
+#endif
     real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
     real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
     real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing 
@@ -116,6 +119,19 @@ contains
       ! EO parameters
       logical mpi_is_initialized
       integer              :: tr_num
+
+#if defined(__usetp)
+! kh 11.11.21 multi FESOM group loop parallelization
+      integer             :: npes_fesom_world
+      integer             :: mype_fesom_world
+      integer             :: processes_per_group
+      integer             :: npes_check
+      integer             :: mype_check
+
+! kh 26.11.21 get current value for num_fesom_groups
+    call read_namelist_run_config
+#endif
+
 #if !defined  __ifsinterface
       if(command_argument_count() > 0) then
         call command_line_options%parse()
@@ -147,8 +163,13 @@ contains
 #endif
 
 #if defined (__oasis)
-
-        call cpl_oasis3mct_init(f%partit,f%partit%MPI_COMM_FESOM)
+!        call cpl_oasis3mct_init(f%partit,f%partit%MPI_COMM_FESOM)
+! kh 02.12.21
+#if defined(__usetp)
+        call cpl_oasis3mct_init(f%partit, f%partit%localCommunicator, num_fesom_groups)
+#else
+        call cpl_oasis3mct_init(f%partit, f%partit%localCommunicator)
+#endif
 #endif
         f%t1 = MPI_Wtime()
 
@@ -162,6 +183,108 @@ contains
 
         f%npes          =>f%partit%npes
 
+#if defined(__usetp)
+! kh 26.11.21 prepare communicator splitting for multi FESOM group loop parallelization
+    f%my_fesom_group=>f%partit%my_fesom_group
+
+    f%MPI_COMM_FESOM_WORLD=> f%partit%MPI_COMM_FESOM_WORLD
+    f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS=> f%partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS
+
+    f%MPI_COMM_FESOM_WORLD = f%MPI_COMM_FESOM
+    npes_fesom_world     = f%npes
+    mype_fesom_world     = f%mype
+    if(mype_fesom_world == 0) then
+        write(*,*) 'npes_fesom_world, num_fesom_groups', npes_fesom_world, num_fesom_groups
+    end if
+    if(mod(npes_fesom_world, num_fesom_groups) /= 0) then
+        if(mype_fesom_world == 0) then
+            write(*,*) 'MPI_comm_split mismatch npes_fesom_world, num_fesom_groups', npes_fesom_world, num_fesom_groups
+        end if
+        call par_ex(f%MPI_COMM_FESOM, f%mype)
+        stop
+    end if
+
+    processes_per_group = npes_fesom_world / num_fesom_groups
+    if(mype_fesom_world == 0) then
+        write(*,*) 'processes_per_group', processes_per_group
+    end if
+    f%npes           = processes_per_group
+    f%my_fesom_group = mype_fesom_world / processes_per_group
+    f%mype           = mod(mype_fesom_world, processes_per_group)
+
+! kh 26.11.21 split to num_fesom_groups
+    call MPI_comm_split(f%MPI_COMM_FESOM_WORLD, f%my_fesom_group, 0, f%MPI_COMM_FESOM, f%MPIerr)
+    if (f%MPIerr /= MPI_SUCCESS) then
+        write(*,*) 'MPI_comm_split(MPI_COMM_FESOM_WORLD, my_fesom_group, 0, MPI_COMM_FESOM, MPIERR) failed'
+        call par_ex(f%MPI_COMM_FESOM, f%mype)
+        stop
+    end if
+
+    call MPI_comm_size(f%MPI_COMM_FESOM, npes_check, f%MPIerr)
+    if(f%MPIerr /= MPI_SUCCESS) then
+        write(*,*) 'MPI_comm_size(MPI_COMM_FESOM, npes_check, MPIERR) failed'
+        call par_ex(f%MPI_COMM_FESOM, f%mype)
+        stop
+    end if
+
+    call MPI_comm_rank(f%MPI_COMM_FESOM, mype_check, f%MPIerr)
+    if(f%MPIerr /= MPI_SUCCESS) then
+        write(*,*) 'MPI_comm_rank(MPI_COMM_FESOM, mype_check, MPIERR) failed'
+        call par_ex(f%partit%MPI_COMM_FESOM, f%mype)
+        stop
+    end if
+
+    if(npes_check /= f%npes) then
+        write(*,*) 'npes mismatch, npes, npes_check', f%npes, npes_check
+        call par_ex(f%MPI_COMM_FESOM, f%mype)
+        stop
+    end if
+
+    if(mype_check /= f%mype) then
+        write(*,*) 'mype mismatch, mype, mype_check', f%mype, mype_check
+        call par_ex(f%MPI_COMM_FESOM, f%mype)
+        stop
+    end if
+
+! kh 17.11.21 group same ranks in each group for broadcasting
+!   write(*,*) 'mype, my_fesom_group', mype, my_fesom_group
+
+    call MPI_comm_split(f%MPI_COMM_FESOM_WORLD, f%mype, f%my_fesom_group, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIERR)
+    if (f%MPIERR /= MPI_SUCCESS) then
+        write(*,*) 'MPI_comm_split(MPI_COMM_FESOM_WORLD, mype, my_fesom_group, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIERR) failed'
+        call par_ex(f%MPI_COMM_FESOM, f%mype)
+        stop
+    end if
+
+    call MPI_comm_size(f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, npes_check, f%MPIERR)
+    if(f%MPIERR /= MPI_SUCCESS) then
+        write(*,*) 'MPI_comm_size(MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, npes_check, MPIERR) failed'
+        call par_ex(f%MPI_COMM_FESOM, f%mype)
+        stop
+    end if
+
+    call MPI_comm_rank(f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, mype_check, f%MPIERR)
+    if(f%MPIERR /= MPI_SUCCESS) then
+        write(*,*) 'MPI_comm_rank(MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, mype_check, MPIERR) failed'
+        call par_ex(f%MPI_COMM_FESOM, f%mype)
+        stop
+    end if
+
+    if(npes_check /= num_fesom_groups) then
+        write(*,*) 'npes mismatch, num_fesom_groups, npes_check', num_fesom_groups, npes_check
+        call par_ex(f%MPI_COMM_FESOM, f%mype)
+        stop
+    end if
+
+    if(mype_check /= f%my_fesom_group) then
+        write(*,*) 'mype mismatch, my_fesom_group, mype_check', f%my_fesom_group, mype_check
+        call par_ex(f%MPI_COMM_FESOM, f%mype)
+        stop
+    end if
+
+! kh 29.02.22
+    if(f%my_fesom_group==0) then
+#endif
 
         if(f%mype==0) then
             write(*,*)
@@ -171,6 +294,11 @@ contains
             print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
             print *, achar(27)//'[7;32m'//' --> FESOM BUILDS UP MODEL CONFIGURATION                    '//achar(27)//'[0m'
         end if
+
+#if defined(__usetp)
+    end if
+#endif
+
         !=====================
         ! Read configuration data,  
         ! load the mesh and fill in 
@@ -183,7 +311,16 @@ contains
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call mesh_setup'//achar(27)//'[0m'
         call mesh_setup(f%partit, f%mesh)
 
+! kh 29.02.22
+#if defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif 
+
         if (f%mype==0) write(*,*) 'FESOM mesh_setup... complete'
+
+#if defined(__usetp)
+        end if
+#endif 
 
         !=====================
         ! Allocate field variables 
@@ -220,15 +357,43 @@ contains
 
         ! recom setup
 #if defined (__recom)
+#if defined (__usetp)
+        if(f%my_fesom_group==0) then
+#endif 
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call recom_init'//achar(27)//'[0m'
+#if defined (__usetp)
+        end if
+#endif
+
         f%t0_recom=MPI_Wtime()
         call recom_init(f%tracers, f%partit, f%mesh) ! adjust values for recom tracers (derived type "t_tracer")
         f%t1_recom=MPI_Wtime()
+
+#if defined (__usetp)
+        if(f%my_fesom_group==0) then
+#endif
+
         if (f%mype==0) write(*,*) 'RECOM recom_init... complete'
+
+#if defined (__usetp)
+        end if
+#endif
+
 #endif
 
         if (f%mype==0) then
+
+! kh 29.02.22
+#if defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif
+
            write(*,*) 'FESOM ocean_setup... complete'
+
+#if defined(__usetp)
+        end if
+#endif
+
            f%t3=MPI_Wtime()
         endif
         call forcing_setup(f%partit, f%mesh)
@@ -239,7 +404,17 @@ contains
             call ice_setup(f%ice, f%tracers, f%partit, f%mesh)
             f%ice%ice_steps_since_upd = f%ice%ice_ave_steps-1
             f%ice%ice_update=.true.
+
+#if defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif 
+            
             if (f%mype==0) write(*,*) 'EVP scheme option=', f%ice%whichEVP
+
+#if defined(__usetp)
+        end if
+#endif 
+
         else 
             ! create a dummy ice derived type with only a_ice, m_ice, m_snow and 
             ! uvice since oce_timesteps still needs in moment
@@ -264,9 +439,32 @@ contains
         !---age-code-end
 #if defined (__oasis)
 
+! kh 30.11.21 only mype == 0 in my_fesom_group == 0 handles coupling with extern models
+#if defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif 
+
         call cpl_oasis3mct_define_unstr(f%partit, f%mesh)
 
         if(f%mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
+
+#if defined(__usetp)
+        end if
+#endif
+
+#if defined(__usetp)
+! kh 03.12.21
+!    call MPI_Barrier(f%MPI_COMM_FESOM_WORLD, f%MPIERR)
+    if(num_fesom_groups > 1) then
+
+        call MPI_Bcast(cpl_send, sizeof(cpl_send), MPI_CHARACTER, 0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
+        call MPI_Bcast(cpl_recv, sizeof(cpl_recv), MPI_CHARACTER, 0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
+
+! kh 10.12.21 needed in SUBROUTINE net_rec_from_atm(action)
+        call MPI_Bcast(target_root,             1, MPI_INTEGER,   0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
+    end if
+#endif
+
 #endif
     
         ! --------------
@@ -292,7 +490,18 @@ contains
         call restart(0, 0, 0, r_restart, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         if (f%mype==0) f%t7=MPI_Wtime()
         ! store grid information into netcdf file
+
+! kh 29.03.22
+#if defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif
+
         if (.not. r_restart) call write_mesh_info(f%partit, f%mesh)
+
+! kh 29.03.22
+#if defined(__usetp)
+        end if
+#endif
 
         !___IF RESTART WITH ZLEVEL OR ZSTAR IS DONE, ALSO THE ACTUAL LEVELS AND ____
         !___MIDDEPTH LEVELS NEEDS TO BE CALCULATET AT RESTART_______________________
@@ -313,6 +522,11 @@ contains
            f%rtime_setup_recom   = real( f%t1_recom - f%t0_recom  ,real32)
 #endif
 
+! kh 29.03.22
+#if defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif
+
            write(*,*) '=========================================='
            write(*,*) 'MODEL SETUP took on mype=0 [seconds]      '
            write(*,*) 'runtime setup total      ',real(f%t8-f%t1,real32)      
@@ -326,6 +540,12 @@ contains
            write(*,*) ' > runtime setup recom   ',f%rtime_setup_recom
 #endif
             write(*,*) '============================================' 
+
+! kh 29.03.22
+#if defined(__usetp)
+        end if
+#endif
+
         endif
 
 #if defined(__MULTIO)
@@ -443,24 +663,61 @@ contains
 
     ! --------------
     ! LA icebergs: 2023-05-17 
+!YY: only when using icebergs?
+    if (use_icebergs) then
     f%MPI_COMM_FESOM_IB = f%MPI_COMM_FESOM
     if (f%mype==0) then
 !        write (*,*) 'ib_async_mode, initial omp_num_threads ', ib_async_mode, omp_get_num_threads()
         write (*,*) 'current_nsteps, steps_per_ib_step, icb_outfreq :', current_nsteps, steps_per_ib_step, icb_outfreq
     end if
+    end if
     ! --------------
+! kh 29.03.22
+#if defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif 
 
     if (f%mype==0) write(*,*) 'FESOM start iteration before the barrier...'
+
+! kh 29.03.22
+#if defined(__usetp)
+        end if
+#endif 
+
     call MPI_Barrier(f%MPI_COMM_FESOM, f%MPIERR)   
     if (f%mype==0) then
+
+! kh 29.03.22
+#if defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif 
+
        write(*,*) 'FESOM start iteration after the barrier...'
+
+! kh 29.03.22
+#if defined(__usetp)
+        end if
+#endif 
+
        f%t0 = MPI_Wtime()
     endif
+
+! kh 29.03.22
+#if defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif 
+
     if(f%mype==0) then
         write(*,*)
         print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
         print *, achar(27)//'[7;32m'//' --> FESOM STARTS TIME LOOP                                 '//achar(27)//'[0m'
     end if
+
+! kh 29.03.22
+#if defined(__usetp)
+        end if
+#endif
+
     !___MODEL TIME STEPPING LOOP________________________________________________
     if (use_global_tides) then
        call foreph_ini(yearnew, month, f%partit)
@@ -526,12 +783,24 @@ contains
            call foreph(f%partit, f%mesh)
         end if
         mstep = n
+
+! kh 29.03.22
+#if defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif
+
         if (mod(n,logfile_outfreq)==0 .and. f%mype==0) then
             write(*,*) 'FESOM ======================================================='
 !             write(*,*) 'FESOM step:',n,' day:', n*dt/24./3600.,
             write(*,*) 'FESOM step:',n,' day:', daynew,' year:',yearnew 
             write(*,*)
         end if
+
+! kh 29.03.22
+#if defined(__usetp)
+        end if
+#endif 
+
 #if defined (__oifs) || defined (__oasis)
             seconds_til_now=INT(dt)*(n-1)
 #endif
@@ -590,25 +859,53 @@ contains
 
         !___now recom____________________________________________________
 #if defined (__recom)
+! kh 29.03.22
+#if defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif 
+
         if (f%mype==0 .and. n==1)  print *, achar(27)//'[46'  //'_____________________________________________________________'//achar(27)//'[0m'
         if (f%mype==0 .and. n==1)  print *, achar(27)//'[46;1m'//'     --> call REcoM                                         '//achar(27)//'[0m'
+
+#if defined(__usetp)
+        end if
+#endif 
+
         f%t0_recom = MPI_Wtime()
         call recom(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         f%t1_recom = MPI_Wtime()
 #endif
         
         !___model ocean step____________________________________________________
+#if defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_timestep_ale'//achar(27)//'[0m'
+#if defined(__usetp)
+        end if
+#endif
         call oce_timestep_ale(n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
 
         f%t3 = MPI_Wtime()
         !___compute energy diagnostics..._______________________________________
+#if defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif 
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call compute_diagnostics(1)'//achar(27)//'[0m'
+#if defined(__usetp)
+        end if
+#endif
         call compute_diagnostics(1, f%dynamics, f%tracers, f%ice, f%partit, f%mesh)
 
         f%t4 = MPI_Wtime()
         !___prepare output______________________________________________________
+#if defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif 
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
+#if defined(__usetp)
+        end if
+#endif 
         call output (n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
 
         ! LA icebergs: 2023-05-17 
@@ -646,18 +943,45 @@ contains
     ! EO parameters
     real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
     integer           :: tr_num
+    integer :: i !YY
     ! --------------
     ! LA icebergs: 2023-05-17 
     if (use_icebergs) then
          call iceberg_out(f%partit)
     end if
     ! --------------
+! kh 11.11.21 multi FESOM group loop parallelization
+#if defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif 
+
     call finalize_output()
     call finalize_restart()
 
+! kh 29.03.22
+#if defined(__usetp)
+        end if
+#endif 
+
     !___FINISH MODEL RUN________________________________________________________
 
+#if !defined (__usetp) 
+! kh 11.11.21 multi FESOM group loop parallelization    
     call MPI_Barrier(f%MPI_COMM_FESOM, f%MPIERR)
+#endif
+#if defined (__usetp) 
+! kh 11.11.21 list statistics for all fesom_groups 
+! fesom groups are listed backwards, so info for the main fesom group 0 is at the end in the log
+    do i = num_fesom_groups - 1, 0, -1
+
+! kh 29.03.22 use a barrier to "sort" the output but the mpi output can still get a bit mixed up,
+! because MPI does not define the handling of the order of the output lines
+        call MPI_Barrier(f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIERR)
+
+! kh 29.03.22 for the sake of output clarity produce output only for my_fesom_group == 0 for now
+        if(i == f%my_fesom_group .and. f%my_fesom_group == 0) then
+#endif
+
     !$ACC EXIT DATA DELETE (f%ice%delta_min, f%ice%Tevp_inv, f%ice%cd_oce_ice)
     !$ACC EXIT DATA DELETE (f%ice%work%fct_tmax, f%ice%work%fct_tmin)
     !$ACC EXIT DATA DELETE (f%ice%work%fct_fluxes, f%ice%work%fct_plus, f%ice%work%fct_minus)
@@ -745,10 +1069,20 @@ contains
     call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
 #endif
 
+#if defined (__usetp)
+        end if
+    end do ! i = num_fesom_groups - 1, 0, -1
+#endif
+
 #if defined(__MULTIO) && !defined(__ifsinterface) && !defined(__oasis)
    call mpp_stop
 #endif
     if(f%fesom_did_mpi_init) call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype) ! finalize MPI before FESOM prints its stats block, otherwise there is sometimes output from other processes from an earlier time in the programm AFTER the starts block (with parastationMPI)
+
+#if defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif
+
     if (f%mype==0) then
         41 format (a35,a10,2a15) !Format for table heading
         42 format (a30,3f15.4)   !Format for table content
@@ -787,6 +1121,12 @@ contains
         write(*,*) '======================================================'
         write(*,*)
     end if    
+
+! kh 29.03.22
+#if defined(__usetp)
+        end if
+#endif 
+
 !   call clock_finish  
   end subroutine
 
