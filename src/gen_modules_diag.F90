@@ -943,7 +943,7 @@ subroutine compute_destinE(mode, dynamics, tracers, partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
     if (firstcall) then  !allocate the stuff at the first call
-        allocate(heatcontent(ndepths, myDim_nod2D+eDim_nod2D))
+        allocate(heatcontent(myDim_nod2D+eDim_nod2D, ndepths))
         heatcontent =0.0_WP
         firstcall=.false.
         if (mode==0) return
@@ -952,21 +952,21 @@ subroutine compute_destinE(mode, dynamics, tracers, partit, mesh)
     
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, zint)
     DO n=1, myDim_nod2D
-       heatcontent(:, n) =0.0_WP
+       heatcontent(n, :) =0.0_WP
        nzmax=nlevels_nod2D(n)
        nzmin=ulevels_nod2D(n)
        zint=0.0_WP
        do nz=nzmin, nzmax-1
           zint=zint+hnode(nz, n)
           where (whichdepth>zint)
-              heatcontent(:,n)=heatcontent(:,n)+temp(nz,n)*hnode(nz,n)
+              heatcontent(n,:)=heatcontent(n,:)+temp(nz,n)*hnode(nz,n)
           end where
        end do
-       heatcontent(:,n)=1025.*3990.*heatcontent(:,n) 
+       heatcontent(n,:)=1025.*3990.*heatcontent(n,:) 
     END DO
 !$OMP END PARALLEL DO 
   do n=1, size(whichdepth)
-     call exchange_nod(heatcontent(n,:), partit)
+     call exchange_nod(heatcontent(:,n), partit)
   end do
 end subroutine compute_destinE
 !_______________________________________________________________________________
