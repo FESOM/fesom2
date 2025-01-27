@@ -309,15 +309,15 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
     if(raw_restart_length_unit /= "off") then
 
 #if defined(__recom) & defined(__usetp)
-            if(partit%my_fesom_group == 0) then ! OG master rank creates the folder 
+      if(partit%my_fesom_group == 0) then ! OG master rank creates the folder 
 #endif
-      if(partit%mype == RAW_RESTART_METADATA_RANK) then
+          if(partit%mype == RAW_RESTART_METADATA_RANK) then
         ! execute_command_line with mkdir sometimes fails, use a custom implementation around mkdir from C instead
-        call mkdir(trim(ResultPath)//"fesom_raw_restart") ! we have no mkdir -p, create the intermediate dirs separately
-        call mkdir(raw_restart_dirpath)
-      end if
+              call mkdir(trim(ResultPath)//"fesom_raw_restart") ! we have no mkdir -p, create the intermediate dirs separately
+              call mkdir(raw_restart_dirpath)
+          end if
 #if defined(__recom) & defined(__usetp)
-            end if ! (my_fesom_group == 0) then
+      end if ! (my_fesom_group == 0) then
 #endif
       call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr) ! make sure the dir has been created before we continue...
     end if
@@ -331,15 +331,15 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
     bin_restart_infopath = trim(ResultPath)//"fesom_bin_restart/np"//int_to_txt(partit%npes)//".info"
     if(bin_restart_length_unit /= "off") then
 #if defined(__recom) & defined(__usetp)
-            if(partit%my_fesom_group == 0) then  ! OG
+        if(partit%my_fesom_group == 0) then  ! OG
 #endif
-        if(partit%mype == RAW_RESTART_METADATA_RANK) then
+            if(partit%mype == RAW_RESTART_METADATA_RANK) then
             ! execute_command_line with mkdir sometimes fails, use a custom implementation around mkdir from C instead
-            call mkdir(trim(ResultPath)//"fesom_bin_restart") ! we have no mkdir -p, create the intermediate dirs separately
-            call mkdir(bin_restart_dirpath)
-        end if
+                call mkdir(trim(ResultPath)//"fesom_bin_restart") ! we have no mkdir -p, create the intermediate dirs separately
+                call mkdir(bin_restart_dirpath)
+            end if
 #if defined(__recom) & defined(__usetp)
-            end if ! (my_fesom_group == 0) then
+        end if ! (my_fesom_group == 0) then
 #endif
         call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr) ! make sure the dir has been created before we continue...
     end if

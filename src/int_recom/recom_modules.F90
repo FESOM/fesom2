@@ -110,7 +110,7 @@ module recom_config
   Logical                :: REcoM_restart        = .false.
 
   Integer                :: bgc_num               = 33      ! NEW increased the number from 28 to 34 (added coccos and respiration) ! NEW 3Zoo changed from 31 to 33
-  integer                :: bgc_base_num          = 22      ! standard tracers
+  integer                :: bgc_base_num          = 22      ! tracer number for case 2phy 1zoo 1det
   Integer                :: diags3d_num           = 28      ! Number of diagnostic 3d tracers to be saved
   Real(kind=8)           :: VDet                  = 20.d0   ! Sinking velocity, constant through the water column and positive downwards
   Real(kind=8)           :: VDet_zoo2             = 200.d0  ! Sinking velocity, constant through the water column 

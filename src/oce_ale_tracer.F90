@@ -176,7 +176,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     type(t_partit), intent(inout), target    :: partit
     type(t_mesh)  , intent(in)   , target    :: mesh
 
-#if defined(__recom) || defined ( __usetp)
+#if defined ( __usetp)
 ! kh 11.11.21 multi FESOM group loop parallelization
     integer             :: num_tracers
     integer             :: tr_num_start_memo
@@ -230,7 +230,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     end if
     del_ttf => tracers%work%del_ttf
 
-#if defined(__recom) || defined ( __usetp)
+#if defined ( __usetp)
     num_tracers=tracers%num_tracers
 #endif
 
@@ -465,7 +465,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     end if ! (num_fesom_groups > 1) then
 #endif
 
-#if defined(__recom)
+#if defined(__usetp)
 ! kh 25.03.22 SinkFlx and Benthos values are buffered per tracer index in the loop above and now summed up to
 ! avoid non bit identical results regarding global sums when running the tracer loop in parallel
         do tr_num = 1, num_tracers
@@ -1840,7 +1840,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
 !        bc_surface=0.0_WP
     CASE (1023:1033)
         bc_surface=0.0_WP  ! OG added bc for recom fields
-    CASE (1302) ! Before (1033) ! DIC_13
+    CASE (1302) 
          if (ciso) then
             if (use_MEDUSA .and. add_loopback) then
                bc_surface= dt*(GloCO2flux_seaicemask_13(n) &
@@ -1853,7 +1853,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
          end if
     CASE (1305:1321)
          bc_surface=0.0_WP ! organic 13C
-    CASE (1402) ! Before (1034) ! DIC_14
+    CASE (1402)
          if (ciso .and. ciso_14) then
              if (use_MEDUSA .and. add_loopback .and. ciso_organic_14) then
                  bc_surface= dt*(GloCO2flux_seaicemask_14(n) &
