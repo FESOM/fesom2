@@ -107,25 +107,29 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
   integer, optional, intent(in)   :: abort
   integer                         :: error
 
-! For standalone runs we directly call the MPI_barrier and MPI_finalize
+ 
+! For standalone runs we
+! when there is error par_ex should be called with abort argument to abort abruptly,
+! in all other cases model will be finalized here, call the MPI_barrier and MPI_finalize
 !---------------------------------------------------------------
-!TODO: logic is convoluted here, not defined oasis and model needs to abort doesn't happen using par_ex 
 #ifndef __oasis
   if (present(abort)) then
      if (mype==0) write(*,*) 'Run finished unexpectedly!'
-     call MPI_ABORT(MPI_COMM_WORLD, 1, error)
+     call MPI_ABORT(COMM, 1, error)
   else
-          ! TODO: this is where fesom standalone, ifsinterface etc get to 
-          !1. there no abort actually even when model calls abort, and barrier may hang
-          !2. when using fesom as lib using finalize is bad here as there may 
+          ! TODO: this is where fesom standalone, and ifsinterface get to in case of normal exit.
+          !1. barrier may hang so have to be careful
+          !2. when using fesom as interface using finalize is bad here as there may 
           !   be other MPI tasks running in calling library like IFS, better 
           !   better practice in that case would be to free the communicator.
+          !3. or change all the cases in fesom that call par_ex to properly use abort in all cases other then normal closure.
      call  MPI_Barrier(COMM, error)
      call  MPI_Finalize(error)
   endif
 
-#else !  standalone
-! TODO logic below is also convoluted really not really for standalone
+#else ! 
+! TODO logic below is convoluted, COMM that is passed should be used for MPI_ABORT
+! changes are easy but need to be tested with coupled configurations 
 ! From here on the two coupled options
 !-------------------------------------
 #if defined (__oifs)
