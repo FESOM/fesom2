@@ -22,9 +22,9 @@ module diagnostics
   public :: ldiag_solver, lcurt_stress_surf, ldiag_Ri, ldiag_TurbFlux, ldiag_dMOC,                                &
             ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, ldiag_vorticity, ldiag_extflds, ldiag_ice,      &
             compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, shear, Ri, KvdTdZ, KvdSdZ,                & 
-            std_dens_min, std_dens_max, std_dens_N, std_dens, ldiag_trflx,                                        &
+            std_dens_min, std_dens_max, std_dens_N, std_dens, ldiag_trflx, ldiag_destinE,                                       &
             std_dens_UVDZ, std_dens_DIV, std_dens_DIV_fer, std_dens_Z, std_dens_H, std_dens_dVdT, std_dens_flux,  &
-            dens_flux_e, vorticity, zisotherm, tempzavg, saltzavg, vol_ice, vol_snow, compute_ice_diag, thetao,   &
+            dens_flux_e, vorticity, zisotherm, tempzavg, saltzavg, heatcontent, vol_ice, vol_snow, compute_ice_diag, thetao,   &
             tuv, suv,                                                                                             &
             ldiag_DVD, compute_dvd, dvd_KK_tot, dvd_SD_tot, dvd_SD_chi_adv_h, dvd_SD_chi_adv_v, dvd_SD_chi_dif_he,&
             dvd_SD_chi_dif_heR, dvd_SD_chi_dif_hbh, dvd_SD_chi_dif_veR, dvd_SD_chi_dif_viR, dvd_SD_chi_dif_vi,    &
@@ -45,6 +45,7 @@ module diagnostics
   real(kind=WP),  save, allocatable, target      :: vorticity(:,:)
   real(kind=WP),  save, allocatable, target      :: zisotherm(:)              !target temperature is specified as whichtemp in compute_extflds
   real(kind=WP),  save, allocatable, target      :: tempzavg(:), saltzavg(:)  !target depth for averaging is specified as whichdepth in compute_extflds
+  real(kind=WP),  save, allocatable, target      :: heatcontent(:,:)
   real(kind=WP),  save, allocatable, target      :: vol_ice(:),  vol_snow(:)
   ! defining a set of standard density bins which will be used for computing densMOC
 ! integer,        parameter                      :: std_dens_N  = 100
@@ -99,6 +100,7 @@ module diagnostics
   
   logical                                       :: ldiag_vorticity  =.false.
   logical                                       :: ldiag_extflds    =.false.
+  logical                                       :: ldiag_destinE    =.false.
   logical                                       :: ldiag_ice        =.false.
   logical                                       :: ldiag_trflx      =.false.
   logical                                       :: ldiag_uvw_sqr    =.false.
@@ -106,7 +108,7 @@ module diagnostics
   
   namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_Ri, & 
                        ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, &
-                       ldiag_vorticity, ldiag_extflds, ldiag_trflx, ldiag_ice, ldiag_uvw_sqr, ldiag_trgrd_xyz
+                       ldiag_vorticity, ldiag_extflds, ldiag_destinE, ldiag_trflx, ldiag_ice, ldiag_uvw_sqr, ldiag_trgrd_xyz
   
   contains
 
@@ -921,6 +923,53 @@ subroutine compute_extflds(mode, dynamics, tracers, partit, mesh)
   call exchange_nod(saltzavg, partit)
 end subroutine compute_extflds
 !_______________________________________________________________________________
+subroutine compute_destinE(mode, dynamics, tracers, partit, mesh)
+    IMPLICIT NONE
+    integer,        intent(in)              :: mode
+    logical,        save                    :: firstcall=.true.
+    type(t_dyn)   , intent(in),     target  :: dynamics
+    type(t_tracer), intent(in)   ,  target  :: tracers
+    type(t_partit), intent(inout),  target  :: partit
+    type(t_mesh)  , intent(in)   ,  target  :: mesh
+    real(kind=WP),  dimension(:,:), pointer :: temp, salt
+    real(kind=WP)                           :: zn, zint, tup, tlo
+    integer                                 :: n, nz, nzmin, nzmax
+    integer                                 :: ndepths=3    
+    real(kind=WP), dimension(3)             :: whichdepth = (/ 300.0_WP, 700.0_WP, 100000._WP /)
+
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
+    if (firstcall) then  !allocate the stuff at the first call
+        allocate(heatcontent(myDim_nod2D+eDim_nod2D, ndepths))
+        heatcontent =0.0_WP
+        firstcall=.false.
+        if (mode==0) return
+    end if  
+    temp   => tracers%data(1)%values(:,:)
+    
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, zint)
+    DO n=1, myDim_nod2D
+       heatcontent(n, :) =0.0_WP
+       nzmax=nlevels_nod2D(n)
+       nzmin=ulevels_nod2D(n)
+       zint=0.0_WP
+       do nz=nzmin, nzmax-1
+          zint=zint+hnode(nz, n)
+          where (whichdepth>zint)
+              heatcontent(n,:)=heatcontent(n,:)+temp(nz,n)*hnode(nz,n)
+          end where
+       end do
+       heatcontent(n,:)=1025.*3990.*heatcontent(n,:) 
+    END DO
+!$OMP END PARALLEL DO 
+  do n=1, size(whichdepth)
+     call exchange_nod(heatcontent(:,n), partit)
+  end do
+end subroutine compute_destinE
+!_______________________________________________________________________________
 subroutine compute_ice_diag(mode, ice, partit, mesh)
     IMPLICIT NONE
     integer,        intent(in)              :: mode
@@ -1180,6 +1229,8 @@ subroutine compute_diagnostics(mode, dynamics, tracers, ice, partit, mesh)
   
   ! 14. compute fields required for for destinE
   if (ldiag_ice)         call compute_ice_diag(mode, ice, partit, mesh)
+  
+  if (ldiag_destinE)     call compute_destinE(mode, dynamics, tracers, partit, mesh)
   
   call compute_thetao(mode, tracers, partit, mesh) 
 
@@ -3124,11 +3175,20 @@ subroutine dvd_add_difflux_sbc(do_SDdvd, tr_num, dvd_tot, tr, trstar, partit, me
         
         !_______________________________________________________________________
         ! apply apply surface boundarie condition
+        ! SBC_dvd = -2*T_k*Qflx - 2*T_k*T_w * W * kron_1k + T_k^2 * W *kron_1k
+        !         = -2*T_k*Qflx + ((T_k - T_w)^2 - T_w^2) *W * kron_1k
+        !
+        ! temp: T_w=T_k, ((T_k - T_w)^2 - T_w^2) = -T_k^2
+        !       -->SBC_dvd = -2*T_k (Qflx + 0.5*T_k*W)        
+        !       
+        ! salt: T_w=0  , ((T_k - T_w)^2 - T_w^2) =  T_k^2
+        !       -->SBC_dvd = -2*T_k (Qflx - 0.5*T_k*W)        
+        !
         nz = nu1
         if     (tr_num==1) then 
             sbc = -(heat_flux(node)/vcpw + tr(nz, node)*water_flux(node)*is_nonlinfs*0.5_WP)
         elseif (tr_num==2) then 
-                sbc =  (virtual_salt(node) + relax_salt(node) - (real_salt_flux(node) - tr(nz, node)*water_flux(node)*0.5_WP)*is_nonlinfs)
+            sbc =  (virtual_salt(node) + relax_salt(node) - (real_salt_flux(node) - tr(nz, node)*water_flux(node)*0.5_WP)*is_nonlinfs)
         end if 
         Dflx(nz) = Dflx(nz) + sbc*area(nz, node)
             

@@ -1,0 +1,29 @@
+#!/bin/bash
+#SBATCH --job-name=nemo_dg_test
+#SBATCH --partition=base
+#SBATCH --time=02:45:00
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=20
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=60G
+
+#SBATCH --output %x_%j.out
+#SBATCH --error %x_%j.err
+
+# disable hyperthreading
+#SBATCH --hint=nomultithread
+
+module purge 
+source ../env/nesh/shell
+export OMP_NUM_THREADS=1
+
+ln -sf ../bin/fesom.x .
+
+#___DETERMINE SLURM JOBID+OUTPUTFILE____________________________________________
+jobid=$(echo $SLURM_JOB_ID | cut -d"." -f1)
+fname="${SLURM_JOB_NAME}_${jobid}.out"
+
+#___PUT JOB IN QUEUE____________________________________________________________
+date
+srun --mpi=pmi2 ./fesom.x >> ${fname}
+date
