@@ -302,7 +302,8 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+! #include "associate_mesh_ass.h"
+nl => mesh%nl
     
     !___________________________________________________________________________
     ! OPEN and read namelist for I/O
@@ -516,7 +517,8 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h"   
+! #include "associate_mesh_ass.h"   
+nl => mesh%nl
     
     !___________________________________________________________________________
     ! open and read namelist for I/O
@@ -755,7 +757,9 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+! #include "associate_mesh_ass.h"
+nl              => mesh%nl
+mesh_resolution => mesh%mesh_resolution
 
     !___________________________________________________________________________
     elem_size=myDim_elem2D+eDim_elem2D
