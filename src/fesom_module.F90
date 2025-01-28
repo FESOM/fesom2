@@ -180,8 +180,11 @@ contains
         ! load the mesh and fill in 
         ! auxiliary mesh arrays
         !=====================
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call setup_model'//achar(27)//'[0m'
         call setup_model(f%partit)  ! Read Namelists, always before clock_init
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call clock_init'//achar(27)//'[0m'
         call clock_init(f%partit)   ! read the clock file 
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call get_run_steps'//achar(27)//'[0m'
         call get_run_steps(fesom_total_nsteps, f%partit)
         f%total_nsteps=fesom_total_nsteps
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call mesh_setup'//achar(27)//'[0m'
