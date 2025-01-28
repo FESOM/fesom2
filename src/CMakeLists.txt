@@ -261,6 +261,7 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
 #    target_compile_options(${PROJECT_NAME} PRIVATE -qopenmp -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -xHost -ip -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
 #    target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -ip -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
 
+
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 #    target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
    if(${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu )
@@ -272,6 +273,32 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
    if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
       target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
    endif()
+   
+   # extended debugging flags for GNU compiler
+   target_compile_options(${PROJECT_NAME} PRIVATE 
+                           -ffloat-store 
+                           -finit-local-zero  
+                           -finline-functions 
+                           -fimplicit-none  
+                           -fdefault-real-8 
+                           -fdefault-double-8 
+                           -ffree-line-length-none 
+                           -fallow-argument-mismatch 
+                           -fno-fast-math -fno-signed-zeros 
+                           -freciprocal-math 
+                           -mveclibabi=svml 
+                           -flto
+                           -pg 
+                           -fbacktrace 
+                           -fcheck=all,bounds 
+                           -finit-real=snan 
+                           -finit-integer=-9999 
+                           -fsanitize=undefined,address
+                        )
+   # if use -fsanitize=undefined,address you also need ... PRIVATE -lubsan)           
+   target_link_libraries(${PROJECT_NAME} PRIVATE -lubsan)
+                     
+
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
 	#target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O3)
    target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O2 -hnoacc -M878)  #-hnoacc is a workaround for cray automatically activate -hacc, -M878 is to suppress ftn-878 warning
@@ -312,6 +339,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${MCT_Fortran_LIBRARIES} ${MPEU_Fo
 # OASIS-YAK
 target_link_libraries(${PROJECT_NAME} PRIVATE ${YACUTILS_Fortran_LIBRARIES} ${YACCORE_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_Fortran_LIBRARIES})
+
 
 #set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 
