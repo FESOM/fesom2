@@ -302,7 +302,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
 
   close(fileID)
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+
   if (mype==0) write(*,*) 'myLists are read'
 
   !==============================
@@ -885,6 +885,12 @@ CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
     write(*,*) '2D mesh info : ', 'nod2D=', mesh%nod2D,' elem2D=', mesh%elem2D,'checksum= ',mesh%representative_checksum
     write(*,*) '========================='
  endif
+
+! here at the end all mesh related mesh%... variables are allocated, than i can do the pointer assignment
+! done in associate_mesh_ass.h otherwise you would do a pointer into an unallocated array
+#include "associate_mesh_ass.h"
+
+
 
  END subroutine  read_mesh
 !

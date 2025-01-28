@@ -759,7 +759,6 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
 #include "associate_part_ass.h"
 ! #include "associate_mesh_ass.h"
 nl              => mesh%nl
-mesh_resolution => mesh%mesh_resolution
 
     !___________________________________________________________________________
     elem_size=myDim_elem2D+eDim_elem2D
@@ -843,8 +842,8 @@ mesh_resolution => mesh%mesh_resolution
     allocate(Ki(nl-1, node_size))
 
     do n=1, node_size
-    !  Ki(n)=K_hor*area(1,n)/scale_area
-    Ki(:,n)=K_hor*(mesh_resolution(n)/100000.0_WP)**2
+        !  Ki(n)=K_hor*area(1,n)/scale_area
+        Ki(:,n)=K_hor*(mesh%mesh_resolution(n)/100000.0_WP)**2
     end do
     call exchange_nod(Ki, partit)
 
