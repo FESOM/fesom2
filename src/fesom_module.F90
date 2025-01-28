@@ -633,6 +633,11 @@ contains
             call reset_ib_fluxes
         end if
         !--------------------------
+        !now if the model run is about to finish let us deallocate unnecessary arrays before restart and finalization takes place
+        !it looks like on levante the memory was full for arge meshes
+        if (n==f%total_nsteps) then
+	   call fesom_deallocate_arrays
+        end if
 
         f%t5 = MPI_Wtime()
         call restart(n, nstart, f%total_nsteps, .false., f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
@@ -825,4 +830,17 @@ contains
 !   call clock_finish  
   end subroutine
 
+  subroutine fesom_deallocate_arrays()
+    use diagnostics
+    if (ldiag_dMOC) then
+       deallocate(std_dens_UVDZ)
+       deallocate(std_dens_dVdT)
+       deallocate(std_dens_DIV)
+       if (allocated(std_dens_DIV_fer)) deallocate(std_dens_DIV_fer)
+       deallocate(std_dens_flux)
+       deallocate(std_dens_Z)
+       deallocate(std_dens_H)
+       deallocate(dens_flux_e)
+    end if
+  end subroutine fesom_deallocate_arrays
 end module
