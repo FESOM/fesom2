@@ -1022,6 +1022,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !< Second zooplankton fecal pellets
 
             Zoo2fecalloss_n = fecal_rate_n * grazingFlux2
+!            Zoo2fecalloss_n = fecal_rate_n * grazingFlux2 * grazEff2
             Zoo2fecalloss_c = fecal_rate_c * grazingFluxcarbonzoo2
 
 !-------------------------------------------------------------------------------
@@ -1056,7 +1057,9 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             aggregationrate = aggregationrate + agg_PD * DetN + agg_PP * PhyN
 
 #if defined (__3Zoo2Det)
-            aggregationrate = aggregationrate + agg_PD * DetZ2N ! 2Det
+! This has been retired: aggregation with large detritus is now a source of
+! large dteritus (CV, Jan '25)
+!            aggregationrate = aggregationrate + agg_PD * DetZ2N ! 2Det
 #endif
 #if defined (__coccos)
             aggregationrate = aggregationrate + agg_PP * CoccoN
@@ -1237,7 +1240,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         - grazingFlux_phy                                  & ! --> Grazing loss
 #if defined (__3Zoo2Det)
         - grazingFlux_phy2                                 & 
-        - grazingFlux_phy3                                 & ! 3Zoo    
+        - grazingFlux_phy3                                 & ! 3Zoo
+        - agg_PD2 * DetZ2N                       * PhyN    &
 #endif
                                                           ) * dt_b + sms(k,iphyn)
 !____________________________________________________________
@@ -1257,6 +1261,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #if defined (__3Zoo2Det)
         - grazingFlux_phy2 * recipQuota                    &
         - grazingFlux_phy3 * recipQuota                    & ! 3Zoo
+        - agg_PD2 * DetZ2N                       * PhyC    &
 #endif
                                                           ) * dt_b + sms(k,iphyc)
 !____________________________________________________________
@@ -1273,6 +1278,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #if defined (__3Zoo2Det)
         - grazingFlux_phy2 * Chl2N                         & 
         - grazingFlux_phy3 * Chl2N                         & ! 3Zoo
+        - agg_PD2 * DetZ2N                       * PhyChl  &
 #endif
                                                           ) * dt_b + sms(k,ipchl)
 
@@ -1297,6 +1303,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             - grazingFlux_Det2   * grazEff2                & ! --> grazing of second zoo (macro) on first detritus class
             + aggregationRate               * PhyN         &
             + aggregationRate               * DiaN         &
+            - agg_DD2 * DetZ2N              * DetN         & ! aggregation small/large detritus
             + miczooLossFlux                               & !  --> microzooplankton, mortality
             - reminN * arrFunc * O2Func     * DetN         & !  --> O2remin
                                                           ) * dt_b + sms(k,idetn)
@@ -1330,6 +1337,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             - grazingFlux        * grazEff3                &
             + aggregationRate               * PhyN         &
             + aggregationRate               * DiaN         &
+            - agg_DD2 * DetZ2N              * DetN         & ! aggregation small/large detritus
             + miczooLossFlux                               &
             - reminN * arrFunc * O2Func     * DetN         & ! O2remin
                                                           ) * dt_b + sms(k,idetn)
@@ -1368,6 +1376,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             - grazingFlux_Det2 * recipDet  * grazEff2          & ! corrected recipDet2 -> recipDet
             + aggregationRate                         * PhyC   &
             + aggregationRate                         * DiaC   &
+            - agg_DD2 * DetZ2N                        * DetC   &
             + miczooLossFlux   * recipQZoo3                    &
             - reminC * arrFunc * O2Func   * DetC               & ! O2remin
                                                               ) * dt_b + sms(k,idetc)
@@ -1403,6 +1412,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #endif
             + aggregationRate                       * PhyC     &
             + aggregationRate                       * DiaC     &
+            - agg_DD2 * DetZ2N                      * DetC     &
             + miczooLossFlux     * recipQZoo3                  &
             - reminC * arrFunc * O2Func    * DetC              & ! O2remin
                                                               ) * dt_b + sms(k,idetc)
@@ -1582,6 +1592,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             - grazingFlux_miczoo  * grazEff          &
             - grazingFlux_DetZ2   * grazEff          &
             - grazingFlux_DetZ22  * grazEff2         &
+            + agg_PD2 * detZ2N * PhyN                &
+            + agg_PD2 * detZ2N * DiaN                &
+#if defined (__coccos)
+            + agg_PD2 * detZ2N * CoccoN              &
+#endif
+            + agg_DD2 * detZ2N * DetN                &
             + Zoo2LossFlux                           &
             + hetLossFlux                            &
             + Zoo2fecalloss_n                        &
@@ -1603,6 +1619,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             + grazingFlux_dia                        &
             + grazingFlux_miczoo                     &
             - grazingFlux         * grazEff          &
+            + agg_PD2 * detZ2N * PhyN                &
+            + agg_PD2 * detZ2N * DiaN                &
+#if defined (__coccos)
+            + agg_PD2 * detZ2N * CoccoN              &
+#endif
+            + agg_DD2 * detZ2N * DetN                &
             + Zoo2LossFlux                           &
             + hetLossFlux                            &
             + Zoo2fecalloss_n                        &
@@ -1637,6 +1659,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             - grazingFlux_miczoo  * recipQZoo3       * grazEff  &
             - grazingFlux_DetZ2   * recipDet2        * grazEff  &
             - grazingFlux_DetZ22  * recipDet2        * grazEff2 &
+            + agg_PD2 * detZ2N * PhyC                           &
+            + agg_PD2 * detZ2N * DiaC                           &
+#if defined (__coccos)
+            + agg_PD2 * detZ2N * CoccoC                         &
+#endif
+            + agg_DD2 * detZ2N * DetC                           &
             + Zoo2LossFlux        * recipQZoo2                  &
             + hetLossFlux         * recipQZoo                   &
             + Zoo2fecalloss_c                                   &
@@ -1665,6 +1693,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             - grazingFlux_Dia     * recipQuota_Dia   * grazEff  &
             + grazingFlux_miczoo  * recipQZoo3                  &
             - grazingFlux_miczoo  * recipQZoo3       * grazEff  &
+            + agg_PD2 * detZ2N * PhyC                           &
+            + agg_PD2 * detZ2N * DiaC                           &
+#if defined (__coccos)
+            + agg_PD2 * detZ2N * CoccoC                         &
+#endif
+            + agg_DD2 * detZ2N * DetC                           &
             + Zoo2LossFlux        * recipQZoo2                  &
             + hetLossFlux         * recipQZoo                   &
             + Zoo2fecalloss_c                                   &
@@ -1678,6 +1712,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     sms(k,idetz2si)     = (                 &
         + grazingFlux_dia2 * qSiN           &  ! --> qSin convert N to Si
         + grazingFlux_dia  * qSiN           &
+        + agg_PD2 * detZ2N * DiaSi                           &
+        + agg_DD2 * detZ2N * DetSi                           &
         - reminSiT                * DetZ2Si &
                                           ) * dt_b + sms(k,idetz2si)
 
@@ -1688,6 +1724,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         - calc_loss_gra2 * calc_diss_guts &
         + calc_loss_gra                   &
         - calc_loss_gra  * calc_diss_guts &
+        + agg_PD2 * detZ2N * PhyCalc      &
+        + agg_DD2 * detZ2N * DetCalc      &
         - calc_diss2     * DetZ2Calc      &
                                          ) * dt_b + sms(k,idetz2calc)
 #endif 
@@ -1752,6 +1790,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #if defined (__3Zoo2Det)
         - grazingFlux_Dia2                       &
         - grazingFlux_Dia3                       & ! 3Zoo
+        - agg_PD2 * DetZ2N               * DiaN  & 
 #endif
                                                 ) * dt_b + sms(k,idian)
 
@@ -1772,6 +1811,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #if defined (__3Zoo2Det)
         - grazingFlux_dia2 * recipQuota_dia         &
         - grazingFlux_dia3 * recipQuota_dia         & ! 3Zoo
+        - agg_PD2 * DetZ2N                  * DiaC  & 
 #endif
      	                                           ) * dt_b + sms(k,idiac)
 
@@ -1786,6 +1826,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #if defined (__3Zoo2Det)
         - grazingFlux_dia2 * Chl2N_dia              &          
         - grazingFlux_dia3 * Chl2N_dia              & ! 3Zoo
+        - agg_PD2 * DetZ2N                 * DiaChl & 
 #endif
                                                    ) * dt_b + sms(k,idchl)
 
@@ -1805,6 +1846,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #if defined (__3Zoo2Det)
         - grazingFlux_dia2 * qSiN                   &
         - grazingFlux_dia3 * qSiN                   & ! 3Zoo
+        - agg_PD2 * DetZ2N                  * DiaSi & 
 #endif
                                                    ) * dt_b + sms(k,idiasi)
 
@@ -1822,6 +1864,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #if defined (__3Zoo2Det)
         - grazingFlux_Cocco2                 &                        
         - grazingFlux_Cocco3                 &  ! 3Zoo 
+        - agg_PD2 * DetZ2N          * CoccoN & 
 #endif
                                             ) * dt_b + sms(k,icocn)    
 
@@ -1837,6 +1880,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #if defined (__3Zoo2Det)
       - grazingFlux_Cocco2        * recipQuota_cocco &
       - grazingFlux_Cocco3        * recipQuota_cocco & ! 3Zoo
+        - agg_PD2 * DetZ2N        * CoccoC           & 
 #endif
                                                     ) * dt_b + sms(k,icocc)
 
@@ -1871,6 +1915,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #if defined (__3Zoo2Det)
       - grazingFlux_Cocco2 * Chl2N_cocco            & 
       - grazingFlux_Cocco3 * Chl2N_cocco            & ! 3Zoo
+        - agg_PD2 * DetZ2N               * CoccoChl & 
 #endif
                                                    ) * dt_b + sms(k,icchl)
 #endif
@@ -1885,6 +1930,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         + aggregationRate                  * DiaSi &
         + lossN_d          * limitFacN_dia * DiaSi &
         + grazingFlux_dia3 * qSiN                  &
+        - agg_DD2 * DetZ2N                 * DetSi & 
         - reminSiT                         * DetSi &
                                                   ) * dt_b + sms(k,idetsi)
 #else
@@ -1977,6 +2023,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #if defined (__3Zoo2Det)
         - calc_loss_gra2                                &
         - calc_loss_gra3                                & ! 3Zoo
+        - agg_PD2 * DetZ2N                    * PhyCalc & 
 #endif
                                                        ) * dt_b + sms(k,iphycal)
 #else
@@ -1989,6 +2036,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #if defined (__3Zoo2Det)
         - calc_loss_gra2                       &
         - calc_loss_gra3                       & ! 3Zoo
+        - agg_PD2 * DetZ2N           * PhyCalc & 
 #endif
                                               ) * dt_b + sms(k,iphycal)
 #endif
@@ -2003,6 +2051,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         + phyRespRate_cocco                   * PhyCalc & 
         + calc_loss_agg                                 &
         + calc_loss_gra3                                &
+        - agg_DD2 * DetZ2N                    * DetCalc & 
         - calc_loss_gra3    * calc_diss_guts            &
         - calc_diss                           * DetCalc &
                                                        ) * dt_b + sms(k,idetcal)
@@ -2028,6 +2077,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         + calc_loss_agg                             &
         + calc_loss_gra3                            &
         - calc_loss_gra3 * calc_diss_guts           &
+        - agg_DD2 * DetZ2N                * DetCalc & 
         - calc_diss                       * DetCalc &
                                                    ) * dt_b + sms(k,idetcal)
 #else
