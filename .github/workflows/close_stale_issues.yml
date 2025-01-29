@@ -36,5 +36,5 @@ jobs:
         close-issue-label: 'Closed by github-actions'
         exempt-issue-labels: enhancement, feature request
         exempt-pr-labels: enhancement, feature request
-        exempt-issue-milestones: '*'
+        ignore-updates: milestone
 
