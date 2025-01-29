@@ -1122,7 +1122,7 @@ subroutine diag_trgrd_xyz(mode, tracers, partit, mesh)
     if (firstcall) then !allocate the stuff at the first call
         allocate(trgrd_x(2, nl-1, myDim_elem2D))
         allocate(trgrd_y(2, nl-1, myDim_elem2D))
-        allocate(trgrd_z(2, nl-1, myDim_nod2D))
+        allocate(trgrd_z(2, nl  , myDim_nod2D))
         trgrd_x = 0.0_WP
         trgrd_y = 0.0_WP
         trgrd_z = 0.0_WP
