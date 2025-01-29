@@ -310,10 +310,6 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
           if (mype==0) write(*,*) 'upwind reconstruction momentum advection momadv_opt==1 is not supported by energy diagnostic yet!'
           call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
        end if
-       if (dynamics%use_wsplit) then
-          if (mype==0) write(*,*) 'upwind reconstruction momentum advection momadv_opt==1 cannot yet be combined with wsplit=.TRUE.'
-          call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)          
-       end if
        !upwind reconstruction momentum advection
        call vel_gradients(dynamics, partit, mesh)
        call momentum_adv_lin_upwind(dynamics, partit, mesh)
@@ -787,13 +783,13 @@ Wvel      =>dynamics%w_e(:,:)
   ! centered differences on levels 2 and nl1
   ! ===========
   DO nz=2, nl1
-   w=1.0_WP/6.0_WP*sum(Wvel(nz,elnodes))*ff !0.5*W
-   uvertAB(1,nz)= -w*(UV(1,nz-1,elem)-UV(1,nz,elem))      !/(Z(nz-1)-Z(nz)) 
-   uvertAB(2,nz)= -w*(UV(2,nz-1,elem)-UV(2,nz,elem))      !/(Z(nz-1)-Z(nz)) 
+     w=1.0_WP/6.0_WP*sum(Wvel(nz,elnodes))*ff               !0.5*W
+     uvertAB(1,nz)= -w*(UV(1,nz-1,elem)-UV(1,nz,elem))      !/(Z(nz-1)-Z(nz)) 
+     uvertAB(2,nz)= -w*(UV(2,nz-1,elem)-UV(2,nz,elem))      !/(Z(nz-1)-Z(nz)) 
   END DO
   DO nz=1,nl1
-    UV_rhsAB(1,1,nz,elem)=UV_rhsAB(1,1,nz,elem)+(uvertAB(1,nz)+uvertAB(1,nz+1))/helem(nz,elem)!(zbar(nz)-zbar(nz+1)) 
-    UV_rhsAB(1,2,nz,elem)=UV_rhsAB(1,2,nz,elem)+(uvertAB(2,nz)+uvertAB(2,nz+1))/helem(nz,elem)!(zbar(nz)-zbar(nz+1))
+     UV_rhsAB(1,1,nz,elem)=UV_rhsAB(1,1,nz,elem)+(uvertAB(1,nz)+uvertAB(1,nz+1))/helem(nz,elem)!(zbar(nz)-zbar(nz+1)) 
+     UV_rhsAB(1,2,nz,elem)=UV_rhsAB(1,2,nz,elem)+(uvertAB(2,nz)+uvertAB(2,nz+1))/helem(nz,elem)!(zbar(nz)-zbar(nz+1))
   END DO
 END DO
 

@@ -3181,6 +3181,11 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
             
             b(nz)=b(nz)-min(0._WP, wd)*zinv
             c(nz)=c(nz)-max(0._WP, wd)*zinv
+
+            if (dynamics%momadv_opt==1) then
+               b(nz)=b(nz)-(wu-wd)*zinv
+            end if
+
         end do
         ! The last row
         zinv=1.0_WP*dt/(zbar_n(nzmax-1)-zbar_n(nzmax))
@@ -3192,6 +3197,10 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         wu=sum(Wvel_i(nzmax-1, elnodes))/3._WP
         a(nzmax-1)=a(nzmax-1)+min(0._WP, wu)*zinv
         b(nzmax-1)=b(nzmax-1)+max(0._WP, wu)*zinv
+
+        if (dynamics%momadv_opt==1) then
+           b(nzmax-1)=b(nzmax-1)-wu*zinv
+        end if
         
         ! The first row
         !!PS zinv=1.0_WP*dt/(zbar_n(1)-zbar_n(2))
@@ -3215,6 +3224,10 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         b(nzmin)=b(nzmin)+wu*zinv
         b(nzmin)=b(nzmin)-min(0._WP, wd)*zinv
         c(nzmin)=c(nzmin)-max(0._WP, wd)*zinv
+
+        if (dynamics%momadv_opt==1) then
+           b(nzmin)=b(nzmin)-(wu-wd)*zinv
+        end if
         
         ! ===========================
         ! The rhs:
