@@ -71,7 +71,7 @@ TYPE T_PARTIT
   integer              :: MPI_COMM_FESOM ! FESOM communicator (for ocean only runs if often a copy of MPI_COMM_WORLD)
   integer              :: MPI_COMM_WORLD ! FESOM communicator (for ocean only runs if often a copy of MPI_COMM_WORLD)
 
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
 ! kh 11.11.21 communicator for multi FESOM group loop parallelization
  integer               :: MPI_COMM_FESOM_WORLD
 
@@ -96,7 +96,7 @@ TYPE T_PARTIT
 
   integer            :: MPIERR
 
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
 ! kh 11.11.21 multi FESOM group loop parallelization
   integer            :: my_fesom_group
 #endif

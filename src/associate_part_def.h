@@ -1,4 +1,4 @@
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
   integer,          pointer     :: MPI_COMM_FESOM_WORLD
   integer,          pointer     :: MPI_COMM_FESOM_SAME_RANK_IN_GROUPS
 #endif
@@ -24,7 +24,7 @@
   integer, pointer   :: MPIERR_IB       ! copy for icebergs LA: 2023-05-22
   integer, pointer   :: npes
   integer, pointer   :: mype
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
   integer, pointer   :: my_fesom_group
 #endif
   integer, pointer   :: maxPEnum

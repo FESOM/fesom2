@@ -1433,7 +1433,7 @@ CONTAINS
 
      end if
 
-#if defined (__recom)
+#if defined(__recom)
 !<  read surface atmospheric deposition for Fe, N, CO2
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'//achar(27)//'[0m'
 

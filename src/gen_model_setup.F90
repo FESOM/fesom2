@@ -176,7 +176,7 @@ subroutine setup_model(partit)
 end subroutine setup_model
 
 
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
 ! kh 11.11.21 read num_fesom_groups for multi FESOM group loop parallelization
 ! =================================================================
 subroutine read_namelist_run_config(partit)

@@ -176,7 +176,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     type(t_partit), intent(inout), target    :: partit
     type(t_mesh)  , intent(in)   , target    :: mesh
 
-#if defined ( __usetp)
+#if defined(__recom) && defined(__usetp)
 ! kh 11.11.21 multi FESOM group loop parallelization
     integer             :: num_tracers
     integer             :: tr_num_start_memo
@@ -230,7 +230,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     end if
     del_ttf => tracers%work%del_ttf
 
-#if defined ( __usetp)
+#if defined(__recom) && defined(__usetp)
     num_tracers=tracers%num_tracers
 #endif
 
@@ -270,7 +270,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 !!!     !$ACC UPDATE DEVICE(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus)
         !$ACC UPDATE DEVICE (mesh%helem, mesh%hnode, mesh%hnode_new, mesh%zbar_3d_n, mesh%z_3d_n)
 
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
 ! kh 11.11.21 multi FESOM group loop parallelization
     call calc_slice(num_tracers, num_fesom_groups, partit%my_fesom_group, tr_num_start, tr_num_end, tr_num_in_group_dummy, has_one_added_tracer)
 
@@ -287,7 +287,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     request_count = 0
 #endif
 
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
     do tr_num = tr_num_start, tr_num_end
 #else
     do tr_num=1, tracers%num_tracers
@@ -393,7 +393,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 !!!        !$ACC UPDATE HOST (tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus) &
 !!!        !$ACC HOST  (tracers%work%edge_up_dn_grad)
 
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
 ! kh 19.11.21 broadcast tracer results to fesom groups
         if(num_fesom_groups > 1) then
 
@@ -423,7 +423,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 #endif
     end do ! tr_num = tr_num_start, tr_num_end
     
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
 ! kh 19.11.21 if tracer in group was added to compensate for fragmentation its broadcast of the last index is handled here
     if(num_fesom_groups > 1) then
         do group_i = 0, num_fesom_groups - 1
@@ -465,7 +465,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     end if ! (num_fesom_groups > 1) then
 #endif
 
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
 ! kh 25.03.22 SinkFlx and Benthos values are buffered per tracer index in the loop above and now summed up to
 ! avoid non bit identical results regarding global sums when running the tracer loop in parallel
         do tr_num = 1, num_tracers

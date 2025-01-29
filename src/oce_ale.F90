@@ -3757,7 +3757,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! write out global fields for debugging
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call write_step_info'//achar(27)//'[0m'
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
 ! kh 19.11.21
     if(partit%my_fesom_group == 0) then
 #endif
@@ -3773,7 +3773,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! togeather around 2.5% of model runtime
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call check_blowup'//achar(27)//'[0m'
     call check_blowup(n, ice, dynamics, tracers, partit, mesh)
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
     endif
 #endif
 
@@ -3790,7 +3790,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     rtime_oce_solvetra = rtime_oce_solvetra + (t8-t7)
     rtime_tot          = rtime_tot + (t10-t0)-(t10-t9)
 
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
 ! kh 19.11.21
     if(partit%my_fesom_group == 0) then
 #endif    
@@ -3813,7 +3813,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         write(*,*)
         write(*,*)
     end if 
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
     endif
 #endif
 

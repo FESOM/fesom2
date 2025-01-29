@@ -14,7 +14,7 @@ module cpl_driver
   !
   use mod_oasis                    ! oasis module
   use g_config, only : dt, use_icebergs, lwiso
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
   use g_config, only : num_fesom_groups ! kh 03.12.21 OG 08.09.23
 #endif
   use o_param,  only : rad
@@ -314,7 +314,7 @@ include "node_contour_boundary.h"
     end subroutine node_contours
 
 ! kh 02.12.21
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
   subroutine cpl_oasis3mct_init(partit, localCommunicator, num_fesom_groups)
 #else
   subroutine cpl_oasis3mct_init(partit, localCommunicator)
@@ -333,7 +333,7 @@ include "node_contour_boundary.h"
     !
     integer, intent(OUT)       :: localCommunicator
     type(t_partit), intent(inout), target :: partit
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
 ! kh 02.12.21
     integer, intent(inout)     :: num_fesom_groups
 #endif
@@ -359,7 +359,7 @@ include "node_contour_boundary.h"
     ! 1st Initialize the OASIS3-MCT coupling system for the application
     !------------------------------------------------------------------
 ! kh 02.12.21
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
     CALL oasis_init_comp(comp_id, comp_name, ierror, num_program_groups = num_fesom_groups)
 #else
     CALL oasis_init_comp(comp_id, comp_name, ierror )
@@ -375,7 +375,7 @@ include "node_contour_boundary.h"
     ENDIF
 
 ! kh 02.12.21
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
     CALL oasis_get_localcomm_all_groups( localCommunicator, ierror )
 #else
     CALL oasis_get_localcomm( localCommunicator, ierror )
@@ -630,7 +630,7 @@ include "associate_mesh_ass.h"
     endif
 
 ! kh 30.11.21
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
     if(my_fesom_group == 0) then
 #endif
 
@@ -660,7 +660,7 @@ include "associate_mesh_ass.h"
       print *, 'FESOM after terminate_grids_writing'
     endif !localroot
      
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
     end if !(my_fesom_group == 0) then     
 #endif
 
@@ -931,14 +931,14 @@ include "associate_mesh_ass.h"
     endif    
 #endif
 
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
 ! kh 06.12.21 the coupling is in principle as it was before, i.e. the fesom processes - in group 0 - receive their data from echam
     if(my_fesom_group == 0) then
 #endif
 
     call oasis_get(recv_id(ind), seconds_til_now, exfld,info)
 
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
     else
 
 ! kh 06.12.21 defensive: assignment statement "action=(info==3 ..." below is "don't care" in this case, because the actual value for action
@@ -955,7 +955,7 @@ include "associate_mesh_ass.h"
  ! and delivered back to FESOM.
    action=(info==3 .OR. info==10 .OR. info==11 .OR. info==12 .OR. info==13)
 
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
 ! kh 03.12.21
    if(num_fesom_groups > 1) then
       call MPI_Bcast(action, 1, MPI_LOGICAL, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIerr)
@@ -963,12 +963,12 @@ include "associate_mesh_ass.h"
 #endif 
 
    if (action) then
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
 ! kh 03.12.21
       if(my_fesom_group == 0) then
 #endif
       data_array(1:partit%myDim_nod2d) = exfld
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
       end if
 
 ! kh 03.12.21

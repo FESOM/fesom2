@@ -1,4 +1,4 @@
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
 MPI_COMM_FESOM_WORLD                => partit%MPI_COMM_FESOM_WORLD
 MPI_COMM_FESOM_SAME_RANK_IN_GROUPS  => partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS
 #endif
@@ -20,7 +20,7 @@ MPIERR          => partit%MPIERR
 MPIERR_IB               => partit%MPIERR_IB
 npes            => partit%npes
 mype            => partit%mype
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
 my_fesom_group  => my_fesom_group
 #endif
 maxPEnum        => partit%maxPEnum

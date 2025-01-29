@@ -220,7 +220,7 @@ real(kind=WP), allocatable :: tr_z(:,:)
 #if defined(__recom)
 real(kind=WP), allocatable    :: dtr_bf(:,:), str_bf(:,:)
 real(kind=WP), allocatable    :: vert_sink(:,:)
-#if defined ( __usetp)
+#if defined(__usetp)
 ! kh 22.11.21
 integer                       :: request_count
 integer, allocatable          :: tr_arr_requests(:), tr_arr_old_requests(:)

@@ -811,7 +811,7 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     allocate(str_bf    ( nl-1, node_size ))
     allocate(vert_sink ( nl-1, node_size ))
     allocate(Alk_surf  (       node_size ))
-#if defined (__usetp)
+#if defined(__usetp)
 ! kh 22.11.21
     allocate(tr_arr_requests(num_tracers), tr_arr_old_requests(num_tracers))
     allocate(SinkFlx_tr_requests(num_tracers))
@@ -926,7 +926,7 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     str_bf              = 0.0_WP
     vert_sink           = 0.0_WP
     Alk_surf            = 0.0_WP
-#if defined (__usetp)
+#if defined(__usetp)
 ! kh 23.03.22
     tr_arr_requests     = 0
     tr_arr_old_requests = 0
@@ -1028,7 +1028,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     end if
 
     if (mype==0) then
-#if defined (__usetp)
+#if defined(__usetp)
         if (my_fesom_group==0) then
 #endif
             write(*,*)
@@ -1055,7 +1055,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             write(*,*) 'read Nitrate     climatology from:', trim(filelist(6))
             write(*,*) 'read Salt        climatology from:', trim(filelist(7))
             write(*,*) 'read Temperature climatology from:', trim(filelist(8))
-#if defined ( __usetp)
+#if defined(__usetp)
         end if ! (my_fesom_group==0) then
 #endif
     end if
@@ -1096,13 +1096,13 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 #if defined(__recom)
     if (restore_alkalinity) then
 
-#if defined ( __usetp)
+#if defined(__usetp)
         if (my_fesom_group==0) then
 #endif
         if (mype==0) write(*,*)
         if (mype==0) print *, achar(27)//'[46;1m'//' --> Set surface field for alkalinity restoring'//achar(27)//'[0m'
         if (mype==0) write(*,*),'Alkalinity restoring = true. Field is read.'
-#if defined ( __usetp)
+#if defined(__usetp)
         endif !(my_fesom_group==0) then
 #endif
 
@@ -1140,7 +1140,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
         !_______________________________________________________________________
         CASE (1004:1017)
             tracers%data(i)%values(:,:)=0.0_WP
-#if defined ( __usetp)
+#if defined(__recom) && defined(__usetp)
     if (my_fesom_group==0) then
 #endif
             if (mype==0) then
@@ -1148,12 +1148,12 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-#if defined ( __usetp)
+#if defined(__recom) && defined(__usetp)
     endif !(my_fesom_group==0) then
 #endif
         CASE (1020:1021)
             tracers%data(i)%values(:,:)=0.0_WP
-#if defined ( __usetp)
+#if defined(__recom) && defined(__usetp)
     if (my_fesom_group==0) then
 #endif
             if (mype==0) then
@@ -1161,12 +1161,12 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-#if defined ( __usetp)
+#if defined(__recom) && defined(__usetp)
     endif !(my_fesom_group==0) then
 #endif
         CASE (1023:1033)
             tracers%data(i)%values(:,:)=0.0_WP
-#if defined ( __usetp)
+#if defined(__recom) && defined(__usetp)
     if (my_fesom_group==0) then
 #endif
             if (mype==0) then
@@ -1174,7 +1174,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-#if defined ( __usetp)
+#if defined(__recom) && defined(__usetp)
     endif !(my_fesom_group==0) then
 #endif
 !_______________________________________________________________________
@@ -1182,7 +1182,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 ! Carbon-13
        CASE (1302)
             tracers%data(i)%values(:,:)=0.0_WP
-#if defined ( __usetp)
+#if defined(__recom) && defined(__usetp)
     if (my_fesom_group==0) then
 #endif
             if (mype==0) then
@@ -1190,12 +1190,12 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-#if defined ( __usetp)
+#if defined(__recom) && defined(__usetp)
     endif !(my_fesom_group==0) then
 #endif
        CASE (1305:1321)
             tracers%data(i)%values(:,:)=0.0_WP
-#if defined ( __usetp)
+#if defined(__recom) && defined(__usetp)
     if (my_fesom_group==0) then
 #endif
             if (mype==0) then
@@ -1203,13 +1203,13 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-#if defined ( __usetp)
+#if defined(__recom) && defined(__usetp)
     endif !(my_fesom_group==0) then
 #endif
 ! Radiocarbon
        CASE (1402)
             tracers%data(i)%values(:,:)=0.0_WP
-#if defined ( __usetp)
+#if defined(__recom) && defined(__usetp)
     if (my_fesom_group==0) then
 #endif
             if (mype==0) then
@@ -1217,12 +1217,12 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-#if defined ( __usetp)
+#if defined(__recom) && defined(__usetp)
     endif !(my_fesom_group==0) then
 #endif
        CASE (1405:1421)
             tracers%data(i)%values(:,:)=0.0_WP
-#if defined ( __usetp)
+#if defined(__recom) && defined(__usetp)
     if (my_fesom_group==0) then
 #endif
             if (mype==0) then
@@ -1230,7 +1230,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-#if defined ( __usetp)
+#if defined(__recom) && defined(__usetp)
     endif !(my_fesom_group==0) then
 #endif
 ! End of carbon isotopes section

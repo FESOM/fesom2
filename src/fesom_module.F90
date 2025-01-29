@@ -60,7 +60,7 @@ module fesom_main_storage_module
     integer           :: which_readr ! read which restart files (0=netcdf, 1=core dump,2=dtype)
     integer           :: total_nsteps
     integer, pointer  :: mype, npes, MPIerr, MPI_COMM_FESOM, MPI_COMM_WORLD, MPI_COMM_FESOM_IB
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
     integer, pointer  :: my_fesom_group, MPI_COMM_FESOM_WORLD, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS
 #endif
     real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
@@ -120,7 +120,7 @@ contains
       logical mpi_is_initialized
       integer              :: tr_num
 
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
 ! kh 11.11.21 multi FESOM group loop parallelization
       integer             :: npes_fesom_world
       integer             :: mype_fesom_world
@@ -130,6 +130,8 @@ contains
 
 ! kh 26.11.21 get current value for num_fesom_groups
     call read_namelist_run_config
+    print *,"reading number of tracer groups "
+
 #endif
 
 #if !defined  __ifsinterface
@@ -165,7 +167,7 @@ contains
 #if defined (__oasis)
 !        call cpl_oasis3mct_init(f%partit,f%partit%MPI_COMM_FESOM)
 ! kh 02.12.21
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         call cpl_oasis3mct_init(f%partit, f%partit%localCommunicator, num_fesom_groups)
 #else
         call cpl_oasis3mct_init(f%partit, f%partit%localCommunicator)
@@ -183,7 +185,7 @@ contains
 
         f%npes          =>f%partit%npes
 
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
 ! kh 26.11.21 prepare communicator splitting for multi FESOM group loop parallelization
     f%my_fesom_group=>f%partit%my_fesom_group
 
@@ -295,7 +297,7 @@ contains
             print *, achar(27)//'[7;32m'//' --> FESOM BUILDS UP MODEL CONFIGURATION                    '//achar(27)//'[0m'
         end if
 
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
     end if
 #endif
 
@@ -312,13 +314,13 @@ contains
         call mesh_setup(f%partit, f%mesh)
 
 ! kh 29.02.22
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif 
 
         if (f%mype==0) write(*,*) 'FESOM mesh_setup... complete'
 
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         end if
 #endif 
 
@@ -384,13 +386,13 @@ contains
         if (f%mype==0) then
 
 ! kh 29.02.22
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif
 
            write(*,*) 'FESOM ocean_setup... complete'
 
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         end if
 #endif
 
@@ -440,7 +442,7 @@ contains
 #if defined (__oasis)
 
 ! kh 30.11.21 only mype == 0 in my_fesom_group == 0 handles coupling with extern models
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif 
 
@@ -448,11 +450,11 @@ contains
 
         if(f%mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
 
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         end if
 #endif
 
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
 ! kh 03.12.21
 !    call MPI_Barrier(f%MPI_COMM_FESOM_WORLD, f%MPIERR)
     if(num_fesom_groups > 1) then
@@ -492,14 +494,14 @@ contains
         ! store grid information into netcdf file
 
 ! kh 29.03.22
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif
 
         if (.not. r_restart) call write_mesh_info(f%partit, f%mesh)
 
 ! kh 29.03.22
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         end if
 #endif
 
@@ -523,7 +525,7 @@ contains
 #endif
 
 ! kh 29.03.22
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif
 
@@ -542,7 +544,7 @@ contains
             write(*,*) '============================================' 
 
 ! kh 29.03.22
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         end if
 #endif
 
@@ -673,14 +675,14 @@ contains
     end if
     ! --------------
 ! kh 29.03.22
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif 
 
     if (f%mype==0) write(*,*) 'FESOM start iteration before the barrier...'
 
 ! kh 29.03.22
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         end if
 #endif 
 
@@ -688,14 +690,14 @@ contains
     if (f%mype==0) then
 
 ! kh 29.03.22
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif 
 
        write(*,*) 'FESOM start iteration after the barrier...'
 
 ! kh 29.03.22
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         end if
 #endif 
 
@@ -703,7 +705,7 @@ contains
     endif
 
 ! kh 29.03.22
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif 
 
@@ -714,7 +716,7 @@ contains
     end if
 
 ! kh 29.03.22
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         end if
 #endif
 
@@ -785,7 +787,7 @@ contains
         mstep = n
 
 ! kh 29.03.22
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif
 
@@ -797,7 +799,7 @@ contains
         end if
 
 ! kh 29.03.22
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         end if
 #endif 
 
@@ -877,33 +879,33 @@ contains
 #endif
         
         !___model ocean step____________________________________________________
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_timestep_ale'//achar(27)//'[0m'
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         end if
 #endif
         call oce_timestep_ale(n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
 
         f%t3 = MPI_Wtime()
         !___compute energy diagnostics..._______________________________________
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif 
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call compute_diagnostics(1)'//achar(27)//'[0m'
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         end if
 #endif
         call compute_diagnostics(1, f%dynamics, f%tracers, f%ice, f%partit, f%mesh)
 
         f%t4 = MPI_Wtime()
         !___prepare output______________________________________________________
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif 
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         end if
 #endif 
         call output (n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
@@ -951,7 +953,7 @@ contains
     end if
     ! --------------
 ! kh 11.11.21 multi FESOM group loop parallelization
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif 
 
@@ -959,7 +961,7 @@ contains
     call finalize_restart()
 
 ! kh 29.03.22
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         end if
 #endif 
 
@@ -969,7 +971,7 @@ contains
 ! kh 11.11.21 multi FESOM group loop parallelization    
     call MPI_Barrier(f%MPI_COMM_FESOM, f%MPIERR)
 #endif
-#if defined (__usetp) 
+#if defined(__recom) && defined (__usetp) 
 ! kh 11.11.21 list statistics for all fesom_groups 
 ! fesom groups are listed backwards, so info for the main fesom group 0 is at the end in the log
     do i = num_fesom_groups - 1, 0, -1
@@ -1069,7 +1071,7 @@ contains
     call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
 #endif
 
-#if defined (__usetp)
+#if defined(__recom) && defined (__usetp)
         end if
     end do ! i = num_fesom_groups - 1, 0, -1
 #endif
@@ -1079,7 +1081,7 @@ contains
 #endif
     if(f%fesom_did_mpi_init) call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype) ! finalize MPI before FESOM prints its stats block, otherwise there is sometimes output from other processes from an earlier time in the programm AFTER the starts block (with parastationMPI)
 
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif
 
@@ -1123,7 +1125,7 @@ contains
     end if    
 
 ! kh 29.03.22
-#if defined(__usetp)
+#if defined(__recom) && defined(__usetp)
         end if
 #endif 
 
