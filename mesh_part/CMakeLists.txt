@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.4)
 
 project(fesom_ini C Fortran)
+find_package(MPI REQUIRED)
+
+
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}/../src)
@@ -12,7 +15,7 @@ add_subdirectory(${src_home}/../lib/metis-5.1.0             ${PROJECT_BINARY_DIR
 include_directories(${src_home}/../lib/metis-5.1.0/include)
 
 add_library(${PROJECT_NAME}_C ${sources_C})
-target_compile_definitions(${PROJECT_NAME}_C PRIVATE PARMS USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
+target_compile_definitions(${PROJECT_NAME}_C PRIVATE USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
 target_link_libraries(${PROJECT_NAME}_C metis)
 
 add_executable(${PROJECT_NAME} ${sources_Fortran})
@@ -26,5 +29,5 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
       target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
    endif()
 endif()
-target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C)
+target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C MPI::MPI_Fortran)
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)

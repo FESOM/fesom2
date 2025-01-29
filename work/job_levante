@@ -28,6 +28,10 @@ cp -n ../config/namelist.forcing .
 cp -n ../config/namelist.oce     .
 cp -n ../config/namelist.ice     .
 cp -n ../config/namelist.icepack .
+cp -n ../config/namelist.tra     .
+cp -n ../config/namelist.io      .
+cp -n ../config/namelist.cvmix   .
+cp -n ../config/namelist.dyn     .
 
 date
 srun -l fesom.x > "fesom2.0.out"

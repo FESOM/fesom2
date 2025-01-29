@@ -26,7 +26,9 @@ idemix_mu0         = 0.33333333 ! dissipation parameter (dimensionless)
 idemix_sforcusage  = 0.2
 idemix_n_hor_iwe_prop_iter = 5  ! iterations for contribution from horiz. wave propagation
 idemix_surforc_file = '/work/ollie/clidyn/forcing/IDEMIX/fourier_smooth_2005_cfsr_inert_rgrid.nc'
+idemix_surforc_vname= 'var706'
 idemix_botforc_file = '/work/ollie/clidyn/forcing/IDEMIX/tidal_energy_gx1v6_20090205_rgrid.nc'
+idemix_botforc_vname= 'wave_dissipation'
 /
 
 ! namelist for PP
@@ -68,6 +70,6 @@ tidal_vert_decayscale= 500.0     ! units: m; zeta in Simmons et al. (used to com
 tidal_max_coeff    = 50e-4       ! units: m^2/s; largest acceptable value for diffusivity          
 tidal_lcl_mixfrac  = 0.33        !tidal dissipation efficiency (q in Simmons et al.), i.e. fraction of energy that dissipates locally
 tidal_depth_cutoff = 0.0         !depth of the shallowest column where tidal mixing is computed (positive below surface)
-tidal_botforc_file = '/work/ollie/pscholz/FORCING/IDEMIX/tidal_energy_gx1v6_20090205_rgrid.nc'
+tidal_botforc_file = '/albedo/work/projects/p_pool_fesom1/fesom2.0/forcing/idemix/tidal_energy_gx1v6_20090205_rgrid.nc'
 /
 

@@ -1,6 +1,6 @@
 MODULE MOD_ICE
 USE o_PARAM, only: WP
-USE, intrinsic :: ISO_FORTRAN_ENV
+USE, intrinsic :: ISO_FORTRAN_ENV, only : int32
 USE MOD_WRITE_BINARY_ARRAYS
 USE MOD_READ_BINARY_ARRAYS
 IMPLICIT NONE
@@ -49,6 +49,7 @@ TYPE T_ICE_THERMO
     !___________________________________________________________________________
     real(kind=WP) :: rhoair=1.3  , inv_rhoair=1./1.3  ! Air density & inverse ,  LY2004 !1.3 AOMIP
     real(kind=WP) :: rhowat=1025., inv_rhowat=1./1025.! Water density & inverse
+    real(kind=WP) :: rhofwt=1000., inv_rhofwt=1./1000.! Freshwter density & inverse
     real(kind=WP) :: rhoice=910. , inv_rhoice=1./910. ! Ice density & inverse, AOMIP
     real(kind=WP) :: rhosno=290. , inv_rhosno=1./290. ! Snow density & inverse, AOMIP
     ! Specific heat of air, ice, snow [J/(kg * K)]
@@ -92,7 +93,7 @@ TYPE T_ICE_ATMCOUPL
     real(kind=WP), allocatable, dimension(:)    :: oce_flx_h, ice_flx_h, tmpoce_flx_h, tmpice_flx_h
 #if defined (__oifs) || defined (__ifsinterface)
     !___________________________________________________________________________
-    real(kind=WP), allocatable, dimension(:)    :: ice_alb, enthalpyoffuse
+    real(kind=WP), allocatable, dimension(:)    :: ice_alb, enthalpyoffuse, flx_qres, flx_qcon
     ! !!! DONT FORGET ice_temp rhs_tempdiv rhs_temp is advected for oifs !!! --> becomes additional ice
     ! tracer in ice%data(4)%values
 #endif /* (__oifs)  */
@@ -111,9 +112,9 @@ TYPE T_ICE
 
     !___________________________________________________________________________
     ! zonal & merdional ice velocity
-    real(kind=WP), allocatable, dimension(:)    :: uice, uice_rhs, uice_old, uice_aux
-    real(kind=WP), allocatable, dimension(:)    :: vice, vice_rhs, vice_old, vice_aux
-
+    real(kind=WP), allocatable, dimension(:)    :: uice, uice_rhs, uice_old, uice_aux, uice_ib
+    real(kind=WP), allocatable, dimension(:)    :: vice, vice_rhs, vice_old, vice_aux, vice_ib
+    
     ! surface stess atm<-->ice, oce<-->ice
     real(kind=WP), allocatable, dimension(:)    :: stress_atmice_x, stress_iceoce_x
     real(kind=WP), allocatable, dimension(:)    :: stress_atmice_y, stress_iceoce_y
@@ -128,14 +129,24 @@ TYPE T_ICE
 
     ! maEVP variables
     real(kind=WP), allocatable, dimension(:)    :: alpha_evp_array, beta_evp_array
+    ! ice/snow thicknesses in the ice-covered area
+    real(kind=WP), allocatable, dimension(:)    :: h_ice, h_snow    
 
     !___________________________________________________________________________
     ! total number of ice tracers (default=3, 1=area, 2=mice, 3=msnow, (4=ice_temp)
 #if defined (__oifs) || defined (__ifsinterface)
     integer                                     :: num_itracers=4
 #else
+!    integer                                     :: num_itracers=3
+    !------------------------------
+    ! LA 2023-01-31 add icebergs
+#if defined(__async_icebergs)
+    integer                                     :: num_itracers=5
+#else
     integer                                     :: num_itracers=3
-#endif
+#endif 
+    !------------------------------
+#endif 
 
     ! put ice tracers data arrays
     type(t_ice_data), allocatable, dimension(:) :: data
@@ -615,6 +626,8 @@ subroutine ice_init(ice, partit, mesh)
     allocate(ice%stress_iceoce_x(      node_size))
     allocate(ice%stress_atmice_y(      node_size))
     allocate(ice%stress_iceoce_y(      node_size))
+    allocate(ice%h_ice          (      node_size))
+    allocate(ice%h_snow         (      node_size))    
     ice%uice            = 0.0_WP
     ice%uice_rhs        = 0.0_WP
     ice%uice_old        = 0.0_WP
@@ -625,6 +638,8 @@ subroutine ice_init(ice, partit, mesh)
     ice%vice_old        = 0.0_WP
     ice%stress_atmice_y = 0.0_WP
     ice%stress_iceoce_y = 0.0_WP
+    ice%h_ice           = 0.0_WP
+    ice%h_snow          = 0.0_WP    
     if (ice%whichEVP /= 0) then
         allocate(ice%uice_aux(         node_size))
         allocate(ice%vice_aux(         node_size))
@@ -655,7 +670,7 @@ subroutine ice_init(ice, partit, mesh)
     allocate(ice%flx_h( node_size))
     ice%flx_fw           = 0.0_WP
     ice%flx_h            = 0.0_WP
-
+    
     !___________________________________________________________________________
     ! initialse data array of ice derived type containing "ice tracer" that have
     ! to be advected: a_ice (index=1), m_ice (index=2), m_snow (index=3),
@@ -743,6 +758,10 @@ subroutine ice_init(ice, partit, mesh)
     allocate(ice%atmcoupl%enthalpyoffuse(node_size))
     ice%atmcoupl%ice_alb       = 0.6_WP
     ice%atmcoupl%enthalpyoffuse= 0.0_WP
+    allocate(ice%atmcoupl%flx_qres(node_size))
+    allocate(ice%atmcoupl%flx_qcon(node_size))
+    ice%atmcoupl%flx_qres      = 0.0_WP    
+    ice%atmcoupl%flx_qcon      = 0.0_WP
 #endif /* (__oifs) */
 #endif /* (__oasis) */
 
@@ -751,7 +770,8 @@ subroutine ice_init(ice, partit, mesh)
     ! to here since namelist.ice is now read in ice_init where whichEVP is not available
     ! when  mesh_auxiliary_arrays is called
     !array of 2D boundary conditions is used in ice_maEVP
-    if (ice%whichEVP > 0) then
+    
+    ! LA 2023-05-24 initiate bc_index_nod2D also for whichEVP==0
         allocate(mesh%bc_index_nod2D(myDim_nod2D+eDim_nod2D))
         mesh%bc_index_nod2D=1._WP
         do n=1, myDim_edge2D
@@ -759,9 +779,8 @@ subroutine ice_init(ice, partit, mesh)
             if (myList_edge2D(n) <= mesh%edge2D_in) cycle
             mesh%bc_index_nod2D(ed)=0._WP
         end do
-    end if
-
-end subroutine ice_init
+    
+end subroutine ice_init  
 !
 !
 !

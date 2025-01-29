@@ -7,7 +7,7 @@ use o_PARAM
 private
 public :: read_bin_array, read1d_int_static
 INTERFACE read_bin_array
-          MODULE PROCEDURE read1d_real, read1d_int, read1d_char, read2d_real, read2d_int, read3d_real, read3d_int
+          MODULE PROCEDURE read1d_real, read1d_int, read1d_char, read2d_real, read2d_int, read3d_real, read3d_int, read4d_real, read4d_int
 END INTERFACE
 contains
 subroutine read1d_real(arr, unit, iostat, iomsg)
@@ -113,5 +113,31 @@ subroutine read3d_int(arr, unit, iostat, iomsg)
     if (.not. allocated(arr)) allocate(arr(s1,s2,s3))
     read(unit, iostat=iostat, iomsg=iomsg) arr(1:s1, 1:s2, 1:s3)
 end subroutine read3d_int
+
+subroutine read4d_real(arr, unit, iostat, iomsg)
+    real(kind=WP), intent(inout), allocatable :: arr(:,:,:,:)
+    integer,       intent(in)                 :: unit
+    integer,       intent(out)                :: iostat
+    character(*),  intent(inout)              :: iomsg
+    integer                                   :: s1, s2, s3, s4
+
+    read(unit, iostat=iostat, iomsg=iomsg) s1, s2, s3, s4
+    if ((s1==0) .or. (s2==0) .or. (s3==0) .or. (s4==0)) return
+    if (.not. allocated(arr)) allocate(arr(s1,s2,s3,s4))
+    read(unit, iostat=iostat, iomsg=iomsg) arr(1:s1, 1:s2, 1:s3, 1:s4)
+end subroutine read4d_real
+
+subroutine read4d_int(arr, unit, iostat, iomsg)
+    integer, intent(inout), allocatable :: arr(:,:,:,:)
+    integer,       intent(in)           :: unit
+    integer,       intent(out)          :: iostat
+    character(*),  intent(inout)        :: iomsg
+    integer                             :: s1, s2, s3, s4
+
+    read(unit, iostat=iostat, iomsg=iomsg) s1, s2, s3, s4
+    if ((s1==0) .or. (s2==0) .or. (s3==0) .or. (s4==0)) return
+    if (.not. allocated(arr)) allocate(arr(s1,s2,s3,s4))
+    read(unit, iostat=iostat, iomsg=iomsg) arr(1:s1, 1:s2, 1:s3, 1:s4)
+end subroutine read4d_int
 end module MOD_READ_BINARY_ARRAYS
 !==========================================================

@@ -6,8 +6,10 @@
 !-----------------------------------------------------
 
 MODULE mpp_io
+    USE mpi
 #if defined(__MULTIO)        
-    USE iom
+    USE iom, only : iom_enable_multio, iom_initialize, iom_init_server, iom_finalize
+#endif
     IMPLICIT NONE
     PRIVATE
 
@@ -18,7 +20,7 @@ MODULE mpp_io
 
     INTEGER :: ntask_multio  = 0
     INTEGER :: ntask_xios    = 0
-    LOGICAL, PUBLIC  :: lioserver, lmultioserver, lmultiproc
+    LOGICAL, PUBLIC :: lioserver, lmultioserver, lmultiproc
     INTEGER :: ntask_notio
     INTEGER, SAVE :: mppallrank, mppallsize, mppiorank, mppiosize
     INTEGER, SAVE :: mppmultiorank, mppmultiosize
@@ -29,7 +31,6 @@ MODULE mpp_io
     
     SUBROUTINE mpp_io_init( iicomm,  lio, irequired, iprovided, lmpi1 ) 
 
-        INCLUDE "mpif.h"
         INTEGER, INTENT(INOUT) :: iicomm
         LOGICAL, INTENT(INOUT) :: lio
         INTEGER, INTENT(INOUT) :: irequired, iprovided
@@ -77,6 +78,12 @@ MODULE mpp_io
         WRITE(*,namio)
         CLOSE(10)
 
+#if defined(__MULTIO)
+        IF (ntask_multio /= 0) THEN
+            CALL iom_enable_multio()
+        ENDIF
+#endif
+
         IF ( ntask_xios + ntask_multio == 0 ) THEN
             iicomm = mpi_comm_world
             lio=.FALSE.
@@ -119,7 +126,6 @@ MODULE mpp_io
         INTEGER :: icode, ierr, icolor, iicommx, iicommm, iicommo
         INTEGER :: ji,inum
         LOGICAL :: lcompp
-        INCLUDE "mpif.h"
 
         ! Construct multio server communicator
 
@@ -157,12 +163,14 @@ MODULE mpp_io
         CALL mpi_comm_rank( iicommo, mppcomprank, ierr )
         CALL mpi_comm_size( iicommo, mppcompsize, ierr )
 
+#if defined(__MULTIO)
         IF (.NOT.lioserver) THEN
             CALL iom_initialize( "for_xios_mpi_id", return_comm=iicommm, global_comm = pcommworldmultio )    ! nemo local communicator given by xios
         ELSE
             ! For io-server tasks start an run the right server
             CALL iom_init_server( server_comm = pcommworldmultio )
         ENDIF
+#endif
 
         ! Return to the model with iicomm being compute only tasks
         iicomm = iicommo
@@ -172,11 +180,13 @@ MODULE mpp_io
     SUBROUTINE mpp_stop
         INTEGER :: ierr
         
+#if defined(__MULTIO)
         IF (.NOT.lioserver) THEN
             call iom_finalize()
         ENDIF
+#endif
 
         CALL mpi_finalize( ierr )
     END SUBROUTINE mpp_stop
-#endif
+
 END MODULE mpp_io

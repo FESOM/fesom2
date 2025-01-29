@@ -491,9 +491,9 @@ subroutine pressure_bv(tracers, partit, mesh)
         end if
     end do
 !$OMP END DO
+!$OMP BARRIER
 !$OMP END PARALLEL
 call smooth_nod (bvfreq, 1, partit, mesh)
-!$OMP BARRIER
 end subroutine pressure_bv
 !
 !
@@ -2835,10 +2835,10 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
    end do
  end do
 !$OMP END DO
+!$OMP BARRIER
 !$OMP END PARALLEL
 call exchange_nod(sw_alpha, partit)
 call exchange_nod(sw_beta, partit)
-!$OMP BARRIER
 end subroutine sw_alpha_beta
 !
 !
@@ -2870,6 +2870,7 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
   real(kind=WP),  intent(IN)             :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D), SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
   real(kind=WP)                          :: tx(mesh%nl-1), ty(mesh%nl-1), sx(mesh%nl-1), sy(mesh%nl-1), vol(mesh%nl-1), testino(2)
   integer                                :: n, nz, elnodes(3),el, k, nln, uln, nle, ule
+  real(kind=WP)                          :: aux(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -2924,9 +2925,18 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
         sigma_xy(2,uln:nln,n) = (-sw_alpha(uln:nln,n)*ty(uln:nln)+sw_beta(uln:nln,n)*sy(uln:nln))/vol(uln:nln)*density_0
   END DO
 !$OMP END DO
-!$OMP END PARALLEL
-  call exchange_nod(sigma_xy, partit)
 !$OMP BARRIER
+!$OMP END PARALLEL
+! call exchange_nod(sigma_xy, partit)
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+aux=sigma_xy(1,:,:)
+call exchange_nod(aux, partit)
+sigma_xy(1,:,:)=aux
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+aux=sigma_xy(2,:,:)
+call exchange_nod(aux, partit)
+sigma_xy(2,:,:)=aux
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 end subroutine compute_sigma_xy
 !
 !
@@ -2963,7 +2973,10 @@ subroutine compute_neutral_slope(partit, mesh)
         nl1=nlevels_nod2d(n)-1
         ul1=ulevels_nod2d(n)
         do nz = ul1+1, nl1
-            ro_z_inv=2._WP*g/density_0/max(bvfreq(nz,n)+bvfreq(nz+1,n), eps**2) !without minus, because neutral slope S=-(nabla\rho)/(d\rho/dz)
+            !without minus, because neutral slope S=-(nabla\rho)/(d\rho/dz)
+            ! --> the minus sign is hidden within the definition of buoyancy
+            ! --> N2 = -g*drho/dz
+            ro_z_inv=2._WP*g/density_0/max(bvfreq(nz,n)+bvfreq(nz+1,n), eps**2) 
             neutral_slope(1,nz,n)=sigma_xy(1,nz,n)*ro_z_inv
             neutral_slope(2,nz,n)=sigma_xy(2,nz,n)*ro_z_inv
             neutral_slope(3,nz,n)=sqrt(neutral_slope(1,nz,n)**2+neutral_slope(2,nz,n)**2)
@@ -2975,10 +2988,10 @@ subroutine compute_neutral_slope(partit, mesh)
         enddo
     enddo
 !$OMP END DO
+!$OMP BARRIER
 !$OMP END PARALLEL
     call exchange_nod(neutral_slope, partit)
     call exchange_nod(slope_tapered, partit)
-!$OMP BARRIER
 end subroutine compute_neutral_slope
 !
 !
@@ -3055,6 +3068,8 @@ IMPLICIT NONE
 
   IF((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) THEN
       rho_out  = density_0 - 0.00025_WP*(t - 10.0_WP)*density_0
+  ELSE IF((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) THEN
+      rho_out  = density_0 - density_0*0.0002052_WP*(t - 10.0_WP) + density_0*0.00079_WP*(s - 35.0_WP)
   ELSE
       rho_out  = density_0 + 0.8_WP*(s - 34.0_WP) - 0.2*(t - 20.0_WP)
   END IF

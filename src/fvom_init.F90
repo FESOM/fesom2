@@ -888,7 +888,7 @@ subroutine find_levels(mesh)
                     !___________________________________________________________
                     ! loop over neighbouring triangles
                     do i=1,nneighb
-                        if (elems(i)>1) then
+                        if (elems(i)>0) then
                             if (nlevels(elems(i))>=nz) then
                                 !count neighbours
                                 count_neighb_open=count_neighb_open+1

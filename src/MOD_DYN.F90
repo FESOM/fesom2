@@ -1,7 +1,7 @@
 !==========================================================
 MODULE MOD_DYN
 USE O_PARAM
-USE, intrinsic :: ISO_FORTRAN_ENV
+USE, intrinsic :: ISO_FORTRAN_ENV, only : int32
 USE MOD_WRITE_BINARY_ARRAYS
 USE MOD_READ_BINARY_ARRAYS
 IMPLICIT NONE
@@ -17,14 +17,7 @@ TYPE T_SOLVERINFO
     integer       :: fillin  = 3
     integer       :: lutype  = 2
     real(kind=WP) :: droptol = 1.e-8
-!!! PARMS Solver
-    real(kind=WP) :: soltol  = 1e-10  ! default for PARMS
-    logical       :: use_parms = .TRUE.
-!!!
-!!! Sergey's Solver
-!   real(kind=WP)  :: soltol  = 1e-5  ! default for PARMS
-!   logical        :: use_parms = .FALSE.
-!!!
+    real(kind=WP)  :: soltol  = 1e-5
     real(kind=WP), allocatable   :: rr(:), zz(:), pp(:), App(:)
     contains
     procedure WRITE_T_SOLVERINFO
@@ -49,10 +42,11 @@ END TYPE T_DYN_WORK
 ! set main structure for dynamicss, contains viscosity options and parameters +
 ! option for momentum advection
 TYPE T_DYN
-!___________________________________________________________________________
+    !___________________________________________________________________________
     ! instant zonal merdional velocity & Adams-Bashfort rhs
-    real(kind=WP), allocatable, dimension(:,:,:):: uv, uv_rhs, uv_rhsAB, fer_uv
-
+    real(kind=WP), allocatable, dimension(:,:,:)   :: uv, uv_rhs, fer_uv
+    real(kind=WP), allocatable, dimension(:,:,:,:) :: uv_rhsAB
+    integer                                        :: AB_order=2
     ! horizontal velocities at nodes
     real(kind=WP), allocatable, dimension(:,:,:):: uvnode
 
@@ -62,6 +56,28 @@ TYPE T_DYN
     ! sea surface height arrays
     real(kind=WP), allocatable, dimension(:)    :: eta_n, d_eta, ssh_rhs, ssh_rhs_old
 
+    !___arrays for split explicite ssh computation______________________________
+    ! se_uvh...transport velocity, 
+    real(kind=WP), allocatable, dimension(:,:,:):: se_uvh 
+    !se_uv_rhs...vertical integral of transport velocity rhs, se_uvBT_4AB...
+    ! barotropic transport velocities (vertically integrated), contains actual 
+    ! timestep (1:2) and previous timestep (3:4) for adams-bashfort interpolation
+    real(kind=WP), allocatable, dimension(:,:)  :: se_uvBT_rhs, se_uvBT_4AB 
+    
+    ! se_uvBT...barotropic trnasport velocities from barotropic time stepping
+    ! se_uvBT_theta...velocities for dissipative time stepping of thickness equation
+    ! UBTmean_mean... Mean BT velocity to trim 3D velocity in tracers
+    real(kind=WP), allocatable, dimension(:,:)  :: se_uvBT, se_uvBT_theta, se_uvBT_mean, se_uvBT_12 
+    
+    ! array that are needed for viscosity and bottomdrag stabilization of 
+    ! split-expl subcycling method
+    real(kind=WP), allocatable, dimension(:,:)  :: se_uvBT_stab_hvisc 
+    real(kind=WP), allocatable, dimension(:)    :: se_uvBT_stab_bdrag
+    
+    ! LA: 2023-05-17 iceberg arrays
+    real(kind=WP), allocatable, dimension(:)    :: eta_n_ib ! kh 18.03.21 additional array for asynchronous iceberg computations
+    real(kind=WP), allocatable, dimension(:,:,:):: uv_ib    ! kh 18.03.21 additional array for asynchronous iceberg computations
+    
     !___________________________________________________________________________
     ! summarizes solver input parameter
     type(t_solverinfo)                          :: solverinfo
@@ -101,19 +117,36 @@ TYPE T_DYN
     logical                                     :: use_wsplit    = .false.
     ! maximum allowed CFL criteria in vertical (0.5 < w_max_cfl < 1.)
     ! in older FESOM it used to be w_exp_max=1.e-3
-    real(kind=WP)                               :: wsplit_maxcfl= 1.0
+    real(kind=WP)                               :: wsplit_maxcfl = 1.0
+    
+    ! switch between ssh computation, by solver or split explicite subcycling
+    ! use_ssh_se_subcycl = .false. --> solver
+    ! use_ssh_se_subcycl = .true.  --> split explicite subcycling
+    logical                                     :: use_ssh_se_subcycl = .false.
+    
+    ! barotropic subcycling time-steps and dissipation parameter
+    integer                                     :: se_BTsteps     = 50
+    real(kind=WP)                               :: se_BTtheta     = 0.14_WP
+    logical                                     :: se_bottdrag    = .true.
+    logical                                     :: se_bdrag_si    = .true.
+    logical                                     :: se_visc        = .true.
+    real(kind=WP)                               :: se_visc_gamma0 = 10
+    real(kind=WP)                               :: se_visc_gamma1 = 2750
+    real(kind=WP)                               :: se_visc_gamma2 = 0
+    
+    !___________________________________________________________________________
     ! energy diagnostic part: will be computed inside the model ("hard integration"):
     logical                                      :: ldiag_ke       = .true.
     ! different contributions to velocity change. will be computed inside the code.
     real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv, ke_cor, ke_pre, ke_hvis, ke_vvis, ke_du2, ke_umean, ke_u2mean
     real(kind=WP), allocatable, dimension(:,:)   :: ke_wind, ke_drag
     ! same as above but multiplied by velocity. we need both for later computation of turbulent fluxes
-    real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv_xVEL, ke_cor_xVEL, ke_pre_xVEL, ke_hvis_xVEL, ke_vvis_xVEL
-    real(kind=WP), allocatable, dimension(:,:)   :: ke_wind_xVEL, ke_drag_xVEL
-    real(kind=WP), allocatable, dimension(:,:)   :: ke_wrho         !we use pressure to compute (W*dens) as it appeares much easier to compute (P*dW) instead of (dP*w)
-    real(kind=WP), allocatable, dimension(:,:)   :: ke_dW, ke_Pfull !for later computation of turbulent fluxes from the term above
-    real(kind=WP), allocatable, dimension(:,:,:) :: ke_adv_AB, ke_cor_AB
-    real(kind=WP), allocatable, dimension(:,:,:) :: ke_rhs_bak
+    real(kind=WP), allocatable, dimension(:,:,:)   :: ke_adv_xVEL, ke_cor_xVEL, ke_pre_xVEL, ke_hvis_xVEL, ke_vvis_xVEL
+    real(kind=WP), allocatable, dimension(:,:)     :: ke_wind_xVEL, ke_drag_xVEL
+    real(kind=WP), allocatable, dimension(:,:)     :: ke_wrho         !we use pressure to compute (W*dens) as it appeares much easier to compute (P*dW) instead of (dP*w)
+    real(kind=WP), allocatable, dimension(:,:)     :: ke_dW, ke_Pfull !for later computation of turbulent fluxes from the term above
+    real(kind=WP), allocatable, dimension(:,:,:,:) :: ke_adv_AB, ke_cor_AB
+    real(kind=WP), allocatable, dimension(:,:,:)   :: ke_rhs_bak
     ! surface fields to compute APE generation
     real(kind=WP), allocatable, dimension(:)     :: ke_J, ke_D, ke_G, ke_D2, ke_JD, ke_GD, ke_swA, ke_swB
     real(kind=WP), allocatable, dimension(:,:)   :: ke_n0, ke_Dx, ke_Dy, ke_DU, ke_DV, ke_elemD, ke_elemD2
@@ -232,7 +265,8 @@ subroutine WRITE_T_DYN(dynamics, unit, iostat, iomsg)
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%use_freeslip
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%use_wsplit
     write(unit, iostat=iostat, iomsg=iomsg) dynamics%wsplit_maxcfl
-
+    write(unit, iostat=iostat, iomsg=iomsg) dynamics%use_ssh_se_subcycl
+    
     !___________________________________________________________________________
     call dynamics%solverinfo%WRITE_T_SOLVERINFO(unit)
 
@@ -252,6 +286,17 @@ subroutine WRITE_T_DYN(dynamics, unit, iostat, iomsg)
         call write_bin_array(dynamics%fer_w , unit, iostat, iomsg)
         call write_bin_array(dynamics%fer_uv, unit, iostat, iomsg)
     end if
+    if (dynamics%use_ssh_se_subcycl) then
+        call write_bin_array(dynamics%se_uvh       , unit, iostat, iomsg)
+        call write_bin_array(dynamics%se_uvBT_rhs , unit, iostat, iomsg)
+        call write_bin_array(dynamics%se_uvBT_4AB , unit, iostat, iomsg)
+        call write_bin_array(dynamics%se_uvBT      , unit, iostat, iomsg)
+        call write_bin_array(dynamics%se_uvBT_theta, unit, iostat, iomsg)
+        call write_bin_array(dynamics%se_uvBT_mean , unit, iostat, iomsg)
+        call write_bin_array(dynamics%se_uvBT_12 , unit, iostat, iomsg)
+        call write_bin_array(dynamics%se_uvBT_stab_hvisc , unit, iostat, iomsg)
+        call write_bin_array(dynamics%se_uvBT_stab_bdrag , unit, iostat, iomsg)
+    end if 
 
 
 end subroutine WRITE_T_DYN
@@ -278,6 +323,7 @@ subroutine READ_T_DYN(dynamics, unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%use_freeslip
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%use_wsplit
     read(unit, iostat=iostat, iomsg=iomsg) dynamics%wsplit_maxcfl
+    read(unit, iostat=iostat, iomsg=iomsg) dynamics%use_ssh_se_subcycl
 
     !___________________________________________________________________________
     call dynamics%solverinfo%READ_T_SOLVERINFO(unit)
@@ -298,6 +344,17 @@ subroutine READ_T_DYN(dynamics, unit, iostat, iomsg)
         call read_bin_array(dynamics%fer_w     , unit, iostat, iomsg)
         call read_bin_array(dynamics%fer_uv    , unit, iostat, iomsg)
     end if
+    if (dynamics%use_ssh_se_subcycl) then
+        call read_bin_array(dynamics%se_uvh       , unit, iostat, iomsg)
+        call read_bin_array(dynamics%se_uvBT_rhs , unit, iostat, iomsg)
+        call read_bin_array(dynamics%se_uvBT_4AB , unit, iostat, iomsg)
+        call read_bin_array(dynamics%se_uvBT      , unit, iostat, iomsg)
+        call read_bin_array(dynamics%se_uvBT_theta, unit, iostat, iomsg)
+        call read_bin_array(dynamics%se_uvBT_mean , unit, iostat, iomsg)
+        call read_bin_array(dynamics%se_uvBT_12 , unit, iostat, iomsg)
+        call read_bin_array(dynamics%se_uvBT_stab_hvisc , unit, iostat, iomsg)
+        call read_bin_array(dynamics%se_uvBT_stab_bdrag , unit, iostat, iomsg)
+    end if 
 
 end subroutine READ_T_DYN
 

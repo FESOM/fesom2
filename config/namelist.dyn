@@ -21,5 +21,16 @@ use_wsplit   = .false. ! Switch for implicite/explicte splitting of vert. veloci
 wsplit_maxcfl= 1.0     ! maximum allowed CFL criteria in vertical (0.5 < w_max_cfl < 1.) 
                        ! in older FESOM it used to be w_exp_max=1.e-3
 ldiag_KE=.false.       ! activates energy diagnostics
+AB_order=2
+
+use_ssh_se_subcycl = .false.
+se_BTsteps     = 50   
+se_BTtheta     = 0.14   ! default: 0.14, 
+se_bottdrag    = .true.
+se_bdrag_si    = .true. ! bottomdrag semi-implicite/explicite
+se_visc        = .true.
+se_visc_gamma0 = 10  
+se_visc_gamma1 = 19500  !19500 (core2@32spd), 2750 (core2@72spd)
+se_visc_gamma2 = 0
 /
 

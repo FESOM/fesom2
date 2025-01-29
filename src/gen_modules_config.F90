@@ -23,12 +23,14 @@ module g_config
   
   !_____________________________________________________________________________
   ! *** Paths for all in and out ***
+! kh 01.03.21 paths in test environments can easily become longer than 100 characters (the former value) 
   character(MAX_PATH)        :: MeshPath='./mesh/'
   character(MAX_PATH)        :: ClimateDataPath='./hydrography/'
   character(MAX_PATH)        :: TideForcingPath='./tide_forcing/'
   character(MAX_PATH)        :: ResultPath='./result/'
+  character(20)              :: MeshId='NONE'
   namelist /paths/  MeshPath, ClimateDataPath, &
-       TideForcingPath, ResultPath
+       TideForcingPath, ResultPath, MeshId
        
   !_____________________________________________________________________________
   ! *** restart_log ***
@@ -114,6 +116,32 @@ module g_config
   ! *** configuration***
   logical                       :: use_sw_pene=.true.
   logical                       :: use_ice=.false.  
+                                                   ! to be supplied
+  ! *** icebergs ***
+  logical                       :: use_icebergs=.false.
+  logical                       :: turn_off_hf=.false.
+  logical                       :: turn_off_fw=.false.
+  logical                       :: use_icesheet_coupling=.false.  
+  logical                       :: lbalance_fw=.true.
+  integer                       :: cell_saturation=2 ! 0=no cell saturation, 1=one additional iceberg allowed, 2=no daddtional iceberg allowed
+  logical                       :: lmin_latent_hf=.true.
+  logical                       :: lverbose_icb=.false.  
+  integer                       :: ib_num=0
+  integer                       :: steps_per_ib_step=8
+
+! kh 02.02.21
+! ib_async_mode == 0: original sequential behavior for both ice sections (for testing purposes, creating reference results etc.)
+! ib_async_mode == 1: OpenMP code active to overlapped computations in first (ocean ice) and second (icebergs) parallel section
+! ib_async_mode == 2: OpenMP code active but computations still serialized via spinlock (for testing purposes)
+  integer                       :: ib_async_mode=0
+  integer                       :: thread_support_level_required=3 ! 2 = MPI_THREAD_SERIALIZED, 3 = MPI_THREAD_MULTIPLE
+
+  namelist /icebergs/   use_icebergs, turn_off_hf, turn_off_fw, use_icesheet_coupling, lbalance_fw, cell_saturation, lmin_latent_hf, &
+                        ib_num, steps_per_ib_step, ib_async_mode, thread_support_level_required, lverbose_icb
+
+!wiso-code!!!
+  logical                       :: lwiso  =.false.  ! enable isotope?
+!wiso-code!!!
   logical                       :: use_floatice = .false.
   logical                       :: use_cavity = .false. ! switch on/off cavity usage
   logical                       :: use_cavity_partial_cell = .false. ! switch on/off cavity usage
@@ -123,9 +151,11 @@ module g_config
   character(100)                :: which_toy="soufflet" 
   logical                       :: flag_debug=.false.    ! prints name of actual subroutine he is in 
   logical                       :: flag_warn_cflz=.true. ! switches off cflz warning
+  logical                       :: use_transit=.false.    ! switches off transient tracers
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
-                        use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz
+                        use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
+                        use_transit
   
   !_____________________________________________________________________________
   ! *** others ***
@@ -139,4 +169,3 @@ module g_config
   
   
 end module g_config
-
