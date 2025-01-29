@@ -277,29 +277,29 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
       target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
    endif()
    
-   # extended debugging flags for GNU compiler
-   target_compile_options(${PROJECT_NAME} PRIVATE 
-                           -ffloat-store 
-                           -finit-local-zero  
-                           -finline-functions 
-                           -fimplicit-none  
-                           -fdefault-real-8 
-                           -fdefault-double-8 
-                           -ffree-line-length-none 
-                           -fallow-argument-mismatch 
-                           -fno-fast-math -fno-signed-zeros 
-                           -freciprocal-math 
-                           -mveclibabi=svml 
-                           -flto
-                           -pg 
-                           -fbacktrace 
-                           -fcheck=all,bounds 
-                           -finit-real=snan 
-                           -finit-integer=-9999 
-                           -fsanitize=undefined,address
-                        )
-   # if use -fsanitize=undefined,address you also need ... PRIVATE -lubsan)           
-   target_link_libraries(${PROJECT_NAME} PRIVATE -lubsan)
+   ## extended debugging flags for GNU compiler
+   #target_compile_options(${PROJECT_NAME} PRIVATE 
+                           #-ffloat-store 
+                           #-finit-local-zero  
+                           #-finline-functions 
+                           #-fimplicit-none  
+                           #-fdefault-real-8 
+                           #-fdefault-double-8 
+                           #-ffree-line-length-none 
+                           #-fallow-argument-mismatch 
+                           #-fno-fast-math -fno-signed-zeros 
+                           #-freciprocal-math 
+                           #-mveclibabi=svml 
+                           #-flto
+                           #-pg 
+                           #-fbacktrace 
+                           #-fcheck=all,bounds 
+                           #-finit-real=snan 
+                           #-finit-integer=-9999 
+                           #-fsanitize=undefined,address
+                        #)
+   ## if use -fsanitize=undefined,address you also need ... PRIVATE -lubsan)           
+   #target_link_libraries(${PROJECT_NAME} PRIVATE -lubsan)
                      
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
