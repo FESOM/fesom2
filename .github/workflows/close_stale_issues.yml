@@ -20,7 +20,7 @@ jobs:
 
     steps:
     - run: |
-        echo "$(date) :: The job was automatically triggered by a schedule. If you are seeing this message, the schedule is working correctly."
+        echo "$(date) :: The job was manually dispatched, or automatically triggered by a schedule. If you are seeing this message, the schedule is working correctly."
     - uses: actions/stale@v5
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
