@@ -1449,7 +1449,6 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
       end if
     else 
 !     Prescribed atmospheric CO2 values
-
         if (constant_CO2) then
             AtmCO2(:) = CO2_for_spinup
 #if defined(__usetp)

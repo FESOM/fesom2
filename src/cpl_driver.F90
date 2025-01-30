@@ -631,7 +631,7 @@ include "associate_mesh_ass.h"
 
 ! kh 30.11.21
 #if defined(__recom) && defined(__usetp)
-    if(my_fesom_group == 0) then
+    if(partit%my_fesom_group == 0) then
 #endif
 
     if (mype .eq. localroot) then
@@ -661,7 +661,7 @@ include "associate_mesh_ass.h"
     endif !localroot
      
 #if defined(__recom) && defined(__usetp)
-    end if !(my_fesom_group == 0) then     
+    end if !(partit%my_fesom_group == 0) then     
 #endif
 
 
@@ -933,7 +933,7 @@ include "associate_mesh_ass.h"
 
 #if defined(__recom) && defined(__usetp)
 ! kh 06.12.21 the coupling is in principle as it was before, i.e. the fesom processes - in group 0 - receive their data from echam
-    if(my_fesom_group == 0) then
+    if(partit%my_fesom_group == 0) then
 #endif
 
     call oasis_get(recv_id(ind), seconds_til_now, exfld,info)
@@ -965,7 +965,7 @@ include "associate_mesh_ass.h"
    if (action) then
 #if defined(__recom) && defined(__usetp)
 ! kh 03.12.21
-      if(my_fesom_group == 0) then
+      if(partit%my_fesom_group == 0) then
 #endif
       data_array(1:partit%myDim_nod2d) = exfld
 #if defined(__recom) && defined(__usetp)

@@ -1029,7 +1029,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 
     if (mype==0) then
 #if defined(__usetp)
-        if (my_fesom_group==0) then
+        if (partit%my_fesom_group==0) then
 #endif
             write(*,*)
             print *, achar(27)//'[36m'//'*************************'//achar(27)//'[0m'
@@ -1056,7 +1056,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             write(*,*) 'read Salt        climatology from:', trim(filelist(7))
             write(*,*) 'read Temperature climatology from:', trim(filelist(8))
 #if defined(__usetp)
-        end if ! (my_fesom_group==0) then
+        end if ! (partit%my_fesom_group==0) then
 #endif
     end if
     ! read ocean state
@@ -1097,13 +1097,13 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     if (restore_alkalinity) then
 
 #if defined(__usetp)
-        if (my_fesom_group==0) then
+        if (partit%my_fesom_group==0) then
 #endif
         if (mype==0) write(*,*)
         if (mype==0) print *, achar(27)//'[46;1m'//' --> Set surface field for alkalinity restoring'//achar(27)//'[0m'
         if (mype==0) write(*,*),'Alkalinity restoring = true. Field is read.'
 #if defined(__usetp)
-        endif !(my_fesom_group==0) then
+        endif !(partit%my_fesom_group==0) then
 #endif
 
         Alk_surf = tracers%data(5)%values(1,:) ! alkalinity is the 5th tracer
@@ -1141,7 +1141,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
         CASE (1004:1017)
             tracers%data(i)%values(:,:)=0.0_WP
 #if defined(__recom) && defined(__usetp)
-    if (my_fesom_group==0) then
+    if (partit%my_fesom_group==0) then
 #endif
             if (mype==0) then
                 write (i_string,  "(I4)") i
@@ -1149,12 +1149,12 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
 #if defined(__recom) && defined(__usetp)
-    endif !(my_fesom_group==0) then
+    endif !(partit%my_fesom_group==0) then
 #endif
         CASE (1020:1021)
             tracers%data(i)%values(:,:)=0.0_WP
 #if defined(__recom) && defined(__usetp)
-    if (my_fesom_group==0) then
+    if (partit%my_fesom_group==0) then
 #endif
             if (mype==0) then
                 write (i_string,  "(I4)") i
@@ -1162,12 +1162,12 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
 #if defined(__recom) && defined(__usetp)
-    endif !(my_fesom_group==0) then
+    endif !(partit%my_fesom_group==0) then
 #endif
         CASE (1023:1033)
             tracers%data(i)%values(:,:)=0.0_WP
 #if defined(__recom) && defined(__usetp)
-    if (my_fesom_group==0) then
+    if (partit%my_fesom_group==0) then
 #endif
             if (mype==0) then
                 write (i_string,  "(I4)") i
@@ -1175,7 +1175,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
 #if defined(__recom) && defined(__usetp)
-    endif !(my_fesom_group==0) then
+    endif !(partit%my_fesom_group==0) then
 #endif
 !_______________________________________________________________________
 ! Carbon isotopes
@@ -1183,7 +1183,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
        CASE (1302)
             tracers%data(i)%values(:,:)=0.0_WP
 #if defined(__recom) && defined(__usetp)
-    if (my_fesom_group==0) then
+    if (partit%my_fesom_group==0) then
 #endif
             if (mype==0) then
                 write (i_string,  "(I4)") i
@@ -1191,12 +1191,12 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
 #if defined(__recom) && defined(__usetp)
-    endif !(my_fesom_group==0) then
+    endif !(partit%my_fesom_group==0) then
 #endif
        CASE (1305:1321)
             tracers%data(i)%values(:,:)=0.0_WP
 #if defined(__recom) && defined(__usetp)
-    if (my_fesom_group==0) then
+    if (partit%my_fesom_group==0) then
 #endif
             if (mype==0) then
                 write (i_string,  "(I4)") i
@@ -1204,13 +1204,13 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
 #if defined(__recom) && defined(__usetp)
-    endif !(my_fesom_group==0) then
+    endif !(partit%my_fesom_group==0) then
 #endif
 ! Radiocarbon
        CASE (1402)
             tracers%data(i)%values(:,:)=0.0_WP
 #if defined(__recom) && defined(__usetp)
-    if (my_fesom_group==0) then
+    if (partit%my_fesom_group==0) then
 #endif
             if (mype==0) then
                 write (i_string,  "(I4)") i
@@ -1218,12 +1218,12 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
 #if defined(__recom) && defined(__usetp)
-    endif !(my_fesom_group==0) then
+    endif !(partit%my_fesom_group==0) then
 #endif
        CASE (1405:1421)
             tracers%data(i)%values(:,:)=0.0_WP
 #if defined(__recom) && defined(__usetp)
-    if (my_fesom_group==0) then
+    if (partit%my_fesom_group==0) then
 #endif
             if (mype==0) then
                 write (i_string,  "(I4)") i
@@ -1231,7 +1231,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
 #if defined(__recom) && defined(__usetp)
-    endif !(my_fesom_group==0) then
+    endif !(partit%my_fesom_group==0) then
 #endif
 ! End of carbon isotopes section
 !_______________________________________________________________________

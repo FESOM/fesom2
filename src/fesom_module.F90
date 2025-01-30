@@ -130,8 +130,6 @@ contains
 
 ! kh 26.11.21 get current value for num_fesom_groups
     call read_namelist_run_config
-    print *,"reading number of tracer groups "
-
 #endif
 
 #if !defined  __ifsinterface

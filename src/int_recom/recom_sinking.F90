@@ -41,11 +41,6 @@ module ver_sinking_recom_benthos_interface
   end interface
 end module
 !===============================================================================
-! YY: sinking of second detritus adapted from Ozgur's code
-! but not using recom_det_tracer_id, since
-! second detritus has a different sinking speed than the first
-! define recom_det2_tracer_id to make it consistent???
-!===============================================================================
 subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
 
     use MOD_MESH
@@ -138,8 +133,7 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
         !! * Particulate Organic Nitrogen *
         if( tracers%data(tr_num)%ID==1004 .or. &  !iphyn
             tracers%data(tr_num)%ID==1007 .or. &  !idetn
-            tracers%data(tr_num)%ID==1013 .or. &  !idian
-            tracers%data(tr_num)%ID==1025 ) then  !idetz2n
+            tracers%data(tr_num)%ID==1013 ) then  !idian
             Benthos(n,1)= Benthos(n,1) +  add_benthos_2d(n) ![mmol]
 
 #if defined(__usetp)
@@ -157,8 +151,7 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
         !! * Particulate Organic Carbon *
         if( tracers%data(tr_num)%ID==1005 .or. &  !iphyc
             tracers%data(tr_num)%ID==1008 .or. &  !idetc
-            tracers%data(tr_num)%ID==1014 .or. &  !idiac
-            tracers%data(tr_num)%ID==1026 ) then  !idetz2c
+            tracers%data(tr_num)%ID==1014 ) then
             Benthos(n,2)= Benthos(n,2) + add_benthos_2d(n)
 
 #if defined(__usetp)
@@ -172,8 +165,7 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
 
         !! *Particulate Organic Silicon *
         if( tracers%data(tr_num)%ID==1016 .or. &  !idiasi
-            tracers%data(tr_num)%ID==1017 .or. &  !idetsi
-            tracers%data(tr_num)%ID==1027 ) then  !idetz2si
+            tracers%data(tr_num)%ID==1017 ) then
             Benthos(n,3)= Benthos(n,3) + add_benthos_2d(n)
 
 #if defined(__usetp)
@@ -187,8 +179,7 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
 
         !! * Cal *
         if( tracers%data(tr_num)%ID==1020 .or. &  !iphycal
-            tracers%data(tr_num)%ID==1021 .or. &  !idetcal
-            tracers%data(tr_num)%ID==1028 ) then  !idetz2cal
+            tracers%data(tr_num)%ID==1021 ) then   !idetcal
             Benthos(n,4)= Benthos(n,4) + add_benthos_2d(n)
 
 #if defined(__usetp)

@@ -391,12 +391,15 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             NPPc3D       (1:nzmax,n) = vertNPPc         (1:nzmax)
 #endif
 
+!YY: why printing this?
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
 
             !! * Deallocating 2D diagnostics *
             deallocate(vertNPPn, vertGPPn, vertNNAn, vertChldegn) 
             deallocate(vertNPPd, vertGPPd, vertNNAd, vertChldegd)
+#if defined (__coccos)
             deallocate(vertNPPc, vertGPPc, vertNNAc, vertChldegc) 
+#endif
 
             !! * Deallocating 3D Diagnostics *
             deallocate(vertrespmeso)
