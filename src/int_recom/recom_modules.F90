@@ -314,8 +314,8 @@ module recom_config
   Real(kind=8)                 :: agg_PD        = 0.165d0         ! [m3/(mmol N * day)] Maximum aggregation loss parameter for DetN
   Real(kind=8)                 :: agg_PP        = 0.015d0         ! [m3/(mmol N * day)] Maximum aggregation loss parameter for PhyN and DiaN (plankton)
   Real(kind=8)                 :: agg_PD2       = 0.165d0         ! [m3/(mmol N * day)] aggregation kernel between DetN and DetZ2N
-  Real(kind=8)                 :: agg_PP2       = 0.165d0         ! [m3/(mmol N * day)] aggregation kernel between PhyN (DiaN, CoccoN) and DetZ2N
-  namelist /paaggregation/ agg_PD, agg_PP, agg_PD2, agg_PP2
+  Real(kind=8)                 :: agg_DD2       = 0.165d0         ! [m3/(mmol N * day)] aggregation kernel between PhyN (DiaN, CoccoN) and DetZ2N
+  namelist /paaggregation/ agg_PD, agg_PP, agg_PD2, agg_DD2
 !!------------------------------------------------------------------------------
 !! *** DIN ***
   Real(kind=8)                 :: rho_N         = 0.11d0          ! [1/day] Temperature dependent N degradation of extracellular organic N (EON) (Remineralization of DON)
