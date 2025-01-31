@@ -188,6 +188,18 @@ module pressure_force_4_zxxxx_interface
     end subroutine
   end interface
 end module
+module read_ref_profile_interface
+interface
+    subroutine read_ref_profile(fname, ref_temp, ref_salt, nlevels)
+	use o_PARAM
+        implicit none
+        character(len=*), intent(in)  :: fname
+        integer,          intent(in)  :: nlevels
+        real(kind=WP),    intent(out) :: ref_temp(nlevels)
+        real(kind=WP),    intent(out) :: ref_salt(nlevels)
+    end subroutine read_ref_profile
+end interface
+end module
 !
 !
 !===============================================================================
@@ -3140,6 +3152,7 @@ subroutine init_ref_density_advanced(tracers, partit, mesh)
     use o_PARAM
     use o_ARRAYS
     use densityJM_components_interface
+    use read_ref_profile_interface
     implicit none
 
     !___________________________________________________________________________
@@ -3184,6 +3197,18 @@ where( vol1D > 1.e-12_WP) !more than 0.!
      ref_temp1D=ref_temp1D/vol1D
      ref_salt1D=ref_salt1D/vol1D
 end where
+
+!for_regional_analysis.............................................
+if (partit%mype==0) then
+   call read_ref_profile('temp_and_salt_ref.dat', ref_temp1D, ref_salt1D, mesh%nl-1)
+else
+ref_temp1D=0.0_WP
+ref_salt1D=0.0_WP
+end if
+call MPI_BCast(ref_temp1D, mesh%nl-1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, MPIerr)
+call MPI_BCast(ref_salt1D, mesh%nl-1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, MPIerr)
+!for_regional_analysis.............................................
+
 ! we better rewrite this loop (1) do nz...; (2) do node... later
 !___________________________________________________________________________
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, rhopot, bulk_0, bulk_pz, bulk_pz2, rho, T, S, auxz)
@@ -3211,3 +3236,54 @@ do nz=1,68
 end do
 end if
 end subroutine init_ref_density_advanced
+
+subroutine read_ref_profile(fname, ref_temp, ref_salt, nlevels)
+    use o_PARAM
+    implicit none
+    
+    !----------------------------------------------------------------------
+    ! Subroutine arguments
+    !----------------------------------------------------------------------
+    character(len=*), intent(in)  :: fname     ! File name
+    integer,          intent(in)  :: nlevels   ! Number of vertical levels
+    real(kind=WP),    intent(out) :: ref_temp(nlevels)
+    real(kind=WP),    intent(out) :: ref_salt(nlevels)
+    
+    !----------------------------------------------------------------------
+    ! Local variables
+    !----------------------------------------------------------------------
+    integer :: i, ios
+    integer, parameter :: unit_in = 10
+    
+    !----------------------------------------------------------------------
+    ! Initialize arrays (optional, but good practice)
+    !----------------------------------------------------------------------
+    ref_temp = 0.0_WP
+    ref_salt = 0.0_WP
+    
+    !----------------------------------------------------------------------
+    ! Open the file
+    !----------------------------------------------------------------------
+    open(unit=unit_in, file=fname, status='old', action='read', iostat=ios)
+    if (ios /= 0) then
+        print *, "Error opening file ", fname
+        stop
+    end if
+    
+    !----------------------------------------------------------------------
+    ! Read each line
+    !  Each line: two real numbers (temp, salt)
+    !----------------------------------------------------------------------
+    do i = 1, nlevels
+        read(unit_in, *, iostat=ios) ref_temp(i), ref_salt(i)
+        if (ios /= 0) then
+            print *, "Error reading line", i, "in file", fname
+            stop
+        end if
+    end do
+    
+    !----------------------------------------------------------------------
+    ! Close the file
+    !----------------------------------------------------------------------
+    close(unit_in)
+end subroutine read_ref_profile
