@@ -6,15 +6,21 @@
 module --force purge
 module use $OTHERSTAGES
 module --force purge
-module load Stages/2023
-module load GCC/11.3.0
-module load OpenMPI/4.1.4
-module load CMake/3.26.3
-module load Python/3.10.4
-module load imkl/2022.1.0
-module load Perl/5.34.1
+
+# module load Stages/2023
+# module load Stages/2024
+module load Stages/2025
+module load GCC
+module load OpenMPI
+module load imkl
+module load netCDF netCDF-Fortran
+module load CMake
+module load Python
+module load Perl
 module load git
 module load CDO
 module unload ecCodes
-module load libaec FFTW imkl cURL netCDF netCDF-Fortran
+module load libaec FFTW cURL
 module list
+
+#export ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS='ON'
