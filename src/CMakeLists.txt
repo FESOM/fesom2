@@ -24,6 +24,11 @@ if(DEFINED ENV{ENABLE_ALBEDO_INTELMPI_WORKAROUNDS}) # be able to set the initial
 else()
    option(ALBEDO_INTELMPI_WORKAROUNDS "workaround for performance issues on albedo" OFF)
 endif()
+if(DEFINED ENV{ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS}) # be able to set the initial cache value from our env settings for aleph, not only via cmake command
+   option(JUWELS_GNUOPENMPI_WORKAROUNDS "workaround for performance issues on juwels" ON)
+else()
+   option(JUWELS_GNUOPENMPI_WORKAROUNDS "workaround for performance issues on juwels" OFF)
+endif()
 
 #TODO: these machine specific changes must be done using cmake toolchain then here otherwise will make cmake another raps. 
 
@@ -40,6 +45,9 @@ endif()
 if(ALBEDO_INTELMPI_WORKAROUNDS)
    add_compile_options(-DENABLE_ALBEDO_INTELMPI_WORKAROUNDS)
    add_compile_options(-DDISABLE_PARALLEL_RESTART_READ)
+endif()
+if(JUWELS_GNUOPENMPI_WORKAROUNDS)
+   add_compile_options(-DENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS)
 endif()
 
 #TODO: this machine specific block can easyly go in  cmake toolchain.
