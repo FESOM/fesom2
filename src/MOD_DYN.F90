@@ -115,7 +115,7 @@ TYPE T_DYN
     integer                                     :: smooth_dis         = 2
     integer                                     :: smooth_back_tend   = 4
     real(kind=WP)                               :: K_back             = 600._WP
-    real(kind=WP)                               :: c_back             = 0.1_8
+    real(kind=WP)                               :: c_back             = 0.1_WP
 
     logical                                     :: use_ivertvisc = .true.
     integer                                     :: momadv_opt    = 2

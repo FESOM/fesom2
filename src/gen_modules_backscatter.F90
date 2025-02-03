@@ -66,7 +66,7 @@ module g_backscatter
         UV_back       = 0.0_WP
         UV_back_tend  = 0.0_WP
         UV_total_tend = 0.0_WP
-        
+
     end subroutine init_backscatter
 
     !
@@ -235,7 +235,7 @@ module g_backscatter
         deallocate(uke_d)
         deallocate(uuu)
     end subroutine visc_filt_dbcksc
-    
+
     !
     !
     !_______________________________________________________________________________
@@ -257,8 +257,8 @@ module g_backscatter
         DO  elem=1, myDim_elem2D 
             DO  nz=1,nlevels(elem)-1
                 !v_back(1,ed)=c_back*sqrt(2.0_WP*elem_area(ed))*sqrt(max(2.0_WP*uke(1,ed),0.0_WP))*(3600.0_WP*24.0_WP/tau_c)*4.0_WP/sqrt(2.0_WP*elem_area(ed))**2 !*sqrt(max(2.0_WP*uke(1,ed),0.0_WP))
-                !v_back(nz,elem)=-c_back*sqrt(4._8/sqrt(3.0_8)*elem_area(elem))*sqrt(max(2.0_8*uke(nz,elem),0.0_8)) !Is the scaling correct
-                v_back(nz,elem)=min(-dynamics%c_back*sqrt(elem_area(elem))*sqrt(max(2.0_8*uke(nz,elem),0.0_8)),0.2*elem_area(elem)/dt) !Is the scaling correct
+                !v_back(nz,elem)=-c_back*sqrt(4._WP/sqrt(3.0_WP)*elem_area(elem))*sqrt(max(2.0_WP*uke(nz,elem),0.0_WP)) !Is the scaling correct
+                v_back(nz,elem)=min(-dynamics%c_back*sqrt(elem_area(elem))*sqrt(max(2.0_WP*uke(nz,elem),0.0_WP)),0.2*elem_area(elem)/dt) !Is the scaling correct
                 !Scaling by sqrt(2*elem_area) or sqrt(elem_area)?
             END DO
         END DO
@@ -290,7 +290,7 @@ module g_backscatter
 #include "associate_mesh_ass.h" 
         UV => dynamics%uv(:,:,:)
         
-        !rosb_dis=1._8 !Should be variable to control how much of the dissipated energy is backscattered
+        !rosb_dis=1._WP !Should be variable to control how much of the dissipated energy is backscattered
         !rossby_num=2
         
         ed=myDim_elem2D+eDim_elem2D
@@ -306,7 +306,7 @@ module g_backscatter
         END DO
         
         DO  nz=1,nl-1
-            uuu=0.0_8
+            uuu=0.0_WP
             uuu=uke_back(nz,:)
             call smooth_elem(uuu,dynamics%smooth_back, partit, mesh) !3) ?
             uke_back(nz,:)=uuu
@@ -393,11 +393,12 @@ module g_backscatter
             call smooth_elem(uuu,dynamics%smooth_dis, partit, mesh)
             uke_dis(nz,:)=uuu
         END DO
+
         DO ed=1, myDim_elem2D
             DO  nz=1,nlevels(ed)-1
-            uke_rhs_old(nz,ed)=uke_rhs(nz,ed)
-            uke_rhs(nz,ed)=-uke_dis(nz,ed)-uke_back(nz,ed)+uke_dif(nz,ed)
-            uke(nz,ed)=uke(nz,ed)+1.5_8*uke_rhs(nz,ed)-0.5_8*uke_rhs_old(nz,ed)
+                uke_rhs_old(nz,ed)=uke_rhs(nz,ed)
+                uke_rhs(nz,ed)=-uke_dis(nz,ed)-uke_back(nz,ed)+uke_dif(nz,ed)
+                uke(nz,ed)=uke(nz,ed)+1.5_WP*uke_rhs(nz,ed)-0.5_WP*uke_rhs_old(nz,ed)
             END DO
         END DO
         
