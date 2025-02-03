@@ -361,7 +361,7 @@ module g_backscatter
                 
                 !Taking out that one place where it is always weird (Pacific Southern Ocean)
                 !Should not really be used later on, once we fix the issue with the 1/4 degree grid
-                if(.not. (TRIM(which_toy)=="soufflet")) then
+                if(.not. (TRIM(which_toy)=="soufflet") .AND. .not. (TRIM(which_toy)=="dbgyre") ) then
                 call elem_center(ed, ex, ey)
                 !a1=-104.*rad
                 !a2=-49.*rad

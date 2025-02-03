@@ -125,7 +125,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
     !LA 2023-03-08
     real(kind=WP), dimension(:), pointer  :: u_ice_ib, v_ice_ib
 #if defined (__oifs) || defined (__ifsinterface)
-    real(kind=WP), dimension(:), pointer  :: ice_temp, a_ice
+    real(kind=WP), dimension(:), pointer  :: a_ice, ice_temp
     !LA 2023-03-08
     real(kind=WP), dimension(:), pointer  :: a_ice_ib
 #endif
@@ -170,9 +170,8 @@ subroutine ice_timestep(step, ice, partit, mesh)
 !$omp end parallel sections
   end if
 !---------------------------------------------
-
 #if defined (__oifs) || defined (__ifsinterface)
-    a_ice    => ice%data(1)%values(:)
+    a_ice    => ice%data(1)%values(:)    
     ice_temp => ice%data(4)%values(:)
 #endif
     !___________________________________________________________________________
@@ -300,6 +299,8 @@ subroutine ice_timestep(step, ice, partit, mesh)
     !___________________________________________________________________________
 !$OMP PARALLEL DO
     do i=1,myDim_nod2D+eDim_nod2D
+        ice%h_ice(i) =ice%data(2)%values(i)/max(ice%data(1)%values(i), 1.e-3)
+        ice%h_snow(i)=ice%data(3)%values(i)/max(ice%data(1)%values(i), 1.e-3)
         if ( ( U_ice(i)/=0.0_WP .and. mesh%ulevels_nod2d(i)>1) .or. (V_ice(i)/=0.0_WP .and. mesh%ulevels_nod2d(i)>1) ) then
             write(*,*) " --> found cavity velocity /= 0.0_WP , ", mype
             write(*,*) " ulevels_nod2d(n) = ", mesh%ulevels_nod2d(i)

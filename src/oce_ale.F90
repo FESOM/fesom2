@@ -1926,10 +1926,12 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
 !$OMP DO
         do n=1,myDim_nod2D
             nzmin = ulevels_nod2D(n)
-            if (ulevels_nod2D(n)>1 .and. use_cavity_fw2press ) then
+            if (ulevels_nod2D(n)>1) then
                 ! use_cavity_fw2press=.true.: adds freshwater under the cavity thereby 
                 ! increasing the local pressure
-                ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)
+                if (use_cavity_fw2press) then
+                    ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)
+                end if
             else
                 ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)+(1.0_WP-alpha)*ssh_rhs_old(n)
             end if 
@@ -3112,7 +3114,7 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_DYN
-    USE g_CONFIG,only: dt
+    USE g_CONFIG !,only: dt
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -3237,8 +3239,14 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         zinv=1.0_WP*dt/(zbar_n(nzmax-1)-zbar_n(nzmax))
         !!PS friction=-C_d*sqrt(UV(1,nlevels(elem)-1,elem)**2+ &
         !!PS             UV(2,nlevels(elem)-1,elem)**2)
-        friction=-C_d*sqrt(UV(1,nzmax-1,elem)**2+ &
-                        UV(2,nzmax-1,elem)**2)
+        
+        if ((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) then
+           friction=-C_d
+        else
+           friction=-C_d*sqrt(UV(1,nzmax-1,elem)**2+ &
+                           UV(2,nzmax-1,elem)**2)
+        end if
+
         ur(nzmax-1)=ur(nzmax-1)+zinv*friction*UV(1,nzmax-1,elem)
         vr(nzmax-1)=vr(nzmax-1)+zinv*friction*UV(2,nzmax-1,elem)
 
