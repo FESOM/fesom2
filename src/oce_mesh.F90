@@ -143,6 +143,7 @@ SUBROUTINE mesh_setup(partit, mesh)
 USE MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
+USE g_config, only: flag_debug
 USE g_ROTATE_grid
 use read_mesh_interface
 use find_levels_interface
@@ -157,21 +158,46 @@ use par_support_interfaces
 IMPLICIT NONE
       type(t_mesh),   intent(inout)         :: mesh
       type(t_partit), intent(inout), target :: partit
-
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call set_mesh_transform_matrix'//achar(27)//'[0m'
       call set_mesh_transform_matrix  !(rotated grid)
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call read_mesh'//achar(27)//'[0m'
       call read_mesh(partit, mesh)
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_mpi_types'//achar(27)//'[0m'
       call init_mpi_types(partit, mesh)
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_gatherLists'//achar(27)//'[0m'
       call init_gatherLists(partit)
+      
+      
       if(partit%mype==0) write(*,*) 'Communication arrays are set' 
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call test_tri'//achar(27)//'[0m'
       call test_tri(partit, mesh)
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call load_edges'//achar(27)//'[0m'
       call load_edges(partit, mesh)
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call find_neighbors'//achar(27)//'[0m'
       call find_neighbors(partit, mesh)
       
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call find_levels'//achar(27)//'[0m'
       call find_levels(partit, mesh)
-      if (use_cavity) call find_levels_cavity(partit, mesh)
       
+      
+      if (use_cavity) then
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call find_levels_cavity'//achar(27)//'[0m'
+        call find_levels_cavity(partit, mesh)
+      end if 
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call find_levels_min_e2n'//achar(27)//'[0m'
       call find_levels_min_e2n(partit, mesh)
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call mesh_areas'//achar(27)//'[0m'
       call mesh_areas(partit, mesh)
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call mesh_auxiliary_arrays'//achar(27)//'[0m'
       call mesh_auxiliary_arrays(partit, mesh)
            
 END SUBROUTINE mesh_setup
@@ -300,7 +326,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
 
   close(fileID)
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+
   if (mype==0) write(*,*) 'myLists are read'
 
   !==============================
@@ -883,6 +909,7 @@ CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
     write(*,*) '2D mesh info : ', 'nod2D=', mesh%nod2D,' elem2D=', mesh%elem2D,'checksum= ',mesh%representative_checksum
     write(*,*) '========================='
  endif
+
 
  END subroutine  read_mesh
 !
