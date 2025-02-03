@@ -373,7 +373,7 @@ module g_backscatter
                     rosb=rosb+min(c1/max(abs(mesh%coriolis_node(elnodes(kk))), f_min), r_max)
                 END DO
                 rosb=rosb/3._WP
-                scaling=1._WP/(1._WP+(dynamics%uke_scaling*reso/rosb))!(4._wp*reso/rosb))
+                scaling=1._WP/(1._WP+(dynamics%uke_scaling_factor*reso/rosb))!(4._wp*reso/rosb))
             END IF
             
             DO nz=1, nlevels(ed)-1  
