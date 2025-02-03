@@ -7,23 +7,23 @@ module --force purge
 # module load Stages/2024
 module load Stages/2025
 
-# # use GCC + openMPI
-# module load GCC OpenMPI
-# export FC=gfortran
-# export F77=gfortran
-# export MPIFC=gfortran
-# export FCFLAGS=-free
-# export CC=cc
-# export CXX=c++
-
-# use INTEL + MPI
-module load Intel ParaStationMPI
-export FC=mpifort
-export F77=mpifort
-export MPIFC=mpifort
+# use GCC + openMPI
+module load GCC OpenMPI
+export FC=gfortran
+export F77=gfortran
+export MPIFC=gfortran
 export FCFLAGS=-free
-export CC=mpicc
-export CXX=mpic++
+export CC=cc
+export CXX=c++
+
+# # use INTEL + MPI
+# module load Intel ParaStationMPI
+# export FC=mpifort
+# export F77=mpifort
+# export MPIFC=mpifort
+# export FCFLAGS=-free
+# export CC=mpicc
+# export CXX=mpic++
 
 # Intel oneAPI Math Kernel Library
 module load imkl
