@@ -5,7 +5,6 @@ MODULE io_RESTART
   use o_arrays
   use g_cvmix_tke
   use g_cvmix_idemix
-  use g_backscatter
   use MOD_TRACER
   use MOD_ICE
   use MOD_DYN
