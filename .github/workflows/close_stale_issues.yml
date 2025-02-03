@@ -8,6 +8,7 @@ name: Mark stale issues and pull requests
 on:
   schedule:
   - cron: '00 14 * * *'
+  workflow_dispatch:
 
 jobs:
   stale:
@@ -18,8 +19,11 @@ jobs:
       pull-requests: write
 
     steps:
+    - run: |
+        echo "$(date) :: The job was manually dispatched, or automatically triggered by a schedule. If you are seeing this message, the schedule is working correctly."
     - uses: actions/stale@v5
       with:
+        operations-per-run: 1000
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         days-before-issue-stale: 730
         days-before-pr-stale: 730
@@ -32,3 +36,5 @@ jobs:
         close-issue-label: 'Closed by github-actions'
         exempt-issue-labels: enhancement, feature request
         exempt-pr-labels: enhancement, feature request
+        ignore-updates: milestone
+
