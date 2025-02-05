@@ -291,11 +291,11 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
       # | Intel/Para...MPI    | -O3 -xCORE-AVX512                                         | 117s |
       # | Intel/Para...MPI    | -O3 -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte | 119s |
       # | Intel/Para...MPI    | -O2 -xCORE-AVX2                                           | 114s |
-      # | Intel/Para...MPI    | -O3 -xCORE-AVX2                                           | 112s |
+      # |*Intel/Para...MPI    | -O3 -xCORE-AVX2                                           | 112s |
       # | Intel/Para...MPI    | -O3 -xCORE-AVX2 -qopt-streaming-stores=always             | 126s |
       # | Intel/Para...MPI    | -O3 -xCORE-AVX2 -qopt-prefetch=5                          | 116s |
       # | Intel/Para...MPI    | -O3 -xCORE-AVX2 -funroll-loops                            | 113s |
-      # | Intel/Para...MPI-mt | -O3 -xCORE-AVX2                                           | 113s |
+      # |*Intel/Para...MPI-mt | -O3 -xCORE-AVX2                                           | 113s |
       target_compile_options(${PROJECT_NAME} PRIVATE -xCORE-AVX2)
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE -xHost)
