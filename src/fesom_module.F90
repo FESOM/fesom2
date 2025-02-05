@@ -46,6 +46,9 @@ module fesom_main_storage_module
 #if defined (__oasis)
   use cpl_driver
 #endif
+#if defined (__yac)
+use cpl_yac_driver
+#endif
 
 ! define recom module
 #if defined (__recom)
@@ -153,7 +156,10 @@ contains
 #if defined (__oasis)
 
         call cpl_oasis3mct_init(f%partit,f%partit%MPI_COMM_FESOM)
+#elif defined (__yac)
+        call cpl_yac_init(f%partit%MPI_COMM_FESOM)
 #endif
+
         f%t1 = MPI_Wtime()
 
         call par_init(f%partit)
@@ -294,6 +300,11 @@ contains
             call allocate_icb(f%partit, f%mesh)
         endif
         ! --------------
+
+#if defined (__yac)
+        call cpl_yac_define_unstr(f%partit, f%mesh)
+        if(f%mype==0)  write(*,*) 'FESOM ---->     cpl_yac_define_unstr nsend, nrecv:',nsend, nrecv
+#endif
 
 #if defined (__icepack)
         !=====================
@@ -687,6 +698,7 @@ contains
          call iceberg_out(f%partit)
     end if
     ! --------------
+
     call finalize_output()
     call finalize_restart()
 

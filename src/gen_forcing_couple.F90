@@ -74,6 +74,7 @@ module net_rec_from_atm_interface
 end module
 ! Routines for updating ocean surface forcing fields
 !-------------------------------------------------------------------------
+#if !defined (__yac)
 subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   use o_PARAM
   use MOD_MESH
@@ -115,7 +116,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   integer                  :: nt1, nt2
   real(kind=WP), parameter :: zwisomin = 1.e-6_WP
   !---wiso-code-end
-#ifdef __oasis
+#if defined(__coupled)
   real(kind=WP)        				   :: flux_global(2), flux_local(2), eff_vol(2)
   real(kind=WP), dimension(:), allocatable , save  :: exchange
   real(kind=WP), dimension(:), allocatable , save  :: mask !, weight
@@ -136,7 +137,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, u_w, v_w
   real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
   real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
-#if defined (__oasis) || defined (__ifsinterface)
+#if defined (__coupled) || defined (__ifsinterface)
   real(kind=WP), dimension(:), pointer  ::  oce_heat_flux, ice_heat_flux 
   real(kind=WP), dimension(:), pointer  ::  tmp_oce_heat_flux, tmp_ice_heat_flux 
 #endif 
@@ -165,8 +166,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   enthalpyoffuse   => ice%atmcoupl%enthalpyoffuse(:)
   tmelt            => ice%thermo%tmelt
   UVnode           => dynamics%uvnode(:,:,:)
-#endif      
-#if defined (__oasis) || defined (__ifsinterface)
+#if defined (__coupled) || defined (__ifsinterface)
   oce_heat_flux    => ice%atmcoupl%oce_flx_h(:)
   ice_heat_flux    => ice%atmcoupl%ice_flx_h(:)
   tmp_oce_heat_flux=> ice%atmcoupl%tmpoce_flx_h(:)
@@ -176,7 +176,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   
   !_____________________________________________________________________________
   t1=MPI_Wtime()
-#if defined (__oasis)
+#if defined (__coupled)
      if (firstcall) then
         allocate(exchange(myDim_nod2D+eDim_nod2D), mask(myDim_nod2D+eDim_nod2D))
         allocate(a2o_fcorr_stat(nrecv,6))
@@ -214,7 +214,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #else   ! oifs
             ! AWI-CM2 outgoing state vectors
             do n=1,myDim_nod2D+eDim_nod2D
-            exchange(n)=tracers%data(1)%values(1, n)                     ! sea surface temperature [°C]
+               exchange(n)=tracers%data(1)%values(1, n)                     ! sea surface temperature [°C]
             end do
             elseif (i.eq.2) then
             exchange(:) = m_ice(:)                                  ! ice thickness [m]
@@ -270,6 +270,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #endif  ! oifs
          endif
          call cpl_oasis3mct_send(i, exchange, action, partit)
+#elif defined(__yac)
+         call cpl_yac_send(i, exchange, action, partit)
+#endif
       end do
 #ifdef VERBOSE
       do i=1, nsend 
@@ -279,8 +282,10 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
       mask=1.
       do i=1,nrecv
          exchange =0.0
+#if defined (__oasis)
          call cpl_oasis3mct_recv (i, exchange, action, partit)
-         !if (.not. action) cycle
+#endif
+	 !if (.not. action) cycle
 	 !Do not apply a correction at first time step!
     if (i==1 .and. action .and. istep/=1) call net_rec_from_atm(action, partit)
         if (i.eq.1) then
@@ -583,10 +588,176 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #endif
 
 end subroutine update_atm_forcing
+
+#else
+! defined(__yac)
+
+subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
+  use o_PARAM
+  use MOD_MESH
+  USE MOD_PARTIT
+  USE MOD_PARSUP
+  use MOD_TRACER
+  use MOD_ICE
+  use MOD_DYN
+  use o_arrays
+  use g_forcing_param
+  use g_forcing_arrays
+  use g_clock
+  use g_config
+  use g_comm_auto
+  use g_rotate_grid
+  use net_rec_from_atm_interface
+  use g_sbf, only: sbc_do
+  use g_sbf, only: atmdata, i_totfl, i_xwind, i_ywind, i_xstre, i_ystre, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow, &
+                                     l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
+  use cpl_yac_driver
+  use gen_bulk
+  use force_flux_consv_interface
+
+  implicit none
+  integer,        intent(in)            :: istep
+  type(t_ice)   , intent(inout), target :: ice
+  type(t_tracer), intent(in),    target :: tracers
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_dyn)   , intent(in), target :: dynamics
+  !_____________________________________________________________________________
+  integer		   :: i, itime,n2,n,nz,k,elem
+  real(kind=WP)            :: i_coef, aux
+  real(kind=WP)	           :: dux, dvy,tx,ty,tvol
+  real(kind=WP)            :: t1, t2
+  real(kind=WP)        				   :: flux_global(2), flux_local(2), eff_vol(2)
+  real(kind=WP), dimension(:,:), allocatable , save  :: exchange
+  real(kind=WP), dimension(:), allocatable , save  :: mask !, weight
+  logical                                          :: action
+  logical                                          :: do_rotate_oce_wind=.false.
+  logical                                          :: do_rotate_ice_wind=.false.
+  INTEGER                                          :: my_global_rank, ierror
+  INTEGER 					   :: status(MPI_STATUS_SIZE)
+  !character(15)                         :: vari, filevari
+  !character(4)                          :: fileyear
+  !integer, parameter                    :: nci=192, ncj=94 ! T62 grid
+  !real(kind=WP), dimension(nci,ncj)     :: array_nc, array_nc2,array_nc3,x
+  !character(500)                        :: file
+  !_____________________________________________________________________________
+  ! pointer on necessary derived types
+  real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, u_w, v_w
+  real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
+  real(kind=WP), dimension(:), pointer  ::  oce_heat_flux, ice_heat_flux
+  real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
+  real(kind=WP)              , pointer  :: rhoair
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+  u_ice            => ice%uice(:)
+  v_ice            => ice%vice(:)
+  u_w              => ice%srfoce_u(:)
+  v_w              => ice%srfoce_v(:)
+  stress_atmice_x  => ice%stress_atmice_x(:)
+  stress_atmice_y  => ice%stress_atmice_y(:)
+  a_ice            => ice%data(1)%values(:)
+  m_ice            => ice%data(2)%values(:)
+  m_snow           => ice%data(3)%values(:)
+  oce_heat_flux    => ice%atmcoupl%oce_flx_h(:)
+  ice_heat_flux    => ice%atmcoupl%ice_flx_h(:)
+  rhoair           => ice%thermo%rhoair
+
+  stress_atmoce_x = 0.
+  stress_atmoce_y = 0.
+  stress_atmice_x = 0.
+  stress_atmice_y = 0.
+  !_____________________________________________________________________________
+  t1=MPI_Wtime()
+  if (.NOT. ALLOCATED(exchange)) then
+     ALLOCATE(exchange(myDim_nod2D, &
+          MAX(MAXVAL(cpl_send_collection_size), MAXVAL(cpl_recv_collection_size))))
+     exchange = 0
+  end if
+  do i=1,nsend
+     exchange  =0.
+     if (i.eq.1) then
+        exchange(:,1)=tracers%data(1)%values(1, 1:myDim_nod2d)+273.15 ! sea surface temperature [°K]
+     elseif (i.eq.2) then
+        exchange(:,1) = m_ice(1:myDim_nod2d)              ! ice thickness [m]
+        exchange(:,2) = m_snow(1:myDim_nod2d)             ! snow thickness
+        exchange(:,3) = a_ice(1:myDim_nod2d)              ! ice concentation [%]
+     endif
+     call cpl_yac_send(i, exchange(:,1:cpl_send_collection_size(i)), action)
+  enddo
+#ifdef VERBOSE
+  do i=1, nsend 
+     if (mype==0) write(*,*) 'SEND: field ', i, ' max val:', maxval(exchange), ' . ACTION? ', action 
+  enddo
+#endif
+  do i=1,nrecv
+     exchange =0.0
+     CALL cpl_yac_recv (i, exchange(:,1:cpl_recv_collection_size(i)), action)
+#ifdef VERBOSE
+     if (mype==0) then
+        write(*,*) 'FESOM RECV: flux ', i, ', max val: ', maxval(exchange), ' . ACTION? ', action 
+     end if
+#endif
+     if (.not. action) cycle
+     !Do not apply a correction at first time step!
+     if (i.eq.1) then
+        stress_atmoce_x(1:myDim_nod2d) =  exchange(:,1)                    ! taux_oce
+        call exchange_nod(stress_atmoce_x, partit)
+        stress_atmice_x(1:myDim_nod2d) =  exchange(:,2)                    ! taux_ice
+        call exchange_nod(stress_atmice_x, partit)
+        do_rotate_oce_wind=.true.
+        do_rotate_ice_wind=.true.
+     elseif (i.eq.2) then
+        stress_atmoce_y(1:myDim_nod2d) =  exchange(:,1)                    ! tauy_oce
+        call exchange_nod(stress_atmoce_y, partit)
+        stress_atmice_y(1:myDim_nod2d) =  exchange(:,2)                    ! tauy_ice
+        call exchange_nod(stress_atmice_y, partit)
+        do_rotate_oce_wind=.true.
+        do_rotate_ice_wind=.true.
+     elseif (i.eq.3) then
+        prec_rain(1:myDim_nod2d)    =  exchange(:,1)/1000                   ! tot_prec ! kg m^(-2) s^(-1) -> m/s
+        call exchange_nod(prec_rain, partit)
+        prec_snow(1:myDim_nod2d)    =  exchange(:,2)/1000                    ! snowfall ! kg m^(-2) s^(-1) -> m/s
+        call exchange_nod(prec_snow, partit)
+        evap_no_ifrac(1:myDim_nod2d)     =  -exchange(:,3)/1000               ! tot_evap ! kg m^(-2) s^(-1) -> m/s; change sign
+        call exchange_nod(evap_no_ifrac, partit)
+     elseif (i.eq.4) then
+        oce_heat_flux(1:myDim_nod2d)     =  exchange(:,2) + exchange(:,3) + exchange(:,4)     ! heat_oce
+        call exchange_nod(oce_heat_flux, partit)
+        shortwave(1:myDim_nod2d)         =  exchange(:,1)       ! heat_swr
+        call exchange_nod(shortwave, partit)
+     elseif (i.eq.5) then
+        ice_heat_flux(1:myDim_nod2d)     =  exchange(:,1) + exchange(:,2) ! heat_ice
+        call exchange_nod(ice_heat_flux, partit)
+     endif
+  end do
+
+  if ((do_rotate_oce_wind .AND. do_rotate_ice_wind) .AND. rotated_grid) then
+     do n=1, myDim_nod2D+eDim_nod2D
+        call vector_g2r(stress_atmoce_x(n), stress_atmoce_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
+        call vector_g2r(stress_atmice_x(n), stress_atmice_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
+     end do
+     do_rotate_oce_wind=.false.
+     do_rotate_ice_wind=.false.
+  end if
+
+  t2=MPI_Wtime()
+
+#ifdef VERBOSE
+  if (mod(istep,logfile_outfreq)==0 .and. mype==0) then
+     write(*,*) 'update forcing data took', t2-t1
+  end if
+#endif
+
+end subroutine update_atm_forcing
+
+#endif
+
 !
 !------------------------------------------------------------------------------------
 !
-#if defined (__oasis)
+#if defined (__coupled)
 !
 !=================================================================
 !
@@ -610,7 +781,11 @@ SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats, partit, mesh)
   use mod_mesh
   USE MOD_PARTIT
   USE MOD_PARSUP
+#if defined(__oasis)
   use cpl_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
+#elif defined(__yac)
+  use cpl_yac_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
+#endif
   use o_PARAM,           only : mstep, WP
   use compute_residual_interface
   use integrate_2D_interface
@@ -830,7 +1005,11 @@ END SUBROUTINE integrate_2D
 SUBROUTINE net_rec_from_atm(action, partit)
 !
   use g_forcing_arrays
+#if defined(__oasis)
   use cpl_driver
+#elif defined(__yac)
+  use cpl_yac_driver
+#endif
   use o_PARAM, only: WP
   USE MOD_PARTIT
   USE MOD_PARSUP
@@ -843,7 +1022,7 @@ SUBROUTINE net_rec_from_atm(action, partit)
   INTEGER 					  :: status(MPI_STATUS_SIZE,partit%npes) 
   INTEGER                                         :: request(2)
   real(kind=WP)                 		  :: aux(nrecv)
-#if defined (__oifs)
+#if defined (__oifs) || defined(__yac)
   return  !OIFS-FESOM2 coupling uses OASIS3MCT conservative remapping and recieves no net fluxes here.
 #endif
 
