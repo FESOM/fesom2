@@ -166,9 +166,9 @@ contains
 !        call cpl_oasis3mct_init(f%partit,f%partit%MPI_COMM_FESOM)
 ! kh 02.12.21
 #if defined(__recom) && defined(__usetp)
-        call cpl_oasis3mct_init(f%partit, f%partit%localCommunicator, num_fesom_groups)
+        call cpl_oasis3mct_init(f%partit, f%partit%MPI_COMM_FESOM, num_fesom_groups)
 #else
-        call cpl_oasis3mct_init(f%partit, f%partit%localCommunicator)
+        call cpl_oasis3mct_init(f%partit, f%partit%MPI_COMM_FESOM)
 #endif
 #endif
         f%t1 = MPI_Wtime()
@@ -454,7 +454,7 @@ contains
 
 #if defined(__recom) && defined(__usetp)
 ! kh 03.12.21
-!    call MPI_Barrier(f%MPI_COMM_FESOM_WORLD, f%MPIERR)
+    call MPI_Barrier(f%MPI_COMM_FESOM_WORLD, f%MPIERR)
     if(num_fesom_groups > 1) then
 
         call MPI_Bcast(cpl_send, sizeof(cpl_send), MPI_CHARACTER, 0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
