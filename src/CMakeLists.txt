@@ -329,9 +329,9 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
       # |             | -falign-jumps=64  (chatGPT recomendation)                         |      |
       target_compile_options(${PROJECT_NAME} PRIVATE -O3 -march=skylake-avx512 -mtune=skylake-avx512 -mprefer-vector-width=512 -falign-loops=64 -falign-functions=64 -falign-jumps=64)      
    else()
-      if(NOT (${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu))
+      #[[if(NOT (${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu))
          target_compile_options(${PROJECT_NAME} PRIVATE -native)
-      endif()    
+      endif()  ]]  
    endif()
    
    # # debugging related compiler flags
