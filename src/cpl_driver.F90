@@ -958,7 +958,7 @@ include "associate_mesh_ass.h"
 #if defined(__recom) && defined(__usetp)
 ! kh 03.12.21
    if(num_fesom_groups > 1) then
-      call MPI_Bcast(action, 1, MPI_LOGICAL, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIerr)
+      call MPI_Bcast(action, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
    end if
 #endif 
 
@@ -973,7 +973,7 @@ include "associate_mesh_ass.h"
 
 ! kh 03.12.21
       if(num_fesom_groups > 1) then
-          call MPI_Bcast(data_array, myDim_nod2d, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIerr)
+          call MPI_Bcast(data_array, partit%myDim_nod2d, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
       end if
 #endif
 

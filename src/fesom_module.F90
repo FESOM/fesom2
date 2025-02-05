@@ -115,6 +115,7 @@ contains
 #if defined(__MULTIO)
       use iom
 #endif
+      use cpl_driver
       integer, intent(out) :: fesom_total_nsteps
       ! EO parameters
       logical mpi_is_initialized
