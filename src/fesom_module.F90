@@ -115,6 +115,7 @@ contains
 #if defined(__MULTIO)
       use iom
 #endif
+      use cpl_driver
       integer, intent(out) :: fesom_total_nsteps
       ! EO parameters
       logical mpi_is_initialized
@@ -166,9 +167,9 @@ contains
 !        call cpl_oasis3mct_init(f%partit,f%partit%MPI_COMM_FESOM)
 ! kh 02.12.21
 #if defined(__recom) && defined(__usetp)
-        call cpl_oasis3mct_init(f%partit, f%partit%localCommunicator, num_fesom_groups)
+        call cpl_oasis3mct_init(f%partit, f%partit%MPI_COMM_FESOM, num_fesom_groups)
 #else
-        call cpl_oasis3mct_init(f%partit, f%partit%localCommunicator)
+        call cpl_oasis3mct_init(f%partit, f%partit%MPI_COMM_FESOM)
 #endif
 #endif
         f%t1 = MPI_Wtime()

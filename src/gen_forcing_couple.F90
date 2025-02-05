@@ -272,7 +272,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 
 ! kh 30.11.21
 #if defined(__recom) && defined(__usetp)
-         if(my_fesom_group == 0) then
+         if(partit%my_fesom_group == 0) then
 #endif
          call cpl_oasis3mct_send(i, exchange, action, partit)
 #if defined(__recom) && defined(__usetp)
@@ -842,12 +842,12 @@ SUBROUTINE net_rec_from_atm(action, partit)
   use o_PARAM, only: WP
   USE MOD_PARTIT
   USE MOD_PARSUP
-  IMPLICIT NONE
 
 #if defined(__recom) && defined(__usetp)
 ! kh 10.21.21
   use g_config, only: num_fesom_groups
 #endif
+  IMPLICIT NONE
 
   LOGICAL,        INTENT (IN)   		  :: action
   type(t_partit), intent(inout), target           :: partit
@@ -870,13 +870,13 @@ SUBROUTINE net_rec_from_atm(action, partit)
      atm_net_fluxes_south=0.
 #if defined(__recom) && defined(__usetp)
 ! kh 10.12.21
-     my_global_rank_test = my_global_rank - (my_fesom_group * npes)
+     my_global_rank_test = my_global_rank - (partit%my_fesom_group * partit%npes)
 #endif
 
 #if defined(__recom) && defined(__usetp)
 ! kh 10.12.21 check for is root in group
      if (my_global_rank_test==target_root) then
-        if(my_fesom_group == 0) then
+        if(partit%my_fesom_group == 0) then
 #else
      if (my_global_rank==target_root) then
 #endif
@@ -887,8 +887,8 @@ SUBROUTINE net_rec_from_atm(action, partit)
 
 #if defined(__recom) && defined(__usetp)
         if(num_fesom_groups > 1) then
-           call MPI_Bcast(atm_net_fluxes_north(1), nrecv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIerr)
-           call MPI_Bcast(atm_net_fluxes_south(1), nrecv, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIerr)
+           call MPI_Bcast(atm_net_fluxes_north(1), nrecv, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+           call MPI_Bcast(atm_net_fluxes_south(1), nrecv, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
         end if
      end if ! (my_global_rank_test==target_root) then
 #endif
