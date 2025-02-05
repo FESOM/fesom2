@@ -20,8 +20,8 @@ module load Stages/2025
 
 #_______________________________________________________________________________
 # use INTEL + MPI
-# module load Intel ParaStationMPI
-module load Intel ParaStationMPI/5.10.0-1-mt # -mt ... Multi-threaded Version
+module load Intel ParaStationMPI
+# module load Intel ParaStationMPI/5.10.0-1-mt # -mt ... Multi-threaded Version
 export FC=mpifort
 export F77=mpifort
 export MPIFC=mpifort

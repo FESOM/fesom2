@@ -52,26 +52,26 @@ endif()
 
 #TODO: this machine specific block can easyly go in  cmake toolchain.
 if    (${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
-   message(STATUS "multithreading disabled for Levante") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
-   message(STATUS "multithreading disabled for Leonardo") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
-   message(STATUS "multithreading disabled for MN5 GPP") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL albedo )
-   message(STATUS "multithreading disabled for Albedo") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL atosecmwf )
-   message(STATUS "multithreading disabled for Atos ECMWF")
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL juwels )
-   message(STATUS "multithreading disabled for Juwels")
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)   
 else()
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 endif()
+if (DISABLE_MULTITHREADING)
+   message(STATUS "MULTITHREADING @ ${FESOM_PLATFORM_STRATEGY}: OFF")
+else()
+   message(STATUS "MULTITHREADING @ ${FESOM_PLATFORM_STRATEGY}: ON")
+endif()
+
 
 option(ENABLE_OPENACC "compile with OpenACC support" OFF)
 message(STATUS "ENABLE_OPENACC: ${ENABLE_OPENACC}")
@@ -256,7 +256,7 @@ endif()
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL  IntelLLVM )
    
    # Base compiler flags
-   target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0)
+   target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0)
    
    # compiler flags not supported by IntelLLVM
    if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
@@ -272,19 +272,31 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
    if    (${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
       # PROCESSORS:  2x AMD 7763 CPU; 128 cores in total, 256 GB main memory
       #target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
-      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low -align array64byte -unroll-aggressive -qopt-malloc-options=2)
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low -align array64byte -unroll-aggressive -qopt-malloc-options=2)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
-      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
+      target_compile_options(${PROJECT_NAME} PRIVATE -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
-      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
+      target_compile_options(${PROJECT_NAME} PRIVATE -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL albedo)
       # PROCESSORS: 2x AMD Rome Epyc 7702 (64 cores each), 128 cores, 256 GB RAM
-      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -march=core-avx2 -fPIC -qopt-malloc-options=2 -qopt-prefetch=5 -unroll-aggressive) # -g -traceback -check) #NEC mpi option
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -fPIC -qopt-malloc-options=2 -qopt-prefetch=5 -unroll-aggressive) # -g -traceback -check) #NEC mpi option
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL atosecmwf )
       target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL juwels )
       # PROCESSOR: 2× Intel Xeon Platinum 8168 CPU, 2× 24 cores, 2.7 GHz, 96 (12× 8) GB DDR4, 2666 MHz
-      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte)      
+      # --> compiler flag performance test: core2, 192CPUs, 1mon. simulat.
+      # | Intel/Para...MPI    | nothing                                                   | 309s |
+      # | Intel/Para...MPI    | -O2                                                       | 114s |
+      # | Intel/Para...MPI    | -O3                                                       | 115s |
+      # | Intel/Para...MPI    | -O3 -xCORE-AVX512                                         | 117s |
+      # | Intel/Para...MPI    | -O3 -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte | 119s |
+      # | Intel/Para...MPI    | -O2 -xCORE-AVX2                                           | 114s |
+      # | Intel/Para...MPI    | -O3 -xCORE-AVX2                                           | 112s |
+      # | Intel/Para...MPI    | -O3 -xCORE-AVX2 -qopt-streaming-stores=always             | 126s |
+      # | Intel/Para...MPI    | -O3 -xCORE-AVX2 -qopt-prefetch=5                          | 116s |
+      # | Intel/Para...MPI    | -O3 -xCORE-AVX2 -funroll-loops                            | 113s |
+      # | Intel/Para...MPI-mt | -O3 -xCORE-AVX2                                           | 113s |
+      target_compile_options(${PROJECT_NAME} PRIVATE -xCORE-AVX2)
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE -xHost)
    endif()
@@ -309,7 +321,13 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
    # platform specific compiler flags
    if(${FESOM_PLATFORM_STRATEGY} STREQUAL juwels )
       # PROCESSOR: 2× Intel Xeon Platinum 8168 CPU, 2× 24 cores, 2.7 GHz, 96 (12× 8) GB DDR4, 2666 MHz
-      #target_compile_options(${PROJECT_NAME} PRIVATE -O3 -march=skylake-avx512 -mtune=skylake-avx512 -mprefer-vector-width=512 -falign-loops=64 -falign-functions=64 -falign-jumps=64)      
+      # --> compiler flag performance test: core2, 192CPUs, 1mon. simulat.
+      # | GCC/openMPI | nothing                                                           | 390s |
+      # | GCC/openMPI | -O2                                                               | 192s |
+      # | GCC/openMPI | -O3 -march=skylake-avx512 -mtune=skylake-avx512                   | 173s |
+      # |             | -mprefer-vector-width=512 -falign-loops=64 -falign-functions=64   |      |
+      # |             | -falign-jumps=64  (chatGPT recomendation)                         |      |
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -march=skylake-avx512 -mtune=skylake-avx512 -mprefer-vector-width=512 -falign-loops=64 -falign-functions=64 -falign-jumps=64)      
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE -native)
    endif()
