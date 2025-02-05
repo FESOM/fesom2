@@ -51,21 +51,24 @@ if(JUWELS_GNUOPENMPI_WORKAROUNDS)
 endif()
 
 #TODO: this machine specific block can easyly go in  cmake toolchain.
-if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
+if    (${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
    message(STATUS "multithreading disabled for Levante") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  leo-dcgp )
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
    message(STATUS "multithreading disabled for Leonardo") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  mn5-gpp )
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
    message(STATUS "multithreading disabled for MN5 GPP") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  albedo )
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL albedo )
    message(STATUS "multithreading disabled for Albedo") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL atosecmwf )
    message(STATUS "multithreading disabled for Atos ECMWF")
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL juwels )
+   message(STATUS "multithreading disabled for Juwels")
+   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)   
 else()
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 endif()
@@ -250,28 +253,46 @@ if(${CISO_COUPLED})
 endif()
 
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
-if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
-   target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -ip -init=zero -no-wrap-margin -fpe0) # add -fpe0 for RAPS environment
-   if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
-      target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
+if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL  IntelLLVM )
+   
+   # Base compiler flags
+   target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0)
+   
+   # compiler flags not supported by IntelLLVM
+   if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
+      target_compile_options(${PROJECT_NAME} PRIVATE -no-prec-sqrt -ip )
+   endif()   
+   
+   if(ENABLE_OPENMP)
+      target_compile_options(${PROJECT_NAME} PRIVATE -qopenmp)
+   endif()   
+   
+   # platform specific compiler flags
+   # add -fpe0 for RAPS environment
+   if    (${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
+      # PROCESSORS:  2x AMD 7763 CPU; 128 cores in total, 256 GB main memory
+      #target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low -align array64byte -unroll-aggressive -qopt-malloc-options=2)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
       target_compile_options(${PROJECT_NAME} PRIVATE -O3 -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
       target_compile_options(${PROJECT_NAME} PRIVATE -O3 -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
-   elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  albedo)
-      target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -O3 -ip -fPIC -qopt-malloc-options=2 -qopt-prefetch=5 -unroll-aggressive) # -g -traceback -check) #NEC mpi option
+   elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL albedo)
+      # PROCESSORS: 2x AMD Rome Epyc 7702 (64 cores each), 128 cores, 256 GB RAM
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -march=core-avx2 -fPIC -qopt-malloc-options=2 -qopt-prefetch=5 -unroll-aggressive) # -g -traceback -check) #NEC mpi option
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL atosecmwf )
       target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
+   elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL juwels )
+      # PROCESSOR: 2× Intel Xeon Platinum 8168 CPU, 2× 24 cores, 2.7 GHz, 96 (12× 8) GB DDR4, 2666 MHz
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte)      
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE -xHost)
    endif()
-#    target_compile_options(${PROJECT_NAME} PRIVATE -g -traceback ) #-check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
-#    target_compile_options(${PROJECT_NAME} PRIVATE -qopenmp -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -xHost -ip -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
-#    target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -ip -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
+   
+   # # debugging related compiler flags
+   # target_compile_options(${PROJECT_NAME} PRIVATE -qopenmp -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
+   # target_compile_options(${PROJECT_NAME} PRIVATE -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
 
-# CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
-elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  IntelLLVM )
-     target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin) 
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 #    target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
@@ -279,21 +300,22 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
       message(STATUS "Allowing type mismatches on Ubuntu for CI Testing" )  # NOTE(PG): Would be nicer to grab the CI=True from the env variable
       target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch)
    else()
-      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none)
+      target_compile_options(${PROJECT_NAME} PRIVATE -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none)
    endif()
    if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
       target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
    endif()
    
-   ## extended debugging flags for GNU compiler
+   # platform specific compiler flags
+   if(${FESOM_PLATFORM_STRATEGY} STREQUAL juwels )
+      # PROCESSOR: 2× Intel Xeon Platinum 8168 CPU, 2× 24 cores, 2.7 GHz, 96 (12× 8) GB DDR4, 2666 MHz
+      #target_compile_options(${PROJECT_NAME} PRIVATE -O3 -march=skylake-avx512 -mtune=skylake-avx512 -mprefer-vector-width=512 -falign-loops=64 -falign-functions=64 -falign-jumps=64)      
+   else()
+      target_compile_options(${PROJECT_NAME} PRIVATE -native)
+   endif()
+   
+   # # debugging related compiler flags
    #target_compile_options(${PROJECT_NAME} PRIVATE 
-                           #-ffloat-store 
-                           #-finit-local-zero  
-                           #-finline-functions 
-                           #-fimplicit-none  
-                           #-fdefault-real-8 
-                           #-fdefault-double-8 
-                           #-ffree-line-length-none 
                            #-fallow-argument-mismatch 
                            #-fno-fast-math -fno-signed-zeros 
                            #-freciprocal-math 
@@ -369,6 +391,10 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_
 # fesom.x executable
 add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
 target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
+
+
+get_target_property(FLAGS ${PROJECT_NAME} COMPILE_OPTIONS)
+message(STATUS " --> Final Compile options for ${PROJECT_NAME}: ${FLAGS}")
 
 
 ### Export and installation
