@@ -275,7 +275,7 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
       # | Intel/MPI | nothing                                                             | 144s |
       # | Intel/MPI | -O2                                                                 | 144s |
       # | Intel/MPI | -O3                                                                 | 144s |
-      # | Intel/MPI | -03 -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low           | 140.95s |
+      # |*Intel/MPI | -03 -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low           | 140.95s |
       # |           | -align array64byte -unroll-aggressive -qopt-malloc-options=2        |         |
       #target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low -align array64byte -unroll-aggressive -qopt-malloc-options=2)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
@@ -329,7 +329,7 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
       # --> compiler flag performance test: core2, 192CPUs, 1mon. simulat.
       # | GCC/openMPI | nothing                                                           | 390s |
       # | GCC/openMPI | -O2                                                               | 192s |
-      # | GCC/openMPI | -O3 -march=skylake-avx512 -mtune=skylake-avx512                   | 173s | chatgpt recomendation
+      # |*GCC/openMPI | -O3 -march=skylake-avx512 -mtune=skylake-avx512                   | 173s | chatgpt recomendation
       # |             | -mprefer-vector-width=512 -falign-loops=64 -falign-functions=64   |      |
       # |             | -falign-jumps=64  (chatGPT recomendation)                         |      |
       target_compile_options(${PROJECT_NAME} PRIVATE -march=skylake-avx512 -mtune=skylake-avx512 -mprefer-vector-width=512 -falign-loops=64 -falign-functions=64 -falign-jumps=64)      
