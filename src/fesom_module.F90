@@ -122,14 +122,15 @@ contains
       integer              :: tr_num
 
 #if defined(__recom) && defined(__usetp)
-! kh 11.11.21 multi FESOM group loop parallelization
+! multi FESOM group loop parallelization
+! moved from fvom_main.F90
       integer             :: npes_fesom_world
       integer             :: mype_fesom_world
       integer             :: processes_per_group
       integer             :: npes_check
       integer             :: mype_check
 
-! kh 26.11.21 get current value for num_fesom_groups
+! get current value for num_fesom_groups
     call read_namelist_run_config
 #endif
 
@@ -164,13 +165,14 @@ contains
 #endif
 
 #if defined (__oasis)
-!        call cpl_oasis3mct_init(f%partit,f%partit%MPI_COMM_FESOM)
-! kh 02.12.21
+
+! pass num_fesom_groups to coupler
 #if defined(__recom) && defined(__usetp)
         call cpl_oasis3mct_init(f%partit, f%partit%MPI_COMM_FESOM, num_fesom_groups)
 #else
         call cpl_oasis3mct_init(f%partit, f%partit%MPI_COMM_FESOM)
 #endif
+
 #endif
         f%t1 = MPI_Wtime()
 
@@ -185,7 +187,7 @@ contains
         f%npes          =>f%partit%npes
 
 #if defined(__recom) && defined(__usetp)
-! kh 26.11.21 prepare communicator splitting for multi FESOM group loop parallelization
+! prepare communicator splitting for multi FESOM group loop parallelization
     f%my_fesom_group=>f%partit%my_fesom_group
 
     f%MPI_COMM_FESOM_WORLD=> f%partit%MPI_COMM_FESOM_WORLD
@@ -213,7 +215,7 @@ contains
     f%my_fesom_group = mype_fesom_world / processes_per_group
     f%mype           = mod(mype_fesom_world, processes_per_group)
 
-! kh 26.11.21 split to num_fesom_groups
+! split to num_fesom_groups
     call MPI_comm_split(f%MPI_COMM_FESOM_WORLD, f%my_fesom_group, 0, f%MPI_COMM_FESOM, f%MPIerr)
     if (f%MPIerr /= MPI_SUCCESS) then
         write(*,*) 'MPI_comm_split(MPI_COMM_FESOM_WORLD, my_fesom_group, 0, MPI_COMM_FESOM, MPIERR) failed'
@@ -231,7 +233,7 @@ contains
     call MPI_comm_rank(f%MPI_COMM_FESOM, mype_check, f%MPIerr)
     if(f%MPIerr /= MPI_SUCCESS) then
         write(*,*) 'MPI_comm_rank(MPI_COMM_FESOM, mype_check, MPIERR) failed'
-        call par_ex(f%partit%MPI_COMM_FESOM, f%mype)
+        call par_ex(f%MPI_COMM_FESOM, f%mype)
         stop
     end if
 
@@ -247,8 +249,7 @@ contains
         stop
     end if
 
-! kh 17.11.21 group same ranks in each group for broadcasting
-!   write(*,*) 'mype, my_fesom_group', mype, my_fesom_group
+! group same ranks in each group for broadcasting
 
     call MPI_comm_split(f%MPI_COMM_FESOM_WORLD, f%mype, f%my_fesom_group, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIERR)
     if (f%MPIERR /= MPI_SUCCESS) then
@@ -283,7 +284,6 @@ contains
         stop
     end if
 
-! kh 29.02.22
     if(f%my_fesom_group==0) then
 #endif
 
@@ -305,14 +305,19 @@ contains
         ! load the mesh and fill in 
         ! auxiliary mesh arrays
         !=====================
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call setup_model'//achar(27)//'[0m'
         call setup_model(f%partit)  ! Read Namelists, always before clock_init
+
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call clock_init'//achar(27)//'[0m'
         call clock_init(f%partit)   ! read the clock file 
+
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call get_run_steps'//achar(27)//'[0m'
         call get_run_steps(fesom_total_nsteps, f%partit)
         f%total_nsteps=fesom_total_nsteps
+
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call mesh_setup'//achar(27)//'[0m'
         call mesh_setup(f%partit, f%mesh)
 
-! kh 29.02.22
 #if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif 
@@ -322,6 +327,20 @@ contains
 #if defined(__recom) && defined(__usetp)
         end if
 #endif 
+
+!       Transient tracers: control output of initial input values
+        if(use_transit .and. anthro_transit .and. f%mype==0) then
+          write (*,*)
+          write (*,*) "*** Transient tracers: Initial atmospheric input values >>>"
+          write (*,*) "Year CE, xCO2, D14C_NH, D14C_TZ, D14C_SH, xCFC-11_NH, xCFC-11_SH, xCFC-12_NH, xCFC-12_SH, xSF6_NH, xSF6_SH"
+          write (*, fmt="(2x,i4,10(2x,f6.2))") &
+                  year_ce(ti_transit), xCO2_ti(ti_transit) * 1.e6, &
+                  (r14c_nh(ti_transit) - 1.) * 1000., (r14c_tz(ti_transit) - 1.) * 1000., (r14c_sh(ti_transit) - 1.) * 1000., &
+                  xf11_nh(ti_transit) * 1.e12, xf11_sh(ti_transit) * 1.e12, &
+                  xf12_nh(ti_transit) * 1.e12, xf12_sh(ti_transit) * 1.e12, &
+                  xsf6_nh(ti_transit) * 1.e12, xsf6_sh(ti_transit) * 1.e12
+          write (*,*)
+        end if
 
         !=====================
         ! Allocate field variables 
@@ -373,24 +392,17 @@ contains
 #if defined (__usetp)
         if(f%my_fesom_group==0) then
 #endif
-
         if (f%mype==0) write(*,*) 'RECOM recom_init... complete'
-
 #if defined (__usetp)
         end if
 #endif
-
 #endif
 
         if (f%mype==0) then
-
-! kh 29.02.22
 #if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif
-
            write(*,*) 'FESOM ocean_setup... complete'
-
 #if defined(__recom) && defined(__usetp)
         end if
 #endif
@@ -409,9 +421,7 @@ contains
 #if defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif 
-            
             if (f%mype==0) write(*,*) 'EVP scheme option=', f%ice%whichEVP
-
 #if defined(__usetp)
         end if
 #endif 
@@ -440,33 +450,29 @@ contains
         !---age-code-end
 #if defined (__oasis)
 
-! kh 30.11.21 only mype == 0 in my_fesom_group == 0 handles coupling with extern models
+! only mype == 0 in my_fesom_group == 0 handles coupling with extern models
 #if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif 
-
         call cpl_oasis3mct_define_unstr(f%partit, f%mesh)
-
         if(f%mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
-
 #if defined(__recom) && defined(__usetp)
         end if
 #endif
 
 #if defined(__recom) && defined(__usetp)
-! kh 03.12.21
     call MPI_Barrier(f%MPI_COMM_FESOM_WORLD, f%MPIERR)
     if(num_fesom_groups > 1) then
 
         call MPI_Bcast(cpl_send, sizeof(cpl_send), MPI_CHARACTER, 0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
         call MPI_Bcast(cpl_recv, sizeof(cpl_recv), MPI_CHARACTER, 0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
 
-! kh 10.12.21 needed in SUBROUTINE net_rec_from_atm(action)
+!  needed in SUBROUTINE net_rec_from_atm(action)
         call MPI_Bcast(target_root,             1, MPI_INTEGER,   0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
     end if
 #endif
 
-#endif
+#endif  ! defined (__oasis)
     
         ! --------------
         ! LA icebergs: 2023-05-17 
@@ -485,6 +491,7 @@ contains
         call init_icepack(f%ice, f%tracers%data(1), f%mesh)
         if (f%mype==0) write(*,*) 'Icepack: setup complete'
 #endif
+
         call clock_newyear                        ! check if it is a new year
         if (f%mype==0) f%t6=MPI_Wtime()
         !___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
@@ -492,14 +499,10 @@ contains
         if (f%mype==0) f%t7=MPI_Wtime()
         ! store grid information into netcdf file
 
-! kh 29.03.22
 #if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif
-
         if (.not. r_restart) call write_mesh_info(f%partit, f%mesh)
-
-! kh 29.03.22
 #if defined(__recom) && defined(__usetp)
         end if
 #endif
@@ -523,7 +526,6 @@ contains
            f%rtime_setup_recom   = real( f%t1_recom - f%t0_recom  ,real32)
 #endif
 
-! kh 29.03.22
 #if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif
@@ -542,7 +544,6 @@ contains
 #endif
             write(*,*) '============================================' 
 
-! kh 29.03.22
 #if defined(__recom) && defined(__usetp)
         end if
 #endif
@@ -673,48 +674,33 @@ contains
     end if
     end if
     ! --------------
-! kh 29.03.22
 #if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif 
-
     if (f%mype==0) write(*,*) 'FESOM start iteration before the barrier...'
-
-! kh 29.03.22
 #if defined(__recom) && defined(__usetp)
         end if
 #endif 
-
     call MPI_Barrier(f%MPI_COMM_FESOM, f%MPIERR)   
     if (f%mype==0) then
-
-! kh 29.03.22
 #if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif 
-
        write(*,*) 'FESOM start iteration after the barrier...'
-
-! kh 29.03.22
 #if defined(__recom) && defined(__usetp)
         end if
 #endif 
-
        f%t0 = MPI_Wtime()
     endif
 
-! kh 29.03.22
 #if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif 
-
     if(f%mype==0) then
         write(*,*)
         print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
         print *, achar(27)//'[7;32m'//' --> FESOM STARTS TIME LOOP                                 '//achar(27)//'[0m'
     end if
-
-! kh 29.03.22
 #if defined(__recom) && defined(__usetp)
         end if
 #endif
@@ -785,19 +771,15 @@ contains
         end if
         mstep = n
 
-! kh 29.03.22
 #if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif
-
         if (mod(n,logfile_outfreq)==0 .and. f%mype==0) then
             write(*,*) 'FESOM ======================================================='
 !             write(*,*) 'FESOM step:',n,' day:', n*dt/24./3600.,
             write(*,*) 'FESOM step:',n,' day:', daynew,' year:',yearnew 
             write(*,*)
         end if
-
-! kh 29.03.22
 #if defined(__recom) && defined(__usetp)
         end if
 #endif 
@@ -807,7 +789,13 @@ contains
 #endif
         call clock      
         !___compute horizontal velocity on nodes (originaly on elements)________
+#if defined(__recom) && defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call compute_vel_nodes'//achar(27)//'[0m'
+#if defined(__recom) && defined(__usetp)
+        end if
+#endif
         call compute_vel_nodes(f%dynamics, f%partit, f%mesh)
         ! --------------
         ! LA icebergs: 2023-05-17 
@@ -821,11 +809,23 @@ contains
         f%t1 = MPI_Wtime()
         if(use_ice) then
             !___compute fluxes from ocean to ice________________________________
+#if defined(__recom) && defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ocean2ice(n)'//achar(27)//'[0m'
+#if defined(__recom) && defined(__usetp)
+        end if
+#endif
             call ocean2ice(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
             
             !___compute update of atmospheric forcing____________________________
+#if defined(__recom) && defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call update_atm_forcing(n)'//achar(27)//'[0m'
+#if defined(__recom) && defined(__usetp)
+        end if
+#endif
             f%t0_frc = MPI_Wtime()
             call update_atm_forcing(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
             f%t1_frc = MPI_Wtime()
@@ -837,7 +837,13 @@ contains
                 f%ice%ice_update=.false.
                 f%ice%ice_steps_since_upd=f%ice%ice_steps_since_upd+1
             endif
+#if defined(__recom) && defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_timestep(n)'//achar(27)//'[0m'
+#if defined(__recom) && defined(__usetp)
+        end if
+#endif
             if (f%ice%ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh)  
 
             
@@ -851,7 +857,13 @@ contains
 
 
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
+#if defined(__recom) && defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
+#if defined(__recom) && defined(__usetp)
+        end if
+#endif
             call oce_fluxes_mom(f%ice, f%dynamics, f%partit, f%mesh) ! momentum only
             call oce_fluxes(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         end if
@@ -860,14 +872,11 @@ contains
 
         !___now recom____________________________________________________
 #if defined (__recom)
-! kh 29.03.22
 #if defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif 
-
         if (f%mype==0 .and. n==1)  print *, achar(27)//'[46'  //'_____________________________________________________________'//achar(27)//'[0m'
         if (f%mype==0 .and. n==1)  print *, achar(27)//'[46;1m'//'     --> call REcoM                                         '//achar(27)//'[0m'
-
 #if defined(__usetp)
         end if
 #endif 
@@ -904,10 +913,10 @@ contains
         if (f%my_fesom_group==0) then
 #endif 
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
+        call output (n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
 #if defined(__recom) && defined(__usetp)
         end if
-#endif 
-        call output (n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+#endif
 
         ! LA icebergs: 2023-05-17 
         if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
@@ -927,13 +936,30 @@ contains
 #if defined (__recom)
         f%rtime_compute_recom = f%rtime_compute_recom + f%t1_recom - f%t0_recom
 #endif
+
+!       Transient tracers: update of input values between restarts
+        if(use_transit .and. anthro_transit .and. (daynew == ndpyr) .and. (timenew==86400.)) then
+          ti_transit = ti_transit + 1
+          if (f%mype==0) then
+            write (*,*)
+            write (*,*) "*** Transient tracers: Updated atmospheric input values >>>"
+            write (*,*) "Year CE, xCO2, D14C_NH, D14C_TZ, D14C_SH, xCFC-11_NH, xCFC-11_SH, xCFC-12_NH, xCFC-12_SH, xSF6_NH, xSF6_SH"
+            write (*, fmt="(2x,i4,10(2x,f6.2))") &
+                        year_ce(ti_transit), xCO2_ti(ti_transit) * 1.e6, &
+                        (r14c_nh(ti_transit) - 1.) * 1000., (r14c_tz(ti_transit) - 1.) * 1000., (r14c_sh(ti_transit) - 1.) * 1000., &
+                        xf11_nh(ti_transit) * 1.e12, xf11_sh(ti_transit) * 1.e12, &
+                        xf12_nh(ti_transit) * 1.e12, xf12_sh(ti_transit) * 1.e12, &
+                        xsf6_nh(ti_transit) * 1.e12, xsf6_sh(ti_transit) * 1.e12
+            write (*,*)
+          end if
+        endif
+
     end do
 !call cray_acc_set_debug_global_level(3)    
     f%from_nstep = f%from_nstep+current_nsteps
 !call cray_acc_set_debug_global_level(0)    
 !   write(0,*) 'f%from_nstep after the loop:', f%from_nstep    
   end subroutine
-
 
   subroutine fesom_finalize()
     use fesom_main_storage_module
@@ -951,15 +977,11 @@ contains
          call iceberg_out(f%partit)
     end if
     ! --------------
-! kh 11.11.21 multi FESOM group loop parallelization
 #if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif 
-
     call finalize_output()
     call finalize_restart()
-
-! kh 29.03.22
 #if defined(__recom) && defined(__usetp)
         end if
 #endif 
@@ -967,19 +989,19 @@ contains
     !___FINISH MODEL RUN________________________________________________________
 
 #if !defined (__usetp) 
-! kh 11.11.21 multi FESOM group loop parallelization    
+! multi FESOM group loop parallelization    
     call MPI_Barrier(f%MPI_COMM_FESOM, f%MPIERR)
 #endif
 #if defined(__recom) && defined (__usetp) 
-! kh 11.11.21 list statistics for all fesom_groups 
+! list statistics for all fesom_groups 
 ! fesom groups are listed backwards, so info for the main fesom group 0 is at the end in the log
     do i = num_fesom_groups - 1, 0, -1
 
-! kh 29.03.22 use a barrier to "sort" the output but the mpi output can still get a bit mixed up,
+! use a barrier to "sort" the output but the mpi output can still get a bit mixed up,
 ! because MPI does not define the handling of the order of the output lines
         call MPI_Barrier(f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIERR)
 
-! kh 29.03.22 for the sake of output clarity produce output only for my_fesom_group == 0 for now
+! for the sake of output clarity produce output only for my_fesom_group == 0 for now
         if(i == f%my_fesom_group .and. f%my_fesom_group == 0) then
 #endif
 
@@ -1123,7 +1145,6 @@ contains
         write(*,*)
     end if    
 
-! kh 29.03.22
 #if defined(__recom) && defined(__usetp)
         end if
 #endif 
