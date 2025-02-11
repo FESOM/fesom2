@@ -427,11 +427,11 @@ subroutine solve_tracers_ale(mesh)
 
 !OG
 ! BGC tracer fields might become negative
-
+#if defined(__recom)
         where (tr_arr(nzmin:nzmax,node,num_tracers-bgc_num+1:num_tracers) < tiny) ! 2.23D-16 )
             tr_arr(nzmin:nzmax,node,num_tracers-bgc_num+1:num_tracers) = tiny ! 2.23D-16 )
         end where
-
+#endif
     end do
 end subroutine solve_tracers_ale
 !
@@ -1332,6 +1332,7 @@ end subroutine ver_sinking_recom_benthos
 ! because Benthos and SinkFlx values are buffered per tracer index in the
 ! meantime to avoid non bit identical results when running the tracer loop in
 ! parallel.
+#if defined(__recom)
 subroutine integrate_bottom(tflux,mesh)
     use o_ARRAYS
     use g_PARSUP
@@ -1363,6 +1364,7 @@ subroutine integrate_bottom(tflux,mesh)
    call MPI_AllREDUCE(tf, tflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
         MPI_COMM_FESOM, MPIerr)
 end subroutine integrate_bottom
+#endif
 !
 !
 !===============================================================================
