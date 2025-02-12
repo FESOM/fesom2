@@ -16,6 +16,7 @@ MODULE mod_transit
                   r39ar_a = 1.0, &       ! 39Ar / 40 Ar (homogeneous)
                   xarg_a  = 9.34e-3, &   ! Argon (homogeneous)
                   xCO2_a  = 284.32e-6, & ! CO2 (CMIP6 & OMIP-BGC: 284.32e-6 for 1700-1850, PMIP4: 190.00e-6 for 21 ka BP)
+                  xf11_a  = 0.0, &       ! CFC-11 (latitude dependent)
                   xf12_a  = 0.0, &       ! CFC-12 (latitude dependent)
                   xsf6_a  = 0.0          ! SF6 (latitude dependent)
 
@@ -23,6 +24,7 @@ MODULE mod_transit
   real(kind=8), allocatable, dimension(:) :: r14c_nh, r14c_tz, r14c_sh, & ! 14CO2 / 12CO2, latitude-dependent (e.g., bomb 14C)
                                              r14c_ti, &                   ! 14CO2 / 12CO2, homogenous (e.g., IntCal)
                                              xCO2_ti, &                   ! CO2
+                                             xf11_nh, xf11_sh, &          ! CFC-11, latitude-dependent
                                              xf12_nh, xf12_sh, &          ! CFC-12, latitude-dependent
                                              xsf6_nh, xsf6_sh             ! SF6, latitude-dependent
   integer, allocatable, dimension(:)      :: year_ce                      ! current year in anthropenic runs (control output)
