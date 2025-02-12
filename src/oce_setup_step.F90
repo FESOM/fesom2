@@ -812,7 +812,6 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     allocate(vert_sink ( nl-1, node_size ))
     allocate(Alk_surf  (       node_size ))
 #if defined(__usetp)
-! kh 22.11.21
     allocate(tr_arr_requests(num_tracers), tr_arr_old_requests(num_tracers))
     allocate(SinkFlx_tr_requests(num_tracers))
     allocate(Benthos_tr_requests(num_tracers))
@@ -927,7 +926,6 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     vert_sink           = 0.0_WP
     Alk_surf            = 0.0_WP
 #if defined(__usetp)
-! kh 23.03.22
     tr_arr_requests     = 0
     tr_arr_old_requests = 0
     SinkFlx_tr_requests = 0

@@ -137,7 +137,7 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
             Benthos(n,1)= Benthos(n,1) +  add_benthos_2d(n) ![mmol]
 
 #if defined(__usetp)
-! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+! buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
                Benthos_tr(n,1,tr_num)= Benthos_tr(n,1,tr_num) +  add_benthos_2d(n) ![mmol]
 
             if (use_MEDUSA) then

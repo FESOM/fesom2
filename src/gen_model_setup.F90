@@ -130,7 +130,7 @@ subroutine setup_model(partit)
     if(partit%mype==0) print *, "Transient tracers are ON. Tracer input file: ", ifile_transit
     open (20,file=ifile_transit)
     if (anthro_transit .or. paleo_transit) then
-      call read_transit_input
+!      call read_transit_input
     else
 !     Spinup / equilibrium runs with constant tracer input,
 !     read parameter values from namelist.oce
@@ -177,12 +177,12 @@ end subroutine setup_model
 
 
 #if defined(__recom) && defined(__usetp)
-! kh 11.11.21 read num_fesom_groups for multi FESOM group loop parallelization
+! read num_fesom_groups for multi FESOM group loop parallelization
 ! =================================================================
 subroutine read_namelist_run_config(partit)
   ! Reads run_config namelist and overwrite default parameters.
   !
-  ! kh 11.11.21 Copied by Kai Himstedt (based on read_namelist)
+  ! Copied by Kai Himstedt (based on read_namelist)
   !--------------------------------------------------------------
   USE MOD_PARTIT
   USE MOD_PARSUP

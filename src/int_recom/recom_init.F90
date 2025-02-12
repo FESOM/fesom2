@@ -89,7 +89,7 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(GlodPCO2surf          ( node_size ))
     allocate(GlodecayBenthos       ( node_size, benthos_num ))
     allocate(Benthos               ( node_size, benthos_num ))
-    allocate(Benthos_tr            ( node_size, benthos_num, num_tracers )) ! kh 25.03.22 buffer per tracer index
+    allocate(Benthos_tr            ( node_size, benthos_num, num_tracers )) ! buffer per tracer index
     allocate(GloHplus              ( node_size ))
     allocate(DenitBen              ( node_size ))
 
@@ -124,7 +124,7 @@ subroutine recom_init(tracers, partit, mesh)
     GlodPCO2surf          = 0.d0
     GlodecayBenthos       = 0.d0
     Benthos               = 0.d0
-    Benthos_tr(:,:,:)     = 0.0d0 ! kh 25.03.22
+    Benthos_tr(:,:,:)     = 0.0d0 
     GloHplus              = exp(-8.d0 * log(10.d0)) ! = 10**(-8)
     DenitBen              = 0.d0
 
@@ -249,10 +249,10 @@ subroutine recom_init(tracers, partit, mesh)
     if (use_MEDUSA) then
         allocate(GloSed(node_size,sedflx_num))
         allocate(SinkFlx(node_size,bottflx_num))
-        allocate(SinkFlx_tr(node_size,bottflx_num,num_tracers)) ! kh 25.03.22 buffer sums per tracer index
+        allocate(SinkFlx_tr(node_size,bottflx_num,num_tracers)) ! buffer sums per tracer index
 
         SinkFlx(:,:)      = 0.d0
-        SinkFlx_tr(:,:,:) = 0.0d0 ! kh 25.03.22
+        SinkFlx_tr(:,:,:) = 0.0d0
         GloSed(:,:)       = 0.d0
         allocate(lb_flux(node_size,9))
         lb_flux(:,:)      = 0.d0

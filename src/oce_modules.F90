@@ -221,11 +221,9 @@ real(kind=WP), allocatable :: tr_z(:,:)
 real(kind=WP), allocatable    :: dtr_bf(:,:), str_bf(:,:)
 real(kind=WP), allocatable    :: vert_sink(:,:)
 #if defined(__usetp)
-! kh 22.11.21
 integer                       :: request_count
 integer, allocatable          :: tr_arr_requests(:), tr_arr_old_requests(:)
 
-! kh 28.03.22
 integer, allocatable          :: SinkFlx_tr_requests(:)
 integer, allocatable          :: Benthos_tr_requests(:)
 #endif

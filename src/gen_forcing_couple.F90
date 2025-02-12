@@ -270,7 +270,6 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #endif  ! oifs
          endif
 
-! kh 30.11.21
 #if defined(__recom) && defined(__usetp)
          if(partit%my_fesom_group == 0) then
 #endif
@@ -844,16 +843,15 @@ SUBROUTINE net_rec_from_atm(action, partit)
   USE MOD_PARSUP
 
 #if defined(__recom) && defined(__usetp)
-! kh 10.21.21
   use g_config, only: num_fesom_groups
 #endif
+
   IMPLICIT NONE
 
   LOGICAL,        INTENT (IN)   		  :: action
   type(t_partit), intent(inout), target           :: partit
   INTEGER                                         :: my_global_rank, ierror
 #if defined(__recom) && defined(__usetp)
-! kh 10.12.21
   INTEGER                                         :: my_global_rank_test
 #endif
   INTEGER                                         :: n  
@@ -869,12 +867,11 @@ SUBROUTINE net_rec_from_atm(action, partit)
      atm_net_fluxes_north=0.
      atm_net_fluxes_south=0.
 #if defined(__recom) && defined(__usetp)
-! kh 10.12.21
      my_global_rank_test = my_global_rank - (partit%my_fesom_group * partit%npes)
 #endif
 
 #if defined(__recom) && defined(__usetp)
-! kh 10.12.21 check for is root in group
+! check for is root in group
      if (my_global_rank_test==target_root) then
         if(partit%my_fesom_group == 0) then
 #else
