@@ -271,8 +271,13 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
    # add -fpe0 for RAPS environment
    if    (${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
       # PROCESSORS:  2x AMD 7763 CPU; 128 cores in total, 256 GB main memory
-      #target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
-      target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low -align array64byte -unroll-aggressive -qopt-malloc-options=2)
+      # --> compiler flag performance test: core2, 512CPUs, 3mon. simulat.
+      # | Intel/MPI | nothing                                                             | 144s |
+      # | Intel/MPI | -O2                                                                 | 144s |
+      # | Intel/MPI | -O3                                                                 | 144s |
+      # |*Intel/MPI | -03 -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low           | 140.95s |
+      # |           | -align array64byte -unroll-aggressive -qopt-malloc-options=2        |         |
+      #target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low -align array64byte -unroll-aggressive -qopt-malloc-options=2)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
       target_compile_options(${PROJECT_NAME} PRIVATE -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
@@ -312,26 +317,45 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
       message(STATUS "Allowing type mismatches on Ubuntu for CI Testing" )  # NOTE(PG): Would be nicer to grab the CI=True from the env variable
       target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch)
    else()
-      target_compile_options(${PROJECT_NAME} PRIVATE -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none)
    endif()
    if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
       target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
    endif()
    
    # platform specific compiler flags
-   if(${FESOM_PLATFORM_STRATEGY} STREQUAL juwels )
+   if    (${FESOM_PLATFORM_STRATEGY} STREQUAL juwels )
       # PROCESSOR: 2× Intel Xeon Platinum 8168 CPU, 2× 24 cores, 2.7 GHz, 96 (12× 8) GB DDR4, 2666 MHz
       # --> compiler flag performance test: core2, 192CPUs, 1mon. simulat.
       # | GCC/openMPI | nothing                                                           | 390s |
       # | GCC/openMPI | -O2                                                               | 192s |
-      # | GCC/openMPI | -O3 -march=skylake-avx512 -mtune=skylake-avx512                   | 173s |
+      # |*GCC/openMPI | -O3 -march=skylake-avx512 -mtune=skylake-avx512                   | 173s | chatgpt recomendation
       # |             | -mprefer-vector-width=512 -falign-loops=64 -falign-functions=64   |      |
       # |             | -falign-jumps=64  (chatGPT recomendation)                         |      |
-      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -march=skylake-avx512 -mtune=skylake-avx512 -mprefer-vector-width=512 -falign-loops=64 -falign-functions=64 -falign-jumps=64)      
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=skylake-avx512 -mtune=skylake-avx512 -mprefer-vector-width=512 -falign-loops=64 -falign-functions=64 -falign-jumps=64)      
+   elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
+      # PROCESSORS:  2x AMD 7763 CPU; 128 cores in total, 256 GB main memory
+      # --> compiler flag performance test: core2, 512CPUs, 3mon. simulat.
+      # | GCC/openMPI | nothing                                                           | 659s |
+      # | GCC/openMPI | -O2                                                               | 364s |
+      # | GCC/openMPI | -O3                                                               | 316s |
+      # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3                                   | 278s | chatgpt recomendation
+      # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -ftree-vectorize                  | 278s | chatgpt recomendation
+      # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -funroll-loops                    | 284s | chatgpt recomendation
+      # |*GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -ftree-vectorize -flto            | 276s | chatgpt recomendation
+      # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -ftree-vectorize -flto            | 281s | chatgpt recomendation
+      # |             | -falign-functions=32 -falign-loops=32 -falign-jumps=32            |      |
+      # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -ftree-vectorize -flto            | 281s | chatgpt recomendation
+      # |             | -falign-functions=64 -falign-loops=64 -falign-jumps=64            |      |
+      # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -ftree-vectorize -flto            | 280s | chatgpt recomendation
+      # |             | -mno-fma4 -mavx2 -mfma                                            |      |
+      # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -ftree-vectorize -flto            | 280s | chatgpt recomendation
+      # |             | -mcpu=znver3                                                      |      |
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3 -ftree-vectorize -flto)      
    else()
-      if(NOT (${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu))
+      #[[if(NOT (${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu))
          target_compile_options(${PROJECT_NAME} PRIVATE -native)
-      endif()    
+      endif()  ]]  
    endif()
    
    # # debugging related compiler flags
