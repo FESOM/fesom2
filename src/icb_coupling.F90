@@ -105,7 +105,7 @@ type(t_partit), intent(inout), target :: partit
 
         do i=1, 3
             iceberg_node=ib_nods_in_ib_elem(i)
-            if (use_cavity .and. ulevels_nod2d(iceberg_node) > 1) cycle
+            if ((ulevels_nod2d(iceberg_node) == 0 ) .or. (use_cavity .and. ulevels_nod2d(iceberg_node) > 1)) cycle
 
             if (iceberg_node>0) then
                 ibfwbv(iceberg_node) = ibfwbv(iceberg_node) - fwbv_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
