@@ -326,6 +326,12 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
     	          mask=1.
 	              call force_flux_consv(enthalpyoffuse, mask, i, 0, action, partit, mesh)
              end if
+         elseif (i.eq.14) then
+             if (action) then
+	              runoff(:)            =  runoff(:)+exchange(:)        ! For Greenland add calving forcing to runoff.
+    	          mask=1.
+	              call force_flux_consv(enthalpyoffuse, mask, i, 0, action, partit, mesh)
+             end if
 #endif	 
          end if
 
