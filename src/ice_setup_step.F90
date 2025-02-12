@@ -135,38 +135,28 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #include "associate_mesh_ass.h"
 
 !---------------------------------------------
-! LA: 2023-01-31 add asynchronous icebergs
-!    u_ice    => ice%uice(:)
-!    v_ice    => ice%vice(:)
-! kh 19.02.21
   if (ib_async_mode == 0) then
       u_ice    => ice%uice(:)
       v_ice    => ice%vice(:)
-      !allocate(u_ice(n_size), v_ice(n_size))
-      !allocate(u_ice_ib(n_size), v_ice_ib(n_size))
   else
 !$omp parallel sections num_threads(2)
 ! kh 19.02.21 support "first touch" idea
 !$omp section
       u_ice    => ice%uice(:)
       v_ice    => ice%vice(:)
-      !allocate(u_ice(n_size), v_ice(n_size))
       u_ice    = 0._WP
       v_ice    = 0._WP
-      !do i = 1, n_size
-      !    u_ice(i) = 0._WP
-      !    v_ice(i) = 0._WP
-      !end do
 !$omp section
-      u_ice_ib => ice%uice_ib(:)
-      v_ice_ib => ice%vice_ib(:)
-      !allocate(u_ice_ib(n_size), v_ice_ib(n_size))
-      u_ice_ib = 0._WP
-      v_ice_ib = 0._WP
-      !do i = 1, n_size
-      !    u_ice_ib(i) = 0._WP
-      !    v_ice_ib(i) = 0._WP
-      !end do
+      if (use_icebergs) then
+        if (allocated(ice%uice_ib)) then
+          u_ice_ib => ice%uice_ib(:)
+          u_ice_ib = 0._WP
+        end if
+        if (allocated(ice%vice_ib)) then
+          v_ice_ib => ice%vice_ib(:)
+          v_ice_ib = 0._WP
+        end if
+      end if
 !$omp end parallel sections
   end if
 !---------------------------------------------
@@ -396,22 +386,24 @@ else
   if (ib_async_mode == 0) then
     u_ice        => ice%uice(:)
     v_ice        => ice%vice(:)
-    u_ice_ib     => ice%uice_ib(:)
-    v_ice_ib     => ice%vice_ib(:)
     a_ice        => ice%data(1)%values(:)
     m_ice        => ice%data(2)%values(:)
-    a_ice_ib     => ice%data(size(ice%data)-1)%values(:)
-    m_ice_ib     => ice%data(size(ice%data))%values(:)
-    !allocate(m_ice(n_size), a_ice(n_size))
-    !allocate(m_ice_ib(n_size), a_ice_ib(n_size))
     m_ice        = 0._WP
     a_ice        = 0._WP
     u_ice        = 0._WP
     v_ice        = 0._WP
-    u_ice_ib     = 0._WP
-    v_ice_ib     = 0._WP
-    m_ice_ib     = 0._WP
+    if (allocated(ice%uice_ib)) then
+        u_ice_ib     => ice%uice_ib(:)
+        u_ice_ib     = 0._WP
+    end if
+    if (allocated(ice%vice_ib)) then
+        v_ice_ib     => ice%vice_ib(:)
+        v_ice_ib     = 0._WP
+    end if
+    a_ice_ib     => ice%data(size(ice%data)-1)%values(:)
     a_ice_ib     = 0._WP
+    m_ice_ib     => ice%data(size(ice%data))%values(:)
+    m_ice_ib     = 0._WP
   else
 ! kh 19.02.21 support "first touch" idea
 !$omp parallel sections num_threads(2)
