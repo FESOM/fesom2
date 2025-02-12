@@ -46,9 +46,11 @@ if (allocated(mesh%lump2d_north)) then
 end if 
 if (allocated(mesh%cavity_flag_n)) then
     cavity_flag_n(1:myDim_nod2D+eDim_nod2D)                => mesh%cavity_flag_n(:)
+end if 
+if (allocated(mesh%cavity_flag_e)) then
     cavity_flag_e(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => mesh%cavity_flag_e(:)
-!!$cavity_lev_nod2D(1:myDim_nod2D+eDim_nod2D)                 => mesh%cavity_lev_nod2D
-!!$cavity_lev_elem2D(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => mesh%cavity_lev_elem2D
+end if 
+if (allocated(mesh%cavity_depth)) then
     cavity_depth(1:myDim_nod2D+eDim_nod2D)                 => mesh%cavity_depth(:)
 end if 
 ulevels(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)           => mesh%ulevels(:)
