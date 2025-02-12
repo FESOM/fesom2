@@ -304,7 +304,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 
 !YY: C14 seems to be calculated both in fesom and recom
 !YY: decay differently calculated???
-#if defined(__recom)
+#if defined(__ciso)
         ! radioactive decay of 14C
         if (ciso_14 .and. any(c14_tracer_id == tracers%data(tr_num)%ID)) then
           tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * (1 - lambda_14 * dt)
@@ -1608,6 +1608,10 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
 #if defined (__recom)
    use recoM_declarations
    use recom_glovar
+   use recom_config
+#endif
+#if defined (__ciso)
+   use recom_ciso
 #endif
   use mod_transit
   implicit none
@@ -1689,6 +1693,8 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
     CASE (1023:1033)
         bc_surface=0.0_WP  ! OG added bc for recom fields
     CASE (1302) ! Before (1033) ! DIC_13
+
+#if defined (__ciso)
          if (ciso) then
             if (use_MEDUSA .and. add_loopback) then
                bc_surface= dt*(GloCO2flux_seaicemask_13(n) &
@@ -1699,9 +1705,11 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
          else
             bc_surface=0.0_WP
          end if
+#endif
     CASE (1305:1321)
          bc_surface=0.0_WP ! organic 13C
     CASE (1402) ! Before (1034) ! DIC_14
+#if defined (__ciso)
          if (ciso .and. ciso_14) then
              if (use_MEDUSA .and. add_loopback .and. ciso_organic_14) then
                  bc_surface= dt*(GloCO2flux_seaicemask_14(n) &
@@ -1712,6 +1720,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
          else
              bc_surface=0.0_WP
          end if
+#endif
     CASE (1405:1421)
          bc_surface=0.0_WP ! organic 14C
 #endif
