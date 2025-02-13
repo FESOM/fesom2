@@ -382,12 +382,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
     	          mask=1.
 	              call force_flux_consv(enthalpyoffuse, mask, i, 0, action, partit, mesh)
              end if
-<<<<<<< HEAD
-! oifs
-#else
-=======
 #else 
->>>>>>> 9514143e (together with Sveta fixed directive error when compiling FESOM as library (ifsinterface))
          elseif (i.eq.13) then
             if (action) then
                  if (lwiso) then         
@@ -477,8 +472,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
              if (use_icebergs.and.lwiso) then    
                  call force_flux_consv(v_wind, mask, i, 0, action, partit, mesh)
              end if
-!   oifs
-#endif
+#endif !   oifs
          end if
 
 #ifdef VERBOSE
@@ -782,8 +776,7 @@ end subroutine update_atm_forcing
 !-----------------------------------------------------------------
 !
 SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats, partit, mesh)
-  ! Add comment to first #endif directive
-  ! This is the first #endif directive
+
   use g_forcing_arrays,	only : 	atm_net_fluxes_north, atm_net_fluxes_south, 	&
   				oce_net_fluxes_north, oce_net_fluxes_south, 	&
 				flux_correction_north, flux_correction_south,	&
