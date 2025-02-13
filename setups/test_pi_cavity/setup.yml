@@ -11,7 +11,6 @@ namelist.config:
     run_config:
       use_cavity: True
       use_cavity_partial_cell: True
-      use_transit: true
     timestep:
         step_per_day: 96
         run_length: 1
