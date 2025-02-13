@@ -166,6 +166,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   enthalpyoffuse   => ice%atmcoupl%enthalpyoffuse(:)
   tmelt            => ice%thermo%tmelt
   UVnode           => dynamics%uvnode(:,:,:)
+#endif
 #if defined (__coupled) || defined (__ifsinterface)
   oce_heat_flux    => ice%atmcoupl%oce_flx_h(:)
   ice_heat_flux    => ice%atmcoupl%ice_flx_h(:)
@@ -271,6 +272,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 ! oifs
 #endif
          endif
+#if defined(__oasis)
          call cpl_oasis3mct_send(i, exchange, action, partit)
 #elif defined(__yac)
          call cpl_yac_send(i, exchange, action, partit)
@@ -359,8 +361,8 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
             call force_flux_consv(ice_heat_flux, mask, i, 2,action, partit, mesh) ! Southern Hemisphere	     
         elseif (i.eq.11) then
             if (action) then
-                shortwave(:)         =  exchange(:)		        ! heat_swr
-                tmp_shortwave(:)     =  exchange(:) 		    ! to reset for flux 
+                shortwave(:)         =  exchange(:)             ! heat_swr
+                tmp_shortwave(:)     =  exchange(:)             ! to reset for flux 
                                                                 ! correction
             end if
             mask=1.-a_ice
@@ -380,8 +382,12 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
     	          mask=1.
 	              call force_flux_consv(enthalpyoffuse, mask, i, 0, action, partit, mesh)
              end if
+<<<<<<< HEAD
 ! oifs
 #else
+=======
+#else 
+>>>>>>> 9514143e (together with Sveta fixed directive error when compiling FESOM as library (ifsinterface))
          elseif (i.eq.13) then
             if (action) then
                  if (lwiso) then         
@@ -593,8 +599,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 
 end subroutine update_atm_forcing
 
-#else
-! defined(__yac)
+#elif defined(__yac)
 
 subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   use o_PARAM
@@ -629,7 +634,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   !_____________________________________________________________________________
   integer		   :: i, itime,n2,n,nz,k,elem
   real(kind=WP)            :: i_coef, aux
-  real(kind=WP)	           :: dux, dvy,tx,ty,tvol
+  real(kind=WP)　　         :: dux, dvy,tx,ty,tvol
   real(kind=WP)            :: t1, t2
   real(kind=WP)        				   :: flux_global(2), flux_local(2), eff_vol(2)
   real(kind=WP), dimension(:,:), allocatable , save  :: exchange
@@ -777,7 +782,8 @@ end subroutine update_atm_forcing
 !-----------------------------------------------------------------
 !
 SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats, partit, mesh)
-
+  ! Add comment to first #endif directive
+  ! This is the first #endif directive
   use g_forcing_arrays,	only : 	atm_net_fluxes_north, atm_net_fluxes_south, 	&
   				oce_net_fluxes_north, oce_net_fluxes_south, 	&
 				flux_correction_north, flux_correction_south,	&
