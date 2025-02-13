@@ -98,7 +98,7 @@ jobs:
 
     - name: Create iceberg test run
       run: |
-        mkrun iceberg test_pi_iceberg -m docker
+        mkrun iceberg test_pi_icebergs -m docker
     - name: FESOM2 iceberg test run
       run: |
         cd work_iceberg
