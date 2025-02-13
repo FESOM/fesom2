@@ -274,8 +274,6 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
          endif
 #if defined(__oasis)
          call cpl_oasis3mct_send(i, exchange, action, partit)
-#elif defined(__yac)
-         call cpl_yac_send(i, exchange, action, partit)
 #endif
       end do
 #ifdef VERBOSE
