@@ -96,6 +96,19 @@ jobs:
         cd work_souf
         fcheck .    
 
+    - name: Create cavity test run
+      run: |
+        mkrun iceberg test_pi_cavity -m docker
+    - name: FESOM2 cavity test run
+      run: |
+        cd work_cavity
+        chmod +x job_docker_new
+        ./job_docker_new
+    - name: Check cavity results
+      run: |-
+        cd work_cavity
+        fcheck .
+
     - name: Create iceberg test run
       run: |
         mkrun iceberg test_pi_icebergs -m docker
