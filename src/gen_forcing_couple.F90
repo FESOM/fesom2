@@ -380,7 +380,8 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
     	          mask=1.
 	              call force_flux_consv(enthalpyoffuse, mask, i, 0, action, partit, mesh)
              end if
-#else ! oifs
+! oifs
+#else
          elseif (i.eq.13) then
             if (action) then
                  if (lwiso) then         
@@ -470,7 +471,8 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
              if (use_icebergs.and.lwiso) then    
                  call force_flux_consv(v_wind, mask, i, 0, action, partit, mesh)
              end if
-#endif !   oifs
+!   oifs
+#endif
          end if
 
 #ifdef VERBOSE
