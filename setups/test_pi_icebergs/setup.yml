@@ -1,4 +1,4 @@
-mesh: test_global
+mesh: test_cavity
 forcing: test_global
 clim:
     type: test_global
@@ -8,6 +8,16 @@ ntasks: 2
 time: "00:10:00"
 
 namelist.config:
+    icebergs:
+      use_icebergs: True
+      ib_num: 5
+      use_icesheet_coupling: False
+      steps_per_ib_step: 8
+      ib_async_mode: 0
+    run_config:
+      use_cavity: True
+      use_cavity_partial_cell: True
+      use_transit: true
     timestep:
         step_per_day: 96
         run_length: 1
@@ -18,6 +28,25 @@ namelist.config:
         restart_length: 1
         restart_length_unit: "d"
         logfile_outfreq: 10
+        
+namelist.tra:
+    tracer_init3d:
+        n_ic3d: 3
+        idlist: [2,1,14]
+        filelist: ["phc3.0_winter.nc","phc3.0_winter.nc","rC14t_abio_OMIPinit.nc"]
+        varlist: ["salt","temp","rC14t"]
+
+namelist.transit:
+    transit_param:
+        l_r14c: true
+        l_r39ar: false
+        l_f11: true
+        l_f12: true
+        l_sf6: true
+        anthro_transit: true
+        length_transit: 166
+        ti_start_transit: 101
+        ifile_transit: "${climate_data_dir}/Table_CO2_isoC_CFCs1112_SF6.txt"
 
 namelist.dyn:
     dynamics_general:
