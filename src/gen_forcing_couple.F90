@@ -211,7 +211,8 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
               end do
             else    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
-#else   ! oifs
+! oifs
+#else
             ! AWI-CM2 outgoing state vectors
             do n=1,myDim_nod2D+eDim_nod2D
                exchange(n)=tracers%data(1)%values(1, n)                     ! sea surface temperature [°C]
