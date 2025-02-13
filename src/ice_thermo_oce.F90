@@ -130,7 +130,7 @@ END DO
 !$OMP END PARALLEL DO
 end subroutine cut_off
 
-#if !defined (__oasis) && !defined (__ifsinterface)
+#if !defined (__coupled) && !defined (__ifsinterface)
 !_______________________________________________________________________________
 ! Sea-ice thermodynamics routines
 !
@@ -818,4 +818,4 @@ end function TFrez
 !
 !
 !_______________________________________________________________________________
-#endif /* #if !defined (__oasis) && !defined (__ifsinterface) */
+#endif /* #if !defined (__coupled) && !defined (__ifsinterface) */
