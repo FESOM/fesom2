@@ -267,7 +267,8 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 !---wiso-code-end
             else	    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
-#endif  ! oifs
+! oifs
+#endif
          endif
          call cpl_oasis3mct_send(i, exchange, action, partit)
 #elif defined(__yac)
