@@ -143,6 +143,7 @@ SUBROUTINE mesh_setup(partit, mesh)
 USE MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
+USE g_config, only: flag_debug
 USE g_ROTATE_grid
 use read_mesh_interface
 use find_levels_interface
@@ -157,21 +158,46 @@ use par_support_interfaces
 IMPLICIT NONE
       type(t_mesh),   intent(inout)         :: mesh
       type(t_partit), intent(inout), target :: partit
-
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call set_mesh_transform_matrix'//achar(27)//'[0m'
       call set_mesh_transform_matrix  !(rotated grid)
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call read_mesh'//achar(27)//'[0m'
       call read_mesh(partit, mesh)
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_mpi_types'//achar(27)//'[0m'
       call init_mpi_types(partit, mesh)
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_gatherLists'//achar(27)//'[0m'
       call init_gatherLists(partit)
+      
+      
       if(partit%mype==0) write(*,*) 'Communication arrays are set' 
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call test_tri'//achar(27)//'[0m'
       call test_tri(partit, mesh)
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call load_edges'//achar(27)//'[0m'
       call load_edges(partit, mesh)
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call find_neighbors'//achar(27)//'[0m'
       call find_neighbors(partit, mesh)
       
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call find_levels'//achar(27)//'[0m'
       call find_levels(partit, mesh)
-      if (use_cavity) call find_levels_cavity(partit, mesh)
       
+      
+      if (use_cavity) then
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call find_levels_cavity'//achar(27)//'[0m'
+        call find_levels_cavity(partit, mesh)
+      end if 
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call find_levels_min_e2n'//achar(27)//'[0m'
       call find_levels_min_e2n(partit, mesh)
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call mesh_areas'//achar(27)//'[0m'
       call mesh_areas(partit, mesh)
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call mesh_auxiliary_arrays'//achar(27)//'[0m'
       call mesh_auxiliary_arrays(partit, mesh)
            
 END SUBROUTINE mesh_setup
@@ -179,6 +205,7 @@ END SUBROUTINE mesh_setup
 ! Reads distributed mesh
 ! The mesh will be read only by 0 proc and broadcasted to the others.
 SUBROUTINE read_mesh(partit, mesh)
+use iso_fortran_env, only: error_unit
 USE o_PARAM
 USE g_CONFIG
 USE MOD_MESH
@@ -205,8 +232,10 @@ type(t_partit), intent(inout), target :: partit
  integer, allocatable, dimension(:,:)       :: ibuff
  real(kind=WP), allocatable, dimension(:,:) :: rbuff
  integer, allocatable, dimension(:,:)       :: auxbuff ! will be used for reading aux3d.out 
- integer                                    :: fileunit, iostat
+ integer                                    :: fileunit
  character(32)                              :: mesh_checksum
+ integer                                    :: ioerr
+ character(512)                             :: errmsg
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -235,7 +264,13 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
   if (mype==0) then
      file_name=trim(dist_mesh_dir)//'rpart.out'
      fileID=10
-     open(fileID, file=trim(file_name)) 
+     open(unit=fileID, file=trim(file_name), action='read', status='old', &
+         iostat=ioerr, iomsg=errmsg) 
+     if (ioerr /= 0) then
+       write (unit=error_unit, fmt='(3A)') &
+         '### error: can not open file ', file_name, &
+         ', error: ' // trim(errmsg)
+     end if
      allocate(partit%part(npes+1))
      part=>partit%part
      read(fileID,*) n
@@ -254,7 +289,6 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
      write(*,*) n
      write(*,*) 'error: NPES does not coincide with that of the mesh'
      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
-     STOP
   end if
   ! broadcasting partitioning vector to the other procs
   if (mype/=0) then
@@ -292,7 +326,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
 
   close(fileID)
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+
   if (mype==0) write(*,*) 'myLists are read'
 
   !==============================
@@ -413,7 +447,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
         write(*,*) '____________________________________________________________________'
         print *, achar(27)//'[0m'
         write(*,*)
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     !___________________________________________________________________________
     ! check if rotation needs to be applied to an unrotated mesh
     elseif ((mype==0) .and. (.not. force_rotation) .and. (flag_checkmustrot==1) .and. (.not. toy_ocean)) then
@@ -434,7 +468,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
         write(*,*) '____________________________________________________________________'
         print *, achar(27)//'[0m'
         write(*,*)
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     end if
   
   
@@ -535,7 +569,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
         call MPI_BCast(mesh%nl, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
         if (mesh%nl < 3) then
             write(*,*) '!!!Number of levels is less than 3, model will stop!!!'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
             stop
         end if
         allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
@@ -556,7 +590,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
             write(*,*) '        --> model stops here'
             write(*,*) '____________________________________________________________________'
         end if
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     end if
     
  !______________________________________________________________________________
@@ -576,7 +610,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
         call MPI_BCast(mesh%nl, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
         if (mesh%nl < 3) then
             write(*,*) '!!!Number of levels is less than 3, model will stop!!!'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
             stop
         end if
         allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
@@ -599,7 +633,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
             write(*,*) '            use_depthfile= "aux3d" or "depth@" and your meshfolder'
             write(*,*) '        --> model stops here'
             write(*,*) '____________________________________________________________________'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
         end if 
     end if 
     
@@ -624,7 +658,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
             write(*,*) '            use_depthfile= "aux3d" or "depth@" and your meshfolder '
             write(*,*) '        --> model stops here'
             write(*,*) '____________________________________________________________________'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
         end if
     end if     
  end if 
@@ -756,7 +790,7 @@ if ((mype==0) .and. (flag_wrongaux3d==1)) then
     write(*,*) '____________________________________________________________________'
     print *, achar(27)//'[0m'
     write(*,*)
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
 end if 
 
  ! ==============================
@@ -875,6 +909,7 @@ CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
     write(*,*) '2D mesh info : ', 'nod2D=', mesh%nod2D,' elem2D=', mesh%elem2D,'checksum= ',mesh%representative_checksum
     write(*,*) '========================='
  endif
+
 
  END subroutine  read_mesh
 !
@@ -1146,7 +1181,7 @@ subroutine find_levels_cavity(partit, mesh)
             write(*,*) '____________________________________________________________________'
             print *, achar(27)//'[0m'
             write(*,*)
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
         end if 
     end if
     
@@ -1234,7 +1269,7 @@ subroutine find_levels_cavity(partit, mesh)
             write(*,*) '____________________________________________________________________'
             print *, achar(27)//'[0m'
             write(*,*)
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
         end if    
     end if
     
@@ -1399,7 +1434,7 @@ subroutine find_levels_cavity(partit, mesh)
             write(*,*) '____________________________________________________________________'
             print *, achar(27)//'[0m'
             write(*,*)
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
         end if 
     end if
     

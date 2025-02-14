@@ -33,11 +33,8 @@ release = "0.2"
 extensions = [
     "sphinx.ext.mathjax",
     "sphinxcontrib.bibtex",
-    "sphinxfortran.fortran_domain",
-    "sphinxfortran.fortran_autodoc",
 ]
 bibtex_bibfiles = ["mybib_fesom2.bib"]
-fortran_src = ["../src/"]
 
 numfig = True
 # Add any paths that contain templates here, relative to this directory.

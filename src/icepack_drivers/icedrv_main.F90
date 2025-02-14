@@ -25,7 +25,7 @@
                     ! Subroutines
                     set_icepack, alloc_icepack, init_icepack, step_icepack, &
                     icepack_to_fesom, icepack_to_fesom_single_point,        &
-                    init_flux_atm_ocn, init_io_icepack, init_restart_icepack
+                    init_flux_atm_ocn, ini_icepack_io , ini_mean_icepack_io
     
           !=======================================================================
 !--------- Everything else is private
@@ -153,6 +153,10 @@
              opening(:),  & ! rate of opening due to divergence/shear (1/s)   
              dhi_dt(:),   & ! ice volume tendency due to thermodynamics (m/s)
              dhs_dt(:),   & ! snow volume tendency due to thermodynamics (m/s) 
+             dhi_t_dt(:),   & ! ice volume tendency due to thermodynamics (m/s)
+             dhs_t_dt(:),   & ! snow volume tendency due to thermodynamics (m/s)
+             dhi_r_dt(:),   & ! ice volume tendency due to ridging (m/s)
+             dhs_r_dt(:),   & ! snow volume tendency due to ridging (m/s)
              ! ridging diagnostics in categories
              dardg1ndt(:,:), & ! rate of area loss by ridging ice (1/s)
              dardg2ndt(:,:), & ! rate of area gain by new ridges (1/s)
@@ -820,7 +824,8 @@
                                           fhocn_tot_out, fresh_tot_out,    &
                                           strocnxT_out,  strocnyT_out,     &
                                           dhs_dt_out,    dhi_dt_out,       &
-                                          fsalt_out,     evap_ocn_out      )
+                                          fsalt_out,     evap_ocn_out,     &
+                                          evap_out                         )
                   use mod_mesh
                   implicit none        
                   integer (kind=int_kind), intent(in) :: &
@@ -836,7 +841,8 @@
                      fsalt_out,     &
                      dhs_dt_out,    &
                      dhi_dt_out,    &
-                     evap_ocn_out
+                     evap_ocn_out,  &
+                     evap_out
               end subroutine icepack_to_fesom
 
               ! Copy variables from icepack to fesom (single node or element)
@@ -883,20 +889,23 @@
               end subroutine step_icepack
 
               ! Initialize output
-              module subroutine init_io_icepack(mesh)
+              module subroutine ini_mean_icepack_io(mesh)
                   use mod_mesh
                   implicit none
                   type(t_mesh), intent(in), target :: mesh
-              end subroutine init_io_icepack
+              end subroutine ini_mean_icepack_io
 
               ! Initialize restart
-              module subroutine init_restart_icepack(year, mesh)
+              module subroutine ini_icepack_io(year, partit, mesh)
                   use mod_mesh
+                  use mod_partit
+                  use mod_parsup
                   implicit none
-                  type(t_mesh), intent(in), target     :: mesh
-                  integer(kind=int_kind),  intent(in) :: year
-              end subroutine init_restart_icepack
-
+                  type(t_mesh),           intent(in)   , target :: mesh
+                  type(t_partit),         intent(inout), target :: partit
+                  integer(kind=int_kind), intent(in)            :: year
+              end subroutine ini_icepack_io
+              
               ! Cut off Icepack
               module subroutine cut_off_icepack
                   use icepack_intfc,         only: icepack_compute_tracers
