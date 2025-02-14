@@ -1,0 +1,1 @@
+../global/ncar_precip.1948.nc

@@ -55,8 +55,10 @@ docker:
     meshes:
         test_souf: ./test/meshes/soufflet/
         test_global: ./test/meshes/pi/
+        test_cavity: ./test/meshes/pi_cavity/
     forcing:
         test_global: ./test/input/global/
+        test_icebergs: ./test/input/icebergs
     clim:
         test_global: ./test/input/global/
     opath:
