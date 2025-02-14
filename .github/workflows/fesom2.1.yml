@@ -96,6 +96,19 @@ jobs:
         cd work_souf
         fcheck .    
 
+    - name: Create iceberg test run
+      run: |
+        mkrun iceberg test_pi_icebergs -m docker
+    - name: FESOM2 iceberg test run
+      run: |
+        cd work_iceberg
+        chmod +x job_docker_new
+        ./job_docker_new
+    - name: Check iceberg results
+      run: |-
+        cd work_iceberg
+        fcheck .
+
     - name: Create cavity test run
       run: |
         mkrun cavity test_pi_cavity -m docker
@@ -109,19 +122,6 @@ jobs:
     - name: Check cavity results
       run: |-
         cd work_cavity
-        fcheck .
-
-    - name: Create iceberg test run
-      run: |
-        mkrun iceberg test_pi_icebergs -m docker
-    - name: FESOM2 iceberg test run
-      run: |
-        cd work_iceberg
-        chmod +x job_docker_new
-        ./job_docker_new
-    - name: Check iceberg results
-      run: |-
-        cd work_iceberg
         fcheck .
         
     - name: Check partitioner compilation
