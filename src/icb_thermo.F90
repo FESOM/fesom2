@@ -49,7 +49,7 @@ subroutine iceberg_meltrates(partit, mesh, M_b, M_v, M_e, M_bv, &
   use g_forcing_arrays
   use g_rotate_grid
 
-  use iceberg_params, only: fwe_flux_ib, fwl_flux_ib, fwb_flux_ib, fwbv_flux_ib, hfb_flux_ib, hfbv_flux_ib, hfe_flux_ib, hfl_flux_ib, scaling
+  use iceberg_params, only: fwe_flux_ib, fwl_flux_ib, fwb_flux_ib, fwbv_flux_ib, hfb_flux_ib, hfbv_flux_ib, hfe_flux_ib, hfl_flux_ib, scaling, wave_erosion_potential, linit_wave_erosion_pot
   implicit none
   
   ! LA: include latent heat 2023-04-04
@@ -71,6 +71,7 @@ subroutine iceberg_meltrates(partit, mesh, M_b, M_v, M_e, M_bv, &
   real              :: lev_up, lev_low, dz
   real			:: absamino, damping, sea_state, v_ibmino
   real			:: tf, T_d 				!freezing temp. and 'thermal driving'
+  real          :: ib_wave_erosion_pot
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
 !==================== MODULES & DECLARATIONS ==========================!= 
@@ -119,7 +120,11 @@ type(t_partit), intent(inout), target :: partit
     !temperature above freezing point' (Neshyba and Josberger, 1979).
     T_d = arr_T_ave_ib(n) - tf
     if(T_d < 0.) T_d = 0.
-  
+ 
+    if (linit_wave_erosion_pot(elem)) then 
+        wave_erosion_potential(elem) = vcpw * T_d * elem_area(elem) * helem(1,elem)
+        linit_wave_erosion_pot(elem) = .false.
+    end if
     !lateral melt (buoyant convection)
     !M_v = 0.00762 * sst_ib + 0.00129 * sst_ib**2
     !M_v = M_v/86400.
@@ -141,10 +146,24 @@ type(t_partit), intent(inout), target :: partit
   M_e = 1./6. * sea_state * (sst_ib + 2.0) * damping
   M_e = M_e/86400.
   H_e = M_e * rho_icb * L
-  hfe_flux_ib(ib) = H_e * (length_ib*abs(height_ib)  + length_ib*abs(height_ib) ) * scaling(ib)
-  !fwe_flux_ib = M_e  
+  
+  ! check wave erosion potential
+  ib_wave_erosion_pot = abs(H_e * dt * REAL(steps_per_ib_step) * 2 * length_ib * abs(height_ib) * scaling(ib))
+  if (ib_wave_erosion_pot .le. wave_erosion_potential(elem)) then
+    !if (lverbose_icb) write(*,*) " * wave erosion for ib ", ib, "; wave_erosion_potential=",wave_erosion_potential(elem), "; ib_wave_erosion_pot=",ib_wave_erosion_pot,"; elem=",elem
+    wave_erosion_potential(elem) = wave_erosion_potential(elem) - ib_wave_erosion_pot
+  else
+    !if (lverbose_icb) write(*,*) " * no wave erosion for ib ", ib, "; wave_erosion_potential=",wave_erosion_potential(elem), "; ib_wave_erosion_pot=",ib_wave_erosion_pot,"; elem=",elem
+    H_e = H_e * abs(wave_erosion_potential(elem) / ib_wave_erosion_pot)
+    M_e = M_e * abs(wave_erosion_potential(elem) / ib_wave_erosion_pot)
+    wave_erosion_potential(elem) = 0.0
+!  else
+!    if (lverbose_icb) write(*,*) " * no wave erosion for ib ", ib, "; wave_erosion_potential=",wave_erosion_potential(elem), "; ib_wave_erosion_pot=",ib_wave_erosion_pot
+!    H_e = 0.0
+!    M_e = 0.0
+  end if
+  hfe_flux_ib(ib) = H_e * (length_ib*abs(height_ib) + length_ib*abs(height_ib) ) * scaling(ib)
 end subroutine iceberg_meltrates
-
 
  !***************************************************************************************************************************
  !***************************************************************************************************************************

@@ -1,3 +1,20 @@
+module allocate_icb_interface
+  interface
+     subroutine allocate_icb(partit, mesh)
+        use iceberg_params
+        use g_config
+        use g_comm
+        use g_comm_auto
+        use o_param
+        use MOD_PARTIT
+        use MOD_MESH
+        implicit none
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in)   , target :: mesh
+     end subroutine allocate_icb
+  end interface
+end module allocate_icb_interface
+
 subroutine allocate_icb(partit, mesh)
   use iceberg_params
   use g_config
@@ -25,6 +42,10 @@ type(t_mesh), intent(in), target :: mesh
   ibfwbv    = 0.0
   allocate(ibhf_n(mesh%nl, n2))
   ibhf_n    = 0.0_WP
+
+  allocate(wave_erosion_potential(elem2D), linit_wave_erosion_pot(elem2D))
+  wave_erosion_potential = 0.0
+  linit_wave_erosion_pot = .true.
 
   allocate(calving_day(ib_num))
   calving_day = 1   !28.0: September 29 for restart in 1 SEP 97 ! 271.0: September 29 for year 1997
