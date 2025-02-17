@@ -102,6 +102,8 @@ jobs:
     - name: FESOM2 iceberg test run
       run: |
         cd work_iceberg
+        ls -ratl
+        cat namelist.config
         chmod +x job_docker_new
         ./job_docker_new
     - name: Check iceberg results
