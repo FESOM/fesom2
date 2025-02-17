@@ -20,11 +20,11 @@ module diagnostics
 
   private
   public :: ldiag_solver, lcurt_stress_surf, ldiag_Ri, ldiag_TurbFlux, ldiag_dMOC,                                &
-            ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, ldiag_vorticity, ldiag_extflds, ldiag_ice,      &
+            ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, ldiag_extflds, ldiag_ice,      &
             compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, shear, Ri, KvdTdZ, KvdSdZ,                & 
             std_dens_min, std_dens_max, std_dens_N, std_dens, ldiag_trflx, ldiag_destinE,                                       &
             std_dens_UVDZ, std_dens_DIV, std_dens_DIV_fer, std_dens_Z, std_dens_H, std_dens_dVdT, std_dens_flux,  &
-            dens_flux_e, vorticity, zisotherm, tempzavg, saltzavg, heatcontent, vol_ice, vol_snow, compute_ice_diag, thetao,   &
+            dens_flux_e, zisotherm, tempzavg, saltzavg, heatcontent, vol_ice, vol_snow, compute_ice_diag, thetao,   &
             tuv, suv,                                                                                             &
             ldiag_DVD, compute_dvd, dvd_KK_tot, dvd_SD_tot, dvd_SD_chi_adv_h, dvd_SD_chi_adv_v, dvd_SD_chi_dif_he,&
             dvd_SD_chi_dif_heR, dvd_SD_chi_dif_hbh, dvd_SD_chi_dif_veR, dvd_SD_chi_dif_viR, dvd_SD_chi_dif_vi,    &
@@ -42,7 +42,6 @@ module diagnostics
 
   real(kind=WP),  save, allocatable, target      :: shear(:,:), Ri(:,:), KvdTdZ(:,:), KvdSdZ(:,:)
   real(kind=WP),  save, allocatable, target      :: stress_bott(:,:), u_bott(:), v_bott(:), u_surf(:), v_surf(:)
-  real(kind=WP),  save, allocatable, target      :: vorticity(:,:)
   real(kind=WP),  save, allocatable, target      :: zisotherm(:)              !target temperature is specified as whichtemp in compute_extflds
   real(kind=WP),  save, allocatable, target      :: tempzavg(:), saltzavg(:)  !target depth for averaging is specified as whichdepth in compute_extflds
   real(kind=WP),  save, allocatable, target      :: heatcontent(:,:)
@@ -98,7 +97,6 @@ module diagnostics
   
   logical                                       :: ldiag_forc       =.false.
   
-  logical                                       :: ldiag_vorticity  =.false.
   logical                                       :: ldiag_extflds    =.false.
   logical                                       :: ldiag_destinE    =.false.
   logical                                       :: ldiag_ice        =.false.
@@ -108,7 +106,7 @@ module diagnostics
   
   namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_Ri, & 
                        ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, &
-                       ldiag_vorticity, ldiag_extflds, ldiag_destinE, ldiag_trflx, ldiag_ice, ldiag_uvw_sqr, ldiag_trgrd_xyz
+                       ldiag_extflds, ldiag_destinE, ldiag_trflx, ldiag_ice, ldiag_uvw_sqr, ldiag_trgrd_xyz
   
   contains
 
@@ -189,7 +187,9 @@ subroutine diag_curl_stress_surf(mode, partit, mesh)
      curl_stress_surf(n)=curl_stress_surf(n)/areasvol(ulevels_nod2D(n),n)
   END DO
 end subroutine diag_curl_stress_surf
-! ==============================================================
+!
+!
+!_______________________________________________________________________________
 !3D curl(velocity)
 subroutine diag_curl_vel3(mode, dynamics, partit, mesh)
     implicit none
@@ -280,8 +280,9 @@ subroutine diag_curl_vel3(mode, dynamics, partit, mesh)
     end do
     
 end subroutine diag_curl_vel3
-! ==============================================================
-! 
+!
+!
+!_______________________________________________________________________________
 subroutine diag_turbflux(mode, dynamics, tracers, partit, mesh)
   implicit none
   type(t_dyn)   , intent(inout), target :: dynamics
@@ -745,108 +746,7 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
   
   firstcall_e=.false.
 end subroutine diag_densMOC
-!
-!
-!_______________________________________________________________________________
-subroutine relative_vorticity(mode, dynamics, partit, mesh)
-    IMPLICIT NONE
-    integer        :: n, nz, el(2), enodes(2), nl1, nl2, edge, ul1, ul2, nl12, ul12
-    real(kind=WP)  :: deltaX1, deltaY1, deltaX2, deltaY2, c1
-    integer,        intent(in)            :: mode
-    logical,        save                  :: firstcall=.true.
-    type(t_dyn)   , intent(inout), target :: dynamics
-    type(t_partit), intent(inout), target :: partit
-    type(t_mesh)  , intent(in)   , target :: mesh
-    real(kind=WP), dimension(:,:,:), pointer :: UV
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
-    UV => dynamics%uv(:,:,:)
-    
-    !___________________________________________________________________________
-    if (firstcall) then  !allocate the stuff at the first call
-        allocate(vorticity(nl-1, myDim_nod2D+eDim_nod2D))
-        firstcall=.false.
-        if (mode==0) return
-    end if
-    !!PS DO n=1,myDim_nod2D
-    !!PS    nl1 = nlevels_nod2D(n)-1
-    !!PS    ul1 = ulevels_nod2D(n)
-    !!PS    vorticity(ul1:nl1,n)=0.0_WP
-    !!PS    !!PS DO nz=1, nlevels_nod2D(n)-1
-    !!PS    !!PS    vorticity(nz,n)=0.0_WP
-    !!PS    !!PS END DO
-    !!PS END DO      
-    vorticity = 0.0_WP
-    DO edge=1,myDim_edge2D
-                                    !! edge=myList_edge2D(m)
-        enodes=edges(:,edge)
-        el=edge_tri(:,edge)
-        nl1=nlevels(el(1))-1
-        ul1=ulevels(el(1))
-        deltaX1=edge_cross_dxdy(1,edge)
-        deltaY1=edge_cross_dxdy(2,edge)
-        nl2=0
-        ul2=0
-        if(el(2)>0) then
-            deltaX2=edge_cross_dxdy(3,edge)
-            deltaY2=edge_cross_dxdy(4,edge)
-            nl2=nlevels(el(2))-1
-            ul2=ulevels(el(2))
-        end if  
-        nl12 = min(nl1,nl2)
-        ul12 = max(ul1,ul2)
-        
-        DO nz=ul1,ul12-1
-            c1=deltaX1*UV(1,nz,el(1))+deltaY1*UV(2,nz,el(1))
-            vorticity(nz,enodes(1))=vorticity(nz,enodes(1))+c1
-            vorticity(nz,enodes(2))=vorticity(nz,enodes(2))-c1
-        END DO
-        if (ul2>0) then
-            DO nz=ul2,ul12-1
-                c1= -deltaX2*UV(1,nz,el(2))-deltaY2*UV(2,nz,el(2))
-                vorticity(nz,enodes(1))=vorticity(nz,enodes(1))+c1
-                vorticity(nz,enodes(2))=vorticity(nz,enodes(2))-c1
-            END DO
-        endif 
-        !!PS DO nz=1,min(nl1,nl2)
-        DO nz=ul12,nl12
-            c1=deltaX1*UV(1,nz,el(1))+deltaY1*UV(2,nz,el(1))- &
-            deltaX2*UV(1,nz,el(2))-deltaY2*UV(2,nz,el(2))
-            vorticity(nz,enodes(1))=vorticity(nz,enodes(1))+c1
-            vorticity(nz,enodes(2))=vorticity(nz,enodes(2))-c1
-        END DO
-        !!PS DO nz=min(nl1,nl2)+1,nl1
-        DO nz=nl12+1,nl1
-            c1=deltaX1*UV(1,nz,el(1))+deltaY1*UV(2,nz,el(1))
-            vorticity(nz,enodes(1))=vorticity(nz,enodes(1))+c1
-            vorticity(nz,enodes(2))=vorticity(nz,enodes(2))-c1
-        END DO
-        !!PS DO nz=min(nl1,nl2)+1,nl2
-        DO nz=nl12+1,nl2
-            c1= -deltaX2*UV(1,nz,el(2))-deltaY2*UV(2,nz,el(2))
-            vorticity(nz,enodes(1))=vorticity(nz,enodes(1))+c1
-            vorticity(nz,enodes(2))=vorticity(nz,enodes(2))-c1
-        END DO
-    END DO
-    
-    ! vorticity = vorticity*area at this stage
-    ! It is correct only on myDim nodes
-    DO n=1,myDim_nod2D
-                                !! n=myList_nod2D(m)
-        ul1 = ulevels_nod2D(n)
-        nl1 = nlevels_nod2D(n)
-        !!PS DO nz=1,nlevels_nod2D(n)-1
-        DO nz=ul1,nl1-1
-            vorticity(nz,n)=vorticity(nz,n)/areasvol(nz,n)
-        END DO
-    END DO      
-    
-    call exchange_nod(vorticity, partit)
-    
-! Now it the relative vorticity known on neighbors too
-end subroutine relative_vorticity
+
 !
 !
 !_______________________________________________________________________________
@@ -1208,26 +1108,23 @@ subroutine compute_diagnostics(mode, dynamics, tracers, ice, partit, mesh)
   ! 8. compute tracers fluxes
   if (ldiag_trflx)       call diag_trflx(mode, dynamics, tracers, partit, mesh)
 
-  ! 9. compute relative vorticity
-  if (ldiag_vorticity)   call relative_vorticity(mode, dynamics, partit, mesh)
-  
-  ! 10. compute some exchanged fields requested by IFS/FESOM in NextGEMS.
+  ! 9. compute some exchanged fields requested by IFS/FESOM in NextGEMS.
   if (ldiag_extflds)     call compute_extflds(mode, dynamics, tracers, partit, mesh)
 
-  ! 11. compute Discrete Variance Decay (DVD) diagnostic of: 
+  ! 10. compute Discrete Variance Decay (DVD) diagnostic of: 
   ! K. Klingbeil et al., 2014, Quantification of spurious dissipation and mixing – 
   ! Discrete variance decay in Finite-Volume framework ...
   ! T. Banerjee, S. Danilov, K. Klingbeil, 2023, Discrete variance decay analysis of 
   ! spurious mixing
   if (ldiag_DVD)         call compute_dvd(mode, dynamics, tracers, partit, mesh)
  
-  ! 12. compute squared velocities for varaince computation .
+  ! 11. compute squared velocities for varaince computation .
   if (ldiag_uvw_sqr)     call diag_uvw_sqr(mode, dynamics, partit, mesh)
   
-  ! 13. compute online tracer gradients
+  ! 12. compute online tracer gradients
   if (ldiag_trgrd_xyz)   call diag_trgrd_xyz(mode, tracers, partit, mesh)
   
-  ! 14. compute fields required for for destinE
+  ! 13. compute fields required for for destinE
   if (ldiag_ice)         call compute_ice_diag(mode, ice, partit, mesh)
   
   if (ldiag_destinE)     call compute_destinE(mode, dynamics, tracers, partit, mesh)
