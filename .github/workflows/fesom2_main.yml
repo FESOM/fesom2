@@ -1,0 +1,53 @@
+
+name: FESOM2 main test
+
+# Controls when the action will run. Triggers the workflow on push or pull request. 
+
+on: [push, pull_request]
+
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  general_test:
+    # Containers must run in Linux based operating systems
+    runs-on: ubuntu-latest
+    # Docker Hub image that `container-job` executes in
+    container: ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master
+
+    # Service containers to run with `gfortran_ubuntu`
+    steps:
+    # NK: this changes working directory to fesom2
+    - uses: actions/checkout@v2
+
+    - name: Git safe directory
+      run: |
+        git config --global --add safe.directory ${PWD}
+
+    - name: Compile model (binary)
+      run: |
+        ./configure.sh ubuntu
+
+    - name: Create global test run
+      run: |
+        mkrun pi test_pi -m docker
+
+    - name: FESOM2 global test run
+      run: |    
+        cd work_pi
+        chmod +x job_docker_new
+        ./job_docker_new
+    - name: Check global results
+      run: |
+        cd work_pi
+        fcheck .
+    - name: Check UGRID Compliance
+      run: |
+        pip install ugrid-checks xarray
+        # Needed to combine the mesh diag and output
+        python3 -c "import xarray as xr; ds1 = xr.open_dataset('./test/output_pi/sst.fesom.1948.nc'); ds2 = xr.open_dataset('./test/output_pi/fesom.mesh.diag.nc'); xr.merge([ds1, ds2]).to_netcdf('./test/output_pi/merged_ugrid_check.nc')"
+        ugrid-checker ./test/output_pi/merged_ugrid_check.nc
+
+    - name: Check restarts
+      run: |
+        cd work_pi
+        ./job_docker_new

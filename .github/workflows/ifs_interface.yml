@@ -1,0 +1,53 @@
+
+name: FESOM2 main test
+
+# Controls when the action will run. Triggers the workflow on push or pull request. 
+
+on: [push, pull_request]
+
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  general_test:
+    # Containers must run in Linux based operating systems
+    runs-on: ubuntu-latest
+    # Docker Hub image that `container-job` executes in
+    container: ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master
+
+    # Service containers to run with `gfortran_ubuntu`
+    steps:
+    # NK: this changes working directory to fesom2
+    - uses: actions/checkout@v2
+
+    - name: Git safe directory
+      run: |
+        git config --global --add safe.directory ${PWD}
+
+    - name: Compile model (ifs_interface)
+      run: |
+        export BUILD_DIR=$PWD/build.ifs_interface
+        ./configure.sh ubuntu -DENABLE_IFS_INTERFACE=ON -DCMAKE_INSTALL_PREFIX=$PWD/install.ifs_interface
+
+    - name: Test downstream from install-dir
+      run: |
+        export fesom_ROOT=${PWD}
+        rm -rf test_downstream/build
+        cmake -S test_downstream -B test_downstream/build -DASSERT_HAVE_IFS_INTERFACE=OFF -DASSERT_FESOM_DIR=${fesom_ROOT}
+        cmake --build test_downstream/build
+        test_downstream/build/main
+
+    - name: Test downstream from ifs_interface build-dir
+      run: |
+        export fesom_ROOT=$PWD/build.ifs_interface
+        rm -rf test_downstream/build
+        cmake -S test_downstream -B test_downstream/build -DASSERT_HAVE_IFS_INTERFACE=ON -DASSERT_FESOM_DIR=${fesom_ROOT}
+        cmake --build test_downstream/build
+        test_downstream/build/main
+
+    - name: Test downstream from ifs_interface install-dir
+      run: |
+        export fesom_ROOT=$PWD/install.ifs_interface
+        rm -rf test_downstream/build
+        cmake -S test_downstream -B test_downstream/build -DASSERT_HAVE_IFS_INTERFACE=ON -DASSERT_FESOM_DIR=${fesom_ROOT}
+        cmake --build test_downstream/build
+        test_downstream/build/main
