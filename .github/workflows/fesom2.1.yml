@@ -99,6 +99,13 @@ jobs:
     - name: Create iceberg test run
       run: |
         mkrun iceberg test_pi_icebergs -m docker
+        # Add iceberg files
+        cp test/input/icebergs/icb_height.dat work_iceberg/
+        cp test/input/icebergs/icb_latitude.dat work_iceberg/
+        cp test/input/icebergs/icb_length.dat work_iceberg/
+        cp test/input/icebergs/icb_longitude.dat work_iceberg/
+        cp test/input/icebergs/icb_scaling.dat work_iceberg/
+
     - name: FESOM2 iceberg test run
       run: |
         cd work_iceberg
@@ -138,4 +145,3 @@ jobs:
         ./fesom_ini.x
         
     
-
