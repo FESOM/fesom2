@@ -21,6 +21,10 @@ jobs:
         run: |
           git config --global --add safe.directory ${PWD}
 
+      - name: Create global test run
+        run: |
+          mkrun pi test_pi -m docker
+
       - name: Check partitioner compilation
         run: |
           cd mesh_part
@@ -28,7 +32,6 @@ jobs:
 
       - name: Run partitioner
         run: |
-          mkdir work_pi
           cd work_pi
           cp ../bin/fesom_ini.x .
           ./fesom_ini.x
