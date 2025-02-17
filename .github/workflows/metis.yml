@@ -28,6 +28,7 @@ jobs:
 
       - name: Run partitioner
         run: |
+          mkdir work_pi
           cd work_pi
           cp ../bin/fesom_ini.x .
           ./fesom_ini.x
