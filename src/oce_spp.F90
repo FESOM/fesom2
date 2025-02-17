@@ -61,7 +61,7 @@ subroutine app_rejected_salt(ttf, partit, mesh)
   implicit none
 
   integer         :: row, k, nod, nup, nlo, kml, nzmin, nzmax
-  real(kind=WP)    :: zsurf, rhosurf, drhodz, spar(100)
+  real(kind=WP)    :: zsurf, rhosurf, drhodz, spar(100)=0.0_WP
 
   integer         :: n_distr
   real(kind=WP)    :: drhodz_cri, rho_cri
@@ -89,23 +89,28 @@ subroutine app_rejected_salt(ttf, partit, mesh)
      if (ttf(nzmin,row) < 10.0_WP) cycle
      !if (geo_coord_nod2D(2,row)>0.0_WP) then  !NH
         kml=1
-        !!PS spar(1)=0.0_WP
         spar(nzmin)=0.0_WP
-        
-        !!PS do k=1, nlevels_nod2D(row)
-        do k=nzmin, nzmax
+        do k=nzmin, nzmax-1
            drhodz=bvfreq(k, row)*density_0/g
            if (drhodz>=drhodz_cri .or. Z_3d_n(k,row)<-80.0_WP) exit
            kml=kml+1
            spar(k+1)=area(k+1,row)*hnode(k+1,row)*(Z_3d_n(1,row)-Z_3d_n(k+1,row))**n_distr
         end do
-
+        
+        !_______________________________________________________________________
+        !PS Here make sure that kml<=nzmax-1, otherwise you will write 
+        !PS ttf(k,row)=ttf(k,row)+... into the bottom topography, which will cause 
+        !PS a division by zero, due to areasvol(kml,row)=0.0_WP wherever is bottom
+        !PS and can trigger the Nan Checker
+        kml = min(kml, nzmax-1)
+        
+        !_______________________________________________________________________
         if (kml>nzmin) then
-           ttf(nzmin,row)=ttf(nzmin,row)-ice_rejected_salt(row)/areasvol(1,row)/hnode(1,row)
-           spar(nzmin+1:kml)=spar(nzmin+1:kml)/sum(spar(nzmin+1:kml))
-           do k=nzmin+1,kml
-              ttf(k,row)=ttf(k,row)+ice_rejected_salt(row)*spar(k)/areasvol(k,row)/hnode(k,row)
-           end do
+            ttf(nzmin,row)=ttf(nzmin,row)-ice_rejected_salt(row)/areasvol(1,row)/hnode(1,row)
+            spar(nzmin+1:kml)=spar(nzmin+1:kml)/sum(spar(nzmin+1:kml))
+            do k=nzmin+1,kml
+                ttf(k,row)=ttf(k,row)+ice_rejected_salt(row)*spar(k)/areasvol(k,row)/hnode(k,row)
+            end do
         endif
       !endif
   end do

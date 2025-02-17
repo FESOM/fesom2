@@ -129,6 +129,8 @@ TYPE T_ICE
 
     ! maEVP variables
     real(kind=WP), allocatable, dimension(:)    :: alpha_evp_array, beta_evp_array
+    ! ice/snow thicknesses in the ice-covered area
+    real(kind=WP), allocatable, dimension(:)    :: h_ice, h_snow    
 
     !___________________________________________________________________________
     ! total number of ice tracers (default=3, 1=area, 2=mice, 3=msnow, (4=ice_temp)
@@ -624,6 +626,8 @@ subroutine ice_init(ice, partit, mesh)
     allocate(ice%stress_iceoce_x(      node_size))
     allocate(ice%stress_atmice_y(      node_size))
     allocate(ice%stress_iceoce_y(      node_size))
+    allocate(ice%h_ice          (      node_size))
+    allocate(ice%h_snow         (      node_size))    
     ice%uice            = 0.0_WP
     ice%uice_rhs        = 0.0_WP
     ice%uice_old        = 0.0_WP
@@ -634,6 +638,8 @@ subroutine ice_init(ice, partit, mesh)
     ice%vice_old        = 0.0_WP
     ice%stress_atmice_y = 0.0_WP
     ice%stress_iceoce_y = 0.0_WP
+    ice%h_ice           = 0.0_WP
+    ice%h_snow          = 0.0_WP    
     if (ice%whichEVP /= 0) then
         allocate(ice%uice_aux(         node_size))
         allocate(ice%vice_aux(         node_size))
