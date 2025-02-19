@@ -1,0 +1,15 @@
+# Inspired by environment for albedo
+module load oneapi2023-env/2023.2.0
+
+module load cmake/3.27.4
+module load oneapi/2023.2.0
+module load oneapi-mkl/2023.1.0
+module load oneapi-mpi/2021.10.0
+module load netcdf-c/4.9.2-with-oneapi-mpi-2021.10.0
+module load netcdf-fortran/4.6.0-with-oneapi-mpi-2021.10.0
+export FC=mpiifort CC=mpiicc CXX=mpiicpc
+
+
+# haven't set any environment variables. hopefully fine by now
+export I_MPI_PMI=pmi2
+export I_MPI_PMI_LIBRARY=/usr/lib64/libpmi2.so

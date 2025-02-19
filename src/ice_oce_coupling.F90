@@ -264,6 +264,8 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     use icedrv_main,   only: icepack_to_fesom,    &
                             init_flux_atm_ocn
 #endif
+    use iceberg_params
+    use iceberg_ocean_coupling
     use cavity_interfaces
     !---fwf-code
     use g_clock
@@ -355,23 +357,35 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     !     
 #if defined (__icepack)
 
-    call icepack_to_fesom (nx_in=(myDim_nod2D+eDim_nod2D), &
-                           aice_out=a_ice,                 &
-                           vice_out=m_ice,                 &
-                           vsno_out=m_snow,                &
-                           fhocn_tot_out=net_heat_flux,    &
-                           fresh_tot_out=fresh_wa_flux,    &
-                           fsalt_out=real_salt_flux,       &
-                           dhi_dt_out=thdgrsn,             &
-                           dhs_dt_out=thdgr,               &
-                           evap_ocn_out=evaporation        )
+    call icepack_to_fesom (nx_in         = (myDim_nod2D+eDim_nod2D), &
+                           aice_out      = a_ice,                    &
+                           vice_out      = m_ice,                    &
+                           vsno_out      = m_snow,                   &
+                           fhocn_tot_out = net_heat_flux,            &
+                           fresh_tot_out = fresh_wa_flux,            &
+                           fsalt_out     = real_salt_flux,           &
+                           dhs_dt_out    = thdgrsn,                  &
+                           dhi_dt_out    = thdgr,                    &
+                           evap_ocn_out  = evaporation,              &
+                           evap_out      = ice_sublimation           )
 
-    heat_flux(:)   = - net_heat_flux(:)
-    water_flux(:)  = - (fresh_wa_flux(:)/1000.0_WP) - runoff(:)
+!$OMP PARALLEL DO
+    do n=1, myDim_nod2d+eDim_nod2d  
+        ! Heat flux 
+        heat_flux(n)       = - net_heat_flux(n)
 
-    ! Evaporation
-    evaporation(:) = - evaporation(:) / 1000.0_WP
-    ice_sublimation(:) = 0.0_WP
+        ! Freshwater flux (convert units from icepack to fesom)
+        water_flux(n)      = - (fresh_wa_flux(n) * inv_rhowat) - runoff(n)
+
+        ! Evaporation (convert units from icepack to fesom)
+        evaporation(n)     = - evaporation(n) * (1.0_WP - a_ice(n)) * inv_rhowat
+
+        ! Ice-Sublimation is added to to the freshwater in icepack --> see 
+        ! icepack_therm_vertical.90 --> subroutine thermo_vertical(...): Line: 453
+        ! freshn = freshn + evapn - (rhoi*dhi + rhos*dhs) / dt , evapn==sublimation
+        ice_sublimation(n) = - ice_sublimation(n) * inv_rhowat
+    end do
+!$OMP END PARALLEL DO
 
     call init_flux_atm_ocn()
 
@@ -383,6 +397,10 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     end do
 !$OMP END PARALLEL DO
 #endif
+
+    if (use_icebergs) then
+        call icb2fesom(mesh, partit, ice)
+    end if
 
     !___________________________________________________________________________
     ! add heat and fresh water flux from cavity 
@@ -509,12 +527,31 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     ! enforce the total freshwater/salt flux be zero
     ! 1. water flux ! if (.not. use_virt_salt) can be used!
     ! we conserve only the fluxes from the database plus evaporation.
+    ! ICEPACK: adds rain, snow and evap is based on the newly formed ice 
+    !          concentration (a_ice). In our standard ice model rain, snow and evap is
+    !          added based on the ice concentration of the previous time step (a_ice_old)  
+    !          So for the proper balancing of snow the proper aice has to be choosen 
+    !          -icepack_therm_itd.F90 --> subroutine icepack_step_therm2(...)
+    !           fresh  = fresh + frain*aice
+    !          -icedrv_step.F90: subroutine ocn_mixed_layer_icepack(...
+    !           fresh_tot = fresh + (-evap_ocn + frain + fsnow)*(c1-aice)
+    !          At the end all rain is added to the ocean, only snow needs to be
+    !          scaled with (1-aice )
+    !          -Ice-Sublimation is not added to evap in icepack, therefor we dont need
+    !           to compensate for it the ice2atmos subplimation does not contribute 
+    !           to the freshwater flux into the ocean
+                   
 !$OMP PARALLEL DO
     do n=1, myDim_nod2D+eDim_nod2D
-        flux(n) = evaporation(n)                      &
+        flux(n) = evaporation(n)                     &
                   -ice_sublimation(n)                 & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
-                  +prec_rain(n)                       &
+                  +prec_rain(n)                       &                  
+#if defined (__icepack)
+                  +prec_snow(n)*(1.0_WP-a_ice(n))     &
+#else
                   +prec_snow(n)*(1.0_WP-a_ice_old(n)) &
+#endif
+
 #if defined (__oasis) || defined (__ifsinterface)
                   +residualifwflx(n)                  & ! balance residual ice flux only in coupled case
 #endif
@@ -554,6 +591,16 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     end if     
     
     !___________________________________________________________________________
+    if (use_icebergs) then
+        if (lbalance_fw .and. (.not. turn_off_fw)) then
+            flux = flux + (ibfwb + ibfwe + ibfwl + ibfwbv) !* steps_per_ib_step
+        end if
+        
+        call integrate_nod(ibfwb + ibfwe + ibfwl + ibfwbv, net, partit, mesh)
+        if (mype==0) write(*,*) " * total iceberg fw flux: ", net
+    end if
+    
+    !___________________________________________________________________________
     if (use_cavity) then
         ! with zstar we do not balance the freshwater flux under the cavity since its
         ! not contributing to the ocean volume increase/decrease since under the
@@ -567,6 +614,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
             where (ulevels_nod2d > 1) flux = -water_flux
         end if 
     end if 
+
     !___________________________________________________________________________
     ! compute total global net freshwater flux into the ocean 
     call integrate_nod(flux, net, partit, mesh)
@@ -597,26 +645,6 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
     end if 
     
-!---fwf-code-begin
-    if(use_landice_water) then
-!$OMP PARALLEL DO
-      do n=1, myDim_nod2D+eDim_nod2D
-         water_flux(n)=water_flux(n)-runoff_landice(n)*landice_season(month)
-      end do
-!$OMP END PARALLEL DO
-    end if
- 
-    if(lwiso .and. use_landice_water) then
-!$OMP PARALLEL DO
-      do n=1, myDim_nod2D+eDim_nod2D
-         wiso_flux_oce(n,1)=wiso_flux_oce(n,1)+runoff_landice(n)*1000.0*wiso_smow(1)*(1-30.0/1000.0)*landice_season(month)
-         wiso_flux_oce(n,2)=wiso_flux_oce(n,2)+runoff_landice(n)*1000.0*wiso_smow(2)*(1-240.0/1000.0)*landice_season(month)
-         wiso_flux_oce(n,3)=wiso_flux_oce(n,3)+runoff_landice(n)*1000.0*landice_season(month)
-      end do
-!$OMP END PARALLEL DO
-    end if
-!---fwf-code-end
-
     !___________________________________________________________________________
     ! use the balanced water_flux and relax_salt flux (same as in the tracer 
     ! boundary condition) to compute the dens_flux for MOC diagnostic
@@ -761,6 +789,29 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     end if  ! lwiso end
 
     !---wiso-code-end
+    
+    !___________________________________________________________________________
+!---fwf-code-begin
+    if(use_landice_water) then
+!$OMP PARALLEL DO
+      do n=1, myDim_nod2D+eDim_nod2D
+         water_flux(n)=water_flux(n)-runoff_landice(n)*landice_season(month)
+      end do
+!$OMP END PARALLEL DO
+    end if
+    
+    !___________________________________________________________________________
+    if(lwiso .and. use_landice_water) then
+!$OMP PARALLEL DO
+      do n=1, myDim_nod2D+eDim_nod2D
+         wiso_flux_oce(n,1)=wiso_flux_oce(n,1)+runoff_landice(n)*1000.0*wiso_smow(1)*(1-30.0/1000.0)*landice_season(month)
+         wiso_flux_oce(n,2)=wiso_flux_oce(n,2)+runoff_landice(n)*1000.0*wiso_smow(2)*(1-240.0/1000.0)*landice_season(month)
+         wiso_flux_oce(n,3)=wiso_flux_oce(n,3)+runoff_landice(n)*1000.0*landice_season(month)
+      end do
+!$OMP END PARALLEL DO
+    end if
+!---fwf-code-end
+
 
     !---age-code-begin
     if (use_age_tracer) then

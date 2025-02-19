@@ -1050,13 +1050,12 @@ CONTAINS
 #include "associate_mesh_ass.h"
 
       ! OPEN and read namelist for SBC
-      open( unit=nm_sbc_unit, file='namelist.forcing', form='formatted', access='sequential', status='old', iostat=iost )
+      open(unit=nm_sbc_unit, file='namelist.forcing', action='read', form='formatted', access='sequential', status='old', iostat=iost )
       if (iost == 0) then
-         if (mype==0) WRITE(*,*) '     file   : ', 'namelist_bc.nml',' open ok'
+         if (mype==0) WRITE(*,*) '     file   : ', 'namelist.forcing',' open ok'
       else
-         if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist_bc.nml',' ; iostat=',iost
-         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-         stop
+         if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.forcing',' ; iostat=',iost
+         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
       endif
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
       close( nm_sbc_unit )

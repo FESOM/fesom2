@@ -1,0 +1,52 @@
+
+name: "FESOM2: Cavities"
+# Controls when the action will run. Triggers the workflow on push or pull request. 
+on:
+  workflow_dispatch: {}
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+    branches:
+      - main
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  general_test:
+    # Containers must run in Linux based operating systems
+    runs-on: ubuntu-latest
+    # Docker Hub image that `container-job` executes in
+    container: ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master
+
+    # Service containers to run with `gfortran_ubuntu`
+    steps:
+    # NK: this changes working directory to fesom2
+    - uses: actions/checkout@v2
+
+    - name: Git safe directory
+      run: |
+        git config --global --add safe.directory ${PWD}
+
+    - name: Compile model (binary)
+      run: |
+        ./configure.sh ubuntu
+
+    - name: Compile model (ifs_interface)
+      run: |
+        export BUILD_DIR=$PWD/build.ifs_interface
+        ./configure.sh ubuntu -DENABLE_IFS_INTERFACE=ON -DCMAKE_INSTALL_PREFIX=$PWD/install.ifs_interface
+
+    - name: Create cavity test run
+      run: |
+        mkrun cavity test_pi_cavity -m docker
+    - name: FESOM2 cavity test run
+      run: |
+        cd work_cavity
+        ls -ratl
+        cat namelist.config
+        chmod +x job_docker_new
+        ./job_docker_new
+    - name: Check cavity results
+      run: |-
+        cd work_cavity
+        fcheck .
