@@ -1,5 +1,5 @@
 
-name: FESOM2 OpenMP test
+name: "FESOM2: Channel"
 # Controls when the action will run. Triggers the workflow on push or pull request. 
 on:
   workflow_dispatch: {}
@@ -12,11 +12,11 @@ on:
       - main
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  openmp_test:
+  general_test:
     # Containers must run in Linux based operating systems
     runs-on: ubuntu-latest
     # Docker Hub image that `container-job` executes in
-    container: ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-nightly
+    container: ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master
 
     # Service containers to run with `gfortran_ubuntu`
     steps:
@@ -27,25 +27,21 @@ jobs:
       run: |
         git config --global --add safe.directory ${PWD}
 
-    - name: Compile model
+    - name: Compile model (binary)
       run: |
-        bash -l configure.sh ubuntu -DENABLE_OPENMP=ON
-    
-    - name: Create global test run with 4 OpenMP threads
-      run: |
-        mkrun pi test_pi -m docker
-        cd work_pi
-        sed -i 's/THREADS=1/THREADS=4/g' job_docker_new
-        cd ../
+        ./configure.sh ubuntu
 
-    - name: FESOM2 global test run
+    - name: Create channel test run
+      run: |
+        mkrun souf test_souf -m docker
+
+    - name: FESOM2 channel test run
       run: |    
-        cd work_pi
+        cd work_souf
         chmod +x job_docker_new
         ./job_docker_new
-  
 
-    
-        
-    
-
+    - name: Check channel  results
+      run: |
+        cd work_souf
+        fcheck .    
