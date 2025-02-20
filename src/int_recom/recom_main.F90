@@ -246,11 +246,12 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 
         ttf_rhs_bak = 0.0 ! OG - tra_diag
 
-        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+
            do tr_num=1, num_tracers
+        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
               ttf_rhs_bak(1:nzmax,tr_num) = tracers%data(tr_num)%values(1:nzmax, n)
-           end do
         end if
+           end do
 
         !!---- Depth of the nodes in the water column
         zr(1:nzmax) = Z_3d_n(1:nzmax, n)
@@ -338,12 +339,14 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
         end do
 
         ! recom_sms
-        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+
            do tr_num=1, num_tracers
+        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
              tracers%work%tra_recom_sms(1:nzmax,n,tr_num) = tracers%data(tr_num)%values(1:nzmax, n) - ttf_rhs_bak(1:nzmax,tr_num)
              !if (mype==0)  print *,  tra_recom_sms(:,:,tr_num)
-           end do
         end if
+
+           end do
 
         !!---- Local variables that have been changed during the time-step are stored so they can be saved
         Benthos(n,1:benthos_num) = LocBenthos(1:benthos_num)
@@ -396,7 +399,9 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
             !! * Deallocating 2D diagnostics *
             deallocate(vertNPPn, vertGPPn, vertNNAn, vertChldegn) 
             deallocate(vertNPPd, vertGPPd, vertNNAd, vertChldegd)
+#if defined (__coccos)
             deallocate(vertNPPc, vertGPPc, vertNNAc, vertChldegc) 
+#endif 
 
             !! * Deallocating 3D Diagnostics *
             deallocate(vertrespmeso)
