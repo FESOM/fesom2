@@ -330,9 +330,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
              if (action) then
 	              runoff(:)            =  runoff(:)+exchange(:)        ! For Greenland add calving forcing to runoff.
     	          mask=1.
-	              call force_flux_consv(enthalpyoffuse, mask, i, 0, action, partit, mesh)
+	              call force_flux_consv(runoff, mask, i, 0, action, partit, mesh)
              end if
-         elseif (i.eq.13) then
+         elseif (i.eq.15) then
              if (action) then
 	              enthalpyoffuse(:)            = enthalpyoffuse(:) + exchange(:)        ! enthalpy of fusion via solid water discharge from glaciers
     	          mask=1.
