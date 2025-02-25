@@ -337,7 +337,8 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 	              enthalpyoffuse(:)            = enthalpyoffuse(:) + exchange(:)        ! enthalpy of fusion via solid water discharge from glaciers
     	          mask=1.
 	              call force_flux_consv(enthalpyoffuse, mask, i, 0, action, partit, mesh)
-#endif	 
+             end if
+#endif 
          end if
 
 #ifdef VERBOSE
