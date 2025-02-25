@@ -421,7 +421,7 @@ contains
     cpl_recv(11) = 'heat_swo'    
     cpl_recv(12) = 'hydr_oce'
     cpl_recv(13) = 'enth_oce'
-    cpl_recv(14) = 'calv_for'
+    cpl_recv(14) = 'hydr_for'
     cpl_recv(15) = 'enth_for'
 #else
     cpl_recv(1)  = 'taux_oce'
