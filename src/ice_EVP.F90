@@ -225,13 +225,16 @@ subroutine stress2rhs(ice, partit, mesh)
 #else
     !$ACC END PARALLEL LOOP
 #endif
-#if !defined(DISABLE_OPENACC_ATOMICS)
-    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
-#else
-    !$ACC UPDATE SELF(u_rhs_ice, v_rhs_ice, sigma11, sigma12, sigma22)
-#endif
+
 #ifndef ENABLE_OPENACC
 !$OMP DO
+#else
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
+    #if !defined(DISABLE_OPENACC_ATOMICS)
+       !$ACC ATOMIC UPDAATE
+    #else
+    !$ACC UPDATE SELF(u_rhs_ice, v_rhs_ice, sigma11, sigma12, sigma22)
+    #endif
 #endif
     do el=1,myDim_elem2D
         ! ===== Skip if ice is absent
@@ -251,16 +254,20 @@ subroutine stress2rhs(ice, partit, mesh)
 !$OMP ORDERED
 #endif
 #endif
+#ifdef ENABLE_OPENACC
 #if !defined(DISABLE_OPENACC_ATOMICS)
                 !$ACC ATOMIC UPDATE
+#endif
 #endif
                 U_rhs_ice(elem2D_nodes(k,el)) = U_rhs_ice(elem2D_nodes(k,el)) &
                 - elem_area(el) * &
                     (sigma11(el)*gradient_sca(k,el) + sigma12(el)*gradient_sca(k+3,el) &
                     +sigma12(el)*val3*metric_factor(el))            !metrics
 
+#ifdef ENABLE_OPENACC
 #if !defined(DISABLE_OPENACC_ATOMICS)
                 !$ACC ATOMIC UPDATE
+#endif
 #endif
                 V_rhs_ice(elem2D_nodes(k,el)) = V_rhs_ice(elem2D_nodes(k,el)) &
                     - elem_area(el) * &
@@ -278,15 +285,15 @@ subroutine stress2rhs(ice, partit, mesh)
         endif
     end do
 #ifdef ENABLE_OPENACC
-#if !defined(DISABLE_OPENACC_ATOMICS)
-    !$ACC END PARALLEL LOOP
-#else
+   #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC UPDATE DEVICE(u_rhs_ice, v_rhs_ice)
+    #endif
 #endif
-#endif 
 
 #ifndef ENABLE_OPENACC
 !$OMP END DO
+#else
+    !$ACC END PARALLEL LOOP
 #endif
 
 #ifndef ENABLE_OPENACC

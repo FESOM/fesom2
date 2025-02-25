@@ -570,15 +570,17 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #endif
     ! Auxiliary elemental operator (mass matrix- lumped mass matrix)
 
-    !$ACC KERNELS
-    icoef = 1
-    !$ACC END KERNELS
+    #ifdef ENABLE_OPENACC
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
+    #endif
+    icoef = 1
     do n=1,3   ! three upper nodes
         ! Cycle over rows  row=elnodes(n)
         icoef(n,n)=-2
     end do
+    #ifdef ENABLE_OPENACC
     !$ACC END PARALLEL LOOP
+    #endif
 
 
 #ifndef ENABLE_OPENACC
