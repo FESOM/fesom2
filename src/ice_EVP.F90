@@ -230,11 +230,11 @@ subroutine stress2rhs(ice, partit, mesh)
 !$OMP DO
 #else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
-    #if !defined(DISABLE_OPENACC_ATOMICS)
+#if !defined(DISABLE_OPENACC_ATOMICS)
        !$ACC ATOMIC UPDAATE
-    #else
+#else
     !$ACC UPDATE SELF(u_rhs_ice, v_rhs_ice, sigma11, sigma12, sigma22)
-    #endif
+#endif
 #endif
     do el=1,myDim_elem2D
         ! ===== Skip if ice is absent
@@ -285,9 +285,9 @@ subroutine stress2rhs(ice, partit, mesh)
         endif
     end do
 #ifdef ENABLE_OPENACC
-   #if !defined(DISABLE_OPENACC_ATOMICS)
+#if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC UPDATE DEVICE(u_rhs_ice, v_rhs_ice)
-    #endif
+#endif
 #endif
 
 #ifndef ENABLE_OPENACC

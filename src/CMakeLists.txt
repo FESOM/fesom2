@@ -404,7 +404,6 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
    if(${ENABLE_OPENACC})
       # additional compiler settings
       message("Taking ENABLE_OPENACC = ON")
-      message(STATUS "GPU_FLAGS = ${GPU_FLAGS}")
       target_compile_options(${PROJECT_NAME} PRIVATE -acc -O2 -gpu=${GPU_FLAGS} -Minfo=accel)
       set(CMAKE_EXE_LINKER_FLAGS "-acc -gpu=${GPU_FLAGS}")
       if(${DISABLE_OPENACC_ATOMICS})
