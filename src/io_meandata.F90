@@ -142,6 +142,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     use g_cvmix_idemix
     use g_cvmix_kpp
     use g_cvmix_tidal
+    use g_backscatter
     use diagnostics
     use g_config,        only: use_cavity
     use g_forcing_param, only: use_virt_salt
