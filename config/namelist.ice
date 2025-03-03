@@ -20,8 +20,8 @@ ice_ave_steps=1        ! ice step=ice_ave_steps*oce_step
 Sice=4.0               ! Ice salinity 3.2--5.0 ppt.
 iclasses=15            ! default = 7; in case of EM distribution ('new_iceclasses=.true.') must be set to 15
 h0=.5                  ! Lead closing parameter [m] 
-hmin=0.05              ! default=0.01
-armin=0.15             ! default=0.01
+hmin=0.01              ! default=0.01
+armin=0.01             ! default=0.01
 emiss_ice=0.97         ! Emissivity of Snow/Ice,
 emiss_wat=0.97         ! Emissivity of open water
 albsn=0.81             ! Albedo: frozen snow
