@@ -29,7 +29,7 @@ module ice_therm_interface
         rsf, dhgrowth, dhsngrowth, iflice, hflatow, hfsenow, hflwrdout,lid_clo,geolon, geolat, subli)
         USE MOD_ICE
         type(t_ice_thermo), intent(in), target :: ithermp
-        real(kind=WP)  h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rsss, evap_in, &
+        real(kind=WP)  h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rsss, &
                        ug, ustar, T_oc, S_oc, H_ML, t, ice_dt, ch, ce, ch_i, ce_i, evap_in, fw, ehf, &
                        dhgrowth, dhsngrowth, ahf, prec, subli, subli_i, rsf, &
                        rhow, show, rhice, shice, sh, thick, thact, lat, &
@@ -37,7 +37,7 @@ module ice_therm_interface
                        hfsenow, hflwrdout, lid_clo, geolon, geolat
         end subroutine therm_ice
     end interface
-end module ice_therm_interface
+end module
 
 module ice_budget_interfaces
     interface
@@ -248,14 +248,14 @@ subroutine thermodynamics(ice, partit, mesh)
         fsh     = shortwave(i)
         flo     = longwave(i)
         Ta      = Tair(i)
-        if (l_tdew) then
-            call 
-            qa   = 0.
-         elseif (l_humi) then
-            qa   = shum(i)
-         else
-            stop 'neither specific humidity nor dew-point temperature is defined!'
-         endif
+        ! if (l_tdew) then
+        !     !call ! I am not sure what is meant here 
+        !     qa   = 0.
+        !  elseif (l_humi) then
+        !     qa   = shum(i)
+        !  else
+        !     stop 'neither specific humidity nor dew-point temperature is defined!'
+        !  endif
            
         if (.not. l_snow) then
             if (Ta>=0.0_WP) then
