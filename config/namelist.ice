@@ -18,7 +18,7 @@ ice_ave_steps=1        ! ice step=ice_ave_steps*oce_step
 
 &ice_therm
 Sice=4.0               ! Ice salinity 3.2--5.0 ppt.
-iclasses=15            ! default = 7; in case of EM distribution ('new_iceclasses=.true.') must be set to 15
+iclasses=7            ! default = 7; in case of EM distribution ('new_iceclasses=.true.') must be set to 15
 h0=.5                  ! Lead closing parameter [m] 
 hmin=0.01              ! default=0.01
 armin=0.01             ! default=0.01
