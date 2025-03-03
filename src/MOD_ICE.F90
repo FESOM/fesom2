@@ -70,7 +70,7 @@ TYPE T_ICE_THERMO
     ! --- namelist parameter /ice_therm/
     real(kind=WP) :: con= 2.1656, consn = 0.31 ! Thermal conductivities: ice & snow; W/m/K
     real(kind=WP) :: Sice = 4.0        ! Ice salinity 3.2--5.0 ppt.
-    real(kind=WP) :: h0=0.5	           ! Lead closing parameter [m] ! 0.5
+    real(kind=WP) :: h0=1.0	           ! Lead closing parameter [m] ! 0.5
     real(kind=WP) :: emiss_ice=0.97    ! Emissivity of Snow/Ice,
     real(kind=WP) :: emiss_wat=0.97    ! Emissivity of open water
     real(kind=WP) :: albsn = 0.81      ! Albedo: frozen snow

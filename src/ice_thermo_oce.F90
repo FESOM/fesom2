@@ -101,9 +101,10 @@ DO n=1, myDim_nod2D+eDim_nod2D
     ! lower cutoff: a_ice
    if (a_ice(n) < .1e-8_WP) then
        a_ice(n)=0.0_WP
+       m_ice(n)   =0.0_WP
+       m_snow(n)  =0.0_WP
 #if defined (__oifs) || defined (__ifsinterface)
-        m_ice(n)   =0.0_WP
-        m_snow(n)  =0.0_WP
+        
         ice_temp(n)=273.15_WP
 #endif /* (__oifs) */
    end if
@@ -111,9 +112,9 @@ DO n=1, myDim_nod2D+eDim_nod2D
     ! lower cutoff: m_ice
    if (m_ice(n) < .1e-8_WP) then
         m_ice(n)=0.0_WP 
-#if defined (__oifs) || defined (__ifsinterface)
         m_snow(n)  =0.0_WP
         a_ice(n)   =0.0_WP
+#if defined (__oifs) || defined (__ifsinterface)
         ice_temp(n)=273.15_WP
 #endif /* (__oifs) */
    end if
@@ -248,6 +249,7 @@ subroutine thermodynamics(ice, partit, mesh)
         fsh     = shortwave(i)
         flo     = longwave(i)
         Ta      = Tair(i)
+        qa      = shum(i)
         ! if (l_tdew) then
         !     !call ! I am not sure what is meant here 
         !     qa   = 0.
@@ -584,6 +586,7 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
         rsf= -dhgrowth*rhoice*inv_rhowat*Sice
     else
         fw= prec+evap - dhgrowth*rhoice*inv_rhowat*(rsss-Sice)/rsss - dhsngrowth*rhosno*inv_rhowat 
+        rsf = 0.0_WP
     end if
     
     ! Changes in compactnesses (equation 16 of Hibler 1979)
