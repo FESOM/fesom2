@@ -137,13 +137,11 @@ subroutine forcing_array_setup(partit, mesh)
   allocate(Tair(n2), shum(n2))
   Tair=0.0_WP
   shum=0.0_WP
-  allocate(runoff(n2), evaporation(n2),ice_sublimation(n2), ice_ocean_hflx(n2), ice_dTfrez(n2), ice_ustar(n2))
+  allocate(runoff(n2), evaporation(n2),ice_sublimation(n2))
   runoff=0.0_WP
   evaporation = 0.0_WP
   ice_sublimation = 0.0_WP
-  ice_ocean_hflx = 0.0_WP
-  ice_dTfrez = 0.0_WP
-  ice_ustar = 0.0_WP
+
 
 #if defined (__oasis) || defined (__ifsinterface)
   allocate(sublimation(n2), evap_no_ifrac(n2))

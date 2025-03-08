@@ -70,7 +70,7 @@ use o_param
   real(kind=WP), allocatable, dimension(:,:)       :: Tair_t, shum_t
   real(kind=WP), allocatable, dimension(:)         :: shortwave, longwave
   real(kind=WP), allocatable, dimension(:)         :: prec_rain, prec_snow
-  real(kind=WP), allocatable, dimension(:)         :: runoff, evaporation, ice_sublimation, ice_ocean_hflx, ice_dTfrez, ice_ustar
+  real(kind=WP), allocatable, dimension(:)         :: runoff, evaporation, ice_sublimation
   real(kind=WP), allocatable, dimension(:)         :: cloudiness, press_air
   !---wiso-code
   real(kind=WP), allocatable, dimension(:)         :: www1,www2,www3,iii1,iii2,iii3

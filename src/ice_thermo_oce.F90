@@ -250,14 +250,7 @@ subroutine thermodynamics(ice, partit, mesh)
         flo     = longwave(i)
         Ta      = Tair(i)
         qa      = shum(i)
-        ! if (l_tdew) then
-        !     !call ! I am not sure what is meant here 
-        !     qa   = 0.
-        !  elseif (l_humi) then
-        !     qa   = shum(i)
-        !  else
-        !     stop 'neither specific humidity nor dew-point temperature is defined!'
-        !  endif
+
            
         if (.not. l_snow) then
             if (Ta>=0.0_WP) then
@@ -320,9 +313,6 @@ subroutine thermodynamics(ice, partit, mesh)
         net_heat_flux(i)  = ehf     !positive down
         evaporation(i)    = evap    !negative up
         ice_sublimation(i)= subli 
-        ice_ocean_hflx(i) = o2ihf
-        ice_dTfrez(i)     = T_oc-TFrez(S_oc)
-        ice_ustar(i)      = ustar
         
         thdgr(i)          = ithdgr
         thdgrsn(i)        = ithdgrsn
