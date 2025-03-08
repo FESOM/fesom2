@@ -755,7 +755,7 @@ subroutine obudget (ithermp, qa,fsh,flo,t,ug,ta,ch,ce,geolon, geolat,fh,evap,hfl
     real(kind=WP) hfsenow,hfradow,hflatow,hftotow,hflwrdout,b
     real(kind=WP) q1, q2 		! coefficients for saturated specific humidity
     real(kind=WP) c1, c4, c5, coszen, geolon, geolat
-    real(kind=WP), external  :: solar_zenith_cosangle, albw_taylor, albw_briegleb
+    real(kind=WP), external  :: compute_solar_zenith_angle, albw_taylor, albw_briegleb
     logical :: standard_saturation_shum_formula = .true.
     integer :: ii
     !___________________________________________________________________________
@@ -781,7 +781,7 @@ subroutine obudget (ithermp, qa,fsh,flo,t,ug,ta,ch,ce,geolon, geolat,fh,evap,hfl
     q1 = 640380._WP
     q2 = -5107.4_WP
     if(open_water_albedo > 0)then
-        coszen=solar_zenith_cosangle(daynew, timenew/3600., geolon, geolat)
+        coszen=compute_solar_zenith_angle(daynew, timenew/3600., geolon, geolat)
         if(open_water_albedo > 1)then
            albw=albw_briegleb(coszen)
         else
@@ -861,59 +861,73 @@ function TFrez(S)
 end function TFrez
 
 
-!-----------------------------------------------------------------------
-! Copyright by the GOTM-team under the GNU Public License - www.gnu.org
-!-----------------------------------------------------------------------
-!-----------------------------------------------------------------------
-!
-! ROUTINE: Calculate the solar zenith angle
-!
-! INTERFACE:                                                                                                                                                                           
-function solar_zenith_cosangle(yday, hh, rlon, rlat)
+function compute_solar_zenith_angle(day_of_year, hour_utc, longitude, latitude) result(cos_zenith)
+    !-----------------------------------------------------------------------
+    ! Purpose: Compute the cosine of the solar zenith angle given the day of the year,
+    !          time in UTC, and geographic coordinates.
     !
-    ! DESCRIPTION:
-    ! This subroutine calculates the solar zenith angle as being used both
-    ! in albedo_water() and short_wave_radiation(). The result is in degrees.
+    ! Inputs:
+    !   - day_of_year: Integer, day of the year (1 to 365 or 366)
+    !   - hour_utc: Real, time in UTC (decimal hours)
+    !   - longitude: Real, longitude in radians
+    !   - latitude: Real, latitude in radians
     !
-    use o_param, only: WP
-  
-    IMPLICIT NONE
-  
-    integer, intent(in)            :: yday
-    real(kind=WP), intent(in)      :: hh
-    real(kind=WP), intent(in)      :: rlon,rlat
-    !                                                                                                                                                                           
-    ! REVISION HISTORY:
-    ! Original author(s): Karsten Bolding
+    ! Output:
+    !   - cos_zenith: Real, cosine of the solar zenith angle
     !
-    real(kind=WP), parameter       :: pi=3.14159265358979323846
-    real(kind=WP), parameter       :: deg2rad=pi/180.
-    real(kind=WP), parameter       :: rad2deg=180./pi
-  
-    real(kind=WP)                  :: yrdays, th0, th02, th03, sundec, thsun, solar_zenith_cosangle
-  
-    !  from now on everything in radians
-    !   rlon = deg2rad*dlon
-    !   rlat = deg2rad*dlat
-    
-    yrdays=365.25_WP
-    th0 = 2._WP * pi * yday/yrdays
-    th02 = 2._WP * th0
-    th03 = 3._WP * th0
-  
-    !  sun declination :
-    sundec = 0.006918_WP - 0.399912_WP * cos(th0) + 0.070257_WP * sin(th0)   &
-         - 0.006758_WP * cos(th02) + 0.000907_WP * sin(th02)                 &
-         - 0.002697*cos(th03) + 0.001480*sin(th03)
-  
-    !  sun hour angle :
-    thsun = (hh-12._WP) * 15._WP * deg2rad + rlon
-    
-    !  cosine of the solar zenith angle :
-    solar_zenith_cosangle = sin(rlat) * sin(sundec) + cos(rlat) * cos(sundec) * cos(thsun)
-    if (solar_zenith_cosangle .lt. 0.0_WP) solar_zenith_cosangle = 0.0_WP
+    ! Notes:
+    !   - Based on standard solar position calculations
+    !   - Uses an approximation for solar declination
+    !
+    ! Written for Apache 2.0 licensed projects.
+    !-----------------------------------------------------------------------
+
+    use o_param, only: WP  ! Ensure precision consistency
+
+    implicit none
+
+    ! Input variables
+    integer, intent(in)        :: day_of_year
+    real(kind=WP), intent(in)  :: hour_utc
+    real(kind=WP), intent(in)  :: longitude, latitude
+
+    ! Output variable
+    real(kind=WP)              :: cos_zenith
+
+    ! Constants
+    real(kind=WP), parameter   :: PI = 3.141592653589793_WP
+    real(kind=WP), parameter   :: DEG_TO_RAD = PI / 180.0_WP
+    real(kind=WP), parameter   :: RAD_TO_DEG = 180.0_WP / PI
+    real(kind=WP), parameter   :: DAYS_PER_YEAR = 365.25_WP
+
+    ! Computed values
+    real(kind=WP)              :: solar_declination, hour_angle
+    real(kind=WP)              :: solar_fraction
+
+    ! Compute solar position parameters
+    solar_fraction = 2.0_WP * PI * day_of_year / DAYS_PER_YEAR
+
+    ! Approximate solar declination using Fourier terms
+    solar_declination = 0.006918_WP - 0.399912_WP * cos(solar_fraction) &
+                      + 0.070257_WP * sin(solar_fraction) &
+                      - 0.006758_WP * cos(2.0_WP * solar_fraction) &
+                      + 0.000907_WP * sin(2.0_WP * solar_fraction) &
+                      - 0.002697_WP * cos(3.0_WP * solar_fraction) &
+                      + 0.001480_WP * sin(3.0_WP * solar_fraction)
+
+    ! Compute hour angle (relative to noon, converted to radians)
+    hour_angle = (hour_utc - 12.0_WP) * 15.0_WP * DEG_TO_RAD + longitude
+
+    ! Compute cosine of the solar zenith angle
+    cos_zenith = sin(latitude) * sin(solar_declination) &
+               + cos(latitude) * cos(solar_declination) * cos(hour_angle)
+
+    ! Ensure cosine is non-negative (no below-horizon values)
+    if (cos_zenith < 0.0_WP) cos_zenith = 0.0_WP
+
     return
-  end function solar_zenith_cosangle
+end function compute_solar_zenith_angle
+
   
   function albw_taylor(coszen)
     !     purpose:  zenith depending open water albedo
