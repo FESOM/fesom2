@@ -220,7 +220,7 @@ subroutine thermodynamics(ice, partit, mesh)
     ! Friction velocity 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, elem, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rsss, rsf, evap_in, ug, ustar, T_oc, S_oc, &
 !$OMP                                  h_ml, t, ch, ce, ch_i, ce_i, fw, ehf, evap, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,    &
-!$OMP                                  subli, lid_clo, lat)
+!$OMP                                  subli, lid_clo, lat, geolon, geolat, o2ihf)
 !$OMP DO
     do i=1, myDim_nod2D
         ustar=0.0_WP
@@ -280,15 +280,16 @@ subroutine thermodynamics(ice, partit, mesh)
         h_ml    = 2.5_WP                ! 10.0 or 30. used previously
         fw      = 0.0_WP
         ehf     = 0.0_WP
-        lid_Clo=ice%thermo%h0
-        if (geo_coord_nod2D(2, i)>0) then !TODO 2 separate pars for each hemisphere
-            lid_clo=0.5_WP
-        else
-            lid_clo=0.5_WP
-        endif
         geolon = geo_coord_nod2D(1, i)
         geolat = geo_coord_nod2D(2, i)
         
+        if (geolat>0) then !TODO 2 separate pars for each hemisphere
+            lid_clo=ice%thermo%h0
+        else
+            lid_clo=ice%thermo%h0_s
+        endif
+        
+
         !_______________________________________________________________________
         ! do ice thermodynamics
         call therm_ice(ice%thermo,h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &

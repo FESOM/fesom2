@@ -19,7 +19,8 @@ ice_ave_steps=1        ! ice step=ice_ave_steps*oce_step
 &ice_therm
 Sice=4.0               ! Ice salinity 3.2--5.0 ppt.
 iclasses=7            ! default = 7; in case of EM distribution ('new_iceclasses=.true.') must be set to 15
-h0=.5                  ! Lead closing parameter [m] 
+h0=0.5                 ! Lead closing parameter for Nothern Hemisphere [m], default 0.5
+h0_s=0.5               ! Lead closing parameter [m] for Southern Hemisphere, default 0.5
 hmin=0.01              ! default=0.01
 armin=0.01             ! default=0.01
 emiss_ice=0.97         ! Emissivity of Snow/Ice,

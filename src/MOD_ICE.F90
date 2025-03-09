@@ -70,7 +70,8 @@ TYPE T_ICE_THERMO
     ! --- namelist parameter /ice_therm/
     real(kind=WP) :: con= 2.1656, consn = 0.31 ! Thermal conductivities: ice & snow; W/m/K
     real(kind=WP) :: Sice = 4.0        ! Ice salinity 3.2--5.0 ppt.
-    real(kind=WP) :: h0=1.0	           ! Lead closing parameter [m] ! 0.5
+    real(kind=WP) :: h0=0.5	           ! Lead closing parameter [m] for Nothern Hemisphere! 0.5
+    real(kind=WP) :: h0_s=0.5	           ! Lead closing parameter [m] for Southern Hemisphere! 0.5
     real(kind=WP) :: emiss_ice=0.97    ! Emissivity of Snow/Ice,
     real(kind=WP) :: emiss_wat=0.97    ! Emissivity of open water
     real(kind=WP) :: albsn = 0.81      ! Albedo: frozen snow
@@ -562,9 +563,9 @@ subroutine ice_init(ice, partit, mesh)
                        alpha_evp, beta_evp, c_aevp
     logical        :: snowdist, new_iclasses
     integer        :: open_water_albedo, iclasses
-    real(kind=WP)  :: Sice, h0, emiss_ice, emiss_wat, albsn, albsnm, albi, &
+    real(kind=WP)  :: Sice, h0, h0_s, emiss_ice, emiss_wat, albsn, albsnm, albi, &
                       albim, albw, con, consn, hmin, armin, c_melt, h_cutoff
-    namelist /ice_therm/ Sice, iclasses, h0, hmin, armin,  emiss_ice, emiss_wat, albsn, albsnm, albi, &
+    namelist /ice_therm/ Sice, iclasses, h0, h0_s, hmin, armin,  emiss_ice, emiss_wat, albsn, albsnm, albi, &
                          albim, albw, con, consn,  snowdist, new_iclasses, open_water_albedo, c_melt, h_cutoff
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -610,6 +611,7 @@ subroutine ice_init(ice, partit, mesh)
     ice%thermo%Sice     = Sice
     ice%thermo%iclasses = iclasses
     ice%thermo%h0       = h0
+    ice%thermo%h0_s     = h0_s
     ice%thermo%hmin     = hmin
     ice%thermo%armin    = armin
     ice%thermo%emiss_ice= emiss_ice
