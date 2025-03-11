@@ -441,27 +441,16 @@ get_target_property(FLAGS ${PROJECT_NAME} COMPILE_OPTIONS)
 message(STATUS " --> Final Compile options for ${PROJECT_NAME}: ${FLAGS}")
 
 
+# Include the AddPreprocessTarget module
+include(${CMAKE_CURRENT_LIST_DIR}/../cmake/AddPreprocessTarget.cmake)
+
 # Add preprocess target to output preprocessed source files
-# after build or configure, cd build;cmake --build . --trget preprocess-sources to get preprocesses src in build/preprocessed
-add_custom_target(preprocess-sources
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/preprocessed
-    COMMAND ${CMAKE_COMMAND} -E echo "Preprocessing Fortran sources to ${CMAKE_BINARY_DIR}/preprocessed"
-    COMMENT "Preprocessing Fortran source files"
+# Usage: cd build; cmake --build . --target preprocess-sources
+add_preprocess_target(
+    preprocess-sources
+    "${sources_Fortran}"
+    EXCLUDE_PATTERN "fesom_version_info-generated.F90"
 )
-
-# First, create a list of source files excluding the generated version file
-set(preprocess_sources ${sources_Fortran})
-list(FILTER preprocess_sources EXCLUDE REGEX "fesom_version_info-generated.F90")
-
-# Add custom command for each Fortran source file
-foreach(source_file ${preprocess_sources})
-    get_filename_component(fname ${source_file} NAME)
-    add_custom_command(
-        TARGET preprocess-sources
-        COMMAND ${CMAKE_Fortran_COMPILER} -cpp -E ${source_file} -o ${CMAKE_BINARY_DIR}/preprocessed/${fname}
-        DEPENDS ${source_file}
-    )
-endforeach()
 
 ### Export and installation
 
