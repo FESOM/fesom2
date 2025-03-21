@@ -104,7 +104,7 @@ real(kind=WP), allocatable, dimension(:,:)  :: cavity_nrst_cavlpnt_xyz
 !___Elevation stiffness matrix__________________________________________________
 type(sparse_matrix)                         :: ssh_stiff
 
-!#if defined (__oasis)
+!#if defined (__coupled)
 real(kind=WP), allocatable, dimension(:)    :: lump2d_south
 real(kind=WP), allocatable, dimension(:)    :: lump2d_north
 integer,       allocatable, dimension(:)    :: ind_south
