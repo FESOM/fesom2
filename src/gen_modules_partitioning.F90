@@ -160,8 +160,10 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
   
   if (mype==0) print *, 'FESOM calls MPI_Finalize'
   call MPI_Finalize(error)
-#endif ! oifs/echam
-#endif ! coupled
+#endif 
+! oifs/echam
+#endif 
+! coupled
 
 ! Regardless of standalone, OpenIFS oder ECHAM coupling, if we reach to this point
 ! we should be fine shutting the whole model down
