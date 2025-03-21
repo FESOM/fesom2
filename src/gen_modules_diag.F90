@@ -22,7 +22,7 @@ module diagnostics
   public :: ldiag_solver, lcurt_stress_surf, ldiag_Ri, ldiag_TurbFlux, ldiag_dMOC,                                &
             ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, ldiag_extflds, ldiag_ice,      &
             compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, shear, Ri, KvdTdZ, KvdSdZ,                & 
-            std_dens_min, std_dens_max, std_dens_N, std_dens, ldiag_trflx, ldiag_destinE,                                       &
+            std_dens_min, std_dens_max, std_dens_N, std_dens, ldiag_trflx, ldiag_destine,                                       &
             std_dens_UVDZ, std_dens_DIV, std_dens_DIV_fer, std_dens_Z, std_dens_H, std_dens_dVdT, std_dens_flux,  &
             dens_flux_e, zisotherm, tempzavg, saltzavg, heatcontent, vol_ice, vol_snow, compute_ice_diag, thetao,   &
             tuv, suv,                                                                                             &
@@ -98,7 +98,7 @@ module diagnostics
   logical                                       :: ldiag_forc       =.false.
   
   logical                                       :: ldiag_extflds    =.false.
-  logical                                       :: ldiag_destinE    =.false.
+  logical                                       :: ldiag_destine    =.false.
   logical                                       :: ldiag_ice        =.false.
   logical                                       :: ldiag_trflx      =.false.
   logical                                       :: ldiag_uvw_sqr    =.false.
@@ -106,7 +106,7 @@ module diagnostics
   
   namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_Ri, & 
                        ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, &
-                       ldiag_extflds, ldiag_destinE, ldiag_trflx, ldiag_ice, ldiag_uvw_sqr, ldiag_trgrd_xyz
+                       ldiag_extflds, ldiag_destine, ldiag_trflx, ldiag_ice, ldiag_uvw_sqr, ldiag_trgrd_xyz
   
   contains
 
@@ -1127,7 +1127,7 @@ subroutine compute_diagnostics(mode, dynamics, tracers, ice, partit, mesh)
   ! 13. compute fields required for for destinE
   if (ldiag_ice)         call compute_ice_diag(mode, ice, partit, mesh)
   
-  if (ldiag_destinE)     call compute_destinE(mode, dynamics, tracers, partit, mesh)
+  if (ldiag_destine)     call compute_destinE(mode, dynamics, tracers, partit, mesh)
   
   call compute_thetao(mode, tracers, partit, mesh) 
 
