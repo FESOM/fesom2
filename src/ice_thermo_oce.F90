@@ -546,6 +546,8 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
         rsf= -dhgrowth*rhoice*inv_rhowat*Sice
     else
         fw= prec+evap - dhgrowth*rhoice*inv_rhowat*(rsss-Sice)/rsss - dhsngrowth*rhosno*inv_rhowat 
+        ! initialize rsf with zero since it is not used for linfs only in zstar
+        rsf = 0.0_WP
     end if
     
     ! Changes in compactnesses (equation 16 of Hibler 1979)

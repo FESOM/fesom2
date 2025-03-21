@@ -305,7 +305,8 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+! #include "associate_mesh_ass.h"
+nl => mesh%nl
     
     !___________________________________________________________________________
     ! OPEN and read namelist for I/O
@@ -519,7 +520,8 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h"   
+! #include "associate_mesh_ass.h"   
+nl => mesh%nl
     
     !___________________________________________________________________________
     ! open and read namelist for I/O
@@ -758,7 +760,8 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+! #include "associate_mesh_ass.h"
+nl              => mesh%nl
 
     !___________________________________________________________________________
     elem_size=myDim_elem2D+eDim_elem2D
@@ -844,8 +847,8 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     allocate(Ki(nl-1, node_size))
 
     do n=1, node_size
-    !  Ki(n)=K_hor*area(1,n)/scale_area
-    Ki(:,n)=K_hor*(mesh_resolution(n)/100000.0_WP)**2
+        !  Ki(n)=K_hor*area(1,n)/scale_area
+        Ki(:,n)=K_hor*(mesh%mesh_resolution(n)/100000.0_WP)**2
     end do
     call exchange_nod(Ki, partit)
 
