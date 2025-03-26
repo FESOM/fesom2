@@ -6,7 +6,9 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/../cmake ${CMAKE_MODULE_PATH})
 include(fesom_setup)
 
 find_package(MPI REQUIRED)
-
+set(CURL_LIBRARY "/usr/lib/x86_64-linux-gnu/libcurl.so")
+set(CURL_INCLUDE_DIR "/usr/include")
+find_package(CURL REQUIRED)
 #TODO: these machine specific changes must be done using cmake toolchain then here otherwise will make cmake another raps. 
 if(DEFINED ENV{FESOM_PLATFORM_STRATEGY})
    set(FESOM_PLATFORM_STRATEGY $ENV{FESOM_PLATFORM_STRATEGY} CACHE STRING "switch to platform specific compile settings, this is usually determined via the env.sh script")
@@ -329,7 +331,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_
    
 # fesom.x executable
 add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
-target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
+target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME} PRIVATE CURL::libcurl)
 
 
 ### Export and installation

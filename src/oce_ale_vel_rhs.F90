@@ -1,13 +1,12 @@
 
 module compute_vel_rhs_interface
     interface
-        subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
+        subroutine compute_vel_rhs(dynamics, partit, mesh)
         USE MOD_ICE
         USE MOD_DYN
         USE MOD_PARTIT
         USE MOD_PARSUP
         USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
@@ -32,7 +31,7 @@ end module
 !
 !
 !_______________________________________________________________________________
-subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
+subroutine compute_vel_rhs(dynamics, partit, mesh)
     USE MOD_ICE
     USE MOD_DYN
     USE MOD_PARTIT
@@ -48,7 +47,6 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     use momentum_adv_scalar_interface
     use momentum_adv_scalar_transpv_interface
     implicit none 
-    type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
@@ -77,11 +75,6 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     UV_rhs    => dynamics%uv_rhs(:,:,:)
     UV_rhsAB  => dynamics%uv_rhsAB(:,:,:,:)
     eta_n     => dynamics%eta_n(:)
-    m_ice     => ice%data(2)%values(:)
-    m_snow    => ice%data(3)%values(:)
-    rhoice    => ice%thermo%rhoice
-    rhosno    => ice%thermo%rhosno
-    inv_rhowat=> ice%thermo%inv_rhowat
     
     ! if split-explicite ssh subcycling is used
     if (dynamics%use_ssh_se_subcycl) then
@@ -89,11 +82,6 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         UVBT_4AB => dynamics%se_uvBT_4AB
     end if 
     
-    !___________________________________________________________________________
-    use_pice=0
-    if (use_floatice .and.  .not. trim(which_ale)=='linfs') use_pice=1
-    if ((toy_ocean)  .and. (trim(which_toy)=="soufflet"))   use_pice=0
-
     IF     (dynamics%AB_order==2)  THEN
             ab1=-(0.5_WP+epsilon)
             ab2= (1.5_WP+epsilon)
@@ -124,14 +112,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
                 ! Here Adams-Bashfort from previouse time n-0.5
                 ! Thats why (0.5_WP+epsilon)*... to achieve second
                 ! order AB2 --> fAB2 = 3/2*fab_n - 1/2*fab_n-1   
-            end do
-            if (dynamics%ldiag_ke) then
-                do nz=nzmin,nzmax-1
-                    dynamics%ke_adv(:,nz,elem)=ab1*dynamics%ke_adv_AB(1, :,nz,elem)
-                    dynamics%ke_cor(:,nz,elem)=ab1*dynamics%ke_cor_AB(1, :,nz,elem)
-                end do
-            end if
-        
+            end do       
         ! 3rd order Adams-Bashfort
         elseif (dynamics%AB_order==3) then
             do nz=nzmin,nzmax-1
@@ -149,49 +130,14 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         !_______________________________________________________________________
         ! Sea level and pressure contribution   -\nabla(\eta +hpressure/rho_0)
         ! and the Coriolis force + metric terms
-        elnodes=elem2D_nodes(:,elem)
-        
+        elnodes=elem2D_nodes(:,elem)        
         !  p_eta=g*eta_n(elnodes)*(1-theta)        !! this place needs update (1-theta)!!!
         p_eta = g*eta_n(elnodes)   
         
         ff    = mesh%coriolis(elem)*elem_area(elem)
-        !mm=metric_factor(elem)*elem_area(elem)
-        
-        !_______________________________________________________________________
-        ! contribution from sea level pressure
-        if (l_mslp) then
-            p_air = press_air(elnodes)/1000
-        else                   !|-> convert press_air from: Pa--> bar)
-            p_air = 0.0_WP
-        end if
-        
-        !_______________________________________________________________________
-        ! in case of ALE zlevel and zstar add pressure from ice to atmospheric pressure
-        ! to account for floating ice
-        if (use_pice > 0) then
-            p_ice = 0.0_WP
-            p_ice = (m_ice(elnodes)*rhoice+m_snow(elnodes)*rhosno)*inv_rhowat
-            ! limit maximum ice loading like in FESOM1.4
-            p_ice = g*min(p_ice,max_ice_loading)
-        else
-            p_ice = 0.0_WP
-        endif
-        
-        !_______________________________________________________________________
-        ! apply pressure gradient force, as well as contributions from gradient of 
-        ! the sea surface height as well as ice pressure in case of floating sea ice
-        ! to velocity rhs
-        pre = -(p_eta+p_ice+p_air)
-        if (use_global_tides) then
-           pre=pre-ssh_gp(elnodes)
-        end if
+        pre = -p_eta
         Fx  = sum(gradient_sca(1:3, elem)*pre)
         Fy  = sum(gradient_sca(4:6, elem)*pre)
-        
-        !_______________________________________________________________________
-        ! when ssh split-explicite subcycling method is setted use transport velocities
-        ! u*h, v*h instead of u,v 
-        if (.not. dynamics%use_ssh_se_subcycl) then
             do nz=nzmin, nzmax-1
                 ! add pressure gradient terms
                 UV_rhs(  1, nz, elem) = UV_rhs(1, nz, elem) + (Fx-pgf_x(nz, elem))*elem_area(elem) 
@@ -209,73 +155,8 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
                     UV_rhsAB(1,2,nz,elem) =-UV(1,nz,elem)*ff
                 end if 
             end do
-        else
-            UVBT_4AB(1:2, elem) = 0.0_WP
-            do nz=nzmin, nzmax-1
-                ! add pressure gradient terms
-                UV_rhs(  1, nz, elem) = UV_rhs(1, nz, elem) + (Fx-pgf_x(nz, elem))*elem_area(elem)*helem(nz,elem)
-                UV_rhs(  2, nz, elem) = UV_rhs(2, nz, elem) + (Fy-pgf_y(nz, elem))*elem_area(elem)*helem(nz,elem)
-                
-                ! add coriolis force, initialise AB2 array of actual timestep 
-                ! with coriolis term
-                if     (dynamics%AB_order==2) then
-                    UV_rhsAB(1,1,nz,elem) = UVh(2,nz,elem)*ff! + mm*UV(1,nz,elem)*UV(2,nz,elem)
-                    UV_rhsAB(1,2,nz,elem) =-UVh(1,nz,elem)*ff! - mm*UV(1,nz,elem)*UV(2,nz,elem)
-                elseif (dynamics%AB_order==3) then 
-                    UV_rhsAB(2,1,nz,elem) = UV_rhsAB(1,1,nz,elem)
-                    UV_rhsAB(2,2,nz,elem) = UV_rhsAB(1,2,nz,elem)
-                    UV_rhsAB(1,1,nz,elem) = UVh(2,nz,elem)*ff
-                    UV_rhsAB(1,2,nz,elem) =-UVh(1,nz,elem)*ff
-                end if
-                
-                ! compute barotropic velocity for adams-bashfort time stepping
-                ! UVBT_4AB(1:2, elem)--> actual timestep, 
-                ! UVBT_4AB(3:4, elem)--> previous timestep (is setted in 
-                ! call compute_BC_BT_SE_vtransp) 
-                UVBT_4AB(1, elem)     = UVBT_4AB(1, elem) + UVh(1, nz, elem)  ! 
-                UVBT_4AB(2, elem)     = UVBT_4AB(2, elem) + UVh(2, nz, elem)  !
-            end do    
-        end if 
-        
-        !_______________________________________________________________________
-        if (dynamics%ldiag_ke) then
-            do nz=nzmin,nzmax-1
-                dynamics%ke_pre(1,nz,elem)= (Fx-pgf_x(nz,elem))*dt!*elem_area(elem) !not to divide it aterwards (at the end of this subroutine)
-                dynamics%ke_pre(2,nz,elem)= (Fy-pgf_y(nz,elem))*dt!*elem_area(elem) !but account for DT here              
-                
-                if (dynamics%AB_order==3) then
-                    dynamics%ke_cor_AB(2,1,nz,elem) = dynamics%ke_cor_AB(1,1,nz,elem)
-                    dynamics%ke_cor_AB(2,2,nz,elem) = dynamics%ke_cor_AB(1,2,nz,elem)
-                    
-                    dynamics%ke_adv_AB(2,1,nz,elem)= dynamics%ke_adv_AB(1,1,nz,elem)
-                    dynamics%ke_adv_AB(2,2,nz,elem)= dynamics%ke_adv_AB(1,2,nz,elem)
-                end if
-                
-                dynamics%ke_cor_AB(1,1,nz,elem)= UV(2,nz,elem)*ff
-                dynamics%ke_cor_AB(1,2,nz,elem)=-UV(1,nz,elem)*ff
-                
-                dynamics%ke_adv_AB(1,1,nz,elem)= 0.0_WP
-                dynamics%ke_adv_AB(1,2,nz,elem)= 0.0_WP
-            end do
-        end if
-
     end do
 !$OMP END PARALLEL DO
-    
-    !___________________________________________________________________________
-    ! advection --> add momentum advection to actual timerstep adams-bashfort 
-    ! array UV_rhsAB
-    if (dynamics%momadv_opt==1) then
-       if (mype==0) write(*,*) 'in moment not adapted mom_adv advection typ for ALE, check your namelist'
-       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
-    elseif (dynamics%momadv_opt==2) then
-        if (.not. dynamics%use_ssh_se_subcycl) then
-            call momentum_adv_scalar(dynamics, partit, mesh)
-        else
-            call momentum_adv_scalar_transpv(dynamics, partit, mesh)
-        end if     
-    end if
-    
     !___________________________________________________________________________
     ! Update the rhs
     IF (dynamics%AB_order==2) THEN
@@ -307,24 +188,6 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         end do
     end do
 !$OMP END PARALLEL DO
-
-    !___________________________________________________________________________
-    if (dynamics%ldiag_ke) then
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
-        do elem=1, myDim_elem2D
-            nzmin = ulevels(elem)
-            nzmax = nlevels(elem)
-            do nz=nzmin,nzmax-1
-                dynamics%ke_adv(:,nz,elem)=dt*(dynamics%ke_adv(:,nz,elem)+dynamics%ke_adv_AB(1,:,nz,elem)*ff)/elem_area(elem)
-                dynamics%ke_cor(:,nz,elem)=dt*(dynamics%ke_cor(:,nz,elem)+dynamics%ke_cor_AB(1,:,nz,elem)*ff)/elem_area(elem)
-            end do
-        end do
-!$OMP END PARALLEL DO
-    end if
-    
-    ! =======================  
-    ! U_rhs contains all contributions to velocity from old time steps   
-    ! =======================
 END SUBROUTINE compute_vel_rhs
 
 !

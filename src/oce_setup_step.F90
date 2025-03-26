@@ -80,8 +80,8 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     USE MOD_PARSUP
     USE MOD_TRACER
     USE MOD_DYN
+    USE o_ARRAYS    
     USE o_PARAM
-    USE o_ARRAYS
     USE g_config
     USE g_forcing_param, only: use_virt_salt
     use g_cvmix_tke
@@ -101,8 +101,8 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
     !___________________________________________________________________________
-    integer                               :: i, n
-    
+    integer                               :: i, n, TTIMESTEP
+    real(kind=WP)                         :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14 
     !___setup virt_salt_flux____________________________________________________
     ! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
     ! salinity flux need to be used
@@ -131,7 +131,71 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     call init_ale(dynamics, partit, mesh)
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_stiff_mat_ale'//achar(27)//'[0m'
     call init_stiff_mat_ale(partit, mesh) !!PS test  
-    
+    call init_thickness_ale(dynamics, partit, mesh)
+    dynamics%eta_n=mesh%coord_nod2D(1,:)
+    C_d=1.e-3_WP
+    Av=1.e-3_WP
+    stress_surf=1.e-3_WP
+    call ssh_solve_preconditioner(dynamics%solverinfo, partit, mesh)
+    write(*,*) partit%mype, sum(mesh%coriolis)
+    DO TTIMESTEP=1, 2
+        t0=MPI_Wtime()
+        call compute_vel_rhs(dynamics, partit, mesh)
+        t1=MPI_Wtime()
+        call visc_filt_bilapl(dynamics, partit, mesh)
+        t2=MPI_Wtime()
+        t3=MPI_Wtime()
+        t4=MPI_Wtime()
+        call impl_vert_visc_ale(dynamics, partit, mesh)
+        t5=MPI_Wtime()
+        call compute_ssh_rhs_ale(dynamics, partit, mesh)
+        t6=MPI_Wtime()
+        t7=MPI_Wtime()
+        call ssh_solve_cg(dynamics%d_eta, dynamics%ssh_rhs, dynamics%solverinfo, partit, mesh)
+        t8=MPI_Wtime()
+        call update_vel(dynamics, partit, mesh)
+        t9=MPI_Wtime()
+        t10=MPI_Wtime()
+        t11=MPI_Wtime()
+        t12=MPI_Wtime()
+        call compute_hbar_ale(dynamics, partit, mesh)
+        t13=MPI_Wtime()
+        call exchange_nod(dynamics%ssh_rhs_old, partit)
+        t14=MPI_Wtime()
+        dynamics%eta_n=alpha*mesh%hbar+(1.0_WP-alpha)*mesh%hbar_old
+        write(*,*) "hbar/dhe/ssh_rhs_old", partit%mype, sum(mesh%hbar), sum(mesh%dhe), sum(dynamics%eta_n)
+    if (partit%mype == 0) then
+        write(*,*) ''
+        write(*,*) 'Timestep ', TTIMESTEP, ' timing measurements (seconds):'
+        write(*,*) 't1 - t0: ', t1 - t0
+        write(*,*) 't2 - t1: ', t2 - t1
+        write(*,*) 't3 - t2: ', t3 - t2
+        write(*,*) 't4 - t3: ', t4 - t3
+        write(*,*) 't4 - t1: ', t4 - t1
+        write(*,*) 't5 - t4: ', t5 - t4
+        write(*,*) 't6 - t5: ', t6 - t5
+        write(*,*) 't7 - t6: ', t7 - t6
+        write(*,*) 't8 - t7: ', t8 - t7
+        write(*,*) 't9 - t8: ', t9 - t8
+        write(*,*) 't10 - t9: ', t10 - t9
+        write(*,*) 't11 - t10: ', t11 - t10
+        write(*,*) 't12 - t11: ', t12 - t11
+        write(*,*) 't13 - t12: ', t13 - t12
+        write(*,*) 't14 - t13: ', t14 - t13
+        write(*,*) 't14 - t0: ', t14 - t0
+    end if
+    CALL MPI_BARRIER(partit%MPI_COMM_FESOM, partit%MPIerr)    
+    t0=MPI_Wtime()
+    call exchange_elem(dynamics%UV(1,:,:) , partit)
+    call exchange_elem(dynamics%UV(2,:,:) , partit)
+    t1=MPI_Wtime()
+    CALL MPI_BARRIER(partit%MPI_COMM_FESOM, partit%MPIerr)    
+    if (partit%mype == 0) then
+        write(*,*) 'exchange UV: ', t1 - t0
+    end if    
+        
+    END DO
+    !write(*,*) "ssh_rhs_sum=", partit%mype, partit%myDim_nod2D, partit%myDim_edge2D
     !___________________________________________________________________________
     ! initialize arrays from cvmix library for CVMIX_KPP, CVMIX_PP, CVMIX_TKE,
     ! CVMIX_IDEMIX and CVMIX_TIDAL
@@ -1011,9 +1075,6 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             if(DIC_PI) then
                 print *, achar(27)//'[36m'// ' --> Preindustrial DIC will be used'//achar(27)//'[0m'
             end if
-            if (restore_alkalinity)  then
-               print *, achar(27)//'[36m'//' --> Alkalinity restoring = .true.'//achar(27)//'[0m'
-            endif
             print *, achar(27)//'[36m'//'*************************'//achar(27)//'[0m'
             write(*,*)
             write(*,*) 'read Iron        climatology from:', trim(filelist(1))

@@ -507,6 +507,9 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! compute viscosity on element
 !$OMP DO
+    dynamics%visc_gamma0=1.0
+    dynamics%visc_gamma1=1.0
+    dynamics%visc_gamma2=1.0    
     DO ed=1,myDim_elem2D
         len   = sqrt(elem_area(ed))
         nzmin = ulevels(ed)

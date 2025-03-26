@@ -78,6 +78,8 @@ subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
        offset=ssh_stiff%rowptr(row)-ssh_stiff%rowptr(1)
        nend=ssh_stiff%rowptr(row+1)-ssh_stiff%rowptr(row)
        pr_values(offset+1)=1.0_WP/ssh_stiff%values(offset+1)
+       if ((partit%mype==0) .AND. (row==2)) write(*,*) "mycheck:", offset, pr_values(offset+1), ssh_stiff%values(offset+1)
+       if ((partit%mype==0) .AND. (row==2)) write(*,*) "mycheck2:", ssh_stiff%values(1)
        DO n=2, nend   
           node=cind(offset+n)    ! Will be ssh_stiff$colind(offset+n) 
           pr_values(n+offset)=-0.5_WP*(ssh_stiff%values(n+offset)/ssh_stiff%values(1+offset))/  &
@@ -176,7 +178,6 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! ===============
   ! Scalar product of r*z
   ! ===============
-
 #if !defined(__openmp_reproducible)
   s_old=0.0_WP
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:s_old)
@@ -189,11 +190,13 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
 #endif
 
   call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
-  
+  !write(*,*) "x check:", partit%mype, sum(x), sum(rhs), sum(pr_values), sum(mesh%ssh_stiff%values)
+  !write(*,*) "x check:", partit%mype, s_old    
   ! ===============
   ! Iterations
   ! ===============
   Do iter=1, solverinfo%maxiter
+     write(*,*) "solver:", partit%mype, iter, sqrt(sprod(2)/nod2D) 
      ! ============
      ! Compute Ap
      ! ============

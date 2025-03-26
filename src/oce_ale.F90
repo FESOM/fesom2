@@ -3488,7 +3488,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! force to UV_rhs
     ! UV_rhs = dt*[ (R_advec + R_coriolis)_AB2^n + R_pressure^n ]
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'
-    call compute_vel_rhs(ice, dynamics, partit, mesh)
+!!! call compute_vel_rhs(ice, dynamics, partit, mesh)
     
     !___________________________________________________________________________
     ! Energy diagnostic contribution
