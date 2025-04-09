@@ -683,6 +683,9 @@ subroutine budget (ithermp, hice,hsn,t,ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,fh,subli)
             alb=albim
         endif
     endif
+    !replace albedo with that provided by Diajeng Wulandari Atmojo
+    alb = (tanh(62.56 * (hsn**2) + 0.11 * hice + 0.84)**2) / &
+        (2.19 - tanh(0.14 * Ta - 0.3 * T + 0.93))
 
     !___________________________________________________________________________
     d1=rhoair*cpair*Ch_i
