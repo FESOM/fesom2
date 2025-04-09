@@ -20,10 +20,10 @@ contains
 !
 ! -------------------------------------------------------------------------
 subroutine write_mesh_info(partit, mesh)
-! this routine stores most of metadata used in FESOM. Shall be called at the cold start once during the simulation. 
+! this routine stores most of metadata used in FESOM. Shall be called at the cold start once during the simulation.
 !
 ! .. info::
-! 
+!
 !    fesom.mesh.diag.nc is 77MB for the CORE II mesh with 47 vertical levels
 implicit none
   type(t_mesh),   intent(in)   , target :: mesh
@@ -39,6 +39,7 @@ implicit none
   integer                    :: nlevels_nod2D_id, nlevels_id, ulevels_nod2D_id, ulevels_id
   integer                    :: nod_in_elem2D_num_id, nod_in_elem2D_id
   integer                    :: gradient_sca_x_id, gradient_sca_y_id
+  integer                    :: gradient_vec_x_id, gradient_vec_y_id
   integer                    :: zbar_e_bot_id, zbar_n_bot_id, zbar_e_srf_id, zbar_n_srf_id
   integer                    :: elem_id
   integer                    :: nod_id
@@ -58,7 +59,7 @@ implicit none
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-  
+
   call MPI_AllREDUCE(maxval(nod_in_elem2D_num), N_max, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 
   filename=trim(ResultPath)//runid//'.mesh.diag.nc'
@@ -82,12 +83,12 @@ implicit none
   call add_fesom_ugrid_info(ncid, partit)
   !Define the variables
   ! 1D
-  call my_def_var(ncid,                                &  ! NetCDF Variable File Handle ID                                                                                     
+  call my_def_var(ncid,                                &  ! NetCDF Variable File Handle ID
     'nz',                                              &  ! Short Name
     NF_DOUBLE,                                         &  ! Variable Type
     1,                                                 &  ! Variable Dimensionality
     (/nl_id /),                                        &  ! Dimension IDs
-    zbar_id,                                           &  ! ID 
+    zbar_id,                                           &  ! ID
     'depth of levels',                                 &  ! Long Name. NOTE(PG): Taken from https://ugrid-conventions.github.io/ugrid-conventions/#2d-triangular-mesh-topology
     partit,                                            &  ! Partitioning
     "",                                                &  ! Standard Name
@@ -106,7 +107,7 @@ implicit none
     NF_DOUBLE,                                         &  ! Variable Type
     1,                                                 &  ! Variable Dimensionality
     (/nl1_id/),                                        &  ! Dimension IDs
-    z_id,                                              &  ! ID 
+    z_id,                                              &  ! ID
     'depth of layers',                                 &  ! Long Name. NOTE(PG): Taken from https://ugrid-conventions.github.io/ugrid-conventions/#2d-triangular-mesh-topology
     partit                                             &  ! Partitioning
   )
@@ -117,13 +118,13 @@ implicit none
   if (partit%mype==0) then
     status = nf_put_att_text(ncid, z_id, 'positive', len_trim("down"), trim("down"));
   end if
-  
+
   call my_def_var(ncid,                                       &  ! NetCDF Variable File Handle ID
     'elem_area',                                              &  ! Short Name
     NF_DOUBLE,                                                &  ! Variable Type
     1,                                                        &  ! Variable Dimensionality
     (/elem_n_id/),                                            &  ! Dimension IDs
-    elem_area_id,                                             &  ! ID 
+    elem_area_id,                                             &  ! ID
     'element areas',                                          &  ! Long Name. NOTE(PG): Taken from https://ugrid-conventions.github.io/ugrid-conventions/#2d-triangular-mesh-topology
     partit                                                    &  ! Partitioning
   )
@@ -133,7 +134,7 @@ implicit none
     NF_INT,                                                   &  ! Variable Type
     1,                                                        &  ! Variable Dimensionality
     (/nod_n_id/),                                             &  ! Dimension IDs
-    nlevels_nod2D_id,                                         &  ! ID 
+    nlevels_nod2D_id,                                         &  ! ID
     'number of levels below nodes',                           &  ! Long Name. NOTE(PG): Taken from https://ugrid-conventions.github.io/ugrid-conventions/#2d-triangular-mesh-topology
     partit                                                    &  ! Partitioning
   )
@@ -143,7 +144,7 @@ implicit none
     NF_INT,                                                   &  ! Variable Type
     1,                                                        &  ! Variable Dimensionality
     (/elem_n_id/),                                            &  ! Dimension IDs
-    nlevels_id,                                               &  ! ID 
+    nlevels_id,                                               &  ! ID
     'number of levels below elements',                        &  ! Long Name. NOTE(PG): Taken from https://ugrid-conventions.github.io/ugrid-conventions/#2d-triangular-mesh-topology
     partit                                                    &  ! Partitioning
   )
@@ -153,17 +154,17 @@ implicit none
     NF_INT,                                                   &  ! Variable Type
     1,                                                        &  ! Variable Dimensionality
     (/nod_n_id/),                                             &  ! Dimension IDs
-    nod_in_elem2D_num_id,                                     &  ! ID 
+    nod_in_elem2D_num_id,                                     &  ! ID
     'number of elements containing the node',                 &  ! Long Name. NOTE(PG): Taken from https://ugrid-conventions.github.io/ugrid-conventions/#2d-triangular-mesh-topology
     partit                                                    &  ! Partitioning
   )
-  
-  call my_def_var(ncid,                                       &  ! NetCDF Variable File Handle ID                                                                                     
+
+  call my_def_var(ncid,                                       &  ! NetCDF Variable File Handle ID
     'nod_part',                                               &  ! Short Name
     NF_INT,                                                   &  ! Variable Type
     1,                                                        &  ! Variable Dimensionality
     (/nod_n_id/),                                             &  ! Dimension IDs
-    nod_part_id,                                              &  ! ID 
+    nod_part_id,                                              &  ! ID
     'nodal partitioning at the cold start',                   &  ! Long Name. NOTE(PG): Taken from https://ugrid-conventions.github.io/ugrid-conventions/#2d-triangular-mesh-topology
     partit                                                    &  ! Partitioning
   )
@@ -173,7 +174,7 @@ implicit none
     NF_INT,                                                   &  ! Variable Type
     1,                                                        &  ! Variable Dimensionality
     (/elem_n_id/),                                            &  ! Dimension IDs
-    elem_part_id,                                             &  ! ID 
+    elem_part_id,                                             &  ! ID
     'element partitioning at the cold start',                 &  ! Long Name. NOTE(PG): Taken from https://ugrid-conventions.github.io/ugrid-conventions/#2d-triangular-mesh-topology
     partit                                                    &  ! Partitioning
   )
@@ -183,7 +184,7 @@ implicit none
     NF_DOUBLE,                                                &  ! Variable Type
     1,                                                        &  ! Variable Dimensionality
     (/elem_n_id/),                                            &  ! Dimension IDs
-    zbar_e_bot_id,                                            &  ! ID 
+    zbar_e_bot_id,                                            &  ! ID
     'element bottom dep',                                     &  ! Long Name. NOTE(PG): Taken from https://ugrid-conventions.github.io/ugrid-conventions/#2d-triangular-mesh-topologyth',
     partit                                                    &  ! Partitioning
   )
@@ -193,7 +194,7 @@ implicit none
     NF_DOUBLE,                                                &  ! Variable Type
     1,                                                        &  ! Variable Dimensionality
     (/nod_n_id/),                                             &  ! Dimension IDs
-    zbar_n_bot_id,                                            &  ! ID 
+    zbar_n_bot_id,                                            &  ! ID
     'nodal bottom depth',                                     &  ! Long Name. NOTE(PG): Taken from https://ugrid-conventions.github.io/ugrid-conventions/#2d-triangular-mesh-topology',
     partit                                                    &  ! Partitioning
   )
@@ -203,7 +204,7 @@ implicit none
     NF_DOUBLE,                                                &  ! Variable Type
     1,                                                        &  ! Variable Dimensionality
     (/nod_n_id/),                                             &  ! Dimension IDs
-    lon_id,                                                   &  ! ID 
+    lon_id,                                                   &  ! ID
     'longitude',                                              &  ! Long Name. NOTE(PG): Taken from https://ugrid-conventions.github.io/ugrid-conventions/#2d-triangular-mesh-topology
     partit,                                                   &  ! Partitioning
     ! Everything after partit is an optional argument
@@ -216,7 +217,7 @@ implicit none
     NF_DOUBLE,                                                &  ! Variable Type
     1,                                                        &  ! Variable Dimensionality
     (/nod_n_id/),                                             &  ! Dimension IDs
-    lat_id,                                                   &  ! ID 
+    lat_id,                                                   &  ! ID
     'latitude',                                               &  ! Long Name. NOTE(PG): Taken from https://ugrid-conventions.github.io/ugrid-conventions/#2d-triangular-mesh-topology
     partit,                                                   &  ! Partitioning
     ! Everything after partit is an optional argument
@@ -236,29 +237,29 @@ implicit none
     NF_DOUBLE,                                                &  ! Variable Type
     2,                                                        &  ! Variable Dimensionality
     (/nod_n_id, nl_id/),                                      &  ! Dimension IDs
-    nod_area_id,                                              &  ! ID 
+    nod_area_id,                                              &  ! ID
     'nodal areas',                                            &  ! Long Name. NOTE(PG): Taken from https://ugrid-conventions.github.io/ugrid-conventions/#2d-triangular-mesh-topology
     partit                                                    &  ! Partitioning
   )
-  
+
   call my_def_var(ncid,                                       &  ! NetCDF Variable File Handle ID
     'face_nodes',                                             &  ! Short Name
     NF_INT,                                                   &  ! Variable Type
     2,                                                        &  ! Variable Dimensionality
     (/elem_n_id, id_3/),                                      &  ! Dimension IDs
-    face_node_id,                                             &  ! ID 
+    face_node_id,                                             &  ! ID
     "Maps every triangular face to its three corner nodes.",  &  ! Long Name. NOTE(PG): Taken from https://ugrid-conventions.github.io/ugrid-conventions/#2d-triangular-mesh-topology
     partit,                                                   &  ! Partitioning
     ! Everything after partit is an optional argument
     "face",                                                   &  ! Standard Name
     "",                                                       &  ! Units
-    "face_node_connectivity",                                 &  ! CF Role 
+    "face_node_connectivity",                                 &  ! CF Role
     start_index = 1                                           &  ! Start index
   )
   if (partit%mype==0) then
     status = nf_put_att_text(ncid, face_node_id, 'location', len_trim("face"), trim("face"));
   end if
-  
+
   call my_def_var(ncid,                                       &  ! NetCDF Variable File Handle ID
   "edge_nodes",                                               &  ! Short Name
   NF_INT,                                                     &  ! Variable Type
@@ -324,6 +325,8 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   call my_def_var(ncid, 'edge_cross_dxdy',   NF_DOUBLE, 2, (/edge_n_id, id_4/), edge_cross_dxdy_id, 'edge cross distancess',        partit)
   call my_def_var(ncid, 'gradient_sca_x',    NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_x_id,  'x component of a gradient at nodes of an element', partit)
   call my_def_var(ncid, 'gradient_sca_y',    NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_y_id,  'y component of a gradient at nodes of an element', partit)
+  call my_def_var(ncid, 'gradient_vec_x',    NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_vec_x_id,  'x component of a gradient at elements of an element', partit)
+  call my_def_var(ncid, 'gradient_vec_y',    NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_vec_y_id,  'y component of a gradient at elements of an element', partit)
   call my_nf_enddef(ncid, partit)
 
   ! NOTE(PG): Same order as definition!
@@ -338,7 +341,7 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   do k=1, nl
      ! area     ...area of prism top face
      ! areasvol ...area of scalar volume cell
-     ! better write areasvol to meshdiag, without cavity area==areasvol but with 
+     ! better write areasvol to meshdiag, without cavity area==areasvol but with
      ! cavity area!=areasvol, at least where is cavity
      !!PS      call gather_nod(area(k, :), rbuffer, partit)
      call gather_nod(areasvol(k, :), rbuffer, partit)
@@ -357,7 +360,7 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   call gather_nod(nlevels_nod2D(1:myDim_nod2D), ibuffer, partit)
   call my_put_vara(ncid, nlevels_nod2D_id, 1, nod2D, ibuffer, partit)
   deallocate(ibuffer)
-  
+
   ! WRITE(*,*) "nlevels"
   allocate(ibuffer(elem2D))
   call gather_elem(nlevels(1:myDim_elem2D), ibuffer, partit)
@@ -372,7 +375,7 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
 
   ! WRITE(*,*) "nod_part"
   allocate(ibuffer(nod2D))
-  allocate(lbuffer(myDim_nod2D))  
+  allocate(lbuffer(myDim_nod2D))
   lbuffer=mype
   call gather_nod(lbuffer, ibuffer, partit)
   call my_put_vara(ncid, nod_part_id, 1, nod2D, ibuffer, partit)
@@ -380,7 +383,7 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
 
   ! WRITE(*,*) "elem_part"
   allocate(ibuffer(elem2D))
-  allocate(lbuffer(myDim_elem2D))  
+  allocate(lbuffer(myDim_elem2D))
   lbuffer=mype
   call gather_elem(lbuffer, ibuffer, partit)
   call my_put_vara(ncid, elem_part_id, 1, elem2D, ibuffer, partit)
@@ -473,7 +476,7 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
      call my_put_vara(ncid, face_links_id, (/1, i/), (/elem2D, 1/), ibuffer, partit)
   end do
   deallocate(lbuffer, ibuffer)
-  
+
   ! WRITE(*,*) "edge_face_links"
   ! Used to be called edge_tri
   allocate(ibuffer(edge2D))
@@ -487,7 +490,7 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
            lbuffer(k) = -999  ! Changed from missing value of 0 before
         endif
      end do
-!$OMP END PARALLEL DO     
+!$OMP END PARALLEL DO
      call gather_edge(lbuffer, ibuffer, partit)
      call my_put_vara(ncid, edge_face_links_id, (/1, i/), (/edge2D, 1/), ibuffer, partit)
   end do
@@ -499,13 +502,13 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   allocate(lbuffer(myDim_nod2D))
   DO i=1, N_max
      lbuffer=0
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(k)     
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(k)
      do k=1, myDim_nod2D
         if ((nod_in_elem2D_num(k)>=i)) then
            lbuffer(k)=myList_elem2D(nod_in_elem2D(i, k))
         end if
      end do
-!$OMP END PARALLEL DO     
+!$OMP END PARALLEL DO
      call gather_nod(lbuffer, ibuffer, partit)
      call my_put_vara(ncid, nod_in_elem2D_id, (/1, i/), (/nod2D, 1/), ibuffer, partit)
   END DO
@@ -540,12 +543,30 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   end do
   deallocate(rbuffer)
 
+  ! WRITE(*,*) "gradient_vec_x"
+    ! X component of gadient at elements
+  allocate(rbuffer(elem2D))
+  do i=1, 3
+     call gather_elem(gradient_vec(i, 1:myDim_elem2D), rbuffer, partit)
+     call my_put_vara(ncid, gradient_vec_x_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit) ! (4-i), NETCDF will permute otherwise
+  end do
+  deallocate(rbuffer)
+
+  ! WRITE(*,*) "gradient_vec_y"
+    ! Y component of gadient at elements
+  allocate(rbuffer(elem2D))
+  do i=1, 3
+     call gather_elem(gradient_vec(i+3, 1:myDim_elem2D), rbuffer, partit)
+     call my_put_vara(ncid, gradient_vec_y_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit)! (4-i), NETCDF will permute otherwise
+  end do
+  deallocate(rbuffer)
+
   ! element bottom depth (take into account partial cells if used)
   allocate(rbuffer(elem2D))
   call gather_elem(zbar_e_bot(1:myDim_elem2D), rbuffer, partit)
   call my_put_vara(ncid, zbar_e_bot_id, 1, elem2D, rbuffer, partit)
   deallocate(rbuffer)
-  
+
   if (use_cavity) then
     ! number of levels above elements
     allocate(ibuffer(elem2D))
@@ -573,7 +594,7 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   endif
 
   call my_close(ncid, partit)
-  
+
 end subroutine write_mesh_info
 !
 !============================================================================
