@@ -2053,6 +2053,7 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
     if (.not. trim(which_ALE)=='linfs') then
 !$OMP PARALLEL DO
         do n=1,myDim_nod2D
+            if (ulevels_nod2D(n)>1) cycle
             ssh_rhs_old(n)=ssh_rhs_old(n)-water_flux(n)*areasvol(ulevels_nod2D(n),n)
         end do
 !$OMP END PARALLEL DO
