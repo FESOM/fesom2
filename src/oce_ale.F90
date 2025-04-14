@@ -1928,7 +1928,6 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     else
 !$OMP DO
         do n=1,myDim_nod2D
-            if (ulevels_nod2D(n)>1) cycle ! --> in case of cavity 
             ssh_rhs(n)=ssh_rhs(n)+(1.0_WP-alpha)*ssh_rhs_old(n)
         end do
 !$OMP END DO
