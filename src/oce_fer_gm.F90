@@ -229,6 +229,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
     real(kind=WP)            :: c_min=0.5_WP, f_min=1.e-6_WP, r_max=200000._WP
     real(kind=WP)            :: zscaling(mesh%nl)
     real(kind=WP)            :: bvref
+    real(kind=WP)            :: refscalresol = 100000._WP ! 100km 
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -271,8 +272,13 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
             
             !___________________________________________________________________
             ! Scale K_GM with resolution (referenced to 100,000m)
-            if (scaling_resolution) then
-                scaling=scaling*(reso/100000._WP)**K_GM_resscalorder !put to repo
+            if     (scaling_resolution .and. K_GM_resscalorder==1) then
+                scaling=scaling*(reso/refscalresol)**K_GM_resscalorder 
+                
+            elseif (scaling_resolution .and. K_GM_resscalorder==2) then    
+                scaling=scaling*(area(1,n)/(refscalresol**2)*2)**(1/K_GM_resscalorder) 
+                !                           |--> scalvolume: for 100km resolution: (100km^2)*0.5
+                !
             end if
             
             !___________________________________________________________________
@@ -313,7 +319,13 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
         ! if both are used it will be reset below
         if (Redi) then
             !!PS Ki(1,n)=K_hor*(reso/100000.0_WP)**2
-            Ki(nzmin,n)=K_hor*(reso/100000.0_WP)**2
+            !!PS Ki(nzmin,n)=K_hor*(reso/100000.0_WP)**2
+            if     (K_GM_resscalorder==1) then
+                Ki(nzmin,n)=K_hor*(reso/refscalresol)**K_GM_resscalorder 
+            elseif (K_GM_resscalorder==2) then
+                Ki(nzmin,n)=K_hor**(area(1,n)/(refscalresol**2)*2)**(1/K_GM_resscalorder) 
+            end if 
+
         end if
     end do
 !$OMP END DO

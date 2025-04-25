@@ -2956,7 +2956,10 @@ subroutine compute_neutral_slope(partit, mesh)
     integer                                :: edge
     real(kind=WP)                          :: deltaX1, deltaY1, deltaX2, deltaY2
     integer                                :: n, nz, nl1, ul1, el(2), elnodes(3), enodes(2)
-    real(kind=WP)                          :: c, ro_z_inv, eps, S_cr, S_d
+    real(kind=WP)                          :: c, ro_z_inv, eps !PS, S_cr, S_d
+    real(kind=WP)                          :: f_min=1.0e-6_WP, dep_scale, rssby
+    real(kind=WP), dimension(:)            :: c1(mesh%nl-1), c2(mesh%nl-1)
+    
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -2964,15 +2967,30 @@ subroutine compute_neutral_slope(partit, mesh)
 #include "associate_mesh_ass.h"
     !if sigma_xy is not computed
     eps=5.0e-6_WP
-    S_cr=1.0e-2_WP
-    S_d=1.0e-3_WP
+!PS     S_cr=1.0e-2_WP
+!PS     S_d=1.0e-3_WP
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, n, nz, nl1, ul1, el, elnodes, enodes, c, ro_z_inv)
 !$OMP DO
     do n=1, myDim_nod2D
         slope_tapered(: , :, n)=0._WP
         nl1=nlevels_nod2d(n)-1
         ul1=ulevels_nod2d(n)
-        do nz = ul1+1, nl1
+!PS         do nz = ul1+1, nl1
+!PS             !without minus, because neutral slope S=-(nabla\rho)/(d\rho/dz)
+!PS             ! --> the minus sign is hidden within the definition of buoyancy
+!PS             ! --> N2 = -g*drho/dz
+!PS             ro_z_inv=2._WP*g/density_0/max(bvfreq(nz,n)+bvfreq(nz+1,n), eps**2) 
+!PS             neutral_slope(1,nz,n)=sigma_xy(1,nz,n)*ro_z_inv
+!PS             neutral_slope(2,nz,n)=sigma_xy(2,nz,n)*ro_z_inv
+!PS             neutral_slope(3,nz,n)=sqrt(neutral_slope(1,nz,n)**2+neutral_slope(2,nz,n)**2)
+!PS             !tapering
+!PS             c=1.0_WP
+!PS             c=0.5_WP*(1.0_WP + tanh((S_cr - neutral_slope(3,nz,n))/S_d))
+!PS             if ((bvfreq(nz,n) <= 0.0_WP) .or. (bvfreq(nz+1,n) <= 0.0_WP)) c=0.0_WP
+!PS             slope_tapered(:,nz,n)=neutral_slope(:,nz,n)*c
+!PS         enddo
+
+        do nz = ul1, nl1
             !without minus, because neutral slope S=-(nabla\rho)/(d\rho/dz)
             ! --> the minus sign is hidden within the definition of buoyancy
             ! --> N2 = -g*drho/dz
@@ -2980,12 +2998,54 @@ subroutine compute_neutral_slope(partit, mesh)
             neutral_slope(1,nz,n)=sigma_xy(1,nz,n)*ro_z_inv
             neutral_slope(2,nz,n)=sigma_xy(2,nz,n)*ro_z_inv
             neutral_slope(3,nz,n)=sqrt(neutral_slope(1,nz,n)**2+neutral_slope(2,nz,n)**2)
-            !tapering
-            c=1.0_WP
-            c=0.5_WP*(1.0_WP + tanh((S_cr - neutral_slope(3,nz,n))/S_d))
-            if ((bvfreq(nz,n) <= 0.0_WP) .or. (bvfreq(nz+1,n) <= 0.0_WP)) c=0.0_WP
-            slope_tapered(:,nz,n)=neutral_slope(:,nz,n)*c
-        enddo
+        end do
+        
+        ! in FESOM1.4 ODM95=True hyperbolic tangent slope tapering tapering
+        ! Danabasoglu and McWilliams, 1995, sensitivity of the global ocean circulation 
+        ! to parameterizations of mesoscale tracer transport, 
+        c1 = 1.0_WP
+        if (scaling_ODM95) then
+            do nz = ul1, nl1
+                c1(nz)=0.5_WP*(1.0_WP + tanh((ODM95_Scr - neutral_slope(3,nz,n))/ODM95_Sd))
+                if ((bvfreq(nz,n) <= 0.0_WP) .or. (bvfreq(nz+1,n) <= 0.0_WP)) c1(nz)=0.0_WP
+            enddo
+        end if     
+        
+        ! in FESOM1.4 LDD97=True
+        ! William G. Large, Gokhan Danabasoglu, Scott C. Doney, and James C. McWilliams, 
+        ! 1997, Sensitivity to Surface Forcing and Boundary Layer Mixing in a 
+        ! Global Ocean Model: Annual-Mean Climatology 
+        ! The second function f2 is designed to reduce the isopycnal mixing near 
+        ! the ocean surface if the isopycnal slopes are too large, thus limiting 
+        ! the competition with vertical mixing. Here, the idea is to compare the water
+        ! parcel depth d with the vertical displacement distance associated with a 
+        ! horizontal displacement equivalent to the Rossby radius of deformation 
+        ! R. Because this radius represents the preferred horizontal length scale
+        ! of the baroclinic eddies, the vertical displacement is given D = R*|S|,
+        ! where usually |S| << 1. The governing parameter becomes the ratio = r/D
+        ! A parcel traveling isopycnally can cover its full horizontal displacement 
+        ! without reaching the surface only for values of r greater than unity. 
+        ! For values of r less than unity the supposed encounter with the surface pre-
+        ! sumably reduces the isopycnal mixing.
+        c2 = 1.0_WP
+        if (scaling_LDD97) then 
+            ! rssby = c_speed(n)/max(abs(mesh%coriolis_node(n)), f_min)
+            rssby = LDD97_c/max(abs(mesh%coriolis_node(n)), f_min)
+            rssby = min(LDD97_rmax, max(LDD97_rmin, rssby))
+            
+            do nz = ul1, nl1
+                dep_scale = rssby*neutral_slope(3,nz,n)
+                if (abs(Z_3d_n(nz, n))< dep_scale) then 
+                    c2(nz) = 0.5_WP * (1.0_WP + sin(pi*abs(Z_3d_n(nz, n))/dep_scale - pi/2.0_WP    )) 
+                end if 
+            end do
+        end if
+        
+        ! now taper slope with c1 and c2
+        do nz = ul1, nl1
+            slope_tapered(:, nz, n)=neutral_slope(:, nz, n) * c1(nz) * c2(nz)
+        end do    
+
     enddo
 !$OMP END DO
 !$OMP BARRIER

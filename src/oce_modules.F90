@@ -56,6 +56,15 @@ logical                       :: scaling_resolution =.true.
 logical                       :: scaling_FESOM14    =.false.
 logical                       :: Redi               =.false.  !flag for Redi scheme
 
+logical                       :: scaling_ODM95 =.true.    ! tapering based on critical slope
+real(kind=WP)                 :: ODM95_Scr = 1.0e-2   ! Critical slope for tapering
+real(kind=WP)                 :: ODM95_Sd = 1.0e-3   ! slope width of tapering smoothing zone
+
+logical                       :: scaling_LDD97 =.false.   ! tapering in surface
+real(kind=WP)                 :: LDD97_c = 2.0      ! [m/s] is the first baroclinic wave speed
+real(kind=WP)                 :: LDD97_rmin = 15.0e3   ! rossby radius min cutoff [m]
+real(kind=WP)                 :: LDD97_rmax = 100.0e3  ! rossby radius max cutoff [m]
+
 real(kind=WP)                 :: visc_sh_limit=5.0e-3      !for KPP, max visc due to shear instability
 real(kind=WP)                 :: diff_sh_limit=5.0e-3      !for KPP, max diff due to shear instability
 logical                       :: Kv0_const=.true.		    !use Kv0 varying with depth and latitude
@@ -162,12 +171,14 @@ character(20)                  :: which_pgf='shchepetkin'
 
 
  NAMELIST /oce_dyn/ state_equation, C_d, A_ver, &
-                    scale_area, SPP,&
+                    scale_area, SPP, &
                     Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, &
                     scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, &
                     Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, alpha, theta, use_density_ref, &
                     K_back, c_back, uke_scaling, uke_scaling_factor, smooth_back, smooth_dis, &
-                    smooth_back_tend, rosb_dis
+                    smooth_back_tend, rosb_dis, &
+                    scaling_ODM95, ODM95_Scr, ODM95_Sd, &
+                    scaling_LDD97, LDD97_c, LDD97_rmin, LDD97_rmax         
 
  NAMELIST /tracer_phys/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, &
             balance_salt_water, clim_relax, ref_sss_local, ref_sss, &

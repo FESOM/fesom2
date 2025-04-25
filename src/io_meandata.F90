@@ -1028,6 +1028,22 @@ CASE ('fer_C     ')
     if (Fer_GM) then
     call def_stream(        nod2D   ,         myDim_nod2D   , 'fer_C',     'GM,   depth independent speed',  'm/s' ,   fer_c(:),                  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
+CASE ('fer_gammax')
+    if (Fer_GM) then
+    call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'fer_gammax','GM, transport gamma_x',  'm^2/s^2', fer_gamma(1,:,:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('fer_gammay')
+    if (Fer_GM) then
+    call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'fer_gammay','GM, transport gamma_y',  'm^2/s^2', fer_gamma(2,:,:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('sigma_x   ')
+    if (Fer_GM) then
+    call def_stream((/nl-1, nod2D /), (/nl-1, myDim_nod2D /), 'sigma_x',   'zonal density gradient ', 'kg/m^4' , sigma_xy(1,:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('sigma_y   ')
+    if (Fer_GM) then
+    call def_stream((/nl-1, nod2D /), (/nl-1, myDim_nod2D /), 'sigma_y',   'meridional density gradient ',  'kg/m^4' , sigma_xy(2,:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if     
 CASE ('cfl_z         ')
     call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'cfl_z',         'vertical CFL criteria',  '?',           dynamics%cfl_z(:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
