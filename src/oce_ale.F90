@@ -1928,7 +1928,6 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     else
 !$OMP DO
         do n=1,myDim_nod2D
-            if (ulevels_nod2D(n)>1) cycle ! --> in case of cavity 
             ssh_rhs(n)=ssh_rhs(n)+(1.0_WP-alpha)*ssh_rhs_old(n)
         end do
 !$OMP END DO
@@ -2054,6 +2053,7 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
     if (.not. trim(which_ALE)=='linfs') then
 !$OMP PARALLEL DO
         do n=1,myDim_nod2D
+            if (ulevels_nod2D(n)>1) cycle
             ssh_rhs_old(n)=ssh_rhs_old(n)-water_flux(n)*areasvol(ulevels_nod2D(n),n)
         end do
 !$OMP END PARALLEL DO
@@ -2070,6 +2070,7 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
 
 !$OMP PARALLEL DO
     do n=1,myDim_nod2D
+        if (ulevels_nod2D(n) > 1) cycle ! --> if cavity node hbar == hbar_old
         hbar(n)=hbar_old(n)+ssh_rhs_old(n)*dt/areasvol(ulevels_nod2D(n),n)
     end do
 !$OMP END PARALLEL DO
@@ -3656,7 +3657,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         !   rigid lid.
 !$OMP PARALLEL DO
         do node=1, myDim_nod2D+eDim_nod2D
-            eta_n(node)=alpha*hbar(node)+(1.0_WP-alpha)*hbar_old(node)
+            if (ulevels_nod2D(node)==1) eta_n(node)=alpha*hbar(node)+(1.0_WP-alpha)*hbar_old(node)
         end do
 !$OMP END PARALLEL DO
         ! --> eta_(n)
