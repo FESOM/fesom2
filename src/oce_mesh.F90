@@ -2435,6 +2435,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 USE o_PARAM
 USE o_ARRAYS
+USE g_CONFIG, only: rotated_grid, force_rotation
 USE g_ROTATE_grid
 use g_comm_auto
 use elem_center_interface
@@ -2477,7 +2478,12 @@ t0=MPI_Wtime()
  END DO
 
  DO n=1,myDim_nod2D+eDim_nod2D 
-    call r2g(lon, lat, mesh%coord_nod2D(1,n), mesh%coord_nod2D(2,n))
+    if ((.not. rotated_grid)  .and. (.not. force_rotation)) then
+         lon =  mesh%coord_nod2D(1,n)
+         lat  =  mesh%coord_nod2D(2,n)
+    else
+          call r2g(lon, lat, mesh%coord_nod2D(1,n), mesh%coord_nod2D(2,n))
+    end if
     ! in case of numerical noise at the boundaries
     if (lon > 2._WP*pi) lon=lon-2._WP*pi
     if (lon <-2._WP*pi) lon=lon+2._WP*pi
