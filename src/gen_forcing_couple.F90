@@ -369,9 +369,12 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 
          elseif (i.eq.13) then
              if (action) then
-	              enthalpyoffuse(:)            =  exchange(:)        ! enthalpy of fusion via solid water discharge from glaciers
-    	          mask=1.
-	              call force_flux_consv(enthalpyoffuse, mask, i, 0, action, partit, mesh)
+                enthalpyoffuse(:)            =  exchange(:)*333.55*1000000.0        ! enthalpy of fusion via solid water discharge from glaciers
+                enthalpyoffuse = -min(enthalpyoffuse, 1000.0)
+                runoff(:)            = runoff(:) + exchange(:)                      ! Add calving massflux to the liquid runoff. Heatflux goes into enthalpyoffuse.
+
+                mask=1.
+                call force_flux_consv(enthalpyoffuse, mask, i, 0, action, partit, mesh)
              end if
 #else ! oifs
          elseif (i.eq.13) then
