@@ -215,7 +215,7 @@ end subroutine fer_gamma2vel
 subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
     USE MOD_MESH
     USE o_PARAM
-    USE o_ARRAYS, ONLY: fer_c, fer_k, fer_scal, Ki, bvfreq, MLD1_ind, neutral_slope
+    USE o_ARRAYS, ONLY: fer_c, fer_k, fer_scal, Ki, bvfreq, MLD1_ind, neutral_slope, fer_tapfac
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE g_CONFIG
@@ -334,7 +334,9 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
     if (Redi .and. Fer_GM) then
 !$OMP DO
         do n=1, myDim_nod2D
-           Ki(nzmin, n)=fer_k(nzmin, n)
+            !PS Ki(nzmin, n)=fer_k(nzmin, n)
+            Ki(nzmin, n)=max(fer_scal(n)*K_Redi_max, K_GM_min)
+!PS             Ki(nzmin, n)=fer_scal(n)*K_Redi_max
         end do
 !$OMP END DO
     end if
@@ -420,6 +422,13 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
             ! after vertical Ferreira scaling is done also scale surface template
             !!PS Ki(1,n)=Ki(1,n)*0.5_WP*(zscaling(1)+zscaling(2))
             Ki(nzmin,n)=Ki(nzmin,n)*0.5_WP*(zscaling(nzmin)+zscaling(nzmin+1))
+            
+            ! do tapering of redi diffusion coefficient instead of tapering neutral
+            ! slope 
+            do nz=nzmin, nzmax-1
+                !PS  Ki(nz, n)=min(K_Redi_min, Ki(nz, n)) + (Ki(nz, n)-min(K_Redi_min, Ki(nz, n)))*fer_tapfac(nz, n)
+                Ki(nz, n)=Ki(nz, n)*sqrt(fer_tapfac(nz, n)) + K_Redi_min*abs(sqrt(fer_tapfac(nz, n))-1)
+            end do
         end if
    end do
 !$OMP END DO

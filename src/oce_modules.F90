@@ -54,7 +54,10 @@ logical                       :: scaling_Ferreira   =.true.
 logical                       :: scaling_Rossby     =.false.
 logical                       :: scaling_resolution =.true.
 logical                       :: scaling_FESOM14    =.false.
+
 logical                       :: Redi               =.false.  !flag for Redi scheme
+real(kind=WP)                 :: K_Redi_max = 3000.0
+real(kind=WP)                 :: K_Redi_min = 2.0
 
 logical                       :: scaling_ODM95 =.true.    ! tapering based on critical slope
 real(kind=WP)                 :: ODM95_Scr = 1.0e-2   ! Critical slope for tapering
@@ -172,11 +175,12 @@ character(20)                  :: which_pgf='shchepetkin'
 
  NAMELIST /oce_dyn/ state_equation, C_d, A_ver, &
                     scale_area, SPP, &
-                    Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, &
                     scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, &
-                    Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, alpha, theta, use_density_ref, &
+                    visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, alpha, theta, use_density_ref, &
                     K_back, c_back, uke_scaling, uke_scaling_factor, smooth_back, smooth_dis, &
                     smooth_back_tend, rosb_dis, &
+                    Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, &
+                    Redi, K_Redi_max, K_Redi_min, &
                     scaling_ODM95, ODM95_Scr, ODM95_Sd, &
                     scaling_LDD97, LDD97_c, LDD97_rmin, LDD97_rmax         
 
@@ -275,7 +279,7 @@ real(kind=WP),allocatable :: mo(:,:),mixlength(:)
 !GM_stuff
 real(kind=WP),allocatable :: bvfreq(:,:),mixlay_dep(:),bv_ref(:)
 
-real(kind=WP), target, allocatable    :: fer_c(:), fer_scal(:), fer_K(:,:), fer_gamma(:,:,:)
+real(kind=WP), target, allocatable    :: fer_c(:), fer_scal(:), fer_K(:,:), fer_gamma(:,:,:), fer_tapfac(:,:)
 
 real(kind=WP),         allocatable    :: ice_rejected_salt(:)
 

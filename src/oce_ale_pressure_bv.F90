@@ -3043,7 +3043,9 @@ subroutine compute_neutral_slope(partit, mesh)
         
         ! now taper slope with c1 and c2
         do nz = ul1, nl1
-            slope_tapered(:, nz, n)=neutral_slope(:, nz, n) * c1(nz) * c2(nz)
+            fer_tapfac(nz, n) = c1(nz) * c2(nz)
+!PS             slope_tapered(:, nz, n)=neutral_slope(:, nz, n) * c1(nz) * c2(nz)
+            slope_tapered(:, nz, n)=neutral_slope(:, nz, n) * sqrt(c1(nz) * c2(nz))
         end do    
 
     enddo
