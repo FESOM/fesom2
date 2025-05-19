@@ -87,6 +87,11 @@ endif()
 option(USE_ICEPACK "Use ICEPACK" OFF)
 message(STATUS "USE_ICEPACK: ${USE_ICEPACK}")
 
+
+option(BUILD_MESHPARTITIONER "build mesh partitioner" OFF)
+message(STATUS "BUILD_MESHPARTITIONER: ${BUILD_MESHPARTITIONER}")
+
+
 # option to trigger building a library version of FESOM
 # we do not always build the library along with the executable to avoid having two targets here in the CMakeLists.txt
 # two targets would allow e.g. setting different compiler options or preprocessor definition, which would be error prone.
@@ -444,3 +449,32 @@ message(STATUS " --> Final Compile options for ${PROJECT_NAME}: ${FLAGS}")
 ### Export and installation
 
 fesom_export(TARGETS ${PROJECT_NAME} fesom.x)
+
+
+# mesh partitioner
+
+if(BUILD_MESHPARTITIONER)
+  set(meshpartitioner_sources_Fortran ${src_home}/MOD_MESH.F90 ${src_home}/oce_modules.F90 ${src_home}/gen_modules_config.F90 ${src_home}/gen_modules_partitioning.F90 ${src_home}/gen_modules_rotate_grid.F90 ${src_home}/fvom_init.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90 ${src_home}/MOD_READ_BINARY_ARRAYS.F90 ${src_home}/MOD_WRITE_BINARY_ARRAYS.F90 ${src_home}/MOD_PARTIT.F90)
+  set(meshpartitioner_sources_C ${src_home}/fort_part.c)
+  
+  add_subdirectory(${src_home}/../lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
+  include_directories(${src_home}/../lib/metis-5.1.0/include)
+  
+  add_library(meshpartitioner_C ${meshpartitioner_sources_C})
+  target_compile_definitions(meshpartitioner_C PRIVATE USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
+  target_link_libraries(meshpartitioner_C metis)
+  
+  add_executable(meshpartitioner ${meshpartitioner_sources_Fortran})
+  # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
+  if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
+  	target_compile_options(meshpartitioner PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip)
+  #	target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip -g -traceback -check all,noarg_temp_created,bounds,uninit) 
+  elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
+  	target_compile_options(meshpartitioner PRIVATE -fdefault-real-8 -ffree-line-length-none)
+    if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
+        target_compile_options(meshpartitioner PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
+     endif()
+  endif()
+  target_link_libraries(meshpartitioner meshpartitioner_C MPI::MPI_Fortran)
+  set_target_properties(meshpartitioner PROPERTIES LINKER_LANGUAGE Fortran)
+endif()
