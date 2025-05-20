@@ -131,21 +131,6 @@ module g_backscatter
             END DO 
         END DO
         
-        ! old viscosity
-       ! Do ed=1,myDim_elem2D
-       !     len=sqrt(elem_area(ed))                     
-       !     len=dt*len/30.0_WP
-       !     Do nz=1,nlevels(ed)-1
-       !         ! vi has the sense of harmonic viscosity coefficient because of 
-       !         ! the division by area in the end 
-       !         ! ====
-       !         ! Case 1 -- an analog to the third-order upwind (vi=|u|l/12)
-       !         ! ====
-       !         vi=max(0.2_WP,sqrt(UV(1,nz,ed)**2+UV(2,nz,ed)**2))*len 
-       !         U_c(nz,ed)=-U_c(nz,ed)*vi                             
-       !         V_c(nz,ed)=-V_c(nz,ed)*vi
-       !     END DO
-       ! end do
         call exchange_elem(U_c, partit)
         call exchange_elem(V_c, partit) 
         
@@ -154,7 +139,6 @@ module g_backscatter
             el=edge_tri(:,ed)
             le=edge_dxdy(:,ed)
             le(1)=le(1)*sum(elem_cos(el))*0.25_WP
-            !Check this weighting here!!!
             len=sqrt(le(1)**2+le(2)**2)*r_earth
             !Weighting new viscosity 
             len2=sqrt(sum(elem_area(el)))
@@ -184,10 +168,6 @@ module g_backscatter
                 !Correct scaling for the diffusion?
                 uke_d(nz,el(1))=uke_d(nz,el(1))-uke1/elem_area(el(1))
                 uke_d(nz,el(2))=uke_d(nz,el(2))+uke1/elem_area(el(2))
-                
-                !Biharmonic contribution
-                !u1=(U_c(nz,el(1))-U_c(nz,el(2)))
-                !v1=(V_c(nz,el(1))-V_c(nz,el(2)))
                 
                 !New viscosity param part
                 u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
