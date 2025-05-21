@@ -446,9 +446,6 @@ get_target_property(FLAGS ${PROJECT_NAME} COMPILE_OPTIONS)
 message(STATUS " --> Final Compile options for ${PROJECT_NAME}: ${FLAGS}")
 
 
-### Export and installation
-
-fesom_export(TARGETS ${PROJECT_NAME} fesom.x)
 
 
 # mesh partitioner
@@ -478,3 +475,7 @@ if(BUILD_MESHPARTITIONER)
   target_link_libraries(fesom_meshpart fesom_meshpart_C MPI::MPI_Fortran)
   set_target_properties(fesom_meshpart PROPERTIES LINKER_LANGUAGE Fortran)
 endif()
+
+### Export and installation
+
+fesom_export(TARGETS ${PROJECT_NAME} fesom.x fesom_meshpart)
