@@ -1,11 +1,10 @@
 # Download icepack columphysics code
-# from Lorenzo's fork on github and
+# from Frank's fork on github and
 # switch to the appropriate branch
 
 DIR="./Icepack"
 if [ ! -d "$DIR" ]; then
-   git clone https://github.com/lzampier/Icepack.git
+   git clone https://github.com/fkauker/Icepack.git
    cd $DIR
-   # git checkout icepack_fesom2
-   git checkout icepack_fesom2_bugfix
+   git checkout icepack1.4.1_fesom2
 fi

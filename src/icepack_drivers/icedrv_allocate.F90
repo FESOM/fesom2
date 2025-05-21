@@ -5,43 +5,43 @@
 ! Author: Lorenzo Zampieri ( lorenzo.zampieri@awi.de )
 ! -------------------------------------------------------------
 
-  submodule (icedrv_main) allocate_icepack 
+submodule (icedrv_main) allocate_icepack 
 
-      use icepack_intfc,    only: icepack_max_nbtrcr, icepack_max_algae, icepack_max_aero
-      use icepack_intfc,    only: icepack_nmodal1, icepack_nmodal2
-      use icepack_intfc,    only: icepack_nspint
-      use icepack_intfc,    only: icepack_warnings_flush, icepack_warnings_aborted
-      use icepack_intfc,    only: icepack_max_aero, icepack_max_nbtrcr, &
-          icepack_max_algae, icepack_max_doc, icepack_max_don, icepack_max_dic, icepack_max_fe, &
-          icepack_query_tracer_indices, icepack_query_tracer_flags, icepack_query_parameters,   &
-          icepack_query_tracer_sizes
-      use icedrv_system,    only: icedrv_system_abort
+  use icepack_intfc, only: &
+       icepack_max_nbtrcr, icepack_max_algae, icepack_max_iso, icepack_max_aero,       &
+       icepack_nmodal1, icepack_nmodal2, icepack_warnings_flush,                       &
+       icepack_warnings_aborted, icepack_max_aero, icepack_max_nbtrcr,                 &
+       icepack_max_algae, icepack_max_doc, icepack_max_don, icepack_max_dic,           &
+       icepack_max_fe, icepack_query_tracer_indices, icepack_query_tracer_flags,       &
+       icepack_query_parameters, icepack_query_tracer_sizes, icepack_nspint_3bd,       &
+       icepack_nspint_5bd
+  use icedrv_system, only: icedrv_system_abort
 
-      contains
+contains
 
-      subroutine alloc_state
+  subroutine alloc_state
 
-      implicit none
-
-      integer (int_kind)          :: ntrcr, ierr
-      character(len=*), parameter :: subname='(alloc_state)'
-
-      call icepack_query_tracer_sizes(ntrcr_out=ntrcr)
-      call icepack_warnings_flush(ice_stderr)
-      if (icepack_warnings_aborted()) & 
-          call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)     
-
-      allocate (           &
+    implicit none
+    
+    integer (int_kind)          :: ntrcr, ierr
+    character(len=*), parameter :: subname='(alloc_state)'
+    
+    call icepack_query_tracer_sizes(ntrcr_out=ntrcr)
+    call icepack_warnings_flush(ice_stderr)
+    if (icepack_warnings_aborted()) & 
+         call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)     
+    
+    allocate (           &
          lmask_n(nx)     , & ! N. Hemis mask 
          lmask_s(nx)     , & ! S. Hemis mask
          lon_val(nx)     , &
          lat_val(nx)     , &
          stat=ierr)
-
-      if (ierr/=0) write(ice_stderr,*) 'Memory issue in task ', mype
-      if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
-
-      allocate (               &
+    
+    if (ierr/=0) write(ice_stderr,*) 'Memory issue in task ', mype
+    if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
+    
+    allocate (               &
          aice      (nx)      , & ! concentration of ice
          vice      (nx)      , & ! volume per unit area of ice (m)
          vsno      (nx)      , & ! volume per unit area of snow (m)
@@ -62,40 +62,40 @@
          trcrn     (nx,max_ntrcr,ncat) , & ! tracers: 1: surface temperature of ice/snow (C)
          stat=ierr)
 
-      if (ierr/=0) write(ice_stderr,*) 'Memory issue in task ', mype
-      if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
+    if (ierr/=0) write(ice_stderr,*) 'Memory issue in task ', mype
+    if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
 
-      allocate (                &
+    allocate (                &
          trcr_depend(max_ntrcr)   , & !
          n_trcr_strata(max_ntrcr) , & ! number of underlying tracer layers
          nt_strata(max_ntrcr,2)   , & ! indices of underlying tracer layers
          trcr_base(max_ntrcr,3)   , & ! = 0 or 1 depending on tracer dependency, (1) aice, (2) vice, (3) vsno
          stat=ierr)
 
-      if (ierr/=0) write(ice_stderr,*) 'Memory issue in task ', mype
-      if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
+    if (ierr/=0) write(ice_stderr,*) 'Memory issue in task ', mype
+    if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
+    
+    trcr_depend = 0
+    n_trcr_strata = 0
+    nt_strata = 0
+    trcr_base = 0
 
-      trcr_depend = 0
-      n_trcr_strata = 0
-      nt_strata = 0
-      trcr_base = 0
+  end subroutine alloc_state
 
-      end subroutine alloc_state
-
-      ! ---------------------------------------------------------------
-      ! Subroutine to allocate the arrays declared in ice icedrv_flux
-      ! ---------------------------------------------------------------
-      ! Lorenzo Zampieri 02/2019
-      ! ---------------------------------------------------------------
+  ! ---------------------------------------------------------------
+  ! Subroutine to allocate the arrays declared in ice icedrv_flux
+  ! ---------------------------------------------------------------
+  ! Lorenzo Zampieri 02/2019
+  ! ---------------------------------------------------------------
       
-      subroutine alloc_flux
+  subroutine alloc_flux
 
-      implicit none
-
-      integer (int_kind)          :: ierr
-      character(len=*), parameter :: subname='(alloc_flux)'
-
-      allocate( &
+    implicit none
+    
+    integer (int_kind)          :: ierr
+    character(len=*), parameter :: subname='(alloc_flux)'
+    
+    allocate( &
          strax(nx)   , & ! wind stress components (N/m^2)
          stray(nx)   , & !
          uocn(nx)   , & ! ocean current, x-direction (m/s)
@@ -157,6 +157,10 @@
          Tf(nx)      , & ! freezing temperature (C)
          qdp(nx)     , & ! deep ocean heat flux (W/m^2), negative upward
          hmix(nx)    , & ! mixed layer depth (m)
+         ! water isotopes
+         HDO_ocn(nx),    & ! seawater concentration of HDO (kg/kg)
+         H2_16O_ocn(nx), & ! seawater concentration of H2_16O (kg/kg)
+         H2_18O_ocn(nx), & ! seawater concentration of H2_18O (kg/kg)     
          fsens(nx)   , & ! sensible heat flux (W/m^2)
          flat(nx)    , & ! latent heat flux   (W/m^2)
          fswabs(nx)  , & ! shortwave flux absorbed in ice and ocean (W/m^2)
@@ -191,14 +195,19 @@
          fsalt(nx)     , & ! salt flux to ocean (kg/m^2/s)
          fhocn(nx)     , & ! net heat flux to ocean (W/m^2)
          fhocn_tot(nx) , & ! total net heat flux to ocean (W/m^2)
+         fsloss(nx)    , & ! snow loss to ocean due to wind redistribution (kg/m^2 s)
          fswthru(nx)   , & ! shortwave penetrating to ocean (W/m^2)
-         fswfac(nx)    , & ! for history
-         scale_factor(nx), &  ! scaling factor for shortwave components
-         meltsn(nx,ncat) , & ! snow melt in category n (m)
-         melttn(nx,ncat) , & ! top melt in category n (m)
-         meltbn(nx,ncat) , & ! bottom melt in category n (m)
-         congeln(nx,ncat), & ! congelation ice formation in category n (m)
-         snoicen(nx,ncat), & ! snow-ice formation in category n (m)
+         fswthru_vdr(nx),    & ! vis dir shortwave penetrating to ocean (W/m^2)
+         fswthru_vdf(nx),    & ! vis dif shortwave penetrating to ocean (W/m^2)
+	 fswthru_idr(nx),    & ! nir dir shortwave penetrating to ocean (W/m^2)
+         fswthru_idf(nx),    & ! nir dif shortwave penetrating to ocean (W/m^2)   
+         fswfac(nx),         & ! for history
+         scale_factor(nx),   & ! scaling factor for shortwave components
+         meltsn(nx,ncat),    & ! snow melt in category n (m)
+         melttn(nx,ncat),    & ! top melt in category n (m)
+         meltbn(nx,ncat),    & ! bottom melt in category n (m)
+         congeln(nx,ncat),   & ! congelation ice formation in category n (m)
+         snoicen(nx,ncat),   & ! snow-ice formation in category n (m)
          keffn_top(nx,ncat), & ! effective thermal conductivity of the top ice layer
                                ! on categories (W/m^2/K)
          strairx_ocn(nx) , & ! stress on ocean by air, x-direction
@@ -238,46 +247,51 @@
          fcondbotn(nx,ncat) , & ! category fcondbot
          fsensn(nx,ncat)    , & ! category sensible heat flux
          flatn(nx,ncat)     , & ! category latent heat flux
-         fresh_ai(nx),   & ! fresh water flux to ocean (kg/m^2/s)
-         fsalt_ai(nx),   & ! salt flux to ocean (kg/m^2/s)
-         fhocn_ai(nx),   & ! net heat flux to ocean (W/m^2)
-         fswthru_ai(nx), &  ! shortwave penetrating to ocean (W/m^2)
-         rside(nx)     , & ! fraction of ice that melts laterally
-         fside(nx)     , & ! lateral heat flux (W/m^2)
-         fsw(nx)       , & ! incoming shortwave radiation (W/m^2)
-         cos_zen(nx)   , & ! cosine solar zenith angle, < 0 for sun below horizon
-         rdg_conv(nx)  , & ! convergence term for ridging on nodes (1/s)
-         rdg_shear(nx) , & ! shear term for ridging on nodes (1/s)
+         fresh_ai(nx),        & ! fresh water flux to ocean (kg/m^2/s)
+         fsalt_ai(nx),        & ! salt flux to ocean (kg/m^2/s)
+         fhocn_ai(nx),        & ! net heat flux to ocean (W/m^2)
+         fswthru_ai(nx),      & ! shortwave penetrating to ocean (W/m^2)
+         rside(nx),           & ! fraction of ice that melts laterally
+         fside(nx),           & ! lateral heat flux (W/m^2)
+         wlat(nx),            & ! lateral melt rate (m/s)
+         fsw(nx),             & ! incoming shortwave radiation (W/m^2)
+         cos_zen(nx),         & ! cosine solar zenith angle, < 0 for sun below horizon
+         rdg_conv(nx),        & ! convergence term for ridging on nodes (1/s)
+         rdg_shear(nx),       & ! shear term for ridging on nodes (1/s)
          rdg_conv_elem(nx_elem),  & ! convergence term for ridging on elements (1/s)
          rdg_shear_elem(nx_elem), & ! shear term for ridging on elements (1/s)
-         salinz(nx,nilyr+1)  , & ! initial salinity  profile (ppt)
-         Tmltz(nx,nilyr+1)   , & ! initial melting temperature (C)
+         salinz(nx,nilyr+1),  & ! initial salinity  profile (ppt)
+         Tmltz(nx,nilyr+1),   & ! initial melting temperature (C)
          stat=ierr)
 
-      if (ierr/=0) write(ice_stderr,*) 'Memory issue in task ', mype
-      if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
+    if (ierr/=0) write(ice_stderr,*) 'Memory issue in task ', mype
+    if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
       
-      end subroutine alloc_flux
+  end subroutine alloc_flux
 
-      ! ---------------------------------------------------------------
-      ! Subroutine to allocate the arrays declared in ice icedrv_flux_bgc
-      ! ---------------------------------------------------------------
-      ! Lorenzo Zampieri 02/2019
-      ! ---------------------------------------------------------------
+  ! ---------------------------------------------------------------
+  ! Subroutine to allocate the arrays declared in ice icedrv_flux_bgc
+  ! ---------------------------------------------------------------
+  ! Lorenzo Zampieri 02/2019
+  ! ---------------------------------------------------------------
 
-      subroutine alloc_flux_bgc
+  subroutine alloc_flux_bgc
 
-      implicit none
+    implicit none
 
-      integer (int_kind)            :: ierr
-      character(len=*),   parameter :: subname='(alloc_flux_bgc)'
+    integer (int_kind)            :: ierr
+    character(len=*),   parameter :: subname='(alloc_flux_bgc)'
 
-      allocate( &
-         faero_atm(nx,icepack_max_aero)       , &
-         flux_bio_atm(nx,icepack_max_nbtrcr)  , & ! all bio fluxes to ice from atmosphere
-         faero_ocn(nx,icepack_max_aero)       , & ! aerosol flux to ocean  (kg/m^2/s)
-         flux_bio(nx,icepack_max_nbtrcr)      , & ! all bio fluxes to ocean
-         flux_bio_ai(nx,icepack_max_nbtrcr)   , & ! all bio fluxes to ocean, averaged over grid cell
+    allocate( &
+         faero_atm(nx,icepack_max_aero),        &
+         flux_bio_atm(nx,icepack_max_nbtrcr),   & ! all bio fluxes to ice from atmosphere
+         fiso_atm(nx,icepack_max_iso),          & ! isotope deposition rate (kg/m^2 s)
+         fiso_evap(nx,icepack_max_iso),         & ! isotope evaporation rate (kg/m^2 s)         
+         Qa_iso(nx,icepack_max_iso),            & ! isotope specific humidity (kg/kg)
+         Qref_iso(nx,icepack_max_iso),          & ! 2m atm reference isotope spec humidity (kg/kg)      
+         faero_ocn(nx,icepack_max_aero),        & ! aerosol flux to ocean  (kg/m^2/s)
+         flux_bio(nx,icepack_max_nbtrcr),       & ! all bio fluxes to ocean
+         flux_bio_ai(nx,icepack_max_nbtrcr),    & ! all bio fluxes to ocean, averaged over grid cell
          fzsal_ai(nx)          , & ! salt flux to ocean from zsalinity (kg/m^2/s)
          fzsal_g_ai(nx)        , & ! gravity drainage salt flux to ocean (kg/m^2/s)
          hin_old(nx,ncat)      , & ! old ice thickness
@@ -308,29 +322,27 @@
          zaeros(nx,icepack_max_aero)     , & ! ocean aerosols (mmol/m^3)
          stat=ierr)
 
-      if (ierr/=0) write(ice_stderr,*) 'Memory issue in task ', mype
-      if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
+    if (ierr/=0) write(ice_stderr,*) 'Memory issue in task ', mype
+    if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
 
-      end subroutine alloc_flux_bgc
+  end subroutine alloc_flux_bgc
 
-      subroutine alloc_column
+  subroutine alloc_column
 
-      implicit none
+    implicit none
 
-      integer (int_kind)          :: max_nbtrcr, max_algae, max_aero, &
-                                     nmodal1, nmodal2,    max_don
-      integer (int_kind)          :: ierr
-      character(len=*), parameter :: subname='(alloc_column)'
+    integer (int_kind) :: max_nbtrcr, max_algae, max_aero, nmodal1, nmodal2, max_don
+    integer (int_kind) :: ierr
+    character(len=*), parameter :: subname='(alloc_column)'
 
-
-      call icepack_query_tracer_sizes( max_nbtrcr_out=max_nbtrcr,       &
+    call icepack_query_tracer_sizes( max_nbtrcr_out=max_nbtrcr,       &
          max_algae_out=max_algae, max_aero_out=max_aero,                &
          nmodal1_out=nmodal1, nmodal2_out=nmodal2, max_don_out=max_don) 
-      call icepack_warnings_flush(ice_stderr)
-      if (icepack_warnings_aborted())                                   &
-          call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
-
-      allocate(             &
+    call icepack_warnings_flush(ice_stderr)
+    if (icepack_warnings_aborted())                                   &
+         call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
+    
+    allocate(             &
          Cdn_atm(nx)      , & ! atm drag coefficient
          Cdn_ocn(nx)      , & ! ocn drag coefficient
                               ! form drag
@@ -342,18 +354,20 @@
          dkeel(nx),         & ! distance between keels
          lfloe(nx),         & ! floe length
          dfloe(nx),         & ! distance between floes
+         meltsliq(nx),      & ! snow melt mass (kg/m^2/step-->kg/m^2/day)        
          Cdn_atm_skin(nx),  & ! neutral skin drag coefficient
          Cdn_atm_floe(nx),  & ! neutral floe edge drag coefficient
          Cdn_atm_pond(nx),  & ! neutral pond edge drag coefficient
          Cdn_atm_rdg(nx),   & ! neutral ridge drag coefficient
          Cdn_ocn_skin(nx),  & ! skin drag coefficient
          Cdn_ocn_floe(nx),  & ! floe edge drag coefficient
-         Cdn_ocn_keel(nx),  & ! keel drag coefficient
-         Cdn_atm_ratio(nx), & ! ratio drag atm / neutral drag atm
-         hin_max(0:ncat)  , & ! category limits (m)
-         c_hi_range(ncat) , & !
-         dhsn(nx,ncat)    , & ! depth difference for snow on sea ice and pond ice
-         ffracn(nx,ncat)  , & ! fraction of fsurfn used to melt ipond
+         Cdn_ocn_keel(nx),     & ! keel drag coefficient
+         Cdn_atm_ratio(nx),    & ! ratio drag atm / neutral drag atm
+         hin_max(0:ncat),      & ! category limits (m)
+         c_hi_range(ncat),     & !
+         dhsn(nx,ncat),        & ! depth difference for snow on sea ice and pond ice
+         meltsliqn(nx,ncat),   & ! snow melt mass in category n (kg/m^2)
+         ffracn(nx,ncat)     , & ! fraction of fsurfn used to melt ipond
          alvdrn(nx,ncat)     , & ! visible direct albedo           (fraction)
          alidrn(nx,ncat)     , & ! near-ir direct albedo           (fraction)
          alvdfn(nx,ncat)     , & ! visible diffuse albedo          (fraction)
@@ -363,19 +377,31 @@
          albpndn(nx,ncat)    , & ! pond
          apeffn(nx,ncat)     , & ! effective pond area used for radiation calculation
          snowfracn(nx,ncat)  , & ! Category snow fraction used in radiation
-         Iswabsn(nx,nilyr,ncat)      , & ! SW radiation absorbed in ice layers (W m-2)
-         Sswabsn(nx,nslyr,ncat)      , & ! SW radiation absorbed in snow layers (W m-2)
-         fswsfcn(nx,ncat)            , & ! SW absorbed at ice/snow surface (W m-2)
-         fswthrun(nx,ncat)           , & ! SW through ice to ocean            (W/m^2)
-         fswintn(nx,ncat)            , & ! SW absorbed in ice interior, below surface (W m-2)
-         fswpenln(nx,nilyr+1,ncat)   , &  ! visible SW entering ice layers (W m-2)
-         kaer_tab(icepack_nspint,icepack_max_aero)   , & ! aerosol mass extinction cross section (m2/kg)
-         waer_tab(icepack_nspint,icepack_max_aero)   , & ! aerosol single scatter albedo (fraction)
-         gaer_tab(icepack_nspint,icepack_max_aero)   , & ! aerosol asymmetry parameter (cos(theta))
-         kaer_bc_tab(icepack_nspint,icepack_nmodal1) , & ! BC mass extinction cross section (m2/kg)
-         waer_bc_tab(icepack_nspint,icepack_nmodal1) , & ! BC single scatter albedo (fraction)
-         gaer_bc_tab(icepack_nspint,icepack_nmodal1) , & ! BC aerosol asymmetry parameter (cos(theta))
-         bcenh(icepack_nspint,icepack_nmodal1,icepack_nmodal2)    , &  ! BC absorption enhancement factor
+         fswsfcn(nx,ncat)    , & ! SW absorbed at ice/snow surface (W m-2)
+         fswthrun(nx,ncat)   , & ! SW through ice to ocean            (W/m^2)
+         fswthrun_vdr(nx,ncat),    & ! vis dir SW through ice to ocean (W/m^2)
+         fswthrun_vdf(nx,ncat),    & ! vis dif SW through ice to ocean (W/m^2)
+         fswthrun_idr(nx,ncat),    & ! nir dir SW through ice to ocean (W/m^2)
+         fswthrun_idf(nx,ncat),    & ! nir dif SW through ice to ocean (W/m^2)
+         fswintn(nx,ncat),         & ! SW absorbed in ice interior, below surface (W m-2)
+         Iswabsn(nx,nilyr,ncat),   & ! SW radiation absorbed in ice layers (W m-2)
+         Sswabsn(nx,nslyr,ncat),   & ! SW radiation absorbed in snow layers (W m-2)
+         fswpenln(nx,nilyr+1,ncat),& ! visible SW entering ice layers (W m-2)
+         !!! do not see why that should be allocated here frank.kauker@awi.de
+         ! gaer_bc_3bd (icepack_nspint_3bd,icepack_nmodal1),      & ! gaer_bc_3bd, modalAsymmetryParameter5band
+         ! kaer_bc_3bd (icepack_nspint_3bd,icepack_nmodal1),      & ! kaer_bc_3bd, modalMassExtinctionCrossSection5band
+         ! waer_bc_3bd (icepack_nspint_3bd,icepack_nmodal1),      & ! waer_bc_3bd, modalSingleScatterAlbedo5band
+         ! gaer_3bd    (icepack_nspint_3bd,icepack_nmodal1),      & ! gaer_3bd, aerosolAsymmetryParameter5band
+         ! kaer_3bd    (icepack_nspint_3bd,icepack_nmodal1),      & ! kaer_3bd, aerosolMassExtinctionCrossSection5band
+         ! waer_3bd    (icepack_nspint_3bd,icepack_nmodal1),      & ! waer_3bd, aerosolSingleScatterAlbedo5band
+         ! bcenh_3bd   (icepack_nspint_3bd,icepack_nmodal1,icepack_nmodal2),    & ! bcenh_3bd, modalBCabsorptionParameter5band
+         ! gaer_bc_5bd (icepack_nspint_5bd,icepack_nmodal1),      & ! gaer_bc_5bd, modalAsymmetryParameter5band
+         ! kaer_bc_5bd (icepack_nspint_5bd,icepack_nmodal1),      & ! kaer_bc_5bd, modalMassExtinctionCrossSection5band
+         ! waer_bc_5bd (icepack_nspint_5bd,icepack_nmodal1),      & ! waer_bc_5bd, modalSingleScatterAlbedo5band
+         ! gaer_5bd    (icepack_nspint_5bd,icepack_nmodal1),      & ! gaer_5bd, aerosolAsymmetryParameter5band
+         ! kaer_5bd    (icepack_nspint_5bd,icepack_nmodal1),      & ! kaer_5bd, aerosolMassExtinctionCrossSection5band
+         ! waer_5bd    (icepack_nspint_5bd,icepack_nmodal1),      & ! waer_5bd, aerosolSingleScatterAlbedo5band
+         ! bcenh_5bd   (icepack_nspint_5bd,icepack_nmodal1,icepack_nmodal2),    & ! bcenh_5bd, modalBCabsorptionParameter5band
          bgrid(nblyr+2)              , & ! biology nondimensional vertical grid points
          igrid(nblyr+1)              , & ! biology vertical interface points
          cgrid(nilyr+1)              , & ! CICE vertical coordinate

@@ -120,6 +120,7 @@ contains
       ! EO parameters
       logical mpi_is_initialized
       integer              :: tr_num
+
 #if !defined  __ifsinterface
       if(command_argument_count() > 0) then
         call command_line_options%parse()
@@ -306,9 +307,12 @@ contains
         ! Setup icepack
         !=====================
         if (f%mype==0) write(*,*) 'Icepack: reading namelists from namelist.icepack'
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call set_icepack'//achar(27)//'[0m'
         call set_icepack(f%ice, f%partit)
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call alloc_icepack'//achar(27)//'[0m'
         call alloc_icepack
-        call init_icepack(f%ice, f%tracers%data(1), f%mesh)
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call init_icepack'//achar(27)//'[0m'
+        call init_icepack(flag_debug, f%ice, f%tracers%data(1), f%mesh)
         if (f%mype==0) write(*,*) 'Icepack: setup complete'
 #endif
         call clock_newyear                        ! check if it is a new year
@@ -452,7 +456,9 @@ contains
     !$ACC CREATE (f%tracers%work%adv_flux_hor, f%tracers%work%adv_flux_ver, f%tracers%work%fct_LO) &
     !$ACC CREATE (f%tracers%work%del_ttf_advvert, f%tracers%work%del_ttf_advhoriz, f%tracers%work%edge_up_dn_grad) &
     !$ACC CREATE (f%tracers%work%del_ttf)
-  end subroutine
+
+     if (f%mype==0) write(*,*) 'leave - fesom_init'
+  end subroutine fesom_init
 
 
   subroutine fesom_runloop(current_nsteps)
@@ -641,7 +647,9 @@ contains
         !--------------------------
 
         f%t5 = MPI_Wtime()
+        if(f%mype==0) write(*,*) 'fesom_runloop: enter restart', n, nstart, ntotal  
         call restart(n, nstart, f%total_nsteps, .false., f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        if(f%mype==0) write(*,*) 'fesom_runloop: leave restart'
         f%t6 = MPI_Wtime()
         
         f%rtime_fullice       = f%rtime_fullice       + f%t2 - f%t1
@@ -675,7 +683,7 @@ contains
     f%from_nstep = f%from_nstep+current_nsteps
 !call cray_acc_set_debug_global_level(0)    
 !   write(0,*) 'f%from_nstep after the loop:', f%from_nstep    
-  end subroutine
+  end subroutine fesom_runloop
 
 
   subroutine fesom_finalize()

@@ -595,9 +595,7 @@ submodule (icedrv_main) icedrv_advection
         integer (kind=int_kind) :: nt_Tsfc, nt_qice, nt_qsno,                          & 
                                    nt_sice, nt_fbri, nt_iage, nt_FY, nt_alvl, nt_vlvl, &
                                    nt_apnd, nt_hpnd, nt_ipnd, nt_bgc_Nit, nt_bgc_S
-        logical (kind=log_kind) :: tr_pond_topo, tr_pond_lvl, tr_pond_cesm,            &
-                                   tr_pond,      tr_aero,     tr_FY,                   &
-                                   tr_iage,      heat_capacity
+        logical (kind=log_kind) :: tr_pond_topo, tr_pond_lvl, tr_pond, tr_aero, tr_FY, tr_iage
         real    (kind=dbl_kind) :: puny
       
         ! Tracer dependencies and additional arrays
@@ -615,19 +613,20 @@ submodule (icedrv_main) icedrv_advection
         type(t_mesh),        target,       intent(in)    :: mesh
         type(t_ice),        target,       intent(in)    :: ice
 
-        call icepack_query_parameters(heat_capacity_out=heat_capacity,    &
-                                      puny_out=puny)
+        call icepack_query_parameters(puny_out=puny)
         call icepack_query_tracer_sizes(ntrcr_out=ntrcr, nbtrcr_out=nbtrcr)
-        call icepack_query_tracer_flags(                                  &
-               tr_iage_out=tr_iage, tr_FY_out=tr_FY,                      &
-               tr_aero_out=tr_aero, tr_pond_out=tr_pond,                  &
-               tr_pond_cesm_out=tr_pond_cesm,                             &
-               tr_pond_lvl_out=tr_pond_lvl, tr_pond_topo_out=tr_pond_topo)
-        call icepack_query_tracer_indices(nt_Tsfc_out=nt_Tsfc, nt_qice_out=nt_qice, &
-               nt_qsno_out=nt_qsno, nt_sice_out=nt_sice, nt_fbri_out=nt_fbri,       &
-               nt_iage_out=nt_iage, nt_FY_out=nt_FY, nt_alvl_out=nt_alvl,           &
-               nt_vlvl_out=nt_vlvl, nt_apnd_out=nt_apnd, nt_hpnd_out=nt_hpnd,       &
-               nt_ipnd_out=nt_ipnd, nt_bgc_Nit_out=nt_bgc_Nit, nt_bgc_S_out=nt_bgc_S)
+        call icepack_query_tracer_flags( &
+             tr_iage_out=tr_iage, tr_FY_out=tr_FY,                       &
+             tr_aero_out=tr_aero, tr_pond_out=tr_pond,                   &
+             tr_pond_lvl_out=tr_pond_lvl, tr_pond_topo_out=tr_pond_topo)
+        call icepack_query_tracer_indices( &
+             nt_Tsfc_out=nt_Tsfc,         nt_qice_out=nt_qice,           &
+             nt_qsno_out=nt_qsno,         nt_sice_out=nt_sice,           &
+             nt_fbri_out=nt_fbri,         nt_iage_out=nt_iage,           &
+             nt_FY_out=nt_FY,             nt_alvl_out=nt_alvl,           &
+             nt_vlvl_out=nt_vlvl,         nt_apnd_out=nt_apnd,           &
+             nt_hpnd_out=nt_hpnd,         nt_ipnd_out=nt_ipnd,           &
+             nt_bgc_Nit_out=nt_bgc_Nit,   nt_bgc_S_out=nt_bgc_S )
       
         narr   = 1 + ncat * (3 + ntrcr) ! max number of state variable arrays
       
@@ -654,41 +653,35 @@ submodule (icedrv_main) icedrv_advection
      
         do i=1,nx
            if (ncat < 0) then ! Do we really need this?
-     
-              call cleanup_itd  (dt,                     ntrcr,                &
-                                 nilyr,                  nslyr,                &
-                                 ncat,                   hin_max(:),           &
-                                 aicen(i,:),             trcrn(i,1:ntrcr,:),   &
-                                 vicen(i,:),             vsnon(i,:),           &
-                                 aice0(i),               aice(i),              &
-                                 n_aero,                                       &
-                                 nbtrcr,                 nblyr,                &
-                                 tr_aero,                                      &
-                                 tr_pond_topo,                                 &
-                                 heat_capacity,                                &
-                                 first_ice(i,:),                               &
-                                 trcr_depend(1:ntrcr),   trcr_base(1:ntrcr,:), &
-                                 n_trcr_strata(1:ntrcr), nt_strata(1:ntrcr,:), &
-                                 fpond(i),               fresh(i),             &
-                                 fsalt(i),               fhocn(i),             &
-                                 faero_ocn(i,:),         fzsal(i),             &
-                                 flux_bio(i,1:nbtrcr))
+              !dtt = dt * ndtd  ! for proper averaging over thermo timestep
+              call cleanup_itd  ( &
+                   dt,                     ntrcr,                nilyr,                   nslyr,                &
+                   ncat,                   hin_max(:),           aicen(i,:),              trcrn(i,1:ntrcr,:),   &
+                   vicen(i,:),             vsnon(i,:),           aice0(i),                aice(i),              &
+                   n_aero,                 nbtrcr,               nblyr,                   tr_aero,              &
+                   tr_pond_topo,           first_ice(i,:),       trcr_depend(1:ntrcr),    trcr_base(1:ntrcr,:), &
+                   n_trcr_strata(1:ntrcr), nt_strata(1:ntrcr,:), fpond(i),                fresh(i),             &
+                   fsalt(i),               fhocn(i),             faero_ocn(i,:),          fiso_ocn(i,:),        &
+                   flux_bio(i,1:nbtrcr),   Tf(i) )
       
-              call icepack_aggregate (ncat,                    &
-                                     aicen(i,:),               &
-                                     trcrn(i,1:ntrcr,:),       &
-                                     vicen(i,:),               &
-                                     vsnon(i,:),               &
-                                     aice (i),                 &
-                                     trcr (i,1:ntrcr),         &
-                                     vice (i),                 &
-                                     vsno (i),                 &
-                                     aice0(i),                 &
-                                     ntrcr,                    &
-                                     trcr_depend  (1:ntrcr),   &
-                                     trcr_base    (1:ntrcr,:), &
-                                     n_trcr_strata(1:ntrcr),   &
-                                     nt_strata    (1:ntrcr,:))
+              call icepack_aggregate( &
+                   ncat=ncat,                    &
+                   trcrn=trcrn(i,1:ntrcr,:),     &
+                   aicen=aicen(i,:),             &
+                   vicen=vicen(i,:),             &
+                   vsnon=vsnon(i,:),             &
+                   trcr=trcr(i,1:ntrcr),         &
+                   aice=aice(i),                 &
+                   vice=vice(i),                 &
+                   vsno =vsno(i),                &
+                   aice0=aice0(i),               &
+                   ntrcr=ntrcr,                  &
+                   trcr_depend=trcr_depend(1:ntrcr),     &
+                   trcr_base=trcr_base(1:ntrcr,:),       &
+                   n_trcr_strata=n_trcr_strata(1:ntrcr), &
+                   nt_strata=nt_strata(1:ntrcr,:),       &
+                   Tf=Tf(i)          )
+
            end if
         end do
 
@@ -713,7 +706,7 @@ submodule (icedrv_main) icedrv_advection
            nt_alvl, nt_apnd, nt_fbri, nt_Tsfc, ktherm
   
         logical (kind=log_kind) :: &
-           tr_lvl, tr_pond_cesm, tr_pond_lvl, tr_pond_topo, heat_capacity
+           tr_lvl, tr_pond_lvl, tr_pond_topo
   
         integer (kind=int_kind) ::      &
            k, i, n, it   , & ! counting indices
@@ -738,16 +731,18 @@ submodule (icedrv_main) icedrv_advection
   
         character(len=*), parameter :: subname = '(state_to_work)'
   
-        call icepack_query_tracer_flags(tr_pond_cesm_out=tr_pond_cesm,              &
+        call icepack_query_tracer_flags( &
              tr_pond_lvl_out=tr_pond_lvl, tr_pond_topo_out=tr_pond_topo,            &
              tr_lvl_out=tr_lvl)
-        call icepack_query_tracer_indices(nt_alvl_out=nt_alvl, nt_apnd_out=nt_apnd, &
-             nt_fbri_out=nt_fbri, nt_qsno_out=nt_qsno,                              &
-             nt_qice_out=nt_qice, nt_sice_out=nt_sice, nt_Tsfc_out=nt_Tsfc) 
-        call icepack_query_parameters(rhoi_out=rhoi,     rhos_out=rhos,                   &
-                                      Lfresh_out=Lfresh, heat_capacity_out=heat_capacity, &
-                                      Tsmelt_out=Tsmelt, ktherm_out=ktherm,               &
-                                      puny_out=puny)
+        call icepack_query_tracer_indices( &
+             nt_alvl_out=nt_alvl,         nt_apnd_out=nt_apnd,           &
+             nt_fbri_out=nt_fbri,         nt_qsno_out=nt_qsno,           &
+             nt_qice_out=nt_qice,         nt_sice_out=nt_sice,           &
+             nt_Tsfc_out=nt_Tsfc ) 
+        call icepack_query_parameters( &
+             rhoi_out=rhoi,               rhos_out=rhos,                 &
+             Lfresh_out=Lfresh,           Tsmelt_out=Tsmelt,             &
+             ktherm_out=ktherm,           puny_out=puny )
         call icepack_warnings_flush(ice_stderr)
         if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
            file=__FILE__, line=__LINE__)
@@ -757,7 +752,8 @@ submodule (icedrv_main) icedrv_advection
         vicen(:,:)   = c0
         vsnon(:,:)   = c0
         aice0(:)     = c0
-
+        Tf(:)        = c0
+        
         ! Open water fraction
   
         do i = 1, nx
@@ -814,21 +810,16 @@ submodule (icedrv_main) icedrv_advection
         narrays = 1
 
         do n=1, ncat
-
            narrays = narrays + 3
-
            do i = 1, nx
-              call icepack_compute_tracers(ntrcr=ntrcr,trcr_depend=trcr_depend(:),    &
-                                           atrcrn = works(i,narrays+1:narrays+ntrcr), &
-                                           aicen  = aicen(i,n),                       &
-                                           vicen  = vicen(i,n),                       &
-                                           vsnon  = vsnon(i,n),                       &
-                                           trcr_base     = trcr_base(:,:),            &
-                                           n_trcr_strata = n_trcr_strata(:),          &
-                                           nt_strata     = nt_strata(:,:),            &
-                                           trcrn  = trcrn(i,:,n)) 
+              call icepack_compute_tracers( &
+                   ntrcr=ntrcr,                             trcr_depend=trcr_depend(:),    &
+                   atrcrn=works(i,narrays+1:narrays+ntrcr), aicen=aicen(i,n),              &
+                   vicen=vicen(i,n),                        vsnon=vsnon(i,n),              &
+                   trcr_base=trcr_base(:,:),                n_trcr_strata=n_trcr_strata(:),&
+                   nt_strata=nt_strata(:,:),                trcrn=trcrn(i,:,n),            &
+                   Tf=Tf(i) )
            enddo
-           
            narrays = narrays + ntrcr
         enddo
  
@@ -940,7 +931,7 @@ submodule (icedrv_main) icedrv_advection
            nt_alvl, nt_apnd, nt_fbri, nt_Tsfc
   
         logical (kind=log_kind) :: &
-           tr_pond_cesm, tr_pond_lvl, tr_pond_topo
+           tr_pond_lvl, tr_pond_topo
   
         integer (kind=int_kind) ::      &
            i, n, it   , & ! counting indices
@@ -953,10 +944,13 @@ submodule (icedrv_main) icedrv_advection
   
         character(len=*), parameter :: subname = '(state_to_work)'
   
-        call icepack_query_tracer_flags(tr_pond_cesm_out=tr_pond_cesm, &
-             tr_pond_lvl_out=tr_pond_lvl, tr_pond_topo_out=tr_pond_topo)
-        call icepack_query_tracer_indices(nt_alvl_out=nt_alvl, nt_apnd_out=nt_apnd, &
-             nt_fbri_out=nt_fbri, nt_qsno_out=nt_qsno, nt_Tsfc_out=nt_Tsfc)
+           
+        call icepack_query_tracer_flags( &
+             tr_pond_lvl_out=tr_pond_lvl,   tr_pond_topo_out=tr_pond_topo)
+        call icepack_query_tracer_indices( &
+             nt_alvl_out=nt_alvl,           nt_apnd_out=nt_apnd,          &
+             nt_fbri_out=nt_fbri,           nt_qsno_out=nt_qsno,          &
+             nt_Tsfc_out=nt_Tsfc )
         call icepack_query_parameters(rhos_out=rhos, Lfresh_out=Lfresh)
         call icepack_warnings_flush(ice_stderr)
         if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
@@ -999,15 +993,13 @@ submodule (icedrv_main) icedrv_advection
                                         * trcrn(i,nt_alvl,n) &
                                         * trcrn(i,it,n)
                  enddo
-              elseif (trcr_depend(it) == 2+nt_apnd .and. &
-                      tr_pond_cesm .or. tr_pond_topo) then
+              elseif (trcr_depend(it) == 2+nt_apnd .and. tr_pond_topo) then
                  do i = 1, nx
                     works(i,narrays+it) = aicen(i,n) &
                                         * trcrn(i,nt_apnd,n) &
                                         * trcrn(i,it,n)
                  enddo
-              elseif (trcr_depend(it) == 2+nt_apnd .and. &
-                      tr_pond_lvl) then
+              elseif (trcr_depend(it) == 2+nt_apnd .and. tr_pond_lvl) then
                  do i = 1, nx
                     works(i,narrays+it) = aicen(i,n) &
                                         * trcrn(i,nt_alvl,n) &
@@ -1059,8 +1051,7 @@ submodule (icedrv_main) icedrv_advection
            ktherm         , &
            ntrcr
   
-         real (kind=dbl_kind), dimension(ncat) :: &
-           aicecat
+         real (kind=dbl_kind), dimension(ncat) :: aicecat
   
         real (kind=dbl_kind) ::         &
            rhos,       Lfresh,          &
@@ -1076,42 +1067,35 @@ submodule (icedrv_main) icedrv_advection
            
   
         logical (kind=log_kind) :: tr_brine, tr_lvl, flag_snow, flag_cold_ice, flag_warm_ice, &
-                                   tr_pond_cesm, tr_pond_topo, tr_pond_lvl, tr_FY, tr_iage,   &
-                                   heat_capacity
+                                   tr_pond_topo, tr_pond_lvl, tr_FY, tr_iage
         integer (kind=int_kind) :: nt_Tsfc, nt_qice, nt_qsno, nt_sice
         integer (kind=int_kind) :: nt_fbri, nt_alvl, nt_vlvl, nt_apnd, nt_hpnd, nt_ipnd, nt_FY, nt_iage
   
         character(len=*), parameter :: subname = '(cut_off_icepack)'
   
         call icepack_query_tracer_sizes(ntrcr_out=ntrcr)
-        call icepack_query_tracer_flags(tr_brine_out=tr_brine, tr_lvl_out=tr_lvl,      &
-          tr_pond_cesm_out=tr_pond_cesm, tr_pond_topo_out=tr_pond_topo,                &
-          tr_pond_lvl_out=tr_pond_lvl, tr_FY_out=tr_FY, tr_iage_out=tr_iage            )
-        call icepack_query_tracer_indices( nt_Tsfc_out=nt_Tsfc, nt_qice_out=nt_qice,   &
-          nt_qsno_out=nt_qsno, nt_sice_out=nt_sice, nt_FY_out=nt_FY,                   &
-          nt_fbri_out=nt_fbri, nt_alvl_out=nt_alvl, nt_vlvl_out=nt_vlvl,               &         
-          nt_apnd_out=nt_apnd, nt_hpnd_out=nt_hpnd, nt_ipnd_out=nt_ipnd,               &
-          nt_iage_out=nt_iage                                                          )
-        call icepack_query_parameters(rhos_out=rhos, rhoi_out=rhoi, Lfresh_out=Lfresh, &
-                                      cp_ice_out=cp_ice, cp_ocn_out=cp_ocn)
-        call icepack_query_parameters(depressT_out=depressT, puny_out=puny, &
-          Tsmelt_out=Tsmelt, ktherm_out=ktherm, heat_capacity_out=heat_capacity)
+                call icepack_query_tracer_flags( &
+             tr_brine_out=tr_brine,         tr_lvl_out=tr_lvl,             &
+             tr_pond_topo_out=tr_pond_topo, tr_pond_lvl_out=tr_pond_lvl,   &
+             tr_FY_out=tr_FY,               tr_iage_out=tr_iage )
+        call icepack_query_tracer_indices( &
+             nt_Tsfc_out=nt_Tsfc,           nt_qice_out=nt_qice,           &
+             nt_qsno_out=nt_qsno,           nt_sice_out=nt_sice,           &
+             nt_FY_out=nt_FY,               nt_fbri_out=nt_fbri,           &
+             nt_alvl_out=nt_alvl,           nt_vlvl_out=nt_vlvl,           &         
+             nt_apnd_out=nt_apnd,           nt_hpnd_out=nt_hpnd,           &
+             nt_ipnd_out=nt_ipnd,           nt_iage_out=nt_iage )
+        call icepack_query_parameters( &
+             rhos_out=rhos,                 rhoi_out=rhoi,                 &
+             Lfresh_out=Lfresh,             cp_ice_out=cp_ice,             &
+             cp_ocn_out=cp_ocn,             depressT_out=depressT,         &
+             puny_out=puny,                 Tsmelt_out=Tsmelt,             &
+             ktherm_out=ktherm )
+        
         call icepack_warnings_flush(ice_stderr)
   
         small = puny        
         Tmin  = -100.0_dbl_kind
-  
-        if (.not. heat_capacity) then ! for 0 layer thermodynamics
-           do n = 1, ncat
-              do i = 1, nx
-                 if (trcrn(i,nt_Tsfc,n) > Tf(i) .or. trcrn(i,nt_Tsfc,n)< Tmin) then
-                     trcrn(i,nt_Tsfc,n) = min(Tf(i), (T_air(i) + 273.15_dbl_kind))
-                 endif
-              enddo
-           enddo
-        endif
-  
-        if (heat_capacity) then    ! only for bl99 and mushy thermodynamics
   
         ! Here we should implement some conditions to check the tracers
         ! when ice is present, particularly enthalpy, surface temperature
@@ -1246,16 +1230,6 @@ submodule (icedrv_main) icedrv_advection
                      if (trcrn(i,nt_vlvl,n) < 0.000001_dbl_kind .or. trcrn(i,nt_alvl,n) < 0.000001_dbl_kind) trcrn(i,nt_vlvl,n) = c0
                      if (trcrn(i,nt_vlvl,n) > vicen(i,n)) trcrn(i,nt_vlvl,n) = vicen(i,n)
                  end if
-                 ! CESM melt pond parameterization
-                 if (tr_pond_cesm) then
-                     if (trcrn(i,nt_apnd,n) > c1) then
-                         trcrn(i,nt_apnd,n) = c1
-                     elseif (trcrn(i,nt_apnd,n) < 0.000001_dbl_kind) then
-                         trcrn(i,nt_apnd,n) = c0
-                     endif
-                     if (trcrn(i,nt_hpnd,n) < 0.000001_dbl_kind .or. trcrn(i,nt_apnd,n) < 0.000001_dbl_kind) trcrn(i,nt_hpnd,n) = c0
-                     if (trcrn(i,nt_hpnd,n) > hpnd_max) trcrn(i,nt_hpnd,n) = hpnd_max
-                 end if
                  ! Topo and level melt pond parameterization
                  if (tr_pond_topo .or. tr_pond_lvl) then
                      if (trcrn(i,nt_apnd,n) > c1) then
@@ -1282,24 +1256,25 @@ submodule (icedrv_main) icedrv_advection
            do it = 1, ntrcr
               trcr(i,it) = c0
            enddo
-           call icepack_aggregate (ncat,                    &
-                                  aicen(i,:),               &
-                                  trcrn(i,1:ntrcr,:),       &
-                                  vicen(i,:),               &
-                                  vsnon(i,:),               &
-                                  aice (i),                 &
-                                  trcr (i,1:ntrcr),         &
-                                  vice (i),                 &
-                                  vsno (i),                 &
-                                  aice0(i),                 &
-                                  ntrcr,                    &
-                                  trcr_depend  (1:ntrcr),   &
-                                  trcr_base    (1:ntrcr,:), &
-                                  n_trcr_strata(1:ntrcr),   &
-                                  nt_strata    (1:ntrcr,:))
+           call icepack_aggregate( &
+                ncat=ncat,                    &
+                trcrn=trcrn(i,1:ntrcr,:),     &
+                aicen=aicen(i,:),             &
+                vicen=vicen(i,:),             &
+                vsnon=vsnon(i,:),             &
+                trcr=trcr(i,1:ntrcr),         &
+                aice=aice(i),                 &
+                vice=vice(i),                 &
+                vsno =vsno(i),                &
+                aice0=aice0(i),               &
+                ntrcr=ntrcr,                  &
+                trcr_depend=trcr_depend(1:ntrcr),     &
+                trcr_base=trcr_base(1:ntrcr,:),       &
+                n_trcr_strata=n_trcr_strata(1:ntrcr), &
+                nt_strata=nt_strata(1:ntrcr,:),       &
+                Tf=Tf(i)          )
+
         end do
-  
-        end if ! heat_capacity
   
         call icepack_warnings_flush(ice_stderr)
         if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
