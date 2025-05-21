@@ -17,6 +17,7 @@ program MAIN
   use MOD_PARTIT
   use g_CONFIG
   use g_rotate_grid
+  use iso_fortran_env, only: error_unit
   
   implicit none
 
@@ -90,6 +91,9 @@ end interface
 
   character(len=MAX_PATH)         :: nmlfile  !> name of configuration namelist file
   integer                     :: start_t, interm_t, finish_t, rate_t
+  integer                     :: file_unit
+  integer                     :: ierr
+  character(512)              :: errmsg
   type(t_mesh),   target, save :: mesh
   type(t_partit), target, save :: partit
 
@@ -97,12 +101,22 @@ end interface
   interm_t = start_t
   
   nmlfile ='namelist.config'
-  open (20,file=nmlfile)
-  read (20,NML=paths)         ! We need MeshPath
-  read (20,NML=geometry)      ! We need cyclic_length and cartesian
-  read (20,NML=run_config)    ! We need use_cavity=true/false
-  read (20,NML=machine)       ! We need partitioning hierarchy
-  close (20)
+
+  open(newunit=file_unit, file=nmlfile, action='read', &
+      status='old', iostat=ierr, iomsg=errmsg)
+  if (ierr /= 0) then
+    write (unit=error_unit, fmt='(3A)') &
+      '### error: can not open file ', trim(nmlfile), &
+      ', error: ' // trim(errmsg)
+    error stop
+  end if
+
+  read (file_unit, NML=paths)         ! We need MeshPath
+  read (file_unit, NML=geometry)      ! We need cyclic_length and cartesian
+  read (file_unit, NML=run_config)    ! We need use_cavity=true/false
+  read (file_unit, NML=machine)       ! We need partitioning hierarchy
+  close (file_unit)
+
   cyclic_length=cyclic_length*rad 
   alphaEuler=alphaEuler*rad 	
   betaEuler=betaEuler*rad
@@ -1899,5 +1913,4 @@ subroutine check_partitioning(partit, mesh)
        100.*real(max_nod_per_part(2)) / real(average_nod_per_part(2))
 
 end subroutine check_partitioning
-
 
