@@ -436,11 +436,40 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_
 add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
 target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
 
+# option to export compiler settings for mesh partitioner
+option(EXPORT_COMPILER_SETTINGS "Export compiler settings for mesh partitioner" OFF)
+message(STATUS "EXPORT_COMPILER_SETTINGS: ${EXPORT_COMPILER_SETTINGS}")
 
 get_target_property(FLAGS ${PROJECT_NAME} COMPILE_OPTIONS)
 message(STATUS " --> Final Compile options for ${PROJECT_NAME}: ${FLAGS}")
 
+# install targets if needed
+if(ENABLE_IFS_INTERFACE)
+   install(TARGETS ${PROJECT_NAME} DESTINATION lib)
+   install(DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY}/ DESTINATION module/fesom)
+endif()
 
-### Export and installation
+# Export compiler settings if requested
+if(EXPORT_COMPILER_SETTINGS)
+   # Create a file with compiler settings to be used by mesh_part
+   file(WRITE ${CMAKE_BINARY_DIR}/fesom_compiler_settings.cmake
+   "# FESOM compiler settings exported for mesh partitioner
+"
+   "set(FESOM_COMPILER_ID \"${CMAKE_Fortran_COMPILER_ID}\" CACHE STRING \"Compiler ID used by FESOM\")
+"
+   "set(FESOM_PLATFORM_STRATEGY \"${FESOM_PLATFORM_STRATEGY}\" CACHE STRING \"Platform strategy used by FESOM\")
+"
+   "set(FESOM_ENABLE_OPENMP ${ENABLE_OPENMP} CACHE BOOL \"OpenMP setting used by FESOM\")
+"
+   "set(FESOM_ENABLE_OPENACC ${ENABLE_OPENACC} CACHE BOOL \"OpenACC setting used by FESOM\")
+"
+   "set(FESOM_COMPILER_FLAGS \"${FLAGS}\" CACHE STRING \"Compiler flags used by FESOM\")
+"
+   )
+   
+   message(STATUS "Compiler settings exported to ${CMAKE_BINARY_DIR}/fesom_compiler_settings.cmake")
+endif()
+
+### Export and installation
 
 fesom_export(TARGETS ${PROJECT_NAME} fesom.x)

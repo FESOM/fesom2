@@ -1,33 +1,89 @@
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.16)
 
 project(fesom_ini C Fortran)
+
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/../cmake ${CMAKE_MODULE_PATH})
+
+# Check for exported compiler settings from main FESOM build
+set(FESOM_SETTINGS_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../build/fesom_compiler_settings.cmake")
+if(EXISTS ${FESOM_SETTINGS_FILE})
+    message(STATUS "Using compiler settings from main FESOM build: ${FESOM_SETTINGS_FILE}")
+    include(${FESOM_SETTINGS_FILE})
+else()
+    # Include fesom_setup when building standalone
+    include(../cmake/fesom_setup.cmake)
+    
+    # Default compiler options when built standalone
+    set(FESOM_COMPILER_ID ${CMAKE_Fortran_COMPILER_ID})
+    set(FESOM_PLATFORM_STRATEGY "notset")
+    set(FESOM_ENABLE_OPENMP OFF)
+    set(FESOM_ENABLE_OPENACC OFF)
+endif()
+
+# Always find MPI regardless of how we're being built
 find_package(MPI REQUIRED)
 
-
+# Print compiler settings being used
+message(STATUS "Building mesh partitioner with compiler: ${FESOM_COMPILER_ID}")
+message(STATUS "Platform strategy: ${FESOM_PLATFORM_STRATEGY}")
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}/../src)
 set(sources_Fortran ${src_home}/MOD_MESH.F90 ${src_home}/oce_modules.F90 ${src_home}/gen_modules_config.F90 ${src_home}/gen_modules_partitioning.F90 ${src_home}/gen_modules_rotate_grid.F90 ${src_home}/fvom_init.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90 ${src_home}/MOD_READ_BINARY_ARRAYS.F90 ${src_home}/MOD_WRITE_BINARY_ARRAYS.F90 ${src_home}/MOD_PARTIT.F90)
 set(sources_C ${src_home}/fort_part.c)
 
+# Add metis library
+set(METIS_DIR ${CMAKE_CURRENT_LIST_DIR}/../lib/metis-5.1.0)
+add_subdirectory(${METIS_DIR} ${PROJECT_BINARY_DIR}/metis)
+include_directories(${METIS_DIR}/include)
 
-add_subdirectory(${src_home}/../lib/metis-5.1.0             ${PROJECT_BINARY_DIR}/metis)
-include_directories(${src_home}/../lib/metis-5.1.0/include)
-
+# Build C component
 add_library(${PROJECT_NAME}_C ${sources_C})
 target_compile_definitions(${PROJECT_NAME}_C PRIVATE USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
 target_link_libraries(${PROJECT_NAME}_C metis)
 
+# Build main executable
 add_executable(${PROJECT_NAME} ${sources_Fortran})
-# CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
-if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
-	target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip)
-#	target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip -g -traceback -check all,noarg_temp_created,bounds,uninit) 
-elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
-	target_compile_options(${PROJECT_NAME} PRIVATE -fdefault-real-8 -ffree-line-length-none)
-  if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
-      target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
-   endif()
+
+# Apply compiler flags - use exported flags if available, otherwise use preset flags
+if(DEFINED FESOM_COMPILER_FLAGS)
+    # Use the exact same flags as the main FESOM build
+    message(STATUS "Using compiler flags from main FESOM build: ${FESOM_COMPILER_FLAGS}")
+    separate_arguments(FESOM_FLAGS_LIST UNIX_COMMAND "${FESOM_COMPILER_FLAGS}")
+    target_compile_options(${PROJECT_NAME} PRIVATE ${FESOM_FLAGS_LIST})
+else()
+    # Fall back to preset flags based on compiler ID
+    message(STATUS "Using preset compiler flags for ${FESOM_COMPILER_ID}")
+    
+    if(${FESOM_COMPILER_ID} STREQUAL Intel OR ${FESOM_COMPILER_ID} STREQUAL IntelLLVM)
+        target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0)
+    elseif(${FESOM_COMPILER_ID} STREQUAL GNU)
+        if(${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu)
+            target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero -finline-functions -fimplicit-none -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch)
+        else()
+            target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero -finline-functions -fimplicit-none -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none)
+        endif()
+        
+        # Add argument mismatch flag for newer GNU compilers
+        if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
+            target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch)
+        endif()
+    elseif(${FESOM_COMPILER_ID} STREQUAL Cray)
+        target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O2 -hnoacc -M878)
+    elseif(${FESOM_COMPILER_ID} STREQUAL NVHPC)
+        target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -Mfree -Mallocatable=03 -Mstack_arrays -Minfo=accel -Mpreprocess)
+    endif()
 endif()
+
+# Add OpenMP if enabled
+if(FESOM_ENABLE_OPENMP)
+    find_package(OpenMP REQUIRED COMPONENTS Fortran)
+    target_link_libraries(${PROJECT_NAME} OpenMP::OpenMP_Fortran)
+endif()
+
+# Link against MPI and C library
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C MPI::MPI_Fortran)
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
+
+# Installation target
+install(TARGETS ${PROJECT_NAME} DESTINATION bin)
