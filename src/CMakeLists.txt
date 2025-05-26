@@ -451,6 +451,8 @@ message(STATUS " --> Final Compile options for ${PROJECT_NAME}: ${FLAGS}")
 # mesh partitioner
 
 if(BUILD_MESHPARTITIONER)
+block()
+set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/module/fesom_meshpart)
   set(fesom_meshpart_sources_Fortran ${src_home}/MOD_MESH.F90 ${src_home}/oce_modules.F90 ${src_home}/gen_modules_config.F90 ${src_home}/gen_modules_partitioning.F90 ${src_home}/gen_modules_rotate_grid.F90 ${src_home}/fvom_init.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90 ${src_home}/MOD_READ_BINARY_ARRAYS.F90 ${src_home}/MOD_WRITE_BINARY_ARRAYS.F90 ${src_home}/MOD_PARTIT.F90)
   set(fesom_meshpart_sources_C ${src_home}/fort_part.c)
   
@@ -474,6 +476,7 @@ if(BUILD_MESHPARTITIONER)
   endif()
   target_link_libraries(fesom_meshpart fesom_meshpart_C MPI::MPI_Fortran)
   set_target_properties(fesom_meshpart PROPERTIES LINKER_LANGUAGE Fortran)
+endblock()
 endif()
 
 ### Export and installation
