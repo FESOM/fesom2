@@ -34,13 +34,16 @@ set(sources_C ${src_home}/fort_part.c)
 
 # Add metis library
 set(METIS_DIR ${CMAKE_CURRENT_LIST_DIR}/../lib/metis-5.1.0)
+# Force METIS to build as a static library
+set(SHARED FALSE CACHE BOOL "build a shared library" FORCE)
 add_subdirectory(${METIS_DIR} ${PROJECT_BINARY_DIR}/metis)
 include_directories(${METIS_DIR}/include)
 
-# Build C component
-add_library(${PROJECT_NAME}_C ${sources_C})
+# Build C component as a shared library
+add_library(${PROJECT_NAME}_C SHARED ${sources_C})
 target_compile_definitions(${PROJECT_NAME}_C PRIVATE USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
 target_link_libraries(${PROJECT_NAME}_C metis)
+set_target_properties(${PROJECT_NAME}_C PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # Build main executable
 add_executable(${PROJECT_NAME} ${sources_Fortran})
@@ -85,5 +88,17 @@ endif()
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C MPI::MPI_Fortran)
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 
-# Installation target
-install(TARGETS ${PROJECT_NAME} DESTINATION bin)
+# Make sure the executable name has .x extension for consistency
+set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME ${PROJECT_NAME}.x)
+
+# Set RPATH settings to find shared libraries
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    INSTALL_RPATH "$ORIGIN/../lib"
+    BUILD_WITH_INSTALL_RPATH TRUE
+    SKIP_BUILD_RPATH FALSE
+    INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+# Installation target - install both the executable and the shared library
+install(TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_C
+        RUNTIME DESTINATION bin
+        LIBRARY DESTINATION lib)
