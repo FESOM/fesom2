@@ -22,5 +22,5 @@ cp -n ../config/namelist.oce     .
 cp -n ../config/namelist.ice     .
 
 date
-srun --mpi=pmi2 --ntasks=1 ./fesom_meshpart > "fesom_meshpartut"
+srun --mpi=pmi2 --ntasks=1 ./fesom_meshpart > "fesom_meshpart.out"
 date
