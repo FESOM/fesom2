@@ -436,11 +436,73 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_
 add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
 target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
 
+# option to build the mesh partitioner directly
+option(BUILD_MESHPART "Build the FESOM mesh partitioner" OFF)
+message(STATUS "BUILD_MESHPART: ${BUILD_MESHPART}")
 
 get_target_property(FLAGS ${PROJECT_NAME} COMPILE_OPTIONS)
 message(STATUS " --> Final Compile options for ${PROJECT_NAME}: ${FLAGS}")
 
+# install targets if needed
+if(ENABLE_IFS_INTERFACE)
+   install(TARGETS ${PROJECT_NAME} DESTINATION lib)
+   install(DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY}/ DESTINATION module/fesom)
+endif()
 
-### Export and installation
+# Build mesh partitioner if requested
+if(BUILD_MESHPART)
+   message(STATUS "Building FESOM mesh partitioner with the same compiler settings")
+   
+   # Add METIS library (use absolute paths to avoid issues)
+   set(METIS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../lib/metis-5.1.0)
+   if(NOT TARGET metis)
+     add_subdirectory(${METIS_DIR} ${CMAKE_BINARY_DIR}/metis)
+     include_directories(${METIS_DIR}/include)
+   endif()
+   
+   # Define the mesh partitioner sources
+   set(mesh_part_sources
+       ${src_home}/MOD_MESH.F90
+       ${src_home}/oce_modules.F90
+       ${src_home}/gen_modules_config.F90
+       ${src_home}/gen_modules_partitioning.F90
+       ${src_home}/gen_modules_rotate_grid.F90
+       ${src_home}/fvom_init.F90
+       ${src_home}/oce_local.F90
+       ${src_home}/gen_comm.F90
+       ${src_home}/MOD_READ_BINARY_ARRAYS.F90
+       ${src_home}/MOD_WRITE_BINARY_ARRAYS.F90
+       ${src_home}/MOD_PARTIT.F90)
+   
+   # Build C component for mesh partitioner
+   add_library(fesom_ini_C ${src_home}/fort_part.c)
+   target_compile_definitions(fesom_ini_C PRIVATE USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
+   target_link_libraries(fesom_ini_C metis)
+   
+   # Build mesh partitioner executable
+   add_executable(fesom_ini ${mesh_part_sources})
+   
+   # Use the same compiler flags as the main FESOM
+   get_target_property(FESOM_FLAGS ${PROJECT_NAME} COMPILE_OPTIONS)
+   if(FESOM_FLAGS)
+       target_compile_options(fesom_ini PRIVATE ${FESOM_FLAGS})
+   endif()
+   
+   # Add OpenMP if enabled
+   if(ENABLE_OPENMP)
+       target_link_libraries(fesom_ini OpenMP::OpenMP_Fortran)
+   endif()
+   
+   # Link against MPI and C library
+   target_link_libraries(fesom_ini fesom_ini_C MPI::MPI_Fortran)
+   set_target_properties(fesom_ini PROPERTIES LINKER_LANGUAGE Fortran)
+   
+   # Installation target
+   install(TARGETS fesom_ini DESTINATION bin)
+   
+   message(STATUS "FESOM mesh partitioner added to build")
+endif()
+
+### Export and installation
 
 fesom_export(TARGETS ${PROJECT_NAME} fesom.x)
