@@ -208,8 +208,8 @@ contains
 
     integer                    :: my_number_of_points
     integer                    :: number_of_all_points
-    integer                    :: counts_from_all_pes(npes)
-    integer                    :: displs_from_all_pes(npes)
+    integer, allocatable       :: counts_from_all_pes(:)
+    integer, allocatable       :: displs_from_all_pes(:)
     integer                    :: my_displacement
 
     integer,allocatable        :: unstr_mask(:,:)
@@ -311,6 +311,8 @@ contains
       ALLOCATE(all_y_coords(1, 1))
       ALLOCATE(all_area(1, 1))
     endif
+    ALLOCATE(displs_from_all_pes(npes))
+    ALLOCATE(counts_from_all_pes(npes))
 
     displs_from_all_pes(1) = 0
     do i = 2, npes
@@ -369,7 +371,7 @@ contains
      
 
 
-    DEALLOCATE(all_x_coords, all_y_coords, my_x_coords, my_y_coords) 
+    DEALLOCATE(all_x_coords, all_y_coords, my_x_coords, my_y_coords, displs_from_all_pes, counts_from_all_pes) 
 !------------------------------------------------------------------
 ! 3rd Declare the transient variables
 !------------------------------------------------------------------
