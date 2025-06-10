@@ -1,0 +1,3 @@
+[submodule "src/int_recom"]
+	path = src/int_recom
+	url = https://github.com/RECOM-Regulated-Ecosystem-Model/REcoM_Standalone.git
