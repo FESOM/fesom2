@@ -626,7 +626,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   !_____________________________________________________________________________
   integer		   :: i, itime,n2,n,nz,k,elem
   real(kind=WP)            :: i_coef, aux
-  real(kind=WP)　　         :: dux, dvy,tx,ty,tvol
+  real(kind=WP)            :: dux, dvy,tx,ty,tvol
   real(kind=WP)            :: t1, t2
   real(kind=WP)        				   :: flux_global(2), flux_local(2), eff_vol(2)
   real(kind=WP), dimension(:,:), allocatable , save  :: exchange
