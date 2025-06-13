@@ -2508,6 +2508,25 @@ if (Diags) then
 
      end if ! grazing_detritus
 
+!*** formation of detritus through aggregation     
+#if defined (__3Zoo2Det)
+        vert_dets_agg(k) = (
+              agg_PD * DetN * PhyN                &
+            + agg_PD * DetN * DiaN                &      
+#if defined (__coccos)
+            + agg_PD * DetN * CoccoN              &
+#endif
+            + agg_DD * DetN * DetN                &
+        ) * recipbiostep
+        vert_detl_agg(k) = (
+              agg_PD2 * detZ2N * PhyN                &
+            + agg_PD2 * detZ2N * DiaN                &
+#if defined (__coccos)
+            + agg_PD2 * detZ2N * CoccoN              &
+#endif
+            + agg_DD2 * detZ2N * DetN                &
+        ) * recipbiostep
+#endif  
 !-----------------------------------------------------------------------------------------------------------------
      
 !*** zooplankton1 respiration

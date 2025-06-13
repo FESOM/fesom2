@@ -617,9 +617,11 @@ Module REcoM_declarations
   Real(kind=8)  :: locgrazmeso_tot, locgrazmeso_n, locgrazmeso_d, locgrazmeso_c, locgrazmeso_det, locgrazmeso_mic, locgrazmeso_det2
   Real(kind=8)  :: locgrazmacro_tot, locgrazmacro_n, locgrazmacro_d, locgrazmacro_c, locgrazmacro_mes, locgrazmacro_det, locgrazmacro_mic, locgrazmacro_det2
   Real(kind=8)  :: locgrazmicro_tot, locgrazmicro_n, locgrazmicro_d, locgrazmicro_c
+  Real(kind=8)  :: loc_detl_agg, loc_dets_agg
   Real(kind=8),allocatable,dimension(:) :: vertgrazmeso_tot, vertgrazmeso_n, vertgrazmeso_d, vertgrazmeso_c, vertgrazmeso_det, vertgrazmeso_mic, vertgrazmeso_det2
   Real(kind=8),allocatable,dimension(:) :: vertgrazmacro_tot, vertgrazmacro_n, vertgrazmacro_d, vertgrazmacro_c, vertgrazmacro_mes, vertgrazmacro_det, vertgrazmacro_mic, vertgrazmacro_det2
   Real(kind=8),allocatable,dimension(:) :: vertgrazmicro_tot, vertgrazmicro_n, vertgrazmicro_d, vertgrazmicro_c
+  Real(kind=8),allocatable,dimension(:) :: vert_detl_agg, vert_dets_agg
   Real(kind=8),allocatable,dimension(:) :: vertrespmeso, vertrespmacro, vertrespmicro
   Real(kind=8),allocatable,dimension(:) :: vertcalcdiss, vertcalcif
   Real(kind=8),allocatable,dimension(:) :: vertaggn, vertaggd, vertaggc
@@ -739,6 +741,8 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:,:)   :: aggn
   Real(kind=8),allocatable,dimension(:,:)   :: aggd
   Real(kind=8),allocatable,dimension(:,:)   :: aggc
+  Real(kind=8),allocatable,dimension(:)     :: detl_agg  ! source of large detritus from aggregation (vertical integral)
+  Real(kind=8),allocatable,dimension(:)     :: dets_agg  ! source of small detritus from aggregation (vertical integral)
   Real(kind=8),allocatable,dimension(:,:)   :: docexn
   Real(kind=8),allocatable,dimension(:,:)   :: docexd
   Real(kind=8),allocatable,dimension(:,:)   :: docexc

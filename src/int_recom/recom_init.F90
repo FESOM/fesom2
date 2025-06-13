@@ -233,6 +233,10 @@ subroutine recom_init(mesh)
   grazmicro_d = 0.d0
   allocate(grazmicro_c(node_size))
   grazmicro_c = 0.d0
+  allocate(detl_all(node_size))
+  detl_agg = 0.d0
+  allocate(dets_all(node_size))
+  dets_agg = 0.d0
 !--- Allocate 3D diagnostics
 !  allocate(grazmeso_tot(nl-1,node_size))  ! Comment Miriam (02/2024): changed grazing output from 3D to 2D diagnostics
 !  grazmeso_tot(:,:) = 0.d0

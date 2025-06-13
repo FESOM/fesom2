@@ -514,6 +514,12 @@ CASE ('grazmicro_d')
 CASE ('grazmicro_c')
    call def_stream(nod2D,  myDim_nod2D,   'grazmicro_c','Grazing flux of microzooplankton on coccolithophores without grazing efficiency (i.e., = loss coccolithophores)','mmolC/(m2*d)', grazmicro_c, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 
+CASE ('dets_agg')
+   call def_stream(nod2D,  myDim_nod2D,   'dets_agg','increase rate of small detritus by aggregation','mmolN/(m2*d)', detl_agg, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
+CASE ('detl_agg')
+   call def_stream(nod2D,  myDim_nod2D,   'detl_agg','increase rate of large detritus by aggregation','mmolN/(m2*d)', detl_agg, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
 #endif
    
 !___________________________________________________________________________________________________________________________________    

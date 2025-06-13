@@ -369,8 +369,10 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
 #endif        
      endif
 
-
-     
+#if defined (__3Zoo2Det)
+        loc_detl_agg = sum(vert_detl_agg(1:nn) * thick(1:nn))
+        loc_dets_agg = sum(vert_dets_agg(1:nn) * thick(1:nn))
+#endif
 
   end if
 

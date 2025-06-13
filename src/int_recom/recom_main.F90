@@ -315,6 +315,9 @@ if (Diags) then
         allocate(vertgrazmicro_c(nl-1))
         vertgrazmicro_c   = 0.d0
 #endif
+        allocate( vert_detl_agg(nl-1), vert_dets_agg(nl-1) )
+        vert_detl_agg     = 0.0 
+        vert_dets_agg     = 0.0
 #endif
      endif !Grazing_detritus
 end if
@@ -394,7 +397,8 @@ if (Diags) then
 #if defined (__coccos)
      grazmicro_c(n)   = locgrazmicro_c
 #endif
-     
+     detl_agg(n)      = loc_aggl_agg
+     dets_agg(n)      = loc_aggs_agg
 #endif
      endif
      
@@ -457,7 +461,10 @@ if (Diags) then
 #endif        
 #endif
      endif ! Grazing_detritus
-        
+ 
+#if defined (__3Zoo2Det)
+     deallocate(vert_detl_agg, vert_dets_agg)
+#endif       
 
      !!---- Deallocating 3D Diagnistics
      !     deallocate(vertgrazmeso_tot, vertgrazmeso_n, vertgrazmeso_d, vertrespmeso)
@@ -565,6 +572,8 @@ endif
 #if defined (__coccos)
     call exchange_nod(grazmicro_c)
 #endif
+    call exchange_nod(detl_agg)
+    call exchange_nod(detc_agg)
 #endif
   endif
 
