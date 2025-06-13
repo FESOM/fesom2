@@ -3,7 +3,7 @@
 ! Module that contains the whole icepack implementation in fesom2
 !
 ! Author: Lorenzo Zampieri ( lorenzo.zampieri@awi.de )
-! Adapted for Icepack 1.4.1 by F. Kauker (frank.kauker@awi.de)
+! Adapted for Icepack 1.5.0 by F. Kauker (frank.kauker@awi.de)
 !
 !=======================================================================
 
@@ -275,6 +275,7 @@ module icedrv_main
        frazil_diag(:)                             ! frazil ice growth diagnostic (m/step-->cm/day)
     
   real (kind=dbl_kind), allocatable, save ::    & ! DIM nx,ncat
+       rsiden(:,:),                             & ! fraction of ice that melts laterally
        fsurfn(:,:),                             & ! category fsurf
        fcondtopn(:,:),                          & ! category fcondtop
        fcondbotn(:,:),                          & ! category fcondbot

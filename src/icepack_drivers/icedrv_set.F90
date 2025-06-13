@@ -3,7 +3,7 @@
 ! This module defines and and initializes the namelists
 !
 ! Author: L. Zampieri ( lorenzo.zampieri@awi.de )
-! Adapted for Icepack 1.4.1 by F. Kauker (frank.kauker@awi.de)
+! Adapted for Icepack 1.5.0 by F. Kauker (frank.kauker@awi.de)
 !
 !=======================================================================
 
@@ -19,6 +19,9 @@ submodule (icedrv_main) icedrv_set
 contains 
 
   module subroutine set_icepack(ice, partit)
+    !
+    ! originally 'subroutine input_data' in icedrv_init.F90
+    !
     use MOD_ICE
     
     implicit none
@@ -38,21 +41,8 @@ contains
 
     ! env namelist
 
-    logical(kind=log_kind) :: conserv_check   ! run conservation checks and abort if checks fail; originally in setup_nml (frank.kauker@awi.de)
-    integer(kind=int_kind) :: nicecat         ! number of ice thickness categories
-    integer(kind=int_kind) :: nfsdcat         ! number of floe size categories
-    integer(kind=int_kind) :: nicelyr         ! number of vertical layers in the ice
-    integer(kind=int_kind) :: nsnwlyr         ! number of vertical layers in the snow
-    integer(kind=int_kind) :: ntraiso         ! number of water isotopes (snow, sea ice)
-    integer(kind=int_kind) :: ntraero         ! number of aerosol tracers (up to max_aero in ice_domain_size.F90)
-    integer(kind=int_kind) :: trzaero         ! number of z aerosol tracers (up to max_aero = 6)
-    integer(kind=int_kind) :: tralg           ! number of algal tracers (up to max_algae = 3)
-    integer(kind=int_kind) :: trdoc           ! number of dissolve organic carbon (up to max_doc = 3)
-    integer(kind=int_kind) :: trdic           ! number of dissolve inorganic carbon (up to max_dic = 1)
-    integer(kind=int_kind) :: trdon           ! number of dissolve organic nitrogen (up to max_don = 1)
-    integer(kind=int_kind) :: trfed           ! number of dissolved iron tracers (up to max_fe  = 2)
-    integer(kind=int_kind) :: trfep           ! number of particulate iron tracers (up to max_fe  = 2)
-    integer(kind=int_kind) :: nbgclyr         ! number of zbgc layers
+    logical(kind=log_kind) :: conserv_check   ! run conservation checks and abort if checks fail
+                                              ! originally in setup_nml (frank.kauker@awi.de)
     integer(kind=int_kind) :: trbgcz          ! set to 1 for zbgc tracers (needs TRBGCS = 0 and TRBRI = 1)
     integer(kind=int_kind) :: trbri           ! set to 1 for brine height tracer
     integer(kind=int_kind) :: trage           ! set to 1 for ice age tracer
@@ -148,6 +138,7 @@ contains
     character (len=char_len) :: atmbndy
     character (len=char_len) :: fbot_xfer_type
     character (len=char_len) :: cpl_frazil
+    character (len=char_len) :: congel_freeze
     character (len=char_len) :: tfrz_option
     character (len=char_len) :: saltflux_option
     character (len=char_len) :: wave_spec_type
@@ -205,13 +196,8 @@ contains
     ! Namelist variables
     !-----------------------------------------------------------------
 
-    ! env_nml is not used in 1.4.1 because it causes a lot of trouble (see definition of n_bgc, nltrcr, max_nsw, max_ntrcr)
+    ! env_nml is not used in 1.5.0 because it causes a lot of trouble (see definition of n_bgc, nltrcr, max_nsw, max_ntrcr)
     ! All variables have to be pre-defined in this file and cannot be changed after compilation (fkauker@awi.de)
-    !namelist / env_nml / &
-    !     nicecat, nfsdcat, nicelyr, nsnwlyr, ntraero, trzaero, tralg,     &
-    !     trdoc,   trdic,   trdon,   trfed,   trfep,   nbgclyr, trbgcz,    &
-    !     trbri,   trage,   trfy,    trlvl,   trpnd,   trsnow,  trbgcs,    &
-    !     ndtd,    conserv_check
 
     namelist / grid_nml /                                               &
          kcatbound
@@ -248,48 +234,11 @@ contains
          update_ocn_f,    l_mpond_fresh,   ustar_min,       &
          fbot_xfer_type,  oceanmixed_ice,  emissivity,      &
          formdrag,        highfreq,        natmiter,        &
-         atmiter_conv,    calc_dragio,                      &
+         atmiter_conv,    calc_dragio,     congel_freeze,   &
          tfrz_option,     saltflux_option, ice_ref_salinity, &
-                          wave_spec_type,  cpl_frazil
-    
-    namelist /tracer_nml/   &
-         tr_iage,      &
-         tr_FY,        &
-         tr_lvl,       &
-         tr_pond_lvl,  &
-         tr_pond_topo, &
-         tr_snow,      &
-         tr_aero,      &
-         tr_fsd,       &
-         tr_iso
-    
+         wave_spec_type,  cpl_frazil
+
     nml_filename = 'namelist.icepack'        ! name of icepack namelist file
-
-    !-----------------------------------------------------------------
-    ! env namelist - STANDARD VALUES
-    !-----------------------------------------------------------------
-
-    nicecat   = 5           ! number of ice thickness categories
-    nicelyr   = 4           ! number of vertical layers in the ice
-    nsnwlyr   = 4           ! number of vertical layers in the snow
-    nfsdcat   = 1           ! number of floe size categories
-    ntraiso   = 0           ! number of water isotopes (snow, sea ice) 
-    ntraero   = 0           ! number of aerosol tracers (up to max_aero in ice_domain_size.f90)
-    trzaero   = 0           ! number of z aerosol tracers (up to max_aero = 6)
-    tralg     = 0           ! number of algal tracers (up to max_algae = 3)
-    trdoc     = 0           ! number of dissolve organic carbon (up to max_doc = 3)
-    trdic     = 0           ! number of dissolve inorganic carbon (up to max_dic = 1)
-    trdon     = 0           ! number of dissolve organic nitrogen (up to max_don = 1)
-    trfed     = 0           ! number of dissolved iron tracers (up to max_fe  = 2)
-    trfep     = 0           ! number of particulate iron tracers (up to max_fe  = 2)
-    nbgclyr   = 4           ! number of zbgc layers 
-    trbgcz    = 0           ! set to 1 for zbgc tracers (needs trbgcs = 0 and trbri = 1)
-    trbri     = 0           ! set to 1 for brine height tracer 
-    trage     = 0           ! set to 1 for ice age tracer
-    trfy      = 0           ! set to 1 for first-year ice area tracer
-    trlvl     = 1           ! set to 1 for level and deformed ice tracers
-    trpnd     = 0           ! set to 1 for melt pond tracers
-    trbgcs    = 0           ! set to 1 for skeletal layer tracers (needs
 
     !-----------------------------------------------------------------
     ! Derived types used by icepack
@@ -303,59 +252,48 @@ contains
     mype       = p_partit%mype
 
     !-----------------------------------------------------------------
-    ! NOT read in version 1.4.1+ - Read namelist env_nml (see above)
-    !-----------------------------------------------------------------
-    
-    ! open (nu_nml, file=trim(nml_filename), status='old',iostat=nml_error)
-    ! if (nml_error /= 0) then
-    !    call icedrv_system_abort(string=subname//'ERROR: open file '// &
-    !         trim(nml_filename), &
-    !         file=__FILE__, line=__LINE__)
-    ! endif
-
-    ! nml_error =  1
-    ! do while (nml_error > 0)
-    !    if (mype == 0) print*,'Reading env_nml'
-    !    read(nu_nml, nml=env_nml,iostat=nml_error)
-    ! end do
-    ! if (nml_error /= 0) then
-    !    if (mype == 0) write(*,*) 'Error reading env namelist'
-    !    call icedrv_system_abort(file=__FILE__,line=__LINE__)
-    ! end if
-    ! close(nu_nml)
-
-    !-----------------------------------------------------------------
-    ! !!! originally defined in icedrv_domain_size (frank.kauker@awi.de)
+    ! !!! THE VARIABLES below are originally defined in
+    ! icedrv_domain_size.F90 with the help of environment variables.
+    ! Because a consistency check follows afterwards these variables
+    ! cannot be changed in namelist.icepack when Icepack is coupled to
+    ! FESOM2 (frank.kauker@awi.de)
     !----------------------------------------------------------------- 
-    ncat      = nicecat    ! number of categories
-    nfsd      = nfsdcat    ! number of floe size categories
-    nilyr     = nicelyr    ! number of ice layers per category
-    nslyr     = nsnwlyr    ! number of snow layers per category
-    n_iso     = ntraiso    ! number of  water isotopes (snow, sea ice),
+    ncat      = 5          ! number of categories
+    nfsd      = 1          ! number of floe size categories
+    nilyr     = 4          ! number of ice layers per category
+    nslyr     = 4          ! number of snow layers per category
+    n_iso     = 0          ! number of  water isotopes (snow, sea ice),
                            ! name changed in this routine because because n_iso is used in fesom as well 
-    n_aero    = ntraero    ! number of aerosols in use
-    n_zaero   = trzaero    ! number of z aerosols in use
-    n_algae   = tralg      ! number of algae in use
-    n_doc     = trdoc      ! number of DOC pools in use
-    n_dic     = trdic      ! number of DIC pools in use
-    n_don     = trdon      ! number of DON pools in use
-    n_fed     = trfed      ! number of Fe  pools in use dissolved Fe
-    n_fep     = trfep      ! number of Fe  pools in use particulate Fe
+    n_aero    = 0          ! number of aerosols in use
+    n_zaero   = 0          ! number of z aerosols in use
+    n_algae   = 0          ! number of algae in use
+    n_doc     = 0          ! number of DOC pools in use
+    n_dic     = 0          ! number of DIC pools in use
+    n_don     = 0          ! number of DON pools in use
+    n_fed     = 0          ! number of Fe  pools in use dissolved Fe
+    n_fep     = 0          ! number of Fe  pools in use particulate Fe
     nfreq     = 25         ! number of wave frequencies ! HARDWIRED FOR NOW
-    nblyr     = nbgclyr    ! number of bio/brine layers per category
+    nblyr     = 4          ! number of bio/brine layers per category
                            ! maximum number of biology tracers + aerosols
     ndtd      = 1          ! dynamic time steps per thermodynamic time step
     conserv_check = .false.! if .true., run conservation checks and abort if checks fail
                            ! originally in setup_nml (frank.kauker@awi.de)
                            ! *** add to kscavz in icepack_zbgc_shared.F90
+    trbgcz    = 0          ! set to 1 for zbgc tracers (needs trbgcs = 0 and trbri = 1)
+    trbri     = 0          ! set to 1 for brine height tracer
+    trage     = 0          ! set to 1 for ice age tracer
+    trfy      = 0          ! set to 1 for first-year ice area tracer
+    trlvl     = 1          ! set to 1 for level and deformed ice tracers
+    trpnd     = 0          ! set to 1 for melt pond tracers
+    trbgcs    = 0          ! set to 1 for skeletal layer tracers (needs
 
     n_bgc     = (n_algae*2 + n_doc + n_dic + n_don + n_fed + n_fep +n_zaero &
          + 8)         ! nit, am, sil, dmspp, dmspd, dms, pon, humic
     nltrcr    = (n_bgc*trbgcz)*trbri ! number of zbgc (includes zaero)
                                      ! and zsalinity tracers
     max_nsw   = (nilyr+nslyr+2) & ! total chlorophyll plus aerosols
-         * (1+trzaero)       ! number of tracers active in shortwave calculation
-    max_ntrcr =   1         & ! 1 = surface temperature
+         * (n_zaero)     ! number of tracers active in shortwave calculation
+    max_ntrcr =   1    & ! 1 = surface temperature
          + nilyr       & ! ice salinity
          + nilyr       & ! ice enthalpy
          + nslyr       & ! snow enthalpy
@@ -406,6 +344,7 @@ contains
          tfrz_option_out=tfrz_option, saltflux_option_out=saltflux_option, &
          ice_ref_salinity_out=ice_ref_salinity, kalg_out=kalg, &
          fbot_xfer_type_out=fbot_xfer_type, puny_out=puny, &
+         congel_freeze_out=congel_freeze, &
          wave_spec_type_out=wave_spec_type, dragio_out=dragio, &
          sw_redist_out=sw_redist, sw_frac_out=sw_frac, sw_dtemp_out=sw_dtemp, &
          snwredist_out=snwredist, use_smliq_pnd_out=use_smliq_pnd, &
@@ -516,21 +455,6 @@ contains
     end do
     if (nml_error /= 0) then
        call icedrv_system_abort(string=subname//'ERROR: thermo_nml reading ', &
-            file=__FILE__, line=__LINE__)
-    endif
-
-    rewind(unit=nu_nml, iostat=nml_error)
-    if (nml_error /= 0) then
-       call icedrv_system_abort(string=subname//'ERROR: tracer_nml rewind ', &
-            file=__FILE__, line=__LINE__)
-    endif
-    nml_error =  1
-    if (partit%mype == 0) write(nu_diag,*) subname,' Reading tracer_nml'
-    do while (nml_error > 0)
-       read(nu_nml, nml=tracer_nml,iostat=nml_error)
-    end do
-    if (nml_error /= 0) then
-       call icedrv_system_abort(string=subname//'ERROR: tracer_nml reading ', &
             file=__FILE__, line=__LINE__)
     endif
 
@@ -932,6 +856,7 @@ contains
        write(nu_diag,*)    ' saltflux_option           = ', trim(saltflux_option)
        if (trim(saltflux_option)=='constant') &
           write(nu_diag,1005) ' ice_ref_salinity          = ', ice_ref_salinity
+       write(nu_diag,1030) ' congel_freeze             = ', trim(congel_freeze)
        ! tracers
        write(nu_diag,1010) ' tr_iage                   = ', tr_iage
        write(nu_diag,1010) ' tr_FY                     = ', tr_FY
@@ -1038,6 +963,7 @@ contains
     if (ntrcr > max_ntrcr-1) then
        if (partit%mype == 0) write(ice_stderr,*) 'max_ntrcr-1 < number of namelist tracers'
        if (partit%mype == 0) write(ice_stderr,*) 'max_ntrcr-1 = ',max_ntrcr-1,' ntrcr = ',ntrcr
+       call icepack_warnings_flush(ice_stderr)
        call icedrv_system_abort(file=__FILE__,line=__LINE__)
     endif
  
@@ -1120,6 +1046,7 @@ contains
          tfrz_option_in=tfrz_option, saltflux_option_in=saltflux_option, &
          ice_ref_salinity_in=ice_ref_salinity, kalg_in=kalg, &
          fbot_xfer_type_in=fbot_xfer_type, &
+         congel_freeze_in=congel_freeze, &
          wave_spec_type_in=wave_spec_type, wave_spec_in=wave_spec, &
          sw_redist_in=sw_redist, sw_frac_in=sw_frac, sw_dtemp_in=sw_dtemp, &
          snwredist_in=snwredist, use_smliq_pnd_in=use_smliq_pnd, &

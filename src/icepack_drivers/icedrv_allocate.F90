@@ -239,14 +239,15 @@ contains
          daidtt(nx), & ! ice area tendency thermo.   (s^-1)
          dvidtt(nx), & ! ice volume tendency thermo. (m/s)
          dagedtt(nx),& ! ice age tendency thermo.    (s/s)
-         mlt_onset(nx)      , &! day of year that sfc melting begins
-         frz_onset(nx)      , &! day of year that freezing begins (congel or frazil)
-         frazil_diag(nx)    , & ! frazil ice growth diagnostic (m/step-->cm/day)
-         fsurfn(nx,ncat)    , & ! category fsurf
-         fcondtopn(nx,ncat) , & ! category fcondtop
-         fcondbotn(nx,ncat) , & ! category fcondbot
-         fsensn(nx,ncat)    , & ! category sensible heat flux
-         flatn(nx,ncat)     , & ! category latent heat flux
+         mlt_onset(nx),       & ! day of year that sfc melting begins
+         frz_onset(nx),       & ! day of year that freezing begins (congel or frazil)
+         frazil_diag(nx),     & ! frazil ice growth diagnostic (m/step-->cm/day)
+         rsiden(nx,ncat),     & ! fraction of ice that melts laterally
+         fsurfn(nx,ncat),     & ! category fsurf
+         fcondtopn(nx,ncat),  & ! category fcondtop
+         fcondbotn(nx,ncat),  & ! category fcondbot
+         fsensn(nx,ncat),     & ! category sensible heat flux
+         flatn(nx,ncat),      & ! category latent heat flux
          fresh_ai(nx),        & ! fresh water flux to ocean (kg/m^2/s)
          fsalt_ai(nx),        & ! salt flux to ocean (kg/m^2/s)
          fhocn_ai(nx),        & ! net heat flux to ocean (W/m^2)

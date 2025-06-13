@@ -22,20 +22,19 @@ contains
   module subroutine ini_mean_icepack_io(mesh)
     
     use mod_mesh
-    use io_meandata,      only: def_stream
+    use io_meandata, only: def_stream
     
     implicit none
 
     type(t_mesh), target, intent(in) :: mesh
         
-    integer           :: &
-         i, j, k, nt_Tsfc, nt_sice, nt_qice, nt_qsno, nt_apnd, &
-         nt_hpnd, nt_ipnd, nt_alvl, nt_vlvl, nt_iage, nt_FY,   &
-         nt_aero, ktherm,  nt_fbri, iost
+    integer :: &
+         i, k, nt_Tsfc, nt_sice, nt_qice, nt_qsno, nt_apnd,  &
+         nt_hpnd, nt_ipnd, nt_alvl, nt_vlvl, nt_iage, nt_FY, &
+         nt_aero, ktherm, nt_fbri, iost
     
-    integer, save     :: &
+    integer, save :: &
          nm_io_unit  = 102, nm_icepack_unit = 103, io_listsize=0
-    character(len=10) :: id_string
     character(500)    :: longname, trname, units
         
     logical (kind=log_kind) :: &
@@ -328,16 +327,16 @@ contains
     logical       , save                  :: has_been_called = .false.
     
     integer (kind=int_kind)   :: &
-         i, j, k, iblk,          &     ! counters
+         i, k,                   & ! counter
          nt_Tsfc, nt_sice, nt_qice, nt_qsno, nt_apnd, nt_hpnd, nt_ipnd, nt_alvl,    &
-         nt_vlvl, nt_iage, nt_FY,   nt_aero, ktherm,  nt_fbri
+         nt_vlvl, nt_iage, nt_FY, nt_aero, ktherm, nt_fbri
     character(500)            :: longname, trname, units
     character(4)              :: cyear
     
     logical (kind=log_kind)   :: &
          solve_zsal, skl_bgc, z_tracers, tr_iage, tr_FY, tr_lvl, tr_aero, tr_pond_topo,  &
          tr_pond_lvl, tr_brine, tr_bgc_N, tr_bgc_C, tr_bgc_Nit, tr_bgc_Sil, tr_bgc_DMS,  &
-         tr_bgc_chl, tr_bgc_Am, tr_bgc_PON,  tr_bgc_DON, tr_zaero, tr_bgc_Fe, tr_bgc_hum
+         tr_bgc_chl, tr_bgc_Am, tr_bgc_PON, tr_bgc_DON, tr_zaero, tr_bgc_Fe, tr_bgc_hum
     
 #include "associate_mesh.h"^
     

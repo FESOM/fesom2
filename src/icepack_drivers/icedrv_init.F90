@@ -3,14 +3,14 @@
 ! This submodule initializes the icepack variables
 !
 ! Author: L. Zampieri ( lorenzo.zampieri@awi.de )
-! Adapted for Icepack 1.4.1 by F. Kauker (frank.kauker@awi.de)
+! Adapted for Icepack 1.5.0 by F. Kauker (frank.kauker@awi.de)
 !
 !=======================================================================
 
 submodule (icedrv_main) icedrv_init
 
   use icepack_intfc, only: icepack_init_parameters, icepack_init_tracer_flags, icepack_init_tracer_sizes,    &
-       icepack_init_tracer_indices, icepack_init_trcr, icepack_query_parameters, icepack_query_tracer_flags, &
+       icepack_init_tracer_indices, icepack_init_enthalpy, icepack_query_parameters, icepack_query_tracer_flags, &
        icepack_query_tracer_sizes, icepack_query_tracer_indices, icepack_warnings_flush,                     &
        icepack_warnings_aborted, icepack_write_tracer_flags, icepack_write_tracer_indices,                   & 
        icepack_write_tracer_sizes, icepack_init_wave
@@ -549,7 +549,7 @@ contains
 
   subroutine init_thermo_vertical()
     ! originally in icedrv_init_column.F90
-    use icepack_intfc,        only: icepack_init_thermo
+    use icepack_intfc, only: icepack_init_salinity
     
     implicit none
     
@@ -567,7 +567,7 @@ contains
     !-----------------------------------------------------------------
     
     call icepack_query_parameters(depressT_out=depressT)
-    call icepack_init_thermo(nilyr=nilyr, sprofile=sprofile)
+    call icepack_init_salinity(sprofile=sprofile)
     call icepack_warnings_flush(ice_stderr)
     if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
          file=__FILE__, line=__LINE__)
@@ -730,14 +730,9 @@ contains
           if (tr_brine)  fbri(n) = trcrn(i,nt_fbri,n)
           if (snwgrain) rsnow (:,n) = trcrn(i,nt_rsnw:nt_rsnw+nslyr-1,n)
        enddo
-    
-       call icepack_step_radiation ( &
-            dt=dt,           ncat=ncat,           &
-            nblyr=nblyr,                          &
-            nilyr=nilyr,     nslyr=nslyr,         &
-            dEdd_algae=dEdd_algae,                &
-            sw_grid=swgrid(:),                    &
-            i_grid=igrid(:),                      &
+
+       call icepack_step_radiation (                      &
+            dt=dt,                                &
             fbri=fbri(:),                         &
             aicen=aicen(i,:),                     &
             vicen=vicen(i,:),                     &
@@ -747,24 +742,12 @@ contains
             apndn=trcrn(i,nt_apnd,:),             &
             hpndn=trcrn(i,nt_hpnd,:),             &
             ipndn=trcrn(i,nt_ipnd,:),             &
-            aeron=trcrn(i,nt_aero:nt_aero+4*n_aero-1,:),                   &
-            bgcNn=trcrn(i,nt_bgc_N(1):nt_bgc_N(1)+n_algae*(nblyr+3)-1,:),  &
+            aeron=trcrn(i,nt_aero:nt_aero+4*n_aero-1,:), &
+            bgcNn=trcrn(i,nt_bgc_N(1):nt_bgc_N(1)+n_algae*(nblyr+3)-1,:), &
             zaeron=trcrn(i,nt_zaero(1):nt_zaero(1)+n_zaero*(nblyr+3)-1,:), &
             trcrn_bgcsw=ztrcr_sw,                 &
             TLAT=lat_val(i), TLON=lon_val(i),     &
-            calendar_type=calendar_type,          &
-            days_per_year=days_per_year,          &
-            nextsw_cday=nextsw_cday, yday=yday, sec=sec,      &
-            !!! do not see whhy that should be here frank.kauker@awi.de
-            ! kaer_3bd=kaer_3bd, kaer_bc_3bd=kaer_bc_3bd(:,:),  &
-            ! waer_3bd=waer_3bd, waer_bc_3bd=waer_bc_3bd(:,:),  &
-            ! gaer_3bd=gaer_3bd, gaer_bc_3bd=gaer_bc_3bd(:,:),  &
-            ! kaer_5bd=kaer_5bd, kaer_bc_5bd=kaer_bc_5bd(:,:),  &
-            ! waer_5bd=waer_5bd, waer_bc_5bd=waer_bc_5bd(:,:),  &
-            ! gaer_5bd=gaer_5bd, gaer_bc_5bd=gaer_bc_5bd(:,:),  &
-            ! bcenh_3db=bcenh_3db(:,:,:),                       &
-            ! bcenh_5db=bcenh_5db(:,:,:),                       &
-            modal_aero=modal_aero,                            &
+            yday=yday, sec=sec,                   &
             swvdr=swvdr(i),         swvdf=swvdf(i),           &
             swidr=swidr(i),         swidf=swidf(i),           &
             coszen=cos_zen(i),      fsnow=fsnow(i),           &
@@ -979,25 +962,20 @@ contains
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call init_thermo_vertical'//achar(27)//'[0m'
     call init_thermo_vertical                           ! initialize vertical thermodynamics
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> icepack_init_itd'//achar(27)//'[0m'
-    call icepack_init_itd(ncat=ncat, hin_max=hin_max)   ! initialize the ice thickness distribution
+    call icepack_init_itd(hin_max=hin_max)   ! initialize the ice thickness distribution
     call icepack_warnings_flush(ice_stderr)
     if (icepack_warnings_aborted(subname)) &
        call icedrv_system_abort(file=__FILE__,line=__LINE__)
     
     if (mype==0) then  
-       call icepack_init_itd_hist(ncat=ncat, hin_max=hin_max, c_hi_range=c_hi_range) ! output
+       call icepack_init_itd_hist(hin_max=hin_max, c_hi_range=c_hi_range) ! output
        call icepack_warnings_flush(nu_diag)
        if (icepack_warnings_aborted(subname)) &
                 call icedrv_system_abort(file=__FILE__,line=__LINE__)
     end if
         
     if (tr_fsd) then
-       call icepack_init_fsd_bounds(   &
-            nfsd=nfsd,                   &  ! floe size distribution
-            floe_rad_l=floe_rad_l,       &  ! fsd size lower bound in m (radius)
-            floe_rad_c=floe_rad_c,       &  ! fsd size bin centre in m (radius)
-            floe_binwidth=floe_binwidth, &  ! fsd size bin width in m (radius)
-            c_fsd_range=c_fsd_range)        ! string for history output
+       call icepack_init_fsd_bounds(floe_rad_c_out=floe_rad_c,  write_diags=.true. )
        call icepack_warnings_flush(ice_stderr)
        if (icepack_warnings_aborted(subname)) then
           call icedrv_system_abort(file=__FILE__,line=__LINE__)
@@ -1149,23 +1127,16 @@ contains
              vicen(i,n) = hinit(n) * ainit(n) ! m
              vsnon(i,n) = min(aicen(i,n)*hsno_init,p2*vicen(i,n))
              ! tracers
-             call icepack_init_trcr( &
+             call icepack_init_enthalpy( &
                   Tair     = T_air(i),    &
                   Tf       = Tf(i),       &
                   Sprofile = salinz(i,:), &
                   Tprofile = Tmltz(i,:),  &
                   Tsfc     = Tsfc,        &
-                  nilyr    = nilyr,       &
-                  nslyr    = nslyr,       &
                   qin      = qin(:),      &
                   qsn      = qsn(:) )
              ! floe size distribution
-             if (tr_fsd) call icepack_init_fsd( &
-                  nfsd     = nfsd,        &
-                  ice_ic   = ice_ic,      &
-                  floe_rad_c=floe_rad_c,                &
-                  floe_binwidth=floe_binwidth,          &
-                  afsd=trcrn(i,nt_fsd:nt_fsd+nfsd-1,n))
+             if (tr_fsd) call icepack_init_fsd( ice_ic=ice_ic, afsd=trcrn(i,nt_fsd:nt_fsd+nfsd-1,n) )
              ! surface temperature
              trcrn(i,nt_Tsfc,n) = Tsfc ! deg C
              ! ice enthalpy, salinity
@@ -1205,24 +1176,22 @@ contains
        vsno(i) = c0
        do it = 1, max_ntrcr
           trcr(i,it) = c0
-       enddo
-       call icepack_aggregate( &
-            ncat=ncat,                    &
-            trcrn=trcrn(i,1:ntrcr,:),     &
-            aicen=aicen(i,:),             &
-            vicen=vicen(i,:),             &
-            vsnon=vsnon(i,:),             &
-            trcr=trcr(i,1:ntrcr),         &
-            aice=aice(i),                 &
-            vice=vice(i),                 &
-            vsno =vsno(i),                &
-            aice0=aice0(i),               &
-            ntrcr=ntrcr,                  &
-            trcr_depend=trcr_depend(1:ntrcr),     &
-            trcr_base=trcr_base(1:ntrcr,:),       &
-            n_trcr_strata=n_trcr_strata(1:ntrcr), &
-            nt_strata=nt_strata(1:ntrcr,:),       &
-            Tf=Tf(i)          )
+      enddo
+      call icepack_aggregate( &
+           trcrn=trcrn(i,1:ntrcr,:),     &
+           aicen=aicen(i,:),             &
+           vicen=vicen(i,:),             &
+           vsnon=vsnon(i,:),             &
+           trcr=trcr (i,1:ntrcr),        &
+           aice=aice (i),                &
+           vice=vice (i),                &
+           vsno=vsno (i),                &
+           aice0=aice0(i),               &
+           trcr_depend=trcr_depend(1:ntrcr),     &
+           trcr_base=trcr_base    (1:ntrcr,:),   &
+           n_trcr_strata=n_trcr_strata(1:ntrcr), &
+           nt_strata=nt_strata    (1:ntrcr,:), &
+           Tf = Tf(i) )
        aice_init(i) = aice(i)
     enddo
     

@@ -191,8 +191,8 @@
           if ( ncar_bulk_z_tair .ne. ncar_bulk_z_shum ) then
              call icedrv_system_abort(string=subname, file=__FILE__,line= __LINE__)
           else
-             zlvl_s    = c2 ! ncar_bulk_z_tair ! should be equal to ncar_bulk_z_shum
-             zlvl_v    = c10 !ncar_bulk_z_wind
+             zlvl_s    = ncar_bulk_z_tair ! should be equal to ncar_bulk_z_shum
+             zlvl_v    = ncar_bulk_z_wind
           endif
 
         end subroutine fesom_to_icepack_para
