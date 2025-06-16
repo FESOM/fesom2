@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --account=nwg_maresys.maresys
-#SBATCH --job-name=2p3z2d
+#SBATCH --job-name=4p3z2d
 #SBATCH --partition=mpp
 #SBATCH -N 9
 #SBATCH --cpus-per-task=1

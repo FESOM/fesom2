@@ -570,7 +570,7 @@ SUBROUTINE vars_sprac (ph, pco2, fco2, co2, hco3, co3, OmegaA, OmegaC, kspc_out,
         ! If Absolute salinity is given
         IF (trim(opS) == 'Sabs')  THEN
            ! If in-situ or potential temperature is given
-           IF (trim(optT) /= 'Scsv') THEN
+           IF (trim(optT) /= 'Scsv') THEN      !!!!!!!!! Is it a bug? OG 20.03.2025 Scsv -> Tcsv .OR. tcsv
               ! First compute conservative temperature
               tempcsv = gsw_ct_from_t (DBLE(ssal), tempis90, DBLE(p(i)))
            ELSE
