@@ -255,7 +255,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     ! initialise arrays that are needed for backscatter_coef
-    if(dynamics%opt_visc==8) call init_backscatter(partit, mesh)
+    if(dynamics%opt_visc==8) call init_backscatter(dynamics, partit, mesh)
         
     
     !___________________________________________________________________________
@@ -495,6 +495,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     logical        :: use_ivertvisc=.true.
     logical        :: uke_scaling=.true.
     real(kind=WP)  :: uke_scaling_factor=1._WP
+    logical        :: uke_advection=.false.
     real(kind=WP)  :: rosb_dis=1._WP
     integer        :: smooth_back=2
     integer        :: smooth_dis=2
@@ -516,8 +517,8 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     
     namelist /dynamics_visc   / opt_visc, check_opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
                                 use_ivertvisc, visc_easybsreturn, &
-                                uke_scaling, uke_scaling_factor, rosb_dis, smooth_back,           &
-                                smooth_dis, smooth_back_tend, K_back, c_back
+                                uke_scaling, uke_scaling_factor, uke_advection, &
+                                rosb_dis, smooth_back, smooth_dis, smooth_back_tend, K_back, c_back
 
     namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, & 
                                 ldiag_KE, AB_order,                                  &
@@ -557,6 +558,7 @@ nl => mesh%nl
     dynamics%visc_easybsreturn   = visc_easybsreturn
     dynamics%uke_scaling         = uke_scaling
     dynamics%uke_scaling_factor  = uke_scaling_factor
+    dynamics%uke_advection       = uke_advection
     dynamics%rosb_dis            = rosb_dis
     dynamics%smooth_back         = smooth_back
     dynamics%smooth_dis          = smooth_dis

@@ -109,6 +109,7 @@ TYPE T_DYN
 
     ! coefficients and options for opt_visc=8 (dynamic backscatter)
     logical                                     :: uke_scaling        = .true.
+    logical                                     :: uke_advection      = .false.
     real(kind=WP)                               :: uke_scaling_factor = 1._WP
     real(kind=WP)                               :: rosb_dis           = 1._WP
     integer                                     :: smooth_back        = 2

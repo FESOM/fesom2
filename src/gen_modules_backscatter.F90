@@ -20,7 +20,7 @@ module g_backscatter
     !___________________________________________________________________________
     ! allocate backscatter arrays
     real(kind=WP), allocatable, dimension(:,:)  :: v_back
-    real(kind=WP), allocatable, dimension(:,:)  :: uke, uke_back, uke_dis, uke_dif
+    real(kind=WP), allocatable, dimension(:,:)  :: uke, uke_back, uke_dis, uke_dif, uke_adv
     real(kind=WP), allocatable, dimension(:,:)  :: uke_rhs, uke_rhs_old
     real(kind=WP), allocatable, dimension(:,:)  :: UV_dis_posdef_b2, UV_dis_posdef, UV_back_posdef                                                
     real(kind=WP), allocatable, dimension(:,:,:):: UV_back, UV_dis
@@ -31,9 +31,10 @@ module g_backscatter
     !
     !___________________________________________________________________________
     ! allocate/initialise backscatter arrays
-    subroutine init_backscatter(partit, mesh)
+    subroutine init_backscatter(dynamics, partit, mesh)
         implicit none 
         integer                               :: elem_size
+        type(t_dyn)   , intent(inout), target :: dynamics
         type(t_mesh),   intent(in),    target :: mesh
         type(t_partit), intent(inout), target :: partit
 #include "associate_part_def.h"
@@ -66,6 +67,11 @@ module g_backscatter
         UV_back       = 0.0_WP
         UV_back_tend  = 0.0_WP
         UV_total_tend = 0.0_WP
+        
+        if (dynamics%uke_advection) then
+            allocate(uke_adv(    nl-1, elem_size))
+            uke_adv     = 0.0_WP
+        endif
 
     end subroutine init_backscatter
 
@@ -215,6 +221,141 @@ module g_backscatter
         deallocate(uke_d)
         deallocate(uuu)
     end subroutine visc_filt_dbcksc
+
+
+    subroutine backscatter_adv(dynamics, partit, mesh)
+        IMPLICIT NONE
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        integer                               :: n, nz, el1, el2, ul1
+        integer                               :: nl1, nl2, nod(2), el, ed, k, nle
+        real(kind=WP), dimension(:,:,:), pointer :: UV
+        real(kind=WP), dimension(:,:),   pointer :: Wvel_e
+        real(kind=WP), allocatable, dimension(:) :: contr1, contr2, wuke
+        real(kind=WP), allocatable, dimension(:,:)  :: advnode
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+        Wvel_e    =>dynamics%w_e(:,:)
+        UV        =>dynamics%UV(:,:,:)
+        
+        allocate(contr1(1:nl-1))
+        allocate(contr2(1:nl-1))
+        allocate(wuke(1:nl-1))
+        allocate(advnode(nl-1, myDim_nod2d+eDim_nod2D))
+
+        advnode=0.0_WP
+        contr1=0.0_WP
+        contr2=0.0_WP
+        wuke=0.0_WP
+         
+        !vertical advection
+        do n=1,myDim_nod2d
+           nl1 = nlevels_nod2D(n)-1
+           
+           !find average of uke between vertical layers
+           do k=1,nod_in_elem2D_num(n)
+               el = nod_in_elem2D(k,n)
+               nle = nlevels(el)-1
+           
+               wuke(1) = wuke(1) + uke(1,el)*elem_area(el)
+               wuke(2:nle) = wuke(2:nle) + 0.5_WP*(uke(2:nle,el)+uke(1:nle-1,el))*elem_area(el)      
+
+           end do
+
+           wuke(1:nl) = wuke(1:nl1)*Wvel_e(1:nl1,n)
+
+           do nz=1,nl1
+              ! Here 1/3 because 1/3 of the area is related to the node
+              advnode(nz,n) = - (wuke(nz) - wuke(nz+1) ) / (3._WP*hnode(nz,n)) 
+           end do
+           
+           advnode(nl1+1:nl-1,n) = 0._WP
+
+        end do
+
+        !horizontal advection
+        DO ed=1, myDim_edge2D
+           nod = edges(:,ed) 
+           el1  = edge_tri(1,ed)   
+           el2  = edge_tri(2,ed)
+           nl1 = nlevels(el1)-1
+
+           !calculate fluxes throught the each edge 
+           !for the edges that are on the boundary and have only one element 
+           contr1(1:nl1) = UV(2,1:nl1,el1)*edge_cross_dxdy(1,ed) - UV(1,1:nl1,el1)*edge_cross_dxdy(2,ed)  
+           
+           ! if we have the other element as well
+           if (el2>0) then
+              nl2 = nlevels(el2)-1
+              
+              contr2(1:nl2) = - UV(2,1:nl2,el2)*edge_cross_dxdy(3,ed) + UV(1,1:nl2,el2)*edge_cross_dxdy(4,ed)
+              
+              contr1(nl1+1:max(nl1,nl2)) = 0._WP
+              contr2(nl2+1:max(nl1,nl2)) = 0._WP
+              
+              if (nod(1) <= myDim_nod2d) then
+                 do nz=1, max(nl1,nl2)
+                    advnode(nz,nod(1)) = advnode(nz,nod(1)) + contr1(nz)*uke(nz,el1) + contr2(nz)*uke(nz,el2)             
+                 end do
+              endif
+              
+              if (nod(2) <= myDim_nod2d) then
+                 do nz=1, max(nl1,nl2)
+                    advnode(nz,nod(2)) = advnode(nz,nod(2)) - contr1(nz)*uke(nz,el1) - contr2(nz)*uke(nz,el2)
+                 end do
+              endif
+           
+           else  ! ed is a boundary edge, there is only the contribution from el1
+              if (nod(1) <= myDim_nod2d) then
+                 do nz=1, nl1
+                    advnode(nz,nod(1)) = advnode(nz,nod(1)) + contr1(nz)*uke(nz,el1)
+                 end do
+              endif
+              ! second edge node
+              if  (nod(2) <= myDim_nod2d) then
+                 do nz=1, nl1
+                    advnode(nz,nod(2)) = advnode(nz,nod(2)) - contr1(nz)*uke(nz,el1)
+                 end do
+              endif
+           endif
+        end do
+
+        ! Multiply by the segment area
+        do n=1,myDim_nod2d
+           nl1 = nlevels_nod2D(n)-1
+           advnode(1:nl1,n) = advnode(1:nl1,n) * area_inv(1:nl1,n)
+        end do
+
+        call exchange_nod(advnode, partit)
+
+        !Calculate advection as an average across the nodes
+        do n=1,myDim_nod2d
+           nl1 = nlevels_nod2D(n)-1
+           advnode(1:nl1,n) = advnode(1:nl1,n) *areasvol_inv(1:nl1,n)
+        end do
+
+        do el=1, myDim_elem2D
+           nl1 = nlevels(el)-1
+           uke_adv(1:nl1,el) = uke_adv(1:nl1,el) &
+                + elem_area(el)*(advnode(1:nl1,elem2D_nodes(1,el)) &
+                + advnode(1:nl1,elem2D_nodes(2,el)) & 
+                + advnode(1:nl1,elem2D_nodes(3,el)))/ 3.0_WP
+        end do
+
+        do el=1, myDim_elem2D
+            do nz=1,nlevels(el)-1   
+                uke_adv(nz,el)=dt*uke_adv(nz,el)/elem_area(el)
+            end do
+        end do
+
+        deallocate(contr1)
+        deallocate(contr2)
+        deallocate(wuke)
+        deallocate(advnode)
+    end subroutine backscatter_adv
 
     !
     !
@@ -374,13 +515,26 @@ module g_backscatter
             uke_dis(nz,:)=uuu
         END DO
 
-        DO ed=1, myDim_elem2D
-            DO  nz=1,nlevels(ed)-1
+        if (dynamics%uke_advection) then
+            call backscatter_adv(dynamics, partit, mesh)
+            call exchange_elem(uke_adv, partit)
+
+            DO ed=1, myDim_elem2D
+                DO  nz=1,nlevels(ed)-1
+                uke_rhs_old(nz,ed)=uke_rhs(nz,ed)
+                uke_rhs(nz,ed)=-uke_dis(nz,ed)-uke_back(nz,ed)+uke_dif(nz,ed)-uke_adv(nz, ed)
+                uke(nz,ed)=uke(nz,ed)+1.5_WP*uke_rhs(nz,ed)-0.5_WP*uke_rhs_old(nz,ed)
+                END DO
+            END DO
+        else
+            DO ed=1, myDim_elem2D
+                DO  nz=1,nlevels(ed)-1
                 uke_rhs_old(nz,ed)=uke_rhs(nz,ed)
                 uke_rhs(nz,ed)=-uke_dis(nz,ed)-uke_back(nz,ed)+uke_dif(nz,ed)
                 uke(nz,ed)=uke(nz,ed)+1.5_WP*uke_rhs(nz,ed)-0.5_WP*uke_rhs_old(nz,ed)
+                END DO
             END DO
-        END DO
+        end if
         
         call exchange_elem(uke, partit)
         deallocate(uuu)
