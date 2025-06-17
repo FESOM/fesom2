@@ -343,9 +343,7 @@ module g_backscatter
                 + elem_area(el)*(advnode(1:nl1,elem2D_nodes(1,el)) &
                 + advnode(1:nl1,elem2D_nodes(2,el)) & 
                 + advnode(1:nl1,elem2D_nodes(3,el)))/ 3.0_WP
-        end do
 
-        do el=1, myDim_elem2D
             do nz=1,nlevels(el)-1   
                 uke_adv(nz,el)=dt*uke_adv(nz,el)/elem_area(el)
             end do
