@@ -88,7 +88,7 @@ option(USE_ICEPACK "Use ICEPACK" OFF)
 message(STATUS "USE_ICEPACK: ${USE_ICEPACK}")
 
 
-option(BUILD_MESHPARTITIONER "build mesh partitioner" ON)
+option(BUILD_MESHPARTITIONER "build mesh partitioner" OFF)
 message(STATUS "BUILD_MESHPARTITIONER: ${BUILD_MESHPARTITIONER}")
 
 
