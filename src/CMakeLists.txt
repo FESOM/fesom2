@@ -189,11 +189,15 @@ find_package( MPI REQUIRED COMPONENTS C Fortran )
 #add_subdirectory(../lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
 #include_directories(../lib/metis-5.1.0/include)
 
-add_subdirectory(async_threads_cpp)
 
+add_library(${PROJECT_NAME} ${sources_Fortran})
 
 # fesom library
-add_library(${PROJECT_NAME} ${sources_Fortran} $<TARGET_OBJECTS:async_threads_cpp>)
+if (NOT DISABLE_MULTITHREADING)
+add_subdirectory(async_threads_cpp)
+add_library(${PROJECT_NAME} $<TARGET_OBJECTS:async_threads_cpp>)
+endif()
+
 add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
 target_compile_definitions(${PROJECT_NAME} PRIVATE -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
 
@@ -404,7 +408,7 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
       set(CMAKE_EXE_LINKER_FLAGS "-acc -ta=tesla:${NV_GPU_ARCH}")
    endif()
    if(ENABLE_OPENMP)
-      target_compile_options(${PROJECT_NAME} PRIVATE -Mipa=fast)
+      target_compile_options(${PROJECT_NAME} PRIVATE -Mipa=fast -mp )
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE -Mipa=fast,inline)
    endif()
