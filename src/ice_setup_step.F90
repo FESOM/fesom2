@@ -92,6 +92,11 @@ e_size=myDim_elem2D+eDim_elem2D
  end if
  
  allocate(rhs_mdiv(n_size), rhs_adiv(n_size), rhs_msdiv(n_size))
+ 
+#if defined (__seaice_tracers)
+ allocate(tr_ice(ntr_ice,n_size))
+ allocate(flx_iceocn(ntr_ice,n_size), flx_atmice(ntr_ice,n_size))
+#endif /* (__seaice_tracers) */
 
  m_ice_old=0.0_WP !PS
  a_ice_old=0.0_WP !PS
@@ -120,6 +125,12 @@ e_size=myDim_elem2D+eDim_elem2D
  rhs_mdiv=0.0_WP
  rhs_adiv=0.0_WP
  rhs_msdiv=0.0_WP
+ 
+#if defined (__seaice_tracers)
+ tr_ice = 0.0
+ flx_iceocn = 0.0
+ flx_atmice = 0.0
+#endif /* (__seaice_tracers) */
 
 
 ! Allocate memory for arrays used in coupling 

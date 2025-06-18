@@ -78,10 +78,26 @@ save
 							!temporary flux fields
 							!(for flux correction)
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_temp, m_templ, dm_temp, rhs_tempdiv
+
 #if defined (__oifs)
   real(kind=WP),target, allocatable, dimension(:)  :: enthalpyoffuse
 #endif
 #endif /* (__oasis) */
+  
+#if defined (__seaice_tracers)
+  ! stuff for iron/other nutrients in seaice
+  
+  ! number of concentration tracers in ice
+  integer                                          :: ntr_ice = 1, ntr_ice_max = 1
+  
+  ! which sea ice tracer belongs to which ocean tracer
+  integer, DIMENSION(ntr_ice_max)                  :: ice_tracer_mate
+
+  ! variables for holding concentration of stuff (nutrients e.g.) in ice and fluxes
+  ! between atmosphere/ice and ice/ocean
+  ! the sign convention is that positive fluxes are down (atm->ice and ice->ocn)
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:,:)       :: tr_ice, flx_iceocn, flx_atmice 
+#endif /* (__seaice_tracers) */
 
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: S_oc_array, T_oc_array
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_iceoce_x         

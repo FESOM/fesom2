@@ -209,6 +209,10 @@ subroutine ini_ice_io(year, mesh)
   call def_variable(iid, 'ice_albedo', (/nod2D/), 'ice albedo',                 '-',   ice_alb);
   call def_variable(iid, 'ice_temp',(/nod2D/), 'ice surface temperature',  'K',   ice_temp);
 #endif /* (__oifs) */
+  
+#if defined (__seaice_tracers)
+  call def_variable(iid, 'ice_tracer',(/ntr_ice, nod2D/), 'ice tracer content', 'mmol/m^3', tr_ice);
+#endif /* (__seaice_tracers) */
 
 end subroutine ini_ice_io
 !
