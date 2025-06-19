@@ -64,4 +64,3 @@ cmake ${SOURCE_DIR} -DCMAKE_INSTALL_PREFIX=$HERE -DCMAKE_BUILD_TYPE=Debug ${CMAK
     # additional cmake arguments can be passed to configure.sh
     # this also includes fesom specific options in CMakeLists, can be used as -DFESOM_COUPLED=ON
 make install -j`nproc --all`
-

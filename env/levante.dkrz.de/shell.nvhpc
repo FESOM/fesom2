@@ -5,8 +5,8 @@ export CPU_MODEL=AMD_EPYC_ZEN3
 module --force purge 
 # module load intel-oneapi-compilers/2022.0.1-gcc-11.2.0
 # module load openmpi/4.1.2-intel-2021.5.0
-module load nvhpc/22.5-gcc-11.2.0
-module load openmpi/.4.1.4-nvhpc-22.5
+module load nvhpc/23.9-gcc-11.2.0
+module load openmpi/4.1.6-nvhpc-23.9
 export FC=mpif90 CC=mpicc CXX=mpicxx;
 
 module load netcdf-c/4.8.1-openmpi-4.1.2-intel-2021.5.0
