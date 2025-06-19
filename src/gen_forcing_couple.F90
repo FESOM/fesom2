@@ -376,6 +376,14 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
                 mask=1.
                 call force_flux_consv(enthalpyoffuse, mask, i, 0, action, partit, mesh)
              end if
+         elseif (i.eq.14) then
+             if (action) then
+                u_wind(:)                     = exchange(:)        ! zonal wind
+             end if
+         elseif (i.eq.15) then
+             if (action) then
+                v_wind(:)                     = exchange(:)        ! meridional wind
+             end if
 #else ! oifs
          elseif (i.eq.13) then
             if (action) then
