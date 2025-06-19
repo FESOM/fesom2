@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 2.8)
-project(METIS)
+cmake_minimum_required(VERSION 3.2)
+project(METIS VERSION 5.1.0)
 
 #set(GKLIB_PATH "GKlib" CACHE PATH "path to GKlib")
 #set(GKLIB_PATH "${CMAKE_SOURCE_DIR}/lib/metis-5.1.0/GKlib" CACHE PATH "path to GKlib")
