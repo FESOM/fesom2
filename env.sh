@@ -54,7 +54,7 @@ elif [[ $LOGINHOST =~ ^m[A-Za-z0-9]+\.hpc\.dkrz\.de$ ]]; then
    STRATEGY="mistral.dkrz.de"
 elif [[ $LOGINHOST =~ ^levante ]] || [[ $LOGINHOST =~ ^l[:alnum:]+\.lvt\.dkrz\.de$ ]]; then 
    STRATEGY="levante.dkrz.de"
-   # following regex only matches if input is 2 word like levante.nvhpc
+   # following regex only matches if input is 2 word like levante.nvhpc, this enables using different shells for a machine directly
    compid_regex="^([[:alnum:]]+)\.([[:alnum:]]+)$"
    if [[ $LOGINHOST =~ $compid_regex ]]; then
      COMPILERID="${BASH_REMATCH[2]}"
