@@ -37,6 +37,8 @@ module fesom_main_storage_module
   use iceberg_params
   use iceberg_step
   use mod_transit
+  use iceberg_ocean_coupling
+
   ! Define icepack module
 
 #if defined (__icepack)
@@ -53,11 +55,14 @@ module fesom_main_storage_module
   use recom_interface
 #endif
 
+! Transient tracers
+use mod_transit, only: year_ce, r14c_nh, r14c_tz, r14c_sh, r14c_ti, xCO2_ti, xf11_nh, xf11_sh, xf12_nh, xf12_sh, xsf6_nh, xsf6_sh, ti_transit, anthro_transit
+
   implicit none
     
   type :: fesom_main_storage_type
 
-    integer           :: n, from_nstep, offset, row, i, provided
+    integer           :: n, from_nstep, offset, row, i, provided, id
     integer           :: which_readr ! read which restart files (0=netcdf, 1=core dump,2=dtype)
     integer           :: total_nsteps
     integer, pointer  :: mype, npes, MPIerr, MPI_COMM_FESOM, MPI_COMM_WORLD, MPI_COMM_FESOM_IB
@@ -309,12 +314,14 @@ contains
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call setup_model'//achar(27)//'[0m'
         call setup_model(f%partit)  ! Read Namelists, always before clock_init
 
+        
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call clock_init'//achar(27)//'[0m'
         call clock_init(f%partit)   ! read the clock file 
-
+        
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call get_run_steps'//achar(27)//'[0m'
         call get_run_steps(fesom_total_nsteps, f%partit)
         f%total_nsteps=fesom_total_nsteps
+        
 
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call mesh_setup'//achar(27)//'[0m'
         call mesh_setup(f%partit, f%mesh)
@@ -478,7 +485,7 @@ contains
         ! --------------
         ! LA icebergs: 2023-05-17 
         if (use_icebergs) then
-            call allocate_icb(f%partit)
+            call allocate_icb(f%partit, f%mesh)
         endif
         ! --------------
 
@@ -847,16 +854,6 @@ contains
 #endif
             if (f%ice%ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh)  
 
-            
-            ! LA commented for debugging
-            ! --------------
-            ! LA icebergs: 2023-05-17 
-            if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
-                call icb2fesom(f%mesh, f%partit, f%ice)
-            end if
-            ! --------------
-
-
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
 #if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
@@ -896,6 +893,14 @@ contains
         end if
 #endif
         call oce_timestep_ale(n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        if (use_transit) then
+          ! Prevent negative concentrations of SF6, CFC-11 and CFC-12 during the first years (inital values are zero)
+          do tr_num=1, f%tracers%num_tracers
+            if ((f%tracers%data(tr_num)%ID==6) .or. (f%tracers%data(tr_num)%ID==11) .or. (f%tracers%data(tr_num)%ID==12)) then
+                f%tracers%data(tr_num)%values(:,:) = max(f%tracers%data(tr_num)%values(:,:), 0._WP)
+            end if
+          end do
+        end if ! use_transit
 
         f%t3 = MPI_Wtime()
         !___compute energy diagnostics..._______________________________________

@@ -263,7 +263,7 @@ subroutine viscosity_filter(option, dynamics, partit, mesh)
             call visc_filt_bidiff(dynamics, partit, mesh)
         CASE (8)
             if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call backscatter_coef'//achar(27)//'[0m'
-            call backscatter_coef(partit, mesh)
+            call backscatter_coef(dynamics, partit, mesh)
             if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call visc_filt_dbcksc'//achar(27)//'[0m'
             call visc_filt_dbcksc(dynamics, partit, mesh) 
         CASE DEFAULT

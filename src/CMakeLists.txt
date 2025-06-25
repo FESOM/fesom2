@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.25)
 
 project(fesom LANGUAGES C CXX Fortran VERSION 2.0.0)
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/../cmake ${CMAKE_MODULE_PATH})
@@ -24,6 +24,11 @@ if(DEFINED ENV{ENABLE_ALBEDO_INTELMPI_WORKAROUNDS}) # be able to set the initial
 else()
    option(ALBEDO_INTELMPI_WORKAROUNDS "workaround for performance issues on albedo" OFF)
 endif()
+if(DEFINED ENV{ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS}) # be able to set the initial cache value from our env settings for aleph, not only via cmake command
+   option(JUWELS_GNUOPENMPI_WORKAROUNDS "workaround for performance issues on juwels" ON)
+else()
+   option(JUWELS_GNUOPENMPI_WORKAROUNDS "workaround for performance issues on juwels" OFF)
+endif()
 
 #TODO: these machine specific changes must be done using cmake toolchain then here otherwise will make cmake another raps. 
 
@@ -41,26 +46,32 @@ if(ALBEDO_INTELMPI_WORKAROUNDS)
    add_compile_options(-DENABLE_ALBEDO_INTELMPI_WORKAROUNDS)
    add_compile_options(-DDISABLE_PARALLEL_RESTART_READ)
 endif()
+if(JUWELS_GNUOPENMPI_WORKAROUNDS)
+   add_compile_options(-DENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS)
+endif()
 
 #TODO: this machine specific block can easyly go in  cmake toolchain.
-if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
-   message(STATUS "multithreading disabled for Levante") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
+if    (${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  leo-dcgp )
-   message(STATUS "multithreading disabled for Leonardo") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  mn5-gpp )
-   message(STATUS "multithreading disabled for MN5 GPP") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  albedo )
-   message(STATUS "multithreading disabled for Albedo") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL albedo )
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL atosecmwf )
-   message(STATUS "multithreading disabled for Atos ECMWF")
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL juwels )
+   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)   
 else()
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 endif()
+if (DISABLE_MULTITHREADING)
+   message(STATUS "MULTITHREADING @ ${FESOM_PLATFORM_STRATEGY}: OFF")
+else()
+   message(STATUS "MULTITHREADING @ ${FESOM_PLATFORM_STRATEGY}: ON")
+endif()
+
 
 option(ENABLE_OPENACC "compile with OpenACC support" OFF)
 message(STATUS "ENABLE_OPENACC: ${ENABLE_OPENACC}")
@@ -78,6 +89,11 @@ message(STATUS "RECOM_COUPLED: ${RECOM_COUPLED}")
 
 option(USE_ICEPACK "Use ICEPACK" OFF)
 message(STATUS "USE_ICEPACK: ${USE_ICEPACK}")
+
+
+option(BUILD_MESHPARTITIONER "build mesh partitioner" OFF)
+message(STATUS "BUILD_MESHPARTITIONER: ${BUILD_MESHPARTITIONER}")
+
 
 # option to trigger building a library version of FESOM
 # we do not always build the library along with the executable to avoid having two targets here in the CMakeLists.txt
@@ -247,24 +263,63 @@ if(${CISO_COUPLED})
 endif()
 
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
-if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
-   target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -ip -init=zero -no-wrap-margin -fpe0) # add -fpe0 for RAPS environment
-   if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
-      target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
+if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL  IntelLLVM )
+   
+   # Base compiler flags
+   target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0)
+   
+   # compiler flags not supported by IntelLLVM
+   if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
+      target_compile_options(${PROJECT_NAME} PRIVATE -no-prec-sqrt -ip )
+   endif()   
+   
+   if(ENABLE_OPENMP)
+      target_compile_options(${PROJECT_NAME} PRIVATE -qopenmp)
+   endif()   
+   
+   # platform specific compiler flags
+   # add -fpe0 for RAPS environment
+   if    (${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
+      # PROCESSORS:  2x AMD 7763 CPU; 128 cores in total, 256 GB main memory
+      # --> compiler flag performance test: core2, 512CPUs, 3mon. simulat.
+      # | Intel/MPI | nothing                                                             | 144s |
+      # | Intel/MPI | -O2                                                                 | 144s |
+      # | Intel/MPI | -O3                                                                 | 144s |
+      # |*Intel/MPI | -03 -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low           | 140.95s |
+      # |           | -align array64byte -unroll-aggressive -qopt-malloc-options=2        |         |
+      #target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low -align array64byte -unroll-aggressive -qopt-malloc-options=2)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
-      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
+      target_compile_options(${PROJECT_NAME} PRIVATE -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
-      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
-   elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  albedo)
-      target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -O3 -ip -fPIC -qopt-malloc-options=2 -qopt-prefetch=5 -unroll-aggressive) # -g -traceback -check) #NEC mpi option
+      target_compile_options(${PROJECT_NAME} PRIVATE -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
+   elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL albedo)
+      # PROCESSORS: 2x AMD Rome Epyc 7702 (64 cores each), 128 cores, 256 GB RAM
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -fPIC -qopt-malloc-options=2 -qopt-prefetch=5 -unroll-aggressive) # -g -traceback -check) #NEC mpi option
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL atosecmwf )
       target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
+   elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL juwels )
+      # PROCESSOR: 2× Intel Xeon Platinum 8168 CPU, 2× 24 cores, 2.7 GHz, 96 (12× 8) GB DDR4, 2666 MHz
+      # --> compiler flag performance test: core2, 192CPUs, 1mon. simulat.
+      # | Intel/Para...MPI    | nothing                                                   | 309s |
+      # | Intel/Para...MPI    | -O2                                                       | 114s |
+      # | Intel/Para...MPI    | -O3                                                       | 115s |
+      # | Intel/Para...MPI    | -O3 -xCORE-AVX512                                         | 117s |
+      # | Intel/Para...MPI    | -O3 -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte | 119s |
+      # | Intel/Para...MPI    | -O2 -xCORE-AVX2                                           | 114s |
+      # |*Intel/Para...MPI    | -O3 -xCORE-AVX2                                           | 112s |
+      # | Intel/Para...MPI    | -O3 -xCORE-AVX2 -qopt-streaming-stores=always             | 126s |
+      # | Intel/Para...MPI    | -O3 -xCORE-AVX2 -qopt-prefetch=5                          | 116s |
+      # | Intel/Para...MPI    | -O3 -xCORE-AVX2 -funroll-loops                            | 113s |
+      # |*Intel/Para...MPI-mt | -O3 -xCORE-AVX2                                           | 113s |
+      target_compile_options(${PROJECT_NAME} PRIVATE -xCORE-AVX2)
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE -xHost)
    endif()
-#    target_compile_options(${PROJECT_NAME} PRIVATE -g -traceback ) #-check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
-#    target_compile_options(${PROJECT_NAME} PRIVATE -qopenmp -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -xHost -ip -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
-#    target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -ip -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
+   
+   # # debugging related compiler flags
+   # target_compile_options(${PROJECT_NAME} PRIVATE -qopenmp -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
+   # target_compile_options(${PROJECT_NAME} PRIVATE -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
+
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 #    target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
@@ -272,11 +327,65 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
       message(STATUS "Allowing type mismatches on Ubuntu for CI Testing" )  # NOTE(PG): Would be nicer to grab the CI=True from the env variable
       target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch)
    else()
-      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none)
    endif()
    if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
       target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
    endif()
+   
+   # platform specific compiler flags
+   if    (${FESOM_PLATFORM_STRATEGY} STREQUAL juwels )
+      # PROCESSOR: 2× Intel Xeon Platinum 8168 CPU, 2× 24 cores, 2.7 GHz, 96 (12× 8) GB DDR4, 2666 MHz
+      # --> compiler flag performance test: core2, 192CPUs, 1mon. simulat.
+      # | GCC/openMPI | nothing                                                           | 390s |
+      # | GCC/openMPI | -O2                                                               | 192s |
+      # |*GCC/openMPI | -O3 -march=skylake-avx512 -mtune=skylake-avx512                   | 173s | chatgpt recomendation
+      # |             | -mprefer-vector-width=512 -falign-loops=64 -falign-functions=64   |      |
+      # |             | -falign-jumps=64  (chatGPT recomendation)                         |      |
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=skylake-avx512 -mtune=skylake-avx512 -mprefer-vector-width=512 -falign-loops=64 -falign-functions=64 -falign-jumps=64)      
+   elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
+      # PROCESSORS:  2x AMD 7763 CPU; 128 cores in total, 256 GB main memory
+      # --> compiler flag performance test: core2, 512CPUs, 3mon. simulat.
+      # | GCC/openMPI | nothing                                                           | 659s |
+      # | GCC/openMPI | -O2                                                               | 364s |
+      # | GCC/openMPI | -O3                                                               | 316s |
+      # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3                                   | 278s | chatgpt recomendation
+      # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -ftree-vectorize                  | 278s | chatgpt recomendation
+      # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -funroll-loops                    | 284s | chatgpt recomendation
+      # |*GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -ftree-vectorize -flto            | 276s | chatgpt recomendation
+      # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -ftree-vectorize -flto            | 281s | chatgpt recomendation
+      # |             | -falign-functions=32 -falign-loops=32 -falign-jumps=32            |      |
+      # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -ftree-vectorize -flto            | 281s | chatgpt recomendation
+      # |             | -falign-functions=64 -falign-loops=64 -falign-jumps=64            |      |
+      # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -ftree-vectorize -flto            | 280s | chatgpt recomendation
+      # |             | -mno-fma4 -mavx2 -mfma                                            |      |
+      # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -ftree-vectorize -flto            | 280s | chatgpt recomendation
+      # |             | -mcpu=znver3                                                      |      |
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3 -ftree-vectorize -flto)      
+   else()
+      #[[if(NOT (${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu))
+         target_compile_options(${PROJECT_NAME} PRIVATE -native)
+      endif()  ]]  
+   endif()
+   
+   # # debugging related compiler flags
+   #target_compile_options(${PROJECT_NAME} PRIVATE 
+                           #-fallow-argument-mismatch 
+                           #-fno-fast-math -fno-signed-zeros 
+                           #-freciprocal-math 
+                           #-mveclibabi=svml 
+                           #-flto
+                           #-pg 
+                           #-fbacktrace 
+                           #-fcheck=all,bounds 
+                           #-finit-real=snan 
+                           #-finit-integer=-9999 
+                           #-fsanitize=undefined,address
+                        #)
+   ## if use -fsanitize=undefined,address you also need ... PRIVATE -lubsan)           
+   #target_link_libraries(${PROJECT_NAME} PRIVATE -lubsan)
+                     
+
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
 	#target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O3)
    target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O2 -hnoacc -M878)  #-hnoacc is a workaround for cray automatically activate -hacc, -M878 is to suppress ftn-878 warning
@@ -318,6 +427,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${MCT_Fortran_LIBRARIES} ${MPEU_Fo
 target_link_libraries(${PROJECT_NAME} PRIVATE ${YACUTILS_Fortran_LIBRARIES} ${YACCORE_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_Fortran_LIBRARIES})
 
+
 #set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 
 #target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES} ${OASIS_Fortran_INCLUDE_DIRECTORIES})
@@ -337,6 +447,48 @@ add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
 target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
 
 
+get_target_property(FLAGS ${PROJECT_NAME} COMPILE_OPTIONS)
+message(STATUS " --> Final Compile options for ${PROJECT_NAME}: ${FLAGS}")
+
+
+
+set(additional_targets)
+# mesh partitioner
+
+if(BUILD_MESHPARTITIONER)
+  if(NOT (${CMAKE_Fortran_COMPILER_ID} STREQUAL GNU OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL Intel OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL IntelLLVM))
+    message(WARNING "Mesh partitioner is only supported for GNU and Intel compilers. Please use -DBUILD_MESHPARTITIONER=OFF when configuring with ${CMAKE_Fortran_COMPILER_ID} compiler.")
+  endif()
+  message(STATUS "Building mesh partitioner...")
+block()
+set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/module/fesom_meshpart)
+  set(fesom_meshpart_sources_Fortran ${src_home}/MOD_MESH.F90 ${src_home}/oce_modules.F90 ${src_home}/gen_modules_config.F90 ${src_home}/gen_modules_partitioning.F90 ${src_home}/gen_modules_rotate_grid.F90 ${src_home}/fvom_init.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90 ${src_home}/MOD_READ_BINARY_ARRAYS.F90 ${src_home}/MOD_WRITE_BINARY_ARRAYS.F90 ${src_home}/MOD_PARTIT.F90)
+  set(fesom_meshpart_sources_C ${src_home}/fort_part.c)
+  
+  add_subdirectory(${src_home}/../lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
+  include_directories(${src_home}/../lib/metis-5.1.0/include)
+  
+  add_library(fesom_meshpart_C ${fesom_meshpart_sources_C})
+  target_compile_definitions(fesom_meshpart_C PRIVATE USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
+  target_link_libraries(fesom_meshpart_C metis)
+  
+  add_executable(fesom_meshpart ${fesom_meshpart_sources_Fortran})
+  # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
+  if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
+  	target_compile_options(fesom_meshpart PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip)
+  #	target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip -g -traceback -check all,noarg_temp_created,bounds,uninit) 
+  elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
+  	target_compile_options(fesom_meshpart PRIVATE -fdefault-real-8 -ffree-line-length-none)
+    if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
+        target_compile_options(fesom_meshpart PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
+     endif()
+  endif()
+  target_link_libraries(fesom_meshpart fesom_meshpart_C MPI::MPI_Fortran)
+  set_target_properties(fesom_meshpart PROPERTIES LINKER_LANGUAGE Fortran)
+  list(APPEND additional_targets fesom_meshpart)
+endblock()
+endif()
+
 ### Export and installation
 
-fesom_export(TARGETS ${PROJECT_NAME} fesom.x)
+fesom_export(TARGETS ${PROJECT_NAME} fesom.x ${additional_targets})

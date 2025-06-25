@@ -55,10 +55,13 @@ docker:
     meshes:
         test_souf: ./test/meshes/soufflet/
         test_global: ./test/meshes/pi/
+        test_cavity: ./test/meshes/pi_cavity/
     forcing:
         test_global: ./test/input/global/
+        test_icebergs: ./test/input/icebergs/
     clim:
         test_global: ./test/input/global/
+        test_icebergs: ./test/input/icebergs/
     opath:
         opath: ./test/
 
@@ -83,4 +86,3 @@ juwels:
         phc: /p/project/chhb19/hhb192/meshes/POOL/FESOM2/hydrography/phc3.0/
     opath:
         opath: /p/scratch/chhb19/${USER}/
-

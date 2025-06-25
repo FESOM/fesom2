@@ -5,6 +5,7 @@ MODULE io_RESTART
   use o_arrays
   use g_cvmix_tke
   use g_cvmix_idemix
+  use g_backscatter
   use MOD_TRACER
   use MOD_ICE
   use MOD_DYN
@@ -12,6 +13,10 @@ MODULE io_RESTART
   use MOD_PARTIT
   use MOD_PARSUP
   use fortran_utils
+  use mpi
+#if defined(__icepack)
+  use icedrv_main
+#endif 
 #if defined(__recom)
   use recom_glovar
   use recom_config
@@ -26,9 +31,16 @@ MODULE io_RESTART
   real(kind=WP)             :: ctime !current time in seconds from the beginning of the year
 
   type(restart_file_group) , save :: oce_files
-  type(restart_file_group) , save :: ice_files
   character(:), allocatable, save :: oce_path
+  
+  type(restart_file_group) , save :: ice_files
   character(:), allocatable, save :: ice_path
+  
+#if defined(__icepack)
+  type(restart_file_group) , save, public :: icepack_files
+  character(:), allocatable, save, public :: icepack_path
+#endif  
+
 #if defined(__recom)
   type(restart_file_group) , save :: bio_files
   character(:), allocatable, save :: bio_path
@@ -51,7 +63,7 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
   use nvfortran_subarray_workaround_module
 #endif
   integer, intent(in)       :: year
-  integer                   :: j
+  integer                   :: j, id
   character(500)            :: longname
   character(500)            :: trname, units
   character(4)              :: cyear
@@ -107,7 +119,8 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
   endif
   
   do j=1,tracers%num_tracers
-     SELECT CASE (j) 
+     id=tracers%data(j)%ID  !MB: Avoid hard-wired tracer assignments like SELECT CASE(j)
+     SELECT CASE (id) 
        CASE(1)
          trname='temp'
          longname='potential temperature'
@@ -119,6 +132,10 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
        CASE(6)
          trname='sf6'
          longname='sulfur hexafluoride'
+         units='mol / m**3'
+       CASE(11)
+         trname='cfc11'
+         longname='chlorofluorocarbon CFC-11'
          units='mol / m**3'
        CASE(12)
          trname='cfc12'
@@ -250,11 +267,8 @@ end subroutine ini_bio_io
 !
 subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tracers, partit, mesh)
 
-#if defined(__icepack)
-  icepack restart not merged here ! produce a compiler error if USE_ICEPACK=ON; todo: merge icepack restart from 68d8b8b
-#endif
-
   use fortran_utils
+
   implicit none
   ! this is the main restart subroutine
   ! if l_read   is TRUE the restart file will be read
@@ -292,7 +306,6 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   integer             :: cstep
 
 #if defined(__recom) && defined(__usetp)
-! kh 31.03.22 nl is required
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -300,6 +313,7 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
 
     num_tracers = tracers%num_tracers
 #endif
+
   !_____________________________________________________________________________
   ! initialize directory for core dump restart 
   if(.not. initialized_raw) then
@@ -353,18 +367,31 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   ! initialise files for netcdf restart if l_read==TRUE --> the restart file 
   ! will be read
   if (.not. l_read) then
-               call ini_ocean_io(yearnew, dynamics, tracers, partit, mesh)
-  if (use_ice) call ini_ice_io  (yearnew, ice, partit, mesh)
+    call ini_ocean_io(yearnew, dynamics, tracers, partit, mesh)
+    if (use_ice) then
+#if defined(__icepack)
+        call ini_icepack_io(yearnew, partit, mesh)
+#else        
+        call ini_ice_io(yearnew, ice, partit, mesh)        
+#endif        
+    end if     
 #if defined(__recom)
     if (use_REcoM) call ini_bio_io  (yearnew, tracers, partit, mesh)
 #endif
+
   else
-               call ini_ocean_io(yearold, dynamics, tracers, partit, mesh)
-  if (use_ice) call ini_ice_io  (yearold, ice, partit, mesh)
+    call ini_ocean_io(yearold, dynamics, tracers, partit, mesh)
+    if (use_ice) then
+#if defined(__icepack)    
+        call ini_icepack_io(yearold, partit, mesh)
+#else
+        call ini_ice_io  (yearold, ice, partit, mesh)
+#endif        
+    end if     
 #if defined(__recom)
     if (REcoM_restart) call ini_bio_io(yearold, tracers, partit, mesh)
 #endif
-  end if
+  end if ! --> if (.not. l_read) then
 
   !___READING OF RESTART________________________________________________________
   ! should restart files be readed --> see r_restart in gen_modules_clock.F90
@@ -411,15 +438,32 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
     ! read netcdf file restart
     else
         which_readr = 0
+
+        !_______________________________________________________________________
+        ! read OCEAN restart
 #if defined(__recom) && defined(__usetp)
-            if(partit%my_fesom_group == 0) then !OG
+            if(partit%my_fesom_group == 0) then ! In tracer parallel mode, only read restarts on main MPI group
 #endif
+
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ocean'//achar(27)//'[0m'
 #if defined(__recom) && defined(__usetp)
             endif !(partit%my_fesom_group == 0) then ! OG 
 #endif
         call read_restart(oce_path, oce_files, partit%MPI_COMM_FESOM, partit%mype)
+        
+        !_______________________________________________________________________
+        ! read ICE/ICEPACK restart
         if (use_ice) then
+
+#if defined(__icepack)   
+            if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: icepack'//achar(27)//'[0m'
+            call read_restart(icepack_path, icepack_files, partit%MPI_COMM_FESOM, partit%mype)
+#else            
+            if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ice'//achar(27)//'[0m'
+            call read_restart(ice_path, ice_files, partit%MPI_COMM_FESOM, partit%mype)            
+#endif
+        end if 
+
 #if defined(__recom) && defined(__usetp)
                 if(partit%my_fesom_group == 0) then ! OG 
 #endif
@@ -443,8 +487,10 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
 #endif
                 call read_restart(bio_path, bio_files, partit%MPI_COMM_FESOM, partit%mype)
             end if
+
 #endif
 
+        !_______________________________________________________________________
         ! immediately create a raw core dump restart
         if(raw_restart_length_unit /= "off") then
 #if defined(__recom) && defined(__usetp)
@@ -518,9 +564,13 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   ! finally write restart for netcdf, core dump and derived type binary
   ! write netcdf restart
   if(is_portable_restart_write) then
+
+    !___________________________________________________________________________
+    ! write OCEAN restart
 #if defined(__recom) && defined(__usetp)
                 if(partit%my_fesom_group == 0) then
 #endif
+
 !     if(partit%mype==0) write(*,*)'Do output (netCDF, restart) ...'
     if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ocean'//achar(27)//'[0m'
 #if defined(__recom) && defined(__usetp)
@@ -528,27 +578,29 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
 #endif
 
     call write_restart(oce_path, oce_files, istep)
+    
+    !___________________________________________________________________________
+    ! write ICE/ICEPACK restart
     if(use_ice) then
-#if defined(__recom) && defined(__usetp)
-                if(partit%my_fesom_group == 0) then
-#endif
+#if defined(__icepack)        
+        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: icepack'//achar(27)//'[0m'
+        call write_restart(icepack_path, icepack_files, istep)
+#else
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ice'//achar(27)//'[0m'
-#if defined(__recom) && defined(__usetp)
-                endif !(partit%my_fesom_group == 0) then
-#endif
         call write_restart(ice_path, ice_files, istep)
+#endif 
     end if
-
+    
+    !___________________________________________________________________________
+    ! write RECOM restart
 #if defined(__recom)
-!RECOM restart
-!write here
         if (REcoM_restart .or. use_REcoM) then
 #if defined(__usetp)
             if(partit%my_fesom_group == 0) then
 #endif
                 if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: bio'//achar(27)//'[0m'
 #if defined(__usetp)
-            endif !(partit%my_fesom_group == 0) then
+            endif 
 #endif
 
             call write_restart(bio_path, bio_files, istep)
@@ -903,7 +955,6 @@ subroutine read_all_raw_restarts(mpicomm, mype)
   integer fileunit
   integer status
   integer mpierr
-  include 'mpif.h'
 
   if(mype == RAW_RESTART_METADATA_RANK) then
     ! read metadata info for the raw restart
@@ -992,7 +1043,6 @@ end subroutine
 !
 !_______________________________________________________________________________
 subroutine read_restart(path, filegroup, mpicomm, mype)
-  include 'mpif.h'        
   character(len=*), intent(in) :: path
   type(restart_file_group), intent(inout) :: filegroup
   integer, intent(in) :: mpicomm
@@ -1136,7 +1186,6 @@ end subroutine
 !     integer mype
 !     integer npes
 !     integer mpierr
-!     include 'mpif.h'
 !   
 !     call MPI_Comm_Rank(mpicomm, mype, mpierr)
 !     call MPI_Comm_Size(mpicomm, npes, mpierr)

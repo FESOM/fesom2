@@ -13,12 +13,14 @@ module cpl_driver
   ! Modules used
   !
   use mod_oasis                    ! oasis module
-  use g_config, only : dt, use_icebergs, lwiso
+  use g_config, only : dt, use_icebergs, lwiso, compute_oasis_corners
 #if defined(__recom) && defined(__usetp)
   use g_config, only : num_fesom_groups 
 #endif
+
   use o_param,  only : rad
   USE MOD_PARTIT
+  use mpi
   implicit none
   save   
   !
@@ -31,7 +33,7 @@ module cpl_driver
 
 #if defined (__oifs)
   integer                    :: nsend = 7
-  integer                    :: nrecv = 13
+  integer                    :: nrecv = 15
 #else
   integer                    :: nsend = 4
   integer                    :: nrecv = 12
@@ -59,7 +61,7 @@ module cpl_driver
   integer                    :: localRank      ! local MPI rank
   integer                    :: localSize      ! local MPI size
   integer                    :: localComm      ! local MPI size
-  logical                    :: commRank       ! true for ranks doing OASIS communication
+  integer                    :: commRank
   integer                    :: comp_id        ! id returned by oasis_init_comp
 
   logical, save              :: oasis_was_initialized
@@ -566,12 +568,14 @@ include "associate_mesh_ass.h"
     my_x_coords=my_x_coords/rad
     my_y_coords=my_y_coords/rad
 
-    if (mype .eq. 0) then
-      print *, 'FESOM before corner computation'
-    endif
-    call node_contours(my_x_corners, my_y_corners, partit, mesh)
-    if (mype .eq. 0) then
-      print *, 'FESOM after corner computation'
+    if (compute_oasis_corners) then
+      if (mype .eq. 0) then
+        print *, 'FESOM before corner computation'
+      endif
+      call node_contours(my_x_corners, my_y_corners, partit, mesh)
+      if (mype .eq. 0) then
+        print *, 'FESOM after corner computation'
+      endif
     endif
 
     if (mype .eq. localroot) then
@@ -613,12 +617,14 @@ include "associate_mesh_ass.h"
     CALL MPI_GATHERV(area(1,:), my_number_of_points, MPI_DOUBLE_PRECISION, all_area,  &
                     counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
 
-    do j = 1, 25
-      CALL MPI_GATHERV(my_x_corners(:,j), myDim_nod2D, MPI_DOUBLE_PRECISION, all_x_corners(:,:,j),  &
-                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
-      CALL MPI_GATHERV(my_y_corners(:,j), myDim_nod2D, MPI_DOUBLE_PRECISION, all_y_corners(:,:,j),  &
-                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
-    end do
+    if (compute_oasis_corners) then
+      do j = 1, 25
+        CALL MPI_GATHERV(my_x_corners(:,j), myDim_nod2D, MPI_DOUBLE_PRECISION, all_x_corners(:,:,j),  &
+                      counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+        CALL MPI_GATHERV(my_y_corners(:,j), myDim_nod2D, MPI_DOUBLE_PRECISION, all_y_corners(:,:,j),  &
+                      counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+      end do
+    endif
 
     CALL MPI_Barrier(MPI_COMM_FESOM, ierror)
     if (mype .eq. 0) then 
@@ -637,8 +643,10 @@ include "associate_mesh_ass.h"
           print *, 'FESOM before write grid centers'
           CALL oasis_write_grid (grid_name, number_of_all_points, 1, all_x_coords(:,:), all_y_coords(:,:))
 
-          print *, 'FESOM before write corner'
-          CALL oasis_write_corner (grid_name, number_of_all_points, 1, 25, all_x_corners(:,:,:), all_y_corners(:,:,:))
+          if (compute_oasis_corners) then
+            print *, 'FESOM before write corner'
+            CALL oasis_write_corner (grid_name, number_of_all_points, 1, 25, all_x_corners(:,:,:), all_y_corners(:,:,:))
+          endif
 
           ALLOCATE(unstr_mask(number_of_all_points, 1))
           unstr_mask=0
@@ -714,7 +722,9 @@ include "associate_mesh_ass.h"
     cpl_recv(10) = 'heat_ico'
     cpl_recv(11) = 'heat_swo'    
     cpl_recv(12) = 'hydr_oce'
-    cpl_recv(13) = 'enth_oce'
+    cpl_recv(13) = 'calv_oce'
+    cpl_recv(14) = 'u10w_oce'
+    cpl_recv(15) = 'v10w_oce'
 #else
     cpl_recv(1)  = 'taux_oce'
     cpl_recv(2)  = 'tauy_oce'
@@ -799,11 +809,11 @@ include "associate_mesh_ass.h"
 !------------------------------------------------------------------
 
    call oasis_enddef(ierror)
-   if (commRank) print *, 'fesom oasis_enddef: COMPLETED'
+   if (ierror .eq. oasis_ok) print *, 'fesom oasis_enddef: COMPLETED'
 #ifndef __oifs
-   if (commRank) print *, 'FESOM: calling exchange_roots'
+   if (ierror .eq. oasis_ok) print *, 'FESOM: calling exchange_roots'
    call exchange_roots(source_root, target_root, 1, partit%MPI_COMM_FESOM, MPI_COMM_WORLD)
-   if (commRank) print *, 'FESOM source/target roots: ', source_root, target_root
+   if (ierror .eq. oasis_ok) print *, 'FESOM source/target roots: ', source_root, target_root
 #endif
 
    ! WAS VOM FOLGENDEN BRAUCHE ICH NOCH ??? 

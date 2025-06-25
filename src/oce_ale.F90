@@ -242,7 +242,7 @@ subroutine init_ale(dynamics, partit, mesh)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+nl => mesh%nl
 
     !___allocate________________________________________________________________
     ! hnode and hnode_new: layer thicknesses at nodes. 
@@ -312,20 +312,8 @@ subroutine init_ale(dynamics, partit, mesh)
     allocate(mesh%zbar_n_srf(myDim_nod2D+eDim_nod2D)) 
 
     ! reassociate after the allocation (no pointer exists before)
-    hnode(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)               => mesh%hnode(:,:)
-    hnode_new(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)           => mesh%hnode_new(:,:)
-    zbar_3d_n(1:mesh%nl, 1:myDim_nod2D+eDim_nod2D)             => mesh%zbar_3d_n(:,:)
-    Z_3d_n(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)              => mesh%Z_3d_n(:,:)
-    helem(1:mesh%nl-1, 1:myDim_elem2D+eDim_nod2D)              => mesh%helem(:,:)
-    bottom_elem_thickness(1:myDim_elem2D+eDim_nod2D)           => mesh%bottom_elem_thickness(:)
-    bottom_node_thickness(1:myDim_nod2D+eDim_nod2D)            => mesh%bottom_node_thickness(:)
-    dhe(1:myDim_elem2D)                                        => mesh%dhe(:)
-    hbar(1:myDim_nod2D+eDim_nod2D)                             => mesh%hbar(:)
-    hbar_old(1:myDim_nod2D+eDim_nod2D)                         => mesh%hbar_old(:)
-    zbar_n_bot(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_bot(:)
-    zbar_e_bot(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_bot(:)
-    zbar_n_srf(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_srf(:)
-    zbar_e_srf(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_srf(:)
+#include "associate_mesh_ass.h"
+ 
     !___initialize______________________________________________________________
     hbar      = 0.0_WP
     hbar_old  = 0.0_WP
@@ -1940,7 +1928,6 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     else
 !$OMP DO
         do n=1,myDim_nod2D
-            if (ulevels_nod2D(n)>1) cycle ! --> in case of cavity 
             ssh_rhs(n)=ssh_rhs(n)+(1.0_WP-alpha)*ssh_rhs_old(n)
         end do
 !$OMP END DO
@@ -2066,6 +2053,7 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
     if (.not. trim(which_ALE)=='linfs') then
 !$OMP PARALLEL DO
         do n=1,myDim_nod2D
+            if (ulevels_nod2D(n)>1) cycle
             ssh_rhs_old(n)=ssh_rhs_old(n)-water_flux(n)*areasvol(ulevels_nod2D(n),n)
         end do
 !$OMP END PARALLEL DO
@@ -2082,6 +2070,7 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
 
 !$OMP PARALLEL DO
     do n=1,myDim_nod2D
+        if (ulevels_nod2D(n) > 1) cycle ! --> if cavity node hbar == hbar_old
         hbar(n)=hbar_old(n)+ssh_rhs_old(n)*dt/areasvol(ulevels_nod2D(n),n)
     end do
 !$OMP END PARALLEL DO
@@ -3114,7 +3103,7 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_DYN
-    USE g_CONFIG,only: dt
+    USE g_CONFIG !,only: dt
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -3239,8 +3228,14 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         zinv=1.0_WP*dt/(zbar_n(nzmax-1)-zbar_n(nzmax))
         !!PS friction=-C_d*sqrt(UV(1,nlevels(elem)-1,elem)**2+ &
         !!PS             UV(2,nlevels(elem)-1,elem)**2)
-        friction=-C_d*sqrt(UV(1,nzmax-1,elem)**2+ &
-                        UV(2,nzmax-1,elem)**2)
+        
+        if ((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) then
+           friction=-C_d
+        else
+           friction=-C_d*sqrt(UV(1,nzmax-1,elem)**2+ &
+                           UV(2,nzmax-1,elem)**2)
+        end if
+
         ur(nzmax-1)=ur(nzmax-1)+zinv*friction*UV(1,nzmax-1,elem)
         vr(nzmax-1)=vr(nzmax-1)+zinv*friction*UV(2,nzmax-1,elem)
 
@@ -3367,7 +3362,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 !PS     heat_flux  = 0.0_WP
 !PS     stress_surf= 0.0_WP
 !PS     stress_node_surf= 0.0_WP
-    
+
     !___________________________________________________________________________
     ! calculate equation of state, density, pressure and mixed layer depths
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_bv'//achar(27)//'[0m'
@@ -3399,7 +3394,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! compute both: neutral slope and tapered neutral slope. Can be later combined with compute_sigma_xy
     ! will be primarily used for computing Redi diffusivities. etc?
     call compute_neutral_slope(partit, mesh)
-
+ 
     !___________________________________________________________________________
     call status_check(partit)
     !___________________________________________________________________________
@@ -3489,7 +3484,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! UV_rhs = dt*[ (R_advec + R_coriolis)_AB2^n + R_pressure^n ]
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'
     call compute_vel_rhs(ice, dynamics, partit, mesh)
-    
+     
     !___________________________________________________________________________
     ! Energy diagnostic contribution
     if (dynamics%ldiag_ke) then
@@ -3662,7 +3657,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         !   rigid lid.
 !$OMP PARALLEL DO
         do node=1, myDim_nod2D+eDim_nod2D
-            eta_n(node)=alpha*hbar(node)+(1.0_WP-alpha)*hbar_old(node)
+            if (ulevels_nod2D(node)==1) eta_n(node)=alpha*hbar(node)+(1.0_WP-alpha)*hbar_old(node)
         end do
 !$OMP END PARALLEL DO
         ! --> eta_(n)
@@ -3701,7 +3696,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         call fer_gamma2vel(dynamics, partit, mesh)
     end if
     t6=MPI_Wtime() 
-
+ 
     !___________________________________________________________________________
     ! keep the old vertical velocity for computation of the mean between the timesteps (is used in compute_ke_wrho)
     if (dynamics%ldiag_ke) then
@@ -3727,20 +3722,20 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         call compute_vert_vel_transpv(dynamics, partit, mesh)
     end if    
     t7=MPI_Wtime()   
-    
+     
     !___________________________________________________________________________
     ! energy diagnostic computation
     if (dynamics%ldiag_ke) then
        call compute_ke_wrho(dynamics, partit, mesh)
        call compute_apegen (dynamics, tracers, partit, mesh)
     end if
-    
+ 
     !___________________________________________________________________________
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
     call solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     t8=MPI_Wtime() 
-    
+     
     !___________________________________________________________________________
     ! Update hnode=hnode_new, helem
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_thickness_ale'//achar(27)//'[0m'
