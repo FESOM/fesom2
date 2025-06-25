@@ -110,7 +110,11 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, elem, ed, nz, nl1, ul1, nl2, ul2, nl12, ul12, &
 !$OMP                                  uv1, uv2, uv12, qc, qu, qd, wu, wv, &
 !$OMP                                  ednodes, edelem, un1, un2)
-!$OMP DO    
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
+!$OMP DO
+#endif
     do node=1, myDim_nod2D
         ul1 = ulevels_nod2D(node)
         nl1 = nlevels_nod2D(node)
@@ -179,7 +183,11 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! 2nd. compute horizontal advection component: u*du/dx, u*dv/dx & v*du/dy, v*dv/dy
     ! loop over triangle edges
-!$OMP DO    
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
+!$OMP DO
+#endif
     do ed=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         ednodes = edges(:,ed)   
@@ -303,7 +311,7 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
         
         !_______________________________________________________________________
         ! if edelem(2)==0 than edge is boundary edge
-        else ! --> if(edelem(2)>0) then
+        else
             !___________________________________________________________________
             !NR add contribution to first edge node --> ednodes(1)
             !NR Do not calculate on Halo nodes, as the result will not be used. 
@@ -338,13 +346,13 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
                 call omp_unset_lock(partit%plock(ednodes(2)))
 #endif
             end if 
-        end if ! --> if(edelem(2)>0) then
+        end if
         
 #if defined(__openmp_reproducible)
 !$OMP END ORDERED
 #endif
 
-    end do ! --> do ed=1, myDim_edge2D  
+    end do
 !$OMP END DO 
 
     !___________________________________________________________________________
@@ -847,7 +855,11 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
         ! remove viscosity
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, edelem, ednodes, hh, len, &
 !$OMP                                  vi, update_ubt, update_vbt)
-!$OMP DO        
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
+!$OMP DO
+#endif   
         do edge=1, myDim_edge2D+eDim_edge2D
                 
             ! if ed is an outer boundary edge, skip it
@@ -902,7 +914,11 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     ! remove bottom drag
     if (dynamics%se_bottdrag) then
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nzmax, hh)
-!$OMP DO    
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
+!$OMP DO
+#endif
         do elem=1, myDim_elem2D
             elnodes= elem2D_nodes(:,elem)
             nzmax  = nlevels(elem)
@@ -952,7 +968,11 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             !___________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, edelem, ednodes, hh, len, &
 !$OMP                                  vi, update_ubt, update_vbt)
-!$OMP DO                  
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
+!$OMP DO
+#endif
             do edge=1, myDim_edge2D+eDim_edge2D
                     
                 ! if ed is an outer boundary edge, skip it
@@ -1138,7 +1158,11 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
         ! and advance ssh --> eta^(n+(m+1)/M) = eta^(n+(m)/M) - dt/M * div_H * [...]
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, ednodes, edelem, c1, c2, &
 !$OMP                                  deltaX1, deltaX2, deltaY1, deltaY2)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
         do edge=1, myDim_edge2D
             ednodes = edges(:,edge)
             edelem  = edge_tri(:,edge)
