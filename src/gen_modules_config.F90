@@ -159,6 +159,7 @@ module g_config
                         use_transit, compute_oasis_corners
  
 #if defined(__recom) && defined(__usetp)
+! number of groups for multi FESOM group loop parallelization
   integer                       :: num_fesom_groups=1
   namelist /run_config_tp/ num_fesom_groups  
 #endif

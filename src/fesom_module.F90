@@ -336,20 +336,6 @@ contains
         end if
 #endif 
 
-!       Transient tracers: control output of initial input values
-        if(use_transit .and. anthro_transit .and. f%mype==0) then
-          write (*,*)
-          write (*,*) "*** Transient tracers: Initial atmospheric input values >>>"
-          write (*,*) "Year CE, xCO2, D14C_NH, D14C_TZ, D14C_SH, xCFC-11_NH, xCFC-11_SH, xCFC-12_NH, xCFC-12_SH, xSF6_NH, xSF6_SH"
-          write (*, fmt="(2x,i4,10(2x,f6.2))") &
-                  year_ce(ti_transit), xCO2_ti(ti_transit) * 1.e6, &
-                  (r14c_nh(ti_transit) - 1.) * 1000., (r14c_tz(ti_transit) - 1.) * 1000., (r14c_sh(ti_transit) - 1.) * 1000., &
-                  xf11_nh(ti_transit) * 1.e12, xf11_sh(ti_transit) * 1.e12, &
-                  xf12_nh(ti_transit) * 1.e12, xf12_sh(ti_transit) * 1.e12, &
-                  xsf6_nh(ti_transit) * 1.e12, xsf6_sh(ti_transit) * 1.e12
-          write (*,*)
-        end if
-
         !=====================
         ! Allocate field variables 
         ! and additional arrays needed for 
@@ -942,23 +928,6 @@ contains
 #if defined (__recom)
         f%rtime_compute_recom = f%rtime_compute_recom + f%t1_recom - f%t0_recom
 #endif
-
-!       Transient tracers: update of input values between restarts
-        if(use_transit .and. anthro_transit .and. (daynew == ndpyr) .and. (timenew==86400.)) then
-          ti_transit = ti_transit + 1
-          if (f%mype==0) then
-            write (*,*)
-            write (*,*) "*** Transient tracers: Updated atmospheric input values >>>"
-            write (*,*) "Year CE, xCO2, D14C_NH, D14C_TZ, D14C_SH, xCFC-11_NH, xCFC-11_SH, xCFC-12_NH, xCFC-12_SH, xSF6_NH, xSF6_SH"
-            write (*, fmt="(2x,i4,10(2x,f6.2))") &
-                        year_ce(ti_transit), xCO2_ti(ti_transit) * 1.e6, &
-                        (r14c_nh(ti_transit) - 1.) * 1000., (r14c_tz(ti_transit) - 1.) * 1000., (r14c_sh(ti_transit) - 1.) * 1000., &
-                        xf11_nh(ti_transit) * 1.e12, xf11_sh(ti_transit) * 1.e12, &
-                        xf12_nh(ti_transit) * 1.e12, xf12_sh(ti_transit) * 1.e12, &
-                        xsf6_nh(ti_transit) * 1.e12, xsf6_sh(ti_transit) * 1.e12
-            write (*,*)
-          end if
-        endif
 
     end do
 !call cray_acc_set_debug_global_level(3)    
