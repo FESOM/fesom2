@@ -399,7 +399,13 @@ contains
 
         if (f%mype==0) f%t4=MPI_Wtime()
         if (use_ice) then 
+#if defined(__recom) && defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_setup'//achar(27)//'[0m'
+#if defined(__recom) && defined(__usetp)
+        end if
+#endif
             call ice_setup(f%ice, f%tracers, f%partit, f%mesh)
             f%ice%ice_steps_since_upd = f%ice%ice_ave_steps-1
             f%ice%ice_update=.true.
@@ -895,14 +901,14 @@ contains
 
         f%t4 = MPI_Wtime()
         !___prepare output______________________________________________________
-#if defined(__recom) && defined(__usetp)
-        if (f%my_fesom_group==0) then
-#endif 
+!#if defined(__recom) && defined(__usetp)
+!        if (f%my_fesom_group==0) then
+!#endif 
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
+!#if defined(__recom) && defined(__usetp)
+!        end if
+!#endif
         call output (n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
-#if defined(__recom) && defined(__usetp)
-        end if
-#endif
 
         ! LA icebergs: 2023-05-17 
         if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
@@ -957,11 +963,11 @@ contains
 
     !___FINISH MODEL RUN________________________________________________________
 
-#if !defined (__usetp) 
-! multi FESOM group loop parallelization    
     call MPI_Barrier(f%MPI_COMM_FESOM, f%MPIERR)
-#endif
+
+! multi FESOM group loop parallelization    
 #if defined(__recom) && defined (__usetp) 
+
 ! list statistics for all fesom_groups 
 ! fesom groups are listed backwards, so info for the main fesom group 0 is at the end in the log
     do i = num_fesom_groups - 1, 0, -1
@@ -1055,15 +1061,15 @@ contains
     mean_rtime(1:14) = mean_rtime(1:14) / real(f%npes,real32)
     call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime,  14, MPI_REAL, MPI_MAX, f%MPI_COMM_FESOM, f%MPIerr)
     call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime,  14, MPI_REAL, MPI_MIN, f%MPI_COMM_FESOM, f%MPIerr)
-    
-#if defined (__oifs) 
-    ! OpenIFS coupled version has to call oasis_terminate through par_ex
-    call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
-#endif
 
 #if defined(__recom) && defined (__usetp)
         end if
     end do ! i = num_fesom_groups - 1, 0, -1
+#endif
+    
+#if defined (__oifs) 
+    ! OpenIFS coupled version has to call oasis_terminate through par_ex
+    call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
 #endif
 
 #if defined(__MULTIO) && !defined(__ifsinterface) && !defined(__oasis)
