@@ -36,15 +36,15 @@ age_start_year=2000
 /
 
 &nam_sbc
-   nm_xwind_file = 'FORCING/CORE2/u_10.'        ! name of file with winds
-   nm_ywind_file = 'FORCING/CORE2/v_10.'        ! name of file with winds
-   nm_humi_file  = 'FORCING/CORE2/q_10.'        ! name of file with humidity
-   nm_qsr_file   = 'FORCING/CORE2/ncar_rad.'    ! name of file with solar heat
-   nm_qlw_file   = 'FORCING/CORE2/ncar_rad.'    ! name of file with Long wave
-   nm_tair_file  = 'FORCING/CORE2/t_10.'        ! name of file with 2m air temperature
-   nm_prec_file  = 'FORCING/CORE2/ncar_precip.' ! name of file with total precipitation
-   nm_snow_file  = 'FORCING/CORE2/ncar_precip.' ! name of file with snow precipitation
-   nm_mslp_file  = 'FORCING/CORE2/slp.'         ! air_pressure_at_sea_level
+   nm_xwind_file = 'FORCING/CORE2/u_10.1948'        ! name of file with winds
+   nm_ywind_file = 'FORCING/CORE2/v_10.1948'        ! name of file with winds
+   nm_humi_file  = 'FORCING/CORE2/q_10.1948'        ! name of file with humidity
+   nm_qsr_file   = 'FORCING/CORE2/ncar_rad.1948'    ! name of file with solar heat
+   nm_qlw_file   = 'FORCING/CORE2/ncar_rad.1948'    ! name of file with Long wave
+   nm_tair_file  = 'FORCING/CORE2/t_10.1948'        ! name of file with 2m air temperature
+   nm_prec_file  = 'FORCING/CORE2/ncar_precip.1948' ! name of file with total precipitation
+   nm_snow_file  = 'FORCING/CORE2/ncar_precip.1948' ! name of file with snow precipitation
+   nm_mslp_file  = 'FORCING/CORE2/slp.1948'         ! air_pressure_at_sea_level
    nm_xwind_var  = 'U_10_MOD'   ! name of variable in file with wind
    nm_ywind_var  = 'V_10_MOD'   ! name of variable in file with wind
    nm_humi_var   = 'Q_10_MOD'   ! name of variable in file with humidity
