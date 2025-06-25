@@ -92,7 +92,11 @@ subroutine muscl_adv_init(twork, partit, mesh)
     allocate(twork%nboundary_lay(myDim_nod2D+eDim_nod2D)) !node n becomes a boundary node after layer twork%nboundary_lay(n)
     twork%nboundary_lay=nl-1
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, n1, n2)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     do n=1, myDim_edge2D
         ! n1 and n2 are local indices 
         n1=edges(1,n)
