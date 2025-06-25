@@ -1,7 +1,7 @@
-!DIR$ if defined(__recom) .AND. defined(__usetp)
+#if defined(__recom) && defined(__usetp)
 MPI_COMM_FESOM_WORLD                => partit%MPI_COMM_FESOM_WORLD
 MPI_COMM_FESOM_SAME_RANK_IN_GROUPS  => partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS
-!DIR$ endif
+#endif
 MPI_COMM_FESOM  => partit%MPI_COMM_FESOM
 MPI_COMM_FESOM_IB       => partit%MPI_COMM_FESOM_IB
 com_nod2D       => partit%com_nod2D
@@ -20,9 +20,9 @@ MPIERR          => partit%MPIERR
 MPIERR_IB       => partit%MPIERR_IB
 npes            => partit%npes
 mype            => partit%mype
-!DIR$ if defined(__recom) .AND. defined(__usetp)
+#if defined(__recom) && defined(__usetp)
 my_fesom_group  => my_fesom_group
-!DIR$ endif
+#endif
 maxPEnum        => partit%maxPEnum
 part            => partit%part
 
