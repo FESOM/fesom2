@@ -207,6 +207,13 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
         un1(ul1:nl1) = (  UVh(2, ul1:nl1, edelem(1))*edge_cross_dxdy(1,ed) & 
                         - UVh(1, ul1:nl1, edelem(1))*edge_cross_dxdy(2,ed)) 
         
+        !___________________________________________________________________
+        ! ensure openmp numerical reproducability
+        ! block had to be moved outside of if statement, otherwise the else
+        ! part was missing the !$OMP ORDERED
+#if defined(__openmp_reproducible)
+!$OMP ORDERED
+#endif
         !_______________________________________________________________________
         ! if edelem(2)==0 than edge is boundary edge
         if(edelem(2)>0) then
@@ -229,11 +236,6 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
             ul12 = max(ul1, ul2)
             nl12 = min(nl1, nl2)
             
-            !___________________________________________________________________
-            ! ensure openmp numerical reproducability
-#if defined(__openmp_reproducible)
-!$OMP ORDERED
-#endif
             !___________________________________________________________________
             !NR add contribution to first edge node --> ednodes(1)
             !NR Do not calculate on Halo nodes, as the result will not be used. 
