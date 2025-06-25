@@ -164,7 +164,7 @@ function(generate_fesom_clock OUTPUT_DIR)
     file(MAKE_DIRECTORY "${OUTPUT_DIR}")
     
     # Create the fesom.clock file with the correct format
-    file(WRITE "${OUTPUT_DIR}/fesom.clock" "0 1 1958\n0 1 1958\n")
+    file(WRITE "${OUTPUT_DIR}/fesom.clock" "0 1 1948\n0 1 1948\n")
 endfunction()
 
 # Function to add a FESOM integration test
