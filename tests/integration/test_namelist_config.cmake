@@ -21,6 +21,11 @@ set(REQUIRED_NAMELISTS
     namelist.config
     namelist.forcing
     namelist.oce
+    namelist.tra
+    namelist.ice
+    namelist.io
+    namelist.dyn
+    namelist.cvmix
 )
 
 foreach(NAMELIST ${REQUIRED_NAMELISTS})
@@ -38,8 +43,8 @@ file(READ "${CONFIG_DIR}/namelist.config" ORIGINAL_CONTENT)
 file(WRITE "${TEST_DIR}/namelist.config" "${ORIGINAL_CONTENT}")
 
 # Test path replacements
-set(TEST_MESH_PATH "${TEST_DATA_DIR}/meshes/")
-set(TEST_FORCING_PATH "${TEST_DATA_DIR}/forcing/")
+set(TEST_MESH_PATH "${TEST_DATA_DIR}/MESHES/")
+set(TEST_FORCING_PATH "${TEST_DATA_DIR}/")
 set(TEST_RESULT_PATH "${TEST_DIR}/results/")
 
 # Apply the same replacements as in FesomTesting.cmake
