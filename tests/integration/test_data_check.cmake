@@ -17,7 +17,8 @@ endif()
 # Check that required subdirectories exist
 set(REQUIRED_SUBDIRS
     MESHES
-    FORCING
+    FORCING 
+    INITIAL 
 )
 
 foreach(SUBDIR ${REQUIRED_SUBDIRS})
@@ -32,55 +33,34 @@ foreach(SUBDIR ${REQUIRED_SUBDIRS})
 endforeach()
 
 # Check for any mesh files
-file(GLOB MESH_FILES "${TEST_DATA_DIR}/meshes/*")
+file(GLOB MESH_FILES "${TEST_DATA_DIR}/MESHES/*")
 if(NOT MESH_FILES)
-    message(WARNING "No mesh files found in ${TEST_DATA_DIR}/meshes/")
+    message(WARNING "No mesh files found in ${TEST_DATA_DIR}/MESHES/")
     message(STATUS "Note: You may need to add test mesh data for integration tests to work")
-    
-    # Create a placeholder README
-    file(WRITE "${TEST_DATA_DIR}/meshes/README.md"
-"# Test Mesh Data
 
-Place your test mesh files here. You can:
-
-1. Copy a small mesh from your existing FESOM data
-2. Create symbolic links to existing test meshes:
-   ```bash
-   ln -s /path/to/test/mesh ./test_mesh
-   ```
-3. Use the toy mesh configurations if available
-
-The integration tests will look for mesh data in this directory.
-")
 else()
     list(LENGTH MESH_FILES NUM_MESH_FILES)
     message(STATUS "Found ${NUM_MESH_FILES} items in meshes directory")
 endif()
 
 # Check for any forcing files
-file(GLOB FORCING_FILES "${TEST_DATA_DIR}/forcing/*")
+file(GLOB FORCING_FILES "${TEST_DATA_DIR}/FORCING/*")
 if(NOT FORCING_FILES)
-    message(WARNING "No forcing files found in ${TEST_DATA_DIR}/forcing/")
+    message(WARNING "No forcing files found in ${TEST_DATA_DIR}/FORCING/")
     message(STATUS "Note: You may need to add minimal forcing data for integration tests")
-    
-    # Create a placeholder README
-    file(WRITE "${TEST_DATA_DIR}/forcing/README.md"
-"# Test Forcing Data
-
-Place your test forcing/climate files here. You can:
-
-1. Copy minimal forcing data from existing FESOM datasets
-2. Create symbolic links to existing test data:
-   ```bash
-   ln -s /path/to/minimal/forcing ./forcing_data
-   ```
-3. Use simplified/idealized forcing for testing
-
-The integration tests will configure namelists to use this directory.
-")
 else()
     list(LENGTH FORCING_FILES NUM_FORCING_FILES)
     message(STATUS "Found ${NUM_FORCING_FILES} items in forcing directory")
+endif()
+
+# Check for any initial files
+file(GLOB INITIAL_FILES "${TEST_DATA_DIR}/INITIAL/*")
+if(NOT INITIAL_FILES)
+    message(WARNING "No initial files found in ${TEST_DATA_DIR}/INITIAL/")
+    message(STATUS "Note: You may need to add minimal initial data for integration tests")
+else()
+    list(LENGTH INITIAL_FILES NUM_INITIAL_FILES)
+    message(STATUS "Found ${NUM_INITIAL_FILES} items in initial directory")
 endif()
 
 message(STATUS "Test data check completed")
