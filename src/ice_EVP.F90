@@ -8,7 +8,7 @@ module ice_EVP_interfaces
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine stress_tensor
 
         subroutine stress2rhs(ice, partit, mesh)
         USE MOD_ICE
@@ -18,9 +18,9 @@ module ice_EVP_interfaces
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine stress2rhs
     end interface
-end module
+end module ice_EVP_interfaces
 
 module ice_EVPdynamics_interface
     interface
@@ -32,9 +32,9 @@ module ice_EVPdynamics_interface
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine EVPdynamics
     end interface
-end module
+end module ice_EVPdynamics_interface
 
 !
 ! Contains routines of EVP dynamics
