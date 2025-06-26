@@ -8,9 +8,9 @@ module oce_initial_state_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in)  ,  target :: mesh
-        end subroutine
+        end subroutine oce_initial_state
     end interface
-end module
+end module oce_initial_state_interface
 
 module tracer_init_interface
     interface
@@ -22,9 +22,9 @@ module tracer_init_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in)  ,  target :: mesh
-        end subroutine
+        end subroutine tracer_init
     end interface
-end module
+end module tracer_init_interface
 
 module dynamics_init_interface
     interface
@@ -36,9 +36,9 @@ module dynamics_init_interface
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine dynamics_init
     end interface
-end module
+end module dynamics_init_interface
 
 module ocean_setup_interface
     interface
@@ -52,9 +52,9 @@ module ocean_setup_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout)   , target :: mesh
-        end subroutine
+        end subroutine ocean_setup
     end interface
-end module
+end module ocean_setup_interface
 
 module before_oce_step_interface
     interface
@@ -68,9 +68,9 @@ module before_oce_step_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine before_oce_step
     end interface
-end module
+end module before_oce_step_interface
 !
 !
 !_______________________________________________________________________________
