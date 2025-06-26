@@ -246,7 +246,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 
         ttf_rhs_bak = 0.0 ! OG - tra_diag
 
-        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+        if (tracers%data(1)%ltra_diag) then ! OG - tra_diag
            do tr_num=1, num_tracers
               ttf_rhs_bak(1:nzmax,tr_num) = tracers%data(tr_num)%values(1:nzmax, n)
            end do
@@ -338,7 +338,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
         end do
 
         ! recom_sms
-        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+        if (tracers%data(1)%ltra_diag) then ! OG - tra_diag
            do tr_num=1, num_tracers
              tracers%work%tra_recom_sms(1:nzmax,n,tr_num) = tracers%data(tr_num)%values(1:nzmax, n) - ttf_rhs_bak(1:nzmax,tr_num)
              !if (mype==0)  print *,  tra_recom_sms(:,:,tr_num)
