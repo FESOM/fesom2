@@ -30,7 +30,20 @@ add_subdirectory(src)
 
 # Add mesh_part directory if requested
 if(BUILD_MESHPARTITIONER)
+    message(STATUS "Configuring mesh partitioner as part of the main build")
     add_subdirectory(mesh_part)
+    
+    # Install the mesh partitioner
+    install(TARGETS fesom_meshpart
+            RUNTIME DESTINATION bin
+            COMPONENT tools)
+    
+    # Create a convenience target for building just the mesh partitioner
+    add_custom_target(meshpart
+        COMMENT "Building just the mesh partitioner"
+        DEPENDS fesom_meshpart)
+    
+    message(STATUS "Mesh partitioner will be built as part of the main build")
 endif()
 
 foreach( _file fesom-config.cmake fesom-config-version.cmake fesom-targets.cmake )

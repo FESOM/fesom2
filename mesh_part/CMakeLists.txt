@@ -4,8 +4,36 @@ project(fesom_meshpart C Fortran)
 # Find required packages
 find_package(MPI REQUIRED)
 
-# Get our source files from the main src directory
-set(src_home ${CMAKE_SOURCE_DIR}/src)
+# Determine source directory - works for both standalone and integrated builds
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    # This is a standalone build
+    set(src_home ${CMAKE_SOURCE_DIR}/../src)
+    set(METIS_ROOT ${CMAKE_SOURCE_DIR}/../lib/metis-5.1.0)
+    message(STATUS "Building as standalone mesh partitioner")
+    
+    # Set default install prefix if not specified
+    if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+        set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/.. CACHE PATH "Install path prefix" FORCE)
+    endif()
+    
+    # Add uninstall target
+    if(NOT TARGET uninstall)
+        configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/cmake_uninstall.cmake.in"
+            "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+            IMMEDIATE @ONLY)
+        add_custom_target(uninstall
+            COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
+    endif()
+else()
+    # This is part of the main FESOM build
+    set(src_home ${CMAKE_SOURCE_DIR}/src)
+    set(METIS_ROOT ${CMAKE_SOURCE_DIR}/lib/metis-5.1.0)
+    message(STATUS "Building as part of FESOM main build")
+endif()
+
+message(STATUS "Source directory: ${src_home}")
+message(STATUS "METIS root: ${METIS_ROOT}")
 
 # Source files for the mesh tools
 set(sources_Fortran 
@@ -23,9 +51,14 @@ set(sources_Fortran
 )
 set(sources_C ${src_home}/fort_part.c)
 
-# Add metis library - using the one from the main source tree
-add_subdirectory(${CMAKE_SOURCE_DIR}/lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
-include_directories(${CMAKE_SOURCE_DIR}/lib/metis-5.1.0/include)
+# Check if metis exists
+if(EXISTS ${METIS_ROOT} AND IS_DIRECTORY ${METIS_ROOT})
+    message(STATUS "Using METIS from: ${METIS_ROOT}")
+    add_subdirectory(${METIS_ROOT} ${PROJECT_BINARY_DIR}/metis)
+    include_directories(${METIS_ROOT}/include)
+else()
+    message(FATAL_ERROR "METIS not found at ${METIS_ROOT}. Please ensure the METIS library is available.")
+endif()
 
 # C library for mesh partitioning
 add_library(${PROJECT_NAME}_C ${sources_C})
@@ -45,6 +78,22 @@ target_link_libraries(${PROJECT_NAME}_C metis)
 
 # Main executable
 add_executable(${PROJECT_NAME} ${sources_Fortran})
+
+# Add install target for standalone build
+if(NOT DEFINED FESOM_SOURCE_DIR)
+    install(TARGETS ${PROJECT_NAME} 
+            RUNTIME DESTINATION bin
+            LIBRARY DESTINATION lib
+            ARCHIVE DESTINATION lib
+            COMPONENT tools)
+    
+    # Install the C library as well
+    install(TARGETS ${PROJECT_NAME}_C
+            RUNTIME DESTINATION bin
+            LIBRARY DESTINATION lib
+            ARCHIVE DESTINATION lib
+            COMPONENT tools)
+endif()
 
 # Set compiler flags based on the compiler
 if(CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
