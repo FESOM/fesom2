@@ -21,8 +21,30 @@ set(USE_MULTIO OFF CACHE BOOL "Use MULTIO for IO, either grib or binary for now.
 set(OASIS_WITH_YAC OFF CACHE BOOL "Useing a version of OASIS compiled with YAC instead of SCRIP for interpolation?")
 set(ASYNC_ICEBERGS ON CACHE BOOL "compile fesom with or without support for asynchronous iceberg computations")
 set(VERBOSE OFF CACHE BOOL "toggle debug output")
+
+# Tools
+option(BUILD_MESHPARTITIONER "Build mesh partitioning tools (fesom_meshpart executable)" OFF)
+
 #add_subdirectory(oasis3-mct/lib/psmile)
 add_subdirectory(src)
+
+# Add mesh_part directory if requested
+if(BUILD_MESHPARTITIONER)
+    message(STATUS "Configuring mesh partitioner as part of the main build")
+    add_subdirectory(mesh_part)
+    
+    # Install the mesh partitioner
+    install(TARGETS fesom_meshpart
+            RUNTIME DESTINATION bin
+            COMPONENT tools)
+    
+    # Create a convenience target for building just the mesh partitioner
+    add_custom_target(meshpart
+        COMMENT "Building just the mesh partitioner"
+        DEPENDS fesom_meshpart)
+    
+    message(STATUS "Mesh partitioner will be built as part of the main build")
+endif()
 
 foreach( _file fesom-config.cmake fesom-config-version.cmake fesom-targets.cmake )
   execute_process( COMMAND ${CMAKE_COMMAND} -E create_symlink ${PROJECT_BINARY_DIR}/src/${_file} ${PROJECT_BINARY_DIR}/${_file}  )
