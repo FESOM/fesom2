@@ -259,7 +259,8 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
                 !!PS c1=c1+hnode_new(nz,n)*(sqrt(max(bvfreq(nz,n), 0._WP))+sqrt(max(bvfreq(nz+1,n), 0._WP)))/2._WP
                 c1=c1+hnode_new(nz,n)*(sqrt(abs(max(bvfreq(nz,n), 0._WP)))+sqrt(abs(max(bvfreq(nz+1,n), 0._WP))))/2._WP ! add abs() for -0 case, cray
             end do
-            c1=max(c_min, c1/pi) !ca. first baroclinic gravity wave speed limited from below by c_min
+            !PS c1=max(c_min, c1/pi/K_GM_cm) !ca. first baroclinic gravity wave speed limited from below by c_min
+            c1=max(K_GM_cmin, c1/pi/K_GM_cm) !ca. first baroclinic gravity wave speed limited from below by c_min
             scaling=1._WP
             
             !___________________________________________________________________
@@ -335,7 +336,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
 !$OMP DO
         do n=1, myDim_nod2D
             !PS Ki(nzmin, n)=fer_k(nzmin, n)
-            Ki(nzmin, n)=max(fer_scal(n)*K_Redi_max, K_GM_min)
+            Ki(nzmin, n)=max(fer_scal(n)*Redi_Kmax, K_GM_min)
 !PS             Ki(nzmin, n)=fer_scal(n)*K_Redi_max
         end do
 !$OMP END DO
@@ -407,6 +408,15 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
             ! after vertical Ferreira scaling is done also scale surface template
             !!PS fer_k(1,n)=fer_k(1,n)*zscaling(1)
             fer_k(nzmin,n)=fer_k(nzmin,n)*zscaling(nzmin)
+            
+            ! aplly tapering to Kgm, not just to the tapered neutral slope 
+            if (K_GM_Ktaper) then 
+                ! do tapering of redi diffusion coefficient instead of tapering neutral
+                ! slope 
+                do nz=nzmin, nzmax-1
+                    fer_k(nz, n)=fer_k(nz, n)*sqrt(fer_tapfac(nz, n)) + K_GM_min*abs(sqrt(fer_tapfac(nz, n))-1)
+                end do
+            end if 
         end if
         
         !_______________________________________________________________________
@@ -423,12 +433,15 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
             !!PS Ki(1,n)=Ki(1,n)*0.5_WP*(zscaling(1)+zscaling(2))
             Ki(nzmin,n)=Ki(nzmin,n)*0.5_WP*(zscaling(nzmin)+zscaling(nzmin+1))
             
-            ! do tapering of redi diffusion coefficient instead of tapering neutral
-            ! slope 
-            do nz=nzmin, nzmax-1
-                !PS  Ki(nz, n)=min(K_Redi_min, Ki(nz, n)) + (Ki(nz, n)-min(K_Redi_min, Ki(nz, n)))*fer_tapfac(nz, n)
-                Ki(nz, n)=Ki(nz, n)*sqrt(fer_tapfac(nz, n)) + K_Redi_min*abs(sqrt(fer_tapfac(nz, n))-1)
-            end do
+            ! aplly tapering to Ki, not just to the tapered neutral slope 
+            if (Redi_Ktaper) then 
+                ! do tapering of redi diffusion coefficient instead of tapering neutral
+                ! slope 
+                do nz=nzmin, nzmax-1
+                    !PS  Ki(nz, n)=min(K_Redi_min, Ki(nz, n)) + (Ki(nz, n)-min(K_Redi_min, Ki(nz, n)))*fer_tapfac(nz, n)
+                    Ki(nz, n)=Ki(nz, n)*sqrt(fer_tapfac(nz, n)) + Redi_Kmin*abs(sqrt(fer_tapfac(nz, n))-1)
+                end do
+            end if 
         end if
    end do
 !$OMP END DO
