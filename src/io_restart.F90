@@ -620,7 +620,7 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   end if !is_portable_restart_write
 
   ! write core dump
-  if(is_raw_restart_write) theni
+  if(is_raw_restart_write) then
 
 #if defined(__recom) && defined(__usetp)
         if(partit%my_fesom_group == 0) then
