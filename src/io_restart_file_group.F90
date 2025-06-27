@@ -12,7 +12,7 @@ module restart_file_group_module
     character(:), allocatable :: varname
     character(:), allocatable :: path
     logical must_exist_on_read
-  end type
+  end type restart_file_type
 
 
   type restart_file_group
@@ -30,7 +30,7 @@ module restart_file_group_module
     generic, public :: def_elem_var_optional => def_elem_var_2d_optional, def_elem_var_3d_optional
     procedure, private :: def_node_var_2d_optional, def_node_var_3d_optional
     procedure, private :: def_elem_var_2d_optional, def_elem_var_3d_optional
-  end type
+  end type restart_file_group
   
 contains
 
@@ -47,7 +47,7 @@ contains
 !PS     write(*,*) "--> def_node_var_2d:", __LINE__, __FILE__
     call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
     call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
-  end subroutine
+  end subroutine def_node_var_2d
 
   subroutine def_node_var_3d(this, name, longname, units, local_data, mesh, partit, ncat)
     use mod_mesh
@@ -70,7 +70,7 @@ contains
         call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
         call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
     end if 
-  end subroutine
+  end subroutine def_node_var_3d
 
 
   subroutine def_elem_var_2d(this, name, longname, units, local_data, mesh, partit)
@@ -85,7 +85,7 @@ contains
 !PS     write(*,*) "--> def_elem_var_2d:", __LINE__, __FILE__
     call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
     call this%files(this%nfiles)%specify_elem_var(name, longname, units, local_data)
-  end subroutine
+  end subroutine def_elem_var_2d
 
 
   subroutine def_elem_var_3d(this, name, longname, units, local_data, mesh, partit)
@@ -100,7 +100,7 @@ contains
 !PS     write(*,*) "--> def_elem_var_3d:", __LINE__, __FILE__
     call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
     call this%files(this%nfiles)%specify_elem_var(name, longname, units, local_data)
-  end subroutine
+  end subroutine def_elem_var_3d
 
 
   subroutine add_file(g, name, must_exist_on_read, mesh_nod2d, mesh_elem2d, mesh_nl, partit, mesh_ncat)
@@ -135,7 +135,7 @@ contains
     end if
     ! this is specific for a restart file
     f%iter_varindex = f%add_var_int('iter', [f%time_dimindex()])    
-  end subroutine
+  end subroutine add_file
 
 
   subroutine def_node_var_2d_optional(this, name, longname, units, local_data, mesh, partit)
@@ -150,7 +150,7 @@ contains
 
     call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
     call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
-  end subroutine
+  end subroutine def_node_var_2d_optional
 
   subroutine def_node_var_3d_optional(this, name, longname, units, local_data, mesh, partit, ncat)
     use mod_mesh
@@ -173,7 +173,7 @@ contains
         call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
     end if 
     
-  end subroutine
+  end subroutine def_node_var_3d_optional
 
 
   subroutine def_elem_var_2d_optional(this, name, longname, units, local_data, mesh, partit)
@@ -188,7 +188,7 @@ contains
 
     call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
     call this%files(this%nfiles)%specify_elem_var(name, longname, units, local_data)
-  end subroutine
+  end subroutine def_elem_var_2d_optional
 
 
   subroutine def_elem_var_3d_optional(this, name, longname, units, local_data, mesh, partit)
@@ -203,7 +203,7 @@ contains
 
     call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl, partit)
     call this%files(this%nfiles)%specify_elem_var(name, longname, units, local_data)
-  end subroutine
+  end subroutine def_elem_var_3d_optional
 
 
   subroutine assert(val, line)
@@ -214,6 +214,6 @@ contains
       print *, "error in line ",line, __FILE__
       stop 1
     end if
-  end subroutine
+  end subroutine assert
 
-end module
+end module restart_file_group_module

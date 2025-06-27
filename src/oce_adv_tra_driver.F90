@@ -16,9 +16,9 @@ module oce_adv_tra_driver_interfaces
       real(kind=WP),  intent(in), target    :: W(mesh%nl,    partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP),  intent(in), target    :: WI(mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP),  intent(in), target    :: WE(mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
-    end subroutine
+    end subroutine do_oce_adv_tra
   end interface
-end module
+end module oce_adv_tra_driver_interfaces
 
 module oce_tra_adv_flux2dtracer_interface
   interface
@@ -37,9 +37,9 @@ module oce_tra_adv_flux2dtracer_interface
       logical,       optional           :: use_lo
       real(kind=WP), optional           :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), optional           :: lo (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-    end subroutine
+    end subroutine oce_tra_adv_flux2dtracer
   end interface
-end module
+end module oce_tra_adv_flux2dtracer_interface
 !
 !
 !===============================================================================

@@ -6,9 +6,9 @@ module read_mesh_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine read_mesh
   end interface
-end module
+end module read_mesh_interface
 module find_levels_interface
   interface
     subroutine find_levels(partit, mesh)
@@ -17,9 +17,9 @@ module find_levels_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine find_levels
   end interface
-end module
+end module find_levels_interface
 module find_levels_cavity_interface
   interface
     subroutine find_levels_cavity(partit, mesh)
@@ -28,9 +28,9 @@ module find_levels_cavity_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine find_levels_cavity
   end interface
-end module
+end module find_levels_cavity_interface
 module test_tri_interface
   interface
     subroutine test_tri(partit, mesh)
@@ -39,9 +39,9 @@ module test_tri_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine test_tri
   end interface
-end module
+end module test_tri_interface
 module load_edges_interface
   interface
     subroutine load_edges(partit, mesh)
@@ -50,9 +50,9 @@ module load_edges_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine load_edges
   end interface
-end module
+end module load_edges_interface
 module find_neighbors_interface
   interface
     subroutine find_neighbors(partit, mesh)
@@ -61,9 +61,9 @@ module find_neighbors_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine find_neighbors
   end interface
-end module
+end module find_neighbors_interface
 module mesh_areas_interface
   interface
     subroutine mesh_areas(partit, mesh)
@@ -72,9 +72,9 @@ module mesh_areas_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine mesh_areas
   end interface
-end module
+end module mesh_areas_interface
 module elem_center_interface
   interface
     subroutine elem_center(elem, x, y, mesh)
@@ -84,9 +84,9 @@ module elem_center_interface
       integer       :: elem    
       real(kind=WP), intent(inout) :: x, y
       type(t_mesh),  intent(inout), target :: mesh
-    end subroutine
+    end subroutine elem_center
   end interface
-end module
+end module elem_center_interface
 module edge_center_interface
   interface
     subroutine edge_center(n1, n2, x, y, mesh)
@@ -96,9 +96,9 @@ module edge_center_interface
       integer                     :: n1, n2
       real(kind=WP), intent(inout):: x, y
       type(t_mesh),  intent(inout), target :: mesh
-    end subroutine
+    end subroutine edge_center
   end interface
-end module
+end module edge_center_interface
 module mesh_auxiliary_arrays_interface
   interface
     subroutine mesh_auxiliary_arrays(partit, mesh)
@@ -107,9 +107,9 @@ module mesh_auxiliary_arrays_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine mesh_auxiliary_arrays
   end interface
-end module
+end module mesh_auxiliary_arrays_interface
 module find_levels_min_e2n_interface
   interface
     subroutine find_levels_min_e2n(partit, mesh)
@@ -118,9 +118,9 @@ module find_levels_min_e2n_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine find_levels_min_e2n
   end interface
-end module
+end module find_levels_min_e2n_interface
 module check_total_volume_interface
   interface
     subroutine check_total_volume(partit, mesh)
@@ -129,9 +129,9 @@ module check_total_volume_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine check_total_volume
   end interface
-end module
+end module check_total_volume_interface
 
 ! Driving routine. The distributed mesh information and mesh proper 
 ! are read from files.

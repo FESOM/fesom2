@@ -8,9 +8,9 @@ module diff_part_hor_redi_interface
         type(t_tracer), intent(inout), target :: tracer
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine diff_part_hor_redi
     end interface
-end module
+end module diff_part_hor_redi_interface
 
 module diff_ver_part_expl_ale_interface
     interface
@@ -23,9 +23,9 @@ module diff_ver_part_expl_ale_interface
         type(t_tracer), intent(inout), target :: tracer
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine diff_ver_part_expl_ale
     end interface
-end module
+end module diff_ver_part_expl_ale_interface
 
 module diff_ver_part_redi_expl_interface
     interface
@@ -37,9 +37,9 @@ module diff_ver_part_redi_expl_interface
         type(t_tracer), intent(inout), target :: tracer
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine diff_ver_part_redi_expl
     end interface
-end module
+end module diff_ver_part_redi_expl_interface
 
 module diff_ver_part_impl_ale_interface
     interface
@@ -56,9 +56,9 @@ module diff_ver_part_impl_ale_interface
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
         type(t_ice)   , intent(in)   , target :: ice
-        end subroutine
+        end subroutine diff_ver_part_impl_ale
     end interface
-end module
+end module diff_ver_part_impl_ale_interface
 
 module diff_tracers_ale_interface
     interface
@@ -75,9 +75,9 @@ module diff_tracers_ale_interface
         type(t_ice),    intent(in),    target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine diff_tracers_ale
     end interface
-end module
+end module diff_tracers_ale_interface
 
 module bc_surface_interface
     interface
@@ -90,9 +90,9 @@ module bc_surface_interface
         type(t_mesh), intent(in), target      :: mesh
         real(kind=WP)                         :: bc_surface
         real(kind=WP), intent(in)             :: sval, sst, sss, a_ice
-        end function
+        end function bc_surface
     end interface
-end module
+end module bc_surface_interface
 
 module diff_part_bh_interface
     interface
@@ -107,9 +107,9 @@ module diff_part_bh_interface
         type(t_tracer), intent(inout), target :: tracer
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine diff_part_bh
     end interface
-end module
+end module diff_part_bh_interface
 
 module solve_tracers_ale_interface
     interface
@@ -125,9 +125,9 @@ module solve_tracers_ale_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine solve_tracers_ale
     end interface
-end module
+end module solve_tracers_ale_interface
 !
 !
 !===============================================================================
@@ -2018,8 +2018,6 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
 
 END FUNCTION
 
-
-
 !===============================================================================
 ! This function returns a boundary conditions for a specified transient tracer ID and surface node.
 ! Different to function bc_surface, SST, SSS, and sea ice concentrations are always needed as
@@ -2190,4 +2188,3 @@ subroutine calc_slice(index_count, fesom_group_count, fesom_group_id, start_inde
 
     end_index  = start_index + index_count_in_group - 1
 end subroutine calc_slice
-

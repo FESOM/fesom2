@@ -15,4 +15,4 @@ program main
   call fesom_runloop(nsteps)
   call fesom_finalize
 
-end program
+end program main

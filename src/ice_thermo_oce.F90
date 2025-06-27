@@ -8,7 +8,7 @@ module ice_thermodynamics_interfaces
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine thermodynamics
         
         subroutine cut_off(ice, partit, mesh)
         USE MOD_ICE
@@ -18,9 +18,9 @@ module ice_thermodynamics_interfaces
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine cut_off
     end interface  
-end module
+end module ice_thermodynamics_interfaces
 
 module ice_therm_interface
     interface
@@ -37,7 +37,7 @@ module ice_therm_interface
                        hfsenow, hflwrdout, lid_clo, geolon, geolat
         end subroutine therm_ice
     end interface
-end module
+end module ice_therm_interface
 
 module ice_budget_interfaces
     interface

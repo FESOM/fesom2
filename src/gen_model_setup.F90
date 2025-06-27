@@ -409,4 +409,4 @@ subroutine check_namelist_read(fileunit, nml_name, nmlfile, partit)
         write(error_unit,'(A)') 'Invalid line in namelist: '//trim(line)
     endif
     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
-end subroutine
+end subroutine check_namelist_read

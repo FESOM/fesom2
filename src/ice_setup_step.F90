@@ -10,9 +10,9 @@ module ice_initial_state_interface
         type(t_tracer), intent(in)   , target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine ice_initial_state
     end interface
-end module
+end module ice_initial_state_interface
 
 module ice_setup_interface
     interface
@@ -26,9 +26,9 @@ module ice_setup_interface
         type(t_tracer), intent(in)   , target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine ice_setup
     end interface
-end module
+end module ice_setup_interface
 
 module ice_timestep_interface
     interface
@@ -41,9 +41,9 @@ module ice_timestep_interface
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine ice_timestep
     end interface
-end module
+end module ice_timestep_interface
 
 !
 !_______________________________________________________________________________

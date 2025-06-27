@@ -12,11 +12,11 @@ module io_netcdf_file_module
 #endif
     integer len
     integer ncid
-  end type
+  end type dim_type
 
   type att_type_wrapper ! work around Fortran not being able to have polymorphic types in the same array
     class(att_type), allocatable :: it
-  end type
+  end type att_type_wrapper
 
   type var_type ! todo: use variable type from io_netcdf_module here
 #if !defined(_CRAYFTN)
@@ -29,7 +29,7 @@ module io_netcdf_file_module
     type(att_type_wrapper) :: atts(15) ! use a fixed size array to store our netcdf variable attributes as nvfortran seems to loose allocation of derived types which contain allocatable types when copying the array
     integer :: atts_count = 0
     integer ncid
-  end type
+  end type var_type
 
   type netcdf_file_type
     private
@@ -51,7 +51,7 @@ module io_netcdf_file_module
     procedure, private :: read_var_r4, read_var_r8, read_var_integer, attach_dims_vars_to_file, add_var_x, write_var_r4, write_var_r8, write_var_integer, add_var_att_text, add_var_att_int
     procedure, private :: read_var1_r4, read_var1_r8, read_var1_integer
     procedure, private :: add_global_att_text, add_global_att_int
-  end type
+  end type netcdf_file_type
   
 contains
 
@@ -63,7 +63,7 @@ contains
     allocate(this%dims(0))
     allocate(this%vars(0))
     allocate(this%gatts(0))
-  end subroutine
+  end subroutine initialize
 
   
   function add_dim_unlimited(this, name) result(dimindex)
@@ -74,7 +74,7 @@ contains
     include "netcdf.inc"
 
     dimindex = this%add_dim(name, nf_unlimited)
-  end function
+  end function add_dim_unlimited
 
 
   function add_dim(this, name, len) result(dimindex)
@@ -93,7 +93,7 @@ contains
     
     dimindex = size(this%dims)
     this%dims(dimindex) = dim_type(name=name, len=len, ncid=-1)
-  end function
+  end function add_dim
 
 
   ! return number of specified dimensions (which might be less dimensions than an attached file has)
@@ -103,7 +103,7 @@ contains
     ! EO parameters
     
     ndims = size(this%dims)
-  end function
+  end function ndims
   
 
   ! the sizes of the dims define the global shape of the var
@@ -116,7 +116,7 @@ contains
     include "netcdf.inc"
     
     varindex = this%add_var_x(name, dim_indices, nf_double)
-  end function
+  end function add_var_double
 
 
   ! the sizes of the dims define the global shape of the var
@@ -129,7 +129,7 @@ contains
     include "netcdf.inc"
     
     varindex = this%add_var_x(name, dim_indices, nf_real)
-  end function
+  end function add_var_real
 
 
   ! the sizes of the dims define the global shape of the var
@@ -142,7 +142,7 @@ contains
     include "netcdf.inc"
     
     varindex = this%add_var_x(name, dim_indices, nf_int)
-  end function
+  end function add_var_int
 
 
   function add_var_x(this, name, dim_indices, netcdf_datatype) result(varindex)
@@ -168,7 +168,7 @@ contains
     this%vars(varindex)%dim_indices= dim_indices
     this%vars(varindex)%datatype   = netcdf_datatype
     this%vars(varindex)%ncid       = -1    
-  end function
+  end function add_var_x
 
 
   subroutine add_global_att_text(this, att_name, att_text)
@@ -184,7 +184,7 @@ contains
     call move_alloc(tmparr, this%gatts)
     
     this%gatts( size(this%gatts) )%it = att_type_text(name=att_name, text=att_text)
-  end subroutine
+  end subroutine add_global_att_text
 
 
   subroutine add_global_att_int(this, att_name, att_val)
@@ -200,7 +200,7 @@ contains
     call move_alloc(tmparr, this%gatts)
     
     this%gatts( size(this%gatts) )%it = att_type_int(name=att_name, val=att_val)
-  end subroutine
+  end subroutine add_global_att_int
 
 
   subroutine add_var_att_text(this, varindex, att_name, att_text)
@@ -218,7 +218,7 @@ contains
     
     att = att_type_text(name=att_name, text=att_text)
     allocate( this%vars(varindex)%atts( this%vars(varindex)%atts_count )%it, source=att )
-  end subroutine
+  end subroutine add_var_att_text
 
 
   subroutine add_var_att_int(this, varindex, att_name, att_val)
@@ -236,7 +236,7 @@ contains
     
     att = att_type_int(name=att_name, val=att_val)
     allocate( this%vars(varindex)%atts( this%vars(varindex)%atts_count )%it, source=att )
-  end subroutine
+  end subroutine add_var_att_int
   
   
   function is_attached(this) result(x)
@@ -245,7 +245,7 @@ contains
     ! EO parameters
 
     x = (this%filepath .ne. "")
-  end function
+  end function is_attached
 
 
   subroutine open_read(this, filepath)
@@ -262,7 +262,7 @@ contains
     
     ! attach our dims and vars to their counterparts in the file
     call this%attach_dims_vars_to_file()
-  end subroutine
+  end subroutine open_read
 
 
   ! return an array with the dimension sizes for all dimensions of the given variable
@@ -293,7 +293,7 @@ contains
         varshape(i) = this%dims( var%dim_indices(i) )%len
       end if
     end do
-  end subroutine
+  end subroutine read_var_shape
 
 
   ! values array is not required to have the same shape as the variable but must fit the product of all items of the sizes array
@@ -315,7 +315,7 @@ contains
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
     call assert_nc(nf_get_vara_double(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
-  end subroutine
+  end subroutine read_var_r8
 
 
   ! see read_var_r8 for usage comment
@@ -335,7 +335,7 @@ contains
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
     call assert_nc(nf_get_vara_real(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
-  end subroutine
+  end subroutine read_var_r4
 
 
   ! see read_var_r8 for usage comment
@@ -355,7 +355,7 @@ contains
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
     call assert_nc(nf_get_vara_int(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
-  end subroutine
+  end subroutine read_var_integer
 
 
   ! retrieve a single value specified via the indices array
@@ -371,7 +371,7 @@ contains
     call assert(size(indices) == size(this%vars(varindex)%dim_indices), __LINE__)
 
     call assert_nc(nf_get_var1_double(this%ncid, this%vars(varindex)%ncid, indices, value), __LINE__)
-  end subroutine
+  end subroutine read_var1_r8
 
 
   ! see read_var1_r8 for usage comment
@@ -387,7 +387,7 @@ contains
     call assert(size(indices) == size(this%vars(varindex)%dim_indices), __LINE__)
 
     call assert_nc(nf_get_var1_real(this%ncid, this%vars(varindex)%ncid, indices, value), __LINE__)
-  end subroutine
+  end subroutine read_var1_r4
 
 
   ! see read_var1_r8 for usage comment
@@ -403,7 +403,7 @@ contains
     call assert(size(indices) == size(this%vars(varindex)%dim_indices), __LINE__)
 
     call assert_nc(nf_get_var1_int(this%ncid, this%vars(varindex)%ncid, indices, value), __LINE__)
-  end subroutine
+  end subroutine read_var1_integer
 
 
   subroutine open_write_create(this, filepath)
@@ -448,7 +448,7 @@ contains
     end do
 
     call assert_nc( nf_enddef(this%ncid), __LINE__ )
-  end subroutine
+  end subroutine open_write_create
 
 
   ! open an existing file and prepare to write data to it
@@ -466,7 +466,7 @@ contains
 
     ! make sure that all our dims and vars exist in this file and get hold of them
     call this%attach_dims_vars_to_file()
-  end subroutine
+  end subroutine open_write_append
 
 
   subroutine write_var_r8(this, varindex, starts, sizes, values)
@@ -485,7 +485,7 @@ contains
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
     call assert_nc(nf_put_vara_double(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
-  end subroutine
+  end subroutine write_var_r8
 
 
   subroutine write_var_r4(this, varindex, starts, sizes, values)
@@ -504,7 +504,7 @@ contains
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
     call assert_nc(nf_put_vara_real(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
-  end subroutine
+  end subroutine write_var_r4
 
 
   subroutine write_var_integer(this, varindex, starts, sizes, values)
@@ -523,7 +523,7 @@ contains
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
     call assert_nc(nf_put_vara_int(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
-  end subroutine
+  end subroutine write_var_integer
 
 
   subroutine flush_file(this)
@@ -532,7 +532,7 @@ contains
     include "netcdf.inc"
 
     call assert_nc( nf_sync(this%ncid), __LINE__ ) ! flush the file to disk
-  end subroutine
+  end subroutine flush_file
 
 
   subroutine close_file(this)
@@ -543,7 +543,7 @@ contains
     call assert_nc( nf_close(this%ncid) , __LINE__)
     
     this%filepath = ""
-  end subroutine
+  end subroutine close_file
 
 
   ! connect our dims and vars to their counterparts in the NetCDF file, bail out if they do not match
@@ -580,7 +580,7 @@ contains
         call assert(exp_dimid == actual_dimids(ii), __LINE__)
       end do
     end do
-  end subroutine
+  end subroutine attach_dims_vars_to_file
 
 
   subroutine assert(val, line)
@@ -591,7 +591,7 @@ contains
       print *, "error in line ",line, __FILE__
       stop 1
     end if
-  end subroutine
+  end subroutine assert
 
 
   subroutine assert_nc(status, line)
@@ -603,6 +603,6 @@ contains
       print *, "error in line ",line, __FILE__, ' ', trim(nf_strerror(status))
       stop 1
     endif   
-  end subroutine
+  end subroutine assert_nc
 
-end module
+end module io_netcdf_file_module
