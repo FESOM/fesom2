@@ -241,6 +241,24 @@ subroutine ini_bio_io(year, tracers, partit, mesh)
     call bio_files%def_node_var('BenSi',   'Benthos Silicate', 'mmol/m3',   Benthos(:,3), mesh, partit);
     call bio_files%def_node_var('BenCalc', 'Benthos Calcite',  'mmol/m3',   Benthos(:,4), mesh, partit);
     call bio_files%def_node_var('HPlus',   'Conc. of H-plus ions in the surface water', 'mol/kg',   GloHplus, mesh, partit);
+  if (ciso) then
+    call bio_files%def_node_var('BenC_13', 'Benthos Carbon-13', 'mmol/m3',   Benthos(:,5), mesh, partit);
+    call bio_files%def_node_var('BenCalc_13', 'Benthos Calcite-13', 'mmol/m3',   Benthos(:,6), mesh, partit); 
+    if (ciso_14 .and. ciso_organic_14) then
+      call bio_files%def_node_var('BenC_14', 'Benthos Carbon-14',  'mmol/m3',   Benthos(:,7), mesh, partit);
+      call bio_files%def_node_var('BenCalc_14', 'Benthos Calcite-14', 'mmol/m3',   Benthos(:,8), mesh, partit); 
+    end if ! ciso_14
+  end if   ! ciso
+  if (use_atbox) then
+    call bio_files%def_node_var('xCO2', 'Atm. CO2 mixing ratio', 'mol / mol', x_co2atm(:), mesh, partit);
+    if (ciso) then
+      call bio_files%def_node_var('xCO2_13', 'Atm. 13CO2 mixing ratio', 'mol / mol', x_co2atm_13(:), mesh, partit);
+      if (ciso_14) then
+        call bio_files%def_node_var('xCO2_14', 'Atm. 14CO2 mixing ratio', 'mol / mol', x_co2atm_14(:), mesh, partit);
+        call bio_files%def_node_var('cosmic_14', 'Cosmic 14C production', 'mol / s', cosmic_14(:), mesh, partit);
+      end if
+    end if
+  end if  ! use_atbox
 
 end subroutine ini_bio_io
 #endif
@@ -266,8 +284,18 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   logical rawfiles_exist, binfiles_exist
   logical, save :: initialized_raw = .false.
   logical, save :: initialized_bin = .false.
-  integer mpierr
-  
+!  integer mpierr
+
+#if defined(__recom) && defined(__usetp)
+  integer :: tr_arr_slice_count_fix_1
+  integer :: group_i
+  integer :: tr_num_start
+  integer :: tr_num_end
+  integer :: tr_num_in_group
+  logical :: has_one_added_tracer
+  integer :: num_tracers
+#endif
+
   !which_readr = ...
   ! 0 ... read netcdf restart
   ! 1 ... read dump file restart (binary)
@@ -275,7 +303,16 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   integer, intent(out):: which_readr
   
   integer             :: cstep
-  
+
+#if defined(__recom) && defined(__usetp)
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+    num_tracers = tracers%num_tracers
+#endif
+
   !_____________________________________________________________________________
   ! initialize directory for core dump restart 
   if(.not. initialized_raw) then
@@ -283,12 +320,19 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
     raw_restart_dirpath  = trim(ResultPath)//"fesom_raw_restart/np"//int_to_txt(partit%npes)
     raw_restart_infopath = trim(ResultPath)//"fesom_raw_restart/np"//int_to_txt(partit%npes)//".info"
     if(raw_restart_length_unit /= "off") then
-      if(partit%mype == RAW_RESTART_METADATA_RANK) then
+
+#if defined(__recom) && defined(__usetp)
+      if(partit%my_fesom_group == 0) then ! master rank creates the folder 
+#endif
+          if(partit%mype == RAW_RESTART_METADATA_RANK) then
         ! execute_command_line with mkdir sometimes fails, use a custom implementation around mkdir from C instead
-        call mkdir(trim(ResultPath)//"fesom_raw_restart") ! we have no mkdir -p, create the intermediate dirs separately
-        call mkdir(raw_restart_dirpath)
+              call mkdir(trim(ResultPath)//"fesom_raw_restart") ! we have no mkdir -p, create the intermediate dirs separately
+              call mkdir(raw_restart_dirpath)
+          end if
+#if defined(__recom) && defined(__usetp)
       end if
-      call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr) ! make sure the dir has been created before we continue...
+#endif
+      call MPI_Barrier(partit%MPI_COMM_FESOM, partit%mpierr) ! make sure the dir has been created before we continue...
     end if
   end if
 
@@ -299,12 +343,18 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
     bin_restart_dirpath  = trim(ResultPath)//"fesom_bin_restart/np"//int_to_txt(partit%npes)
     bin_restart_infopath = trim(ResultPath)//"fesom_bin_restart/np"//int_to_txt(partit%npes)//".info"
     if(bin_restart_length_unit /= "off") then
-        if(partit%mype == RAW_RESTART_METADATA_RANK) then
+#if defined(__recom) && defined(__usetp)
+        if(partit%my_fesom_group == 0) then 
+#endif
+            if(partit%mype == RAW_RESTART_METADATA_RANK) then
             ! execute_command_line with mkdir sometimes fails, use a custom implementation around mkdir from C instead
-            call mkdir(trim(ResultPath)//"fesom_bin_restart") ! we have no mkdir -p, create the intermediate dirs separately
-            call mkdir(bin_restart_dirpath)
-        end if
-        call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr) ! make sure the dir has been created before we continue...
+                call mkdir(trim(ResultPath)//"fesom_bin_restart") ! we have no mkdir -p, create the intermediate dirs separately
+                call mkdir(bin_restart_dirpath)
+            end if
+#if defined(__recom) && defined(__usetp)
+        end if 
+#endif
+        call MPI_Barrier(partit%MPI_COMM_FESOM, partit%mpierr) ! make sure the dir has been created before we continue...
     end if
   end if
   
@@ -351,13 +401,13 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
     if(partit%mype == RAW_RESTART_METADATA_RANK) then
       inquire(file=raw_restart_infopath, exist=rawfiles_exist)
     end if
-    call MPI_Bcast(rawfiles_exist, 1, MPI_LOGICAL, RAW_RESTART_METADATA_RANK, partit%MPI_COMM_FESOM, mpierr)
+    call MPI_Bcast(rawfiles_exist, 1, MPI_LOGICAL, RAW_RESTART_METADATA_RANK, partit%MPI_COMM_FESOM, partit%mpierr)
     
     ! check if folder for derived type binary restarts exist
     if(partit%mype == RAW_RESTART_METADATA_RANK) then
       inquire(file=bin_restart_infopath, exist=binfiles_exist)
     end if
-    call MPI_Bcast(binfiles_exist, 1, MPI_LOGICAL, RAW_RESTART_METADATA_RANK, partit%MPI_COMM_FESOM, mpierr)
+    call MPI_Bcast(binfiles_exist, 1, MPI_LOGICAL, RAW_RESTART_METADATA_RANK, partit%MPI_COMM_FESOM, partit%mpierr)
     
     !___________________________________________________________________________
     ! read core dump file restart
@@ -387,14 +437,23 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
     ! read netcdf file restart
     else
         which_readr = 0
+
         !_______________________________________________________________________
         ! read OCEAN restart
+#if defined(__recom) && defined(__usetp)
+            if(partit%my_fesom_group == 0) then ! In tracer parallel mode, only read restarts on main MPI group
+#endif
+
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ocean'//achar(27)//'[0m'
+#if defined(__recom) && defined(__usetp)
+            endif  
+#endif
         call read_restart(oce_path, oce_files, partit%MPI_COMM_FESOM, partit%mype)
         
         !_______________________________________________________________________
         ! read ICE/ICEPACK restart
         if (use_ice) then
+
 #if defined(__icepack)   
             if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: icepack'//achar(27)//'[0m'
             call read_restart(icepack_path, icepack_files, partit%MPI_COMM_FESOM, partit%mype)
@@ -404,24 +463,49 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
 #endif
         end if 
 
+#if defined(__recom) && defined(__usetp)
+            if(partit%my_fesom_group == 0) then
+#endif
+            if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ice'//achar(27)//'[0m'
+#if defined(__recom) && defined(__usetp)
+            endif 
+#endif
+            call read_restart(ice_path, ice_files, partit%MPI_COMM_FESOM, partit%mype)
+
 #if defined(__recom)
-        !_______________________________________________________________________
-        ! read RECOM restarts
-        if (REcoM_restart) then
-            if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: bio'//achar(27)//'[0m'
-            call read_restart(bio_path, bio_files, partit%MPI_COMM_FESOM, partit%mype)
-        end if
+!RECOM restart
+!read here
+            if (REcoM_restart) then
+#if defined(__usetp)
+                if(partit%my_fesom_group == 0) then
+#endif
+                    if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: bio'//achar(27)//'[0m'
+#if defined(__usetp)
+                endif 
+#endif
+                call read_restart(bio_path, bio_files, partit%MPI_COMM_FESOM, partit%mype)
+            end if
+
 #endif
 
         !_______________________________________________________________________
         ! immediately create a raw core dump restart
         if(raw_restart_length_unit /= "off") then
+#if defined(__recom) && defined(__usetp)
+                if(partit%my_fesom_group == 0) then ! master rank reads 
+#endif
             call write_all_raw_restarts(istep, partit%MPI_COMM_FESOM, partit%mype)
+#if defined(__recom) && defined(__usetp)
+                end if 
+#endif
         end if
         
         ! immediately create a derived type binary restart
         if(bin_restart_length_unit /= "off") then
             ! current (total) model step --> cstep = globalstep+istep
+#if defined(__recom) && defined(__usetp)
+                if(partit%my_fesom_group == 0) then 
+#endif
             call write_all_bin_restarts((/globalstep+istep, int(ctime), yearnew/),      &
                                         bin_restart_dirpath,                 &
                                         bin_restart_infopath,                &
@@ -430,7 +514,10 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
                                         ice,                                 &
                                         dynamics,                            &
                                         tracers                              )
-        end if
+#if defined(__recom) && defined(__usetp)
+                end if 
+#endif
+        end if ! bin_restart_length_unit /= "off"
     end if
   end if
 
@@ -458,46 +545,102 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   else
     is_bin_restart_write = is_due(trim(bin_restart_length_unit), bin_restart_length, istep)
   end if
+ 
+  ! --> synchronizes tracer data within one fesom group
+#if defined(__recom) && defined(__usetp)
+    if(num_fesom_groups > 1) then
+        tr_arr_slice_count_fix_1 = 1 * (nl - 1) * (myDim_nod2D + eDim_nod2D)
+
+        do group_i = 0, num_fesom_groups - 1
+            call calc_slice(num_tracers, num_fesom_groups, group_i, tr_num_start, tr_num_end, tr_num_in_group, has_one_added_tracer)
+
+            call MPI_Bcast(tracers%data(tr_num_start)%valuesold(tracers%data(j)%AB_order-1,:,:), tr_arr_slice_count_fix_1 * tr_num_in_group, MPI_DOUBLE_PRECISION, group_i, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%mpierr)
+        end do
+    end if
+#endif
 
   !_____________________________________________________________________________
   ! finally write restart for netcdf, core dump and derived type binary
   ! write netcdf restart
   if(is_portable_restart_write) then
+
     !___________________________________________________________________________
     ! write OCEAN restart
+#if defined(__recom) && defined(__usetp)
+                if(partit%my_fesom_group == 0) then
+#endif
+
 !     if(partit%mype==0) write(*,*)'Do output (netCDF, restart) ...'
     if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ocean'//achar(27)//'[0m'
     call write_restart(oce_path, oce_files, istep)
-    
+
+#if defined(__recom) && defined(__usetp)
+                endif !(partit%my_fesom_group == 0) then
+#endif
+
     !___________________________________________________________________________
     ! write ICE/ICEPACK restart
     if(use_ice) then
+
+#if defined(__recom) && defined(__usetp)
+        if(partit%my_fesom_group == 0) then
+#endif
+
 #if defined(__icepack)        
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: icepack'//achar(27)//'[0m'
         call write_restart(icepack_path, icepack_files, istep)
 #else
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ice'//achar(27)//'[0m'
         call write_restart(ice_path, ice_files, istep)
-#endif 
-    end if
+#endif
 
-#if defined(__recom)
+#if defined(__recom) && defined(__usetp)
+        endif !(partit%my_fesom_group == 0) then
+#endif
+
+    end if
+    
     !___________________________________________________________________________
     ! write RECOM restart
-    if (REcoM_restart .or. use_REcoM) then
-        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: bio'//achar(27)//'[0m'
-        call write_restart(bio_path, bio_files, istep)
-    end if
+#if defined(__recom)
+        if (REcoM_restart .or. use_REcoM) then
+#if defined(__usetp)
+            if(partit%my_fesom_group == 0) then
 #endif
-  end if
+                if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: bio'//achar(27)//'[0m'
+                call write_restart(bio_path, bio_files, istep)
+
+#if defined(__usetp)
+            endif 
+#endif
+
+        end if
+#endif
+
+  end if !is_portable_restart_write
 
   ! write core dump
   if(is_raw_restart_write) then
+
+#if defined(__recom) && defined(__usetp)
+        if(partit%my_fesom_group == 0) then
+#endif
+
     call write_all_raw_restarts(istep, partit%MPI_COMM_FESOM, partit%mype)
+
+#if defined(__recom) && defined(__usetp)
+        endif !(partit%my_fesom_group == 0) then
+#endif
+
   end if
 
   ! write derived type binary
   if(is_bin_restart_write) then
+
+#if defined(__recom) && defined(__usetp)
+        if(partit%my_fesom_group == 0) then
+#endif
+
     ! current (total) model step --> cstep = globalstep+istep
     call write_all_bin_restarts((/globalstep+istep, int(ctime), yearnew/),      &
                                 bin_restart_dirpath,                 &
@@ -507,13 +650,26 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
                                 ice,                                 &
                                 dynamics,                            &
                                 tracers                              )
+
+#if defined(__recom) && defined(__usetp)
+        endif !(partit%my_fesom_group == 0) then
+#endif
+
   end if
 
   ! actualize clock file to latest restart point
   if (partit%mype==0) then
     if(is_portable_restart_write .or. is_raw_restart_write .or. is_bin_restart_write) then
+#if defined(__recom) && defined(__usetp)
+        if(partit%my_fesom_group == 0) then
+#endif
+
         write(*,*) ' --> actualize clock file to latest restart point'
         call clock_finish
+
+#if defined(__recom) && defined(__usetp)
+        end if
+#endif
     end if
   end if
 

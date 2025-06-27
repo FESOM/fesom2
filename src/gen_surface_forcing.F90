@@ -1219,9 +1219,22 @@ CONTAINS
         ! OPEN and read namelist for SBC REcoM
         open( unit=nm_sbc_unit+1, file='namelist.recom', form='formatted', access='sequential', status='old', iostat=iost )
         if (iost == 0) then
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
             if (mype==0) WRITE(*,*) '     file   : ', 'namelist.recom for sbc',' open ok'
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
         else
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
+
             if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.recom for sbc',' ; iostat=',iost
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
             call par_ex(partit%MPI_COMM_FESOM, partit%mype)
             stop
         endif
@@ -1245,6 +1258,7 @@ CONTAINS
 #if defined (__recom)
       use recom_config
       use recom_glovar
+      use REcoM_ciso
 #endif
       IMPLICIT NONE
 
@@ -1262,6 +1276,11 @@ CONTAINS
       real(kind=8), allocatable :: ncdata(:)
       integer                   :: CO2start, CO2count
       integer	                :: status, ncid, varid
+      character(300)            :: sedfilename
+      logical                   :: do_read=.false.
+      integer                   :: n_lb
+      integer, dimension(2)     :: istart, icount
+      real(kind=8)              :: total_runoff
 #endif
       type(t_partit), intent(inout), target :: partit
       type(t_mesh),   intent(in),    target :: mesh
@@ -1413,20 +1432,61 @@ CONTAINS
 
      end if
 
-#if defined (__recom)
+#if defined(__recom)
 !<  read surface atmospheric deposition for Fe, N, CO2
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'//achar(27)//'[0m'
 
 ! ******** Atmospheric CO2 *********
     if (mstep == 1) then ! The year has changed
 
+    if (use_atbox) then  
+!     Atmospheric box model CO2 values
+      AtmCO2(:)                   = x_co2atm(1)
+      if (ciso) then 
+        AtmCO2_13(:)              = x_co2atm_13(1)
+        if (ciso_14) AtmCO2_14(:,1) = x_co2atm_14(1)
+      end if
+    else 
+!     Prescribed atmospheric CO2 values
         if (constant_CO2) then
             AtmCO2(:) = CO2_for_spinup
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
             if (mype==0) write(*,*) 'Constant_CO2 = ', CO2_for_spinup 
-            if (mype==0) write(*,*),'Atm CO2=', AtmCO2               
+            if (mype==0) write(*,*),'Atm CO2=', AtmCO2     
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
+            if (ciso) then
+                AtmCO2_13          = CO2_for_spinup * (1. + 0.001 * delta_co2_13)
+                if (ciso_14) then
+!               Atmospheric 14C varies with latitude
+                    do i=1, myDim_nod2D
+!                       Latitude of atmospheric input data
+                        lat_val = geo_coord_nod2D(2,i) / rad
+!                       Binning to latitude zones
+                        if (ciso_organic_14) then
+!                           Convert Delta_14C to delta_14C
+                            delta_co2_14 = (big_delta_co2_14(lat_zone(lat_val)) + 2. * delta_co2_13 + 50.) / &
+                                         (0.95 - 0.002 * delta_co2_13)
+                        else
+!                           "Inorganic" 14C approximation: delta_14C := Delta_14C 
+                            delta_co2_14 = big_delta_co2_14(lat_zone(lat_val))
+                        end if
+                        AtmCO2_14(lat_zone(lat_val),:) = CO2_for_spinup * (1. + 0.001 * delta_co2_14)
+                    end do
+                end if
+            end if          
         else
             filename=trim(nm_co2_data_file)
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
             if (mype==0) write(*,*) 'Updating CO2 climatology for month       ', i,' from ', trim(filename)
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
 
             totnumyear                 = lastyearoffesomcycle-firstyearoffesomcycle+1
             firstyearofcurrentCO2cycle = lastyearoffesomcycle-numofCO2cycles*totnumyear+(currentCO2cycle-1)*totnumyear
@@ -1453,11 +1513,316 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
             status=nf_get_vara_double(ncid,varid,CO2start,CO2count,ncdata)
             AtmCO2(:)=ncdata(:)
             deallocate(ncdata)
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
             if (mype==0) write(*,*),'Current carbon year=',currentCO2year
             if (mype==0) write(*,*),'Atm CO2=', AtmCO2
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
             status=nf_close(ncid)
         end if
+    end if   ! atmospheric box model or prescribed CO2 values   
+
+!   Control output of atmospheric CO2 values
+    if (mype==0) then !OG
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
+      print *,                "In atm_input: AtmCO2    = ", AtmCO2(1)
+      if (ciso) then
+        print *,              "              AtmCO2_13 = ", AtmCO2_13(1)
+        if (ciso_14) print *, "              AtmCO2_14 = ", AtmCO2_14(:,1)
+      end if
+      if (use_atbox) print *, "              use_atbox = .true."
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
     end if
+ 
+
+
+! ******** Sediment input *********
+!-Checking if files need to be opened---------------------------------------------
+        if(use_MEDUSA .and. (sedflx_num .ne. 0)) then
+            allocate(ncdata(9))
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
+            if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Sed_input'//achar(27)//'[0m'
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
+            ! MEDUSA input needs to be renamed via jobscript
+            sedfilename  = trim(ResultPath)//'medusa_flux2fesom.nc'
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
+            if (mype==0) write(*,*) 'Updating sedimentary input first time from', sedfilename
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
+
+!-Opening files--------------------------------------------------------------------
+
+            call read_2ddata_on_grid_NetCDF(sedfilename, 'df_din', 1, GloSed(:,1), partit,mesh)
+!      if (mype==0) write(*,*) mype, 'sediment DIN flux:', maxval(GloSed(:,1)), minval(GloSed(:,1))
+
+            call read_2ddata_on_grid_NetCDF(sedfilename, 'df_dic', 1, GloSed(:,2), partit, mesh)
+!      if (mype==0) write(*,*) mype, 'sediment DIC flux:', maxval(GloSed(:,2)), minval(GloSed(:,2))
+
+            call read_2ddata_on_grid_NetCDF(sedfilename, 'df_alk', 1, GloSed(:,3), partit, mesh)
+!      if (mype==0) write(*,*) mype, 'sediment Alk flux:', maxval(GloSed(:,3)), minval(GloSed(:,3))
+
+            call read_2ddata_on_grid_NetCDF(sedfilename, 'df_dsi', 1, GloSed(:,4), partit, mesh)
+!      if (mype==0) write(*,*) mype, 'sediment DSi flux:', maxval(GloSed(:,4)), minval(GloSed(:,4))
+
+            call read_2ddata_on_grid_NetCDF(sedfilename, 'df_o2', 1, GloSed(:,5), partit, mesh)
+!      if (mype==0) write(*,*) mype, 'sediment O2 flux:', maxval(GloSed(:,5)), minval(GloSed(:,5))
+
+            if(ciso) then
+                call read_2ddata_on_grid_NetCDF(sedfilename, 'df_dic13', 1, GloSed(:,6), partit, mesh)
+!        if (mype==0) write(*,*) mype, 'sediment DIC13 flux:', maxval(GloSed(:,6)), minval(GloSed(:,6))
+                if(ciso_14) then
+                    call read_2ddata_on_grid_NetCDF(sedfilename, 'df_dic14', 1, GloSed(:,7), partit, mesh)
+!        if (mype==0) write(*,*) mype, 'sediment DIC14 flux:', maxval(GloSed(:,7)), minval(GloSed(:,7))
+                end if ! ciso_14
+            end if ! ciso
+
+! unit conversion
+      GloSed(:,:)=GloSed(:,:)/86400
+
+! read loopback fluxes from the same file
+      if(add_loopback) then
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
+        if (mype==0) write(*,*) 'adding loopback fluxes through runoff for the first time' !OG
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
+
+        istart = (/1,1/)
+        icount = (/1,1/)
+        ncdata = 0.d0
+
+        total_runoff = 8.76d5*86400
+
+        status=nf_open(sedfilename, nf_nowrite, ncid)
+        if(status.ne.nf_noerr) call handle_err(status)
+
+        status=nf_inq_varid(ncid, 'loopback_orgm_din', varid)
+        if(status.ne.nf_noerr) call handle_err(status)
+        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(1))
+        if(status.ne.nf_noerr) call handle_err(status)
+!        if (mype==0) write(*,*) mype, 'loopback_orgm_din (mmolN/day):', ncdata(1) !OG
+
+        status=nf_inq_varid(ncid, 'loopback_orgm_dic', varid)
+        if(status.ne.nf_noerr) call handle_err(status)
+        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(2))
+        if(status.ne.nf_noerr) call handle_err(status)
+!        if (mype==0) write(*,*) mype, 'loopback_orgm_dic (mmolC/day):', ncdata(2) !OG
+
+        status=nf_inq_varid(ncid, 'loopback_orgm_alk', varid)
+        if(status.ne.nf_noerr) call handle_err(status)
+        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(3))
+        if(status.ne.nf_noerr) call handle_err(status)
+!        if (mype==0) write(*,*) mype, 'loopback_orgm_alk (mmolAlk/day):', ncdata(3) !OG
+
+        status=nf_inq_varid(ncid, 'loopback_opal', varid)
+        if(status.ne.nf_noerr) call handle_err(status)
+        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(4))
+        if(status.ne.nf_noerr) call handle_err(status)
+!        if (mype==0) write(*,*) mype, 'loopback_opal (mmolSi/day):', ncdata(4) !OG
+
+        status=nf_inq_varid(ncid, 'loopback_caco3', varid)
+        if(status.ne.nf_noerr) call handle_err(status)
+        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(5))
+        if(status.ne.nf_noerr) call handle_err(status)
+!        if (mype==0) write(*,*) mype, 'loopback_caco3 (mmolC/day):', ncdata(5) !OG
+
+      if(ciso) then
+        status=nf_inq_varid(ncid, 'loopback_orgm_dic13', varid)
+        if(status.ne.nf_noerr) call handle_err(status)
+        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(6))
+        if(status.ne.nf_noerr) call handle_err(status)
+!        if (mype==0) write(*,*) mype, 'loopback_dic13:', ncdata(6)      !OG   
+
+        status=nf_inq_varid(ncid, 'loopback_caco313', varid)
+        if(status.ne.nf_noerr) call handle_err(status)
+        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(7))
+        if(status.ne.nf_noerr) call handle_err(status)
+!        if (mype==0) write(*,*) mype, 'loopback_caco313:', ncdata(7)!OG
+
+       if(ciso_14 .and. ciso_organic_14) then
+        status=nf_inq_varid(ncid, 'loopback_orgm_dic14', varid)
+        if(status.ne.nf_noerr) call handle_err(status)
+        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(8))
+        if(status.ne.nf_noerr) call handle_err(status)
+!        if (mype==0) write(*,*) mype, 'loopback_dic14:', ncdata(8) !OG
+
+        status=nf_inq_varid(ncid, 'loopback_caco314', varid)
+        if(status.ne.nf_noerr) call handle_err(status)
+        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(9))
+        if(status.ne.nf_noerr) call handle_err(status)
+!        if (mype==0) write(*,*) mype, 'loopback_caco314:', ncdata(9) !OG
+
+       end if ! ciso_14 .and. ciso_organic_14
+      end if ! ciso
+        deallocate(ncdata)
+        status=nf_close(ncid)
+
+! calculating fluxes back to ocean surface through rivers (mmol/m2/s)
+! converting from fluxes out of sediment to fluxes into the ocean 
+        do n_lb = 1,9
+           lb_flux(:,n_lb) = -runoff*ncdata(n_lb)/total_runoff*lb_tscale
+        end do
+
+      end if ! add_loopback
+
+   else
+
+!-Checking if files need to be opened---------------------------------------------
+     call monthly_event(do_read)
+     if(do_read) then ! file is opened and read every year
+      i=month
+      if (i > 12) i=1
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
+      if (mype==0) write(*,*) 'Updating sedimentary input for month', i, 'from', sedfilename !OG
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
+
+
+      call read_2ddata_on_grid_NetCDF(sedfilename, 'df_din', 1, GloSed(:,1), partit, mesh)
+!      if (mype==0) write(*,*) mype, 'sediment DIN flux:', maxval(GloSed(:,1)), minval(GloSed(:,1))
+
+      call read_2ddata_on_grid_NetCDF(sedfilename, 'df_dic', 1, GloSed(:,2), partit, mesh)
+!      if (mype==0) write(*,*) mype, 'sediment DIC flux:', maxval(GloSed(:,2)), minval(GloSed(:,2))
+
+      call read_2ddata_on_grid_NetCDF(sedfilename, 'df_alk', 1, GloSed(:,3), partit, mesh)
+!      if (mype==0) write(*,*) mype, 'sediment Alk flux:', maxval(GloSed(:,3)), minval(GloSed(:,3))
+
+      call read_2ddata_on_grid_NetCDF(sedfilename, 'df_dsi', 1, GloSed(:,4), partit, mesh)
+!      if (mype==0) write(*,*) mype, 'sediment DSi flux:', maxval(GloSed(:,4)), minval(GloSed(:,4))
+
+      call read_2ddata_on_grid_NetCDF(sedfilename, 'df_o2', 1, GloSed(:,5), partit, mesh)
+!      if (mype==0) write(*,*) mype, 'sediment O2 flux:', maxval(GloSed(:,5)), minval(GloSed(:,5))
+
+      if(ciso) then
+        call read_2ddata_on_grid_NetCDF(sedfilename, 'df_dic13', 1, GloSed(:,6), partit, mesh)
+!        if (mype==0) write(*,*) mype, 'sediment DIC13 flux:', maxval(GloSed(:,6)), minval(GloSed(:,6))
+        if(ciso_14) then
+          call read_2ddata_on_grid_NetCDF(sedfilename, 'df_dic14', 1, GloSed(:,7), partit, mesh)
+!          if (mype==0) write(*,*) mype, 'sediment DIC14 flux:', maxval(GloSed(:,7)), minval(GloSed(:,7))
+        end if ! ciso_14
+      end if ! ciso
+
+!to mmol/m2/s
+      GloSed(:,:)=GloSed(:,:)/86400
+
+! read loopback fluxes from the same file
+      if(add_loopback) then
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
+        if (mype==0) write(*,*) 'adding loopback fluxes into the ocean monthly' !OG
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
+        istart = (/1,1/)
+        icount = (/1,1/)
+        ncdata = 0.d0
+
+        total_runoff = 8.76d5*86400
+
+        status=nf_open(sedfilename, nf_nowrite, ncid)
+        if(status.ne.nf_noerr) call handle_err(status)
+
+        status=nf_inq_varid(ncid, 'loopback_orgm_din', varid)
+        if(status.ne.nf_noerr) call handle_err(status)
+        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(1))
+        if(status.ne.nf_noerr) call handle_err(status)
+!        if (mype==0) write(*,*) mype, 'loopback_orgm_din (mmolN/day):', ncdata(1) !OG
+
+        status=nf_inq_varid(ncid, 'loopback_orgm_dic', varid)
+        if(status.ne.nf_noerr) call handle_err(status)
+        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(2))
+        if(status.ne.nf_noerr) call handle_err(status)
+!        if (mype==0) write(*,*) mype, 'loopback_orgm_dic (mmolC/day):', ncdata(2) !OG
+
+        status=nf_inq_varid(ncid, 'loopback_orgm_alk', varid)
+        if(status.ne.nf_noerr) call handle_err(status)
+        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(3))
+        if(status.ne.nf_noerr) call handle_err(status)
+!        if (mype==0) write(*,*) mype, 'loopback_orgm_alk (mmolAlk/day):', ncdata(3) !OG
+
+        status=nf_inq_varid(ncid, 'loopback_opal', varid)
+        if(status.ne.nf_noerr) call handle_err(status)
+        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(4))
+        if(status.ne.nf_noerr) call handle_err(status)
+!        if (mype==0) write(*,*) mype, 'loopback_opal (mmolSi/day):', ncdata(4) !OG
+
+        status=nf_inq_varid(ncid, 'loopback_caco3', varid)
+        if(status.ne.nf_noerr) call handle_err(status)
+        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(5))
+        if(status.ne.nf_noerr) call handle_err(status)
+!        if (mype==0) write(*,*) mype, 'loopback_caco3 (mmolC/day):', ncdata(5) !OG
+
+      if(ciso) then
+        status=nf_inq_varid(ncid, 'loopback_orgm_dic13', varid)
+        if(status.ne.nf_noerr) call handle_err(status)
+        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(6))
+        if(status.ne.nf_noerr) call handle_err(status)
+!        if (mype==0) write(*,*) mype, 'loopback_dic13:', ncdata(6)     !OG   
+
+        status=nf_inq_varid(ncid, 'loopback_caco313', varid)
+        if(status.ne.nf_noerr) call handle_err(status)
+        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(7))
+        if(status.ne.nf_noerr) call handle_err(status)
+!        if (mype==0) write(*,*) mype, 'loopback_caco313:', ncdata(7) !OG
+
+       if(ciso_14 .and. ciso_organic_14) then
+        status=nf_inq_varid(ncid, 'loopback_orgm_dic14', varid)
+        if(status.ne.nf_noerr) call handle_err(status)
+        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(8))
+        if(status.ne.nf_noerr) call handle_err(status)
+!        if (mype==0) write(*,*) mype, 'loopback_dic14:', ncdata(8) !OG
+
+        status=nf_inq_varid(ncid, 'loopback_caco314', varid)
+        if(status.ne.nf_noerr) call handle_err(status)
+        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(9))
+        if(status.ne.nf_noerr) call handle_err(status)
+!        if (mype==0) write(*,*) mype, 'loopback_caco314:', ncdata(9) !OG
+
+       end if ! ciso_14 .and. ciso_organic_14
+      end if ! ciso
+        status=nf_close(ncid)
+
+! calculating fluxes back to ocean surface through rivers (mmol/m2/s)
+! converting from fluxes out of sediment to fluxes into the ocean 
+        do n_lb = 1,9
+           lb_flux(:,n_lb) = -runoff*ncdata(n_lb)/total_runoff*lb_tscale
+        end do
+
+      end if ! add_loopback
+
+    end if ! do_read
+
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif    
+    if (mype==0) write(*,*) 'sedimentary input from MEDUSA not used!' !OG
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
+    end if ! use_MEDUSA and sedflx_num not 0
+
+    end if
+
 
 ! ******** Fe deposition *********
     if (fe_data_source=='Albani') then
@@ -1466,11 +1831,23 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
             if (mstep > 1) i=i+1 
             if (i > 12) i=1
             filename=trim(nm_fe_data_file)
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif 
             if (mype==0) write(*,*) 'Updating iron climatology for month       ', i,' from ', trim(filename)
+#if defined(__usetp)
+        endif
+#endif
             call read_2ddata_on_grid_NetCDF(filename,'DustClim', i, GloFeDust, partit, mesh)
         end if
     else
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif 
         if (mype==0) write(*,*) 'Albani is switched off --> Check namelist.recom'     
+#if defined(__usetp)
+        endif
+#endif
     end if
 
 ! ******** N deposition *********
@@ -1482,7 +1859,13 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 !            if (i > 12) i=1
 !            if (mype==0) write(*,*) 'Updating iron climatology for month ', i 
             filename=trim(nm_aen_data_file)
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
             if (mype==0) write(*,*) 'Updating nitrogen climatology for month   ', i,' from ', trim(filename)
+#if defined(__usetp)
+        endif
+#endif
             if (yearnew .gt. 2009) then
                 Nvari = 'NDep2009'
             else if (yearnew .lt. 1850) then
@@ -1495,7 +1878,13 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
         end if
     else
         GloNDust = 0.0_WP
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
         if (mstep==1 .and. mype==0) write(*,*) 'useAeolianN is switched off'       
+#if defined(__usetp)
+        endif
+#endif
     end if
 
 ! ******** Riverine input (Nutrients) *********
@@ -1512,7 +1901,13 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
             if (mstep > 1) i=i+1 
             if (i > 12) i=1
             filename=trim(nm_river_data_file)
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
             if (mype==0) write(*,*) 'Updating riverine restoring data for month', i,' from ', trim(filename)
+#if defined(__usetp)
+        endif
+#endif
             call read_2ddata_on_grid_NetCDF(filename,'Alkalinity', i, RiverAlk2D, partit, mesh)
             ! write(*,*) mype, 'RiverAlk2D', maxval(RiverAlk2D(:)), minval(RiverAlk2D(:))        
             ! molar convertion of [CaCo3] * 2  -> [total Alkalinity]   
@@ -1534,7 +1929,13 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
         end if
     else
         is_riverinput = 0.0d0
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
         if (mype==0 .and. mstep==1) write(*,*) 'No riverine input' 
+#if defined(__usetp)
+        endif
+#endif
     end if
 
 ! ******** Riverine input of iron *********
@@ -1552,7 +1953,13 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 !<  read erosion input
     ! *** River inputs are in mmol/m2/s ***
     ! add erosion nutrients as surface boundary condition (surface_bc function in oce_ale_tracers)
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
     if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//' --> Erosion_input'//achar(27)//'[0m'
+#if defined(__usetp)
+        endif
+#endif
 
     is_erosioninput = 1.0d0
 
@@ -1561,7 +1968,13 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
             if (mstep > 1) i=i+1 
             if (i > 12) i=1
             filename=trim(nm_erosion_data_file)
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
             if (mype==0) write(*,*) 'Updating erosion restoring data for month ', i,' from ', trim(filename)
+#if defined(__usetp)
+        endif
+#endif
             call read_2ddata_on_grid_NetCDF(filename,'POC', i, ErosionTOC2D, partit, mesh)
             ! write(*,*) mype, 'ErosionTOC2D', maxval(ErosionTOC2D(:)), minval(ErosionTOC2D(:))    
     
@@ -1573,7 +1986,13 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
         end if
     else
         is_erosioninput = 0.0d0
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
         if (mype==0 .and. mstep==1) write(*,*) 'No erosion input' 
+#if defined(__usetp)
+        endif
+#endif
     end if
 #endif
 
