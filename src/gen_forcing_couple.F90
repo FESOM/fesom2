@@ -10,9 +10,9 @@ module force_flux_consv_interface
       real(kind=WP), intent (in)    :: mask(partit%myDim_nod2D+partit%eDim_nod2D)
       integer, intent (in)          :: n, h
       logical, intent (in)          :: do_stats
-    end subroutine
+    end subroutine force_flux_consv
   end interface
-end module
+end module force_flux_consv_interface
 module compute_residual_interface
   interface
     subroutine compute_residual(field2d, mask, n, partit, mesh)
@@ -24,9 +24,9 @@ module compute_residual_interface
       real(kind=WP),  intent (in) :: field2d(partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP),  intent (in) :: mask(partit%myDim_nod2D+partit%eDim_nod2D)
       integer, intent (in)       :: n
-    end subroutine
+    end subroutine compute_residual
   end interface
-end module
+end module compute_residual_interface
 module integrate_2D_interface
   interface
     subroutine integrate_2D(flux_global, flux_local, eff_vol, field2d, mask, partit, mesh)
@@ -39,9 +39,9 @@ module integrate_2D_interface
       real(kind=WP), intent (out) :: eff_vol(2)
       real(kind=WP), intent (in)  :: field2d(partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent (in)  :: mask(partit%myDim_nod2D   +partit%eDim_nod2D)
-    end subroutine
+    end subroutine integrate_2D
   end interface
-end module
+end module integrate_2D_interface
 
 module update_atm_forcing_interface
     interface
@@ -58,9 +58,9 @@ module update_atm_forcing_interface
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in),    target :: mesh
         type(t_dyn)   , intent(in),    target :: dynamics
-        end subroutine
+        end subroutine update_atm_forcing
     end interface
-end module
+end module update_atm_forcing_interface
 
 module net_rec_from_atm_interface
   interface
@@ -69,9 +69,9 @@ module net_rec_from_atm_interface
       USE MOD_PARSUP
       logical,        intent(in)             :: action
       type(t_partit), intent(inout), target  :: partit
-    end subroutine
+    end subroutine net_rec_from_atm
   end interface
-end module
+end module net_rec_from_atm_interface
 ! Routines for updating ocean surface forcing fields
 !-------------------------------------------------------------------------
 subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)

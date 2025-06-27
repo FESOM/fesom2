@@ -666,7 +666,7 @@ CONTAINS
          call par_ex(partit%MPI_COMM_FESOM, partit%mype)
          stop
       endif
-   END SUBROUTINE
+   end subroutine check_nferr
 
    SUBROUTINE binarysearch(length, array, value, ind)!, delta)
       ! Given an array and a value, returns the index of the element that
