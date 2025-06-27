@@ -755,7 +755,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #endif
 
 #ifndef ENABLE_OPENACC
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes) DEFAULT(PRESENT)
@@ -897,7 +901,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #endif
 
 #ifndef ENABLE_OPENACC
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes) DEFAULT(PRESENT)
@@ -955,7 +963,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         end do
 #ifndef ENABLE_OPENACC
 !$OMP END DO
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
 #else
         !$ACC END PARALLEL LOOP
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -1014,7 +1026,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         end do
 #ifndef ENABLE_OPENACC
 !$OMP END DO
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
 #else
         !$ACC END PARALLEL LOOP
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -1074,7 +1090,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         end do
 #ifndef ENABLE_OPENACC
 !$OMP END DO
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
 #else
         !$ACC END PARALLEL LOOP
 #endif
@@ -1161,7 +1181,11 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
     !
     ! a)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, row, elem, elnodes, q, offset, ipos, aa)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     DO elem=1,myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
 
@@ -1320,7 +1344,11 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(diff, entries, um, vm, vol, dx, dy, n, q, row, elem, elnodes, c1, c2, c3, c4, cx1, cx2, cx3, cx4, entries2)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes, dx, dy, entries, entries2) DEFAULT(PRESENT)

@@ -231,7 +231,11 @@ subroutine stress2rhs(ice, partit, mesh)
     !$ACC UPDATE SELF(u_rhs_ice, v_rhs_ice, sigma11, sigma12, sigma22)
 #endif
 #ifndef ENABLE_OPENACC
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
 #endif
     do el=1,myDim_elem2D
         ! ===== Skip if ice is absent
@@ -709,7 +713,11 @@ subroutine EVPdynamics(ice, partit, mesh)
         ! apply sea ice velocity boundary condition
 
 #ifndef ENABLE_OPENACC
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
 #else
         ! With the binary data of np2 goes only inside the first if
         !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
