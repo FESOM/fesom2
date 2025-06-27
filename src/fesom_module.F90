@@ -137,7 +137,7 @@ contains
       integer             :: mype_check
 
 ! get current value for num_fesom_groups
-    call read_namelist_run_config
+      call read_namelist_run_config
 #endif
 
 #if !defined  __ifsinterface
@@ -194,101 +194,101 @@ contains
 
 #if defined(__recom) && defined(__usetp)
 ! prepare communicator splitting for multi FESOM group loop parallelization
-    f%my_fesom_group=>f%partit%my_fesom_group
+        f%my_fesom_group=>f%partit%my_fesom_group
 
-    f%MPI_COMM_FESOM_WORLD=> f%partit%MPI_COMM_FESOM_WORLD
-    f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS=> f%partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS
+        f%MPI_COMM_FESOM_WORLD=> f%partit%MPI_COMM_FESOM_WORLD
+        f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS=> f%partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS
 
-    f%MPI_COMM_FESOM_WORLD = f%MPI_COMM_FESOM
-    npes_fesom_world     = f%npes
-    mype_fesom_world     = f%mype
-    if(mype_fesom_world == 0) then
-        write(*,*) 'npes_fesom_world, num_fesom_groups', npes_fesom_world, num_fesom_groups
-    end if
-    if(mod(npes_fesom_world, num_fesom_groups) /= 0) then
+        f%MPI_COMM_FESOM_WORLD = f%MPI_COMM_FESOM
+        npes_fesom_world     = f%npes
+        mype_fesom_world     = f%mype
         if(mype_fesom_world == 0) then
-            write(*,*) 'MPI_comm_split mismatch npes_fesom_world, num_fesom_groups', npes_fesom_world, num_fesom_groups
+            write(*,*) 'npes_fesom_world, num_fesom_groups', npes_fesom_world, num_fesom_groups
         end if
-        call par_ex(f%MPI_COMM_FESOM, f%mype)
-        stop
-    end if
+        if(mod(npes_fesom_world, num_fesom_groups) /= 0) then
+            if(mype_fesom_world == 0) then
+                write(*,*) 'MPI_comm_split mismatch npes_fesom_world, num_fesom_groups', npes_fesom_world, num_fesom_groups
+            end if
+            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            stop
+        end if
 
-    processes_per_group = npes_fesom_world / num_fesom_groups
-    if(mype_fesom_world == 0) then
-        write(*,*) 'processes_per_group', processes_per_group
-    end if
-    f%npes           = processes_per_group
-    f%my_fesom_group = mype_fesom_world / processes_per_group
-    f%mype           = mod(mype_fesom_world, processes_per_group)
+        processes_per_group = npes_fesom_world / num_fesom_groups
+        if(mype_fesom_world == 0) then
+            write(*,*) 'processes_per_group', processes_per_group
+        end if
+        f%npes           = processes_per_group
+        f%my_fesom_group = mype_fesom_world / processes_per_group
+        f%mype           = mod(mype_fesom_world, processes_per_group)
 
 ! split to num_fesom_groups
-    call MPI_comm_split(f%MPI_COMM_FESOM_WORLD, f%my_fesom_group, 0, f%MPI_COMM_FESOM, f%MPIerr)
-    if (f%MPIerr /= MPI_SUCCESS) then
-        write(*,*) 'MPI_comm_split(MPI_COMM_FESOM_WORLD, my_fesom_group, 0, MPI_COMM_FESOM, MPIERR) failed'
-        call par_ex(f%MPI_COMM_FESOM, f%mype)
-        stop
-    end if
+        call MPI_comm_split(f%MPI_COMM_FESOM_WORLD, f%my_fesom_group, 0, f%MPI_COMM_FESOM, f%MPIerr)
+        if (f%MPIerr /= MPI_SUCCESS) then
+            write(*,*) 'MPI_comm_split(MPI_COMM_FESOM_WORLD, my_fesom_group, 0, MPI_COMM_FESOM, MPIERR) failed'
+            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            stop
+        end if
 
-    call MPI_comm_size(f%MPI_COMM_FESOM, npes_check, f%MPIerr)
-    if(f%MPIerr /= MPI_SUCCESS) then
-        write(*,*) 'MPI_comm_size(MPI_COMM_FESOM, npes_check, MPIERR) failed'
-        call par_ex(f%MPI_COMM_FESOM, f%mype)
-        stop
-    end if
+        call MPI_comm_size(f%MPI_COMM_FESOM, npes_check, f%MPIerr)
+        if(f%MPIerr /= MPI_SUCCESS) then
+            write(*,*) 'MPI_comm_size(MPI_COMM_FESOM, npes_check, MPIERR) failed'
+            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            stop
+        end if
 
-    call MPI_comm_rank(f%MPI_COMM_FESOM, mype_check, f%MPIerr)
-    if(f%MPIerr /= MPI_SUCCESS) then
-        write(*,*) 'MPI_comm_rank(MPI_COMM_FESOM, mype_check, MPIERR) failed'
-        call par_ex(f%MPI_COMM_FESOM, f%mype)
-        stop
-    end if
+        call MPI_comm_rank(f%MPI_COMM_FESOM, mype_check, f%MPIerr)
+        if(f%MPIerr /= MPI_SUCCESS) then
+            write(*,*) 'MPI_comm_rank(MPI_COMM_FESOM, mype_check, MPIERR) failed'
+            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            stop
+        end if
 
-    if(npes_check /= f%npes) then
-        write(*,*) 'npes mismatch, npes, npes_check', f%npes, npes_check
-        call par_ex(f%MPI_COMM_FESOM, f%mype)
-        stop
-    end if
+        if(npes_check /= f%npes) then
+            write(*,*) 'npes mismatch, npes, npes_check', f%npes, npes_check
+            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            stop
+        end if
 
-    if(mype_check /= f%mype) then
-        write(*,*) 'mype mismatch, mype, mype_check', f%mype, mype_check
-        call par_ex(f%MPI_COMM_FESOM, f%mype)
-        stop
-    end if
+        if(mype_check /= f%mype) then
+            write(*,*) 'mype mismatch, mype, mype_check', f%mype, mype_check
+            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            stop
+        end if
 
 ! group same ranks in each group for broadcasting
 
-    call MPI_comm_split(f%MPI_COMM_FESOM_WORLD, f%mype, f%my_fesom_group, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIERR)
-    if (f%MPIERR /= MPI_SUCCESS) then
-        write(*,*) 'MPI_comm_split(MPI_COMM_FESOM_WORLD, mype, my_fesom_group, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIERR) failed'
-        call par_ex(f%MPI_COMM_FESOM, f%mype)
-        stop
-    end if
+        call MPI_comm_split(f%MPI_COMM_FESOM_WORLD, f%mype, f%my_fesom_group, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIERR)
+        if (f%MPIERR /= MPI_SUCCESS) then
+            write(*,*) 'MPI_comm_split(MPI_COMM_FESOM_WORLD, mype, my_fesom_group, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, MPIERR) failed'
+            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            stop
+        end if
 
-    call MPI_comm_size(f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, npes_check, f%MPIERR)
-    if(f%MPIERR /= MPI_SUCCESS) then
-        write(*,*) 'MPI_comm_size(MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, npes_check, MPIERR) failed'
-        call par_ex(f%MPI_COMM_FESOM, f%mype)
-        stop
-    end if
+        call MPI_comm_size(f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, npes_check, f%MPIERR)
+        if(f%MPIERR /= MPI_SUCCESS) then
+            write(*,*) 'MPI_comm_size(MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, npes_check, MPIERR) failed'
+            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            stop
+        end if
 
-    call MPI_comm_rank(f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, mype_check, f%MPIERR)
-    if(f%MPIERR /= MPI_SUCCESS) then
-        write(*,*) 'MPI_comm_rank(MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, mype_check, MPIERR) failed'
-        call par_ex(f%MPI_COMM_FESOM, f%mype)
-        stop
-    end if
+        call MPI_comm_rank(f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, mype_check, f%MPIERR)
+        if(f%MPIERR /= MPI_SUCCESS) then
+            write(*,*) 'MPI_comm_rank(MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, mype_check, MPIERR) failed'
+            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            stop
+        end if
 
-    if(npes_check /= num_fesom_groups) then
-        write(*,*) 'npes mismatch, num_fesom_groups, npes_check', num_fesom_groups, npes_check
-        call par_ex(f%MPI_COMM_FESOM, f%mype)
-        stop
-    end if
+        if(npes_check /= num_fesom_groups) then
+            write(*,*) 'npes mismatch, num_fesom_groups, npes_check', num_fesom_groups, npes_check
+            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            stop
+        end if
 
-    if(mype_check /= f%my_fesom_group) then
-        write(*,*) 'mype mismatch, my_fesom_group, mype_check', f%my_fesom_group, mype_check
-        call par_ex(f%MPI_COMM_FESOM, f%mype)
-        stop
-    end if
+        if(mype_check /= f%my_fesom_group) then
+            write(*,*) 'mype mismatch, my_fesom_group, mype_check', f%my_fesom_group, mype_check
+            call par_ex(f%MPI_COMM_FESOM, f%mype)
+            stop
+        end if
 
     if(f%my_fesom_group==0) then
 #endif
@@ -303,7 +303,7 @@ contains
         end if
 
 #if defined(__recom) && defined(__usetp)
-    end if
+    end if ! f%my_fesom_group==0
 #endif
 
         !=====================

@@ -22,7 +22,7 @@ integer                                       :: AB_order=2
 integer                                       :: ID
 !___________________________________________________________________________
 ! TODO: Make it as a part of namelist.tra
-logical                                      :: ltra_diag       = .true. ! OG - tra_diag
+logical                                      :: ltra_diag       = .false. ! OG - tra_diag
 
 contains
 procedure WRITE_T_TRACER_DATA
