@@ -27,7 +27,7 @@ subroutine reset_ib_fluxes()
     ibfwe   = 0.0
     ibhf    = 0.0
     ibhf_n  = 0.0_WP
-end subroutine
+end subroutine reset_ib_fluxes
 
 
 subroutine prepare_icb2fesom(mesh, partit, ib,i_have_element,localelement,depth_ib,height_ib_single)
@@ -207,4 +207,4 @@ type(t_partit), intent(inout), target :: partit
     end if
 !---wiso-code-end
 end subroutine icb2fesom
-end module
+end module iceberg_ocean_coupling

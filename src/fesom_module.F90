@@ -92,10 +92,10 @@ use mod_transit, only: year_ce, r14c_nh, r14c_tz, r14c_sh, r14c_ti, xCO2_ti, xf1
     integer mpi_version_len
     logical fesom_did_mpi_init
     
-  end type
+  end type fesom_main_storage_type
   type(fesom_main_storage_type), save, target :: f
 
-end module
+end module fesom_main_storage_module
 
 
 ! synopsis: main FESOM program split into 3 parts
@@ -452,7 +452,7 @@ contains
     !$ACC CREATE (f%tracers%work%adv_flux_hor, f%tracers%work%adv_flux_ver, f%tracers%work%fct_LO) &
     !$ACC CREATE (f%tracers%work%del_ttf_advvert, f%tracers%work%del_ttf_advhoriz, f%tracers%work%edge_up_dn_grad) &
     !$ACC CREATE (f%tracers%work%del_ttf)
-  end subroutine
+  end subroutine fesom_init
 
 
   subroutine fesom_runloop(current_nsteps)
@@ -675,7 +675,7 @@ contains
     f%from_nstep = f%from_nstep+current_nsteps
 !call cray_acc_set_debug_global_level(0)    
 !   write(0,*) 'f%from_nstep after the loop:', f%from_nstep    
-  end subroutine
+  end subroutine fesom_runloop
 
 
   subroutine fesom_finalize()
@@ -829,6 +829,6 @@ contains
         write(*,*)
     end if    
 !   call clock_finish  
-  end subroutine
+  end subroutine fesom_finalize
 
-end module
+end module fesom_module
