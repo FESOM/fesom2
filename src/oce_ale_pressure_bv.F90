@@ -3126,3 +3126,88 @@ subroutine init_ref_density(partit, mesh)
 !$OMP END PARALLEL DO
     if(mype==0) write(*,*) ' --> compute reference density'
 end subroutine init_ref_density
+!
+!===============================================================================
+subroutine init_ref_density_advanced(tracers, partit, mesh)
+    ! compute reference density
+    ! Coded by Qiang Wang
+    ! Reviewed by ??
+    !___________________________________________________________________________
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_TRACER
+    use o_PARAM
+    use o_ARRAYS
+    use densityJM_components_interface
+    implicit none
+
+    !___________________________________________________________________________
+    type(t_mesh),   intent(in) ,    target  :: mesh
+    type(t_partit), intent(inout),  target  :: partit
+    type(t_tracer), intent(in),     target  :: tracers
+    integer                                 :: node, nz, nzmin, nzmax
+    real(kind=WP)                           :: rhopot, bulk_0, bulk_pz, bulk_pz2, rho
+    real(kind=8)                            :: T, S, auxz, x, y
+    real(kind=WP),  dimension(:,:), pointer :: temp, salt
+    real(kind=8)                            :: ref_temp1D(mesh%nl-1), ref_salt1D(mesh%nl-1), vol1D(mesh%nl-1)
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+temp=>tracers%data(1)%values(:,:)
+salt=>tracers%data(2)%values(:,:)
+vol1D=0.0_WP
+ref_temp1D=0.0_WP
+ref_salt1D=0.0_WP
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax) REDUCTION(+:vol1D)
+do node=1,myDim_nod2d
+    x=geo_coord_nod2D(1,node)/rad
+    y=geo_coord_nod2D(1,node)/rad
+    if ((x>=-6.) .AND. (x<=42) .AND. (y>=30.15) .AND. (y<=42)) CYCLE !exclude Mediterranean Sea
+    if ((x>= 2.) .AND. (x<=42) .AND. (y>=41)    .AND. (y<=48)) CYCLE !exclude Black Sea
+    nzmin = 1
+    nzmax = nlevels_nod2d(node)-1
+    do nz=nzmin,nzmax
+       ref_temp1D(nz)=ref_temp1D(nz)+areasvol(nz,node)*temp(nz,node)
+       ref_salt1D(nz)=ref_salt1D(nz)+areasvol(nz,node)*salt(nz,node)
+       vol1D(nz)=vol1D(nz)+areasvol(nz,node)
+    end do
+end do
+!$OMP END PARALLEL DO
+call MPI_Allreduce(MPI_IN_PLACE, ref_temp1D, mesh%nl-1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+call MPI_Allreduce(MPI_IN_PLACE, ref_salt1D, mesh%nl-1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+call MPI_Allreduce(MPI_IN_PLACE,      vol1D, mesh%nl-1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+
+where( vol1D > 1.e-12_WP) !more than 0.!
+     ref_temp1D=ref_temp1D/vol1D
+     ref_salt1D=ref_salt1D/vol1D
+end where
+! we better rewrite this loop (1) do nz...; (2) do node... later
+!___________________________________________________________________________
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, rhopot, bulk_0, bulk_pz, bulk_pz2, rho, T, S, auxz)
+    do node=1,myDim_nod2d+eDim_nod2d
+        density_ref(:, node) = 0.0_WP
+        nzmin = 1
+        nzmax = nlevels_nod2d(node)-1
+        auxz=min(0.0,Z_3d_n(nzmin,node))
+        do nz=nzmin,nzmax
+            call densityJM_components(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
+            auxz=Z_3d_n(nz,node)
+            rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
+            density_ref(nz,node) = rho*rhopot/(rho+0.1_WP*auxz)
+        end do
+    end do
+!$OMP END PARALLEL DO
+if(mype==0) write(*,*) ' --> compute reference density'
+if(mype==0) then
+do nz=1,68
+ call densityJM_components(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
+ auxz=Z(nz)
+ rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
+ rho = rho*rhopot/(rho+0.1_WP*auxz)
+ write(*,*) "mytest:", ref_temp1D(nz), ref_salt1D(nz), auxz, rho
+end do
+end if
+end subroutine init_ref_density_advanced
