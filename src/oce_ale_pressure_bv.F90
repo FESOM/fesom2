@@ -218,7 +218,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     real(kind=WP)                           :: sigma_theta_crit=0.125_WP   !kg/m3, Levitus threshold for computing MLD2
     real(kind=WP)                           :: sigma_theta_crit_cmor=0.03_WP   !kg/m3, Griffies threshold for computing MLD3
     logical                                 :: flag1, flag2, flag3, mixing_kpp
-    logical                                 :: smooth_bv_vertical=.false. ! smoothing Bv in vertical is sometimes necessary in order to avoid vertival noise in Kv/Av
+!PS     logical                                 :: smooth_bv_vertical=.false. ! smoothing Bv in vertical is sometimes necessary in order to avoid vertival noise in Kv/Av
     real(kind=WP),  dimension(:,:), pointer :: temp, salt
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -479,7 +479,7 @@ subroutine pressure_bv(tracers, partit, mesh)
         ! bv_ref
         !_______________________________________________________________________
         ! BV is defined on full levels except for the first and the last ones.
-        if (smooth_bv_vertical) then
+        if (N2smth_v) then
            do nz=nzmin+1,nzmax-1
               bv1(nz)=        (zbar_3d_n(nz-1,node)-zbar_3d_n(nz,  node))*(bvfreq(nz-1,node)+bvfreq(nz,  node))
               bv1(nz)=bv1(nz)+(zbar_3d_n(nz,  node)-zbar_3d_n(nz+1,node))*(bvfreq(nz,  node)+bvfreq(nz+1,node))
@@ -493,7 +493,11 @@ subroutine pressure_bv(tracers, partit, mesh)
 !$OMP END DO
 !$OMP BARRIER
 !$OMP END PARALLEL
-call smooth_nod (bvfreq, 1, partit, mesh)
+
+!_______________________________________________________________________________
+! apply horizontal smoothing of N2 bouyancy frequency
+if (N2smth_h) call smooth_nod (bvfreq, N2smth_hidx, partit, mesh)
+
 end subroutine pressure_bv
 !
 !
@@ -3042,11 +3046,17 @@ subroutine compute_neutral_slope(partit, mesh)
         end if
         
         ! now taper slope with c1 and c2
-        do nz = ul1, nl1
-            fer_tapfac(nz, n) = c1(nz) * c2(nz)
-!PS             slope_tapered(:, nz, n)=neutral_slope(:, nz, n) * c1(nz) * c2(nz)
-            slope_tapered(:, nz, n)=neutral_slope(:, nz, n) * sqrt(c1(nz) * c2(nz))
-        end do    
+        if (Redi_Ktaper) then 
+            do nz = ul1, nl1
+                fer_tapfac(nz, n) = c1(nz) * c2(nz)
+                !PS slope_tapered(:, nz, n)=neutral_slope(:, nz, n) * c1(nz) * c2(nz)
+                slope_tapered(:, nz, n)=neutral_slope(:, nz, n) * sqrt(c1(nz) * c2(nz))
+            end do    
+        else   
+            do nz = ul1, nl1
+                slope_tapered(:, nz, n)=neutral_slope(:, nz, n) * c1(nz) * c2(nz)
+            end do
+        end if 
 
     enddo
 !$OMP END DO
