@@ -546,7 +546,7 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
     is_bin_restart_write = is_due(trim(bin_restart_length_unit), bin_restart_length, istep)
   end if
  
-  ! --> should write 
+  ! --> synchronizes tracer data within one fesom group
 #if defined(__recom) && defined(__usetp)
     if(num_fesom_groups > 1) then
         tr_arr_slice_count_fix_1 = 1 * (nl - 1) * (myDim_nod2D + eDim_nod2D)
