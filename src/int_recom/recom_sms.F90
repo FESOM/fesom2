@@ -331,25 +331,31 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             rTloc   = real(one)/(Temp(k) + C2K)
             arrFunc = exp(-Ae * ( rTloc - rTref))
 
-#if defined (__coccos) 
-            CoccoTFunc = max(0.1419d0 * Temp(k)**0.8151d0,tiny) ! Function from Fielding 2013; is based on observational GR, but range fits best to ours
-#endif
+
+! The following part defines the new temperature functions with are ONLY used in the 4P version with Coccos and Phaeo (new temp
+! functions in 2p version would need to be tuned first)
+
+! #if defined (__coccos) ! (old Cocco temperature function)
+!            CoccoTFunc = max(0.1419d0 * Temp(k)**0.8151d0,tiny) ! Function from Fielding 2013; is based on observational GR, but range fits best to ours
+! #endif
 
 !< New phytoplankton temperature functions
+#if defined (__coccos)
 
+            ! Small Phytoplankton:
             Temp_phyto = exp(ord_phy + expon_phy * Temp(k)) ! NEW MODIFIED
             VTTemp_phyto(k) = Temp_phyto
+
+            ! Diatoms:
             Temp_diatoms = exp(ord_d + expon_d * Temp(k)) ! NEW MODIFIED  2 parameters in new function ordonnee and exponent
             VTTemp_diatoms(k) = Temp_diatoms ! track the output here 
-   
 
-
-#if defined (__coccos)
             ! Coccolithophores:
             if (Temp(k) < 5.0) then
                 Temp_cocco = tiny
             else
-                Temp_cocco = max(exp(ord_cocco + expon_cocco * Temp(k)), tiny)
+                Temp_cocco = exp(ord_cocco + expon_cocco * Temp(k))
+                Temp_cocco = max(Temp_cocco, tiny)
             end if 
             VTTemp_cocco(k) = Temp_cocco
 
@@ -357,7 +363,6 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             ! Blanchard function (Grimaud et al., 2017):
             Temp_phaeo = uopt_phaeo * ((Tmax_phaeo-Temp(k))/(Tmax_phaeo-Topt_phaeo))**beta_phaeo * exp(-beta_phaeo * (Topt_phaeo-Temp(k))/(Tmax_phaeo-Topt_phaeo))
             Temp_phaeo = max(Temp_phaeo, tiny)
-            
             VTTemp_phaeo(k) = Temp_phaeo
 #endif
 
@@ -550,10 +555,15 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !< *** Small phytoplankton ***
 !< ***************************
             qlimitFac    = recom_limiter(NMinSlope, NCmin, quota) ! Eqn A55
-            feLimitFac   = Fe/(k_Fe + Fe)                         ! Use Michaelis–Menten kinetics
+            feLimitFac   = Fe/(k_Fe + Fe)                         ! Use Michaelis-Menten kinetics
             qlimitFac    = min(qlimitFac, feLimitFac)             ! Liebig law of the minimum
             pMax         = P_cm * qlimitFac * arrFunc             ! Maximum value of C-specific rate of photosynthesis
-    
+
+#if defined (__coccos)
+! for 4p version which contains new Temperature functions from Hannah
+            pMax         = qlimitFac * Temp_phyto                ! Maximum value of C-specific rate of photosynthesis
+#endif
+
 !< *** Diatoms ***
 !< ***************
             qlimitFac    = recom_limiter(NMinSlope, NCmin_d, quota_dia)
@@ -563,13 +573,19 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             qlimitFac    = min(qlimitFac, feLimitFac)
             pMax_dia     = P_cm_d * qlimitFac * arrFunc
 
+#if defined (__coccos)
+! for 4p version which contains new Temperature functions from Hannah
+            pMax_dia     = qlimitFac * Temp_diatoms
+#endif
+
 !< *** Coccolithophores ***
 !< ************************
 #if defined (__coccos) 
             qlimitFac  = recom_limiter(NMinSlope, NCmin_c, quota_cocco) 
             feLimitFac = Fe/(k_Fe_c + Fe)                               
             qlimitFac  = min(qlimitFac, feLimitFac)                     
-            pMax_cocco = P_cm_c * qlimitFac * CoccoTFunc                ! Here the T dependency is changed
+!            pMax_cocco = P_cm_c * qlimitFac * CoccoTFunc                ! Here the T dependency is changed
+            pMax_cocco = qlimitFac * Temp_cocco               ! Here the T dependency is changed
 
 !< *** Phaeocystis ***
 !< *******************
@@ -744,7 +760,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             V_cm      = V_cm_fact
             limitFacN = recom_limiter(NMaxSlope, quota, NCmax)
             N_assim   = V_cm * pMax * NCuptakeRatio &                ! [mmol N / (mmol C * day)]
-                         * limitFacN * (DIN/(DIN + k_din))           ! Michaelis–Menten kinetics
+                         * limitFacN * (DIN/(DIN + k_din))           ! Michaelis-Menten kinetics
 
             V_cm          = V_cm_fact_d
             limitFacN_dia = recom_limiter(NMaxSlope, quota_dia, NCmax_d)
