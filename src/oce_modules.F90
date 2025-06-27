@@ -50,14 +50,19 @@ integer                       :: K_GM_bvref = 2 ! 0...surface, 1...bottom mixlay
 real(kind=WP)                 :: K_GM_resscalorder = 2.0
 real(kind=WP)                 :: K_GM_rampmax = 40.0 ! Resol >K_GM_rampmax[km] GM full
 real(kind=WP)                 :: K_GM_rampmin = 30.0 ! Resol <K_GM_rampmin[km] GM off
+real(kind=WP)                 :: K_GM_cm = 1.0    ! =1.0 ...first baroclini wave speed, =2.0...2nd, =3.0...3rd, ...
+real(kind=WP)                 :: K_GM_cmin = 0.5 ! lower cutoff of baroclinic wave speed
+logical                       :: K_GM_Ktaper = .false.
+
 logical                       :: scaling_Ferreira   =.true.
 logical                       :: scaling_Rossby     =.false.
 logical                       :: scaling_resolution =.true.
 logical                       :: scaling_FESOM14    =.false.
 
-logical                       :: Redi               =.false.  !flag for Redi scheme
-real(kind=WP)                 :: K_Redi_max = 3000.0
-real(kind=WP)                 :: K_Redi_min = 2.0
+logical                       :: Redi        = .false.  !flag for Redi scheme
+logical                       :: Redi_Ktaper = .false.
+real(kind=WP)                 :: Redi_Kmax   = 3000.0
+real(kind=WP)                 :: Redi_Kmin   = 2.0
 
 logical                       :: scaling_ODM95 =.true.    ! tapering based on critical slope
 real(kind=WP)                 :: ODM95_Scr = 1.0e-2   ! Critical slope for tapering
@@ -87,7 +92,19 @@ real(kind=WP)                 :: alpha=1.0_WP, theta=1.0_WP ! implicitness for
 real(kind=WP)                 :: epsilon=0.1_WP  ! AB2 offset
 ! Tracers
 
-logical                       :: SPP=.false.
+! Salt Prine Parameterisation
+logical                       :: SPP            = .false.
+real(kind=WP)                 :: SPP_dep_N      = -80.0_WP   ! salt prine max rejection depth Northern hemisphere
+real(kind=WP)                 :: SPP_dep_S      = -80.0_WP   ! salt prine max rejection depth Southern hemisphere
+real(kind=WP)                 :: SPP_drhodz_cr_N= 0.01_WP    ! salt prine critical slope Northern hemispher
+real(kind=WP)                 :: SPP_drhodz_cr_S= 0.01_WP    ! salt prine critical slope Southern hemispher
+integer                       :: SPP_expon      = 5          ! exponent for salt prine vertical distribution 
+
+! Smoothing of N2 buoyancy frequency
+logical                       :: N2smth_v       = .false.  ! do vertical N2 smoothing 
+logical                       :: N2smth_h       = .true.   ! do horizontal N2 smoothing 
+integer                       :: N2smth_hidx    = 1        ! how many horizontal smoothing cycles should be applied
+
 
 integer                       :: acc_vl = 64
 
@@ -172,15 +189,16 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
 ! > 'easypgf'      ... interpolate pressure on elemental depth
 character(20)                  :: which_pgf='shchepetkin'
 
-
  NAMELIST /oce_dyn/ state_equation, C_d, A_ver, &
-                    scale_area, SPP, &
-                    scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, &
+                    scale_area, &
+                    SPP, SPP_dep_N, SPP_dep_S, SPP_drhodz_cr_N, SPP_drhodz_cr_S, SPP_expon,  &
+                    N2smth_v, N2smth_h, N2smth_hidx, &
                     visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, alpha, theta, use_density_ref, &
                     K_back, c_back, uke_scaling, uke_scaling_factor, smooth_back, smooth_dis, &
                     smooth_back_tend, rosb_dis, &
-                    Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, &
-                    Redi, K_Redi_max, K_Redi_min, &
+                    Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, K_GM_cm, K_GM_cmin, K_GM_Ktaper, &
+                    Redi, Redi_Ktaper, Redi_Kmax, Redi_Kmin, &
+                    scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, &
                     scaling_ODM95, ODM95_Scr, ODM95_Sd, &
                     scaling_LDD97, LDD97_c, LDD97_rmin, LDD97_rmax         
 
