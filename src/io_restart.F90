@@ -554,7 +554,7 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
         do group_i = 0, num_fesom_groups - 1
             call calc_slice(num_tracers, num_fesom_groups, group_i, tr_num_start, tr_num_end, tr_num_in_group, has_one_added_tracer)
 
-            call MPI_Bcast(tracers%data(tr_num_start)%valuesold(1,:,:), tr_arr_slice_count_fix_1 * tr_num_in_group, MPI_DOUBLE_PRECISION, group_i, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%mpierr)
+            call MPI_Bcast(tracers%data(tr_num_start)%valuesold(tracers%data(j)%AB_order-1,:,:), tr_arr_slice_count_fix_1 * tr_num_in_group, MPI_DOUBLE_PRECISION, group_i, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%mpierr)
         end do
     end if
 #endif
