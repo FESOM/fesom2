@@ -277,7 +277,7 @@ subroutine thermodynamics(ice, partit, mesh)
         ce	    = Ce_atm_oce_arr(i)
         ch_i    = Ch_atm_ice
         ce_i    = Ce_atm_ice
-        h_ml    = 2.5_WP                ! 10.0 or 30. used previously
+        h_ml    = ice%thermo%h_ml               ! 10.0 or 30. used previously
         fw      = 0.0_WP
         ehf     = 0.0_WP
         geolon = geo_coord_nod2D(1, i)
