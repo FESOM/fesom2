@@ -571,7 +571,7 @@ subroutine write_restart(path, filegroup, istep)
     call filegroup%files(i)%async_gather_and_write_variables()
   end do
   
-end subroutine
+end subroutine write_restart
 !
 !
 !_______________________________________________________________________________
@@ -606,7 +606,7 @@ subroutine write_all_raw_restarts(istep, mpicomm, mype)
 #endif
     close(fileunit)
   end if
-end subroutine
+end subroutine write_all_raw_restarts
 !
 !
 !_______________________________________________________________________________
@@ -619,7 +619,7 @@ subroutine write_raw_restart_group(filegroup, fileunit)
   do i=1, filegroup%nfiles
     call filegroup%files(i)%write_variables_raw(fileunit)
   end do
-end subroutine
+end subroutine write_raw_restart_group
 ! ! !
 ! ! !
 ! ! !_______________________________________________________________________________
@@ -855,7 +855,7 @@ subroutine read_all_raw_restarts(mpicomm, mype)
     print *,"can not open ",raw_restart_dirpath//'/'//mpirank_to_txt(mpicomm)//'.dump'
     stop 1
   end if
-end subroutine
+end subroutine read_all_raw_restarts
 !
 !
 !_______________________________________________________________________________
@@ -868,7 +868,7 @@ subroutine read_raw_restart_group(filegroup, fileunit)
   do i=1, filegroup%nfiles
     call filegroup%files(i)%read_variables_raw(fileunit)
   end do  
-end subroutine
+end subroutine read_raw_restart_group
 !
 !
 !_______________________________________________________________________________
@@ -902,7 +902,7 @@ subroutine finalize_restart()
     end if
   end do
 #endif
-end subroutine
+end subroutine finalize_restart
 !
 !
 !_______________________________________________________________________________
@@ -1008,7 +1008,7 @@ subroutine read_restart(path, filegroup, mpicomm, mype)
       call MPI_Recv(globalstep, 1, MPI_INTEGER, MPI_ANY_SOURCE, 42, mpicomm, mpistatus, mpierr)
     end if
   end if
-end subroutine
+end subroutine read_restart
 !
 !
 !_______________________________________________________________________________
