@@ -448,10 +448,9 @@ contains
     !$ACC ENTER DATA CREATE (f%tracers%data(tr_num)%values, f%tracers%data(tr_num)%valuesAB)
     !$ACC ENTER DATA CREATE (f%tracers%data(tr_num)%tra_adv_ph, f%tracers%data(tr_num)%tra_adv_pv)
     end do
-    !$ACC ENTER DATA CREATE (f%tracers%work%fct_ttf_min, f%tracers%work%fct_ttf_max, f%tracers%work%fct_plus, f%tracers%work%fct_minus) &
-    !$ACC CREATE (f%tracers%work%adv_flux_hor, f%tracers%work%adv_flux_ver, f%tracers%work%fct_LO) &
-    !$ACC CREATE (f%tracers%work%del_ttf_advvert, f%tracers%work%del_ttf_advhoriz, f%tracers%work%edge_up_dn_grad) &
-    !$ACC CREATE (f%tracers%work%del_ttf)
+    !$ACC ENTER DATA CREATE (f%tracers%work%fct_ttf_min, f%tracers%work%fct_ttf_max, f%tracers%work%fct_plus, f%tracers%work%fct_minus)
+    !$ACC ENTER DATA CREATE (f%tracers%work%adv_flux_hor, f%tracers%work%adv_flux_ver, f%tracers%work%fct_LO)
+    !$ACC ENTER DATA CREATE (f%tracers%work%del_ttf_advvert, f%tracers%work%del_ttf_advhoriz, f%tracers%work%edge_up_dn_grad)
   end subroutine fesom_init
 
 
