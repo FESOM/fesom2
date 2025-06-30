@@ -127,7 +127,7 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
      call  MPI_Finalize(error)
   endif
 
-#else ! 
+#else 
 ! TODO logic below is convoluted, COMM that is passed should be used for MPI_ABORT
 ! changes are easy but need to be tested with coupled configurations 
 ! From here on the two coupled options
