@@ -42,12 +42,10 @@ end do
 !$ACC END PARALLEL LOOP
 #endif
 
-#ifndef ENABLE_OPENACC
-!$OMP PARALLEL DO
-#endif
     ! AB interpolation
     if (tracers%data(tr_num)%AB_order==2) then
 #ifndef ENABLE_OPENACC
+!$OMP PARALLEL DO
 #else
 !ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
@@ -55,11 +53,13 @@ end do
            tracers%data(tr_num)%valuesAB(:, n)  =-(0.5_WP+epsilon)*tracers%data(tr_num)%valuesold(1, :, n)+(1.5_WP+epsilon)*tracers%data(tr_num)%values(:, n)
        end do
 #ifndef ENABLE_OPENACC
+!$OMP END PARALLEL DO
 #else
 !ACC END PARALLEL LOOP
 #endif
     elseif (tracers%data(tr_num)%AB_order==3) then
 #ifndef ENABLE_OPENACC
+!$OMP PARALLEL DO
 #else
 !ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
@@ -68,6 +68,7 @@ end do
            tracers%data(tr_num)%valuesAB(:, n)  =tracers%data(tr_num)%valuesAB(:, n)/12.0_WP
        end do
 #ifndef ENABLE_OPENACC
+!$OMP END PARALLEL DO
 #else
 !ACC END PARALLEL LOOP
 #endif
@@ -89,9 +90,6 @@ end do
        write(*,*)
        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
     end if
-#ifndef ENABLE_OPENACC
-!$OMP END PARALLEL DO
-#endif
 
     if (tracers%data(tr_num)%AB_order==2) then
 #ifndef ENABLE_OPENACC
