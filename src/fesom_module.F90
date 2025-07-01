@@ -92,10 +92,10 @@ use mod_transit, only: year_ce, r14c_nh, r14c_tz, r14c_sh, r14c_ti, xCO2_ti, xf1
     integer mpi_version_len
     logical fesom_did_mpi_init
     
-  end type
+  end type fesom_main_storage_type
   type(fesom_main_storage_type), save, target :: f
 
-end module
+end module fesom_main_storage_module
 
 
 ! synopsis: main FESOM program split into 3 parts
@@ -446,13 +446,14 @@ contains
     !$ACC ENTER DATA CREATE (f%tracers%data, f%tracers%work) 
     do tr_num=1, f%tracers%num_tracers
     !$ACC ENTER DATA CREATE (f%tracers%data(tr_num)%values, f%tracers%data(tr_num)%valuesAB)
+    !$ACC ENTER DATA CREATE (f%tracers%data(tr_num)%valuesold)
     !$ACC ENTER DATA CREATE (f%tracers%data(tr_num)%tra_adv_ph, f%tracers%data(tr_num)%tra_adv_pv)
     end do
-    !$ACC ENTER DATA CREATE (f%tracers%work%fct_ttf_min, f%tracers%work%fct_ttf_max, f%tracers%work%fct_plus, f%tracers%work%fct_minus) &
-    !$ACC CREATE (f%tracers%work%adv_flux_hor, f%tracers%work%adv_flux_ver, f%tracers%work%fct_LO) &
-    !$ACC CREATE (f%tracers%work%del_ttf_advvert, f%tracers%work%del_ttf_advhoriz, f%tracers%work%edge_up_dn_grad) &
-    !$ACC CREATE (f%tracers%work%del_ttf)
-  end subroutine
+    !$ACC ENTER DATA CREATE (f%tracers%work%fct_ttf_min, f%tracers%work%fct_ttf_max, f%tracers%work%fct_plus, f%tracers%work%fct_minus)
+    !$ACC ENTER DATA CREATE (f%tracers%work%adv_flux_hor, f%tracers%work%adv_flux_ver, f%tracers%work%fct_LO)
+    !$ACC ENTER DATA CREATE (f%tracers%work%del_ttf_advvert, f%tracers%work%del_ttf_advhoriz, f%tracers%work%edge_up_dn_grad)
+    !$ACC ENTER DATA CREATE (tr_xy, tr_z, relax2clim, Sclim, Tclim)
+  end subroutine fesom_init
 
 
   subroutine fesom_runloop(current_nsteps)
@@ -675,7 +676,7 @@ contains
     f%from_nstep = f%from_nstep+current_nsteps
 !call cray_acc_set_debug_global_level(0)    
 !   write(0,*) 'f%from_nstep after the loop:', f%from_nstep    
-  end subroutine
+  end subroutine fesom_runloop
 
 
   subroutine fesom_finalize()
@@ -721,11 +722,13 @@ contains
     !$ACC EXIT DATA DELETE (f%ice)
     do tr_num=1, f%tracers%num_tracers
     !$ACC EXIT DATA DELETE (f%tracers%data(tr_num)%values, f%tracers%data(tr_num)%valuesAB)
+    !$ACC EXIT DATA DELETE (f%tracers%data(tr_num)%valuesold)
     end do
     !$ACC EXIT DATA DELETE (f%tracers%work%fct_ttf_min, f%tracers%work%fct_ttf_max, f%tracers%work%fct_plus, f%tracers%work%fct_minus)
     !$ACC EXIT DATA DELETE (f%tracers%work%adv_flux_hor, f%tracers%work%adv_flux_ver, f%tracers%work%fct_LO)
     !$ACC EXIT DATA DELETE (f%tracers%work%del_ttf_advvert, f%tracers%work%del_ttf_advhoriz, f%tracers%work%edge_up_dn_grad)
     !$ACC EXIT DATA DELETE (f%tracers%work%del_ttf)
+    !$ACC EXIT DATA DELETE (tr_xy, tr_z, relax2clim, Sclim, Tclim)
     !$ACC EXIT DATA DELETE (f%tracers%data, f%tracers%work)
     !$ACC EXIT DATA DELETE (f%dynamics%w, f%dynamics%w_e, f%dynamics%uv)
     !$ACC EXIT DATA DELETE (f%dynamics, f%tracers)
@@ -829,6 +832,6 @@ contains
         write(*,*)
     end if    
 !   call clock_finish  
-  end subroutine
+  end subroutine fesom_finalize
 
-end module
+end module fesom_module

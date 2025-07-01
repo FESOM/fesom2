@@ -6,9 +6,9 @@ module com_global2local_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine com_global2local
   end interface
-end module
+end module com_global2local_interface
 
 !=============================================================================
 SUBROUTINE com_global2local(partit, mesh)

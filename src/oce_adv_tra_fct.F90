@@ -8,7 +8,7 @@ module oce_adv_tra_fct_interfaces
       type(t_mesh),  intent(in),    target        :: mesh
       type(t_partit),intent(inout), target        :: partit
       type(t_tracer_work), intent(inout), target  :: twork
-    end subroutine
+    end subroutine oce_adv_tra_fct_init
 
     subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, AUX, partit, mesh)
       use MOD_MESH
@@ -26,9 +26,9 @@ module oce_adv_tra_fct_interfaces
       real(kind=WP), intent(inout)      :: fct_plus(mesh%nl-1, partit%myDim_nod2D)
       real(kind=WP), intent(inout)      :: fct_minus(mesh%nl,  partit%myDim_nod2D)
       real(kind=WP), intent(inout)      :: AUX(:,:,:) !a large auxuary array
-    end subroutine
+    end subroutine oce_tra_adv_fct
  end interface
-end module
+end module oce_adv_tra_fct_interfaces
 !
 !
 !===============================================================================
