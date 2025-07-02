@@ -147,7 +147,7 @@ contains
                io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, p_partit, mesh)
        case ('qice      ')
           do k = 1,nilyr  ! Separate variable for each sea ice layer
-             write(trname,'(A6,i1)') 'qicen_', k
+             write(trname,'(A5,i1)') 'qice_', k
              write(longname,'(A22,i1)') 'sea ice enthalpy lyr: ', k 
              units='J/m3'
              call def_stream(nod2D, nx_nh, trim(trname), trim(longname), trim(units), trcr(:,nt_qice+k-1), &
@@ -155,7 +155,7 @@ contains
           end do
        case ('sice      ')
           do k = 1,nilyr  ! Separate variable for each sea ice layer
-             write(trname,'(A6,i1)') 'sicen_', k
+             write(trname,'(A5,i1)') 'sice_', k
              write(longname,'(A22,i1)') 'sea ice salinity lyr: ', k
              units='psu'
              call def_stream(nod2D, nx_nh, trim(trname), trim(longname), trim(units), trcr(:,nt_sice+k-1), &
@@ -163,7 +163,7 @@ contains
           end do
        case ('qsno      ')
           do k = 1,nslyr  ! Separate variable for each snow layer
-             write(trname,'(A6,i1)') 'qsnon_', k
+             write(trname,'(A5,i1)') 'qsno_', k
              write(longname,'(A19,i1)') 'snow enthalpy lyr: ', k
              units='J/m3'
              call def_stream(nod2D, nx_nh, trim(trname), trim(longname), trim(units), trcr(:,nt_qsno+k-1), &

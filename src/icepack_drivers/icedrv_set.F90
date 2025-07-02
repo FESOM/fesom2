@@ -18,7 +18,7 @@ submodule (icedrv_main) icedrv_set
       
 contains 
 
-  module subroutine set_icepack(ice, partit)
+  module subroutine set_icepack(flag_debug, ice, partit)
     !
     ! originally 'subroutine input_data' in icedrv_init.F90
     !
@@ -26,10 +26,11 @@ contains
     
     implicit none
 
-    ! local variables
+    logical (kind=log_kind), intent(in) :: flag_debug
     type(t_partit), intent(inout), target :: partit
     type(t_ice), intent(inout), target :: ice
 
+    ! local variables
     character(len=char_len) :: nml_filename, diag_filename
     character(len=*), parameter :: subname = '(set_icepack)'
     logical(kind=log_kind) :: tr_pond, wave_spec
@@ -739,7 +740,9 @@ contains
     if (tr_fsd .and. (trim(wave_spec_type) == 'none')) then
        if (mype == 0) write (nu_diag,*) 'WARNING: tr_fsd=T but wave_spec=F - not recommended'
     endif
-    
+
+    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call fesom_to_icepack_para'//achar(27)//'[0m'
+    call fesom_to_icepack_para() ! no atmoshperic data yet frank.kauker@awi.de                                         
     !-----------------------------------------------------------------
     ! spew
     !-----------------------------------------------------------------

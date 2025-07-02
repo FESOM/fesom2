@@ -308,7 +308,7 @@ contains
         !=====================
         if (f%mype==0) write(*,*) 'Icepack: reading namelists from namelist.icepack'
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call set_icepack'//achar(27)//'[0m'
-        call set_icepack(f%ice, f%partit)
+        call set_icepack(flag_debug, f%ice, f%partit)
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call alloc_icepack'//achar(27)//'[0m'
         call alloc_icepack
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call init_icepack'//achar(27)//'[0m'

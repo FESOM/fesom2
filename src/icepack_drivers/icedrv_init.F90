@@ -14,7 +14,7 @@ submodule (icedrv_main) icedrv_init
        icepack_query_tracer_sizes, icepack_query_tracer_indices, icepack_warnings_flush,                     &
        icepack_warnings_aborted, icepack_write_tracer_flags, icepack_write_tracer_indices,                   & 
        icepack_write_tracer_sizes, icepack_init_wave
-  use icedrv_system,    only: icedrv_system_abort
+  use icedrv_system, only: icedrv_system_abort
   
 contains
 
@@ -30,7 +30,7 @@ contains
          it              ! tracer index
     
     logical (kind=log_kind) :: &
-             tr_iage, tr_FY, tr_lvl, tr_aero, tr_fsd, tr_iso, tr_snow, tr_pond_lvl, tr_pond_topo
+         tr_iage, tr_FY, tr_lvl, tr_aero, tr_fsd, tr_iso, tr_snow, tr_pond_lvl, tr_pond_topo
     integer (kind=int_kind) :: &
          ntrcr, nt_Tsfc, nt_sice, nt_qice, nt_qsno, nt_iage, nt_fy, nt_smice, nt_smliq, nt_rhos, &
          nt_rsnw, nt_isosno, nt_isoice, nt_alvl, nt_vlvl, nt_apnd, nt_hpnd, nt_ipnd, nt_aero, nt_fsd
@@ -212,10 +212,10 @@ contains
     ! fluxes received from atmosphere
     !-----------------------------------------------------------------
     
-    zlvl_s    = c10                ! atm level height for scalars (temperature, humidity) (m)
-    zlvl_v    = c10                ! atm level height for wind        (m)
+    zlvl_s    = c2                 ! atm level height for scalars (temperature, humidity) (m)
+    zlvl_v    = c10                ! atm level height for wind (m)
     rhoa  (:) = 1.3_dbl_kind       ! air density (kg/m^3)
-    uatm  (:) = c5                 ! wind velocity    (m/s)
+    uatm  (:) = c5                 ! wind velocity (m/s)
     vatm  (:) = c5
     strax (:) = 0.05_dbl_kind
     stray (:) = 0.05_dbl_kind
@@ -223,7 +223,7 @@ contains
                                    ! fsnow must be 0 for exact restarts
     ! typical winter values
     potT  (:) = 253.0_dbl_kind  ! air potential temp (K)
-    T_air (:) = 253.0_dbl_kind  ! air temperature  (K)
+    T_air (:) = 253.0_dbl_kind  ! air temperature (K)
     Qa    (:) = 0.0006_dbl_kind ! specific humidity (kg/kg)
     swvdr (:) = c0              ! shortwave radiation (W/m^2)
     swvdf (:) = c0              ! shortwave radiation (W/m^2)
@@ -983,8 +983,6 @@ contains
     endif
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call init_fsd'//achar(27)//'[0m'
     call init_fsd
-    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call fesom_to_icepack_para'//achar(27)//'[0m'
-    call fesom_to_icepack_para() ! no atmoshperic data yet - originally fesom_to_icepack was called frank.kauker@awi.de    
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call init_state'//achar(27)//'[0m'
     call init_state(tracer)      ! initialize the ice state
     call init_history_therm      ! initialize thermo history variables

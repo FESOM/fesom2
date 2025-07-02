@@ -101,22 +101,20 @@ contains
     
     integer (kind=int_kind) :: &
          ntrcr, nt_apnd, nt_hpnd, nt_ipnd, nt_alvl, nt_vlvl, nt_Tsfc,   &
-         nt_iage, nt_FY, nt_qice, nt_sice, nt_qsno, nt_aero, nt_isosno, &
-         nt_isoice, nt_rsnw, nt_smice, nt_smliq, nt_fsd
+         nt_iage, nt_FY, nt_qice, nt_sice, nt_qsno, nt_fsd,             &
+         nt_aero, nt_isosno, nt_isoice, nt_rsnw, nt_smice, nt_smliq
     
     logical (kind=log_kind) :: &
-         tr_iage, tr_FY, tr_aero, tr_iso, calc_Tsfc, snwgrain, tr_pond, tr_pond_lvl, tr_pond_topo
+         tr_iage, tr_FY, tr_aero, tr_iso, calc_Tsfc, snwgrain
     
     real (kind=dbl_kind), dimension(n_aero,2,ncat) :: aerosno,  aeroice ! kg/m^2
         
-    real (kind=dbl_kind), dimension(n_iso,ncat) :: &
-         isosno, isoice    ! kg/m^2
+    real (kind=dbl_kind), dimension(n_iso,ncat) :: isosno, isoice       ! kg/m^2
 
-    real (kind=dbl_kind), dimension(nslyr,ncat) :: &
-         rsnwn, smicen, smliqn
+    real (kind=dbl_kind), dimension(nslyr,ncat) :: rsnwn, smicen, smliqn
     
     real (kind=dbl_kind) :: puny
-    
+
     character(len=*), parameter :: subname='(step_therm1)'
     
     !-----------------------------------------------------------------
@@ -125,32 +123,29 @@ contains
     
     call icepack_query_parameters( &
          puny_out=puny, calc_Tsfc_out=calc_Tsfc,  snwgrain_out=snwgrain)
-
     call icepack_warnings_flush(ice_stderr)
     if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
          file=__FILE__,line= __LINE__)
     
     call icepack_query_tracer_sizes(ntrcr_out=ntrcr)
-    
     call icepack_warnings_flush(ice_stderr)
     if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
          file=__FILE__,line= __LINE__)
     
     call icepack_query_tracer_flags( &
-         tr_iage_out=tr_iage, tr_FY_out=tr_FY, tr_aero_out=tr_aero, tr_pond_out=tr_pond,    &
-         tr_pond_lvl_out=tr_pond_lvl, tr_pond_topo_out=tr_pond_topo)
-
+         tr_iage_out=tr_iage, tr_FY_out=tr_FY, tr_aero_out=tr_aero,  tr_iso_out=tr_iso)
     call icepack_warnings_flush(ice_stderr)
     if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
          file=__FILE__,line= __LINE__)
     
     call icepack_query_tracer_indices( &
-         nt_apnd_out=nt_apnd, nt_hpnd_out=nt_hpnd, nt_ipnd_out=nt_ipnd, nt_alvl_out=nt_alvl, &
-         nt_vlvl_out=nt_vlvl, nt_Tsfc_out=nt_Tsfc, nt_iage_out=nt_iage, nt_FY_out=nt_FY,     &
-         nt_qice_out=nt_qice, nt_sice_out=nt_sice, nt_aero_out=nt_aero, nt_qsno_out=nt_qsno, &
-         nt_rsnw_out=nt_rsnw, nt_smice_out=nt_smice, nt_smliq_out=nt_smliq,                  &
-         nt_isosno_out=nt_isosno, nt_isoice_out=nt_isoice, nt_fsd_out=nt_fsd )
-
+         nt_apnd_out=nt_apnd, nt_hpnd_out=nt_hpnd, nt_ipnd_out=nt_ipnd,     &
+         nt_alvl_out=nt_alvl, nt_vlvl_out=nt_vlvl, nt_Tsfc_out=nt_Tsfc,     &
+         nt_iage_out=nt_iage, nt_FY_out=nt_FY,                              &
+         nt_qice_out=nt_qice, nt_sice_out=nt_sice,                          &
+         nt_aero_out=nt_aero, nt_qsno_out=nt_qsno,                          &
+         nt_rsnw_out=nt_rsnw, nt_smice_out=nt_smice, nt_smliq_out=nt_smliq, &
+         nt_isosno_out=nt_isosno, nt_isoice_out=nt_isoice, nt_fsd_out=nt_fsd)
     call icepack_warnings_flush(ice_stderr)
     if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
          file=__FILE__,line= __LINE__)
@@ -782,8 +777,8 @@ contains
     
     logical (kind=log_kind) :: &
          l_print_point,                                  & ! flag for printing debugging information
-         dEdd_algae,                                     & ! from icepack
-         modal_aero                                        ! from icepack
+         dEdd_algae                                        ! from icepack
+
     
     character(len=*), parameter :: subname='(step_radiation)'
     
@@ -800,6 +795,7 @@ contains
     allocate(nlt_zaero_sw(max_aero))
     allocate(nt_zaero(max_aero))
     allocate(nt_bgc_N(max_algae))
+    
     call icepack_query_tracer_sizes(ntrcr_out=ntrcr, nbtrcr_sw_out=nbtrcr_sw)
     call icepack_warnings_flush(ice_stderr)
     if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
@@ -822,7 +818,7 @@ contains
          file=__FILE__,line= __LINE__)
     
     call icepack_query_parameters( &
-         dEdd_algae_out=dEdd_algae, modal_aero_out=modal_aero, snwgrain_out=snwgrain )
+         dEdd_algae_out=dEdd_algae, snwgrain_out=snwgrain )
     call icepack_warnings_flush(ice_stderr)
     if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
          file=__FILE__,line= __LINE__)
@@ -928,7 +924,7 @@ contains
          delq,                                & ! specific humidity difference   (kg/kg)
          shcoef,                              & ! transfer coefficient for sensible heat
          lhcoef                                 ! transfer coefficient for latent heat
-    
+
     character(len=*), parameter :: subname='(ocean_mixed_layer)'
     character (len=100) :: value
     character (len=*), parameter :: fmt = "(f6.2)" 

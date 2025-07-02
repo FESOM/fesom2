@@ -664,10 +664,11 @@ module icedrv_main
   interface
 
      ! Read icepack namelists, setup the model parameter and write diagnostics               
-     module subroutine set_icepack(ice, partit)
+     module subroutine set_icepack(flag_debug, ice, partit)
        use mod_partit
        use MOD_ICE
-       implicit none 
+       implicit none
+       logical (kind=log_kind), intent(in) :: flag_debug
        type(t_partit), intent(inout), target :: partit
        type(t_ice), intent(inout), target :: ice
      end subroutine set_icepack
