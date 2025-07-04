@@ -3,8 +3,6 @@ name: FESOM2 CTest Framework (Native Runner)
 # Controls when the action will run
 on:
   # Triggers the workflow on push or pull request events
-  push:
-    branches: [ add_ctest_automation ]
   pull_request:
     types:
       - opened
