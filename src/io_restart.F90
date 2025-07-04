@@ -166,11 +166,6 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
          write(longname,'(A15,i4.4)') 'passive tracer ', j
          units='none'
      END SELECT
-    ! if (lwiso) then
-    !   call oce_files%def_node_var_optional('h2o18', 'h2o18 concentration', 'kmol/m**3', tracers%data(index_wiso_tracers(1))%values(:,:), mesh, partit)
-    !   call oce_files%def_node_var_optional('hDo16', 'hDo16 concentration', 'kmol/m**3', tracers%data(index_wiso_tracers(2))%values(:,:), mesh, partit)
-    !   call oce_files%def_node_var_optional('h2o16', 'h2o16 concentration', 'kmol/m**3', tracers%data(index_wiso_tracers(3))%values(:,:), mesh, partit)
-    ! end if
      if ((tracers%data(j)%ID==101) .or. (tracers%data(j)%ID==102) .or. (tracers%data(j)%ID==103)) then
         call oce_files%def_node_var_optional(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
      else
