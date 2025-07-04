@@ -12,7 +12,7 @@ nml_tracer_list =
 &tracer_init3d                            ! initial conditions for tracers
 n_ic3d   = 2                              ! number of tracers to initialize
 idlist   = 2, 1                           ! their IDs (0 is temperature, 1 is salinity, etc.). The reading order is defined here!
-filelist = 'phc3.0_winter.nc', 'phc3.0_winter.nc' ! list of files in ClimateDataPath to read (one file per tracer), same order as idlist
+filelist = 'INITIAL/WOA18/woa18_netcdf_5deg.nc', 'INITIAL/WOA18/woa18_netcdf_5deg.nc' ! list of files in ClimateDataPath to read (one file per tracer), same order as idlist
 varlist  = 'salt', 'temp'                 ! variables to read from specified files
 t_insitu = .true.                         ! if T is insitu it will be converted to potential after reading it
 /
