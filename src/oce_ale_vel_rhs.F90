@@ -1,33 +1,23 @@
+module oce_ale_vel_rhs_module
+    USE MOD_ICE
+    USE MOD_DYN
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_MESH
+    use o_ARRAYS
+    use o_PARAM
+    use g_CONFIG
+    use g_forcing_param
+    use g_forcing_arrays
+    use g_comm_auto
+    use g_sbf
+    
+    implicit none
+    
+    private
+    public :: compute_vel_rhs, momentum_adv_scalar
 
-module compute_vel_rhs_interface
-    interface
-        subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
-        USE MOD_ICE
-        USE MOD_DYN
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine compute_vel_rhs
-    end interface
-end module compute_vel_rhs_interface
-
-module momentum_adv_scalar_interface
-    interface
-        subroutine momentum_adv_scalar(dynamics, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine momentum_adv_scalar
-    end interface
-end module momentum_adv_scalar_interface
+contains
 
 !
 !
@@ -45,7 +35,6 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     use g_forcing_arrays, only: press_air
     use g_comm_auto
     use g_sbf, only: l_mslp
-    use momentum_adv_scalar_interface
     use momentum_adv_scalar_transpv_interface
     implicit none 
     type(t_ice)   , intent(inout), target :: ice
@@ -588,6 +577,5 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
 !$OMP END PARALLEL
 end subroutine momentum_adv_scalar
 
-
-! ===================================================================
+end module oce_ale_vel_rhs_module
 
