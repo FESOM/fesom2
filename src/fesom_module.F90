@@ -27,6 +27,7 @@ module fesom_main_storage_module
   use oce_setup_step_module, only: before_oce_step
   use oce_ale_module, only: oce_timestep_ale, restart_thickness_ale
   use oce_mesh_module, only: mesh_setup, check_mesh_consistency
+  use oce_dyn_module, only: compute_vel_nodes
   use fesom_version_info_module
   use command_line_options_module
   use, intrinsic :: iso_fortran_env, only : real32
