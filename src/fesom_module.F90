@@ -19,13 +19,12 @@ module fesom_main_storage_module
   use io_mesh_info
   use diagnostics
   use mo_tidal
-  use tracer_init_interface
-  use ocean_setup_interface
+  use oce_setup_step_module, only: tracer_init, ocean_setup, dynamics_init, arrays_init
   use ice_setup_interface
   use ocean2ice_interface
   use oce_fluxes_interface
   use update_atm_forcing_interface
-  use before_oce_step_interface
+  use oce_setup_step_module, only: before_oce_step
   use oce_ale_module, only: oce_timestep_ale, restart_thickness_ale
   use read_mesh_interface
   use fesom_version_info_module

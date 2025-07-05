@@ -1,80 +1,4 @@
-module oce_initial_state_interface
-    interface
-        subroutine oce_initial_state(tracers, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        type(t_tracer), intent(inout), target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh),   intent(in)  ,  target :: mesh
-        end subroutine oce_initial_state
-    end interface
-end module oce_initial_state_interface
-
-module tracer_init_interface
-    interface
-        subroutine tracer_init(tracers, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        type(t_tracer), intent(inout), target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh),   intent(in)  ,  target :: mesh
-        end subroutine tracer_init
-    end interface
-end module tracer_init_interface
-
-module dynamics_init_interface
-    interface
-        subroutine dynamics_init(dynamics, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine dynamics_init
-    end interface
-end module dynamics_init_interface
-
-module ocean_setup_interface
-    interface
-        subroutine ocean_setup(dynamics, tracers, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        use MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_tracer), intent(inout), target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout)   , target :: mesh
-        end subroutine ocean_setup
-    end interface
-end module ocean_setup_interface
-
-module before_oce_step_interface
-    interface
-        subroutine before_oce_step(dynamics, tracers, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        use MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_tracer), intent(inout), target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine before_oce_step
-    end interface
-end module before_oce_step_interface
-!
-!
-!_______________________________________________________________________________
-subroutine ocean_setup(dynamics, tracers, partit, mesh)
+module oce_setup_step_module
     USE MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -92,10 +16,20 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     use g_backscatter
     use Toy_Channel_Soufflet
     use Toy_Channel_Dbgyre
-    use oce_initial_state_interface
-    use oce_adv_tra_fct_interfaces
     use oce_ale_module, only: init_ale, init_thickness_ale, init_stiff_mat_ale
-    IMPLICIT NONE
+    use oce_adv_tra_fct_interfaces
+    
+    implicit none
+    
+    private
+    public :: oce_initial_state, tracer_init, dynamics_init, ocean_setup, before_oce_step, arrays_init
+
+contains
+
+!===============================================================================
+! Ocean setup subroutine
+!===============================================================================
+subroutine ocean_setup(dynamics, tracers, partit, mesh)
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_tracer), intent(inout), target :: tracers
     type(t_partit), intent(inout), target :: partit
@@ -1398,3 +1332,5 @@ SUBROUTINE before_oce_step(dynamics, tracers, partit, mesh)
         END SELECT
     end if
 END SUBROUTINE before_oce_step
+
+end module oce_setup_step_module
