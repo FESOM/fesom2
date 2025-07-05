@@ -26,7 +26,7 @@ module fesom_main_storage_module
   use oce_fluxes_interface
   use update_atm_forcing_interface
   use before_oce_step_interface
-  use oce_timestep_ale_interface
+  use oce_ale_module, only: oce_timestep_ale, restart_thickness_ale
   use read_mesh_interface
   use fesom_version_info_module
   use command_line_options_module

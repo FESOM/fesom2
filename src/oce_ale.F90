@@ -7,13 +7,6 @@ module oce_ale_module
   USE o_ARRAYS
   USE g_config
   USE g_forcing_param, only: use_virt_salt
-!  use oce_ale_interfaces
-!  use init_ale_interface
-!  use init_thickness_ale_interface
-!  use oce_timestep_ale_interface
-!  use compute_CFLz_interface
-!  use compute_Wvel_split_interface
-!  use compute_vert_vel_transpv_interface
 
   implicit none
 
@@ -62,7 +55,6 @@ subroutine init_ale(dynamics, partit, mesh)
     USE g_config, only: which_ale, use_cavity, use_partial_cell, ib_async_mode
 
     USE g_forcing_param, only: use_virt_salt
-    !use oce_ale_interfaces
     Implicit NONE
      
 ! kh 18.03.21
@@ -1951,8 +1943,6 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     use g_comm_auto
     use io_RESTART !!PS
     use g_forcing_arrays !!PS
-    !use compute_Wvel_split_interface
-    !use compute_CFLz_interface
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -2521,8 +2511,6 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
     use o_ARRAYS, only: water_flux
     use g_config, only: dt, which_ale
     use g_comm_auto
-    !use compute_Wvel_split_interface
-    !use compute_CFLz_interface
     implicit none
     !___________________________________________________________________________
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -3159,8 +3147,6 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     use g_cvmix_kpp
     use g_cvmix_tidal
     use Toy_Channel_Soufflet
-    !use oce_ale_interfaces
-    !use compute_vert_vel_transpv_interface
     use compute_ssh_split_explicit_interface
     use pressure_bv_interface
     use pressure_force_4_linfs_interface

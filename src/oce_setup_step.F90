@@ -94,8 +94,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     use Toy_Channel_Dbgyre
     use oce_initial_state_interface
     use oce_adv_tra_fct_interfaces
-    use init_ale_interface
-    use init_thickness_ale_interface
+    use oce_ale_module, only: init_ale, init_thickness_ale, init_stiff_mat_ale
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_tracer), intent(inout), target :: tracers
