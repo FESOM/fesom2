@@ -26,7 +26,7 @@ module fesom_main_storage_module
   use update_atm_forcing_interface
   use oce_setup_step_module, only: before_oce_step
   use oce_ale_module, only: oce_timestep_ale, restart_thickness_ale
-  use read_mesh_interface
+  use oce_mesh_module, only: mesh_setup, check_mesh_consistency
   use fesom_version_info_module
   use command_line_options_module
   use, intrinsic :: iso_fortran_env, only : real32
