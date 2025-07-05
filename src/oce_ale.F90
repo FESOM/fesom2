@@ -3152,7 +3152,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     use pressure_force_4_linfs_interface
     use pressure_force_4_zxxxx_interface
     use compute_vel_rhs_interface
-    use solve_tracers_ale_interface
+    use oce_ale_tracer_module, only: solve_tracers_ale
     use write_step_info_interface
     use check_blowup_interface
     use fer_solve_interface
