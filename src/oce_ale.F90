@@ -7,6 +7,8 @@ module oce_ale_module
   USE o_ARRAYS
   USE g_config
   USE g_forcing_param, only: use_virt_salt
+  use solver_module, only: ssh_solve_preconditioner, ssh_solve_cg
+  use oce_dyn_module, only: viscosity_filter, update_vel, compute_apegen, check_viscopt, compute_ke_wrho
 
   implicit none
 
@@ -2886,7 +2888,6 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     USE MOD_DYN
     use g_comm_auto
     use g_config, only: which_ale
-    use solver_module, only: ssh_solve_preconditioner, ssh_solve_cg
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
