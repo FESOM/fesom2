@@ -2886,8 +2886,7 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     USE MOD_DYN
     use g_comm_auto
     use g_config, only: which_ale
-    use ssh_solve_preconditioner_interface
-    use ssh_solve_cg_interface
+    use solver_module, only: ssh_solve_preconditioner, ssh_solve_cg
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
