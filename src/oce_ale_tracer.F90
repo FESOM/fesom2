@@ -43,7 +43,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use o_ARRAYS, only: heat_flux
     use g_forcing_arrays, only: sw_3d
     ! diff_tracers_ale is now in the same module
-    use oce_adv_tra_driver_interfaces
+    use oce_adv_tra_driver_module, only: do_oce_adv_tra
 #if defined(__recom)
     use recom_glovar
     use recom_config
