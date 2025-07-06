@@ -1,73 +1,23 @@
 !===============================================================================================================================
 !**************** routines for horizontal tracer advection ***********************
-module oce_adv_tra_hor_interfaces
-  interface
+module oce_adv_tra_hor_module
+  use MOD_MESH
+  use MOD_TRACER
+  USE MOD_PARTIT
+  USE MOD_PARSUP
+  use g_comm_auto
+  use O_PARAM, only: r_earth
+  implicit none
+  private
+  public :: adv_tra_hor_upw1, adv_tra_hor_muscl, adv_tra_hor_mfct
+contains
 ! (low order upwind)
 ! returns flux given at edges which contributes with
 ! plus sign into 1st. node and with the minus sign into the 2nd node
 ! IF init_zero=.TRUE.  : flux will be set to zero before computation
 ! IF init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-    subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
-      use MOD_MESH
-      use MOD_TRACER
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_partit),intent(in), target :: partit
-      type(t_mesh),  intent(in), target :: mesh
-      real(kind=WP), intent(in)         :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
-      real(kind=WP), intent(inout)      :: flux(  mesh%nl-1, partit%myDim_edge2D)
-      logical, optional                 :: o_init_zero
-    end subroutine adv_tra_hor_upw1
-!===============================================================================
-! MUSCL
-! returns flux given at edges which contributes with
-! plus sign into 1st. node and with the minus sign into the 2nd node
-! IF init_zero=.TRUE.  : flux will be set to zero before computation
-! IF init_zero=.FALSE. : flux=flux-input flux
-! flux is not multiplied with dt
-    subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad, nboundary_lay, o_init_zero)
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_partit),intent(in), target :: partit
-      type(t_mesh),  intent(in), target :: mesh
-      real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
-      real(kind=WP), intent(in)         :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
-      real(kind=WP), intent(inout)      :: flux(  mesh%nl-1, partit%myDim_edge2D)
-      integer,       intent(in)         :: nboundary_lay(partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, partit%myDim_edge2D)
-      logical, optional                 :: o_init_zero
-    end subroutine adv_tra_hor_muscl
-! a not stable version of MUSCL (reconstruction in the vicinity of bottom topography is not upwind)
-! it runs with FCT option only
-    subroutine adv_tra_hor_mfct(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad,                 o_init_zero)
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_partit),intent(inout), target :: partit
-      type(t_mesh),  intent(in), target :: mesh
-      real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
-      real(kind=WP), intent(in)         :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
-      real(kind=WP), intent(inout)      :: flux(  mesh%nl-1, partit%myDim_edge2D)
-      real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, partit%myDim_edge2D)
-      logical, optional                 :: o_init_zero
-    end subroutine adv_tra_hor_mfct
-  end interface
-end module oce_adv_tra_hor_interfaces
-!
-!
-!===============================================================================
-subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
-    use MOD_MESH
-    use O_PARAM, only: r_earth
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use g_comm_auto
-    implicit none
+  subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
     type(t_partit),intent(in), target :: partit
     type(t_mesh),  intent(in), target :: mesh
     real(kind=WP), intent(in)         :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
@@ -255,17 +205,15 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
 #else
     !$ACC END PARALLEL LOOP
 #endif
-end subroutine adv_tra_hor_upw1
-!
-!
+  end subroutine adv_tra_hor_upw1
 !===============================================================================
-subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad, nboundary_lay, o_init_zero)
-    use MOD_MESH
-    use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use g_comm_auto
-    implicit none
+! MUSCL
+! returns flux given at edges which contributes with
+! plus sign into 1st. node and with the minus sign into the 2nd node
+! IF init_zero=.TRUE.  : flux will be set to zero before computation
+! IF init_zero=.FALSE. : flux=flux-input flux
+! flux is not multiplied with dt
+  subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad, nboundary_lay, o_init_zero)
     type(t_partit),intent(in), target :: partit
     type(t_mesh),  intent(in), target :: mesh
     real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
@@ -540,17 +488,11 @@ subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_g
     end do
 !$OMP END DO
 !$OMP END PARALLEL
-end subroutine adv_tra_hor_muscl
+  end subroutine adv_tra_hor_muscl
 !
 !
 !===============================================================================
-    subroutine adv_tra_hor_mfct(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad,                 o_init_zero)
-    use MOD_MESH
-    use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use g_comm_auto
-    implicit none
+  subroutine adv_tra_hor_mfct(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad,                 o_init_zero)
     type(t_partit),intent(inout), target :: partit
     type(t_mesh),  intent(in), target :: mesh
     real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
@@ -832,4 +774,6 @@ end subroutine adv_tra_hor_muscl
 #else
     !$ACC END PARALLEL LOOP
 #endif 
-end subroutine adv_tra_hor_mfct
+  end subroutine adv_tra_hor_mfct
+
+end module oce_adv_tra_hor_module

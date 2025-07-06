@@ -6,8 +6,8 @@ module oce_adv_tra_driver_module
     USE MOD_DYN
     use g_comm_auto
     use diagnostics
-    use oce_adv_tra_hor_interfaces
-    use oce_adv_tra_ver_interfaces
+    use oce_adv_tra_hor_module
+    use oce_adv_tra_ver_module
     use oce_adv_tra_fct_module, only: oce_tra_adv_fct
     
     implicit none
@@ -28,8 +28,8 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     USE MOD_DYN
     use g_comm_auto
     use diagnostics, only: ldiag_DVD
-    use oce_adv_tra_hor_interfaces
-    use oce_adv_tra_ver_interfaces
+    use oce_adv_tra_hor_module
+    use oce_adv_tra_ver_module
     use oce_adv_tra_fct_module, only: oce_tra_adv_fct
     ! oce_tra_adv_flux2dtracer is now in the same module
     implicit none
