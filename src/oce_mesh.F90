@@ -4,7 +4,6 @@ module oce_mesh_module
     USE MOD_PARSUP
     USE g_config, only: flag_debug
     USE g_ROTATE_grid
-    use par_support_interfaces
     
     implicit none
     

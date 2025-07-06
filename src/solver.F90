@@ -4,6 +4,7 @@ module solver_module
     USE MOD_PARSUP
     USE MOD_DYN
     USE g_comm_auto
+    USE MOD_PARSUP
     
     implicit none
     
