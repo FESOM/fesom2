@@ -3152,8 +3152,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     use compute_ssh_split_explicit_interface
     use oce_ale_vel_rhs_module, only: compute_vel_rhs
     use oce_ale_tracer_module, only: solve_tracers_ale
-    use write_step_info_interface
-    use check_blowup_interface
+    use write_step_info_module
     use fer_solve_interface
     use impl_vert_visc_ale_vtransp_interface
     
