@@ -1,36 +1,17 @@
-module oce_adv_tra_fct_interfaces
-  interface
-    subroutine oce_adv_tra_fct_init(twork, partit, mesh)
-      use MOD_MESH
-      use MOD_TRACER
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),  intent(in),    target        :: mesh
-      type(t_partit),intent(inout), target        :: partit
-      type(t_tracer_work), intent(inout), target  :: twork
-    end subroutine oce_adv_tra_fct_init
+module oce_adv_tra_fct_module
+  use MOD_MESH
+  use MOD_TRACER
+  USE MOD_PARTIT
+  USE MOD_PARSUP
+  USE g_comm_auto
+  
+  implicit none
+  
+  private
+  public :: oce_adv_tra_fct_init, oce_tra_adv_fct
 
-    subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, AUX, partit, mesh)
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      real(kind=WP), intent(in),    target :: dt
-      type(t_partit),intent(inout), target :: partit
-      type(t_mesh),  intent(in),    target :: mesh
-      real(kind=WP), intent(inout)      :: fct_ttf_min(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(inout)      :: fct_ttf_max(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(in)         :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(in)         :: lo (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(inout)      :: adf_h(mesh%nl-1, partit%myDim_edge2D)
-      real(kind=WP), intent(inout)      :: adf_v(mesh%nl,   partit%myDim_nod2D)
-      real(kind=WP), intent(inout)      :: fct_plus(mesh%nl-1, partit%myDim_nod2D)
-      real(kind=WP), intent(inout)      :: fct_minus(mesh%nl,  partit%myDim_nod2D)
-      real(kind=WP), intent(inout)      :: AUX(:,:,:) !a large auxuary array
-    end subroutine oce_tra_adv_fct
- end interface
-end module oce_adv_tra_fct_interfaces
-!
-!
+contains
+
 !===============================================================================
 subroutine oce_adv_tra_fct_init(twork, partit, mesh)
     use MOD_MESH
@@ -498,3 +479,5 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 !$ACC END DATA
 #endif
 end subroutine oce_tra_adv_fct
+
+end module oce_adv_tra_fct_module

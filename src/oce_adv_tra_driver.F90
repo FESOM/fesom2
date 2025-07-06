@@ -8,7 +8,7 @@ module oce_adv_tra_driver_module
     use diagnostics
     use oce_adv_tra_hor_interfaces
     use oce_adv_tra_ver_interfaces
-    use oce_adv_tra_fct_interfaces
+    use oce_adv_tra_fct_module, only: oce_tra_adv_fct
     
     implicit none
     
@@ -30,7 +30,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     use diagnostics, only: ldiag_DVD
     use oce_adv_tra_hor_interfaces
     use oce_adv_tra_ver_interfaces
-    use oce_adv_tra_fct_interfaces
+    use oce_adv_tra_fct_module, only: oce_tra_adv_fct
     ! oce_tra_adv_flux2dtracer is now in the same module
     implicit none
     real(kind=WP),  intent(in),    target :: dt
