@@ -9,6 +9,8 @@ module oce_ale_module
   USE g_forcing_param, only: use_virt_salt
   use solver_module, only: ssh_solve_preconditioner, ssh_solve_cg
   use oce_dyn_module, only: viscosity_filter, update_vel, compute_apegen, check_viscopt, compute_ke_wrho
+  use oce_ale_pressure_bv_module, only: pressure_bv, pressure_force_4_linfs, pressure_force_4_zxxxx, &
+                                        sw_alpha_beta, compute_neutral_slope, compute_sigma_xy
 
   implicit none
 
@@ -3148,9 +3150,6 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     use g_cvmix_tidal
     use Toy_Channel_Soufflet
     use compute_ssh_split_explicit_interface
-    use pressure_bv_interface
-    use pressure_force_4_linfs_interface
-    use pressure_force_4_zxxxx_interface
     use oce_ale_vel_rhs_module, only: compute_vel_rhs
     use oce_ale_tracer_module, only: solve_tracers_ale
     use write_step_info_interface

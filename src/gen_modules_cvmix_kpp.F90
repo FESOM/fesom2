@@ -33,6 +33,7 @@ module g_cvmix_kpp
     use g_forcing_arrays
     use g_support
     use o_mixing_KPP_mod
+    use oce_ale_pressure_bv_module, only: densityJM_components
     implicit none
     
     !___Parameter for the init of KPP___________________________________________
@@ -431,8 +432,8 @@ module g_cvmix_kpp
                     ! oce_ale_pressure_bf.F90 --> subroutine pressure_bv 
                     ! --> dbsfc(nz,node)
                     !!PS call densityJM_components(temp(1,node), salt(1,node), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot, mesh)
-                    call densityJM_components(temp(nun,node), salt(nun,node), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot, mesh)
-                    call densityJM_components(temp(nz, node), salt(nz, node), bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)                    
+                    call densityJM_components(temp(nun,node), salt(nun,node), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot)
+                    call densityJM_components(temp(nz, node), salt(nz, node), bulk_0, bulk_pz, bulk_pz2, rhopot)                    
                     rho_nz  = bulk_0   + Z_3d_n(nz,node)*(bulk_pz   + Z_3d_n(nz,node)*bulk_pz2)
                     rho_nz  = rho_nz*rhopot/(rho_nz+0.1_WP*Z_3d_n(nz,node))-density_0
                     rho_sfc = sfc_bulk_0   + Z_3d_n(nz,node)*(sfc_bulk_pz   + Z_3d_n(nz,node)*sfc_bulk_pz2)
@@ -489,8 +490,8 @@ module g_cvmix_kpp
                     ! --> bring density of surface point adiabatically to the same 
                     !     depth level as the deep point --> than calculate bouyancy 
                     !     difference
-                    call densityJM_components(sfc_temp, sfc_salt, sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot, mesh)
-                    call densityJM_components(temp(nz,node), salt(nz,node), bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)                    
+                    call densityJM_components(sfc_temp, sfc_salt, sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot)
+                    call densityJM_components(temp(nz,node), salt(nz,node), bulk_0, bulk_pz, bulk_pz2, rhopot)                    
                     rho_nz  = bulk_0   + Z_3d_n(nz,node)*(bulk_pz   + Z_3d_n(nz,node)*bulk_pz2)
                     rho_nz  = rho_nz*rhopot/(rho_nz+0.1_WP*Z_3d_n(nz,node))-density_0
                     rho_sfc = sfc_bulk_0   + Z_3d_n(nz,node)*(sfc_bulk_pz   + Z_3d_n(nz,node)*sfc_bulk_pz2)
