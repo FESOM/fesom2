@@ -14,7 +14,7 @@ module write_step_info_interface
       type(t_tracer), intent(in)   , target :: tracers
       type(t_dyn)   , intent(in)   , target :: dynamics
       type(t_ice)   , intent(in)   , target :: ice
-    end subroutine
+    end subroutine write_step_info
     subroutine write_enegry_info(dynamics, partit, mesh)
       use MOD_MESH
       USE MOD_PARTIT
@@ -24,9 +24,9 @@ module write_step_info_interface
       type(t_mesh),   intent(in)   , target :: mesh
       type(t_partit), intent(inout), target :: partit
       type(t_dyn)   , intent(in)   , target :: dynamics
-    end subroutine
+    end subroutine write_enegry_info
   end interface
-end module
+end module write_step_info_interface
 module check_blowup_interface
   interface
     subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
@@ -42,9 +42,9 @@ module check_blowup_interface
       type(t_tracer), intent(in),    target :: tracers
       type(t_dyn)   , intent(in)   , target :: dynamics
       type(t_ice)   , intent(in)   , target :: ice
-    end subroutine
+    end subroutine check_blowup
   end interface
-end module
+end module check_blowup_interface
 !
 !
 !===============================================================================
@@ -692,7 +692,7 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
         if (mype==0) write(*,*) ' --> finished writing blow up file'
         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
     endif 
-end subroutine
+end subroutine check_blowup
 !===============================================================================
 subroutine write_enegry_info(dynamics, partit, mesh)
    use MOD_MESH
@@ -746,4 +746,4 @@ subroutine write_enegry_info(dynamics, partit, mesh)
    call integrate_elem(dynamics%ke_drag_xVEL(2,:),  budget(2), partit, mesh)
    if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. drag=', budget(1), ' | ', budget(2), ' | ', sum(budget)
    if (mype==0) write(*,*) '***********************************'   
-end subroutine
+end subroutine write_enegry_info

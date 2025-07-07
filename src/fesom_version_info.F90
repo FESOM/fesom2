@@ -9,6 +9,6 @@ contains
     character(:), allocatable :: x
     ! EO args
     x = "@FESOM_GIT_SHA@"
-  end function
+  end function fesom_git_sha
 
-end module
+end module fesom_version_info_module

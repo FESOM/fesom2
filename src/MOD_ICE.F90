@@ -532,9 +532,9 @@ module ice_init_interface
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine ice_init
     end interface
-end module
+end module ice_init_interface
 !
 !
 !_______________________________________________________________________________
