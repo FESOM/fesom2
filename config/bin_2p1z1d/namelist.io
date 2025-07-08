@@ -12,7 +12,7 @@ ldiag_extflds    =.false.
 /
 
 &nml_general
-io_listsize    =100 !number of streams to allocate. shallbe large or equal to the number of streams in &nml_list
+io_listsize    =150 !number of streams to allocate. shallbe large or equal to the number of streams in &nml_list
 vec_autorotate =.false.
 /
 
@@ -40,11 +40,11 @@ io_list =  'sst       ',1, 'm', 4,
            'otracers  ',1, 'm', 4,
            'N2        ',1, 'y', 4,
            'Kv        ',1, 'y', 4,
-           'u         ',1, 'y', 4,
-           'v         ',1, 'y', 4,
-           'unod      ',1, 'y', 4,
-           'vnod      ',1, 'y', 4,
-           'w         ',1, 'y', 4,
+           'u         ',1, 'm', 4,
+           'v         ',1, 'm', 4,
+           'unod      ',1, 'm', 4,
+           'vnod      ',1, 'm', 4,
+           'w         ',1, 'm', 4,
            'Av        ',1, 'y', 4,
            'bolus_u   ',1, 'y', 4,
            'bolus_v   ',1, 'y', 4,

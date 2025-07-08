@@ -149,28 +149,36 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(NPPn    ( node_size ))
     allocate(NPPd    ( node_size ))
     allocate(NPPc    ( node_size ))
+    allocate(NPPp    ( node_size ))
     allocate(GPPn    ( node_size ))
     allocate(GPPd    ( node_size ))
     allocate(GPPc    ( node_size ))
+    allocate(GPPp    ( node_size ))
     allocate(NNAn    ( node_size ))
     allocate(NNAd    ( node_size ))
     allocate(NNAc    ( node_size ))
+    allocate(NNAp    ( node_size ))
     allocate(Chldegn ( node_size ))
     allocate(Chldegd ( node_size ))
     allocate(Chldegc ( node_size ))
+    allocate(Chldegp ( node_size ))
 
     NPPn    = 0.d0
     NPPd    = 0.d0
     NPPc    = 0.d0
+    NPPp    = 0.d0
     GPPn    = 0.d0
     GPPd    = 0.d0
     GPPc    = 0.d0
+    GPPp    = 0.d0
     NNAn    = 0.d0
     NNAd    = 0.d0
     NNAc    = 0.d0
+    NNAp    = 0.d0
     Chldegn = 0.d0
     Chldegd = 0.d0
     Chldegc = 0.d0
+    Chldegp = 0.d0
 
 !! *** Allocate 3D diagnostics ***
     allocate(respmeso     ( nl-1, node_size ))
@@ -181,15 +189,19 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(aggn         ( nl-1, node_size ))
     allocate(aggd         ( nl-1, node_size ))
     allocate(aggc         ( nl-1, node_size ))
+    allocate(aggp         ( nl-1, node_size ))
     allocate(docexn       ( nl-1, node_size ))
     allocate(docexd       ( nl-1, node_size ))
     allocate(docexc       ( nl-1, node_size ))
+    allocate(docexp       ( nl-1, node_size ))
     allocate(respn        ( nl-1, node_size ))
     allocate(respd        ( nl-1, node_size ))
     allocate(respc        ( nl-1, node_size ))
+    allocate(respp        ( nl-1, node_size ))
     allocate(NPPn3D       ( nl-1, node_size ))
     allocate(NPPd3D       ( nl-1, node_size ))
     allocate(NPPc3D       ( nl-1, node_size ))
+    allocate(NPPp3D       ( nl-1, node_size ))
 
     respmeso     = 0.d0
     respmacro    = 0.d0
@@ -199,15 +211,78 @@ subroutine recom_init(tracers, partit, mesh)
     aggn         = 0.d0
     aggd         = 0.d0
     aggc         = 0.d0
+    aggp         = 0.d0
     docexn       = 0.d0
     docexd       = 0.d0
     docexc       = 0.d0
+    docexp       = 0.d0
     respn        = 0.d0
     respd        = 0.d0
     respc        = 0.d0
+    respp        = 0.d0
     NPPn3D       = 0.d0
     NPPd3D       = 0.d0
     NPPc3D       = 0.d0
+    NPPp3D       = 0.d0
+
+!! From Hannahs new temperature function (not sure if needed as diagnostic):
+
+  allocate(TTemp_diatoms  (nl-1,node_size))
+  allocate(TTemp_phyto    (nl-1,node_size))
+  allocate(TTemp_cocco    (nl-1,node_size))
+  allocate(TTemp_phaeo    (nl-1,node_size))
+
+  TTemp_diatoms  (:,:) = 0.d0
+  TTemp_phyto    (:,:) = 0.d0
+  TTemp_cocco    (:,:) = 0.d0
+  TTemp_phaeo    (:,:) = 0.d0
+
+  allocate(TPhyCO2        (nl-1,node_size))
+  allocate(TDiaCO2        (nl-1,node_size))
+  allocate(TCoccoCO2      (nl-1,node_size))
+  allocate(TPhaeoCO2      (nl-1,node_size))
+
+  TPhyCO2        (:,:) = 0.d0
+  TDiaCO2        (:,:) = 0.d0
+  TCoccoCO2      (:,:) = 0.d0
+  TPhaeoCO2      (:,:) = 0.d0
+
+  allocate(TqlimitFac_phyto     (nl-1,node_size))
+  allocate(TqlimitFac_diatoms   (nl-1,node_size))
+  allocate(TqlimitFac_cocco     (nl-1,node_size))
+  allocate(TqlimitFac_phaeo     (nl-1,node_size))
+
+  TqlimitFac_phyto      (:,:) = 0.d0
+  TqlimitFac_diatoms    (:,:) = 0.d0
+  TqlimitFac_cocco      (:,:) = 0.d0
+  TqlimitFac_phaeo      (:,:) = 0.d0
+
+
+  allocate(TCphotLigLim_diatoms    (nl-1,node_size))
+  allocate(TCphotLigLim_phyto      (nl-1,node_size))
+  allocate(TCphotLigLim_cocco      (nl-1,node_size))
+  allocate(TCphotLigLim_phaeo      (nl-1,node_size))
+
+
+  TCphotLigLim_diatoms  (:,:) = 0.d0
+  TCphotLigLim_phyto    (:,:) = 0.d0
+  TCphotLigLim_cocco    (:,:) = 0.d0
+  TCphotLigLim_phaeo    (:,:) = 0.d0
+
+  allocate(TCphot_diatoms       (nl-1,node_size))
+  allocate(TCphot_phyto         (nl-1,node_size))
+  allocate(TCphot_cocco         (nl-1,node_size))
+  allocate(TCphot_phaeo         (nl-1,node_size))
+
+  TCphot_diatoms        (:,:) = 0.d0
+  TCphot_phyto          (:,:) = 0.d0
+  TCphot_cocco          (:,:) = 0.d0
+  TCphot_phaeo          (:,:) = 0.d0
+
+  allocate(TSi_assimDia         (nl-1,node_size))
+
+  TSi_assimDia          (:,:) = 0.d0
+
     end if
 
 !! *** Allocate 3D mocsy ***
@@ -326,7 +401,7 @@ subroutine recom_init(tracers, partit, mesh)
             tracers%data(i)%values(:,:) = tiny                     ! DetCalc
 
 ! *******************
-! CASE 2phy 2zoo 2det
+! CASE 2phy 3zoo 2det
 ! *******************
 #if defined (__3Zoo2Det)
         CASE (1023)
@@ -344,7 +419,7 @@ subroutine recom_init(tracers, partit, mesh)
 #endif
 
 ! *******************
-! CASE 3phy 2zoo 2det
+! CASE 4phy 3zoo 2det
 ! *******************
 #if defined (__coccos) & defined (__3Zoo2Det)
         CASE (1029)
@@ -356,8 +431,19 @@ subroutine recom_init(tracers, partit, mesh)
         CASE (1031)
             tracers%data(i)%values(:,:) = tiny_chl                 ! CoccoChl
 
+        CASE (1032)
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max       ! PhaeoN
+
+        CASE (1033)
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax ! PhaeoC
+
+        CASE (1034)
+            tracers%data(i)%values(:,:) = tiny_chl                 ! PhaeoChl
+
+
+
 ! *******************
-! CASE 3phy 1zoo 1det
+! CASE 4phy 1zoo 1det
 ! *******************
 #elif defined (__coccos) & !defined (__3Zoo2Det)
         CASE (1023)
@@ -369,16 +455,25 @@ subroutine recom_init(tracers, partit, mesh)
         CASE (1025)
             tracers%data(i)%values(:,:) = tiny_chl                 ! CoccoChl
 
+        CASE (1026)
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max       ! PhaeoN
+
+        CASE (1027)
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax ! PhaeoC
+
+        CASE (1028)
+            tracers%data(i)%values(:,:) = tiny_chl                 ! PhaeoChl
+
 #endif
 
 ! *******************
-! CASE 3phy 3zoo 2det
+! CASE 4phy 3zoo 2det
 ! *******************
 #if defined (__coccos) & defined (__3Zoo2Det)
-        CASE (1032)
+        CASE (1035)
             tracers%data(i)%values(:,:) = tiny                     ! Zoo3N
 
-        CASE (1033)
+        CASE (1036)
             tracers%data(i)%values(:,:) = tiny * Redfield          ! Zoo3C
 
 #elif !defined (__coccos) & defined (__3Zoo2Det)

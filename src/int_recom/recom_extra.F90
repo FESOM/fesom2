@@ -28,8 +28,13 @@ subroutine Depth_calculations(n, nn, wf, zf, thick, recipthick, partit, mesh)
     real(kind=8), dimension(mesh%nl-1), intent(out)  :: thick       ! [m] Distance between two nodes = layer thickness
     real(kind=8), dimension(mesh%nl-1), intent(out)  :: recipthick  ! [1/m] Reciprocal thickness
 
+<<<<<<< HEAD
     ! Local variables
     integer                                          :: k           ! Layer index
+=======
+  real(kind=8),dimension(mesh%nl,6), intent(out)    :: wF             ! [m/day] Velocities of fluxes at the border of the control volumes
+  Integer                                           :: k, n           ! Index for depth      
+>>>>>>> origin/fesom2.6_recom_tra_diags
 
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
@@ -56,9 +61,21 @@ subroutine Depth_calculations(n, nn, wf, zf, thick, recipthick, partit, mesh)
     wf(2:nn, ivdetsc) = VDet_zoo2 ! Second detritus sinking velocity
     wf(2:nn, ivcoc)   = VCocco    ! Coccolithophores sinking velocity
 
+<<<<<<< HEAD
     !! Boundary conditions (surface and bottom)
     wf(1,:)          = 0.d0
     wf(nn+1,:)       = 0.d0
+=======
+  wF(2:Nn,ivphy)   = VPhy  
+  wF(2:Nn,ivdia)   = VDia
+  wF(2:Nn,ivdet)   = VDet
+  wF(2:Nn,ivdetsc) = VDet_zoo2
+  wF(2:Nn,ivcoc)   = VCocco
+  wF(2:Nn,ivpha)   = VPhaeo
+
+  wF(1,:)          = 0.d0
+  wF(Nn+1,:)       = 0.d0
+>>>>>>> origin/fesom2.6_recom_tra_diags
 
 !if (allow_var_sinking) then
 !!    wF(2:Nn+1,ivdet) = Vdet_a * abs(zbar_n(2:Nn+1)) + VDet

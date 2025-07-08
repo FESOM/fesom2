@@ -13,27 +13,29 @@ nm_co2_data_file      ='/albedo/work/projects/p_pool_recom/input/mesh_CORE2_fina
 use_REcoM             =.true.
 REcoM_restart         =.true.
 
-bgc_num               = 30 !22 !33 !24 !38
-diags3d_num           = 28          ! Number of diagnostic 3d tracers to be saved
+bgc_num               = 36 !33 !30 !22 !33 !24 !38
+diags3d_num           = 31          ! Number of diagnostic 3d tracers to be saved
 bgc_base_num          = 22          ! standard tracers
 VDet                  = 20.d0       ! Sinking velocity, constant through the water column and positive downwards
 VDet_zoo2             = 200.d0      ! Sinking velocity, constant through the water column
 VPhy                  = 0.d0        !!! If the number of sinking velocities are different from 3, code needs to be changed !!!
 VDia                  = 0.d0
-VCocco	       	      = 0.d0       
+VCocco	       	      = 0.d0      
+VPhaeo                = 0.d0 
 allow_var_sinking     = .true.   
 biostep               = 1           ! Number of times biology should be stepped forward for each time step		 
 REcoM_Geider_limiter  = .false.     ! Decides what routine should be used to calculate limiters in sms
 REcoM_Grazing_Variable_Preference = .true. ! Decides if grazing should have preference for phyN or DiaN 
 Grazing_detritus      = .true.
+!TIRPS                 = .false.    ! Temperature induced reduction in photosynthesis for phytoplankton
 het_resp_noredfield   = .true.    ! Decides respiratation of copepod group
 diatom_mucus          = .true.    ! Decides nutrient limitation effect on aggregation
-O2dep_remin           = .false.    ! O2remin Add option for O2 dependency of organic matter remineralization
-use_ballasting        = .false.    ! BALL
-use_density_scaling   = .false.    ! BALL
-use_viscosity_scaling = .false.    ! BALL
-OmegaC_diss           = .false.    ! DISS Use OmegaC from Mocsy to compute calcite dissolution (after Aumont et al. 2015 and Gehlen et al. 2007)
-CO2lim                = .false.    ! CO2 dependence of growth and calcification
+O2dep_remin           = .true.    ! O2remin Add option for O2 dependency of organic matter remineralization
+use_ballasting        = .true.    ! BALL
+use_density_scaling   = .true.    ! BALL
+use_viscosity_scaling = .true.    ! BALL
+OmegaC_diss           = .true.    ! DISS Use OmegaC from Mocsy to compute calcite dissolution (after Aumont et al. 2015 and Gehlen et al. 2007)
+CO2lim                = .true.    ! CO2 dependence of growth and calcification
 Diags                 = .true.
 constant_CO2          = .true.
 UseFeDust             = .true.      ! Turns dust input of iron off when set to.false.
@@ -49,11 +51,7 @@ useErosion            = .false.
 NitrogenSS            = .false.     ! When set to true, external sources and sinks of nitrogen are activated (Riverine, aeolian and denitrification)
 useAeolianN           = .false.      ! When set to true, aeolian nitrogen deposition is activated
 firstyearoffesomcycle = 1958        ! The first year of the actual physical forcing (e.g. JRA-55) used
-<<<<<<< HEAD
-lastyearoffesomcycle  = 2023        ! Last year of the actual physical forcing used
-=======
 lastyearoffesomcycle  = 2024        ! Last year of the actual physical forcing used
->>>>>>> origin/fesom2.6_recom_tra_diags
 numofCO2cycles        = 1           ! Number of cycles of the forcing planned 
 currentCO2cycle       = 1           ! Which CO2 cycle we are currently running
 DIC_PI                = .true.
@@ -84,8 +82,26 @@ cZoo2N                = 0.2d0
 recom_Tref            = 288.15d0    ! [K]
 C2K                   = 273.15d0    ! Conversion from degrees C to K
 Ae                    = 4500.d0     ! [K] Slope of the linear part of the Arrhenius function
+Tmax_phaeo            = 16d0        ! [°C] For Blanchard temp fxn: maximum temperature
+Topt_phaeo            = 6.7982d0    ! [°C] For Blanchard temp fxn: optimum temperature
+uopt_phaeo            = 0.6903d0    ! [1/day] For Blanchard temp fxn: optimum growth rate
+beta_phaeo            = 0.7114d0    ! [unitless] For Blanchard temp fxn
+ord_d                 = -0.2216d0   ! diatom ordonnée
+expon_d               = 0.0406d0    ! diatom exponent
+ord_phy               = -0.7338d0   ! small phyto ordonnée
+expon_phy             = 0.06422d0    ! small phyto exponent
+ord_cocco             = -0.2310d0   ! coccolitho ordonnée
+expon_cocco           = 0.0327d0    ! coccolitho exponent
+ord_phaeo             = -0.2310d0   ! phaeocystis ordonnée
+expon_phaeo           = 0.0327d0    ! phaeocystis exponent
 reminSi               = 0.02d0
 k_o2_remin            = 15.d0       ! NEW O2remin mmol m-3; Table 1 in Cram 2018 cites DeVries & Weber 2017 for a range of 0-30 mmol m-3
+!d1_d                  = 0.001d0     ! 42°C version
+!d2_d                  = 0.2d0       ! 42°C version
+!d1_phy                = 0.0016d0      ! 42°C version
+!d2_phy                = 0.1987d0      ! 42°C version
+!d1_cocco              = 0.0025d0    ! 42°C version
+!d2_cocco              = 0.17d0      ! 42°C version
 /
 
 &palimiter_function
@@ -94,14 +110,17 @@ SiMinSlope            = 1000.d0
 NCmin                 = 0.04d0 !0.05d0
 NCmin_d               = 0.04d0 !0.05d0
 NCmin_c		      = 0.04d0      ! NEW
+NCmin_p               = 0.04d0      ! NEW for Phaeocystis
 SiCmin                = 0.04d0
 k_Fe                  = 0.04d0
 k_Fe_d                = 0.12d0
 k_Fe_c		      = 0.09d0      ! NEW
+k_Fe_p                = 0.09d0      ! NEW for Phaeocystis (to be tuned)
 k_si                  = 4.d0
 P_cm                  = 3.0d0       ! [1/day]            Rate of C-specific photosynthesis 
 P_cm_d                = 3.5d0
 P_cm_c		      = 2.8d0	    ! NEW
+P_cm_p                = 0.75d0       ! NEW for Phaeocystis (to be tuned)
 /
 
 &palight_calculations
@@ -110,9 +129,10 @@ a_chl                 = 0.03d0      ! [1/m * 1/(mg Chl)] Chlorophyll specific at
 /
 
 &paphotosynthesis
-alfa                  = 0.14d0	    ! [(mmol C*m2)/(mg Chl*W*day)] 
+alfa                  = 0.15d0 !0.14d0	    ! [(mmol C*m2)/(mg Chl*W*day)]  ! NEW value for Phaeocystis
 alfa_d                = 0.19d0      ! An initial slope of the P-I curve
 alfa_c		      = 0.10d0      ! NEW
+alfa_p                = 0.17d0      ! NEW for Phaeocystis (to be tuned)
 parFrac               = 0.43d0
 /
 
@@ -120,25 +140,31 @@ parFrac               = 0.43d0
 V_cm_fact             = 0.7d0       ! scaling factor for temperature dependent maximum of C-specific N-uptake
 V_cm_fact_d           = 0.7d0  
 V_cm_fact_c	      = 0.7d0       ! NEW
+V_cm_fact_p           = 0.7d0       ! NEW for Phaeocystis
 NMaxSlope             = 1000.d0     ! Max slope for limiting function
 SiMaxSlope            = 1000.d0
 NCmax                 = 0.2d0       ! [mmol N/mmol C] Maximum cell quota of nitrogen (N:C)
 NCmax_d               = 0.2d0
 NCmax_c		      = 0.15d0      ! NEW
+NCmax_p               = 0.15d0       ! NEW for Phaeocystis (to be tuned)
 SiCmax                = 0.8d0
 NCuptakeRatio         = 0.2d0       ! [mmol N/mmol C] Maximum uptake ratio of N:C
 NCUptakeRatio_d       = 0.2d0
 NCUptakeRatio_c	      = 0.2d0       ! NEW
+NCUptakeRatio_p       = 0.2d0       ! NEW for Phaeocystis
 SiCUptakeRatio        = 0.2d0
 k_din                 = 0.55d0      ! [mmol N/m3] Half-saturation constant for nitrate uptake
 k_din_d               = 1.0d0
 k_din_c		      = 0.9d0       ! NEW
+k_din_p               = 0.7d0      ! NEW for Phaeocystis (to be tuned)
 Chl2N_max             = 3.15d0      ! [mg CHL/mmol N] Maximum CHL a : N ratio = 0.3 gCHL gN^-1
 Chl2N_max_d           = 4.2d0
 Chl2N_max_c	      = 3.5d0       ! NEW
+Chl2N_max_p           = 2.6d0       ! NEW for Phaeocystis
 res_phy               = 0.01d0      ! [1/day] Maintenance respiration rate constant
 res_phy_d             = 0.01d0
 res_phy_c	      = 0.01d0      ! NEW
+res_phy_p             = 0.01d0      ! NEW for phaeocystis
 biosynth              = 2.33d0      ! [mmol C/mmol N] Cost of biosynthesis
 biosynthSi            = 0.d0
 /
@@ -154,19 +180,21 @@ epsilonr              = 0.09d0      ! [(mmol N)2 /m6] Half saturation constant f
 res_het               = 0.028d0      ! [1/day] Respiration by heterotrophs and mortality (loss to detritus)
 Redfield              = 6.625       ! [mmol C/mmol N] Redfield ratio of C:N = 106:16
 loss_het              = 0.04d0      ! [1/day] Temperature dependent N degradation of extracellular organic N (EON)
-pzDia                 = 1.0d0 !0.5d0       ! Maximum diatom preference
+pzDia                 = 1.0d0 !0.5d0       ! Maximum diatom preference ! NEW value for Phaeocystis
 sDiaNsq               = 0.d0
-pzPhy                 = 0.5d0 !0.25d0 !1.0d0       ! Maximum nano-phytoplankton preference (NEW: 3/12)
+pzPhy                 = 0.5d0 !0.04d0 !0.25d0 !1.0d0       ! Maximum nano-phytoplankton preference (NEW: 3/12) ! NEW value for Phaeocystis
 sPhyNsq               = 0.d0
-pzCocco		      = 0.666d0     ! NEW (8/12)
+pzCocco		      = 0.666d0  !0.4d0   ! NEW (8/12) ! NEW value for Phaeocystis
 sCoccoNsq	      = 0.d0        ! NEW
+pzPhaeo               = 0.5d0       ! NEW for Phaeocystis
+sPhaeoNsq             = 0.d0        ! NEW for Phaeocystis
 pzMicZoo              = 1.0d0       ! NEW 3Zoo Maximum nano-phytoplankton preference
 sMicZooNsq            = 0.d0        ! NEW 3Zoo
 tiny_het              = 1.d-5       ! for more stable computation of HetRespFlux (_plus). Value can be > tiny because HetRespFlux ~ hetC**2.
 /
 
 &pasecondzooplankton
-graz_max2      = 0.1d0              ! [mmol N/(m3 * day)] Maximum grazing loss parameter                                                                                        
+graz_max2      = 0.25d0 !0.1d0              ! [mmol N/(m3 * day)] Maximum grazing loss parameter   ! NEW value for Phaeocystis                                                                                     
 epsilon2       = 0.0144d0           ! [(mmol N)2 /m6] Half saturation constant for grazing loss                                                                              
 res_zoo2       = 0.0107d0           ! [1/day] Respiration by heterotrophs and mortality (loss to detritus)                                                            
 loss_zoo2      = 0.003d0            ! [1/day] Temperature dependent N degradation of extracellular organic N (EON)
@@ -174,13 +202,15 @@ fecal_rate_n      = 0.104d0         ! [1/day] Temperature dependent N degradatio
 fecal_rate_c      = 0.236d0  
 fecal_rate_n_mes = 0.25d0           ! NEW 3Zoo
 fecal_rate_c_mes = 0.32d0           ! NEW 3Zoo                                                          
-pzDia2         = 1.5d0 !1.d0        ! Maximum diatom preference                                                                                                                 
+pzDia2         = 1.5d0  !1.0d0     ! Maximum diatom preference ! NEW value for Phaeocystis
 sDiaNsq2       = 0.d0
-pzPhy2         = 0.5d0              ! Maximum diatom preference                                                                                                                
+pzPhy2         = 0.5d0  !0.07d0    ! Maximum diatom preference ! NEW value for Phaeocystis
 sPhyNsq2       = 0.d0
-pzCocco2       = 0.5d0              ! NEW
+pzCocco2       = 0.5d0  !0.7d0        ! NEW ! NEW value for Phaeocystis
 sCoccoNsq2     = 0.d0		    ! NEW
-pzHet          = 1.5d0 !0.8d0              ! Maximum diatom preference                                                                                                               
+pzPhaeo2       = 0.5d0              ! NEW for Phaeocystis
+sPhaeoNsq2     = 0.d0               ! NEW for Phaeocystis
+pzHet          = 1.5d0 !0.8d0       ! Maximum diatom preference                                                                                                               
 sHetNsq        = 0.d0
 pzMicZoo2      = 1.0d0              ! NEW 3Zoo Maximum nano-phytoplankton preference
 sMicZooNsq2    = 0.d0   
@@ -191,16 +221,18 @@ t4_zoo2        = 274.15d0           ! Krill temp. function constant3
 /
 
 &pathirdzooplankton
-graz_max3      = 0.46d0             ! NEW 3Zoo [mmol N/(m3 * day)] Maximum grazing loss parameter
+graz_max3      = 0.36d0 !0.46d0             ! NEW 3Zoo [mmol N/(m3 * day)] Maximum grazing loss parameter ! NEW value for Phaeocystis
 epsilon3       = 0.64d0             ! NEW 3Zoo [(mmol N)2 /m6] Half saturation constant for grazing loss
 loss_miczoo    = 0.01d0             ! NEW 3Zoo [1/day] Temperature dependent N degradation of extracellular organic N (EON)
-res_miczoo     = 0.01d0             ! NEW 3Zoo [1/day] Respiration by heterotrophs and mortality (loss to detritus)
-pzDia3         = 0.5d0              ! NEW 3Zoo Maximum diatom preference
+res_miczoo     = 0.01d0 !0.02d0            ! NEW 3Zoo [1/day] Respiration by heterotrophs and mortality (loss to detritus)  ! NEW value for Phaeocystis
+pzDia3         = 0.5d0  !0.04d0     ! NEW 3Zoo Maximum diatom preference ! NEW value for Phaeocystis
 sDiaNsq3       = 0.d0               ! NEW 3Zoo
-pzPhy3         = 1.0d0              ! NEW 3Zoo Maximum nano-phytoplankton preference
+pzPhy3         = 1.0d0 !0.07d0 ! NEW 3Zoo Maximum nano-phytoplankton preference ! NEW value for Phaeocystis
 sPhyNsq3       = 0.d0               ! NEW 3Zoo
-pzCocco3       = 0.d0               ! NEW 3Zoo Maximum coccolithophore preference ! ATTENTION: This value needs to be tuned; I start with zero preference!
+pzCocco3       = 0.5d0 !0.7d0               ! NEW 3Zoo Maximum coccolithophore preference ! ATTENTION: This value needs to be tuned; I start with zero preference! ! NEW value for Phaeocystis
 sCoccoNsq3     = 0.d0               ! NEW 3Zoo
+pzPhaeo3       = 0.25d0              ! NEW for Phaeocystis
+sPhaeoNsq3     = 0.d0               ! NEW for Phaeocystis
 /
 
 &pagrazingdetritus
@@ -231,18 +263,22 @@ rho_C1                = 0.1d0       ! [1/day] Temperature dependent C degradatio
 lossN                 = 0.05d0      ! [1/day] Phytoplankton loss of organic N compounds
 lossN_d               = 0.05d0
 lossN_c		      = 0.05d0      ! NEW
+lossN_p               = 0.05d0      ! NEW for Phaeocystis
 /
 
 &paphytoplankton_C
 lossC                 = 0.10d0      ! [1/day] Phytoplankton loss of carbon 
 lossC_d               = 0.10d0
 lossC_c		      = 0.10d0      ! NEW
+lossC_p               = 0.10d0      ! NEW for Phaeocystis
 /
 
 &paphytoplankton_ChlA
-deg_Chl               = 0.25d0 !0.2d0 !0.25d0      ! [1/day]
-deg_Chl_d             = 0.15d0 !0.2d0 !0.15d0
+deg_Chl               = 0.15d0 !0.25d0 !0.2d0   ! NEW value for Phaeocystis   ! [1/day]
+deg_Chl_d             = 0.2d0 ! 0.15d0 ! NEW value for Phaeocystis
 deg_Chl_c	      = 0.2d0       ! NEW (has been 0.5)
+deg_Chl_p             = 0.15d0       ! NEW for Phaeocystis
+
 /
 
 &padetritus_N
@@ -277,18 +313,22 @@ Cunits         = 976.5625    ! Conversion factor between [mol/m3] (model) and [u
 a_co2_phy      = 1.162e+00   ! [dimensionless]
 a_co2_dia      = 1.040e+00   ! [dimensionless]
 a_co2_cocco    = 1.109e+00   ! [dimensionless]
+a_co2_phaeo    = 1.162e+00   ! [dimensionless] Phaeocystis
 a_co2_calc     = 1.102e+00   ! [dimensionless]
 b_co2_phy      = 4.888e+01   ! [mol/kg]
 b_co2_dia      = 2.890e+01   ! [mol/kg]
 b_co2_cocco    = 3.767e+01   ! [mol/kg]
+b_co2_phaeo    = 4.888e+01   ! [mol/kg] Phaeocystis
 b_co2_calc     = 4.238e+01   ! [mol/kg]
 c_co2_phy      = 2.255e-01   ! [kg/mol]
 c_co2_dia      = 8.778e-01   ! [kg/mol]
 c_co2_cocco    = 3.912e-01   ! [kg/mol]
-c_co2_calc     = 7.079e-01   ! [kg/mol]
+c_co2_phaeo    = 2.255e-01   ! [kg/mol] Phaeocystis
+c_co2_calc     = 7.079e-01   ! [kg/mol] 
 d_co2_phy      = 1.023e+07   ! [kg/mol]
 d_co2_dia      = 2.640e+06   ! [kg/mol]
 d_co2_cocco    = 9.450e+06   ! [kg/mol]
+d_co2_phaeo    = 1.023e+07   ! [kg/mol] Phaeocystis
 d_co2_calc     = 1.343e+07   ! [kg/mol]
 /
 
@@ -302,8 +342,8 @@ RiverFeConc           = 100
 
 &pacalc
 calc_prod_ratio       = 0.02
-calc_diss_guts        = 0.0d0
-calc_diss_rate        = 0.005714    ! 20.d0/3500.d0
+calc_diss_guts        = 0.5d0 !0.0d0
+calc_diss_rate        = 0.005714d0  ! 20.d0/3500.d0
 calc_diss_rate2       = 0.005714d0
 calc_diss_omegac      = 0.197d0     ! NEW DISS Value from Aumont et al. 2015, will be used with OmegaC_diss flag
 calc_diss_exp         = 1.d0        ! NEW DISS Exponent in the dissolution rate of calcite, will be used with OmegaC_diss flag
@@ -339,7 +379,7 @@ rho_ref_water        = 1027.d0   ! kg m-3; reference seawater density (see Cram 
 visc_ref_water       = 0.00158d0 ! kg m-1 s-1; reference seawater viscosity, at Temp=4 degC (see Cram et al., 2018)
 w_ref1               = 10.d0     ! m s-1; reference sinking velocity of small detritus
 w_ref2               = 200.d0    ! m s-1; reference sinking velocity of large detritus
-depth_scaling1       = 0.015d0   ! s-1; factor to increase sinking speed of det1 with depth, set to 0 if not wanted
+depth_scaling1       = 0.01d0 !5d0   ! s-1; factor to increase sinking speed of det1 with depth, set to 0 if not wanted
 depth_scaling2       = 0.d0      ! s-1; factor to increase sinking speed of det2 with depth, set to 0 if not wanted
 max_sinking_velocity = 250.d0    ! d-1; for numerical stability, set a maximum possible sinking velocity here (applies to both detritus classes)
 /

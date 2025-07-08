@@ -475,7 +475,7 @@ subroutine ver_sinking_recom(tr_num, tracers, partit, mesh)
     real(kind=8)                           :: Rjp,Rj,Rjm
 
     real(kind=8)                           :: cfl, d0, d1, thetaP, thetaM, psiP, psiM
-    real(kind=8)                           :: onesixth	= 1.d0/6.d0
+    real(kind=8)                           :: onesixth  = 1.d0/6.d0
     real(kind=8)                           :: dt_sink, c1, c2
     real(kind=8)                           :: Vsink, tv
     real(kind=8),dimension(mesh%nl)        :: Wvel_flux
@@ -526,6 +526,13 @@ subroutine ver_sinking_recom(tr_num, tracers, partit, mesh)
         tracers%data(tr_num)%ID == 1031 ) then     !icchl
 
             Vsink = VCocco
+
+    elseif(tracers%data(tr_num)%ID == 1032 .or. &  !iphan
+        tracers%data(tr_num)%ID == 1033 .or.    &  !iphac
+        tracers%data(tr_num)%ID == 1034 ) then     !iphachl
+
+           Vsink = VPhaeo
+        
 #endif
 
     elseif(tracers%data(tr_num)%ID == 1020) then   !iphycal
@@ -650,7 +657,7 @@ if (.TRUE.) then ! 3rd Order DST Sceheme with flux limiting. This code comes fro
             (1.d0-cfl)/(1.d-20-cfl)*thetaM))
 
          tv= (0.5 * wPs * (trarr(nz,n)              + psiM * Rj)+ &
-	      0.5 * wM  * (trarr(max(nzmin,nz-1),n) + psiP * Rj))
+              0.5 * wM  * (trarr(max(nzmin,nz-1),n) + psiP * Rj))
          vd_flux(nz)= - tv*area(nz,n)
       end do
 end if ! 3rd Order DST Sceheme with flux limiting

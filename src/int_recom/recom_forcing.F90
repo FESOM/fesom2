@@ -1,7 +1,7 @@
 !===============================================================================
 ! REcoM_Forcing
 !===============================================================================
-subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sali_depth &
+subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali_depth &
             , CO2_watercolumn                                          &
             , pH_watercolumn                                           &
             , pCO2_watercolumn                                         &
@@ -66,7 +66,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
     !!---- Subroutine Depth
 
     real(kind=8),dimension(mesh%nl)           :: zF                   ! [m] Depth of fluxes
-    real(kind=8),dimension(mesh%nl,5)         :: SinkVel              ! [m/day]
+    real(kind=8),dimension(mesh%nl,6)         :: SinkVel              ! [m/day]
     real(kind=8),dimension(mesh%nl-1)         :: thick                ! [m] Vertical distance between two nodes = Thickness 
     real(kind=8),dimension(mesh%nl-1)         :: recipthick           ! [1/m] reciprocal of thick
 
@@ -111,8 +111,11 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
     tiny_Si  = tiny_C_d/SiCmax      ! SiCmax = 0.8d0
 
 #if defined (__coccos)
-    tiny_N_c = tiny_chl/chl2N_max_c ! 0.00001/ 3.5d0 
+    tiny_N_c = tiny_chl/chl2N_max_c ! 0.00001/ 3.5d0
     tiny_C_c = tiny_N_c/NCmax_c     ! NCmax_c = 0.15d0
+
+    tiny_N_p = tiny_chl/chl2N_max_p ! 0.00001/ 3.5d0 
+    tiny_C_p = tiny_N_p/NCmax_p     ! NCmax_c = 0.15d0
 #endif
 
     call Cobeta(partit, mesh)      
@@ -263,6 +266,10 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
   state(1:nn,icchl)  = max(tiny_chl,state(1:nn,icchl))
   state(1:nn,icocn)  = max(tiny_N_c,state(1:nn,icocn))
   state(1:nn,icocc)  = max(tiny_C_c,state(1:nn,icocc))
+
+  state(1:nn,iphachl)  = max(tiny_chl,state(1:nn,iphachl))
+  state(1:nn,iphan)  = max(tiny_N_p,state(1:nn,iphan))
+  state(1:nn,iphac)  = max(tiny_C_p,state(1:nn,iphac))
 #endif
 
 #if defined (__3Zoo2Det)
@@ -344,6 +351,11 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
      locGPPc = sum(vertGPPc(1:nn) * thick(1:nn))
      locNNAc = sum(vertNNAc(1:nn) * thick(1:nn))
      locChldegc = sum(vertChldegc(1:nn) * thick(1:nn))
+
+     locNPPp = sum(vertNPPp(1:nn) * thick(1:nn))
+     locGPPp = sum(vertGPPp(1:nn) * thick(1:nn))
+     locNNAp = sum(vertNNAp(1:nn) * thick(1:nn))
+     locChldegp = sum(vertChldegp(1:nn) * thick(1:nn))
 #endif
 
   end if
