@@ -238,6 +238,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         if(use_MEDUSA) then
             SinkFlx = 0.0d0
         endif
+        SinkingVel1 = 0.0d0 ! OG 16.03.23
+        SinkingVel2 = 0.0d0 ! OG 16.03.23
 #endif    
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
@@ -326,6 +328,17 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     end do
 !!!        !$ACC UPDATE HOST (tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus) &
 !!!        !$ACC HOST  (tracers%work%edge_up_dn_grad)
+
+#if defined(__recom)
+    do tr_num = 1, tracers%num_tracers
+        if (use_MEDUSA) then
+            SinkFlx = SinkFlx + SinkFlx_tr(:, :, tr_num)
+        endif
+!        Benthos = Benthos + Benthos_tr(:, :, tr_num)
+        Sinkingvel1(:,:) = Sinkingvel1(:,:) + Sinkvel1_tr(:, :, tr_num)
+        Sinkingvel2(:,:) = Sinkingvel2(:,:) + Sinkvel2_tr(:, :, tr_num)
+    end do
+#endif
 
     !___________________________________________________________________________
     ! 3D restoring for "passive" tracers

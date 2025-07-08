@@ -6,8 +6,8 @@ module recom_interface
     interface
         subroutine recom(ice, dynamics, tracers, partit, mesh)
             use mod_mesh
-            USE MOD_PARTIT
-            USE MOD_PARSUP
+            use MOD_PARTIT
+            use MOD_PARSUP
             use mod_tracer
             use MOD_DYN
             use MOD_ICE
@@ -29,8 +29,8 @@ module bio_fluxes_interface
             use recom_config
 
             use mod_mesh
-            USE MOD_PARTIT
-            USE MOD_PARSUP
+            use MOD_PARTIT
+            use MOD_PARSUP
             use mod_tracer
 
             use g_config
@@ -52,11 +52,11 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     use MOD_MESH
     use MOD_TRACER
     use MOD_DYN
-    USE MOD_ICE
+    use MOD_ICE
     use o_ARRAYS
     use o_PARAM
-    USE MOD_PARTIT
-    USE MOD_PARSUP
+    use MOD_PARTIT
+    use MOD_PARSUP
 
     use recom_declarations
     use bio_fluxes_interface
@@ -67,7 +67,8 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     use g_clock
     use g_forcing_arrays, only: press_air, u_wind, v_wind, shortwave
     use g_comm_auto
-    IMPLICIT NONE
+
+    implicit none
 
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_tracer), intent(inout), target :: tracers
@@ -94,7 +95,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 
     real(kind=8)               :: SW, Loc_slp
     integer                    :: tr_num, num_tracers
-    integer                    :: nz, n, nzmin, nzmax, nu1, nl1
+    integer                    :: nz, n, nzmin, nzmax
     integer                    :: idiags
 
     real(kind=8)               :: Sali
@@ -526,8 +527,8 @@ subroutine bio_fluxes(tracers, partit, mesh)
     use recom_config
 
     use mod_mesh
-    USE MOD_PARTIT
-    USE MOD_PARSUP
+    use MOD_PARTIT
+    use MOD_PARSUP
     use mod_tracer
 
     use g_config

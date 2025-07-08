@@ -604,6 +604,13 @@ if (Vsink .gt. 0.1) then
 
          endif
 #endif
+
+         if (tracers%data(tr_num)%ID == 1021) Sinkvel1_tr(nz,n,tr_num) = Wvel_flux(nz) !-1.0d0/SecondsPerDay  !idetcal
+#if defined (__3Zoo2Det)
+         if (tracers%data(tr_num)%ID == 1028) Sinkvel2_tr(nz,n,tr_num) = Wvel_flux(nz)  !idetz2calc
+#endif
+
+
       end do
 
       dt_sink = dt

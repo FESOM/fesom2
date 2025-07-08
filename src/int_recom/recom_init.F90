@@ -97,6 +97,7 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(decayBenthos          ( benthos_num ))     ! [1/day] Decay rate of detritus in the benthic layer
     allocate(PAR3D                 ( nl-1, node_size ))
 
+
     GloFeDust             = 0.d0
     AtmFeInput            = 0.d0
     GloNDust              = 0.d0
@@ -245,6 +246,10 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(Sinkingvel1(nl,node_size), Sinkingvel2(nl,node_size))
     Sinkingvel1(:,:)      = 0.d0
     Sinkingvel2(:,:)      = 0.d0
+
+    allocate(Sinkvel1_tr(nl,node_size,num_tracers), Sinkvel2_tr(nl,node_size,num_tracers))  ! OG 16.03.23
+    Sinkvel1_tr(:,:,:)    = 0.0d0 ! OG 16.03.23
+    Sinkvel2_tr(:,:,:)    = 0.0d0 ! OG 16.03.23
 
     if (use_MEDUSA) then
         allocate(GloSed(node_size,sedflx_num))
