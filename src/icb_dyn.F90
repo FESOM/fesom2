@@ -90,14 +90,18 @@ type(t_dyn)   , intent(inout), target :: dynamics
  ! - (uo_skin_ib, vo_skin_ib)	: velocity below the draft of the iceberg
  ! call iceberg_avvelo_ufkeel(uo_dz,vo_dz, uo_keel,vo_keel, depth_ib,iceberg_elem) 
  call iceberg_average_andkeel(mesh, partit, dynamics, uo_dz,vo_dz, uo_keel,vo_keel, T_dz,S_dz, T_keel,S_keel, depth_ib,iceberg_elem, ib)
+ write(*,*) "LA DEBUG: dyn 1"
  call FEM_3eval(mesh, partit, uo_ib,vo_ib,lon,lat,uo_dz,vo_dz,iceberg_elem)
+ write(*,*) "LA DEBUG: dyn 2"
  call FEM_3eval(mesh, partit, uo_skin_ib,vo_skin_ib,lon,lat,uo_keel,vo_keel,iceberg_elem)
  
 
  !TEMPERATURE AND SALINITY:
  ! - T_ave_ib, S_ave_ib		: Mean T & S (integrated) at location of iceberg
  ! - T_keel_ib, S_keel_ib	: T & S below the draft of the iceberg (depth_ib)
+ write(*,*) "LA DEBUG: dyn 3"
  call FEM_3eval(mesh, partit, T_ave_ib,S_ave_ib,lon,lat,T_dz,S_dz,iceberg_elem)
+ write(*,*) "LA DEBUG: dyn 4"
  call FEM_3eval(mesh, partit, T_keel_ib,S_keel_ib,lon,lat,T_keel,S_keel,iceberg_elem)
  T_ave(ib) = T_ave_ib
 
@@ -110,6 +114,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
  !ICE THICKNESS (CONCENTRATION) hi_ib, conci_ib
  hi_ib3    => ice%data(size(ice%data))%values(:) !ice%m_ice_ib(tmp_arr)
  conci_ib3 => ice%data(size(ice%data)-1)%values(:) !ice%a_ice_ib(tmp_arr) 
+ write(*,*) "LA DEBUG: dyn 5"
  call FEM_3eval(mesh, partit, hi_ib,conci_ib,lon,lat,hi_ib3,conci_ib3,iceberg_elem)
  P_ib = 20000. * hi_ib * exp(-20.*(1-conci_ib))
  
@@ -702,7 +707,7 @@ type(t_partit), intent(inout), target :: partit
     if( abs(lev_low)>=abs(depth_ib) ) then !.AND. (abs(lev_up)<=abs(depth_ib)) ) then
 #endif
       if( abs(lev_up)<abs(depth_ib) ) then
-        dz = abs ( lev_up - depth_ib )
+        dz = abs(lev_up - depth_ib)
       else
         ! LA: Never go here, when starting with k=1
         dz = abs(depth_ib)

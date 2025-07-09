@@ -58,13 +58,13 @@ type(t_partit), intent(inout), target :: partit
   !3-eq. formulation for bottom melting [m/s]    
   v_ibmino  = sqrt( (u_ib - uo_keel_ib)**2 + (v_ib - vo_keel_ib)**2 )
   call iceberg_heat_water_fluxes_3eq(partit, ib, M_b, H_b, T_keel_ib,S_keel_ib,v_ibmino, depth_ib, tf)
-  hfb_flux_ib = H_b * length_ib*length_ib*scaling(ib)
+  hfb_flux_ib(ib) = H_b * length_ib*length_ib*scaling(ib)
 !  write(*,*) "LA DEBUG: 1"
 
   !3-eq. formulation for lateral 'basal' melting [m/s]
   v_ibmino  = sqrt( (u_ib - uo_ib)**2 + (v_ib - vo_ib)**2 ) ! depth-average rel. velocity
   call iceberg_heat_water_fluxes_3eq(partit, ib, M_bv, H_bv, T_ave_ib,S_ave_ib,v_ibmino, depth_ib/2.0, tf)
-  hfbv_flux_ib = H_bv * (2*length_ib*abs(depth_ib)  + 2*length_ib*abs(depth_ib) ) * scaling(ib)
+  hfbv_flux_ib(ib) = H_bv * (2*length_ib*abs(depth_ib)  + 2*length_ib*abs(depth_ib) ) * scaling(ib)
 !  write(*,*) "LA DEBUG: 2"
   
   !'thermal driving', defined as the elevation of ambient water 
@@ -80,7 +80,7 @@ type(t_partit), intent(inout), target :: partit
   M_v = M_v/86400.
   H_v = M_v * rho_icb * L
 !  write(*,*) "!LA DEBUG: H_v=",H_v
-  hfl_flux_ib = H_v * (2*length_ib*abs(depth_ib)  + 2*length_ib*abs(depth_ib) ) * scaling(ib)
+  hfl_flux_ib(ib) = H_v * (2*length_ib*abs(depth_ib)  + 2*length_ib*abs(depth_ib) ) * scaling(ib)
 !  write(*,*) "LA DEBUG: hfl_flux_ib=",hfl_flux_ib
 !  write(*,*) "LA DEBUG: 3"
   !fwl_flux_ib = M_v
@@ -94,7 +94,7 @@ type(t_partit), intent(inout), target :: partit
   H_e = M_e * rho_icb * L
 !  write(*,*) "LA DEBUG: H_e=",H_e
 !  write(*,*) "LA DEBUG: height=",height_ib
-  hfe_flux_ib = H_e * (length_ib*abs(height_ib)  + length_ib*abs(height_ib) ) * scaling(ib)
+  hfe_flux_ib(ib) = H_e * (length_ib*abs(height_ib)  + length_ib*abs(height_ib) ) * scaling(ib)
 !  write(*,*) "LA DEBUG: hfe_flux_ib=",hfe_flux_ib
 !  write(*,*) "LA DEBUG: 4"
   !fwe_flux_ib = M_e  

@@ -63,6 +63,7 @@ eta_n_ib => dynamics%eta_n_ib(:)
   nablaeta(1) = sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(1:3, elem)) 
   nablaeta(2) = sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(4:6, elem)) 
  else
+ write(*,*) "LA DEBUG: elem 1"
   call FEM_3eval(mesh, partit, nablaeta(1),nablaeta(2),lon_rad,lat_rad,gradientx,gradienty,elem)
  end if
   
@@ -175,7 +176,7 @@ type(t_partit), intent(inout), target :: partit
   
   !values of the 3 local basisfunctions at the 
   !position 'coords'
-  write(*,*) "LA DEBUG: 1 - elem=",elem,", coords_tmp=",coords_tmp,", phi=",phi
+!  write(*,*) "LA DEBUG: 1 - elem=",elem,", coords_tmp=",coords_tmp,", phi=",phi
   call locbafu_2D(mesh, partit, phi,elem,coords_tmp)
 
   values_u = field_u(elem2D_nodes(:,elem))
@@ -354,7 +355,7 @@ type(t_partit), intent(inout), target :: partit
   !values of the 3 local basisfunctions at the 
   !position 'coords'
   coords_tmp = [lon_deg, lat_deg]
-  write(*,*) "LA DEBUG: 2 - elem=",elem,", coords_tmp=",coords_tmp,", phi=",phi
+!  write(*,*) "LA DEBUG: 2 - elem=",elem,", coords_tmp=",coords_tmp,", phi=",phi
   call locbafu_2D(mesh, partit, phi,elem, coords_tmp)
   
   u_at_ib = sum( ocean_u(:) * phi(:))
@@ -391,7 +392,8 @@ type(t_partit), intent(inout), target :: partit
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
- 
+
+  write(*,*) "LA DEBUG: point_in_triangle 2 - lon/lat", lon_deg, "/", lat_deg
   call point_in_triangle(mesh, partit, elem, (/lon_deg, lat_deg/)) !all PEs search here
   i_have_element= (elem .ne. 0) !up to 3 PEs .true.
   
@@ -446,7 +448,7 @@ do m=1, 3
   !elem_containing_n2 = nod_in_elem2D(n2)%addresses(idx_elem_containing_n2)
   elem_containing_n2 = nod_in_elem2D(idx_elem_containing_n2,n2) 
     
-  write(*,*) "LA DEBUG: 3 - elem=",elem_containing_n2,", coords_tmp=",pt,", phi=",werte2D
+!  write(*,*) "LA DEBUG: 3 - elem=",elem_containing_n2,", coords_tmp=",pt,", phi=",werte2D
   call locbafu_2D(mesh, partit, werte2D, elem_containing_n2, pt)
    
   if (ALL(werte2D <= 1.+ 1.0e-07) .AND. ALL(werte2D >= 0.0- 1.0e-07) ) then
@@ -499,8 +501,7 @@ type(t_partit), intent(inout), target :: partit
   el2D=0
   !DO l=1,elem2D
   DO l=1,partit%myDim_elem2D
- 
-  write(*,*) "LA DEBUG: 4 - elem=",l,", coords_tmp=",pt,", phi=",werte2D
+     !write(*,*) "LA DEBUG: 4 - coords_tmp=",pt,", phi=",werte2D, ", l=", l, ", nodes=",mesh%elem2D_nodes(:,l)
      call locbafu_2D(mesh, partit, werte2D, l, pt)
      
      if (ALL(werte2D <= 1.+ 1.0e-07) .AND. ALL(werte2D >= 0.0- 1.0e-07) ) then

@@ -404,6 +404,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
   
   !find LOCAL element where the iceberg starts:
   coords_tmp = [lon_deg, lat_deg]
+  write(*,*) "LA DEBUG: point_in_triangle 1 - lon/lat", lon_deg, "/", lat_deg
   call point_in_triangle(mesh, partit, iceberg_elem, coords_tmp)
   !call point_in_triangle(mesh, iceberg_elem, (/lon_deg, lat_deg/))
   i_have_element= (iceberg_elem .ne. 0) !up to 3 PEs possible
@@ -494,6 +495,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
  
   call depth_bathy(mesh,partit, Zdepth3, local_idx_of(iceberg_elem))
   !interpolate depth to location of iceberg (2 times because FEM_3eval expects a 2 component vector...)
+ write(*,*) "LA DEBUG: step 1"
   call FEM_3eval(mesh,partit, Zdepth,Zdepth,lon_rad,lat_rad,Zdepth3,Zdepth3,local_idx_of(iceberg_elem))
   !write(*,*) 'nodal depth in iceberg ', ib,'s element:', Zdepth3
   !write(*,*) 'depth at iceberg ', ib, 's location:', Zdepth
@@ -927,6 +929,7 @@ type(t_partit), intent(inout), target :: partit
 	else
    		!OCEAN VELOCITY uo_ib, voib is start velocity
    		call iceberg_avvelo(mesh, partit, dynamics, startu,startv,depth_ib,localelem)
+ write(*,*) "LA DEBUG: step 2"
         call FEM_3eval(mesh, partit,u_ib,v_ib,lon_rad,lat_rad,startu,startv,localelem)
 	end if
  end if
