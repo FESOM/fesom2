@@ -613,27 +613,125 @@ include "associate_mesh_ass.h"
 
     if (mype .eq. localroot) then
       print *, 'FESOM before grid writing to oasis grid files'
-       CALL oasis_start_grids_writing(il_flag)
-       IF (il_flag .NE. 0) THEN
-
-          print *, 'FESOM before write grid centers'
-          CALL oasis_write_grid (grid_name, number_of_all_points, 1, all_x_coords(:,:), all_y_coords(:,:))
-
-          if (compute_oasis_corners) then
-            print *, 'FESOM before write corner'
-            CALL oasis_write_corner (grid_name, number_of_all_points, 1, 25, all_x_corners(:,:,:), all_y_corners(:,:,:))
-          endif
-
-          ALLOCATE(unstr_mask(number_of_all_points, 1))
-          unstr_mask=0
-          print *, 'FESOM before write mask'
-          CALL oasis_write_mask(grid_name, number_of_all_points, 1, unstr_mask)
-          DEALLOCATE(unstr_mask)
-
-          print *, 'FESOM before write area'
-          CALL oasis_write_area(grid_name, number_of_all_points, 1, all_area)
-
-       end if
+      
+      ! Variables for potential sorting
+      integer, allocatable :: global_ids(:), permutation(:)
+      real(kind=WP), allocatable :: all_x_sorted(:,:), all_y_sorted(:,:), all_area_sorted(:,:)
+      real(kind=WP), allocatable :: all_x_corners_sorted(:,:,:), all_y_corners_sorted(:,:,:)
+      
+      ! Use consistent mesh ordering if enabled
+      use g_config, only: consistent_oasis_mesh
+      
+      ! Allocate arrays for sorted data (or direct references if not sorting)
+      real(kind=WP), pointer :: use_x_coords(:,:), use_y_coords(:,:), use_area(:,:)
+      real(kind=WP), pointer :: use_x_corners(:,:,:), use_y_corners(:,:,:)
+      
+      if (consistent_oasis_mesh) then
+        print *, 'FESOM sorting data by global node IDs for consistent ordering'
+        
+        ! Allocate arrays for the permutation and sorted coordinates
+        ALLOCATE(global_ids(number_of_all_points))
+        ALLOCATE(permutation(number_of_all_points))
+        ALLOCATE(all_x_sorted(number_of_all_points, 1))
+        ALLOCATE(all_y_sorted(number_of_all_points, 1))
+        ALLOCATE(all_area_sorted(number_of_all_points, 1))
+        
+        if (compute_oasis_corners) then
+          ALLOCATE(all_x_corners_sorted(number_of_all_points, 1, 25))
+          ALLOCATE(all_y_corners_sorted(number_of_all_points, 1, 25))
+        endif
+        
+        ! Fill global_ids array with the appropriate global node IDs
+        ! This assumes all global IDs have been gathered on root processor
+        ! First, we need to gather global node IDs from all processors
+        call gather_global_ids(global_ids, number_of_all_points, MPI_COMM_FESOM)
+        
+        ! Create a permutation array for sorting
+        do i = 1, number_of_all_points
+          permutation(i) = i
+        end do
+        
+        ! Sort permutation array based on global_ids using a simple insertion sort
+        ! This could be optimized with a more efficient algorithm if needed
+        do i = 2, number_of_all_points
+          j = i
+          do while (j > 1 .and. global_ids(permutation(j)) < global_ids(permutation(j-1)))
+            ! Swap permutation indices
+            k = permutation(j)
+            permutation(j) = permutation(j-1)
+            permutation(j-1) = k
+            j = j - 1
+          end do
+        end do
+        
+        ! Apply permutation to all arrays before writing
+        do i = 1, number_of_all_points
+          all_x_sorted(i,1) = all_x_coords(permutation(i),1)
+          all_y_sorted(i,1) = all_y_coords(permutation(i),1)
+          all_area_sorted(i,1) = all_area(permutation(i),1)
+        end do
+        
+        if (compute_oasis_corners) then
+          do j = 1, 25
+            do i = 1, number_of_all_points
+              all_x_corners_sorted(i,1,j) = all_x_corners(permutation(i),1,j)
+              all_y_corners_sorted(i,1,j) = all_y_corners(permutation(i),1,j)
+            end do
+          end do
+        endif
+        
+        ! Point to the sorted arrays for OASIS writing
+        use_x_coords => all_x_sorted
+        use_y_coords => all_y_sorted
+        use_area => all_area_sorted
+        if (compute_oasis_corners) then
+          use_x_corners => all_x_corners_sorted
+          use_y_corners => all_y_corners_sorted
+        endif
+      else
+        ! Use original unsorted arrays
+        print *, 'FESOM using original mesh ordering for OASIS files (not sorted)'
+        use_x_coords => all_x_coords
+        use_y_coords => all_y_coords
+        use_area => all_area
+        if (compute_oasis_corners) then
+          use_x_corners => all_x_corners
+          use_y_corners => all_y_corners
+        endif
+      endif
+      
+      ! Start OASIS grid writing
+      CALL oasis_start_grids_writing(il_flag)
+      IF (il_flag .NE. 0) THEN
+      
+        print *, 'FESOM before write grid centers'
+        CALL oasis_write_grid (grid_name, number_of_all_points, 1, use_x_coords(:,:), use_y_coords(:,:))
+      
+        if (compute_oasis_corners) then
+          print *, 'FESOM before write corner'
+          CALL oasis_write_corner (grid_name, number_of_all_points, 1, 25, use_x_corners(:,:,:), use_y_corners(:,:,:))
+        endif
+      
+        ALLOCATE(unstr_mask(number_of_all_points, 1))
+        unstr_mask=0
+        print *, 'FESOM before write mask'
+        CALL oasis_write_mask(grid_name, number_of_all_points, 1, unstr_mask)
+        DEALLOCATE(unstr_mask)
+      
+        print *, 'FESOM before write area'
+        CALL oasis_write_area(grid_name, number_of_all_points, 1, use_area)
+      
+      end if
+      
+      ! Free memory for temporary arrays
+      if (consistent_oasis_mesh) then
+        DEALLOCATE(global_ids, permutation)
+        DEALLOCATE(all_x_sorted, all_y_sorted, all_area_sorted)
+        if (compute_oasis_corners) then
+          DEALLOCATE(all_x_corners_sorted, all_y_corners_sorted)
+        endif
+      endif
+      
       print *, 'FESOM before terminate_grids_writing'
       call oasis_terminate_grids_writing()
       print *, 'FESOM after terminate_grids_writing'
@@ -1006,6 +1104,60 @@ END SUBROUTINE exchange_roots
       call oasis_terminate( ierror )
 
   end subroutine cpl_oasis3mct_finalize
+
+  ! Gather global node IDs from all processors to root process
+  ! This is used to create a consistent ordering for OASIS mesh files
+  subroutine gather_global_ids(global_ids, number_of_points, communicator)
+    USE MOD_PARTIT
+    implicit none
+    integer, intent(out) :: global_ids(number_of_points)
+    integer, intent(in)  :: number_of_points
+    integer, intent(in)  :: communicator
+    
+    integer :: ierror, i, n
+    integer :: npes, mype
+    integer :: local_size, offset
+    integer, allocatable :: local_ids(:)
+    integer, allocatable :: counts_from_all_pes(:), displs_from_all_pes(:)
+    
+    CALL MPI_Comm_Size(communicator, npes, ierror)
+    CALL MPI_Comm_Rank(communicator, mype, ierror)
+    
+    ! Allocate arrays for gathering process
+    ALLOCATE(counts_from_all_pes(npes))
+    ALLOCATE(displs_from_all_pes(npes))
+    
+    ! Get counts from all processors
+    local_size = myDim_nod2D
+    CALL MPI_ALLGATHER(local_size, 1, MPI_INTEGER, counts_from_all_pes, 1, MPI_INTEGER, communicator, ierror)
+    
+    ! Calculate displacements
+    displs_from_all_pes(1) = 0
+    do i = 2, npes
+      displs_from_all_pes(i) = SUM(counts_from_all_pes(1:(i-1)))
+    end do
+    
+    ! Allocate array for local global IDs
+    ALLOCATE(local_ids(local_size))
+    
+    ! Fill local global IDs array
+    do n = 1, local_size
+      local_ids(n) = myList_nod2D(n)  ! myList_nod2D contains global IDs of local nodes
+    end do
+    
+    ! Gather all global IDs to root
+    CALL MPI_GATHERV(local_ids, local_size, MPI_INTEGER, global_ids, &
+                    counts_from_all_pes, displs_from_all_pes, MPI_INTEGER, localRoot, communicator, ierror)
+    
+    ! For non-root processes, we don't need the global_ids array
+    if (mype .ne. localRoot) then
+      global_ids = 0  ! Just initialize to avoid undefined values
+    endif
+    
+    ! Free memory
+    DEALLOCATE(local_ids, counts_from_all_pes, displs_from_all_pes)
+    
+  end subroutine gather_global_ids
 
   subroutine fesom_flush ()
   end subroutine fesom_flush
