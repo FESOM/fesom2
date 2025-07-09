@@ -79,6 +79,11 @@ module cpl_driver
   integer, dimension(1,3)    :: iextent    
   integer, dimension(1,3)    :: ioffset   
 
+  ! Mapping arrays for consistent OASIS coupling
+  logical                                       :: oasis_mapping_initialized = .false.
+  integer, allocatable, dimension(:)            :: oasis_local_to_ordered(:)
+  integer, allocatable, dimension(:)            :: oasis_ordered_to_local(:)
+
  !
   real(kind=WP), dimension(:,:),   allocatable   :: a2o_fcorr_stat  !flux correction statistics for the output
 
@@ -372,6 +377,9 @@ include "node_contour_boundary.h"
     IF (ierror /= 0) THEN
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'comm_rank failed.')
     ENDIF
+    
+    ! Initialize OASIS mapping arrays for consistent coupling
+    call init_oasis_mapping()
 
   end subroutine cpl_oasis3mct_init
 
@@ -614,24 +622,34 @@ include "associate_mesh_ass.h"
     if (mype .eq. localroot) then
       print *, 'FESOM before grid writing to oasis grid files'
       
-      ! Variables for potential sorting
-      integer, allocatable :: global_ids(:), permutation(:)
+      ! Variables for consistent mesh ordering via rpart.out
+      integer :: total_mesh_points
+      integer, allocatable :: local_to_oasis(:), oasis_to_local(:)
       real(kind=WP), allocatable :: all_x_sorted(:,:), all_y_sorted(:,:), all_area_sorted(:,:)
       real(kind=WP), allocatable :: all_x_corners_sorted(:,:,:), all_y_corners_sorted(:,:,:)
       
       ! Use consistent mesh ordering if enabled
-      use g_config, only: consistent_oasis_mesh
+      use g_config, only: consistent_oasis_mesh, meshpath
       
       ! Allocate arrays for sorted data (or direct references if not sorting)
       real(kind=WP), pointer :: use_x_coords(:,:), use_y_coords(:,:), use_area(:,:)
       real(kind=WP), pointer :: use_x_corners(:,:,:), use_y_corners(:,:,:)
       
       if (consistent_oasis_mesh) then
-        print *, 'FESOM sorting data by global node IDs for consistent ordering'
+        print *, 'FESOM using rpart.out mapping for consistent mesh ordering'
         
-        ! Allocate arrays for the permutation and sorted coordinates
-        ALLOCATE(global_ids(number_of_all_points))
-        ALLOCATE(permutation(number_of_all_points))
+        ! Read the rpart.out mapping file
+        call read_rpart_mapping(meshpath, npes, local_to_oasis, oasis_to_local, total_mesh_points)
+        
+        ! Verify that the mesh size matches
+        if (total_mesh_points /= number_of_all_points) then
+          print *, '### ERROR: Mesh size mismatch between rpart.out and gathered data:'
+          print *, 'rpart.out total points =', total_mesh_points
+          print *, 'gathered total points =', number_of_all_points
+          call MPI_Abort(MPI_COMM_FESOM, 1, ierror)
+        end if
+        
+        ! Allocate arrays for the reordered mesh data
         ALLOCATE(all_x_sorted(number_of_all_points, 1))
         ALLOCATE(all_y_sorted(number_of_all_points, 1))
         ALLOCATE(all_area_sorted(number_of_all_points, 1))
@@ -641,41 +659,19 @@ include "associate_mesh_ass.h"
           ALLOCATE(all_y_corners_sorted(number_of_all_points, 1, 25))
         endif
         
-        ! Fill global_ids array with the appropriate global node IDs
-        ! This assumes all global IDs have been gathered on root processor
-        ! First, we need to gather global node IDs from all processors
-        call gather_global_ids(global_ids, number_of_all_points, MPI_COMM_FESOM)
-        
-        ! Create a permutation array for sorting
+        ! Apply the rpart.out mapping to reorder the mesh data
+        print *, 'FESOM applying rpart.out mapping for consistent ordering'
         do i = 1, number_of_all_points
-          permutation(i) = i
-        end do
-        
-        ! Sort permutation array based on global_ids using a simple insertion sort
-        ! This could be optimized with a more efficient algorithm if needed
-        do i = 2, number_of_all_points
-          j = i
-          do while (j > 1 .and. global_ids(permutation(j)) < global_ids(permutation(j-1)))
-            ! Swap permutation indices
-            k = permutation(j)
-            permutation(j) = permutation(j-1)
-            permutation(j-1) = k
-            j = j - 1
-          end do
-        end do
-        
-        ! Apply permutation to all arrays before writing
-        do i = 1, number_of_all_points
-          all_x_sorted(i,1) = all_x_coords(permutation(i),1)
-          all_y_sorted(i,1) = all_y_coords(permutation(i),1)
-          all_area_sorted(i,1) = all_area(permutation(i),1)
+          all_x_sorted(i, 1) = all_x_coords(local_to_oasis(i), 1)
+          all_y_sorted(i, 1) = all_y_coords(local_to_oasis(i), 1)
+          all_area_sorted(i, 1) = all_area(local_to_oasis(i), 1)
         end do
         
         if (compute_oasis_corners) then
           do j = 1, 25
             do i = 1, number_of_all_points
-              all_x_corners_sorted(i,1,j) = all_x_corners(permutation(i),1,j)
-              all_y_corners_sorted(i,1,j) = all_y_corners(permutation(i),1,j)
+              all_x_corners_sorted(i,1,j) = all_x_corners(local_to_oasis(i),1,j)
+              all_y_corners_sorted(i,1,j) = all_y_corners(local_to_oasis(i),1,j)
             end do
           end do
         endif
@@ -725,7 +721,7 @@ include "associate_mesh_ass.h"
       
       ! Free memory for temporary arrays
       if (consistent_oasis_mesh) then
-        DEALLOCATE(global_ids, permutation)
+        DEALLOCATE(local_to_oasis, oasis_to_local)
         DEALLOCATE(all_x_sorted, all_y_sorted, all_area_sorted)
         if (compute_oasis_corners) then
           DEALLOCATE(all_x_corners_sorted, all_y_corners_sorted)
@@ -931,7 +927,7 @@ include "associate_mesh_ass.h"
     !
     ! Local declarations
     !
-    integer                :: info
+    integer                :: info, i
     !
     real (kind=WP)          :: t1, t2, t3
     !
@@ -944,7 +940,17 @@ include "associate_mesh_ass.h"
     cplsnd(ind, :)=cplsnd(ind, :)+data_array
     ! call do_oce_2_atm(cplsnd(ind, :)/real(o2a_call_count), atm_fld, 1)
 
-    exfld = cplsnd(ind, 1:partit%myDim_nod2D)/real(o2a_call_count)
+    ! Apply consistent ordering if enabled on all processes
+    if (consistent_oasis_mesh .and. oasis_mapping_initialized) then
+      ! Reorder data using the mapping arrays
+      exfld = 0.0_WP
+      do i = 1, partit%myDim_nod2D
+        exfld(oasis_local_to_ordered(i)) = cplsnd(ind, i)/real(o2a_call_count)
+      end do
+    else
+      ! When consistent ordering is disabled, use original ordering
+      exfld = cplsnd(ind, 1:partit%myDim_nod2D)/real(o2a_call_count)
+    endif
 
     t2=MPI_Wtime()
 #ifdef VERBOSE
@@ -1013,9 +1019,18 @@ include "associate_mesh_ass.h"
  ! FESOM's interpolation routine interpolates structured
  ! VarStrLoc coming from OASIS3MCT to local unstructured data_array
  ! and delivered back to FESOM.
-   action=(info==3 .OR. info==10 .OR. info==11 .OR. info==12 .OR. info==13)
+    action=(info==3 .OR. info==10 .OR. info==11 .OR. info==12 .OR. info==13)
    if (action) then
-      data_array(1:partit%myDim_nod2d) = exfld
+      ! Apply reverse mapping if consistent ordering is enabled
+      if (consistent_oasis_mesh .and. oasis_mapping_initialized) then
+        ! Map from OASIS ordering back to FESOM ordering on all processes
+        do j = 1, partit%myDim_nod2d
+          data_array(j) = exfld(oasis_local_to_ordered(j))
+        end do
+      else
+        ! When consistent ordering is disabled
+        data_array(1:partit%myDim_nod2d) = exfld
+      endif
       call exchange_nod(data_array, partit)
    end if   
    t3=MPI_Wtime()
@@ -1158,6 +1173,151 @@ END SUBROUTINE exchange_roots
     DEALLOCATE(local_ids, counts_from_all_pes, displs_from_all_pes)
     
   end subroutine gather_global_ids
+
+  !--------------------------------------------------------------------
+  ! Subroutine to read and process the rpart.out mapping file
+  ! Creates mapping arrays between FESOM2's internal mesh ordering and
+  ! a consistent OASIS coupling order
+  !--------------------------------------------------------------------
+  subroutine read_rpart_mapping(mesh_path, npes_count, local_to_oasis, oasis_to_local, number_of_all_points)
+    USE MOD_PARTIT
+    use o_param
+    implicit none
+    
+    character(len=*), intent(in)  :: mesh_path        ! Path to mesh files
+    integer, intent(in)           :: npes_count       ! Total number of processors
+    integer, intent(out)          :: number_of_all_points ! Total number of mesh points
+    integer, allocatable, intent(out) :: local_to_oasis(:) ! Mapping from local to OASIS order
+    integer, allocatable, intent(out) :: oasis_to_local(:) ! Mapping from OASIS to local order
+    
+    ! Local variables
+    integer              :: fileID, ioerr, n, i
+    character(len=300)   :: file_name, dist_mesh_dir, npes_string, errmsg
+    integer, allocatable :: rpart_mapping(:)
+    integer              :: error_status
+    
+    write(npes_string, "(I10)") npes_count
+    dist_mesh_dir = trim(mesh_path)//'/dist_'//trim(ADJUSTL(npes_string))//'/'
+    file_name = trim(dist_mesh_dir)//'rpart.out'
+    
+    if (mype == 0) then
+      print *, 'Reading rpart.out mapping from: ', trim(file_name)
+      
+      fileID = 10
+      open(unit=fileID, file=trim(file_name), action='read', status='old', &
+           iostat=ioerr, iomsg=errmsg)
+      
+      if (ioerr /= 0) then
+        write(*, '(3A)') '### ERROR: Cannot open rpart.out file ', trim(file_name), &
+                         ', error: ' // trim(errmsg)
+        error_status = 1
+      else
+        ! First line: number of processors
+        read(fileID, *) n
+        error_status = 0
+        if (n /= npes_count) then
+          print *, '### ERROR: Number of processors in rpart.out does not match: ', n, npes_count
+          error_status = 2
+        else
+          ! Read the number of 2D nodes per processor
+          allocate(rpart_mapping(npes_count))
+          read(fileID, *) rpart_mapping(1:npes_count)
+          
+          ! Calculate total number of mesh points
+          number_of_all_points = sum(rpart_mapping)
+          
+          ! Read the full mapping array
+          allocate(local_to_oasis(number_of_all_points))
+          read(fileID, *) local_to_oasis
+          
+          ! Create reverse mapping (OASIS to local)
+          allocate(oasis_to_local(number_of_all_points))
+          do i = 1, number_of_all_points
+            oasis_to_local(local_to_oasis(i)) = i
+          end do
+          
+          deallocate(rpart_mapping)
+        end if
+        close(fileID)
+      end if
+    end if
+    
+    ! Broadcast error status and total points to all processes
+    call MPI_BCast(error_status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ioerr)
+    call MPI_BCast(number_of_all_points, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ioerr)
+    
+    if (error_status /= 0) then
+      print *, 'Error reading rpart.out file. Aborting.'
+      call MPI_Abort(MPI_COMM_FESOM, error_status, ioerr)
+    end if
+    
+    ! Make sure arrays are allocated on non-root processes too
+    ! Note: Arrays will be broadcast to all processes in init_oasis_mapping
+  end subroutine read_rpart_mapping
+  
+  !--------------------------------------------------------------------
+  ! Subroutine to initialize the OASIS coupling mapping arrays
+  ! This ensures consistent ordering between OASIS grid files and
+  ! runtime coupling data exchanges
+  !--------------------------------------------------------------------
+  subroutine init_oasis_mapping()
+    use o_param
+    use g_config
+    USE MOD_PARTIT
+    implicit none
+    
+    integer :: total_points, i, ierror
+    integer :: nod2d_count, local_size, max_size
+    
+    ! Skip if mapping is already initialized or consistent mesh is disabled
+    if (oasis_mapping_initialized .or. .not. consistent_oasis_mesh) return
+    
+    if (mype == 0) then
+      print *, 'Initializing OASIS coupling mapping from rpart.out'
+    endif
+    
+    ! Read the rpart.out mapping on root process
+    if (mype == 0) then
+      call read_rpart_mapping(meshpath, npes, oasis_local_to_ordered, oasis_ordered_to_local, total_points)
+    endif
+    
+    ! Broadcast total points to all processes
+    if (mype == 0) then
+      nod2d_count = total_points
+    endif
+    call MPI_BCAST(nod2d_count, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+    
+    ! Verify that the mesh size is correct
+    local_size = myDim_nod2D
+    call MPI_ALLREDUCE(local_size, total_points, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM, ierror)
+    
+    if (mype == 0 .and. total_points /= nod2d_count) then
+      print *, '### WARNING: Mesh size mismatch between rpart.out and current mesh:'
+      print *, 'rpart.out total points =', nod2d_count
+      print *, 'current mesh total points =', total_points
+    endif
+    
+    ! Find maximum local size to allocate arrays on all processes
+    call MPI_ALLREDUCE(myDim_nod2D, max_size, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, ierror)
+    
+    ! Allocate arrays on all processes
+    if (mype /= 0) then
+      if (allocated(oasis_local_to_ordered)) deallocate(oasis_local_to_ordered)
+      if (allocated(oasis_ordered_to_local)) deallocate(oasis_ordered_to_local)
+      allocate(oasis_local_to_ordered(max_size))
+      allocate(oasis_ordered_to_local(max_size))
+    endif
+    
+    ! Broadcast mapping arrays to all processes
+    call MPI_BCAST(oasis_local_to_ordered, max_size, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+    call MPI_BCAST(oasis_ordered_to_local, max_size, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+    
+    oasis_mapping_initialized = .true.
+    
+    if (mype == 0) then
+      print *, 'OASIS coupling mapping initialized on all processes'
+    endif
+  end subroutine init_oasis_mapping
 
   subroutine fesom_flush ()
   end subroutine fesom_flush
