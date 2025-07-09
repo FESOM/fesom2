@@ -1189,11 +1189,20 @@ subroutine diff_part_hor_redi(tracers, partit, mesh)
 
     !___________________________________________________________________________
     if (Redi) isredi=1._WP
+#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, &
 !$OMP                   nl1, ul1, nl2, ul2, nl12, ul12, nz, el, elnodes, enodes, &
 !$OMP                             c, Fx, Fy, Tx, Ty, Tx_z, Ty_z, SxTz, SyTz, Tz, &
 !$OMP                                                          rhs1, rhs2, Kh, dz)
 !$OMP DO
+#else
+!$ACC UPDATE DEVICE(edge_cross_dxdy, edge_tri, Ki, slope_tapered)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT) &
+!$ACC PRIVATE(el, enodes, elnodes, deltaX1, deltaY1, nl1, ul1, nl2, ul2, &
+!$ACC         nl12, ul12, deltaX2, deltaY2, Kh, dz, nz, Tz, SxTz, SyTz, &
+!$ACC         Tx, Ty, Fx, Fy, c, rhs1, rhs2)
+#endif
+
     do edge=1, myDim_edge2D
         rhs1=0.0_WP
         rhs2=0.0_WP

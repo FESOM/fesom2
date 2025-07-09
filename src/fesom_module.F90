@@ -442,6 +442,7 @@ contains
 #endif
     !$ACC ENTER DATA COPYIN (f%dynamics)
     !$ACC ENTER DATA CREATE (f%dynamics%w, f%dynamics%w_e, f%dynamics%uv)
+    !$ACC ENTER DATA COPYIN (f%tracers)
     !$ACC ENTER DATA CREATE (f%tracers%work%del_ttf)
     !$ACC ENTER DATA CREATE (f%tracers%data, f%tracers%work) 
     do tr_num=1, f%tracers%num_tracers
