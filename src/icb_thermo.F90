@@ -635,4 +635,4 @@ subroutine fcn_density(t,s,z,rho)
       + 4.8314e-4*s**2)
  rho = rhopot / (1.0 + 0.1*z/bulk)
 end subroutine fcn_density
-end module
+end module iceberg_thermodynamics

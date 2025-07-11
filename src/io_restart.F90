@@ -149,14 +149,34 @@ subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
          trname='r39ar'
          longname='39Ar / Ar ratio'
          units='none'
+       CASE(101)
+         trname='h2o18'
+         longname='h2o18 concentration'
+         units='kmol/m**3'
+       CASE(102)
+         trname='hDo16'
+         longname='hDo16 concentration'
+         units='kmol/m**3'
+       CASE(103)
+         trname='h2o16'
+         longname='h2o16 concentration'
+         units='kmol/m**3'
        CASE DEFAULT
          write(trname,'(A3,i4.4)') 'tra_', j
          write(longname,'(A15,i4.4)') 'passive tracer ', j
          units='none'
      END SELECT
-     call oce_files%def_node_var(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
+     if ((tracers%data(j)%ID==101) .or. (tracers%data(j)%ID==102) .or. (tracers%data(j)%ID==103)) then
+        call oce_files%def_node_var_optional(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
+     else
+        call oce_files%def_node_var(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
+     endif
      longname=trim(longname)//', Adams-Bashforth'
-     call oce_files%def_node_var(trim(trname)//'_AB', trim(longname), trim(units), tracers%data(j)%valuesAB(:,:),    mesh, partit)
+     if ((tracers%data(j)%ID==101) .or. (tracers%data(j)%ID==102) .or. (tracers%data(j)%ID==103)) then
+        call oce_files%def_node_var_optional(trim(trname)//'_AB', trim(longname), trim(units), tracers%data(j)%valuesAB(:,:),    mesh, partit)
+     else
+        call oce_files%def_node_var(trim(trname)//'_AB', trim(longname), trim(units), tracers%data(j)%valuesAB(:,:),    mesh, partit)
+     endif
      call oce_files%def_node_var_optional(trim(trname)//'_M1', trim(longname), trim(units), tracers%data(j)%valuesold(1,:,:), mesh, partit)
      if (tracers%data(j)%AB_order==3) &
      call oce_files%def_node_var_optional(trim(trname)//'_M2', trim(longname), trim(units), tracers%data(j)%valuesold(2,:,:), mesh, partit)
@@ -571,7 +591,7 @@ subroutine write_restart(path, filegroup, istep)
     call filegroup%files(i)%async_gather_and_write_variables()
   end do
   
-end subroutine
+end subroutine write_restart
 !
 !
 !_______________________________________________________________________________
@@ -606,7 +626,7 @@ subroutine write_all_raw_restarts(istep, mpicomm, mype)
 #endif
     close(fileunit)
   end if
-end subroutine
+end subroutine write_all_raw_restarts
 !
 !
 !_______________________________________________________________________________
@@ -619,7 +639,7 @@ subroutine write_raw_restart_group(filegroup, fileunit)
   do i=1, filegroup%nfiles
     call filegroup%files(i)%write_variables_raw(fileunit)
   end do
-end subroutine
+end subroutine write_raw_restart_group
 ! ! !
 ! ! !
 ! ! !_______________________________________________________________________________
@@ -855,7 +875,7 @@ subroutine read_all_raw_restarts(mpicomm, mype)
     print *,"can not open ",raw_restart_dirpath//'/'//mpirank_to_txt(mpicomm)//'.dump'
     stop 1
   end if
-end subroutine
+end subroutine read_all_raw_restarts
 !
 !
 !_______________________________________________________________________________
@@ -868,7 +888,7 @@ subroutine read_raw_restart_group(filegroup, fileunit)
   do i=1, filegroup%nfiles
     call filegroup%files(i)%read_variables_raw(fileunit)
   end do  
-end subroutine
+end subroutine read_raw_restart_group
 !
 !
 !_______________________________________________________________________________
@@ -902,7 +922,7 @@ subroutine finalize_restart()
     end if
   end do
 #endif
-end subroutine
+end subroutine finalize_restart
 !
 !
 !_______________________________________________________________________________
@@ -1008,7 +1028,7 @@ subroutine read_restart(path, filegroup, mpicomm, mype)
       call MPI_Recv(globalstep, 1, MPI_INTEGER, MPI_ANY_SOURCE, 42, mpicomm, mpistatus, mpierr)
     end if
   end if
-end subroutine
+end subroutine read_restart
 !
 !
 !_______________________________________________________________________________
