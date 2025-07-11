@@ -62,7 +62,7 @@ implicit none
 
   call MPI_AllREDUCE(maxval(nod_in_elem2D_num), N_max, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 
-  filename=trim(ResultPath)//runid//'.mesh.diag.nc'
+  filename=trim(ResultPath)//trim(runid)//'.mesh.diag.nc'
   call my_create(filename, IOR(NF_CLOBBER,IOR(NF_NETCDF4,NF_CLASSIC_MODEL)), ncid, partit)
 
   ! NOTE(PG): For naming conventions of node, edge, face, please see here:
