@@ -1,8 +1,255 @@
 #===============================================================================
 # FesomTesting.cmake - Testing utilities for FESOM2
 #===============================================================================
+#
+# This file provides utilities for configuring and running FESOM2 tests.
+# The namelist configuration has been refactored into individual functions
+# for better control and customization:
+#
+# Individual namelist functions:
+# - update_common_paths() - Updates common paths in namelist.config only
+# - update_namelist_config() - Configures namelist.config for test_pi
+# - update_namelist_dyn() - Configures namelist.dyn for test_pi
+# - update_namelist_ice() - Configures namelist.ice for test_pi
+# - update_namelist_tra() - Configures namelist.tra for test_pi
+# - update_tracer_init3d_filelist() - Specifically updates tracer_init3d filelist
+# - update_namelist_forcing() - Configures namelist.forcing for test_pi
+# - update_namelist_oce() - Configures namelist.oce (placeholder)
+# - update_namelist_io() - Configures namelist.io (placeholder)
+# - update_namelist_cvmix() - Configures namelist.cvmix (placeholder)
+#
+# Main functions:
+# - configure_fesom_namelists() - Main function that calls all individual functions
+# - add_fesom_test() - Adds a complete FESOM integration test
+# - generate_fesom_clock() - Generates fesom.clock file
+# - setup_mpi_testing() - Sets up MPI for testing
+#
+# Example usage for custom namelist configuration:
+# ```
+# # Copy and configure namelist.config with common paths
+# configure_file("${CMAKE_SOURCE_DIR}/config/namelist.config" "${TARGET_DIR}/namelist.config" COPYONLY)
+# update_common_paths("${TARGET_DIR}/namelist.config" "${TARGET_DIR}/namelist.config" "${TEST_DATA_DIR}" "${RESULT_DIR}")
+# update_namelist_config("${TARGET_DIR}/namelist.config" "${TARGET_DIR}/namelist.config")
+# 
+# # Copy and configure a specific namelist (e.g., tracer)
+# configure_file("${CMAKE_SOURCE_DIR}/config/namelist.tra" "${TARGET_DIR}/namelist.tra" COPYONLY)
+# update_tracer_init3d_filelist("${TARGET_DIR}/namelist.tra" "${TARGET_DIR}/namelist.tra" "${TEST_DATA_DIR}")
+# ```
+#
 
-# Function to configure namelists for a test
+# Function to update common paths in any namelist
+function(update_common_paths NAMELIST_IN NAMELIST_OUT TEST_DATA_DIR RESULT_DIR)
+    file(READ "${NAMELIST_IN}" CONTENT)
+    
+    # Replace common paths with test data paths
+    string(REGEX REPLACE "MeshPath='[^']*'" "MeshPath='${TEST_DATA_DIR}/MESHES/pi/'" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "ClimateDataPath='[^']*'" "ClimateDataPath='${TEST_DATA_DIR}/'" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "ResultPath='[^']*'" "ResultPath='${RESULT_DIR}/'" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "fwf_path='[^']*'" "fwf_path='${TEST_DATA_DIR}/meshes/pi/'" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "age_tracer_path='[^']*'" "age_tracer_path='${TEST_DATA_DIR}/meshes/pi/'" CONTENT "${CONTENT}")
+    
+    file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
+endfunction()
+
+# Function to update namelist.config for test_pi
+function(update_namelist_config NAMELIST_IN NAMELIST_OUT)
+    file(READ "${NAMELIST_IN}" CONTENT)
+    
+    # Set step_per_day to 96 for test_pi
+    string(REGEX REPLACE "step_per_day=[0-9]+" "step_per_day=96" CONTENT "${CONTENT}")
+    # Set run_length to 1 day for tests
+    string(REGEX REPLACE "run_length=[0-9]+" "run_length=1" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "run_length_unit='[^']*'" "run_length_unit='d'" CONTENT "${CONTENT}")
+    # Set restart_length to 1 day
+    string(REGEX REPLACE "restart_length=[0-9]+" "restart_length=1" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "restart_length_unit='[^']*'" "restart_length_unit='d'" CONTENT "${CONTENT}")
+    # Set logfile output frequency
+    string(REGEX REPLACE "logfile_outfreq=[0-9]+" "logfile_outfreq=10" CONTENT "${CONTENT}")
+    # Force rotation for test geometry
+    string(REGEX REPLACE "force_rotation=.[a-zA-Z]." "force_rotation=.true." CONTENT "${CONTENT}")
+    
+    file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
+endfunction()
+
+# Function to update namelist.dyn for test_pi
+function(update_namelist_dyn NAMELIST_IN NAMELIST_OUT)
+    file(READ "${NAMELIST_IN}" CONTENT)
+    
+    # Enable wind stress splitting for test_pi dynamics
+    string(REGEX REPLACE "use_wsplit=.[a-zA-Z]." "use_wsplit=.true." CONTENT "${CONTENT}")
+    
+    file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
+endfunction()
+
+# Function to update namelist.ice for test_pi
+function(update_namelist_ice NAMELIST_IN NAMELIST_OUT)
+    file(READ "${NAMELIST_IN}" CONTENT)
+    
+    # Set EVP rheology parameters for test_pi
+    string(REGEX REPLACE "whichEVP=[0-9]+" "whichEVP=1" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "evp_rheol_steps=[0-9]+" "evp_rheol_steps=120" CONTENT "${CONTENT}")
+    
+    file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
+endfunction()
+
+# Function to update namelist.tra for test_pi
+function(update_namelist_tra NAMELIST_IN NAMELIST_OUT TEST_DATA_DIR)
+    file(READ "${NAMELIST_IN}" CONTENT)
+    
+    # Set filelist for test_global climate data with correct path
+    # Replace the complete line including the comment
+    string(REGEX REPLACE "filelist[ \t]*=[ \t]*'[^']*'[ \t]*,[ \t]*'[^']*'" "filelist = 'INITIAL/WOA18/woa18_netcdf_5deg.nc', 'INITIAL/WOA18/woa18_netcdf_5deg.nc'" CONTENT "${CONTENT}")
+    
+    # Update any other hardcoded paths in the tracers section
+    string(REGEX REPLACE "/pool/data/AWICM/FESOM2/FORCING/[^']*" "${TEST_DATA_DIR}/initial" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "phc3.0_winter\\.nc" "woa18_netcdf_5deg.nc" CONTENT "${CONTENT}")
+    
+    file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
+endfunction()
+
+# Function to update tracer_init3d filelist specifically (as requested)
+function(update_tracer_init3d_filelist NAMELIST_IN NAMELIST_OUT TEST_DATA_DIR)
+    file(READ "${NAMELIST_IN}" NAMELIST_TEXT)
+
+    # Match the &tracer_init3d block up to the ending "/"
+    string(REGEX MATCHALL "&tracer_init3d[^\n]*\n([^/]*\n)*[ \t]*/" MATCHED_BLOCKS "${NAMELIST_TEXT}")
+
+    if(NOT MATCHED_BLOCKS)
+        message(FATAL_ERROR "Could not find &tracer_init3d block in ${NAMELIST_IN}")
+    endif()
+
+    list(GET MATCHED_BLOCKS 0 TRACER_INIT3D_BLOCK)
+
+    # Replace the filelist line in the extracted block
+    string(REGEX REPLACE
+        "filelist[ \t]*=.*\n"
+        "filelist = '${TEST_DATA_DIR}/INITIAL/WOA18/woa18_netcdf_5deg.nc', '${TEST_DATA_DIR}/INITIAL/WOA18/woa18_netcdf_5deg.nc'\n"
+        TRACER_INIT3D_MODIFIED
+        "${TRACER_INIT3D_BLOCK}"
+    )
+
+    # Replace the original block with the modified one in the full namelist
+    string(REPLACE "${TRACER_INIT3D_BLOCK}" "${TRACER_INIT3D_MODIFIED}" NAMELIST_MODIFIED "${NAMELIST_TEXT}")
+
+    # Write the modified namelist to output
+    file(WRITE "${NAMELIST_OUT}" "${NAMELIST_MODIFIED}")
+endfunction()
+
+# Function to update namelist.forcing for test_pi
+function(update_namelist_forcing NAMELIST_IN NAMELIST_OUT TEST_DATA_DIR)
+    file(READ "${NAMELIST_IN}" CONTENT)
+    
+    # Apply test_global forcing configurations from setups/forcings.yml
+    
+    # forcing_exchange_coeff section
+    string(REGEX REPLACE "Ce_atm_oce=[0-9.e-]+" "Ce_atm_oce=1.75e-3" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "Ch_atm_oce=[0-9.e-]+" "Ch_atm_oce=1.75e-3" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "Cd_atm_oce=[0-9.e-]+" "Cd_atm_oce=1.0e-3" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "Ce_atm_ice=[0-9.e-]+" "Ce_atm_ice=1.75e-3" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "Ch_atm_ice=[0-9.e-]+" "Ch_atm_ice=1.75e-3" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "Cd_atm_ice=[0-9.e-]+" "Cd_atm_ice=1.2e-3" CONTENT "${CONTENT}")
+    
+    # forcing_bulk section  
+    string(REGEX REPLACE "AOMIP_drag_coeff=[.][A-Za-z][A-Za-z]*" "AOMIP_drag_coeff=.false." CONTENT "${CONTENT}")
+    string(REGEX REPLACE "ncar_bulk_formulae=[.][A-Za-z][A-Za-z]*" "ncar_bulk_formulae=.true." CONTENT "${CONTENT}")
+    string(REGEX REPLACE "ncar_bulk_z_wind=[0-9.]+" "ncar_bulk_z_wind=10.0" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "ncar_bulk_z_tair=[0-9.]+" "ncar_bulk_z_tair=10.0" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "ncar_bulk_z_shum=[0-9.]+" "ncar_bulk_z_shum=10.0" CONTENT "${CONTENT}")
+    
+    # Update nam_sbc section with test_global values
+    # File paths (prepend with ClimateDataPath)
+    #string(REGEX REPLACE "nm_xwind_file *= *'[^']*'" "nm_xwind_file = '${TEST_DATA_DIR}/forcing/global/u_10.1948.nc'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_ywind_file *= *'[^']*'" "nm_ywind_file = '${TEST_DATA_DIR}/forcing/global/v_10.1948.nc'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_xstre_file *= *'[^']*'" "nm_xstre_file = '${TEST_DATA_DIR}/forcing/global/u_10.1948.nc'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_ystre_file *= *'[^']*'" "nm_ystre_file = '${TEST_DATA_DIR}/forcing/global/v_10.1948.nc'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_humi_file *= *'[^']*'" "nm_humi_file = '${TEST_DATA_DIR}/forcing/global/q_10.1948.nc'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_qsr_file *= *'[^']*'" "nm_qsr_file = '${TEST_DATA_DIR}/forcing/global/ncar_rad.1948.nc'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_qlw_file *= *'[^']*'" "nm_qlw_file = '${TEST_DATA_DIR}/forcing/global/ncar_rad.1948.nc'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_tair_file *= *'[^']*'" "nm_tair_file = '${TEST_DATA_DIR}/forcing/global/t_10.1948.nc'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_prec_file *= *'[^']*'" "nm_prec_file = '${TEST_DATA_DIR}/forcing/global/ncar_precip.1948.nc'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_snow_file *= *'[^']*'" "nm_snow_file = '${TEST_DATA_DIR}/forcing/global/ncar_precip.1948.nc'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_mslp_file *= *'[^']*'" "nm_mslp_file = '${TEST_DATA_DIR}/forcing/global/slp.1948.nc'" CONTENT "${CONTENT}")
+    
+    # Variable names
+    #string(REGEX REPLACE "nm_xwind_var *= *'[^']*'" "nm_xwind_var = 'U_10_MOD'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_ywind_var *= *'[^']*'" "nm_ywind_var = 'V_10_MOD'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_xstre_var *= *'[^']*'" "nm_xstre_var = 'U_10_MOD'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_ystre_var *= *'[^']*'" "nm_ystre_var = 'V_10_MOD'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_humi_var *= *'[^']*'" "nm_humi_var = 'Q_10_MOD'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_qsr_var *= *'[^']*'" "nm_qsr_var = 'SWDN_MOD'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_qlw_var *= *'[^']*'" "nm_qlw_var = 'LWDN_MOD'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_tair_var *= *'[^']*'" "nm_tair_var = 'T_10_MOD'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_prec_var *= *'[^']*'" "nm_prec_var = 'RAIN'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_snow_var *= *'[^']*'" "nm_snow_var = 'SNOW'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_mslp_var *= *'[^']*'" "nm_mslp_var = 'SLP'" CONTENT "${CONTENT}")
+    
+    # NetCDF parameters
+    #string(REGEX REPLACE "nm_nc_iyear *= *[0-9]+" "nm_nc_iyear = 1948" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_nc_imm *= *[0-9]+" "nm_nc_imm = 1" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_nc_idd *= *[0-9]+" "nm_nc_idd = 1" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_nc_freq *= *[0-9]+" "nm_nc_freq = 1" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_nc_tmid *= *[0-9]+" "nm_nc_tmid = 1" CONTENT "${CONTENT}")
+    
+    # Flags
+    #string(REGEX REPLACE "l_xwind=[.][A-Za-z][A-Za-z]*" "l_xwind=.true." CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "l_ywind=[.][A-Za-z][A-Za-z]*" "l_ywind=.true." CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "l_xstre=[.][A-Za-z][A-Za-z]*" "l_xstre=.false." CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "l_ystre=[.][A-Za-z][A-Za-z]*" "l_ystre=.false." CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "l_humi=[.][A-Za-z][A-Za-z]*" "l_humi=.true." CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "l_qsr=[.][A-Za-z][A-Za-z]*" "l_qsr=.true." CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "l_qlw=[.][A-Za-z][A-Za-z]*" "l_qlw=.true." CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "l_tair=[.][A-Za-z][A-Za-z]*" "l_tair=.true." CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "l_prec=[.][A-Za-z][A-Za-z]*" "l_prec=.true." CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "l_mslp=[.][A-Za-z][A-Za-z]*" "l_mslp=.false." CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "l_cloud=[.][A-Za-z][A-Za-z]*" "l_cloud=.false." CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "l_snow=[.][A-Za-z][A-Za-z]*" "l_snow=.true." CONTENT "${CONTENT}")
+    
+    # Data sources and files
+    #string(REGEX REPLACE "runoff_data_source *= *'[^']*'" "runoff_data_source = 'CORE2'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_runoff_file *= *'[^']*'" "nm_runoff_file = '${TEST_DATA_DIR}/forcing/global/runoff.nc'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "sss_data_source *= *'[^']*'" "sss_data_source = 'CORE2'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_sss_data_file *= *'[^']*'" "nm_sss_data_file = '${TEST_DATA_DIR}/forcing/global/PHC2_salx.nc'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "chl_data_source *= *'[^']*'" "chl_data_source = 'None'" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "nm_chl_data_file *= *'[^']*'" "nm_chl_data_file = ''" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "chl_const *= *[0-9.]*" "chl_const = 0.1" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "use_runoff_mapper *= *[.][A-Za-z][A-Za-z]*" "use_runoff_mapper = .FALSE." CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "runoff_basins_file *= *'[^']*'" "runoff_basins_file = ''" CONTENT "${CONTENT}")
+    #string(REGEX REPLACE "runoff_radius *= *[0-9.]*" "runoff_radius = 500000." CONTENT "${CONTENT}")
+    
+    file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
+endfunction()
+
+# Function to update namelist.oce (placeholder for future customization)
+function(update_namelist_oce NAMELIST_IN NAMELIST_OUT)
+    file(READ "${NAMELIST_IN}" CONTENT)
+    
+    # Add ocean-specific modifications here as needed
+    # For now, just copy the content as-is
+    
+    file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
+endfunction()
+
+# Function to update namelist.io (placeholder for future customization)
+function(update_namelist_io NAMELIST_IN NAMELIST_OUT)
+    file(READ "${NAMELIST_IN}" CONTENT)
+    
+    # Add I/O-specific modifications here as needed
+    # For now, just copy the content as-is
+    
+    file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
+endfunction()
+
+# Function to update namelist.cvmix (placeholder for future customization)
+function(update_namelist_cvmix NAMELIST_IN NAMELIST_OUT)
+    file(READ "${NAMELIST_IN}" CONTENT)
+    
+    # Add CVMix-specific modifications here as needed
+    # For now, just copy the content as-is
+    
+    file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
+endfunction()
+
+# Function to configure namelists for a test (refactored version)
 function(configure_fesom_namelists TARGET_DIR TEST_DATA_DIR RESULT_DIR)
     # List of namelists that need to be copied and configured
     set(NAMELISTS
@@ -18,142 +265,33 @@ function(configure_fesom_namelists TARGET_DIR TEST_DATA_DIR RESULT_DIR)
     
     foreach(NAMELIST ${NAMELISTS})
         if(EXISTS "${CMAKE_SOURCE_DIR}/config/${NAMELIST}")
-            # Copy the namelist to target directory
+            # Copy the namelist to target directory first
             configure_file(
                 "${CMAKE_SOURCE_DIR}/config/${NAMELIST}"
                 "${TARGET_DIR}/${NAMELIST}"
                 COPYONLY
             )
             
-            # Generate a script to modify paths in the namelist
-            set(MODIFY_SCRIPT "${TARGET_DIR}/modify_${NAMELIST}.cmake")
-            file(WRITE ${MODIFY_SCRIPT} "
-                file(READ \"${TARGET_DIR}/${NAMELIST}\" CONTENT)
-                # Replace common paths with test data paths
-		string(REGEX REPLACE \"MeshPath='[^']*'\" \"MeshPath='${TEST_DATA_DIR}/MESHES/pi/'\" CONTENT \"\${CONTENT}\")
-                string(REGEX REPLACE \"ClimateDataPath='[^']*'\" \"ClimateDataPath='${TEST_DATA_DIR}/'\" CONTENT \"\${CONTENT}\")
-                string(REGEX REPLACE \"ResultPath='[^']*'\" \"ResultPath='${RESULT_DIR}/'\" CONTENT \"\${CONTENT}\")
-                string(REGEX REPLACE \"fwf_path='[^']*'\" \"fwf_path='${TEST_DATA_DIR}/meshes/pi/'\" CONTENT \"\${CONTENT}\")
-                string(REGEX REPLACE \"age_tracer_path='[^']*'\" \"age_tracer_path='${TEST_DATA_DIR}/meshes/pi/'\" CONTENT \"\${CONTENT}\")
-                
-                # Apply test_pi specific configurations
-                if(\"${NAMELIST}\" STREQUAL \"namelist.config\")
-                    # Set step_per_day to 96 for test_pi
-                    string(REGEX REPLACE \"step_per_day=[0-9]+\" \"step_per_day=96\" CONTENT \"\${CONTENT}\")
-                    # Set run_length to 1 day for tests
-                    string(REGEX REPLACE \"run_length=[0-9]+\" \"run_length=1\" CONTENT \"\${CONTENT}\")
-                    string(REGEX REPLACE \"run_length_unit='[^']*'\" \"run_length_unit='d'\" CONTENT \"\${CONTENT}\")
-                    # Set restart_length to 1 day
-                    string(REGEX REPLACE \"restart_length=[0-9]+\" \"restart_length=1\" CONTENT \"\${CONTENT}\")
-                    string(REGEX REPLACE \"restart_length_unit='[^']*'\" \"restart_length_unit='d'\" CONTENT \"\${CONTENT}\")
-                    # Set logfile output frequency
-                    string(REGEX REPLACE \"logfile_outfreq=[0-9]+\" \"logfile_outfreq=10\" CONTENT \"\${CONTENT}\")
-                    # Force rotation for test geometry
-                    string(REGEX REPLACE \"force_rotation=.[a-zA-Z].\" \"force_rotation=.true.\" CONTENT \"\${CONTENT}\")
-                endif()
-                
-                if(\"${NAMELIST}\" STREQUAL \"namelist.dyn\")
-                    # Enable wind stress splitting for test_pi dynamics
-                    string(REGEX REPLACE \"use_wsplit=.[a-zA-Z].\" \"use_wsplit=.true.\" CONTENT \"\${CONTENT}\")
-                endif()
-                
-                if(\"${NAMELIST}\" STREQUAL \"namelist.ice\")
-                    # Set EVP rheology parameters for test_pi
-                    string(REGEX REPLACE \"whichEVP=[0-9]+\" \"whichEVP=1\" CONTENT \"\${CONTENT}\")
-                    string(REGEX REPLACE \"evp_rheol_steps=[0-9]+\" \"evp_rheol_steps=120\" CONTENT \"\${CONTENT}\")
-                endif()
-                
-                if(\"${NAMELIST}\" STREQUAL \"namelist.tra\")
-                    # Set filelist for test_global climate data
-                    # Replace the complete line including the comment
-                    string(REGEX REPLACE \"filelist[ \t]*=[ \t]*'[^']*'[ \t]*,[ \t]*'[^']*'\" \"filelist = 'woa18_netcdf_5deg.nc', 'woa18_netcdf_5deg.nc'\" CONTENT \"\${CONTENT}\")
-                    
-                    # Update any other hardcoded paths in the tracers section
-                    string(REGEX REPLACE \"/pool/data/AWICM/FESOM2/FORCING/[^']*\" \"${TEST_DATA_DIR}/initial\" CONTENT \"\${CONTENT}\")
-                    string(REGEX REPLACE \"phc3.0_winter\\.nc\" \"woa18_netcdf_5deg.nc\" CONTENT \"\${CONTENT}\")
-                endif()
-                
-                if(\"${NAMELIST}\" STREQUAL \"namelist.forcing\")
-                    # Apply test_global forcing configurations from setups/forcings.yml
-                    
-                    # forcing_exchange_coeff section
-                    string(REGEX REPLACE \"Ce_atm_oce=[0-9.e-]+\" \"Ce_atm_oce=1.75e-3\" CONTENT \"\${CONTENT}\")
-                    string(REGEX REPLACE \"Ch_atm_oce=[0-9.e-]+\" \"Ch_atm_oce=1.75e-3\" CONTENT \"\${CONTENT}\")
-                    string(REGEX REPLACE \"Cd_atm_oce=[0-9.e-]+\" \"Cd_atm_oce=1.0e-3\" CONTENT \"\${CONTENT}\")
-                    string(REGEX REPLACE \"Ce_atm_ice=[0-9.e-]+\" \"Ce_atm_ice=1.75e-3\" CONTENT \"\${CONTENT}\")
-                    string(REGEX REPLACE \"Ch_atm_ice=[0-9.e-]+\" \"Ch_atm_ice=1.75e-3\" CONTENT \"\${CONTENT}\")
-                    string(REGEX REPLACE \"Cd_atm_ice=[0-9.e-]+\" \"Cd_atm_ice=1.2e-3\" CONTENT \"\${CONTENT}\")
-                    
-                    # forcing_bulk section  
-                    string(REGEX REPLACE \"AOMIP_drag_coeff=[.][A-Za-z][A-Za-z]*\" \"AOMIP_drag_coeff=.false.\" CONTENT \"\${CONTENT}\")
-                    string(REGEX REPLACE \"ncar_bulk_formulae=[.][A-Za-z][A-Za-z]*\" \"ncar_bulk_formulae=.true.\" CONTENT \"\${CONTENT}\")
-                    string(REGEX REPLACE \"ncar_bulk_z_wind=[0-9.]+\" \"ncar_bulk_z_wind=10.0\" CONTENT \"\${CONTENT}\")
-                    string(REGEX REPLACE \"ncar_bulk_z_tair=[0-9.]+\" \"ncar_bulk_z_tair=10.0\" CONTENT \"\${CONTENT}\")
-                    string(REGEX REPLACE \"ncar_bulk_z_shum=[0-9.]+\" \"ncar_bulk_z_shum=10.0\" CONTENT \"\${CONTENT}\")
-                    
-                    # Update nam_sbc section with test_global values
-                    # File paths (prepend with ClimateDataPath)
-		    #string(REGEX REPLACE \"nm_xwind_file *= *'[^']*'\" \"nm_xwind_file = '${TEST_DATA_DIR}/forcing/global/u_10.1948.nc'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_ywind_file *= *'[^']*'\" \"nm_ywind_file = '${TEST_DATA_DIR}/forcing/global/v_10.1948.nc'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_xstre_file *= *'[^']*'\" \"nm_xstre_file = '${TEST_DATA_DIR}/forcing/global/u_10.1948.nc'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_ystre_file *= *'[^']*'\" \"nm_ystre_file = '${TEST_DATA_DIR}/forcing/global/v_10.1948.nc'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_humi_file *= *'[^']*'\" \"nm_humi_file = '${TEST_DATA_DIR}/forcing/global/q_10.1948.nc'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_qsr_file *= *'[^']*'\" \"nm_qsr_file = '${TEST_DATA_DIR}/forcing/global/ncar_rad.1948.nc'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_qlw_file *= *'[^']*'\" \"nm_qlw_file = '${TEST_DATA_DIR}/forcing/global/ncar_rad.1948.nc'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_tair_file *= *'[^']*'\" \"nm_tair_file = '${TEST_DATA_DIR}/forcing/global/t_10.1948.nc'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_prec_file *= *'[^']*'\" \"nm_prec_file = '${TEST_DATA_DIR}/forcing/global/ncar_precip.1948.nc'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_snow_file *= *'[^']*'\" \"nm_snow_file = '${TEST_DATA_DIR}/forcing/global/ncar_precip.1948.nc'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_mslp_file *= *'[^']*'\" \"nm_mslp_file = '${TEST_DATA_DIR}/forcing/global/slp.1948.nc'\" CONTENT \"\${CONTENT}\")
-                    
-                    # Variable names
-		    #string(REGEX REPLACE \"nm_xwind_var *= *'[^']*'\" \"nm_xwind_var = 'U_10_MOD'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_ywind_var *= *'[^']*'\" \"nm_ywind_var = 'V_10_MOD'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_xstre_var *= *'[^']*'\" \"nm_xstre_var = 'U_10_MOD'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_ystre_var *= *'[^']*'\" \"nm_ystre_var = 'V_10_MOD'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_humi_var *= *'[^']*'\" \"nm_humi_var = 'Q_10_MOD'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_qsr_var *= *'[^']*'\" \"nm_qsr_var = 'SWDN_MOD'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_qlw_var *= *'[^']*'\" \"nm_qlw_var = 'LWDN_MOD'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_tair_var *= *'[^']*'\" \"nm_tair_var = 'T_10_MOD'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_prec_var *= *'[^']*'\" \"nm_prec_var = 'RAIN'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_snow_var *= *'[^']*'\" \"nm_snow_var = 'SNOW'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_mslp_var *= *'[^']*'\" \"nm_mslp_var = 'SLP'\" CONTENT \"\${CONTENT}\")
-                    
-                    # NetCDF parameters
-		    #string(REGEX REPLACE \"nm_nc_iyear *= *[0-9]+\" \"nm_nc_iyear = 1948\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_nc_imm *= *[0-9]+\" \"nm_nc_imm = 1\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_nc_idd *= *[0-9]+\" \"nm_nc_idd = 1\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_nc_freq *= *[0-9]+\" \"nm_nc_freq = 1\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_nc_tmid *= *[0-9]+\" \"nm_nc_tmid = 1\" CONTENT \"\${CONTENT}\")
-                    
-                    # Flags
-		    #string(REGEX REPLACE \"l_xwind=[.][A-Za-z][A-Za-z]*\" \"l_xwind=.true.\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"l_ywind=[.][A-Za-z][A-Za-z]*\" \"l_ywind=.true.\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"l_xstre=[.][A-Za-z][A-Za-z]*\" \"l_xstre=.false.\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"l_ystre=[.][A-Za-z][A-Za-z]*\" \"l_ystre=.false.\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"l_humi=[.][A-Za-z][A-Za-z]*\" \"l_humi=.true.\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"l_qsr=[.][A-Za-z][A-Za-z]*\" \"l_qsr=.true.\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"l_qlw=[.][A-Za-z][A-Za-z]*\" \"l_qlw=.true.\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"l_tair=[.][A-Za-z][A-Za-z]*\" \"l_tair=.true.\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"l_prec=[.][A-Za-z][A-Za-z]*\" \"l_prec=.true.\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"l_mslp=[.][A-Za-z][A-Za-z]*\" \"l_mslp=.false.\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"l_cloud=[.][A-Za-z][A-Za-z]*\" \"l_cloud=.false.\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"l_snow=[.][A-Za-z][A-Za-z]*\" \"l_snow=.true.\" CONTENT \"\${CONTENT}\")
-                    
-                    # Data sources and files
-		    #string(REGEX REPLACE \"runoff_data_source *= *'[^']*'\" \"runoff_data_source = 'CORE2'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_runoff_file *= *'[^']*'\" \"nm_runoff_file = '${TEST_DATA_DIR}/forcing/global/runoff.nc'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"sss_data_source *= *'[^']*'\" \"sss_data_source = 'CORE2'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_sss_data_file *= *'[^']*'\" \"nm_sss_data_file = '${TEST_DATA_DIR}/forcing/global/PHC2_salx.nc'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"chl_data_source *= *'[^']*'\" \"chl_data_source = 'None'\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"nm_chl_data_file *= *'[^']*'\" \"nm_chl_data_file = ''\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"chl_const *= *[0-9.]*\" \"chl_const = 0.1\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"use_runoff_mapper *= *[.][A-Za-z][A-Za-z]*\" \"use_runoff_mapper = .FALSE.\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"runoff_basins_file *= *'[^']*'\" \"runoff_basins_file = ''\" CONTENT \"\${CONTENT}\")
-		    #string(REGEX REPLACE \"runoff_radius *= *[0-9.]*\" \"runoff_radius = 500000.\" CONTENT \"\${CONTENT}\")
-                endif()
-                
-                file(WRITE \"${TARGET_DIR}/${NAMELIST}\" \"\${CONTENT}\")
-            ")
+            # Apply namelist-specific updates
+            if("${NAMELIST}" STREQUAL "namelist.config")
+                # Apply common path updates only to namelist.config
+                update_common_paths("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}" "${TEST_DATA_DIR}" "${RESULT_DIR}")
+                update_namelist_config("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}")
+            elseif("${NAMELIST}" STREQUAL "namelist.dyn")
+                update_namelist_dyn("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}")
+            elseif("${NAMELIST}" STREQUAL "namelist.ice")
+                update_namelist_ice("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}")
+            elseif("${NAMELIST}" STREQUAL "namelist.tra")
+                update_namelist_tra("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}" "${TEST_DATA_DIR}")
+            elseif("${NAMELIST}" STREQUAL "namelist.forcing")
+                update_namelist_forcing("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}" "${TEST_DATA_DIR}")
+            elseif("${NAMELIST}" STREQUAL "namelist.oce")
+                update_namelist_oce("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}")
+            elseif("${NAMELIST}" STREQUAL "namelist.io")
+                update_namelist_io("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}")
+            elseif("${NAMELIST}" STREQUAL "namelist.cvmix")
+                update_namelist_cvmix("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}")
+            endif()
         endif()
     endforeach()
 endfunction()
@@ -200,23 +338,6 @@ function(add_fesom_test TEST_NAME)
             file(MAKE_DIRECTORY \"${TEST_RUN_DIR}\")
             file(MAKE_DIRECTORY \"${RESULT_DIR}\")
             
-            # Configure namelists
-            execute_process(
-                COMMAND ${CMAKE_COMMAND} -P \"${TEST_RUN_DIR}/modify_namelist.config.cmake\"
-                RESULT_VARIABLE result
-            )
-            if(result)
-                message(FATAL_ERROR \"Failed to configure namelist.config\")
-            endif()
-            
-            execute_process(
-                COMMAND ${CMAKE_COMMAND} -P \"${TEST_RUN_DIR}/modify_namelist.forcing.cmake\"
-                RESULT_VARIABLE result
-            )
-            if(result)
-                message(FATAL_ERROR \"Failed to configure namelist.forcing\")
-            endif()
-            
             # Run FESOM with MPI
             execute_process(
                 COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${FESOM_TEST_NP} ${CMAKE_BINARY_DIR}/bin/fesom.x
@@ -244,23 +365,6 @@ function(add_fesom_test TEST_NAME)
             # Create test directories
             file(MAKE_DIRECTORY \"${TEST_RUN_DIR}\")
             file(MAKE_DIRECTORY \"${RESULT_DIR}\")
-            
-            # Configure namelists
-            execute_process(
-                COMMAND ${CMAKE_COMMAND} -P \"${TEST_RUN_DIR}/modify_namelist.config.cmake\"
-                RESULT_VARIABLE result
-            )
-            if(result)
-                message(FATAL_ERROR \"Failed to configure namelist.config\")
-            endif()
-            
-            execute_process(
-                COMMAND ${CMAKE_COMMAND} -P \"${TEST_RUN_DIR}/modify_namelist.forcing.cmake\"
-                RESULT_VARIABLE result
-            )
-            if(result)
-                message(FATAL_ERROR \"Failed to configure namelist.forcing\")
-            endif()
             
             # Run FESOM
             execute_process(
