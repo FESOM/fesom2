@@ -526,8 +526,7 @@ CONTAINS
          elseif (current_tracer==tracers%num_tracers) then
             if (partit%mype==0) write(*,*) "idlist contains tracer which is not listed in tracer_id!"
             if (partit%mype==0) write(*,*) "check your namelists!"
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-            stop
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
          end if
       END DO
       END DO
@@ -658,8 +657,7 @@ CONTAINS
       integer, intent(in)                    :: iost
       if (iost .ne. NF_NOERR) then
          write(*,*) 'ERROR: I/O status= "',trim(nf_strerror(iost)),'";',iost,' file= ', trim(fname)
-         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-         stop
+         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
       endif
    end subroutine check_nferr
 
