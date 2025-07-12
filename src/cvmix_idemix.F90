@@ -216,7 +216,7 @@ max_nlev = Vmix_vars%max_nlev
 ! FIXME: nils: put a security stop in case this routine is called in the current state
 ! call to actual computation of IDEMIX parameterization
 write(*,*) 'I am wrapping'
-stop
+stop 1
 
 call cvmix_coeffs_idemix( &
                          ! parameter

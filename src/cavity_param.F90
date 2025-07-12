@@ -598,7 +598,7 @@ subroutine potit(salz,pt,pres,rfpres,tin)
     enddo
     write(6,*) ' WARNING!'
     write(6,*) ' in-situ temperature calculation has not converged.'
-    stop
+    stop 1
     return
 end subroutine potit
 !
