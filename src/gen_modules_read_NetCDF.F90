@@ -54,7 +54,6 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
      print*,'ERROR: CANNOT READ 2D netCDF FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file '//file
      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
-     stop
   endif
 
   if (mype==0) then
@@ -233,7 +232,6 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file '//file
      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
-     stop
   endif
 
   if (mype==0) then
@@ -350,7 +348,6 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, 
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file '//file
      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
-     stop
   endif
 
   if (mype==0) then
