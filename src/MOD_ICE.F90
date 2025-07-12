@@ -581,8 +581,7 @@ subroutine ice_init(ice, partit, mesh)
         if (mype==0) write(*,*) '     file   : ', 'namelist.ice',' open ok'
     else
         if (mype==0) write(*,*) 'ERROR: --> bad opening file   : ', 'namelist.ice',' ; iostat=',iost
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-        stop
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     end if
     read(nm_unit, nml=ice_dyn  , iostat=iost)
     read(nm_unit, nml=ice_therm, iostat=iost)
