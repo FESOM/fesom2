@@ -1235,8 +1235,7 @@ CONTAINS
             if (mype==0) WRITE(*,*) '     file   : ', 'namelist.recom for sbc',' open ok'
         else
             if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.recom for sbc',' ; iostat=',iost
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-            stop
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
         endif
         READ( nm_sbc_unit+1, nml=nam_rsbc, iostat=iost )
         close( nm_sbc_unit+1 )
@@ -1454,10 +1453,9 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
             if (status.ne.nf_noerr)then
                 print*,'ERROR: CANNOT READ CO2 FILE CORRECTLY !!!!!'
                 print*,'Error in opening netcdf file '//filename
-                call par_ex(MPI_COMM_FESOM, mype)
-                stop
+                call par_ex(MPI_COMM_FESOM, mype, 1)
             endif
-	
+            
             ! data
             allocate(ncdata(12))
             status=nf_inq_varid(ncid, CO2vari, varid)
@@ -1706,8 +1704,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 
       if (iost .ne. NF_NOERR) then
          write(*,*) 'ERROR: I/O status= "',trim(nf_strerror(iost)),'";',iost,' file= ',fname
-         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-         stop
+         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
       endif
    END SUBROUTINE check_nferr
 
@@ -2631,8 +2628,7 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
    if (status.ne.nf_noerr)then
       print*,'ERROR: CANNOT READ 2D netCDF FILE CORRECTLY !!!!!'
       print*,'Error in opening netcdf file '//file
-      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-      stop
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
    endif
  
    if (mype==0) then
@@ -2753,8 +2749,7 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
          write(*,*) 'RUNOFF MAPPER ERROR: total number of arrival points does not sum up among partitions: ', status, number_arrival_points
          write(*,*) 'two different grid points have same distance to a target point!'
       end if
-      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-      STOP
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
    end if
    RUNOFF_MAPPER%dim=myDim_nod2d+eDim_nod2D
    ALLOCATE(RUNOFF_MAPPER%rowptr(RUNOFF_MAPPER%dim+1))
@@ -2783,8 +2778,7 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
                write(*,*) 'RUNOFF MAPPER ERROR: arrival point has an index outside of permitted range', j, drain_num
                write(*,*) 'two different grid points have same distance to a target point!'
             end if
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-            STOP
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
          end if
          dist=distance_on_sphere(lon_sparse(i), lat_sparse(i), geo_coord_nod2D(1,n), geo_coord_nod2D(2,n))
          if (dist < R) then
