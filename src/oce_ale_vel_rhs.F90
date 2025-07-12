@@ -105,7 +105,6 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     ELSE 
        write(*,*) 'unsuppported AB scheme for momentum, use 2 or 3'
        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
-       stop
     END IF 
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax, elnodes, ff, mm, Fx, Fy, pre, p_ice, p_air, p_eta)
