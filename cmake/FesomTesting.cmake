@@ -7,8 +7,10 @@
 # for better control and customization:
 #
 # Individual namelist functions:
-# - update_common_paths() - Updates common paths in namelist.config only
-# - update_namelist_config() - Configures namelist.config for test_pi
+# - update_common_paths() - Updates common paths in namelist.config only (defaults to pi mesh)
+# - update_common_paths_with_mesh() - Updates common paths with specific mesh
+# - update_namelist_config() - Configures namelist.config for test_pi (defaults)
+# - update_namelist_config_with_options() - Configures namelist.config with custom options
 # - update_namelist_dyn() - Configures namelist.dyn for test_pi
 # - update_namelist_ice() - Configures namelist.ice for test_pi
 # - update_namelist_tra() - Configures namelist.tra for test_pi
@@ -19,8 +21,10 @@
 # - update_namelist_cvmix() - Configures namelist.cvmix (placeholder)
 #
 # Main functions:
-# - configure_fesom_namelists() - Main function that calls all individual functions
-# - add_fesom_test() - Adds a complete FESOM integration test
+# - configure_fesom_namelists() - Main function that calls all individual functions (defaults)
+# - configure_fesom_namelists_with_options() - Configure namelists with custom options
+# - add_fesom_test() - Adds a complete FESOM integration test (defaults)
+# - add_fesom_test_with_options() - Adds a FESOM test with custom options
 # - generate_fesom_clock() - Generates fesom.clock file
 # - setup_mpi_testing() - Sets up MPI for testing
 #
@@ -34,39 +38,56 @@
 # # Copy and configure a specific namelist (e.g., tracer)
 # configure_file("${CMAKE_SOURCE_DIR}/config/namelist.tra" "${TARGET_DIR}/namelist.tra" COPYONLY)
 # update_tracer_init3d_filelist("${TARGET_DIR}/namelist.tra" "${TARGET_DIR}/namelist.tra" "${TEST_DATA_DIR}")
+# 
+# # Example: Custom test with pi_cavity mesh and cavity enabled
+# add_fesom_test_with_options("test_pi_cavity_mpi8" "pi_cavity" "96" "1" "d" "1" "d" "10" ".true." ".true."
+#     MPI_TEST NP 8 TIMEOUT 600
+# )
 # ```
 #
 
 # Function to update common paths in any namelist
 function(update_common_paths NAMELIST_IN NAMELIST_OUT TEST_DATA_DIR RESULT_DIR)
+    update_common_paths_with_mesh("${NAMELIST_IN}" "${NAMELIST_OUT}" "${TEST_DATA_DIR}" "${RESULT_DIR}" "pi")
+endfunction()
+
+# Function to update common paths with specific mesh
+function(update_common_paths_with_mesh NAMELIST_IN NAMELIST_OUT TEST_DATA_DIR RESULT_DIR MESH_NAME)
     file(READ "${NAMELIST_IN}" CONTENT)
     
-    # Replace common paths with test data paths
-    string(REGEX REPLACE "MeshPath='[^']*'" "MeshPath='${TEST_DATA_DIR}/MESHES/pi/'" CONTENT "${CONTENT}")
+    # Replace common paths with test data paths for specific mesh
+    string(REGEX REPLACE "MeshPath='[^']*'" "MeshPath='${TEST_DATA_DIR}/MESHES/${MESH_NAME}/'" CONTENT "${CONTENT}")
     string(REGEX REPLACE "ClimateDataPath='[^']*'" "ClimateDataPath='${TEST_DATA_DIR}/'" CONTENT "${CONTENT}")
     string(REGEX REPLACE "ResultPath='[^']*'" "ResultPath='${RESULT_DIR}/'" CONTENT "${CONTENT}")
-    string(REGEX REPLACE "fwf_path='[^']*'" "fwf_path='${TEST_DATA_DIR}/meshes/pi/'" CONTENT "${CONTENT}")
-    string(REGEX REPLACE "age_tracer_path='[^']*'" "age_tracer_path='${TEST_DATA_DIR}/meshes/pi/'" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "fwf_path='[^']*'" "fwf_path='${TEST_DATA_DIR}/meshes/${MESH_NAME}/'" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "age_tracer_path='[^']*'" "age_tracer_path='${TEST_DATA_DIR}/meshes/${MESH_NAME}/'" CONTENT "${CONTENT}")
     
     file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
 endfunction()
 
 # Function to update namelist.config for test_pi
 function(update_namelist_config NAMELIST_IN NAMELIST_OUT)
+    update_namelist_config_with_options("${NAMELIST_IN}" "${NAMELIST_OUT}" "96" "1" "d" "1" "d" "10" ".true." ".false.")
+endfunction()
+
+# Function to update namelist.config with custom options
+function(update_namelist_config_with_options NAMELIST_IN NAMELIST_OUT STEP_PER_DAY RUN_LENGTH RUN_LENGTH_UNIT RESTART_LENGTH RESTART_LENGTH_UNIT LOGFILE_OUTFREQ FORCE_ROTATION USE_CAVITY)
     file(READ "${NAMELIST_IN}" CONTENT)
     
-    # Set step_per_day to 96 for test_pi
-    string(REGEX REPLACE "step_per_day=[0-9]+" "step_per_day=96" CONTENT "${CONTENT}")
-    # Set run_length to 1 day for tests
-    string(REGEX REPLACE "run_length=[0-9]+" "run_length=1" CONTENT "${CONTENT}")
-    string(REGEX REPLACE "run_length_unit='[^']*'" "run_length_unit='d'" CONTENT "${CONTENT}")
-    # Set restart_length to 1 day
-    string(REGEX REPLACE "restart_length=[0-9]+" "restart_length=1" CONTENT "${CONTENT}")
-    string(REGEX REPLACE "restart_length_unit='[^']*'" "restart_length_unit='d'" CONTENT "${CONTENT}")
+    # Set step_per_day
+    string(REGEX REPLACE "step_per_day=[0-9]+" "step_per_day=${STEP_PER_DAY}" CONTENT "${CONTENT}")
+    # Set run_length
+    string(REGEX REPLACE "run_length=[0-9]+" "run_length=${RUN_LENGTH}" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "run_length_unit='[^']*'" "run_length_unit='${RUN_LENGTH_UNIT}'" CONTENT "${CONTENT}")
+    # Set restart_length
+    string(REGEX REPLACE "restart_length=[0-9]+" "restart_length=${RESTART_LENGTH}" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "restart_length_unit='[^']*'" "restart_length_unit='${RESTART_LENGTH_UNIT}'" CONTENT "${CONTENT}")
     # Set logfile output frequency
-    string(REGEX REPLACE "logfile_outfreq=[0-9]+" "logfile_outfreq=10" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "logfile_outfreq=[0-9]+" "logfile_outfreq=${LOGFILE_OUTFREQ}" CONTENT "${CONTENT}")
     # Force rotation for test geometry
-    string(REGEX REPLACE "force_rotation=.[a-zA-Z]." "force_rotation=.true." CONTENT "${CONTENT}")
+    string(REGEX REPLACE "force_rotation=.[a-zA-Z]." "force_rotation=${FORCE_ROTATION}" CONTENT "${CONTENT}")
+    # Set cavity usage
+    string(REGEX REPLACE "use_cavity=.[a-zA-Z]." "use_cavity=${USE_CAVITY}" CONTENT "${CONTENT}")
     
     file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
 endfunction()
@@ -251,6 +272,11 @@ endfunction()
 
 # Function to configure namelists for a test (refactored version)
 function(configure_fesom_namelists TARGET_DIR TEST_DATA_DIR RESULT_DIR)
+    configure_fesom_namelists_with_options("${TARGET_DIR}" "${TEST_DATA_DIR}" "${RESULT_DIR}" "pi" "96" "1" "d" "1" "d" "10" ".true." ".false.")
+endfunction()
+
+# Function to configure namelists with custom options
+function(configure_fesom_namelists_with_options TARGET_DIR TEST_DATA_DIR RESULT_DIR MESH_NAME STEP_PER_DAY RUN_LENGTH RUN_LENGTH_UNIT RESTART_LENGTH RESTART_LENGTH_UNIT LOGFILE_OUTFREQ FORCE_ROTATION USE_CAVITY)
     # List of namelists that need to be copied and configured
     set(NAMELISTS
         namelist.config
@@ -274,9 +300,9 @@ function(configure_fesom_namelists TARGET_DIR TEST_DATA_DIR RESULT_DIR)
             
             # Apply namelist-specific updates
             if("${NAMELIST}" STREQUAL "namelist.config")
-                # Apply common path updates only to namelist.config
-                update_common_paths("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}" "${TEST_DATA_DIR}" "${RESULT_DIR}")
-                update_namelist_config("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}")
+                # Apply common path updates only to namelist.config with specific mesh
+                update_common_paths_with_mesh("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}" "${TEST_DATA_DIR}" "${RESULT_DIR}" "${MESH_NAME}")
+                update_namelist_config_with_options("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}" "${STEP_PER_DAY}" "${RUN_LENGTH}" "${RUN_LENGTH_UNIT}" "${RESTART_LENGTH}" "${RESTART_LENGTH_UNIT}" "${LOGFILE_OUTFREQ}" "${FORCE_ROTATION}" "${USE_CAVITY}")
             elseif("${NAMELIST}" STREQUAL "namelist.dyn")
                 update_namelist_dyn("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}")
             elseif("${NAMELIST}" STREQUAL "namelist.ice")
@@ -291,7 +317,7 @@ function(configure_fesom_namelists TARGET_DIR TEST_DATA_DIR RESULT_DIR)
                 update_namelist_io("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}")
             elseif("${NAMELIST}" STREQUAL "namelist.cvmix")
                 update_namelist_cvmix("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}")
-            endif()
+                endif()
         endif()
     endforeach()
 endfunction()
@@ -307,6 +333,11 @@ endfunction()
 
 # Function to add a FESOM integration test
 function(add_fesom_test TEST_NAME)
+    add_fesom_test_with_options("${TEST_NAME}" "pi" "96" "1" "d" "1" "d" "10" ".true." ".false." ${ARGN})
+endfunction()
+
+# Function to add a FESOM integration test with custom options
+function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH RUN_LENGTH_UNIT RESTART_LENGTH RESTART_LENGTH_UNIT LOGFILE_OUTFREQ FORCE_ROTATION USE_CAVITY)
     set(options MPI_TEST)
     set(oneValueArgs NP TIMEOUT)
     set(multiValueArgs COMMAND_ARGS)
@@ -389,8 +420,8 @@ function(add_fesom_test TEST_NAME)
         ")
     endif()
     
-    # Configure namelists for this test
-    configure_fesom_namelists("${TEST_RUN_DIR}" "${TEST_DATA_DIR}" "${RESULT_DIR}")
+    # Configure namelists for this test with custom options
+    configure_fesom_namelists_with_options("${TEST_RUN_DIR}" "${TEST_DATA_DIR}" "${RESULT_DIR}" "${MESH_NAME}" "${STEP_PER_DAY}" "${RUN_LENGTH}" "${RUN_LENGTH_UNIT}" "${RESTART_LENGTH}" "${RESTART_LENGTH_UNIT}" "${LOGFILE_OUTFREQ}" "${FORCE_ROTATION}" "${USE_CAVITY}")
     
     # Add the test
     add_test(
@@ -412,6 +443,7 @@ function(add_fesom_test TEST_NAME)
         )
     endif()
     
+    message(STATUS "Added FESOM test: ${TEST_NAME} with mesh: ${MESH_NAME}, cavity: ${USE_CAVITY}")
 endfunction()
 
 # Function to find and validate MPI for testing
