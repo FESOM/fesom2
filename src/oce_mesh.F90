@@ -570,7 +570,6 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
         if (mesh%nl < 3) then
             write(*,*) '!!!Number of levels is less than 3, model will stop!!!'
             call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
-            stop
         end if
         allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
         if (mype==0) read(fileID,*) mesh%zbar
@@ -611,7 +610,6 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
         if (mesh%nl < 3) then
             write(*,*) '!!!Number of levels is less than 3, model will stop!!!'
             call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
-            stop
         end if
         allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
         if (mype==0) read(fileID,*) mesh%zbar
