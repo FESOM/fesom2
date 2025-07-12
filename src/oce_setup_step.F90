@@ -315,8 +315,7 @@ nl => mesh%nl
         if (mype==0) WRITE(*,*) '     file   : ', 'namelist.tra',' open ok'
         else
         if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.tra',' ; iostat=',iost
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-        stop
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     end if
 
     READ(nm_unit, nml=tracer_listsize, iostat=iost)
@@ -541,8 +540,7 @@ nl => mesh%nl
         if (mype==0) write(*,*) '     file   : ', 'namelist.dyn',' open ok'
     else
         if (mype==0) write(*,*) 'ERROR: --> bad opening file   : ', 'namelist.dyn',' ; iostat=',iost
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-        stop
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     end if
     read(nm_unit, nml=dynamics_visc,    iostat=iost)
     read(nm_unit, nml=dynamics_general, iostat=iost)
@@ -1356,8 +1354,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 if (mype==0) write(*,*) 'invalid ID '//trim(id_string)//' specified for '//trim(i_string)//' th tracer!!!'
                 if (mype==0) write(*,*) 'the model will stop!'
             end if
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-            stop
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
         END SELECT
     END DO
 end subroutine oce_initial_state
