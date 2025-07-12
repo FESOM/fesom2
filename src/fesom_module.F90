@@ -124,7 +124,7 @@ contains
 #if !defined  __ifsinterface
       if(command_argument_count() > 0) then
         call command_line_options%parse()
-        stop
+        stop 1
       end if
 #endif
 
