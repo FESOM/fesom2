@@ -184,7 +184,6 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     else
       if (mype==0) WRITE(*,*) 'ERROR: --> file not found   : ', 'namelist.io',' ; iostat=',iost
       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
-      stop
     endif
 
     READ(nm_io_unit, nml=nml_general,  iostat=iost )
