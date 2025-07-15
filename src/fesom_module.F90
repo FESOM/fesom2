@@ -36,6 +36,7 @@ module fesom_main_storage_module
   use iceberg_params
   use iceberg_step
   use iceberg_ocean_coupling
+  use Toy_Channel_Soufflet, only: compute_zonal_mean
   ! Define icepack module
 
 #if defined (__icepack)
@@ -315,6 +316,17 @@ contains
         !___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
         call restart(0, 0, 0, r_restart, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         if (f%mype==0) f%t7=MPI_Wtime()
+        
+        ! recompute zonal profiles of temp and velocity, with the data from the restart
+        ! otherwise zonal profiles of the initial condition are used, this will 
+        ! fuck up the continutiy of the restart
+        if (toy_ocean .and. r_restart) then  
+            SELECT CASE (TRIM(which_toy))
+                CASE ("soufflet") !forcing update for soufflet testcase
+                    call compute_zonal_mean(f%dynamics, f%tracers, f%partit, f%mesh)
+            END SELECT
+        end if    
+        
         ! store grid information into netcdf file
         if (.not. r_restart) call write_mesh_info(f%partit, f%mesh)
 
