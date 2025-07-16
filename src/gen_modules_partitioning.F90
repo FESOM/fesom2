@@ -1,17 +1,47 @@
-!===============================================================================================================================
-!**************** routines for partitioning and MPI support ***********************
 module mod_parsup
-  USE MOD_PARTIT
-  USE o_PARAM
-  use MOD_MESH
-  implicit none
-  private
-  public :: par_ex, par_init, init_mpi_types, init_gatherLists, status_check
-contains
+  interface
+  subroutine par_ex(COMM, mype, abort)
+     USE MOD_PARTIT
+     implicit none
+     integer,           intent(in)   :: COMM
+     integer,           intent(in)   :: mype
+     integer, optional, intent(in)   :: abort
+  end subroutine par_ex
+  end interface
+end module mod_parsup
+
+module par_support_interfaces
+  interface
+  subroutine par_init(partit)
+     USE o_PARAM
+     USE MOD_PARTIT
+     USE MOD_PARSUP
+     implicit none
+     type(t_partit), intent(inout), target :: partit
+  end subroutine par_init
+
+  subroutine init_mpi_types(partit, mesh)
+     use MOD_MESH
+     USE MOD_PARTIT
+     USE MOD_PARSUP
+     implicit none
+     type(t_partit), intent(inout), target :: partit
+     type(t_mesh),   intent(in), target :: mesh
+  end subroutine init_mpi_types
+
+  subroutine init_gatherLists(partit)
+     USE MOD_PARTIT
+     USE MOD_PARSUP
+     implicit none
+     type(t_partit), intent(inout), target :: partit    
+  end subroutine init_gatherLists
+  end interface
+end module par_support_interfaces
 
 subroutine par_init(partit)    ! initializes MPI
   USE o_PARAM
   USE MOD_PARTIT
+  USE MOD_PARSUP
 #ifdef __MULTIO
   USE iom
   USE mpp_io
@@ -136,6 +166,7 @@ end subroutine par_ex
 subroutine init_mpi_types(partit, mesh)
   use MOD_MESH
   USE MOD_PARTIT
+  USE MOD_PARSUP
   implicit none
 
   type(t_partit), intent(inout), target :: partit
@@ -477,6 +508,7 @@ end subroutine init_mpi_types
 !===================================================================
 subroutine init_gatherLists(partit)
   USE MOD_PARTIT
+  USE MOD_PARSUP
   implicit none
   type(t_partit), intent(inout), target :: partit    
   integer                               :: n2D, e2D, sum_loc_elem2D
@@ -547,6 +579,7 @@ end subroutine init_gatherLists
 !===================================================================
 subroutine status_check(partit)
 USE MOD_PARTIT
+USE MOD_PARSUP
 implicit none
 type(t_partit), intent(inout), target :: partit
 integer                               :: res
@@ -557,5 +590,3 @@ if (res /= 0 ) then
     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
 endif
 end subroutine status_check
-
-end module mod_parsup

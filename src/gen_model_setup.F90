@@ -15,7 +15,6 @@ subroutine setup_model(partit)
   use recom_ciso
 #endif
   use mod_transit
-  USE MOD_PARSUP
 
   implicit none
   type(t_partit), intent(inout), target :: partit

@@ -5,10 +5,11 @@ module fesom_main_storage_module
   USE MOD_MESH
   USE MOD_ICE
   USE MOD_TRACER
+  USE MOD_PARTIT
   USE MOD_PARSUP
   USE MOD_DYN
-  use o_ARRAYS
-  use o_PARAM
+  USE o_ARRAYS
+  USE o_PARAM
   use g_clock
   use g_config
   use g_comm_auto
