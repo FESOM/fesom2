@@ -73,6 +73,9 @@ target_compile_definitions(${PROJECT_NAME}_C PRIVATE
     LINUX 
     UNDER_ 
     MPI2
+    METIS_VERSION=5
+    PART_WEIGHTED
+    METISRANDOMSEED=35243
 )
 target_link_libraries(${PROJECT_NAME}_C metis)
 
