@@ -22,11 +22,29 @@ set(OASIS_WITH_YAC OFF CACHE BOOL "Useing a version of OASIS compiled with YAC i
 set(ASYNC_ICEBERGS ON CACHE BOOL "compile fesom with or without support for asynchronous iceberg computations")
 set(VERBOSE OFF CACHE BOOL "toggle debug output")
 
+# Testing options
+option(BUILD_TESTING "Build tests" OFF)
+
 # Tools
 option(BUILD_MESHPARTITIONER "Build mesh partitioning tools (fesom_meshpart executable)" OFF)
 
 #add_subdirectory(oasis3-mct/lib/psmile)
 add_subdirectory(src)
+
+# Enable testing if requested
+if(BUILD_TESTING)
+    enable_testing()
+    # Only add tests if the tests directory exists
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
+        add_subdirectory(tests)
+    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test/CMakeLists.txt")
+        # Fallback to existing test directory if tests/ doesn't exist yet
+        message(STATUS "Using existing test/ directory for testing")
+        add_subdirectory(test)
+    else()
+        message(WARNING "BUILD_TESTING is ON but no tests directory found")
+    endif()
+endif()
 
 # Add mesh_part directory if requested
 if(BUILD_MESHPARTITIONER)
