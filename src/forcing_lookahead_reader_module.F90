@@ -14,7 +14,7 @@ module forcing_lookahead_reader_module
     contains
     procedure, public :: initialize, finalize, yield_data, is_initialized, fileyear, netcdf_timestep_size, timeindex_hint, timeindex_in_cache_bounds
     procedure, private :: read_data
-  end type
+  end type forcing_lookahead_reader_type
 
   character(len=*), parameter :: FILENAMESUFFIX = ".nc"
   integer, public, parameter :: PREFETCH_SIZE = 10
@@ -27,7 +27,7 @@ module forcing_lookahead_reader_module
     integer x
     ! EO args
     x = this%fileyear_
-  end function
+  end function fileyear
   
 
   pure function is_initialized(this) result(x)
@@ -35,14 +35,14 @@ module forcing_lookahead_reader_module
     logical x
     ! EO args
     x = (this%netcdf_timestep_size_ /= -1)
-  end function
+  end function is_initialized
   
   
   function netcdf_timestep_size(this) result(t)
     class(forcing_lookahead_reader_type), intent(in) :: this
     integer t
     t = this%netcdf_timestep_size_
-  end function
+  end function netcdf_timestep_size
   
   
   subroutine initialize(this, filepath, fileyear, varname)
@@ -55,14 +55,14 @@ module forcing_lookahead_reader_module
     this%fileyear_ = fileyear
     call this%filehandle%initialize(filepath, varname) ! finalize() to close the file
     this%netcdf_timestep_size_ = this%filehandle%timestep_size() 
-  end subroutine
+  end subroutine initialize
 
 
   subroutine finalize(this)
     class(forcing_lookahead_reader_type), intent(inout) :: this
     ! EO args
     call this%filehandle%finalize()
-  end subroutine
+  end subroutine finalize
   
   
   pure function timeindex_in_cache_bounds(this, time_index) result(x)
@@ -71,7 +71,7 @@ module forcing_lookahead_reader_module
     logical x
     ! EO args
     x = all([ this%first_stored_timeindex <= time_index, time_index <= this%last_stored_timeindex ])
-  end function
+  end function timeindex_in_cache_bounds
 
   
   subroutine timeindex_hint(this, time_index)
@@ -82,7 +82,7 @@ module forcing_lookahead_reader_module
     if(time_index <= this%netcdf_timestep_size_) then
       call this%read_data(time_index)
     end if
-  end subroutine
+  end subroutine timeindex_hint
 
 
   subroutine yield_data(this, time_index, values)
@@ -101,7 +101,7 @@ module forcing_lookahead_reader_module
     call assert(allocated(this%stored_values), __LINE__)
     call assert( all( shape(values)==shape(this%stored_values(:,:,reader_time_index)) ), __LINE__ )
     values = this%stored_values(:,:,reader_time_index)    
-  end subroutine
+  end subroutine yield_data
 
 
   subroutine read_data(this, time_index)
@@ -121,7 +121,7 @@ module forcing_lookahead_reader_module
       call assert(allocated(this%stored_values), __LINE__)    
     end if
 
-  end subroutine
+  end subroutine read_data
   
   
   subroutine assert(val, line)
@@ -132,5 +132,5 @@ module forcing_lookahead_reader_module
       print *, "error in line ",line, __FILE__
       stop 1
     end if
-  end subroutine
-end module
+  end subroutine assert
+end module forcing_lookahead_reader_module

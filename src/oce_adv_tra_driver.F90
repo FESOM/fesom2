@@ -16,9 +16,9 @@ module oce_adv_tra_driver_interfaces
       real(kind=WP),  intent(in), target    :: W(mesh%nl,    partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP),  intent(in), target    :: WI(mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP),  intent(in), target    :: WE(mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
-    end subroutine
+    end subroutine do_oce_adv_tra
   end interface
-end module
+end module oce_adv_tra_driver_interfaces
 
 module oce_tra_adv_flux2dtracer_interface
   interface
@@ -37,9 +37,9 @@ module oce_tra_adv_flux2dtracer_interface
       logical,       optional           :: use_lo
       real(kind=WP), optional           :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), optional           :: lo (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-    end subroutine
+    end subroutine oce_tra_adv_flux2dtracer
   end interface
-end module
+end module oce_tra_adv_flux2dtracer_interface
 !
 !
 !===============================================================================
@@ -243,7 +243,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz)
 #else
-            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
 !$OMP DO
             do n=1, myDim_edge2D
@@ -254,8 +254,12 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
                 !$ACC END LOOP
             end do
 !$OMP END DO
+#ifndef ENABLE_OPENACC
+#else
             !$ACC END PARALLEL LOOP
-            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
+
+            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 !$OMP DO
             do n=1, myDim_nod2D
                 !$ACC LOOP VECTOR
@@ -351,7 +355,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         !_______________________________________________________________________
         if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz)
-            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 !$OMP DO
             do n=1, myDim_edge2D
                 !$ACC LOOP VECTOR
@@ -365,7 +369,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 !$OMP END DO
             !$ACC END PARALLEL LOOP
             
-            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 !$OMP DO
             do n=1, myDim_nod2D
                 !$ACC LOOP VECTOR
@@ -384,7 +388,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         !_______________________________________________________________________
         else
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz)
-            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 !$OMP DO
             do n=1, myDim_edge2D
                 !$ACC LOOP VECTOR
@@ -396,7 +400,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 !$OMP END DO
             !$ACC END PARALLEL LOOP
             
-            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+            !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 !$OMP DO
             do n=1, myDim_nod2D
                 !$ACC LOOP VECTOR

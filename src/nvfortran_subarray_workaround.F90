@@ -4,5 +4,5 @@ module nvfortran_subarray_workaround_module
   implicit none
 
   type(t_dyn), pointer, save :: dynamics_workaround
-end module
+end module nvfortran_subarray_workaround_module
 #endif

@@ -8,9 +8,9 @@ module oce_initial_state_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in)  ,  target :: mesh
-        end subroutine
+        end subroutine oce_initial_state
     end interface
-end module
+end module oce_initial_state_interface
 
 module tracer_init_interface
     interface
@@ -22,9 +22,9 @@ module tracer_init_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in)  ,  target :: mesh
-        end subroutine
+        end subroutine tracer_init
     end interface
-end module
+end module tracer_init_interface
 
 module dynamics_init_interface
     interface
@@ -36,9 +36,9 @@ module dynamics_init_interface
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine dynamics_init
     end interface
-end module
+end module dynamics_init_interface
 
 module ocean_setup_interface
     interface
@@ -52,9 +52,9 @@ module ocean_setup_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout)   , target :: mesh
-        end subroutine
+        end subroutine ocean_setup
     end interface
-end module
+end module ocean_setup_interface
 
 module before_oce_step_interface
     interface
@@ -68,9 +68,9 @@ module before_oce_step_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine before_oce_step
     end interface
-end module
+end module before_oce_step_interface
 !
 !
 !_______________________________________________________________________________
@@ -255,7 +255,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     ! initialise arrays that are needed for backscatter_coef
-    if(dynamics%opt_visc==8) call init_backscatter(partit, mesh)
+    if(dynamics%opt_visc==8) call init_backscatter(dynamics, partit, mesh)
         
     
     !___________________________________________________________________________
@@ -493,6 +493,15 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     real(kind=WP)  :: visc_gamma0, visc_gamma1, visc_gamma2
     real(kind=WP)  :: visc_easybsreturn
     logical        :: use_ivertvisc=.true.
+    logical        :: uke_scaling=.true.
+    real(kind=WP)  :: uke_scaling_factor=1._WP
+    logical        :: uke_advection=.false.
+    real(kind=WP)  :: rosb_dis=1._WP
+    integer        :: smooth_back=2
+    integer        :: smooth_dis=2
+    integer        :: smooth_back_tend=4
+    real(kind=WP)  :: K_back=600._WP
+    real(kind=WP)  :: c_back=0.1_8
     integer        :: momadv_opt
     logical        :: use_freeslip =.false.
     logical        :: use_wsplit   =.false.
@@ -507,7 +516,9 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     real(kind=WP)  :: se_visc_gamma0, se_visc_gamma1, se_visc_gamma2
     
     namelist /dynamics_visc   / opt_visc, check_opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
-                                use_ivertvisc, visc_easybsreturn
+                                use_ivertvisc, visc_easybsreturn, &
+                                uke_scaling, uke_scaling_factor, uke_advection, &
+                                rosb_dis, smooth_back, smooth_dis, smooth_back_tend, K_back, c_back
 
     namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, & 
                                 ldiag_KE, AB_order,                                  &
@@ -545,6 +556,15 @@ nl => mesh%nl
     dynamics%visc_gamma1         = visc_gamma1
     dynamics%visc_gamma2         = visc_gamma2
     dynamics%visc_easybsreturn   = visc_easybsreturn
+    dynamics%uke_scaling         = uke_scaling
+    dynamics%uke_scaling_factor  = uke_scaling_factor
+    dynamics%uke_advection       = uke_advection
+    dynamics%rosb_dis            = rosb_dis
+    dynamics%smooth_back         = smooth_back
+    dynamics%smooth_dis          = smooth_dis
+    dynamics%smooth_back_tend    = smooth_back_tend
+    dynamics%K_back              = K_back
+    dynamics%c_back              = c_back
     dynamics%use_ivertvisc       = use_ivertvisc
     dynamics%momadv_opt          = momadv_opt
     dynamics%use_freeslip        = use_freeslip

@@ -75,17 +75,20 @@ endif()
 
 option(ENABLE_OPENACC "compile with OpenACC support" OFF)
 message(STATUS "ENABLE_OPENACC: ${ENABLE_OPENACC}")
-
-set(NV_GPU_ARCH "cc80" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
+option(DISABLE_OPENACC_ATOMICS "disable kernels using atomic statement for reproducible results" ON)
+set(GPU_COMPUTE_CAPABILITY "cc80" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
+# set(GPU_FLAGS "${GPU_COMPUTE_CAPABILITY}" CACHE STRING "GPU arch for nvfortran compiler")
+set(GPU_FLAGS "cuda12.2,${GPU_COMPUTE_CAPABILITY}" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
 
 option(ENABLE_OPENMP "build FESOM with OpenMP" OFF)
 message(STATUS "ENABLE_OPENMP: ${ENABLE_OPENMP}")
-if(ENABLE_OPENMP)
+if(${ENABLE_OPENMP})
    find_package(OpenMP REQUIRED COMPONENTS Fortran)
 endif()
 
 option(USE_ICEPACK "Use ICEPACK" OFF)
 message(STATUS "USE_ICEPACK: ${USE_ICEPACK}")
+
 
 # option to trigger building a library version of FESOM
 # we do not always build the library along with the executable to avoid having two targets here in the CMakeLists.txt
@@ -190,14 +193,13 @@ add_subdirectory(async_threads_cpp)
 # fesom library
 add_library(${PROJECT_NAME} ${sources_Fortran} $<TARGET_OBJECTS:async_threads_cpp>)
 add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
-target_compile_definitions(${PROJECT_NAME} PRIVATE -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
 
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>)
 target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fesom>)
 target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
-if(ENABLE_OPENMP)
+if(${ENABLE_OPENMP})
    target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_Fortran)
 endif()
 
@@ -385,7 +387,7 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
 	#target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O3)
    target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O2 -hnoacc -M878)  #-hnoacc is a workaround for cray automatically activate -hacc, -M878 is to suppress ftn-878 warning
-   if(ENABLE_OPENMP)
+   if(${ENABLE_OPENMP})
       target_compile_options(${PROJECT_NAME} PRIVATE -homp)
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE -hnoomp)
@@ -398,16 +400,19 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
    endif()
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
    target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_NVHPC_WORKAROUNDS)
-   target_compile_options(${PROJECT_NAME} PRIVATE -fast -fastsse -O3 -Mallocatable=95 -Mr8 -pgf90libs)
-   if(ENABLE_OPENACC)
-      # additional compiler settings
-      target_compile_options(${PROJECT_NAME} PRIVATE -acc -ta=tesla:${NV_GPU_ARCH} -Minfo=accel)
-      set(CMAKE_EXE_LINKER_FLAGS "-acc -ta=tesla:${NV_GPU_ARCH}")
-   endif()
-   if(ENABLE_OPENMP)
-      target_compile_options(${PROJECT_NAME} PRIVATE -Mipa=fast)
+   if(${ENABLE_OPENACC})
+      target_compile_options(${PROJECT_NAME} PRIVATE
+      $<$<CONFIG:DEBUG>:-Mallocatable=95 -Mr8 -pgf90libs -Mnofma -Minfo=all -acc=verystrict -gpu=math_uniform,cuda12.2,cc80>
+      $<$<CONFIG:RELEASE>:-Mallocatable=95 -Mr8 -pgf90libs -Minfo=all -acc=verystrict -gpu=cc80>)
+      set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-acc=verystrict -Mnofma -gpu=math_uniform,cuda12.2,cc80")
+      set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-acc=verystrict -gpu=cc80")
+      if(${DISABLE_OPENACC_ATOMICS})
+         target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_OPENACC_ATOMICS)
+      endif()
    else()
-      target_compile_options(${PROJECT_NAME} PRIVATE -Mipa=fast,inline)
+      target_compile_options(${PROJECT_NAME} PRIVATE 
+      $<$<CONFIG:DEBUG>:-Mallocatable=95 -Mr8 -pgf90libs -Mnofma>
+      $<$<CONFIG:RELEASE>:-Mallocatable=95 -Mr8 -pgf90libs>)
    endif()
 endif()
 
@@ -450,4 +455,4 @@ message(STATUS " --> Final Compile options for ${PROJECT_NAME}: ${FLAGS}")
 
 ### Export and installation
 
-fesom_export(TARGETS ${PROJECT_NAME} fesom.x)
+fesom_export(TARGETS ${PROJECT_NAME} fesom.x ${additional_targets})

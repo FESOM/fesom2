@@ -564,7 +564,7 @@ FUNCTION omp_min_max_sum1(arr, pos1, pos2, what, partit, nan)
   END SELECT
 
   omp_min_max_sum1=val
-END FUNCTION
+end function omp_min_max_sum1
 !
 !--------------------------------------------------------------------------------------------
 ! returns min/max/sum of a two dimentional array (same as minval) but with the support of OpenMP
@@ -638,7 +638,7 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
    END SELECT
 
 omp_min_max_sum2=val
-END FUNCTION
+end function omp_min_max_sum2
 !
 !--------------------------------------------------------------------------------------------
 !

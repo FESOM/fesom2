@@ -6,9 +6,9 @@ module forcing_array_setup_interfaces
       USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine forcing_array_setup
   end interface
-end module
+end module forcing_array_setup_interfaces
 
 
 module forcing_array_setup_dbgyre_interfaces
@@ -19,9 +19,9 @@ module forcing_array_setup_dbgyre_interfaces
       USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine forcing_array_setup_dbgyre
   end interface
-end module
+end module forcing_array_setup_dbgyre_interfaces
 
 ! Adapted from FESOM code by Q. Wang. 
 ! Added the driving routine forcing_setup.
@@ -145,6 +145,7 @@ subroutine forcing_array_setup(partit, mesh)
   ice_sublimation = 0.0_WP
 
 #if defined (__coupled) || defined (__ifsinterface)
+
   allocate(sublimation(n2), evap_no_ifrac(n2))
   sublimation=0.0_WP
   evap_no_ifrac=0.0_WP

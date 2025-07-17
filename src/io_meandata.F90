@@ -68,7 +68,7 @@ module io_MEANDATA
     integer :: startDate, startTime
   contains
     final destructor
-  end type
+  end type Meandata
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -89,7 +89,7 @@ module io_MEANDATA
         INTEGER                  :: freq      =0
         CHARACTER                :: unit      =''
         INTEGER                  :: precision =0
-  end type
+  end type io_entry 
 
   type(io_entry), save, allocatable, target   :: io_list(:)
 !
@@ -122,7 +122,7 @@ subroutine destructor(this)
     type(Meandata), intent(inout) :: this
     ! EO args
     call assert_nf(nf_close(this%ncid), __LINE__)
-end subroutine
+end subroutine destructor
 !
 !
 !_______________________________________________________________________________
@@ -142,6 +142,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     use g_cvmix_idemix
     use g_cvmix_kpp
     use g_cvmix_tidal
+    use g_backscatter
     use diagnostics
     use g_config,        only: use_cavity
     use g_forcing_param, only: use_virt_salt
