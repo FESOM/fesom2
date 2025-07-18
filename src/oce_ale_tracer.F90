@@ -536,7 +536,7 @@ subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nl1, ul1, vd_flux, rdata, flux, rlx, zinv1)
 #else
 !$ACC PARALLEL LOOP DEFAULT(PRESENT) GANG VECTOR &
-!$ACC PRIVATE(n, nz, nl1, ul1, vd_flux, rdata, flox, rlx, zinv1)
+!$ACC PRIVATE(n, nz, nl1, ul1, vd_flux, rdata, flux, rlx, zinv1)
 #endif
     !___________________________________________________________________________
     do n=1, myDim_nod2D
@@ -769,10 +769,10 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         Z_n=0.0_WP
         zbar_n(nzmax)=zbar_n_bot(n)
         Z_n(nzmax-1)=zbar_n(nzmax) + hnode_new(nzmax-1,n)/2.0_WP
-#ifndef ENABLE_OPENACC
-#else
-!$ACC LOOP VECTOR
-#endif
+! #ifndef ENABLE_OPENACC
+! #else
+! !$ACC LOOP VECTOR
+! #endif
         do nz=nzmax-1,nzmin+1,-1
             zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
             Z_n(nz-1)  = zbar_n(nz) + hnode_new(nz-1,n)/2.0_WP
@@ -815,10 +815,10 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         zinv1=zinv2
         !_______________________________________________________________________
         ! Regular part of coefficients: --> 2nd...nl-2 layer
-#ifndef ENABLE_OPENACC
-#else
-!$ACC LOOP VECTOR
-#endif
+! #ifndef ENABLE_OPENACC
+! #else
+! !$ACC LOOP VECTOR
+! #endif
         do nz=nzmin+1, nzmax-2
 
             ! 1/dz(nz)
@@ -905,10 +905,10 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         dz=hnode_new(nz,n) ! It would be (zbar(nz)-zbar(nz+1)) if not ALE
         tr(nz)=-(b(nz)-dz)*trarr(nz,n)-c(nz)*trarr(nz+1,n)
 
-#ifndef ENABLE_OPENACC
-#else
-!$ACC LOOP VECTOR
-#endif
+! #ifndef ENABLE_OPENACC
+! #else
+! !$ACC LOOP VECTOR
+! #endif
         do nz=nzmin+1,nzmax-2
             dz=hnode_new(nz,n)
             tr(nz)= -a(nz)     * trarr(nz-1,n) &
@@ -944,10 +944,10 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
                                +(-MIN(ghats(nz+1,n)*blmc(nz+1,n,2), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
                                 ) * heat_flux(n) / vcpw * dt
                     !___bulk____________________________________________________
-#ifndef ENABLE_OPENACC
-#else
-!$ACC LOOP VECTOR
-#endif
+! #ifndef ENABLE_OPENACC
+! #else
+! !$ACC LOOP VECTOR
+! #endif
                     do nz=nzmin+1, nzmax-2
                         tr(nz)=tr(nz) &
                                +( MIN(ghats(nz  ,n)*blmc(nz  ,n,2), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
@@ -969,10 +969,10 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
                                -(-MIN(ghats(nz+1,n)*blmc(nz+1,n,3), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
                                 ) * rsss * water_flux(n) * dt
                     !___bulk____________________________________________________
-#ifndef ENABLE_OPENACC
-#else
-!$ACC LOOP VECTOR
-#endif
+! #ifndef ENABLE_OPENACC
+! #else
+! !$ACC LOOP VECTOR
+! #endif
                     do nz=nzmin+1, nzmax-2
                         tr(nz)=tr(nz) &
                                -( MIN(ghats(nz  ,n)*blmc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
@@ -995,10 +995,10 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
                                +(-MIN(kpp_nonlcltranspT(nz+1,n)*kpp_oblmixc(nz+1,n,2), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
                                 ) * heat_flux(n) / vcpw * dt
                     !___bulk____________________________________________________
-#ifndef ENABLE_OPENACC
-#else
-!$ACC LOOP VECTOR
-#endif
+! #ifndef ENABLE_OPENACC
+! #else
+! !$ACC LOOP VECTOR
+! #endif
                     do nz=nzmin+1, nzmax-2
                         tr(nz)=tr(nz) &
                                +( MIN(kpp_nonlcltranspT(nz  ,n)*kpp_oblmixc(nz  ,n,2), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
@@ -1018,10 +1018,10 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
                                -(-MIN(kpp_nonlcltranspS(nz+1,n)*kpp_oblmixc(nz+1,n,3), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
                                 ) * rsss * water_flux(n) * dt
                     !___bulk____________________________________________________
-#ifndef ENABLE_OPENACC
-#else
-!$ACC LOOP VECTOR
-#endif
+! #ifndef ENABLE_OPENACC
+! #else
+! !$ACC LOOP VECTOR
+! #endif
                     do nz=nzmin+1, nzmax-2
                         tr(nz)=tr(nz) &
                                -( MIN(kpp_nonlcltranspS(nz  ,n)*kpp_oblmixc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
@@ -1040,10 +1040,10 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         !_______________________________________________________________________
         ! case of activated shortwave penetration into the ocean, ad 3d contribution
         if (use_sw_pene .and. tracers%data(tr_num)%ID==1 .and. .not. toy_ocean) then
-#ifndef ENABLE_OPENACC
-#else
-!$ACC LOOP VECTOR
-#endif
+! #ifndef ENABLE_OPENACC
+! #else
+! !$ACC LOOP VECTOR
+! #endif
             do nz=nzmin, nzmax-1
                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
                 !!PS tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n) * ( area(nz+1,n)/areasvol(nz,n)) ) * zinv
@@ -1052,10 +1052,10 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         elseif (use_sw_pene .and. (tracers%data(tr_num)%ID==1) .and. toy_ocean .and. TRIM(which_toy)=="dbgyre") then
 
          call cal_shortwave_rad_dbgyre(ice, tracers, partit, mesh)
-#ifndef ENABLE_OPENACC
-#else
-!$ACC LOOP VECTOR
-#endif
+! #ifndef ENABLE_OPENACC
+! #else
+! !$ACC LOOP VECTOR
+! #endif
             do nz=nzmin, nzmax-1
                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
                 tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n)*area(nz+1,n)/area(nz,n))*zinv
@@ -1066,10 +1066,10 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         !_______________________________________________________________________
         ! case of activated shortwave penetration into the ocean, ad 3d contribution
         if (use_icebergs .and. (.not. turn_off_hf) .and. tracers%data(tr_num)%ID==1) then
-#ifndef ENABLE_OPENACC
-#else
-!$ACC LOOP VECTOR
-#endif
+! #ifndef ENABLE_OPENACC
+! #else
+! !$ACC LOOP VECTOR
+! #endif
             do nz=nzmin, nzmax-1
                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
                 !!PS tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n) * ( area(nz+1,n)/areasvol(nz,n)) ) * zinv
@@ -1116,10 +1116,10 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         tp(nzmin) = tr(nzmin)/b(nzmin)
 
         ! solve for vectors c-prime and t, s-prime
-#ifndef ENABLE_OPENACC
-#else
-!$ACC LOOP VECTOR
-#endif
+! #ifndef ENABLE_OPENACC
+! #else
+! !$ACC LOOP VECTOR
+! #endif
         do nz = nzmin+1,nzmax-1
             m = b(nz)-cp(nz-1)*a(nz)
             cp(nz) = c(nz)/m
@@ -1130,10 +1130,10 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         tr(nzmax-1) = tp(nzmax-1)
 
         ! solve for x from the vectors c-prime and d-prime
-#ifndef ENABLE_OPENACC
-#else
-!$ACC LOOP VECTOR
-#endif
+! #ifndef ENABLE_OPENACC
+! #else
+! !$ACC LOOP VECTOR
+! #endif
         do nz = nzmax-2, nzmin, -1
             tr(nz) = tp(nz)-cp(nz)*tr(nz+1)
         end do
@@ -1141,10 +1141,10 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         !_______________________________________________________________________
         ! update tracer
         ! tr ... dTnew = T^(n+0.5) - T*
-#ifndef ENABLE_OPENACC
-#else
-!$ACC LOOP VECTOR
-#endif
+! #ifndef ENABLE_OPENACC
+! #else
+! !$ACC LOOP VECTOR
+! #endif
         do nz=nzmin,nzmax-1
             ! trarr - before ... T*
             trarr(nz,n)=trarr(nz,n)+tr(nz)
@@ -1514,7 +1514,6 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
-!$ACC ENTER DATA CREATE (temporary_ttf)
 !$ACC PARALLEL LOOP DEFAULT(PRESENT) GANG VECTOR
 #endif
         do n=1, myDim_nod2D+eDim_nod2D
@@ -1671,7 +1670,6 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL
 #else
 !$ACC END PARALLEL LOOP
-!$ACC EXIT DATA (temporary_ttf)
 #endif
 call exchange_nod(ttf, partit)
 #ifndef ENABLE_OPENACC
