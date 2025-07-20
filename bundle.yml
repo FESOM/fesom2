@@ -1,6 +1,8 @@
 ---
 ### Bundle
-
+### to create bundle use ecbundle-create; it downloads sources
+### to build ecbundle-build --help 
+### e.g,: ecbundle-build --with-meshpart=ON will build meshpartitioner along
 name    : fesom-bundle
 version : 2.x
 projects :
