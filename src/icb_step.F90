@@ -1543,15 +1543,16 @@ subroutine determine_save_count(partit)
   ! computes save_count_buoys and prev_sec_in_year from records in existing netcdf file
   !-----------------------------------------------------------  
   use g_clock
+  use netcdf_nf_interfaces
+  use netcdf_nf_data
 !  use iceberg_params, only : file_icb_netcdf, save_count_buoys, prev_sec_in_year
   !use iceberg_params, only : save_count_buoys, prev_sec_in_year
-  implicit none
-
-#include "netcdf.inc" 
+  implicit none 
   integer		    :: buoy_nrec
   integer                   :: status, ncid
   integer                   :: dimid_rec
   integer                   :: time_varid
+  real(kind=WP)             :: prev_sec_array(1) ! temporary array for netcdf calls
 type(t_partit), intent(inout), target :: partit
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
@@ -1576,7 +1577,8 @@ type(t_partit), intent(inout), target :: partit
   ! load sec_in_year up to now in 'prev_sec_in_year', time axis will be continued
   status=nf_inq_varid(ncid, 'time', time_varid)
   if (status .ne. nf_noerr) call handle_err(status, partit)
-  status=nf_get_vara_double(ncid, time_varid, save_count_buoys-1, 1, prev_sec_in_year) 
+  status=nf_get_vara_double(ncid, time_varid, [save_count_buoys-1], [1], prev_sec_array) 
+  prev_sec_in_year = prev_sec_array(1) 
   if (status .ne. nf_noerr) call handle_err(status, partit)
 
   write(*,*) 'seconds passed up to now: ',prev_sec_in_year
@@ -1601,9 +1603,11 @@ subroutine init_buoy_output(partit)
   use g_clock
   use g_config, only : ib_num
 !  use iceberg_params, only : file_icb_netcdf, save_count_buoys !ggf in namelist
+
+  use netcdf_nf_interfaces
+  use netcdf_nf_data
   implicit none
 
-#include "netcdf.inc" 
   integer                   :: status,ncid,year_start,month_start,day_start
   integer                   :: dimid_ib, dimid_rec, dimids(2)
   integer                   :: time_varid, iter_varid
@@ -1633,9 +1637,9 @@ type(t_partit), intent(inout), target :: partit
 
 
   ! Define the time and iteration variables
-  status = nf_def_var(ncid, 'time', NF_DOUBLE, 1, dimid_rec, time_varid)
+  status = nf_def_var(ncid, 'time', NF_DOUBLE, 1, [dimid_rec], time_varid)
   if (status .ne. nf_noerr) call handle_err(status, partit)
-  status = nf_def_var(ncid, 'iter', NF_INT, 1, dimid_rec, iter_varid)
+  status = nf_def_var(ncid, 'iter', NF_INT, 1, [dimid_rec], iter_varid)
   if (status .ne. nf_noerr) call handle_err(status, partit)
 
   ! Define the netCDF variables for the tracers.
@@ -1936,10 +1940,11 @@ subroutine write_buoy_props_netcdf(partit)
  use g_clock
 ! use iceberg_params, only : buoy_props, file_icb_netcdf, save_count_buoys, prev_sec_in_year, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean
  use g_forcing_param
-
+! use netcdf
+  use netcdf_nf_interfaces
+  use netcdf_nf_data
  implicit none
 
-#include "netcdf.inc" 
 
   integer                   :: status,ncid, istep
   integer                   :: dimid_ib, dimid_rec, dimids(2)
@@ -2051,9 +2056,9 @@ type(t_partit), intent(inout), target :: partit
      !lvlb_mean(ib)*step_per_day
 
      ! time and iteration
-     status=nf_put_vara_double(ncid, time_varid, save_count_buoys, 1, prev_sec_in_year+sec_in_year) 
+     status=nf_put_vara(ncid, time_varid, save_count_buoys, 1, prev_sec_in_year+sec_in_year) 
      if (status .ne. nf_noerr) call handle_err(status, partit)
-     status=nf_put_vara_int(ncid, iter_varid, save_count_buoys, 1, istep)
+     status=nf_put_vara(ncid, iter_varid, save_count_buoys, 1, istep)
      if (status .ne. nf_noerr) call handle_err(status, partit)
 
      !variables
