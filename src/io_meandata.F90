@@ -11,9 +11,10 @@ module io_MEANDATA
   use, intrinsic :: iso_fortran_env, only: real64, real32
   use io_data_strategy_module
   use async_threads_module
+  use netcdf_nf_interfaces
+  use netcdf_nf_data
 
   implicit none
-#include "netcdf.inc"
   private
   public :: def_stream, def_stream2D, def_stream3D, output, finalize_output
 !
@@ -1541,6 +1542,7 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
 
     implicit none
     character(2000)               :: att_text
+    integer                       :: temp_int_scalar !temporary scalar for netcdf calls
     type(t_mesh)  , intent(in) :: mesh
     type(t_partit), intent(in) :: partit
     type(t_dyn)   , intent(in) :: dynamics
@@ -1602,7 +1604,7 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
   
     !___________________________________________________________________________
     ! Define the time and iteration variables
-    call assert_nf( nf_def_var(entry%ncid, 'time', NF_DOUBLE, 1, entry%recID, entry%tID), __LINE__)
+    call assert_nf( nf_def_var(entry%ncid, 'time', NF_DOUBLE, 1, [entry%recID], entry%tID), __LINE__)
     att_text='time'
     call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'long_name', len_trim(att_text), trim(att_text)), __LINE__)
     call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'standard_name', len_trim(att_text), trim(att_text)), __LINE__)
@@ -1613,7 +1615,7 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     
     call assert_nf( nf_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), entry%ndim+1, (/entry%dimid(entry%ndim:1:-1), entry%recID/), entry%varID), __LINE__)
 
-    call assert_nf( nf_def_var_deflate(entry%ncid, entry%varID, 0, 1, compression_level), __LINE__)
+    !call assert_nf( nf_def_var_deflate(entry%ncid, entry%varID, 0, 1, compression_level), __LINE__)
     call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'description', len_trim(entry%description), entry%description), __LINE__)
     call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'long_name', len_trim(entry%description), entry%description), __LINE__)
     call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'units',       len_trim(entry%units),       entry%units), __LINE__)
@@ -1637,16 +1639,19 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
   ! call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_ver', len_trim(tra_adv_ver), trim(tra_adv_ver)), __LINE__)
   ! call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_lim', len_trim(tra_adv_lim), trim(tra_adv_lim)), __LINE__)
  
-    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell', NF_INT, 1,  use_partial_cell), __LINE__)
-    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'force_rotation', NF_INT, 1,  force_rotation), __LINE__)
-    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'include_fleapyear', NF_INT, 1,  include_fleapyear), __LINE__)
-    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_floatice', NF_INT, 1,  use_floatice), __LINE__)
-    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'whichEVP'         , NF_INT, 1,  ice%whichEVP), __LINE__)
-    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'evp_rheol_steps'  , NF_INT, 1,  ice%evp_rheol_steps), __LINE__)
-    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'opt_visc'         , NF_INT, 1,  dynamics%opt_visc), __LINE__)
-    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_wsplit'       , NF_INT, 1,  dynamics%use_wsplit), __LINE__)
-    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell', NF_INT, 1,  use_partial_cell), __LINE__)
-    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'autorotate_back_to_geo', NF_INT, 1,  vec_autorotate), __LINE__)
+    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell', NF_INT, 1,  [merge(1,0,use_partial_cell)]), __LINE__)
+    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'force_rotation', NF_INT, 1,  [merge(1,0,force_rotation)]), __LINE__)
+    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'include_fleapyear', NF_INT, 1,  [merge(1,0,include_fleapyear)]), __LINE__)
+    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_floatice', NF_INT, 1,  [merge(1,0,use_floatice)]), __LINE__)
+    ! temp_int_scalar = ice%whichEVP(1)
+    ! call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'whichEVP'         , NF_INT, 1,  temp_int_scalar), __LINE__)
+    ! temp_int_scalar = ice%evp_rheol_steps(1)
+    ! call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'evp_rheol_steps'  , NF_INT, 1,  temp_int_scalar), __LINE__)
+    ! temp_int_scalar = dynamics%opt_visc(1)
+    ! call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'opt_visc'         , NF_INT, 1,  temp_int_scalar), __LINE__)
+    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_wsplit'       , NF_INT, 1,  [merge(1,0,dynamics%use_wsplit)]), __LINE__)
+    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell', NF_INT, 1,  [merge(1,0,use_partial_cell)]), __LINE__)
+    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'autorotate_back_to_geo', NF_INT, 1,  [merge(1,0,vec_autorotate)]), __LINE__)
  
     !___________________________________________________________________________
     ! This ends definition part of the file, below filling in variables is possible
@@ -1717,7 +1722,7 @@ subroutine write_mean(entry, entry_index)
     ! write new time index ctime_copy to file --> expand time array in nc file
     if (entry%p_partit%mype==entry%root_rank) then
         write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
-        call assert_nf( nf_put_vara_double(entry%ncid, entry%Tid, entry%rec_count, 1, entry%ctime_copy, 1), __LINE__)
+        call assert_nf( nf_put_vara_double(entry%ncid, entry%Tid, [entry%rec_count], [1], [entry%ctime_copy]), __LINE__)
     end if
   
     !_______writing 2D and 3D fields____________________________________________
@@ -1762,9 +1767,9 @@ subroutine write_mean(entry, entry_index)
             ! variables into specific layer position lev
             if (entry%p_partit%mype==entry%root_rank) then
                 if (entry%ndim==1) then
-                    call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r8, 1), __LINE__)
+                    call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r8), __LINE__)
                 elseif (entry%ndim==2) then
-                    call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size2, 1, 1/), entry%aux_r8, 1), __LINE__)
+                    call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size2, 1, 1/), entry%aux_r8), __LINE__)
                 end if
             end if
         end do ! --> do lev=1, size1
@@ -1807,11 +1812,11 @@ subroutine write_mean(entry, entry_index)
             ! variables into specific layer position lev
             if (entry%p_partit%mype==entry%root_rank) then
                 if (entry%ndim==1) then
-                    call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r4, 1), __LINE__)
+                    call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r4), __LINE__)
                     !PS t1=MPI_Wtime()  
                     !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> after nf_put_vara_real'//achar(27)//'[0m', entry%p_partit%mype, t1-t0
                 elseif (entry%ndim==2) then
-                    call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size2, 1, 1/), entry%aux_r4, 1), __LINE__)
+                    call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size2, 1, 1/), entry%aux_r4), __LINE__)
                     !PS t1=MPI_Wtime()  
                     !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> after nf_put_vara_real'//achar(27)//'[0m', entry%p_partit%mype, lev, t1-t0
                 end if
@@ -1909,6 +1914,8 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     type(t_ice)   , intent(inout), target :: ice
     character(:), allocatable             :: filepath
     real(real64)                          :: rtime !timestamp of the record
+    real(real64)                          :: rtime_array(1) !temporary array for netcdf calls
+    integer                               :: temp_int_array(1) !temporary array for netcdf calls
 #if defined(__MULTIO)
     logical       :: output_done
     logical       :: trigger_flush
@@ -2022,7 +2029,8 @@ ctime=timeold+(dayold-1.)*86400
                 do k=entry%rec_count, 1, -1
                     !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf B'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank  
                     ! determine rtime from exiting file
-                    call assert_nf( nf_get_vara_double(entry%ncid, entry%tID, k, 1, rtime, 1), __LINE__)
+                    call assert_nf( nf_get_vara_double(entry%ncid, entry%tID, [k], [1], rtime_array), __LINE__)
+                    rtime = rtime_array(1)
                     if (ctime > rtime) then
                         entry%rec_count=k+1
                         exit ! a proper rec_count detected, exit the loop
@@ -2430,9 +2438,8 @@ subroutine assert_nf(status, line)
     integer, intent(in) :: status
     integer, intent(in) :: line
     ! EO args
-    include "netcdf.inc" ! old netcdf fortran interface required?
     if(status /= NF_NOERR) then
-        print *, "error in line ",line, __FILE__, ' ', trim(nf_strerror(status))
+        print *, "error in line ",line, __FILE__, ' ', nf_strerror(status)
         stop 1
     end if   
 end subroutine
