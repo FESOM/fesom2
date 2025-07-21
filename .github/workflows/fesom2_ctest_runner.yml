@@ -1,0 +1,218 @@
+name: FESOM2 CTest Framework (Native Runner)
+
+# Controls when the action will run
+on:
+  # Triggers the workflow on push or pull request events
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+    branches: [ main ]
+  
+  # Allows to run this workflow manually from the Actions tab
+  workflow_dispatch:
+    inputs:
+      continue_on_test_failure:
+        description: 'Continue workflow even if tests fail'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      test_timeout:
+        description: 'Test timeout in seconds'
+        required: false
+        default: '600'
+        type: string
+      test_pattern:
+        description: 'Run only tests matching this pattern (optional)'
+        required: false
+        default: ''
+        type: string
+      build_type:
+        description: 'CMake build type'
+        required: false
+        default: 'Release'
+        type: choice
+        options:
+          - 'Debug'
+          - 'Release'
+          - 'RelWithDebInfo'
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  ctest_framework:
+    # Run directly on Ubuntu runner
+    runs-on: ubuntu-latest
+    
+    env:
+      # Set environment variables for the build
+      CC: gcc
+      CXX: g++
+      FC: gfortran
+      OMPI_MCA_rmaps_base_oversubscribe: yes
+
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Install system dependencies
+        run: |
+          echo "Installing FESOM2 dependencies..."
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc \
+            gfortran \
+            g++ \
+            cmake \
+            make \
+            openmpi-bin \
+            libopenmpi-dev \
+            libnetcdf-dev \
+            libnetcdff-dev \
+            pkg-config \
+            git \
+            wget \
+            ca-certificates \
+            gnupg \
+            lsb-release
+          
+          echo "Installing CMake 3.25+ from Kitware repository..."
+          # Add Kitware's signing key
+          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | sudo tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null
+          
+          # Add Kitware repository
+          echo "deb https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/kitware.list >/dev/null
+          
+          # Update package list and install latest CMake
+          sudo apt-get update
+          sudo apt-get install -y cmake
+          
+          echo "Verifying installations..."
+          gcc --version
+          gfortran --version
+          mpirun --version
+          cmake --version
+          pkg-config --modversion netcdf
+          pkg-config --modversion netcdf-fortran
+          
+      - name: Set up environment variables
+        run: |
+          echo "Setting up environment for FESOM2 build..."
+          
+          # Set NetCDF paths
+          echo "NETCDF_ROOT=/usr" >> $GITHUB_ENV
+          echo "NETCDF_Fortran_ROOT=/usr" >> $GITHUB_ENV
+          
+          # Set compiler flags for better compatibility
+          echo "FCFLAGS=-fallow-argument-mismatch" >> $GITHUB_ENV
+          echo "FFLAGS=-fallow-argument-mismatch" >> $GITHUB_ENV
+          
+          # MPI settings for GitHub Actions
+          echo "OMPI_MCA_btl_vader_single_copy_mechanism=none" >> $GITHUB_ENV
+          echo "OMPI_MCA_rmaps_base_oversubscribe=yes" >> $GITHUB_ENV
+          echo "OMPI_MCA_btl_base_warn_component_unused=0" >> $GITHUB_ENV
+      
+      - name: Configure FESOM2 build
+        run: |
+          echo "Configuring FESOM2 build..."
+          
+          # Create build directory
+          mkdir -p build
+          cd build
+          
+          # Configure with CMake directly (skip configure.sh for more control)
+          cmake \
+            -DCMAKE_BUILD_TYPE=${{ github.event.inputs.build_type || 'Release' }} \
+            -DBUILD_TESTING=ON \
+            -DENABLE_INTEGRATION_TESTS=ON \
+            -DENABLE_MPI_TESTS=ON \
+            -DTEST_TIMEOUT=${{ github.event.inputs.test_timeout || '600' }} \
+            -DCMAKE_C_COMPILER=gcc \
+            -DCMAKE_CXX_COMPILER=g++ \
+            -DCMAKE_Fortran_COMPILER=gfortran \
+            -DMPI_C_COMPILER=mpicc \
+            -DMPI_CXX_COMPILER=mpicxx \
+            -DMPI_Fortran_COMPILER=mpifort \
+            -DNetCDF_ROOT=/usr \
+            -DNetCDF_Fortran_ROOT=/usr \
+            -DCMAKE_Fortran_FLAGS="-fallow-argument-mismatch" \
+            ..
+          
+          echo "CMake configuration completed"
+      
+      - name: Build FESOM2
+        run: |
+          echo "Building FESOM2..."
+          cd build
+          
+          # Build with multiple cores
+          make -j$(nproc) VERBOSE=1
+          
+          echo "Build completed successfully"
+          
+          # Verify executable exists
+          if [ -f "bin/fesom.x" ]; then
+            echo "✅ FESOM2 executable created successfully"
+            ls -la bin/fesom.x
+          else
+            echo "❌ FESOM2 executable not found"
+            find . -name "fesom.x" -type f || echo "No fesom.x found anywhere"
+            exit 1
+          fi
+            
+      - name: List available tests
+        run: |
+          echo "Discovering available tests..."
+          cd build
+          
+          # List tests in different formats
+          echo "=== Available Tests (Summary) ==="
+          ctest -N
+          
+          echo ""
+          echo "=== Available Tests (Detailed JSON) ==="
+          ctest --show-only=json-v1 > available_tests.json
+          
+          echo ""
+          echo "=== Test Count Summary ==="
+          ctest -N | grep "Total Tests:" || echo "No tests found or different format"
+          
+          # Show test details if available
+          if [ -f available_tests.json ]; then
+            echo ""
+            echo "=== Test Details ==="
+            cat available_tests.json | jq '.tests[].name' 2>/dev/null || echo "jq not available, raw JSON saved"
+          fi
+      
+      - name: Run CTest framework
+        id: run_tests
+        continue-on-error: ${{ github.event.inputs.continue_on_test_failure == 'true' || github.event.inputs.continue_on_test_failure == '' }}
+        run: |
+          cd build
+          echo "Running FESOM2 test suite..."
+          
+          # Set test pattern if provided
+          TEST_PATTERN="${{ github.event.inputs.test_pattern }}"
+          
+          # Configure test execution parameters
+          CTEST_ARGS="--output-on-failure --verbose --timeout ${{ github.event.inputs.test_timeout || '600' }}"
+          
+          if [ -n "$TEST_PATTERN" ]; then
+            echo "Running tests matching pattern: $TEST_PATTERN"
+            ctest $CTEST_ARGS -R "$TEST_PATTERN"
+          else
+            echo "Running all available tests"
+            ctest $CTEST_ARGS
+          fi
+          
+          # Capture exit code
+          TEST_EXIT_CODE=$?
+          echo "CTest exit code: $TEST_EXIT_CODE"
+          
+          # Save exit code for later steps
+          echo "TEST_EXIT_CODE=$TEST_EXIT_CODE" >> $GITHUB_ENV
+        

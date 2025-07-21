@@ -36,6 +36,8 @@ module fesom_main_storage_module
   use age_tracer_init_interface
   use iceberg_params
   use iceberg_step
+  use iceberg_ocean_coupling
+  use Toy_Channel_Soufflet, only: compute_zonal_mean
   ! Define icepack module
 
 #if defined (__icepack)
@@ -52,11 +54,14 @@ module fesom_main_storage_module
   use recom_interface
 #endif
 
+! Transient tracers
+use mod_transit, only: year_ce, r14c_nh, r14c_tz, r14c_sh, r14c_ti, xCO2_ti, xf11_nh, xf11_sh, xf12_nh, xf12_sh, xsf6_nh, xsf6_sh, ti_transit, anthro_transit
+
   implicit none
     
   type :: fesom_main_storage_type
 
-    integer           :: n, from_nstep, offset, row, i, provided
+    integer           :: n, from_nstep, offset, row, i, provided, id
     integer           :: which_readr ! read which restart files (0=netcdf, 1=core dump,2=dtype)
     integer           :: total_nsteps
     integer, pointer  :: mype, npes, MPIerr, MPI_COMM_FESOM, MPI_COMM_WORLD, MPI_COMM_FESOM_IB
@@ -88,10 +93,10 @@ module fesom_main_storage_module
     integer mpi_version_len
     logical fesom_did_mpi_init
     
-  end type
+  end type fesom_main_storage_type
   type(fesom_main_storage_type), save, target :: f
 
-end module
+end module fesom_main_storage_module
 
 
 ! synopsis: main FESOM program split into 3 parts
@@ -176,14 +181,35 @@ contains
         ! load the mesh and fill in 
         ! auxiliary mesh arrays
         !=====================
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call setup_model'//achar(27)//'[0m'
         call setup_model(f%partit)  ! Read Namelists, always before clock_init
+        
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call clock_init'//achar(27)//'[0m'
         call clock_init(f%partit)   ! read the clock file 
+        
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call get_run_steps'//achar(27)//'[0m'
         call get_run_steps(fesom_total_nsteps, f%partit)
         f%total_nsteps=fesom_total_nsteps
+        
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call mesh_setup'//achar(27)//'[0m'
         call mesh_setup(f%partit, f%mesh)
 
         if (f%mype==0) write(*,*) 'FESOM mesh_setup... complete'
+
+!       Transient tracers: control output of initial input values
+        if(use_transit .and. anthro_transit .and. f%mype==0) then
+          write (*,*)
+          write (*,*) "*** Transient tracers: Initial atmospheric input values >>>"
+          write (*,*) "Year CE, xCO2, D14C_NH, D14C_TZ, D14C_SH, xCFC-11_NH, xCFC-11_SH, xCFC-12_NH, xCFC-12_SH, xSF6_NH, xSF6_SH"
+          write (*, fmt="(2x,i4,10(2x,f6.2))") &
+                  year_ce(ti_transit), xCO2_ti(ti_transit) * 1.e6, &
+                  (r14c_nh(ti_transit) - 1.) * 1000., (r14c_tz(ti_transit) - 1.) * 1000., (r14c_sh(ti_transit) - 1.) * 1000., &
+                  xf11_nh(ti_transit) * 1.e12, xf11_sh(ti_transit) * 1.e12, &
+                  xf12_nh(ti_transit) * 1.e12, xf12_sh(ti_transit) * 1.e12, &
+                  xsf6_nh(ti_transit) * 1.e12, xsf6_sh(ti_transit) * 1.e12
+          write (*,*)
+        end if
+
 
         !=====================
         ! Allocate field variables 
@@ -272,7 +298,7 @@ contains
         ! --------------
         ! LA icebergs: 2023-05-17 
         if (use_icebergs) then
-            call allocate_icb(f%partit)
+            call allocate_icb(f%partit, f%mesh)
         endif
         ! --------------
 
@@ -291,6 +317,17 @@ contains
         !___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
         call restart(0, 0, 0, r_restart, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         if (f%mype==0) f%t7=MPI_Wtime()
+        
+        ! recompute zonal profiles of temp and velocity, with the data from the restart
+        ! otherwise zonal profiles of the initial condition are used, this will 
+        ! fuck up the continutiy of the restart
+        if (toy_ocean .and. r_restart) then  
+            SELECT CASE (TRIM(which_toy))
+                CASE ("soufflet") !forcing update for soufflet testcase
+                    call compute_zonal_mean(f%dynamics, f%tracers, f%partit, f%mesh)
+            END SELECT
+        end if    
+        
         ! store grid information into netcdf file
         if (.not. r_restart) call write_mesh_info(f%partit, f%mesh)
 
@@ -421,13 +458,14 @@ contains
     !$ACC ENTER DATA CREATE (f%tracers%data, f%tracers%work) 
     do tr_num=1, f%tracers%num_tracers
     !$ACC ENTER DATA CREATE (f%tracers%data(tr_num)%values, f%tracers%data(tr_num)%valuesAB)
+    !$ACC ENTER DATA CREATE (f%tracers%data(tr_num)%valuesold)
     !$ACC ENTER DATA CREATE (f%tracers%data(tr_num)%tra_adv_ph, f%tracers%data(tr_num)%tra_adv_pv)
     end do
-    !$ACC ENTER DATA CREATE (f%tracers%work%fct_ttf_min, f%tracers%work%fct_ttf_max, f%tracers%work%fct_plus, f%tracers%work%fct_minus) &
-    !$ACC CREATE (f%tracers%work%adv_flux_hor, f%tracers%work%adv_flux_ver, f%tracers%work%fct_LO) &
-    !$ACC CREATE (f%tracers%work%del_ttf_advvert, f%tracers%work%del_ttf_advhoriz, f%tracers%work%edge_up_dn_grad) &
-    !$ACC CREATE (f%tracers%work%del_ttf)
-  end subroutine
+    !$ACC ENTER DATA CREATE (f%tracers%work%fct_ttf_min, f%tracers%work%fct_ttf_max, f%tracers%work%fct_plus, f%tracers%work%fct_minus)
+    !$ACC ENTER DATA CREATE (f%tracers%work%adv_flux_hor, f%tracers%work%adv_flux_ver, f%tracers%work%fct_LO)
+    !$ACC ENTER DATA CREATE (f%tracers%work%del_ttf_advvert, f%tracers%work%del_ttf_advhoriz, f%tracers%work%edge_up_dn_grad)
+    !$ACC ENTER DATA CREATE (tr_xy, tr_z, relax2clim, Sclim, Tclim)
+  end subroutine fesom_init
 
 
   subroutine fesom_runloop(current_nsteps)
@@ -570,16 +608,6 @@ contains
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_timestep(n)'//achar(27)//'[0m'
             if (f%ice%ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh)  
 
-            
-            ! LA commented for debugging
-            ! --------------
-            ! LA icebergs: 2023-05-17 
-            if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
-                call icb2fesom(f%mesh, f%partit, f%ice)
-            end if
-            ! --------------
-
-
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
             call oce_fluxes_mom(f%ice, f%dynamics, f%partit, f%mesh) ! momentum only
@@ -600,6 +628,14 @@ contains
         !___model ocean step____________________________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_timestep_ale'//achar(27)//'[0m'
         call oce_timestep_ale(n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        if (use_transit) then
+          ! Prevent negative concentrations of SF6, CFC-11 and CFC-12 during the first years (inital values are zero)
+          do tr_num=1, f%tracers%num_tracers
+            if ((f%tracers%data(tr_num)%ID==6) .or. (f%tracers%data(tr_num)%ID==11) .or. (f%tracers%data(tr_num)%ID==12)) then
+                f%tracers%data(tr_num)%values(:,:) = max(f%tracers%data(tr_num)%values(:,:), 0._WP)
+            end if
+          end do
+        end if ! use_transit
 
         f%t3 = MPI_Wtime()
         !___compute energy diagnostics..._______________________________________
@@ -629,12 +665,30 @@ contains
 #if defined (__recom)
         f%rtime_compute_recom = f%rtime_compute_recom + f%t1_recom - f%t0_recom
 #endif
+
+!       Transient tracers: update of input values between restarts
+        if(use_transit .and. anthro_transit .and. (daynew == ndpyr) .and. (timenew==86400.)) then
+          ti_transit = ti_transit + 1
+          if (f%mype==0) then
+            write (*,*)
+            write (*,*) "*** Transient tracers: Updated atmospheric input values >>>"
+            write (*,*) "Year CE, xCO2, D14C_NH, D14C_TZ, D14C_SH, xCFC-11_NH, xCFC-11_SH, xCFC-12_NH, xCFC-12_SH, xSF6_NH, xSF6_SH"
+            write (*, fmt="(2x,i4,10(2x,f6.2))") &
+                        year_ce(ti_transit), xCO2_ti(ti_transit) * 1.e6, &
+                        (r14c_nh(ti_transit) - 1.) * 1000., (r14c_tz(ti_transit) - 1.) * 1000., (r14c_sh(ti_transit) - 1.) * 1000., &
+                        xf11_nh(ti_transit) * 1.e12, xf11_sh(ti_transit) * 1.e12, &
+                        xf12_nh(ti_transit) * 1.e12, xf12_sh(ti_transit) * 1.e12, &
+                        xsf6_nh(ti_transit) * 1.e12, xsf6_sh(ti_transit) * 1.e12
+            write (*,*)
+          end if
+        endif
+
     end do
 !call cray_acc_set_debug_global_level(3)    
     f%from_nstep = f%from_nstep+current_nsteps
 !call cray_acc_set_debug_global_level(0)    
 !   write(0,*) 'f%from_nstep after the loop:', f%from_nstep    
-  end subroutine
+  end subroutine fesom_runloop
 
 
   subroutine fesom_finalize()
@@ -680,11 +734,13 @@ contains
     !$ACC EXIT DATA DELETE (f%ice)
     do tr_num=1, f%tracers%num_tracers
     !$ACC EXIT DATA DELETE (f%tracers%data(tr_num)%values, f%tracers%data(tr_num)%valuesAB)
+    !$ACC EXIT DATA DELETE (f%tracers%data(tr_num)%valuesold)
     end do
     !$ACC EXIT DATA DELETE (f%tracers%work%fct_ttf_min, f%tracers%work%fct_ttf_max, f%tracers%work%fct_plus, f%tracers%work%fct_minus)
     !$ACC EXIT DATA DELETE (f%tracers%work%adv_flux_hor, f%tracers%work%adv_flux_ver, f%tracers%work%fct_LO)
     !$ACC EXIT DATA DELETE (f%tracers%work%del_ttf_advvert, f%tracers%work%del_ttf_advhoriz, f%tracers%work%edge_up_dn_grad)
     !$ACC EXIT DATA DELETE (f%tracers%work%del_ttf)
+    !$ACC EXIT DATA DELETE (tr_xy, tr_z, relax2clim, Sclim, Tclim)
     !$ACC EXIT DATA DELETE (f%tracers%data, f%tracers%work)
     !$ACC EXIT DATA DELETE (f%dynamics%w, f%dynamics%w_e, f%dynamics%uv)
     !$ACC EXIT DATA DELETE (f%dynamics, f%tracers)
@@ -788,6 +844,6 @@ contains
         write(*,*)
     end if    
 !   call clock_finish  
-  end subroutine
+  end subroutine fesom_finalize
 
-end module
+end module fesom_module

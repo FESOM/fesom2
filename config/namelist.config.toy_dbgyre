@@ -1,0 +1,79 @@
+! This is the namelist file for model general configuration
+
+&modelname
+runid='fesom'
+/
+
+&timestep
+step_per_day=45 !96 !96 !72 !72 !45 !72 !96
+run_length=1 !62 !62 !62 !28
+run_length_unit='d' ! y, m, d, s
+/
+
+&clockinit              ! the model starts at
+timenew=0.0
+daynew=1
+yearnew=1900
+/
+
+&paths
+MeshPath=''
+ResultPath='../results_tmp/'
+/
+
+&restart_log
+restart_length=1           ! --> do netcdf restart ( only required for d,h,s cases, y, m take 1)
+restart_length_unit='y'     !output period: y, d, h, s, off
+raw_restart_length=1        ! --> do core dump restart
+raw_restart_length_unit='off' ! e.g. y, d, h, s, off
+bin_restart_length=1        ! --> do derived type binary restart 
+bin_restart_length_unit='off' ! e.g. y, d, h, s, off
+logfile_outfreq=72     !in logfile info. output frequency, # steps
+/
+
+&ale_def
+which_ALE='linfs'       ! 'linfs','zlevel', 'zstar'
+use_partial_cell=.false.
+/
+
+&geometry
+cartesian=.false.
+fplane=.false.
+cyclic_length=90       ![degree]
+rotated_grid=.false.     !option only valid for coupled model case now
+force_rotation=.false.
+alphaEuler=0          ![degree] Euler angles, convention:
+betaEuler=0           ![degree] first around z, then around new x,
+gammaEuler=0         ![degree] then around new z.
+/
+
+&calendar
+include_fleapyear=.false.
+/
+
+&run_config
+use_ice=.false.                  ! ocean+ice
+use_cavity=.false.              !
+use_cavity_partial_cell=.false. 
+use_floatice = .false.
+use_sw_pene=.true.
+flag_debug=.false.
+flag_warn_cflz=.false.
+toy_ocean=.true.
+which_toy="dbgyre"
+flag_debug=.false.
+/
+
+&machine
+n_levels=1
+n_part=24
+/
+
+&icebergs
+use_icesheet_coupling=.false.
+ib_num=1
+use_icebergs=.false.
+steps_per_ib_step=8
+ib_async_mode=0
+/
+

@@ -1,5 +1,6 @@
  ! synopsis: basic Fortran utilities, no MPI, dependencies only to INTRINSIC modules
 module fortran_utils
+  use mpi
   implicit none
 
 contains
@@ -18,7 +19,7 @@ contains
     end if
     allocate(character(val_width) :: txt)
     write(txt,'(i0)') val
-  end function
+  end function int_to_txt
 
 
   function int_to_txt_pad(val, width) result(txt)
@@ -38,7 +39,7 @@ contains
     widthtxt = int_to_txt(w)
     allocate(character(w) :: txt)
     write(txt,'(i0.'//widthtxt//')') val
-  end function
+  end function int_to_txt_pad
 
 
   function mpirank_to_txt(mpicomm) result(txt)
@@ -48,12 +49,11 @@ contains
     integer mype
     integer npes
     integer mpierr
-    include 'mpif.h'
 
     call MPI_Comm_Rank(mpicomm, mype, mpierr)
     call MPI_Comm_Size(mpicomm, npes, mpierr)
     txt = int_to_txt_pad(mype,int(log10(real(npes)))+1) ! pad to the width of the number of processes
-  end function
+  end function mpirank_to_txt
 
 
   ! using EXECUTE_COMMAND_LINE to call mkdir sometimes fail (EXECUTE_COMMAND_LINE is forked as an new process, which may be the problem)
@@ -71,13 +71,13 @@ contains
         integer(c_int) mkdir_c
         character(kind=c_char,len=1) path(*)
         integer(c_int), value :: mode
-      end function
+      end function mkdir_c
     end interface
 
     pathcopy = path ! we need to pass an array of c_char to the C funcktion (this is not a correct type conversion, but Fortran characters seem to be of the same kind as c_char)
     ! result is 0 if the dir has been created from this call, otherwise -1
     ! the mode will not exactly be what we pass here, as it is subtracted by the umask bits (and possibly more)
     result = mkdir_c(pathcopy//C_NULL_CHAR, int(o'777', c_int))
-  end subroutine
+  end subroutine mkdir
 
-end module
+end module fortran_utils

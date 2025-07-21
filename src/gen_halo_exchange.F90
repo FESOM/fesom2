@@ -1795,7 +1795,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr2D, myDim_nod2D, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr2D(1:myDim_nod2D), myDim_nod2D, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_FESOM, MPIerr )
 
 ENDIF
 
@@ -1849,7 +1849,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr2D, myDim_nod2D, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr2D(1:myDim_nod2D), myDim_nod2D, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
 
 ENDIF
 
@@ -1904,7 +1904,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr2D, myDim_nod2D, MPI_SHORT, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr2D(1:myDim_nod2D), myDim_nod2D, MPI_SHORT, 0, 2, MPI_COMM_FESOM, MPIerr )
 
 ENDIF
 
@@ -2157,7 +2157,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr2D, myDim_elem2D, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr2D(1:myDim_elem2D), myDim_elem2D, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_FESOM, MPIerr )
 
 ENDIF
 end if
@@ -2216,7 +2216,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr2D, myDim_elem2D, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr2D(1:myDim_elem2D), myDim_elem2D, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
 
 ENDIF
 end if
@@ -2274,7 +2274,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr2D, myDim_elem2D, MPI_SHORT, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr2D(1:myDim_elem2D), myDim_elem2D, MPI_SHORT, 0, 2, MPI_COMM_FESOM, MPIerr )
 
 ENDIF
 end if
@@ -2556,7 +2556,8 @@ CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
         arr2D_global(:) = arr2D(:)
      endif
   ELSE
-     call MPI_SEND(arr2D, myDim_elem2D, MPI_INTEGER, 0, 2, MPI_COMM_FESOM, MPIerr )
+     ! Modify arr2D to be an explicitly contiguous array with arr2D --> arr2D(1:myDim_elem2D)
+     call MPI_SEND(arr2D(1:myDim_elem2D), myDim_elem2D, MPI_INTEGER, 0, 2, MPI_COMM_FESOM, MPIerr )
   ENDIF
 end subroutine gather_elem2D_i
 !==============================================
@@ -2607,7 +2608,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr2D, myDim_nod2D, MPI_INTEGER, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr2D(1:myDim_nod2D), myDim_nod2D, MPI_INTEGER, 0, 2, MPI_COMM_FESOM, MPIerr )
 
 ENDIF
 
@@ -2637,20 +2638,31 @@ IF ( mype == 0 ) THEN
        sender = status(MPI_SOURCE)
        ALLOCATE(rbuf(buf_size), ibuf(buf_size))
 
-       CALL MPI_RECV(ibuf(1), buf_size, MPI_INTEGER, sender, &
+!PS        CALL MPI_RECV(ibuf(1), buf_size, MPI_INTEGER, sender, &
+!PS                       1, MPI_COMM_FESOM, status, MPIerr )
+!PS        CALL MPI_RECV(rbuf(1), buf_size, MPI_DOUBLE_PRECISION, sender, &
+!PS                       2, MPI_COMM_FESOM, status, MPIerr )
+                      
+       CALL MPI_RECV(ibuf, buf_size, MPI_INTEGER, sender, &
                       1, MPI_COMM_FESOM, status, MPIerr )
-
-       CALL MPI_RECV(rbuf(1), buf_size, MPI_DOUBLE_PRECISION, sender, &
-                      2, MPI_COMM_FESOM, status, MPIerr )
+       CALL MPI_RECV(rbuf, buf_size, MPI_DOUBLE_PRECISION, sender, &
+                      2, MPI_COMM_FESOM, status, MPIerr )               
        arr2Dglobal(ibuf)=rbuf
        DEALLOCATE(ibuf, rbuf)
     ENDDO
 ELSE
+!PS     CALL MPI_SEND( myDim_edge2D, 1, MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
+!PS     CALL MPI_SEND( myList_edge2D(1), myDim_edge2D, MPI_INTEGER, 0, 1, &
+!PS                    MPI_COMM_FESOM, MPIerr )
+!PS     CALL MPI_SEND( arr2D(1), myDim_edge2D, MPI_DOUBLE_PRECISION, 0, 2,&
+!PS                    MPI_COMM_FESOM, MPIerr )
+                   
     CALL MPI_SEND( myDim_edge2D, 1, MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
-    CALL MPI_SEND( myList_edge2D(1), myDim_edge2D, MPI_INTEGER, 0, 1, &
+    CALL MPI_SEND( myList_edge2D(1:myDim_edge2D), myDim_edge2D, MPI_INTEGER, 0, 1, &
                    MPI_COMM_FESOM, MPIerr )
-    CALL MPI_SEND( arr2D(1), myDim_edge2D, MPI_DOUBLE_PRECISION, 0, 2,&
+    CALL MPI_SEND( arr2D(1:myDim_edge2D), myDim_edge2D, MPI_DOUBLE_PRECISION, 0, 2,&
                    MPI_COMM_FESOM, MPIerr )
+                   
 ENDIF
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 end subroutine gather_edg2D
@@ -2678,20 +2690,32 @@ IF ( mype == 0 ) THEN
        sender = status(MPI_SOURCE)
        ALLOCATE(ibuf(buf_size), vbuf(buf_size))
 
-       CALL MPI_RECV(ibuf(1), buf_size, MPI_INTEGER, sender, &
-                      1, MPI_COMM_FESOM, status, MPIerr )
+!PS        CALL MPI_RECV(ibuf(1), buf_size, MPI_INTEGER, sender, &
+!PS                       1, MPI_COMM_FESOM, status, MPIerr )
+!PS        CALL MPI_RECV(vbuf(1), buf_size, MPI_INTEGER, sender, &
+!PS                       2, MPI_COMM_FESOM, status, MPIerr )
 
-       CALL MPI_RECV(vbuf(1), buf_size, MPI_INTEGER, sender, &
-                      2, MPI_COMM_FESOM, status, MPIerr )
+       CALL MPI_RECV(ibuf, buf_size, MPI_INTEGER, sender, &
+                      1, MPI_COMM_FESOM, status, MPIerr )
+       CALL MPI_RECV(vbuf, buf_size, MPI_INTEGER, sender, &
+                      2, MPI_COMM_FESOM, status, MPIerr )               
        arr2Dglobal(ibuf)=vbuf
        DEALLOCATE(ibuf, vbuf)
     ENDDO
 ELSE
+!PS     CALL MPI_SEND( myDim_edge2D, 1, MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
+!PS     CALL MPI_SEND( myList_edge2D(1), myDim_edge2D, MPI_INTEGER, 0, 1, &
+!PS                    MPI_COMM_FESOM, MPIerr )
+!PS     CALL MPI_SEND( arr2D(1), myDim_edge2D, MPI_INTEGER, 0, 2,&
+!PS                    MPI_COMM_FESOM, MPIerr )
+                   
     CALL MPI_SEND( myDim_edge2D, 1, MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
-    CALL MPI_SEND( myList_edge2D(1), myDim_edge2D, MPI_INTEGER, 0, 1, &
+    CALL MPI_SEND( myList_edge2D(1:myDim_edge2D), myDim_edge2D, MPI_INTEGER, 0, 1, &
                    MPI_COMM_FESOM, MPIerr )
-    CALL MPI_SEND( arr2D(1), myDim_edge2D, MPI_INTEGER, 0, 2,&
+    CALL MPI_SEND( arr2D(1:myDim_edge2D), myDim_edge2D, MPI_INTEGER, 0, 2,&
                    MPI_COMM_FESOM, MPIerr )
+                   
+                   
 ENDIF
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 end subroutine gather_edg2D_i

@@ -12,7 +12,7 @@ module cavity_interfaces
         type(t_tracer), intent(in)   , target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine cavity_heat_water_fluxes_3eq
         
         subroutine cavity_heat_water_fluxes_2eq(ice, tracers, partit, mesh)
         USE MOD_ICE
@@ -24,7 +24,7 @@ module cavity_interfaces
         type(t_tracer), intent(in)   , target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine cavity_heat_water_fluxes_2eq
 
         subroutine cavity_ice_clean_vel(ice, partit, mesh)
         use MOD_ICE
@@ -34,7 +34,7 @@ module cavity_interfaces
         type(t_ice),    intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in),    target :: mesh
-        end subroutine
+        end subroutine cavity_ice_clean_vel
         
         subroutine cavity_ice_clean_ma(ice, partit, mesh)
         use MOD_ICE
@@ -44,7 +44,7 @@ module cavity_interfaces
         type(t_ice),    intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in),    target :: mesh
-        end subroutine
+        end subroutine cavity_ice_clean_ma
         
         subroutine cavity_momentum_fluxes(dynamics, partit, mesh)
         use MOD_DYN
@@ -54,9 +54,9 @@ module cavity_interfaces
         type(t_dyn),    intent(in), target    :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in),    target :: mesh
-        end subroutine
+        end subroutine cavity_momentum_fluxes
     end interface
-end module
+end module cavity_interfaces
 
 
 !

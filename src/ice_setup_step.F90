@@ -10,9 +10,9 @@ module ice_initial_state_interface
         type(t_tracer), intent(in)   , target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine ice_initial_state
     end interface
-end module
+end module ice_initial_state_interface
 
 module ice_setup_interface
     interface
@@ -26,9 +26,9 @@ module ice_setup_interface
         type(t_tracer), intent(in)   , target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine ice_setup
     end interface
-end module
+end module ice_setup_interface
 
 module ice_timestep_interface
     interface
@@ -41,9 +41,9 @@ module ice_timestep_interface
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine ice_timestep
     end interface
-end module
+end module ice_timestep_interface
 
 !
 !_______________________________________________________________________________
@@ -125,7 +125,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
     !LA 2023-03-08
     real(kind=WP), dimension(:), pointer  :: u_ice_ib, v_ice_ib
 #if defined (__oifs) || defined (__ifsinterface)
-    real(kind=WP), dimension(:), pointer  :: ice_temp, a_ice
+    real(kind=WP), dimension(:), pointer  :: a_ice, ice_temp
     !LA 2023-03-08
     real(kind=WP), dimension(:), pointer  :: a_ice_ib
 #endif
@@ -135,44 +135,33 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #include "associate_mesh_ass.h"
 
 !---------------------------------------------
-! LA: 2023-01-31 add asynchronous icebergs
-!    u_ice    => ice%uice(:)
-!    v_ice    => ice%vice(:)
-! kh 19.02.21
   if (ib_async_mode == 0) then
       u_ice    => ice%uice(:)
       v_ice    => ice%vice(:)
-      !allocate(u_ice(n_size), v_ice(n_size))
-      !allocate(u_ice_ib(n_size), v_ice_ib(n_size))
   else
 !$omp parallel sections num_threads(2)
 ! kh 19.02.21 support "first touch" idea
 !$omp section
       u_ice    => ice%uice(:)
       v_ice    => ice%vice(:)
-      !allocate(u_ice(n_size), v_ice(n_size))
       u_ice    = 0._WP
       v_ice    = 0._WP
-      !do i = 1, n_size
-      !    u_ice(i) = 0._WP
-      !    v_ice(i) = 0._WP
-      !end do
 !$omp section
-      u_ice_ib => ice%uice_ib(:)
-      v_ice_ib => ice%vice_ib(:)
-      !allocate(u_ice_ib(n_size), v_ice_ib(n_size))
-      u_ice_ib = 0._WP
-      v_ice_ib = 0._WP
-      !do i = 1, n_size
-      !    u_ice_ib(i) = 0._WP
-      !    v_ice_ib(i) = 0._WP
-      !end do
+      if (use_icebergs) then
+        if (allocated(ice%uice_ib)) then
+          u_ice_ib => ice%uice_ib(:)
+          u_ice_ib = 0._WP
+        end if
+        if (allocated(ice%vice_ib)) then
+          v_ice_ib => ice%vice_ib(:)
+          v_ice_ib = 0._WP
+        end if
+      end if
 !$omp end parallel sections
   end if
 !---------------------------------------------
-
 #if defined (__oifs) || defined (__ifsinterface)
-    a_ice    => ice%data(1)%values(:)
+    a_ice    => ice%data(1)%values(:)    
     ice_temp => ice%data(4)%values(:)
 #endif
     !___________________________________________________________________________
@@ -300,6 +289,8 @@ subroutine ice_timestep(step, ice, partit, mesh)
     !___________________________________________________________________________
 !$OMP PARALLEL DO
     do i=1,myDim_nod2D+eDim_nod2D
+        ice%h_ice(i) =ice%data(2)%values(i)/max(ice%data(1)%values(i), 1.e-3)
+        ice%h_snow(i)=ice%data(3)%values(i)/max(ice%data(1)%values(i), 1.e-3)
         if ( ( U_ice(i)/=0.0_WP .and. mesh%ulevels_nod2d(i)>1) .or. (V_ice(i)/=0.0_WP .and. mesh%ulevels_nod2d(i)>1) ) then
             write(*,*) " --> found cavity velocity /= 0.0_WP , ", mype
             write(*,*) " ulevels_nod2d(n) = ", mesh%ulevels_nod2d(i)
@@ -395,22 +386,24 @@ else
   if (ib_async_mode == 0) then
     u_ice        => ice%uice(:)
     v_ice        => ice%vice(:)
-    u_ice_ib     => ice%uice_ib(:)
-    v_ice_ib     => ice%vice_ib(:)
     a_ice        => ice%data(1)%values(:)
     m_ice        => ice%data(2)%values(:)
-    a_ice_ib     => ice%data(size(ice%data)-1)%values(:)
-    m_ice_ib     => ice%data(size(ice%data))%values(:)
-    !allocate(m_ice(n_size), a_ice(n_size))
-    !allocate(m_ice_ib(n_size), a_ice_ib(n_size))
     m_ice        = 0._WP
     a_ice        = 0._WP
     u_ice        = 0._WP
     v_ice        = 0._WP
-    u_ice_ib     = 0._WP
-    v_ice_ib     = 0._WP
-    m_ice_ib     = 0._WP
+    if (allocated(ice%uice_ib)) then
+        u_ice_ib     => ice%uice_ib(:)
+        u_ice_ib     = 0._WP
+    end if
+    if (allocated(ice%vice_ib)) then
+        v_ice_ib     => ice%vice_ib(:)
+        v_ice_ib     = 0._WP
+    end if
+    a_ice_ib     => ice%data(size(ice%data)-1)%values(:)
     a_ice_ib     = 0._WP
+    m_ice_ib     => ice%data(size(ice%data))%values(:)
+    m_ice_ib     = 0._WP
   else
 ! kh 19.02.21 support "first touch" idea
 !$omp parallel sections num_threads(2)

@@ -551,18 +551,18 @@ CONTAINS
       !! ** Purpose : Fill names of sbc_flfi array (file names and variable names)
 
       !prepare proper nc file (add year and .nc to the end of the file name from namelist
-      if (l_xwind) write(sbc_flfi(i_xwind)%file_name, *) trim(nm_xwind_file),trim(yyear),'.nc'
-      if (l_ywind) write(sbc_flfi(i_ywind)%file_name, *) trim(nm_ywind_file),trim(yyear),'.nc'
-      if (l_xstre) write(sbc_flfi(i_xstre)%file_name, *) trim(nm_xstre_file),trim(yyear),'.nc'
-      if (l_ystre) write(sbc_flfi(i_ystre)%file_name, *) trim(nm_ystre_file),trim(yyear),'.nc'
-      if (l_humi)  write(sbc_flfi(i_humi)%file_name,  *) trim(nm_humi_file), trim(yyear),'.nc'
-      if (l_qsr)   write(sbc_flfi(i_qsr)%file_name,   *) trim(nm_qsr_file),  trim(yyear),'.nc'
-      if (l_qlw)   write(sbc_flfi(i_qlw)%file_name,   *) trim(nm_qlw_file),  trim(yyear),'.nc'
-      if (l_tair)  write(sbc_flfi(i_tair)%file_name,  *) trim(nm_tair_file), trim(yyear),'.nc'
-      if (l_prec)  write(sbc_flfi(i_prec)%file_name,  *) trim(nm_prec_file), trim(yyear),'.nc'
-      if (l_snow)  write(sbc_flfi(i_snow)%file_name,  *) trim(nm_snow_file), trim(yyear),'.nc'
-      if (l_mslp)  write(sbc_flfi(i_mslp)%file_name,  *) trim(nm_mslp_file), trim(yyear),'.nc'
-      if (l_cloud) write(sbc_flfi(i_cloud)%file_name, *) trim(nm_cloud_file),trim(yyear),'.nc'
+      if (l_xwind) write(sbc_flfi(i_xwind)%file_name, *) trim(make_full_path(nm_xwind_file)),trim(yyear),'.nc'
+      if (l_ywind) write(sbc_flfi(i_ywind)%file_name, *) trim(make_full_path(nm_ywind_file)),trim(yyear),'.nc'
+      if (l_xstre) write(sbc_flfi(i_xstre)%file_name, *) trim(make_full_path(nm_xstre_file)),trim(yyear),'.nc'
+      if (l_ystre) write(sbc_flfi(i_ystre)%file_name, *) trim(make_full_path(nm_ystre_file)),trim(yyear),'.nc'
+      if (l_humi)  write(sbc_flfi(i_humi)%file_name,  *) trim(make_full_path(nm_humi_file)), trim(yyear),'.nc'
+      if (l_qsr)   write(sbc_flfi(i_qsr)%file_name,   *) trim(make_full_path(nm_qsr_file)),  trim(yyear),'.nc'
+      if (l_qlw)   write(sbc_flfi(i_qlw)%file_name,   *) trim(make_full_path(nm_qlw_file)),  trim(yyear),'.nc'
+      if (l_tair)  write(sbc_flfi(i_tair)%file_name,  *) trim(make_full_path(nm_tair_file)), trim(yyear),'.nc'
+      if (l_prec)  write(sbc_flfi(i_prec)%file_name,  *) trim(make_full_path(nm_prec_file)), trim(yyear),'.nc'
+      if (l_snow)  write(sbc_flfi(i_snow)%file_name,  *) trim(make_full_path(nm_snow_file)), trim(yyear),'.nc'
+      if (l_mslp)  write(sbc_flfi(i_mslp)%file_name,  *) trim(make_full_path(nm_mslp_file)), trim(yyear),'.nc'
+      if (l_cloud) write(sbc_flfi(i_cloud)%file_name, *) trim(make_full_path(nm_cloud_file)),trim(yyear),'.nc'
 
       if (l_xwind) sbc_flfi(i_xwind)%file_name=ADJUSTL(trim(sbc_flfi(i_xwind)%file_name))
       if (l_ywind) sbc_flfi(i_ywind)%file_name=ADJUSTL(trim(sbc_flfi(i_ywind)%file_name))
@@ -590,6 +590,19 @@ CONTAINS
       if (l_mslp)  sbc_flfi(i_mslp)%var_name=ADJUSTL(trim(nm_mslp_var))
       if (l_cloud) sbc_flfi(i_cloud)%var_name=ADJUSTL(trim(nm_cloud_var))
    END SUBROUTINE nc_sbc_ini_fillnames
+
+   function make_full_path(filename) result(full_path)
+      character(len=*), intent(in) :: filename
+      character(len=MAX_PATH) :: full_path
+      
+      if (len_trim(filename) > 0 .and. filename(1:1) /= '/') then
+         ! Relative path - prepend ClimateDataPath
+         full_path = trim(ClimateDataPath) // trim(filename)
+      else
+         ! Absolute path or empty - use as is
+         full_path = filename
+      endif
+   end function make_full_path
 
    SUBROUTINE nc_sbc_ini(partit, mesh)
       !!---------------------------------------------------------------------
@@ -1050,13 +1063,12 @@ CONTAINS
 #include "associate_mesh_ass.h"
 
       ! OPEN and read namelist for SBC
-      open( unit=nm_sbc_unit, file='namelist.forcing', form='formatted', access='sequential', status='old', iostat=iost )
+      open(unit=nm_sbc_unit, file='namelist.forcing', action='read', form='formatted', access='sequential', status='old', iostat=iost )
       if (iost == 0) then
-         if (mype==0) WRITE(*,*) '     file   : ', 'namelist_bc.nml',' open ok'
+         if (mype==0) WRITE(*,*) '     file   : ', 'namelist.forcing',' open ok'
       else
-         if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist_bc.nml',' ; iostat=',iost
-         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-         stop
+         if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.forcing',' ; iostat=',iost
+         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
       endif
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
       close( nm_sbc_unit )
@@ -1199,7 +1211,7 @@ CONTAINS
       if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
          ! runoff in CORE is constant in time
          ! Warning: For a global mesh, conservative scheme is to be updated!!
-         call read_other_NetCDF(nm_runoff_file, 'Foxx_o_roff', 1, runoff, .false., .true., partit, mesh) 
+         call read_other_NetCDF(make_full_path(nm_runoff_file), 'Foxx_o_roff', 1, runoff, .false., .true., partit, mesh) 
          runoff=runoff/1000.0_WP  ! Kg/s/m2 --> m/s
       end if
 
@@ -1230,7 +1242,7 @@ CONTAINS
         close( nm_sbc_unit+1 )
 #endif
 
-      if (use_runoff_mapper) call read_runoff_mapper(runoff_basins_file, "arrival_point_id", runoff_radius, partit, mesh)
+      if (use_runoff_mapper) call read_runoff_mapper(make_full_path(runoff_basins_file), "arrival_point_id", runoff_radius, partit, mesh)
 
    END SUBROUTINE sbc_ini
 
@@ -1369,7 +1381,7 @@ CONTAINS
                if (mstep > 1) i=i+1 
                if (i > 12) i=1
                if (mype==0) write(*,*) 'Updating SSS restoring data for month     ', i 
-               call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true., .true., partit, mesh) 
+               call read_other_NetCDF(make_full_path(nm_sss_data_file), 'SALT', i, Ssurf, .true., .true., partit, mesh) 
             end if
          end if
       end if
@@ -1382,7 +1394,7 @@ CONTAINS
                if (mstep > 1) i=i+1 
                if (i > 12) i=1
                if (mype==0) write(*,*) 'Updating chlorophyll climatology for month ', i 
-               call read_other_NetCDF(nm_chl_data_file, 'chl', i, chl, .true., .true., partit, mesh) 
+               call read_other_NetCDF(make_full_path(nm_chl_data_file), 'chl', i, chl, .true., .true., partit, mesh) 
             end if
          end if
       end if
@@ -1397,7 +1409,7 @@ CONTAINS
            if (mstep > 1) i=i+1 
            if (i > 12) i=1
            if (mype==0) write(*,*) 'Updating monthly climatology runoff for month ', i 
-           filename=trim(nm_runoff_file)
+           filename=trim(make_full_path(nm_runoff_file))
            call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
 
            !kg/m2/s -> m/s
@@ -1409,7 +1421,7 @@ CONTAINS
            if (mstep > 1) i=i+1 
            if (i > 12) i=1
            if (mype==0) write(*,*) 'Updating monthly runoff for month             ', i 
-           filename=trim(nm_runoff_file)//cyearnew//'.nc' 
+           filename=trim(make_full_path(nm_runoff_file))//cyearnew//'.nc' 
            call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
 
            !kg/m2/s -> m/s
@@ -1462,7 +1474,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
                 end if
             end if          
         else
-            filename=trim(nm_co2_data_file)
+            filename=trim(make_full_path(nm_co2_data_file))
             if (mype==0) write(*,*) 'Updating CO2 climatology for month       ', i,' from ', trim(filename)
 
             totnumyear                 = lastyearoffesomcycle-firstyearoffesomcycle+1
@@ -1760,7 +1772,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
             i=month
             if (mstep > 1) i=i+1 
             if (i > 12) i=1
-            filename=trim(nm_fe_data_file)
+            filename=trim(make_full_path(nm_fe_data_file))
             if (mype==0) write(*,*) 'Updating iron climatology for month       ', i,' from ', trim(filename)
             call read_2ddata_on_grid_NetCDF(filename,'DustClim', i, GloFeDust, partit, mesh)
         end if
@@ -1776,7 +1788,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 !            if (mstep > 1) i=i+1 
 !            if (i > 12) i=1
 !            if (mype==0) write(*,*) 'Updating iron climatology for month ', i 
-            filename=trim(nm_aen_data_file)
+            filename=trim(make_full_path(nm_aen_data_file))
             if (mype==0) write(*,*) 'Updating nitrogen climatology for month   ', i,' from ', trim(filename)
             if (yearnew .gt. 2009) then
                 Nvari = 'NDep2009'
@@ -2337,7 +2349,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 
          end if ! ier >0
       end if ! Ri < 0.25
-   end if  !delw != 0.0
+      end if  !delw != 0.0
 
    return
    end subroutine fairall

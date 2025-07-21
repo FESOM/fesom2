@@ -21,12 +21,41 @@ set(USE_MULTIO OFF CACHE BOOL "Use MULTIO for IO, either grib or binary for now.
 set(OASIS_WITH_YAC OFF CACHE BOOL "Useing a version of OASIS compiled with YAC instead of SCRIP for interpolation?")
 set(ASYNC_ICEBERGS ON CACHE BOOL "compile fesom with or without support for asynchronous iceberg computations")
 set(VERBOSE OFF CACHE BOOL "toggle debug output")
+
+# Testing options
+option(BUILD_TESTING "Build tests" OFF)
+
 #add_subdirectory(oasis3-mct/lib/psmile)
 add_subdirectory(src)
 
 foreach( _file fesom-config.cmake fesom-config-version.cmake fesom-targets.cmake )
   execute_process( COMMAND ${CMAKE_COMMAND} -E create_symlink ${PROJECT_BINARY_DIR}/src/${_file} ${PROJECT_BINARY_DIR}/${_file}  )
 endforeach()
+
+# Add uninstall target
+if(NOT TARGET uninstall)
+  configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+    IMMEDIATE @ONLY)
+  add_custom_target(uninstall
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
+endif()
+
+# Enable testing if requested
+if(BUILD_TESTING)
+    enable_testing()
+    # Only add tests if the tests directory exists
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
+        add_subdirectory(tests)
+    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test/CMakeLists.txt")
+        # Fallback to existing test directory if tests/ doesn't exist yet
+        message(STATUS "Using existing test/ directory for testing")
+        add_subdirectory(test)
+    else()
+        message(WARNING "BUILD_TESTING is ON but no tests directory found")
+    endif()
+endif()
 
 # Define ${PROJECT_NAME}_DIR in PARENT_SCOPE so that a `find_package( <this-project> )` in a bundle
 # will easily find the project without requiring a `HINT <this-project>_BINARY_DIR` argument
