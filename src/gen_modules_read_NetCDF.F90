@@ -18,9 +18,9 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
   USE MOD_MESH
   USE MOD_PARTIT
   USE MOD_PARSUP
-  implicit none
-
-#include "netcdf.inc" 
+  use netcdf_nf_interfaces
+  use netcdf_nf_data
+  implicit none 
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
   integer                    :: i, j, ii, jj, k, n, num, flag, cnt
@@ -29,6 +29,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
   integer                    :: lonid, latid
   integer                    :: istart(3), icount(3), elnodes(3)
   real(real64)               :: x, y, miss, aux, xmin, elnodes_x(3)
+  real(real64)               :: miss_array(1) ! temporary array for netcdf calls
   real(real64), allocatable  :: lon(:), lat(:)
   real(real64), allocatable  :: ncdata(:,:), ncdata_temp(:,:)
   real(real64), allocatable  :: temp_x(:), temp_y(:)
@@ -72,7 +73,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
   allocate(lat(latlen))
   if (mype==0) then
      status=nf_inq_varid(ncid, 'lat', varid)
-     status=nf_get_vara_double(ncid,varid,1,latlen,lat)
+     status=nf_get_vara_double(ncid,varid,[1],[latlen],lat)
   end if
   call MPI_BCast(lat, latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
 
@@ -80,7 +81,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
   allocate(lon(lonlen))
   if (mype==0) then
      status=nf_inq_varid(ncid, 'lon', varid)
-     status=nf_get_vara_double(ncid,varid,1,lonlen,lon)
+     status=nf_get_vara_double(ncid,varid,[1],[lonlen],lon)
   end if
   call MPI_BCast(lon, lonlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
 
@@ -102,7 +103,8 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
      status=nf_get_vara_double(ncid,varid,istart,icount,ncdata)
 
     ! missing value
-     status= nf_get_att_double(ncid,varid,'missing_value',miss)
+     status= nf_get_att_double(ncid,varid,'missing_value',miss_array)
+     miss = miss_array(1)
     ! close file
     status=nf_close(ncid)
   end if
@@ -199,8 +201,9 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
     USE MOD_PARSUP
     use g_rotate_grid
     use, intrinsic :: ISO_FORTRAN_ENV, only: real64
-    implicit none
-#include "netcdf.inc" 
+    use netcdf_nf_interfaces
+    use netcdf_nf_data
+    implicit none 
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
   integer                       :: i, j,  n, num
@@ -209,6 +212,7 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
   integer                       :: lonid, latid, drain_num
   integer                       :: istart(4), icount(4)
   real(real64)                  :: x, y, miss
+  real(real64)                  :: miss_array(1) ! temporary array for netcdf calls
   real(real64), allocatable     :: lon(:), lat(:)
   real(real64), allocatable     :: ncdata(:,:)
   real(real64), allocatable     :: temp_x(:), temp_y(:)
@@ -249,7 +253,7 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
   allocate(lat(latlen))
   if (mype==0) then
      status=nf_inq_varid(ncid, 'lat', varid)
-     status=nf_get_vara_double(ncid,varid,1,latlen,lat)
+     status=nf_get_vara_double(ncid,varid,[1],[latlen],lat)
    end if
   call MPI_BCast(lat, latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
 
@@ -257,7 +261,7 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
   allocate(lon(lonlen))
   if (mype==0) then
      status=nf_inq_varid(ncid, 'lon', varid)
-     status=nf_get_vara_double(ncid,varid,1,lonlen,lon)
+     status=nf_get_vara_double(ncid,varid,[1],[lonlen],lon)
   end if
   call MPI_BCast(lon, lonlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
 
@@ -279,7 +283,8 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
      status=nf_get_vara_double(ncid,varid,istart,icount,ncdata)
 
      ! missing value
-     status= nf_get_att_double(ncid,varid,'missing_value',miss)
+     status= nf_get_att_double(ncid,varid,'missing_value',miss_array)
+     miss = miss_array(1)
      !write(*,*)'miss', miss
      !write(*,*)'raw',minval(ncdata),maxval(ncdata)
      !close file
