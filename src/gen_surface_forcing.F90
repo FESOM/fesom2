@@ -49,10 +49,10 @@ MODULE g_sbf
    use recom_declarations
 #endif
    USE g_read_other_NetCDF, only: read_other_NetCDF, read_2ddata_on_grid_netcdf
+   use netcdf_nf_interfaces
+   use netcdf_nf_data
 
    IMPLICIT NONE
-
-   include 'netcdf.inc'
 
    public  sbc_ini  ! routine called before 1st time step (open files, read namelist,...)
    public  sbc_do   ! routine called each time step to provide a sbc fileds (wind,...)
@@ -397,7 +397,7 @@ CONTAINS
     ! digg for calendar attribute in time axis variable
     if (partit%mype==0) then
         iost         = nf_inq_attlen(ncid, id_time,'calendar',aux_len)
-        iost         = nf_get_att(ncid, id_time,'calendar',aux_calendar)
+        iost         = nf_get_att_text(ncid, id_time,'calendar',aux_calendar)
         aux_calendar = aux_calendar(1:aux_len)
         if (iost .ne. NF_NOERR) then
             flf%calendar='none'
@@ -2596,7 +2596,6 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
    use g_support
    implicit none
  
-#include "netcdf.inc"
    character(*),   intent(in) :: file
    character(*),   intent(in) :: vari
    real(kind=WP),   intent(in):: R
@@ -2650,14 +2649,14 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
    if (mype==0) then
       allocate(lat(latlen))
       status=nf_inq_varid(ncid, 'lat', varid)
-      status=nf_get_vara_double(ncid,varid,1,latlen,lat)
+      status=nf_get_vara(ncid,varid,1,latlen,lat)
    end if
 
    ! lon
    if (mype==0) then
       allocate(lon(lonlen))
       status=nf_inq_varid(ncid, 'lon', varid)
-      status=nf_get_vara_double(ncid,varid,1,lonlen,lon)
+      status=nf_get_vara(ncid,varid,1,lonlen,lon)
    ! make sure range 0. - 360.
    do n=1,lonlen
       if (lon(n)<0.0_WP) then
