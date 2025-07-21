@@ -5,9 +5,10 @@ USE MOD_PARSUP
 use g_config
 use g_comm_auto
 use o_PARAM
+use netcdf_nf_interfaces
+use netcdf_nf_data
 
 implicit none
-#include "netcdf.inc"
 private
 public :: write_mesh_info
 INTERFACE my_put_vara
@@ -644,7 +645,7 @@ if (status .ne. nf_noerr) call handle_err(status, partit)
 
 call my_def_dim(ncid, "info", 1, info_id, partit)
 if (partit%mype==0) then
-   status = nf_def_var(ncid, 'fesom_mesh', NF_INT, 0, info_id, fesom_mesh_id)
+   status = nf_def_var(ncid, 'fesom_mesh', NF_INT, 0, [0], fesom_mesh_id)
 end if
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
 if (status .ne. nf_noerr) call handle_err(status, partit)
@@ -662,7 +663,7 @@ call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
 if (status .ne. nf_noerr) call handle_err(status, partit)
 
 if (partit%mype==0) then
-  status = nf_put_att_int(ncid, fesom_mesh_id, 'topology_dimension', NF_INT, 1, 2);
+  status = nf_put_att_int(ncid, fesom_mesh_id, 'topology_dimension', NF_INT, 1, [2]);
 end if
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
 if (status .ne. nf_noerr) call handle_err(status, partit)
@@ -775,13 +776,13 @@ endif
 
 if (partit%mype==0) then
   if (present(missing_value)) then
-      status = nf_put_att_int(ncid, id, '_FillValue', NF_INT, 1, missing_value);
+      status = nf_put_att_int(ncid, id, '_FillValue', NF_INT, 1, [missing_value]);
   endif
 endif
 
 if (partit%mype==0) then
   if (present(start_index)) then
-    status = nf_put_att_int(ncid, id, 'start_index', NF_INT, 1, start_index);
+    status = nf_put_att_int(ncid, id, 'start_index', NF_INT, 1, [start_index]);
   endif
 end if
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
@@ -821,7 +822,7 @@ integer, intent(in)           :: ncid, varid, start, N
 real(kind=WP)                 :: var(:)
 integer                       :: ierror, status
 
-  if (partit%mype==0) status=nf_put_vara_double(ncid, varid, start, N, var)
+  if (partit%mype==0) status=nf_put_vara_double(ncid, varid, [start], [N], var)
   call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
   if (status .ne. nf_noerr) call handle_err(status, partit)
 
@@ -851,7 +852,7 @@ integer,        intent(in)    :: ncid, varid, start, N
 integer                       :: var(:)
 integer                       :: ierror, status
 
-  if (partit%mype==0) status=nf_put_vara_int(ncid, varid, start, N, var)
+  if (partit%mype==0) status=nf_put_vara_int(ncid, varid, [start], [N], var)
   call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
   if (status .ne. nf_noerr) call handle_err(status, partit)
 
@@ -878,7 +879,8 @@ end subroutine my_put_vara_int_2D
 subroutine my_create(filename, opt, ncid, partit)
 IMPLICIT NONE
 type(t_partit), intent(inout):: partit
-integer,        intent(in)   :: opt, ncid
+integer,        intent(in)   :: opt
+integer,        intent(out)  :: ncid
 character(*),   intent(in)   :: filename
 integer                      :: ierror, status
   if (partit%mype==0) then  ! create a file
