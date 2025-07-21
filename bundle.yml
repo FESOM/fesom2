@@ -4,7 +4,7 @@
 ### to build ecbundle-build --help 
 ### e.g,: ecbundle-build --with-meshpart=ON will build meshpartitioner along
 name    : fesom-bundle
-version : 2.x
+version : 2.6
 projects :
 
   #    - ecbuild :
@@ -14,7 +14,7 @@ projects :
 
     - fesom :
         git     : https://github.com/FESOM/fesom2.git
-        version : main
+        version : add_ecbundle_support
         cmake   : >
             ENABLE_IFS_INTERFACE=OFF
             DISABLE_MULTITHREADING=ON
