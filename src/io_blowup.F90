@@ -9,8 +9,9 @@ MODULE io_BLOWUP
     USE MOD_DYN
     USE MOD_ICE
     use o_arrays
+    use netcdf_nf_interfaces
+    use netcdf_nf_data
     implicit none
-#include "netcdf.inc"
 	!___________________________________________________________________________
 	type nc_dims
 		integer        :: size
@@ -235,8 +236,8 @@ MODULE io_BLOWUP
 		!___Create time related dimentions__________________________________________
 		id%error_status(c) = nf_def_dim(id%ncid, 'time', NF_UNLIMITED, id%rec);         c=c+1
 		!___Define the time and iteration variables_________________________________
-		id%error_status(c) = nf_def_var(id%ncid, 'time', NF_DOUBLE, 1, id%rec, id%tID); c=c+1
-		id%error_status(c) = nf_def_var(id%ncid, 'iter', NF_INT,    1, id%rec, id%iID); c=c+1
+		id%error_status(c) = nf_def_var(id%ncid, 'time', NF_DOUBLE, 1, [id%rec], id%tID); c=c+1
+		id%error_status(c) = nf_def_var(id%ncid, 'iter', NF_INT,    1, [id%rec], id%iID); c=c+1
 		
 		
 		att_text='time'
@@ -392,8 +393,8 @@ MODULE io_BLOWUP
 			!id%rec_count=id%rec_count+1
 			write(*,*) 'writing blowup record ', id%rec_count
 			id%error_status(c)=nf_open(id%filename, nf_write, id%ncid); c=c+1
-			id%error_status(c)=nf_put_vara_double(id%ncid, id%tID, id%rec_count, 1, ctime, 1); c=c+1
-			id%error_status(c)=nf_put_vara_int(id%ncid,    id%iID, id%rec_count, 1, globalstep+istep, 1);   c=c+1
+		id%error_status(c)=nf_put_vara_double(id%ncid, id%tID, [id%rec_count], [1], [ctime]); c=c+1
+		id%error_status(c)=nf_put_vara_int(id%ncid,    id%iID, [id%rec_count], [1], [globalstep+istep]);   c=c+1
 		end if
 		
 		do i=1, id%nvar
@@ -405,7 +406,7 @@ MODULE io_BLOWUP
 				if (size1==nod2D)  call gather_nod (id%var(i)%pt1, aux1, partit)
 				if (size1==elem2D) call gather_elem(id%var(i)%pt1, aux1, partit)
 				if (mype==0) then
-				id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux1, 1); c=c+1
+				id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux1); c=c+1
 				end if
 				if (mype==0) deallocate(aux1)
 		!_______writing 3D fields________________________________________________
@@ -416,7 +417,7 @@ MODULE io_BLOWUP
 				if (size1==nod2D  .or. size2==nod2D)  call gather_nod (id%var(i)%pt2, aux2, partit)
 				if (size1==elem2D .or. size2==elem2D) call gather_elem(id%var(i)%pt2, aux2, partit)
 				if (mype==0) then
-				id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, 1, id%rec_count/), (/size1, size2, 1/), aux2, 2); c=c+1
+				id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, 1, id%rec_count/), (/size1, size2, 1/), aux2); c=c+1
 				end if
 				if (mype==0) deallocate(aux2)
 			else
@@ -442,6 +443,7 @@ MODULE io_BLOWUP
 		character(500)                :: longname
 		integer                       :: c, j, k
 		real(kind=WP)                 :: rtime !timestamp of the record
+		real(kind=WP)                 :: rtime_array(1) !temporary array for netcdf calls
 		! Serial output implemented so far
 		if (partit%mype/=0) return
 		c=1
@@ -470,7 +472,8 @@ MODULE io_BLOWUP
 		!___if the time rtime at the rec_count does not equal ctime we look for the closest record with the 
 		! timestamp less than ctime
 		do k=id%rec_count, 1, -1
-			id%error_status(c)=nf_get_vara_double(id%ncid, id%tID, k, 1, rtime, 1);
+			id%error_status(c)=nf_get_vara_double(id%ncid, id%tID, [k], [1], rtime_array);
+			rtime = rtime_array(1)
 			if (ctime > rtime) then
 				id%rec_count=k+1
 				exit ! a proper rec_count detected, ready for writing restart, exit the loop
