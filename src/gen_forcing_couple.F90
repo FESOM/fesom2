@@ -99,7 +99,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   use gen_bulk
   use force_flux_consv_interface
 #if defined (__recom)
-  use REcoM_locVar, only: LocAtmCO2, co2flux
+  use recom_modules, only: x_co2atm, GloCO2flux
 #endif
 
   implicit none
@@ -214,7 +214,12 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
               end do
 #if defined (__recom)
             elseif (i.eq.8) then
-              exchange(:) = co2flux(:)                              ! CO2 concentration
+              ! Convert CO2 flux from mmol/(m² day) to kg/(m² s)
+              ! GloCO2flux is in [mmol/m2/day], need [kg/m2/s]
+              ! Conversion: mmol/day -> mol/s -> kg/s
+              ! 1 mmol/day = 1e-3 mol / (24*3600 s) = 1.157e-8 mol/s
+              ! 1 mol CO2 = 0.04401 kg
+              exchange(:) = GloCO2flux(:) * 1.157e-8_WP * 0.04401_WP  ! [kg m⁻² s⁻¹]
 #endif
             else    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
@@ -394,7 +399,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #if defined (__recom)
          elseif (i.eq.16) then
              if (action) then
-                LocAtmCO2(1)                  = exchange(1)        ! Atmospheric CO2 [uatm]
+                ! Convert mass mixing ratio (kg/kg) to mole fraction (dimensionless)
+                ! MW_CO2/MW_air = 44.01/28.97
+                x_co2atm(:) = exchange(:) * (28.97_WP/44.01_WP)  ! [mole fraction]
              end if
 #endif
 #else ! oifs
