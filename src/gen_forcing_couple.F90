@@ -99,7 +99,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   use gen_bulk
   use force_flux_consv_interface
 #if defined (__recom)
-  use REcoM_locVar, only: x_co2atm, co2flux
+  use REcoM_locVar, only: LocAtmCO2, co2flux
 #endif
 
   implicit none
@@ -214,7 +214,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
               end do
 #if defined (__recom)
             elseif (i.eq.8) then
-              exchange(n) = co2flux(:)                              ! CO2 concentration
+              exchange(:) = co2flux(:)                              ! CO2 concentration
 #endif
             else    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
@@ -394,7 +394,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #if defined (__recom)
          elseif (i.eq.16) then
              if (action) then
-                x_co2atm(:)                   = exchange(:)        ! Mass Mixing ratio CO2
+                LocAtmCO2(1)                  = exchange(1)        ! Atmospheric CO2 [uatm]
              end if
 #endif
 #else ! oifs
