@@ -138,22 +138,21 @@ endif()
 # Step 5: Test that the executable can run
 message(STATUS "Step 5: Testing FESOM executable...")
 execute_process(
-    COMMAND ${TEST_DIR}/build/bin/fesom.x --help
-    RESULT_VARIABLE HELP_RESULT
-    OUTPUT_VARIABLE HELP_OUTPUT
-    ERROR_VARIABLE HELP_ERROR
+    COMMAND ${TEST_DIR}/build/bin/fesom.x --info
+    RESULT_VARIABLE INFO_RESULT
+    OUTPUT_VARIABLE INFO_OUTPUT
+    ERROR_VARIABLE INFO_ERROR
     OUTPUT_STRIP_TRAILING_WHITESPACE
     ERROR_STRIP_TRAILING_WHITESPACE
 )
 
-# Note: We don't fail here if --help doesn't work, as FESOM might not support it
-# But we log the result for debugging
-if(HELP_RESULT EQUAL 0)
-    message(STATUS "FESOM --help command successful")
-    message(STATUS "Help output: ${HELP_OUTPUT}")
+# FESOM should return info successfully
+if(INFO_RESULT EQUAL 0)
+    message(STATUS "FESOM --info command successful")
+    message(STATUS "Info output: ${INFO_OUTPUT}")
 else()
-    message(STATUS "FESOM --help command failed (this might be expected)")
-    message(STATUS "Help error: ${HELP_ERROR}")
+    message(FATAL_ERROR "FESOM --info command failed")
+    message(FATAL_ERROR "Info error: ${INFO_ERROR}")
 endif()
 
 message(STATUS "ecbundle build test with OpenMP support completed successfully!") 

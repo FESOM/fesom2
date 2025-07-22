@@ -24,7 +24,7 @@ Tests the basic ecbundle build process using default options from `bundle.yml`.
 - `ecbundle-create` successfully downloads FESOM sources
 - `ecbundle-build` successfully builds FESOM with default options
 - FESOM executable is created and is executable
-- Basic functionality test (--help command)
+- Basic functionality test (--info command)
 
 ### 2. `ecbundle_with_meshpart`
 Tests building FESOM with meshpartitioner enabled using `--with-meshpart=ON`.
@@ -32,7 +32,8 @@ Tests building FESOM with meshpartitioner enabled using `--with-meshpart=ON`.
 **What it tests:**
 - All basic build functionality
 - Meshpartitioner executable is created and is executable
-- Both FESOM and meshpartitioner executables are functional
+- Meshpartitioner correctly fails with namelist.config error (expected behavior)
+- FESOM executable is functional (--info command)
 
 ### 3. `ecbundle_with_omp`
 Tests building FESOM with OpenMP support using `--with-omp-parallel`.
@@ -41,6 +42,7 @@ Tests building FESOM with OpenMP support using `--with-omp-parallel`.
 - All basic build functionality
 - Checks for OpenMP library linkage using `ldd` and `nm`
 - Verifies OpenMP support was properly configured
+- FESOM executable is functional (--info command)
 
 ### 4. `ecbundle_with_testing`
 Tests building FESOM with testing enabled using `--with-testing=ON`.
@@ -49,6 +51,7 @@ Tests building FESOM with testing enabled using `--with-testing=ON`.
 - All basic build functionality
 - Checks for test executables and test files
 - Attempts to run tests using CTest if available
+- FESOM executable is functional (--info command)
 
 ## Running the Tests
 

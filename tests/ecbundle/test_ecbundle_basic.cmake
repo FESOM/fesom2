@@ -87,25 +87,24 @@ if(NOT EXEC_TEST_RESULT EQUAL 0)
     message(FATAL_ERROR "FESOM executable is not executable")
 endif()
 
-# Step 4: Test that the executable can run (version check)
+# Step 4: Test that the executable can run (info check)
 message(STATUS "Step 4: Testing FESOM executable...")
 execute_process(
-    COMMAND ${TEST_DIR}/build/bin/fesom.x --help
-    RESULT_VARIABLE HELP_RESULT
-    OUTPUT_VARIABLE HELP_OUTPUT
-    ERROR_VARIABLE HELP_ERROR
+    COMMAND ${TEST_DIR}/build/bin/fesom.x --info
+    RESULT_VARIABLE INFO_RESULT
+    OUTPUT_VARIABLE INFO_OUTPUT
+    ERROR_VARIABLE INFO_ERROR
     OUTPUT_STRIP_TRAILING_WHITESPACE
     ERROR_STRIP_TRAILING_WHITESPACE
 )
 
-# Note: We don't fail here if --help doesn't work, as FESOM does not support it
-# But we log the result for debugging
-if(HELP_RESULT EQUAL 0)
-    message(STATUS "FESOM --help command successful")
-    message(STATUS "Help output: ${HELP_OUTPUT}")
+# FESOM should return info successfully
+if(INFO_RESULT EQUAL 0)
+    message(STATUS "FESOM --info command successful")
+    message(STATUS "Info output: ${INFO_OUTPUT}")
 else()
-    message(STATUS "FESOM --help command failed (this might be expected)")
-    message(STATUS "Help error: ${HELP_ERROR}")
+    message(FATAL_ERROR "FESOM --info command failed")
+    message(FATAL_ERROR "Info error: ${INFO_ERROR}")
 endif()
 
 message(STATUS "Basic ecbundle build test completed successfully!") 

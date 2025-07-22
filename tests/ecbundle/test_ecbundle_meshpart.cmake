@@ -104,43 +104,49 @@ endif()
 # Step 4: Test that the meshpartitioner executable can run
 message(STATUS "Step 4: Testing meshpartitioner executable...")
 execute_process(
-    COMMAND ${TEST_DIR}/build/bin/fesom_meshpart --help
-    RESULT_VARIABLE MESHPART_HELP_RESULT
-    OUTPUT_VARIABLE MESHPART_HELP_OUTPUT
-    ERROR_VARIABLE MESHPART_HELP_ERROR
+    COMMAND ${TEST_DIR}/build/bin/fesom_meshpart
+    RESULT_VARIABLE MESHPART_RESULT
+    OUTPUT_VARIABLE MESHPART_OUTPUT
+    ERROR_VARIABLE MESHPART_ERROR
     OUTPUT_STRIP_TRAILING_WHITESPACE
     ERROR_STRIP_TRAILING_WHITESPACE
 )
 
-# Note: We don't fail here if --help doesn't work, as meshpartitioner might not support it
-# But we log the result for debugging
-if(MESHPART_HELP_RESULT EQUAL 0)
-    message(STATUS "meshpartitioner --help command successful")
-    message(STATUS "Help output: ${MESHPART_HELP_OUTPUT}")
+# meshpartitioner should fail with namelist.config error (expected behavior)
+if(NOT MESHPART_RESULT EQUAL 0)
+    message(STATUS "meshpartitioner failed as expected (no namelist.config)")
+    message(STATUS "Error output: ${MESHPART_ERROR}")
+    
+    # Check if the error contains the expected message
+    string(FIND "${MESHPART_ERROR}" "namelist.config" NAMELIST_ERROR_FOUND)
+    if(NAMELIST_ERROR_FOUND GREATER -1)
+        message(STATUS "✓ meshpartitioner correctly reported namelist.config error")
+    else()
+        message(WARNING "meshpartitioner error doesn't contain expected 'namelist.config' message")
+        message(WARNING "Actual error: ${MESHPART_ERROR}")
+    endif()
 else()
-    message(STATUS "meshpartitioner --help command failed (this might be expected)")
-    message(STATUS "Help error: ${MESHPART_HELP_ERROR}")
+    message(FATAL_ERROR "meshpartitioner should have failed due to missing namelist.config")
 endif()
 
 # Step 5: Test that the FESOM executable can run
 message(STATUS "Step 5: Testing FESOM executable...")
 execute_process(
-    COMMAND ${TEST_DIR}/build/bin/fesom.x --help
-    RESULT_VARIABLE FESOM_HELP_RESULT
-    OUTPUT_VARIABLE FESOM_HELP_OUTPUT
-    ERROR_VARIABLE FESOM_HELP_ERROR
+    COMMAND ${TEST_DIR}/build/bin/fesom.x --info
+    RESULT_VARIABLE FESOM_INFO_RESULT
+    OUTPUT_VARIABLE FESOM_INFO_OUTPUT
+    ERROR_VARIABLE FESOM_INFO_ERROR
     OUTPUT_STRIP_TRAILING_WHITESPACE
     ERROR_STRIP_TRAILING_WHITESPACE
 )
 
-# Note: We don't fail here if --help doesn't work, as FESOM does not support it yet
-# But we log the result for debugging
-if(FESOM_HELP_RESULT EQUAL 0)
-    message(STATUS "FESOM --help command successful")
-    message(STATUS "Help output: ${FESOM_HELP_OUTPUT}")
+# FESOM should return info successfully
+if(FESOM_INFO_RESULT EQUAL 0)
+    message(STATUS "FESOM --info command successful")
+    message(STATUS "Info output: ${FESOM_INFO_OUTPUT}")
 else()
-    message(STATUS "FESOM --help command failed (this might be expected)")
-    message(STATUS "Help error: ${FESOM_HELP_ERROR}")
+    message(FATAL_ERROR "FESOM --info command failed")
+    message(FATAL_ERROR "Info error: ${FESOM_INFO_ERROR}")
 endif()
 
 message(STATUS "ecbundle build test with meshpartitioner completed successfully!") 
