@@ -217,9 +217,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
               ! Convert CO2 flux from mmol/(m² day) to kg/(m² s)
               ! GloCO2flux is in [mmol/m2/day], need [kg/m2/s]
               ! Conversion: mmol/day -> mol/s -> kg/s
-              ! 1 mmol/day = 1e-3 mol / (24*3600 s) = 1.157e-8 mol/s
-              ! 1 mol CO2 = 0.04401 kg
-              exchange(:) = GloCO2flux(:) * 1.157e-8_WP * 0.04401_WP  ! [kg m⁻² s⁻¹]
+              ! 1 mmol/day = 1e-3 mol / (86400 s) = 1.157407407407407e-8 mol/s
+              ! 1 mol CO2 = 44.0095 g/mol = 0.0440095 kg/mol (NIST 2018)
+              exchange(:) = GloCO2flux(:) * 1.157407407407407e-8_WP * 0.0440095_WP  ! [kg m⁻² s⁻¹]
 #endif
             else    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
@@ -400,8 +400,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
          elseif (i.eq.16) then
              if (action) then
                 ! Convert mass mixing ratio (kg/kg) to mole fraction (dimensionless)
-                ! MW_CO2/MW_air = 44.01/28.97
-                x_co2atm(:) = exchange(:) * (28.97_WP/44.01_WP)  ! [mole fraction]
+                ! MW_CO2 = 44.0095 g/mol (NIST 2018)
+                ! MW_dry_air = 28.9647 g/mol (standard atmosphere composition)
+                x_co2atm(:) = exchange(:) * (28.9647_WP/44.0095_WP)  ! [mole fraction]
              end if
 #endif
 #else ! oifs
