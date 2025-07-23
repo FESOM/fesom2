@@ -1609,8 +1609,8 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)') 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
     call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'units', trim(att_text)), __LINE__)
     call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'axis', 'T'), __LINE__)
-    call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'calendar', 'standard'), __LINE__)
-    
+    call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'stored_direction', 'increasing'), __LINE__)
+
     call assert_nf( nf90_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), (/entry%dimid(entry%ndim:1:-1), entry%recID/), entry%varID), __LINE__)
 
     call assert_nf( nf90_def_var_deflate(entry%ncid, entry%varID, 0, 1, compression_level), __LINE__)
