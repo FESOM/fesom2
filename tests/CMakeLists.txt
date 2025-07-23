@@ -72,6 +72,11 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/unit/CMakeLists.txt")
     add_subdirectory(unit)
 endif()
 
+# Add ecbundle tests if ecbundle is available
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ecbundle/CMakeLists.txt")
+    add_subdirectory(ecbundle)
+endif()
+
 # Create a convenience target to run all tests
 add_custom_target(run_tests
     COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
