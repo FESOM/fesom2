@@ -97,7 +97,6 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(decayBenthos          ( benthos_num ))     ! [1/day] Decay rate of detritus in the benthic layer
     allocate(PAR3D                 ( nl-1, node_size ))
 
-
     GloFeDust             = 0.d0
     AtmFeInput            = 0.d0
     GloNDust              = 0.d0
@@ -131,8 +130,6 @@ subroutine recom_init(tracers, partit, mesh)
 
     LocBenthos            = 0.d0
     decayBenthos          = 0.d0
-    wFluxPhy              = 0.d0
-    wFluxDia              = 0.d0
     PAR3D                 = 0.d0
 
 !    pco2surf           = 0.d0
