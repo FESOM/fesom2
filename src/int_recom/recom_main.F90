@@ -208,6 +208,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
            LocAtmCO2_14 = AtmCO2_14(lat_zone(lat_val), month)
          end if
        end if
+       LocAtmCO2                   = x_co2atm(n) ! from oifs
      end if  ! use_atbox
 
      if (ciso) then
