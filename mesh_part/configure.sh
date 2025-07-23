@@ -57,8 +57,8 @@ fi
 mkdir -p "${BIN_DIR}"
 
 # Create a symlink in the bin directory
-ln -sf "${BUILD_DIR}/fesom_meshpart" "${BIN_DIR}/fesom_meshpart"
-ln -sf "${BUILD_DIR}/fesom_meshpart" "${BIN_DIR}/fesom_ini.x"
+ln -sf "${BUILD_DIR}/bin/fesom_meshpart" "${BIN_DIR}/fesom_meshpart"
+ln -sf "${BUILD_DIR}/bin/fesom_meshpart" "${BIN_DIR}/fesom_ini.x"
 
 # Install the executable
 make install
