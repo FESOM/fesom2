@@ -5,7 +5,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 # Include our testing utilities
-include(${CMAKE_SOURCE_DIR}/cmake/FesomTesting.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/FesomTesting.cmake)
 
 # Set up MPI for testing
 setup_mpi_testing()
