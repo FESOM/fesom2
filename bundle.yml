@@ -14,7 +14,7 @@ projects :
 
     - fesom :
         git     : https://github.com/FESOM/fesom2.git
-        version : add_ecbundle_support
+        version : main
         cmake   : >
             ENABLE_IFS_INTERFACE=OFF
             DISABLE_MULTITHREADING=ON
