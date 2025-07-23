@@ -99,7 +99,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   use gen_bulk
   use force_flux_consv_interface
 #if defined (__recom)
-  use recom_modules, only: x_co2atm, GloCO2flux
+  use REcoM_GloVar, only: x_co2atm, GloCO2flux_seaicemask
 #endif
 
   implicit none
@@ -215,11 +215,11 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #if defined (__recom)
             elseif (i.eq.8) then
               ! Convert CO2 flux from mmol/(m² day) to kg/(m² s)
-              ! GloCO2flux is in [mmol/m2/day], need [kg/m2/s]
+              ! GloCO2flux_seaicemask is in [mmol/m2/day], need [kg/m2/s]
               ! Conversion: mmol/day -> mol/s -> kg/s
               ! 1 mmol/day = 1e-3 mol / (86400 s) = 1.157407407407407e-8 mol/s
               ! 1 mol CO2 = 44.0095 g/mol = 0.0440095 kg/mol (NIST 2018)
-              exchange(:) = GloCO2flux(:) * 1.157407407407407e-8_WP * 0.0440095_WP  ! [kg m⁻² s⁻¹]
+              exchange(:) = GloCO2flux_seaicemask(:) * 1.157407407407407e-8_WP * 0.0440095_WP  ! [kg m⁻² s⁻¹]
 #endif
             else    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
