@@ -133,9 +133,12 @@ subroutine recom_init(tracers, partit, mesh)
     PAR3D                 = 0.d0
     
     if (use_atbox) then
+        allocate(x_co2atm ( 1 ))
+    else
         allocate(x_co2atm ( node_size ))
-        x_co2atm          = 0.d0
     endif
+    x_co2atm          = 0.d0
+
 
 !    pco2surf           = 0.d0
 !    dflux              = 0.d0
