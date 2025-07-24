@@ -3057,6 +3057,10 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         
         if ((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) then
            friction=-C_d
+
+        else if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) then
+           friction=-C_d
+
         else
            friction=-C_d*sqrt(UV(1,nzmax-1,elem)**2+ &
                            UV(2,nzmax-1,elem)**2)
