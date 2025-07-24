@@ -145,7 +145,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use o_tracers
     use Toy_Channel_Soufflet
     use Toy_Channel_Dbgyre
-    use o_ARRAYS, only: heat_flux
+    use o_ARRAYS, only: heat_flux, Ki, slope_tapered
     use g_forcing_arrays, only: sw_3d
     use diff_tracers_ale_interface
     use oce_adv_tra_driver_interfaces
@@ -214,6 +214,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         !$ACC UPDATE DEVICE(dynamics%w, dynamics%w_e, dynamics%uv) !!! async(1) 
 !!!     !$ACC UPDATE DEVICE(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus)
         !$ACC UPDATE DEVICE (mesh%helem, mesh%hnode, mesh%hnode_new, mesh%zbar_3d_n, mesh%z_3d_n)
+        !$ACC UPDATE DEVICE(edge_cross_dxdy, edge_tri, Ki, slope_tapered)
     do tr_num=1, tracers%num_tracers
 
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
@@ -253,6 +254,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
         call diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     !$ACC UPDATE HOST(tracers%work%del_ttf, tracers%work%del_ttf_advhoriz, tracers%work%del_ttf_advvert)
+    !$ACC UPDATE HOST(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesold, tracers%data(tr_num)%valuesAB)
 
  ! Radioactive decay of 14C and 39Ar
         if (tracers%data(tr_num)%ID == 14) tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * exp(-decay14 * dt)
@@ -1317,7 +1319,6 @@ subroutine diff_part_hor_redi(tracers, partit, mesh)
 !$OMP                                                          rhs1, rhs2, Kh, dz)
 !$OMP DO
 #else
-!$ACC UPDATE DEVICE(edge_cross_dxdy, edge_tri, Ki, slope_tapered)
 !$ACC PARALLEL LOOP DEFAULT(PRESENT) GANG VECTOR &
 !$ACC PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, nl1, ul1, nl2, ul2, &
 !$ACC         nl12, ul12, nz, el, elnodes, enodes, c, Fx, Fy, Tx, Ty, Tx_z, &
