@@ -11,9 +11,9 @@ module io_MEANDATA
   use, intrinsic :: iso_fortran_env, only: real64, real32
   use io_data_strategy_module
   use async_threads_module
+  use netcdf
 
   implicit none
-#include "netcdf.inc"
   private
   public :: def_stream, def_stream2D, def_stream3D, output, finalize_output
 !
@@ -121,7 +121,7 @@ module io_MEANDATA
 subroutine destructor(this)
     type(Meandata), intent(inout) :: this
     ! EO args
-    call assert_nf(nf_close(this%ncid), __LINE__)
+    call assert_nf(nf90_close(this%ncid), __LINE__)
 end subroutine destructor
 !
 !
@@ -1560,118 +1560,119 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     
     !___________________________________________________________________________
     ! Create file
-    call assert_nf( nf_create(entry%filename, IOR(NF_NOCLOBBER,IOR(NF_NETCDF4,NF_CLASSIC_MODEL)), entry%ncid), __LINE__)
+    call assert_nf( nf90_create(entry%filename, IOR(nf90_noclobber,IOR(nf90_netcdf4,nf90_classic_model)), entry%ncid), __LINE__)
 
     !___________________________________________________________________________
     ! Create mesh related dimensions
     if (entry%ndim==1) then
-        call assert_nf( nf_def_dim(entry%ncid, entry%dimname(1), entry%glsize(2), entry%dimID(1)), __LINE__)
+        call assert_nf( nf90_def_dim(entry%ncid, entry%dimname(1), entry%glsize(2), entry%dimID(1)), __LINE__)
         
     else if (entry%ndim==2) then
-        call assert_nf( nf_def_dim(entry%ncid,  entry%dimname(1), entry%glsize(1), entry%dimID(1)), __LINE__)
+        call assert_nf( nf90_def_dim(entry%ncid,  entry%dimname(1), entry%glsize(1), entry%dimID(1)), __LINE__)
         if (entry%dimname(1)=='nz') then
-            call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
-            call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer interface'),'depth at layer interface'), __LINE__)
+            call assert_nf( nf90_def_var(entry%ncid,  entry%dimname(1), nf90_double,   (/entry%dimID(1)/), entry%dimvarID(1)), __LINE__)
+            call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'long_name', 'depth at layer interface'), __LINE__)
             
         elseif (entry%dimname(1)=='nz1') then
-            call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
-            call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer midpoint'),'depth at layer midpoint'), __LINE__)
+            call assert_nf( nf90_def_var(entry%ncid,  entry%dimname(1), nf90_double,   (/entry%dimID(1)/), entry%dimvarID(1)), __LINE__)
+            call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'long_name', 'depth at layer midpoint'), __LINE__)
             
         elseif (entry%dimname(1)=='ncat') then
-            call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_INT   ,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
-            call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('sea-ice thickness class'),'sea-ice thickness class'), __LINE__)
+            call assert_nf( nf90_def_var(entry%ncid,  entry%dimname(1), nf90_int,   (/entry%dimID(1)/), entry%dimvarID(1)), __LINE__)
+            call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'long_name', 'sea-ice thickness class'), __LINE__)
         
         elseif (entry%dimname(1)=='ndens') then
-            call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_INT   ,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
-            call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('sigma2 density class'),'sigma2 density class'), __LINE__)
+            call assert_nf( nf90_def_var(entry%ncid,  entry%dimname(1), nf90_int,   (/entry%dimID(1)/), entry%dimvarID(1)), __LINE__)
+            call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'long_name', 'sigma2 density class'), __LINE__)
         
         else
             if (partit%mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
             
         end if 
-        call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'units', len_trim('m'),'m'), __LINE__)
-        call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'positive', len_trim('down'),'down'), __LINE__)
-        call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'axis', len_trim('Z'),'Z'), __LINE__)
+        call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'units', 'm'), __LINE__)
+        call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'positive', 'down'), __LINE__)
+        call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'axis', 'Z'), __LINE__)
         
-        call assert_nf( nf_def_dim(entry%ncid, entry%dimname(2), entry%glsize(2), entry%dimID(2)), __LINE__)
+        call assert_nf( nf90_def_dim(entry%ncid, entry%dimname(2), entry%glsize(2), entry%dimID(2)), __LINE__)
     end if
   
     !___________________________________________________________________________
     ! Create time related dimensions
-    call assert_nf( nf_def_dim(entry%ncid, 'time', NF_UNLIMITED, entry%recID), __LINE__)
+    call assert_nf( nf90_def_dim(entry%ncid, 'time', nf90_unlimited, entry%recID), __LINE__)
   
     !___________________________________________________________________________
     ! Define the time and iteration variables
-    call assert_nf( nf_def_var(entry%ncid, 'time', NF_DOUBLE, 1, entry%recID, entry%tID), __LINE__)
+    call assert_nf( nf90_def_var(entry%ncid, 'time', nf90_double, (/entry%recID/), entry%tID), __LINE__)
     att_text='time'
-    call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'long_name', len_trim(att_text), trim(att_text)), __LINE__)
-    call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'standard_name', len_trim(att_text), trim(att_text)), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'long_name', trim(att_text)), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'standard_name', trim(att_text)), __LINE__)
     write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)') 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
-    call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'units', len_trim(att_text), trim(att_text)), __LINE__)
-    call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'axis', len_trim('T'), trim('T')), __LINE__)
-    call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'stored_direction', len_trim('increasing'), trim('increasing')), __LINE__)
-    
-    call assert_nf( nf_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), entry%ndim+1, (/entry%dimid(entry%ndim:1:-1), entry%recID/), entry%varID), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'units', trim(att_text)), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'axis', 'T'), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'stored_direction', 'increasing'), __LINE__)
 
-    call assert_nf( nf_def_var_deflate(entry%ncid, entry%varID, 0, 1, compression_level), __LINE__)
-    call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'description', len_trim(entry%description), entry%description), __LINE__)
-    call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'long_name', len_trim(entry%description), entry%description), __LINE__)
-    call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'units',       len_trim(entry%units),       entry%units), __LINE__)
-    call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'location',       len_trim(entry%defined_on),       entry%defined_on), __LINE__)
-    call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'mesh',       len_trim(entry%mesh),       entry%mesh), __LINE__)
+    call assert_nf( nf90_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), (/entry%dimid(entry%ndim:1:-1), entry%recID/), entry%varID), __LINE__)
+
+    call assert_nf( nf90_def_var_deflate(entry%ncid, entry%varID, 0, 1, compression_level), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, entry%varID, 'description', entry%description), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, entry%varID, 'long_name', entry%description), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, entry%varID, 'units', entry%units), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, entry%varID, 'location', entry%defined_on), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, entry%varID, 'mesh', entry%mesh), __LINE__)
 
 
   !___Global attributes________  
-    call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'Conventions', len_trim('UGRID-1.0'),'UGRID-1.0'), __LINE__)
-    call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'model', len_trim('FESOM2'),'FESOM2'), __LINE__)
-    call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'website', len_trim('fesom.de'), trim('fesom.de')), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, nf90_global, 'title', 'FESOM2 output'), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'model', 'FESOM2'), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'website', 'fesom.de'), __LINE__)
 
-    call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'git_SHA', len_trim(fesom_git_sha()), fesom_git_sha()), __LINE__)
-    call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'MeshPath', len_trim(MeshPath), trim(MeshPath)), __LINE__)
-    call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'mesh_representative_checksum', len(mesh%representative_checksum), mesh%representative_checksum), __LINE__)
-    call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'ClimateDataPath', len_trim(ClimateDataPath), trim(ClimateDataPath)), __LINE__)
-    call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'which_ALE', len_trim(which_ALE), trim(which_ALE)), __LINE__)
-    call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'mix_scheme', len_trim(mix_scheme), trim(mix_scheme)), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'git_SHA', fesom_git_sha()), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'MeshPath', trim(MeshPath)), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'mesh_representative_checksum', mesh%representative_checksum), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'ClimateDataPath', trim(ClimateDataPath)), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'which_ALE', trim(which_ALE)), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'mix_scheme', trim(mix_scheme)), __LINE__)
+    ! Global attributes already set above
 
-  ! call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_hor', len_trim(tra_adv_hor), trim(tra_adv_hor)), __LINE__)
-  ! call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_ver', len_trim(tra_adv_ver), trim(tra_adv_ver)), __LINE__)
-  ! call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_lim', len_trim(tra_adv_lim), trim(tra_adv_lim)), __LINE__)
+  ! call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'tra_adv_hor', trim(tra_adv_hor)), __LINE__)
+  ! call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'tra_adv_ver', trim(tra_adv_ver)), __LINE__)
+  ! call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'tra_adv_lim', trim(tra_adv_lim)), __LINE__)
  
-    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell', NF_INT, 1,  use_partial_cell), __LINE__)
-    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'force_rotation', NF_INT, 1,  force_rotation), __LINE__)
-    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'include_fleapyear', NF_INT, 1,  include_fleapyear), __LINE__)
-    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_floatice', NF_INT, 1,  use_floatice), __LINE__)
-    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'whichEVP'         , NF_INT, 1,  ice%whichEVP), __LINE__)
-    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'evp_rheol_steps'  , NF_INT, 1,  ice%evp_rheol_steps), __LINE__)
-    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'opt_visc'         , NF_INT, 1,  dynamics%opt_visc), __LINE__)
-    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_wsplit'       , NF_INT, 1,  dynamics%use_wsplit), __LINE__)
-    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell', NF_INT, 1,  use_partial_cell), __LINE__)
-    call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'autorotate_back_to_geo', NF_INT, 1,  vec_autorotate), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'use_partial_cell', merge(1, 0, use_partial_cell)), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'force_rotation', merge(1, 0, force_rotation)), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'include_fleapyear', merge(1, 0, include_fleapyear)), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'use_floatice', merge(1, 0, use_floatice)), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'whichEVP', ice%whichEVP), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'evp_rheol_steps', ice%evp_rheol_steps), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'opt_visc', dynamics%opt_visc), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'use_wsplit', merge(1, 0, dynamics%use_wsplit)), __LINE__)
+    ! use_partial_cell already set above
+    call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'autorotate_back_to_geo', merge(1, 0, vec_autorotate)), __LINE__)
  
     !___________________________________________________________________________
     ! This ends definition part of the file, below filling in variables is possible
-    call assert_nf( nf_enddef(entry%ncid), __LINE__)
+    call assert_nf( nf90_enddef(entry%ncid), __LINE__)
     if (entry%dimname(1)=='nz') then
-        call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%zbar)), __LINE__)
+        call assert_nf( nf90_put_var(entry%ncid, entry%dimvarID(1), abs(mesh%zbar)), __LINE__)
     elseif (entry%dimname(1)=='nz1') then
-        call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%Z)), __LINE__)
+        call assert_nf( nf90_put_var(entry%ncid, entry%dimvarID(1), abs(mesh%Z)), __LINE__)
 #if defined(__icepack)    
     elseif (entry%dimname(1)=='ncat') then
         allocate(ncat_arr(entry%glsize(1)))
         do ii= 1, entry%glsize(1)
             ncat_arr(ii)=ii
         end do        
-        call assert_nf( nf_put_var_int(entry%ncid, entry%dimvarID(1), ncat_arr), __LINE__)    
+        call assert_nf( nf90_put_var(entry%ncid, entry%dimvarID(1), ncat_arr), __LINE__)    
         deallocate(ncat_arr)
 #endif
     elseif (entry%dimname(1)=='ndens') then
-        call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), std_dens), __LINE__)
+        call assert_nf( nf90_put_var(entry%ncid, entry%dimvarID(1), std_dens), __LINE__)
     else
         if (partit%mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
     end if 
     
     !___________________________________________________________________________
-    call assert_nf( nf_close(entry%ncid), __LINE__)
+    call assert_nf( nf90_close(entry%ncid), __LINE__)
 end subroutine
 !
 !
@@ -1684,15 +1685,15 @@ subroutine assoc_ids(entry)
     write(*,*) 'associating mean I/O file ', trim(entry%filename)
 
     do j=1, entry%ndim
-        call assert_nf( nf_inq_dimid(entry%ncid, entry%dimname(j), entry%dimID(j)), __LINE__)
+        call assert_nf( nf90_inq_dimid(entry%ncid, entry%dimname(j), entry%dimID(j)), __LINE__)
     end do
     !___Associate time related dimensions_______________________________________
-    call assert_nf( nf_inq_dimid (entry%ncid, 'time', entry%recID), __LINE__)
-    call assert_nf( nf_inq_dimlen(entry%ncid, entry%recID, entry%rec_count), __LINE__)
+    call assert_nf( nf90_inq_dimid(entry%ncid, 'time', entry%recID), __LINE__)
+    call assert_nf( nf90_inquire_dimension(entry%ncid, entry%recID, len=entry%rec_count), __LINE__)
     !___Associate the time and iteration variables______________________________
-    call assert_nf( nf_inq_varid(entry%ncid, 'time', entry%tID), __LINE__)
+    call assert_nf( nf90_inq_varid(entry%ncid, 'time', entry%tID), __LINE__)
     !___Associate physical variables____________________________________________
-    call assert_nf( nf_inq_varid(entry%ncid, entry%name, entry%varID), __LINE__)
+    call assert_nf( nf90_inq_varid(entry%ncid, entry%name, entry%varID), __LINE__)
 end subroutine
 !
 !
@@ -1717,7 +1718,7 @@ subroutine write_mean(entry, entry_index)
     ! write new time index ctime_copy to file --> expand time array in nc file
     if (entry%p_partit%mype==entry%root_rank) then
         write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
-        call assert_nf( nf_put_vara_double(entry%ncid, entry%Tid, entry%rec_count, 1, entry%ctime_copy, 1), __LINE__)
+        call assert_nf( nf90_put_var(entry%ncid, entry%Tid, entry%ctime_copy), __LINE__)
     end if
   
     !_______writing 2D and 3D fields____________________________________________
@@ -1762,9 +1763,9 @@ subroutine write_mean(entry, entry_index)
             ! variables into specific layer position lev
             if (entry%p_partit%mype==entry%root_rank) then
                 if (entry%ndim==1) then
-                    call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r8, 1), __LINE__)
+                    call assert_nf( nf90_put_var(entry%ncid, entry%varID, entry%aux_r8, start=(/1, entry%rec_count/), count=(/size2, 1/)), __LINE__)
                 elseif (entry%ndim==2) then
-                    call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size2, 1, 1/), entry%aux_r8, 1), __LINE__)
+                    call assert_nf( nf90_put_var(entry%ncid, entry%varID, entry%aux_r8, start=(/1, lev, entry%rec_count/), count=(/size2, 1, 1/)), __LINE__)
                 end if
             end if
         end do ! --> do lev=1, size1
@@ -1807,13 +1808,13 @@ subroutine write_mean(entry, entry_index)
             ! variables into specific layer position lev
             if (entry%p_partit%mype==entry%root_rank) then
                 if (entry%ndim==1) then
-                    call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r4, 1), __LINE__)
+                    call assert_nf( nf90_put_var(entry%ncid, entry%varID, entry%aux_r4, start=(/1, entry%rec_count/), count=(/size2, 1/)), __LINE__)
                     !PS t1=MPI_Wtime()  
-                    !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> after nf_put_vara_real'//achar(27)//'[0m', entry%p_partit%mype, t1-t0
+                    !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> after nf90_put_var'//achar(27)//'[0m', entry%p_partit%mype, t1-t0
                 elseif (entry%ndim==2) then
-                    call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size2, 1, 1/), entry%aux_r4, 1), __LINE__)
+                    call assert_nf( nf90_put_var(entry%ncid, entry%varID, entry%aux_r4, start=(/1, lev, entry%rec_count/), count=(/size2, 1, 1/)), __LINE__)
                     !PS t1=MPI_Wtime()  
-                    !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> after nf_put_vara_real'//achar(27)//'[0m', entry%p_partit%mype, lev, t1-t0
+                    !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> after nf90_put_var'//achar(27)//'[0m', entry%p_partit%mype, lev, t1-t0
                 end if
             end if
         end do ! --> do lev=1, size1
@@ -1996,16 +1997,16 @@ ctime=timeold+(dayold-1.)*86400
                 !_______________________________________________________________
                 ! create new output file ?!
                 if(filepath /= trim(entry%filename)) then
-                    if("" /= trim(entry%filename)) call assert_nf(nf_close(entry%ncid), __LINE__)   
+                    if("" /= trim(entry%filename)) call assert_nf(nf90_close(entry%ncid), __LINE__)   
                     entry%filename = filepath
                     !___________________________________________________________
                     ! use any existing file with this name or create a new one
-                    if( nf_open(entry%filename, nf_write, entry%ncid) /= nf_noerr ) then
+                    if( nf90_open(entry%filename, nf90_write, entry%ncid) /= nf90_noerr ) then
                         !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call create_new_file'//achar(27)//'[0m'  
                         call create_new_file(entry, ice, dynamics, partit, mesh)
                         
                         !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf A'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank    
-                        call assert_nf( nf_open(entry%filename, nf_write, entry%ncid), __LINE__)
+                        call assert_nf( nf90_open(entry%filename, nf90_write, entry%ncid), __LINE__)
                     end if
                     
                     !___________________________________________________________
@@ -2022,7 +2023,7 @@ ctime=timeold+(dayold-1.)*86400
                 do k=entry%rec_count, 1, -1
                     !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf B'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank  
                     ! determine rtime from exiting file
-                    call assert_nf( nf_get_vara_double(entry%ncid, entry%tID, k, 1, rtime, 1), __LINE__)
+                    call assert_nf( nf90_get_var(entry%ncid, entry%tID, rtime), __LINE__)
                     if (ctime > rtime) then
                         entry%rec_count=k+1
                         exit ! a proper rec_count detected, exit the loop
@@ -2123,7 +2124,7 @@ subroutine do_output_callback(entry_index)
     ! available to other processes for reading immediately after it is written. 
     if(entry%p_partit%mype == entry%root_rank) then 
         !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> call nf_sync'//achar(27)//'[0m', entry%p_partit%mype
-        call assert_nf( nf_sync(entry%ncid), __LINE__ ) ! flush the file to disk after each write
+        call assert_nf( nf90_sync(entry%ncid), __LINE__ ) ! flush the file to disk after each write
     end if   
     
 end subroutine
@@ -2430,9 +2431,8 @@ subroutine assert_nf(status, line)
     integer, intent(in) :: status
     integer, intent(in) :: line
     ! EO args
-    include "netcdf.inc" ! old netcdf fortran interface required?
-    if(status /= NF_NOERR) then
-        print *, "error in line ",line, __FILE__, ' ', trim(nf_strerror(status))
+    if(status /= nf90_noerr) then
+        print *, "error in line ",line, __FILE__, ' ', trim(nf90_strerror(status))
         stop 1
     end if   
 end subroutine
