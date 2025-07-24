@@ -1,6 +1,6 @@
 !==========================================================
 MODULE MOD_MESH
-USE O_PARAM
+USE O_PARAM, only : WP
 USE MOD_WRITE_BINARY_ARRAYS
 USE MOD_READ_BINARY_ARRAYS
 USE,     intrinsic    :: ISO_FORTRAN_ENV, only : int32
