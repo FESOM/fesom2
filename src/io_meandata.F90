@@ -1718,7 +1718,7 @@ subroutine write_mean(entry, entry_index)
     ! write new time index ctime_copy to file --> expand time array in nc file
     if (entry%p_partit%mype==entry%root_rank) then
         write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
-        call assert_nf( nf90_put_var(entry%ncid, entry%Tid, entry%ctime_copy), __LINE__)
+        call assert_nf( nf90_put_var(entry%ncid, entry%Tid, entry%ctime_copy, start = (/entry%rec_count/) ), __LINE__)
     end if
   
     !_______writing 2D and 3D fields____________________________________________
