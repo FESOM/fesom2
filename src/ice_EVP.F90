@@ -103,10 +103,10 @@ subroutine stress_tensor(ice, partit, mesh)
             ! =====
             ! ===== Deformation rate tensor on element elem:
                 !du/dx
-            eps11(el) = sum(gradient_sca(1:3,el)*U_ice(elem2D_nodes(1:3,el))) &
-                - metric_factor(el) * sum(V_ice(elem2D_nodes(1:3,el)))/3.0_WP
+            eps11(el) = sum( gradient_sca(1:3,el) * U_ice(elem2D_nodes(1:3,el)) ) &
+                        - metric_factor(el) * sum( V_ice(elem2D_nodes(1:3,el)) ) / 3.0_WP
 
-            eps22(el) = sum(gradient_sca(4:6, el)*V_ice(elem2D_nodes(1:3,el)))
+            eps22(el) = sum( gradient_sca(4:6, el) * V_ice(elem2D_nodes(1:3,el)) )
 
             eps12(el) = 0.5_WP*(sum(gradient_sca(4:6,el)*U_ice(elem2D_nodes(1:3,el))) &
                         + sum(gradient_sca(1:3,el)*V_ice(elem2D_nodes(1:3,el))) &
@@ -157,8 +157,8 @@ subroutine stress_tensor(ice, partit, mesh)
             sigma22(el) = 0.5_WP*(si1-si2)
 
 #if defined (__icepack)
-            rdg_conv_elem(el)  = -min((eps11(el)+eps22(el)),0.0_WP)
-            rdg_shear_elem(el) = 0.5_WP*(delta - abs(eps11(el)+eps22(el)))
+            rdg_conv_elem(el)  = -min( (eps11(el)+eps22(el)), 0.0_WP )
+            rdg_shear_elem(el) = 0.5_WP * (delta - abs( eps11(el)+eps22(el)) )
 #endif
         endif
     end do

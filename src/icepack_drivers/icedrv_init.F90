@@ -174,7 +174,7 @@ contains
 
   subroutine init_coupler_flux()
     
-    use icepack_intfc, only: icepack_liquidus_temperature
+    use icepack_intfc, only: icepack_sea_freezing_temperature ! icepack_liquidus_temperature frank.kauker@awi.de
     
     implicit none    
     
@@ -258,8 +258,11 @@ contains
     H2_18O_ocn(:) = c0
 
     do i = 1, nx
-       Tf (i) = icepack_liquidus_temperature(sss(i)) ! freezing temp (C)
+       Tf (i) = icepack_sea_freezing_temperature(sss(i)) ! ocean surface freezing (some as basal freezing temp) - deg C
+       ! Lorenzo called 'icepack_liquidus_temperature(sss(i))' why??? frank.kauker@awi.de
     enddo
+    !write(*,*) 'icedrv_init: min/max val(Tf)=', minval(Tf), maxval (Tf), minval(sss), maxval (sss)
+
     call icepack_warnings_flush(ice_stderr)
     if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
          file=__FILE__,line= __LINE__)
@@ -269,7 +272,7 @@ contains
     ! water isotopes
     HDO_ocn(:) = c0              ! seawater concentration of HDO (kg/kg)
     H2_16O_ocn(:) = c0           ! seawater concentration of H2_16O (kg/kg)
-     H2_18O_ocn(:) = c0          ! seawater concentration of H2_18O (kg/kg)      
+    H2_18O_ocn(:) = c0           ! seawater concentration of H2_18O (kg/kg)      
     
     !-----------------------------------------------------------------
     ! fluxes sent to atmosphere
@@ -1069,7 +1072,7 @@ contains
           aicen(i,n) = c0
           vicen(i,n) = c0
           vsnon(i,n) = c0
-          trcrn(i,nt_Tsfc,n) = Tf(i)  ! surface temperature
+          trcrn(i,nt_Tsfc,n) = T_air(i)  ! surface temperature
           if (max_ntrcr >= 2) then
              do it = 2, max_ntrcr
                 trcrn(i,it,n) = c0
@@ -1112,7 +1115,7 @@ contains
        ainit(n) = ainit(n) / (sum + puny/ncat) ! normalize
     enddo
 
-    !if (mype==0) write(nu_diag,*) 'icedrv.init_state_var: Max/Min air temperature = ', maxval(T_air), minval(T_air)
+    !write(nu_diag,*) 'icedrv.init_state_var: Max/Min air temperature = ', maxval(T_air), minval(T_air)
     !if (mype==0) write(nu_diag,*) 'icedrv.init_state_var: Max/Min freezing temperature = ', maxval(Tf), minval(Tf)
     !if (mype==0) write(nu_diag,*) 'icedrv.init_state_var: Max/Min melting temperature = ', maxval(Tmltz), minval(Tmltz)
     !if (mype==0) write(nu_diag,*) 'icedrv.init_state_var: Max/Min salinity profile = ', maxval(salinz), minval(salinz)

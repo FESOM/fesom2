@@ -645,7 +645,11 @@ contains
     ! Ridging
     !-----------------------------------------------------------------
 
+    !write(*,*) 'step_dyn_ridge: min/max rdg_conv = ', minval(rdg_conv), maxval(rdg_conv)                                                                   
+    !write(*,*) 'step_dyn_ridge: min/max rdg_shear = ', minval(rdg_shear), maxval(rdg_shear)
+
     do i = 1, nx
+       if(rdg_conv(i) > c0 .or. rdg_shear(i) > c0) then
        call icepack_step_ridge( &
             dt=dt,                    ndtd=ndtd,                &
             hin_max=hin_max(:),                                 &
@@ -671,7 +675,8 @@ contains
             aice=aice(i),             fsalt=fsalt(i),           &
             first_ice=first_ice(i,:),                           &
             flux_bio=flux_bio(i,1:nbtrcr),                      &
-            closing=closing(i),       Tf = Tf(i) )
+                                      Tf = Tf(i) )
+       endif
     enddo
     
     call cut_off_icepack

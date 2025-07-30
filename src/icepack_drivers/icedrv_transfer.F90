@@ -83,10 +83,6 @@
           flw(:)    = longwave(:)
           frain(:)  = prec_rain(:) * rhowat
           fsnow(:)  = prec_snow(:) * rhowat
-          !if (mype==7) write(nu_diag,*) 'icedrv.fesom_to_icepack: Max/Min air temperature = ', maxval(T_air), minval(T_air)
-          !if (mype==7) write(nu_diag,*) 'icedrv.fesom_to_icepack: Max/Min humidity = ', maxval(Qa), minval(Qa)
-          !if (mype==7) write(nu_diag,*) 'icedrv.fesom_to_icepack: Max/Min longwave = ', maxval(flw), minval(flw)
-
           wind(:)   = sqrt(uatm(:)**2 + vatm(:)**2)
 
           if ( l_mslp ) then
@@ -124,15 +120,23 @@
     
           do i = 1, nx
              ! ocean - ice stress
-             aux = sqrt((uvel(i)-uocn(i))**2+(vvel(i)-vocn(i))**2)*rhowat*ice%cd_oce_ice
-             strocnxT(i) = aux*(uvel(i) - uocn(i))
-             strocnyT(i) = aux*(vvel(i) - vocn(i))
+             aux = sqrt( (uvel(i)-uocn(i))**2 + (vvel(i)-vocn(i))**2 ) * rhowat * ice%cd_oce_ice
+             strocnxT(i) = aux * (uvel(i) - uocn(i))
+             strocnyT(i) = aux * (vvel(i) - vocn(i))
              ! freezing - melting potential
-             Tf(i)   = icepack_sea_freezing_temperature(sss(i))
-             frzmlt(i) = min((Tf(i)-sst(i)) * cprho * hmix(i) / dt, 1000.0_dbl_kind)
+             Tf(i) = icepack_sea_freezing_temperature(sss(i))
+             ! depending on 'tfrz_option', 'Tf' (deg C) is:
+             ! 'mushy':       Tf = icepack_liquidus_temperature(sss)
+             ! 'linear_salt': Tf = -depressT * sss
+             ! 'constant':    Tf = Tocnfrz
+             ! 'minus1p8':    Tf = -1.8_dbl_kind
+             ! frank.kauker@awi.de
+             if(tf(i) >=  c0) write(*,*) 'tf >= 0: ', tf(i), mype, geo_coord_nod2D(1, i), geo_coord_nod2D(2, i)
+             frzmlt(i) = min( (Tf(i)-sst(i)) * cprho * hmix(i) / dt, 1000.0_dbl_kind )
              !if (geo_coord_nod2D(2, i) > 89.5 * 3.14159/180.) &
              !     write(*,*) 'pole index =', i, geo_coord_nod2D(1, i), geo_coord_nod2D(2, i), mype
           enddo
+          ! write(*,*) 'icedrv_transfer: min/max val(Tf)=', minval(Tf), maxval (Tf)
 
           ! Compute convergence and shear on the nodes
 
@@ -146,9 +150,11 @@
                 tx = tx + rdg_conv_elem(elem)  * elem_area(elem)
                 ty = ty + rdg_shear_elem(elem) * elem_area(elem)
              enddo
-             rdg_conv(i)  = tx / tvol
-             rdg_shear(i) = ty / tvol
+             rdg_conv(i)  = tx / tvol ! min(tx / tvol, 1.e-5)
+             rdg_shear(i) = ty / tvol ! min(ty / tvol, 1.e-5)
           enddo
+          !write(*,*) 'icedrv_transfer: min/max rdg_conv = ', minval(rdg_conv), maxval(rdg_conv)
+          !write(*,*) 'icedrv_transfer: min/max rdg_shear = ', minval(rdg_shear), maxval(rdg_shear)
           
           call exchange_nod(rdg_conv, rdg_shear, p_partit)
 

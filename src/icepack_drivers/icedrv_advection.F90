@@ -912,7 +912,7 @@ contains
           works(i,narrays+2) = vicen(i,n)
           works(i,narrays+3) = vsnon(i,n)
        enddo                  ! i
-       narrays = narrays + 3
+       narrays = narrays + 3 ! i.e. narray
        do it = 1, ntrcr
           if (trcr_depend(it) == 0) then
              do i = 1, nx
@@ -1028,14 +1028,28 @@ contains
                Tsfc=Tsfc,  qin=qin(:),       &
                qsn=qsn(:) )
           call icepack_warnings_flush(ice_stderr)
-          if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
-               file=__FILE__, line=__LINE__)
+          if (icepack_warnings_aborted()) then
+             write(*,*) 'tair= ', T_air(i)
+             write(*,*) 'tf= ', tf(i)
+             write(*,*) 'Sprofile= ', salinz(i,:)
+             write(*,*) 'Tprofile= ', Tmltz(i,:)
+             write(*,*) 'Tsfc= ', Tsfc
+             write(*,*) 'qin= ', qin
+             write(*,*) 'qsn= ', qsn
+             call icedrv_system_abort(string=subname, &
+                  file=__FILE__, line=__LINE__)
+          endif
           !
           ! Correct qin profile for melting temperatures
           !
           ! Maximum ice enthalpy
           qin_max(:) = rhoi * cp_ocn * (Tmltz(i,:) - 0.1_dbl_kind)
           if (vicen(i,n) > small .and. aicen(i,n) > small) then
+             ! Condition on ice salnity
+             do k = 1, nilyr  ! Check for problematic salinities - frank-kauler@awi.de
+                if (trcrn(i,nt_sice+k-1,n) < c0) trcrn(i,nt_sice+k-1,n) = c0
+                if (trcrn(i,nt_sice+k-1,n) > c6) trcrn(i,nt_sice+k-1,n) = c20
+             enddo
              ! Condition on surface temperature
              if (trcrn(i,nt_Tsfc,n) > Tsmelt .or. trcrn(i,nt_Tsfc,n) < Tmin) then
                 trcrn(i,nt_Tsfc,n) = Tsfc
@@ -1064,6 +1078,7 @@ contains
                    enddo
                 else                        ! No snow 
                    trcrn(i,nt_qsno:nt_qsno+nslyr-1,n) = c0
+                   trcrn(i,nt_sice:nt_sice+nslyr-1,n) = c0
                 endif
              end if            ! flag cold ice
              if (flag_warm_ice) then         ! This sea ice should have melted already 

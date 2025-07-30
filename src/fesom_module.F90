@@ -647,9 +647,7 @@ contains
         !--------------------------
 
         f%t5 = MPI_Wtime()
-        if(f%mype==0) write(*,*) 'fesom_runloop: enter restart', n, nstart, ntotal  
         call restart(n, nstart, f%total_nsteps, .false., f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
-        if(f%mype==0) write(*,*) 'fesom_runloop: leave restart'
         f%t6 = MPI_Wtime()
         
         f%rtime_fullice       = f%rtime_fullice       + f%t2 - f%t1
