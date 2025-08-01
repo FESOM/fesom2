@@ -1139,13 +1139,77 @@ subroutine find_levels_cavity(mesh)
                         ! (3rd) check how many open faces to neighboring triangles the cell 
                         ! has, if there are less than 2 its isolated (a cell should 
                         ! have at least 2 valid neighbours)
-                        ! --> in this case shift cavity-ocean interface one level down
-                        if (count_neighb_open<=1) then
+                        if (count_neighb_open==0) then
+                            ! elemnt is fully isolated has no neighbour, its like an
+                            ! ocean chimney inside the cavity.
+                            !   |###|###|###|###|###|###|###|
+                            !   |#  CAVITY  |###| . |###|###|                    OCEAN
+                            !   |###|###|###|###|/|\|###|###| 
+                            !   |###|###|###|###| | |###|###| 
+                            !
+                            !    ###########################
+                            !    ############o##############
+                            !    ###########/ \#############
+                            !    #########/     \###########
+                            !    #######/  isol.  \#########
+                            !    ######o------------o#######
+                            !    ###########################
+                            !
+                            ! set ocean element that is like chimney to the shallowest
+                            ! cavity depth of one of the neighbouring elements to 
+                            ! give it a valid ocean neighbour
+                            
+                            count_isoelem = count_isoelem+1
+                            
+                            ! compute shallowest neighbouring cavity level
+                            val = nl
+                            do j = 1, 3
+                                if (elems(j)>0) then
+                                    val = min(nl,ulevels(elems(j)))
+                                end if 
+                            end do ! --> do i = 1, nneighb
+                            
+                            ! still there must be at least three valid ocean layers between
+                            ! cavity and bottom interface
+                            if ( (nlevels(elem)-val)>=3            .and. &
+                                 (elemreducelvl(elem) .eqv. .False.) .and. &
+                                 (elemfixlvl(   elem) .eqv. .False.)       &
+                               ) then 
+                                ulevels(elem) = val
+                                
+                            else
+                                val=nl
+                                do j = 1, 3
+                                    if (elems(j)>0) then ! if its a valid boundary triangle, 0=missing value
+                                        if (ulevels(elems(j))-ulevels(elem)>0 .and. ulevels(elems(j))-ulevels(elem)<val) then
+                                            val=ulevels(elems(j))-ulevels(elem)
+                                            idx=j
+                                        end if 
+                                    end if 
+                                end do ! --> do i = 1, nneighb
+                                ulevels(      elems(idx)) = ulevels(elem)
+                                elemreducelvl(elems(idx)) = .True.
+                            end if     
+                        
+                        elseif (count_neighb_open==1) then
+                            ! element has only one neighbouring triangle which means
+                            ! that all three nodes are connected to the boundary
+                            !
+                            !  ####\.   ./     \.   ./     \.   ./
+                            !  ######\ /         \ /         \ /
+                            !  #######o-----------o-----------o
+                            !  #####./ \.       ./ \.       ./ \.
+                            !  ###./     \.   ./     \.   ./     \
+                            !  ##/  isol.  \ /         \ /
+                            !  #o-----------o-----------o---------
+                            !  ##############\.       ./ \.
+                            !  ################\     /     \
+                        
                             count_isoelem = count_isoelem+1
                             
                             ! (4th.1 ) if cell elem is isolated convert it to a deeper ocean level
                             ! except when this levels would remain less than 3 valid 
-                            ! bottom levels --> in case make the levels of all sorounding
+                            ! bottom levels --> in case make the levels of one sorounding
                             ! triangles shallower
                             if ( (nlevels(elem)-(nz+1))>=3           .and. &
                                  (elemreducelvl(elem) .eqv. .False.) .and. &
@@ -1159,10 +1223,6 @@ subroutine find_levels_cavity(mesh)
                             ! triangles. Choose triangle whos depth is already closest
                             ! to nz    
                             else 
-                                !PS replace this with do j=1,3... because of 
-                                !PS indice -999 conflict in elems, ulevels(-999)
-                                !PS not possible 
-                                !PS idx = minloc(ulevels(elems)-nz, 1, MASK=( (elems>0) .and. ((ulevels(elems)-nz)>0) ) )
                                 val=nl
                                 do j = 1, 3
                                     if (elems(j)>0) then ! if its a valid boundary triangle, 0=missing value
@@ -1172,7 +1232,6 @@ subroutine find_levels_cavity(mesh)
                                         end if 
                                     end if 
                                 end do ! --> do i = 1, nneighb
-                                
                                 ulevels(      elems(idx)) = nz
                                 elemreducelvl(elems(idx)) = .True.
                             end if    
@@ -1401,7 +1460,8 @@ subroutine find_levels_cavity(mesh)
                         idx  = minloc(aux_arr, 1, MASK=((aux_arr>0)) )
                         deallocate(aux_arr, aux_idx)
                         ulevels(   nod_in_elem2D(idx,node)) = nz
-                        elemfixlvl(nod_in_elem2D(idx,node)) = .True.
+                        elemfixlvl(nod_in_elem2D(idx,node)) = .False.
+                        elemreducelvl(nod_in_elem2D(idx,node)) = .False.
                         
                         !_______________________________________________________
                         ! inflict another outer iteration loop
