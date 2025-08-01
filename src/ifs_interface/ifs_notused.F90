@@ -176,6 +176,7 @@ SUBROUTINE nemogcmcoup_update_add( mype, npes, icomm, &
 
    if(fesom%mype==0) then
    WRITE(0,*)'In nemogcmcoup_update_add FESOM dummy routine. Proceeding...'
+
    !CALL abort
    endif   
 
