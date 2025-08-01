@@ -2,7 +2,10 @@ module iceberg_element
  use MOD_PARTIT
  USE MOD_MESH
  USE MOD_DYN
+ USE MOD_PARSUP
  use iceberg_params
+ use iceberg_thermodynamics
+ use iceberg_ocean_coupling
 ! use iceberg_dynamics
 ! use iceberg_step
 
@@ -260,12 +263,12 @@ type(t_partit), intent(inout), target :: partit
   if( (x > maxlon) .OR. (x < minlon) ) then
     write(*,*) 'FEM_eval error: iceberg lon ', x, ' outside element!'
     write(*,*) 'maxlon:', maxlon, ' minlon:', minlon
-    call par_ex
+    call par_ex (partit%MPI_COMM_FESOM, partit%mype)
     stop
   else if( (y > maxlat) .OR. (y < minlat)) then
     write(*,*) 'FEM_eval error: iceberg lat', y, ' outside element!'
     write(*,*) 'maxlat:', maxlat, ' minlat:', minlat
-    call par_ex
+    call par_ex (partit%MPI_COMM_FESOM, partit%mype)
     stop
   else
     !everything okay
@@ -376,14 +379,12 @@ end subroutine FEM_3eval
 subroutine iceberg_elem4all(mesh, partit, elem, lon_deg, lat_deg) 
  USE MOD_MESH
  use MOD_PARTIT		!for myDim_nod2D, myList_elem2D
-! use iceberg_params, only: reject_elem
  
  implicit none
  
  integer, intent(INOUT) :: elem
  real, intent(IN) :: lon_deg, lat_deg
- logical :: i_have_element
- logical                        :: reject_tmp !LA for debugging
+ logical :: i_have_element, reject_tmp
 
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
@@ -408,29 +409,27 @@ type(t_partit), intent(inout), target :: partit
        elem=myList_elem2D(elem) !global now
       end if 
    else
-   elem=myList_elem2D(elem) !global now
-endif 
+    elem=myList_elem2D(elem) !global now
+   endif 
   end if
   call com_integer(partit, i_have_element,elem) !max 1 PE sends element here; 
 end subroutine iceberg_elem4all
 
 
  !***************************************************************************************************************************
- !***************************************************************************************************************************
 
 subroutine find_new_iceberg_elem(mesh, partit, old_iceberg_elem, pt, left_mype)
   use o_param
-!  use iceberg_params, only: reject_elem
 
   implicit none
   
+  logical                :: reject_tmp
   INTEGER, INTENT(INOUT) :: old_iceberg_elem
   REAL, DIMENSION(2), INTENT(IN) :: pt
   real, INTENT(OUT) :: left_mype
   
   INTEGER :: m, n2, idx_elem_containing_n2, elem_containing_n2, ibelem_tmp
   REAL, DIMENSION(3) :: werte2D
- logical                        :: reject_tmp !LA for debugging
 
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
@@ -460,7 +459,6 @@ do m=1, 3
    
   if (ALL(werte2D <= 1.+ 1.0e-07) .AND. ALL(werte2D >= 0.0- 1.0e-07) ) then
    old_iceberg_elem=elem_containing_n2
-   
    if (use_cavity) then 
       !if( reject_elem(mesh, partit, old_iceberg_elem) ) then
       reject_tmp = all( (mesh%cavity_depth(elem2D_nodes(:,ibelem_tmp))/=0.0) .OR. (mesh%bc_index_nod2D(elem2D_nodes(:,ibelem_tmp))==0.0) )
@@ -470,7 +468,6 @@ do m=1, 3
          old_iceberg_elem=ibelem_tmp
       end if
    endif
-
    RETURN 
   end if
  end do
@@ -593,7 +590,7 @@ type(t_partit), intent(inout), target :: partit
   DO i=1, 2
      TRANS(:,i) = local_cart_coords(:,i+1)-local_cart_coords(:,1)     
   END DO  
-  call matrix_inverse_2x2(TRANS, TRANS_inv, DET)  
+  call matrix_inverse_2x2(TRANS, TRANS_inv, DET, elem, coords)  
 
   vec=x_cart-local_cart_coords(:,1)  
   stdel_coords = MATMUL(TRANS_inv, vec)
@@ -852,13 +849,16 @@ type(t_partit), intent(inout), target :: partit
 !END SUBROUTINE tides_distr
 
 !LA from oce_mesh_setup ofr iceberg coupling
-subroutine  matrix_inverse_2x2 (A, AINV, DET)
+subroutine  matrix_inverse_2x2 (A, AINV, DET, elem, coords)
   !
   ! Coded by Sergey Danilov
   ! Reviewed by Qiang Wang
   !-------------------------------------------------------------
   
   implicit none
+ 
+  integer                                   :: elem
+  REAL, DIMENSION(2), INTENT(IN) :: coords
   
   real(kind=8), dimension(2,2), intent(IN)  :: A
   real(kind=8), dimension(2,2), intent(OUT) :: AINV
@@ -870,6 +870,7 @@ subroutine  matrix_inverse_2x2 (A, AINV, DET)
      do j=1,2
         write(*,*) (A(i,j),i=1,2)
      end do
+     write(*,*) " * elem: ", elem, ", coords: ", coords
      stop 'SINGULAR 2X2 MATRIX'
   else
      AINV(1,1) =  A(2,2)/DET

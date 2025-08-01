@@ -14,7 +14,6 @@ Supported systems are: generic ``ubuntu``, ``albedo`` at AWI, ``levante`` at DKR
 
     git clone https://github.com/FESOM/fesom2.git
     cd fesom2
-    git checkout refactoring
     bash -l ./configure.sh
 
 Create file ``fesom.clock`` in the output directory with the following content (if you plan to run with COREII forcing):
@@ -58,13 +57,12 @@ Change to the `fesom2` folder and execute:
 ::
 
     cd fesom2
-    git checkout refactoring
 
-As a good practice, if one wants to make modifications to the source code or any of the files, it is advisable to create a branch from refactoring:
+As a good practice, if one wants to make modifications to the source code or any of the files, it is advisable to create a branch from main:
 
 ::
 
-    git checkout -b <my branch> refactoring
+    git checkout -b <my branch> main
 
 After confirming that the right FESOM2 branch is being used, compile the model with:
 
@@ -461,12 +459,16 @@ The best way to run the model locally is to use Docker container. You obviously 
 
 - Get the image::
     
-    docker pull koldunovn/fesom2_test:refactoring2
+    docker pull ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master
+    # if you use Mac Silicon (M1 M2 etc) use:
+    docker pull --platform linux/amd64 ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master
 
 - Go to the folder with your version of fesom2 folder (NOT inside fesom2 folder, one up, the one you run ``git clone https://github.com/FESOM/fesom2.git`` in).
 - Run::
 
-    docker run -it -v "$(pwd)"/fesom2:/fesom/fesom2 koldunovn/fesom2_test:refactoring2 /bin/bash
+    docker run -it -v "$(pwd)"/fesom2:/fesom/fesom2 ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master /bin/bash
+    # if you use Mac Silicon (M1 M2 etc) use:
+    docker run --platform linux/amd64 -it -v "$(pwd)"/fesom2:/fesom/fesom2 ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master /bin/bash
 
 - This should get you inside the container. You now can edit the files in your fesom2 folder (on host system), but run compule and run the model inside the container.
 - When inside the container, to compile do:
@@ -474,7 +476,6 @@ The best way to run the model locally is to use Docker container. You obviously 
   ::
 
     cd fesom2
-    git checkout refactoring
     bash -l configure.sh ubuntu
 
 - To prepare the run (this will do the test with pi mesh)::

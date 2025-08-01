@@ -8,7 +8,7 @@ module io_netcdf_attribute_module
     character(:), allocatable :: name
   contains
     procedure(define_in_var), deferred :: define_in_var
-  end type
+  end type att_type
   
   
   interface
@@ -17,7 +17,7 @@ module io_netcdf_attribute_module
       class(att_type), intent(inout) :: this
       integer, intent(in) :: fileid
       integer, intent(in) :: varid
-    end subroutine
+    end subroutine define_in_var
   end interface
 
 
@@ -25,14 +25,14 @@ module io_netcdf_attribute_module
     character(:), allocatable :: text
   contains
     procedure :: define_in_var => define_in_var_text
-  end type
+  end type att_type_text
 
 
   type, extends(att_type) :: att_type_int
     integer :: val
   contains
     procedure :: define_in_var => define_in_var_int
-  end type
+  end type att_type_int
 
 
 contains
@@ -46,7 +46,7 @@ contains
     include "netcdf.inc"
 
     call assert_nc( nf_put_att_text(fileid, varid, this%name, len(this%text), this%text) , __LINE__)
-  end subroutine
+  end subroutine define_in_var_text
 
 
   subroutine define_in_var_int(this, fileid, varid)
@@ -57,7 +57,7 @@ contains
     include "netcdf.inc"
 
     call assert_nc( nf_put_att_int(fileid, varid, this%name, nf_int, 1, this%val) , __LINE__)
-  end subroutine
+  end subroutine define_in_var_int
 
 
   subroutine assert_nc(status, line)
@@ -69,6 +69,6 @@ contains
       print *, "error in line ",line, __FILE__, ' ', trim(nf_strerror(status))
       stop 1
     endif   
-  end subroutine
+  end subroutine assert_nc
 
-end module
+end module io_netcdf_attribute_module

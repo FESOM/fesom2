@@ -25,7 +25,9 @@ nod_in_elem2D_num(1:myDim_nod2D+eDim_nod2D)                => mesh%nod_in_elem2D
 depth(1:myDim_nod2D+eDim_nod2D)                            => mesh%depth(:)
 gradient_vec(1:6,1:myDim_elem2D)                           => mesh%gradient_vec(:,:)
 gradient_sca(1:6,1:myDim_elem2D)                           => mesh%gradient_sca(:,:)
-bc_index_nod2D(1:myDim_nod2D+eDim_nod2D)                   => mesh%bc_index_nod2D(:)
+if (allocated(mesh%bc_index_nod2D)) then
+    bc_index_nod2D(1:myDim_nod2D+eDim_nod2D)               => mesh%bc_index_nod2D(:)
+end if 
 zbar(1:mesh%nl)                                            => mesh%zbar(:)
 Z(1:mesh%nl-1)                                             => mesh%Z(:)
 elem_depth         => mesh%elem_depth      ! never used, not even allocated
@@ -38,18 +40,26 @@ area_inv(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)               => mesh%area_inv(:,:)
 areasvol_inv(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)           => mesh%areasvol_inv(:,:)
 mesh_resolution(1:myDim_nod2d+eDim_nod2D)                  => mesh%mesh_resolution(:)
 ssh_stiff                                                  => mesh%ssh_stiff
-lump2d_north(1:myDim_nod2d)                                => mesh%lump2d_north(:)
-lump2d_south(1:myDim_nod2d)                                => mesh%lump2d_south(:)
-cavity_flag_n(1:myDim_nod2D+eDim_nod2D)                    => mesh%cavity_flag_n(:)
-cavity_flag_e(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)     => mesh%cavity_flag_e(:)
-!!$cavity_lev_nod2D(1:myDim_nod2D+eDim_nod2D)                 => mesh%cavity_lev_nod2D
-!!$cavity_lev_elem2D(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => mesh%cavity_lev_elem2D
-cavity_depth(1:myDim_nod2D+eDim_nod2D)                     => mesh%cavity_depth(:)
+if (allocated(mesh%lump2d_north)) then
+    lump2d_north(1:myDim_nod2d)                            => mesh%lump2d_north(:)
+    lump2d_south(1:myDim_nod2d)                            => mesh%lump2d_south(:)
+end if 
+if (allocated(mesh%cavity_flag_n)) then
+    cavity_flag_n(1:myDim_nod2D+eDim_nod2D)                => mesh%cavity_flag_n(:)
+end if 
+if (allocated(mesh%cavity_flag_e)) then
+    cavity_flag_e(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => mesh%cavity_flag_e(:)
+end if 
+if (allocated(mesh%cavity_depth)) then
+    cavity_depth(1:myDim_nod2D+eDim_nod2D)                 => mesh%cavity_depth(:)
+end if 
 ulevels(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)           => mesh%ulevels(:)
 ulevels_nod2D(1:myDim_nod2D+eDim_nod2D)                    => mesh%ulevels_nod2D(:)
 ulevels_nod2D_max(1:myDim_nod2D+eDim_nod2D)                => mesh%ulevels_nod2D_max(:)
-nn_num(1:myDim_nod2D)                                      => mesh%nn_num(:)
-nn_pos(1:mesh%nn_size, 1:myDim_nod2D)                      => mesh%nn_pos(:,:)
+if (allocated(mesh%nn_num)) then
+    nn_num(1:myDim_nod2D)                                      => mesh%nn_num(:)
+    nn_pos(1:mesh%nn_size, 1:myDim_nod2D)                      => mesh%nn_pos(:,:)
+end if 
 hnode(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)               => mesh%hnode(:,:)
 hnode_new(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)           => mesh%hnode_new(:,:)
 zbar_3d_n(1:mesh%nl, 1:myDim_nod2D+eDim_nod2D)             => mesh%zbar_3d_n(:,:)
@@ -57,14 +67,14 @@ Z_3d_n(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)              => mesh%Z_3d_n(:,:)
 #if defined(__async_icebergs)
 Z_3d_n_ib(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)           => mesh%Z_3d_n_ib(:,:)
 #endif
-helem(1:mesh%nl-1, 1:myDim_elem2D)                         => mesh%helem(:,:)
-bottom_elem_thickness(1:myDim_elem2D)                      => mesh%bottom_elem_thickness(:)
+helem(1:mesh%nl-1, 1:myDim_elem2D+eDim_elem2D)             => mesh%helem(:,:)
+bottom_elem_thickness(1:myDim_elem2D+eDim_elem2D)          => mesh%bottom_elem_thickness(:)
 bottom_node_thickness(1:myDim_nod2D+eDim_nod2D)            => mesh%bottom_node_thickness(:)
 dhe(1:myDim_elem2D)                                        => mesh%dhe(:)
 hbar(1:myDim_nod2D+eDim_nod2D)                             => mesh%hbar(:)
 hbar_old(1:myDim_nod2D+eDim_nod2D)                         => mesh%hbar_old(:)
-!zbar_n(1:mesh%nl)                                          => mesh%zbar_n
-!Z_n(1:mesh%nl-1)                                           => mesh%Z_n
+!zbar_n(1:mesh%nl)                                         => mesh%zbar_n
+!Z_n(1:mesh%nl-1)                                          => mesh%Z_n
 zbar_n_bot(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_bot(:)
 zbar_e_bot(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_bot(:)
 zbar_n_srf(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_srf(:)

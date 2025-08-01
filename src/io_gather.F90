@@ -22,7 +22,7 @@ contains
 
     if(.not. nod2D_lists_initialized) call init_nod2D_lists(partit)
     if(.not. elem2D_lists_initialized) call init_elem2D_lists(partit)
-  end subroutine
+  end subroutine init_io_gather
 
 
   subroutine init_nod2D_lists(partit)
@@ -56,7 +56,7 @@ contains
     end if
     
     nod2D_lists_initialized = .true.
-  end subroutine
+  end subroutine init_nod2D_lists
 
 
   subroutine init_elem2D_lists(partit)
@@ -92,7 +92,7 @@ contains
     end if
 
     elem2D_lists_initialized = .true.
-  end subroutine
+  end subroutine init_elem2D_lists
   
 
   ! thread-safe procedure
@@ -121,7 +121,7 @@ contains
     if(.not. nod2D_lists_initialized) stop "io_gather_module has not been initialized"
 
     include "io_gather_nod.inc"  
-  end subroutine
+  end subroutine gather_nod2D
 
 
   ! thread-safe procedure
@@ -150,7 +150,7 @@ contains
     if(.not. nod2D_lists_initialized) stop "io_gather_module has not been initialized"
 
     include "io_gather_nod.inc"  
-  end subroutine
+  end subroutine gather_real4_nod2D
 
 
   ! thread-safe procedure
@@ -179,7 +179,7 @@ contains
     if(.not. elem2D_lists_initialized) stop "io_gather_module has not been initialized"
 
     include "io_gather_elem.inc"
-  end subroutine
+  end subroutine gather_elem2D
 
 
   ! thread-safe procedure
@@ -208,7 +208,7 @@ contains
     if(.not. elem2D_lists_initialized) stop "io_gather_module has not been initialized"
 
     include "io_gather_elem.inc"
-  end subroutine
+  end subroutine gather_real4_elem2D
 
-end module
+end module io_gather_module
 

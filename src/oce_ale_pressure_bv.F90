@@ -5,9 +5,9 @@ module densityJM_components_interface
       USE o_param
       real(kind=WP),  intent(IN)             :: t,s
       real(kind=WP),  intent(OUT)            :: bulk_0, bulk_pz, bulk_pz2, rhopot
-    end subroutine
+    end subroutine densityJM_components
   end interface
-end module
+end module densityJM_components_interface
 
 module density_linear_interface
   interface
@@ -16,9 +16,9 @@ module density_linear_interface
       USE o_param
       real(kind=WP),  intent(IN)             :: t,s
       real(kind=WP),  intent(OUT)            :: bulk_0, bulk_pz, bulk_pz2, rho_out
-    end subroutine
+    end subroutine density_linear
   end interface
-end module
+end module density_linear_interface
 
 module pressure_force_4_linfs_fullcell_interface
   interface
@@ -28,9 +28,9 @@ module pressure_force_4_linfs_fullcell_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
-    end subroutine
+    end subroutine pressure_force_4_linfs_fullcell
   end interface
-end module
+end module pressure_force_4_linfs_fullcell_interface
 module pressure_force_4_linfs_nemo_interface
   interface
     subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
@@ -41,9 +41,9 @@ module pressure_force_4_linfs_nemo_interface
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
       type(t_tracer), intent(in),     target :: tracers
-    end subroutine
+    end subroutine pressure_force_4_linfs_nemo
   end interface
-end module
+end module pressure_force_4_linfs_nemo_interface
 module pressure_force_4_linfs_shchepetkin_interface
   interface
     subroutine pressure_force_4_linfs_shchepetkin(partit, mesh)
@@ -52,9 +52,9 @@ module pressure_force_4_linfs_shchepetkin_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
-    end subroutine
+    end subroutine pressure_force_4_linfs_shchepetkin
   end interface
-end module
+end module pressure_force_4_linfs_shchepetkin_interface
 module pressure_force_4_linfs_easypgf_interface
   interface
     subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
@@ -65,9 +65,9 @@ module pressure_force_4_linfs_easypgf_interface
       type(t_tracer), intent(in),     target :: tracers
       type(t_partit), intent(inout),  target :: partit
       type(t_mesh),   intent(in),     target :: mesh
-    end subroutine
+    end subroutine pressure_force_4_linfs_easypgf
   end interface
-end module
+end module pressure_force_4_linfs_easypgf_interface
 module pressure_force_4_linfs_cubicspline_interface
   interface
     subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
@@ -76,9 +76,9 @@ module pressure_force_4_linfs_cubicspline_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
-    end subroutine
+    end subroutine pressure_force_4_linfs_cubicspline
   end interface
-end module
+end module pressure_force_4_linfs_cubicspline_interface
 module pressure_force_4_linfs_cavity_interface
   interface
     subroutine pressure_force_4_linfs_cavity(partit, mesh)
@@ -87,9 +87,9 @@ module pressure_force_4_linfs_cavity_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
-    end subroutine
+    end subroutine pressure_force_4_linfs_cavity
   end interface
-end module
+end module pressure_force_4_linfs_cavity_interface
 module pressure_force_4_zxxxx_shchepetkin_interface
   interface
     subroutine pressure_force_4_zxxxx_shchepetkin(partit, mesh)
@@ -98,9 +98,9 @@ module pressure_force_4_zxxxx_shchepetkin_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
-    end subroutine
+    end subroutine pressure_force_4_zxxxx_shchepetkin
   end interface
-end module
+end module pressure_force_4_zxxxx_shchepetkin_interface
 module pressure_force_4_zxxxx_easypgf_interface
   interface
     subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
@@ -111,9 +111,9 @@ module pressure_force_4_zxxxx_easypgf_interface
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
       type(t_tracer), intent(in),     target :: tracers
-    end subroutine
+    end subroutine pressure_force_4_zxxxx_easypgf
   end interface
-end module
+end module pressure_force_4_zxxxx_easypgf_interface
 module pressure_force_4_zxxxx_cubicspline_interface
   interface
     subroutine pressure_force_4_zxxxx_cubicspline(partit, mesh)
@@ -122,9 +122,9 @@ module pressure_force_4_zxxxx_cubicspline_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
-    end subroutine
+    end subroutine pressure_force_4_zxxxx_cubicspline
   end interface
-end module
+end module pressure_force_4_zxxxx_cubicspline_interface
 module init_ref_density_interface
   interface
     subroutine init_ref_density(partit, mesh)
@@ -133,9 +133,9 @@ module init_ref_density_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
-    end subroutine
+    end subroutine init_ref_density
   end interface
-end module
+end module init_ref_density_interface
 module insitu2pot_interface
   interface
     subroutine insitu2pot(tracers, partit, mesh)
@@ -146,9 +146,9 @@ module insitu2pot_interface
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
       type(t_tracer), intent(in),     target :: tracers
-    end subroutine
+    end subroutine insitu2pot
   end interface
-end module
+end module insitu2pot_interface
 module pressure_bv_interface
   interface
     subroutine pressure_bv(tracers, partit, mesh)
@@ -159,9 +159,9 @@ module pressure_bv_interface
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
       type(t_tracer), intent(in),     target :: tracers
-    end subroutine
+    end subroutine pressure_bv
   end interface
-end module
+end module pressure_bv_interface
 module pressure_force_4_linfs_interface
   interface
     subroutine pressure_force_4_linfs(tracers, partit, mesh)
@@ -172,9 +172,9 @@ module pressure_force_4_linfs_interface
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
       type(t_tracer), intent(in),     target :: tracers
-    end subroutine
+    end subroutine pressure_force_4_linfs
   end interface
-end module
+end module pressure_force_4_linfs_interface
 module pressure_force_4_zxxxx_interface
   interface
     subroutine pressure_force_4_zxxxx(tracers, partit, mesh)
@@ -185,9 +185,9 @@ module pressure_force_4_zxxxx_interface
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
       type(t_tracer), intent(in),     target :: tracers
-    end subroutine
+    end subroutine pressure_force_4_zxxxx
   end interface
-end module
+end module pressure_force_4_zxxxx_interface
 !
 !
 !===============================================================================
@@ -491,9 +491,9 @@ subroutine pressure_bv(tracers, partit, mesh)
         end if
     end do
 !$OMP END DO
+!$OMP BARRIER
 !$OMP END PARALLEL
 call smooth_nod (bvfreq, 1, partit, mesh)
-!$OMP BARRIER
 end subroutine pressure_bv
 !
 !
@@ -2835,10 +2835,10 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
    end do
  end do
 !$OMP END DO
+!$OMP BARRIER
 !$OMP END PARALLEL
 call exchange_nod(sw_alpha, partit)
 call exchange_nod(sw_beta, partit)
-!$OMP BARRIER
 end subroutine sw_alpha_beta
 !
 !
@@ -2870,6 +2870,7 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
   real(kind=WP),  intent(IN)             :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D), SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
   real(kind=WP)                          :: tx(mesh%nl-1), ty(mesh%nl-1), sx(mesh%nl-1), sy(mesh%nl-1), vol(mesh%nl-1), testino(2)
   integer                                :: n, nz, elnodes(3),el, k, nln, uln, nle, ule
+  real(kind=WP)                          :: aux(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -2924,10 +2925,18 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
         sigma_xy(2,uln:nln,n) = (-sw_alpha(uln:nln,n)*ty(uln:nln)+sw_beta(uln:nln,n)*sy(uln:nln))/vol(uln:nln)*density_0
   END DO
 !$OMP END DO
-!$OMP END PARALLEL
-  CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
-  call exchange_nod(sigma_xy, partit)
 !$OMP BARRIER
+!$OMP END PARALLEL
+! call exchange_nod(sigma_xy, partit)
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+aux=sigma_xy(1,:,:)
+call exchange_nod(aux, partit)
+sigma_xy(1,:,:)=aux
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+aux=sigma_xy(2,:,:)
+call exchange_nod(aux, partit)
+sigma_xy(2,:,:)=aux
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 end subroutine compute_sigma_xy
 !
 !
@@ -2964,7 +2973,10 @@ subroutine compute_neutral_slope(partit, mesh)
         nl1=nlevels_nod2d(n)-1
         ul1=ulevels_nod2d(n)
         do nz = ul1+1, nl1
-            ro_z_inv=2._WP*g/density_0/max(bvfreq(nz,n)+bvfreq(nz+1,n), eps**2) !without minus, because neutral slope S=-(nabla\rho)/(d\rho/dz)
+            !without minus, because neutral slope S=-(nabla\rho)/(d\rho/dz)
+            ! --> the minus sign is hidden within the definition of buoyancy
+            ! --> N2 = -g*drho/dz
+            ro_z_inv=2._WP*g/density_0/max(bvfreq(nz,n)+bvfreq(nz+1,n), eps**2) 
             neutral_slope(1,nz,n)=sigma_xy(1,nz,n)*ro_z_inv
             neutral_slope(2,nz,n)=sigma_xy(2,nz,n)*ro_z_inv
             neutral_slope(3,nz,n)=sqrt(neutral_slope(1,nz,n)**2+neutral_slope(2,nz,n)**2)
@@ -2976,10 +2988,10 @@ subroutine compute_neutral_slope(partit, mesh)
         enddo
     enddo
 !$OMP END DO
+!$OMP BARRIER
 !$OMP END PARALLEL
     call exchange_nod(neutral_slope, partit)
     call exchange_nod(slope_tapered, partit)
-!$OMP BARRIER
 end subroutine compute_neutral_slope
 !
 !
@@ -3056,6 +3068,8 @@ IMPLICIT NONE
 
   IF((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) THEN
       rho_out  = density_0 - 0.00025_WP*(t - 10.0_WP)*density_0
+  ELSE IF((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) THEN
+      rho_out  = density_0 - density_0*0.0002052_WP*(t - 10.0_WP) + density_0*0.00079_WP*(s - 35.0_WP)
   ELSE
       rho_out  = density_0 + 0.8_WP*(s - 34.0_WP) - 0.2*(t - 20.0_WP)
   END IF

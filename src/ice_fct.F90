@@ -8,7 +8,7 @@ module ice_fct_interfaces
         type(t_ice),    intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in),    target :: mesh
-        end subroutine
+        end subroutine ice_mass_matrix_fill
 
         subroutine ice_solve_high_order(ice, partit, mesh)
         USE MOD_ICE
@@ -18,7 +18,7 @@ module ice_fct_interfaces
         type(t_ice),    intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in),    target :: mesh
-        end subroutine
+        end subroutine ice_solve_high_order
 
         subroutine ice_solve_low_order(ice, partit, mesh)
         USE MOD_ICE
@@ -28,7 +28,7 @@ module ice_fct_interfaces
         type(t_ice),    intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in),    target :: mesh
-        end subroutine
+        end subroutine ice_solve_low_order
 
         subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         USE MOD_ICE
@@ -39,7 +39,7 @@ module ice_fct_interfaces
         type(t_ice),    intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in),    target :: mesh
-        end subroutine
+        end subroutine ice_fem_fct
 
         subroutine ice_TG_rhs_div(ice, partit, mesh)
         USE MOD_ICE
@@ -49,7 +49,7 @@ module ice_fct_interfaces
         type(t_ice),    intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in),    target :: mesh
-        end subroutine
+        end subroutine ice_TG_rhs_div
 
         subroutine ice_TG_rhs(ice, partit, mesh)
         USE MOD_ICE
@@ -59,7 +59,7 @@ module ice_fct_interfaces
         type(t_ice),    intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in),    target :: mesh
-        end subroutine
+        end subroutine ice_TG_rhs
 
         subroutine ice_update_for_div(ice, partit, mesh)
         USE MOD_ICE
@@ -69,9 +69,9 @@ module ice_fct_interfaces
         type(t_ice),    intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in),    target :: mesh
-        end subroutine
+        end subroutine ice_update_for_div
     end interface
-end module
+end module ice_fct_interfaces
 !
 !
 !_______________________________________________________________________________
@@ -570,15 +570,19 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #endif
     ! Auxiliary elemental operator (mass matrix- lumped mass matrix)
 
-    !$ACC KERNELS
+    ! do we need to make the entire array of icoef equal to 1 ?
+    ! if so, we have to write another loop for that. For now, I am running it on cpu.
     icoef = 1
-    !$ACC END KERNELS
+#ifdef ENABLE_OPENACC
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
+#endif
     do n=1,3   ! three upper nodes
         ! Cycle over rows  row=elnodes(n)
         icoef(n,n)=-2
     end do
+#ifdef ENABLE_OPENACC
     !$ACC END PARALLEL LOOP
+#endif
 
 
 #ifndef ENABLE_OPENACC
@@ -650,8 +654,10 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         do row=1, myDim_nod2D
             if (ulevels_nod2d(row)>1) cycle
             n=nn_num(row)
-            tmax(row)=maxval(m_icel(nn_pos(1:n,row)))
-            tmin(row)=minval(m_icel(nn_pos(1:n,row)))
+            tmax(row)=max(maxval(m_icel(nn_pos(1:n,row))), maxval(m_ice(nn_pos(1:n,row))))
+            tmin(row)=min(minval(m_icel(nn_pos(1:n,row))), minval(m_ice(nn_pos(1:n,row))))
+            ! tmax(row)=maxval(m_icel(nn_pos(1:n,row)))
+            ! tmin(row)=minval(m_icel(nn_pos(1:n,row)))
             ! Admissible increments
             tmax(row)=tmax(row)-m_icel(row)
             tmin(row)=tmin(row)-m_icel(row)
@@ -672,8 +678,10 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         do row=1, myDim_nod2D
             if (ulevels_nod2d(row)>1) cycle
             n=nn_num(row)
-            tmax(row)=maxval(a_icel(nn_pos(1:n,row)))
-            tmin(row)=minval(a_icel(nn_pos(1:n,row)))
+            tmax(row)=max(maxval(a_icel(nn_pos(1:n,row))), maxval(a_ice(nn_pos(1:n,row))))
+            tmin(row)=min(minval(a_icel(nn_pos(1:n,row))), minval(a_ice(nn_pos(1:n,row))))
+            !tmax(row)=maxval(a_icel(nn_pos(1:n,row)))
+            !tmin(row)=minval(a_icel(nn_pos(1:n,row)))
             ! Admissible increments
             tmax(row)=tmax(row)-a_icel(row)
             tmin(row)=tmin(row)-a_icel(row)
@@ -694,8 +702,10 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         do row=1, myDim_nod2D
             if (ulevels_nod2d(row)>1) cycle
             n=nn_num(row)
-            tmax(row)=maxval(m_snowl(nn_pos(1:n,row)))
-            tmin(row)=minval(m_snowl(nn_pos(1:n,row)))
+            tmax(row)=max(maxval(m_snowl(nn_pos(1:n,row))), maxval(m_snow(nn_pos(1:n,row))))
+            tmin(row)=min(minval(m_snowl(nn_pos(1:n,row))), minval(m_snow(nn_pos(1:n,row))))
+            !tmax(row)=maxval(m_snowl(nn_pos(1:n,row)))
+            !tmin(row)=minval(m_snowl(nn_pos(1:n,row)))
             ! Admissible increments
             tmax(row)=tmax(row)-m_snowl(row)
             tmin(row)=tmin(row)-m_snowl(row)
@@ -717,8 +727,8 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         do row=1, myDim_nod2D
             if (ulevels_nod2d(row)>1) cycle
             n=nn_num(row)
-            tmax(row)=maxval(m_templ(nn_pos(1:n,row)))
-            tmin(row)=minval(m_templ(nn_pos(1:n,row)))
+            tmax(row)=max(maxval(m_templ(nn_pos(1:n,row))), maxval(ice_temp(nn_pos(1:n,row))))
+            tmin(row)=min(minval(m_templ(nn_pos(1:n,row))), minval(ice_temp(nn_pos(1:n,row))))
             ! Admissible increments
             tmax(row)=tmax(row)-m_templ(row)
             tmin(row)=tmin(row)-m_templ(row)
@@ -1122,7 +1132,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     call exchange_nod(ice_temp, partit, luse_g2g = .true.)
 #endif
 
+#ifdef ENABLE_OPENACC
 !$ACC END DATA
+#endif
 
 !$OMP BARRIER
 end subroutine ice_fem_fct

@@ -54,6 +54,11 @@ elif [[ $LOGINHOST =~ ^m[A-Za-z0-9]+\.hpc\.dkrz\.de$ ]]; then
    STRATEGY="mistral.dkrz.de"
 elif [[ $LOGINHOST =~ ^levante ]] || [[ $LOGINHOST =~ ^l[:alnum:]+\.lvt\.dkrz\.de$ ]]; then 
    STRATEGY="levante.dkrz.de"
+   # following regex only matches if input is 2 word like levante.nvhpc
+   compid_regex="^([[:alnum:]]+)\.([[:alnum:]]+)$"
+   if [[ $LOGINHOST =~ $compid_regex ]]; then
+     COMPILERID="${BASH_REMATCH[2]}"
+   fi
 elif [[ $LOGINHOST =~ ^ollie[0-9]$ ]] || [[ $LOGINHOST =~ ^prod-[0-9]{4}$ ]]; then
    STRATEGY="ollie"
 elif [[ $LOGINHOST =~ ^albedo[0-9]$ ]] || [[ $LOGINHOST =~ ^prod-[0-9]{4}$ ]]; then
@@ -84,6 +89,8 @@ elif [[ $LOGINHOST =~ \.bullx$ ]]; then
    STRATEGY="atosecmwf"
 elif [[ $LOGINHOST =~ uan[0-9][0-9] ]]; then
    STRATEGY="lumi"
+elif [[ $LOGINHOST =~ nesh-login[1-3] ]]; then
+   STRATEGY="nesh"
 elif [[ -d $DIR/env/$LOGINHOST ]]; then # check if directory with LOGINHOST exists in env
 STRATEGY=$LOGINHOST
 else
