@@ -23,7 +23,7 @@ subroutine Depth_calculations(n, nn, wf, zf, thick, recipthick, partit, mesh)
     integer       , intent(in)                       :: n           ! Current node
 
     ! Output arrays
-    real(kind=8), dimension(mesh%nl,5), intent(out)  :: wf          ! [m/day] Flux velocities at the border of the control volumes
+    real(kind=8), dimension(mesh%nl,6), intent(out)  :: wf          ! [m/day] Flux velocities at the border of the control volumes
     real(kind=8), dimension(mesh%nl),   intent(out)  :: zf          ! [m] Depth of vertical fluxes
     real(kind=8), dimension(mesh%nl-1), intent(out)  :: thick       ! [m] Distance between two nodes = layer thickness
     real(kind=8), dimension(mesh%nl-1), intent(out)  :: recipthick  ! [1/m] Reciprocal thickness
