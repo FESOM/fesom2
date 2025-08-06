@@ -402,7 +402,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
                 ! Convert mass mixing ratio (kg/kg) to mole fraction (dimensionless)
                 ! MW_CO2 = 44.0095 g/mol (NIST 2018)
                 ! MW_dry_air = 28.9647 g/mol (standard atmosphere composition)
-                x_co2atm(:) = exchange(:) * (28.9647_WP/44.0095_WP)  ! [mole fraction]
+                x_co2atm(:) = exchange(:) * ((28.9647_WP/44.0095_WP)*1e6_WP)  ! [mole fraction]
              end if
 #endif
 #else ! oifs
