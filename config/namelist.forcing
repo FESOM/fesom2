@@ -35,6 +35,8 @@ landice_end_mon=10
    nm_prec_file  = '/work/ollie/clidyn/forcing/JRA55-do-v1.4.0/prra.' ! name of file with total precipitation
    nm_snow_file  = '/work/ollie/clidyn/forcing/JRA55-do-v1.4.0/prsn.' ! name of file with snow  precipitation
    nm_mslp_file  = '/work/ollie/clidyn/forcing/JRA55-do-v1.4.0/psl.'         ! air_pressure_at_sea_level
+   nm_xmodini_file = '/work/ollie/clidyn/forcing/JRA55-do-v1.4.0/uas.'        ! name of file with winds, if nm_sbc=2
+   nm_ymodini_file = '/work/ollie/clidyn/forcing/JRA55-do-v1.4.0/vas.'        ! name of file with winds, if nm_sbc=2
    nm_xwind_var  = 'uas'   ! name of variable in file with wind
    nm_ywind_var  = 'vas'   ! name of variable in file with wind
    nm_humi_var   = 'huss'   ! name of variable in file with humidity
@@ -44,6 +46,8 @@ landice_end_mon=10
    nm_prec_var   = 'prra'       ! name of variable in file with total precipitation
    nm_snow_var   = 'prsn'       ! name of variable in file with total precipitation
    nm_mslp_var   = 'psl'        ! name of variable in file with air_pressure_at_sea_level
+   nm_xmodini_var  = 'uas'   ! name of variable in file with wind
+   nm_ymodini_var  = 'vas'   ! name of variable in file with wind
    nm_nc_iyear   = 1900
    nm_nc_imm     = 1            ! initial month of time axis in netCDF 
    nm_nc_idd     = 1            ! initial day of time axis in netCDF

@@ -71,6 +71,8 @@ include_fleapyear=.false.
 /
 
 &run_config
+use_modini=.true.
+check_modini=.true.
 use_ice=.true.                  ! ocean+ice
 use_floatice = .false.
 use_sw_pene=.true.

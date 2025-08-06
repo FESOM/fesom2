@@ -40,7 +40,7 @@ MODULE g_sbf
    USE g_comm_auto
    USE g_support
    USE g_rotate_grid
-   USE g_config, only: dummy, ClimateDataPath, dt
+   USE g_config, only: dummy, ClimateDataPath, dt, use_modini
    USE g_clock,  only: timeold, timenew, dayold, daynew, yearold, yearnew, cyearnew
    USE g_forcing_arrays,    only: runoff
    USE g_read_other_NetCDF, only: read_other_NetCDF, read_2ddata_on_grid_netcdf
@@ -53,22 +53,24 @@ MODULE g_sbf
    public  sbc_end  ! routine called after last time step
    public  julday   ! get julian day from date
    public  atmdata
-   public  i_totfl, i_xwind, i_ywind, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow
+   public  i_totfl, i_xwind, i_ywind, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow, i_xmodini, i_ymodini
    public  l_xwind, l_ywind, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
    private
 
-   integer :: i_totfl = 10! total number of fluxes
-   integer :: i_xwind = 1 ! index of 10m wind velocity (x-component) [m/s]
-   integer :: i_ywind = 2 ! index of 10m wind velocity (y-component) [m/s]
-   integer :: i_humi  = 3 ! index of specific humidity               [kg/kg]
-   integer :: i_qsr   = 4 ! index of solar heat                      [W/m2]
-   integer :: i_qlw   = 5 ! index of Long wave                       [W/m2]
-   integer :: i_tair  = 6 ! index of 2m air temperature              [degK]
-   integer :: i_prec  = 7 ! index of total precipitation (rain+snow) [Kg/m^2/s]
-   integer :: i_mslp  = 8 ! index of mean sea level pressure         [Pascals]
-   integer :: i_cloud = 9 ! index of mean sea level pressure         [0-1]
-   integer :: i_snow  = 10! index of mean sea level pressure         [Kg/m^2/s]
-
+   integer :: i_totfl   = 12! total number of fluxes
+   integer :: i_xwind   = 1 ! index of 10m wind velocity (x-component) [m/s]
+   integer :: i_ywind   = 2 ! index of 10m wind velocity (y-component) [m/s]
+   integer :: i_humi    = 3 ! index of specific humidity               [kg/kg]
+   integer :: i_qsr     = 4 ! index of solar heat                      [W/m2]
+   integer :: i_qlw     = 5 ! index of Long wave                       [W/m2]
+   integer :: i_tair    = 6 ! index of 2m air temperature              [degK]
+   integer :: i_prec    = 7 ! index of total precipitation (rain+snow) [Kg/m^2/s]
+   integer :: i_mslp    = 8 ! index of mean sea level pressure         [Pascals]
+   integer :: i_cloud   = 9 ! index of mean sea level pressure         [0-1]
+   integer :: i_snow    = 10! index of mean sea level pressure         [Kg/m^2/s]
+   integer :: i_xmodini = 11! index of 10m wind velocity (x-component) [m/s]
+   integer :: i_ymodini = 12! index of 10m wind velocity (y-component) [m/s]
+  
    logical :: l_totfl = .false. 
    logical :: l_xwind = .false. 
    logical :: l_ywind = .false. 
@@ -123,6 +125,8 @@ MODULE g_sbf
    character(len=256), save   :: nm_snow_file  = 'snow.dat'  ! name of file with snow  precipitation, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
    character(len=256), save   :: nm_mslp_file  = 'mslp.dat'  ! name of file with mean sea level pressure, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
    character(len=256), save   :: nm_cloud_file = 'cloud.dat'  ! name of file with clouds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
+   character(len=256), save   :: nm_xmodini_file = 'xmodini.dat' ! name of file with winds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
+   character(len=256), save   :: nm_ymodini_file = 'ymodini.dat' ! name of file with winds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
 
    character(len=34), save   :: nm_xwind_var = 'uwnd' ! name of variable in file with wind
    character(len=34), save   :: nm_ywind_var = 'vwnd' ! name of variable in file with wind
@@ -134,12 +138,14 @@ MODULE g_sbf
    character(len=34), save   :: nm_snow_var  = 'snow' ! name of variable in file with snow  precipitation
    character(len=34), save   :: nm_mslp_var  = 'mslp' ! name of variable in file with mean sea level pressure
    character(len=34), save   :: nm_cloud_var = 'cloud'! name of variable in file with clouds
+   character(len=34), save   :: nm_xmodini_var = 'uwnd' ! name of variable in file with wind
+   character(len=34), save   :: nm_ymodini_var = 'vwnd' ! name of variable in file with wind
 
    ! ========== netCDF time param
    integer, save :: nm_nc_iyear = 1948    ! initial year of time axis in netCDF (1948 like CoastDat,1800 NCEP)
    integer, save :: nm_nc_imm   = 1       ! initial month of time axis in netCDF
    integer, save :: nm_nc_idd   = 1       ! initial day of time axis in netCDF
-   real,    save :: nm_nc_freq  = 86400.0 ! time units coef (86400 CoastDat, 24 NCEP)
+   real,    save :: nm_nc_freq  = 86400.0 ! time units coef (86400 CoastDat, 24 NCEP,1 JRA-55)
    integer, save :: nm_nc_tmid  = 1       ! 1 if the time stamps are given at the mid points of the netcdf file, 0 otherwise!
    logical, save :: y_perpetual=.false.
 
@@ -198,10 +204,11 @@ CONTAINS
       integer                      :: ierror              ! return error code
       character(len=20)            :: aux_calendar
       integer                      :: aux_len
-
+      !if (mype==0) write(*,*) 'nc_readTimeGrid is in process. '
       !open file
       if (mype==0) then
          iost = nf_open(trim(flf%file_name),NF_NOWRITE,ncid)
+         !if (mype==0) write(*,*) 'File is Opened ', iost
       end if
 
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
@@ -281,9 +288,11 @@ CONTAINS
       call check_nferr(iost,flf%file_name)
 
       if (mype==0) then
+         !if (mype==0) write(*,*) 'Getting variable ID.'
          iost = nf_inq_varid(ncid, "TIME", id_time)
          if      (iost .ne. NF_NOERR) then
                  iost = nf_inq_varid(ncid, "time", id_time)
+                 if (mype==0) write(*,*) 'time should be it ', id_time
          end if
          if      (iost .ne. NF_NOERR) then
                  iost = nf_inq_varid(ncid, "TIME1",id_time)
@@ -344,11 +353,14 @@ CONTAINS
     !____________________________________________________________________________
     ! read time axis from file
       if (mype==0) then
+         !if (mype==0) write(*,*) 'READING TIME AXIS FROM THE FILE '
          nf_start(1)=1
          nf_edges(1)=flf%nc_Ntime
          iost = nf_get_vara_double(ncid, id_time, nf_start, nf_edges, flf%nc_time)
-         ! digg for calendar attribute in time axis variable         
+         !if (mype==0) write(*,*) 'READING TIME AXIS IS FINISHED',iost
+        ! digg for calendar attribute in time axis variable         
       end if
+
       call MPI_BCast(flf%nc_time, flf%nc_Ntime,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)
@@ -429,16 +441,38 @@ CONTAINS
          end if 
       end if
       
-    ! transform time axis accorcing to calendar and include_fleapyear=.true./.false. flag  
+    ! transform time axis accorcing to calendar and include_fleapyear=.true./.false. flag 
+      !if (mype==0) then
+      !   write(*,*) '-----------------TRANSFORMIN TIME AXIS---------------------------- ' 
+      !   write(*,*) 'nc_time(FIRST) :  ', flf%nc_time
+      !end if
       flf%nc_time = flf%nc_time / nm_nc_freq + julday(nm_nc_iyear,nm_nc_imm,nm_nc_idd)
+      !if (mype==0) then
+      !   write(*,*) 'nc_time :  ', flf%nc_time
+      !end if
       if (nm_nc_tmid/=1) then
+      !   if (mype==0) then
+      !      write(*,*) 'MODEL IS USING nm_nc_tmid=1 '
+      !   end if
          if (flf%nc_Ntime > 1) then
+      !      if (mype==0) then
+      !          write(*,*) 'nc_NTime >1/ nc_Ntime: ', flf%nc_Ntime
+      !      end if     
             do i = 1, flf%nc_Ntime-1
                flf%nc_time(i) = (flf%nc_time(i+1) + flf%nc_time(i))/2.0_WP
+      !      if (mype==0) then
+      !          write(*,*) 'nctime: ', flf%nc_time(i)
+      !      end if   
             end do
-           flf%nc_time(flf%nc_Ntime) = flf%nc_time(flf%nc_Ntime) + (flf%nc_time(flf%nc_Ntime) - flf%nc_time(flf%nc_Ntime-1))/2.0
+            flf%nc_time(flf%nc_Ntime) = flf%nc_time(flf%nc_Ntime) + (flf%nc_time(flf%nc_Ntime) - flf%nc_time(flf%nc_Ntime-1))/2.0
+      !      if (mype==0) then
+      !          write(*,*) 'nctime: ', flf%nc_time(flf%nc_Ntime)
+      !      end if
          end if
       end if
+      !if (mype==0) then
+      !   write(*,*) '----------------FINIDHES TRANSFORMING TIME AXIS---------------------------- '
+      !end if      
       call MPI_BCast(flf%nc_lon,   flf%nc_Nlon,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
       call MPI_BCast(flf%nc_lat,   flf%nc_Nlat,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
     
@@ -508,6 +542,14 @@ CONTAINS
       if (l_snow)  sbc_flfi(i_snow)%var_name=ADJUSTL(trim(nm_snow_var))
       if (l_mslp)  sbc_flfi(i_mslp)%var_name=ADJUSTL(trim(nm_mslp_var))
       if (l_cloud) sbc_flfi(i_cloud)%var_name=ADJUSTL(trim(nm_cloud_var))
+      if (use_modini) then
+         write(sbc_flfi(i_xmodini)%file_name, *) trim(nm_xmodini_file),trim(yyear),'.nc'
+         write(sbc_flfi(i_ymodini)%file_name, *) trim(nm_ymodini_file),trim(yyear),'.nc'
+         sbc_flfi(i_xmodini)%file_name=ADJUSTL(trim(sbc_flfi(i_xmodini)%file_name))
+         sbc_flfi(i_ymodini)%file_name=ADJUSTL(trim(sbc_flfi(i_ymodini)%file_name))
+         sbc_flfi(i_xmodini)%var_name=ADJUSTL(trim(nm_xmodini_var))
+         sbc_flfi(i_ymodini)%var_name=ADJUSTL(trim(nm_ymodini_var))
+      endif
    END SUBROUTINE nc_sbc_ini_fillnames
 
    SUBROUTINE nc_sbc_ini(rdate, mesh)
@@ -894,9 +936,9 @@ CONTAINS
 
       namelist /nam_sbc/ nm_xwind_file, nm_ywind_file, nm_humi_file, nm_qsr_file, &
                         nm_qlw_file, nm_tair_file, nm_prec_file, nm_snow_file, &
-                        nm_mslp_file, nm_xwind_var, nm_ywind_var, nm_humi_var, &
+                        nm_mslp_file, nm_xmodini_file, nm_ymodini_file,nm_xwind_var, nm_ywind_var, nm_humi_var, &
                         nm_qsr_var, nm_qlw_var, nm_tair_var, nm_prec_var, nm_snow_var, &
-                        nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, y_perpetual, &
+                        nm_mslp_var, nm_cloud_var, nm_xmodini_var, nm_ymodini_var,nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, y_perpetual, &
                         l_xwind, l_ywind, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
                         nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source
       ! OPEN and read namelist for SBC
@@ -1002,7 +1044,20 @@ CONTAINS
          i_totfl =i_totfl+1
          i_mslp  =i_totfl
       end if
-
+      if (use_ice) then
+         if (mype==0) then
+            write(*,*) "      nm_xmodini_file = ", trim(nm_xmodini_file) ," ! name of file with X winds"
+            write(*,*) "      nm_xmodini_var  = ", trim(nm_xmodini_var)  ," ! name of variable in file with wind "
+         end if
+         i_totfl=i_totfl+1
+         i_xmodini=i_totfl
+         if (mype==0) then
+            write(*,*) "      nm_ymodini_file = ", trim(nm_ymodini_file) ," ! name of file with X winds"
+            write(*,*) "      nm_ymodini_var  = ", trim(nm_ymodini_var)  ," ! name of variable in file with wind "
+         end if
+         i_totfl=i_totfl+1
+         i_ymodini=i_totfl
+      end if
       if (mype==0) then
          write(*,*) 'total fluxes to read: ', i_totfl
       end if
@@ -1026,13 +1081,14 @@ CONTAINS
       call nc_sbc_ini(rdate, mesh)
       !==========================================================================
       ! runoff    
-      if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
-         ! runoff in CORE is constant in time
-         ! Warning: For a global mesh, conservative scheme is to be updated!!
-         call read_other_NetCDF(nm_runoff_file, 'Foxx_o_roff', 1, runoff, .false., mesh) 
-         runoff=runoff/1000.0_WP  ! Kg/s/m2 --> m/s
-      end if
-
+      if (.not. use_modini) then
+          if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
+             ! runoff in CORE is constant in time
+             ! Warning: For a global mesh, conservative scheme is to be updated!!
+             call read_other_NetCDF(nm_runoff_file, 'Foxx_o_roff', 1, runoff, .false., mesh) 
+             runoff=runoff/1000.0_WP  ! Kg/s/m2 --> m/s
+          end if
+      end if 
       if (mype==0) write(*,*) "DONE:  Ocean forcing inizialization."
       if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
    END SUBROUTINE sbc_ini
@@ -1076,75 +1132,86 @@ CONTAINS
       rdate = real(julday(yearnew,1,1),WP)
       rdate = rdate+real(daynew-1,WP)+timenew/86400._WP-dt/86400._WP/2._WP
       do_rotation=.false.
-
+      !if (mype==0) write(*,*) 'SBC_DO is in progress'
       do fld_idx = 1, i_totfl
+        ! if (mype==0) write(*,*) 'FLD_IDX: ', fld_idx, 'I_TOTFL: ', i_totfl
          nc_time  =>sbc_flfi(fld_idx)%nc_time
          t_indx_p1=>sbc_flfi(fld_idx)%t_indx_p1
          t_indx   =>sbc_flfi(fld_idx)%t_indx
          nc_Ntime =>sbc_flfi(fld_idx)%nc_Ntime
+         !if (mype==0) write(*,*) 'RDATE: ', rdate, 'must be bigger than ', nc_time(t_indx_p1)
+         !if (mype==0) write(*,*) 'and ', nc_time(nc_Ntime), 'must be bigger than ', nc_time(t_indx)
+         !if (mype==0) write(*,*) 'or force_newcoeff then getcoeff'
+         !if (use_modini) then
+         !   force_newcoeff=.true.
+         !   if (mype==0) write(*,*) 'FORCE_NEWCOEFF', force_newcoeff
+         !end if
          if ( ((rdate > nc_time(t_indx_p1)) .and. (nc_time(t_indx) < nc_time(nc_Ntime))) .or. force_newcoeff) then
             ! get new coefficients for time interpolation on model grid for all data
             call getcoeffld(fld_idx, rdate, mesh)
+            !if (mype==0) write(*,*) 'VARIABLE: ', fld_idx, 'DATE: ', rdate
             if (fld_idx==i_xwind) do_rotation=.true.
+            if (fld_idx==i_xmodini) do_rotation=.true.
          endif
       end do
 
       if (do_rotation) then
          do i=1, myDim_nod2D+eDim_nod2D
             call vector_g2r(coef_a(i_xwind,i), coef_a(i_ywind,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
-            call vector_g2r(coef_b(i_xwind,i), coef_b(i_ywind,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
+            call vector_g2r(coef_b(i_xmodini,i), coef_b(i_ymodini,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
          end do
       end if
       
-      !==========================================================================
+      if (.not. use_modini) then 
+          !==========================================================================
 
-      ! prepare a flag which checks whether to update monthly data (SSS, river runoff)
-      update_monthly_flag=((day_in_month==num_day_in_month(fleapyear,month) .and. timenew==86400._WP))
+          ! prepare a flag which checks whether to update monthly data (SSS, river runoff)
+          update_monthly_flag=((day_in_month==num_day_in_month(fleapyear,month) .and. timenew==86400._WP))
 
-      ! read in SSS for applying SSS restoring
-      if (surf_relax_S > 0._WP) then
-         if (sss_data_source=='CORE1' .or. sss_data_source=='CORE2') then
-            if (update_monthly_flag) then
+          ! read in SSS for applying SSS restoring
+          if (surf_relax_S > 0._WP) then
+             if (sss_data_source=='CORE1' .or. sss_data_source=='CORE2') then
+                if (update_monthly_flag) then
+                   i=month+1
+                   if (i > 12) i=1
+                   if (mype==0) write(*,*) 'Updating SSS restoring data for month ', i 
+                   call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true., mesh) 
+                end if
+             end if
+          end if
+
+         ! runoff  
+         if(runoff_data_source=='Dai09' .or. runoff_data_source=='JRA55') then
+           
+           if(update_monthly_flag) then
+             if(runoff_climatology) then
+               !climatology monthly mean
                i=month+1
                if (i > 12) i=1
-               if (mype==0) write(*,*) 'Updating SSS restoring data for month ', i 
-               call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true., mesh) 
-            end if
+               if (mype==0) write(*,*) 'Updating monthly climatology runoff for month ', i 
+               filename=trim(nm_runoff_file)
+               call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, mesh)
+
+               !kg/m2/s -> m/s
+               runoff=runoff/1000.0_WP
+
+             else
+               !monthly data
+
+               i=month+1
+               if (i > 12) i=1
+               if (mype==0) write(*,*) 'Updating monthly runoff for month ', i 
+               filename=trim(nm_runoff_file)//cyearnew//'.nc' 
+               call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, mesh)
+
+               !kg/m2/s -> m/s
+               runoff=runoff/1000.0_WP
+
+             end if
+           end if
+
          end if
       end if
-
-     ! runoff  
-     if(runoff_data_source=='Dai09' .or. runoff_data_source=='JRA55') then
-       
-       if(update_monthly_flag) then
-         if(runoff_climatology) then
-           !climatology monthly mean
-           i=month+1
-           if (i > 12) i=1
-           if (mype==0) write(*,*) 'Updating monthly climatology runoff for month ', i 
-           filename=trim(nm_runoff_file)
-           call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, mesh)
-
-           !kg/m2/s -> m/s
-           runoff=runoff/1000.0_WP
-
-         else
-           !monthly data
-
-           i=month+1
-           if (i > 12) i=1
-           if (mype==0) write(*,*) 'Updating monthly runoff for month ', i 
-           filename=trim(nm_runoff_file)//cyearnew//'.nc' 
-           call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, mesh)
-
-           !kg/m2/s -> m/s
-           runoff=runoff/1000.0_WP
-
-         end if
-       end if
-
-     end if
-
 
       ! interpolate in time
       call data_timeinterp(rdate)

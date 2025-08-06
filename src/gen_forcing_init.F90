@@ -14,6 +14,7 @@ end module
 subroutine forcing_setup(mesh)
 use g_parsup
 use g_CONFIG
+use g_config, only:use_modini
 use g_sbf, only: sbc_ini
 use mod_mesh
 use forcing_array_setup_interfaces
@@ -26,6 +27,9 @@ implicit none
      call sbc_ini(mesh)         ! initialize forcing fields
 #endif
   endif 
+  if (use_modini) then
+     call sbc_ini(mesh)
+  endif
 end subroutine forcing_setup
 ! ==========================================================
 subroutine forcing_array_setup(mesh)

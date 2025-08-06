@@ -3,11 +3,12 @@ MODULE gen_bulk
     use mod_mesh
     use i_therm_param
     use i_arrays
+    use g_config, only:use_modini
     use g_forcing_arrays
     use g_forcing_param, only: ncar_bulk_z_wind, ncar_bulk_z_tair, ncar_bulk_z_shum
     use g_parsup
     use o_param, only: WP
-    use g_sbf, only: atmdata, i_totfl, i_xwind, i_ywind, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud
+    use g_sbf, only: atmdata, i_totfl, i_xwind, i_ywind, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_xmodini, i_ymodini
 
     implicit none
 
@@ -368,8 +369,13 @@ SUBROUTINE nemo_ocean_fluxes_mode
 !!$OMP PARALLEL
 !!$OMP DO
    do i = 1, myDim_nod2D+eDim_nod2d
-      wdx  = atmdata(i_xwind,i) - u_w(i) ! wind from data - ocean current ( x direction)
-      wdy  = atmdata(i_ywind,i) - v_w(i) ! wind from data - ocean current ( y direction)
+      if (use_modini) then
+         wdx = atmdata(i_xmodini,i) - u_w(i)
+         wdy = atmdata(i_ymodini,i) - v_w(i)  
+      else
+         wdx  = atmdata(i_xwind,i) - u_w(i) ! wind from data - ocean current ( x direction)
+         wdy  = atmdata(i_ywind,i) - v_w(i) ! wind from data - ocean current ( y direction)
+      endif
       wndm = SQRT( wdx * wdx + wdy * wdy )
       zst  = t_oc_array(i)+273.15_WP
 
