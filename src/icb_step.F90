@@ -412,11 +412,12 @@ type(t_dyn)   , intent(inout), target :: dynamics
    
    
    if (use_cavity) then
+      !reject_tmp = all(mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0) .OR. all(mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0.0) 
       reject_tmp = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0.0) )
       if(reject_tmp) then
-!       write(*,*) " * set IB elem ",iceberg_elem,"to zero for IB=",ib
-!       write(*,*) " cavity: ",all((mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0))
-!       write(*,*) " boundary: ", all(mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==1)
+       write(*,*) " * set IB elem ",iceberg_elem,"to zero for IB=",ib
+       write(*,*) " cavity: ",all((mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0))
+       write(*,*) " boundary: ", all(mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0)
        iceberg_elem=0 !reject element
        i_have_element=.false.
       else 
@@ -1080,7 +1081,7 @@ type(t_partit), intent(inout), target :: partit
          exit
         end if 
       else
-        if( mesh%bc_index_nod2D(node)==1 ) then
+        if( mesh%bc_index_nod2D(node)==0.0 ) then
          n(i) = node
          exit
         end if 
@@ -1139,7 +1140,7 @@ type(t_partit), intent(inout), target :: partit
          i = i+1
         end if
       else
-        if( mesh%bc_index_nod2D(node)==1 ) then
+        if( mesh%bc_index_nod2D(node)==0.0 ) then
          n(i) = node
          i = i+1
         end if
