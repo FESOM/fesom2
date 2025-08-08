@@ -1,32 +1,17 @@
-module ssh_solve_preconditioner_interface
-    interface
-        subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
-        use MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_solverinfo),  intent(inout), target :: solverinfo
-        type(t_partit),      intent(inout), target :: partit
-        type(t_mesh),        intent(inout), target :: mesh
-        end subroutine ssh_solve_preconditioner
-    end interface
-end module ssh_solve_preconditioner_interface
+module solver_module
+    use MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_DYN
+    USE g_comm_auto
+    
+    implicit none
+    
+    private
+    public :: ssh_solve_preconditioner, ssh_solve_cg
 
-module ssh_solve_cg_interface
-    interface
-        subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
-        use MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_solverinfo),  intent(inout), target :: solverinfo
-        type(t_partit),      intent(inout), target :: partit
-        type(t_mesh),        intent(inout), target :: mesh
-        real(kind=WP),       intent(inout) :: x(partit%myDim_nod2D+partit%eDim_nod2D)
-        real(kind=WP),       intent(in)    :: rhs(partit%myDim_nod2D+partit%eDim_nod2D)
-        end subroutine ssh_solve_cg
-    end interface
-end module ssh_solve_cg_interface
+contains
+
 !=========================================================================
 subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
   ! Preconditioner follows MITgcm (JGR, 102,5753-5766, 1997)
@@ -40,11 +25,6 @@ subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
   ! paper cited) is, in reality, one iteration of the
   ! Jacobi method, with symmetrization. We need symmetrization to be able to use
   ! the conjugate gradient method.    
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    USE g_comm_auto
     IMPLICIT NONE
     type(t_solverinfo),  intent(inout), target :: solverinfo
     type(t_partit),      intent(inout), target :: partit
@@ -102,11 +82,6 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! 
   ! I tried first to follow the MITgcm paper, but I have doubts about
   ! their computations of beta. The variant below -- see Wikipedia.
-  USE MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  USE MOD_DYN
-  USE g_comm_auto
   IMPLICIT NONE
   type(t_solverinfo),  intent(inout), target :: solverinfo
   type(t_partit),      intent(inout), target :: partit
@@ -278,7 +253,7 @@ sprod(1:2)=0.0_WP
  ! At the end: The result is in X, but it needs a halo exchange.
   call exchange_nod(x, partit)
 !$OMP BARRIER
-end subroutine ssh_solve_cg 
+end subroutine ssh_solve_cg
 
-! ===================================================================
+end module solver_module
 
