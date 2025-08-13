@@ -8,7 +8,7 @@ module ice_thermodynamics_interfaces
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine thermodynamics
         
         subroutine cut_off(ice, partit, mesh)
         USE MOD_ICE
@@ -18,26 +18,26 @@ module ice_thermodynamics_interfaces
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine cut_off
     end interface  
-end module
+end module ice_thermodynamics_interfaces
 
 module ice_therm_interface
     interface
         subroutine therm_ice(ithermp, h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
         ug,ustar,T_oc,S_oc,H_ML,t,ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
-        rsf, dhgrowth, dhsngrowth, iflice, hflatow, hfsenow, hflwrdout,lid_clo,subli)
+        rsf, dhgrowth, dhsngrowth, iflice, hflatow, hfsenow, hflwrdout,lid_clo,geolon, geolat, subli)
         USE MOD_ICE
         type(t_ice_thermo), intent(in), target :: ithermp
-        real(kind=WP)  h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rsss, evap_in, &
-                       ug, ustar, T_oc, S_oc, H_ML, t, ice_dt, ch, ce, ch_i, ce_i, fw, ehf, &
+        real(kind=WP)  h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rsss, &
+                       ug, ustar, T_oc, S_oc, H_ML, t, ice_dt, ch, ce, ch_i, ce_i, evap_in, fw, ehf, &
                        dhgrowth, dhsngrowth, ahf, prec, subli, subli_i, rsf, &
                        rhow, show, rhice, shice, sh, thick, thact, lat, &
                        rh, rA, qhst, sn, hsntmp, o2ihf, evap, iflice, hflatow, &
-                       hfsenow, hflwrdout, lid_clo
-        end subroutine
+                       hfsenow, hflwrdout, lid_clo, geolon, geolat
+        end subroutine therm_ice
     end interface
-end module
+end module ice_therm_interface
 
 module ice_budget_interfaces
     interface
@@ -45,22 +45,22 @@ module ice_budget_interfaces
         USE MOD_ICE
         type(t_ice_thermo), intent(in), target :: ithermp
         real(kind=WP)  hice, hsn, t, ta, qa, fsh, flo, ug, S_oc, ch_i, ce_i, fh, subli
-        end subroutine
+        end subroutine budget
         
-        subroutine obudget(ithermp, qa, fsh, flo, t, ug, ta, ch, ce, fh, evap, hflatow, hfsenow, hflwrdout) 
+        subroutine obudget(ithermp, qa, fsh, flo, t, ug, ta, ch, ce, geolon, geolat, fh, evap, hflatow, hfsenow, hflwrdout) 
         USE MOD_ICE
         type(t_ice_thermo), intent(in), target :: ithermp
-        real(kind=WP)  qa, t, ta, fsh, flo, ug, ch, ce, fh, evap, hfsenow, &
-                       hfradow, hflatow, hftotow, hflwrdout
-        end subroutine
+        real(kind=WP)  qa, t, ta, fsh, flo, ug, ch, ce, geolon, geolat, fh, evap, hfsenow, &
+        hfsensow, hfradow, hflatow, hftotow, hflwrdout
+        end subroutine obudget
         
         subroutine flooding(ithermp, h, hsn)
         USE MOD_ICE
         type(t_ice_thermo), intent(in), target :: ithermp
         real(kind=WP)   h, hsn
-        end subroutine
+        end subroutine flooding
     end interface
-end module
+end module ice_budget_interfaces
 !
 !
 !_______________________________________________________________________________
@@ -94,23 +94,24 @@ subroutine cut_off(ice, partit, mesh)
 #endif /* (__oifs) */
 
     !___________________________________________________________________________
-    ! lower cutoff: a_ice
+    ! upper cutoff: a_ice
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
 DO n=1, myDim_nod2D+eDim_nod2D
    if (a_ice(n) > 1.0_WP)   a_ice(n)=1.0_WP
-    ! upper cutoff: a_ice
+    ! lower cutoff: a_ice
    if (a_ice(n) < .1e-8_WP) then
-        a_ice(n)   =0.0_WP
-        m_ice(n)   =0.0_WP
-        m_snow(n)  =0.0_WP
+       a_ice(n)=0.0_WP
+       m_ice(n)   =0.0_WP
+       m_snow(n)  =0.0_WP
 #if defined (__oifs) || defined (__ifsinterface)
+        
         ice_temp(n)=273.15_WP
 #endif /* (__oifs) */
    end if
     !___________________________________________________________________________
     ! lower cutoff: m_ice
    if (m_ice(n) < .1e-8_WP) then
-        m_ice(n)   =0.0_WP 
+        m_ice(n)=0.0_WP 
         m_snow(n)  =0.0_WP
         a_ice(n)   =0.0_WP
 #if defined (__oifs) || defined (__ifsinterface)
@@ -169,8 +170,9 @@ subroutine thermodynamics(ice, partit, mesh)
     real(kind=WP)  :: h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss,rsf,evap_in
     real(kind=WP)  :: ug,ustar,T_oc,S_oc,h_ml,t,ch,ce,ch_i,ce_i,fw,ehf,evap
     real(kind=WP)  :: ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout, subli
-    real(kind=WP)  :: lid_clo
+    real(kind=WP)  :: lid_clo, o2ihf
     real(kind=WP)  :: lat
+    real(kind=WP)  :: geolon, geolat
     
     !_____________________________________________________________________________
     ! pointer on necessary derived types
@@ -183,6 +185,7 @@ subroutine thermodynamics(ice, partit, mesh)
     real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn, thdgr_old, t_skin, ustar_aux
     real(kind=WP), dimension(:)  , pointer :: S_oc_array, T_oc_array, u_w, v_w
     real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
+    real(kind=WP), external  :: TFrez  ! Sea water freeze temperature
     myDim_nod2d   => partit%myDim_nod2D
     eDim_nod2D    => partit%eDim_nod2D
     ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D(:)
@@ -217,7 +220,7 @@ subroutine thermodynamics(ice, partit, mesh)
     ! Friction velocity 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, elem, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rsss, rsf, evap_in, ug, ustar, T_oc, S_oc, &
 !$OMP                                  h_ml, t, ch, ce, ch_i, ce_i, fw, ehf, evap, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,    &
-!$OMP                                  subli, lid_clo, lat)
+!$OMP                                  subli, lid_clo, lat, geolon, geolat, o2ihf)
 !$OMP DO
     do i=1, myDim_nod2D
         ustar=0.0_WP
@@ -246,7 +249,9 @@ subroutine thermodynamics(ice, partit, mesh)
         fsh     = shortwave(i)
         flo     = longwave(i)
         Ta      = Tair(i)
-        qa      = shum(i)  
+        qa      = shum(i)
+
+           
         if (.not. l_snow) then
             if (Ta>=0.0_WP) then
             rain=prec_rain(i)
@@ -275,18 +280,21 @@ subroutine thermodynamics(ice, partit, mesh)
         h_ml    = 2.5_WP                ! 10.0 or 30. used previously
         fw      = 0.0_WP
         ehf     = 0.0_WP
-        lid_Clo=ice%thermo%h0
-        if (geo_coord_nod2D(2, i)>0) then !TODO 2 separate pars for each hemisphere
-            lid_clo=0.5_WP
+        geolon = geo_coord_nod2D(1, i)
+        geolat = geo_coord_nod2D(2, i)
+        
+        if (geolat>0) then !TODO 2 separate pars for each hemisphere
+            lid_clo=ice%thermo%h0
         else
-            lid_clo=0.5_WP
+            lid_clo=ice%thermo%h0_s
         endif
         
+
         !_______________________________________________________________________
         ! do ice thermodynamics
         call therm_ice(ice%thermo,h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
             ug,ustar,T_oc,S_oc,h_ml,t,ice%ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
-            rsf, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,lid_clo,subli)
+            rsf, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,lid_clo,geolon, geolat, subli)
         
         !_______________________________________________________________________
         ! write ice thermodyn. results into arrays
@@ -333,7 +341,7 @@ end subroutine thermodynamics
 subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rsss, &
                     ug, ustar, T_oc, S_oc, H_ML, t, ice_dt, ch, ce, ch_i, ce_i,    &
                     evap_in, fw, ehf, evap, rsf, dhgrowth, dhsngrowth, iflice,     &
-                    hflatow, hfsenow, hflwrdout, lid_clo, subli)
+                    hflatow, hfsenow, hflwrdout, lid_clo, geolon, geolat, subli)
     ! Ice Thermodynamic growth model     
     !
     ! Input parameters:
@@ -359,6 +367,8 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
     ! ch_i - transfer coefficient for sensible heat (for ice)
     ! ce_i - transfer coefficient for evaporation   (for ice)  
     ! lid_clo - lid closing parameter
+    ! geolon - geographical longitude
+    ! geolat - geographical latitude
     ! Output parameters:
     !-------------------
     ! h - ice mass
@@ -367,6 +377,8 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
     ! t - temperature of snow/ice top surface
     ! fw - freshwater flux due to ice melting [m water/ice_dt]
     ! ehf - net heat flux at the ocean surface [W/m2]        !RTnew
+    ! subli - sublimatione over ice
+    ! o2ihf - ocean to ice heat flux [W/m2] 
 
     USE MOD_ICE
     use g_forcing_param,  only: use_virt_salt  
@@ -378,14 +390,20 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
     real(kind=WP)  h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss,evap_in
     real(kind=WP)  ug,ustar,T_oc,S_oc,H_ML,t,ice_dt,ch,ce,ch_i,ce_i,fw,ehf
     real(kind=WP)  dhgrowth,dhsngrowth,ahf,prec,subli,subli_i,rsf
-    real(kind=WP)  rhow,show,rhice,shice,sh,thick,thact,lat
+    real(kind=WP)  rhow,show,rhice,shice,sh,snthick,thick,thact,lat
     real(kind=WP)  rh,rA,qhst,sn,hsntmp,o2ihf,evap
     real(kind=WP)  iflice,hflatow,hfsenow,hflwrdout
     real(kind=WP), external  :: TFrez  ! Sea water freeze temperature.
-    real(kind=WP)  lid_clo
+    real(kind=WP)  lid_clo, geolon, geolat
     !___________________________________________________________________________
-    real(kind=WP), pointer :: hmin, Sice, Armin, cc, cl, con, consn, rhosno, rhoice, inv_rhowat, inv_rhosno
-    integer      , pointer :: iclasses
+    logical      , pointer :: snowdist, new_iclasses
+    integer      , pointer :: iclasses, open_water_albedo
+    real(kind=WP), pointer :: hmin, Sice, Armin, cc, cl, con, consn, rhosno, rhoice, inv_rhowat, inv_rhosno, c_melt, h_cutoff
+    real(kind=WP), pointer, dimension (:) :: hpdf
+    snowdist          => ithermp%snowdist
+    new_iclasses      => ithermp%new_iclasses
+    iclasses          => ithermp%iclasses
+    open_water_albedo => ithermp%open_water_albedo
     hmin       => ithermp%hmin
     Armin      => ithermp%Armin
     Sice       => ithermp%Sice
@@ -398,6 +416,9 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
     rhoice     => ithermp%rhoice
     inv_rhowat => ithermp%inv_rhowat
     inv_rhosno => ithermp%inv_rhosno
+    c_melt            => ithermp%c_melt
+    h_cutoff          => ithermp%h_cutoff
+    hpdf              => ithermp%hpdf
     
     !___________________________________________________________________________
     ! Store ice thickness at start of growth routine
@@ -408,13 +429,14 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
     ! of conductivities of ice and snow, according to 0-layer approach
     ! of Semtner (1976).   	    
     ! thickness at the ice covered part
-    thick=hsn*(con/consn)/max(A,Armin)    ! Effective snow thickness
-    thick=thick+h/max(A,Armin)            ! Effective total snow-ice thickness
+    snthick=hsn*(con/consn)/max(A,Armin)  ! Effective snow thickness
+    thick=h/max(A,Armin)            ! Effective ice thickness
+    if (snowdist) thick=snthick+thick   ! Effective ice and ice thickness
 
     ! Growth rate for ice in open ocean
     rhow=0.0_WP
     evap=0.0_WP
-    call obudget(ithermp, qa,fsh,flo,T_oc,ug,ta,ch,ce,rhow,evap,hflatow,hfsenow,hflwrdout) 
+    call obudget(ithermp, qa,fsh,flo,T_oc,ug,ta,ch,ce,geolon, geolat, rhow,evap,hflatow,hfsenow,hflwrdout) 
     hflatow=hflatow*(1.0_WP-A)
     hfsenow=hfsenow*(1.0_WP-A)
     hflwrdout=hflwrdout*(1.0_WP-A)
@@ -431,13 +453,22 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
     if (thick.gt.hmin) then
         do k=1,iclasses
             thact = real((2*k-1),WP)*thick/real(iclasses,WP) ! Thicknesses of actual ice class
+            if(new_iclasses) thact=h_cutoff/2.*thact       ! h_cutoff is variable (originally hcutoff was 2*h => factor 2 singles out)
+            if(.not. snowdist) thact=thact+snthick         ! if snowdist=.true. snow depth is the same on every ice class
             call budget(ithermp, thact, hsn,t,Ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,shice,subli_i) 
             !Thick ice K-class growth rate
-            rhice=rhice+shice      	! Add to average heat flux
-            subli=subli+subli_i
+            if(new_iclasses) then
+                rhice=rhice+shice*hpdf(k)
+                subli=subli+subli_i*hpdf(k)
+             else
+                rhice=rhice+shice
+                subli=subli+subli_i
+             end if
         end do
-        rhice=rhice/real(iclasses,WP)      	! Add to average heat flux
-        subli=subli/real(iclasses,WP)
+        if(.not. new_iclasses) then
+            rhice=rhice/real(iclasses,WP)      	! Add to average heat flux
+            subli=subli/real(iclasses,WP)
+        end if
     end if
     
     ! Convert growth rates [m ice/sec] into growth per time step DT.
@@ -546,7 +577,6 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
         rsf= -dhgrowth*rhoice*inv_rhowat*Sice
     else
         fw= prec+evap - dhgrowth*rhoice*inv_rhowat*(rsss-Sice)/rsss - dhsngrowth*rhosno*inv_rhowat 
-        ! initialize rsf with zero since it is not used for linfs only in zstar
         rsf = 0.0_WP
     end if
     
@@ -554,7 +584,7 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
     rh=-min(h,-rh)   ! Make sure we do not try to melt more ice than is available
     rA= rhow - o2ihf*ice_dt/cl !Qiang: it was -(T_oc-TFrez(S_oc))*H_ML*cc/cl, changed in June 2010
     !rA= rhow - (T_oc-TFrez(S_oc))*H_ML*cc/cl*(1.0-A)
-    A=A + 0.5_WP*min(rh,0.0_WP)*A/max(h,hmin) + max(rA,0.0_WP)*(1._WP-A)/lid_clo  !/h0   
+    A=A + c_melt*min(rh,0.0_WP)*A/max(h,hmin) + max(rA,0.0_WP)*(1._WP-A)/lid_clo  !/h0   
     !meaning:           melting                         freezing
     
     A=min(A,h*1.e6_WP)     ! A -> 0 for h -> 0
@@ -699,7 +729,7 @@ end subroutine budget
 !
 !
 !_______________________________________________________________________________
-subroutine obudget (ithermp, qa,fsh,flo,t,ug,ta,ch,ce,fh,evap,hflatow,hfsenow,hflwrdout)  
+subroutine obudget (ithermp, qa,fsh,flo,t,ug,ta,ch,ce,geolon, geolat,fh,evap,hflatow,hfsenow,hflwrdout)  
     ! Ice growth rate for open ocean [m ice/sec]
     !
     ! INPUT:
@@ -711,20 +741,26 @@ subroutine obudget (ithermp, qa,fsh,flo,t,ug,ta,ch,ce,fh,evap,hflatow,hfsenow,hf
     ! ug - wind speed [m/sec]
     ! ch - transfer coefficient for sensible heat
     ! ce - transfer coefficient for evaporation
+    ! geolon - geographical longitude
+    ! geolat - geographical latitude
     !
     ! OUTPUT: fh - growth rate
     !         evap - evaporation
     use MOD_ICE  
+    use MOD_MESH
     use o_param, only: WP
+    use g_clock
     implicit none
     type(t_ice_thermo), intent(in), target :: ithermp
     real(kind=WP) qa,t,ta,fsh,flo,ug,ch,ce,fh,evap
     real(kind=WP) hfsenow,hfradow,hflatow,hftotow,hflwrdout,b
     real(kind=WP) q1, q2 		! coefficients for saturated specific humidity
-    real(kind=WP) c1, c4, c5
+    real(kind=WP) c1, c4, c5, coszen, geolon, geolat
+    real(kind=WP), external  :: compute_solar_zenith_angle, albw_taylor, albw_briegleb
     logical :: standard_saturation_shum_formula = .true.
     integer :: ii
     !___________________________________________________________________________
+    integer, pointer :: open_water_albedo
     real(kind=WP), pointer :: boltzmann, emiss_wat, inv_rhowat, inv_rhoair, rhoair, &
                               tmelt, cl, clhw, cpair, albw
     boltzmann  => ithermp%boltzmann
@@ -737,6 +773,7 @@ subroutine obudget (ithermp, qa,fsh,flo,t,ug,ta,ch,ce,fh,evap,hflatow,hfsenow,hf
     clhw       => ithermp%clhw
     cpair      => ithermp%cpair
     albw       => ithermp%albw
+    open_water_albedo => ithermp%open_water_albedo
     
     !___________________________________________________________________________
     c1 = 3.8e-3_WP    
@@ -744,6 +781,14 @@ subroutine obudget (ithermp, qa,fsh,flo,t,ug,ta,ch,ce,fh,evap,hflatow,hfsenow,hf
     c5 = 237.3_WP
     q1 = 640380._WP
     q2 = -5107.4_WP
+    if(open_water_albedo > 0)then
+        coszen=compute_solar_zenith_angle(daynew, timenew/3600., geolon, geolat)
+        if(open_water_albedo > 1)then
+           albw=albw_briegleb(coszen)
+        else
+           albw=albw_taylor(coszen)
+        endif
+     endif
 
     ! (saturated) surface specific humidity
     if(standard_saturation_shum_formula) then
@@ -815,6 +860,109 @@ function TFrez(S)
     TFrez= -0.0575_WP*S+1.7105e-3_WP *sqrt(S**3)-2.155e-4_WP *S*S
 
 end function TFrez
+
+
+function compute_solar_zenith_angle(day_of_year, hour_utc, longitude, latitude) result(cos_zenith)
+    !-----------------------------------------------------------------------
+    ! Purpose: Compute the cosine of the solar zenith angle given the day of the year,
+    !          time in UTC, and geographic coordinates.
+    !
+    ! Inputs:
+    !   - day_of_year: Integer, day of the year (1 to 365 or 366)
+    !   - hour_utc: Real, time in UTC (decimal hours)
+    !   - longitude: Real, longitude in radians
+    !   - latitude: Real, latitude in radians
+    !
+    ! Output:
+    !   - cos_zenith: Real, cosine of the solar zenith angle
+    !
+    ! Notes:
+    !   - Based on standard solar position calculations
+    !   - Uses an approximation for solar declination
+    !
+    ! Written for Apache 2.0 licensed projects.
+    !-----------------------------------------------------------------------
+
+    use o_param, only: WP  ! Ensure precision consistency
+
+    implicit none
+
+    ! Input variables
+    integer, intent(in)        :: day_of_year
+    real(kind=WP), intent(in)  :: hour_utc
+    real(kind=WP), intent(in)  :: longitude, latitude
+
+    ! Output variable
+    real(kind=WP)              :: cos_zenith
+
+    ! Constants
+    real(kind=WP), parameter   :: PI = 3.141592653589793_WP
+    real(kind=WP), parameter   :: DEG_TO_RAD = PI / 180.0_WP
+    real(kind=WP), parameter   :: RAD_TO_DEG = 180.0_WP / PI
+    real(kind=WP), parameter   :: DAYS_PER_YEAR = 365.25_WP
+
+    ! Computed values
+    real(kind=WP)              :: solar_declination, hour_angle
+    real(kind=WP)              :: solar_fraction
+
+    ! Compute solar position parameters
+    solar_fraction = 2.0_WP * PI * day_of_year / DAYS_PER_YEAR
+
+    ! Approximate solar declination using Fourier terms
+    solar_declination = 0.006918_WP - 0.399912_WP * cos(solar_fraction) &
+                      + 0.070257_WP * sin(solar_fraction) &
+                      - 0.006758_WP * cos(2.0_WP * solar_fraction) &
+                      + 0.000907_WP * sin(2.0_WP * solar_fraction) &
+                      - 0.002697_WP * cos(3.0_WP * solar_fraction) &
+                      + 0.001480_WP * sin(3.0_WP * solar_fraction)
+
+    ! Compute hour angle (relative to noon, converted to radians)
+    hour_angle = (hour_utc - 12.0_WP) * 15.0_WP * DEG_TO_RAD + longitude
+
+    ! Compute cosine of the solar zenith angle
+    cos_zenith = sin(latitude) * sin(solar_declination) &
+               + cos(latitude) * cos(solar_declination) * cos(hour_angle)
+
+    ! Ensure cosine is non-negative (no below-horizon values)
+    if (cos_zenith < 0.0_WP) cos_zenith = 0.0_WP
+
+    return
+end function compute_solar_zenith_angle
+
+  
+  function albw_taylor(coszen)
+    !     purpose:  zenith depending open water albedo
+    !     method:   taylor et al. (1996)
+    !     author:   frank kauker
+    !     date:     26. april 2017
+    use o_param, only: WP
+    implicit none
+  
+    real(kind=WP), intent(in)  :: coszen
+    real(kind=WP) :: albw_taylor
+  
+    albw_taylor = 0.037_WP/(1.1_WP * coszen**1.4_WP + 0.15_WP)
+  
+    return
+  end function albw_taylor
+  
+  function albw_briegleb(coszen)
+    !     purpose:  zenith depending open water albedo
+    !     method:   briegleb et al. (1986)
+    !     author:   frank kauker
+    !     date:     26. april 2017
+    
+    use o_param, only: WP
+    implicit none
+  
+    real(kind=WP), intent(in)  :: coszen
+    real(kind=WP)              :: albw_briegleb
+  
+    albw_briegleb = 0.026_WP/(1.1_WP * coszen**1.7_WP + 0.065_WP) + 0.15_WP * (coszen-1._WP)**2 * (coszen-0.5_WP)
+  
+    return
+  end function albw_briegleb
+  !
 !
 !
 !_______________________________________________________________________________

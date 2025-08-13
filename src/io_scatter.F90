@@ -58,7 +58,7 @@ contains
     ! without a barrier, we get wrong results in arr2D_local
     ! todo: not sure why this happens (probably because the 3D levels have the same send/recv signature), get rid of the barrier if possible
     call mpi_barrier(comm, mpierr)
-  end subroutine
+  end subroutine scatter_nod2D
 
 
   ! thread-safe procedure
@@ -113,7 +113,7 @@ contains
     ! without a barrier, we get wrong results in arr2D_local
     ! todo: not sure why this happens (probably because the 3D levels have the same send/recv signature), get rid of the barrier if possible
     call mpi_barrier(comm, mpierr)
-  end subroutine
+  end subroutine scatter_elem2D
 
 
   subroutine assert(val, line)
@@ -124,7 +124,7 @@ contains
       print *, "error in line ",line, __FILE__
       stop 1
     end if
-  end subroutine
+  end subroutine assert
 
-end module
+end module io_scatter_module
 

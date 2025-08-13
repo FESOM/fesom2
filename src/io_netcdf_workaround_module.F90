@@ -25,7 +25,7 @@ contains
     else
       async_netcdf_allowed = .true.
     end if    
-  end function
+  end function next_io_rank
 
 
   integer recursive function next_io_rank_helper(communicator, rank_use_count) result(result)
@@ -44,6 +44,6 @@ contains
     end if
     
     result = rank
-  end function
+  end function next_io_rank_helper
 
-end module
+end module io_netcdf_workaround_module

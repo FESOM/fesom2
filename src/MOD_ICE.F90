@@ -70,7 +70,8 @@ TYPE T_ICE_THERMO
     ! --- namelist parameter /ice_therm/
     real(kind=WP) :: con= 2.1656, consn = 0.31 ! Thermal conductivities: ice & snow; W/m/K
     real(kind=WP) :: Sice = 4.0        ! Ice salinity 3.2--5.0 ppt.
-    real(kind=WP) :: h0=1.0	           ! Lead closing parameter [m] ! 0.5
+    real(kind=WP) :: h0=0.5	           ! Lead closing parameter [m] for Nothern Hemisphere! 0.5
+    real(kind=WP) :: h0_s=0.5	           ! Lead closing parameter [m] for Southern Hemisphere! 0.5
     real(kind=WP) :: emiss_ice=0.97    ! Emissivity of Snow/Ice,
     real(kind=WP) :: emiss_wat=0.97    ! Emissivity of open water
     real(kind=WP) :: albsn = 0.81      ! Albedo: frozen snow
@@ -78,6 +79,17 @@ TYPE T_ICE_THERMO
     real(kind=WP) :: albi  = 0.70      !         frozen ice
     real(kind=WP) :: albim = 0.68      !         melting ice
     real(kind=WP) :: albw  = 0.066     !         open water, LY2004
+
+
+    ! --- additional namelist parameters (Frank.Kauker(at)awi.de 2023/04/04)
+    logical       :: snowdist=.true.   ! distribution of snow depth according to ice distribution
+    logical       :: new_iclasses=.false. ! ice thickness distribution based on EM observations (Castro-Morales et al., JGR, 2013)
+    integer       :: open_water_albedo=0  ! 0=standard; 1=taylor; 2=briegleb        
+    REAL(kind=WP) :: c_melt=0.5        ! constant in concentration equation for melting conditions
+    REAL(kind=WP) :: h_cutoff=3.0      ! cutoff thickness of thickness pdf
+    REAL(kind=WP), DIMENSION(15) :: hpdf = (/ 0.066745491, 0.1462317, 0.17769822, 0.13131106, &
+         0.11518432, 0.08514193, 0.06871303, 0.05592151, 0.04428673, 0.03584652, 0.02970195, 0.02469673, &
+         0.02001543, 0.01653681, 0.0141026 /)  ! pdf of ice thickness based on EM observations
     contains
         procedure WRITE_T_ICE_THERMO
         procedure READ_T_ICE_THERMO
@@ -520,9 +532,9 @@ module ice_init_interface
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine ice_init
     end interface
-end module
+end module ice_init_interface
 !
 !
 !_______________________________________________________________________________
@@ -549,11 +561,12 @@ subroutine ice_init(ice, partit, mesh)
     namelist /ice_dyn/ whichEVP, Pstar, ellipse, c_pressure, delta_min, evp_rheol_steps, &
                        Cd_oce_ice, ice_gamma_fct, ice_diff, theta_io, ice_ave_steps, &
                        alpha_evp, beta_evp, c_aevp
-
-    real(kind=WP)  :: Sice, h0, emiss_ice, emiss_wat, albsn, albsnm, albi, &
-                      albim, albw, con, consn
-    namelist /ice_therm/ Sice, h0, emiss_ice, emiss_wat, albsn, albsnm, albi, &
-                         albim, albw, con, consn
+    logical        :: snowdist, new_iclasses
+    integer        :: open_water_albedo, iclasses
+    real(kind=WP)  :: Sice, h0, h0_s, emiss_ice, emiss_wat, albsn, albsnm, albi, &
+                      albim, albw, con, consn, hmin, armin, c_melt, h_cutoff
+    namelist /ice_therm/ Sice, iclasses, h0, h0_s, hmin, armin,  emiss_ice, emiss_wat, albsn, albsnm, albi, &
+                         albim, albw, con, consn,  snowdist, new_iclasses, open_water_albedo, c_melt, h_cutoff
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -596,7 +609,11 @@ subroutine ice_init(ice, partit, mesh)
     ice%thermo%con      = con
     ice%thermo%consn    = consn
     ice%thermo%Sice     = Sice
+    ice%thermo%iclasses = iclasses
     ice%thermo%h0       = h0
+    ice%thermo%h0_s     = h0_s
+    ice%thermo%hmin     = hmin
+    ice%thermo%armin    = armin
     ice%thermo%emiss_ice= emiss_ice
     ice%thermo%emiss_wat= emiss_wat
     ice%thermo%albsn    = albsn
@@ -604,9 +621,13 @@ subroutine ice_init(ice, partit, mesh)
     ice%thermo%albi     = albi
     ice%thermo%albim    = albim
     ice%thermo%albw     = albw
-
-    ice%thermo%cc=ice%thermo%rhowat*4190.0  ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
-    ice%thermo%cl=ice%thermo%rhoice*3.34e5  ! Volumetr. latent heat of ice fusion [J/m**3](cl=rhoice*Lf)
+    ice%thermo%snowdist = snowdist
+    ice%thermo%new_iclasses=new_iclasses
+    ice%thermo%open_water_albedo=open_water_albedo
+    ice%thermo%c_melt   = c_melt
+    ice%thermo%h_cutoff = h_cutoff    
+    ice%thermo%cc       =ice%thermo%rhowat*4190.0  ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
+    ice%thermo%cl       =ice%thermo%rhoice*3.34e5  ! Volumetr. latent heat of ice fusion [J/m**3](cl=rhoice*Lf)
 
     !___________________________________________________________________________
     ! define local vertice & elem array size

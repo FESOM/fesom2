@@ -13,7 +13,7 @@ ulimit -s unlimited
 
 source ../env/lumi/shell
 
-ln -s ../bin/fesom_ini.x         .           # cp -n ../bin/fvom_ini.x
+ln -s ../bin/fesom_meshpart      .
 cp -n ../config/namelist.config  .
 #cp -n ../config/namelist.forcing .
 #cp -n ../config/namelist.oce     .
@@ -26,6 +26,6 @@ fname="fesom2_${SLURM_JOB_NAME}_${jobid}.out"
 
 #___PUT JOB IN QUEUE____________________________________________________________
 date
-srun --mpi=pmi2 --ntasks=1 ./fesom_ini.x >> ${fname}
+srun --mpi=pmi2 --ntasks=1 ./fesom_meshpart >> ${fname}
 date
 
