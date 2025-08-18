@@ -224,7 +224,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
     integer                  :: n, k, nz, nzmax, nzmin
-    real(kind=WP)            :: reso, c1, rosb, scaling, rr_ratio, aux, aux_zz(mesh%nl)
+    real(kind=WP)            :: reso, c1, cm, rosb, scaling, rr_ratio, aux, aux_zz(mesh%nl)
     real(kind=WP)            :: x0=1.5_WP, sigma=.15_WP ! Fermi function parameters to cut off GM where Rossby radius is resolved
     real(kind=WP)            :: c_min=0.5_WP, f_min=1.e-6_WP, r_max=200000._WP
     real(kind=WP)            :: zscaling(mesh%nl)
@@ -252,15 +252,16 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
         end do
         reso=mesh_resolution(n)
         if (Fer_GM) then
+            !___________________________________________________________________
+            ! compute baroklionic gravity wave speed
             c1=0._wp
-            
-            !!PS do nz=1, nzmax-1
+            cm=0._wp
             do nz=nzmin, nzmax-1
                 !!PS c1=c1+hnode_new(nz,n)*(sqrt(max(bvfreq(nz,n), 0._WP))+sqrt(max(bvfreq(nz+1,n), 0._WP)))/2._WP
-                c1=c1+hnode_new(nz,n)*(sqrt(abs(max(bvfreq(nz,n), 0._WP)))+sqrt(abs(max(bvfreq(nz+1,n), 0._WP))))/2._WP ! add abs() for -0 case, cray
+                cm=cm+hnode_new(nz,n)*(sqrt(abs(max(bvfreq(nz,n), 0._WP)))+sqrt(abs(max(bvfreq(nz+1,n), 0._WP))))/2._WP ! add abs() for -0 case, cray
             end do
-            !PS c1=max(c_min, c1/pi/K_GM_cm) !ca. first baroclinic gravity wave speed limited from below by c_min
-            c1=max(K_GM_cmin, c1/pi/K_GM_cm) !ca. first baroclinic gravity wave speed limited from below by c_min
+            c1=max(K_GM_cmin, cm/pi)         !ca. first baroclinic gravity wave speed limited from below by c_min --> need for rosbyradius
+            cm=max(K_GM_cmin, cm/pi/K_GM_cm) !ca. mth baroclinic gravity wave speed limited from below by c_min   --> needed for ferrari GM
             scaling=1._WP
             
             !___________________________________________________________________
@@ -312,7 +313,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
             fer_k(nzmin,n)  = fer_scal(n)*K_GM_max
             ! limit lower values to K_GM_min
             fer_k(nzmin,n)  = max(fer_k(nzmin,n),K_GM_min)
-            fer_c(n)    = c1*c1                          !put to repo
+            fer_c(n)    = cm*cm                          !put to repo
         end if
         
         !_______________________________________________________________________
