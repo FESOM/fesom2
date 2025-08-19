@@ -446,6 +446,17 @@ get_target_property(FLAGS ${PROJECT_NAME} COMPILE_OPTIONS)
 message(STATUS " --> Final Compile options for ${PROJECT_NAME}: ${FLAGS}")
 
 
+# Include the AddPreprocessTarget module
+include(${CMAKE_CURRENT_LIST_DIR}/../cmake/AddPreprocessTarget.cmake)
+
+# Add preprocess target to output preprocessed source files
+# Usage: cd build; cmake --build . --target preprocess-sources
+add_preprocess_target(
+    preprocess-sources
+    "${sources_Fortran}"
+    EXCLUDE_PATTERN "fesom_version_info-generated.F90"
+)
+
 ### Export and installation
 
 fesom_export(TARGETS ${PROJECT_NAME} fesom.x ${additional_targets})
