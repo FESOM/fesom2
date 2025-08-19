@@ -180,8 +180,8 @@ add_custom_target(fesom_version_info-generated.F90 ALL
 list(REMOVE_ITEM sources_Fortran ${src_home}/fvom_init.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90)
 list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_main.F90)
 
-find_package( NETCDF REQUIRED COMPONENTS C Fortran )
 find_package( MPI REQUIRED COMPONENTS C Fortran )
+find_package( NETCDF REQUIRED COMPONENTS C Fortran )
 
 # depends on the metis library
 #add_subdirectory(../lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
@@ -193,6 +193,11 @@ add_subdirectory(async_threads_cpp)
 # fesom library
 add_library(${PROJECT_NAME} ${sources_Fortran} $<TARGET_OBJECTS:async_threads_cpp>)
 add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
+
+# Add dependency on external NetCDF if BUILD_NETCDF is enabled
+if(BUILD_NETCDF)
+    add_dependencies(${PROJECT_NAME} build_netcdf)
+endif()
 
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>)
 target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fesom>)
