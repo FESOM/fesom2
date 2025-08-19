@@ -1,0 +1,12 @@
+# Intel OneAPI Compilers environment for Ubuntu local development
+# This environment uses Intel Fortran with system GCC for C/C++
+
+# Source Intel OneAPI environment (this sets up paths and environment variables)
+source /opt/intel/oneapi/setvars.sh --force
+
+# Use Intel Fortran with system GCC (common mixed-compiler setup)
+export FC=mpiifx CC=mpicc CXX=mpicxx
+
+# Intel MKL for LAPACK
+export LAPACK_LIBRARIES="-mkl=sequential"
+export CMAKE_ARGS="-DLAPACK_LIBRARIES='${LAPACK_LIBRARIES}'"
