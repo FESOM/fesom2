@@ -237,7 +237,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
 #include "associate_mesh_ass.h"
 
     ! automatically synchronise Redi and GM coefficient when Redi_Kmax<=0
-    if (Redi_Kmax<=0) then 
+    if (Redi .and. Redi_Kmax<=0) then 
         Redi_Kmax = K_GM_max
     end if 
 
