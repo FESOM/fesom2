@@ -236,6 +236,11 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
+    ! automatically synchronise Redi and GM coefficient when Redi_Kmax<=0
+    if (Redi_Kmax<=0) then 
+        Redi_Kmax = K_GM_max
+    end if 
+
     ! fill arrays for 3D Redi and GM coefficients: F1(xy)*F2(z)
     !******************************* F1(x,y) ***********************************
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, nz, nzmax, nzmin, reso, c1, rosb, scaling, rr_ratio, aux, aux_zz, zscaling, bvref)
