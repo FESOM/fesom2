@@ -24,14 +24,6 @@ real(kind=WP)                 :: C_d= 0.0025_WP ! Bottom drag coefficient
 real(kind=WP)	              :: kappa=0.4      !von Karman's constant
 real(kind=WP)                 :: mix_coeff_PP=0.01_WP   ! mixing coef for PP scheme
 real(kind=WP)                 :: A_ver=0.001_WP ! Vertical harm. visc.
-logical                       :: uke_scaling=.true.
-real(kind=WP)                 :: uke_scaling_factor=1._WP
-real(kind=WP)		          :: rosb_dis=1._WP
-integer                       :: smooth_back=2
-integer                       :: smooth_dis=2
-integer                       :: smooth_back_tend=4
-real(kind=WP)		          :: K_back=600._WP
-real(kind=WP)                 :: c_back=0.1_8
 real(kind=WP)                 :: K_hor=10._WP
 real(kind=WP)                 :: K_ver=0.00001_WP
 real(kind=WP)                 :: scale_area=2.0e8
@@ -215,11 +207,7 @@ MODULE o_ARRAYS
 USE o_PARAM
 IMPLICIT NONE
 ! Arrays are described in subroutine array_setup
-real(kind=WP), allocatable         :: uke(:,:), v_back(:,:), uke_back(:,:), uke_dis(:,:), uke_dif(:,:)
-real(kind=WP), allocatable         :: uke_rhs(:,:), uke_rhs_old(:,:)
 !real(kind=WP), allocatable         :: UV_ib(:,:,:) ! kh 08.03.21 additional array for asynchronous iceberg computations
-real(kind=WP), allocatable         :: UV_dis_tend(:,:,:), UV_back_tend(:,:,:), UV_total_tend(:,:,:), UV_dis_tend_node(:,:,:)
-real(kind=WP), allocatable         :: UV_dis_posdef_b2(:,:), UV_dis_posdef(:,:), UV_back_posdef(:,:)
 real(kind=WP), allocatable         :: hpressure(:,:)
 real(kind=WP), allocatable         :: stress_surf(:,:)
 real(kind=WP), allocatable         :: stress_node_surf(:,:)

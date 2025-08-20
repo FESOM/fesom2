@@ -5,9 +5,9 @@ module densityJM_components_interface
       USE o_param
       real(kind=WP),  intent(IN)             :: t,s
       real(kind=WP),  intent(OUT)            :: bulk_0, bulk_pz, bulk_pz2, rhopot
-    end subroutine
+    end subroutine densityJM_components
   end interface
-end module
+end module densityJM_components_interface
 
 module density_linear_interface
   interface
@@ -16,9 +16,9 @@ module density_linear_interface
       USE o_param
       real(kind=WP),  intent(IN)             :: t,s
       real(kind=WP),  intent(OUT)            :: bulk_0, bulk_pz, bulk_pz2, rho_out
-    end subroutine
+    end subroutine density_linear
   end interface
-end module
+end module density_linear_interface
 
 module pressure_force_4_linfs_fullcell_interface
   interface
@@ -28,9 +28,9 @@ module pressure_force_4_linfs_fullcell_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
-    end subroutine
+    end subroutine pressure_force_4_linfs_fullcell
   end interface
-end module
+end module pressure_force_4_linfs_fullcell_interface
 module pressure_force_4_linfs_nemo_interface
   interface
     subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
@@ -41,9 +41,9 @@ module pressure_force_4_linfs_nemo_interface
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
       type(t_tracer), intent(in),     target :: tracers
-    end subroutine
+    end subroutine pressure_force_4_linfs_nemo
   end interface
-end module
+end module pressure_force_4_linfs_nemo_interface
 module pressure_force_4_linfs_shchepetkin_interface
   interface
     subroutine pressure_force_4_linfs_shchepetkin(partit, mesh)
@@ -52,9 +52,9 @@ module pressure_force_4_linfs_shchepetkin_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
-    end subroutine
+    end subroutine pressure_force_4_linfs_shchepetkin
   end interface
-end module
+end module pressure_force_4_linfs_shchepetkin_interface
 module pressure_force_4_linfs_easypgf_interface
   interface
     subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
@@ -65,9 +65,9 @@ module pressure_force_4_linfs_easypgf_interface
       type(t_tracer), intent(in),     target :: tracers
       type(t_partit), intent(inout),  target :: partit
       type(t_mesh),   intent(in),     target :: mesh
-    end subroutine
+    end subroutine pressure_force_4_linfs_easypgf
   end interface
-end module
+end module pressure_force_4_linfs_easypgf_interface
 module pressure_force_4_linfs_cubicspline_interface
   interface
     subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
@@ -76,9 +76,9 @@ module pressure_force_4_linfs_cubicspline_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
-    end subroutine
+    end subroutine pressure_force_4_linfs_cubicspline
   end interface
-end module
+end module pressure_force_4_linfs_cubicspline_interface
 module pressure_force_4_linfs_cavity_interface
   interface
     subroutine pressure_force_4_linfs_cavity(partit, mesh)
@@ -87,9 +87,9 @@ module pressure_force_4_linfs_cavity_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
-    end subroutine
+    end subroutine pressure_force_4_linfs_cavity
   end interface
-end module
+end module pressure_force_4_linfs_cavity_interface
 module pressure_force_4_zxxxx_shchepetkin_interface
   interface
     subroutine pressure_force_4_zxxxx_shchepetkin(partit, mesh)
@@ -98,9 +98,9 @@ module pressure_force_4_zxxxx_shchepetkin_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
-    end subroutine
+    end subroutine pressure_force_4_zxxxx_shchepetkin
   end interface
-end module
+end module pressure_force_4_zxxxx_shchepetkin_interface
 module pressure_force_4_zxxxx_easypgf_interface
   interface
     subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
@@ -111,9 +111,9 @@ module pressure_force_4_zxxxx_easypgf_interface
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
       type(t_tracer), intent(in),     target :: tracers
-    end subroutine
+    end subroutine pressure_force_4_zxxxx_easypgf
   end interface
-end module
+end module pressure_force_4_zxxxx_easypgf_interface
 module pressure_force_4_zxxxx_cubicspline_interface
   interface
     subroutine pressure_force_4_zxxxx_cubicspline(partit, mesh)
@@ -122,9 +122,9 @@ module pressure_force_4_zxxxx_cubicspline_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
-    end subroutine
+    end subroutine pressure_force_4_zxxxx_cubicspline
   end interface
-end module
+end module pressure_force_4_zxxxx_cubicspline_interface
 module init_ref_density_interface
   interface
     subroutine init_ref_density(partit, mesh)
@@ -133,9 +133,9 @@ module init_ref_density_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
-    end subroutine
+    end subroutine init_ref_density
   end interface
-end module
+end module init_ref_density_interface
 module insitu2pot_interface
   interface
     subroutine insitu2pot(tracers, partit, mesh)
@@ -146,9 +146,9 @@ module insitu2pot_interface
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
       type(t_tracer), intent(in),     target :: tracers
-    end subroutine
+    end subroutine insitu2pot
   end interface
-end module
+end module insitu2pot_interface
 module pressure_bv_interface
   interface
     subroutine pressure_bv(tracers, partit, mesh)
@@ -159,9 +159,9 @@ module pressure_bv_interface
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
       type(t_tracer), intent(in),     target :: tracers
-    end subroutine
+    end subroutine pressure_bv
   end interface
-end module
+end module pressure_bv_interface
 module pressure_force_4_linfs_interface
   interface
     subroutine pressure_force_4_linfs(tracers, partit, mesh)
@@ -172,9 +172,9 @@ module pressure_force_4_linfs_interface
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
       type(t_tracer), intent(in),     target :: tracers
-    end subroutine
+    end subroutine pressure_force_4_linfs
   end interface
-end module
+end module pressure_force_4_linfs_interface
 module pressure_force_4_zxxxx_interface
   interface
     subroutine pressure_force_4_zxxxx(tracers, partit, mesh)
@@ -185,9 +185,9 @@ module pressure_force_4_zxxxx_interface
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
       type(t_tracer), intent(in),     target :: tracers
-    end subroutine
+    end subroutine pressure_force_4_zxxxx
   end interface
-end module
+end module pressure_force_4_zxxxx_interface
 !
 !
 !===============================================================================

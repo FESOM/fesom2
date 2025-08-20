@@ -9,9 +9,9 @@ module compute_CFLz_interface
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine compute_CFLz
     end interface
-end module
+end module compute_CFLz_interface
 
 module compute_Wvel_split_interface
     interface
@@ -23,9 +23,9 @@ module compute_Wvel_split_interface
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine compute_Wvel_split
     end interface
-end module
+end module compute_Wvel_split_interface
 
 module compute_vert_vel_transpv_interface
     interface        
@@ -37,9 +37,9 @@ module compute_vert_vel_transpv_interface
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine compute_vert_vel_transpv
     end interface
-end module
+end module compute_vert_vel_transpv_interface
 
 module oce_ale_interfaces
     interface
@@ -49,7 +49,7 @@ module oce_ale_interfaces
         USE MOD_PARSUP
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine init_bottom_elem_thickness
 
         subroutine init_bottom_node_thickness(partit, mesh)
         use mod_mesh
@@ -57,7 +57,7 @@ module oce_ale_interfaces
         USE MOD_PARSUP
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine init_bottom_node_thickness
         
         subroutine init_surface_elem_depth(partit, mesh)
         use mod_mesh
@@ -65,7 +65,7 @@ module oce_ale_interfaces
         USE MOD_PARSUP
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine init_surface_elem_depth
 
         subroutine init_surface_node_depth(partit, mesh)
         use mod_mesh
@@ -73,7 +73,7 @@ module oce_ale_interfaces
         USE MOD_PARSUP
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine init_surface_node_depth
 
         subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         use mod_mesh
@@ -83,7 +83,7 @@ module oce_ale_interfaces
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine impl_vert_visc_ale
 
         subroutine update_stiff_mat_ale(partit, mesh)
         use mod_mesh
@@ -91,7 +91,7 @@ module oce_ale_interfaces
         USE MOD_PARSUP
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine update_stiff_mat_ale
 
         subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
         use mod_mesh
@@ -101,7 +101,7 @@ module oce_ale_interfaces
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine compute_ssh_rhs_ale
 
         subroutine solve_ssh_ale(dynamics, partit, mesh)
         use mod_mesh
@@ -111,7 +111,7 @@ module oce_ale_interfaces
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine solve_ssh_ale
 
         subroutine compute_hbar_ale(dynamics, partit, mesh)
         use mod_mesh
@@ -121,7 +121,7 @@ module oce_ale_interfaces
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine compute_hbar_ale
 
         subroutine vert_vel_ale(dynamics, partit, mesh)
         use mod_mesh
@@ -131,7 +131,7 @@ module oce_ale_interfaces
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine vert_vel_ale
 
         subroutine update_thickness_ale(partit, mesh)
         use mod_mesh
@@ -139,9 +139,9 @@ module oce_ale_interfaces
         USE MOD_PARSUP
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine update_thickness_ale
     end interface
-end module
+end module oce_ale_interfaces
 
 module init_ale_interface
     interface
@@ -153,9 +153,9 @@ module init_ale_interface
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine init_ale
     end interface
-end module
+end module init_ale_interface
 
 module init_thickness_ale_interface
     interface
@@ -167,9 +167,9 @@ module init_thickness_ale_interface
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine init_thickness_ale
     end interface
-end module
+end module init_thickness_ale_interface
 
 module oce_timestep_ale_interface
     interface
@@ -186,9 +186,9 @@ module oce_timestep_ale_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine oce_timestep_ale
     end interface
-end module
+end module oce_timestep_ale_interface
 
 
 ! CONTENT:
@@ -3231,6 +3231,10 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         
         if ((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) then
            friction=-C_d
+
+        else if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) then
+           friction=-C_d
+
         else
            friction=-C_d*sqrt(UV(1,nzmax-1,elem)**2+ &
                            UV(2,nzmax-1,elem)**2)

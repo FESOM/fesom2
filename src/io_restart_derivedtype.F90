@@ -14,7 +14,7 @@ module restart_derivedtype_module
             type(t_ice)   ,         intent(in), target, optional :: ice
             type(t_dyn)   ,         intent(in), target, optional :: dynamics
             type(t_tracer),         intent(in), target, optional :: tracers
-        end subroutine
+        end subroutine write_all_bin_restarts
 
         subroutine read_all_bin_restarts(path_in, partit, mesh, ice, dynamics, tracers)
             use MOD_ICE
@@ -28,9 +28,9 @@ module restart_derivedtype_module
             type(t_ice)   , intent(inout), target, optional :: ice
             type(t_dyn)   , intent(inout), target, optional :: dynamics
             type(t_tracer), intent(inout), target, optional :: tracers
-        end subroutine
+        end subroutine read_all_bin_restarts
     end interface
-end module
+end module restart_derivedtype_module
 !
 !
 !_______________________________________________________________________________
@@ -144,7 +144,7 @@ subroutine write_all_bin_restarts(ctarr, path_in, pathi_in, partit, mesh, ice, d
     end if
     !___________________________________________________________________________
     if(partit%mype == 0) close(fileunit_i)
-end subroutine
+end subroutine write_all_bin_restarts
 !
 !
 !_______________________________________________________________________________
@@ -231,4 +231,4 @@ subroutine read_all_bin_restarts(path_in, partit, mesh, ice, dynamics, tracers)
         close(fileunit)
         if (partit%mype==0) print *, achar(27)//'[33m'//'     > read derived type t_ice'//achar(27)//'[0m'
     end if
-end subroutine
+end subroutine read_all_bin_restarts
