@@ -64,6 +64,8 @@ module io_MEANDATA
 !
   integer, save                  :: io_listsize   =0
   logical, save                  :: vec_autorotate=.FALSE.
+  integer, save                  :: keep_nth_level
+
   type io_entry
         CHARACTER(len=15)        :: id        ='unknown   '
         INTEGER                  :: freq      =0
@@ -413,42 +415,48 @@ CASE ('otracers  ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'tra_'//id_string, 'pasive tracer ID='//id_string, 'n/a', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end do
 CASE ('slope_x   ')
-    call def_stream((/nl-1,  nod2D/), (/nl-1, myDim_nod2D/),  'slope_x',   'neutral slope X',    'none', slope_tapered(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream((/nl-1,  nod2D/), (/nl-1, myDim_nod2D/),  'slope_x',   'neutral slope X',    'none',          slope_tapered(1,:,:),   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('slope_y   ')
-    call def_stream((/nl-1,  nod2D/), (/nl-1, myDim_nod2D/),  'slope_y',   'neutral slope Y',    'none', slope_tapered(2,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream((/nl-1,  nod2D/), (/nl-1, myDim_nod2D/),  'slope_y',   'neutral slope Y',    'none',          slope_tapered(2,:,:),   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('slope_z   ')
-    call def_stream((/nl-1,  nod2D/), (/nl-1, myDim_nod2D/),  'slope_z',   'neutral slope Z',    'none', slope_tapered(3,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream((/nl-1,  nod2D/), (/nl-1, myDim_nod2D/),  'slope_z',   'neutral slope Z',    'none',          slope_tapered(3,:,:),   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('N2        ')
-    call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'N2',        'brunt väisälä',      '1/s2', bvfreq(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'N2',        'brunt väisälä',      '1/s2',          bvfreq(:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) 
 CASE ('Kv        ')
-    call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'Kv',        'vertical diffusivity Kv',  'm2/s', Kv(:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'Kv',        'vertical diffusivity Kv',  'm2/s',    Kv(:,:),                io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('u         ')
-    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u',         'zonal velocity','m/s',           dynamics%uv(1,:,:),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u',         'zonal velocity','m/s',                dynamics%uv(1,:,:),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('v         ')
     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v',         'meridional velocity','m/s',           dynamics%uv(2,:,:),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('unod      ')
-    call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/),'unod',      'zonal velocity at nodes', 'm/s', dynamics%uvnode(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'unod',      'zonal velocity at nodes', 'm/s',      dynamics%uvnode(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('vnod      ')
-    call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/),'vnod',      'meridional velocity at nodes', 'm/s', dynamics%uvnode(2,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'vnod',      'meridional velocity at nodes', 'm/s', dynamics%uvnode(2,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('w         ')
-    call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'w',         'vertical velocity',  'm/s',           dynamics%w(:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream((/nl,   nod2D/),  (/nl,   myDim_nod2D/),  'w',         'vertical velocity',  'm/s',           dynamics%w(:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('Av        ')
     call def_stream((/nl,   elem2D/), (/nl,   myDim_elem2D/), 'Av',        'vertical viscosity Av',  'm2/s',      Av(:,:),                io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('u1-31     ')
+    call def_stream((/31,    elem2D/), (/31, myDim_elem2D/),  'u1-31',     'horizontal velocity','m/s',           dynamics%uv(1,1:32,:),  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('v1-31     ')
+    call def_stream((/31,    elem2D/), (/31, myDim_elem2D/),  'v1-31',     'meridional velocity','m/s',           dynamics%uv(2,1:32,:),  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('w1-31     ')
+    call def_stream((/31,    nod2D/),  (/31, myDim_nod2D/),   'w1-31',     'vertical velocity',  'm/s',           dynamics%w(1:32,:),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('u_dis_tend')
     if(dynamics%opt_visc==8) then
-    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u_dis_tend',    'horizontal velocity viscosity tendency', 'm/s', UV_dis_tend(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u_dis_tend',    'horizontal velocity viscosity tendency', 'm/s',         UV_dis_tend(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('v_dis_tend')
     if(dynamics%opt_visc==8) then
-    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v_dis_tend',    'meridional velocity viscosity tendency', 'm/s', UV_dis_tend(2,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) 
+    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v_dis_tend',    'meridional velocity viscosity tendency', 'm/s',         UV_dis_tend(2,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) 
     end if
 CASE ('u_back_tend')
     if(dynamics%opt_visc==8) then    
-    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u_back_tend',    'horizontal velocity backscatter tendency', 'm2/s2', UV_back_tend(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u_back_tend',    'horizontal velocity backscatter tendency', 'm2/s2',    UV_back_tend(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('v_back_tend') 
     if(dynamics%opt_visc==8) then
-    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v_back_tend',    'meridional velocity backscatter tendency', 'm2/s2', UV_back_tend(2,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) 
+    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v_back_tend',    'meridional velocity backscatter tendency', 'm2/s2',    UV_back_tend(2,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) 
     end if
 CASE ('u_total_tend')
     if(dynamics%opt_visc==8) then
@@ -786,7 +794,7 @@ function mesh_dimname_from_dimsize(size, partit, mesh) result(name)
         name='elem'
     elseif (size==mesh%nl) then
         name='nz'
-    elseif (size==mesh%nl-1) then
+    elseif (size==mesh%nl-1 .or. size == 31) then
         name='nz1'
     elseif (size==std_dens_N) then
         name='ndens'
@@ -904,6 +912,7 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     !___________________________________________________________________________
     ! This ends definition part of the file, below filling in variables is possible
     call assert_nf( nf_enddef(entry%ncid), __LINE__)
+
     if (entry%dimname(1)=='nz') then
         call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%zbar)), __LINE__)
     elseif (entry%dimname(1)=='nz1') then
@@ -1411,6 +1420,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
     
     ! non dimension specific
     call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh)
+    
 end subroutine
 !
 !
