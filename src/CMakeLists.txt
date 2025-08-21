@@ -446,6 +446,17 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_
 add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
 target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
 
+# When BUILD_NETCDF is enabled, explicitly link NetCDF libraries to the executable
+# This ensures proper dependency propagation from the shared library
+if(BUILD_NETCDF)
+    target_link_libraries(${PROJECT_NAME}.x PRIVATE ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES})
+    # Set RPATH so the executable can find both FESOM and NetCDF libraries at runtime
+    set_target_properties(${PROJECT_NAME}.x PROPERTIES
+        INSTALL_RPATH "${CMAKE_BINARY_DIR}/external/netcdf/lib:${CMAKE_BINARY_DIR}/../lib"
+        BUILD_RPATH "${CMAKE_BINARY_DIR}/external/netcdf/lib:${CMAKE_BINARY_DIR}/../lib"
+    )
+endif()
+
 
 get_target_property(FLAGS ${PROJECT_NAME} COMPILE_OPTIONS)
 message(STATUS " --> Final Compile options for ${PROJECT_NAME}: ${FLAGS}")
