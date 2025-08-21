@@ -68,7 +68,7 @@ type(t_partit), intent(inout), target :: partit
         tot_area_nods_in_ib_elem=0.0                            ! total area associated to nodes of iceberg element
         idx_d = 0                                               ! index of level directly below or at iceberg base
 
-        ! loop over all three nodes of an element
+        ! loop over all three nodes of element
         do i=1,3
             
             ! assign node to iceberg_node
@@ -211,6 +211,7 @@ type(t_partit), intent(inout), target :: partit
     do n=1, myDim_nod2d+eDim_nod2D
         if (ulevels_nod2d(n) > 1) cycle
         if (.not.turn_off_fw) then
+                ! LA add heat fluxes here...
                 water_flux(n)  = water_flux(n) - (ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n)) !* steps_per_ib_step
         end if
     end do
