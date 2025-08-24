@@ -648,7 +648,13 @@ contains
             !___compute update of atmospheric forcing____________________________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call update_atm_forcing(n)'//achar(27)//'[0m'
             f%t0_frc = MPI_Wtime()
+#ifdef FESOM_PROFILING
+        call fesom_profiler_start("update_atm_forcing")
+#endif
             call update_atm_forcing(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
+#ifdef FESOM_PROFILING
+        call fesom_profiler_end("update_atm_forcing")
+#endif
             f%t1_frc = MPI_Wtime()
             !___compute ice step________________________________________________
             if (f%ice%ice_steps_since_upd>=f%ice%ice_ave_steps-1) then
@@ -707,12 +713,24 @@ contains
         f%t3 = MPI_Wtime()
         !___compute energy diagnostics..._______________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call compute_diagnostics(1)'//achar(27)//'[0m'
+#ifdef FESOM_PROFILING
+        call fesom_profiler_start("compute_diagnostics")
+#endif
         call compute_diagnostics(1, f%dynamics, f%tracers, f%ice, f%partit, f%mesh)
+#ifdef FESOM_PROFILING
+        call fesom_profiler_end("compute_diagnostics")
+#endif
 
         f%t4 = MPI_Wtime()
         !___prepare output______________________________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
+#ifdef FESOM_PROFILING
+        call fesom_profiler_start("output")
+#endif
         call output (n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+#ifdef FESOM_PROFILING
+        call fesom_profiler_end("output")
+#endif
 
         ! LA icebergs: 2023-05-17 
         if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
@@ -721,7 +739,13 @@ contains
         !--------------------------
 
         f%t5 = MPI_Wtime()
+#ifdef FESOM_PROFILING
+        call fesom_profiler_start("restart")
+#endif
         call restart(n, nstart, f%total_nsteps, .false., f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+#ifdef FESOM_PROFILING
+        call fesom_profiler_end("restart")
+#endif
         f%t6 = MPI_Wtime()
         
         f%rtime_fullice       = f%rtime_fullice       + f%t2 - f%t1
