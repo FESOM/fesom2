@@ -13,6 +13,7 @@
 !=============================================================================!
 
 module fesom_profiler
+    use g_config, only: runid, ResultPath
     implicit none
     private
     
@@ -246,12 +247,34 @@ contains
         integer :: unit, ierr, i, npes
         real(kind=PROF_WP), allocatable :: local_data(:), global_data(:)
         integer, allocatable :: local_counts(:), global_counts(:)
-        logical :: section_has_data
+        logical :: section_has_data, file_opened
+        character(len=300) :: stats_filename
         
         if (.not. fesom_profiler_enabled()) return
         
-        unit = 6  ! stdout
-        if (present(output_unit)) unit = output_unit
+        file_opened = .false.
+        unit = 6  ! stdout default
+        
+        if (present(output_unit)) then
+            unit = output_unit
+        else
+            ! Only rank 0 opens the stats file
+            if (mpi_rank == 0) then
+                if (trim(runid) == 'fesom') then
+                    stats_filename = trim(ResultPath) // 'fesom.stats'
+                else
+                    stats_filename = trim(ResultPath) // 'fesom.' // trim(runid) // '.stats'
+                endif
+                
+                open(newunit=unit, file=trim(stats_filename), action='write', status='replace', iostat=ierr)
+                if (ierr /= 0) then
+                    write(*,*) 'Warning: Cannot open stats file ', trim(stats_filename), ', using stdout'
+                    unit = 6
+                else
+                    file_opened = .true.
+                endif
+            endif
+        endif
         
         call MPI_Comm_size(mpi_comm, npes, ierr)
         
@@ -286,6 +309,11 @@ contains
             call print_detailed_report(unit, global_data, global_counts, npes)
         endif
         
+        ! Close the stats file if we opened it
+        if (file_opened .and. mpi_rank == 0) then
+            close(unit)
+        endif
+        
         deallocate(local_data, global_data, local_counts, global_counts)
     end subroutine fesom_profiler_report
 
@@ -300,31 +328,32 @@ contains
         
         ! Print header in FESOM style
         write(unit, '(A)') ''
-        write(unit, '(A)') repeat('_', 90)
-        write(unit, '(A)') '___FESOM2 ENHANCED PROFILING REPORT (detailed timing statistics)___'
+        write(unit, '(A)') repeat('=', 90)
+        write(unit, '(A)') '======== FESOM2 ENHANCED PROFILING REPORT (detailed timing statistics) ========'
         if (total_timesteps > 0) then
             write(unit, '(A,I0,A,I0,A)') '   ', npes, ' ranks, ', total_timesteps, ' timesteps'
         else
             write(unit, '(A,I0,A)') '   ', npes, ' MPI ranks'
         endif
-        write(unit, '(A)') repeat('_', 90)
+        write(unit, '(A)') repeat('=', 90)
         
-        ! Print detailed header matching existing FESOM style
+        ! Print detailed header with clean formatting
         write(unit, '(A)') ''
         write(unit, '(A35,A15,A15,A15,A8,A10,A8)') &
             'Section Name', 'WallTime(s)', 'Min(s)', 'Max(s)', 'Calls', 'StdDev', 'LdImb(%)'
-        write(unit, '(A)') repeat('-', 90)
+        write(unit, '(A)') repeat('-', 106)
         
         ! Print sections with all statistics
         call print_detailed_sections(unit, global_data, global_counts, npes, 0, "")
         
-        write(unit, '(A)') repeat('-', 90)
+        write(unit, '(A)') repeat('-', 106)
         write(unit, '(A)') ''
         
-        ! Load balance summary
-        write(unit, '(A)') 'LOAD BALANCE ANALYSIS:'
+        ! Load balance summary section
+        write(unit, '(A)') repeat('=', 90)
+        write(unit, '(A)') '========================== LOAD BALANCE ANALYSIS =========================='
         call print_load_balance_summary(unit, global_data, global_counts, npes)
-        write(unit, '(A)') repeat('_', 90)
+        write(unit, '(A)') repeat('=', 90)
         write(unit, '(A)') ''
         
         ! Find the total runtime from runloop or main sections
@@ -508,12 +537,55 @@ contains
         integer, intent(in) :: unit, npes
         real(kind=PROF_WP), intent(in) :: global_data(:)
         integer, intent(in) :: global_counts(:)
-        integer :: i, imbalanced_count, well_balanced_count
+        integer :: i, imbalanced_count, well_balanced_count, ignored_count, analyzed_count
         real(kind=PROF_WP) :: wall_clock_time, min_total, max_total, load_imbalance, worst_imbalance
+        real(kind=PROF_WP) :: total_runtime, threshold_time
         character(len=100) :: worst_section
+        logical :: found_total
+        
+        ! Calculate total runtime for meaningful threshold
+        total_runtime = 0.0_PROF_WP
+        found_total = .false.
+        
+        ! Search for main timing sections to determine total runtime
+        do i = 1, num_profiles
+            if (trim(profiles(i)%name) == "") cycle
+            
+            ! Look for main timing sections (same logic as benchmark summary)
+            if (index(profiles(i)%name, "runloop_total") > 0 .or. &
+                index(profiles(i)%name, "main_total") > 0 .or. &
+                index(profiles(i)%name, "fesom_total") > 0) then
+                wall_clock_time = global_data(4*i-3) / real(npes, PROF_WP)
+                if (wall_clock_time > total_runtime) then
+                    total_runtime = wall_clock_time
+                    found_total = .true.
+                endif
+            endif
+        end do
+        
+        ! If no main section found, sum up major sections
+        if (.not. found_total) then
+            do i = 1, num_profiles
+                if (trim(profiles(i)%name) == "") cycle
+                if (trim(profiles(i)%parent_name) == "") then  ! Only top-level sections
+                    wall_clock_time = global_data(4*i-3) / real(npes, PROF_WP)
+                    total_runtime = total_runtime + wall_clock_time
+                endif
+            end do
+            if (total_runtime > 0.0_PROF_WP) found_total = .true.
+        endif
+        
+        ! Set meaningful threshold: 1% of total runtime, minimum 0.01 seconds
+        if (found_total .and. total_runtime > 0.0_PROF_WP) then
+            threshold_time = max(0.01_PROF_WP, total_runtime * 0.01_PROF_WP)
+        else
+            threshold_time = 0.01_PROF_WP  ! Fallback to 0.01 seconds
+        endif
         
         imbalanced_count = 0
         well_balanced_count = 0
+        ignored_count = 0
+        analyzed_count = 0
         worst_imbalance = 0.0_PROF_WP
         worst_section = ""
         
@@ -524,7 +596,8 @@ contains
             min_total = global_data(4*i-2)
             max_total = global_data(4*i-1)
             
-            if (wall_clock_time > 0.001_PROF_WP) then  ! Only analyze significant sections
+            if (wall_clock_time > threshold_time) then  ! Only analyze meaningful sections
+                analyzed_count = analyzed_count + 1
                 load_imbalance = (max_total - min_total) / wall_clock_time * 100.0_PROF_WP
                 
                 if (load_imbalance > worst_imbalance) then
@@ -537,13 +610,20 @@ contains
                 else if (load_imbalance < 5.0_PROF_WP) then
                     well_balanced_count = well_balanced_count + 1
                 endif
+            else
+                ignored_count = ignored_count + 1
             endif
         end do
         
+        write(unit, '(A,I0,A,I0,A)') '  Analyzed sections: ', analyzed_count, ' (ignored ', ignored_count, ' minor sections)'
         write(unit, '(A,I0)') '  Well-balanced sections: ', well_balanced_count
         write(unit, '(A,I0)') '  Imbalanced sections:    ', imbalanced_count
         if (worst_imbalance > 0.0_PROF_WP) then
-            write(unit, '(A,F6.1,A,A)') '  Worst imbalance: ', worst_imbalance, '% (', trim(worst_section), ')'
+            write(unit, '(A,F6.1,A,A,A)') '  Worst imbalance: ', worst_imbalance, '% (', trim(worst_section), ')'
+        endif
+        
+        if (ignored_count > 0) then
+            write(unit, '(A,F8.4,A)') '  Note: Sections < ', threshold_time, 's (1% of total runtime) ignored (init/finalize/minor overhead)'
         endif
     end subroutine print_load_balance_summary
 
@@ -620,8 +700,8 @@ contains
         real(kind=PROF_WP), intent(in) :: total_runtime
         real(kind=PROF_WP) :: sypd, simulated_time, simulated_years
         
-        write(unit, '(A)') repeat('=', 54)
-        write(unit, '(A)') repeat('=', 16) // ' BENCHMARK RUNTIME ' // repeat('=', 19)
+        write(unit, '(A)') repeat('=', 90)
+        write(unit, '(A)') '============================ BENCHMARK RUNTIME ============================'
         write(unit, '(A,I0)') '    Number of cores :                      ', npes
         write(unit, '(A,I0)') '    Number of OMP threads per rank :      ', omp_threads
         if (total_timesteps > 0) then
@@ -637,7 +717,7 @@ contains
             write(unit, '(A,F12.4,A)') '    Estimated SYPD :                  ', sypd, ' years/day'
         endif
         
-        write(unit, '(A)') repeat('=', 54)
+        write(unit, '(A)') repeat('=', 90)
     end subroutine print_benchmark_summary
 
     !=========================================================================
