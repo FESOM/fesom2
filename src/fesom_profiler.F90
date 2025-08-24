@@ -13,15 +13,22 @@
 !=============================================================================!
 
 module fesom_profiler
-    use o_PARAM, only: WP
     implicit none
     private
+    
+    ! Define profiler-specific precision for time measurements
+    ! Use double precision to ensure compatibility with MPI_Wtime and MPI operations
+    integer, parameter :: PROF_WP = selected_real_kind(15, 307)  ! Double precision
+    
+    ! MPI data type for PROF_WP - will be set to MPI_DOUBLE_PRECISION at runtime
+    ! This ensures compatibility with our double precision timing variables
     
     ! Public interface
     public :: fesom_profiler_init, fesom_profiler_finalize
     public :: fesom_profiler_start, fesom_profiler_end
     public :: fesom_profiler_report, fesom_profiler_reset
     public :: fesom_profiler_enabled, fesom_profiler_set_timesteps
+    public :: fesom_profiler_set_timestep_size
     
     ! Maximum number of profiling sections
     integer, parameter :: MAX_PROFILE_SECTIONS = 256
@@ -29,26 +36,26 @@ module fesom_profiler
     ! Profiling statistics type
     type :: profile_stats
         character(len=100) :: name = ""
-        real(kind=WP) :: total_time = 0.0_WP
-        real(kind=WP) :: min_time = HUGE(1.0_WP)
-        real(kind=WP) :: max_time = 0.0_WP
-        real(kind=WP) :: sum_squares = 0.0_WP     ! For std deviation calculation
+        real(kind=PROF_WP) :: total_time = 0.0_PROF_WP
+        real(kind=PROF_WP) :: min_time = HUGE(1.0_PROF_WP)
+        real(kind=PROF_WP) :: max_time = 0.0_PROF_WP
+        real(kind=PROF_WP) :: sum_squares = 0.0_PROF_WP     ! For std deviation calculation
         integer :: call_count = 0
         logical :: is_active = .false.
-        real(kind=WP) :: start_time = 0.0_WP
+        real(kind=PROF_WP) :: start_time = 0.0_PROF_WP
         ! Load balance metrics (computed during finalization)
-        real(kind=WP) :: mean_time = 0.0_WP
-        real(kind=WP) :: std_dev = 0.0_WP
-        real(kind=WP) :: load_imbalance = 0.0_WP  ! (max-min)/mean * 100
-        real(kind=WP) :: efficiency = 0.0_WP      ! mean/max * 100
+        real(kind=PROF_WP) :: mean_time = 0.0_PROF_WP
+        real(kind=PROF_WP) :: std_dev = 0.0_PROF_WP
+        real(kind=PROF_WP) :: load_imbalance = 0.0_PROF_WP  ! (max-min)/mean * 100
+        real(kind=PROF_WP) :: efficiency = 0.0_PROF_WP      ! mean/max * 100
         integer :: participating_ranks = 0
         ! Call hierarchy tracking
         character(len=100) :: parent_name = ""
         integer :: nesting_level = 0
         ! Cumulative statistics across ranks
-        real(kind=WP) :: total_time_across_ranks = 0.0_WP
-        real(kind=WP) :: min_total_time = HUGE(1.0_WP)
-        real(kind=WP) :: max_total_time = 0.0_WP
+        real(kind=PROF_WP) :: total_time_across_ranks = 0.0_PROF_WP
+        real(kind=PROF_WP) :: min_total_time = HUGE(1.0_PROF_WP)
+        real(kind=PROF_WP) :: max_total_time = 0.0_PROF_WP
     end type profile_stats
     
     ! Module variables
@@ -65,6 +72,8 @@ module fesom_profiler
     ! System information
     integer, save :: total_timesteps = 0
     integer, save :: total_ranks = 0
+    real(kind=PROF_WP), save :: timestep_size = 0.0_PROF_WP  ! Model timestep in seconds
+    integer, save :: omp_threads = 1
     character(len=200), save :: system_info = ""
     
 contains
@@ -81,21 +90,28 @@ contains
         endif
         
         if (.not. profiler_enabled) return
+
+        ! Detect OpenMP thread count
+#ifdef _OPENMP
+        !$ omp_threads = omp_get_max_threads()
+#else
+        omp_threads = 1
+#endif
         
         ! Initialize all profiles
         do i = 1, MAX_PROFILE_SECTIONS
             profiles(i)%name = ""
-            profiles(i)%total_time = 0.0_WP
-            profiles(i)%min_time = HUGE(1.0_WP)
-            profiles(i)%max_time = 0.0_WP
-            profiles(i)%sum_squares = 0.0_WP
+            profiles(i)%total_time = 0.0_PROF_WP
+            profiles(i)%min_time = HUGE(1.0_PROF_WP)
+            profiles(i)%max_time = 0.0_PROF_WP
+            profiles(i)%sum_squares = 0.0_PROF_WP
             profiles(i)%call_count = 0
             profiles(i)%is_active = .false.
-            profiles(i)%start_time = 0.0_WP
-            profiles(i)%mean_time = 0.0_WP
-            profiles(i)%std_dev = 0.0_WP
-            profiles(i)%load_imbalance = 0.0_WP
-            profiles(i)%efficiency = 0.0_WP
+            profiles(i)%start_time = 0.0_PROF_WP
+            profiles(i)%mean_time = 0.0_PROF_WP
+            profiles(i)%std_dev = 0.0_PROF_WP
+            profiles(i)%load_imbalance = 0.0_PROF_WP
+            profiles(i)%efficiency = 0.0_PROF_WP
             profiles(i)%participating_ranks = 0
         end do
         
@@ -120,6 +136,15 @@ contains
         if (.not. fesom_profiler_enabled()) return
         total_timesteps = timesteps
     end subroutine fesom_profiler_set_timesteps
+
+    !=========================================================================
+    ! Set timestep size in seconds for SYPD calculation
+    !=========================================================================
+    subroutine fesom_profiler_set_timestep_size(dt_seconds)
+        real(kind=PROF_WP), intent(in) :: dt_seconds
+        if (.not. fesom_profiler_enabled()) return
+        timestep_size = dt_seconds
+    end subroutine fesom_profiler_set_timestep_size
 
     !=========================================================================
     ! Start profiling a section
@@ -178,7 +203,7 @@ contains
         character(len=*), intent(in), optional :: source_file
         integer, intent(in), optional :: line_number
         integer :: profile_index
-        real(kind=WP) :: end_time, elapsed_time
+        real(kind=PROF_WP) :: end_time, elapsed_time
         
         if (.not. fesom_profiler_enabled()) return
         
@@ -219,7 +244,7 @@ contains
         integer, intent(in) :: mpi_comm, mpi_rank
         integer, intent(in), optional :: output_unit
         integer :: unit, ierr, i, npes
-        real(kind=WP), allocatable :: local_data(:), global_data(:)
+        real(kind=PROF_WP), allocatable :: local_data(:), global_data(:)
         integer, allocatable :: local_counts(:), global_counts(:)
         logical :: section_has_data
         
@@ -244,6 +269,7 @@ contains
         end do
         
         ! Get averages for wall clock time calculation
+        ! Use MPI_DOUBLE_PRECISION since PROF_WP is double precision
         call MPI_Allreduce(local_data(1::4), global_data(1::4), num_profiles, &
                           MPI_DOUBLE_PRECISION, MPI_SUM, mpi_comm, ierr)
         call MPI_Allreduce(local_counts, global_counts, num_profiles, &
@@ -268,7 +294,7 @@ contains
     !=========================================================================
     subroutine print_detailed_report(unit, global_data, global_counts, npes)
         integer, intent(in) :: unit, npes
-        real(kind=WP), intent(in) :: global_data(:)
+        real(kind=PROF_WP), intent(in) :: global_data(:)
         integer, intent(in) :: global_counts(:)
         integer :: i
         
@@ -300,6 +326,9 @@ contains
         call print_load_balance_summary(unit, global_data, global_counts, npes)
         write(unit, '(A)') repeat('_', 90)
         write(unit, '(A)') ''
+        
+        ! Find the total runtime from runloop or main sections
+        call print_benchmark_summary_with_total_runtime(unit, global_data, global_counts, npes)
     end subroutine print_detailed_report
 
     !=========================================================================
@@ -307,12 +336,12 @@ contains
     !=========================================================================
     recursive subroutine print_detailed_sections(unit, global_data, global_counts, npes, level, parent)
         integer, intent(in) :: unit, npes, level
-        real(kind=WP), intent(in) :: global_data(:)
+        real(kind=PROF_WP), intent(in) :: global_data(:)
         integer, intent(in) :: global_counts(:)
         character(len=*), intent(in) :: parent
         integer :: i, j, total_calls
-        real(kind=WP) :: wall_clock_time, min_total, max_total, load_imbalance
-        real(kind=WP) :: mean_time, min_call_time, max_call_time, std_dev, sum_squares
+        real(kind=PROF_WP) :: wall_clock_time, min_total, max_total, load_imbalance
+        real(kind=PROF_WP) :: mean_time, min_call_time, max_call_time, std_dev, sum_squares
         character(len=100) :: display_name
         character(len=15) :: indent_prefix
         
@@ -329,7 +358,7 @@ contains
             endif
             
             ! Extract all statistics from global data
-            wall_clock_time = global_data(4*i-3) / real(npes, WP)  ! Wall clock time
+            wall_clock_time = global_data(4*i-3) / real(npes, PROF_WP)  ! Wall clock time
             min_total = global_data(4*i-2)                         ! Min total across ranks
             max_total = global_data(4*i-1)                         ! Max total across ranks
             sum_squares = global_data(4*i)                         ! Sum of squares
@@ -338,34 +367,34 @@ contains
             if (total_calls == 0) cycle
             
             ! Calculate per-call statistics
-            mean_time = wall_clock_time / real(total_calls/npes, WP)
+            mean_time = wall_clock_time / real(total_calls/npes, PROF_WP)
             
             ! Calculate min/max per-call times (approximation)
             if (total_calls > 0) then
-                min_call_time = min_total / real(max(1, total_calls/npes), WP)
-                max_call_time = max_total / real(max(1, total_calls/npes), WP)
+                min_call_time = min_total / real(max(1, total_calls/npes), PROF_WP)
+                max_call_time = max_total / real(max(1, total_calls/npes), PROF_WP)
             else
-                min_call_time = 0.0_WP
-                max_call_time = 0.0_WP
+                min_call_time = 0.0_PROF_WP
+                max_call_time = 0.0_PROF_WP
             endif
             
             ! Calculate standard deviation (use mean per-call time for high-frequency calls)
-            if (total_calls > npes .and. wall_clock_time > 0.0_WP) then
+            if (total_calls > npes .and. wall_clock_time > 0.0_PROF_WP) then
                 if (total_calls > 100) then
                     ! For high-frequency calls, use mean-based std dev to avoid overflow
-                    std_dev = (max_total - min_total) / 4.0_WP  ! Approximation: range/4 ≈ std dev
+                    std_dev = (max_total - min_total) / 4.0_PROF_WP  ! Approximation: range/4 ≈ std dev
                 else
-                    std_dev = sqrt(abs(sum_squares/real(npes,WP) - (wall_clock_time**2/real(npes,WP))))
+                    std_dev = sqrt(abs(sum_squares/real(npes,PROF_WP) - (wall_clock_time**2/real(npes,PROF_WP))))
                 endif
             else
-                std_dev = 0.0_WP
+                std_dev = 0.0_PROF_WP
             endif
             
             ! Calculate load imbalance
-            if (wall_clock_time > 0.0_WP) then
-                load_imbalance = (max_total - min_total) / wall_clock_time * 100.0_WP
+            if (wall_clock_time > 0.0_PROF_WP) then
+                load_imbalance = (max_total - min_total) / wall_clock_time * 100.0_PROF_WP
             else
-                load_imbalance = 0.0_WP
+                load_imbalance = 0.0_PROF_WP
             endif
             
             ! Create indented display name with FESOM-style hierarchy
@@ -379,7 +408,7 @@ contains
             endif
             
             ! Print line with all statistics in FESOM format (like existing output)
-            if (std_dev < 9999.0_WP) then
+            if (std_dev < 9999.0_PROF_WP) then
                 write(unit, '(A35,3F15.4,I8,F10.4,F8.1)') &
                     display_name, wall_clock_time, min_total, max_total, &
                     total_calls, std_dev, load_imbalance
@@ -400,11 +429,11 @@ contains
     !=========================================================================  
     recursive subroutine print_fesom_style_sections(unit, global_data, global_counts, npes, level, parent)
         integer, intent(in) :: unit, npes, level
-        real(kind=WP), intent(in) :: global_data(:)
+        real(kind=PROF_WP), intent(in) :: global_data(:)
         integer, intent(in) :: global_counts(:)
         character(len=*), intent(in) :: parent
         integer :: i, j, total_calls
-        real(kind=WP) :: wall_clock_time, min_total, max_total, load_imbalance
+        real(kind=PROF_WP) :: wall_clock_time, min_total, max_total, load_imbalance
         character(len=100) :: display_name
         character(len=15) :: indent_prefix
         logical :: has_children
@@ -422,7 +451,7 @@ contains
             endif
             
             ! Extract statistics
-            wall_clock_time = global_data(4*i-3) / real(npes, WP)
+            wall_clock_time = global_data(4*i-3) / real(npes, PROF_WP)
             min_total = global_data(4*i-2)
             max_total = global_data(4*i-1)
             total_calls = global_counts(i)
@@ -430,10 +459,10 @@ contains
             if (total_calls == 0) cycle
             
             ! Calculate load imbalance
-            if (wall_clock_time > 0.0_WP) then
-                load_imbalance = (max_total - min_total) / wall_clock_time * 100.0_WP
+            if (wall_clock_time > 0.0_PROF_WP) then
+                load_imbalance = (max_total - min_total) / wall_clock_time * 100.0_PROF_WP
             else
-                load_imbalance = 0.0_WP
+                load_imbalance = 0.0_PROF_WP
             endif
             
             ! Create indented display name
@@ -455,7 +484,7 @@ contains
             end do
             
             ! Print in FESOM style: "name : time" with load balance info if significant
-            if (load_imbalance > 15.0_WP) then
+            if (load_imbalance > 15.0_PROF_WP) then
                 write(unit, '(A30,A,1X,E10.3,A,F6.1,A)') &
                     display_name, ':', wall_clock_time, ' [LdImb:', load_imbalance, '%]'
             else
@@ -477,35 +506,35 @@ contains
     !=========================================================================
     subroutine print_load_balance_summary(unit, global_data, global_counts, npes)
         integer, intent(in) :: unit, npes
-        real(kind=WP), intent(in) :: global_data(:)
+        real(kind=PROF_WP), intent(in) :: global_data(:)
         integer, intent(in) :: global_counts(:)
         integer :: i, imbalanced_count, well_balanced_count
-        real(kind=WP) :: wall_clock_time, min_total, max_total, load_imbalance, worst_imbalance
+        real(kind=PROF_WP) :: wall_clock_time, min_total, max_total, load_imbalance, worst_imbalance
         character(len=100) :: worst_section
         
         imbalanced_count = 0
         well_balanced_count = 0
-        worst_imbalance = 0.0_WP
+        worst_imbalance = 0.0_PROF_WP
         worst_section = ""
         
         do i = 1, num_profiles
             if (trim(profiles(i)%name) == "" .or. global_counts(i) == 0) cycle
             
-            wall_clock_time = global_data(4*i-3) / real(npes, WP)
+            wall_clock_time = global_data(4*i-3) / real(npes, PROF_WP)
             min_total = global_data(4*i-2)
             max_total = global_data(4*i-1)
             
-            if (wall_clock_time > 0.001_WP) then  ! Only analyze significant sections
-                load_imbalance = (max_total - min_total) / wall_clock_time * 100.0_WP
+            if (wall_clock_time > 0.001_PROF_WP) then  ! Only analyze significant sections
+                load_imbalance = (max_total - min_total) / wall_clock_time * 100.0_PROF_WP
                 
                 if (load_imbalance > worst_imbalance) then
                     worst_imbalance = load_imbalance
                     worst_section = trim(profiles(i)%name)
                 endif
                 
-                if (load_imbalance > 15.0_WP) then
+                if (load_imbalance > 15.0_PROF_WP) then
                     imbalanced_count = imbalanced_count + 1
-                else if (load_imbalance < 5.0_WP) then
+                else if (load_imbalance < 5.0_PROF_WP) then
                     well_balanced_count = well_balanced_count + 1
                 endif
             endif
@@ -513,7 +542,7 @@ contains
         
         write(unit, '(A,I0)') '  Well-balanced sections: ', well_balanced_count
         write(unit, '(A,I0)') '  Imbalanced sections:    ', imbalanced_count
-        if (worst_imbalance > 0.0_WP) then
+        if (worst_imbalance > 0.0_PROF_WP) then
             write(unit, '(A,F6.1,A,A)') '  Worst imbalance: ', worst_imbalance, '% (', trim(worst_section), ')'
         endif
     end subroutine print_load_balance_summary
@@ -523,11 +552,11 @@ contains
     !=========================================================================
     subroutine print_load_balance_analysis(unit, global_data, global_counts, npes)
         integer, intent(in) :: unit, npes
-        real(kind=WP), intent(in) :: global_data(:)
+        real(kind=PROF_WP), intent(in) :: global_data(:)
         integer, intent(in) :: global_counts(:)
         integer :: i, imbalanced_sections, well_balanced_sections
-        real(kind=WP) :: total_time, min_time, max_time, mean_time, load_imbalance
-        real(kind=WP) :: worst_imbalance
+        real(kind=PROF_WP) :: total_time, min_time, max_time, mean_time, load_imbalance
+        real(kind=PROF_WP) :: worst_imbalance
         character(len=100) :: worst_section
         
         write(unit, '(A)') 'LOAD BALANCE ANALYSIS:'
@@ -535,7 +564,7 @@ contains
         
         imbalanced_sections = 0
         well_balanced_sections = 0
-        worst_imbalance = 0.0_WP
+        worst_imbalance = 0.0_PROF_WP
         worst_section = ""
         
         do i = 1, num_profiles
@@ -544,19 +573,19 @@ contains
             total_time = global_data(4*i-3)
             min_time = global_data(4*i-2)
             max_time = global_data(4*i-1)
-            mean_time = total_time / real(npes, WP)
+            mean_time = total_time / real(npes, PROF_WP)
             
-            if (mean_time > 0.001_WP) then  ! Only analyze sections with significant time
-                load_imbalance = (max_time - min_time) / mean_time * 100.0_WP
+            if (mean_time > 0.001_PROF_WP) then  ! Only analyze sections with significant time
+                load_imbalance = (max_time - min_time) / mean_time * 100.0_PROF_WP
                 
                 if (load_imbalance > worst_imbalance) then
                     worst_imbalance = load_imbalance
                     worst_section = trim(profiles(i)%name)
                 endif
                 
-                if (load_imbalance > 15.0_WP) then
+                if (load_imbalance > 15.0_PROF_WP) then
                     imbalanced_sections = imbalanced_sections + 1
-                else if (load_imbalance < 5.0_WP) then
+                else if (load_imbalance < 5.0_PROF_WP) then
                     well_balanced_sections = well_balanced_sections + 1
                 endif
             endif
@@ -565,7 +594,7 @@ contains
         write(unit, '(A,I0)') '  Well-balanced sections (< 5% imbalance): ', well_balanced_sections
         write(unit, '(A,I0)') '  Imbalanced sections (> 15% imbalance):   ', imbalanced_sections
         write(unit, '(A,F6.1,A)') '  Worst load imbalance: ', worst_imbalance, '%'
-        if (worst_imbalance > 0.0_WP) then
+        if (worst_imbalance > 0.0_PROF_WP) then
             write(unit, '(A,A)') '  Worst section: ', trim(worst_section)
         endif
         write(unit, '(A)') ''
@@ -581,6 +610,84 @@ contains
         endif
         write(unit, '(A)') ''
     end subroutine print_load_balance_analysis
+
+    !=========================================================================
+    ! Print benchmark summary in FESOM style
+    !=========================================================================
+    subroutine print_benchmark_summary(unit, global_data, npes, total_runtime)
+        integer, intent(in) :: unit, npes
+        real(kind=PROF_WP), intent(in) :: global_data(:)
+        real(kind=PROF_WP), intent(in) :: total_runtime
+        real(kind=PROF_WP) :: sypd, simulated_time, simulated_years
+        
+        write(unit, '(A)') repeat('=', 54)
+        write(unit, '(A)') repeat('=', 16) // ' BENCHMARK RUNTIME ' // repeat('=', 19)
+        write(unit, '(A,I0)') '    Number of cores :                      ', npes
+        write(unit, '(A,I0)') '    Number of OMP threads per rank :      ', omp_threads
+        if (total_timesteps > 0) then
+            write(unit, '(A,I0)') '    Number of timesteps :                  ', total_timesteps
+        endif
+        write(unit, '(A,F12.4,A)') '    Runtime for all timesteps :      ', total_runtime, ' sec'
+        
+        ! Calculate SYPD (Simulated Years Per Day) if we have timestep info
+        if (total_timesteps > 0 .and. timestep_size > 0.0_PROF_WP .and. total_runtime > 0.0_PROF_WP) then
+            simulated_time = timestep_size * real(total_timesteps, PROF_WP)  ! seconds
+            simulated_years = simulated_time / (365.25_PROF_WP * 86400.0_PROF_WP)  ! years (accounting for leap years)
+            sypd = simulated_years / (total_runtime / 86400.0_PROF_WP)  ! years per day
+            write(unit, '(A,F12.4,A)') '    Estimated SYPD :                  ', sypd, ' years/day'
+        endif
+        
+        write(unit, '(A)') repeat('=', 54)
+    end subroutine print_benchmark_summary
+
+    !=========================================================================
+    ! Helper function to find total runtime and call benchmark summary
+    !=========================================================================
+    subroutine print_benchmark_summary_with_total_runtime(unit, global_data, global_counts, npes)
+        integer, intent(in) :: unit, npes
+        real(kind=PROF_WP), intent(in) :: global_data(:)
+        integer, intent(in) :: global_counts(:)
+        integer :: i
+        real(kind=PROF_WP) :: total_runtime, wall_clock_time
+        logical :: found_total
+        
+        ! Look for total runtime from main sections
+        total_runtime = 0.0_PROF_WP
+        found_total = .false.
+        
+        ! Search for common main section names
+        do i = 1, num_profiles
+            if (trim(profiles(i)%name) == "") cycle
+            
+            ! Look for main timing sections
+            if (index(profiles(i)%name, "runloop_total") > 0 .or. &
+                index(profiles(i)%name, "main_total") > 0 .or. &
+                index(profiles(i)%name, "fesom_total") > 0) then
+                wall_clock_time = global_data(4*i-3) / real(npes, PROF_WP)
+                if (wall_clock_time > total_runtime) then
+                    total_runtime = wall_clock_time
+                    found_total = .true.
+                endif
+            endif
+        end do
+        
+        ! If no main section found, sum up major sections
+        if (.not. found_total) then
+            do i = 1, num_profiles
+                if (trim(profiles(i)%name) == "") cycle
+                if (trim(profiles(i)%parent_name) == "") then  ! Only top-level sections
+                    wall_clock_time = global_data(4*i-3) / real(npes, PROF_WP)
+                    total_runtime = total_runtime + wall_clock_time
+                endif
+            end do
+            if (total_runtime > 0.0_PROF_WP) found_total = .true.
+        endif
+        
+        ! Print benchmark summary if we found a reasonable total runtime
+        if (found_total .and. total_runtime > 0.001_PROF_WP) then
+            call print_benchmark_summary(unit, global_data, npes, total_runtime)
+        endif
+    end subroutine print_benchmark_summary_with_total_runtime
 
     !=========================================================================
     ! Finalize profiler and generate final report
@@ -604,10 +711,10 @@ contains
         if (.not. fesom_profiler_enabled()) return
         
         do i = 1, num_profiles
-            profiles(i)%total_time = 0.0_WP
-            profiles(i)%min_time = HUGE(1.0_WP)
-            profiles(i)%max_time = 0.0_WP
-            profiles(i)%sum_squares = 0.0_WP
+            profiles(i)%total_time = 0.0_PROF_WP
+            profiles(i)%min_time = HUGE(1.0_PROF_WP)
+            profiles(i)%max_time = 0.0_PROF_WP
+            profiles(i)%sum_squares = 0.0_PROF_WP
             profiles(i)%call_count = 0
             profiles(i)%is_active = .false.
         end do
@@ -631,10 +738,10 @@ contains
             num_profiles = num_profiles + 1
             index = num_profiles
             profiles(index)%name = trim(name)
-            profiles(index)%total_time = 0.0_WP
-            profiles(index)%min_time = HUGE(1.0_WP)
-            profiles(index)%max_time = 0.0_WP
-            profiles(index)%sum_squares = 0.0_WP
+            profiles(index)%total_time = 0.0_PROF_WP
+            profiles(index)%min_time = HUGE(1.0_PROF_WP)
+            profiles(index)%max_time = 0.0_PROF_WP
+            profiles(index)%sum_squares = 0.0_PROF_WP
             profiles(index)%call_count = 0
             profiles(index)%is_active = .false.
         else

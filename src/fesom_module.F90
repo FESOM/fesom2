@@ -214,6 +214,8 @@ contains
         f%total_nsteps=fesom_total_nsteps
 #ifdef FESOM_PROFILING
         call fesom_profiler_set_timesteps(fesom_total_nsteps)
+        ! Set timestep size in seconds for SYPD calculation: 86400 seconds/day / steps_per_day
+        call fesom_profiler_set_timestep_size(86400.0d0 / real(step_per_day, kind=8))
 #endif
         
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call mesh_setup'//achar(27)//'[0m'
