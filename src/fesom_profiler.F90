@@ -337,16 +337,43 @@ contains
         endif
         write(unit, '(A)') repeat('=', 90)
         
+        ! Add comprehensive explanation section
+        write(unit, '(A)') ''
+        write(unit, '(A)') 'METRICS EXPLANATION:'
+        write(unit, '(A)') '-------------------'
+        write(unit, '(A)') 'WallTime(s): Average wall clock time across all MPI ranks'
+        write(unit, '(A)') 'Min(s)/Max(s): Fastest/slowest total time among all ranks'
+        write(unit, '(A)') 'Calls: Total number of function calls across all ranks'
+        write(unit, '(A)') ''
+        write(unit, '(A)') 'LOAD BALANCE METRICS:'
+        write(unit, '(A)') 'RngImb(%) = (Max - Min) / Mean × 100  [Range-based imbalance]'
+        write(unit, '(A)') '  → How much slower is the worst rank vs average?'
+        write(unit, '(A)') '  → Critical for HPC: slowest rank determines completion time'
+        write(unit, '(A)') 'StdImb(%) = StdDev / Mean × 100       [Distribution-based imbalance]'
+        write(unit, '(A)') '  → Overall variability across all ranks (coefficient of variation)'
+        write(unit, '(A)') '  → Shows whether imbalance affects few ranks or is widespread'
+        write(unit, '(A)') ''
+        write(unit, '(A)') 'INTERPRETATION EXAMPLES:'
+        write(unit, '(A)') '• High RngImb + Low StdImb  → One outlier rank, others well-balanced'
+        write(unit, '(A)') '• High RngImb + High StdImb → General imbalance across many ranks'
+        write(unit, '(A)') '• Low RngImb + High StdImb  → Multiple performance clusters, no single outlier'
+        write(unit, '(A)') ''
+        if (total_timesteps > 0 .and. timestep_size > 0.0_PROF_WP) then
+            write(unit, '(A,F8.1,A)') 'SYPD CALCULATION: Simulated Years Per Day = (timestep_size_seconds × timesteps) / (365.25 × runtime_seconds)'
+            write(unit, '(A,F8.1,A,I0,A)') '  → Based on ', timestep_size, 's timesteps, ', total_timesteps, ' steps total'
+        endif
+        write(unit, '(A)') repeat('=', 90)
+        
         ! Print detailed header with clean formatting
         write(unit, '(A)') ''
-        write(unit, '(A35,A15,A15,A15,A8,A10,A8)') &
-            'Section Name', 'WallTime(s)', 'Min(s)', 'Max(s)', 'Calls', 'StdDev', 'LdImb(%)'
-        write(unit, '(A)') repeat('-', 106)
+        write(unit, '(A35,A15,A15,A15,A8,A10,A10)') &
+            'Section Name', 'WallTime(s)', 'Min(s)', 'Max(s)', 'Calls', 'RngImb(%)', 'StdImb(%)'
+        write(unit, '(A)') repeat('-', 108)
         
         ! Print sections with all statistics
         call print_detailed_sections(unit, global_data, global_counts, npes, 0, "")
         
-        write(unit, '(A)') repeat('-', 106)
+        write(unit, '(A)') repeat('-', 108)
         write(unit, '(A)') ''
         
         ! Load balance summary section
@@ -370,7 +397,7 @@ contains
         character(len=*), intent(in) :: parent
         integer :: i, j, total_calls
         real(kind=PROF_WP) :: wall_clock_time, min_total, max_total, load_imbalance
-        real(kind=PROF_WP) :: mean_time, min_call_time, max_call_time, std_dev, sum_squares
+        real(kind=PROF_WP) :: mean_time, min_call_time, max_call_time, std_dev, sum_squares, std_imbalance
         character(len=100) :: display_name
         character(len=15) :: indent_prefix
         
@@ -436,16 +463,23 @@ contains
                 write(display_name, '(A,A)') trim(indent_prefix), trim(profiles(i)%name)
             endif
             
-            ! Print line with all statistics in FESOM format (like existing output)
+            ! Calculate std imbalance as percentage of mean
+            if (wall_clock_time > 0.0_PROF_WP) then
+                std_imbalance = (std_dev / wall_clock_time) * 100.0_PROF_WP
+            else
+                std_imbalance = 0.0_PROF_WP
+            endif
+            
+            ! Print line with dual load balance metrics
             if (std_dev < 9999.0_PROF_WP) then
-                write(unit, '(A35,3F15.4,I8,F10.4,F8.1)') &
+                write(unit, '(A35,3F15.4,I8,F10.1,F10.1)') &
                     display_name, wall_clock_time, min_total, max_total, &
-                    total_calls, std_dev, load_imbalance
+                    total_calls, load_imbalance, std_imbalance
             else
                 ! Handle overflow for high-frequency calls
-                write(unit, '(A35,3F15.4,I8,A10,F8.1)') &
+                write(unit, '(A35,3F15.4,I8,A10,A10)') &
                     display_name, wall_clock_time, min_total, max_total, &
-                    total_calls, '    N/A   ', load_imbalance
+                    total_calls, '     N/A  ', '     N/A  '
             endif
             
             ! Recursively print children with increased indentation
