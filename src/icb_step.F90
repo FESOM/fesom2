@@ -1038,6 +1038,8 @@ end subroutine depth_bathy
 
 subroutine parallel2coast(mesh, partit,u, v, lon,lat, elem, ib, elem_global)
  use iceberg_params, only: coastal_nodes
+ use g_config, only: lverbose_icb
+ 
  implicit none
  
  real, intent(inout) 	:: u, v 	!velocity
@@ -1064,7 +1066,7 @@ type(t_partit), intent(inout), target :: partit
     fld_tmp =  count( (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
   end if
  
-  if( licb_versbose ) then
+  if( lverbose_icb ) then
     write(*,*) " - running parallel2coast for  IB ",ib," on elem ",elem_global,", fld_tmp=",fld_tmp
     write(*,*) " - u_old, v_old =",u,v
   end if
@@ -1165,7 +1167,7 @@ type(t_partit), intent(inout), target :: partit
  
  u = velocity(1)
  v = velocity(2)
-  if( licb_versbose ) then
+  if( lverbose_icb ) then
     write(*,*) " - u_new, v_new =",u,v
   end if
 
