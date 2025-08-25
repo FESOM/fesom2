@@ -325,6 +325,8 @@ contains
         real(kind=PROF_WP), intent(in) :: global_data(:)
         integer, intent(in) :: global_counts(:)
         integer :: i
+        real(kind=PROF_WP) :: total_runtime_for_percent, wall_clock_time
+        logical :: found_total_for_percent
         
         ! Print header in FESOM style
         write(unit, '(A)') ''
@@ -341,9 +343,15 @@ contains
         write(unit, '(A)') ''
         write(unit, '(A)') 'METRICS EXPLANATION:'
         write(unit, '(A)') '-------------------'
-        write(unit, '(A)') 'WallTime(s): Average wall clock time across all MPI ranks'
+        write(unit, '(A)') 'Mean(s): Average wall clock time across all MPI ranks'
         write(unit, '(A)') 'Min(s)/Max(s): Fastest/slowest total time among all ranks'
         write(unit, '(A)') 'Calls: Total number of function calls across all ranks'
+        write(unit, '(A)') ''
+        write(unit, '(A)') 'PERCENTAGE METRICS:'
+        write(unit, '(A)') '%Total: Percentage of absolute total runtime (init + runloop + finalize)'
+        write(unit, '(A)') '%Parent: Percentage relative to immediate parent section'
+        write(unit, '(A)') '  → Top-level: same as %Total (relative to absolute total)'
+        write(unit, '(A)') '  → Nested: relative to parent (e.g., oce_mix_pres % of oce_timestep_ale)'
         write(unit, '(A)') ''
         write(unit, '(A)') 'LOAD BALANCE METRICS:'
         write(unit, '(A)') 'RngImb(%) = (Max - Min) / Mean × 100  [Range-based imbalance]'
@@ -366,14 +374,32 @@ contains
         
         ! Print detailed header with clean formatting
         write(unit, '(A)') ''
-        write(unit, '(A35,A15,A15,A15,A8,A10,A10)') &
-            'Section Name', 'WallTime(s)', 'Min(s)', 'Max(s)', 'Calls', 'RngImb(%)', 'StdImb(%)'
-        write(unit, '(A)') repeat('-', 108)
+        write(unit, '(A35,A15,A15,A15,A8,A8,A8,A10,A10)') &
+            'Section Name', 'Mean(s)', 'Min(s)', 'Max(s)', 'Calls', '%Total', '%Parent', 'RngImb(%)', 'StdImb(%)'
+        write(unit, '(A)') repeat('-', 124)
+        
+        ! Calculate absolute total runtime (sum of all top-level sections)
+        total_runtime_for_percent = 0.0_PROF_WP
+        
+        do i = 1, num_profiles
+            if (trim(profiles(i)%name) == "") cycle
+            
+            ! Only sum top-level sections (those with no parent)
+            if (trim(profiles(i)%parent_name) == "") then
+                wall_clock_time = global_data(4*i-3) / real(npes, PROF_WP)
+                total_runtime_for_percent = total_runtime_for_percent + wall_clock_time
+            endif
+        end do
+        
+        ! Fallback to avoid division by zero
+        if (total_runtime_for_percent <= 0.0_PROF_WP) then
+            total_runtime_for_percent = 1.0_PROF_WP
+        endif
         
         ! Print sections with all statistics
-        call print_detailed_sections(unit, global_data, global_counts, npes, 0, "")
+        call print_detailed_sections(unit, global_data, global_counts, npes, 0, "", total_runtime_for_percent, total_runtime_for_percent)
         
-        write(unit, '(A)') repeat('-', 108)
+        write(unit, '(A)') repeat('-', 124)
         write(unit, '(A)') ''
         
         ! Load balance summary section
@@ -390,14 +416,17 @@ contains
     !=========================================================================
     ! Print detailed sections with all statistics and hierarchy
     !=========================================================================
-    recursive subroutine print_detailed_sections(unit, global_data, global_counts, npes, level, parent)
+    recursive subroutine print_detailed_sections(unit, global_data, global_counts, npes, level, parent, total_runtime, parent_runtime)
         integer, intent(in) :: unit, npes, level
         real(kind=PROF_WP), intent(in) :: global_data(:)
         integer, intent(in) :: global_counts(:)
         character(len=*), intent(in) :: parent
+        real(kind=PROF_WP), intent(in) :: total_runtime
+        real(kind=PROF_WP), intent(in), optional :: parent_runtime
         integer :: i, j, total_calls
         real(kind=PROF_WP) :: wall_clock_time, min_total, max_total, load_imbalance
         real(kind=PROF_WP) :: mean_time, min_call_time, max_call_time, std_dev, sum_squares, std_imbalance
+        real(kind=PROF_WP) :: percent_total, percent_parent, current_parent_runtime
         character(len=100) :: display_name
         character(len=15) :: indent_prefix
         
@@ -470,20 +499,35 @@ contains
                 std_imbalance = 0.0_PROF_WP
             endif
             
-            ! Print line with dual load balance metrics
+            ! Calculate percentage of absolute total runtime
+            if (total_runtime > 0.0_PROF_WP) then
+                percent_total = (wall_clock_time / total_runtime) * 100.0_PROF_WP
+            else
+                percent_total = 0.0_PROF_WP
+            endif
+            
+            ! Calculate percentage relative to parent
+            if (present(parent_runtime) .and. parent_runtime > 0.0_PROF_WP) then
+                percent_parent = (wall_clock_time / parent_runtime) * 100.0_PROF_WP
+            else
+                ! For top-level sections, parent % same as total %
+                percent_parent = percent_total
+            endif
+            
+            ! Print line with dual percentages and dual load balance metrics
             if (std_dev < 9999.0_PROF_WP) then
-                write(unit, '(A35,3F15.4,I8,F10.1,F10.1)') &
+                write(unit, '(A35,3F15.4,I8,F8.1,F8.1,F10.1,F10.1)') &
                     display_name, wall_clock_time, min_total, max_total, &
-                    total_calls, load_imbalance, std_imbalance
+                    total_calls, percent_total, percent_parent, load_imbalance, std_imbalance
             else
                 ! Handle overflow for high-frequency calls
-                write(unit, '(A35,3F15.4,I8,A10,A10)') &
+                write(unit, '(A35,3F15.4,I8,A8,A8,A10,A10)') &
                     display_name, wall_clock_time, min_total, max_total, &
-                    total_calls, '     N/A  ', '     N/A  '
+                    total_calls, '   N/A ', '   N/A ', '     N/A  ', '     N/A  '
             endif
             
             ! Recursively print children with increased indentation
-            call print_detailed_sections(unit, global_data, global_counts, npes, level+1, profiles(i)%name)
+            call print_detailed_sections(unit, global_data, global_counts, npes, level+1, profiles(i)%name, total_runtime, wall_clock_time)
         end do
     end subroutine print_detailed_sections
     
