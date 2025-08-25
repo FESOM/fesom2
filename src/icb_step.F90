@@ -412,11 +412,12 @@ type(t_dyn)   , intent(inout), target :: dynamics
    
    
    if (use_cavity) then
-      reject_tmp = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0.0) )
+      reject_tmp = any(mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0) .OR. all(mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0.0) 
+      !reject_tmp = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0.0) )
       if(reject_tmp) then
-!       write(*,*) " * set IB elem ",iceberg_elem,"to zero for IB=",ib
-!       write(*,*) " cavity: ",all((mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0))
-!       write(*,*) " boundary: ", all(mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==1)
+       write(*,*) " * set IB elem ",iceberg_elem,"to zero for IB=",ib
+       write(*,*) " cavity: ",all((mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0))
+       write(*,*) " boundary: ", all(mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0)
        iceberg_elem=0 !reject element
        i_have_element=.false.
       else 
@@ -429,9 +430,9 @@ type(t_dyn)   , intent(inout), target :: dynamics
   call com_integer(partit, i_have_element,iceberg_elem)
  
   if(iceberg_elem .EQ. 0) then
-        write(*,*) 'IB ',ib,' rot. coords:', lon_deg, lat_deg !,lon_rad, lat_rad
-   	call par_ex (partit%MPI_COMM_FESOM, partit%mype)
-   	stop 'ICEBERG OUTSIDE MODEL DOMAIN OR IN ICE SHELF REGION'
+    write(*,*) 'IB ',ib,' rot. coords:', lon_deg, lat_deg !,lon_rad, lat_rad
+    call par_ex (partit%MPI_COMM_FESOM, partit%mype)
+    stop 'ICEBERG OUTSIDE MODEL DOMAIN OR IN ICE SHELF REGION'
   end if
   
   ! initialize the iceberg velocity
@@ -534,7 +535,8 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
    lon_rad = old_lon
    lat_rad = old_lat
  t4=MPI_Wtime()
-   call parallel2coast(mesh,partit, new_u_ib, new_v_ib, lon_rad,lat_rad, local_idx_of(iceberg_elem))
+   ! LA: Does this work corretly?
+   call parallel2coast(mesh,partit, new_u_ib, new_v_ib, lon_rad,lat_rad, local_idx_of(iceberg_elem), ib, iceberg_elem)
  t5=MPI_Wtime()
    call trajectory( lon_rad,lat_rad, new_u_ib,new_v_ib, new_u_ib,new_v_ib, &
 		   lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
@@ -1034,14 +1036,16 @@ end subroutine depth_bathy
 !****************************************************************************************************************************
 !****************************************************************************************************************************
 
-subroutine parallel2coast(mesh, partit,u, v, lon,lat, elem)
+subroutine parallel2coast(mesh, partit,u, v, lon,lat, elem, ib, elem_global)
  use iceberg_params, only: coastal_nodes
+ use g_config, only: lverbose_icb
+ 
  implicit none
  
  real, intent(inout) 	:: u, v 	!velocity
  real, intent(in)	:: lon, lat 	!radiant
  integer, intent(in)	:: elem
- 
+ integer, intent(in)    :: ib, elem_global
  integer :: fld_tmp
  integer, dimension(3) :: n
  integer :: node, m, i
@@ -1054,14 +1058,19 @@ type(t_partit), intent(inout), target :: partit
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-  
+ 
   if( use_cavity ) then
     !fld_tmp = coastal_nodes(mesh, partit, elem)
     fld_tmp =  count( (mesh%cavity_depth(mesh%elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
   else
     fld_tmp =  count( (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
   end if
-  
+ 
+  if( lverbose_icb ) then
+    write(*,*) " - running parallel2coast for  IB ",ib," on elem ",elem_global,", fld_tmp=",fld_tmp
+    write(*,*) " - u_old, v_old =",u,v
+  end if
+
   SELECT CASE ( fld_tmp ) !num of coastal points
    CASE (0) !...coastal points: do nothing
     return
@@ -1080,7 +1089,7 @@ type(t_partit), intent(inout), target :: partit
          exit
         end if 
       else
-        if( mesh%bc_index_nod2D(node)==1 ) then
+        if( mesh%bc_index_nod2D(node)==0.0 ) then
          n(i) = node
          exit
         end if 
@@ -1090,21 +1099,24 @@ type(t_partit), intent(inout), target :: partit
    !write(*,*) 'one coastal node ', n(1)
   
   !LA comment for testing
-   !i = 2 
+   i = 2 
    !if ( n(1) <= myDim_nod2D ) then	!all neighbours known
-
-   ! do m = 1, nghbr_nod2D(n(1))%nmb
-   !   node = nghbr_nod2D(n(1))%addresses(m) 
-!#ifdef use_cavity
-   !   if ( (node /= n(1)) .and. ( (bc_index_nod2D(node)==1) .OR. (cavity_flag_nod2d(node)==1) ) ) then   
-!#else
-   !   if ( (node /= n(1)) .and. (bc_index_nod2D(node)==1)) then
-!#endif
-   !    n(i) = node
-   !    i = i+1
-   !    if(i==4) exit
-   !   end if
-   ! end do
+    do m = 1, 3 !nghbr_nod2D(n(1))%nmb
+      node = mesh%elem2D_nodes(m,elem)
+      if( use_cavity ) then
+        if ( (node /= n(1)) .and. ( (mesh%bc_index_nod2D(node)==0.0) .OR. (mesh%cavity_depth(node)/=0.0) ) ) then   
+            n(i) = node
+            i = i+1
+            if(i==4) exit
+        end if
+      else
+        if ( (node /= n(1)) .and. ( (mesh%bc_index_nod2D(node)==0.0))) then
+            n(i) = node
+            i = i+1
+            if(i==4) exit
+        end if
+      end if
+    end do
     
     !write(*,*) 'nodes n(i) ', n
     
@@ -1139,7 +1151,7 @@ type(t_partit), intent(inout), target :: partit
          i = i+1
         end if
       else
-        if( mesh%bc_index_nod2D(node)==1 ) then
+        if( mesh%bc_index_nod2D(node)==0.0 ) then
          n(i) = node
          i = i+1
         end if
@@ -1155,6 +1167,9 @@ type(t_partit), intent(inout), target :: partit
  
  u = velocity(1)
  v = velocity(2)
+  if( lverbose_icb ) then
+    write(*,*) " - u_new, v_new =",u,v
+  end if
 
 end subroutine parallel2coast
 

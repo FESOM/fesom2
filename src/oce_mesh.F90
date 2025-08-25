@@ -2731,16 +2731,16 @@ DO elem=1,myDim_elem2D
 END DO
 deallocate(center_y, center_x)
 
-!     !array of 2D boundary conditions is used in ice_maEVP
-!     if (whichEVP > 0) then
-!        allocate(mesh%bc_index_nod2D(myDim_nod2D+eDim_nod2D))
-!        mesh%bc_index_nod2D=1._WP
-!        do n=1, myDim_edge2D
-!           ed=mesh%edges(:, n)
-!           if (myList_edge2D(n) <= mesh%edge2D_in) cycle
-!           mesh%bc_index_nod2D(ed)=0._WP
-!        end do
-!     end if
+     !!array of 2D boundary conditions is used in ice_maEVP
+     !if (ice%whichEVP > 0) then
+     !   allocate(mesh%bc_index_nod2D(myDim_nod2D+eDim_nod2D))
+     !   mesh%bc_index_nod2D=1._WP
+     !   do n=1, myDim_edge2D
+     !      ed=mesh%edges(:, n)
+     !      if (myList_edge2D(n) <= mesh%edge2D_in) cycle
+     !      mesh%bc_index_nod2D(ed)=0._WP
+     !   end do
+     !end if
 
 #if defined (__oasis)
   nn=0
