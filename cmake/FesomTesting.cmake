@@ -364,32 +364,63 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
     
     if(FESOM_TEST_MPI_TEST AND FESOM_TEST_NP GREATER 1)
         # MPI test
-        file(GENERATE OUTPUT ${TEST_SCRIPT} CONTENT "
-            # Create test directories
-            file(MAKE_DIRECTORY \"${TEST_RUN_DIR}\")
-            file(MAKE_DIRECTORY \"${RESULT_DIR}\")
-            
-            # Run FESOM with MPI
-            execute_process(
-                COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${FESOM_TEST_NP} ${CMAKE_BINARY_DIR}/bin/fesom.x
-                WORKING_DIRECTORY \"${TEST_RUN_DIR}\"
-                RESULT_VARIABLE test_result
-                OUTPUT_VARIABLE test_output
-                ERROR_VARIABLE test_error
-                TIMEOUT ${FESOM_TEST_TIMEOUT}
-            )
+        if(FESOM_MPIPROFILING)
+            # MPI test with mpiP profiling
+            file(GENERATE OUTPUT ${TEST_SCRIPT} CONTENT "
+                # Create test directories
+                file(MAKE_DIRECTORY \"${TEST_RUN_DIR}\")
+                file(MAKE_DIRECTORY \"${RESULT_DIR}\")
+                
+                # Run FESOM with MPI and mpiP profiling
+                execute_process(
+                    COMMAND ${CMAKE_COMMAND} -E env MPIP=-g\\ -v ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${FESOM_TEST_NP} ${CMAKE_BINARY_DIR}/bin/fesom.x
+                    WORKING_DIRECTORY \"${TEST_RUN_DIR}\"
+                    RESULT_VARIABLE test_result
+                    OUTPUT_VARIABLE test_output
+                    ERROR_VARIABLE test_error
+                    TIMEOUT ${FESOM_TEST_TIMEOUT}
+                )
             
             # Log the output
             file(WRITE \"${TEST_RUN_DIR}/test_output.log\" \"\${test_output}\")
             file(WRITE \"${TEST_RUN_DIR}/test_error.log\" \"\${test_error}\")
             
-            # Check result (accept certain error codes as success for initial setup tests)
-            if(test_result EQUAL 0 OR test_result EQUAL 1)
-                message(STATUS \"Test ${TEST_NAME} completed (exit code: \${test_result})\")
-            else()
-                message(FATAL_ERROR \"Test ${TEST_NAME} failed with exit code: \${test_result}\")
-            endif()
-        ")
+                # Check result (accept certain error codes as success for initial setup tests)
+                if(test_result EQUAL 0 OR test_result EQUAL 1)
+                    message(STATUS \"Test ${TEST_NAME} completed (exit code: \${test_result})\")
+                else()
+                    message(FATAL_ERROR \"Test ${TEST_NAME} failed with exit code: \${test_result}\")
+                endif()
+            ")
+        else()
+            # MPI test without mpiP profiling
+            file(GENERATE OUTPUT ${TEST_SCRIPT} CONTENT "
+                # Create test directories
+                file(MAKE_DIRECTORY \"${TEST_RUN_DIR}\")
+                file(MAKE_DIRECTORY \"${RESULT_DIR}\")
+                
+                # Run FESOM with MPI
+                execute_process(
+                    COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${FESOM_TEST_NP} ${CMAKE_BINARY_DIR}/bin/fesom.x
+                    WORKING_DIRECTORY \"${TEST_RUN_DIR}\"
+                    RESULT_VARIABLE test_result
+                    OUTPUT_VARIABLE test_output
+                    ERROR_VARIABLE test_error
+                    TIMEOUT ${FESOM_TEST_TIMEOUT}
+                )
+                
+                # Log the output
+                file(WRITE \"${TEST_RUN_DIR}/test_output.log\" \"\${test_output}\")
+                file(WRITE \"${TEST_RUN_DIR}/test_error.log\" \"\${test_error}\")
+                
+                # Check result (accept certain error codes as success for initial setup tests)
+                if(test_result EQUAL 0 OR test_result EQUAL 1)
+                    message(STATUS \"Test ${TEST_NAME} completed (exit code: \${test_result})\")
+                else()
+                    message(FATAL_ERROR \"Test ${TEST_NAME} failed with exit code: \${test_result}\")
+                endif()
+            ")
+        endif()
     else()
         # Serial test
         file(GENERATE OUTPUT ${TEST_SCRIPT} CONTENT "
