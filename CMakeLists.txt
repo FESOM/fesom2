@@ -24,6 +24,25 @@ set(OASIS_WITH_YAC OFF CACHE BOOL "Useing a version of OASIS compiled with YAC i
 set(ASYNC_ICEBERGS ON CACHE BOOL "compile fesom with or without support for asynchronous iceberg computations")
 set(VERBOSE OFF CACHE BOOL "toggle debug output")
 set(FESOM_PROFILING OFF CACHE BOOL "Enable enhanced profiling system")
+set(FESOM_MPIPROFILING OFF CACHE BOOL "Enable MPI communication profiling with mpiP library")
+
+# Configure mpiP if MPI profiling is enabled
+if(FESOM_MPIPROFILING)
+    message(STATUS "MPI profiling enabled - configuring mpiP library")
+    find_package(MpiP REQUIRED)
+    
+    if(MpiP_FOUND)
+        message(STATUS "mpiP will be linked with FESOM targets")
+        # Set minimal global properties for src/CMakeLists.txt
+        set_property(GLOBAL PROPERTY FESOM_MPIP_ENABLED TRUE)
+        set_property(GLOBAL PROPERTY FESOM_MPIP_LIBRARIES "${MpiP_LIBRARIES}")
+        set_property(GLOBAL PROPERTY FESOM_MPIP_BUILT_FROM_SOURCE "${MpiP_BUILT_FROM_SOURCE}")
+    else()
+        message(FATAL_ERROR "FESOM_MPIPROFILING is ON but mpiP library not found/built successfully")
+    endif()
+else()
+    message(STATUS "MPI profiling disabled")
+endif()
 
 # Testing options
 option(BUILD_TESTING "Build tests" OFF)

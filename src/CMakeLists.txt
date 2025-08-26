@@ -258,6 +258,31 @@ if(${FESOM_PROFILING})
    target_compile_definitions(${PROJECT_NAME} PRIVATE FESOM_PROFILING)
 endif()
 
+# MPI profiling with mpiP integration
+get_property(MPIP_ENABLED GLOBAL PROPERTY FESOM_MPIP_ENABLED)
+if(MPIP_ENABLED)
+   message(STATUS "Integrating mpiP with FESOM targets")
+   
+   get_property(MPIP_LIBRARIES GLOBAL PROPERTY FESOM_MPIP_LIBRARIES)
+   get_property(MPIP_BUILT_FROM_SOURCE GLOBAL PROPERTY FESOM_MPIP_BUILT_FROM_SOURCE)
+   
+   # If mpiP was built from source, add dependency on external project
+   if(MPIP_BUILT_FROM_SOURCE)
+       add_dependencies(${PROJECT_NAME} mpip_external)
+   endif()
+   
+   # Link mpiP library (mpiP works by automatic MPI call interception - no headers needed)
+   target_link_libraries(${PROJECT_NAME} PRIVATE ${MPIP_LIBRARIES})
+   
+   # Add RPATH so mpiP library is found automatically at runtime (library only)
+   get_filename_component(MPIP_LIB_DIR "${MPIP_LIBRARIES}" DIRECTORY)
+   set_target_properties(${PROJECT_NAME} PROPERTIES 
+       INSTALL_RPATH "${MPIP_LIB_DIR}"
+       BUILD_RPATH "${MPIP_LIB_DIR}")
+   
+   message(STATUS "mpiP integration completed: ${MPIP_LIBRARIES}")
+endif()
+
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL  IntelLLVM )
    
@@ -445,6 +470,23 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_
 add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
 target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
 
+# Configure RPATH for executable to find libfesom.so and mpiP library
+get_property(MPIP_ENABLED GLOBAL PROPERTY FESOM_MPIP_ENABLED)
+if(MPIP_ENABLED)
+   get_property(MPIP_LIBRARIES GLOBAL PROPERTY FESOM_MPIP_LIBRARIES)
+   get_filename_component(MPIP_LIB_DIR "${MPIP_LIBRARIES}" DIRECTORY)
+   # Set RPATH for both libfesom.so (in ../lib) and mpiP library
+   set_target_properties(${PROJECT_NAME}.x PROPERTIES
+       INSTALL_RPATH "$ORIGIN/../lib;${MPIP_LIB_DIR}" 
+       BUILD_RPATH "${CMAKE_BINARY_DIR}/lib;${MPIP_LIB_DIR}")
+   message(STATUS "Added RPATH to executable: libfesom.so + mpiP (${MPIP_LIB_DIR})")
+else()
+   # Set RPATH for libfesom.so only
+   set_target_properties(${PROJECT_NAME}.x PROPERTIES
+       INSTALL_RPATH "$ORIGIN/../lib"
+       BUILD_RPATH "${CMAKE_BINARY_DIR}/lib")
+   message(STATUS "Added RPATH to executable: libfesom.so only")
+endif()
 
 get_target_property(FLAGS ${PROJECT_NAME} COMPILE_OPTIONS)
 message(STATUS " --> Final Compile options for ${PROJECT_NAME}: ${FLAGS}")
