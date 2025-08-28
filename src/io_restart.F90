@@ -463,15 +463,6 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
 #endif
         end if 
 
-#if defined(__recom) && defined(__usetp)
-            if(partit%my_fesom_group == 0) then
-#endif
-            if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ice'//achar(27)//'[0m'
-#if defined(__recom) && defined(__usetp)
-            endif 
-#endif
-            call read_restart(ice_path, ice_files, partit%MPI_COMM_FESOM, partit%mype)
-
 #if defined(__recom)
 !RECOM restart
 !read here
