@@ -613,7 +613,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 Cphot_dia = zero
             else
                 Cphot_dia = pMax_dia * (real(one) - exp(-alfa_d * Chl2C_dia * PARave / pMax_dia))
-                VTCphotLigLim_diatoms(k) = Cphot/pMax ! track light limitation
+                VTCphotLigLim_diatoms(k) = Cphot_dia/pMax_dia ! track light limitation
                 if (CO2lim) Cphot_dia = Cphot_dia  * DiaCO2 ! Added the CO2 dependence
             end if
             if (Cphot_dia .lt. tiny) Cphot_dia = zero
@@ -780,10 +780,15 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 
             limitFacSi     = recom_limiter(SiMaxSlope, qSiC, SiCmax)  &
                               * limitFacN_dia
+
+            Si_assim       = V_cm_fact_d * P_cm_d * arrFunc * SiCUptakeRatio &
+                              * limitFacSi * Si/(Si + k_si)
+
+#if defined (__coccos) 
             Si_assim       = V_cm_fact_d * Temp_diatoms * SiCUptakeRatio &
                               * limitFacSi * Si/(Si + k_si)
             VTSi_assimDia(k) = Si_assim
-
+#endif
 !-------------------------------------------------------------------------------
 !< *** Iron chemistry ***
 !< ********************** 
