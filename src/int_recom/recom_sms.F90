@@ -626,7 +626,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 Cphot_cocco = zero
             else 
                 Cphot_cocco = pMax_cocco * (real(one) - exp( -alfa_c * Chl2C_cocco * PARave / pMax_cocco))  
-                VTCphotLigLim_cocco(k) = Cphot/pMax ! track the light limitation
+                VTCphotLigLim_cocco(k) = Cphot_cocco/pMax_cocco ! track the light limitation
                 if (CO2lim) Cphot_cocco = Cphot_cocco * CoccoCO2 ! Added the CO2 dependence 
             end if 
             if (Cphot_cocco .lt. tiny) Cphot_cocco = zero
@@ -638,7 +638,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 Cphot_phaeo = zero
             else
                 Cphot_phaeo = pMax_phaeo * (real(one) - exp( -alfa_p * Chl2C_phaeo * PARave / pMax_phaeo))
-                VTCphotLigLim_phaeo(k) = Cphot/pMax ! track the light limitation
+                VTCphotLigLim_phaeo(k) = Cphot_phaeo/pMax_phaeo ! track the light limitation
                 if (CO2lim) Cphot_phaeo = Cphot_phaeo * PhaeoCO2 ! Added the CO2 dependence 
             end if
             if (Cphot_phaeo .lt. tiny) Cphot_phaeo = zero
