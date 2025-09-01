@@ -14,6 +14,7 @@
 
 module fesom_profiler
     use g_config, only: runid, ResultPath
+    use mpi
     implicit none
     private
     
@@ -151,7 +152,6 @@ contains
     ! Start profiling a section
     !=========================================================================
     subroutine fesom_profiler_start(section_name, source_file, line_number)
-        include "mpif.h"
         character(len=*), intent(in) :: section_name
         character(len=*), intent(in), optional :: source_file
         integer, intent(in), optional :: line_number
@@ -199,7 +199,6 @@ contains
     ! End profiling a section
     !=========================================================================
     subroutine fesom_profiler_end(section_name, source_file, line_number)
-        include "mpif.h"
         character(len=*), intent(in) :: section_name
         character(len=*), intent(in), optional :: source_file
         integer, intent(in), optional :: line_number
@@ -241,7 +240,6 @@ contains
     ! Generate comprehensive profiling report
     !=========================================================================
     subroutine fesom_profiler_report(mpi_comm, mpi_rank, output_unit)
-        include "mpif.h"
         integer, intent(in) :: mpi_comm, mpi_rank
         integer, intent(in), optional :: output_unit
         integer :: unit, ierr, i, npes
@@ -851,7 +849,6 @@ contains
     ! Finalize profiler and generate final report
     !=========================================================================
     subroutine fesom_profiler_finalize(mpi_comm, mpi_rank)
-        include "mpif.h"
         integer, intent(in) :: mpi_comm, mpi_rank
         
         if (.not. fesom_profiler_enabled()) return
