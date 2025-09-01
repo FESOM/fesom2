@@ -780,10 +780,13 @@ contains
         write(unit, '(A)') '============================ BENCHMARK RUNTIME ============================'
         write(unit, '(A,I0)') '    Number of cores :                      ', npes
         write(unit, '(A,I0)') '    Number of OMP threads per rank :      ', omp_threads
+        if (timestep_size > 0.0_PROF_WP) then
+            write(unit, '(A,F12.2,A)') '    Timestep size :                      ', timestep_size, ' sec'
+        endif
         if (total_timesteps > 0) then
             write(unit, '(A,I0)') '    Number of timesteps :                  ', total_timesteps
         endif
-        write(unit, '(A,F12.4,A)') '    Runtime for all timesteps :      ', total_runtime, ' sec'
+        write(unit, '(A,F12.4,A)') '    Total runtime (init+run+finalize):', total_runtime, ' sec'
         
         ! Calculate SYPD (Simulated Years Per Day) if we have timestep info
         if (total_timesteps > 0 .and. timestep_size > 0.0_PROF_WP .and. total_runtime > 0.0_PROF_WP) then
@@ -807,37 +810,19 @@ contains
         real(kind=PROF_WP) :: total_runtime, wall_clock_time
         logical :: found_total
         
-        ! Look for total runtime from main sections
+        ! Calculate total runtime by summing the three main FESOM sections
         total_runtime = 0.0_PROF_WP
         found_total = .false.
         
-        ! Search for common main section names
+        ! Sum up the three main sections: init, runloop, and finalize
         do i = 1, num_profiles
             if (trim(profiles(i)%name) == "") cycle
-            
-            ! Look for main timing sections
-            if (index(profiles(i)%name, "runloop_total") > 0 .or. &
-                index(profiles(i)%name, "main_total") > 0 .or. &
-                index(profiles(i)%name, "fesom_total") > 0) then
+            if (trim(profiles(i)%parent_name) == "") then  ! Only top-level sections
                 wall_clock_time = global_data(4*i-3) / real(npes, PROF_WP)
-                if (wall_clock_time > total_runtime) then
-                    total_runtime = wall_clock_time
-                    found_total = .true.
-                endif
+                total_runtime = total_runtime + wall_clock_time
+                found_total = .true.
             endif
         end do
-        
-        ! If no main section found, sum up major sections
-        if (.not. found_total) then
-            do i = 1, num_profiles
-                if (trim(profiles(i)%name) == "") cycle
-                if (trim(profiles(i)%parent_name) == "") then  ! Only top-level sections
-                    wall_clock_time = global_data(4*i-3) / real(npes, PROF_WP)
-                    total_runtime = total_runtime + wall_clock_time
-                endif
-            end do
-            if (total_runtime > 0.0_PROF_WP) found_total = .true.
-        endif
         
         ! Print benchmark summary if we found a reasonable total runtime
         if (found_total .and. total_runtime > 0.001_PROF_WP) then
