@@ -107,7 +107,7 @@ module fesom_module
   use, intrinsic :: ieee_exceptions
 #endif
   ! Enhanced profiler integration
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
   use fesom_profiler
 #endif
   implicit none
@@ -162,16 +162,16 @@ contains
         f%t1 = MPI_Wtime()
 
         ! Initialize enhanced profiler
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_init(.true.)
         call fesom_profiler_start("fesom_init_total")
 #endif
 
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_start("par_init")
 #endif
         call par_init(f%partit)
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_end("par_init")
 #endif
 
@@ -198,11 +198,11 @@ contains
         ! auxiliary mesh arrays
         !=====================
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call setup_model'//achar(27)//'[0m'
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_start("setup_model")
 #endif
         call setup_model(f%partit)  ! Read Namelists, always before clock_init
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_end("setup_model")
 #endif
         
@@ -212,18 +212,18 @@ contains
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call get_run_steps'//achar(27)//'[0m'
         call get_run_steps(fesom_total_nsteps, f%partit)
         f%total_nsteps=fesom_total_nsteps
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_set_timesteps(fesom_total_nsteps)
         ! Set timestep size in seconds for SYPD calculation: 86400 seconds/day / steps_per_day
         call fesom_profiler_set_timestep_size(86400.0d0 / real(step_per_day, kind=8))
 #endif
         
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call mesh_setup'//achar(27)//'[0m'
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_start("mesh_setup")
 #endif
         call mesh_setup(f%partit, f%mesh)
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_end("mesh_setup")
 #endif
 
@@ -275,12 +275,12 @@ contains
         call arrays_init(f%tracers%num_tracers, f%partit, f%mesh)    ! allocate other arrays (to be refactured same as tracers in the future)
         
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ocean_setup'//achar(27)//'[0m'
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_start("ocean_setup")
         call fesom_profiler_start("dynamics_init")
 #endif
         call ocean_setup(f%dynamics, f%tracers, f%partit, f%mesh)
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_end("dynamics_init")
         call fesom_profiler_end("ocean_setup")
 #endif
@@ -463,7 +463,7 @@ contains
     f%from_nstep = 1
 
     ! End initialization profiling
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_end("fesom_init_total")
 #endif
 
@@ -551,7 +551,7 @@ contains
     end if
     
     ! Start main time loop profiling
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_start("fesom_runloop_total")
 #endif
     !___MODEL TIME STEPPING LOOP________________________________________________
@@ -650,11 +650,11 @@ contains
             !___compute update of atmospheric forcing____________________________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call update_atm_forcing(n)'//achar(27)//'[0m'
             f%t0_frc = MPI_Wtime()
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_start("update_atm_forcing")
 #endif
             call update_atm_forcing(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_end("update_atm_forcing")
 #endif
             f%t1_frc = MPI_Wtime()
@@ -668,11 +668,11 @@ contains
             endif
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_timestep(n)'//achar(27)//'[0m'
             if (f%ice%ice_update) then
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_start("ice_timestep")
 #endif
                 call ice_timestep(n, f%ice, f%partit, f%mesh)
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_end("ice_timestep")
 #endif
             endif
@@ -696,11 +696,11 @@ contains
         
         !___model ocean step____________________________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_timestep_ale'//achar(27)//'[0m'
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_start("oce_timestep_ale")
 #endif
         call oce_timestep_ale(n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_end("oce_timestep_ale")
 #endif
         if (use_transit) then
@@ -715,22 +715,22 @@ contains
         f%t3 = MPI_Wtime()
         !___compute energy diagnostics..._______________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call compute_diagnostics(1)'//achar(27)//'[0m'
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_start("compute_diagnostics")
 #endif
         call compute_diagnostics(1, f%dynamics, f%tracers, f%ice, f%partit, f%mesh)
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_end("compute_diagnostics")
 #endif
 
         f%t4 = MPI_Wtime()
         !___prepare output______________________________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_start("output")
 #endif
         call output (n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_end("output")
 #endif
 
@@ -741,11 +741,11 @@ contains
         !--------------------------
 
         f%t5 = MPI_Wtime()
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_start("restart")
 #endif
         call restart(n, nstart, f%total_nsteps, .false., f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_end("restart")
 #endif
         f%t6 = MPI_Wtime()
@@ -783,7 +783,7 @@ contains
 !   write(0,*) 'f%from_nstep after the loop:', f%from_nstep    
     
     ! End main time loop profiling
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_end("fesom_runloop_total")
 #endif
   end subroutine fesom_runloop
@@ -800,7 +800,7 @@ contains
     integer           :: tr_num
     
     ! Start finalization profiling
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_start("fesom_finalize_total")
 #endif
     ! --------------
@@ -908,7 +908,7 @@ contains
    call mpp_stop
 #endif
     ! Generate enhanced profiler report BEFORE MPI finalization
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
         call fesom_profiler_end("fesom_finalize_total")
         call fesom_profiler_report(f%MPI_COMM_FESOM, f%mype)
         ! Note: Do NOT call fesom_profiler_finalize here as it would duplicate the report

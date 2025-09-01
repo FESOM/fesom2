@@ -108,7 +108,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #if defined (__icepack)
     use icedrv_main,   only: step_icepack
 #endif
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
     use fesom_profiler
 #endif
     implicit none
@@ -169,7 +169,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #endif
     !___________________________________________________________________________
     t0=MPI_Wtime()
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
     call fesom_profiler_start("ice_dynamics")
 #endif
 #if defined (__icepack)
@@ -219,7 +219,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
 
     if (use_cavity) call cavity_ice_clean_vel(ice, partit, mesh)
     t1=MPI_Wtime()
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
     call fesom_profiler_end("ice_dynamics")
     call fesom_profiler_start("ice_advection")
 #endif
@@ -288,7 +288,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
 
     if (use_cavity) call cavity_ice_clean_ma(ice, partit, mesh)
     t2=MPI_Wtime()
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
     call fesom_profiler_end("ice_advection")
     call fesom_profiler_start("ice_thermodynamics")
 #endif
@@ -315,7 +315,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
     end do
 !$OMP END PARALLEL DO
     t3=MPI_Wtime()
-#ifdef FESOM_PROFILING
+#if defined (FESOM_PROFILING)
     call fesom_profiler_end("ice_thermodynamics")
 #endif
     rtime_ice = rtime_ice + (t3-t0)
