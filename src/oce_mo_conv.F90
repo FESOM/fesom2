@@ -9,7 +9,7 @@ subroutine mo_convect(ice, partit, mesh)
     USE MOD_ICE
     USE o_ARRAYS
     USE g_config
-    use g_comm_auto
+    use g_comm
     IMPLICIT NONE
     type(t_ice), intent(in), target :: ice
     type(t_partit), intent(inout), target :: partit

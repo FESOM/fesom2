@@ -4,7 +4,7 @@ module oce_adv_tra_driver_module
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_DYN
-    use g_comm_auto
+    use g_comm
     use diagnostics
     use oce_adv_tra_hor_interfaces
     use oce_adv_tra_ver_interfaces
@@ -26,7 +26,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_DYN
-    use g_comm_auto
+    use g_comm
     use diagnostics, only: ldiag_DVD
     use oce_adv_tra_hor_interfaces
     use oce_adv_tra_ver_interfaces
@@ -402,7 +402,7 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
     use o_ARRAYS
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use g_comm_auto
+    use g_comm
     implicit none
     real(kind=WP), intent(in),    target :: dt
     type(t_partit),intent(inout), target :: partit

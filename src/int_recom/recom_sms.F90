@@ -27,7 +27,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     USE MOD_PARSUP
 
     use g_forcing_arrays
-    use g_comm_auto
+    use g_comm
     use mvars
     use mdepth2press                                   
     use gsw_mod_toolbox, only: gsw_sa_from_sp,gsw_ct_from_pt,gsw_rho

@@ -18,7 +18,7 @@ SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
     USE MOD_TRACER
     use g_config, only: flag_debug
     use o_arrays
-    use g_comm_auto
+    use g_comm
     IMPLICIT NONE
     integer,        intent(in)            :: tr_num
     type(t_mesh),   intent(in),    target :: mesh

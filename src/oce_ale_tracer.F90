@@ -8,7 +8,7 @@ module oce_ale_tracer_module
     USE o_PARAM
     USE o_ARRAYS
     USE g_CONFIG
-    use g_comm_auto
+    use g_comm
     use g_forcing_arrays
     use g_forcing_param
     use diagnostics
@@ -36,7 +36,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     USE MOD_DYN
     USE MOD_ICE
     use mod_tracer
-    use g_comm_auto
+    use g_comm
     use o_tracers
     use Toy_Channel_Soufflet
     use Toy_Channel_Dbgyre
@@ -236,7 +236,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     use ver_sinking_recom_benthos_interface
     use recom_glovar
     use recom_config
-    use g_comm_auto
+    use g_comm
     use g_support
 #endif
     use mod_ice
@@ -971,7 +971,7 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
     use MOD_TRACER
     USE o_param
     use g_config
-    use g_comm_auto
+    use g_comm
     IMPLICIT NONE
     type(t_tracer), intent(inout), target :: tracers
     type(t_partit), intent(inout), target :: partit
@@ -1226,7 +1226,7 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
     use MOD_DYN
     use o_param
     use g_config
-    use g_comm_auto
+    use g_comm
     IMPLICIT NONE
     integer,        intent(in),    target    :: tr_num
     type(t_dyn)   , intent(inout), target    :: dynamics

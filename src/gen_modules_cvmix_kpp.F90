@@ -29,7 +29,7 @@ module g_cvmix_kpp
     USE MOD_PARSUP
     USE MOD_MESH
     use o_arrays
-    use g_comm_auto 
+    use g_comm 
     use g_forcing_arrays
     use g_support
     use o_mixing_KPP_mod

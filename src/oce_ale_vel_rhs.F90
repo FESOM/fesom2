@@ -9,7 +9,7 @@ module oce_ale_vel_rhs_module
     use g_CONFIG
     use g_forcing_param
     use g_forcing_arrays
-    use g_comm_auto
+    use g_comm
     use g_sbf
     
     implicit none
@@ -33,7 +33,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     use g_CONFIG
     use g_forcing_param, only: use_virt_salt
     use g_forcing_arrays, only: press_air
-    use g_comm_auto
+    use g_comm
     use g_sbf, only: l_mslp
     use momentum_adv_scalar_transpv_interface
     implicit none 
@@ -327,7 +327,7 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
     USE MOD_PARSUP
     use MOD_DYN
     USE o_PARAM
-    use g_comm_auto
+    use g_comm
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit

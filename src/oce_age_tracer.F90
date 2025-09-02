@@ -12,7 +12,7 @@ end module age_tracer_init_interface
 subroutine age_tracer_init(partit, mesh)
   use MOD_PARTIT
   use MOD_MESH
-  use g_comm_auto
+  use g_comm
   use g_forcing_param
   use g_forcing_arrays
 

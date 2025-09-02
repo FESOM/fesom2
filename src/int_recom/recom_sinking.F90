@@ -67,7 +67,7 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
     use o_param           ! num_tracers
     use o_arrays
     use g_forcing_arrays  ! press_air
-    use g_comm_auto
+    use g_comm
     implicit none
 
     integer       , intent(in)   , target :: tr_num
@@ -195,7 +195,7 @@ subroutine diff_ver_recom_expl(tr_num, tracers, partit, mesh)
     use o_param 
     use o_arrays
     use g_forcing_arrays
-    use g_comm_auto
+    use g_comm
 
     IMPLICIT NONE
 
@@ -294,7 +294,7 @@ subroutine ver_sinking_recom(tr_num, tracers, partit, mesh)
     use o_param
     use o_arrays
     use g_forcing_arrays
-    use g_comm_auto
+    use g_comm
     implicit none
 
     integer       , intent(in)   , target  :: tr_num
@@ -529,7 +529,7 @@ subroutine ballast(tr_num, tracers, partit, mesh)
     USE o_ARRAYS
     USE g_CONFIG
     use g_forcing_arrays
-    use g_comm_auto
+    use g_comm
     use g_clock
     use g_rotate_grid
     use mvars
@@ -643,7 +643,7 @@ subroutine get_particle_density(tracers, partit, mesh)
     USE o_ARRAYS
     USE g_CONFIG
     use g_forcing_arrays
-    use g_comm_auto
+    use g_comm
     use g_clock
     use g_rotate_grid
 
@@ -745,7 +745,7 @@ subroutine get_seawater_viscosity(tr_num, tracers, partit, mesh)
     USE o_ARRAYS
     USE g_CONFIG
     use g_forcing_arrays
-    use g_comm_auto
+    use g_comm
     use g_clock
     use g_rotate_grid
 

@@ -87,7 +87,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   use g_forcing_arrays
   use g_clock
   use g_config
-  use g_comm_auto
+  use g_comm
   use g_rotate_grid
   use net_rec_from_atm_interface
   use g_sbf, only: sbc_do

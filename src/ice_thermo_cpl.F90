@@ -23,7 +23,7 @@ subroutine thermodynamics(ice, partit, mesh)
   use g_config
   use g_forcing_param
   use g_forcing_arrays
-  use g_comm_auto
+  use g_comm
   use g_rotate_grid
   implicit none
   type(t_ice)   , intent(inout), target :: ice

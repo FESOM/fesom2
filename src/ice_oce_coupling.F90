@@ -59,7 +59,7 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
     use o_PARAM
     use o_ARRAYS
     USE g_CONFIG
-    use g_comm_auto
+    use g_comm
     use cavity_interfaces    
 #if defined (__icepack)
     use icedrv_main,   only: icepack_to_fesom
@@ -160,7 +160,7 @@ subroutine ocean2ice(ice, dynamics, tracers, partit, mesh)
     USE MOD_MESH
     use o_PARAM
     use g_CONFIG
-    use g_comm_auto
+    use g_comm
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(in)   , target :: dynamics
@@ -255,7 +255,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     USE MOD_MESH
     use g_CONFIG
     use o_ARRAYS
-    use g_comm_auto
+    use g_comm
     use g_forcing_param, only: use_virt_salt, use_landice_water, use_age_tracer, use_age_mask, age_start_year !---fwf-code, age-code
     use g_forcing_arrays
     use g_support

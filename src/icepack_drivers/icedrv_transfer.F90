@@ -21,7 +21,7 @@
           use icepack_intfc,    only: icepack_warnings_flush, icepack_warnings_aborted
           use icepack_intfc,    only: icepack_query_parameters
           use icepack_intfc,    only: icepack_sea_freezing_temperature
-          use g_comm_auto,      only: exchange_nod
+          use g_comm,      only: exchange_nod
           use icedrv_system,    only: icedrv_system_abort
           use g_config,         only: dt
           use o_param,          only: mstep

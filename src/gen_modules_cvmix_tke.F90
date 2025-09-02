@@ -30,7 +30,7 @@ module g_cvmix_tke
     USE MOD_PARSUP
     USE MOD_DYN
     use o_arrays
-    use g_comm_auto 
+    use g_comm 
     implicit none
     
     !___________________________________________________________________________

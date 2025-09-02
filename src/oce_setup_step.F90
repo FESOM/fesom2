@@ -691,7 +691,7 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     USE MOD_PARSUP
     USE o_ARRAYS
     USE o_PARAM
-    use g_comm_auto
+    use g_comm
     use g_config
     use g_forcing_arrays
     use o_mixing_kpp_mod ! KPP

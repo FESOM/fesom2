@@ -66,7 +66,7 @@ subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
     use O_PARAM, only: r_earth
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use g_comm_auto
+    use g_comm
     implicit none
     type(t_partit),intent(in), target :: partit
     type(t_mesh),  intent(in), target :: mesh
@@ -264,7 +264,7 @@ subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_g
     use MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use g_comm_auto
+    use g_comm
     implicit none
     type(t_partit),intent(in), target :: partit
     type(t_mesh),  intent(in), target :: mesh
@@ -549,7 +549,7 @@ end subroutine adv_tra_hor_muscl
     use MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use g_comm_auto
+    use g_comm
     implicit none
     type(t_partit),intent(inout), target :: partit
     type(t_mesh),  intent(in), target :: mesh

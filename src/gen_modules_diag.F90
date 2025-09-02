@@ -8,7 +8,7 @@ module diagnostics
   use MOD_DYN
   use MOD_ICE
   use g_clock
-  use g_comm_auto
+  use g_comm
   use o_ARRAYS
   use o_tracers
   use g_forcing_arrays

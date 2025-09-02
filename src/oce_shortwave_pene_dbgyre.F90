@@ -13,7 +13,7 @@ subroutine cal_shortwave_rad_dbgyre(ice, tracers, partit, mesh)
   USE MOD_TRACER
   USE g_CONFIG
   use g_forcing_arrays
-  use g_comm_auto
+  use g_comm
   use Toy_Channel_Dbgyre
   IMPLICIT NONE
   type(t_ice) ,intent(in), target :: ice

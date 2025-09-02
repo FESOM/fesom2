@@ -35,7 +35,7 @@ module bio_fluxes_interface
 
             use g_config
             use o_arrays
-            use g_comm_auto
+            use g_comm
             use g_forcing_arrays
             use g_support
 
@@ -66,7 +66,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     use recom_ciso
     use g_clock
     use g_forcing_arrays, only: press_air, u_wind, v_wind, shortwave
-    use g_comm_auto
+    use g_comm
     IMPLICIT NONE
 
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -431,7 +431,7 @@ subroutine bio_fluxes(tracers, partit, mesh)
 
     use g_config
     use o_arrays
-    use g_comm_auto
+    use g_comm
     use g_forcing_arrays
     use g_support
 

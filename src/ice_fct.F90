@@ -256,7 +256,7 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_MESH
-    use g_comm_auto
+    use g_comm
     implicit none
     type(t_ice),    intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -351,7 +351,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     use o_PARAM
-    use g_comm_auto
+    use g_comm
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -501,7 +501,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     use o_PARAM
-    use g_comm_auto
+    use g_comm
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -1456,7 +1456,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
     USE MOD_MESH
     use o_PARAM
     use g_CONFIG
-    use g_comm_auto
+    use g_comm
     implicit none
     type(t_ice)   , intent(inout), target   :: ice
     type(t_partit), intent(inout), target   :: partit

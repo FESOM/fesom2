@@ -158,7 +158,7 @@ subroutine thermodynamics(ice, partit, mesh)
     use g_config
     use g_forcing_param
     use g_forcing_arrays
-    use g_comm_auto
+    use g_comm
     use g_sbf, only: l_snow
     use ice_therm_interface
     implicit none

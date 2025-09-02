@@ -637,7 +637,7 @@ subroutine iceberg_step2(mesh, partit,arr, elem_from_block, ib, height_ib_single
  use o_param 		!for rad								!=
  use g_rotate_grid	!for subroutine g2r, logfile_outfreq					!=
  use g_config, only: steps_per_ib_step
- use g_comm_auto
+ use g_comm
 !=
 use g_comm
 use iceberg_params, only: length_ib, width_ib, scaling !smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, melted, grounded, scaling !, length_ib, width_ib, scaling

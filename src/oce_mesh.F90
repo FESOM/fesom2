@@ -1505,7 +1505,7 @@ subroutine find_levels_min_e2n(partit, mesh)
     USE MOD_PARSUP
     use o_PARAM
     use g_config
-    use g_comm_auto
+    use g_comm
     !
     implicit none
     !
@@ -1841,7 +1841,7 @@ USE MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
 USE g_ROTATE_grid
-use g_comm_auto
+use g_comm
 ! elem_center is now in the same module
 implicit none
 type(t_mesh),   intent(inout), target :: mesh
@@ -2027,7 +2027,7 @@ SUBROUTINE mesh_areas(partit, mesh)
     USE o_PARAM
     USE o_arrays, only: dum_3d_n
     USE g_ROTATE_GRID
-    use g_comm_auto
+    use g_comm
     IMPLICIT NONE
     ! Collects auxilliary information on the mesh
     ! Allocated and filled in are:
@@ -2303,7 +2303,7 @@ USE o_PARAM
 USE o_ARRAYS
 USE g_CONFIG, only: rotated_grid, force_rotation
 USE g_ROTATE_grid
-use g_comm_auto
+use g_comm
 ! elem_center and edge_center are now in the same module
 IMPLICIT NONE
 
@@ -2654,7 +2654,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 USE o_PARAM
 USE g_ROTATE_GRID
-  use g_comm_auto
+  use g_comm
 IMPLICIT NONE
 ! Collects auxilliary information on the mesh
 ! Allocated and filled in are:
@@ -2709,7 +2709,7 @@ subroutine check_total_volume(partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE o_PARAM
-    use g_comm_auto
+    use g_comm
     use o_ARRAYS
     
     IMPLICIT NONE

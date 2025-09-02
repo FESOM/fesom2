@@ -105,7 +105,7 @@ contains
         USE MOD_PARTIT
         USE MOD_PARSUP
         USE o_PARAM
-        use g_comm_auto
+        use g_comm
         use o_ARRAYS
         use g_rotate_grid
 
@@ -872,7 +872,7 @@ include "associate_mesh_ass.h"
 
   subroutine cpl_oasis3mct_recv(ind, data_array, action, partit)
     use o_param
-    use g_comm_auto
+    use g_comm
     USE MOD_PARTIT
     USE MOD_PARSUP
     implicit none

@@ -1210,7 +1210,7 @@ subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     USE MOD_DYN
-    use g_comm_auto
+    use g_comm
     IMPLICIT NONE
     !___________________________________________________________________________
     integer       , intent(in)            :: mode
@@ -1454,7 +1454,7 @@ subroutine compute_thickness_zstar(dynamics, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     USE MOD_DYN
-    use g_comm_auto
+    use g_comm
     implicit none
     !___________________________________________________________________________
     type(t_dyn)   , intent(inout), target :: dynamics

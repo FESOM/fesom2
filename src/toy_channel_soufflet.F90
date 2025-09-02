@@ -7,7 +7,7 @@ MODULE Toy_Channel_Soufflet
   USE o_ARRAYS
   USE o_PARAM
   USE g_config
-  use g_comm_auto
+  use g_comm
 
   implicit none
   SAVE 

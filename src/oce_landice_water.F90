@@ -14,7 +14,7 @@ subroutine landice_water_init(partit, mesh)
   use MOD_PARTIT
   use MOD_MESH
   use o_PARAM , only: WP
-  use g_comm_auto
+  use g_comm
   use g_forcing_param
   use g_forcing_arrays
 

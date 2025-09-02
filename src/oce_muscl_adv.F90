@@ -5,7 +5,7 @@ module oce_muscl_adv_module
     use MOD_TRACER
     use o_ARRAYS
     use o_PARAM
-    use g_comm_auto
+    use g_comm
     use g_config
     
     implicit none
@@ -39,7 +39,7 @@ subroutine muscl_adv_init(twork, partit, mesh)
     use MOD_TRACER
     use o_ARRAYS
     use o_PARAM
-    use g_comm_auto
+    use g_comm
     use g_config
     ! find_up_downwind_triangles is now in the same module
     IMPLICIT NONE
@@ -170,7 +170,7 @@ USE MOD_TRACER
 USE o_ARRAYS
 USE o_PARAM
 USE g_CONFIG
-use g_comm_auto
+use g_comm
 IMPLICIT NONE
 integer                    :: n, k, ednodes(2), elem, el
 real(kind=WP)              :: x(2),b(2), c(2), cr, bx, by, xx, xy, ab, ax

@@ -12,7 +12,7 @@ subroutine cal_shortwave_rad(ice, partit, mesh)
     USE o_ARRAYS
     USE g_CONFIG
     use g_forcing_arrays
-    use g_comm_auto
+    use g_comm
     IMPLICIT NONE
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit

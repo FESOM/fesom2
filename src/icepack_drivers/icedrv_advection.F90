@@ -12,7 +12,7 @@ submodule (icedrv_main) icedrv_advection
     use icedrv_kinds
     use icedrv_constants
     use icedrv_system,      only: icedrv_system_abort
-    use g_comm_auto,        only: exchange_nod
+    use g_comm,        only: exchange_nod
     use icepack_intfc,      only: icepack_warnings_flush,         &
                                   icepack_warnings_aborted,       &
                                   icepack_query_tracer_indices,   &

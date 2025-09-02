@@ -3,7 +3,7 @@ USE MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
 use g_config
-use g_comm_auto
+use g_comm
 use o_PARAM
 
 use netcdf

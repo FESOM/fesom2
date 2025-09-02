@@ -5,7 +5,7 @@ module oce_dyn_module
     USE MOD_DYN
     USE o_PARAM
     USE g_CONFIG
-    use g_comm_auto
+    use g_comm
     
     implicit none
     

@@ -12,7 +12,7 @@ module fesom_main_storage_module
   USE o_PARAM
   use g_clock
   use g_config
-  use g_comm_auto
+  use g_comm
   use g_forcing_arrays
   use io_RESTART
   use io_MEANDATA

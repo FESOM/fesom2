@@ -434,7 +434,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     use o_param
     use g_config
     use o_arrays
-    use g_comm_auto
+    use g_comm
 #if defined (__icepack)
     use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
     use icedrv_main,   only: icepack_to_fesom
@@ -1112,7 +1112,7 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     USE o_arrays
     use o_PARAM
     use g_config, only: use_cavity
-    use g_comm_auto
+    use g_comm
     use ice_maEVP_interfaces
 #if defined (__icepack)
     use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem

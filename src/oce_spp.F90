@@ -14,7 +14,7 @@ USE MOD_ICE
 use mod_mesh
 USE MOD_PARTIT
 USE MOD_PARSUP
-use g_comm_auto
+use g_comm
 use o_tracers
 use g_config,         only: dt
 implicit none
@@ -57,7 +57,7 @@ subroutine app_rejected_salt(ttf, partit, mesh)
   USE MOD_PARTIT
   USE MOD_PARSUP
   use o_tracers
-  use g_comm_auto
+  use g_comm
   implicit none
 
   integer         :: row, k, nod, nup, nlo, kml, nzmin, nzmax

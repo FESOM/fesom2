@@ -18,7 +18,7 @@ module g_cvmix_tidal
     USE MOD_PARTIT
     USE MOD_PARSUP
     use o_arrays
-    use g_comm_auto 
+    use g_comm 
     use g_read_other_NetCDF
     implicit none
     public

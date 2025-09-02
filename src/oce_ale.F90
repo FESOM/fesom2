@@ -217,7 +217,7 @@ subroutine init_bottom_elem_thickness(partit, mesh)
     USE MOD_PARSUP
     use o_ARRAYS
     use g_config,only: use_partial_cell, partial_cell_thresh, use_depthonelem
-    use g_comm_auto
+    use g_comm
     use g_support
     implicit none
     type(t_partit), intent(inout), target :: partit
@@ -348,7 +348,7 @@ subroutine init_bottom_node_thickness(partit, mesh)
     USE MOD_PARSUP
     use o_ARRAYS
     use g_config,only: use_partial_cell
-    use g_comm_auto
+    use g_comm
     use g_support
     implicit none
     type(t_partit), intent(inout), target :: partit
@@ -461,7 +461,7 @@ subroutine init_surface_elem_depth(partit, mesh)
     USE MOD_PARSUP
     use o_ARRAYS
     use g_config,only: use_cavity, use_cavity_partial_cell, cavity_partial_cell_thresh, use_cavityonelem
-    use g_comm_auto
+    use g_comm
     use g_support
     implicit none
     type(t_partit), intent(inout), target :: partit
@@ -545,7 +545,7 @@ subroutine init_surface_node_depth(partit, mesh)
     USE MOD_PARSUP
     use o_ARRAYS
     use g_config,only:  use_cavity, use_cavity_partial_cell
-    use g_comm_auto
+    use g_comm
     use g_support
     implicit none
     type(t_partit), intent(inout), target :: partit
@@ -612,7 +612,7 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_DYN
-    use g_comm_auto
+    use g_comm
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -872,7 +872,7 @@ subroutine update_thickness_ale(partit, mesh)
     use o_ARRAYS
     use g_config,only: which_ale,lzstar_lev,min_hnode
     use diagnostics, only: ldiag_DVD 
-    use g_comm_auto
+    use g_comm
 
     implicit none
     type(t_partit), intent(inout), target :: partit
@@ -1640,7 +1640,7 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_DYN
-    use g_comm_auto
+    use g_comm
     implicit none
     type(t_mesh)  , intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
@@ -1793,7 +1793,7 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_DYN
-    use g_comm_auto
+    use g_comm
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -1944,7 +1944,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_DYN
-    use g_comm_auto
+    use g_comm
     use io_RESTART !!PS
     use g_forcing_arrays !!PS
     implicit none
@@ -2514,7 +2514,7 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
     USE MOD_DYN
     use o_ARRAYS, only: water_flux
     use g_config, only: dt, which_ale
-    use g_comm_auto
+    use g_comm
     implicit none
     !___________________________________________________________________________
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -2742,7 +2742,7 @@ subroutine compute_CFLz(dynamics, partit, mesh)
     USE MOD_PARSUP
     USE MOD_DYN
     use o_PARAM
-    use g_comm_auto
+    use g_comm
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -2832,7 +2832,7 @@ subroutine compute_Wvel_split(dynamics, partit, mesh)
     USE MOD_PARSUP
     USE MOD_DYN
     use o_PARAM
-    use g_comm_auto
+    use g_comm
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -2888,7 +2888,7 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_DYN
-    use g_comm_auto
+    use g_comm
     use g_config, only: which_ale
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -3144,7 +3144,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     use o_PARAM
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use g_comm_auto
+    use g_comm
     use io_RESTART !PS
     use o_mixing_KPP_mod
     use g_cvmix_tke

@@ -6,7 +6,7 @@ module oce_ale_pressure_bv_module
     USE o_PARAM
     USE o_ARRAYS
     use g_config
-    use g_comm_auto
+    use g_comm
     ! USE diagnostics,      only: ldiag_dMOC  ! Temporarily commented out due to compilation issues
     
     implicit none
@@ -2592,7 +2592,7 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
   USE MOD_PARSUP
   use o_arrays
   use o_param
-  use g_comm_auto
+  use g_comm
   implicit none
   !
   type(t_mesh),   intent(in) ,    target :: mesh
@@ -2681,7 +2681,7 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
   USE MOD_PARSUP
   use o_param
   use o_arrays
-  use g_comm_auto
+  use g_comm
   implicit none
   !
   type(t_mesh),   intent(in) ,    target :: mesh
@@ -2768,7 +2768,7 @@ subroutine compute_neutral_slope(partit, mesh)
     use MOD_MESH
     use o_param
     use g_config
-    use g_comm_auto
+    use g_comm
     IMPLICIT NONE
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit

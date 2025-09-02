@@ -44,7 +44,7 @@ subroutine fer_solve_Gamma(partit, mesh)
     USE o_PARAM
     USE o_ARRAYS, ONLY: sigma_xy, fer_gamma, bvfreq, fer_c, fer_K
     USE g_CONFIG
-    use g_comm_auto
+    use g_comm
     IMPLICIT NONE
     type(t_partit), intent(inout), target  :: partit
     type(t_mesh),   intent(in),    target  :: mesh	
@@ -173,7 +173,7 @@ subroutine fer_gamma2vel(dynamics, partit, mesh)
     USE o_PARAM
     USE o_ARRAYS, ONLY: fer_gamma
     USE g_CONFIG
-    use g_comm_auto
+    use g_comm
     IMPLICIT NONE
 
     integer                                :: nz, nzmax, el, elnod(3), nzmin
@@ -219,7 +219,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE g_CONFIG
-    use g_comm_auto
+    use g_comm
     IMPLICIT NONE
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit

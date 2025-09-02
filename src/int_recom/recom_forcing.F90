@@ -32,7 +32,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
     use o_param
     use o_arrays
     use g_forcing_arrays
-    use g_comm_auto
+    use g_comm
     use g_support
     implicit none
 

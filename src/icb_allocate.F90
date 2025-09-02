@@ -4,7 +4,7 @@ module allocate_icb_interface
         use iceberg_params
         use g_config
         use g_comm
-        use g_comm_auto
+        use g_comm
         use o_param
         use MOD_PARTIT
         use MOD_MESH
@@ -19,7 +19,7 @@ subroutine allocate_icb(partit, mesh)
   use iceberg_params
   use g_config
   use g_comm
-  use g_comm_auto
+  use g_comm
   use o_param
   use MOD_PARTIT
   use MOD_MESH

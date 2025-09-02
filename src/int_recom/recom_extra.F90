@@ -10,7 +10,7 @@ subroutine Depth_calculations(n,Nn,wF,zF,thick,recipthick, partit, mesh)
   USE o_ARRAYS
   USE g_CONFIG
   use g_forcing_arrays
-  use g_comm_auto
+  use g_comm
 
   use g_clock
   use g_rotate_grid
@@ -103,7 +103,7 @@ subroutine Cobeta(partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     use o_PARAM
-    use g_comm_auto
+    use g_comm
     Implicit none
   	
 ! Declarations
@@ -162,7 +162,7 @@ end subroutine Cobeta
     use mod_mesh
     USE MOD_PARTIT
     USE MOD_PARSUP
-   use g_comm_auto
+   use g_comm
    implicit none
    integer                          :: n
 

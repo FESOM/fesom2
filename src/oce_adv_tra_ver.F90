@@ -92,7 +92,7 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
     use MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use g_comm_auto
+    use g_comm
 
     implicit none
     real(kind=WP), intent(in) , target :: dt
@@ -246,7 +246,7 @@ subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
     use MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use g_comm_auto
+    use g_comm
 
     implicit none
     type(t_partit),intent(in), target :: partit
@@ -440,7 +440,7 @@ subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
     use MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use g_comm_auto
+    use g_comm
     implicit none
     real(kind=WP), intent(in),  target :: dt
     type(t_partit),intent(in), target  :: partit
@@ -635,7 +635,7 @@ subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, o_init_zero)
     use MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
-    use g_comm_auto
+    use g_comm
     implicit none
     type(t_partit),intent(in), target :: partit
     type(t_mesh),  intent(in), target :: mesh

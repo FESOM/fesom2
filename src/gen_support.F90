@@ -5,7 +5,7 @@ module g_support
   USE MOD_MESH
   USE MOD_PARTIT
   USE MOD_PARSUP
-  use g_comm_auto
+  use g_comm
   use o_ARRAYS
   use g_config, only: dummy
   implicit none
@@ -318,7 +318,7 @@ end subroutine smooth_elem3D
 subroutine integrate_nod_2D(data, int2D, partit, mesh)
   USE MOD_PARTIT
   USE MOD_PARSUP
-  use g_comm_auto
+  use g_comm
 
   IMPLICIT NONE
   type(t_mesh),  intent(in),    target :: mesh
@@ -355,7 +355,7 @@ end subroutine integrate_nod_2D
 subroutine integrate_nod_3D(data, int3D, partit, mesh)
   USE MOD_PARTIT
   USE MOD_PARSUP
-  use g_comm_auto
+  use g_comm
 
   IMPLICIT NONE
   type(t_mesh),  intent(in), target :: mesh
@@ -645,7 +645,7 @@ end function omp_min_max_sum2
 subroutine integrate_elem_3D(data, int3D, partit, mesh)
   USE MOD_PARTIT
   USE MOD_PARSUP
-  use g_comm_auto
+  use g_comm
 
   IMPLICIT NONE
   type(t_mesh),  intent(in), target :: mesh
@@ -690,7 +690,7 @@ end subroutine integrate_elem_3D
 subroutine integrate_elem_2D(data, int2D, partit, mesh)
   USE MOD_PARTIT
   USE MOD_PARSUP
-  use g_comm_auto
+  use g_comm
 
   IMPLICIT NONE
   type(t_mesh),  intent(in), target :: mesh
