@@ -379,19 +379,20 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
    
    # debugging related compiler flags (activated for Debug build type)
    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-      target_compile_options(${PROJECT_NAME} PRIVATE 
-                              -fno-fast-math 
-                              -fno-signed-zeros 
-                              -freciprocal-math 
-                              -fcheck=all,bounds 
-                              -finit-real=snan 
-                              -finit-integer=-9999 
-                              -fsanitize=undefined,address
+      target_compile_options(${PROJECT_NAME} PRIVATE
+                           -fallow-argument-mismatch
+                           -fno-fast-math -fno-signed-zeros
+                           -freciprocal-math
+                           -mveclibabi=svml
+                           -flto
+                           -pg
+                           -fbacktrace
+                           -fcheck=all,bounds
+                           -finit-real=snan
+                           -finit-integer=-9999
+                           -fsanitize=undefined,address
                            )
       target_link_libraries(${PROJECT_NAME} PRIVATE -lubsan)
-      
-      # Uncomment the following line if you need profiling
-      #target_compile_options(${PROJECT_NAME} PRIVATE -pg)
    endif()
                      
 
