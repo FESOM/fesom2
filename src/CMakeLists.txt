@@ -388,7 +388,7 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
                               -finit-integer=-9999 
                               -fsanitize=undefined,address
                            )
-      target_link_libraries(${PROJECT_NAME} PRIVATE -lasan -lubsan)
+      target_link_libraries(${PROJECT_NAME} PRIVATE -lubsan)
       
       # Uncomment the following line if you need profiling
       #target_compile_options(${PROJECT_NAME} PRIVATE -pg)
