@@ -12,7 +12,7 @@ module g_backscatter
     !___________________________________________________________________________
     USE o_param
     USE g_CONFIG
-    USE g_comm_auto
+    USE g_comm
     USE g_support
     USE g_rotate_grid
     IMPLICIT NONE

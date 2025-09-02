@@ -3,7 +3,7 @@ module solver_module
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_DYN
-    USE g_comm_auto
+    USE g_comm
     
     implicit none
     

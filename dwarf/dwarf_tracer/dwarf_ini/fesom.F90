@@ -13,7 +13,7 @@ USE MOD_TRACER
 USE MOD_DYN
 USE MOD_ICE
 USE MOD_PARSUP
-USE g_comm_auto
+USE g_comm
 USE par_support_interfaces
 USE restart_derivedtype_module
 USE fortran_utils

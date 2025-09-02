@@ -3,7 +3,7 @@ module oce_adv_tra_fct_module
   use MOD_TRACER
   USE MOD_PARTIT
   USE MOD_PARSUP
-  USE g_comm_auto
+  USE g_comm
   
   implicit none
   
@@ -61,7 +61,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     use MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
-    USE g_comm_auto
+    USE g_comm
     implicit none
     real(kind=WP), intent(in),    target :: dt
     type(t_mesh),  intent(in),    target :: mesh

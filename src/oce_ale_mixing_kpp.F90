@@ -15,7 +15,7 @@ MODULE o_mixing_KPP_mod
   USE o_ARRAYS
   USE g_config
   USE g_forcing_arrays
-  USE g_comm_auto
+  USE g_comm
   USE g_support
   IMPLICIT NONE
   

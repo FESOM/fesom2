@@ -11,7 +11,7 @@ USE MOD_MESH
 USE MOD_PARTIT
 USE MOD_ICE
 USE MOD_PARSUP
-USE g_comm_auto
+USE g_comm
 USE par_support_interfaces
 USE restart_derivedtype_module
 use fortran_utils

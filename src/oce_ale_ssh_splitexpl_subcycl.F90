@@ -78,7 +78,7 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
     USE MOD_PARSUP
     USE MOD_DYN
     USE o_PARAM
-    USE g_comm_auto
+    USE g_comm
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -673,7 +673,7 @@ subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
     USE MOD_MESH
     USE MOD_DYN
     USE g_config, only: dt, r_restart
-    USE g_comm_auto
+    USE g_comm
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -787,7 +787,7 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     USE MOD_DYN
-    USE g_comm_auto
+    USE g_comm
     USE g_config,  only: dt, which_ALE, use_cavity_fw2press
     USE g_support, only: integrate_nod
     use o_ARRAYS,  only: water_flux

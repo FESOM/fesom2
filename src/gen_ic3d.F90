@@ -17,7 +17,7 @@ MODULE g_ic3d
    USE MOD_PARSUP
    USE MOD_TRACER
    USE o_PARAM
-   USE g_comm_auto
+   USE g_comm
    USE g_support
    USE g_config, only: dummy, ClimateDataPath, use_cavity
    use oce_ale_pressure_bv_module, only: insitu2pot

@@ -38,7 +38,7 @@ MODULE g_sbf
    USE MOD_PARSUP
    USE o_ARRAYS
    USE o_PARAM
-   USE g_comm_auto
+   USE g_comm
    USE g_support
    USE g_rotate_grid
    USE g_config, only: dummy, ClimateDataPath, dt

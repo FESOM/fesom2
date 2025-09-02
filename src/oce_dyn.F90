@@ -226,7 +226,7 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
     use MOD_DYN
     USE o_PARAM
     USE g_CONFIG
-    USE g_comm_auto
+    USE g_comm
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -384,7 +384,7 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
     use MOD_DYN
     USE o_PARAM
     USE g_CONFIG
-    USE g_comm_auto
+    USE g_comm
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -539,7 +539,7 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
     use MOD_DYN
     USE o_PARAM
     USE g_CONFIG
-    USE g_comm_auto
+    USE g_comm
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -692,7 +692,7 @@ SUBROUTINE compute_ke_wrho(dynamics, partit, mesh)
     use MOD_DYN
     USE o_PARAM
     USE g_CONFIG
-    USE g_comm_auto
+    USE g_comm
     USE o_ARRAYS
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -738,7 +738,7 @@ SUBROUTINE compute_apegen(dynamics, tracers, partit, mesh)
     USE MOD_PARSUP
     use MOD_DYN
     USE o_PARAM
-    USE g_comm_auto
+    USE g_comm
     USE o_ARRAYS
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target   :: dynamics
@@ -830,7 +830,7 @@ subroutine check_validviscopt_5(partit, mesh)
     USE o_PARAM , ONLY: rad
     USE o_ARRAYS, ONLY: bvfreq
     USE g_CONFIG
-    USE g_comm_auto
+    USE g_comm
     IMPLICIT NONE
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit

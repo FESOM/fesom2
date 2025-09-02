@@ -335,7 +335,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     USE o_PARAM
     USE o_ARRAYS
     USE g_CONFIG
-    USE g_comm_auto
+    USE g_comm
     use ice_EVP_interfaces
 #if defined (__icepack)
     use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
