@@ -23,7 +23,7 @@ module fesom_main_storage_module
   use ice_setup_interface
   use ocean2ice_interface
   use oce_fluxes_interface
-  use update_atm_forcing_interface
+  use forcing_coupling_interfaces, only: update_atm_forcing
   use oce_setup_step_module, only: before_oce_step
   use oce_ale_module, only: oce_timestep_ale, restart_thickness_ale
   use oce_mesh_module, only: mesh_setup, check_mesh_consistency
