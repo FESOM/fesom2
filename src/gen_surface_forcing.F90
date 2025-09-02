@@ -50,9 +50,9 @@ MODULE g_sbf
 #endif
    USE g_read_other_NetCDF, only: read_other_NetCDF, read_2ddata_on_grid_netcdf
 
-   IMPLICIT NONE
+   USE netcdf
 
-   include 'netcdf.inc'
+   IMPLICIT NONE
 
    public  sbc_ini  ! routine called before 1st time step (open files, read namelist,...)
    public  sbc_do   ! routine called each time step to provide a sbc fileds (wind,...)
@@ -242,7 +242,7 @@ CONTAINS
 
       !open file
       if (partit%mype==0) then
-         iost = nf_open(trim(flf%file_name),NF_NOWRITE,ncid)
+         iost = nf90_open(trim(flf%file_name), NF90_NOWRITE, ncid)
       end if
 
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
@@ -250,42 +250,42 @@ CONTAINS
 
       ! get dimensions
       if (partit%mype==0) then
-         iost = nf_inq_dimid(ncid,    "LAT",      id_latd)
-         if (iost .ne. NF_NOERR) then
-            iost = nf_inq_dimid(ncid, "lat",      id_latd)
+         iost = nf90_inq_dimid(ncid, "LAT", id_latd)
+         if (iost .ne. NF90_NOERR) then
+            iost = nf90_inq_dimid(ncid, "lat", id_latd)
          end if
-         if (iost .ne. NF_NOERR) then
-            iost = nf_inq_dimid(ncid, "latitude", id_latd)
+         if (iost .ne. NF90_NOERR) then
+            iost = nf90_inq_dimid(ncid, "latitude", id_latd)
          end if
-         if (iost .ne. NF_NOERR) then
-            iost = nf_inq_dimid(ncid, "LAT1",     id_latd)
+         if (iost .ne. NF90_NOERR) then
+            iost = nf90_inq_dimid(ncid, "LAT1", id_latd)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name,partit)  
 
       if (partit%mype==0) then 
-         iost = nf_inq_dimid(ncid,    "LON",       id_lond)
-         if (iost .ne. NF_NOERR) then
-            iost = nf_inq_dimid(ncid, "lon",       id_lond)
+         iost = nf90_inq_dimid(ncid, "LON", id_lond)
+         if (iost .ne. NF90_NOERR) then
+            iost = nf90_inq_dimid(ncid, "lon", id_lond)
          end if
-         if (iost .ne. NF_NOERR) then
-            iost = nf_inq_dimid(ncid, "longitude", id_lond)
+         if (iost .ne. NF90_NOERR) then
+            iost = nf90_inq_dimid(ncid, "longitude", id_lond)
          end if
-         if (iost .ne. NF_NOERR) then
-            iost = nf_inq_dimid(ncid, "LON1",      id_lond)
+         if (iost .ne. NF90_NOERR) then
+            iost = nf90_inq_dimid(ncid, "LON1", id_lond)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name,partit) 
 
       if (partit%mype==0) then   
-         iost = nf_inq_dimid(ncid, "TIME", id_timed)
-         if      (iost .ne. NF_NOERR) then
-                 iost = nf_inq_dimid(ncid, "time",  id_timed)
+         iost = nf90_inq_dimid(ncid, "TIME", id_timed)
+         if (iost .ne. NF90_NOERR) then
+            iost = nf90_inq_dimid(ncid, "time", id_timed)
          end if
-         if      (iost .ne. NF_NOERR) then
-                 iost = nf_inq_dimid(ncid, "TIME1", id_timed)
+         if (iost .ne. NF90_NOERR) then
+            iost = nf90_inq_dimid(ncid, "TIME1", id_timed)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
@@ -293,58 +293,58 @@ CONTAINS
 
       ! get variable id
       if (partit%mype==0) then
-         iost = nf_inq_varid(ncid,    "LAT",      id_lat)
-         if (iost .ne. NF_NOERR) then
-            iost = nf_inq_varid(ncid, "lat",      id_lat)
+         iost = nf90_inq_varid(ncid, "LAT", id_lat)
+         if (iost .ne. NF90_NOERR) then
+            iost = nf90_inq_varid(ncid, "lat", id_lat)
          end if
-         if (iost .ne. NF_NOERR) then
-            iost = nf_inq_varid(ncid, "latitude", id_lat)
+         if (iost .ne. NF90_NOERR) then
+            iost = nf90_inq_varid(ncid, "latitude", id_lat)
          end if
-         if (iost .ne. NF_NOERR) then
-            iost = nf_inq_varid(ncid, "LAT1",     id_lat)
+         if (iost .ne. NF90_NOERR) then
+            iost = nf90_inq_varid(ncid, "LAT1", id_lat)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name,partit)
       if (partit%mype==0) then
-         iost = nf_inq_varid(ncid,    "LON",       id_lon)
-         if      (iost .ne. NF_NOERR) then
-            iost = nf_inq_varid(ncid, "longitude", id_lon)
+         iost = nf90_inq_varid(ncid, "LON", id_lon)
+         if (iost .ne. NF90_NOERR) then
+            iost = nf90_inq_varid(ncid, "longitude", id_lon)
          end if
-         if (iost .ne. NF_NOERR) then
-            iost = nf_inq_varid(ncid, "lon",       id_lon)
+         if (iost .ne. NF90_NOERR) then
+            iost = nf90_inq_varid(ncid, "lon", id_lon)
          end if
-         if (iost .ne. NF_NOERR) then
-            iost = nf_inq_varid(ncid, "LON1",      id_lon)
+         if (iost .ne. NF90_NOERR) then
+            iost = nf90_inq_varid(ncid, "LON1", id_lon)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name,partit)
 
       if (partit%mype==0) then
-         iost = nf_inq_varid(ncid, "TIME", id_time)
-         if      (iost .ne. NF_NOERR) then
-                 iost = nf_inq_varid(ncid, "time", id_time)
+         iost = nf90_inq_varid(ncid, "TIME", id_time)
+         if (iost .ne. NF90_NOERR) then
+            iost = nf90_inq_varid(ncid, "time", id_time)
          end if
-         if      (iost .ne. NF_NOERR) then
-                 iost = nf_inq_varid(ncid, "TIME1",id_time)
+         if (iost .ne. NF90_NOERR) then
+            iost = nf90_inq_varid(ncid, "TIME1", id_time)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name,partit)   
       ! get dimensions size
       if (partit%mype==0) then
-         iost = nf_inq_dimlen(ncid, id_latd, flf%nc_Nlat)
+         iost = nf90_inquire_dimension(ncid, id_latd, len=flf%nc_Nlat)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name,partit)
       if (partit%mype==0) then      
-         iost = nf_inq_dimlen(ncid, id_lond, flf%nc_Nlon)
+         iost = nf90_inquire_dimension(ncid, id_lond, len=flf%nc_Nlon)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name,partit)   
       if (partit%mype==0) then      
-         iost = nf_inq_dimlen(ncid, id_timed,flf%nc_Ntime)
+         iost = nf90_inquire_dimension(ncid, id_timed, len=flf%nc_Ntime)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name,partit) 
@@ -365,18 +365,14 @@ CONTAINS
     !read variables from file
     ! read lat
       if (partit%mype==0) then
-         nf_start(1)=1
-         nf_edges(1)=flf%nc_Nlat
-         iost = nf_get_vara_double(ncid, id_lat, nf_start, nf_edges, flf%nc_lat)
+         iost = nf90_get_var(ncid, id_lat, flf%nc_lat, start=(/1/), count=(/flf%nc_Nlat/))
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name,partit)
       
     ! read lon  
       if (partit%mype==0) then
-         nf_start(1)=1
-         nf_edges(1)=flf%nc_Nlon-2
-         iost = nf_get_vara_double(ncid, id_lon, nf_start, nf_edges, flf%nc_lon(2:flf%nc_Nlon-1))
+         iost = nf90_get_var(ncid, id_lon, flf%nc_lon(2:flf%nc_Nlon-1), start=(/1/), count=(/flf%nc_Nlon-2/))
          flf%nc_lon(1)        =flf%nc_lon(flf%nc_Nlon-1)
          flf%nc_lon(flf%nc_Nlon)  =flf%nc_lon(2)
       end if
@@ -385,21 +381,19 @@ CONTAINS
     !____________________________________________________________________________
     ! read time axis from file
     if (partit%mype==0) then
-        nf_start(1)=1
-        nf_edges(1)=flf%nc_Ntime
-        iost = nf_get_vara_double(ncid, id_time, nf_start, nf_edges, flf%nc_time)
+        iost = nf90_get_var(ncid, id_time, flf%nc_time, start=(/1/), count=(/flf%nc_Ntime/))
         ! digg for calendar attribute in time axis variable         
     end if
-    call MPI_BCast(flf%nc_time, flf%nc_Ntime,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+    call MPI_BCast(flf%nc_time, flf%nc_Ntime, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
     call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
     call check_nferr(iost,flf%file_name,partit)
       
     ! digg for calendar attribute in time axis variable
     if (partit%mype==0) then
-        iost         = nf_inq_attlen(ncid, id_time,'calendar',aux_len)
-        iost         = nf_get_att(ncid, id_time,'calendar',aux_calendar)
+        iost = nf90_inquire_attribute(ncid, id_time, 'calendar', len=aux_len)
+        iost = nf90_get_att(ncid, id_time, 'calendar', aux_calendar)
         aux_calendar = aux_calendar(1:aux_len)
-        if (iost .ne. NF_NOERR) then
+        if (iost .ne. NF90_NOERR) then
             flf%calendar='none'
             write(*,*) ' --> could not find/read calendar attribute in the time axis'
             write(*,*) '     of the forcing file (Is this right?). I assume there is'
@@ -530,7 +524,7 @@ CONTAINS
     endif
 
     if (partit%mype==0) then
-         iost = nf_close(ncid)
+         iost = nf90_close(ncid)
     end if
     call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
     call check_nferr(iost,flf%file_name,partit)
@@ -1486,8 +1480,8 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
             CO2vari     = 'AtmCO2_'//currentCO2year_char
 
             ! open file
-            status=nf_open(filename, nf_nowrite, ncid)
-            if (status.ne.nf_noerr)then
+            status=nf90_open(filename, nf90_nowrite, ncid)
+            if (status.ne.nf90_noerr)then
                 print*,'ERROR: CANNOT READ CO2 FILE CORRECTLY !!!!!'
                 print*,'Error in opening netcdf file '//filename
                 call par_ex(MPI_COMM_FESOM, mype)
@@ -1496,15 +1490,15 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 	
             ! data
             allocate(ncdata(12))
-            status=nf_inq_varid(ncid, CO2vari, varid)
+            status=nf90_inq_varid(ncid, CO2vari, varid)
             CO2start = 1
             CO2count = 12
-            status=nf_get_vara_double(ncid,varid,CO2start,CO2count,ncdata)
+            status=nf90_get_var(ncid, varid, ncdata, start=(/CO2start/), count=(/CO2count/))
             AtmCO2(:)=ncdata(:)
             deallocate(ncdata)
             if (mype==0) write(*,*),'Current carbon year=',currentCO2year
             if (mype==0) write(*,*),'Atm CO2=', AtmCO2
-            status=nf_close(ncid)
+            status=nf90_close(ncid)
         end if
     end if   ! atmospheric box model or prescribed CO2 values   
 
@@ -1998,8 +1992,8 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
       character(len=MAX_PATH), intent(in)            :: fname
       integer, intent(in)                            :: iost
 
-      if (iost .ne. NF_NOERR) then
-         write(*,*) 'ERROR: I/O status= "',trim(nf_strerror(iost)),'";',iost,' file= ',fname
+      if (iost .ne. NF90_NOERR) then
+         write(*,*) 'ERROR: I/O status= "',trim(nf90_strerror(iost)),'";',iost,' file= ',fname
          call par_ex(partit%MPI_COMM_FESOM, partit%mype)
          stop
       endif
@@ -2888,9 +2882,9 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
    USE MOD_PARSUP
    USE g_forcing_arrays,    only: runoff
    use g_support
-   implicit none
+   use netcdf
  
-#include "netcdf.inc"
+   implicit none
    character(*),   intent(in) :: file
    character(*),   intent(in) :: vari
    real(kind=WP),   intent(in):: R
@@ -2918,11 +2912,11 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
    if (mype==0) write(*,*) 'building RUNOFF MAPPER with radius of smoothing= ', R*1.e-3, ' km'
    if (mype==0) then
       ! open file
-      status=nf_open(trim(file), nf_nowrite, ncid)
+      status=nf90_open(trim(file), nf90_nowrite, ncid)
    end if
  
    call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-   if (status.ne.nf_noerr)then
+   if (status.ne.nf90_noerr)then
       print*,'ERROR: CANNOT READ 2D netCDF FILE CORRECTLY !!!!!'
       print*,'Error in opening netcdf file '//file
       call par_ex(partit%MPI_COMM_FESOM, partit%mype)
@@ -2931,11 +2925,11 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
  
    if (mype==0) then
       ! lat
-      status=nf_inq_dimid(ncid, 'lat', latid)
-      status=nf_inq_dimlen(ncid, latid, latlen)
+      status=nf90_inq_dimid(ncid, 'lat', latid)
+      status=nf90_inquire_dimension(ncid, latid, len=latlen)
       ! lon
-      status=nf_inq_dimid(ncid, 'lon', lonid)
-      status=nf_inq_dimlen(ncid, lonid, lonlen)
+      status=nf90_inq_dimid(ncid, 'lon', lonid)
+      status=nf90_inquire_dimension(ncid, lonid, len=lonlen)
    end if
    call MPI_BCast(latlen, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
    call MPI_BCast(lonlen, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
@@ -2943,15 +2937,15 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
    ! lat
    if (mype==0) then
       allocate(lat(latlen))
-      status=nf_inq_varid(ncid, 'lat', varid)
-      status=nf_get_vara_double(ncid,varid,1,latlen,lat)
+      status=nf90_inq_varid(ncid, 'lat', varid)
+      status=nf90_get_var(ncid, varid, lat, start=(/1/), count=(/latlen/))
    end if
 
    ! lon
    if (mype==0) then
       allocate(lon(lonlen))
-      status=nf_inq_varid(ncid, 'lon', varid)
-      status=nf_get_vara_double(ncid,varid,1,lonlen,lon)
+      status=nf90_inq_varid(ncid, 'lon', varid)
+      status=nf90_get_var(ncid, varid, lon, start=(/1/), count=(/lonlen/))
    ! make sure range 0. - 360.
    do n=1,lonlen
       if (lon(n)<0.0_WP) then
@@ -2964,12 +2958,12 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
       allocate(ncdata(lonlen,latlen))
       ncdata = 0.0_WP
      ! data
-      status=nf_inq_varid(ncid, trim(vari), varid)
+      status=nf90_inq_varid(ncid, trim(vari), varid)
       istart = (/1,1/)
       icount= (/lonlen,latlen/)
-      status=nf_get_vara_int(ncid,varid,istart,icount,ncdata)
+      status=nf90_get_var(ncid, varid, ncdata, start=istart, count=icount)
      ! close file
-     status=nf_close(ncid)
+     status=nf90_close(ncid)
      number_arrival_points=0
      do i=1, lonlen
         do j=1, latlen

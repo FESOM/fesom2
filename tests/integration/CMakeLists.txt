@@ -5,23 +5,24 @@
 # MPI tests (if enabled)
 if(ENABLE_MPI_TESTS)
     # Basic integration test with 2 processes (minimum required for mesh partitioning)
-    add_fesom_test(integration_basic_run_mpi2
+    add_fesom_test(integration_full_run_mpi2
         MPI_TEST
         NP 2
         TIMEOUT ${TEST_TIMEOUT}
     )
     
-    # Short duration test to check initialization with 2 processes
-    add_fesom_test(integration_init_test_mpi2
-        MPI_TEST
-        NP 2
-        TIMEOUT 120  # 2 minutes for quick init test
-    )
-    
     # MPI test with 8 processes (as requested by user)
-    add_fesom_test(integration_basic_run_mpi8
+    add_fesom_test(integration_full_run_mpi8
         MPI_TEST  
         NP 8
+        TIMEOUT ${TEST_TIMEOUT}
+    )
+    
+    # Pi cavity test with 2 processes (cavity enabled) - only dist_2 available
+    add_fesom_test_with_options(integration_pi_cavity_mpi2
+        "pi_cavity" "96" "1" "d" "1" "d" "10" ".true." ".true."
+        MPI_TEST
+        NP 2
         TIMEOUT ${TEST_TIMEOUT}
     )
     
