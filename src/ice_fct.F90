@@ -570,15 +570,19 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #endif
     ! Auxiliary elemental operator (mass matrix- lumped mass matrix)
 
-    !$ACC KERNELS
+    ! do we need to make the entire array of icoef equal to 1 ?
+    ! if so, we have to write another loop for that. For now, I am running it on cpu.
     icoef = 1
-    !$ACC END KERNELS
+#ifdef ENABLE_OPENACC
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
+#endif
     do n=1,3   ! three upper nodes
         ! Cycle over rows  row=elnodes(n)
         icoef(n,n)=-2
     end do
+#ifdef ENABLE_OPENACC
     !$ACC END PARALLEL LOOP
+#endif
 
 
 #ifndef ENABLE_OPENACC
@@ -1128,7 +1132,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     call exchange_nod(ice_temp, partit, luse_g2g = .true.)
 #endif
 
+#ifdef ENABLE_OPENACC
 !$ACC END DATA
+#endif
 
 !$OMP BARRIER
 end subroutine ice_fem_fct

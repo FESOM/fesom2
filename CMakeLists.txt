@@ -8,6 +8,8 @@ endif()
 
 project(FESOM2.0)
 
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake ${CMAKE_MODULE_PATH})
+
 set(BUILD_SHARED_LIBS ON CACHE BOOL "Default to using shared libs")
 set(TOPLEVEL_DIR ${CMAKE_CURRENT_LIST_DIR})
 set(FESOM_COUPLED OFF CACHE BOOL "compile fesom standalone or with oasis support (i.e. coupled)")
@@ -21,8 +23,48 @@ set(USE_MULTIO OFF CACHE BOOL "Use MULTIO for IO, either grib or binary for now.
 set(OASIS_WITH_YAC OFF CACHE BOOL "Useing a version of OASIS compiled with YAC instead of SCRIP for interpolation?")
 set(ASYNC_ICEBERGS ON CACHE BOOL "compile fesom with or without support for asynchronous iceberg computations")
 set(VERBOSE OFF CACHE BOOL "toggle debug output")
+
+# Testing options
+option(BUILD_TESTING "Build tests" OFF)
+
+# Tools
+option(BUILD_MESHPARTITIONER "Build mesh partitioning tools (fesom_meshpart executable)" OFF)
+
 #add_subdirectory(oasis3-mct/lib/psmile)
 add_subdirectory(src)
+
+# Enable testing if requested
+if(BUILD_TESTING)
+    enable_testing()
+    # Only add tests if the tests directory exists
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
+        add_subdirectory(tests)
+    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test/CMakeLists.txt")
+        # Fallback to existing test directory if tests/ doesn't exist yet
+        message(STATUS "Using existing test/ directory for testing")
+        add_subdirectory(test)
+    else()
+        message(WARNING "BUILD_TESTING is ON but no tests directory found")
+    endif()
+endif()
+
+# Add mesh_part directory if requested
+if(BUILD_MESHPARTITIONER)
+    message(STATUS "Configuring mesh partitioner as part of the main build")
+    add_subdirectory(mesh_part)
+    
+    # Install the mesh partitioner
+    install(TARGETS fesom_meshpart
+            RUNTIME DESTINATION bin
+            COMPONENT tools)
+    
+    # Create a convenience target for building just the mesh partitioner
+    add_custom_target(meshpart
+        COMMENT "Building just the mesh partitioner"
+        DEPENDS fesom_meshpart)
+    
+    message(STATUS "Mesh partitioner will be built as part of the main build")
+endif()
 
 foreach( _file fesom-config.cmake fesom-config-version.cmake fesom-targets.cmake )
   execute_process( COMMAND ${CMAKE_COMMAND} -E create_symlink ${PROJECT_BINARY_DIR}/src/${_file} ${PROJECT_BINARY_DIR}/${_file}  )
