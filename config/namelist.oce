@@ -1,26 +1,43 @@
 ! The namelist file for the finite-volume ocean model
 
 &oce_dyn
-C_d=0.0025             ! Bottom drag, nondimensional
-A_ver= 1.e-4	       ! Vertical viscosity, m^2/s
-scale_area=5.8e9       ! Visc. and diffus. are for an element with scale_area
-SPP=.false.                 ! Salt Plume Parameterization
-Fer_GM=.true.               ! to swith on/off GM after Ferrari et al. 2010
-K_GM_max     = 2000.0       ! max. GM thickness diffusivity (m2/s)
-K_GM_min     = 2.0          ! max. GM thickness diffusivity (m2/s)
-K_GM_bvref   = 2            ! def of bvref in ferreira scaling 0=srf,1=bot mld,2=mean over mld,3=weighted mean over mld
-K_GM_rampmax = -1.0         ! Resol >K_GM_rampmax[km] GM on
-K_GM_rampmin = -1.0         ! Resol <K_GM_rampmin[km] GM off, in between linear scaled down
-K_GM_resscalorder = 1
+C_d                = 0.0025  ! Bottom drag, nondimensional
+A_ver              = 1.e-4	 ! Vertical viscosity, m^2/s
+scale_area         = 5.8e9   ! Visc. and diffus. are for an element with scale_area
+SPP                = .false. ! Salt Plume Parameterization
 
-scaling_Ferreira   =.false.  ! GM vertical scaling after Ferreira et al.(2005) (as also implemented by Qiang in FESOM 1.4)
-scaling_Rossby     =.false. ! GM is smoothly switched off according to Rossby radius (from 1. in coarse areas to 0. where resolution reaches 2 points/Rossby radius)
-scaling_resolution =.true.  ! GM is spatially scaled with resolution; A value of K_GM corresponds then to a resolution of 100km
-scaling_FESOM14    =.false.  ! special treatment of GM in the NH (as also implemented by Qiang in FESOM 1.4; it is zero within the boundary layer)
+Fer_GM             = .true.  ! to swith on/off GM after Ferrari et al. 2010
+K_GM_max           = 1000.0  ! max. GM thickness diffusivity (m2/s)
+K_GM_min           = 2.0     ! max. GM thickness diffusivity (m2/s)
+K_GM_bvref         = 2       ! def of bvref in ferreira scaling 0=srf,1=bot mld,2=mean over mld,3=weighted mean over mld
+K_GM_rampmax       = -1.0    ! Resol >K_GM_rampmax[km] GM on
+K_GM_rampmin       = -1.0    ! Resol <K_GM_rampmin[km] GM off, in between linear scaled down
+K_GM_resscalorder  = 2       ! scaling order 1: resol scaling, 2: area scaling 
+K_GM_cm            = 3.0     ! which baroclinic velocity used for GM ferrari method 1st, 2nd, 3rd, ...   
+K_GM_cmin          = 0.1     ! cutoff for near coastal minimum velocity
+K_GM_Ktaper        = .false. ! apply neutral slope tapering function also to the GM coefficient
 
-Redi  =.true.
-visc_sh_limit=5.0e-3       ! for KPP, max visc due to shear instability
-mix_scheme='KPP'           ! vertical mixing scheme: KPP, PP 
-Ricr   = 0.3               ! critical bulk Richardson Number
-concv  = 1.6               ! constant for pure convection (eqn. 23) (Large 1.5-1.6; MOM default 1.8)
+scaling_Ferreira   = .false. ! GM vertical scaling after Ferreira et al.(2005) (as also implemented by Qiang in FESOM 1.4)
+scaling_Rossby     = .false. ! GM is smoothly switched off according to Rossby radius (from 1. in coarse areas to 0. where resolution reaches 2 points/Rossby radius)
+scaling_resolution = .true.  ! GM is spatially scaled with resolution; A value of K_GM corresponds then to a resolution of 100km
+scaling_FESOM14    = .false. ! special treatment of GM in the NH (as also implemented by Qiang in FESOM 1.4; it is zero within the boundary layer)
+
+scaling_ODM95      = .true.  ! tapering based on critical slope
+ODM95_Scr          = 0.2e-2  ! Critical slope for tapering
+ODM95_Sd           = 1.0e-3  ! slope width of tapering smoothing zone
+
+scaling_LDD97      = .false. ! tapering in surface
+LDD97_c            = 2.0     ! [m/s] is the first baroclinic wave speed
+LDD97_rmin         = 15.0e3  ! rossby radius min cutoff [m]
+LDD97_rmax         = 100.0e3 ! rossby radius max cutoff [m]
+
+Redi               = .true.  ! Switch on/off isoneutral Redi Diffusion
+Redi_Ktaper        = .false. ! apply neutral slope tapering function also to the Redi coefficient
+Redi_Kmax          = 0.0	 ! Redi Diffusivity can be different from K_GM_max but recomment to be the same, if Redi_Kmax<=0 its synchronised with Redi_Kmax=K_GM_max 
+Redi_Kmin          = 100.0   ! minimum Redi difusivity thats left when Redi_Ktaper= .true.
+
+visc_sh_limit      = 5.0e-3  ! for KPP, max visc due to shear instability
+mix_scheme         = 'KPP'   ! vertical mixing scheme: KPP, PP 
+Ricr               = 0.3     ! critical bulk Richardson Number
+concv              = 1.6     ! constant for pure convection (eqn. 23) (Large 1.5-1.6; MOM default 1.8)
 /
