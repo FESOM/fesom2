@@ -7,7 +7,7 @@
 # disable hyperthreading
 #SBATCH --hint=nomultithread
 #SBATCH --nodes=4                  # Number of tasks (MPI) tasks to be launched
-#SBATCH --tasks-per-node 127        # using all 128CPus we exceed the maxload limit (>130) of many used nodes
+#SBATCH --tasks-per-node 128        # using all 128CPus we exceed the maxload limit (>130) of many used nodes
 #SBATCH --cpus-per-task 1
 
 #SBATCH --time=12:00:00
@@ -96,7 +96,7 @@ cp -n ../config/namelist.tra     .
 cp -n ../config/namelist.ice     .
 cp -n ../config/namelist.io      .
 cp -n ../config/namelist.icepack .
-
+chmnod u+w namelist.config
 
 #___CREATE SAVE DIR INFRASTRUCTURE______________________________________________
 # extract resultpath from namelist.config
