@@ -15,6 +15,9 @@
 module fesom_profiler
     use g_config, only: runid, ResultPath
     use mpi
+#ifdef _OPENMP
+    use omp_lib
+#endif
     implicit none
     private
     
