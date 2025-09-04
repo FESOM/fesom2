@@ -8,6 +8,8 @@ endif()
 
 project(FESOM2.0)
 
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake ${CMAKE_MODULE_PATH})
+
 set(BUILD_SHARED_LIBS ON CACHE BOOL "Default to using shared libs")
 set(TOPLEVEL_DIR ${CMAKE_CURRENT_LIST_DIR})
 set(FESOM_COUPLED OFF CACHE BOOL "compile fesom standalone or with oasis support (i.e. coupled)")

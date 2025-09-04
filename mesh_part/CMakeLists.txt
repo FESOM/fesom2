@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(fesom_meshpart C Fortran)
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../cmake ${CMAKE_MODULE_PATH})
+include(fesom_setup)
 
 # Find required packages
 find_package(MPI REQUIRED)
@@ -7,13 +9,13 @@ find_package(MPI REQUIRED)
 # Determine source directory - works for both standalone and integrated builds
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     # This is a standalone build
-    set(src_home ${CMAKE_SOURCE_DIR}/../src)
-    set(METIS_ROOT ${CMAKE_SOURCE_DIR}/../lib/metis-5.1.0)
+    set(src_home ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+    set(METIS_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../lib/metis-5.1.0)
     message(STATUS "Building as standalone mesh partitioner")
     
     # Set default install prefix if not specified
     if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-        set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/.. CACHE PATH "Install path prefix" FORCE)
+        set(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/.. CACHE PATH "Install path prefix" FORCE)
     endif()
     
     # Add uninstall target
@@ -27,8 +29,10 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     endif()
 else()
     # This is part of the main FESOM build
-    set(src_home ${CMAKE_SOURCE_DIR}/src)
-    set(METIS_ROOT ${CMAKE_SOURCE_DIR}/lib/metis-5.1.0)
+    set(src_home ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+    set(METIS_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../lib/metis-5.1.0)
+    #set(src_home ${CMAKE_SOURCE_DIR}/src)
+    #set(METIS_ROOT ${CMAKE_SOURCE_DIR}/lib/metis-5.1.0)
     message(STATUS "Building as part of FESOM main build")
 endif()
 
@@ -111,7 +115,7 @@ elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch)
     endif()
 endif()
-target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C MPI::MPI_Fortran)
+target_link_libraries(${PROJECT_NAME} PUBLIC ${PROJECT_NAME}_C MPI::MPI_Fortran)
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 
 # Install the executable
