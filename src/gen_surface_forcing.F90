@@ -1269,6 +1269,7 @@ CONTAINS
 #endif
       IMPLICIT NONE
 
+      include 'netcdf.inc'
       real(wp)     :: rdate ! date
       integer      :: fld_idx, i
       logical      :: do_rotation_wind, do_rotation_stre, force_newcoeff, update_monthly_flag
