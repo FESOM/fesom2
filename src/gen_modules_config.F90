@@ -11,7 +11,7 @@ module g_config
   save
   !_____________________________________________________________________________
   ! *** Modelname ***
-  character(5)           :: runid='test1'       ! a model/setup name
+  character(10)           :: runid='test1'       ! a model/setup name
   namelist /modelname/ runid
   
   !_____________________________________________________________________________

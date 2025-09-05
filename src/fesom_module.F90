@@ -37,6 +37,7 @@ module fesom_main_storage_module
   use iceberg_params
   use iceberg_step
   use iceberg_ocean_coupling
+  use Toy_Channel_Soufflet, only: compute_zonal_mean
   ! Define icepack module
 
 #if defined (__icepack)
@@ -105,6 +106,10 @@ module fesom_module
 #if defined  __ifsinterface
   use, intrinsic :: ieee_exceptions
 #endif
+  ! Enhanced profiler integration
+#if defined (FESOM_PROFILING)
+  use fesom_profiler
+#endif
   implicit none
   public fesom_init, fesom_runloop, fesom_finalize
   private
@@ -156,7 +161,19 @@ contains
 #endif
         f%t1 = MPI_Wtime()
 
+        ! Initialize enhanced profiler
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_init(.true.)
+        call fesom_profiler_start("fesom_init_total")
+#endif
+
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("par_init")
+#endif
         call par_init(f%partit)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("par_init")
+#endif
 
         f%mype          =>f%partit%mype
         f%MPIerr        =>f%partit%MPIerr
@@ -181,17 +198,34 @@ contains
         ! auxiliary mesh arrays
         !=====================
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call setup_model'//achar(27)//'[0m'
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("setup_model")
+#endif
         call setup_model(f%partit)  ! Read Namelists, always before clock_init
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("setup_model")
+#endif
         
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call clock_init'//achar(27)//'[0m'
-        call clock_init(f%partit)   ! read the clock file 
+        call clock_init(f%partit)   ! read the clock file
         
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call get_run_steps'//achar(27)//'[0m'
         call get_run_steps(fesom_total_nsteps, f%partit)
         f%total_nsteps=fesom_total_nsteps
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_set_timesteps(fesom_total_nsteps)
+        ! Set timestep size in seconds for SYPD calculation: 86400 seconds/day / steps_per_day
+        call fesom_profiler_set_timestep_size(86400.0d0 / real(step_per_day, kind=8))
+#endif
         
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call mesh_setup'//achar(27)//'[0m'
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("mesh_setup")
+#endif
         call mesh_setup(f%partit, f%mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("mesh_setup")
+#endif
 
         if (f%mype==0) write(*,*) 'FESOM mesh_setup... complete'
 
@@ -241,7 +275,15 @@ contains
         call arrays_init(f%tracers%num_tracers, f%partit, f%mesh)    ! allocate other arrays (to be refactured same as tracers in the future)
         
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ocean_setup'//achar(27)//'[0m'
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("ocean_setup")
+        call fesom_profiler_start("dynamics_init")
+#endif
         call ocean_setup(f%dynamics, f%tracers, f%partit, f%mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("dynamics_init")
+        call fesom_profiler_end("ocean_setup")
+#endif
 
         ! recom setup
 #if defined (__recom)
@@ -280,12 +322,16 @@ contains
         
         !---fwf-code-begin
         if(f%mype==0)  write(*,*) 'use_landice_water', use_landice_water
-        if(use_landice_water) call landice_water_init(f%partit, f%mesh)
+        if(use_landice_water) then
+            call landice_water_init(f%partit, f%mesh)
+        endif
         !---fwf-code-end
 
         !---age-code-begin
         if(f%mype==0)  write(*,*) 'use_age_tracer', use_age_tracer
-        if(use_age_tracer) call age_tracer_init(f%partit, f%mesh)
+        if(use_age_tracer) then
+            call age_tracer_init(f%partit, f%mesh)
+        endif
         !---age-code-end
 #if defined (__oasis)
 
@@ -316,6 +362,17 @@ contains
         !___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
         call restart(0, 0, 0, r_restart, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         if (f%mype==0) f%t7=MPI_Wtime()
+        
+        ! recompute zonal profiles of temp and velocity, with the data from the restart
+        ! otherwise zonal profiles of the initial condition are used, this will 
+        ! fuck up the continutiy of the restart
+        if (toy_ocean .and. r_restart) then  
+            SELECT CASE (TRIM(which_toy))
+                CASE ("soufflet") !forcing update for soufflet testcase
+                    call compute_zonal_mean(f%dynamics, f%tracers, f%partit, f%mesh)
+            END SELECT
+        end if    
+        
         ! store grid information into netcdf file
         if (.not. r_restart) call write_mesh_info(f%partit, f%mesh)
 
@@ -405,6 +462,11 @@ contains
 
     f%from_nstep = 1
 
+    ! End initialization profiling
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("fesom_init_total")
+#endif
+
     !enter mesh and partit data. 
     !$ACC ENTER DATA COPYIN (f) 
     !$ACC ENTER DATA COPYIN (f%mesh, f%mesh%coriolis_node, f%mesh%nn_num, f%mesh%nn_pos) 
@@ -487,6 +549,11 @@ contains
         print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
         print *, achar(27)//'[7;32m'//' --> FESOM STARTS TIME LOOP                                 '//achar(27)//'[0m'
     end if
+    
+    ! Start main time loop profiling
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("fesom_runloop_total")
+#endif
     !___MODEL TIME STEPPING LOOP________________________________________________
     if (use_global_tides) then
        call foreph_ini(yearnew, month, f%partit)
@@ -583,7 +650,13 @@ contains
             !___compute update of atmospheric forcing____________________________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call update_atm_forcing(n)'//achar(27)//'[0m'
             f%t0_frc = MPI_Wtime()
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("update_atm_forcing")
+#endif
             call update_atm_forcing(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("update_atm_forcing")
+#endif
             f%t1_frc = MPI_Wtime()
             !___compute ice step________________________________________________
             if (f%ice%ice_steps_since_upd>=f%ice%ice_ave_steps-1) then
@@ -594,7 +667,15 @@ contains
                 f%ice%ice_steps_since_upd=f%ice%ice_steps_since_upd+1
             endif
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_timestep(n)'//achar(27)//'[0m'
-            if (f%ice%ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh)  
+            if (f%ice%ice_update) then
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("ice_timestep")
+#endif
+                call ice_timestep(n, f%ice, f%partit, f%mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("ice_timestep")
+#endif
+            endif
 
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
@@ -615,7 +696,13 @@ contains
         
         !___model ocean step____________________________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_timestep_ale'//achar(27)//'[0m'
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("oce_timestep_ale")
+#endif
         call oce_timestep_ale(n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("oce_timestep_ale")
+#endif
         if (use_transit) then
           ! Prevent negative concentrations of SF6, CFC-11 and CFC-12 during the first years (inital values are zero)
           do tr_num=1, f%tracers%num_tracers
@@ -628,12 +715,24 @@ contains
         f%t3 = MPI_Wtime()
         !___compute energy diagnostics..._______________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call compute_diagnostics(1)'//achar(27)//'[0m'
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("compute_diagnostics")
+#endif
         call compute_diagnostics(1, f%dynamics, f%tracers, f%ice, f%partit, f%mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("compute_diagnostics")
+#endif
 
         f%t4 = MPI_Wtime()
         !___prepare output______________________________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("output")
+#endif
         call output (n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("output")
+#endif
 
         ! LA icebergs: 2023-05-17 
         if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
@@ -642,7 +741,13 @@ contains
         !--------------------------
 
         f%t5 = MPI_Wtime()
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("restart")
+#endif
         call restart(n, nstart, f%total_nsteps, .false., f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("restart")
+#endif
         f%t6 = MPI_Wtime()
         
         f%rtime_fullice       = f%rtime_fullice       + f%t2 - f%t1
@@ -676,6 +781,11 @@ contains
     f%from_nstep = f%from_nstep+current_nsteps
 !call cray_acc_set_debug_global_level(0)    
 !   write(0,*) 'f%from_nstep after the loop:', f%from_nstep    
+    
+    ! End main time loop profiling
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("fesom_runloop_total")
+#endif
   end subroutine fesom_runloop
 
 
@@ -688,6 +798,11 @@ contains
     ! EO parameters
     real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
     integer           :: tr_num
+    
+    ! Start finalization profiling
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("fesom_finalize_total")
+#endif
     ! --------------
     ! LA icebergs: 2023-05-17 
     if (use_icebergs) then
@@ -792,6 +907,13 @@ contains
 #if defined(__MULTIO) && !defined(__ifsinterface) && !defined(__oasis)
    call mpp_stop
 #endif
+    ! Generate enhanced profiler report BEFORE MPI finalization
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("fesom_finalize_total")
+        call fesom_profiler_report(f%MPI_COMM_FESOM, f%mype)
+        ! Note: Do NOT call fesom_profiler_finalize here as it would duplicate the report
+#endif
+    
     if(f%fesom_did_mpi_init) call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype) ! finalize MPI before FESOM prints its stats block, otherwise there is sometimes output from other processes from an earlier time in the programm AFTER the starts block (with parastationMPI)
     if (f%mype==0) then
         41 format (a35,a10,2a15) !Format for table heading
@@ -832,6 +954,8 @@ contains
         write(*,*)
     end if    
 !   call clock_finish  
+    
+    ! Enhanced profiler is already finalized above before MPI finalization
   end subroutine fesom_finalize
 
 end module fesom_module
