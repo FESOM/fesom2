@@ -85,9 +85,9 @@ function(update_namelist_config_with_options NAMELIST_IN NAMELIST_OUT STEP_PER_D
     # Set logfile output frequency
     string(REGEX REPLACE "logfile_outfreq=[0-9]+" "logfile_outfreq=${LOGFILE_OUTFREQ}" CONTENT "${CONTENT}")
     # Force rotation for test geometry
-    string(REGEX REPLACE "force_rotation=.[a-zA-Z]." "force_rotation=${FORCE_ROTATION}" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "force_rotation=\\.[a-zA-Z]+\\." "force_rotation=${FORCE_ROTATION}" CONTENT "${CONTENT}")
     # Set cavity usage
-    string(REGEX REPLACE "use_cavity=.[a-zA-Z]." "use_cavity=${USE_CAVITY}" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "use_cavity=\\.[a-zA-Z]+\\." "use_cavity=${USE_CAVITY}" CONTENT "${CONTENT}")
     
     file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
 endfunction()
@@ -565,4 +565,158 @@ function(add_fesom_meshdiag_test_with_options TEST_NAME MESH_NAME RUNID)
     )
     
     message(STATUS "Added FESOM meshdiag test: ${TEST_NAME} with mesh: ${MESH_NAME}, runid: ${RUNID}")
+endfunction()
+
+#===============================================================================
+# Generic Mesh Pipeline Functions
+#===============================================================================
+
+# Function to add mesh download fixture
+function(add_mesh_download_fixture MESH_NAME)
+    set(DOWNLOAD_TEST_NAME "mesh_download_${MESH_NAME}")
+    
+    add_test(
+        NAME ${DOWNLOAD_TEST_NAME}
+        COMMAND ${CMAKE_COMMAND}
+            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -DMESH_NAME=${MESH_NAME}
+            -P ${CMAKE_SOURCE_DIR}/tests/integration/mesh_download.cmake
+    )
+    
+    set_tests_properties(${DOWNLOAD_TEST_NAME} PROPERTIES
+        TIMEOUT 1200  # 20 minutes for download
+        FIXTURES_SETUP "mesh_${MESH_NAME}"
+        LABELS "mesh_download"
+    )
+    
+    message(STATUS "Added mesh download fixture: ${DOWNLOAD_TEST_NAME}")
+endfunction()
+
+# Function to add mesh partition fixture  
+function(add_mesh_partition_fixture MESH_NAME NUM_PROCESSES)
+    set(PARTITION_TEST_NAME "mesh_partition_${MESH_NAME}_${NUM_PROCESSES}")
+    
+    add_test(
+        NAME ${PARTITION_TEST_NAME}
+        COMMAND ${CMAKE_COMMAND}
+            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -DBUILD_DIR=${CMAKE_BINARY_DIR}
+            -DMESH_NAME=${MESH_NAME}
+            -DNUM_PROCESSES=${NUM_PROCESSES}
+            -P ${CMAKE_SOURCE_DIR}/tests/integration/mesh_partition.cmake
+    )
+    
+    set_tests_properties(${PARTITION_TEST_NAME} PROPERTIES
+        TIMEOUT 1200  # 20 minutes for partitioning
+        FIXTURES_SETUP "mesh_${MESH_NAME}_${NUM_PROCESSES}"
+        FIXTURES_REQUIRED "mesh_${MESH_NAME}"
+        LABELS "mesh_partition"
+    )
+    
+    message(STATUS "Added mesh partition fixture: ${PARTITION_TEST_NAME}")
+endfunction()
+
+# Function to add complete mesh pipeline (download + multiple partitions)
+function(add_mesh_pipeline MESH_NAME)
+    # Parse additional arguments for process counts
+    set(PROCESS_COUNTS ${ARGN})
+    if(NOT PROCESS_COUNTS)
+        set(PROCESS_COUNTS 2 4)  # Default process counts
+    endif()
+    
+    # Add download fixture
+    add_mesh_download_fixture(${MESH_NAME})
+    
+    # Add partition fixtures for each process count
+    foreach(NP ${PROCESS_COUNTS})
+        add_mesh_partition_fixture(${MESH_NAME} ${NP})
+    endforeach()
+    
+    message(STATUS "Added complete mesh pipeline for '${MESH_NAME}' with process counts: ${PROCESS_COUNTS}")
+endfunction()
+
+# Enhanced function to add FESOM test with mesh pipeline integration
+function(add_fesom_mesh_test TEST_NAME MESH_NAME NP)
+    set(options MPI_TEST)
+    set(oneValueArgs TIMEOUT)
+    set(multiValueArgs)
+    cmake_parse_arguments(FESOM_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+    
+    # Set defaults
+    if(NOT DEFINED FESOM_TEST_TIMEOUT)
+        set(FESOM_TEST_TIMEOUT 900)  # 15 minutes default
+    endif()
+    
+    # Parse mesh configuration from registry
+    set(MESH_REGISTRY "${CMAKE_SOURCE_DIR}/tests/mesh_registry.json")
+    if(EXISTS "${MESH_REGISTRY}")
+        file(READ "${MESH_REGISTRY}" REGISTRY_CONTENT)
+        
+        # Extract mesh configuration
+        string(REGEX MATCH "\"${MESH_NAME}\"[^}]*\"force_rotation\"[ ]*:[ ]*([^,}]+)" ROTATION_MATCH "${REGISTRY_CONTENT}")
+        if(ROTATION_MATCH)
+            string(STRIP "${CMAKE_MATCH_1}" FORCE_ROTATION_RAW)
+            string(REPLACE "true" ".true." FORCE_ROTATION "${FORCE_ROTATION_RAW}")
+            string(REPLACE "false" ".false." FORCE_ROTATION "${FORCE_ROTATION}")
+        else()
+            set(FORCE_ROTATION ".true.")  # Default
+        endif()
+        
+        string(REGEX MATCH "\"${MESH_NAME}\"[^}]*\"use_cavity\"[ ]*:[ ]*([^,}]+)" CAVITY_MATCH "${REGISTRY_CONTENT}")
+        if(CAVITY_MATCH)
+            string(STRIP "${CMAKE_MATCH_1}" USE_CAVITY_RAW)
+            string(REPLACE "true" ".true." USE_CAVITY "${USE_CAVITY_RAW}")
+            string(REPLACE "false" ".false." USE_CAVITY "${USE_CAVITY}")
+        else()
+            set(USE_CAVITY ".false.")  # Default
+        endif()
+        
+        # Extract timing parameters
+        string(REGEX MATCH "\"${MESH_NAME}\"[^}]*\"step_per_day\"[ ]*:[ ]*([^,}]+)" SPD_MATCH "${REGISTRY_CONTENT}")
+        if(SPD_MATCH)
+            string(STRIP "${CMAKE_MATCH_1}" STEP_PER_DAY)
+        else()
+            set(STEP_PER_DAY "288")  # Default
+        endif()
+        
+        string(REGEX MATCH "\"${MESH_NAME}\"[^}]*\"run_length\"[ ]*:[ ]*([^,}]+)" RL_MATCH "${REGISTRY_CONTENT}")
+        if(RL_MATCH)
+            string(STRIP "${CMAKE_MATCH_1}" RUN_LENGTH)
+        else()
+            set(RUN_LENGTH "1")  # Default
+        endif()
+        
+        string(REGEX MATCH "\"${MESH_NAME}\"[^}]*\"run_length_unit\"[ ]*:[ ]*\"([^\"]+)\"" RLU_MATCH "${REGISTRY_CONTENT}")
+        if(RLU_MATCH)
+            string(STRIP "${CMAKE_MATCH_1}" RUN_LENGTH_UNIT)
+        else()
+            set(RUN_LENGTH_UNIT "s")  # Default
+        endif()
+    else()
+        # Fallback defaults
+        set(FORCE_ROTATION ".true.")
+        set(USE_CAVITY ".false.")
+        set(STEP_PER_DAY "288")
+        set(RUN_LENGTH "1")
+        set(RUN_LENGTH_UNIT "s")
+    endif()
+    
+    # Create FESOM test with appropriate configuration from registry
+    add_fesom_test_with_options(${TEST_NAME}
+        "${MESH_NAME}" "${STEP_PER_DAY}" "${RUN_LENGTH}" "${RUN_LENGTH_UNIT}" "1" "d" "10" "${FORCE_ROTATION}" "${USE_CAVITY}"
+        MPI_TEST
+        NP ${NP}
+        TIMEOUT ${FESOM_TEST_TIMEOUT}
+    )
+    
+    # Add mesh pipeline dependency
+    set_tests_properties(${TEST_NAME} PROPERTIES
+        FIXTURES_REQUIRED "mesh_${MESH_NAME}_${NP}"
+        LABELS "mesh_simulation"
+    )
+    
+    message(STATUS "Added FESOM mesh test: ${TEST_NAME} (mesh: ${MESH_NAME}, ${NP} processes)")
+    message(STATUS "  Configuration: force_rotation=${FORCE_ROTATION}, use_cavity=${USE_CAVITY}")
+    message(STATUS "  Timing: step_per_day=${STEP_PER_DAY}, run_length=${RUN_LENGTH} ${RUN_LENGTH_UNIT}")
+endfunction()
 endfunction()

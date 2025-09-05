@@ -1,0 +1,106 @@
+{
+  "mesh_registry": {
+    "core2": {
+      "name": "CORE2 Global Ocean Mesh",
+      "description": "Global ocean mesh used with CORE2 forcing data",
+      "url": "https://swift.dkrz.de/v1/dkrz_035d8f6ff058403bb42f8302e6badfbc/FESOM_MESHES2.1/core2.tar.gz",
+      "archive_type": "tar.gz",
+      "archive_size": "6.8MB",
+      "mesh_stats": {
+        "nodes_2d": 126858,
+        "elements_2d": 244659,
+        "vertical_levels": 48
+      },
+      "config": {
+        "force_rotation": true,
+        "use_cavity": false,
+        "typical_processors": [4, 8, 16, 32],
+        "timing": {
+          "step_per_day": 32,
+          "run_length": 1,
+          "run_length_unit": "s"
+        }
+      },
+      "verification": {
+        "required_files": ["nod2d.out", "elem2d.out", "aux3d.out"],
+        "checksum": "optional"
+      }
+    },
+    "orca25": {
+      "name": "Global ~0.25-degree Ocean Mesh", 
+      "description": "Global ocean mesh at ~1 degree resolution",
+      "url": "https://swift.dkrz.de/v1/dkrz_035d8f6ff058403bb42f8302e6badfbc/FESOM_MESHES2.1/orca25.tar.gz",
+      "archive_type": "tar.gz",
+      "config": {
+        "force_rotation": true,
+        "use_cavity": false,
+        "typical_processors": [128],
+        "timing": {
+          "step_per_day": 288,
+          "run_length": 1, 
+          "run_length_unit": "s"
+        }
+      },
+      "verification": {
+        "required_files": ["nod2d.out", "elem2d.out", "aux3d.out"]
+      }
+    },
+    "ng5": {
+      "name": "Global ~5km mesh",
+      "description": "High resolution ~5km mesh",
+      "url": "https://swift.dkrz.de/v1/dkrz_035d8f6ff058403bb42f8302e6badfbc/FESOM_MESHES2.1/ng5.tar.gz", 
+      "archive_type": "tar.gz",
+      "config": {
+        "force_rotation": true,
+        "use_cavity": false,
+        "typical_processors": [128],
+        "timing": {
+          "step_per_day": 288,
+          "run_length": 1,
+          "run_length_unit": "s"
+        }
+      },
+      "verification": {
+        "required_files": ["nod2d.out", "elem2d.out", "aux3d.out"]
+      }
+    },
+    "dars": {
+      "name": "DARS Ocean Mesh",
+      "description": "DARS (Data Assimilation Research System) ocean mesh",
+      "url": "https://swift.dkrz.de/v1/dkrz_035d8f6ff058403bb42f8302e6badfbc/FESOM_MESHES2.1/dars.tar.gz",
+      "archive_type": "tar.gz",
+      "config": {
+        "force_rotation": true,
+        "use_cavity": false,
+        "typical_processors": [64],
+        "timing": {
+          "step_per_day": 32,
+          "run_length": 1,
+          "run_length_unit": "s"
+        }
+      },
+      "verification": {
+        "required_files": ["nod2d.out", "elem2d.out", "aux3d.out"]
+      }
+    },
+    "pi_remote": {
+      "name": "PI Test Mesh (Remote)",
+      "description": "Alternative version of PI test mesh downloaded from remote repository",
+      "url": "https://swift.dkrz.de/v1/dkrz_035d8f6ff058403bb42f8302e6badfbc/FESOM_MESHES2.1/pi.tar.gz",
+      "archive_type": "tar.gz",
+      "config": {
+        "force_rotation": true,
+        "use_cavity": false,
+        "typical_processors": [4, 8, 16],
+        "timing": {
+          "step_per_day": 32,
+          "run_length": 1,
+          "run_length_unit": "s"
+        }
+      },
+      "verification": {
+        "required_files": ["nod2d.out", "elem2d.out", "aux3d.out"]
+      }
+    }
+  }
+}
