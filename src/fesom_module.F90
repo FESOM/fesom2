@@ -961,6 +961,7 @@ contains
 
 #if defined(__recom) && defined(__usetp)
         end if
+#endif 
 
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("oce_timestep_ale")
@@ -987,6 +988,7 @@ contains
 
 #if defined(__recom) && defined(__usetp)
         end if
+#endif
 
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("compute_diagnostics")
@@ -1012,7 +1014,7 @@ contains
 #endif
 #if defined(__recom) && defined(__usetp)
         end if
-
+#endif 
         ! LA icebergs: 2023-05-17 
         if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
             call reset_ib_fluxes
