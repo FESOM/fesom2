@@ -585,15 +585,6 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #endif /* skip all in case of __ifsinterface */
 #endif /* (__oasis) */
 
-  !! PSong: Antarctica runoff masked (lat<-60)
-  if (use_cavity) then
-     do i=1, myDim_nod2D+eDim_nod2D
-        if (geo_coord_nod2D(2,i) < -60.0*rad) then
-           runoff(i) = 0.0_WP
-        end if
-     end do
-  end if
-
   t2=MPI_Wtime()
 
 #ifdef VERBOSE
