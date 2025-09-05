@@ -35,42 +35,37 @@ add_fesom_mesh_test(integration_dars_mpi16 "dars" 16
 # PI Mesh Tests (Remote Version)
 # =============================================================================
 
-# Add mesh pipeline for PI remote (download + partitioning for 4, 8 processes - min 4)
-add_mesh_pipeline("pi_remote" 4 8)
+# Add mesh pipeline for PI remote (using recommended processor count from registry)
+add_mesh_pipeline("pi_remote" 8)
 
-# Add FESOM simulation tests for PI remote mesh
-add_fesom_mesh_test(integration_pi_remote_mpi4 "pi_remote" 4
-    MPI_TEST
-    TIMEOUT 600
-)
-
+# Add FESOM simulation test for PI remote mesh
 add_fesom_mesh_test(integration_pi_remote_mpi8 "pi_remote" 8
     MPI_TEST
     TIMEOUT 600
 )
 
 # =============================================================================
-# Example: Adding a new mesh (glob) - Just uncomment when ready
+# NG5 Mesh Tests (High Resolution ~5km)
 # =============================================================================
 
-# # Add mesh pipeline for glob mesh (download + partitioning for 4, 8 processes)
-# add_mesh_pipeline("glob" 4 8)
-# 
-# # Add FESOM simulation test for glob mesh
-# add_fesom_mesh_test(integration_glob_mpi4 "glob" 4
-#     MPI_TEST
-#     TIMEOUT 1200  # Larger mesh may take longer
-# )
+# Add mesh pipeline for ng5 (using recommended processor count from registry)
+add_mesh_pipeline("ng5" 16)
+
+# Add FESOM simulation test for ng5 mesh
+add_fesom_mesh_test(integration_ng5_mpi16 "ng5" 16
+    MPI_TEST
+    TIMEOUT 1800  # High resolution mesh may take longer
+)
 
 # =============================================================================
-# Example: Adding arctic mesh with cavity support
+# ORCA25 Mesh Tests (Global ~0.25-degree)
 # =============================================================================
 
-# # Add mesh pipeline for arctic mesh  
-# add_mesh_pipeline("arctic" 8 16)
-# 
-# # Add FESOM simulation test for arctic mesh (with cavity)
-# add_fesom_mesh_test(integration_arctic_mpi8 "arctic" 8
-#     MPI_TEST
-#     TIMEOUT 1500  # Arctic mesh with cavity may take longer
-# )
+# Add mesh pipeline for orca25 (using recommended processor count from registry)
+add_mesh_pipeline("orca25" 16)
+
+# Add FESOM simulation test for orca25 mesh
+add_fesom_mesh_test(integration_orca25_mpi16 "orca25" 16
+    MPI_TEST
+    TIMEOUT 1500  # Larger global mesh may take longer
+)

@@ -14,7 +14,7 @@
       "config": {
         "force_rotation": true,
         "use_cavity": false,
-        "typical_processors": [4, 8, 16, 32],
+        "typical_processors": [16],
         "timing": {
           "step_per_day": 32,
           "run_length": 1,
@@ -34,9 +34,9 @@
       "config": {
         "force_rotation": true,
         "use_cavity": false,
-        "typical_processors": [128],
+        "typical_processors": [16],
         "timing": {
-          "step_per_day": 288,
+          "step_per_day": 32,
           "run_length": 1, 
           "run_length_unit": "s"
         }
@@ -53,9 +53,9 @@
       "config": {
         "force_rotation": true,
         "use_cavity": false,
-        "typical_processors": [128],
+        "typical_processors": [16],
         "timing": {
-          "step_per_day": 288,
+          "step_per_day": 32,
           "run_length": 1,
           "run_length_unit": "s"
         }
@@ -72,7 +72,7 @@
       "config": {
         "force_rotation": true,
         "use_cavity": false,
-        "typical_processors": [64],
+        "typical_processors": [16],
         "timing": {
           "step_per_day": 32,
           "run_length": 1,
@@ -91,7 +91,7 @@
       "config": {
         "force_rotation": true,
         "use_cavity": false,
-        "typical_processors": [4, 8, 16],
+        "typical_processors": [8],
         "timing": {
           "step_per_day": 32,
           "run_length": 1,
