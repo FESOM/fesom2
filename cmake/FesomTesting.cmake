@@ -474,3 +474,95 @@ function(setup_mpi_testing)
     message(STATUS "  MPIEXEC_EXECUTABLE: ${MPIEXEC_EXECUTABLE}")
     message(STATUS "  MPIEXEC_NUMPROC_FLAG: ${MPIEXEC_NUMPROC_FLAG}")
 endfunction()
+
+# Function to add a FESOM meshdiag test (uses same setup as integration tests)
+function(add_fesom_meshdiag_test TEST_NAME)
+    add_fesom_meshdiag_test_with_options("${TEST_NAME}" "pi" "mesh2" ${ARGN})
+endfunction()
+
+# Function to add a FESOM meshdiag test with custom options
+function(add_fesom_meshdiag_test_with_options TEST_NAME MESH_NAME RUNID)
+    set(oneValueArgs NP TIMEOUT)
+    set(multiValueArgs COMMAND_ARGS)
+    cmake_parse_arguments(FESOM_TEST "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+    
+    # Set defaults (meshdiag requires MPI, minimum 2 processes)
+    if(NOT DEFINED FESOM_TEST_NP)
+        set(FESOM_TEST_NP 2)
+    endif()
+    if(NOT DEFINED FESOM_TEST_TIMEOUT)
+        set(FESOM_TEST_TIMEOUT 120)  # 2 minutes default (much faster than full FESOM)
+    endif()
+    
+    # Create test run directory
+    set(TEST_RUN_DIR "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}")
+    set(TEST_DATA_DIR "${CMAKE_SOURCE_DIR}/tests/data")
+    set(RESULT_DIR "${TEST_RUN_DIR}/results")
+    
+    # Configure namelists with custom runid to avoid conflicts
+    configure_fesom_namelists_with_options("${TEST_RUN_DIR}" "${TEST_DATA_DIR}" "${RESULT_DIR}"
+        "${MESH_NAME}" "96" "1" "d" "1" "d" "10" ".true." ".false.")
+    
+    # Update runid in namelist.config to create unique output file
+    file(READ "${TEST_RUN_DIR}/namelist.config" CONTENT)
+    string(REGEX REPLACE "runid='[^']*'" "runid='${RUNID}'" CONTENT "${CONTENT}")
+    file(WRITE "${TEST_RUN_DIR}/namelist.config" "${CONTENT}")
+    
+    # Generate fesom.clock file in the results directory
+    generate_fesom_clock("${RESULT_DIR}")
+    
+    # Generate the test script
+    set(TEST_SCRIPT "${TEST_RUN_DIR}/run_test.cmake")
+    
+    # Generate MPI test script (meshdiag always requires MPI)
+    file(GENERATE OUTPUT ${TEST_SCRIPT} CONTENT "
+        # Create test directories
+        file(MAKE_DIRECTORY \"${TEST_RUN_DIR}\")
+        file(MAKE_DIRECTORY \"${RESULT_DIR}\")
+        
+        # Run fesom_meshdiag with MPI
+        execute_process(
+            COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${FESOM_TEST_NP} ${CMAKE_BINARY_DIR}/bin/fesom_meshdiag
+            WORKING_DIRECTORY \"${TEST_RUN_DIR}\"
+            RESULT_VARIABLE test_result
+            OUTPUT_VARIABLE test_output
+            ERROR_VARIABLE test_error
+            TIMEOUT ${FESOM_TEST_TIMEOUT}
+        )
+        
+        # Log the output
+        file(WRITE \"${TEST_RUN_DIR}/test_output.log\" \"\${test_output}\")
+        file(WRITE \"${TEST_RUN_DIR}/test_error.log\" \"\${test_error}\")
+        
+        # Check if mesh.diag.nc file was created
+        set(EXPECTED_OUTPUT \"${RESULT_DIR}/${RUNID}.mesh.diag.nc\")
+        if(EXISTS \"\${EXPECTED_OUTPUT}\")
+            message(STATUS \"Test ${TEST_NAME} completed successfully - mesh diagnostics file created: \${EXPECTED_OUTPUT}\")
+        else()
+            message(FATAL_ERROR \"Test ${TEST_NAME} failed - mesh diagnostics file not created: \${EXPECTED_OUTPUT}\")
+        endif()
+        
+        # Check result
+        if(test_result EQUAL 0)
+            message(STATUS \"Test ${TEST_NAME} completed with exit code: \${test_result}\")
+        else()
+            message(FATAL_ERROR \"Test ${TEST_NAME} failed with exit code: \${test_result}\")
+        endif()
+    ")
+    
+    # Add the test
+    add_test(
+        NAME ${TEST_NAME}
+        COMMAND ${CMAKE_COMMAND} -P ${TEST_SCRIPT}
+    )
+    
+    # Set test properties (meshdiag always uses MPI)
+    set_tests_properties(${TEST_NAME} PROPERTIES
+        TIMEOUT ${FESOM_TEST_TIMEOUT}
+        WORKING_DIRECTORY ${TEST_RUN_DIR}
+        PROCESSORS ${FESOM_TEST_NP}
+        RUN_SERIAL FALSE
+    )
+    
+    message(STATUS "Added FESOM meshdiag test: ${TEST_NAME} with mesh: ${MESH_NAME}, runid: ${RUNID}")
+endfunction()

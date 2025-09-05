@@ -102,3 +102,13 @@ if(ENABLE_MPI_TESTS)
         VERBATIM
     )
 endif()
+
+# Create target to run only meshdiag tests (if BUILD_MESHDIAG is enabled)
+if(BUILD_MESHDIAG)
+    add_custom_target(run_meshdiag_tests
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "meshdiag_"
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Running FESOM2 meshdiag tests"
+        VERBATIM
+    )
+endif()
