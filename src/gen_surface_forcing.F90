@@ -53,6 +53,8 @@ MODULE g_sbf
    USE netcdf
 
    IMPLICIT NONE
+   
+   include 'netcdf.inc'
 
    public  sbc_ini  ! routine called before 1st time step (open files, read namelist,...)
    public  sbc_do   ! routine called each time step to provide a sbc fileds (wind,...)
