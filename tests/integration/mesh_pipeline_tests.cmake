@@ -28,18 +28,18 @@ set_tests_properties(meshdiag_core2_mpi16 PROPERTIES
 # DARS Mesh Tests
 # =============================================================================
 
-# Add mesh pipeline for DARS (download + partitioning for 16 processes - min 16)
-add_mesh_pipeline("dars" 16)
+# Add mesh pipeline for DARS (download + partitioning for 128 processes for large mesh)
+add_mesh_pipeline("dars" 128)
 
 # Add meshdiag test for DARS mesh (large mesh ~3M nodes, needs longer timeout)
-add_fesom_meshdiag_test_with_options(meshdiag_dars_mpi16 "dars" "dars"
-    NP 16
+add_fesom_meshdiag_test_with_options(meshdiag_dars_mpi128 "dars" "dars"
+    NP 128
     TIMEOUT 1800  # 30 minutes for large DARS mesh
 )
 
 # Make meshdiag test depend on mesh pipeline
-set_tests_properties(meshdiag_dars_mpi16 PROPERTIES
-    FIXTURES_REQUIRED "mesh_dars_16"
+set_tests_properties(meshdiag_dars_mpi128 PROPERTIES
+    FIXTURES_REQUIRED "mesh_dars_128"
     LABELS "mesh_validation"
 )
 
@@ -66,18 +66,18 @@ set_tests_properties(meshdiag_pi_remote_mpi8 PROPERTIES
 # NG5 Mesh Tests (High Resolution ~5km)
 # =============================================================================
 
-# Add mesh pipeline for ng5 (using recommended processor count from registry)
-add_mesh_pipeline("ng5" 16)
+# Add mesh pipeline for ng5 (128 processes for very large mesh ~7.4M nodes)
+add_mesh_pipeline("ng5" 128)
 
 # Add meshdiag test for ng5 mesh (very large mesh ~7.4M nodes, needs long timeout)
-add_fesom_meshdiag_test_with_options(meshdiag_ng5_mpi16 "ng5" "ng5"
-    NP 16
+add_fesom_meshdiag_test_with_options(meshdiag_ng5_mpi128 "ng5" "ng5"
+    NP 128
     TIMEOUT 3600  # 60 minutes for very large NG5 mesh
 )
 
 # Make meshdiag test depend on mesh pipeline
-set_tests_properties(meshdiag_ng5_mpi16 PROPERTIES
-    FIXTURES_REQUIRED "mesh_ng5_16"
+set_tests_properties(meshdiag_ng5_mpi128 PROPERTIES
+    FIXTURES_REQUIRED "mesh_ng5_128"
     LABELS "mesh_validation"
 )
 
@@ -85,17 +85,17 @@ set_tests_properties(meshdiag_ng5_mpi16 PROPERTIES
 # ORCA25 Mesh Tests (Global ~0.25-degree)
 # =============================================================================
 
-# Add mesh pipeline for orca25 (using recommended processor count from registry)
-add_mesh_pipeline("orca25" 16)
+# Add mesh pipeline for orca25 (128 processes for large global mesh)
+add_mesh_pipeline("orca25" 128)
 
 # Add meshdiag test for orca25 mesh (large global mesh, needs longer timeout)
-add_fesom_meshdiag_test_with_options(meshdiag_orca25_mpi16 "orca25" "orca25"
-    NP 16
+add_fesom_meshdiag_test_with_options(meshdiag_orca25_mpi128 "orca25" "orca25"
+    NP 128
     TIMEOUT 1800  # 30 minutes for large ORCA25 mesh
 )
 
 # Make meshdiag test depend on mesh pipeline
-set_tests_properties(meshdiag_orca25_mpi16 PROPERTIES
-    FIXTURES_REQUIRED "mesh_orca25_16"
+set_tests_properties(meshdiag_orca25_mpi128 PROPERTIES
+    FIXTURES_REQUIRED "mesh_orca25_128"
     LABELS "mesh_validation"
 )
