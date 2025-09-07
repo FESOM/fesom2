@@ -573,7 +573,7 @@ endfunction()
 
 # Function to add mesh download fixture
 function(add_mesh_download_fixture MESH_NAME)
-    set(DOWNLOAD_TEST_NAME "mesh_download_${MESH_NAME}")
+    set(DOWNLOAD_TEST_NAME "download_mesh_${MESH_NAME}")
     
     add_test(
         NAME ${DOWNLOAD_TEST_NAME}
@@ -586,7 +586,7 @@ function(add_mesh_download_fixture MESH_NAME)
     set_tests_properties(${DOWNLOAD_TEST_NAME} PROPERTIES
         TIMEOUT 1200  # 20 minutes for download
         FIXTURES_SETUP "mesh_${MESH_NAME}"
-        LABELS "mesh_download"
+        LABELS "download_mesh"
     )
     
     message(STATUS "Added mesh download fixture: ${DOWNLOAD_TEST_NAME}")
@@ -594,7 +594,7 @@ endfunction()
 
 # Function to add mesh partition fixture  
 function(add_mesh_partition_fixture MESH_NAME NUM_PROCESSES)
-    set(PARTITION_TEST_NAME "mesh_partition_${MESH_NAME}_${NUM_PROCESSES}")
+    set(PARTITION_TEST_NAME "partition_mesh_${MESH_NAME}_${NUM_PROCESSES}")
     
     add_test(
         NAME ${PARTITION_TEST_NAME}
@@ -610,7 +610,7 @@ function(add_mesh_partition_fixture MESH_NAME NUM_PROCESSES)
         TIMEOUT 1200  # 20 minutes for partitioning
         FIXTURES_SETUP "mesh_${MESH_NAME}_${NUM_PROCESSES}"
         FIXTURES_REQUIRED "mesh_${MESH_NAME}"
-        LABELS "mesh_partition"
+        LABELS "partition_mesh"
     )
     
     message(STATUS "Added mesh partition fixture: ${PARTITION_TEST_NAME}")
