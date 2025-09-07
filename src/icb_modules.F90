@@ -141,7 +141,8 @@ type(t_partit), intent(in), target :: partit
 if (use_cavity) then
 ! kh 09.08.21 change index_nod2d -> bc_index_nod2d?
  if (.not. use_cavityonelem) then
-   reject_elem = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
+   reject_elem = any(mesh%cavity_depth(mesh%elem2D_nodes(:,elem))/=0.0) .OR. all(mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) 
+   !reject_elem = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
  !else
  end if
 else
