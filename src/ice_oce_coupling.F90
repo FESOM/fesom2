@@ -788,6 +788,17 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 
     end if  ! lwiso end
 
+    ! wiso from ice shelf basal melt
+    if (lwiso .and. use_cavity) then
+      do n=1, myDim_nod2D+eDim_nod2D
+        if (ulevels_nod2d(n) == 1) cycle  ! --> is open ocean node
+        if (water_flux(n) > 0) cycle  ! --> is refreezing
+        wiso_flux_oce(n,1)=wiso_flux_oce(n,1)-water_flux(n)*1000.0*wiso_smow(1)*(1-30.0/1000.0)
+        wiso_flux_oce(n,2)=wiso_flux_oce(n,2)-water_flux(n)*1000.0*wiso_smow(2)*(1-240.0/1000.0)
+        wiso_flux_oce(n,3)=wiso_flux_oce(n,3)-water_flux(n)*1000.0
+      end do
+    end if
+
     !---wiso-code-end
     
     !___________________________________________________________________________
