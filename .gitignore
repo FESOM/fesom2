@@ -1,4 +1,7 @@
 /build
+/build.lib
+/work
+/lib64
 *.o
 *.mod
 *.x
@@ -6,5 +9,9 @@
 *~
 *.swp
 src/icepack_drivers/Icepack
+lib/*.a
+lib/*.so
 /work_*
 Makefile.in
+mesh_part/build
+test/output_pi 

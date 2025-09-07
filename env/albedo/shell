@@ -1,0 +1,23 @@
+# make the contents as shell agnostic as possible so we can include them with bash, zsh and others
+module load intel-oneapi-compilers 
+export FC="mpiifort -qmkl" CC=mpiicc CXX=mpiicpc
+module load intel-oneapi-mpi/2021.6.0
+
+module load intel-oneapi-mkl/2022.1.0
+module load netcdf-fortran/4.5.4-intel-oneapi-mpi2021.6.0-oneapi2022.1.0
+module load netcdf-c/4.8.1-intel-oneapi-mpi2021.6.0-oneapi2022.1.0
+
+# from DKRZ recommented environment variables on levante
+# (https://docs.dkrz.de/doc/levante/running-jobs/runtime-settings.html) 
+export HCOLL_ENABLE_MCAST_ALL="0"
+export HCOLL_MAIN_IB=mlx5_0:1
+export UCX_IB_ADDR_TYPE=ib_global
+export UCX_NET_DEVICES=mlx5_0:1
+export UCX_TLS=mm,knem,cma,dc_mlx5,dc_x,self # this line here brings the most speedup factor ~1.5
+export UCX_UNIFIED_MODE=y
+export UCX_HANDLE_ERRORS=bt
+export HDF5_USE_FILE_LOCKING=FALSE
+export I_MPI_PMI=pmi2
+export I_MPI_PMI_LIBRARY=/usr/lib64/libpmi2.so
+
+export ENABLE_ALBEDO_INTELMPI_WORKAROUNDS=''

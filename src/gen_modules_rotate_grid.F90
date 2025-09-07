@@ -1,9 +1,12 @@
 ! Routines needed to support displaced poles: 
 ! The new pole position is set with 
-! alphaEuler, betaEuler and gammaEuler. The degfault values 
+! alphaEuler, betaEuler and gammaEuler. The default values 
 ! alphaEuler=50.   [degree] Euler angles, convention:
 ! betaEuler=15.	   [degree] first around z, then around new x,
 ! gammaEuler=-90.  [degree] then around new z.
+!
+! A helpful animation may be found online here:
+! https://en.wikipedia.org/wiki/Euler_angles
 !
 ! The first two define the new pole position 
 ! as phi_p=alphaEuler-90, theta_p=90-betaEuler.
@@ -30,7 +33,6 @@ module g_rotate_grid
     ! angle A around z-axis, the second is by an angle B about the new 
     ! x-axis, and the third is by an angle G about the new z-axis.   
     use o_PARAM
-    use g_PARSUP, only : mype
     implicit none
     real(kind=WP)      :: al, be, ga
 
@@ -48,7 +50,6 @@ module g_rotate_grid
     r2g_matrix(3,1)=sin(be)*sin(al) 
     r2g_matrix(3,2)=-sin(be)*cos(al)  
     r2g_matrix(3,3)=cos(be)
-    if(mype==0) write(*,*) 'rotation matrix for rotated model grids prepared'
   end subroutine set_mesh_transform_matrix
 !
 !----------------------------------------------------------------

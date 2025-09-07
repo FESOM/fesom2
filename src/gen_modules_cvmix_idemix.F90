@@ -27,7 +27,8 @@ module g_cvmix_idemix
     use g_config , only: dt
     use o_param           
     use mod_mesh
-    use g_parsup
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_arrays
     use g_comm_auto 
     use g_read_other_NetCDF
@@ -37,7 +38,8 @@ module g_cvmix_idemix
     !___________________________________________________________________________
     ! OCECTL/CVMIX_IDEMIX_PARAM namelist parameters
     ! time scale for vertical symmetrisation (sec)
-    real(kind=WP) :: idemix_tau_v = 86400.0
+    ! real(kind=WP) :: idemix_tau_v = 86400.0 ! old
+    real(kind=WP) :: idemix_tau_v = 172800.0  ! from Pollman et al. (2017), use 2days
     
     ! time scale for horizontal symmetrisation, only necessary for lateral diffusion (sec)
     real(kind=WP) :: idemix_tau_h = 1296000.0
@@ -46,25 +48,33 @@ module g_cvmix_idemix
     real(kind=WP) :: idemix_gamma = 1.570
     
     ! spectral bandwidth in modes (dimensionless)
-    real(kind=WP) :: idemix_jstar = 10.0
+    ! real(kind=WP) :: idemix_jstar = 10.0 ! old 
+    real(kind=WP) :: idemix_jstar = 5.0    ! from Pollman et al. (2017)
     
     ! dissipation parameter (dimensionless)
-    real(kind=WP) :: idemix_mu0   = 1.33333333
+    ! real(kind=WP) :: idemix_mu0   = 1.33333333 ! old 
+    real(kind=WP) :: idemix_mu0   = 0.33333333   ! from Pollman et al. (2017), use 2days
 
     ! amount of surface forcing that is used
     real(kind=WP) :: idemix_sforcusage = 0.2
     
     
-    integer       :: idemix_n_hor_iwe_prop_iter = 1
+    ! integer       :: idemix_n_hor_iwe_prop_iter = 1 ! old 
+    integer       :: idemix_n_hor_iwe_prop_iter = 5   ! from Pollman et al. (2017)
     
     ! filelocation for idemix surface forcing
     character(MAX_PATH):: idemix_surforc_file = './fourier_smooth_2005_cfsr_inert_rgrid.nc'
-
+    character(MAX_PATH):: idemix_surforc_vname= 'var706'
+    
     ! filelocation for idemix bottom forcing
     character(MAX_PATH):: idemix_botforc_file = './tidal_energy_gx1v6_20090205_rgrid.nc'
-
+    character(MAX_PATH):: idemix_botforc_vname= 'wave_dissipation'
+    ! total global Energy input that should be conserved if 0.0 no conservation is applied
+    real(kind=WP)      :: idemix_botforc_Etot = 0.0_WP ! units W
+    
     namelist /param_idemix/ idemix_tau_v, idemix_tau_h, idemix_gamma, idemix_jstar, idemix_mu0, idemix_n_hor_iwe_prop_iter, &
-                            idemix_sforcusage, idemix_surforc_file, idemix_botforc_file
+                            idemix_sforcusage, idemix_surforc_file, idemix_surforc_vname, &
+                            idemix_botforc_file, idemix_botforc_vname, idemix_botforc_Etot
                             
                             
     
@@ -72,34 +82,27 @@ module g_cvmix_idemix
     ! CVMIX-IDEMIX variables
     
     ! diagnostic fields
-    real(kind=WP), allocatable, dimension(:,:) :: iwe
+    real(kind=WP), allocatable, dimension(:,:) :: iwe_n, iwe
     real(kind=WP), allocatable, dimension(:)   :: iwe_old
-    real(kind=WP), allocatable, dimension(:,:) :: iwe_diss
-    real(kind=WP), allocatable, dimension(:,:) :: iwe_alpha_c
+    real(kind=WP), allocatable, dimension(:,:) :: iwe_alpha_c, iwe_alpha_c_n
     real(kind=WP), allocatable, dimension(:,:) :: iwe_c0
-    real(kind=WP), allocatable, dimension(:,:) :: iwe_v0
+    real(kind=WP), allocatable, dimension(:,:) :: iwe_v0_n, iwe_v0
     real(kind=WP), allocatable, dimension(:,:) :: cvmix_dummy_1
     real(kind=WP), allocatable, dimension(:,:) :: cvmix_dummy_2
     real(kind=WP), allocatable, dimension(:,:) :: cvmix_dummy_3
     real(kind=WP), allocatable, dimension(:,:) :: iwe_Ttot
     real(kind=WP), allocatable, dimension(:,:) :: iwe_Tdif
     real(kind=WP), allocatable, dimension(:,:) :: iwe_Thdi
-    real(kind=WP), allocatable, dimension(:,:) :: iwe_Tdis
+    real(kind=WP), allocatable, dimension(:,:) :: iwe_Tdis, iwe_Tdis_n
     real(kind=WP), allocatable, dimension(:,:) :: iwe_Tsur
     real(kind=WP), allocatable, dimension(:,:) :: iwe_Tbot
     real(kind=WP), allocatable, dimension(:,:) :: iwe_Av
     real(kind=WP), allocatable, dimension(:,:) :: iwe_Kv
     
-    ! forcing square of Brunt Väisälä frequency
-    real(kind=WP), allocatable, dimension(:,:) :: in3d_bvfreq2
-    
     real(kind=WP), allocatable, dimension(:,:) :: vol_wcelli
     
-    real(kind=WP), allocatable, dimension(:)   :: forc_iw_bottom_2D
-    real(kind=WP), allocatable, dimension(:)   :: forc_iw_surface_2D
-
-    real(kind=WP), dimension(:,:), pointer     :: dummy_3D
-    real(kind=WP), dimension(:,:), pointer     :: dummy_2D
+    real(kind=WP), allocatable, dimension(:)   :: iwe_fbot
+    real(kind=WP), allocatable, dimension(:)   :: iwe_fsrf
 
     ! load variables from CVMix list
     type(cvmix_data_type) :: CVMix_vars
@@ -114,15 +117,19 @@ module g_cvmix_idemix
     !===========================================================================
     ! allocate and initialize IDEMIX variables --> call initialisation 
     ! routine from cvmix library
-    subroutine init_cvmix_idemix(mesh)
+    subroutine init_cvmix_idemix(partit, mesh)
         implicit none
         character(len=cvmix_strlen) :: nmlfile
-        logical                  :: file_exist=.False.
-        integer                  :: node_size
+        logical                     :: file_exist=.False.
+        integer                     :: node_size, elem_size, elem
+        real(kind=WP)               :: loc_Etot=0.0_WP, glb_Etot=0.0_WP
 
-        type(t_mesh), intent(in), target :: mesh
-
-#include "associate_mesh.h"     
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -133,55 +140,60 @@ module g_cvmix_idemix
         !_______________________________________________________________________
         ! allocate + initialse idemix arrays --> with size myDim_nod2D+eDim_nod2D
         node_size=myDim_nod2D+eDim_nod2D
-        allocate(iwe(nl,node_size))
-        iwe(:,:)         = 0.0_WP
-        allocate(iwe_v0(nl,node_size))
-        iwe_v0(:,:)      = 0.0_WP
-        allocate(vol_wcelli(nl,node_size))
-        vol_wcelli(:,:)  = 0.0_WP
+        elem_size=myDim_elem2D+eDim_elem2D
+        
+        allocate(iwe_n(nl,node_size), iwe(nl,elem_size))
+        iwe_n(:,:)          = 0.0_WP
+        iwe(:,:)            = 0.0_WP
+        allocate(iwe_v0_n(nl,node_size), iwe_v0(nl,elem_size))
+        iwe_v0_n(:,:)       = 0.0_WP
+        iwe_v0(:,:)         = 0.0_WP
         
         ! internal wave related vertical viscosity and diffusivity
-        allocate(iwe_Av(nl,node_size))
-        allocate(iwe_Kv(nl,node_size))
-        iwe_Av(:,:)     = 0.0_WP
-        iwe_Kv(:,:)     = 0.0_WP
+        allocate(iwe_Av(nl,elem_size))
+        allocate(iwe_Kv(nl,elem_size))
+        iwe_Av(:,:)         = 0.0_WP
+        iwe_Kv(:,:)         = 0.0_WP
         
         allocate(iwe_old(nl))
-        allocate(iwe_diss(nl,node_size))
-        iwe_old(:)       = 0.0_WP
-        iwe_diss(:,:)    = 0.0_WP
+        iwe_old(:)          = 0.0_WP
         
-        allocate(cvmix_dummy_1(nl,node_size))
-        allocate(cvmix_dummy_2(nl,node_size))
-        allocate(cvmix_dummy_3(nl,node_size))
-        cvmix_dummy_1(:,:) = 0.0_WP
-        cvmix_dummy_2(:,:) = 0.0_WP
-        cvmix_dummy_3(:,:) = 0.0_WP
+        allocate(vol_wcelli(nl,node_size))
+        vol_wcelli(:,:)     = 0.0_WP        
+        
+        allocate(cvmix_dummy_1(nl,elem_size))
+        allocate(cvmix_dummy_2(nl,elem_size))
+        allocate(cvmix_dummy_3(nl,elem_size))
+        cvmix_dummy_1(:,:)  = 0.0_WP
+        cvmix_dummy_2(:,:)  = 0.0_WP
+        cvmix_dummy_3(:,:)  = 0.0_WP
         
         ! diagnostic 
-        allocate(iwe_Ttot(nl,node_size))
-        allocate(iwe_Tdif(nl,node_size))
-        allocate(iwe_Thdi(nl,node_size))
-        allocate(iwe_Tdis(nl,node_size))
-        allocate(iwe_Tsur(nl,node_size))
-        allocate(iwe_Tbot(nl,node_size))
-        iwe_Ttot(:,:)    = 0.0_WP
-        iwe_Tdif(:,:)    = 0.0_WP
-        iwe_Thdi(:,:)    = 0.0_WP
-        iwe_Tdis(:,:)    = 0.0_WP
-        iwe_Tsur(:,:)    = 0.0_WP
-        iwe_Tbot(:,:)    = 0.0_WP
+        allocate(iwe_Ttot(nl,elem_size))
+        allocate(iwe_Tdif(nl,elem_size))
+        allocate(iwe_Thdi(nl,elem_size))
+        allocate(iwe_Tdis(nl,elem_size), iwe_Tdis_n(nl,node_size))
+        allocate(iwe_Tsur(nl,elem_size))
+        allocate(iwe_Tbot(nl,elem_size))
+        iwe_Ttot(:,:)       = 0.0_WP
+        iwe_Tdif(:,:)       = 0.0_WP
+        iwe_Thdi(:,:)       = 0.0_WP
+        iwe_Tdis(:,:)       = 0.0_WP
+        iwe_Tsur(:,:)       = 0.0_WP
+        iwe_Tbot(:,:)       = 0.0_WP
+        iwe_Tdis_n(:,:)     = 0.0_WP
         
-        allocate(iwe_c0(nl,node_size))
-        allocate(iwe_alpha_c(nl,node_size))
-        iwe_c0(:,:)      = 0.0_WP
-        iwe_alpha_c(:,:) = 0.0_WP
+        allocate(iwe_c0(nl,elem_size))
+        allocate(iwe_alpha_c(nl,elem_size), iwe_alpha_c_n(nl,node_size))
+        iwe_c0(:,:)         = 0.0_WP
+        iwe_alpha_c(:,:)    = 0.0_WP
+        iwe_alpha_c_n(:,:)  = 0.0_WP
         
         ! 2D
-        allocate(forc_iw_bottom_2D(node_size))
-        allocate(forc_iw_surface_2D(node_size))
-        forc_iw_bottom_2D(:) = 0.0_WP
-        forc_iw_surface_2D(:)= 0.0_WP
+        allocate(iwe_fbot(elem_size))
+        allocate(iwe_fsrf(elem_size))
+        iwe_fbot(:) = 0.0_WP
+        iwe_fsrf(:)= 0.0_WP
         
         ! nils (for debugging)
         tstep_count = 0
@@ -208,8 +220,9 @@ module g_cvmix_idemix
             write(*,*) "     idemix_jstar        = ", idemix_jstar
             write(*,*) "     idemix_mu0          = ", idemix_mu0
             write(*,*) "     idemix_n_hor_iwe_...= ", idemix_n_hor_iwe_prop_iter
-            write(*,*) "     idemix_surforc_file = ", idemix_surforc_file
-            write(*,*) "     idemix_botforc_file = ", idemix_botforc_file
+            write(*,*) "     idemix_surforc_file = ", trim(idemix_surforc_file)
+            write(*,*) "     idemix_botforc_file = ", trim(idemix_botforc_file)
+            write(*,*) "     idemix_botforc_Etot = ", idemix_botforc_Etot
             write(*,*)
         end if
         
@@ -220,9 +233,13 @@ module g_cvmix_idemix
         inquire(file=trim(idemix_surforc_file),exist=file_exist) 
         if (file_exist) then
             if (mype==0) write(*,*) ' --> read IDEMIX near inertial wave surface forcing'
-            call read_other_NetCDF(idemix_surforc_file, 'var706', 1, forc_iw_surface_2D, .true., mesh) 
+            call read_other_NetCDF(idemix_surforc_file, idemix_surforc_vname, 1, iwe_fsrf, .true., .false., partit, mesh)
+            !                                                                                                   |           
+            !                                  .false.=interpolate on element centroids instead of vertices <---+   
+            
             ! only 20% of the niw-input are available to penetrate into the deeper ocean
-            forc_iw_surface_2D = forc_iw_surface_2D/density_0 * idemix_sforcusage 
+            ! divide by density_0 --> convert from W/m^2 to m^3/s^3
+            iwe_fsrf = iwe_fsrf/density_0 * idemix_sforcusage 
             
         else
             if (mype==0) then
@@ -233,7 +250,7 @@ module g_cvmix_idemix
                 write(*,*) '            idemix_botforc_file'
                 write(*,*) '____________________________________________________________________'
             end if
-            call par_ex(0)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
         end if 
         
         !_______________________________________________________________________
@@ -243,9 +260,47 @@ module g_cvmix_idemix
         inquire(file=trim(idemix_surforc_file),exist=file_exist) 
         if (file_exist) then
             if (mype==0) write(*,*) ' --> read IDEMIX near tidal bottom forcing'
-            call read_other_NetCDF(idemix_botforc_file, 'wave_dissipation', 1, forc_iw_bottom_2D, .true., mesh) 
-            ! convert from W/m^2 to m^3/s^3
-            forc_iw_bottom_2D  = forc_iw_bottom_2D/density_0
+            call read_other_NetCDF(idemix_botforc_file, idemix_botforc_vname, 1, iwe_fbot, .true., .false., partit, mesh)
+            !                                                                                                  |           
+            !                                 .false.=interpolate on element centroids instead of vertices <---+   
+            
+            ! check for total tidal energy that is infused through the bottom, see how 
+            ! much is lossed during interpolation and compare with value of the 
+            ! original files
+            loc_Etot = 0.0_WP
+            do elem=1, myDim_elem2D
+                ! REMEMBER!!!: the partition on elements is not unique there are 
+                ! elements that belong to two CPUs. For unique elements the index
+                ! of the First trinagle node must  be <= myDim_nod2D
+                if (elem2D_nodes(1,elem)<=myDim_nod2D) then
+                    loc_Etot = loc_Etot + elem_area(elem)*iwe_fbot(elem)
+                end if     
+            end do
+            call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) " --> IDEMIX total tidal energy Etot_bot =", glb_Etot*1.0e-12, ' TW'
+            
+            ! normalize total tidal energy at bottom with respect to the total 
+            ! tidal energy that is e.g in the original forcing files to accomodate 
+            ! non concerving losses during interpolation. This is only done when 
+            ! in namelist.cvmix: idemix_botforc_Etot \= 0.0_WP
+            if (idemix_botforc_Etot /= 0.0_WP) then
+                iwe_fbot = iwe_fbot * idemix_botforc_Etot/glb_Etot
+                
+                loc_Etot = 0.0_WP
+                do elem=1, myDim_elem2D
+                    ! REMEMBER!!!: the partition on elements is not unique there are 
+                    ! elements that belong to two CPUs. For unique elements the index
+                    ! of the First trinagle node must  be <= myDim_nod2D
+                    if (elem2D_nodes(1,elem)<=myDim_nod2D) then
+                        loc_Etot = loc_Etot + elem_area(elem)*iwe_fbot(elem)
+                    end if     
+                end do
+                call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+                if (mype==0) write(*,*) " --> IDEMIX Etot_bot after normalizing =", glb_Etot*1.0e-12, ' TW'
+            end if 
+            
+            ! divide by density_0 --> convert from W/m^2 to m^3/s^3
+            iwe_fbot  = iwe_fbot/density_0
             
         else
             if (mype==0) then
@@ -256,7 +311,7 @@ module g_cvmix_idemix
                 write(*,*) '            idemix_botforc_file'
                 write(*,*) '____________________________________________________________________'
             end if 
-            call par_ex(0)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
         end if 
         
         !_______________________________________________________________________
@@ -268,85 +323,130 @@ module g_cvmix_idemix
     !
     !===========================================================================
     ! calculate IDEMIX internal wave energy and its dissipation
-    subroutine calc_cvmix_idemix(mesh)
+    subroutine calc_cvmix_idemix(partit, mesh)
         implicit none
-        type(t_mesh), intent(in), target :: mesh
-        integer       :: node, elem, edge, node_size
-        integer       :: nz, nln, nl1, nl2, nl12, nu1, nu2, nu12, uln 
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        integer       :: node, elem, edge, node_size, elem_size, k
+        integer       :: nz, nln, nl1, nl2, nl12, nu1, nu2, nu12, uln, niter  
         integer       :: elnodes1(3), elnodes2(3), el(2), ednodes(2) 
         real(kind=WP) :: dz_trr(mesh%nl), dz_trr2(mesh%nl), bvfreq2(mesh%nl), vflux, dz_el, aux, cflfac
         real(kind=WP) :: grad_v0Eiw(2), deltaX1, deltaY1, deltaX2, deltaY2
+        real(kind=WP) :: tsum1, tsum2, tsum3, tsum4, tvol
         logical       :: debug=.false.
 
-#include "associate_mesh.h"   
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
         ! nils
         tstep_count = tstep_count + 1
-          
-        !_______________________________________________________________________
         node_size = myDim_nod2D
-        do node = 1,node_size
-            nln = nlevels_nod2D(node)-1
-            uln = ulevels_nod2D(node)
+        elem_size = myDim_elem2D
+        
+        !_______________________________________________________________________
+        do elem = 1,elem_size
+            nln = nlevels(elem)-1
+            uln = ulevels(elem)
             
             !___________________________________________________________________
             ! calculate for TKE square of Brünt-Väisälä frequency, be aware that
             ! bvfreq contains already the squared brünt Väisälä frequency ...
-            bvfreq2        = 0.0_WP
-            bvfreq2(uln:nln) = bvfreq(uln:nln,node)
+            bvfreq2          = 0.0_WP
+            do nz= uln, nln 
+                elnodes1     = elem2d_nodes(:,elem)
+                bvfreq2(nz)  = sum(bvfreq(nz,elnodes1))/3.0_WP
+            end do
             
             !___________________________________________________________________
             ! dz_trr distance between tracer points, surface and bottom dz_trr is half 
             ! the layerthickness ...
-            dz_trr         = 0.0_WP
-            dz_trr(uln+1:nln)  = abs(Z_3d_n(uln:nln-1,node)-Z_3d_n(uln+1:nln,node))
-            dz_trr(uln)      = hnode(uln,node)/2.0_WP
-            dz_trr(nln+1)  = hnode(nln,node)/2.0_WP
+            dz_trr           = 0.0_WP
+            dz_trr(uln+1:nln)= helem(uln:nln-1,elem)*0.5_WP + helem(uln+1:nln,elem)*0.5_WP
+            dz_trr(uln)      = helem(uln,elem)*0.5_WP
+            dz_trr(nln+1)    = helem(nln,elem)*0.5_WP
             
             !___________________________________________________________________
             ! main call to calculate idemix
-            iwe_old = iwe(:,node)
-            
+            iwe_old = iwe(:,elem)
             call cvmix_coeffs_idemix(&
                 ! parameter
-                dzw             = hnode(:,node),                &
-                dzt             = dz_trr(:),                    &
-                nlev            = nln,                          &
-                max_nlev        = nl-1,                         &  
-                dtime           = dt,                           &
-                coriolis        = coriolis_node(node),          &
+                dzw             = helem(uln:nln, elem),               &
+                dzt             = dz_trr(uln:nln+1),                  &
+!                 nlev            = nln,                                &
+                nlev            = nln-uln+1,                          &
+                max_nlev        = nl-1,                               &  
+                dtime           = dt,                                 &
+                coriolis        = mesh%coriolis(elem),                &
                 ! essentials 
-                iwe_new         = iwe(:,node),                  & ! out
-                iwe_old         = iwe_old(:),                   & ! in
-                forc_iw_surface = forc_iw_surface_2D(node),     & ! in
-                forc_iw_bottom  = forc_iw_bottom_2D(node),      & ! in
+                iwe_new         = iwe(uln:nln+1,elem),                & ! out
+                iwe_old         = iwe_old(uln:nln+1),                 & ! in
+                forc_iw_surface = iwe_fsrf(elem),                     & ! in
+                forc_iw_bottom  = iwe_fbot(elem),                     & ! in
                 ! FIXME: nils: better output IDEMIX Ri directly
-                alpha_c         = iwe_alpha_c(:,node),          & ! out (for Ri IMIX)
+                alpha_c         = iwe_alpha_c(uln:nln+1, elem),       & ! out (for Ri IMIX)
                 ! only for Osborn shortcut 
                 ! FIXME: nils: put this to cvmix_tke
-                KappaM_out      = iwe_Av(:,node),               & ! out
-                KappaH_out      = iwe_Kv(:,node),               & ! out
-                Nsqr            = bvfreq2(:),                   & ! in
+                KappaM_out      = iwe_Av(  uln:nln+1, elem),          & ! out
+                KappaH_out      = iwe_Kv(  uln:nln+1, elem),          & ! out
+                Nsqr            = bvfreq2( uln:nln+1),                & ! in
                 ! diagnostics
-                iwe_Ttot        = iwe_Ttot(:,node),             &
-                iwe_Tdif        = iwe_Tdif(:,node),             &
-                iwe_Thdi        = iwe_Thdi(:,node),             &
-                iwe_Tdis        = iwe_Tdis(:,node),             &
-                iwe_Tsur        = iwe_Tsur(:,node),             &
-                iwe_Tbot        = iwe_Tbot(:,node),             &
-                c0              = iwe_c0(:,node),               &
-                v0              = iwe_v0(:,node),               &
+                iwe_Ttot        = iwe_Ttot(uln:nln+1, elem),          &
+                iwe_Tdif        = iwe_Tdif(uln:nln+1, elem),          &
+                iwe_Thdi        = iwe_Thdi(uln:nln+1, elem),          &
+                iwe_Tdis        = iwe_Tdis(uln:nln+1, elem),          &
+                iwe_Tsur        = iwe_Tsur(uln:nln+1, elem),          &
+                iwe_Tbot        = iwe_Tbot(uln:nln+1, elem),          &
+                c0              = iwe_c0(  uln:nln+1, elem),          &
+                v0              = iwe_v0(  uln:nln+1, elem),          &
                 ! debugging
-                debug           = debug,                        &
+                debug           = debug,                              &
                 !i = i,                                        &
                 !j = j,                                        &
                 !tstep_count = tstep_count,                    &
-                cvmix_int_1     = cvmix_dummy_1(:,node),        &
-                cvmix_int_2     = cvmix_dummy_2(:,node),        &
-                cvmix_int_3     = cvmix_dummy_3(:,node)         &
+                cvmix_int_1     = cvmix_dummy_1(uln:nln+1, elem),     &
+                cvmix_int_2     = cvmix_dummy_2(uln:nln+1, elem),     &
+                cvmix_int_3     = cvmix_dummy_3(uln:nln+1, elem)      &
                 )
             
         end do !-->do node = 1,node_size
-            
+        
+        !_______________________________________________________________________
+        ! the variables iwe, iwe_v0 need to be now transfered from the elements 
+        ! towards vertices --> iwe_n, iwe_v0_n --> since they need to be advected
+        ! and iwe_Tdis and iwe_alpha_c are needed by TKE also on vertices 
+        ! --> iwe_Tdis_n, iwe_alpha_c_n
+        do node=1, node_size 
+            uln = ulevels_nod2D(node)
+            nln = nlevels_nod2D(node)-1
+            do nz=uln, nln
+                tvol =0.0_WP
+                tsum1=0.0_WP
+                tsum2=0.0_WP
+                tsum3=0.0_WP
+                tsum4=0.0_WP
+                do k=1, nod_in_elem2D_num(node)
+                    elem = nod_in_elem2D(k,node)
+                    nu1  = ulevels(elem)
+                    nl1  = nlevels(elem)-1
+                    if (nl1<nz .or. nz<nu1) cycle
+                    tvol = tvol +                     elem_area(elem)
+                    tsum1= tsum1+iwe(        nz,elem)*elem_area(elem)
+                    tsum2= tsum2+iwe_v0(     nz,elem)*elem_area(elem)
+                    tsum3= tsum3+iwe_Tdis(   nz,elem)*elem_area(elem)
+                    tsum4= tsum4+iwe_alpha_c(nz,elem)*elem_area(elem)
+                end do
+                iwe_n(        nz,node)=tsum1/tvol
+                iwe_v0_n(     nz,node)=tsum2/tvol
+                iwe_Tdis_n(   nz,node)=tsum3/tvol
+                iwe_alpha_c_n(nz,node)=tsum4/tvol
+            end do
+        end do
+        call exchange_nod(iwe_n         , partit)
+        call exchange_nod(iwe_v0_n      , partit)
+        call exchange_nod(iwe_Tdis_n    , partit)
+        call exchange_nod(iwe_alpha_c_n , partit)
+        
         !_______________________________________________________________________
         ! --> add contribution from horizontal wave propagation
         ! Since IDEMIX is used in a global model configuration the vertical 
@@ -361,178 +461,241 @@ module g_cvmix_idemix
         !
         if (idemix_n_hor_iwe_prop_iter>0) then
         
-            ! make boundary exchange for iwe, and iwe_v0 --> for propagation need
-            ! to calculate edge contribution that crosses the halo
-            call exchange_nod(iwe)
-            
+            ! temporarily store old iwe values for diag
+            iwe_Thdi = iwe
+                
             !___________________________________________________________________
             ! calculate inverse volume and restrict iwe_v0 to fullfill stability 
-            ! criterium --> CFL
-            ! CFL Diffusion : CFL = v0^2 * dt/dx^2, CFL < 0.5
-            ! --> limit v0 to CFL=0.2
-            ! --> v0 = sqrt(CFL * dx^2 / dt)
-            cflfac = 0.2_WP
-            ! |--> FROM NILS: "fac=0.2 ist geschätzt. Würde ich erstmal so 
-            !      probieren. Der kommt aus dem stabilitätskriterium für Diffusion 
-            !      (ähnlich berechnet wie das CFL Kriterium nur halt für den 
-            !      Diffusions anstatt für den Advektionsterm). Normalerweise 
-            !      sollte der Grenzwert aber nicht zu oft auftreten. Ich hatte 
-            !      mal damit rum-experimentiert, aber letztendlich war die Lösung 
-            !      das Iterativ zu machen und ggf. idemix_n_hor_iwe_prop_iter zu erhöhen. 
-            !      Du kannst IDEMIX erstmal ohne den Term ausprobieren und sehen, 
-            !      ob es läuft, dann kannst du den dazuschalten und hoffen, dass 
-            !      es nicht explodiert. Eigentlich sollte der Term alles glatter 
-            !      machen, aber nahe der ML kann der schon Probleme machen".
             do node = 1,node_size
-            
-                ! temporarily store old iwe values for diag
-                iwe_Thdi(:,node) = iwe(:,node)
-                
                 ! number of above bottom levels at node
                 nln = nlevels_nod2D(node)-1
                 uln = ulevels_nod2D(node)
                 
                 ! thickness of mid-level to mid-level interface at node
-                dz_trr         = 0.0_WP
+                dz_trr             = 0.0_WP
                 dz_trr(uln+1:nln)  = Z_3d_n(uln:nln-1,node)-Z_3d_n(uln+1:nln,node)
-                dz_trr(uln)      = hnode(uln,node)/2.0_WP
-                dz_trr(nln+1)  = hnode(nln,node)/2.0_WP
+                dz_trr(uln)        = hnode(uln,node)/2.0_WP
+                dz_trr(nln+1)      = hnode(nln,node)/2.0_WP
                 
                 ! surface cell 
-                vol_wcelli(uln,node) = 1/(areasvol(uln,node)*dz_trr(uln))
-                aux = sqrt(cflfac*(area(uln,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
-                iwe_v0(uln,node) = min(iwe_v0(uln,node),aux)
-                
-                ! bulk cells
-                !!PS do nz=2,nln
+                vol_wcelli(uln,node)   = 1/areasvol(uln,node)/dz_trr(uln)
                 do nz=uln+1,nln
-                    ! inverse volumne 
-                    vol_wcelli(nz,node) = 1/(areasvol(nz-1,node)*dz_trr(nz))
-                    
-                    ! restrict iwe_v0
-                    aux = sqrt(cflfac*(area(nz-1,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
-                    !                  `--------+-------------´
-                    !                           |-> comes from mesh_resolution=sqrt(area(1, :)/pi)*2._WP
-                    iwe_v0(nz,node) = min(iwe_v0(nz,node),aux)
+                    ! inverse volumne centered around full depth levels
+                    vol_wcelli(nz,node)= 1/areasvol(nz-1,node)/dz_trr(nz)
                 end do 
-                
                 ! bottom cell 
-                vol_wcelli(nln+1,node) = 1/(areasvol(nln,node)*dz_trr(nln+1))
-                aux = sqrt(cflfac*(area(nln,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
-                iwe_v0(nln+1,node) = min(iwe_v0(nln+1,node),aux)
+                vol_wcelli(nln+1,node) = 1/areasvol(nln,node)/dz_trr(nln+1)
                 
             end do !-->do node = 1,node_size
-            call exchange_nod(vol_wcelli)
-            call exchange_nod(iwe_v0)
+            call exchange_nod(vol_wcelli, partit)
             
             !___________________________________________________________________
-            ! calculate horizontal diffusion term for internal wave energy
-            do edge=1,myDim_edge2D
+            ! do iterative diffusion of internal wave energy
+            do niter=1, idemix_n_hor_iwe_prop_iter
                 !_______________________________________________________________
-                ! deltaX1,deltaY1 ... cross edge dx and dy for the two elements 
-                ! that contribute to the edge
-                !                 o
-                !                / \
-                !               /   \       + ... triangle centroids
-                !              /  +  \      x ... edge mid points
-                !             /   ^   \
-                !            /    |----\--------------->edge_cross_dxdy(1:2,edge)
-                ! ednodes(1)o-----x-----o ednodes(2)
-                !            \    |----/--------------->edge_cross_dxdy(3:4,edge)
-                !             \   v   /
-                !              \  +  /     
-                !               \   /
-                !                \ /
-                !                 o
-                deltaX1  = edge_cross_dxdy(1,edge)
-                deltaY1  = edge_cross_dxdy(2,edge)
-                ! ednode ... vertices that form the edgeiwe_Thdi
-                ednodes  = edges(:,edge)
-                ! el ... elements that contribute to edge
-                el       = edge_tri(:,edge)
-                ! elnodes1 ... nodes that contribute to element el(1) 
-                elnodes1 = elem2d_nodes(:,el(1))
-                ! nl1 ... number of layers at element el(1)
-                nl1      = nlevels(el(1))
-                ! nu1 ... upper index of ocean default = 1 but can consider cavity !=1
-                nu1      = ulevels(el(1))
-                
-                ! thickness of mid-level to mid-level interface of element el(1)
-                dz_trr         = 0.0_WP
-                dz_trr(1)      = helem(1,el(1))/2.0_WP
-                !!PS do nz=2,nl1-1
-                do nz=nu1+1,nl1-1
-                    dz_trr(nz) = helem(nz-1,el(1))/2.0_WP + helem(nz,el(1))/2.0_WP
-                end do
-                dz_trr(nl1)    = helem(nl1-1,el(1))/2.0_WP
-                
-                !_______________________________________________________________
-                ! the same as above but for el(2)--> if el(2)==0 than this edge 
-                ! is a boundary edge and el(2) does not exist
-                nl2=0
-                nu2=0
-                if (el(2)>0) then 
-                    deltaX2  = edge_cross_dxdy(3,edge)
-                    deltaY2  = edge_cross_dxdy(4,edge)
-                    elnodes2 = elem2d_nodes(:,el(2))
-                    nl2      = nlevels(el(2))
-                    nu2      = ulevels(el(2))
+                ! calculate horizontal diffusion term for internal wave energy
+                do edge=1,myDim_edge2D
+                    !___________________________________________________________
+                    ! deltaX1,deltaY1 ... cross edge dx and dy for the two elements 
+                    ! that contribute to the edge
+                    !                 o
+                    !                / \
+                    !               /   \       + ... triangle centroids
+                    !              /  +  \      x ... edge mid points
+                    !             /   ^   \
+                    !            /    |----\--------------->edge_cross_dxdy(1:2,edge)
+                    ! ednodes(1)o-----x-----o ednodes(2)
+                    !            \    |----/--------------->edge_cross_dxdy(3:4,edge)
+                    !             \   v   /
+                    !              \  +  /     
+                    !               \   /
+                    !                \ /
+                    !                 o
+                    deltaX1  = edge_cross_dxdy(1,edge)
+                    deltaY1  = edge_cross_dxdy(2,edge)
+                    ! ednode ... vertices that form the edgeiwe_Thdi
+                    ednodes  = edges(:,edge)
+                    ! el ... elements that contribute to edge
+                    el       = edge_tri(:,edge)
+                    ! elnodes1 ... nodes that contribute to element el(1) 
+                    elnodes1 = elem2d_nodes(:,el(1))
+                    ! nl1 ... number of layers at element el(1)
+                    nl1      = nlevels(el(1))
+                    ! nu1 ... upper index of ocean default = 1 but can consider cavity !=1
+                    nu1      = ulevels(el(1))
                     
-                    ! thickness of mid-level to mid-level interface of element el(2)
-                    dz_trr2         = 0.0_WP
-                    dz_trr2(1)      = helem(1,el(2))/2.0_WP
-                    !!PS do nz=2,nl2-1
-                    do nz=nu2+1,nl2-1
-                        dz_trr2(nz) = helem(nz-1,el(2))/2.0_WP + helem(nz,el(2))/2.0_WP
+                    ! thickness of mid-level to mid-level interface of element el(1)
+                    dz_trr         = 0.0_WP
+                    dz_trr(nu1)    = helem(nu1,el(1))/2.0_WP
+                    !!PS do nz=2,nl1-1
+                    do nz=nu1+1,nl1-1
+                        dz_trr(nz) = helem(nz-1,el(1))/2.0_WP + helem(nz,el(1))/2.0_WP
                     end do
-                    dz_trr2(nl2)    = helem(nl2-1,el(2))/2.0_WP
-                endif
-                
-                !_______________________________________________________________
-                nl12=min(nl1,nl2)
-                nu12=max(nu1,nu2)
-                
-                !_______________________________________________________________
-                ! (A) goes only into this loop when the edge has only facing element
-                ! el(1) --> so the edge is a boundary edge --> this is for ocean 
-                ! surface in case of cavity
-                do nz=nu1,nu12-1
-                    !___________________________________________________________
-                    ! --> calc: grad_h(v_0*E_iw)
-                    ! calculate flux from el(1) with respect to edge mid 
-                    ! point
-                    grad_v0Eiw(1) = sum(gradient_sca(1:3,el(1))*iwe_v0(nz,elnodes1)*iwe(nz,elnodes1))
-                    grad_v0Eiw(2) = sum(gradient_sca(4:6,el(1))*iwe_v0(nz,elnodes1)*iwe(nz,elnodes1))
-                    dz_el         = dz_trr(nz)
-                    
-                    ! calculate flux 
-                    vflux = (grad_v0Eiw(1)*deltaY1-grad_v0Eiw(2)*deltaX1)*dz_el
+                    dz_trr(nl1)    = helem(nl1-1,el(1))/2.0_WP
                     
                     !___________________________________________________________
-                    ! --> calc: v_0*idemix_tau_h* grad_h(v_0*E_iw)
-                    ! multiply vflux with iwe_v0 interpolate to the edge-
-                    ! mid point 
-                    vflux = vflux * (iwe_v0(nz,ednodes(1))+iwe_v0(nz,ednodes(2)))*0.5_WP
+                    ! the same as above but for el(2)--> if el(2)==0 than this edge 
+                    ! is a boundary edge and el(2) does not exist
+                    nl2=0
+                    nu2=0
+                    if (el(2)>0) then 
+                        deltaX2  = edge_cross_dxdy(3,edge)
+                        deltaY2  = edge_cross_dxdy(4,edge)
+                        elnodes2 = elem2d_nodes(:,el(2))
+                        nl2      = nlevels(el(2))
+                        nu2      = ulevels(el(2))
+                        
+                        ! thickness of mid-level to mid-level interface of element el(2)
+                        dz_trr2         = 0.0_WP
+                        dz_trr2(nu2)    = helem(nu2,el(2))/2.0_WP
+                        !!PS do nz=2,nl2-1
+                        do nz=nu2+1,nl2-1
+                            dz_trr2(nz) = helem(nz-1,el(2))/2.0_WP + helem(nz,el(2))/2.0_WP
+                        end do
+                        dz_trr2(nl2)    = helem(nl2-1,el(2))/2.0_WP
+                    endif
                     
                     !___________________________________________________________
-                    ! --> calc: div(v_0*idemix_tau_h* grad_h(v_0*E_iw))
-                    ! sum fluxes over the surface --> gaussian integral satz
-                    iwe(nz,ednodes(1)) = iwe(nz,ednodes(1)) + dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(1))*vflux
-                    iwe(nz,ednodes(2)) = iwe(nz,ednodes(2)) - dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(2))*vflux
-                end do !-->do nz=nu1,nu12-1
-                
-                !_______________________________________________________________
-                ! (B) goes only into this loop when the edge has only facing elemenmt
-                ! el(2) --> so the edge is a boundary edge --> this is for ocean 
-                ! surface in case of cavity
-                if (nu2 > 0) then 
-                    do nz=nu2,nu12-1
-                        !___________________________________________________________
+                    nl12=min(nl1,nl2)
+                    nu12=max(nu1,nu2)
+                    
+                    !___________________________________________________________
+                    ! (A) goes only into this loop when the edge has only facing element
+                    ! el(1) --> so the edge is a boundary edge --> this is for ocean 
+                    ! surface in case of cavity
+                    do nz=nu1,nu12-1
+                        !_______________________________________________________
+                        ! --> calc: grad_h(v_0*E_iw)
+                        ! calculate flux from el(1) with respect to edge mid 
+                        ! point
+                        grad_v0Eiw(1) = sum(gradient_sca(1:3,el(1))*iwe_v0_n(nz,elnodes1)*iwe_n(nz,elnodes1))
+                        grad_v0Eiw(2) = sum(gradient_sca(4:6,el(1))*iwe_v0_n(nz,elnodes1)*iwe_n(nz,elnodes1))
+                        dz_el         = dz_trr(nz)
+                        
+                        ! calculate flux 
+                        vflux = (grad_v0Eiw(1)*deltaY1-grad_v0Eiw(2)*deltaX1)*dz_el
+                        
+                        !_______________________________________________________
+                        ! --> calc: v_0*idemix_tau_h* grad_h(v_0*E_iw)
+                        ! multiply vflux with iwe_v0 interpolate to the edge-
+                        ! mid point 
+                        vflux = vflux * (iwe_v0_n(nz,ednodes(1))+iwe_v0_n(nz,ednodes(2)))*0.5_WP
+                        
+                        !_______________________________________________________
+                        ! --> calc: div(v_0*idemix_tau_h* grad_h(v_0*E_iw))
+                        ! sum fluxes over the surface --> gaussian integral satz
+                        iwe_n(nz,ednodes(1)) = iwe_n(nz,ednodes(1)) + dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(1))*vflux
+                        iwe_n(nz,ednodes(2)) = iwe_n(nz,ednodes(2)) - dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(2))*vflux
+                    end do !-->do nz=nu1,nu12-1
+                    
+                    !___________________________________________________________
+                    ! (B) goes only into this loop when the edge has only facing elemenmt
+                    ! el(2) --> so the edge is a boundary edge --> this is for ocean 
+                    ! surface in case of cavity
+                    if (nu2 > 0) then 
+                        do nz=nu2,nu12-1
+                            !___________________________________________________
+                            ! --> calc: grad_h(v_0*E_iw)
+                            ! first calculate flux from el(1) with respect to edge mid 
+                            ! point
+                            grad_v0Eiw(1) = sum(gradient_sca(1:3,el(2))*iwe_v0_n(nz,elnodes2)*iwe_n(nz,elnodes2))
+                            grad_v0Eiw(2) = sum(gradient_sca(4:6,el(2))*iwe_v0_n(nz,elnodes2)*iwe_n(nz,elnodes2))
+                            dz_el         = dz_trr2(nz)
+                            
+                            ! calculate flux 
+                            vflux = -(grad_v0Eiw(1)*deltaY2-grad_v0Eiw(2)*deltaX2)*dz_el
+                            !       |--> minus sign comes from the fact that the the 
+                            !            normal vectors (dx1,dy1) and (dx2,dy2) face 
+                            !            in opposite direction (Right-Hand-Rule)
+                            
+                            !___________________________________________________
+                            ! --> calc: v_0*idemix_tau_h* grad_h(v_0*E_iw)
+                            ! multiply vflux with iwe_v0 interpolate to the edge-
+                            ! mid point 
+                            vflux = vflux * (iwe_v0_n(nz,ednodes(1))+iwe_v0_n(nz,ednodes(2)))*0.5_WP
+                            
+                            !___________________________________________________
+                            ! --> calc: div(v_0*idemix_tau_h* grad_h(v_0*E_iw))
+                            ! sum fluxes over the surface --> gaussian integral satz
+                            iwe_n(nz,ednodes(1)) = iwe_n(nz,ednodes(1)) + dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(1))*vflux
+                            iwe_n(nz,ednodes(2)) = iwe_n(nz,ednodes(2)) - dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(2))*vflux
+                            
+                        end do !-->do nz=nu2,nu12-1
+                    end if 
+                    
+                    !___________________________________________________________
+                    ! (C) goes only into this loop when the edge has two facing elements
+                    ! --> so the edge is not a boundary edge
+                    !!PS do nz=1,nl12
+                    do nz=nu12,nl12
+                        !_______________________________________________________
+                        ! --> calc: grad_h(v_0*E_iw)
+                        ! calculate grad(iwe*iwe_v0) for el(1)
+                        grad_v0Eiw(1) = sum(gradient_sca(1:3,el(1))*iwe_v0_n(nz,elnodes1)*iwe_n(nz,elnodes1))
+                        grad_v0Eiw(2) = sum(gradient_sca(4:6,el(1))*iwe_v0_n(nz,elnodes1)*iwe_n(nz,elnodes1))
+                        
+                        ! calculate grad(iwe*iwe_v0) for el(2) and average for el(1)
+                        ! and el(2)
+                        grad_v0Eiw(1) = (grad_v0Eiw(1) + sum(gradient_sca(1:3,el(2))*iwe_v0_n(nz,elnodes2)*iwe_n(nz,elnodes2)))*0.5_WP
+                        grad_v0Eiw(2) = (grad_v0Eiw(2) + sum(gradient_sca(4:6,el(2))*iwe_v0_n(nz,elnodes2)*iwe_n(nz,elnodes2)))*0.5_WP
+                        
+                        ! mean mid level to midlevel tickness between el(1) and el(2)
+                        dz_el         = (dz_trr(nz)+dz_trr2(nz))*0.5_WP
+                        
+                        ! calculate flux 
+                        vflux = ((deltaX2-deltaX1)*grad_v0Eiw(2)-(deltaY2-deltaY1)*grad_v0Eiw(1))*dz_el
+                        
+                        !_______________________________________________________
+                        ! --> calc: v_0*idemix_tau_h* grad_h(v_0*E_iw)
+                        ! multiply vflux with iwe_v0 interpolate to the edge-
+                        ! mid point 
+                        vflux = vflux * (iwe_v0_n(nz,ednodes(1))+iwe_v0_n(nz,ednodes(2)))*0.5_WP
+                        
+                        !_______________________________________________________
+                        ! --> calc: div(v_0*idemix_tau_h* grad_h(v_0*E_iw))
+                        ! sum fluxes over the surface --> gaussian integral satz
+                        iwe_n(nz,ednodes(1)) = iwe_n(nz,ednodes(1)) + dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(1))*vflux
+                        iwe_n(nz,ednodes(2)) = iwe_n(nz,ednodes(2)) - dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(2))*vflux
+                    end do !-->do nz=1,n2
+                    
+                    !___________________________________________________________
+                    ! (D) goes only into this loop when the edge has only facing element
+                    ! el(1) --> so the edge is a boundary edge
+                    do nz=nl12+1,nl1
+                        !_______________________________________________________
+                        ! --> calc: grad_h(v_0*E_iw)
+                        ! calculate flux from el(1) with respect to edge mid 
+                        ! point
+                        grad_v0Eiw(1) = sum(gradient_sca(1:3,el(1))*iwe_v0_n(nz,elnodes1)*iwe_n(nz,elnodes1))
+                        grad_v0Eiw(2) = sum(gradient_sca(4:6,el(1))*iwe_v0_n(nz,elnodes1)*iwe_n(nz,elnodes1))
+                        dz_el         = dz_trr(nz)
+                        
+                        ! calculate flux 
+                        vflux = (grad_v0Eiw(1)*deltaY1-grad_v0Eiw(2)*deltaX1)*dz_el
+                        
+                        !_______________________________________________________
+                        ! --> calc: v_0*idemix_tau_h* grad_h(v_0*E_iw)
+                        ! multiply vflux with iwe_v0 interpolate to the edge-
+                        ! mid point 
+                        vflux = vflux * (iwe_v0_n(nz,ednodes(1))+iwe_v0_n(nz,ednodes(2)))*0.5_WP
+                        
+                        !_______________________________________________________
+                        ! --> calc: div(v_0*idemix_tau_h* grad_h(v_0*E_iw))
+                        ! sum fluxes over the surface --> gaussian integral satz
+                        iwe_n(nz,ednodes(1)) = iwe_n(nz,ednodes(1)) + dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(1))*vflux
+                        iwe_n(nz,ednodes(2)) = iwe_n(nz,ednodes(2)) - dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(2))*vflux
+                    end do !-->do nz=nl12+1,nl1
+                    
+                    !___________________________________________________________
+                    ! (E) goes only into this loop when the edge has only facing elemenmt
+                    ! el(2) --> so the edge is a boundary edge
+                    do nz=nl12+1,nl2
+                        !_______________________________________________________
                         ! --> calc: grad_h(v_0*E_iw)
                         ! first calculate flux from el(1) with respect to edge mid 
                         ! point
-                        grad_v0Eiw(1) = sum(gradient_sca(1:3,el(2))*iwe_v0(nz,elnodes2)*iwe(nz,elnodes2))
-                        grad_v0Eiw(2) = sum(gradient_sca(4:6,el(2))*iwe_v0(nz,elnodes2)*iwe(nz,elnodes2))
+                        grad_v0Eiw(1) = sum(gradient_sca(1:3,el(2))*iwe_v0_n(nz,elnodes2)*iwe_n(nz,elnodes2))
+                        grad_v0Eiw(2) = sum(gradient_sca(4:6,el(2))*iwe_v0_n(nz,elnodes2)*iwe_n(nz,elnodes2))
                         dz_el         = dz_trr2(nz)
                         
                         ! calculate flux 
@@ -541,115 +704,31 @@ module g_cvmix_idemix
                         !            normal vectors (dx1,dy1) and (dx2,dy2) face 
                         !            in opposite direction (Right-Hand-Rule)
                         
-                        !___________________________________________________________
+                        !_______________________________________________________
                         ! --> calc: v_0*idemix_tau_h* grad_h(v_0*E_iw)
                         ! multiply vflux with iwe_v0 interpolate to the edge-
                         ! mid point 
-                        vflux = vflux * (iwe_v0(nz,ednodes(1))+iwe_v0(nz,ednodes(2)))*0.5_WP
+                        vflux = vflux * (iwe_v0_n(nz,ednodes(1))+iwe_v0_n(nz,ednodes(2)))*0.5_WP
                         
-                        !___________________________________________________________
+                        !_______________________________________________________
                         ! --> calc: div(v_0*idemix_tau_h* grad_h(v_0*E_iw))
                         ! sum fluxes over the surface --> gaussian integral satz
-                        iwe(nz,ednodes(1)) = iwe(nz,ednodes(1)) + dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(1))*vflux
-                        iwe(nz,ednodes(2)) = iwe(nz,ednodes(2)) - dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(2))*vflux
+                        iwe_n(nz,ednodes(1)) = iwe_n(nz,ednodes(1)) + dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(1))*vflux
+                        iwe_n(nz,ednodes(2)) = iwe_n(nz,ednodes(2)) - dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(2))*vflux
                         
-                    end do !-->do nz=nu2,nu12-1
-                end if 
-                !_______________________________________________________________
-                ! (C) goes only into this loop when the edge has two facing elements
-                ! --> so the edge is not a boundary edge
-                !!PS do nz=1,nl12
-                do nz=nu12,nl12
-                    !___________________________________________________________
-                    ! --> calc: grad_h(v_0*E_iw)
-                    ! calculate grad(iwe*iwe_v0) for el(1)
-                    grad_v0Eiw(1) = sum(gradient_sca(1:3,el(1))*iwe_v0(nz,elnodes1)*iwe(nz,elnodes1))
-                    grad_v0Eiw(2) = sum(gradient_sca(4:6,el(1))*iwe_v0(nz,elnodes1)*iwe(nz,elnodes1))
-                    
-                    ! calculate grad(iwe*iwe_v0) for el(2) and average for el(1)
-                    ! and el(2)
-                    grad_v0Eiw(1) = (grad_v0Eiw(1) + sum(gradient_sca(1:3,el(2))*iwe_v0(nz,elnodes2)*iwe(nz,elnodes2)))*0.5_WP
-                    grad_v0Eiw(2) = (grad_v0Eiw(2) + sum(gradient_sca(4:6,el(2))*iwe_v0(nz,elnodes2)*iwe(nz,elnodes2)))*0.5_WP
-                    
-                    ! mean mid level to midlevel tickness between el(1) and el(2)
-                    dz_el         = (dz_trr(nz)+dz_trr2(nz))*0.5_WP
-                    
-                    ! calculate flux 
-                    vflux = ((deltaX2-deltaX1)*grad_v0Eiw(2)-(deltaY2-deltaY1)*grad_v0Eiw(1))*dz_el
-                    
-                    !___________________________________________________________
-                    ! --> calc: v_0*idemix_tau_h* grad_h(v_0*E_iw)
-                    ! multiply vflux with iwe_v0 interpolate to the edge-
-                    ! mid point 
-                    vflux = vflux * (iwe_v0(nz,ednodes(1))+iwe_v0(nz,ednodes(2)))*0.5_WP
-                    
-                    !___________________________________________________________
-                    ! --> calc: div(v_0*idemix_tau_h* grad_h(v_0*E_iw))
-                    ! sum fluxes over the surface --> gaussian integral satz
-                    iwe(nz,ednodes(1)) = iwe(nz,ednodes(1)) + dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(1))*vflux
-                    iwe(nz,ednodes(2)) = iwe(nz,ednodes(2)) - dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(2))*vflux
-                end do !-->do nz=1,n2
-                
-                !_______________________________________________________________
-                ! (D) goes only into this loop when the edge has only facing element
-                ! el(1) --> so the edge is a boundary edge
-                do nz=nl12+1,nl1
-                    !___________________________________________________________
-                    ! --> calc: grad_h(v_0*E_iw)
-                    ! calculate flux from el(1) with respect to edge mid 
-                    ! point
-                    grad_v0Eiw(1) = sum(gradient_sca(1:3,el(1))*iwe_v0(nz,elnodes1)*iwe(nz,elnodes1))
-                    grad_v0Eiw(2) = sum(gradient_sca(4:6,el(1))*iwe_v0(nz,elnodes1)*iwe(nz,elnodes1))
-                    dz_el         = dz_trr(nz)
-                    
-                    ! calculate flux 
-                    vflux = (grad_v0Eiw(1)*deltaY1-grad_v0Eiw(2)*deltaX1)*dz_el
-                    
-                    !___________________________________________________________
-                    ! --> calc: v_0*idemix_tau_h* grad_h(v_0*E_iw)
-                    ! multiply vflux with iwe_v0 interpolate to the edge-
-                    ! mid point 
-                    vflux = vflux * (iwe_v0(nz,ednodes(1))+iwe_v0(nz,ednodes(2)))*0.5_WP
-                    
-                    !___________________________________________________________
-                    ! --> calc: div(v_0*idemix_tau_h* grad_h(v_0*E_iw))
-                    ! sum fluxes over the surface --> gaussian integral satz
-                    iwe(nz,ednodes(1)) = iwe(nz,ednodes(1)) + dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(1))*vflux
-                    iwe(nz,ednodes(2)) = iwe(nz,ednodes(2)) - dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(2))*vflux
-                end do !-->do nz=nl12+1,nl1
-                
-                !_______________________________________________________________
-                ! (E) goes only into this loop when the edge has only facing elemenmt
-                ! el(2) --> so the edge is a boundary edge
-                do nz=nl12+1,nl2
-                    !___________________________________________________________
-                    ! --> calc: grad_h(v_0*E_iw)
-                    ! first calculate flux from el(1) with respect to edge mid 
-                    ! point
-                    grad_v0Eiw(1) = sum(gradient_sca(1:3,el(2))*iwe_v0(nz,elnodes2)*iwe(nz,elnodes2))
-                    grad_v0Eiw(2) = sum(gradient_sca(4:6,el(2))*iwe_v0(nz,elnodes2)*iwe(nz,elnodes2))
-                    dz_el         = dz_trr2(nz)
-                    
-                    ! calculate flux 
-                    vflux = -(grad_v0Eiw(1)*deltaY2-grad_v0Eiw(2)*deltaX2)*dz_el
-                    !       |--> minus sign comes from the fact that the the 
-                    !            normal vectors (dx1,dy1) and (dx2,dy2) face 
-                    !            in opposite direction (Right-Hand-Rule)
-                    
-                    !___________________________________________________________
-                    ! --> calc: v_0*idemix_tau_h* grad_h(v_0*E_iw)
-                    ! multiply vflux with iwe_v0 interpolate to the edge-
-                    ! mid point 
-                    vflux = vflux * (iwe_v0(nz,ednodes(1))+iwe_v0(nz,ednodes(2)))*0.5_WP
-                    
-                    !___________________________________________________________
-                    ! --> calc: div(v_0*idemix_tau_h* grad_h(v_0*E_iw))
-                    ! sum fluxes over the surface --> gaussian integral satz
-                    iwe(nz,ednodes(1)) = iwe(nz,ednodes(1)) + dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(1))*vflux
-                    iwe(nz,ednodes(2)) = iwe(nz,ednodes(2)) - dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(2))*vflux
-                    
-                end do !-->do nz=nl12+1,nl1
-            end do !-->do edge=1,myDim_edge2D
+                    end do !-->do nz=nl12+1,nl1
+                end do !-->do edge=1,myDim_edge2D
+            end do !--> niter =1, idemix_n_hor_iwe_prop_iter
+            
+            !___________________________________________________________________
+            ! convert: iwe_n (nodes) --> iwe (elem)
+            call exchange_nod(iwe_n, partit) !Warning: don't forget to communicate before averaging on elements!!!
+            do elem=1, elem_size
+                elnodes1=elem2D_nodes(:,elem)
+                do nz=ulevels(elem),nlevels(elem)-1
+                    iwe(nz,elem) = sum(iwe_n(nz,elnodes1))/3.0_WP    ! (elementwise)                
+                end do
+            end do
             
             !___________________________________________________________________
             ! diagnostic: add horizontal propgation to the total production rate
@@ -665,20 +744,30 @@ module g_cvmix_idemix
         ! used alone --> mostly for debuging --> otherwise TKE Av and Kv are use
         if(mix_scheme_nmb==6) then 
             !___________________________________________________________________
-            ! write out diffusivity
-            call exchange_nod(iwe_Kv)
-            Kv = iwe_Kv
-            
-            !___________________________________________________________________
-            ! write out viscosity -->interpolate therefor from nodes to elements
-            call exchange_nod(iwe_Av) !Warning: don't forget to communicate before averaging on elements!!!
-            do elem=1, myDim_elem2D
-                elnodes1=elem2D_nodes(:,elem)
-                !!PS do nz=1,nlevels(elem)-1
-                do nz=ulevels(elem),nlevels(elem)-1
-                    Av(nz,elem) = sum(iwe_Av(nz,elnodes1))/3.0_WP    ! (elementwise)                
+            ! write out diffusivity --> convert from elem to vertices
+            do node=1, node_size 
+                uln = ulevels_nod2D(node)
+                nln = nlevels_nod2D(node)-1
+                do nz=uln, nln
+                    tvol =0.0_WP
+                    tsum1=0.0_WP
+                    do k=1, nod_in_elem2D_num(node)
+                        elem = nod_in_elem2D(k,node)
+                        nu1  = ulevels(elem)
+                        nl1  = nlevels(elem)-1
+                        if (nl1<nz .or. nz<nu1) cycle
+                        tvol = tvol +elem_area(elem)
+                        tsum1= tsum1+iwe_Kv(nz,elem)*elem_area(elem)
+                    end do
+                    Kv(nz,node)=tsum1/tvol
                 end do
             end do
+            call exchange_nod(Kv, partit)
+            
+            !___________________________________________________________________
+            ! write out viscosity 
+            Av = iwe_Av
+            
         end if 
     end subroutine calc_cvmix_idemix
 end module g_cvmix_idemix

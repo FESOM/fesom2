@@ -37,6 +37,8 @@ if(CMAKE_COMPILER_IS_GNUCC)
 elseif(${CMAKE_C_COMPILER_ID} MATCHES "Sun")
 # Sun insists on -xc99.
   set(GKlib_COPTIONS "${GKlib_COPTIONS} -xc99")
+elseif(${CMAKE_C_COMPILER_ID} MATCHES "Cray")
+  set(GKlib_COPTIONS "${GKlib_COPTIONS} -fPIC")
 endif(CMAKE_COMPILER_IS_GNUCC)
 
 # Find OpenMP if it is requested.

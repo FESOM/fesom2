@@ -36,17 +36,21 @@ namelist.config:
 namelist.oce:
     oce_dyn:
         state_equation: 0
-        Div_c: 0.5
-        Leith_c: 0.05
-        w_split: False
         Fer_GM: False
         Redi: False
         mix_scheme: "PP"
-    oce_tra:
+
+namelist.dyn:
+    dynamics_general:
+        use_wsplit: False
+
+namelist.tra:
+    tracer_phys:
         use_momix: False
         K_hor: 10
         surf_relax_S: 0.0
         balance_salt_water: False
+
 
 namelist.ice:
     ice_dyn:
@@ -54,8 +58,6 @@ namelist.ice:
         evp_rheol_steps: 150
 
 namelist.io:
-    diag_list:
-        ldiag_energy: False
     nml_list:
         io_list:
             "sst       ":
@@ -81,8 +83,8 @@ namelist.io:
 
 fcheck:
     salt: 35.0
-    temp: 14.329708416524904
-    sst: 18.939699613817496
-    u: 0.0274316731683607
-    v: -0.0008870790518593145
+    temp: 14.32971070841858
+    sst: 18.939706786577307
+    u: 0.02758697670905878
+    v: -0.0008622141069446677
 

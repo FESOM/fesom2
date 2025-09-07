@@ -1,0 +1,37 @@
+# used at ECMWF
+
+module unload metview
+module unload emos
+module unload eccodes
+module unload fftw
+module unload openmpi
+module unload boost
+module unload fcm
+module unload hdf5
+module unload netcdf
+module unload netcdf4
+module unload python3
+module unload nag
+module unload gnu 
+module unload clang 
+module unload intel 
+module unload cmake 
+module unload prgenv
+module unload gcc
+
+# Load modules
+module load prgenv/intel
+module load intel/2021.4.0
+module load hpcx-openmpi/2.9.0
+module load intel-mkl/19.0.5
+module load fftw/3.3.9
+module load netcdf4/4.7.4
+module load hdf5/1.10.6
+module load boost/1.71.0
+module load eigen/3.3.7 
+module load cmake/3.20.2
+module load ninja/1.10.0
+module load fcm/2019.05.0
+
+export FC=ifort CC=icc CXX=icpc
+

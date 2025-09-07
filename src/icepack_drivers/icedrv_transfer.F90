@@ -10,7 +10,7 @@
 
       contains
 
-      module subroutine fesom_to_icepack(mesh)
+      module subroutine fesom_to_icepack(ice, mesh)
 
           use g_forcing_arrays, only: Tair, shum, u_wind,   v_wind,       & ! Atmospheric forcing fields
                                       shortwave,  longwave, prec_rain,    &
@@ -18,11 +18,6 @@
           use g_forcing_param,  only: ncar_bulk_z_wind, ncar_bulk_z_tair, &
                                       ncar_bulk_z_shum
           use g_sbf,            only: l_mslp                     
-          use i_arrays,         only: S_oc_array,      T_oc_array,        & ! Ocean and sea ice fields
-                                      u_w,             v_w,               &
-                                      u_ice,           v_ice,             &
-                                      stress_atmice_x, stress_atmice_y
-          use i_param,          only: cd_oce_ice                            ! Sea ice parameters
           use icepack_intfc,    only: icepack_warnings_flush, icepack_warnings_aborted
           use icepack_intfc,    only: icepack_query_parameters
           use icepack_intfc,    only: icepack_sea_freezing_temperature
@@ -31,8 +26,8 @@
           use g_config,         only: dt
           use o_param,          only: mstep
           use mod_mesh
-          use o_mesh
-          use g_parsup
+          use mod_tracer
+          use mod_ice
           use g_clock
  
           implicit none
@@ -49,21 +44,36 @@
              frcidf = 0.17_dbl_kind,    & ! frac of incoming sw in near IR diffuse band
              R_dry  = 287.05_dbl_kind,  & ! specific gas constant for dry air (J/K/kg)
              R_vap  = 461.495_dbl_kind, & ! specific gas constant for water vapo (J/K/kg)
-             rhowat = 1025.0_dbl_kind,  & ! Water density
-             cc     = rhowat*4190.0_dbl_kind, & ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
              ex     = 0.286_dbl_kind
-
-          integer(kind=dbl_kind)   :: i, n,  k,  elem
-          real   (kind=int_kind)   :: tx, ty, tvol
+             !PS rhowat = 1025.0_dbl_kind,  & ! Water density
+             !PS cc     = rhowat*4190.0_dbl_kind, & ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
+             
+          integer(kind=int_kind)   :: i, n,  k,  elem
+          real   (kind=dbl_kind)   :: tx, ty, tvol
+          real   (kind=dbl_kind)   :: rhowat
 
           real (kind=dbl_kind) :: &
              aux,                 &
              cprho
 
           type(t_mesh), target, intent(in) :: mesh
+          type(t_ice), target, intent(inout) :: ice
+          real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, S_oc_array, T_oc_array, & 
+                                                   u_w, v_w, stress_atmice_x, stress_atmice_y
+#include "associate_mesh.h"
+          
+          ! make sure we use the same water density to scale precip and snow in 
+          ! fesom and icepack
+          call icepack_query_parameters(rhow_out=rhowat) 
 
-#include "../associate_mesh.h"
-
+          u_ice      => ice%uice(:)
+          v_ice      => ice%vice(:)
+          S_oc_array => ice%srfoce_salt(:)
+          T_oc_array => ice%srfoce_temp(:)
+          u_w        => ice%srfoce_u(:)
+          v_w        => ice%srfoce_v(:)
+          stress_atmice_x => ice%stress_atmice_x(:)
+          stress_atmice_y => ice%stress_atmice_y(:)
           ! Ice 
     
           uvel(:)  = u_ice(:)
@@ -77,8 +87,8 @@
           vatm(:)   = v_wind(:)
           fsw(:)    = shortwave(:)
           flw(:)    = longwave(:)
-          frain(:)  = prec_rain(:) * 1000.0_dbl_kind
-          fsnow(:)  = prec_snow(:) * 1000.0_dbl_kind
+          frain(:)  = prec_rain(:) * rhowat
+          fsnow(:)  = prec_snow(:) * rhowat
 
           wind(:)   = sqrt(uatm(:)**2 + vatm(:)**2)
 
@@ -121,7 +131,7 @@
     
           do i = 1, nx
               ! ocean - ice stress
-              aux = sqrt((uvel(i)-uocn(i))**2+(vvel(i)-vocn(i))**2)*rhowat*cd_oce_ice
+              aux = sqrt((uvel(i)-uocn(i))**2+(vvel(i)-vocn(i))**2)*rhowat*ice%cd_oce_ice
               strocnxT(i) = aux*(uvel(i) - uocn(i))
               strocnyT(i) = aux*(vvel(i) - vocn(i))
               ! freezing - melting potential
@@ -145,7 +155,7 @@
               rdg_shear(i) = ty / tvol
            enddo
 
-           call exchange_nod(rdg_conv, rdg_shear)
+           call exchange_nod(rdg_conv, rdg_shear, p_partit)
 
           ! Clock variables
     
@@ -178,7 +188,8 @@
                                           fhocn_tot_out, fresh_tot_out,    &
                                           strocnxT_out,  strocnyT_out,     &
                                           dhs_dt_out,    dhi_dt_out,       &
-                                          fsalt_out,     evap_ocn_out      )
+                                          fsalt_out,     evap_ocn_out,     &
+                                          evap_out)
 
           implicit none
 
@@ -196,7 +207,8 @@
              fsalt_out,     &
              dhs_dt_out,    &
              dhi_dt_out,    &
-             evap_ocn_out
+             evap_ocn_out,  &
+             evap_out
 
           character(len=*),parameter :: subname='(icepack_to_fesom)'   
 
@@ -212,6 +224,7 @@
           if (present(dhs_dt_out)            ) dhs_dt_out       = dhs_dt
           if (present(fsalt_out)             ) fsalt_out        = fsalt
           if (present(evap_ocn_out)          ) evap_ocn_out     = evap_ocn
+          if (present(evap_out)              ) evap_out         = evap
 
       end subroutine icepack_to_fesom
 

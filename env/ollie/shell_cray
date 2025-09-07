@@ -1,6 +1,0 @@
-# make the contents as shell agnostic as possible so we can include them with bash, zsh and others
-
-module load cmake
-module load PrgEnv-cray
-
-export FC=ftn CC=cc CXX=CC

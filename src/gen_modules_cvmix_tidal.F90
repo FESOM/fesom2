@@ -15,7 +15,8 @@ module g_cvmix_tidal
     use g_config , only: dt
     use o_param           
     use mod_mesh
-    use g_parsup
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_arrays
     use g_comm_auto 
     use g_read_other_NetCDF
@@ -55,11 +56,13 @@ module g_cvmix_tidal
     real(kind=WP) :: tidal_depth_cutoff=0.0              
 
     ! filelocation for idemix bottom forcing 
-    character(200):: tidal_botforc_file = '/work/ollie/pscholz/FORCING/IDEMIX/tidal_energy_gx1v6_20090205_rgrid.nc'
+    character(MAX_PATH):: tidal_botforc_file = '/work/ollie/pscholz/FORCING/IDEMIX/tidal_energy_gx1v6_20090205_rgrid.nc'
+    character(MAX_PATH):: tidal_botforc_vname= 'wave_dissipation'
+    real(kind=WP)      :: tidal_botforc_Etot = 0.0_WP ! units W
     
     namelist /param_tidal/ tidal_mixscheme, tidal_efficiency, tidal_vert_decayscale, &
                            tidal_max_coeff, tidal_lcl_mixfrac,tidal_depth_cutoff,    &
-                           tidal_botforc_file
+                           tidal_botforc_file, tidal_botforc_vname, tidal_botforc_Etot
     
     type(cvmix_global_params_type) :: CVmix_tidal_params ! reads the 'Prandtl' number in
     
@@ -67,7 +70,7 @@ module g_cvmix_tidal
     ! CVMIX-TIDAL variables
     real(kind=WP), allocatable, dimension(:,:) :: tidal_Av
     real(kind=WP), allocatable, dimension(:,:) :: tidal_Kv
-    real(kind=WP), allocatable, dimension(:)   :: tidal_forc_bottom_2D
+    real(kind=WP), allocatable, dimension(:)   :: tidal_fbot
     
     contains
     !
@@ -76,13 +79,20 @@ module g_cvmix_tidal
     !===========================================================================
     ! allocate and initialize IDEMIX variables --> call initialisation 
     ! routine from cvmix library
-    subroutine init_cvmix_tidal(mesh)
+    subroutine init_cvmix_tidal(partit, mesh)
         
-        character(len=MAX_PATH)  :: nmlfile
-        logical                  :: file_exist=.False.
-        integer                  :: node_size
-        type(t_mesh), intent(in), target :: mesh
-#include "associate_mesh.h"
+        character(len=MAX_PATH)               :: nmlfile
+        logical                               :: file_exist=.False.
+        integer                               :: node_size, elem_size, elem
+        real(kind=WP)                         :: loc_Etot=0.0_WP, glb_Etot=0.0_WP
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        integer fileunit
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -93,13 +103,14 @@ module g_cvmix_tidal
         !_______________________________________________________________________
         ! allocate + initialse idemix arrays --> with size myDim_nod2D+eDim_nod2D
         node_size=myDim_nod2D+eDim_nod2D
-        allocate(tidal_Av(nl,node_size))
-        allocate(tidal_Kv(nl,node_size))
+        elem_size=myDim_elem2D+eDim_elem2D
+        allocate(tidal_Av(nl,elem_size))
+        allocate(tidal_Kv(nl,elem_size))
         tidal_Av(:,:)     = 0.0_WP
         tidal_Kv(:,:)     = 0.0_WP
         
-        allocate(tidal_forc_bottom_2D(node_size))
-        tidal_forc_bottom_2D(:) = 0.0_WP
+        allocate(tidal_fbot(elem_size))
+        tidal_fbot(:) = 0.0_WP
         
         !_______________________________________________________________________
         ! read cvmix namelist file 
@@ -108,9 +119,9 @@ module g_cvmix_tidal
         file_exist=.False.
         inquire(file=trim(nmlfile),exist=file_exist) 
         if (file_exist) then
-            open(20,file=trim(nmlfile))
-                read(20,nml=param_tidal)
-            close(20)
+            open(newunit=fileunit,file=trim(nmlfile))
+                read(fileunit,nml=param_tidal)
+            close(fileunit)
         else
             write(*,*) '     could not find namelist.cvmix, will use default values !'    
         end if    
@@ -124,6 +135,8 @@ module g_cvmix_tidal
             write(*,*) "     tidal_lcl_mixfrac     = ", tidal_lcl_mixfrac
             write(*,*) "     tidal_depth_cutoff    = ", tidal_depth_cutoff
             write(*,*) "     tidal_botforc_file    = ", tidal_botforc_file
+            write(*,*) "     tidal_botforc_vname   = ", tidal_botforc_vname
+            write(*,*) "     tidal_botforc_Etot    = ", tidal_botforc_Etot
             write(*,*)
         end if
         
@@ -134,9 +147,47 @@ module g_cvmix_tidal
         inquire(file=trim(tidal_botforc_file),exist=file_exist) 
         if (file_exist) then
             if (mype==0) write(*,*) ' --> read TIDAL near tidal bottom forcing'
-            call read_other_NetCDF(tidal_botforc_file, 'wave_dissipation', 1, tidal_forc_bottom_2D, .true., mesh) 
-            !!PS ! convert from W/m^2 to m^3/s^3
-            !!PS tidal_forc_bottom_2D  = tidal_forc_bottom_2D/density_0
+            call read_other_NetCDF(tidal_botforc_file, tidal_botforc_vname, 1, tidal_fbot, .true., .false.,  partit, mesh) 
+            !                                                                                                  |           
+            !                                 .false.=interpolate on element centroids instead of vertices <---+   
+            
+            ! check for total tidal energy that is infused through the bottom, see how 
+            ! much is lossed during interpolation and compare with value of the 
+            ! original files
+            loc_Etot = 0.0_WP
+            do elem=1, myDim_elem2D
+                ! REMEMBER!!!: the partition on elements is not unique there are 
+                ! elements that belong to two CPUs. For unique elements the index
+                ! of the First trinagle node must  be <= myDim_nod2D
+                if (elem2D_nodes(1,elem)<=myDim_nod2D) then
+                    loc_Etot = loc_Etot + elem_area(elem)*tidal_fbot(elem)
+                end if     
+            end do
+            call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) " --> TIDAL total tidal energy Etot_bot =", glb_Etot*1.0e-12, ' TW'
+            
+            ! normalize total tidal energy at bottom with respect to the total 
+            ! tidal energy that is e.g in the original forcing files to accomodate 
+            ! non concerving losses during interpolation. This is only done when 
+            ! in namelist.cvmix: tidal_botforc_Etot \= 0.0_WP
+            if (tidal_botforc_Etot /= 0.0_WP) then
+                tidal_fbot = tidal_fbot * tidal_botforc_Etot/glb_Etot
+                
+                loc_Etot = 0.0_WP
+                do elem=1, myDim_elem2D
+                    ! REMEMBER!!!: the partition on elements is not unique there are 
+                    ! elements that belong to two CPUs. For unique elements the index
+                    ! of the First trinagle node must  be <= myDim_nod2D
+                    if (elem2D_nodes(1,elem)<=myDim_nod2D) then
+                        loc_Etot = loc_Etot + elem_area(elem)*tidal_fbot(elem)
+                    end if     
+                end do
+                call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+                if (mype==0) write(*,*) " --> TIDAL Etot_bot after normalizing =", glb_Etot*1.0e-12, ' TW'
+            end if 
+            
+            ! convert from W/m^2 to m^3/s^3
+            ! tidal_fbot  = tidal_fbot/density_0
             ! --> the tidal energy for dissipation is divided by rho0 in 
             !     cvmix_tidal.f90 (subroutine 'cvmix_compute_Simmons_invariant_low')
             
@@ -148,7 +199,7 @@ module g_cvmix_tidal
                 write(*,*) '        --> check your namelist.cvmix, tidal_botforc_file &  '
                 write(*,*) '____________________________________________________________________'
             end if 
-            call par_ex(0)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
         end if 
         
         !_______________________________________________________________________
@@ -159,62 +210,95 @@ module g_cvmix_tidal
                               max_coefficient      = tidal_max_coeff,        &
                               local_mixing_frac    = tidal_lcl_mixfrac,      &
                               depth_cutoff         = tidal_depth_cutoff)
+        
     end subroutine init_cvmix_tidal
     !
     !
     !
     !===========================================================================
     ! calculate TIDAL mixing parameterisation
-    subroutine calc_cvmix_tidal(mesh)
-        type(t_mesh), intent(in), target :: mesh
-        integer       :: node, elem, node_size
-        integer       :: nz, nln, nun
-        integer       :: elnodes(3)
-        real(kind=WP) :: simmonscoeff, vertdep(mesh%nl)
-
-#include "associate_mesh.h"
-        !_______________________________________________________________________
+    subroutine calc_cvmix_tidal(partit, mesh)
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        integer                               :: node, elem, node_size, elem_size
+        integer                               :: nz, nln, uln, nle, ule, ki
+        integer                               :: elnodes(3)
+        real(kind=WP)                         :: simmonscoeff, vertdep(mesh%nl)
+        real(kind=WP)                         :: zbar_e(mesh%nl), Z_e(mesh%nl-1), bvfreq2(mesh%nl)
+        real(kind=WP)                         :: tsum1, tvol
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
         node_size = myDim_nod2D
-        do node = 1,node_size
-            nln = nlevels_nod2D(node)-1
-            nun = ulevels_nod2D(node)
+        elem_size = myDim_elem2D
+        
+        !_______________________________________________________________________
+        do elem = 1,elem_size
+            nln = nlevels(elem)-1
+            uln = ulevels(elem)
             vertdep = 0.0_WP
+            
+            !___________________________________________________________________
+            ! compute full zbar_e and mid depth levels z_e at elements
+            zbar_e        = 0.0_WP
+            Z_e           = 0.0_WP
+            zbar_e(nln+1) = zbar_e_bot(elem)
+            Z_e(nln)      = zbar_e(nln+1) + helem(nln ,elem)/2.0_WP
+            do nz=nln, uln+1, -1
+                zbar_e(nz)= zbar_e(nz+1 ) + helem(nz  ,elem)
+                Z_e(nz-1) = zbar_e(nz   ) + helem(nz-1,elem)/2.0_WP
+            end do
+            zbar_e(uln)   = zbar_e(uln+1) + helem(uln ,elem)
+            
+            !___________________________________________________________________
+            ! calculate for TKE square of Brünt-Väisälä frequency, be aware that
+            ! bvfreq contains already the squared brünt Väisälä frequency ...
+            bvfreq2          = 0.0_WP
+            do nz= uln, nln 
+                elnodes      = elem2d_nodes(:,elem)
+                bvfreq2(nz)  = sum(bvfreq(nz,elnodes))/3.0_WP
+            end do
             
             !___________________________________________________________________
             ! Compute the time-invariant portion of the tidal mixing coefficient
             ! using the Simmons et al.(2004) scheme.
             call cvmix_compute_Simmons_invariant_low(         &
-                 nlev            = nln ,                      &
-                 energy_flux     = tidal_forc_bottom_2D(node),& !in W m-2  
+                 nlev            = nln-uln+1 ,                &
+                 energy_flux     = tidal_fbot(elem),          & !in W m-2  
                  rho             = density_0,                 &
                  SimmonsCoeff    = simmonscoeff,              &
-                 VertDep         = vertdep(nun:nln),                & ! vertical deposition function 
-                 zw              = zbar_3d_n(nun:nln+1,node),         & 
-                 zt              = Z_3d_n(nun:nln,node))
+                 VertDep         = vertdep(uln:nln),          & ! vertical deposition function 
+                 zw              = zbar_e(uln:nln+1),         & 
+                 zt              = Z_e(uln:nln))
                 
             !___________________________________________________________________
             ! Computes vertical diffusion coefficients for tidal mixing 
             ! parameterizations.
             call cvmix_coeffs_tidal_low(                      &
-                 Mdiff_out       = tidal_Av(:,node),          &
-                 Tdiff_out       = tidal_Kv(:,node),          &
-                 Nsqr            = bvfreq(:,node),            & !FIXME: limit to N2 > 10^-8 ? as in Simmons et al.
-                 OceanDepth      = -zbar_n_bot(node),         & !FIXME: neglecting free surface contribution
+                 Mdiff_out       = tidal_Av(uln:nln,elem),    &
+                 Tdiff_out       = tidal_Kv(uln:nln,elem),    &
+                 Nsqr            = bvfreq2(uln:nln),          & !FIXME: limit to N2 > 10^-8 ? as in Simmons et al.
+                 OceanDepth      = -zbar_e_bot(elem),         & !FIXME: neglecting free surface contribution
                  SimmonsCoeff    = simmonscoeff,              &
-                 vert_dep        = vertdep(:),                &
-                 nlev            = nln,                       &
+                 vert_dep        = vertdep(uln:nln),          &
+                 nlev            = nln-uln+1,                       &
                  max_nlev        = nl-1,                      &
                  CVmix_params    = CVmix_tidal_params) ! FIXME: Simmons et al. use Prandtl=10.0 (atm its 1.0)
                  
 !!PS             if (mype==0) then 
 !!PS                 write(*,*) 'SimmonsCoeff = ',simmonscoeff
-!!PS                 write(*,*) 'tidalforcbot = ',tidal_forc_bottom_2D(node)
+!!PS                 write(*,*) 'tidalforcbot = ',tidal_fbot(node)
 !!PS                 write(*,*) 'VertDep      = ',vertdep
 !!PS                 write(*,*) 'bvfreq       = ',bvfreq(:,node)
 !!PS                 write(*,*) 'tidal_Kv     = ',tidal_Kv(1:nln+1,node)
 !!PS                 write(*,*) 'tidal_Av     = ',tidal_Av(1:nln+1,node)
 !!PS             end if 
-        end do !-->do node = 1,node_size
+                tidal_Av(uln,elem)   = 0.0_WP
+                tidal_Kv(uln,elem)   = 0.0_WP
+                tidal_Av(nln+1,elem) = 0.0_WP
+                tidal_Kv(nln+1,elem) = 0.0_WP
+        end do !-->do elem = 1,elem_size
             
         !_______________________________________________________________________
         ! add tidal diffusivity to main model diffusivity Kv
@@ -226,19 +310,32 @@ module g_cvmix_tidal
         ! 
         ! MPIOM note 2: background diffusivities were already added in the mixed layer 
         !               scheme (KPP)
-        call exchange_nod(tidal_Kv)
-        Kv = Kv + tidal_Kv
-            
+        
         !_______________________________________________________________________
-        ! add tidal viscosity to main model diffusivity Av -->interpolate 
-        ! therefor from nodes to elements
-        call exchange_nod(tidal_Av)
-        do elem=1, myDim_elem2D
-            elnodes=elem2D_nodes(:,elem)
-            !!PS do nz=1,nlevels(elem)-1
-            do nz=ulevels(elem),nlevels(elem)-1
-                Av(nz,elem) = Av(nz,elem) + sum(tidal_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
+        ! write out tidal diffusivity tidal_Kv --> convert from elem to vertices 
+        ! --> add it to main diffusivity Kv
+        do node=1, node_size 
+            uln = ulevels_nod2D(node)+1
+            nln = nlevels_nod2D(node)-1
+            do nz=uln, nln
+                tvol =0.0_WP
+                tsum1=0.0_WP
+                do ki=1, nod_in_elem2D_num(node)
+                    elem = nod_in_elem2D(ki,node)
+                    ule  = ulevels(elem)+1
+                    nle  = nlevels(elem)-1
+                    if (nle<nz .or. nz<ule) cycle
+                    tvol = tvol  +                   elem_area(elem)
+                    tsum1= tsum1 + tidal_Kv(nz,elem)*elem_area(elem)
+                end do
+                Kv(nz,node) = Kv(nz,node) + tsum1/tvol
             end do
         end do
+        call exchange_nod(Kv, partit)
+            
+        !_______________________________________________________________________
+        ! add tidal viscosity tidal_Av to main model viscosity Av
+        Av = Av + tidal_Av
+        
     end subroutine calc_cvmix_tidal
 end module g_cvmix_tidal

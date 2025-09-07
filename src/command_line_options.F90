@@ -8,7 +8,7 @@ module command_line_options_module
   type :: command_line_options_type
   contains
     procedure, nopass :: parse
-  end type
+  end type command_line_options_type
   type(command_line_options_type) command_line_options
 
 contains
@@ -29,6 +29,12 @@ contains
       case('--info')
         print '(g0)', '# Definitions'
         call info%print_definitions()
+        print '(g0)', '# compiled with OpenMP?'
+#ifdef _OPENMP
+        print '(g0)', '_OPENMP is ON'
+#else
+        print '(g0)', '_OPENMP is OFF'
+#endif
       case default
         print *, 'unknown option: ', arg
         error stop
@@ -36,6 +42,6 @@ contains
       deallocate(arg)
     end do
 
-  end subroutine
+  end subroutine parse
 
-end module
+end module command_line_options_module

@@ -1,3 +1,64 @@
+module cavity_interfaces
+    interface
+        subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
+        USE MOD_ICE
+        USE MOD_DYN
+        USE MOD_TRACER
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice)   , intent(inout), target :: ice
+        type(t_dyn)   , intent(in)   , target :: dynamics
+        type(t_tracer), intent(in)   , target :: tracers
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine cavity_heat_water_fluxes_3eq
+        
+        subroutine cavity_heat_water_fluxes_2eq(ice, tracers, partit, mesh)
+        USE MOD_ICE
+        USE MOD_TRACER
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice)   , intent(inout), target :: ice
+        type(t_tracer), intent(in)   , target :: tracers
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in)   , target :: mesh
+        end subroutine cavity_heat_water_fluxes_2eq
+
+        subroutine cavity_ice_clean_vel(ice, partit, mesh)
+        use MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice),    intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        end subroutine cavity_ice_clean_vel
+        
+        subroutine cavity_ice_clean_ma(ice, partit, mesh)
+        use MOD_ICE
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_ice),    intent(inout), target :: ice
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        end subroutine cavity_ice_clean_ma
+        
+        subroutine cavity_momentum_fluxes(dynamics, partit, mesh)
+        use MOD_DYN
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        USE MOD_MESH
+        type(t_dyn),    intent(in), target    :: dynamics
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        end subroutine cavity_momentum_fluxes
+    end interface
+end module cavity_interfaces
+
+
 !
 !
 !_______________________________________________________________________________
@@ -5,20 +66,24 @@
 ! that have at least one cavity nodes as nearest neighbour.
 ! Than compute for all cavity points (ulevels_nod2D>1), which is the closest
 ! cavity line point to that point --> use their coordinates and depth
-subroutine compute_nrst_pnt2cavline(mesh)
+subroutine compute_nrst_pnt2cavline(partit, mesh)
     use MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_PARAM , only: WP
-    use o_ARRAYS, only: Z_3d_n
-    use g_PARSUP
     implicit none
 
-    type(t_mesh), intent(inout) , target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(inout), target :: mesh
     integer                                             :: node, kk, elnodes(3), gnode, aux_idx
     integer,       allocatable, dimension(:)            :: cavl_idx, lcl_cavl_idx
     real(kind=WP), allocatable, dimension(:)            :: cavl_lon, cavl_lat, cavl_dep,lcl_cavl_lon, lcl_cavl_lat, lcl_cavl_dep
     real(kind=WP)                                       :: aux_x, aux_y, aux_d, aux_dmin
     
-#include "associate_mesh.h"  
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
     if (mype==0) write(*,*) ' --> compute cavity line '
@@ -65,10 +130,10 @@ subroutine compute_nrst_pnt2cavline(mesh)
     call MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
     
     ! mpi reduce from local to global 
-    call MPI_AllREDUCE(lcl_cavl_idx, cavl_idx, nod2d, MPI_INTEGER         , MPI_SUM, MPI_COMM_WORLD, MPIerr)
-    call MPI_AllREDUCE(lcl_cavl_lon, cavl_lon, nod2d, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, MPIerr)
-    call MPI_AllREDUCE(lcl_cavl_lat, cavl_lat, nod2d, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, MPIerr)
-    call MPI_AllREDUCE(lcl_cavl_dep, cavl_dep, nod2d, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, MPIerr)
+    call MPI_AllREDUCE(lcl_cavl_idx, cavl_idx, nod2d, MPI_INTEGER         , MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(lcl_cavl_lon, cavl_lon, nod2d, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(lcl_cavl_lat, cavl_lat, nod2d, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(lcl_cavl_dep, cavl_dep, nod2d, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
   
     !___________________________________________________________________________
     ! deallocate local arrays
@@ -120,24 +185,29 @@ end subroutine compute_nrst_pnt2cavline
 ! adjusted for use in FESOM by Ralph Timmermann, 16.02.2011
 ! Reviewed by ?
 ! adapted by P. SCholz for FESOM2.0
-subroutine cavity_heat_water_fluxes_3eq(mesh)
+subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
     use MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use MOD_TRACER
+    use MOD_DYN
+    use MOD_ICE
     use o_PARAM , only: density_0, WP
-    use o_ARRAYS, only: heat_flux, water_flux, tr_arr, Z_3d_n, Unode, density_m_rho0,density_ref
-    use i_ARRAYS, only: net_heat_flux, fresh_wa_flux
-    use g_PARSUP
+    use o_ARRAYS, only: heat_flux, water_flux, density_m_rho0, density_ref
     implicit none
-    
     !___________________________________________________________________________
-    type(t_mesh), intent(inout) , target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_tracer), intent(in)   , target :: tracers
+    type(t_ice)   , intent(inout), target :: ice
+    type(t_dyn), intent(in),     target :: dynamics
     real (kind=WP)  :: temp,sal,tin,zice
     real (kind=WP)  :: rhow, rhor, rho
     real (kind=WP)  :: gats1, gats2, gas, gat
     real (kind=WP)  :: ep1,ep2,ep3,ep4,ep5,ep31
     real (kind=WP)  :: ex1,ex2,ex3,ex4,ex5,ex6
     real (kind=WP)  :: vt1,sr1,sr2,sf1,sf2,tf1,tf2,tf,sf,seta,re
-    integer        :: node, nzmax, nzmin
-    
+    integer         :: node, nzmax, nzmin
     !___________________________________________________________________________
     real(kind=WP),parameter ::  rp =   0.                        !reference pressure
     real(kind=WP),parameter ::  a   = -0.0575                    !Foldvik&Kvinge (1974)
@@ -168,17 +238,25 @@ subroutine cavity_heat_water_fluxes_3eq(mesh)
     !      hemw=  4.02*14.
     !      oomw= -30.
     !      oofw= -2.5
+    real(kind=WP), dimension(:,:,:), pointer :: UVnode
+    real(kind=WP), dimension(:)    , pointer :: fresh_wa_flux, net_heat_flux
+!     real(kind=WP), dimension(:)    , pointer :: net_heat_flux
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    UVnode=>dynamics%uvnode(:,:,:)
+    fresh_wa_flux => ice%flx_fw(:)
+    net_heat_flux => ice%flx_h(:)
     
-#include "associate_mesh.h"  
-
     !___________________________________________________________________________
     do node=1,myDim_nod2D !+eDim_nod2D  
         nzmin = ulevels_nod2D(node)
         if(nzmin==1) cycle ! if no cavity skip that node
         
         !_______________________________________________________________________
-        temp = tr_arr(nzmin, node,1)
-        sal  = tr_arr(nzmin, node,2)
+        temp = tracers%data(1)%values(nzmin,node)
+        sal  = tracers%data(2)%values(nzmin,node)
         zice = Z_3d_n(nzmin, node)  !(<0)
         
         !_______________________________________________________________________
@@ -194,7 +272,7 @@ subroutine cavity_heat_water_fluxes_3eq(mesh)
         ! if(vt1.eq.0.) vt1=0.001
         !rt      re   = Hz_r(i,j,N)*ds/un        !Reynolds number
         
-        vt1  = sqrt(Unode(1,nzmin,node)*Unode(1,nzmin,node)+Unode(2,nzmin,node)*Unode(2,nzmin,node))
+        vt1  = sqrt(UVnode(1,nzmin,node)*UVnode(1,nzmin,node)+UVnode(2,nzmin,node)*UVnode(2,nzmin,node))
         vt1  = max(vt1,0.001_WP)
         !vt1  = max(vt1,0.005) ! CW
         re   = 10._WP/un                   !vt1*re (=velocity times length scale over kinematic viscosity) is the Reynolds number
@@ -305,22 +383,33 @@ end subroutine cavity_heat_water_fluxes_3eq
 ! Compute the heat and freshwater fluxes under ice cavity using simple 2equ.
 ! Coded by Adriana Huerta-Casas
 ! Reviewed by Qiang Wang
-subroutine cavity_heat_water_fluxes_2eq(mesh)
+subroutine cavity_heat_water_fluxes_2eq(ice, tracers, partit, mesh)
     use MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use MOD_TRACER
+    use MOD_ICE
     use o_PARAM , only: WP
-    use o_ARRAYS, only: heat_flux, water_flux, tr_arr, Z_3d_n
-    use i_ARRAYS, only: net_heat_flux, fresh_wa_flux
-    use g_PARSUP
+    use o_ARRAYS, only: heat_flux, water_flux
     implicit none
 
-    type(t_mesh), intent(inout) , target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_tracer), intent(in)   , target :: tracers
+    type(t_ice)   , intent(inout), target :: ice
     integer        :: node, nzmin
     real(kind=WP)   :: gama, L, aux
     real(kind=WP)   :: c2, c3, c4, c5, c6
     real(kind=WP)   :: t_i, s_i, p, t_fz
+    real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
+!     real(kind=WP), dimension(:)  , pointer :: net_heat_flux
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    fresh_wa_flux => ice%flx_fw(:)
+    net_heat_flux => ice%flx_h(:)
     
-#include "associate_mesh.h"  
-
     !___________________________________________________________________________
     ! parameter for computing heat and water fluxes
     gama = 1.0e-4_WP     ! heat exchange velocity [m/s]
@@ -336,8 +425,8 @@ subroutine cavity_heat_water_fluxes_2eq(mesh)
     do node=1,myDim_nod2D      
         nzmin = ulevels_nod2D(node)
         if(nzmin==1) cycle
-        t_i  = tr_arr(nzmin,node,1)
-        s_i  = tr_arr(nzmin,node,2)
+        t_i  = tracers%data(1)%values(nzmin,node)
+        s_i  = tracers%data(2)%values(nzmin,node)
         t_fz = c3*(s_i**(3./2.)) + c4*(s_i**2) + c5*s_i + c6*abs(Z_3d_n(nzmin,node))
         
         heat_flux(node)=vcpw*gama*(t_i - t_fz)  ! Hunter2006 used cpw=3974J/Kg (*rhowat)
@@ -353,20 +442,29 @@ end subroutine cavity_heat_water_fluxes_2eq
 !_______________________________________________________________________________
 ! Compute the momentum fluxes under ice cavity
 ! Moved to this separated routine by Qiang, 20.1.2012
-subroutine cavity_momentum_fluxes(mesh)
+subroutine cavity_momentum_fluxes(dynamics, partit, mesh)
     use MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_DYN
     use o_PARAM , only: density_0, C_d, WP
-    use o_ARRAYS, only: UV, Unode, stress_surf, stress_node_surf
-    use i_ARRAYS, only: u_w, v_w
-    use g_PARSUP   
+    use o_ARRAYS, only: stress_surf, stress_node_surf
     implicit none
     
     !___________________________________________________________________________
-    type(t_mesh), intent(inout) , target :: mesh
+    type(t_dyn)   , intent(in),    target :: dynamics
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh)  , intent(in)   , target :: mesh
     integer        :: elem, elnodes(3), nzmin, node
     real(kind=WP)  :: aux
-
-#include "associate_mesh.h" 
+    real(kind=WP), dimension(:,:,:), pointer :: UV, UVnode
+    
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    UV=>dynamics%uv(:,:,:)
+    UVnode=>dynamics%uvnode(:,:,:)
 
     !___________________________________________________________________________
     do elem=1,myDim_elem2D
@@ -390,24 +488,36 @@ subroutine cavity_momentum_fluxes(mesh)
         ! momentum stress:
         ! need to check the sensitivity to the drag coefficient
         ! here I use the bottom stress coefficient, which is 3e-3, for this FO2 work.
-        aux=sqrt(Unode(1,nzmin,node)**2+Unode(2,nzmin,node)**2)*density_0*C_d 
-        stress_node_surf(1,node)=-aux*Unode(1,nzmin,node)
-        stress_node_surf(2,node)=-aux*Unode(2,nzmin,node)
+        aux=sqrt(UVnode(1,nzmin,node)**2+UVnode(2,nzmin,node)**2)*density_0*C_d 
+        stress_node_surf(1,node)=-aux*UVnode(1,nzmin,node)
+        stress_node_surf(2,node)=-aux*UVnode(2,nzmin,node)
     end do
 end subroutine cavity_momentum_fluxes
 !
 !
 !_______________________________________________________________________________
-subroutine cavity_ice_clean_vel(mesh)
-    use MOD_MESH
-    use i_ARRAYS, only: U_ice, V_ice
-    use g_PARSUP   
+subroutine cavity_ice_clean_vel(ice, partit, mesh)
+    USE MOD_ICE
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_MESH
     implicit none
-    type(t_mesh), intent(inout) , target :: mesh
-    integer        :: node
+    type(t_ice),    intent(inout), target :: ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+    !___________________________________________________________________________
+    integer                               :: node
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    u_ice           => ice%uice(:)
+    v_ice           => ice%vice(:)
     
-#include "associate_mesh.h" 
-
+    !___________________________________________________________________________
     do node=1,myDim_nod2d+eDim_nod2d           
         if(ulevels_nod2D(node)>1) then
             U_ice(node)=0._WP
@@ -418,16 +528,29 @@ end subroutine cavity_ice_clean_vel
 !
 !
 !_______________________________________________________________________________
-subroutine cavity_ice_clean_ma(mesh)
-    use MOD_MESH
-    use i_ARRAYS, only: m_ice, m_snow, a_ice
-    use g_PARSUP   
+subroutine cavity_ice_clean_ma(ice, partit, mesh)
+    USE MOD_ICE
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_MESH
     implicit none
-    type(t_mesh), intent(inout) , target :: mesh
-    integer        :: node
+    type(t_ice),    intent(inout), target :: ice
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+    !___________________________________________________________________________
+    integer                               :: node
+    !___________________________________________________________________________
+    ! pointer on necessary derived types
+    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    a_ice        => ice%data(1)%values(:)
+    m_ice        => ice%data(2)%values(:)
+    m_snow       => ice%data(3)%values(:)
     
-#include "associate_mesh.h" 
-
+    !___________________________________________________________________________
     do node=1,myDim_nod2d+eDim_nod2d           
         if(ulevels_nod2D(node)>1) then
             m_ice(node) =0.0_WP
@@ -458,11 +581,12 @@ end subroutine dist_on_earth
 ! [oC] (TIN) bezogen auf den in-situ Druck[dbar] (PRES) mit Hilfe
 ! eines Iterationsverfahrens aus.
 subroutine potit(salz,pt,pres,rfpres,tin)
+    use o_PARAM , only: WP
     integer iter
-    real salz,pt,pres,rfpres,tin
-    real epsi,tpmd,pt1,ptd,pttmpr
+    real(kind=WP) :: salz,pt,pres,rfpres,tin
+    real(kind=WP) :: epsi, pt1,ptd,pttmpr
 
-    data tpmd / 0.001 /
+     real(kind=WP), parameter :: tpmd=0.001_WP
 
     epsi = 0.
     do iter=1,100
@@ -489,15 +613,19 @@ end subroutine potit
 !            TEMP   =    40.0 DegC
 !            PRES   = 10000.000 dbar
 !            RFPRES =     0.000 dbar
-real function pttmpr(salz,temp,pres,rfpres)
-  
-    data ct2 ,ct3  /0.29289322 ,  1.707106781/
-    data cq2a,cq2b /0.58578644 ,  0.121320344/
-    data cq3a,cq3b /3.414213562, -4.121320344/
+real(kind=WP) function pttmpr(salz,temp,pres,rfpres)
+    use o_PARAM , only: WP
 
-    real salz,temp,pres,rfpres
-    real p,t,dp,dt,q,ct2,ct3,cq2a,cq2b,cq3a,cq3b
-    real adlprt
+    real(kind=WP) :: salz,temp,pres,rfpres
+    real(kind=WP) :: p,t,dp,dt,q
+    real(kind=WP) :: adlprt
+    real(kind=WP), parameter :: ct2  =  0.29289322_WP
+    real(kind=WP), parameter :: ct3  =  1.707106781_WP
+    real(kind=WP), parameter :: cq2a =  0.58578644_WP
+    real(kind=WP), parameter :: cq2b =  0.121320344_WP
+    real(kind=WP), parameter :: cq3a =  3.414213562_WP
+    real(kind=WP), parameter :: cq3b = -4.121320344_WP    
+    
 
     p  = pres
     t  = temp
@@ -528,17 +656,26 @@ end function pttmpr
 !       fuer SALZ   =    40.0 psu
 !            TEMP   =    40.0 DegC
 !            PRES   = 10000.000 dbar
-real function adlprt(salz,temp,pres)
+real(kind=WP) function adlprt(salz,temp,pres)
   
-  real salz,temp,pres
-  real s0,a0,a1,a2,a3,b0,b1,c0,c1,c2,c3,d0,d1,e0,e1,e2,ds
-
-  data s0 /35.0/
-  data a0,a1,a2,a3 /3.5803E-5, 8.5258E-6, -6.8360E-8, 6.6228E-10/
-  data b0,b1       /1.8932E-6, -4.2393E-8/
-  data c0,c1,c2,c3 /1.8741E-8, -6.7795E-10, 8.7330E-12, -5.4481E-14/
-  data d0,d1       /-1.1351E-10, 2.7759E-12/
-  data e0,e1,e2    /-4.6206E-13,  1.8676E-14, -2.1687E-16/
+  use o_PARAM , only: WP
+  real(kind=WP) :: salz,temp,pres, ds
+  real(kind=WP), parameter :: s0 = 35.0
+  real(kind=WP), parameter :: a0 =  3.5803E-5
+  real(kind=WP), parameter :: a1 =  8.5258E-6
+  real(kind=WP), parameter :: a2 = -6.8360E-8
+  real(kind=WP), parameter :: a3 =  6.6228E-10
+  real(kind=WP), parameter :: b0 =  1.8932E-6
+  real(kind=WP), parameter :: b1 = -4.2393E-8
+  real(kind=WP), parameter :: c0 =  1.8741E-8
+  real(kind=WP), parameter :: c1 = -6.7795E-10
+  real(kind=WP), parameter :: c2 =  8.7330E-12
+  real(kind=WP), parameter :: c3 = -5.4481E-14
+  real(kind=WP), parameter :: d0 = -1.1351E-10
+  real(kind=WP), parameter :: d1 =  2.7759E-12
+  real(kind=WP), parameter :: e0 = -4.6206E-13
+  real(kind=WP), parameter :: e1 =  1.8676E-14
+  real(kind=WP), parameter :: e2 = -2.1687E-16
 
   ds = salz-s0
   adlprt = ( ( (e2*temp + e1)*temp + e0 )*pres                     &

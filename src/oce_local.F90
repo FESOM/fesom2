@@ -1,23 +1,31 @@
 module com_global2local_interface
   interface
-    subroutine com_global2local(mesh)
+    subroutine com_global2local(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
-    end subroutine
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
+    end subroutine com_global2local
   end interface
-end module
+end module com_global2local_interface
 
 !=============================================================================
-SUBROUTINE com_global2local(mesh)
-USE g_PARSUP
+SUBROUTINE com_global2local(partit, mesh)
 use MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
 IMPLICIT NONE
 
-type(t_mesh), intent(in)           , target :: mesh
+type(t_mesh),   intent(in),    target :: mesh
+type(t_partit), intent(inout), target :: partit
+
 INTEGER                            :: n, m
 INTEGER, ALLOCATABLE, DIMENSION(:) :: temp
 
+#include "associate_part_def.h"
 #include "associate_mesh_ini.h"
+#include "associate_part_ass.h"
 
 allocate(temp(max(nod2D, elem2D))) 
 ! =========
@@ -116,15 +124,17 @@ allocate(temp(max(nod2D, elem2D)))
 deallocate(temp)
 END SUBROUTINE com_global2local       	  
 !=============================================================================
-SUBROUTINE save_dist_mesh(mesh)
+SUBROUTINE save_dist_mesh(partit, mesh)
   USE g_CONFIG
   USE MOD_MESH
-  USE o_ARRAYS
-  USE g_PARSUP 
+  USE MOD_PARTIT
+  USE MOD_PARSUP
+  USE o_ARRAYS 
   use com_global2local_interface
   IMPLICIT NONE
 
-  type(t_mesh), intent(in)           , target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
   Integer        n, m, q, q2, counter, fileID, nend, nini,ed(2)
   character*10   mype_string,npes_string
   character(MAX_PATH) file_name
@@ -132,12 +142,12 @@ SUBROUTINE save_dist_mesh(mesh)
   integer, allocatable, dimension(:)  :: temp, ncount
   integer   n1, n2, flag, eledges(4)
 
-#include  "associate_mesh_ini.h"
+#include "associate_part_def.h"
+#include "associate_mesh_ini.h"
+#include "associate_part_ass.h"
 
-!!$  allocate(temp(nod2D))  ! serves for mapping
-!!$  allocate(ncount(npes+1))
   write(mype_string,'(i5.5)') mype  
-  write(npes_string,"(I10)") npes
+  write(npes_string,"(I10)")  npes
   dist_mesh_dir=trim(meshpath)//'dist_'//trim(ADJUSTL(npes_string))//'/'
 
   ! ==============================
@@ -187,7 +197,8 @@ SUBROUTINE save_dist_mesh(mesh)
   write(fileID,*) myList_elem2D(1:myDim_elem2D), com_elem2D%rlist(1:eDim_elem2D), temp(1:eXDim_elem2D)
   deallocate(temp)
 
-  allocate(myList_edge2D(4*myDim_elem2D))
+  allocate(partit%myList_edge2D(4*myDim_elem2D))
+  myList_edge2D=>partit%myList_edge2D
   counter = 0
   do n=1, edge2D
      do q=1,2 
@@ -219,14 +230,14 @@ SUBROUTINE save_dist_mesh(mesh)
   write(fileID,*) myDim_edge2D
   write(fileID,*) eDim_edge2D 	 
   write(fileID,*) myList_edge2D(1:myDim_edge2D +eDim_edge2D)
-  deallocate(myList_edge2D)
+  deallocate(partit%myList_edge2D)
   close(fileID)       
 
 
   ! =========================  
   ! communication information
   ! ========================= 
-  call com_global2local(mesh)   ! Do not call this subroutine earlier, global numbering is needed!
+  call com_global2local(partit, mesh)   ! Do not call this subroutine earlier, global numbering is needed!
   file_name=trim(dist_mesh_dir)//'com_info'//trim(mype_string)//'.out' 
   fileID=103+mype  !skip unit range 100--102 
   open(fileID, file=file_name)
@@ -239,13 +250,13 @@ SUBROUTINE save_dist_mesh(mesh)
   write(fileID,*) com_nod2D%sPE(1:com_nod2D%sPEnum)
   write(fileID,*) com_nod2D%sptr(1:com_nod2D%sPEnum+1)
   write(fileID,*) com_nod2D%slist
-  deallocate(myList_nod2D)
+  deallocate(partit%myList_nod2D)
 !!$  deallocate(com_nod2D%rPE)
 !!$  deallocate(com_nod2D%rptr)
-  deallocate(com_nod2D%rlist)
+  deallocate(partit%com_nod2D%rlist)
 !!$  deallocate(com_nod2D%sPE)
 !!$  deallocate(com_nod2D%sptr)
-  deallocate(com_nod2D%slist)
+  deallocate(partit%com_nod2D%slist)
 
   write(fileID,*) com_elem2D%rPEnum
   write(fileID,*) com_elem2D%rPE(1:com_elem2D%rPEnum)
@@ -255,13 +266,13 @@ SUBROUTINE save_dist_mesh(mesh)
   write(fileID,*) com_elem2D%sPE(1:com_elem2D%sPEnum)
   write(fileID,*) com_elem2D%sptr(1:com_elem2D%sPEnum+1)
   write(fileID,*) com_elem2D%slist
-  deallocate(myList_elem2D)
+  deallocate(partit%myList_elem2D)
 !!$  deallocate(com_elem2D%rPE)
 !!$  deallocate(com_elem2D%rptr)
-  deallocate(com_elem2D%rlist)
+  deallocate(partit%com_elem2D%rlist)
 !!$  deallocate(com_elem2D%sPE)
 !!$  deallocate(com_elem2D%sptr)
-  deallocate(com_elem2D%slist)
+  deallocate(partit%com_elem2D%slist)
 
   write(fileID,*) com_elem2D_full%rPEnum
   write(fileID,*) com_elem2D_full%rPE(1:com_elem2D_full%rPEnum)
@@ -273,10 +284,10 @@ SUBROUTINE save_dist_mesh(mesh)
   write(fileID,*) com_elem2D_full%slist
 !!$  deallocate(com_elem2D_full%rPE)
 !!$  deallocate(com_elem2D_full%rptr)
-  deallocate(com_elem2D_full%rlist)
+  deallocate(partit%com_elem2D_full%rlist)
 !!$  deallocate(com_elem2D_full%sPE)
 !!$  deallocate(com_elem2D_full%sptr)
-  deallocate(com_elem2D_full%slist)
+  deallocate(partit%com_elem2D_full%slist)
   close(fileID)
   ! ================================
   ! mapping ( PE contiguous 2D numbering) 	 

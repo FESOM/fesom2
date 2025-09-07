@@ -8,7 +8,7 @@ module info_module
   type :: info_type
   contains
     procedure, nopass :: print_definitions
-  end type
+  end type info_type
   type(info_type) info
 
 contains
@@ -62,20 +62,10 @@ contains
 #else
       print '(g0)', 'OMP_MAX_THREADS is OFF'
 #endif  
-#ifdef PARMS
-      print '(g0)', 'PARMS is ON'
-#else
-      print '(g0)', 'PARMS is OFF'
-#endif  
 #ifdef PETSC
       print '(g0)', 'PETSC is ON'
 #else
       print '(g0)', 'PETSC is OFF'
-#endif  
-#ifdef use_cavity
-      print '(g0)', 'use_cavity is ON'
-#else
-      print '(g0)', 'use_cavity is OFF'
 #endif  
 #ifdef use_fullfreesurf
       print '(g0)', 'use_fullfreesurf is ON'
@@ -87,6 +77,31 @@ contains
 #else
       print '(g0)', 'VERBOSE is OFF'
 #endif  
-  end subroutine
+#ifdef DISABLE_PARALLEL_RESTART_READ
+      print '(g0)', 'DISABLE_PARALLEL_RESTART_READ is ON'
+#else
+      print '(g0)', 'DISABLE_PARALLEL_RESTART_READ is OFF'
+#endif  
+#ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
+      print '(g0)', 'ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS is ON'
+#else
+      print '(g0)', 'ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS is OFF'
+#endif  
+#ifdef ENABLE_ALBEDO_INTELMPI_WORKAROUNDS
+      print '(g0)', 'ENABLE_ALBEDO_INTELMPI_WORKAROUNDS is ON'
+#else
+      print '(g0)', 'ENABLE_ALBEDO_INTELMPI_WORKAROUNDS is OFF'
+#endif 
+#ifdef ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS
+      print '(g0)', 'ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS is ON'
+#else
+      print '(g0)', 'ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS is OFF'
+#endif  
+#ifdef ENABLE_NVHPC_WORKAROUNDS
+      print '(g0)', 'ENABLE_NVHPC_WORKAROUNDS is ON'
+#else
+      print '(g0)', 'ENABLE_NVHPC_WORKAROUNDS is OFF'
+#endif  
+  end subroutine print_definitions
 
-end module
+end module info_module

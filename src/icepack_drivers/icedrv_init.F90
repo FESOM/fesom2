@@ -27,10 +27,10 @@
 
       contains
 
-      subroutine init_state()
+      subroutine init_state(tracer)
  
           use icepack_intfc, only: icepack_aggregate
-    
+          use mod_tracer
           implicit none
     
           integer (kind=int_kind) :: &
@@ -49,7 +49,8 @@
                                      nt_ipnd, nt_aero, nt_fsd
     
           character(len=*), parameter :: subname='(init_state)'
-    
+          type(t_tracer_data), intent(in), target  :: tracer
+
           !-----------------------------------------------------------------
           ! query Icepack values
           !-----------------------------------------------------------------
@@ -199,7 +200,7 @@
           ! Set state variables
           !-----------------------------------------------------------------
 
-          call init_state_var()        
+          call init_state_var(tracer)        
     
       end subroutine init_state
 
@@ -909,7 +910,7 @@
 
 !=======================================================================
 
-      module subroutine init_icepack(mesh)
+      module subroutine init_icepack(ice, tracer, mesh)
 
           use icepack_intfc, only: icepack_init_itd
           use icepack_intfc, only: icepack_init_itd_hist
@@ -917,6 +918,8 @@
           use icepack_intfc, only: icepack_init_fsd_bounds
           use icepack_intfc, only: icepack_warnings_flush
           use mod_mesh
+          use mod_ice
+          use mod_tracer
     
           implicit none
     
@@ -926,8 +929,9 @@
              tr_fsd,    &   ! from icepack
              wave_spec      ! from icepack
           character(len=*), parameter :: subname='(icedrv_initialize)'
-          type(t_mesh), intent(in), target :: mesh
-
+          type(t_mesh),        intent(in), target :: mesh
+          type(t_tracer_data), intent(in), target :: tracer
+          type(t_ice), intent(inout), target :: ice
           call icepack_query_parameters(wave_spec_out=wave_spec)
           call icepack_query_tracer_flags(tr_aero_out=tr_aero)
           call icepack_query_tracer_flags(tr_zaero_out=tr_zaero)
@@ -978,8 +982,8 @@
           endif
           call init_fsd
 
-          call fesom_to_icepack(mesh)    
-          call init_state           ! initialize the ice state
+          call fesom_to_icepack(ice, mesh)    
+          call init_state(tracer)   ! initialize the ice state
           call init_history_therm   ! initialize thermo history variables
 
           if (tr_fsd .and. wave_spec) call init_wave_spec    ! wave spectrum in ice
@@ -996,15 +1000,17 @@
 
 !=======================================================================
 
-      subroutine init_state_var ()
+      subroutine init_state_var (tracer)
 
           use icepack_intfc,   only: icepack_init_fsd
           use icepack_intfc,   only: icepack_aggregate
-          use o_arrays,        only: tr_arr
+          use mod_tracer
           implicit none
 
           ! local variables
-    
+          type(t_tracer_data), intent(in), target  :: tracer
+          real(kind=WP), dimension(:,:),   pointer :: tr_arr
+
           integer (kind=int_kind) :: &
              i     , & ! horizontal indices
              k     , & ! ice layer index
@@ -1033,7 +1039,7 @@
     
           character(len=char_len_long), parameter  :: ice_ic='default'
           character(len=*),             parameter  :: subname='(set_state_var)'
-    
+          tr_arr=>tracer%values(:,:)    
           !-----------------------------------------------------------------
           ! query Icepack values
           !-----------------------------------------------------------------
@@ -1103,7 +1109,7 @@
           enddo
 
           do i = 1, nx
-             if (tr_arr(1,i,1) < 0.0_dbl_kind) then             !
+             if (tr_arr(1,i) < 0.0_dbl_kind) then             !
                 do n = 1, ncat
                    ! ice volume, snow volume
                    aicen(i,n) = ainit(n)

@@ -26,10 +26,9 @@ ollie:
     opath:
         opath: /work/ollie/${USER}/
 
-mistral:
+levante:
     lnodename:
-        - 'mlogin*'
-        - 'mistralpp*'
+        - 'levante*'
     meshes:
         test_global: ./test/meshes/pi/
         test_souf: ./test/meshes/soufflet/
@@ -54,18 +53,17 @@ docker:
     lnodename:
         - ' '
     meshes:
-        pi: /fesom/pi/
         test_souf: ./test/meshes/soufflet/
         test_global: ./test/meshes/pi/
+        test_cavity: ./test/meshes/pi_cavity/
     forcing:
-        CORE2: /fesom/dCORE2/
-        JRA55: /fesom/dJRA55/
         test_global: ./test/input/global/
+        test_icebergs: ./test/input/icebergs/
     clim:
-        phc: /fesom/phc3/
         test_global: ./test/input/global/
+        test_icebergs: ./test/input/icebergs/
     opath:
-        opath: ../results/
+        opath: ./test/
 
 juwels:
     lnodename:
@@ -88,4 +86,3 @@ juwels:
         phc: /p/project/chhb19/hhb192/meshes/POOL/FESOM2/hydrography/phc3.0/
     opath:
         opath: /p/scratch/chhb19/${USER}/
-

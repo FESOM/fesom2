@@ -39,8 +39,20 @@ real(kind=WP)  :: Swind     =0.0_WP  ! parameterization for coupled current feed
   logical                       :: use_landice_water=.false.
   integer                       :: landice_start_mon=1
   integer                       :: landice_end_mon=12
+  !---fwf-code-begin
+  character(MAX_PATH)           :: fwf_path='./mesh/'
+  !---fwf-code-end
 
-  namelist /land_ice/ use_landice_water, landice_start_mon, landice_end_mon
+  namelist /land_ice/ use_landice_water, landice_start_mon, landice_end_mon, fwf_path !---fwf-code, add fwf_path
+
+  !---age-code-begin
+  logical                       :: use_age_tracer=.false.
+  logical                       :: use_age_mask=.false.
+  character(MAX_PATH)           :: age_tracer_path='./mesh/'
+  integer                       :: age_start_year=2000
+
+  namelist /age_tracer/ use_age_tracer, use_age_mask, age_tracer_path, age_start_year
+  !---age-code-end
 
 end module g_forcing_param
 ! ====================================================================
@@ -51,6 +63,8 @@ use o_param
 
   ! forcing arrays
   real(kind=WP), allocatable, dimension(:)         :: u_wind, v_wind 
+  real(kind=WP), allocatable, dimension(:)         :: u_wind_ib, v_wind_ib ! kh 19.02.21 additional arrays for asynchronous iceberg computations
+
   real(kind=WP), allocatable, dimension(:)         :: Tair, shum
   real(kind=WP), allocatable, dimension(:,:)       :: u_wind_t, v_wind_t 
   real(kind=WP), allocatable, dimension(:,:)       :: Tair_t, shum_t
@@ -58,16 +72,29 @@ use o_param
   real(kind=WP), allocatable, dimension(:)         :: prec_rain, prec_snow
   real(kind=WP), allocatable, dimension(:)         :: runoff, evaporation, ice_sublimation
   real(kind=WP), allocatable, dimension(:)         :: cloudiness, press_air
+  !---wiso-code
+  real(kind=WP), allocatable, dimension(:)         :: www1,www2,www3,iii1,iii2,iii3
+  real(kind=WP), allocatable, dimension(:)         :: tmp_iii1,tmp_iii2,tmp_iii3
+  !---wiso-code-end
+  !---age-code-begin
+  integer, allocatable, dimension(:)               :: age_tracer_loc_index
+  !---age-code-end
 
-#if defined (__oasis)
+#if defined (__oasis) || defined (__ifsinterface) /* todo: use a single shared definition */
   real(kind=WP), target, allocatable, dimension(:) :: sublimation, evap_no_ifrac
+#endif
+#if defined (__oasis)
   real(kind=WP), target, allocatable, dimension(:) :: tmp_sublimation, tmp_evap_no_ifrac !temporary flux fields
   real(kind=WP), target, allocatable, dimension(:) :: tmp_shortwave 			!(for flux correction) 
   real(kind=WP), allocatable, dimension(:)         :: atm_net_fluxes_north, atm_net_fluxes_south
   real(kind=WP), allocatable, dimension(:)         :: oce_net_fluxes_north, oce_net_fluxes_south
   real(kind=WP), allocatable, dimension(:)         :: flux_correction_north, flux_correction_south, flux_correction_total
 #endif
-  
+
+#if defined (__oasis) || defined (__ifsinterface)
+  real(kind=WP), allocatable, dimension(:)         :: residualifwflx
+#endif
+
   real(kind=WP), allocatable, dimension(:)         :: runoff_landice
   real(kind=WP)                                    :: landice_season(12)
 
@@ -75,7 +102,8 @@ use o_param
   real(kind=WP), allocatable, dimension(:)         :: chl
   real(kind=WP), allocatable, dimension(:,:)       :: sw_3d
 
-  real(kind=WP), allocatable, dimension(:)         :: thdgr, thdgrsn, flice
+!   real(kind=WP), allocatable, dimension(:)         :: thdgr, thdgrsn
+  real(kind=WP), allocatable, dimension(:)         :: flice
   real(kind=WP), allocatable, dimension(:)         :: olat_heat, osen_heat, olwout
   real(kind=WP), allocatable, dimension(:)         :: real_salt_flux !PS
 

@@ -19,14 +19,16 @@ module g_cvmix_tke
     use cvmix_tke,         only: init_tke, cvmix_coeffs_tke
     use cvmix_put_get,     only: cvmix_put
     use cvmix_kinds_and_types
-    use g_cvmix_idemix,    only: iwe, iwe_Tdis, iwe_alpha_c
+    use g_cvmix_idemix,    only: iwe_n, iwe_Tdis_n, iwe_alpha_c_n
     
     !___________________________________________________________________________
     ! module calls from FESOM
     use g_config , only: dt
     use o_param           
     use mod_mesh
-    use g_parsup
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_DYN
     use o_arrays
     use g_comm_auto 
     implicit none
@@ -52,6 +54,9 @@ module g_cvmix_tke
     logical       :: use_ubound_dirichlet = .false.           
     logical       :: use_lbound_dirichlet = .false.
     
+    logical       :: tke_dolangmuir       = .false.             
+    real(kind=WP) :: tke_clangmuir        = 0.3
+    
     ! apply time relaxation to avo/dvo
     ! FIXME: nils: Do we need that
     logical       :: timerelax_tke = .false.
@@ -62,7 +67,7 @@ module g_cvmix_tke
     namelist /param_tke/ tke_c_k, tke_c_eps, tke_alpha, tke_mxl_min, tke_kappaM_min, tke_kappaM_max, &
                          tke_cd, tke_surf_min, tke_min, tke_mxl_choice, &
                          use_ubound_dirichlet, use_lbound_dirichlet, & 
-                         timerelax_tke, relne, relax
+                         timerelax_tke, relne, relax, tke_dolangmuir, tke_clangmuir
      
     !___________________________________________________________________________
     ! CVMIX-TKE 3D variables
@@ -108,7 +113,13 @@ module g_cvmix_tke
 
     ! nils
     integer :: tstep_count
-  
+    
+    !___________________________________________________________________________
+    ! Langmuir parameterisation
+    real(kind=WP), allocatable, dimension(:,:) :: tke_langmuir, langmuir_wlc
+    real(kind=WP), allocatable, dimension(:)   :: langmuir_hlc, langmuir_ustoke
+    
+    
     contains
     !
     !
@@ -116,13 +127,20 @@ module g_cvmix_tke
     !===========================================================================
     ! allocate and initialize TKE 2D and 3D variables --> call initialisation 
     ! routine from cvmix library
-    subroutine init_cvmix_tke(mesh)
+    subroutine init_cvmix_tke(partit, mesh)
         implicit none
-        character(len=cvmix_strlen)       :: nmlfile
-        logical                  :: nmlfile_exist=.False.
-        integer                  :: node_size
-        type(t_mesh), intent(in), target :: mesh
-#include "associate_mesh.h"
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        character(len=cvmix_strlen)           :: nmlfile
+        logical                               :: nmlfile_exist=.False.
+        integer                               :: node_size
+        integer fileunit
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -197,9 +215,9 @@ module g_cvmix_tke
         ! check if cvmix namelist file exists if not use default values 
         inquire(file=trim(nmlfile),exist=nmlfile_exist) 
         if (nmlfile_exist) then
-            open(20,file=trim(nmlfile))
-                read(20,nml=param_tke)
-            close(20)
+            open(newunit=fileunit,file=trim(nmlfile))
+                read(fileunit,nml=param_tke)
+            close(fileunit)
         else
             write(*,*) '     could not find namelist.cvmix, will use default values !'    
         end if
@@ -218,8 +236,22 @@ module g_cvmix_tke
             write(*,*) "     tke_kappaM_min = ", tke_kappaM_min
             write(*,*) "     tke_kappaM_max = ", tke_kappaM_max
             write(*,*) "     tke_mxl_choice = ", tke_mxl_choice
+            write(*,*) "     tke_dolangmuir = ", tke_dolangmuir
             write(*,*)
         end if
+        
+        !_______________________________________________________________________
+        !langmuir parameterisation
+        allocate(tke_langmuir(nl,node_size))
+        tke_langmuir    = 0.0_WP
+        if (tke_dolangmuir) then
+            allocate(langmuir_wlc(nl,node_size))
+            allocate(langmuir_hlc(node_size))
+            allocate(langmuir_ustoke(node_size))
+            langmuir_wlc    = 0.0_WP
+            langmuir_hlc    = 0.0_WP
+            langmuir_ustoke = 0.0_WP
+        end if 
         
         !_______________________________________________________________________
         ! call tke initialisation routine from cvmix library
@@ -234,6 +266,8 @@ module g_cvmix_tke
                       use_ubound_dirichlet = use_ubound_dirichlet, &
                       use_lbound_dirichlet = use_lbound_dirichlet, &
                       only_tke       = tke_only,           &
+                      l_lc           = tke_dolangmuir,     &
+                      clc            = tke_clangmuir,      &
                       tke_min        = tke_min,            &
                       tke_surf_min   = tke_surf_min    )
     end subroutine init_cvmix_tke
@@ -242,16 +276,23 @@ module g_cvmix_tke
     !
     !===========================================================================
     ! calculate TKE vertical mixing coefficients from CVMIX library
-    subroutine calc_cvmix_tke(mesh)
+    subroutine calc_cvmix_tke(dynamics, partit, mesh)
         implicit none
-        type(t_mesh), intent(in), target :: mesh
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        type(t_dyn), intent(inout), target :: dynamics
         integer       :: node, elem, nelem, nz, nln, nun, elnodes(3), node_size
-        real(kind=WP) :: tvol
+        real(kind=WP) :: tvol, aux
         real(kind=WP) :: dz_trr(mesh%nl), bvfreq2(mesh%nl), vshear2(mesh%nl)
         real(kind=WP) :: tke_Av_old(mesh%nl), tke_Kv_old(mesh%nl), tke_old(mesh%nl)
+        real(kind=WP), dimension(:,:,:), pointer :: UVnode
+    
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+        UVnode=>dynamics%uvnode(:,:,:)
         
-#include "associate_mesh.h"
-
         node_size = myDim_nod2D
         !_______________________________________________________________________
         ! calculate all neccessary forcing for TKE 
@@ -261,9 +302,9 @@ module g_cvmix_tke
         
         ! load things from idemix when selected
         if (.not. tke_only) then
-            tke_in3d_iwe       = iwe
-            tke_in3d_iwdis     = -iwe_Tdis
-            tke_in3d_iwealphac = iwe_alpha_c
+            tke_in3d_iwe       = iwe_n
+            tke_in3d_iwdis     = -iwe_Tdis_n
+            tke_in3d_iwealphac = iwe_alpha_c_n
         endif
         
         !_______________________________________________________________________
@@ -277,22 +318,24 @@ module g_cvmix_tke
             ! calcualte for TKE surface momentum forcing --> norm of nodal 
             ! surface wind stress --> tke_forc2d_normstress --> interpolate from elements
             ! to nodes
-            tvol = 0.0_WP
-            do nelem=1,nod_in_elem2D_num(node)
-                elem = nod_in_elem2D(nelem,node)
-                tvol = tvol + elem_area(elem)
-                tke_forc2d_normstress(node) = tke_forc2d_normstress(node) &
-                                         + sqrt(stress_surf(1,elem)**2 + stress_surf(2,elem)**2)*elem_area(elem)/density_0
-            end do !--> do nelem=1,nod_in_elem2D_num(node)
-            tke_forc2d_normstress(node) = tke_forc2d_normstress(node)/tvol
-                
+
+!!PS             tvol = 0.0_WP
+!!PS             do nelem=1,nod_in_elem2D_num(node)
+!!PS                 elem = nod_in_elem2D(nelem,node)
+!!PS                 tvol = tvol + elem_area(elem)
+!!PS                 tke_forc2d_normstress(node) = tke_forc2d_normstress(node) &
+!!PS                                          + sqrt(stress_surf(1,elem)**2 + stress_surf(2,elem)**2)*elem_area(elem)/density_0
+!!PS             end do !--> do nelem=1,nod_in_elem2D_num(node)
+!!PS             tke_forc2d_normstress(node) = tke_forc2d_normstress(node)/tvol
+            tke_forc2d_normstress(node) = sqrt( stress_node_surf(1,node)**2 + stress_node_surf(2,node)**2)/density_0
+
+            
             !___________________________________________________________________
             ! calculate for TKE 3D vertical velocity shear
             vshear2=0.0_WP
-            !!PS do nz=2,nln
             do nz=nun+1,nln
-                vshear2(nz)=(( Unode(1, nz-1, node) - Unode(1, nz, node))**2 + &
-                             ( Unode(2, nz-1, node) - Unode(2, nz, node))**2)/ &
+                vshear2(nz)=(( UVnode(1, nz-1, node) - UVnode(1, nz, node))**2 + &
+                             ( UVnode(2, nz-1, node) - UVnode(2, nz, node))**2)/ &
                              ((Z_3d_n(nz-1,node)-Z_3d_n(nz,node))**2)
             end do 
             
@@ -313,14 +356,77 @@ module g_cvmix_tke
             !___________________________________________________________________
             ! dz_trr distance between tracer points, surface and bottom dz_trr is half 
             ! the layerthickness ...
-            !!PS dz_trr         = 0.0_WP
-            !!PS dz_trr(2:nln)  = abs(Z_3d_n(1:nln-1,node)-Z_3d_n(2:nln,node))
-            !!PS dz_trr(1)      = hnode(1,node)/2.0_WP
-            !!PS dz_trr(nln+1)  = hnode(nln,node)/2.0_WP
-            dz_trr         = 0.0_WP
-            dz_trr(nun+1:nln)  = abs(Z_3d_n(nun:nln-1,node)-Z_3d_n(nun+1:nln,node))
-            dz_trr(nun)      = hnode(nun,node)/2.0_WP
-            dz_trr(nln+1)  = hnode(nln,node)/2.0_WP
+            dz_trr            = 0.0_WP
+            dz_trr(nun+1:nln) = abs(Z_3d_n(nun:nln-1,node)-Z_3d_n(nun+1:nln,node))
+            dz_trr(nun)       = hnode(nun,node)/2.0_WP
+            dz_trr(nln+1)     = hnode(nln,node)/2.0_WP
+            
+            !___________________________________________________________________
+            ! calculate Langmuir cell additional term after Axell (2002)
+            ! --> adapted from ICON and Oliver Gutjahr
+            if (tke_dolangmuir) then
+                !_______________________________________________________________
+                ! calculate Stoke's drift
+                ! Approximation if there is no information about the wave field
+                ! As done in Nemo
+                ! FIXME: do we need to divide tau by rho?
+                
+                ! Option used in NEMO model (https://www.nemo-ocean.eu/wp-content/
+                ! uploads/NEMO_book.pdf, p.197) see also Breivik et al. (2015)
+                ! They assume rhoair=1.2 kg/m3 and cd=1.5e-03:
+                ! u_stokes = 0.016/(1.2 * 1.5e-03)^0.5 * |tau|^0.5; although they 
+                ! seem to use rhoair=1.2 kg/m3
+                !   langmuir_ustoke(node) = 0.377_wp * SQRT(tau_abs)  ! [tau]=N2/m2
+                !   langmuir_ustoke(node) = 0.016_wp/SQRT(1.2_wp * 1.5e-03_wp)*SQRT(tau_abs)           
+                !   [tau]=N2/m2, rhoair=1.2, cd=1.5*10e-03
+                langmuir_ustoke(node) = 0.016_WP/sqrt(1.2_WP * 1.5e-03_WP)*sqrt(tke_forc2d_normstress(node)*density_0)         
+                
+                ! --> This is done in Coulevard et al (2020, doi:10.5194/gmd-13-3067-2020), see Fig.2
+                !   langmuir_ustoke(node) = 0.377_wp * SQRT(forc_tke_surf_2D(jc,blockNo))
+                ! --> other option from Li and Garrett (1993)
+                !   langmuir_ustoke(node) = 0.016_wp * fu10(jc,blockNo)  
+                ! --> or original version from Axell (2002)
+                !   LLC = 0.12_wp*(u10**2/g)
+                !   langmuir_ustoke(node) = 0.0016*u10*EXP(depth/LLC)
+                
+                !_______________________________________________________________
+                ! find depth of langmuir cell (hlc). hlc is the depth to which a water
+                ! parcel with kinetic energy 0.5*u_stokes**2 can reach on its own by
+                ! converting its kinetic energy to potential energy.
+                langmuir_hlc(node) = 0.0_wp
+                do nz=nun+1,nln
+                    !!PS k_hlc = nz
+                    aux = sum( -bvfreq2(2:nz+1)*zbar_3d_n(2:nz+1,node) )
+                    if(aux > 0.5_wp*langmuir_ustoke(node)**2.0_wp) then
+                        !!PS k_hlc = nz
+                        langmuir_hlc(node) = -zbar_3d_n(nz,node)
+                        exit
+                    end if 
+                end do
+                
+                !_______________________________________________________________
+                ! calculate langmuir cell velocity scale (wlc)
+                ! Note: Couvelard et al (2020) set clc=0.3 instead of default 0.15 from
+                ! Axell (2002); results in deeper MLDs and better spatial MLD pattern.
+                langmuir_wlc(:,node) = 0.0_wp
+                do nz=nun+1,nln    
+                    if(-zbar_3d_n(nz,node) <= langmuir_hlc(node)) then
+                        langmuir_wlc(nz,node) = tke_clangmuir * langmuir_ustoke(node) * &
+                        sin(-pi*zbar_3d_n(nz,node)/langmuir_hlc(node))
+                    !!PS else
+                    !!PS     langmuir_wlc(nz,node) = 0.0_wp
+                    endif
+                end do
+                
+                !_______________________________________________________________
+                ! calculate langmuir turbulence term (tke_plc)
+                if (langmuir_hlc(node) > 0.0_wp) then
+                    tke_langmuir(:,node) = langmuir_wlc(:,node)**3.0_wp / langmuir_hlc(node)
+                else
+                    tke_langmuir(:,node) = 0.0_wp
+                end if 
+                
+            end if 
             
             !___________________________________________________________________
             ! main cvmix call to calculate tke
@@ -330,44 +436,46 @@ module g_cvmix_tke
             
             call cvmix_coeffs_tke(&
                 ! parameter
-                dzw          = hnode(:,node),               & ! distance between layer interface --> hnode
-                dzt          = dz_trr(:),                   & ! distnace between tracer points
-                nlev         = nln,                         &
+                dzw          = hnode(nun:nln,node),               & ! distance between layer interface --> hnode
+                dzt          = dz_trr(nun:nln+1),                   & ! distnace between tracer points
+!                 nlev         = nln,                         &
+                nlev         = nln-nun+1,                         &
                 max_nlev     = nl-1,                        &
                 dtime        = dt,                          &
                 rho_ref      = density_0,                   &
                 grav         = g,                           &
                 ! essentials
-                tke_new      = tke(:,node),                 & ! out--> turbulent kinetic energy
-                KappaM_out   = tke_Av(:,node),              & ! out
-                KappaH_out   = tke_Kv(:,node),              & ! out
-                tke_old      = tke_old(:),                  & ! in --> turbulent kinetic energy previous time step
-                old_KappaM   = tke_Av_old(:),               & ! in
-                old_KappaH   = tke_Kv_old(:),               & ! in
-                Ssqr         = vshear2(:),                  & ! in --> square vert. vel. shear
-                Nsqr         = bvfreq2(:),                  & ! in --> square brunt Väisälä freq
-                alpha_c      = tke_in3d_iwealphac(:,node),  & ! in for IDEMIX Ri
-                E_iw         = tke_in3d_iwe(:,node),        & ! in for IDEMIX Ri
+                tke_new      = tke(       nun:nln+1,node),                 & ! out--> turbulent kinetic energy
+                KappaM_out   = tke_Av(    nun:nln+1,node),              & ! out
+                KappaH_out   = tke_Kv(    nun:nln+1,node),              & ! out
+                tke_old      = tke_old(   nun:nln+1),                  & ! in --> turbulent kinetic energy previous time step
+                old_KappaM   = tke_Av_old(nun:nln+1),               & ! in
+                old_KappaH   = tke_Kv_old(nun:nln+1),               & ! in
+                Ssqr         = vshear2(   nun:nln+1),                  & ! in --> square vert. vel. shear
+                Nsqr         = bvfreq2(   nun:nln+1),                  & ! in --> square brunt Väisälä freq
+                alpha_c      = tke_in3d_iwealphac(nun:nln+1,node),  & ! in for IDEMIX Ri
+                E_iw         = tke_in3d_iwe(nun:nln+1,node),        & ! in for IDEMIX Ri
                 ! forcing
-                forc_tke_surf= tke_forc2d_normstress(node), & ! in --> wind stress  
-                forc_rho_surf= tke_forc2d_rhosurf(node),    & ! in
-                bottom_fric  = tke_forc2d_botfrict(node),   & ! in
-                iw_diss      = tke_in3d_iwdis(:,node),      & ! in
+                forc_tke_surf= tke_forc2d_normstress(   node), & ! in --> wind stress  
+                forc_rho_surf= tke_forc2d_rhosurf(      node), & ! in
+                bottom_fric  = tke_forc2d_botfrict(     node), & ! in
+                iw_diss      = tke_in3d_iwdis(nun:nln+1,node), & ! in
                 ! diagnostics
-                tke_Tbpr     = tke_Tbpr(:,node),            & ! buoyancy production
-                tke_Tspr     = tke_Tspr(:,node),            & ! shear production 
-                tke_Tdif     = tke_Tdif(:,node),            & ! vertical diffusion d/dz(k d/dz)TKE
-                tke_Tdis     = tke_Tdis(:,node),            & ! dissipation
-                tke_Twin     = tke_Twin(:,node),            & ! wind forcing
-                tke_Tiwf     = tke_Tiwf(:,node),            & ! internal wave forcing when idemix is used
-                tke_Tbck     = tke_Tbck(:,node),            & ! background forcing only active if IDEMIX is not active, forcing that results from resetting TKE to minimum background TKE value
-                tke_Ttot     = tke_Ttot(:,node),            & ! sum of all terms
-                tke_Lmix     = tke_Lmix(:,node),            & ! mixing length scale of the TKE scheme
-                tke_Pr       = tke_Pr(:,node),              & ! Prantl number
+                tke_plc      = tke_langmuir(nun:nln+1,node),   & ! in   
+                tke_Tbpr     = tke_Tbpr(nun:nln+1,node),            & ! buoyancy production
+                tke_Tspr     = tke_Tspr(nun:nln+1,node),            & ! shear production 
+                tke_Tdif     = tke_Tdif(nun:nln+1,node),            & ! vertical diffusion d/dz(k d/dz)TKE
+                tke_Tdis     = tke_Tdis(nun:nln+1,node),            & ! dissipation
+                tke_Twin     = tke_Twin(nun:nln+1,node),            & ! wind forcing
+                tke_Tiwf     = tke_Tiwf(nun:nln+1,node),            & ! internal wave forcing when idemix is used
+                tke_Tbck     = tke_Tbck(nun:nln+1,node),            & ! background forcing only active if IDEMIX is not active, forcing that results from resetting TKE to minimum background TKE value
+                tke_Ttot     = tke_Ttot(nun:nln+1,node),            & ! sum of all terms
+                tke_Lmix     = tke_Lmix(nun:nln+1,node),            & ! mixing length scale of the TKE scheme
+                tke_Pr       = tke_Pr(  nun:nln+1,node),              & ! Prantl number
                 ! debugging
-                cvmix_int_1  = cvmix_dummy_1(:,node),        & !
-                cvmix_int_2  = cvmix_dummy_2(:,node),        & !
-                cvmix_int_3  = cvmix_dummy_3(:,node),        & !
+                cvmix_int_1  = cvmix_dummy_1(nun:nln+1,node),        & !
+                cvmix_int_2  = cvmix_dummy_2(nun:nln+1,node),        & !
+                cvmix_int_3  = cvmix_dummy_3(nun:nln+1,node),        & !
                 i = 1,                                       &
                 j = 1,                                       &
                 tstep_count = tstep_count                    &
@@ -375,28 +483,26 @@ module g_cvmix_tke
             
             tke_Av(nln+1,node)=0.0_WP
             tke_Kv(nln+1,node)=0.0_WP
-            !!PS tke_Av(1,node)=0.0_WP
-            !!PS tke_Kv(1,node)=0.0_WP
-            tke_Av(nun,node)=0.0_WP
-            tke_Kv(nun,node)=0.0_WP
+            tke_Av(nun  ,node)=0.0_WP
+            tke_Kv(nun  ,node)=0.0_WP
             
         end do !--> do node = 1,node_size
         
         !_______________________________________________________________________
         ! write out diffusivity
-        call exchange_nod(tke_Kv)
+        call exchange_nod(tke_Kv, partit)
         Kv = tke_Kv
             
         !_______________________________________________________________________
         ! write out viscosity -->interpolate therefor from nodes to elements
-        call exchange_nod(tke_Av) !Warning: don't forget to communicate before averaging on elements!!!
+        call exchange_nod(tke_Av, partit) !Warning: don't forget to communicate before averaging on elements!!!
         Av = 0.0_WP
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)
-            !!PS do nz=2,nlevels(elem)-1
             do nz=ulevels(elem)+1,nlevels(elem)-1
                 Av(nz,elem) = sum(tke_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do
+        
     end subroutine calc_cvmix_tke
 end module g_cvmix_tke

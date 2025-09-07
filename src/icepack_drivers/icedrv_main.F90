@@ -10,7 +10,7 @@
 
           use icedrv_kinds
           use icedrv_constants
-          use g_parsup,            only: mype
+          use mod_partit
 
           implicit none
 
@@ -25,7 +25,7 @@
                     ! Subroutines
                     set_icepack, alloc_icepack, init_icepack, step_icepack, &
                     icepack_to_fesom, icepack_to_fesom_single_point,        &
-                    init_flux_atm_ocn, init_io_icepack, init_restart_icepack
+                    init_flux_atm_ocn, ini_icepack_io , ini_mean_icepack_io
     
           !=======================================================================
 !--------- Everything else is private
@@ -64,6 +64,8 @@
           integer (kind=int_kind), save  :: max_ntrcr            ! number of tracers in total
           integer (kind=int_kind), save  :: nfreq                ! number of wave frequencies ! HARDWIRED FOR NOW
           integer (kind=int_kind), save  :: ndtd                 ! dynamic time steps per thermodynamic time step
+          type(t_partit), pointer, save  :: p_partit             ! a pointer to the mesh partitioning (has been accessed via "use g_parsup" in the previous versions)
+          integer (kind=int_kind), save  :: mype                 ! a copy of a mype which has been accessed via "use g_parsup" in the previous versions
 
           !=======================================================================
           ! 2. State variabels for icepack
@@ -151,6 +153,10 @@
              opening(:),  & ! rate of opening due to divergence/shear (1/s)   
              dhi_dt(:),   & ! ice volume tendency due to thermodynamics (m/s)
              dhs_dt(:),   & ! snow volume tendency due to thermodynamics (m/s) 
+             dhi_t_dt(:),   & ! ice volume tendency due to thermodynamics (m/s)
+             dhs_t_dt(:),   & ! snow volume tendency due to thermodynamics (m/s)
+             dhi_r_dt(:),   & ! ice volume tendency due to ridging (m/s)
+             dhs_r_dt(:),   & ! snow volume tendency due to ridging (m/s)
              ! ridging diagnostics in categories
              dardg1ndt(:,:), & ! rate of area loss by ridging ice (1/s)
              dardg2ndt(:,:), & ! rate of area gain by new ridges (1/s)
@@ -751,8 +757,12 @@
           interface
 
               ! Read icepack namelists, setup the model parameter and write diagnostics               
-              module subroutine set_icepack()
+              module subroutine set_icepack(ice, partit)
+                  use mod_partit
+                  use mod_ice
                   implicit none 
+                  type(t_partit), intent(inout), target :: partit
+                  type(t_ice)   , intent(inout), target :: ice
               end subroutine set_icepack
 
               ! Set up hemispheric masks 
@@ -788,17 +798,23 @@
               end subroutine init_history_bgc
 
               ! Initialize all
-              module subroutine init_icepack(mesh)
+              module subroutine init_icepack(ice, tracer, mesh)
                   use mod_mesh
+                  use mod_tracer
+                  use mod_ice
                   implicit none
-                  type(t_mesh), intent(in), target :: mesh
+                  type(t_mesh),        intent(in), target :: mesh
+                  type(t_tracer_data), intent(in), target :: tracer
+                  type(t_ice)        , intent(inout), target :: ice
               end subroutine init_icepack
 
               ! Copy variables from fesom to icepack
-              module subroutine fesom_to_icepack(mesh)
+              module subroutine fesom_to_icepack(ice, mesh)
                   use mod_mesh
+                  use mod_ice
                   implicit none
                   type(t_mesh), intent(in), target :: mesh
+                  type(t_ice), intent(inout), target :: ice
               end subroutine fesom_to_icepack
 
               ! Copy variables from icepack to fesom
@@ -808,7 +824,8 @@
                                           fhocn_tot_out, fresh_tot_out,    &
                                           strocnxT_out,  strocnyT_out,     &
                                           dhs_dt_out,    dhi_dt_out,       &
-                                          fsalt_out,     evap_ocn_out      )
+                                          fsalt_out,     evap_ocn_out,     &
+                                          evap_out                         )
                   use mod_mesh
                   implicit none        
                   integer (kind=int_kind), intent(in) :: &
@@ -824,7 +841,8 @@
                      fsalt_out,     &
                      dhs_dt_out,    &
                      dhi_dt_out,    &
-                     evap_ocn_out
+                     evap_ocn_out,  &
+                     evap_out
               end subroutine icepack_to_fesom
 
               ! Copy variables from icepack to fesom (single node or element)
@@ -840,10 +858,12 @@
               end subroutine icepack_to_fesom_single_point
 
               ! Trancers advection 
-              module subroutine tracer_advection_icepack(mesh)
+              module subroutine tracer_advection_icepack(ice, mesh)
                   use mod_mesh
+                  use MOD_ICE
                   implicit none
                   type(t_mesh), intent(in), target :: mesh
+                  type(t_ice), intent(in), target :: ice
               end subroutine tracer_advection_icepack
 
               ! Advection initialization
@@ -854,11 +874,10 @@
               end subroutine init_advection_icepack
 
               ! Driving subroutine for column physics
-              module subroutine step_icepack(mesh, time_evp, time_advec, time_therm)
+              module subroutine step_icepack(ice, mesh, time_evp, time_advec, time_therm)
                   use mod_mesh
+                  use mod_ice
                   use g_config,              only: dt
-                  use i_PARAM,               only: whichEVP
-                  use g_parsup
                   use icepack_intfc,         only: icepack_ice_strength
                   implicit none
                   real (kind=dbl_kind), intent(out) :: &
@@ -866,23 +885,27 @@
                      time_advec,                       &
                      time_evp
                   type(t_mesh), intent(in), target  :: mesh
+                  type(t_ice), intent(inout), target  :: ice
               end subroutine step_icepack
 
               ! Initialize output
-              module subroutine init_io_icepack(mesh)
+              module subroutine ini_mean_icepack_io(mesh)
                   use mod_mesh
                   implicit none
                   type(t_mesh), intent(in), target :: mesh
-              end subroutine init_io_icepack
+              end subroutine ini_mean_icepack_io
 
               ! Initialize restart
-              module subroutine init_restart_icepack(year, mesh)
+              module subroutine ini_icepack_io(year, partit, mesh)
                   use mod_mesh
+                  use mod_partit
+                  use mod_parsup
                   implicit none
-                  type(t_mesh), intent(in), target     :: mesh
-                  integer(kind=int_kind),  intent(in) :: year
-              end subroutine init_restart_icepack
-
+                  type(t_mesh),           intent(in)   , target :: mesh
+                  type(t_partit),         intent(inout), target :: partit
+                  integer(kind=int_kind), intent(in)            :: year
+              end subroutine ini_icepack_io
+              
               ! Cut off Icepack
               module subroutine cut_off_icepack
                   use icepack_intfc,         only: icepack_compute_tracers

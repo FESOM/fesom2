@@ -1,0 +1,48 @@
+#!/bin/bash
+#SBATCH --account=clidyn.p_fesom # edit your account
+#SBATCH --job-name=run
+#SBATCH --partition=mpp
+#SBATCH --time=01:00:00
+#SBATCH --qos=12h
+#SBATCH --nodes=48            # Number of tasks (MPI) tasks to be launched
+#SBATCH --tasks-per-node 128  # using all 128CPus we exceed the maxload limit (>130) of many used nodes when us parallel I/O
+#SBATCH --cpus-per-task 1
+
+#SBATCH -o fesom2_%x_%j.out
+#SBATCH -e fesom2_%x_%j.out
+
+# disable hyperthreading
+#SBATCH --hint=nomultithread
+
+module purge 
+source ../env/albedo/shell
+export OMP_NUM_THREADS=1
+ulimit -s unlimited
+
+# determine JOBID
+JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
+
+ln -s ../bin/fesom.x .           # cp -n ../bin/fesom.x
+cp -n ../config/namelist.config  .
+cp -n ../config/namelist.forcing .
+cp -n ../config/namelist.oce     .
+cp -n ../config/namelist.dyn     .
+cp -n ../config/namelist.tra     .
+cp -n ../config/namelist.ice     .
+cp -n ../config/namelist.io      .
+cp -n ../config/namelist.icepack .
+
+#___DETERMINE SLURM JOBID+OUTPUTFILE____________________________________________
+jobid=$(echo $SLURM_JOB_ID | cut -d"." -f1)
+fname="fesom2_${SLURM_JOB_NAME}_${jobid}.out"
+
+#___PUT JOB IN QUEUE____________________________________________________________
+date
+srun --mpi=pmi2 ./fesom.x >> ${fname}
+date
+
+#qstat -f $PBS_JOBID
+#export EXITSTATUS=$?
+#if [ ${EXITSTATUS} -eq 0 ] || [ ${EXITSTATUS} -eq 127 ] ; then
+#sbatch job_ollie
+#fi

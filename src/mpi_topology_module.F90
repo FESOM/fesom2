@@ -7,8 +7,8 @@ module hostname_sys_module
     
     allocate(character(32) :: hostname) ! platform dependent length in limits.h or call `getconf HOST_NAME_MAX`
     status = hostnm(hostname)
-  end subroutine
-end module
+  end subroutine hostname_sys
+end module hostname_sys_module
 
 
 module mpi_topology_module
@@ -25,8 +25,10 @@ module mpi_topology_module
 
   type :: mpi_topology_type
   contains
-    procedure, nopass :: next_host_head_rank, set_hostname_strategy, reset_state
-  end type
+    procedure, nopass :: next_host_head_rank
+    procedure, nopass :: set_hostname_strategy
+    procedure, nopass :: reset_state
+  end type mpi_topology_type
   type(mpi_topology_type) mpi_topology
 
   logical, save :: IS_STATE_INITIALIZED = .false.
@@ -41,7 +43,7 @@ module mpi_topology_module
   abstract interface
     subroutine hostname_interface(hostname)
     character(len=:), allocatable, intent(out) :: hostname
-    end subroutine
+    end subroutine hostname_interface
   end interface
 
 contains
@@ -56,13 +58,13 @@ contains
     hostname_strategy => hostname_sys
     
     IS_STATE_INITIALIZED = .true.
-  end subroutine
+  end subroutine reset_state
 
 
   subroutine set_hostname_strategy(strategy)
     procedure(hostname_interface) strategy
     hostname_strategy => strategy
-  end subroutine
+  end subroutine set_hostname_strategy
 
 
   integer recursive function next_host_head_rank(communicator, rank_use_count) result(result)
@@ -86,7 +88,7 @@ contains
     if(present(rank_use_count)) then
       rank_use_count = (host_use_count-1)/STEP +1
     end if
-  end function
+  end function next_host_head_rank
 
 
   integer function learn_topology(communicator) result(result)
@@ -127,5 +129,5 @@ contains
 
     call MPI_BCAST(ranks_per_host, 1, MPI_INT, 0, communicator, ierror)
     STEP = ranks_per_host
-  end function
-end module
+  end function learn_topology
+end module mpi_topology_module

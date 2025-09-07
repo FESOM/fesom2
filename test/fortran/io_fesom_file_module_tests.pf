@@ -1,0 +1,81 @@
+module io_fesom_file_module_tests
+  use io_fesom_file_module
+  use funit; implicit none
+  
+  character(len=*), parameter :: TMPPATHPREFIX = "./io_fesom_file_module_tests_DAEA1C34_F042_4243_AA88_273E4AA9D4A6__"
+  
+contains
+
+
+  @test
+  subroutine can_be_initialized()
+    type(fesom_file_type) f
+    integer, parameter :: mesh_nod2d = 3140
+    integer, parameter :: mesh_elem2d = 5839
+    integer, parameter :: mesh_nl = 48
+    
+    call f%init(mesh_nod2d, mesh_elem2d, mesh_nl)
+  end subroutine
+
+
+  @test
+  subroutine rec_count_returns_neg1_for_an_unattached_file()
+    type(fesom_file_type) f
+    integer, parameter :: mesh_nod2d = 3140
+    integer, parameter :: mesh_elem2d = 5839
+    integer, parameter :: mesh_nl = 48
+    
+    call f%init(mesh_nod2d, mesh_elem2d, mesh_nl)
+    
+    @assertEqual(-1, f%rec_count())
+  end subroutine
+
+
+  @test
+  subroutine rec_count_returns_0_for_a_newly_created_file()
+    character(len=*), parameter :: filepath = TMPPATHPREFIX//"rec_count_returns_0_for_a_newly_created_file.nc"
+    integer exitstat
+    type(fesom_file_type) f
+    integer, parameter :: mesh_nod2d = 3140
+    integer, parameter :: mesh_elem2d = 5839
+    integer, parameter :: mesh_nl = 48
+
+    call execute_command_line("rm -f "//filepath) ! silently remove the file if it exists from an aborted previous run
+    
+    call f%init(mesh_nod2d, mesh_elem2d, mesh_nl)    
+    call f%open_write_create(filepath)
+    
+    @assertEqual(0, f%rec_count())
+    
+    call f%close_file()
+
+    call execute_command_line("rm "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+  end subroutine
+
+
+  @test
+  subroutine rec_count_returns_2_for_existing_file_with_2_timesteps()
+    type(fesom_file_type) f
+    integer, parameter :: mesh_nod2d = 3140
+    integer, parameter :: mesh_elem2d = 5839
+    integer, parameter :: mesh_nl = 48
+
+    integer, allocatable :: varshape(:)
+    integer node_dimidx, time_dimidx
+    integer varindex
+    
+    call f%init(mesh_nod2d, mesh_elem2d, mesh_nl)
+    
+    time_dimidx = f%add_dim_unlimited("time")
+    node_dimidx = f%add_dim("nod2", 5)
+    varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
+    call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc")
+    call f%read_var_shape(varindex, varshape)
+    
+    @assertEqual(2, f%rec_count())
+    
+    call f%close_file()
+  end subroutine
+
+end module

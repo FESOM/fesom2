@@ -18,22 +18,18 @@
       use icepack_intfc,    only: icepack_query_tracer_indices
       use icepack_intfc,    only: icepack_warnings_flush
       use icepack_intfc,    only: icepack_warnings_aborted
-      use icedrv_system,    only: icedrv_system_abort 
+      use icedrv_system,    only: icedrv_system_abort, icedrv_system_init
       
       contains 
 
-      module subroutine set_icepack()
-
-          use g_parsup,            only: myDim_nod2D,  eDim_nod2D,  &
-                                         myDim_elem2D, eDim_elem2D, &
-                                         mpi_comm_fesom
-          use i_param,             only: whichEVP
-          use i_param,             only: cd_oce_ice, Pstar, c_pressure  
-          use i_therm_param,       only: albw
+      module subroutine set_icepack(ice, partit)
+          use MOD_ICE
 
           implicit none
 
           ! local variables
+          type(t_partit), intent(inout), target :: partit
+          type(t_ice), intent(inout), target :: ice
 
           character(len=char_len)     :: nml_filename, diag_filename
           character(len=*), parameter :: subname = '(set_icepack)'
@@ -154,7 +150,10 @@
           logical (kind=log_kind)  :: oceanmixed_ice   
           character (len=char_len) :: wave_spec_type
 
-
+          ! to snychronize density definition between icepack and fesom2, becomes
+          ! crucial for waterflux computation and volume conservation
+          real (kind=dbl_kind)     :: rhoice, rhosno, rhowat, rhofwt
+          
           !-----------------------------------------------------------------
           ! Namelist definition
           !-----------------------------------------------------------------
@@ -239,16 +238,16 @@
           end if
 
           do while (nml_error > 0) 
-              if (mype == 0) print*,'Reading namelist file   ',nml_filename
+              if (partit%mype == 0) print*,'Reading namelist file   ',nml_filename
 
-              if (mype == 0) print*,'Reading env_nml'
+              if (partit%mype == 0) print*,'Reading env_nml'
               read(nu_nml, nml=env_nml,iostat=nml_error)
               if (nml_error /= 0) exit
           end do
 
           if (nml_error == 0) close(nu_nml)
           if (nml_error /= 0) then
-             if (mype == 0) write(*,*) 'Error reading env namelist'
+             if (partit%mype == 0) write(*,*) 'Error reading env namelist'
              call icedrv_system_abort(file=__FILE__,line=__LINE__)
              close(nu_nml)
           end if
@@ -256,12 +255,13 @@
           !-----------------------------------------------------------------
           ! Derived quantities used by the icepack model
           !-----------------------------------------------------------------
-          
-          nx         = myDim_nod2D  + eDim_nod2D
-          nx_elem    = myDim_elem2D + eDim_elem2D
-          nx_nh      = myDim_nod2D
-          nx_elem_nh = myDim_elem2D
-
+          call icedrv_system_init(partit)
+          p_partit => partit
+          nx         = p_partit%myDim_nod2D  + p_partit%eDim_nod2D
+          nx_elem    = p_partit%myDim_elem2D + p_partit%eDim_elem2D
+          nx_nh      = p_partit%myDim_nod2D
+          nx_elem_nh = p_partit%myDim_elem2D
+          mype       = p_partit%mype
           ncat      = nicecat    ! number of categories
           nfsd      = nfsdcat    ! number of floe size categories
           nilyr     = nicelyr    ! number of ice layers per category
@@ -339,7 +339,25 @@
           call icepack_warnings_flush(nu_diag)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__, line=__LINE__)
-
+          
+          !-----------------------------------------------------------------
+          ! Synchronize values between Icepack and FESOM2 values
+          !-----------------------------------------------------------------
+          ! Make the namelists.ice and namelist.icepack consistent (icepack wins
+          ! over fesom)
+          ice%cd_oce_ice = dragio
+          ice%thermo%albw= albocn
+          ice%Pstar      = P_star
+          ice%c_pressure = C_star
+          
+          ! in terms of density definition fesom wins over icepack, otherwise
+          ! we can get in trouble with the waterflux computation and thus the 
+          ! volume conservation under zstar
+          rhoice = ice%thermo%rhoice 
+          rhosno = ice%thermo%rhosno
+          rhowat = ice%thermo%rhowat
+          rhofwt = ice%thermo%rhofwt
+          
           !-----------------------------------------------------------------
           ! other default values 
           !-----------------------------------------------------------------
@@ -402,7 +420,7 @@
 
           if (nml_error == 0) close(nu_nml)
           if (nml_error /= 0) then
-             if (mype == 0) write(*,*) 'Error reading iecpack namelists'
+             if (partit%mype == 0) write(*,*) 'Error reading iecpack namelists'
              call icedrv_system_abort(file=__FILE__,line=__LINE__)
           endif
           close(nu_nml)
@@ -411,47 +429,47 @@
           ! set up diagnostics output and resolve conflicts
           !-----------------------------------------------------------------
     
-          if (mype == 0) write(*,*) 'Diagnostic output will be in file '
-          if (mype == 0) write(*,*) '       icepack.diagnostics'
+          if (partit%mype == 0) write(*,*) 'Diagnostic output will be in file '
+          if (partit%mype == 0) write(*,*) '       icepack.diagnostics'
 
           diag_filename = 'icepack.errors'
           open (ice_stderr, file=diag_filename, status='unknown', iostat=diag_error)
           if (diag_error /= 0) then
-             if (mype == 0) write(*,*) 'Error while opening error file'
-             if (mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
+             if (partit%mype == 0) write(*,*) 'Error while opening error file'
+             if (partit%mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
           endif
 
           diag_filename = 'icepack.diagnostics'
           open (nu_diag, file=diag_filename, status='unknown', iostat=diag_error)
           if (diag_error /= 0) then
-             if (mype == 0) write(*,*) 'Error while opening diagnostic file'
-             if (mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
+             if (partit%mype == 0) write(*,*) 'Error while opening diagnostic file'
+             if (partit%mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
           endif
 
-          if (mype == 0) write(nu_diag,*) '-----------------------------------'
-          if (mype == 0) write(nu_diag,*) '  ICEPACK model diagnostic output  '
-          if (mype == 0) write(nu_diag,*) '-----------------------------------'
-          if (mype == 0) write(nu_diag,*) ' '
+          if (partit%mype == 0) write(nu_diag,*) '-----------------------------------'
+          if (partit%mype == 0) write(nu_diag,*) '  ICEPACK model diagnostic output  '
+          if (partit%mype == 0) write(nu_diag,*) '-----------------------------------'
+          if (partit%mype == 0) write(nu_diag,*) ' '
 
-          if (whichEVP == 1 .or. whichEVP == 2) then
-             if (mype == 0) write (nu_diag,*) 'WARNING: whichEVP = 1 or 2'
-             if (mype == 0) write (nu_diag,*) 'Adaptive or Modified EVP formulations'
-             if (mype == 0) write (nu_diag,*) 'are not allowed when using Icepack (yet).'
-             if (mype == 0) write (nu_diag,*) 'Standard EVP will be used instead'
-             if (mype == 0) write (nu_diag,*) '         whichEVP = 0'
-             whichEVP = 0
+          if (ice%whichEVP == 1 .or. ice%whichEVP == 2) then
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: whichEVP = 1 or 2'
+             if (partit%mype == 0) write (nu_diag,*) 'Adaptive or Modified EVP formulations'
+             if (partit%mype == 0) write (nu_diag,*) 'are not allowed when using Icepack (yet).'
+             if (partit%mype == 0) write (nu_diag,*) 'Standard EVP will be used instead'
+             if (partit%mype == 0) write (nu_diag,*) '         whichEVP = 0'
+             ice%whichEVP = 0
           endif
     
           if (ncat == 1 .and. kitd == 1) then
-             if (mype == 0) write (nu_diag,*) 'Remapping the ITD is not allowed for ncat=1.'
-             if (mype == 0) write (nu_diag,*) 'Use kitd = 0 (delta function ITD) with kcatbound = 0'
-             if (mype == 0) write (nu_diag,*) 'or for column configurations use kcatbound = -1'
-             if (mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
+             if (partit%mype == 0) write (nu_diag,*) 'Remapping the ITD is not allowed for ncat=1.'
+             if (partit%mype == 0) write (nu_diag,*) 'Use kitd = 0 (delta function ITD) with kcatbound = 0'
+             if (partit%mype == 0) write (nu_diag,*) 'or for column configurations use kcatbound = -1'
+             if (partit%mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
           endif
     
           if (ncat /= 1 .and. kcatbound == -1) then
-             if (mype == 0) write (nu_diag,*) 'WARNING: ITD required for ncat > 1'
-             if (mype == 0) write (nu_diag,*) 'WARNING: Setting kitd and kcatbound to default values'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: ITD required for ncat > 1'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: Setting kitd and kcatbound to default values'
              kitd = 1
              kcatbound = 0
           endif
@@ -467,46 +485,46 @@
           if (rpcesm + rplvl + rptopo > puny) tr_pond = .true.
     
           if (rpcesm + rplvl + rptopo > c1 + puny) then
-             if (mype == 0) write (nu_diag,*) 'WARNING: Must use only one melt pond scheme'
-             if (mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: Must use only one melt pond scheme'
+             if (partit%mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
           endif
     
           if (tr_pond_lvl .and. .not. tr_lvl) then
-             if (mype == 0) write (nu_diag,*) 'WARNING: tr_pond_lvl=T but tr_lvl=F'
-             if (mype == 0) write (nu_diag,*) 'WARNING: Setting tr_lvl=T'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: tr_pond_lvl=T but tr_lvl=F'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: Setting tr_lvl=T'
              tr_lvl = .true.
           endif
     
           if (tr_pond_lvl .and. abs(hs0) > puny) then
-             if (mype == 0) write (nu_diag,*) 'WARNING: tr_pond_lvl=T and hs0/=0'
-             if (mype == 0) write (nu_diag,*) 'WARNING: Setting hs0=0'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: tr_pond_lvl=T and hs0/=0'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: Setting hs0=0'
              hs0 = c0
           endif
     
           if (tr_pond_cesm .and. trim(frzpnd) /= 'cesm') then
-             if (mype == 0) write (nu_diag,*) 'WARNING: tr_pond_cesm=T'
-             if (mype == 0) write (nu_diag,*) 'WARNING: frzpnd, dpscale not used'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: tr_pond_cesm=T'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: frzpnd, dpscale not used'
              frzpnd = 'cesm'
           endif
     
           if (trim(shortwave) /= 'dEdd' .and. tr_pond .and. calc_tsfc) then
-             if (mype == 0) write (nu_diag,*) 'WARNING: Must use dEdd shortwave'
-             if (mype == 0) write (nu_diag,*) 'WARNING: with tr_pond and calc_tsfc=T.'
-             if (mype == 0) write (nu_diag,*) 'WARNING: Setting shortwave = dEdd'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: Must use dEdd shortwave'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: with tr_pond and calc_tsfc=T.'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: Setting shortwave = dEdd'
              shortwave = 'dEdd'
           endif
     
           if (tr_aero .and. n_aero==0) then
-             if (mype == 0) write (nu_diag,*) 'WARNING: aerosols activated but'
-             if (mype == 0) write (nu_diag,*) 'WARNING: not allocated in tracer array.'
-             if (mype == 0) write (nu_diag,*) 'WARNING: Activate in compilation script.'
-             if (mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: aerosols activated but'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: not allocated in tracer array.'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: Activate in compilation script.'
+             if (partit%mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
           endif
     
           if (tr_aero .and. trim(shortwave) /= 'dEdd') then
-             if (mype == 0) write (nu_diag,*) 'WARNING: aerosols activated but dEdd'
-             if (mype == 0) write (nu_diag,*) 'WARNING: shortwave is not.'
-             if (mype == 0) write (nu_diag,*) 'WARNING: Setting shortwave = dEdd'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: aerosols activated but dEdd'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: shortwave is not.'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: Setting shortwave = dEdd'
              shortwave = 'dEdd'
           endif
     
@@ -514,53 +532,53 @@
           rfracmax = min(max(rfracmax,c0),c1)
     
           if (ktherm == 2 .and. .not. calc_Tsfc) then
-             if (mype == 0) write (nu_diag,*) 'WARNING: ktherm = 2 and calc_Tsfc = F'
-             if (mype == 0) write (nu_diag,*) 'WARNING: Setting calc_Tsfc = T'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: ktherm = 2 and calc_Tsfc = F'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: Setting calc_Tsfc = T'
              calc_Tsfc = .true.
           endif
     
           if (ktherm == 1 .and. trim(tfrz_option) /= 'linear_salt') then
-             if (mype == 0) write (nu_diag,*) &
+             if (partit%mype == 0) write (nu_diag,*) &
              'WARNING: ktherm = 1 and tfrz_option = ',trim(tfrz_option)
-             if (mype == 0) write (nu_diag,*) &
+             if (partit%mype == 0) write (nu_diag,*) &
              'WARNING: For consistency, set tfrz_option = linear_salt'
           endif
           if (ktherm == 2 .and. trim(tfrz_option) /= 'mushy') then
-             if (mype == 0) write (nu_diag,*) &
+             if (partit%mype == 0) write (nu_diag,*) &
              'WARNING: ktherm = 2 and tfrz_option = ',trim(tfrz_option)
-             if (mype == 0) write (nu_diag,*) &
+             if (partit%mype == 0) write (nu_diag,*) &
              'WARNING: For consistency, set tfrz_option = mushy'
           endif
     
           if (formdrag) then
           if (trim(atmbndy) == 'constant') then
-             if (mype == 0) write (nu_diag,*) 'WARNING: atmbndy = constant not allowed with formdrag'
-             if (mype == 0) write (nu_diag,*) 'WARNING: Setting atmbndy = default'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: atmbndy = constant not allowed with formdrag'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: Setting atmbndy = default'
              atmbndy = 'default'
           endif
     
           if (.not. calc_strair) then
-             if (mype == 0) write (nu_diag,*) 'WARNING: formdrag=T but calc_strair=F'
-             if (mype == 0) write (nu_diag,*) 'WARNING: Setting calc_strair=T'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: formdrag=T but calc_strair=F'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: Setting calc_strair=T'
              calc_strair = .true.
           endif
     
           if (tr_pond_cesm) then
-             if (mype == 0) write (ice_stderr,*) 'ERROR: formdrag=T but frzpnd=cesm'
-             if (mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
+             if (partit%mype == 0) write (ice_stderr,*) 'ERROR: formdrag=T but frzpnd=cesm'
+             if (partit%mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
           endif
     
           if (.not. tr_lvl) then
-             if (mype == 0) write (nu_diag,*) 'WARNING: formdrag=T but tr_lvl=F'
-             if (mype == 0) write (nu_diag,*) 'WARNING: Setting tr_lvl=T'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: formdrag=T but tr_lvl=F'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: Setting tr_lvl=T'
              tr_lvl = .true.
              max_ntrcr = max_ntrcr + 2 ! tr_lvl brings two more tracers
           endif
           endif
     
           if (trim(fbot_xfer_type) == 'Cdn_ocn' .and. .not. formdrag)  then
-             if (mype == 0) write (nu_diag,*) 'WARNING: formdrag=F but fbot_xfer_type=Cdn_ocn'
-             if (mype == 0) write (nu_diag,*) 'WARNING: Setting fbot_xfer_type = constant'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: formdrag=F but fbot_xfer_type=Cdn_ocn'
+             if (partit%mype == 0) write (nu_diag,*) 'WARNING: Setting fbot_xfer_type = constant'
              fbot_xfer_type = 'constant'
           endif
     
@@ -571,7 +589,7 @@
           ! Write Icepack configuration
           !-----------------------------------------------------------------
            
-          if (mype == 0) then
+          if (partit%mype == 0) then
 
              write(nu_diag,*) ' Document ice_in namelist parameters:'
              write(nu_diag,*) ' ==================================== '
@@ -616,6 +634,11 @@
                 write(nu_diag,1000) ' ahmax                     = ', ahmax
              endif    
 
+             write(nu_diag,1000) ' rhos                      = ', rhosno
+             write(nu_diag,1000) ' rhoi                      = ', rhoice
+             write(nu_diag,1000) ' rhow                      = ', rhowat
+             write(nu_diag,1000) ' rhofwt                    = ', rhofwt
+             
              write(nu_diag,1000) ' rfracmin                  = ', rfracmin
              write(nu_diag,1000) ' rfracmax                  = ', rfracmax
 
@@ -656,7 +679,7 @@
              write(nu_diag,1010) ' update_ocn_f              = ', update_ocn_f
              write(nu_diag,1010) ' wave_spec                 = ', wave_spec
              write(nu_diag,1005) ' dragio                    = ', dragio
-             write(nu_diag,1005) ' Pstar                     = ', P_star
+             write(nu_diag,*   ) ' Pstar                     = ', P_star
              write(nu_diag,1005) ' Cstar                     = ', C_star
 
              if (kstrength==1) then
@@ -760,12 +783,12 @@
           endif
  
           if (ntrcr > max_ntrcr-1) then
-             if (mype == 0) write(ice_stderr,*) 'max_ntrcr-1 < number of namelist tracers'
-             if (mype == 0) write(ice_stderr,*) 'max_ntrcr-1 = ',max_ntrcr-1,' ntrcr = ',ntrcr
-             if (mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
+             if (partit%mype == 0) write(ice_stderr,*) 'max_ntrcr-1 < number of namelist tracers'
+             if (partit%mype == 0) write(ice_stderr,*) 'max_ntrcr-1 = ',max_ntrcr-1,' ntrcr = ',ntrcr
+             if (partit%mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
           endif
  
-          if (mype == 0) then 
+          if (partit%mype == 0) then 
 
              write(nu_diag,*) ' '
              write(nu_diag,1020) 'max_ntrcr = ', max_ntrcr
@@ -813,17 +836,7 @@
 
           !-----------------------------------------------------------------
           ! set Icepack values
-          !-----------------------------------------------------------------
-
-          ! Make the namelists.ice and namelist.icepack consistent (icepack wins
-          ! over fesom)
-
-          cd_oce_ice = dragio
-          albw       = albocn
-          Pstar      = P_star
-          c_pressure = C_star
-
-    
+          !-----------------------------------------------------------------  
           call icepack_init_parameters(ustar_min_in=ustar_min, Cf_in=Cf, &
                albicev_in=albicev, albicei_in=albicei, &
                albsnowv_in=albsnowv, albsnowi_in=albsnowi, &
@@ -850,7 +863,9 @@
                fbot_xfer_type_in=fbot_xfer_type, &
                wave_spec_type_in=wave_spec_type, wave_spec_in=wave_spec, &
                ksno_in=ksno, dragio_in=dragio, Cstar_in=C_star, &
-               Pstar_in=P_star, albocn_in=albocn)
+               Pstar_in=P_star, albocn_in=albocn, &
+               update_ocn_f_in=update_ocn_f, &
+               rhoi_in=rhoice, rhos_in=rhosno, rhow_in=rhowat, rhofresh_in=rhofwt)
           call icepack_init_tracer_sizes(ntrcr_in=ntrcr, &
                ncat_in=ncat, nilyr_in=nilyr, nslyr_in=nslyr, nblyr_in=nblyr, &
                nfsd_in=nfsd, n_aero_in=n_aero)
@@ -870,7 +885,7 @@
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
 
-          call mpi_barrier(mpi_comm_fesom,mpi_error)
+          call mpi_barrier(p_partit%mpi_comm_fesom, mpi_error)
 
       end subroutine set_icepack
 

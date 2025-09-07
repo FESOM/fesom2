@@ -2,6 +2,8 @@ module g_clock
   !combining RT and Lars version
   !
   use g_config
+  use iso_fortran_env, only: error_unit
+  use mpi
   implicit none
   save
   real(kind=WP)            :: timeold, timenew     !time in a day, unit: sec
@@ -12,6 +14,7 @@ module g_clock
   integer                  :: ndpyr                !number of days in yearnew 
   integer                  :: num_day_in_month(0:1,12)
   character(4)             :: cyearold, cyearnew   !year as character string      
+  character(2)             :: cmonth               !month as character string      
   data num_day_in_month(0,:) /31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31/
   data num_day_in_month(1,:) /31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31/
 
@@ -55,6 +58,7 @@ contains
        aux2=aux1+num_day_in_month(fleapyear,i)
        if(daynew>aux1 .and. daynew<=aux2) then
           month=i
+          write(cmonth, '(I2.2)') month
           day_in_month=daynew-aux1
           exit
        end if
@@ -65,12 +69,17 @@ contains
   !
   !--------------------------------------------------------------------------------
   !
-  subroutine clock_init
-    use g_parsup
+  subroutine clock_init(partit)
+    USE MOD_PARTIT
     use g_config
+    use mod_transit, only: ti_transit, ti_start_transit
     implicit none
-    integer          :: i, daystart, yearstart
-    real(kind=WP)    :: aux1, aux2, timestart
+    type(t_partit), intent(in), target    :: partit
+    integer                               :: i, daystart, yearstart
+    real(kind=WP)                         :: aux1, aux2, timestart
+    integer                               :: ierr
+    integer                               :: file_unit
+    character(512)                        :: errmsg
  
     ! the model initialized at
     timestart=timenew
@@ -78,10 +87,17 @@ contains
     yearstart=yearnew
 
     ! init clock for this run
-    open(99,file=trim(ResultPath)//trim(runid)//'.clock',status='old')
-    read(99,*) timeold, dayold, yearold
-    read(99,*) timenew, daynew, yearnew
-    close(99)
+    open(newunit=file_unit, file=trim(ResultPath)//trim(runid)//'.clock', action='read', &
+        status='old', iostat=ierr, iomsg=errmsg)
+    if (ierr /= 0) then
+      write (unit=error_unit, fmt='(3A)') &
+        '### error: can not open file ', trim(ResultPath)//trim(runid)//'.clock', &
+        ', error: ' // trim(errmsg)
+      call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
+    end if
+    read(unit=file_unit, fmt=*) timeold, dayold, yearold
+    read(unit=file_unit, fmt=*) timenew, daynew, yearnew
+    close(unit=file_unit)
     if(daynew==0) daynew=1
     
     ! check if this is a restart or not
@@ -91,6 +107,9 @@ contains
     else
        r_restart=.true.
     end if
+!   For simulations with transient tracer input data
+    if (use_transit) ti_transit = yearnew - yearstart + ti_start_transit
+
 
     ! year as character string 
     write(cyearold,'(i4)') yearold
@@ -123,18 +142,18 @@ contains
        aux1=aux2
     end do
 
-    if(mype==0) then
+    if(partit%mype==0) then
         if(r_restart) then
             write(*,*)
             print *, achar(27)//'[31m'    //'____________________________________________________________'//achar(27)//'[0m'
             print *, achar(27)//'[5;7;31m'//' --> THIS IS A RESTART RUN !!!                              '//achar(27)//'[0m'
-            write(*,"(A, F5.2, I4, I5)") '     > clock restarted at time:', timenew, daynew, yearnew
+            write(*,"(A, F8.2, I4, I5)") '     > clock restarted at time:', timenew, daynew, yearnew
             write(*,*)
         else
             write(*,*)
             print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
             print *, achar(27)//'[7;32m'//' --> THIS IS A INITIALISATION RUN !!!                       '//achar(27)//'[0m'
-            write(*,"(A, F5.2, I4, I5)")'     > clock initialized at time:', timenew, daynew, yearnew
+            write(*,"(A, F8.2, I4, I5)")'     > clock initialized at time:', timenew, daynew, yearnew
             write(*,*)
         end if
     end if
@@ -149,6 +168,9 @@ contains
     real(kind=WP)            :: dum_timenew     !time in a day, unit: sec
     integer                  :: dum_daynew       !day in a year
     integer                  :: dum_yearnew     !year before and after time step
+    integer                               :: ierr
+    integer                               :: file_unit
+    character(512)                        :: errmsg
     
     dum_timenew = timenew
     dum_daynew  = daynew
@@ -159,10 +181,17 @@ contains
        dum_yearnew=yearold+1
     endif
 
-    open(99,file=trim(ResultPath)//trim(runid)//'.clock',status='unknown')
-    write(99,*) timeold, dayold, yearold
-    write(99,*) dum_timenew, dum_daynew, dum_yearnew
-    close(99)
+    open(newunit=file_unit, file=trim(ResultPath)//trim(runid)//'.clock', action='write', &
+        status='unknown', iostat=ierr, iomsg=errmsg)
+    if (ierr /= 0) then
+      write (unit=error_unit, fmt='(3A)') &
+        '### error: can not open file ', trim(ResultPath)//trim(runid)//'.clock', &
+        ', error: ' // trim(errmsg)
+      call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
+    end if
+    write(unit=file_unit, fmt=*) timeold, dayold, yearold
+    write(unit=file_unit, fmt=*) dum_timenew, dum_daynew, dum_yearnew
+    close(unit=file_unit)
   end subroutine clock_finish
   !
   !----------------------------------------------------------------------------
@@ -188,11 +217,18 @@ contains
     flag=0
 
     if(.not.include_fleapyear) return
+    call is_fleapyr(year, flag)
+  end subroutine check_fleapyr
 
+  subroutine is_fleapyr(year, flag)
+    implicit none
+    integer, intent(in) :: year      
+    integer, intent(out):: flag
+    flag=0
     if ((mod(year,4)==0.and.mod(year,100)/=0) .or. mod(year,400)==0) then
        flag=1
     endif
-  end subroutine check_fleapyr
+  end subroutine is_fleapyr
   !
   !----------------------------------------------------------------------------
   !

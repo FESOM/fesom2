@@ -1,0 +1,75 @@
+#!/bin/bash
+#SBATCH --job-name=fesom_gpu_test
+#SBATCH --partition=gpu
+#SBATCH --nodes=4                 # Specify number of nodes
+#SBATCH --ntasks-per-node=4
+#SBATCH --cpus-per-task=4
+#SBATCH --gpus=16  # 4 # 8 for 2 nodes
+#SBATCH --gpus-per-task=1 #specific case when tasks=gpues
+#SBATCH --exclusive
+#SBATCH --mem=0                    # Request all memory available on all nodes
+#SBATCH --time=00:20:00            # Set a limit on the total run time
+#SBATCH -o slurm.out
+#SBATCH -e slurm.err
+#SBATCH --account=ab0995
+
+set -e
+export SLURM_CPUS_PER_TASK=4
+
+source /sw/etc/profile.levante
+#source ../env/levante.dkrz.de/shell
+read -r USED_SHELL <../bin/current_shell_path
+source $USED_SHELL
+
+#source /work/ab0995/a270232/refactoring/fesom2/env/levante.dkrz.de/shell.nvhpc
+echo "using environment from" $USED_SHELL
+
+ulimit -s 204800 # https://docs.dkrz.de/doc/levante/running-jobs/runtime-settings.html
+
+echo Submitted job: $jobid
+squeue -u $USER
+
+# Check GPUs available for the job
+nvidia-smi
+
+# determine JOBID
+JOBID=$(echo $SLURM_JOB_ID | cut -d"." -f1)
+
+rm -f fesom.x
+ln -s ../bin/fesom.x . # cp -n ../bin/fesom.x
+
+export OMP_NUM_THREADS=4
+cp -n ../config/namelist.config .
+cp -n ../config/namelist.forcing .
+cp -n ../config/namelist.oce .
+cp -n ../config/namelist.ice .
+cp -n ../config/namelist.icepack .
+cp -n ../config/namelist.tra .
+cp -n ../config/namelist.io .
+cp -n ../config/namelist.cvmix .
+cp -n ../config/namelist.dyn .
+
+## levante specific gpu env used for ICON otherwise segfault
+export OMPI_MCA_pml=ucx # Use UCX to support InfiniBand devices and CUDA [1]
+
+export OMPI_MCA_btl="self" # Only use self transport to reduce overhead [2]
+
+export UCX_RNDV_SCHEME=put_zcopy # Preferred communication scheme with Rendezvous protocol
+export UCX_RNDV_THRESH=16384     # Threshold when to switch transport from TCP to NVLINK [3]
+
+export UCX_IB_GPU_DIRECT_RDMA=yes # Allow remote direct memory access from/to GPU
+
+export UCX_TLS=cma,rc,mm,cuda_ipc,cuda_copy,gdr_copy # Include cuda and gdr based transport layers for communication [4]
+
+export UCX_MEMTYPE_CACHE=n
+
+date
+srun -l fesom.x >fesom2.out 2>&1 #> "fesom2.0.out" 2>&1
+# srun -l nsys profile -t cuda,osrt,mpi fesom.x > fesom2.out 2>&1 #> "fesom2.0.out" 2>&1
+date
+
+# qstat -f $PBS_JOBID
+#export EXITSTATUS=$?
+#if [ ${EXITSTATUS} -eq 0 ] || [ ${EXITSTATUS} -eq 127 ] ; then
+#sbatch job_mistral
+#fi
