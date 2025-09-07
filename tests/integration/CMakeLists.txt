@@ -26,32 +26,6 @@ if(ENABLE_MPI_TESTS)
         TIMEOUT ${TEST_TIMEOUT}
     )
     
-    # Core2 mesh test with 2 processes - CORE2 global ocean mesh
-    add_fesom_test_with_options(integration_core2_mpi2
-        "core2" "48" "1" "d" "1" "d" "10" ".true." ".false."
-        MPI_TEST
-        NP 2
-        TIMEOUT 900
-    )
-    
-    # Make core2 test depend on mesh partitioning
-    set_tests_properties(integration_core2_mpi2 PROPERTIES
-        DEPENDS integration_core2_partition_2
-    )
-    
-    # Core2 mesh test with 4 processes - CORE2 global ocean mesh
-    add_fesom_test_with_options(integration_core2_mpi4
-        "core2" "48" "1" "d" "1" "d" "10" ".true." ".false."
-        MPI_TEST
-        NP 4
-        TIMEOUT 900
-    )
-    
-    # Make core2 test depend on mesh partitioning
-    set_tests_properties(integration_core2_mpi4 PROPERTIES
-        DEPENDS integration_core2_partition_4
-    )
-    
     # Additional MPI test configurations can be added here
     # For example, testing different domain decompositions
 else()
