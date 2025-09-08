@@ -1,329 +1,329 @@
 # FESOM2 Testing Framework
 
-This directory contains the testing framework for FESOM2, including unit tests, integration tests, and system tests.
+This directory contains the comprehensive testing framework for FESOM2, organized into focused test groups for different aspects of the model.
 
 ## Table of Contents
 - [Quick Start](#quick-start)
-- [CMake Configuration](#cmake-configuration)
-- [Running Tests](#running-tests)
+- [Test Enablement](#test-enablement)
 - [Test Organization](#test-organization)
-- [Test Data Setup](#test-data-setup)
-- [Debugging Tests](#debugging-tests)
-- [Adding New Tests](#adding-new-tests)
+- [Listing and Filtering Tests](#listing-and-filtering-tests)
+- [Running Tests](#running-tests)
+- [Custom Test Targets](#custom-test-targets)
+- [Test Configuration](#test-configuration)
+- [Test Data](#test-data)
+- [Troubleshooting](#troubleshooting)
 
 ## Quick Start
 
-1. **Build with testing enabled** (default):
-   ```bash
-   # Create build directory and configure
-   mkdir -p build && cd build
-   cmake -DBUILD_TESTING=ON ..
-   
-   # Build the code and tests
-   make -j$(nproc)
-   
-   # Build specific test targets
-   make fesom_test  # Build all tests
-   make fesom.x     # Build main executable
-   ```
-
-2. **Run tests**:
-   ```bash
-   # Run all tests with verbose output
-   ctest --output-on-failure -V
-   
-   # Run tests matching a pattern
-   ctest -R "integration"       # Run integration tests
-   ctest -R "mpi"              # Run all MPI tests
-   ctest -R "basic"            # Run basic tests
-   
-   # Run specific test by name
-   ctest -R integration_basic_run_mpi8
-   
-   # Run tests with more output
-   ctest --output-on-failure --verbose
-   
-   # Run tests in parallel (e.g., 4 jobs)
-   ctest -j4 --output-on-failure
-   ```
-
-3. **Use convenience targets**:
-   ```bash
-   make test                    # Run all tests (same as 'ctest')
-   make run_tests              # Alias for 'make test'
-   make run_integration_tests  # Run only integration tests
-   make run_mpi_tests          # Run only MPI tests
-   make run_unit_tests         # Run only unit tests
-   ```
-
-## CMake Configuration
-
-### Build Configuration Options
-
-When configuring the build with CMake, you can use these options:
-
 ```bash
-cmake \
-  -DBUILD_TESTING=ON \
-  -DENABLE_MPI_TESTS=ON \
-  -DMPIEXEC_MAX_NUMPROCS=8 \
-  -DCMAKE_BUILD_TYPE=Debug \
-  ..
+# 1. Build with all testing components
+./configure.sh ubuntu -DBUILD_TESTING=ON -DBUILD_MESHDIAG=ON -DBUILD_MESHPARTITIONER=ON
+
+# 2. List available tests (see what's enabled)
+ctest -N
+
+# 3. Run all tests
+ctest --output-on-failure
 ```
 
-Key CMake options:
-- `BUILD_TESTING`: Enable testing (default: ON)
-- `ENABLE_MPI_TESTS`: Enable MPI tests (default: ON)
-- `MPIEXEC_MAX_NUMPROCS`: Maximum number of MPI processes for tests
-- `CMAKE_BUILD_TYPE`: Build type (Debug, Release, RelWithDebInfo, MinSizeRel)
-- `TEST_TIMEOUT`: Global test timeout in seconds (default: 600)
+## Test Enablement
 
-### Building Specific Test Targets
+**Tests are conditionally enabled based on build configuration.** The test system automatically detects available components and includes only relevant tests.
 
+### Core Testing
 ```bash
-# Build all tests
-make fesom_test
+-DBUILD_TESTING=ON              # Required - enables basic test framework
+```
+**Enables**: Integration tests, basic infrastructure
 
-# Build specific test
-make integration_basic_run_mpi8
+### Component-Specific Testing
+```bash
+-DBUILD_MESHDIAG=ON             # Enables mesh diagnostics tests
+-DBUILD_MESHPARTITIONER=ON      # Enables mesh partitioner tests
+```
 
-# Build and run a specific test
-make integration_basic_run_mpi8 && ctest -R integration_basic_run_mpi8 -V
+### System Dependencies
+The system **automatically detects** and reports:
+- **Download capability**: wget or curl (for remote tests)
+- **MPI availability**: mpiexec/mpirun (for MPI tests)
+
+### Detection Report Example
+```
+Remote mesh pipeline component availability:
+  Download capability: TRUE (wget: /usr/bin/wget)
+  Mesh partitioner: ON
+  Mesh diagnostics: ON
+```
+
+**Missing components result in clear skip messages** with instructions to enable them.
+
+## Test Organization
+
+The test framework is organized into **4 focused directories**:
+
+### 📁 `integration/` - Local Integration Tests
+**Purpose**: Core FESOM functionality using local mesh files
+- `integration_pi_mpi2` - PI mesh with 2 processes
+- `integration_pi_mpi8` - PI mesh with 8 processes  
+- `integration_pi_cavity_mpi2` - PI cavity mesh with 2 processes
+- `integration_meshdiag_pi_mpi2/8` - Generate mesh diagnostics (`fesom.mesh.diag.nc`)
+
+**Requirements**: Local mesh files in `tests/data/MESHES/`
+
+### 📁 `remote/` - Remote Mesh Pipeline Tests
+**Purpose**: Test complete pipeline for downloading, partitioning, and validating remote meshes
+- `remote_download_mesh_{name}` - Download mesh from remote repository
+- `remote_partition_mesh_{name}_{procs}` - Partition mesh for specified process count
+- `remote_generate_meshdiag_{name}_mpi{procs}` - Generate mesh diagnostics (`fesom.mesh.diag.nc`)
+
+**Supported Meshes**: core2, dars, pi_remote, ng5, orca25
+**Requirements**: wget/curl, internet connection
+
+### 📁 `meshpartitioner/` - Local Mesh Partitioning Tests  
+**Purpose**: Test mesh partitioner tool on local meshes
+- `meshpartitioner_partition_local_pi_mesh_4` - Create 4-process partition for PI mesh
+- `meshpartitioner_partition_local_pi_cavity_mesh_4` - Create 4-process partition for PI cavity
+
+**Requirements**: `BUILD_MESHPARTITIONER=ON`
+
+### 📁 `ecbundle/` - External Tool Integration Tests
+**Purpose**: Test ECBundle integration and build system
+- `ecbundle_basic_build` - Basic ECBundle functionality
+- `ecbundle_with_meshpart` - ECBundle with mesh partitioner
+- `ecbundle_with_omp` - ECBundle with OpenMP
+- `ecbundle_with_testing` - ECBundle with testing enabled
+
+## Listing and Filtering Tests
+
+**Before running tests, it's helpful to see what's available** based on your build configuration.
+
+### List All Available Tests
+```bash
+ctest -N                    # List all tests (typically 20-26 depending on build options)
+ctest -N -R "integration_"  # List integration tests only
+ctest -N -R "remote_"       # List remote pipeline tests  
+ctest -N -R "meshpartitioner_" # List mesh partitioner tests
+```
+
+### Filter by Test Group
+```bash
+# Show tests by prefix
+ctest -N -R "integration_"     # All integration tests
+ctest -N -R "remote_"          # All remote mesh pipeline tests  
+ctest -N -R "meshpartitioner_" # All mesh partitioner tests
+ctest -N -R "ecbundle_"        # All ecbundle tests
+```
+
+### Filter by Functionality
+```bash
+# Show tests by label
+ctest -N -L "download_mesh"     # All mesh download tests
+ctest -N -L "partition_mesh"    # All mesh partition tests  
+ctest -N -L "generate_meshdiag" # All meshdiag generation tests
+ctest -N -R "_mpi"              # All MPI tests
+```
+
+### Example Output
+```bash
+$ ctest -N
+Test project /path/to/build
+  Test  #1: integration_pi_mpi2
+  Test  #2: integration_pi_mpi8
+  Test  #3: integration_pi_cavity_mpi2
+  Test  #4: integration_meshdiag_pi_mpi2
+  Test  #5: integration_meshdiag_pi_mpi8
+  Test  #6: meshpartitioner_partition_local_pi_mesh_4
+  Test  #7: meshpartitioner_partition_local_pi_cavity_mesh_4
+  Test  #8: remote_download_mesh_core2
+  ...
+Total Tests: 26
 ```
 
 ## Running Tests
 
-### Listing Available Tests
+### Run by Test Group
+```bash
+ctest -R "integration_"     # All integration tests
+ctest -R "remote_"          # All remote mesh pipeline tests  
+ctest -R "meshpartitioner_" # All mesh partitioner tests
+ctest -R "ecbundle_"        # All ecbundle tests
+```
+
+### Run by Functionality
+```bash
+ctest -L "download_mesh"     # All mesh download tests
+ctest -L "partition_mesh"    # All mesh partition tests  
+ctest -L "generate_meshdiag" # All meshdiag generation tests
+ctest -R "_mpi"              # All MPI tests
+```
+
+### Run Specific Tests
+```bash
+ctest -R integration_pi_mpi2 -V                    # Single integration test
+ctest -R remote_generate_meshdiag_core2_mpi16 -V   # Single meshdiag test
+ctest -R meshpartitioner_partition_local_pi_mesh_4 # Single partition test
+```
+
+### Run All Tests
+```bash
+ctest --output-on-failure   # Run all available tests
+```
+
+## Custom Test Targets
+
+Convenient make targets for common test workflows:
 
 ```bash
-# List all available tests
-ctest -N
-
-# List tests matching a pattern
-ctest -N -R "integration"
-
-# Show detailed information about tests
-ctest --show-only=json-v1
+make run_tests                  # Run all tests
+make run_integration_tests      # Integration tests only
+make run_mpi_tests             # All MPI tests
+make run_meshdiag_tests        # All mesh diagnostics tests
+make run_meshpartitioner_tests # Mesh partitioner tests only
 ```
 
-### Running Specific Tests
+## Test Configuration
 
+### CMake Build Options
 ```bash
-# Run a single test
-ctest -R integration_basic_run_mpi8
+# Core testing
+-DBUILD_TESTING=ON              # Enable all tests (required)
 
-# Run tests matching a pattern
-ctest -R "mpi"
+# Component-specific testing  
+-DBUILD_MESHDIAG=ON             # Enable mesh diagnostics tests
+-DBUILD_MESHPARTITIONER=ON      # Enable mesh partitioner tests
 
-# Run tests excluding certain patterns
-ctest -E "long_running|performance"
+# MPI configuration
+-DENABLE_MPI_TESTS=ON           # Enable MPI tests (default: ON)
+-DMPIEXEC_MAX_NUMPROCS=128      # Max MPI processes available
 
-# Run tests with labels
-ctest -L "mpi"
+# Test timing
+-DTEST_TIMEOUT=600              # Default test timeout (seconds)
 ```
 
-### Test Output and Debugging
+### Component Dependencies
+The test system automatically detects and reports available components:
 
-```bash
-# Show test output on failure
-ctest --output-on-failure
-
-# Run with verbose output
-ctest -V
-
-# Run with debug output
-ctest --debug
-
-# Run with extra output
-ctest --extra-verbose
+```
+Remote mesh pipeline component availability:
+  Download capability: TRUE (wget: /usr/bin/wget, curl: /usr/bin/curl)
+  Mesh partitioner: ON
+  Mesh diagnostics: ON
 ```
 
-### Running Tests in Parallel
+**Missing components are clearly reported** with instructions to enable them.
 
-```bash
-# Run tests in parallel (4 jobs)
-ctest -j4
+## Test Data
 
-# Run tests with timeout (seconds)
-ctest --timeout 30
-
-# Run tests repeatedly (good for flaky tests)
-ctest --repeat until-pass:3  # Run up to 3 times until pass
-ctest --repeat until-fail:3  # Run up to 3 times until failure
-ctest --repeat after-timeout:3  # Repeat only after timeout
+### Local Test Data (`tests/data/`)
+```
+tests/data/
+├── MESHES/
+│   ├── pi/          # PI test mesh (3k nodes)
+│   ├── pi_cavity/   # PI cavity test mesh (7k nodes)
+│   └── soufflet/    # Soufflet test mesh (3k nodes)
+├── FORCING/         # Minimal forcing data
+└── INITIAL/         # Initial condition data
 ```
 
-## Test Organization
+### Remote Test Data
+Remote meshes are **automatically downloaded** by the test pipeline:
+- **CORE2**: ~127k nodes, global ocean mesh
+- **DARS**: ~3.2M nodes, large regional mesh  
+- **NG5**: ~7.4M nodes, high-resolution global mesh
+- **ORCA25**: Large global mesh (~0.25 degree)
+- **PI Remote**: Same as local PI but downloaded
 
-Tests are organized into different categories:
+## Process Count Guidelines
 
-1. **Unit Tests**: Tests for individual components/functions
-2. **Integration Tests**: Tests that verify components work together
-3. **MPI Tests**: Tests that require MPI parallel execution
-4. **System Tests**: End-to-end tests of the complete system
+Tests use **appropriate process counts** based on mesh size:
+- **Small meshes** (pi, pi_cavity): 2, 4, 8 processes
+- **Medium meshes** (core2): 16 processes
+- **Large meshes** (dars, orca25): 128 processes  
+- **Very large meshes** (ng5): 128 processes
 
-### Test Naming Convention
+## Output Files
 
-- `unit_*`: Unit tests
-- `integration_*`: Integration tests
-- `*_mpi*`: MPI parallel tests
-- `*_basic_*`: Basic functionality tests
-- `*_init_*`: Initialization tests
+### Integration Tests
+All mesh diagnostics tests create: **`fesom.mesh.diag.nc`**
 
-## Test Data Setup
-
-For the integration tests to run successfully, you need minimal test data:
-
-1. **Test mesh**:
-   ```bash
-   # Link to existing test mesh
-   mkdir -p tests/data/meshes
-   ln -s /path/to/fesom2/test/meshes/pi tests/data/meshes/
-   ```
-
-2. **Test forcing data**:
-   ```bash
-   # Link to minimal forcing data
-   mkdir -p tests/data/forcing
-   ln -s /path/to/forcing/global tests/data/forcing/
-   ```
-
-## Debugging Tests
-
-### Running Tests in Debugger
-
-```bash
-# Run a test under gdb
-export TEST_EXECUTABLE="$(pwd)/bin/fesom.x"
-cd tests/integration/integration_basic_run_mpi8
-gdb --args mpirun -np 2 $TEST_EXECUTABLE
-
-# Or use the test script directly
-cd build
-gdb --args ctest -V -R integration_basic_run_mpi8
+Directory structure tells the complete story:
+```
+integration_meshdiag_pi_mpi2/results/fesom.mesh.diag.nc    # PI mesh, 2 processes
+integration_meshdiag_pi_mpi8/results/fesom.mesh.diag.nc    # PI mesh, 8 processes
+remote_generate_meshdiag_core2_mpi16/results/fesom.mesh.diag.nc    # CORE2 mesh, 16 processes
 ```
 
-### Enabling Verbose Output
-
-Add these to your `namelist.config`:
-```
-&io_nml
-    verbose = .true.
-    debug_level = 2
-/
-```
-
-## Adding New Tests
-
-1. **Unit Tests**:
-   - Add new test files in `tests/unit/`
-   - Follow the naming convention `test_*.f90`
-
-2. **Integration Tests**:
-   - Add new test configurations in `tests/integration/`
-   - Update `tests/integration/CMakeLists.txt`
-
-3. **MPI Tests**:
-   - Use the `add_fesom_test` function with `MPI_TEST` option
-   - Specify the number of processes with `NP`
-
-Example of adding a new test:
-
-```cmake
-# In tests/integration/CMakeLists.txt
-add_fesom_test(integration_my_new_test
-    MPI_TEST
-    NP 4
-    TIMEOUT 300  # 5 minutes
-    COMMAND_ARGS "--my-arg=value"
-)
-```
+### Test Logs
+Each test creates detailed logs:
+- `test_output.log` - Standard output from FESOM/meshdiag
+- `test_error.log` - Error output (usually empty for successful tests)
+- `namelist.*` - Configured namelists used by the test
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Test Fails with MPI Errors**:
-   - Ensure MPI is properly installed and in your PATH
-   - Check that the number of processes matches the mesh partitioning
-
-2. **Missing Test Data**:
-   - Verify that test data is correctly linked in `tests/data/`
-   - Check the test output for missing files
-
-3. **Test Timeout**:
-   - Increase the test timeout with `ctest --timeout 600`
-   - Or modify the test's timeout in the CMake configuration
-
-4. **Debugging Hanging Tests**:
-   - Run with `ctest -V` for verbose output
-   - Check system logs for OOM killer or other system events
-
-### Getting Help
-
-For issues with the test framework:
-1. Check the test output in `build/Testing/Temporary/LastTest.log`
-2. Consult the FESOM2 documentation
-3. Open an issue on the FESOM2 GitHub repository
-
-## Test Data Setup
-
-For the integration tests to run successfully, you need minimal test data:
-
-1. **Add test mesh**:
+1. **"No download capability"**:
    ```bash
-   # Link to existing test mesh
-   ln -s /path/to/fesom2/test/meshes/test_mesh ./data/meshes/
-   
-   # Or copy minimal mesh files
-   cp -r /path/to/minimal/mesh ./data/meshes/test_mesh
+   sudo apt install wget curl
    ```
 
-2. **Add test forcing data**:
+2. **"Mesh partitioner tests skipped"**:
    ```bash
-   # Link to minimal forcing data
-   ln -s /path/to/minimal/forcing ./data/forcing/
+   cmake .. -DBUILD_MESHPARTITIONER=ON
    ```
 
-## Available Tests
+3. **"Mesh diagnostics test skipped"**:
+   ```bash
+   cmake .. -DBUILD_MESHDIAG=ON
+   ```
 
-- `integration_basic_run`: Serial FESOM execution test
-- `integration_init_test`: Quick initialization test (2 min timeout)
-- `integration_basic_run_mpi2`: MPI test with 2 processes
-- `integration_basic_run_mpi4`: MPI test with 4 processes
-- `integration_namelist_config`: Verify namelist configuration
-- `integration_test_data_check`: Validate test data setup
+4. **Large mesh tests timeout**:
+   - DARS: 30-minute timeout (3.2M nodes)
+   - NG5: 60-minute timeout (7.4M nodes)
+   - These are appropriate for mesh complexity
 
-## Test Configuration
+5. **MPI test failures**:
+   ```bash
+   # Check MPI installation
+   which mpiexec mpirun
+   mpirun -np 2 echo "MPI works"
+   ```
 
-Configure tests with CMake options:
-
+### Debug Test Execution
 ```bash
-# Disable integration tests
-cmake -DENABLE_INTEGRATION_TESTS=OFF ..
+# Run with maximum verbosity
+ctest -R integration_pi_mpi2 -V --output-on-failure
 
-# Disable MPI tests
-cmake -DENABLE_MPI_TESTS=OFF ..
+# Check specific test logs
+cat build/tests/integration/integration_pi_mpi2/test_output.log
 
-# Set custom timeout (default: 600s)
-cmake -DTEST_TIMEOUT=300 ..
+# Run test manually
+cd build/tests/integration/integration_pi_mpi2
+mpirun -np 2 ../../../../bin/fesom.x
 ```
 
-## Troubleshooting
+## Test Development
 
-1. **Missing test data**: Tests will warn about missing data but still pass for initial setup
-2. **MPI not found**: Ensure MPI is installed and mpiexec/mpirun is in PATH
-3. **Test timeouts**: Increase TEST_TIMEOUT for slower systems
-4. **Build failures**: Ensure FESOM builds successfully before running tests
+### Adding New Tests
 
-## Test Output
+1. **Integration tests** - Add to `integration/CMakeLists.txt`
+2. **Remote meshes** - Add to mesh registry JSON and `remote/CMakeLists.txt`  
+3. **Mesh partitioner tests** - Add to `meshpartitioner/CMakeLists.txt`
 
-Each integration test creates its own directory with:
-- Modified namelists pointing to test data
-- `test_output.log`: Standard output from FESOM
-- `test_error.log`: Error output from FESOM
-- `results/`: Directory for FESOM output files
+### Best Practices
+- **Use group prefixes** (`integration_`, `remote_`, `meshpartitioner_`)
+- **Include mesh name** in test names for clarity
+- **Set appropriate timeouts** based on mesh complexity
+- **Use conditional logic** with clear messages for missing dependencies
+- **Create clean output files** (`fesom.mesh.diag.nc`)
 
-The test data directory should contain the following subdirectories:
-- `meshes/`: Test mesh files
-- `forcing/`: Test forcing/climate data files
+## Test Infrastructure
+
+The test system uses `cmake/FesomTesting.cmake` (757 lines) which provides:
+- Automatic namelist configuration
+- Mesh pipeline management  
+- Test script generation
+- MPI setup and execution
+
+**Note**: A simplification roadmap is documented in `TODO_TEST_INFRASTRUCTURE_SIMPLIFICATION.md` for future maintenance.
