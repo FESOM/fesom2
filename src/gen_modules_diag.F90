@@ -1129,7 +1129,8 @@ subroutine compute_diagnostics(mode, dynamics, tracers, ice, partit, mesh)
   
   if (ldiag_destine)     call compute_destinE(mode, dynamics, tracers, partit, mesh)
   
-  call compute_thetao(mode, tracers, partit, mesh) 
+  ! Currently deactivated, as it is not needed
+  ! call compute_thetao(mode, tracers, partit, mesh) 
 
 end subroutine compute_diagnostics
 
