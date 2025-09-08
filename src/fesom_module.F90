@@ -411,6 +411,11 @@ contains
         call fesom_profiler_end("ocean_setup")
 #endif
 
+        ! global tides
+        if (use_global_tides) then
+           call foreph_ini(yearnew, month, f%partit)
+        end if
+
         ! recom setup
 #if defined (__recom)
 #if defined (__usetp)
@@ -768,10 +773,6 @@ contains
         call fesom_profiler_start("fesom_runloop_total")
 #endif
     !___MODEL TIME STEPPING LOOP________________________________________________
-    if (use_global_tides) then
-       call foreph_ini(yearnew, month, f%partit)
-    end if
-    
     nstart=f%from_nstep
     ntotal=f%from_nstep-1+current_nsteps
 

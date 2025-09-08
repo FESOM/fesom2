@@ -56,3 +56,24 @@ add_test(
 set_tests_properties(integration_test_data_check PROPERTIES
     TIMEOUT 10
 )
+
+# Meshdiag tests (only when BUILD_MESHDIAG is enabled)
+if(BUILD_MESHDIAG AND TARGET fesom_meshdiag)
+    message(STATUS "Adding meshdiag tests...")
+    
+    # Basic meshdiag test with 2 processes (matches integration_full_run_mpi2)
+    add_fesom_meshdiag_test(meshdiag_pi_mpi2
+        NP 2
+        TIMEOUT 120
+    )
+    
+    # Meshdiag test with 8 processes (matches integration_full_run_mpi8)
+    add_fesom_meshdiag_test_with_options(meshdiag_pi_mpi8
+        "pi" "mesh8"
+        NP 8
+        TIMEOUT 120
+    )
+    
+else()
+    message(STATUS "Meshdiag tests disabled. Set BUILD_MESHDIAG=ON to enable them.")
+endif()
