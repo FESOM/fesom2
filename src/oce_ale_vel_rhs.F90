@@ -172,7 +172,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         ! to velocity rhs
         pre = -(p_eta+p_ice+p_air)
         if (use_global_tides) then
-           pre=pre-ssh_gp(elnodes)
+           pre=pre-ssh_gp(elnodes)+0.1*p_eta
         end if
         Fx  = sum(gradient_sca(1:3, elem)*pre)
         Fy  = sum(gradient_sca(4:6, elem)*pre)

@@ -85,9 +85,9 @@ function(update_namelist_config_with_options NAMELIST_IN NAMELIST_OUT STEP_PER_D
     # Set logfile output frequency
     string(REGEX REPLACE "logfile_outfreq=[0-9]+" "logfile_outfreq=${LOGFILE_OUTFREQ}" CONTENT "${CONTENT}")
     # Force rotation for test geometry
-    string(REGEX REPLACE "force_rotation=.[a-zA-Z]." "force_rotation=${FORCE_ROTATION}" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "force_rotation=\\.[a-zA-Z]+\\." "force_rotation=${FORCE_ROTATION}" CONTENT "${CONTENT}")
     # Set cavity usage
-    string(REGEX REPLACE "use_cavity=.[a-zA-Z]." "use_cavity=${USE_CAVITY}" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "use_cavity=\\.[a-zA-Z]+\\." "use_cavity=${USE_CAVITY}" CONTENT "${CONTENT}")
     
     file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
 endfunction()
@@ -473,4 +473,285 @@ function(setup_mpi_testing)
     message(STATUS "MPI testing setup complete:")
     message(STATUS "  MPIEXEC_EXECUTABLE: ${MPIEXEC_EXECUTABLE}")
     message(STATUS "  MPIEXEC_NUMPROC_FLAG: ${MPIEXEC_NUMPROC_FLAG}")
+endfunction()
+
+# Function to add a FESOM meshdiag test (uses same setup as integration tests)
+function(add_fesom_meshdiag_test TEST_NAME)
+    add_fesom_meshdiag_test_with_options("${TEST_NAME}" "pi" "mesh2" ${ARGN})
+endfunction()
+
+# Function to add a FESOM meshdiag test with custom options
+function(add_fesom_meshdiag_test_with_options TEST_NAME MESH_NAME RUNID)
+    set(oneValueArgs NP TIMEOUT PREFIX)
+    set(multiValueArgs COMMAND_ARGS)
+    cmake_parse_arguments(FESOM_TEST "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+    
+    # Apply prefix if provided
+    if(FESOM_TEST_PREFIX)
+        set(TEST_NAME "${FESOM_TEST_PREFIX}_${TEST_NAME}")
+    endif()
+    
+    # Set defaults (meshdiag requires MPI, minimum 2 processes)
+    if(NOT DEFINED FESOM_TEST_NP)
+        set(FESOM_TEST_NP 2)
+    endif()
+    if(NOT DEFINED FESOM_TEST_TIMEOUT)
+        set(FESOM_TEST_TIMEOUT 120)  # 2 minutes default (much faster than full FESOM)
+    endif()
+    
+    # Create test run directory
+    set(TEST_RUN_DIR "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}")
+    set(TEST_DATA_DIR "${CMAKE_SOURCE_DIR}/tests/data")
+    set(RESULT_DIR "${TEST_RUN_DIR}/results")
+    
+    # Configure namelists with custom runid to avoid conflicts
+    configure_fesom_namelists_with_options("${TEST_RUN_DIR}" "${TEST_DATA_DIR}" "${RESULT_DIR}"
+        "${MESH_NAME}" "96" "1" "d" "1" "d" "10" ".true." ".false.")
+    
+    # Update runid in namelist.config to create unique output file
+    file(READ "${TEST_RUN_DIR}/namelist.config" CONTENT)
+    string(REGEX REPLACE "runid='[^']*'" "runid='${RUNID}'" CONTENT "${CONTENT}")
+    file(WRITE "${TEST_RUN_DIR}/namelist.config" "${CONTENT}")
+    
+    # Generate fesom.clock file in the results directory
+    generate_fesom_clock("${RESULT_DIR}")
+    
+    # Generate the test script
+    set(TEST_SCRIPT "${TEST_RUN_DIR}/run_test.cmake")
+    
+    # Generate MPI test script (meshdiag always requires MPI)
+    file(GENERATE OUTPUT ${TEST_SCRIPT} CONTENT "
+        # Create test directories
+        file(MAKE_DIRECTORY \"${TEST_RUN_DIR}\")
+        file(MAKE_DIRECTORY \"${RESULT_DIR}\")
+        
+        # Run fesom_meshdiag with MPI
+        execute_process(
+            COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${FESOM_TEST_NP} ${CMAKE_BINARY_DIR}/bin/fesom_meshdiag
+            WORKING_DIRECTORY \"${TEST_RUN_DIR}\"
+            RESULT_VARIABLE test_result
+            OUTPUT_VARIABLE test_output
+            ERROR_VARIABLE test_error
+            TIMEOUT ${FESOM_TEST_TIMEOUT}
+        )
+        
+        # Log the output
+        file(WRITE \"${TEST_RUN_DIR}/test_output.log\" \"\${test_output}\")
+        file(WRITE \"${TEST_RUN_DIR}/test_error.log\" \"\${test_error}\")
+        
+        # Check if mesh.diag.nc file was created
+        set(EXPECTED_OUTPUT \"${RESULT_DIR}/${RUNID}.mesh.diag.nc\")
+        if(EXISTS \"\${EXPECTED_OUTPUT}\")
+            message(STATUS \"Test ${TEST_NAME} completed successfully - mesh diagnostics file created: \${EXPECTED_OUTPUT}\")
+        else()
+            message(FATAL_ERROR \"Test ${TEST_NAME} failed - mesh diagnostics file not created: \${EXPECTED_OUTPUT}\")
+        endif()
+        
+        # Check result
+        if(test_result EQUAL 0)
+            message(STATUS \"Test ${TEST_NAME} completed with exit code: \${test_result}\")
+        else()
+            message(FATAL_ERROR \"Test ${TEST_NAME} failed with exit code: \${test_result}\")
+        endif()
+    ")
+    
+    # Add the test
+    add_test(
+        NAME ${TEST_NAME}
+        COMMAND ${CMAKE_COMMAND} -P ${TEST_SCRIPT}
+    )
+    
+    # Set test properties (meshdiag always uses MPI)
+    set_tests_properties(${TEST_NAME} PROPERTIES
+        TIMEOUT ${FESOM_TEST_TIMEOUT}
+        WORKING_DIRECTORY ${TEST_RUN_DIR}
+        PROCESSORS ${FESOM_TEST_NP}
+        RUN_SERIAL FALSE
+    )
+    
+    message(STATUS "Added FESOM meshdiag test: ${TEST_NAME} with mesh: ${MESH_NAME}, runid: ${RUNID}")
+endfunction()
+
+#===============================================================================
+# Generic Mesh Pipeline Functions
+#===============================================================================
+
+# Function to add mesh download fixture
+function(add_mesh_download_fixture MESH_NAME)
+    # Parse optional prefix argument
+    set(oneValueArgs PREFIX)
+    cmake_parse_arguments(DOWNLOAD_ARGS "" "${oneValueArgs}" "" ${ARGN})
+    
+    if(DOWNLOAD_ARGS_PREFIX)
+        set(DOWNLOAD_TEST_NAME "${DOWNLOAD_ARGS_PREFIX}_download_mesh_${MESH_NAME}")
+    else()
+        set(DOWNLOAD_TEST_NAME "download_mesh_${MESH_NAME}")
+    endif()
+    
+    add_test(
+        NAME ${DOWNLOAD_TEST_NAME}
+        COMMAND ${CMAKE_COMMAND}
+            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -DMESH_NAME=${MESH_NAME}
+            -P ${CMAKE_SOURCE_DIR}/tests/integration/mesh_download.cmake
+    )
+    
+    set_tests_properties(${DOWNLOAD_TEST_NAME} PROPERTIES
+        TIMEOUT 1200  # 20 minutes for download
+        FIXTURES_SETUP "mesh_${MESH_NAME}"
+        LABELS "download_mesh"
+    )
+    
+    message(STATUS "Added mesh download fixture: ${DOWNLOAD_TEST_NAME}")
+endfunction()
+
+# Function to add mesh partition fixture  
+function(add_mesh_partition_fixture MESH_NAME NUM_PROCESSES)
+    # Parse optional prefix argument
+    set(oneValueArgs PREFIX)
+    cmake_parse_arguments(PARTITION_ARGS "" "${oneValueArgs}" "" ${ARGN})
+    
+    if(PARTITION_ARGS_PREFIX)
+        set(PARTITION_TEST_NAME "${PARTITION_ARGS_PREFIX}_partition_mesh_${MESH_NAME}_${NUM_PROCESSES}")
+    else()
+        set(PARTITION_TEST_NAME "partition_mesh_${MESH_NAME}_${NUM_PROCESSES}")
+    endif()
+    
+    add_test(
+        NAME ${PARTITION_TEST_NAME}
+        COMMAND ${CMAKE_COMMAND}
+            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -DBUILD_DIR=${CMAKE_BINARY_DIR}
+            -DMESH_NAME=${MESH_NAME}
+            -DNUM_PROCESSES=${NUM_PROCESSES}
+            -P ${CMAKE_SOURCE_DIR}/tests/integration/mesh_partition.cmake
+    )
+    
+    set_tests_properties(${PARTITION_TEST_NAME} PROPERTIES
+        TIMEOUT 1200  # 20 minutes for partitioning
+        FIXTURES_SETUP "mesh_${MESH_NAME}_${NUM_PROCESSES}"
+        FIXTURES_REQUIRED "mesh_${MESH_NAME}"
+        LABELS "partition_mesh"
+    )
+    
+    message(STATUS "Added mesh partition fixture: ${PARTITION_TEST_NAME}")
+endfunction()
+
+# Function to add complete mesh pipeline (download + multiple partitions)
+function(add_mesh_pipeline MESH_NAME)
+    # Parse arguments
+    set(oneValueArgs PREFIX)
+    set(multiValueArgs PROCESS_COUNTS)
+    cmake_parse_arguments(PIPELINE_ARGS "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+    
+    # Use remaining args as process counts if not specified
+    if(NOT PIPELINE_ARGS_PROCESS_COUNTS)
+        set(PIPELINE_ARGS_PROCESS_COUNTS ${PIPELINE_ARGS_UNPARSED_ARGUMENTS})
+        if(NOT PIPELINE_ARGS_PROCESS_COUNTS)
+            set(PIPELINE_ARGS_PROCESS_COUNTS 2 4)  # Default process counts
+        endif()
+    endif()
+    
+    # Add download fixture
+    if(PIPELINE_ARGS_PREFIX)
+        add_mesh_download_fixture(${MESH_NAME} PREFIX ${PIPELINE_ARGS_PREFIX})
+    else()
+        add_mesh_download_fixture(${MESH_NAME})
+    endif()
+    
+    # Add partition fixtures for each process count
+    foreach(NP ${PIPELINE_ARGS_PROCESS_COUNTS})
+        if(PIPELINE_ARGS_PREFIX)
+            add_mesh_partition_fixture(${MESH_NAME} ${NP} PREFIX ${PIPELINE_ARGS_PREFIX})
+        else()
+            add_mesh_partition_fixture(${MESH_NAME} ${NP})
+        endif()
+    endforeach()
+    
+    message(STATUS "Added complete mesh pipeline for '${MESH_NAME}' with process counts: ${PIPELINE_ARGS_PROCESS_COUNTS}")
+endfunction()
+
+# Enhanced function to add FESOM test with mesh pipeline integration
+function(add_fesom_mesh_test TEST_NAME MESH_NAME NP)
+    set(options MPI_TEST)
+    set(oneValueArgs TIMEOUT)
+    set(multiValueArgs)
+    cmake_parse_arguments(FESOM_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+    
+    # Set defaults
+    if(NOT DEFINED FESOM_TEST_TIMEOUT)
+        set(FESOM_TEST_TIMEOUT 900)  # 15 minutes default
+    endif()
+    
+    # Parse mesh configuration from registry
+    set(MESH_REGISTRY "${CMAKE_SOURCE_DIR}/tests/mesh_registry.json")
+    if(EXISTS "${MESH_REGISTRY}")
+        file(READ "${MESH_REGISTRY}" REGISTRY_CONTENT)
+        
+        # Extract mesh configuration
+        string(REGEX MATCH "\"${MESH_NAME}\"[^}]*\"force_rotation\"[ ]*:[ ]*([^,}]+)" ROTATION_MATCH "${REGISTRY_CONTENT}")
+        if(ROTATION_MATCH)
+            string(STRIP "${CMAKE_MATCH_1}" FORCE_ROTATION_RAW)
+            string(REPLACE "true" ".true." FORCE_ROTATION "${FORCE_ROTATION_RAW}")
+            string(REPLACE "false" ".false." FORCE_ROTATION "${FORCE_ROTATION}")
+        else()
+            set(FORCE_ROTATION ".true.")  # Default
+        endif()
+        
+        string(REGEX MATCH "\"${MESH_NAME}\"[^}]*\"use_cavity\"[ ]*:[ ]*([^,}]+)" CAVITY_MATCH "${REGISTRY_CONTENT}")
+        if(CAVITY_MATCH)
+            string(STRIP "${CMAKE_MATCH_1}" USE_CAVITY_RAW)
+            string(REPLACE "true" ".true." USE_CAVITY "${USE_CAVITY_RAW}")
+            string(REPLACE "false" ".false." USE_CAVITY "${USE_CAVITY}")
+        else()
+            set(USE_CAVITY ".false.")  # Default
+        endif()
+        
+        # Extract timing parameters
+        string(REGEX MATCH "\"${MESH_NAME}\"[^}]*\"step_per_day\"[ ]*:[ ]*([^,}]+)" SPD_MATCH "${REGISTRY_CONTENT}")
+        if(SPD_MATCH)
+            string(STRIP "${CMAKE_MATCH_1}" STEP_PER_DAY)
+        else()
+            set(STEP_PER_DAY "288")  # Default
+        endif()
+        
+        string(REGEX MATCH "\"${MESH_NAME}\"[^}]*\"run_length\"[ ]*:[ ]*([^,}]+)" RL_MATCH "${REGISTRY_CONTENT}")
+        if(RL_MATCH)
+            string(STRIP "${CMAKE_MATCH_1}" RUN_LENGTH)
+        else()
+            set(RUN_LENGTH "1")  # Default
+        endif()
+        
+        string(REGEX MATCH "\"${MESH_NAME}\"[^}]*\"run_length_unit\"[ ]*:[ ]*\"([^\"]+)\"" RLU_MATCH "${REGISTRY_CONTENT}")
+        if(RLU_MATCH)
+            string(STRIP "${CMAKE_MATCH_1}" RUN_LENGTH_UNIT)
+        else()
+            set(RUN_LENGTH_UNIT "s")  # Default
+        endif()
+    else()
+        # Fallback defaults
+        set(FORCE_ROTATION ".true.")
+        set(USE_CAVITY ".false.")
+        set(STEP_PER_DAY "288")
+        set(RUN_LENGTH "1")
+        set(RUN_LENGTH_UNIT "s")
+    endif()
+    
+    # Create FESOM test with appropriate configuration from registry
+    add_fesom_test_with_options(${TEST_NAME}
+        "${MESH_NAME}" "${STEP_PER_DAY}" "${RUN_LENGTH}" "${RUN_LENGTH_UNIT}" "1" "d" "10" "${FORCE_ROTATION}" "${USE_CAVITY}"
+        MPI_TEST
+        NP ${NP}
+        TIMEOUT ${FESOM_TEST_TIMEOUT}
+    )
+    
+    # Add mesh pipeline dependency
+    set_tests_properties(${TEST_NAME} PROPERTIES
+        FIXTURES_REQUIRED "mesh_${MESH_NAME}_${NP}"
+        LABELS "mesh_simulation"
+    )
+    
+    message(STATUS "Added FESOM mesh test: ${TEST_NAME} (mesh: ${MESH_NAME}, ${NP} processes)")
+    message(STATUS "  Configuration: force_rotation=${FORCE_ROTATION}, use_cavity=${USE_CAVITY}")
+    message(STATUS "  Timing: step_per_day=${STEP_PER_DAY}, run_length=${RUN_LENGTH} ${RUN_LENGTH_UNIT}")
 endfunction()
