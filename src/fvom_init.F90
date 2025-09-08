@@ -12,13 +12,17 @@
 !> Main driver routine for initialization
 program MAIN
 
-  use o_PARAM
-  use MOD_MESH
-  use MOD_PARTIT
-  use g_CONFIG
-  use g_rotate_grid
+  use o_PARAM, only: MAX_PATH
+  use MOD_MESH, only: t_mesh
+  use MOD_PARTIT, only: t_partit
+  use g_CONFIG, only: paths, geometry, run_config, machine, cyclic_length, rad, &
+                      alphaEuler, betaEuler, gammaEuler, use_cavity
+  use g_rotate_grid, only: set_mesh_transform_matrix
   use iso_fortran_env, only: error_unit
-  use mod_mesh_utils
+  use mod_mesh_utils, only: read_mesh_ini, read_mesh_cavity, test_tri_ini, &
+                            find_edges_ini, find_elem_neighbors_ini, find_levels, &
+                            find_levels_cavity, stiff_mat_ini, set_par_support_ini, &
+                            communication_ini
   
   implicit none
 

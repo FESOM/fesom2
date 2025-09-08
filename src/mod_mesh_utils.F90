@@ -7,15 +7,23 @@
 
 module mod_mesh_utils
 
+    use MOD_MESH
+    use o_PARAM
+    use g_CONFIG
+
+    implicit none
+    
+    public :: read_mesh_ini, read_mesh_cavity, test_tri_ini, find_edges_ini
+    public :: find_elem_neighbors_ini, find_levels, find_levels_cavity
+    public :: edge_center, elem_center, stiff_mat_ini, communication_ini
+    public :: set_par_support_ini, check_partitioning
+
 contains
 
 !=============================================================================
 !> @brief
 !> Reads mesh files 
 subroutine read_mesh_ini(mesh)
-USE MOD_MESH
-USE o_PARAM
-use g_CONFIG
 use g_rotate_grid
 !
 IMPLICIT NONE
@@ -83,9 +91,6 @@ END SUBROUTINE read_mesh_ini
 !> @brief
 !> Reads mesh cavity files 
 subroutine read_mesh_cavity(mesh)
-    use mod_mesh
-    use o_PARAM
-    use g_CONFIG
     implicit none
 
     type(t_mesh), intent(inout), target :: mesh
@@ -140,9 +145,6 @@ end subroutine read_mesh_cavity
 !> Check the order of nodes in triangles; correct it if necessary to make
 !! it same sense (clockwise) 
 SUBROUTINE test_tri_ini(mesh)
-USE MOD_MESH
-USE o_PARAM
-USE g_CONFIG
 IMPLICIT NONE
 
 real(kind=WP)                       ::  a(2), b(2), c(2),  r
@@ -180,9 +182,6 @@ END SUBROUTINE  test_tri_ini
 !> @brief
 !> Finds edges. Creates 3 files: edgenum.out, edges.out, edge_tri.out
 SUBROUTINE find_edges_ini(mesh)
-USE MOD_MESH
-USE o_PARAM
-USE g_CONFIG
 use g_rotate_grid
 IMPLICIT NONE
 
@@ -504,7 +503,6 @@ END SUBROUTINE find_edges_ini
 !=======================================================================
 SUBROUTINE find_elem_neighbors_ini(mesh)
 ! For each element three its element neighbors are found
-USE MOD_MESH
 implicit none
 integer    :: elem, eledges(3), elem1, j, n, elnodes(3)
 type(t_mesh), intent(inout), target :: mesh
@@ -597,8 +595,6 @@ END SUBROUTINE find_elem_neighbors_ini
 !> Fixes rough topography, by converting some oceans cells to ground cell(reflected by changing levels arrays)
 !> Creates 2 files: elvls.out, nlvls.out
 subroutine find_levels(mesh)
-    use g_config
-    use mod_mesh
     implicit none
     INTEGER :: nodes(3), elems(3), eledges(3)
     integer :: elem1, j, n, nneighb, q, node, i, nz, auxi
@@ -916,8 +912,6 @@ end subroutine find_levels
 ! finds elemental and nodal levels of cavity-ocean boundary.
 ! Creates 2 files: cavity_elvls.out, cavity_nlvls.out
 subroutine find_levels_cavity(mesh)
-    use mod_mesh
-    use g_config
     implicit none
     integer        :: nodes(3), elems(3)
     integer        :: elem, node, nz, j
@@ -1341,8 +1335,6 @@ end subroutine find_levels_cavity
 
 !===================================================================
 subroutine edge_center(n1, n2, x, y, mesh)
-USE MOD_MESH
-USE g_CONFIG
 !
 ! Returns coordinates of edge center in x and y
 ! 
@@ -1365,8 +1357,6 @@ subroutine elem_center(elem, x, y, mesh)
 !
 ! Returns coordinates of elem center in x and y
 !
-USE MOD_MESH
-USE g_CONFIG
 implicit none
 integer, intent(in)  :: elem
 integer              ::  elnodes(3), k    
@@ -1389,7 +1379,6 @@ end subroutine elem_center
 !===================================================================
 ! Stiffness matrix for the elevation
 subroutine stiff_mat_ini(mesh)
-  use MOD_MESH
   
   !
   implicit none
@@ -1458,9 +1447,7 @@ end subroutine stiff_mat_ini
 !===================================================================
 ! Setup of communication arrays
 subroutine communication_ini(partit, mesh)
-  use MOD_MESH
-  USE g_CONFIG
-  USE MOD_PARTIT
+  use MOD_PARTIT
   use omp_lib
   implicit none
 
@@ -1512,9 +1499,7 @@ end subroutine communication_ini
 !=================================================================
 subroutine set_par_support_ini(partit, mesh)
   use iso_c_binding, only: idx_t=>C_INT32_T
-  use MOD_MESH
   use MOD_PARTIT
-  use g_config
   implicit none
 
   integer         :: n, j, k, nini, nend, ierr
@@ -1595,7 +1580,6 @@ subroutine check_partitioning(partit, mesh)
   ! This routine checks for isolated nodes and moves them to an adjacent partition,
   ! trying not to spoil the load balance.
 
-  use MOD_MESH
   use MOD_PARTIT
   type(t_partit), intent(inout), target :: partit
   type(t_mesh),   intent(inout), target :: mesh
