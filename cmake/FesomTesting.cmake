@@ -482,9 +482,14 @@ endfunction()
 
 # Function to add a FESOM meshdiag test with custom options
 function(add_fesom_meshdiag_test_with_options TEST_NAME MESH_NAME RUNID)
-    set(oneValueArgs NP TIMEOUT)
+    set(oneValueArgs NP TIMEOUT PREFIX)
     set(multiValueArgs COMMAND_ARGS)
     cmake_parse_arguments(FESOM_TEST "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+    
+    # Apply prefix if provided
+    if(FESOM_TEST_PREFIX)
+        set(TEST_NAME "${FESOM_TEST_PREFIX}_${TEST_NAME}")
+    endif()
     
     # Set defaults (meshdiag requires MPI, minimum 2 processes)
     if(NOT DEFINED FESOM_TEST_NP)
@@ -573,7 +578,15 @@ endfunction()
 
 # Function to add mesh download fixture
 function(add_mesh_download_fixture MESH_NAME)
-    set(DOWNLOAD_TEST_NAME "download_mesh_${MESH_NAME}")
+    # Parse optional prefix argument
+    set(oneValueArgs PREFIX)
+    cmake_parse_arguments(DOWNLOAD_ARGS "" "${oneValueArgs}" "" ${ARGN})
+    
+    if(DOWNLOAD_ARGS_PREFIX)
+        set(DOWNLOAD_TEST_NAME "${DOWNLOAD_ARGS_PREFIX}_download_mesh_${MESH_NAME}")
+    else()
+        set(DOWNLOAD_TEST_NAME "download_mesh_${MESH_NAME}")
+    endif()
     
     add_test(
         NAME ${DOWNLOAD_TEST_NAME}
@@ -594,7 +607,15 @@ endfunction()
 
 # Function to add mesh partition fixture  
 function(add_mesh_partition_fixture MESH_NAME NUM_PROCESSES)
-    set(PARTITION_TEST_NAME "partition_mesh_${MESH_NAME}_${NUM_PROCESSES}")
+    # Parse optional prefix argument
+    set(oneValueArgs PREFIX)
+    cmake_parse_arguments(PARTITION_ARGS "" "${oneValueArgs}" "" ${ARGN})
+    
+    if(PARTITION_ARGS_PREFIX)
+        set(PARTITION_TEST_NAME "${PARTITION_ARGS_PREFIX}_partition_mesh_${MESH_NAME}_${NUM_PROCESSES}")
+    else()
+        set(PARTITION_TEST_NAME "partition_mesh_${MESH_NAME}_${NUM_PROCESSES}")
+    endif()
     
     add_test(
         NAME ${PARTITION_TEST_NAME}
@@ -618,21 +639,36 @@ endfunction()
 
 # Function to add complete mesh pipeline (download + multiple partitions)
 function(add_mesh_pipeline MESH_NAME)
-    # Parse additional arguments for process counts
-    set(PROCESS_COUNTS ${ARGN})
-    if(NOT PROCESS_COUNTS)
-        set(PROCESS_COUNTS 2 4)  # Default process counts
+    # Parse arguments
+    set(oneValueArgs PREFIX)
+    set(multiValueArgs PROCESS_COUNTS)
+    cmake_parse_arguments(PIPELINE_ARGS "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+    
+    # Use remaining args as process counts if not specified
+    if(NOT PIPELINE_ARGS_PROCESS_COUNTS)
+        set(PIPELINE_ARGS_PROCESS_COUNTS ${PIPELINE_ARGS_UNPARSED_ARGUMENTS})
+        if(NOT PIPELINE_ARGS_PROCESS_COUNTS)
+            set(PIPELINE_ARGS_PROCESS_COUNTS 2 4)  # Default process counts
+        endif()
     endif()
     
     # Add download fixture
-    add_mesh_download_fixture(${MESH_NAME})
+    if(PIPELINE_ARGS_PREFIX)
+        add_mesh_download_fixture(${MESH_NAME} PREFIX ${PIPELINE_ARGS_PREFIX})
+    else()
+        add_mesh_download_fixture(${MESH_NAME})
+    endif()
     
     # Add partition fixtures for each process count
-    foreach(NP ${PROCESS_COUNTS})
-        add_mesh_partition_fixture(${MESH_NAME} ${NP})
+    foreach(NP ${PIPELINE_ARGS_PROCESS_COUNTS})
+        if(PIPELINE_ARGS_PREFIX)
+            add_mesh_partition_fixture(${MESH_NAME} ${NP} PREFIX ${PIPELINE_ARGS_PREFIX})
+        else()
+            add_mesh_partition_fixture(${MESH_NAME} ${NP})
+        endif()
     endforeach()
     
-    message(STATUS "Added complete mesh pipeline for '${MESH_NAME}' with process counts: ${PROCESS_COUNTS}")
+    message(STATUS "Added complete mesh pipeline for '${MESH_NAME}' with process counts: ${PIPELINE_ARGS_PROCESS_COUNTS}")
 endfunction()
 
 # Enhanced function to add FESOM test with mesh pipeline integration
