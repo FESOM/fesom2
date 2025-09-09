@@ -60,6 +60,7 @@ subroutine recom_init(tracers, partit, mesh)
     !! * Fe and N deposition as surface boundary condition *
     allocate(GloFeDust             ( node_size ))
     allocate(AtmFeInput            ( node_size ))
+    allocate(SedFeInput            ( node_size ))
     allocate(GloNDust              ( node_size ))
     allocate(AtmNInput             ( node_size ))
 
@@ -100,6 +101,7 @@ subroutine recom_init(tracers, partit, mesh)
 
     GloFeDust             = 0.d0
     AtmFeInput            = 0.d0
+    SedFeInput            = 0.d0     !NEW sedimentary iron input variable
     GloNDust              = 0.d0
     AtmNInput             = 0.d0
 
@@ -133,6 +135,7 @@ subroutine recom_init(tracers, partit, mesh)
     decayBenthos          = 0.d0
     wFluxPhy              = 0.d0
     wFluxDia              = 0.d0
+    wFluxDiaH             = 0.d0
     PAR3D                 = 0.d0
 
 !    pco2surf           = 0.d0
@@ -148,35 +151,43 @@ subroutine recom_init(tracers, partit, mesh)
 !! *** Allocate 2D diagnostics ***
     allocate(NPPn    ( node_size ))
     allocate(NPPd    ( node_size ))
+    allocate(NPPdiaH ( node_size ))
     allocate(NPPc    ( node_size ))
     allocate(NPPp    ( node_size ))
     allocate(GPPn    ( node_size ))
     allocate(GPPd    ( node_size ))
+    allocate(GPPdiaH ( node_size ))
     allocate(GPPc    ( node_size ))
     allocate(GPPp    ( node_size ))
     allocate(NNAn    ( node_size ))
     allocate(NNAd    ( node_size ))
+    allocate(NNAdiaH ( node_size ))
     allocate(NNAc    ( node_size ))
     allocate(NNAp    ( node_size ))
     allocate(Chldegn ( node_size ))
     allocate(Chldegd ( node_size ))
+    allocate(ChldegdiaH ( node_size ))
     allocate(Chldegc ( node_size ))
     allocate(Chldegp ( node_size ))
 
     NPPn    = 0.d0
     NPPd    = 0.d0
+    NPPdiaH = 0.d0
     NPPc    = 0.d0
     NPPp    = 0.d0
     GPPn    = 0.d0
     GPPd    = 0.d0
+    GPPdiaH = 0.d0
     GPPc    = 0.d0
     GPPp    = 0.d0
     NNAn    = 0.d0
     NNAd    = 0.d0
+    NNAdiaH = 0.d0
     NNAc    = 0.d0
     NNAp    = 0.d0
     Chldegn = 0.d0
     Chldegd = 0.d0
+    ChldegdiaH = 0.d0
     Chldegc = 0.d0
     Chldegp = 0.d0
 
@@ -188,18 +199,22 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(calcif       ( nl-1, node_size ))
     allocate(aggn         ( nl-1, node_size ))
     allocate(aggd         ( nl-1, node_size ))
+    allocate(aggdiaH      ( nl-1, node_size ))
     allocate(aggc         ( nl-1, node_size ))
     allocate(aggp         ( nl-1, node_size ))
     allocate(docexn       ( nl-1, node_size ))
     allocate(docexd       ( nl-1, node_size ))
+    allocate(docexdiaH    ( nl-1, node_size ))
     allocate(docexc       ( nl-1, node_size ))
     allocate(docexp       ( nl-1, node_size ))
     allocate(respn        ( nl-1, node_size ))
     allocate(respd        ( nl-1, node_size ))
+    allocate(respdiaH     ( nl-1, node_size ))
     allocate(respc        ( nl-1, node_size ))
     allocate(respp        ( nl-1, node_size ))
     allocate(NPPn3D       ( nl-1, node_size ))
     allocate(NPPd3D       ( nl-1, node_size ))
+    allocate(NPPdiaH3D    ( nl-1, node_size ))
     allocate(NPPc3D       ( nl-1, node_size ))
     allocate(NPPp3D       ( nl-1, node_size ))
 
@@ -210,18 +225,22 @@ subroutine recom_init(tracers, partit, mesh)
     calcif       = 0.d0
     aggn         = 0.d0
     aggd         = 0.d0
+    aggdiaH      = 0.d0
     aggc         = 0.d0
     aggp         = 0.d0
     docexn       = 0.d0
     docexd       = 0.d0
+    docexdiaH    = 0.d0
     docexc       = 0.d0
     docexp       = 0.d0
     respn        = 0.d0
     respd        = 0.d0
+    respdiaH     = 0.d0
     respc        = 0.d0
     respp        = 0.d0
     NPPn3D       = 0.d0
     NPPd3D       = 0.d0
+    NPPdiaH3D    = 0.d0
     NPPc3D       = 0.d0
     NPPp3D       = 0.d0
 
@@ -262,26 +281,32 @@ subroutine recom_init(tracers, partit, mesh)
   allocate(TCphotLigLim_phyto      (nl-1,node_size))
   allocate(TCphotLigLim_cocco      (nl-1,node_size))
   allocate(TCphotLigLim_phaeo      (nl-1,node_size))
+  allocate(TCphotLigLim_diaH       (nl-1,node_size))
 
 
   TCphotLigLim_diatoms  (:,:) = 0.d0
   TCphotLigLim_phyto    (:,:) = 0.d0
   TCphotLigLim_cocco    (:,:) = 0.d0
   TCphotLigLim_phaeo    (:,:) = 0.d0
+  TCphotLigLim_diaH     (:,:) = 0.d0
 
   allocate(TCphot_diatoms       (nl-1,node_size))
   allocate(TCphot_phyto         (nl-1,node_size))
   allocate(TCphot_cocco         (nl-1,node_size))
   allocate(TCphot_phaeo         (nl-1,node_size))
+  allocate(TCphot_diaH          (nl-1,node_size))
 
   TCphot_diatoms        (:,:) = 0.d0
   TCphot_phyto          (:,:) = 0.d0
   TCphot_cocco          (:,:) = 0.d0
   TCphot_phaeo          (:,:) = 0.d0
+  TCphot_diaH           (:,:) = 0.d0
 
   allocate(TSi_assimDia         (nl-1,node_size))
+  allocate(TSi_assimDiaH         (nl-1,node_size))
 
   TSi_assimDia          (:,:) = 0.d0
+  TSi_assimDiaH         (:,:) = 0.d0
 
     end if
 
@@ -486,6 +511,20 @@ subroutine recom_init(tracers, partit, mesh)
         CASE (1030)
             tracers%data(i)%values(:,:) = tiny * Redfield          ! Zoo3C
 
+#endif
+
+#if defined (__diaH) & defined (__coccos) & defined (__3Zoo2Det)
+        CASE (1037)
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max       ! DiaH_N
+
+        CASE (1038)
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax ! DiaH_C
+
+        CASE (1039)
+            tracers%data(i)%values(:,:) = tiny_chl                 ! DiaH_Chl
+
+        CASE (1040)
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max_d/NCmax_d/SiCmax ! DiaH_Si
 #endif
 
         END SELECT

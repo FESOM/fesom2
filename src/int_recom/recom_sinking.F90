@@ -102,6 +102,7 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
           if (any(recom_det_tracer_id == tracers%data(tr_num)%ID)) Vben = Vdet
           if (any(recom_phy_tracer_id == tracers%data(tr_num)%ID)) Vben = VPhy
           if (any(recom_dia_tracer_id == tracers%data(tr_num)%ID)) Vben = VDia
+          if (any(recom_diaH_tracer_id == tracers%data(tr_num)%ID)) Vben = VDiaH
         if (allow_var_sinking) then
           Vben = Vdet_a * abs(zbar_3d_n(:,n)) + Vben
         end if
@@ -541,6 +542,15 @@ subroutine ver_sinking_recom(tr_num, tracers, partit, mesh)
             Vsink = VCocco
 #else
             Vsink = VPhy
+#endif
+
+#if defined (__diaH)
+    elseif(tracers%data(tr_num)%ID==1037 .or. &  !idiaH_N
+           tracers%data(tr_num)%ID==1038 .or. &  !idiaH_C
+           tracers%data(tr_num)%ID==1039 .or. &  !idiaH_Chl
+           tracers%data(tr_num)%ID==1040 ) then  !idiaH_Si 
+            
+            Vsink = VDiaH
 #endif
             
 #if defined (__3Zoo2Det)

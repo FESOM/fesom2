@@ -261,6 +261,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
         PAR(1:nzmax) = 0.d0
 
         !!---- a_ice(row): Ice concentration in the local node
+if (UseDustClimMyrio) dust_sol=1.0 !Solubulity set to one, because it is already labile Fe in the ocean in DustClimMyrio 
         FeDust = GloFeDust(n) * (1.d0 - a_ice(n)) * dust_sol
         NDust  = GloNDust(n)  * (1.d0 - a_ice(n))
 
@@ -348,6 +349,18 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 
 #endif
 
+#if defined (__diaH)
+            allocate(vertaggdiaH(nl-1), vertdocexdiaH(nl-1), vertrespdiaH(nl-1))
+            vertaggdiaH   = 0.d0
+            vertdocexdiaH = 0.d0
+            vertrespdiaH  = 0.d0
+
+            allocate(VTCphotLigLim_diaH(nl-1), VTCphot_diaH(nl-1), VTSi_assimDiaH(nl-1))
+            VTCphotLigLim_diaH  = 0.d0
+            VTCphot_diaH        = 0.d0
+            VTSi_assimDiaH      = 0.d0
+#endif
+
             !! * Allocate 2D diagnostics *
             allocate(vertNPPn(nl-1), vertGPPn(nl-1), vertNNAn(nl-1), vertChldegn(nl-1)) 
             vertNPPn = 0.d0
@@ -373,6 +386,14 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             vertGPPp = 0.d0
             vertNNAp = 0.d0
             vertChldegp = 0.d0
+#endif
+
+#if defined (__diaH)
+            allocate(vertNPPdiaH(nl-1), vertGPPdiaH(nl-1), vertNNAdiaH(nl-1), vertChldegdiaH(nl-1)) 
+            vertNPPdiaH = 0.d0
+            vertGPPdiaH = 0.d0
+            vertNNAdiaH = 0.d0
+            ChldegdiaH = 0.d0
 #endif
         end if
 
@@ -408,6 +429,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
         !!---- Local variables that have been changed during the time-step are stored so they can be saved
         Benthos(n,1:benthos_num) = LocBenthos(1:benthos_num)
         GlodecayBenthos(n, 1:benthos_num) = decayBenthos(1:benthos_num)/SecondsPerDay ! convert from [mmol/m2/d] to [mmol/m2/s]
+        SedFeInput(n)  = GlodecayBenthos(n, 1) * Fe2N_benthos / (area(1,n))
 
         if (Diags) then
 
@@ -430,6 +452,13 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             GPPp(n) = locGPPp
             NNAp(n) = locNNAp
             Chldegp(n) = locChldegp
+#endif
+
+#if defined (__diaH)
+            NPPdiaH(n) = locNPPdiaH
+            GPPdiaH(n) = locGPPdiaH
+            NNAdiaH(n) = locNNAdiaH
+            ChldegdiaH(n) = locChldegdiaH
 #endif
 
             !! * Update 3D diagnostics *
@@ -490,6 +519,17 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 
 #endif
 
+#if defined (__diaH)
+            aggdiaH     (1:nzmax,n) = vertaggdiaH(1:nzmax)
+            docexdiaH   (1:nzmax,n) = vertdocexdiaH(1:nzmax)
+            respdiaH    (1:nzmax,n) = vertrespdiaH(1:nzmax)
+            NPPdiaH3D   (1:nzmax,n) = vertNPPdiaH(1:nzmax)
+
+            TCphotLigLim_diaH  (1:nzmax,n) = VTCphotLigLim_diaH       (1:nzmax)
+            TCphot_diaH        (1:nzmax,n) = VTCphot_diaH             (1:nzmax)
+            TSi_assimDiaH      (1:nzmax,n) = VTSi_assimDiaH           (1:nzmax)
+#endif
+
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
 
             !! * Deallocating 2D diagnostics *
@@ -498,6 +538,10 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
 #if defined (__coccos)
             deallocate(vertNPPc,vertGPPc,vertNNAc,vertChldegc)
             deallocate(vertNPPp,vertGPPp,vertNNAp,vertChldegp)
+#endif
+
+#if defined (__diaH)
+            deallocate(vertNPPdiaH,vertGPPdiaH,vertNNAdiaH,vertChldegdiaH) 
 #endif
 
             !! * Deallocating 3D Diagnostics *
@@ -521,6 +565,11 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
             deallocate(VTTemp_cocco, VTCoccoCO2, VTqlimitFac_cocco, VTCphotLigLim_cocco, VTCphot_cocco)
             deallocate(VTTemp_phaeo, VTPhaeoCO2, VTqlimitFac_phaeo, VTCphotLigLim_phaeo, VTCphot_phaeo)
 
+#endif
+
+#if defined (__diaH)
+            deallocate(vertaggdiaH, vertdocexdiaH, vertrespdiaH)
+            deallocate(VTCphotLigLim_diaH, VTCphot_diaH, VTSi_assimDiaH)
 #endif
 
         end if 
@@ -603,6 +652,14 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
         call exchange_nod(NNAp, partit)
         call exchange_nod(Chldegp, partit)
 #endif
+
+#if defined (__diaH)
+        call exchange_nod(NPPdiaH, partit)
+        call exchange_nod(GPPdiaH, partit)
+        call exchange_nod(NNAdiaH, partit)
+        call exchange_nod(ChldegdiaH, partit)
+#endif
+
     endif
 
     do n=1, benthos_num
@@ -612,6 +669,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
     call exchange_nod(GloHplus, partit)
     call exchange_nod(AtmFeInput, partit)
     call exchange_nod(AtmNInput, partit)
+    call exchange_nod(SedFeInput, partit)
 
     call exchange_nod(PAR3D, partit)
 

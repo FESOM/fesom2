@@ -103,6 +103,13 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         DiaChl,  &
         DiaSi,   &
         DetSi,   &
+#if defined (__diaH)
+        DiaH_N,  &
+        DiaH_C,  &
+        DiaH_Chl,&
+        DiaH_Si, &
+#endif
+
 #if defined (__coccos) 
         CoccoN,  &
         CoccoC,  &
@@ -206,6 +213,13 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             DiaSi  = max(tiny_si,state(k,idiasi)     + sms(k,idiasi)) 
             DetSi  = max(tiny,state(k,idetsi)        + sms(k,idetsi)) 
             Si     = max(tiny,state(k,isi)           + sms(k,isi   ))
+#if defined (__diaH) 
+            DiaH_N   = max(tiny_N_d,state(k,idiaH_n)     + sms(k,idiaH_n ))
+            DiaH_C   = max(tiny_C_d,state(k,idiaH_c)     + sms(k,idiaH_c ))
+            DiaH_Chl = max(tiny_chl,state(k,idiaH_chl)   + sms(k,idiaH_chl ))
+            DiaH_Si  = max(tiny_si,state(k,idiaH_si)     + sms(k,idiaH_si)) 
+#endif
+
 #if defined (__coccos) 
             CoccoN   = max(tiny_N_c,state(k,icocn)   + sms(k,icocn ))
             CoccoC   = max(tiny_C_c,state(k,icocc)   + sms(k,icocc ))
@@ -249,6 +263,16 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             CHL2C_plast_dia =  Chl2C_dia * (quota_dia/(quota_dia - NCmin_d))
             qSiC            =  DiaSi / DiaC
             qSiN            =  DiaSi / DiaN
+
+#if defined (__diaH) 
+            quota_diaH       =  DiaH_N / DiaH_C
+            recipQuota_diaH  =  real(one)/quota_diaH
+            Chl2C_diaH       =  DiaH_Chl / DiaH_C
+            Chl2N_diaH       =  DiaH_Chl / DiaH_N
+            CHL2C_plast_diaH =  Chl2C_diaH * (quota_diaH/(quota_diaH - NCmin_d))
+            qSiC_H            =  DiaH_Si / DiaH_C
+            qSiN_H            =  DiaH_Si / DiaH_N
+#endif 
 
 #if defined (__coccos)
             ! *** Coccolithophores
@@ -401,10 +425,20 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #if defined (__coccos) 
                 chl_upper  = chl_upper + CoccoChl + PhaeoChl
 #endif
+
+#if defined (__diaH) 
+                chl_upper = chl_upper + DiaH_Chl 
+#endif
+
             else
                 chl_lower  = PhyChl + DiaChl
+
 #if defined (__coccos)
                 chl_lower  = chl_lower + CoccoChl + PhaeoChl
+#endif
+
+#if defined (__diaH) 
+                chl_lower  = chl_lower + DiaH_Chl
 #endif
                 Chlave     = (chl_upper+chl_lower)*0.5
 
@@ -557,12 +591,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             qlimitFac    = recom_limiter(NMinSlope, NCmin, quota) ! Eqn A55
             feLimitFac   = Fe/(k_Fe + Fe)                         ! Use Michaelis-Menten kinetics
             qlimitFac    = min(qlimitFac, feLimitFac)             ! Liebig law of the minimum
-            pMax         = P_cm * qlimitFac * arrFunc             ! Maximum value of C-specific rate of photosynthesis
-
-#if defined (__coccos)
-! for 4p version which contains new Temperature functions from Hannah
-            pMax         = qlimitFac * Temp_phyto                ! Maximum value of C-specific rate of photosynthesis
-#endif
+!           pMax         = P_cm * qlimitFac * arrFunc             ! old T function
+            pMax         = qlimitFac * Temp_phyto                 ! Maximum value of C-specific rate of photosynthesis, Hannah's NEW T func
 
 !< *** Diatoms ***
 !< ***************
@@ -571,11 +601,17 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             qlimitFac    = min(qLimitFac, qlimitFacTmp)
             feLimitFac   = Fe/(k_Fe_d + Fe)
             qlimitFac    = min(qlimitFac, feLimitFac)
-            pMax_dia     = P_cm_d * qlimitFac * arrFunc
+!           pMax_dia     = P_cm_d * qlimitFac * arrFunc ! old T function
+            pMax_dia     = qlimitFac * Temp_diatoms ! Hannah's NEW T func
 
-#if defined (__coccos)
-! for 4p version which contains new Temperature functions from Hannah
-            pMax_dia     = qlimitFac * Temp_diatoms
+#if defined (__diaH)            
+            qlimitFac    = recom_limiter(NMinSlope, NCmin_d_H, quota_diaH)
+            qlimitFacTmp = recom_limiter(SiMinSlope, SiCmin_H, qSiC_H)
+            qlimitFac    = min(qLimitFac, qlimitFacTmp)
+            feLimitFac   = Fe/(k_Fe_d_H + Fe)
+            qlimitFac    = min(qlimitFac, feLimitFac)
+!           pMax_diaH     = P_cm_d_H * qlimitFac * arrFunc ! old T function
+            pMax_diaH     = qlimitFac * Temp_diatoms ! Hannah's NEW T func
 #endif
 
 !< *** Coccolithophores ***
@@ -584,7 +620,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             qlimitFac  = recom_limiter(NMinSlope, NCmin_c, quota_cocco) 
             feLimitFac = Fe/(k_Fe_c + Fe)                               
             qlimitFac  = min(qlimitFac, feLimitFac)                     
-!            pMax_cocco = P_cm_c * qlimitFac * CoccoTFunc                ! Here the T dependency is changed
+!           pMax_cocco = P_cm_c * qlimitFac * CoccoTFunc                ! Here the T dependency is changed
             pMax_cocco = qlimitFac * Temp_cocco               ! Here the T dependency is changed
 
 !< *** Phaeocystis ***
@@ -613,11 +649,23 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 Cphot_dia = zero
             else
                 Cphot_dia = pMax_dia * (real(one) - exp(-alfa_d * Chl2C_dia * PARave / pMax_dia))
-                VTCphotLigLim_diatoms(k) = Cphot/pMax ! track light limitation
+                VTCphotLigLim_diatoms(k) = Cphot_dia/pMax_dia ! track light limitation
                 if (CO2lim) Cphot_dia = Cphot_dia  * DiaCO2 ! Added the CO2 dependence
             end if
             if (Cphot_dia .lt. tiny) Cphot_dia = zero
             VTCphot_diatoms(k) = Cphot_dia ! tracking complete Cphot
+
+#if defined (__diaH) 
+            if ( pMax_diaH .lt. tiny .OR. PARave /= PARave .OR. CHL2C_diaH /= CHL2C_diaH) then
+                Cphot_diaH = zero
+            else
+                Cphot_diaH = pMax_diaH * (real(one) - exp(-alfa_d_H * Chl2C_diaH * PARave / pMax_diaH))
+                VTCphotLigLim_diaH(k) = Cphot_diaH/pMax_diaH ! track light limitation        
+               if (CO2lim) Cphot_diaH = Cphot_diaH  * DiaCO2 ! Added the CO2 dependence
+            end if
+            if (Cphot_diaH .lt. tiny) Cphot_diaH = zero
+            VTCphot_diaH(k) = Cphot_diaH ! tracking complete Cphot
+#endif
             
 !< *** Coccolithophore photosynthesis rate ***
 !< *******************************************
@@ -626,7 +674,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 Cphot_cocco = zero
             else 
                 Cphot_cocco = pMax_cocco * (real(one) - exp( -alfa_c * Chl2C_cocco * PARave / pMax_cocco))  
-                VTCphotLigLim_cocco(k) = Cphot/pMax ! track the light limitation
+                VTCphotLigLim_cocco(k) = Cphot_cocco/pMax_cocco ! track the light limitation
                 if (CO2lim) Cphot_cocco = Cphot_cocco * CoccoCO2 ! Added the CO2 dependence 
             end if 
             if (Cphot_cocco .lt. tiny) Cphot_cocco = zero
@@ -638,13 +686,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 Cphot_phaeo = zero
             else
                 Cphot_phaeo = pMax_phaeo * (real(one) - exp( -alfa_p * Chl2C_phaeo * PARave / pMax_phaeo))
-                VTCphotLigLim_phaeo(k) = Cphot/pMax ! track the light limitation
+                VTCphotLigLim_phaeo(k) = Cphot_phaeo/pMax_phaeo ! track the light limitation
                 if (CO2lim) Cphot_phaeo = Cphot_phaeo * PhaeoCO2 ! Added the CO2 dependence 
             end if
             if (Cphot_phaeo .lt. tiny) Cphot_phaeo = zero
             VTCphot_phaeo(k) = Cphot_phaeo
-           
-
 #endif
 !------------------------------------------------------------------------------- 
 !< chlorophyll degradation
@@ -654,6 +700,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #if defined (__coccos) 
             KOchl_cocco = deg_Chl_c
             KOchl_phaeo = deg_Chl_p
+#endif
+
+#if defined (__diaH)
+            KOchl_diaH = deg_Chl_d_H
 #endif
         
             if (use_photodamage) then
@@ -678,6 +728,18 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                     KOchl_dia = max((deg_Chl_d*0.1d0), KOchl_dia)
                     KOchl_dia = min(KOChl_dia, 0.3d0)
                 end if
+
+#if defined (__diaH)
+                if (pMax_diaH .lt. tiny .OR. PARave /= PARave .OR. CHL2C_plast_diaH /= CHL2C_plast_diaH) then
+                    KOchl_diaH = deg_Chl_d_H*0.1d0
+                else
+                   !KOchl_diaH = deg_Chl_d_H * (real(one) - exp(-alfa_d_H * CHL2C_plast_diaH * PARave / pMax_diaH ))
+                    KOchl_diaH = deg_Chl_d_H * CHL2C_plast_diaH * PARave
+                    KOchl_diaH = max((deg_Chl_d_H*0.1d0), KOchl_diaH)
+                    KOchl_diaH = min(KOChl_diaH, 0.3d0)
+                end if
+#endif
+
 !< *** Coccolithophores chla loss ***
 !< **********************************
 #if defined (__coccos) 
@@ -719,6 +781,19 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                     print*,' pMax_d is ', pMax_dia
                     stop
                 end if
+
+#if defined (__diaH)
+                if (KOchl_diaH /= KOchl_diaH) then
+                    print*,' KOchl_diaH is ', KOchl_diaH
+                    print*,' deg_Chl_d_H is ', deg_Chl_d_H
+                    print*,' alfa_d_H is ', alfa_d_H
+                    print*,' CHL2C_d_H is ', CHL2C_plast_diaH
+                    print*,' PARave is ', PARave
+                    print*,' pMax_d_H is ', pMax_diaH
+                    stop
+                end if
+#endif
+
 #if defined (__coccos) 
                 if (KOchl_cocco /= KOchl_cocco) then 
                     print*,' KOchl_cocco is ', KOchl_cocco
@@ -767,6 +842,13 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             N_assim_dia   = V_cm * pMax_dia * NCUptakeRatio_d &
                              * limitFacN_dia * DIN/(DIN + k_din_d)
 
+#if defined (__diaH)
+            V_cm           = V_cm_fact_d_H
+            limitFacN_diaH = recom_limiter(NMaxSlope, quota_diaH, NCmax_d_H)
+            N_assim_diaH   = V_cm * pMax_diaH * NCUptakeRatio_d_H &
+                             * limitFacN_diaH * DIN/(DIN + k_din_d_H)
+#endif
+
 #if defined (__coccos) 
             V_cm            = V_cm_fact_c                                   
             limitFacN_cocco = recom_limiter(NMaxSlope, quota_cocco, NCmax_c)
@@ -780,9 +862,17 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 
             limitFacSi     = recom_limiter(SiMaxSlope, qSiC, SiCmax)  &
                               * limitFacN_dia
-            Si_assim       = V_cm_fact_d * Temp_diatoms * SiCUptakeRatio &
+            Si_assim       = V_cm_fact_d * Temp_diatoms * SiCUptakeRatio &     !Hannah's new T function
                               * limitFacSi * Si/(Si + k_si)
             VTSi_assimDia(k) = Si_assim
+
+#if defined (__diaH)
+            limitFacSi_diaH = recom_limiter(SiMaxSlope, qSiC_H, SiCmax_d_H)  &
+                              * limitFacN_diaH
+            Si_assim_diaH   = V_cm_fact_d_H * Temp_diatoms * SiCUptakeRatio_diaH &  !Hannah's new T fucntion, thus far not splitted for diaH
+                              * limitFacSi_diaH * Si/(Si + k_si_d_H)
+            VTSi_assimDiaH(k) = Si_assim_diaH
+#endif
 
 !-------------------------------------------------------------------------------
 !< *** Iron chemistry ***
@@ -807,6 +897,13 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 ChlSynth_dia = N_assim_dia * Chl2N_max_d                         &
                              * min(real(one),Cphot_dia /(alfa_d * Chl2C_dia * PARave))
             end if
+
+#if defined (__diaH)
+            if (PARave .ge. tiny .AND. PARave .eq. PARave) then
+                ChlSynth_diaH = N_assim_diaH * Chl2N_max_d_H                        &
+                             * min(real(one),Cphot_diaH /(alfa_d_H * Chl2C_diaH * PARave))
+            end if
+#endif
             
 #if defined (__coccos)
             ChlSynth_cocco = zero
@@ -829,6 +926,9 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 
             phyRespRate     = res_phy   * limitFacN     + biosynth * N_assim
             phyRespRate_dia = res_phy_d * limitFacN_dia + biosynth * N_assim_dia + biosynthSi * Si_assim
+#if defined (__diaH)
+            phyRespRate_diaH = res_phy_d_H * limitFacN_diaH + biosynth * N_assim_diaH + biosynthSi * Si_assim_DiaH
+#endif
 #if defined (__coccos) 
             phyRespRate_cocco = res_phy_c * limitFacN_cocco + biosynth * N_assim_cocco
             phyRespRate_phaeo = res_phy_p * limitFacN_phaeo + biosynth * N_assim_phaeo ! Phaeocystis
@@ -837,13 +937,14 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !-------------------------------------------------------------------------------
 ! Mesozooplankton
 !-------------------------------------------------------------------------------
-!< Grazing on small phytoplankton, diatoms, coccolithophore (optional), 
+!< Grazing on small phytoplankton, diatoms, heaviliy silicified diatoms (diaH, optional), coccolithophore (optional), 
 !< microzooplankton (optional), slow- and fast-sinking detritus
 
 !< *** Food availability ***
 !< *************************
 !< pzPhy: Maximum nanophytoplankton preference
 !< pzDia: Maximum diatom preference
+!< pzDiaH: Maximum diatom preference of heavily silicified diatoms
 !< pzCocco: Maximum coccolithophore preference
 !< pzDet: Maximum slow-sinking detritus prefence by first zooplankton
 !< pzDetZ2: Maximum fast-sinking detritus preference by first zooplankton
@@ -856,10 +957,16 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 if (Grazing_detritus) aux = aux + pzDetZ2*DetZ2N ! 2Det
                 aux = aux + pzMicZoo*MicZooN                     ! 3Zoo
 #endif
+
 #if defined (__coccos) 
                 aux = aux + pzCocco*CoccoN
                 aux = aux + pzPhaeo*PhaeoN
 #endif
+
+#if defined (__diaH) 
+                aux = aux + pzDiaH*DiaH_N
+#endif
+
 ! ******************************************************************************
                 varpzPhy = (pzPhy*PhyN)/aux
                 varpzDia = (pzDia*DiaN)/aux
@@ -872,6 +979,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 varpzCocco = (pzCocco*CoccoN)/aux
                 varpzPhaeo = (pzPhaeo*PhaeoN)/aux
 #endif
+
+#if defined (__diaH) 
+                varpzDiaH = (pzDiaH*DiaH_N)/aux
+#endif
+
 ! ******************************************************************************
                 fDiaN = varpzDia * DiaN
                 fPhyN = varpzPhy * PhyN
@@ -880,22 +992,35 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 if (Grazing_detritus) fDetZ2N = varpzDetZ2 * DetZ2N ! 2Det
                 fMicZooN = varpzMicZoo * MicZooN                    ! 3Zoo                                         
 #endif
+
 #if defined (__coccos) 
                 fCoccoN = varpzCocco * CoccoN
                 fPhaeoN = varpzPhaeo * PhaeoN
 #endif
+
+#if defined (__diaH) 
+                fDiaH_N = varpzDiaH * DiaH_N
+#endif
+
             else ! REcoM_Grazing_Variable_Preference = .false.
                 fPhyN = pzPhy * PhyN
                 fDiaN = pzDia * DiaN
                 if (Grazing_detritus) fDetN = pzDet * DetN
+
 #if defined (__3Zoo2Det)
                 if (Grazing_detritus) fDetZ2N = pzDetZ2 * DetZ2N ! 2Det
                 fMicZooN = pzMicZoo * MicZooN                    ! 3Zoo
 #endif
+
 #if defined (__coccos) 
                 fCoccoN = pzCocco * CoccoN
                 fPhaeoN = pzPhaeo * PhaeoN
 #endif
+
+#if defined (__diaH) 
+                fDiaH_N = pzDiaH * DiaH_N
+#endif
+
             end if ! REcoM_Grazing_Variable_Preference
 
 !< *** Grazing fluxes ***
@@ -910,6 +1035,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             food = food + fCoccoN
             food = food + fPhaeoN
 #endif
+
+#if defined (__diaH) 
+            food = food + fDiaH_N
+#endif
+
 ! ******************************************************************************
             foodsq            = food**2
             grazingFlux       = (Graz_max * foodsq)/(epsilonr + foodsq) * HetN * arrFunc
@@ -926,6 +1056,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #if defined (__coccos) 
             grazingFlux_Cocco = grazingFlux * fCoccoN / food
             grazingFlux_Phaeo = grazingFlux * fPhaeoN / food
+#endif
+
+#if defined (__diaH) 
+            grazingFlux_DiaH   = grazingFlux * fDiaH_N / food
 #endif
 
 !< *** Grazing efficiency ***
@@ -950,16 +1084,22 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                                   + (grazingFlux_Phaeo * recipQuota_phaeo * grazEff)         
 #endif
 
+#if defined (__diaH) 
+            grazingFluxcarbon_mes = grazingFluxcarbon_mes                              &
+                                  + (grazingFlux_DiaH * recipQuota_DiaH * grazEff)         
+#endif
+
 !-------------------------------------------------------------------------------
 ! Second Zooplankton
 !-------------------------------------------------------------------------------
-!< Grazing on small phytoplankton, diatoms, coccolithophore (optional), 
-!< heterotrophs, slow- and fast-sinking detritus
+!< Grazing on small phytoplankton, diatoms, heaviliy silicified diatoms (diaH, optional), coccolithophore (optional), 
+!< heterotrophs, microzooplankton (optional), slow- and fast-sinking detritus
 
 !< *** Food availability ***
 !< *************************
 !< pzPhy2: Maximum nanophytoplankton preference
 !< pzDia2: Maximum diatom preference
+!< pzDiaH2: Maximum preference for heavily silicified
 !< pzCocco2: Maximum coccolithophore preference
 !< pzPhaeo2: Maximum phaeocystis preference 
 !< pzDet2: Maximum slow-sinking detritus prefence by macrozooplankton
@@ -976,6 +1116,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 aux = aux + pzCocco2 * CoccoN
                 aux = aux + pzPhaeo2 * PhaeoN
 #endif
+
+#if defined (__diaH) 
+                aux = aux + pzDiaH2 * DiaH_N
+#endif
+
 ! ******************************************************************************
                 varpzPhy2 = (pzPhy2 * PhyN)/aux
                 varpzDia2 = (pzDia2 * DiaN)/aux
@@ -985,6 +1130,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 varpzCocco2 = (pzCocco2 * CoccoN)/aux
                 varpzPhaeo2 = (pzPhaeo2 * PhaeoN)/aux
 #endif 
+
+#if defined (__diaH) 
+                varpzDiaH2 = (pzDiaH2*DiaH_N)/aux
+#endif
+
                 varpzHet = (pzHet * HetN)/aux
                 if (Grazing_detritus) then
                     varpzDet2   = (pzDet2 * DetN)/aux
@@ -998,6 +1148,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 fCoccoN2 = varpzCocco2 * CoccoN
                 fPhaeoN2 = varpzPhaeo2 * PhaeoN
 #endif
+
+#if defined (__diaH) 
+                fDiaH_N2 = varpzDiaH2 * DiaH_N
+#endif
+
                 fHetN = varpzHet * HetN
                 if (Grazing_detritus) then
                     fDetN2   = varpzDet2 * DetN
@@ -1012,6 +1167,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 fCoccoN2 = pzCocco2 * CoccoN
                 fPhaeoN2 = pzPhaeo2 * PhaeoN
 #endif
+
+#if defined (__diaH) 
+                fDiaH_N2 = pzDiaH2 * DiaH_N
+#endif
+
                 fHetN = pzHet * HetN
                 if (Grazing_detritus) then
                     fDetN2 = pzDet2 * DetN
@@ -1028,6 +1188,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             food2 = food2 + fCoccoN2
             food2 = food2 + fPhaeoN2
 #endif
+
+#if defined (__diaH) 
+            food2 = food2 + fDiaH_N2
+#endif 
 ! ******************************************************************************
             foodsq2 = food2**2
             grazingFlux2 = (Graz_max2 * foodsq2)/(epsilon2 + foodsq2) * Zoo2N * arrFuncZoo2
@@ -1040,6 +1204,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             grazingFlux_Cocco2 = (grazingFlux2 * fCoccoN2)/food2
             grazingFlux_Phaeo2 = (grazingFlux2 * fPhaeoN2)/food2
 #endif
+
+#if defined (__diaH) 
+            grazingFlux_DiaH2   = grazingFlux2 * fDiaH_N2 / food2
+#endif
+
             grazingFlux_het2 = (grazingFlux2 * fHetN)/food2
             if (Grazing_detritus) then
                 grazingFlux_Det2 = (grazingFlux2 * fDetN2)/food2
@@ -1063,15 +1232,20 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                                   + (grazingFlux_Phaeo2  * recipQuota_Phaeo * grazEff2)
 #endif
 
+#if defined (__diaH) 
+            grazingFluxcarbonzoo2 = grazingFluxcarbonzoo2                              &
+                                  + (grazingFlux_DiaH2 * recipQuota_DiaH * grazEff2)         
+#endif
 !-------------------------------------------------------------------------------
 ! Third Zooplankton (Microzooplankton)
 !-------------------------------------------------------------------------------
-!< Grazing on small phytoplankton, diatoms and coccolithophore (optional) and phaeocystis (optional)
+!< Grazing on small phytoplankton, diatoms, heaviliy silicified diatoms (diaH, optional) and coccolithophore (optional) and phaeocystis (optional)
 
 !< *** Food availability ***
 !< *************************
 !< pzPhy3: Maximum nanophytoplankton preference
 !< pzDia3: Maximum diatom preference
+!< pzDiaH3: Maximum preference  for heavily silicified diatoms
 !< pzCocco3: Maximum coccolithophore preference
 !< pzPhaeo3: Maximum phaeocystis preference
 
@@ -1081,6 +1255,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 aux = aux + pzCocco3 * CoccoN
                 aux = aux + pzPhaeo3 * PhaeoN
 #endif
+
+#if defined (__diaH) 
+                aux = aux + pzDiaH3 * DiaH_N
+#endif 
 ! ******************************************************************************
                 varpzPhy3 = (pzPhy3 * PhyN)/aux
                 varpzDia3 = (pzDia3 * DiaN)/aux
@@ -1088,6 +1266,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 varpzCocco3 = (pzCocco3 * CoccoN)/aux
                 varpzPhaeo3 = (pzPhaeo3 * PhaeoN)/aux
 #endif
+
+#if defined (__diaH) 
+                varpzDiaH3 = (pzDiaH3*DiaH_N)/aux
+#endif 
 ! ******************************************************************************
                 fPhyN3 = varpzPhy3 * PhyN
                 fDiaN3 = varpzDia3 * DiaN
@@ -1095,6 +1277,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 fCoccoN3 = varpzCocco3 * CoccoN
                 fPhaeoN3 = varpzPhaeo3 * PhaeoN
 #endif
+
+#if defined (__diaH) 
+                fDiaH_N3 = varpzDiaH3 * DiaH_N
+#endif 
             else ! REcoM_Grazing_Variable_Preference = .false.
 
                 fPhyN3 = pzPhy3 * PhyN
@@ -1103,6 +1289,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 fCoccoN3 = pzCocco3 * CoccoN
                 fPhaeoN3 = pzPhaeo3 * PhaeoN
 #endif
+
+#if defined (__diaH) 
+                fDiaH_N3 = pzDiaH3 * DiaH_N
+#endif
+
             endif !REcoM_Grazing_Variable_Preference
 
 !< *** Grazing fluxes ***
@@ -1112,6 +1303,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             food3 = food3 + fCoccoN3
             food3 = food3 + fPhaeoN3 
 #endif
+
+#if defined (__diaH) 
+            food3 = food3 + fDiaH_N3
+#endif 
 ! ******************************************************************************
             foodsq3 = food3**2
             grazingFlux3 = (Graz_max3 * foodsq3)/(epsilon3 + foodsq3) * MicZooN * q10_mic
@@ -1121,6 +1316,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             grazingFlux_Cocco3 = (grazingFlux3 * fCoccoN3)/food3
             grazingFlux_Phaeo3 = (grazingFlux3 * fPhaeoN3)/food3
 #endif
+
+#if defined (__diaH) 
+            grazingFlux_DiaH3   = grazingFlux3 * fDiaH_N3 / food3
+#endif 
+
 #endif
 
 !-------------------------------------------------------------------------------
@@ -1220,7 +1420,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             aggregationrate = aggregationrate + agg_PP * CoccoN
             aggregationrate = aggregationrate + agg_PP * PhaeoN
 #endif
-    
+
+#if defined (__diaH)
+            aggregationrate = aggregationrate + agg_PP * DiaH_N
+#endif    
 !-------------------------------------------------------------------------------
 ! Calcification
 !-------------------------------------------------------------------------------
@@ -1296,6 +1499,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !< PhyC:           Intracellular carbon concentration in nanophytoplankton [mmolC m-3]
 !< N_assim_Dia:    N assimilation rate for diatoms [mmolN mmolC-1 day-1]
 !< DiaC:           Intracellular carbon concentration in diatoms [mmolC m-3]
+!< N_assim_DiaH:   N assimilation rate for heavily silicified diatoms [mmolN mmolC-1 day-1]
+!< DiaH_C:         Intracellular carbon concentration in heavily silicified diatoms [mmolC m-3]
 !< N_assim_Cocco:  N assimilation rate for coccolithophore [mmolN mmolC-1 day-1]
 !< CoccoC:         Intracellular carbon concentration in coccolithophore [mmolC m-3]
 !< rho_N*arrFunc:  Remineralization rate and temperature dependency which is calculated with arrFunc [day^-1]
@@ -1312,6 +1517,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         - N_assim_Cocco            * CoccoC  &  ! --> N assimilation Coccolithophore
         - N_assim_Phaeo            * PhaeoC  &  ! --> N assimilation Phaeocystis
 #endif
+
+#if defined (__diaH)
+        - N_assim_diaH            * DiaH_C  &  ! --> N assimilation heavily silicified diatoms
+#endif
+
         + rho_N * arrFunc * O2Func * DON     &  ! --> DON remineralization, temperature dependent [day^-1 * mmol/m3] ! O2remin
                                             ) * dt_b + sms(k,idin)  
 
@@ -1323,13 +1533,17 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     sms(k,idic)      = (                              &
         - Cphot                           * PhyC      & ! --> Small pyhtoplankton photosynthesis 
         + phyRespRate                     * PhyC      & ! --> Small pyhtoplankton respiration 
-        - Cphot_Dia                       * DiaC      & ! --> Diatom photosynthesis 
+        - Cphot_dia                       * DiaC      & ! --> Diatom photosynthesis 
         + phyRespRate_Dia                 * DiaC      & ! --> Diatom respiration
 #if defined (__coccos)
         - Cphot_Cocco                     * CoccoC    & ! --> Coccolithophore photosynthesis
         + phyRespRate_Cocco               * CoccoC    & ! --> Coccolithophore respiration
         - Cphot_Phaeo                     * PhaeoC    & ! --> Phaeocystis photosynthesis
         + phyRespRate_Phaeo               * PhaeoC    & ! --> Phaeocystis respiration
+#endif
+#if defined (__diaH)
+        - Cphot_diaH                     * DiaH_C     & ! --> heavily silicified diatom photosynthesis
+        + phyRespRate_diaH               * DiaH_C     & ! --> heavily silicified diatom respiration
 #endif
         + rho_C1 * arrFunc * O2Func       * EOC       & ! --> Remineralization of DOC ! NEW O2remin
         + HetRespFlux                                 & ! --> Mesozooplankton respiration
@@ -1353,7 +1567,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !      print*,'state(k,idic): ', state(k,idic)
 !      print*,'sms Cphot: ', -Cphot*PhyC
 !      print*,'sms resp: ', phyRespRate*PhyC
-!      print*,'sms Cphot dia: ', -Cphot_Dia*DiaC
+!      print*,'sms Cphot dia: ', -Cphot_dia*DiaC
 !      print*,'sms resp dia: ', phyRespRate_Dia * DiaC
 !      print*,'sms eoc: ', rho_C1* arrFunc *EOC
 !      print*,'sms het resp: ', HetRespFlux
@@ -1373,10 +1587,16 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     sms(k,ialk)      = (                                   &
         + 1.0625 * N_assim                       * PhyC    &
         + 1.0625 * N_assim_Dia                   * DiaC    &
+
 #if defined (__coccos)
         + 1.0625 * N_assim_Cocco                 * CoccoC  &
         + 1.0625 * N_assim_Phaeo                 * PhaeoC  &
 #endif
+
+#if defined (__diaH)
+        + 1.0625 * N_assim_diaH                 * DiaH_C   & 
+#endif
+
         - 1.0625 * rho_N * arrFunc * O2Func      * DON     & ! O2remin      
         + 2.d0 * calc_diss                       * DetCalc &
         + 2.d0 * calc_loss_gra  * calc_diss_guts           &
@@ -1461,6 +1681,13 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             - grazingFlux_Phaeo3 * grazEff3                & ! --> fraction of grazingFlux_Phaeo3 into microzooplankton pool
             + aggregationRate               * PhaeoN       &
 #endif
+
+#if defined (__diaH)
+            + grazingFlux_diaH3                           & ! --> grazing on heavily silicified diatoms by third zooplankton
+            - grazingFlux_diaH3 * grazEff3                & ! --> fraction of grazingFlux_diaH3 into microzooplankton pool
+            + aggregationRate               * DiaH_N      & 
+#endif
+
             - grazingFlux_Det    * grazEff                 & ! --> grazing of first zoo (meso) on first detritus class
             - grazingFlux_Det2   * grazEff2                & ! --> grazing of second zoo (macro) on first detritus class
             + aggregationRate               * PhyN         &
@@ -1482,6 +1709,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             - grazingFlux_Phaeo * grazEff                  &
             + aggregationRate               * PhaeoN       &
 #endif
+
+#if defined (__diaH)
+            + grazingFlux_diaH                            & ! --> grazing on heavily silicified diatoms
+            - grazingFlux_diaH * grazEff                  & ! --> fraction of grazingFlux_diaH3 into zoo pool
+            + aggregationRate               * DiaH_N      & 
+#endif
             - grazingFlux_Det   * grazEff                  & ! Sloppy feeding is thought because of grazing flux multiplied with grazeff 
             - grazingFlux_Det2  * grazEff2                 &  !!!!!!!!!!CHECK
             + aggregationRate               * PhyN         &
@@ -1501,6 +1734,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             + grazingFlux_Phaeo3 *                         &
             + aggregationRate               * PhaeoN       &
 #endif
+
+#if defined (__diaH)
+            + grazingFlux_diaH3                           & 
+            + aggregationRate               * DiaH_N      & 
+#endif
             - grazingFlux        * grazEff3                &
             + aggregationRate               * PhyN         &
             + aggregationRate               * DiaN         &
@@ -1516,6 +1754,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             + aggregationRate               * CoccoN       &
             + grazingFlux_Phaeo *                          &
             + aggregationRate               * PhaeoN       & 
+#endif
+
+#if defined (__diaH)
+            + grazingFlux_diaH                             & 
+            + aggregationRate               * DiaH_N       & 
 #endif
             - grazingFlux        * grazEff                 &
             + aggregationRate               * PhyN         &
@@ -1543,6 +1786,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             - grazingFlux_Phaeo3 * recipQuota_Phaeo * grazEff3 &
             + aggregationRate                       * PhaeoC   &
 #endif
+
+#if defined (__diaH)
+            + grazingFlux_diaH3 * recipQuota_diaH              &
+            - grazingFlux_diaH3 * recipQuota_diaH * grazEff3   &
+            + aggregationRate                       * DiaH_C   &
+#endif
             - grazingFlux_Det  * recipDet  * grazEff           &
             - grazingFlux_Det2 * recipDet  * grazEff2          & ! corrected recipDet2 -> recipDet
             + aggregationRate                         * PhyC   &
@@ -1563,6 +1812,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             + grazingFlux_Phaeo * recipQuota_Phaeo             &
             - grazingFlux_Phaeo * recipQuota_Phaeo * grazEff   &
             + aggregationRate                      * PhaeoC    &
+#endif
+
+#if defined (__diaH)
+            + grazingFlux_diaH * recipQuota_diaH              &
+            - grazingFlux_diaH * recipQuota_diaH * grazEff   &
+            + aggregationRate                       * DiaH_C   &
 #endif
             - grazingFlux_Det  * recipDet  * grazEff           &
            ! - grazingFlux_Det2 * recipDet2 * grazEff           & !!!!!! CHECK
@@ -1587,6 +1842,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             - grazingFlux_Phaeo3 * recipQuota_Phaeo * grazEff3 &
             + aggregationRate                       * PhaeoC   &
 #endif
+
+#if defined (__diaH)
+            + grazingFlux_diaH3 * recipQuota_diaH              &
+            - grazingFlux_diaH3 * recipQuota_diaH * grazEff3   &
+            + aggregationRate                       * DiaH_C   &
+#endif
             + aggregationRate                       * PhyC     &
             + aggregationRate                       * DiaC     &
             + miczooLossFlux     * recipQZoo3                  &
@@ -1605,6 +1866,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             + grazingFlux_Phaeo * recipQuota_Phaeo             &
             - grazingFlux_Phaeo * recipQuota_Phaeo * grazEff   &
             + aggregationRate                      * PhaeoC    & 
+#endif
+
+#if defined (__diaH)
+            + grazingFlux_diaH * recipQuota_diaH               &
+            - grazingFlux_diaH * recipQuota_diaH * grazEff     &
+            + aggregationRate                       * DiaH_C   &
 #endif
             + aggregationRate                       * phyC     &
             + aggregationRate                       * DiaC     &
@@ -1638,6 +1905,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 + grazingFlux_Cocco  * recipQuota_Cocco * grazEff &
                 + grazingFlux_Phaeo  * recipQuota_Phaeo * grazEff &
 #endif
+
+#if defined (__diaH)
+                + grazingFlux_diaH  * recipQuota_diaH * grazEff   & ! --> Grazing on heavily silicified diatoms
+#endif
+
 #if defined (__3Zoo2Det)
                 + grazingFlux_miczoo * recipQZoo3       * grazEff & ! 3Zoo
                 + grazingFlux_DetZ2  * recipDet2        * grazEff &
@@ -1657,6 +1929,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 + grazingFlux_Cocco  * recipQuota_Cocco * grazEff &
                 + grazingFlux_Phaeo  * recipQuota_Phaeo * grazEff &
 #endif
+
+#if defined (__diaH)
+                + grazingFlux_diaH  * recipQuota_diaH * grazEff   & 
+#endif
+
 #if defined (__3Zoo2Det)
                 + grazingFlux_miczoo * recipQZoo3       * grazEff & ! 3Zoo
                 - grazingFlux_het2   * recipQZoo                  &
@@ -1688,10 +1965,16 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         sms(k,izoo2c)      = (                                 &
             + grazingFlux_phy2   * recipQuota       * grazEff2 &
             + grazingFlux_Dia2   * recipQuota_Dia   * grazEff2 &
+
 #if defined (__coccos)
             + grazingFlux_Cocco2 * recipQuota_Cocco * grazEff2 &
             + grazingFlux_Phaeo2 * recipQuota_Phaeo * grazEff2 &
 #endif
+
+#if defined (__diaH)
+            + grazingFlux_diaH2  * recipQuota_diaH * grazEff2  & 
+#endif
+
             + grazingFlux_het2   * recipQZoo        * grazEff2 &
             + grazingFlux_miczoo2* recipQZoo3       * grazEff2 & ! 3Zoo
             + grazingFlux_Det2   * recipDet         * grazEff2 &
@@ -1705,10 +1988,16 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         sms(k,izoo2c)      = (                                 &
             + grazingFlux_phy2   * recipQuota       * grazEff2 &
             + grazingFlux_Dia2   * recipQuota_Dia   * grazEff2 &
+
 #if defined (__coccos)
             + grazingFlux_Cocco2 * recipQuota_Cocco * grazEff2 & 
             + grazingFlux_Phaeo2 * recipQuota_Phaeo * grazEff2 &
 #endif
+
+#if defined (__diaH)
+            + grazingFlux_diaH2  * recipQuota_diaH * grazEff2  & 
+#endif
+
             + grazingFlux_het2   * recipQZoo        * grazEff2 &
             + grazingFlux_miczoo2* recipQZoo3       * grazEff2 & ! 3Zoo
             - zoo2LossFlux       * recipQZoo2                  &
@@ -1736,10 +2025,16 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     sms(k,imiczooc)      = (                                &
         + grazingFlux_phy3    * recipQuota       * grazEff3 &
         + grazingFlux_Dia3    * recipQuota_Dia   * grazEff3 &
+
 #if defined (__coccos)
         + grazingFlux_Cocco3  * recipQuota_Cocco * grazEff3 & 
         + grazingFlux_Phaeo3  * recipQuota_Phaeo * grazEff3 &
 #endif
+
+#if defined (__diaH)
+        + grazingFlux_diaH3  * recipQuota_diaH * grazEff3 & 
+#endif
+
         - MicZooLossFlux      * recipQZoo3                  &
         - grazingFlux_miczoo  * recipQZoo3                  & 
         - grazingFlux_miczoo2 * recipQZoo3                  &
@@ -1768,6 +2063,14 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             + grazingFlux_Phaeo2                     &
             - grazingFlux_Phaeo2  * grazEff2         &
 #endif
+
+#if defined (__diaH)
+            + grazingFlux_diaH                       &
+            - grazingFlux_diaH   * grazEff           &
+            + grazingFlux_diaH2                      &
+            - grazingFlux_diaH2  * grazEff2          &
+#endif
+
             + grazingFlux_het2                       &
             - grazingFlux_het2    * grazEff2         &
             + grazingFlux_miczoo2                    &
@@ -1790,11 +2093,17 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         sms(k,idetz2n)       = (                     &
             + grazingFlux_phy2                       &
             + grazingFlux_dia2                       &
+
 #if defined (__coccos)
             + grazingFlux_Cocco                      &
             + grazingFlux_Cocco2                     &
             + grazingFlux_Phaeo                      &
             + grazingFlux_Phaeo2                     &
+#endif
+
+#if defined (__diaH)
+            + grazingFlux_diaH                       &
+            + grazingFlux_diaH2                      &
 #endif
             + grazingFlux_het2                       &
             + grazingFlux_miczoo2                    &
@@ -1829,6 +2138,14 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             + grazingFlux_Phaeo2  * recipQuota_Phaeo            &
             - grazingFlux_Phaeo2  * recipQuota_Phaeo * grazEff2 & 
 #endif
+
+#if defined (__diaH)
+            + grazingFlux_diaH   * recipQuota_diaH              &
+            - grazingFlux_diaH   * recipQuota_diaH * grazEff    &
+            + grazingFlux_diaH2  * recipQuota_diaH              & 
+            - grazingFlux_diaH2  * recipQuota_diaH * grazEff2   & 
+#endif
+
             + grazingFlux_het2    * recipQZoo                   &
             - grazingFlux_het2    * recipQZoo        * grazEff2 &
             + grazingFlux_miczoo2 * recipQZoo3                  &
@@ -1863,6 +2180,14 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             + grazingFlux_Phaeo2  * recipQuota_Phaeo            &
             - grazingFlux_Phaeo2  * recipQuota_Phaeo * grazEff2 & 
 #endif  
+
+#if defined (__diaH)
+            + grazingFlux_diaH   * recipQuota_diaH              &
+            - grazingFlux_diaH   * recipQuota_diaH * grazEff    &
+            + grazingFlux_diaH2  * recipQuota_diaH              & 
+            - grazingFlux_diaH2  * recipQuota_diaH * grazEff2   & 
+#endif
+
             + grazingFlux_het2    * recipQZoo                   &
             - grazingFlux_het2    * recipQZoo        * grazEff2 &
             + grazingFlux_miczoo2 * recipQZoo3                  &
@@ -1886,6 +2211,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     sms(k,idetz2si)     = (                 &
         + grazingFlux_dia2 * qSiN           &  ! --> qSin convert N to Si
         + grazingFlux_dia  * qSiN           &
+#if defined (__diaH)
+        + grazingFlux_diaH2 * qSiN_H        &  ! --> qSin_h convert N to Si
+        + grazingFlux_diaH  * qSiN_H        &
+#endif
         - reminSiT                * DetZ2Si &
                                           ) * dt_b + sms(k,idetz2si)
 
@@ -1909,10 +2238,16 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     sms(k,idon)      = (                      &
         + lossN * limitFacN         * phyN    &
         + lossN_d * limitFacN_Dia   * DiaN    &
+
 #if defined (__coccos)
         + lossN_c * limitFacN_Cocco * CoccoN  &
         + lossN_p * limitFacN_Phaeo * PhaeoN  &
 #endif
+
+#if defined (__diaH)
+        + lossN_diaH * limitFacN_diaH * DiaH_N  & 
+#endif
+
         + reminN * arrFunc * O2Func * DetN    & 
         + lossN_z                   * HetN    &
 #if defined (__3Zoo2Det)
@@ -1920,6 +2255,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         + lossN_z2                  * Zoo2N   &
         + lossN_z3                  * MicZooN & ! 3Zoo
 #endif 
+
         - rho_N * arrFunc * O2Func  * DON     & ! O2remin
                                              ) * dt_b + sms(k,idon)
 
@@ -1929,17 +2265,25 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     sms(k,idoc)       = (                     &
         + lossC * limitFacN         * phyC    &
         + lossC_d * limitFacN_dia   * DiaC    &
+
 #if defined (__coccos)
         + lossC_c * limitFacN_cocco * CoccoC  &
         + lossC_p * limitFacN_Phaeo * PhaeoC  &
 #endif
+
+#if defined (__diaH)
+        + lossC_d_H * limitFacN_diaH * DiaH_C &
+#endif
+
         + reminC * arrFunc * O2Func * DetC    &
         + lossC_z                   * HetC    &
+
 #if defined (__3Zoo2Det)
         + reminC * arrFunc * O2Func * DetZ2C  & 
         + lossC_z2                  * Zoo2C   &
         + lossC_z3                  * MicZooC & ! 3Zoo
 #endif
+
         - rho_c1 * arrFunc * O2Func * EOC     & ! O2remin
                                              ) * dt_b + sms(k,idoc)
 
@@ -1964,7 +2308,19 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         - grazingFlux_Dia3                       & ! 3Zoo
 #endif
                                                 ) * dt_b + sms(k,idian)
+#if defined (__diaH)
+    sms(k,idiaH_n)      = (                        &
+        + N_assim_diaH                   * DiaH_C  & ! --> N assimilation
+        - lossN_diaH * limitFacN_diaH    * DiaH_N  & ! --> DON excretion
+        - aggregationRate                * DiaH_N  & ! --> Aggregation loss
+        - grazingFlux_DiaH                         & ! --> Grazing loss
+#endif
 
+#if defined (__3Zoo2Det)
+        - grazingFlux_DiaH2                       &
+        - grazingFlux_DiaH3                       & ! 3Zoo
+#endif
+                                                ) * dt_b + sms(k,idiaH_n)
 !____________________________________________________________
 !< Diatom C
 
@@ -1984,6 +2340,20 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         - grazingFlux_dia3 * recipQuota_dia         & ! 3Zoo
 #endif
                                                    ) * dt_b + sms(k,idiac)
+#if defined (__diaH)
+    sms(k,idiaH_c)      = (                           &
+        + Cphot_diaH                         * DiaH_C  & ! -- Photosynthesis ---->/
+        - lossC_d_H * limitFacN_diaH           * DiaH_C  & ! -- Excretion of DOC --/ Net Photosynthesis
+        - phyRespRate_diaH                   * DiaH_C  & ! -- Respiration ----->/
+        - aggregationRate                   * DiaH_C  &
+        - grazingFlux_diaH  * recipQuota_diaH         &
+#endif
+
+#if defined (__3Zoo2Det)
+        - grazingFlux_diaH2 * recipQuota_diaH         &
+        - grazingFlux_diaH3 * recipQuota_diaH         & ! 3Zoo
+#endif
+     	                                           ) * dt_b + sms(k,idiaH_c)
 
 !____________________________________________________________
 !< Diatom Chl
@@ -1998,6 +2368,20 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         - grazingFlux_dia3 * Chl2N_dia              & ! 3Zoo
 #endif
                                                    ) * dt_b + sms(k,idchl)
+
+#if defined (__diaH)
+    sms(k,idiaH_chl)      = (                           &
+        + chlSynth_diaH                    * DiaH_C   & ! --> Chl a synthesis
+        - KOchl_diaH                       * DiaH_Chl & ! --> Degradation loss
+        - aggregationRate                  * DiaH_Chl & ! --> Aggregation loss
+        - grazingFlux_diaH  * Chl2N_diaH              & ! --> Grazing loss
+#endif
+
+#if defined (__3Zoo2Det)
+        - grazingFlux_diaH2 * Chl2N_diaH              &          
+        - grazingFlux_diaH3 * Chl2N_diaH              & ! 3Zoo
+#endif
+                                                   ) * dt_b + sms(k,idiaH_chl)
 
 !____________________________________________________________
 !< Diatom Si
@@ -2017,6 +2401,19 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         - grazingFlux_dia3 * qSiN                   & ! 3Zoo
 #endif
                                                    ) * dt_b + sms(k,idiasi)
+#if defined (__diaH)
+    sms(k,idiaH_si)        = (                      &
+        + Si_assim_diaH                    * DiaH_C  & ! -- Diatom silicon assimilation
+        - lossN_diaH * limitFacN_diaH      * DiaH_Si & ! -- Excretion to detritus
+        - aggregationRate                  * DiaH_Si & ! -- Aggregation loss
+        - grazingFlux_diaH  * qSiN_H                 & ! -- Grazing loss
+#endif
+
+#if defined (__3Zoo2Det)
+        - grazingFlux_diaH2 * qSiN_H                 &
+        - grazingFlux_diaH3 * qSiN_H                 & ! 3Zoo
+#endif
+                                                   ) * dt_b + sms(k,idiaH_si)
 
 !< *** Coccolithophore ***
 !< ***********************
@@ -2152,6 +2549,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         + aggregationRate                  * DiaSi &
         + lossN_d          * limitFacN_dia * DiaSi &
         + grazingFlux_dia3 * qSiN                  &
+
+#if defined (__diaH)
+        + aggregationRate                    * DiaH_Si &
+        + lossN_diaH        * limitFacN_diaH * DiaH_Si &
+        + grazingFlux_diaH3 * qSiN_H                   &
+#endif
         - reminSiT                         * DetSi &
                                                   ) * dt_b + sms(k,idetsi)
 #else
@@ -2159,6 +2562,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         + aggregationRate                  * DiaSi &
         + lossN_d         * limitFacN_dia  * DiaSi &
         + grazingFlux_dia * qSiN                   &
+#if defined (__diaH)
+        + aggregationRate                    * DiaH_Si &
+        + lossN_diaH        * limitFacN_diaH * DiaH_Si &
+        + grazingFlux_diaH * qSiN_H                   &
+#endif
         - reminSiT                         * DetSi &
                                                   ) * dt_b + sms(k,idetsi)
 #endif
@@ -2175,6 +2583,9 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 
     sms(k,isi)        = (                            &
         - Si_assim                         * DiaC    &  ! --> Si assimilation of diatoms
+#if defined (__diaH)
+        - Si_assim_diaH                    * DiaH_C  &  ! --> Si assimilation of heavily silicified diatoms
+#endif
         + reminSiT                         * DetSi   &  ! --> Remineralization of detritus, temperature dependent
 #if defined (__3Zoo2Det)
         + reminSiT                         * DetZ2Si &
@@ -2214,6 +2625,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         - N_assim_phaeo                   * PhaeoC  &
         + lossN_p       * limitFacN_phaeo * PhaeoN  &
 #endif
+#if defined (__diaH)
+        - N_assim_diaH                    * DiaH_C  & 
+        + lossN_diaH    * limitFacN_diaH  * DiaH_N  & 
+#endif
         + lossN         * limitFacN       * PhyN    & ! --> Excretion from small pythoplankton
         + lossN_d       * limitFacN_dia   * DiaN    & ! --> Excretion from diatom
         + reminN * arrFunc * O2Func * DetN          & ! --> Remineralization of detritus   ! NEW O2remin
@@ -2223,7 +2638,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         + lossN_z2                        * Zoo2N   &         
         + lossN_z3                        * MicZooN & ! 3Zoo
 #endif
-                                              )     &
+                                                )   &               
+
         - kScavFe          * DetC   * FreeFe        & 
 #if defined (__3Zoo2Det)
         - kScavFe          * DetZ2C * FreeFe        &
@@ -2325,6 +2741,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
       + Cphot_phaeo                * PhaeoC &
       - phyRespRate_phaeo          * PhaeoC &
 #endif
+#if defined (__diaH)
+      + Cphot_diaH                * DiaH_C &
+      - phyRespRate_diaH          * DiaH_C &
+#endif
       - rho_C1  * arrFunc * O2Func * EOC    & ! O2remin
       - hetRespFlux                         &
 #if defined (__3Zoo2Det)
@@ -2339,7 +2759,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
       sms(k,idic_13) =        (                           &
             - Cphot                         * PhyC_13       &
             + phyRespRate                   * PhyC_13       &
-            - Cphot_Dia                     * DiaC_13       &
+            - Cphot_dia                     * DiaC_13       &
             + phyRespRate_Dia               * DiaC_13       &
             + rho_C1 * arrFunc              * EOC_13        &
             + HetRespFlux_13                                &
@@ -2423,7 +2843,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
           sms(k,idic_14) =        (                         &
             - Cphot                         * PhyC_14       &
             + phyRespRate                   * PhyC_14       &
-            - Cphot_Dia                     * DiaC_14       &
+            - Cphot_dia                     * DiaC_14       &
             + phyRespRate_Dia               * DiaC_14       &
             + rho_C1 * arrFunc              * EOC_14        &
             + HetRespFlux_14                                &
@@ -2534,6 +2954,13 @@ if (Diags) then
         ) * recipbiostep
 #endif
 
+#if defined (__diaH)
+        vertNPPdiaH(k) = vertNPPdiaH(k)  + (   &
+        + Cphot_diaH             * DiaH_C  &
+        - PhyRespRate_diaH       * DiaH_C  & 
+        ) * recipbiostep
+#endif
+
 !*** Gross primary production [mmol C /(m3 * day)]
         vertGPPn(k) = vertGPPn(k)  + (   &
         + Cphot                   * PhyC  &
@@ -2549,6 +2976,12 @@ if (Diags) then
         ) * recipbiostep
         vertGPPp(k) = vertGPPp(k)  + (   &
         + Cphot_phaeo             * PhaeoC  &
+        ) * recipbiostep
+#endif
+
+#if defined (__diaH)
+        vertGPPdiaH(k) = vertGPPdiaH(k)  + (   &
+        + Cphot_diaH             * DiaH_C  &
         ) * recipbiostep
 #endif
 
@@ -2574,6 +3007,13 @@ if (Diags) then
         ) * recipbiostep
 #endif
 
+#if defined (__diaH)
+        vertNNAdiaH(k) = vertNNAdiaH(k)  + (   &
+        + N_assim_diaH           * DiaH_C  &
+        - lossN * limitFacN_diaH * DiaH_N  &
+        ) * recipbiostep
+#endif
+
 !*** Changed to chlorophyll degradation (commented out gross N-assimilation below)
         vertChldegn(k) = vertChldegn(k)  + (   &
         + KOchl  &
@@ -2589,6 +3029,12 @@ if (Diags) then
         ) * recipbiostep
         vertChldegp(k) = vertChldegp(k)  + (   &
         + KOchl_phaeo &
+        ) * recipbiostep
+#endif
+
+#if defined (__diaH)
+        vertChldegdiaH(k) = vertChldegdiaH(k)  + (   &
+        + KOchl_diaH & 
         ) * recipbiostep
 #endif
 
@@ -2622,6 +3068,13 @@ if (Diags) then
         + aggregationrate * DiaC                  &
         ) * recipbiostep  
 
+#if defined (__diaH)
+!***    aggregation by heavily silicified diatoms
+        vertaggdiaH(k) = vertaggdiaH(k) + (       &
+        + aggregationrate * DiaH_C                &    
+        ) * recipbiostep
+#endif  
+
 #if defined (__coccos)
 !***    aggregation by coccolithophores
         vertaggc(k) = vertaggc(k) + (             &
@@ -2642,6 +3095,13 @@ if (Diags) then
         vertdocexd(k) = vertdocexd(k) + (         &
         + lossC_d * limitFacN_dia        * DiaC   &
         ) * recipbiostep  
+
+#if defined (__diaH)
+!*** excretion of DOC by heavily silicifying diatoms
+        vertdocexdiaH(k) = vertdocexdiaH(k) + (         &
+        + lossC_d_H * limitFacN_diaH      * DiaH_C &  
+        ) * recipbiostep
+#endif
 
 #if defined (__coccos)
 !*** excretion of DOC by coccolithophores
@@ -2669,6 +3129,13 @@ if (Diags) then
         + PhyRespRate_dia         * DiaC          &
         ) * recipbiostep
 
+#if defined (__diaH)
+! heavily silicified diatom resipration
+        vertrespdiaH(k) = vertrespdiaH(k) + (           &
+        + PhyRespRate_diaH       * DiaH_C        &
+        ) * recipbiostep
+#endif
+
 #if defined (__coccos)
 ! cocco resipration
         vertrespc(k) = vertrespc(k) + (           &
@@ -2679,8 +3146,9 @@ if (Diags) then
         + PhyRespRate_phaeo       * PhaeoC        &
         ) * recipbiostep
 #endif
+
 endif
-  end do ! Main vertikal loop ends
+  end do ! Main vertical loop ends
 
 !-------------------------------------------------------------------------------
 ! Remineralization from the sediments into the bottom layer

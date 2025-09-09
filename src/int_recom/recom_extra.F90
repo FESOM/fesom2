@@ -52,6 +52,7 @@ subroutine Depth_calculations(n, nn, wf, zf, thick, recipthick, partit, mesh)
     !! Background sinking speed
     wF(2:Nn, ivphy)   = VPhy      ! Phytoplankton sinking velocity
     wF(2:Nn, ivdia)   = VDia      ! Diatoms sinking velocity
+    wF(2:Nn,ivdiaH)   = VDiaH     ! NEW 
     wF(2:Nn, ivdet)   = VDet      ! Detritus sinking velocity
     wF(2:Nn, ivdetsc) = VDet_zoo2 ! Second detritus sinking velocity
     wF(2:Nn, ivcoc)   = VCocco    ! Coccolithophores sinking velocity

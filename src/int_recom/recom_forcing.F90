@@ -118,6 +118,12 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
     tiny_C_p = tiny_N_p/NCmax_p     ! NCmax_c = 0.15d0
 #endif
 
+#if defined (__diaH)
+    tiny_N_diaH = tiny_chl/chl2N_max_d          
+    tiny_C_diaH = tiny_N_diaH/NCmax_d        
+    tiny_Si_diaH = tiny_C_diaH/SiCmax 
+#endif
+
     call Cobeta(partit, mesh)      
     call Depth_calculations(n, Nn,SinkVel,zF,thick,recipthick, partit, mesh)
 
@@ -272,6 +278,13 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
   state(1:nn,iphac)  = max(tiny_C_p,state(1:nn,iphac))
 #endif
 
+#if defined (__diaH)
+  state(1:nn,idiaH_chl)  = max(tiny_chl,state(1:nn,idiaH_chl))
+  state(1:nn,idiaH_n)  = max(tiny_N_diaH,state(1:nn,idiaH_n))
+  state(1:nn,idiaH_c)  = max(tiny_C_diaH,state(1:nn,idiaH_c))
+  state(1:nn,idiaH_si) = max(tiny_Si_diaH, state(1:nn,idiaH_si))
+#endif 
+
 #if defined (__3Zoo2Det)
   state(1:nn,imiczoon)  = max(tiny,state(1:nn,imiczoon))
   state(1:nn,imiczooc)  = max(tiny,state(1:nn,imiczooc))
@@ -356,6 +369,13 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
      locGPPp = sum(vertGPPp(1:nn) * thick(1:nn))
      locNNAp = sum(vertNNAp(1:nn) * thick(1:nn))
      locChldegp = sum(vertChldegp(1:nn) * thick(1:nn))
+#endif
+
+#if defined (__diaH)
+     locNPPdiaH = sum(vertNPPdiaH(1:nn) * thick(1:nn))
+     locGPPdiaH = sum(vertGPPdiaH(1:nn) * thick(1:nn))
+     locNNAdiaH = sum(vertNNAdiaH(1:nn) * thick(1:nn))
+     locChldegdiaH = sum(vertChldegdiaH(1:nn) * thick(1:nn))
 #endif
 
   end if
