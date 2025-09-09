@@ -259,6 +259,12 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
         
     
     !___________________________________________________________________________
+    ! precompute mask for GM/Redi upscalling in the GINsea
+    if ((Fer_GM .or. Redi) .and. scaling_GINsea) then 
+        call init_RediGM_GINsea_mask(partit, mesh)
+    end if 
+    
+    !___________________________________________________________________________
     if(partit%mype==0) write(*,*) 'Initial state'
     if (dynamics%use_wsplit .and. partit%mype==0) then
         write(*,*) '******************************************************************************'

@@ -22,6 +22,9 @@ scaling_Rossby     = .false. ! GM is smoothly switched off according to Rossby r
 scaling_resolution = .true.  ! GM is spatially scaled with resolution; A value of K_GM corresponds then to a resolution of 100km
 scaling_FESOM14    = .false. ! special treatment of GM in the NH (as also implemented by Qiang in FESOM 1.4; it is zero within the boundary layer)
 
+scaling_GINsea     = .false. ! Increase K_GM resolution scaling only in the GIN sea by factor 
+GINsea_fac         = 2.0     ! GIN sea K_GM upscaling factor 
+
 scaling_ODM95      = .true.  ! tapering based on critical slope
 ODM95_Scr          = 0.2e-2  ! Critical slope for tapering
 ODM95_Sd           = 1.0e-3  ! slope width of tapering smoothing zone

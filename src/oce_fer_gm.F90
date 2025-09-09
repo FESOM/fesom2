@@ -215,7 +215,7 @@ end subroutine fer_gamma2vel
 subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
     USE MOD_MESH
     USE o_PARAM
-    USE o_ARRAYS, ONLY: fer_c, fer_k, fer_scal, Ki, bvfreq, MLD1_ind, neutral_slope, fer_tapfac
+    USE o_ARRAYS, ONLY: fer_c, fer_k, fer_scal, Ki, bvfreq, MLD1_ind, neutral_slope, fer_tapfac, fer_GINsea_mask
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE g_CONFIG
@@ -309,12 +309,22 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
             end if
             
             !___________________________________________________________________
+            ! apply upscaling of GM coefficient in the GIN sea
+            if (scaling_GINsea) then 
+                ! --> create scaling multiplacator: (fer_GINsea_mask(n)*scaling_GINsea_fac-1.0)+1.0) 
+                scaling = scaling * (fer_GINsea_mask(n)*(GINsea_fac-1.0)+1.0)
+            end if 
+            
+            !___________________________________________________________________
             ! apply KGM scaling paramter (K_GM_scal)
             fer_scal(n) = min(scaling,1.0_WP)
              ! set maximum amplitude to K_GM_max
             !!PS fer_k(1,n)  = fer_scal(n)*K_GM_max
             !!PS ! limit lower values to K_GM_min
             !!PS fer_k(1,n)  = max(fer_k(1,n),K_GM_min)
+            
+            !___________________________________________________________________
+            ! finaly scale GM coefficient K_GM_max --> fer_K
             fer_k(nzmin,n)  = fer_scal(n)*K_GM_max
             ! limit lower values to K_GM_min
             fer_k(nzmin,n)  = max(fer_k(nzmin,n),K_GM_min)
@@ -421,6 +431,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
                 ! slope 
                 do nz=nzmin, nzmax-1
                     fer_k(nz, n)=fer_k(nz, n)*sqrt(fer_tapfac(nz, n)) + K_GM_min*abs(sqrt(fer_tapfac(nz, n))-1)
+!PS                     fer_k(nz, n)=fer_k(nz, n)*(fer_tapfac(nz, n))
                 end do
             end if 
         end if
@@ -457,4 +468,49 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
    if (Fer_GM) call exchange_nod(fer_k, partit)
    if (Redi)   call exchange_nod(Ki, partit)
 end subroutine init_Redi_GM
-!====================================================================
+
+!
+!
+!_______________________________________________________________________________
+! initialise GINsea mask 
+subroutine init_RediGM_GINsea_mask(partit, mesh)
+    use MOD_MESH
+    use MOD_PARTIT
+    use MOD_PARSUP
+    use o_PARAM
+    use o_ARRAYS, only: fer_GINsea_mask
+    use g_support
+    implicit none 
+    
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    integer                               :: node, npts
+    real(kind=WP)                         :: lon, lat
+    real(kind=WP), allocatable            :: poly_lon(:), poly_lat(:)
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    
+    ! define GINsea Polygon: 
+    npts=9
+    allocate(poly_lon(npts), poly_lat(npts))
+    poly_lon = (/ -4.5,  8.0, 25.0, 25.0, -25.0, -32.0, -22.0, -14.5,  -6.6/)
+    poly_lat = (/ 58.0, 61.0, 69.0, 80.0,  80.0,  69.0,  65.5,  65.2,  62.1/)
+    
+    ! initialise GINSea mask 
+    allocate(fer_GINsea_mask(partit%myDim_nod2D+partit%eDim_nod2D))
+    fer_GINsea_mask = 0.0
+    
+    ! decide which point is in/out of the polygon
+    do node=1, myDim_nod2D+eDim_nod2D
+        lon = geo_coord_nod2D(1, node)/rad
+        lat = geo_coord_nod2D(2, node)/rad
+        fer_GINsea_mask(node) = point_in_polygon(lon, lat, poly_lon, poly_lat)
+    end do
+    
+    ! smooth out boundaries of mask to ensure smooth transition between inside
+    ! and outside of polygon 
+    call smooth_nod(fer_GINsea_mask, 5, partit, mesh)
+    
+end subroutine init_RediGM_GINsea_mask 

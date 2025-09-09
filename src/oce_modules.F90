@@ -51,6 +51,9 @@ logical                       :: scaling_Rossby     =.false.
 logical                       :: scaling_resolution =.true.
 logical                       :: scaling_FESOM14    =.false.
 
+logical                       :: scaling_GINsea     =.false. ! do upsaling of GINsea via polygon 
+real(kind=WP)                 :: GINsea_fac         = 2.0    ! increase K_GM_max in Gin sea by factor 
+
 logical                       :: Redi        = .false.  !flag for Redi scheme
 logical                       :: Redi_Ktaper = .false.
 real(kind=WP)                 :: Redi_Kmax   = 3000.0
@@ -190,7 +193,8 @@ character(20)                  :: which_pgf='shchepetkin'
                     Redi, Redi_Ktaper, Redi_Kmax, Redi_Kmin, &
                     scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, &
                     scaling_ODM95, ODM95_Scr, ODM95_Sd, &
-                    scaling_LDD97, LDD97_c, LDD97_rmin, LDD97_rmax         
+                    scaling_LDD97, LDD97_c, LDD97_rmin, LDD97_rmax, &
+                    scaling_GINsea, GINsea_fac
 
  NAMELIST /tracer_phys/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, &
             balance_salt_water, clim_relax, ref_sss_local, ref_sss, &
@@ -283,7 +287,7 @@ real(kind=WP),allocatable :: mo(:,:),mixlength(:)
 !GM_stuff
 real(kind=WP),allocatable :: bvfreq(:,:),mixlay_dep(:),bv_ref(:)
 
-real(kind=WP), target, allocatable    :: fer_c(:), fer_scal(:), fer_K(:,:), fer_gamma(:,:,:), fer_tapfac(:,:)
+real(kind=WP), target, allocatable    :: fer_c(:), fer_scal(:), fer_GINsea_mask(:), fer_K(:,:), fer_gamma(:,:,:), fer_tapfac(:,:)
 
 real(kind=WP),         allocatable    :: ice_rejected_salt(:)
 

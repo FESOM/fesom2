@@ -1028,6 +1028,10 @@ CASE ('fer_scal  ')
     if (Fer_GM) then
     call def_stream(        nod2D   ,         myDim_nod2D   , 'fer_scal',  'GM surface scaling','',  fer_scal(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
+!PS CASE ('fer_GINsea')
+!PS     if (Fer_GM .and. scaling_GINsea) then
+!PS     call def_stream(        nod2D   ,         myDim_nod2D   , 'fer_GINsea',  'GM surface muliplicator','',  fer_GINsea_mask(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+!PS     end if
 CASE ('fer_C     ')
     if (Fer_GM) then
     call def_stream(        nod2D   ,         myDim_nod2D   , 'fer_C',     'GM,   depth independent speed',  'm/s' ,   fer_c(:),                  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -1050,12 +1054,10 @@ CASE ('sigma_y   ')
     end if     
 CASE ('cfl_z         ')
     call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'cfl_z',         'vertical CFL criteria',  '?',           dynamics%cfl_z(:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
 CASE ('fer_tapfac')
     if (Fer_GM) then
     call def_stream((/nl-1  , nod2D /), (/nl-1,   myDim_nod2D /), 'fer_tapfac','tapering factor',  '', fer_tapfac(:,:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-    end if
-    
+    end if    
 CASE ('redi_K        ')    
     sel_redi=1
     if (Redi) then
